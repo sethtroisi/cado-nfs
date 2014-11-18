@@ -229,6 +229,8 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
+    unsigned int nrhs = 0;
+
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
@@ -260,20 +262,17 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     FILE * rhs = NULL;
     if (rhs_name) {
-        if (!bw->nrhs) {
-            fprintf(stderr, "Missing argument nrhs\n");
-            exit(EXIT_FAILURE);
-        }
-        rhs = fopen(rhs_name, "rb");
+        rhs = fopen(rhs_name, "r");
+        get_rhs_file_header_stream(rhs, NULL, &nrhs, NULL);
         ASSERT_ALWAYS(rhs != NULL);
     }
 
     /* First create all RHS vectors -- these are just splits of the big
      * RHS block. Those files get created together. */
-    if (bw->nrhs) {
-        char ** vec_names = malloc(bw->nrhs * sizeof(char *));
-        FILE ** vec_files = malloc(bw->nrhs * sizeof(FILE *));
-        for(int j = 0 ; j < bw->nrhs ; j++) {
+    if (nrhs) {
+        char ** vec_names = malloc(nrhs * sizeof(char *));
+        FILE ** vec_files = malloc(nrhs * sizeof(FILE *));
+        for(unsigned int j = 0 ; j < nrhs ; j++) {
             int rc = asprintf(&vec_names[j], V_FILE_BASE_PATTERN ".0", j, j+1);
             ASSERT_ALWAYS(rc >= 0);
             vec_files[j] = fopen(vec_names[j], "wb");
@@ -282,21 +281,22 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         }
         void * coeff;
         A->vec_init(A, &coeff, 1);
-        /* How many 32-bit words does it take to hold a coefficient mod p */
-        unsigned int n32b_per_p = iceildiv(mpz_sizeinbase(bw->p, 2), 32);
+        mpz_t c;
+        mpz_init(c);
         for(unsigned int i = 0 ; i < mmt->n0[!bw->dir] ; i++) {
-            for(int j = 0 ; j < bw->nrhs ; j++) {
+            for(unsigned int j = 0 ; j < nrhs ; j++) {
+                int rc;
                 memset(coeff, 0, A->vec_elt_stride(A, 1));
-                for(unsigned int k = 0 ; k < n32b_per_p ; k++) {
-                    size_t n = fread32_little(((uint32_t*)coeff) + k, 1, rhs);
-                    ASSERT_ALWAYS(n == 1);
-                }
-                int rc = fwrite(coeff, A->vec_elt_stride(A,1), 1, vec_files[j]);
+                rc = gmp_fscanf(rhs, "%Zd", c);
+                ASSERT_ALWAYS(rc == 1);
+                A->set_mpz(A, A->vec_coeff_ptr(A, coeff, 0), c);
+                rc = fwrite(coeff, A->vec_elt_stride(A,1), 1, vec_files[j]);
                 ASSERT_ALWAYS(rc == 1);
             }
         }
+        mpz_clear(c);
         A->vec_clear(A, &coeff, 1);
-        for(int j = 0 ; j < bw->nrhs ; j++) {
+        for(unsigned int j = 0 ; j < nrhs ; j++) {
             fclose(vec_files[j]);
             free(vec_names[j]);
         }
@@ -304,7 +304,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         free(vec_names);
     }
     /* Now create purely random vectors */
-    for(int j = bw->nrhs ; j < bw->n ; j++) {
+    for(int j = (int) nrhs ; j < bw->n ; j++) {
         void * vec;
         char * vec_name;
         FILE * vec_file;
@@ -335,17 +335,17 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
          * the possibility that a solution vector found by BW still has
          * non-zero coordinates at these locations.
          */
-        if (bw->m < bw->nrhs) {
+        if (bw->m < (int) nrhs) {
             fprintf(stderr, "m < nrhs is not supported\n");
             exit(EXIT_FAILURE);
         }
-        for(int i = 0 ; i < bw->nrhs ; i++) {
-            xvecs[i] = balancing_pre_shuffle(mmt->bal, mmt->n0[!bw->dir]-bw->nrhs+i);
+        for(unsigned int i = 0 ; i < nrhs ; i++) {
+            xvecs[i] = balancing_pre_shuffle(mmt->bal, mmt->n0[!bw->dir]-nrhs+i);
             printf("Forced %d-th x vector to be the %"PRIu32"-th canonical basis vector\n", i, xvecs[i]);
-            ASSERT_ALWAYS(xvecs[i] >= (uint32_t) (bw->m - bw->nrhs));
+            ASSERT_ALWAYS(xvecs[i] >= (uint32_t) (bw->m - nrhs));
         }
-        for(int i = bw->nrhs ; i < bw->m ; i++) {
-            xvecs[i] = i - bw->nrhs;
+        for(int i = (int) nrhs ; i < bw->m ; i++) {
+            xvecs[i] = i - nrhs;
         }
         /* save_x operates only on the leader thread */
         save_x(xvecs, bw->m, my_nx, pi);

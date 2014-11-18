@@ -172,7 +172,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+
+    /* this is really a misnomer, because in the typical case, M is
+     * rectangular, and then the square matrix does induce some padding.
+     * This is however not the padding we are interested in. The padding
+     * we're referring to in the naming of this variable is the one which
+     * is related to the number of jobs and threads: internal dimensions
+     * are arranged to be multiples */
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
+    unsigned int nrhs = 0;
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
@@ -205,13 +213,34 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     vec_init_generic(pi->m, A, svec, 0, ii1-ii0);
     vec_init_generic(pi->m, A, tvec, 0, ii1-ii0);
 
-    const char * rhs_name = param_list_lookup_string(pl, "rhscoeffs");
+    const char * rhs_name = param_list_lookup_string(pl, "rhs");
+    if (rhs_name != NULL) {
+        get_rhs_file_header(rhs_name, NULL, &nrhs, NULL);
+    }
+
+    if (tcan_print && nrhs) {
+        if (nrhs) {
+            printf("** Informational note about GF(p) inhomogeneous system:\n");
+            printf("   Original matrix dimensions: %"PRIu32" %"PRIu32"\n", mmt->n0[0], mmt->n0[1]);
+            printf("   We expect to obtain a vector of size %"PRIu32"\n",
+                    mmt->n0[!bw->dir] + nrhs);
+            printf("   which we hope will be a kernel vector for (M_square||RHS).\n"
+                   "   We will discard the coefficients which correspond to padding columns\n"
+                   "   This entails keeping coordinates in the intervals\n"
+                   "   [0..%"PRIu32"[ and [%"PRIu32"..%"PRIu32"[\n"
+                   "   in the result.\n"
+                   "** end note.\n",
+            mmt->n0[bw->dir], mmt->n0[!bw->dir], mmt->n0[!bw->dir] + nrhs);
+        }
+    }
+
+    const char * rhscoeffs_name = param_list_lookup_string(pl, "rhscoeffs");
     FILE * rhscoeffs_file = NULL;
-    mmt_vec rhsvec;
-    if (rhs_name) {
+    mmt_vec rhscoeffs_vec;
+    if (rhscoeffs_name) {
         if (!pi->m->trank && !pi->m->jrank)
-            rhscoeffs_file = fopen(rhs_name, "rb");
-        matmul_top_vec_init_generic(mmt, A, rhsvec, bw->dir, 0);
+            rhscoeffs_file = fopen(rhscoeffs_name, "rb");
+        matmul_top_vec_init_generic(mmt, A, rhscoeffs_vec, bw->dir, 0);
     }
 
     for(int s = 0 ; s < sl->nsols ; s++) {
@@ -229,18 +258,18 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
 
-        /* This array receives the bw->nrhs coefficients affecting the
+        /* This array receives the nrhs coefficients affecting the
          * rhs * columns in the identities obtained */
         void * rhscoeffs;
 
-        if (rhs_name) {
-            A->vec_init(A, &rhscoeffs, bw->nrhs);
+        if (rhscoeffs_name) {
+            A->vec_init(A, &rhscoeffs, nrhs);
 
             if (tcan_print) {
                 printf("Reading rhs coefficients for solution %u\n", sf->s0);
             }
             if (rhscoeffs_file) {      /* main thread */
-                for(int j = 0 ; j < bw->nrhs ; j++) {
+                for(unsigned int j = 0 ; j < nrhs ; j++) {
                     /* We're implicitly supposing that elements are stored
                      * alone, not grouped à la SIMD (which does happen for
                      * GF(2), of course). */
@@ -254,10 +283,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     ASSERT_ALWAYS(rc == 1);
                 }
             }
-            global_broadcast(pi->m, rhscoeffs, A->vec_elt_stride(A,bw->nrhs), 0, 0);
+            global_broadcast(pi->m, rhscoeffs, A->vec_elt_stride(A,nrhs), 0, 0);
 
             A->vec_set_zero(A, tvec->v, ii1 - ii0);
-            for(int j = 0 ; j < bw->nrhs ; j++) {
+            for(unsigned int j = 0 ; j < nrhs ; j++) {
                 /* Add c_j times v_j to tvec */
                 ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
                 char * tmp;
@@ -344,11 +373,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
             matmul_top_untwist_vector(mmt, bw->dir);
 
-            if (rhs_name) {
+            if (rhscoeffs_name) {
                 char * tmp;
                 int rc = asprintf(&tmp, R_FILE_BASE_PATTERN, sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
-                matmul_top_load_vector_generic(mmt, rhsvec, tmp, bw->dir, 0, unpadded);
+                matmul_top_load_vector_generic(mmt, rhscoeffs_vec, tmp, bw->dir, 0, unpadded);
                 free(tmp);
                 if (rhscoeffs_file) {
                     /* Now get rid of the R file, we don't need it */
@@ -360,7 +389,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 }
 
                 A->vec_add(A, check_area, check_area,
-                        SUBVEC(rhsvec, v, offset_v), how_many);
+                        SUBVEC(rhscoeffs_vec, v, offset_v), how_many);
             }
 
             is_zero = A->vec_is_zero(A, check_area, how_many);
@@ -368,7 +397,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             serialize(pi->m);
             if (agree_on_flag(pi->m, is_zero)) {
                 if (tcan_print) {
-                    if (rhs_name) {
+                    if (rhscoeffs_name) {
                         printf("M^%u * V + R is zero\n", i);
                         // printf("M^%u * V + R is zero [" K_FILE_BASE_PATTERN ".%u contains M^%u * V, R.sols%u-%u contains R]!\n", i, sf->s0, sf->s1, i-1, i-1, sf->s0, sf->s1);
                     } else {
@@ -377,7 +406,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 }
                 break;
             }
-            if (rhs_name) break;
+            if (rhscoeffs_name) break;
 
             matmul_top_unapply_T(mmt, bw->dir);
             matmul_top_save_vector(mmt, kprefix, bw->dir, i, unpadded);
@@ -393,30 +422,55 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             pthread_mutex_unlock(pi->m->th->m);
             return NULL;
         }
-        if (rhscoeffs_file) {
+        if (rhscoeffs_file) {   /* leader node only ! */
             /* We now append the rhs coefficients to the vector we
              * have just saved. Of course only the I/O thread does this. */
             char * tmp;
             int rc = asprintf(&tmp, "%s.%u", kprefix, 0);
             ASSERT_ALWAYS(rc >= 0);
-            printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, bw->nrhs);
+            printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, nrhs);
+
             FILE * f = fopen(tmp, "ab");
+            ASSERT_ALWAYS(f);
             rc = fseek(f, 0, SEEK_END);
             ASSERT_ALWAYS(rc >= 0);
-            rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), bw->nrhs, f);
-            ASSERT_ALWAYS(rc == bw->nrhs);
+            rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), nrhs, f);
+            ASSERT_ALWAYS(rc == (int) nrhs);
             fclose(f);
-            printf("%s is now a right nullspace vector for (M|RHS).\n", tmp);
+            printf("%s is now a right nullspace vector for (M|RHS) (for a square M of dimension %"PRIu32"x%"PRIu32").\n", tmp, unpadded, unpadded);
+
+            char * tmp2;
+            rc = asprintf(&tmp2, "%s.%u.truncated.txt", kprefix, 0);
+            ASSERT_ALWAYS(rc >= 0);
+
+            f = fopen(tmp, "rb");
+
+            FILE *f2 = fopen(tmp2, "w");
+            ASSERT_ALWAYS(f2);
+            void * data = malloc( A->vec_elt_stride(A, 1));
+            for(uint32_t i = 0 ; i < mmt->n0[bw->dir] ; i++) {
+                fread(data, A->vec_elt_stride(A, 1), 1, f);
+                A->fprint(A, f2, data);
+                fprintf(f2, "\n");
+            }
+            free(data);
+            for(uint32_t i = 0 ; i < nrhs ; i++) {
+                A->fprint(A, f2, A->vec_coeff_ptr(A, rhscoeffs, i));
+                fprintf(f2, "\n");
+            }
+            fclose(f2);
+            printf("%s (in ascii) is now a right nullspace vector for (M|RHS) (for the original M, of dimension %"PRIu32"x%"PRIu32").\n", tmp2, mmt->n0[0], mmt->n0[1]);
+            free(tmp2);
             free(tmp);
         }
 
         serialize(pi->m);
         free(kprefix);
-        if (rhs_name) A->vec_clear(A, &rhscoeffs, bw->nrhs);
+        if (rhscoeffs_name) A->vec_clear(A, &rhscoeffs, nrhs);
     }
 
     if (rhscoeffs_file) fclose(rhscoeffs_file);
-    if (rhs_name) matmul_top_vec_clear_generic(mmt, rhsvec, bw->dir);
+    if (rhscoeffs_name) matmul_top_vec_clear_generic(mmt, rhscoeffs_vec, bw->dir);
 
     vec_clear_generic(pi->m, svec, ii1-ii0);
     vec_clear_generic(pi->m, tvec, ii1-ii0);

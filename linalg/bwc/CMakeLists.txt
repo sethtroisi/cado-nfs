@@ -103,6 +103,8 @@ endif(HAVE_CXX11 AND HAVE_HWLOC)
 
 add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
+target_link_libraries(bwc_base ${gmp_libname})
+
 if (HAVE_CURL)
 target_link_libraries(bwc_base curl)
 endif (HAVE_CURL)

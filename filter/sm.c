@@ -192,7 +192,12 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   uint64_t i = 0; // counter of relation-sets.
   uint64_t out_cpt = 0; // counter of already printed relation-sets;
   FILE * out = fopen(outname, "w");
-  fprintf(out, "%" PRIu64 "\n", sr);
+  int nsm_total=0;
+  for (int side = 0; side < 2; side++) {
+      nsm_total += nsm[side];
+  }
+  gmp_fprintf(out, "%" PRIu64 " %d %Zd\n", sr, nsm_total, ell);
+
   mpz_t invl2;
   mpz_init(invl2);
   barrett_init(invl2, ell2);
@@ -292,7 +297,11 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
       dd = MAX(dd, F[1]->deg);
   mpz_poly_init(SM, dd);
 
-  fprintf(out, "%" PRIu64 "\n", sr);
+  int nsm_total=0;
+  for (int side = 0; side < 2; side++) {
+      nsm_total += nsm[side];
+  }
+  gmp_fprintf(out, "%" PRIu64 " %d %Zd\n", sr, nsm_total, ell);
 
   uint64_t i;
   stats_init (stats, stdout, &i, nbits(sr)-5, "Computed", "SMs", "", "SMs");

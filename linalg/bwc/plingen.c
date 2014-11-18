@@ -78,6 +78,8 @@ static const char * checkpoint_directory;
 static unsigned int checkpoint_threshold = 100;
 static int save_gathered_checkpoints = 0;
 
+int rank0_exit_code = EXIT_SUCCESS;
+
 
 struct bmstatus_s {
     dims d[1];
@@ -1721,12 +1723,6 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
 
     /* This **modifies** the "sols" array */
     if (d->nrhs) {
-        matpoly rhs;
-        matpoly_init(ab, rhs, d->nrhs, n, 1);
-        rhs->size = 1;
-
-        unsigned int rhscontribs = 0;
-
         /* determine which are the coefficients of pi which contribute
          * to the rhs coeffs. See the full logic for F (which comes
          * afterwards) in order to track down what appears here.
@@ -1764,91 +1760,105 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
         pi->size = B;
         bigmatpoly_gather_mat_partial(ab, pi, xpi, kpi_rhs_min,
                 MIN(kpi_rhs_max - kpi_rhs_min + 1, pilen - kpi_rhs_min));
-        /* Now redo the exact same loop as above, this time
-         * adding the contributions to the rhs matrix. */
-        for(unsigned int ipi = 0 ; ipi < m + n ; ipi++) {
-            for(unsigned int jF = 0 ; jF < n ; jF++) {
-                unsigned int jpi = sols[jF];
-                unsigned int iF, offset;
-                if (ipi < n) {
-                    iF = ipi;
-                    offset = 0;
-                } else {
-                    iF = aa->fdesc[ipi-n][1];
-                    offset = aa->t0 - aa->fdesc[ipi-n][0];
-                }
-                if (iF >= d->nrhs) continue;
-                ASSERT_ALWAYS(delta[jpi] >= offset);
-                unsigned kpi = delta[jpi] - offset;
-
-
-                rhscontribs++;
-                ASSERT_ALWAYS(d->nrhs);
-                ASSERT_ALWAYS(iF < d->nrhs);
-                ASSERT_ALWAYS(jF < n);
-                abdst_elt dst = matpoly_coeff(ab, rhs, iF, jF, 0);
-                absrc_elt src = matpoly_coeff_const(ab, pi, ipi, jpi, kpi - kpi_rhs_min);
-                abadd(ab, dst, dst, src);
-            }
-        }
-
-        printf("Note: %u contributions to RHS coefficients have been added into the rhs file %s\n", rhscontribs, aa->rhs_output_file);
-        /* Now comes the time to prioritize the different solutions. Our
-         * goal is to get the unessential solutions last ! */
-        int (*sol_score)[2];
-        sol_score = malloc(n * 2 * sizeof(int));
-        memset(sol_score, 0, n * 2 * sizeof(int));
-        /* score per solution is the number of non-zero coefficients,
-         * that's it. Since we have access to lexcmp2, we want to use it.
-         * Therefore, desiring the highest scoring solutions first, we
-         * negate the hamming weight.
-         */
-        for(unsigned int jF = 0 ; jF < n ; jF++) {
-            sol_score[jF][1] = jF;
-            for(unsigned int iF = 0 ; iF < d->nrhs ; iF++) {
-                int z = !abis_zero(ab, matpoly_coeff(ab, rhs, iF, jF, 0));
-                sol_score[jF][0] -= z;
-            }
-        }
-        qsort(sol_score, n, 2 * sizeof(int), (sortfunc_t) & lexcmp2);
 
         if (!rank) {
-            printf("Reordered solutions:\n");
-            for(unsigned int i = 0 ; i < n ; i++) {
-                printf(" %d (col %d in pi, weight %d on rhs vectors)\n", sol_score[i][1], sols[sol_score[i][1]], -sol_score[i][0]);
-            }
-        }
+            matpoly rhs;
+            matpoly_init(ab, rhs, d->nrhs, n, 1);
+            rhs->size = 1;
 
-        /* We'll now modify the sols[] array, so that we get a reordered
-         * F, too (and mksol/gather don't have to care about our little
-         * tricks */
-        {
-            matpoly rhs2;
-            matpoly_init(ab, rhs2, d->nrhs, n, 1);
-            rhs2->size = 1;
-            for(unsigned int i = 0 ; i < n ; i++) {
-                matpoly_extract_column(ab, rhs2, i, 0, rhs, sol_score[i][1], 0);
+            unsigned int rhscontribs = 0;
+
+            /* Now redo the exact same loop as above, this time
+             * adding the contributions to the rhs matrix. */
+            for(unsigned int ipi = 0 ; ipi < m + n ; ipi++) {
+                for(unsigned int jF = 0 ; jF < n ; jF++) {
+                    unsigned int jpi = sols[jF];
+                    unsigned int iF, offset;
+                    if (ipi < n) {
+                        iF = ipi;
+                        offset = 0;
+                    } else {
+                        iF = aa->fdesc[ipi-n][1];
+                        offset = aa->t0 - aa->fdesc[ipi-n][0];
+                    }
+                    if (iF >= d->nrhs) continue;
+                    ASSERT_ALWAYS(delta[jpi] >= offset);
+                    unsigned kpi = delta[jpi] - offset;
+
+
+                    rhscontribs++;
+                    ASSERT_ALWAYS(d->nrhs);
+                    ASSERT_ALWAYS(iF < d->nrhs);
+                    ASSERT_ALWAYS(jF < n);
+                    abdst_elt dst = matpoly_coeff(ab, rhs, iF, jF, 0);
+                    absrc_elt src = matpoly_coeff_const(ab, pi, ipi, jpi, kpi - kpi_rhs_min);
+                    abadd(ab, dst, dst, src);
+                }
             }
-            matpoly_swap(rhs2, rhs);
-            matpoly_clear(ab, rhs2);
-            /* ugly: use sol_score[i][0] now to provide the future
-             * "sols" array. We'll get rid of sol_score right afterwards
-             * anyway.
+
+            printf("Note: %u contributions to RHS coefficients have been added into the rhs file %s\n", rhscontribs, aa->rhs_output_file);
+            /* Now comes the time to prioritize the different solutions. Our
+             * goal is to get the unessential solutions last ! */
+            int (*sol_score)[2];
+            sol_score = malloc(n * 2 * sizeof(int));
+            memset(sol_score, 0, n * 2 * sizeof(int));
+            /* score per solution is the number of non-zero coefficients,
+             * that's it. Since we have access to lexcmp2, we want to use it.
+             * Therefore, desiring the highest scoring solutions first, we
+             * negate the hamming weight.
              */
-            for(unsigned int i = 0 ; i < n ; i++) {
-                sol_score[i][0] = sols[sol_score[i][1]];
+            for(unsigned int jF = 0 ; jF < n ; jF++) {
+                sol_score[jF][1] = jF;
+                for(unsigned int iF = 0 ; iF < d->nrhs ; iF++) {
+                    int z = !abis_zero(ab, matpoly_coeff(ab, rhs, iF, jF, 0));
+                    sol_score[jF][0] -= z;
+                }
             }
-            for(unsigned int i = 0 ; i < n ; i++) {
-                sols[i] = sol_score[i][0];
+            qsort(sol_score, n, 2 * sizeof(int), (sortfunc_t) & lexcmp2);
+
+            if (!rank) {
+                printf("Reordered solutions:\n");
+                for(unsigned int i = 0 ; i < n ; i++) {
+                    printf(" %d (col %d in pi, weight %d on rhs vectors)\n", sol_score[i][1], sols[sol_score[i][1]], -sol_score[i][0]);
+                }
             }
+
+            /* We'll now modify the sols[] array, so that we get a reordered
+             * F, too (and mksol/gather don't have to care about our little
+             * tricks */
+            {
+                matpoly rhs2;
+                matpoly_init(ab, rhs2, d->nrhs, n, 1);
+                rhs2->size = 1;
+                for(unsigned int i = 0 ; i < n ; i++) {
+                    matpoly_extract_column(ab, rhs2, i, 0, rhs, sol_score[i][1], 0);
+                }
+                matpoly_swap(rhs2, rhs);
+                matpoly_clear(ab, rhs2);
+                if (sol_score[0][0] == 0) {
+                    fprintf(stderr, "ERROR: all solutions have zero contribution on the RHS vectors -- we will just output right kernel vectors\n");
+                    rank0_exit_code = EXIT_FAILURE;
+                }
+                /* ugly: use sol_score[i][0] now to provide the future
+                 * "sols" array. We'll get rid of sol_score right afterwards
+                 * anyway.
+                 */
+                for(unsigned int i = 0 ; i < n ; i++) {
+                    sol_score[i][0] = sols[sol_score[i][1]];
+                }
+                for(unsigned int i = 0 ; i < n ; i++) {
+                    sols[i] = sol_score[i][0];
+                }
+            }
+
+            free(sol_score);
+
+
+            FILE * f = fopen(aa->rhs_output_file, aa->ascii ? "w" : "wb");
+            matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
+            fclose(f);
+            matpoly_clear(ab, rhs);
         }
-        free(sol_score);
-
-
-        FILE * f = fopen(aa->rhs_output_file, aa->ascii ? "w" : "wb");
-        matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
-        fclose(f);
-        matpoly_clear(ab, rhs);
     }
 
     /* we need to read pi backwards. The number of coefficients in pi is
@@ -2731,7 +2741,14 @@ int main(int argc, char *argv[])
 
     bmstatus_init(bm, bw->m, bw->n);
 
-    bm->d->nrhs = bw->nrhs;
+    const char * rhs_name = param_list_lookup_string(pl, "rhs");
+    if ((rhs_name != NULL) && param_list_parse_uint(pl, "nrhs", &(bm->d->nrhs))) {
+        fprintf(stderr, "the command line arguments rhs= and nrhs= are incompatible\n");
+        exit(EXIT_FAILURE);
+    }
+    if (rhs_name) {
+        get_rhs_file_header(rhs_name, NULL, &(bm->d->nrhs), NULL);
+    }
 
     unsigned int m = d->m;
     unsigned int n = d->n;
@@ -2964,7 +2981,7 @@ int main(int argc, char *argv[])
     gmp_randclear(rstate);
 
     MPI_Finalize();
-    return 0;
+    return rank0_exit_code;
 }
 
 /* vim:set sw=4 sta et: */

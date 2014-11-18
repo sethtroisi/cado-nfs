@@ -86,4 +86,12 @@ tasks.reconstructlog.partial = false
 checkdlp = false
 EOF
 
-${CADO_NFS_SOURCE_DIR}/scripts/cadofactor/cadofactor.py $PARAMFILE && rm -rf $t
+cleanup() {
+    if ! [ "$CADO_DEBUG" ] ; then
+        rm -rf $t
+    else
+        echo "(debug mode, temporary files are kept in $t)"
+    fi
+}
+
+${CADO_NFS_SOURCE_DIR}/scripts/cadofactor/cadofactor.py $PARAMFILE && cleanup

@@ -335,16 +335,24 @@ if ($prime == 2 && (defined($rhs) || defined($nrhs))) {
 if (defined($nrhs) && !defined($rhs)) {
     die "nrhs may only be specified together with rhs";
 }
+if (defined($rhs) && defined($nrhs)) {
+    die "no longer supported -- please specify rhs, not nrhs";
+    my $header = eval { open F, $rhs or die "$rhs: $!"; <F>; };
+    if ($header =~ /^[\d\s:-]+$/) {
+        die "$rhs seems to be an ascii file. Please do not provide nrhs in that case";
+    }
+}
 if (defined($rhs) && !defined($nrhs)) {
     # Try to read the first line.
     my $header = eval { open F, $rhs or die "$rhs: $!"; <F>; };
-    if ($header !~ /^(\d+) (\d+)$/) {
+    if ($header !~ /^(\d+) (\d+) (\d+)$/) {
         die "$rhs does not seem to be ascii with header, we can't proceed.\n";
     }
     $param->{'nrhs'} = $nrhs = $2;
+    print "$rhs is ascii file with header. Getting nrhs=$nrhs from there\n";
 }
-if (defined($nrhs) && $nrhs > $n) {
-    die "nrhs > n is not supported";
+if (defined($nrhs) && ($nrhs > $n || $nrhs > $m)) {
+    die "nrhs > n or m is not supported";
 }
 
 
@@ -1758,7 +1766,7 @@ sub task_lingen {
         push @args, "lingen-threshold=$lt";
         push @args, "lingen-mpi-threshold=$lt";
         push @args, "afile=$concatenated_A";
-        push @args, grep { /^(?:m|n|wdir|prime|nrhs|mpi|thr)=/ } @main_args;
+        push @args, grep { /^(?:m|n|wdir|prime|rhs|mpi|thr)=/ } @main_args;
         if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {
             print "## non-MPI build, avoiding multithreaded plingen\n";
             @args = grep { !/^(mpi|thr)=/ } @args;
@@ -1831,11 +1839,21 @@ sub task_mksol {
 
     print "## mksol max iteration is $length\n";
 
+    my $nsolvecs;
+    if (grep { /^nsolvecs=(\d+)/} @main_args) {
+        $nsolvecs = $1;
+    } else {
+        $nsolvecs = subtask_default_nsolvecs;
+    }
+    
     my @todo = subtask_krylov_mksol_todo $length, sub {
         my ($range, $cp) = @_;
         ## return if $cp > $length;
-        for (@sols) {
-            return unless $sfiles->{$_ . ".." . $range}->{$cp};
+        for my $s (@sols) {
+            $s =~ /^(\d+)\.\.(\d+)$/ or die;
+            my $optional = $1 >= $nsolvecs;
+            last if $optional;
+            return unless $sfiles->{$s . ".." . $range}->{$cp};
         }
         return 1;
     };
@@ -1854,8 +1872,7 @@ sub task_mksol {
         # print "main_args: @main_args\n";
         my @args = grep { !/^(ys|n?rhs)/ } @main_args;
         push @args, split(' ', $t);
-        if (!grep { /^nsolvecs/} @args) {
-            my $nsolvecs = subtask_default_nsolvecs;
+        if (!grep { /^nsolvecs=(\d+)/} @args) {
             push @args, "nsolvecs=$nsolvecs";
         }
 
@@ -1875,18 +1892,33 @@ sub task_gather {
 
     my @sols = subtask_solution_blocks;
     s/\.\./-/g for @sols;
+ 
+    # we need to decide which solution blocks are optional, and which are
+    # mandatory. This all depends on what we asked in the first place...
+    my $nsolvecs;
+    if (grep { /^nsolvecs=(\d+)/} @main_args) {
+        $nsolvecs = $1;
+    } else {
+        $nsolvecs = subtask_default_nsolvecs;
+    }
+    
 
     my @missing;
     my $leader_files = get_cached_leadernode_filelist 'HASH';
-    for (map { "K.sols$_.0" } (@sols)) {
+    my @mandatory_sols;
+    for my $s (@sols) { 
+        $s =~ /^(\d+)-(\d+)$/ or die;
+        my $optional = $1 >= $nsolvecs;
+        push @mandatory_sols, $s unless $optional;
+        my $kfile = "K.sols$s.0";
         # Do we have that solution file ?
-        next if exists $leader_files->{$_};
-        push @missing, $_;
+        next if exists $leader_files->{$kfile};
+        push @missing, $kfile unless $optional;
     }
     if (@missing == 0) {
         task_check_message 'ok', "All solution files produced by gather seem to be present, good.";
         return;
-    } elsif (@missing < @sols) {
+    } elsif (@missing < @mandatory_sols) {
         task_check_message 'error', "Only some of the solution files for gather are present. Please investigate. Missing: @missing\n";
         die;
     }
@@ -1914,15 +1946,6 @@ sub task_gather {
     my $c = 0;
     for (@all_ys) { my $l = length($_); $c = $l if $l > $c; }
 
-    # we need to decide which solution blocks are optional, and which are
-    # mandatory. This all depends on what we asked in the first place...
-    my $nsolvecs;
-    if (grep { /^nsolvecs=(\d+)/} @main_args) {
-        $nsolvecs = $1;
-    } else {
-        $nsolvecs = subtask_default_nsolvecs;
-    }
-    
     for my $s (@sols) {
         $s =~ /^(\d+)-(\d+)$/ or die;
         my $optional = $1 >= $nsolvecs;
@@ -1965,7 +1988,7 @@ sub task_gather {
 
     task_check_message 'ok', "All required files for gather seem to be present, good.";
 
-    my @args = grep { !/^(ys|rhs)/ } @main_args;
+    my @args = grep { !/^ys/ } @main_args;
     if (!grep { /^nsolvecs/} @args) {
         my $nsolvecs = ($prime ne '2' ? $splitwidth : $n);
         push @args, "nsolvecs=$nsolvecs";

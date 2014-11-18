@@ -58,8 +58,6 @@ wordsize=64
 # This has to be provided as auxiliary data for the GF(p) case (or we'll
 # do without any rhs whatsoever).
 : ${rhs=}
-# This is an experimental mode.
-: ${replace_sm_with_zero_block=}
 
 # For the rest of this script, we'll prefer the variable name "rhsfile"
 rhsfile="$rhs"
@@ -207,7 +205,7 @@ create_test_matrix_if_needed() {
         matrix="$basename.matrix.bin"
         rmargs=("${rmargs[@]}" --k$nullspace ${random_matrix_minkernel})
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
-    elif [ "$replace_sm_with_zero_block" ] ; then
+    else
         # This is an experimental mode. In the DLP context, we have a
         # matrix with N rows, N-r ideal columns, and r Schirokauer maps.   
         # let's say random_matrix_size is N and nrhs is r. We'll generate
@@ -219,16 +217,7 @@ create_test_matrix_if_needed() {
         if [ "$density" -lt 12 ] ; then density=12; fi
         rmargs=("${rmargs[@]}" -d $density)
         matrix="$basename.matrix.bin"
-        rhsfile="$basename.rhs.bin"
-        rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
-        rmargs=("${rmargs[@]}" rhs="$nrhs,$prime,$rhsfile")
-    else
-        basename=$mats/t${random_matrix_size}p+${nrhs}
-        density=`echo "l($random_matrix_size)^2/2" | bc -l | cut -d. -f1`
-        if [ "$density" -lt 12 ] ; then density=12; fi
-        rmargs=("${rmargs[@]}" -d $density)
-        matrix="$basename.matrix.bin"
-        rhsfile="$basename.rhs.bin"
+        rhsfile="$basename.rhs.txt"
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
         rmargs=("${rmargs[@]}" rhs="$nrhs,$prime,$rhsfile")
     fi
@@ -319,10 +308,14 @@ fi
 prepare_common_arguments
 
 if [ "$rhsfile" ] ; then
-    set $common rhs=$rhsfile nrhs=$nrhs
-else
-    set $common
+    common="$common rhs=$rhsfile"
 fi
+
+if [ "$tolerate_failure" ] ; then
+    common="$common tolerate_failure=$tolerate_failure"
+fi
+
+set $common
 
 if [ "$magma" ] ; then
     echo "### Enabling magma checking ###"

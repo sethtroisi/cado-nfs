@@ -57,7 +57,7 @@ if nmaps gt 0 then
     printf "Reading the SM part %o...\n", smfile;
     SMFile := Read(smfile);
     Lines := Split(SMFile);
-    mm := StringToInteger(Lines[1]);
+    mm := StringToIntegerSequence(Lines[1])[1];
     assert mm eq m;
 
     for i := 1 to m do
