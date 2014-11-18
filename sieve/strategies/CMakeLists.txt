@@ -29,3 +29,4 @@ add_executable(finalst
   ${SRC_UTILS})
 
 target_link_libraries(finalst ${LIB_EXEC})
+
