@@ -1,22 +1,23 @@
 /* dup2: 2nd pass
 
-   Usage: dup2 -poly name.poly [-basepath <dir>] [-filelist <fl>]
-          -K <K> -renumber xxx file1 ... filen
-
-   Put non-duplicate files (among file1 ... filen only) into:
-   <dir>/file1 ... <dir>/filen
+   Usage: dup2 -nrels <nrels> -renumber <renumberfile> [ -outdir <dir> ]
+               [ -outfmt <fmt> ] [ -dl ] [ -badidealinfo <file> ]
+               [ -filelist <fl> [ -basepath <dir> ] | file1 ... filen ]
 
    Input files can be given on command line, or via a filelist file.
 
+   By default dup2 overwrites inputs file. To modify this behaviour an output
+   directory can be given with '-outidir'.
    In case a filelist is given, the -basepath option enables to tell in which
-   directory those files are. Note that input files will be replaced in-place.
+   directory those files are.
 
    By default, the output will be bzipped/gzipped according to the status
-   of the input file.
+   of the input file. The output format can be chosen with '-outfmt'.
 
-   Allocates a hash-table of 2^k 32-bit entries.
+   Allocates a hash-table of size next_prime(100 + 1.2*nrels).
 
-   The relations are renumbered according to the file xxx, as input we have:
+   The relations are renumbered according to the file given via the
+   '-renumberfile' argument. Input relations are of the following format:
 
        a,b:p1,p2,...,pj:q1,q2,...,qk                                 (*)
 
@@ -25,8 +26,9 @@
 
        a,b:r1,r2,...,rm                                              (**)
 
-   where each index r1,r2,...,rm appears only once, and refers to either
-   a rational or to an algebraic ideal.
+   where each index r1,r2,...,rm refering to ideals via the renumbering table.
+   By default valuations are reduce modulo 2. This can by cancel by using the
+   '-dl' argument.
 
    The format of each file is recognized by counting the number of ':' in the
    first line: if two we have the raw format (*), if only one we have the
