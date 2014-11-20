@@ -643,15 +643,15 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   else /* p is cached */
   {
     i = renumber_info->cached[p];
-#ifdef RENUMBER_DO_EXPENSIVE_CHECK
+    if (tab[i] != vp)
     {
-      /* Check cached index */
-      char tmp[256];
-      snprintf (tmp, 256, "p = %" PRpr "; vp = %" PRpr"; i = %" PRid ";"
-                          "tab[i] = %" PRpr "", p, vp, i, tab[i]);
-      FATAL_ERROR_CHECK (tab[i] != vp, tmp);
+      /* There is a problem, most probably p is not prime. */
+      fprintf(stderr,"Fatal error in %s at %s:%d\nError with the cached part of "
+                     "the renumbering table\n  p = %" PRpr "\n  vp = %" PRpr
+                     "\n  i = cached[p] = %" PRid "\n  tab[i] = %" PRpr "\n",
+                     __func__, __FILE__, __LINE__, p, vp, i, tab[i]);
+      abort();
     }
-#endif
   }
 
   /**************************************************************************/
