@@ -654,24 +654,35 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 #endif
   }
 
-  /* now i points at the beginning of a decreasing sequence of values of vr */
-  if (side != renumber_info->rat && tab[i] > tab[i+1])
-  {
-    while (i < renumber_info->size)
-    {
-      if (vr < tab[i])
-      {
-        if (i == renumber_info->size - 1 || vr > tab[i+1])
-          break;
-        else
-          i++;
-      }
-      else
-        break;
-    }
-  }
+  /**************************************************************************/
+  /* Now i points at the beginning of a decreasing sequence of values of vr */
 
-  return i;
+  /* Return i in 4 cases:
+    first case: an ideal on rational side always corresponds to the first
+                element of a sequence
+    second case: i is the last index of the table
+    third case: the sequence contains only one value
+    fourth case: next element of the sequence is too small to correspond to vr
+  */
+  if (side == renumber_info->rat || i == renumber_info->size - 1
+                                 || tab[i] <= tab[i+1]
+                                 || vr > tab[i+1])
+    return i;
+  else
+  {
+    while(i != renumber_info->size - 1 && tab[i] > tab[i+1])
+    {
+      i++;
+      if (vr == tab[i])
+        return i;
+    }
+    /* if we arrive here, there is a problem, the ideal was not found in the
+       renumbering table */
+    fprintf(stderr,"Fatal error in %s at %s:%d\nIdeal (p, r, side) = (%" PRpr
+                   ", %" PRpr ", %d) was not found on the renumbering table\n",
+                   __func__, __FILE__, __LINE__, p, r, side);
+    abort();
+  }
 }
 
 void

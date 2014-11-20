@@ -767,6 +767,10 @@ modredcul_finished (const residueredcul_t r, const modulusredcul_t m)
 
 
 /* prototypes of non-inline functions */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int modredcul_div3 (residueredcul_t, const residueredcul_t,
                      const modulusredcul_t);
 int modredcul_div5 (residueredcul_t, const residueredcul_t,
@@ -808,5 +812,9 @@ int modredcul_batch_Q_to_Fp (unsigned long *, unsigned long,
                              unsigned long, unsigned long,
                              const unsigned long *, size_t);
 int modredcul_jacobi (const residueredcul_t, const modulusredcul_t);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* MODREDC_UL_H */

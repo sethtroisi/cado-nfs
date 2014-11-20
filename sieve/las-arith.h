@@ -1,8 +1,8 @@
 #ifndef LAS_ARITH_H_
 #define LAS_ARITH_H_
 
-#include "cado.h"
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "fb.h"
 #include "utils.h"
@@ -55,14 +55,14 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
     fprintf(stderr, "BUG in redc_32. x = %" PRId64
 	    " p = %u, invp = %u, u = %d\n", x, p, invp, u);
     if (x < 0) {
-      fprintf(stderr, "x/2^32 = -%"PRId64, (-x)>>32);
+      fprintf(stderr, "x/2^32 = -%" PRId64, (-x)>>32);
       if (((-x)>>32) < p) {
 	fprintf(stderr, ", within bounds\n");
       } else {
 	fprintf(stderr, ", OUT OF BOUNDS\n");
       }
     } else {
-      fprintf(stderr, "x/2^32 = -%"PRId64, x>>32);
+      fprintf(stderr, "x/2^32 = -%" PRId64, x>>32);
       if ((x>>32) < p) {
 	fprintf(stderr, ", within bounds\n");
       } else {

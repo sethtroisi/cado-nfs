@@ -1240,7 +1240,7 @@ void init_trace_k(sieve_info_srcptr si, param_list pl)
 
     const char *abstr = param_list_lookup_string(pl, "traceab");
     if (abstr != NULL) {
-        if (sscanf(abstr, "%"SCNd64",%"SCNu64, &ab.a, &ab.b) == 2)
+        if (sscanf(abstr, "%" SCNd64",%" SCNu64, &ab.a, &ab.b) == 2)
             have_trace_ab = 1;
         else {
             fprintf (stderr, "Invalid value for parameter: -traceab %s\n",

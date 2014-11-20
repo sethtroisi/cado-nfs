@@ -103,6 +103,8 @@ endif(HAVE_CXX11 AND HAVE_HWLOC)
 
 add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
+target_link_libraries(bwc_base ${gmp_libname})
+
 if (HAVE_CURL)
 target_link_libraries(bwc_base curl)
 endif (HAVE_CURL)
@@ -383,7 +385,12 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
             lingen-bigmatpoly-ft.c)
     endif(WITH_MPIR)
 
-    add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
+    # make plingen_pz a default target, but not the others.
+    if(v STREQUAL "pz")
+        add_executable(plingen_${v} ${plingen_${v}_sources})
+    else(v STREQUAL "pz")
+        add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
+    endif(v STREQUAL "pz")
 
     if(WITH_MPIR)
         target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)

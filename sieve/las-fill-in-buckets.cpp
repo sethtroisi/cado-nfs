@@ -1374,24 +1374,23 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   th->sides[side]->BA = BA;
 }
 
-void * fill_in_buckets_both(thread_data_ptr th)
+static void
+fill_in_buckets_one_side(thread_data_ptr th, const int side)
 {
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, th->si);
-
-    if (th->sides[ALGEBRAIC_SIDE]->BA.n_bucket < THRESHOLD_K_BUCKETS)
-      fill_in_buckets(th, ALGEBRAIC_SIDE, w);
-    else if (th->sides[ALGEBRAIC_SIDE]->BA.n_bucket < THRESHOLD_M_BUCKETS)
-      fill_in_k_buckets(th, ALGEBRAIC_SIDE, w);
+    if (th->sides[side]->BA.n_bucket < THRESHOLD_K_BUCKETS)
+      fill_in_buckets(th, side, w);
+    else if (th->sides[side]->BA.n_bucket < THRESHOLD_M_BUCKETS)
+      fill_in_k_buckets(th, side, w);
     else
-      fill_in_m_buckets(th, ALGEBRAIC_SIDE, w);
+      fill_in_m_buckets(th, side, w);
+}
 
-    if (th->sides[RATIONAL_SIDE]->BA.n_bucket < THRESHOLD_K_BUCKETS)
-      fill_in_buckets(th, RATIONAL_SIDE, w);
-    else if (th->sides[RATIONAL_SIDE]->BA.n_bucket < THRESHOLD_M_BUCKETS)
-      fill_in_k_buckets(th, RATIONAL_SIDE, w);
-    else
-      fill_in_m_buckets(th, RATIONAL_SIDE, w);
+void * fill_in_buckets_both(thread_data_ptr th)
+{
+    fill_in_buckets_one_side(th, ALGEBRAIC_SIDE);
+    fill_in_buckets_one_side(th, RATIONAL_SIDE);
     return NULL;
 }
 /* }}} */

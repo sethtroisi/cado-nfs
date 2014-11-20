@@ -1990,7 +1990,7 @@ UnitsWithParams := function(Kdata, FB, epsab, GEN, generate, params)
 	ficunits:=params["ficunits"];
 	printf "## outputting units to file %o\n", ficunits;
 	fd:=Open(ficunits, "w");
-	fprintf fd, "%o\n", nrows;
+	fprintf fd, "%o %o 0\n", nrows, rK;
 	for i:=1 to nrows do
 	    // only rK components, we don't care about val(eps0)
 	    for j:=1 to rK do

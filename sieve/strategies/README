@@ -1,6 +1,6 @@
-/******************************************************************************/
-/*                    to generate our factoring methods                       */
-/******************************************************************************/
+/*****************************************************************************/
+/*                   to generate our factoring methods                       */
+/*****************************************************************************/
 
 Some binaries are available in this directory :
   1- gfm
@@ -18,14 +18,14 @@ options:
    - cmin, cmax, cstep (where c equal to B2/B1).
 
 Now, you have got your optimal parameters for each type of factoring
-methods for different intervals of prime numbers. In the contex of the
+methods for different intervals of prime numbers. In the context of the
 sieving step, the goal is to define strategies to find quickly the most
 relations. Before choosing these strategies, you must do a benchmark over
-our factoring methods to know exatly what is the probability and the cost
+your factoring methods to know exatly what is the probability and the cost
 to find a prime number of certain bit size.
 
 To do this, the binary benchfm is available. In input, you give a file
-with factoring methods, and you could compute the probabilities and/or
+with factoring methods, and you can compute the probabilities and/or
 the time for each one of them.
 
 TODO: a filter is doing to allow to keep only a number of factoring methods!!!
@@ -45,27 +45,27 @@ where:
 (c1 (resp. c2 c3 c4) for an integer to MODREDCUL_MAXBITS, (resp. 
 MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and MODREDC2UL2_MAXBITS+30) bits size.
 
-In what follows, we give usage examples :
+In what follows, we give usage examples:
 
 For examples, you could search optimal parameters with:
 ./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 100 -b1max 500 -b1step 50 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_1
 ./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 500 -b1max 2000 -b1step 50 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_2
 ./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 2000 -b1max 5000 -b1step 100 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_3
 
-Then, we concatenate our datas, and compute the convex hull:
+Then, we concatenate our data, and compute the convex hull:
 cat Data_PM1_1 Data_PM1_2 Data_PM1_3 > Data_PM1
 ./gfm -fch -fch_in Data_PM1 -fch_out Data_PM1_ch
 
-Finally, to bench the found methods, you could use the following command :
+Finally, to bench the found methods, you can use the following command :
 ./benchfm -in Data_PM1_ch -p -t -out Data_PM1_ch_pt
 
-Note that these commands are just an example to illustrate the differents
-usefullness of our binaries.
+Note that these commands are just an example to illustrate the different
+usages of our binaries.
 
 
-/******************************************************************************/
-/*                        to generate our strategies                          */
-/******************************************************************************/
+/*****************************************************************************/
+/*                       to generate our strategies                          */
+/*****************************************************************************/
 
 Now, you have generated our factoring methods, but you must chain them
 to optain the best performances. In order to do that, we can use the
@@ -73,11 +73,11 @@ binary gst to build the optimal strategies for each pair of bit
 lengths. 
  This program works firstly side by side. On each side, for
 each bit size of cofactor, you generate many strategies and keep only
-the bests. After these differents computations, it merges them to
+the best ones. After these different computations, it merges them to
 generate on each pair of cofactors the best strategies to find 
 a prime divisor.
 
-In what follows, you give an example to illustrate a procedure to
+In what follows, we give an example to illustrate a procedure to
 achieve our objective:
 
 Firstly, you can distribute the precomputation of strategies for each

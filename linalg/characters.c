@@ -455,10 +455,10 @@ read_heavyblock_matrix_ascii(const char * heavyblockname)
 
     for(unsigned int i = 0 ; i < nrows ; i++) {
         uint32_t len;
-        int r = fscanf(f, "%"SCNu32, &len); ASSERT_ALWAYS(r == 1);
+        int r = fscanf(f, "%" SCNu32, &len); ASSERT_ALWAYS(r == 1);
         for( ; len-- ; ) {
             uint32_t v;
-            r = fscanf(f, "%"SCNu32, &v); ASSERT_ALWAYS(r == 1);
+            r = fscanf(f, "%" SCNu32, &v); ASSERT_ALWAYS(r == 1);
             res->mb[(i/64) + (v/64) * res->nrblocks][i%64] ^= ((uint64_t)1) << (v%64);
         }
     }

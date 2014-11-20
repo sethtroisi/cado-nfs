@@ -5,6 +5,8 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdio.h>
+#include <gmp.h>
 #include "bwc_config.h"
 #include "cado_config.h"
 #include "bw-common.h"
@@ -12,6 +14,7 @@
 #include "filenames.h"
 #include "portability.h"
 #include "utils.h"
+
 
 struct bw_params bw[1];
 
@@ -184,8 +187,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     bw->nsolvecs = bw->n;
     param_list_parse_int(pl, "nsolvecs", &bw->nsolvecs);
 
-    param_list_parse_int(pl, "nrhs", &bw->nrhs);
-
     bw->number_of_check_stops = param_list_parse_int_list(pl, "check_stops", bw->check_stops, MAX_NUMBER_OF_CHECK_STOPS, ",");
     int interval_already_in_check_stops = 0;
     for(int i = 0 ; i < bw->number_of_check_stops ; i++) {
@@ -227,7 +228,8 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "local_cache_copy_dir");
     param_list_lookup_string(pl, "matmul_bucket_methods");
     param_list_lookup_string(pl, "sequence");   // for lingen
-    param_list_lookup_string(pl, "rhs");  // for gather
+    param_list_lookup_string(pl, "rhs");  // for prep
+    param_list_lookup_string(pl, "rhscoeffs");  // for gather
     param_list_lookup_string(pl, "save_submatrices");
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "sanity_check_vector");
@@ -250,6 +252,40 @@ int bw_common_clear(struct bw_params * bw)
 {
     mpz_clear(bw->p);
     return 0;
+}
+
+int get_rhs_file_header_stream(FILE * f, uint32_t * p_nrows, unsigned int * p_nrhs, mpz_ptr p_p)
+{
+    int rc;
+    if (p_nrows) {
+        rc = fscanf(f, "%" SCNu32, p_nrows);
+        ASSERT_ALWAYS(rc == 1);
+    } else {
+        fscanf(f, "%*" SCNu32);
+    }
+    if (p_nrhs) {
+        rc = fscanf(f, "%d", p_nrhs);
+        ASSERT_ALWAYS(rc == 1);
+    } else {
+        fscanf(f, "%*d");
+    }
+    if (p_p) {
+        rc = gmp_fscanf(f, "%Zd", p_p);
+        ASSERT_ALWAYS(rc == 1);
+    } else {
+        gmp_fscanf(f, "%*Zd");
+    }
+    return 1;
+}
+
+int get_rhs_file_header(const char * filename, uint32_t * p_nrows, unsigned int * p_nrhs, mpz_ptr p_p)
+{
+    FILE * f = NULL;
+    f = fopen(filename, "r");
+    ASSERT_ALWAYS(f != NULL);
+    int rc = get_rhs_file_header_stream(f, p_nrows, p_nrhs, p_p);
+    fclose(f);
+    return rc;
 }
 
 const char * bw_common_usage_string()

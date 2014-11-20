@@ -166,7 +166,7 @@ void matrix_read_pass(
         if (m_in->f) {
             if (m_in->ascii) {
                 delta=0;
-                rc = fscanf(m_in->f, "%"SCNu32"%n", &w, &delta);
+                rc = fscanf(m_in->f, "%" SCNu32"%n", &w, &delta);
                 readbytes += delta;
                 if (i >= exp_nr) {
                     if (rc == EOF)

@@ -148,8 +148,8 @@ main (int argc, char *argv[])
   double p0, p1;
 
   ASSERT_ALWAYS (argc == 3);
-  mfb = atoi (argv[1]);
-  lim = atoi (argv[2]);
+  mfb = atol (argv[1]);
+  lim = atol (argv[2]);
   imin = ceil (log2 ((double) (lim + 1)));
   for (i = 1; (i < 256) && i <= mfb; i++)
     {

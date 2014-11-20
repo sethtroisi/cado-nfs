@@ -671,7 +671,7 @@ sieve/las-unsieve.c
 sieve/las-unsieve.h
 sieve/las-cofactor.c
 sieve/las-cofactor.h
-sieve/las-fill-in-buckets.c
+sieve/las-fill-in-buckets.cpp
 sieve/las-fill-in-buckets.h
 sieve/las.c
 sieve/makefb.c

@@ -319,6 +319,9 @@ print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
         push @miss, grep { !defined $param->{$_}; } (qw/prime matrix interval/);
     }
     die "Missing argument(s): @miss" if @miss;
+    if (!defined($m) || !defined($n)) {
+        die "Missing parameters: m and/or n";
+    }
 }
 
 $param->{'matrix'} =~ s/~/$ENV{HOME}/g;
@@ -335,16 +338,24 @@ if ($prime == 2 && (defined($rhs) || defined($nrhs))) {
 if (defined($nrhs) && !defined($rhs)) {
     die "nrhs may only be specified together with rhs";
 }
+if (defined($rhs) && defined($nrhs)) {
+    die "no longer supported -- please specify rhs, not nrhs";
+    my $header = eval { open F, $rhs or die "$rhs: $!"; <F>; };
+    if ($header =~ /^[\d\s:-]+$/) {
+        die "$rhs seems to be an ascii file. Please do not provide nrhs in that case";
+    }
+}
 if (defined($rhs) && !defined($nrhs)) {
     # Try to read the first line.
     my $header = eval { open F, $rhs or die "$rhs: $!"; <F>; };
-    if ($header !~ /^(\d+) (\d+)$/) {
+    if ($header !~ /^(\d+) (\d+) (\d+)$/) {
         die "$rhs does not seem to be ascii with header, we can't proceed.\n";
     }
     $param->{'nrhs'} = $nrhs = $2;
+    print "$rhs is ascii file with header. Getting nrhs=$nrhs from there\n";
 }
-if (defined($nrhs) && $nrhs > $n) {
-    die "nrhs > n is not supported";
+if (defined($nrhs) && ($nrhs > $n || $nrhs > $m)) {
+    die "nrhs > n or m is not supported";
 }
 
 
@@ -1382,6 +1393,9 @@ sub subtask_krylov_mksol_todo {
 # }}}
 
 # {{{ solution blocks relevant to lingen mksol gather cleanup
+#
+# Those are _all_ solutions one can consider computing. However, we have
+# no obligation to do so.
 sub subtask_solution_blocks {
     my @sols;
     if ($prime eq '2') {
@@ -1389,13 +1403,35 @@ sub subtask_solution_blocks {
         # nsolvecs solutions. Those should be split in chunks of width
         # 64.
         @sols = ("0..$n");
-    } elsif ($nrhs) {
-        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
     } else {
         @sols = map {"$_..".($_+1);} (0..$n-1);
     }
     print "## $current_task considering the following solution blocks: @sols\n";
     return @sols;
+}
+
+sub subtask_default_nsolvecs {
+    # those are the solutions we compute by default, split in chunks
+    # whose sizes are prescribed by the lists above.
+    my $nsolvecs;
+    if ($nrhs) {
+        # we used to force nsolvecs = nrhs. In fact, if we order
+        # the solutions appropriately, it seems that we don't
+        # have to, and one solution suffices.
+        # $nsolvecs = $nrhs;
+        $nsolvecs = 1;
+    } elsif ($prime == 2) {
+        # This is just a default. Either $n or $splitwidth could
+        # be considered reasonable defaults here.
+        $nsolvecs = $n;
+    } else {
+        # I'm not sure whether I really mean splitwidth or 1,
+        # since splitwidth *is* equal to 1 in that case. If I
+        # were to loosen this relationship, I probably would have
+        # to define splitwidth more accurately.
+        $nsolvecs = $splitwidth;
+    }
+    return $nsolvecs;
 }
 # }}}
 
@@ -1733,7 +1769,7 @@ sub task_lingen {
         push @args, "lingen-threshold=$lt";
         push @args, "lingen-mpi-threshold=$lt";
         push @args, "afile=$concatenated_A";
-        push @args, grep { /^(?:m|n|wdir|prime|nrhs|mpi|thr)=/ } @main_args;
+        push @args, grep { /^(?:mn|m|n|wdir|prime|rhs|mpi|thr)=/ } @main_args;
         if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {
             print "## non-MPI build, avoiding multithreaded plingen\n";
             @args = grep { !/^(mpi|thr)=/ } @args;
@@ -1743,7 +1779,10 @@ sub task_lingen {
         # Some splitting work needed...
         @args=();
         push @args, "splits=" . join(",",@splits);
-        push @args, grep { /^(?:m|n|wdir|prime|verbose_flags)=/ } @main_args;
+        push @args, grep { /^(?:mn|m|n|wdir|prime|verbose_flags)=/ } @main_args;
+        if (-f "$wdir/$concatenated_A.gen" && -z "$wdir/$concatenated_A.gen") {
+            die "generating sequence file has size zero";
+        }
         task_common_run "split", @args,
                 "ifile=$concatenated_A.gen", "ofile-fmt=F.%u-%u";
         for my $j (0..$n/$splitwidth-1) {
@@ -1803,11 +1842,21 @@ sub task_mksol {
 
     print "## mksol max iteration is $length\n";
 
+    my $nsolvecs;
+    if (grep { /^nsolvecs=(\d+)/} @main_args) {
+        $nsolvecs = $1;
+    } else {
+        $nsolvecs = subtask_default_nsolvecs;
+    }
+    
     my @todo = subtask_krylov_mksol_todo $length, sub {
         my ($range, $cp) = @_;
         ## return if $cp > $length;
-        for (@sols) {
-            return unless $sfiles->{$_ . ".." . $range}->{$cp};
+        for my $s (@sols) {
+            $s =~ /^(\d+)\.\.(\d+)$/ or die;
+            my $optional = $1 >= $nsolvecs;
+            last if $optional;
+            return unless $sfiles->{$s . ".." . $range}->{$cp};
         }
         return 1;
     };
@@ -1826,8 +1875,7 @@ sub task_mksol {
         # print "main_args: @main_args\n";
         my @args = grep { !/^(ys|n?rhs)/ } @main_args;
         push @args, split(' ', $t);
-        if (!grep { /^nsolvecs/} @args) {
-            my $nsolvecs = $nrhs || ($prime ne '2' ? $splitwidth : $n);
+        if (!grep { /^nsolvecs=(\d+)/} @args) {
             push @args, "nsolvecs=$nsolvecs";
         }
 
@@ -1847,18 +1895,33 @@ sub task_gather {
 
     my @sols = subtask_solution_blocks;
     s/\.\./-/g for @sols;
+ 
+    # we need to decide which solution blocks are optional, and which are
+    # mandatory. This all depends on what we asked in the first place...
+    my $nsolvecs;
+    if (grep { /^nsolvecs=(\d+)/} @main_args) {
+        $nsolvecs = $1;
+    } else {
+        $nsolvecs = subtask_default_nsolvecs;
+    }
+    
 
     my @missing;
     my $leader_files = get_cached_leadernode_filelist 'HASH';
-    for (map { "K.sols$_.0" } (@sols)) {
+    my @mandatory_sols;
+    for my $s (@sols) { 
+        $s =~ /^(\d+)-(\d+)$/ or die;
+        my $optional = $1 >= $nsolvecs;
+        push @mandatory_sols, $s unless $optional;
+        my $kfile = "K.sols$s.0";
         # Do we have that solution file ?
-        next if exists $leader_files->{$_};
-        push @missing, $_;
+        next if exists $leader_files->{$kfile};
+        push @missing, $kfile unless $optional;
     }
     if (@missing == 0) {
         task_check_message 'ok', "All solution files produced by gather seem to be present, good.";
         return;
-    } elsif (@missing < @sols) {
+    } elsif (@missing < @mandatory_sols) {
         task_check_message 'error', "Only some of the solution files for gather are present. Please investigate. Missing: @missing\n";
         die;
     }
@@ -1885,12 +1948,16 @@ sub task_gather {
     my $c0 = 4;
     my $c = 0;
     for (@all_ys) { my $l = length($_); $c = $l if $l > $c; }
+
     for my $s (@sols) {
+        $s =~ /^(\d+)-(\d+)$/ or die;
+        my $optional = $1 >= $nsolvecs;
         my $l = 4+length($s); $c0 = $l if $l > $c0;
         for my $y (@all_ys) {
             my $key = "$s,$y";
             my $n = $cmat->{$key} || 'NONE'; $cmat->{$key} = $n;
             my $l = length($n); $c = $l if $l > $c;
+            next if $optional;
             push @missing, "S.sols$s.$y" if $n eq 'NONE' || $n =~ /\*$/; 
         }
     }
@@ -1898,8 +1965,12 @@ sub task_gather {
     print "##    " . " "x$c0 . "|" . join(" ", map { sprintf "%${c}s", $_ } @all_ys) . "\n";
     print "##    " . "-"x$c0 . "|" . "-" x (($c+1)*scalar @all_ys) . "\n";
     for my $s (@sols) { 
+        $s =~ /^(\d+)-(\d+)$/ or die;
+        my $optional = $1 >= $nsolvecs;
         print "##    " . sprintf("%${c0}s","sols$s") . "|" .
-            join(" ", map { sprintf "%${c}s", $cmat->{"$s,$_"} } @all_ys) . "\n";
+            join(" ", map { sprintf "%${c}s", $cmat->{"$s,$_"} } @all_ys)
+            . ($optional ? " (optional)" : "")
+            . "\n";
     }
     # }}}
     if (@missing) {
@@ -1920,13 +1991,13 @@ sub task_gather {
 
     task_check_message 'ok', "All required files for gather seem to be present, good.";
 
-    my @args = grep { !/^(ys|rhs)/ } @main_args;
+    my @args = grep { !/^ys/ } @main_args;
     if (!grep { /^nsolvecs/} @args) {
         my $nsolvecs = ($prime ne '2' ? $splitwidth : $n);
         push @args, "nsolvecs=$nsolvecs";
     }
     if ($param->{'rhs'}) {
-        push @args, "rhs=$rhs_companion";
+        push @args, "rhscoeffs=$rhs_companion";
     }
     task_common_run 'gather', @args;
 }

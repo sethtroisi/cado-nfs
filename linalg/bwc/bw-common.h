@@ -39,7 +39,10 @@ struct bw_params {
      *
      * By default we have nrhs=0
      */
-    int nrhs;
+    // we make this a phantom parameter. It's deduced from reading the
+    // rhs file, and we have no compelling need for allotting room for it
+    // in the global struct, given its rare use.
+    // int nrhs;
 
     /* modulus */
     mpz_t p;
@@ -155,6 +158,10 @@ extern const char * bw_common_usage_string();
  * the public interface nevertheless */
 extern int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv);
 extern int bw_common_init_defaults(struct bw_params * bw);
+
+/* utility function. */
+extern int get_rhs_file_header(const char * filename, uint32_t * p_nrows, unsigned int * p_nrhs, mpz_ptr p_p);
+extern int get_rhs_file_header_stream(FILE * f, uint32_t * p_nrows, unsigned int * p_nrhs, mpz_ptr p_p);
 
 #ifdef __cplusplus
 }

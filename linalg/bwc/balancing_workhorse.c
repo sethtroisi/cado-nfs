@@ -1702,7 +1702,7 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         read_bfile(m, arg->bfile);
 
-        printf("Balancing flags: 0x%"PRIx32"\n", m->bal->h->flags);
+        printf("Balancing flags: 0x%" PRIx32"\n", m->bal->h->flags);
 
         int ok = 1;
 

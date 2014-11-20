@@ -737,8 +737,9 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
         }
         r->rhs->f = fopen(rhsname, "w");
         DIE_ERRNO_DIAG(r->rhs->f == NULL, "fopen", rhsname);
-        if (r->ascii)
-            fprintf(r->rhs->f, "%lu %d\n", r->nrows, r->rhs->n);
+        // rhs file is now always in ascii
+        // if (r->ascii)
+            gmp_fprintf(r->rhs->f, "%lu %d %Zd\n", r->nrows, r->rhs->n, r->rhs->p);
     }
     /* }}} */
 
@@ -1127,23 +1128,6 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
 #endif
 
 #ifdef  WANT_MAIN
-/* We do not claim to be endianness-safe here. For random generation,
- * it's not too bad.
- */
-static inline void write_in_32bit_limbs(FILE * out, mpz_srcptr x, mpz_srcptr p)
-{
-    mp_size_t n32 = iceildiv(mpz_sizeinbase(p, 2), 32);
-    uint32_t temp[n32+1];
-    memset(temp, 0, (n32+1)*sizeof(uint32_t));
-    ASSERT_ALWAYS(mpz_size(x) * sizeof(mp_limb_t) <= (n32+1)*sizeof(uint32_t));
-#if GMP_VERSION_ATLEAST(6,0,0)
-    memcpy(temp, mpz_limbs_read(x), mpz_size(x) * sizeof(mp_limb_t));
-#else
-    memcpy(temp, x->_mp_d, mpz_size(x) * sizeof(mp_limb_t));
-#endif
-    fwrite(temp, sizeof(uint32_t), n32, out);
-    ASSERT_ALWAYS(temp[n32]==0);
-}
 
 void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix_ddata_ptr F)
 {
@@ -1162,7 +1146,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 #define WU32(out, pre, x, post) do {					\
         if (ascii) {							\
-            fprintf(out, pre "%"PRIu32 post, (x));			\
+            fprintf(out, pre "%" PRIu32 post, (x));			\
         } else {							\
             fwrite(&(x), sizeof(uint32_t), 1, out);			\
         }								\
@@ -1170,19 +1154,14 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 #define WS32(out, pre, x, post) do {                                    \
         if (ascii) {							\
-            fprintf(out, pre "%"PRId32 post, (x));			\
+            fprintf(out, pre "%" PRId32 post, (x));			\
         } else {							\
             fwrite(&(x), sizeof(uint32_t), 1, out);			\
         }								\
     } while (0)
 
-#define WZ(out, pre, x, post, p) do {					\
-        if (ascii) {							\
+#define WZa(out, pre, x, post, p) do {					\
             gmp_fprintf(out, pre "%Zd" post, x);			\
-        } else {							\
-            /* Then it's hard. */					\
-            write_in_32bit_limbs(out, x, p);				\
-        }								\
     } while (0)
 
 
@@ -1219,13 +1198,13 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
             for(int j = 0 ; j < r->rhs->n - 1 ; j++) {
                 mpz_urandomm(x, rstate, r->rhs->p);
                 mpz_addmul_ui(s, x, r->ncols + j + 1);
-                WZ(r->rhs->f, "", x, " ", r->rhs->p);
+                WZa(r->rhs->f, "", x, " ", r->rhs->p);
             }
             mpz_set_si(x, -(r->ncols + r->rhs->n));
             mpz_invert(x, x, r->rhs->p);
             mpz_mul(s, s, x);
             mpz_mod(s, s, r->rhs->p);
-            WZ(r->rhs->f, "", s, "\n", r->rhs->p);
+            WZa(r->rhs->f, "", s, "\n", r->rhs->p);
             mpz_clear(x);
             mpz_clear(s);
         }

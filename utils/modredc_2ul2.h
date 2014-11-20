@@ -1310,6 +1310,9 @@ struct modredc2ul2_batch_Q_to_Fp_context_s {
 typedef struct modredc2ul2_batch_Q_to_Fp_context_s modredc2ul2_batch_Q_to_Fp_context_t;
 
 /* prototypes of non-inline functions */
+#ifdef __cplusplus
+extern "C" {
+#endif
 int modredc2ul2_div3 (residueredc2ul2_t, const residueredc2ul2_t, 
 		      const modulusredc2ul2_t);
 int modredc2ul2_div5 (residueredc2ul2_t, const residueredc2ul2_t, 
@@ -1352,4 +1355,8 @@ int modredc2ul2_batch_Q_to_Fp (unsigned long *,
                                const modredc2ul2_batch_Q_to_Fp_context_t *,
                                unsigned long, int, const unsigned long *, size_t);
 int modredc2ul2_jacobi (const residueredc2ul2_t, const modulusredc2ul2_t);
+#ifdef __cplusplus
+}
+#endif
+
 #endif  /* MODREDC_2UL2_H */

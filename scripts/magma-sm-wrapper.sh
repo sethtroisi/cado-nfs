@@ -194,7 +194,9 @@ if [ $side -ne -1 ]; then
 	    # paste $OUT and $OUT.1 to get a new $OUT
 	    f1=$OUT; f2=$OUT.$side
 	fi
-	paste -d" " $f1 $f2 | awk '{n++; if(n==1){print $1}else{print}}' > $OUT.$$
+        head -1 $f1
+        head -1 $f2
+	paste -d" " $f1 $f2 | (read sr0 nsm0 p0 sr1 nsm1 p1 ; echo "$sr0 $((nsm0+nsm1)) $ELL" ; cat) > $OUT.$$
 	mv $OUT.$$ $OUT
     fi
 fi

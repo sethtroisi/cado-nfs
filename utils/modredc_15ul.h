@@ -1243,6 +1243,10 @@ modredc15ul_divn (residueredc15ul_t r, const residueredc15ul_t a,
 
 
 /* prototypes of non-inline functions */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t, 
 		      const modulusredc15ul_t);
 int modredc15ul_div5 (residueredc15ul_t, const residueredc15ul_t, 
@@ -1278,4 +1282,9 @@ int modredc15ul_batchinv (residueredc15ul_t *, const residueredc15ul_t *,
                           size_t, const residueredc15ul_t,
                           const modulusredc15ul_t);
 int modredc15ul_jacobi (const residueredc15ul_t, const modulusredc15ul_t);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif  /* MODREDC_15UL_H */
