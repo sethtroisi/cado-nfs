@@ -101,6 +101,7 @@ public:
   
   unsigned char k, nr_roots;
   void parse_line (const char *line, unsigned long linenr);
+  void merge (const fb_general_entry &);
   void fprint(FILE *out);
 };
 
@@ -112,12 +113,12 @@ public:
 void
 fb_general_entry::read_roots (const char *lineptr, const unsigned long linenr)
 {
-    size_t nr_roots = 0;
+    size_t i_roots = 0;
     unsigned long long last_t = 0;
 
     while (*lineptr != '\0')
     {
-        if (nr_roots == MAXDEGREE) {
+        if (i_roots == MAXDEGREE) {
             fprintf (stderr,
                     "# Error, too many roots for prime %" FBPRIME_FORMAT
                     " in factor base line %lu\n", p, linenr);
@@ -127,15 +128,15 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned long linenr)
            the factor base file; since q can be a 32-bit value, we read the
            root as a 64-bit integer first and subtract q if necessary. */
         const unsigned long long t = strtoull_const (lineptr, &lineptr, 10);
-        if (nr_roots > 0 && t <= last_t) {
+        if (i_roots > 0 && t <= last_t) {
             fprintf (stderr,
                 "# Error, roots must be sorted in the fb file, line %lu\n",
                 linenr);
             exit(EXIT_FAILURE);
         }
 
-        this->projective[nr_roots] = (t >= p);
-        this->roots[nr_roots++] = static_cast<fbroot_t>(t - ((t >= p) ? p : 0));
+        projective[i_roots] = (t >= p);
+        roots[i_roots++] = static_cast<fbroot_t>(t - ((t >= p) ? p : 0));
         if (*lineptr != '\0' && *lineptr != ',') {
             fprintf(stderr,
                     "# Incorrect format in factor base file line %lu\n",
@@ -146,12 +147,12 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned long linenr)
             lineptr++;
     }
 
-    if (nr_roots == 0) {
+    if (i_roots == 0) {
         fprintf (stderr, "# Error, no root for prime %" FBPRIME_FORMAT
                 " in factor base line %lu\n", p, linenr - 1);
         exit(EXIT_FAILURE);
     }
-    this->nr_roots = nr_roots;
+    nr_roots = i_roots;
 }
 
 /* Parse a factor base line.
@@ -162,8 +163,8 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned long linenr)
 void
 fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
 {
-    this->q = strtoul_const (lineptr, &lineptr, 10);
-    if (this->q == 0) {
+    q = strtoul_const (lineptr, &lineptr, 10);
+    if (q == 0) {
         fprintf(stderr, "# fb_read: prime is not an integer on line %lu\n",
                 linenr);
         exit (EXIT_FAILURE);
@@ -179,25 +180,26 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
 
     /* NB: a short version is not permitted for a prime power, so we
      * do the test for prime powers only for long version */
-    this->p = this->q;
-    unsigned char exp = 1, oldexp = 0;
-    this->k = 1;
+    p = q;
+    exp[0] = 1;
+    oldexp[0] = 0;
+    k = 1;
     if (longversion) {
-        unsigned long k;
-        const fbprime_t p = fb_is_power (this->q, &k);
-        ASSERT(ulong_isprime(p != 0 ? p : this->q));
-        /* If q is not a power, then p==0, and we use p = q */
-        if (p != 0) {
-            this->p = p;
-            this->k = static_cast<unsigned char>(k);
-        } 
+        unsigned long k_ul;
+        const fbprime_t base = fb_is_power (q, &k_ul);
+        ASSERT(ulong_isprime(base != 0 ? base : q));
+        /* If q is not a power, then base==0, and we use p = q */
+        if (base != 0) {
+            p = base;
+            k = static_cast<unsigned char>(k_ul);
+        }
 
         /* read the multiple of logp, if any */
         /* this must be of the form  q:nlogp,oldlogp: ... */
         /* if the information is not present, it means q:1,0: ... */
-        exp = strtoul_const (lineptr, &lineptr, 10);
+        exp[0] = strtoul_const (lineptr, &lineptr, 10);
 
-        if (exp == 0) {
+        if (exp[0] == 0) {
             fprintf(stderr, "# Error in fb_read: could not parse the integer "
 		    "after the colon of prime %" FBPRIME_FORMAT "\n", q);
             exit (EXIT_FAILURE);
@@ -209,48 +211,60 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
             exit (EXIT_FAILURE);
         }
         lineptr++; /* skip comma */
-        oldexp = strtoul_const (lineptr, &lineptr, 10);
+        oldexp[0] = strtoul_const (lineptr, &lineptr, 10);
         if (*lineptr != ':') {
             fprintf(stderr,
 		    "# fb_read: oldlogp is not followed by colon on line %lu",
 		    linenr);
             exit (EXIT_FAILURE);
         }
-        ASSERT (exp > oldexp);
+        ASSERT (exp[0] > oldexp[0]);
         lineptr++; /* skip colon */
     }
 
-    this->read_roots(lineptr, linenr);
+    read_roots(lineptr, linenr);
 
     /* exp and oldexp are a property of a root, not of a prime (power).
        The factor base file should specify them per root, but specifies
        them per prime instead - a bit of a design bug.
        For long version lines, we thus use the exp and oldexp values for all
        roots specified in that line. */
-    for (unsigned char i = 0; i < this->nr_roots; i++) {
-      this->exp[i] = exp;
-      this->oldexp[i] = oldexp;      
+    for (unsigned char i = 1; i < nr_roots; i++) {
+      exp[i] = exp[0];
+      oldexp[i] = oldexp[0];
     }
 }
 
 void
 fb_general_entry::fprint(FILE *out)
 {
-  fprintf(out, "%" FBPRIME_FORMAT ": ", this->q);
-  for (unsigned char i_root = 0; i_root < this->nr_roots; i_root++) {
-    unsigned long long t = this->roots[i_root];
-    if (this->projective[i_root])
-      t += this->q;
+  fprintf(out, "%" FBPRIME_FORMAT ": ", q);
+  for (unsigned char i_root = 0; i_root < nr_roots; i_root++) {
+    unsigned long long t = roots[i_root];
+    if (projective[i_root])
+      t += q;
     fprintf(out, "%llu", t);
-    if (this->oldexp[i_root] != 0 || this->exp[i_root] != 1)
-      fprintf(out, ":%hhu:%hhu", this->oldexp[i_root], this->exp[i_root]);
-    if (i_root + 1 < this->nr_roots)
+    if (oldexp[i_root] != 0 || exp[i_root] != 1)
+      fprintf(out, ":%hhu:%hhu", oldexp[i_root], exp[i_root]);
+    if (i_root + 1 < nr_roots)
       fprintf(out, ",");
   }
   fprintf(out, "\n");
 }
 
-
+void
+fb_general_entry::merge (const fb_general_entry &other)
+{
+  ASSERT_ALWAYS(p == other.p && q == other.q && k == other.k);
+  for (unsigned char i_root = 0; i_root < other.nr_roots; i_root++) {
+    ASSERT_ALWAYS(nr_roots < MAXDEGREE);
+    roots[nr_roots] = other.roots[i_root];
+    exp[nr_roots] = other.exp[i_root];
+    oldexp[nr_roots] = other.oldexp[i_root];
+    projective[nr_roots] = other.projective[nr_roots];
+    nr_roots++;
+  }
+}
 
 /* "Simple" factor base entries. We imply q=p, k=1, oldexp=0, exp=1,
    and projective=false for all roots. */
@@ -267,18 +281,18 @@ template <int Nr_roots>
 fb_entry_x_roots_s<Nr_roots>::fb_entry_x_roots_s(const fb_general_entry &fb_cur)
 {
   // ASSERT(Nr_roots == fb_cur->nr_roots);
-  this->p = fb_cur.p;
+  p = fb_cur.p;
   for (size_t i = 0; i < Nr_roots; i++)
-    this->roots[i] = fb_cur.roots[i];
+    roots[i] = fb_cur.roots[i];
 }
 
 template <int Nr_roots>
 void
 fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out)
 {
-  fprintf(out, "%" FBPRIME_FORMAT ": ", this->p);
+  fprintf(out, "%" FBPRIME_FORMAT ": ", p);
   for (size_t i = 0; i < Nr_roots; i++) {
-    fprintf(out, "%" FBROOT_FORMAT "%s", this->roots[i],
+    fprintf(out, "%" FBROOT_FORMAT "%s", roots[i],
 	    (i + 1 < Nr_roots) ? "," : "");
   }
   fprintf(out, "\n");
@@ -295,7 +309,7 @@ class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
   void push_back(const fb_general_entry &fb_cur)
   {
     fb_entry_x_roots_s<Nr_roots> f = fb_cur;
-    this->push_back(f);
+    push_back(f);
   }
   void fprint(FILE *);
 };
@@ -339,25 +353,25 @@ template <int Nr_roots>
 void
 fb_slices<Nr_roots>::append(const fb_general_entry &fb_cur)
 {
-  this->vectors[this->next_slice++].push_back(fb_cur);
-  if (this->next_slice == this->nr_slices)
-    this->next_slice = 0;
+  vectors[next_slice++].push_back(fb_cur);
+  if (next_slice == nr_slices)
+    next_slice = 0;
 }
 
 template <int Nr_roots>
 fb_entry_x_roots_s<Nr_roots> *
 fb_slices<Nr_roots>::get_slice(size_t slice)
 {
-  ASSERT_ALWAYS(slice < this->nr_slices);
-  return this->vectors[slice];
+  ASSERT_ALWAYS(slice < nr_slices);
+  return vectors[slice];
 }
 
 template <int Nr_roots>
 void
 fb_slices<Nr_roots>::fprint(FILE *out)
 {
-  for (size_t slice = 0; slice < this->nr_slices; slice++)
-    this->vectors[slice].fprint(out);
+  for (size_t slice = 0; slice < nr_slices; slice++)
+    vectors[slice].fprint(out);
 }
 
 /* A "part" is the set of all factor base primes that get sieved over a given
@@ -390,15 +404,15 @@ class fb_part {
 };
 
 fb_part::fb_part(const size_t nr_slices) {
-  this->fb0_slices = new fb_slices<0>(nr_slices);
-  this->fb1_slices = new fb_slices<1>(nr_slices);
-  this->fb2_slices = new fb_slices<2>(nr_slices);
-  this->fb3_slices = new fb_slices<3>(nr_slices);
-  this->fb4_slices = new fb_slices<4>(nr_slices);
-  this->fb5_slices = new fb_slices<5>(nr_slices);
-  this->fb6_slices = new fb_slices<6>(nr_slices);
-  this->fb7_slices = new fb_slices<7>(nr_slices);
-  this->fb8_slices = new fb_slices<8>(nr_slices);
+  fb0_slices = new fb_slices<0>(nr_slices);
+  fb1_slices = new fb_slices<1>(nr_slices);
+  fb2_slices = new fb_slices<2>(nr_slices);
+  fb3_slices = new fb_slices<3>(nr_slices);
+  fb4_slices = new fb_slices<4>(nr_slices);
+  fb5_slices = new fb_slices<5>(nr_slices);
+  fb6_slices = new fb_slices<6>(nr_slices);
+  fb7_slices = new fb_slices<7>(nr_slices);
+  fb8_slices = new fb_slices<8>(nr_slices);
 }
 
 
@@ -421,22 +435,22 @@ fb_part::append(const fb_general_entry &fb_cur)
 
   /* Non-simple ones go in the general vector */
   if (!is_simple) {
-    this->general_vector.push_back(fb_cur);
+    general_vector.push_back(fb_cur);
     return;
   }
 
   /* Simple ones go in the simple vector with the corresponding number of
      roots */
   switch (fb_cur.nr_roots) {
-    case 0: this->fb0_slices->append(fb_cur); break;
-    case 1: this->fb1_slices->append(fb_cur); break;
-    case 2: this->fb2_slices->append(fb_cur); break;
-    case 3: this->fb3_slices->append(fb_cur); break;
-    case 4: this->fb4_slices->append(fb_cur); break;
-    case 5: this->fb5_slices->append(fb_cur); break;
-    case 6: this->fb6_slices->append(fb_cur); break;
-    case 7: this->fb7_slices->append(fb_cur); break;
-    case 8: this->fb8_slices->append(fb_cur); break;
+    case 0: fb0_slices->append(fb_cur); break;
+    case 1: fb1_slices->append(fb_cur); break;
+    case 2: fb2_slices->append(fb_cur); break;
+    case 3: fb3_slices->append(fb_cur); break;
+    case 4: fb4_slices->append(fb_cur); break;
+    case 5: fb5_slices->append(fb_cur); break;
+    case 6: fb6_slices->append(fb_cur); break;
+    case 7: fb7_slices->append(fb_cur); break;
+    case 8: fb8_slices->append(fb_cur); break;
     default: abort();
   }
 }
@@ -444,18 +458,18 @@ fb_part::append(const fb_general_entry &fb_cur)
 void
 fb_part::fprint(FILE *out)
 {
-  this->fb0_slices->fprint(out);
-  this->fb1_slices->fprint(out);
-  this->fb2_slices->fprint(out);
-  this->fb3_slices->fprint(out);
-  this->fb4_slices->fprint(out);
-  this->fb5_slices->fprint(out);
-  this->fb6_slices->fprint(out);
-  this->fb7_slices->fprint(out);
-  this->fb8_slices->fprint(out);
+  fb0_slices->fprint(out);
+  fb1_slices->fprint(out);
+  fb2_slices->fprint(out);
+  fb3_slices->fprint(out);
+  fb4_slices->fprint(out);
+  fb5_slices->fprint(out);
+  fb6_slices->fprint(out);
+  fb7_slices->fprint(out);
+  fb8_slices->fprint(out);
 
-  for (size_t i = 0; i < this->general_vector.size(); i++)
-    this->general_vector[i].fprint(out);
+  for (size_t i = 0; i < general_vector.size(); i++)
+    general_vector[i].fprint(out);
 }
 
 /* Splits the factor base for a polynomial into disjoint parts which are
@@ -496,7 +510,7 @@ fb_factorbase::append(const fb_general_entry &fb_cur)
   static bool printed_too_large_prime_warning = false;
 
   /* Find the smallest threshold t such that t >= q */
-  for (i = 0; i < FB_MAX_PARTS && fb_cur.q > this->thresholds[i]; i++);
+  for (i = 0; i < FB_MAX_PARTS && fb_cur.q > thresholds[i]; i++);
   /* No prime > largest threshold should ever be added */
   if (i == FB_MAX_PARTS) {
     if (!printed_too_large_prime_warning) {
@@ -507,7 +521,7 @@ fb_factorbase::append(const fb_general_entry &fb_cur)
     }
     return; /* silently skip this entry */
   }
-  this->parts[i]->append(fb_cur);
+  parts[i]->append(fb_cur);
 }
 
 /* Remove newline, comment, and trailing space from a line. Write a
@@ -555,49 +569,61 @@ read_strip_comment (char *const line)
 void
 fb_factorbase::read(const char * const filename)
 {
-    fb_general_entry fb_cur;
-    FILE *fbfile;
-    // too small linesize led to a problem with rsa768;
-    // it would probably be a good idea to get rid of fgets
-    const size_t linesize = 1000;
-    char line[linesize];
-    unsigned long linenr = 0;
-    fbprime_t maxprime = 0;
-    unsigned long nr_primes = 0;
-
-    fbfile = fopen_maybe_compressed (filename, "r");
-    if (fbfile == NULL) {
-        fprintf (stderr, "# Could not open file %s for reading\n", filename);
-        return;
-    }
-
-    while (!feof(fbfile)) {
-        /* Sadly, the size parameter of fgets() is of type int */
-        if (fgets (line, static_cast<int>(linesize), fbfile) == NULL)
-            break;
-        linenr++;
-        if (read_strip_comment(line) == (size_t) 0) {
-            /* Skip empty/comment lines */
-            continue;
-        }
-
-        fb_cur.parse_line (line, linenr);
-        fb_cur.invq = compute_invq(fb_cur.q);
-        this->append(fb_cur);
-
-        /* fb_fprint_entry (stdout, fb_cur); */
-	if (fb_cur.p > maxprime)
-	    maxprime = fb_cur.p;
-        nr_primes++;
-    }
-
-    verbose_output_print (0, 2, "# Factor base successfully read, %lu primes, "
-			  "largest was %" FBPRIME_FORMAT "\n",
-			  nr_primes, maxprime);
-
-    fclose_maybe_compressed (fbfile, filename);
-
+  fb_general_entry fb_cur, fb_last;
+  bool had_entry = false;
+  FILE *fbfile;
+  // too small linesize led to a problem with rsa768;
+  // it would probably be a good idea to get rid of fgets
+  const size_t linesize = 1000;
+  char line[linesize];
+  unsigned long linenr = 0;
+  fbprime_t maxprime = 0;
+  unsigned long nr_primes = 0;
+  
+  fbfile = fopen_maybe_compressed (filename, "r");
+  if (fbfile == NULL) {
+    fprintf (stderr, "# Could not open file %s for reading\n", filename);
     return;
+  }
+  
+  while (!feof(fbfile)) {
+    /* Sadly, the size parameter of fgets() is of type int */
+    if (fgets (line, static_cast<int>(linesize), fbfile) == NULL)
+      break;
+    linenr++;
+    if (read_strip_comment(line) == (size_t) 0) {
+      /* Skip empty/comment lines */
+      continue;
+    }
+    
+    fb_cur.parse_line (line, linenr);
+    fb_cur.invq = compute_invq(fb_cur.q);
+    if (!had_entry) {
+      fb_last = fb_cur;
+      had_entry = true;
+    } else if (fb_cur.q == fb_last.q) {
+      fb_last.merge(fb_cur);
+    } else {
+      append(fb_last);
+      fb_last = fb_cur;
+    }
+    
+    /* fb_fprint_entry (stdout, fb_cur); */
+    if (fb_cur.p > maxprime)
+      maxprime = fb_cur.p;
+    nr_primes++;
+  }
+
+  if (had_entry)
+    append(fb_last);
+  
+  verbose_output_print (0, 2, "# Factor base successfully read, %lu primes, "
+			"largest was %" FBPRIME_FORMAT "\n",
+			nr_primes, maxprime);
+  
+  fclose_maybe_compressed (fbfile, filename);
+  
+  return;
 }
 
 /* Return p^e. Trivial exponentiation for small e, no check for overflow */
@@ -635,7 +661,6 @@ fb_linear_root (fbroot_t *root, const mpz_t *poly, fbprime_t q)
   modulusul_t m;
   residueul_t r0, r1;
   bool is_projective;
-
 
   modul_initmod_ul (m, q);
   modul_init_noset0 (r0, m);
@@ -689,14 +714,14 @@ class fb_powers {
   fb_power_t operator[] (const size_t i) {
     return (*this->powers)[i];
   }
-  size_t size() {return this->powers->size();}
+  size_t size() {return powers->size();}
 };
 
 /* Create a list of prime powers (with exponent >1) up to lim */
 fb_powers::fb_powers (const fbprime_t lim)
 {
   fbprime_t p;
-  this->powers = new std::vector<fb_power_t>;
+  powers = new std::vector<fb_power_t>;
   
   for (p = 2; p <= lim / p; p = getprime(1)) {
     fbprime_t q = p;
@@ -705,12 +730,12 @@ fb_powers::fb_powers (const fbprime_t lim)
       q *= p;
       k++;
       fb_power_t new_entry = {p, q, k};
-      this->powers->push_back(new_entry);
+      powers->push_back(new_entry);
     } while (q <= lim / p);
   }
   getprime(0);
   
-  std::sort (this->powers->begin(), this->powers->end(), cmp_powers);
+  std::sort (powers->begin(), powers->end(), cmp_powers);
 }
 
 /* Generate a factor base with primes <= bound and prime powers <= powbound
@@ -733,9 +758,9 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
                "# including primes up to %" FBPRIME_FORMAT
                " and prime powers up to %" FBPRIME_FORMAT ".\n",
                poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
-               poly[0], this->thresholds[FB_MAX_PARTS-1], powbound);
+               poly[0], thresholds[FB_MAX_PARTS-1], powbound);
 
-  for (next_prime = 2; next_prime <= this->thresholds[FB_MAX_PARTS-1]; ) {
+  for (next_prime = 2; next_prime <= thresholds[FB_MAX_PARTS-1]; ) {
     /* Handle any prime powers that are smaller than next_prime */
     if (next_pow < powers->size() && (*powers)[next_pow].q <= next_prime) {
       /* The list of powers must not include primes */
@@ -759,7 +784,7 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
                    skip to next prime */
 
     fb_cur.invq = compute_invq(fb_cur.q);
-    this->append(fb_cur);
+    append(fb_cur);
   }
 
   getprime (0); /* free prime iterator */
@@ -771,7 +796,7 @@ void
 fb_factorbase::fprint(FILE *out)
 {
   for (size_t part = 0; part < FB_MAX_PARTS; part++)
-    this->parts[part]->fprint(out);
+    parts[part]->fprint(out);
 }
 
 
@@ -794,7 +819,7 @@ int main(int argc, char **argv)
 
   fb1->make_linear(poly, powbound, true);
   fprintf (stdout, "Linear factor base:\n");
-  fb1->fprint(stdout);
+  // fb1->fprint(stdout);
   if (argc > 1) {
     fb2->read(argv[1]);
     fprintf (stdout, "Factor base from file:\n");
