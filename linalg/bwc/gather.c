@@ -221,13 +221,13 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (tcan_print && nrhs) {
         if (nrhs) {
             printf("** Informational note about GF(p) inhomogeneous system:\n");
-            printf("   Original matrix dimensions: %"PRIu32" %"PRIu32"\n", mmt->n0[0], mmt->n0[1]);
-            printf("   We expect to obtain a vector of size %"PRIu32"\n",
+            printf("   Original matrix dimensions: %" PRIu32" %" PRIu32"\n", mmt->n0[0], mmt->n0[1]);
+            printf("   We expect to obtain a vector of size %" PRIu32"\n",
                     mmt->n0[!bw->dir] + nrhs);
             printf("   which we hope will be a kernel vector for (M_square||RHS).\n"
                    "   We will discard the coefficients which correspond to padding columns\n"
                    "   This entails keeping coordinates in the intervals\n"
-                   "   [0..%"PRIu32"[ and [%"PRIu32"..%"PRIu32"[\n"
+                   "   [0..%" PRIu32"[ and [%" PRIu32"..%" PRIu32"[\n"
                    "   in the result.\n"
                    "** end note.\n",
             mmt->n0[bw->dir], mmt->n0[!bw->dir], mmt->n0[!bw->dir] + nrhs);
@@ -437,7 +437,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), nrhs, f);
             ASSERT_ALWAYS(rc == (int) nrhs);
             fclose(f);
-            printf("%s is now a right nullspace vector for (M|RHS) (for a square M of dimension %"PRIu32"x%"PRIu32").\n", tmp, unpadded, unpadded);
+            printf("%s is now a right nullspace vector for (M|RHS) (for a square M of dimension %" PRIu32"x%" PRIu32").\n", tmp, unpadded, unpadded);
 
             char * tmp2;
             rc = asprintf(&tmp2, "%s.%u.truncated.txt", kprefix, 0);
@@ -459,7 +459,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 fprintf(f2, "\n");
             }
             fclose(f2);
-            printf("%s (in ascii) is now a right nullspace vector for (M|RHS) (for the original M, of dimension %"PRIu32"x%"PRIu32").\n", tmp2, mmt->n0[0], mmt->n0[1]);
+            printf("%s (in ascii) is now a right nullspace vector for (M|RHS) (for the original M, of dimension %" PRIu32"x%" PRIu32").\n", tmp2, mmt->n0[0], mmt->n0[1]);
             free(tmp2);
             free(tmp);
         }

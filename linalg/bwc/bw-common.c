@@ -258,10 +258,10 @@ int get_rhs_file_header_stream(FILE * f, uint32_t * p_nrows, unsigned int * p_nr
 {
     int rc;
     if (p_nrows) {
-        rc = fscanf(f, "%"SCNu32, p_nrows);
+        rc = fscanf(f, "%" SCNu32, p_nrows);
         ASSERT_ALWAYS(rc == 1);
     } else {
-        fscanf(f, "%*"SCNu32);
+        fscanf(f, "%*" SCNu32);
     }
     if (p_nrhs) {
         rc = fscanf(f, "%d", p_nrhs);

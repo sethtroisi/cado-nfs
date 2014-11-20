@@ -341,7 +341,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         }
         for(unsigned int i = 0 ; i < nrhs ; i++) {
             xvecs[i] = balancing_pre_shuffle(mmt->bal, mmt->n0[!bw->dir]-nrhs+i);
-            printf("Forced %d-th x vector to be the %"PRIu32"-th canonical basis vector\n", i, xvecs[i]);
+            printf("Forced %d-th x vector to be the %" PRIu32"-th canonical basis vector\n", i, xvecs[i]);
             ASSERT_ALWAYS(xvecs[i] >= (uint32_t) (bw->m - nrhs));
         }
         for(int i = (int) nrhs ; i < bw->m ; i++) {

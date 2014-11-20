@@ -629,7 +629,7 @@ read_relation_cwi (FILE *fp, relation_t *rel, const int alg_first)
   unsigned int i; /* number of given primes */
   char c, flag[4];
 
-  ret = fscanf (fp, "%4s %" SCNd64 " %"SCNu64 "", flag, &(rel->a), &(rel->b));
+  ret = fscanf (fp, "%4s %" SCNd64 " %" SCNu64 "", flag, &(rel->a), &(rel->b));
   if (ret != 3)
     {
       if (feof (fp))

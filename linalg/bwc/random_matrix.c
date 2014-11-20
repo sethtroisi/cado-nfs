@@ -1146,7 +1146,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 #define WU32(out, pre, x, post) do {					\
         if (ascii) {							\
-            fprintf(out, pre "%"PRIu32 post, (x));			\
+            fprintf(out, pre "%" PRIu32 post, (x));			\
         } else {							\
             fwrite(&(x), sizeof(uint32_t), 1, out);			\
         }								\
@@ -1154,7 +1154,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 #define WS32(out, pre, x, post) do {                                    \
         if (ascii) {							\
-            fprintf(out, pre "%"PRId32 post, (x));			\
+            fprintf(out, pre "%" PRId32 post, (x));			\
         } else {							\
             fwrite(&(x), sizeof(uint32_t), 1, out);			\
         }								\
