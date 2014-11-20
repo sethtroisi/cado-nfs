@@ -1,8 +1,8 @@
 #ifndef LAS_ARITH_H_
 #define LAS_ARITH_H_
 
-#include "cado.h"
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "fb.h"
 #include "utils.h"
