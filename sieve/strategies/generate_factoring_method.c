@@ -1,3 +1,5 @@
+#include "cado.h"
+
 #include <float.h>
 #include <gmp.h>
 #include <math.h>
@@ -9,7 +11,7 @@
 #include <sys/resource.h>
 #include <time.h>
 
-#include "cado.h"
+
 #include "portability.h"
 #include "utils.h"
 #include "facul.h"

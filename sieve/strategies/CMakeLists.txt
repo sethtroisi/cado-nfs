@@ -32,3 +32,13 @@ target_link_libraries(finalst ${LIB_EXEC})
 
 add_executable(gen_decomp gen_decomp.c)
 target_link_libraries(gen_decomp m)
+
+add_executable(test_strategy_cado
+  test_strategy_cado.c
+  finding_good_strategy.c
+  generate_strategies.c
+  generate_factoring_method.c
+  ${SUF_UTILS}/decomp.c
+  ${SUF_UTILS}/tab_decomp.c
+  ${SRC_UTILS})
+target_link_libraries(test_strategy_cado ${LIB_EXEC} facul)

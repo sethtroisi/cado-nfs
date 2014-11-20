@@ -1,14 +1,14 @@
+#include "cado.h"
+
 #include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "cado.h"
 #include "ecm.h"
 #include "facul.h"
 #include "portability.h"
 #include "utils.h"
-
 #include "finding_good_strategy.h"
 
 //#define STATS 

@@ -1,11 +1,11 @@
+#include "cado.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
-
 #include "finding_good_strategy.h"
 
 /************************************************************************/

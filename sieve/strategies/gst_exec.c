@@ -1,16 +1,16 @@
+#include "cado.h"
+
 #include <math.h>
 #include <float.h>
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <gmp.h>
 
-#include "facul.h"
-#include "ecm.h"
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
+#include "facul.h"
+#include "ecm.h"
 #include "tab_strategy.h"
 #include "generate_strategies.h"
 

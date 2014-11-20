@@ -1,12 +1,12 @@
+#include "cado.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
 #include "ecm.h"
-
 #include "generate_factoring_method.h"
 
 static void declare_usage(param_list pl)
