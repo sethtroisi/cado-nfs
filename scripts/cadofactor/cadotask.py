@@ -2792,8 +2792,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, removal pass"
     @property
     def programs(self):
-        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                 "renumber": Request.GET_RENUMBER_FILENAME}
+        input = { "renumber": Request.GET_RENUMBER_FILENAME}
         if self.params["dlp"]:
             input["badidealinfo"] = Request.GET_BADIDEALINFO_FILENAME
         return ((cadoprograms.Duplicates2, ("rel_count", "filelist"), input),)

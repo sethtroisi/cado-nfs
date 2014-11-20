@@ -471,7 +471,6 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "filelist", "file containing a list of input files");
   param_list_decl_usage(pl, "basepath", "path added to all file in filelist");
-  param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
   param_list_decl_usage(pl, "nrels",
                               "number of relations to be found in the slice");
@@ -498,8 +497,6 @@ int
 main (int argc, char *argv[])
 {
     argv0 = argv[0];
-    //TODO remove useless polynomials
-    cado_poly cpoly;
 
     param_list pl;
     param_list_init(pl);
@@ -535,7 +532,6 @@ main (int argc, char *argv[])
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 
-    const char * polyfilename = param_list_lookup_string(pl, "poly");
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
@@ -551,11 +547,6 @@ main (int argc, char *argv[])
       usage(pl, argv0);
     }
 
-    if (polyfilename == NULL)
-    {
-      fprintf(stderr, "Error, missing -poly command line argument\n");
-      usage(pl, argv0);
-    }
     if (renumberfilename == NULL)
     {
       fprintf (stderr, "Error, missing -renumber command line argument\n");
@@ -586,17 +577,6 @@ main (int argc, char *argv[])
     if ((filelist != NULL) + (argc != 0) != 1) {
       fprintf(stderr, "Error, provide either -filelist or freeform file names\n");
       usage(pl, argv0);
-    }
-
-    cado_poly_init (cpoly);
-#ifndef FOR_FFS
-    if (!cado_poly_read (cpoly, polyfilename))
-#else
-    if (!ffs_poly_read (cpoly, polyfilename))
-#endif
-    {
-      fprintf (stderr, "Error reading polynomial file\n");
-      exit (EXIT_FAILURE);
     }
 
     allbad_info_t badinfo;
@@ -771,6 +751,5 @@ main (int argc, char *argv[])
 
   param_list_clear(pl);
   renumber_clear (renumber_tab);
-  cado_poly_clear (cpoly);
   return 0;
 }

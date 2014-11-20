@@ -770,7 +770,6 @@ class Duplicates2(Program):
     def __init__(self,
                  *args: PositionalParameter(is_input_file=True),
                  rel_count: Parameter("nrels", checktype=int),
-                 poly: Parameter(is_input_file=True),
                  renumber: Parameter(is_input_file=True),
                  filelist: Parameter(is_input_file=True)=None,
                  badidealinfo: Parameter(is_input_file=True)=None,
