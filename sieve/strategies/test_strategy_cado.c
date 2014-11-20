@@ -270,7 +270,8 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "t",
 	  "specify the time (seconds) to optain cofactors in the file\n"
 	  "\t\t given by the option 'dist'.");
-
+    param_list_decl_usage(pl, "out",
+          "the output file which contain our strategies\n");
 }
 
 
@@ -338,7 +339,7 @@ int main (int argc, char *argv[])
     int lpb = (lpb0>lpb1)?lpb0:lpb1;
     //convert the time in micro-s. because all previous binaries
     //compute their times in micro-s.
-    C0 *= 1000000;    //s-->ms 
+    C0 *= 1000000;    //s-->micro-s 
 
     //option: tab decomp
     const char *name_directory_decomp;
@@ -372,7 +373,7 @@ int main (int argc, char *argv[])
     }
     fclose(file_C);
 
-        
+   
     gmp_randstate_t state;
     gmp_randinit_default(state);
 
@@ -400,21 +401,33 @@ int main (int argc, char *argv[])
     printf(" Y = %lf relations, T = %lf s., yt = %1.10lf rel/s\n", Y,
     	   T / 1000000, Y / T * 1000000);
 
-    //free
-    FILE *file_out = fopen("/tmp/res_cado", "w");
-    for (int r0 = 0; r0 <= mfb0; r0++) {
-	for (int r1 = 0; r1 <= mfb1; r1++) {
-	    fprintf (file_out, "[r0 = %d, r2 = %d]\n", r0, r1);
-	    tabular_strategy_fprint(file_out, matrix[r0][r1]);
-	    tabular_strategy_free(matrix[r0][r1]);
-	}
-	free (distrib_C[r0]);
-	free(matrix[r0]);
+    const char *pathname_output;
+    pathname_output = param_list_lookup_string(pl, "out");
+    
+    if (pathname_output != NULL) {
+	FILE *file_output = fopen(pathname_output, "w");
+	for (int r0 = 0; r0 <= mfb0; r0++)
+	    for (int r1 = 0; r1 <= mfb1; r1++)
+		if (matrix[r0][r1]->tab[0] != NULL) {
+		    fprintf(file_output,
+			    "[r0=%d, r1=%d] : (p = %lf, t = %lf)\n",
+			    r0, r1, matrix[r0][r1]->tab[0]->proba,
+			    matrix[r0][r1]->tab[0]->time);
+		    strategy_fprint_design(file_output, matrix[r0][r1]->tab[0]);
+		}
+	fclose(file_output);
     }
-    free(distrib_C);
-    free(matrix);
-    fclose(file_out);
-    gmp_randclear(state);
-    param_list_clear(pl);
-    return EXIT_SUCCESS;
+//free
+
+for (int r0 = 0; r0 <= mfb0; r0++) {
+    for (int r1 = 0; r1 <= mfb1; r1++) 
+	tabular_strategy_free(matrix[r0][r1]);
+    free (distrib_C[r0]);
+    free(matrix[r0]);
+ }
+free(distrib_C);
+free(matrix);
+gmp_randclear(state);
+param_list_clear(pl);
+return EXIT_SUCCESS;
 }
