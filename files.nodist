@@ -121,4 +121,3 @@ linalg/bwc/update-flint.sh
 linalg/bwc/parse-flint-fft-doc.pl
 linalg/bwc/creating-sm-example.m
 linalg/bwc/sm-outside-matrix.m
-sieve/strategies/test_strategy_cado.c
