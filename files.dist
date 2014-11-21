@@ -401,7 +401,6 @@ local.sh.macosx.x86_32
 local.sh.macosx.x86_64
 macros.h
 misc/CMakeLists.txt
-misc/CMakeLists-nodist.txt
 misc/convert_poly.c
 misc/convert_rels.c
 misc/check_rels.c
