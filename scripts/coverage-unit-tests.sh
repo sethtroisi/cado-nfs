@@ -14,6 +14,7 @@ doit() {
     cat > $F <<EOF
 CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
 CXXFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
+CHECKS_EXPENSIVE=1
 EOF
     export LOCALFILE=$F
 
