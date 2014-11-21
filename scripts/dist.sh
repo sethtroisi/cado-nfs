@@ -42,7 +42,7 @@ read_files_dist | rsync -a     \
 
 scripts/version.sh > $t/$pkg/.git_version
 
-if tar --version | grep -q "GNU tar" ; then
+if tar --version 2>/dev/null | grep -q "GNU tar" ; then
 	if tar --version | perl -ne '/^tar.*(\d+\.\d+)/ && do { $ver=$1; }; END { exit 1 unless defined($ver) && $ver >= 1.13; exit 0; }' ; then
 		taropts="--format=oldgnu"
 	fi
