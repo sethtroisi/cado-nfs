@@ -65,7 +65,7 @@ nb_curves (const unsigned int lpb)
 
 facul_strategy_t *
 facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
-                     int n, const int verbose)
+		     int n, const int verbose)
 {
   facul_strategy_t *strategy;
   facul_method_t *methods;
@@ -286,18 +286,25 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
 /*                       STRATEGY BOOK                                       */
 /*****************************************************************************/
 
+/*If the plan is already precomputed and stored at the index i, return
+  i. Otherwise return the last index of tab to compute and add this
+  new plan at this index!*/
 static int
-get_index_plan (precompute_plan_t*tab, int len, int B1, int B2, int method)
+get_index_plan (precompute_plan_t*tab, int B1, int B2, int method)
 {
-  for (int i = 0; i < len; i++)
+  int i = 0;
+  while (tab[i].plan != NULL){
     if (tab[i].B1 == B1 && tab[i].B2 == B2 && tab[i].method == method)
-      return i;
-  return -1;
+      break;
+    i++;
+  }
+  return i;
 }
 
 
 static void
-return_data_ex (char** res, regmatch_t *pmatch, size_t nmatch, const char * str_process)
+return_data_ex (char** res, regmatch_t *pmatch, size_t nmatch,
+		const char * str_process)
 {
   //(re)init res
   for (size_t i = 0; i < nmatch;i++)
@@ -329,9 +336,7 @@ return_data_ex (char** res, regmatch_t *pmatch, size_t nmatch, const char * str_
 
 static int
 process_line (facul_strategies_t* strategies, unsigned int* index_st,
-	      int* length_plan, const unsigned int rfbb, const unsigned int afbb,
-	      const unsigned long rlpb, const unsigned long alpb, const char *str,
-	      const int verbose)
+	      const char *str, const int verbose)
 {
   int index_method = 0; /* this is the index of the current factoring
 			   methods */
@@ -340,10 +345,11 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
   //regular expression for the sides
   const char *str_preg_index = "r0=([[:digit:]]+),[[:space:]]r1=([[:digit:]]+)";
   //regular expression for the strategy
-  const char *str_preg_fm = "([[:alnum:]]{2,3}):[[:space:]](...-?[[:alnum:]]{2,3}?),[[:space:]]([[:digit:]]+),[[:space:]]([[:digit:]]+)";
+  const char *str_preg_fm = "([[:alnum:]]{2,3}):[[:space:]](...-?[[:alnum:]]"
+    "{2,3}?),[[:space:]]([[:digit:]]+),[[:space:]]([[:digit:]]+)";
   regcomp (&preg_index, str_preg_index, REG_ICASE|REG_EXTENDED);
   regcomp (&preg_fm, str_preg_fm, REG_ICASE|REG_EXTENDED);
-  
+
   //process the ligne
   const char * str_process = &str[0];
 
@@ -358,43 +364,21 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
       return_data_ex (res, pmatch, nmatch, str_process);
       if (res[0] != NULL)
 	{
-	  /* changes the current strategy and allocates it! */
-	  facul_both_strategy_t strategy;
-
-	  strategy.lpb[0] = rlpb;
-	  strategy.lpb[1] = alpb;
-	  /* Store fbb^2 in assume_prime_thresh */
-	  strategy.assume_prime_thresh[0] = (double) rfbb * (double) rfbb;
-	  strategy.assume_prime_thresh[1] = (double) afbb * (double) afbb;
-
-	  strategy.BBB[0] = (double) rfbb * strategy.assume_prime_thresh[0];
-	  strategy.BBB[1] = (double) afbb * strategy.assume_prime_thresh[1];
-
-	  facul_method_t *methods;
-	  methods = malloc (NB_MAX_METHODS * sizeof (facul_method_t));
-	  ASSERT_ALWAYS (methods != NULL);
-	  strategy.methods = methods;
-	  strategy.methods[0].method = 0;
-	  strategy.methods[0].plan = NULL;
-
+	  /* changes the current strategy! */
 	  index_st[0] = atoi(res[0]);
 	  index_st[1] = atoi(res[1]);
-	  strategies->strategy[ atoi(res[0]) ][ atoi(res[1]) ] = strategy;
 	}
 
       /*else TEST REGULAR EXPRESSION  'preg_alg'*/
-      else 
+      else
 	{
 	  regexec (&preg_fm, str_process, nmatch, pmatch, 0);
 	  return_data_ex (res, pmatch, nmatch, str_process);
 	  if (res[0] != NULL)
 	    {
 	      /*add the new factoring method to the current strategy! */
-	      facul_both_strategy_t* strategy =
-		&strategies->strategy[index_st[0]][index_st[1]];
-	      facul_method_t* methods= strategy->methods;
-	      ASSERT_ALWAYS (methods!=NULL);
-
+	      facul_method_t* methods =
+		strategies->methods[index_st[0]][index_st[1]];
 	      int side;
 	      //todo: remove the words ALG and RAT!!!//S0 or S1
 	      if (strcmp (res[0], "ALG") == 0 || strcmp (res[0], "S1") == 0)
@@ -409,11 +393,11 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      int B2 = atoi (res[3]);
 
 	      if ( B1 == 0 || B2 == 0)//This is the zero strategy
-	      	{
+		{
 		  methods[index_method].method = PM1_METHOD;
-	      	  methods[index_method].side = side;
+		  methods[index_method].side = side;
 		  methods[index_method].plan = NULL;
-	      	}
+		}
 	      else
 		{
 		  int curve = 0;
@@ -442,28 +426,28 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		    }
 		  //search if the plan isn't already computed!
 		  methods[index_method].side = side;
-		  int index_plan = get_index_plan(strategies->plan,
-						  *length_plan, B1, B2,
-						  methods[index_method].method);
-		  //index_plan = -1;
-		  if (index_plan == -1)
+		  int index_plan =get_index_plan(strategies->plan, B1, B2,
+						 methods[index_method].method); 
+
+		  if ( strategies->plan[index_plan].plan == NULL)
 		    {
+		      //the plan isn't already precomputed!
 		      void* plan = NULL;
 		      if (methods[index_method].method == PM1_METHOD)
-		      	{
+			{
 			  plan = malloc (sizeof (pm1_plan_t));
 			  pm1_make_plan (plan, B1, B2, verbose);
 			}
 		      else if (methods[index_method].method == PP1_27_METHOD ||
 			       methods[index_method].method == PP1_65_METHOD)
-		      	{
+			{
 			  plan = malloc (sizeof (pp1_plan_t));
 			  pp1_make_plan (plan, B1, B2, verbose);
 			}
 		      else {
-		      	//int param =
-			//(curve==MONTY16)?1:3+index_method; todo:
-			//change -1 by +3 (-1 is to do the same thing
+			//int param =
+			//(curve==MONTY16)?1:3+index_method;
+			//todo:change -1 by +3 (-1 is to do the same thing
 			//that make_strategy)
 			//todo: choose better values for param.
 			int param = (curve==MONTY16)?1:index_method-2;
@@ -475,25 +459,25 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 			  param = 11;//B12
 			plan = malloc (sizeof (ecm_plan_t));
 
-		      	ecm_make_plan (plan,
-		      		       B1,B2, curve, param, 1, verbose);
+			ecm_make_plan (plan,
+				       B1,B2, curve, param, 1, verbose);
 		      }
-		      strategies->plan[*length_plan].method = methods[index_method].method;
-		      strategies->plan[*length_plan].B1 = B1;
-		      strategies->plan[*length_plan].B2 = B2;
-		      strategies->plan[*length_plan].plan = plan;
+		      strategies->plan[index_plan].method =
+			methods[index_method].method;
+		      strategies->plan[index_plan].B1 = B1;
+		      strategies->plan[index_plan].B2 = B2;
+		      strategies->plan[index_plan].plan = plan;
 
-		      index_plan = *length_plan;
-		      (*length_plan)++;
-		      ASSERT (*length_plan < NB_MAX_METHODS);
+		      index_plan++;
+		      ASSERT (index_plan < NB_MAX_METHODS);
 		      //to show the end of plan!
-		      strategies->plan[*length_plan].plan = NULL;
-		      strategies->plan[*length_plan].B1 = 0;
-		      strategies->plan[*length_plan].B2 = 0;
-		      strategies->plan[*length_plan].method = 0;
+		      strategies->plan[index_plan].plan = NULL;
+		      strategies->plan[index_plan].B1 = 0;
+		      strategies->plan[index_plan].B2 = 0;
+		      strategies->plan[index_plan].method = 0;
 		    }
-
-		  methods[index_method].plan = strategies->plan[index_plan].plan;
+		  methods[index_method].plan =
+		    strategies->plan[index_plan].plan;
 
 		}
 	      index_method++;
@@ -515,7 +499,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
       free(res);
       free (pmatch);
     }
-  
+
   regfree(&preg_index);
   regfree(&preg_fm);
   return 0;
@@ -536,25 +520,38 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   ASSERT (strategies != NULL);
   strategies->mfb[0] = rmfb;
   strategies->mfb[1] = amfb;
-  facul_both_strategy_t** strategy = malloc (sizeof (*strategy) * (rmfb+1));
-  ASSERT (strategy != NULL);
-  unsigned int r, a;
-  for (r = 0; r <= rmfb; r++)
-    {
-      strategy[r] = malloc (sizeof (*strategy[r]) * (amfb+1));
-      ASSERT (strategy[r] != NULL);
-    } 
 
+  strategies->lpb[0] = rlpb;
+  strategies->lpb[1] = alpb;
+  /* Store fbb^2 in assume_prime_thresh */
+  strategies->assume_prime_thresh[0] = (double) rfbb * (double) rfbb;
+  strategies->assume_prime_thresh[1] = (double) afbb * (double) afbb;
+
+  strategies->BBB[0] = (double) rfbb * strategies->assume_prime_thresh[0];
+  strategies->BBB[1] = (double) afbb * strategies->assume_prime_thresh[1];
+
+  //alloc methods!
+  facul_method_t*** methods = malloc (sizeof (*methods) * (rmfb+1));
+  unsigned int r, a;
+  for (r = 0; r <= rmfb; r++) {
+    methods[r] = malloc (sizeof (*methods[r]) * (amfb+1));
+    ASSERT (methods[r] != NULL);
+    for (a = 0; a <= amfb; a++)
+      {
+	methods[r][a] = malloc (NB_MAX_METHODS * sizeof (facul_method_t));
+	ASSERT (methods[r][a] != NULL);
+	methods[r][a][0].method = 0;
+	methods[r][a][0].plan = NULL;
+      }
+  }
   /* to precompute our method */
-  precompute_plan_t* plan = malloc (sizeof(precompute_plan_t*)*NB_MAX_METHODS);
+  precompute_plan_t* plan = malloc (sizeof(precompute_plan_t)*NB_MAX_METHODS);
   plan[0].method = 0;
   plan[0].plan = NULL;
 
   strategies->plan = plan;
-  strategies->strategy = strategy;
-  
+  strategies->methods = methods;
   unsigned int index_strategies[2] = {0,0};
-  int length_plan = 0;
 
   char line[10000];
 
@@ -563,8 +560,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     {
       //process each line of 'file'
       int err = process_line (strategies, index_strategies,
-			      &length_plan, rfbb, afbb,
-			      rlpb, alpb, line, verbose);
+			      line, verbose);
       ASSERT (index_strategies[0] <= rmfb && index_strategies[1] <= amfb);
       if (err == -1)
 	return NULL;
@@ -576,11 +572,11 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   */
   for (r = 0; r <= rmfb; r++)
     for (a = 0; a <= amfb; a++){
-      facul_both_strategy_t* st = &strategies->strategy[r][a];
-      ASSERT (st != NULL);
-      facul_method_t* methods = st->methods;
-      int index_last_method[2] = {-1, -1};
+      facul_method_t* methods =
+	strategies->methods[r][a];
       ASSERT (methods != NULL);
+
+      int index_last_method[2] = {-1, -1};
       unsigned int i;
       for (i = 0; methods[i].method != 0; i++) {
 	methods[i].is_the_last = 0;
@@ -597,12 +593,12 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 }
 
 
-void 
+void
 facul_clear_strategies (facul_strategies_t *strategies)
 {
   if (strategies == NULL)
     return ;
-  
+
   //free plan
   precompute_plan_t* plan = strategies->plan;
   for (int j = 0; plan[j].method!=0; j++)
@@ -617,7 +613,7 @@ facul_clear_strategies (facul_strategies_t *strategies)
       free (plan[j].plan);
       plan[j].method = 0;
       plan[j].plan = NULL;
-    } 
+    }
   free (plan);
   plan = NULL;
 
@@ -626,12 +622,12 @@ facul_clear_strategies (facul_strategies_t *strategies)
   for (r = 0; r <= strategies->mfb[0]; r++) {
     unsigned int a;
     for (a = 0; a <= strategies->mfb[1]; a++)
-      free (strategies->strategy[r][a].methods);
-    free (strategies->strategy[r]);
+      free (strategies->methods[r][a]);
+    free (strategies->methods[r]);
   }
-  free (strategies->strategy);
+  free (strategies->methods);
   free (strategies);
-  
+
 }
 
 int
@@ -640,20 +636,20 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
   if (file == NULL)
     return -1;
   unsigned int r;
+  //print info lpb ...
+  printf ("(lpb = [%ld,%ld], as...=[%lf, %lf], BBB = [%lf, %lf])\n",
+	  strategies->lpb[0], strategies->lpb[1],
+	  strategies->assume_prime_thresh[0],
+	  strategies->assume_prime_thresh[1],
+	  strategies->BBB[0], strategies->BBB[1]);
+
   for (r = 0; r <= strategies->mfb[0]; r++) {
     unsigned int a;
     for (a = 0; a <= strategies->mfb[1]; a++) {
       printf ("[r = %d, a = %d]", r, a);
-      facul_both_strategy_t* st = &strategies->strategy[r][a];
-      //print info lpb ...
-      if (st == NULL)
-	continue;
-      printf ("(lpb = [%ld,%ld], as...=[%lf, %lf], BBB = [%lf, %lf])\n",
-	      st->lpb[0], st->lpb[1], st->assume_prime_thresh[0],
-	      st->assume_prime_thresh[1], st->BBB[0], st->BBB[1]);
-      facul_method_t* methods = st->methods;
+      facul_method_t* methods = strategies->methods[r][a];
       if (methods == NULL)
-      	continue;
+	continue;
       for (int i = 0; methods[i].method != 0; i++)
 	{
 	  if (methods[i].plan == NULL)//zero method!!!
@@ -695,31 +691,24 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 /********************************************/
 
 
-void 
+void
 modset_clear (modset_t *modset)
 {
-  //ASSERT_ALWAYS(modset->arith != CHOOSE_NONE);//why!!!
   switch (modset->arith) {
   case CHOOSE_NONE: /* already clear */
     break;
   case CHOOSE_UL:
     modredcul_clearmod (modset->m_ul);
     break;
-//#if     MOD_MAXBITS > MODREDCUL_MAXBITS
   case CHOOSE_15UL:
     modredc15ul_clearmod (modset->m_15ul);
     break;
-//#endif
-//#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
   case CHOOSE_2UL2:
     modredc2ul2_clearmod (modset->m_2ul2);
     break;
-//#endif
-//#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
   case CHOOSE_MPZ:
     modmpz_clearmod (modset->m_mpz);
     break;
-//#endif
   default:
     abort();
   }
@@ -742,18 +731,18 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 		 int* is_smooth)
 {
   int* found = calloc(2, sizeof(int));
-  
-  facul_both_strategy_t* strategy = &strategies->strategy[cof[0]][cof[1]];
-  
-  if (strategy->methods == NULL)
+
+  facul_method_t* methods = strategies->methods[cof[0]][cof[1]];
+
+  if (methods == NULL)
     return found;
 
-  for (int i = 0; strategy->methods[i].method != 0; i++)
+  for (int i = 0; methods[i].method != 0; i++)
     {
       modset_t fm, cfm;
       unsigned int len_fm = 0;
       unsigned int len_cfm = 0;
-      int side = strategy->methods[i].side;
+      int side = methods[i].side;
       if (is_smooth[side])
 	continue; 
 
@@ -761,38 +750,32 @@ facul_both_src (unsigned long **factors, const modset_t* m,
       switch (m[side].arith) {
       case CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors[side], m[side].m_ul,
-				      strategy->methods[i], &fm, &cfm,
-				      &len_fm, &len_cfm, strategy->lpb[side],
-				      strategy->assume_prime_thresh[side],
-				      strategy->BBB[side]);
+				      methods[i], &fm, &cfm, &len_fm,
+				      &len_cfm, strategies->lpb[side],
+				      strategies->assume_prime_thresh[side],
+				      strategies->BBB[side]);
 	break;
-//#if     MOD_MAXBITS > MODREDCUL_MAXBITS
       case CHOOSE_15UL:
 	res_fac = facul_doit_onefm_15ul(factors[side], m[side].m_15ul,
-					strategy->methods[i], &fm, &cfm,
-					&len_fm, &len_cfm, strategy->lpb[side],
-					strategy->assume_prime_thresh[side],
-					strategy->BBB[side]);
+					methods[i], &fm, &cfm, &len_fm,
+					&len_cfm, strategies->lpb[side],
+					strategies->assume_prime_thresh[side],
+					strategies->BBB[side]);
 	break;
-//#endif
-//#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
       case CHOOSE_2UL2:
 	res_fac = facul_doit_onefm_2ul2 (factors[side], m[side].m_2ul2,
-					 strategy->methods[i], &fm, &cfm,
-					 &len_fm, &len_cfm, strategy->lpb[side],
-					 strategy->assume_prime_thresh[side],
-					 strategy->BBB[side]);
+					 methods[i], &fm, &cfm, &len_fm,
+					 &len_cfm, strategies->lpb[side],
+					 strategies->assume_prime_thresh[side],
+					 strategies->BBB[side]);
 	break;
-//#endif
-//#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
       case CHOOSE_MPZ:
 	res_fac = facul_doit_onefm_mpz (factors[side], m[side].m_mpz,
-					strategy->methods[i], &fm, &cfm,
-					&len_fm, &len_cfm, strategy->lpb[side],
-					strategy->assume_prime_thresh[side],
-					strategy->BBB[side]);
+					methods[i], &fm, &cfm, &len_fm,
+					&len_cfm, strategies->lpb[side],
+					strategies->assume_prime_thresh[side],
+					strategies->BBB[side]);
 	break;
-//#endif
       default: abort();
       }
       //check our result!
@@ -812,7 +795,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	  /* Zero factor found. If it was the last method for this
 	     side, then one stops the cofactorisation. Otherwise, one
 	     tries with an other method! */
-	  if (strategy->methods[i].is_the_last)
+	  if (methods[i].is_the_last)
 	      break;
 	  else
 	    continue;
@@ -871,7 +854,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	  break;
 	}
     }
-  
+
   return found;
 }
 
@@ -892,14 +875,14 @@ facul_both (unsigned long **factors, mpz_t* N,
   modset_t n[2];
   n[0].arith = CHOOSE_NONE;
   n[1].arith = CHOOSE_NONE;
-  
+
 #ifdef PARI
   gmp_fprintf (stderr, "(%Zd %Zd)", N[0], N[1]);
 #endif
 
   if (mpz_sgn (N[0]) <= 0 || mpz_sgn (N[1]) <= 0)
       return found;
-  
+
   if (mpz_cmp_ui (N[0], 1UL) == 0)
     is_smooth[0] = 1;
   if (mpz_cmp_ui (N[1], 1UL) == 0)
@@ -913,8 +896,9 @@ facul_both (unsigned long **factors, mpz_t* N,
       cof[side] = bits;
       if (bits > MODMPZ_MAXBITS)
 	return 0;
-  
-      /* Use the fastest modular arithmetic that's large enough for this input */
+
+      /* Use the fastest modular arithmetic that's large enough for
+	 this input */
       if (bits <= MODREDCUL_MAXBITS)
 	{
 	  ASSERT(mpz_fits_ulong_p(N[side]));
@@ -978,8 +962,6 @@ facul_both (unsigned long **factors, mpz_t* N,
   //Free
   modset_clear (&n[0]);
   modset_clear (&n[1]);
-  
+
   return found;
 }
-
-

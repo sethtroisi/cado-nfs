@@ -49,22 +49,6 @@ typedef struct {
 
 
 
-
-/*
-  This is the same structure than facul_strategy_t but now our
-  strategy will be applied on both sides.
-*/
-typedef struct {
-  unsigned long lpb[2];        /* Large prime bound 2^lpb */
-  double assume_prime_thresh[2]; /* The factor base bound squared.
-                                We assume that primes <= fbb have already been 
-				removed, thus any factor <= assume_prime_thresh 
-				is  assumed prime without further test. */
-  double BBB[2];               /* The factor base bound cubed. */
-  facul_method_t *methods;  /* List of methods to try */
-} facul_both_strategy_t;
-
-
 typedef struct {
   int B1;
   int B2;
@@ -74,9 +58,16 @@ typedef struct {
 
 
 typedef struct {
-  facul_both_strategy_t** strategy;
-  precompute_plan_t* plan;
-  unsigned int mfb[2];
+  unsigned long lpb[2];        /* Large prime bounds 2^lpb */
+  double assume_prime_thresh[2]; /* The factor base bounds squared.
+                                We assume that primes <= fbb have already been 
+				removed, thus any factor <= assume_prime_thresh 
+				is  assumed prime without further test. */
+  double BBB[2];               /* The factor base bounds cubed. */
+  unsigned int mfb[2];        /* The cofactor bounds.*/
+  facul_method_t ***methods;  /* List of methods to try for each pair
+				 of cofactors.*/
+  precompute_plan_t* plan;    /* Optimisation for facul_make_strategies ().*/
 } facul_strategies_t;
 
 
@@ -89,27 +80,15 @@ typedef struct {
   enum {
       CHOOSE_NONE,
       CHOOSE_UL,
-      //#if     MOD_MAXBITS > MODREDCUL_MAXBITS
       CHOOSE_15UL,
-      ////#endif
-//#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
       CHOOSE_2UL2,
-//#endif
-//#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
       CHOOSE_MPZ,
-//#endif
   } arith;
 
   modulusredcul_t m_ul;
-//#if     MOD_MAXBITS > MODREDCUL_MAXBITS
   modulusredc15ul_t m_15ul;
-//#endif
-//#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
   modulusredc2ul2_t m_2ul2;
-//#endif
-//#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
   modulusmpz_t m_mpz;
-//#endif
 } modset_t;
 
 
