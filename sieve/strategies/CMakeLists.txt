@@ -16,7 +16,8 @@ target_link_libraries(benchfm ${LIB_EXEC})
 
 add_executable(gst 
   gst_exec.c 
-  generate_strategies.c 
+  generate_strategies.c
+  gen_decomp.c
   ${SUF_UTILS}/decomp.c
   ${SUF_UTILS}/tab_decomp.c
   ${SRC_UTILS})
