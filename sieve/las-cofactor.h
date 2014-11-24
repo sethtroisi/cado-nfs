@@ -7,5 +7,5 @@
 
 int check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side);
 int factor_both_leftover_norms(mpz_t *, const mpz_t, mpz_array_t **,
-    uint32_array_t **, sieve_info_srcptr);
+			       uint32_array_t **, sieve_info_srcptr);
 #endif

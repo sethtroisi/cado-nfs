@@ -17,6 +17,32 @@ int facul_doit_15ul (unsigned long *, const modulusredc15ul_t,
 int facul_doit_2ul2 (unsigned long *, const modulusredc2ul2_t, 
 		     const facul_strategy_t *, const int);
 int facul_doit_mpz (unsigned long *, const modulusmpz_t, 
-		     const facul_strategy_t *, const int);
+		    const facul_strategy_t *, const int);
+
+int
+facul_doit_onefm_ul (unsigned long*, const modulusredcul_t,
+		     const facul_method_t, modset_t*,
+		     modset_t*, unsigned int*, unsigned int*,
+		     unsigned long, double, double);
+int
+facul_doit_onefm_15ul (unsigned long*, const modulusredc15ul_t,
+		       const facul_method_t, modset_t*,
+		       modset_t*, unsigned int*, unsigned int*,
+		       unsigned long, double, double);
+int
+facul_doit_onefm_2ul2 (unsigned long*, const modulusredc2ul2_t,
+		       const facul_method_t, modset_t*,
+		       modset_t*, unsigned int*, unsigned int*,
+		       unsigned long, double, double);
+int
+facul_doit_onefm_mpz (unsigned long*, const modulusmpz_t,
+		      const facul_method_t, modset_t*,
+		      modset_t*, unsigned int*, unsigned int*,
+		      unsigned long, double, double);
+
+/* int* */
+/* facul_both (unsigned long**, mpz_t* , */
+/* 	    const facul_strategies_t *); */
+
 
 #endif /* FACUL_DOIT_H */
