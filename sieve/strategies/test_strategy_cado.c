@@ -326,7 +326,7 @@ int main(int argc, char *argv[])
 	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
-    
+
     int fbb = (fbb0 < fbb1) ? fbb0 : fbb1;
     int lpb = (lpb0 > lpb1) ? lpb0 : lpb1;
     //convert the time in micro-s. because all previous binaries
@@ -381,14 +381,14 @@ int main(int argc, char *argv[])
     //eval our strategy!
     double Y = 0, T = C0;
     for (int r0 = 0; r0 <= mfb0; r0++) {
-    	for (int r1 = 0; r1 <= mfb1; r1++) {
-    	    Y += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->proba;
-    	    T += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->time;
-    	}
+	for (int r1 = 0; r1 <= mfb1; r1++) {
+	    Y += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->proba;
+	    T += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->time;
+	}
     }
     //print the result!
     printf(" Y = %lf relations, T = %lf s., yt = %1.10lf rel/s\n", Y,
-    	   T / 1000000, Y / T * 1000000);
+	   T / 1000000, Y / T * 1000000);
 
     const char *pathname_output;
     pathname_output = param_list_lookup_string(pl, "out");
