@@ -30,7 +30,12 @@ add_executable(finalst
 
 target_link_libraries(finalst ${LIB_EXEC})
 
-add_executable(gen_decomp gen_decomp.c)
+add_executable(gen_decomp
+  test_gen_decomp.c
+  gen_decomp.c
+  ${SUF_UTILS}/decomp.c
+  ${SUF_UTILS}/tab_decomp.c)
+
 target_link_libraries(gen_decomp m)
 
 add_executable(test_strategy_cado
