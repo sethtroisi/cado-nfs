@@ -122,3 +122,8 @@ linalg/bwc/parse-flint-fft-doc.pl
 linalg/bwc/creating-sm-example.m
 linalg/bwc/sm-outside-matrix.m
 misc/CMakeLists-nodist.txt
+sieve/strategies/script_bench.sh
+sieve/strategies/script_fm.sh
+sieve/strategies/script_mg.sh
+sieve/strategies/script_str.sh
+sieve/strategies/script_str_r.sh
