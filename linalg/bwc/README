@@ -591,8 +591,8 @@ Using bwc.pl
     The spirit is that all parameters listed above are to be given to
     bwc.pl ; the _first_ provided argument must be either the basename of
     a specific binary to call (with possibly the proper mpiexec arguments
-    added, and possibly the unrecognized arguments stripped out), or one
-    of the meta-commands :balance, :complete, and :wipeout.
+    added, and possibly the unrecognized arguments stripped out), or
+    the meta-command :complete.
 
     More extensive documentation in bwc.pl is included in the file
     header.
