@@ -330,7 +330,7 @@ static inline double lg2abs (double i, double add, double scale) {
    no xmm -> GR conversion, no * 0x0101010101010101 (3 to 4 cycles) but only
    2 P-instructions (1 cycle).
 */
-static inline void w64lg2abs(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
+MAYBE_UNUSED static inline void w64lg2abs(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
             "psllq $0x01,  %0                 \n"
@@ -359,7 +359,7 @@ static inline void w64lg2abs(double i, double add, double scale, uint8_t *addr, 
    log2 of the result.
    Careful: if i == 0, the result is not predictible.
 */
-static inline void w128lg2abs(__m128d i, const __m128d add, const __m128d scale, uint8_t *addr, const ssize_t decal) {
+MAYBE_UNUSED static inline void w128lg2abs(__m128d i, const __m128d add, const __m128d scale, uint8_t *addr, const ssize_t decal) {
   __asm__ __volatile__ (
 	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrlq     $0x01,    %0       \n" /* i = fast_abs(i) */
