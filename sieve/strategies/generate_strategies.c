@@ -112,21 +112,29 @@ double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, in
     for (int index_decomp = 0; index_decomp < nb_decomp; index_decomp++) {
 	decomp_t *dec = init_tab->tab[index_decomp];
 	double time_dec = 0;
-	double proba_fail_previous_method = 1;
+	double proba_fail_all = 1;
 	double time_method = 0;
 	//compute the time of each decomposition
 	for (int index_fm = 0; index_fm < nb_fm; index_fm++) {
 	    fm_t* elem = tabular_fm_get_fm(tab_fm, index_fm);
 	    int len_time = fm_get_len_time (elem);
 	    if (ind_time >= len_time)
-		time_method = elem->time[len_time-1];
+	      time_method = elem->time[len_time-1];
 	    else
-		time_method = elem->time[ind_time];
-	    time_dec += time_method * proba_fail_previous_method;
-
-	    proba_fail_previous_method = 
-		compute_proba_method_one_decomp (dec, elem);
+	      time_method = elem->time[ind_time];
+	    time_dec += time_method * proba_fail_all;
+	    
+	    double proba_fail_method = 
+	      compute_proba_method_one_decomp (dec, elem);
+	    proba_fail_all *= proba_fail_method;
+	    if (elem->method[0] == PM1_METHOD ||
+		elem->method[0] == PP1_27_METHOD ||
+		elem->method[0] == PP1_65_METHOD)
+	      //because if you chain PP1||PM1 to PM1||PP1-->they are
+	      //not independant.
+	      proba_fail_all = (proba_fail_all + proba_fail_method) / 2;
 	}
+
 	time_average += time_dec * dec->nb_elem;
 	all += dec->nb_elem;
     }
