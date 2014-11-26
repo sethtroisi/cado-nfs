@@ -30,9 +30,7 @@ The action to be performed is either:
   prepended by a colon.
     :complete -- do a complete linear system solving. The solution ends
                  up in \$wdir/W.
-    :wipeout  -- quite like rm -rf \$wdir, but focuses on bwc files. Does
-                 not wipe out matrix file, nor cached in-memory files.
-    :bench    -- does :wipeout, dispatch, prep, secure, and krylov with
+    :bench    -- does dispatch, prep, secure, and krylov with
                  an exceedingly large finish bound in order to perform
                  some timings.
 
@@ -402,7 +400,7 @@ if ($main !~ /^:(?:complete|bench)$/ && !-d $param->{'wdir'}) {
 ##################################################
 # Some more default values to set. Setting separately splits=, ys= and so
 # on is quite awkward in the case of a single-site test.
-if ((!defined($m) || !defined($n)) && $main !~ /^:wipeout$/) {
+if ((!defined($m) || !defined($n))) {
     usage "The parameters m and n must be set";
 }
 if (!defined($param->{'splits'})) {
@@ -811,8 +809,7 @@ if ($mpi_needed) {
     }
 
     if (scalar @hosts) {
-        # Don't use an uppercase filename, it would be deleted by
-        # wipeout.
+        # Don't use an uppercase filename.
         $hostfile = "$wdir/hosts";
         open F, ">$hostfile" or die "$hostfile: $!";
         for my $h (@hosts) { print F "$h\n"; }

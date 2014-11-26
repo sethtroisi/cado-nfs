@@ -21,6 +21,7 @@ import cadocommand
 import wuserver
 import workunit
 from struct import error as structerror
+from shutil import rmtree
 from workunit import Workunit
 
 # Patterns for floating-point numbers
@@ -302,6 +303,8 @@ class FilePath(object):
         return os.path.realpath(str(self))
     def open(self, *args, **kwargs):
         return open(str(self), *args, **kwargs)
+    def rmtree (self, ignore_errors=False):
+        rmtree(str(self), ignore_errors)
 
 
 class WorkDir(object):
@@ -3711,7 +3714,7 @@ class LinAlgTask(Task, HasStatistics):
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
     def paramnames(self):
-        return super().paramnames
+        return self.join_params(super().paramnames, {"allow_wipeout": False})
 
     @property
     def stat_conversions(self):
@@ -3763,9 +3766,27 @@ class LinAlgTask(Task, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.state.setdefault("ran_already", False)
     
     def run(self):
         super().run()
+
+        if self.state["ran_already"] and self.have_new_input_files():
+            if self.params["allow_wipeout"]:
+                self.logger.warn("Ran before, but input files have changed. "
+                                 "Wiping out working directory")
+                self.workdir.make_dirname().rmtree()
+                self.state["ran_already"] = False
+                self.state.pop("dependency", None)
+            else:
+                self.logger.critical(
+                    "Ran before, but input files have changed. The "
+                    "allow_wipeout parameter is not set, aborting.")
+                self.logger.critical(
+                    "If it is ok to discard the previous linear algebra run "
+                    "and start it from scratch, please add the "
+                    "allow_wipeout=True parameter and re-run cadofactor.")
+                return False
 
         if not "dependency" in self.state or self.have_new_input_files():
             workdir = self.workdir.make_dirname()
@@ -3777,6 +3798,8 @@ class LinAlgTask(Task, HasStatistics):
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()
             wdir = workdir.realpath()
+            self.state["ran_already"] = True
+            self.remember_input_versions(commit=True)
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left",
                                  stdout=str(stdoutpath),
@@ -3789,7 +3812,6 @@ class LinAlgTask(Task, HasStatistics):
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.parse_stats(stdoutpath, commit=False)
-            self.remember_input_versions(commit=False)
             output_version = self.state.get("output_version", 0) + 1
             update = {"dependency": dependencyfilename.get_wdir_relative(),
                       "output_version": output_version}

@@ -285,7 +285,7 @@ modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
    subtrahend = subtrahend_lo + subtrahend_hi * 2^LONG_BIT.
    Return 1 if (v - subtrahend) / divisor is a non-negative integer less than
    2^LONG_BIT, and 0 otherwise */
-static inline int
+MAYBE_UNUSED static inline int
 check_divisible(const unsigned long lo, const unsigned long hi,
                 const unsigned long subtrahend_lo, const unsigned long subtrahend_hi,
                 const unsigned long divisor)

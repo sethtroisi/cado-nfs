@@ -923,7 +923,6 @@ class BWC(Program):
     subdir = "linalg/bwc"
     def __init__(self,
                  complete: Toggle(prefix=":")=None,
-                 wipeout: Toggle(prefix=":")=None,
                  dryrun: Toggle("d")=None,
                  verbose: Toggle("v")=None,
                  mpi: ParameterEq()=None,
