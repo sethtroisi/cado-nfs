@@ -1,13 +1,18 @@
 #!/bin/bash
 
-#merge the strategies for each r0 and each r1 to compute the best strategies
-#for each pair of cofactors (r0, r1).
+#merge the strategies for each r0 and each r1 to compute the best
+#strategies for each pair of cofactors (r0, r1).
 
-#At the end, we will optain in the directory 'res_matrix' some files where
-#each file is a set of optimal strategies for a pair (r0,r1).
+#At the end, we will optain in the directory 'res_matrix' some files
+#where each file is a set of optimal strategies for a pair (r0,r1).
 
+#the directory where the strategies related on each value of r were
+#stored.
 in='res_precompt_st'
+#the directory where the files results will be stored. One file will
+#be generated for each pair of bit size (r0,r1).
 out='res_matrix'
+
 fbb0=27
 mfb0=110
 fbb1=29

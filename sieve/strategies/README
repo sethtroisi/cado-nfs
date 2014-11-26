@@ -80,29 +80,33 @@ a prime divisor.
 In what follows, we give an example to illustrate a procedure to
 achieve our objective:
 
-Firstly, you can distribute the precomputation of strategies for each
-size and side: (see the script (coming days)):
+Firsly, you should precompute all decompositions of cofactors of less than mfb bits given that 
+it has no prime divisors less than fbb. To do it:
+./gst -gdc -fbb0 20 -mfb0 40 -out file
+[ 20, 20 ] : 451299262.762625
+[ 20, 21 ] : 1122087524.990350
+./gst -gdc -fbb0 20 -mfb0 41 -out file
+./gst -gdc -fbb0 20 -mfb0 42 -out file
+./gst -gdc -fbb0 20 -mfb0 43 -out file
+etc ... until mfb!
 
-./gst -gst_r -lpb0 $lpb0 -fbb0 $fbb0 -r $r0 -in $methods -decomp $pathname_decomp -out $out &
+Secondly, you should distribute the precomputation of strategies for each
+size and side. A example is given by the script script_str_r.sh
 
-(the files results are stored in the directory 'out' and the format
-name of files is: strategies_fbb_r, where fbb is the bit size of
+Remark: the files results are stored in the directory 'out' and the format
+name of files is: strategies_$fbb_$r, where fbb is the bit size of the
 factor base bound and r the bit size of the cofactor).
 
-Then, you merge our results to compute the matrix which store the
+Then, you merge our results to compute the matrix which stores the
 differents strategies for each pair of bit size (see the script
-(coming days)):
+'script_str.sh').
 
-./gst -gst -mfb0 $mfb0 -fbb0 $fbb0 -mfb1 $mfb1 -fbb1 $fbb1 -r0 $r0 -r1 $r1 -in $in -out $out &
-
-(the files results are stored in the directory 'out' and the format
-name of files is: strategies_r0_r2, where r0 and r1 are the bit size
-of the studied pair of cofactors.)
-
+Remark: The format name of files is: strategies_r0_r1, where r0 and r1
+are the bit size of the studied pair of cofactors (r0,r1).
 
 Note that: Without options '-gst' or '-gst_r' the binary 'gst' compute
 our matrix of strategies without precompution in several files. For
-more informmation, see the function generate_matrix() in
+more information, see the function generate_matrix() in
 generate_strategies.c.
 
 
@@ -118,15 +122,9 @@ etc ... for each strategy.
 with: m the factoring method
       c the curve
       b1 and b2 the parameters
-      side is the side where you apply this factoring method.
+      side is the side where one applies this factoring method.
       p and t the probability and the time to find a non
       trivial factor in our cofactor.
-
-These files are also a format name according the used option: 
--gst_r the file name is 'strategies_**_++ where: ** is equal to fbb 
-       and ++ the bit size of cofactor.  
--gst_r the file name is 'strategies_**_++ where: ** is equal to the bit
- size of the first cofactor r0 and ++ for the second.
 
 
 /******************************************************************************/

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#precompute for each size of cofactors and each side (RAT or ALG), the convex hull of
-#strategies!
+#precompute for each size of cofactors and each side (RAT or ALG), the
+#convex hull of strategies!
 
 
 #the sieving region
@@ -17,9 +17,10 @@ mfb1=110
 
 #directory which store our decomposition files!
 decomp='/localdisk/trichard/results/decomp_cofactor/decomp_tmp/'
-#file which contain our factoring methods!
-methods='Echantillon_21_22'
-#directory where the output file will be stored!
+#file which contains our factoring methods (PM1, PP1, EC)!
+methods='All_methods'
+#directory where the output file will be stored, because this binary
+#generates a file for each r.
 out='res_precompt_st/'
 
 
