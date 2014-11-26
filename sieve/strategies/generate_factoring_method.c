@@ -26,14 +26,12 @@
 /*
   BOUND_SIGMA is used when you generate a random value of sigma.
 */
-const int BOUND_SIGMA = 100;
+const int BOUND_SIGMA = 15;
 
 /* 
    The test fails with probabily equals to 1/4^15 (approx 0) (MILLER RABIN).
 */
 const int NB_PRIMALITY_TEST = 15;
-
-const int BOUND_FILTER = 20;	//todo: unused!!! 
 
 const double EPSILON_DBL = LDBL_EPSILON;
 
@@ -213,12 +211,12 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 	if (curve == MONTY16) {
 	    sigma = 1;
 	} else
-	    sigma = 2 + rand();
+	    sigma = 2 + rand()%BOUND_SIGMA;
 
 	strategy->methods[0].plan = malloc(sizeof(ecm_plan_t));
 	ASSERT(strategy->methods[0].plan != NULL);
 	ecm_make_plan(strategy->methods[0].plan, B1, B2, curve,
-		      labs(sigma), 0, 0);
+		      labs(sigma), 1, 0);
     } else {
 	exit(EXIT_FAILURE);
     }
@@ -245,14 +243,6 @@ bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
     int nb_test = 0;
 
     while (nb_success < nb_success_max && (nb_test < nb_test_max)) {
-	if (strategy->methods[0].method == EC_METHOD) {
-	    ecm_plan_t *plan = strategy->methods[0].plan;
-	    //RANDOM_SIGMA
-	    if (plan->parameterization != MONTY16) {
-		plan->sigma = 2 + rand() % BOUND_SIGMA;
-		strategy->methods[0].plan = plan;
-	    }
-	}
 	/* 
 	   f will contain the prime factor of N that the strategy
 	   found.  Note that N is composed by two prime factors by the
@@ -528,7 +518,6 @@ int *choice_parameters(int method, int len_p_min)
   This function allows to compute the probability and the time of a strategy
   to find a prime number in an interval [2**len_p_min, 2**len_p_max].
 */
-//todo:  will be optimize!
 static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
 					   mpz_t* N, int nb_test_max)
 {
@@ -551,7 +540,7 @@ static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
 		strategy->methods[0].plan = plan;
 	    }
 	}
-	//compute the the time of execution
+	//computes the the time of execution
 	/*
 	   f will contain the prime factor of N that the strategy
 	   found.  Note that N is composed by two prime factors by the
