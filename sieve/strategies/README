@@ -36,8 +36,8 @@ file format :
 m c B1 B2 | p propa_p proba_(p+1) ...  | c1 c2 c3 c4 |
 etc... one line equals to one factoring method.
 where:
-  - m denotes a type of method.
-  - c denotes the curve.
+  - m denotes a type of method and c denotes the curve
+    (PM1=1 0, PP1-27=2 0, PP1-65=3 0, ECM-M12=4 1, ECM-M16=4 2, ECM-B12=4 0)
   - B1 et B2 are the parameters of the factoring method.
   - p is the bit size of prime number that we start to bench
   - p_i is the probabiliy to find a prime number of i bits size.
