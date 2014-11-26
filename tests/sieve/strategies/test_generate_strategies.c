@@ -1,7 +1,10 @@
-#include "generate_strategies.h"
-#include "generate_factoring_method.h"
-
 #include "cado.h"
+
+#include <float.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+
 #include "portability.h"
 #include "utils.h"
 #include "facul.h"
@@ -9,10 +12,8 @@
 #include "pp1.h"
 #include "ecm.h"
 
-#include <float.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include<time.h>
+#include "generate_strategies.h"
+#include "generate_factoring_method.h"
 
 
 
