@@ -211,7 +211,7 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 	if (curve == MONTY16) {
 	    sigma = 1;
 	} else
-	    sigma = 2 + rand()%BOUND_SIGMA;
+	  sigma = 2 + rand()%BOUND_SIGMA;
 
 	strategy->methods[0].plan = malloc(sizeof(ecm_plan_t));
 	ASSERT(strategy->methods[0].plan != NULL);
@@ -481,7 +481,7 @@ int *choice_parameters(int method, int len_p_min)
 	} else if (len_p_min <= 25) {
 	    b1_min = 100;
 	    b1_max = 10000;
-	    b1_step = 1.4;
+	    b1_step = 10;
 	    c_min = 10;
 	    c_max = 200;
 	    c_step = 40;
@@ -531,16 +531,7 @@ static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
 
     while ((nb_succes < nb_succes_lim) && (nb_test < nb_test_max)) {
 
-
-	if (strategy->methods[0].method == EC_METHOD) {
-	    ecm_plan_t *plan = strategy->methods[0].plan;
-	    //RANDOM_SIGMA
-	    if (plan->parameterization != MONTY16) {
-		plan->sigma = 2 + rand() % BOUND_SIGMA;
-		strategy->methods[0].plan = plan;
-	    }
-	}
-	//computes the the time of execution
+      //computes the the time of execution
 	/*
 	   f will contain the prime factor of N that the strategy
 	   found.  Note that N is composed by two prime factors by the

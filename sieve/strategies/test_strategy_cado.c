@@ -4,8 +4,12 @@
 #include <stdio.h>
 #include <time.h>
 
+
+
 #include "portability.h"
 #include "utils.h"
+#include "pm1.h"
+#include "pp1.h"
 #include "ecm.h"
 #include "facul.h"
 #include "finding_good_strategy.h"
@@ -14,6 +18,8 @@
 #include "tab_strategy.h"
 #include "tab_fm.h"
 #include "tab_decomp.h"
+
+int CONST_TEST_R = 55;
 
 /*
 This binary allows to test our procedure choosing optimal
@@ -85,10 +91,10 @@ tabular_fm_t *generate_methods_cado(const int lpb)
 }
 
 /*
-This function generate the strategy of cado and compute the
-  probability and the time to find a prime divisor in a 
-cofactor of 'r' bits with the bound fbb and lpb.
-  This strategy is the concatenation of all methods in 'methods'.
+This function generates the strategy of cado and computes the
+  probability and the time to find a prime divisor in a cofactor of
+  'r' bits with the bound fbb and lpb.  This strategy is the
+  concatenation of all methods in 'methods'.
 */
 tabular_strategy_t *generate_strategy_cado(tabular_fm_t * methods,
 					   tabular_decomp_t * tab_dec, int fbb,
@@ -111,17 +117,23 @@ tabular_strategy_t *generate_strategy_cado(tabular_fm_t * methods,
 	    strategy_set_proba(strat, 1.0);
 	fm_free(zero);
     } else {
-	int len = 3 + nb_curves(lpb);
-	ASSERT(len <= methods->index);
-
-	for (int i = 0; i < len; i++)
-	    strategy_add_fm(strat, methods->tab[i]);
+      int len = 3 + nb_curves(lpb);//todo
+      //printf ("len  = %d\n", len);
+      //ASSERT(len <= methods->index);
+      /* strategy_add_fm(strat, methods->tab[0]); */
+      //strategy_add_fm(strat, methods->tab[2]);
+      for (int i = 0; i < len; i++)
+	strategy_add_fm(strat, methods->tab[i]);
 
 	//eval
 	double p = compute_proba_strategy(tab_dec, strat, fbb, lpb);
 
 	double t = compute_time_strategy(tab_dec, strat, r);
-
+	/* if (r == CONST_TEST_R) */
+	/*   { */
+	/*     printf ("p =  %lf, t = %lf\n", p, t); */
+	/*     getchar(); */
+	/*   } */
 	strategy_set_proba(strat, p);
 	strategy_set_time(strat, t);
     }
@@ -166,10 +178,10 @@ tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
     tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
     ASSERT(data_rat);
 
-    int lim1 = 2 * fbb0 - 1;
+    int lim0 = 2 * fbb0 - 1;
     for (int r0 = 0; r0 <= mfb0; r0++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r0 >= lim1) {
+	if (r0 >= lim0) {
 	    char name_file[200];
 	    sprintf(name_file,
 		    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);
@@ -192,10 +204,10 @@ tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
        read good elements for r_2 in the array data_r1 and compute the
        data for each r_1. So :
      */
-    int lim2 = 2 * fbb1 - 1;
+    int lim1 = 2 * fbb1 - 1;
     for (int r1 = 0; r1 <= mfb1; r1++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r1 >= lim2) {
+	if (r1 >= lim1) {
 	    char name_file[200];
 	    sprintf(name_file,
 		    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1);
@@ -230,6 +242,88 @@ tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
 
     fm_free(zero);
     return matrix;
+}
+
+
+/************************************************************************/
+/*                  To bench our strategies                             */
+/************************************************************************/
+
+
+int
+select_random_index_dec(double sum_nb_elem, tabular_decomp_t* t)
+{
+    //100000 to consider approximation of distribution
+    double alea = rand() % 10000;
+    int i = 0;
+    double bound = (t->tab[0]->nb_elem/sum_nb_elem) * 10000;
+    int len = t->index;
+    while (i < (len-1) && (alea - bound) >= 1) {
+	i++;
+	bound += (t->tab[i]->nb_elem/sum_nb_elem) * 10000;
+    }
+    return i;
+}
+
+
+/*
+  This function compute directly the probabity and the time to find a
+  factor in a good decomposition in a cofactor of length r.
+ */
+double*
+bench_proba_time_st(gmp_randstate_t state, facul_strategy_t* strategy,
+		    tabular_decomp_t* init_tab, int r, MAYBE_UNUSED int lpb)
+{
+    double* res = malloc (2*sizeof (double));
+    int nb_test = 0, nb_success = 0;
+    int nb_test_max = 100000;
+    double time = 0;
+    
+  
+    double sum_dec = 0;
+    for (int i = 0; i < init_tab->index; i++)
+	sum_dec += init_tab->tab[i]->nb_elem;
+
+    mpz_t N[nb_test_max];
+    for (int i =0; i < nb_test_max; i++)
+      {
+	mpz_init (N[i]);
+	int index = select_random_index_dec(sum_dec, init_tab);
+	int len_p = init_tab->tab[index]->tab[1];
+	//generation of the integer N (which will be factoring)
+	generate_composite_integer(N[i],state, len_p, r);
+	//printf ("%d, %d\n", len_p, r);
+	//generate_composite_integer(N[i],state, 18,r);
+	//generate_prime_factor(N[i], state, 50);
+      }
+    //}}
+    double starttime = microseconds();
+    while (nb_test < nb_test_max)
+	{
+	    /*
+	       f will contain the prime factor of N that the strategy
+	       found.  Note that N is composed by two prime factors by the
+	       previous function.
+	    */
+	    unsigned long f[2];
+	    f[0] = 0;
+	    facul(f, N[nb_test], strategy);
+	    if (f[0] != 0)
+		{
+		  nb_success++;
+		}
+	    nb_test++;
+	}
+    double endtime = microseconds();
+    time = endtime - starttime;
+    
+    res[0] = nb_success / ((double)nb_test);
+    res[1] = time / ((double)nb_test);
+    
+    for (int i = 0; i < nb_test_max; i++)
+      mpz_clear(N[i]);
+
+    return res;
 }
 
 /************************************************************************/
@@ -267,6 +361,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "out",
 			  "the output file which contain our strategies\n");
 }
+
 
 /************************************************************************/
 /*     MAIN                                                             */
@@ -327,8 +422,8 @@ int main(int argc, char *argv[])
 	exit(EXIT_FAILURE);
     }
 
-    int fbb = (fbb0 < fbb1) ? fbb0 : fbb1;
-    int lpb = (lpb0 > lpb1) ? lpb0 : lpb1;
+    //int fbb = (fbb0 < fbb1) ? fbb0 : fbb1;
+    //int lpb = (lpb0 > lpb1) ? lpb0 : lpb1;
     //convert the time in micro-s. because all previous binaries
     //compute their times in micro-s.
     C0 *= 1000000;		//s-->micro-s 
@@ -367,12 +462,18 @@ int main(int argc, char *argv[])
     gmp_randinit_default(state);
 
     //select our methods
-    tabular_fm_t *methods = generate_methods_cado(lpb);
+    //tabular_fm_t *methods = generate_methods_cado(lpb);
     //benchmark
-    bench_proba(state, methods, fbb);
-    bench_time(state, methods);
+    //bench_proba(state, methods, fbb);
+    //bench_time(state, methods);
+    //tabular_fm_print (methods);
+    FILE* file_in = fopen ("/localdisk/trichard/cadoRSA155/data_fm_25", "r");
+    tabular_fm_t *methods = tabular_fm_fscan (file_in);
+    printf ("len  = %d, (%d)\n", methods->index, 3+nb_curves(lpb0));
+    methods->index = 3+nb_curves(lpb0);//todo change it!!!pb for free and the nb is diff for each side
+    
     //generate our strategies
-    //remark: for each pair (r0, r1), the tabular contain only one strategy!!
+    //remark: for each pair (r0, r1), we have only one strategy!!
     tabular_strategy_t ***matrix =
 	generate_matrix_cado(name_directory_decomp, methods,
 			     fbb0, lpb0, mfb0,
@@ -381,14 +482,14 @@ int main(int argc, char *argv[])
     //eval our strategy!
     double Y = 0, T = C0;
     for (int r0 = 0; r0 <= mfb0; r0++) {
-	for (int r1 = 0; r1 <= mfb1; r1++) {
-	    Y += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->proba;
-	    T += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->time;
-	}
+    	for (int r1 = 0; r1 <= mfb1; r1++) {
+    	    Y += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->proba;
+    	    T += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->time;
+    	}
     }
     //print the result!
     printf(" Y = %lf relations, T = %lf s., yt = %1.10lf rel/s\n", Y,
-	   T / 1000000, Y / T * 1000000);
+    	   T / 1000000, Y / T * 1000000);
 
     const char *pathname_output;
     pathname_output = param_list_lookup_string(pl, "out");
@@ -406,6 +507,47 @@ int main(int argc, char *argv[])
 		}
 	fclose(file_output);
     }
+
+    //{{test bench strategy!
+    /* int r0 = CONST_TEST_R; */
+    /* int r1 = CONST_TEST_R; */
+    /* printf ("r0 = %d, r1 = %d, lpb0 = %d, lpb1 = %d\n", r0, r1, lpb0, lpb1); */
+    /* //printf ("nb call = %lu\n", distrib_C[r0][r1]); */
+    /* printf ("proba found: %lf, %lf\n", matrix[r0][r1]->tab[0]->proba, matrix[r0][r1]->tab[0]->time); */
+    /* char name_file[200]; */
+    /* sprintf(name_file, */
+    /* 	    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0); */
+    /* FILE *file = fopen(name_file, "r"); */
+    
+    /* tabular_decomp_t* tab_decomp = tabular_decomp_fscan(file); */
+    
+    /* tabular_decomp_print (tab_decomp); */
+    /* fclose (file); */
+    
+    /* facul_strategy_t* facul_st = facul_make_strategy (fbb0, lpb0, 0, 0); */
+
+    /* double* res = bench_proba_time_st(state, facul_st, tab_decomp, r0, lpb0); */
+    /* double p0 = res[0], t0 = res[1]; */
+    /* printf ("side = 0, proba = %lf, time = %lf\n", res[0], res[1]); */
+    /* tabular_decomp_free (tab_decomp); */
+    /* facul_clear_strategy(facul_st); */
+    /* //r1 */
+    /* sprintf(name_file, */
+    /* 	    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1); */
+    /* file = fopen(name_file, "r"); */
+    
+    /* tab_decomp = tabular_decomp_fscan(file); */
+    /* fclose (file); */
+    
+    /* facul_st = facul_make_strategy (fbb1, lpb1, 0, 0); */
+    /* res = bench_proba_time_st(state, facul_st, tab_decomp, r1, lpb1); */
+    /* printf ("side = 1, proba = %lf, time = %lf\n", res[0], res[1]); */
+    /* printf ("two sides, proba = %lf, time = %lf\n", res[0]*p0, t0+p0*res[1]); */
+    /* tabular_decomp_free (tab_decomp); */
+    /* //Free facil_st */
+    /* facul_clear_strategy(facul_st); */
+    //}}
+    
     //free
     for (int r0 = 0; r0 <= mfb0; r0++) {
 	for (int r1 = 0; r1 <= mfb1; r1++)
