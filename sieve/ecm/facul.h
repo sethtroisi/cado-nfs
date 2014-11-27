@@ -68,6 +68,8 @@ typedef struct {
   facul_method_t ***methods;  /* List of methods to try for each pair
 				 of cofactors.*/
   precompute_plan_t* plan;    /* Optimisation for facul_make_strategies ().*/
+
+  facul_method_t* methods_aux;
 } facul_strategies_t;
 
 
@@ -113,7 +115,7 @@ int
 facul_fprint_strategies (FILE*, facul_strategies_t* );
 
 
-void 
+void
 modset_clear (modset_t *modset);
 
 int*
