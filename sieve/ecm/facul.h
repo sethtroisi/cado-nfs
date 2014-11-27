@@ -16,7 +16,11 @@
 #define PP1_65_METHOD 3
 #define EC_METHOD 4
 
+
 #define FACUL_NOT_SMOOTH (-1)
+#define FACUL_MAYBE (0)
+#define FACUL_SMOOTH (1)
+#define FACUL_AUX (2)
 
 #define STATS_LEN 128
 
@@ -71,8 +75,6 @@ typedef struct {
 
   facul_method_t* methods_aux;
 } facul_strategies_t;
-
-
 
 
 typedef struct {

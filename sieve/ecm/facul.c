@@ -115,12 +115,12 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
       B1 += sqrt (B1);
       B2 = 17.0 * B1;
       /* we round B2 to (2k+1)*105, thus k is the integer nearest to
-         B2/210-0.5 */
+	 B2/210-0.5 */
       k = B2 / 210.0;
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
       ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
-                     MONTY12, i - 1, 1, 0);
+		     MONTY12, i - 1, 1, 0);
     }
 
   methods[n + 3].method = 0;
@@ -139,7 +139,7 @@ facul_clear_strategy (facul_strategy_t *strategy)
   for (i = 0; methods[i].method != 0; i++)
     {
       if (methods[i].method == PM1_METHOD)
-        pm1_clear_plan (methods[i].plan);
+	pm1_clear_plan (methods[i].plan);
       else if (methods[i].method == PP1_27_METHOD)
 	pp1_clear_plan (methods[i].plan);
       else if (methods[i].method == PP1_65_METHOD)
@@ -258,7 +258,7 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
       found = facul_doit_mpz (factors, m, strategy, 0);
       modmpz_clearmod (m);
     }
-  
+
   if (found > 1)
     {
       /* Sort the factors we found */
@@ -642,29 +642,24 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     For each strategy, one finds what is the last method used on each
     side.
   */
-  for (r = 0; r <= rmfb; r++)
-    for (a = 0; a <= amfb; a++){
+  for (r = 1; r <= rmfb; r++)
+    for (a = 1; a <= amfb; a++){
       facul_method_t* methods =
 	strategies->methods[r][a];
       ASSERT (methods != NULL);
-
-      int index_last_method[2] = {-1, -1};
+      int index_last_method[2] = {0, 0};      //the default_values
       unsigned int i;
       for (i = 0; methods[i].method != 0; i++) {
 	methods[i].is_the_last = 0;
 	index_last_method[methods[i].side] = i;
       }
-      /*if index_last_method[*] that imply that it doesn't exist method
-	for one side!!!*/
-      ASSERT (index_last_method[0] != -1 &&
-	      index_last_method[1] != -1);
       methods[index_last_method[0]].is_the_last = 1;
       methods[index_last_method[1]].is_the_last = 1;
     }
 
   //Create the auxiliary methods!
   //add test to check if it's necessary to create our aux methods!
-  strategies->methods_aux = facul_make_aux_methods (nb_curves(rlpb), verbose);
+  strategies->methods_aux = facul_make_aux_methods (30, verbose);
   return strategies;
 }
 
@@ -796,10 +791,12 @@ modset_clear (modset_t *modset)
 
 
 /*
-  returns -1 if the factor is not smooth, otherwise the number of
+  This is our auxiliary factorisation.
+  It applies a bunch of ECM curves with larger bounds to find
+  a factor with hight probability, and returns -1 if the factor
+  is not smooth, otherwise the number of
   factors.
 */
-//todo: clear the duplication between facul_both_src and facul_aux
 static int
 facul_aux (unsigned long *factors, const modset_t m,
 	   const facul_strategies_t *strategies, int method_start, int side)
@@ -809,39 +806,39 @@ facul_aux (unsigned long *factors, const modset_t m,
   if (methods == NULL)
     return found;
 
-  for (int i = method_start ;methods[i].method != 0; i++)
+  int i = 0;
+  for (i = method_start ;methods[i].method != 0; i++)
     {
       modset_t fm, cfm;
-      unsigned int len_fm = 0;
-      unsigned int len_cfm = 0;
 
       int res_fac = 0;
+
       switch (m.arith) {
       case CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors, m.m_ul,
-				      methods[i], &fm, &cfm, &len_fm,
-				      &len_cfm, strategies->lpb[side],
+				      methods[i], &fm, &cfm,
+				      strategies->lpb[side],
 				      strategies->assume_prime_thresh[side],
 				      strategies->BBB[side]);
 	break;
       case CHOOSE_15UL:
 	res_fac = facul_doit_onefm_15ul(factors, m.m_15ul,
-					methods[i], &fm, &cfm, &len_fm,
-					&len_cfm, strategies->lpb[side],
+					methods[i], &fm, &cfm,
+					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
       case CHOOSE_2UL2:
 	res_fac = facul_doit_onefm_2ul2 (factors, m.m_2ul2,
-					 methods[i], &fm, &cfm, &len_fm,
-					 &len_cfm, strategies->lpb[side],
+					 methods[i], &fm, &cfm,
+					 strategies->lpb[side],
 					 strategies->assume_prime_thresh[side],
 					 strategies->BBB[side]);
 	break;
       case CHOOSE_MPZ:
 	res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
-					methods[i], &fm, &cfm, &len_fm,
-					&len_cfm, strategies->lpb[side],
+					methods[i], &fm, &cfm,
+					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
@@ -865,11 +862,11 @@ facul_aux (unsigned long *factors, const modset_t m,
 	     tries with an other method! */
 	    continue;
 	}
-      
+
       found += res_fac;
       if (res_fac == 2)
 	break;
-      
+
       /*
 	res_fac == 1!  Only one factor has been found. Hence, our
 	factorisation is not finished.
@@ -902,7 +899,6 @@ facul_aux (unsigned long *factors, const modset_t m,
 	}
       break;
     }
-
   return found;
 }
 
@@ -931,43 +927,45 @@ facul_both_src (unsigned long **factors, const modset_t* m,
   if (methods == NULL)
     return found;
 
+  modset_t f[2][2];
+  f[0][0].arith = CHOOSE_NONE;
+  f[0][1].arith = CHOOSE_NONE;
+  f[1][0].arith = CHOOSE_NONE;
+  f[1][1].arith = CHOOSE_NONE;
+
   for (int i = 0; methods[i].method != 0; i++)
     {
-      modset_t fm, cfm;
-      unsigned int len_fm = 0;
-      unsigned int len_cfm = 0;
       int side = methods[i].side;
-      //printf ("first facul: i = %d, side = %d\n", i, side);
-      if (is_smooth[side])
-	continue; 
+      if (is_smooth[side] == FACUL_SMOOTH)
+	continue;
 
       int res_fac = 0;
       switch (m[side].arith) {
       case CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors[side], m[side].m_ul,
-				      methods[i], &fm, &cfm, &len_fm,
-				      &len_cfm, strategies->lpb[side],
+				      methods[i], &f[side][0], &f[side][1],
+				      strategies->lpb[side],
 				      strategies->assume_prime_thresh[side],
 				      strategies->BBB[side]);
 	break;
       case CHOOSE_15UL:
 	res_fac = facul_doit_onefm_15ul(factors[side], m[side].m_15ul,
-					methods[i], &fm, &cfm, &len_fm,
-					&len_cfm, strategies->lpb[side],
+					methods[i], &f[side][0], &f[side][1],
+					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
       case CHOOSE_2UL2:
 	res_fac = facul_doit_onefm_2ul2 (factors[side], m[side].m_2ul2,
-					 methods[i], &fm, &cfm, &len_fm,
-					 &len_cfm, strategies->lpb[side],
+					 methods[i], &f[side][0], &f[side][1],
+					 strategies->lpb[side],
 					 strategies->assume_prime_thresh[side],
 					 strategies->BBB[side]);
 	break;
       case CHOOSE_MPZ:
 	res_fac = facul_doit_onefm_mpz (factors[side], m[side].m_mpz,
-					methods[i], &fm, &cfm, &len_fm,
-					&len_cfm, strategies->lpb[side],
+					methods[i], &f[side][0], &f[side][1],
+					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
@@ -995,63 +993,52 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	  else
 	    continue;
 	}
-      found[side] += res_fac;
+      found[side] = res_fac;
 
       if (res_fac == 2)
-	/*
-	  Indeed, using only one factoring method, you found two
-	  primes factors of m (f, m/f) then m is factored and your
-	  work is finished for this cofactor!!
-	*/
-	is_smooth[side] = true;
-      
+	{
+	  /*
+	    Indeed, using only one factoring method, you found two
+	    primes factors of m (f, m/f) then m is factored and your
+	    work is finished for this cofactor!!
+	  */
+	  is_smooth[side] = FACUL_SMOOTH;
+	  continue;
+	}
       /*
-	res_fac == 1!  Only one factor has been found. Hence, our
-	factorisation is not finished.
+	res_fac == 1!  Only one factor has been found. Hence, a
+	auxiliary factorisation will be necessary!
        */
-      //todo: be more intelligent!
-      if (fm.arith != CHOOSE_NONE)
-	{
-	  /* printf ("found = %d\n", found[side]); */
-	  /* printf ("premier facteur = %lu, res_fac = %d\n", factors[side][0], res_fac); */
-	  int found2 = facul_aux (factors[side]+found[side], fm, strategies,
-				  0, side); //todo add old values for B1
-	  //printf ("found2 = %d\n", found2);
-	  if (found2 < 1)//NOT_SMOOTH or NOT_FOUND
-	    {
-	      found[side] = found2;//FACUL_NOT_SMOOTH;
-	      modset_clear (&cfm);
-	      modset_clear (&fm);
-	      break;
-	    }
-	  else
-	    found[side] += found2;
-	  modset_clear (&fm);
-	}
-      if (cfm.arith != CHOOSE_NONE)
-	{
-	  /* printf ("found = %d\n", found[side]); */
-	  /* printf ("premier facteur = %lu, res_fac = %d\n", factors[side][0], res_fac); */
-
-	  int found2 = facul_aux (factors[side]+found[side], cfm, strategies,
-				  0, side); //todo add old values for B1
-	  //printf ("found2 = %d\n", found2);
-	  if (found2 < 1)//NOT_SMOOTH or NOT_FOUND
-	    {
-	      found[side] = found2;//FACUL_NOT_SMOOTH;
-	      modset_clear (&cfm);
-	      break;
-	    }
-	  else
-	    found[side] += found2;
-	  modset_clear (&cfm);
-	  //break;
-
-	}
-      is_smooth[side] = true;
+      is_smooth[side] = FACUL_AUX;
     }
+  //begin the auxiliary factorisation!
+  if (is_smooth[0] >= 1 &&  is_smooth[1] >= 1)
+    for (int side = 0; side < 2; side++)
+      if (is_smooth[side] == FACUL_AUX)
+	for (int ind_cof = 0; ind_cof < 2; ind_cof++)
+	  {
+	    //factor f[side][0] or/and f[side][1]
+	    if (f[side][ind_cof].arith != CHOOSE_NONE)
+	      {
+		int found2 = facul_aux (factors[side]+found[side],
+					f[side][ind_cof], strategies, 0, side);
+		//todo add old values for B1
+		if (found2 < 1)//FACUL_NOT_SMOOTH or FACUL_MAYBE
+		  {
+		    found[side] = found2;//FACUL_NOT_SMOOTH or FACUL_MAYBE
+		    goto clean_up;
+		  }
+		else
+		  found[side] += found2;
+	      }
+	  }
 
-  
+ clean_up:
+  modset_clear (&f[0][0]);
+  modset_clear (&f[0][1]);
+  modset_clear (&f[1][0]);
+  modset_clear (&f[1][1]);
+
   return found;
 }
 

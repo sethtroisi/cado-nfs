@@ -400,8 +400,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 int
 facul_doit_onefm (unsigned long* factors, const modulus_t m,
 		  const facul_method_t method,
-		  modset_t* fm, modset_t* cfm, unsigned int* len_fm,
-		  unsigned int* len_cfm, unsigned long lpb,
+		  modset_t* fm, modset_t* cfm, unsigned long lpb,
 		  double assume_prime_thresh, double BBB)
 {
   residue_t r;
@@ -416,8 +415,6 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
   mod_init (r, m);
   fm->arith = CHOOSE_NONE;
   cfm->arith = CHOOSE_NONE;
-  *len_fm = 0;
-  *len_cfm = 0;
 
   if (method.plan == NULL)
     return found;
@@ -561,8 +558,7 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
       fprime = modset_primetest (fm);
       if (fprime) 
 	modset_clear (fm);
-      *len_fm = mod_intbits (f);
-      if (fprime && *len_fm > lpb)
+      if (fprime && mod_intbits (f) > lpb)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	  goto clean_up;
@@ -577,8 +573,7 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
 
 	if (cfprime)
 	  modset_clear (cfm);
-	*len_cfm = mod_intbits (n);
-	if (cfprime &&  *len_cfm > lpb)
+	if (cfprime && mod_intbits (n) > lpb)
 	  {
 	    if (!fprime)
 	      modset_clear (fm);
@@ -605,7 +600,6 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
     mod_clear (r, m);
     mod_intclear (n);
     mod_intclear (f);
-  
     return found;
 }
 
