@@ -2129,9 +2129,11 @@ class FactorBaseTask(Task):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
-        # must also have a polynomial (in self.state["poly"])
+        # must also have a polynomial (in self.state["poly"] ) and the alim
+        # value used in self.state["alim"]
         if "outputfile" in self.state:
             assert "poly" in self.state
+            assert "alim" in self.state
             # The target file must correspond to the polynomial "poly"
         self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
     
@@ -2144,18 +2146,30 @@ class FactorBaseTask(Task):
             raise Exception("FactorBaseTask(): no polynomial "
                             "received from PolyselTask")
         twoalgsides = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        check_params = {key: self.params[key]
+                        for key in ["alim", "rlim"][0:1 + twoalgsides]}
         
-        # Check if we have already computed the target file for this polynomial
-        if "poly" in self.state:
+        # Check if we have already computed the outputfile for this polynomial
+        # and fbb. If any of the inputs mismatch, we remove outputfile from
+        # state
+        if "outputfile" in self.state:
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                if "outputfile" in self.state:
-                    self.logger.info("Received different polynomial, "
-                                     "discarding old one")
-                    del(self.state["outputfile"])
-                self.state["poly"] = str(poly)
-        else:
-            self.state["poly"] = str(poly)
+                self.logger.warn("Received different polynomial, "
+                                 "discarding old factor base file")
+                del(self.state["outputfile"])
+            else:
+                for key in check_params:
+                    if self.state[key] != check_params[key]:
+                        self.logger.warn("Parameter %s changed, discarding old "
+                                         "factor base file", key)
+                        del(self.state["outputfile"])
+                    break
+        # If outputfile is not in state, because we never produced it or because
+        # input parameters changed, we remember our current input parameters
+        if not "outputfile" in self.state:
+            check_params["poly"] = str(poly)
+            self.state.update(check_params)
         
         if not "outputfile" in self.state or self.have_new_input_files():
             
@@ -2254,9 +2268,11 @@ class FreeRelTask(Task):
             # default for dlp is addfullcol
             self.progparams[0].setdefault("addfullcol", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
-        # then we must also have a polynomial (in self.state["poly"])
+        # then we must also have a polynomial (in self.state["poly"]) and
+        # the lpba value used in self.state["lpba"]
         if "freerelfilename" in self.state:
             assert "poly" in self.state
+            assert "lpba" in self.state
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
@@ -2267,20 +2283,29 @@ class FreeRelTask(Task):
         if not poly:
             raise Exception("FreerelTask(): no polynomial "
                             "received from PolyselTask")
-        
-        # Check if we have already computed the target file for this polynomial
-        if "poly" in self.state:
+
+        # Check if we have already computed the freerelfile for this polynomial
+        # and lpb. If any of the inputs mismatch, we remove freerelfilename
+        # from state
+        if "freerelfilename" in self.state:
+            discard = False
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                if "freerelfilename" in self.state:
-                    self.logger.info("Received different polynomial, "
-                                     "discarding old one")
-                    del(self.state["freerelfilename"])
-                    del(self.state["renumberfilename"])
-                self.state["poly"] = str(poly)
-        else:
-            self.state["poly"] = str(poly)
-        
+                self.logger.warn("Received different polynomial, discarding "
+                                 "old free relations file")
+                discard = True
+            elif self.state["lpba"] != self.progparams[0]["lpba"]:
+                self.logger.warn("Parameter lpba changed, discarding old free "
+                                 "relations file")
+                discard = True
+            if discard:
+                del(self.state["freerelfilename"])
+                del(self.state["renumberfilename"])
+        # If outputfile is not in state, because we never produced it or because
+        # input parameters changed, we remember our currnet input parameters
+        if not "freerelfilename" in self.state:
+            self.state.update({"poly": str(poly), "lpba": self.progparams[0]["lpba"]})
+
         if not "freerelfilename" in self.state or self.have_new_input_files():
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
