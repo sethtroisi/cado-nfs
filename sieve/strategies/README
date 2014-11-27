@@ -80,18 +80,23 @@ a prime divisor.
 In what follows, we give an example to illustrate a procedure to
 achieve our objective:
 
-Firsly, you should precompute all decompositions of cofactors of less than mfb bits given that 
-it has no prime divisors less than fbb. To do it:
-./gst -gdc -fbb0 20 -mfb0 40 -out file
+Firsly, you should precompute all decompositions of cofactors of less than mfb
+bits given that  it has no prime divisors less than fbb. To do it, assuming you
+have created a directory decomp_tmp/:
+
+./gst -gdc -fbb0 20 -mfb0 39 -out decomp_tmp/decomp_20_39
+# Note the product of two 20-bit primes can have 39 or 40 bits
+./gst -gdc -fbb0 20 -mfb0 40 -out decomp_tmp/decomp_20_40
+cat decomp_tmp/decomp_20_40
 [ 20, 20 ] : 451299262.762625
 [ 20, 21 ] : 1122087524.990350
-./gst -gdc -fbb0 20 -mfb0 41 -out file
-./gst -gdc -fbb0 20 -mfb0 42 -out file
-./gst -gdc -fbb0 20 -mfb0 43 -out file
+./gst -gdc -fbb0 20 -mfb0 41 -out decomp_tmp/decomp_20_41
+./gst -gdc -fbb0 20 -mfb0 42 -out decomp_tmp/decomp_20_42
+./gst -gdc -fbb0 20 -mfb0 43 -out decomp_tmp/decomp_20_43
 etc ... until mfb!
 
 Secondly, you should distribute the precomputation of strategies for each
-size and side. A example is given by the script script_str_r.sh
+size and side. An example is given by the script script_str_r.sh
 
 Remark: the files results are stored in the directory 'out' and the format
 name of files is: strategies_$fbb_$r, where fbb is the bit size of the

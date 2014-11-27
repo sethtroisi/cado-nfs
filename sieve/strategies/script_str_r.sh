@@ -7,23 +7,21 @@
 #the sieving region
 #remark: when I will embeded the code to compute the decomposition files, 
 #I will change fbb0 and fbb1 by lim0 and lim1. 
-fbb0=27
-lpb0=37
-mfb0=110
+fbb0=$1 # say 27
+lpb0=$2 # say 37
+mfb0=$3 # say 110
 
-fbb1=29
-lpb1=37
-mfb1=110
+fbb1=$4 # say 29
+lpb1=$5 # say 37
+mfb1=$6 # say 110
 
 #directory which store our decomposition files!
-decomp='/localdisk/trichard/results/decomp_cofactor/decomp_tmp/'
+decomp=$7 # say '/localdisk/trichard/results/decomp_cofactor/decomp_tmp/'
 #file which contains our factoring methods (PM1, PP1, EC)!
-methods='All_methods'
+methods=$8 # say 'All_methods'
 #directory where the output file will be stored, because this binary
 #generates a file for each r.
-out='res_precompt_st/'
-
-
+out=$9 # say 'res_precompt_st/'
 let "r0=0"
 while [ $r0 -le $mfb0 ]; do
 pathname_decomp=$decomp"/decomp_"$fbb0"_"$r0
