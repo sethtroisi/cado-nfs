@@ -99,8 +99,8 @@ Secondly, you should distribute the precomputation of strategies for each
 size and side. An example is given by the script script_str_r.sh
 
 Remark: the files results are stored in the directory 'out' and the format
-name of files is: strategies_$fbb_$r, where fbb is the bit size of the
-factor base bound and r the bit size of the cofactor).
+name of files is: strategies($fbb)_$r, where fbb is the bit size of the
+factor base bound and r the bit size of the cofactor.
 
 Then, you merge our results to compute the matrix which stores the
 differents strategies for each pair of bit size (see the script
