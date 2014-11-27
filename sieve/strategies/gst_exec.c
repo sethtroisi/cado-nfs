@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
     }
 
     /*default values */
+    //todo: change fbb by lim
     int fbb1 = -1;
     int mfb1 = -1;
     int fbb0 = -1;
@@ -190,7 +191,7 @@ int main(int argc, char *argv[])
 	    char name_file_in[strlen(directory_in) + 20];
 	    FILE * file_in;
 	    //get back the best strategies for r0!
-	    sprintf(name_file_in, "%s/strategies(%d)_%d",
+	    sprintf(name_file_in, "%s/strategies%d_%d",
 		    directory_in, fbb0, r0);
 	    file_in = fopen(name_file_in, "r");
 	    tabular_strategy_t *strat_r0 = tabular_strategy_fscan(file_in);
@@ -203,7 +204,7 @@ int main(int argc, char *argv[])
 	    fclose(file_in);
 
 	    //get back the best strategies for r1!
-	    sprintf(name_file_in, "%s/strategies(%d)_%d",
+	    sprintf(name_file_in, "%s/strategies%d_%d",
 		    directory_in, fbb1, r1);
 	    file_in = fopen(name_file_in, "r");
 	    tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
@@ -244,7 +245,7 @@ int main(int argc, char *argv[])
 	  ASSERT_ALWAYS(data_rat);
 	  char name_file_in[strlen(directory_in) + 20];
 	  for (int r0 = 0; r0 <= mfb0; r0++) {
-	    sprintf(name_file_in, "%s/strategies(%d)_%d",
+	    sprintf(name_file_in, "%s/strategies%d_%d",
 		    directory_in, fbb0, r0);
 	    FILE *file_in = fopen(name_file_in, "r");
 	    data_rat[r0] = tabular_strategy_fscan(file_in);
@@ -258,7 +259,7 @@ int main(int argc, char *argv[])
 	  }
 
 	  for (int r1 = 0; r1 <= mfb1; r1++) {
-	    sprintf(name_file_in, "%s/strategies(%d)_%d",
+	    sprintf(name_file_in, "%s/strategies%d_%d",
 		    directory_in, fbb1, r1);
 	    FILE *file_in = fopen(name_file_in, "r");
 	    tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
@@ -369,7 +370,7 @@ int main(int argc, char *argv[])
 	  tabular_decomp_free(tab_decomp);
 
 	  char name_file[strlen (directory_out) + 20];
-	  sprintf(name_file, "%s/strategies(%d)_%d", directory_out, fbb0, r);
+	  sprintf(name_file, "%s/strategies%d_%d", directory_out, fbb0, r);
 	  FILE *file_out = fopen(name_file, "w");
 	  tabular_strategy_fprint(file_out, res);
 	  fclose(file_out);
