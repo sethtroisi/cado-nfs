@@ -1119,6 +1119,7 @@ config/openmp.cmake
 sieve/strategies/CMakeLists.txt
 sieve/strategies/Makefile
 sieve/strategies/README
+sieve/strategies/README.c120
 sieve/strategies/benchfm_exec.c
 sieve/strategies/generate_factoring_method.c
 sieve/strategies/generate_factoring_method.h
