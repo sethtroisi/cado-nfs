@@ -117,9 +117,9 @@ tabular_strategy_t *generate_strategy_cado(tabular_fm_t * methods,
 	    strategy_set_proba(strat, 1.0);
 	fm_free(zero);
     } else {
-      int len = 3 + nb_curves(lpb);//todo
+      int len = 3 + nb_curves(lpb);
       //printf ("len  = %d\n", len);
-      //ASSERT(len <= methods->index);
+      ASSERT(len <= methods->index);
       /* strategy_add_fm(strat, methods->tab[0]); */
       //strategy_add_fm(strat, methods->tab[2]);
       for (int i = 0; i < len; i++)
@@ -423,7 +423,7 @@ int main(int argc, char *argv[])
     }
 
     //int fbb = (fbb0 < fbb1) ? fbb0 : fbb1;
-    //int lpb = (lpb0 > lpb1) ? lpb0 : lpb1;
+    //    int lpb = (lpb0 > lpb1) ? lpb0 : lpb1;
     //convert the time in micro-s. because all previous binaries
     //compute their times in micro-s.
     C0 *= 1000000;		//s-->micro-s 
@@ -464,13 +464,14 @@ int main(int argc, char *argv[])
     //select our methods
     //tabular_fm_t *methods = generate_methods_cado(lpb);
     //benchmark
-    //bench_proba(state, methods, fbb);
-    //bench_time(state, methods);
-    //tabular_fm_print (methods);
+    /* bench_proba(state, methods, fbb); */
+    /* bench_time(state, methods); */
+    /* tabular_fm_print (methods); */
     FILE* file_in = fopen ("/localdisk/trichard/cadoRSA155/data_fm_25", "r");
     tabular_fm_t *methods = tabular_fm_fscan (file_in);
     printf ("len  = %d, (%d)\n", methods->index, 3+nb_curves(lpb0));
-    methods->index = 3+nb_curves(lpb0);//todo change it!!!pb for free and the nb is diff for each side
+    //methods->index = 3+nb_curves(lpb0);
+    //change it!!!pb for free and the nb is diff for each side
     
     //generate our strategies
     //remark: for each pair (r0, r1), we have only one strategy!!
