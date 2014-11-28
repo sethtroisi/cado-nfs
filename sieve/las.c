@@ -1379,6 +1379,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
     if (UNLIKELY(next_align > next_logp_change)) next_align = next_logp_change;
     while (read_ptr < next_align) {
       uint16_t x;
+      WHERE_AM_I_UPDATE(w, h, read_ptr->p);
       x = (read_ptr++)->x;
       WHERE_AM_I_UPDATE(w, x, x);
       sieve_increase(S + x, logp, w);
