@@ -1933,8 +1933,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* now start ecm */
 
   /* Do stage 1 */
-  if (plan->parameterization & MONTY12+MONTY16)
-    {
       ellM_interpret_bytecode (P, plan->bc, m, b);
       
       /* Add prime 2 in the desired power. If a zero residue for the 
@@ -1990,12 +1988,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       mod_clear (r, m);
       ellM_clear (P, m);
       ellM_clear (Pt, m);
-    }
+    
 
-  else if (plan->parameterization & TWED12+TWED16)
-    {
-      /* TODO: Edwards sage 1 */
-    }
 
   return bt;
 
