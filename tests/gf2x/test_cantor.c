@@ -4,11 +4,14 @@
 #include <gmp.h>
 #include "gf2x.h"
 #include "gf2x-fft.h"
+#include "tests_common.h"
 
 int main(int argc, char **argv)
 {
+    char *argv0 = argv[0];
+    tests_common_cmdline(&argc, &argv, PARSE_SEED);
     if (argc != 2) {
-        fprintf(stderr, "usage: %s N\n", argv[0]);
+        fprintf(stderr, "usage: %s <option> N\n", argv0);
         fprintf(stderr,
                 "  where N is the number of limbs of operands\n");
         exit(1);
@@ -25,8 +28,6 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(h1 != NULL);
     ASSERT_ALWAYS(h2 != NULL);
 
-    gmp_randstate_t state;
-    gmp_randinit_default(state);
     for (int i = 0; i < N; ++i) {
         f[i] = gmp_urandomb_ui(state, 64);
         g[i] = gmp_urandomb_ui(state, 64);
