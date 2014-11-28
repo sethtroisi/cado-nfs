@@ -662,6 +662,7 @@ class MakeFB(Program):
                  maxbits: Parameter(checktype=int)=None,
                  out: Parameter(is_output_file=True)=None,
                  side: Parameter(checktype=int)=None,
+                 threads : Parameter("t", checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
