@@ -1100,6 +1100,7 @@ tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
 tests/gf2x/CMakeLists.txt
 tests/gf2x/test_gf2x.sh
+tests/gf2x/test_cantor.c
 config/hwloc.cmake
 config/numa.cmake
 linalg/bwc/cpubinding.conf
