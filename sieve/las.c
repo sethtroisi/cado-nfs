@@ -1375,7 +1375,11 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
     }
     else
       next_logp_change = BA.bucket_write[i];
-    next_align = (bucket_update_t *) (((size_t) read_ptr + 0x3F) & ~((size_t) 0x3F));
+    if (sizeof(bucket_update_t) == 4) {
+        next_align = (bucket_update_t *) (((size_t) read_ptr + 0x3F) & ~((size_t) 0x3F));
+    } else {
+        next_align = next_logp_change;
+    }
     if (UNLIKELY(next_align > next_logp_change)) next_align = next_logp_change;
     while (read_ptr < next_align) {
       uint16_t x;
