@@ -1495,3 +1495,572 @@ mpz_vector_skew_norm_sq_L2 (mpz_t res_num, mpz_t res_den, mpz_vector_srcptr u,
 /*******************************************************************/
 /* Functions for double poly.                                      */
 /*******************************************************************/
+
+
+/* Compute inner product for the classical L2 norm. */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_innerproduct_L2 (double_poly_srcptr f, double_poly_srcptr g)
+{
+  FATAL_ERROR_CHECK (f->deg != g->deg, "f->deg should be equal to g->deg");
+  double *a = f->coeff;
+  double *b = g->coeff;
+  if (f->deg == 0)
+  {
+    return ( a[0]*b[0] );
+  }
+  else if (f->deg == 1)
+  {
+    return ( a[1]*b[1] + a[0]*b[0] );
+  }
+  else if (f->deg == 2)
+  {
+    return ( a[2]*b[2] + a[1]*b[1] + a[0]*b[0] );
+  }
+  else if (f->deg == 3)
+  {
+    return ( a[3]*b[3] + a[2]*b[2] + a[1]*b[1] + a[0]*b[0] );
+  }
+  else if (f->deg == 4)
+  {
+    return ( a[4]*b[4] + a[3]*b[3] + a[2]*b[2] + a[1]*b[1] + a[0]*b[0] );
+  }
+  else if (f->deg == 5)
+  {
+    return ( a[5]*b[5] + a[4]*b[4] + a[3]*b[3] + a[2]*b[2] + a[1]*b[1] + a[0]*b[0] );
+  }
+  else if (f->deg == 6)
+  {
+    return ( a[6]*b[6] + a[5]*b[5] + a[4]*b[4] + a[3]*b[3] + a[2]*b[2] + a[1]*b[1] + a[0]*b[0] );
+  }
+  else if (f->deg == 7)
+  {
+    return ( a[7]*b[7] + a[6]*b[6] + a[5]*b[5] + a[4]*b[4] + a[3]*b[3] + a[2]*b[2] + a[1]*b[1] + a[0]*b[0] );
+  }
+  else
+  {
+    fprintf (stderr, "Not implemented yet, deg = %u\n", f->deg);
+    abort();
+  }
+}
+
+/* Compute the square of the norm for the classical L2 norm. */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_norm_L2 (double_poly_srcptr f)
+{
+  return double_poly_innerproduct_L2 (f, f);
+}
+
+/* Compute inner product for the classical L2 norm, with skewness */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_skew_innerproduct_L2 (double_poly_srcptr f, double_poly_srcptr g, double skew)
+{
+  FATAL_ERROR_CHECK (f->deg != g->deg, "f->deg should be equal to g->deg");
+  double *a = f->coeff;
+  double *b = g->coeff;
+  double skew2 = skew*skew;
+  double ret, s = 1;
+  ret = a[0]*b[0];
+  for (int i = 1; i <= f->deg; i++)
+  {
+    s = s*skew2;             /* s = skew^(2*i) */
+    ret += s*a[i]*b[i];
+  }
+  if (f->deg == 1)
+    ret = ret / (skew);
+  if (f->deg == 2)
+    ret = ret / (skew*skew);
+  if (f->deg == 3)
+    ret = ret / (skew*skew*skew);
+  if (f->deg == 4)
+    ret = ret / (skew*skew*skew*skew);
+  if (f->deg == 5)
+    ret = ret / (skew*skew*skew*skew*skew);
+  if (f->deg == 6)
+    ret = ret / (skew*skew*skew*skew*skew*skew);
+  if (f->deg == 7)
+    ret = ret / (skew*skew*skew*skew*skew*skew*skew);
+
+  return ret;
+}
+
+/* Return the square of the skew-norm of the polynomial f. */
+double
+double_poly_skew_norm_L2 (double_poly_srcptr f, double skew)
+{
+  return double_poly_skew_innerproduct_L2 (f, f, skew);
+}
+
+/* Return the log of the skew-norm of the polynomial f. */
+double
+double_poly_lognorm_L2 (double_poly_srcptr f, double skew)
+{
+  double n = double_poly_skew_norm_L2 (f, skew);
+  return 0.5 * log (n);
+}
+
+
+#define PI 3.14159265358979323846
+
+/* Compute inner product for the circular L2 norm. */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_innerproduct_cir_L2 (double_poly_srcptr f, double_poly_srcptr g)
+{
+  FATAL_ERROR_CHECK (f->deg != g->deg, "f->deg should be equal to g->deg");
+  double *a = f->coeff;
+  double *b = g->coeff;
+  if (f->deg == 0)
+  {
+    return ( a[0]*b[0] );
+  }
+  else if (f->deg == 1)
+  {
+    return ( a[1]*b[1] + a[0]*b[0] )/4.0;
+  }
+  else if (f->deg == 2)
+  {
+    return ( 3.0*a[2]*b[2] + a[1]*b[1] + 2.0*a[0]*b[2] + 3.0*a[0]*b[0] )/24.0;
+  }
+  else if (f->deg == 3)
+  {
+    return ( 5.0*a[3]*b[3] + a[2]*b[2] + 2.0*a[1]*b[3] + a[1]*b[1] + 2.0*a[0]*b[2] + 5.0*a[0]*b[0] )/64.0;
+  }
+  else if (f->deg == 4)
+  {
+    return ( 35.0*a[4]*b[4] + 5.0*a[3]*b[3] + 10.0*a[2]*b[4] + 3.0*a[2]*b[2] + 6.0*a[1]*b[3] + 5.0*a[1]*b[1] + 6.0*a[0]*b[4] + 10.0*a[0]*b[2] + 35.0*a[0]*b[0] )/640.0;
+  }
+  else if (f->deg == 5)
+  {
+    return ( 63.0*a[5]*b[5] + 7.0*a[4]*b[4] + 14.0*a[3]*b[5] + 3.0*a[3]*b[3] + 6.0*a[2]*b[4] + 3.0*a[2]*b[2] + 6.0*a[1]*b[5] + 6.0*a[1]*b[3] + 7.0*a[1]*b[1] + 6.0*a[0]*b[4] + 14.0*a[0]*b[2] + 63.0*a[0]*b[0] )/1536.0;
+  }
+  else if (f->deg == 6)
+  {
+    return ( 231.0*a[6]*b[6] + 21.0*a[5]*b[5] + 42.0*a[4]*b[6] + 7.0*a[4]*b[4] + 14.0*a[3]*b[5] + 5.0*a[3]*b[3] + 14.0*a[2]*b[6] + 10.0*a[2]*b[4] + 7.0*a[2]*b[2] + 10.0*a[1]*b[5] + 14.0*a[1]*b[3] + 21.0*a[1]*b[1] + 10.0*a[0]*b[6] + 14.0*a[0]*b[4] + 42.0*a[0]*b[2] + 231.0*a[0]*b[0] )/7168.0;
+  }
+  else if (f->deg == 7)
+  {
+    return ( 429.0*a[7]*b[7] + 33.0*a[6]*b[6] + 66.0*a[5]*b[7] + 9.0*a[5]*b[5] + 18.0*a[4]*b[6] + 5.0*a[4]*b[4] + 18.0*a[3]*b[7] + 10.0*a[3]*b[5] + 5.0*a[3]*b[3] + 10.0*a[2]*b[6] + 10.0*a[2]*b[4] + 9.0*a[2]*b[2] + 10.0*a[1]*b[7] + 10.0*a[1]*b[5] + 18.0*a[1]*b[3] + 33.0*a[1]*b[1] + 10.0*a[0]*b[6] + 18.0*a[0]*b[4] + 66.0*a[0]*b[2] + 429.0*a[0]*b[0] )/16384.0;
+  }
+  else
+  {
+    fprintf (stderr, "Not implemented yet, deg = %u\n", f->deg);
+    abort();
+  }
+}
+
+/* Compute the square of the norm for the circular L2 norm. */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_norm_cir_L2 (double_poly_srcptr f)
+{
+  return double_poly_innerproduct_cir_L2 (f, f);
+}
+
+/* Compute inner product for the circular L2 norm, with skewness */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_skew_innerproduct_cir_L2 (double_poly_srcptr f, double_poly_srcptr g, double skew)
+{
+  FATAL_ERROR_CHECK (f->deg != g->deg, "f->deg should be equal to g->deg");
+  double *a = f->coeff;
+  double *b = g->coeff;
+  double skew2 = skew*skew;
+  double ret, s = 1;
+  if (f->deg == 0)
+  {
+    /* s = 1 = skew^0 */
+    ret = 1.0*a[0]*b[0];
+
+  }
+  else if (f->deg == 1)
+  {
+    /* s = 1 = skew^0 */
+    ret = 1.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 1.0*s*( a[1]*b[1] );
+
+    ret = ret / (4.0*skew);
+  }
+  else if (f->deg == 2)
+  {
+    /* s = 1 = skew^0 */
+    ret = 3.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 1.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 3.0*s*( a[2]*b[2] );
+
+    ret = ret / (24.0*skew*skew);
+  }
+  else if (f->deg == 3)
+  {
+    /* s = 1 = skew^0 */
+    ret = 5.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 1.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 1.0*s*( a[1]*b[3] + a[2]*b[2] + a[3]*b[1] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 5.0*s*( a[3]*b[3] );
+
+    ret = ret / (64.0*skew*skew*skew);
+  }
+  else if (f->deg == 4)
+  {
+    /* s = 1 = skew^0 */
+    ret = 35.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 5.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 3.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 5.0*s*( a[2]*b[4] + a[3]*b[3] + a[4]*b[2] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 35.0*s*( a[4]*b[4] );
+
+    ret = ret / (640.0*skew*skew*skew*skew);
+  }
+  else if (f->deg == 5)
+  {
+    /* s = 1 = skew^0 */
+    ret = 63.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 7.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 3.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 3.0*s*( a[1]*b[5] + a[2]*b[4] + a[3]*b[3] + a[4]*b[2] + a[5]*b[1] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 7.0*s*( a[3]*b[5] + a[4]*b[4] + a[5]*b[3] );
+
+    s = s*skew2;        /* s = skew^10 */
+    ret += 63.0*s*( a[5]*b[5] );
+
+    ret = ret / (1536.0*skew*skew*skew*skew*skew);
+  }
+  else if (f->deg == 6)
+  {
+    /* s = 1 = skew^0 */
+    ret = 231.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 21.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 7.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 5.0*s*( a[0]*b[6] + a[1]*b[5] + a[2]*b[4] + a[3]*b[3] + a[4]*b[2] + a[5]*b[1] + a[6]*b[0] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 7.0*s*( a[2]*b[6] + a[3]*b[5] + a[4]*b[4] + a[5]*b[3] + a[6]*b[2] );
+
+    s = s*skew2;        /* s = skew^10 */
+    ret += 21.0*s*( a[4]*b[6] + a[5]*b[5] + a[6]*b[4] );
+
+    s = s*skew2;        /* s = skew^12 */
+    ret += 231.0*s*( a[6]*b[6] );
+
+    ret = ret / (7168.0*skew*skew*skew*skew*skew*skew);
+  }
+  else if (f->deg == 7)
+  {
+    /* s = 1 = skew^0 */
+    ret = 429.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 33.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 9.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 5.0*s*( a[0]*b[6] + a[1]*b[5] + a[2]*b[4] + a[3]*b[3] + a[4]*b[2] + a[5]*b[1] + a[6]*b[0] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 5.0*s*( a[1]*b[7] + a[2]*b[6] + a[3]*b[5] + a[4]*b[4] + a[5]*b[3] + a[6]*b[2] + a[7]*b[1] );
+
+    s = s*skew2;        /* s = skew^10 */
+    ret += 9.0*s*( a[3]*b[7] + a[4]*b[6] + a[5]*b[5] + a[6]*b[4] + a[7]*b[3] );
+
+    s = s*skew2;        /* s = skew^12 */
+    ret += 33.0*s*( a[5]*b[7] + a[6]*b[6] + a[7]*b[5] );
+
+    s = s*skew2;        /* s = skew^14 */
+    ret += 429.0*s*( a[7]*b[7] );
+
+    ret = ret / (16384.0*skew*skew*skew*skew*skew*skew*skew);
+  }
+  else
+  {
+    fprintf (stderr, "Not implemented yet, deg =  %d\n", f->deg);
+    abort();
+  }
+
+  /* In CADO, there is no 1/pi factor in the definition of the
+     circular norm*/
+  return PI * ret;
+}
+
+/* Return the square of the skew-norm of the polynomial f. */
+double
+double_poly_skew_norm_cir_L2 (double_poly_srcptr f, double skew)
+{
+  return double_poly_skew_innerproduct_cir_L2 (f, f, skew);
+}
+
+/* Return the log of the skew-norm of the polynomial f. */
+double
+double_poly_lognorm_cir_L2 (double_poly_srcptr f, double skew)
+{
+  double n = double_poly_skew_norm_cir_L2 (f, skew);
+  return 0.5 * log (n);
+}
+
+
+
+/* Compute inner product for the square L2 norm. */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_innerproduct_sq_L2 (double_poly_srcptr f, double_poly_srcptr g)
+{
+  FATAL_ERROR_CHECK (f->deg != g->deg, "f->deg should be equal to g->deg");
+  double *a = f->coeff;
+  double *b = g->coeff;
+  if (f->deg == 0)
+  {
+    return ( a[0]*b[0] );
+  }
+  else if (f->deg == 1)
+  {
+    return ( a[1]*b[1] + a[0]*b[0] )/3.0;
+  }
+  else if (f->deg == 2)
+  {
+    return ( 9.0*a[2]*b[2] + 5.0*a[1]*b[1] + 10.0*a[0]*b[2] + 9.0*a[0]*b[0] )/45.0;
+  }
+  else if (f->deg == 3)
+  {
+    return ( 15.0*a[3]*b[3] + 7.0*a[2]*b[2] + 14.0*a[1]*b[3] + 7.0*a[1]*b[1] + 14.0*a[0]*b[2] + 15.0*a[0]*b[0] )/105.0;
+  }
+  else if (f->deg == 4)
+  {
+    return ( 175.0*a[4]*b[4] + 75.0*a[3]*b[3] + 150.0*a[2]*b[4] + 63.0*a[2]*b[2] + 126.0*a[1]*b[3] + 75.0*a[1]*b[1] + 126.0*a[0]*b[4] + 150.0*a[0]*b[2] + 175.0*a[0]*b[0] )/1575.0;
+  }
+  else if (f->deg == 5)
+  {
+    return ( 945.0*a[5]*b[5] + 385.0*a[4]*b[4] + 770.0*a[3]*b[5] + 297.0*a[3]*b[3] + 594.0*a[2]*b[4] + 297.0*a[2]*b[2] + 594.0*a[1]*b[5] + 594.0*a[1]*b[3] + 385.0*a[1]*b[1] + 594.0*a[0]*b[4] + 770.0*a[0]*b[2] + 945.0*a[0]*b[0] )/10395.0;
+  }
+  else if (f->deg == 6)
+  {
+    return ( 24255.0*a[6]*b[6] + 9555.0*a[5]*b[5] + 19110.0*a[4]*b[6] + 7007.0*a[4]*b[4] + 14014.0*a[3]*b[5] + 6435.0*a[3]*b[3] + 14014.0*a[2]*b[6] + 12870.0*a[2]*b[4] + 7007.0*a[2]*b[2] + 12870.0*a[1]*b[5] + 14014.0*a[1]*b[3] + 9555.0*a[1]*b[1] + 12870.0*a[0]*b[6] + 14014.0*a[0]*b[4] + 19110.0*a[0]*b[2] + 24255.0*a[0]*b[0] )/315315.0;
+  }
+  else if (f->deg == 7)
+  {
+    return ( 3003.0*a[7]*b[7] + 1155.0*a[6]*b[6] + 2310.0*a[5]*b[7] + 819.0*a[5]*b[5] + 1638.0*a[4]*b[6] + 715.0*a[4]*b[4] + 1638.0*a[3]*b[7] + 1430.0*a[3]*b[5] + 715.0*a[3]*b[3] + 1430.0*a[2]*b[6] + 1430.0*a[2]*b[4] + 819.0*a[2]*b[2] + 1430.0*a[1]*b[7] + 1430.0*a[1]*b[5] + 1638.0*a[1]*b[3] + 1155.0*a[1]*b[1] + 1430.0*a[0]*b[6] + 1638.0*a[0]*b[4] + 2310.0*a[0]*b[2] + 3003.0*a[0]*b[0] )/45045.0;
+  }
+  else
+  {
+    fprintf (stderr, "Not implemented yet, deg = %u\n", f->deg);
+    abort();
+  }
+}
+
+/* Compute the square of the norm for the square L2 norm. */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_norm_sq_L2 (double_poly_srcptr f)
+{
+  return double_poly_innerproduct_sq_L2 (f, f);
+}
+
+/* Compute inner product for the square L2 norm, with skewness */
+/* Assume deg(f) == deg(g) */
+double
+double_poly_skew_innerproduct_sq_L2 (double_poly_srcptr f, double_poly_srcptr g, double skew)
+{
+  FATAL_ERROR_CHECK (f->deg != g->deg, "f->deg should be equal to g->deg");
+  double *a = f->coeff;
+  double *b = g->coeff;
+  double skew2 = skew*skew;
+  double ret, s = 1;
+  if (f->deg == 0)
+  {
+    /* s = 1 = skew^0 */
+    ret = 1.0*a[0]*b[0];
+
+  }
+  else if (f->deg == 1)
+  {
+    /* s = 1 = skew^0 */
+    ret = 1.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 1.0*s*( a[1]*b[1] );
+
+    ret = ret / (3.0*skew);
+  }
+  else if (f->deg == 2)
+  {
+    /* s = 1 = skew^0 */
+    ret = 9.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 5.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 9.0*s*( a[2]*b[2] );
+
+    ret = ret / (45.0*skew*skew);
+  }
+  else if (f->deg == 3)
+  {
+    /* s = 1 = skew^0 */
+    ret = 15.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 7.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 7.0*s*( a[1]*b[3] + a[2]*b[2] + a[3]*b[1] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 15.0*s*( a[3]*b[3] );
+
+    ret = ret / (105.0*skew*skew*skew);
+  }
+  else if (f->deg == 4)
+  {
+    /* s = 1 = skew^0 */
+    ret = 175.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 75.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 63.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 75.0*s*( a[2]*b[4] + a[3]*b[3] + a[4]*b[2] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 175.0*s*( a[4]*b[4] );
+
+    ret = ret / (1575.0*skew*skew*skew*skew);
+  }
+  else if (f->deg == 5)
+  {
+    /* s = 1 = skew^0 */
+    ret = 945.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 385.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 297.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 297.0*s*( a[1]*b[5] + a[2]*b[4] + a[3]*b[3] + a[4]*b[2] + a[5]*b[1] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 385.0*s*( a[3]*b[5] + a[4]*b[4] + a[5]*b[3] );
+
+    s = s*skew2;        /* s = skew^10 */
+    ret += 945.0*s*( a[5]*b[5] );
+
+    ret = ret / (10395.0*skew*skew*skew*skew*skew);
+  }
+  else if (f->deg == 6)
+  {
+    /* s = 1 = skew^0 */
+    ret = 24255.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 9555.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 7007.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 6435.0*s*( a[0]*b[6] + a[1]*b[5] + a[2]*b[4] + a[3]*b[3] + a[4]*b[2] + a[5]*b[1] + a[6]*b[0] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 7007.0*s*( a[2]*b[6] + a[3]*b[5] + a[4]*b[4] + a[5]*b[3] + a[6]*b[2] );
+
+    s = s*skew2;        /* s = skew^10 */
+    ret += 9555.0*s*( a[4]*b[6] + a[5]*b[5] + a[6]*b[4] );
+
+    s = s*skew2;        /* s = skew^12 */
+    ret += 24255.0*s*( a[6]*b[6] );
+
+    ret = ret / (315315.0*skew*skew*skew*skew*skew*skew);
+  }
+  else if (f->deg == 7)
+  {
+    /* s = 1 = skew^0 */
+    ret = 3003.0*a[0]*b[0];
+
+    s = s*skew2;        /* s = skew^2 */
+    ret += 1155.0*s*( a[0]*b[2] + a[1]*b[1] + a[2]*b[0] );
+
+    s = s*skew2;        /* s = skew^4 */
+    ret += 819.0*s*( a[0]*b[4] + a[1]*b[3] + a[2]*b[2] + a[3]*b[1] + a[4]*b[0] );
+
+    s = s*skew2;        /* s = skew^6 */
+    ret += 715.0*s*( a[0]*b[6] + a[1]*b[5] + a[2]*b[4] + a[3]*b[3] + a[4]*b[2] + a[5]*b[1] + a[6]*b[0] );
+
+    s = s*skew2;        /* s = skew^8 */
+    ret += 715.0*s*( a[1]*b[7] + a[2]*b[6] + a[3]*b[5] + a[4]*b[4] + a[5]*b[3] + a[6]*b[2] + a[7]*b[1] );
+
+    s = s*skew2;        /* s = skew^10 */
+    ret += 819.0*s*( a[3]*b[7] + a[4]*b[6] + a[5]*b[5] + a[6]*b[4] + a[7]*b[3] );
+
+    s = s*skew2;        /* s = skew^12 */
+    ret += 1155.0*s*( a[5]*b[7] + a[6]*b[6] + a[7]*b[5] );
+
+    s = s*skew2;        /* s = skew^14 */
+    ret += 3003.0*s*( a[7]*b[7] );
+
+    ret = ret / (45045.0*skew*skew*skew*skew*skew*skew*skew);
+  }
+  else
+  {
+    fprintf (stderr, "Not implemented yet, deg =  %d\n", f->deg);
+    abort();
+  }
+
+  return ret;
+}
+
+/* Return the square of the skew-norm of the polynomial f. */
+double
+double_poly_skew_norm_sq_L2 (double_poly_srcptr f, double skew)
+{
+  return double_poly_skew_innerproduct_sq_L2 (f, f, skew);
+}
+
+/* Return the log of the skew-norm of the polynomial f. */
+double
+double_poly_lognorm_sq_L2 (double_poly_srcptr f, double skew)
+{
+  double n = double_poly_skew_norm_sq_L2 (f, skew);
+  return 0.5 * log (n);
+}
+
