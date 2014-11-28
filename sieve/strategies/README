@@ -188,3 +188,8 @@ and t the average runtime.
 And each [S: m, b1, b2] is a factoring method given by the
 method m and these parameters b1 and b2, and S is the side where
 this factoring method is apply (S0 for r0 and S1 for r1).
+
+
+
+Remark: an example of this procedure is given in README.commands.
+------
