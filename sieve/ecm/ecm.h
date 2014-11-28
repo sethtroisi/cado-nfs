@@ -4,11 +4,25 @@
 #include "mod_mpz.h"
 #include "stage2.h"
 
-#define BRENT12 0
-#define MONTY12 1
-#define MONTY16 2
-#define TWED12  4
-#define TWED16  8
+#define BRENT12 1
+#define MONTY12 2
+#define MONTY16 4
+#define TWED12  8
+#define TWED16  16
+
+
+
+/* Twisted Edwards curve with a = -1 */
+typedef struct {
+  unsigned long g_numer, g_denom;
+  unsigned long d_numer, d_denom;        /* d parameter for twisted Edwards curves */
+  unsigned long x_numer, x_denom, 
+                y_numer, y_denom;        /* non-torsion point on the curve */
+} Edwards_curve_t;
+
+static const Edwards_curve_t Ecurve14 = {1, 4, -50625, 4096, 104329, 16384, 1630827, 262144};
+static const Edwards_curve_t Ecurve45 = {4, 5, -6561, 2560000, 106564329, 501760000, -3715030917, 280985600000};
+
 
 
 typedef struct {
@@ -20,10 +34,12 @@ typedef struct {
   unsigned long sigma;  /* Sigma parameter for Brent curves, or
 			   multiplier for Montgomery torsion-12 curves */
 
-  unsigned long g_num, g_denom;   /* Rational parameter for ECM friendly Edwards curves */
-
+  Edwards_curve_t *E;   /* Parameters for Edwards curve */
   stage2_plan_t stage2;
 } ecm_plan_t;
+
+
+
 
 
 int ecm_ul (modintredcul_t, const modulusredcul_t, const ecm_plan_t *);
@@ -63,3 +79,4 @@ void ecm_make_plan (ecm_plan_t *, const unsigned int, const unsigned int,
 		    const int, const unsigned long, const int, const int);
 
 void ecm_clear_plan (ecm_plan_t *);
+
