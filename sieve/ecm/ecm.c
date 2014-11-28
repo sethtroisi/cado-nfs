@@ -26,20 +26,41 @@
 #endif
 #endif
 
+
 #define COUNT_ELLM_OPS 0
 #if COUNT_ELLM_OPS
 static unsigned long ellM_add_count, ellM_double_count;
 #endif
 
+#define COUNT_ELLE_OPS 0
+#if COUNT_ELLE_OPS
+static unsigned long ellE_add_count, ellE_double_count;
+#endif
+
+
+
+/* Projective point on Montgomery curve (x : z) onlyx */
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
 
+/* Homogeneous projective Edwards coordinates 
+   (x : y : z) ---> (x/z, y/z)  z != 0 */
+typedef struct {residue_t x, y, z;} __ellE_point_t;
+typedef __ellE_point_t ellE_point_t[1];
+
+/* Extended projective Edwards coordinates 
+   [Hisil et al. 2008] */
+typedef struct {residue_t x, y, t, z;} __ellEe_point_t;
+typedef __ellEe_point_t ellEe_point_t[1];
+
+/* Affine point on Weierstrass curve */
 typedef struct {residue_t x, y;} __ellW_point_t;
 typedef __ellW_point_t ellW_point_t[1];
 
 
+/* -------------------------------------------------------------------------- */
 /* Functions for curves in Montgomery form */
-
+/* -------------------------------------------------------------------------- */
 static inline void
 ellM_init (ellM_point_t P, const modulus_t m)
 {
@@ -278,9 +299,352 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
   ellM_clear (t2, m);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Functions for curves in twisted Edwards form */
+/* -------------------------------------------------------------------------- */
 
+static inline void
+ellE_init (ellE_point_t P, const modulus_t m)
+{
+  mod_init (P->x, m);
+  mod_init (P->y, m);
+  mod_init (P->z, m);
+}
+
+static inline void
+ellEe_init (ellEe_point_t P, const modulus_t m)
+{
+  mod_init (P->x, m);
+  mod_init (P->y, m);
+  mod_init (P->t, m);
+  mod_init (P->z, m);
+}
+
+static inline void
+ellE_clear (ellE_point_t P, const modulus_t m)
+{
+  mod_clear (P->x, m);
+  mod_clear (P->y, m);
+  mod_clear (P->z, m);
+}
+
+static inline void
+ellEe_clear (ellEe_point_t P, const modulus_t m)
+{
+  mod_clear (P->x, m);
+  mod_clear (P->y, m);
+  mod_clear (P->t, m);
+  mod_clear (P->z, m);
+}
+
+static inline void
+ellE_set (ellE_point_t Q, const ellE_point_t P, const modulus_t m)
+{
+  mod_set (Q->x, P->x, m);
+  mod_set (Q->y, P->y, m);
+  mod_set (Q->z, P->z, m);
+}
+
+static inline void
+ellEe_set (ellEe_point_t Q, const ellEe_point_t P, const modulus_t m)
+{
+  mod_set (Q->x, P->x, m);
+  mod_set (Q->y, P->y, m);
+  mod_set (Q->t, P->t, m);
+  mod_set (Q->z, P->z, m);
+}
+
+/* (x : y : t : z) to (x : y : z) 
+   free: simply ignore t coordinate */
+static inline void
+ellE_set_from_Ee (ellE_point_t Q, const ellEe_point_t P, const modulus_t m)
+{
+  mod_set (Q->x, P->x, m);
+  mod_set (Q->y, P->y, m);
+  mod_set (Q->z, P->z, m);
+}
+
+/* (x : y : z) to (x : y : t : z)
+   cost: 3m+1s by computing (xz, yz, xy, z^2) */
+static inline void
+ellEe_set_from_E (ellEe_point_t Q, const ellE_point_t P, const modulus_t m)
+{
+  mod_mul (Q->x, P->x, P->z, m);
+  mod_mul (Q->y, P->y, P->z, m);
+  mod_mul (Q->t, P->x, P->y, m);
+  mod_sqr (Q->z, P->z, m);
+}
+
+static inline void
+ellE_swap (ellE_point_t Q, ellE_point_t P, const modulus_t m)
+{
+  mod_swap (Q->x, P->x, m);
+  mod_swap (Q->y, P->y, m);
+  mod_swap (Q->z, P->z, m);
+}
+
+static inline void
+ellEe_swap (ellEe_point_t Q, ellEe_point_t P, const modulus_t m)
+{
+  mod_swap (Q->x, P->x, m);
+  mod_swap (Q->y, P->y, m);
+  mod_swap (Q->t, P->t, m);
+  mod_swap (Q->z, P->z, m);
+}
+
+
+/* 
+   Computes Q=2P in Ee using dedicated doubling in extended twisted Edwards
+   coordinates from [Hisil et al. 2008] 
+
+   Formulae only depends on the curve constant a (curve constant d is not
+   necessary).  
+
+   Cost: 4m + 4s + 1d (where d stands for a multiplication by a constant)
+   
+   [Hisil et al. 2008] H. Hisil, K. K.-H. Wong, G. Carter and E. Dawson. Twisted
+   Edwards Curves Revisited. ASIACRYPT 2008, vol 5350 of LNCS, pp. 326--343,
+   Springer.
+*/
+static void
+ellEe_double (ellEe_point_t Q, const ellEe_point_t P, const modulus_t m, 
+             const residue_t a)
+{
+  /* FIXME: optimize registers */
+  residue_t A, B, C, D, E, F, G, H;
+
+#if COUNT_ELLE_OPS
+  ellE_double_count++;
+#endif
+
+  mod_init_noset0 (A, m);
+  mod_init_noset0 (B, m);
+  mod_init_noset0 (C, m);
+  mod_init_noset0 (D, m);
+  mod_init_noset0 (E, m);
+  mod_init_noset0 (F, m);
+  mod_init_noset0 (G, m);
+  mod_init_noset0 (H, m);
+
+  mod_sqr(A, P->x, m);            /* A = X1^2 */
+  mod_sqr(B, P->y, m);            /* B = Y1^2 */
+  mod_sqr(C, P->z, m);
+  mod_add(C, C, C, m);            /* C = 2 * Z1^2 */
+  mod_mul(D, A, a, m);            /* D = a * A */
+  mod_add(E, P->x, P->y, m);
+  mod_sqr(E, E, m);
+  mod_sub(E, E, A, m);
+  mod_sub(E, E, B, m);            /* E = (X1+Y1)^2 - A - B */
+  mod_add(G, D, B, m);            /* G = D + B */
+  mod_sub(F, G, C, m);            /* F = G - C */
+  mod_sub(H, D, B, m);            /* H = D - B */
+  mod_mul(Q->x, E, F, m);         /* X3 = E * F */
+  mod_mul(Q->y, G, H, m);         /* Y3 = G * H */
+  mod_mul(Q->t, E, H, m);         /* T3 = E * H */
+  mod_mul(Q->z, F, G, m);         /* Z3 = F * G */
+ 
+  mod_clear (A, m);
+  mod_clear (B, m);
+  mod_clear (C, m);
+  mod_clear (D, m);
+  mod_clear (E, m);
+  mod_clear (F, m);
+  mod_clear (G, m);
+  mod_clear (H, m);
+}
+
+
+/* 
+   Adds P and Q and puts the result in R, using the dedicated addition formula
+   in extended twisted Edwards coordinates from [Hisil et al. 2008]
+
+   Formulae only depends on the curve constant a (curve constant d is not necessary).
+
+   Cost: 9m + 1d    (where d stands for a multiplication by a constant)
+   
+   [Hisil et al. 2008] H. Hisil, K. K.-H. Wong, G. Carter and E. Dawson. Twisted
+   Edwards Curves Revisited. ASIACRYPT 2008, vol 5350 of LNCS, pp. 326--343,
+   Springer.
+*/
+static void
+ellEe_add (ellEe_point_t R, const ellEe_point_t P, const ellEe_point_t Q,
+	  const residue_t a, const modulus_t m)
+{
+  /* FIXME: optimize registers */
+  residue_t A, B, C, D, E, F, G, H;
+
+  /* FIXME: check if necessary in twisted Edwards form */
+/* #if ELLM_SAFE_ADD */
+/*   /\* Handle case where at least one input point is point at infinity *\/ */
+/*   if (mod_is0 (P->z, m)) */
+/*     { */
+/*       ASSERT (mod_is0 (P->x, m)); */
+/*       ellM_set (R, Q, m); */
+/*       return; */
+/*     } */
+/*   if (mod_is0 (Q->z, m)) */
+/*     { */
+/*       ASSERT (mod_is0 (Q->x, m)); */
+/*       ellM_set (R, P, m); */
+/*       return; */
+/*     } */
+/* #endif */
+
+#if COUNT_ELLE_OPS
+  ellE_add_count++;
+#endif
+
+  mod_init_noset0 (A, m);
+  mod_init_noset0 (B, m);
+  mod_init_noset0 (C, m);
+  mod_init_noset0 (D, m);
+  mod_init_noset0 (E, m);
+  mod_init_noset0 (F, m);
+  mod_init_noset0 (G, m);
+  mod_init_noset0 (H, m);
+
+  mod_mul(A, P->x, Q->x, m);          /* A = X1 * X2 */
+  mod_mul(B, P->y, Q->y, m);          /* B = Y1 * Y2 */
+  mod_mul(C, P->z, Q->t, m);          /* C = Z1 * T2 */
+  mod_mul(D, P->t, Q->z, m);          /* D = T1 * Z2 */
+  mod_add(E, D, C, m);                /* E = D + C */
+  mod_sub(H, D, C, m);                /* H = D - C */
+  
+  mod_sub(C, P->x, P->y, m);          /* C = (X1 - Y1) */
+  mod_add(D, Q->x, Q->y, m);          /* D = (X2 + Y2) */
+  mod_mul(F, C, D, m);
+  mod_add(F, F, B, m);
+  mod_sub(F, F, A, m);                /* F = (X1 - Y1) * (X2 + Y2) + B - A */
+  
+  mod_mul(G, A, a, m);
+  mod_add(G, G, B, m);                /* G = B + a * A */
+  
+  mod_mul(R->x, E, F, m);             /* X3 = E * F */
+  mod_mul(R->y, G, H, m);             /* Y3 = G * H */
+  mod_mul(R->z, F, G, m);             /* Z3 = F * G */
+  mod_mul(R->t, E, H, m);             /* T3 = E * H */
+  
+
+/* #if ELLM_SAFE_ADD */
+/*   /\* Check if v == 0, which happens if P=Q or P=-Q.  */
+/*      If P=-Q, set result to point at infinity. */
+/*      If P=Q, use ellM_double() instead. */
+/*      This test only works if P=Q on the pseudo-curve modulo N, i.e., */
+/*      if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but  */
+/*      not on E_q, this test won't notice it. *\/ */
+/*   if (mod_is0 (v, m)) */
+/*     { */
+/*       mod_clear (w, m); */
+/*       mod_clear (v, m); */
+/*       mod_clear (u, m); */
+/*       /\* Test if difference is point at infinity *\/ */
+/*       if (mod_is0 (D->z, m)) */
+/*         { */
+/*           ASSERT (mod_is0 (D->x, m)); */
+/*           ellM_double (R, P, m, b); /\* Yes, points are identical, use doubling *\/ */
+/*         } */
+/*       else */
+/*         {  */
+/*           mod_set0 (R->x, m); /\* No, are each other's negatives. *\/ */
+/*           mod_set0 (R->z, m); /\* Set result to point at infinity *\/ */
+/*         } */
+/*       return; */
+/*     } */
+/* #endif */
+
+  mod_clear (A, m);
+  mod_clear (B, m);
+  mod_clear (C, m);
+  mod_clear (D, m);
+  mod_clear (E, m);
+  mod_clear (F, m);
+  mod_clear (G, m);
+  mod_clear (H, m);
+}
+
+
+/* Computes R = [e]P (mod m) in homogeneous Edwards coordinates
+
+   Twisted Edwards curve (a,d):
+   ax^2 + y^2 = 1 + d * x^2 * y^2, with a * d * (a-d) != 0
+
+   TODO: add conversions between E and Ee coordinates for consecutive doublings
+   Only useful for precomputed addition chains
+ */
+MAYBE_UNUSED 
+static void
+ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e, 
+             const modulus_t m, const residue_t a)
+{
+  unsigned long j;
+  long k;
+  ellEe_point_t T, PP;
+
+  if (e == 0UL)
+    {
+      mod_set0 (R->x, m);
+      mod_set1 (R->y, m);
+      mod_set1 (R->z, m);
+      return;
+    }
+
+  if (e == 1UL)
+    {
+      ellE_set (R, P, m);
+      return;
+    }
+
+  ellEe_init (T, m);
+  ellEe_init (PP, m);
+  ellEe_set_from_E (PP, P, m);
+
+  /* if (e == 2UL) */
+  /*   { */
+  /*     /\* doubling directly in E is probably faster *\/ */
+  /*     ellEe_set_from_E (T, P, m); */
+  /*     ellEe_double (T, T, m, b); */
+  /*     ellE_set_from_Ee (R, T, m); */
+  /*     return; */
+  /*   } */
+
+  /* if (e == 4UL) */
+  /*   { */
+  /*     /\* doubling twice directly in E is also probably faster *\/ */
+  /*     ellEe_set_from_E (T, P, m); */
+  /*     ellEe_double (T, T, m, b); */
+  /*     ellEe_double (T, T, m, b); */
+  /*     ellE_set_from_Ee (R, T, m); */
+  /*     return; */
+  /*   } */
+
+  /* basic double-and-add */
+
+   mod_set0 (T->x, m);
+   mod_set0 (T->t, m);
+   mod_set1 (T->y, m);
+   mod_set1 (T->z, m);
+
+   k = CHAR_BIT * sizeof(e) - 1;
+   j = (1UL << k);
+
+   while(k-- >= 0)
+     {
+       ellEe_double (T, T, m, a);
+       if (j & e)
+	 ellEe_add (T, T, PP, a, m);
+       j >>= 1;
+     }
+
+   ellE_set_from_Ee (R, T, m);
+   
+   ellEe_clear (T, m);
+   ellEe_clear (PP, m);
+}
+
+
+/* -------------------------------------------------------------------------- */
 /* Functions for curves in Weierstrass form */
-
+/* -------------------------------------------------------------------------- */
 static inline void
 ellW_init (ellW_point_t P, const modulus_t m)
 {
@@ -934,6 +1298,14 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
   return 1;
 }
 
+/* Construct a twisted Edwards curve from g as in [Bardulescu et al. 2012] */
+/* static int */
+/* TwEdwards_curve_from_g (residue_t A, residue_t x, const residue_t g, */
+/* 			  const modulus_t m) */
+/* { */
+/*   /\* TODO *\/ */
+/* } */
+
 
 /* Make a curve of the form y^2 = x^3 + a*x^2 + b with a valid point
    (x, y) from a curve Y^2 = X^3 + A*X^2 + X. The value of b will not
@@ -1539,6 +1911,14 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       }
     mod_set1 (P->z, m);
   }
+  else if (plan->parameterization == TWED12)
+    {
+      /* Construct Edwards12 curve [Bardulescu et. al 2012] */
+    }
+  else if (plan->parameterization == TWED16)
+    {
+      /* Construct Edwards16 curve [Bardulescu et. al 2012] */
+    }
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");
@@ -1553,65 +1933,75 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* now start ecm */
 
   /* Do stage 1 */
-  ellM_interpret_bytecode (P, plan->bc, m, b);
-
-  /* Add prime 2 in the desired power. If a zero residue for the 
-     Z-coordinate is encountered, we backtrack to previous point and stop.
-     NOTE: This is not as effective as I hoped. It prevents trivial 
-     factorizations only if after processing the odd part of the stage 1 
-     multiplier, the resulting point has power-of-2 order on E_p for all p|N.
-     If that were to happen, the point probably had that (presumably small 
-     on most E_p) power-of-2 order during the last couple of primes processed 
-     in the precomputed Lucas chain, and then quite likely the Lucas chain 
-     incorrectly used an addition of identical points, causing the 
-     Z-coordinate to become zero, leading to 0 (mod N) before we even 
-     get here. 
-     For example, using 10^6 composites from an RSA155 sieving experiment,
-     without backtracking we get N as the factor 456 times, with backtracking
-     still 360 times. 
-     TODO: this could probably be fixed by treating 3 separately, too, 
-     instead of putting it in the precomputed Lucas chain. Then the 
-     probability that a point of very small order on all E_p is encountered
-     during the Lucas chain is reduced, and so the probability of using
-     curve addition erroneously. */
-  ellM_init (Pt, m);
-  ellM_set (Pt, P, m);
-  for (i = 0; i < plan->exp2; i++)
+  if (plan->parameterization & MONTY12+MONTY16)
     {
-      ellM_double (P, P, m, b);
-#if ECM_BACKTRACKING
-      if (mod_is0 (P[0].z, m))
-	{
-	  ellM_set (P, Pt, m);
-	  bt = 1;
-	  break;
-	}
+      ellM_interpret_bytecode (P, plan->bc, m, b);
+      
+      /* Add prime 2 in the desired power. If a zero residue for the 
+	 Z-coordinate is encountered, we backtrack to previous point and stop.
+	 NOTE: This is not as effective as I hoped. It prevents trivial 
+	 factorizations only if after processing the odd part of the stage 1 
+	 multiplier, the resulting point has power-of-2 order on E_p for all p|N.
+	 If that were to happen, the point probably had that (presumably small 
+	 on most E_p) power-of-2 order during the last couple of primes processed 
+	 in the precomputed Lucas chain, and then quite likely the Lucas chain 
+	 incorrectly used an addition of identical points, causing the 
+	 Z-coordinate to become zero, leading to 0 (mod N) before we even 
+	 get here. 
+	 For example, using 10^6 composites from an RSA155 sieving experiment,
+	 without backtracking we get N as the factor 456 times, with backtracking
+	 still 360 times. 
+	 TODO: this could probably be fixed by treating 3 separately, too, 
+	 instead of putting it in the precomputed Lucas chain. Then the 
+	 probability that a point of very small order on all E_p is encountered
+	 during the Lucas chain is reduced, and so the probability of using
+	 curve addition erroneously. */
+      ellM_init (Pt, m);
       ellM_set (Pt, P, m);
+      for (i = 0; i < plan->exp2; i++)
+	{
+	  ellM_double (P, P, m, b);
+#if ECM_BACKTRACKING
+	  if (mod_is0 (P[0].z, m))
+	    {
+	      ellM_set (P, Pt, m);
+	      bt = 1;
+	      break;
+	    }
+	  ellM_set (Pt, P, m);
 #endif
-    }
+	}
 
 #if 0
-  printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n", 
-          mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
+      printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n", 
+	      mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
 #endif
 
-  mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
-			     in stage 2 init find factors? */
-  if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
-    {
-      bt = ecm_stage2 (r, P, &(plan->stage2), b, m);
-      mod_gcd (f, r, m);
-    }
+      mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
+				 in stage 2 init find factors? */
+      if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
+	{
+	  bt = ecm_stage2 (r, P, &(plan->stage2), b, m);
+	  mod_gcd (f, r, m);
+	}
   
-  mod_clear (u, m);
-  mod_clear (b, m);
-  mod_clear (r, m);
-  ellM_clear (P, m);
-  ellM_clear (Pt, m);
+      mod_clear (u, m);
+      mod_clear (b, m);
+      mod_clear (r, m);
+      ellM_clear (P, m);
+      ellM_clear (Pt, m);
+    }
+
+  else if (plan->parameterization & TWED12+TWED16)
+    {
+      /* TODO: Edwards sage 1 */
+    }
 
   return bt;
+
 }
 
+/* -------------------------------------------------------------------------- */
 
 /* Determine order of a point P on a curve, both defined by the sigma value
    as in ECM. 
