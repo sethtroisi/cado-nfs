@@ -2023,8 +2023,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	  mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
 #endif
 
-
-
   mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
 			     in stage 2 init find factors? */
   if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)

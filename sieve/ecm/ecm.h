@@ -11,7 +11,6 @@
 #define TWED16  16
 
 
-
 /* Twisted Edwards curve with a = -1 */
 typedef struct {
   unsigned long g_numer, g_denom;
