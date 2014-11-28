@@ -759,7 +759,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
       uint64_t x = (r ? 1 : I) + (I >> 1);
-      prime_hint_t prime = bucket_encode_prime (p);
+      prime_hint_t hint = bucket_encode_prime (p);
       /*****************************************************************/
 #define FILL_BUCKET_HEART() do {					\
 	bucket_update_t **pbut = BA.bucket_write + (x >> 16);		\
@@ -767,7 +767,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
-	but->p = prime;							\
+	but->p = hint;							\
 	but->x = (uint16_t) x;						\
 	*pbut = ++but;							\
 	FILL_BUCKET_PREFETCH(but);					\
@@ -807,7 +807,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       if (x >= IJ) continue;
       const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
 #endif
-      const prime_hint_t prime = (prime_hint_t) bucket_encode_prime (p);
+      const prime_hint_t hint = bucket_encode_prime (p);
       
       /* Now, do the real work: the filling of the buckets */
       do {
@@ -890,7 +890,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
       uint64_t x = (r ? 1 : I) + (I >> 1);
-      prime_hint_t prime = bucket_encode_prime(p);
+      prime_hint_t hint = bucket_encode_prime(p);
       /* 1. pkbut must be volatile in BIG_ENDIAN: the write order of prime & x
 	 is need because the last byte of x (always 0 because x <<= 8) must
 	 be overwritten by the first byte of prime.
@@ -906,7 +906,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
-	memcpy(kbut, &prime, sizeof(prime_hint_t));			\
+	memcpy(kbut, &hint, sizeof(prime_hint_t));			\
 	uint32_t i = (uint32_t) x;					\
 	memcpy((uint8_t *) kbut + sizeof(prime_hint_t), &i, 4);		\
 	*pkbut = ++kbut;						\
@@ -921,7 +921,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
 	uint32_t i = (uint32_t) x << 8;					\
 	memcpy(kbut, &i, 4);						\
-	memcpy((uint8_t *) kbut + 3, &prime, sizeof(prime_hint_t));	\
+	memcpy((uint8_t *) kbut + 3, &hint, sizeof(prime_hint_t));	\
 	*pkbut = ++kbut;						\
 	FILL_BUCKET_PREFETCH(kbut);					\
       } while(0)
@@ -961,7 +961,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       if (x >= IJ) continue;
       const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
 #endif
-      const prime_hint_t prime = (prime_hint_t) bucket_encode_prime (p);
+      const prime_hint_t hint = bucket_encode_prime (p);
       
       /* Now, do the real work: the filling of the k-buckets */
       do { 
@@ -1139,7 +1139,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
       uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
-      prime_hint_t prime = bucket_encode_prime(p);
+      prime_hint_t hint = bucket_encode_prime(p);
       /* memcpy is good because it's its job to know if it's possible to
 	 write an int to all even addresses.
 	 gcc does a optimal job with memcpy & a little + constant length.
@@ -1152,7 +1152,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
-	memcpy(mbut, &prime, sizeof(prime_hint_t));			\
+	memcpy(mbut, &hint, sizeof(prime_hint_t));			\
 	uint32_t i = (uint32_t) x;					\
 	memcpy((uint8_t *) mbut + sizeof(prime_hint_t), &i, 4);	\
 	*pmbut = ++mbut;						\
@@ -1167,7 +1167,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
 	uint32_t i = (uint32_t) x;					\
 	memcpy(mbut, &i, 4);						\
-	memcpy((uint8_t *) mbut + 4, &prime, sizeof(prime_hint_t));	\
+	memcpy((uint8_t *) mbut + 4, &hint, sizeof(prime_hint_t));	\
 	*pmbut = ++mbut;						\
 	FILL_BUCKET_PREFETCH(mbut);					\
       } while (0)
@@ -1207,7 +1207,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       if (x >= IJ) continue;
       const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
 #endif
-      const prime_hint_t prime = bucket_encode_prime (p);
+      const prime_hint_t hint = bucket_encode_prime (p);
 
       /* Now, do the real work: the filling of the m-buckets */
       do {
