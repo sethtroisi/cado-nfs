@@ -24,7 +24,7 @@ typedef cado_poly_extended_s *cado_poly_extended_ptr;
 void
 cado_poly_extended_init (cado_poly_extended poly)
 {
-  cado_poly_init (poly->poly);
+  cado_poly_init (poly->poly, 2); // FIXME: asap
   mpz_init (poly->m);
   mpz_init (poly->p);
   mpz_init (poly->skew);
@@ -426,7 +426,7 @@ main (int argc, char *argv[])
 
   cado_poly_extended_init (best_poly);
   cado_poly_extended_init (poly);
-  cado_poly_init (cur_poly);
+  cado_poly_init (cur_poly, 2);  // FIXME: asap
   mpz_init(P);
   mpz_init(sqrtN);
   mpz_init(r);

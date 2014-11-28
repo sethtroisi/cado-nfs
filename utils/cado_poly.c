@@ -12,14 +12,15 @@ const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
 
-void cado_poly_init(cado_poly poly)
+void cado_poly_init(cado_poly poly, int nb_polys)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly[0]));
     poly->rat = poly->pols[RATIONAL_SIDE];
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
-    for(int side = 0 ; side < 2 ; side++)
+    poly->nb_polys = nb_polys;
+    for(int side = 0 ; side < nb_polys ; side++)
       mpz_poly_init (poly->pols[side], MAXDEGREE);
 
     mpz_init_set_ui(poly->n, 0);
@@ -27,7 +28,7 @@ void cado_poly_init(cado_poly poly)
 
 void cado_poly_clear(cado_poly poly)
 {
-    for(int side = 0 ; side < 2 ; side++)
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_clear (poly->pols[side]);
 
     mpz_clear(poly->n);
@@ -40,7 +41,8 @@ cado_poly_set (cado_poly p, cado_poly q)
 {
     mpz_set (p->n, q->n);
     p->skew = q->skew;
-    for(int side = 0 ; side < 2 ; side++)
+    p->nb_polys = q->nb_polys;
+    for(int side = 0 ; side < q->nb_polys ; side++)
       mpz_poly_set (p->pols[side], q->pols[side]);
 }
 
@@ -49,8 +51,12 @@ static
 int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;
-    int have_f[2][(MAXDEGREE + 1)] = {{ 0, }, {0,}};
+    int have_f[NB_POLYS_MAX][(MAXDEGREE + 1)];
     int i;
+
+    for(i = 0; i < NB_POLYS_MAX; i++)
+	have_f[i][0] = 0;
+    poly->nb_polys = 2; // TODO: update this asap
 
     have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
     poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
@@ -68,7 +74,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
         have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
     }
 
-    for(int side = 0 ; side < 2 ; side++) {
+    for(int side = 0 ; side < poly->nb_polys ; side++) {
         mpz_poly_ptr ps = poly->pols[side];
         int d;
         for (d = MAXDEGREE; d >= 0 && !have_f[side][d]; d--) {
@@ -109,7 +115,7 @@ int cado_poly_read(cado_poly poly, const char *filename)
     return r;
 }
 
-
+// TODO: adapt to multiple polys?
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
     // have to work with copies, because pseudo_gcd destroys its input

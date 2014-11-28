@@ -782,7 +782,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     /* }}} */
     /* {{{ Parse polynomial */
-    cado_poly_init(las->cpoly);
+    cado_poly_init(las->cpoly, 2); // FIXME: asap
     const char *tmp;
     if ((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
         fprintf(stderr, "Error: -poly is missing\n");

@@ -450,7 +450,7 @@ main (int argc, char * argv[])
     if (!polyfilename)
       usage(argv0);
 
-    cado_poly_init (cpoly);
+    cado_poly_init (cpoly, 2); // FIXME: asap
     if (!cado_poly_read (cpoly, polyfilename))
     {
       fprintf (stderr, "Error reading polynomial file\n");

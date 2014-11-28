@@ -87,7 +87,7 @@ read_relation(relation_t * rel, const char *line)
 static void
 read_poly(cado_poly_ptr cpoly, param_list pl)
 {
-    cado_poly_init(cpoly);
+    cado_poly_init(cpoly, 2); // FIXME: asap
     const char *cpoly_filename;
     if ((cpoly_filename = param_list_lookup_string(pl, "poly")) == NULL) {
         fprintf(stderr, "Error: -poly is missing\n");

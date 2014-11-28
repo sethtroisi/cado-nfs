@@ -1454,7 +1454,7 @@ main(int argc, char *argv[])
                     "-partial is not set\n");
   }
 
-  cado_poly_init (poly);
+  cado_poly_init (poly, 2); // FIXME: asap
 #ifndef FOR_FFS
   if (!cado_poly_read (poly, polyfilename))
 #else
