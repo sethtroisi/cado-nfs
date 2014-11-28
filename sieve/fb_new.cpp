@@ -6,7 +6,7 @@
 #include <cstdarg>
 #include <cctype>
 #include <gmp.h>
-#include "fb.h"
+#include "fb_new.h"
 #include "mod_ul.h"
 #include "verbose.h"
 #include "getprime.h"
