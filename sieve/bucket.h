@@ -382,11 +382,13 @@ rewind_primes_by_1 (bucket_primes_t *BP)
 
 
 /* Remove some redundancy form the stored primes, e.g., remove the low
-   bit which is always 1, or if BUCKET_ENCODE3 is set store floor(p/6)*2 and 
+   bit which is always 1, or if BUCKET_ENCODE3 is set, store floor(p/6)*2 and
    the LSB telling whether it was 1 or 5 (mod 6). */
 static inline prime_hint_t
 bucket_encode_prime (uint32_t p)
 {
+  if (sizeof(prime_hint_t) == sizeof(uint32_t))
+    return (prime_hint_t) p;
 #ifdef BUCKET_ENCODE3
   return (prime_hint_t)(p/3U); /* This happens to work: if p=6k+1, we store
                                 2k; if p=6k+5, we store 2k+1 */
@@ -398,6 +400,8 @@ bucket_encode_prime (uint32_t p)
 static inline uint32_t
 bucket_decode_prime (prime_hint_t h)
 {
+  if (sizeof(prime_hint_t) == sizeof(uint32_t))
+    return (uint32_t) h;
 #ifdef BUCKET_ENCODE3
   return 3U * (uint32_t) h + 1U + ((uint32_t) h & 1U);
   /* if p was 6k+1, we stored h=2k, thus we want 3h+1;
