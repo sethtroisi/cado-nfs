@@ -1918,59 +1918,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       }
     mod_set1 (P->z, m);
   }
-  else if (plan->parameterization == TWED16)
-    {
-      /* Construct Edwards16 curve [Barbulescu et. al 2012] */
-
-/* /\* Homogeneous projective Edwards coordinates  */
-/*    (x : y : z) ---> (x/z, y/z)  z != 0 *\/ */
-/* typedef struct {residue_t x, y, z;} __ellE_point_t; */
-/* typedef __ellE_point_t ellE_point_t[1]; */
-
-      residue_t xn, xd, yn, yd, dn, dd;
-
-      mod_set_ul (xn, Ecurve14.x_numer, m);
-      mod_set_ul (xd, Ecurve14.x_denom, m);
-
-      /* (xn, yn) = P (mod m) */
-      if ( mod_inv (u, xd, m) == 0)
-	{
-	  mod_gcd (f, xd, m);
-	  mod_clear (u, m);
-	  mod_clear (b, m);
-	  ellM_clear (P, m);
-	  return 0;
-	}
-      mod_mul (xn, xn, u, m);
-
-      mod_set_ul (yn, Ecurve14.y_numer, m);
-      mod_set_ul (yd, Ecurve14.y_denom, m);
-      if (mod_inv (u, yd, m) == 0)
-	{
-	  mod_gcd (f, yd, m);
-	  mod_clear (u, m);
-	  mod_clear (b, m);
-	  ellM_clear (P, m);
-	  return 0;
-	}
-      mod_mul (yn, yn, u, m);
-
-      /* Reduce d = dn/dd mod m */
-      mod_set_ul (dn, Ecurve14.d_numer, m);
-      mod_set_ul (dd, Ecurve14.d_denom, m);
-      if (mod_inv (u, dd, m) == 0)
-	{
-	  mod_gcd (f, dd, m);
-	  mod_clear (u, m);
-	  mod_clear (b, m);
-	  ellM_clear (P, m);
-	  return 0;
-	}
-      mod_mul (dn, dn, u, m);
-
-
-      
-    }
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");
@@ -2044,13 +1991,85 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 }
 
 
-/*
+
 int 
-ecmE (modint_t f, const modulus_t m, const ecm_plan_t *plan)
+ecmE (modint_t f, const modulus_t m, const ecmE_plan_t *plan)
 {
-  
+  residue_t u, b;
+  ellE_point_t P;
+  ellE_init (P, m);
+  //  unsigned int i;
+  int bt = 0;
+
+  mod_init (u, m);
+  mod_init (b, m);
+
+  mod_intset_ul (f, 1UL);
+
+/* Curve init */
+
+if (plan->parameterization == TWED16)
+  {
+    /* Construct Edwards16 curve [Barbulescu et. al 2012] */
+
+      residue_t xn, xd, yn, yd, dn, dd;
+
+      mod_set_ul (xn, Ecurve14.x_numer, m);
+      mod_set_ul (xd, Ecurve14.x_denom, m);
+
+      /* (xn, yn) = P (mod m) */
+      if ( mod_inv (u, xd, m) == 0)
+	{
+	  mod_gcd (f, xd, m);
+	  mod_clear (u, m);
+	  mod_clear (b, m);
+	  ellE_clear (P, m);
+	  return 0;
+	}
+      mod_mul (xn, xn, u, m);
+
+      mod_set_ul (yn, Ecurve14.y_numer, m);
+      mod_set_ul (yd, Ecurve14.y_denom, m);
+      if (mod_inv (u, yd, m) == 0)
+	{
+	  mod_gcd (f, yd, m);
+	  mod_clear (u, m);
+	  mod_clear (b, m);
+	  ellE_clear (P, m);
+	  return 0;
+	}
+      mod_mul (yn, yn, u, m);
+
+      /* Reduce d = dn/dd mod m */
+      mod_set_ul (dn, Ecurve14.d_numer, m);
+      mod_set_ul (dd, Ecurve14.d_denom, m);
+      if (mod_inv (u, dd, m) == 0)
+	{
+	  mod_gcd (f, dd, m);
+	  mod_clear (u, m);
+	  mod_clear (b, m);
+	  ellE_clear (P, m);
+	  return 0;
+	}
+      mod_mul (dn, dn, u, m);
+    }
+ else
+   {
+     fprintf (stderr, "ecm: Unknown parameterization\n");
+     abort();
+   }
+
+/* Stage 1 */
+
+/* Stage 2 */
+
+  mod_clear (u, m);
+  mod_clear (b, m);
+  ellE_clear (P, m);
+
+  return bt;
 }
-*/
+
 
 
 /* -------------------------------------------------------------------------- */
