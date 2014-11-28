@@ -129,17 +129,11 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
   if (facul_code > 0)
     {
       nr_factors = facul_code;
-      /* gmp_printf ("facul: %Zd\n", n); */
-      /* printf ("(nr_factors = %d)\n", facul_code); */
-      /* for (int l = 0; l < facul_code; l++) */
-      /* 	printf ("%lu, ", ul_factors[l]); */
-      /* printf ("\n"); */
-
       for (i = 0; i < nr_factors; i++)
 	{
 	  unsigned long r;
 	  mpz_t t;
-	  if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
+	 if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
             return -1;
 	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
 	  ASSERT_ALWAYS (r == 0UL);
@@ -182,8 +176,8 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
 			       uint32_array_t** multis,
 			       sieve_info_srcptr si)
 {
-  int is_smooth[2] = {0, 0}; /* To remember if a cofactor is already
-				factored.*/
+  int is_smooth[2] = {FACUL_MAYBE, FACUL_MAYBE};
+  /* To remember if a cofactor is already factored.*/
 
   unsigned long** ul_factors = malloc(sizeof (*ul_factors) * 2);
   for (int i = 0; i < 2; i++)
@@ -216,15 +210,14 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
 	      append_mpz_to_array (factors[side], n[side]);
 	      append_uint32_to_array (multis[side], 1);
 	    }
-	  is_smooth[side] = 1;
+	  is_smooth[side] = FACUL_SMOOTH;
 	}
     }
 
   /* use the facul library */
   //gmp_printf ("facul: %Zd, %Zd\n", n[0], n[1]);
-
   int* facul_code = facul_both (ul_factors, n, si->strategies, is_smooth);
-  //printf ("smooth = %d %d\n", is_smooth[0], is_smooth[1]);
+
   if (facul_code[0] == FACUL_NOT_SMOOTH ||
       facul_code[1] == FACUL_NOT_SMOOTH)
     {
@@ -242,12 +235,6 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
   int ret = is_smooth[0] && is_smooth[1];
   for (int side = 0; ret == 1 && side < 2; side++)
     {
-      //{{print factors
-      /* printf ("(nr_factors(%d) = %d)\n", side, facul_code[side]); */
-      /* for (int l = 0; l < facul_code[side]; l++) */
-      /* 	printf ("%lu, ", ul_factors[side][l]); */
-      /* printf ("\n"); */
-      //}}
       unsigned int lpb = si->strategies->lpb[side];
       uint32_t i, nr_factors;
       /* we use this mask to trap prime factors above bound */
@@ -393,7 +380,6 @@ factor_both_leftover_norms(mpz_t *norm, const mpz_t BLPrat, mpz_array_t **f,
 		    cf[side] ++;
 	    }
 	}
-
     /* Add thread-local statistics to the global arrays */
     pthread_mutex_lock(&mutex);
     cof_calls[0][nbits[0]] += cc[0];

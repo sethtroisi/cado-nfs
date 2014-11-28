@@ -27,18 +27,18 @@ static void declare_usage(param_list pl)
 
     param_list_decl_usage(pl, "gdc",
     "(switch)  to precompute all decompositions of cofactors of mfb bits given that \n "
-"\t \t it has no prime divisors less than fbb. So, you must specify these options:\n"
-			  "\t \t -fbb0, -mfb0\n");
+"\t \t it has no prime divisors less than lim. So, you must specify these options:\n"
+			  "\t \t -lim0, -mfb0\n");
     param_list_decl_usage(pl, "gst_r",
 			  "(switch)  to precompute the best strategies \n"
 			  "\t \t for one bit size cofactor.\n "
 			  "\t \t You must specify these options:\n"
-			  "\t \t -fbb0, -lpb0, -r -decomp\n");
+			  "\t \t -lim0, -lpb0, -r -decomp\n");
     param_list_decl_usage(pl, "gst",
 	"(switch)  to merge two (or all) precomputing did by the option 'gst_r',\n "
 	"\t \t and thus find the best strategie(s) for one (or each) couple (r0,r1).\n"
 	"\t \t So, you must specify these options:\n"
-	"\t \t -mfb0, -mfb1, -fbb0, -fbb1 ,-in, (-r0 -r1)\n");
+	"\t \t -mfb0, -mfb1, -lim0, -lim1 ,-in, (-r0 -r1)\n");
 
     param_list_decl_usage(pl, "r0",
 			  "with r1 specify the bit sizes of the cofactor couple"
@@ -50,10 +50,10 @@ static void declare_usage(param_list pl)
 			  "specify the bit size of the studied cofactor.\n");
     param_list_decl_usage(pl, "r",
 			  "specify the bit size of the studied cofactor.\n");
-    param_list_decl_usage(pl, "fbb1",
-			  "set algebraic factor base bound to 2^fbb1\n");
-    param_list_decl_usage(pl, "fbb0",
-			  "set rationnal factor base bound to 2^fbb0\n");
+    param_list_decl_usage(pl, "lim0",
+			  "set rationnal factor base bound to lim0\n");
+    param_list_decl_usage(pl, "lim1",
+			  "set algebraic factor base bound to lim1\n");
     param_list_decl_usage(pl, "lpb0",
 			  "set rational large prime bound to 2^lpb0");
     param_list_decl_usage(pl, "lpb1",
@@ -114,23 +114,19 @@ int main(int argc, char *argv[])
     }
 
     /*default values */
-    //todo: change fbb by lim
-    int fbb1 = -1;
+    unsigned long lim0 = 0;
+    unsigned long lim1 = 0;
     int mfb1 = -1;
-    int fbb0 = -1;
     int mfb0 = -1;
     int lpb0 = -1;
     int lpb1 = -1;
-    int r = -1;
 
+    param_list_parse_ulong(pl, "lim0", &lim0);
+    param_list_parse_ulong(pl, "lim1", &lim1);
     param_list_parse_int(pl, "lpb0", &lpb0);
     param_list_parse_int(pl, "lpb1", &lpb1);
-    param_list_parse_int(pl, "fbb1", &fbb1);
     param_list_parse_int(pl, "mfb1", &mfb1);
-    param_list_parse_int(pl, "fbb0", &fbb0);
     param_list_parse_int(pl, "mfb0", &mfb0);
-    param_list_parse_int(pl, "r", &r);
-
 
     int gdc = param_list_parse_switch(pl, "-gdc");
     int gst_r = param_list_parse_switch(pl, "-gst_r");
@@ -145,7 +141,7 @@ int main(int argc, char *argv[])
 	  file = stdout;
 	else
 	  file = fopen (file_out, "w");
-	if (fbb0 < 0 || mfb0 < 0 )
+	if (mfb0 < 0 || lim0 == 0 )
 	  {
 	    fprintf (stderr,"for this option '-gdc', you must also "
 		     "specify these options:\t -fbb0, -mfb0\n");
@@ -154,8 +150,7 @@ int main(int argc, char *argv[])
 
 	//check parameters
 	//precompute_tabular_decomp_files (2*fbb0-1, max_cof, fbb0);
-	unsigned long lim = (unsigned long) pow (2, (double)(fbb0-1));
-	tabular_decomp_t* res = generate_all_decomp (mfb0, lim);
+	tabular_decomp_t* res = generate_all_decomp (mfb0, lim0);
 	tabular_decomp_fprint (file, res);
 	tabular_decomp_free (res);
 	fclose (file);
@@ -168,6 +163,10 @@ int main(int argc, char *argv[])
 	directory_out = "./";
       }
 
+      int fbb0 = ceil (log2 ((double) (lim0 + 1)));
+      int fbb1 = ceil (log2 ((double) (lim1 + 1)));
+
+      
       if (gst) {
 	//check parameters!
 
@@ -179,7 +178,7 @@ int main(int argc, char *argv[])
 	  exit(EXIT_FAILURE);
 	}
 
-
+	
 	int r0 = -1, r1 = -1;
 	param_list_parse_int(pl, "r0", &r0);
 	param_list_parse_int(pl, "r1", &r1);
@@ -298,7 +297,7 @@ int main(int argc, char *argv[])
 		"-in and a valid file name.\n", stderr);
 	  exit(EXIT_FAILURE);
 	}
-
+	//todo: compute fbb!!
 
 	FILE *file_in = fopen(name_file_in, "r");
 	tabular_fm_t *c = tabular_fm_fscan(file_in);
@@ -334,6 +333,10 @@ int main(int argc, char *argv[])
 	tabular_fm_sort(data_ecm_rc);
 
 	if (gst_r) {
+
+	  int r = -1;
+	  param_list_parse_int(pl, "r", &r);
+
 	  ASSERT_ALWAYS(fbb0 < lpb0 && r != -1 && fbb0 != -1 && lpb0 != -1);
 
 	  //precompute the convex hull for one bit size of cofactor
