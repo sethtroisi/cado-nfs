@@ -30,7 +30,7 @@ void
 double_poly_set (double_poly_ptr r, double_poly_srcptr s)
 {
   r->deg = s->deg;
-  for (unsigned int i = 0; i <= s->deg; i++) {
+  for (int i = 0; i <= s->deg; i++) {
     r->coeff[i] = s->coeff[i];
   }
 }
@@ -141,7 +141,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
 void
 double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
 {
-  unsigned int n;
+  int n;
   if (f->deg == 0) {
     df->deg = 0; /* How do we store deg -\infty polynomials? */
     df->coeff[0] = 0.;
@@ -177,7 +177,7 @@ double_poly_product(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr 
 void
 MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  size_t i;
+  int i;
   if (f->deg <= g->deg) {
     ASSERT(h->deg >= g->deg);
     h->deg = g->deg;
@@ -197,7 +197,7 @@ MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_pol
 void
 double_poly_subtract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  size_t i;
+  int i;
   if (f->deg <= g->deg) {
     ASSERT(h->deg >= g->deg);
     h->deg = g->deg;
@@ -215,13 +215,13 @@ double_poly_subtract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr
 void
 double_poly_revert (double_poly_ptr f)
 {
-  const unsigned int d = f->deg;
+  const int d = f->deg;
 
   if (d <= 0)
     return;
 
   /* if d is even, nothing to do for k=d/2 */
-  for (unsigned int k = 0; k <= (d - 1) / 2; k++)
+  for (int k = 0; k <= (d - 1) / 2; k++)
     {
       double tmp = f->coeff[k];
       f->coeff[k] = f->coeff[d - k];
@@ -233,7 +233,7 @@ double_poly_revert (double_poly_ptr f)
 static void
 double_poly_neg_x (double_poly_ptr r, double_poly_srcptr s)
 {
-  unsigned int i;
+  int i;
   r->deg = s->deg;
   for (i = 0; i < s->deg; i += 2) {
     r->coeff[i]     = s->coeff[i]; /* Even power coeff */
