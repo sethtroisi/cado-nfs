@@ -115,11 +115,17 @@ int cado_poly_read(cado_poly poly, const char *filename)
     return r;
 }
 
-// TODO: adapt to multiple polys?
+/* TODO: adapt for more than 2 polynomials:
+ * compute for each pair (0,i) the corresponding common root m_i
+ * check all m_i are equal
+ */
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
     // have to work with copies, because pseudo_gcd destroys its input
     mpz_poly_t f[2];
+
+    ASSERT_ALWAYS(cpoly->nb_polys == 2);
+
     for (int i = 0; i < 2; ++i) {
         mpz_poly_init(f[i], cpoly->pols[i]->alloc);
         mpz_poly_set(f[i], cpoly->pols[i]);
