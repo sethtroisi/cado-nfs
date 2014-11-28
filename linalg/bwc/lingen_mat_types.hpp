@@ -16,7 +16,7 @@
 #include <algorithm>
 #ifdef  HAVE_OPENMP
 #include <omp.h>
-#define OMP_ROUND(k) (k % omp_get_num_threads() == omp_get_thread_num())
+#define OMP_ROUND(k) ((k) % omp_get_num_threads() == omp_get_thread_num())
 #else
 #define OMP_ROUND(k) (1)
 #endif
@@ -1080,16 +1080,21 @@ void compose_inner(
 #endif  /* HAVE_OPENMP */
         {
             typename fft_type::t * x = o.alloc(1);
-            int kk MAYBE_UNUSED = 0;
-            for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-                for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-                    if (OMP_ROUND(kk++)) {
-                        for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-                            o.compose(x, s1.poly(i,k), s2.poly(k,j));
-                            o.add(tmp.poly(i,j), tmp.poly(i,j), x);
-                        }
-                    }
-                }
+	    /* This way of doing matrix multiplication is better for locality:
+	       in the inner loop, the first element s1[i,k] is constant,
+	       and in the second one s2[k,j], only the second index changes.
+	       If the inner loop was on k, both s1[i,k] and s2[k,j] would
+	       change, and a change on the first index is worse if matrices
+	       are stored row by row. */
+	    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+	      for(unsigned int k = 0 ; k < s1.ncols ; k++) {
+		for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+		  if (OMP_ROUND((int) (i * s2.ncols + j))) {
+		    o.compose(x, s1.poly(i,k), s2.poly(k,j));
+		    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+		  }
+		}
+	      }
             }
             o.free(x,1);
             x = NULL;
