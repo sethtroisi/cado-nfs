@@ -218,7 +218,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
 						tabular_fm_t * ecm_rc, 
-						unsigned long lim,
+						int ncurves, unsigned long lim,
 						int lpb, int r)
 {
     //contains the final result
@@ -261,10 +261,10 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
     int len_pp1 = pp1->index;
     int len_ecm_m16 = ecm_m16->index;
     int len_ecm_rc = ecm_rc->index;
-    int nb_iteration = 4;
+    //int nb_iteration = 4;
 
     //init strat
-    int len_strat = 3 + nb_iteration;
+    int len_strat = 2 + ncurves;
     strategy_t *strat = strategy_create();
     for (int i = 0; i < len_strat; i++)
 	strategy_add_fm(strat, zero);
@@ -309,9 +309,8 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 		while (ind_ecm_rc < len_ecm_rc &&
 		       ecm_rc->tab[ind_ecm_rc]->proba[0] < current_proba_ecm)
 		    ind_ecm_rc++;
-
 		generate_collect_iter_ecm_rc(zero, ecm_rc, ind_ecm_rc, strat,
-					     3, 0, nb_iteration, init_tab,
+					     3, 0, ncurves, init_tab,
 					     all_strat, fbb, lpb, r);
 
 		//process data to avoid to full the RAM!!!
@@ -466,6 +465,7 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 				      tabular_fm_t* pm1, tabular_fm_t* pp1,
 				      tabular_fm_t*ecm_m16, tabular_fm_t*ecm_rc,
+				      int ncurves,
 				      unsigned long lim0, int lpb0, int mfb0,
 				      unsigned long lim1, int lpb1, int mfb1)
 {
@@ -517,7 +517,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	}
 	data_rat[r0] =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, lim0, lpb0, r0);
+					ecm_rc, ncurves, lim0, lpb0, r0);
 	tabular_decomp_free(tab_decomp);
     }
 
@@ -545,7 +545,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 
 	tabular_strategy_t *strat_r1 =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, lim1, lpb1, r1);
+					ecm_rc, ncurves, lim1, lpb1, r1);
 	tabular_decomp_free(tab_decomp);
 
 	for (int r0 = 0; r0 <= mfb0; r0++) {

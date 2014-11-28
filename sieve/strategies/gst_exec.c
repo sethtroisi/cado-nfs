@@ -33,13 +33,15 @@ static void declare_usage(param_list pl)
 			  "(switch)  to precompute the best strategies \n"
 			  "\t \t for one bit size cofactor.\n "
 			  "\t \t You must specify these options:\n"
-			  "\t \t -lim0, -lpb0, -r0 -decomp\n");
+			  "\t \t -lim0, -lpb0, -r0, -ncurves, -decomp\n");
     param_list_decl_usage(pl, "gst",
 	"(switch)  to merge two (or all) precomputing did by the option 'gst_r',\n "
 	"\t \t and thus find the best strategie(s) for one (or each) couple (r0,r1).\n"
 	"\t \t So, you must specify these options:\n"
 	"\t \t -lim0, -lim1 ,-in, and ((-r0 -r1) or (-mfb0, -mfb1))\n");
 
+    param_list_decl_usage(pl, "ncurves",
+			  "controls number of curves.\n");
     param_list_decl_usage(pl, "r0",
 			  "set the bit size of the studied cofactor to r0.\n");
     param_list_decl_usage(pl, "r1",
@@ -114,6 +116,7 @@ int main(int argc, char *argv[])
     int mfb0 = -1;
     int lpb0 = -1;
     int lpb1 = -1;
+    int ncurves = -1;
 
     param_list_parse_ulong(pl, "lim0", &lim0);
     param_list_parse_ulong(pl, "lim1", &lim1);
@@ -121,6 +124,7 @@ int main(int argc, char *argv[])
     param_list_parse_int(pl, "lpb1", &lpb1);
     param_list_parse_int(pl, "mfb1", &mfb1);
     param_list_parse_int(pl, "mfb0", &mfb0);
+    param_list_parse_int(pl, "ncurves", &ncurves);
 
     int gdc = param_list_parse_switch(pl, "-gdc");
     int gst_r = param_list_parse_switch(pl, "-gst_r");
@@ -340,24 +344,16 @@ int main(int argc, char *argv[])
 	  tabular_fm_sort(data_ecm_m16);
 	  tabular_fm_sort(data_ecm_rc);
 
+	  data_pp1->index = 10;
+	  data_pm1->index = 10;
+	  data_ecm_rc->index = 10;
 	  if (gst_r) {
 
 	      int r0 = -1;
 	      param_list_parse_int(pl, "r0", &r0);
-	      if (r0 == -1){
-		  fprintf(stderr, "Error: parameter -r0 is mandatory\n");
-		  param_list_print_usage(pl, argv[0], stderr);
-		  exit(EXIT_FAILURE);
-	      }
-
-	      if (lpb0 == -1){
-		  fprintf(stderr, "Error: parameter -lbp0 is mandatory\n");
-		  param_list_print_usage(pl, argv[0], stderr);
-		  exit(EXIT_FAILURE);
-	      }
-
-	      if (lim0 == 0){
-		  fprintf(stderr, "Error: parameter -lim0 is mandatory\n");
+	      if (r0 == -1 || lpb0 == -1 || lim0 == 0 || ncurves == -1){
+		  fprintf(stderr, "Error: parameters -r0 -lim0 "
+			  "-lpb0 -ncurves are mandatories.\n");
 		  param_list_print_usage(pl, argv[0], stderr);
 		  exit(EXIT_FAILURE);
 	      }
@@ -394,7 +390,8 @@ int main(int argc, char *argv[])
 	      tabular_strategy_t *res =
 		  generate_strategies_oneside(tab_decomp, zero, data_pm1,
 					      data_pp1, data_ecm_m16,
-					      data_ecm_rc, lim0, lpb0, r0);
+					      data_ecm_rc, ncurves, 
+					      lim0, lpb0, r0);
 
 	      tabular_decomp_free(tab_decomp);
 
@@ -425,7 +422,7 @@ int main(int argc, char *argv[])
 	      //Check parameters
 
 	      if (lim0 == 0 || lpb0 == -1 || mfb0 == -1 ||
-		  lim1 == 0 || lpb1 == -1 || mfb1 == -1){
+		  lim1 == 0 || lpb1 == -1 || mfb1 == -1 || ncurves){
 		  fprintf(stderr, 
 			  "Error: parameters -lim0 -lpb0 -mfb0"
 			  " -lim1 -lpb1 -mfb1 are mandatories\n");
@@ -448,7 +445,7 @@ int main(int argc, char *argv[])
 	      tabular_strategy_t ***matrix =
 		  generate_matrix(name_directory_decomp,
 				  data_pm1, data_pp1,
-				  data_ecm_m16, data_ecm_rc,
+				  data_ecm_m16, data_ecm_rc, ncurves,
 				  lim0, lpb0, mfb0,
 				  lim1, lpb1,mfb1);
 
