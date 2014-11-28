@@ -34,7 +34,7 @@
  *
  * Unfortunately the apple-bastardized gcc-4.2.1 backported this feature,
  * which gives rise to spurious warnings in that case as well. Since
- * there is no way to tell whether this pragma will be recognize or not,
+ * there is no way to tell whether this pragma will be recognized or not,
  * we accept the change...
  */
 // #if defined(__cplusplus) && GNUC_VERSION_ATLEAST(4,3,0)
@@ -1080,10 +1080,11 @@ void compose_inner(
 #endif  /* HAVE_OPENMP */
         {
             typename fft_type::t * x = o.alloc(1);
+            int kk MAYBE_UNUSED = 0;
             for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-                for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-                    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-                        if (OMP_ROUND((int) (i * s2.ncols + j))) {
+                for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+                    if (OMP_ROUND(kk++)) {
+                        for(unsigned int k = 0 ; k < s1.ncols ; k++) {
                             o.compose(x, s1.poly(i,k), s2.poly(k,j));
                             o.add(tmp.poly(i,j), tmp.poly(i,j), x);
                         }

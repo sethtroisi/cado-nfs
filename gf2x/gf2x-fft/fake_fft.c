@@ -45,18 +45,20 @@ void fake_ift(fake_info_srcptr p MAYBE_UNUSED, unsigned long * dst, size_t n, fa
     size_t t = BITS_TO_WORDS(n, ULONG_BITS);
     memcpy(dst, src, t * sizeof(unsigned long));
 }
+
 void fake_compose(fake_info_srcptr p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
     size_t n1 = BITS_TO_WORDS(p->n1, ULONG_BITS);
     size_t n2 = BITS_TO_WORDS(p->n2, ULONG_BITS);
-    gf2x_mul(dst, s1, n1, s2, n2);
+    gf2x_mul_r(dst, s1, n1, s2, n2, NULL);
 }
+
 void fake_addcompose(fake_info_srcptr p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
     size_t n1 = BITS_TO_WORDS(p->n1, ULONG_BITS);
     size_t n2 = BITS_TO_WORDS(p->n2, ULONG_BITS);
     unsigned long * h = malloc(p->size * sizeof(unsigned long));
     /* lacking addmul in gf2x, we do some extra allocation */
     memset(h, 0, p->size * sizeof(unsigned long));
-    gf2x_mul(h, s1, n1, s2, n2);
+    gf2x_mul_r(h, s1, n1, s2, n2, NULL);
     for(unsigned int i = 0 ; i < p->size ; i++) {
         dst[i] ^= h[i];
     }
