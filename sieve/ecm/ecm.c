@@ -38,7 +38,6 @@ static unsigned long ellE_add_count, ellE_double_count;
 #endif
 
 
-
 /* Projective point on Montgomery curve (x : z) onlyx */
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
@@ -640,6 +639,7 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
    ellEe_clear (T, m);
    ellEe_clear (PP, m);
 }
+
 
 
 /* -------------------------------------------------------------------------- */
@@ -1298,12 +1298,21 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
   return 1;
 }
 
-/* Construct a twisted Edwards curve from g as in [Bardulescu et al. 2012] */
+/* Construct a twisted Edwards curve with a = -1 from g = g_num / g_denom
+
+   -x^2 + y^2 = 1 + d * x^2 * y^2, with d = -((g - 1/g)/2)^4 for g in Q \ {-1,0,1}
+   
+   [Bardulescu et al. 2012]    
+*/
+
 /* static int */
-/* TwEdwards_curve_from_g (residue_t A, residue_t x, const residue_t g, */
-/* 			  const modulus_t m) */
+/* TwEdwards_curve_from_g (residue_t d, residue_t x, residue_t y, const unsigned_long g_num, */
+/* 			const unsigned_long g_denom, const modulus_t m) */
 /* { */
-/*   /\* TODO *\/ */
+
+  
+
+
 /* } */
 
 
@@ -1841,15 +1850,14 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 int 
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, b, r;
+  residue_t u, b;
   ellM_point_t P, Pt;
+  ellM_init (P, m);
   unsigned int i;
   int bt = 0;
 
   mod_init (u, m);
   mod_init (b, m);
-  mod_init (r, m);
-  ellM_init (P, m);
 
   mod_intset_ul (f, 1UL);
 
@@ -1911,14 +1919,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       }
     mod_set1 (P->z, m);
   }
-  else if (plan->parameterization == TWED12)
-    {
-      /* Construct Edwards12 curve [Bardulescu et. al 2012] */
-    }
-  else if (plan->parameterization == TWED16)
-    {
-      /* Construct Edwards16 curve [Bardulescu et. al 2012] */
-    }
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");
@@ -1933,67 +1933,159 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* now start ecm */
 
   /* Do stage 1 */
-      ellM_interpret_bytecode (P, plan->bc, m, b);
-      
-      /* Add prime 2 in the desired power. If a zero residue for the 
-	 Z-coordinate is encountered, we backtrack to previous point and stop.
-	 NOTE: This is not as effective as I hoped. It prevents trivial 
-	 factorizations only if after processing the odd part of the stage 1 
-	 multiplier, the resulting point has power-of-2 order on E_p for all p|N.
-	 If that were to happen, the point probably had that (presumably small 
-	 on most E_p) power-of-2 order during the last couple of primes processed 
-	 in the precomputed Lucas chain, and then quite likely the Lucas chain 
-	 incorrectly used an addition of identical points, causing the 
-	 Z-coordinate to become zero, leading to 0 (mod N) before we even 
-	 get here. 
-	 For example, using 10^6 composites from an RSA155 sieving experiment,
-	 without backtracking we get N as the factor 456 times, with backtracking
-	 still 360 times. 
-	 TODO: this could probably be fixed by treating 3 separately, too, 
-	 instead of putting it in the precomputed Lucas chain. Then the 
-	 probability that a point of very small order on all E_p is encountered
-	 during the Lucas chain is reduced, and so the probability of using
-	 curve addition erroneously. */
-      ellM_init (Pt, m);
-      ellM_set (Pt, P, m);
-      for (i = 0; i < plan->exp2; i++)
-	{
-	  ellM_double (P, P, m, b);
+  ellM_interpret_bytecode (P, plan->bc, m, b);
+  
+  /* Add prime 2 in the desired power. If a zero residue for the 
+     Z-coordinate is encountered, we backtrack to previous point and stop.
+     NOTE: This is not as effective as I hoped. It prevents trivial 
+     factorizations only if after processing the odd part of the stage 1 
+     multiplier, the resulting point has power-of-2 order on E_p for all p|N.
+     If that were to happen, the point probably had that (presumably small 
+     on most E_p) power-of-2 order during the last couple of primes processed 
+     in the precomputed Lucas chain, and then quite likely the Lucas chain 
+     incorrectly used an addition of identical points, causing the 
+     Z-coordinate to become zero, leading to 0 (mod N) before we even 
+     get here. 
+     For example, using 10^6 composites from an RSA155 sieving experiment,
+     without backtracking we get N as the factor 456 times, with backtracking
+     still 360 times. 
+     TODO: this could probably be fixed by treating 3 separately, too, 
+     instead of putting it in the precomputed Lucas chain. Then the 
+     probability that a point of very small order on all E_p is encountered
+     during the Lucas chain is reduced, and so the probability of using
+     curve addition erroneously. */
+  ellM_init (Pt, m);
+  ellM_set (Pt, P, m);
+  for (i = 0; i < plan->exp2; i++)
+    {
+      ellM_double (P, P, m, b);
 #if ECM_BACKTRACKING
-	  if (mod_is0 (P[0].z, m))
-	    {
-	      ellM_set (P, Pt, m);
-	      bt = 1;
-	      break;
-	    }
-	  ellM_set (Pt, P, m);
-#endif
+      if (mod_is0 (P[0].z, m))
+	{
+	  ellM_set (P, Pt, m);
+	  bt = 1;
+	  break;
 	}
+      ellM_set (Pt, P, m);
+#endif
+    }
 
 #if 0
-      printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n", 
-	      mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
+  printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n", 
+	  mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
 #endif
 
-      mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
-				 in stage 2 init find factors? */
-      if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
-	{
-	  bt = ecm_stage2 (r, P, &(plan->stage2), b, m);
-	  mod_gcd (f, r, m);
-	}
+  mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
+			     in stage 2 init find factors? */
+  if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
+    {
+      bt = ecm_stage2 (u, P, &(plan->stage2), b, m);
+      mod_gcd (f, u, m);
+    }
   
-      mod_clear (u, m);
-      mod_clear (b, m);
-      mod_clear (r, m);
-      ellM_clear (P, m);
-      ellM_clear (Pt, m);
+  mod_clear (u, m);
+  mod_clear (b, m);
+  ellM_clear (P, m);
+  ellM_clear (Pt, m);
     
-
-
   return bt;
-
 }
+
+
+
+int 
+ecmE (modint_t f, const modulus_t m, const ecmE_plan_t *plan)
+{
+  residue_t u, a;
+  ellE_point_t P;
+  ellE_init (P, m);
+  unsigned int i;
+  int bt = 0;
+
+  mod_init (u, m);
+  mod_init (a, m);
+
+  mod_intset_ul (f, 1UL);
+
+/* Curve init */
+
+if (plan->parameterization == TWED16)
+  {
+    /* Construct Edwards16 curve [Barbulescu et. al 2012] */
+
+      residue_t xn, xd, yn, yd, d, dd;
+
+      mod_set_ul (xn, Ecurve14.x_numer, m);
+      mod_set_ul (xd, Ecurve14.x_denom, m);
+
+      /* (xn, yn) = P (mod m) */
+      if ( mod_inv (u, xd, m) == 0)
+	{
+	  mod_gcd (f, xd, m);
+	  mod_clear (u, m);
+	  mod_clear (a, m);
+	  ellE_clear (P, m);
+	  return 0;
+	}
+      mod_mul (P->x, xn, u, m);
+
+      mod_set_ul (yn, Ecurve14.y_numer, m);
+      mod_set_ul (yd, Ecurve14.y_denom, m);
+      if (mod_inv (u, yd, m) == 0)
+	{
+	  mod_gcd (f, yd, m);
+	  mod_clear (u, m);
+	  mod_clear (a, m);
+	  ellE_clear (P, m);
+	  return 0;
+	}
+      mod_mul (P->y, yn, u, m);
+
+      /* Reduce d = dn/dd mod m */
+      mod_set_ul (d, Ecurve14.d_numer, m);
+      mod_set_ul (dd, Ecurve14.d_denom, m);
+      if (mod_inv (u, dd, m) == 0)
+      	{
+      	  mod_gcd (f, dd, m);
+      	  mod_clear (u, m);
+      	  mod_clear (a, m);
+      	  ellE_clear (P, m);
+      	  return 0;
+      	}
+      mod_mul (d, d, u, m);
+    }
+ else
+   {
+     fprintf (stderr, "ecm: Unknown parameterization\n");
+     abort();
+   }
+ 
+ mod_set1 (P->z, m);
+
+#ifdef TRACE
+ printf ("starting point: (%lu:%lu:%lu) on twisted Edwards curve -x^2 + y^2 = 1 + %lu * x^2 * y^2\n", mod_get_ul (P->x, m), mod_get_ul (P->y, m), mod_get_ul (P->z, m), mod_get_ul(d, m));
+#endif
+ 
+ 
+ /* Stage 1 */
+
+ /* a = -1 */
+ mod_set1 (a, m);
+ mod_neg (a, a, m);
+
+ for ( i=2; i<= plan->B1; i++)
+   ellE_mul_ul (P, P, i, m, a);
+
+ /* Stage 2 */
+ 
+ mod_clear (u, m);
+ mod_clear (a, m);
+ ellE_clear (P, m);
+ 
+ return bt;
+}
+
+
 
 /* -------------------------------------------------------------------------- */
 
@@ -2356,3 +2448,4 @@ ell_curveorder (const unsigned long sigma_par, int parameterization,
 
   return order;
 }
+
