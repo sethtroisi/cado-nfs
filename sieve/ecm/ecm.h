@@ -4,11 +4,11 @@
 #include "mod_mpz.h"
 #include "stage2.h"
 
-#define BRENT12 0
-#define MONTY12 1
-#define MONTY16 2
-#define TWED12  4
-#define TWED16  8
+#define BRENT12 1
+#define MONTY12 2
+#define MONTY16 4
+#define TWED12  8
+#define TWED16  16
 
 
 typedef struct {
