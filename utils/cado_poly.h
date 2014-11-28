@@ -14,7 +14,7 @@
 #define RATIONAL_SIDE   0
 #define ALGEBRAIC_SIDE   1
 
-#define NB_POLYS_MAX 8 /* maximal number of polynomials in multiple fiels */
+#define NB_POLYS_MAX 8 /* maximal number of polynomials in multiple fields */
 
 struct cado_poly_s {
   mpz_t n;        /* number to factor */
