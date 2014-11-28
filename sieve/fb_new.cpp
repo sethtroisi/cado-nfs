@@ -370,8 +370,10 @@ template <int Nr_roots>
 void
 fb_slices<Nr_roots>::fprint(FILE *out)
 {
-  for (size_t slice = 0; slice < nr_slices; slice++)
+  for (size_t slice = 0; slice < nr_slices; slice++) {
+    fprintf (out, "#    Slice %zu:\n", slice);
     vectors[slice].fprint(out);
+  }
 }
 
 /* A "part" is the set of all factor base primes that get sieved over a given
@@ -458,18 +460,29 @@ fb_part::append(const fb_general_entry &fb_cur)
 void
 fb_part::fprint(FILE *out)
 {
+  fprintf(out, "#   Entries with 0 roots:\n");
   fb0_slices->fprint(out);
+  fprintf(out, "#   Entries with 1 root:\n");
   fb1_slices->fprint(out);
+  fprintf(out, "#   Entries with 2 roots:\n");
   fb2_slices->fprint(out);
+  fprintf(out, "#   Entries with 3 roots:\n");
   fb3_slices->fprint(out);
+  fprintf(out, "#   Entries with 4 roots:\n");
   fb4_slices->fprint(out);
+  fprintf(out, "#   Entries with 5 roots:\n");
   fb5_slices->fprint(out);
+  fprintf(out, "#   Entries with 6 roots:\n");
   fb6_slices->fprint(out);
+  fprintf(out, "#   Entries with 7 roots:\n");
   fb7_slices->fprint(out);
+  fprintf(out, "#   Entries with 8 roots:\n");
   fb8_slices->fprint(out);
 
-  for (size_t i = 0; i < general_vector.size(); i++)
+  fprintf(out, "#   General entries (powers, ramified primes or primes with projective roots):\n");
+  for (size_t i = 0; i < general_vector.size(); i++) {
     general_vector[i].fprint(out);
+  }
 }
 
 /* Splits the factor base for a polynomial into disjoint parts which are
@@ -795,8 +808,10 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
 void
 fb_factorbase::fprint(FILE *out)
 {
-  for (size_t part = 0; part < FB_MAX_PARTS; part++)
+  for (size_t part = 0; part < FB_MAX_PARTS; part++) {
+    fprintf(out, "#  Factor base entries up to %" FBPRIME_FORMAT "\n", thresholds[part]);
     parts[part]->fprint(out);
+  }
 }
 
 
@@ -818,11 +833,11 @@ int main(int argc, char **argv)
   mpz_set_ui(poly[1], 210); /* Bunch of projective primes */
 
   fb1->make_linear(poly, powbound, true);
-  fprintf (stdout, "Linear factor base:\n");
-  // fb1->fprint(stdout);
+  fprintf (stdout, "# Linear factor base:\n");
+  fb1->fprint(stdout);
   if (argc > 1) {
     fb2->read(argv[1]);
-    fprintf (stdout, "Factor base from file:\n");
+    fprintf (stdout, "# Factor base from file:\n");
     fb2->fprint(stdout);
   }
 

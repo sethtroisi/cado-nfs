@@ -67,6 +67,7 @@ sieve/ecm/getprime.c
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
 sieve/fb_new.cpp
+sieve/fb_new.h
 sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
