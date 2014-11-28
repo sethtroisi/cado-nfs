@@ -23,7 +23,6 @@ static const Edwards_curve_t Ecurve14 = {1, 4, -50625, 4096, 104329, 16384, 1630
 static const Edwards_curve_t Ecurve45 = {4, 5, -6561, 2560000, 106564329, 501760000, -3715030917, 280985600000};
 
 
-
 typedef struct {
   char *bc;             /* Bytecode for the Lucas chain for stage 1 */
   unsigned int bc_len;  /* Number of bytes in bytecode */
@@ -33,12 +32,16 @@ typedef struct {
   unsigned long sigma;  /* Sigma parameter for Brent curves, or
 			   multiplier for Montgomery torsion-12 curves */
 
-  Edwards_curve_t *E;   /* Parameters for Edwards curve */
   stage2_plan_t stage2;
 } ecm_plan_t;
 
 
-
+typedef struct {
+  unsigned int exp2;
+  unsigned int B1;
+  int parameterization; /* TWED12 or TWED16 */
+  Edwards_curve_t *E;   /* Parameters for Edwards curve */
+} ecmE_plan_t;
 
 
 int ecm_ul (modintredcul_t, const modulusredcul_t, const ecm_plan_t *);

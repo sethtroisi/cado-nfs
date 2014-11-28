@@ -38,7 +38,6 @@ static unsigned long ellE_add_count, ellE_double_count;
 #endif
 
 
-
 /* Projective point on Montgomery curve (x : z) onlyx */
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
@@ -1852,12 +1851,12 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
   residue_t u, b;
   ellM_point_t P, Pt;
+  ellM_init (P, m);
   unsigned int i;
   int bt = 0;
 
   mod_init (u, m);
   mod_init (b, m);
-  ellM_init (P, m);
 
   mod_intset_ul (f, 1UL);
 
@@ -1922,6 +1921,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   else if (plan->parameterization == TWED16)
     {
       /* Construct Edwards16 curve [Barbulescu et. al 2012] */
+
+/* /\* Homogeneous projective Edwards coordinates  */
+/*    (x : y : z) ---> (x/z, y/z)  z != 0 *\/ */
+/* typedef struct {residue_t x, y, z;} __ellE_point_t; */
+/* typedef __ellE_point_t ellE_point_t[1]; */
 
       residue_t xn, xd, yn, yd, dn, dd;
 
@@ -2038,6 +2042,16 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     
   return bt;
 }
+
+
+/*
+int 
+ecmE (modint_t f, const modulus_t m, const ecm_plan_t *plan)
+{
+  
+}
+*/
+
 
 /* -------------------------------------------------------------------------- */
 
