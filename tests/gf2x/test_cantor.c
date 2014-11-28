@@ -6,9 +6,9 @@
 #include "gf2x-fft.h"
 #include "tests_common.h"
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
-    char *argv0 = argv[0];
+    const char *argv0 = argv[0];
     tests_common_cmdline(&argc, &argv, PARSE_SEED);
     if (argc != 2) {
         fprintf(stderr, "usage: %s <option> N\n", argv0);
