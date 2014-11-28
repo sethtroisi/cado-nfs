@@ -727,6 +727,8 @@ utils/stats.h
 utils/stats.c
 utils/lll.c
 utils/lll.h
+utils/lognorm_skewness.h
+utils/lognorm_skewness.c
 tests/README
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
