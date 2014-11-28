@@ -152,6 +152,7 @@ gf2x/config/ltsugar.m4
 gf2x/config/ltversion.m4
 gf2x/config/lt~obsolete.m4
 gf2x/config/missing
+gf2x/config/test-driver
 gf2x/configure
 gf2x/configure.ac
 gf2x/fft.c
