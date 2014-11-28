@@ -1841,14 +1841,13 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 int 
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, b, r;
+  residue_t u, b;
   ellM_point_t P, Pt;
   unsigned int i;
   int bt = 0;
 
   mod_init (u, m);
   mod_init (b, m);
-  mod_init (r, m);
   ellM_init (P, m);
 
   mod_intset_ul (f, 1UL);
@@ -1979,13 +1978,12 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 				 in stage 2 init find factors? */
       if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
 	{
-	  bt = ecm_stage2 (r, P, &(plan->stage2), b, m);
-	  mod_gcd (f, r, m);
+	  bt = ecm_stage2 (u, P, &(plan->stage2), b, m);
+	  mod_gcd (f, u, m);
 	}
   
       mod_clear (u, m);
       mod_clear (b, m);
-      mod_clear (r, m);
       ellM_clear (P, m);
       ellM_clear (Pt, m);
     
