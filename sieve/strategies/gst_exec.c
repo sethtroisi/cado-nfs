@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
 
     //and precompute just for one side!
     if (gdc) {			//precompute all decompositions!
-	
+
 	if (lim0 == 0){
 	    fprintf(stderr, "Error: parameter -lim0 is mandatory\n");
 	    param_list_print_usage(pl, argv[0], stderr);
@@ -151,16 +151,16 @@ int main(int argc, char *argv[])
 	tabular_decomp_fprint (file, res);
 	tabular_decomp_free (res);
 	fclose (file);
-	
+
       } else {
-      
+
       //store data
       const char *directory_out;
       if ((directory_out = param_list_lookup_string(pl, "out")) == NULL) {
 	directory_out = "./";
       }
 
-      
+
       if (gst) {
 	//check parameters!
 	const char *directory_in;
@@ -180,7 +180,6 @@ int main(int argc, char *argv[])
 	    exit(EXIT_FAILURE);
 	}
 
-	
 	int r0 = -1, r1 = -1;
 	param_list_parse_int(pl, "r0", &r0);
 	param_list_parse_int(pl, "r1", &r1);
@@ -237,7 +236,7 @@ int main(int argc, char *argv[])
 	       strategies had been choosed. Now, it's time to merge these
 	       datas to compute the best strategies for each couple (r0, r1)!
 	    */
-	    
+
 	    if (mfb0 == 0){
 		fprintf(stderr, "Error: parameter -mfb0 is mandatory\n");
 		param_list_print_usage(pl, argv[0], stderr);
@@ -265,7 +264,7 @@ int main(int argc, char *argv[])
 		}
 		fclose(file_in);
 	    }
-	    
+
 	    for (int r1 = 0; r1 <= mfb1; r1++) {
 		sprintf(name_file_in, "%s/strategies%lu_%d",
 			directory_in, lim1, r1);
@@ -277,19 +276,20 @@ int main(int argc, char *argv[])
 			    name_file_in);
 		    exit(EXIT_FAILURE);
 		}
-		
+
 		fclose(file_in);
-		
+
 		for (int r0 = 0; r0 <= mfb0; r0++) {
 		    char res_file[200];
 		    tabular_strategy_t *res =
 			generate_strategy_r0_r1(data_rat[r0], strat_r1);
 		    //print
-		    sprintf(res_file, "%s/strategies_%d_%d", directory_out, r0, r1);
+		    sprintf(res_file,
+			    "%s/strategies_%d_%d", directory_out, r0, r1);
 	      FILE *file = fopen(res_file, "w");
 	      tabular_strategy_fprint(file, res);
 	      fclose(file);
-	      
+
 	      tabular_strategy_free(res);
 		}
 		tabular_strategy_free(strat_r1);
@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
 	      param_list_print_usage(pl, argv[0], stderr);
 	      exit(EXIT_FAILURE);
 	  }
-	  
+
 	  FILE *file_in = fopen(name_file_in, "r");
 	  tabular_fm_t *c = tabular_fm_fscan(file_in);
 	  if (c == NULL) {
@@ -315,18 +315,18 @@ int main(int argc, char *argv[])
 	      exit(EXIT_FAILURE);
 	  }
 	  fclose(file_in);
-	  
+
 	  tabular_fm_t *data_pp1_27 = extract_fm_method(c, PP1_27_METHOD, 0);
 	  tabular_fm_t *data_pp1_65 = extract_fm_method(c, PP1_65_METHOD, 0);
-	  
+
 	  tabular_fm_t *data_pm1 = extract_fm_method(c, PM1_METHOD, 0);
-	  
+
 	  tabular_fm_t *data_ecm_m16 = extract_fm_method(c, EC_METHOD, MONTY16);
-	  
+
 	  tabular_fm_t *data_ecm_m12 = extract_fm_method(c, EC_METHOD, MONTY12);
-	  
+
 	  tabular_fm_t *data_ecm_b12 = extract_fm_method(c, EC_METHOD, BRENT12);
-	
+
 	  tabular_fm_t *data_ecm_rc = tabular_fm_create();
 	  tabular_fm_concat(data_ecm_rc, data_ecm_b12);
 	  tabular_fm_concat(data_ecm_rc, data_ecm_m12);
@@ -344,8 +344,8 @@ int main(int argc, char *argv[])
 
 	      int r0 = -1;
 	      param_list_parse_int(pl, "r0", &r0);
-	      if (lim0 == 0){
-		  fprintf(stderr, "Error: parameter -r is mandatory\n");
+	      if (r0 == -1){
+		  fprintf(stderr, "Error: parameter -r0 is mandatory\n");
 		  param_list_print_usage(pl, argv[0], stderr);
 		  exit(EXIT_FAILURE);
 	      }
@@ -371,14 +371,15 @@ int main(int argc, char *argv[])
 		  if ((name_file_decomp =
 		       param_list_lookup_string(pl, "decomp")) == NULL) {
 
-		      fprintf(stderr, "Error: parameter -decomp is mandatory\n");
+		      fprintf(stderr, 
+			      "Error: parameter -decomp is mandatory\n");
 		      param_list_print_usage(pl, argv[0], stderr);
 		      exit(EXIT_FAILURE);
 		  }
 		  FILE *file_decomp = fopen(name_file_decomp, "r");
-		  
+
 		  tab_decomp = tabular_decomp_fscan(file_decomp);
-		  
+
 		  if (tab_decomp == NULL) {
 		      fprintf(stderr, "impossible to read '%s'\n",
 			      name_file_decomp);
@@ -389,22 +390,31 @@ int main(int argc, char *argv[])
 	      fm_t *zero = fm_create();
 	      unsigned long method_zero[4] = { 0, 0, 0, 0 };
 	      fm_set_method(zero, method_zero, 4);
-	      
+
 	      tabular_strategy_t *res =
 		  generate_strategies_oneside(tab_decomp, zero, data_pm1,
 					      data_pp1, data_ecm_m16,
 					      data_ecm_rc, lim0, lpb0, r0);
-	      
+
 	      tabular_decomp_free(tab_decomp);
-	      
-	      char name_file[strlen (directory_out) + 20];
-	      sprintf(name_file, "%s/strategies%lu_%d", directory_out, lim0, r0);
+
+	      char name_file[strlen (directory_out) + 50];
+	      sprintf(name_file, 
+		      "%s/strategies%lu_%d", directory_out, lim0, r0);
 	      FILE *file_out = fopen(name_file, "w");
+	      if (file_out == NULL)
+		  {
+		      fprintf(stderr, "impossible to write in %s\n", name_file);
+		      param_list_clear(pl);
+		      exit(EXIT_FAILURE);
+		  }
+
+
 	      tabular_strategy_fprint(file_out, res);
 	      fclose(file_out);
 	      tabular_strategy_free(res);
 	      fm_free(zero);
-	      
+
 	  } else {
 	      /*
 		default parameter: this function generates our best
