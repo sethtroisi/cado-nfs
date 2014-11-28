@@ -16,6 +16,7 @@
 #define MAP_FAILED ((void *) -1)
 #endif
 #include <gmp.h>
+#include <vector>
 #include "las-config.h"
 #include "cado_poly.h" // for MAXDEGREE
 
@@ -166,6 +167,11 @@ class fb_factorbase {
   void read(const char * const filename);
   void make_linear (const mpz_t *poly, fbprime_t powbound, bool do_projective);
   void fprint(FILE *);
+  bool mmap_fbc(const char *) {return false;};
+  void dump_fbc(const char *) {return;};
+  unsigned long *extract_bycost(size_t &n, fbprime_t pmax, fbprime_t td_thresh);
+  size_t size() {abort(); return 0;}
+  size_t nroots_total() {abort(); return 0;}
 };
 
 

@@ -1,6 +1,5 @@
 #include "cado.h"
 #include <cstdlib>
-#include <vector>
 #include <algorithm>
 #include <cmath>
 #include <cstdarg>
