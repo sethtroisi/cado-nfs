@@ -79,8 +79,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-check_PROGRAMS = cantor_bench$(EXEEXT) cantor_gm_bench$(EXEEXT) \
-	cantor_gmt_bench$(EXEEXT) cantor$(EXEEXT) cantor_gm$(EXEEXT) \
+check_PROGRAMS = cantor$(EXEEXT) cantor_gm$(EXEEXT) \
 	cantor_gmt$(EXEEXT)
 subdir = gf2x-fft
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
@@ -154,21 +153,12 @@ libgf2x_fft_la_OBJECTS = $(am_libgf2x_fft_la_OBJECTS)
 am_cantor_OBJECTS = cantor_main.$(OBJEXT)
 cantor_OBJECTS = $(am_cantor_OBJECTS)
 cantor_DEPENDENCIES = ../libgf2x.la libcantor128.la
-am_cantor_bench_OBJECTS = cantor_bench.$(OBJEXT)
-cantor_bench_OBJECTS = $(am_cantor_bench_OBJECTS)
-cantor_bench_DEPENDENCIES = ../libgf2x.la libcantor128.la
 am_cantor_gm_OBJECTS = cantor_main.$(OBJEXT)
 cantor_gm_OBJECTS = $(am_cantor_gm_OBJECTS)
 cantor_gm_DEPENDENCIES = ../libgf2x.la libcantor128gm.la
-am_cantor_gm_bench_OBJECTS = cantor_bench.$(OBJEXT)
-cantor_gm_bench_OBJECTS = $(am_cantor_gm_bench_OBJECTS)
-cantor_gm_bench_DEPENDENCIES = ../libgf2x.la libcantor128gm.la
 am_cantor_gmt_OBJECTS = cantor_main.$(OBJEXT)
 cantor_gmt_OBJECTS = $(am_cantor_gmt_OBJECTS)
 cantor_gmt_DEPENDENCIES = ../libgf2x.la libcantor128gmt.la
-am_cantor_gmt_bench_OBJECTS = cantor_bench.$(OBJEXT)
-cantor_gmt_bench_OBJECTS = $(am_cantor_gmt_bench_OBJECTS)
-cantor_gmt_bench_DEPENDENCIES = ../libgf2x.la libcantor128gmt.la
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -205,14 +195,10 @@ am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libcantor128_la_SOURCES) $(libcantor128gm_la_SOURCES) \
 	$(libcantor128gmt_la_SOURCES) $(libgf2x_fft_la_SOURCES) \
-	$(cantor_SOURCES) $(cantor_bench_SOURCES) $(cantor_gm_SOURCES) \
-	$(cantor_gm_bench_SOURCES) $(cantor_gmt_SOURCES) \
-	$(cantor_gmt_bench_SOURCES)
+	$(cantor_SOURCES) $(cantor_gm_SOURCES) $(cantor_gmt_SOURCES)
 DIST_SOURCES = $(libcantor128_la_SOURCES) $(libcantor128gm_la_SOURCES) \
 	$(libcantor128gmt_la_SOURCES) $(libgf2x_fft_la_SOURCES) \
-	$(cantor_SOURCES) $(cantor_bench_SOURCES) $(cantor_gm_SOURCES) \
-	$(cantor_gm_bench_SOURCES) $(cantor_gmt_SOURCES) \
-	$(cantor_gmt_bench_SOURCES)
+	$(cantor_SOURCES) $(cantor_gm_SOURCES) $(cantor_gmt_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -378,16 +364,10 @@ libcantor128gm_la_CFLAGS = $(AM_CFLAGS) -DCANTOR_GM
 libcantor128gmt_la_CFLAGS = $(AM_CFLAGS) -DCANTOR_GM -DCANTOR_GM_TRUNCATE
 cantor_SOURCES = cantor_main.c
 cantor_LDADD = ../libgf2x.la libcantor128.la -lgmp
-cantor_bench_SOURCES = cantor_bench.c
-cantor_bench_LDADD = ../libgf2x.la libcantor128.la -lgmp
 cantor_gm_SOURCES = cantor_main.c
 cantor_gm_LDADD = ../libgf2x.la libcantor128gm.la -lgmp
-cantor_gm_bench_SOURCES = cantor_bench.c
-cantor_gm_bench_LDADD = ../libgf2x.la libcantor128gm.la -lgmp
 cantor_gmt_SOURCES = cantor_main.c
 cantor_gmt_LDADD = ../libgf2x.la libcantor128gmt.la -lgmp
-cantor_gmt_bench_SOURCES = cantor_bench.c
-cantor_gmt_bench_LDADD = ../libgf2x.la libcantor128gmt.la -lgmp
 all: all-am
 
 .SUFFIXES:
@@ -494,25 +474,13 @@ cantor$(EXEEXT): $(cantor_OBJECTS) $(cantor_DEPENDENCIES) $(EXTRA_cantor_DEPENDE
 	@rm -f cantor$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(cantor_OBJECTS) $(cantor_LDADD) $(LIBS)
 
-cantor_bench$(EXEEXT): $(cantor_bench_OBJECTS) $(cantor_bench_DEPENDENCIES) $(EXTRA_cantor_bench_DEPENDENCIES) 
-	@rm -f cantor_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(cantor_bench_OBJECTS) $(cantor_bench_LDADD) $(LIBS)
-
 cantor_gm$(EXEEXT): $(cantor_gm_OBJECTS) $(cantor_gm_DEPENDENCIES) $(EXTRA_cantor_gm_DEPENDENCIES) 
 	@rm -f cantor_gm$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(cantor_gm_OBJECTS) $(cantor_gm_LDADD) $(LIBS)
 
-cantor_gm_bench$(EXEEXT): $(cantor_gm_bench_OBJECTS) $(cantor_gm_bench_DEPENDENCIES) $(EXTRA_cantor_gm_bench_DEPENDENCIES) 
-	@rm -f cantor_gm_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(cantor_gm_bench_OBJECTS) $(cantor_gm_bench_LDADD) $(LIBS)
-
 cantor_gmt$(EXEEXT): $(cantor_gmt_OBJECTS) $(cantor_gmt_DEPENDENCIES) $(EXTRA_cantor_gmt_DEPENDENCIES) 
 	@rm -f cantor_gmt$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(cantor_gmt_OBJECTS) $(cantor_gmt_LDADD) $(LIBS)
-
-cantor_gmt_bench$(EXEEXT): $(cantor_gmt_bench_OBJECTS) $(cantor_gmt_bench_DEPENDENCIES) $(EXTRA_cantor_gmt_bench_DEPENDENCIES) 
-	@rm -f cantor_gmt_bench$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(cantor_gmt_bench_OBJECTS) $(cantor_gmt_bench_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -521,7 +489,6 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cantor128.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cantor_bench.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cantor_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fake_fft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcantor128gm_la-cantor128.Plo@am__quote@
@@ -776,6 +743,14 @@ uninstall-am: uninstall-libLTLIBRARIES
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags tags-am uninstall uninstall-am uninstall-libLTLIBRARIES
 
+
+#check_PROGRAMS=cantor_bench cantor_gm_bench cantor_gmt_bench cantor cantor_gm cantor_gmt
+#cantor_bench_SOURCES=cantor_bench.c
+#cantor_bench_LDADD=../libgf2x.la libcantor128.la -lgmp
+#cantor_gm_bench_SOURCES=cantor_bench.c
+#cantor_gm_bench_LDADD=../libgf2x.la libcantor128gm.la -lgmp
+#cantor_gmt_bench_SOURCES=cantor_bench.c
+#cantor_gmt_bench_LDADD=../libgf2x.la libcantor128gmt.la -lgmp
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
