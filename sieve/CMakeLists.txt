@@ -10,9 +10,6 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 # ugly (copied from linalg/bwc/CMakeLists.txt...)
 add_executable (makefb makefb.c)
 target_link_libraries (makefb utils)
-set_target_properties(makefb PROPERTIES
-    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
-    LINK_FLAGS "${OpenMP_CXX_FLAGS}")
 
 set (las_sources las.c fb.c
   las-coordinates.c las-debug.c las-report-stats.c las-duplicate.c

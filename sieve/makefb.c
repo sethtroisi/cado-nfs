@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h> /* for strcmp() */
 #include <math.h> /* for sqrt and floor and log and ceil */
+#include <pthread.h>
 #include "portability.h"
 #include "utils.h"
 
@@ -344,6 +345,25 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
     return L;
 }
 
+/* thread structure */
+typedef struct
+{
+  unsigned long p;
+  entry_list L;
+  mpz_t *f;
+  int d;
+  int thread;
+  int maxbits;
+} __tab_struct;
+typedef __tab_struct tab_t[1];
+
+void*
+one_thread (void* args)
+{
+  tab_t *tab = (tab_t*) args;
+  tab[0]->L = all_roots (tab[0]->f, tab[0]->d, tab[0]->p, tab[0]->maxbits);
+  return NULL;
+}
 
 void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
                         int maxbits, int nb_threads)
@@ -357,36 +377,31 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
     fprintf(outfile, "# alim = %lu\n", alim);
     fprintf(outfile, "# maxbits = %d\n", maxbits);
 
-#ifdef HAVE_OPEMMP
-    omp_set_num_threads (nb_threads);
-#endif
-
-    entry_list L[MAX_THREADS];
-    unsigned long p, P[MAX_THREADS];
+    pthread_t tid[MAX_THREADS];
+    unsigned long p;
+    tab_t T[MAX_THREADS];
     for (p = 2; p <= alim;) {
       for (j = 0; j < nb_threads && p <= alim; p = getprime (p), j++)
         {
-          P[j] = p;
+          T[j]->p = p;
+          T[j]->f = f;
+          T[j]->d = d;
+          T[j]->maxbits = maxbits;
         }
       maxj = j;
-#ifdef HAVE_OPENMP
-#pragma omp parallel for
-#endif
-      for (j = 0; j < maxj; j++) {
-          L[j] = all_roots(f, d, P[j], maxbits);
-      }
-#ifdef HAVE_OPENMP
-#pragma omp single
-#endif
+      for (j = 0; j < maxj; j++)
+        pthread_create (&tid[j], NULL, one_thread, (void *) (T+j));
+      while (j > 0)
+        pthread_join (tid[--j], NULL);
       for (j = 0; j < maxj; j++) {
         // print in a compactified way
         int oldn0=-1, oldn1=-1;
         unsigned long oldq = 0;
-        for (int i = 0; i < L[j].len; ++i) {
-            unsigned long q = L[j].list[i].q;
-            int n1 = L[j].list[i].n1;
-            int n0 = L[j].list[i].n0;
-            unsigned long r =  L[j].list[i].r;
+        for (int i = 0; i < T[j]->L.len; ++i) {
+            unsigned long q = T[j]->L.list[i].q;
+            int n1 = T[j]->L.list[i].n1;
+            int n0 = T[j]->L.list[i].n0;
+            unsigned long r =  T[j]->L.list[i].r;
             if (q == oldq && n1 == oldn1 && n0 == oldn0)
                 fprintf(outfile, ",%lu", r);
             else {
@@ -399,9 +414,9 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
                     fprintf(outfile, "%lu:%d,%d: %lu", q, n1, n0, r);
             }
         }
-        if (L[j].len > 0)
+        if (T[j]->L.len > 0)
             fprintf(outfile, "\n");
-        entry_list_clear(&(L[j]));
+        entry_list_clear(&(T[j]->L));
       }
     }
     /* Free getprime() memory */
