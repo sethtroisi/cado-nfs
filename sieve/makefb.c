@@ -6,6 +6,7 @@
 #include "portability.h"
 #include "utils.h"
 
+#define MAX_THREADS 512
 
 /*
  * Compute g(x) = f(a*x+b), with deg f = d, and a and b are longs.
@@ -345,9 +346,10 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
 
 
 void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
-        int maxbits) {
+                        int maxbits, int nb_threads)
+{
     mpz_t *f = F->coeff;
-    int d = F->deg;
+    int d = F->deg, j, maxj;
 
     fprintf(outfile, "# Roots for polynomial ");
     mpz_poly_fprintf(outfile, F);
@@ -355,18 +357,36 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
     fprintf(outfile, "# alim = %lu\n", alim);
     fprintf(outfile, "# maxbits = %d\n", maxbits);
 
-    entry_list L;
-    unsigned long p;
-    for (p = 2; p <= alim; p = getprime (p)) {
-        L = all_roots(f, d, p, maxbits);
+#ifdef HAVE_OPEMMP
+    omp_set_num_threads (nb_threads);
+#endif
+
+    entry_list L[MAX_THREADS];
+    unsigned long p, P[MAX_THREADS];
+    for (p = 2; p <= alim;) {
+      for (j = 0; j < nb_threads && p <= alim; p = getprime (p), j++)
+        {
+          P[j] = p;
+        }
+      maxj = j;
+#ifdef HAVE_OPENMP
+#pragma omp parallel for
+#endif
+      for (j = 0; j < maxj; j++) {
+          L[j] = all_roots(f, d, P[j], maxbits);
+      }
+#ifdef HAVE_OPENMP
+#pragma omp single
+#endif
+      for (j = 0; j < maxj; j++) {
         // print in a compactified way
         int oldn0=-1, oldn1=-1;
         unsigned long oldq = 0;
-        for (int i = 0; i < L.len; ++i) {
-            unsigned long q = L.list[i].q;
-            int n1 = L.list[i].n1;
-            int n0 = L.list[i].n0;
-            unsigned long r =  L.list[i].r;
+        for (int i = 0; i < L[j].len; ++i) {
+            unsigned long q = L[j].list[i].q;
+            int n1 = L[j].list[i].n1;
+            int n0 = L[j].list[i].n0;
+            unsigned long r =  L[j].list[i].r;
             if (q == oldq && n1 == oldn1 && n0 == oldn0)
                 fprintf(outfile, ",%lu", r);
             else {
@@ -379,9 +399,10 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
                     fprintf(outfile, "%lu:%d,%d: %lu", q, n1, n0, r);
             }
         }
-        if (L.len > 0)
+        if (L[j].len > 0)
             fprintf(outfile, "\n");
-        entry_list_clear(&L);
+        entry_list_clear(&(L[j]));
+      }
     }
     /* Free getprime() memory */
     getprime(0);
@@ -399,6 +420,7 @@ static void declare_usage(param_list pl)
             "Side must be %d or %d (default is %d, i.e. algebraic).",
             RATIONAL_SIDE, ALGEBRAIC_SIDE, ALGEBRAIC_SIDE);
     param_list_decl_usage(pl, "side", str);
+    param_list_decl_usage(pl, "t", "number of threads");
 }
 
 int
@@ -412,6 +434,7 @@ main (int argc, char *argv[])
   int side = ALGEBRAIC_SIDE;
   unsigned long alim = 0;
   char *argv0 = argv[0];
+  unsigned long nb_threads = 1;
 
   param_list_init(pl);
   declare_usage(pl);
@@ -440,6 +463,9 @@ main (int argc, char *argv[])
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
+
+  param_list_parse_ulong(pl, "t"   , &nb_threads);
+  ASSERT_ALWAYS(1 <= nb_threads && nb_threads <= MAX_THREADS);
 
   param_list_parse_ulong(pl, "alim", &alim);
   if (alim == 0) {
@@ -472,9 +498,9 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
   if (side == ALGEBRAIC_SIDE)
-      makefb_with_powers (outputfile, cpoly->alg, alim, maxbits);
+    makefb_with_powers (outputfile, cpoly->alg, alim, maxbits, nb_threads);
   else
-      makefb_with_powers (outputfile, cpoly->rat, alim, maxbits);
+    makefb_with_powers (outputfile, cpoly->rat, alim, maxbits, nb_threads);
 
   cado_poly_clear (cpoly);
   if (outfilename != NULL) {
