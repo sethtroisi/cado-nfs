@@ -641,6 +641,7 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
 }
 
 
+
 /* -------------------------------------------------------------------------- */
 /* Functions for curves in Weierstrass form */
 /* -------------------------------------------------------------------------- */
@@ -1995,14 +1996,14 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 int 
 ecmE (modint_t f, const modulus_t m, const ecmE_plan_t *plan)
 {
-  residue_t u, b;
+  residue_t u, a;
   ellE_point_t P;
   ellE_init (P, m);
-  //  unsigned int i;
+  unsigned int i;
   int bt = 0;
 
   mod_init (u, m);
-  mod_init (b, m);
+  mod_init (a, m);
 
   mod_intset_ul (f, 1UL);
 
@@ -2012,7 +2013,7 @@ if (plan->parameterization == TWED16)
   {
     /* Construct Edwards16 curve [Barbulescu et. al 2012] */
 
-      residue_t xn, xd, yn, yd, dn, dd;
+      residue_t xn, xd, yn, yd, d, dd;
 
       mod_set_ul (xn, Ecurve14.x_numer, m);
       mod_set_ul (xd, Ecurve14.x_denom, m);
@@ -2022,11 +2023,11 @@ if (plan->parameterization == TWED16)
 	{
 	  mod_gcd (f, xd, m);
 	  mod_clear (u, m);
-	  mod_clear (b, m);
+	  mod_clear (a, m);
 	  ellE_clear (P, m);
 	  return 0;
 	}
-      mod_mul (xn, xn, u, m);
+      mod_mul (P->x, xn, u, m);
 
       mod_set_ul (yn, Ecurve14.y_numer, m);
       mod_set_ul (yd, Ecurve14.y_denom, m);
@@ -2034,40 +2035,54 @@ if (plan->parameterization == TWED16)
 	{
 	  mod_gcd (f, yd, m);
 	  mod_clear (u, m);
-	  mod_clear (b, m);
+	  mod_clear (a, m);
 	  ellE_clear (P, m);
 	  return 0;
 	}
-      mod_mul (yn, yn, u, m);
+      mod_mul (P->y, yn, u, m);
 
       /* Reduce d = dn/dd mod m */
-      mod_set_ul (dn, Ecurve14.d_numer, m);
+      mod_set_ul (d, Ecurve14.d_numer, m);
       mod_set_ul (dd, Ecurve14.d_denom, m);
       if (mod_inv (u, dd, m) == 0)
-	{
-	  mod_gcd (f, dd, m);
-	  mod_clear (u, m);
-	  mod_clear (b, m);
-	  ellE_clear (P, m);
-	  return 0;
-	}
-      mod_mul (dn, dn, u, m);
+      	{
+      	  mod_gcd (f, dd, m);
+      	  mod_clear (u, m);
+      	  mod_clear (a, m);
+      	  ellE_clear (P, m);
+      	  return 0;
+      	}
+      mod_mul (d, d, u, m);
     }
  else
    {
      fprintf (stderr, "ecm: Unknown parameterization\n");
      abort();
    }
+ 
+ mod_set1 (P->z, m);
 
-/* Stage 1 */
+#ifdef TRACE
+ printf ("starting point: (%lu:%lu:%lu) on twisted Edwards curve -x^2 + y^2 = 1 + %lu * x^2 * y^2\n", mod_get_ul (P->x, m), mod_get_ul (P->y, m), mod_get_ul (P->z, m), mod_get_ul(d, m));
+#endif
+ 
+ 
+ /* Stage 1 */
 
-/* Stage 2 */
+ /* a = -1 */
+ mod_set1 (a, m);
+ mod_neg (a, a, m);
 
-  mod_clear (u, m);
-  mod_clear (b, m);
-  ellE_clear (P, m);
+ for ( i=2; i<= plan->B1; i++)
+   ellE_mul_ul (P, P, i, m, a);
 
-  return bt;
+ /* Stage 2 */
+ 
+ mod_clear (u, m);
+ mod_clear (a, m);
+ ellE_clear (P, m);
+ 
+ return bt;
 }
 
 
