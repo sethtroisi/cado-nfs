@@ -13,6 +13,7 @@ typedef struct
 
 typedef mpz_vector_struct_t mpz_vector_t[1];
 typedef mpz_vector_struct_t * mpz_vector_ptr;
+typedef const mpz_vector_struct_t * mpz_vector_srcptr;
 
 /* Management of the structure: init, clear, set and swap. */
 void mpz_vector_init (mpz_vector_t, unsigned int);
