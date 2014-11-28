@@ -61,7 +61,7 @@ main (int argc0, char *argv0[])
     exit (EXIT_FAILURE);
   }
 
-  cado_poly_init (pol);
+  cado_poly_init (pol, 2); // FIXME: asap
   ASSERT_ALWAYS((polyfilename = param_list_lookup_string(pl, "poly")) != NULL);
   if (!cado_poly_read (pol, polyfilename)) {
     fprintf (stderr, "Error reading polynomial file\n");

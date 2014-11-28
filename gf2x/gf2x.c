@@ -148,9 +148,18 @@ void gf2x_mul_r(unsigned long * c,
     if (sp < sp3)
         sp = sp3;		// Worst-case space required
 
-    if (pool->stk_size < sp) {
-        pool->stk = realloc(pool->stk, sp * sizeof(unsigned long));
-        pool->stk_size = sp;
+    gf2x_mul_pool_t xxpool;
+    struct gf2x_mul_pool_s * xpool;
+    if (pool == NULL) {
+        gf2x_mul_pool_init(xxpool);
+        xpool = xxpool;
+    } else {
+        xpool = pool;
+    }
+
+    if (xpool->stk_size < sp) {
+        xpool->stk = realloc(xpool->stk, sp * sizeof(unsigned long));
+        xpool->stk_size = sp;
     }
 
     /* None of the alternatives below supports c aliasing a or b */
@@ -159,13 +168,13 @@ void gf2x_mul_r(unsigned long * c,
 
     if (sa == sb) {
         // Avoid copy in common case
-        gf2x_mul_toom(dst, a, b, sa, pool->stk);
+        gf2x_mul_toom(dst, a, b, sa, xpool->stk);
 //    } else if ((sa == (sb + 1) / 2) && gf2x_best_utoom(sb)) {
 //        // Another common case
 //        // due to GCD algorithm
-//        gf2x_mul_tc3u(dst, b, sb, a, pool->stk);
+//        gf2x_mul_tc3u(dst, b, sb, a, xpool->stk);
     } else {
-        unsigned long *v = pool->stk + gf2x_toomspace(sa);
+        unsigned long *v = xpool->stk + gf2x_toomspace(sa);
 
         unsigned int i, j;
 
@@ -185,7 +194,7 @@ void gf2x_mul_r(unsigned long * c,
             // finally: the general case
             for (i = 0; i + sa <= sb; i += sa) {
                 // Generic (balanced) Toom-Cook mult.
-                gf2x_mul_toom(v, a, b + i, sa, pool->stk);
+                gf2x_mul_toom(v, a, b + i, sa, xpool->stk);
                 for (j = 0; j < 2 * sa; j++)
                     ptr[i + j] ^= v[j];
             }
@@ -204,6 +213,9 @@ void gf2x_mul_r(unsigned long * c,
             }
             ptr = ptr + i;
         }
+    }
+    if (pool == NULL) {
+        gf2x_mul_pool_clear(xpool);
     }
 end_of_gf2x_mul_r:
     if (dst && dst != c) {

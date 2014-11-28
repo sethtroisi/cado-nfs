@@ -6,9 +6,9 @@
 #At the end, we will optain in the directory 'res_matrix' some files
 #where each file is a set of optimal strategies for a pair (r0,r1).
 
-fbb0=$1 # say 27
+lim0=$1 # say 2^27
 mfb0=$2 # say 110
-fbb1=$3 # say 29
+lim1=$3 # say 2^29
 mfb1=$4 # say 110
 
 #the directory where the strategies related on each value of r were
@@ -22,7 +22,7 @@ let "r0=0"
 while [ $r0 -le $mfb0 ]; do
 let "r1=0"
 while [ $r1 -le $mfb1 ]; do
-./gst -gst -mfb0 $mfb0 -fbb0 $fbb0 -mfb1 $mfb1 -fbb1 $fbb1 -r0 $r0 -r1 $r1 -in $in -out $out &
+./gst -gst -mfb0 $mfb0 -lim0 $lim0 -mfb1 $mfb1 -lim1 $lim1 -r0 $r0 -r1 $r1 -in $in -out $out &
 let "r1 = r1 + 1"
 done
 let "r0 = r0 + 1"

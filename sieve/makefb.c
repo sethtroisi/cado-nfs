@@ -415,7 +415,7 @@ main (int argc, char *argv[])
 
   param_list_init(pl);
   declare_usage(pl);
-  cado_poly_init(cpoly);
+  cado_poly_init(cpoly, 2); // FIXME: asap
 
   argv++, argc--;
   for( ; argc ; ) {

@@ -3526,7 +3526,7 @@ int main(int argc, char **argv)
         usage();
     /* }}} */
 
-    cado_poly_init(glob.pol);
+    cado_poly_init(glob.pol, 2); // FIXME: asap
     ret = cado_poly_read(glob.pol, param_list_lookup_string(pl, "polyfile"));
     glob.n = glob.pol->alg->deg;
     ASSERT_ALWAYS(ret == 1);

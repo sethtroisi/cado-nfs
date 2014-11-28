@@ -57,7 +57,7 @@ int main(int argc0, char *argv0[])
 	usage(argv0[0]);
     }
 
-    cado_poly_init(pol);
+    cado_poly_init(pol, 2); // FIXME: asap
     ASSERT_ALWAYS((polyfilename =
 		   param_list_lookup_string(pl, "poly")) != NULL);
     if (!cado_poly_read(pol, polyfilename)) {

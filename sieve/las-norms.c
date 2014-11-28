@@ -48,7 +48,6 @@ uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
                          "subq %[offset], %[jmp]\n"
                          "shrq $0x08, %[n]\n"
                          "jmpq *%[jmp]\n"
-                         
                          ".p2align 4\n 1:\n"
                          "addq $0x100, %[S]\n"
                          "subq $0x01,%[n]\n"
@@ -129,7 +128,6 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
                          "subq %[offset], %[jmp]\n"
                          "shrq $0x08, %[n]\n"
                          "jmpq *%[jmp]\n"
-                         
                          ".p2align 4\n 1:\n"
                          "addq $0x100, %[S]\n"
                          "subq $0x01,%[n]\n"
@@ -174,7 +172,7 @@ size_t stos_vs_write128 () {
   size_t n, endn, stepn, realn;
   double s_stos, s_cache;
   uintptr_t rS, S;
-  
+
   /* endn must be greater than the biggest cache on all x86 processors:
      128 Mbytes + 4096 + 64 bytes here. */
   endn = 0x8000000;
@@ -184,16 +182,16 @@ size_t stos_vs_write128 () {
   }
   /* S is at the beginning of a 4096 bytes bloc */
   S = (rS + 0xFFF) & ~0xFFF;
-  
+
   stepn = 0;
   /* Careful: never less than 0x5f (minima for memset_rep_stosq),
      and must be a power of 2 */
   for (n = 0x80; n < endn; ) {
-    
+
     realn = (n + stepn * (n >> 2));
     stepn = (stepn + 1 ) & 3;
     if (!stepn) n <<= 1;
-    
+
     stos = ~0;
     for (unsigned int k = 0; k < 4; k++) {
       c = -cputicks();
@@ -202,7 +200,7 @@ size_t stos_vs_write128 () {
       if (c < stos) stos = c;
     }
     s_stos = (double) realn * 0x40 / stos;
-    
+
     cache = ~0;
     for (unsigned int k = 0; k < 3; k++) {
       c = -cputicks();
@@ -229,7 +227,7 @@ size_t direct_write_vs_stos () {
   size_t n, endn, stepn, realn;
   double s_stos, s_not_cache;
   uintptr_t rS, S;
-  
+
   /* endn must be greater than the biggest cache on all x86 processors:
      at least 128 Mbytes + 4096 bytes here. */
   endn = 0x8000000;
@@ -239,7 +237,7 @@ size_t direct_write_vs_stos () {
   }
   /* S is at the beginning of a 4096 bytes bloc */
   S = (rS + 0xFFF) & ~0xFFF;
-  
+
   not_cache = ~0;
   /* I do this 3 times at least and I take the greatest speed */
   for (unsigned int k = 0; k < 3; k++) {
@@ -249,14 +247,14 @@ size_t direct_write_vs_stos () {
     if (c < not_cache) not_cache = c;
   }
   s_not_cache = (double) endn / not_cache;
-  
+
   stepn = 0;
   n = endn;
   do {
     realn = n - (n >> 3) * stepn;
     stepn = (stepn + 1 ) & 3;
     if (!stepn) n >>= 1;
-    
+
     stos = ~0;
     /* 2 times seems OK here to have the greatest speed */
     for (unsigned int k = 0; k < 2; k++) {
@@ -267,9 +265,9 @@ size_t direct_write_vs_stos () {
     }
     s_stos = (double) realn / stos;
     // fprintf(stderr, "n=%zu(%zx); rep stosl=%.2f, direct128=%.2f\n", realn, realn, s_stos, s_not_cache);
-    
+
   } while (s_stos < s_not_cache);
-  
+
   free((void *)rS);
   return (n == endn) ? (size_t) ~0 : realn;
 }
@@ -326,7 +324,7 @@ static inline double lg2abs (double i, double add, double scale) {
 /* Same than previous with the result is duplicated 8 times
    in a "false" double in SSE version, i.e. in a xmm register, or in a 64 bits
    general register in non SSE version, and written at addr[decal].
-   The SSE version has 4 interests: no memory use, no General Register use, 
+   The SSE version has 4 interests: no memory use, no General Register use,
    no xmm -> GR conversion, no * 0x0101010101010101 (3 to 4 cycles) but only
    2 P-instructions (1 cycle).
 */
@@ -338,7 +336,7 @@ MAYBE_UNUSED static inline void w64lg2abs(double i, double add, double scale, ui
 	    "cvtdq2pd      %0,              %0\n"
 	    : "+&x" (i));
   i = (i - add) * scale;
-  __asm__ __volatile__ ( 
+  __asm__ __volatile__ (
 	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
 	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
 	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
@@ -379,7 +377,7 @@ MAYBE_UNUSED static inline void w128lg2abs(__m128d i, const __m128d add, const _
 
 /* This function is for the SSE2 init algebraics, but for the exact initialization.
    Same than previous but return a SSE2 register with only 16 lowest bits are computed
-   as the 2 results (2 8-bits values). 
+   as the 2 results (2 8-bits values).
    CAREFUL! This function returns the computed value in the data i.
    the i value is modified by this function !
 */
@@ -434,7 +432,7 @@ static inline double compute_f (const unsigned int d, const double *u, const dou
    nroots = number of roots.
    roots = the roots of F, F', F", and pseudo root 0.0 added in F roots.
 
-   NEED: 
+   NEED:
    1. roots size must >= 1 + degree  + max (0, degree - 1) + max (0, 2 * degree - 2)
    so degree * 4 + 1.
    2. p & Roots: the biggest polynome is F", degree = 2 * (degree - 1).
@@ -456,18 +454,18 @@ static void set_lg_page()
 
 void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots)
 {
-  
+
   const double_poly_t f = {{ degree, coeff }};
   double_poly_t df, ddf, f_ddf, df_df, d2f;
   mpz_t           p[(degree << 1) + 1];
   root_struct Roots[degree << 1];
   unsigned int n, cumul_nroots;
   size_t k;
-  
+
   set_lg_page();
   for (k = degree << 1, mpz_init (p[k]); k--; mpz_init (p[k]), root_struct_init (&(Roots[k])));
   for (k = degree + 1; k--; mpz_set_d (p[k], coeff[k]));
-    
+
   /* Pseudo root 0.0 is inserted first as a root of F */
   roots[0].derivate = 0;
   roots[0].value = 0.;
@@ -479,18 +477,18 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
 	.derivate = 0, .value = rootRefine (&(Roots[k]), p, degree, precision) } );
     cumul_nroots += n;
-    
+
     /* Computation of F' */
     double_poly_init (df, MAX(0,((int)degree - 1)));
     double_poly_derivative (df, f);
-    
+
     /* The roots of F' are inserted in roots */
     for (k = df->deg + 1; k--; mpz_set_d (p[k], df->coeff[k]));
     n = numberOfRealRoots (p, df->deg, max_abs_root, 0, Roots);
     for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
 	.derivate = 1, .value = rootRefine (&(Roots[k]), p, df->deg, precision) } );
     cumul_nroots += n;
-    
+
     /* Computation of F" */
     double_poly_init (df_df, df->deg + df->deg);
     double_poly_init (ddf, MAX(0,((int)df->deg - 1)));
@@ -500,21 +498,21 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     double_poly_derivative (ddf, df);
     double_poly_product (f_ddf, f, ddf);
     double_poly_subtract (d2f, f_ddf, df_df);
-    
+
     /* The roots of F" are inserted in roots */
     for (k = d2f->deg + 1; k--; mpz_set_d (p[k], d2f->coeff[k]));
     n = numberOfRealRoots (p, d2f->deg, max_abs_root, 0, Roots);
     for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
 	.derivate = 2, .value = rootRefine (&(Roots[k]), p, d2f->deg, precision) } );
     cumul_nroots += n;
-    
+
     /* Clear double poly */
     double_poly_clear(df);
     double_poly_clear(ddf);
     double_poly_clear(f_ddf);
     double_poly_clear(df_df);
     double_poly_clear(d2f);
-    
+
     /* roots must be sort */
     qsort (roots, cumul_nroots, sizeof(root_t), cmp_root);
   }
@@ -560,7 +558,7 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
 
   const int Idiv2 = (int) I >> 1;
   const double Idiv2_double = (double) Idiv2, Idiv2_double_minus_one = Idiv2_double - 1., invu1 = 1./u1;
-  
+
   endJ = LOG_BUCKET_REGION - ctz(I);
   J <<= endJ;
   endJ = (1U << endJ) + J;
@@ -776,7 +774,7 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
 #endif
-      if (LIKELY(ts <= MEMSET_MIN)) 
+      if (LIKELY(ts <= MEMSET_MIN))
 	memset(S, y, MEMSET_MIN);
       else
 	memset(S, y, ts);
@@ -807,7 +805,7 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
 /* Exact initialisation of F(i,j) with degre >= 2 (not mandatory). Slow.
    Internal function, only with simple types, for unit/integration testing. */
 void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd)
-{ 
+{
   unsigned char *beginS = S;
   uint32_t beginJ, endJ = LOG_BUCKET_REGION - ctz (I);
   scale *= 1./0x100000;
@@ -817,7 +815,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
   endJ = (1U << endJ) + J;
 
 #if !defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) || !defined(HAVE_SSSE3) /* Light optimization, only log2 */
-  
+
   for (; J < endJ; J++) {
     const unsigned char *endS = S + I;
     double f, h, u[d+1];
@@ -1082,7 +1080,7 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
    No SSE version: it's completly unreadable, and the gain is not really interesting.
    Internal function, only with simple types, for unit/integration testing */
 void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double original_scale, unsigned int d, double *fijd, unsigned int nroots, root_ptr roots)
-{ 
+{
   ASSERT (d >= 2);
   /* F, F' and F" roots needs stability for their neighbourhood ?
      F roots, sure; F', sure not; F"... maybe. */
@@ -1134,7 +1132,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	g = lg2abs (g, add, scale);
 	sg[nsg].f_begin = sg[nsg].f_end = g;
 	S[ih] = (unsigned char) g;
-      } 
+      }
       else {
 	/* It's a real (non an one-point) segment. */
 	/* Is the root really far after the interesting zone ? Yes -> end of roots */
@@ -1142,7 +1140,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 
 	/* Is the root really far before the interesting zone or is this segment is
 	   included (in all sides) in the previous segment ? Yes -> next root */
-	if (ih < -Idiv2 - SMART_NORM_INFLUENCE || 
+	if (ih < -Idiv2 - SMART_NORM_INFLUENCE ||
 	    ih <= sg[nsg - 1].end - SMART_NORM_STABILITY) continue;
 
 	/* OK, we have the right side to compute, and maybe the left side */
@@ -1153,7 +1151,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	   2. in the previous segment AND [the beginning of the previous segment
    	   is far enough of the root OR this previous segment is the first, so
               its beginning is the beginning of the interesting zone] ? */
-	if (UNLIKELY(ih <= -Idiv2 || (sg[nsg - 1].end >= ih && 
+	if (UNLIKELY(ih <= -Idiv2 || (sg[nsg - 1].end >= ih &&
 				      (nsg == 1 || sg[nsg - 1].begin + SMART_NORM_STABILITY <= ih)))) {
 	  /* OK, this segment and the previous could be fusionned on this left side.
 	     It's not 100% true in fact, but really very probable. */
@@ -1340,7 +1338,7 @@ get_maxnorm_aux (double_poly_srcptr poly, double s)
   /* Look for extrema of the polynomial, i.e., for roots of the derivative */
   const unsigned int nr_roots = double_poly_compute_roots(roots, derivative, s);
 
-  /* now abscissae of all extrema of poly are 0, roots[0], ..., 
+  /* now abscissae of all extrema of poly are 0, roots[0], ...,
      roots[nr_roots-1], s */
   double gmax = fabs (poly->coeff[0]);
   for (unsigned int k = 0; k <= nr_roots; k++)
@@ -1428,7 +1426,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
   for(size_t side = 2 ; side-- ; ) {
     sieve_side_info_ptr s = si->sides[side];
     mpz_poly_clear (s->fij);
-    free(s->fijd); 
+    free(s->fijd);
     free(s->roots);
     s->nroots = 0;
   }
@@ -1441,7 +1439,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
   might include larger a,b-coordinates than a non-slanted image would.
 
   We compute the maximum norm that would occur if we had a perfect lattice
-  basis in the sense that its image forms a rectangle A/2 <= a < A/2, 
+  basis in the sense that its image forms a rectangle A/2 <= a < A/2,
   0 <= b < B, with A/2/B = skew, and A*B = I*J*q (assuming J=I/2 here).
   Thus we have B = A/2/skew, A*A/2/skew = I*I/2*q, A = I*sqrt(q*skew).
   The optimal maximum norm is then the maximum of |F(a,b)| in this rectangle,
@@ -1461,7 +1459,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
   // The value 2.0 seems to be a good compromise. Setting 1.5 reduces the
   // time per relation and number of relations by about 1.5% on a typical
   // RSA704 benchmark.
-  const double fudge_factor = 2.0; 
+  const double fudge_factor = 2.0;
   const double I = (double) (si->I);
   const double q = mpz_get_d(si->doing->p);
   const double skew = si->cpoly->skew;
@@ -1488,9 +1486,9 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
       double_poly_t F;
       F->deg = ps->deg;
       F->coeff = s->fijd;
-      
+
       double v = get_maxnorm_alg (F, I/2, Jmax);
-      
+
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
           double a, b, c;
@@ -1565,8 +1563,8 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
     else
         si->J = si->I >> 1;
 
-    /* Make sure the bucket region size divides the sieve region size, 
-       partly covered bucket regions may lead to problems when 
+    /* Make sure the bucket region size divides the sieve region size,
+       partly covered bucket regions may lead to problems when
        reconstructing p from half-empty buckets. */
     /* Compute number of i-lines per bucket region, must be integer */
     ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
@@ -1591,7 +1589,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
      si->sides[RATIONAL_SIDE]->scale
      si->sides[RATIONAL_SIDE]->cexp2[]
      si->sides[RATIONAL_SIDE]->bound
-     
+
      si->sides[ALGEBRAIC_SIDE]->logmax
      si->sides[ALGEBRAIC_SIDE]->scale
      si->sides[ALGEBRAIC_SIDE]->cexp2[]

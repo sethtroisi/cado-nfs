@@ -152,6 +152,7 @@ gf2x/config/ltsugar.m4
 gf2x/config/ltversion.m4
 gf2x/config/lt~obsolete.m4
 gf2x/config/missing
+gf2x/config/test-driver
 gf2x/configure
 gf2x/configure.ac
 gf2x/fft.c
@@ -1099,6 +1100,9 @@ tests/linalg/bwc/mpfq/mpfq_test_p_8.c
 tests/linalg/bwc/mpfq/mpfq_test_pz.c
 tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
+tests/gf2x/CMakeLists.txt
+tests/gf2x/test_gf2x.sh
+tests/gf2x/test_cantor.c
 config/hwloc.cmake
 config/numa.cmake
 linalg/bwc/cpubinding.conf

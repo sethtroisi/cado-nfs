@@ -127,3 +127,4 @@ sieve/strategies/script_fm.sh
 sieve/strategies/script_mg.sh
 sieve/strategies/script_str.sh
 sieve/strategies/script_str_r.sh
+linalg/bwc/lingen.txt

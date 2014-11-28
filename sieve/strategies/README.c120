@@ -98,12 +98,12 @@ m="ECM-B12"
 
 mkdir decomp_tmp
 
-fbbr=22
+limr=2097152
 x=43
 mfbr=54
 while [ $x -le $mfbr ]
 do
-./gst -gdc -fbb0 $fbbr -mfb0 $x -out decomp_tmp/decomp_${fbbr}_${x}
+./gst -gdc -lim0 $limr -mfb0 $x -out decomp_tmp/decomp_${limr}_${x}
 x=$[$x+1]
 done
 
@@ -111,11 +111,11 @@ cat Data*pt > All_methods
 
 mkdir res_precompt_st
 
-./script_str_r.sh 22 26 54 22 26 53 decomp_tmp All_methods res_precompt_st
+./script_str_r.sh 2097152 26 54 4 decomp_tmp All_methods res_precompt_st
 
 mkdir res_matrix
 
-./script_str.sh 22 54 22 53 res_precompt_st res_matrix
+./script_str.sh 2097152 54 2097152 53 res_precompt_st res_matrix
 
 ./makefb -poly c120.polyselect2.poly -alim 3837507 -maxbits 11 -out c120.roots
 

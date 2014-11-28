@@ -217,7 +217,8 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 						fm_t * zero, tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
-						tabular_fm_t * ecm_rc, int fbb,
+						tabular_fm_t * ecm_rc, 
+						int ncurves, unsigned long lim,
 						int lpb, int r)
 {
     //contains the final result
@@ -225,7 +226,9 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 
     //check the cases where r is trivial!!
     //{{
-    int lim = 2 * fbb - 1;
+    int fbb = ceil (log2 ((double) (lim + 1)));
+    //conflict name lim
+    int lim_is_prime = 2 * fbb - 1;
     /*
       In this case, r is already a prime number!
       We define two zero strategies to manage:
@@ -235,7 +238,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
       fbb^2) or because the lenght of r is impossible (r<fbb).
       - |-> the probability is equal to 0.
     */ 
-    if (r < lim) {
+    if (r < lim_is_prime) {
 	strategy_t *st_zero = strategy_create();
 	strategy_add_fm(st_zero, zero);
 	strategy_set_time(st_zero, 0.0);
@@ -258,10 +261,10 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
     int len_pp1 = pp1->index;
     int len_ecm_m16 = ecm_m16->index;
     int len_ecm_rc = ecm_rc->index;
-    int nb_iteration = 4;
+    //int nb_iteration = 4;
 
     //init strat
-    int len_strat = 3 + nb_iteration;
+    int len_strat = 2 + ncurves;
     strategy_t *strat = strategy_create();
     for (int i = 0; i < len_strat; i++)
 	strategy_add_fm(strat, zero);
@@ -306,9 +309,8 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 		while (ind_ecm_rc < len_ecm_rc &&
 		       ecm_rc->tab[ind_ecm_rc]->proba[0] < current_proba_ecm)
 		    ind_ecm_rc++;
-
 		generate_collect_iter_ecm_rc(zero, ecm_rc, ind_ecm_rc, strat,
-					     3, 0, nb_iteration, init_tab,
+					     3, 0, ncurves, init_tab,
 					     all_strat, fbb, lpb, r);
 
 		//process data to avoid to full the RAM!!!
@@ -380,7 +382,6 @@ static strategy_t *concat_strategies(strategy_t * st1, strategy_t * st2,
   the time to find a non-trivial for each side must be previously
   computed!
  */
-//todo: test this function!
 tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 					    tabular_strategy_t * strat_r1)
 {
@@ -464,9 +465,14 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 				      tabular_fm_t* pm1, tabular_fm_t* pp1,
 				      tabular_fm_t*ecm_m16, tabular_fm_t*ecm_rc,
-				      int fbb0, int lpb0, int mfb0,
-				      int fbb1, int lpb1, int mfb1)
+				      int ncurves,
+				      unsigned long lim0, int lpb0, int mfb0,
+				      unsigned long lim1, int lpb1, int mfb1)
 {
+
+    int fbb0 = ceil (log2 ((double) (lim0 + 1)));
+    int fbb1 = ceil (log2 ((double) (lim1 + 1)));
+
     /*
        allocates the matrix which contains all optimal strategies for
        each couple (r0, r1): r0 is the lenght of the cofactor in
@@ -492,13 +498,13 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
     tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
     ASSERT (data_rat);
 
-    int lim1 = 2 * fbb0 - 1;
+    int lim_is_prime = 2 * fbb0 - 1;
     for (int r0 = 0; r0 <= mfb0; r0++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r0 >= lim1) {
+	if (r0 >= lim_is_prime) {
 	    char name_file[200];
 	    sprintf(name_file,
-		    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);
+		    "%s/decomp_%lu_%d", name_directory_decomp, lim0, r0);
 	    FILE *file = fopen(name_file, "r");
 
 	    tab_decomp = tabular_decomp_fscan(file);
@@ -511,7 +517,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	}
 	data_rat[r0] =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, fbb0, lpb0, r0);
+					ecm_rc, ncurves, lim0, lpb0, r0);
 	tabular_decomp_free(tab_decomp);
     }
 
@@ -519,13 +525,13 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
        read good elements for r_2 in the array data_r1 and compute the
        data for each r_1. So :
      */
-    int lim2 = 2 * fbb1 - 1;
+    lim_is_prime = 2 * fbb1 - 1;
     for (int r1 = 0; r1 <= mfb1; r1++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r1 >= lim2) {
+	if (r1 >= lim_is_prime) {
 	    char name_file[200];
 	    sprintf(name_file,
-		    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1);
+		    "%s/decomp_%lu_%d", name_directory_decomp, lim1, r1);
 	    FILE *file = fopen(name_file, "r");
 
 	    tab_decomp = tabular_decomp_fscan(file);
@@ -539,7 +545,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 
 	tabular_strategy_t *strat_r1 =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, fbb1, lpb1, r1);
+					ecm_rc, ncurves, lim1, lpb1, r1);
 	tabular_decomp_free(tab_decomp);
 
 	for (int r0 = 0; r0 <= mfb0; r0++) {
