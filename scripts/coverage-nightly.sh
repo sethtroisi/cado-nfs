@@ -1,7 +1,23 @@
 #!/usr/bin/env bash
 
+: ${WEBDIR=$HOME/.webdir}
+: ${TARGET_DIRECTORY=$WEBDIR/cado}
 export DIR=`mktemp -d /tmp/cado-cov.XXXXXXXXXXXX`
 F=`mktemp /tmp/cado-cov.local.XXXXXXXXX.sh`
+
+while [ $# -gt 0 ] ; do
+    if [ "$1" = "--thorough" ] ; then
+        CHECKS_EXPENSIVE=1
+    elif [ "$1" = "--target-directory" ] ; then
+        shift
+        TARGET_DIRECTORY="$1"
+    else
+        echo "Unexpected argument: $1" >&2
+        exit 1
+    fi
+    shift
+done
+
 
 doit() {
     set -e
@@ -12,12 +28,17 @@ doit() {
     CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
     CXXFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
 EOF
+    if [ "$CHECKS_EXPENSIVE" ] ; then
+        cat >> $F <<EOF
+CHECKS_EXPENSIVE=1
+EOF
+    fi
     export LOCALFILE=$F
     $HOME/NFS/cado/scripts/nightly-test all check
     cd $DIR
     geninfo --no-checksum --ignore-errors gcov,source -q --output-filename $DIR/cado-nfs.info  ./ --no-external
-    rm -rf ~/.webdir/cado/ || :
-    genhtml   -o ~/.webdir/cado/ $DIR/cado-nfs.info
+    rm -rf "$TARGET_DIRECTORY"/ || :
+    genhtml   -o "$TARGET_DIRECTORY"/ $DIR/cado-nfs.info
 }
 
 rc=0
