@@ -843,7 +843,9 @@ void parallelizing_info_decl_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "interleaving", "whether we should start two interleaved sets of threads. Only supported by some programs, has no effect on others.");
     param_list_decl_usage(pl, "only_mpi", "replace threads by distinct MPI jobs");
 
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
     cpubinding_decl_usage(pl);
+#endif
 }
 /*}}}*/
 
@@ -856,7 +858,9 @@ void parallelizing_info_lookup_parameters(param_list_ptr pl)/*{{{*/
     param_list_lookup_string(pl, "interleaving");
     param_list_lookup_string(pl, "only_mpi");
 
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
     cpubinding_lookup_parameters(pl);
+#endif
 }
 /*}}}*/
 
