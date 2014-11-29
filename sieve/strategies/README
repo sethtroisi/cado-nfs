@@ -7,60 +7,51 @@ Some binaries are available in this directory :
   2- benchfm
   3- gst
   4- finalst
+
 Firstly, gfm allows to choose the optimal parameters (B1, B2) for each
 factoring methods (PM1, PP1-27, PP1-65, ECM-M12, ECM-M16, ECM-B12) to
-find a prime number in [2^lb, 2^ub]. Potentially, there are innumerable
-couples of parameters.
-
-So, you can specify the sieve region that you want to test with several
-options:
+find a prime number in [2^(lb-1), 2^ub]. Potentially, there are
+innumerable couples of parameters. So, you can specify the sieve
+region that you want to test with several options:
    - b1min, b1_max, b1step
    - cmin, cmax, cstep (where c equal to B2/B1).
 
+Remark: An example is given by the script script_fm.sh
+------
+
 Now, you have got your optimal parameters for each type of factoring
-methods for different intervals of prime numbers. In the context of the
-sieving step, the goal is to define strategies to find quickly the most
-relations. Before choosing these strategies, you must do a benchmark over
-your factoring methods to know exatly what is the probability and the cost
-to find a prime number of certain bit size.
+methods. In the context of the sieving step, the goal is to define
+strategies to find quickly the most relations. Before choosing these
+strategies, you must do a benchmark over your factoring methods to
+know exatly what is the probability and the cost to find a prime
+number of certain bit size.
 
 To do this, the binary benchfm is available. In input, you give a file
 with factoring methods, and you can compute the probabilities and/or
-the time for each one of them.
+the time for each one of them. 
 
-TODO: a filter is doing to allow to keep only a number of factoring methods!!!
+Remark: An example is given by the script script_bench.sh
+------
+
+Note that you consider to have so much methods, you can use the option
+-f of the binary ./bench to keep only a certain number of factoring
+methods.
 
 
-file format :
--------------
+output file format :
+------------------
 m c B1 B2 | p propa_p proba_(p+1) ...  | c1 c2 c3 c4 |
 etc... one line equals to one factoring method.
 where:
   - m denotes a type of method and c denotes the curve
     (PM1=1 0, PP1-27=2 0, PP1-65=3 0, ECM-M12=4 1, ECM-M16=4 2, ECM-B12=4 0)
   - B1 et B2 are the parameters of the factoring method.
-  - p is the bit size of prime number that we start to bench
-  - p_i is the probabiliy to find a prime number of i bits size.
+  - p is the bit size of prime number that we start to bench.
+  - proba_i is the probabiliy to find a prime number of i bits size.
   - ci is the runtime for various input sizes:
-(c1 (resp. c2 c3 c4) for an integer to MODREDCUL_MAXBITS, (resp. 
-MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and MODREDC2UL2_MAXBITS+30) bits size.
+ (c1 (resp. c2 c3 c4) for an integer to MODREDCUL_MAXBITS, (resp. 
+ MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and MODREDC2UL2_MAXBITS+30) bits size.
 
-In what follows, we give usage examples:
-
-For examples, you could search optimal parameters with:
-./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 100 -b1max 500 -b1step 50 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_1
-./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 500 -b1max 2000 -b1step 50 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_2
-./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 2000 -b1max 5000 -b1step 100 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_3
-
-Then, we concatenate our data, and compute the convex hull:
-cat Data_PM1_1 Data_PM1_2 Data_PM1_3 > Data_PM1
-./gfm -fch -fch_in Data_PM1 -fch_out Data_PM1_ch
-
-Finally, to bench the found methods, you can use the following command :
-./benchfm -in Data_PM1_ch -p -t -out Data_PM1_ch_pt
-
-Note that these commands are just an example to illustrate the different
-usages of our binaries.
 
 
 /*****************************************************************************/
@@ -84,39 +75,49 @@ Firsly, you should precompute all decompositions of cofactors of less than mfb
 bits given that  it has no prime divisors less than fbb. To do it, assuming you
 have created a directory decomp_tmp/:
 
-./gst -gdc -fbb0 20 -mfb0 39 -out decomp_tmp/decomp_20_39
+#524288 = 2^19
+./gst -gdc -lim0 524288 -mfb0 39 -out decomp_tmp/decomp_524288_39
 # Note the product of two 20-bit primes can have 39 or 40 bits
-./gst -gdc -fbb0 20 -mfb0 40 -out decomp_tmp/decomp_20_40
-cat decomp_tmp/decomp_20_40
+./gst -gdc -lim0 524288 -mfb0 40 -out decomp_tmp/decomp_524288_40
+cat decomp_tmp/decomp_524288_40
 [ 20, 20 ] : 451299262.762625
 [ 20, 21 ] : 1122087524.990350
-./gst -gdc -fbb0 20 -mfb0 41 -out decomp_tmp/decomp_20_41
-./gst -gdc -fbb0 20 -mfb0 42 -out decomp_tmp/decomp_20_42
-./gst -gdc -fbb0 20 -mfb0 43 -out decomp_tmp/decomp_20_43
+./gst -gdc -lim0 524288 -mfb0 41 -out decomp_tmp/decomp_524288_41
+./gst -gdc -lim0 524288 -mfb0 42 -out decomp_tmp/decomp_524288_42
+./gst -gdc -lim0 524288 -mfb0 43 -out decomp_tmp/decomp_524288_43
 etc ... until mfb!
 
-Secondly, you should distribute the precomputation of strategies for each
-size and side. An example is given by the script script_str_r.sh
+Remark: An example is given by the script script_gen_dec.sh
+------
 
-Remark: the files results are stored in the directory 'out' and the format
-name of files is: strategies($fbb)_$r, where fbb is the bit size of the
-factor base bound and r the bit size of the cofactor.
+Secondly, you should distribute the precomputation of strategies for each
+size and side.
+
+Remark: An example is given by the script script_str_r.sh
+------
+
+Note that the files results are stored in the directory 'out' and the
+format name of files is: strategies$lim_$r, where lim is the factor
+base bound and r the bit size of the cofactor.
 
 Then, you merge our results to compute the matrix which stores the
-differents strategies for each pair of bit size (see the script
-'script_str.sh').
+differents strategies for each pair of bit size.
 
-Remark: The format name of files is: strategies_r0_r1, where r0 and r1
+Remark: An example is given by the script script_str.sh
+------
+
+Note that the format name of files is: strategies_r0_r1, where r0 and r1
 are the bit size of the studied pair of cofactors (r0,r1).
 
-Note that: Without options '-gst' or '-gst_r' the binary 'gst' compute
-our matrix of strategies without precompution in several files. For
-more information, see the function generate_matrix() in
+Note that: Without options '-gst' or '-gst_r' the binary 'gst'
+computes our matrix of strategies without precompution. For more
+information, see the function generate_matrix() in
 generate_strategies.c.
 
 
-Note that these different steps stored their results in a file with
-the following format:
+
+output file format :
+------------------
 m  c  b1  b2  side
 m' c' b1' b2' side' 
 etc...
@@ -152,15 +153,16 @@ Where: res_matrix/ is the directory which contains our strategies.
        137.07      is the time (seconds) which allows to obtain the
                    previous pairs of cofactors.
 
-To optain 'file_dec' and the time, one uses las with the option
+To optain 'cofactors.stats' and '137.07', one uses las with the option
 '-stats-cofact' followed by the name of the output file.
 
-For example, if one runs las with:
-./las -I 14 -poly rsa155.poly -q0 30000100 -q1
-30000500 -lim0 16777216 -lim1 16777216 -lpb0 29 -lpb1 29 -mfb0 90
--mfb1 90 -mt 1 -stats-cofact cofactors.stats -fb1 rsa155.roots
+For example, if one runs las with: 
+./makefb -poly rsa155.poly -alim 16777216 -maxbits 13 -out rsa155.roots
+./las -I 14 -poly rsa155.poly -q0 30000100 -q1 30000500 -lim0 16777216
+-lim1 16777216 -lpb0 29 -lpb1 29 -mfb0 90 -mfb1 90 -mt 1 -stats-cofact
+cofactors.stats -fb1 rsa155.roots
 
-And optains:
+one optains:
 # Total cpu time 373.77s [norm 0.29+1.3, sieving 81.9
 (37.7 + 4.4 + 39.8), factor 290.2 (53.5 + 236.7)]
 
@@ -186,3 +188,8 @@ and t the average runtime.
 And each [S: m, b1, b2] is a factoring method given by the
 method m and these parameters b1 and b2, and S is the side where
 this factoring method is apply (S0 for r0 and S1 for r1).
+
+
+
+Remark: an example of this procedure is given in README.commands.
+------

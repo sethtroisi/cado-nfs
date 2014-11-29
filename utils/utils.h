@@ -46,5 +46,6 @@
 #include "stats.h"
 #include "lll.h"
 #include "verbose.h"
+#include "lognorm_skewness.h"
 
 #endif	/* CADO_UTILS_H_ */

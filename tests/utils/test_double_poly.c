@@ -23,7 +23,7 @@ parse_poly_str (double_poly_ptr poly, const char *str)
     if (sscanf(next, "%lf", &coeff) != 1)
       break;
     if (poly) {
-      ASSERT_ALWAYS((unsigned int) i <= poly->deg);
+      ASSERT_ALWAYS(i <= poly->deg);
       poly->coeff[i] = coeff;
     }
     i++;
