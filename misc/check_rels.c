@@ -413,7 +413,7 @@ main (int argc, char * argv[])
     /* Update parameter list at least once to register argc/argv pointers. */
     param_list_update_cmdline (pl, &argc, &argv);
     /* print command-line arguments */
-    verbose_set_enabled_flags(pl);
+    verbose_interpret_parameters(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 

@@ -15,7 +15,7 @@
 #include "params.h"
 #include "portability.h"
 #include "misc.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "async.h"
 #include "filenames.h"
 #include "xymats.h"
@@ -193,34 +193,44 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 }
 
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./dispatch <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr ys\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
+
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches */
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters: none here (so far). */
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
+    // param_list_clear(pl);
+
 
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
 
     /* Forcibly disable interleaving here */
+    /* TODO: don't do it that way ! */
     param_list_add_key(pl, "interleaving", "0", PARAMETER_FROM_CMDLINE);
-
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
 
     catch_control_signals();
     pi_go(dispatch_prog, pl, 0);
+
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+
+    bw_common_clear_new(bw);
 
     return 0;
 }

@@ -10,7 +10,7 @@
 #include "xymats.h"
 #include "portability.h"
 #include "misc.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "async.h"
 #include "filenames.h"
 #include "xdotprod.h"
@@ -353,32 +353,36 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 }
 
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./krylov <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval start ys\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches: none here (so far). */
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters */
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
-
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
-
     catch_control_signals();
 
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
+
     pi_go(krylov_prog, pl, 0);
+
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
 
     return 0;
 }

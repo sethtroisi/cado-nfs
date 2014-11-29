@@ -13,7 +13,6 @@
 #include "filenames.h"
 #include "bw-common.h"
 #include "params.h"
-// #include "balancing.h"
 #include "misc.h"
 
 
@@ -25,69 +24,78 @@ int splits[MAXSPLITS + 1];
 
 int force = 0;
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./splits <options> [--split-y|--split-f] splits=0,<n1>,<n2>,...\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg n\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
-    FILE ** files;
-    mpz_t p;
-    // balancing bal;
-
-    mpz_init_set_ui(p, 2);
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    /* {{{ declare local parameters and switches */
+    param_list_decl_usage(pl, "force",
+            "overwrite output files if already present");
+    param_list_decl_usage(pl, "splits",
+            "sub-ranges into which the input file should be split");
+    param_list_decl_usage(pl, "binary-ratio",
+            "number of bytes per field element (fractional, e.g. 1/8)");
+    param_list_decl_usage(pl, "ifile",
+            "input file");
+    param_list_decl_usage(pl, "ofile-fmt",
+            "output file pattern (expects two %u's)");
     param_list_configure_switch(pl, "--force", &force);
-    bw_common_init(bw, pl, &argc, &argv);
+    /* }}} */
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+
+    
+    FILE ** files;
     int nsplits;
-    nsplits = param_list_parse_int_list(pl, "splits", splits, MAXSPLITS, ",");
-
-    /* one byte of data contains 8 elements of the field we are
-     * considering
-     */
-    int scale[2] = {1, 8};      /* default for binary */
-
-    param_list_parse_mpz(pl, "prime", p);
-    int bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(p, 2), 64);
-    if (mpz_cmp_ui(p, 2) > 0) {
-        scale[0] = bits_per_coeff/8;
-        scale[1] = 1;
-    }
-    mpz_clear(p);
-
-    param_list_parse_int_and_int(pl, "binary-ratio", scale, "/");
-
-    /*
-    const char * balancing_filename = param_list_lookup_string(pl, "balancing");
-    if (!balancing_filename) {
-        fprintf(stderr, "Required argument `balancing' is missing\n");
-        usage();
-    }
-    balancing_read_header(bal, balancing_filename);
-    */
-
+    int scale[2] = {1, 8};      /* default for binary: one byte of data
+                                   contains 8 elements of the field we
+                                   are considering */
+    int bits_per_coeff;
     char * ifile = NULL;
     char * ofile_fmt = NULL;
 
-    const char * tmp;
-    if ((tmp = param_list_lookup_string(pl, "ifile")) != NULL)
-        ifile = strdup(tmp);
-    if ((tmp = param_list_lookup_string(pl, "ofile-fmt")) != NULL)
-        ofile_fmt = strdup(tmp);
+    /* {{{ interpret our parameters */
+    {
+        nsplits = param_list_parse_int_list(pl, "splits", splits, MAXSPLITS, ",");
 
-    ASSERT_ALWAYS(ifile);
-    ASSERT_ALWAYS(ofile_fmt);
+        bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(bw->p, 2), 64);
+        if (mpz_cmp_ui(bw->p, 2) > 0) {
+            scale[0] = bits_per_coeff/8;
+            scale[1] = 1;
+        }
 
-    if (param_list_warn_unused(pl)) usage();
+        param_list_parse_int_and_int(pl, "binary-ratio", scale, "/");
+
+        const char * tmp;
+        if ((tmp = param_list_lookup_string(pl, "ifile")) != NULL)
+            ifile = strdup(tmp);
+        if ((tmp = param_list_lookup_string(pl, "ofile-fmt")) != NULL)
+            ofile_fmt = strdup(tmp);
+
+        ASSERT_ALWAYS(ifile);
+        ASSERT_ALWAYS(ofile_fmt);
+    }
+    /* }}} */
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
+
+
+    param_list_clear(pl);
+
+
     if (nsplits <= 0) {
         fprintf(stderr, "Please indicate the splitting points\n");
-        usage();
+        param_list_print_usage(pl, argv[0], stderr);
+        exit(EXIT_FAILURE);
     }
 
     files = malloc(nsplits * sizeof(FILE *));
@@ -98,7 +106,7 @@ int main(int argc, char * argv[])
     }
     if (splits[nsplits-1] != bw->n) {
         fprintf(stderr, "last split does not coincide with configured n\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     for(int i = 0 ; i < nsplits ; i++) {
@@ -112,7 +120,7 @@ int main(int argc, char * argv[])
     struct stat sbuf[1];
     if (stat(ifile, sbuf) < 0) {
         perror(ifile);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     if ((sbuf->st_size) % (splits[nsplits]*scale[0]/scale[1]) != 0) {
@@ -132,17 +140,17 @@ int main(int argc, char * argv[])
         rc = stat(fname, sbuf);
         if (rc == 0 && !force) {
             fprintf(stderr,"%s already exists\n", fname);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (rc == 0 && force) { unlink(fname); }
         if (rc < 0 && errno != ENOENT) {
             fprintf(stderr,"%s: %s\n", fname, strerror(errno));
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         rc = link(ifile, fname);
         if (rc < 0) {
             fprintf(stderr,"%s: %s\n", fname, strerror(errno));
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         free(fname);
     } else
@@ -152,7 +160,7 @@ int main(int argc, char * argv[])
         FILE * f = fopen(ifile, "rb");
         if (f == NULL) {
             fprintf(stderr,"%s: %s\n", ifile, strerror(errno));
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         for(int i = 0 ; i < nsplits ; i++) {
@@ -161,17 +169,17 @@ int main(int argc, char * argv[])
             rc = stat(fname, sbuf);
             if (rc == 0 && !force) {
                 fprintf(stderr,"%s already exists\n", fname);
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             if (rc == 0 && force) { unlink(fname); }
             if (rc < 0 && errno != ENOENT) {
                 fprintf(stderr,"%s: %s\n", fname, strerror(errno));
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             files[i] = fopen(fname, "wb");
             if (files[i] == NULL) {
                 fprintf(stderr,"%s: %s\n", fname, strerror(errno));
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             free(fname);
         }
@@ -182,7 +190,7 @@ int main(int argc, char * argv[])
             rc = fread(ptr, 1, splits[nsplits]*scale[0]/scale[1], f);
             if (rc != splits[nsplits]*scale[0]/scale[1] && rc != 0) {
                 fprintf(stderr, "Unexpected short read\n");
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             if (rc == 0)
                 break;
@@ -194,7 +202,7 @@ int main(int argc, char * argv[])
                 rc = fwrite(q, 1, d, files[i]);
                 if (rc != d) {
                     fprintf(stderr, "short write\n");
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
                 q += d;
             }
@@ -205,12 +213,11 @@ int main(int argc, char * argv[])
         fclose(f);
     }
 
-    param_list_clear(pl);
-    bw_common_clear(bw);
     free(files);
-
     free(ifile);
     free(ofile_fmt);
+
+    bw_common_clear_new(bw);
 
     return 0;
 }

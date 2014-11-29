@@ -8,7 +8,7 @@
 #include "parallelizing_info.h"
 #include "select_mpi.h"
 #include "params.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "portability.h"
 #include "misc.h"
@@ -89,21 +89,27 @@ void * shell_prog(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * 
     return NULL;
 }
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./shell <options> -- <shell command>\n");
-    fprintf(stderr, "Relevant options: wdir cfg mpi thr\n");
-    fprintf(stderr, "Executes <shell command> plus row and column indices\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
     param_list_add_key(pl, "mn", "0", PARAMETER_FROM_FILE);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    // if (param_list_warn_unused(pl)) usage();
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+
+    param_list_warn_unused(pl);
+    
+    /* not sure what I should do with this
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    } */
 
     command_argc = argc;
     command_argv = argv;
@@ -111,7 +117,8 @@ int main(int argc, char * argv[])
     pi_go(shell_prog, pl, 0);
 
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
+
     return 0;
 }
 

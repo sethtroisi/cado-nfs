@@ -6,7 +6,7 @@
 #include "select_mpi.h"
 #include "params.h"
 #include "xvectors.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
@@ -169,17 +169,27 @@ void usage()
 int main(int argc, char * argv[])
 {
     param_list pl;
-    param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
+    bw_common_init_new(bw, &argc, &argv);
+    param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
     pi_go(tst_prog, pl, 0);
 
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
+
     return 0;
 }
 

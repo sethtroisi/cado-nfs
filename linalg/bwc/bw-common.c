@@ -12,32 +12,16 @@
 #include "bw-common.h"
 #include "params.h"
 #include "filenames.h"
-#include "portability.h"
 #include "utils.h"
+#include "select_mpi.h"
+#include "timing.h"
+#include "portability.h"
+
 
 
 struct bw_params bw[1];
 
 const char * dirtext[] = { "left", "right" };
-
-/* Has to be defined by the program */
-extern void usage();
-
-int bw_common_init_defaults(struct bw_params * bw)
-{
-    /*** defaults ***/
-    memset(bw, 0, sizeof(*bw));
-    bw->interval = 1000;
-    bw->can_print = 1;
-    bw->ys[0] = bw->ys[1] = -1;
-    bw->dir = 1;
-    bw->mpi_split[0] = bw->mpi_split[1] = 1;
-    bw->thr_split[0] = bw->thr_split[1] = 1;
-
-    bw->checkpoints = 1;
-
-    return 0;
-}
 
 typedef int (*sortfunc_t) (const void*, const void*);
 
@@ -46,8 +30,72 @@ static int intcmp(const int * a, const int * b)
     return (*a>*b)-(*b>*a);
 }
 
+void bw_common_decl_usage(param_list pl)/*{{{*/
+{
+    /* We declare here the doc parameters which are parsed *in this file* !  */
 
-int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
+    /* {{{ Parameters related to the problem we are solving */
+    param_list_decl_usage(pl, "prime", "prime defining the field over which we work");
+    param_list_decl_usage(pl, "nullspace", "whether we solve xM=0 (nullspace=left), or Mx=0 (nullspace=right). Default is left for p=2, right for p>2.");
+    /* }}} */
+
+    /* {{{ general BW parameters */
+    param_list_decl_usage(pl, "mn", "set the block Wiedemann parameters m and n to the same given value");
+    param_list_decl_usage(pl, "m", "set the block Wiedemann parameter m to this value");
+    param_list_decl_usage(pl, "n", "set the block Wiedemann parameter n to this value");
+    /* }}} */
+
+    /* {{{ Parameters which are related to the interaction with the OS */
+    param_list_decl_usage(pl, "wdir", "working directory, created if it does not exist. All file accesses are relative to this directory.");
+    param_list_decl_usage(pl, "cfg", "path to a file containing more parameters to be interpreted.");
+    param_list_decl_usage(pl, "seed", "set seed for all pseudo-random number generation");
+    param_list_decl_usage(pl, "v", "More verbose output");
+    /* }}} */
+
+    /* {{{ Parameters related to checkpoints for krylov/mksol */
+    param_list_decl_usage(pl, "interval", "frequency of the checkpoints within kkrylov/mksol");
+    param_list_decl_usage(pl, "start", "start krylov or mksol at this checkpoint");
+    param_list_decl_usage(pl, "end", "end krylov or mksol at this checkpoint");
+    param_list_decl_usage(pl, "skip_online_checks", "skip consistency checks after each iteration. Use at your own risk.");
+    param_list_decl_usage(pl, "keep_rolling_checkpoints", "keep only this number of checkpoints, and remove the others");
+    param_list_decl_usage(pl, "keep_checkpoints_younger_than", "assuming keep_rolling_checkpoints is on, keep some checkpoints nevertheless if recent enough");
+    param_list_decl_usage(pl, "checkpoint_precious", "assuming keep_rolling_checkpoints is on, never delete checkpoints of index which is a multiple of that number");
+    param_list_decl_usage(pl, "yes_i_insist", "do what I say, even it seems stupid or dangerous");
+    param_list_decl_usage(pl, "check_stops", "for secure, create check files for all these values of the interval. This enables checking more checkpoint files against eachother, once offline checking is functional.");
+    /* }}} */
+
+    /* {{{ Parameters related to multi-sequences */
+    param_list_decl_usage(pl, "ys", "indicates which sequence(s) should be worked on. Syntax is <n0>..<n1> for working with vectors of indices i with n0<=i<n1, with of course 0<=n0<n1<=n.");
+    param_list_decl_usage(pl, "nsolvecs", "for mksol and gather, produce this many independent solutions. Default is n");
+    /* }}} */
+
+    verbose_decl_usage(pl);
+}
+/*}}}*/
+
+#if 0
+const char * bw_common_usage_string()
+{
+    static char t[]=
+        "Common options:\n"
+        "\twdir=<path>\tchdir to <path> beforehand\n"
+        "\tcfg=<file>\timport many settings from <file>\n"
+        "\tm=<int>\tset bw->m blocking factor\n"
+        "\tn=<int>\tset bw->n blocking factor\n"
+        "\tmn=<int>\tset both bw->m and bw->n (exclusive with the two above)\n"
+        "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpiexec\n"
+        "\tthr=<int>x<int>\tset number of threads.\n"
+        "\tcheckpoints=<bool>\tsave checkpoints.\n"
+        "\tmatrix=<filename>\tset matrix\n"
+        "\tinterval=<int>\tset checking bw->interval\n"
+        "\tseed=<int>\tseed value for picking random numbers\n"
+        "\tys=<int>..<int>\tcoordinate range for krylov/mksol task\n"
+        ;
+    return t;
+}
+#endif
+
+void bw_common_parse_cmdline(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)/*{{{*/
 {
     bw->original_argc = *p_argc;
     bw->original_argv = *p_argv;
@@ -62,15 +110,20 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
             break;
         }
         fprintf(stderr, "Unhandled parameter %s\n", (*p_argv)[0]);
-        usage();
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(1);
     }
-
-    verbose_set_enabled_flags(pl);
 
     if (bw->can_print) {
         param_list_print_command_line(stderr, pl);
         param_list_print_command_line(stdout, pl);
     }
+}
+/*}}}*/
+
+void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
+{
+    verbose_interpret_parameters(pl);
 
     const char * tmp;
 
@@ -92,14 +145,11 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     }
 
 
-    param_list_parse_intxint(pl, "mpi", bw->mpi_split);
-    param_list_parse_intxint(pl, "thr", bw->thr_split);
     param_list_parse_int(pl, "seed", &bw->seed);
     param_list_parse_int(pl, "interval", &bw->interval);
     param_list_parse_int_and_int(pl, "ys", bw->ys, "..");
     param_list_parse_int(pl, "start", &bw->start);
     param_list_parse_int(pl, "end", &bw->end);
-    param_list_parse_int(pl, "checkpoints", &bw->checkpoints);
     param_list_parse_int(pl, "skip_online_checks", &bw->skip_online_checks);
     param_list_parse_int(pl, "keep_rolling_checkpoints", &bw->keep_rolling_checkpoints);
     param_list_parse_int(pl, "keep_checkpoints_younger_than", &bw->keep_checkpoints_younger_than);
@@ -116,10 +166,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
         }
         fprintf(stderr, " Proceeding anyway\n");
     }
-
-    param_list_lookup_string(pl, "matrix");
-    param_list_lookup_string(pl, "balancing");
-
 
     mpz_init_set_ui(bw->p, 2);
     param_list_parse_mpz(pl, "prime", bw->p);
@@ -182,7 +228,8 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     okn += param_list_parse_int(pl, "n", &bw->n);
     if (!okm || !okn) {
         fprintf(stderr, "parameter m and/or n is missing\n");
-        usage();
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
     }
     bw->nsolvecs = bw->n;
     param_list_parse_int(pl, "nsolvecs", &bw->nsolvecs);
@@ -201,58 +248,103 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     }
     qsort(bw->check_stops, bw->number_of_check_stops, sizeof(int), (sortfunc_t) &intcmp);
 
-
-
     if (bw->verbose && bw->can_print)
         param_list_display (pl, stderr);
+}
+/*}}}*/
 
-    /* Force lookup of parameters that are used late in the process. This
-     * has the effect of eliminating possible warnings. */
-    param_list_lookup_string(pl, "mm_impl");
-
-    param_list_lookup_string(pl, "l1_cache_size");
-    param_list_lookup_string(pl, "cache_line_size");
-
-    param_list_lookup_string(pl, "mm_threaded_nthreads");
-    param_list_lookup_string(pl, "mm_threaded_sgroup_size");
-    param_list_lookup_string(pl, "mm_threaded_offset1");
-    param_list_lookup_string(pl, "mm_threaded_offset2");
-    param_list_lookup_string(pl, "mm_threaded_offset3");
-    param_list_lookup_string(pl, "mm_threaded_densify_tolerance");
-    param_list_lookup_string(pl, "mm_store_transposed");
-    param_list_lookup_string(pl, "interleaving");
-
-    param_list_lookup_string(pl, "rebuild_cache");
-    param_list_lookup_string(pl, "sequential_cache_build");
-    param_list_lookup_string(pl, "sequential_cache_load");
-    param_list_lookup_string(pl, "local_cache_copy_dir");
-    param_list_lookup_string(pl, "matmul_bucket_methods");
-    param_list_lookup_string(pl, "sequence");   // for lingen
-    param_list_lookup_string(pl, "rhs");  // for prep
-    param_list_lookup_string(pl, "rhscoeffs");  // for gather
-    param_list_lookup_string(pl, "save_submatrices");
-    param_list_lookup_string(pl, "export_cachelist");
-    param_list_lookup_string(pl, "sanity_check_vector");
-    param_list_lookup_string(pl, "cpubinding");
-    param_list_lookup_string(pl, "only_mpi");
-    param_list_lookup_string(pl, "balancing_queue_size");
-    param_list_lookup_string(pl, "random_matrix");
-    param_list_lookup_string(pl, "no_save_cache");
+static int bw_common_init_defaults(struct bw_params * bw)/*{{{*/
+{
+    /*** defaults ***/
+    memset(bw, 0, sizeof(*bw));
+    bw->interval = 1000;
+    bw->can_print = 1;
+    bw->ys[0] = bw->ys[1] = -1;
+    bw->dir = 1;
 
     return 0;
 }
+/*}}}*/
 
-int bw_common_init(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
+int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
 {
+    /* First do MPI_Init */
+#if defined(MPI_LIBRARY_MT_CAPABLE)
+    int req = MPI_THREAD_MULTIPLE;
+    int prov;
+    MPI_Init_thread(p_argc, p_argv, req, &prov);
+    if (req != prov) {
+        fprintf(stderr, "Cannot init mpi with MPI_THREAD_MULTIPLE ;"
+                " got %d != req %d\n",
+                prov, req);
+        exit(1);
+    }
+#if 0   /* was: elif OMPI_VERSION_ATLEAST(1,8,2) */
+    /* This is just a try, right. In practice, we do rely on the
+     * SERIALIZED model, so let's at least do as we cared about telling
+     * the MPI implementation about it.
+     */
+    int req = MPI_THREAD_SERIALIZED;
+    int prov;
+    MPI_Init_thread(p_argc, p_argv, req, &prov);
+    if (req != prov) {
+        fprintf(stderr, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
+                " got %d != req %d\n",
+                prov, req);
+        exit(1);
+    }
+#endif  /* #if 0 */
+#else
+    MPI_Init(p_argc, p_argv);
+#endif
+    int rank;
+    int size;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
     bw_common_init_defaults(bw);
-    return bw_common_init_shared(bw, pl, p_argc, p_argv);
-}
 
-int bw_common_clear(struct bw_params * bw)
-{
-    mpz_clear(bw->p);
+    bw->can_print = rank == 0 || getenv("CAN_PRINT");
+
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
+
     return 0;
 }
+/*}}}*/
+int bw_common_clear_new(struct bw_params * bw)/*{{{*/
+{
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    double wct = wct_seconds() - bw->wct_base;
+    double cpu = seconds();
+    char * ptr = strrchr(bw->original_argv[0], '/');
+    if (ptr) {
+        ptr++;
+    } else {
+        ptr = bw->original_argv[0];
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &cpu, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    if (bw->can_print) {
+        /* valgrind has a tendency to complain about this code depending
+         * on unitialized data in the variable "cpu". This is most
+         * probably due to MPI_Allreduce, and there's not much we can do,
+         * unfortunately.
+         */
+        printf("Timings for %s: wct=%.2f cpu=%.2f (aggregated over %d threads and %d MPI jobs)\n",
+                ptr,
+                wct, cpu,
+                bw->thr_split[0] * bw->thr_split[1],
+                size);
+    }
+    mpz_clear(bw->p);
+    MPI_Finalize();
+    return 0;
+}/*}}}*/
+
+
 
 int get_rhs_file_header_stream(FILE * f, uint32_t * p_nrows, unsigned int * p_nrhs, mpz_ptr p_p)
 {
@@ -288,22 +380,3 @@ int get_rhs_file_header(const char * filename, uint32_t * p_nrows, unsigned int 
     return rc;
 }
 
-const char * bw_common_usage_string()
-{
-    static char t[]=
-        "Common options:\n"
-        "\twdir=<path>\tchdir to <path> beforehand\n"
-        "\tcfg=<file>\timport many settings from <file>\n"
-        "\tm=<int>\tset bw->m blocking factor\n"
-        "\tn=<int>\tset bw->n blocking factor\n"
-        "\tmn=<int>\tset both bw->m and bw->n (exclusive with the two above)\n"
-        "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpiexec\n"
-        "\tthr=<int>x<int>\tset number of threads.\n"
-        "\tcheckpoints=<bool>\tsave checkpoints.\n"
-        "\tmatrix=<filename>\tset matrix\n"
-        "\tinterval=<int>\tset checking bw->interval\n"
-        "\tseed=<int>\tseed value for picking random numbers\n"
-        "\tys=<int>..<int>\tcoordinate range for krylov/mksol task\n"
-        ;
-    return t;
-}

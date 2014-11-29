@@ -98,6 +98,43 @@
 #define alignable_free(p,s)  free((p))
 #endif
 
+void matmul_top_decl_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "matrix",
+            "the matrix file (binary)");
+    param_list_decl_usage(pl, "balancing",
+            "the matrix balancing file, as computed by mf_bal");
+    param_list_decl_usage(pl, "random_matrix",
+            "characteristics of a random matrix to be used for staged runs.");
+
+    param_list_decl_usage(pl, "rebuild_cache",
+            "force rebuilding matrix caches");
+    param_list_decl_usage(pl, "export_cachelist",
+            "print the per-node needed cache files and exit");
+    param_list_decl_usage(pl, "save_submatrices",
+            "after dispatching, save a copy of the local uncompressed matrix before creating the cache file");
+    param_list_decl_usage(pl, "sequential_cache_build",
+            "build the cache files sequentially on each node");
+    param_list_decl_usage(pl, "sequential_cache_read",
+            "read the cache files sequentially on each node");
+    balancing_decl_usage(pl);
+    matmul_decl_usage(pl);
+}
+
+void matmul_top_lookup_parameters(param_list_ptr pl)
+{
+    param_list_lookup_string(pl, "matrix");
+    param_list_lookup_string(pl, "balancing");
+    param_list_lookup_string(pl, "random_matrix");
+
+    param_list_lookup_string(pl, "rebuild_cache");
+    param_list_lookup_string(pl, "export_cachelist");
+    param_list_lookup_string(pl, "save_submatrices");
+    param_list_lookup_string(pl, "sequential_cache_build");
+    param_list_lookup_string(pl, "sequential_cache_read");
+    balancing_lookup_parameters(pl);
+    matmul_lookup_parameters(pl);
+}
 
 /* {{{ vector init/clear (generic low-level interface) */
 void vec_init_generic(pi_wiring_ptr picol, mpfq_vbase_ptr abase, mmt_vec_ptr v, int flags, unsigned int n)
@@ -2187,14 +2224,14 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl
 
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction)
 {
-    const char * impl = param_list_lookup_string(pl, "mm_impl");
     int rebuild = 0;
     param_list_parse_int(pl, "rebuild_cache", &rebuild);
 
     mmt->mm = matmul_init(mmt->abase,
             mmt->wr[0]->i1 - mmt->wr[0]->i0,
             mmt->wr[1]->i1 - mmt->wr[1]->i0,
-            mmt->locfile, impl, pl, optimized_direction); 
+            mmt->locfile, NULL  /* means: choose mm_impl from pl */,
+            pl, optimized_direction); 
 
     mmt->mm->nslices[1] = mmt->bal->h->nh;
     mmt->mm->nslices[0] = mmt->bal->h->nv;
@@ -2263,8 +2300,13 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         // may cause the direct or transposed ordering to be preferred.
         // Thus we have to read this back from the mm structure.
         m->transpose = mmt->mm->store_transposed;
-        m->withcoeffs = param_list_lookup_string(pl, "prime") != NULL && strcmp(param_list_lookup_string(pl, "prime"), "2") != 0;
-
+        {
+            mpz_t p;
+            mpz_init(p);
+            mmt->abase->field_characteristic(mmt->abase, p);
+            m->withcoeffs = mpz_cmp_ui(p, 2) != 0;
+            mpz_clear(p);
+        }
         if (param_list_lookup_string(pl, "random_matrix")) {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Begin creation of fake matrix data in parallel\n");
