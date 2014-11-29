@@ -2724,8 +2724,6 @@ int main(int argc, char *argv[])
 {
     bmstatus bm;
     dims * d = bm->d;
-    int global_flag_tune = 0;
-    int global_flag_ascii = 0;
 
     param_list pl;
 
