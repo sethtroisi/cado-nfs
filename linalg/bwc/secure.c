@@ -6,10 +6,11 @@
 #include "select_mpi.h"
 #include "params.h"
 #include "xvectors.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "async.h"
 #include "portability.h"
 
 /*
@@ -219,30 +220,35 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 }
 
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./secure <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches: none here (so far). */
 
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters */
+    catch_control_signals();
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
     pi_go(sec_prog, pl, 0);
 
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
     return 0;
 }
 

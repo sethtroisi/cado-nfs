@@ -15,7 +15,7 @@
 #include "xvectors.h"
 #include "portability.h"
 #include "misc.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "balancing.h"
 #include "mpfq/mpfq.h"
@@ -487,30 +487,41 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 }
 
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./gather <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    fprintf(stderr, "All S* files are taken in wdir. Spurious leftover data may corrupt result !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
-    param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
+    bw_common_init_new(bw, &argc, &argv);
+    param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches: none here (so far). */
+    param_list_decl_usage(pl, "rhs",
+            "file with the right-hand side vectors for inhomogeneous systems mod p (only the header is read by this program)");
+    param_list_decl_usage(pl, "rhscoeffs",
+            "for the solution vector(s), this corresponds to the contribution(s) on the columns concerned by the rhs");
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters: none here (so far). */
+    param_list_lookup_string(pl, "rhs");
+    param_list_lookup_string(pl, "rhscoeffs");
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
     pi_go(gather_prog, pl, 0);
 
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
+
     return exitcode;
 }
 

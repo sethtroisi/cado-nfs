@@ -10,7 +10,7 @@
 #include "params.h"
 #include "xvectors.h"
 #include "xymats.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
@@ -358,36 +358,43 @@ leave_prep_prog_gfp:
     return NULL;
 }
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./prep <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix\n");
-    exit(EXIT_FAILURE);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
-    param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
-    
+    bw_common_init_new(bw, &argc, &argv);
+    param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches */
+    param_list_decl_usage(pl, "rhs",
+            "file with the right-hand side vectors for inhomogeneous systems mod p");
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters: none here (so far). */
+    if (mpz_cmp_ui(bw->p, 2) != 0)
+        param_list_lookup_string(pl, "rhs");
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
+
     if (mpz_cmp_ui(bw->p, 2) == 0) {
         pi_go(prep_prog, pl, 0);
     } else {
         pi_go(prep_prog_gfp, pl, 0);
     }
 
-    param_list_remove_key(pl, "sequential_cache_build");
-    param_list_remove_key(pl, "rebuild_cache");
-
     param_list_clear(pl);
+    bw_common_clear_new(bw);
 
-    bw_common_clear_mpi(bw);
     return 0;
 }
 

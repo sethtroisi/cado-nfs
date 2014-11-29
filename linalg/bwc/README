@@ -200,8 +200,6 @@ Some more internal parameters.
   Note that when ys is different from 0..n, then computation only involves
   some of the needed subsequences, not all -- and all subsequences must be
   computed.
-* checkpoints=[0|1] deprecated. Do not use. Note that this flag is NOT
-  used for krylov/mksol, which always store checkpoints.
 * splits=<number1>,<number2>,... Only for the auxilary program ``split''.
   Splits Y0-<n> (or equivalently F) in files V<number1>-<number2>.*,
   V<number2>-<number3>.*, to prepare for several independent subsequence

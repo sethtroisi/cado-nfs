@@ -29,6 +29,21 @@
 
 using namespace std;
 
+void cpubinding_decl_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "input-topology-file",
+            "simulated topology, only for testing");
+    param_list_decl_usage(pl, "input-topology-string",
+            "simulated topology, only for testing");
+    param_list_decl_usage(pl, "cpubinding", "path to a cpubinding.conf file, or explicit CPU binding string");
+}
+
+void cpubinding_lookup_parameters(param_list_ptr pl)
+{
+    param_list_lookup_string(pl, "cpubinding");
+}
+
+
 /* {{{ sugar */
 template<class T> invalid_argument operator<<(invalid_argument const& i, T const& a)
 {
@@ -635,7 +650,7 @@ class cpubinder {
     cpubinder&operator=(cpubinder const&) = delete;
     cpubinder(ostream& os) : os(os) { hwloc_topology_init(&topology); }
     ~cpubinder() { hwloc_topology_destroy(topology); }
-    void read_param_list(param_list pl, int want_conf_file);
+    void read_param_list(param_list_ptr pl, int want_conf_file);
     bool find(thread_split const& thr);
     void force(thread_split const& ,const char * desc);
     void set_permissive_binding();
@@ -645,7 +660,7 @@ class cpubinder {
 };
 
 
-void cpubinder::read_param_list(param_list pl, int want_conf_file)
+void cpubinder::read_param_list(param_list_ptr pl, int want_conf_file)
 {
     /* the first two arguments here are not parsed in the cado-nfs
      * context. It's only used by the helper binary I have for testing
@@ -980,11 +995,10 @@ void cpubinder::stage()
 
 void * cpubinding_get_info(char ** messages, param_list_ptr pl, int ttt[2])
 {
+    const char * conf = param_list_lookup_string(pl, "cpubinding");
     thread_split thr(ttt);
 
-    const char * cmdline_provided = param_list_lookup_string(pl, "cpubinding");
-
-    if (cmdline_provided && (strcmp(cmdline_provided, "no") == 0 || strcmp(cmdline_provided, "none")==0)) {
+    if (conf && (strcmp(conf, "no") == 0 || strcmp(conf, "none")==0)) {
         if (messages) {
             *messages = strdup("cpubinding disabled by cmdline switch\n");
         }
@@ -999,12 +1013,12 @@ void * cpubinding_get_info(char ** messages, param_list_ptr pl, int ttt[2])
 
     cpubinder * cb = new cpubinder(os);
 
-    int force = cmdline_provided && (strstr(cmdline_provided, "=>") || strcmp(cmdline_provided, "remove") == 0 || strlen(cmdline_provided) == 0);
+    int force = conf && (strstr(conf, "=>") || strcmp(conf, "remove") == 0 || strlen(conf) == 0);
 
     try {
         cb->read_param_list(pl, !force);
         if (force) {
-            cb->force(thr, cmdline_provided);
+            cb->force(thr, conf);
             cb->stage();
         } else if (cb->find(thr)) {
             cb->stage();

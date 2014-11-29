@@ -93,6 +93,10 @@ struct matmul_public_s {
 extern "C" {
 #endif
 
+extern void matmul_decl_usage(param_list_ptr pl);
+
+extern void matmul_lookup_parameters(param_list_ptr pl);
+
 /* This is defined only in the low-level code (e.g. matmul-bucket.cpp) */
 extern const char * matmul_mpfq_name();
 

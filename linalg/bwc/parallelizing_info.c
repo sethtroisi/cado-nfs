@@ -306,8 +306,6 @@ static void display_process_grid(parallelizing_info_ptr pi)
 static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 {
     int err;
-    int mpi[2] = { 1, 1, };
-    int thr[2] = { 1, 1, };
 
     memset(pi, 0, sizeof(parallelizing_info));
 
@@ -329,8 +327,13 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 #endif
 
+    int mpi[2] = {1,1};
+    int thr[2] = {1,1};
+    int only_mpi = 0;
+
     param_list_parse_intxint(pl, "mpi", mpi);
     param_list_parse_intxint(pl, "thr", thr);
+    param_list_parse_int(pl, "only_mpi", &only_mpi);
 
     unsigned int nhj = mpi[0];
     unsigned int nvj = mpi[1];
@@ -343,9 +346,6 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
     // MPI_Errhandler my_eh;
     // MPI_Comm_create_errhandler(&pi_errhandler, &my_eh);
     // MPI_Comm_set_errhandler(MPI_COMM_WORLD, my_eh);
-
-    int only_mpi=0;
-    param_list_parse_int(pl, "only_mpi", &only_mpi);
 
     if (only_mpi) {
         int grank;
@@ -836,7 +836,33 @@ void * pi_load_generic(parallelizing_info_ptr pi, unsigned long key, unsigned lo
     return r;
 }
 
-void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
+void parallelizing_info_decl_usage(param_list pl)/*{{{*/
+{
+    param_list_decl_usage(pl, "mpi", "number of MPI nodes across which the execution will span, with mesh dimensions");
+    param_list_decl_usage(pl, "thr", "number of threads (on each node) for the program, with mesh dimensions");
+    param_list_decl_usage(pl, "interleaving", "whether we should start two interleaved sets of threads. Only supported by some programs, has no effect on others.");
+    param_list_decl_usage(pl, "only_mpi", "replace threads by distinct MPI jobs");
+
+    cpubinding_decl_usage(pl);
+}
+/*}}}*/
+
+void parallelizing_info_lookup_parameters(param_list_ptr pl)/*{{{*/
+{
+    /* These will all be looked later (within this file, though).
+     */
+    param_list_lookup_string(pl, "mpi");
+    param_list_lookup_string(pl, "thr");
+    param_list_lookup_string(pl, "interleaving");
+    param_list_lookup_string(pl, "only_mpi");
+
+    cpubinding_lookup_parameters(pl);
+}
+/*}}}*/
+
+
+void pi_go(
+        void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         param_list pl,
         void * arg)
 {

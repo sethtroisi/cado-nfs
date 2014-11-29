@@ -49,9 +49,10 @@ struct {
 
 uint64_t verbose_flag_word;
 
+
 /* This must be called in single-threaded context, preferably at program
  * start */
-void verbose_set_enabled_flags(param_list pl)
+void verbose_interpret_parameters(param_list pl)
 {
     verbose_flag_word = ~0UL;
 
@@ -100,10 +101,9 @@ void verbose_set_enabled_flags(param_list pl)
     free(w);
 }
 
-int verbose_decl_usage(param_list pl)
+void verbose_decl_usage(param_list pl)
 {
     param_list_decl_usage(pl, "verbose_flags", "fine grained control on which messages get printed");
-    return 1;
 }
 
 /* returns true if the following verbose flag is enabled */

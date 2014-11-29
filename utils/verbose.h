@@ -31,7 +31,7 @@ typedef int (*vfprintf_func_t)(FILE *, const char *, va_list);
 
 /* This must be called in single-threaded context, preferably at program
  * start */
-extern void verbose_set_enabled_flags(param_list pl);
+extern void verbose_interpret_parameters(param_list pl);
 
 extern int verbose_enabled(int flag);
 extern int verbose_vfprintf(FILE * f, int flag, const char * fmt, va_list ap);
@@ -42,7 +42,7 @@ int verbose_output_init(size_t);
 int verbose_output_clear();
 int verbose_output_add(size_t, FILE *, int);
 int verbose_output_print(size_t, int, const char *, ...) ATTR_PRINTF (3, 4);
-int verbose_decl_usage(param_list pl);
+extern void verbose_decl_usage(param_list pl);
 FILE *verbose_output_get(size_t, int, size_t);
 int verbose_output_vfprint(size_t, int, vfprintf_func_t, const char *, ...);
 

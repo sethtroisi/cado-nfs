@@ -33,7 +33,6 @@
 
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
-#include "bw-common-mpi.h"
 #include "filenames.h"
 #include "plingen.h"
 #include "plingen-tuning.h"
@@ -81,6 +80,9 @@ static int save_gathered_checkpoints = 0;
 int rank0_exit_code = EXIT_SUCCESS;
 
 
+int global_flag_ascii = 0;
+int global_flag_tune = 0;
+
 struct bmstatus_s {
     dims d[1];
     unsigned int t;
@@ -101,6 +103,62 @@ struct bmstatus_s {
 typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
 
+void plingen_decl_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "ascii",
+            "read and write data in ascii");
+    param_list_decl_usage(pl, "timings",
+            "provide timings on all output lines");
+    param_list_decl_usage(pl, "tune",
+            "activate tuning mode");
+
+    /* we must be square ! And thr is not supported. */
+    param_list_decl_usage(pl, "mpi", "number of MPI nodes across which the execution will span, with mesh dimensions");
+    param_list_decl_usage(pl, "thr", "number of threads (on each node) for the program, with mesh dimensions");
+
+    param_list_decl_usage(pl, "nrhs",
+            "number of columns to treat differently, as corresponding to rhs vectors");
+    param_list_decl_usage(pl, "rhs",
+            "file with rhs vectors (only the header is read)");
+    param_list_decl_usage(pl, "rhscoeffs_file",
+            "file to which the contribution f the solution vectors to RHS coefficients is stored");
+
+    param_list_decl_usage(pl, "afile",
+            "input sequence file");
+    param_list_decl_usage(pl, "random-input-with-length",
+            "use surrogate for input");
+    param_list_decl_usage(pl, "random_seed",
+            "seed the random generator");
+    param_list_decl_usage(pl, "ffile",
+            "output generator file");
+
+    param_list_decl_usage(pl, "caching",
+            "whether we should use transform caching");
+    param_list_decl_usage(pl, "caching-threshold",
+            "threshold for transform caching");
+    param_list_decl_usage(pl, "checkpoint-directory",
+            "where to save checkpoints");
+    param_list_decl_usage(pl, "checkpoint-threshold",
+            "threshold for saving checkpoints");
+    param_list_decl_usage(pl, "display-threshold",
+            "threshold for outputting progress lines");
+    param_list_decl_usage(pl, "io-block-size",
+            "chunk size for reading the input or writing the output");
+
+    param_list_decl_usage(pl, "lingen-mpi-threshold",
+            "use MPI matrix operations above this size");
+    param_list_decl_usage(pl, "lingen-threshold",
+            "use recursive algorithm above this size");
+    param_list_decl_usage(pl, "save_gathered_checkpoints",
+            "save global checkpoints files, instead of per-job files");
+
+    param_list_configure_switch(pl, "--tune", &global_flag_tune);
+    param_list_configure_switch(pl, "--ascii", &global_flag_ascii);
+    param_list_configure_switch(pl, "--timings", &with_timings);
+    param_list_configure_alias(pl, "seed", "random_seed");
+
+    plingen_tuning_decl_usage(pl);
+}
 
 /*{{{ statistics for projected running time. One global struct. */
 struct tree_level_stats_s {
@@ -2666,22 +2724,23 @@ int main(int argc, char *argv[])
 {
     bmstatus bm;
     dims * d = bm->d;
-    int tune = 0;
-    int ascii = 0;
+    int global_flag_tune = 0;
+    int global_flag_ascii = 0;
 
-    setvbuf(stdout, NULL, _IONBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
-
-    gmp_randinit_default(rstate);
-
-    /* {{{ Parameter list. Feed the common bw[] struct */
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
 
-    param_list_configure_switch(pl, "--tune", &tune);
-    param_list_configure_switch(pl, "--ascii", &ascii);
-    param_list_configure_switch(pl, "--timings", &with_timings);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
+    bw_common_decl_usage(pl);
+    plingen_decl_usage(pl);
+    logline_decl_usage(pl);
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    /* {{{ interpret our parameters */
+    gmp_randinit_default(rstate);
 
     int rank;
     int size;
@@ -2703,13 +2762,9 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "no n value set\n");
 	exit(EXIT_FAILURE);
     }
-    if (!tune && !(afile || random_input_length)) {
+    if (!global_flag_tune && !(afile || random_input_length)) {
         fprintf(stderr, "No afile provided\n");
         exit(EXIT_FAILURE);
-    }
-    if (!param_list_lookup_string(pl, "prime")) {
-	fprintf(stderr, "no prime set\n");
-	exit(EXIT_FAILURE);
     }
 
     /* we allow ffile and ffile to be both NULL */
@@ -2723,12 +2778,12 @@ int main(int argc, char *argv[])
     }
     ASSERT_ALWAYS((afile==NULL) == (ffile == NULL));
 
-    tmp = param_list_lookup_string(pl, "rhsfile");
-    char * rhsfile = NULL;
+    tmp = param_list_lookup_string(pl, "rhscoeffs_file");
+    char * rhscoeffs_file = NULL;
     if (tmp) {
-        rhsfile = strdup(tmp);
+        rhscoeffs_file = strdup(tmp);
     } else if (afile) {
-        int rc = asprintf(&rhsfile, "%s.gen.rhs", afile);
+        int rc = asprintf(&rhscoeffs_file, "%s.gen.rhs", afile);
         ASSERT_ALWAYS(rc >= 0);
     }
 
@@ -2755,13 +2810,7 @@ int main(int argc, char *argv[])
     abdst_field ab = d->ab;
 
     abfield_init(ab);
-    {
-	mpz_t p;
-	mpz_init_set_ui(p, 2);
-	param_list_parse_mpz(pl, "prime", p);
-	abfield_specify(ab, MPFQ_PRIME_MPZ, p);
-	mpz_clear(p);
-    }
+    abfield_specify(ab, MPFQ_PRIME_MPZ, bw->p);
     abmpi_ops_init(ab);
 
     bm->lingen_threshold = 10;
@@ -2773,11 +2822,7 @@ int main(int argc, char *argv[])
 #endif
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
     param_list_parse_uint(pl, "io-block-size", &(io_block_size));
-    {
-        unsigned long random_seed = 0;
-        param_list_parse_ulong(pl, "random_seed", &random_seed);
-        gmp_randseed_ui(rstate, random_seed);
-    }
+    gmp_randseed_ui(rstate, bw->seed);
     if (bm->lingen_mpi_threshold < bm->lingen_threshold) {
         bm->lingen_mpi_threshold = bm->lingen_threshold;
         fprintf(stderr, "Argument fixing: setting lingen-mpi-threshold=%u (because lingen-threshold=%u)\n",
@@ -2874,15 +2919,16 @@ int main(int argc, char *argv[])
 
     /* plingen tuning accepts some arguments. We look them up so as to
      * avoid failures down the line */
-    param_list_lookup_string(pl, "B");
-    param_list_lookup_string(pl, "catchsig");
+    plingen_tuning_lookup_parameters(pl);
     
-    logline_parse_params(pl);
+    logline_interpret_parameters(pl);
 
-    if (param_list_warn_unused(pl))
-	usage();
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
-    if (tune) {
+    if (global_flag_tune) {
         plingen_tuning(bm->d->ab, bm->d->m, bm->d->n, bm->com[0], pl);
         MPI_Finalize();
         return 0;
@@ -2894,7 +2940,7 @@ int main(int argc, char *argv[])
      * that non-root nodes essentially do nothing while the master job
      * does the I/O stuff) */
     bm_io aa;
-    bm_io_init(aa, bm, afile, ffile, rhsfile, ascii);
+    bm_io_init(aa, bm, afile, ffile, rhscoeffs_file, global_flag_ascii);
     bm_io_begin_read(aa);
     bm_io_guess_length(aa);
 
@@ -2974,13 +3020,13 @@ int main(int argc, char *argv[])
     abmpi_ops_clear(ab);
     abfield_clear(ab);
     bmstatus_clear(bm);
-    bw_common_clear(bw);
-    param_list_clear(pl);
     if (ffile) free(ffile);
 
     gmp_randclear(rstate);
 
-    MPI_Finalize();
+    param_list_clear(pl);
+    bw_common_clear_new(bw);
+
     return rank0_exit_code;
 }
 

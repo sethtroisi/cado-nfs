@@ -86,7 +86,6 @@ set(bwc_base_sources
     intersections.c
     xvectors.c
     bw-common.c
-    bw-common-mpi.c
     async.c
     rolling.c
     matmul.c
@@ -368,7 +367,6 @@ endif(WITH_MPIR)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(plingen_${v}_sources
         bw-common.c
-        bw-common-mpi.c
         plingen.c
         plingen-tuning.cpp
         logline.c

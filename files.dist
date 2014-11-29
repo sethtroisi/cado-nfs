@@ -271,8 +271,6 @@ linalg/bwc/balancing_workhorse.h
 linalg/bwc/bcast-file.c
 linalg/bwc/bench.c
 linalg/bwc/build.c
-linalg/bwc/bw-common-mpi.c
-linalg/bwc/bw-common-mpi.h
 linalg/bwc/bw-common.c
 linalg/bwc/bw-common.h
 linalg/bwc/bwc-ptrace.m

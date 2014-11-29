@@ -5,6 +5,9 @@
 extern "C" {
 #endif
 
+void cpubinding_decl_usage(param_list_ptr);
+void cpubinding_lookup_parameters(param_list_ptr pl);
+
 /* This returns an opaque pointer to data which will be used to perform
  * the actual cpu binding. This function must be called in
  * single-threaded context.
