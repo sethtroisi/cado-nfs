@@ -359,7 +359,7 @@ main (int argc, char *argv[])
   ASSERT_ALWAYS(H);
   memset (H, 0, K * sizeof (uint32_t));
 
-  cado_poly_init (cpoly, 2); // FIXME: asap
+  cado_poly_init (cpoly);
   if (!cado_poly_read (cpoly, polyfilename)) {
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);

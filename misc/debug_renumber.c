@@ -68,7 +68,7 @@ main (int argc, char *argv[])
       usage (pl, argv0);
     }
 
-    cado_poly_init(cpoly, 2);
+    cado_poly_init(cpoly);
 #ifndef FOR_FFS
     if (!cado_poly_read (cpoly, polyfilename))
 #else

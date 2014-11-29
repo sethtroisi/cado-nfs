@@ -1,4 +1,4 @@
-/* Usage: roots -poly xxx.poly -q <q>
+/* Usage: roots -poly xxx.poly -q <q> [-side <side>]
    prints the roots of the polynomial mod q
  */
 
@@ -13,8 +13,9 @@
 
 void usage(const char *argv0)
 {
-    fprintf(stderr, "Usage: %s -poly xxx.poly -q <q>\n", argv0);
-    fprintf(stderr, "prints the roots of the polynomial mod q\n");
+    fprintf(stderr, "Usage: %s -poly xxx.poly -q <q> [-side <side>]\n", argv0);
+    fprintf(stderr, "prints the roots of polynomial[side] mod q");
+    fprintf(stderr, " (default side is ALGEBRAIC)\n");
     exit(1);
 }
 
@@ -57,7 +58,7 @@ int main(int argc0, char *argv0[])
 	usage(argv0[0]);
     }
 
-    cado_poly_init(pol, 2); // FIXME: asap
+    cado_poly_init(pol);
     ASSERT_ALWAYS((polyfilename =
 		   param_list_lookup_string(pl, "poly")) != NULL);
     if (!cado_poly_read(pol, polyfilename)) {

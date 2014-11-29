@@ -635,7 +635,7 @@ int main(int argc, char **argv)
     heavyblockname = param_list_lookup_string(pl, "heavyblock");
     bw_kernel_file = param_list_lookup_string(pl, "ker");
 
-    cado_poly_init (pol, 2); // FIXME: asap
+    cado_poly_init (pol);
 
     const char * tmp;
 

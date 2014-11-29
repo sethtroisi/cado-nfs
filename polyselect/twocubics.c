@@ -1220,8 +1220,8 @@ main (int argc, char *argv[])
 
   mpz_init (N);
   mpz_init (maxS);
-  cado_poly_init (best_poly, 2); // FIXME: asap
-  cado_poly_init (curr_poly, 2); // FIXME: asap
+  cado_poly_init (best_poly);
+  cado_poly_init (curr_poly);
 
   /* read params */
   param_list pl;

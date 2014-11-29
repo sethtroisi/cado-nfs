@@ -40,7 +40,7 @@ main (int argc, char **argv)
     mpz_init(m);
     if (argc != 3)
         usage_and_die (argv0[0]);
-    cado_poly_init (poly, 2); // FIXME: asap
+    cado_poly_init (poly);
     if (!cado_poly_read(poly, argv[1])) {
         fprintf(stderr, "Problem when reading file %s\n", argv[1]);
         usage_and_die (argv0[0]);

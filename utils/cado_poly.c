@@ -12,15 +12,16 @@ const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
 
-void cado_poly_init(cado_poly poly, int nb_polys)
+/* Be conservative and allocate two polynomials by default. */
+void cado_poly_init(cado_poly poly)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly[0]));
     poly->rat = poly->pols[RATIONAL_SIDE];
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
-    poly->nb_polys = nb_polys;
-    for(int side = 0 ; side < nb_polys ; side++)
+    poly->nb_polys = 2;
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_init (poly->pols[side], MAXDEGREE);
 
     mpz_init_set_ui(poly->n, 0);
@@ -47,31 +48,53 @@ cado_poly_set (cado_poly p, cado_poly q)
 }
 
 // This function is no longer exported
+#define BUF_MAX 10000
+
 static
 int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;
     int have_f[NB_POLYS_MAX][(MAXDEGREE + 1)];
-    int i;
+    int i, nb_polys = 2, new_coding = 0;
 
     for(i = 0; i < NB_POLYS_MAX; i++)
 	have_f[i][0] = 0;
-    poly->nb_polys = 2; // TODO: update this asap
 
-    have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
+    have_n = param_list_parse_mpz(pl, "n", poly->n) 
+	     || param_list_parse_mpz(pl, NULL, poly->n);
     poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
                          it is not given */
     param_list_parse_double(pl, "skew", &(poly->skew));
-    for (i = 0; i < (MAXDEGREE + 1); i++) {
-        char tag[4];
-        snprintf(tag, sizeof(tag), "c%d", i);
-        have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-        if (!have_f[ALGEBRAIC_SIDE][i]) {
-            snprintf(tag, sizeof(tag), "X%d", i);
-            have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-        }
-        snprintf(tag, sizeof(tag), "Y%d", i);
-        have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
+
+#if 0 // TODO
+    for(i = 0; i < NB_POLYS_MAX; i++){
+	char tag[5], buf[BUF_MAX];
+	snprintf(tag, sizeof(tag), "poly%d", i);
+	if(param_list_parse_string(pl, tag, buf, BUF_MAX)){
+	    new_coding = 1;
+	    fprintf(stderr, "Read %s\n", buf);
+	    nb_polys = i+1;
+	}
+	else
+	    break;
+    }
+    exit(1);
+#endif
+
+    poly->nb_polys = nb_polys;
+    if(new_coding == 0){
+	/* reading polynomials coefficient by coefficient */
+	for (i = 0; i < (MAXDEGREE + 1); i++) {
+	    char tag[4];
+	    snprintf(tag, sizeof(tag), "c%d", i);
+	    have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+	    if (!have_f[ALGEBRAIC_SIDE][i]) {
+		snprintf(tag, sizeof(tag), "X%d", i);
+		have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+	    }
+	    snprintf(tag, sizeof(tag), "Y%d", i);
+	    have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
+	}
     }
 
     for(int side = 0 ; side < poly->nb_polys ; side++) {

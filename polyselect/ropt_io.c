@@ -482,7 +482,7 @@ print_poly_info_short ( mpz_t *f,
   F->deg = d;
 
   cado_poly cpoly;
-  cado_poly_init(cpoly, 2); // FIXME: asap
+  cado_poly_init(cpoly);
   for (i = 0; i < (d + 1); i++) {
     mpz_set(cpoly->alg->coeff[i], f[i]);
   }

@@ -1213,7 +1213,7 @@ int main(int argc, char *argv[])
         usage(pl, me, stderr);
         exit(1);
     }
-    cado_poly_init(pol, 2); // FIXME: asap
+    cado_poly_init(pol);
     ret = cado_poly_read(pol, tmp);
     if (ret == 0) {
         fprintf(stderr, "Could not read polynomial file\n");

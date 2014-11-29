@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
       }
     if (argc != 4)
         usage_and_die(argv[0]);
-    cado_poly_init (poly, 2); // FIXME: asap
+    cado_poly_init (poly);
     if (!cado_poly_read(poly, argv[1])) {
         fprintf(stderr, "Problem when reading file %s\n", argv[1]);
         usage_and_die(argv[0]);

@@ -8,8 +8,8 @@ test_cado_poly_set ()
 {
   cado_poly p, q;
 
-  cado_poly_init (p, 2);
-  cado_poly_init (q, 2);
+  cado_poly_init (p);
+  cado_poly_init (q);
 
   const double s = 3.1415;
 

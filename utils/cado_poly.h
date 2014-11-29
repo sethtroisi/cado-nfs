@@ -44,7 +44,7 @@ extern int cado_poly_read (cado_poly_ptr, const char *filename);
 extern int cado_poly_read_stream (cado_poly_ptr, FILE *);
 extern void cado_poly_set (cado_poly_ptr p, cado_poly_ptr q);
 
-extern void cado_poly_init (cado_poly_ptr, int nb_polys);
+extern void cado_poly_init (cado_poly_ptr);
 extern void cado_poly_clear (cado_poly_ptr);
 
 // Compute m as the common root of f and g mod N.

@@ -2079,7 +2079,7 @@ print_poly_fg (mpz_poly_ptr f, mpz_t *g, mpz_t N, int mode)
    int d = f->deg;
 
    cado_poly cpoly;
-   cado_poly_init(cpoly, 2); // FIXME: asap
+   cado_poly_init(cpoly);
    for (i = 0; i < (d + 1); i++)
       mpz_set(cpoly->alg->coeff[i], f->coeff[i]);
    for (i = 0; i < 2; i++)
