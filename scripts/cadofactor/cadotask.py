@@ -122,6 +122,7 @@ class Polynomials(object):
 
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
+    re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*(?:\(.*\))?\s*=", 1))
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
     
@@ -155,6 +156,19 @@ class Polynomials(object):
                 return True
             return False
 
+        # line = "poly0: 1, 2, 3" => tabpoly[0] = {1, 2, 3} = 1+2*X+3*X^2
+        def match_poly_all(line, tabpoly, regex):
+            match = regex.match(line)
+            if match:
+                line2 = line.split(":")
+                # get index of poly
+                ip = line2[0].split("poly")[1]
+                # get coeffs of 1+2*X+3*X^2
+                line3=line2[1].split(",")
+                tabpoly[ip] = map(int, line3)
+                return True
+            return False
+
         for line in lines:
             # print ("Parsing line: >%s<" % line.strip())
             # If this is a comment line telling the Murphy E value,
@@ -177,6 +191,9 @@ class Polynomials(object):
             # Try to parse polynomial coefficients
             if match_poly(line, polyf, self.re_pol_f) or \
                     match_poly(line, polyg, self.re_pol_g):
+                continue
+            # is it in format "poly*: ..."
+            if match_poly_all(line, [polyg, polyf]):
                 continue
             # All remaining lines must be of the form "x: y"
             array = line2.split(":")
