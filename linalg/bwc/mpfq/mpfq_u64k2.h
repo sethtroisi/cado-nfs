@@ -239,7 +239,7 @@ int mpfq_u64k2_vec_print(mpfq_u64k2_dst_field, mpfq_u64k2_src_vec, unsigned int)
 int mpfq_u64k2_vec_sscan(mpfq_u64k2_dst_field, mpfq_u64k2_vec *, unsigned int *, const char *);
 int mpfq_u64k2_vec_fscan(mpfq_u64k2_dst_field, FILE *, mpfq_u64k2_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */
-#define mpfq_u64k2_vec_scan(K, w, n)	mpfq_u64k2_vec_fscan(K,stdout,w,n)
+#define mpfq_u64k2_vec_scan(K, w, n)	mpfq_u64k2_vec_fscan(K,stdin,w,n)
 void mpfq_u64k2_vec_ur_init(mpfq_u64k2_dst_field, mpfq_u64k2_vec_ur *, unsigned int);
 static inline
 void mpfq_u64k2_vec_ur_set_zero(mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec_ur, unsigned int);
@@ -306,9 +306,9 @@ MPI_Op mpfq_u64k2_mpi_addition_op_ur(mpfq_u64k2_dst_field);
 void mpfq_u64k2_mpi_ops_clear(mpfq_u64k2_dst_field);
 
 /* Object-oriented interface */
-void mpfq_u64k2_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_u64k2_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_u64k2_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

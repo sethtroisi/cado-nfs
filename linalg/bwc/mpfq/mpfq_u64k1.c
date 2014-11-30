@@ -1118,9 +1118,9 @@ void mpfq_u64k1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->fscan = (int (*) (mpfq_vbase_ptr, FILE *, void *)) mpfq_u64k1_wrapper_fscan;
     vbase->scan = (int (*) (mpfq_vbase_ptr, void *)) mpfq_u64k1_wrapper_scan;
     /* missing read */
-    /* missing import */
+    /* missing importdata */
     /* missing write */
-    /* missing export */
+    /* missing exportdata */
     vbase->vec_init = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_u64k1_wrapper_vec_init;
     vbase->vec_reinit = (void (*) (mpfq_vbase_ptr, void *, unsigned int, unsigned int)) mpfq_u64k1_wrapper_vec_reinit;
     vbase->vec_clear = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_u64k1_wrapper_vec_clear;
@@ -1151,9 +1151,8 @@ void mpfq_u64k1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->vec_scan = (int (*) (mpfq_vbase_ptr, void *, unsigned int *)) mpfq_u64k1_wrapper_vec_scan;
     /* missing vec_read */
     /* missing vec_write */
-    /* missing import */
-    /* missing write */
-    /* missing export */
+    /* missing vec_import */
+    /* missing vec_export */
     vbase->vec_ur_init = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_u64k1_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_u64k1_wrapper_vec_ur_set_zero;
     vbase->vec_ur_set_vec = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned int)) mpfq_u64k1_wrapper_vec_ur_set_vec;

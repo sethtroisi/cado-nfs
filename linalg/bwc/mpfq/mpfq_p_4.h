@@ -305,7 +305,7 @@ int mpfq_p_4_vec_print(mpfq_p_4_dst_field, mpfq_p_4_src_vec, unsigned int);
 int mpfq_p_4_vec_sscan(mpfq_p_4_dst_field, mpfq_p_4_vec *, unsigned int *, const char *);
 int mpfq_p_4_vec_fscan(mpfq_p_4_dst_field, FILE *, mpfq_p_4_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::gfp */
-#define mpfq_p_4_vec_scan(K, w, n)	mpfq_p_4_vec_fscan(K,stdout,w,n)
+#define mpfq_p_4_vec_scan(K, w, n)	mpfq_p_4_vec_fscan(K,stdin,w,n)
 void mpfq_p_4_vec_ur_init(mpfq_p_4_dst_field, mpfq_p_4_vec_ur *, unsigned int);
 static inline
 void mpfq_p_4_vec_ur_set_zero(mpfq_p_4_dst_field, mpfq_p_4_dst_vec_ur, unsigned int);
@@ -435,9 +435,9 @@ MPI_Op mpfq_p_4_mpi_addition_op_ur(mpfq_p_4_dst_field);
 void mpfq_p_4_mpi_ops_clear(mpfq_p_4_dst_field);
 
 /* Object-oriented interface */
+void mpfq_p_4_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_4_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_4_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

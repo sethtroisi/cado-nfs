@@ -78,9 +78,9 @@ struct mpfq_vbase_s {
     int (*fscan)(mpfq_vbase_ptr, FILE *, void *);
     int (*scan)(mpfq_vbase_ptr, void *);
     int (*read)(mpfq_vbase_ptr, FILE *, void *);
-    int (*import)(mpfq_vbase_ptr, void *, int, int);
-    int (*write)(mpfq_vbase_ptr, const void *);
-    int (*export)(mpfq_vbase_ptr, const void *, int, int);
+    int (*importdata)(mpfq_vbase_ptr, FILE *, void *, int, int);
+    int (*write)(mpfq_vbase_ptr, FILE *, const void *);
+    int (*exportdata)(mpfq_vbase_ptr, FILE *, const void *, int, int);
     void (*vec_init)(mpfq_vbase_ptr, void *, unsigned int);
     void (*vec_reinit)(mpfq_vbase_ptr, void *, unsigned int, unsigned int);
     void (*vec_clear)(mpfq_vbase_ptr, void *, unsigned int);
@@ -111,9 +111,8 @@ struct mpfq_vbase_s {
     int (*vec_scan)(mpfq_vbase_ptr, void *, unsigned int *);
     int (*vec_read)(mpfq_vbase_ptr, FILE *, void *, unsigned int);
     int (*vec_write)(mpfq_vbase_ptr, FILE *, const void *, unsigned int);
-    int (*import)(mpfq_vbase_ptr, void *, int, int);
-    int (*write)(mpfq_vbase_ptr, const void *);
-    int (*export)(mpfq_vbase_ptr, const void *, int, int);
+    int (*vec_import)(mpfq_vbase_ptr, void *, unsigned int, int, int);
+    int (*vec_export)(mpfq_vbase_ptr, const void *, unsigned int, int, int);
     void (*vec_ur_init)(mpfq_vbase_ptr, void *, unsigned int);
     void (*vec_ur_set_zero)(mpfq_vbase_ptr, void *, unsigned int);
     void (*vec_ur_set_vec)(mpfq_vbase_ptr, void *, const void *, unsigned int);

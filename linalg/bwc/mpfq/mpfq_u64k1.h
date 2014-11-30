@@ -239,7 +239,7 @@ int mpfq_u64k1_vec_print(mpfq_u64k1_dst_field, mpfq_u64k1_src_vec, unsigned int)
 int mpfq_u64k1_vec_sscan(mpfq_u64k1_dst_field, mpfq_u64k1_vec *, unsigned int *, const char *);
 int mpfq_u64k1_vec_fscan(mpfq_u64k1_dst_field, FILE *, mpfq_u64k1_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */
-#define mpfq_u64k1_vec_scan(K, w, n)	mpfq_u64k1_vec_fscan(K,stdout,w,n)
+#define mpfq_u64k1_vec_scan(K, w, n)	mpfq_u64k1_vec_fscan(K,stdin,w,n)
 void mpfq_u64k1_vec_ur_init(mpfq_u64k1_dst_field, mpfq_u64k1_vec_ur *, unsigned int);
 static inline
 void mpfq_u64k1_vec_ur_set_zero(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec_ur, unsigned int);

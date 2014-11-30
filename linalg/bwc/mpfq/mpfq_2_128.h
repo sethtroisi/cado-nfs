@@ -284,7 +284,7 @@ int mpfq_2_128_vec_print(mpfq_2_128_dst_field, mpfq_2_128_src_vec, unsigned int)
 int mpfq_2_128_vec_sscan(mpfq_2_128_dst_field, mpfq_2_128_vec *, unsigned int *, const char *);
 int mpfq_2_128_vec_fscan(mpfq_2_128_dst_field, FILE *, mpfq_2_128_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */
-#define mpfq_2_128_vec_scan(K, w, n)	mpfq_2_128_vec_fscan(K,stdout,w,n)
+#define mpfq_2_128_vec_scan(K, w, n)	mpfq_2_128_vec_fscan(K,stdin,w,n)
 void mpfq_2_128_vec_ur_init(mpfq_2_128_dst_field, mpfq_2_128_vec_ur *, unsigned int);
 static inline
 void mpfq_2_128_vec_ur_set_zero(mpfq_2_128_dst_field, mpfq_2_128_dst_vec_ur, unsigned int);
