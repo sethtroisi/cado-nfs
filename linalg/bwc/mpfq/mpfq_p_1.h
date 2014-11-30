@@ -435,9 +435,9 @@ MPI_Op mpfq_p_1_mpi_addition_op_ur(mpfq_p_1_dst_field);
 void mpfq_p_1_mpi_ops_clear(mpfq_p_1_dst_field);
 
 /* Object-oriented interface */
+void mpfq_p_1_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_1_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_1_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

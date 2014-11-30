@@ -137,6 +137,10 @@
 #define absscan(a0,a1,a2)	abcommon_name_(sscan) (a0,a1,a2)
 #define abfscan(a0,a1,a2)	abcommon_name_(fscan) (a0,a1,a2)
 #define abscan(a0,a1)	abcommon_name_(scan) (a0,a1)
+#define abread(a0,a1,a2)	abcommon_name_(read) (a0,a1,a2)
+#define abimport(a0,a1,a2,a3)	abcommon_name_(import) (a0,a1,a2,a3)
+#define abwrite(a0,a1)	abcommon_name_(write) (a0,a1)
+#define abexport(a0,a1,a2,a3)	abcommon_name_(export) (a0,a1,a2,a3)
 
 
 
@@ -168,6 +172,11 @@
 #define abvec_sscan(a0,a1,a2,a3)	abcommon_name_(vec_sscan) (a0,a1,a2,a3)
 #define abvec_fscan(a0,a1,a2,a3)	abcommon_name_(vec_fscan) (a0,a1,a2,a3)
 #define abvec_scan(a0,a1,a2)	abcommon_name_(vec_scan) (a0,a1,a2)
+#define abvec_read(a0,a1,a2,a3)	abcommon_name_(vec_read) (a0,a1,a2,a3)
+#define abvec_write(a0,a1,a2,a3)	abcommon_name_(vec_write) (a0,a1,a2,a3)
+#define abimport(a0,a1,a2,a3)	abcommon_name_(import) (a0,a1,a2,a3)
+#define abwrite(a0,a1)	abcommon_name_(write) (a0,a1)
+#define abexport(a0,a1,a2,a3)	abcommon_name_(export) (a0,a1,a2,a3)
 #define abvec_ur_init(a0,a1,a2)	abcommon_name_(vec_ur_init) (a0,a1,a2)
 #define abvec_ur_set_zero(a0,a1,a2)	abcommon_name_(vec_ur_set_zero) (a0,a1,a2)
 #define abvec_ur_set_vec(a0,a1,a2,a3)	abcommon_name_(vec_ur_set_vec) (a0,a1,a2,a3)
