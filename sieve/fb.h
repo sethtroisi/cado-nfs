@@ -103,18 +103,25 @@ class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
 };
 
 
+class fb_slices_interface {
+public:
+  virtual void append(const fb_general_entry &) = 0;
+  virtual void fprint(FILE *) = 0;
+  virtual void count_entries(size_t &nprimes, size_t &nroots, double &weight) = 0;
+};
+
 /* The fb_slices class has nr_slices vectors; when appending elements with
    append(), it appends to these vectors in a round-robin fashion. */
 template <int Nr_roots>
-class fb_slices {
+class fb_slices : public fb_slices_interface {
   fb_vector<Nr_roots> *vectors;
   size_t nr_slices, next_slice;
 public:
   fb_slices(size_t nr_slices);
-  void append(const fb_general_entry &);
+  virtual void append(const fb_general_entry &);
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
-  void fprint(FILE *);
-  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
+  virtual void fprint(FILE *);
+  virtual void count_entries(size_t &nprimes, size_t &nroots, double &weight);
 };
 
 
@@ -141,7 +148,21 @@ class fb_part {
   fb_slices<7> *fb7_slices;
   fb_slices<8> *fb8_slices;
   fb_general_vector general_vector;
-  public:
+  fb_slices_interface *choose(const int n) {
+    switch (n) {
+      case 0: return fb0_slices;
+      case 1: return fb1_slices;
+      case 2: return fb2_slices;
+      case 3: return fb3_slices;
+      case 4: return fb4_slices;
+      case 5: return fb5_slices;
+      case 6: return fb6_slices;
+      case 7: return fb7_slices;
+      case 8: return fb8_slices;
+      default: abort();
+    }
+  }
+public:
   fb_part(size_t nr_slices);
   void append(const fb_general_entry &);
   void fprint(FILE *);
