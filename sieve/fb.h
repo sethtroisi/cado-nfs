@@ -79,7 +79,7 @@ public:
 
 class fb_general_vector: public std::vector<fb_general_entry> {
 public:
-  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
 };
 
 
@@ -99,7 +99,7 @@ template <int Nr_roots>
 class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
   public:
   void fprint(FILE *);
-  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
 };
 
 
@@ -107,7 +107,7 @@ class fb_slices_interface {
 public:
   virtual void append(const fb_general_entry &) = 0;
   virtual void fprint(FILE *) = 0;
-  virtual void count_entries(size_t &nprimes, size_t &nroots, double &weight) = 0;
+  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) = 0;
 };
 
 /* The fb_slices class has nr_slices vectors; when appending elements with
@@ -118,10 +118,10 @@ class fb_slices : public fb_slices_interface {
   size_t nr_slices, next_slice;
 public:
   fb_slices(size_t nr_slices);
-  virtual void append(const fb_general_entry &);
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
+  virtual void append(const fb_general_entry &);
   virtual void fprint(FILE *);
-  virtual void count_entries(size_t &nprimes, size_t &nroots, double &weight);
+  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight);
 };
 
 
@@ -129,7 +129,7 @@ public:
    bucket region size.
    E.g., when we have only 1 level of bucket sorting, then the factor base has
    2 parts: the line-sieved primes, and the bucket-sieved primes. */
-class fb_part {
+class fb_part: public fb_slices_interface {
   /* How do we identify the number of slices in each array?
      Should we have
      size_t nr_entries[9];
@@ -147,6 +147,8 @@ class fb_part {
   fb_slices<6> *fb6_slices;
   fb_slices<7> *fb7_slices;
   fb_slices<8> *fb8_slices;
+  fb_slices<9> *fb9_slices;
+  fb_slices<10> *fb10_slices;
   fb_general_vector general_vector;
   fb_slices_interface *choose(const int n) {
     switch (n) {
@@ -159,6 +161,8 @@ class fb_part {
       case 6: return fb6_slices;
       case 7: return fb7_slices;
       case 8: return fb8_slices;
+      case 9: return fb9_slices;
+      case 10: return fb10_slices;
       default: abort();
     }
   }
@@ -166,7 +170,7 @@ public:
   fb_part(size_t nr_slices);
   void append(const fb_general_entry &);
   void fprint(FILE *);
-  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
 };
 
 
@@ -177,20 +181,20 @@ public:
    parts[1] contains bucket-sieved primes with 1 level of bucket sorting
    (i.e., hits get sorted into bucket regions of size 2^16)
 */
-class fb_factorbase {
+class fb_factorbase: public fb_slices_interface {
   fb_part *parts[FB_MAX_PARTS];
-  void append(const fb_general_entry &);
   fbprime_t thresholds[FB_MAX_PARTS];
   public:
   fb_factorbase(const fbprime_t *thresholds, const size_t *nr_slices);
   void read(const char * const filename);
   void make_linear (const mpz_t *poly, fbprime_t powbound, bool do_projective);
-  void fprint(FILE *);
   bool mmap_fbc(const char *) {return false;};
   void dump_fbc(const char *) {return;};
   unsigned long *extract_bycost(size_t &n, fbprime_t pmax, fbprime_t td_thresh);
   size_t size() {abort(); return 0;}
-  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
+  void fprint(FILE *);
+  void append(const fb_general_entry &);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
 };
 
 

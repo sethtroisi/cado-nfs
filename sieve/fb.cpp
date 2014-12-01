@@ -237,23 +237,21 @@ fb_general_entry::merge (const fb_general_entry &other)
 }
 
 void
-fb_general_vector::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight)
 {
-  if (&nprimes != NULL)
-    nprimes += this->size();
+  if (nprimes != NULL)
+    *nprimes += this->size();
   double w = 0.;
   size_t nr = 0;
   for (size_t i = 0; i < this->size(); i++) {
     nr += (*this)[i].nr_roots;
     w += (double) (*this)[i].nr_roots / (double) (*this)[i].q;
   }
-  if (&nroots != NULL)
-    nroots += nr;
-  if (&weight != NULL)
-    weight += w;
+  if (nroots != NULL)
+    *nroots += nr;
+  if (weight != NULL)
+    *weight += w;
 }
-
-
 
 
 template <int Nr_roots>
@@ -280,17 +278,17 @@ fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out)
 
 template <int Nr_roots>
 void
-fb_vector<Nr_roots>::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+fb_vector<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight)
 {
-  if (&nprimes != NULL)
-    nprimes += this->size();
-  if (&nroots != NULL)
-    nroots += Nr_roots * this->size();
-  if (&weight != NULL) {
+  if (nprimes != NULL)
+    *nprimes += this->size();
+  if (nroots != NULL)
+    *nroots += Nr_roots * this->size();
+  if (weight != NULL) {
     double w = 0.;
     for (size_t i = 0; i < this->size(); i++)
       w += (double) Nr_roots / (double) (*this)[i].p;
-      weight += w;
+      *weight += w;
   }
 }
 
@@ -333,7 +331,7 @@ fb_slices<Nr_roots>::get_slice(size_t slice)
 
 template <int Nr_roots>
 void
-fb_slices<Nr_roots>::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+fb_slices<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight)
 {
   for (size_t slice = 0; slice < nr_slices; slice++) {
     vectors[slice].count_entries(nprimes, nroots, weight);
@@ -362,6 +360,8 @@ fb_part::fb_part(const size_t nr_slices) {
   fb6_slices = new fb_slices<6>(nr_slices);
   fb7_slices = new fb_slices<7>(nr_slices);
   fb8_slices = new fb_slices<8>(nr_slices);
+  fb9_slices = new fb_slices<9>(nr_slices);
+  fb10_slices = new fb_slices<10>(nr_slices);
 }
 
 
@@ -408,7 +408,7 @@ fb_part::fprint(FILE *out)
 }
 
 void
-fb_part::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+fb_part::count_entries(size_t *nprimes, size_t *nroots, double *weight)
 {
   for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
     choose(i_roots)->count_entries(nprimes, nroots, weight);
@@ -728,7 +728,7 @@ fb_factorbase::fprint(FILE *out)
 }
 
 void
-fb_factorbase::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+fb_factorbase::count_entries(size_t *nprimes, size_t *nroots, double *weight)
 {
   for (size_t part = 0; part < FB_MAX_PARTS; part++) {
     parts[part]->count_entries(nprimes, nroots, weight);
@@ -755,12 +755,12 @@ int main(int argc, char **argv)
   fb1->make_linear(poly, powbound, true);
   size_t n_primes = 0, n_roots = 0;
   double weight = 0.;
-  fb1->count_entries(n_primes, n_roots, weight);
+  fb1->count_entries(&n_primes, &n_roots, &weight);
   fprintf (stdout, "# Linear factor base (%zu primes, %zu roots, %f weight):\n", n_primes, n_roots, weight);
   fb1->fprint(stdout);
   if (argc > 1) {
     fb2->read(argv[1]);
-    fb2->count_entries(n_primes, n_roots, weight);
+    fb2->count_entries(&n_primes, &n_roots, &weight);
     fprintf (stdout, "# Factor base from file (%zu primes, %zu roots, %f weight):\n", n_primes, n_roots, weight);
     fb2->fprint(stdout);
   }
