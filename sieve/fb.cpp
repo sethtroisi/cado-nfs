@@ -236,6 +236,23 @@ fb_general_entry::merge (const fb_general_entry &other)
   }
 }
 
+void
+fb_general_vector::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+{
+  nprimes += this->size();
+  double w = 0.;
+  size_t nr = 0;
+  for (size_t i = 0; i < this->size(); i++) {
+    nr += (*this)[i].nr_roots;
+    w += (double) (*this)[i].nr_roots / (double) (*this)[i].q;
+  }
+  nroots += nr;
+  weight += w;
+}
+
+
+
+
 template <int Nr_roots>
 fb_entry_x_roots_s<Nr_roots>::fb_entry_x_roots_s(const fb_general_entry &fb_cur)
 {
@@ -257,6 +274,18 @@ fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out)
   fprintf(out, "\n");
 }
 
+
+template <int Nr_roots>
+void
+fb_vector<Nr_roots>::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+{
+  nprimes += this->size();
+  nroots += Nr_roots * this->size();
+  double w = 0.;
+  for (size_t i = 0; i < this->size(); i++)
+    w += (double) Nr_roots / (double) (*this)[i].p;
+  weight += w;
+}
 
 template <int Nr_roots>
 void
@@ -297,6 +326,16 @@ fb_slices<Nr_roots>::get_slice(size_t slice)
 
 template <int Nr_roots>
 void
+fb_slices<Nr_roots>::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+{
+  for (size_t slice = 0; slice < nr_slices; slice++) {
+    vectors[slice].count_entries(nprimes, nroots, weight);
+  }
+}
+
+
+template <int Nr_roots>
+void
 fb_slices<Nr_roots>::fprint(FILE *out)
 {
   for (size_t slice = 0; slice < nr_slices; slice++) {
@@ -304,6 +343,7 @@ fb_slices<Nr_roots>::fprint(FILE *out)
     vectors[slice].fprint(out);
   }
 }
+
 
 fb_part::fb_part(const size_t nr_slices) {
   fb0_slices = new fb_slices<0>(nr_slices);
@@ -343,47 +383,31 @@ fb_part::append(const fb_general_entry &fb_cur)
 
   /* Simple ones go in the simple vector with the corresponding number of
      roots */
-  switch (fb_cur.nr_roots) {
-    case 0: fb0_slices->append(fb_cur); break;
-    case 1: fb1_slices->append(fb_cur); break;
-    case 2: fb2_slices->append(fb_cur); break;
-    case 3: fb3_slices->append(fb_cur); break;
-    case 4: fb4_slices->append(fb_cur); break;
-    case 5: fb5_slices->append(fb_cur); break;
-    case 6: fb6_slices->append(fb_cur); break;
-    case 7: fb7_slices->append(fb_cur); break;
-    case 8: fb8_slices->append(fb_cur); break;
-    default: abort();
-  }
+  choose(fb_cur.nr_roots)->append(fb_cur);
 }
 
 void
 fb_part::fprint(FILE *out)
 {
-  fprintf(out, "#   Entries with 0 roots:\n");
-  fb0_slices->fprint(out);
-  fprintf(out, "#   Entries with 1 root:\n");
-  fb1_slices->fprint(out);
-  fprintf(out, "#   Entries with 2 roots:\n");
-  fb2_slices->fprint(out);
-  fprintf(out, "#   Entries with 3 roots:\n");
-  fb3_slices->fprint(out);
-  fprintf(out, "#   Entries with 4 roots:\n");
-  fb4_slices->fprint(out);
-  fprintf(out, "#   Entries with 5 roots:\n");
-  fb5_slices->fprint(out);
-  fprintf(out, "#   Entries with 6 roots:\n");
-  fb6_slices->fprint(out);
-  fprintf(out, "#   Entries with 7 roots:\n");
-  fb7_slices->fprint(out);
-  fprintf(out, "#   Entries with 8 roots:\n");
-  fb8_slices->fprint(out);
+  for (int n = 0; n <= 8; n++) {
+    fprintf(out, "#   Entries with %d roots:\n", n);
+    choose(n)->fprint(out);
+  }
 
   fprintf(out, "#   General entries (powers, ramified primes or primes with projective roots):\n");
   for (size_t i = 0; i < general_vector.size(); i++) {
     general_vector[i].fprint(out);
   }
 }
+
+void
+fb_part::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+{
+  for (int n = 0; n <= 8; n++)
+    choose(n)->count_entries(nprimes, nroots, weight);
+  general_vector.count_entries(nprimes, nroots, weight);  
+}
+
 
 fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
 			     const size_t *nr_slices)
@@ -696,6 +720,13 @@ fb_factorbase::fprint(FILE *out)
   }
 }
 
+void
+fb_factorbase::count_entries(size_t &nprimes, size_t &nroots, double &weight)
+{
+  for (size_t part = 0; part < FB_MAX_PARTS; part++) {
+    parts[part]->count_entries(nprimes, nroots, weight);
+  }
+}
 
 
 int main(int argc, char **argv)
@@ -715,11 +746,15 @@ int main(int argc, char **argv)
   mpz_set_ui(poly[1], 210); /* Bunch of projective primes */
 
   fb1->make_linear(poly, powbound, true);
-  fprintf (stdout, "# Linear factor base:\n");
+  size_t n_primes = 0, n_roots = 0;
+  double weight = 0.;
+  fb1->count_entries(n_primes, n_roots, weight);
+  fprintf (stdout, "# Linear factor base (%zu primes, %zu roots, %f weight):\n", n_primes, n_roots, weight);
   fb1->fprint(stdout);
   if (argc > 1) {
     fb2->read(argv[1]);
-    fprintf (stdout, "# Factor base from file:\n");
+    fb2->count_entries(n_primes, n_roots, weight);
+    fprintf (stdout, "# Factor base from file (%zu primes, %zu roots, %f weight):\n", n_primes, n_roots, weight);
     fb2->fprint(stdout);
   }
 
