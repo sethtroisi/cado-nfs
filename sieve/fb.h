@@ -94,15 +94,6 @@ public:
 template <int Nr_roots>
 class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
   public:
-  using std::vector<fb_entry_x_roots_s<Nr_roots> >::push_back; /* wtf C++ */
-
-  /* Overloaded push_back() method that accepts a fb_general_entry, which is
-     converted to this vector's fb_entry_x_roots_s type before adding it */
-  void push_back(const fb_general_entry &fb_cur)
-  {
-    fb_entry_x_roots_s<Nr_roots> f = fb_cur;
-    push_back(f);
-  }
   void fprint(FILE *);
 };
 
