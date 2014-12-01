@@ -736,6 +736,7 @@ fb_factorbase::count_entries(size_t *nprimes, size_t *nroots, double *weight) co
 }
 
 
+#ifdef TESTDRIVE
 int main(int argc, char **argv)
 {
   fbprime_t thresholds[4] = {200, 1000, 1000, 1000};
@@ -769,3 +770,4 @@ int main(int argc, char **argv)
   mpz_clear(poly[1]);
   exit(EXIT_SUCCESS);
 }
+#endif
