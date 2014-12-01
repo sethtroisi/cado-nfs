@@ -76,6 +76,22 @@ fb_is_power (fbprime_t q, unsigned long *final_k)
   return 0;
 }
 
+
+/* Allow assignment-construction of general entries from simple entries */
+template <int Nr_roots>
+fb_general_entry::fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e) {
+  p = q = e.p;
+  k = 1;
+  invq = compute_invq(q);
+  for (int i = 0; i < Nr_roots; i++) {
+    roots[i] = e.roots[i];
+    exp[i] = 1;
+    oldexp[i] = 0;
+    projective[i] = false;
+  }
+}
+
+
 /* Read roots from a factor base file line and store them in roots.
    line must point at the first character of the first root on the line.
    linenr is used only for printing error messages in case of parsing error.
@@ -253,15 +269,6 @@ fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight
     *weight += w;
 }
 
-
-template <int Nr_roots>
-fb_entry_x_roots_s<Nr_roots>::fb_entry_x_roots_s(const fb_general_entry &fb_cur)
-{
-  // ASSERT(Nr_roots == fb_cur->nr_roots);
-  p = fb_cur.p;
-  for (size_t i = 0; i < Nr_roots; i++)
-    roots[i] = fb_cur.roots[i];
-}
 
 template <int Nr_roots>
 void

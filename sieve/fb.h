@@ -49,6 +49,9 @@ typedef uint32_t redc_invp_t;
                                         identify the corresponding IEEE 754
                                         double precision number */
 
+/* Forward declaration so fb_general_entry can use it in constructors */
+template <int Nr_roots>
+class fb_entry_x_roots_s;
 
 /* General entries are anything that needs auxiliary information:
    Prime powers, projective roots, ramified primes where exp != oldexp + 1,
@@ -71,6 +74,9 @@ public:
      If projective and ar == b  -"- */
 
   unsigned char k, nr_roots;
+  fb_general_entry(){}
+  template <int Nr_roots>
+  fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e);
   void parse_line (const char *line, unsigned long linenr);
   void merge (const fb_general_entry &);
   void fprint(FILE *out);
@@ -90,7 +96,14 @@ class fb_entry_x_roots_s {
 public:
   fbprime_t p;
   fbroot_t roots[Nr_roots];
-  fb_entry_x_roots_s(const fb_general_entry &);
+  fb_entry_x_roots_s(){};
+  /* Allow assignment-construction from general entries */
+  fb_entry_x_roots_s(const fb_general_entry &e) {
+    ASSERT_ALWAYS(Nr_roots == e.nr_roots);
+    p = e.p;
+    for (size_t i = 0; i < Nr_roots; i++)
+      roots[i] = e.roots[i];
+  }
   void fprint(FILE *);
 };
 
