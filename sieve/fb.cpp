@@ -239,15 +239,18 @@ fb_general_entry::merge (const fb_general_entry &other)
 void
 fb_general_vector::count_entries(size_t &nprimes, size_t &nroots, double &weight)
 {
-  nprimes += this->size();
+  if (&nprimes != NULL)
+    nprimes += this->size();
   double w = 0.;
   size_t nr = 0;
   for (size_t i = 0; i < this->size(); i++) {
     nr += (*this)[i].nr_roots;
     w += (double) (*this)[i].nr_roots / (double) (*this)[i].q;
   }
-  nroots += nr;
-  weight += w;
+  if (&nroots != NULL)
+    nroots += nr;
+  if (&weight != NULL)
+    weight += w;
 }
 
 
@@ -279,12 +282,16 @@ template <int Nr_roots>
 void
 fb_vector<Nr_roots>::count_entries(size_t &nprimes, size_t &nroots, double &weight)
 {
-  nprimes += this->size();
-  nroots += Nr_roots * this->size();
-  double w = 0.;
-  for (size_t i = 0; i < this->size(); i++)
-    w += (double) Nr_roots / (double) (*this)[i].p;
-  weight += w;
+  if (&nprimes != NULL)
+    nprimes += this->size();
+  if (&nroots != NULL)
+    nroots += Nr_roots * this->size();
+  if (&weight != NULL) {
+    double w = 0.;
+    for (size_t i = 0; i < this->size(); i++)
+      w += (double) Nr_roots / (double) (*this)[i].p;
+      weight += w;
+  }
 }
 
 template <int Nr_roots>

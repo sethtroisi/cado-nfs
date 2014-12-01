@@ -75,8 +75,12 @@ public:
   void merge (const fb_general_entry &);
   void fprint(FILE *out);
 };
-typedef std::vector<fb_general_entry> fb_general_vector;
 
+
+class fb_general_vector: public std::vector<fb_general_entry> {
+public:
+  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
+};
 
 
 /* "Simple" factor base entries. We imply q=p, k=1, oldexp=0, exp=1,
@@ -95,6 +99,7 @@ template <int Nr_roots>
 class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
   public:
   void fprint(FILE *);
+  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
 };
 
 
@@ -109,6 +114,7 @@ public:
   void append(const fb_general_entry &);
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
   void fprint(FILE *);
+  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
 };
 
 
@@ -139,6 +145,7 @@ class fb_part {
   fb_part(size_t nr_slices);
   void append(const fb_general_entry &);
   void fprint(FILE *);
+  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
 };
 
 
@@ -162,7 +169,7 @@ class fb_factorbase {
   void dump_fbc(const char *) {return;};
   unsigned long *extract_bycost(size_t &n, fbprime_t pmax, fbprime_t td_thresh);
   size_t size() {abort(); return 0;}
-  size_t nroots_total() {abort(); return 0;}
+  void count_entries(size_t &nprimes, size_t &nroots, double &weight);
 };
 
 
