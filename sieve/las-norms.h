@@ -65,7 +65,7 @@ extern size_t max_cache;
 
 
   /* The fastest memset for x86 64 & SSE2 */
-  static inline void *las_memset(void *S, int c, size_t n) {
+  static inline void *las_memset(uint8_t *S, int c, size_t n) {
     uint64_t rc = 0x0101010101010101 * (uint8_t) c;
     if (LIKELY (n > 0x20)) {
       register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
@@ -88,7 +88,7 @@ extern size_t max_cache;
          * word intersecting the [S, S+n[ zone (actually not checking
          * that this 128-bit word is fully within the zone).
          */
-	S = (void *) ((uintptr_t) S | 0x0f);
+	S = (uint8_t *) ((uintptr_t) S | 0x0f);
         /* Set n to be the number of bytes which are covered from the
          * second 128-bit word to the last (inclusive, the first line
          * being possibly out of range */
@@ -98,7 +98,7 @@ extern size_t max_cache;
          * will have to be treated separatel (compared to 16 at a time).
          */
 	offset = (uint8_t) n;
-	S = (void *) ((uintptr_t) S + offset - 0x7f);
+	S = (uint8_t *) ((uintptr_t) S + offset - 0x7f);
         /* exactly before value S here, we will have offset/0x10 128-bit
          * words
          * lines to process. This will be for the first iteration only.
@@ -165,12 +165,12 @@ extern size_t max_cache;
 	_mm_store_ps ((float *) (uintptr_t) (n - 0x20), mc);
 	_mm_store_ps ((float *) (uintptr_t) (n - 0x10), mc);
 	S += 0x40;
-	S = (void *)((uintptr_t) S & -0x10);
+	S = (uint8_t *)((uintptr_t) S & -0x10);
 	_mm_store_ps ((float *) (uintptr_t) (S - 0x30), mc);
 	_mm_store_ps ((float *) (uintptr_t) (S - 0x20), mc);
 	_mm_store_ps ((float *) (uintptr_t) (S - 0x10), mc);
 	_mm_store_ps ((float *) (uintptr_t) (S       ), mc);
-	S = (void *)((uintptr_t) S & -0x40);
+	S = (uint8_t *)((uintptr_t) S & -0x40);
 	n &= -0x40;
 	n -= (uintptr_t) S;
 	n >>= 3;
@@ -179,10 +179,10 @@ extern size_t max_cache;
 	uint64_t jmp, offset;
 	n += (uintptr_t) S - 0x10;
 	n |= 0x0f;
-	S = (void *) ((uintptr_t) S | 0x0f);
+	S = (uint8_t *) ((uintptr_t) S | 0x0f);
 	n -= (uintptr_t) S;
 	offset = (uint8_t) n;
-	S = (void *) ((uintptr_t) S + offset - 0x7f);
+	S = (uint8_t *) ((uintptr_t) S + offset - 0x7f);
 	offset = (uint64_t) offset >> 2;
 	__asm__ __volatile__ ( "leaq 0f(%%rip), %[jmp]\n"
 			       "subq %[offset], %[jmp]\n"

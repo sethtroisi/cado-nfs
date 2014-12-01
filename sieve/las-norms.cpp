@@ -924,7 +924,7 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
     int x;
     double fx; } x_fx_t;
   size_t current_stack, max_stack = SIZE_STACK;
-  x_fx_t begin, current, *stack = malloc_check (sizeof(*stack) *  max_stack);
+  x_fx_t begin, current, *stack = (x_fx_t *) malloc_check (sizeof(*stack) *  max_stack);
 
   /* At least 3 segments: -Idiv2, neighbourhood of 0., Idiv2 - 1 */
   ASSERT(nsg >= 3);
@@ -946,7 +946,7 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
 	  current = possible_new;
 	  if (UNLIKELY(current_stack == max_stack)) {
 	    max_stack += (max_stack >> 1);
-	    if ((stack = realloc (stack, sizeof(*stack) * max_stack)) == NULL) {
+	    if ((stack = (x_fx_t *) realloc (stack, sizeof(*stack) * max_stack)) == NULL) {
 	      fprintf (stderr, "Error, realloc of %zu bytes failed\n", sizeof(*stack) * max_stack);
 	      abort ();
 	    }
@@ -1002,7 +1002,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     /* Insertion of point (-Idiv2, F(-Idiv2)) in sg[0] : an artificial one-point segment. */
     g = compute_f (d, u, (double) -Idiv2);
     g = lg2abs (g, add, scale);
-    sg[0] = (sg_t) { .begin = -Idiv2, .end = -Idiv2, .f_begin = g, .f_end = g };
+    sg[0] = (sg_t) { .begin = -(int)Idiv2, .end = -(int)Idiv2, .f_begin = g, .f_end = g };
     nsg = 1;
     S[-Idiv2] = (uint8_t) g;
 
