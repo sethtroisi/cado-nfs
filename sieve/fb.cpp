@@ -396,9 +396,9 @@ fb_part::append(const fb_general_entry &fb_cur)
 void
 fb_part::fprint(FILE *out)
 {
-  for (int n = 0; n <= 8; n++) {
-    fprintf(out, "#   Entries with %d roots:\n", n);
-    choose(n)->fprint(out);
+  for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
+    fprintf(out, "#   Entries with %d roots:\n", i_roots);
+    choose(i_roots)->fprint(out);
   }
 
   fprintf(out, "#   General entries (powers, ramified primes or primes with projective roots):\n");
@@ -410,8 +410,8 @@ fb_part::fprint(FILE *out)
 void
 fb_part::count_entries(size_t &nprimes, size_t &nroots, double &weight)
 {
-  for (int n = 0; n <= 8; n++)
-    choose(n)->count_entries(nprimes, nroots, weight);
+  for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
+    choose(i_roots)->count_entries(nprimes, nroots, weight);
   general_vector.count_entries(nprimes, nroots, weight);  
 }
 
