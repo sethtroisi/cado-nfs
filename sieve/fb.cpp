@@ -237,7 +237,7 @@ fb_general_entry::merge (const fb_general_entry &other)
 }
 
 void
-fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight)
+fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
     *nprimes += this->size();
@@ -278,7 +278,7 @@ fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out)
 
 template <int Nr_roots>
 void
-fb_vector<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight)
+fb_vector<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
     *nprimes += this->size();
@@ -331,7 +331,7 @@ fb_slices<Nr_roots>::get_slice(size_t slice)
 
 template <int Nr_roots>
 void
-fb_slices<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight)
+fb_slices<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   for (size_t slice = 0; slice < nr_slices; slice++) {
     vectors[slice].count_entries(nprimes, nroots, weight);
@@ -408,7 +408,7 @@ fb_part::fprint(FILE *out)
 }
 
 void
-fb_part::count_entries(size_t *nprimes, size_t *nroots, double *weight)
+fb_part::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
     choose(i_roots)->count_entries(nprimes, nroots, weight);
@@ -728,7 +728,7 @@ fb_factorbase::fprint(FILE *out)
 }
 
 void
-fb_factorbase::count_entries(size_t *nprimes, size_t *nroots, double *weight)
+fb_factorbase::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   for (size_t part = 0; part < FB_MAX_PARTS; part++) {
     parts[part]->count_entries(nprimes, nroots, weight);

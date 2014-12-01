@@ -79,7 +79,7 @@ public:
 
 class fb_general_vector: public std::vector<fb_general_entry> {
 public:
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
 
@@ -99,7 +99,7 @@ template <int Nr_roots>
 class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
   public:
   void fprint(FILE *);
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
 
@@ -107,7 +107,7 @@ class fb_slices_interface {
 public:
   virtual void append(const fb_general_entry &) = 0;
   virtual void fprint(FILE *) = 0;
-  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) = 0;
+  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) const = 0;
 };
 
 /* The fb_slices class has nr_slices vectors; when appending elements with
@@ -121,7 +121,7 @@ public:
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
   virtual void append(const fb_general_entry &);
   virtual void fprint(FILE *);
-  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight);
+  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
 
@@ -150,7 +150,8 @@ class fb_part: public fb_slices_interface {
   fb_slices<9> *fb9_slices;
   fb_slices<10> *fb10_slices;
   fb_general_vector general_vector;
-  fb_slices_interface *choose(const int n) {
+  fb_slices_interface *choose(const unsigned int n) const {
+    ASSERT_ALWAYS(n <= MAXDEGREE);
     switch (n) {
       case 0: return fb0_slices;
       case 1: return fb1_slices;
@@ -170,7 +171,7 @@ public:
   fb_part(size_t nr_slices);
   void append(const fb_general_entry &);
   void fprint(FILE *);
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
 
@@ -194,7 +195,7 @@ class fb_factorbase: public fb_slices_interface {
   size_t size() {abort(); return 0;}
   void fprint(FILE *);
   void append(const fb_general_entry &);
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight);
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
 
