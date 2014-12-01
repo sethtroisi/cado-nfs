@@ -259,7 +259,7 @@ int mpfq_pz_vec_print(mpfq_pz_dst_field, mpfq_pz_src_vec, unsigned int);
 int mpfq_pz_vec_sscan(mpfq_pz_dst_field, mpfq_pz_vec *, unsigned int *, const char *);
 int mpfq_pz_vec_fscan(mpfq_pz_dst_field, FILE *, mpfq_pz_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, pz */
-#define mpfq_pz_vec_scan(K, w, n)	mpfq_pz_vec_fscan(K,stdout,w,n)
+#define mpfq_pz_vec_scan(K, w, n)	mpfq_pz_vec_fscan(K,stdin,w,n)
 void mpfq_pz_vec_ur_init(mpfq_pz_dst_field, mpfq_pz_vec_ur *, unsigned int);
 void mpfq_pz_vec_ur_set_zero(mpfq_pz_dst_field, mpfq_pz_dst_vec_ur, unsigned int);
 void mpfq_pz_vec_ur_set_vec(mpfq_pz_dst_field, mpfq_pz_dst_vec_ur, mpfq_pz_src_vec, unsigned int);
@@ -372,9 +372,9 @@ MPI_Op mpfq_pz_mpi_addition_op_ur(mpfq_pz_dst_field);
 void mpfq_pz_mpi_ops_clear(mpfq_pz_dst_field);
 
 /* Object-oriented interface */
-void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_pz_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
