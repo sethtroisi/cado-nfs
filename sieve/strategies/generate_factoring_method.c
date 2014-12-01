@@ -710,14 +710,17 @@ tabular_fm_t *generate_factoring_methods(gmp_randstate_t state, int len_p_min,
     tabular_fm_t *gfm = tabular_fm_create();
 
     //we begin by the first method:
-    int method = PM1_METHOD;
-    int curve = 0;
+    int ind_method = 0;
+    int ind_curve = 0;
+    int curve[3] = {MONTY12, MONTY16, BRENT12};
+    int method[4] = {PM1_METHOD, PP1_27_METHOD, PP1_65_METHOD, EC_METHOD};
+    while (ind_method <= 4 && ind_curve < 3) {
 
-    while (method <= NB_METHOD && curve < NB_CURVE) {
-	printf("method = %d, curve = %d\n", method, curve);
+	printf("method = %d, curve = %d\n",
+	       method[ind_method], curve[ind_curve]);
 	tabular_fm_t *res = generate_factoring_methods_mc
-	    (state, len_p_min, len_p_max, len_n, method, curve, opt_ch,
-	     param_sieve);
+	    (state, len_p_min, len_p_max, len_n, method[ind_method],
+	     curve[ind_curve], opt_ch, param_sieve);
 
 	tabular_fm_concat(gfm, res);
 
@@ -725,10 +728,10 @@ tabular_fm_t *generate_factoring_methods(gmp_randstate_t state, int len_p_min,
 	tabular_fm_free(res);
 
 	//index
-	if (method != EC_METHOD)
-	    method++;
+	if (method[ind_method] != EC_METHOD)
+	    ind_method++;
 	else
-	    curve++;
+	    ind_curve++;
     }
 
     return gfm;
