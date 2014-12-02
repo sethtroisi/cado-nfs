@@ -30,6 +30,22 @@ else
         c := StringToInteger(Split(l, " ")[2]);
         g +:= c*x^e;
     end for;
+    // try the new format if any
+    for l in lines do
+        if #l gt 4 and l[1..4] eq "poly" then
+	    // assuming l = "poly%d: c0,c1,..."
+	    tmp:=Split(l, ":");
+	    ind:=Split(tmp[1], "poly");
+	    ind:=StringToInteger(ind[2]);
+	    pol:=ZP![StringToInteger(x) : x in Split(tmp[2], ",")];
+	    if ind eq 0 then
+	        g:=pol;
+	    elif ind eq 1 then
+	        f:=pol;
+	    else error("Index too large for now");
+	    end if;
+	end if;
+    end for;
 end if;
 
 /*
@@ -674,7 +690,7 @@ K<alpha>:=NumberField(f);
 
 d:=Discriminant(f)*LeadingCoefficient(f);
 fff := Factorization(d : ECMLimit:=100, MPQSLimit:=0);
-BadPrimes := [ x[1] : x in fff | x[2] gt 1];
+BadPrimes := [ x[1] : x in fff | x[2] gt 1 and x[1] le 10^6 ];
 
     /* This is only the debug part. Won't go in C */
 /*
