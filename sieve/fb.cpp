@@ -92,6 +92,20 @@ fb_general_entry::fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e) {
 }
 
 
+bool
+fb_general_entry::is_simple() const
+{
+  /* Is this a simple factor base prime? */
+  bool is_simple = (k == 1);
+  for (unsigned char i = 0; i < nr_roots; i++) {
+    is_simple &= !projective[i];
+    is_simple &= (oldexp[i] == 0);
+    is_simple &= (exp[i] == 1);
+  }
+  return is_simple;
+}
+
+
 /* Read roots from a factor base file line and store them in roots.
    line must point at the first character of the first root on the line.
    linenr is used only for printing error messages in case of parsing error.
@@ -381,16 +395,8 @@ fb_part::fb_part(const size_t nr_slices) {
 void
 fb_part::append(const fb_general_entry &fb_cur)
 {
-  /* Is this a simple factor base prime? */
-  bool is_simple = (fb_cur.k == 1);
-  for (unsigned char i = 0; i < fb_cur.nr_roots; i++) {
-    is_simple &= !fb_cur.projective[i];
-    is_simple &= (fb_cur.oldexp[i] == 0);
-    is_simple &= (fb_cur.exp[i] == 1);
-  }
-
   /* Non-simple ones go in the general vector */
-  if (!is_simple) {
+  if (!fb_cur.is_simple()) {
     general_vector.push_back(fb_cur);
     return;
   }

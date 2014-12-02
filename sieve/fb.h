@@ -80,6 +80,7 @@ public:
   void parse_line (const char *line, unsigned long linenr);
   void merge (const fb_general_entry &);
   void fprint(FILE *out);
+  bool is_simple() const;
 };
 
 
