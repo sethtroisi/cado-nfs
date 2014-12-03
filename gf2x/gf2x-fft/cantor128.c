@@ -1,7 +1,7 @@
 /* An implementation of Cantor's algorithm for multiplication of
   polynomials over GF(2).
 
-  Copyright 2007 Pierrick Gaudry.
+  Copyright 2007-2014 Pierrick Gaudry, Emmanuel Thom\'e.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of the GNU General Public License as published by the
@@ -1261,7 +1261,7 @@ void recomposeK(unsigned long * F, Kelt * f, size_t Fl, int k MAYBE_UNUSED)
 void decomposeK(Kelt * f, unsigned long * F, size_t Fl, int k)
 {
     size_t i;
-    assert(Fl <= (1UL << (k-1)));
+    assert(Fl <= (1UL << (k+1)));
     for (i = 0; i < Fl / 2 ; ++i) {
         f[i][0] = F[2*i];
         f[i][1] = F[2*i + 1];
@@ -1282,7 +1282,7 @@ void recomposeK(unsigned long * F, Kelt * f, size_t Fl, unsigned int k MAYBE_UNU
 {
     size_t i;
 
-    assert(Fl <= (1UL << (k-1)));
+    assert(Fl <= (1UL << (k+1)));
     F[0] = f[0][0];
     F[1] = f[0][1];
     for (i = 2; i < Fl; i += 2) {
@@ -1312,7 +1312,7 @@ void c128_init(c128_info_t p, size_t nF, size_t nG, ...)
     size_t Gl = (nG + 63) / 64;
 
     Hl = Fl + Gl;               // nb of uint64_t of the result
-    n = Hl;                     // nb of Kelt of the result.
+    n = Hl;                     // nb of Kelt of the result, with padding.
     for(k = 1; (1UL << k) < n ; k++) ;
     /* We used to refuse k < 2 here. Now we've got sufficient provision
      * in here to accomodate for the case where k==1, so a safe fallback
@@ -1400,10 +1400,11 @@ void c128_ift(
 
 
 // Main function:
-// Takes two arrays of 64 bit limbs and compute their
+// Takes two arrays of unsigned long and compute their
 // product as polynomials over GF(2). 
 // H must have room for the result (Fl+Gl limbs)
-void mulCantor128(unsigned long * H, unsigned long * F, size_t Fl, unsigned long * G, size_t Gl)
+void mulCantor128(unsigned long * H, unsigned long * F, size_t Fl,
+        unsigned long * G, size_t Gl)
 {
     c128_info_t order;
     c128_t * f, * g;

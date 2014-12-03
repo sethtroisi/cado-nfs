@@ -450,17 +450,19 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 			//todo:change -1 by +3 (-1 is to do the same thing
 			//that make_strategy)
 			//todo: choose better values for param.
-			int param = (curve==MONTY16)?1:index_method-2;
-			if (param <= 1)
-			  param = index_method +10;//for example
+			int sigma = index_method-2;
+			if (sigma <= 1)
+			  sigma = index_method +10;//for example
 			if (index_method == 3)
-			  param = 2;//first  M12
+			  sigma = 2;//first  M12
 			if (curve == BRENT12)
-			  param = 11;//B12
+			  sigma = 11;//B12
+			if (curve == MONTY16)
+			  sigma = 1;
 			plan = malloc (sizeof (ecm_plan_t));
 
 			ecm_make_plan (plan,
-				       B1,B2, curve, param, 1, verbose);
+				       B1,B2, curve, sigma, 1, verbose);
 		      }
 		      strategies->plan[index_plan].method =
 			methods[index_method].method;

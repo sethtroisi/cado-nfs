@@ -79,6 +79,8 @@ compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
 	}
 	all += dec->nb_elem;
     }
+    if (all < (double)LDBL_EPSILON) // all == 0.0 -> it exists any decomposition!
+      return 0;
     return nb_found_elem / all;
 }
 
@@ -138,6 +140,9 @@ double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, in
 	time_average += time_dec * dec->nb_elem;
 	all += dec->nb_elem;
     }
+    if (all < (double)LDBL_EPSILON) // all == 0.0 -> it exists any decomposition!
+      return 0;
+    
     return time_average / all;
 }
 
@@ -182,11 +187,12 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 			     int fbb, int lpb, int r)
 {
     if (index_iter >= len_iteration) {
-	tabular_strategy_add_strategy_without_zero(res, strat);
-	int nb_strat = res->index - 1;
 	double proba =
-	    compute_proba_strategy(init_tab, res->tab[nb_strat], fbb, lpb);
-	double time = compute_time_strategy(init_tab, res->tab[nb_strat], r);
+	    compute_proba_strategy(init_tab, strat, fbb, lpb);
+	double time = compute_time_strategy(init_tab, strat, r);
+
+	int nb_strat = res->index;
+	tabular_strategy_add_strategy_without_zero(res, strat);
 	strategy_set_proba(res->tab[nb_strat], proba);
 	strategy_set_time(res->tab[nb_strat], time);
     } else {
