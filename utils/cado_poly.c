@@ -55,10 +55,12 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;
     int have_f[NB_POLYS_MAX][(MAXDEGREE + 1)];
-    int i, nb_polys = 2, new_coding = 0;
+    int i, j, nb_polys = 2, new_coding = 0;
 
+    /* monitoring the fill in of coefficients */
     for(i = 0; i < NB_POLYS_MAX; i++)
-	have_f[i][0] = 0;
+	for(j = 0; j <= MAXDEGREE; j++)
+	    have_f[i][j] = 0;
 
     have_n = param_list_parse_mpz(pl, "n", poly->n) 
 	     || param_list_parse_mpz(pl, NULL, poly->n);
@@ -66,21 +68,27 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
                          it is not given */
     param_list_parse_double(pl, "skew", &(poly->skew));
 
-#if 0 // TODO
     for(i = 0; i < NB_POLYS_MAX; i++){
-	char tag[5], buf[BUF_MAX];
+	char tag[6], buf[BUF_MAX];
 	snprintf(tag, sizeof(tag), "poly%d", i);
 	if(param_list_parse_string(pl, tag, buf, BUF_MAX)){
+	    /* feeding poly->pols[i] from buf="c0,c1,..." */
+	    char *tmp = buf;
 	    new_coding = 1;
-	    fprintf(stderr, "Read %s\n", buf);
 	    nb_polys = i+1;
+	    for(j = 0; ; j++){
+		gmp_sscanf(tmp, "%Zd", poly->pols[i]->coeff[j]);
+		//		gmp_printf("read: %d %Zd\n", j, poly->pols[i]->coeff[j]);
+		have_f[i][j] = 1;
+		for( ; *tmp != '\0' && *tmp != ','; tmp++);
+		if(*tmp == '\0')
+		    break;
+		tmp++;
+	    }
 	}
 	else
 	    break;
     }
-    exit(1);
-#endif
-
     poly->nb_polys = nb_polys;
     if(new_coding == 0){
 	/* reading polynomials coefficient by coefficient */
@@ -96,7 +104,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 	    have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
 	}
     }
-
+    /* setting degrees */
     for(int side = 0 ; side < poly->nb_polys ; side++) {
         mpz_poly_ptr ps = poly->pols[side];
         int d;

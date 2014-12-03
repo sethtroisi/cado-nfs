@@ -489,14 +489,6 @@ main (int argc, char *argv[])
       exit(EXIT_FAILURE);
   }
 
-  param_list_parse_int(pl, "side", &side);
-  if (side != RATIONAL_SIDE && side != ALGEBRAIC_SIDE) {
-      fprintf(stderr, "Error: side must be %d (for rational) or %d "
-              "(for algebraic)\n", RATIONAL_SIDE, ALGEBRAIC_SIDE);
-      param_list_print_usage(pl, argv0, stderr);
-      exit(EXIT_FAILURE);
-  }
-
   param_list_parse_int(pl, "maxbits", &maxbits);
 
   outfilename = param_list_lookup_string(pl, "out");
@@ -512,6 +504,18 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error reading polynomial file %s\n", filename);
       exit (EXIT_FAILURE);
     }
+
+  param_list_parse_int(pl, "side", &side);
+  if (side < 0 || side >= cpoly->nb_polys){
+      if(cpoly->nb_polys == 2)
+	  fprintf(stderr, "Error: side must be %d (for rational) or %d "
+		  "(for algebraic)\n", RATIONAL_SIDE, ALGEBRAIC_SIDE);
+      else
+	  fprintf(stderr, "Error: side must be in [0..%d[\n", cpoly->nb_polys);
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+
   if (side == ALGEBRAIC_SIDE)
     makefb_with_powers (outputfile, cpoly->alg, alim, maxbits, nb_threads);
   else

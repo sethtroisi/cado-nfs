@@ -8,6 +8,8 @@ Wrapper version, to be used with
 //
 // Using units in (S)NFS-DL
 
+SetDebugOnError(true);
+
 NFSUNITS_VERSION:="20140321.2045"; // first trial with h > 1
 NFSUNITS_VERSION:="20140324.1745"; // Minimize works now for all rK
 NFSUNITS_VERSION:="20140327.0730"; // more cleaning w.r.t. U
@@ -24,6 +26,7 @@ NFSUNITS_VERSION:="20140828.1550"; // cleaning potential unit bugs
 NFSUNITS_VERSION:="20140828.1840"; // making code work for non-Galois groups
 NFSUNITS_VERSION:="20140829.1030"; // bug found
 NFSUNITS_VERSION:="20141008.1030"; // symmetrization, etc.
+NFSUNITS_VERSION:="20141203.1130"; // new poly format
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 
@@ -1177,8 +1180,10 @@ end function;
 // OUTPUT: <elt_of_K, e, f>
 GeneratorForBad := function(Kdata, p, id)
 	lf:=Factorization(id);
-//	printf "# p=%o, id=%o => lf=%o\n", p, id, lf;
-	if #lf ne 1 then error("PB??"); end if;
+	if #lf ne 1 then
+	    printf "# p=%o, id=%o => lf=%o\n", p, id, lf;
+	    error("PB in GeneratorForBad");
+	end if;
 	lf1h:=lf[1][1]^Kdata["hK"];
 	ok,gp:=IsPrincipal(lf1h);
 	if not ok then error("Not principal in GeneratorForBad"); end if;
@@ -1325,7 +1330,7 @@ FindGeneratorWithGalois := function(p, r, Kdata, lp)
 end function;
 
 ReadAlgpr := procedure(~lipr, ~pamax, algpr, f)
-	printf "# Reading file %o\n", algpr;
+	printf "# Reading algpr file %o for f=%o\n", algpr, f;
         fd:=POpen("gzip -dc " * algpr, "r");
 	lipr:=AssociativeArray();
 	npr:=0;
@@ -1778,9 +1783,10 @@ ReadDataFromPolyFile := procedure(~params, name)
 	while true do
 	    s:=Gets(fd); if IsEof(s) then break; end if;
 	    tmp:=Split(s, " ");
-	    if #tmp eq 2 then
+	    if #tmp ge 2 then
 	        if tmp[1] eq "n:" then
 	            p:=StringToInteger(tmp[2]);
+		// old coding of polynomials
 		elif tmp[1][1] eq "c" then
 		    // tmp[1] = "c0:"
 		    i:=StringToInteger(tmp[1][2]); // humf!
@@ -1789,6 +1795,17 @@ ReadDataFromPolyFile := procedure(~params, name)
 		    // tmp[1] = "Y0:"
 		    i:=StringToInteger(tmp[1][2]); // humf!
 		    g:=g+StringToInteger(tmp[2]) * X^i;
+		elif #tmp[1] ge 4 and tmp[1][1..4] eq "poly" then
+		    // new format for polynomials: "poly%d: c0,c1,..."
+		    ind:=tmp[1][5];
+		    pol:=QX![StringToInteger(x) : x in Split(tmp[2], ",")];
+		    if ind eq "0" then
+		        g:=pol;
+		    elif ind eq "1" then
+		        f:=pol;
+		    else
+		        error("Index > 1 NYI in ReadDataFromPolyFile");
+		    end if;
 		end if;
 	    end if;
 	end while;
@@ -1866,7 +1883,7 @@ DLReadSM := procedure(~M, ficsm, ncols, rK)
 	end while;	
 end procedure;
 
-DLCheckKernel := function(params, rK)
+DLComputeKernel := function(params, rK)
 	printf "# Reading small matrix\n";
 	small:=params["small"];
 	mat:=DLReadSmallMatrix(small);
@@ -1943,7 +1960,7 @@ UnitsWithParams := function(Kdata, FB, epsab, GEN, generate, params)
 //	Kdata:=PrepareField(K, true); // FIXME
 	K:=Kdata["K"];
 	rK:=Kdata["rK"];
-        if DLP_VERIFICATION then DLCheckKernel(params, rK); end if;
+        if DLP_VERIFICATION then DLComputeKernel(params, rK); end if;
 // OBSOLETE
         // space for rK units (we don't care about valuations of units...!)
 //	mat:=DLReadSmallMatrix(small, rK, ell);
@@ -1990,7 +2007,8 @@ UnitsWithParams := function(Kdata, FB, epsab, GEN, generate, params)
 	ficunits:=params["ficunits"];
 	printf "## outputting units to file %o\n", ficunits;
 	fd:=Open(ficunits, "w");
-	fprintf fd, "%o %o 0\n", nrows, rK;
+	// new header for Manu
+	fprintf fd, "%o %o 1\n", nrows, rK; // params["ell"];
 	for i:=1 to nrows do
 	    // only rK components, we don't care about val(eps0)
 	    for j:=1 to rK do
@@ -2133,7 +2151,7 @@ Simul := procedure(dir, name, usef, usegen)
 				usef,false);
 end procedure;
 
-print "Simul(\"../catrel/GFP3\", \"p3dd15-f4g3-GJL-1\", false, true);";
+//print "Simul(\"../catrel/GFP3\", \"p3dd15-f4g3-GJL-1\", false, true);";
 // Simul("SNFS", "p60x4x4", false);
 
 ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,badidealinfo,purged,relsdel,index,ficunits,abunits,usef eq "true",ww eq "true"); // don't ask why we should write this...!

@@ -2172,7 +2172,6 @@ class FactorBaseTask(Task):
 #        self.state.setdefault("rlim", 500000)
 #        self.state.setdefault("alim", 500000)
         if "outputfile" in self.state:
-            print(self.state)
             assert "poly" in self.state
             assert "alim" in self.state
             # The target file must correspond to the polynomial "poly"
