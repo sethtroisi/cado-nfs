@@ -76,6 +76,8 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 	    char *tmp = buf;
 	    new_coding = 1;
 	    nb_polys = i+1;
+	    if(i >= 2)
+		mpz_poly_init (poly->pols[i], MAXDEGREE);
 	    for(j = 0; ; j++){
 		gmp_sscanf(tmp, "%Zd", poly->pols[i]->coeff[j]);
 		//		gmp_printf("read: %d %Zd\n", j, poly->pols[i]->coeff[j]);

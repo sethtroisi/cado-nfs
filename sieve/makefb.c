@@ -516,10 +516,13 @@ main (int argc, char *argv[])
       exit(EXIT_FAILURE);
   }
 
+  // TODO: clean this; we keep the first lines for compatibility reasons
   if (side == ALGEBRAIC_SIDE)
     makefb_with_powers (outputfile, cpoly->alg, alim, maxbits, nb_threads);
-  else
+  else if (side == RATIONAL_SIDE)
     makefb_with_powers (outputfile, cpoly->rat, alim, maxbits, nb_threads);
+  else
+    makefb_with_powers (outputfile, cpoly->pols[side], alim, maxbits, nb_threads);
 
   cado_poly_clear (cpoly);
   if (outfilename != NULL) {
