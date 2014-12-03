@@ -2169,8 +2169,6 @@ class FactorBaseTask(Task):
         # Invariant: if we have a result (in self.state["outputfile"]) then we
         # must also have a polynomial (in self.state["poly"] ) and the alim
         # value used in self.state["alim"]
-#        self.state.setdefault("rlim", 500000)
-#        self.state.setdefault("alim", 500000)
         if "outputfile" in self.state:
             assert "poly" in self.state
             assert "alim" in self.state
@@ -2310,8 +2308,6 @@ class FreeRelTask(Task):
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"]) and
         # the lpba value used in self.state["lpba"]
-#        self.state.setdefault("lpba", 24)
-#        self.state.setdefault("lpbr", 24)
         if "freerelfilename" in self.state:
             assert "poly" in self.state
             assert "lpba" in self.state
