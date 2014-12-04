@@ -171,7 +171,6 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  /* A method value we don't know about. Something's wrong, bail out */
 	  abort();
 	}
-      
       /* The following possibilities exist:
 	 bt:   Factor:    Cofactor:   Action:
 	 0           1    composite   Try next method
@@ -251,7 +250,6 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	      continue;
 	    }
 	}
-      
       /* So we found a non-trivial factor. See if it is prime, if the 
 	 cofactor is prime, and if one of them is, whether they are too
 	 large for our smoothness bounds */
