@@ -21,7 +21,7 @@
 
 int CONST_TEST_R = 55;
 
-#define CADO_UNDERLEAVING
+#define CADO_INTERLEAVING
 /*
   This binary allows to test our procedure choosing optimal
   strategies. In fact, using the strategy of CADO, we can use it to
@@ -251,7 +251,7 @@ tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
 
 
 /************************************************************************/
-/*                  To underleave our strategies                        */
+/*                  To interleave our strategies                        */
 /************************************************************************/
 MAYBE_UNUSED int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)
 {
@@ -262,7 +262,7 @@ MAYBE_UNUSED int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)
     return true;
 }
 /*
-  test the underleaving!
+  test the interleaving!
   bug: so many tests!!
 */
 /* strategy_t *gen_strat_r0_r1_uleav_st(strategy_t * strat_r0, */
@@ -510,7 +510,7 @@ tabular_strategy_t *gen_strat_r0_r1_uleav(tabular_strategy_t * strat_r0,
 	strategy_t* st = gen_strat_r0_r1_uleav_st(strat_r0->tab[r0],
 						  strat_r1->tab[r1],
 						  init_tab, fbb, lpb, r);
-	printf ("UNDERL proba=%lf, time=%lf\n", st->proba, st->time);
+	printf ("INTERL proba=%lf, time=%lf\n", st->proba, st->time);
 	tabular_strategy_add_strategy (res, st);
 	//compare probabilities: 
 	strategy_free (st);
@@ -520,7 +520,7 @@ tabular_strategy_t *gen_strat_r0_r1_uleav(tabular_strategy_t * strat_r0,
 }
 
 /*
-  Test an underleaving!!
+  Test an interleaving!!
  */
 tabular_strategy_t ***generate_matrix_cado_uleav(const char *name_directory_decomp,
 						 tabular_fm_t * methods,
@@ -1221,17 +1221,17 @@ int main(int argc, char *argv[])
     strategy_t *res = gen_strat_r0_r1_uleav_st(strat1, strat2, init_tab,
     					       fbb, lpb, r);
     strategy_print (res);
-    //bench time with our underleaving methods!
+    //bench time with our interleaving methods!
     int mfb[2] = {mfb0, mfb1};
     printf ("bench proba time\n");
     double* tmp = bench_proba_time_st_both(state, res, init_tab, r, fbb, lpb, mfb);
-    printf ("bench both UD: proba = %lf, time = %lf\n", tmp[0], tmp[1]);      
+    printf ("bench both interL: proba = %lf, time = %lf\n", tmp[0], tmp[1]);      
     exit(1);
     //}}
     
     //generate our strategies
     //remark: for each pair (r0, r1), we have only one strategy!!
-#ifndef CADO_UNDERLEAVING
+#ifndef CADO_INTERLEAVING
     tabular_strategy_t ***matrix =
       generate_matrix_cado(name_directory_decomp, methods,
 			   fbb0, lpb0, mfb0,
@@ -1265,7 +1265,7 @@ int main(int argc, char *argv[])
 		}
 	fclose(file_output);
     }
-#else  //underleaving!
+#else  //interleaving!
     tabular_strategy_t ***matrix =
       generate_matrix_cado_uleav(name_directory_decomp, methods,
 				 fbb0, lpb0, mfb0,
