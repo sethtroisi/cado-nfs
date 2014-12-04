@@ -96,6 +96,7 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
   methods[2].method = EC_METHOD;
   methods[2].plan = malloc (sizeof (ecm_plan_t));
+  
   ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
 
   if (n > 0)
@@ -122,7 +123,6 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
       ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
 		     MONTY12, i - 1, 1, 0);
     }
-
   methods[n + 3].method = 0;
   methods[n + 3].plan = NULL;
 
@@ -938,7 +938,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
   for (int i = 0; methods[i].method != 0; i++)
     {
       int side = methods[i].side;
-      if (is_smooth[side] == FACUL_SMOOTH)
+      if (is_smooth[side] != FACUL_MAYBE)
 	continue;
 
       int res_fac = 0;
@@ -975,7 +975,6 @@ facul_both_src (unsigned long **factors, const modset_t* m,
       }
       //check our result!
       //res_fac contains the number of factors found!
-
       if (res_fac == -1)
 	{
 	  /*
@@ -1014,6 +1013,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
       is_smooth[side] = FACUL_AUX;
     }
   //begin the auxiliary factorisation!
+
   if (is_smooth[0] >= 1 &&  is_smooth[1] >= 1)
     for (int side = 0; side < 2; side++)
       if (is_smooth[side] == FACUL_AUX)
@@ -1070,9 +1070,9 @@ facul_both (unsigned long **factors, mpz_t* N,
       return found;
 
   if (mpz_cmp_ui (N[0], 1UL) == 0)
-    is_smooth[0] = 1;
+    is_smooth[0] = FACUL_SMOOTH;
   if (mpz_cmp_ui (N[1], 1UL) == 0)
-    is_smooth[1] = 1;
+    is_smooth[1] = FACUL_SMOOTH;
 
   for (int side = 0; side < 2; side++)
     {

@@ -5,8 +5,8 @@
 lim=$1
 x=$2
 mfb=$3
-while [ $x -le $mfbr ]
+while [ $x -le $mfb ]
 do
-    ./gst -gdc -lim0 $limr -mfb0 $x -out decomp_tmp/decomp_${limr}_${x}
+    ./gst -gdc -lim0 $lim -mfb0 $x -out decomp_tmp/decomp_${lim}_${x}
     x=$[$x+1]
 done
