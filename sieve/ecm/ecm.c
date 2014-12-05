@@ -578,7 +578,7 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
   unsigned long j;
   long k;
   ellEe_point_t T, PP;
-
+  
   if (e == 0UL)
     {
       mod_set0 (R->x, m);
@@ -586,17 +586,17 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
       mod_set1 (R->z, m);
       return;
     }
-
+  
   if (e == 1UL)
     {
       ellE_set (R, P, m);
       return;
     }
-
+  
   ellEe_init (T, m);
   ellEe_init (PP, m);
   ellEe_set_from_E (PP, P, m);
-
+  
   /* if (e == 2UL) */
   /*   { */
   /*     /\* doubling directly in E is probably faster *\/ */
@@ -617,27 +617,29 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
   /*   } */
 
   /* basic double-and-add */
+  
+  fprintf (stdout, "Running ellE_mul_ul for e = %lu\n", e);
+  
+  mod_set0 (T->x, m);
+  mod_set0 (T->t, m);
+  mod_set1 (T->y, m);
+  mod_set1 (T->z, m);
+  
+  k = CHAR_BIT * sizeof(e) - 1;
+  j = (1UL << k);
+  
+  while(k-- >= 0)
+    {
+      ellEe_double (T, T, m, a);
+      if (j & e)
+	ellEe_add (T, T, PP, a, m);
+      j >>= 1;
+    }
 
-   mod_set0 (T->x, m);
-   mod_set0 (T->t, m);
-   mod_set1 (T->y, m);
-   mod_set1 (T->z, m);
-
-   k = CHAR_BIT * sizeof(e) - 1;
-   j = (1UL << k);
-
-   while(k-- >= 0)
-     {
-       ellEe_double (T, T, m, a);
-       if (j & e)
-	 ellEe_add (T, T, PP, a, m);
-       j >>= 1;
-     }
-
-   ellE_set_from_Ee (R, T, m);
+  ellE_set_from_Ee (R, T, m);
    
-   ellEe_clear (T, m);
-   ellEe_clear (PP, m);
+  ellEe_clear (T, m);
+  ellEe_clear (PP, m);
 }
 
 
@@ -2076,6 +2078,10 @@ if (plan->parameterization == TWED16)
  for ( i=2; i<= plan->B1; i++)
    ellE_mul_ul (P, P, i, m, a);
 
+ mod_gcd (f, P->z, m);    /* FIXME (from above): 
+			     skip this gcd and let the extgcd
+			     in stage 2 init find factors? */
+ 
  /* Stage 2 */
  
  mod_clear (u, m);

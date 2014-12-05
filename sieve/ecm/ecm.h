@@ -40,7 +40,7 @@ typedef struct {
   unsigned int exp2;
   unsigned int B1;
   int parameterization; /* TWED12 or TWED16 */
-  Edwards_curve_t *E;   /* Parameters for Edwards curve */
+  const Edwards_curve_t *E;   /* Parameters for Edwards curve */
 } ecmE_plan_t;
 
 
@@ -82,3 +82,7 @@ void ecm_make_plan (ecm_plan_t *, const unsigned int, const unsigned int,
 
 void ecm_clear_plan (ecm_plan_t *);
 
+
+void ecmE_make_plan (ecmE_plan_t *, const unsigned int, const int); 
+
+void ecmE_clear_plan (ecmE_plan_t *);
