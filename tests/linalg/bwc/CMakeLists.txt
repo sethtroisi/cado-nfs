@@ -67,12 +67,9 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     if(gfp_layer STREQUAL "p_1")
         set(mextra)
         # Only try to enable magma if CHECKS_EXPENSIVE is set.
-        if(DEFINED ENV{CHECKS_EXPENSIVE})
-            find_program(MAGMA magma)
-            if (MAGMA)
-                set(mextra magma=${MAGMA})
-            endif(MAGMA)
-        endif(DEFINED ENV{CHECKS_EXPENSIVE})
+        if(DEFINED ENV{CHECKS_EXPENSIVE} AND DEFINED ENV{MAGMA})
+            set(mextra magma=$ENV{MAGMA})
+        endif(DEFINED ENV{CHECKS_EXPENSIVE} AND DEFINED ENV{MAGMA})
         add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
             random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
         add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh

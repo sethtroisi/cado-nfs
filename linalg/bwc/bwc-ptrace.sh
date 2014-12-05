@@ -28,6 +28,7 @@ pass_bwcpl_args=("$@")
 : ${n=4}
 : ${prime=4148386731260605647525186547488842396461625774241327567978137}
 : ${mpi=1x1}
+: ${lingen_mpi=1x1}
 : ${thr=2x2}
 # Set the "matrix" variable in order to work on a real matrix.
 : ${matrix=}
@@ -283,6 +284,7 @@ prepare_common_arguments() {
         matrix=$matrix
         mpi=$mpi
         thr=$thr
+        lingen_mpi=$mpi
         m=$m
         n=$n
         wdir=$wdir
