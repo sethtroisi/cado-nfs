@@ -927,6 +927,7 @@ class BWC(Program):
                  dryrun: Toggle("d")=None,
                  verbose: Toggle("v")=None,
                  mpi: ParameterEq()=None,
+                 lingen_mpi: ParameterEq()=None,
                  threads: ParameterEq("thr")=None,
                  mn: ParameterEq()=None,
                  nullspace: ParameterEq()=None,
