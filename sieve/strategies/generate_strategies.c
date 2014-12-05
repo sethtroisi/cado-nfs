@@ -79,6 +79,8 @@ compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
 	}
 	all += dec->nb_elem;
     }
+    if (all < (double)LDBL_EPSILON) // all == 0.0 -> it exists any decomposition!
+      return 0;
     return nb_found_elem / all;
 }
 
@@ -138,6 +140,9 @@ double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, in
 	time_average += time_dec * dec->nb_elem;
 	all += dec->nb_elem;
     }
+    if (all < (double)LDBL_EPSILON) // all == 0.0 -> it exists any decomposition!
+      return 0;
+    
     return time_average / all;
 }
 
@@ -182,11 +187,12 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 			     int fbb, int lpb, int r)
 {
     if (index_iter >= len_iteration) {
-	tabular_strategy_add_strategy_without_zero(res, strat);
-	int nb_strat = res->index - 1;
 	double proba =
-	    compute_proba_strategy(init_tab, res->tab[nb_strat], fbb, lpb);
-	double time = compute_time_strategy(init_tab, res->tab[nb_strat], r);
+	    compute_proba_strategy(init_tab, strat, fbb, lpb);
+	double time = compute_time_strategy(init_tab, strat, r);
+
+	int nb_strat = res->index;
+	tabular_strategy_add_strategy_without_zero(res, strat);
 	strategy_set_proba(res->tab[nb_strat], proba);
 	strategy_set_time(res->tab[nb_strat], time);
     } else {
@@ -218,7 +224,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
 						tabular_fm_t * ecm_rc, 
-						unsigned long lim,
+						int ncurves, unsigned long lim,
 						int lpb, int r)
 {
     //contains the final result
@@ -261,10 +267,10 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
     int len_pp1 = pp1->index;
     int len_ecm_m16 = ecm_m16->index;
     int len_ecm_rc = ecm_rc->index;
-    int nb_iteration = 4;
+    //int nb_iteration = 4;
 
     //init strat
-    int len_strat = 3 + nb_iteration;
+    int len_strat = 2 + ncurves;
     strategy_t *strat = strategy_create();
     for (int i = 0; i < len_strat; i++)
 	strategy_add_fm(strat, zero);
@@ -309,9 +315,8 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 		while (ind_ecm_rc < len_ecm_rc &&
 		       ecm_rc->tab[ind_ecm_rc]->proba[0] < current_proba_ecm)
 		    ind_ecm_rc++;
-
 		generate_collect_iter_ecm_rc(zero, ecm_rc, ind_ecm_rc, strat,
-					     3, 0, nb_iteration, init_tab,
+					     3, 0, ncurves, init_tab,
 					     all_strat, fbb, lpb, r);
 
 		//process data to avoid to full the RAM!!!
@@ -466,6 +471,7 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 				      tabular_fm_t* pm1, tabular_fm_t* pp1,
 				      tabular_fm_t*ecm_m16, tabular_fm_t*ecm_rc,
+				      int ncurves,
 				      unsigned long lim0, int lpb0, int mfb0,
 				      unsigned long lim1, int lpb1, int mfb1)
 {
@@ -517,7 +523,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	}
 	data_rat[r0] =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, lim0, lpb0, r0);
+					ecm_rc, ncurves, lim0, lpb0, r0);
 	tabular_decomp_free(tab_decomp);
     }
 
@@ -545,7 +551,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 
 	tabular_strategy_t *strat_r1 =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, lim1, lpb1, r1);
+					ecm_rc, ncurves, lim1, lpb1, r1);
 	tabular_decomp_free(tab_decomp);
 
 	for (int r0 = 0; r0 <= mfb0; r0++) {

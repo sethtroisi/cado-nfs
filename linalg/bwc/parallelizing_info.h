@@ -179,7 +179,12 @@ extern "C" {
  *
  * nhc, nvc are the same for threads (cores).
  */
-extern void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void * arg),
+
+extern void parallelizing_info_decl_usage(param_list pl);
+extern void parallelizing_info_lookup_parameters(param_list_ptr pl);
+
+extern void pi_go(
+        void *(*fcn)(parallelizing_info_ptr, param_list pl, void * arg),
         param_list pl,
         void * arg);
 

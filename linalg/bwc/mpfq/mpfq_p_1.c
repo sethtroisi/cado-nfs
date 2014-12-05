@@ -1959,6 +1959,10 @@ void mpfq_p_1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->sscan = (int (*) (mpfq_vbase_ptr, void *, const char *)) mpfq_p_1_wrapper_sscan;
     vbase->fscan = (int (*) (mpfq_vbase_ptr, FILE *, void *)) mpfq_p_1_wrapper_fscan;
     vbase->scan = (int (*) (mpfq_vbase_ptr, void *)) mpfq_p_1_wrapper_scan;
+    /* missing read */
+    /* missing importdata */
+    /* missing write */
+    /* missing exportdata */
     vbase->vec_init = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_p_1_wrapper_vec_init;
     vbase->vec_reinit = (void (*) (mpfq_vbase_ptr, void *, unsigned int, unsigned int)) mpfq_p_1_wrapper_vec_reinit;
     vbase->vec_clear = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_p_1_wrapper_vec_clear;
@@ -1987,6 +1991,10 @@ void mpfq_p_1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->vec_sscan = (int (*) (mpfq_vbase_ptr, void *, unsigned int *, const char *)) mpfq_p_1_wrapper_vec_sscan;
     vbase->vec_fscan = (int (*) (mpfq_vbase_ptr, FILE *, void *, unsigned int *)) mpfq_p_1_wrapper_vec_fscan;
     vbase->vec_scan = (int (*) (mpfq_vbase_ptr, void *, unsigned int *)) mpfq_p_1_wrapper_vec_scan;
+    /* missing vec_read */
+    /* missing vec_write */
+    /* missing vec_import */
+    /* missing vec_export */
     vbase->vec_ur_init = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_p_1_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_p_1_wrapper_vec_ur_set_zero;
     vbase->vec_ur_set_vec = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned int)) mpfq_p_1_wrapper_vec_ur_set_vec;

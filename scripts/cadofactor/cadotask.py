@@ -122,6 +122,7 @@ class Polynomials(object):
 
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
+    re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*(?:\(.*\))?\s*=", 1))
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
     
@@ -143,6 +144,8 @@ class Polynomials(object):
         self.params = {}
         polyf = Polynomial()
         polyg = Polynomial()
+        # in case of multiple fields
+        tabpoly = {}
 
         def match_poly(line, poly, regex):
             match = regex.match(line)
@@ -154,6 +157,21 @@ class Polynomials(object):
                 poly[idx] = coeff
                 return True
             return False
+
+        # line = "poly0: 1, 2, 3" => poly[0] = {1, 2, 3} = 1+2*X+3*X^2
+        def match_poly_all(line, regex):
+            match = regex.match(line)
+            if match:
+                line2 = line.split(":")
+                # get index of poly
+                ip = int(line2[0].split("poly")[1])
+                # get coeffs of 1+2*X+3*X^2
+                line3=line2[1].split(",")
+                pol = Polynomial()
+                for idx in range(len(line3)):
+                    pol[idx] = int(line3[idx]);
+                return ip, pol
+            return -1, []
 
         for line in lines:
             # print ("Parsing line: >%s<" % line.strip())
@@ -177,6 +195,11 @@ class Polynomials(object):
             # Try to parse polynomial coefficients
             if match_poly(line, polyf, self.re_pol_f) or \
                     match_poly(line, polyg, self.re_pol_g):
+                continue
+            # is it in format "poly*: ..."
+            ip,tip=match_poly_all(line, self.re_polys)
+            if ip != -1:
+                tabpoly[ip] = tip
                 continue
             # All remaining lines must be of the form "x: y"
             array = line2.split(":")
@@ -204,23 +227,38 @@ class Polynomials(object):
         for (key, (_type, isrequired)) in self.keys.items():
             if isrequired and not key in self.params:
                 raise PolynomialParseException("Key %s missing" % key)
+        if len(tabpoly) > 0:
+            polyg = tabpoly[0]
+            polyf = tabpoly[1]
         self.polyf = polyf
         self.polyg = polyg
+        self.tabpoly = tabpoly
         return
 
     def __str__(self):
         arr = ["%s: %s\n" % (key, self.params[key])
                for key in self.keys if key in self.params]
-        arr += ["c%d: %d\n" % (idx, coeff) for (idx, coeff)
-                in enumerate(self.polyf) if not coeff == 0]
-        arr += ["Y%d: %d\n" % (idx, coeff) for (idx, coeff)
-                in enumerate(self.polyg) if not coeff == 0]
+        if len(self.tabpoly) > 0:
+            for i in range(len(self.tabpoly)):
+                poltmp = self.tabpoly[i]
+                arr += ["poly%d: %s" % (i, poltmp[0])]
+                arr += [","+str(poltmp[j]) for j in range(1, len(poltmp))]
+                arr += "\n"
+        else:
+            arr += ["c%d: %d\n" % (idx, coeff) for (idx, coeff)
+                    in enumerate(self.polyf) if not coeff == 0]
+            arr += ["Y%d: %d\n" % (idx, coeff) for (idx, coeff)
+                    in enumerate(self.polyg) if not coeff == 0]
         if not self.MurphyE == 0.:
             arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
             arr.append("# lognorm %g\n" % self.lognorm)
-        arr.append("# f(x) = %s\n" % str(self.polyf))
-        arr.append("# g(x) = %s\n" % str(self.polyg))
+        if len(self.tabpoly) > 0:
+            for i in range(len(self.tabpoly)):
+                arr.append("# poly%d = %s\n" % (i, str(self.tabpoly[i])))
+        else:
+            arr.append("# f(x) = %s\n" % str(self.polyf))
+            arr.append("# g(x) = %s\n" % str(self.polyg))
         return "".join(arr)
 
     def __eq__(self, other):

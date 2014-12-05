@@ -305,7 +305,7 @@ int mpfq_p_8_vec_print(mpfq_p_8_dst_field, mpfq_p_8_src_vec, unsigned int);
 int mpfq_p_8_vec_sscan(mpfq_p_8_dst_field, mpfq_p_8_vec *, unsigned int *, const char *);
 int mpfq_p_8_vec_fscan(mpfq_p_8_dst_field, FILE *, mpfq_p_8_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::gfp */
-#define mpfq_p_8_vec_scan(K, w, n)	mpfq_p_8_vec_fscan(K,stdout,w,n)
+#define mpfq_p_8_vec_scan(K, w, n)	mpfq_p_8_vec_fscan(K,stdin,w,n)
 void mpfq_p_8_vec_ur_init(mpfq_p_8_dst_field, mpfq_p_8_vec_ur *, unsigned int);
 static inline
 void mpfq_p_8_vec_ur_set_zero(mpfq_p_8_dst_field, mpfq_p_8_dst_vec_ur, unsigned int);

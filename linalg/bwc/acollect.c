@@ -127,26 +127,34 @@ int read_afiles(struct afile_list * a)
 
 int main(int argc, char * argv[])
 {
-    int rc = 0;
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-
     param_list pl;
-    param_list_init(pl);
-    param_list_configure_switch(pl, "--remove-old", &remove_old);
-    bw_common_init(bw, pl, &argc, &argv);
-    param_list_parse_mpz(pl, "prime", p);
-    if (param_list_lookup_string(pl, "bits_per_coeff")) {
-        fprintf(stderr, "bits_per_coeff is deprecated. Please pass p directly\n");
-        exit(1);
-    }
 
-    if (mpz_cmp_ui(p, 2) > 0) {
-        bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(p, 2), 64);
+    bw_common_init_new(bw, &argc, &argv);
+    param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    /* {{{ declare local parameters and switches */
+    param_list_decl_usage(pl, "remove-old",
+            "discard original A file once the concatenated file has been successfully written");
+    param_list_configure_switch(pl, "--remove-old", &remove_old);
+    /* }}} */
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+
+    /* {{{ interpret our parameters */
+    if (mpz_cmp_ui(bw->p, 2) > 0) {
+        bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(bw->p, 2), 64);
     } else {
         bits_per_coeff = 1;
     }
-    mpz_clear(p);
+    /* }}} */
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
     param_list_clear(pl);
 
@@ -154,6 +162,8 @@ int main(int argc, char * argv[])
     memset(a,0,sizeof(a));
     if (read_afiles(a) == 0)
         return 0;
+
+    int rc = 0;
 
 
     /* First merge all files we find with similar [n0..n1[ range. Since
@@ -369,5 +379,7 @@ int main(int argc, char * argv[])
         free(tmp);
     }
     free(a->a);
+    bw_common_clear_new(bw);
+
     return rc;
 }

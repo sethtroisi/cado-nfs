@@ -127,42 +127,6 @@ next_number (FILE* file, char* current_char)
   fseek(file, -1, SEEK_CUR);
 }
 
-static void
-check_variables_matrix_strat (const unsigned long type, 
-			      const unsigned long curve, 
-			      const unsigned long b1, 
-			      const unsigned long b2, 
-			      const int side)
-{
-  int res = true;
-  //side
-  if (side > 2)
-    {
-      fprintf (stderr, "error with parameter side : %d\n", side);
-      res = false;
-    }
-  //b1, b2
-  if (b2 < b1)
-    {
-      fprintf (stderr, "error with parameter (b1,b2) : (%lu, %lu)\n", b1, b2);
-      res = false;
-    }
-  //type
-  if ((int)type > NB_METHOD)
-    {
-      fprintf (stderr, "error with parameter type : %lu\n", type);
-      res = false;
-    }
-  //curve
-  if ((int)curve > NB_CURVE)
-    {
-      fprintf (stderr, "error with parameter curve : %lu\n", curve);
-      res = false;
-    }
-  if (!res)
-      exit (EXIT_FAILURE);
-} 
-
 
 tabular_strategy_t*
 tabular_strategy_fscan (FILE* file)
@@ -199,8 +163,6 @@ tabular_strategy_fscan (FILE* file)
 	  next_number (file, &current_char);
 
 	  fscanf (file, "%d", &side);
-	  check_variables_matrix_strat (elem->method[0], elem->method[1], elem->method[2],
-					elem->method[3], side); 
 	  //go to end of line: 10 = '\t'
 	  while (current_char != 10)
 	    current_char = fgetc (file);

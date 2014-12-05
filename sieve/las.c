@@ -767,7 +767,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         verbose_output_add(2, stderr, 1);
     }
 
-    verbose_set_enabled_flags(pl);
+    verbose_interpret_parameters(pl);
     param_list_print_command_line(las->output, pl);
     las_display_config_flags();
 

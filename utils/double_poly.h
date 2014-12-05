@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 typedef struct {
-  unsigned int deg;
+  int deg;
   double *coeff;         /* array of deg+1 entries */
 } double_poly_struct_t;
 

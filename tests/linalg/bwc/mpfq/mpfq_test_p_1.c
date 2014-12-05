@@ -4,7 +4,6 @@
 /* test_p_1.c is sed- generated from test.c.meta */
 
 #ifdef  NDEBUG
-#warning "Forcibly disabling -DNDEBUG for the tests"
 #undef NDEBUG
 #endif
 

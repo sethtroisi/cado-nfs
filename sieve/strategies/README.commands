@@ -1,0 +1,48 @@
+#!/bin/bash
+
+
+#to select factoring methods
+fbb=$1
+lpb=$2
+
+#to set our sieve region
+lim0=$2
+lpb0=$3
+mfb0=$4
+
+lim1=$5
+lpb1=$6
+mfb1=$7
+ncurve0=$8
+ncurve1=$9
+
+./script_fm.sh $fbb $lpb
+
+./script_mg.sh $fbb $lpb
+
+./script_bench.sh $fbb $lpb
+
+--->all methods!!
+
+mkdir decomp_tmp
+let "bound_min=(2*lim0-1)"
+./script_gen_dec.sh $lim0 $bound_min $mfb0
+if $lim0 != $lim1 then
+let "bound_min=(2*lim1-1)"
+./script_gen_dec.sh $lim1 $bound_min $mfb1
+fi
+
+mkdir res_precompt_st
+./script_str_r.sh $lim0 $lpb0 $mfb0 $ncurve0 decomp_tmp All_methods res_precompt_st 
+if $lim0 != $lim1 then
+./script_str_r.sh $lim1 $lpb1 $mfb1 $ncurve1 decomp_tmp All_methods res_precompt_st 
+fi
+
+mkdir res_matrix
+./script_str.sh $lim0 $mfb0 $lim1 $mfb1 decomp_tmp precompt
+
+# ./makefb -poly c120.polyselect2.poly -alim 3837507 -maxbits 11 -out c120.roots
+
+# ./las -I 12 -poly c120.polyselect2.poly -q0 3837507 -q1 3847507 -lim0 2371302 -lim1 3837507 -lpb0 26 -lpb1 26 -mfb0 54 -mfb1 53 -mt 1 -stats-cofact cofactors.stats -fb1 c120.roots
+
+# ./finalst -st res_matrix -dist cofactors.stats -t 101.02 -mfb0 54 -mfb1 53 -out final_st

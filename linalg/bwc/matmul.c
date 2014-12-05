@@ -24,6 +24,63 @@
 
 #define MATMUL_DEFAULT_IMPL "bucket"
 
+void matmul_decl_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "mm_impl",
+            "name of the lower layer matmul implementation");
+    param_list_decl_usage(pl, "mm_store_transposed",
+            "override the default setting for the matrix storage ordering");
+
+    param_list_decl_usage(pl, "l1_cache_size",
+            "internal, for mm_impl=bucket and mm_impl=sliced");
+    param_list_decl_usage(pl, "l2_cache_size",
+            "internal, for mm_impl=bucket");
+    param_list_decl_usage(pl, "cache_line_size",
+            "internal, for mm_impl=threaded");
+    param_list_decl_usage(pl, "mm_threaded_nthreads",
+            "internal, for mm_impl=threaded");
+    param_list_decl_usage(pl, "mm_threaded_sgroup_size",
+            "internal, for mm_impl=threaded");
+    param_list_decl_usage(pl, "mm_threaded_offset1",
+            "internal, for mm_impl=threaded");
+    param_list_decl_usage(pl, "mm_threaded_offset2",
+            "internal, for mm_impl=threaded");
+    param_list_decl_usage(pl, "mm_threaded_offset3",
+            "internal, for mm_impl=threaded");
+    param_list_decl_usage(pl, "mm_threaded_densify_tolerance",
+            "internal, for mm_impl=threaded");
+
+    param_list_decl_usage(pl, "matmul_bucket_methods",
+            "internal, for mm_impl=bucket");
+
+    param_list_decl_usage(pl, "local_cache_copy_dir",
+            "path to a local directory where a secondary copy of the cache will be saved");
+    param_list_decl_usage(pl, "no_save_cache",
+            "skip saving the cache file to disk");
+}
+
+void matmul_lookup_parameters(param_list_ptr pl)
+{
+    param_list_lookup_string(pl, "mm_impl");
+    param_list_lookup_string(pl, "mm_store_transposed");
+
+    param_list_lookup_string(pl, "l1_cache_size");
+    param_list_lookup_string(pl, "l2_cache_size");
+    param_list_lookup_string(pl, "cache_line_size");
+    param_list_lookup_string(pl, "mm_threaded_nthreads");
+    param_list_lookup_string(pl, "mm_threaded_sgroup_size");
+    param_list_lookup_string(pl, "mm_threaded_offset1");
+    param_list_lookup_string(pl, "mm_threaded_offset2");
+    param_list_lookup_string(pl, "mm_threaded_offset3");
+    param_list_lookup_string(pl, "mm_threaded_densify_tolerance");
+    param_list_lookup_string(pl, "matmul_bucket_methods");
+
+    param_list_lookup_string(pl, "local_cache_copy_dir");
+    param_list_lookup_string(pl, "no_save_cache");
+}
+
+
+
 #ifndef  BUILD_DYNAMICALLY_LINKABLE_BWC
 #define MATMUL_NAME_INNER(abase, impl, func) matmul_ ## abase ## _ ## impl ## _ ## func
 #define MATMUL_NAME_INNER0(abase, impl, func) MATMUL_NAME_INNER(abase, impl, func)
@@ -70,6 +127,7 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
     struct matmul_public_s fake[1];
     memset(fake, 0, sizeof(fake));
 
+    if (!impl) { impl = param_list_lookup_string(pl, "mm_impl"); }
     if (!impl) { impl = MATMUL_DEFAULT_IMPL; }
 
     typedef void (*rebinder_t)(matmul_ptr mm);

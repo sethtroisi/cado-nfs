@@ -79,8 +79,6 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-check_PROGRAMS = cantor$(EXEEXT) cantor_gm$(EXEEXT) \
-	cantor_gmt$(EXEEXT)
 subdir = gf2x-fft
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/config/depcomp README
@@ -150,15 +148,6 @@ libcantor128gmt_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 libgf2x_fft_la_LIBADD =
 am_libgf2x_fft_la_OBJECTS = fake_fft.lo
 libgf2x_fft_la_OBJECTS = $(am_libgf2x_fft_la_OBJECTS)
-am_cantor_OBJECTS = cantor_main.$(OBJEXT)
-cantor_OBJECTS = $(am_cantor_OBJECTS)
-cantor_DEPENDENCIES = ../libgf2x.la libcantor128.la
-am_cantor_gm_OBJECTS = cantor_main.$(OBJEXT)
-cantor_gm_OBJECTS = $(am_cantor_gm_OBJECTS)
-cantor_gm_DEPENDENCIES = ../libgf2x.la libcantor128gm.la
-am_cantor_gmt_OBJECTS = cantor_main.$(OBJEXT)
-cantor_gmt_OBJECTS = $(am_cantor_gmt_OBJECTS)
-cantor_gmt_DEPENDENCIES = ../libgf2x.la libcantor128gmt.la
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -194,11 +183,9 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libcantor128_la_SOURCES) $(libcantor128gm_la_SOURCES) \
-	$(libcantor128gmt_la_SOURCES) $(libgf2x_fft_la_SOURCES) \
-	$(cantor_SOURCES) $(cantor_gm_SOURCES) $(cantor_gmt_SOURCES)
+	$(libcantor128gmt_la_SOURCES) $(libgf2x_fft_la_SOURCES)
 DIST_SOURCES = $(libcantor128_la_SOURCES) $(libcantor128gm_la_SOURCES) \
-	$(libcantor128gmt_la_SOURCES) $(libgf2x_fft_la_SOURCES) \
-	$(cantor_SOURCES) $(cantor_gm_SOURCES) $(cantor_gmt_SOURCES)
+	$(libcantor128gmt_la_SOURCES) $(libgf2x_fft_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -362,12 +349,6 @@ libcantor128gm_la_SOURCES = cantor128.c
 libcantor128gmt_la_SOURCES = cantor128.c
 libcantor128gm_la_CFLAGS = $(AM_CFLAGS) -DCANTOR_GM
 libcantor128gmt_la_CFLAGS = $(AM_CFLAGS) -DCANTOR_GM -DCANTOR_GM_TRUNCATE
-cantor_SOURCES = cantor_main.c
-cantor_LDADD = ../libgf2x.la libcantor128.la -lgmp
-cantor_gm_SOURCES = cantor_main.c
-cantor_gm_LDADD = ../libgf2x.la libcantor128gm.la -lgmp
-cantor_gmt_SOURCES = cantor_main.c
-cantor_gmt_LDADD = ../libgf2x.la libcantor128gmt.la -lgmp
 all: all-am
 
 .SUFFIXES:
@@ -461,27 +442,6 @@ libcantor128gmt.la: $(libcantor128gmt_la_OBJECTS) $(libcantor128gmt_la_DEPENDENC
 libgf2x-fft.la: $(libgf2x_fft_la_OBJECTS) $(libgf2x_fft_la_DEPENDENCIES) $(EXTRA_libgf2x_fft_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(LINK) -rpath $(libdir) $(libgf2x_fft_la_OBJECTS) $(libgf2x_fft_la_LIBADD) $(LIBS)
 
-clean-checkPROGRAMS:
-	@list='$(check_PROGRAMS)'; test -n "$$list" || exit 0; \
-	echo " rm -f" $$list; \
-	rm -f $$list || exit $$?; \
-	test -n "$(EXEEXT)" || exit 0; \
-	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
-	echo " rm -f" $$list; \
-	rm -f $$list
-
-cantor$(EXEEXT): $(cantor_OBJECTS) $(cantor_DEPENDENCIES) $(EXTRA_cantor_DEPENDENCIES) 
-	@rm -f cantor$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(cantor_OBJECTS) $(cantor_LDADD) $(LIBS)
-
-cantor_gm$(EXEEXT): $(cantor_gm_OBJECTS) $(cantor_gm_DEPENDENCIES) $(EXTRA_cantor_gm_DEPENDENCIES) 
-	@rm -f cantor_gm$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(cantor_gm_OBJECTS) $(cantor_gm_LDADD) $(LIBS)
-
-cantor_gmt$(EXEEXT): $(cantor_gmt_OBJECTS) $(cantor_gmt_DEPENDENCIES) $(EXTRA_cantor_gmt_DEPENDENCIES) 
-	@rm -f cantor_gmt$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(cantor_gmt_OBJECTS) $(cantor_gmt_LDADD) $(LIBS)
-
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -489,7 +449,6 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cantor128.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cantor_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fake_fft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcantor128gm_la-cantor128.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcantor128gmt_la-cantor128.Plo@am__quote@
@@ -618,7 +577,7 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-	$(MAKE) $(AM_MAKEFLAGS) $(check_LTLIBRARIES) $(check_PROGRAMS)
+	$(MAKE) $(AM_MAKEFLAGS) $(check_LTLIBRARIES)
 check: check-am
 all-am: Makefile $(LTLIBRARIES)
 installdirs:
@@ -657,8 +616,8 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-checkLTLIBRARIES clean-checkPROGRAMS clean-generic \
-	clean-libLTLIBRARIES clean-libtool mostlyclean-am
+clean-am: clean-checkLTLIBRARIES clean-generic clean-libLTLIBRARIES \
+	clean-libtool mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -729,20 +688,28 @@ uninstall-am: uninstall-libLTLIBRARIES
 .MAKE: check-am install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean \
-	clean-checkLTLIBRARIES clean-checkPROGRAMS clean-generic \
-	clean-libLTLIBRARIES clean-libtool cscopelist-am ctags \
-	ctags-am distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-libLTLIBRARIES install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
+	clean-checkLTLIBRARIES clean-generic clean-libLTLIBRARIES \
+	clean-libtool cscopelist-am ctags ctags-am distclean \
+	distclean-compile distclean-generic distclean-libtool \
+	distclean-tags distdir dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am \
+	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags tags-am uninstall uninstall-am uninstall-libLTLIBRARIES
 
+
+# check_PROGRAMS=cantor cantor_gm cantor_gmt
+# cantor_SOURCES=cantor_main.c
+# cantor_LDADD=../libgf2x.la libcantor128.la -lgmp
+# cantor_gm_SOURCES=cantor_main.c
+# cantor_gm_LDADD=../libgf2x.la libcantor128gm.la -lgmp
+# cantor_gmt_SOURCES=cantor_main.c
+# cantor_gmt_LDADD=../libgf2x.la libcantor128gmt.la -lgmp
 
 #check_PROGRAMS=cantor_bench cantor_gm_bench cantor_gmt_bench cantor cantor_gm cantor_gmt
 #cantor_bench_SOURCES=cantor_bench.c

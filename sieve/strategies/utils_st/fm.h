@@ -4,9 +4,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define NB_METHOD 4
-#define NB_CURVE 3
-
 typedef struct fm {
     unsigned long *method;	//contain: METHOD, CURVE, B1, B2
     double *proba;

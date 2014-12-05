@@ -84,9 +84,8 @@ set \
     wdir=$D	\
     thr=$thr	\
     mpi=$mpi	\
-    cpubinding=remove	\
     mn=64	\
-    verbose_flags=^all-cmdline,^bwc-timing-grids,^all-bwc-dispatch,^bwc-cpubinding,^bwc-cache-major-info,^perl-cmdline,^perl-sections,^perl-checks	\
+    verbose_flags=^all-cmdline,^bwc-timing-grids,^all-bwc-dispatch,^bwc-cache-major-info,^perl-cmdline,^perl-sections,^perl-checks	\
     matrix=$D/$M.bin	\
     sequential_cache_build=1	\
     sanity_check_vector=H1	\
@@ -100,7 +99,7 @@ fi
 $bindir/bwc.pl dispatch "$@"
 
 rc=$?
-# $bindir/dispatch nullspace=left wdir=/tmp/$M thr=${thr1}x${thr2} interval=20 cpubinding=remove mn=64 prime=2 verbose_flags=^all-cmdline,^bwc-timing-grids matrix=/tmp/$M.bin balancing=$bfile ys=0..64 sequential_cache_build=1 sanity_check_vector=H1 rebuild_cache=1 matmul_bucket_methods=small1,small2,large
+# $bindir/dispatch nullspace=left wdir=/tmp/$M thr=${thr1}x${thr2} interval=20 mn=64 prime=2 verbose_flags=^all-cmdline,^bwc-timing-grids matrix=/tmp/$M.bin balancing=$bfile ys=0..64 sequential_cache_build=1 sanity_check_vector=H1 rebuild_cache=1 matmul_bucket_methods=small1,small2,large
 
 if ! [ "$keep" ] ; then
 rm -rf "$D"

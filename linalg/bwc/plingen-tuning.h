@@ -9,6 +9,9 @@
 extern "C" {
 #endif
 
+void plingen_tuning_decl_usage(param_list_ptr pl);
+void plingen_tuning_lookup_parameters(param_list_ptr pl);
+
 void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm comm, param_list_ptr pl);
 
 #ifdef __cplusplus

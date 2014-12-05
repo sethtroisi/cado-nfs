@@ -271,8 +271,6 @@ linalg/bwc/balancing_workhorse.h
 linalg/bwc/bcast-file.c
 linalg/bwc/bench.c
 linalg/bwc/build.c
-linalg/bwc/bw-common-mpi.c
-linalg/bwc/bw-common-mpi.h
 linalg/bwc/bw-common.c
 linalg/bwc/bw-common.h
 linalg/bwc/bwc-ptrace.m
@@ -728,6 +726,8 @@ utils/stats.h
 utils/stats.c
 utils/lll.c
 utils/lll.h
+utils/lognorm_skewness.h
+utils/lognorm_skewness.c
 tests/README
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
@@ -1100,6 +1100,7 @@ tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
 tests/gf2x/CMakeLists.txt
 tests/gf2x/test_gf2x.sh
+tests/gf2x/test_cantor.c
 config/hwloc.cmake
 config/numa.cmake
 linalg/bwc/cpubinding.conf
@@ -1164,3 +1165,5 @@ tests/sieve/strategies/test_generate_composite_numbers.c
 tests/sieve/strategies/test_filtering.c
 tests/sieve/strategies/test_generate_strategies.c
 sieve/strategies/test_strategy_cado.c
+sieve/strategies/README.commands
+sieve/strategies/script_gen_dec.sh

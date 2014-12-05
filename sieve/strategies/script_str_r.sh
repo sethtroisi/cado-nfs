@@ -8,6 +8,7 @@
 lim0=$1 # say 2^27
 lpb0=$2 # say 37
 mfb0=$3 # say 110
+ncurves=$4 # say 10
 
 #directory which store our decomposition files!
 decomp=$5 # say '/localdisk/trichard/results/decomp_cofactor/decomp_tmp/'
@@ -20,7 +21,7 @@ out=$7 # say 'res_precompt_st/'
 let "r0=0"
 while [ $r0 -le $mfb0 ]; do
 pathname_decomp=$decomp"/decomp_"$lim0"_"$r0
-./gst -gst_r -lim0 $fbb0 -lpb0 $lpb0 -r0 $r0 -in $methods -decomp $pathname_decomp -out $out &
+./gst -gst_r -lim0 $lim0 -lpb0 $lpb0 -r0 $r0 -ncurves $ncurves -in $methods -decomp $pathname_decomp -out $out &
 let "r0 = r0 + 1"
 done
 

@@ -33,13 +33,15 @@ static void declare_usage(param_list pl)
 			  "(switch)  to precompute the best strategies \n"
 			  "\t \t for one bit size cofactor.\n "
 			  "\t \t You must specify these options:\n"
-			  "\t \t -lim0, -lpb0, -r0 -decomp\n");
+			  "\t \t -lim0, -lpb0, -r0, -ncurves, -decomp\n");
     param_list_decl_usage(pl, "gst",
 	"(switch)  to merge two (or all) precomputing did by the option 'gst_r',\n "
 	"\t \t and thus find the best strategie(s) for one (or each) couple (r0,r1).\n"
 	"\t \t So, you must specify these options:\n"
 	"\t \t -lim0, -lim1 ,-in, and ((-r0 -r1) or (-mfb0, -mfb1))\n");
 
+    param_list_decl_usage(pl, "ncurves",
+			  "controls number of curves.\n");
     param_list_decl_usage(pl, "r0",
 			  "set the bit size of the studied cofactor to r0.\n");
     param_list_decl_usage(pl, "r1",
@@ -114,6 +116,7 @@ int main(int argc, char *argv[])
     int mfb0 = -1;
     int lpb0 = -1;
     int lpb1 = -1;
+    int ncurves = -1;
 
     param_list_parse_ulong(pl, "lim0", &lim0);
     param_list_parse_ulong(pl, "lim1", &lim1);
@@ -121,6 +124,7 @@ int main(int argc, char *argv[])
     param_list_parse_int(pl, "lpb1", &lpb1);
     param_list_parse_int(pl, "mfb1", &mfb1);
     param_list_parse_int(pl, "mfb0", &mfb0);
+    param_list_parse_int(pl, "ncurves", &ncurves);
 
     int gdc = param_list_parse_switch(pl, "-gdc");
     int gst_r = param_list_parse_switch(pl, "-gst_r");
@@ -128,7 +132,7 @@ int main(int argc, char *argv[])
 
     //and precompute just for one side!
     if (gdc) {			//precompute all decompositions!
-	
+
 	if (lim0 == 0){
 	    fprintf(stderr, "Error: parameter -lim0 is mandatory\n");
 	    param_list_print_usage(pl, argv[0], stderr);
@@ -151,16 +155,16 @@ int main(int argc, char *argv[])
 	tabular_decomp_fprint (file, res);
 	tabular_decomp_free (res);
 	fclose (file);
-	
+
       } else {
-      
+
       //store data
       const char *directory_out;
       if ((directory_out = param_list_lookup_string(pl, "out")) == NULL) {
 	directory_out = "./";
       }
 
-      
+
       if (gst) {
 	//check parameters!
 	const char *directory_in;
@@ -180,7 +184,6 @@ int main(int argc, char *argv[])
 	    exit(EXIT_FAILURE);
 	}
 
-	
 	int r0 = -1, r1 = -1;
 	param_list_parse_int(pl, "r0", &r0);
 	param_list_parse_int(pl, "r1", &r1);
@@ -237,7 +240,7 @@ int main(int argc, char *argv[])
 	       strategies had been choosed. Now, it's time to merge these
 	       datas to compute the best strategies for each couple (r0, r1)!
 	    */
-	    
+
 	    if (mfb0 == 0){
 		fprintf(stderr, "Error: parameter -mfb0 is mandatory\n");
 		param_list_print_usage(pl, argv[0], stderr);
@@ -265,7 +268,7 @@ int main(int argc, char *argv[])
 		}
 		fclose(file_in);
 	    }
-	    
+
 	    for (int r1 = 0; r1 <= mfb1; r1++) {
 		sprintf(name_file_in, "%s/strategies%lu_%d",
 			directory_in, lim1, r1);
@@ -277,19 +280,20 @@ int main(int argc, char *argv[])
 			    name_file_in);
 		    exit(EXIT_FAILURE);
 		}
-		
+
 		fclose(file_in);
-		
+
 		for (int r0 = 0; r0 <= mfb0; r0++) {
 		    char res_file[200];
 		    tabular_strategy_t *res =
 			generate_strategy_r0_r1(data_rat[r0], strat_r1);
 		    //print
-		    sprintf(res_file, "%s/strategies_%d_%d", directory_out, r0, r1);
+		    sprintf(res_file,
+			    "%s/strategies_%d_%d", directory_out, r0, r1);
 	      FILE *file = fopen(res_file, "w");
 	      tabular_strategy_fprint(file, res);
 	      fclose(file);
-	      
+
 	      tabular_strategy_free(res);
 		}
 		tabular_strategy_free(strat_r1);
@@ -306,7 +310,7 @@ int main(int argc, char *argv[])
 	      param_list_print_usage(pl, argv[0], stderr);
 	      exit(EXIT_FAILURE);
 	  }
-	  
+
 	  FILE *file_in = fopen(name_file_in, "r");
 	  tabular_fm_t *c = tabular_fm_fscan(file_in);
 	  if (c == NULL) {
@@ -315,18 +319,18 @@ int main(int argc, char *argv[])
 	      exit(EXIT_FAILURE);
 	  }
 	  fclose(file_in);
-	  
+
 	  tabular_fm_t *data_pp1_27 = extract_fm_method(c, PP1_27_METHOD, 0);
 	  tabular_fm_t *data_pp1_65 = extract_fm_method(c, PP1_65_METHOD, 0);
-	  
+
 	  tabular_fm_t *data_pm1 = extract_fm_method(c, PM1_METHOD, 0);
-	  
+
 	  tabular_fm_t *data_ecm_m16 = extract_fm_method(c, EC_METHOD, MONTY16);
-	  
+
 	  tabular_fm_t *data_ecm_m12 = extract_fm_method(c, EC_METHOD, MONTY12);
-	  
+
 	  tabular_fm_t *data_ecm_b12 = extract_fm_method(c, EC_METHOD, BRENT12);
-	
+
 	  tabular_fm_t *data_ecm_rc = tabular_fm_create();
 	  tabular_fm_concat(data_ecm_rc, data_ecm_b12);
 	  tabular_fm_concat(data_ecm_rc, data_ecm_m12);
@@ -340,24 +344,16 @@ int main(int argc, char *argv[])
 	  tabular_fm_sort(data_ecm_m16);
 	  tabular_fm_sort(data_ecm_rc);
 
+	  data_pp1->index = 10;
+	  data_pm1->index = 10;
+	  data_ecm_rc->index = 10;
 	  if (gst_r) {
 
 	      int r0 = -1;
 	      param_list_parse_int(pl, "r0", &r0);
-	      if (lim0 == 0){
-		  fprintf(stderr, "Error: parameter -r is mandatory\n");
-		  param_list_print_usage(pl, argv[0], stderr);
-		  exit(EXIT_FAILURE);
-	      }
-
-	      if (lpb0 == -1){
-		  fprintf(stderr, "Error: parameter -lbp0 is mandatory\n");
-		  param_list_print_usage(pl, argv[0], stderr);
-		  exit(EXIT_FAILURE);
-	      }
-
-	      if (lim0 == 0){
-		  fprintf(stderr, "Error: parameter -lim0 is mandatory\n");
+	      if (r0 == -1 || lpb0 == -1 || lim0 == 0 || ncurves == -1){
+		  fprintf(stderr, "Error: parameters -r0 -lim0 "
+			  "-lpb0 -ncurves are mandatories.\n");
 		  param_list_print_usage(pl, argv[0], stderr);
 		  exit(EXIT_FAILURE);
 	      }
@@ -371,14 +367,15 @@ int main(int argc, char *argv[])
 		  if ((name_file_decomp =
 		       param_list_lookup_string(pl, "decomp")) == NULL) {
 
-		      fprintf(stderr, "Error: parameter -decomp is mandatory\n");
+		      fprintf(stderr, 
+			      "Error: parameter -decomp is mandatory\n");
 		      param_list_print_usage(pl, argv[0], stderr);
 		      exit(EXIT_FAILURE);
 		  }
 		  FILE *file_decomp = fopen(name_file_decomp, "r");
-		  
+
 		  tab_decomp = tabular_decomp_fscan(file_decomp);
-		  
+
 		  if (tab_decomp == NULL) {
 		      fprintf(stderr, "impossible to read '%s'\n",
 			      name_file_decomp);
@@ -389,22 +386,32 @@ int main(int argc, char *argv[])
 	      fm_t *zero = fm_create();
 	      unsigned long method_zero[4] = { 0, 0, 0, 0 };
 	      fm_set_method(zero, method_zero, 4);
-	      
+
 	      tabular_strategy_t *res =
 		  generate_strategies_oneside(tab_decomp, zero, data_pm1,
 					      data_pp1, data_ecm_m16,
-					      data_ecm_rc, lim0, lpb0, r0);
-	      
+					      data_ecm_rc, ncurves, 
+					      lim0, lpb0, r0);
+
 	      tabular_decomp_free(tab_decomp);
-	      
-	      char name_file[strlen (directory_out) + 20];
-	      sprintf(name_file, "%s/strategies%lu_%d", directory_out, lim0, r0);
+
+	      char name_file[strlen (directory_out) + 50];
+	      sprintf(name_file, 
+		      "%s/strategies%lu_%d", directory_out, lim0, r0);
 	      FILE *file_out = fopen(name_file, "w");
+	      if (file_out == NULL)
+		  {
+		      fprintf(stderr, "impossible to write in %s\n", name_file);
+		      param_list_clear(pl);
+		      exit(EXIT_FAILURE);
+		  }
+
+
 	      tabular_strategy_fprint(file_out, res);
 	      fclose(file_out);
 	      tabular_strategy_free(res);
 	      fm_free(zero);
-	      
+
 	  } else {
 	      /*
 		default parameter: this function generates our best
@@ -415,7 +422,7 @@ int main(int argc, char *argv[])
 	      //Check parameters
 
 	      if (lim0 == 0 || lpb0 == -1 || mfb0 == -1 ||
-		  lim1 == 0 || lpb1 == -1 || mfb1 == -1){
+		  lim1 == 0 || lpb1 == -1 || mfb1 == -1 || ncurves){
 		  fprintf(stderr, 
 			  "Error: parameters -lim0 -lpb0 -mfb0"
 			  " -lim1 -lpb1 -mfb1 are mandatories\n");
@@ -438,7 +445,7 @@ int main(int argc, char *argv[])
 	      tabular_strategy_t ***matrix =
 		  generate_matrix(name_directory_decomp,
 				  data_pm1, data_pp1,
-				  data_ecm_m16, data_ecm_rc,
+				  data_ecm_m16, data_ecm_rc, ncurves,
 				  lim0, lpb0, mfb0,
 				  lim1, lpb1,mfb1);
 

@@ -27,6 +27,3 @@ let "r1 = r1 + 1"
 done
 let "r0 = r0 + 1"
 done
-
-
-

@@ -29,7 +29,8 @@
 
 /* TODO:
  * - implement file-backed rewind on thread pipes. There's a
- *   balancing_use_auxfile parameter for this.
+ *   balancing_use_auxfile parameter for this, but the functionality is
+ *   missing.
  * - integrate fully with matmul_top.c, (DONE)
  * - also call mf_scan and mf_bal when needed (we also want a standalone
  *   tool, though). Not done yet. Chicken and egg problem: mf_bal
@@ -180,6 +181,23 @@
  * n_peer_threads */
 // both sizes below are in uint32_t's
 const size_t default_queue_size = 1 << 20;
+
+void balancing_decl_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "balancing_use_auxfile",
+            "placeholder for future feature. do not use.");
+    param_list_decl_usage(pl, "balancing_queue_size",
+            "adjust internal pipe lengths within dispatch");
+    param_list_decl_usage(pl, "sanity_check_vector",
+            "while dispatching the matrix, store a fixed matrix times vector product in the given file");
+}
+
+void balancing_lookup_parameters(param_list_ptr pl)
+{
+    param_list_lookup_string(pl, "balancing_use_auxfile");
+    param_list_lookup_string(pl, "balancing_queue_size");
+    param_list_lookup_string(pl, "sanity_check_vector");
+}
 
 /* {{{ sources  */
 

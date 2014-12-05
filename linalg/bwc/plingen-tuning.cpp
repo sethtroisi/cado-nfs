@@ -37,6 +37,19 @@
 #include <iostream>
 #include <sstream>
 
+void plingen_tuning_decl_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "B",
+            "minimum end of bench span window");
+    param_list_decl_usage(pl, "catchsig",
+            "enable intercepting ^C");
+}
+void plingen_tuning_lookup_parameters(param_list_ptr pl)
+{
+    param_list_lookup_string(pl, "B");
+    param_list_lookup_string(pl, "catchsig");
+}
+
 /* interface to C programs for list of cutoffs we compute *//*{{{*/
 /* This is the simple C-type cutoff table which is used down the line by
  * C programs */
