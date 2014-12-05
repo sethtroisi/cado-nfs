@@ -119,6 +119,7 @@ class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
 
 class fb_slices_interface {
 public:
+  virtual ~fb_slices_interface(){}
   virtual void append(const fb_general_entry &) = 0;
   virtual void fprint(FILE *) const = 0;
   virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) const = 0;
