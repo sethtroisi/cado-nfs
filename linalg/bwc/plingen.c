@@ -77,6 +77,8 @@ static const char * checkpoint_directory;
 static unsigned int checkpoint_threshold = 100;
 static int save_gathered_checkpoints = 0;
 
+static int allow_zero_on_rhs = 0;
+
 int rank0_exit_code = EXIT_SUCCESS;
 
 
@@ -111,6 +113,8 @@ void plingen_decl_usage(param_list_ptr pl)
             "provide timings on all output lines");
     param_list_decl_usage(pl, "tune",
             "activate tuning mode");
+    param_list_decl_usage(pl, "allow_zero_on_rhs",
+            "do not cry if the generator corresponds to a zero contribution on the RHS vectors");
 
     /* we must be square ! And thr is not supported. */
     param_list_decl_usage(pl, "mpi", "number of MPI nodes across which the execution will span, with mesh dimensions");
@@ -1894,8 +1898,12 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                 matpoly_swap(rhs2, rhs);
                 matpoly_clear(ab, rhs2);
                 if (sol_score[0][0] == 0) {
-                    fprintf(stderr, "ERROR: all solutions have zero contribution on the RHS vectors -- we will just output right kernel vectors\n");
-                    rank0_exit_code = EXIT_FAILURE;
+                    if (allow_zero_on_rhs) {
+                        printf("Note: all solutions have zero contribution on the RHS vectors -- we will just output right kernel vectors (ok because of allow_zero_on_rhs=1)\n");
+                    } else {
+                        fprintf(stderr, "ERROR: all solutions have zero contribution on the RHS vectors -- we will just output right kernel vectors (maybe use allow_zero_on_rhs ?)\n");
+                        rank0_exit_code = EXIT_FAILURE;
+                    }
                 }
                 /* ugly: use sol_score[i][0] now to provide the future
                  * "sols" array. We'll get rid of sol_score right afterwards
@@ -2747,6 +2755,7 @@ int main(int argc, char *argv[])
 
     logline_init_timer();
 
+    param_list_parse_int(pl, "allow_zero_on_rhs", &allow_zero_on_rhs);
     param_list_parse_uint(pl, "random-input-with-length", &random_input_length);
     param_list_parse_int(pl, "caching", &caching);
 

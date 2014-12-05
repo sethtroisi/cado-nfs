@@ -1236,6 +1236,7 @@ sub task_common_run {
     } else {
         @_ = grep !/^lingen_mpi?=/, @_;
     }
+    @_ = grep !/allow_zero_on_rhs/, @_ unless $program =~ /^plingen/;
     @_ = grep !/^splits?=/, @_ unless $program =~ /split$/;
     @_ = grep !/^save_submatrices?=/, @_ unless $program =~ /^(dispatch|prep|krylov|mksol|gather)$/;
     # are we absolutely sure that lingen needs no matrix ?
@@ -1793,7 +1794,7 @@ sub task_lingen {
         push @args, "lingen-threshold=$lt";
         push @args, "lingen-mpi-threshold=$lt";
         push @args, "afile=$concatenated_A";
-        push @args, grep { /^(?:mn|m|n|wdir|prime|rhs|lingen_mpi)=/ } @main_args;
+        push @args, grep { /^(?:mn|m|n|wdir|prime|rhs|lingen_mpi)=/ || /allow_zero_on_rhs/ } @main_args;
         if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {
             print "## non-MPI build, avoiding multithreaded plingen\n";
             @args = grep { !/^(mpi|thr)=/ } @args;
