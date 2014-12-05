@@ -1212,6 +1212,7 @@ sub task_common_run {
     expire_cache_entry 'leadernode_filelist';
     # Some arguments are relevant only to some contexts.
     @_ = grep !/^splits?=/, @_ unless $program =~ /split$/;
+    @_ = grep !/^save_submatrices?=/, @_ unless $program =~ /^(dispatch|prep|krylov|mksol|gather)$/;
     @_ = grep !/^(balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /acollect$/;
     # are we absolutely sure that lingen needs no matrix ?
     @_ = grep !/^(balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /lingen$/;
