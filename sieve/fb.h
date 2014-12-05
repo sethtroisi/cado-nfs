@@ -79,7 +79,7 @@ public:
   fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e);
   void parse_line (const char *line, unsigned long linenr);
   void merge (const fb_general_entry &);
-  void fprint(FILE *out);
+  void fprint(FILE *out) const;
   bool is_simple() const;
 };
 
@@ -105,14 +105,14 @@ public:
     for (size_t i = 0; i < Nr_roots; i++)
       roots[i] = e.roots[i];
   }
-  void fprint(FILE *);
+  void fprint(FILE *) const;
 };
 
 
 template <int Nr_roots>
 class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
   public:
-  void fprint(FILE *);
+  void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
@@ -120,7 +120,7 @@ class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
 class fb_slices_interface {
 public:
   virtual void append(const fb_general_entry &) = 0;
-  virtual void fprint(FILE *) = 0;
+  virtual void fprint(FILE *) const = 0;
   virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) const = 0;
 };
 
@@ -134,7 +134,7 @@ public:
   fb_slices(size_t nr_slices);
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
   virtual void append(const fb_general_entry &);
-  virtual void fprint(FILE *);
+  virtual void fprint(FILE *) const;
   virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
@@ -184,7 +184,7 @@ class fb_part: public fb_slices_interface {
 public:
   fb_part(size_t nr_slices);
   void append(const fb_general_entry &);
-  void fprint(FILE *);
+  void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
@@ -207,7 +207,7 @@ class fb_factorbase: public fb_slices_interface {
   void dump_fbc(const char *) {return;};
   unsigned long *extract_bycost(size_t &n, fbprime_t pmax, fbprime_t td_thresh);
   size_t size() {abort(); return 0;}
-  void fprint(FILE *);
+  void fprint(FILE *) const;
   void append(const fb_general_entry &);
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };

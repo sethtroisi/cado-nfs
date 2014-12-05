@@ -236,7 +236,7 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
 }
 
 void
-fb_general_entry::fprint(FILE *out)
+fb_general_entry::fprint(FILE *out) const
 {
   fprintf(out, "%" FBPRIME_FORMAT ": ", q);
   for (unsigned char i_root = 0; i_root < nr_roots; i_root++) {
@@ -286,7 +286,7 @@ fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight
 
 template <int Nr_roots>
 void
-fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out)
+fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out) const
 {
   fprintf(out, "%" FBPRIME_FORMAT ": ", p);
   for (size_t i = 0; i < Nr_roots; i++) {
@@ -315,7 +315,7 @@ fb_vector<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weig
 
 template <int Nr_roots>
 void
-fb_vector<Nr_roots>::fprint(FILE *out)
+fb_vector<Nr_roots>::fprint(FILE *out) const
 {
   for (size_t i = 0; i < this->size(); i++)
     (*this)[i].fprint(out);
@@ -362,7 +362,7 @@ fb_slices<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weig
 
 template <int Nr_roots>
 void
-fb_slices<Nr_roots>::fprint(FILE *out)
+fb_slices<Nr_roots>::fprint(FILE *out) const
 {
   for (size_t slice = 0; slice < nr_slices; slice++) {
     fprintf (out, "#    Slice %zu:\n", slice);
@@ -407,7 +407,7 @@ fb_part::append(const fb_general_entry &fb_cur)
 }
 
 void
-fb_part::fprint(FILE *out)
+fb_part::fprint(FILE *out) const
 {
   for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
     fprintf(out, "#   Entries with %d roots:\n", i_roots);
@@ -732,7 +732,7 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
 }
 
 void
-fb_factorbase::fprint(FILE *out)
+fb_factorbase::fprint(FILE *out) const
 {
   for (size_t part = 0; part < FB_MAX_PARTS; part++) {
     fprintf(out, "#  Factor base entries up to %" FBPRIME_FORMAT "\n", thresholds[part]);
