@@ -293,6 +293,6 @@ ecmE_make_plan (ecmE_plan_t *plan, const unsigned int B1, const int parameteriza
 }
 
 void 
-ecmE_clear_plan ()
+ecmE_clear_plan (ecmE_plan_t *plan MAYBE_UNUSED)
 {
 }
