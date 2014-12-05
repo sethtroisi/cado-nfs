@@ -684,6 +684,7 @@ for side := 0 to #polys-1 do
 
 f := polys[side+1];
 if Degree(f) eq 1 then continue; end if;
+SBADINFO := Sprintf("%o# bad ideals for poly[%o]=%o\n", SBADINFO, side, f);
 K<alpha>:=NumberField(f);
 
 d:=Discriminant(f)*LeadingCoefficient(f);
