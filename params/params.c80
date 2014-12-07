@@ -16,12 +16,12 @@ tasks.threads = 2
 
 tasks.polyselect.degree = 4
 
-tasks.polyselect.admax = 125e3
-tasks.polyselect.adrange = 1000
+tasks.polyselect.admax = 80e3
+tasks.polyselect.adrange = 5000
 tasks.polyselect.incr = 60
 tasks.polyselect.P = 10000
 tasks.polyselect.nq = 1000
-tasks.polyselect.nrkeep = 70
+tasks.polyselect.nrkeep = 30
 
 ###########################################################################
 # Sieve
@@ -30,17 +30,17 @@ tasks.polyselect.nrkeep = 70
 rlim = 400000
 alim = 100000
 lpbr = 22
-lpba = 22
+lpba = 23
 tasks.sieve.mfbr = 22
-tasks.sieve.mfba = 44
+tasks.sieve.mfba = 46
 tasks.sieve.rlambda = 1.1
 tasks.sieve.alambda = 2.1
 tasks.sieve.ncurves0 = 1
 tasks.sieve.ncurves1 = 3
 
 tasks.I = 11
-tasks.sieve.qrange = 1000
-tasks.sieve.rels_wanted = 763000
+tasks.sieve.qrange = 5000
+tasks.sieve.rels_wanted = 650000
 
 ###########################################################################
 # Filtering
