@@ -377,32 +377,38 @@ fb_slices<Nr_roots>::fprint(FILE *out) const
 }
 
 
-fb_part::fb_part(const size_t nr_slices) {
-  fb0_slices = new fb_slices<0>(nr_slices);
-  fb1_slices = new fb_slices<1>(nr_slices);
-  fb2_slices = new fb_slices<2>(nr_slices);
-  fb3_slices = new fb_slices<3>(nr_slices);
-  fb4_slices = new fb_slices<4>(nr_slices);
-  fb5_slices = new fb_slices<5>(nr_slices);
-  fb6_slices = new fb_slices<6>(nr_slices);
-  fb7_slices = new fb_slices<7>(nr_slices);
-  fb8_slices = new fb_slices<8>(nr_slices);
-  fb9_slices = new fb_slices<9>(nr_slices);
-  fb10_slices = new fb_slices<10>(nr_slices);
+fb_part::fb_part(const size_t nr_slices, const bool only_general)
+  : only_general(only_general)
+{
+  if (!only_general) {
+    fb0_slices = new fb_slices<0>(nr_slices);
+    fb1_slices = new fb_slices<1>(nr_slices);
+    fb2_slices = new fb_slices<2>(nr_slices);
+    fb3_slices = new fb_slices<3>(nr_slices);
+    fb4_slices = new fb_slices<4>(nr_slices);
+    fb5_slices = new fb_slices<5>(nr_slices);
+    fb6_slices = new fb_slices<6>(nr_slices);
+    fb7_slices = new fb_slices<7>(nr_slices);
+    fb8_slices = new fb_slices<8>(nr_slices);
+    fb9_slices = new fb_slices<9>(nr_slices);
+    fb10_slices = new fb_slices<10>(nr_slices);
+  }
 }
 
 fb_part::~fb_part() {
-  delete fb0_slices;
-  delete fb1_slices;
-  delete fb2_slices;
-  delete fb3_slices;
-  delete fb4_slices;
-  delete fb5_slices;
-  delete fb6_slices;
-  delete fb7_slices;
-  delete fb8_slices;
-  delete fb9_slices;
-  delete fb10_slices;
+  if (!only_general) {
+    delete fb0_slices;
+    delete fb1_slices;
+    delete fb2_slices;
+    delete fb3_slices;
+    delete fb4_slices;
+    delete fb5_slices;
+    delete fb6_slices;
+    delete fb7_slices;
+    delete fb8_slices;
+    delete fb9_slices;
+    delete fb10_slices;
+  }
 }
 
 
@@ -415,8 +421,9 @@ fb_part::~fb_part() {
 void
 fb_part::append(const fb_general_entry &fb_cur)
 {
-  /* Non-simple ones go in the general vector */
-  if (!fb_cur.is_simple()) {
+  /* Non-simple ones go in the general vector, or, if this is an only_general
+     part, then all entries do */
+  if (only_general || !fb_cur.is_simple()) {
     general_vector.push_back(fb_cur);
     return;
   }
@@ -429,12 +436,16 @@ fb_part::append(const fb_general_entry &fb_cur)
 void
 fb_part::fprint(FILE *out) const
 {
-  for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
-    fprintf(out, "#   Entries with %d roots:\n", i_roots);
-    choose(i_roots)->fprint(out);
+  if (!only_general) {
+    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
+      fprintf(out, "#   Entries with %d roots:\n", i_roots);
+      choose(i_roots)->fprint(out);
+    }
   }
 
-  fprintf(out, "#   General entries (powers, ramified primes or primes with projective roots):\n");
+  fprintf(out, "#   General entries (%s):\n",
+	  only_general ? "contains all entries" :
+	  "powers, ramified primes or primes with projective roots");
   for (size_t i = 0; i < general_vector.size(); i++) {
     general_vector[i].fprint(out);
   }
@@ -443,18 +454,23 @@ fb_part::fprint(FILE *out) const
 void
 fb_part::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
-  for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
-    choose(i_roots)->count_entries(nprimes, nroots, weight);
+  if (!only_general) {
+    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
+      choose(i_roots)->count_entries(nprimes, nroots, weight);
+  }
   general_vector.count_entries(nprimes, nroots, weight);  
 }
 
 
 fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
-			     const size_t *nr_slices)
+			     const size_t *nr_slices,
+			     const bool *only_general)
 {
   for (size_t i = 0; i < FB_MAX_PARTS; i++) {
     this->thresholds[i] = thresholds[i];
-    parts[i] = new fb_part(nr_slices[i]);
+    // By default, only_general is true for part 0, and false for all others
+    const bool og = (only_general == NULL) ? (i == 0) : only_general[i];
+    parts[i] = new fb_part(nr_slices[i], og);
   }
 }
 
@@ -777,6 +793,18 @@ fb_factorbase::count_entries(size_t *nprimes, size_t *nroots, double *weight) co
 
 
 #ifdef TESTDRIVE
+
+void output(fb_factorbase *fb, const char *name)
+{
+  size_t n_primes = 0, n_roots = 0;
+  double weight = 0.;
+  fb->count_entries(&n_primes, &n_roots, &weight);
+  fprintf (stdout,
+	   "# Factor base %s (%zu primes, %zu roots, %f weight):\n",
+	   name, n_primes, n_roots, weight);
+  fb->fprint(stdout);
+}
+
 int main(int argc, char **argv)
 {
   fbprime_t thresholds[4] = {200, 1000, 1000, 1000};
@@ -794,11 +822,7 @@ int main(int argc, char **argv)
   mpz_set_ui(poly[1], 210); /* Bunch of projective primes */
 
   fb1->make_linear(poly, powbound, true);
-  size_t n_primes = 0, n_roots = 0;
-  double weight = 0.;
-  fb1->count_entries(&n_primes, &n_roots, &weight);
-  fprintf (stdout, "# Linear factor base (%zu primes, %zu roots, %f weight):\n", n_primes, n_roots, weight);
-  fb1->fprint(stdout);
+  output(fb1, "from linear polynomial");
 
   // This line does (and should) fail to compile, as fb_factorbase is
   // NonCopyable:
@@ -806,13 +830,16 @@ int main(int argc, char **argv)
 
   if (argc > 1) {
     fb2->read(argv[1]);
-    fb2->count_entries(&n_primes, &n_roots, &weight);
-    fprintf (stdout, "# Factor base from file (%zu primes, %zu roots, %f weight):\n", n_primes, n_roots, weight);
-    fb2->fprint(stdout);
+    output(fb2, "from file");
   }
 
   delete fb1;
   delete fb2;
+  bool only_general[4] = {false, false, false, false};
+  fb1 = new fb_factorbase(thresholds, nr_slices, only_general);
+  fb1->make_linear(poly, powbound, true);
+  output(fb1, "from linear polynomial, only_general = false");
+  delete fb1;
   mpz_clear(poly[0]);
   mpz_clear(poly[1]);
   exit(EXIT_SUCCESS);

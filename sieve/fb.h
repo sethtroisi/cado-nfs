@@ -167,6 +167,9 @@ class fb_part: public fb_slices_interface, private NonCopyable {
      here, or let each array end with a "magic value", such as a slice with
      0 entries, or a NULL pointer? */
 
+  /* If true, all entries go in the general vector */
+  bool only_general;
+
   /* These vectors are filled when we read or generate the factor base.
      The slices point into the vectors' storage. */
   fb_slices<0> *fb0_slices; /* From 0 to MAXDEGREE */
@@ -199,13 +202,12 @@ class fb_part: public fb_slices_interface, private NonCopyable {
     }
   }
 public:
-  fb_part(size_t nr_slices);
+  fb_part(size_t nr_slices, bool only_general=false);
   ~fb_part();
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
-
 
 /* Splits the factor base for a polynomial into disjoint parts which are
    sieved over different sieve region sizes.
@@ -217,8 +219,9 @@ public:
 class fb_factorbase: public fb_slices_interface, private NonCopyable {
   fb_part *parts[FB_MAX_PARTS];
   fbprime_t thresholds[FB_MAX_PARTS];
-  public:
-  fb_factorbase(const fbprime_t *thresholds, const size_t *nr_slices);
+ public:
+  fb_factorbase(const fbprime_t *thresholds, const size_t *nr_slices,
+		const bool *only_general=NULL);
   ~fb_factorbase();
   void read(const char * const filename);
   void make_linear (const mpz_t *poly, fbprime_t powbound, bool do_projective);
