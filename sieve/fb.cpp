@@ -329,8 +329,14 @@ template <int Nr_roots>
 fb_slices<Nr_roots>::fb_slices(const size_t nr_slices)
 {
   this->nr_slices = nr_slices;
-  this->vectors = new fb_vector<Nr_roots>[nr_slices];
-  this->next_slice = 0;
+  vectors = new fb_vector<Nr_roots>[nr_slices];
+  next_slice = 0;
+}
+
+template <int Nr_roots>
+fb_slices<Nr_roots>::~fb_slices()
+{
+  delete[] vectors;
 }
 
 template <int Nr_roots>
@@ -385,6 +391,20 @@ fb_part::fb_part(const size_t nr_slices) {
   fb10_slices = new fb_slices<10>(nr_slices);
 }
 
+fb_part::~fb_part() {
+  delete fb0_slices;
+  delete fb1_slices;
+  delete fb2_slices;
+  delete fb3_slices;
+  delete fb4_slices;
+  delete fb5_slices;
+  delete fb6_slices;
+  delete fb7_slices;
+  delete fb8_slices;
+  delete fb9_slices;
+  delete fb10_slices;
+}
+
 
 /* Append a factor base entry given in fb_cur to the
    correct vector, as determined by the number of roots.
@@ -434,7 +454,14 @@ fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
 {
   for (size_t i = 0; i < FB_MAX_PARTS; i++) {
     this->thresholds[i] = thresholds[i];
-    this->parts[i] = new fb_part(nr_slices[i]);
+    parts[i] = new fb_part(nr_slices[i]);
+  }
+}
+
+fb_factorbase::~fb_factorbase()
+{
+  for (size_t i = 0; i < FB_MAX_PARTS; i++) {
+    delete parts[i];
   }
 }
 
@@ -779,6 +806,8 @@ int main(int argc, char **argv)
     fb2->fprint(stdout);
   }
 
+  delete fb1;
+  delete fb2;
   mpz_clear(poly[0]);
   mpz_clear(poly[1]);
   exit(EXIT_SUCCESS);

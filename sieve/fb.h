@@ -133,6 +133,7 @@ class fb_slices : public fb_slices_interface {
   size_t nr_slices, next_slice;
 public:
   fb_slices(size_t nr_slices);
+  ~fb_slices();
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
   virtual void append(const fb_general_entry &);
   virtual void fprint(FILE *) const;
@@ -184,6 +185,7 @@ class fb_part: public fb_slices_interface {
   }
 public:
   fb_part(size_t nr_slices);
+  ~fb_part();
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
@@ -202,6 +204,7 @@ class fb_factorbase: public fb_slices_interface {
   fbprime_t thresholds[FB_MAX_PARTS];
   public:
   fb_factorbase(const fbprime_t *thresholds, const size_t *nr_slices);
+  ~fb_factorbase();
   void read(const char * const filename);
   void make_linear (const mpz_t *poly, fbprime_t powbound, bool do_projective);
   bool mmap_fbc(const char *) {return false;};
