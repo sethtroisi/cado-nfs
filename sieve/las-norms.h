@@ -65,7 +65,8 @@ extern size_t max_cache;
 
 
   /* The fastest memset for x86 64 & SSE2 */
-  static inline void *las_memset(uint8_t *S, int c, size_t n) {
+  static inline void *las_memset(void *S_v, int c, size_t n) {
+    uint8_t *S = (uint8_t *)S_v;
     uint64_t rc = 0x0101010101010101 * (uint8_t) c;
     if (LIKELY (n > 0x20)) {
       register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
