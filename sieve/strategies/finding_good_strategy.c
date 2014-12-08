@@ -258,7 +258,6 @@ strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
 		int index =
 		    subroutine_compute_slope_yt_dicho(matrix_strat[r1][r2],
 						      max_s);
-
 		matrix_res[r1][r2] =
 		    strategy_copy(matrix_strat[r1][r2]->tab[index]);
 
