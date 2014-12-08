@@ -207,6 +207,15 @@ public:
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  bool is_only_general() const {return only_general;}
+  fb_general_vector::iterator begin() {
+    ASSERT_ALWAYS(only_general);
+    return general_vector.begin();
+  }
+  fb_general_vector::iterator end() {
+    ASSERT_ALWAYS(only_general);
+    return general_vector.end();
+  }
 };
 
 /* Splits the factor base for a polynomial into disjoint parts which are
