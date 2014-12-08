@@ -1,6 +1,6 @@
 /* tiny MPQS implementation, specially tuned for 128-bit input */
 
-// #define TRACE -402377
+// #define TRACE 446179
 // #define TRACE_P 937
 
 #include "cado.h"
@@ -206,7 +206,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
 }
 
 static inline void
-update (unsigned char *S, int i, unsigned long p MAYBE_UNUSED,
+update (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
         unsigned char logp, unsigned int M MAYBE_UNUSED)
 {
   S[i] += logp;
@@ -281,21 +281,27 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   long M, i, j, *K, wrel, nrel = 0;
   mpz_t R, a, b, c, sqrta;
   double maxnorm, radix, logradix;
-  long st0 = cputime (), st, init_time, sieve_time, check_time, total_time;
+  long st0 = cputime (), st, init_time, sieve_time = 0, check_time = 0;
+  long gauss_time, total_time = 0;
 
   /* assume N is odd */
   assert (mpz_fdiv_ui (N, 2) == 1);
 
+  mpz_init (a);
+  mpz_init (sqrta);
+  mpz_init (b);
+  mpz_init (c);
+
   /* compute factor base */
   P = malloc (ncol * sizeof (unsigned long));
   K = malloc (ncol * sizeof (unsigned long));
-  mpz_init_set_ui (R, 1);
+  mpz_set_ui (a, 1);
   /* a prime p can appear in x^2 mod N only if p is a square modulo N */
   for (j = 0; j < ncol;)
     {
-      mpz_nextprime (R, R);
-      if (mpz_jacobi (R, N) == 1)
-        P[j++] = mpz_get_ui (R);
+      mpz_nextprime (a, a);
+      if (mpz_jacobi (a, N) == 1)
+        P[j++] = mpz_get_ui (a);
     }
   printf ("largest prime is %lu\n", P[ncol - 1]);
   wrel = ncol + 10; /* wanted number of relations */
@@ -306,7 +312,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   for (i = 0; i < wrel; i++)
     mpz_init (X[i]);
 
-  M = (1<<19); /* (half) size of sieve array */
+  M = (1<<16); /* (half) size of sieve array */
 
 #define GUARD 3
 #define MAXS (255-GUARD)
@@ -324,15 +330,6 @@ mpqs (mpz_t f, mpz_t N, long ncol)
       K[j] = tonelli_shanks (Np, p);
     }
 
-  st = cputime ();
-  init_time = st - st0;
-  sieve_time = st;
-
-  mpz_init (a);
-  mpz_init (sqrta);
-  mpz_init (b);
-  mpz_init (c);
-
   /* we want 'a' near sqrt(2*N)/M */
   mpz_mul_ui (a, N, 2);
   mpz_sqrt (a, a);
@@ -340,13 +337,18 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
   /* we want 'a' to be a square */
   mpz_sqrt (sqrta, a);
+
+  st = cputime ();
+  printf ("init: %ldms\n", st);
+  init_time = st - st0;
+
   while (nrel < wrel) {
+  sieve_time -= st;
   do
     mpz_nextprime (sqrta, sqrta);
   while (mpz_jacobi (sqrta, N) != 1);
   unsigned long aui = mpz_get_ui (sqrta);
   mpz_mul (a, sqrta, sqrta);
-  // gmp_printf ("a=%Zd\n", a);
   /* we want b^2-n divisible by a */
   k = tonelli_shanks (mpz_fdiv_ui (N, aui), aui);
   /* we want b = k + a*t: b^2 = k^2 + 2*k*a*t (mod a^2), thus
@@ -362,7 +364,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   mpz_mod (b, b, sqrta);
   mpz_mul (b, b, sqrta);
   mpz_add_ui (b, b, k);
-  // gmp_printf ("b=%Zd\n", b);
+  // gmp_printf ("a=%Zd\nb=%Zd\n", a, b);
 
   /* we now have (a*x+b)^2 - N = a*Q(x) where Q(x) = a*x^2 + 2*b*x + c */
 
@@ -380,9 +382,8 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   for (j = 0; j < ncol; j++)
     {
       unsigned long Np, k2;
-      long i2, Rp;
+      long i2;
       p = P[j];
-      Rp = mpz_fdiv_ui (R, p);
       k = K[j]; /* k^2 = N (mod p) */
 #ifdef TRACE_P
       if (p == TRACE_P)
@@ -403,11 +404,10 @@ mpqs (mpz_t f, mpz_t N, long ncol)
              if N = 7 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7.
           */
           Np = mpz_getlimbn (N, 0) & 7; /* N mod 8 */
-          if (Np == 1)
-            logp *= 3; /* 2^3 always divides, [1,3,5,7] for b even,
-                          [0,2,4,6] for b odd */
-          else if (Np == 5)
-            logp *= 2; /* 2^2 always divides */
+          if (Np == 1) /* 2^3 always divides */
+            logp = (char) (log ((double) 8) / logradix + 0.5);
+          else if (Np == 5) /* 2^2 always divides */
+            logp = (char) (log ((double) 4) / logradix + 0.5);
           for (i = k; i < 2*M; i += 2)
             update (S, i, p, logp, M);
         }
@@ -425,20 +425,26 @@ mpqs (mpz_t f, mpz_t N, long ncol)
           q = p * p;
           if (q < P[ncol - 1])
             {
+              unsigned long Ap, Bp;
+              unsigned char logp2;
+              logp2 = (char) (log ((double) q) / logradix + 0.5) - logp;
               Np = mpz_fdiv_ui (N, q);
-              Rp = mpz_fdiv_ui (R, q);
+              Ap = mpz_fdiv_ui (a, q);
+              Bp = mpz_fdiv_ui (b, q);
               while (k < q)
                 {
-                  /* check if (R+k)^2 = N (mod q) */
-                  if (((Rp + k) * (Rp + k)) % q == Np)
+                  unsigned long y = (Ap * k + Bp) % q;
+                  /* check if (a*k+b)^2 = N (mod q) */
+                  if ((y * y) % q == Np)
                     for (i = k; i < 2*M; i += q)
-                      update (S, i, p, logp, M);
+                      update (S, i, p, logp2, M);
                   k += p;
                   if (k2 >= q)
                     break;
-                  if (((Rp + k2) * (Rp + k2)) % q == Np)
+                  y = (Ap * k2 + Bp) % q;
+                  if ((y * y) % q == Np)
                     for (i = k2; i < 2*M; i += q)
-                      update (S, i, p, logp, M);
+                      update (S, i, p, logp2, M);
                   k2 += p;
                 }
             }
@@ -446,8 +452,8 @@ mpqs (mpz_t f, mpz_t N, long ncol)
     }
 
   st = cputime ();
-  sieve_time = st - sieve_time;
-  check_time = st;
+  sieve_time += st;
+  check_time -= st;
 
 #ifdef TRACE
   printf ("%d: S=%d\n", TRACE, S[M + TRACE]);
@@ -463,13 +469,21 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   bd = mpz_get_d (b);
   for (i = -M; i < M && nrel < wrel; i++)
     {
+#ifdef TRACE
+      if (i == TRACE)
+        printf ("i=%ld: S=%u threshold=%u\n", i, S[M+i], threshold);
+#endif
       if (S[M + i] >= threshold)
         {
           count2 ++;
           y = ad * (double) (M+i) + bd;
           y = fabs ((y * y - Nd) / ad);
           y = log (y) / logradix;
-          if (S[M + i] >= (unsigned char) y - 32) {
+#ifdef TRACE
+          if (i == TRACE)
+            printf ("i=%ld: S=%u y=%f\n", i, S[M+i], y);
+#endif
+          if (S[M + i] >= (unsigned char) y - 15) {
             count ++;
             if (is_smooth (a, M + i, b, N, P, ncol, Mat[nrel]))
               {
@@ -483,17 +497,16 @@ mpqs (mpz_t f, mpz_t N, long ncol)
         }
     }
   st = cputime ();
-  check_time = st - check_time;
-  total_time = st = st - st0;
-  gmp_printf ("sqrta=%Zd: %d above threshold, %ld relations in %ldms (%.2f r/s)\n",
-          sqrta, count, nrel, st, (double) nrel / (double) st);
-
-  printf ("estimated %.0fms to get %lu relations\n",
-          (double) st * (double) wrel / (double) nrel, wrel);
-
+  check_time += st;
+  gmp_printf ("sqrta=%Zd: %d/%d above threshold, total %ld relations in %ldms (%.2f r/s)\n",
+          sqrta, count2, count, nrel, st, (double) nrel / (double) st);
   }
 
+  gauss_time = st;
   gauss (f, Mat, nrel, ncol + 1, X, N);
+  st = cputime ();
+  gauss_time = st - gauss_time;
+  total_time = st - st0;
 
   free (Logp);
   free (S);
@@ -511,14 +524,13 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   free (P);
   free (K);
 
-  printf ("Total time: %ldms (init %ld, sieve %ld, check %ld)\n",
-          total_time, init_time, sieve_time, check_time);
+  printf ("Total time: %ldms (init %ld, sieve %ld, check %ld, gauss %ld)\n",
+          total_time, init_time, sieve_time, check_time, gauss_time);
 }
 
-/* ./mpqs 270788552349171139784543548689828248993 1024
-sqrta=6662891: 21 above threshold, 1025 relations in 224ms (4.58 r/s)
-estimated 224ms to get 1024 relations
-Total time: 224ms (init 32, sieve 100, check 4)
+/* On tarte.loria.fr:
+$ ./mpqs 270788552349171139784543548689828248993 900
+Total time: 144ms (init 20, sieve 64, check 48, gauss 12)
 */
 int
 main (int argc, char *argv[])
