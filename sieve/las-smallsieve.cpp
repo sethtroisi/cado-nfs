@@ -119,7 +119,7 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
     r->nb_ssp = bounds[1] - bounds[0];
     r->ssp = (ssp_t *) malloc (r->nb_ssp * sizeof (ssp_t));
     FATAL_ERROR_CHECK(r->nb_ssp > 0 && r->ssp == NULL, "malloc failed");
-    r->logp = malloc (r->nb_ssp);
+    r->logp = (unsigned char *) malloc (r->nb_ssp);
     FATAL_ERROR_CHECK(r->nb_ssp > 0 && r->logp == NULL, "malloc failed");
     r->markers = NULL;
     int r_nmarkers = 0;
@@ -175,22 +175,15 @@ static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsig
     }
 }/*}}}*/
 
-void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbase_degn_t *fb,
-                      sieve_info_srcptr si, int side)
+void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
+                      fb_part *fb, sieve_info_srcptr si, int side)
 {
-    const factorbase_degn_t *fb_sav = fb;
-    int size = 0;
     const unsigned int thresh = si->conf->bucket_thresh;
     const int verbose = 0;
-    const int do_bad_primes = 1;
     where_am_I w;
 
-    // Count prime ideals of factor base primes p < thresh
-    while (fb->p != FB_END && fb->p < thresh) {
-        size += fb->nr_roots;
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
-    }
-    fb = fb_sav;
+    size_t size;
+    fb->count_entries(NULL, &size, NULL);
 
     // allocate space for these. n is an upper bound, since some of the
     // ideals might become special ones.
@@ -199,11 +192,12 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
     ssd->markers = NULL;
     int nmarkers = 0;
     ssd->logp = (unsigned char *) malloc(size);
+    FATAL_ERROR_CHECK(ssd->logp == NULL, "malloc failed");
     // Do another pass on fb and badprimes, to fill in the data
     // while we have any regular primes or bad primes < thresh left
     ssp_t * tail = ssd->ssp;
 
-    int index;
+    int index = 0;
 
     // The processing of bucket region by nb_threads is interleaved.
     // It means that the positions for the small sieve must jump
@@ -211,75 +205,68 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
     // For typical primes, this jump is easily precomputed and goes into
     // the ssp struct.
     
-    unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
-    for (index = 0 ; fb->p != FB_END && fb->p < thresh ; fb = fb_next(fb)) {
-        const fbprime_t p = fb->p;
+    const unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
+    for (fb_general_vector::iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
+        /* p=pp^k, the prime or prime power in this entry, and pp is prime */
+        const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
 
-        int nr;
-        fbprime_t r;
+        if (p > thresh)
+            continue;
+
         const double log_scale = si->sides[side]->scale * LOG_SCALE;
 
-        for (nr = 0; nr < fb->nr_roots; nr++, index++) {
+        for (int nr = 0; nr < iter->nr_roots; nr++, index++) {
+            const bool proj = iter->projective[nr];
+            /* Convert into old format for projective roots by adding p if projective */
+            const fbroot_t r = iter->roots[nr] + (proj ? p : 0);
+            const unsigned char nexp = iter->exp[nr], oldexp = iter->oldexp[nr];
             unsigned int event = 0;
-            if ((fb->p&1)==0) event |= SSP_POW2;
+            if ((p & 1)==0) event |= SSP_POW2;
 
             /* p may already have occurred before, and was taken into account
-               to the power 'oldexp', with a log contribution of 'ol'. We now
-               want to take into account the extra contribution of going from
-               p^oldexp to p^exp. */
-            fbprime_t pp = p;
-            double ol = 0.;
-            if (fb->oldexp > 0) {
-                /* p a prime power. Find out the prime, pp */
-                pp = fb_is_power(p, NULL);
-                ASSERT_ALWAYS(pp != 0);
-                ol = fb_log (fb_pow (pp, fb->oldexp), log_scale, 0.);
-            }
-            ssd->logp[index] = fb_log (fb_pow (pp, fb->exp), log_scale, - ol);
+               to the power 'oldexp', with a log contribution of 'old_log'. We
+               now want to take into account the extra contribution of going
+               from p^oldexp to p^exp. */
+            const double old_log = (oldexp == 0) ? 0. :
+                fb_log (fb_pow (pp, oldexp), log_scale, 0.);
+            ssd->logp[index] = fb_log (fb_pow (pp, nexp), log_scale, - old_log);
             
-            WHERE_AM_I_UPDATE(w, r, fb->roots[nr]);
-            r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
+            WHERE_AM_I_UPDATE(w, r, r);
+            const fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si);
             /* If this root is somehow interesting (projective in (a,b) or
                in (i,j) plane), print a message */
-            if (verbose && (fb->roots[nr] >= p || r >= p))
+            if (verbose && (r > p || r_q >= p))
                 verbose_output_print(0, 1, "# small_sieve_init: %s side, prime %"
-                        FBPRIME_FORMAT " root %" FBROOT_FORMAT " -> %" 
-                        FBROOT_FORMAT "\n", sidenames[side], p, fb->roots[nr], r);
+                        FBPRIME_FORMAT " root %s%" FBROOT_FORMAT " -> %s%" 
+                        FBROOT_FORMAT "\n", sidenames[side], p, 
+                        r >= p ? "1/" : "", r % p,
+                        r_q >= p ? "1/" : "", r_q % p);
 
             /* Handle projective roots */
-            if (r >= p) {
+            if (r_q >= p) {
                 /* Compute the init data in any case, since the gcd
                  * dominates (and anyway we won't be doing this very
                  * often). */
                 event |= SSP_PROJ;
                 ssp_bad_t * ssp = (ssp_bad_t *) tail;
-                ssp_init_op(ssp, p, r - p, skiprows, w);
+                ssp_init_op(ssp, p, r_q - p, skiprows, w);
                 /* If g exceeds J, then the only reached locations in the
                  * sieving area will be on line (j=0), thus (1,0) only since
                  * the other are equivalent.
                  */
-                if (!do_bad_primes) {
-                    if (verbose) {
-                        verbose_output_print(0, 1,
-                                "# small_sieve_init: not adding bad prime"
-                                " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
-                                " to small sieve because do_bad_primes = 0\n",
-                                r-p, p);
-                    }
-                    event |= SSP_DISCARD;
-                } else if (ssp->g >= si->J) {
+                if (ssp->g >= si->J) {
                     if (verbose) {
                         verbose_output_print(0, 1,
                                 "# small_sieve_init: not adding bad prime"
                                 " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
                                 " to small sieve  because g=%d >= si->J = %d\n",
-                                r-p, p, ssp->g, si->J);
+                                r_q-p, p, ssp->g, si->J);
                     }
                     event |= SSP_DISCARD;
                 }
             } else {
-                ssp_init_oa(tail, p, r, skiprows, w);
+                ssp_init_oa(tail, p, r_q, skiprows, w);
             }
             tail++;
             if (event)
@@ -296,7 +283,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
 /* {{{ Creation of the ssdpos tables */
 int * small_sieve_copy_start(int * base, int bounds[2])
 {
-    int * res = malloc((bounds[1] - bounds[0]) * sizeof(int));
+    int * res = (int *)malloc((bounds[1] - bounds[0]) * sizeof(int));
     memcpy(res, base + bounds[0], (bounds[1] - bounds[0]) * sizeof(int));
     return res;
 }
@@ -934,12 +921,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 /* {{{ resieving. Different interface, since it plays with buckets as well.
  */
 
-/* Sieve small primes (p < I, p not in trialdiv_primes list) of the factor
+/* Sieve small primes (p < I) of the factor
    base fb in the next sieve region S, and add primes and the x position
    where they divide and where there's a sieve report to a bucket (rather
    than subtracting the log norm from S, as during sieving).
-   Information about where we are is in ssd.
-   Primes in trialdiv_primes must be in increasing order. */
+   Information about where we are is in ssd. */
 void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         small_sieve_data_t *ssd, int * ssdpos,
