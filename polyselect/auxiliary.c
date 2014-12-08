@@ -3197,6 +3197,14 @@ compute_roots_and_extrema_close_to_0(double *roots_and_extrema, double_poly_srcp
 #define MAX_Q 1e10
 
 static int
+find_best_k_deg4 (mpz_t *K, mpz_poly_srcptr f MAYBE_UNUSED, mpz_t *g MAYBE_UNUSED)
+{
+  mpz_set_si (K[0], 0);
+  return 1;
+}
+
+
+static int
 find_best_k_deg5 (mpz_t *K, mpz_poly_srcptr f, mpz_t *g)
 {
   int n, ret = 0;
@@ -3477,6 +3485,10 @@ find_best_k (mpz_t *K, mpz_poly_ptr f, mpz_t *g)
   else if (d == 5)
     {
       ret = find_best_k_deg5 (K, f, g);
+    }
+  else if (d == 4)
+    {
+      ret = find_best_k_deg4 (K, f, g);
     }
   else
     ASSERT_ALWAYS(0);
@@ -4352,7 +4364,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, const int verbose, const int use_rotation)
 {
   const int d = f->deg;
 
-  if (d == 6 || d == 5) {
+  if (d == 6 || d == 5 || d == 4) {
 #ifdef OPTIMIZE_LLL_LIST
     optimize_deg6_list (f, g, verbose, use_rotation);
 #else
