@@ -279,7 +279,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   unsigned char *S, *Logp, logp;
   unsigned long *P, p, q, k;
   long M, i, j, *K, wrel, nrel = 0;
-  mpz_t R, a, b, c, sqrta;
+  mpz_t a, b, c, sqrta;
   double maxnorm, radix, logradix;
   long st0 = cputime (), st, init_time, sieve_time = 0, check_time = 0;
   long gauss_time, total_time = 0;
@@ -510,7 +510,6 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
   free (Logp);
   free (S);
-  mpz_clear (R);
   mpz_clear (a);
   mpz_clear (sqrta);
   mpz_clear (b);
