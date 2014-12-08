@@ -49,6 +49,19 @@ typedef uint32_t redc_invp_t;
                                         identify the corresponding IEEE 754
                                         double precision number */
 
+/* Base class with private copy-constructor and assigmnet operator.
+   Classes which are not copy-constructible can inherit this with:
+   private NonCopyable */
+class NonCopyable {
+ protected:
+   NonCopyable() {}
+   ~NonCopyable() {}
+ private:
+   NonCopyable(const NonCopyable&);
+   NonCopyable& operator=(const NonCopyable&);
+};
+
+
 /* Forward declaration so fb_general_entry can use it in constructors */
 template <int Nr_roots>
 class fb_entry_x_roots_s;
@@ -122,22 +135,24 @@ public:
   virtual ~fb_slices_interface(){}
   virtual void append(const fb_general_entry &) = 0;
   virtual void fprint(FILE *) const = 0;
-  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) const = 0;
+  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight)
+    const = 0;
 };
 
 /* The fb_slices class has nr_slices vectors; when appending elements with
    append(), it appends to these vectors in a round-robin fashion. */
 template <int Nr_roots>
-class fb_slices : public fb_slices_interface {
+class fb_slices : public fb_slices_interface, private NonCopyable {
   fb_vector<Nr_roots> *vectors;
   size_t nr_slices, next_slice;
-public:
+ public:
   fb_slices(size_t nr_slices);
   ~fb_slices();
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
   virtual void append(const fb_general_entry &);
   virtual void fprint(FILE *) const;
-  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight)
+    const;
 };
 
 
@@ -145,7 +160,7 @@ public:
    bucket region size.
    E.g., when we have only 1 level of bucket sorting, then the factor base has
    2 parts: the line-sieved primes, and the bucket-sieved primes. */
-class fb_part: public fb_slices_interface {
+class fb_part: public fb_slices_interface, private NonCopyable {
   /* How do we identify the number of slices in each array?
      Should we have
      size_t nr_entries[9];
@@ -199,7 +214,7 @@ public:
    parts[1] contains bucket-sieved primes with 1 level of bucket sorting
    (i.e., hits get sorted into bucket regions of size 2^16)
 */
-class fb_factorbase: public fb_slices_interface {
+class fb_factorbase: public fb_slices_interface, private NonCopyable {
   fb_part *parts[FB_MAX_PARTS];
   fbprime_t thresholds[FB_MAX_PARTS];
   public:

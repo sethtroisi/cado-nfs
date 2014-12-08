@@ -799,6 +799,11 @@ int main(int argc, char **argv)
   fb1->count_entries(&n_primes, &n_roots, &weight);
   fprintf (stdout, "# Linear factor base (%zu primes, %zu roots, %f weight):\n", n_primes, n_roots, weight);
   fb1->fprint(stdout);
+
+  // This line does (and should) fail to compile, as fb_factorbase is
+  // NonCopyable:
+  // fb_factorbase fb3(*fb1);
+
   if (argc > 1) {
     fb2->read(argv[1]);
     fb2->count_entries(&n_primes, &n_roots, &weight);
