@@ -15,15 +15,6 @@
 #include "generate_strategies.h"
 #include "gen_decomp.h"
 
-//todo: jete moi!
-static int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)
-{
-    int len = dec->len;
-    for (int i = 0; i < len; i++)
-	if (dec->tab[i] > len_p_max || dec->tab[i] < len_p_min)
-	    return false;
-    return true;
-}
 
 /************************************************************************/
 /*                            USAGE                                     */
