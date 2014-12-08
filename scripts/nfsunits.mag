@@ -1154,6 +1154,7 @@ ReadBadIdeals := function(K, badidealinfo)
 	    print s;
 	    // s = "### 3 (2 : 1) 1 [ 1 ] (i=1: ramified, e=3) ; easy."
 	    tmp:=Split(s, " ");
+	    if #tmp gt 2 and tmp[2] eq "bad" then continue; end if;
 	    if "easy." in tmp then
 		pp:=StringToInteger(tmp[2]);
 if false then // TODO: understand all this?
