@@ -66,6 +66,30 @@ class NonCopyable {
 template <int Nr_roots>
 class fb_entry_x_roots_s;
 
+/* A root modulo a prime power q. q is specified externally */
+struct fb_general_root {
+  fbroot_t r;
+  /* exp and oldexp are maximal such that:
+     If not projective and a == br (mod p^k), then p^exp | F(a,b)
+     -"-               a == br (mod p^(k-1)), then p^oldexp | F(a,b)
+     If projective and ar == b  -"- */
+  unsigned char exp, oldexp;
+  bool proj;
+
+  fb_general_root (){}
+  /* Constructor for simple entries */
+  fb_general_root (const fbroot_t r) : r(r), exp(1), oldexp(0), proj(false){} 
+
+  /* A root is simple if it not projective, and the exp goes from 0 to 1 */
+  bool is_simple() const {return exp == 1 && oldexp == 0 && !proj;}
+  /* Print one root. Projective roots are printed as r+q */
+  void fprint(FILE *out, const fbprime_t q) const {
+    fprintf(out, "%llu", (unsigned long long) r + (proj ? q : 0));
+    if (oldexp != 0 || this->exp != 1)
+      fprintf(out, ":%hhu:%hhu", oldexp, this->exp);
+  }
+};
+
 /* General entries are anything that needs auxiliary information:
    Prime powers, projective roots, ramified primes where exp != oldexp + 1,
    etc. They could, of course, also store the simple cases, but for those we
@@ -77,16 +101,9 @@ public:
   fbprime_t q, p; /* q = p^k */
   redc_invp_t invq; /* invq = -1/q (mod 2^32), or (mod 2^64), depending on
 		       the size of redc_invp_t */
-  fbroot_t roots[MAXDEGREE];
-  unsigned char exp[MAXDEGREE], oldexp[MAXDEGREE];
-  bool projective[MAXDEGREE];
-
-  /* exp and oldexp are maximal such that:
-     If not projective and a == br (mod p^k), then p^exp | F(a,b)
-     -"-               a == br (mod p^(k-1)), then p^oldexp | F(a,b)
-     If projective and ar == b  -"- */
-
+  fb_general_root roots[MAXDEGREE];
   unsigned char k, nr_roots;
+
   fb_general_entry(){}
   template <int Nr_roots>
   fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e);
@@ -115,8 +132,9 @@ public:
   fb_entry_x_roots_s(const fb_general_entry &e) {
     ASSERT_ALWAYS(Nr_roots == e.nr_roots);
     p = e.p;
+    /* Should we assert is_simple() here for each root? */
     for (size_t i = 0; i < Nr_roots; i++)
-      roots[i] = e.roots[i];
+      roots[i] = e.roots[i].r;
   }
   void fprint(FILE *) const;
 };

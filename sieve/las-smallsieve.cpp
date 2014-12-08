@@ -217,10 +217,9 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
         const double log_scale = si->sides[side]->scale * LOG_SCALE;
 
         for (int nr = 0; nr < iter->nr_roots; nr++, index++) {
-            const bool proj = iter->projective[nr];
+            const fb_general_root *root = &(iter->roots[nr]);
             /* Convert into old format for projective roots by adding p if projective */
-            const fbroot_t r = iter->roots[nr] + (proj ? p : 0);
-            const unsigned char nexp = iter->exp[nr], oldexp = iter->oldexp[nr];
+            const fbroot_t r = root->r + (root->proj ? p : 0);
             unsigned int event = 0;
             if ((p & 1)==0) event |= SSP_POW2;
 
@@ -228,9 +227,9 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
                to the power 'oldexp', with a log contribution of 'old_log'. We
                now want to take into account the extra contribution of going
                from p^oldexp to p^exp. */
-            const double old_log = (oldexp == 0) ? 0. :
-                fb_log (fb_pow (pp, oldexp), log_scale, 0.);
-            ssd->logp[index] = fb_log (fb_pow (pp, nexp), log_scale, - old_log);
+            const double old_log = (root->oldexp == 0) ? 0. :
+                fb_log (fb_pow (pp, root->oldexp), log_scale, 0.);
+            ssd->logp[index] = fb_log (fb_pow (pp, root->exp), log_scale, - old_log);
             
             WHERE_AM_I_UPDATE(w, r, r);
             const fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si);

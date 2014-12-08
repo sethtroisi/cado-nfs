@@ -84,23 +84,20 @@ fb_general_entry::fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e) {
   k = 1;
   invq = compute_invq(q);
   for (int i = 0; i < Nr_roots; i++) {
+    /* Use simple constructor for root */
     roots[i] = e.roots[i];
-    exp[i] = 1;
-    oldexp[i] = 0;
-    projective[i] = false;
   }
 }
 
 
+/* Return whether this is a simple factor base prime.
+   It is simple if it is a prime (not a power) and all its roots are simple. */
 bool
 fb_general_entry::is_simple() const
 {
-  /* Is this a simple factor base prime? */
   bool is_simple = (k == 1);
   for (unsigned char i = 0; i < nr_roots; i++) {
-    is_simple &= !projective[i];
-    is_simple &= (oldexp[i] == 0);
-    is_simple &= (exp[i] == 1);
+    is_simple &= roots[i].is_simple();
   }
   return is_simple;
 }
@@ -135,8 +132,8 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned long linenr)
             exit(EXIT_FAILURE);
         }
 
-        projective[i_roots] = (t >= p);
-        roots[i_roots++] = static_cast<fbroot_t>(t - ((t >= p) ? p : 0));
+        roots[i_roots].proj = (t >= p);
+        roots[i_roots++].r = static_cast<fbroot_t>(t - ((t >= p) ? p : 0));
         if (*lineptr != '\0' && *lineptr != ',') {
             fprintf(stderr,
                     "# Incorrect format in factor base file line %lu\n",
@@ -181,8 +178,8 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
     /* NB: a short version is not permitted for a prime power, so we
      * do the test for prime powers only for long version */
     p = q;
-    exp[0] = 1;
-    oldexp[0] = 0;
+    roots[0].exp = 1;
+    roots[0].oldexp = 0;
     k = 1;
     if (longversion) {
         unsigned long k_ul;
@@ -197,9 +194,9 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
         /* read the multiple of logp, if any */
         /* this must be of the form  q:nlogp,oldlogp: ... */
         /* if the information is not present, it means q:1,0: ... */
-        exp[0] = strtoul_const (lineptr, &lineptr, 10);
+        roots[0].exp = strtoul_const (lineptr, &lineptr, 10);
 
-        if (exp[0] == 0) {
+        if (roots[0].exp == 0) {
             fprintf(stderr, "# Error in fb_read: could not parse the integer "
 		    "after the colon of prime %" FBPRIME_FORMAT "\n", q);
             exit (EXIT_FAILURE);
@@ -211,14 +208,14 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
             exit (EXIT_FAILURE);
         }
         lineptr++; /* skip comma */
-        oldexp[0] = strtoul_const (lineptr, &lineptr, 10);
+        roots[0].oldexp = strtoul_const (lineptr, &lineptr, 10);
         if (*lineptr != ':') {
             fprintf(stderr,
 		    "# fb_read: oldlogp is not followed by colon on line %lu",
 		    linenr);
             exit (EXIT_FAILURE);
         }
-        ASSERT (exp[0] > oldexp[0]);
+        ASSERT (roots[0].exp > roots[0].oldexp);
         lineptr++; /* skip colon */
     }
 
@@ -230,8 +227,8 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
        For long version lines, we thus use the exp and oldexp values for all
        roots specified in that line. */
     for (unsigned char i = 1; i < nr_roots; i++) {
-      exp[i] = exp[0];
-      oldexp[i] = oldexp[0];
+      roots[i].exp = roots[0].exp;
+      roots[i].oldexp = roots[0].oldexp;
     }
 }
 
@@ -240,12 +237,7 @@ fb_general_entry::fprint(FILE *out) const
 {
   fprintf(out, "%" FBPRIME_FORMAT ": ", q);
   for (unsigned char i_root = 0; i_root < nr_roots; i_root++) {
-    unsigned long long t = roots[i_root];
-    if (projective[i_root])
-      t += q;
-    fprintf(out, "%llu", t);
-    if (oldexp[i_root] != 0 || exp[i_root] != 1)
-      fprintf(out, ":%hhu:%hhu", oldexp[i_root], exp[i_root]);
+    roots[i_root].fprint(out, q);
     if (i_root + 1 < nr_roots)
       fprintf(out, ",");
   }
@@ -258,11 +250,7 @@ fb_general_entry::merge (const fb_general_entry &other)
   ASSERT_ALWAYS(p == other.p && q == other.q && k == other.k);
   for (unsigned char i_root = 0; i_root < other.nr_roots; i_root++) {
     ASSERT_ALWAYS(nr_roots < MAXDEGREE);
-    roots[nr_roots] = other.roots[i_root];
-    exp[nr_roots] = other.exp[i_root];
-    oldexp[nr_roots] = other.oldexp[i_root];
-    projective[nr_roots] = other.projective[nr_roots];
-    nr_roots++;
+    roots[nr_roots++] = other.roots[i_root];
   }
 }
 
@@ -757,11 +745,10 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
       next_prime = getprime(1);
     }
     fb_cur.nr_roots = 1;
-    fb_cur.exp[0] = fb_cur.k;
-    fb_cur.oldexp[0] = fb_cur.k - 1U;
-
-    fb_cur.projective[0] = fb_linear_root (&fb_cur.roots[0], poly, fb_cur.q);
-    if (fb_cur.projective[0] && !do_projective)
+    fb_cur.roots[0].exp = fb_cur.k;
+    fb_cur.roots[0].oldexp = fb_cur.k - 1U;
+    fb_cur.roots[0].proj = fb_linear_root (&fb_cur.roots[0].r, poly, fb_cur.q);
+    if (fb_cur.roots[0].proj && !do_projective)
       continue; /* If root is projective and we don't want those,
                    skip to next prime */
 

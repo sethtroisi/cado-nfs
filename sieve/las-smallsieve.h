@@ -52,7 +52,7 @@ extern "C" {
 extern void small_sieve_info(const char * what, int side, small_sieve_data_t * r);
 extern void small_sieve_clear(small_sieve_data_t * ssd);
 extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
-extern void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbase_degn_t *fb,
+extern void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const fb_part *fb,
                       sieve_info_srcptr si, int side);
 extern int * small_sieve_copy_start(int * base, int bounds[2]);
 extern int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_srcptr si);
