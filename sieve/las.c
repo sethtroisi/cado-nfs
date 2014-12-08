@@ -2565,8 +2565,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
   param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
   param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
-  param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0\n");
-  param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1\n");
+  param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0");
+  param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");

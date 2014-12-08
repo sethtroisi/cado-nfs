@@ -15,6 +15,7 @@
 #include "generate_strategies.h"
 #include "gen_decomp.h"
 
+
 /************************************************************************/
 /*                            USAGE                                     */
 /************************************************************************/
@@ -344,9 +345,21 @@ int main(int argc, char *argv[])
 	  tabular_fm_sort(data_ecm_m16);
 	  tabular_fm_sort(data_ecm_rc);
 
-	  data_pp1->index = 10;
-	  data_pm1->index = 10;
-	  data_ecm_rc->index = 10;
+	  //todo: add zero method if doesn't exist!
+	  fm_t *zero = fm_create();
+	  unsigned long method_zero[4] = { 0, 0, 0, 0 };
+	  fm_set_method(zero, method_zero, 4);
+
+	  //todo: be more intelligent!
+	  if (data_pm1->tab[0]->method[2] != 0)//B1=0
+	    tabular_fm_add_fm (data_pm1, zero);
+	  if (data_pp1->tab[0]->method[2] != 0)//B1=0
+	    tabular_fm_add_fm (data_pp1, zero);
+	  if (data_ecm_rc->tab[0]->method[2] != 0)//B1=0
+	    tabular_fm_add_fm (data_ecm_rc, zero);
+	  if (data_ecm_m16->tab[0]->method[2] != 0)//B1=0
+	    tabular_fm_add_fm (data_ecm_m16, zero);
+	  
 	  if (gst_r) {
 
 	      int r0 = -1;
@@ -383,9 +396,6 @@ int main(int argc, char *argv[])
 		  }
 		  fclose(file_decomp);
 	      }
-	      fm_t *zero = fm_create();
-	      unsigned long method_zero[4] = { 0, 0, 0, 0 };
-	      fm_set_method(zero, method_zero, 4);
 
 	      tabular_strategy_t *res =
 		  generate_strategies_oneside(tab_decomp, zero, data_pm1,

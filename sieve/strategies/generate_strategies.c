@@ -178,32 +178,37 @@ tabular_strategy_add_strategy_without_zero(tabular_strategy_t * t,
 /************************************************************************/
 /*                   GENERATE MATRIX                                    */
 /************************************************************************/
-
+/*
+  This function add differents chains of ecm to the strategy 'strat'.
+  Note that the variable 'lbucket' allows to add ecm by bucket of
+  length 'lbucket'.
+ */
 static void
 generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 			     int ind_ecm_rc, strategy_t * strat, int ind_tab,
-			     int index_iter, int len_iteration,
+			     int index_iter, int len_iteration, int lbucket,
 			     tabular_decomp_t *init_tab, tabular_strategy_t*res,
 			     int fbb, int lpb, int r)
 {
     if (index_iter >= len_iteration) {
-	double proba =
-	    compute_proba_strategy(init_tab, strat, fbb, lpb);
-	double time = compute_time_strategy(init_tab, strat, r);
-
 	int nb_strat = res->index;
 	tabular_strategy_add_strategy_without_zero(res, strat);
+	double proba =
+	    compute_proba_strategy(init_tab, res->tab[nb_strat], fbb, lpb);
+	double time = compute_time_strategy(init_tab, res->tab[nb_strat], r);
+
 	strategy_set_proba(res->tab[nb_strat], proba);
 	strategy_set_time(res->tab[nb_strat], time);
     } else {
-	for (int i = ind_ecm_rc; i <= ecm_rc->index; i++) {
-	    if (i < ecm_rc->index)
-		tabular_fm_set_fm_index(strat->tab_fm, ecm_rc->tab[i], ind_tab);
-	    else		// == ecm_rc->index
-		tabular_fm_set_fm_index(strat->tab_fm, zero, ind_tab);
-	    generate_collect_iter_ecm_rc(zero, ecm_rc, i, strat, ind_tab + 1,
-					 index_iter + 1, len_iteration,
-					 init_tab, res, fbb, lpb, r);
+	for (int i = ind_ecm_rc; i < ecm_rc->index; i++) {
+	  for (int j = 0; j < lbucket && ind_tab+j < strat->tab_fm->index; j++)
+	    {
+	      tabular_fm_set_fm_index(strat->tab_fm, ecm_rc->tab[i], ind_tab+j);
+	    }
+	  int lbucket_new = lbucket +1 < 3? lbucket+1: lbucket;
+	  generate_collect_iter_ecm_rc(zero, ecm_rc, i, strat,ind_tab+lbucket,
+				       index_iter + lbucket, len_iteration,
+				       lbucket_new, init_tab, res, fbb, lpb, r);
 	}
     }
 }
@@ -219,11 +224,12 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
   todo: reconsider this scheme according the different
   results can be considered!
 */
+
 tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 						fm_t * zero, tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
-						tabular_fm_t * ecm_rc, 
+						tabular_fm_t * ecm_rc,
 						int ncurves, unsigned long lim,
 						int lpb, int r)
 {
@@ -243,7 +249,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
       - the case where r is a prime number too big (lpb < r <
       fbb^2) or because the lenght of r is impossible (r<fbb).
       - |-> the probability is equal to 0.
-    */ 
+    */
     if (r < lim_is_prime) {
 	strategy_t *st_zero = strategy_create();
 	strategy_add_fm(st_zero, zero);
@@ -259,94 +265,69 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 	return res;
     }
     //}}
-
     //contains strategies which will be processed.
     tabular_strategy_t *all_strat = tabular_strategy_create();
 
     int len_pm1 = pm1->index;
     int len_pp1 = pp1->index;
     int len_ecm_m16 = ecm_m16->index;
-    int len_ecm_rc = ecm_rc->index;
-    //int nb_iteration = 4;
 
     //init strat
     int len_strat = 2 + ncurves;
+    //printf ("len_strat = %d, ncurve = %d\n",len_strat, ncurves);
     strategy_t *strat = strategy_create();
     for (int i = 0; i < len_strat; i++)
 	strategy_add_fm(strat, zero);
 
     tabular_fm_t *tab_strat = strat->tab_fm;
     int nb_strat = 0;
-
-    for (int ind_pm1 = -1; ind_pm1 < len_pm1; ind_pm1++) {
-	double current_proba_pm1 =
-	    (ind_pm1 == -1) ? 0 : pm1->tab[ind_pm1]->proba[0];
-	if (ind_pm1 != -1)
-	    tabular_fm_set_fm_index(tab_strat, pm1->tab[ind_pm1], 0);
-	else
-	    tabular_fm_set_fm_index(tab_strat, zero, 0);
-	int ind_pp1 = -1;
-	while (ind_pp1 < len_pp1) {
-	    if (ind_pp1 != -1) {
-		while (ind_pp1 < len_pp1 &&
-		       pp1->tab[ind_pp1]->proba[0] < current_proba_pm1)
-		    ind_pp1++;
-		if (ind_pp1 >= len_pp1)
-		    break;
-	    }
-	    if (ind_pp1 != -1)
-		tabular_fm_set_fm_index(tab_strat, pp1->tab[ind_pp1], 1);
-	    else
-		tabular_fm_set_fm_index(tab_strat, zero, 1);
-
-	    for (int ind_ecm_m16 = -1;
-		 ind_ecm_m16 < len_ecm_m16; ind_ecm_m16++) {
-
-		if (ind_ecm_m16 != -1)
-		    tabular_fm_set_fm_index(tab_strat,
-					    ecm_m16->tab[ind_ecm_m16], 2);
-		else
-		    tabular_fm_set_fm_index(tab_strat, zero, 2);
-		double current_proba_ecm =
-		    (ind_ecm_m16 ==
-		     -1) ? 0 : ecm_m16->tab[ind_ecm_m16]->proba[0];
-
-		int ind_ecm_rc = 0;
-		while (ind_ecm_rc < len_ecm_rc &&
-		       ecm_rc->tab[ind_ecm_rc]->proba[0] < current_proba_ecm)
-		    ind_ecm_rc++;
-		generate_collect_iter_ecm_rc(zero, ecm_rc, ind_ecm_rc, strat,
-					     3, 0, ncurves, init_tab,
-					     all_strat, fbb, lpb, r);
-
-		//process data to avoid to full the RAM!!!
-		//{{
-		nb_strat = all_strat->index - 1;
-		if (nb_strat > 100000) {
-		    //add strategies of the old convexhull and recompute
-		    //the new convex hull
-		    tabular_strategy_concat(all_strat, res);
-		    tabular_strategy_free(res);
-		    res = convex_hull_strategy(all_strat);
-		    //clear previous collect and start a new collect.
-		    tabular_strategy_free(all_strat);
-		    all_strat = tabular_strategy_create();
-		    nb_strat = 0;
-		}
-		//}}
-	    }
-	    ind_pp1++;
+    //PM1
+    for (int ind_pm1 = 0; ind_pm1 < len_pm1; ind_pm1++) {
+      double current_proba_pm1 = pm1->tab[ind_pm1]->proba[0];
+      tabular_fm_set_fm_index(tab_strat, pm1->tab[ind_pm1], 0);
+      //PP1
+      
+      for (int ind_pp1 = 0; ind_pp1 < len_pp1; ind_pp1++) {
+        if ( pp1->tab[ind_pp1]->method[2] != 0 //B1==0
+	     && pp1->tab[ind_pp1]->proba[0] < current_proba_pm1)
+	    continue;
+	
+	tabular_fm_set_fm_index(tab_strat, pp1->tab[ind_pp1], 1);
+	//ECM-M16
+	for (int ind_ecm_m16 = 0;
+	     ind_ecm_m16 < len_ecm_m16; ind_ecm_m16++) { 
+	  tabular_fm_set_fm_index(tab_strat,
+				  ecm_m16->tab[ind_ecm_m16], 2);
+	  //ECM-RC (M12 || B12)
+	  generate_collect_iter_ecm_rc(zero, ecm_rc, 0, strat, 3,
+				       0, ncurves, 0, init_tab,
+				       all_strat, fbb, lpb, r);
+	  //process data to avoid to full the RAM!!!  todo:
+	  //improve this idea because the problem always exists
+	  //when the nb_curve is large!  {{
+	  nb_strat = all_strat->index - 1;
+	  if (nb_strat > 100000) {
+	    //add strategies of the old convexhull and recompute
+	    //the new convex hull
+	    tabular_strategy_concat(all_strat, res);
+	    tabular_strategy_free(res);
+	    res = convex_hull_strategy(all_strat);
+	    //clear previous collect and start a new collect.
+	    tabular_strategy_free(all_strat);
+	    all_strat = tabular_strategy_create();
+	    nb_strat = 0;
+	  }
 	}
+      }
     }
     if (nb_strat != 0)	//process data
-    {
+      {
 	//add strategies of the old convexhull and recompute the new
 	//convex hull
 	tabular_strategy_concat(all_strat, res);
 	tabular_strategy_free(res);
 	res = convex_hull_strategy(all_strat);
-
-    }
+      }
     tabular_strategy_free(all_strat);
     strategy_free(strat);
     return res;

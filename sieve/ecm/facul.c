@@ -18,6 +18,8 @@
 #include "facul.h"
 #include "facul_doit.h"
 
+unsigned int SIGMA = 2;
+int is_first_brent12 = true;
 /* These global variables are only for statistics. In case of
  * multithreaded sieving, the stats might be wrong...
  */
@@ -290,12 +292,23 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
   i. Otherwise return the last index of tab to compute and add this
   new plan at this index!*/
 static int
-get_index_plan (precompute_plan_t*tab, int B1, int B2, int method)
+get_index_plan (precompute_plan_t*tab, int B1, int B2,
+		int method, int parameterization, unsigned long sigma)
 {
   int i = 0;
   while (tab[i].plan != NULL){
     if (tab[i].B1 == B1 && tab[i].B2 == B2 && tab[i].method == method)
-      break;
+      {
+	if (method == EC_METHOD)
+	  {
+	    ecm_plan_t* plan = (ecm_plan_t*)tab[i].plan;
+	    if (plan->parameterization ==  parameterization
+		&& plan->sigma == sigma)
+	      break;
+	  }
+	else
+	  break;
+      }
     i++;
   }
   return i;
@@ -367,6 +380,9 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	  /* changes the current strategy! */
 	  index_st[0] = atoi(res[0]);
 	  index_st[1] = atoi(res[1]);
+	  /* re-init the value of sigma */
+	  SIGMA = 2;
+	  is_first_brent12 = true;
 	}
 
       /*else TEST REGULAR EXPRESSION  'preg_alg'*/
@@ -391,7 +407,8 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		}
 	      int B1 = atoi (res[2]);
 	      int B2 = atoi (res[3]);
-
+	      unsigned long sigma = 0;
+	      int curve = 0;
 	      if ( B1 == 0 || B2 == 0)//This is the zero strategy
 		{
 		  methods[index_method].method = PM1_METHOD;
@@ -400,7 +417,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		}
 	      else
 		{
-		  int curve = 0;
 		  if (strcmp (res[1], "PM1") == 0)
 		    methods[index_method].method = PM1_METHOD;
 		  else if (strcmp (res[1], "PP1-27") == 0)
@@ -423,11 +439,22 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 				   res[1]);
 			  return -1;
 			}
+		      //sigma!
+		      if (curve == MONTY16)
+			sigma = 1;
+		      else
+			{
+			  if (curve == BRENT12 && is_first_brent12)
+			    sigma = 11;
+			  else
+			    sigma = SIGMA++;
+			}
 		    }
 		  //search if the plan isn't already computed!
 		  methods[index_method].side = side;
 		  int index_plan =get_index_plan(strategies->plan, B1, B2,
-						 methods[index_method].method); 
+						 methods[index_method].method,
+						 curve, sigma); 
 
 		  if ( strategies->plan[index_plan].plan == NULL)
 		    {
@@ -445,20 +472,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 			  pp1_make_plan (plan, B1, B2, verbose);
 			}
 		      else {
-			//int param =
-			//(curve==MONTY16)?1:3+index_method;
-			//todo:change -1 by +3 (-1 is to do the same thing
-			//that make_strategy)
-			//todo: choose better values for param.
-			int sigma = index_method-2;
-			if (sigma <= 1)
-			  sigma = index_method +10;//for example
-			if (index_method == 3)
-			  sigma = 2;//first  M12
-			if (curve == BRENT12)
-			  sigma = 11;//B12
-			if (curve == MONTY16)
-			  sigma = 1;
 			plan = malloc (sizeof (ecm_plan_t));
 
 			ecm_make_plan (plan,
@@ -480,7 +493,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		    }
 		  methods[index_method].plan =
 		    strategies->plan[index_plan].plan;
-
 		}
 	      index_method++;
 	      ASSERT_ALWAYS (index_method < NB_MAX_METHODS);
@@ -538,12 +550,12 @@ facul_make_aux_methods (int n, const int verbose)
       B1 += sqrt (B1);
       B2 = 17.0 * B1;
       /* we round B2 to (2k+1)*105, thus k is the integer nearest to
-         B2/210-0.5 */
+	 B2/210-0.5 */
       k = B2 / 210.0;
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
       ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
-                     MONTY12, i + 1, 1, 0);
+		     MONTY12, i + 1, 1, 0);
     }
 
   methods[n].method = 0;
@@ -558,11 +570,11 @@ facul_clear_aux_methods (facul_method_t *methods)
 {
   if (methods == NULL)
     return;
-  
+
   for (int i = 0; methods[i].method != 0; i++)
     {
       if (methods[i].method == PM1_METHOD)
-        pm1_clear_plan (methods[i].plan);
+	pm1_clear_plan (methods[i].plan);
       else if (methods[i].method == PP1_27_METHOD)
 	pp1_clear_plan (methods[i].plan);
       else if (methods[i].method == PP1_65_METHOD)
@@ -588,7 +600,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 {
   if (file == NULL)
     return NULL;
-  
+
   //printf ("create strategies!\n");
   facul_strategies_t* strategies = malloc (sizeof(facul_strategies_t));
   ASSERT (strategies != NULL);
@@ -701,7 +713,7 @@ facul_clear_strategies (facul_strategies_t *strategies)
   free (strategies->methods);
 
   facul_clear_aux_methods (strategies->methods_aux);
-  
+
   free (strategies);
 
 }
@@ -1013,7 +1025,6 @@ facul_both_src (unsigned long **factors, const modset_t* m,
       is_smooth[side] = FACUL_AUX;
     }
   //begin the auxiliary factorisation!
-
   if (is_smooth[0] >= 1 &&  is_smooth[1] >= 1)
     for (int side = 0; side < 2; side++)
       if (is_smooth[side] == FACUL_AUX)
@@ -1027,11 +1038,15 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 		//todo add old values for B1
 		if (found2 < 1)//FACUL_NOT_SMOOTH or FACUL_MAYBE
 		  {
+		    is_smooth[side] = FACUL_NOT_SMOOTH;
 		    found[side] = found2;//FACUL_NOT_SMOOTH or FACUL_MAYBE
 		    goto clean_up;
 		  }
 		else
-		  found[side] += found2;
+		  {
+		    is_smooth[side] = FACUL_SMOOTH;
+		    found[side] += found2;
+		  }
 	      }
 	  }
 
@@ -1040,7 +1055,6 @@ facul_both_src (unsigned long **factors, const modset_t* m,
   modset_clear (&f[0][1]);
   modset_clear (&f[1][0]);
   modset_clear (&f[1][1]);
-
   return found;
 }
 
@@ -1122,7 +1136,6 @@ facul_both (unsigned long **factors, mpz_t* N,
     }
 
   found = facul_both_src (factors, n, strategies, cof, is_smooth);
-
   for (int side = 0; side < 2; side++)
     {
       if (found[side] > 1)

@@ -21,7 +21,7 @@
 
 int CONST_TEST_R = 55;
 
-#define CADO_INTERLEAVING
+//#define CADO_INTERLEAVING
 /*
   This binary allows to test our procedure choosing optimal
   strategies. In fact, using the strategy of CADO, we can use it to
@@ -77,7 +77,7 @@ tabular_fm_t *generate_methods_cado(const int lpb)
     for (int i = 4; i < n + 3; i++) {
 	double B2;
 	unsigned int k;
-	B1 += sqrt(B1);
+	B1 += sqrt(B1);//TEst
 	B2 = 17.0 * B1;
 	/* we round B2 to (2k+1)*105, thus k is the integer nearest to
 	   B2/210-0.5 */
@@ -86,6 +86,8 @@ tabular_fm_t *generate_methods_cado(const int lpb)
 	method[1] = MONTY12;	//curve
 	method[2] = B1;
 	method[3] = (2 * k + 1) * 105;	//B2
+	//printf ("B1 = %lf, %d\n", B1, (2 * k + 1) * 105);
+	//getchar();
 	fm_set_method(fm, method, 4);
 	tabular_fm_add_fm(res, fm);
     }
@@ -123,8 +125,6 @@ tabular_strategy_t *generate_strategy_cado(tabular_fm_t * methods,
       int len = 3 + nb_curves(lpb);
       //printf ("len  = %d\n", len);
       ASSERT(len <= methods->index);
-      /* strategy_add_fm(strat, methods->tab[0]); */
-      //strategy_add_fm(strat, methods->tab[2]);
       for (int i = 0; i < len; i++)
 	strategy_add_fm(strat, methods->tab[i]);
 
@@ -155,8 +155,8 @@ tabular_strategy_t *generate_strategy_cado(tabular_fm_t * methods,
 
 tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
 					   tabular_fm_t * methods,
-					   int fbb0, int lpb0, int mfb0,
-					   int fbb1, int lpb1, int mfb1)
+					   unsigned long lim0, int lpb0, int mfb0,
+					   unsigned long lim1, int lpb1, int mfb1)
 {
     /*
        allocates the matrix which contains all optimal strategies for
@@ -171,6 +171,9 @@ tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
 	ASSERT(matrix[r0] != NULL);
     }
 
+    int fbb0 = ceil (log2 ((double) (lim0 + 1)));
+    int fbb1 = ceil (log2 ((double) (lim1 + 1)));
+
     /*
        For each r0 in [fbb0..mfb0], we precompute and strore the data
        for all strategies.  Whereas, for each r1, the values will be
@@ -183,13 +186,13 @@ tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
     tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
     ASSERT(data_rat);
 
-    int lim0 = 2 * fbb0 - 1;
+    int lim = 2 * fbb0 - 1;
     for (int r0 = 0; r0 <= mfb0; r0++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r0 >= lim0) {
+	if (r0 >= lim) {
 	    char name_file[200];
 	    sprintf(name_file,
-		    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);
+		    "%s/decomp_%lu_%d", name_directory_decomp, lim0, r0);
 	    FILE *file = fopen(name_file, "r");
 
 	    tab_decomp = tabular_decomp_fscan(file);
@@ -209,13 +212,13 @@ tabular_strategy_t ***generate_matrix_cado(const char *name_directory_decomp,
        read good elements for r_2 in the array data_r1 and compute the
        data for each r_1. So :
      */
-    int lim1 = 2 * fbb1 - 1;
+    lim = 2 * fbb1 - 1;
     for (int r1 = 0; r1 <= mfb1; r1++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r1 >= lim1) {
+	if (r1 >= lim) {
 	    char name_file[200];
 	    sprintf(name_file,
-		    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1);
+		    "%s/decomp_%lu_%d", name_directory_decomp, lim1, r1);
 	    FILE *file = fopen(name_file, "r");
 
 	    tab_decomp = tabular_decomp_fscan(file);
@@ -524,8 +527,10 @@ tabular_strategy_t *gen_strat_r0_r1_uleav(tabular_strategy_t * strat_r0,
  */
 tabular_strategy_t ***generate_matrix_cado_uleav(const char *name_directory_decomp,
 						 tabular_fm_t * methods,
-						 int fbb0, int lpb0, int mfb0,
-						 int fbb1, int lpb1, int mfb1)
+						 unsigned long lim0, int lpb0,
+						 int mfb0,
+						 unsigned long lim1, int lpb1,
+						 int mfb1)
 {
     /*
        allocates the matrix which contains all optimal strategies for
@@ -540,6 +545,11 @@ tabular_strategy_t ***generate_matrix_cado_uleav(const char *name_directory_deco
 	ASSERT(matrix[r0] != NULL);
     }
 
+
+    
+    int fbb0 = ceil (log2 ((double) (lim0 + 1)));
+    int fbb1 = ceil (log2 ((double) (lim1 + 1)));
+
     /*
        For each r0 in [fbb0..mfb0], we precompute and strore the data
        for all strategies.  Whereas, for each r1, the values will be
@@ -552,13 +562,13 @@ tabular_strategy_t ***generate_matrix_cado_uleav(const char *name_directory_deco
     tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
     ASSERT(data_rat);
 
-    int lim0 = 2 * fbb0 - 1;
+    int lim = 2 * fbb0 - 1;
     for (int r0 = 0; r0 <= mfb0; r0++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r0 >= lim0) {
+	if (r0 >= lim) {
 	    char name_file[200];
 	    sprintf(name_file,
-		    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);
+		    "%s/decomp_%lu_%d", name_directory_decomp, lim0, r0);
 	    FILE *file = fopen(name_file, "r");
 
 	    tab_decomp = tabular_decomp_fscan(file);
@@ -578,13 +588,13 @@ tabular_strategy_t ***generate_matrix_cado_uleav(const char *name_directory_deco
        read good elements for r_2 in the array data_r1 and compute the
        data for each r_1. So :
      */
-    int lim1 = 2 * fbb1 - 1;
+    lim = 2 * fbb1 - 1;
     for (int r1 = 0; r1 <= mfb1; r1++) {
 	tabular_decomp_t *tab_decomp = NULL;
 	char name_file[200];
-	if (r1 >= lim1) {
+	if (r1 >= lim) {
 	    sprintf(name_file,
-		    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1);
+		    "%s/decomp_%lu_%d", name_directory_decomp, lim1, r1);
 	    FILE *file = fopen(name_file, "r");
 
 	    tab_decomp = tabular_decomp_fscan(file);
@@ -601,7 +611,7 @@ tabular_strategy_t ***generate_matrix_cado_uleav(const char *name_directory_deco
 
 
 	for (int r0 = 0; r0 <= mfb0; r0++) {
-	  if (r0 < lim0 || r1 < lim1)
+	  if (r0 < 2*fbb0-1 || r1 < 2*fbb1-1)
 	    {
 	      matrix[r0][r1] =
 		generate_strategy_r0_r1(data_rat[r0], strat_r1);
@@ -609,7 +619,7 @@ tabular_strategy_t ***generate_matrix_cado_uleav(const char *name_directory_deco
 	  else
 	    {
 	      sprintf(name_file,
-		      "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);
+		      "%s/decomp_%lu_%d", name_directory_decomp, lim0, r0);
 	      FILE *file = fopen(name_file, "r");
 
 	      tabular_decomp_t* tab_decomp_r0 = tabular_decomp_fscan(file);
@@ -997,10 +1007,10 @@ static void declare_usage(param_list pl)
 			    "and especially compute the theorical number of "
 			    "relations found per second by this strategy.\n");
 
-    param_list_decl_usage(pl, "fbb0",
-			  "set rationnal factor base bound to 2^fbb0\n");
-    param_list_decl_usage(pl, "fbb1",
-			  "set algebraic factor base bound to 2^fbb1\n");
+    param_list_decl_usage(pl, "lim0",
+			  "set rationnal factor base bound to lim0\n");
+    param_list_decl_usage(pl, "lim1",
+			  "set algebraic factor base bound to lim1\n");
     param_list_decl_usage(pl, "lpb0",
 			  "set rational large prime bound to 2^lpb0");
     param_list_decl_usage(pl, "lpb1",
@@ -1058,24 +1068,24 @@ int main(int argc, char *argv[])
     }
 
     //option parser
-    int fbb0 = -1;
+    unsigned long lim0 = 0;
     int lpb0 = -1;
-    int fbb1 = -1;
+    unsigned long lim1 = 0;
     int lpb1 = -1;
     int mfb0 = -1;
     int mfb1 = -1;
     double C0 = -1;
 
-    param_list_parse_int(pl, "lpb0", &lpb0);
+    param_list_parse_ulong(pl, "lim0", &lim0);
     param_list_parse_int(pl, "lpb1", &lpb1);
-    param_list_parse_int(pl, "fbb1", &fbb1);
+    param_list_parse_ulong(pl, "lim1", &lim1);
     param_list_parse_int(pl, "mfb1", &mfb1);
-    param_list_parse_int(pl, "fbb0", &fbb0);
+    param_list_parse_int(pl, "lpb0", &lpb0);
     param_list_parse_int(pl, "mfb0", &mfb0);
     param_list_parse_double(pl, "t", &C0);
 
-    if (fbb0 == -1 || lpb0 == -1 || mfb0 == -1 ||
-	fbb0 == -1 || lpb0 == -1 || mfb0 == -1 || C0 == -1) {
+    if (lim0 == 0 || lpb0 == -1 || mfb0 == -1 ||
+	lim1 == 0 || lpb1 == -1 || mfb1 == -1 || C0 == -1) {
 	fputs("ALL parameters are mandatory!\n", stderr);
 	param_list_clear(pl);
 	exit(EXIT_FAILURE);
@@ -1151,82 +1161,90 @@ int main(int argc, char *argv[])
     //select our methods
     //tabular_fm_t *methods = generate_methods_cado(lpb);
     //benchmark
-    /* bench_proba(state, methods, fbb); */
-    /* bench_time(state, methods); */
-    /* tabular_fm_print (methods); */
+    //bench_proba(state, methods, fbb);
+    //bench_time(state, methods);
+    //FILE* filee = fopen ("bench_data_cado","w");
+    //tabular_fm_fprint (filee, methods);
+    //fclose (filee);
     FILE* file_in = fopen ("/localdisk/trichard/cadoRSA155/data_fm_25", "r");
+    if (file_in == NULL)
+      {
+    	fprintf (stderr,
+    		 "impossible to read: /localdisk/trichard/cadoRSA155/data_fm_25\n");
+    	  exit(1);
+      }
     tabular_fm_t *methods = tabular_fm_fscan (file_in);
     printf ("len  = %d, (%d)\n", methods->index, 3+nb_curves(lpb0));
     
     //test computation of probabilities
     //{tab_init
-    int r0 = 80, r1=80;
-    char name_file[200];
-    sprintf(name_file,
-    	    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);//modify it!!
-    FILE *file = fopen(name_file, "r");
-    tabular_decomp_t* init_tab0 = tabular_decomp_fscan (file);
-    fclose (file);
-    sprintf(name_file,
-    	    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1);//modify it!!
-    file = fopen(name_file, "r");
-    tabular_decomp_t* init_tab1 = tabular_decomp_fscan (file);
-    fclose (file);
-    //Test{{{
-    /* init_tab0->index = 1; */
-    /* init_tab1->index = 1; */
-    /* tabular_decomp_print (init_tab0); */
-    //}}}
-    //  }
-    strategy_t* strat1 = strategy_create();
-    strategy_add_fm (strat1, methods->tab[0]);
-    strategy_add_fm (strat1, methods->tab[1]);
-    strategy_add_fm (strat1, methods->tab[2]);
-    strategy_add_fm (strat1, methods->tab[3]);
-    strategy_add_fm (strat1, methods->tab[4]);
-    strategy_add_fm (strat1, methods->tab[5]);
-    strategy_add_fm (strat1, methods->tab[6]);
-    strategy_t* strat2 = strategy_create();
-    strategy_add_fm (strat2, methods->tab[0]);
-    strategy_add_fm (strat2, methods->tab[1]);
-    strategy_add_fm (strat2, methods->tab[2]);
-    strategy_add_fm (strat2, methods->tab[3]);
-    strategy_add_fm (strat2, methods->tab[4]);
-    strategy_add_fm (strat2, methods->tab[5]);
-    strategy_add_fm (strat2, methods->tab[6]);
+    /* int r0 = 80, r1=80; */
+    /* char name_file[200]; */
+    /* sprintf(name_file, */
+    /* 	    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);//modify it!! */
+    /* FILE *file = fopen(name_file, "r"); */
+    /* tabular_decomp_t* init_tab0 = tabular_decomp_fscan (file); */
+    /* fclose (file); */
+    /* sprintf(name_file, */
+    /* 	    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1);//modify it!! */
+    /* file = fopen(name_file, "r"); */
+    /* tabular_decomp_t* init_tab1 = tabular_decomp_fscan (file); */
+    /* fclose (file); */
+    /* //Test{{{ */
+    /* /\* init_tab0->index = 1; *\/ */
+    /* /\* init_tab1->index = 1; *\/ */
+    /* /\* tabular_decomp_print (init_tab0); *\/ */
+    /* //}}} */
+    /* //  } */
+    /* strategy_t* strat1 = strategy_create(); */
+    /* strategy_add_fm (strat1, methods->tab[0]); */
+    /* strategy_add_fm (strat1, methods->tab[1]); */
+    /* strategy_add_fm (strat1, methods->tab[2]); */
+    /* strategy_add_fm (strat1, methods->tab[3]); */
+    /* strategy_add_fm (strat1, methods->tab[4]); */
+    /* strategy_add_fm (strat1, methods->tab[5]); */
+    /* strategy_add_fm (strat1, methods->tab[6]); */
+    /* strategy_t* strat2 = strategy_create(); */
+    /* strategy_add_fm (strat2, methods->tab[0]); */
+    /* strategy_add_fm (strat2, methods->tab[1]); */
+    /* strategy_add_fm (strat2, methods->tab[2]); */
+    /* strategy_add_fm (strat2, methods->tab[3]); */
+    /* strategy_add_fm (strat2, methods->tab[4]); */
+    /* strategy_add_fm (strat2, methods->tab[5]); */
+    /* strategy_add_fm (strat2, methods->tab[6]); */
 
-    double proba1 = compute_proba_strategy (init_tab0, strat1, fbb0, lpb0);
-    double proba2 = compute_proba_strategy (init_tab1, strat2, fbb1, lpb1);
-    double temps1 = compute_time_strategy (init_tab0, strat1, r0);
-    double temps2 = compute_time_strategy (init_tab1, strat2, r1);
-    strategy_set_proba (strat1, proba1);
-    strategy_set_proba (strat2, proba2);
-    strategy_set_time (strat1, temps1);
-    strategy_set_time (strat2, temps2);
-    printf ("proba1 = %lf, proba2 = %lf, combo = %lf\n",
-    	    proba1, proba2, proba1*proba2);
-    printf ("temps1 = %lf, temps2 = %lf, combo = %lf, %lf\n",
-    	    temps1, temps2, temps1 + proba1*temps2, temps2 + proba2*temps1);
-    int fbb[2] = {fbb0, fbb1};
-    int lpb[2] ={lpb0, lpb1};
-    int r[2] = {r0, r1};
-    tabular_decomp_t* init_tab[2] = {init_tab0, init_tab1};
-    //{
-    strat1->len_side = 3;
-    strat1->side = malloc (sizeof (int) * strat1->len_side);
-    strat1->side[0] = strat1->side[1] = strat1->side[2] =0;
-    //  }
-    /* double temps = compute_time_strategy_uleav(init_tab, strat1, fbb, lpb, r); */
-    /* printf ("temps %lf\n", temps); */
-    strategy_t *res = gen_strat_r0_r1_uleav_st(strat1, strat2, init_tab,
-    					       fbb, lpb, r);
-    strategy_print (res);
-    //bench time with our interleaving methods!
-    int mfb[2] = {mfb0, mfb1};
-    printf ("bench proba time\n");
-    double* tmp = bench_proba_time_st_both(state, res, init_tab, r, fbb, lpb, mfb);
-    printf ("bench both interL: proba = %lf, time = %lf\n", tmp[0], tmp[1]);      
-    exit(1);
+    /* double proba1 = compute_proba_strategy (init_tab0, strat1, fbb0, lpb0); */
+    /* double proba2 = compute_proba_strategy (init_tab1, strat2, fbb1, lpb1); */
+    /* double temps1 = compute_time_strategy (init_tab0, strat1, r0); */
+    /* double temps2 = compute_time_strategy (init_tab1, strat2, r1); */
+    /* strategy_set_proba (strat1, proba1); */
+    /* strategy_set_proba (strat2, proba2); */
+    /* strategy_set_time (strat1, temps1); */
+    /* strategy_set_time (strat2, temps2); */
+    /* printf ("proba1 = %lf, proba2 = %lf, combo = %lf\n", */
+    /* 	    proba1, proba2, proba1*proba2); */
+    /* printf ("temps1 = %lf, temps2 = %lf, combo = %lf, %lf\n", */
+    /* 	    temps1, temps2, temps1 + proba1*temps2, temps2 + proba2*temps1); */
+    /* int fbb[2] = {fbb0, fbb1}; */
+    /* int lpb[2] ={lpb0, lpb1}; */
+    /* int r[2] = {r0, r1}; */
+    /* tabular_decomp_t* init_tab[2] = {init_tab0, init_tab1}; */
+    /* //{ */
+    /* strat1->len_side = 3; */
+    /* strat1->side = malloc (sizeof (int) * strat1->len_side); */
+    /* strat1->side[0] = strat1->side[1] = strat1->side[2] =0; */
+    /* //  } */
+    /* /\* double temps = compute_time_strategy_uleav(init_tab, strat1, fbb, lpb, r); *\/ */
+    /* /\* printf ("temps %lf\n", temps); *\/ */
+    /* strategy_t *res = gen_strat_r0_r1_uleav_st(strat1, strat2, init_tab, */
+    /* 					       fbb, lpb, r); */
+    /* strategy_print (res); */
+    /* //bench time with our interleaving methods! */
+    /* int mfb[2] = {mfb0, mfb1}; */
+    /* printf ("bench proba time\n"); */
+    /* double* tmp = bench_proba_time_st_both(state, res, init_tab, r, fbb, lpb, mfb); */
+    /* printf ("bench both interL: proba = %lf, time = %lf\n", tmp[0], tmp[1]);       */
+    /* exit(1); */
     //}}
     
     //generate our strategies
@@ -1234,16 +1252,41 @@ int main(int argc, char *argv[])
 #ifndef CADO_INTERLEAVING
     tabular_strategy_t ***matrix =
       generate_matrix_cado(name_directory_decomp, methods,
-			   fbb0, lpb0, mfb0,
-			   fbb1, lpb1, mfb1);
+			   lim0, lpb0, mfb0,
+			   lim1, lpb1, mfb1);
 
+    //clear me!!!!
+    //compute our strategy
+    char pathname_st[200] = "/localdisk/trichard/cado704_new/res_matrix/";
+    tabular_strategy_t ***matrix_strat =
+      extract_matrix_strat(pathname_st, mfb0 + 1, mfb1 + 1);
+    
+    strategy_t ***matrix_strat_res =
+      compute_best_strategy(matrix_strat, distrib_C,  mfb0 + 1, mfb1 + 1,
+    			    C0);
+    //}}
+    
     //eval our strategy!
     double Y = 0, T = C0;
     for (int r0 = 0; r0 <= mfb0; r0++) {
     	for (int r1 = 0; r1 <= mfb1; r1++) {
     	    Y += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->proba;
     	    T += distrib_C[r0][r1] * matrix[r0][r1]->tab[0]->time;
-    	}
+	    //test: Add test with our strategy!
+	    if (matrix_strat_res[r0][r1] != NULL)
+	      {
+		printf ("cado r0=%d, r1=%d, p =%lf, t = %lf\n", r0, r1,
+			matrix[r0][r1]->tab[0]->proba,
+			matrix[r0][r1]->tab[0]->time);
+		printf ("file r0=%d, r1=%d, p =%lf, t = %lf\n", r0, r1,
+			matrix_strat_res[r0][r1]->proba,
+			matrix_strat_res[r0][r1]->time);
+		printf ("number of pair: %lu\n", distrib_C[r0][r1]);
+		strategy_print (matrix_strat_res[r0][r1]);
+		//getchar();
+	      }
+	    //end of test
+	}
     }
     //print the result!
     printf(" Y = %lf relations, T = %lf s., yt = %1.10lf rel/s\n", Y,
@@ -1268,8 +1311,8 @@ int main(int argc, char *argv[])
 #else  //interleaving!
     tabular_strategy_t ***matrix =
       generate_matrix_cado_uleav(name_directory_decomp, methods,
-				 fbb0, lpb0, mfb0,
-				 fbb1, lpb1, mfb1);
+				 lim0, lpb0, mfb0,
+				 lim1, lpb1, mfb1);
     
     strategy_t ***matrix_strat_res =
       compute_best_strategy(matrix, distrib_C, mfb0 + 1, mfb1 + 1,
