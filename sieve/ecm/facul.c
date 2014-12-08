@@ -365,7 +365,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 
   //process the ligne
   const char * str_process = &str[0];
-
+  int side = -1;
   while (str_process[0] != '\0' )
     {
       //init
@@ -395,12 +395,22 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      /*add the new factoring method to the current strategy! */
 	      facul_method_t* methods =
 		strategies->methods[index_st[0]][index_st[1]];
-	      int side;
+
 	      //todo: remove the words ALG and RAT!!!//S0 or S1
 	      if (strcmp (res[0], "ALG") == 0 || strcmp (res[0], "S1") == 0)
-		side = 1;
+		  {
+		      //we change the side so re-initialize the value of sigma
+		      if (side == -1 || side == 0)
+			  SIGMA = 2;
+		      side = 1;
+		  }
 	      else if (strcmp (res[0], "RAT") == 0 || strcmp(res[0], "S0") == 0)
-		side = 0;
+		  {
+		      //we change the side so re-initialize the value of sigma
+		      if (side == -1 || side == 1)
+			  SIGMA = 2;
+		      side = 0;
+		  }
 	      else 
 		{
 		  side = atoi(res[0]);
@@ -482,7 +492,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		      strategies->plan[index_plan].B1 = B1;
 		      strategies->plan[index_plan].B2 = B2;
 		      strategies->plan[index_plan].plan = plan;
-
 		      index_plan++;
 		      ASSERT (index_plan < NB_MAX_METHODS);
 		      //to show the end of plan!
