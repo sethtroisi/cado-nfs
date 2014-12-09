@@ -36,7 +36,7 @@ tasks.sieve.mfba = 90
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.8
 
-tasks.I = 13
+tasks.I = 14
 tasks.sieve.qrange = 8000
 tasks.sieve.rels_wanted = 81000000
 

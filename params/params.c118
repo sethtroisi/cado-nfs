@@ -14,7 +14,7 @@ tasks.threads = 2
 # Polynomial selection
 ###########################################################################
 
-tasks.polyselect.degree = 4
+tasks.polyselect.degree = 5
 
 tasks.polyselect.P = 10000
 tasks.polyselect.admax = 4e5
