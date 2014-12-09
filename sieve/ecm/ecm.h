@@ -4,11 +4,12 @@
 #include "mod_mpz.h"
 #include "stage2.h"
 
-#define BRENT12 1
-#define MONTY12 2
-#define MONTY16 4
-#define TWED12  8
-#define TWED16  16
+#define BRENT12   1
+#define MONTY12   2
+#define MONTY16   4
+#define FULLMONTY 7
+#define TWED12    8
+#define TWED16   16
 
 
 /* Twisted Edwards curve with a = -1 */
