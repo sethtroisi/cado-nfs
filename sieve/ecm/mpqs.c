@@ -673,7 +673,8 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
 /* On tarte.loria.fr:
 $ ./mpqs 270788552349171139784543548689828248993 1000
-Total time: 144ms (init 20, sieve 64, check 48, gauss 12)
+gcd=15723507801130702049
+Total time: 68ms (init 0, sieve 48, check 16, gauss 4)
 */
 int
 main (int argc, char *argv[])
