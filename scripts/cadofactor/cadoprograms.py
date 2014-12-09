@@ -662,6 +662,7 @@ class MakeFB(Program):
                  maxbits: Parameter(checktype=int)=None,
                  out: Parameter(is_output_file=True)=None,
                  side: Parameter(checktype=int)=None,
+                 threads : Parameter("t", checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -923,10 +924,11 @@ class BWC(Program):
     subdir = "linalg/bwc"
     def __init__(self,
                  complete: Toggle(prefix=":")=None,
-                 wipeout: Toggle(prefix=":")=None,
                  dryrun: Toggle("d")=None,
                  verbose: Toggle("v")=None,
                  mpi: ParameterEq()=None,
+                 lingen_mpi: ParameterEq()=None,
+                 allow_zero_on_rhs: ParameterEq()=None,
                  threads: ParameterEq("thr")=None,
                  mn: ParameterEq()=None,
                  nullspace: ParameterEq()=None,

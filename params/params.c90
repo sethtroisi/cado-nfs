@@ -16,25 +16,27 @@ tasks.threads = 2
 
 tasks.polyselect.degree = 4
 
-tasks.polyselect.admax = 250e3
+tasks.polyselect.admax = 150e3
 tasks.polyselect.adrange = 3000
 tasks.polyselect.incr = 60
 tasks.polyselect.P = 10000
 tasks.polyselect.nq = 1000
-tasks.polyselect.nrkeep = 100
+tasks.polyselect.nrkeep = 40
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-rlim = 200000
-alim = 400000
+rlim = 312500
+alim = 200000
 lpbr = 23
 lpba = 23
-tasks.sieve.mfbr = 46
+tasks.sieve.mfbr = 45
 tasks.sieve.mfba = 46
-tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.2
+tasks.sieve.rlambda = 2.05
+tasks.sieve.alambda = 2.1
+tasks.sieve.ncurves0 = 4
+tasks.sieve.ncurves1 = 3
 
 tasks.I = 11
 tasks.sieve.qrange = 1000

@@ -22,13 +22,13 @@
 #endif
 
 
-static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
+MAYBE_UNUSED static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
 {
     assert(f->deg >= 0);
     return f->coeff[f->deg];
 }
 
-static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f)
+MAYBE_UNUSED static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f)
 {
     assert(f->deg >= 0);
     return f->coeff[f->deg];

@@ -1,14 +1,14 @@
+#include "cado.h"
+
 #include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "cado.h"
 #include "ecm.h"
 #include "facul.h"
 #include "portability.h"
 #include "utils.h"
-
 #include "finding_good_strategy.h"
 
 //#define STATS 
@@ -258,7 +258,6 @@ strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
 		int index =
 		    subroutine_compute_slope_yt_dicho(matrix_strat[r1][r2],
 						      max_s);
-
 		matrix_res[r1][r2] =
 		    strategy_copy(matrix_strat[r1][r2]->tab[index]);
 
@@ -283,11 +282,11 @@ strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
   for each pair (r0,r1) where at least one call has been done by CADO
   in the distribution of cofactors.
  */
-static void strategy_fprint_design(FILE * output_file, const strategy_t * t)
+void strategy_fprint_design(FILE * output_file, const strategy_t * t)
 {
     tabular_fm_t *tmp = t->tab_fm;
     for (int i = 0; i < tmp->index; i++) {
-	fprintf(output_file, "[ ");
+	fprintf(output_file, "[");
 	//side: 
 	if (t->side[i] == SIDE_1)
 	    fputs("S1: ", output_file);
@@ -326,14 +325,14 @@ int fprint_final_strategy(FILE * file, strategy_t *** matrix_strat_res,
 {
     if (file == NULL)
 	return -1;
-    for (int r1 = 0; r1 < len_abs; r1++)
-	for (int r2 = 0; r2 < len_ord; r2++)
-	    if (matrix_strat_res[r1][r2] != NULL) {
+    for (int r0 = 0; r0 < len_abs; r0++)
+	for (int r1 = 0; r1 < len_ord; r1++)
+	    if (matrix_strat_res[r0][r1] != NULL) {
 		fprintf(file,
 			"[r0=%d, r1=%d] : (p = %lf, t = %lf)\n",
-			r1, r2, matrix_strat_res[r1][r2]->proba,
-			matrix_strat_res[r1][r2]->time);
-		strategy_fprint_design(file, matrix_strat_res[r1][r2]);
+			r0, r1, matrix_strat_res[r0][r1]->proba,
+			matrix_strat_res[r0][r1]->time);
+		strategy_fprint_design(file, matrix_strat_res[r0][r1]);
 	    }
     return 0;
 }

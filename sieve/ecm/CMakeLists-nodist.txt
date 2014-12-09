@@ -2,5 +2,8 @@
 add_executable(issmooth issmooth.c)
 target_link_libraries(issmooth ${gmp_libname})
 
+add_executable(mpqs mpqs.c)
+target_link_libraries(mpqs utils ${gmp_libname})
+
 # vim: set ft=cmake:
 

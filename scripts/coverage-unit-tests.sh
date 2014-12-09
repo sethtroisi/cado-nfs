@@ -3,6 +3,27 @@
 : ${REVISION=HEAD}
 : ${REPO=git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git}
 : ${WEBDIR=$HOME/.webdir}
+: ${TARGET_DIRECTORY=$WEBDIR/cado-unit-tests}
+
+while [ $# -gt 0 ] ; do
+    if [ "$1" = "--thorough" ] ; then
+        CHECKS_EXPENSIVE=1
+    elif [ "$1" = "--silent" ] ; then
+        silent=1
+    elif [ "$1" = "--target-directory" ] ; then
+        shift
+        TARGET_DIRECTORY="$1"
+    else
+        echo "Unexpected argument: $1" >&2
+        exit 1
+    fi
+    shift
+done
+
+if [ "$silent" ] ; then
+    exec > >(gzip -9 > /tmp/cado-unit-tests-`date +%Y%m%d%H%M`.gz) 2>&1
+fi
+
 export DIR=`mktemp -d /tmp/cado-cov.XXXXXXXXXXXX`
 export TMPDIR="$DIR"
 F="$TMPDIR/local.sh"
@@ -15,6 +36,11 @@ doit() {
 CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
 CXXFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
 EOF
+    if [ "$CHECKS_EXPENSIVE" ] ; then
+        cat >> $F <<EOF
+CHECKS_EXPENSIVE=1
+EOF
+    fi
     export LOCALFILE=$F
 
     if [ -x "$HOME/cmake/bin/cmake" ] ; then
@@ -79,7 +105,7 @@ EOF
 
     cd $DIR/$CADO_DIST_ARCHIVE_NAME
     geninfo --no-checksum --ignore-errors gcov,source -q --output-filename $DIR/cado-nfs.info  ./ --no-external
-    rm -rf ~/.webdir/cado-unit-tests/ || :
+    rm -rf "$TARGET_DIRECTORY"/ || :
     /bin/cp -pf $(which genhtml) $DIR/genhtml
     ex $DIR/genhtml <<EOF
 /sub get_date_string()$
@@ -95,8 +121,8 @@ mark b
 wq
 EOF
     chmod 755 $DIR/genhtml
-    $DIR/genhtml --html-epilog $DIR/epilog.html  -o $WEBDIR/cado-unit-tests/ $DIR/cado-nfs.info
-    cp $DIR/make-test.txt $WEBDIR/cado-unit-tests
+    $DIR/genhtml --html-epilog $DIR/epilog.html  -o "$TARGET_DIRECTORY"/ $DIR/cado-nfs.info
+    cp $DIR/make-test.txt "$TARGET_DIRECTORY"
 }
 
 rc=0

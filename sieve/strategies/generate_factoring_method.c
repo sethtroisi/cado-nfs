@@ -1,3 +1,5 @@
+#include "cado.h"
+
 #include <float.h>
 #include <gmp.h>
 #include <math.h>
@@ -9,7 +11,7 @@
 #include <sys/resource.h>
 #include <time.h>
 
-#include "cado.h"
+
 #include "portability.h"
 #include "utils.h"
 #include "facul.h"
@@ -24,14 +26,12 @@
 /*
   BOUND_SIGMA is used when you generate a random value of sigma.
 */
-const int BOUND_SIGMA = 100;
+const int BOUND_SIGMA = 15;
 
 /* 
    The test fails with probabily equals to 1/4^15 (approx 0) (MILLER RABIN).
 */
 const int NB_PRIMALITY_TEST = 15;
-
-const int BOUND_FILTER = 20;	//todo: unused!!! 
 
 const double EPSILON_DBL = LDBL_EPSILON;
 
@@ -211,12 +211,12 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 	if (curve == MONTY16) {
 	    sigma = 1;
 	} else
-	    sigma = 2 + rand();
+	  sigma = 2 + rand()%BOUND_SIGMA;
 
 	strategy->methods[0].plan = malloc(sizeof(ecm_plan_t));
 	ASSERT(strategy->methods[0].plan != NULL);
 	ecm_make_plan(strategy->methods[0].plan, B1, B2, curve,
-		      labs(sigma), 0, 0);
+		      labs(sigma), 1, 0);
     } else {
 	exit(EXIT_FAILURE);
     }
@@ -243,14 +243,6 @@ bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
     int nb_test = 0;
 
     while (nb_success < nb_success_max && (nb_test < nb_test_max)) {
-	if (strategy->methods[0].method == EC_METHOD) {
-	    ecm_plan_t *plan = strategy->methods[0].plan;
-	    //RANDOM_SIGMA
-	    if (plan->parameterization != MONTY16) {
-		plan->sigma = 2 + rand() % BOUND_SIGMA;
-		strategy->methods[0].plan = plan;
-	    }
-	}
 	/* 
 	   f will contain the prime factor of N that the strategy
 	   found.  Note that N is composed by two prime factors by the
@@ -489,7 +481,7 @@ int *choice_parameters(int method, int len_p_min)
 	} else if (len_p_min <= 25) {
 	    b1_min = 100;
 	    b1_max = 10000;
-	    b1_step = 1.4;
+	    b1_step = 10;
 	    c_min = 10;
 	    c_max = 200;
 	    c_step = 40;
@@ -526,7 +518,6 @@ int *choice_parameters(int method, int len_p_min)
   This function allows to compute the probability and the time of a strategy
   to find a prime number in an interval [2**len_p_min, 2**len_p_max].
 */
-//todo:  will be optimize!
 static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
 					   mpz_t* N, int nb_test_max)
 {
@@ -540,16 +531,7 @@ static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
 
     while ((nb_succes < nb_succes_lim) && (nb_test < nb_test_max)) {
 
-
-	if (strategy->methods[0].method == EC_METHOD) {
-	    ecm_plan_t *plan = strategy->methods[0].plan;
-	    //RANDOM_SIGMA
-	    if (plan->parameterization != MONTY16) {
-		plan->sigma = 2 + rand() % BOUND_SIGMA;
-		strategy->methods[0].plan = plan;
-	    }
-	}
-	//compute the the time of execution
+      //computes the the time of execution
 	/*
 	   f will contain the prime factor of N that the strategy
 	   found.  Note that N is composed by two prime factors by the
@@ -728,14 +710,17 @@ tabular_fm_t *generate_factoring_methods(gmp_randstate_t state, int len_p_min,
     tabular_fm_t *gfm = tabular_fm_create();
 
     //we begin by the first method:
-    int method = PM1_METHOD;
-    int curve = 0;
+    int ind_method = 0;
+    int ind_curve = 0;
+    int curve[3] = {MONTY12, MONTY16, BRENT12};
+    int method[4] = {PM1_METHOD, PP1_27_METHOD, PP1_65_METHOD, EC_METHOD};
+    while (ind_method <= 4 && ind_curve < 3) {
 
-    while (method <= NB_METHOD && curve < NB_CURVE) {
-	printf("method = %d, curve = %d\n", method, curve);
+	printf("method = %d, curve = %d\n",
+	       method[ind_method], curve[ind_curve]);
 	tabular_fm_t *res = generate_factoring_methods_mc
-	    (state, len_p_min, len_p_max, len_n, method, curve, opt_ch,
-	     param_sieve);
+	    (state, len_p_min, len_p_max, len_n, method[ind_method],
+	     curve[ind_curve], opt_ch, param_sieve);
 
 	tabular_fm_concat(gfm, res);
 
@@ -743,10 +728,10 @@ tabular_fm_t *generate_factoring_methods(gmp_randstate_t state, int len_p_min,
 	tabular_fm_free(res);
 
 	//index
-	if (method != EC_METHOD)
-	    method++;
+	if (method[ind_method] != EC_METHOD)
+	    ind_method++;
 	else
-	    curve++;
+	    ind_curve++;
     }
 
     return gfm;

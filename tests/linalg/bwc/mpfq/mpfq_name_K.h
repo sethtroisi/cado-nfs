@@ -137,6 +137,10 @@
 #define Ksscan(a0,a1)	Kcommon_name_(sscan) (K,a0,a1)
 #define Kfscan(a0,a1)	Kcommon_name_(fscan) (K,a0,a1)
 #define Kscan(a0)	Kcommon_name_(scan) (K,a0)
+#define Kread(a0,a1)	Kcommon_name_(read) (K,a0,a1)
+#define Kimportdata(a0,a1,a2,a3)	Kcommon_name_(importdata) (K,a0,a1,a2,a3)
+#define Kwrite(a0,a1)	Kcommon_name_(write) (K,a0,a1)
+#define Kexportdata(a0,a1,a2,a3)	Kcommon_name_(exportdata) (K,a0,a1,a2,a3)
 
 
 
@@ -168,6 +172,10 @@
 #define Kvec_sscan(a0,a1,a2)	Kcommon_name_(vec_sscan) (K,a0,a1,a2)
 #define Kvec_fscan(a0,a1,a2)	Kcommon_name_(vec_fscan) (K,a0,a1,a2)
 #define Kvec_scan(a0,a1)	Kcommon_name_(vec_scan) (K,a0,a1)
+#define Kvec_read(a0,a1,a2)	Kcommon_name_(vec_read) (K,a0,a1,a2)
+#define Kvec_write(a0,a1,a2)	Kcommon_name_(vec_write) (K,a0,a1,a2)
+#define Kvec_import(a0,a1,a2,a3)	Kcommon_name_(vec_import) (K,a0,a1,a2,a3)
+#define Kvec_export(a0,a1,a2,a3)	Kcommon_name_(vec_export) (K,a0,a1,a2,a3)
 #define Kvec_ur_init(a0,a1)	Kcommon_name_(vec_ur_init) (K,a0,a1)
 #define Kvec_ur_set_zero(a0,a1)	Kcommon_name_(vec_ur_set_zero) (K,a0,a1)
 #define Kvec_ur_set_vec(a0,a1,a2)	Kcommon_name_(vec_ur_set_vec) (K,a0,a1,a2)

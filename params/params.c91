@@ -136,7 +136,7 @@ tasks.polyselect.degree = 4		# degree of the algebraic polynomial
 tasks.polyselect.threads = 2
     # How many threads to use per polyselect process
 
-tasks.polyselect.P = 16000		# choose lc(g) with two prime factors in [P,2P]
+tasks.polyselect.P = 10000		# choose lc(g) with two prime factors in [P,2P]
     # Setting a large value will most likely find better polynomials,
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
@@ -145,7 +145,7 @@ tasks.polyselect.P = 16000		# choose lc(g) with two prime factors in [P,2P]
 tasks.polyselect.admin = 0          # min value for leading coefficient of f(x)
     # If not set, the default is 0.
 
-tasks.polyselect.admax = 250e3      # max value for leading coefficient of f(x)
+tasks.polyselect.admax = 150e3      # max value for leading coefficient of f(x)
 
 tasks.polyselect.incr = 60	    # increment for leading coefficient of f(x)
     # This factor is usually a smooth number, which forces projective roots in
@@ -156,7 +156,7 @@ tasks.polyselect.incr = 60	    # increment for leading coefficient of f(x)
     # The polynomial selection search time is proportional to the
     # length of the search interval, i.e., (admax-admin)/incr.
 
-tasks.polyselect.nrkeep = 100
+tasks.polyselect.nrkeep = 40
 
 tasks.polyselect.adrange = 5000		# size of individual tasks
     # Polynomial selection is split into several individual tasks. The

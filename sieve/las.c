@@ -449,7 +449,34 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * strategies will be similar. Presently we spend some time creating
      * each of them for the descent case.
      */
+    const char *cofactfilename = param_list_lookup_string (pl, "file-cofact");
+    if (cofactfilename != NULL) /* a file was given */
+	{
+	    printf ("read the cofactorisation file\n");
+	    printf ("param = %ld, %d, %d, %ld, %d, %d\n",
+		    sc->sides[0]->lim, sc->sides[0]->lpb,
+		    sc->sides[0]->mfb, sc->sides[1]->lim,
+		    sc->sides[1]->lpb, sc->sides[1]->mfb);
+	    FILE* file = fopen (cofactfilename, "r");
+	    si->strategies = facul_make_strategies (sc->sides[0]->lim,
+						    sc->sides[0]->lpb,
+						    sc->sides[0]->mfb,
+						    sc->sides[1]->lim,
+						    sc->sides[1]->lpb,
+						    sc->sides[1]->mfb,
+						    file, 0);
+	    if (si->strategies == NULL)
+	      {
+		fprintf (stderr, "impossible to read %s\n",
+			 cofactfilename);
+		abort ();
+	      }
+	    fclose (file);
+	}
+    else /* To show if we use a file of strategies or not! */
+	si->strategies = NULL;
 
+    
     for(int s = 0 ; s < 2 ; s++) {
         sieve_info_print_fb_statistics(las, si, s);
         /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
@@ -475,6 +502,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         si->sides[s]->strategy = facul_make_strategy(
                 sc->sides[s]->lim, sc->sides[s]->lpb,
                 sc->sides[s]->ncurves, 0);
+
         reorder_fb(si, s);
 
         verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
@@ -558,6 +586,8 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
         mpz_clear (si->BBB[s]);
         mpz_clear (si->BBBB[s]);
     }
+    facul_clear_strategies (si->strategies);
+    si->strategies = NULL;
     sieve_info_clear_norm_data(si);
     mpz_clear(si->doing->p);
     mpz_clear(si->doing->r);
@@ -737,7 +767,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         verbose_output_add(2, stderr, 1);
     }
 
-    verbose_set_enabled_flags(pl);
+    verbose_interpret_parameters(pl);
     param_list_print_command_line(las->output, pl);
     las_display_config_flags();
 
@@ -1837,10 +1867,12 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
                 }
 #endif
+                rep->ttf += seconds_thread ();
                 trial_div (&factors[side], norm[side], N, x,
                         si->sides[side]->fb,
                         &primes[side], si->sides[side]->trialdiv_data,
                         lim, a, b);
+                rep->ttf -= seconds_thread ();
 
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
@@ -1872,7 +1904,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
               verbose_output_vfprint(1, 0, gmp_vfprintf, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), remains %Zd, %Zd unfactored\n",
                            a, b, norm[0], norm[1]);
 #endif
-
             if (pass <= 0) continue; /* a factor was > 2^lpb, or some
                                         factorization was incomplete */
 
@@ -1880,7 +1911,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             if (cof_stats == 1) /* learning phase */
                 cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
-
+	    
             // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
             relation_t rel[1];
@@ -2534,8 +2565,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
   param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
   param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
-  param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0\n");
-  param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1\n");
+  param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0");
+  param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
@@ -2543,6 +2574,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorisation step in file xxx");
+  param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorisation step");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
   param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");

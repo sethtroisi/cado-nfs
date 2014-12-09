@@ -66,6 +66,7 @@ sieve/ecm/find_primes_hit.c
 sieve/ecm/getprime.c
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
+sieve/ecm/mpqs.c
 sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
@@ -121,3 +122,10 @@ linalg/bwc/update-flint.sh
 linalg/bwc/parse-flint-fft-doc.pl
 linalg/bwc/creating-sm-example.m
 linalg/bwc/sm-outside-matrix.m
+misc/CMakeLists-nodist.txt
+sieve/strategies/script_bench.sh
+sieve/strategies/script_fm.sh
+sieve/strategies/script_mg.sh
+sieve/strategies/script_str.sh
+sieve/strategies/script_str_r.sh
+linalg/bwc/lingen.txt

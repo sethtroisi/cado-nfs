@@ -12,6 +12,7 @@ const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
 
+/* Be conservative and allocate two polynomials by default. */
 void cado_poly_init(cado_poly poly)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
@@ -19,7 +20,8 @@ void cado_poly_init(cado_poly poly)
     poly->rat = poly->pols[RATIONAL_SIDE];
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
-    for(int side = 0 ; side < 2 ; side++)
+    poly->nb_polys = 2;
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_init (poly->pols[side], MAXDEGREE);
 
     mpz_init_set_ui(poly->n, 0);
@@ -27,7 +29,7 @@ void cado_poly_init(cado_poly poly)
 
 void cado_poly_clear(cado_poly poly)
 {
-    for(int side = 0 ; side < 2 ; side++)
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_clear (poly->pols[side]);
 
     mpz_clear(poly->n);
@@ -40,35 +42,72 @@ cado_poly_set (cado_poly p, cado_poly q)
 {
     mpz_set (p->n, q->n);
     p->skew = q->skew;
-    for(int side = 0 ; side < 2 ; side++)
+    p->nb_polys = q->nb_polys;
+    for(int side = 0 ; side < q->nb_polys ; side++)
       mpz_poly_set (p->pols[side], q->pols[side]);
 }
 
 // This function is no longer exported
+#define BUF_MAX 10000
+
 static
 int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;
-    int have_f[2][(MAXDEGREE + 1)] = {{ 0, }, {0,}};
-    int i;
+    int have_f[NB_POLYS_MAX][(MAXDEGREE + 1)];
+    int i, j, nb_polys = 2, new_coding = 0;
 
-    have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
+    /* monitoring the fill in of coefficients */
+    for(i = 0; i < NB_POLYS_MAX; i++)
+	for(j = 0; j <= MAXDEGREE; j++)
+	    have_f[i][j] = 0;
+
+    have_n = param_list_parse_mpz(pl, "n", poly->n) 
+	     || param_list_parse_mpz(pl, NULL, poly->n);
     poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
                          it is not given */
     param_list_parse_double(pl, "skew", &(poly->skew));
-    for (i = 0; i < (MAXDEGREE + 1); i++) {
-        char tag[4];
-        snprintf(tag, sizeof(tag), "c%d", i);
-        have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-        if (!have_f[ALGEBRAIC_SIDE][i]) {
-            snprintf(tag, sizeof(tag), "X%d", i);
-            have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-        }
-        snprintf(tag, sizeof(tag), "Y%d", i);
-        have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
-    }
 
-    for(int side = 0 ; side < 2 ; side++) {
+    for(i = 0; i < NB_POLYS_MAX; i++){
+	char tag[6], buf[BUF_MAX];
+	snprintf(tag, sizeof(tag), "poly%d", i);
+	if(param_list_parse_string(pl, tag, buf, BUF_MAX)){
+	    /* feeding poly->pols[i] from buf="c0,c1,..." */
+	    char *tmp = buf;
+	    new_coding = 1;
+	    nb_polys = i+1;
+	    if(i >= 2)
+		mpz_poly_init (poly->pols[i], MAXDEGREE);
+	    for(j = 0; ; j++){
+		gmp_sscanf(tmp, "%Zd", poly->pols[i]->coeff[j]);
+		//		gmp_printf("read: %d %Zd\n", j, poly->pols[i]->coeff[j]);
+		have_f[i][j] = 1;
+		for( ; *tmp != '\0' && *tmp != ','; tmp++);
+		if(*tmp == '\0')
+		    break;
+		tmp++;
+	    }
+	}
+	else
+	    break;
+    }
+    poly->nb_polys = nb_polys;
+    if(new_coding == 0){
+	/* reading polynomials coefficient by coefficient */
+	for (i = 0; i < (MAXDEGREE + 1); i++) {
+	    char tag[4];
+	    snprintf(tag, sizeof(tag), "c%d", i);
+	    have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+	    if (!have_f[ALGEBRAIC_SIDE][i]) {
+		snprintf(tag, sizeof(tag), "X%d", i);
+		have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+	    }
+	    snprintf(tag, sizeof(tag), "Y%d", i);
+	    have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
+	}
+    }
+    /* setting degrees */
+    for(int side = 0 ; side < poly->nb_polys ; side++) {
         mpz_poly_ptr ps = poly->pols[side];
         int d;
         for (d = MAXDEGREE; d >= 0 && !have_f[side][d]; d--) {
@@ -109,11 +148,17 @@ int cado_poly_read(cado_poly poly, const char *filename)
     return r;
 }
 
-
+/* TODO: adapt for more than 2 polynomials:
+ * compute for each pair (0,i) the corresponding common root m_i
+ * check all m_i are equal
+ */
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
     // have to work with copies, because pseudo_gcd destroys its input
     mpz_poly_t f[2];
+
+    ASSERT_ALWAYS(cpoly->nb_polys == 2);
+
     for (int i = 0; i < 2; ++i) {
         mpz_poly_init(f[i], cpoly->pols[i]->alloc);
         mpz_poly_set(f[i], cpoly->pols[i]);

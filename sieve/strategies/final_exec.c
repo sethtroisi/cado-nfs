@@ -1,11 +1,11 @@
+#include "cado.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
-
 #include "finding_good_strategy.h"
 
 /************************************************************************/
@@ -136,8 +136,6 @@ int main(int argc, char *argv[])
 	compute_best_strategy(matrix_strat, matrix_C, mfb0 + 1, mfb1 + 1,
 			      time_C);
 
-    //store the result
-    //todo: change the name of this function.
     FILE *file_output = fopen(pathname_output, "w");
     int err = fprint_final_strategy(file_output, matrix_strat_res,
 				    mfb0 + 1, mfb1 + 1);

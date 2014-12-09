@@ -29,12 +29,12 @@ tasks.polyselect.degree = 5
 
 ## Parameters of polyselect
 # note: those parameters are just a guess, they might be far from optimal
-tasks.polyselect.P = 500000
+tasks.polyselect.P = 5000000
 tasks.polyselect.admax = 2e7
 tasks.polyselect.adrange = 2e5
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1000
-tasks.polyselect.nrkeep = 900
+tasks.polyselect.nrkeep = 1000
 
 ###########################################################################
 ###########################################################################

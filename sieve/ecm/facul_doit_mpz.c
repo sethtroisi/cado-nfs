@@ -6,5 +6,6 @@
 #define ecm ecm_mpz
 #define primetest primetest_mpz
 #define facul_doit facul_doit_mpz
+#define facul_doit_onefm facul_doit_onefm_mpz
 
 #include "facul_doit.c"

@@ -5,9 +5,9 @@ This is the main workhorse for the parallelizing of the computation. It
 allows multi-thread (with pthread) and multinode (with MPI) processing.
 
 The parameters given to pi_go() are:
+   . an outer description of how many mpi jobs and threads should be set up.
    . a pointer to the function that must be called in parallel.
-   . the mpi splitting (a pair of integers)
-   . the thread splitting (a pair of integers)
+   . arguments which are to be passed to the function.
 
 Its implementation is in parallelizing_info.[ch] .  The main data
 structure that conveys information on the parallel setting is 

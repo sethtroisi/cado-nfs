@@ -279,3 +279,20 @@ ecm_clear_plan (ecm_plan_t *plan)
   plan->bc_len = 0;
   plan->B1 = 0;
 }
+
+
+void
+ecmE_make_plan (ecmE_plan_t *plan, const unsigned int B1, const int parameterization)
+{
+  fprintf(stderr, "In ecmE_make_plan\n");
+
+  plan->exp2 = 0;
+  plan->B1 = B1;
+  plan->parameterization = parameterization;
+  plan->E = &Ecurve14;
+}
+
+void 
+ecmE_clear_plan (ecmE_plan_t *plan MAYBE_UNUSED)
+{
+}

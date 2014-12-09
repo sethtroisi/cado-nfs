@@ -30,9 +30,7 @@ The action to be performed is either:
   prepended by a colon.
     :complete -- do a complete linear system solving. The solution ends
                  up in \$wdir/W.
-    :wipeout  -- quite like rm -rf \$wdir, but focuses on bwc files. Does
-                 not wipe out matrix file, nor cached in-memory files.
-    :bench    -- does :wipeout, dispatch, prep, secure, and krylov with
+    :bench    -- does dispatch, prep, secure, and krylov with
                  an exceedingly large finish bound in order to perform
                  some timings.
 
@@ -45,6 +43,7 @@ mn m n prime         same meaning as for bwc programs.
 nullspace            same meaning as for bwc programs.
 interval             same meaning as for bwc programs.
 ys splits            same meaning as for bwc programs (krylov and mksol)
+lingen_mpi           like mpi, but for plingen only (and someday lingen).
 
 matrix               input matrix file. Must be a complete path. Binary, 32-b LE
 rhs                  rhs file for inhomogeneous systems (in binary, 32-b LE)
@@ -119,6 +118,7 @@ my $param_defaults={
     prime => 2,         # for factoring.
     thr => '1x1',
     mpi => '1x1',
+    lingen_mpi => '1x1',
     shuffled_product => 1,
     interval => 200,
 };
@@ -168,6 +168,7 @@ for my $k (keys %$param_defaults) {
 my @main_args;
 
 my @mpi_split=(1,1);
+my @lingen_mpi_split=(1,1);
 my @thr_split=(1,1);
 my $nh;
 my $nv;
@@ -266,6 +267,7 @@ while (my ($k,$v) = each %$param) {
     # into the main argument list.
     if ($k eq 'mpi') { @mpi_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @mpi_split;}
     if ($k eq 'thr') { @thr_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @thr_split; }
+    if ($k eq 'lingen_mpi') { @lingen_mpi_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @lingen_mpi_split;}
     if ($k eq 'verbose_flags') {
         my @heritage;
         for my $f (split(',', $v)) {
@@ -305,6 +307,7 @@ while (my ($k,$v) = each %$param) {
 
     # Ok, probably there's a fancy argument we don't care about.
 }
+
 $nh = $mpi_split[0] * $thr_split[0];
 $nv = $mpi_split[1] * $thr_split[1];
 $splitwidth = ($prime == 2) ? 64 : 1;
@@ -358,6 +361,17 @@ if (defined($nrhs) && ($nrhs > $n || $nrhs > $m)) {
     die "nrhs > n or m is not supported";
 }
 
+if ($prime == 2 && ($lingen_mpi_split[0] != 1 || $lingen_mpi_split[1] != 1)) {
+    die "Current binary lingen code does not support mpi";
+}
+
+if ($lingen_mpi_split[0] != $lingen_mpi_split[1]) {
+    die "lingen_mpi must be a square split";
+}
+
+if ($m % $lingen_mpi_split[0] != 0 || $n % $lingen_mpi_split[0] != 0) {
+    die "lingen_mpi must divide gcd(m,n)"
+}
 
 # }}}
 
@@ -402,7 +416,7 @@ if ($main !~ /^:(?:complete|bench)$/ && !-d $param->{'wdir'}) {
 ##################################################
 # Some more default values to set. Setting separately splits=, ys= and so
 # on is quite awkward in the case of a single-site test.
-if ((!defined($m) || !defined($n)) && $main !~ /^:wipeout$/) {
+if ((!defined($m) || !defined($n))) {
     usage "The parameters m and n must be set";
 }
 if (!defined($param->{'splits'})) {
@@ -516,9 +530,8 @@ if (!-d $wdir) {        # create $wdir on script node.
 #    --> Simply put, the former is prepended before all important
 #    mpi-level programs (dispatch secure krylov mksol gather), while the
 #    other is of course for leader-node-only programs.
-#  - @mpi_precmd_nopthreads
-#    --> exactly the same, but here we leave even thread management to
-#    mpi. This applies to plingen_pz.
+#  - @mpi_precmd_lingen (currently this is only for *plingen*)
+#    --> use lingen_mpi (no lingen_thr exists at this point)
 #  - $mpi_needed
 #    --> to be used to check whether we want mpi. This is important
 #    before calling dosystem.
@@ -535,7 +548,7 @@ my $mpi_needed = $mpiexec ne '';
 # short of a more accurate solution, this is a hack.
 my @mpi_precmd;
 my @mpi_precmd_single;
-my @mpi_precmd_nopthreads;
+my @mpi_precmd_lingen;
 
 
 sub detect_mpi {
@@ -811,8 +824,7 @@ if ($mpi_needed) {
     }
 
     if (scalar @hosts) {
-        # Don't use an uppercase filename, it would be deleted by
-        # wipeout.
+        # Don't use an uppercase filename.
         $hostfile = "$wdir/hosts";
         open F, ">$hostfile" or die "$hostfile: $!";
         for my $h (@hosts) { print F "$h\n"; }
@@ -877,13 +889,13 @@ if ($mpi_needed) {
     }
 
     @mpi_precmd_single = @mpi_precmd;
-    @mpi_precmd_nopthreads = @mpi_precmd;
+    @mpi_precmd_lingen = @mpi_precmd;
     if (!$param->{'only_mpi'}) {
         push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
     } else {
         push @mpi_precmd, '-n', $nh * $nv;
     }
-    push @mpi_precmd_nopthreads, '-n', $nh * $nv;
+    push @mpi_precmd_lingen, '-n', $lingen_mpi_split[0] * $lingen_mpi_split[1];
     push @mpi_precmd_single, '-n', 1;
 }
 
@@ -1214,7 +1226,20 @@ sub task_common_run {
     my $program = shift @_;
     expire_cache_entry 'leadernode_filelist';
     # Some arguments are relevant only to some contexts.
+    #
+    # We start with linven, because it's slightly specific
+    # take out the ones we don't need (and acollect shares some
+    # peculiarities).
+    @_ = grep !/^(balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /(lingen|acollect$)/;
+    if ($program =~ /plingen/) {
+        @_ = map { s/^lingen_mpi/mpi/; $_; } @_;
+    } else {
+        @_ = grep !/^lingen_mpi?=/, @_;
+    }
+    @_ = grep !/allow_zero_on_rhs/, @_ unless $program =~ /^plingen/;
     @_ = grep !/^splits?=/, @_ unless $program =~ /split$/;
+    @_ = grep !/^save_submatrices?=/, @_ unless $program =~ /^(dispatch|prep|krylov|mksol|gather)$/;
+    # are we absolutely sure that lingen needs no matrix ?
     @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|mksol|dispatch)$/;
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
@@ -1230,7 +1255,7 @@ sub task_common_run {
 
     if ($mpi_needed) {
         if ($program =~ /\/plingen[^\/]*$/) {
-            unshift @_, @mpi_precmd_nopthreads;
+            unshift @_, @mpi_precmd_lingen;
         } elsif ($program =~ /\/(?:split|acollect|lingen|mf_bal|cleanup)$/) {
             unshift @_, @mpi_precmd_single;
         } elsif ($program =~ /\/(?:prep|secure|krylov|mksol|gather|dispatch)$/) {
@@ -1769,7 +1794,7 @@ sub task_lingen {
         push @args, "lingen-threshold=$lt";
         push @args, "lingen-mpi-threshold=$lt";
         push @args, "afile=$concatenated_A";
-        push @args, grep { /^(?:mn|m|n|wdir|prime|rhs|mpi|thr)=/ } @main_args;
+        push @args, grep { /^(?:mn|m|n|wdir|prime|rhs|lingen_mpi)=/ || /allow_zero_on_rhs/ } @main_args;
         if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {
             print "## non-MPI build, avoiding multithreaded plingen\n";
             @args = grep { !/^(mpi|thr)=/ } @args;

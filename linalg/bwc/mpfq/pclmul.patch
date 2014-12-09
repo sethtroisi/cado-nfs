@@ -62,9 +62,9 @@ mpfq-generated file into something valid for 32- and 64-bit.)
 +    t[2] = t11.x[0] ^ tk.x[1];
 +    t[3] = t11.x[1];
 +#else
-     typedef union { __v2di s; unsigned long x[2]; } v2di_proxy;
  #define SHL(x, r) _mm_slli_epi64((x), (r))
  #define SHR(x, r) _mm_srli_epi64((x), (r))
+ #define SHLD(x, r) _mm_slli_si128((x), (r) >> 3)
 @@ -1059,6 +1095,7 @@
  #undef SHR
  #undef SHLD

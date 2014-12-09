@@ -1,39 +1,9 @@
-/* gen_decomp mfb fbb computes approximations of all decompositions of
-   mfb-bit integers into primes larger than fbb. Example:
-$ gen_decomp 60 524288
-60 20 40 4.700208e+14 # 1
-60 21 39 4.596914e+14 # 2
-60 22 38 4.502935e+14 # 3
-60 23 37 4.420430e+14 # 4
-60 24 36 4.351291e+14 # 5
-60 25 35 4.297433e+14 # 6
-60 26 34 4.254332e+14 # 7
-60 27 33 4.214013e+14 # 8
-60 28 32 4.197615e+14 # 9
-60 29 31 4.183856e+14 # 10
-60 30 30 2.088895e+14 # 11
-60 20 41 5.930007e+14 # 12
-60 21 40 5.788613e+14 # 13
-60 22 39 5.664933e+14 # 14
-60 23 38 5.560455e+14 # 15
-60 24 37 5.460721e+14 # 16
-60 25 36 5.393045e+14 # 17
-60 26 35 5.322997e+14 # 18
-60 27 34 5.281604e+14 # 19
-60 28 33 5.249884e+14 # 20
-60 29 32 5.234872e+14 # 21
-60 30 31 5.197604e+14 # 22
-60 20 20 20 2.477904e+12 # 23
-60 20 20 21 3.529032e+13 # 24
-60 20 20 22 1.034259e+13 # 25
-60 20 21 21 1.030657e+13 # 26
-*/
-
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include "macros.h"
+#include "gen_decomp.h"
 
 #define PREC 1000000
 
@@ -50,7 +20,7 @@ unsigned long A7053[256] = {0,1,2,4,6,11,18,31,54,97,172,309,564,1028,1900,
                             65612899915304,128625503610475,0,};
 
 /* return prime_pi(2^i) */
-double
+static double
 prime_pi (unsigned long i)
 {
   if (A7053[i] != 0)
@@ -62,22 +32,8 @@ prime_pi (unsigned long i)
     }
 }
 
-#if 0
-
-/* generate a random i-bit integer, uniformly distributed in [2^(i-1), 2^i[ */
-double
-gen_random (unsigned long i)
-{
-  double min;
-
-  min = ldexp (1.0, i - 1);
-  return min * (1.0 + drand48 ());
-}
-
-#else /* better version: takes into account the 1/log(x) bias */
-
 /* generate a random i-bit integer, distributed with density in 1/log(x). */
-double
+static double
 gen_random (unsigned long i)
 {
   double n0 = prime_pi (i - 1);
@@ -93,24 +49,23 @@ gen_random (unsigned long i)
   return a * n * log (n) + b;
 }
 
-#endif
 
 double T[256] = {0,};
 
 /* estimates number of products of primes:
    l[0]-bit * l[1]-bit * ... * l[k-1]-bit
    with product of mfb bits, each prime should be >= lim */
-void
-doit (unsigned int *l, unsigned int k, unsigned long mfb, unsigned long lim)
+static double
+psi (int *l, int k, unsigned long mfb, unsigned long lim)
 {
-  unsigned long ok, tot, i, j;
+  unsigned long ok, tot;
+  int i, j;
   double S, p, r, rmin, rmax;
-  static int count = 0;
 
   ok = tot = 0;
   for (S = 1.0, i = 0; i < k; S *= T[l[i]], i++);
   if (S == 0.0)
-    return;
+    return 0;
   rmin = ldexp (1.0, mfb - 1);
   rmax = ldexp (1.0, mfb);
   while (tot < PREC)
@@ -127,29 +82,28 @@ doit (unsigned int *l, unsigned int k, unsigned long mfb, unsigned long lim)
       if (rmin <= r && r <= rmax)
         ok ++;
     }
-  printf ("%lu", mfb);
+  //printf ("%lu", mfb);
   for (i = 0; i < k; i++)
     {
       for (j = 1; i >= j && l[i-j] == l[i]; j++);
       S /= (double) j;
     }
-  for (i = 0; i < k; i++)
-    printf (" %d", l[i]);
-  printf (" %e # %d\n", (double) ok * S / (double) tot, ++count);
-  fflush (stdout);
+  /* for (i = 0; i < k; i++) */
+  /*   printf (" %d", l[i]); */
+  /* printf (" %e # %d\n", (double) ok * S / (double) tot, ++count); */
+  /* fflush (stdout); */
+  return (double) ok * S / (double) tot;
 }
 
-int
-main (int argc, char *argv[])
+tabular_decomp_t*
+generate_all_decomp (int mfb, unsigned long lim)
 {
-  unsigned long mfb, lim, i, j, k, kmax;
-  unsigned int l[256], u;
+  tabular_decomp_t* res = tabular_decomp_create();  
+  int i, j, k, kmax;
+  int l[256], u;
   int imin, t, s;
   double p0, p1;
 
-  ASSERT_ALWAYS (argc == 3);
-  mfb = atol (argv[1]);
-  lim = atol (argv[2]);
   imin = ceil (log2 ((double) (lim + 1)));
   for (i = 1; (i < 256) && i <= mfb; i++)
     {
@@ -174,7 +128,11 @@ main (int argc, char *argv[])
           l[k-1] = mfb + j - (k - 1) * imin;
           while (1)
             {
-              doit (l, k, mfb, lim);
+              double val = psi (l, k, mfb, lim);
+	      decomp_t* tmp = decomp_create (k, l, val);
+	      tabular_decomp_add_decomp (res, tmp); 
+	      decomp_free (tmp);
+
               /* next partition of mfb + j */
               for (t = k - 1; t > 0; t--)
                 /* try to increase l[t-1] and decrease l[t] */
@@ -198,5 +156,5 @@ main (int argc, char *argv[])
             }
         }    
     }
-  return 0;
+  return res;
 }

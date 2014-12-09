@@ -28,7 +28,7 @@
 #include <sstream>
 #ifdef  HAVE_OPENMP
 #include <omp.h>
-#define OMP_ROUND(k) (k % omp_get_num_threads() == omp_get_thread_num())
+#define OMP_ROUND(k) ((k) % omp_get_num_threads() == omp_get_thread_num())
 #else
 #define OMP_ROUND(k) (1)
 #endif
@@ -1317,8 +1317,7 @@ static bool go_quadratic(polmat& pi)/*{{{*/
 #ifdef  DO_EXPENSIVE_CHECKS
         write_pi(pi,tstart,t);
 #else
-    if (bw->checkpoints)
-        write_pi(pi,tstart,t);
+    // if (bw->checkpoints) write_pi(pi,tstart,t);
 #endif
 
 #ifdef  VERBOSE
@@ -1485,8 +1484,8 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 
     unsigned int expected_pi_deg = pi_deg_bound(llen);
     unsigned int kill;
-    unsigned int tstart = t;
-    unsigned int tmiddle;
+    // unsigned int tstart = t;
+    // unsigned int tmiddle;
     bool finished_early;
 #ifdef  DO_EXPENSIVE_CHECKS
     checker c;
@@ -1535,7 +1534,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     }
 
 
-    tmiddle = t;
+    // tmiddle = t;
 
     // printf("deg(pi_l)=%d, bound is %d\n",pi_l_deg,expected_pi_deg);
 
@@ -1633,6 +1632,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
      * degree ! */
     itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
 
+    /*
     if (bw->checkpoints) {
         write_pi(pi,tstart,t);
         {
@@ -1640,6 +1640,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
             unlink_pi(tmiddle,t);
         }
     }
+    */
 
 #ifdef  DO_EXPENSIVE_CHECKS
     c.check(pi);
@@ -1793,17 +1794,31 @@ int main(int argc, char *argv[])
 {
     using namespace globals;
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
-
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    /* {{{ declare local parameters and switches */
+    param_list_decl_usage(pl, "lingen-threshold", "sequence length above which we use the recursive algorithm for lingen");
+    param_list_decl_usage(pl, "cantor-threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
     param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
     param_list_configure_alias(pl, "cantor-threshold", "cantor_threshold");
-    bw_common_init(bw, pl, &argc, &argv);
+    /* }}} */
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    /* {{{ interpret our parameters */
     param_list_parse_uint(pl, "lingen-threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor-threshold", &cantor_threshold);
-    if (param_list_warn_unused(pl)) usage();
+    /* }}} */
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
     param_list_clear(pl);
 
     m = n = 0;
@@ -1962,6 +1977,8 @@ int main(int argc, char *argv[])
     polmat F;
     compute_final_F_from_PI(F, pi_left);
     bw_commit_f(F);
+
+    bw_common_clear_new(bw);
 
 #if 0/*{{{*/
     if (ec->degree>=0) {

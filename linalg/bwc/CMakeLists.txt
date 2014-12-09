@@ -86,7 +86,6 @@ set(bwc_base_sources
     intersections.c
     xvectors.c
     bw-common.c
-    bw-common-mpi.c
     async.c
     rolling.c
     matmul.c
@@ -146,19 +145,7 @@ add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
 set_property(TARGET random_matrix PROPERTY COMPILE_DEFINITIONS WANT_MAIN)
 
 
-# balancing.c itself is in fact standalone, and lightweight. We prefer to
-# avoid having the whole thing entangled with too many dependencies all
-# around, since all that split.c actually needs is very, very little.
-add_executable(split split.c bw-common.c balancing.c)
-
-add_executable(acollect acollect.c bw-common.c)
-
-install(TARGETS split acollect RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
-
 target_link_libraries(random_matrix utils m)
-
-target_link_libraries(split utils)
-target_link_libraries(acollect utils)
 
 add_executable(bcast-file ${EXCLUDE_FROM_RELEASE_BUILD} bcast-file.c)
 set_target_properties(bcast-file PROPERTIES
@@ -315,6 +302,8 @@ macro(bwc_program v)
     target_link_libraries(${v} bwc_base)
 endmacro(bwc_program)
 
+bwc_program(acollect acollect.c)
+bwc_program(split split.c)
 bwc_program(build build.c)
 target_link_libraries(build matmul_mf)
 bwc_program(bench bench.c worker-threads.c)
@@ -368,7 +357,6 @@ endif(WITH_MPIR)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(plingen_${v}_sources
         bw-common.c
-        bw-common-mpi.c
         plingen.c
         plingen-tuning.cpp
         logline.c

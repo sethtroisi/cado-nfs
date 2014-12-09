@@ -1,10 +1,8 @@
-/* #include "cado.h" */
+#include "cado.h"
 
 #include <dirent.h>
 #include <sys/types.h>
-
 #include <getopt.h>
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,11 +13,9 @@
 #include <time.h>
 #include <math.h>
 
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
 #include "ecm.h"
-
 #include "generate_factoring_method.h"
 
 static void declare_usage(param_list pl)

@@ -164,6 +164,8 @@ extern void matmul_top_init(matmul_top_data_ptr mmt,
         int optimized_direction);
 
 
+void matmul_top_decl_usage(param_list_ptr pl);
+void matmul_top_lookup_parameters(param_list_ptr pl);
 extern void matmul_top_clear(matmul_top_data_ptr mmt);
 #if 0
 extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);

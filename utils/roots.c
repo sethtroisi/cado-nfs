@@ -1,4 +1,4 @@
-/* Usage: roots -poly xxx.poly -q <q>
+/* Usage: roots -poly xxx.poly -q <q> [-side <side>]
    prints the roots of the polynomial mod q
  */
 
@@ -13,8 +13,9 @@
 
 void usage(const char *argv0)
 {
-    fprintf(stderr, "Usage: %s -poly xxx.poly -q <q>\n", argv0);
-    fprintf(stderr, "prints the roots of the polynomial mod q\n");
+    fprintf(stderr, "Usage: %s -poly xxx.poly -q <q> [-side <side>]\n", argv0);
+    fprintf(stderr, "prints the roots of polynomial[side] mod q");
+    fprintf(stderr, " (default side is ALGEBRAIC)\n");
     exit(1);
 }
 

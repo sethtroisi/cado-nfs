@@ -205,6 +205,8 @@ struct sieve_info_s {
 
     sieve_side_info sides[2];
 
+    facul_strategies_t* strategies;
+  
     /* Data for unsieving locations where gcd(i,j) > 1 */
     unsieve_aux_data_srcptr us;
     /* Data for divisibility tests p|i in lines where p|j */

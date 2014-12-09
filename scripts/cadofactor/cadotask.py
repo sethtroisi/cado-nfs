@@ -21,6 +21,7 @@ import cadocommand
 import wuserver
 import workunit
 from struct import error as structerror
+from shutil import rmtree
 from workunit import Workunit
 
 # Patterns for floating-point numbers
@@ -121,6 +122,7 @@ class Polynomials(object):
 
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
+    re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*(?:\(.*\))?\s*=", 1))
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
     
@@ -142,6 +144,8 @@ class Polynomials(object):
         self.params = {}
         polyf = Polynomial()
         polyg = Polynomial()
+        # in case of multiple fields
+        tabpoly = {}
 
         def match_poly(line, poly, regex):
             match = regex.match(line)
@@ -153,6 +157,21 @@ class Polynomials(object):
                 poly[idx] = coeff
                 return True
             return False
+
+        # line = "poly0: 1, 2, 3" => poly[0] = {1, 2, 3} = 1+2*X+3*X^2
+        def match_poly_all(line, regex):
+            match = regex.match(line)
+            if match:
+                line2 = line.split(":")
+                # get index of poly
+                ip = int(line2[0].split("poly")[1])
+                # get coeffs of 1+2*X+3*X^2
+                line3=line2[1].split(",")
+                pol = Polynomial()
+                for idx in range(len(line3)):
+                    pol[idx] = int(line3[idx]);
+                return ip, pol
+            return -1, []
 
         for line in lines:
             # print ("Parsing line: >%s<" % line.strip())
@@ -176,6 +195,11 @@ class Polynomials(object):
             # Try to parse polynomial coefficients
             if match_poly(line, polyf, self.re_pol_f) or \
                     match_poly(line, polyg, self.re_pol_g):
+                continue
+            # is it in format "poly*: ..."
+            ip,tip=match_poly_all(line, self.re_polys)
+            if ip != -1:
+                tabpoly[ip] = tip
                 continue
             # All remaining lines must be of the form "x: y"
             array = line2.split(":")
@@ -203,23 +227,38 @@ class Polynomials(object):
         for (key, (_type, isrequired)) in self.keys.items():
             if isrequired and not key in self.params:
                 raise PolynomialParseException("Key %s missing" % key)
+        if len(tabpoly) > 0:
+            polyg = tabpoly[0]
+            polyf = tabpoly[1]
         self.polyf = polyf
         self.polyg = polyg
+        self.tabpoly = tabpoly
         return
 
     def __str__(self):
         arr = ["%s: %s\n" % (key, self.params[key])
                for key in self.keys if key in self.params]
-        arr += ["c%d: %d\n" % (idx, coeff) for (idx, coeff)
-                in enumerate(self.polyf) if not coeff == 0]
-        arr += ["Y%d: %d\n" % (idx, coeff) for (idx, coeff)
-                in enumerate(self.polyg) if not coeff == 0]
+        if len(self.tabpoly) > 0:
+            for i in range(len(self.tabpoly)):
+                poltmp = self.tabpoly[i]
+                arr += ["poly%d: %s" % (i, poltmp[0])]
+                arr += [","+str(poltmp[j]) for j in range(1, len(poltmp))]
+                arr += "\n"
+        else:
+            arr += ["c%d: %d\n" % (idx, coeff) for (idx, coeff)
+                    in enumerate(self.polyf) if not coeff == 0]
+            arr += ["Y%d: %d\n" % (idx, coeff) for (idx, coeff)
+                    in enumerate(self.polyg) if not coeff == 0]
         if not self.MurphyE == 0.:
             arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
             arr.append("# lognorm %g\n" % self.lognorm)
-        arr.append("# f(x) = %s\n" % str(self.polyf))
-        arr.append("# g(x) = %s\n" % str(self.polyg))
+        if len(self.tabpoly) > 0:
+            for i in range(len(self.tabpoly)):
+                arr.append("# poly%d = %s\n" % (i, str(self.tabpoly[i])))
+        else:
+            arr.append("# f(x) = %s\n" % str(self.polyf))
+            arr.append("# g(x) = %s\n" % str(self.polyg))
         return "".join(arr)
 
     def __eq__(self, other):
@@ -302,6 +341,8 @@ class FilePath(object):
         return os.path.realpath(str(self))
     def open(self, *args, **kwargs):
         return open(str(self), *args, **kwargs)
+    def rmtree (self, ignore_errors=False):
+        rmtree(str(self), ignore_errors)
 
 
 class WorkDir(object):
@@ -2126,9 +2167,11 @@ class FactorBaseTask(Task):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
-        # must also have a polynomial (in self.state["poly"])
+        # must also have a polynomial (in self.state["poly"] ) and the alim
+        # value used in self.state["alim"]
         if "outputfile" in self.state:
             assert "poly" in self.state
+            assert "alim" in self.state
             # The target file must correspond to the polynomial "poly"
         self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
     
@@ -2141,18 +2184,30 @@ class FactorBaseTask(Task):
             raise Exception("FactorBaseTask(): no polynomial "
                             "received from PolyselTask")
         twoalgsides = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        check_params = {key: self.params[key]
+                        for key in ["alim", "rlim"][0:1 + twoalgsides]}
         
-        # Check if we have already computed the target file for this polynomial
-        if "poly" in self.state:
+        # Check if we have already computed the outputfile for this polynomial
+        # and fbb. If any of the inputs mismatch, we remove outputfile from
+        # state
+        if "outputfile" in self.state:
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                if "outputfile" in self.state:
-                    self.logger.info("Received different polynomial, "
-                                     "discarding old one")
-                    del(self.state["outputfile"])
-                self.state["poly"] = str(poly)
-        else:
-            self.state["poly"] = str(poly)
+                self.logger.warn("Received different polynomial, "
+                                 "discarding old factor base file")
+                del(self.state["outputfile"])
+            else:
+                for key in check_params:
+                    if self.state[key] != check_params[key]:
+                        self.logger.warn("Parameter %s changed, discarding old "
+                                         "factor base file", key)
+                        del(self.state["outputfile"])
+                    break
+        # If outputfile is not in state, because we never produced it or because
+        # input parameters changed, we remember our current input parameters
+        if not "outputfile" in self.state:
+            check_params["poly"] = str(poly)
+            self.state.update(check_params)
         
         if not "outputfile" in self.state or self.have_new_input_files():
             
@@ -2251,9 +2306,11 @@ class FreeRelTask(Task):
             # default for dlp is addfullcol
             self.progparams[0].setdefault("addfullcol", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
-        # then we must also have a polynomial (in self.state["poly"])
+        # then we must also have a polynomial (in self.state["poly"]) and
+        # the lpba value used in self.state["lpba"]
         if "freerelfilename" in self.state:
             assert "poly" in self.state
+            assert "lpba" in self.state
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
@@ -2264,20 +2321,29 @@ class FreeRelTask(Task):
         if not poly:
             raise Exception("FreerelTask(): no polynomial "
                             "received from PolyselTask")
-        
-        # Check if we have already computed the target file for this polynomial
-        if "poly" in self.state:
+
+        # Check if we have already computed the freerelfile for this polynomial
+        # and lpb. If any of the inputs mismatch, we remove freerelfilename
+        # from state
+        if "freerelfilename" in self.state:
+            discard = False
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                if "freerelfilename" in self.state:
-                    self.logger.info("Received different polynomial, "
-                                     "discarding old one")
-                    del(self.state["freerelfilename"])
-                    del(self.state["renumberfilename"])
-                self.state["poly"] = str(poly)
-        else:
-            self.state["poly"] = str(poly)
-        
+                self.logger.warn("Received different polynomial, discarding "
+                                 "old free relations file")
+                discard = True
+            elif self.state["lpba"] != self.progparams[0]["lpba"]:
+                self.logger.warn("Parameter lpba changed, discarding old free "
+                                 "relations file")
+                discard = True
+            if discard:
+                del(self.state["freerelfilename"])
+                del(self.state["renumberfilename"])
+        # If outputfile is not in state, because we never produced it or because
+        # input parameters changed, we remember our currnet input parameters
+        if not "freerelfilename" in self.state:
+            self.state.update({"poly": str(poly), "lpba": self.progparams[0]["lpba"]})
+
         if not "freerelfilename" in self.state or self.have_new_input_files():
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
@@ -3711,7 +3777,7 @@ class LinAlgTask(Task, HasStatistics):
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
     def paramnames(self):
-        return super().paramnames
+        return self.join_params(super().paramnames, {"allow_wipeout": False})
 
     @property
     def stat_conversions(self):
@@ -3763,9 +3829,27 @@ class LinAlgTask(Task, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.state.setdefault("ran_already", False)
     
     def run(self):
         super().run()
+
+        if self.state["ran_already"] and self.have_new_input_files():
+            if self.params["allow_wipeout"]:
+                self.logger.warn("Ran before, but input files have changed. "
+                                 "Wiping out working directory")
+                self.workdir.make_dirname().rmtree()
+                self.state["ran_already"] = False
+                self.state.pop("dependency", None)
+            else:
+                self.logger.critical(
+                    "Ran before, but input files have changed. The "
+                    "allow_wipeout parameter is not set, aborting.")
+                self.logger.critical(
+                    "If it is ok to discard the previous linear algebra run "
+                    "and start it from scratch, please add the "
+                    "allow_wipeout=True parameter and re-run cadofactor.")
+                return False
 
         if not "dependency" in self.state or self.have_new_input_files():
             workdir = self.workdir.make_dirname()
@@ -3777,6 +3861,8 @@ class LinAlgTask(Task, HasStatistics):
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()
             wdir = workdir.realpath()
+            self.state["ran_already"] = True
+            self.remember_input_versions(commit=True)
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left",
                                  stdout=str(stdoutpath),
@@ -3789,7 +3875,6 @@ class LinAlgTask(Task, HasStatistics):
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.parse_stats(stdoutpath, commit=False)
-            self.remember_input_versions(commit=False)
             output_version = self.state.get("output_version", 0) + 1
             update = {"dependency": dependencyfilename.get_wdir_relative(),
                       "output_version": output_version}

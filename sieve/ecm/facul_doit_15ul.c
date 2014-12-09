@@ -6,5 +6,6 @@
 #define ecm ecm_15ul
 #define primetest primetest_15ul
 #define facul_doit facul_doit_15ul
+#define facul_doit_onefm facul_doit_onefm_15ul
 
 #include "facul_doit.c"

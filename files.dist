@@ -152,6 +152,7 @@ gf2x/config/ltsugar.m4
 gf2x/config/ltversion.m4
 gf2x/config/lt~obsolete.m4
 gf2x/config/missing
+gf2x/config/test-driver
 gf2x/configure
 gf2x/configure.ac
 gf2x/fft.c
@@ -270,8 +271,6 @@ linalg/bwc/balancing_workhorse.h
 linalg/bwc/bcast-file.c
 linalg/bwc/bench.c
 linalg/bwc/build.c
-linalg/bwc/bw-common-mpi.c
-linalg/bwc/bw-common-mpi.h
 linalg/bwc/bw-common.c
 linalg/bwc/bw-common.h
 linalg/bwc/bwc-ptrace.m
@@ -401,7 +400,6 @@ local.sh.macosx.x86_32
 local.sh.macosx.x86_64
 macros.h
 misc/CMakeLists.txt
-misc/CMakeLists-nodist.txt
 misc/convert_poly.c
 misc/convert_rels.c
 misc/check_rels.c
@@ -728,6 +726,8 @@ utils/stats.h
 utils/stats.c
 utils/lll.c
 utils/lll.h
+utils/lognorm_skewness.h
+utils/lognorm_skewness.c
 tests/README
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
@@ -1098,6 +1098,9 @@ tests/linalg/bwc/mpfq/mpfq_test_p_8.c
 tests/linalg/bwc/mpfq/mpfq_test_pz.c
 tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
+tests/gf2x/CMakeLists.txt
+tests/gf2x/test_gf2x.sh
+tests/gf2x/test_cantor.c
 config/hwloc.cmake
 config/numa.cmake
 linalg/bwc/cpubinding.conf
@@ -1120,6 +1123,7 @@ config/openmp.cmake
 sieve/strategies/CMakeLists.txt
 sieve/strategies/Makefile
 sieve/strategies/README
+sieve/strategies/README.c120
 sieve/strategies/benchfm_exec.c
 sieve/strategies/generate_factoring_method.c
 sieve/strategies/generate_factoring_method.h
@@ -1149,6 +1153,8 @@ sieve/strategies/final_exec.c
 sieve/strategies/finding_good_strategy.c
 sieve/strategies/finding_good_strategy.h
 sieve/strategies/gen_decomp.c
+sieve/strategies/gen_decomp.h
+sieve/strategies/test_gen_decomp.c
 tests/sieve/strategies/CMakeLists.txt
 tests/sieve/strategies/utils_st/CMakeLists.txt
 tests/sieve/strategies/utils_st/test_strategy.c
@@ -1158,3 +1164,6 @@ tests/sieve/strategies/utils_st/test_convex_hull.c
 tests/sieve/strategies/test_generate_composite_numbers.c
 tests/sieve/strategies/test_filtering.c
 tests/sieve/strategies/test_generate_strategies.c
+sieve/strategies/test_strategy_cado.c
+sieve/strategies/README.commands
+sieve/strategies/script_gen_dec.sh

@@ -10,6 +10,9 @@
 /*                      COLLECT DATA FOR ONLY ONE COFACTOR              */
 /************************************************************************/
 
+double
+compute_proba_method_one_decomp (decomp_t* dec, fm_t* fm);
+
 double compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
 			      int len_p_min, int len_p_max);
 
@@ -25,7 +28,8 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * tab_decomp,
 						tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
-						tabular_fm_t * ecm_rc, int lb,
+						tabular_fm_t * ecm_rc,
+						int nb_curve, unsigned long lim,
 						int ub, int r);
 
 tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
@@ -34,8 +38,9 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 				      tabular_fm_t * pm1, tabular_fm_t * pp1,
 				      tabular_fm_t * ecm_m16,
-				      tabular_fm_t * ecm_rc, int rlb, int rub,
-				      int rmfb, int alb, int aub, int amfb);
+				      tabular_fm_t * ecm_rc, int nb_curve, 
+				      unsigned long lim0, int lpb0, int mfb0,
+				      unsigned long lim1, int lpb1, int mfb1);
 
 /************************************************************************/
 /*                      CONVEX_HULL_ST                                  */

@@ -1,12 +1,12 @@
+#include "cado.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
 #include "ecm.h"
-
 #include "generate_factoring_method.h"
 
 static void declare_usage(param_list pl)
@@ -210,26 +210,10 @@ int main(int argc, char *argv[])
 	//to do: change the file output!
 	const char *name_file_out = param_list_lookup_string(pl, "out");
 
-	if (name_file_out == NULL) {
-	    char tmp[50];
-	    char tmp2[100];
-	    //Default Output
-	    if (name_fm == NULL)
-		sprintf(tmp, "Data_all_");
-	    else
-		sprintf(tmp, "Data_%s", name_fm);
 
-	    if (param_sieve != NULL)
-		sprintf(tmp2, "%s[%.2d_%.2d]_[%d_%d_%d]_[%d_%d_%d]",
-			tmp, lb, ub, param_sieve[0], param_sieve[1],
-			param_sieve[2], param_sieve[3],
-			param_sieve[4], param_sieve[5]);
-	    else
-		sprintf(tmp2, "%s[%.2d_%.2d]", tmp, lb, ub);
-	    name_file_out = tmp2;
-	}
-
-	FILE *file_out = fopen(name_file_out, "w");
+        /* if -out is not given, print to stdout */
+	FILE *file_out = (name_file_out == NULL)
+          ? stdout : fopen(name_file_out, "w");
 	int err = tabular_fm_fprint(file_out, res);
 	if (err < 0) {
 	    fprintf(stderr,
