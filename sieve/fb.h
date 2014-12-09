@@ -134,6 +134,13 @@ class fb_vector_interface: public fb_interface {
   virtual bool is_general() = 0;
 };
 
+class fb_slices_interface: public fb_vector_interface {
+  public:
+  virtual ~fb_slices_interface(){}
+  virtual fb_vector_interface *get_vector(size_t) const = 0;
+  virtual bool is_general() = 0;
+};
+
 
 class fb_general_vector: public std::vector<fb_general_entry>, public fb_vector_interface {
 public:
@@ -179,16 +186,20 @@ class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> >, public fb_ve
 /* The fb_slices class has nr_slices vectors; when appending elements with
    append(), it appends to these vectors in a round-robin fashion. */
 template <int Nr_roots>
-class fb_slices : public fb_interface, private NonCopyable {
+class fb_slices : public fb_slices_interface, private NonCopyable {
   fb_vector<Nr_roots> *vectors;
   size_t nr_slices, next_slice;
  public:
   fb_slices(size_t nr_slices);
   ~fb_slices();
-  fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  int get_nr_roots(){return Nr_roots;};
+  bool is_general(){return false;};
+  fb_vector<Nr_roots> *get_vector(const size_t n) const {
+    return (n < nr_slices) ? &vectors[n] : NULL;
+  }
 };
 
 
@@ -220,7 +231,7 @@ class fb_part: public fb_interface, private NonCopyable {
   fb_slices<9> *fb9_slices;
   fb_slices<10> *fb10_slices;
   fb_general_vector general_vector;
-  fb_interface *choose(const unsigned int n) const {
+  fb_slices_interface *choose(const unsigned int n) const {
     ASSERT_ALWAYS(n <= MAXDEGREE);
     switch (n) {
       case 0: return fb0_slices;
@@ -251,6 +262,10 @@ public:
   fb_general_vector::iterator end() {
     ASSERT_ALWAYS(only_general);
     return general_vector.end();
+  }
+  fb_general_vector *get_general_vector(){return &general_vector;}
+  fb_vector_interface *get_n_roots_vector(const int n, const size_t slice) {
+    return choose(n)->get_vector(slice);
   }
 };
 

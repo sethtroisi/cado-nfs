@@ -343,14 +343,6 @@ fb_slices<Nr_roots>::append(const fb_general_entry &fb_cur)
 }
 
 template <int Nr_roots>
-fb_entry_x_roots_s<Nr_roots> *
-fb_slices<Nr_roots>::get_slice(size_t slice)
-{
-  ASSERT_ALWAYS(slice < nr_slices);
-  return vectors[slice];
-}
-
-template <int Nr_roots>
 void
 fb_slices<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
