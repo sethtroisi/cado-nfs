@@ -114,11 +114,34 @@ public:
 };
 
 
-class fb_general_vector: public std::vector<fb_general_entry> {
+class fb_slices_interface {
+public:
+  virtual ~fb_slices_interface(){}
+  virtual void append(const fb_general_entry &) = 0;
+  virtual void fprint(FILE *) const = 0;
+  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight)
+    const = 0;
+};
+
+/* The work queue of slices that need to be sieved must return a common base
+   class of fb_general_vector and fb_vector<Nr_roots>; this base class is
+   fb_vector_interface. It allows determining which kind of vector it is,
+   so that the correct siever implementation can be called. */
+class fb_vector_interface: public fb_slices_interface {
+  public:
+  virtual ~fb_vector_interface(){}
+  virtual int get_nr_roots() = 0;
+  virtual bool is_general() = 0;
+};
+
+
+class fb_general_vector: public std::vector<fb_general_entry>, public fb_vector_interface {
 public:
   void append(const fb_general_entry &e) {push_back(e);}
   void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  int get_nr_roots(){return 0;};
+  bool is_general(){return true;};
 };
 
 
@@ -143,21 +166,15 @@ public:
 
 
 template <int Nr_roots>
-class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
+class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> >, public fb_vector_interface {
   public:
+  void append(const fb_general_entry &e){this->push_back(e);};
   void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  int get_nr_roots(){return Nr_roots;};
+  bool is_general(){return false;};
 };
 
-
-class fb_slices_interface {
-public:
-  virtual ~fb_slices_interface(){}
-  virtual void append(const fb_general_entry &) = 0;
-  virtual void fprint(FILE *) const = 0;
-  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight)
-    const = 0;
-};
 
 /* The fb_slices class has nr_slices vectors; when appending elements with
    append(), it appends to these vectors in a round-robin fashion. */
@@ -169,10 +186,9 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   fb_slices(size_t nr_slices);
   ~fb_slices();
   fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
-  virtual void append(const fb_general_entry &);
-  virtual void fprint(FILE *) const;
-  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight)
-    const;
+  void append(const fb_general_entry &);
+  void fprint(FILE *) const;
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
 
