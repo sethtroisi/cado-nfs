@@ -271,6 +271,12 @@ fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight
     *weight += w;
 }
 
+void fb_general_vector::fprint(FILE *out) const {
+  for (size_t i = 0; i < size(); i++) {
+    (*this)[i].fprint(out);
+  }
+}
+
 
 template <int Nr_roots>
 void
@@ -434,9 +440,7 @@ fb_part::fprint(FILE *out) const
   fprintf(out, "#   General entries (%s):\n",
 	  only_general ? "contains all entries" :
 	  "powers, ramified primes or primes with projective roots");
-  for (size_t i = 0; i < general_vector.size(); i++) {
-    general_vector[i].fprint(out);
-  }
+  general_vector.fprint(out);
 }
 
 void

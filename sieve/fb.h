@@ -116,6 +116,8 @@ public:
 
 class fb_general_vector: public std::vector<fb_general_entry> {
 public:
+  void append(const fb_general_entry &e) {push_back(e);}
+  void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
 };
 
