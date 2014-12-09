@@ -114,9 +114,9 @@ public:
 };
 
 
-class fb_slices_interface {
+class fb_interface {
 public:
-  virtual ~fb_slices_interface(){}
+  virtual ~fb_interface(){}
   virtual void append(const fb_general_entry &) = 0;
   virtual void fprint(FILE *) const = 0;
   virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight)
@@ -127,7 +127,7 @@ public:
    class of fb_general_vector and fb_vector<Nr_roots>; this base class is
    fb_vector_interface. It allows determining which kind of vector it is,
    so that the correct siever implementation can be called. */
-class fb_vector_interface: public fb_slices_interface {
+class fb_vector_interface: public fb_interface {
   public:
   virtual ~fb_vector_interface(){}
   virtual int get_nr_roots() = 0;
@@ -179,7 +179,7 @@ class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> >, public fb_ve
 /* The fb_slices class has nr_slices vectors; when appending elements with
    append(), it appends to these vectors in a round-robin fashion. */
 template <int Nr_roots>
-class fb_slices : public fb_slices_interface, private NonCopyable {
+class fb_slices : public fb_interface, private NonCopyable {
   fb_vector<Nr_roots> *vectors;
   size_t nr_slices, next_slice;
  public:
@@ -196,7 +196,7 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
    bucket region size.
    E.g., when we have only 1 level of bucket sorting, then the factor base has
    2 parts: the line-sieved primes, and the bucket-sieved primes. */
-class fb_part: public fb_slices_interface, private NonCopyable {
+class fb_part: public fb_interface, private NonCopyable {
   /* How do we identify the number of slices in each array?
      Should we have
      size_t nr_entries[9];
@@ -220,7 +220,7 @@ class fb_part: public fb_slices_interface, private NonCopyable {
   fb_slices<9> *fb9_slices;
   fb_slices<10> *fb10_slices;
   fb_general_vector general_vector;
-  fb_slices_interface *choose(const unsigned int n) const {
+  fb_interface *choose(const unsigned int n) const {
     ASSERT_ALWAYS(n <= MAXDEGREE);
     switch (n) {
       case 0: return fb0_slices;
@@ -261,7 +261,7 @@ public:
    parts[1] contains bucket-sieved primes with 1 level of bucket sorting
    (i.e., hits get sorted into bucket regions of size 2^16)
 */
-class fb_factorbase: public fb_slices_interface, private NonCopyable {
+class fb_factorbase: public fb_interface, private NonCopyable {
   fb_part *parts[FB_MAX_PARTS];
   fbprime_t thresholds[FB_MAX_PARTS];
  public:
