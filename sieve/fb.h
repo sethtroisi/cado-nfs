@@ -295,6 +295,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void fprint(FILE *) const;
   void append(const fb_general_entry &);
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
 };
 
 
