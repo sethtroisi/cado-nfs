@@ -18,8 +18,8 @@
 #include "facul.h"
 #include "facul_doit.h"
 
-unsigned int SIGMA = 2;
-int is_first_brent12 = true;
+unsigned int SIGMA[2] = {2,2};
+int is_first_brent12[2] = {true, true};
 /* These global variables are only for statistics. In case of
  * multithreaded sieving, the stats might be wrong...
  */
@@ -107,7 +107,6 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
       methods[3].plan = malloc (sizeof (ecm_plan_t));
       ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
     }
-
   /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
   double B1 = 105.0;
   for (i = 4; i < n + 3; i++)
@@ -381,8 +380,10 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	  index_st[0] = atoi(res[0]);
 	  index_st[1] = atoi(res[1]);
 	  /* re-init the value of sigma */
-	  SIGMA = 2;
-	  is_first_brent12 = true;
+	  SIGMA[0] = 2;
+	  SIGMA[1] = 2;
+	  is_first_brent12[0] = true;
+	  is_first_brent12[1] = true;
 	}
 
       /*else TEST REGULAR EXPRESSION  'preg_alg'*/
@@ -398,19 +399,13 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 
 	      //todo: remove the words ALG and RAT!!!//S0 or S1
 	      if (strcmp (res[0], "ALG") == 0 || strcmp (res[0], "S1") == 0)
-		  {
-		      //we change the side so re-initialize the value of sigma
-		      if (side == -1 || side == 0)
-			  SIGMA = 2;
-		      side = 1;
-		  }
+		{
+		  side = 1;
+		}
 	      else if (strcmp (res[0], "RAT") == 0 || strcmp(res[0], "S0") == 0)
-		  {
-		      //we change the side so re-initialize the value of sigma
-		      if (side == -1 || side == 1)
-			  SIGMA = 2;
-		      side = 0;
-		  }
+		{
+		  side = 0;
+		}
 	      else 
 		{
 		  side = atoi(res[0]);
@@ -454,10 +449,13 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 			sigma = 1;
 		      else
 			{
-			  if (curve == BRENT12 && is_first_brent12)
-			    sigma = 11;
+			  if (curve == BRENT12 && is_first_brent12[side])
+			    {
+			      sigma = 11;
+			      is_first_brent12[side] = false;
+			    }
 			  else
-			    sigma = SIGMA++;
+			    sigma = SIGMA[side]++;
 			}
 		    }
 		  //search if the plan isn't already computed!
@@ -492,13 +490,13 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		      strategies->plan[index_plan].B1 = B1;
 		      strategies->plan[index_plan].B2 = B2;
 		      strategies->plan[index_plan].plan = plan;
-		      index_plan++;
-		      ASSERT (index_plan < NB_MAX_METHODS);
+
+		      ASSERT (index_plan+1 < NB_MAX_METHODS);
 		      //to show the end of plan!
-		      strategies->plan[index_plan].plan = NULL;
-		      strategies->plan[index_plan].B1 = 0;
-		      strategies->plan[index_plan].B2 = 0;
-		      strategies->plan[index_plan].method = 0;
+		      strategies->plan[index_plan+1].plan = NULL;
+		      strategies->plan[index_plan+1].B1 = 0;
+		      strategies->plan[index_plan+1].B2 = 0;
+		      strategies->plan[index_plan+1].method = 0;
 		    }
 		  methods[index_method].plan =
 		    strategies->plan[index_plan].plan;
@@ -994,6 +992,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	break;
       default: abort();
       }
+
       //check our result!
       //res_fac contains the number of factors found!
       if (res_fac == -1)
