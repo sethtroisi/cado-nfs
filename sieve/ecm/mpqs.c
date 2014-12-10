@@ -1,6 +1,6 @@
 /* tiny MPQS implementation, specially tuned for 128-bit input */
 
-// #define TRACE -46222
+// #define TRACE -55867
 // #define TRACE_P 937
 
 #include "cado.h"
@@ -286,6 +286,20 @@ update (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
 #endif
 }
 
+/* update 8 bytes at a time */
+static inline void
+update8 (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
+        unsigned char logp, unsigned int M MAYBE_UNUSED)
+{
+  uint64_t l8, *S8 = (uint64_t*) S;
+
+  l8 = logp;
+  l8 = (i == 0) ? (l8 << 48) | (l8 << 32) | (l8 << 16) | l8
+    : (l8 << 56) | (l8 << 40) | (l8 << 24) | (l8 << 8);
+  for (i = 0; i < M; i+=8)
+    S8[i>>3] += l8;
+}
+
 /* put factor in z */
 void
 gauss (mpz_t z, mpz_t *Mat, int nrel, int ncol, mpz_t *X, mpz_t N)
@@ -449,6 +463,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
     {
       unsigned long p = Primes[i];
       mpz_set_ui (a, p);
+      /* a prime p can be in the factor base only if it is a square mod N */
       if (mpz_jacobi (a, N) == 1)
         {
           P[j] = p;
@@ -477,6 +492,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
   /* initialize sieve area [-M, M-1] */
   S = malloc (2 * M * sizeof (char));
+  ASSERT_ALWAYS(((long) S & 7) == 0);
   Logp = malloc (ncol * sizeof (char));
 
   /* initialize square roots mod p */
@@ -500,14 +516,17 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   printf ("init: %ldms\n", st);
   init_time = st - st0;
 
+  int pols = 0;
   while (nrel < wrel) {
   sieve_time -= st;
+  pols ++;
   do
     mpz_nextprime (sqrta, sqrta);
-  while (mpz_jacobi (sqrta, N) != 1);
+  while (mpz_jacobi (N, sqrta) != 1);
+  /* we want N to be a square mod a: N = b^2 (mod a) */
   unsigned long aui = mpz_get_ui (sqrta);
   mpz_mul (a, sqrta, sqrta);
-  /* we want b^2-n divisible by a */
+  /* we want b^2-N divisible by a */
   k = tonelli_shanks (mpz_fdiv_ui (N, aui), aui);
   /* we want b = k + a*t: b^2 = k^2 + 2*k*a*t (mod a^2), thus
      k^2 + 2*k*a*t = N (mod a^2): t = ((N-k^2)/a)/(2*k) mod a */
@@ -569,8 +588,12 @@ mpqs (mpz_t f, mpz_t N, long ncol)
             logp = (char) (log ((double) 8) / logradix + 0.5);
           else if (Np == 5) /* 2^2 always divides */
             logp = (char) (log ((double) 4) / logradix + 0.5);
+#if 0
           for (i = k; i < 2*M; i += 2)
             update (S, i, p, logp, M);
+#else
+          update8 (S, k, p, logp, M);
+#endif
         }
       else
         {
@@ -644,6 +667,8 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   gmp_printf ("sqrta=%Zd, total %ld rels in %ldms (%.2f r/s)\n",
               sqrta, nrel, st, (double) nrel / (double) st);
   }
+  printf ("%ld rels with %d polynomials: %f per poly\n",
+          nrel, pols, (double) nrel / (double) pols);
 
   gauss_time = st;
   gauss (f, Mat, nrel, ncol + 1, X, N);
@@ -653,19 +678,19 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
   free (Logp);
   free (S);
-  mpz_clear (a);
-  mpz_clear (sqrta);
-  mpz_clear (b);
-  mpz_clear (c);
   for (i = 0; i < wrel; i++)
     mpz_clear (Mat[i]);
   free (Mat);
   for (i = 0; i < wrel; i++)
     mpz_clear (X[i]);
   free (X);
-  free (P);
-  free (K);
   free (invp);
+  free (K);
+  free (P);
+  mpz_clear (c);
+  mpz_clear (b);
+  mpz_clear (sqrta);
+  mpz_clear (a);
 
   printf ("Total time: %ldms (init %ld, sieve %ld, check %ld, gauss %ld)\n",
           total_time, init_time, sieve_time, check_time, gauss_time);
