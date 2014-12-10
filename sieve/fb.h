@@ -79,6 +79,9 @@ struct fb_general_root {
   fb_general_root (){}
   /* Constructor for simple entries */
   fb_general_root (const fbroot_t r) : r(r), exp(1), oldexp(0), proj(false){} 
+  fb_general_root (const fbroot_t r, const unsigned char nexp,
+                   const unsigned char oldexp, const bool proj) :
+                   r(r), exp(nexp), oldexp(oldexp), proj(proj) {}
 
   /* A root is simple if it not projective, and the exp goes from 0 to 1 */
   bool is_simple() const {return exp == 1 && oldexp == 0 && !proj;}
@@ -96,7 +99,7 @@ struct fb_general_root {
    use the simple struct to conserve memory and to decide algorithms (batch
    inversion, etc.) statically. */
 class fb_general_entry {
-  void read_roots (const char *, unsigned long);
+  void read_roots (const char *, unsigned char, unsigned char, unsigned long);
 public:
   fbprime_t q, p; /* q = p^k */
   redc_invp_t invq; /* invq = -1/q (mod 2^32), or (mod 2^64), depending on

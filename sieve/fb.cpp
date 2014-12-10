@@ -108,7 +108,9 @@ fb_general_entry::is_simple() const
    linenr is used only for printing error messages in case of parsing error.
    Returns the number of roots read. */
 void
-fb_general_entry::read_roots (const char *lineptr, const unsigned long linenr)
+fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
+                              const unsigned char oldexp,
+                              const unsigned long linenr)
 {
     size_t i_roots = 0;
     unsigned long long last_t = 0;
@@ -132,8 +134,7 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned long linenr)
             exit(EXIT_FAILURE);
         }
 
-        roots[i_roots].proj = (t >= p);
-        roots[i_roots++].r = static_cast<fbroot_t>(t - ((t >= p) ? p : 0));
+        roots[i_roots++] = fb_general_root(static_cast<fbroot_t>(t - ((t >= p) ? p : 0)), nexp, oldexp, (t >= p));
         if (*lineptr != '\0' && *lineptr != ',') {
             fprintf(stderr,
                     "# Incorrect format in factor base file line %lu\n",
@@ -178,8 +179,7 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
     /* NB: a short version is not permitted for a prime power, so we
      * do the test for prime powers only for long version */
     p = q;
-    roots[0].exp = 1;
-    roots[0].oldexp = 0;
+    unsigned char nexp = 1, oldexp = 0;
     k = 1;
     if (longversion) {
         unsigned long k_ul;
@@ -194,9 +194,9 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
         /* read the multiple of logp, if any */
         /* this must be of the form  q:nlogp,oldlogp: ... */
         /* if the information is not present, it means q:1,0: ... */
-        roots[0].exp = strtoul_const (lineptr, &lineptr, 10);
+        nexp = strtoul_const (lineptr, &lineptr, 10);
 
-        if (roots[0].exp == 0) {
+        if (nexp == 0) {
             fprintf(stderr, "# Error in fb_read: could not parse the integer "
 		    "after the colon of prime %" FBPRIME_FORMAT "\n", q);
             exit (EXIT_FAILURE);
@@ -208,18 +208,18 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
             exit (EXIT_FAILURE);
         }
         lineptr++; /* skip comma */
-        roots[0].oldexp = strtoul_const (lineptr, &lineptr, 10);
+        oldexp = strtoul_const (lineptr, &lineptr, 10);
         if (*lineptr != ':') {
             fprintf(stderr,
 		    "# fb_read: oldlogp is not followed by colon on line %lu",
 		    linenr);
             exit (EXIT_FAILURE);
         }
-        ASSERT (roots[0].exp > roots[0].oldexp);
+        ASSERT (nexp > oldexp);
         lineptr++; /* skip colon */
     }
 
-    read_roots(lineptr, linenr);
+    read_roots(lineptr, nexp, oldexp, linenr);
 
     /* exp and oldexp are a property of a root, not of a prime (power).
        The factor base file should specify them per root, but specifies
