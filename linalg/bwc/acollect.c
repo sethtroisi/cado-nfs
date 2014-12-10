@@ -25,7 +25,7 @@
 void usage()
 {
     fprintf(stderr, "Usage: acollect [m=<m>] [wdir=<path>] [--remove-old]\n");
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 struct bw_params bw[1];
@@ -85,20 +85,20 @@ int read_afiles(struct afile_list * a)
         if ((A->n1 * bits_per_coeff) % CHAR_BIT || (A->n0 * bits_per_coeff) % CHAR_BIT) {
             fprintf(stderr, "%s has bad boundaries\n",
                     de->d_name);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         struct stat sbuf[1];
         rc = stat(de->d_name, sbuf);
         if (rc < 0) {
             fprintf(stderr, "stat(%s): %s\n", de->d_name, strerror(errno));
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         ssize_t expected = bw->m * (A->n1-A->n0) * bits_per_coeff / CHAR_BIT * (A->j1 - A->j0);
 
         if (sbuf->st_size != expected) {
             fprintf(stderr, "%s does not have expected size %zu\n",
                     de->d_name, expected);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         a->n++;
@@ -183,7 +183,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Found inconsistent files A%u-%u.%u-%u and A%u-%u.%u-%u\n",
                         a->a[k0]->n0, a->a[k0]->n1, a->a[k0]->j0, a->a[k0]->j1,
                         a->a[k1]->n0, a->a[k1]->n1, a->a[k1]->j0, a->a[k1]->j1);
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             j = a->a[k1]->j1;
         }
@@ -207,14 +207,14 @@ int main(int argc, char * argv[])
                 int nr = fread(buf, 1, BUFSIZ, g);
                 if (nr < BUFSIZ && ferror(g)) {
                     fprintf(stderr, "%s: %s\n", tmp, strerror(errno));
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
                 if (nr == 0)
                     break;
                 int nw = fwrite(buf, 1, nr, f);
                 if (nr < nw) {
                     fprintf(stderr, "copying %s: %s\n", tmp, strerror(errno));
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
                 if (nr < BUFSIZ)
                     break;
@@ -224,7 +224,7 @@ int main(int argc, char * argv[])
             if (remove_old) {
                 if (unlink(tmp) < 0) {
                     fprintf(stderr, "unlink(%s): %s\n", tmp, strerror(errno));
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
             }
             free(tmp);
@@ -238,7 +238,7 @@ int main(int argc, char * argv[])
             if (r < 0) {
                 fprintf(stderr, "rename(A.temp, %s): %s\n",
                         tmp, strerror(errno));
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             free(tmp);
         }
@@ -246,7 +246,7 @@ int main(int argc, char * argv[])
 
     if (did_merge && !remove_old) {
         fprintf(stderr, "Done some merges, but cannot continue unless --remove-old is specified\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     /* Good. Now merge the other way around. Not clear it's really
@@ -276,7 +276,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Found inconsistent files A%u-%u.%u-%u and A%u-%u.%u-%u\n",
                         a->a[k0]->n0, a->a[k0]->n1, a->a[k0]->j0, a->a[k0]->j1,
                         a->a[k1]->n0, a->a[k1]->n1, a->a[k1]->j0, a->a[k1]->j1);
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             n = a->a[k1]->n1;
         }
@@ -304,7 +304,7 @@ int main(int argc, char * argv[])
             rs[k - k0] = fopen(tmp, "rb");
             if (rs[k-k0] == NULL) {
                 fprintf(stderr, "fopen(%s): %s\n", tmp, strerror(errno));
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             free(tmp);
         }
@@ -323,7 +323,8 @@ int main(int argc, char * argv[])
                     rz = fread(ptr, 1, sz, rs[k-k0]);
                     if (rz < sz) {
                         rc = 2;
-                        exit(1);
+                        fprintf(stderr, "fwrite: short read\n");
+                        exit(EXIT_FAILURE);
                     }
                     ptr += sz;
                 }
@@ -331,7 +332,7 @@ int main(int argc, char * argv[])
                 rz = fwrite(buf, 1, sz, f);
                 if (rz != sz) {
                     fprintf(stderr, "fwrite: short write\n");
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
             }
             final->j1++;
@@ -345,7 +346,7 @@ int main(int argc, char * argv[])
         if (fflush(f) != 0) {
             // we're in trouble
             fprintf(stderr, "fflush(): %s\n", strerror(errno));
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         final->j1 = j1;
@@ -359,7 +360,7 @@ int main(int argc, char * argv[])
             ASSERT_ALWAYS(rc >= 0);
             if (unlink(tmp) < 0) {
                 fprintf(stderr, "unlink(%s): %s\n", tmp, strerror(errno));
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             free(tmp);
         }
@@ -373,7 +374,7 @@ int main(int argc, char * argv[])
         r = rename("A.temp", tmp);
         if (r < 0) {
             fprintf(stderr, "rename(A.temp, %s): %s\n", tmp, strerror(errno));
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         printf("%s\n",tmp);
         free(tmp);
