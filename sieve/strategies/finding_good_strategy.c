@@ -268,8 +268,8 @@ strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
 	    }
 	}
     }
-    printf(" Y = %lf relations, T = %lf s., yt = %1.10lf rel/s\n", Y,
-	   T / 1000000, Y / T * 1000000);
+    printf(" Y = %lf relations, T = %lf s., yt = %1.10lf s/rel.\n", Y,
+	   T / 1000000, T /(Y * 1000000));
 
     return matrix_res;
 }
