@@ -394,6 +394,10 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	  if (res[0] != NULL)
 	    {
 	      /*add the new factoring method to the current strategy! */
+	      if (index_st[0] > strategies->mfb[0] ||
+		  index_st[1] > strategies->mfb[1])
+		return 0;
+	      
 	      facul_method_t* methods =
 		strategies->methods[index_st[0]][index_st[1]];
 
@@ -598,7 +602,6 @@ facul_clear_aux_methods (facul_method_t *methods)
 
 
 
-//todo: add si, and create methods for auxiliary factorisations
 facul_strategies_t*
 facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      const unsigned int rmfb, const unsigned long afbb,
@@ -654,7 +657,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       //process each line of 'file'
       int err = process_line (strategies, index_strategies,
 			      line, verbose);
-      ASSERT (index_strategies[0] <= rmfb && index_strategies[1] <= amfb);
+      //ASSERT (index_strategies[0] <= rmfb && index_strategies[1] <= amfb);
       if (err == -1)
 	return NULL;
     }
@@ -667,7 +670,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     for (a = 1; a <= amfb; a++){
       facul_method_t* methods =
 	strategies->methods[r][a];
-      ASSERT (methods != NULL);
+      if (methods == NULL)
+	continue;
       int index_last_method[2] = {0, 0};      //the default_values
       unsigned int i;
       for (i = 0; methods[i].method != 0; i++) {
