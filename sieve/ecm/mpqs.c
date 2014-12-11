@@ -1,5 +1,7 @@
 /* tiny MPQS implementation, specially tuned for 128-bit input */
 
+// #define LARGE_PRIME
+
 // #define TRACE -13461
 // #define TRACE_P 937
 
@@ -257,6 +259,10 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
               res = 1;
               goto end;
             }
+#ifdef LARGE_PRIME
+          else if (R <= p * p) /* if B < R <= p^2 it cannot be B-smooth */
+            goto end;
+#endif
           else if (R <= BB)
             {
               /* if R = q0 * q1 with p < q0 < q1 < B, then q0 >= R/p */
@@ -267,6 +273,10 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
                   continue;
                 }
             }
+#ifdef LARGE_PRIME
+          else if (R <= p * p * p) /* B^2 < R <= p^3 cannot be B-smooth */
+            goto end;
+#endif
           /* we don't check for primality of R > B since it is rare */
         }
     }
@@ -436,9 +446,9 @@ void
 mpqs (mpz_t f, mpz_t N, long ncol)
 {
   mpz_t *Mat, *X;
-  unsigned char *S, *T, *Logp, logp, log2[8], *Logp2, threshold = 0;
+  unsigned char *S, *T, *Logp, logp, log2[8], threshold = 0;
   unsigned long *P, p, k;
-  long M, i, j, *K, wrel, nrel = 0;
+  long M, i, j, *K, wrel, nrel = 0, lim;
   mpz_t a, b, c, sqrta;
   double maxnorm, radix, logradix = 0;
   long st0 = cputime (), st, init_time, sieve_time = 0, check_time = 0;
@@ -477,7 +487,13 @@ mpqs (mpz_t f, mpz_t N, long ncol)
     }
   ASSERT_ALWAYS(i < MAX_PRIMES);
   printf ("largest prime is %lu\n", P[ncol - 1]);
+#ifdef LARGE_PRIME
+  lim = ncol / 2;    /* factor base bound */
+  wrel = ncol - 185; /* wanted number of relations */
+#else
+  lim = ncol;       /* factor base bound */
   wrel = ncol - 76; /* wanted number of relations */
+#endif
   Mat = (mpz_t*) malloc (wrel * sizeof (mpz_t));
   for (i = 0; i < wrel; i++)
     mpz_init (Mat[i]);
@@ -494,11 +510,10 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   S = malloc (2 * M * sizeof (char));
   T = malloc (2 * M * sizeof (char));
   ASSERT_ALWAYS(((long) S & 7) == 0);
-  Logp = malloc (ncol * sizeof (char));
-  Logp2 = malloc (ncol * sizeof (char));
+  Logp = malloc (lim * sizeof (char));
 
   /* initialize square roots mod p */
-  for (j = 0; j < ncol; j++)
+  for (j = 0; j < lim; j++)
     {
       unsigned long Np;
       p = P[j];
@@ -561,13 +576,8 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 #ifdef TRACE
       printf ("radix=%f logradix=%f\n", radix, logradix);
 #endif
-      for (j = 0; j < ncol; j++)
-        {
-          Logp[j] = (char) (log ((double) P[j]) / logradix + 0.5);
-          unsigned long q = P[j] * P[j];
-          if (q < P[ncol - 1])
-            Logp2[j] = (char) (log ((double) q) / logradix + 0.5) - Logp[j];
-        }
+      for (j = 0; j < lim; j++)
+        Logp[j] = (char) (log ((double) P[j]) / logradix + 0.5);
       log2[1] = (char) (log ((double) 8) / logradix + 0.5);
       log2[3] = Logp[2];
       log2[5] = (char) (log ((double) 4) / logradix + 0.5);
@@ -583,7 +593,11 @@ mpqs (mpz_t f, mpz_t N, long ncol)
           if (i < M)
             T[M + i] = T[M - i];
         }
+#ifdef LARGE_PRIME
+      threshold = T[0] - 68;
+#else
       threshold = T[0] - 38;
+#endif
       for (i = 1; i < 2*M; i++)
         T[i] = T[0] - T[i];
       T[0] = 0;
@@ -593,7 +607,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
   /* sieve */
   mpz_submul_ui (b, a, M);
-  for (j = 0; j < ncol; j++)
+  for (j = 0; j < lim; j++)
     {
       unsigned long k2;
       long i2;
@@ -667,7 +681,6 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   total_time = st - st0;
 
   free (Logp);
-  free (Logp2);
   free (S);
   free (T);
   for (i = 0; i < wrel; i++)
