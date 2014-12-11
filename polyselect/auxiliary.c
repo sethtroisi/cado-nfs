@@ -2616,17 +2616,6 @@ fdminus4_translated (mpz_poly_ptr h, mpz_poly_ptr f)
 
 int optimize_effort = 1; /* should be <= MAX_EFFORT */
 
-/* LMAX is the number of l-values kept for which the coefficient
-   of degree d-2 in [f(x)+l*x^(d-3)*g(x)](x+k) is small for some k.
-   The optimization time is roughly linear in LMAX. */
-int LMAX;
-
-/* MAXL is such that we consider only values of l in [-MAXL,MAXL].
-   The optimization time does not depend much on MAXL, but taking a
-   too large value will find values of k which are large, and might give
-   worse results. Taking MAXL = 2*LMAX seems to work well. */
-int MAXL;
-
 void
 set_optimize_effort (int e)
 {
@@ -2634,178 +2623,7 @@ set_optimize_effort (int e)
   optimize_effort = e;
 }
 
-#define LMAX_MAX MAX_EFFORT
 #define MAXY 0
-/* we need at least LMAX+1 entries in each array (for a sentinel and to
-   store l=0 at the end) */
-long best_l[LMAX_MAX+1], best_l2[LMAX_MAX+1];
-double best_v[LMAX_MAX+1], best_v2[LMAX_MAX+1];
-
-void
-insert_l (long *L, double *V, int *n, long l, double v)
-{
-  int i = *n;
-
-  while (0 < i && v < V[i-1])
-    {
-      V[i] = V[i-1];
-      L[i] = L[i-1];
-      i--;
-    }
-  if (i == LMAX)
-    return;
-  V[i] = v;
-  L[i] = l;
-  if (*n < LMAX)
-    (*n)++;
-}
-
-/* Put in best_l[0..n-1] the best values of l such that the coefficient
-   of degree d-2 of (f+l*x^(d-3)*g)(x=x+k) is small, i.e.,
-   d*(d-1)/2*c[d]*k^2 + (d-1)*c[d-1]*k + c[d-2] + l*g1.
-   To ensure we have at two real roots in k, we should have:
-   (d-1)^2*c[d-1]^2 - 2*d*(d-1)*c[d]*(c[d-2] + l*g1) >= 0
-   l*g1 <= (d-1)*c[d-1]^2/(2*d*c[d]) - c[d-2].
-   Return the number n of values stored, with n <= LMAX.
-*/
-int
-find_good_l (mpz_poly_ptr f, mpz_t *g)
-{
-  int d = f->deg, n = 0;
-  mpz_t lmax;
-  long l, l0, l1;
-  double v0, v1;
-
-  mpz_init (lmax);
-  mpz_mul (lmax, f->coeff[d-1], f->coeff[d-1]);
-  mpz_mul_ui (lmax, lmax, d-1);
-  mpz_fdiv_q (lmax, lmax, f->coeff[d]);
-  mpz_fdiv_q_ui (lmax, lmax, 2*d);
-  mpz_sub (lmax, lmax, f->coeff[d-2]);
-  mpz_fdiv_q (lmax, lmax, g[1]);
-  if (mpz_fits_slong_p (lmax))
-    {
-      mpz_t az, bz, cz, delta, t, sdelta, k, v;
-      mpz_init (az);
-      mpz_init (bz);
-      mpz_init (cz);
-      mpz_init (delta);
-      mpz_init (sdelta);
-      mpz_init (t);
-      mpz_init (k);
-      mpz_init (v);
-      l0 = mpz_get_si (lmax);
-      if (l0 > MAXL)
-        {
-          l0 = MAXL;
-          l1 = -MAXL;
-        }
-      else if (-MAXL <= l0)
-        l1 = -MAXL;
-      else
-        l1 = l0 - MAXL / 2;
-      mpz_mul_ui (az, f->coeff[d], (d * (d-1)) / 2);
-      mpz_mul_ui (bz, f->coeff[d-1], d-1);
-      mpz_mul_si (cz, g[1], l0);
-      mpz_add (cz, cz, f->coeff[d-2]);
-      mpz_mul (delta, az, cz);
-      mpz_mul_si (delta, delta, -4);
-      mpz_addmul (delta, bz, bz);
-      ASSERT_ALWAYS(mpz_cmp_ui (delta, 0) >= 0);
-      mpz_mul (t, az, g[1]);
-      mpz_mul_ui (t, t, 4);
-      for (l = l0; l >= l1; l--)
-        {
-          /* invariant: cz = c[d-2] + l * g1
-                        delta = bz^2 - 4*az*cz */
-          mpz_sqrt (sdelta, delta);
-
-          /* first root, rounded downwards */
-          mpz_sub (k, sdelta, bz);
-          mpz_fdiv_q (k, k, az);
-          mpz_fdiv_q_ui (k, k, 2);
-          mpz_mul (v, az, k);
-          mpz_add (v, v, bz);
-          mpz_mul (v, v, k);
-          mpz_add (v, v, cz);
-          v0 = fabs (mpz_get_d (v));
-
-          /* second root, rounded downwards */
-          mpz_add (k, bz, sdelta);
-          mpz_neg (k, k);
-          mpz_fdiv_q (k, k, az);
-          mpz_fdiv_q_ui (k, k, 2);
-          mpz_mul (v, az, k);
-          mpz_add (v, v, bz);
-          mpz_mul (v, v, k);
-          mpz_add (v, v, cz);
-          v1 = fabs (mpz_get_d (v));
-
-          /* insert only the smallest absolute value */
-          insert_l (best_l, best_v, &n, l, (v0 < v1) ? v0 : v1);
-
-          /* update invariants */
-          mpz_sub (cz, cz, g[1]);
-          mpz_add (delta, delta, t);
-        }
-      mpz_clear (az);
-      mpz_clear (bz);
-      mpz_clear (cz);
-      mpz_clear (delta);
-      mpz_clear (sdelta);
-      mpz_clear (t);
-      mpz_clear (k);
-      mpz_clear (v);
-    }
-  mpz_clear (lmax);
-  return n;
-}
-
-/* Put in best_l2[0..n-1] the best values of l such that the coefficient
-   of degree d-3 of (f+l*x^(d-3)*g)(x+k) is small, i.e.,
-   d*(d-1)*(d-2)/6*c[d]*k^3 + (d-1)*(d-2)/2*c[d-1]*k^2 +
-   (d-2)*(c[d-2]+l*g1)*k + c[d-3] + l*g0.
-   Return the number n of values stored, with n <= LMAX.
-*/
-int
-find_good_l2 (mpz_poly_ptr f, mpz_t *g)
-{
-  int d = f->deg, n = 0, nr, j;
-  long l;
-  mpz_poly_t c3k;
-  mpz_t r[3], v;
-
-  mpz_poly_init (c3k, 3);
-  c3k->deg = 3;
-  l = -MAXL;
-  mpz_mul_ui (c3k->coeff[3], f->coeff[d], (d * (d-1) * (d-2)) / 6);
-  mpz_mul_ui (c3k->coeff[2], f->coeff[d-1], ((d-1) * (d-2)) / 2);
-  mpz_mul_ui (c3k->coeff[1], f->coeff[d-2], d-2);
-  mpz_addmul_si (c3k->coeff[1], g[1], l * (d-2));
-  mpz_set (c3k->coeff[0], f->coeff[d-3]);
-  mpz_addmul_si (c3k->coeff[0], g[0], l);
-  mpz_init (r[0]);
-  mpz_init (r[1]);
-  mpz_init (r[2]);
-  mpz_init (v);
-  for (; l <= MAXL; l++)
-    {
-      nr = mpz_poly_mpz_roots (r, c3k);
-      for (j = 0; j < nr; j++)
-        {
-          mpz_poly_eval (v, c3k, r[j]);
-          insert_l (best_l2, best_v2, &n, l, fabs (mpz_get_d (v)));
-        }
-      mpz_add (c3k->coeff[0], c3k->coeff[0], g[0]);
-      mpz_addmul_ui (c3k->coeff[1], g[1], d-2);
-    }
-  mpz_poly_clear (c3k);
-  mpz_clear (r[0]);
-  mpz_clear (r[1]);
-  mpz_clear (r[2]);
-  mpz_clear (v);
-  return n;
-}
 
 /* assuming h(a)*h(b) < 0 where h(k) = h[n]*k^n+...+h[0] and a < b,
    refines the root such that a + 1 = b.
@@ -3695,11 +3513,6 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
   mpz_t k, r[MAXR], g0_copy, best_g0;
   long l;
   mpz_poly_t h, best_f, f_copy;
-
-  LMAX = optimize_effort;
-  //  ASSERT_ALWAYS(LMAX <= LMAX_MAX);
-
-  MAXL = 2 * optimize_effort;
 
   mpz_init (k);
   mpz_init (best_g0);
