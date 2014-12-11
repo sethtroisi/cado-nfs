@@ -436,11 +436,11 @@ void
 mpqs (mpz_t f, mpz_t N, long ncol)
 {
   mpz_t *Mat, *X;
-  unsigned char *S, *Logp, logp;
+  unsigned char *S, *Logp, logp, log2[8], *Logp2, threshold = 0;
   unsigned long *P, p, q, k;
   long M, i, j, *K, wrel, nrel = 0;
   mpz_t a, b, c, sqrta;
-  double maxnorm, radix, logradix;
+  double maxnorm, radix, logradix = 0;
   long st0 = cputime (), st, init_time, sieve_time = 0, check_time = 0;
   long gauss_time, total_time = 0;
 
@@ -494,6 +494,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   S = malloc (2 * M * sizeof (char));
   ASSERT_ALWAYS(((long) S & 7) == 0);
   Logp = malloc (ncol * sizeof (char));
+  Logp2 = malloc (ncol * sizeof (char));
 
   /* initialize square roots mod p */
   for (j = 0; j < ncol; j++)
@@ -519,7 +520,6 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   int pols = 0;
   while (nrel < wrel) {
   sieve_time -= st;
-  pols ++;
   do
     mpz_nextprime (sqrta, sqrta);
   while (mpz_jacobi (N, sqrta) != 1);
@@ -548,12 +548,26 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
   /* we now have (a*x+b)^2 - N = a*Q(x) where Q(x) = a*x^2 + 2*b*x + c */
 
-  /* initialize radix and Logp[]: we want radix^MAXS = maxnorm ~ N/a */
-  maxnorm = mpz_get_d (N) / mpz_get_d (a);
-  radix = pow (maxnorm, 1.0 / (double) MAXS);
-  logradix = log (radix);
-  for (j = 0; j < ncol; j++)
-    Logp[j] = (char) (log ((double) P[j]) / logradix + 0.5);
+  /* we initialize radix only once, assuming it will not vary very much */
+  if (pols++ == 0)
+    {
+      /* initialize radix and Logp[]: we want radix^MAXS = maxnorm ~ N/a */
+      maxnorm = mpz_get_d (N) / mpz_get_d (a);
+      radix = pow (maxnorm, 1.0 / (double) MAXS);
+      logradix = log (radix);
+      for (j = 0; j < ncol; j++)
+        {
+          Logp[j] = (char) (log ((double) P[j]) / logradix + 0.5);
+          unsigned long q = P[j] * P[j];
+          if (q < P[ncol - 1])
+            Logp2[j] = (char) (log ((double) q) / logradix + 0.5) - Logp[j];
+        }
+      log2[1] = (char) (log ((double) 8) / logradix + 0.5);
+      log2[3] = Logp[2];
+      log2[5] = (char) (log ((double) 4) / logradix + 0.5);
+      log2[7] = Logp[2];
+      threshold = (unsigned char) (log (mpz_get_d (N)) / logradix) + 66;
+    }
 
   memset (S, 0, 2 * M * sizeof (char));
 
@@ -583,11 +597,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
              if N = 5 (mod 8) then 4 divides x^2-N for x = 1, 3, 5, 7
              if N = 7 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7.
           */
-          Np = mpz_getlimbn (N, 0) & 7; /* N mod 8 */
-          if (Np == 1) /* 2^3 always divides */
-            logp = (char) (log ((double) 8) / logradix + 0.5);
-          else if (Np == 5) /* 2^2 always divides */
-            logp = (char) (log ((double) 4) / logradix + 0.5);
+          logp = log2[mpz_getlimbn (N, 0) & 7];
 #if 0
           for (i = k; i < 2*M; i += 2)
             update (S, i, p, logp, M);
@@ -610,8 +620,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
           if (q < P[ncol - 1])
             {
               unsigned long Ap, Bp;
-              unsigned char logp2;
-              logp2 = (char) (log ((double) q) / logradix + 0.5) - logp;
+              unsigned char logp2 = Logp2[j];
               Np = mpz_fdiv_ui (N, q);
               Ap = mpz_fdiv_ui (a, q);
               Bp = mpz_fdiv_ui (b, q);
@@ -643,11 +652,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   printf ("%d: S=%d\n", TRACE, S[M + TRACE]);
 #endif
 
-  /* find smooth locations: the norm for location i is about 2*sqrt(N)*i */
-  double Nd = mpz_get_d (N);
-  /* we go from about sqrt(N) for i=0 to N/a for i=M. The magic constant 66
-     here seems to be optimal for a 128-bit input. */
-  unsigned char threshold = (unsigned char) (log (Nd) / logradix) + 66;
+  /* find smooth locations */
   for (i = -M; i < M && nrel < wrel; i++)
     {
       if (S[M + i] >= threshold)
@@ -677,6 +682,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   total_time = st - st0;
 
   free (Logp);
+  free (Logp2);
   free (S);
   for (i = 0; i < wrel; i++)
     mpz_clear (Mat[i]);
