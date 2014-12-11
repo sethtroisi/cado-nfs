@@ -232,7 +232,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
             ssd->logp[index] = fb_log (fb_pow (pp, root->exp), log_scale, - old_log);
             
             WHERE_AM_I_UPDATE(w, r, r);
-            const fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si);
+            const fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si->qbasis);
             /* If this root is somehow interesting (projective in (a,b) or
                in (i,j) plane), print a message */
             if (verbose && (r > p || r_q >= p))

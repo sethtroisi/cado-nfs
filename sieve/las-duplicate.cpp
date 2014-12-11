@@ -120,7 +120,7 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
 
     new_si->sides[side]->strategy = strategy[side];
   }
-  SkewGauss(new_si);  
+  SkewGauss(new_si->qbasis, new_si->doing->p, new_si->doing->r, new_si->conf->skewness);
   return new_si;
 }
 
@@ -311,7 +311,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   sieve_info_update_norm_data(si, nb_threads);
   if (verbose) {
     verbose_output_print(0, 1, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", relation->a, relation->b, sq, r);
-    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
+    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
   }
 
   I = si->I;

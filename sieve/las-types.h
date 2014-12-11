@@ -11,6 +11,7 @@
 #include "ecm/facul.h"
 #include "relation.h"
 #include "las-unsieve.h"
+#include "las-qlattice.h"
 
 /* These must be forward-declared, because the header file below uses
  * them */
@@ -197,7 +198,7 @@ struct sieve_info_s {
     // description of the q-lattice. The values here should remain
     // compatible with those in ->conf (this concerns notably the bit
     // size as well as the special-q side).
-    int64_t a0, b0, a1, b1;
+    qlattice_basis_t qbasis;
 
     // parameters for bucket sieving
     uint32_t nb_buckets; /* Actual number of buckets used by current special-q */

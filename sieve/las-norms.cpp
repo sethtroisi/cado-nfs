@@ -1428,20 +1428,21 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
     if (verbose) {
         printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
                "; a1=%" PRId64 "; b1=%" PRId64 "), p=%lu, skew=%f, nb_threads=%d)\n",
-               si->a0, si->b0, si->a1, si->b1, mpz_get_ui(si->doing->p), skewness, nb_threads);
+               si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1,
+               mpz_get_ui(si->doing->p), skewness, nb_threads);
     }
     double maxab1, maxab0;
-    maxab1 = si->b1 * skewness;
-    maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
-    maxab0 = si->b0 * skewness;
-    maxab0 = maxab0 * maxab0 + si->a0 * si->a0;
+    maxab1 = si->qbasis->b1 * skewness;
+    maxab1 = maxab1 * maxab1 + si->qbasis->a1 * si->qbasis->a1;
+    maxab0 = si->qbasis->b0 * skewness;
+    maxab0 = maxab0 * maxab0 + si->qbasis->a0 * si->qbasis->a0;
     if (maxab0 > maxab1) { /* exchange u and v, thus I and J */
-        int64_t oa[2] = { si->a0, si->a1 };
-        int64_t ob[2] = { si->b0, si->b1 };
-        si->a0 = oa[1]; si->a1 = oa[0];
-        si->b0 = ob[1]; si->b1 = ob[0];
+        int64_t oa[2] = { si->qbasis->a0, si->qbasis->a1 };
+        int64_t ob[2] = { si->qbasis->b0, si->qbasis->b1 };
+        si->qbasis->a0 = oa[1]; si->qbasis->a1 = oa[0];
+        si->qbasis->b0 = ob[1]; si->qbasis->b1 = ob[0];
     }
-    maxab1 = MAX(labs(si->a1), labs(si->b1) * skewness);
+    maxab1 = MAX(labs(si->qbasis->a1), labs(si->qbasis->b1) * skewness);
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
@@ -1487,7 +1488,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
 void
 sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
 {
-  int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+  int64_t H[4] = { si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1 };
 
   double step, begin;
   double r, maxlog2;
