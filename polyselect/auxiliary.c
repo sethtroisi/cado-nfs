@@ -3478,6 +3478,10 @@ find_best_k (mpz_t *K, mpz_poly_ptr f, mpz_t *g)
     {
       ret = find_best_k_deg5 (K, f, g);
     }
+  else if (d == 4)
+  {
+    ret = 0;
+  }
   else
     ASSERT_ALWAYS(0);
 
@@ -4352,7 +4356,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, const int verbose, const int use_rotation)
 {
   const int d = f->deg;
 
-  if (d == 6 || d == 5) {
+  if (d == 6 || d == 5 || d == 4) {
 #ifdef OPTIMIZE_LLL_LIST
     optimize_deg6_list (f, g, verbose, use_rotation);
 #else
