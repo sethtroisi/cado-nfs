@@ -205,10 +205,9 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 	    {
 	      tabular_fm_set_fm_index(strat->tab_fm, ecm_rc->tab[i], ind_tab+j);
 	    }
-	  int lbucket_new = lbucket +1 < 3? lbucket+1: lbucket;
 	  generate_collect_iter_ecm_rc(zero, ecm_rc, i, strat,ind_tab+lbucket,
 				       index_iter + lbucket, len_iteration,
-				       lbucket_new, init_tab, res, fbb, lpb, r);
+				       lbucket+1, init_tab, res, fbb, lpb, r);
 	}
     }
 }

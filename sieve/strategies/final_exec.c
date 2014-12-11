@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
 
     const char *pathname_output;
     if ((pathname_output = param_list_lookup_string(pl, "out")) == NULL) {
-	fputs("Parser error: Please re-run with the option -out"
+	fputs("Parser error: Please re-run with the option -out "
 	      "to specify where the result will be stored!\n", stderr);
 	exit(EXIT_FAILURE);
     }

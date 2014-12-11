@@ -1227,10 +1227,10 @@ sub task_common_run {
     expire_cache_entry 'leadernode_filelist';
     # Some arguments are relevant only to some contexts.
     #
-    # We start with linven, because it's slightly specific
+    # We start with lingen, because it's slightly specific
     # take out the ones we don't need (and acollect shares some
     # peculiarities).
-    @_ = grep !/^(balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /(lingen|acollect$)/;
+    @_ = grep !/^(cpubinding|balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /(lingen|acollect$)/;
     if ($program =~ /plingen/) {
         @_ = map { s/^lingen_mpi/mpi/; $_; } @_;
     } else {

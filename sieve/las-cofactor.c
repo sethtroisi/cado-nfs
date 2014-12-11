@@ -231,7 +231,6 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
 
   ASSERT (facul_code[0] == 0 || mpz_cmp_ui (n[0], ul_factors[0][0]) != 0);
   ASSERT (facul_code[1] == 0 || mpz_cmp_ui (n[1], ul_factors[1][0]) != 0);
-
   int ret = is_smooth[0] == 1 && is_smooth[1] == 1;
   for (int side = 0; ret == 1 && side < 2; side++)
     {
@@ -370,13 +369,13 @@ factor_both_leftover_norms(mpz_t *norm, const mpz_t BLPrat, mpz_array_t **f,
     if (have_file)
 	pass = factor_both_leftover_norms_src (norm, f, m, si);
     else {
-	for (int z = 0 ; pass > 0 && z < 2 ; z++){
+        for (int z = 0 ; pass > 0 && z < 2 ; z++){
 	    int side = first ^ z;
 	    cc[side] ++;
 	    pass = factor_leftover_norm (norm[side], f[side], m[side],
 					 si, side);
 	    if (pass <= 0)
-		cf[side] ++;
+	      cf[side] ++;
 	}
     }
     /* Add thread-local statistics to the global arrays */
