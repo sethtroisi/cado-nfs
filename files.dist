@@ -650,6 +650,7 @@ sieve/ecm/mpqs_2ul2.c
 sieve/ecm/mpqs_mpz.c
 sieve/fb.cpp
 sieve/fb.h
+sieve/fb-types.h
 sieve/freerel.c
 sieve/las-arith.cpp
 sieve/las-arith.h
