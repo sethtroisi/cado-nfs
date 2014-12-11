@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#include "fb.h"
+#include "fb-types.h"
 #include "utils.h"
 #include "las-config.h"
 #include "utils/misc.h" /* ctzl */
