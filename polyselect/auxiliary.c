@@ -3022,9 +3022,40 @@ optimize_c3 (mpz_t *f, mpz_t *g, long l)
 }
 #endif
 
+typedef struct {
+  unsigned long int *tab;
+  unsigned long alloc;
+  unsigned long size;
+} hash_table_ui_s;
+
+typedef hash_table_ui_s hash_table_ui_t[1];
+typedef hash_table_ui_s * hash_table_ui_ptr;
+typedef const hash_table_ui_s * hash_table_ui_srcptr;
+
+void
+hash_ui_init (hash_table_ui_ptr H)
+{
+  H->size  = 0;
+  H->alloc = 1009; /* next_prime (1000) */
+  H->tab = (unsigned long int *) malloc (H->alloc * sizeof (unsigned long int));
+  ASSERT_ALWAYS (H->tab != NULL);
+  memset (H->tab, 0, H->alloc * sizeof (unsigned long int));
+}
+
+void
+hash_ui_clear (hash_table_ui_ptr H)
+{
+  free (H->tab);
+  H->tab = NULL;
+  H->alloc = 0;
+  H->size = 0;
+}
+
+/* Internal function. Do not use it directly, use hash_ui_insert instead. */
 /* return 1 if new, 0 if already present in table */
-int
-insert_one (unsigned long *H, unsigned long alloc, unsigned long h)
+static inline int
+hash_ui_insert_one (unsigned long int *H, unsigned long alloc,
+                    unsigned long int h)
 {
   unsigned long i = h % alloc;
 
@@ -3041,45 +3072,34 @@ insert_one (unsigned long *H, unsigned long alloc, unsigned long h)
   }
 }
 
+/* return 1 if new, 0 if already present in table */
 int
-insert_hash (unsigned long h)
+hash_ui_insert (hash_table_ui_ptr H, unsigned long int h)
 {
-  static unsigned long *H = NULL, size = 0, alloc = 0, inserted = 0;
-
-  inserted++;
-
-  if (h == 0) /* free table */
+  if (2 * H->size >= H->alloc) /* realloc */
   {
-    //printf ("inserted %lu elements, among which %lu new\n", inserted, size);
-    free (H);
-    H = NULL;
-    size = alloc = inserted = 0;
-    return 0;
+    unsigned long int *new;
+    unsigned long new_size = 0, new_alloc;
+
+    new_alloc = ulong_nextprime (2 * H->alloc + 1);
+    new = (unsigned long int *) malloc (new_alloc * sizeof (unsigned long int));
+    memset (new, 0, new_alloc * sizeof (unsigned long int));
+    for (unsigned long i = 0; i < H->alloc; i++)
+      if (H->tab[i])
+        new_size += hash_ui_insert_one (new, new_alloc, H->tab[i]);
+    free (H->tab);
+    H->tab = new;
+    H->alloc = new_alloc;
+    ASSERT_ALWAYS(new_size == H->size);
   }
 
-  if (2 * size >= alloc) /* realloc */
+  if (hash_ui_insert_one (H->tab, H->alloc, h))
   {
-    unsigned long *newH, newalloc, i, newsize = 0;
-
-    newalloc = ulong_nextprime (2 * alloc + 1);
-    newH = malloc (newalloc * sizeof (unsigned long));
-    memset (newH, 0, newalloc * sizeof (unsigned long));
-    for (i = 0; i < alloc; i++)
-      if (H[i])
-        newsize += insert_one (newH, newalloc, H[i]);
-    free (H);
-    H = newH;
-    alloc = newalloc;
-    ASSERT_ALWAYS(newsize == size);
-  }
-
-  if (insert_one (H, alloc, h))
-  {
-    size ++;
+    H->size++;
     return 1;
   }
-
-  return 0;
+  else
+    return 0;
 }
 
 
@@ -4027,6 +4047,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
   mat_Z m;
   mpz_poly_t best_f, copy_f;
   mpz_t best_g0, copy_g0, k, copy_g0k;
+  hash_table_ui_t H;
 
   mpz_init (s);
   mpz_init (det);
@@ -4044,6 +4065,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
   best_lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
   mpz_init (k);
   mpz_init (copy_g0k);
+  hash_ui_init (H);
 
   /* m has d (row) vectors of d+1 coefficients each */
   m.NumRows = d; /* consider rotation up to x^(m.NumRows-2)*g(x) */
@@ -4154,7 +4176,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
             for (i = 0; i <= d; i++)
               mpz_neg (f->coeff[i], f->coeff[i]);
 
-          if (insert_hash (mpz_getlimbn (f->coeff[0], 0)))
+          if (hash_ui_insert (H, mpz_get_ui (f->coeff[0])))
           {
             mpz_set (g[0], copy_g0k);
             optimize_aux (f, g, verbose, 1, OPT_STEPS);
@@ -4195,6 +4217,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
   mpz_clear (copy_g0);
   mpz_clear (k);
   mpz_clear (copy_g0k);
+  hash_ui_clear (H);
 }
 
 /* Pre-optimize routine: we assume that f[d], f[d-1] and f[d-2] are small,
@@ -4344,8 +4367,6 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
   mpz_clear (skew);
   mpz_clear (best_logmu);
 #endif
-
-  insert_hash (0);
 }
 #endif
 
