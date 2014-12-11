@@ -3298,9 +3298,9 @@ find_best_k (mpz_t *K, mpz_poly_ptr f, mpz_t *g)
       ret = find_best_k_deg5 (K, f, g);
     }
   else if (d == 4)
-  {
-    ret = 0;
-  }
+    {
+      ret = 0;
+    }
   else
     ASSERT_ALWAYS(0);
 
