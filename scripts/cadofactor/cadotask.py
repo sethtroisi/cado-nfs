@@ -123,7 +123,7 @@ class Polynomials(object):
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
-    re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*(?:\(.*\))?\s*=", 1))
+    re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
@@ -140,6 +140,7 @@ class Polynomials(object):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
         """
         self.MurphyE = 0.
+        self.MurphyParams = None
         self.lognorm = 0.
         self.params = {}
         polyf = Polynomial()
@@ -179,7 +180,8 @@ class Polynomials(object):
             # extract the value and store it
             match = self.re_Murphy.match(line)
             if match:
-                self.MurphyE = float(match.group(1))
+                self.MurphyParams = match.group(1)
+                self.MurphyE = float(match.group(2))
                 continue
             # If this is a comment line telling the lognorm,
             # extract the value and store it
@@ -250,7 +252,10 @@ class Polynomials(object):
             arr += ["Y%d: %d\n" % (idx, coeff) for (idx, coeff)
                     in enumerate(self.polyg) if not coeff == 0]
         if not self.MurphyE == 0.:
-            arr.append("# MurphyE = %g\n" % self.MurphyE)
+            if self.MurphyParams:
+                arr.append("# MurphyE (%s) = %g\n" % (self.MurphyParams, self.MurphyE))
+            else:
+                arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
             arr.append("# lognorm %g\n" % self.lognorm)
         if len(self.tabpoly) > 0:

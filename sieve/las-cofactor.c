@@ -60,8 +60,41 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
       if (3 * lpb < s && mpz_cmp (n, si->BBBB[side]) < 0)
         return 0; /* case (h) */
     }
-  // TODO: replace this by the primality test of mod_ul.
-  if (mpz_probab_prime_p (n, 1))
+  // TODO: maybe we should pass the modulus to the facul machinery
+  // instead of reconstructing it.
+  int prime=0;
+  if (s <= MODREDCUL_MAXBITS) {
+      modulusredcul_t m;
+      ASSERT(mpz_fits_ulong_p(n));
+      modredcul_initmod_ul (m, mpz_get_ui(n));
+      prime = modredcul_sprp2(m);
+      modredcul_clearmod (m);
+  } else if (s <= MODREDC15UL_MAXBITS) {
+      modulusredc15ul_t m;
+      unsigned long t[2];
+      modintredc15ul_t nn;
+      size_t written;
+      mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, n);
+      ASSERT_ALWAYS(written <= 2);
+      modredc15ul_intset_uls (nn, t, written);
+      modredc15ul_initmod_int (m, nn);
+      prime = modredc15ul_sprp2(m);
+      modredc15ul_clearmod (m);
+  } else if (s <= MODREDC2UL2_MAXBITS) {
+      modulusredc2ul2_t m;
+      unsigned long t[2];
+      modintredc2ul2_t nn;
+      size_t written;
+      mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, n);
+      ASSERT_ALWAYS(written <= 2);
+      modredc2ul2_intset_uls (nn, t, written);
+      modredc2ul2_initmod_int (m, nn);
+      prime = modredc2ul2_sprp2(m);
+      modredc2ul2_clearmod (m);
+  } else {
+      prime = mpz_probab_prime_p (n, 1);
+  }
+  if (prime)
     return 0; /* n is a pseudo-prime larger than L */
   return 1;
 }
