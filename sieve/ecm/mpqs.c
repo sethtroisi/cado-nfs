@@ -451,8 +451,11 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   long M, i, j, *K, wrel, nrel = 0, lim;
   mpz_t a, b, c, sqrta;
   double maxnorm, radix, logradix = 0;
-  long st0 = cputime (), st, init_time, sieve_time = 0, check_time = 0;
-  long gauss_time, total_time = 0;
+  long st;
+  static long init_time = 0, sieve_time = 0, check_time = 0;
+  static long gauss_time = 0, total_time = 0;
+
+  init_time -= cputime ();
 
   /* assume N is odd */
   ASSERT_ALWAYS (mpz_fdiv_ui (N, 2) == 1);
@@ -529,13 +532,12 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   /* we want 'a' to be a square */
   mpz_sqrt (sqrta, a);
 
-  st = cputime ();
-  printf ("init: %ldms\n", st);
-  init_time = st - st0;
+  init_time += cputime ();
+  printf ("init: %ldms\n", init_time);
 
   int pols = 0;
   while (nrel < wrel) {
-  sieve_time -= st;
+  sieve_time -= cputime ();
   do
     mpz_nextprime (sqrta, sqrta);
   while (mpz_jacobi (N, sqrta) != 1);
@@ -666,19 +668,20 @@ mpqs (mpz_t f, mpz_t N, long ncol)
             }
         }
     }
-  st = cputime ();
-  check_time += st;
+  check_time += cputime ();
+#if 0
   gmp_printf ("sqrta=%Zd, total %ld/%d rels in %ldms (%.2f r/s)\n",
               sqrta, nrel, count, st, (double) nrel / (double) st);
+#endif
   }
   printf ("%ld rels with %d polynomials: %f per poly\n",
           nrel, pols, (double) nrel / (double) pols);
 
-  gauss_time = st;
+  gauss_time -= cputime ();
   gauss (f, Mat, nrel, ncol + 1, X, N);
   st = cputime ();
-  gauss_time = st - gauss_time;
-  total_time = st - st0;
+  gauss_time += st;
+  total_time = st;
 
   free (Logp);
   free (S);
@@ -718,7 +721,8 @@ main (int argc, char *argv[])
   mpz_init (f);
   mpz_set_str (N, argv[1], 10);
   ncol = atol (argv[2]);
-  mpqs (f, N, ncol);
+  for (int i = 0; i < 100; i++)
+    mpqs (f, N, ncol);
   mpz_clear (N);
   mpz_clear (f);
 }
