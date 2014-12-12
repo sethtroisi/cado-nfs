@@ -208,9 +208,11 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 	pp1_make_plan(strategy->methods[0].plan, B1, B2, 0);
     } else if (method == EC_METHOD) {
 	long sigma;
-	if (curve == MONTY16) {
-	    sigma = 1;
-	} else
+	if (curve == MONTY16)
+	  sigma = 1;
+	else if (curve == BRENT12)
+	  sigma = 11;
+	else 
 	  sigma = 2 + rand()%BOUND_SIGMA;
 
 	strategy->methods[0].plan = malloc(sizeof(ecm_plan_t));
@@ -218,9 +220,8 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 	ecm_make_plan(strategy->methods[0].plan, B1, B2, curve,
 		      labs(sigma), 1, 0);
     } else {
-	exit(EXIT_FAILURE);
+      exit(EXIT_FAILURE);
     }
-
     return strategy;
 }
 
