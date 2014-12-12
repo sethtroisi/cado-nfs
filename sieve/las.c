@@ -1869,12 +1869,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
                 }
 #endif
-                rep->ttf += seconds_thread ();
                 trial_div (&factors[side], norm[side], N, x,
                         si->sides[side]->fb,
                         &primes[side], si->sides[side]->trialdiv_data,
                         lim, a, b);
-                rep->ttf -= seconds_thread ();
 
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
