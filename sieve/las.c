@@ -482,27 +482,29 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
         sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
 
-        mpz_init (si->BB[s]);
-        mpz_init (si->BBB[s]);
-        mpz_init (si->BBBB[s]);
-        unsigned long lim = si->conf->sides[s]->lim;
-        mpz_ui_pow_ui (si->BB[s], lim, 2);
-        mpz_mul_ui (si->BBB[s], si->BB[s], lim);
-        mpz_mul_ui (si->BBBB[s], si->BBB[s], lim);
+	if (si->strategies == NULL)  /* no file was given. */
+	  {
+	    mpz_init (si->BB[s]);
+	    mpz_init (si->BBB[s]);
+	    mpz_init (si->BBBB[s]);
+	    unsigned long lim = si->conf->sides[s]->lim;
+	    mpz_ui_pow_ui (si->BB[s], lim, 2);
+	    mpz_mul_ui (si->BBB[s], si->BB[s], lim);
+	    mpz_mul_ui (si->BBBB[s], si->BBB[s], lim);
 
-        /* The strategies also depend on the special-q used within the
-         * descent, assuming lim / lpb depend on the sq bitsize */
-        verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
-                sc->bitsize, sidenames[sc->side][0], sidenames[s],
-                sc->sides[s]->lim, sc->sides[s]->lpb);
-        verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
-                             sc->sides[s]->ncurves > 0
-                             ? sc->sides[s]->ncurves
-                             : nb_curves (sc->sides[s]->lpb));
-        si->sides[s]->strategy = facul_make_strategy(
-                sc->sides[s]->lim, sc->sides[s]->lpb,
-                sc->sides[s]->ncurves, 0);
-
+	    /* The strategies also depend on the special-q used within the
+	     * descent, assuming lim / lpb depend on the sq bitsize */
+	    verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
+				 sc->bitsize, sidenames[sc->side][0], sidenames[s],
+				 sc->sides[s]->lim, sc->sides[s]->lpb);
+	    verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
+				 sc->sides[s]->ncurves > 0
+				 ? sc->sides[s]->ncurves
+				 : nb_curves (sc->sides[s]->lpb));
+	    si->sides[s]->strategy =
+	      facul_make_strategy(sc->sides[s]->lim, sc->sides[s]->lpb,
+				  sc->sides[s]->ncurves, 0);
+	  }
         reorder_fb(si, s);
 
         verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
