@@ -73,7 +73,7 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
   facul_method_t *methods;
   int i;
 
-  if (n == 0)
+  if (n == -1)
     n = nb_curves (lpb);
   ASSERT_ALWAYS(n < STATS_LEN);
   strategy = malloc (sizeof (facul_strategy_t));
