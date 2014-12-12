@@ -630,9 +630,8 @@ is installed, then bwc.pl might use it for cpu binding, which will improve the
 performance of the linear algebra step. When hwloc is used, the keyword
 "cpubinding" should appear in cxxx.bwc.log.
 
-See cpubinding.conf for more information. In short, you need to add
-cpubinding=$(CADO)/linalg/bwc/cpubinding.conf on the bwc.pl command line.
-
+See cpubinding.conf for more information. In short, you just need to add on the
+cadofactor.py command line: cpubinding=$(CADO)/linalg/bwc/cpubinding.conf.
 
 Notes:
 ======
