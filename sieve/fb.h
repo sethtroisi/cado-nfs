@@ -19,8 +19,8 @@
 #include <vector>
 #include "las-config.h"
 #include "cado_poly.h" // for MAXDEGREE
-
 #include "fb-types.h"
+#include "las-qlattice.h"
 
 /* Base class with private copy-constructor and assigmnet operator.
    Classes which are not copy-constructible can inherit this with:
@@ -64,6 +64,16 @@ struct fb_general_root {
     if (oldexp != 0 || this->exp != 1)
       fprintf(out, ":%hhu:%hhu", oldexp, this->exp);
   }
+  void transform(fb_general_root &result, const fbprime_t q,
+                 const redc_invp_t invq,
+                 qlattice_basis_srcptr basis) const {
+    result.exp = this->exp;
+    result.oldexp = oldexp;
+    fbprime_t t = r + (proj ? q : 0);
+    t = fb_root_in_qlattice(q, t, invq, basis);
+    result.proj = (t >= q);
+    result.r = t - ( (t >= q) ? q : 0);
+  }
 };
 
 /* General entries are anything that needs auxiliary information:
@@ -87,6 +97,7 @@ public:
   void merge (const fb_general_entry &);
   void fprint(FILE *out) const;
   bool is_simple() const;
+  void transform_roots(fb_general_entry &, qlattice_basis_srcptr) const;
 };
 
 
@@ -264,7 +275,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   bool mmap_fbc(const char *) {return false;};
   void dump_fbc(const char *) {return;};
   unsigned long *extract_bycost(size_t &n, fbprime_t pmax, fbprime_t td_thresh);
-  size_t size() {abort(); return 0;}
+  size_t size() const {return 0;}
   void fprint(FILE *) const;
   void append(const fb_general_entry &);
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;

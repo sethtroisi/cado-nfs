@@ -255,6 +255,21 @@ fb_general_entry::merge (const fb_general_entry &other)
 }
 
 void
+fb_general_entry::transform_roots(fb_general_entry &result,
+                                  qlattice_basis_srcptr basis) const
+{
+  result.p = p;
+  result.q = q;
+  result.invq = invq;
+  result.k = k;
+  result.nr_roots = nr_roots;
+  /* TODO: Use batch-inversion here */
+  for (unsigned char i_root = 0; i_root < nr_roots; i_root++)
+    roots[i_root].transform(result.roots[i_root], q, invq, basis);
+}
+
+
+void
 fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
