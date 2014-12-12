@@ -332,34 +332,35 @@ int main(int argc, char *argv[])
 
 	  tabular_fm_t *data_ecm_b12 = extract_fm_method(c, EC_METHOD, BRENT12);
 
-	  tabular_fm_t *data_ecm_rc = tabular_fm_create();
-	  tabular_fm_concat(data_ecm_rc, data_ecm_b12);
-	  tabular_fm_concat(data_ecm_rc, data_ecm_m12);
-
 	  tabular_fm_t *data_pp1 = tabular_fm_create();
 	  tabular_fm_concat(data_pp1, data_pp1_27);
 	  tabular_fm_concat(data_pp1, data_pp1_65);
 
-	  tabular_fm_sort(data_pm1);
-	  tabular_fm_sort(data_pp1);
-	  tabular_fm_sort(data_ecm_m16);
-	  tabular_fm_sort(data_ecm_rc);
-
-	  //todo: add zero method if doesn't exist!
+	  //add zero method if doesn't exist!
 	  fm_t *zero = fm_create();
 	  unsigned long method_zero[4] = { 0, 0, 0, 0 };
 	  fm_set_method(zero, method_zero, 4);
 
-	  //todo: be more intelligent!
 	  if (data_pm1->tab[0]->method[2] != 0)//B1=0
 	    tabular_fm_add_fm (data_pm1, zero);
 	  if (data_pp1->tab[0]->method[2] != 0)//B1=0
 	    tabular_fm_add_fm (data_pp1, zero);
-	  if (data_ecm_rc->tab[0]->method[2] != 0)//B1=0
-	    tabular_fm_add_fm (data_ecm_rc, zero);
+	  if (data_ecm_b12->tab[0]->method[2] != 0)//B1=0
+	    tabular_fm_add_fm (data_ecm_b12, zero);
+	  if (data_ecm_m12->tab[0]->method[2] != 0)//B1=0
+	    tabular_fm_add_fm (data_ecm_m12, zero);
 	  if (data_ecm_m16->tab[0]->method[2] != 0)//B1=0
 	    tabular_fm_add_fm (data_ecm_m16, zero);
-	  
+
+	  tabular_fm_t *data_ecm = tabular_fm_create();
+	  tabular_fm_concat(data_ecm, data_ecm_m16);
+	  tabular_fm_concat(data_ecm, data_ecm_b12);
+	  tabular_fm_concat(data_ecm, data_ecm_m12);
+
+	  tabular_fm_sort(data_pm1);
+	  tabular_fm_sort(data_pp1);
+	  tabular_fm_sort(data_ecm);
+
 	  if (gst_r) {
 
 	      int r0 = -1;
@@ -399,8 +400,7 @@ int main(int argc, char *argv[])
 
 	      tabular_strategy_t *res =
 		  generate_strategies_oneside(tab_decomp, zero, data_pm1,
-					      data_pp1, data_ecm_m16,
-					      data_ecm_rc, ncurves, 
+					      data_pp1, data_ecm, ncurves, 
 					      lim0, lpb0, r0);
 
 	      tabular_decomp_free(tab_decomp);
@@ -455,7 +455,7 @@ int main(int argc, char *argv[])
 	      tabular_strategy_t ***matrix =
 		  generate_matrix(name_directory_decomp,
 				  data_pm1, data_pp1,
-				  data_ecm_m16, data_ecm_rc, ncurves,
+				  data_ecm, ncurves,
 				  lim0, lpb0, mfb0,
 				  lim1, lpb1,mfb1);
 
@@ -485,7 +485,7 @@ int main(int argc, char *argv[])
 	  tabular_fm_free(data_ecm_m16);
 	  tabular_fm_free(data_ecm_m12);
 	  tabular_fm_free(data_ecm_b12);
-	  tabular_fm_free(data_ecm_rc);
+	  tabular_fm_free(data_ecm);
 	  tabular_fm_free(c);
       }
     }

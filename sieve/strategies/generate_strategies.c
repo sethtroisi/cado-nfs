@@ -184,11 +184,11 @@ tabular_strategy_add_strategy_without_zero(tabular_strategy_t * t,
   length 'lbucket'.
  */
 static void
-generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
-			     int ind_ecm_rc, strategy_t * strat, int ind_tab,
+generate_collect_iter_ecm(fm_t * zero, tabular_fm_t * ecm,
+			     int ind_ecm, strategy_t * strat, int ind_tab,
 			     int index_iter, int len_iteration, int lbucket,
 			     tabular_decomp_t *init_tab, tabular_strategy_t*res,
-			     int fbb, int lpb, int r)
+			     int fbb, int lpb, int r, int is_already_used_B12M16)
 {
     if (index_iter >= len_iteration) {
 	int nb_strat = res->index;
@@ -200,14 +200,31 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 	strategy_set_proba(res->tab[nb_strat], proba);
 	strategy_set_time(res->tab[nb_strat], time);
     } else {
-	for (int i = ind_ecm_rc; i < ecm_rc->index; i++) {
-	  for (int j = 0; j < lbucket && ind_tab+j < strat->tab_fm->index; j++)
+	for (int i = ind_ecm; i < ecm->index; i++) {
+	  /* The curve BRENT12 and MONTY16 are curves with only one
+	  sigma. So use it only one time.*/
+	  if (ecm->tab[i]->method[1] == MONTY16 || //MONTY16
+	      ecm->tab[i]->method[1] == BRENT12) //BRENT12
 	    {
-	      tabular_fm_set_fm_index(strat->tab_fm, ecm_rc->tab[i], ind_tab+j);
+	      if (is_already_used_B12M16)
+		continue;
+	      tabular_fm_set_fm_index(strat->tab_fm, ecm->tab[i], ind_tab);
+	      generate_collect_iter_ecm(zero, ecm, i+1, strat,ind_tab+1,
+					index_iter + 1, len_iteration,
+					lbucket, init_tab, res, fbb, lpb, r,
+					true);			
 	    }
-	  generate_collect_iter_ecm_rc(zero, ecm_rc, i, strat,ind_tab+lbucket,
-				       index_iter + lbucket, len_iteration,
-				       lbucket+1, init_tab, res, fbb, lpb, r);
+	  else //MONTY12
+	    {
+	      for (int j = 0; j < lbucket && ind_tab+j < strat->tab_fm->index; j++)
+		{
+		  tabular_fm_set_fm_index(strat->tab_fm, ecm->tab[i], ind_tab+j);
+		}
+	      generate_collect_iter_ecm(zero, ecm, i, strat,ind_tab+lbucket,
+					index_iter + lbucket, len_iteration,
+					lbucket+1, init_tab, res, fbb, lpb,r,
+					is_already_used_B12M16);
+	    }
 	}
     }
 }
@@ -219,16 +236,12 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
   strategies!  
   Moreover, this generator chains our factoring methods
   such that: 
-       PM1 (0/1) + PP1 (0/1) + ECM-M16 (0/1) + ECM-RC(0/1/2/3/4) 
-  todo: reconsider this scheme according the different
-  results can be considered!
+ PM1 (0/1) + PP1 (0/1) + ECM-M12(0/1/2...)+ ECM-M16/B12(0/1)+ ECM-M12(0/1/...)
 */
-
 tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 						fm_t * zero, tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
-						tabular_fm_t * ecm_m16,
-						tabular_fm_t * ecm_rc,
+						tabular_fm_t * ecm,
 						int ncurves, unsigned long lim,
 						int lpb, int r)
 {
@@ -269,7 +282,6 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 
     int len_pm1 = pm1->index;
     int len_pp1 = pp1->index;
-    int len_ecm_m16 = ecm_m16->index;
 
     //init strat
     int len_strat = 2 + ncurves;
@@ -289,36 +301,31 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
       for (int ind_pp1 = 0; ind_pp1 < len_pp1; ind_pp1++) {
         if ( pp1->tab[ind_pp1]->method[2] != 0 //B1==0
 	     && pp1->tab[ind_pp1]->proba[0] < current_proba_pm1)
-	    continue;
+	  continue;
 	
 	tabular_fm_set_fm_index(tab_strat, pp1->tab[ind_pp1], 1);
-	//ECM-M16
-	for (int ind_ecm_m16 = 0;
-	     ind_ecm_m16 < len_ecm_m16; ind_ecm_m16++) { 
-	  tabular_fm_set_fm_index(tab_strat,
-				  ecm_m16->tab[ind_ecm_m16], 2);
-	  //ECM-RC (M12 || B12)
-	  generate_collect_iter_ecm_rc(zero, ecm_rc, 0, strat, 3,
-				       0, ncurves, 0, init_tab,
-				       all_strat, fbb, lpb, r);
-	  //process data to avoid to full the RAM!!!  todo:
-	  //improve this idea because the problem always exists
-	  //when the nb_curve is large!  {{
-	  nb_strat = all_strat->index - 1;
-	  if (nb_strat > 100000) {
-	    //add strategies of the old convexhull and recompute
-	    //the new convex hull
-	    tabular_strategy_concat(all_strat, res);
-	    tabular_strategy_free(res);
-	    res = convex_hull_strategy(all_strat);
-	    //clear previous collect and start a new collect.
-	    tabular_strategy_free(all_strat);
-	    all_strat = tabular_strategy_create();
-	    nb_strat = 0;
-	  }
+
+	//ECM (M12-B12-M16)
+	generate_collect_iter_ecm(zero, ecm, 0, strat, 2,
+				  0, ncurves, 0, init_tab,
+				  all_strat, fbb, lpb, r, false);
+	//process data to avoid to full the RAM!!!  todo:
+	//improve this idea because the problem always exists
+	//when the nb_curve is large!  {{
+	nb_strat = all_strat->index - 1;
+	if (nb_strat > 100000) {
+	  //add strategies of the old convexhull and recompute
+	  //the new convex hull
+	  tabular_strategy_concat(all_strat, res);
+	  tabular_strategy_free(res);
+	  res = convex_hull_strategy(all_strat);
+	  //clear previous collect and start a new collect.
+	  tabular_strategy_free(all_strat);
+	  all_strat = tabular_strategy_create();
+	  nb_strat = 0;
 	}
       }
-    }
+    } 
     if (nb_strat != 0)	//process data
       {
 	//add strategies of the old convexhull and recompute the new
@@ -450,8 +457,7 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 				      tabular_fm_t* pm1, tabular_fm_t* pp1,
-				      tabular_fm_t*ecm_m16, tabular_fm_t*ecm_rc,
-				      int ncurves,
+				      tabular_fm_t*ecm, int ncurves,
 				      unsigned long lim0, int lpb0, int mfb0,
 				      unsigned long lim1, int lpb1, int mfb1)
 {
@@ -502,8 +508,8 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	    fclose(file);
 	}
 	data_rat[r0] =
-	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, ncurves, lim0, lpb0, r0);
+	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1,
+					ecm, ncurves, lim0, lpb0, r0);
 	tabular_decomp_free(tab_decomp);
     }
 
@@ -530,8 +536,8 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	}
 
 	tabular_strategy_t *strat_r1 =
-	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, ncurves, lim1, lpb1, r1);
+	  generate_strategies_oneside(tab_decomp, zero, pm1, pp1,
+				      ecm, ncurves, lim1, lpb1, r1);
 	tabular_decomp_free(tab_decomp);
 
 	for (int r0 = 0; r0 <= mfb0; r0++) {

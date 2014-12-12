@@ -27,8 +27,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * tab_decomp,
 						fm_t * zero,
 						tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
-						tabular_fm_t * ecm_m16,
-						tabular_fm_t * ecm_rc,
+						tabular_fm_t * ecm,
 						int nb_curve, unsigned long lim,
 						int ub, int r);
 
@@ -37,8 +36,7 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 				      tabular_fm_t * pm1, tabular_fm_t * pp1,
-				      tabular_fm_t * ecm_m16,
-				      tabular_fm_t * ecm_rc, int nb_curve, 
+				      tabular_fm_t * ecm, int nb_curve, 
 				      unsigned long lim0, int lpb0, int mfb0,
 				      unsigned long lim1, int lpb1, int mfb1);
 

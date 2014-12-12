@@ -116,3 +116,4 @@ Y = 424.428310 relations, T = 2407.373605 s., yt = 5.6720382455 s/rel.
 # Total 447 reports [5.4s/r, 14.9r/sq]
 (So a speed-up: 5% for the time per relation and
                 10% for the number of relations per special-q).
+		
