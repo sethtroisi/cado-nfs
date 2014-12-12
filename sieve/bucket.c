@@ -4,6 +4,7 @@
 #include "portability.h"
 #include "memory.h"
 #include "las-config.h"
+#include "iqsort.h"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
@@ -285,8 +286,11 @@ bucket_cmp_x (const bucket_prime_t *a, const bucket_prime_t *b)
 void
 bucket_sortbucket (bucket_primes_t *BP)
 {
-  qsort (BP->start, BP->write - BP->start, sizeof (bucket_prime_t), 
-	 (int(*)(const void *, const void *)) &bucket_cmp_x);
+//  qsort (BP->start, BP->write - BP->start, sizeof (bucket_prime_t),
+//	 (int(*)(const void *, const void *)) &bucket_cmp_x);
+
+#define islt(a,b) ((a)->x < (b)->x)
+QSORT(bucket_prime_t, BP->start, BP->write - BP->start, islt);
 }
 
 
