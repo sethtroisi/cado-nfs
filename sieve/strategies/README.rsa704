@@ -61,10 +61,10 @@ cat ecm_b12_* > data_ecm_b12
 cat data_pp1_65_pt data_pp1_27_pt > data_pp1_pt
 cat data_ecm_m12_pt data_ecm_b12_pt > data_ecm_rc_pt
 
-./bench_fm -f 10 -in data_ecm_rc_pt -out ecm_rc
-./bench_fm -f 10 -in data_ecm_m16_pt -out ecm_m16
-./bench_fm -f 10 -in data_pm1_pt -out pm1
-./bench_fm -f 10 -in data_pp1_pt -out pp1
+./benchfm -f 10 -in data_ecm_rc_pt -out ecm_rc
+./benchfm -f 10 -in data_ecm_m16_pt -out ecm_m16
+./benchfm -f 10 -in data_pm1_pt -out pm1
+./benchfm -f 10 -in data_pp1_pt -out pp1
 
 cat pm1 pp1 ecm_rc ecm_m16 > All_methods
 
