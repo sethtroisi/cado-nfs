@@ -28,7 +28,7 @@ alambda: 3.2
 
 
 #select our factoring methods
-./script_fm 28 33
+./script_fm.sh 28 33
 
 cat pm1_* > data_pm1
 ./gfm -fch -fch_in data_pm1 -fch_out data_pm1_ch
@@ -114,4 +114,5 @@ Y = 424.428310 relations, T = 2407.373605 s., yt = 5.6720382455 s/rel.
 # Total cpu time 2414.18s [norm 3.59+9.7, sieving 1916.8 (1120.8 + 107.0 + 689.1), factor 484.1 (434.4 + 49.7)]
 # Total elapsed time 2431.19s, per special-q 81.0396s, per relation 5.4389s
 # Total 447 reports [5.4s/r, 14.9r/sq]
-(So a speed-up to 5% and more than 10 percent of relations per special-q).
+(So a speed-up: 5% for the time per relation and
+                10% for the number of relations per special-q).
