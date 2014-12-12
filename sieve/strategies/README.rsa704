@@ -104,4 +104,14 @@ mkdir res_matrix
 ./las -I 16 -poly rsa704.poly -q0 1000000000 -q1 1000000700 -lim0 250000000 -lim1 500000000 -lpb0 33 -lpb1 33 -mfb0 66 -mfb1 99 -mt 1 -fb1 rsa704.roots -file-cofact final_st
 # Total cpu time 2242.31s [norm 3.22+8.9, sieving 1847.5 (1119.5 + 106.9 + 621.0), factor 382.8 (357.1 + 25.7)]
 # Total elapsed time 2246.51s, per special-q 74.8837s, per relation 5.54694s
-# Total 403 reports [5.58s/r, 13.5r/sq]
+# Total 404 reports [5.57s/r, 13.5r/sq]
+
+
+#Note that with parameter mfb0 = 99, and the same procedure to generate a strategy file, we obtain:
+                                emulator
+Y = 424.428310 relations, T = 2407.373605 s., yt = 5.6720382455 s/rel.
+                                in practice!!!
+# Total cpu time 2414.18s [norm 3.59+9.7, sieving 1916.8 (1120.8 + 107.0 + 689.1), factor 484.1 (434.4 + 49.7)]
+# Total elapsed time 2431.19s, per special-q 81.0396s, per relation 5.4389s
+# Total 447 reports [5.4s/r, 14.9r/sq]
+(So a speed-up to 5% and more than 10 percent of relations per special-q).
