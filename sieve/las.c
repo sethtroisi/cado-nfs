@@ -498,7 +498,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 				 sc->bitsize, sidenames[sc->side][0], sidenames[s],
 				 sc->sides[s]->lim, sc->sides[s]->lpb);
 	    verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
-				 sc->sides[s]->ncurves > -1
+				 sc->sides[s]->ncurves > 0
 				 ? sc->sides[s]->ncurves
 				 : nb_curves (sc->sides[s]->lpb));
 	    si->sides[s]->strategy =
@@ -900,7 +900,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     for (int side = 0; side < 2; side++)
       if (!param_list_parse_int(pl, ncurves_params[side],
                                 &sc->sides[side]->ncurves))
-        sc->sides[side]->ncurves = -1;
+        sc->sides[side]->ncurves = 0;
 
     /* }}} */
 
