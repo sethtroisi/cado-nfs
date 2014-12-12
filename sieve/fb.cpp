@@ -292,6 +292,26 @@ void fb_general_vector::fprint(FILE *out) const {
   }
 }
 
+template <int Nr_roots>
+void
+fb_entry_x_roots_s<Nr_roots>::transform_roots(fb_general_entry &result, qlattice_basis_srcptr basis) const
+{
+  result.p = p;
+  result.q = p;
+  result.invq = compute_invq(p);
+  result.k = 1;
+  result.nr_roots = Nr_roots;
+  /* TODO: Use batch-inversion here */
+  for (unsigned char i_root = 0; i_root < Nr_roots; i_root++) {
+    result.roots[i_root].exp = 1;
+    result.roots[i_root].oldexp = 0;
+    fbprime_t t = fb_root_in_qlattice(p, roots[i_root], result.invq, basis);
+    result.roots[i_root].proj = (t >= p);
+    result.roots[i_root].r = t - ( (t >= p) ? p : 0);
+  }
+}
+
+
 
 template <int Nr_roots>
 void

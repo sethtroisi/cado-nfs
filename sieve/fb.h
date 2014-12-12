@@ -156,6 +156,7 @@ public:
       roots[i] = e.roots[i].r;
   }
   void fprint(FILE *) const;
+  void transform_roots(fb_general_entry &, qlattice_basis_srcptr) const;
 };
 
 
