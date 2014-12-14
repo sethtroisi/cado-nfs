@@ -80,21 +80,21 @@ cat Data_${m}_[1-3] > Data_${m}
 ./gfm -fch -fch_in Data_${m} -fch_out Data_${m}_ch
 
 m="PM1"
-./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt 2>1 > /dev/null &
+./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt -lb 28  2>1 > /dev/null &
 
 m="PP1-27"
-./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt 2>1 > /dev/null &
+./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt -lb 28 2>1 > /dev/null &
 
 m="PP1-65"
-./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt 2>1 > /dev/null &
+./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt -lb 28 2>1 > /dev/null &
 
 m="ECM-M12"
-./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt 2>1 > /dev/null &
+./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt -lb 28 -lb 28 2>1 > /dev/null &
 m="ECM-M16"
-./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt 2>1 > /dev/null &
+./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt -lb 28 2>1 > /dev/null &
 
 m="ECM-B12"
-./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt 2>1 > /dev/null &
+./benchfm -in Data_${m}_ch -p -t -out Data_${m}_ch_pt -lb 28 2>1 > /dev/null &
 
 mkdir decomp_tmp
 

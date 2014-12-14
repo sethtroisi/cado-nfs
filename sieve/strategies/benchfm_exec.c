@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
     }
 
     //default values
-    int len_p_min = 19; //default_value
+    int len_p_min = -1; //default_value
     int final_nb_fm = -1; //default value
     
     int opt_proba = param_list_parse_switch(pl, "-p");
@@ -118,8 +118,15 @@ int main(int argc, char *argv[])
     fclose(file_in);
 
     if (opt_proba)
-	bench_proba(state, c, len_p_min);
-
+	{
+	    if (len_p_min == -1)
+		{
+		    fprintf(stderr, "error: -lb is missing.\n");
+		    param_list_clear(pl);
+		    exit(EXIT_FAILURE);
+		}
+	    bench_proba(state, c, len_p_min);
+	}
     if (opt_time)
 	bench_time(state, c);
 

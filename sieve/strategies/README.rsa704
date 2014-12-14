@@ -49,12 +49,12 @@ cat ecm_b12_* > data_ecm_b12
 ./gfm -fch -fch_in data_ecm_b12 -fch_out data_ecm_b12_ch
 
 #bench our factoring methods
-./benchfm -in data_pm1_ch -p -t -out data_pm1_pt  &
-./benchfm -in data_pp1_27_ch -p -t -out data_pp1_27_pt  &
-./benchfm -in data_pp1_65_ch -p -t -out data_pp1_65_pt  &
-./benchfm -in data_ecm_b12_ch -p -t -out data_ecm_b12_pt  &
-./benchfm -in data_ecm_m12_ch -p -t -out data_ecm_m12_pt  &
-./benchfm -in data_ecm_m16_ch -p -t -out data_ecm_m16_pt
+./benchfm -in data_pm1_ch -p -t -lb 28 -out data_pm1_pt  &
+./benchfm -in data_pp1_27_ch -p -t -lb 28 -out data_pp1_27_pt  &
+./benchfm -in data_pp1_65_ch -p -t -lb 28 -out data_pp1_65_pt  &
+./benchfm -in data_ecm_b12_ch -p -t -lb 28 -out data_ecm_b12_pt  &
+./benchfm -in data_ecm_m12_ch -p -t -lb 28 -out data_ecm_m12_pt  &
+./benchfm -in data_ecm_m16_ch -p -t -lb 28 -out data_ecm_m16_pt
 
 #filtering step!  just to have few factoring methods (10 PM1, 10 PP1,
 #10 EC_M16, 10 EC_RC (curve B12 or M12))
