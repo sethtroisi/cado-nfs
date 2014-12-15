@@ -128,4 +128,6 @@ sieve/strategies/script_fm.sh
 sieve/strategies/script_mg.sh
 sieve/strategies/script_str.sh
 sieve/strategies/script_str_r.sh
+sieve/strategies/CMakeLists-nodist.txt
+sieve/strategies/test_strategy_cado.c
 linalg/bwc/lingen.txt

@@ -39,12 +39,4 @@ add_executable(gen_decomp
 
 target_link_libraries(gen_decomp m)
 
-add_executable(test_strategy_cado
-  test_strategy_cado.c
-  finding_good_strategy.c
-  generate_strategies.c
-  generate_factoring_method.c
-  ${SUF_UTILS}/decomp.c
-  ${SUF_UTILS}/tab_decomp.c
-  ${SRC_UTILS})
-target_link_libraries(test_strategy_cado ${LIB_EXEC} facul)
+include(CMakeLists-nodist.txt OPTIONAL)
