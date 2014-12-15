@@ -481,7 +481,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         sieve_info_print_fb_statistics(las, si, s);
         /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
         sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
-
+	//todo: dead code: if(){...}.clear me!
 	if (si->strategies == NULL)  /* no file was given. */
 	  {
 	    mpz_init (si->BB[s]);
@@ -505,6 +505,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	      facul_make_strategy(sc->sides[s]->lim, sc->sides[s]->lpb,
 				  sc->sides[s]->ncurves, 0);
 	  }
+	else
+	  si->sides[s]->strategy = NULL;
         reorder_fb(si, s);
 
         verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
@@ -571,9 +573,10 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
     si->j_div = NULL;
 
     for(int s = 0 ; s < 2 ; s++) {
-        facul_clear_strategy (si->sides[s]->strategy);
-        si->sides[s]->strategy = NULL;
-        sieve_info_clear_trialdiv(si, s);
+        if (si->sides[s]->strategy != NULL)
+	    facul_clear_strategy (si->sides[s]->strategy);
+	si->sides[s]->strategy = NULL;
+	sieve_info_clear_trialdiv(si, s);
         if (si == las->sievers) {
             free(si->sides[s]->fb);
             if (! si->sides[s]->fb_is_mmapped) {

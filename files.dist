@@ -609,7 +609,6 @@ sieve/README.descent
 sieve/basicnt.h
 sieve/bucket.c
 sieve/bucket.h
-sieve/isqrt.h
 sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
 sieve/ecm/ecm.c
