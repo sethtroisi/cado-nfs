@@ -85,7 +85,7 @@ static inline void
 list_mpz_sort_and_remove_dup (list_mpz_t l, const int verbose)
 {
   /* Sort list_k by increasing order */
-  qsort (l->tab, l->len, sizeof (mpz_t), (__compar_fn_t) mpz_cmp);
+  qsort (l->tab, l->len, sizeof (mpz_t), (int(*)(const void*,const void*)) mpz_cmp);
 
   /* Remove duplicates */
   uint64_t len = l->len;
