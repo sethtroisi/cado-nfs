@@ -19,6 +19,7 @@
 #include "portability.h"
 #include "mpz_poly.h"
 #include "area.h"
+#include "size_optimization.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
@@ -47,6 +48,7 @@ size_t keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
 int rseffort = DEFAULT_RSEFFORT; /* sieving effort, among 1-5 */
+unsigned int sopt_effort = SOPT_DEFAULT_EFFORT; /* size optimization effort */
 static unsigned long incr = DEFAULT_INCR;
 const char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
@@ -423,8 +425,12 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   mpz_clear (t);
 
   /* optimize size */
+  mpz_poly_t G;
+  G->deg = 1;
+  G->coeff = g;
+
   st = seconds_thread ();
-  optimize (F, g, verbose, 1);
+  size_optimization (F, G, F, G, sopt_effort, verbose);
   st = seconds_thread () - st;
   mutex_lock (&lock);
   optimize_time += st;
@@ -1935,6 +1941,9 @@ declare_usage(param_list pl)
   snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
             DEFAULT_RSEFFORT);
   param_list_decl_usage(pl, "rseffort", str);
+  snprintf (str, 200, "size-optimization effort ranging from 0 to %d "
+                      "(default %d)", SOPT_MAX_EFFORT, SOPT_DEFAULT_EFFORT);
+  param_list_decl_usage(pl, "sopt-effort", str);
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
   param_list_decl_usage(pl, "s", str);
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
@@ -2022,6 +2031,9 @@ main (int argc, char *argv[])
     fprintf (stderr, "Error, -rseffort should be in [1,10]\n");
     exit (1);
   }
+
+  /* size optimization effort that passed to size_optimization */
+  param_list_parse_uint (pl, "size-effort", &sopt_effort);
 
   param_list_parse_size_t (pl, "keep", &keep);
   /* initialize best norms */
