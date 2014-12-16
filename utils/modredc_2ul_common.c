@@ -430,7 +430,7 @@ mod_sprp (const residue_t b, const modulus_t m)
       po2 += LONG_BIT;
     }
   ASSERT (mm1[0] != 0UL);
-  i = ularith_clz (mm1[0]);
+  i = ularith_ctz (mm1[0]);
   mod_intshr (mm1, mm1, i);
   po2 += i;
 
@@ -474,7 +474,7 @@ mod_sprp2 (const modulus_t m)
       po2 += LONG_BIT;
     }
   ASSERT (mm1[0] != 0UL);
-  i = ularith_clz (mm1[0]);
+  i = ularith_ctz (mm1[0]);
   mod_intshr (mm1, mm1, i);
   po2 += i;
 
