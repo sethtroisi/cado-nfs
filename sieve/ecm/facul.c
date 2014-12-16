@@ -479,7 +479,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		    }
 		}
 	      //check if the method is already computed!
-	      methods[index_method].side = side;
 	      int index_prec_fm = 
 		get_index_method(strategies->precomputed_methods, B1, B2,
 				 method, curve, sigma);
@@ -525,7 +524,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	       */
 	      methods[index_method].method =
 		&strategies->precomputed_methods[index_prec_fm];
-	      
+	      methods[index_method].side = side;
 	      index_method++;
 	      ASSERT_ALWAYS (index_method < NB_MAX_METHODS);
 	      
@@ -733,14 +732,21 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       for (r = 0; r <= rmfb; r++)
 	for (a = 0; a <= amfb; a++) {
 	  int index = 0;
-	  for (int side  = 0; side < 2; side++) 
-	    for (int i = 0; i < ncurves[side] + 3; i++)
-	      {
-		methods[r][a][index].method =
-		  &strategies->precomputed_methods[i];
-		methods[r][a][index].side = side;
-		index++;
-	      }
+	  int first = (r < a);//begin by the largest cofactor.
+	  printf ("r = %d, a = %d, first = %d\n", r, a, first);
+	  for (int z  = 0; z < 2; z++)
+	    {
+	      int side = first ^ z;
+	      printf ("side = %d\n", side);
+	      for (int i = 0; i < ncurves[side] + 3; i++)
+		{
+		  methods[r][a][index].method =
+		    &strategies->precomputed_methods[i];
+		  methods[r][a][index].side = side;
+		  index++;
+		}
+	      getchar ();
+	    }
 	  //add NULL to show the end of the strategy.
 	  methods[r][a][index].method = NULL;
 	}

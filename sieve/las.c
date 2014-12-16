@@ -450,7 +450,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * each of them for the descent case.
      */
     const char *cofactfilename = param_list_lookup_string (pl, "file-cofact");
-    si->strategies = NULL;
     /*
      * We create our strategy book from the file given by
      * 'file-cofact'. Otherwise, we use a default strategy given by
@@ -475,9 +474,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
       }
     if (file != NULL)
       fclose (file);
-    //}
-    /* else /\* To show if we use a file of strategies or not! *\/ */
-    /* 	si->strategies = NULL; */
 
     
     for(int s = 0 ; s < 2 ; s++) {
@@ -493,6 +489,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	mpz_mul_ui (si->BBBB[s], si->BBB[s], lim);
 
 	//todo: unused code: if(){...}.
+	//{{
 	if (si->strategies == NULL) /* old cofactorization. */
 	  {
 	    /* The strategies also depend on the special-q used within the
@@ -508,8 +505,9 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	      facul_make_strategy(sc->sides[s]->lim, sc->sides[s]->lpb,
 				  sc->sides[s]->ncurves, 0);
 	  }
-	else
+	else //always in this case!
 	  si->sides[s]->strategy = NULL;
+	//}}
 	reorder_fb(si, s);
 
 	verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
@@ -2983,7 +2981,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) nr_sq_processed);
-    
+
     /*}}}*/
 
     //{{print the stats of the cofactorization.
