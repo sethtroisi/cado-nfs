@@ -37,7 +37,7 @@ class NonCopyable {
 
 /* Forward declaration so fb_general_entry can use it in constructors */
 template <int Nr_roots>
-class fb_entry_x_roots_s;
+class fb_entry_x_roots;
 
 /* A root modulo a prime power q. q is specified externally */
 struct fb_general_root {
@@ -92,7 +92,7 @@ public:
 
   fb_general_entry(){}
   template <int Nr_roots>
-  fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e);
+  fb_general_entry (const fb_entry_x_roots<Nr_roots> &e);
   void parse_line (const char *line, unsigned long linenr);
   void merge (const fb_general_entry &);
   void fprint(FILE *out) const;
@@ -149,13 +149,13 @@ public:
 /* "Simple" factor base entries. We imply q=p, k=1, oldexp=0, exp=1,
    and projective=false for all roots. */
 template <int Nr_roots>
-class fb_entry_x_roots_s {
+class fb_entry_x_roots {
 public:
   fbprime_t p;
   fbroot_t roots[Nr_roots];
-  fb_entry_x_roots_s(){};
+  fb_entry_x_roots(){};
   /* Allow assignment-construction from general entries */
-  fb_entry_x_roots_s(const fb_general_entry &e) {
+  fb_entry_x_roots(const fb_general_entry &e) {
     ASSERT_ALWAYS(Nr_roots == e.nr_roots);
     p = e.p;
     /* Should we assert is_simple() here for each root? */
@@ -168,11 +168,11 @@ public:
 
 
 template <int Nr_roots>
-class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> >, public fb_vector_interface {
+class fb_vector: public std::vector<fb_entry_x_roots<Nr_roots> >, public fb_vector_interface {
   public:
   fb_vector(){}
   /* FIXME: using size_type here does not work, why? */
-  fb_vector(size_t n) : std::vector<fb_entry_x_roots_s<Nr_roots> >(n){}
+  fb_vector(size_t n) : std::vector<fb_entry_x_roots<Nr_roots> >(n){}
   void append(const fb_general_entry &e){this->push_back(e);};
   void fprint(FILE *) const;
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;

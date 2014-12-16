@@ -79,7 +79,7 @@ fb_is_power (fbprime_t q, unsigned long *final_k)
 
 /* Allow assignment-construction of general entries from simple entries */
 template <int Nr_roots>
-fb_general_entry::fb_general_entry (const fb_entry_x_roots_s<Nr_roots> &e) {
+fb_general_entry::fb_general_entry (const fb_entry_x_roots<Nr_roots> &e) {
   p = q = e.p;
   k = 1;
   invq = compute_invq(q);
@@ -294,7 +294,7 @@ void fb_general_vector::fprint(FILE *out) const {
 
 template <int Nr_roots>
 void
-fb_entry_x_roots_s<Nr_roots>::transform_roots(fb_general_entry &result, qlattice_basis_srcptr basis) const
+fb_entry_x_roots<Nr_roots>::transform_roots(fb_general_entry &result, qlattice_basis_srcptr basis) const
 {
   result.p = p;
   result.q = p;
@@ -343,7 +343,7 @@ fb_vector<Nr_roots>::transform_roots(qlattice_basis_srcptr basis) const
 
 template <int Nr_roots>
 void
-fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out) const
+fb_entry_x_roots<Nr_roots>::fprint(FILE *out) const
 {
   fprintf(out, "%" FBPRIME_FORMAT ": ", p);
   for (size_t i = 0; i < Nr_roots; i++) {
