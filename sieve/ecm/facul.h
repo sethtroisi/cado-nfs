@@ -30,9 +30,6 @@
 typedef struct {
   long method; /* Which method to use (P-1, P+1 or ECM) */
   void *plan;  /* Parameters for that method */
-  int side; /* To know on which side this method will be apply! */
-  int is_the_last; /* To know if this method is the last on its side
-		      (used when you chain methods).  */
 } facul_method_t;
 
 
@@ -54,24 +51,26 @@ typedef struct {
 
 
 typedef struct {
-  int B1;
-  int B2;
-  int method;
-  void *plan;
-} precompute_plan_t;
-
+  facul_method_t* method;
+  int side; /* To know on which side this method will be apply! */
+  int is_the_last; /* To know if this method is the last on its side
+		      (used when you chain methods).  */
+}facul_method_side_t;
 
 typedef struct {
   unsigned long lpb[2];        /* Large prime bounds 2^lpb */
   double assume_prime_thresh[2]; /* The factor base bounds squared.
-                                We assume that primes <= fbb have already been 
-				removed, thus any factor <= assume_prime_thresh 
-				is  assumed prime without further test. */
+				    We assume that primes <= fbb have
+				    already been removed, thus any
+				    factor <= assume_prime_thresh is
+				    assumed prime without further
+				    test. */
   double BBB[2];               /* The factor base bounds cubed. */
   unsigned int mfb[2];        /* The cofactor bounds.*/
-  facul_method_t ***methods;  /* List of methods to try for each pair
-				 of cofactors.*/
-  precompute_plan_t* plan;    /* Optimisation for facul_make_strategies ().*/
+  facul_method_side_t ***methods;  /* List of methods to factor each pair
+				      of cofactors.*/
+  facul_method_t* precomputed_methods;  /* Optimization for
+					   facul_make_strategies ().*/
 
   facul_method_t* methods_aux;
 } facul_strategies_t;
