@@ -725,6 +725,27 @@ tests_mod_jacobi (int iter)
   mod_intclear (tr);
 }
 
+void test_sprp2()
+{
+#if MOD_MINBITS <= 65 &&  MOD_MAXBITS >= 65 && LONG_BIT == 64
+  /* 22626675434590779179 is a prime */
+  unsigned long p[2] = {4179931360881227563UL, 1};
+  modint_t pi;
+  modulus_t m;
+
+  mod_intinit(pi);
+  mod_intset_uls(pi, p, 2);
+  mod_initmod_int(m, pi);
+  mod_intclear(pi);
+
+  if (! mod_sprp2(m)) {
+    fprintf (stderr, "22626675434590779179 incorrectly declared composite by mod_sprp2()\n");
+    abort();
+  }
+  mod_clearmod(m);
+#endif
+}
+
 
 int main(int argc, const char **argv)
 {
@@ -759,6 +780,8 @@ int main(int argc, const char **argv)
   tests_mod_inv (iter);
   printf ("Testing mod_jacobi()\n");
   tests_mod_jacobi (iter);
+  printf ("Testing mod_sprp2()\n");
+  test_sprp2();
   tests_common_clear();
   return 0;
 }
