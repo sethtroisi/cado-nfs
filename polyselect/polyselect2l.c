@@ -455,21 +455,23 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   if (*logmu > max_opt_lognorm)
     max_opt_lognorm = *logmu;
 
-  /* MurphyE */
-  mpz_set (curr_poly->n, N);
-  curr_poly->rat->deg = 1;
-  mpz_set (curr_poly->rat->coeff[0], g[0]);
-  mpz_set (curr_poly->rat->coeff[1], g[1]);
-  curr_poly->alg->deg = F->deg;
-  for (j = d + 1; j -- != 0; )
-    mpz_set (curr_poly->alg->coeff[j], F->coeff[j]);
-  curr_poly->skew = skew;
-  *E = MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
-
-  if (*E > best_E)
+  if (!raw)
   {
-    best_E = *E;
-    cado_poly_set (best_poly, curr_poly);
+    /* MurphyE */
+    mpz_set (curr_poly->n, N);
+    curr_poly->rat->deg = 1;
+    mpz_set (curr_poly->rat->coeff[0], g[0]);
+    mpz_set (curr_poly->rat->coeff[1], g[1]);
+    curr_poly->alg->deg = F->deg;
+    for (j = d + 1; j -- != 0; )
+      mpz_set (curr_poly->alg->coeff[j], F->coeff[j]);
+    curr_poly->skew = skew;
+    *E = MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
+    if (*E > best_E)
+    {
+      best_E = *E;
+      cado_poly_set (best_poly, curr_poly);
+    }
   }
   mutex_unlock (&lock);
 
