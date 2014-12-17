@@ -33,6 +33,7 @@ extern void mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
 extern int mpz_fits_int64_p(mpz_srcptr);
 extern unsigned long ulong_nextprime (unsigned long);
 extern int ulong_isprime (unsigned long);
+extern void mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d);
 extern void mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d);
 extern int mpz_divisible_uint64_p (mpz_t a, uint64_t c);
 extern int mpz_coprime_p (mpz_t a, mpz_t b);
