@@ -30,6 +30,35 @@
 
 #define ROW /* each row represents a vector */
 
+void
+LLL_init (mat_Z *m, int nRows, int nCols)
+{
+  m->NumRows = nRows;
+  m->NumCols = nCols;
+  /* indices in the LLL code start at 1, thus we allocate one more row */
+  m->coeff = (mpz_t **) malloc ((m->NumRows + 1) * sizeof(mpz_t*));
+  ASSERT_ALWAYS (m->coeff != NULL);
+  for (int j = 1; j <= m->NumRows; j++)
+  {
+    m->coeff[j] = (mpz_t *) malloc ((m->NumCols + 1) * sizeof(mpz_t));
+    ASSERT_ALWAYS (m->coeff[j] != NULL);
+    for (int i = 1; i <= m->NumCols; i++)
+      mpz_init (m->coeff[j][i]);
+  }
+}
+
+void
+LLL_clear (mat_Z *m)
+{
+  for (int j = 1; j <= m->NumRows; j++)
+  {
+    for (int i = 1; i <= m->NumCols; i++)
+      mpz_clear (m->coeff[j][i]);
+    free (m->coeff[j]);
+  }
+  free (m->coeff);
+}
+
 static void
 ident (mat_Z X, long n)
 {

@@ -18,6 +18,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
+#include "size_optimization.h"
 #include "area.h"
 
 #define MAX_LINE_LENGTH 1024
@@ -34,6 +35,11 @@ int fake = 0;
 
 /* only use translation in optimization */
 int translate = 0;
+
+/* size optimization effort */
+unsigned int sopt_effort = SOPT_DEFAULT_EFFORT;
+
+int verbose = 0;
 
 /* 
    Care: poly_print is named in utils.h
@@ -169,11 +175,16 @@ opt_file (FILE *file, int deg, mpz_t N) {
       printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %f\n",
               logmu, alpha, logmu + alpha, nroots, skew);
 
+      mpz_poly_t G;
+      G->deg = 1;
+      G->coeff = g;
+
       /* optimize */
       if (translate)
         optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
       else
-        optimize (F, g, 0, 1);
+        //optimize (F, g, 0, 1);
+        size_optimization (F, G, F, G, sopt_effort, verbose);
 
       /* output size-optimized polynomials */
       nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
@@ -226,7 +237,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 */
 static void
 usage (void) {
-  fprintf (stdout, "Usage: polyopt [--fake] [--translate] [--lll] -f POLYFILE -d DEGREE -n NUMBER\n");
+  fprintf (stdout, "Usage: sopt [-v] [--fake] [--translate] -f POLYFILE -d DEGREE -n NUMBER\n");
   exit(1);
 }
 
@@ -246,6 +257,7 @@ int main (int argc, char **argv)
   if (argc == 1) usage();
   param_list pl;
   param_list_init (pl);
+  param_list_configure_switch (pl, "-v", &verbose);
   param_list_configure_switch (pl, "--fake", &fake);
   param_list_configure_switch (pl, "--translate", &translate);
 
@@ -271,6 +283,9 @@ int main (int argc, char **argv)
   
   /* parse poly filename */
   filename = param_list_lookup_string (pl, "f");
+
+  /* parse size optimization effort that passed to size_optimization */
+  param_list_parse_uint (pl, "size-effort", &sopt_effort);
 
   /* print out commands */
   verbose_interpret_parameters(pl);

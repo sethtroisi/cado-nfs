@@ -1488,6 +1488,13 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N M
           while (p <= fbb) {
               if (bucket_prime_stats) nr_div_tests++;
               if (LIKELY(mpz_divisible_ui_p (norm, p))) {
+                  // FIXME: This is very tempting to just skip
+                  // this block for small sizes. For large factorization
+                  // this will create failed assertions, though...
+                  // So, you might comment the following line, but
+                  // proceed at your own risk:
+                  //
+                  // break;
                   int isprime;
                   modulusul_t m; 
                   modul_initmod_ul (m, p);
@@ -1847,6 +1854,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             /* Since the q-lattice is exactly those (a, b) with
                a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
             /* FIXME: fast divisibility test here! */
+            /* Dec 2014: on a c90, it takes 0.1 % of total sieving time*/
             if (b == 0 || (mpz_cmp_ui(si->doing->p, b) <= 0 && b % mpz_get_ui(si->doing->p) == 0))
                 continue;
 

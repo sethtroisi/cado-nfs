@@ -39,8 +39,6 @@ Y2: -205964131819700
   - Tell the script to use your polynomial file:
     tasks.polyselect.admax = 0
     tasks.polyselect.import = /my/wonderful/path/c59.poly
-  - Tell the script to use your relation file:
-    tasks.sieve.import = /my/wonderful/path/rels
   - Add the following to have characters also on the "rational" side:
     tasks.linalg.characters.nratchars = 25
 

@@ -89,12 +89,21 @@ random_integer (modint_t z)
 
 
 static void
-mod_setint_mpz (mpz_t r, const modint_t s)
+mpz_set_modint (mpz_t r, const modint_t s)
 {
   mpz_import (r, MOD_SIZE, -1, sizeof (unsigned long), 0, 0, s);
 }
 
 
+static inline void
+mod_intset_mpz (modint_t r, const mpz_t s)
+{
+  unsigned long t[MOD_SIZE];
+  size_t written;
+  mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, s);
+  ASSERT_ALWAYS(written <= MOD_SIZE);
+  mod_intset_uls(r, t, written);
+}
 
 static void
 test_mod_intmod (const modint_t la, const modint_t lm)
@@ -110,10 +119,10 @@ test_mod_intmod (const modint_t la, const modint_t lm)
   mpz_init (mr);
   mpz_init (ms);
 
-  mod_setint_mpz (mm, lm);
-  mod_setint_mpz (ma, la);
+  mpz_set_modint (mm, lm);
+  mpz_set_modint (ma, la);
   mpz_mod (mr, ma, mm);
-  mod_setint_mpz (ms, s);
+  mpz_set_modint (ms, s);
 
   if (mpz_cmp (mr, ms) != 0)
     {
@@ -189,10 +198,10 @@ test_mod_set_int(const modint_t la, const modint_t lm)
   mpz_init (ma);
   mpz_init (mr);
   mpz_init (ms);
-  mod_setint_mpz (mm, lm);
-  mod_setint_mpz (ma, la);
+  mpz_set_modint (mm, lm);
+  mpz_set_modint (ma, la);
   mpz_mod (mr, ma, mm);
-  mod_setint_mpz (ms, s);
+  mpz_set_modint (ms, s);
 
   if (mpz_cmp (mr, ms) != 0)
     {
@@ -311,11 +320,11 @@ tests_mod_divn(const int iter, const unsigned long n)
   for (i = 0; i < MOD_SIZE; i++)
     tm[i] = ULONG_MAX;
   limit_modulus (tm);
-  mod_setint_mpz (mod, tm);
+  mpz_set_modint (mod, tm);
   while (mpz_divisible_ui_p (mod, n))
     {
       tm[0] = ULONG_MAX - 2UL;
-      mod_setint_mpz (mod, tm);
+      mpz_set_modint (mod, tm);
     }
 
   for (i = 0; i < 100; i++) /* Test i/n and (m-i)/n for i=0, ..., 99 */
@@ -331,7 +340,7 @@ tests_mod_divn(const int iter, const unsigned long n)
     {
       do {
 	random_modulus (tm);
-	mod_setint_mpz (mod, tm);
+	mpz_set_modint (mod, tm);
       } while (mpz_divisible_ui_p (mod, n));
 
       /* Test 0, 1 and -1 residue */
@@ -375,9 +384,9 @@ test_mod_gcd (const modint_t la, const modint_t lm)
   mpz_init (mr);
   mpz_init (mm);
   mpz_init (mt);
-  mod_setint_mpz (mm, lm); /* modulus */
-  mod_setint_mpz (ma, la); /* input */
-  mod_setint_mpz (mt, lt); /* gcd */
+  mpz_set_modint (mm, lm); /* modulus */
+  mpz_set_modint (ma, la); /* input */
+  mpz_set_modint (mt, lt); /* gcd */
   mpz_gcd (mr, ma, mm);    /* re-compute gcd */
   if (mpz_cmp (mr, mt) != 0)
     {
@@ -451,9 +460,9 @@ test_mod_pow_ul (const modint_t la, const modint_t lm,
   mpz_init (ma);
   mpz_init (mr);
   mpz_init (mt);
-  mod_setint_mpz (mm, lm); /* modulus */
-  mod_setint_mpz (ma, la); /* input */
-  mod_setint_mpz (mt, lt);  /* result of modul function */
+  mpz_set_modint (mm, lm); /* modulus */
+  mpz_set_modint (ma, la); /* input */
+  mpz_set_modint (mt, lt);  /* result of modul function */
   
   mpz_powm_ui (mr, ma, e, mm);
   if (mpz_cmp (mr, mt) != 0)
@@ -524,9 +533,9 @@ test_mod_2pow_ul (const modint_t lm, const unsigned long e)
   mpz_init (mr);
   mpz_init (mt);
   mpz_init (m2);
-  mod_setint_mpz (mm, lm); /* modulus */
+  mpz_set_modint (mm, lm); /* modulus */
   mpz_set_ui (m2, 2UL);
-  mod_setint_mpz (mt, lt);  /* result of mod_2pow_ul() */
+  mpz_set_modint (mt, lt);  /* result of mod_2pow_ul() */
   
   mpz_powm_ui (mr, m2, e, mm);
   if (mpz_cmp (mr, mt) != 0)
@@ -592,9 +601,9 @@ test_mod_inv (const modint_t la, const modint_t lm)
   mpz_init (mr);
   mpz_init (mm);
   mpz_init (mt);
-  mod_setint_mpz (ma, la);
-  mod_setint_mpz (mm, lm);
-  mod_setint_mpz (mt, lt);
+  mpz_set_modint (ma, la);
+  mpz_set_modint (mm, lm);
+  mpz_set_modint (mt, lt);
   ok2 = mpz_invert (mr, ma, mm) ? 1 : 0;
 
   if (ok1 != ok2)
@@ -674,8 +683,8 @@ test_mod_jacobi (const modint_t la, const modint_t lm)
   
   mpz_init (ma);
   mpz_init (mm);
-  mod_setint_mpz (ma, la);
-  mod_setint_mpz (mm, lm);
+  mpz_set_modint (ma, la);
+  mpz_set_modint (mm, lm);
   j2 = mpz_jacobi (ma, mm);
 
   if (j1 != j2)
@@ -725,6 +734,52 @@ tests_mod_jacobi (int iter)
   mod_intclear (tr);
 }
 
+#if MOD_MINBITS <= 65 &&  MOD_MAXBITS >= 65 && LONG_BIT == 64
+void test_sprp(const mpz_t n, const int is_prime)
+{
+  const char *prime_str[2] = {"composite", "prime"};
+  modint_t ni;
+  modulus_t m;
+
+  mod_intinit(ni);
+  mod_intset_mpz(ni, n);
+  mod_initmod_int(m, ni);
+  mod_intclear(ni);
+
+  if (mod_sprp2(m) != is_prime) {
+    gmp_fprintf (stderr, "%Zd incorrectly declared %s by mod_sprp2()\n",
+                 n, prime_str[!is_prime]);
+    abort();
+  }
+
+  for (unsigned long b = 2; b < 10; b++) {
+    residue_t r;
+    mod_init(r, m);
+    mod_set_ul(r, b, m);
+    if (mod_sprp(r, m) != is_prime) {
+      gmp_fprintf (stderr, "%Zd incorrectly declared %s by mod_sprp(%lu)\n",
+              n, prime_str[!is_prime], b);
+      abort();
+    }
+    mod_clear(r, m);
+  }
+  mod_clearmod(m);
+}
+#endif
+
+void tests_sprp()
+{
+#if MOD_MINBITS <= 65 &&  MOD_MAXBITS >= 65 && LONG_BIT == 64
+  mpz_t n;
+  mpz_init(n);
+  mpz_set_str(n, "22626675434590779179", 10); /* a prime */
+  test_sprp(n, 1);
+  mpz_set_str(n, "22626675434590779197", 10); /* a composite */
+  test_sprp(n, 0);
+  mpz_clear(n);
+#endif
+}
+
 
 int main(int argc, const char **argv)
 {
@@ -759,6 +814,8 @@ int main(int argc, const char **argv)
   tests_mod_inv (iter);
   printf ("Testing mod_jacobi()\n");
   tests_mod_jacobi (iter);
+  printf ("Testing mod_sprp2()\n");
+  tests_sprp();
   tests_common_clear();
   return 0;
 }
