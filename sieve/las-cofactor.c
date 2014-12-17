@@ -33,6 +33,7 @@
    (f) B^3 < n < B^2*L: r1 or q1*r2 or r1*r2 or q1*q2*q3
    (g) B^2*L < n < L^3: r1 or q1*r2 or r1*r2
    (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
+                        -> cannot yield a relation
 */
 int
 check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
