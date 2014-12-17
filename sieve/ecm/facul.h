@@ -51,6 +51,10 @@ typedef struct {
   facul_method_t *methods;  /* List of methods to try */
 } facul_strategy_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 
 typedef struct {
@@ -123,5 +127,8 @@ modset_clear (modset_t *modset);
 int*
 facul_both (unsigned long**, mpz_t* ,
 	    const facul_strategies_t *, int*);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FACUL_H */
