@@ -12,10 +12,18 @@ typedef struct {
   int kb;
 } root_struct;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *R);
 double rootRefine (root_struct *r, mpz_t *p, int n, double precision);
 void root_struct_init (root_struct *R);
 void root_struct_clear (root_struct *R);
 int mpz_poly_mpz_roots (mpz_t *r, mpz_poly_t p);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* USP_H_ */
