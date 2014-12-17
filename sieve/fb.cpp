@@ -479,7 +479,7 @@ fb_part::append(const fb_general_entry &fb_cur)
 
   /* Simple ones go in the simple vector with the corresponding number of
      roots */
-  choose(fb_cur.nr_roots)->append(fb_cur);
+  get_slices(fb_cur.nr_roots)->append(fb_cur);
 }
 
 void
@@ -488,7 +488,7 @@ fb_part::fprint(FILE *out) const
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
       fprintf(out, "#   Entries with %d roots:\n", i_roots);
-      choose(i_roots)->fprint(out);
+      get_slices(i_roots)->fprint(out);
     }
   }
 
@@ -503,7 +503,7 @@ fb_part::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
-      choose(i_roots)->count_entries(nprimes, nroots, weight);
+      get_slices(i_roots)->count_entries(nprimes, nroots, weight);
   }
   general_vector.count_entries(nprimes, nroots, weight);  
 }

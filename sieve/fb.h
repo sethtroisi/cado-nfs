@@ -230,8 +230,12 @@ class fb_part: public fb_interface, private NonCopyable {
   fb_slices<9> *fb9_slices;
   fb_slices<10> *fb10_slices;
   fb_general_vector general_vector;
-  fb_slices_interface *choose(const unsigned int n) const {
+  fb_slices_interface *get_slices(const unsigned int n) const {
     ASSERT_ALWAYS(n <= MAXDEGREE);
+    
+    if (only_general)
+     return NULL;
+    
     switch (n) {
       case 0: return fb0_slices;
       case 1: return fb1_slices;
@@ -264,7 +268,7 @@ public:
   }
   fb_general_vector *get_general_vector(){return &general_vector;}
   fb_vector_interface *get_n_roots_vector(const int n, const size_t slice) {
-    return choose(n)->get_vector(slice);
+    return get_slices(n)->get_vector(slice);
   }
 };
 
