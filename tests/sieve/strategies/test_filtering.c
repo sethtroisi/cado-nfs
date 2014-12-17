@@ -55,7 +55,7 @@ int main ()
 	}
     fm_free (fm);
     tabular_fm_t* res = filtering (tab, final_nb_fm);
-    tabular_fm_print (res);
+    //tabular_fm_print (res);
     int err = 0;
     if (!check_filt (res, nb_fm))
 	err = 1;

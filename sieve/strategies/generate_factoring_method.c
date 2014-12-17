@@ -841,7 +841,7 @@ tabular_fm_t *filtering(tabular_fm_t * tab, int final_nb_methods)
     //sort the pairs of methods according to the dist!
     int nb_pair = (nb_methods-1)*(nb_methods)/2;
     int sort_dist[nb_pair][2];
-    //todo: improve this method! For now, it's a naive method
+    //todo: improve this method! For now, it's a naive method.
     int k = 0;
     while (k < nb_pair) {
 	int i_min = -1;
