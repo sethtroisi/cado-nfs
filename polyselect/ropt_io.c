@@ -8,6 +8,7 @@
 #include "ropt_io.h"
 #include "ropt.h"
 #include "portability.h"
+#include "size_optimization.h"
 
 /**
  * Get L1 cache size in the beginning.
@@ -93,17 +94,20 @@ ropt_common ( ropt_poly_t poly,
   /* if sopt and not from -fm */
   if (fm==0) {
     if (param->sopt) {
-      mpz_poly_t F2;
+      mpz_poly_t F2, G2;
       mpz_poly_init (F2, poly->d);
-      F2->deg = poly->d;
-      for (int j = 0; j <= poly->d; j++)
-        mpz_set (F2->coeff[j], poly->f[j]);
-      optimize (F2, poly->g, 0, 1);
+      mpz_poly_init (G2, 1);
+      mpz_poly_setcoeffs (F2, poly->f, poly->d);
+      mpz_poly_setcoeffs (G2, poly->g, 1);
+      size_optimization (F2, G2, F2, G2, SOPT_DEFAULT_EFFORT, 0);
       fprintf (stderr, "\n# Size-optimized polynomial.\n");
-      print_poly_fg (F2, poly->g, poly->n, 1);
+      print_poly_fg (F2, G2->coeff, poly->n, 1);
       for (int j = 0; j <= poly->d; j++)
         mpz_set (poly->f[j], F2->coeff[j]);
+      mpz_set (poly->g[0], G2->coeff[0]);
+      mpz_set (poly->g[1], G2->coeff[1]);
       mpz_poly_clear (F2);
+      mpz_poly_clear (G2);
     }
   }
   
@@ -420,36 +424,39 @@ ropt_on_msievepoly ( FILE *file,
       Lemma21 (poly->f, poly->n, poly->d, l, m, res);
     }
 
-    mpz_poly_t F;
+    mpz_poly_t F, G;
     mpz_poly_init (F, poly->d);
-    F->deg = poly->d;
-    for (int j = 0; j <= poly->d; j++)
-      mpz_set (F->coeff[j], poly->f[j]);
+    mpz_poly_init (G, 1);
+    mpz_poly_setcoeffs (F, poly->f, poly->d);
+    mpz_poly_setcoeffs (G, poly->g, 1);
 
     /* print before size optimization */
     fprintf (stderr, "\n# Polynomial (# %5d).", count);
-    print_poly_fg (F, poly->g, poly->n, 1);
+    print_poly_fg (F, G->coeff, poly->n, 1);
 
     /* optimize size */
     if (param->sopt) {
       fprintf (stderr, "\n# Size-optimize only (# %5d).", count);
-      optimize (F, poly->g, 0, 1);
+      size_optimization (F, G, F, G, SOPT_DEFAULT_EFFORT, 0);
 
       /* print in Msieve format */
       // print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
 
       /* print in CADO format */
-      print_poly_fg (F, poly->g, poly->n, 1);
+      print_poly_fg (F, G->coeff, poly->n, 1);
     }
     
     /* skip or do ropt */
     if (param->skip_ropt == 0 && param->gen_raw == 0) {
       for (int j = 0; j <= poly->d; j++)
         mpz_set (poly->f[j], F->coeff[j]);
+      mpz_set (poly->g[0], G->coeff[0]);
+      mpz_set (poly->g[1], G->coeff[1]);
       ropt_common (poly, param, 1);
     }
 
     mpz_poly_clear (F);
+    mpz_poly_clear (G);
     count ++;
   }
 
