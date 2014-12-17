@@ -676,6 +676,14 @@ fb_log_2 (fbprime_t n)
 }
 
 
+unsigned char
+fb_log (double n, double log_scale, double offset)
+{
+  const long l = floor (log (n) * log_scale + offset + 0.5);
+  return static_cast<unsigned char>(l);
+}
+
+
 /* Make one factor base entry for a linear polynomial poly[1] * x + poly[0]
    and the prime (power) q. We assume that poly[0] and poly[1] are coprime.
    Non-projective roots a/b such that poly[1] * a + poly[0] * b == 0 (mod q)
