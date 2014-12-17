@@ -542,6 +542,14 @@ int mpz_poly_normalized_p (mpz_poly_srcptr f)
 
 /* -------------------------------------------------------------------------- */
 
+/* Set f=-g.
+   Note: f can be the same as g. */
+void mpz_poly_neg (mpz_poly_ptr f, mpz_poly_srcptr g) {
+  mpz_poly_realloc(f, g->deg + 1);
+  for (int i = 0 ; i <= g->deg ; i++) {
+    mpz_neg (f->coeff[i], g->coeff[i]);
+  }
+}
 
 /* Set f=g+h.
    Note: f can be the same as g or h;
