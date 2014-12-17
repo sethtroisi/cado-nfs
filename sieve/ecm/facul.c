@@ -287,27 +287,50 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
 /*                       STRATEGY BOOK                                       */
 /*****************************************************************************/
 
-/*If the plan is already precomputed and stored at the index i, return
-  i. Otherwise return the last index of tab to compute and add this
-  new plan at this index!*/
+/*
+ * If the plan is already precomputed and stored at the index i, return
+ * i. Otherwise return the last index of tab to compute and add this new
+ * plan at this index!
+ */
 static int
-get_index_plan (precompute_plan_t*tab, int B1, int B2,
-		int method, int parameterization, unsigned long sigma)
+get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
+		  int method, int parameterization, unsigned long sigma)
 {
   int i = 0;
-  while (tab[i].plan != NULL){
-    if (tab[i].B1 == B1 && tab[i].B2 == B2 && tab[i].method == method)
-      {
-	if (method == EC_METHOD)
-	  {
-	    ecm_plan_t* plan = (ecm_plan_t*)tab[i].plan;
-	    if (plan->parameterization ==  parameterization
-		&& plan->sigma == sigma)
-	      break;
-	  }
-	else
-	  break;
-      }
+  while (tab[i].method != 0){
+    if (tab[i].plan == NULL){
+      if(B1 == 0 && B2 == 0)
+	//zero method!
+	break;
+      else
+	{
+	  i++;
+	  continue;
+	}
+    }
+    else if (tab[i].method == method) {
+      if (method == PM1_METHOD)
+	{
+	  pm1_plan_t* plan = (pm1_plan_t*)tab[i].plan;
+	  if (plan->B1 == B1 && plan->stage2.B2 == B2)
+	    break;
+	}
+      else if (method == PP1_27_METHOD ||
+	       method == PP1_65_METHOD)
+	{
+	  pp1_plan_t* plan = (pp1_plan_t*)tab[i].plan;
+	  if (plan->B1 == B1 && plan->stage2.B2 == B2)
+	    break;
+	}
+      else if (method == EC_METHOD)
+	{
+	  ecm_plan_t* plan = (ecm_plan_t*)tab[i].plan;
+	  if (plan->B1 == B1 && plan->stage2.B2 == B2 &&
+	      plan->parameterization == parameterization
+	      && plan->sigma == sigma)
+	    break;
+	}
+    }
     i++;
   }
   return i;
@@ -345,7 +368,9 @@ return_data_ex (char** res, regmatch_t *pmatch, size_t nmatch,
     }
 }
 
-
+/*
+ * process one line of our strategy file to collect our strategy book!
+ */
 static int
 process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      const char *str, const int verbose)
@@ -382,6 +407,8 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	  /* re-init the value of sigma */
 	  SIGMA[0] = 2;
 	  SIGMA[1] = 2;
+	  //todo: change it to add it in the parameters of our function.
+	  //maybe unused if you use only one curve B12 by strategy.
 	  is_first_brent12[0] = true;
 	  is_first_brent12[1] = true;
 	}
@@ -398,119 +425,111 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		  index_st[1] > strategies->mfb[1])
 		return 0;
 	      
-	      facul_method_t* methods =
+	      facul_method_side_t* methods =
 		strategies->methods[index_st[0]][index_st[1]];
 
-	      //todo: remove the words ALG and RAT!!!//S0 or S1
-	      if (strcmp (res[0], "ALG") == 0 || strcmp (res[0], "S1") == 0)
-		{
-		  side = 1;
-		}
-	      else if (strcmp (res[0], "RAT") == 0 || strcmp(res[0], "S0") == 0)
-		{
-		  side = 0;
-		}
+	      if (strcmp (res[0], "S1") == 0)
+		side = 1;
+	      else if (strcmp(res[0], "S0") == 0)
+		side = 0;
 	      else 
-		{
-		  side = atoi(res[0]);
-		}
-	      int B1 = atoi (res[2]);
-	      int B2 = atoi (res[3]);
+		side = atoi(res[0]);
+
+	      unsigned int B1 = (unsigned int) atoi (res[2]);
+	      unsigned int B2 = (unsigned int) atoi (res[3]);
 	      unsigned long sigma = 0;
 	      int curve = 0;
-	      if ( B1 == 0 || B2 == 0)//This is the zero strategy
+	      int method = 0;
+	      //method
+	      if (strcmp (res[1], "PM1") == 0)
+		method = PM1_METHOD;
+	      else if (strcmp (res[1], "PP1-27") == 0)
+		method = PP1_27_METHOD;
+	      else if (strcmp (res[1], "PP1-65") == 0)
+		method = PP1_65_METHOD;
+	      else 
 		{
-		  methods[index_method].method = PM1_METHOD;
-		  methods[index_method].side = side;
-		  methods[index_method].plan = NULL;
+		  method = EC_METHOD;
+		  //curve
+		  if (strcmp (res[1], "ECM-B12") == 0)
+		    curve = BRENT12;
+		  else if (strcmp (res[1], "ECM-M12") == 0)
+		    curve = MONTY12;
+		  else if (strcmp (res[1], "ECM-M16") == 0)
+		    curve = MONTY16;
+		  else
+		    {
+		      fprintf (stderr,
+			       "error : the method '%s' is unknown!\n",
+			       res[1]);
+		      return -1;
+		    }
+		  //sigma!
+		  if (curve == MONTY16)
+		    sigma = 1;
+		  else
+		    {
+		      if (curve == BRENT12 && is_first_brent12[side])
+			{
+			  sigma = 11;
+			  is_first_brent12[side] = false;
+			}
+		      else
+			sigma = SIGMA[side]++;
+		    }
 		}
-	      else
+	      //check if the method is already computed!
+	      int index_prec_fm = 
+		get_index_method(strategies->precomputed_methods, B1, B2,
+				 method, curve, sigma);
+	      if ( strategies->precomputed_methods[index_prec_fm].method == 0)
 		{
-		  if (strcmp (res[1], "PM1") == 0)
-		    methods[index_method].method = PM1_METHOD;
-		  else if (strcmp (res[1], "PP1-27") == 0)
-		    methods[index_method].method = PP1_27_METHOD;
-		  else if (strcmp (res[1], "PP1-65") == 0)
-		    methods[index_method].method = PP1_65_METHOD;
-		  else 
-		    {
-		      methods[index_method].method = EC_METHOD;
-		      if (strcmp (res[1], "ECM-B12") == 0)
-			curve = BRENT12;
-		      else if (strcmp (res[1], "ECM-M12") == 0)
-			curve = MONTY12;
-		      else if (strcmp (res[1], "ECM-M16") == 0)
-			curve = MONTY16;
-		      else
-			{
-			  fprintf (stderr,
-				   "error : the method '%s' is unknown!\n",
-				   res[1]);
-			  return -1;
-			}
-		      //sigma!
-		      if (curve == MONTY16)
-			sigma = 1;
-		      else
-			{
-			  if (curve == BRENT12 && is_first_brent12[side])
-			    {
-			      sigma = 11;
-			      is_first_brent12[side] = false;
-			    }
-			  else
-			    sigma = SIGMA[side]++;
-			}
+		  /*
+		   * The current method isn't already precomputed. So
+		   * we will compute and store it.
+		   */
+		  void* plan = NULL;
+		  if (B1 == 0 && B2 == 0)
+		    { //zero method!
+		      plan = NULL;
+		      method = PM1_METHOD;//default value.
 		    }
-		  //search if the plan isn't already computed!
-		  methods[index_method].side = side;
-		  int index_plan =get_index_plan(strategies->plan, B1, B2,
-						 methods[index_method].method,
-						 curve, sigma); 
-
-		  if ( strategies->plan[index_plan].plan == NULL)
+		  else if (method == PM1_METHOD)
 		    {
-		      //the plan isn't already precomputed!
-		      void* plan = NULL;
-		      if (methods[index_method].method == PM1_METHOD)
-			{
-			  plan = malloc (sizeof (pm1_plan_t));
-			  pm1_make_plan (plan, B1, B2, verbose);
-			}
-		      else if (methods[index_method].method == PP1_27_METHOD ||
-			       methods[index_method].method == PP1_65_METHOD)
-			{
-			  plan = malloc (sizeof (pp1_plan_t));
-			  pp1_make_plan (plan, B1, B2, verbose);
-			}
-		      else {
-			plan = malloc (sizeof (ecm_plan_t));
-
-			ecm_make_plan (plan,
-				       B1,B2, curve, sigma, 1, verbose);
-		      }
-		      strategies->plan[index_plan].method =
-			methods[index_method].method;
-		      strategies->plan[index_plan].B1 = B1;
-		      strategies->plan[index_plan].B2 = B2;
-		      strategies->plan[index_plan].plan = plan;
-
-		      ASSERT (index_plan+1 < NB_MAX_METHODS);
-		      //to show the end of plan!
-		      strategies->plan[index_plan+1].plan = NULL;
-		      strategies->plan[index_plan+1].B1 = 0;
-		      strategies->plan[index_plan+1].B2 = 0;
-		      strategies->plan[index_plan+1].method = 0;
+		      plan = malloc (sizeof (pm1_plan_t));
+		      pm1_make_plan (plan, B1, B2, verbose);
 		    }
-		  methods[index_method].plan =
-		    strategies->plan[index_plan].plan;
+		  else if (method == PP1_27_METHOD ||
+			   method == PP1_65_METHOD)
+		    {
+		      plan = malloc (sizeof (pp1_plan_t));
+		      pp1_make_plan (plan, B1, B2, verbose);
+		    }
+		  else { //method == EC_METHOD
+		    plan = malloc (sizeof (ecm_plan_t));
+		    ecm_make_plan (plan,
+				   B1, B2, curve, sigma, 1, verbose);
+		  }
+		  strategies->precomputed_methods[index_prec_fm].method =method;
+		  strategies->precomputed_methods[index_prec_fm].plan = plan;
+		  
+		  ASSERT_ALWAYS (index_prec_fm+1 < NB_MAX_METHODS);
+		  //to show the end of plan!
+		  strategies->precomputed_methods[index_prec_fm+1].plan = NULL;
+		  strategies->precomputed_methods[index_prec_fm+1].method = 0;
 		}
+	      /* 
+	       * Add this method to the current strategy
+	       * methods[index_st[0]][index_st[1]]. 
+	       */
+	      methods[index_method].method =
+		&strategies->precomputed_methods[index_prec_fm];
+	      methods[index_method].side = side;
 	      index_method++;
 	      ASSERT_ALWAYS (index_method < NB_MAX_METHODS);
-
+	      
 	      //to show the end of methods!
-	      methods[index_method].plan = NULL;
-	      methods[index_method].method = 0;
+	      methods[index_method].method = NULL;
 	    }
 	  else//to end the while
 	    {
@@ -524,20 +543,20 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
       free(res);
       free (pmatch);
     }
-
+  
   regfree(&preg_index);
   regfree(&preg_fm);
   return 0;
 }
 
 /*
-This function generates a chain of 'n' ecm used to the auxiliary
-cofactorisation.
+ * This function generates a chain of 'n' ecm used to the auxiliary
+ * cofactorization.
  */
 facul_method_t*
 facul_make_aux_methods (int n, const int verbose)
 {
-  if (n == 0)
+  if (n <= 0)
     n = 30;//nb_curves
 
   facul_method_t *methods = malloc ((n+1) * sizeof (facul_method_t));
@@ -575,6 +594,64 @@ facul_make_aux_methods (int n, const int verbose)
   return methods;
 }
 
+/*
+  Make a simple strategy for factoring. We start with
+  P-1 and P+1 (with x0=2/7), then an ECM curve with low bounds, then
+  a bunch of ECM curves with larger bounds. How many methods to do in
+  total is controlled by the n parameter: P-1, P+1 and the first ECM
+  curve (with small bounds) are always done, then n ECM curves (with
+  larger bounds).
+  This function is used when you don't give a strategy file.
+*/
+
+facul_method_t*
+facul_make_default_strategy (int n, const int verbose)
+{
+  ASSERT_ALWAYS (n >= 0);
+  facul_method_t *methods = malloc ((n+4) * sizeof (facul_method_t));
+  
+  /* run one P-1 curve with B1=315 and B2=2205 */
+  methods[0].method = PM1_METHOD;
+  methods[0].plan = malloc (sizeof (pm1_plan_t));
+  pm1_make_plan (methods[0].plan, 315, 2205, verbose);
+
+  /* run one P+1 curve with B1=525 and B2=3255 */
+  methods[1].method = PP1_27_METHOD;
+  methods[1].plan = malloc (sizeof (pp1_plan_t));
+  pp1_make_plan (methods[1].plan, 525, 3255, verbose);
+
+  /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
+  methods[2].method = EC_METHOD;
+  methods[2].plan = malloc (sizeof (ecm_plan_t));
+  ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
+
+  methods[3].method = EC_METHOD;
+  methods[3].plan = malloc (sizeof (ecm_plan_t));
+  ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+
+  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
+  double B1 = 105.0;
+  for (int i = 4; i < n + 3; i++)
+    {
+      double B2;
+      unsigned int k;
+
+      B1 += sqrt (B1);
+      B2 = 17.0 * B1;
+      /* we round B2 to (2k+1)*105, thus k is the integer nearest to
+	 B2/210-0.5 */
+      k = B2 / 210.0;
+      methods[i].method = EC_METHOD;
+      methods[i].plan = malloc (sizeof (ecm_plan_t));
+      ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+		     MONTY12, i - 1, 1, 0);
+    }
+
+  methods[n+3].method = 0;
+  methods[n+3].plan = NULL;
+  return methods;
+}
+
 
 void 
 facul_clear_aux_methods (facul_method_t *methods)
@@ -601,16 +678,16 @@ facul_clear_aux_methods (facul_method_t *methods)
 }
 
 
-
+/*
+ * Create our strategy book from a file (if a file is given :) ) and
+ * otherwise from our default strategy.
+ */
 facul_strategies_t*
 facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      const unsigned int rmfb, const unsigned long afbb,
 		      const unsigned int alpb, const unsigned int amfb,
 		      FILE* file, const int verbose)
 {
-  if (file == NULL)
-    return NULL;
-
   //printf ("create strategies!\n");
   facul_strategies_t* strategies = malloc (sizeof(facul_strategies_t));
   ASSERT (strategies != NULL);
@@ -627,48 +704,80 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   strategies->BBB[1] = (double) afbb * strategies->assume_prime_thresh[1];
 
   //alloc methods!
-  facul_method_t*** methods = malloc (sizeof (*methods) * (rmfb+1));
+  facul_method_side_t*** methods = malloc (sizeof (*methods) * (rmfb+1));
   unsigned int r, a;
+  //init methods!
   for (r = 0; r <= rmfb; r++) {
     methods[r] = malloc (sizeof (*methods[r]) * (amfb+1));
     ASSERT (methods[r] != NULL);
     for (a = 0; a <= amfb; a++)
       {
-	methods[r][a] = malloc (NB_MAX_METHODS * sizeof (facul_method_t));
+	methods[r][a] = malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
 	ASSERT (methods[r][a] != NULL);
-	methods[r][a][0].method = 0;
-	methods[r][a][0].plan = NULL;
+	methods[r][a][0].method = NULL;
       }
   }
-  /* to precompute our method */
-  precompute_plan_t* plan = malloc (sizeof(precompute_plan_t)*NB_MAX_METHODS);
-  plan[0].method = 0;
-  plan[0].plan = NULL;
-
-  strategies->plan = plan;
   strategies->methods = methods;
-  unsigned int index_strategies[2] = {0,0};
-
-  char line[10000];
-
-  fseek (file, 0, SEEK_SET);
-  while (fgets (line, sizeof(line), file) != NULL)
-    {
-      //process each line of 'file'
-      int err = process_line (strategies, index_strategies,
-			      line, verbose);
-      //ASSERT (index_strategies[0] <= rmfb && index_strategies[1] <= amfb);
-      if (err == -1)
-	return NULL;
+  
+  /*Default strategy. */ 
+  if (file == NULL)
+    {//make_default_strategy
+      printf ("#default strategy for the cofactorization!\n");
+      int ncurves[2];
+      ncurves[0] = nb_curves (rlpb);
+      ncurves[1] = nb_curves (alpb);
+      int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
+      strategies->precomputed_methods =
+	facul_make_default_strategy (max_ncurves,verbose);
+      for (r = 0; r <= rmfb; r++)
+	for (a = 0; a <= amfb; a++) {
+	  int index = 0;
+	  int first = (r < a);//begin by the largest cofactor.
+	  for (int z  = 0; z < 2; z++)
+	    {
+	      int side = first ^ z;
+	      for (int i = 0; i < ncurves[side] + 3; i++)
+		{
+		  methods[r][a][index].method =
+		    &strategies->precomputed_methods[i];
+		  methods[r][a][index].side = side;
+		  index++;
+		}
+	    }
+	  //add NULL to show the end of the strategy.
+	  methods[r][a][index].method = NULL;
+	}
     }
-
+  else
+    {/* to precompute our method from the file.*/
+      printf ("#read the cofactorization file\n");
+      facul_method_t* precomputed_methods =
+	malloc (sizeof(facul_method_t) * NB_MAX_METHODS);
+      precomputed_methods[0].method = 0;
+      precomputed_methods[0].plan = NULL;
+      
+      strategies->precomputed_methods = precomputed_methods;
+      unsigned int index_strategies[2] = {0,0};
+      
+      char line[10000];
+      
+      fseek (file, 0, SEEK_SET);
+      while (fgets (line, sizeof(line), file) != NULL)
+	{
+	  //process each line of 'file'
+	  int err = process_line (strategies, index_strategies,
+				  line, verbose);
+	  if (err == -1)
+	    return NULL;
+	}
+    }
   /*
     For each strategy, one finds what is the last method used on each
     side.
   */
   for (r = 1; r <= rmfb; r++)
     for (a = 1; a <= amfb; a++){
-      facul_method_t* methods =
+      facul_method_side_t* methods =
 	strategies->methods[r][a];
       if (methods == NULL)
 	continue;
@@ -684,7 +793,9 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 
   //Create the auxiliary methods!
   //add test to check if it's necessary to create our aux methods!
+  //todo: choose a better choice of our number of curves!
   strategies->methods_aux = facul_make_aux_methods (30, verbose);
+
   return strategies;
 }
 
@@ -695,25 +806,27 @@ facul_clear_strategies (facul_strategies_t *strategies)
   if (strategies == NULL)
     return ;
 
-  //free plan
-  precompute_plan_t* plan = strategies->plan;
-  for (int j = 0; plan[j].method!=0; j++)
+  //free precomputed_methods
+  facul_method_t* fm = strategies->precomputed_methods;
+  for (int j = 0; fm[j].method!=0; j++)
     {
-      if (plan[j].method == PM1_METHOD)
-	pm1_clear_plan (plan[j].plan);
-      else if (plan[j].method == PP1_27_METHOD ||
-	       plan[j].method == PP1_65_METHOD)
-	pp1_clear_plan (plan[j].plan);
-      else if (plan[j].method == EC_METHOD)
-	ecm_clear_plan (plan[j].plan);
-      free (plan[j].plan);
-      plan[j].method = 0;
-      plan[j].plan = NULL;
+      if (fm[j].plan == NULL)
+	continue;
+      if (fm[j].method == PM1_METHOD)
+	pm1_clear_plan (fm[j].plan);
+      else if (fm[j].method == PP1_27_METHOD ||
+	       fm[j].method == PP1_65_METHOD)
+	pp1_clear_plan (fm[j].plan);
+      else if (fm[j].method == EC_METHOD)
+	ecm_clear_plan (fm[j].plan);
+      free (fm[j].plan);
+      fm[j].method = 0;
+      fm[j].plan = NULL;
     }
-  free (plan);
-  plan = NULL;
+  free (fm);
+  fm = NULL;
 
-  //free strategies
+  //free methods
   unsigned int r;
   for (r = 0; r <= strategies->mfb[0]; r++) {
     unsigned int a;
@@ -723,11 +836,14 @@ facul_clear_strategies (facul_strategies_t *strategies)
   }
   free (strategies->methods);
 
+  //free methods_aux
   facul_clear_aux_methods (strategies->methods_aux);
 
+  //free strategies
   free (strategies);
 
 }
+
 
 int
 facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
@@ -741,42 +857,48 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 	  strategies->assume_prime_thresh[0],
 	  strategies->assume_prime_thresh[1],
 	  strategies->BBB[0], strategies->BBB[1]);
-
+  printf ("mfb = [%d, %d]\n", strategies->mfb[0], strategies->mfb[1]);
   for (r = 0; r <= strategies->mfb[0]; r++) {
     unsigned int a;
     for (a = 0; a <= strategies->mfb[1]; a++) {
       printf ("[r = %d, a = %d]", r, a);
-      facul_method_t* methods = strategies->methods[r][a];
+      facul_method_side_t* methods = strategies->methods[r][a];
       if (methods == NULL)
 	continue;
-      for (int i = 0; methods[i].method != 0; i++)
+      
+      int i = 0;
+      while (true)
 	{
-	  if (methods[i].plan == NULL)//zero method!!!
+	  facul_method_t* fm = methods[i].method;
+	  if (fm == NULL || fm->method == 0)
+	    break;
+	  if (fm->plan == NULL)//zero method!!!
 	    printf ("[side=%d, FM=%ld, B1=0, B2=0] ", methods[i].side,
-		    methods[i].method);
+		    fm->method);
 	  else {
-	    if (methods[i].method == PM1_METHOD)
+	    if (fm->method == PM1_METHOD)
 	      {
-		pm1_plan_t* plan = (pm1_plan_t*) methods[i].plan;
+		pm1_plan_t* plan = (pm1_plan_t*) fm->plan;
 		printf ("[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
-			methods[i].method, plan->B1, plan->stage2.B2);
+			fm->method, plan->B1, plan->stage2.B2);
 	      }
-	    else if (methods[i].method == PP1_27_METHOD ||
-		     methods[i].method == PP1_65_METHOD)
+	    else if (fm->method == PP1_27_METHOD ||
+		     fm->method == PP1_65_METHOD)
 	      {
-		pp1_plan_t* plan = (pp1_plan_t*) methods[i].plan;
+		pp1_plan_t* plan = (pp1_plan_t*) fm->plan;
 		printf ("[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
-			methods[i].method, plan->B1, plan->stage2.B2);
+			fm->method, plan->B1, plan->stage2.B2);
 	      }
-	    else if (methods[i].method == EC_METHOD)
+	    else if (fm->method == EC_METHOD)
 	      {
-		ecm_plan_t* plan = (ecm_plan_t*) methods[i].plan;
+		ecm_plan_t* plan = (ecm_plan_t*) fm->plan;
 		printf ("[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
-			methods[i].method, plan->B1,plan->stage2.B2);
+			fm->method, plan->B1,plan->stage2.B2);
 	      }
 	    else
 	      return -1;
 	  }
+	  i++;
 	}
       printf ("\n");
     }
@@ -785,43 +907,13 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 }
 
 
-/********************************************/
-/*            modset_t                      */
-/********************************************/
-
-
-void
-modset_clear (modset_t *modset)
-{
-  switch (modset->arith) {
-  case CHOOSE_NONE: /* already clear */
-    break;
-  case CHOOSE_UL:
-    modredcul_clearmod (modset->m_ul);
-    break;
-  case CHOOSE_15UL:
-    modredc15ul_clearmod (modset->m_15ul);
-    break;
-  case CHOOSE_2UL2:
-    modredc2ul2_clearmod (modset->m_2ul2);
-    break;
-  case CHOOSE_MPZ:
-    modmpz_clearmod (modset->m_mpz);
-    break;
-  default:
-    abort();
-  }
-  modset->arith = CHOOSE_NONE;
-}
-
-
 /*
-  This is our auxiliary factorisation.
-  It applies a bunch of ECM curves with larger bounds to find
-  a factor with hight probability, and returns -1 if the factor
-  is not smooth, otherwise the number of
-  factors.
-*/
+ * This is our auxiliary factorization.
+ * It applies a bunch of ECM curves with larger bounds to find
+ * a factor with hight probability. It returns -1 if the factor
+ * is not smooth, otherwise the number of
+ * factors.
+ */
 static int
 facul_aux (unsigned long *factors, const modset_t m,
 	   const facul_strategies_t *strategies, int method_start, int side)
@@ -875,7 +967,7 @@ facul_aux (unsigned long *factors, const modset_t m,
 	{
 	  /*
 	    The cofactor m is not smooth. So, one stops the
-	    cofactorisation.
+	    cofactorization.
 	  */
 	  found = FACUL_NOT_SMOOTH;
 	  break;
@@ -883,7 +975,7 @@ facul_aux (unsigned long *factors, const modset_t m,
       if (res_fac == 0)
 	{
 	  /* Zero factor found. If it was the last method for this
-	     side, then one stops the cofactorisation. Otherwise, one
+	     side, then one stops the cofactorization. Otherwise, one
 	     tries with an other method! */
 	    continue;
 	}
@@ -894,7 +986,7 @@ facul_aux (unsigned long *factors, const modset_t m,
 
       /*
 	res_fac == 1!  Only one factor has been found. Hence, our
-	factorisation is not finished.
+	factorization is not finished.
       */
       if (fm.arith != CHOOSE_NONE)
 	{
@@ -936,8 +1028,8 @@ facul_aux (unsigned long *factors, const modset_t m,
   strategies. It returns the number of factors found on each side, or
   -1 if the factor is not smooth.
   Remarks: - the values of factors found are stored in 'factors'.
-  - the variable 'is_smooth' allows to know if a cofactor
-  is already factored.
+           - the variable 'is_smooth' allows to know if a cofactor
+             is already factored.
 */
 
 static int*
@@ -947,7 +1039,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 {
   int* found = calloc(2, sizeof(int));
 
-  facul_method_t* methods = strategies->methods[cof[0]][cof[1]];
+  facul_method_side_t* methods = strategies->methods[cof[0]][cof[1]];
 
   if (methods == NULL)
     return found;
@@ -958,61 +1050,60 @@ facul_both_src (unsigned long **factors, const modset_t* m,
   f[1][0].arith = CHOOSE_NONE;
   f[1][1].arith = CHOOSE_NONE;
 
-  for (int i = 0; methods[i].method != 0; i++)
+  for (int i = 0; methods[i].method != NULL; i++)
     {
       int side = methods[i].side;
       if (is_smooth[side] != FACUL_MAYBE)
 	continue;
-
       int res_fac = 0;
       switch (m[side].arith) {
       case CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors[side], m[side].m_ul,
-				      methods[i], &f[side][0], &f[side][1],
+				      *methods[i].method, &f[side][0], &f[side][1],
 				      strategies->lpb[side],
 				      strategies->assume_prime_thresh[side],
 				      strategies->BBB[side]);
 	break;
       case CHOOSE_15UL:
 	res_fac = facul_doit_onefm_15ul(factors[side], m[side].m_15ul,
-					methods[i], &f[side][0], &f[side][1],
+					*methods[i].method, &f[side][0], &f[side][1],
 					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
       case CHOOSE_2UL2:
 	res_fac = facul_doit_onefm_2ul2 (factors[side], m[side].m_2ul2,
-					 methods[i], &f[side][0], &f[side][1],
+					 *methods[i].method, &f[side][0], &f[side][1],
 					 strategies->lpb[side],
 					 strategies->assume_prime_thresh[side],
 					 strategies->BBB[side]);
 	break;
       case CHOOSE_MPZ:
 	res_fac = facul_doit_onefm_mpz (factors[side], m[side].m_mpz,
-					methods[i], &f[side][0], &f[side][1],
+					*methods[i].method, &f[side][0], &f[side][1],
 					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
       default: abort();
       }
-
       //check our result!
       //res_fac contains the number of factors found!
       if (res_fac == -1)
 	{
 	  /*
 	    The cofactor m[side] is not smooth. So, one stops the
-	    cofactorisation.
+	    cofactorization.
 	  */
 	  found[side] = -1;
 	  break;
 	}
       if (res_fac == 0)
 	{
-	  /* Zero factor found. If it was the last method for this
-	     side, then one stops the cofactorisation. Otherwise, one
-	     tries with an other method! */
+	  /* No factor found. If it was the last method for this
+	     side, then one stops the cofactorization. Otherwise, one
+	     tries with an other method.
+	  */
 	  if (methods[i].is_the_last)
 	      break;
 	  else
@@ -1031,13 +1122,13 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	  continue;
 	}
       /*
-	res_fac == 1!  Only one factor has been found. Hence, a
-	auxiliary factorisation will be necessary!
+	res_fac == 1. Only one factor has been found. Hence, a
+	auxiliary factorization will be necessary!
        */
       is_smooth[side] = FACUL_AUX;
     }
-  //begin the auxiliary factorisation!
-  if (is_smooth[0] >= 1 &&  is_smooth[1] >= 1)
+  //begin the auxiliary factorization!
+  if (is_smooth[0] >= 1 && is_smooth[1] >= 1)
     for (int side = 0; side < 2; side++)
       if (is_smooth[side] == FACUL_AUX)
 	for (int ind_cof = 0; ind_cof < 2; ind_cof++)
@@ -1047,7 +1138,6 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	      {
 		int found2 = facul_aux (factors[side]+found[side],
 					f[side][ind_cof], strategies, 0, side);
-		//todo add old values for B1
 		if (found2 < 1)//FACUL_NOT_SMOOTH or FACUL_MAYBE
 		  {
 		    is_smooth[side] = FACUL_NOT_SMOOTH;
@@ -1074,7 +1164,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 /*
   This function is like facul, but we will work with the both norms
   together.
-  returns the number of factors for each side!
+  It returns the number of factors for each side!
 */
 int*
 facul_both (unsigned long **factors, mpz_t* N,
@@ -1175,4 +1265,34 @@ facul_both (unsigned long **factors, mpz_t* N,
   modset_clear (&n[1]);
 
   return found;
+}
+
+
+/********************************************/
+/*            modset_t                      */
+/********************************************/
+
+
+void
+modset_clear (modset_t *modset)
+{
+  switch (modset->arith) {
+  case CHOOSE_NONE: /* already clear */
+    break;
+  case CHOOSE_UL:
+    modredcul_clearmod (modset->m_ul);
+    break;
+  case CHOOSE_15UL:
+    modredc15ul_clearmod (modset->m_15ul);
+    break;
+  case CHOOSE_2UL2:
+    modredc2ul2_clearmod (modset->m_2ul2);
+    break;
+  case CHOOSE_MPZ:
+    modmpz_clearmod (modset->m_mpz);
+    break;
+  default:
+    abort();
+  }
+  modset->arith = CHOOSE_NONE;
 }

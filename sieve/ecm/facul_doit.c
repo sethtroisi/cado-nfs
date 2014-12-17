@@ -165,7 +165,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       else if (strategy->methods[i].method == PP1_65_METHOD)
 	bt = pp1_65 (f, m, (pp1_plan_t *) (strategy->methods[i].plan));
       else if (strategy->methods[i].method == EC_METHOD)
-	bt = ecm (f, m, (ecm_plan_t *) (strategy->methods[i].plan));
+	bt = ecm (f, m, (ecm_plan_t *) (strategy->methods[i].plan));	
       else 
 	{
 	  /* A method value we don't know about. Something's wrong, bail out */
@@ -210,7 +210,6 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	 1   composite            1   Could try again with careful bt
 	 
       */
-
       if (mod_intequal_ul (f, 1UL))
 	{
 	  if (bt == 0)
@@ -386,15 +385,13 @@ facul_doit (unsigned long *factors, const modulus_t m,
 /*
   This function applies one factoring method 'method' on a cofactor 'm'
   and returns: 
-       -1 if m is not smooth 
-       n if we found n factors and  store them in 'factors'. 
+       -1 if m is not smooth.
+       n if we found n factors and store them in 'factors'.
 
-  Remark: if m has more than two factors,  it's possible that 
-  we need to try a factorisation on f (or/and  m/f). So
-  the values of our composite factor is stored in fm (or/and cfm)
-  and the length in len_fm (or/and len_cfm).
-  
- */
+  Remark: if m has more than two factors, it's possible that 
+  we need to try a other factorization on f (or/and  m/f). So
+  the values of our composite factor is stored in fm (or/and cfm).
+*/
 int
 facul_doit_onefm (unsigned long* factors, const modulus_t m,
 		  const facul_method_t method,
@@ -430,7 +427,6 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
       /* A method value we don't know about. Something's wrong, bail out */
       abort();
     }
-
   /* The following possibilities exist:
      bt:   Factor:    Cofactor:   Action:
      0           1    composite   Try next method

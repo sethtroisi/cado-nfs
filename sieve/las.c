@@ -450,48 +450,48 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * each of them for the descent case.
      */
     const char *cofactfilename = param_list_lookup_string (pl, "file-cofact");
+    /*
+     * We create our strategy book from the file given by
+     * 'file-cofact'. Otherwise, we use a default strategy given by
+     * the function facul_make_default_strategy ().
+     */
+    //if (cofactfilename != NULL) { /* a file was given */
+    FILE* file = NULL;
     if (cofactfilename != NULL) /* a file was given */
-	{
-	    printf ("read the cofactorisation file\n");
-	    printf ("param = %ld, %d, %d, %ld, %d, %d\n",
-		    sc->sides[0]->lim, sc->sides[0]->lpb,
-		    sc->sides[0]->mfb, sc->sides[1]->lim,
-		    sc->sides[1]->lpb, sc->sides[1]->mfb);
-	    FILE* file = fopen (cofactfilename, "r");
-	    si->strategies = facul_make_strategies (sc->sides[0]->lim,
-						    sc->sides[0]->lpb,
-						    sc->sides[0]->mfb,
-						    sc->sides[1]->lim,
-						    sc->sides[1]->lpb,
-						    sc->sides[1]->mfb,
-						    file, 0);
-	    if (si->strategies == NULL)
-	      {
-		fprintf (stderr, "impossible to read %s\n",
-			 cofactfilename);
-		abort ();
-	      }
-	    fclose (file);
-	}
-    else /* To show if we use a file of strategies or not! */
-	si->strategies = NULL;
+      file = fopen (cofactfilename, "r");
+    si->strategies = facul_make_strategies (sc->sides[0]->lim,
+					    sc->sides[0]->lpb,
+					    sc->sides[0]->mfb,
+					    sc->sides[1]->lim,
+					    sc->sides[1]->lpb,
+					    sc->sides[1]->mfb,
+					    file, 0);
+    if (si->strategies == NULL)
+      {
+	fprintf (stderr, "impossible to read %s\n",
+		 cofactfilename);
+	abort ();
+      }
+    if (file != NULL)
+      fclose (file);
 
     
     for(int s = 0 ; s < 2 ; s++) {
         sieve_info_print_fb_statistics(las, si, s);
-        /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
-        sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
-	//todo: dead code: if(){...}.clear me!
-	if (si->strategies == NULL)  /* no file was given. */
-	  {
-	    mpz_init (si->BB[s]);
-	    mpz_init (si->BBB[s]);
-	    mpz_init (si->BBBB[s]);
-	    unsigned long lim = si->conf->sides[s]->lim;
-	    mpz_ui_pow_ui (si->BB[s], lim, 2);
-	    mpz_mul_ui (si->BBB[s], si->BB[s], lim);
-	    mpz_mul_ui (si->BBBB[s], si->BBB[s], lim);
+	/* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
+	sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
+	mpz_init (si->BB[s]);
+	mpz_init (si->BBB[s]);
+	mpz_init (si->BBBB[s]);
+	unsigned long lim = si->conf->sides[s]->lim;
+	mpz_ui_pow_ui (si->BB[s], lim, 2);
+	mpz_mul_ui (si->BBB[s], si->BB[s], lim);
+	mpz_mul_ui (si->BBBB[s], si->BBB[s], lim);
 
+	//todo: unused code: if(){...}.
+	//{{
+	if (si->strategies == NULL) /* old cofactorization. */
+	  {
 	    /* The strategies also depend on the special-q used within the
 	     * descent, assuming lim / lpb depend on the sq bitsize */
 	    verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
@@ -505,11 +505,12 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	      facul_make_strategy(sc->sides[s]->lim, sc->sides[s]->lpb,
 				  sc->sides[s]->ncurves, 0);
 	  }
-	else
+	else //always in this case!
 	  si->sides[s]->strategy = NULL;
-        reorder_fb(si, s);
+	//}}
+	reorder_fb(si, s);
 
-        verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
+	verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
         factorbase_degn_t ** q;
         q = si->sides[s]->fb_parts->pow2;
         verbose_output_print(0, 2, ": %d pow2", fb_diff(q[1], q[0]));
@@ -2584,8 +2585,8 @@ static void declare_usage(param_list pl)
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
-  param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorisation step in file xxx");
-  param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorisation step");
+  param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
+  param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorization step");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
   param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
@@ -2988,7 +2989,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) nr_sq_processed);
-    
+
     /*}}}*/
 
     //{{print the stats of the cofactorization.
