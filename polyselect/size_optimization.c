@@ -10,7 +10,7 @@
 /************************** internal stuff ************************************/
 
 /* To handle list of translations */
-typedef struct 
+typedef struct
 {
   mpz_t *tab;
   uint64_t len;
@@ -108,9 +108,76 @@ typedef hash_table_ui_s hash_table_ui_t[1];
 typedef hash_table_ui_s * hash_table_ui_ptr;
 typedef const hash_table_ui_s * hash_table_ui_srcptr;
 
-void hash_ui_init (hash_table_ui_ptr H);
-void hash_ui_clear (hash_table_ui_ptr H);
-int hash_ui_insert (hash_table_ui_ptr H, unsigned long int h);
+void
+hash_ui_init (hash_table_ui_ptr H)
+{
+  H->size  = 0;
+  H->alloc = 1009; /* next_prime (1000) */
+  H->tab = (unsigned long int *) malloc (H->alloc * sizeof (unsigned long int));
+  ASSERT_ALWAYS (H->tab != NULL);
+  memset (H->tab, 0, H->alloc * sizeof (unsigned long int));
+}
+
+void
+hash_ui_clear (hash_table_ui_ptr H)
+{
+  free (H->tab);
+  H->tab = NULL;
+  H->alloc = 0;
+  H->size = 0;
+}
+
+/* Internal function. Do not use it directly, use hash_ui_insert instead. */
+/* return 1 if new, 0 if already present in table */
+static inline int
+hash_ui_insert_one (unsigned long int *H, unsigned long alloc,
+                    unsigned long int h)
+{
+  unsigned long i = h % alloc;
+
+  while (H[i] != 0 && H[i] != h)
+    if (++i == alloc)
+      i = 0;
+  if (H[i] == h) /* already present */
+    return 0;
+  else
+  {
+    ASSERT_ALWAYS(H[i] == 0);
+    H[i] = h;
+    return 1;
+  }
+}
+
+/* return 1 if new, 0 if already present in table */
+int
+hash_ui_insert (hash_table_ui_ptr H, unsigned long int h)
+{
+  if (2 * H->size >= H->alloc) /* realloc */
+  {
+    unsigned long int *new;
+    unsigned long new_size = 0, new_alloc;
+
+    new_alloc = ulong_nextprime (2 * H->alloc + 1);
+    new = (unsigned long int *) malloc (new_alloc * sizeof (unsigned long int));
+    memset (new, 0, new_alloc * sizeof (unsigned long int));
+    for (unsigned long i = 0; i < H->alloc; i++)
+      if (H->tab[i])
+        new_size += hash_ui_insert_one (new, new_alloc, H->tab[i]);
+    free (H->tab);
+    H->tab = new;
+    H->alloc = new_alloc;
+    ASSERT_ALWAYS(new_size == H->size);
+  }
+
+  if (hash_ui_insert_one (H->tab, H->alloc, h))
+  {
+    H->size++;
+    return 1;
+  }
+  else
+    return 0;
+}
+
 
 /* store in Q[0..nb_approx-1] the nb_approx best rational approximations of q
    with denominator <= bound. nb_approx should be greater than 0
@@ -172,6 +239,59 @@ sopt_list_skewness_values (mpz_t *skew, mpz_poly_srcptr f, mpz_poly_srcptr g,
   }
 }
 
+/* Computes the roots of R below bound_on_roots_and_extrema, and the extrema
+   of R which are below the same bound and closer to 0 than their neighbourhood.
+   Stores those roots and extrema in roots_and_extrema, and returns their
+   number.
+   Note: roots_and_extrema must have enough storage for all roots and ALL
+   extrema, whether close to 0 or not; i.e., 2*deg - 1 entries is enough.
+*/
+static inline unsigned int
+sopt_compute_roots_and_extrema_close_to_0 (double *roots_and_extrema,
+                                           double_poly_srcptr R,
+                                           double bound_on_roots_and_extrema,
+                                           int verbose)
+{
+  unsigned int nr, ne;
+  nr = double_poly_compute_all_roots_with_bound (roots_and_extrema, R,
+                                                 bound_on_roots_and_extrema);
+
+  if (R->deg < 2) /* No extremum of f' in this case */
+    return nr;
+  else
+  {
+    /* add roots of the derivative */
+    double_poly_t dR;
+    double_poly_init (dR, R->deg - 1);
+    double_poly_derivative (dR, R);
+    ne = double_poly_compute_all_roots_with_bound (roots_and_extrema + nr, dR,
+                                                   bound_on_roots_and_extrema);
+
+    /* Keep only those extrema which are closer to 0 than points in their
+       neighbourhood. They are exactly those for which f(x) * f''(x) > 0. */
+
+    double_poly_derivative (dR, dR); /* dR is now the second derivative of R */
+
+    unsigned int kept = nr;
+    for (unsigned int i = nr; i < nr + ne; i++)
+    {
+      const double x = roots_and_extrema[i];
+      const double Rx = double_poly_eval(R, x);
+      const double ddRx = double_poly_eval(dR, x);
+      if (Rx * ddRx > 0.)
+      {
+        roots_and_extrema[kept++] = x;
+        if (verbose)
+          printf ("Keeping x = %f, f(x) = %f, f''(x) = %f\n", x, Rx, ddRx);
+      }
+      else if (verbose)
+        printf ("Not keeping x = %f, f(x) = %f, f''(x) = %f\n", x, Rx, ddRx);
+    }
+
+    double_poly_clear (dR);
+    return kept;
+  }
+}
 
 /* For deg(f) = 6 and deg(g) = 1 */
 /* Return in list_k good values of k such that f(x+k) has small coefficients of
@@ -194,20 +314,20 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
   a2 = mpz_get_d (f->coeff[2]);
   g1 = mpz_get_d (g->coeff[1]);
   g0 = mpz_get_d (g->coeff[0]);
-  
+
   /* Let f~(x,k,q3) = f(x+k)+q3*x^3*g(x+k).
      Let c_i(k,q3) be the coefficient of x^i in f~. Then
         c_3(k,q3) = 20*a6*k^3 + 10*a5*k^2 + 4*a4*k + q3*g1*k + a3 + q3*g0
         c_4(k,q3) = 15*a6*k^2 + 5*a5*k + q3*g1 + a4
-     
+
      Let res = Res (c_3(k,q3), c_4(k,q3)), where the resultant is taken to
      eliminate the variable k.
      We compute the roots of res and of the derivative of res.
 
      #Sage code to compute Res(c3(k), c4(k)):
-        R.<x,a6,k,a5,g1,q3,g0,a3,a4> = ZZ[]
-        f = a6*x^6+a5*x^5+a4*x^4+a3*x^3
-        g = g1*x+g0
+        R.<x,k,q3,g1,g0,a6,a5,a4,a3,a2,a1,a0> = ZZ[]
+        f = a6*x^6 + a5*x^5 + a4*x^4 + a3*x^3 + a2*x^2 + a1*x + a0
+        g = g1*x + g0
         ff=f(x=x+k)+q3*x^3*g(x=x+k)
         c3=ff.coefficient({x:3})
         c4=ff.coefficient({x:4})
@@ -221,7 +341,6 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
   double_poly_t res;
   double roots_q3[5]; /* 5 = 3 roots for res + 2 roots for the derivative */
   double_poly_init (res, 3);
-
 
   /* degree 3: a6*g1^3 */
   res->coeff[3] = a6 * g1 * g1 * g1;
@@ -242,25 +361,13 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
                   + 64.0 * a4 * a4 * a4 * a6 - 180.0 * a3 * a4 * a5 * a6
                   + 135.0 * a3 * a3 * a6 * a6;
 
-  /* compute roots of res */
-  nb_q3roots = double_poly_compute_all_roots_with_bound (roots_q3, res,
-                                                    SOPT_MAX_VALUE_FOR_Q_ROOTS);
+  /* compute roots of res and some roots of the derivative */
+  nb_q3roots = sopt_compute_roots_and_extrema_close_to_0 (roots_q3, res,
+                                         SOPT_MAX_VALUE_FOR_Q_ROOTS, verbose);
   if (verbose)
   {
-    fprintf (stderr, "# sopt: q-roots of Res(c3,c4) = {");
+    fprintf (stderr, "# sopt: q-roots of Res(c3,c4) or Res(c3,c4)' = {");
     for (i = 0; i < nb_q3roots; i++)
-      fprintf (stderr, " %f%c", roots_q3[i], (i+1==nb_q3roots)?' ':',');
-    fprintf (stderr, "}\n");
-  }
-
-  /* add roots of the derivative */
-  double_poly_derivative (res, res);
-  nb_q3roots+=double_poly_compute_all_roots_with_bound (roots_q3+nb_q3roots, res,
-                                                    SOPT_MAX_VALUE_FOR_Q_ROOTS);
-  if (verbose)
-  {
-    fprintf (stderr, "# sopt: q-roots of derivative of Res(c3,c4) = {");
-    for (; i < nb_q3roots; i++)
       fprintf (stderr, " %f%c", roots_q3[i], (i+1==nb_q3roots)?' ':',');
     fprintf (stderr, "}\n");
   }
@@ -286,9 +393,9 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
 
       /* find roots k of c4(k, q3=q3_rat) */
       C->deg = 2;
-      C->coeff[0] = g1 * q3_rat + a4;
-      C->coeff[1] = 5.0 * a5;
       C->coeff[2] = 15.0 * a6;
+      C->coeff[1] = 5.0 * a5;
+      C->coeff[0] = g1 * q3_rat + a4;
 
       nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
       for (unsigned int l = 0; l < nb_k_roots; l++)
@@ -330,9 +437,9 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       */
       C->deg = 4;
       C->coeff[4] = -5.0 * a6 * g1;
-      C->coeff[3] =  -20.0 * a6 * g0;
-      C->coeff[2] =  -g1 * g1 * q3_rat - 10.0 * a5 * g0 + 2.0 * g1 * a4;
-      C->coeff[1] =  2.0 * g1 * a3 - 2.0 * g1 * q3_rat * g0 - 4.0 * g0 * a4;
+      C->coeff[3] = -20.0 * a6 * g0;
+      C->coeff[2] = -g1 * g1 * q3_rat - 10.0 * a5 * g0 + 2.0 * g1 * a4;
+      C->coeff[1] = 2.0 * g1 * a3 - 2.0 * g1 * q3_rat * g0 - 4.0 * g0 * a4;
       C->coeff[0] = -q3_rat * g0 * g0 - g0 * a3 + g1 * a2;
 
       nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
@@ -382,7 +489,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
 
 
       nb_roots_q2 += double_poly_compute_all_roots_with_bound (roots_q2, C,
-                                                               MAX_Q);
+                                                               SOPT_MAX_VALUE_FOR_Q_ROOTS);
       ASSERT_ALWAYS(nb_roots_q2 <= 4);
 
       /* roots of the derivative of Res(c3,c2) */
@@ -392,7 +499,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       C->coeff[2] = C->coeff[3] * 3.0;
       C->coeff[3] = C->coeff[4] * 4.0;
       nb_roots_q2 += double_poly_compute_all_roots_with_bound (roots_q2
-                                                  + nb_roots_q2, C, MAX_Q);
+                                                  + nb_roots_q2, C, SOPT_MAX_VALUE_FOR_Q_ROOTS);
       ASSERT_ALWAYS(nb_roots_q2 <= 7);
 
       for (ii = 0; ii < nb_roots_q2; ii++)
@@ -414,13 +521,132 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
   double_poly_clear (res);
 }
 
-#if 0
+/* For deg(f) = 5 and deg(g) = 1 */
+/* Return in list_k good values of k such that f(x+k) has small coefficients of
+   degree 3 and 2. */
 static void
 sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
                              mpz_poly_srcptr g, const int verbose)
 {
+  ASSERT_ALWAYS (f->deg == 5);
+  ASSERT_ALWAYS (g->deg == 1);
+
+  unsigned int i, nb_q2roots;
+
+  /* Let f(x) = a5 x^5 + ... + a0 and g(x) = g1 x + g0. */
+  double a5, a4, a3, a2, g1, g0;
+  a5 = mpz_get_d (f->coeff[5]);
+  a4 = mpz_get_d (f->coeff[4]);
+  a3 = mpz_get_d (f->coeff[3]);
+  a2 = mpz_get_d (f->coeff[2]);
+  g1 = mpz_get_d (g->coeff[1]);
+  g0 = mpz_get_d (g->coeff[0]);
+
+  /* Let f~(x,k,q2) = f(x+k)+q2*x^2*g(x+k).
+     Let c_i(k,q2) be the coefficient of x^i in f~. Then
+        c_2(k,q2) = 10*a5*k^3 + 6*a4*k^2 + 3*a3*k + q2*g1*k + a2 + q2*g0
+        c_3(k,q2) = 10*a5*k^2 + 4*a4*k + q2*g1 + a3
+
+     Let res = Res (c_2(k,q3), c_3(k,q3)), where the resultant is taken to
+     eliminate the variable k.
+     We compute the roots of res and of the derivative of res.
+     Degree 5 is the only case where res is of degree 2 in q2 (instead of 3)
+
+     #Sage code to compute Res(c2(k), c3(k)):
+        R.<x,k,q2,g1,g0,a5,a4,a3,a2,a1,a0> = ZZ[]
+        f = a5*x^5 + a4*x^4 + a3*x^3 + a2*x^2 + a1*x + a0
+        g = g1*x + g0
+        ff=f(x=x+k)+q2*x^2*g(x=x+k)
+        c2=ff.coefficient({x:2})
+        c3=ff.coefficient({x:3})
+        r = c2.resultant(c3,k)//(40*a5)
+        SR(r.coefficient({q2:2})).factor()
+        SR(r.coefficient({q2:1})).factor()
+        SR(r.coefficient({q2:0})).factor()
+  */
+
+  double_poly_t res;
+  double roots_q2[3]; /* 3 = 2 roots for res + 1 roots for the derivative */
+  double_poly_init (res, 2);
+
+  /* degree 2: (5*a5*g0 - a4*g1)^2 */
+  res->coeff[2] =  (5.0*a5*g0 - a4*g1)*(5.0*a5*g0 - a4*g1);
+
+  /* degree 1: 8*a4^3*g0 - 30*a3*a4*a5*g0 + 50*a2*a5^2*g0 - 2*a3*a4^2*g1
+               + 10*a3^2*a5*g1 - 10*a2*a4*a5*g1 */
+  res->coeff[1] = 8.0*a4*a4*a4*g0 - 30.0*a3*a4*a5*g0 + 50.0*a2*a5*a5*g0
+                  - 2.0*a3*a4*a4*g1 + 10.0*a3*a3*a5*g1 - 10.0*a2*a4*a5*g1;
+
+  /* degree 0: -3*a3^2*a4^2 + 8*a2*a4^3 + 10*a3^3*a5 - 30*a2*a3*a4*a5
+               + 25*a2^2*a5^2 */
+  res->coeff[0] = -3.0*a3*a3*a4*a4 + 8.0*a2*a4*a4*a4 + 10.0*a3*a3*a3*a5
+                  - 30.0*a2*a3*a4*a5 + 25.0*a2*a2*a5*a5;
+
+  /* compute roots of res and some roots of the derivative */
+  nb_q2roots = sopt_compute_roots_and_extrema_close_to_0 (roots_q2, res,
+                                         SOPT_MAX_VALUE_FOR_Q_ROOTS, verbose);
+  if (verbose)
+  {
+    fprintf (stderr, "# sopt: q-roots of Res(c2,c3) or Res(c2,c3)' = {");
+    for (i = 0; i < nb_q2roots; i++)
+      fprintf (stderr, " %f%c", roots_q2[i], (i+1==nb_q2roots)?' ':',');
+    fprintf (stderr, "}\n");
+  }
+
+  double_poly_t C;
+  double_poly_init (C, 3);
+  for (i = 0; i < nb_q2roots; i++)
+  {
+    unsigned int t;
+    double q2_rat_approx[SOPT_NB_RAT_APPROX_OF_Q_ROOTS];
+    t = compute_rational_approximation (q2_rat_approx, roots_q2[i],
+                                        SOPT_NB_RAT_APPROX_OF_Q_ROOTS,
+                                        SOPT_MAX_DEN_IN_RAT_APPROX_OF_Q_ROOTS);
+    for (unsigned int j = 0; j < t; j++)
+    {
+      double q2_rat = q2_rat_approx[j];
+      double double_roots_k[5];
+      unsigned int nb_k_roots;
+
+      if (verbose)
+        fprintf (stderr, "# sopt: process rational approximation %f of %f\n",
+                         q2_rat, roots_q2[i]);
+
+      /* find roots k of c3(k, q2=q2_rat) */
+      C->deg = 2;
+      C->coeff[2] = 10.0 * a5;
+      C->coeff[1] = 4.0 * a4;
+      C->coeff[0] = g1 * q2_rat + a3;
+
+      nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
+      for (unsigned int l = 0; l < nb_k_roots; l++)
+      {
+        list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
+        if (verbose)
+          gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of c3)\n",
+                       list_k->tab[list_k->len-1]);
+      }
+
+      /* find roots k of c2(k, q2=q2_rat) */
+      C->deg = 3;
+      C->coeff[3] = 10.0 * a5;
+      C->coeff[2] = 6.0 * a4;
+      C->coeff[1] = g1 * q2_rat + 3.0 * a3;
+      C->coeff[0] = g0 * q2_rat + a2;
+
+      nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
+      for (unsigned int l = 0; l < nb_k_roots; l++)
+      {
+        list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
+        if (verbose)
+          gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of c2)\n",
+                       list_k->tab[list_k->len-1]);
+      }
+    }
+  }
+  double_poly_clear (C);
+  double_poly_clear (res);
 }
-#endif
 
 static inline void
 improve_list_k (list_mpz_ptr list_k, const int sopt_effort, const int verbose)
@@ -563,11 +789,10 @@ mpz_poly_apply_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
 
 #define SOPT_INIT_SIZE_ALLOCATED_TRANSLATIONS 1024
 
-/* Size optimize the polynomial pair (f,g).
+/* Size optimize the polynomial pair (f,g) with rotations and translations.
    Assume that deg(g) = 1.
    Return the size-optimized pair (fopt, gopt).
-   If use_rotation is non-zero, rotations are used, else only translations are
-   used. */
+ */
 void
 size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt, mpz_poly_srcptr f_raw,
                    mpz_poly_srcptr g_raw, const unsigned int sopt_effort,
@@ -620,10 +845,8 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt, mpz_poly_srcptr f_raw
   {
     if (d == 6)
       sopt_find_translations_deg6 (list_k, f_raw, g_raw, verbose);
-#if 0
     else if (d == 5)
       sopt_find_translations_deg5 (list_k, f_raw, g_raw, verbose);
-#endif
     if (verbose)
       fprintf (stderr, "# sopt: %" PRIu64 " values for the translations were "
                        "computed and added in list_k\n", list_k->len);
@@ -659,15 +882,15 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt, mpz_poly_srcptr f_raw
   }
   else if (verbose)
     fprintf (stderr, "# sopt: sopt_effort = 0. list_k is not modify.\n");
-    
+
 
   /****************************** Main loop *******************************/
   /* For each value of k, call LLL on translated polynomial, and for each
      polynomial returned by LLL, call size_optimize_local_descent */
-  
+
   /* Init hash table */
   hash_ui_init (H);
-  
+
   /* Compute values of skewness that are going to be used in LLL */
   sopt_list_skewness_values (list_skew, f_raw, g_raw, verbose);
 
