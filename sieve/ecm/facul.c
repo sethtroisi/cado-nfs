@@ -722,7 +722,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   /*Default strategy. */ 
   if (file == NULL)
     {//make_default_strategy
-      printf ("Default strategy for the cofactorization!\n");
+      printf ("#default strategy for the cofactorization!\n");
       int ncurves[2];
       ncurves[0] = nb_curves (rlpb);
       ncurves[1] = nb_curves (alpb);
@@ -750,7 +750,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     }
   else
     {/* to precompute our method from the file.*/
-      printf ("read the cofactorization file\n");
+      printf ("#read the cofactorization file\n");
       facul_method_t* precomputed_methods =
 	malloc (sizeof(facul_method_t) * NB_MAX_METHODS);
       precomputed_methods[0].method = 0;
