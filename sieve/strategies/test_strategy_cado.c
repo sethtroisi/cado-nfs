@@ -1023,16 +1023,66 @@ facul_strategy_t* convert_strategy_to_facul_strategy (strategy_t* t, unsigned lo
 
     return strategy;
 }
+/*
+ * If the plan is already precomputed and stored at the index i, return
+ * i. Otherwise return the last index of tab to compute and add this new
+ * plan at this index!
+ */
+static int
+get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
+		  int method, int parameterization, unsigned long sigma)
+{
+  int i = 0;
+  while (tab[i].method != 0){
+    if (tab[i].plan == NULL){
+      if(B1 == 0 && B2 == 0)
+	//zero method!
+	break;
+      else
+	{
+	  i++;
+	  continue;
+	}
+    }
+    else if (tab[i].method == method) {
+      if (method == PM1_METHOD)
+	{
+	  pm1_plan_t* plan = (pm1_plan_t*)tab[i].plan;
+	  if (plan->B1 == B1 && plan->stage2.B2 == B2)
+	    break;
+	}
+      else if (method == PP1_27_METHOD ||
+	       method == PP1_65_METHOD)
+	{
+	  pp1_plan_t* plan = (pp1_plan_t*)tab[i].plan;
+	  if (plan->B1 == B1 && plan->stage2.B2 == B2)
+	    break;
+	}
+      else if (method == EC_METHOD)
+	{
+	  ecm_plan_t* plan = (ecm_plan_t*)tab[i].plan;
+	  if (plan->B1 == B1 && plan->stage2.B2 == B2 &&
+	      plan->parameterization == parameterization
+	      && plan->sigma == sigma)
+	    break;
+	}
+    }
+    i++;
+  }
+  return i;
+}
 
-facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r, unsigned long*fbb,
+facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r,
+							  unsigned long*fbb,
 							  int*lpb, int*mfb)
 {
-  facul_strategies_t* strategies = malloc (sizeof(facul_strategies_t));
-  ASSERT (strategies != NULL);
-  strategies->mfb[0] = mfb[0];
-  strategies->mfb[1] = mfb[1];
+  int verbose = 0;
+    facul_strategies_t* strategies = malloc (sizeof(facul_strategies_t));
+    ASSERT (strategies != NULL);
+    strategies->mfb[0] = mfb[0];
+    strategies->mfb[1] = mfb[1];
 
-  strategies->lpb[0] = lpb[0];
+    strategies->lpb[0] = lpb[0];
     strategies->lpb[1] = lpb[1];
     /* Store fbb^2 in assume_prime_thresh */
     strategies->assume_prime_thresh[0] = (double) fbb[0] * (double) fbb[0];
@@ -1042,20 +1092,27 @@ facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r,
     strategies->BBB[1] = (double) fbb[1] * strategies->assume_prime_thresh[1];
 
     //alloc methods!
-    facul_method_t*** methods = malloc (sizeof (*methods) * (mfb[0]+1));
+    facul_method_side_t*** methods = malloc (sizeof (*methods) * (mfb[0]+1));
     int r0, r1;
     for (r0 = 0; r0 <= mfb[0]; r0++) {
       methods[r0] = malloc (sizeof (*methods[r0]) * (mfb[1]+1));
       assert (methods[r0] != NULL);
       for (r1 = 0; r1 <= mfb[1];r1++)
 	{
-	  methods[r0][r1] = malloc (50 * sizeof (facul_method_t));
+	  methods[r0][r1] = malloc (50 * sizeof (facul_method_side_t));
 	  assert (methods[r0][r1] != NULL);
-	  methods[r0][r1][0].method = 0;
-	  methods[r0][r1][0].plan = NULL;
+	  methods[r0][r1][0].method = NULL;
 	}
     }
-    
+    strategies->methods = methods;
+    //alloc precomputed_methods
+    facul_method_t* precomputed_methods =
+      malloc (sizeof(facul_method_t) * NB_MAX_METHODS);
+    precomputed_methods[0].method = 0;
+    precomputed_methods[0].plan = NULL;
+      
+    strategies->precomputed_methods = precomputed_methods;
+
     tabular_fm_t* tab_fm = strategy_get_tab_fm (t);
     int nb_methods = tab_fm->index;
     for (int i = 0; i < nb_methods; i++)
@@ -1065,40 +1122,64 @@ facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r,
 	int curve = (int)fm->method[1];
 	unsigned long B1 = fm->method[2];
 	unsigned long B2 = fm->method[3];
-	methods[r[0]][r[1]][i].method = method;
-	methods[r[0]][r[1]][i].side = t->side[i];
-	if (method == PM1_METHOD) {
-	  methods[r[0]][r[1]][i].plan = malloc(sizeof(pm1_plan_t));
-	  assert(methods[r[0]][r[1]][i].plan != NULL);
-	  pm1_make_plan(methods[r[0]][r[1]][i].plan, B1, B2, 0);
-	} else if (method == PP1_27_METHOD || method == PP1_65_METHOD) {
-	  methods[r[0]][r[1]][i].plan = malloc(sizeof(pp1_plan_t));
-	  assert(methods[r[0]][r[1]][i].plan != NULL);
-	  pp1_make_plan(methods[r[0]][r[1]][i].plan, B1, B2, 0);
-	} else if (method == EC_METHOD) {
-	  long sigma;
-	  if (curve == MONTY16) {
-	    sigma = 1;
-	  } else
-	    sigma = 4;//2 + rand();
-	  methods[r[0]][r[1]][i].plan = malloc(sizeof(ecm_plan_t));
-	  assert(methods[r[0]][r[1]][i].plan != NULL);
-	  ecm_make_plan(methods[r[0]][r[1]][i].plan, B1, B2, curve,
-			labs(sigma), 0, 0);
-	} else {
-	  exit(EXIT_FAILURE);
-	}
+	int side = (t->side != NULL)?t->side[i]:0;
+	int sigma = (curve == MONTY16)?1:rand()+2;
+	//check if the method is already computed!
+	int index_prec_fm = 
+	  get_index_method(strategies->precomputed_methods, B1, B2,
+			   method, curve, sigma);
+	if ( strategies->precomputed_methods[index_prec_fm].method == 0)
+	  {
+	    /*
+	     * The current method isn't already precomputed. So
+	     * we will compute and store it.
+	     */
+	    void* plan = NULL;
+	    if (B1 == 0 && B2 == 0)
+	      { //zero method!
+		plan = NULL;
+		method = PM1_METHOD;//default value.
+	      }
+	    else if (method == PM1_METHOD)
+	      {
+		plan = malloc (sizeof (pm1_plan_t));
+		pm1_make_plan (plan, B1, B2, verbose);
+	      }
+	    else if (method == PP1_27_METHOD ||
+		     method == PP1_65_METHOD)
+	      {
+		plan = malloc (sizeof (pp1_plan_t));
+		pp1_make_plan (plan, B1, B2, verbose);
+	      }
+	    else { //method == EC_METHOD
+	      plan = malloc (sizeof (ecm_plan_t));
+	      ecm_make_plan (plan,
+			     B1, B2, curve, sigma, 1, verbose);
+	    }
+	    strategies->precomputed_methods[index_prec_fm].method =method;
+	    strategies->precomputed_methods[index_prec_fm].plan = plan;
+	    
+	    ASSERT_ALWAYS (index_prec_fm+1 < NB_MAX_METHODS);
+	    //to show the end of plan!
+	    strategies->precomputed_methods[index_prec_fm+1].plan = NULL;
+	    strategies->precomputed_methods[index_prec_fm+1].method = 0;
+	  }
+	/* 
+	 * Add this method to the current strategy
+	 * methods[index_st[0]][index_st[1]]. 
+	 */
+	strategies->methods[r[0]][r[1]][i].method =
+	  &strategies->precomputed_methods[index_prec_fm];
+	strategies->methods[r[0]][r[1]][i].side = side;
+	//to show the end of methods!
+	strategies->methods[r[0]][r[1]][i+1].method = NULL;
       }
-    methods[r[0]][r[1]][nb_methods].method = 0;
-    methods[r[0]][r[1]][nb_methods].plan = NULL;
-    strategies->methods = methods;
-
 
     /*
       For this strategy, one finds what is the last method used on each
       side.
     */
-    facul_method_t* fm =
+    facul_method_side_t* fm =
       strategies->methods[r[0]][r[1]];
     ASSERT (fm != NULL);
     int index_last_method[2] = {0, 0};      //the default_values
