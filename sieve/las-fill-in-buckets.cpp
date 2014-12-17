@@ -21,11 +21,11 @@
 extern pthread_mutex_t io_mutex;
 
 /* For memcpy in fill_in_k_buckets & fill_in_m_buckets.
-   When you have to move data which the lenght is a
+   When you have to move data whose length is a
    static const uint8_t N <= 16 bytes,
-   it's faster to move optimal_move[N] with a memcpy
-   (if you could do this, of course) :
-   it's done with only one or two instructions */
+   it is faster to move optimal_move[N]>=N bytes with a memcpy
+   (if possible, of course) :
+   it is done with one or two instructions */
 static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 16, 16, 16, 16, 16 };
 
 

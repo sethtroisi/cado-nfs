@@ -3,6 +3,10 @@
 
 #include <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void * malloc_check(const size_t x);
 extern void * physical_malloc(const size_t x, const int affect);
 extern void physical_free(const void *, size_t);
@@ -17,5 +21,9 @@ extern void free_pagealigned(const void * ptr);
 
 void *contiguous_malloc(size_t);
 void contiguous_free(const void *);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
