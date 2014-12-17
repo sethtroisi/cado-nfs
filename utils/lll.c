@@ -200,7 +200,7 @@ reduce ( long k, long l, mat_Z B, long *P, mpz_t *D,
    MulSubN (B.coeff[k], B.coeff[l], r, B.NumCols, t1);
 
    if (U)
-     MulSubN (U->coeff[k], U->coeff[l], r, B.NumCols, t1);
+     MulSubN (U->coeff[k], U->coeff[l], r, B.NumRows, t1);
 
    for (j = 1; j <= l-1; j++)
      if (P[j] != 0)
