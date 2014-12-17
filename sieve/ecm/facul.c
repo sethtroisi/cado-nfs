@@ -733,11 +733,9 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 	for (a = 0; a <= amfb; a++) {
 	  int index = 0;
 	  int first = (r < a);//begin by the largest cofactor.
-	  printf ("r = %d, a = %d, first = %d\n", r, a, first);
 	  for (int z  = 0; z < 2; z++)
 	    {
 	      int side = first ^ z;
-	      printf ("side = %d\n", side);
 	      for (int i = 0; i < ncurves[side] + 3; i++)
 		{
 		  methods[r][a][index].method =
@@ -745,7 +743,6 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		  methods[r][a][index].side = side;
 		  index++;
 		}
-	      getchar ();
 	    }
 	  //add NULL to show the end of the strategy.
 	  methods[r][a][index].method = NULL;
