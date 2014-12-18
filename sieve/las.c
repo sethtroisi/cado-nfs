@@ -455,7 +455,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * 'file-cofact'. Otherwise, we use a default strategy given by
      * the function facul_make_default_strategy ().
      */
-    //if (cofactfilename != NULL) { /* a file was given */
+
     FILE* file = NULL;
     if (cofactfilename != NULL) /* a file was given */
       file = fopen (cofactfilename, "r");
@@ -465,6 +465,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 					    sc->sides[1]->lim,
 					    sc->sides[1]->lpb,
 					    sc->sides[1]->mfb,
+					    sc->sides[0]->ncurves,
+					    sc->sides[1]->ncurves,
 					    file, 0);
     if (si->strategies == NULL)
       {
@@ -475,7 +477,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     if (file != NULL)
       fclose (file);
 
-    
     for(int s = 0 ; s < 2 ; s++) {
         sieve_info_print_fb_statistics(las, si, s);
 	/* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
@@ -2956,6 +2957,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     tts -= report->tn[0];
     tts -= report->tn[1];
     tts -= report->ttf;
+
     if (las->verbose)
         facul_print_stats (las->output);
 

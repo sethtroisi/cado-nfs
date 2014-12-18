@@ -112,7 +112,7 @@ int facul (unsigned long *, const mpz_t, const facul_strategy_t *);
 facul_strategies_t* facul_make_strategies (unsigned long, unsigned int,
 					   unsigned int, unsigned long,
 					   unsigned int, unsigned int,
-					   FILE*, const int);
+					   int, int, FILE*, const int);
 
 void facul_clear_strategies (facul_strategies_t*);
 
