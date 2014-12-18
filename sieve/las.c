@@ -1741,8 +1741,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
            purge_bucket() that way */
     }
 
-    pre_check_leftover_norm(S, si);
-
     /* Copy those bucket entries that belong to sieving survivors and
        store them with the complete prime */
     /* FIXME: choose a sensible size here */

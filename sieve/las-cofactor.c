@@ -35,53 +35,6 @@
    (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
                         -> cannot yield a relation
 */
-
-
-/*
- * This is a pre-check, based on the log-approximation in the sieve
- * array. In principle, this could save a lot of trial-divisions and
- * primality tests, if done early enough. However, this is costly and
- * since the log-approximation is not very good, we lose a lot of
- * relations.
- * Ideas to test for the future:
- *   - use it for the large holes, but not the one between 1 and 2 LP
- *   - move this check inside search_survivor(), so that the scanning is
- *   shared.
- */
-
-void pre_check_leftover_norm(unsigned char * const SS[2], sieve_info_srcptr si)
-{
-    unsigned char L[2], LL[2], LLL[2], BB[2], BBB[2], BBBB[2];
-    // TODO: precompute those and store them in si.
-    for (int side = 0; side < 2; ++side) {
-        L[side] = (unsigned char)(si->conf->sides[side]->lpb * si->sides[side]->scale);
-        LL[side] = (unsigned char)(2*si->conf->sides[side]->lpb * si->sides[side]->scale);
-        LLL[side] = (unsigned char)(3*si->conf->sides[side]->lpb * si->sides[side]->scale);
-        size_t bb = mpz_sizeinbase (si->BB[side], 2);
-        BB[side] = (unsigned char)(bb*si->sides[side]->scale);
-        size_t bbb = mpz_sizeinbase (si->BBB[side], 2);
-        BBB[side] = (unsigned char)(bbb*si->sides[side]->scale);
-        size_t bbbb = mpz_sizeinbase (si->BBBB[side], 2);
-        BBBB[side] = (unsigned char)(bbbb*si->sides[side]->scale);
-    }
-
-    const unsigned char GG=2;
-    for (int i = 0; i < 1 << LOG_BUCKET_REGION; i++) {
-        // TODO: fast scan
-        if (SS[0][i] == 255)
-            continue;
-        for (int side = 0; side < 2; side++) {
-            if ( (SS[side][i] > L[side]+GG && SS[side][i] < BB[side]-GG) ||
-                 (SS[side][i] > LL[side]+GG && SS[side][i] < BBB[side]-GG) ||
-                 (SS[side][i] > LLL[side]+GG && SS[side][i] < BBBB[side]-GG)) {
-                SS[0][i] = 255;
-                break;
-            }
-        }
-    }
-}
-
-
 int
 check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 {
