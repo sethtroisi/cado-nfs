@@ -935,7 +935,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 /*
  * This is our auxiliary factorization.
  * It applies a bunch of ECM curves with larger bounds to find
- * a factor with hight probability. It returns -1 if the factor
+ * a factor with high probability. It returns -1 if the factor
  * is not smooth, otherwise the number of
  * factors.
  */
