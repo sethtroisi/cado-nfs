@@ -824,6 +824,7 @@ mpz_poly_fprintf_verbose (FILE *out, mpz_poly_srcptr f, int verbose)
    To use only translation: use_translation = 1 and deg_rotation = -1
    To use only rotation   : use_transaltion = 0 and deg_rotation >= 0
    To use both            : use_translation = 1 and deg_rotation >= 0
+   TODO: _mp version like old optimize_aux_mp in auxiliary.c
 */
 double
 sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
@@ -914,7 +915,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
       {
         changedt = 1;
         logmu_opt = logmu;
-        mpz_poly_swap (ftmp, f_opt);
+        mpz_poly_swap (f_opt, ftmp);
         mpz_poly_translation (g_opt, g_opt, kt);
       }
       else
@@ -926,7 +927,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
         {
           changedt = 1;
           logmu_opt = logmu;
-          mpz_poly_swap (ftmp, f_opt);
+          mpz_poly_swap (f_opt, ftmp);
           mpz_poly_translation (g_opt, g_opt, tmp);
         }
       }
@@ -940,7 +941,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
       {
         changed[i] = 1;
         logmu_opt = logmu;
-        mpz_poly_swap (ftmp, f_opt);
+        mpz_poly_swap (f_opt, ftmp);
       }
       else
       {
@@ -951,7 +952,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
         {
           changed[i] = 1;
           logmu_opt = logmu;
-          mpz_poly_swap (ftmp, f_opt);
+          mpz_poly_swap (f_opt, ftmp);
         }
       }
     }

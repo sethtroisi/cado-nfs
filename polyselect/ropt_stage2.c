@@ -7,6 +7,7 @@
 #include "cado.h"
 #include "ropt_stage2.h"
 #include "portability.h"
+#include "size_optimization.h"
 
 
 /**
@@ -869,9 +870,13 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   sievescore_pq *sievescore;
   sievearray_t sa;
 
-  mpz_poly_t F;
+  mpz_poly_t F, G;
   F->coeff = s2param->f;
+  G->coeff = s2param->g;
   F->deg = poly->d;
+  G->deg = 1;
+  F->alloc = F->deg + 1;
+  G->alloc = 2;
 
   /* sieving length */
   len_A = (unsigned long) (s2param->Amax - s2param->Amin + 1);
@@ -968,7 +973,9 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
       mpz_set (s2param->g[0], poly->g[0]);
       mpz_set (s2param->g[1], poly->g[1]);
 
-      optimize_aux (F, s2param->g, 0, 0, OPT_STEPS_FINAL);
+      sopt_local_descent (F, G, F, G, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+      s2param->f = F->coeff;
+      s2param->g = G->coeff;
 
       MurphyE = print_poly_fg (F, s2param->g, poly->n, 0);
 

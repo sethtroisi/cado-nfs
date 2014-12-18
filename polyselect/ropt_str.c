@@ -8,33 +8,12 @@
 #include "ropt_str.h"
 #include "portability.h"
 #include "area.h"
+#include "size_optimization.h"
 
 
 /* -----------------*/
 /* Static Functions */
 /* -----------------*/
-
-
-/**
- * Replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), 
- * and return k to k0
- */
-static inline void
-rotate_aux_mpz ( mpz_t *f,
-                 mpz_t b,
-                 mpz_t m,
-                 mpz_t k0,
-                 mpz_t k,
-                 unsigned int t )
-{
-  mpz_t tmp;
-  mpz_init (tmp);
-  mpz_sub (tmp, k, k0);
-  mpz_addmul (f[t + 1], b, tmp);
-  mpz_submul (f[t], m, tmp);
-  mpz_set (k0, k);
-  mpz_clear (tmp);
-}
 
 
 /**
@@ -44,92 +23,53 @@ static inline void
 rotate_bounds_V_mpz ( ropt_poly_t poly,
                       ropt_bound_t bound )
 {
+  mpz_t V;
+  mpz_poly_t F0, G0, F, G;
 
-  int i, j;
-  double skewness, lognorm;
-  mpz_t *f, *g, b, m, tmpv, V;
-  mpz_poly_t F;
-
+  mpz_poly_init (F0, poly->d);
   mpz_poly_init (F, poly->d);
-  F->deg = poly->d;
-  f = F->coeff;
-  g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
-  for (j = 0; j <= poly->d; j ++)
-    mpz_set (f[j], poly->f[j]);
-  for (j = 0; j < 2; j ++)
-    mpz_init_set (g[j], poly->g[j]);
-  mpz_init_set (b, poly->g[1]);
-  mpz_init_set (m, poly->g[0]);
-  mpz_neg (m, m);
-  mpz_init_set_si (V, 1);
-  mpz_init_set_ui (tmpv, 0);
+  mpz_poly_init (G0, 1);
+  mpz_poly_init (G, 1);
+  mpz_poly_setcoeffs (F0, poly->f, poly->d);
+  mpz_poly_setcoeffs (G0, poly->g, 1);
 
   /* look for positive V: 2, 4, 8, ... */
-  for (i = 0; i < 150; i++, mpz_mul_si (V, V, 2) )
+  mpz_init_set_ui (V, 1);
+  for (unsigned int i = 0; i < 150; i++, mpz_mul_2exp (V, V, 1) )
   {
-    /* rotate by w*x */
-    rotate_aux_mpz (poly->f, b, m, tmpv, V, 0);
+    /* F = F0 + V*G0 */
+    mpz_poly_rotation (F, F0, G0, V, 0);
 
     /* translation-optimize the rotated polynomial */
-    for (j = 0; j <= poly->d; j ++)
-      mpz_set (f[j], poly->f[j]);
-    for (j = 0; j < 2; j ++)
-      mpz_set (g[j], poly->g[j]);
-
-    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
-
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-    lognorm = L2_lognorm (F, skewness);
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
 
     if (lognorm > bound->bound_lognorm)
       break;
   }
-
   mpz_set (bound->global_v_boundr, V);
-  mpz_set_si (V, 0);
 
-  /* rotate back */
-  rotate_aux_mpz (poly->f, b, m, tmpv, V, 0);
-
-  /* look for negative k: -2, -4, -8, ... */
+  /* look for negative V: -2, -4, -8, ... */
   mpz_set_si (V, -1);
-  for (i = 0; i < 150; i++, mpz_mul_si (V, V, 2))
+  for (unsigned int i = 0; i < 150; i++, mpz_mul_2exp (V, V, 1))
   {
-    /* rotate by w*x */
-    rotate_aux_mpz (poly->f, b, m, tmpv, V, 0);
+    /* F = F0 + V*G0 */
+    mpz_poly_rotation (F, F0, G0, V, 0);
 
     /* translation-optimize the rotated polynomial */
-    for (j = 0; j <= poly->d; j ++)
-      mpz_set (f[j], poly->f[j]);
-    for (j = 0; j < 2; j ++)
-      mpz_set (g[j], poly->g[j]);
-
-    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
-
-    /* get lognorm */
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-    lognorm = L2_lognorm (F, skewness);
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
 
     if (lognorm > bound->bound_lognorm)
       break;
   }
-
   mpz_set (bound->global_v_boundl, V);
 
-  /* rotate back */
-  mpz_set_ui (V, 0);
-  rotate_aux_mpz (poly->f, b, m, tmpv, V, 0);
-
+  mpz_poly_clear (F0);
   mpz_poly_clear (F);
-  for (j = 0; j < 2; j ++)
-    mpz_clear (g[j]);
-  free (g);
-  mpz_clear (b);
-  mpz_clear (m);
+  mpz_poly_clear (G0);
+  mpz_poly_clear (G);
   mpz_clear (V);
-  mpz_clear (tmpv);
 }
 
 
@@ -140,95 +80,51 @@ static inline void
 rotate_bounds_U_lu ( ropt_poly_t poly,
                      ropt_bound_t bound )
 {
-  unsigned int i;
-  int j;
-  double skewness, lognorm;
-  mpz_t *f, *g, b, m;
-  mpz_poly_t F;
-  
+  mpz_poly_t F0, G0, F, G;
+
+  mpz_poly_init (F0, poly->d);
   mpz_poly_init (F, poly->d);
-  F->deg = poly->d;
-  f = F->coeff;
-  g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
-  for (j = 0; j <= poly->d; j ++)
-    mpz_set (f[j], poly->f[j]);
-  for (j = 0; j < 2; j ++)
-    mpz_init_set (g[j], poly->g[j]);
-  mpz_init_set (b, poly->g[1]);
-  mpz_init_set (m, poly->g[0]);
-  mpz_neg (m, m);
+  mpz_poly_init (G0, 1);
+  mpz_poly_init (G, 1);
+  mpz_poly_setcoeffs (F0, poly->f, poly->d);
+  mpz_poly_setcoeffs (G0, poly->g, 1);
 
-  /* Look for positive w: 1, 2, 4, 8, ... Note (sizeof (long) * 8 - 3)
-     to prevent overflow in the rotate_aux(). */
-  long w0 = 0, w = 1;
-  for (i = 0; i < (sizeof (long) * 8 - 3); i++, w *= 2)
+  /* Look for positive u: 1, 2, 4, 8, ... */
+  int64_t u = 1;
+  for (unsigned int i = 0; i < 62; i++, u *= 2)
   {
-    /* rotate by w*x */
-    w0 = rotate_aux (poly->f, b, m, w0, w, 1);
+    /* F = F0 + u*x*G0 */
+    mpz_poly_rotation_int64 (F, F0, G0, u, 1);
 
     /* translation-optimize the rotated polynomial */
-    for (j = 0; j <= poly->d; j ++)
-      mpz_set (f[j], poly->f[j]);
-    for (j = 0; j < 2; j ++)
-      mpz_set (g[j], poly->g[j]);
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
 
-    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
-
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-    lognorm = L2_lognorm (F, skewness);
-    /*
-      fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, "
-      "bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
-    */
     if (lognorm > bound->bound_lognorm)
       break;
   }
+  bound->global_u_boundr = u;
 
-  bound->global_u_boundr = w;
-
-  /* go back to w=0 */
-  rotate_aux (poly->f, b, m, w0, 0, 1);
-
-  /* Look for negative w: -1, -2, -4, -8, ... Note (sizeof (long) * 8 - 3)
-     to prevent overflow in the rotate_aux(). */
-  w0 = 0;
-  w = -1;
-  for (i = 0; i < (sizeof (long int) * 8 - 3); i++, w *= 2)
+  /* Look for negative u: -1, -2, -4, -8, ... */
+  u = -1;
+  for (unsigned int i = 0; i < 62; i++, u *= 2)
   {
-    /* rotate by w*x */
-    w0 = rotate_aux (poly->f, b, m, w0, w, 1);
+    /* F = F0 + u*x*G0 */
+    mpz_poly_rotation_int64 (F, F0, G0, u, 1);
 
     /* translation-optimize the rotated polynomial */
-    for (j = 0; j <= poly->d; j ++)
-      mpz_set (f[j], poly->f[j]);
-    for (j = 0; j < 2; j ++)
-      mpz_set (g[j], poly->g[j]);
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
 
-    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
-
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-    lognorm = L2_lognorm (F, skewness);
-    /*
-      fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, "
-      "bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
-    */
     if (lognorm > bound->bound_lognorm)
       break;
   }
+  bound->global_u_boundl = u;
 
-  bound->global_u_boundl = w;
-
-  /* go back to w=0 */
-  rotate_aux (poly->f, b, m, w0, 0, 1);
-
+  mpz_poly_clear (F0);
   mpz_poly_clear (F);
-  for (j = 0; j < 2; j ++)
-    mpz_clear (g[j]);
-  free (g);
-  mpz_clear (b);
-  mpz_clear (m);
+  mpz_poly_clear (G0);
+  mpz_poly_clear (G);
 }
 
 
@@ -239,94 +135,49 @@ static inline void
 rotate_bounds_W_lu ( ropt_poly_t poly,
                      ropt_bound_t bound )
 {
-  int i, j;
-  double skewness, lognorm;
-  mpz_t *f, *g, b, m;
-  mpz_poly_t F;
+  mpz_poly_t F0, G0, F, G;
 
+  mpz_poly_init (F0, poly->d);
   mpz_poly_init (F, poly->d);
-  F->deg = poly->d;
-  f = F->coeff;
-  g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
-  for (i = 0; i <= poly->d; i ++)
-    mpz_set (f[i], poly->f[i]);
-  for (i = 0; i < 2; i ++)
-    mpz_init_set (g[i], poly->g[i]);
-  mpz_init_set (b, poly->g[1]);
-  mpz_init_set (m, poly->g[0]);
-  mpz_neg (m, m);
+  mpz_poly_init (G0, 1);
+  mpz_poly_init (G, 1);
+  mpz_poly_setcoeffs (F0, poly->f, poly->d);
+  mpz_poly_setcoeffs (G0, poly->g, 1);
 
-  /* look for positive w: , ... 0, 1, 2 */
-  long w0 = 0, w = 0;
-  for (i = 0; i < 4096; i++, w++)
+  /* look for positive w: 0, 1, 2, ... */
+  int64_t w = 0;
+  for (int64_t w = 0; w < 4096; w++)
   {
-    /* rotate by w*x */
-    w0 = rotate_aux (poly->f, b, m, w0, w, 2);
+    /* F = F0 + w*x^2*G0 */
+    mpz_poly_rotation_int64 (F, F0, G0, w, 2);
 
     /* translation-optimize the rotated polynomial */
-    for (j = 0; j <= poly->d; j ++)
-      mpz_set (f[j], poly->f[j]);
-    for (j = 0; j < 2; j ++)
-      mpz_set (g[j], poly->g[j]);
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
 
-    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
-
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-    lognorm = L2_lognorm (F, skewness);
-
-    /*
-      fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, "
-      "bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
-    */       
     if (lognorm > bound->bound_lognorm)
       break;
   }
-
   bound->global_w_boundr = w;
 
-  /* go back to w=0 */
-  rotate_aux (poly->f, b, m, w0, 0, 2);
-
-  /* look for negative w: , ... 0, -1, -2 */
-  w0 = 0;
-  w = 0;
-  for (i = 0; i < 4096; i++, w--)
+  for (int64_t w = 0; w > -4096; w--)
   {
-    /* rotate by w*x */
-    w0 = rotate_aux (poly->f, b, m, w0, w, 2);
+    /* F = F0 + w*x^2*G0 */
+    mpz_poly_rotation_int64 (F, F0, G0, w, 2);
 
     /* translation-optimize the rotated polynomial */
-    for (j = 0; j <= poly->d; j ++)
-      mpz_set (f[j], poly->f[j]);
-    for (j = 0; j < 2; j ++)
-      mpz_set (g[j], poly->g[j]);
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
 
-    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
-
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-    lognorm = L2_lognorm (F, skewness);
-
-    /*
-      fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f,
-      bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
-    */
     if (lognorm > bound->bound_lognorm)
       break;
   }
-
   bound->global_w_boundl = w;
-  
-  /* go back to w=0 */
-  rotate_aux (poly->f, b, m, w0, 0, 2);
 
+  mpz_poly_clear (F0);
   mpz_poly_clear (F);
-  for (i = 0; i < 2; i ++)
-    mpz_clear (g[i]);
-  free (g);
-  mpz_clear (b);
-  mpz_clear (m);
+  mpz_poly_clear (G0);
+  mpz_poly_clear (G);
 }
 
 
@@ -336,7 +187,7 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
 
 
 /**
- * Init ropt_poly_t. 
+ * Init ropt_poly_t.
  */
 void
 ropt_poly_init ( ropt_poly_t poly )
@@ -374,7 +225,7 @@ ropt_poly_init ( ropt_poly_t poly )
 
 
 /**
- * Evaluation polynomials at many points. 
+ * Evaluation polynomials at many points.
  */
 static inline void
 ropt_poly_setup_eval ( mpz_t *f,
@@ -406,7 +257,7 @@ ropt_poly_setup_eval ( mpz_t *f,
 
 
 /**
- * Precompute fx, gx and numerator in ropt_poly_t. Note: poly->f, 
+ * Precompute fx, gx and numerator in ropt_poly_t. Note: poly->f,
  * poly->g, poly->d, poly->n must be set in prior.
  * This function can be called to reset poly after rotation.
  */
@@ -419,7 +270,7 @@ ropt_poly_setup ( ropt_poly_t poly )
 
   mpz_init (t);
   /* degree */
-  for ( (poly->d) = MAXDEGREE; 
+  for ( (poly->d) = MAXDEGREE;
         (poly->d) > 0 && mpz_cmp_ui ((poly->f[poly->d]), 0) == 0;
         poly->d -- );
 
@@ -446,7 +297,7 @@ ropt_poly_setup ( ropt_poly_t poly )
   }
 
   /* pre-compute f(r) for all r < B */
-  ropt_poly_setup_eval ( poly->f, poly->g, poly->fx, poly->gx, 
+  ropt_poly_setup_eval ( poly->f, poly->g, poly->fx, poly->gx,
                          poly->numerator, primes, poly->d );
 
   /* projective alpha */
@@ -489,7 +340,7 @@ ropt_poly_free ( ropt_poly_t poly )
 
 
 /**
- * Init ropt_bound_t. 
+ * Init ropt_bound_t.
  */
 void
 ropt_bound_init ( ropt_bound_t bound )
@@ -587,7 +438,7 @@ ropt_bound_setup_others ( ropt_bound_t bound )
     bound->global_u_boundr = 1;
 
   /*
-    printf ("size: %ld, uboundr: %ld, uboundl: %ld\n", 
+    printf ("size: %ld, uboundr: %ld, uboundl: %ld\n",
             size, bound->global_u_boundr, bound->global_u_boundl);
   */
 
@@ -595,7 +446,7 @@ ropt_bound_setup_others ( ropt_bound_t bound )
                                 bound->global_u_boundl));
   if (size > 150)
     size = 150;
-  
+
   bound->exp_min_alpha = exp_alpha[size-1];
 }
 
@@ -675,7 +526,7 @@ ropt_bound_reset ( ropt_poly_t poly,
 
 
 /**
- * Free ropt_bound_t. 
+ * Free ropt_bound_t.
  */
 void
 ropt_bound_free ( ropt_bound_t bound )
@@ -702,13 +553,13 @@ ropt_s1param_init ( ropt_s1param_t s1param )
   /* set to 1 for using quicker, smaller nbest_sl for tunning
      sublattices */
   s1param->nbest_sl_tunemode = 0;
-  
+
   mpz_init_set_ui (s1param->modulus, 1UL);
 
-  s1param->e_sl = (unsigned int*) 
+  s1param->e_sl = (unsigned int*)
     malloc ( NUM_SUBLATTICE_PRIMES * sizeof (unsigned int) );
 
-  s1param->individual_nbest_sl = (unsigned int*) 
+  s1param->individual_nbest_sl = (unsigned int*)
     malloc ( NUM_SUBLATTICE_PRIMES * sizeof (unsigned int) );
 
   if (s1param->e_sl == NULL || s1param->individual_nbest_sl == NULL) {
@@ -752,9 +603,9 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
     if (sublattice > bound_by_u / 16)
       sublattice = bound_by_u / 16;
   }
-  else 
+  else
     sublattice = bound_by_u / 16;
-  
+
   mpz_poly_t F;
   F->coeff = poly->f;
   F->deg = poly->d;
@@ -768,7 +619,7 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
     if (default_sublattice_prod[i] > sublattice)
       break;
   /* fix if i too large */
-  i = (i >= NUM_DEFAULT_SUBLATTICE) ? 
+  i = (i >= NUM_DEFAULT_SUBLATTICE) ?
     (NUM_DEFAULT_SUBLATTICE - 1) : i;
 
   /* set e_sl[] from default array */
@@ -821,7 +672,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
                      ropt_param_t param )
 {
   unsigned int i, j;
-  
+
   /* Set 1: "len_e_sl" and "tlen_e_sl" */
   s1param->len_e_sl = NUM_SUBLATTICE_PRIMES;
   s1param->tlen_e_sl = s1param->len_e_sl;
@@ -831,10 +682,10 @@ ropt_s1param_setup ( ropt_poly_t poly,
   for (i = 0; i < 7; i ++)
     if (size_total_sublattices[i][0] > j)
       break;
-  
+
   s1param->nbest_sl = size_total_sublattices[i][1] * param->effort;
   //printf ("[Info] s1param->nbest_sl: %u\n", s1param->nbest_sl);
-  
+
   /* Set 3: set "e_sl[]" */
   ropt_s1param_setup_e_sl (poly, s1param, bound, param);
 
@@ -898,7 +749,7 @@ ropt_s2param_free ( ropt_poly_t poly,
                     ropt_s2param_t s2param )
 {
   int i;
-  
+
   mpz_clear (s2param->Umax);
   mpz_clear (s2param->Umin);
   mpz_clear (s2param->Vmax);
@@ -1060,7 +911,7 @@ ropt_s2param_setup_tune ( ropt_s1param_t s1param,
               len_p_rs, s1param->tlen_e_sl );
   }
   s2param->len_p_rs = len_p_rs;
-  
+
   /* set tune sieving length */
   ropt_s2param_setup_tune_range (s2param, Amax, Bmax);
 

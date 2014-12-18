@@ -49,37 +49,35 @@ main (int argc, char **argv)
     kmax = strtol(argv[2], NULL, 10);
     MAX_k = kmax;
 
-    mpz_poly_t F;
-    F->coeff = poly->alg->coeff;
-    F->deg = poly->alg->deg;
-    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
 
     printf ("Initial polynomial:\n");
     if (verbose)
       print_cadopoly_extra (stdout, poly, argc0, argv0, 0);
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n", poly->skew,
-              get_alpha (F, ALPHA_BOUND));
-    size_optimization (F, poly->rat, F, poly->rat, SOPT_DEFAULT_EFFORT,
-                                                                   verbose - 1);
-    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+              get_alpha (poly->alg, ALPHA_BOUND));
+    size_optimization (poly->alg, poly->rat, poly->alg, poly->rat,
+                       SOPT_DEFAULT_EFFORT, verbose - 1);
+    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
     
     printf ("After norm optimization:\n");
     if (verbose)
       print_cadopoly_extra (stdout, poly, argc0, argv0, 0);
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n",
-              poly->skew, get_alpha (F, ALPHA_BOUND));
+              poly->skew, get_alpha (poly->alg, ALPHA_BOUND));
 
     mpz_set (b, poly->rat->coeff[1]);
     mpz_neg (m, poly->rat->coeff[0]);
-    rotate (F, alim, m, b, &jmin, &kmin, 0, verbose - 1);
+    rotate (poly->alg, alim, m, b, &jmin, &kmin, 0, verbose - 1);
     mpz_set (poly->rat->coeff[1], b);
     mpz_neg (poly->rat->coeff[0], m);
     /* optimize again, but only translation */
     mpz_poly_fprintf (stdout, poly->rat);
-    optimize_aux (F, poly->rat->coeff, verbose - 1, 0, SOPT_DEFAULT_MAX_STEPS);
-    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    sopt_local_descent (poly->alg, poly->rat, poly->alg, poly->rat, 1, -1,
+                                          SOPT_DEFAULT_MAX_STEPS, verbose - 1);
+    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
     mpz_clear(b);
     mpz_clear(m);
 

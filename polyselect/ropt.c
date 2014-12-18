@@ -13,6 +13,7 @@
 #include "ropt.h"
 #include "portability.h"
 #include "area.h"
+#include "size_optimization.h"
 
 
 /**
@@ -26,7 +27,7 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   double ave_MurphyE = 0.0, best_E = 0.0;
   int i, old_i, k;
   mpz_t m, t, *fuv, *guv;
-  mpz_poly_t Fuv;
+  mpz_poly_t Fuv, Guv;
 
   mpz_init_set (m, poly->g[0]);
   mpz_neg (m, m);
@@ -34,18 +35,15 @@ ropt_get_bestpoly ( ropt_poly_t poly,
 
   /* var for computing E */
   mpz_poly_init (Fuv, poly->d);
+  mpz_poly_init (Guv, 1);
   Fuv->deg = poly->d;
+  Guv->deg = 1;
   fuv = Fuv->coeff;
-  guv = (mpz_t*) malloc (2 * sizeof (mpz_t));
-  if (guv == NULL) {
-    fprintf (stderr, "Error, cannot allocate memory in "
-             "ropt_get_bestpoly().\n");
-    exit (1);
-  }
+  guv = Guv->coeff;
   for (i = 0; i <= poly->d; i++)
     mpz_set (fuv[i], poly->f[i]);
   for (i = 0; i < 2; i++)
-    mpz_init_set (guv[i], poly->g[i]);
+    mpz_set (guv[i], poly->g[i]);
 
   /* output all polys in the global queue */
   for (i = 1; i < global_E_pqueue->used; i ++) {
@@ -63,7 +61,9 @@ ropt_get_bestpoly ( ropt_poly_t poly,
     compute_fuv_mp (fuv, poly->f, poly->g, poly->d, global_E_pqueue->u[i],
                     global_E_pqueue->v[i]);
 
-    optimize_aux (Fuv, guv, 0, 0, OPT_STEPS_FINAL);
+    sopt_local_descent (Fuv, Guv, Fuv, Guv, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    fuv = Fuv->coeff;
+    guv = Guv->coeff;
 
     ave_MurphyE = print_poly_fg (Fuv, guv, poly->n, 0);
 
@@ -84,11 +84,9 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   }
 
   mpz_poly_clear (Fuv);
-  for (i = 0; i < 2; i++)
-    mpz_clear (guv[i]);
+  mpz_poly_clear (Guv);
   mpz_clear (m);
   mpz_clear (t);
-  free (guv);
 }
 
 
