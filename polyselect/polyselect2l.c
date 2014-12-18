@@ -427,6 +427,7 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   /* optimize size */
   mpz_poly_t G;
   G->deg = 1;
+  G->alloc = 2;
   G->coeff = g;
 
   st = seconds_thread ();

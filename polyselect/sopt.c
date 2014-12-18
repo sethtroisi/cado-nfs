@@ -177,6 +177,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 
       mpz_poly_t G;
       G->deg = 1;
+      G->alloc = 2;
       G->coeff = g;
 
       /* optimize */
