@@ -285,10 +285,12 @@ sopt_compute_roots_and_extrema_close_to_0 (double *roots_and_extrema,
       {
         roots_and_extrema[kept++] = x;
         if (verbose)
-          printf ("Keeping x = %f, f(x) = %f, f''(x) = %f\n", x, Rx, ddRx);
+          fprintf (stderr, "Keeping x = %f, f(x) = %f, f''(x) = %f\n",
+                           x, Rx, ddRx);
       }
       else if (verbose)
-        printf ("Not keeping x = %f, f(x) = %f, f''(x) = %f\n", x, Rx, ddRx);
+        fprintf (stderr, "Not keeping x = %f, f(x) = %f, f''(x) = %f\n",
+                         x, Rx, ddRx);
     }
 
     double_poly_clear (dR);
@@ -1013,6 +1015,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
    found by sopt_find_translation_deg* and the translation k = 0.
    TODO: LLL on gram matrix to be faster
    TODO: precompute skew^i for i in [0..d]
+   TODO: return the n better poly not only the best one
 */
 double
 size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
