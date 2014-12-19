@@ -126,6 +126,8 @@ generate_all_decomp (int mfb, unsigned long lim)
           for (i = 0; i < k - 1; i++)
             l[i] = imin;
           l[k-1] = mfb + j - (k - 1) * imin;
+	  if (l[k-1] < imin)
+	    continue;
           while (1)
             {
               double val = psi (l, k, mfb, lim);
