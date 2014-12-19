@@ -151,7 +151,13 @@ int main(int argc, char *argv[])
 	  file = stdout;
 	else
 	  file = fopen (file_out, "w");
-
+	if (file == NULL)
+	  {
+	    fprintf(stderr, "Error: impossible to write in %s.\n", file_out);
+	    param_list_print_usage(pl, argv[0], stderr);
+	    exit(EXIT_FAILURE);
+	  }
+	   
 	tabular_decomp_t* res = generate_all_decomp (mfb0, lim0);
 	tabular_decomp_fprint (file, res);
 	tabular_decomp_free (res);
