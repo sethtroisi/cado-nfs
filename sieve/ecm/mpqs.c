@@ -213,13 +213,22 @@ int prime_index[INDEX];
 
 uint64_t *invp;
 
+inline void
+setbit (mpz_t row, int shift, unsigned long i, unsigned short *W, long *ncolw)
+{
+  mpz_setbit (row, shift + i);
+  *ncolw += (W[i] == 0);
+  W[i] ++;
+}
+
 /* Check that ((a*i+b)^2-N)/a is smooth. By construction, almost all inputs
    are smooth.
    We put relations in column 'shift' and above.
 */
 int
 is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
-           unsigned long ncol, int shift, mpz_t row)
+           unsigned long ncol, int shift, mpz_t row, unsigned short *W,
+           long *ncolw)
 {
   mpz_t r;
   int res = 0;
@@ -236,7 +245,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
   mpz_divexact (r, r, a);
   if (mpz_sgn (r) < 0)
     {
-      mpz_setbit (row, shift + 0); /* sign is in column 0 */
+      setbit (row, shift, 0, W, ncolw); /* sign is in column 0 */
       mpz_neg (r, r);
     }
 
@@ -254,7 +263,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
           } while (mpz_divisible_ui_p (r, p));
 
           if (e & 1)
-            mpz_setbit (row, shift + i + 1);
+            setbit (row, shift, i + 1, W, ncolw);
 
           /* we don't check for cases where r = 1 or is a prime <= B here,
              since they will have very rarely */
@@ -286,7 +295,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
             ularith_mul_ul_ul_2ul (&r0, &r1, q, p);
           } while (r1 == 0);
           if (e & 1)
-            mpz_setbit (row, shift + i + 1);
+            setbit (row, shift, i + 1, W, ncolw);
           /* now since R has no factor <= p it is either 1 or a prime > p,
              or a product > p^2 of at least two primes  */
           if (R <= B)
@@ -297,7 +306,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
                 {
                   i = prime_index[R];
                   ASSERT(R == P[i]);
-                  mpz_setbit (row, shift + i + 1);
+                  setbit (row, shift, i + 1, W, ncolw);
                 }
               res = 1;
               goto end;
@@ -506,12 +515,13 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   mpz_t *Mat, *X;
   unsigned char *S, *T, *Logp, logp, log2[8], threshold = 0;
   unsigned long *P, *Q, p, k;
-  long M, i, j, *K, wrel, nrel = 0, lim;
+  long M, i, j, *K, wrel, nrel = 0, lim, ncolw = 0;
   mpz_t a, b, c, sqrta;
   double maxnorm, radix, logradix = 0;
   long st;
   static long init_time = 0, sieve_time = 0, check_time = 0;
   static long gauss_time = 0, total_time = 0;
+  unsigned short *W; /* column weight */
 
   init_time -= cputime ();
 
@@ -527,6 +537,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   P = malloc (ncol * sizeof (unsigned long));
   K = malloc (ncol * sizeof (unsigned long));
   invp = malloc (ncol * sizeof (uint64_t));
+  W = malloc ((ncol + 1) * sizeof (unsigned short));
   /* a prime p can appear in x^2 mod N only if p is a square modulo N */
   mpz_ui_pow_ui (b, 2, 64);
   memset (prime_index, 0, INDEX * sizeof (int));
@@ -590,6 +601,8 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 
   /* we want 'a' to be a square */
   mpz_sqrt (sqrta, a);
+
+  memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
   init_time += cputime ();
   printf ("init: %ldms\n", init_time);
@@ -718,11 +731,11 @@ mpqs (mpz_t f, mpz_t N, long ncol)
       if (S[M + i] >= threshold)
         {
           count ++;
-          if (is_smooth (a, M + i, b, N, P, ncol, wrel, Mat[nrel]))
+          if (is_smooth (a, M + i, b, N, P, ncol, wrel, Mat[nrel], W, &ncolw))
             {
               mpz_setbit (Mat[nrel], nrel);
-              mpz_set (X[nrel], b);
-              mpz_addmul_ui (X[nrel], a, M + i);
+              mpz_mul_ui (X[nrel], a, M + i);
+              mpz_add (X[nrel], X[nrel], b);
               nrel ++;
               // printf ("%ld: i=%ld\n", nrel, i);
             }
@@ -737,6 +750,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   printf ("%ld rels with %d polynomials: %f per poly\n",
           nrel, pols, (double) nrel / (double) pols);
 
+  printf ("%lu %lu %lu\n", nrel, ncolw + 10, wrel);
   gauss_time -= cputime ();
   gauss (f, Mat, nrel, ncol + 1, X, N);
   st = cputime ();
@@ -756,6 +770,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   free (K);
   free (P);
   free (Q);
+  free (W);
   mpz_clear (c);
   mpz_clear (b);
   mpz_clear (sqrta);
