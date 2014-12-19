@@ -350,16 +350,22 @@ update (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
 #endif
 }
 
-/* update 8 bytes at a time */
+/* Update 8 bytes at a time for p=2. If b is even, since a and N are odd,
+   the double root of (a*x+b)^2 = N (mod 2) is i=1. */
 static inline void
 update8 (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
         unsigned char logp, unsigned int M MAYBE_UNUSED)
 {
   uint64_t l8, *S8 = (uint64_t*) S;
 
+  /* Sieve 2, 4 and 8 simultaneously:
+     if N = 1 (mod 8) then 8 divides x^2-N for x = 1, 3, 5, 7
+     if N = 3 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7
+     if N = 5 (mod 8) then 4 divides x^2-N for x = 1, 3, 5, 7
+     if N = 7 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7. */
   l8 = logp;
-  l8 = (i == 0) ? (l8 << 48) | (l8 << 32) | (l8 << 16) | l8
-    : (l8 << 56) | (l8 << 40) | (l8 << 24) | (l8 << 8);
+  ASSERT_ALWAYS(i == 1);
+  l8 = (l8 << 56) | (l8 << 40) | (l8 << 24) | (l8 << 8);
   for (i = 0; i < 2*M; i+=8)
     S8[i>>3] += l8;
 }
@@ -558,7 +564,7 @@ mpqs (mpz_t f, mpz_t N, long ncol)
         }
     }
   ASSERT_ALWAYS(i < MAX_PRIMES);
-  printf ("largest prime is %lu\n", P[ncol - 1]);
+  ASSERT_ALWAYS(P[0] == 2); /* required by the sieve */
 #ifdef LARGE_PRIME
   lim = ncol / 2;    /* factor base bound */
   wrel = ncol - 185; /* wanted number of relations */
@@ -605,7 +611,6 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
   init_time += cputime ();
-  printf ("init: %ldms\n", init_time);
 
   int pols = 0;
   while (nrel < wrel) {
@@ -630,6 +635,9 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   mpz_mod (b, b, sqrta);
   mpz_mul (b, b, sqrta);
   mpz_add_ui (b, b, k);
+  /* we want b even to ensure k=1 is a root of (a*k+b)^2 = N (mod 2) */
+  if (mpz_tstbit (b, 0) == 1)
+    mpz_sub (b, b, a);
 #ifdef TRACE
   gmp_printf ("a=%Zd\nb=%Zd\n", a, b);
 #endif
@@ -672,9 +680,13 @@ mpqs (mpz_t f, mpz_t N, long ncol)
 #else
       threshold = T[0] - 39;
 #endif
+      /* we want S[i] >= T[i] - xxx, thus S[i] + T[0] >= T[i] + T[0] - xxx
+         thus S[i] + (T[0] - T[i]) >= T[0] - xxx */
       for (i = 1; i < 2*M; i++)
         T[i] = T[0] - T[i];
       T[0] = 0;
+      logp = log2[mpz_getlimbn (N, 0) & 7];
+      update8 (T, 1, 2, logp, M);
     }
 
   memcpy (S, T, 2 * M);
@@ -682,38 +694,22 @@ mpqs (mpz_t f, mpz_t N, long ncol)
   /* sieve */
   mpz_submul_ui (b, a, M);
   batch_invert (Q, P, lim, aa);
-  for (j = 0; j < lim; j++)
+  /* skip prime p=2 (j=0) which is already taken into account in T[] */
+  for (j = 1; j < lim; j++)
     {
       unsigned long k2;
       long i2;
+
       p = P[j];
       k = findroot (&k2, mpz_fdiv_ui (b, p), p, K[j], Q[j]);
-#ifdef TRACE_P
-      if (p == TRACE_P)
-        printf ("p=%lu k=%lu k2=%lu\n", p, k, k2);
-#endif
-      if (p == 2)
+      logp = Logp[j];
+      for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
         {
-          /* Sieve 2, 4 and 8 simultaneously:
-             if N = 1 (mod 8) then 8 divides x^2-N for x = 1, 3, 5, 7
-             if N = 3 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7
-             if N = 5 (mod 8) then 4 divides x^2-N for x = 1, 3, 5, 7
-             if N = 7 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7.
-          */
-          logp = log2[mpz_getlimbn (N, 0) & 7];
-          update8 (S, k, p, logp, M);
+          update (S, i, p, logp, M);
+          update (S, i2, p, logp, M);
         }
-      else
-        {
-          logp = Logp[j];
-          for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
-            {
-              update (S, i, p, logp, M);
-              update (S, i2, p, logp, M);
-            }
-          if (i < 2*M)
-            update (S, i, p, logp, M);
-        }
+      if (i < 2*M)
+        update (S, i, p, logp, M);
     }
 
   st = cputime ();

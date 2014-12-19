@@ -767,6 +767,39 @@ mpz_poly_mul_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
   mpz_clear (aux);
 }
 
+/* Set ft(x) = f(x+k) where k is an mpz_t, ft and f can be the same poly. */
+void
+mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
+{
+  int i, j;
+  int d = f->deg;
+  mpz_poly_set (ft, f);
+
+  for (i = d - 1; i >= 0; i--)
+    for (j = i; j < d; j++)
+      mpz_addmul (ft->coeff[j], ft->coeff[j+1], k);
+}
+
+/* Set h = fr + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
+ * assumptions are not checked). fr and f can be the same poly */
+void mpz_poly_rotation (mpz_poly_ptr fr, mpz_poly_srcptr f, mpz_poly_srcptr g,
+                        const mpz_t k, int t)
+{
+  mpz_poly_set (fr, f);
+  for (int i = 0; i <= g->deg; i++)
+    mpz_addmul (fr->coeff[i+t], g->coeff[i], k);
+}
+
+/* Set h = fr + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
+ * assumptions are not checked). fr and f can be the same poly */
+void mpz_poly_rotation_int64 (mpz_poly_ptr fr, mpz_poly_srcptr f,
+                              mpz_poly_srcptr g, const int64_t k, int t)
+{
+  mpz_poly_set (fr, f);
+  for (int i = 0; i <= g->deg; i++)
+    mpz_addmul_int64 (fr->coeff[i+t], g->coeff[i], k);
+}
+
 /* h=rem(h, f) mod N, f not necessarily monic, N not necessarily prime */
 /* Coefficients of f must be reduced mod N
  * Coefficients of h need not be reduced mod N on input, but are reduced

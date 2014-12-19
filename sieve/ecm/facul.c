@@ -24,12 +24,21 @@ int is_first_brent12[2] = {true, true};
  * multithreaded sieving, the stats might be wrong...
  */
 
+//{for the facul statistics.
 unsigned long stats_called[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
+//for the auxiliary factorization.
+unsigned long stats_called_aux[STATS_LEN] = {
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+};
+int stats_current_index = 0; //only useful for stats_found_n!
 unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -182,6 +191,20 @@ void facul_print_stats (FILE *stream)
     }
   fprintf (stream, ". Total: %lu\n", sum);
 
+  fprintf (stream, "# histogram of auxiliary methods called: ");
+  notfirst = 0;
+  sum = 0;
+  for (i = 0; i < STATS_LEN; i++)
+    {
+      sum += stats_called_aux[i];
+      if (stats_called_aux[i] > 0UL)
+	fprintf (stream, "%s %d: %lu", 
+		 (notfirst++) ? ", " : "", i, stats_called_aux[i]);
+    }
+  fprintf (stream, ". Total: %lu\n", sum);
+
+  
+  
   fprintf (stream, "# histogram of input numbers found: ");
   notfirst = 0;
   sum = 0;
@@ -607,9 +630,9 @@ facul_make_aux_methods (int n, const int verbose)
 facul_method_t*
 facul_make_default_strategy (int n, const int verbose)
 {
-  ASSERT_ALWAYS (n >= 0);
+  ASSERT_ALWAYS (n >= 0);  
   facul_method_t *methods = malloc ((n+4) * sizeof (facul_method_t));
-  
+
   /* run one P-1 curve with B1=315 and B2=2205 */
   methods[0].method = PM1_METHOD;
   methods[0].plan = malloc (sizeof (pm1_plan_t));
@@ -679,14 +702,14 @@ facul_clear_aux_methods (facul_method_t *methods)
 
 
 /*
- * Create our strategy book from a file (if a file is given :) ) and
+ * Create our strategy book from a file (if a file is given) and
  * otherwise from our default strategy.
  */
 facul_strategies_t*
 facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      const unsigned int rmfb, const unsigned long afbb,
 		      const unsigned int alpb, const unsigned int amfb,
-		      FILE* file, const int verbose)
+		      int n0, int n1, FILE* file, const int verbose)
 {
   //printf ("create strategies!\n");
   facul_strategies_t* strategies = malloc (sizeof(facul_strategies_t));
@@ -722,10 +745,10 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   /*Default strategy. */ 
   if (file == NULL)
     {//make_default_strategy
-      printf ("#default strategy for the cofactorization!\n");
+      verbose_output_print(0, 1, "# Using default strategy for the cofactorization\n");
       int ncurves[2];
-      ncurves[0] = nb_curves (rlpb);
-      ncurves[1] = nb_curves (alpb);
+      ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
+      ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
       int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
       strategies->precomputed_methods =
 	facul_make_default_strategy (max_ncurves,verbose);
@@ -750,7 +773,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     }
   else
     {/* to precompute our method from the file.*/
-      printf ("#read the cofactorization file\n");
+      verbose_output_print(0, 1, "# Read the cofactorization strategy file\n");
       facul_method_t* precomputed_methods =
 	malloc (sizeof(facul_method_t) * NB_MAX_METHODS);
       precomputed_methods[0].method = 0;
@@ -789,6 +812,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       }
       methods[index_last_method[0]].is_the_last = 1;
       methods[index_last_method[1]].is_the_last = 1;
+      ASSERT_ALWAYS (index_last_method[0] < STATS_LEN &&
+		     index_last_method[1] < STATS_LEN);
     }
 
   //Create the auxiliary methods!
@@ -910,7 +935,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 /*
  * This is our auxiliary factorization.
  * It applies a bunch of ECM curves with larger bounds to find
- * a factor with hight probability. It returns -1 if the factor
+ * a factor with high probability. It returns -1 if the factor
  * is not smooth, otherwise the number of
  * factors.
  */
@@ -926,6 +951,7 @@ facul_aux (unsigned long *factors, const modset_t m,
   int i = 0;
   for (i = method_start ;methods[i].method != 0; i++)
     {
+      stats_called_aux[i]++;
       modset_t fm, cfm;
 
       int res_fac = 0;
@@ -1016,6 +1042,7 @@ facul_aux (unsigned long *factors, const modset_t m,
 	}
       break;
     }
+
   return found;
 }
 
@@ -1049,12 +1076,24 @@ facul_both_src (unsigned long **factors, const modset_t* m,
   f[0][1].arith = CHOOSE_NONE;
   f[1][0].arith = CHOOSE_NONE;
   f[1][1].arith = CHOOSE_NONE;
-
+  int stats_nb_side = 0, stats_index_transition = 0;
   for (int i = 0; methods[i].method != NULL; i++)
     {
+      //{for the stats
+      stats_current_index = i - stats_nb_side * stats_index_transition;
+      if (methods[i].is_the_last)
+	{
+	  stats_nb_side = 1;
+	  stats_index_transition = i+1;
+	}
+      //}
       int side = methods[i].side;
       if (is_smooth[side] != FACUL_MAYBE)
 	continue;
+
+      //{for the stats
+      stats_called[stats_current_index]++;
+      //}
       int res_fac = 0;
       switch (m[side].arith) {
       case CHOOSE_UL:
@@ -1110,7 +1149,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	    continue;
 	}
       found[side] = res_fac;
-
+      
       if (res_fac == 2)
 	{
 	  /*

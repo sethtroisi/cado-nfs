@@ -305,7 +305,12 @@ void rootsieve_poly(mpz_t *g, const unsigned long d,
     mpz_neg (g[0], m);
     mpz_clear(m);
     /* optimize again, but only translation */
-    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
+    mpz_poly_t G;
+    G->deg = 1;
+    G->alloc = 2;
+    G->coeff = g;
+    sopt_local_descent (F, G, F, G, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    g = G->coeff;
   }
 #else
   mpz_t m;
@@ -315,7 +320,12 @@ void rootsieve_poly(mpz_t *g, const unsigned long d,
   mpz_neg (g[0], m);
   mpz_clear(m);
   /* optimize again, but only translation */
-  optimize_aux (F, g, 0, 0);
+  mpz_poly_t G;
+  G->deg = 1;
+  G->alloc = 2;
+  G->coeff = g;
+  sopt_local_descent (F, G, F, G, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+  g = G->coeff;
 #endif
 
   mutex_lock (&lock);
@@ -427,6 +437,7 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   /* optimize size */
   mpz_poly_t G;
   G->deg = 1;
+  G->alloc = 2;
   G->coeff = g;
 
   st = seconds_thread ();

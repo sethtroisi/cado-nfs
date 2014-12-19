@@ -6,6 +6,7 @@
 
 extern unsigned long stats_called[];
 extern unsigned long stats_found_n[];
+extern int stats_current_index;
 
 int
 primetest (const modulus_t m)
@@ -155,7 +156,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       if (i > 3 && mod_intbits (n) > 64)
         break;
 #endif
-      
+
       stats_called[i]++;
       
       if (strategy->methods[i].method == PM1_METHOD)
@@ -488,7 +489,7 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
       
   if (mod_intequal (f, n))
     {
-
+      stats_found_n[stats_current_index]++;
       if (bt == 0)
 	{
 	  /* Input number was found without any backtracking happening?

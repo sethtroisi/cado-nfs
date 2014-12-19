@@ -41,7 +41,6 @@ tabular_strategy_t ***extract_matrix_strat(const char *pathname_st,
 
     for (int r0 = 0; r0 < len_abs; r0++) {
 	for (int r1 = 0; r1 < len_ord; r1++) {
-	    //todo: define the name_file
 	    char name_file[strlen(pathname_st) + 20];
 	    sprintf(name_file, "%s/strategies_%d_%d", pathname_st, r0, r1);
 	    FILE *file = fopen(name_file, "r");
@@ -226,7 +225,6 @@ sampling_function(tabular_strategy_t *** matrix_strat,
   number of relations per seconde in the sieving step.
   (cofactor + precomputation sieve).
 */
-//change the sense of s s 
 strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
 				    unsigned long **distrib_C, int len_abs,
 				    int len_ord, double C0)

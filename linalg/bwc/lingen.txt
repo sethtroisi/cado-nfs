@@ -20,57 +20,11 @@ OMP_THREAD_LIMIT and OMP_NUM_THREADS (I don't know which does what) have
 also failed. The real thing to do anyway would be to provide multi node
 parallelism, as is done with plingen.
 
-Action 1
+Action 1 (done in commit 0586c99)
 ========
 
 Making the OMP patch work should be doable within a reasonable amount of
 time, I expect.
-
-The patch consists of modifications like this one.
-
-@@ -861,16 +875,22 @@ void glue4(
- {
-     unsigned int nr2 = dst.nrows >> 1;
-     unsigned int nc2 = dst.ncols >> 1;
--    for(unsigned int i = 0; i < nr2; ++i) {
--        for(unsigned int j = 0; j < nc2; ++j) {
--            o.cpy(dst.poly(i,j), s00.poly(i,j));
--            o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
--        }
--    }
--    for(unsigned int i = 0; i < nr2; ++i) {
--        for(unsigned int j = 0; j < nc2; ++j) {
--            o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
--            o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
-+#ifdef  HAVE_OPENMP
-+#pragma omp parallel
-+#endif  /* HAVE_OPENMP */
-+    {
-+        int k MAYBE_UNUSED = 0;
-+        for(unsigned int i = 0; i < nr2; ++i) {
-+            for(unsigned int j = 0; j < nc2; ++j) {
-+                if (OMP_ROUND(k++))
-+                    o.cpy(dst.poly(i,j), s00.poly(i,j));
-+                if (OMP_ROUND(k++))
-+                    o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
-+                if (OMP_ROUND(k++))
-+                    o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
-+                if (OMP_ROUND(k++))
-+                    o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
-+            }
-         }
-     }
- }
-
-There are several such chunks. The strategy for debugging is:
-
- - get a krylov sequence for an example where the openmp-enabled lingen
-   fails (pre-2aa05ed) ; a c120 test fails, but I'm quite confident that
-   finding a smaller one is easy.
- - enable the significant chunks in commit
-   08b019b801b100d72dd4640955b356dd7b5334a2 one by one, see which one
-   modifies the output.
-
 
 Action 2
 ========
@@ -131,6 +85,9 @@ lot by enabling cantor, and enacting reasonable parallelism.
 At the leaves of the recursion, we have small (512x768) binary linear
 system solving (PLUQ-like). Currently, this seems to represent too much
 time. I am confident that improvement is possible here as well.
+
+Update: on a c125, 94% of the total time spent in the leaves (go_quadratic)
+is spent in extract_coeff_degree_t(), and only 6% in gauss().
 
 Action 3
 ========

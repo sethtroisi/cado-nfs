@@ -70,9 +70,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
   int i, nroots, skip = 0;
   unsigned flag = 0UL, count = 0;
   char str[MAX_LINE_LENGTH];
-  mpz_t g[2];
-  mpz_t *f;
-  mpz_poly_t F;
+  mpz_poly_t F, G;
   mpz_t t, M;
   double skew = 0.0, alpha = 0.0, logmu = 0.0;
   double ave_logmu = 0.0, ave_alpha = 0.0;
@@ -80,11 +78,10 @@ opt_file (FILE *file, int deg, mpz_t N) {
 
   mpz_init (t);
   mpz_init (M);
-  mpz_init (g[1]);
-  mpz_init (g[0]);
   mpz_poly_init (F, deg);
+  mpz_poly_init (G, 1);
   F->deg = deg;
-  f = F->coeff;
+  G->deg = 1;
 
   while (1) {
     /* wrong line or EOF */
@@ -92,11 +89,11 @@ opt_file (FILE *file, int deg, mpz_t N) {
       break;
     if ( str[0] == 'Y' ) {
       if ( str[1] == '1' ) {
-        gmp_sscanf (str, "Y1: %Zd\n", g[1]);
+        gmp_sscanf (str, "Y1: %Zd\n", G->coeff[1]);
         (flag) ^= ( 1<<(8) );
       }
       else if ( str[1] == '0' ) {
-        gmp_sscanf (str, "Y0: %Zd\n", g[0]);
+        gmp_sscanf (str, "Y0: %Zd\n", G->coeff[0]);
         (flag) ^= ( 1<<(7) );
       }
       else {
@@ -106,31 +103,31 @@ opt_file (FILE *file, int deg, mpz_t N) {
     }
     else if ( str[0] == 'c') {
       if ( str[1] == '0' ) {
-        gmp_sscanf (str, "c0: %Zd\n", f[0]);
+        gmp_sscanf (str, "c0: %Zd\n", F->coeff[0]);
         (flag) ^= ( 1<<(0) );
       }
       else if ( str[1] == '1' ) {
-        gmp_sscanf (str, "c1: %Zd\n", f[1]);
+        gmp_sscanf (str, "c1: %Zd\n", F->coeff[1]);
         (flag) ^= ( 1<<(1) );
       }
       else if ( str[1] == '2' ) {
-        gmp_sscanf (str, "c2: %Zd\n", f[2]);
+        gmp_sscanf (str, "c2: %Zd\n", F->coeff[2]);
         (flag) ^= ( 1<<(2) );
       }
       else if ( str[1] == '3' ) {
-        gmp_sscanf (str, "c3: %Zd\n", f[3]);
+        gmp_sscanf (str, "c3: %Zd\n", F->coeff[3]);
         (flag) ^= ( 1<<(3) );
       }
       else if ( str[1] == '4' ) {
-        gmp_sscanf (str, "c4: %Zd\n", f[4]);
+        gmp_sscanf (str, "c4: %Zd\n", F->coeff[4]);
         (flag) ^= ( 1<<(4) );
       }
       else if ( str[1] == '5' ) {
-        gmp_sscanf (str, "c5: %Zd\n", f[5]);
+        gmp_sscanf (str, "c5: %Zd\n", F->coeff[5]);
         (flag) ^= ( 1<<(5) );
       }
       else if ( str[1] == '6' ) {
-        gmp_sscanf (str, "c6: %Zd\n", f[6]);
+        gmp_sscanf (str, "c6: %Zd\n", F->coeff[6]);
         (flag) ^= ( 1<<(6) );
       }
       else
@@ -145,54 +142,49 @@ opt_file (FILE *file, int deg, mpz_t N) {
     /* consider raw polynomial only */
     if ( (flag == FLAG_TERMINATION[deg]) &&  (skip == 0) ) {
       /* M = -Y0/Y1 mod N */
-      mpz_invert (M, g[1], N);
+      mpz_invert (M, G->coeff[1], N);
       mpz_neg (M, M);
-      mpz_mul (M, M, g[0]);
+      mpz_mul (M, M, G->coeff[0]);
       mpz_mod (M, M, N);
       /* check M ? a root of the algebraic polynomial mod N */
-      mpz_set (t, f[deg]);
+      mpz_set (t, F->coeff[deg]);
       for (i = deg - 1; i >= 0; i --) {
         mpz_mul (t, t, M);
-        mpz_add (t, t, f[i]);
+        mpz_add (t, t, F->coeff[i]);
         mpz_mod (t, t, N);
       }
          
       if (!fake) {
         if (mpz_cmp_ui (t, 0) != 0) {
           fprintf (stderr, "Given polynomials have no common root mod N:\n");
-          polyprint (f, g, deg, N);
+          polyprint (F->coeff, G->coeff, deg, N);
           exit (1);
         }
       }
 
       /* output raw polynomials */
-      nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
+      nroots = numberOfRealRoots (F->coeff, deg, 0, 0, NULL);
       skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
       logmu = L2_lognorm (F, skew);
       alpha = get_alpha (F, ALPHA_BOUND);
       fprintf (stdout, "\n# Raw polynomial (#%6d):", count + 1);
-      polyprint (f, g, deg, N);
+      polyprint (F->coeff, G->coeff, deg, N);
       printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %f\n",
               logmu, alpha, logmu + alpha, nroots, skew);
 
-      mpz_poly_t G;
-      G->deg = 1;
-      G->coeff = g;
-
       /* optimize */
       if (translate)
-        optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
+        sopt_local_descent (F, G, F, G, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
       else
-        //optimize (F, g, 0, 1);
         size_optimization (F, G, F, G, sopt_effort, verbose);
 
       /* output size-optimized polynomials */
-      nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
+      nroots = numberOfRealRoots (F->coeff, deg, 0, 0, NULL);
       skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
       logmu = L2_lognorm (F, skew);
       alpha = get_alpha (F, ALPHA_BOUND);
       fprintf (stdout, "# Optimized polynomial (#%10d): ", count + 1);
-      polyprint (f, g, deg, N);
+      polyprint (F->coeff, G->coeff, deg, N);
       printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %.2f\n",
               logmu, alpha, logmu + alpha, nroots, skew);
       fflush (stdout);
@@ -223,11 +215,10 @@ opt_file (FILE *file, int deg, mpz_t N) {
   fprintf(stdout, "# max. l2norm: %3.3f\n", max_logmu);
   fprintf(stdout, "# ave. alpha: %3.3f\n", ave_alpha / count);
 
-  mpz_clear (g[0]);
-  mpz_clear (g[1]);
   mpz_clear (t);
   mpz_clear (M);
   mpz_poly_clear (F);
+  mpz_poly_clear (G);
   return 0;
 }
 

@@ -27,9 +27,16 @@
  * given to the local optimization algorithm (should be >= 1) */
 #define SOPT_MAX_LLL_POLY_PROCESS 2
 
+/* Maximum degree possible of the rotations in the local descent algorithm. */
+#define SOPT_MAX_DEGREE_ROTATION 7
 
-void size_optimization (mpz_poly_ptr, mpz_poly_ptr, mpz_poly_srcptr,
-                        mpz_poly_srcptr, const unsigned int, const int);
+#define SOPT_LOCAL_DESCENT_GUARD 0.001
+
+
+double sopt_local_descent (mpz_poly_ptr, mpz_poly_ptr, mpz_poly_srcptr,
+                           mpz_poly_srcptr, int, int, unsigned int, int);
+double size_optimization (mpz_poly_ptr, mpz_poly_ptr, mpz_poly_srcptr,
+                          mpz_poly_srcptr, const unsigned int, const int);
 
 #endif	/* POLYSELECT_SIZE_OPTIMIZATION_H_ */
 

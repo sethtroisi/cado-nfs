@@ -32,12 +32,9 @@ compute_proba_method_one_decomp (decomp_t* dec, fm_t* fm)
     for (int i = 0; i < dec->len; i++) {
 	int j = dec->tab[i] - fm->len_p_min;
 	ASSERT (j >= 0);
-	/* if (j < 0) {//todo: clean it--->when the script will be ok!!! */
-	/*     printf("%d, %d\n", dec->tab[i], fm->len_p_min); */
-	/*     fprintf(stderr,  */
-	/* 	    "This probability wasn't computed in the benchmark!\n"); */
-	/*     exit(EXIT_FAILURE); */
-	/* } */
+	/* j < 0 => This probability wasn't computed in the
+	   precomputed benchmark.
+	*/
 	if (j < len_proba)
 	    proba_fail *= (1 - proba_suc[j]);
 	//else //the probability seems closest to 0.
@@ -263,7 +260,6 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
     //check the cases where r is trivial!!
     //{{
     int fbb = ceil (log2 ((double) (lim + 1)));
-    //conflict name lim
     int lim_is_prime = 2 * fbb - 1;
     /*
       In this case, r is already a prime number!
@@ -395,9 +391,9 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 	    double c1 = strat_r1->tab[a]->time;
 	    double proba = p0 * p1;
 	    double tps0 = c0 + p0 * c1;
-	    //mean time when we begin by the SIDE_0
+	    //time when we begin by the SIDE_0
 	    double tps1 = c1 + p1 * c0;
-	    //mean time when we begin by the SIDE_1
+	    //time when we begin by the SIDE_1
 	    if (tps0 < tps1) {
 		st = concat_strategies(strat_r0->tab[r], strat_r1->tab[a],
 				       SIDE_0);
