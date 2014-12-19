@@ -241,6 +241,23 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d)
     }
 }
 
+void
+mpz_ndiv_qr_ui (mpz_t q, mpz_t r, mpz_t n, unsigned long int d)
+{
+  int s;
+
+  ASSERT (d != 0);
+  mpz_fdiv_qr_ui (q, r, n, d); /* round towards -inf, r has same sign as d */
+  mpz_mul_2exp (r, r, 1);
+  s = mpz_cmpabs_ui (r, d);
+  mpz_div_2exp (r, r, 1);
+  if (s > 0) /* |r| > |d|/2 */
+    {
+      mpz_add_ui (q, q, 1);
+      mpz_sub_ui (r, r, d);
+    }
+}
+
 /* q <- n/d rounded to nearest, assuming d <> 0
    Output satisfies |n-q*d| <= |d|/2
 */
@@ -251,6 +268,16 @@ mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d)
 
   mpz_init (r);
   mpz_ndiv_qr (q, r, n, d);
+  mpz_clear (r);
+}
+
+void
+mpz_ndiv_q_ui (mpz_t q, mpz_t n, unsigned long int d)
+{
+  mpz_t r;
+
+  mpz_init (r);
+  mpz_ndiv_qr_ui (q, r, n, d);
   mpz_clear (r);
 }
 
