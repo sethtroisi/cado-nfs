@@ -792,6 +792,7 @@ static inline void
 mpz_poly_fprintf_short (FILE *out, mpz_poly_srcptr f)
 {
   int d = f->deg;
+  ASSERT_ALWAYS (d >= 1);
   gmp_fprintf (out, "%Zd*x^%d + %Zd*x^%d%s\n", f->coeff[d], d,
                     f->coeff[d-1], d-1, (d > 1) ? " + ...":"");
 }
@@ -1132,6 +1133,8 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     fprintf (stderr, "# sopt: Start processing all k in list_k of length "
                      "%" PRIu64 "\n", list_k->len);
 
+  mpz_poly_set (fbest, f_raw);
+  mpz_poly_set (gbest, g_raw);
   for (unsigned int i = 0; i < list_k->len; i++)
   {
     mpz_poly_translation (ft, f_raw, list_k->tab[i]);
