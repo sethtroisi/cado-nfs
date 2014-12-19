@@ -1,7 +1,7 @@
 #ifndef LAS_SMALLSIEVE_H_
 #define LAS_SMALLSIEVE_H_
 
-#include "fb.h"
+#include "fb-types.h"
 
 /* Structures for small sieves */
 
