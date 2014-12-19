@@ -18,13 +18,10 @@
 #include "facul.h"
 #include "facul_doit.h"
 
-unsigned int SIGMA[2] = {2,2};
-int is_first_brent12[2] = {true, true};
 /* These global variables are only for statistics. In case of
  * multithreaded sieving, the stats might be wrong...
  */
 
-//{for the facul statistics.
 unsigned long stats_called[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -400,6 +397,8 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 {
   int index_method = 0; /* this is the index of the current factoring
 			   methods */
+  unsigned int SIGMA[2] = {2,2};
+  int is_first_brent12[2] = {true, true};
 
   regex_t preg_index, preg_fm;
   //regular expression for the sides
