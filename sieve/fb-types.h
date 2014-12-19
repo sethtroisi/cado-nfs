@@ -3,6 +3,7 @@
 
 /* Elementary data types for the factor base */
 
+#include <stdint.h>
 #include "las-config.h"
 
 typedef unsigned int fbprime_t; /* 32 bits should be enough for everyone */
