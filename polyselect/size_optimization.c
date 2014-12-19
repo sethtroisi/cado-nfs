@@ -218,6 +218,7 @@ compute_rational_approximation (double *Q, double q, unsigned int nb_approx,
   }
   /* force approximation with denominator 1 at the end */
   Q[n++] = floor (q + 0.5);
+  free (E);
   return n;
 }
 
@@ -467,6 +468,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       }
 
     }
+// TODO use the following code.
 #if 0
     double_poly_init (C, 4);
     int n, i, j, t, m, ret = 0;
@@ -656,71 +658,53 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
 /* If sopt_effort is not 0, add translations to the list of translations that
    are going to be tried in LLL */
 static inline void
-improve_list_k (list_mpz_ptr list_k, const int sopt_effort, const int verbose)
+improve_list_k (list_mpz_ptr list_k, const unsigned int sopt_effort,
+                const int verbose)
 {
-  mpz_t tmp, tmp2;
-  mpz_init (tmp);
-  mpz_init (tmp2);
+  if (sopt_effort == 0) /* do nothing if sopt_effort == 0 */
+    return ;
+  mpz_t k, new_k, delta_k;
+  mpz_init (k);
+  mpz_init (new_k);
+  mpz_init (delta_k);
 
-  uint64_t len;
-
-  int effort_sqrt = (int) sqrt ((double) sopt_effort);
-  int effort_sqrt_max = effort_sqrt/2;
-  int effort_sqrt_min = -effort_sqrt_max;
-  int effort_max = (((int) sopt_effort) + 1)/2;
-  int effort_min = -effort_max;
-
-  unsigned int emax; /* emax is the number of digits of max(|k|) */
-  mpz_abs (tmp, list_k->tab[0]);
-  mpz_abs (tmp2, list_k->tab[list_k->len-1]);
-  if  (mpz_cmp (tmp, tmp2) >= 0)
-    emax = mpz_sizeinbase (tmp, 10);
-  else
-    emax = mpz_sizeinbase (tmp2, 10);
-
-  /* For each value of k computed earlier, add k + delta_k, where
-      delta_k is in [ effort_sqrt_min..effort_sqrt_max ] */
-  /* Then add k = j*10^e for e in [0..emax], where emax = log_10 (max |k|) + 1,
-                         and j in [ effort_min..effort_max ] */
   if (verbose)
-    fprintf (stderr, "# sopt: sopt_effort_sqrt = "
-                     "%d\n# sopt: adding delta_k to the %" PRIu64 " values "
-                     "of k in the table, for delta_k in [%d..%d]\n",
-                     effort_sqrt, list_k->len, effort_sqrt_min,
-                     effort_sqrt_max);
+    fprintf (stderr, "# sopt: improve_list_k: for each k in list_k, add "
+                     " k +/- k/10^i and k +/- k/(2*10^i) for i in [1..%u]\n",
+                      sopt_effort);
 
-  len = list_k->len;
+  uint64_t len = list_k->len;
   for (unsigned int i = 0; i < len; i++)
   {
-    mpz_set (tmp, list_k->tab[i]);
-    for (int delta_k = effort_sqrt_min; delta_k <= effort_sqrt_max; delta_k++)
+    mpz_set (k, list_k->tab[i]);
+    unsigned long int d = 10;
+    for (unsigned int i = 0; i < sopt_effort; i++)
     {
-      mpz_add_si (tmp2, tmp, delta_k);
-      list_mpz_append (list_k, tmp2);
+      mpz_ndiv_q_ui (delta_k, k, d);
+      mpz_add (new_k, k, delta_k);
+      list_mpz_append (list_k, new_k);
+      mpz_sub (new_k, k, delta_k);
+      list_mpz_append (list_k, new_k);
+
+      mpz_ndiv_q_ui (delta_k, k, 2*d);
+      mpz_add (new_k, k, delta_k);
+      list_mpz_append (list_k, new_k);
+      mpz_sub (new_k, k, delta_k);
+      list_mpz_append (list_k, new_k);
+
+      d *= 10;
     }
   }
 
   if (verbose)
   {
     fprintf (stderr, "# sopt: %" PRIu64 " values for the translations were "
-                     "added\n# sopt: add k = j*10^e for e in [0..%d] and j "
-                     "in [%d..%d]\n", list_k->len-len, emax, effort_min,
-                     effort_max);
+                     "added\n", list_k->len-len);
     len = list_k->len;
   }
 
-  for (unsigned int e = 0; e <= emax; e++)
-  {
-    mpz_ui_pow_ui (tmp, 10, e);
-    for (int j = effort_min; j <= effort_max; j++)
-    {
-      mpz_mul_si (tmp2, tmp, j);
-      list_mpz_append (list_k, tmp2);
-    }
-  }
-  if (verbose)
-    fprintf (stderr, "# sopt: %" PRIu64 " values for the translations were "
-                     "added\n", list_k->len-len);
+// TODO add k of the form j*10^i for some value of i and j (depending of
+// sopt_effort). 
 
   /* Sort list_k by increasing order and remove duplicates */
   list_mpz_sort_and_remove_dup (list_k, verbose);
@@ -728,8 +712,9 @@ improve_list_k (list_mpz_ptr list_k, const int sopt_effort, const int verbose)
     fprintf (stderr, "# sopt: It remains %" PRIu64 " values after sorting "
                      " and removing duplicates\n", list_k->len);
 
-  mpz_clear (tmp);
-  mpz_clear (tmp2);
+  mpz_clear (k);
+  mpz_clear (new_k);
+  mpz_clear (delta_k);
 }
 
 /* Construct the LLL matrix from the polynomial pair. */
@@ -828,6 +813,8 @@ mpz_poly_fprintf_verbose (FILE *out, mpz_poly_srcptr f, int verbose)
    To use only rotation   : use_transaltion = 0 and deg_rotation >= 0
    To use both            : use_translation = 1 and deg_rotation >= 0
    TODO: _mp version like old optimize_aux_mp in auxiliary.c
+   XXX: Could we replace lognorm computation by norm computation to save
+        computation of the log. Compute lognorm only for printing.
 */
 double
 sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
@@ -1023,10 +1010,10 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
                    mpz_poly_srcptr f_raw, mpz_poly_srcptr g_raw,
                    const unsigned int sopt_effort, const int verbose)
 {
+  ASSERT_ALWAYS (f_raw->deg >= 2);
   ASSERT_ALWAYS (g_raw->deg == 1);
-  ASSERT_ALWAYS (sopt_effort <= SOPT_MAX_EFFORT);
   const int d = f_raw->deg;
-  double lognorm_opt =
+  double best_lognorm =
       L2_skew_lognorm ((mpz_poly_ptr) f_raw, SKEWNESS_DEFAULT_PREC);
 
 
@@ -1037,7 +1024,7 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     mpz_poly_fprintf_verbose (stderr, f_raw, verbose);
     fprintf (stderr, "# sopt: g_raw = ");
     mpz_poly_fprintf_verbose (stderr, g_raw, verbose);
-    fprintf (stderr, "# sopt: with lognorm = %f\n", lognorm_opt);
+    fprintf (stderr, "# sopt: with lognorm = %f\n", best_lognorm);
   }
 
   /****************************** init *******************************/
@@ -1100,15 +1087,10 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   }
 
   /******* Improve list of translation (depending on sopt_effort) *******/
-  if (sopt_effort > 0)
-  {
-    if (verbose)
-      fprintf (stderr, "# sopt: sopt_effort = %u > 0. Try to improve list_k\n",
-                        sopt_effort);
-    improve_list_k (list_k, sopt_effort, verbose);
-  }
-  else if (verbose)
-    fprintf (stderr, "# sopt: sopt_effort = 0. list_k is not modify.\n");
+  if (verbose)
+    fprintf (stderr, "# sopt: Calling improve_list_k with sopt_effort = %u\n",
+                      sopt_effort);
+  improve_list_k (list_k, sopt_effort, verbose);
 
 
   /****************************** Main loop *******************************/
@@ -1177,21 +1159,21 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
           {
             double lognorm = sopt_local_descent (fld, gld, flll, gt, 1, d-2,
                                              SOPT_DEFAULT_MAX_STEPS, verbose);
-            if (lognorm < lognorm_opt)
+            if (lognorm < best_lognorm)
             {
               if (verbose)
               {
                 fprintf (stderr, "# sopt:       better lognorm = %f (previous "
-                                 "was %f)\n", lognorm, lognorm_opt);
+                                 "was %f)\n", lognorm, best_lognorm);
               }
-              lognorm_opt = lognorm;
+              best_lognorm = lognorm;
               mpz_poly_swap (fbest, fld);
               mpz_poly_swap (gbest, gld);
             }
             else if (verbose)
             {
               fprintf (stderr, "# sopt:       lognorm = %f (better is %f)\n",
-                               lognorm, lognorm_opt);
+                               lognorm, best_lognorm);
             }
           }
           else if (verbose)
@@ -1231,8 +1213,8 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     mpz_poly_fprintf_verbose (stderr, f_opt, verbose);
     fprintf (stderr, "# sopt: g_opt = ");
     mpz_poly_fprintf_verbose (stderr, g_opt, verbose);
-    fprintf (stderr, "# sopt: with lognorm = %f\n\n", lognorm_opt);
+    fprintf (stderr, "# sopt: with lognorm = %f\n\n", best_lognorm);
   }
 
-  return lognorm_opt;
+  return best_lognorm;
 }

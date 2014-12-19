@@ -1952,8 +1952,7 @@ declare_usage(param_list pl)
   snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
             DEFAULT_RSEFFORT);
   param_list_decl_usage(pl, "rseffort", str);
-  snprintf (str, 200, "size-optimization effort ranging from 0 to %d "
-                      "(default %d)", SOPT_MAX_EFFORT, SOPT_DEFAULT_EFFORT);
+  snprintf (str, 200, "size-optimization effort (default %d)", SOPT_DEFAULT_EFFORT);
   param_list_decl_usage(pl, "sopt-effort", str);
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
   param_list_decl_usage(pl, "s", str);

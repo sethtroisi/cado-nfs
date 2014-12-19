@@ -7,9 +7,6 @@
 /* Default value for sopt_effort */
 #define SOPT_DEFAULT_EFFORT 0
 
-/* Maximum value for sopt_effort */
-#define SOPT_MAX_EFFORT 1000
-
 /* values of q greater than 1e10 in absolute value do not help */
 #define SOPT_MAX_VALUE_FOR_Q_ROOTS 1e10
 
