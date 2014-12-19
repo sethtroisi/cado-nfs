@@ -1041,7 +1041,7 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
 
   /****************************** init *******************************/
   mpz_t tmp, tmp2, list_skew[SOPT_NB_OF_SKEWNESS_VALUES], a, b;
-  mpz_poly_t ft, gt, flll, fld, gld;
+  mpz_poly_t ft, gt, flll, fld, gld, fbest, gbest;
   list_mpz_t list_k;
   mat_Z m, U;
   hash_table_uint64_t H;
@@ -1061,6 +1061,8 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   mpz_poly_init (flll, d);
   mpz_poly_init (fld, d);
   mpz_poly_init (gld, 1);
+  mpz_poly_init (fbest, d);
+  mpz_poly_init (gbest, 1);
 
   list_mpz_init (list_k, SOPT_INIT_SIZE_ALLOCATED_TRANSLATIONS);
 
@@ -1180,8 +1182,8 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
                                  "was %f)\n", lognorm, lognorm_opt);
               }
               lognorm_opt = lognorm;
-              mpz_poly_set (f_opt, fld);
-              mpz_poly_set (g_opt, gld);
+              mpz_poly_swap (fbest, fld);
+              mpz_poly_swap (gbest, gld);
             }
             else if (verbose)
             {
@@ -1197,6 +1199,9 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     }
   }
 
+  mpz_poly_set (f_opt, fbest);
+  mpz_poly_set (g_opt, gbest);
+
   /************************** Clear everything ***************************/
   LLL_clear (&m);
   LLL_clear (&U);
@@ -1207,6 +1212,8 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   mpz_poly_clear (flll);
   mpz_poly_clear (fld);
   mpz_poly_clear (gld);
+  mpz_poly_clear (fbest);
+  mpz_poly_clear (gbest);
   mpz_poly_clear (ft);
   mpz_poly_clear (gt);
   mpz_clear (a);
