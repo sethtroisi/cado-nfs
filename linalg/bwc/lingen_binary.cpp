@@ -1132,6 +1132,13 @@ static void bw_traditional_algo_2(struct e_coeff * ec, int * delta,
 }
 #endif/*}}}*/
 
+/* This function returns the coefficient of degree t (0 or 1) in a*b,
+   where a is a polynomial over GF(2) of degree da, and b is a polynomial
+   over GF(2) of degree db.
+   Note: it seems in most cases less than 64 values of a and b are used,
+   thus one might extract the corresponding 64-bits of a and b (possibly
+   with shifts) and use PCLMULQDQ or the corresponding GF2X routine.
+*/
 static unsigned long extract_coeff_degree_t(unsigned int t, unsigned long const * a, unsigned int da, unsigned long const * b, unsigned int db)/*{{{*/
 {
     unsigned long c = 0;
@@ -1166,6 +1173,15 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
 
     vector<unsigned int> z;
 
+    /* Note 1: this routine is not optimal for locality. It would be better
+       to first loop on i, then k, then j. But then the if (known[j]) continue
+       would be in the inner loop. Otherwise first loop on j, then k, then i.
+       Note 2: the inner routine extract_coeff_degree_t() requires to reverse
+       the coefficients of PI.poly(k, j) [or E.poly(i, k), since the popcount
+       is symmetrical]. If we first loop on (i,k) or (j,k), then we could
+       precompute the reverse polynomial, and give it to the inner routine,
+       which would then just perform a xor of the relevant bit part, and a
+       popcount. */
     for(unsigned int j = 0 ; j < m+n ; j++) {
         if (known[j]) continue;
         e0.zcol(j);
