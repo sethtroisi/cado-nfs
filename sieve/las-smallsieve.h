@@ -45,10 +45,6 @@ typedef struct {
 #include "las-types.h"
 #include "bucket.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 extern void small_sieve_info(const char * what, int side, small_sieve_data_t * r);
 extern void small_sieve_clear(small_sieve_data_t * ssd);
 extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
@@ -67,9 +63,5 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         small_sieve_data_t *ssd, int * ssdpos,
         sieve_info_srcptr si, where_am_I_ptr w MAYBE_UNUSED);
 
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_SMALLSIEVE_H_ */
