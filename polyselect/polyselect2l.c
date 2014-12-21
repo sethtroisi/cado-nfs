@@ -2077,7 +2077,7 @@ main (int argc, char *argv[])
 
   if (!have_n) {
     fprintf(stderr, "# Reading n from stdin\n");
-    param_list_read_stream(pl, stdin);
+    param_list_read_stream(pl, stdin, 0);
     have_n = param_list_parse_mpz(pl, "n", N);
   }
 

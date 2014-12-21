@@ -606,7 +606,7 @@ main (int argc, char *argv[])
             continue;
         FILE *f;
         if ((f = fopen(argv[0], "r")) != NULL) {
-            param_list_read_stream(pl, f);
+            param_list_read_stream(pl, f, 0);
             fclose(f);
             argv++,argc--;
             continue;

@@ -127,7 +127,7 @@ int cado_poly_read_stream(cado_poly poly, FILE * f)
 {
     param_list pl;
     param_list_init(pl);
-    param_list_read_stream(pl, f);
+    param_list_read_stream(pl, f, 0);
     int r = cado_poly_set_plist(poly, pl);
     param_list_clear(pl);
     return r;

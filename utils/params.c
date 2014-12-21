@@ -240,8 +240,12 @@ void param_list_remove_key(param_list pl, const char * key)
     pl->consolidated = 1;
 }
 
-
-int param_list_read_stream(param_list pl, FILE *f)
+/* If step_on_empty_line is non-zero, then this function reads the file until a
+ * line containing only space caracters (check with isspace) is found. It allows
+ * to read a file contaning more than one polynomial.
+ * Otherwise the function reads the whole file.
+ */
+int param_list_read_stream(param_list pl, FILE *f, int stop_on_empty_line)
 {
     int all_ok=1;
     const int linelen = 512;
@@ -269,9 +273,14 @@ int param_list_read_stream(param_list pl, FILE *f)
         // leading space.
         for( ; *p && isspace((int)(unsigned char)*p) ; p++, l--);
 
-        // empty ps are ignored.
+        // empty ps are ignored (unless stop_on_empty_line is non-zero).
         if (l == 0)
+        {
+          if (stop_on_empty_line)
+            break;
+          else
             continue;
+        }
 
         // look for a left-hand-side.
         l = 0;
@@ -331,7 +340,7 @@ int param_list_read_file(param_list pl, const char * name)
         fprintf(stderr, "Cannot read %s\n", name);
         exit(1);
     }
-    int r = param_list_read_stream(pl, f);
+    int r = param_list_read_stream(pl, f, 0);
     fclose(f);
     return r;
 }

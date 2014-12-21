@@ -2651,7 +2651,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Could also be a file */
         FILE * f;
         if ((f = fopen(argv[0], "r")) != NULL) {
-            param_list_read_stream(pl, f);
+            param_list_read_stream(pl, f, 0);
             fclose(f);
             argv++,argc--;
             continue;

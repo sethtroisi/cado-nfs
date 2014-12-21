@@ -92,7 +92,7 @@ extern void param_list_usage_header(param_list pl, const char * hdr);
 
 // takes a file, in the Cado-NFS params format, and stores the dictionary
 // of parameters to pl.
-extern int param_list_read_stream(param_list pl, FILE *f);
+extern int param_list_read_stream(param_list pl, FILE *f, int stop_on_empty_line);
 extern int param_list_read_file(param_list pl, const char * name);
 
 // sees whether the arguments pointed to by argv[0] and (possibly)
