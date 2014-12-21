@@ -513,6 +513,34 @@ void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
   fprintf (fp, "\n");
 }
 
+/* Print f of degree d with the following format
+    f0<sep>f1<sep>...<sep>fd\n
+   Print only '\n' if f = 0 (ie deg(f) = -1)
+*/
+void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep)
+{
+  if (f->deg >= 0)
+  {
+    gmp_fprintf (fp, "%Zd", f->coeff[0]);
+    for (int i = 1; i <= f->deg; i++)
+      gmp_fprintf (fp, "%c%Zd", sep, f->coeff[i]);
+  }
+  fprintf (fp, "\n");
+}
+
+/* Print f of degree d with the following format
+    <pre>0: f0\n
+    <pre>1: f1\n
+    ...
+    <pre>d: fd\n
+   Print nothing if f = 0 (ie deg(f) = -1)
+*/
+void
+mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f, const char *pre)
+{
+  for (int i = 0; i <= f->deg; i++)
+    gmp_fprintf (fp, "%s%d: %Zd\n", pre, f->coeff[i]);
+}
 /* -------------------------------------------------------------------------- */
 
 /* Tests and comparison functions */
