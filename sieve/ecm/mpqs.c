@@ -318,7 +318,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
           else if (R <= p * p) /* if B < R <= p^2 it cannot be B-smooth */
             goto end;
 #endif
-          else if (R <= BB)
+          else if (R <= BB && R <= p * p * p)
             {
               /* if R = q0 * q1 with p < q0 < q1 < B, then q0 >= R/B */
               q = R / B;
@@ -578,7 +578,9 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
           j++;
         }
     }
-  // printf ("largest prime in factor base is %lu\n", P[ncol-1]);
+#ifdef TRACE
+  printf ("largest prime in factor base is %lu\n", P[ncol-1]);
+#endif
   ASSERT_ALWAYS(i < MAX_PRIMES);
   ASSERT_ALWAYS(P[0] == 2); /* required by the sieve */
 #ifdef LARGE_PRIME
@@ -694,16 +696,13 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
         }
       threshold = T[0] - (char) floor (log ((double) P[ncol - 1]) / logradix);
 #ifdef TRACE
-      printf ("T[%ld]=%u threshold=%u\n", TRACE, T[M +  TRACE], threshold);
+      printf ("T[%ld]=%u threshold=%u\n", TRACE, T[M + TRACE], threshold);
 #endif
       /* we want S[i] >= T[i] - xxx, thus S[i] + T[0] >= T[i] + T[0] - xxx
          thus S[i] + (T[0] - T[i]) >= T[0] - xxx */
       for (i = 1; i < 2*M; i++)
         T[i] = T[0] - T[i];
       T[0] = 0;
-#ifdef TRACE
-      printf ("T[%ld]=%u log2[1]=%u\n", TRACE, T[M +  TRACE], log2[1]);
-#endif
       /* sieve for 2, 4, 8 */
       logp = log2[mpz_getlimbn (N, 0) & 7];
       update8 (T, 1, 2, logp, M);
@@ -726,13 +725,21 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
       p = P[j];
       k = findroot (&k2, mpz_fdiv_ui (b, p), p, K[j], Q[j]);
       logp = Logp[j];
-      for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
+      if (k != k2)
         {
-          update (S, i, p, logp, M);
-          update (S, i2, p, logp, M);
+          for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
+            {
+              update (S, i, p, logp, M);
+              update (S, i2, p, logp, M);
+            }
+          if (i < 2*M)
+            update (S, i, p, logp, M);
         }
-      if (i < 2*M)
-        update (S, i, p, logp, M);
+      else
+        {
+          for (i = k; i < 2*M; i += p)
+            update (S, i, p, logp, M);
+        }
     }
 
   st = cputime ();
