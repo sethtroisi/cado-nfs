@@ -127,40 +127,47 @@ tonelli_shanks (uint64_t rr, uint64_t p)
 }
 
 /* q[i] <- 1/p[i] mod a for 0 <= i < n, using batch inversion.
-   Requires that a * p[i] < 2^64. */
+   Assume inva = 1/a mod 2^K where K is the number of bits of an unsigned long.
+ */
 void
-batch_invert (unsigned long *q, unsigned long *p, long n, unsigned long a)
+batch_invert (unsigned long *q, unsigned long *p, long n, unsigned long a,
+              unsigned long inva)
 {
   long i;
   unsigned long t;
   modulus_t aa;
-  residueul_t qq, uu;
+  residueul_t pp, qq, uu;
 
-  for (q[0] = p[0], i = 1; i < n; i++)
-    q[i] = (q[i-1] * p[i]) % a;
-  /* now q[i] = p[1] * p[2] * ... * p[i] */
   modul_initmod_ul (aa, a);
+  modul_init (pp, aa);
   modul_init (qq, aa);
   modul_init (uu, aa);
-  modul_set_ul (qq, q[n-1], aa);
-  modul_inv (uu, qq, aa);
+  modul_set_ul (uu, q[0] = p[0], aa);
+  for (i = 1; i < n; i++)
+    {
+      modul_set_ul (pp, p[i], aa);
+      modul_mul (uu, uu, pp, aa);
+      q[i] = mod_get_ul (uu, aa);
+    }
+  /* now q[i] = p[1] * p[2] * ... * p[i] */
+  modul_inv (uu, uu, aa);
   for (i = n-1; i > 0; i--)
     {
       /* invariant: uu = 1/(p[1] * ... * p[i]) mod a */
       modul_set_ul (qq, q[i-1], aa);
-      modul_mul (qq, uu, qq, aa);
-      t = mod_get_ul (qq, aa);           /* t = 1/p[i] mod a */
-      /* t*p[i] + k*a = 1 */
+      modul_mul (qq, uu, qq, aa); /* now qq = 1/p[i] mod a */
+      /* qq*p[i] + k*a = 1 */
+      t = mod_get_ul (qq, aa);
       t = t * p[i] - 1;
       /* divide by a */
-      ASSERT (t % a == 0);
-      t = t / a;
+      t = t * inva;
       ASSERT (0 < t && t < p[i]);
       q[i] = p[i] - t;
       modul_set_ul (qq, p[i], aa);
       modul_mul (uu, uu, qq, aa);
     }
   q[0] = mod_get_ul (uu, aa);
+  modul_clear (pp, aa);
   modul_clear (qq, aa);
   modul_clear (uu, aa);
   modul_clearmod (aa);
@@ -658,11 +665,13 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
 #ifdef TRACE
   gmp_printf ("a=%Zd\nb=%Zd\n", a, b);
 #endif
-  unsigned long aa;
+  unsigned long aa, inva;
   ASSERT (mpz_fits_ulong_p (a));
   aa = mpz_get_ui (a);
-  /* the following is required by batch_invert */
-  ASSERT_ALWAYS((double) aa * (double) P[ncol-1] < 1.84467440737096e19);
+  /* inva <- 1/a mod (unsigned long) */
+  mpz_ui_pow_ui (c, 2, sizeof (unsigned long) * 8);
+  mpz_invert (c, a, c);
+  inva = mpz_get_ui (c);
 
   /* we now have (a*x+b)^2 - N = a*Q(x) where Q(x) = a*x^2 + 2*b*x + c */
 
@@ -715,7 +724,7 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
 
   /* sieve */
   mpz_submul_ui (b, a, M);
-  batch_invert (Q, P, lim, aa);
+  batch_invert (Q, P, lim, aa, inva);
   /* skip prime p=2 which is already taken into account in T[] */
   for (j = 1; j < lim; j++)
     {
