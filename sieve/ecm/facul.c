@@ -647,9 +647,12 @@ facul_make_default_strategy (int n, const int verbose)
   methods[2].plan = malloc (sizeof (ecm_plan_t));
   ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
 
-  methods[3].method = EC_METHOD;
-  methods[3].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+  if (n > 0)
+    {
+      methods[3].method = EC_METHOD;
+      methods[3].plan = malloc (sizeof (ecm_plan_t));
+      ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+    }
 
   /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
   double B1 = 105.0;
