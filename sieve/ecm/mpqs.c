@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/resource.h>
+#include <float.h> /* for DBL_MAX */
 #include "gmp.h"
 #include "macros.h"
 #include "mod_ul_default.h"
@@ -527,7 +528,66 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t N,
   mpz_clear (y);
 }
 
+/* consider all primes up to B, and all odd multipliers up to K */
+int
+best_multiplier (mpz_t N, unsigned long B, unsigned long K)
+{
+  unsigned long i, n, *Q, p, q, j, t, Nq, k, best_k = 1;
+  double **X, logp, alpha, best_alpha = DBL_MAX;
 
+  for (i = 0; i < MAX_PRIMES && Primes[i] <= B; i++);
+  n = i;
+  X = (double**) malloc (n * sizeof (double*));
+  Q = (unsigned long*) malloc (n * sizeof (unsigned long));
+
+  /* first compute number of roots for all residues mod q = p^k */
+  for (i = 0; i < n; i++)
+    {
+      p = Primes[i];
+      for (q = p, k = 1; q * p <= B; q = q * p, k++);
+      Q[i] = q;
+      X[i] = malloc (q * sizeof(double));
+      for (t = 0; t < q; t++)
+        X[i][t] = 0;
+      unsigned long qmax = q;
+      for (q = p, k = 1; q <= qmax; q *= p, k++)
+        {
+          logp = log ((double) p) / (double) q;
+          for (j = 0; j < q; j++)
+            {
+              t = (j * j) % q;
+              /* we have j^2 = t (mod q) */
+              for (; t < qmax; t += q)
+                X[i][t] += logp;
+            }
+        }
+    }
+
+  /* now check all odd multiplies */
+  for (k = 1; k <= K; k += 2)
+    {
+      alpha = 0.5 * log ((double) k);
+      for (i = 0; i < n; i++)
+        {
+          q = Q[i];
+          Nq = mpz_fdiv_ui (N, q);
+          Nq = (Nq * k) % q;
+          alpha -= X[i][Nq];
+        }
+      if (alpha < best_alpha)
+        {
+          best_alpha = alpha;
+          best_k = k;
+        }
+    }
+
+  for (i = 0; i < n; i++)
+    free (X[i]);
+  free (X);
+  free (Q);
+
+  return best_k;
+}
 
 /* Put in f a factor of N, using factor base of ncol primes.
    Assume N is odd. */
@@ -548,10 +608,9 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
   init_time -= cputime ();
 
   mpz_init (N);
-  mpz_mul_ui (N, N0, mpz_fdiv_ui (N0, 8)); /* if N0 = 3 (mod 8), multiply by 3;
-                                              if N0 = 5 (mod 8), multiply by 5;
-                                              if N0 = 7 (mod 8), multiply by 7;
-                                              so that N = 1 (mod 8) */
+  k = best_multiplier (N0, 200, 200);
+  printf ("Using multiplier k=%lu\n", k);
+  mpz_mul_ui (N, N0, k);
 
   /* assume N is odd */
   ASSERT_ALWAYS (mpz_fdiv_ui (N, 2) == 1);
