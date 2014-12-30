@@ -5,7 +5,7 @@
 // #define TRACE -23830
 // #define TRACE_P 937
 
-#define WANT_EXCESS 3
+#define WANT_EXCESS 11
 
 #include "cado.h"
 #include <stdio.h>
@@ -301,7 +301,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
             setbit (row, shift, i + 1, W, ncolw);
           /* now since R has no factor <= p it is either 1 or a prime > p,
              or a product > p^2 of at least two primes */
-          if (R <= B)
+          if (R <= B && R <= p * p)
             {
               /* R=1 might happen when the largest prime factor of R appears
                  with exponent 2 */
@@ -325,7 +325,8 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
               if (q > p)
                 {
                   i = prime_index[q];
-                  ASSERT(R >= P[i] * P[i]);
+                  /* we might have R < P[i]^2 since the sieving is not 100%
+                     accurate, and thus we might have q1 > B */
                   continue;
                 }
             }
@@ -333,7 +334,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
           else if (R <= p * p * p) /* B^2 < R <= p^3 cannot be B-smooth */
             goto end;
 #endif
-          /* we don't check for primality of R > B since it is rare */
+          /* we don't check for primality of R > B^2 since it is rare */
         }
     }
   ASSERT(R > B);
@@ -584,12 +585,13 @@ best_multiplier (mpz_t N, unsigned long B, unsigned long K)
 /* Put in f a factor of N, using factor base of ncol primes.
    Assume N is odd. */
 void
-mpqs (mpz_t f, mpz_t N0, long ncol)
+mpqs (mpz_t f, mpz_t N0)
 {
   mpz_t N, *Mat, *X;
-  unsigned char *S, *T, *Logp, logp, log2[8], threshold = 0;
-  unsigned long *P, *Q, p, k;
-  long M, i, j, *K, wrel, nrel = 0, lim, ncolw = 0;
+  unsigned char *S, *T, *Logp, logp, log2[8], threshold = 0, mask = 128;
+  uint64_t *S8, mask8 = 0;
+  unsigned long *P, *Q, p, k, Nbits;
+  long M, i, j, *K, wrel, nrel = 0, lim, ncolw = 0, ncol;
   mpz_t a, b, c, sqrta;
   double maxnorm, radix, logradix = 0;
   long st;
@@ -599,8 +601,15 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
 
   init_time -= cputime ();
 
+  Nbits = mpz_sizeinbase (N0, 2);
+
+  /* Set M (half size of sieve array) and size of factor base.
+     Note: when M=2^15, setting M=1<<15 statically is faster with gcc. */
+  M = 1 << (11 + ((Nbits - 56) >> 4));
+  ncol = 75 << ((Nbits - 56) >> 4);
+
   mpz_init (N);
-  k = best_multiplier (N0, 200, 200);
+  k = best_multiplier (N0, Nbits, Nbits);
   printf ("Using multiplier k=%lu\n", k);
   mpz_mul_ui (N, N0, k);
 
@@ -650,11 +659,6 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
   for (i = 0; i < wrel; i++)
     mpz_init (X[i]);
 
-  M = (1<<15); /* (half) size of sieve array */
-
-#define GUARD 3
-#define MAXS (255-GUARD)
-
   /* initialize sieve area [-M, M-1] */
   S = malloc (2 * M * sizeof (char));
   T = malloc (2 * M * sizeof (char));
@@ -679,12 +683,16 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
   /* we want 'a' to be a square */
   mpz_sqrt (sqrta, a);
 
+  /* we also want sqrt(a) greater than the largest factor base prime */
+  if (mpz_cmp_ui (sqrta, P[lim-1]) <= 0)
+    mpz_set_ui (sqrta, P[lim-1] + 1);
+
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
   init_time += cputime ();
 
   int pols = 0;
-  while (nrel <= ncolw + WANT_EXCESS) {
+  while (nrel < ncolw + WANT_EXCESS) {
   sieve_time -= cputime ();
   do
     mpz_nextprime (sqrta, sqrta);
@@ -728,9 +736,9 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
   if (pols++ == 0)
     {
       double Nd = mpz_get_d (N), ad = (double) aa;
-      /* initialize radix and Logp[]: we want radix^MAXS = maxnorm ~ N/a */
+      /* initialize radix and Logp[]: we want radix^255 = maxnorm ~ N/a */
       maxnorm = mpz_get_d (N) / mpz_get_d (a);
-      radix = pow (maxnorm, 1.0 / (double) MAXS);
+      radix = pow (maxnorm, 1.0 / 255.0);
       logradix = log (radix);
 #ifdef TRACE
       printf ("radix=%f logradix=%f\n", radix, logradix);
@@ -755,6 +763,11 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
             T[M + i] = T[M - i];
         }
       threshold = T[0] - (char) floor (log ((double) P[ncol - 1]) / logradix);
+      ASSERT_ALWAYS(threshold >= 128);
+      mask = 128;
+      mask8 = (mask << 8) | mask;
+      mask8 = (mask8 << 16) | mask8;
+      mask8 = (mask8 << 32) | mask8;
 #ifdef TRACE
       printf ("T[%d]=%u threshold=%u\n", TRACE, T[M + TRACE], threshold);
 #endif
@@ -814,30 +827,31 @@ mpqs (mpz_t f, mpz_t N0, long ncol)
 #endif
 
   /* find smooth locations */
-  static int count = 0;
-  for (i = -M; i < M && nrel <= ncolw + WANT_EXCESS; i++)
-    {
-      if (S[M + i] >= threshold)
+  /* ncolw <= ncol+1, and we allocated a matrix of ncol+1+WANT_EXCESS rows */
+  for (S8 = (uint64_t*) S, i = -M; i < M; S8++)
+    if ((S8[0] & mask8) == 0)
+      i += 8;
+    else
+      for (int ii = 0; ii < 8; ii++, i++)
         {
-          count ++;
-          if (is_smooth (a, M + i, b, N, P, ncol, wrel, Mat[nrel], W, &ncolw))
+          if (S[M + i] >= threshold)
             {
-              /* matrix M has nrel rows, the left part has wrel columns and
-                 is initially the identity matrix, the right part has ncol+1
-                 columns and contains initially the relations */
-              mpz_setbit (Mat[nrel], nrel);
-              mpz_mul_ui (X[nrel], a, M + i);
-              mpz_add (X[nrel], X[nrel], b);
-              nrel ++;
-              // printf ("%ld: i=%ld\n", nrel, i);
+              if (is_smooth (a, M + i, b, N, P, ncol, wrel, Mat[nrel], W,
+                             &ncolw))
+                {
+                  /* matrix M has nrel rows, the left part has wrel columns and
+                     is initially the identity matrix, the right part has
+                     ncol+1 columns and contains initially the relations */
+                  mpz_setbit (Mat[nrel], nrel);
+                  mpz_mul_ui (X[nrel], a, M + i);
+                  mpz_add (X[nrel], X[nrel], b);
+                  if (++nrel >= ncolw + WANT_EXCESS)
+                    goto end_check;
+                }
             }
         }
-    }
+  end_check:
   check_time += cputime ();
-#if 0
-  gmp_printf ("sqrta=%Zd, total %ld/%d rels in %ldms (%.2f r/s)\n",
-              sqrta, nrel, count, st, (double) nrel / (double) st);
-#endif
   }
   printf ("%ld rels with %d polynomials: %f per poly\n",
           nrel, pols, (double) nrel / (double) pols);
@@ -881,7 +895,7 @@ int
 main (int argc, char *argv[])
 {
   mpz_t N, f;
-  unsigned long bits, ncol, iter, i, seed;
+  unsigned long bits, iter, i, seed;
   gmp_randstate_t rstate;
 
   gmp_randinit_default (rstate);
@@ -916,8 +930,7 @@ main (int argc, char *argv[])
          bad case:
          N=67523040085253628156794501367376554497 (3.6 rels per poly) */
       gmp_printf ("N=%Zd\n", N);
-      ncol = 1200;
-      mpqs (f, N, ncol);
+      mpqs (f, N);
     }
   mpz_clear (N);
   mpz_clear (f);
