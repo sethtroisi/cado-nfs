@@ -1836,19 +1836,16 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 int 
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, a, b;
+  residue_t u, b;
   ellM_point_t P, Pt;
-  ellM_init (P, m);
-
   ellE_point_t Q;
-  ellE_init (Q, m);
+  ellM_init (P, m);
 
   unsigned int i;
   int bt = 0;
 
   mod_init (u, m);
   mod_init (b, m);
-  mod_init (a, m);
 
   mod_intset_ul (f, 1UL);
 
@@ -1916,7 +1913,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     /* Curve is constant for now */
     
     residue_t xn, xd, yn, yd, d, dd;
-    
+
     mod_set_ul (xn, Ecurve14.x_numer, m);
     mod_set_ul (xd, Ecurve14.x_denom, m);
     
@@ -1925,10 +1922,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       {
 	mod_gcd (f, xd, m);
 	mod_clear (u, m);
-	mod_clear (a, m);
-	ellE_clear (Q, m);
 	return 0;
       }
+    ellE_init (Q, m);
     mod_mul (Q->x, xn, u, m);
     
     mod_set_ul (yn, Ecurve14.y_numer, m);
@@ -1937,7 +1933,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       {
 	mod_gcd (f, yd, m);
 	mod_clear (u, m);
-	mod_clear (a, m);
 	ellE_clear (Q, m);
 	return 0;
       }
@@ -1950,7 +1945,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       {
 	mod_gcd (f, dd, m);
 	mod_clear (u, m);
-	mod_clear (a, m);
 	ellE_clear (Q, m);
 	return 0;
       }
@@ -2024,8 +2018,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   else if (plan->parameterization == TWED16)
     {
-      /* Naive scalar mult on Edrwards curve */
+      residue_t a;
+
+      /* Naive scalar mult on Edwards curve */
       
+      mod_init (a, m);
       /* a = -1 */
       mod_set1 (a, m);
       mod_neg (a, a, m);
@@ -2036,7 +2033,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       mod_gcd (f, Q->z, m);    /* FIXME (from above): 
 				  skip this gcd and let the extgcd
 				  in stage 2 init find factors? */
-      
+      mod_clear (a, m);
+      ellE_clear (Q, m);
     }
   
 #if 0
