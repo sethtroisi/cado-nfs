@@ -54,7 +54,8 @@ add_library(facul
         pp1_mpz.c
         facul_doit_mpz.c
         stage2.c prac_bc.c
-	makeplan.c facul.c)
+	makeplan.c facul.c
+        mpqs.c)
 
 add_executable(testbench testbench.c)
 target_link_libraries(testbench facul utils m)

@@ -19,7 +19,6 @@ macro(add_order_test METHOD SIGMA PMIN PMAX)
   add_test("test_order_ecm${METHOD}_${SIGMA}_${PMIN}_${PMAX}" bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_order_ecm${METHOD}_${SIGMA}_${PMIN}_${PMAX}.inp\" -q -vf \"-po${METHOD}\" ${SIGMA}")
 endmacro(add_order_test)
 
-
 add_order_test("" 10 1000 2000)
 add_order_test("" 10 1000000 1001000)
 # Only one test with large primes as the sieve of Eratosthenes take a while
@@ -39,3 +38,5 @@ add_order_test(m12 6 1000000 1001000)
 # Point counting with torsion 16 curves is currently broken
 # add_order_test(m16 1 1000 2000)
 # add_order_test(m16 1 1000000 1001000)
+
+build_and_run_test(test_mpqs.c "tests;facul;utils")

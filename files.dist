@@ -645,6 +645,8 @@ sieve/ecm/prac_bc.h
 sieve/ecm/stage2.c
 sieve/ecm/stage2.h
 sieve/ecm/testbench.c
+sieve/ecm/mpqs.c
+sieve/ecm/mpqs.h
 sieve/fb.c
 sieve/fb.h
 sieve/freerel.c
@@ -788,6 +790,7 @@ tests/sieve/ecm/test_order_ecmm12_6_1000000_1001000.inp
 tests/sieve/ecm/test_order_ecmm12_6_1000_2000.inp
 tests/sieve/ecm/test_order_ecmm16_1_1000000_1001000.inp
 tests/sieve/ecm/test_order_ecmm16_1_1000_2000.inp
+tests/sieve/ecm/test_mpqs.c
 tests/sieve/ecm/test_testbench.sh
 tests/sieve/ecm/make_tests.sh
 tests/polyselect/CMakeLists.txt
