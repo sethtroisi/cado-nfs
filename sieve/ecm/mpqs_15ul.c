@@ -14,7 +14,13 @@ mpqs_15ul (modint_t f, const modulus_t m)
   mpz_mul_2exp (mz, mz, LONG_BIT);
   mpz_add_ui (mz, mz, m[0].m[0]);
   mpqs_doit (fz, mz, 0);
-  ASSERT_ALWAYS (mpz_fits_ulong_p (fz));
+  if (mpz_fits_ulong_p (fz) == 0)
+    {
+      mpz_divexact (fz, mz, fz);
+      /* since mz fits in 1.5 unsigned longs, then mz/fz should
+         fit into an unsigned long */
+      ASSERT_ALWAYS (mpz_fits_ulong_p (fz));
+    }
   f[0] = mpz_get_ui (fz);
   mpz_clear (fz);
   mpz_clear (mz);
