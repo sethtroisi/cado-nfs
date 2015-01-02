@@ -709,8 +709,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_set_ui (a, aui * aui);
   /* we want b^2-N divisible by a */
   k = tonelli_shanks (mpz_fdiv_ui (N, aui), aui);
-  /* we want b = k + a*t: b^2 = k^2 + 2*k*a*t (mod a^2), thus
-     k^2 + 2*k*a*t = N (mod a^2): t = ((N-k^2)/a)/(2*k) mod a */
+  /* we want b = k + sqrta*t: b^2 = k^2 + 2*k*sqrta*t (mod a), thus
+     k^2 + 2*k*sqrta*t = N (mod a): t = ((N-k^2)/sqrta)/(2*k) mod sqrta */
   mpz_set_ui (b, k * k);
   mpz_sub (b, N, b);
   ASSERT (mpz_divisible_p (b, sqrta));
