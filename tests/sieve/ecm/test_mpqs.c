@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "tests_common.h"
-#include "sieve/ecm/mpqs.h"
+#include "sieve/ecm/mpqs_doit.h"
 
 int
 main (int argc, const char *argv[])
@@ -34,7 +34,7 @@ main (int argc, const char *argv[])
         }
       while (mpz_sizeinbase (N, 2) != bits);
       gmp_printf ("N=%Zd\n", N);
-      mpqs (f, N, 1);
+      mpqs_doit (f, N, 1);
       if (mpz_cmp_ui (f, 1) > 0 && mpz_cmp (f, N) < 0)
         found ++;
     }

@@ -672,6 +672,16 @@ facul_make_default_strategy (int n, const int verbose)
 		     MONTY12, i - 1, 1, 0);
     }
 
+#ifdef USE_MPQS
+  /* replace last method by MPQS */
+  if (n > 1)
+    {
+      ecm_clear_plan (methods[n+2].plan);
+      free (methods[n+2].plan);
+      methods[n+2].method = MPQS_METHOD;
+    }
+#endif
+
   methods[n+3].method = 0;
   methods[n+3].plan = NULL;
   return methods;
@@ -1146,7 +1156,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	     tries with an other method.
 	  */
 	  if (methods[i].is_the_last)
-	      break;
+            break;
 	  else
 	    continue;
 	}

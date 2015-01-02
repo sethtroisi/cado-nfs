@@ -373,7 +373,7 @@ update8 (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
 /* put factor in z */
 static void
 gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t N,
-       mpz_t N0, int verbose)
+       const mpz_t N0, int verbose)
 {
   int i, j, k, k2, j2;
   int shift = wrel; /* shift for the relations */
@@ -521,7 +521,7 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t N,
 
 /* consider all primes up to B, and all odd multipliers up to K */
 static int
-best_multiplier (mpz_t N, unsigned long B, unsigned long K)
+best_multiplier (const mpz_t N, unsigned long B, unsigned long K)
 {
   unsigned long i, n, *Q, p, q, j, t, Nq, k, best_k = 1;
   double **X, logp, alpha, best_alpha = DBL_MAX;
@@ -580,10 +580,10 @@ best_multiplier (mpz_t N, unsigned long B, unsigned long K)
   return best_k;
 }
 
-/* Put in f a factor of N0, using factor base of ncol primes.
+/* Put in f a factor of N0 using MPQS.
    Assume N0 is odd. */
 void
-mpqs (mpz_t f, mpz_t N0, int verbose)
+mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 {
   mpz_t N, *Mat, *X;
   unsigned char *S, *T, *Logp, logp, log2[8], threshold = 0, mask = 128;
@@ -606,8 +606,16 @@ mpqs (mpz_t f, mpz_t N0, int verbose)
 
   /* Set M (half size of sieve array) and size of factor base.
      Note: when M=2^15, setting M=1<<15 statically is faster with gcc. */
-  M = 1 << (11 + ((Nbits - 56) >> 4));
-  ncol = 75 << ((Nbits - 56) >> 4);
+  if (Nbits < 56)
+    {
+      M = 10;
+      ncol = 40;
+    }
+  else
+    {
+      M = 1 << (11 + ((Nbits - 56) >> 4));
+      ncol = 75 << ((Nbits - 56) >> 4);
+    }
 
   mpz_init (N);
   k = best_multiplier (N0, Nbits, Nbits);
