@@ -677,7 +677,7 @@ facul_make_default_strategy (int n, const int verbose)
   if (n > 1)
     {
       ecm_clear_plan (methods[n+2].plan);
-      free (methods[n+2].plan);
+      /* the plan pointer will be freed in facul_clear_aux_methods() */
       methods[n+2].method = MPQS_METHOD;
     }
 #endif
