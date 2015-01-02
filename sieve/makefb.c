@@ -7,7 +7,7 @@
 #include "portability.h"
 #include "utils.h"
 
-#define MAX_THREADS 512
+#define MAX_THREADS 16
 
 /*
  * Compute g(x) = f(a*x+b), with deg f = d, and a and b are longs.
@@ -347,7 +347,7 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
 
 /* process 'GROUP' primes per thread, since the timings might differ a lot
    between successive primes */
-#define GROUP 512
+#define GROUP 1024
 
 /* thread structure */
 typedef struct
