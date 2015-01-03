@@ -164,16 +164,12 @@ batch_invert (unsigned long *q, unsigned long *p, long n, unsigned long a,
 
 /* Given k1 such that k1^2 = N (mod p),
    return k1 and k2 which are the roots of (a*x+b)^2 = N (mod p).
-   Assume inva = 1/sqrt(a) mod p.
+   Assume p is odd, and inva = 1/sqrt(a) mod p.
 */
 static unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
           unsigned long k1, unsigned long inva)
 {
-  /* special case for p=2: since a is odd, x = k1-b (mod 2) */
-  if (p == 2)
-    return (k1 - bmodp) & 1;
-
   /* the two roots are (k1-b)/a and (-k1-b)/a */
   modulus_t pp;
   residueul_t tt, uu, vv;

@@ -38,6 +38,7 @@ SET_TESTS_PROPERTIES(F9_kbucket_test PROPERTIES DEPENDS F9_sievetest)
 add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
 SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest)
 add_test(F9_cofactest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.cofactest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -file-cofact \"${CADO_NFS_SOURCE_DIR}/params/F9.st\"")
+SET_TESTS_PROPERTIES(F9_cofactest PROPERTIES DEPENDS F9_sievetest)
 
 # The TRACE_K test does only a single special-q, so we don't compare output
 # relations or checksums
