@@ -414,11 +414,6 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
   mod_init (r, m);
   fm->arith = CHOOSE_NONE;
   cfm->arith = CHOOSE_NONE;
-
-#ifndef USE_MPQS
-  if (method.plan == NULL) /* why this? */
-    return found;
-#endif
   
   if (method.method == PM1_METHOD)
     bt = pm1 (f, m, (pm1_plan_t *) (method.plan));
