@@ -25,7 +25,8 @@ add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \
 # We have to make this a "test" so that ctest runs it, even though it does
 # not actually test anything
 add_test(F9_sievetest_cleanup "${CMAKE_COMMAND}" -E remove -f "${CMAKE_CURRENT_BINARY_DIR}/F9.checksums")
-SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS "F9_sievetest_cleanup;F9_makefbtest")
+SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS F9_sievetest_cleanup)
+SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS F9_makefbtest)
 
 # We make these depend on sievetest, for checking the checksum file.
 # Since sievetest depends on makefbtest, we don't have to specify it
@@ -36,6 +37,7 @@ add_test(F9_kbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\
 SET_TESTS_PROPERTIES(F9_kbucket_test PROPERTIES DEPENDS F9_sievetest)
 add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
 SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest)
+add_test(F9_cofactest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.cofactest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -file-cofact \"${CADO_NFS_SOURCE_DIR}/params/F9.st\"")
 
 # The TRACE_K test does only a single special-q, so we don't compare output
 # relations or checksums

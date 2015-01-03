@@ -766,6 +766,7 @@ tests/sieve/test_init_norms_bucket_region.c
 tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh
+tests/sieve/F9.cofactest.sh
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
 tests/sieve/test_fb_make_step.c
