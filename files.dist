@@ -528,6 +528,7 @@ params/params.c98
 params/params.c99
 params/parameters.F9
 params/F9.poly
+params/F9.st
 polyselect/CMakeLists.txt
 polyselect/Makefile
 polyselect/area.c
