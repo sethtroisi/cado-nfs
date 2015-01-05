@@ -402,10 +402,16 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 
   regex_t preg_index, preg_fm;
   //regular expression for the sides
-  const char *str_preg_index = "r0=([[:digit:]]+),[[:space:]]r1=([[:digit:]]+)";
+  const char *str_preg_index =
+        "r0=([[:digit:]]+)"
+        ",[[:space:]]*"
+        "r1=([[:digit:]]+)";
   //regular expression for the strategy
-  const char *str_preg_fm = "([[:alnum:]]{2,3}):[[:space:]](...-?[[:alnum:]]"
-    "{2,3}?),[[:space:]]([[:digit:]]+),[[:space:]]([[:digit:]]+)";
+  const char *str_preg_fm =
+        "(S[[:alnum:]]+):[[:space:]]*"  /* side, like "S0: " */
+        "([[:alnum:]-]+)"               /* method, like "PP1-65" or "ECM-M12" */
+        ",[[:space:]]*([[:digit:]]+)"   /* B1, an integer */
+        ",[[:space:]]*([[:digit:]]+)";  /* B2, an integer */
   regcomp (&preg_index, str_preg_index, REG_ICASE|REG_EXTENDED);
   regcomp (&preg_fm, str_preg_fm, REG_ICASE|REG_EXTENDED);
 
