@@ -58,7 +58,7 @@ target_link_libraries(test_trialdiv utils tests)
 run_test(test_trialdiv test_trialdiv)
 
 add_executable(test_memset_things test_memset_things.c)
-target_link_libraries(test_memset_things las-norms utils gmp)
+target_link_libraries(test_memset_things las-norms utils)
 add_dependencies(check test_memset_things)
 run_test(test_memset_things test_memset_things)
 
