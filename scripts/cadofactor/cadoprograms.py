@@ -84,6 +84,32 @@ class Option(object, metaclass=abc.ABCMeta):
         self.defaultname = None
 
     def set_defaultname(self, defaultname):
+        """ Sets default name for the command line parameter. It must be specified
+        before calling map().
+
+        The reason for this is that command line parameters can be specified
+        in the constructor of Program sub-classes as, e.g.,
+          class Las(Program):
+            def __init__(lpba : Parameter()=None):
+        and the name "lpba" of the Las constructor's parameter should also be
+        the default name of command line parameter. However, the Parameter()
+        gets instantiated when the ":" annotation gets parsed, i.e., at the 
+        time the class definition of Las is parsed, and the fact that this
+        Parameter instance will act as an annotation to the "lpba" parameter
+        is not known to the Parameter() instance. I.e., at its instantiation,
+        the Parameter instance cannot tell to which parameter it will belong.
+
+        This information must be filled in later, via set_defaultname(), which
+        is called from Program.__init__(). It uses introspection to find out
+        which Option objects belong to which Program constructor parameter, and
+        fills in the constructor parameters' name via set_defaultname("lpba").
+
+        If the Option constructor had received an arg parameter, then that is
+        used instead of the defaultname, which allows for using different names
+        for the Program constructor's parameter and the command line parameter,
+        such as in
+          __init__(threads: Parameter("t")):
+        """
         self.defaultname = defaultname
 
     def get_arg(self):
@@ -94,16 +120,17 @@ class Option(object, metaclass=abc.ABCMeta):
         return self.checktype
 
     def map(self, value):
-        """ Public class that converts the Option instance into an array of
+        """ Public method that converts the Option instance into an array of
         strings with command line parameters. It also checks the type, if
         checktype was specified in the constructor.
         """
+        assert not self.defaultname is None
         if not self.checktype is None:
             # If checktype is float, we allow both float and int as the type of
             # value. Some programs accept parameters that are integers (such as
             # admax) in scientific notation which is typed as floating point,
             # thus we want to allow float parameters to be given in both
-            # integer and float typee, so that passing, e.g., admax as an int
+            # integer and float type, so that passing, e.g., admax as an int
             # does not trip the assertion
             if self.checktype is float and type(value) is int:
                 # Write it to command line as an int
@@ -127,7 +154,7 @@ class Option(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def _map(self, value):
-        """ Private class that does the actual translation to an array of string
+        """ Private method that does the actual translation to an array of string
         with command line parameters. Subclasses need to implement it.
 
         A simple case of the Template Method pattern.
