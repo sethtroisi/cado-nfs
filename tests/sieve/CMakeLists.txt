@@ -2,6 +2,7 @@
 # to stay compatible with older versions
 
 # Build makefb and las before running check
+include_directories(${PROJECT_SOURCE_DIR}/sieve)
 add_dependencies(check makefb las las_tracek las_kbucket las_mbucket)
 
 # Get paths to the makefb and las binaries and store in variables
@@ -55,6 +56,11 @@ SET_TESTS_PROPERTIES(F9_alambdatest PROPERTIES DEPENDS F9_makefbtest)
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")
 target_link_libraries(test_trialdiv utils tests)
 run_test(test_trialdiv test_trialdiv)
+
+add_executable(test_memset_things test_memset_things.c)
+target_link_libraries(test_memset_things las-norms utils gmp)
+add_dependencies(check test_memset_things)
+run_test(test_memset_things test_memset_things)
 
 macro (add_trialdiv_test MAXLEN)
   add_executable(test_trialdiv${MAXLEN} test_trialdiv.c)

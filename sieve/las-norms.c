@@ -191,8 +191,10 @@ size_t stos_vs_write128 () {
     realn = (n + stepn * (n >> 2));
     stepn = (stepn + 1 ) & 3;
     if (!stepn) n <<= 1;
+    if (realn < 0x20) break;
 
     stos = ~0;
+    ASSERT_ALWAYS(0x40 + realn >= 0x5f);
     for (unsigned int k = 0; k < 4; k++) {
       c = -cputicks();
       for (size_t decal = 0x40; decal--; ) memset_rep_stosq (S + decal, 0, realn);
@@ -202,6 +204,7 @@ size_t stos_vs_write128 () {
     s_stos = (double) realn * 0x40 / stos;
 
     cache = ~0;
+    ASSERT_ALWAYS(0x40 + realn >= 0x20);
     for (unsigned int k = 0; k < 3; k++) {
       c = -cputicks();
       for (size_t decal = 0x40; decal--; ) memset_write128 (S + decal, 0, realn);
@@ -240,6 +243,7 @@ size_t direct_write_vs_stos () {
 
   not_cache = ~0;
   /* I do this 3 times at least and I take the greatest speed */
+  ASSERT_ALWAYS(endn >= 0x20);
   for (unsigned int k = 0; k < 3; k++) {
     c = -cputicks();
     memset_direct128 (S, 0, endn);
@@ -252,11 +256,14 @@ size_t direct_write_vs_stos () {
   n = endn;
   do {
     realn = n - (n >> 3) * stepn;
+    if (realn < 0x60) break;
+
     stepn = (stepn + 1 ) & 3;
     if (!stepn) n >>= 1;
 
     stos = ~0;
     /* 2 times seems OK here to have the greatest speed */
+    ASSERT_ALWAYS(realn >= 0x5f);
     for (unsigned int k = 0; k < 2; k++) {
       c = -cputicks();
       memset_rep_stosq (S, 0, realn);

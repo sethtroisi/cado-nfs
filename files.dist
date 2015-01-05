@@ -1179,3 +1179,4 @@ tests/sieve/strategies/test_generate_strategies.c
 sieve/strategies/script_gen_dec.sh
 sieve/strategies/README.rsa704
 sieve/iqsort.h
+tests/sieve/test_memset_things.c
