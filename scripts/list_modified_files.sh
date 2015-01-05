@@ -11,13 +11,21 @@ EOF
     exit 0
 fi
 
+SHA1BIN=sha1sum
+if ! type -p "$SHA1BIN" > /dev/null ; then SHA1BIN=sha1 ; fi
+if ! type -p "$SHA1BIN" > /dev/null ; then SHA1BIN=shasum ; fi
+if ! type -p "$SHA1BIN" > /dev/null ; then
+    echo "Could not find a SHA-1 checksumming binary !" >&2
+    exit 1
+fi
+
 function list_modified() {
   echo '#define CADO_MODIFIED_FILES "\'
   git status --porcelain -uno | while read STATUS FILE
   do
     if [[ "$STATUS" = M  ||  "$STATUS" = A ]]
     then
-      SHA1="`sha1sum "$FILE" | cut -d " " -f 1`"
+      SHA1="`$SHA1BIN "$FILE" | cut -d " " -f 1`"
       echo "# $STATUS" "$FILE" "$SHA1"'\n\'
     else
       echo "# $STATUS" "$FILE"'\n\'
