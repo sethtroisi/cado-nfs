@@ -207,11 +207,7 @@ main (int argc, char * argv[])
       usage(pl, argv0);
     }
 
-#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
-    max_cache = direct_write_vs_stos ();
-    min_stos = stos_vs_write128 ();
-    fprintf (stderr, "# Las normalisation memset: movaps from 33(0x21) to %zu(0x%zx); rep stosq until %zu(0x%zx); movntps after\n", min_stos, min_stos, max_cache, max_cache);
-#endif
+    tune_las_memset();
 
     for (int side = 0; side < 2; side++)
       strategy[side] = facul_make_strategy(conf->sides[side]->lim,

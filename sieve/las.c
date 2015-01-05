@@ -2697,17 +2697,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
     }
 
-#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
-    extern size_t max_cache, min_stos;
-    max_cache = direct_write_vs_stos ();
-    min_stos = stos_vs_write128 ();
-    verbose_output_print(0, 2, "# movaps / rep-stosq cutoff: %zu(0x%zx) ;", min_stos, min_stos);
-    verbose_output_print(0, 2, " rep-stosq / movntps cutoff:");
-    if (max_cache != ~(size_t)0)
-        verbose_output_print(0, 2, " %zu(0x%zx)\n", max_cache, max_cache);
-    else
-        verbose_output_print(0, 2, " never\n");
-#endif
+    tune_las_memset();
     
     thread_data * thrs = thread_data_alloc(las, las->nb_threads);
 
