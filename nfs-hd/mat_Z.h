@@ -1,10 +1,10 @@
 #ifndef MAT_Z_H
 #define MAT_Z_H
 
-#include <gmp.h>
-#include <stdint.h>
 #include "cado.h"
 #include "utils.h"
+#include <gmp.h>
+#include <stdint.h>
 
 typedef struct {
   mpz_t **coeff;
@@ -148,24 +148,18 @@ void mat_Z_mul_mpz_vector_to_mpz_poly(mpz_poly_ptr a, mat_Z_srcptr A,
 void mat_Z_mul_mpz_poly(mpz_poly_ptr a, mat_Z_srcptr A, mpz_poly_srcptr c);
 
 /*
+  LLL on a mat_Z matrix. Use LLL in utils.
+
+  A: the original matrix.
+  C: result of LLL on A.
+*/
+void mat_Z_LLL(mat_Z_ptr C, mat_Z_srcptr A);
+
+/*
   LLL on a matrix whose columns represent vectors.
 
   matrix: perform LLL on the matrix and set the result in this matrix.
 */
 void mat_Z_LLL_transpose(mat_Z_ptr matrix);
-
-/* Come from cado-nfs. */
-
-/* LLL-reduce the matrix A (whose rows represent vectors, with indices
-   starting at 1) and put the LLL reduction of A in B:
-   * det (output) is the determinant
-   * U (output) is the transformation matrix (NULL if not needed)
-   * a, b are parameters (a/b=3/4 classically, we should have 1/4 < a/b < 1)
-   m is the number of vectors (i.e., number of rows)
-   n is the number of columns (i.e., length of each vector)
-*/
-long full_mat_Z_LLL(mat_Z_ptr B, mat_Z_ptr U, mpz_t det, mat_Z_srcptr A, mpz_t a, mpz_t b);
-
-void mat_Z_LLL(mat_Z_ptr B, mat_Z_srcptr A);
 
 #endif  /* MAT_Z_H */
