@@ -402,10 +402,16 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 
   regex_t preg_index, preg_fm;
   //regular expression for the sides
-  const char *str_preg_index = "r0=([[:digit:]]+),[[:space:]]r1=([[:digit:]]+)";
+  const char *str_preg_index =
+        "r0=([[:digit:]]+)"
+        ",[[:space:]]*"
+        "r1=([[:digit:]]+)";
   //regular expression for the strategy
-  const char *str_preg_fm = "([[:alnum:]]{2,3}):[[:space:]](...-?[[:alnum:]]"
-    "{2,3}?),[[:space:]]([[:digit:]]+),[[:space:]]([[:digit:]]+)";
+  const char *str_preg_fm =
+        "(S[[:alnum:]]+):[[:space:]]*"  /* side, like "S0: " */
+        "([[:alnum:]-]+)"               /* method, like "PP1-65" or "ECM-M12" */
+        ",[[:space:]]*([[:digit:]]+)"   /* B1, an integer */
+        ",[[:space:]]*([[:digit:]]+)";  /* B2, an integer */
   regcomp (&preg_index, str_preg_index, REG_ICASE|REG_EXTENDED);
   regcomp (&preg_fm, str_preg_fm, REG_ICASE|REG_EXTENDED);
 
@@ -459,6 +465,10 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 
 	      unsigned int B1 = (unsigned int) atoi (res[2]);
 	      unsigned int B2 = (unsigned int) atoi (res[3]);
+	      if (B1 == 0 && B2 == 0)
+		{ //zero method!
+		  goto next_regex;
+		}
 	      unsigned long sigma = 0;
 	      int curve = 0;
 	      int method = 0;
@@ -511,12 +521,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		   * we will compute and store it.
 		   */
 		  void* plan = NULL;
-		  if (B1 == 0 && B2 == 0)
-		    { //zero method!
-		      plan = NULL;
-		      method = PM1_METHOD;//default value.
-		    }
-		  else if (method == PM1_METHOD)
+		  if (method == PM1_METHOD)
 		    {
 		      plan = malloc (sizeof (pm1_plan_t));
 		      pm1_make_plan (plan, B1, B2, verbose);
@@ -558,6 +563,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      pmatch[0].rm_eo = strlen(str_process);
 	    }
 	}
+      next_regex:
       str_process = &str_process[pmatch[0].rm_eo];
       //free
       for (size_t i = 0; i < nmatch; i++)
@@ -647,9 +653,12 @@ facul_make_default_strategy (int n, const int verbose)
   methods[2].plan = malloc (sizeof (ecm_plan_t));
   ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
 
-  methods[3].method = EC_METHOD;
-  methods[3].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+  if (n > 0)
+    {
+      methods[3].method = EC_METHOD;
+      methods[3].plan = malloc (sizeof (ecm_plan_t));
+      ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+    }
 
   /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
   double B1 = 105.0;
@@ -668,6 +677,16 @@ facul_make_default_strategy (int n, const int verbose)
       ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
 		     MONTY12, i - 1, 1, 0);
     }
+
+#ifdef USE_MPQS
+  /* replace last method by MPQS */
+  if (n > 1)
+    {
+      ecm_clear_plan (methods[n+2].plan);
+      /* the plan pointer will be freed in facul_clear_aux_methods() */
+      methods[n+2].method = MPQS_METHOD;
+    }
+#endif
 
   methods[n+3].method = 0;
   methods[n+3].plan = NULL;
@@ -803,18 +822,19 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 	strategies->methods[r][a];
       if (methods == NULL)
 	continue;
-      int index_last_method[2] = {0, 0};      //the default_values
+      int index_last_method[2] = {-1, -1};      //the default_values
       unsigned int i;
       for (i = 0; methods[i].method != 0; i++) {
 	methods[i].is_the_last = 0;
 	index_last_method[methods[i].side] = i;
       }
-      methods[index_last_method[0]].is_the_last = 1;
-      methods[index_last_method[1]].is_the_last = 1;
-      ASSERT_ALWAYS (index_last_method[0] < STATS_LEN &&
-		     index_last_method[1] < STATS_LEN);
+      //== -1 if it exists zero method for this side!
+      if (index_last_method[0] != -1)
+	  methods[index_last_method[0]].is_the_last = 1;
+      if (index_last_method[1] != -1)
+	  methods[index_last_method[1]].is_the_last = 1;
     }
-
+  
   //Create the auxiliary methods!
   //add test to check if it's necessary to create our aux methods!
   //todo: choose a better choice of our number of curves!
@@ -876,16 +896,18 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
     return -1;
   unsigned int r;
   //print info lpb ...
-  printf ("(lpb = [%ld,%ld], as...=[%lf, %lf], BBB = [%lf, %lf])\n",
+  fprintf (file,
+	  "(lpb = [%ld,%ld], as...=[%lf, %lf], BBB = [%lf, %lf])\n",
 	  strategies->lpb[0], strategies->lpb[1],
 	  strategies->assume_prime_thresh[0],
 	  strategies->assume_prime_thresh[1],
 	  strategies->BBB[0], strategies->BBB[1]);
-  printf ("mfb = [%d, %d]\n", strategies->mfb[0], strategies->mfb[1]);
+  fprintf (file,
+	  "mfb = [%d, %d]\n", strategies->mfb[0], strategies->mfb[1]);
   for (r = 0; r <= strategies->mfb[0]; r++) {
     unsigned int a;
     for (a = 0; a <= strategies->mfb[1]; a++) {
-      printf ("[r = %d, a = %d]", r, a);
+      fprintf (file, "[r = %d, a = %d]", r, a);
       facul_method_side_t* methods = strategies->methods[r][a];
       if (methods == NULL)
 	continue;
@@ -897,26 +919,30 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 	  if (fm == NULL || fm->method == 0)
 	    break;
 	  if (fm->plan == NULL)//zero method!!!
-	    printf ("[side=%d, FM=%ld, B1=0, B2=0] ", methods[i].side,
+	    fprintf (file,
+		    "[side=%d, FM=%ld, B1=0, B2=0] ", methods[i].side,
 		    fm->method);
 	  else {
 	    if (fm->method == PM1_METHOD)
 	      {
 		pm1_plan_t* plan = (pm1_plan_t*) fm->plan;
-		printf ("[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
+		fprintf (file,
+			 "[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
 			fm->method, plan->B1, plan->stage2.B2);
 	      }
 	    else if (fm->method == PP1_27_METHOD ||
 		     fm->method == PP1_65_METHOD)
 	      {
 		pp1_plan_t* plan = (pp1_plan_t*) fm->plan;
-		printf ("[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
+		fprintf (file,
+		       "[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
 			fm->method, plan->B1, plan->stage2.B2);
 	      }
 	    else if (fm->method == EC_METHOD)
 	      {
 		ecm_plan_t* plan = (ecm_plan_t*) fm->plan;
-		printf ("[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
+		fprintf (file,
+			"[side=%d, FM=%ld, B1=%d, B2=%d] ", methods[i].side,
 			fm->method, plan->B1,plan->stage2.B2);
 	      }
 	    else
@@ -924,7 +950,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 	  }
 	  i++;
 	}
-      printf ("\n");
+      fprintf (file, "\n");
     }
   }
   return 1;
@@ -1143,7 +1169,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	     tries with an other method.
 	  */
 	  if (methods[i].is_the_last)
-	      break;
+            break;
 	  else
 	    continue;
 	}
@@ -1289,7 +1315,7 @@ facul_both (unsigned long **factors, mpz_t* N,
       if (found[side] > 1)
 	{
 	  fprintf (stderr, " == ");
-	  for (i = 0; i < found[side]; i++)
+	  for (int i = 0; i < found[side]; i++)
 	    fprintf (stderr, "%lu%s", factors[side][i],
 		     (i+1 < found[side]) ? " * " : " /* PARI */\n");
 	}

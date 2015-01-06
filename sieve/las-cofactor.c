@@ -199,10 +199,9 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
 }
 
 
-/*
-This is the same function that factor_leftover_norm() but we will work
-with the both norms! It's used when we want to factor these norms in the
-same time and not one after the other.
+/* This is the same function as factor_leftover_norm() but it works
+   with both norms! It is used when we want to factor these norms
+   simultaneously and not one after the other.
 */
 
 static int
@@ -401,7 +400,7 @@ factor_both_leftover_norms(mpz_t *norm, const mpz_t BLPrat, mpz_array_t **f,
 
     int have_file = (si->strategies != NULL);
     if (have_file)
-	pass = factor_both_leftover_norms_src (norm, f, m, si);
+       pass = factor_both_leftover_norms_src (norm, f, m, si);
     else {
         for (int z = 0 ; pass > 0 && z < 2 ; z++){
 	    int side = first ^ z;

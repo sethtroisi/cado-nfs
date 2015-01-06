@@ -3,6 +3,7 @@
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
+#include "mpqs.h"
 
 extern unsigned long stats_called[];
 extern unsigned long stats_found_n[];
@@ -167,6 +168,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	bt = pp1_65 (f, m, (pp1_plan_t *) (strategy->methods[i].plan));
       else if (strategy->methods[i].method == EC_METHOD)
 	bt = ecm (f, m, (ecm_plan_t *) (strategy->methods[i].plan));	
+      else if (strategy->methods[i].method == MPQS_METHOD)
+	bt = mpqs (f, m);
       else 
 	{
 	  /* A method value we don't know about. Something's wrong, bail out */
@@ -411,9 +414,6 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
   mod_init (r, m);
   fm->arith = CHOOSE_NONE;
   cfm->arith = CHOOSE_NONE;
-
-  if (method.plan == NULL)
-    return found;
   
   if (method.method == PM1_METHOD)
     bt = pm1 (f, m, (pm1_plan_t *) (method.plan));
@@ -423,6 +423,8 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
     bt = pp1_65 (f, m, (pp1_plan_t *) (method.plan));
   else if (method.method == EC_METHOD)
     bt = ecm (f, m, (ecm_plan_t *) (method.plan));
+  else if (method.method == MPQS_METHOD)
+    bt = mpqs (f, m);
   else 
     {
       /* A method value we don't know about. Something's wrong, bail out */

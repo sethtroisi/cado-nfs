@@ -528,6 +528,7 @@ params/params.c98
 params/params.c99
 params/parameters.F9
 params/F9.poly
+params/F9.st
 polyselect/CMakeLists.txt
 polyselect/Makefile
 polyselect/area.c
@@ -646,6 +647,13 @@ sieve/ecm/prac_bc.h
 sieve/ecm/stage2.c
 sieve/ecm/stage2.h
 sieve/ecm/testbench.c
+sieve/ecm/mpqs.h
+sieve/ecm/mpqs_doit.h
+sieve/ecm/mpqs_doit.c
+sieve/ecm/mpqs_ul.c
+sieve/ecm/mpqs_15ul.c
+sieve/ecm/mpqs_2ul2.c
+sieve/ecm/mpqs_mpz.c
 sieve/fb.c
 sieve/fb.h
 sieve/freerel.c
@@ -760,6 +768,7 @@ tests/sieve/test_init_norms_bucket_region.c
 tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh
+tests/sieve/F9.cofactest.sh
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
 tests/sieve/test_fb_make_step.c
@@ -789,6 +798,7 @@ tests/sieve/ecm/test_order_ecmm12_6_1000000_1001000.inp
 tests/sieve/ecm/test_order_ecmm12_6_1000_2000.inp
 tests/sieve/ecm/test_order_ecmm16_1_1000000_1001000.inp
 tests/sieve/ecm/test_order_ecmm16_1_1000_2000.inp
+tests/sieve/ecm/test_mpqs.c
 tests/sieve/ecm/test_testbench.sh
 tests/sieve/ecm/make_tests.sh
 tests/polyselect/CMakeLists.txt
@@ -1170,3 +1180,4 @@ tests/sieve/strategies/test_generate_strategies.c
 sieve/strategies/script_gen_dec.sh
 sieve/strategies/README.rsa704
 sieve/iqsort.h
+tests/sieve/test_memset_things.c

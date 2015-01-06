@@ -60,11 +60,13 @@ void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
 #endif
 #define memset las_memset
 
-  /* If the size of memset is before this value, memset uses movaps algorithm.
-     After this value, see max_cache */
+/* strategy used for memset of size n:
+ *
+ * for n < min_stos : movaps
+ * for min_stos <= n < max_cache : rep stosq
+ * for n >= max_cache : movntps
+ */
   static size_t min_stos = 0x8000; /* 32 KB = max size for Intel L0 cache */
-  /* If the size of memset is before this value, memset uses rep stosq algorithm.
-     After this value, memset uses movntps (direct write in memory) */
   static size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
 
   /* The fastest memset for x86 64 & SSE2 */
@@ -190,8 +192,7 @@ void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
     return S;
   }
   
-  extern size_t stos_vs_write128 ();
-  extern size_t direct_write_vs_stos ();
+  extern void tune_las_memset();
 #endif
   
 /* These functions are internals. Don't use them. Use the wrapper above.

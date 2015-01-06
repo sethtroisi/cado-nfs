@@ -2697,12 +2697,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
     }
 
-#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
-    extern size_t max_cache, min_stos;
-    max_cache = direct_write_vs_stos ();
-    min_stos = stos_vs_write128 ();
-    verbose_output_print(0, 1, "# Las normalisation memset: movaps from 33(0x21) to %zu(0x%zx); rep stosq until %zu(0x%zx); movntps after\n", min_stos, min_stos, max_cache, max_cache);
-#endif
+    tune_las_memset();
     
     thread_data * thrs = thread_data_alloc(las, las->nb_threads);
 

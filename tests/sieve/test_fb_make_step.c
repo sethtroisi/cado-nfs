@@ -23,6 +23,8 @@ int main(int argc, const char **argv)
     double scale = 0.5 + 5. * drand48();
     fb_make_steps(steps, fbb, scale);
   }
+
+  tests_common_clear ();
   
   return 0;
 }

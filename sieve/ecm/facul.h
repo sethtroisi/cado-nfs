@@ -15,7 +15,7 @@
 #define PP1_27_METHOD 2
 #define PP1_65_METHOD 3
 #define EC_METHOD 4
-
+#define MPQS_METHOD 5
 
 #define FACUL_NOT_SMOOTH (-1)
 #define FACUL_MAYBE (0)

@@ -7,7 +7,7 @@
 #include "portability.h"
 #include "utils.h"
 
-#define MAX_THREADS 512
+#define MAX_THREADS 16
 
 /*
  * Compute g(x) = f(a*x+b), with deg f = d, and a and b are longs.
@@ -345,11 +345,16 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
     return L;
 }
 
+/* process 'GROUP' primes per thread, since the timings might differ a lot
+   between successive primes */
+#define GROUP 1024
+
 /* thread structure */
 typedef struct
 {
-  unsigned long p;
-  entry_list L;
+  unsigned long p[GROUP];
+  entry_list L[GROUP];
+  int n; /* number of primes to be processed, n <= GROUP */
   mpz_t *f;
   int d;
   int thread;
@@ -360,8 +365,11 @@ typedef __tab_struct tab_t[1];
 void*
 one_thread (void* args)
 {
+  int k;
   tab_t *tab = (tab_t*) args;
-  tab[0]->L = all_roots (tab[0]->f, tab[0]->d, tab[0]->p, tab[0]->maxbits);
+  for (k = 0; k < tab[0]->n; k++)
+    tab[0]->L[k] = all_roots (tab[0]->f, tab[0]->d, tab[0]->p[k],
+                              tab[0]->maxbits);
   return NULL;
 }
 
@@ -369,7 +377,7 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
                         int maxbits, int nb_threads)
 {
     mpz_t *f = F->coeff;
-    int d = F->deg, j, maxj;
+    int d = F->deg, j, k, maxj;
 
     fprintf(outfile, "# Roots for polynomial ");
     mpz_poly_fprintf(outfile, F);
@@ -380,13 +388,18 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
     pthread_t tid[MAX_THREADS];
     unsigned long p;
     tab_t T[MAX_THREADS];
+    for (j = 0; j < nb_threads; j++)
+      {
+        T[j]->f = f;
+        T[j]->d = d;
+        T[j]->maxbits = maxbits;
+      }
     for (p = 2; p <= alim;) {
-      for (j = 0; j < nb_threads && p <= alim; p = getprime (p), j++)
+      for (j = 0; j < nb_threads && p <= alim; j++)
         {
-          T[j]->p = p;
-          T[j]->f = f;
-          T[j]->d = d;
-          T[j]->maxbits = maxbits;
+          for (k = 0; k < GROUP && p <= alim; p = getprime (p), k++)
+            T[j]->p[k] = p;
+          T[j]->n = k;
         }
       maxj = j;
       for (j = 0; j < maxj; j++)
@@ -394,29 +407,31 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
       while (j > 0)
         pthread_join (tid[--j], NULL);
       for (j = 0; j < maxj; j++) {
-        // print in a compactified way
-        int oldn0=-1, oldn1=-1;
-        unsigned long oldq = 0;
-        for (int i = 0; i < T[j]->L.len; ++i) {
-            unsigned long q = T[j]->L.list[i].q;
-            int n1 = T[j]->L.list[i].n1;
-            int n0 = T[j]->L.list[i].n0;
-            unsigned long r =  T[j]->L.list[i].r;
+        for (k = 0; k < T[j]->n; k++) {
+          // print in a compactified way
+          int oldn0=-1, oldn1=-1;
+          unsigned long oldq = 0;
+          for (int i = 0; i < T[j]->L[k].len; ++i) {
+            unsigned long q = T[j]->L[k].list[i].q;
+            int n1 = T[j]->L[k].list[i].n1;
+            int n0 = T[j]->L[k].list[i].n0;
+            unsigned long r =  T[j]->L[k].list[i].r;
             if (q == oldq && n1 == oldn1 && n0 == oldn0)
-                fprintf(outfile, ",%lu", r);
+              fprintf(outfile, ",%lu", r);
             else {
-                if (i > 0)
-                    fprintf(outfile, "\n");
-                oldq = q; oldn1 = n1; oldn0 = n0;
-                if (n1 == 1 && n0 == 0)
-                    fprintf(outfile, "%lu: %lu", q, r);
-                else
-                    fprintf(outfile, "%lu:%d,%d: %lu", q, n1, n0, r);
+              if (i > 0)
+                fprintf(outfile, "\n");
+              oldq = q; oldn1 = n1; oldn0 = n0;
+              if (n1 == 1 && n0 == 0)
+                fprintf(outfile, "%lu: %lu", q, r);
+              else
+                fprintf(outfile, "%lu:%d,%d: %lu", q, n1, n0, r);
             }
-        }
-        if (T[j]->L.len > 0)
+          }
+          if (T[j]->L[k].len > 0)
             fprintf(outfile, "\n");
-        entry_list_clear(&(T[j]->L));
+          entry_list_clear(&(T[j]->L[k]));
+        }
       }
     }
     /* Free getprime() memory */

@@ -21,7 +21,7 @@ out=$8 # say 'res_precompt_st/'
 
 while [ $r0 -le $mfb0 ]; do
 pathname_decomp=$decomp"/decomp_"$lim0"_"$r0
-./gst -gst_r -lim0 $lim0 -lpb0 $lpb0 -r0 $r0 -ncurves $ncurves -in $methods -decomp $pathname_decomp -out $out &
+$CADO_NFS/sieve/strategies/gst -gst_r -lim0 $lim0 -lpb0 $lpb0 -r0 $r0 -ncurves $ncurves -in $methods -decomp $pathname_decomp -out $out &
 let "r0 = r0 + 1"
 done
 

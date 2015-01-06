@@ -66,7 +66,6 @@ sieve/ecm/find_primes_hit.c
 sieve/ecm/getprime.c
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
-sieve/ecm/mpqs.c
 sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
@@ -130,4 +129,5 @@ sieve/strategies/script_str.sh
 sieve/strategies/script_str_r.sh
 sieve/strategies/CMakeLists-nodist.txt
 sieve/strategies/test_strategy_cado.c
+sieve/strategies/F9.sh
 linalg/bwc/lingen.txt

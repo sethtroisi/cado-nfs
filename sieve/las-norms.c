@@ -25,134 +25,6 @@ static long lg_page;
 
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
 
-/* 1 on 3 pseudo memsets, only for speed tests, do not use. */
-/* This memset is correct only for n >= 0x20 */
-uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
-  register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
-  uint64_t jmp, offset, rc = (uint8_t) c * 0x0101010101010101;
-  uintptr_t cS = S;
-  n += S - 0x10;
-  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
-  *(int64_t *) (uintptr_t) (n       ) = rc;
-  *(int64_t *) (uintptr_t) (n + 0x08) = rc;
-  *(int64_t *) (S        ) = rc;
-  *(int64_t *) (S  + 0x08) = rc;
-  __asm__ __volatile__ ( "pshufd $0x00, %[mc], %[mc]\n" : [mc]"+x"(mc));
-  S |= 0x0f;
-  n |= 0x0f;
-  n -= S;
-  offset = (uint8_t) n;
-  S += offset - 0x7f;
-  offset = (uint64_t) offset >> 2;
-  __asm__ __volatile__ ( "leaq 0f(%%rip), %[jmp]\n"
-                         "subq %[offset], %[jmp]\n"
-                         "shrq $0x08, %[n]\n"
-                         "jmpq *%[jmp]\n"
-                         ".p2align 4\n 1:\n"
-                         "addq $0x100, %[S]\n"
-                         "subq $0x01,%[n]\n"
-                         "movaps %[mc], -0x80(%[S])\n"
-                         "movaps %[mc], -0x70(%[S])\n"
-                         "movaps %[mc], -0x60(%[S])\n"
-                         "movaps %[mc], -0x50(%[S])\n"
-                         "movaps %[mc], -0x40(%[S])\n"
-                         "movaps %[mc], -0x30(%[S])\n"
-                         "movaps %[mc], -0x20(%[S])\n"
-                         "movaps %[mc], -0x10(%[S])\n"
-                         "movaps %[mc],      (%[S])\n nop\n"
-                         "movaps %[mc],  0x10(%[S])\n"
-                         "movaps %[mc],  0x20(%[S])\n"
-                         "movaps %[mc],  0x30(%[S])\n"
-                         "movaps %[mc],  0x40(%[S])\n"
-                         "movaps %[mc],  0x50(%[S])\n"
-                         "movaps %[mc],  0x60(%[S])\n"
-                         "movaps %[mc],  0x70(%[S])\n"
-                         "0:\n"
-                         "jnz 1b\n"
-                         : [jmp]"=&r"(jmp), [n]"+r"(n), [S]"+R"(S) : [offset]"r"(offset), [mc]"x"(mc) : "cc", "memory");
-  return cS;
-}
-
-/* 2 on 3 pseudo memsets, only for speed tests, do not use. */
-/* This memset is correct only for n >= 0x5f */
-uintptr_t memset_rep_stosq (uintptr_t S, int c, size_t n) {
-  __m128 mc;
-  int64_t rc = (uint8_t) c * 0x0101010101010101;
-  uintptr_t cS = S;
-  n += S;
-  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
-  *(int64_t *) (uintptr_t) (n - 0x10) = rc;
-  *(int64_t *) (uintptr_t) (n - 0x08) = rc;
-  *(int64_t *) (S        ) = rc;
-  *(int64_t *) (S  + 0x08) = rc;
-  __asm__ __volatile__ ( "pshufd $0x00, %[mc], %[mc]\n" : [mc]"+x"(mc));
-  n &= -0x10;
-  _mm_store_ps ((float *) (uintptr_t) (n - 0x40), mc);
-  _mm_store_ps ((float *) (uintptr_t) (n - 0x30), mc);
-  _mm_store_ps ((float *) (uintptr_t) (n - 0x20), mc);
-  _mm_store_ps ((float *) (uintptr_t) (n - 0x10), mc);
-  S += 0x40;
-  S &= -0x10;
-  _mm_store_ps ((float *) (uintptr_t) (S - 0x30), mc);
-  _mm_store_ps ((float *) (uintptr_t) (S - 0x20), mc);
-  _mm_store_ps ((float *) (uintptr_t) (S - 0x10), mc);
-  _mm_store_ps ((float *) (uintptr_t) (S       ), mc);
-  S &= -0x40;
-  n &= -0x40;
-  n -= S;
-  n >>= 3;
-  __asm__ __volatile__ ( "cld\n rep\n stosq\n" : "+c"(n), [S]"+D"(S) : [rc]"a"(rc) : "cc", "memory");
-  return cS;
-}
-
-/* 3 on 3 pseudo memsets, only for speed tests, do not use. */
-/* This memset is correct only for n >= 0x20 */
-uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
-  register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
-  int64_t jmp, offset, rc = (uint8_t) c * 0x0101010101010101;
-  uintptr_t cS = S;
-  n += S - 0x10;
-  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
-  *(int64_t *) (uintptr_t) (n       ) = rc;
-  *(int64_t *) (uintptr_t) (n + 0x08) = rc;
-  *(int64_t *) (S        ) = rc;
-  *(int64_t *) (S  + 0x08) = rc;
-  __asm__ __volatile__ ( "pshufd $0x00, %[mc], %[mc]\n" : [mc]"+x"(mc));
-  S |= 0x0f;
-  n |= 0x0f;
-  n -= S;
-  offset = (uint8_t) n;
-  S += offset - 0x7f;
-  offset = (uint64_t) offset >> 2;
-  __asm__ __volatile__ ( "leaq 0f(%%rip), %[jmp]\n"
-                         "subq %[offset], %[jmp]\n"
-                         "shrq $0x08, %[n]\n"
-                         "jmpq *%[jmp]\n"
-                         ".p2align 4\n 1:\n"
-                         "addq $0x100, %[S]\n"
-                         "subq $0x01,%[n]\n"
-                         "movntps %[mc], -0x80(%[S])\n"
-                         "movntps %[mc], -0x70(%[S])\n"
-                         "movntps %[mc], -0x60(%[S])\n"
-                         "movntps %[mc], -0x50(%[S])\n"
-                         "movntps %[mc], -0x40(%[S])\n"
-                         "movntps %[mc], -0x30(%[S])\n"
-                         "movntps %[mc], -0x20(%[S])\n"
-                         "movntps %[mc], -0x10(%[S])\n"
-                         "movntps %[mc],      (%[S])\n nop\n"
-                         "movntps %[mc],  0x10(%[S])\n"
-                         "movntps %[mc],  0x20(%[S])\n"
-                         "movntps %[mc],  0x30(%[S])\n"
-                         "movntps %[mc],  0x40(%[S])\n"
-                         "movntps %[mc],  0x50(%[S])\n"
-                         "movntps %[mc],  0x60(%[S])\n"
-                         "movntps %[mc],  0x70(%[S])\n"
-                         "0:\n"
-                         "jnz 1b\n"
-                         : [jmp]"=&r"(jmp), [n]"+r"(n), [S]"+R"(S) : [offset]"r"(offset), [mc]"x"(mc) : "cc", "memory");
-  return cS;
-}
-
 static inline uint64_t cputicks()
 {
   uint64_t r;
@@ -160,119 +32,132 @@ static inline uint64_t cputicks()
   return r;
 }
 
-/* Comparison between the speed of rep stosq and movaps. All
- * the memsets are here really small; the speed of the memsets
- * are completly different if the adress of the memset is L0 cache
- * aligned or not.
- * So, to compute the real speed, I will compute 0x40 memsets
- * for each test, with a L0 aligned cache adress + {0...0x3F}.
- */
-size_t stos_vs_write128 () {
-  uint64_t stos, cache, c;
-  size_t n, endn, stepn, realn;
-  double s_stos, s_cache;
-  uintptr_t rS, S;
+void tune_las_memset()
+{
+    /* larger than the biggest cache on all x86 processors */
+    double xput[3];
+    uint64_t ticks;
+    size_t nmax = 0x8000000;
+    void * S = malloc_aligned(nmax + 0x40, 0x1000);
+    FATAL_ERROR_CHECK(!S, "malloc failed");
 
-  /* endn must be greater than the biggest cache on all x86 processors:
-     128 Mbytes + 4096 + 64 bytes here. */
-  endn = 0x8000000;
-  if ((rS = (uintptr_t) malloc (endn + 0x1040)) == (uintptr_t) NULL) {
-    fprintf (stderr, "Error malloc:%zu bytes not available.\n", endn + 0x1040);
-    exit (1);
-  }
-  /* S is at the beginning of a 4096 bytes bloc */
-  S = (rS + 0xFFF) & ~0xFFF;
+    /* First tuning: comparison between the speed of rep stosq and
+     * movaps. All the memsets are here really small; the speed of the
+     * memsets are completly different if the adress of the memset is L0
+     * cache aligned or not.
+     * So, to compute the real speed, we compute 0x40 memsets
+     * for each test, with a L0 aligned cache adress + {0...0x3F} ; only
+     * the best result is kept.
+     */
 
-  stepn = 0;
-  /* Careful: never less than 0x5f (minima for memset_rep_stosq),
-     and must be a power of 2 */
-  for (n = 0x80; n < endn; ) {
+    /* test for n, 1.25n, 1.5n, 1.75n, 2n, and then replace n by 2n and
+     * iterate -- so in a sense, we're testing on a moderately geometric
+     * progression of the size n, the ratio being roughly 2^(1/4)=1.189
+     */
+    for(size_t n = 0x80, base_n = 0x80, stops=0 ;
+            n != nmax ;
+            n = (++stops&3) ? (n + (base_n>>2)) : (base_n <<= 1))
+    {
+        /* measure bytes pre cpu tick for method write128 (aka movaps) */
+        min_stos = SIZE_MAX;
+        ticks = UINT64_MAX;
+        ASSERT_ALWAYS(0x40 + n >= 0x20);
+        for (unsigned int k = 0; k < 3; k++) {
+            uint64_t c;
+            c = -cputicks();
+            for (size_t shift = 0x40; shift--; )
+                las_memset (pointer_arith(S, shift), 0, n);
+            c += cputicks();
+            if (c < ticks) ticks = c;
+        }
+        xput[0] = (double) 0x40 * n / ticks;
 
-    realn = (n + stepn * (n >> 2));
-    stepn = (stepn + 1 ) & 3;
-    if (!stepn) n <<= 1;
+        /* measure bytes pre cpu tick for method rep_stosq */
+        min_stos = n;
+        ticks = UINT64_MAX;
+        for (unsigned int k = 0; k < 4; k++) {
+            uint64_t c;
+            c = -cputicks();
+            for (size_t shift = 0x40; shift--; )
+                las_memset (pointer_arith(S, shift), 0, n);
+            c += cputicks();
+            if (c < ticks) ticks = c;
+        }
+        xput[1] = (double) 0x40 * n / ticks;
 
-    stos = ~0;
-    for (unsigned int k = 0; k < 4; k++) {
-      c = -cputicks();
-      for (size_t decal = 0x40; decal--; ) memset_rep_stosq (S + decal, 0, realn);
-      c += cputicks();
-      if (c < stos) stos = c;
+        // fprintf (stderr, "n=%zu(%zx), write128=%.2f, rep stosq=%.2f\n", n, n, xput[0], xput[1]);
+
+        if (xput[1] > xput[0]) break;
     }
-    s_stos = (double) realn * 0x40 / stos;
+    verbose_output_print(0, 2, "# movaps / rep-stosq cutoff: %zu(0x%zx)\n", min_stos, min_stos);
 
-    cache = ~0;
-    for (unsigned int k = 0; k < 3; k++) {
-      c = -cputicks();
-      for (size_t decal = 0x40; decal--; ) memset_write128 (S + decal, 0, realn);
-      c += cputicks();
-      if (c < cache) cache = c;
+    /* Second tuning: comparison between the speed of rep stosq and
+     * movntps. All the memsets are here really big, because movntps is
+     * always slower than rep stosq when the size of the memset is
+     * smaller than the biggest cache.
+     * So, the memsets are always L0 cache aligned here.
+     */
+
+    /* measure bytes pre cpu tick for method direct128 (aka movntps).
+     * We're only taking one measure here, as we assume that it is
+     * relatively independent of the size.
+     */
+    {
+        size_t n = nmax;
+        max_cache = nmax;       /* force direct128 */
+        ticks = UINT64_MAX;
+        for (unsigned int k = 0; k < 4; k++) {
+            uint64_t c;
+            c = -cputicks();
+            las_memset(S, 0, n);
+            c += cputicks();
+            if (c < ticks) ticks = c;
+        }
+        xput[2] = (double) n / ticks;
     }
-    s_cache = (double) realn * 0x40 / cache;
-    // fprintf (stderr, "n=%zu(%zx), write128=%.2f, rep stosq=%.2f\n", realn, realn, s_cache, s_stos);
-    if (s_cache < s_stos) break;
-  }
-  free((void *)rS);
-  return (n == endn) ? (size_t) ~0 : realn;
+
+    max_cache = SIZE_MAX;       /* force rep-stosq */
+    /* Now do the same size progression as before, but in reverse order.  */
+    for(size_t n = nmax, base_n = nmax, stops=0 ;
+            n >= 0x80 ;
+            n = (++stops&3) ? (n - (base_n>>3)) : (base_n >>= 1))
+    {
+        /* measure bytes pre cpu tick for method rep_stosq */
+        ticks = UINT64_MAX;
+        for (unsigned int k = 0; k < 4; k++) {
+            uint64_t c;
+            c = -cputicks();
+            las_memset (S, 0, n);
+            c += cputicks();
+            if (c < ticks) ticks = c;
+        }
+        xput[1] = (double) n / ticks;
+
+        // fprintf (stderr, "n=%zu(%zx), rep stosq=%.2f, direct128=%.2f\n", n, n, xput[1], xput[2]);
+
+        if (xput[1] > xput[2])
+            break;
+
+        max_cache = n;
+    }
+    if (max_cache == SIZE_MAX) {
+        verbose_output_print(0, 2, "# rep-stosq / movntps cutoff: never\n");
+    } else {
+        verbose_output_print(0, 2, "# rep-stosq / movntps cutoff: %zu(0x%zx)\n",
+                max_cache, max_cache);
+    }
+    free_aligned(S, nmax + 0x40);
 }
 
-/* Comparison between the speed of rep stosq and movntps. All
- * the memsets are here really big, because movntps is always
- * slower than rep stosq when the size of the memset is smaller
- * than the biggest cache.
- * So, the memsets are always L0 cache aligned here.
- */
-size_t direct_write_vs_stos () {
-  uint64_t stos, not_cache, c;
-  size_t n, endn, stepn, realn;
-  double s_stos, s_not_cache;
-  uintptr_t rS, S;
+#else /* defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET) */
 
-  /* endn must be greater than the biggest cache on all x86 processors:
-     at least 128 Mbytes + 4096 bytes here. */
-  endn = 0x8000000;
-  if ((rS = (uintptr_t) malloc (endn + 0x1040)) == (uintptr_t) NULL) {
-    fprintf (stderr, "Error malloc:%zu bytes not available.\n", endn + 0x1040);
-    exit (1);
-  }
-  /* S is at the beginning of a 4096 bytes bloc */
-  S = (rS + 0xFFF) & ~0xFFF;
-
-  not_cache = ~0;
-  /* I do this 3 times at least and I take the greatest speed */
-  for (unsigned int k = 0; k < 3; k++) {
-    c = -cputicks();
-    memset_direct128 (S, 0, endn);
-    c += cputicks();
-    if (c < not_cache) not_cache = c;
-  }
-  s_not_cache = (double) endn / not_cache;
-
-  stepn = 0;
-  n = endn;
-  do {
-    realn = n - (n >> 3) * stepn;
-    stepn = (stepn + 1 ) & 3;
-    if (!stepn) n >>= 1;
-
-    stos = ~0;
-    /* 2 times seems OK here to have the greatest speed */
-    for (unsigned int k = 0; k < 2; k++) {
-      c = -cputicks();
-      memset_rep_stosq (S, 0, realn);
-      c += cputicks();
-      if (c < stos) stos = c;
-    }
-    s_stos = (double) realn / stos;
-    // fprintf(stderr, "n=%zu(%zx); rep stosl=%.2f, direct128=%.2f\n", realn, realn, s_stos, s_not_cache);
-
-  } while (s_stos < s_not_cache);
-
-  free((void *)rS);
-  return (n == endn) ? (size_t) ~0 : realn;
+void tune_las_memset()
+{
+    verbose_output_print(0, 2, "# las_memset: noasm build, special code disabled\n");
 }
 
-#endif /* End of X86-64 optimized memset pack */
+#endif /* defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET) */
+/* End of X86-64 optimized memset pack */
 
 
 /****************************************************************************
