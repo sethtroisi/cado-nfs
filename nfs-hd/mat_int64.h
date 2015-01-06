@@ -77,13 +77,6 @@ void mat_int64_set_coeff_int64t(mat_int64_ptr matrix, int64_t i, unsigned int ro
 void mat_int64_clear(mat_int64_ptr matrix);
 
 /*
-  Print a matrix.
-
-  matrix: mat_int64_ptr, the matrix.
-*/
-void mat_int64_printf(mat_int64_srcptr matrix);
-
-/*
   Write a matrix in a file.
 
   file: the file.

@@ -66,16 +66,6 @@ void factor_base_clear(factor_base_ptr factor_base, unsigned int t)
   free(factor_base->factor_base_u);
 }
 
-void factor_base_printf(factor_base_srcptr factor_base, unsigned int t)
-{
-  for (uint64_t i = 0; i < factor_base->number_element_1; i++) {
-    ideal_1_printf(factor_base->factor_base_1[i], t);
-  }
-  for (uint64_t i = 0; i < factor_base->number_element_u; i++) {
-    ideal_u_printf(factor_base->factor_base_u[i], t);
-  }
-}
-
 void factor_base_fprintf(FILE * file, factor_base_srcptr factor_base,
                          unsigned int t)
 {

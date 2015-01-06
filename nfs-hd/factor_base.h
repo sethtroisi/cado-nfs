@@ -74,13 +74,6 @@ void factor_base_set_ideal_u_part(factor_base_ptr factor_base,
 void factor_base_clear(factor_base_ptr factor_base, unsigned int t);
 
 /*
-  Print the factor base bound.
-
-  factor_base: the factor base.
-*/
-void factor_base_printf(factor_base_srcptr factor_base, unsigned int t);
-
-/*
   Write the factor base bound.
 
   file: the file in which we want to write.

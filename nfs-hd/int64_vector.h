@@ -25,8 +25,6 @@ void int64_vector_set(int64_vector_ptr v, int64_vector_srcptr s);
 void int64_vector_setcoordinate(int64_vector_ptr v, unsigned int i,
                                 int64_t z);
 
-void int64_vector_printf(int64_vector_srcptr v);
-
 void int64_vector_fprintf(FILE * file, int64_vector_srcptr);
 
 void int64_vector_add_one(int64_vector_ptr v, sieving_interval_srcptr H);

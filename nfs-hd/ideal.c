@@ -26,12 +26,6 @@ void ideal_clear(ideal_ptr ideal)
   ideal->r = 0;
 }
 
-void ideal_printf(ideal_srcptr ideal)
-{
-  printf("r: %" PRIu64 ", h: ", ideal->r);
-  mpz_poly_fprintf(stdout, ideal->h);
-}
-
 void ideal_fprintf(FILE * file, ideal_srcptr ideal)
 {
   fprintf(file, "r: %" PRIu64 ", h: ", ideal->r);
@@ -92,19 +86,6 @@ void ideal_1_clear(ideal_1_ptr ideal, unsigned int t)
 
   ideal_clear(ideal->ideal);
   ideal->log = 0;
-}
-
-void ideal_1_printf(ideal_1_srcptr ideal, unsigned int t)
-{
-  ASSERT(ideal->ideal->h->deg == 1);
-
-  ideal_printf(ideal->ideal);
-  printf("log: %u\n", ideal->log);
-  printf("Tr: [");
-  for (unsigned int i = 0; i < t - 2; i++) {
-    gmp_printf("%Zd, ", ideal->Tr[i]);
-  }
-  gmp_printf("%Zd]\n", ideal->Tr[t - 2]);
 }
 
 void ideal_1_fprintf(FILE * file, ideal_1_srcptr ideal, unsigned int t)
@@ -203,29 +184,6 @@ void ideal_u_clear(ideal_u_ptr ideal, unsigned int t)
 
   ideal_clear(ideal->ideal);
   ideal->log = 0;
-}
-
-void ideal_u_printf(ideal_u_srcptr ideal, unsigned int t)
-{
-  ASSERT(ideal->ideal->h->deg > 1);
-
-  ideal_printf(ideal->ideal);
-  printf("log: %u\n", ideal->log);
-  printf("Tr: [");
-  for (int row = 0; row < ideal->ideal->h->deg - 1; row++) {
-    printf("[");
-    for (int col = 0; col < (int)t - ideal->ideal->h->deg - 1; col++) {
-      gmp_printf("%Zd, ", ideal->Tr[row][col]);
-    }
-    gmp_printf("%Zd],\n", ideal->Tr[row]
-               [t - (unsigned int)ideal->ideal->h->deg - 1]);
-  }
-  printf("[");
-  for (int col = 0; col < (int)t - ideal->ideal->h->deg - 1; col++) {
-    gmp_printf("%Zd, ", ideal->Tr[ideal->ideal->h->deg - 1][col]);
-  }
-  gmp_printf("%Zd]]\n", ideal->Tr[ideal->ideal->h->deg - 1]
-             [t - (unsigned int)ideal->ideal->h->deg - 1]);
 }
 
 void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t)

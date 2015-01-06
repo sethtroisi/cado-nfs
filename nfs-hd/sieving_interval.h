@@ -49,13 +49,6 @@ void sieving_interval_number_element(uint64_t * nb, sieving_interval_srcptr H);
 void sieving_interval_clear(sieving_interval_ptr H);
 
 /*
-  To print a sieving interval.
-
-  H: the sieving interval.
-*/
-void sieving_interval_printf(sieving_interval_srcptr H);
-
-/*
   To write a sieving interval in a file.
 
   file: the file.

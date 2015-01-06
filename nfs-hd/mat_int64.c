@@ -85,23 +85,6 @@ void mat_int64_clear(mat_int64_ptr matrix)
   free(matrix->coeff);
 }
 
-void mat_int64_printf(mat_int64_srcptr matrix)
-{
-  printf("[");
-  for (unsigned int row = 1; row < matrix->NumRows; row++) {
-    printf("[");
-    for (unsigned int col = 1; col < matrix->NumCols; col++) {
-      printf("%" PRId64 ", ", matrix->coeff[row][col]);
-    }
-    printf("%" PRId64 "],\n", matrix->coeff[row][matrix->NumCols]);
-  }
-  printf("[");
-  for (unsigned int col = 1; col < matrix->NumCols; col++) {
-    printf("%" PRId64 ", ", matrix->coeff[matrix->NumRows][col]);
-  }
-  printf("%" PRId64 "]]\n", matrix->coeff[matrix->NumRows][matrix->NumCols]);
-}
-
 void mat_int64_fprintf(FILE * file, mat_int64_srcptr matrix)
 {
   fprintf(file, "[");

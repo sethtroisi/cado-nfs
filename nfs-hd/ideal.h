@@ -65,13 +65,6 @@ void ideal_set_part(ideal_ptr ideal, uint64_t r, mpz_poly_srcptr h);
 void ideal_clear(ideal_ptr ideal);
 
 /*
-  Print an ideal.
-
-  ideal: the ideal we want to print.
-*/
-void ideal_printf(ideal_srcptr ideal);
-
-/*
   Write an ideal in a file.
 
   file: the file.
@@ -108,14 +101,6 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 void ideal_1_clear(ideal_1_ptr ideal, unsigned int t);
 
 /*
-  Print an ideal_1.
-
-  ideal: the ideal we want to delete.
-  t: t is the dimension of the lattice we explore.
-*/
-void ideal_1_printf(ideal_1_srcptr ideal, unsigned int t);
-
-/*
   Write an ideal_1.
 
   ideal: the ideal we want to delete.
@@ -150,14 +135,6 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   t: t is the dimension of the lattice we explore.
 */
 void ideal_u_clear(ideal_u_ptr ideal, unsigned int t);
-
-/*
-  Print an ideal_u.
-
-  ideal: ideal_u_srcptr, the ideal we want to print.
-  t: t is the dimension of the lattice we explore.
-*/
-void ideal_u_printf(ideal_u_srcptr ideal, unsigned int t);
 
 /*
   Write an ideal_u.

@@ -1,6 +1,7 @@
 #ifndef UINT64_ARRAY_H
 #define UINT64_ARRAY_H
 
+#include <stdio.h>
 #include <stdint.h>
 
 typedef struct {
@@ -21,6 +22,6 @@ void uint64_array_realloc(uint64_array_ptr array, uint64_t number);
 
 void uint64_array_clear(uint64_array_ptr array);
 
-void uint64_array_printf(uint64_array_srcptr array);
+void uint64_array_fprintf(FILE * file, uint64_array_srcptr array);
 
 #endif /* UINT64_ARRAY_H */

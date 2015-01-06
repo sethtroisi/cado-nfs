@@ -44,14 +44,6 @@ void int64_vector_setcoordinate(int64_vector_ptr v, unsigned int i,
   v->c[i] = z;
 }
 
-void int64_vector_printf(int64_vector_srcptr v)
-{
-  printf("[");
-  for (unsigned int i = 0; i < v->dim - 1; i++)
-    printf("%" PRId64 ", ", v->c[i]);
-  printf("%" PRId64 "]\n", v->c[v->dim - 1]);
-}
-
 void int64_vector_fprintf(FILE * file, int64_vector_srcptr v)
 {
   fprintf(file, "[");
