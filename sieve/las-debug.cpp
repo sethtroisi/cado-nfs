@@ -154,9 +154,9 @@ void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, 
     backtrace(callers_addresses, 3);
     callers = backtrace_symbols(callers_addresses, 3);
     char * freeme = strdup(callers[2]);
-    char * caller = freeme;
+    const char * caller = freeme;
     free(callers);
-    char * opening = strchr(caller, '(');
+    char * opening = strchr(freeme, '(');
     if (opening) {
         char * closing = strchr(opening + 1, ')');
         if (closing) {
