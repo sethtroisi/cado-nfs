@@ -529,18 +529,24 @@ void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep)
 }
 
 /* Print f of degree d with the following format
-    <pre>0: f0\n
-    <pre>1: f1\n
+    <pre><letter>0: f0\n
+    <pre><letter>1: f1\n
     ...
-    <pre>d: fd\n
+    <pre><letter>d: fd\n
    Print nothing if f = 0 (ie deg(f) = -1)
 */
 void
-mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f, const char *pre)
+mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f, const char letter,
+                              const char *prefix)
 {
   for (int i = 0; i <= f->deg; i++)
-    gmp_fprintf (fp, "%s%d: %Zd\n", pre, f->coeff[i]);
+  {
+    if (prefix)
+      fputs (prefix, fp);
+    gmp_fprintf (fp, "%c%d: %Zd\n", letter, i, f->coeff[i]);
+  }
 }
+
 /* -------------------------------------------------------------------------- */
 
 /* Tests and comparison functions */
@@ -790,6 +796,22 @@ mpz_poly_mul_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
   for (i = 0; i <= P->deg; ++i)
     {
       mpz_mul (aux, P->coeff[i], a);
+      mpz_poly_setcoeff (Q, i, aux);
+    }
+  mpz_clear (aux);
+}
+
+/* Set Q=P/a, where a is an mpz_t. Assume a divides the content of P (the
+   division is done with mpz_divexact). Otherwise the result is not correct. */
+void
+mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
+{
+  mpz_t aux;
+  mpz_init (aux);
+  Q->deg = P->deg;
+  for (int i = 0; i <= P->deg; ++i)
+    {
+      mpz_divexact (aux, P->coeff[i], a);
       mpz_poly_setcoeff (Q, i, aux);
     }
   mpz_clear (aux);

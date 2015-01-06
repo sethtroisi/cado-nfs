@@ -69,7 +69,8 @@ void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 /* Print functions */
 void mpz_poly_fprintf(FILE *fp, mpz_poly_srcptr f);
 void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep);
-void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f, const char *pre);
+void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f,
+                                   const char letter, const char *pre);
 
 /* Tests and comparison functions */
 int mpz_poly_cmp (mpz_poly_srcptr, mpz_poly_srcptr);
@@ -85,6 +86,7 @@ void mpz_poly_sub_mod_mpz(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h,
                       mpz_srcptr m);
 void mpz_poly_mul(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h);
 void mpz_poly_mul_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
+void mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
 void mpz_poly_translation (mpz_poly_ptr, mpz_poly_srcptr, const mpz_t);
 void mpz_poly_rotation (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const mpz_t, int);
 void mpz_poly_rotation_int64 (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const int64_t, int);
