@@ -6,9 +6,6 @@
 #include "area.h"
 #include "ropt.h"
 
-#define STATS_LEN 10
-#define LOGNORM_MAX 999.99
-
 /* thread structure for ropt */
 typedef struct
 {
@@ -23,6 +20,7 @@ typedef const __ropt_thread_struct * ropt_thread_srcptr;
 
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
                                                    lock for those variables */
+unsigned int nthreads = 1;
 int tot_found = 0; /* total number of polynomials */
 static int verbose = 0;
 int rseffort = DEFAULT_RSEFFORT; /* sieving effort, among 1-5 */
@@ -37,10 +35,12 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   cado_poly ropt_poly;
   cado_poly_init (ropt_poly);
 
-  pthread_mutex_lock (&lock);
+  if (nthreads > 1)
+    pthread_mutex_lock (&lock);
   printf ("\n### input polynomial %u ###\n", poly_id);
   cado_poly_fprintf_with_info (stdout, input_poly, "# ");
-  pthread_mutex_unlock (&lock);
+  if (nthreads > 1)
+    pthread_mutex_unlock (&lock);
 
   /* If the content of the algebraic polynomial has content <> 1, then print a
      warning (this should not be frequent) and divides all coefficients of the
@@ -63,7 +63,8 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   /* MurphyE */
   ropt_poly->skew = L2_skewness (ropt_poly->alg, SKEWNESS_DEFAULT_PREC);
   curr_MurphyE = MurphyE (ropt_poly, bound_f, bound_g, area, MURPHY_K);
-  pthread_mutex_lock (&lock);
+  if (nthreads > 1)
+    pthread_mutex_lock (&lock);
   if (curr_MurphyE > best_MurphyE)
   {
     best_MurphyE = curr_MurphyE;
@@ -74,7 +75,8 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
                                              bound_f, bound_g, area, "# ");
   printf ("### Best MurphyE so far is %.2e\n", best_MurphyE);
   fflush (stdout);
-  pthread_mutex_unlock (&lock);
+  if (nthreads > 1)
+    pthread_mutex_unlock (&lock);
 
   cado_poly_clear (ropt_poly);
 }
@@ -130,10 +132,8 @@ main (int argc, char *argv[])
   FILE *polys_file = NULL;
   cado_poly *input_polys = NULL;
   unsigned int nb_input_polys = 0; /* number of input polynomials */
-  unsigned int size_input_polys = 64; /* Size of input_polys tab. */
-  pthread_t *threads = NULL;
-  ropt_thread_t *threads_data = NULL;
-  unsigned int nthreads = 1;
+  unsigned int size_input_polys = 16; /* Size of input_polys tab. */
+  double rootsieve_time = 0.0;
 
   cado_poly_init (best_poly);
   input_polys = (cado_poly *) malloc (size_input_polys * sizeof (cado_poly));
@@ -195,22 +195,14 @@ main (int argc, char *argv[])
   if (polys_filename == NULL)
     usage (argv0[0], "inputpolys", pl);
 
-  /* Allocated memory for threads and threads_data */
-  threads = (pthread_t *) malloc (nthreads * sizeof (pthread_t));
-  ASSERT_ALWAYS (threads != NULL);
-  threads_data = (ropt_thread_t *) malloc (nthreads * sizeof (ropt_thread_t));
-  ASSERT_ALWAYS (threads_data != NULL);
-  for (unsigned int i = 0; i < nthreads; i++)
-  {
-    threads_data[i]->ropt_time = 0.0;
-    threads_data[i]->id = i;
-  }
+  printf ("# Info: Will use %u thread%s\n# Info: rseffort = %d\n", nthreads,
+          (nthreads > 1) ? "s": "", rseffort);
 
   /* detect L1 cache size */
   ropt_L1_cachesize ();
 
-  printf ("# Info: rseffort = %d, L1_cachesize/2 = %u, size_tune_sievearray = "
-          "%u\n", rseffort, L1_cachesize, size_tune_sievearray );
+  printf ("# Info: L1_cachesize/2 = %u, size_tune_sievearray = %u\n",
+          L1_cachesize, size_tune_sievearray);
 
   /* Open file containing polynomials. */
   printf ("# Reading polynomials from %s\n", polys_filename);
@@ -248,34 +240,59 @@ main (int argc, char *argv[])
   printf ("# %u polynomials read.\n", nb_input_polys);
 
   /* Main loop: do root-optimization on input_polys. */
-  for (unsigned int i = 0; i < nb_input_polys; )
+  if (nthreads > 1) /* multi thread version */
   {
-    unsigned int j;
-    for (j = 0; j < nthreads && i < nb_input_polys; j++, i++)
+    /* Allocated memory for threads and threads_data */
+    pthread_t *threads = NULL;
+    ropt_thread_t *threads_data = NULL;
+    threads = (pthread_t *) malloc (nthreads * sizeof (pthread_t));
+    ASSERT_ALWAYS (threads != NULL);
+    threads_data = (ropt_thread_t *) malloc (nthreads * sizeof (ropt_thread_t));
+    ASSERT_ALWAYS (threads_data != NULL);
+    for (unsigned int i = 0; i < nthreads; i++)
     {
-      threads_data[j]->poly = input_polys[i];
-      threads_data[j]->poly_id = i;
-      pthread_create (&threads[j], NULL, thread_ropt, (void*)(threads_data[j]));
+      threads_data[i]->ropt_time = 0.0;
+      threads_data[i]->id = i;
     }
 
-    /* we have created j threads, with j = nthreads usually, except at the
-       end of we might have j < nthreads */
-    while (j > 0)
-      pthread_join (threads[--j], NULL);
+    for (unsigned int i = 0; i < nb_input_polys; )
+    {
+      unsigned int j;
+      for (j = 0; j < nthreads && i < nb_input_polys; j++, i++)
+      {
+        threads_data[j]->poly = input_polys[i];
+        threads_data[j]->poly_id = i;
+        pthread_create (&threads[j], NULL, thread_ropt,
+                                                    (void *) (threads_data[j]));
+      }
+
+      /* we have created j threads, with j = nthreads usually, except at the
+         end of we might have j < nthreads */
+      while (j > 0)
+        pthread_join (threads[--j], NULL);
+    }
+
+    for (unsigned int i = 0; i < nthreads; i++)
+    {
+      rootsieve_time += threads_data[i]->ropt_time;
+      if (verbose > 0)
+        printf ("# Stat: rootsieve on thread %u took %.2fs\n", i,
+                threads_data[i]->ropt_time);
+    }
+
+    free (threads);
+    free (threads_data);
+  }
+  else /* mono thread version */
+  {
+    for (unsigned int i = 0; i < nb_input_polys; i++)
+      ropt_wrapper (input_polys[i], i, &rootsieve_time);
   }
 
   /* print total time and rootsieve time.
      These two lines gets parsed by the script. */
   printf ("\n\n# Stat: total phase took %.2fs\n", seconds () - st0);
 
-  double rootsieve_time = 0.0;
-  for (unsigned int i = 0; i < nthreads; i++)
-  {
-    rootsieve_time += threads_data[i]->ropt_time;
-    if (verbose > 0)
-      printf ("# Stat: rootsieve on thread %u took %.2fs\n", i,
-              threads_data[i]->ropt_time);
-  }
 #ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
                               works or in mono-thread mode */
   if (nthreads == 1)
@@ -309,8 +326,6 @@ main (int argc, char *argv[])
   for (unsigned int i = 0; i < size_input_polys; i++)
     cado_poly_clear (input_polys[i]);
   free (input_polys);
-  free (threads);
-  free (threads_data);
   param_list_clear (pl);
 
   return EXIT_SUCCESS;
