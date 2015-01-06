@@ -2100,3 +2100,28 @@ do_detranslate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k)
   mpz_submul (g[0], g[1], k);
 }
 
+
+/* TODO: adapt for more than 2 polynomials and two algebraic polynomials */
+void
+cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix)
+{
+  unsigned int nrroots;
+  double lognorm, alpha, alpha_proj;
+  cado_poly_fprintf (stdout, poly, prefix);
+  nrroots = numberOfRealRoots (poly->alg->coeff, poly->alg->deg, 0, 0, NULL);
+  lognorm = L2_skew_lognorm (poly->alg, SKEWNESS_DEFAULT_PREC);
+  alpha = get_alpha (poly->alg, ALPHA_BOUND);
+  alpha_proj = get_biased_alpha_projective (poly->alg, ALPHA_BOUND);
+  cado_poly_fprintf_info (fp, lognorm, alpha, alpha_proj, nrroots, prefix);
+}
+
+/* TODO: adapt for more than 2 polynomials and two algebraic polynomials */
+void
+cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr poly,
+                                         double MurphyE, double bound_f,
+                                         double bound_g, double area,
+                                         const char *prefix)
+{
+  cado_poly_fprintf_with_info (fp, poly, prefix);
+  cado_poly_fprintf_MurphyE (fp, MurphyE, bound_f, bound_g, area, prefix);
+}

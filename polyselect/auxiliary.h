@@ -84,6 +84,12 @@ void content_poly (mpz_t g, mpz_poly_ptr);
 void eval_poly_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);
 void eval_poly_diff_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);
 
+
+void cado_poly_fprintf_with_info (FILE *, cado_poly_ptr, const char *);
+void cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr, double,
+                                              double, double, double,
+                                              const char *);
+
 #ifdef __cplusplus
 }
 #endif

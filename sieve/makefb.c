@@ -446,7 +446,7 @@ main (int argc, char *argv[])
   FILE * f, *outputfile;
   const char *outfilename = NULL;
   int maxbits = 1;  // disable powers by default
-  int side = ALGEBRAIC_SIDE;
+  unsigned int side = ALGEBRAIC_SIDE;
   unsigned long alim = 0;
   char *argv0 = argv[0];
   unsigned long nb_threads = 1;
@@ -505,8 +505,8 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-  param_list_parse_int(pl, "side", &side);
-  if (side < 0 || side >= cpoly->nb_polys){
+  param_list_parse_uint(pl, "side", &side);
+  if (side >= cpoly->nb_polys){
       if(cpoly->nb_polys == 2)
 	  fprintf(stderr, "Error: side must be %d (for rational) or %d "
 		  "(for algebraic)\n", RATIONAL_SIDE, ALGEBRAIC_SIDE);

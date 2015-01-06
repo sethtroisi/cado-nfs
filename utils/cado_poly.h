@@ -20,16 +20,13 @@ struct cado_poly_s {
   mpz_t n;        /* number to factor */
   double skew;    /* skewness from poly file, if given, otherwise 0. */
 
-  int nb_polys;   /* number of polynomials used, 2 in most cases */
+  unsigned int nb_polys;   /* number of polynomials used, 2 in most cases */
   mpz_poly_ptr rat, alg;
   mpz_poly_t pols[NB_POLYS_MAX];
 };
 typedef struct cado_poly_s cado_poly[1];
 typedef struct cado_poly_s * cado_poly_ptr;
-
-/* we used to have a true global variable declared here (not extern).
- * This is horrible. */
-extern struct cado_poly_s cado_poly_struct;
+typedef const struct cado_poly_s * cado_poly_srcptr;
 
 extern const char * sidenames[2]; // FIXME: 2 or NB_POLYS_MAX?
 
@@ -42,7 +39,18 @@ extern "C" {
 // stderr)
 extern int cado_poly_read (cado_poly_ptr, const char *filename);
 extern int cado_poly_read_stream (cado_poly_ptr, FILE *);
+extern int cado_poly_read_next_poly_from_stream (cado_poly_ptr, FILE *);
 extern void cado_poly_set (cado_poly_ptr p, cado_poly_ptr q);
+
+void cado_poly_fprintf (FILE *, cado_poly_srcptr, const char *);
+void cado_poly_fprintf_info (FILE *, double, double, double, unsigned int,
+                             const char *);
+void cado_poly_fprintf_MurphyE (FILE *, double, double, double, double,
+                                const char *);
+/* More functions for printing cado_poly are defined in polyselect/ as only
+   binaries in polyselect/ used them and some functions (like L2_skewness, ...)
+   only defined in polyselect/ are needed.
+ */
 
 extern void cado_poly_init (cado_poly_ptr);
 extern void cado_poly_clear (cado_poly_ptr);
