@@ -643,6 +643,27 @@ class Polyselect2l(Program):
         super().__init__(locals(), **kwargs)
 
 
+class PolyselectRopt(Program):
+    """
+    >>> p = PolyselectRopt(rseffort=5, inputpolys="foo.polys", verbose=True)
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
+    'polyselect_ropt -rseffort 5 -inputpolys foo.polys -v'
+    """
+    binary = "polyselect_ropt"
+    name = binary
+    subdir = "polyselect"
+
+    def __init__(self, *,
+                 verbose : Toggle("v")=None,
+                 inputpolys : Parameter(is_input_file=True)=None,
+                 rseffort: Parameter(checktype=int)=None,
+                 area : Parameter(checktype=float)=None,
+                 Bf : Parameter(checktype=float)=None,
+                 Bg : Parameter(checktype=float)=None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
+
 class MakeFB(Program):
     """
     >>> p = MakeFB(poly="foo.poly", lim=1)

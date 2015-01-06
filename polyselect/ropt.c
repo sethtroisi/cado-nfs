@@ -227,33 +227,28 @@ ropt ( ropt_poly_t poly,
 
 
 /**
- * Called by polyselect2l.
+ * Called by polyselect_ropt.
  */
 void
-ropt_polyselect ( mpz_t *f,
-                  const int d,
-                  mpz_t m,
-                  mpz_t l,
-                  const mpz_t N ,
-                  const int effort,
-                  const int verbose )
+ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
+                 const int effort, const int verbose)
 {
   int i;
   ropt_poly_t poly;
   ropt_poly_init (poly);
 
   /* setup poly */
-  mpz_set (poly->g[1], l);
-  mpz_set (poly->g[0], m);
-  for (i = 0; i <=d; i ++)
-    mpz_set (poly->f[i], f[i]);
-  mpz_set (poly->n, N);
+  for (i = 0; i <= input_poly->rat->deg; i++)
+    mpz_set (poly->g[i], input_poly->rat->coeff[i]);
+  for (i = 0; i <= input_poly->alg->deg; i++)
+    mpz_set (poly->f[i], input_poly->alg->coeff[i]);
+  mpz_set (poly->n, input_poly->n);
   ropt_poly_setup (poly);
 
   ropt_info_t info;
   ropt_info_init (info);
 
-  /* passed params from polyselect2l */
+  /* passed params from polyselect_ropt */
   ropt_param_t param;
   ropt_param_init (param);
   param->verbose = verbose;
@@ -266,11 +261,14 @@ ropt_polyselect ( mpz_t *f,
   /* cal main function */
   ropt_do_both_stages (poly, bestpoly, param, info);
   
-  /* bring bestpoly back to polyselect2l */
-  for (i = 0; i <= d; i++)
-    mpz_set (f[i], bestpoly->f[i]);
-  mpz_set (m, bestpoly->g[0]);
-  mpz_set (l, bestpoly->g[1]);
+  /* bring bestpoly back to polyselect_ropt */
+  for (i = 0; i <= input_poly->rat->deg; i++)
+    mpz_set (output_poly->rat->coeff[i], bestpoly->g[i]);
+  mpz_poly_cleandeg (output_poly->rat, input_poly->rat->deg);
+  for (i = 0; i <= input_poly->alg->deg; i++)
+    mpz_set (output_poly->alg->coeff[i], bestpoly->f[i]);
+  mpz_poly_cleandeg (output_poly->alg, input_poly->alg->deg);
+  mpz_set (output_poly->n, input_poly->n);
 
   /* free */
   ropt_param_free (param);

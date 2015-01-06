@@ -138,6 +138,7 @@ class Polynomials(object):
     
     def __init__(self, lines):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
+            and polyselect_ropt
         """
         self.MurphyE = 0.
         self.MurphyParams = None
@@ -1580,8 +1581,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                 [" {stats_raw_logmu[%d]}" % i for i in range(10)],
             ["10 best opt logmu:"] +
                 [" {stats_opt_logmu[%d]}" % i for i in range(10)],
-            ["Total time: {stats_total_time[0]:g}",
-             ", rootsieve time: {stats_rootsieve_time[0]:g}"]
+            ["Total time: {stats_total_time[0]:g}"],
             )
     
     
@@ -1881,7 +1881,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         # coefficients of both polynomials
         found = None
         for (index, (lognorm, (key, poly))) in enumerate(self.poly_heap):
-            if search_poly.same_lc(poly):
+            if search_poly.polyg.same_lc(poly.polyg):
                if not found is None:
                    self.logger.error("Found more than one match for %s", search_poly)
                else:
@@ -1932,7 +1932,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         return "Polynomial Selection (root optimized)"
     @property
     def programs(self):
-        return ((cadoprograms.Polyselect2l, (), {}),)
+        return ((cadoprograms.PolyselectRopt, (), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -1958,8 +1958,8 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def stat_formats(self):
         return (
-            ["Total time: {stats_total_time[0]:g}",
-             ", rootsieve time: {stats_rootsieve_time[0]:g}"],
+            ["Total time: {stats_total_time[0]:g}"],
+            ["Rootsieve time: {stats_rootsieve_time[0]:g}"],
             )
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -2135,14 +2135,14 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            p = cadoprograms.Polyselect2l(rootsieve=str(inputfilename),
-                                          stdout=str(outputfile),
-                                          **self.progparams[0])
+            p = cadoprograms.PolyselectRopt(inputpolys=str(inputfilename),
+                                            stdout=str(outputfile),
+                                            **self.progparams[0])
             self.submit_command(p, "%d" % nr, commit=False)
         self.state.update({"nr_poly_submitted": nr + batchsize}, commit=True)
 
     def get_total_cpu_or_real_time(self, is_cpu):
-        """ Return number of seconds of cpu time spent by polyselect2l """
+        """ Return number of seconds of cpu time spent by polyselect_ropt """
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
     def print_rank(self):
