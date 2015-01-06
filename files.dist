@@ -542,6 +542,7 @@ polyselect/polyselect2l_arith.c
 polyselect/polyselect2l_arith.h
 polyselect/polyselect2l_str.c
 polyselect/polyselect2l_str.h
+polyselect/polyselect_ropt.c
 polyselect/rho.c
 polyselect/rho.h
 polyselect/rootsieve.c
