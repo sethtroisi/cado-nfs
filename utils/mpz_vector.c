@@ -64,6 +64,13 @@ mpz_vector_setcoordinate_ui (mpz_vector_t v, unsigned int i, unsigned int z)
 }
 
 void
+mpz_vector_setcoordinate_si (mpz_vector_ptr v, unsigned int i, int z)
+{
+  ASSERT_ALWAYS (i < v->dim);
+  mpz_set_si (v->c[i], z);
+}
+
+void
 mpz_vector_setcoordinate_uint64 (mpz_vector_t v, unsigned int i, uint64_t z)
 {
   ASSERT_ALWAYS (i < v->dim);

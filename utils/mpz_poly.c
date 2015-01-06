@@ -28,12 +28,6 @@ MAYBE_UNUSED static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
     return f->coeff[f->deg];
 }
 
-MAYBE_UNUSED static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f)
-{
-    assert(f->deg >= 0);
-    return f->coeff[f->deg];
-}
-
 /* --------------------------------------------------------------------------
    Static functions
    -------------------------------------------------------------------------- */
@@ -1596,6 +1590,30 @@ mpz_poly_sizeinbase (mpz_poly_ptr f, int d, int b)
   return S;
 }
 
+static void mpz_max(mpz_ptr max, mpz_srcptr a, mpz_srcptr b)
+{
+    if (mpz_cmp(a, b) < 0) {
+        mpz_set(max, b);
+    } else if (mpz_cmp(a, b) > 0) {
+        mpz_set(max, a);
+    } else {
+        mpz_set(max, a);
+    }
+}
+
+void mpz_poly_infinite_norm(mpz_ptr in, mpz_poly_srcptr f)
+{
+  int i = 1;
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_abs(in, f->coeff[0]);
+  for ( ; i < f->deg + 1; i++) {
+    mpz_abs(tmp, f->coeff[i]);
+    mpz_max(in, in, tmp);
+  }
+  mpz_clear(tmp);
+}
+
 /* f=gcd(f, g) mod p, with p in mpz_t */
 /* clobbers g */
 /* Coefficients of f and g need not be reduced mod p on input.
@@ -1848,6 +1866,174 @@ mpz_poly_content (mpz_t c, mpz_poly_srcptr F)
   mpz_abs (c, c);
 }
 
+/*
+  Like the pseudo division, but set only the remainder.
+  IN:
+    R: mpz_poly_ptr, the remainder.
+    A: mpz_poly_srcptr, the dividend.
+    B: mpz_poly_srcptr, the divisor.
+*/
+static void mpz_poly_pseudo_remainder(mpz_poly_ptr R, mpz_poly_srcptr A,
+                                      mpz_poly_srcptr B)
+{
+  int m = A->deg;
+  int n = B->deg;
+  mpz_t d;
+  int e;
+  mpz_poly_t S;
+
+  mpz_init(d);
+  mpz_set(d, mpz_poly_lc_const(B));
+
+  mpz_poly_set(R, A);
+
+  e = m - n + 1;
+
+  while (R->deg >= n) {
+    mpz_poly_init(S, R->deg - n);
+    mpz_poly_setcoeff(S, R->deg - n, mpz_poly_lc(R));
+    mpz_poly_mul_mpz(R, R, d);
+    mpz_poly_mul(S, B, S);
+    mpz_poly_sub(R, R, S);
+    mpz_poly_clear(S);
+    e--;
+  }
+
+  mpz_pow_ui(d, d, e);
+  mpz_poly_mul_mpz(R, R, d);
+
+  mpz_clear(d);
+}
+
+/*
+  Q = P / a, when it is known in advance that P divides a.
+  IN:
+    Q: mpz_poly_ptr, the quotient equals to P / a.
+    P: mpz_poly_srcptr, the dividend.
+    a: mpz_scrptr, the divisor.
+*/
+static void mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P,
+                                   mpz_srcptr a)
+{
+  int i;
+  mpz_t aux;
+
+  mpz_init (aux);
+  Q->deg = P->deg;
+  for (i = 0; i <= P->deg; ++i)
+  {
+    mpz_divexact (aux, P->coeff[i], a);
+    mpz_poly_setcoeff (Q, i, aux);
+  }
+  mpz_clear (aux);
+}
+
+void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
+{
+  assert(p->coeff[p->deg] != 0);
+  assert(q->coeff[q->deg] != 0);
+
+  //Assume that the polynomial is normalized.
+  if (p->deg == -1 && q->deg == -1) {
+    mpz_set_ui(res, 0);
+    return;
+  }
+
+  mpz_t a;
+  mpz_t b;
+  int64_t s = 1;
+  mpz_t g;
+  mpz_t h;
+  mpz_t t;
+  mpz_t tmp;
+  int64_t d;
+  mpz_poly_t R;
+  mpz_poly_t A;
+  mpz_poly_t B;
+
+  mpz_init(a);
+  mpz_init(b);
+  mpz_init(g);
+  mpz_init(h);
+  mpz_init(t);
+  mpz_init(tmp);
+  mpz_poly_init(R, 0);
+  mpz_poly_init(A, 0);
+  mpz_poly_init(B, 0);
+
+  mpz_poly_set(A, p);
+  mpz_poly_set(B, q);
+
+  mpz_poly_content(a, A);
+  mpz_poly_content(b, B);
+
+  mpz_poly_divexact_mpz(A, A, a);
+  mpz_poly_divexact_mpz(B, B, b);
+
+  mpz_set_si(g, 1);
+  mpz_set_si(h, 1);
+  mpz_pow_ui(t, a, B->deg);
+  mpz_pow_ui(tmp, b, A->deg);
+  mpz_mul(t, t, tmp);
+
+  if (A->deg < B->deg) {
+    mpz_poly_swap (A, B);
+
+    if ((A->deg % 2) == 1 && (B->deg % 2) == 1) {
+      s = (int64_t) -1;
+    }
+  }
+
+  while (B->deg > 0) {
+    d = A->deg - B->deg;
+
+    if ((A->deg % 2) == 1 && (B->deg % 2) == 1) {
+      s = -s;
+    }
+
+    mpz_poly_pseudo_remainder(R, A, B);
+
+    mpz_poly_set(A, B);
+
+    mpz_pow_ui(tmp, h, d);
+    mpz_mul(tmp, g, tmp);
+
+    mpz_poly_divexact_mpz(B, R, tmp);
+
+    mpz_set(g, mpz_poly_lc(A));
+    mpz_pow_ui(h, h, d - 1);
+    mpz_pow_ui(tmp, g, d);
+    mpz_divexact(h, tmp, h);
+  }
+  mpz_pow_ui(h, h, A->deg - 1);
+  //Prevent an error if B = 0.
+  if (B->deg == -1) {
+    mpz_set_ui(res, 0);
+  } else {
+    mpz_set(tmp, mpz_poly_lc(B));
+    mpz_pow_ui(tmp, tmp, A->deg);
+    mpz_divexact(h, tmp, h);
+
+    mpz_mul_si(t, t, s);
+    mpz_mul(h, h, t);
+    mpz_set(res, h);
+  }
+
+  mpz_clear(a);
+  mpz_clear(b);
+  mpz_clear(g);
+  mpz_clear(h);
+  mpz_clear(t);
+  mpz_clear(tmp);
+  mpz_poly_clear(A);
+  mpz_poly_clear(B);
+  mpz_poly_clear(R);
+}
+
+
+
+
+
 /* factoring polynomials */
 
 void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l)
@@ -1896,6 +2082,16 @@ void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, in
     mpz_poly_factor_list_prepare_write(l, l->size);
     mpz_poly_set(l->factors[l->size - 1]->f, f);
     l->factors[l->size - 1]->m = m;
+}
+
+void mpz_poly_factor_list_fprintf(FILE * ff,
+        mpz_poly_factor_list lf)
+{
+  for (int i = 0; i < lf->size ; i++) {
+    for (int j = 0; j < lf->factors[i]->m; j++) {
+      mpz_poly_fprintf(ff, lf->factors[i]->f);
+    }
+  }
 }
 
 /* Squarefree factorization */

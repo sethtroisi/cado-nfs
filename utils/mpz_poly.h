@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <gmp.h>
+#include "macros.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -65,6 +66,10 @@ void mpz_poly_setcoeff(mpz_poly_ptr f, int i, mpz_srcptr z);
 void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, int z);
 void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
+static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f) {
+    ASSERT(f->deg >= 0);
+    return f->coeff[f->deg];
+}
 
 void mpz_poly_fprintf(FILE *fp, mpz_poly_srcptr f);
 
@@ -130,6 +135,7 @@ mpz_poly_t* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
 void mpz_poly_base_modp_clear (mpz_poly_t *P, int l);
 void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_srcptr pk);
 size_t mpz_poly_sizeinbase (mpz_poly_ptr f, int d, int base);
+void mpz_poly_infinite_norm(mpz_ptr in, mpz_poly_srcptr f);
 void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
 // compute f = GCD(f,g) mod N. If this fails, put the factor in the last
 // given argument.
@@ -138,6 +144,7 @@ void mpz_poly_xgcd_mpz(mpz_poly_ptr gcd, mpz_poly_srcptr f, mpz_poly_srcptr g, m
 void mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4]);
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
+void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q);
 
 struct mpz_poly_with_m_s {
     mpz_poly_t f;
@@ -160,6 +167,8 @@ void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_clear(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_flush(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, int m);
+void mpz_poly_factor_list_fprintf(FILE* ff, mpz_poly_factor_list lf);
+
 int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, mpz_srcptr p);
 int mpz_poly_factor_ddf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p);
 int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate);
