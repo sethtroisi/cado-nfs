@@ -622,23 +622,16 @@ class Polyselect2l(Program):
                  degree : Parameter(checktype=int)=None,
                  verbose : Toggle("v")=None,
                  quiet : Toggle("q")=None,
-                 sizeonly : Toggle("r")=None,
                  threads : Parameter("t", checktype=int)=None,
                  admin : Parameter(checktype=int)=None,
                  admax : Parameter(checktype=int)=None,
                  incr : Parameter(checktype=int)=None,
                  nq : Parameter(checktype=int)=None,
-                 save : Parameter(is_output_file=True)=None,
-                 resume : Parameter(is_input_file=True)=None,
-                 rootsieve : Parameter(is_input_file=True)=None,
                  maxtime : Parameter(checktype=float)=None,
-                 rseffort: Parameter(checktype=int)=None,
                  out : Parameter(is_output_file=True)=None,
                  printdelay : Parameter("s", checktype=int)=None,
-                 area : Parameter(checktype=float)=None,
-                 Bf : Parameter(checktype=float)=None,
-                 Bg : Parameter(checktype=float)=None,
                  keep: Parameter(checktype=int)=None,
+                 sopteffort: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -655,6 +648,7 @@ class PolyselectRopt(Program):
 
     def __init__(self, *,
                  verbose : Toggle("v")=None,
+                 threads : Parameter("t", checktype=int)=None,
                  inputpolys : Parameter(is_input_file=True)=None,
                  rseffort: Parameter(checktype=int)=None,
                  area : Parameter(checktype=float)=None,

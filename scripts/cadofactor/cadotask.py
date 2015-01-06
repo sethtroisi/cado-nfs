@@ -1591,10 +1591,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         assert self.params["nrkeep"] > 0
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), self.params["admin"])
-        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
-                * self.params["alim"])
-        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
-        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
         # Remove admin and admax from the parameter-file-supplied program
         # parameters as those would conflict with the computed values
         self.progparams[0].pop("admin", None)
@@ -1912,7 +1908,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         else:
             p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
                                           stdout=str(outputfile),
-                                          sizeonly=True,
                                           **self.progparams[0])
             self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
         self.state.update({"adnext": adend}, commit=True)

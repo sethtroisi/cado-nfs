@@ -1779,9 +1779,8 @@ declare_usage(param_list pl)
   snprintf(str, 200, "number of polynomials kept (default %d)", KEEP);
   param_list_decl_usage(pl, "keep", str);
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
-  param_list_decl_usage(pl, "noc3", "(switch) don't try to reduce c_3 of degree-6 polynomials");
   snprintf (str, 200, "size-optimization effort (default %d)", SOPT_DEFAULT_EFFORT);
-  param_list_decl_usage(pl, "sopt-effort", str);
+  param_list_decl_usage(pl, "sopteffort", str);
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
   param_list_decl_usage(pl, "s", str);
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
@@ -1846,7 +1845,7 @@ main (int argc, char *argv[])
   }
 
   /* size optimization effort that passed to size_optimization */
-  param_list_parse_uint (pl, "sopt-effort", &sopt_effort);
+  param_list_parse_uint (pl, "sopteffort", &sopt_effort);
 
   param_list_parse_size_t (pl, "keep", &keep);
   /* initialize best norms */
