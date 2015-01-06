@@ -1936,7 +1936,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "I": int, "alim": int, "rlim": int, "batch": 5})
+            "I": int, "alim": int, "rlim": int, "batch": [int]})
     @property
     def stat_conversions(self):
         return (
@@ -1973,6 +1973,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                 * self.params["alim"])
         self.progparams[0].setdefault("Bf", float(self.params["alim"]))
         self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+        if not "batch" in self.params:
+            t = self.progparams[0].get("threads", 1)
+            # batch = 5 rounded up to a multiple of t
+            self.params["batch"] = (4 // t + 1) * t
         self.poly_to_submit = None
 
     def run(self):
