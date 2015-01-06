@@ -667,7 +667,7 @@ class PolyselectRopt(Program):
     """
     >>> p = PolyselectRopt(rseffort=5, inputpolys="foo.polys", verbose=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'polyselect_ropt -rseffort 5 -inputpolys foo.polys -v'
+    'polyselect_ropt -v -inputpolys foo.polys -rseffort 5'
     """
     binary = "polyselect_ropt"
     name = binary
