@@ -352,6 +352,15 @@ void mpz_poly_clear(mpz_poly_ptr f)
   f->deg = -1;
 }
 
+/* Return 0 if f[i] is zero, -1 is f[i] is negative and +1 if f[i] is positive,
+   like mpz_sgn function. */
+static inline int mpz_poly_coeff_sgn (mpz_poly_srcptr f, int i)
+{
+  if (i >= f->alloc)
+    return 0;
+  else
+    return mpz_sgn (f->coeff[i]);
+}
 
 /* removed mpz_poly_set_deg, as for all purposes there is no reason to
  * not use the more robust mpz_poly_cleandeg */
@@ -360,7 +369,7 @@ void mpz_poly_clear(mpz_poly_ptr f)
 void mpz_poly_cleandeg(mpz_poly_ptr f, int deg)
 {
   ASSERT(deg >= -1);
-  while ((deg >= 0) && (mpz_cmp_ui(f->coeff[deg], 0)==0))
+  while ((deg >= 0) && (mpz_poly_coeff_sgn (f, deg)==0))
     deg--;
   f->deg = deg;
 }
