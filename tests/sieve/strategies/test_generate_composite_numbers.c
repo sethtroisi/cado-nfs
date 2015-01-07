@@ -47,6 +47,8 @@ int main ()
     if (check_sum > 1+precision || check_sum < 1-precision)
 	{
 	    fprintf (stderr, "error with the test(3)\n");
+            fprintf (stderr, "check_sum=%f precision=%f\n",
+                     check_sum, precision);
 	    free (dist);
 	    return EXIT_FAILURE;
 	}
@@ -63,10 +65,13 @@ int main ()
 	}
     //check the similary!!!
     for (int i = 0; i < len; i++)
-	if ((dist_test[i]/nb_test - dist[i])> precision ||
-	    (dist[i] - dist_test[i]/nb_test)> precision)
+	if ((dist_test[i]/nb_test - dist[i]) > precision ||
+	    (dist[i] - dist_test[i]/nb_test) > precision)
 	    {
-		fprintf (stderr, "error with the test(3)\n");
+		fprintf (stderr, "error with the test(4)\n");
+                fprintf (stderr, "dist_test[i]/nb_test - dist[i]=%f\n",
+                         dist_test[i]/nb_test - dist[i]);
+                fprintf (stderr, "precision=%f\n", precision);
 		free (dist);
 		free (dist_test);
 		return EXIT_FAILURE;
