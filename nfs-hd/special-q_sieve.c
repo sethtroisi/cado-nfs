@@ -1118,11 +1118,11 @@ void find_relation(uint64_array_t * indexes, uint64_t number_element, mpz_t *
   V: number of number fields.
  */
 
-void initialise_parameters(mpz_poly_t * f, uint64_t * fbb, unsigned int * t,
-                           sieving_interval_ptr H, uint64_t * q_min,
-                           uint64_t * q_max, unsigned char * thresh,
-                           mpz_t * lpb, array_ptr array, mat_Z_ptr matrix,
-                           unsigned int * q_side)
+void initialise_parameters(mpz_poly_t * f, uint64_t * fbb, factor_base_t * fb,
+                           unsigned int * t, sieving_interval_ptr H,
+                           uint64_t * q_min, uint64_t * q_max,
+                           unsigned char * thresh, mpz_t * lpb, array_ptr array,
+                           mat_Z_ptr matrix, unsigned int * q_side)
                            //, unsigned int V)
 {
   mpz_poly_init(f[0], 6);
@@ -1207,6 +1207,9 @@ void initialise_parameters(mpz_poly_t * f, uint64_t * fbb, unsigned int * t,
   mat_Z_init(matrix, * t, * t);
 
   * q_side = 1;
+
+  factor_base_init(fb[0], fbb[0], fbb[0]);
+  factor_base_init(fb[1], fbb[1], fbb[1]);
 }
 
 /*
@@ -1230,7 +1233,7 @@ int main()
   uint64_t q;
   uint64_array_t * indexes = malloc(sizeof(uint64_array_t) * V);
 
-  initialise_parameters(f, fbb, &t, H, &q_min, &q_max, thresh, lpb,
+  initialise_parameters(f, fbb, fb, &t, H, &q_min, &q_max, thresh, lpb,
                         array, matrix, &q_side);
 
   double ** pre_compute = malloc(sizeof(double * ) * V);
