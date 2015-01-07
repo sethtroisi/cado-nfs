@@ -170,6 +170,14 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 
   ASSERT(a->deg >= -1);
 
+#ifndef NDEBUG
+  int64_poly_t a_tmp;
+  int64_poly_init(a_tmp, -1);
+  mat_int64_mul_int64_vector_to_int64_poly(a_tmp, matrix, vector);
+  ASSERT(int64_poly_equal(a, a_tmp) == 0);
+  int64_poly_clear(a_tmp);
+#endif // NDEBUG
+
   if (a->deg > 0) {
     uint64_t tmp = 0;
     int64_poly_infinite_norm(&tmp, a);
@@ -1314,8 +1322,8 @@ int main()
         for (unsigned int j = 0; j < V; j++) {
           sec = seconds();
           uint64_array_init(indexes[j], array->number_element);
-          /* init_norm_1(array, pre_compute[j], H, matrix, f[j], special_q, */
-          /*             !(j ^ q_side)); */
+          init_norm_1(array, pre_compute[j], H, matrix, f[j], special_q,
+                      !(j ^ q_side));
           time[j][0] = seconds() - sec;
 
 #ifdef MEAN_NORM_BOUND
