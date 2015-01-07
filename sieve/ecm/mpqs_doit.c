@@ -323,7 +323,10 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
           /* we don't check for primality of R > B^2 since it is rare */
         }
     }
-  ASSERT(R > B);
+  if (R == 1)
+    res = 1;
+  else
+    ASSERT(R > B);
  end:
   mpz_clear (r);
   return res;
