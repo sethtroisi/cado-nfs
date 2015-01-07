@@ -176,7 +176,7 @@ static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsig
 }/*}}}*/
 
 void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
-                      fb_part *fb, sieve_info_srcptr si, int side)
+                      const fb_part *fb, sieve_info_srcptr si, int side)
 {
     const unsigned int thresh = si->conf->bucket_thresh;
     const int verbose = 0;
@@ -206,7 +206,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
     // the ssp struct.
     
     const unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
-    for (fb_general_vector::iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
+    for (fb_general_vector::const_iterator iter = fb->cbegin() ; iter != fb->cend() ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
