@@ -14,9 +14,9 @@
 #include <math.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <float.h> /* for DBL_MAX */
 #include "gmp.h"
+#include "timing.h"
 #include "macros.h"
 #include "mod_ul_default.h"
 
@@ -31,16 +31,6 @@ static unsigned char isprime_table[] = {
 
 static const size_t isprime_table_size = 
     sizeof(isprime_table) / sizeof(isprime_table[0]);
-
-static long
-cputime ()
-{
-  struct rusage rus;
-
-  getrusage (RUSAGE_SELF, &rus);
-  /* This overflows a 32 bit signed int after 2147483s = 24.85 days */
-  return rus.ru_utime.tv_sec * 1000L + rus.ru_utime.tv_usec / 1000L;
-}
 
 static int
 jacobi (unsigned long a, unsigned long b)
@@ -596,7 +586,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   /* assume N0 is odd */
   ASSERT_ALWAYS (mpz_fdiv_ui (N0, 2) == 1);
 
-  init_time -= cputime ();
+  init_time -= milliseconds ();
 
   Nbits = mpz_sizeinbase (N0, 2);
 
@@ -692,11 +682,11 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
-  init_time += cputime ();
+  init_time += milliseconds ();
 
   int pols = 0;
   while (nrel < ncolw + WANT_EXCESS) {
-  sieve_time -= cputime ();
+  sieve_time -= milliseconds ();
   do
     mpz_nextprime (sqrta, sqrta);
   while (mpz_jacobi (N, sqrta) != 1);
@@ -821,7 +811,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         }
     }
 
-  st = cputime ();
+  st = milliseconds ();
   sieve_time += st;
   check_time -= st;
 
@@ -854,15 +844,15 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
             }
         }
   end_check:
-  check_time += cputime ();
+  check_time += milliseconds ();
   }
   if (verbose)
     printf ("%ld rels with %d polynomials: %f per poly\n",
             nrel, pols, (double) nrel / (double) pols);
 
-  gauss_time -= cputime ();
+  gauss_time -= milliseconds ();
   gauss (f, Mat, nrel, wrel, ncol + 1, X, N, N0, verbose);
-  st = cputime ();
+  st = milliseconds ();
   gauss_time += st;
   total_time = st;
 
