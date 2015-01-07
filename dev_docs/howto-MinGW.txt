@@ -27,6 +27,13 @@ mingw-get install mingw32-libgmp
 
 8b. Install the coreutils: mingw-get install msys-coreutils
 
+8c. Install a port of the GNU regex library for mingw (which is LGPL)
+    wget http://sourceforge.net/projects/mingw/files/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-dev.tar.gz/download
+    wget http://sourceforge.net/projects/mingw/files/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-bin.tar.gz/downloadg
+    (cd /c/Mingw ; tar xzf -) < mingw-libgnurx-2.5.1-dev.tar.gz
+    (cd /c/Mingw ; tar xzf -) < mingw-libgnurx-2.5.1-bin.tar.gz
+
+
 9. Download and install CMake from 
 http://www.cmake.org/cmake/resources/software.html
 
