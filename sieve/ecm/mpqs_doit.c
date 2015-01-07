@@ -226,10 +226,6 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
   mpz_add (r, r, b);
   mpz_mul (r, r, r);
   mpz_sub (r, r, N);
-#ifdef HAVE_MINGW
-  if (mpz_divisible_p (r, a) == 0)
-    gmp_printf ("N=%Zd a=%Zd i=%lu b=%Zd r=%Zd\n", N, a, i, b, r);
-#endif
   ASSERT (mpz_divisible_p (r, a));
   mpz_divexact (r, r, a);
   if (mpz_sgn (r) < 0)
@@ -718,7 +714,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   /* we want b even to ensure k=1 is a root of (a*k+b)^2 = N (mod 2) */
   if (mpz_tstbit (b, 0) == 1)
     mpz_sub (b, b, a);
-#if defined(TRACE) || defined(HAVE_MINGW)
+#ifdef TRACE
   gmp_printf ("a=%Zd b=%Zd\n", a, b);
 #endif
   unsigned long aa, inva, sqrtaa;
