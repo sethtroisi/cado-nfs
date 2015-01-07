@@ -703,7 +703,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   while (mpz_jacobi (N, sqrta) != 1);
   /* we want N to be a square mod a: N = b^2 (mod a) */
   unsigned long aui = mpz_get_ui (sqrta);
-  mpz_set_ui (a, aui * aui);
+  mpz_mul (a, sqrta, sqrta);
+  ASSERT(mpz_fits_ulong_p (a));
   /* we want b^2-N divisible by a */
   k = tonelli_shanks (mpz_fdiv_ui (N, aui), aui);
   /* we want b = k + sqrta*t: b^2 = k^2 + 2*k*sqrta*t (mod a), thus
