@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>              /* for _O_BINARY */
 
 //test equality between two fm!  check all parameters in the structure
 //fm, while fm_is_equal just see the parameter method!
@@ -76,6 +77,10 @@ int check_sort (tabular_fm_t* tab)
 
 int main ()
 {
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;		/* Binary open for all files */
+#endif
+
     //create a first fm!
     fm_t* t = fm_create();
     unsigned long elem[4];
