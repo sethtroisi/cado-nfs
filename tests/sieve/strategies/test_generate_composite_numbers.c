@@ -69,6 +69,8 @@ int main ()
 	    (dist[i] - dist_test[i]/nb_test) > precision)
 	    {
 		fprintf (stderr, "error with the test(4)\n");
+                fprintf (stderr, "dist[%d]=%f dist_test[%d]=%f\n",
+                         i, dist[i], i, dist_test[i]);
                 fprintf (stderr, "dist_test[i]/nb_test - dist[i]=%f\n",
                          dist_test[i]/nb_test - dist[i]);
                 fprintf (stderr, "precision=%f\n", precision);
