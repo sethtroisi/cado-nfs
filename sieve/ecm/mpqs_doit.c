@@ -226,6 +226,10 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
   mpz_add (r, r, b);
   mpz_mul (r, r, r);
   mpz_sub (r, r, N);
+#ifdef HAVE_MINGW
+  if (mpz_divisible_p (r, a) == 0)
+    gmp_printf ("N=%Zd a=%Zd i=%lu b=%Zd r=%Zd\n", N, a, i, b, r);
+#endif
   ASSERT (mpz_divisible_p (r, a));
   mpz_divexact (r, r, a);
   if (mpz_sgn (r) < 0)
