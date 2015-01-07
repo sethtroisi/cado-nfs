@@ -1668,11 +1668,14 @@ cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix)
 {
   unsigned int nrroots;
   double lognorm, alpha, alpha_proj;
-  cado_poly_fprintf (stdout, poly, prefix);
   nrroots = numberOfRealRoots (poly->alg->coeff, poly->alg->deg, 0, 0, NULL);
-  lognorm = L2_skew_lognorm (poly->alg, SKEWNESS_DEFAULT_PREC);
+  if (poly->skew <= 0.0) /* If skew is undefined, compute it. */
+    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
+  lognorm = L2_lognorm (poly->alg, poly->skew);
   alpha = get_alpha (poly->alg, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (poly->alg, ALPHA_BOUND);
+
+  cado_poly_fprintf (stdout, poly, prefix);
   cado_poly_fprintf_info (fp, lognorm, alpha, alpha_proj, nrroots, prefix);
 }
 
