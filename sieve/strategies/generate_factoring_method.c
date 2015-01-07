@@ -139,14 +139,12 @@ generate_composite_integer(mpz_t res, gmp_randstate_t state,
 int
 select_random_index_according_dist(double *dist, int len)
 {
-    int precision = 100000;
-    //100000 to consider approximation of distribution
-    int alea = rand() % precision;
+    int alea = rand(); /* 0 <= alea <= RAND_MAX */
     int i = 0;
-    int bound = (int)(dist[0] * precision);
+    int bound = (int) (dist[0] * (double) RAND_MAX);
     while (i < (len-1) && alea > bound) {
 	i++;
-	bound += (int)(dist[i] * precision);
+	bound += (int) (dist[i] * (double) RAND_MAX);
     }
     return i;
 }
