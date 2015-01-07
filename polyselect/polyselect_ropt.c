@@ -23,7 +23,7 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
 unsigned int nthreads = 1;
 int tot_found = 0; /* total number of polynomials */
 static int verbose = 0;
-int rseffort = DEFAULT_RSEFFORT; /* sieving effort, among 1-5 */
+int ropteffort = DEFAULT_RSEFFORT; /* sieving effort, among 1-5 */
 cado_poly best_poly;
 double best_MurphyE = 0.0; /* Murphy's E (the larger the better) */
 
@@ -57,7 +57,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   mpz_clear (t);
 
   st = seconds_thread ();
-  ropt_polyselect (ropt_poly, input_poly, rseffort, verbose);
+  ropt_polyselect (ropt_poly, input_poly, ropteffort, verbose);
   *ropt_time += seconds_thread () - st;
 
   /* MurphyE */
@@ -98,7 +98,7 @@ declare_usage(param_list pl)
                                           "polynomials given in this file");
   snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
             DEFAULT_RSEFFORT);
-  param_list_decl_usage(pl, "rseffort", str);
+  param_list_decl_usage(pl, "ropteffort", str);
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   snprintf (str, 200, "sieving area (default %.2e)", AREA);
   param_list_decl_usage(pl, "area", str);
@@ -167,7 +167,7 @@ main (int argc, char *argv[])
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
   /* sieving effort that passed to ropt */
-  param_list_parse_int (pl, "rseffort", &rseffort);
+  param_list_parse_int (pl, "ropteffort", &ropteffort);
   /* filename of the file with the list of polynomials to root-sieve */
   polys_filename = param_list_lookup_string (pl, "inputpolys");
 
@@ -178,10 +178,10 @@ main (int argc, char *argv[])
   verbose_interpret_parameters(pl);
   param_list_print_command_line (stdout, pl);
 
-  /* Check that rseffort is in [1,10] */
-  if (rseffort < 1 || rseffort > 10)
+  /* Check that ropteffort is in [1,10] */
+  if (ropteffort < 1 || ropteffort > 10)
   {
-    fprintf (stderr, "Error, -rseffort should be in [1,10]\n");
+    fprintf (stderr, "Error, -ropteffort should be in [1,10]\n");
     usage (argv0[0], NULL, pl);
   }
 
@@ -195,8 +195,8 @@ main (int argc, char *argv[])
   if (polys_filename == NULL)
     usage (argv0[0], "inputpolys", pl);
 
-  printf ("# Info: Will use %u thread%s\n# Info: rseffort = %d\n", nthreads,
-          (nthreads > 1) ? "s": "", rseffort);
+  printf ("# Info: Will use %u thread%s\n# Info: ropteffort = %d\n", nthreads,
+          (nthreads > 1) ? "s": "", ropteffort);
 
   /* detect L1 cache size */
   ropt_L1_cachesize ();

@@ -106,6 +106,8 @@ void mpz_poly_div_2_mod_mpz(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_srcptr m);
 void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i);
   
 void mpz_poly_eval(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x);
+void mpz_poly_eval_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x);
+void mpz_poly_eval_diff_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x);
 void mpz_poly_eval_mod_mpz(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x,
                        mpz_srcptr m);
 int mpz_poly_is_root(mpz_poly_srcptr poly, mpz_t root, mpz_t modulus);

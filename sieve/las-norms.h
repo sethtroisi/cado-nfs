@@ -191,9 +191,9 @@ void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
     }
     return S;
   }
-  
-  extern void tune_las_memset();
 #endif
+  
+extern void tune_las_memset();
   
 /* These functions are internals. Don't use them. Use the wrapper above.
    It's need to declare them here for units & coverage tests.

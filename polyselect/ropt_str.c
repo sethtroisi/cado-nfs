@@ -228,13 +228,8 @@ ropt_poly_init ( ropt_poly_t poly )
  * Evaluation polynomials at many points.
  */
 static inline void
-ropt_poly_setup_eval ( mpz_t *f,
-                       mpz_t *g,
-                       mpz_t *fr,
-                       mpz_t *gr,
-                       mpz_t *numerator,
-                       const unsigned int *p,
-                       int d )
+ropt_poly_setup_eval (mpz_t *fr, mpz_t *gr, mpz_t *numerator, mpz_poly_srcptr f,
+                      mpz_poly_srcptr g, const unsigned int *p)
 {
   unsigned long i;
   mpz_t tmp;
@@ -243,12 +238,12 @@ ropt_poly_setup_eval ( mpz_t *f,
   for ( i = 0; i <= p[NP-1]; i ++ ) {
     mpz_set_ui (fr[i], 0);
     mpz_set_ui (gr[i], 0);
-    eval_poly_ui (fr[i], f, d, i);
-    eval_poly_ui (gr[i], g, 1, i);
-    eval_poly_diff_ui (numerator[i], f, d, i);
+    mpz_poly_eval_ui (fr[i], f, i);
+    mpz_poly_eval_ui (gr[i], g, i);
+    mpz_poly_eval_diff_ui (numerator[i], f, i);
     mpz_mul (numerator[i], numerator[i], gr[i]);
     mpz_neg (numerator[i], numerator[i]);
-    mpz_mul (tmp, fr[i], g[1]);
+    mpz_mul (tmp, fr[i], g->coeff[1]);
     mpz_add (numerator[i], tmp, numerator[i]);
   }
 
@@ -266,7 +261,7 @@ ropt_poly_setup ( ropt_poly_t poly )
 {
   int i;
   mpz_t t;
-  mpz_poly_t F;
+  mpz_poly_t F, G;
 
   mpz_init (t);
   /* degree */
@@ -296,13 +291,14 @@ ropt_poly_setup ( ropt_poly_t poly )
     exit (1);
   }
 
-  /* pre-compute f(r) for all r < B */
-  ropt_poly_setup_eval ( poly->f, poly->g, poly->fx, poly->gx,
-                         poly->numerator, primes, poly->d );
-
-  /* projective alpha */
   F->coeff = poly->f;
   F->deg = poly->d;
+  G->coeff = poly->g;
+  G->deg = 1;
+  /* pre-compute f(r) for all r < B */
+  ropt_poly_setup_eval (poly->fx, poly->gx, poly->numerator, F, G, primes);
+
+  /* projective alpha */
   poly->alpha_proj = get_biased_alpha_projective (F, 2000);
 
   mpz_clear (t);

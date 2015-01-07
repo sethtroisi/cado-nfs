@@ -1,9 +1,9 @@
+#include "cado.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <regex.h>
-#include <stdlib.h>
-#include <stdio.h>
 
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
 

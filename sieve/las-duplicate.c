@@ -336,17 +336,17 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
     goto clear_and_exit;
   }
 
-  unsigned char remaining_lognorm[2];
+  uint8_t remaining_lognorm[2];
   for (int side = 0; side < 2; side++) {
-    const unsigned char lognorm = estimate_lognorm(si, i, j, side);
+    const uint8_t lognorm = estimate_lognorm(si, i, j, side);
     remaining_lognorm[side] = subtract_fb_log(lognorm, relation, si, side);
     if (remaining_lognorm[side] > si->sides[side]->bound) {
-      verbose_output_print(0, 1, "# DUPECHECK On side %d, remaining lognorm = %hhu > bound = %hhu\n",
+      verbose_output_print(0, 1, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
               side, remaining_lognorm[side], si->sides[side]->bound);
       is_dupe = 0;
     }
   }
-  verbose_output_print(0, 1, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %hhu, %hhu\n",
+  verbose_output_print(0, 1, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %" PRId8 ", %" PRId8 "\n",
            i, j, remaining_lognorm[0], remaining_lognorm[1]);
   if (!is_dupe) {
     goto clear_and_exit;

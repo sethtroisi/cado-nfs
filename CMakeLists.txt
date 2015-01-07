@@ -335,3 +335,7 @@ message(STATUS "Data will go to ${CMAKE_INSTALL_PREFIX}/${DATASUFFIX}")
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
   include("${CADO_NFS_SOURCE_DIR}/config/variables.cmake")
 ENDIF(DEFINED ENV{CMAKE_DUMP_VARIABLES})
+
+if(MINGW)
+    message(STATUS "Please look up dev_docs/howto-MinGW.txt in the git tree for our mingw testing configuration, and frequently encountered errors")
+endif(MINGW)

@@ -133,9 +133,15 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #ifndef EXPECT
 #define EXPECT(x,val)	__builtin_expect(x,val)
 #endif
+#ifndef  HAVE_MINGW
 #ifndef ATTR_PRINTF
 #define ATTR_PRINTF(a,b) __attribute__((format(printf,a,b)))
 #endif
+#else
+/* mingw's gcc is apparently unaware that the c99 format strings _may_ be
+ * recognized by the win32 printf, for who asks nicely... */
+#define ATTR_PRINTF(a,b) /**/
+#endif  /* HAVE_MINGW */
 #ifndef ATTRIBUTE
 #define ATTRIBUTE(x) __attribute__ (x)
 #endif

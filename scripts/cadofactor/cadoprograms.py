@@ -665,9 +665,9 @@ class Polyselect2l(Program):
 
 class PolyselectRopt(Program):
     """
-    >>> p = PolyselectRopt(rseffort=5, inputpolys="foo.polys", verbose=True)
+    >>> p = PolyselectRopt(ropteffort=5, inputpolys="foo.polys", verbose=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'polyselect_ropt -v -inputpolys foo.polys -rseffort 5'
+    'polyselect_ropt -v -inputpolys foo.polys -ropteffort 5'
     """
     binary = "polyselect_ropt"
     name = binary
@@ -677,7 +677,7 @@ class PolyselectRopt(Program):
                  verbose : Toggle("v")=None,
                  threads : Parameter("t", checktype=int)=None,
                  inputpolys : Parameter(is_input_file=True)=None,
-                 rseffort: Parameter(checktype=int)=None,
+                 ropteffort: Parameter(checktype=int)=None,
                  area : Parameter(checktype=float)=None,
                  Bf : Parameter(checktype=float)=None,
                  Bg : Parameter(checktype=float)=None,

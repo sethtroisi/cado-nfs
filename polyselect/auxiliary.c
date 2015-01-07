@@ -29,16 +29,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
-#include "rootsieve.h"
 #include "murphyE.h"
 
 /* define OPTIMIZE_MP to perform computations in multiple-precision */
 //#define OPTIMIZE_MP
 
 //#define DEBUG_OPTIMIZE_AUX
-
-/* for the rotation, we try (j*x+k) for |k| <= 2^MAX_k */
-int MAX_k = 16;
 
 /************************* norm and skewness *********************************/
 
@@ -1060,48 +1056,6 @@ L2_skewness_derivative_mp (mpz_poly_ptr F, int prec, mpz_t skewness)
 
 /************************** polynomial arithmetic ****************************/
 
-/* g <- content(f) where deg(f)=d */
-void
-content_poly (mpz_t g, mpz_poly_ptr f)
-{
-  unsigned int i;
-  unsigned int d = f->deg;
-
-  ASSERT(d >= 1);
-
-  mpz_gcd (g, f->coeff[0], f->coeff[1]);
-  for (i = 2; i <= d; i++)
-    mpz_gcd (g, g, f->coeff[i]);
-}
-
-/* v <- f(r), where f is of degree d */
-void
-eval_poly_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r)
-{
-  int i;
-
-  mpz_set (v, f[d]);
-  for (i = d - 1; i >= 0; i--)
-    {
-      mpz_mul_ui (v, v, r);
-      mpz_add (v, v, f[i]);
-    }
-}
-
-/* v <- f'(r), where f is of degree d */
-void
-eval_poly_diff_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r)
-{
-  int i;
-
-  mpz_mul_ui (v, f[d], d);
-  for (i = d - 1; i >= 1; i--)
-    {
-      mpz_mul_ui (v, v, r);
-      mpz_addmul_ui (v, f[i], i); /* v <- v + i*f[i] */
-    }
-}
-
 /* h(x) <- h(x + r/p), where the coefficients of h(x + r/p) are known to
    be integers */
 static void
@@ -1136,7 +1090,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   mpz_poly_t g, H;
 
   mpz_init (c);
-  content_poly (c, f);
+  mpz_poly_content (c, f);
   for (v = 0.0; mpz_divisible_ui_p (c, p); v++, mpz_divexact_ui (c, c, p));
   v0 = (int) v;
 
@@ -1173,7 +1127,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   for (r0 = 0, i = 0; i < nroots; i++)
     {
       r = roots[i];
-      eval_poly_diff_ui (c, g->coeff, d, r);
+      mpz_poly_eval_diff_ui (c, g, r);
       if (mpz_divisible_ui_p (c, p) == 0) /* g'(r) <> 0 mod p */
   v += 1.0 / (double) (p - 1);
       else /* hard case */
@@ -1492,7 +1446,7 @@ average_valuation_affine_root (mpz_poly_ptr f, unsigned long p, unsigned long r 
       mpz_init_set (fv[i], f[i]);
 
    /* remove the p-valuations from fv */
-   content_poly (c, f);
+   mpz_poly_content (c, f);
    while (mpz_divisible_ui_p(c, p)) {
       v += 1;
       for (i = 0; i <= d; i ++) {
@@ -1531,74 +1485,6 @@ average_valuation_affine_root (mpz_poly_ptr f, unsigned long p, unsigned long r 
 
 /**************************** rotation ***************************************/
 
-/* D <- discriminant (f+k*g), which has degree d */
-static void
-discriminant_k (mpz_t *D, mpz_poly_ptr f, mpz_t m, mpz_t b)
-{
-  int i, j, k;
-  uint32_t **M, pivot;
-  int d = f->deg;
-
-  ASSERT_ALWAYS(d <= 9);
-
-  /* we first put in D[i] the value of disc(f + i*g) for 0 <= i <= d,
-     thus if disc(f + k*g) = a[d]*k^d + ... + a[0], then
-          D[0] = a[0]
-          D[1] = a[0] + a[1] + ... + a[d]
-          ...
-          D[d] = a[0] + a[1]*d + ... + a[d]*d^d */
-
-  discriminant (D[0], f->coeff, d); /* a[0] */
-  for (i = 1; i <= d; i++)
-    {
-      /* add b*x - m */
-      mpz_add (f->coeff[1], f->coeff[1], b);
-      mpz_sub (f->coeff[0], f->coeff[0], m);
-      discriminant (D[i], f->coeff, d);
-    }
-
-  /* initialize matrix coefficients */
-  M = (uint32_t**) malloc ((d + 1) * sizeof(uint32_t*));
-  for (i = 0; i <= d; i++)
-    {
-      M[i] = (uint32_t*) malloc ((d + 1) * sizeof(uint32_t));
-      M[i][0] = 1;
-      for (j = 1; j <= d; j++)
-        M[i][j] = i * M[i][j-1];
-    }
-
-  for (j = 0; j < d; j++)
-    {
-      /* invariant: D[i] = M[i][0] * a[0] + ... + M[i][d] * a[d]
-         with M[i][k] = 0 for k < j and k < i */
-      for (i = j + 1; i <= d; i++)
-        {
-          /* eliminate M[i][j] */
-          pivot = M[i][j] / M[j][j];
-          mpz_submul_ui (D[i], D[j], pivot);
-          for (k = j; k <= d; k++)
-            M[i][k] -= pivot * M[j][k];
-        }
-    }
-
-  /* now we have an upper triangular matrix */
-  for (j = d; j > 0; j--)
-    {
-      for (k = j + 1; k <= d; k++)
-        mpz_submul_ui (D[j], D[k], M[j][k]);
-      ASSERT_ALWAYS(mpz_divisible_ui_p (D[j], M[j][j]));
-      mpz_divexact_ui (D[j], D[j], M[j][j]);
-    }
-
-  /* restore the original f[] */
-  mpz_submul_ui (f->coeff[1], b, d);
-  mpz_addmul_ui (f->coeff[0], m, d);
-
-  for (i = 0; i <= d; i++)
-    free (M[i]);
-  free (M);
-}
-
 /* replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k */
 long
 rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t)
@@ -1623,331 +1509,6 @@ derotate_auxg_z (mpz_t *f, const mpz_t b, const mpz_t g0, const mpz_t k, unsigne
   mpz_submul (f[t + 1], b, k);
   mpz_submul (f[t], g0, k);
 }
-
-unsigned long
-rotate_area (long K0, long K1, long J0, long J1)
-{
-  return (unsigned long) (J1 - J0 + 1) * (unsigned long) (K1 - K0 + 1);
-}
-
-/* Use Emmanuel Thome's idea: assuming alpha(f + k*g) admits a Gaussian
-   distribution with mean 'm' and standard deviation 's', then the probability
-   that one polynomial has a value of alpha >= A is
-   1/2*(1 - erf((A-m)/s/sqrt(2))), thus the probability that K polynomials
-   have all their alpha values >= A is [1/2*(1 - erf((A-m)/s/sqrt(2)))]^K.
-   For 'm' and 's' fixed, and a given K, we define the value of A for which
-   this probability is 1/2 to be the expected value of A for K polynomials.
-
-   We assume lognorm(f + k*g) + E(alpha(f + k*g)) is first decreasing, then
-   increasing, then the optimal K corresponds to the minimum of that function.
-*/
-void
-rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1,
-               long *J0, long *J1, int verbose)
-{
-  /* exp_alpha[i] corresponds to K=2^i polynomials for m=0, s=1
-     f := x -> 1/2*(1 - erf(x/sqrt(2)));
-     seq(fsolve(f(x)^(2^k) = 1/2, x=-log[2](1.0+k)), k=0..30);
-   */
-  double exp_alpha[] = {0.0 /* K=1 */, -0.5449521356 /* 2 */,
-                        -0.9981488825 /* 4 */, -1.385198061 /* 8 */,
-                        -1.723526050 /* 16 */, -2.025111894 /* 32 */,
-                        -2.298313131 /* 64 */, -2.549067054 /* 128 */,
-                        -2.781676726 /* 256 */, -2.999326227 /* 512 */,
-                        -3.204420841 /* 1024 */, -3.398814100 /* 2048 */,
-                        -3.583961388 /* 4096 */, -3.761025425 /* 8192 */,
-                        -3.930949902 /* 16384 */, -4.094511733 /* 32768 */,
-                        -4.252358774 /* 65536 */, -4.405037486 /* 131072 */,
-                        -4.553013560 /* 262144 */, -4.696687518 /* 524288 */,
-                        -4.836406692 /* 2^20 */, -4.972474538 /* 2^21 */,
-                        -5.105157963 /* 2^22 */, -5.234693169 /* 2^23 */,
-                        -5.361290351 /* 2^24 */, -5.485137511 /* 2^25 */,
-                        -5.606403590 /* 2^26 */, -5.725241052 /* 2^27 */,
-                        -5.841788041 /* 2^27 */, -5.956170181 /* 2^29 */,
-                        DBL_MAX};
-  int i;
-  long k0 = 0, j0 = 0;
-  double lognorm, alpha, E0, E, best_E;
-  double skewness = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
-  long jmax = (long) ((double) (1L << MAX_k) / skewness);
-  unsigned long max_area = 1UL << MAX_k;
-
-#define MARGIN 0.12 /* we allow a small error margin in the expected lognorm
-                       + alpha values, to get a larger search range */
-
-  E0 = L2_lognorm (f, skewness);
-
-  *K0 = -2;
-  *J0 = -16;
-  *J1 = 16;
-
-  /* look for negative k: -2, -4, -8, ... */
-  best_E = E0;
-  for (i = 1; rotate_area (*K0, -*K0, *J0, *J1) < max_area; i++, *K0 *= 2)
-    {
-      k0 = rotate_aux (f->coeff, b, m, k0, *K0, 0);
-      lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
-      alpha = exp_alpha[i];
-      E = lognorm + alpha;
-      if (E < best_E + MARGIN)
-        {
-          if (E < best_E)
-            best_E = E;
-        }
-      else
-        break;
-    }
-  /* go back to k=0 */
-  k0 = rotate_aux (f->coeff, b, m, k0, 0, 0);
-  *K1 = -*K0;
-
-  /* now try negative j: -1, -3, -7, ... */
-  for (i++; exp_alpha[i] != DBL_MAX && rotate_area (*K0, *K1, *J0, -*J0) < max_area; i++, *J0 = 2 * *J0 - 1)
-    {
-      j0 = rotate_aux (f->coeff, b, m, j0, *J0, 1);
-      lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
-      alpha = exp_alpha[i];
-      E = lognorm + alpha;
-      if (E < best_E + MARGIN)
-        {
-          if (E < best_E)
-            best_E = E;
-        }
-      else
-        break;
-      if (1 - 2 * *J0 > jmax)
-        break;
-    }
-  *J1 = -*J0;
-
-  if (verbose > 0)
-    fprintf (stderr, "# Rotate bounds: %ld <= j <= %ld, %ld <= k <= %ld\n",
-             *J0, *J1, *K0, *K1);
-
-  /* rotate back to j=k=0 */
-  rotate_aux (f->coeff, b, m, k0, 0, 0);
-  rotate_aux (f->coeff, b, m, j0, 0, 1);
-}
-
-/* Return the smallest value of lognorm + alpha(f + (j*x+k)*(b*x-m)) for
-   j and k small enough such that the norm does not increase too much, and
-   modify f[] accordingly.
-   The parameter "multi" means that several polynomials are wanted. If
-   multi=0 or 1, then only 1 polynomial is returned (classical behavior).
-   Otherwise, multi polynomials are stored in jmin and kmin (that
-   must be initialized arrays with at least multi elements). This option
-   might be useful for Coppersmith variant (a.k.a. MNFS).
-   In the multi case, the smallest of the returned values of lognorm + alpha
-   is returned (and f[] accordingly).
-   Warning: the caller is responsible to update the skewness if needed.
-
-   FIXME: it would be better to pass the polynomial g to rotate, instead of
-   b and m.
-   */
-double
-rotate (mpz_poly_ptr f, unsigned long alim, mpz_t m, mpz_t b,
-        long *jmin, long *kmin, int multi, int verbose)
-{
-  mpz_array_t *D;
-  long K0, K1, J0, J1, k0, k, i, j, j0, bestk;
-  double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
-  double corr = 0.0;
-  double alpha0;
-  unsigned long p;
-  double *best_E = NULL; /* set to NULL to avoid warning... */
-  double time_alpha = 0.0, time_norm = 0.0;
-  int d = f->deg;
-  unsigned long pp;
-  double one_over_pm1, logp, average_alpha = 0.0;
-
-  /* allocate best_E, to store the best (lognorm+alpha) in multi mode */
-  if (multi > 1)
-    {
-      best_E = (double *) malloc (multi * sizeof (double));
-      for (i = 0; i < multi; ++i)
-        best_E[i] = DBL_MAX;
-    }
-
-  /* allocate D(k) = disc(f + (j*x+k)*g, x) */
-  D = alloc_mpz_array (d + 1);
-
-  /* compute range for k */
-  rotate_bounds (f, b, m, &K0, &K1, &J0, &J1, verbose);
-  ASSERT_ALWAYS(K0 <= 0 && 0 <= K1);
-
-  /* allocate sieving zone for computing alpha */
-  A = (double*) malloc ((K1 + 1 - K0) * sizeof (double));
-  j0 = k0 = 0; /* the current coefficients f[] correspond to f+(j*x+k)*g */
-
-  *jmin = *kmin = 0;
-
-  alpha0 = get_alpha (f, alim); /* value of alpha without rotation */
-
-  ASSERT_ALWAYS(J0 < 0 && 0 < J1);
-  for (j = 0;;)
-    {
-      /* we consider j=0, 1, ..., J1, then J0, J0+1, ..., -1 */
-      j0 = rotate_aux (f->coeff, b, m, j0, j, 1);
-      /* go back to k=0 for the discriminant */
-      k0 = rotate_aux (f->coeff, b, m, k0, 0, 0);
-      /* D(k) = disc(f + (j*x+k)*g, x) (j is now fixed) */
-      discriminant_k (D->data, f, m, b);
-
-      for (k = K0; k <= K1; k++)
-  A[k - K0] = 0.0; /* A[k - K0] will store the value alpha(f + k*g) */
-
-  for (p = 2; p <= alim; p += 1 + (p & 1))
-    if (ulong_isprime (p))
-      {
-        int i;
-        /* We skip primes which divide all coefficients of f, since then
-           f mod p is zero. This can only happen when p divides N, which is
-           silly in GNFS, but maybe the user is stupid. */
-        for (i = d; i >= 0 && mpz_divisible_ui_p (f->coeff[i], p); i--);
-        if (i < 0)
-          continue;
-
-  if (k0 != 0)
-    k0 = rotate_aux (f->coeff, b, m, k0, 0, 0);
-
-  time_alpha -= seconds ();
-
-  one_over_pm1 = 1.0 / (double) (p - 1);
-  logp = log ((double) p);
-  for (pp = p; pp <= alim; pp *= p)
-    {
-      /* Murphy (page 48) defines cont_p(F) = q_p*p/(p^2-1)
-         = q_p*p/(p+1)*(1/p+1/p^2+...)
-         The contribution for p^k is thus q_p*p/(p+1)/p^k. */
-      alpha = logp / (double) (p + 1) * (double) p / (double) pp;
-      /* the following is the average contribution for a prime not
-         dividing the discriminant, cf alpha.sage, function alpha_p.
-         We take it into account only for p, not for p^2, p^3, ... */
-      if (p == pp)
-        average_alpha += logp * one_over_pm1;
-      /* we do not consider the projective roots here, since the
-         corresponding correction will be considered separately for each
-         row below */
-      /* + alpha_p_projective (f, d, (D->data)[0], p); */
-      update_table (f->coeff, d, m, b, A, K0, K1, pp, alpha);
-    }
-
-  time_alpha += seconds ();
-      } /* end of loop on primes p */
-
-  /* determine the best alpha in each row */
-  bestk = K0;
-  for (k = K0 + 1; k <= K1; k++)
-    if (A[k - K0] < A[bestk - K0])
-      bestk = k;
-
-  /* Correction to apply to the current row (takes into account the projective
-     roots). FIXME: we are lazy here, we should only consider the contribution
-     from the projective roots. */
-  k0 = rotate_aux (f->coeff, b, m, k0, bestk, 0);
-  corr = get_alpha (f, alim) - A[bestk - K0];
-
-  if (verbose > 1)
-    fprintf (stderr, "# best alpha for j=%ld: k=%ld with %f\n",
-             j, bestk, A[bestk - K0] + corr);
-
-  /* now finds the best lognorm+alpha */
-  time_norm -= seconds ();
-  for (k = K0; k <= K1; k++)
-    {
-      alpha = A[k - K0] + corr;
-      if (alpha < best_alpha + 2.0)
-        {
-          /* check lognorm + alpha < best_lognorm + best_alpha */
-
-          /* translate from k0 to k */
-          k0 = rotate_aux (f->coeff, b, m, k0, k, 0);
-          lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
-          if (multi <= 1) {
-              if (lognorm + alpha < best_lognorm + best_alpha) {
-                  best_lognorm = lognorm;
-                  best_alpha = alpha;
-                  *kmin = k;
-                  *jmin = j;
-              }
-          } else { /* multi mode */
-              /* Rem: best_lognorm + best_alpha is the worse of the
-                 preselected */
-              double newE = lognorm + alpha;
-              if (newE < best_E[multi-1]) {
-                  int ii;
-                  /* find position; assume list of preselected is sorted */
-                  for (ii = 0; ii < multi; ++ii) {
-                      if (best_E[ii] > newE)
-                          break;
-                  }
-                  ASSERT_ALWAYS(ii < multi);
-                  /* insert */
-                  for (i = multi - 1; i > ii; --i) {
-                      kmin[i] = kmin[i-1];
-                      jmin[i] = jmin[i-1];
-                      best_E[i] = best_E[i-1];
-                  }
-                  kmin[ii] = k;
-                  jmin[ii] = j;
-                  best_E[ii] = newE;
-              }
-          }
-        }
-    }
-  time_norm += seconds ();
-
-  j++;
-  if (j > J1)
-    j = J0;
-  else if (j == 0)
-    break;
-
-    } /* end of loop on j */
-
-  /* we now have f + (j0*x+k0)*(bx-m) and we want f + (jmin*x+kmin)*(bx-m),
-     thus we have to add ((jmin-j0)*x+(kmin-k0)*(bx-m) */
-  /* if you are in multi-mode, we use the best polynomial */
-  rotate_aux (f->coeff, b, m, k0, *kmin, 0);
-  rotate_aux (f->coeff, b, m, j0, *jmin, 1);
-
-  if ((verbose > 0) && (multi <= 1))
-    {
-      fprintf (stderr, "# Rotate by ");
-      if (*jmin != 0)
-        {
-          if (*jmin == -1)
-            fprintf (stderr, "-");
-          else if (*jmin != 1)
-            fprintf (stderr, "%ld*", *jmin);
-          fprintf (stderr, "x");
-          if (*kmin >= 0)
-            fprintf (stderr, "+");
-        }
-      fprintf (stderr, "%ld: alpha improved from %1.2f to %1.2f (alpha %1.2fs, norm %1.2fs)\n", *kmin, alpha0, best_alpha, time_alpha, time_norm);
-    }
-
-  if (verbose && (multi > 1)) {
-      fprintf(stderr, "Found the following polynomials  (j, k, E):\n");
-      for (i = 0; i < multi; ++i) {
-          fprintf(stderr, "  %ld\t%ld\t%1.2f\n", jmin[i], kmin[i], best_E[i]);
-      }
-  }
-
-  free (A);
-
-  clear_mpz_array (D);
-
-  {
-      double ret_val = best_lognorm + best_alpha;
-      if (multi>1) {
-          ret_val = best_E[0]; /* we return the smallest */
-          free(best_E);
-      }
-      return ret_val;
-  }
-}
-
 
 /*
    Print f, g only.
@@ -2107,11 +1668,14 @@ cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix)
 {
   unsigned int nrroots;
   double lognorm, alpha, alpha_proj;
-  cado_poly_fprintf (stdout, poly, prefix);
   nrroots = numberOfRealRoots (poly->alg->coeff, poly->alg->deg, 0, 0, NULL);
-  lognorm = L2_skew_lognorm (poly->alg, SKEWNESS_DEFAULT_PREC);
+  if (poly->skew <= 0.0) /* If skew is undefined, compute it. */
+    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
+  lognorm = L2_lognorm (poly->alg, poly->skew);
   alpha = get_alpha (poly->alg, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (poly->alg, ALPHA_BOUND);
+
+  cado_poly_fprintf (stdout, poly, prefix);
   cado_poly_fprintf_info (fp, lognorm, alpha, alpha_proj, nrroots, prefix);
 }
 
