@@ -182,7 +182,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
     const int verbose = 0;
     where_am_I w;
 
-    size_t size;
+    size_t size = 0;
     fb->count_entries(NULL, &size, NULL);
 
     // allocate space for these. n is an upper bound, since some of the
