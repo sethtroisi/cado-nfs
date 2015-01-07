@@ -122,6 +122,22 @@ void int64_poly_set_bxi(int64_poly_ptr f, int i, int64_t b)
   f->deg = i;
 }
 
+int int64_poly_equal(int64_poly_srcptr a, int64_poly_srcptr b)
+{
+  int r = (a->deg > b->deg) - (b->deg > a->deg);
+  if (r) return 1;
+  for(int d = a->deg; d >= 0 ; d--) {
+    r = a->coeff[d] - b->coeff[d];
+    if (r) return 1;
+  }
+  return 0;
+}
+
+int int64_poly_normalized_p(int64_poly_srcptr f)
+{
+  return (f->deg == -1) || f->coeff[f->deg] !=  0;
+}
+
 void int64_poly_fprintf(FILE * file, int64_poly_srcptr f)
 {
   int i;
