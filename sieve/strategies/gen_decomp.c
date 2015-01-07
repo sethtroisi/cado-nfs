@@ -48,7 +48,7 @@ gen_random (unsigned long i)
      a*n1*log(n1) + b = 2^i */
   a = ldexp (1.0, i - 1) / (n1 * log (n1) - n0 * log (n0));
   b = ldexp (1.0, i) - a * n1 * log (n1);
-  n = n0 + (n1 - n0) * drand48 ();
+  n = n0 + (n1 - n0) * ((double)rand() / (RAND_MAX+1));
   return a * n * log (n) + b;
 }
 
