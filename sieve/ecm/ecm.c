@@ -2010,11 +2010,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	  }
 	ellM_set (Pt, P, m);
 #endif
-	
-	mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
-				   in stage 2 init find factors? */
-	
       }
+    mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
+                               in stage 2 init find factors? */
   }
   else if (plan->parameterization == TWED16)
     {
