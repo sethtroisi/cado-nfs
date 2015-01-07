@@ -122,7 +122,7 @@ polygen_JL_f ( mpz_t n,
         mpz_poly_t ff;
         ff->deg = d;
         ff->coeff = f;
-        content_poly (t, ff);
+        mpz_poly_content (t, ff);
         if (mpz_cmp_ui(t, 1) != 0 ) {
             for (i = 0; i < d+1; i ++) {
                 mpz_divexact (f[i], f[i], t);

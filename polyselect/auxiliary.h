@@ -74,9 +74,6 @@ void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 void rotate_auxg_z (mpz_t*, const mpz_t, const mpz_t, const mpz_t, unsigned int);
 void do_translate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k);
-void content_poly (mpz_t g, mpz_poly_ptr);
-void eval_poly_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);
-void eval_poly_diff_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);
 
 
 void cado_poly_fprintf_with_info (FILE *, cado_poly_ptr, const char *);

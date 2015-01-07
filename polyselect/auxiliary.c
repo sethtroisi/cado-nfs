@@ -1056,48 +1056,6 @@ L2_skewness_derivative_mp (mpz_poly_ptr F, int prec, mpz_t skewness)
 
 /************************** polynomial arithmetic ****************************/
 
-/* g <- content(f) where deg(f)=d */
-void
-content_poly (mpz_t g, mpz_poly_ptr f)
-{
-  unsigned int i;
-  unsigned int d = f->deg;
-
-  ASSERT(d >= 1);
-
-  mpz_gcd (g, f->coeff[0], f->coeff[1]);
-  for (i = 2; i <= d; i++)
-    mpz_gcd (g, g, f->coeff[i]);
-}
-
-/* v <- f(r), where f is of degree d */
-void
-eval_poly_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r)
-{
-  int i;
-
-  mpz_set (v, f[d]);
-  for (i = d - 1; i >= 0; i--)
-    {
-      mpz_mul_ui (v, v, r);
-      mpz_add (v, v, f[i]);
-    }
-}
-
-/* v <- f'(r), where f is of degree d */
-void
-eval_poly_diff_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r)
-{
-  int i;
-
-  mpz_mul_ui (v, f[d], d);
-  for (i = d - 1; i >= 1; i--)
-    {
-      mpz_mul_ui (v, v, r);
-      mpz_addmul_ui (v, f[i], i); /* v <- v + i*f[i] */
-    }
-}
-
 /* h(x) <- h(x + r/p), where the coefficients of h(x + r/p) are known to
    be integers */
 static void
@@ -1132,7 +1090,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   mpz_poly_t g, H;
 
   mpz_init (c);
-  content_poly (c, f);
+  mpz_poly_content (c, f);
   for (v = 0.0; mpz_divisible_ui_p (c, p); v++, mpz_divexact_ui (c, c, p));
   v0 = (int) v;
 
@@ -1169,7 +1127,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   for (r0 = 0, i = 0; i < nroots; i++)
     {
       r = roots[i];
-      eval_poly_diff_ui (c, g->coeff, d, r);
+      mpz_poly_eval_diff_ui (c, g, r);
       if (mpz_divisible_ui_p (c, p) == 0) /* g'(r) <> 0 mod p */
   v += 1.0 / (double) (p - 1);
       else /* hard case */
@@ -1488,7 +1446,7 @@ average_valuation_affine_root (mpz_poly_ptr f, unsigned long p, unsigned long r 
       mpz_init_set (fv[i], f[i]);
 
    /* remove the p-valuations from fv */
-   content_poly (c, f);
+   mpz_poly_content (c, f);
    while (mpz_divisible_ui_p(c, p)) {
       v += 1;
       for (i = 0; i <= d; i ++) {

@@ -1076,6 +1076,34 @@ void mpz_poly_eval(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x) {
   }
 }
 
+/* Set res=f(x) where x is an unsigned long. */
+void mpz_poly_eval_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x)
+{
+  int d = f->deg;
+
+  mpz_set (res, f->coeff[d]);
+  for (int i = d - 1; i >= 0; i--)
+  {
+    mpz_mul_ui (res, res, x);
+    mpz_add (res, res, f->coeff[i]);
+  }
+}
+
+/* Set res=f'(x), where x is an unsigned long */
+void
+mpz_poly_eval_diff_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x)
+{
+  int d = f->deg;
+
+  mpz_mul_ui (res, f->coeff[d], d);
+  for (int i = d - 1; i >= 1; i--)
+    {
+      mpz_mul_ui (res, res, x);
+      mpz_addmul_ui (res, f->coeff[i], i); /* res <- res + i*f[i] */
+    }
+}
+
+
 /* Set res=f(x) (mod m).  Assume res and x are different variables. */
 /* Coefficients of f(x) need not be reduced mod m.
  * The computed value res is reduced mod m
