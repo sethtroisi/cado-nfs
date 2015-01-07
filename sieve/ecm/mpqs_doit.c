@@ -601,7 +601,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
      Note: when M=2^15, setting M=1<<15 statically is faster with gcc. */
   if (Nbits < 56)
     {
-      M = 10;
+      M = 1 << 10;
       ncol = 40;
     }
   else
@@ -687,10 +687,6 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   if (mpz_cmp_ui (sqrta, P[lim-1]) <= 0)
     mpz_set_ui (sqrta, P[lim-1] + 1);
 
-#ifdef HAVE_MINGW
-  gmp_printf ("sqrta=%Zd\n", sqrta);
-#endif
-
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
   init_time += milliseconds ();
@@ -723,7 +719,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   if (mpz_tstbit (b, 0) == 1)
     mpz_sub (b, b, a);
 #if defined(TRACE) || defined(HAVE_MINGW)
-  gmp_printf ("a=%Zd\nb=%Zd\n", a, b);
+  gmp_printf ("a=%Zd b=%Zd\n", a, b);
 #endif
   unsigned long aa, inva, sqrtaa;
   ASSERT (mpz_fits_ulong_p (a));
@@ -741,8 +737,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   if (pols++ == 0)
     {
       double Nd = mpz_get_d (N), ad = (double) aa;
-      /* initialize radix and Logp[]: we want radix^255 = maxnorm ~ N/a */
-      maxnorm = mpz_get_d (N) / mpz_get_d (a);
+      /* initialize radix and Logp[]: we want radix^255 = maxnorm ~ a*M^2 */
+      maxnorm = mpz_get_d (a) * (double) M * (double) M;
       radix = pow (maxnorm, 1.0 / 255.0);
       logradix = log (radix);
 #ifdef TRACE

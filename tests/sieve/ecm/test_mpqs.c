@@ -31,6 +31,8 @@ main (int argc, const char *argv[])
           mpz_nextprime (N, N);
           mpz_urandomb (f, state, (bits + 1) / 2);
           mpz_nextprime (f, f);
+          if (mpz_cmp (N, f) == 0)
+            continue;
           mpz_mul (N, N, f);
         }
       while (mpz_sizeinbase (N, 2) != bits);
