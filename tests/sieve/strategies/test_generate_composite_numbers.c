@@ -63,14 +63,15 @@ int main ()
 	    int index = select_random_index_according_dist(dist, len);
 	    dist_test[index]+=1;
 	}
-    //check the similary!!!
+    //check the similarity!!!
     for (int i = 0; i < len; i++)
 	if ((dist_test[i]/nb_test - dist[i]) > precision ||
 	    (dist[i] - dist_test[i]/nb_test) > precision)
 	    {
 		fprintf (stderr, "error with the test(4)\n");
-                fprintf (stderr, "dist[%d]=%f dist_test[%d]=%f\n",
-                         i, dist[i], i, dist_test[i]);
+                for (int j = 0; j < len; j++)
+                  fprintf (stderr, "dist[%d]=%f dist_test[%d]=%f\n",
+                           j, dist[j], j, dist_test[j]);
                 fprintf (stderr, "dist_test[i]/nb_test - dist[i]=%f\n",
                          dist_test[i]/nb_test - dist[i]);
                 fprintf (stderr, "precision=%f\n", precision);
