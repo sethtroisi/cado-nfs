@@ -684,6 +684,10 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   if (mpz_cmp_ui (sqrta, P[lim-1]) <= 0)
     mpz_set_ui (sqrta, P[lim-1] + 1);
 
+#ifdef HAVE_MINGW
+  gmp_printf ("sqrta=%Zd\n", sqrta);
+#endif
+
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
   init_time += milliseconds ();
@@ -714,7 +718,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   /* we want b even to ensure k=1 is a root of (a*k+b)^2 = N (mod 2) */
   if (mpz_tstbit (b, 0) == 1)
     mpz_sub (b, b, a);
-#ifdef TRACE
+#if defined(TRACE) || defined(HAVE_MINGW)
   gmp_printf ("a=%Zd\nb=%Zd\n", a, b);
 #endif
   unsigned long aa, inva, sqrtaa;
