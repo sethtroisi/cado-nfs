@@ -503,7 +503,7 @@ int main (int argc, char **argv)
     mt = (int) ntm;
 
   fprintf(stdout, "\n# Computing Shirokauer maps for %" PRIu64 " relations "
-                  "using %d threads\n", sr, mt);
+                  "using %d thread(s)\n", sr, mt);
   fflush(stdout);
 
   if (mt == 1)
