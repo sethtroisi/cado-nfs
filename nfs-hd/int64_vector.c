@@ -44,6 +44,17 @@ void int64_vector_setcoordinate(int64_vector_ptr v, unsigned int i,
   v->c[i] = z;
 }
 
+int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b)
+{
+  int r = (a->dim > b->dim) - (b->dim > a->dim);
+  if (r) return 1;
+  for(int d = a->dim; d >= 0 ; d--) {
+    r = a->c[d] - b->c[d];
+    if (r) return 1;
+  }
+  return 0;
+}
+
 void int64_vector_fprintf(FILE * file, int64_vector_srcptr v)
 {
   fprintf(file, "[");
