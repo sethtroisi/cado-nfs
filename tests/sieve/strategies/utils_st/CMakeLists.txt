@@ -23,6 +23,10 @@ add_executable(test_decomp
   ${SUF_SRC}tab_decomp.c
   ${SUF_SRC}decomp.c)
 
+if(MINGW)
+    target_link_libraries(test_decomp gnurx)
+endif(MINGW)
+
 run_test (test_decomp test_decomp)
 
 add_executable(test_convex_hull

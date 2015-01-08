@@ -34,7 +34,9 @@ Output
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <errno.h>
 
+#include "macros.h"
 #include "filter_common.h"
 
 stats_data_t stats; /* struct for printing progress */
@@ -284,6 +286,7 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
         const mpz_t ell, const mpz_t ell2, int *nsm)
 {
   FILE * out = fopen(outname, "w");
+  DIE_ERRNO_DIAG(out==NULL, "fopen", outname);
   mpz_poly_t SM;
   mpz_t invl2;
 
