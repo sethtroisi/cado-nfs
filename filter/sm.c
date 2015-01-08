@@ -198,7 +198,14 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   for (int side = 0; side < 2; side++) {
       nsm_total += nsm[side];
   }
+  /*
   gmp_fprintf(out, "%" PRIu64 " %d %Zd\n", sr, nsm_total, ell);
+  */
+  /* mingw's gmp chokes on the %I64u format string which is used by
+   * windows as a real value for PRIu64...
+   */
+  fprintf(out, "%" PRIu64 " %d", sr, nsm_total);
+  gmp_fprintf(out, " %Zd\n", ell);
 
   mpz_t invl2;
   mpz_init(invl2);
@@ -304,12 +311,7 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
   for (int side = 0; side < 2; side++) {
       nsm_total += nsm[side];
   }
-  /*
-  gmp_fprintf(out, "%" PRIu64 " %d %Zd\n", sr, nsm_total, ell);
-  */
-  /* mingw's gmp chokes on the %I64u format string which is used by
-   * windows as a real value for PRIu64...
-   */
+  /* see in mt_sm above for the explanation of the two-step printf.  */
   fprintf(out, "%" PRIu64 " %d", sr, nsm_total);
   gmp_fprintf(out, " %Zd\n", ell);
 
