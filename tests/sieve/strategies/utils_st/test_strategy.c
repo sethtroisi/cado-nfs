@@ -1,7 +1,12 @@
-#include "tab_strategy.h"
+#include "cado.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+
+#include "tab_strategy.h"
+#include "macros.h"
 
 //test equality between two fm!
 int fm_are_equals (fm_t* t1, fm_t* t2){
@@ -142,20 +147,19 @@ int main()
 	}
 
     //test print and scan
-    char file_name[] = "/tmp/512512512test512512512";
-    FILE* file = fopen (file_name, "w");
+    FILE* file = tmpfile();
+    DIE_ERRNO_DIAG(file == NULL, "tmpfile", "");
     int errf = (tabular_strategy_fprint (file, tab) == -1);
     if (errf)
 	{
-	    fprintf (stderr, "error when i try to write in %s\n", file_name);
+            fprintf (stderr, "write error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
-    fclose (file);
-    file = fopen (file_name, "r");
+    fseek(file, 0, SEEK_SET);
     tabular_strategy_t* tab2 = tabular_strategy_fscan (file);
     if (tab2 == NULL)
 	{
-	    fprintf (stderr, "error when i try to read %s\n", file_name);
+            fprintf (stderr, "read error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
     fclose (file);
@@ -165,7 +169,6 @@ int main()
 	    fprintf (stderr, "error with the test(6)!!!\n");
 	    return EXIT_FAILURE;
 	}
-    system ("rm /tmp/512512512test512512512");
     //free 
     fm_free (elem);
     strategy_free (t1);

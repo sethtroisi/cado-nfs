@@ -1,8 +1,14 @@
-#include "tab_fm.h"
+#include "cado.h"
 
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>              /* for _O_BINARY */
+#include <errno.h>
+#include <math.h>
+#include <string.h>
+
+#include "macros.h"
+#include "tab_fm.h"
 
 //test equality between two fm!  check all parameters in the structure
 //fm, while fm_is_equal just see the parameter method!
@@ -76,6 +82,10 @@ int check_sort (tabular_fm_t* tab)
 
 int main ()
 {
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;		/* Binary open for all files */
+#endif
+
     //create a first fm!
     fm_t* t = fm_create();
     unsigned long elem[4];
@@ -129,20 +139,19 @@ int main ()
 	    return EXIT_FAILURE;
 	}  
     //test fprint fscan
-    char file_name[] = "/tmp/125125125test125125125";
-    FILE* file = fopen (file_name, "w");
+    FILE* file = tmpfile();
+    DIE_ERRNO_DIAG(file == NULL, "tmpfile", "");
     int errf = (tabular_fm_fprint (file, tab1) == -1);
     if (errf)
 	{
-	    fprintf (stderr, "error when i try to write in %s\n", file_name);
+            fprintf (stderr, "write error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
-    fclose (file);
-    file = fopen (file_name, "r");
+    fseek(file, 0, SEEK_SET);
     tabular_fm_t* tab3 = tabular_fm_fscan (file);
     if (tab3 == NULL)
 	{
-	    fprintf (stderr, "error when i try to read %s\n", file_name);
+            fprintf (stderr, "read error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
     fclose (file);
@@ -151,7 +160,6 @@ int main ()
 	    fprintf (stderr, "error with the test(5)!!!\n");
 	    return EXIT_FAILURE;
 	}
-    system ("rm /tmp/125125125test125125125");
 
     //sort (and swap);
     //random test

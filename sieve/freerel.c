@@ -244,6 +244,8 @@ pthread_primes_producer (void *ptvoid) {
   } while (i != j);
 
   pthread_exit (NULL);
+
+  return NULL;
 }
 
 /* This function takes a primes buffer and generates the corresponding

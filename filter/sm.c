@@ -34,7 +34,9 @@ Output
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <errno.h>
 
+#include "macros.h"
 #include "filter_common.h"
 
 stats_data_t stats; /* struct for printing progress */
@@ -196,7 +198,14 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   for (int side = 0; side < 2; side++) {
       nsm_total += nsm[side];
   }
+  /*
   gmp_fprintf(out, "%" PRIu64 " %d %Zd\n", sr, nsm_total, ell);
+  */
+  /* mingw's gmp chokes on the %I64u format string which is used by
+   * windows as a real value for PRIu64...
+   */
+  fprintf(out, "%" PRIu64 " %d", sr, nsm_total);
+  gmp_fprintf(out, " %Zd\n", ell);
 
   mpz_t invl2;
   mpz_init(invl2);
@@ -284,6 +293,7 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
         const mpz_t ell, const mpz_t ell2, int *nsm)
 {
   FILE * out = fopen(outname, "w");
+  DIE_ERRNO_DIAG(out==NULL, "fopen", outname);
   mpz_poly_t SM;
   mpz_t invl2;
 
@@ -301,7 +311,9 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
   for (int side = 0; side < 2; side++) {
       nsm_total += nsm[side];
   }
-  gmp_fprintf(out, "%" PRIu64 " %d %Zd\n", sr, nsm_total, ell);
+  /* see in mt_sm above for the explanation of the two-step printf.  */
+  fprintf(out, "%" PRIu64 " %d", sr, nsm_total);
+  gmp_fprintf(out, " %Zd\n", ell);
 
   uint64_t i;
   stats_init (stats, stdout, &i, nbits(sr)-5, "Computed", "SMs", "", "SMs");
@@ -503,7 +515,7 @@ int main (int argc, char **argv)
     mt = (int) ntm;
 
   fprintf(stdout, "\n# Computing Shirokauer maps for %" PRIu64 " relations "
-                  "using %d threads\n", sr, mt);
+                  "using %d thread(s)\n", sr, mt);
   fflush(stdout);
 
   if (mt == 1)
