@@ -131,7 +131,7 @@ static void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
   fbb: factor base bound for this side.
 */
 static void add_ideal_1(factor_base_ptr fb, uint64_t * index, uint64_t r,
-                 mpz_poly_srcptr h, uint64_t fbb, unsigned int t)
+                        mpz_poly_srcptr h, uint64_t fbb, unsigned int t)
 {
   ASSERT(h->deg == 1);
 
@@ -153,12 +153,31 @@ static void add_ideal_1(factor_base_ptr fb, uint64_t * index, uint64_t r,
   lpb: large prime bound.
 */
 static void add_ideal_u(factor_base_ptr fb, uint64_t * index, uint64_t r,
-                 mpz_poly_srcptr h, uint64_t fbb, mpz_t lpb, unsigned int t)
+                        mpz_poly_srcptr h, uint64_t fbb, mpz_t lpb,
+                        unsigned int t)
 {
   ASSERT(h->deg > 1);
 
   if (mpz_cmp_ui(lpb, pow_uint64_t(r, h->deg)) >= 0 && r <= fbb) {
     factor_base_set_ideal_u_part(fb, * index, r, h, t);
+    * index = * index + 1;
+  }
+}
+
+/*
+  Set an ideal_pr at an index. Do not forget to define LINESIEVE if you
+   want to set an ideal mod r.
+
+  fb: the factor base.
+  index: index in the factor base.
+  r: the r of the ideal (r, h).
+  fbb: factor base bound for this side.
+*/
+static void add_ideal_pr(factor_base_ptr fb, uint64_t * index, uint64_t r,
+                         uint64_t fbb, unsigned int t)
+{
+  if (r <= fbb) {
+    factor_base_set_ideal_pr(fb, * index, r, t);
     * index = * index + 1;
   }
 }
@@ -181,20 +200,34 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   uint64_t q = 2;
   uint64_t * index1 = malloc(sizeof(uint64_t) * V);
   uint64_t * indexu = malloc(sizeof(uint64_t) * V);
+  uint64_t * indexpr = malloc(sizeof(uint64_t) * V);
   gmp_randstate_t state;
   mpz_t a;
   mpz_poly_factor_list l;
 
+  mpz_t zero;
+  mpz_init(zero);
+  mpz_set_ui(zero, 0);
+
+  mpz_t lc;
+  mpz_init(lc);
+
   for (unsigned int k = 0; k < V; k++) {
     index1[k] = 0;
     indexu[k] = 0;
+    indexpr[k] = 0;
   }
 
   gmp_randinit_default(state);
   mpz_init(a);
   mpz_poly_factor_list_init(l);
 
+  mpz_set_ui(a, 2);
   for (unsigned int k = 0; k < V; k++) {
+    mpz_set(lc, mpz_poly_lc_const(f[k]));
+    if (mpz_congruent_p(lc, zero, a) != 0) {
+      add_ideal_pr(fb[k], indexpr + k, q, fbb[k], t);
+    }
     mpz_poly_factor2(l, f[k]);
     for (int i = 0; i < l->size ; i++) {
       if (l->factors[i]->f->deg == 1) {
@@ -212,8 +245,12 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   }
 
   for ( ; q <= qmax; q = getprime(q)) {
+    mpz_set_si(a, q);
     for (unsigned int k = 0; k < V; k++) {
-      mpz_set_si(a, q);
+      mpz_set(lc, mpz_poly_lc_const(f[k]));
+      if (mpz_congruent_p(lc, zero, a) != 0) {
+        add_ideal_pr(fb[k], indexpr + k, q, fbb[k], t);
+      }
       if (q <= fbb[k]) {
         mpz_poly_factor(l, f[k], a, state);
         for (int i = 0; i < l->size ; i++) {
@@ -231,9 +268,10 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   mpz_poly_factor_list_clear(l);
 
   for (unsigned int k = 0; k < V; k++) {
-    factor_base_realloc(fb[k], index1[k], indexu[k]);
+    factor_base_realloc(fb[k], index1[k], indexu[k], indexpr[k]);
   }
 
+  mpz_clear(zero);
   free(index1);
   free(indexu);
   gmp_randclear(state);

@@ -39,6 +39,17 @@ typedef s_ideal_u_t ideal_u_t[1];
 typedef s_ideal_u_t * ideal_u_ptr;
 typedef const s_ideal_u_t * ideal_u_srcptr;
 
+//pr for projective root.
+typedef struct {
+  ideal_t ideal;
+  mpz_t * Tr; // Keep mpz_t because of big coefficients.
+  unsigned char log;
+} s_ideal_pr_t;
+
+typedef s_ideal_pr_t ideal_pr_t[1];
+typedef s_ideal_pr_t * ideal_pr_ptr;
+typedef const s_ideal_pr_t * ideal_pr_srcptr;
+
 /* Ideal: (r, h) */
 
 /*
@@ -144,5 +155,35 @@ void ideal_u_clear(ideal_u_ptr ideal, unsigned int t);
   t: t is the dimension of the lattice we explore.
 */
 void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t);
+
+/* Ideal projective root and Tr */
+
+void ideal_pr_init(ideal_pr_ptr ideal);
+
+/*
+  Set an ideal_pr, compute Tr and the logarithm. The polynomial is x.
+
+  ideal: the ideal we want to set.
+  r: r is equal to the r of the ideal.
+  t: t is the dimension of the lattice we explore.
+*/
+void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t);
+
+/*
+  Delete an ideal_pr.
+
+  ideal: ideal_pr_srcptr, the ideal we want to delete.
+  t: t is the dimension of the lattice we explore.
+*/
+void ideal_pr_clear(ideal_pr_ptr ideal, unsigned int t);
+
+/*
+  Write an ideal_pr.
+
+  file: the file in which we write.
+  ideal: ideal_pr_srcptr, the ideal we want to write.
+  t: t is the dimension of the lattice we explore.
+*/
+void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t);
 
 #endif /* IDEAL_H */

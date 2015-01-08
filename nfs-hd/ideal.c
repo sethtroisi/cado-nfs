@@ -53,7 +53,7 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   mpz_poly_set(ideal->ideal->h, h);
   //if r == 0, Tr is not created.
   if ((ideal->ideal->r) == 0) {
-    ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * t - 1);
+    ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
     for (unsigned int i = 0; i < t - 1; i++) {
       mpz_init(ideal->Tr[i]);
     }
@@ -208,4 +208,60 @@ void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t)
   }
   gmp_fprintf(file, "%Zd]]\n", ideal->Tr[ideal->ideal->h->deg - 1]
               [t - (unsigned int)ideal->ideal->h->deg - 1]);
+}
+
+/* Ideal projective root and Tr */
+
+void ideal_pr_init(ideal_pr_ptr ideal)
+{
+  ideal_init(ideal->ideal);
+  ideal->log = 0;
+}
+
+
+void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t)
+{
+  mpz_poly_t h;
+  mpz_poly_init(h, -1);
+  mpz_poly_setcoeff_si(h, 1, 1);
+  mpz_poly_set(ideal->ideal->h, h);
+  mpz_poly_clear(h);
+
+  if ((ideal->ideal->r) == 0) {
+    ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+    for (unsigned int i = 0; i < t - 1; i++) {
+      mpz_init(ideal->Tr[i]);
+    }
+  }
+  for (unsigned int i = 0; i < t - 1; i++) {
+    mpz_set_ui(ideal->Tr[i], 0);
+
+  }
+  ideal->ideal->r = r;
+  ideal->log = (unsigned char)(log2((double) r));
+}
+
+void ideal_pr_clear(ideal_pr_ptr ideal, unsigned int t)
+{
+  ASSERT(ideal->ideal->r != 0);
+
+  for (unsigned int i = 0; i < t - 1; i++) {
+    mpz_clear(ideal->Tr[i]);
+  }
+  free(ideal->Tr);
+
+  ideal_clear(ideal->ideal);
+  ideal->log = 0;
+}
+
+void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
+{
+  fprintf(file, "Projective root, ");
+  ideal_fprintf(file, ideal->ideal);
+  fprintf(file, "log: %u\n", ideal->log);
+  fprintf(file, "Tr: [");
+  for (unsigned int i = 0; i < t - 2; i++) {
+    gmp_fprintf(file, "%Zd, ", ideal->Tr[i]);
+  }
+  gmp_fprintf(file, "%Zd]\n", ideal->Tr[t - 2]);
 }
