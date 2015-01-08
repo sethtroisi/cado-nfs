@@ -1879,11 +1879,11 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         for (index, (lognorm, (key, poly))) in enumerate(self.poly_heap):
             if search_poly.polyg.same_lc(poly.polyg):
                if not found is None:
-                   self.logger.error("Found more than one match for %s", search_poly)
+                   self.logger.warning("Found more than one match for %s", search_poly)
                else:
                    found = index
         if found is None:
-            self.logger.error("Could not find polynomial rank for %s", search_poly)
+            self.logger.warning("Could not find polynomial rank for %s", search_poly)
             return None
         # print("search_poly: %s" % search_poly)
         # print("Poly found in heap: %s" % self.poly_heap[found][1][1])
