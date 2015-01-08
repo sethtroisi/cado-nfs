@@ -1,9 +1,14 @@
-#include "tab_fm.h"
+#include "cado.h"
 
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>              /* for _O_BINARY */
+#include <errno.h>
+#include <math.h>
+#include <string.h>
+
+#include "macros.h"
+#include "tab_fm.h"
 
 //test equality between two fm!  check all parameters in the structure
 //fm, while fm_is_equal just see the parameter method!
@@ -136,6 +141,7 @@ int main ()
     //test fprint fscan
     char file_name[] = "/tmp/125125125test125125125";
     FILE* file = fopen (file_name, "w");
+    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
     int errf = (tabular_fm_fprint (file, tab1) == -1);
     if (errf)
 	{
@@ -144,6 +150,7 @@ int main ()
 	}
     fclose (file);
     file = fopen (file_name, "r");
+    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
     tabular_fm_t* tab3 = tabular_fm_fscan (file);
     if (tab3 == NULL)
 	{

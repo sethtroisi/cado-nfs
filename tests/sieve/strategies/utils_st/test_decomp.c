@@ -1,8 +1,12 @@
-#include "tab_decomp.h"
+#include "cado.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 
+#include "macros.h"
+#include "tab_decomp.h"
 
 int decomp_are_equals (decomp_t* t1, decomp_t* t2)
 {
@@ -70,6 +74,7 @@ int main()
     //fprint fscan
     char file_name[] = "/tmp/789789789test789789789";
     FILE* file = fopen (file_name, "w");
+    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
     int errf = tabular_decomp_fprint (file, t) ;
     if (errf < 0)
 	{
@@ -81,6 +86,7 @@ int main()
 	}
     fclose (file);
     file = fopen (file_name, "r");
+    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
     tabular_decomp_t* t2 = tabular_decomp_fscan (file);
     if (tab2 == NULL)
 	{

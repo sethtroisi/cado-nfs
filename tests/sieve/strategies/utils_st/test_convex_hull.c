@@ -1,9 +1,13 @@
-#include "convex_hull.h"
+#include "cado.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <errno.h>
+#include <string.h>
 
+#include "macros.h"
+#include "convex_hull.h"
 //#define FPRINT 1
 
 double tab_x[6] = {0,0.3,0.5,0.8,0.9,0.95};
