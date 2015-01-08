@@ -139,22 +139,19 @@ int main ()
 	    return EXIT_FAILURE;
 	}  
     //test fprint fscan
-    char file_name[] = "/tmp/125125125test125125125";
-    FILE* file = fopen (file_name, "w");
-    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
+    FILE* file = tmpfile();
+    DIE_ERRNO_DIAG(file == NULL, "tmpfile", "");
     int errf = (tabular_fm_fprint (file, tab1) == -1);
     if (errf)
 	{
-	    fprintf (stderr, "error when i try to write in %s\n", file_name);
+            fprintf (stderr, "write error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
-    fclose (file);
-    file = fopen (file_name, "r");
-    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
+    fseek(file, 0, SEEK_SET);
     tabular_fm_t* tab3 = tabular_fm_fscan (file);
     if (tab3 == NULL)
 	{
-	    fprintf (stderr, "error when i try to read %s\n", file_name);
+            fprintf (stderr, "read error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
     fclose (file);
@@ -163,7 +160,6 @@ int main ()
 	    fprintf (stderr, "error with the test(5)!!!\n");
 	    return EXIT_FAILURE;
 	}
-    system ("rm /tmp/125125125test125125125");
 
     //sort (and swap);
     //random test

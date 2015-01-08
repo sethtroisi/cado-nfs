@@ -72,25 +72,22 @@ int main()
 	    return EXIT_FAILURE;
 	}  
     //fprint fscan
-    char file_name[] = "/tmp/789789789test789789789";
-    FILE* file = fopen (file_name, "w");
-    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
+    FILE* file = tmpfile();
+    DIE_ERRNO_DIAG(file == NULL, "tmpfile", "");
     int errf = tabular_decomp_fprint (file, t) ;
     if (errf < 0)
 	{
 	    if (errf == -1)
 		fprintf (stderr, "error with your 'tab_decomp_t'\n");
 	    else //==-2
-		fprintf (stderr, "error when i try to write in %s\n", file_name);
+		fprintf (stderr, "write error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
-    fclose (file);
-    file = fopen (file_name, "r");
-    DIE_ERRNO_DIAG(file == NULL, "fopen", file_name);
+    fseek(file, 0, SEEK_SET);
     tabular_decomp_t* t2 = tabular_decomp_fscan (file);
     if (tab2 == NULL)
 	{
-	    fprintf (stderr, "error when i try to read %s\n", file_name);
+	    fprintf (stderr, "read error on temp file\n");
 	    exit (EXIT_FAILURE);
 	}
     fclose (file);
@@ -106,7 +103,6 @@ int main()
 	    fprintf (stderr, "error with the test(6)!!!\n");
 	    return EXIT_FAILURE;
 	}
-    system ("rm /tmp/789789789test789789789");
     //free
     tabular_decomp_free (t);
     tabular_decomp_free (t2);
