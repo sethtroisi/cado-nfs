@@ -1447,7 +1447,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
         si->a0 = oa[1]; si->a1 = oa[0];
         si->b0 = ob[1]; si->b1 = ob[0];
     }
-    maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
+    maxab1 = MAX(labs(si->a1), labs(si->b1) * skewness);
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
