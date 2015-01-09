@@ -54,20 +54,15 @@ void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
 #include <emmintrin.h>
 
-/* Only to avoid a possible warning (in MacOSX). */
-#ifdef memset
-#undef memset
-#endif
-#define memset las_memset
-
 /* strategy used for memset of size n:
  *
  * for n < min_stos : movaps
  * for min_stos <= n < max_cache : rep stosq
  * for n >= max_cache : movntps
  */
-  static size_t min_stos = 0x8000; /* 32 KB = max size for Intel L0 cache */
-  static size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
+extern size_t min_stos;
+extern size_t max_cache;
+
 
   /* The fastest memset for x86 64 & SSE2 */
   static inline void *las_memset(void *S, int c, size_t n) {
@@ -191,7 +186,17 @@ void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
     }
     return S;
   }
+/* Only to avoid a possible warning (in MacOSX). */
+#ifdef memset
+#undef memset
 #endif
+#define memset las_memset
+
+
+
+
+#endif
+
   
 extern void tune_las_memset();
   

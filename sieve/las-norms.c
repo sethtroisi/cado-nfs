@@ -32,6 +32,9 @@ static inline uint64_t cputicks()
   return r;
 }
 
+  size_t min_stos = 0x8000; /* 32 KB = max size for Intel L0 cache */
+  size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
+
 void tune_las_memset()
 {
     /* larger than the biggest cache on all x86 processors */
@@ -85,7 +88,7 @@ void tune_las_memset()
         }
         xput[1] = (double) 0x40 * n / ticks;
 
-        // fprintf (stderr, "n=%zu(%zx), write128=%.2f, rep stosq=%.2f\n", n, n, xput[0], xput[1]);
+        verbose_output_print(0, 4, "n=%zu(%zx), write128=%.2f, rep stosq=%.2f\n", n, n, xput[0], xput[1]);
 
         if (xput[1] > xput[0]) break;
     }
@@ -133,7 +136,7 @@ void tune_las_memset()
         }
         xput[1] = (double) n / ticks;
 
-        // fprintf (stderr, "n=%zu(%zx), rep stosq=%.2f, direct128=%.2f\n", n, n, xput[1], xput[2]);
+        verbose_output_print(0, 4, "n=%zu(%zx), rep stosq=%.2f, direct128=%.2f\n", n, n, xput[1], xput[2]);
 
         if (xput[1] > xput[2])
             break;
@@ -147,6 +150,8 @@ void tune_las_memset()
                 max_cache, max_cache);
     }
     free_aligned(S, nmax + 0x40);
+
+    ASSERT_ALWAYS(min_stos <= 0x800);   /* bug 18441: apparently las_memset buggy with min_stos >= 0x801 */
 }
 
 #else /* defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET) */
