@@ -1992,29 +1992,6 @@ static void mpz_poly_pseudo_remainder(mpz_poly_ptr R, mpz_poly_srcptr A,
   mpz_clear(d);
 }
 
-/*
-  Q = P / a, when it is known in advance that P divides a.
-  IN:
-    Q: mpz_poly_ptr, the quotient equals to P / a.
-    P: mpz_poly_srcptr, the dividend.
-    a: mpz_scrptr, the divisor.
-*/
-static void mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P,
-                                   mpz_srcptr a)
-{
-  int i;
-  mpz_t aux;
-
-  mpz_init (aux);
-  Q->deg = P->deg;
-  for (i = 0; i <= P->deg; ++i)
-  {
-    mpz_divexact (aux, P->coeff[i], a);
-    mpz_poly_setcoeff (Q, i, aux);
-  }
-  mpz_clear (aux);
-}
-
 void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
 {
   assert(p->coeff[p->deg] != 0);

@@ -1123,6 +1123,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lpb0", "threshold on the number field 0");
   param_list_decl_usage(pl, "lpb1", "threshold on the number field 1");
   param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
+  param_list_decl_usage(pl, "f1", "polynomial that defines the number field 1");
 }
 
 /*
@@ -1161,7 +1162,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
 
     /* Could also be a file */
     if ((fpl = fopen(argv[0], "r")) != NULL) {
-      param_list_read_stream(pl, fpl);
+      param_list_read_stream(pl, fpl, 0);
       fclose(fpl);
       argv++,argc--;
       continue;
