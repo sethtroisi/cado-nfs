@@ -6,6 +6,7 @@
 #include <gmp.h>
 
 #include "macros.h"
+#include "mpz_poly.h" // TODO: modify this.
 
 struct param_list_doc_s {
     char * key;
@@ -124,6 +125,36 @@ extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
 extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
 extern int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep);
+
+/*
+  Return an array r with its size t. The array is initialised with the string
+  separate by sep.
+  Usage: if sep is ".,", the string "5.5,5" gives r = [5,5,5] and t = 3.
+  Tested with sep = ".,".
+
+  pl: parameter list.
+  key: key in the parameter list.
+  r: array with the integer value contained in the key.
+  t: number of element in array.
+  sep: separators of the string.
+*/
+extern void param_list_parse_int_list_size(param_list pl, const char * key,
+                                           int ** r, unsigned int * t,
+                                           const char *sep);
+/*
+  Return a mpz_poly f. The polynomial is initialised with the string separate by
+  sep.
+  Usage: if sep is ".,", the string "5.5,5" gives f = 5+5*x^2+5*x^3.
+  Tested with sep = ".,".
+
+  pl: parameter list.
+  key: key in the parameter list.
+  f: the polynomial.
+  sep: separators of the string.
+*/
+extern void param_list_parse_mpz_poly(param_list pl, const char * key,
+                                      mpz_poly_ptr f, const char *sep);
+
 extern int param_list_parse_size_t(param_list pl, const char * key, size_t * r);
 extern int param_list_parse_switch(param_list pl, const char * key);
 

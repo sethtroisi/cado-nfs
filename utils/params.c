@@ -840,6 +840,56 @@ int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n
     return parsed;
 }
 
+void param_list_parse_int_list_size(param_list pl, const char * key , int ** r ,
+                                    unsigned int * t, const char * sep)
+{
+  char *value;
+  if (!get_assoc(pl, key, &value, NULL))
+    return ;
+  * t = 0;
+  unsigned int i = 0;
+  while (value[i] != '\0') {
+    if (strchr(sep, (int)value[i])) {
+      (* t)++;
+    }
+    i++;
+  }
+  (* t)++;
+  * r = malloc(sizeof(int) * (* t));
+  char *token;
+  for (i = 0; i < * t; i++) {
+    token = strsep (&value, sep);
+    (*r)[i] = atoi(token);
+  }
+}
+
+void param_list_parse_mpz_poly(param_list pl, const char * key,
+                               mpz_poly_ptr f, const char *sep)
+{
+  char *value;
+  if (!get_assoc(pl, key, &value, NULL))
+    return ;
+  int deg = -1;
+  int i = 0;
+  while (value[i] != '\0') {
+    if (strchr(sep, (int)value[i])) {
+      deg++;
+    }
+    i++;
+  }
+  deg++;
+  mpz_poly_init(f, deg);
+  char *token;
+  mpz_t coeff;
+  mpz_init(coeff);
+  for (i = 0; i <= deg; i++) {
+    token = strsep (&value, sep);
+    mpz_set_str(coeff, token, 10);
+    mpz_poly_setcoeff(f, i, coeff);
+  }
+  mpz_clear(coeff);
+}
+
 const char * param_list_lookup_string(param_list pl, const char * key)
 {
     char *value;
