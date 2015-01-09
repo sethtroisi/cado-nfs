@@ -71,6 +71,8 @@ extern size_t max_cache;
       register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
       __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
       void *cS = S;
+      /* eeek. Fill first and last cache lines, so as to make sure that
+       * the complete data is covered */
       *(int64_t *) ((uintptr_t) S + n - 0x10) = rc;
       *(int64_t *) ((uintptr_t) S + n - 0x08) = rc;
       *(int64_t *) ((uintptr_t) S           ) = rc;
@@ -78,12 +80,53 @@ extern size_t max_cache;
       __asm__ __volatile__ ( "pshufd $0x00, %[mc], %[mc]\n" : [mc]"+x"(mc));
       if (LIKELY (n < min_stos)) {
 	uint64_t jmp, offset;
+        /* Set n to be the address of the last byte of the last 128-bit
+         * word fully within the [S, S+n[ zone */
 	n += (uintptr_t) S - 0x10;
 	n |= 0x0f;
+        /* Set S to be the address of the last byte of the first 128-bit
+         * word intersecting the [S, S+n[ zone (actually not checking
+         * that this 128-bit word is fully within the zone).
+         */
 	S = (void *) ((uintptr_t) S | 0x0f);
+        /* Set n to be the number of bytes which are covered from the
+         * second 128-bit word to the last (inclusive, the first line
+         * being possibly out of range */
 	n -= (uintptr_t) S;
+        /* and offset is just the low byte -- a multiple of 0x10 --
+         * something between 0x00 and 0xf0, i.e.  how many 128-bit words
+         * will have to be treated separatel (compared to 16 at a time).
+         */
 	offset = (uint8_t) n;
 	S = (void *) ((uintptr_t) S + offset - 0x7f);
+        /* exactly before value S here, we will have offset/0x10 128-bit
+         * words
+         * lines to process. This will be for the first iteration only.
+         * The last 128-bit word will be at S + (n-8)*0x10, or something
+         * similar.
+         */
+        /* we'll do a computed jump. 4 bytes per opcode means we just
+         * divide 0x10*number_of_128bit_words by 4 */
+
+        /***********************************************************
+         *
+         *     FIXME FIXME FIXME FIXME
+         *
+         * This code is absolutely not acceptable. Relying on the size of
+         * the opcodes is evil, to say the least. The Intel asm has some
+         * flexibility. Maybe tomorrow an equivalent movaps with 6-byte
+         * opcode will exist. Maybe one which does movaps %[mc],
+         * -0x40(%[S]) will be provided in 3-bytes. Who knows.
+         *
+         *  This is just *NOT* the way it should be done, period.
+         *
+         *  For the moment, adding .p2align's fixes the issue with bug
+         *  18441. This is however so
+         *  fragile that I intend to either remove this code branch, or
+         *  rewrite it in a more robust way with a proper, dumb feed-in
+         *  loop, followed by an asm block, *IF AND ONLY IF* this seems
+         *  really needed.
+         */
 	offset >>= 2;
 	__asm__ __volatile__ ( "leaq 0f(%%rip), %[jmp]\n"
 			       "subq %[offset], %[jmp]\n"
@@ -93,6 +136,7 @@ extern size_t max_cache;
 			       ".p2align 4\n 1:\n"
 			       "addq $0x100, %[S]\n"
 			       "subq $0x01, %[n]\n"
+                               ".p2align 1\n"
 			       "movaps %[mc], -0x80(%[S])\n"
 			       "movaps %[mc], -0x70(%[S])\n"
 			       "movaps %[mc], -0x60(%[S])\n"
@@ -101,7 +145,8 @@ extern size_t max_cache;
 			       "movaps %[mc], -0x30(%[S])\n"
 			       "movaps %[mc], -0x20(%[S])\n"
 			       "movaps %[mc], -0x10(%[S])\n"
-			       "movdqa %[mc],      (%[S])\n"
+			       "movaps %[mc],      (%[S])\n"
+                               ".p2align 1\n"
 			       "movaps %[mc],  0x10(%[S])\n"
 			       "movaps %[mc],  0x20(%[S])\n"
 			       "movaps %[mc],  0x30(%[S])\n"

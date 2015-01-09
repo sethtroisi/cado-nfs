@@ -150,12 +150,6 @@ void tune_las_memset()
                 max_cache, max_cache);
     }
     free_aligned(S, nmax + 0x40);
-
-    /* bug 18441: apparently las_memset buggy with min_stos > 0x800 */
-    if (min_stos > 0x800) {
-        fprintf(stderr, "min_stos=0x%zx > 0x800 might be buggy (investigating)\n", min_stos);
-        ASSERT_ALWAYS(0);
-    }
 }
 
 #else /* defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET) */
