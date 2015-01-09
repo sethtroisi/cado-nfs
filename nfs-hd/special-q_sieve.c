@@ -16,8 +16,10 @@
   p = 10822639589
   n = 6
   f0 = 4598*x^6 + 4598*x^5 + 4597*x^4 + 4598*x^3 + 4595*x^2 + 4598*x + 4596
+  4596,4598,4585,4598,4597,4598,4598
   f1 = -2353645*x^6 - 2353645*x^5 + 638*x^4 - 2353645*x^3 + 4709204*x^2 -
     2353645*x + 2354921
+  2354921,-2353645,4709204,-2353645,638,-2353645,-2353645
   t = 4
   lpb = 28
   N_a = 2^40
@@ -1110,6 +1112,19 @@ void find_relation(uint64_array_t * indexes, uint64_t number_element, mpz_t *
   }
 }
 
+void declare_usage(param_list pl)
+{
+  param_list_decl_usage(pl, "H", "the sieving region");
+  param_list_decl_usage(pl, "V", "number of number field");
+  param_list_decl_usage(pl, "fbb0", "factor base bound on the number field 0");
+  param_list_decl_usage(pl, "fbb1", "factor base bound on the number field 1");
+  param_list_decl_usage(pl, "thresh0", "threshold on the number field 0");
+  param_list_decl_usage(pl, "thresh1", "threshold on the number field 1");
+  param_list_decl_usage(pl, "lpb0", "threshold on the number field 0");
+  param_list_decl_usage(pl, "lpb1", "threshold on the number field 1");
+  param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
+}
+
 /*
   Initialise the parameters of the special-q sieve.
   f: the V functions to define the number fields.
@@ -1126,123 +1141,142 @@ void find_relation(uint64_array_t * indexes, uint64_t number_element, mpz_t *
   V: number of number fields.
  */
 
-void initialise_parameters(mpz_poly_t * f, uint64_t * fbb, factor_base_t * fb,
+void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
+                           uint64_t ** fbb, factor_base_t ** fb,
                            unsigned int * t, sieving_interval_ptr H,
                            uint64_t * q_min, uint64_t * q_max,
-                           unsigned char * thresh, mpz_t * lpb, array_ptr array,
-                           mat_Z_ptr matrix, unsigned int * q_side)
-                           //, unsigned int V)
+                           unsigned char ** thresh, mpz_t ** lpb,
+                           array_ptr array, mat_Z_ptr matrix,
+                           unsigned int * q_side , unsigned int * V)
 {
-  mpz_poly_init(f[0], 6);
-  mpz_poly_init(f[1], 6);
+  param_list pl;
+  param_list_init(pl);
+  declare_usage(pl);
+  FILE * fpl;
+  char * argv0 = argv[0];
 
-  mpz_poly_setcoeff_int64(f[0], 0, 4596);
-  mpz_poly_setcoeff_int64(f[0], 1, 4598);
-  mpz_poly_setcoeff_int64(f[0], 2, 4595);
-  mpz_poly_setcoeff_int64(f[0], 3, 4598);
-  mpz_poly_setcoeff_int64(f[0], 4, 4597);
-  mpz_poly_setcoeff_int64(f[0], 5, 4598);
-  mpz_poly_setcoeff_int64(f[0], 6, 4598);
+  argv++, argc--;
+  for( ; argc ; ) {
+    if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
 
-  mpz_poly_setcoeff_int64(f[1], 0, 2354921);
-  mpz_poly_setcoeff_int64(f[1], 1, -2353645);
-  mpz_poly_setcoeff_int64(f[1], 2, 4709204);
-  mpz_poly_setcoeff_int64(f[1], 3, -2353645);
-  mpz_poly_setcoeff_int64(f[1], 4, 638);
-  mpz_poly_setcoeff_int64(f[1], 5, -2353645);
-  mpz_poly_setcoeff_int64(f[1], 6, -2353645);
+    /* Could also be a file */
+    if ((fpl = fopen(argv[0], "r")) != NULL) {
+      param_list_read_stream(pl, fpl);
+      fclose(fpl);
+      argv++,argc--;
+      continue;
+    }
 
-  /* fbb[0] = 128; // 2^7 */
-  /* fbb[1] = 128; // 2^7 */
-
-  /* fbb[0] = 256; // 2^8 */
-  /* fbb[1] = 256; // 2^8 */
-
-  /* fbb[0] = 512; // 2^9 */
-  /* fbb[1] = 512; // 2^9 */
-
-  /* fbb[0] = 1024; // 2^10 */
-  /* fbb[1] = 1024; // 2^10 */
-
-  /* fbb[0] = 2048; // 2^11 */
-  /* fbb[1] = 2048; // 2^11 */
-
-  /* fbb[0] = 4096; // 2^12 */
-  /* fbb[1] = 4096; // 2^12 */
-
-  /* fbb[0] = 8192; // 2^13 */
-  /* fbb[1] = 8192; // 2^13 */
-
-  /* fbb[0] = 16384; // 2^14 */
-  /* fbb[1] = 16384; // 2^14 */
-
-  /* fbb[0] = 32768; // 2^15 */
-  /* fbb[1] = 32768; // 2^15 */
-
-  /* fbb[0] = 65536; // 2^16 */
-  /* fbb[1] = 65536; // 2^16 */
-
-  /* fbb[0] = 131072; // 2^17 */
-  /* fbb[1] = 131072; // 2^17 */
-
-  fbb[0] = 262144; // 2^18
-  fbb[1] = 262144; // 2^18
-
-  * t = 4;
-
-  sieving_interval_init(H, * t);
-  unsigned int H0 = 19;
-  for (unsigned int i = 0; i < * t; i++) {
-    sieving_interval_set_hi(H, i, H0);
+    fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+    param_list_print_usage(pl, argv0, stderr);
+    exit (EXIT_FAILURE);
   }
+
+  param_list_parse_uint(pl, "V", V);
+  ASSERT(* V >= 2 && * V < 10);
+
+  int * r;
+  param_list_parse_int_list_size(pl, "H", &r, t, ".,");
+  ASSERT(* t >= 2);
+  sieving_interval_init(H, * t);
+  for (unsigned int i = 0; i < * t; i++) {
+    sieving_interval_set_hi(H, i, (unsigned int) r[i]);
+  }
+  free(r);
+
+  * fbb = malloc(sizeof(uint64_t * ) * (* V));
+  * thresh = malloc(sizeof(unsigned char *) * (* V));
+  * fb = malloc(sizeof(factor_base_t) * (* V));
+  * f = malloc(sizeof(mpz_poly_t) * (* V));
+  * lpb = malloc(sizeof(mpz_t) * (* V));
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [4];
+    sprintf(str, "fbb%u", i);
+    param_list_parse_uint64(pl, str, &fbb[0][i]);
+  }
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [7];
+    sprintf(str, "thresh%u", i);
+    param_list_parse_uint(pl, str, (unsigned int *) &thresh[0][i]);
+  }
+
+  for (unsigned int i = 0; i < * V; i++) {
+    factor_base_init((*fb)[i], fbb[0][i], fbb[0][i], fbb[0][i]);
+  }
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [2];
+    sprintf(str, "f%u", i);
+    param_list_parse_mpz_poly(pl, str, (*f)[i], ".,");
+  }
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [4];
+    sprintf(str, "lpb%u", i);
+    mpz_init((*lpb)[i]);
+    param_list_parse_mpz(pl, str,(*lpb)[i]);
+  }
+
+  param_list_clear(pl);
+
   uint64_t number_element = 0;
   sieving_interval_number_element(&number_element, H);
+  ASSERT(number_element >= 6);
 
   * q_min = 134217757;
-  * q_max = 134219557;
-
-
-  thresh[0] = 62;
-  thresh[1] = 62;
-
-  mpz_init(lpb[0]);
-  mpz_init(lpb[1]);
-  mpz_set_ui(lpb[0], 268435456);
-  mpz_set_ui(lpb[1], 268435456);
+  * q_max = 134217758;
+  /* * q_max = 134219557; */
 
   array_init(array, number_element);
 
   mat_Z_init(matrix, * t, * t);
 
   * q_side = 1;
-
-  factor_base_init(fb[0], fbb[0], fbb[0]);
-  factor_base_init(fb[1], fbb[1], fbb[1]);
 }
 
 /*
   The main.
 */
-int main()
+int main(int argc, char * argv[])
 {
-  unsigned int V = 2;
-  mpz_poly_t * f = malloc(sizeof(mpz_poly_t) * V);
-  uint64_t * fbb = malloc(sizeof(uint64_t) * V);
+  unsigned int V;
+  mpz_poly_t * f;
+  uint64_t * fbb;
   unsigned int t;
   sieving_interval_t H;
   uint64_t q_min;
   uint64_t q_max;
   unsigned int q_side;
-  unsigned char * thresh = malloc(sizeof(unsigned char) * V);
-  mpz_t * lpb = malloc(sizeof(mpz_t) * V);
+  unsigned char * thresh;
+  mpz_t * lpb;
   array_t array;
   mat_Z_t matrix;
-  factor_base_t * fb = malloc(sizeof(factor_base_t) * V);
+  factor_base_t * fb;
   uint64_t q;
-  uint64_array_t * indexes = malloc(sizeof(uint64_array_t) * V);
 
-  initialise_parameters(f, fbb, fb, &t, H, &q_min, &q_max, thresh, lpb,
-                        array, matrix, &q_side);
+  initialise_parameters(argc, argv, &f, &fbb, &fb, &t, H, &q_min, &q_max,
+                        &thresh, &lpb, array, matrix, &q_side, &V);
+
+#ifdef PRINT_PARAMETERS
+  printf("t = %u\n", t);
+  printf("H =\n");
+  sieving_interval_fprintf(stdout, H);
+  printf("V = %u\n", V);
+  printf("fbb0 = %" PRIu64 "\n", fbb[0]);
+  printf("fbb1 = %" PRIu64 "\n", fbb[1]);
+  printf("thresh0 = %u\n", (unsigned int)thresh[0]);
+  printf("thresh1 = %u\n", (unsigned int)thresh[1]);
+  gmp_printf("lpb0 = %Zd\n", lpb[0]);
+  gmp_printf("lpb1 = %Zd\n", lpb[1]);
+  printf("f0 = ");
+  mpz_poly_fprintf(stdout, f[0]);
+  printf("f1 = ");
+  mpz_poly_fprintf(stdout, f[1]);
+#endif // PRINT_PARAMETERS
+
+  uint64_array_t * indexes = malloc(sizeof(uint64_array_t) * V);
 
   double ** pre_compute = malloc(sizeof(double * ) * V);
   for (unsigned int i = 0; i < V; i++) {
@@ -1285,6 +1319,7 @@ int main()
     mpz_set_si(a, q);
     mpz_poly_factor(l, f[q_side], a, state);
     for (int i = 0; i < l->size ; i++) {
+      //Only deal with special-q of degre
       if (l->factors[i]->f->deg == 1) {
         ideal_1_set_part(special_q, q, l->factors[i]->f, t);
         printf("# Special-q: q: %" PRIu64 ", g: ", q);
@@ -1297,6 +1332,11 @@ int main()
 
         sec = seconds();
         sec_tot = sec;
+
+#ifdef TRACE_POS
+        fprintf(file, "Mq:\n");
+        mat_Z_fprintf(file, matrix);
+#endif
 
         //LLL part
         build_Mq_ideal_1(matrix, special_q);
