@@ -32,8 +32,8 @@ static inline uint64_t cputicks()
   return r;
 }
 
-  size_t min_stos = 0x8000; /* 32 KB = max size for Intel L0 cache */
-  size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
+size_t min_stos = 0x8000; /* 32 KB = max size for Intel L0 cache */
+size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
 
 void tune_las_memset()
 {
@@ -151,7 +151,11 @@ void tune_las_memset()
     }
     free_aligned(S, nmax + 0x40);
 
-    ASSERT_ALWAYS(min_stos <= 0x800);   /* bug 18441: apparently las_memset buggy with min_stos >= 0x801 */
+    /* bug 18441: apparently las_memset buggy with min_stos > 0x800 */
+    if (min_stos > 0x800) {
+        fprintf(stderr, "min_stos=0x%zx > 0x800 might be buggy (investigating)\n", min_stos);
+        ASSERT_ALWAYS(0);
+    }
 }
 
 #else /* defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET) */
