@@ -64,7 +64,9 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
 }
 
 void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
-                            sieving_interval_srcptr H, uint64_t number_element)
+                            sieving_interval_srcptr H,
+                            MAYBE_UNUSED uint64_t number_element)
+
 {
 #ifndef NDEBUG
   ASSERT(v->dim == H->t);
@@ -104,7 +106,7 @@ void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
 
 void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
                               sieving_interval_srcptr H,
-                              uint64_t number_element)
+                              MAYBE_UNUSED uint64_t number_element)
 {
 #ifndef NDEBUG
   ASSERT(v->dim == H->t);

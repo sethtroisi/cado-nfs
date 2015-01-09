@@ -239,6 +239,9 @@ void mat_Z_LLL(mat_Z_ptr C, mat_Z_srcptr A)
 
   LLL(det, B, NULL, a, b);
 
+  ASSERT(B.NumRows == (int)C->NumRows);
+  ASSERT(B.NumCols == (int)C->NumCols);
+
   for (unsigned int row = 1; row < A->NumRows + 1; row++) {
     for (unsigned int col = 1; col < A->NumCols + 1; col++) {
       mpz_set(C->coeff[row][col], B.coeff[row][col]);

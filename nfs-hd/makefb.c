@@ -271,9 +271,11 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
     factor_base_realloc(fb[k], index1[k], indexu[k], indexpr[k]);
   }
 
+  mpz_clear(lc);
   mpz_clear(zero);
   free(index1);
   free(indexu);
+  free(indexpr);
   gmp_randclear(state);
   mpz_clear(a);
   getprime(0);
