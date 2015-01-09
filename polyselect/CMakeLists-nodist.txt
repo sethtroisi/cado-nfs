@@ -4,7 +4,7 @@ add_executable (rotate_all rotate_all.c)
 add_executable (sopt sopt.c)
 add_executable (dlpolyselect dlpolyselect.c)
 target_link_libraries (dlpolyselect polyselect_common utils)
-add_executable (twoquadratics twoquadratics.c)
+add_executable (twoquadratics EXCLUDE_FROM_ALL twoquadratics.c)
 target_link_libraries (twoquadratics polyselect_common utils)
 
 target_link_libraries(ropt polyselect_common utils m ${pthread_libs})
@@ -12,7 +12,7 @@ target_link_libraries (rotate polyselect_common utils)
 target_link_libraries (rotate_all polyselect_common utils)
 target_link_libraries (sopt polyselect_common utils)
 
-add_executable (twocubics twocubics.c polyselect2l_str.c polyselect2l_arith.c ${ropt_sources})
+add_executable (twocubics EXCLUDE_FROM_ALL twocubics.c polyselect2l_str.c polyselect2l_arith.c ${ropt_sources})
 target_link_libraries (twocubics polyselect_common utils ${pthread_libs})
 
 # vim: set ft=cmake:

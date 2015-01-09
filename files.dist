@@ -268,9 +268,6 @@ linalg/bwc/balancing_mpi_source.c
 linalg/bwc/balancing_mpi_source.h
 linalg/bwc/balancing_workhorse.c
 linalg/bwc/balancing_workhorse.h
-linalg/bwc/bcast-file.c
-linalg/bwc/bench.c
-linalg/bwc/build.c
 linalg/bwc/bw-common.c
 linalg/bwc/bw-common.h
 linalg/bwc/bwc-ptrace.m
@@ -378,10 +375,8 @@ linalg/bwc/raw_matrix_u32.h
 linalg/bwc/rolling.c
 linalg/bwc/rolling.h
 linalg/bwc/secure.c
-linalg/bwc/short_matmul.c
 linalg/bwc/split.c
 linalg/bwc/strassen-thresholds.h
-linalg/bwc/spmv_test.c
 linalg/bwc/worker-threads.c
 linalg/bwc/worker-threads.h
 linalg/bwc/xdotprod.c
@@ -543,10 +538,9 @@ polyselect/polyselect2l_arith.c
 polyselect/polyselect2l_arith.h
 polyselect/polyselect2l_str.c
 polyselect/polyselect2l_str.h
+polyselect/polyselect_ropt.c
 polyselect/rho.c
 polyselect/rho.h
-polyselect/rootsieve.c
-polyselect/rootsieve.h
 polyselect/ropt.c
 polyselect/ropt.h
 polyselect/ropt_arith.c

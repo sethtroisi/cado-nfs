@@ -244,6 +244,8 @@ pthread_primes_producer (void *ptvoid) {
   } while (i != j);
 
   pthread_exit (NULL);
+
+  return NULL;
 }
 
 /* This function takes a primes buffer and generates the corresponding
@@ -606,7 +608,7 @@ main (int argc, char *argv[])
             continue;
         FILE *f;
         if ((f = fopen(argv[0], "r")) != NULL) {
-            param_list_read_stream(pl, f);
+            param_list_read_stream(pl, f, 0);
             fclose(f);
             argv++,argc--;
             continue;

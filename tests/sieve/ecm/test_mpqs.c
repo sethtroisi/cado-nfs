@@ -16,8 +16,9 @@ main (int argc, const char *argv[])
   if (argc > 1)
     bits = atoi (argv[1]);
   else
-    /* generate a random size between 64 and 128 bits */
-    bits = 64 + (rand () % 65);
+    /* generate a random size between one and two words */
+#define BITS_PER_ULONG (8 * sizeof(unsigned long))
+    bits = BITS_PER_ULONG + (rand () % (BITS_PER_ULONG + 1));
   printf ("bits=%lu iter=%lu\n", bits, iter);
 
   mpz_init (N);
@@ -30,6 +31,8 @@ main (int argc, const char *argv[])
           mpz_nextprime (N, N);
           mpz_urandomb (f, state, (bits + 1) / 2);
           mpz_nextprime (f, f);
+          if (mpz_cmp (N, f) == 0)
+            continue;
           mpz_mul (N, N, f);
         }
       while (mpz_sizeinbase (N, 2) != bits);

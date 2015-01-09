@@ -346,6 +346,15 @@ void mpz_poly_clear(mpz_poly_ptr f)
   f->deg = -1;
 }
 
+/* Return 0 if f[i] is zero, -1 is f[i] is negative and +1 if f[i] is positive,
+   like mpz_sgn function. */
+static inline int mpz_poly_coeff_sgn (mpz_poly_srcptr f, int i)
+{
+  if (i >= f->alloc)
+    return 0;
+  else
+    return mpz_sgn (f->coeff[i]);
+}
 
 /* removed mpz_poly_set_deg, as for all purposes there is no reason to
  * not use the more robust mpz_poly_cleandeg */
@@ -354,7 +363,7 @@ void mpz_poly_clear(mpz_poly_ptr f)
 void mpz_poly_cleandeg(mpz_poly_ptr f, int deg)
 {
   ASSERT(deg >= -1);
-  while ((deg >= 0) && (mpz_cmp_ui(f->coeff[deg], 0)==0))
+  while ((deg >= 0) && (mpz_poly_coeff_sgn (f, deg)==0))
     deg--;
   f->deg = deg;
 }
@@ -505,6 +514,40 @@ void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
     else
       gmp_fprintf (fp, "%Zd*x^%d", f->coeff[i], i);
   fprintf (fp, "\n");
+}
+
+/* Print f of degree d with the following format
+    f0<sep>f1<sep>...<sep>fd\n
+   Print only '\n' if f = 0 (ie deg(f) = -1)
+*/
+void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep)
+{
+  if (f->deg >= 0)
+  {
+    gmp_fprintf (fp, "%Zd", f->coeff[0]);
+    for (int i = 1; i <= f->deg; i++)
+      gmp_fprintf (fp, "%c%Zd", sep, f->coeff[i]);
+  }
+  fprintf (fp, "\n");
+}
+
+/* Print f of degree d with the following format
+    <pre><letter>0: f0\n
+    <pre><letter>1: f1\n
+    ...
+    <pre><letter>d: fd\n
+   Print nothing if f = 0 (ie deg(f) = -1)
+*/
+void
+mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f, const char letter,
+                              const char *prefix)
+{
+  for (int i = 0; i <= f->deg; i++)
+  {
+    if (prefix)
+      fputs (prefix, fp);
+    gmp_fprintf (fp, "%c%d: %Zd\n", letter, i, f->coeff[i]);
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -756,6 +799,22 @@ mpz_poly_mul_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
   for (i = 0; i <= P->deg; ++i)
     {
       mpz_mul (aux, P->coeff[i], a);
+      mpz_poly_setcoeff (Q, i, aux);
+    }
+  mpz_clear (aux);
+}
+
+/* Set Q=P/a, where a is an mpz_t. Assume a divides the content of P (the
+   division is done with mpz_divexact). Otherwise the result is not correct. */
+void
+mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
+{
+  mpz_t aux;
+  mpz_init (aux);
+  Q->deg = P->deg;
+  for (int i = 0; i <= P->deg; ++i)
+    {
+      mpz_divexact (aux, P->coeff[i], a);
       mpz_poly_setcoeff (Q, i, aux);
     }
   mpz_clear (aux);
@@ -1019,6 +1078,34 @@ void mpz_poly_eval(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x) {
     mpz_add(res, res, f->coeff[i]);
   }
 }
+
+/* Set res=f(x) where x is an unsigned long. */
+void mpz_poly_eval_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x)
+{
+  int d = f->deg;
+
+  mpz_set (res, f->coeff[d]);
+  for (int i = d - 1; i >= 0; i--)
+  {
+    mpz_mul_ui (res, res, x);
+    mpz_add (res, res, f->coeff[i]);
+  }
+}
+
+/* Set res=f'(x), where x is an unsigned long */
+void
+mpz_poly_eval_diff_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x)
+{
+  int d = f->deg;
+
+  mpz_mul_ui (res, f->coeff[d], d);
+  for (int i = d - 1; i >= 1; i--)
+    {
+      mpz_mul_ui (res, res, x);
+      mpz_addmul_ui (res, f->coeff[i], i); /* res <- res + i*f[i] */
+    }
+}
+
 
 /* Set res=f(x) (mod m).  Assume res and x are different variables. */
 /* Coefficients of f(x) need not be reduced mod m.

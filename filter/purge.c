@@ -420,6 +420,7 @@ static void *search_chunk_max_cliques (void *pt) {
     }
   }
   pthread_exit (NULL);
+  return NULL;
 }
 
 #ifdef HAVE_SYNC_FETCH
@@ -461,6 +462,7 @@ static void *compute_sum2_index (void *pt) {
   }
   sum2_pth->rels_found = rels_found;
   pthread_exit (NULL);
+  return NULL;
 }
 #endif
 

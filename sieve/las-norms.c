@@ -32,6 +32,9 @@ static inline uint64_t cputicks()
   return r;
 }
 
+size_t min_stos = 0x8000; /* 32 KB = max size for Intel L0 cache */
+size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
+
 void tune_las_memset()
 {
     /* larger than the biggest cache on all x86 processors */
@@ -85,7 +88,7 @@ void tune_las_memset()
         }
         xput[1] = (double) 0x40 * n / ticks;
 
-        // fprintf (stderr, "n=%zu(%zx), write128=%.2f, rep stosq=%.2f\n", n, n, xput[0], xput[1]);
+        verbose_output_print(0, 4, "n=%zu(%zx), write128=%.2f, rep stosq=%.2f\n", n, n, xput[0], xput[1]);
 
         if (xput[1] > xput[0]) break;
     }
@@ -133,7 +136,7 @@ void tune_las_memset()
         }
         xput[1] = (double) n / ticks;
 
-        // fprintf (stderr, "n=%zu(%zx), rep stosq=%.2f, direct128=%.2f\n", n, n, xput[1], xput[2]);
+        verbose_output_print(0, 4, "n=%zu(%zx), rep stosq=%.2f, direct128=%.2f\n", n, n, xput[1], xput[2]);
 
         if (xput[1] > xput[2])
             break;
@@ -1438,7 +1441,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
         si->a0 = oa[1]; si->a1 = oa[0];
         si->b0 = ob[1]; si->b1 = ob[0];
     }
-    maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
+    maxab1 = MAX(labs(si->a1), labs(si->b1) * skewness);
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */

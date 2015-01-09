@@ -95,8 +95,12 @@ scripts/cluster/bwc-cluster-oar.sh
 scripts/cluster/bwc-fetchfiles.pl
 scripts/cluster/oarsh_wrap.sh
 scripts/cluster/trampoline-git.sh
+linalg/bwc/bcast-file.c
+linalg/bwc/short_matmul.c
+linalg/bwc/spmv_test.c
+linalg/bwc/bench_matcache.c
+linalg/bwc/build_matcache.c
 linalg/bwc/test_hello.c
-linalg/bwc/shell.c
 linalg/bwc/tool.sh
 misc/README
 misc/cachesim.c

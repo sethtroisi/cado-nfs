@@ -1771,10 +1771,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
     const size_t together = sizeof(__m128i);
     __m128i ones128 = (__m128i) {-1,-1};
-    const __m128i * restrict SS_lw = (const __m128i *)SS;
+    const __m128i * SS_lw = (const __m128i *)SS;
 #else
     const int together = sizeof(unsigned long);
-    const unsigned long * restrict SS_lw = (const unsigned long *)SS;
+    const unsigned long * SS_lw = (const unsigned long *)SS;
 #endif
 
     for ( ; (unsigned char *) SS_lw < SS + BUCKET_REGION; SS_lw++) {
@@ -2651,7 +2651,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Could also be a file */
         FILE * f;
         if ((f = fopen(argv[0], "r")) != NULL) {
-            param_list_read_stream(pl, f);
+            param_list_read_stream(pl, f, 0);
             fclose(f);
             argv++,argc--;
             continue;

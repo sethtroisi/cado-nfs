@@ -9,6 +9,10 @@ macro(run_test NAME DSTFILE)
     # current source and binary directories. The ctest program then builds
     # the DSTFILE binary by calling cmake (which we suppress here) and make,
     # and then runs DSTFILE
+    set(binary ${DSTFILE})
+    if (${DSTFILE} MATCHES ".sh$")
+        set(binary env bash ${DSTFILE})
+    endif (${DSTFILE} MATCHES ".sh$")
     add_test ("${NAME}" "${CMAKE_CTEST_COMMAND}"
               # Specify the source and build directories for the Cmake/make
               # steps that gets executed by CTest (except we suppress the
@@ -59,7 +63,7 @@ macro(run_test NAME DSTFILE)
               --output-on-failure
 
               # And finally the binary that should be run as the actual test
-              --test-command "${DSTFILE}" ${ARGN})
+              --test-command ${binary} ${ARGN})
 endmacro(run_test NAME DSTFILE)
 
 # The SRCFILE parameter to this macro is the file name of the source file to
@@ -79,7 +83,7 @@ endmacro(build_and_run_test)
 
 if(DEFINED ENV{CHECKS_EXPENSIVE})
     run_test(full_c59 ${CADO_NFS_SOURCE_DIR}/factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2)
-    add_dependencies(check freerel makefb las dup1 dup2 purge merge merge-dl replay replay-dl sm reconstructlog-dl characters bwc_full plingen_pz sqrt)
+    add_dependencies(check polyselect2l polyselect_ropt freerel makefb las dup1 dup2 purge merge merge-dl replay replay-dl sm reconstructlog-dl characters bwc_full plingen_pz sqrt)
     find_program(MAGMA magma)
     if (MAGMA)
         add_dependencies(check debug_renumber)

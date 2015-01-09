@@ -147,11 +147,6 @@ set_property(TARGET random_matrix PROPERTY COMPILE_DEFINITIONS WANT_MAIN)
 
 target_link_libraries(random_matrix utils m)
 
-add_executable(bcast-file ${EXCLUDE_FROM_RELEASE_BUILD} bcast-file.c)
-set_target_properties(bcast-file PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
-
 ### bwc_mpfq
 
 set(bwc_abases u64k1 u64k2 u64k4)
@@ -291,23 +286,29 @@ if(ENABLE_SHARED)
 endif(ENABLE_SHARED)
 ### end matmul_mf
 
-macro(bwc_program v)
+macro(bwc_program_base v)
     add_executable(${v} ${ARGN})
-    install(TARGETS ${v} RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
     set_target_properties(${v} PROPERTIES
             LINKER_LANGUAGE CXX
             COMPILE_FLAGS "--mpi"
             LINK_FLAGS "--mpi")
         # -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${v} bwc_base)
+endmacro(bwc_program_base v)
+
+# The macro bwc_program_extra is mostly used by the binaries specific to
+# the git tree.
+macro(bwc_program_extra v)
+    bwc_program_base(${v} EXCLUDE_FROM_ALL ${ARGN})
+endmacro(bwc_program_extra)
+
+macro(bwc_program v)
+    bwc_program_base(${v} ${ARGN})
+    install(TARGETS ${v} RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 endmacro(bwc_program)
 
 bwc_program(acollect acollect.c)
 bwc_program(split split.c)
-bwc_program(build build.c)
-target_link_libraries(build matmul_mf)
-bwc_program(bench bench.c worker-threads.c)
-target_link_libraries(bench matmul_mf)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 bwc_program(prep prep.c xymats.c ../gauss.c)
 bwc_program(krylov krylov.c xymats.c xdotprod.c)
@@ -315,7 +316,6 @@ bwc_program(dispatch dispatch.c xymats.c xdotprod.c)
 bwc_program(mksol mksol.c xymats.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
-bwc_program(spmv_test spmv_test.c)
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION ${BINSUFFIX}/linalg/bwc)
 
@@ -335,9 +335,6 @@ add_dependencies(lingen gf2x-build)
 set_target_properties(lingen PROPERTIES
     COMPILE_FLAGS "--mpi ${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "--mpi ${OpenMP_CXX_FLAGS}")
-
-add_executable(short_matmul ${EXCLUDE_FROM_RELEASE_BUILD} short_matmul.c)
-target_link_libraries(short_matmul bwc_base)
 
 add_executable(cleanup cleanup.c ../blockmatrix.c ../bit_matrices.c
     ../gauss.c)

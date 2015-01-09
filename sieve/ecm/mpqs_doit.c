@@ -14,9 +14,9 @@
 #include <math.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <float.h> /* for DBL_MAX */
 #include "gmp.h"
+#include "timing.h"
 #include "macros.h"
 #include "mod_ul_default.h"
 
@@ -31,16 +31,6 @@ static unsigned char isprime_table[] = {
 
 static const size_t isprime_table_size = 
     sizeof(isprime_table) / sizeof(isprime_table[0]);
-
-static long
-cputime ()
-{
-  struct rusage rus;
-
-  getrusage (RUSAGE_SELF, &rus);
-  /* This overflows a 32 bit signed int after 2147483s = 24.85 days */
-  return rus.ru_utime.tv_sec * 1000L + rus.ru_utime.tv_usec / 1000L;
-}
 
 static int
 jacobi (unsigned long a, unsigned long b)
@@ -329,7 +319,10 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
           /* we don't check for primality of R > B^2 since it is rare */
         }
     }
-  ASSERT(R > B);
+  if (R == 1)
+    res = 1;
+  else
+    ASSERT(R > B);
  end:
   mpz_clear (r);
   return res;
@@ -596,7 +589,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   /* assume N0 is odd */
   ASSERT_ALWAYS (mpz_fdiv_ui (N0, 2) == 1);
 
-  init_time -= cputime ();
+  init_time -= milliseconds ();
 
   Nbits = mpz_sizeinbase (N0, 2);
 
@@ -604,7 +597,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
      Note: when M=2^15, setting M=1<<15 statically is faster with gcc. */
   if (Nbits < 56)
     {
-      M = 10;
+      M = 1 << 10;
       ncol = 40;
     }
   else
@@ -692,17 +685,18 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
-  init_time += cputime ();
+  init_time += milliseconds ();
 
   int pols = 0;
   while (nrel < ncolw + WANT_EXCESS) {
-  sieve_time -= cputime ();
+  sieve_time -= milliseconds ();
   do
     mpz_nextprime (sqrta, sqrta);
   while (mpz_jacobi (N, sqrta) != 1);
   /* we want N to be a square mod a: N = b^2 (mod a) */
   unsigned long aui = mpz_get_ui (sqrta);
-  mpz_set_ui (a, aui * aui);
+  mpz_mul (a, sqrta, sqrta);
+  ASSERT(mpz_fits_ulong_p (a));
   /* we want b^2-N divisible by a */
   k = tonelli_shanks (mpz_fdiv_ui (N, aui), aui);
   /* we want b = k + sqrta*t: b^2 = k^2 + 2*k*sqrta*t (mod a), thus
@@ -721,7 +715,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   if (mpz_tstbit (b, 0) == 1)
     mpz_sub (b, b, a);
 #ifdef TRACE
-  gmp_printf ("a=%Zd\nb=%Zd\n", a, b);
+  gmp_printf ("a=%Zd b=%Zd\n", a, b);
 #endif
   unsigned long aa, inva, sqrtaa;
   ASSERT (mpz_fits_ulong_p (a));
@@ -739,8 +733,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   if (pols++ == 0)
     {
       double Nd = mpz_get_d (N), ad = (double) aa;
-      /* initialize radix and Logp[]: we want radix^255 = maxnorm ~ N/a */
-      maxnorm = mpz_get_d (N) / mpz_get_d (a);
+      /* initialize radix and Logp[]: we want radix^255 = maxnorm ~ a*M^2 */
+      maxnorm = mpz_get_d (a) * (double) M * (double) M;
       radix = pow (maxnorm, 1.0 / 255.0);
       logradix = log (radix);
 #ifdef TRACE
@@ -821,7 +815,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         }
     }
 
-  st = cputime ();
+  st = milliseconds ();
   sieve_time += st;
   check_time -= st;
 
@@ -854,15 +848,15 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
             }
         }
   end_check:
-  check_time += cputime ();
+  check_time += milliseconds ();
   }
   if (verbose)
     printf ("%ld rels with %d polynomials: %f per poly\n",
             nrel, pols, (double) nrel / (double) pols);
 
-  gauss_time -= cputime ();
+  gauss_time -= milliseconds ();
   gauss (f, Mat, nrel, wrel, ncol + 1, X, N, N0, verbose);
-  st = cputime ();
+  st = milliseconds ();
   gauss_time += st;
   total_time = st;
 

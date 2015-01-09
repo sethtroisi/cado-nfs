@@ -7,8 +7,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 #include <gmp.h>
 #include <time.h>
 #include <math.h>
@@ -66,7 +64,7 @@ int main(int argc, char *argv[])
 	/* Could also be a file */
 	FILE *f;
 	if ((f = fopen(argv[0], "r")) != NULL) {
-	    param_list_read_stream(pl, f);
+	    param_list_read_stream(pl, f, 0);
 	    fclose(f);
 	    argv++, argc--;
 	    continue;

@@ -17,7 +17,6 @@
    the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
    Boston, MA 02110-1301, USA.
 */
-#define _XOPEN_SOURCE   /* lrand48 and friends */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -26,6 +25,15 @@
 #include "gf2x.h"
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x_mul1.h"
+
+unsigned long longrand()
+{
+#if RAND_MAX < LONG_MAX
+    return rand() * ((long)RAND_MAX+1) + rand();
+#else
+    return rand();
+#endif
+}
 
 /* check gf2x_mul_1_n against gf2x_addmul_1_n */
 static void
@@ -38,13 +46,13 @@ check_gf2x_mul_1_n (long sb)
   unsigned long a;
 
   for (i = 0; i < sb; i++)
-    bp[i] = lrand48 ();
-  a = lrand48 ();
+    bp[i] = longrand ();
+  a = longrand ();
 
   /* using gf2x_mul_1_n */
   /* put initial noise into cp */
   for (i = 0; i < sb; i++)
-    cp[i] = lrand48 ();
+    cp[i] = longrand ();
   cp[sb] = gf2x_mul_1_n (cp, bp, sb, a);
 
   /* using gf2x_addmul_1_n */
