@@ -287,6 +287,8 @@ void init_norm_1(array_ptr array, double * pre_compute,
                  sieving_interval_srcptr H, mat_Z_srcptr matrix,
                  mpz_poly_srcptr f, ideal_1_srcptr ideal, int special_q)
 {
+  ASSERT(special_q == 0 || special_q == 1);
+
   int64_vector_t vector;
   int64_vector_init(vector, H->t);
   int64_vector_setcoordinate(vector, 0, -(int64_t)H->h[0] - 1);
@@ -1124,6 +1126,9 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lpb1", "threshold on the number field 1");
   param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
   param_list_decl_usage(pl, "f1", "polynomial that defines the number field 1");
+  param_list_decl_usage(pl, "q_min", "minimum of the special-q");
+  param_list_decl_usage(pl, "q_max", "maximum of the special-q");
+  param_list_decl_usage(pl, "q_side", "side of the special-q");
 }
 
 /*
@@ -1195,16 +1200,13 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     char str [4];
     sprintf(str, "fbb%u", i);
     param_list_parse_uint64(pl, str, &fbb[0][i]);
+    factor_base_init((*fb)[i], fbb[0][i], fbb[0][i], fbb[0][i]);
   }
 
   for (unsigned int i = 0; i < * V; i++) {
     char str [7];
     sprintf(str, "thresh%u", i);
     param_list_parse_uint(pl, str, (unsigned int *) &thresh[0][i]);
-  }
-
-  for (unsigned int i = 0; i < * V; i++) {
-    factor_base_init((*fb)[i], fbb[0][i], fbb[0][i], fbb[0][i]);
   }
 
   for (unsigned int i = 0; i < * V; i++) {
@@ -1218,23 +1220,25 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     sprintf(str, "lpb%u", i);
     mpz_init((*lpb)[i]);
     param_list_parse_mpz(pl, str,(*lpb)[i]);
+    ASSERT(mpz_cmp_ui((*lpb)[i], fbb[0][i]) >= 0);
   }
-
-  param_list_clear(pl);
 
   uint64_t number_element = 0;
   sieving_interval_number_element(&number_element, H);
   ASSERT(number_element >= 6);
 
-  * q_min = 134217757;
-  * q_max = 134217758;
-  /* * q_max = 134219557; */
+  param_list_parse_int(pl, "q_side", (int *)q_side);
+  ASSERT(* q_side < * V);
+  param_list_parse_uint64(pl, "q_min", q_min);
+  ASSERT(* q_min > fbb[0][* q_side]);
+  param_list_parse_uint64(pl, "q_max", q_max);
+  ASSERT(* q_min < * q_max);
+
+  param_list_clear(pl);
 
   array_init(array, number_element);
 
   mat_Z_init(matrix, * t, * t);
-
-  * q_side = 1;
 }
 
 /*
