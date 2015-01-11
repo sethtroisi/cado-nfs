@@ -331,6 +331,9 @@ void init_norm_1(array_ptr array, double * pre_compute,
 
 /*
   Compute Tqr for an ideal (r, h) with deg(h) = 1.
+  In fact, Tqr is not just computed. For example, if Tqr[0] != 0, the output is
+   equal to [-Tqr[0]^{-1} mod r = a, a * Tqr[1] mod r, …].
+  The PRINT_TQR mode print the true Tqr matrix.
 
   Tqr: Tqr is just a line in this case.
   matrix: MqLLL.
@@ -345,6 +348,13 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
   unsigned int i = 0;
   Tqr[i] = 0;
   //Tqr = Mq,1 - Tr * Mq,2.
+
+#ifdef PRINT_TQR
+  mpz_t invert;
+  mpz_init(invert);
+  printf("Tqr = [");
+#endif // PRINT_TQR
+
   for (unsigned int j = 0; j < t; j++) {
     mpz_set(tmp, matrix->coeff[1][j + 1]);
     for (unsigned int k = 0; k < t - 1; k++) {
@@ -352,25 +362,52 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
       mpz_submul(tmp, ideal->Tr[k],
                  matrix->coeff[k + 2][j + 1]);
     }
+
     if (Tqr[i] == 0) {
       mpz_mod_ui(tmp, tmp, ideal->ideal->r);
       if (mpz_cmp_ui(tmp, 0) != 0) {
         mpz_invert_ui(tmp, tmp, ideal->ideal->r);
+
+#ifdef PRINT_TQR
+        mpz_set(invert, tmp);
+        gmp_printf("1, ", invert);
+#endif // PRINT_TQR
+
         mpz_mul_si(tmp, tmp, -1);
         mpz_mod_ui(tmp, tmp, ideal->ideal->r);
         ASSERT(mpz_cmp_ui(tmp, ideal->ideal->r) <= 0);
         Tqr[j] = mpz_get_ui(tmp);
         i = j;
       } else {
+
+#ifdef PRINT_TQR
+        printf("0, ");
+#endif // PRINT_TQR
+
         Tqr[j] = 0;
       }
     } else {
+
+#ifdef PRINT_TQR
+      mpz_t tmp2;
+      mpz_init(tmp2);
+      mpz_mul(tmp2, tmp, invert);
+      mpz_mod_ui(tmp2, tmp2, ideal->ideal->r);
+      gmp_printf("%Zd, ", tmp2);
+      mpz_clear(tmp2);
+#endif // PRINT_TQR
+
       mpz_mul_ui(tmp, tmp, Tqr[i]);
       mpz_mod_ui(tmp, tmp, ideal->ideal->r);
       Tqr[j] = mpz_get_ui(tmp);
     }
   }
   mpz_clear(tmp);
+
+#ifdef PRINT_TQR
+  printf("\b\b]\n");
+  mpz_clear(invert);
+#endif // PRINT_TQR
 }
 
 /*
@@ -1149,7 +1186,7 @@ void declare_usage(param_list pl)
 
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
                            uint64_t ** fbb, factor_base_t ** fb,
-                           unsigned int * t, sieving_interval_ptr H,
+                           sieving_interval_ptr H,
                            uint64_t * q_min, uint64_t * q_max,
                            unsigned char ** thresh, mpz_t ** lpb,
                            array_ptr array, mat_Z_ptr matrix,
@@ -1181,11 +1218,12 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   param_list_parse_uint(pl, "V", V);
   ASSERT(* V >= 2 && * V < 10);
 
+  unsigned int t;
   int * r;
-  param_list_parse_int_list_size(pl, "H", &r, t, ".,");
-  ASSERT(* t >= 2);
-  sieving_interval_init(H, * t);
-  for (unsigned int i = 0; i < * t; i++) {
+  param_list_parse_int_list_size(pl, "H", &r, &t, ".,");
+  ASSERT(t >= 2);
+  sieving_interval_init(H, t);
+  for (unsigned int i = 0; i < t; i++) {
     sieving_interval_set_hi(H, i, (unsigned int) r[i]);
   }
   free(r);
@@ -1238,7 +1276,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
 
   array_init(array, number_element);
 
-  mat_Z_init(matrix, * t, * t);
+  mat_Z_init(matrix, t, t);
 }
 
 /*
@@ -1249,7 +1287,6 @@ int main(int argc, char * argv[])
   unsigned int V;
   mpz_poly_t * f;
   uint64_t * fbb;
-  unsigned int t;
   sieving_interval_t H;
   uint64_t q_min;
   uint64_t q_max;
@@ -1261,24 +1298,29 @@ int main(int argc, char * argv[])
   factor_base_t * fb;
   uint64_t q;
 
-  initialise_parameters(argc, argv, &f, &fbb, &fb, &t, H, &q_min, &q_max,
+  initialise_parameters(argc, argv, &f, &fbb, &fb, H, &q_min, &q_max,
                         &thresh, &lpb, array, matrix, &q_side, &V);
 
 #ifdef PRINT_PARAMETERS
-  printf("t = %u\n", t);
   printf("H =\n");
   sieving_interval_fprintf(stdout, H);
   printf("V = %u\n", V);
-  printf("fbb0 = %" PRIu64 "\n", fbb[0]);
-  printf("fbb1 = %" PRIu64 "\n", fbb[1]);
-  printf("thresh0 = %u\n", (unsigned int)thresh[0]);
-  printf("thresh1 = %u\n", (unsigned int)thresh[1]);
-  gmp_printf("lpb0 = %Zd\n", lpb[0]);
-  gmp_printf("lpb1 = %Zd\n", lpb[1]);
-  printf("f0 = ");
-  mpz_poly_fprintf(stdout, f[0]);
-  printf("f1 = ");
-  mpz_poly_fprintf(stdout, f[1]);
+  for (unsigned int i = 0; i < V; i++) {
+    printf("fbb%u = %" PRIu64 "\n", i, fbb[i]);
+  }
+  for (unsigned int i = 0; i < V; i++) {
+    printf("thresh%u = %u\n", i, (unsigned int)thresh[i]);
+  }
+  for (unsigned int i = 0; i < V; i++) {
+    gmp_printf("lpb%u = %Zd\n", i, lpb[i]);
+  }
+  for (unsigned int i = 0; i < V; i++) {
+    printf("f%u = ", i);
+    mpz_poly_fprintf(stdout, f[i]);
+  }
+  printf("q_min = %" PRIu64 "\n", q_min);
+  printf("q_max = %" PRIu64 "\n", q_min);
+  printf("q_side = %u\n", q_side);
 #endif // PRINT_PARAMETERS
 
   uint64_array_t * indexes = malloc(sizeof(uint64_array_t) * V);
@@ -1302,7 +1344,7 @@ int main(int argc, char * argv[])
 #endif
 
   double sec = seconds();
-  makefb(fb, f, fbb, t, lpb, V);
+  makefb(fb, f, fbb, H->t, lpb, V);
 
   printf("# Time for makefb: %f.\n", seconds() - sec);
 
@@ -1326,7 +1368,7 @@ int main(int argc, char * argv[])
     for (int i = 0; i < l->size ; i++) {
       //Only deal with special-q of degre
       if (l->factors[i]->f->deg == 1) {
-        ideal_1_set_part(special_q, q, l->factors[i]->f, t);
+        ideal_1_set_part(special_q, q, l->factors[i]->f, H->t);
         printf("# Special-q: q: %" PRIu64 ", g: ", q);
         mpz_poly_fprintf(stdout, l->factors[i]->f);
 
@@ -1380,7 +1422,7 @@ int main(int argc, char * argv[])
 #endif // MEAN_NORM
 
           sec = seconds();
-          /* special_q_sieve(array, matrix, fb[j], H, f[j], special_q); */
+          special_q_sieve(array, matrix, fb[j], H, f[j], special_q);
           time[j][1] = seconds() - sec;
           sec = seconds();
           /* find_index(indexes[j], array, thresh[j]); */
@@ -1452,7 +1494,7 @@ int main(int argc, char * argv[])
   }
 
   mpz_poly_factor_list_clear(l);
-  ideal_1_clear(special_q, t);
+  ideal_1_clear(special_q, H->t);
   gmp_randclear(state);
   mpz_clear(a);
   getprime(0);
@@ -1465,7 +1507,7 @@ int main(int argc, char * argv[])
   for (unsigned int i = 0; i < V; i++) {
     mpz_clear(lpb[i]);
     mpz_poly_clear(f[i]);
-    factor_base_clear(fb[i], t);
+    factor_base_clear(fb[i], H->t);
     free(pre_compute[i]);
     free(time[i]);
   }
