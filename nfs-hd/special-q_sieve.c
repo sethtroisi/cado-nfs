@@ -405,7 +405,7 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
   mpz_clear(tmp);
 
 #ifdef PRINT_TQR
-  printf("\b\b]\n");
+  printf("\b\b] mod %" PRIu64 "\n", ideal->ideal->r);
   mpz_clear(invert);
 #endif // PRINT_TQR
 }
@@ -846,7 +846,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       unsigned int pos = 0;
 
       int64_t c0 = 0;
-      int64_vector_setcoordinate(c, 1, -(int64_t)H->h[1] - 1);
+      if (H->t == 2) {
+        int64_vector_setcoordinate(c, 1, (int64_t)(- 1));
+      } else {
+        int64_vector_setcoordinate(c, 1, -(int64_t)H->h[1] - 1);
+      }
       for (unsigned int j = 1; j < H->t; j++) {
         c0 = c0 + (int64_t)Tqr[j] * c->c[j];
         if (c0 >= (int64_t)fb->factor_base_1[i]->ideal->r || c0 < 0) {
@@ -860,9 +864,9 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       uint64_t number_c = array->number_element / (2 * H->h[0] + 1);
 
 #ifdef TIMER_SIEVE
-    if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
-      sec = seconds();
-    }
+      if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
+        sec = seconds();
+      }
 #endif // TIMER_SIEVE
 
       pos = int64_vector_add_one_i(c, 1, H);
@@ -874,15 +878,17 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       }
 
 #ifdef TIMER_SIEVE
-    if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
-      time_sieve = time_sieve + seconds() - sec;
-    }
+      if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
+        time_sieve = time_sieve + seconds() - sec;
+      }
 #endif // TIMER_SIEVE
 
 #ifdef NUMBER_HIT
-      printf("Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ", number_of_hit,
+      printf("Number of hits: %" PRIu64 " for r: %" PRIu64 "\n", number_of_hit,
              fb->factor_base_1[i]->ideal->r);
-      mpz_poly_fprintf(stdout, fb->factor_base_1[i]->ideal->h);
+      printf("Estimated number of hits: %u.\n",
+             (unsigned int) ceil((double) array->number_element /
+                  (double) fb->factor_base_1[i]->ideal->r));
       number_of_hit = 0;
 #endif // NUMBER_HIT
 
