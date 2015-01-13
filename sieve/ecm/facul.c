@@ -120,7 +120,7 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
       unsigned int k;
 
       B1 += sqrt (B1);
-      B2 = 17.0 * B1;
+      B2 = 50.0 * B1;
       /* we round B2 to (2k+1)*105, thus k is the integer nearest to
 	 B2/210-0.5 */
       k = B2 / 210.0;
