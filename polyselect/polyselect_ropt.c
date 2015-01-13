@@ -22,10 +22,9 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
                                                    lock for those variables */
 unsigned int nthreads = 1;
 int tot_found = 0; /* total number of polynomials */
-static int verbose = 0;
-int ropteffort = DEFAULT_RSEFFORT; /* sieving effort, among 1-5 */
 cado_poly best_poly;
 double best_MurphyE = 0.0; /* Murphy's E (the larger the better) */
+ropt_param_t ropt_param; /* params for ropt algorithms */
 
 static inline void
 ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
@@ -57,7 +56,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   mpz_clear (t);
 
   st = seconds_thread ();
-  ropt_polyselect (ropt_poly, input_poly, ropteffort, verbose);
+  ropt_polyselect (ropt_poly, input_poly, ropt_param);
   *ropt_time += seconds_thread () - st;
 
   /* MurphyE */
@@ -97,7 +96,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "inputpolys", "root-sieve the size-optimized "
                                           "polynomials given in this file");
   snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
-            DEFAULT_RSEFFORT);
+            DEFAULT_ROPTEFFORT);
   param_list_decl_usage(pl, "ropteffort", str);
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   snprintf (str, 200, "sieving area (default %.2e)", AREA);
@@ -141,13 +140,16 @@ main (int argc, char *argv[])
   for (unsigned int i = 0; i < size_input_polys; i++)
     cado_poly_init (input_polys[i]);
 
+  ropt_param_init (ropt_param);
+  ropt_param->effort = DEFAULT_ROPTEFFORT; /* ropt effort, among 1-10 */
+
   /* read params */
   param_list pl;
   param_list_init (pl);
 
   declare_usage(pl);
 
-  param_list_configure_switch (pl, "-v", &verbose);
+  param_list_configure_switch (pl, "-v", &(ropt_param->verbose));
 
   if (argc == 1)
     usage (argv0[0], NULL, pl);
@@ -167,7 +169,7 @@ main (int argc, char *argv[])
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
   /* sieving effort that passed to ropt */
-  param_list_parse_int (pl, "ropteffort", &ropteffort);
+  param_list_parse_int (pl, "ropteffort", &(ropt_param->effort));
   /* filename of the file with the list of polynomials to root-sieve */
   polys_filename = param_list_lookup_string (pl, "inputpolys");
 
@@ -179,7 +181,7 @@ main (int argc, char *argv[])
   param_list_print_command_line (stdout, pl);
 
   /* Check that ropteffort is in [1,10] */
-  if (ropteffort < 1 || ropteffort > 10)
+  if (ropt_param->effort < 1 || ropt_param->effort > 10)
   {
     fprintf (stderr, "Error, -ropteffort should be in [1,10]\n");
     usage (argv0[0], NULL, pl);
@@ -196,7 +198,7 @@ main (int argc, char *argv[])
     usage (argv0[0], "inputpolys", pl);
 
   printf ("# Info: Will use %u thread%s\n# Info: ropteffort = %d\n", nthreads,
-          (nthreads > 1) ? "s": "", ropteffort);
+          (nthreads > 1) ? "s": "", ropt_param->effort);
 
   /* detect L1 cache size */
   ropt_L1_cachesize ();
@@ -220,7 +222,7 @@ main (int argc, char *argv[])
     nb_input_polys++;
     if (nb_input_polys == size_input_polys) /* Realloc if needed */
     {
-      if (verbose > 0)
+      if (ropt_param->verbose > 0)
         fprintf (stderr, "# Reallocating input_polys\n");
       unsigned int new_size = 2 * size_input_polys;
       input_polys = (cado_poly *) realloc (input_polys, new_size * sizeof (cado_poly));
@@ -275,7 +277,7 @@ main (int argc, char *argv[])
     for (unsigned int i = 0; i < nthreads; i++)
     {
       rootsieve_time += threads_data[i]->ropt_time;
-      if (verbose > 0)
+      if (ropt_param->verbose > 0)
         printf ("# Stat: rootsieve on thread %u took %.2fs\n", i,
                 threads_data[i]->ropt_time);
     }
@@ -322,6 +324,7 @@ main (int argc, char *argv[])
                                              bound_f, bound_g, area, NULL);
   }
 
+  ropt_param_free (ropt_param);
   cado_poly_clear (best_poly);
   for (unsigned int i = 0; i < size_input_polys; i++)
     cado_poly_clear (input_polys[i]);

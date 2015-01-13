@@ -1034,7 +1034,7 @@ ropt_param_init ( ropt_param_t param )
     param->s1_e_sl[i] = 0;
   param->d = 0;
   param->verbose = 0;
-  param->effort = DEFAULT_RSEFFORT;
+  param->effort = DEFAULT_ROPTEFFORT;
   param->skip_ropt = 0;
   param->gen_raw = 0;
   param->sopt = 0;

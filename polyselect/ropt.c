@@ -231,7 +231,7 @@ ropt ( ropt_poly_t poly,
  */
 void
 ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
-                 const int effort, const int verbose)
+                 ropt_param_t param)
 {
   int i;
   ropt_poly_t poly;
@@ -248,11 +248,6 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
   ropt_info_t info;
   ropt_info_init (info);
 
-  /* passed params from polyselect_ropt */
-  ropt_param_t param;
-  ropt_param_init (param);
-  param->verbose = verbose;
-  param->effort = effort;
 
   ropt_bestpoly_t bestpoly;
   ropt_bestpoly_init (bestpoly, poly->d);
@@ -271,7 +266,6 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
   mpz_set (output_poly->n, input_poly->n);
 
   /* free */
-  ropt_param_free (param);
   ropt_bestpoly_free (bestpoly, poly->d);
   ropt_info_free (info);
   ropt_poly_free (poly);
