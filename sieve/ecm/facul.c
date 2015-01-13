@@ -81,7 +81,6 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
 
   if (n == -1)
     n = nb_curves (lpb);
-  ASSERT_ALWAYS(n < STATS_LEN);
   strategy = malloc (sizeof (facul_strategy_t));
   strategy->lpb = lpb;
   /* Store fbb^2 in assume_prime_thresh */
@@ -976,7 +975,8 @@ facul_aux (unsigned long *factors, const modset_t m,
   int i = 0;
   for (i = method_start ;methods[i].method != 0; i++)
     {
-      stats_called_aux[i]++;
+      if (i < STATS_LEN)
+	stats_called_aux[i]++;
       modset_t fm, cfm;
 
       int res_fac = 0;
@@ -1117,7 +1117,8 @@ facul_both_src (unsigned long **factors, const modset_t* m,
 	continue;
 
       //{for the stats
-      stats_called[stats_current_index]++;
+      if (stats_current_index < STATS_LEN)
+	stats_called[stats_current_index]++;
       //}
       int res_fac = 0;
       switch (m[side].arith) {
