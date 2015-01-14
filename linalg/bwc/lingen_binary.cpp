@@ -49,7 +49,7 @@
 #include "portability.h"
 
 /* Name of the source a file */
-char input_file[FILENAME_MAX];
+char input_file[FILENAME_MAX]={'\0'};
 
 /* threshold for the recursive algorithm */
 unsigned int lingen_threshold = 0;
@@ -1817,6 +1817,7 @@ int main(int argc, char *argv[])
 
     bw_common_decl_usage(pl);
     /* {{{ declare local parameters and switches */
+    param_list_decl_usage(pl, "lingen-input-file", "input file for lingen. Defaults to auto fetched from wdir");
     param_list_decl_usage(pl, "lingen-threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor-threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
     param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
@@ -1827,6 +1828,16 @@ int main(int argc, char *argv[])
 
     bw_common_interpret_parameters(bw, pl);
     /* {{{ interpret our parameters */
+    {
+        const char * tmp = param_list_lookup_string(pl, "lingen-input-file");
+        if (tmp) {
+            size_t rc = strlcpy(input_file, tmp, sizeof(input_file));
+            if (rc >= sizeof(input_file)) {
+                fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(input_file));
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
     param_list_parse_uint(pl, "lingen-threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor-threshold", &cantor_threshold);
     /* }}} */
@@ -1846,52 +1857,67 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    unsigned int n0, n1, j0, j1;
-
-    { /* {{{ detect the input file -- there must be only one file. */
-        DIR * dir = opendir(".");
-        struct dirent * de;
-        input_file[0]='\0';
-        for( ; (de = readdir(dir)) != NULL ; ) {
-            int len;
-            int rc = sscanf(de->d_name, A_FILE_PATTERN "%n",
-                    &n0, &n1, &j0, &j1, &len);
-            /* rc is expected to be 4 or 5 depending on our reading of the
-             * standard */
-            if (rc < 4 || len != (int) strlen(de->d_name)) {
-                continue;
+    if (!strlen(input_file)) {
+        unsigned int n0, n1, j0, j1;
+        /* {{{ detect the input file -- there must be only one file. */
+        {
+            DIR * dir = opendir(".");
+            struct dirent * de;
+            for( ; (de = readdir(dir)) != NULL ; ) {
+                int len;
+                int rc = sscanf(de->d_name, A_FILE_PATTERN "%n",
+                        &n0, &n1, &j0, &j1, &len);
+                /* rc is expected to be 4 or 5 depending on our reading of the
+                 * standard */
+                if (rc < 4 || len != (int) strlen(de->d_name)) {
+                    continue;
+                }
+                if (input_file[0] != '\0') {
+                    fprintf(stderr, "Found two possible file names %s and %s\n",
+                            input_file, de->d_name);
+                    exit(1);
+                }
+                size_t clen = std::max((size_t) len, sizeof(input_file));
+                memcpy(input_file, de->d_name, clen);
             }
-            if (input_file[0] != '\0') {
-                fprintf(stderr, "Found two possible file names %s and %s\n",
-                        input_file, de->d_name);
-                exit(1);
-            }
-            size_t clen = std::max((size_t) len, sizeof(input_file));
-            memcpy(input_file, de->d_name, clen);
+            closedir(dir);
+        } /* }}} */
+        if (bw->n == 0) {
+            bw->n = n1 - n0;
+        } else if (bw->n != (int) (n1 - n0)) {
+            fprintf(stderr, "n value mismatch (config says %d, A file says %u)\n",
+                    bw->n, n1 - n0);
+            exit(EXIT_FAILURE);
         }
-        closedir(dir);
-    } /* }}} */
+        if (bw->end == 0) {
+            ASSERT_ALWAYS(bw->start == 0);
+            bw->end = j1 - j0;
+        } else if (bw->end - bw->start > (int) (j1 - j0)) {
+            fprintf(stderr, "sequence file %s is too short\n", input_file);
+            exit(1);
+        }
 
-    if (bw->n == 0) {
-        bw->n = n1 - n0;
-    } else if (bw->n != (int) (n1 - n0)) {
-        fprintf(stderr, "n value mismatch (config says %d, A file says %u)\n",
-                bw->n, n1 - n0);
-        exit(1);
+        sequence_length = bw->end - bw->start;
+    } else {
+        if (bw->n == 0 || bw->m == 0) {
+            fprintf(stderr, "--lingen-input-file requires setting also m and n\n");
+            exit(EXIT_FAILURE);
+        }
+        struct stat sbuf[1];
+        int rc = stat(input_file, sbuf);
+        DIE_ERRNO_DIAG(rc<0,"stat",input_file);
+        ssize_t one_mat = bw->m * bw->n / CHAR_BIT;
+        if (sbuf->st_size % one_mat != 0) {
+            fprintf(stderr, "The size of %s (%zu bytes) is not a multiple of %zu bytes (as per m,n=%u,%u)\n",
+                    input_file, sbuf->st_size, one_mat, bw->m, bw->n);
+        }
+        sequence_length = sbuf->st_size / one_mat;
+        fprintf(stderr, "Automatically detected sequence length %u\n", sequence_length);
     }
 
     m = bw->m;
     n = bw->n;
 
-    if (bw->end == 0) {
-        ASSERT_ALWAYS(bw->start == 0);
-        bw->end = j1 - j0;
-    } else if (bw->end - bw->start > (int) (j1 - j0)) {
-        fprintf(stderr, "sequence file %s is too short\n", input_file);
-        exit(1);
-    }
-        
-    sequence_length = bw->end - bw->start;
 
 /* bw_init
  *
@@ -1913,7 +1939,7 @@ int main(int argc, char *argv[])
     polmat A;
 
     printf("Reading scalar data in polynomial ``a''\n");
-    read_data_for_series(A, j1 - j0);
+    read_data_for_series(A, sequence_length);
 
     /* Data read stage completed. */
     /* TODO. Prepare the FFT engine for handling polynomial
