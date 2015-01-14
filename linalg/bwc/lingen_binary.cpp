@@ -41,6 +41,8 @@
 #include "utils.h"
 #include "bw-common.h"
 #include "filenames.h"
+#include "logline.h"
+
 
 #include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
@@ -170,6 +172,19 @@ namespace globals {
     std::vector<std::pair<unsigned int, unsigned int> > f0_data;
 
     double start_time;
+
+    /* some timers -- not sure we'll use them. Those are copied from
+     * plingen */
+    double t_basecase;
+    double t_dft_E;
+    double t_dft_pi_left;
+    double t_ift_E_middle;
+    double t_dft_pi_right;
+    double t_ift_pi;
+    double t_mp;
+    double t_mul;
+    double t_cp_io;
+
 }
 
 // To multiply on the right an m x n matrix A by F0, we start by copying
@@ -1483,7 +1498,7 @@ struct recursive_tree_timer_t {
 
 static bool compute_lingen(polmat& pi, recursive_tree_timer_t&);
 
-template<typename fft_type>
+template<typename fft_type>/*{{{*/
 static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 {
     using namespace globals;
@@ -1492,14 +1507,14 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
      * of degree E.ncoef -- this is exactly the number of increases we
      * have to make
      */
-    unsigned int length_E = E.ncoef;
-    unsigned int rlen = length_E / 2;
-    unsigned int llen = length_E - rlen;
+    unsigned long E_length = E.ncoef;
+    unsigned long rlen = E_length / 2;
+    unsigned long llen = E_length - rlen;
 
-    ASSERT(llen && rlen && llen + rlen == length_E);
+    ASSERT(llen && rlen && llen + rlen == E_length);
 
-    unsigned int expected_pi_deg = pi_deg_bound(llen);
-    unsigned int kill;
+    unsigned long expected_pi_deg = pi_deg_bound(llen);
+    unsigned long kill;
     // unsigned int tstart = t;
     // unsigned int tmiddle;
     bool finished_early;
@@ -1513,17 +1528,21 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     kill=0;
 #endif
 
-    // std::cout << "Recursive call, degree " << length_E << std::endl;
+    // std::cout << "Recursive call, degree " << E_length << std::endl;
     // takes lengths.
-    fft_type o(length_E, expected_pi_deg + 1,
-            /* length_E + expected_pi_deg - kill, */
+    fft_type o(E_length, expected_pi_deg + 1,
+            /* E_length + expected_pi_deg - kill, */
             m + n);
 
     tpolmat<fft_type> E_hat;
 
+    logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
+            t, E_length, fft_type::name());
     /* The transform() calls expect a number of coefficients, not a
      * degree. */
-    transform(E_hat, E, o, length_E);
+    transform(E_hat, E, o, E_length);
+    logline_end(&t_dft_E, "");
+
 
     /* ditto for this one */
     E.resize(llen);
@@ -1531,19 +1550,20 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     polmat pi_left;
     finished_early = compute_lingen(pi_left, tim);
     E.clear();
-    int pi_l_deg = pi_left.maxdeg();
+    long pi_l_deg = pi_left.maxdeg();
+    unsigned long pi_left_length = pi_left.maxlength();
 
     if (t < t0 + llen) {
         ASSERT(finished_early);
     }
     if (pi_l_deg >= (int) expected_pi_deg) {
-        printf("%-8u" "deg(pi_l) = %d >= %u ; escaping\n",
+        printf("%-8u" "deg(pi_l) = %ld >= %lu ; escaping\n",
                 t, pi_l_deg, expected_pi_deg);
         finished_early=1;
     }
 
     if (finished_early) {
-        printf("%-8u" "deg(pi_l) = %d ; escaping\n",
+        printf("%-8u" "deg(pi_l) = %ld ; escaping\n",
                 t, pi_l_deg);
         pi.swap(pi_left);
         return true;
@@ -1599,24 +1619,41 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     }/*}}}*/
 #endif
 
+    logline_begin(stdout, E_length,
+            "t=%u DFT_pi_left(%lu) [%s]",
+            t, pi_left_length, fft_type::name());
     tpolmat<fft_type> pi_l_hat;
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
     transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
     pi_left.clear();
+    logline_end(&t_dft_pi_left, "");
 
     tpolmat<fft_type> E_middle_hat;
 
+    /* There's a critical lack here. We're not truncating the output */
     /* TODO XXX Do special convolutions here */
+    /* minimal degree of coefficients of E which contribute to degree
+     * llen and above when multiplying by pi_left is llen-pi_l_deg. */
+    logline_begin(stdout, E_length, "t=%u MP(%lu, %lu) -> %lu [%s]",
+            t,
+            (unsigned long) (E_length - (llen - pi_l_deg)),
+            pi_left_length,
+            E_length,
+            fft_type::name());
     compose(E_middle_hat, E_hat, pi_l_hat, o);
+    logline_end(&t_mp, "");
 
     E_hat.clear();
     /* pi_l_hat is used later on ! */
 
+    logline_begin(stdout, E_length, "t=%u IFT_E_middle(%lu) [%s]",
+            t, E_length + pi_l_deg - kill + 1, fft_type::name());
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
-    itransform(E, E_middle_hat, o, length_E + pi_l_deg - kill + 1);
+    itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
     E_middle_hat.clear();
+    logline_end(&t_ift_E_middle, "");
 
     /* Make sure that the first llen-kill coefficients of all entries of
      * E are zero. It's only a matter of verification, so this does not
@@ -1631,22 +1668,37 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     polmat pi_right;
     finished_early = compute_lingen(pi_right, tim);
     int pi_r_deg = pi_right.maxdeg();
+    unsigned long pi_right_length = pi_right.maxlength();
     E.clear();
 
+    logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
+            t, pi_right_length, fft_type::name());
     tpolmat<fft_type> pi_r_hat;
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
     transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
     pi_right.clear();
+    logline_end(&t_dft_pi_right, "");
 
+    logline_begin(stdout, E_length, "t=%u MUL(%lu, %lu) -> %lu [%s]",
+            t,
+            pi_left_length,
+            pi_right_length,
+            pi_left_length + pi_right_length - 1,
+            fft_type::name());
     tpolmat<fft_type> pi_hat;
     compose(pi_hat, pi_l_hat, pi_r_hat, o);
     pi_l_hat.clear();
     pi_r_hat.clear();
+    logline_end(&t_mul, "");
 
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
+    logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
+            t, pi_left_length + pi_right_length - 1, fft_type::name());
     itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
+    logline_end(&t_ift_pi, "");
+
 
     /*
     if (bw->checkpoints) {
@@ -1667,7 +1719,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
                 t, pi.maxdeg());
     }
     return finished_early;
-}
+}/*}}}*/
 
 static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
 {
@@ -1823,6 +1875,7 @@ int main(int argc, char *argv[])
     param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
     param_list_configure_alias(pl, "cantor-threshold", "cantor_threshold");
     /* }}} */
+    logline_decl_usage(pl);
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
 
@@ -1841,12 +1894,15 @@ int main(int argc, char *argv[])
     param_list_parse_uint(pl, "lingen-threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor-threshold", &cantor_threshold);
     /* }}} */
+    logline_interpret_parameters(pl);
 
     if (param_list_warn_unused(pl)) {
         param_list_print_usage(pl, bw->original_argv[0], stderr);
         exit(EXIT_FAILURE);
     }
     param_list_clear(pl);
+
+    logline_init_timer();
 
     m = n = 0;
 

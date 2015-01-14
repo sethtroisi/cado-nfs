@@ -277,6 +277,7 @@ struct polmat { /* {{{ */
         }
         return m;
     }/*}}}*/
+    inline unsigned long maxlength() const { return 1 + maxdeg(); }
     void alloc() {
         /* we don't care about exceptions */
         x = mynew<unsigned long>(ncols*colstride());
