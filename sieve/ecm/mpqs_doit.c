@@ -176,7 +176,7 @@ findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
   modul_init (tt, pp);
   modul_init (uu, pp);
   modul_init (vv, pp);
-  modul_set_ul_reduced (tt, inva, pp);
+  modul_set_ul (tt, inva, pp);
   modul_set_ul_reduced (vv, k1, pp);
   modul_neg (uu, vv, pp);
   modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
