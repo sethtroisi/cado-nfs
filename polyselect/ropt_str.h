@@ -117,7 +117,6 @@ typedef struct {
   /* quadratic rotation bound */
   int w_left_bound;
   int w_length;
-  int w_flag;
 
   /* stage 1 parameters */
   unsigned short s1_num_e_sl;
