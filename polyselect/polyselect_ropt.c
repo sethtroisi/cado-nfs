@@ -106,6 +106,9 @@ declare_usage(param_list pl)
   snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
   param_list_decl_usage(pl, "Bg", str);
   param_list_decl_usage(pl, "v", "(switch) verbose mode");
+  param_list_decl_usage(pl, "boundmaxlognorm", "Maximum lognorm. Used to compute"
+                                               " bounds for rotations for the "
+                                               "sieve stage of ropt");
   verbose_decl_usage(pl);
 }
 
@@ -170,6 +173,8 @@ main (int argc, char *argv[])
     bound_g = BOUND_G;
   /* sieving effort that passed to ropt */
   param_list_parse_int (pl, "ropteffort", &(ropt_param->effort));
+  /* param for ropt */
+  param_list_parse_double (pl, "boundmaxlognorm", &(ropt_param->bound_lognorm));
   /* filename of the file with the list of polynomials to root-sieve */
   polys_filename = param_list_lookup_string (pl, "inputpolys");
 
