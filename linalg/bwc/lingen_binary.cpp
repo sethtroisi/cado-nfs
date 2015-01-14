@@ -1334,10 +1334,8 @@ static bool go_quadratic(polmat& pi)/*{{{*/
 #ifdef VERBOSE_4PAUL
     cout << "input go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
     cout << E << "\n";
-#endif
-
     double ttq = -seconds();
-
+#endif
 
     polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
     for(unsigned int i = 0 ; i < m + n ; i++) {
@@ -1390,14 +1388,12 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     }
 #endif
 
-    ttq += seconds();
-
 #ifdef VERBOSE_4PAUL
+    ttq += seconds();
     cout << "output go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
     cout << pi << "\n";
-#endif
-
     cout << "Time taken: " << ttq << "\n";
+#endif
 
     tree_stats_leave(stats, finished);
     return finished;
