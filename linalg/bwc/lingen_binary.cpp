@@ -761,7 +761,7 @@ static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
 {
     /* Sort the columns. It might seem merely cosmetic and useless to
      * sort w.r.t both the global and local nominal degrees. In fact, it
-     * is crucial for the corectness of the computations. (Imagine a
+     * is crucial for the correctness of the computations. (Imagine a
      * 2-step increase, starting with uneven global deltas, and hitting
      * an even situation in the middle. One has to sort out the local
      * deltas to prevent trashing the whole picture).
@@ -1322,10 +1322,22 @@ static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
 static bool go_quadratic(polmat& pi)/*{{{*/
 {
     using namespace globals;
+    using namespace std;
     tree_stats_enter(stats, __func__, E.ncoef);
 
     unsigned int piv[m];
     unsigned int deg = E.ncoef - 1;
+    for(unsigned int j = 0 ; j < E.ncols ; j++) {
+        E.deg(j) = deg;
+    }
+
+#ifdef VERBOSE_4PAUL
+    cout << "input go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
+    cout << E << "\n";
+#endif
+
+    double ttq = -seconds();
+
 
     polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
     for(unsigned int i = 0 ; i < m + n ; i++) {
@@ -1377,6 +1389,15 @@ static bool go_quadratic(polmat& pi)/*{{{*/
         E_saved.setdeg(j);
     }
 #endif
+
+    ttq += seconds();
+
+#ifdef VERBOSE_4PAUL
+    cout << "output go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
+    cout << pi << "\n";
+#endif
+
+    cout << "Time taken: " << ttq << "\n";
 
     tree_stats_leave(stats, finished);
     return finished;
@@ -2003,7 +2024,7 @@ int main(int argc, char *argv[])
                     input_file, (size_t) sbuf->st_size, one_mat, bw->m, bw->n);
         }
         sequence_length = sbuf->st_size / one_mat;
-        fprintf(stderr, "Automatically detected sequence length %u\n", sequence_length);
+        printf("Automatically detected sequence length %u\n", sequence_length);
     }
     stats->tree_total_breadth = sequence_length;
 
