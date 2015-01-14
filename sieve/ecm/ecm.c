@@ -1952,7 +1952,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       }
     mod_mul (d, d, u, m);
 
-    fprintf (stderr, "ecm: Edwards parameterization done\n");
+    /* fprintf (stderr, "ecm: Edwards parameterization done\n"); */
 
   }
   else
@@ -2037,10 +2037,10 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       
       mod_gcd (f, Q->z, m);
 
-      if (mod_intcmp_ul(f, 1UL) != 0) {
-        fprintf (stderr, "f = %lu\n", mod_intget_ul(f));
-	fprintf (stderr, "gcd != 1, bt = %d\n", bt);
-      }
+      /* if (mod_intcmp_ul(f, 1UL) != 0) { */
+      /*   fprintf (stderr, "f = %lu\n", mod_intget_ul(f)); */
+      /* 	fprintf (stderr, "gcd != 1, bt = %d\n", bt); */
+      /* } */
 
       mod_clear (a, m);
       ellE_clear (Q, m);
