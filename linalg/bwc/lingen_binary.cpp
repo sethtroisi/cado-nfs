@@ -1965,7 +1965,7 @@ int main(int argc, char *argv[])
         ssize_t one_mat = bw->m * bw->n / CHAR_BIT;
         if (sbuf->st_size % one_mat != 0) {
             fprintf(stderr, "The size of %s (%zu bytes) is not a multiple of %zu bytes (as per m,n=%u,%u)\n",
-                    input_file, sbuf->st_size, one_mat, bw->m, bw->n);
+                    input_file, (size_t) sbuf->st_size, one_mat, bw->m, bw->n);
         }
         sequence_length = sbuf->st_size / one_mat;
         fprintf(stderr, "Automatically detected sequence length %u\n", sequence_length);
