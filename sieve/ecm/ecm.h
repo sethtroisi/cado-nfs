@@ -20,14 +20,29 @@ typedef struct {
                 y_numer, y_denom;        /* non-torsion point on the curve */
 } Edwards_curve_t;
 
-static const Edwards_curve_t Ecurve14 = {1, 4, -50625, 4096, 104329, 16384, 1630827, 262144};
+static const Edwards_curve_t Ecurve14 = {
+  1, 4, 
+  -50625, 4096, 
+  104329, 16384, 
+  1630827, 262144
+};
 
 /* This is not ok for 32-bit builds. Apparently it's not used for the
  * moment anyway, so that's not much of a problem. But what should we do?
  * Use int64_t coefficients (implies things such as mul_si64 down the
  * line), or stick to ulongs and disable this curve for 32-bits ?
-static const Edwards_curve_t Ecurve45 = {4, 5, -6561, 2560000, 106564329, 501760000, -3715030917, 280985600000};
+ *
+ * [Laurent:] Well, most of the ECM friendly curves have even larger
+ * coefficients. We'll have to use mpz_t anyways. Ecurve14 is just a toy example.
  */
+
+ /* static const Edwards_curve_t Ecurve45 = { */
+ /*   4, 5, */
+ /*   -6561, 2560000, */
+ /*   106564329, 501760000, */
+ /*   -3715030917, 280985600000 */
+ /* }; */
+
 
 /* TODO:  */
 /* change to ecmM_plan_t  */
