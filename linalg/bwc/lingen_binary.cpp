@@ -41,6 +41,8 @@
 #include "utils.h"
 #include "bw-common.h"
 #include "filenames.h"
+#include "logline.h"
+
 
 #include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
@@ -49,7 +51,7 @@
 #include "portability.h"
 
 /* Name of the source a file */
-char input_file[FILENAME_MAX];
+char input_file[FILENAME_MAX]={'\0'};
 
 /* threshold for the recursive algorithm */
 unsigned int lingen_threshold = 0;
@@ -170,6 +172,19 @@ namespace globals {
     std::vector<std::pair<unsigned int, unsigned int> > f0_data;
 
     double start_time;
+
+    /* some timers -- not sure we'll use them. Those are copied from
+     * plingen */
+    double t_basecase;
+    double t_dft_E;
+    double t_dft_pi_left;
+    double t_ift_E_middle;
+    double t_dft_pi_right;
+    double t_ift_pi;
+    double t_mp;
+    double t_mul;
+    double t_cp_io;
+
 }
 
 // To multiply on the right an m x n matrix A by F0, we start by copying
@@ -1483,7 +1498,7 @@ struct recursive_tree_timer_t {
 
 static bool compute_lingen(polmat& pi, recursive_tree_timer_t&);
 
-template<typename fft_type>
+template<typename fft_type>/*{{{*/
 static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 {
     using namespace globals;
@@ -1492,14 +1507,14 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
      * of degree E.ncoef -- this is exactly the number of increases we
      * have to make
      */
-    unsigned int length_E = E.ncoef;
-    unsigned int rlen = length_E / 2;
-    unsigned int llen = length_E - rlen;
+    unsigned long E_length = E.ncoef;
+    unsigned long rlen = E_length / 2;
+    unsigned long llen = E_length - rlen;
 
-    ASSERT(llen && rlen && llen + rlen == length_E);
+    ASSERT(llen && rlen && llen + rlen == E_length);
 
-    unsigned int expected_pi_deg = pi_deg_bound(llen);
-    unsigned int kill;
+    unsigned long expected_pi_deg = pi_deg_bound(llen);
+    unsigned long kill;
     // unsigned int tstart = t;
     // unsigned int tmiddle;
     bool finished_early;
@@ -1513,17 +1528,21 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     kill=0;
 #endif
 
-    // std::cout << "Recursive call, degree " << length_E << std::endl;
+    // std::cout << "Recursive call, degree " << E_length << std::endl;
     // takes lengths.
-    fft_type o(length_E, expected_pi_deg + 1,
-            /* length_E + expected_pi_deg - kill, */
+    fft_type o(E_length, expected_pi_deg + 1,
+            /* E_length + expected_pi_deg - kill, */
             m + n);
 
     tpolmat<fft_type> E_hat;
 
+    logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
+            t, E_length, fft_type::name());
     /* The transform() calls expect a number of coefficients, not a
      * degree. */
-    transform(E_hat, E, o, length_E);
+    transform(E_hat, E, o, E_length);
+    logline_end(&t_dft_E, "");
+
 
     /* ditto for this one */
     E.resize(llen);
@@ -1531,19 +1550,20 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     polmat pi_left;
     finished_early = compute_lingen(pi_left, tim);
     E.clear();
-    int pi_l_deg = pi_left.maxdeg();
+    long pi_l_deg = pi_left.maxdeg();
+    unsigned long pi_left_length = pi_left.maxlength();
 
     if (t < t0 + llen) {
         ASSERT(finished_early);
     }
     if (pi_l_deg >= (int) expected_pi_deg) {
-        printf("%-8u" "deg(pi_l) = %d >= %u ; escaping\n",
+        printf("%-8u" "deg(pi_l) = %ld >= %lu ; escaping\n",
                 t, pi_l_deg, expected_pi_deg);
         finished_early=1;
     }
 
     if (finished_early) {
-        printf("%-8u" "deg(pi_l) = %d ; escaping\n",
+        printf("%-8u" "deg(pi_l) = %ld ; escaping\n",
                 t, pi_l_deg);
         pi.swap(pi_left);
         return true;
@@ -1599,24 +1619,41 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     }/*}}}*/
 #endif
 
+    logline_begin(stdout, E_length,
+            "t=%u DFT_pi_left(%lu) [%s]",
+            t, pi_left_length, fft_type::name());
     tpolmat<fft_type> pi_l_hat;
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
     transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
     pi_left.clear();
+    logline_end(&t_dft_pi_left, "");
 
     tpolmat<fft_type> E_middle_hat;
 
+    /* There's a critical lack here. We're not truncating the output */
     /* TODO XXX Do special convolutions here */
+    /* minimal degree of coefficients of E which contribute to degree
+     * llen and above when multiplying by pi_left is llen-pi_l_deg. */
+    logline_begin(stdout, E_length, "t=%u MP(%lu, %lu) -> %lu [%s]",
+            t,
+            (unsigned long) (E_length - (llen - pi_l_deg)),
+            pi_left_length,
+            E_length,
+            fft_type::name());
     compose(E_middle_hat, E_hat, pi_l_hat, o);
+    logline_end(&t_mp, "");
 
     E_hat.clear();
     /* pi_l_hat is used later on ! */
 
+    logline_begin(stdout, E_length, "t=%u IFT_E_middle(%lu) [%s]",
+            t, E_length + pi_l_deg - kill + 1, fft_type::name());
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
-    itransform(E, E_middle_hat, o, length_E + pi_l_deg - kill + 1);
+    itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
     E_middle_hat.clear();
+    logline_end(&t_ift_E_middle, "");
 
     /* Make sure that the first llen-kill coefficients of all entries of
      * E are zero. It's only a matter of verification, so this does not
@@ -1631,22 +1668,37 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     polmat pi_right;
     finished_early = compute_lingen(pi_right, tim);
     int pi_r_deg = pi_right.maxdeg();
+    unsigned long pi_right_length = pi_right.maxlength();
     E.clear();
 
+    logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
+            t, pi_right_length, fft_type::name());
     tpolmat<fft_type> pi_r_hat;
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
     transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
     pi_right.clear();
+    logline_end(&t_dft_pi_right, "");
 
+    logline_begin(stdout, E_length, "t=%u MUL(%lu, %lu) -> %lu [%s]",
+            t,
+            pi_left_length,
+            pi_right_length,
+            pi_left_length + pi_right_length - 1,
+            fft_type::name());
     tpolmat<fft_type> pi_hat;
     compose(pi_hat, pi_l_hat, pi_r_hat, o);
     pi_l_hat.clear();
     pi_r_hat.clear();
+    logline_end(&t_mul, "");
 
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
+    logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
+            t, pi_left_length + pi_right_length - 1, fft_type::name());
     itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
+    logline_end(&t_ift_pi, "");
+
 
     /*
     if (bw->checkpoints) {
@@ -1667,7 +1719,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
                 t, pi.maxdeg());
     }
     return finished_early;
-}
+}/*}}}*/
 
 static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
 {
@@ -1817,25 +1869,40 @@ int main(int argc, char *argv[])
 
     bw_common_decl_usage(pl);
     /* {{{ declare local parameters and switches */
+    param_list_decl_usage(pl, "lingen-input-file", "input file for lingen. Defaults to auto fetched from wdir");
     param_list_decl_usage(pl, "lingen-threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor-threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
     param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
     param_list_configure_alias(pl, "cantor-threshold", "cantor_threshold");
     /* }}} */
+    logline_decl_usage(pl);
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
 
     bw_common_interpret_parameters(bw, pl);
     /* {{{ interpret our parameters */
+    {
+        const char * tmp = param_list_lookup_string(pl, "lingen-input-file");
+        if (tmp) {
+            size_t rc = strlcpy(input_file, tmp, sizeof(input_file));
+            if (rc >= sizeof(input_file)) {
+                fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(input_file));
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
     param_list_parse_uint(pl, "lingen-threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor-threshold", &cantor_threshold);
     /* }}} */
+    logline_interpret_parameters(pl);
 
     if (param_list_warn_unused(pl)) {
         param_list_print_usage(pl, bw->original_argv[0], stderr);
         exit(EXIT_FAILURE);
     }
     param_list_clear(pl);
+
+    logline_init_timer();
 
     m = n = 0;
 
@@ -1846,52 +1913,67 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    unsigned int n0, n1, j0, j1;
-
-    { /* {{{ detect the input file -- there must be only one file. */
-        DIR * dir = opendir(".");
-        struct dirent * de;
-        input_file[0]='\0';
-        for( ; (de = readdir(dir)) != NULL ; ) {
-            int len;
-            int rc = sscanf(de->d_name, A_FILE_PATTERN "%n",
-                    &n0, &n1, &j0, &j1, &len);
-            /* rc is expected to be 4 or 5 depending on our reading of the
-             * standard */
-            if (rc < 4 || len != (int) strlen(de->d_name)) {
-                continue;
+    if (!strlen(input_file)) {
+        unsigned int n0, n1, j0, j1;
+        /* {{{ detect the input file -- there must be only one file. */
+        {
+            DIR * dir = opendir(".");
+            struct dirent * de;
+            for( ; (de = readdir(dir)) != NULL ; ) {
+                int len;
+                int rc = sscanf(de->d_name, A_FILE_PATTERN "%n",
+                        &n0, &n1, &j0, &j1, &len);
+                /* rc is expected to be 4 or 5 depending on our reading of the
+                 * standard */
+                if (rc < 4 || len != (int) strlen(de->d_name)) {
+                    continue;
+                }
+                if (input_file[0] != '\0') {
+                    fprintf(stderr, "Found two possible file names %s and %s\n",
+                            input_file, de->d_name);
+                    exit(1);
+                }
+                size_t clen = std::max((size_t) len, sizeof(input_file));
+                memcpy(input_file, de->d_name, clen);
             }
-            if (input_file[0] != '\0') {
-                fprintf(stderr, "Found two possible file names %s and %s\n",
-                        input_file, de->d_name);
-                exit(1);
-            }
-            size_t clen = std::max((size_t) len, sizeof(input_file));
-            memcpy(input_file, de->d_name, clen);
+            closedir(dir);
+        } /* }}} */
+        if (bw->n == 0) {
+            bw->n = n1 - n0;
+        } else if (bw->n != (int) (n1 - n0)) {
+            fprintf(stderr, "n value mismatch (config says %d, A file says %u)\n",
+                    bw->n, n1 - n0);
+            exit(EXIT_FAILURE);
         }
-        closedir(dir);
-    } /* }}} */
+        if (bw->end == 0) {
+            ASSERT_ALWAYS(bw->start == 0);
+            bw->end = j1 - j0;
+        } else if (bw->end - bw->start > (int) (j1 - j0)) {
+            fprintf(stderr, "sequence file %s is too short\n", input_file);
+            exit(1);
+        }
 
-    if (bw->n == 0) {
-        bw->n = n1 - n0;
-    } else if (bw->n != (int) (n1 - n0)) {
-        fprintf(stderr, "n value mismatch (config says %d, A file says %u)\n",
-                bw->n, n1 - n0);
-        exit(1);
+        sequence_length = bw->end - bw->start;
+    } else {
+        if (bw->n == 0 || bw->m == 0) {
+            fprintf(stderr, "--lingen-input-file requires setting also m and n\n");
+            exit(EXIT_FAILURE);
+        }
+        struct stat sbuf[1];
+        int rc = stat(input_file, sbuf);
+        DIE_ERRNO_DIAG(rc<0,"stat",input_file);
+        ssize_t one_mat = bw->m * bw->n / CHAR_BIT;
+        if (sbuf->st_size % one_mat != 0) {
+            fprintf(stderr, "The size of %s (%zu bytes) is not a multiple of %zu bytes (as per m,n=%u,%u)\n",
+                    input_file, (size_t) sbuf->st_size, one_mat, bw->m, bw->n);
+        }
+        sequence_length = sbuf->st_size / one_mat;
+        fprintf(stderr, "Automatically detected sequence length %u\n", sequence_length);
     }
 
     m = bw->m;
     n = bw->n;
 
-    if (bw->end == 0) {
-        ASSERT_ALWAYS(bw->start == 0);
-        bw->end = j1 - j0;
-    } else if (bw->end - bw->start > (int) (j1 - j0)) {
-        fprintf(stderr, "sequence file %s is too short\n", input_file);
-        exit(1);
-    }
-        
-    sequence_length = bw->end - bw->start;
 
 /* bw_init
  *
@@ -1913,7 +1995,7 @@ int main(int argc, char *argv[])
     polmat A;
 
     printf("Reading scalar data in polynomial ``a''\n");
-    read_data_for_series(A, j1 - j0);
+    read_data_for_series(A, sequence_length);
 
     /* Data read stage completed. */
     /* TODO. Prepare the FFT engine for handling polynomial

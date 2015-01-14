@@ -158,7 +158,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
         break;
 #endif
 
-      stats_called[i]++;
+      if (i < STATS_LEN)
+	stats_called[i]++;
       
       if (strategy->methods[i].method == PM1_METHOD)
 	bt = pm1 (f, m, (pm1_plan_t *) (strategy->methods[i].plan));
@@ -235,7 +236,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
       
       if (mod_intequal (f, n))
 	{
-          stats_found_n[i]++;
+	  if (i < STATS_LEN)
+	    stats_found_n[i]++;
 
 	  if (bt == 0)
 	    {
@@ -491,7 +493,8 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
       
   if (mod_intequal (f, n))
     {
-      stats_found_n[stats_current_index]++;
+      if (stats_current_index < STATS_LEN)
+	stats_found_n[stats_current_index]++;
       if (bt == 0)
 	{
 	  /* Input number was found without any backtracking happening?

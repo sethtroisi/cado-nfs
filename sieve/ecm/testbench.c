@@ -164,6 +164,7 @@ int main (int argc, char **argv)
   int inp_raw = 0;
   int strat = 0;
   int extra_primes = 0;
+  int ncurves = -1;
   unsigned long *primmod = NULL, *hitsmod = NULL;
   uint64_t starttime, endtime;
 
@@ -266,6 +267,13 @@ int main (int argc, char **argv)
 	  nr_methods++;
 	  argc -= 4;
 	  argv += 4;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-ncurves") == 0 &&
+	       nr_methods == 0)
+        {
+	  ncurves = strtoul (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
 	}
       else if (argc > 1 && strcmp (argv[1], "-strat") == 0 && 
 	       nr_methods == 0)
@@ -399,7 +407,7 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (fbb, lpb, 0, (verbose >= 3));
+      strategy = facul_make_strategy (fbb, lpb, ncurves, (verbose >= 3));
     }
   else
     {

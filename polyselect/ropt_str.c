@@ -349,7 +349,6 @@ ropt_bound_init ( ropt_bound_t bound )
   mpz_init_set_ui (bound->global_v_boundr, 0UL);
   bound->init_lognorm = 0.0;
   bound->bound_lognorm = 0.0;
-  bound->bound_lognorm_ratio = 0.0;
   bound->exp_min_alpha = 0.0;
 }
 
@@ -379,8 +378,7 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
     /* The higher, the more margin in computing the sieving bound
        w, u and v, hence the larger the sieving bound, and hence
        larger individual sublattices. */
-    bound->bound_lognorm_ratio = BOUND_LOGNORM_RATIO;
-    bound->bound_lognorm = bound->init_lognorm * bound->bound_lognorm_ratio;
+    bound->bound_lognorm = bound->init_lognorm * BOUND_LOGNORM_RATIO;
   }
 }
 
@@ -1034,7 +1032,7 @@ ropt_param_init ( ropt_param_t param )
     param->s1_e_sl[i] = 0;
   param->d = 0;
   param->verbose = 0;
-  param->effort = DEFAULT_RSEFFORT;
+  param->effort = DEFAULT_ROPTEFFORT;
   param->skip_ropt = 0;
   param->gen_raw = 0;
   param->sopt = 0;
