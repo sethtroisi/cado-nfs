@@ -144,7 +144,7 @@ print_info (FILE * f, renumber_t r)
               "# INFO: lpb0 = %lu\n# INFO: lpb1 = %lu\n",
               sizeof(p_r_values_t), r->nb_bits, r->rat,
               (r->rat == -1) ? "(no rational side)" : "", r->bad_ideals.n,
-              r->add_full_col, r->lpb0, r->lpb1);
+              r->add_full_col, r->lpb[0], r->lpb[1]);
 }
 
 /* sort in decreasing order. Fastest for ~ < 15 values in r[] vs qsort */
@@ -210,8 +210,8 @@ static void
 renumber_write_first_line (renumber_t renum)
 {
   fprintf (renum->file, "%" PRIu8 " %d %d %d %lu %lu\n", renum->nb_bits,
-           renum->rat, renum->bad_ideals.n, renum->add_full_col, renum->lpb0,
-           renum->lpb1);
+           renum->rat, renum->bad_ideals.n, renum->add_full_col, renum->lpb[0],
+           renum->lpb[1]);
 }
 
 static void
@@ -220,7 +220,7 @@ renumber_read_first_line (renumber_t renum)
   int ret;
   ret = fscanf (renum->file, "%" SCNu8 " %d %d %d %lu %lu\n", &(renum->nb_bits),
                 &(renum->rat), &(renum->bad_ideals.n), &(renum->add_full_col),
-                &(renum->lpb0), &(renum->lpb1));
+                &(renum->lpb[0]), &(renum->lpb[1]));
   ASSERT_ALWAYS (ret == 6);
   ASSERT_ALWAYS (-1 <= renum->rat && renum->rat <= 1);
   ASSERT_ALWAYS (renum->add_full_col == 0 || renum->add_full_col == 1);
@@ -263,8 +263,8 @@ renumber_init_for_writing (renumber_t renumber_info, int rat, int add_full_col,
   ASSERT_ALWAYS (lpb != NULL);
   renumber_info->rat = rat;
   renumber_info->add_full_col = add_full_col;
-  renumber_info->lpb0 = lpb[0];
-  renumber_info->lpb1 = lpb[1];
+  renumber_info->lpb[0] = lpb[0];
+  renumber_info->lpb[1] = lpb[1];
 
   int max_nb_bits = MAX(lpb[0], lpb[1]);
   if (renumber_info->rat == -1) /* for two alg side, we need an extra bit. */
@@ -571,7 +571,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 #ifdef RENUMBER_DO_EXPENSIVE_CHECK
   {
     /* assert that p is below the large prime bound */
-    unsigned long lpb = (side == 0) ? renumber_info->lpb0 : renumber_info->lpb1;
+    unsigned long lpb = (side == 0) ? renumber_info->lpb[0] : renumber_info->lpb[1];
     char tmp[256];
     snprintf (tmp, 256, "p = %" PRpr " >= 2^%lu", p, lpb);
     FATAL_ERROR_CHECK (((uint64_t) p) >> lpb, tmp);
@@ -729,8 +729,8 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   else
   {
     *p = tab[j] - 1;
-    unsigned long lpbr = (renumber_info->rat == 0) ? renumber_info->lpb0 :
-                                                     renumber_info->lpb1;
+    unsigned long lpbr = (renumber_info->rat == 0) ? renumber_info->lpb[0] :
+                                                     renumber_info->lpb[1];
     if (*p > (1UL << lpbr) && i == j)
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest

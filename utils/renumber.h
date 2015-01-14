@@ -32,6 +32,7 @@ struct __renumber_t
   FILE * file;           // file containing the renumbering table
   struct __bad_ideals_t bad_ideals;  // the bad ideals
   p_r_values_t * table;  //renumbering table
+  unsigned long lpb[2]; // the large prime bounds
   uint64_t size;         //number of elements in the renumbering table
   uint8_t nb_bits;  // number of bits taken by an index in the file
                     // 32 or 64
@@ -43,8 +44,6 @@ struct __renumber_t
   index_t *cached; // We cached the index for primes < 2^MAX_LOG_CACHED
   index_t first_not_cached;
   int add_full_col; //do we add a col of 1 to all relations
-  unsigned long lpb0;  // The large prime bound on side 0
-  unsigned long lpb1;  // The large prime bound on side 1
 };
 typedef struct __renumber_t renumber_t[1];
 
