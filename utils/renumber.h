@@ -17,7 +17,6 @@
 #define RENUMBER_SPECIAL_VALUE ((p_r_values_t) -1)
 #define RENUMBER_DEFAULT_SIZE (1 << 22)
 
-
 struct __bad_ideals_t 
 {
   int n; // number of p_r_values that correspond to more than one ideals.
@@ -32,7 +31,7 @@ struct __renumber_t
   FILE * file;           // file containing the renumbering table
   struct __bad_ideals_t bad_ideals;  // the bad ideals
   p_r_values_t * table;  //renumbering table
-  unsigned long lpb[2]; // the large prime bounds
+  unsigned long lpb[2];  // The large prime bounds
   uint64_t size;         //number of elements in the renumbering table
   uint8_t nb_bits;  // number of bits taken by an index in the file
                     // 32 or 64
@@ -42,7 +41,10 @@ struct __renumber_t
                  // if rat = -1, we add p+1 to roots on side 1
                  // else we add p+1 to roots on rat side
   index_t *cached; // We cached the index for primes < 2^MAX_LOG_CACHED
-  index_t first_not_cached;
+  p_r_values_t smallest_prime_not_cached;
+  index_t index_smallest_prime_not_cached;
+  p_r_values_t biggest_prime_below_lpb[2];
+  index_t index_biggest_prime_below_lpb[2];
   int add_full_col; //do we add a col of 1 to all relations
 };
 typedef struct __renumber_t renumber_t[1];

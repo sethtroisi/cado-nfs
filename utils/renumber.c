@@ -28,6 +28,37 @@ static const int ugly[256] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
+
+static uint64_t next_prime_of_powers_of_2[64] = { 0x2, 0x3, 0x5, 0xb, 0x11,
+        0x25, 0x43, 0x83, 0x101, 0x209, 0x407, 0x805, 0x1003, 0x2011, 0x401b,
+        0x8003, 0x10001, 0x2001d, 0x40003, 0x80015, 0x100007, 0x200011,
+        0x40000f, 0x800009, 0x100002b, 0x2000023, 0x400000f, 0x800001d,
+        0x10000003, 0x2000000b, 0x40000003, 0x8000000b, 0x10000000f,
+        0x200000011, 0x400000019, 0x800000035, 0x100000001f, 0x2000000009,
+        0x4000000007, 0x8000000017, 0x1000000000f, 0x2000000001b, 0x4000000000f,
+        0x8000000001d, 0x100000000007, 0x20000000003b, 0x40000000000f,
+        0x800000000005, 0x1000000000015, 0x2000000000045, 0x4000000000037,
+        0x8000000000015, 0x10000000000015, 0x20000000000005, 0x4000000000009f,
+        0x80000000000003, 0x100000000000051, 0x200000000000009,
+        0x400000000000045, 0x800000000000083, 0x1000000000000021,
+        0x200000000000000f, 0x4000000000000087, 0x800000000000001d };
+
+static uint64_t previous_prime_of_powers_of_2[65] = { 0x0, 0x0, 0x3, 0x7, 0xd,
+        0x1f, 0x3d, 0x7f, 0xfb, 0x1fd, 0x3fd, 0x7f7, 0xffd, 0x1fff, 0x3ffd,
+        0x7fed, 0xfff1, 0x1ffff, 0x3fffb, 0x7ffff, 0xffffd, 0x1ffff7, 0x3ffffd,
+        0x7ffff1, 0xfffffd, 0x1ffffd9, 0x3fffffb, 0x7ffffd9, 0xfffffc7,
+        0x1ffffffd, 0x3fffffdd, 0x7fffffff, 0xfffffffb, 0x1fffffff7,
+        0x3ffffffd7, 0x7ffffffe1, 0xffffffffb, 0x1fffffffe7, 0x3fffffffd3,
+        0x7ffffffff9, 0xffffffffa9, 0x1ffffffffeb, 0x3fffffffff5, 0x7ffffffffc7,
+        0xfffffffffef, 0x1fffffffffc9, 0x3fffffffffeb, 0x7fffffffff8d,
+        0xffffffffffc5, 0x1ffffffffffaf, 0x3ffffffffffe5, 0x7ffffffffff7f,
+        0xfffffffffffd1, 0x1fffffffffff91, 0x3fffffffffffdf, 0x7fffffffffffc9,
+        0xfffffffffffffb, 0xfffffffffffff3, 0x3ffffffffffffe5, 0xffffffffffffc9,
+        0xfffffffffffffa3, 0x1fffffffffffffff, 0x3fffffffffffffc7,
+        0x7fffffffffffffe7, 0xffffffffffffffc5 };
+
+
+
 /* Skip line beginning with '#'. Return 0 if fgets return NULL.*/
 static inline size_t
 get_one_line (FILE *f, char *s)
@@ -136,21 +167,36 @@ parse_one_line (char * str)
 }
 
 static void
-print_info (FILE * f, renumber_t r)
+print_info (FILE * f, renumber_t r, int after_reading)
 {
-  fprintf (f, "# INFO on renumber struct:\n# INFO: sizeof(p_r_values_t) = %zu\n"
-              "# INFO: nb_bits = %" PRIu8 "\n# INFO: rat = %d %s\n"
-              "# INFO: #badideals = %d\n# INFO: add_full_col = %d\n"
-              "# INFO: lpb0 = %lu\n# INFO: lpb1 = %lu\n",
-              sizeof(p_r_values_t), r->nb_bits, r->rat,
-              (r->rat == -1) ? "(no rational side)" : "", r->bad_ideals.n,
-              r->add_full_col, r->lpb[0], r->lpb[1]);
+  char pre[9] = "# INFO: ";
+  fprintf (f, "# Information on renumber struct:\n%ssizeof(p_r_values_t) = %zu\n"
+              "%snb_bits = %" PRIu8 "\n%srat = %d %s\n%s#badideals = %d\n"
+              "%sadd_full_col = %d\n%slpb0 = %lu\n%slpb1 = %lu\n",
+              pre, sizeof(p_r_values_t), pre, r->nb_bits, pre, r->rat,
+              (r->rat == -1) ? "(no rational side)" : "", pre, r->bad_ideals.n,
+              pre, r->add_full_col, pre, r->lpb[0], pre, r->lpb[1]);
+
+  if (after_reading) /* there is more info to print*/
+  {
+    fprintf (f, "%ssize = %" PRIu64 "\n"
+                "%ssmallest prime not cached = %" PRpr " at index %" PRid "\n"
+                "%sbiggest prime below lbp0 = %" PRpr " at index %" PRid "\n"
+                "%sbiggest prime below lbp1 = %" PRpr " at index %" PRid "\n",
+                pre, r->size, pre, r->smallest_prime_not_cached,
+                r->index_smallest_prime_not_cached, pre,
+                r->biggest_prime_below_lpb[0],
+                r->index_biggest_prime_below_lpb[0], pre,
+                r->biggest_prime_below_lpb[1],
+                r->index_biggest_prime_below_lpb[1]);
+  }
+  fflush (stdout);
 }
 
 /* sort in decreasing order. Fastest for ~ < 15 values in r[] vs qsort */
 inline void
 renumber_sort_ul (unsigned long *r, size_t n)
-{ 
+{
   unsigned long rmin;
 
   if (UNLIKELY (n < 2))
@@ -160,7 +206,7 @@ renumber_sort_ul (unsigned long *r, size_t n)
     if (r[0] < r[1]) {
       rmin = r[0];
       r[0] = r[1];
-      r[1] = rmin; 
+      r[1] = rmin;
     }
     return;
   }
@@ -229,7 +275,7 @@ renumber_read_first_line (renumber_t renum)
 }
 
 /* Assume v correspond to p + 1 or 2p + 1 (i.e. v > 0) */
-static p_r_values_t
+static inline p_r_values_t
 get_p_from_table_value (renumber_t tab, p_r_values_t v)
 {
   if (tab->rat >= 0) /* One alg and one rat side -> p is v-1 */
@@ -331,8 +377,7 @@ renumber_write_open (renumber_t tab, const char *tablefile, const char *badfile,
   renumber_write_first_line (tab);
 
   /* Print info on stdout (~ what is written on the first line of the file) */
-  print_info (stdout, tab);
-  fflush (stdout);
+  print_info (stdout, tab, 0);
 
   /* Write the two polynomials on a line beginning by #, if given */
   if (poly != NULL)
@@ -392,7 +437,7 @@ renumber_read_table (renumber_t tab, const char * filename)
   uint64_t allocated = RENUMBER_DEFAULT_SIZE;
   size_t default_size = RENUMBER_DEFAULT_SIZE * sizeof (p_r_values_t);
 
-  tab->table           = (p_r_values_t *)   malloc (default_size);
+  tab->table           = (p_r_values_t *) malloc (default_size);
   tab->cached          = (index_t *)      malloc (cached_table_size);
   tab->bad_ideals.p    = (p_r_values_t *) malloc (badideals_pr_size);
   tab->bad_ideals.r    = (p_r_values_t *) malloc (badideals_pr_size);
@@ -428,6 +473,12 @@ renumber_read_table (renumber_t tab, const char * filename)
     }
   }
 
+  p_r_values_t prime_cache_limit = next_prime_of_powers_of_2[MAX_LOG_CACHED];
+  p_r_values_t expected_biggest_prime_lpb[2];
+  expected_biggest_prime_lpb[0] = previous_prime_of_powers_of_2[tab->lpb[0]];
+  expected_biggest_prime_lpb[1] = previous_prime_of_powers_of_2[tab->lpb[1]];
+  int has_smallest = 0;
+
   /* Reading the renumbering table */
   stats_init (infostats, stdout, &(tab->size), 24, "Read", "elements", "",
               "elts");
@@ -440,20 +491,35 @@ renumber_read_table (renumber_t tab, const char * filename)
       allocated += RENUMBER_DEFAULT_SIZE;
       size_t new_size = allocated * sizeof (p_r_values_t);
       tab->table = (p_r_values_t *) realloc (tab->table, new_size);
+      // TODO: Check that realloc did not fail
     }
     tab->table[tab->size] = parse_one_line(s);
 
-    if (tab->size == 0 || tab->table[tab->size-1] == RENUMBER_SPECIAL_VALUE 
+    if (tab->size == 0 || tab->table[tab->size-1] == RENUMBER_SPECIAL_VALUE
                        || tab->table[tab->size] > tab->table[tab->size-1])
     {
       /* We just switch to a new prime in the renumbering table, see if we need
        * to cache it (we cached primes below 2^MAX_LOG_CACHED)
        */
       p_r_values_t p = get_p_from_table_value (tab, tab->table[tab->size]);
-      if ((p >> MAX_LOG_CACHED) == 0) /* p < 2^MAX_LOG_CACHED */
-      {
+      if (p < prime_cache_limit) /* p < 2^MAX_LOG_CACHED */
         tab->cached[p] = tab->size;
-        tab->first_not_cached = tab->size + 1;
+      else if (!has_smallest)
+      {
+        has_smallest = 1;
+        tab->index_smallest_prime_not_cached = tab->size;
+        tab->smallest_prime_not_cached = p;
+      }
+
+      if (p <= expected_biggest_prime_lpb[0])
+      {
+        tab->index_biggest_prime_below_lpb[0] = tab->size;
+        tab->biggest_prime_below_lpb[0] = p;
+      }
+      if (p <= expected_biggest_prime_lpb[1])
+      {
+        tab->index_biggest_prime_below_lpb[1] = tab->size;
+        tab->biggest_prime_below_lpb[1] = p;
       }
     }
     tab->size++;
@@ -468,9 +534,7 @@ renumber_read_table (renumber_t tab, const char * filename)
 
   ASSERT_ALWAYS (feof (tab->file));
 
-  print_info (stdout, tab);
-  printf ("# INFO: first_not_cached = 0x%" PRid "\n", tab->first_not_cached);
-  fflush (stdout);
+  print_info (stdout, tab, 1);
 
   fclose_maybe_compressed (tab->file, filename);
 }
@@ -500,7 +564,7 @@ renumber_write_p_2algs (unsigned long p, unsigned long *roots_alg0, size_t nb_ro
 		       unsigned long *roots_alg1, size_t nb_roots_alg1, char *buffer) {
   size_t size_buffer = 0;
   size_t i;
-  
+
   renumber_sort_ul(roots_alg0, nb_roots_alg0);
   renumber_sort_ul(roots_alg1, nb_roots_alg1);
 
@@ -511,7 +575,7 @@ renumber_write_p_2algs (unsigned long p, unsigned long *roots_alg0, size_t nb_ro
   }
   else
     *roots_alg0 = (p << 1) + 1;                             // The largest roots become 2p+1
-    
+
   for (i = 0; i < nb_roots_alg0; ++i)
     size_buffer += sprintf (buffer + size_buffer, "%lx\n", roots_alg0[i]);
 
@@ -546,7 +610,7 @@ renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long *r[2]
 {
   size_t size_buffer;
   char buffer[512];
-  
+
   if (renumber_info->rat == -1)
     size_buffer = renumber_write_p_2algs (p, r[0], (size_t) k[0], r[1], (size_t) k[1], buffer);
   else
@@ -568,16 +632,6 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   p_r_values_t *tab = renumber_info->table;
   p_r_values_t vr, vp; /* values of r and p as they are stored in the table*/
 
-#ifdef RENUMBER_DO_EXPENSIVE_CHECK
-  {
-    /* assert that p is below the large prime bound */
-    unsigned long lpb = (side == 0) ? renumber_info->lpb[0] : renumber_info->lpb[1];
-    char tmp[256];
-    snprintf (tmp, 256, "p = %" PRpr " >= 2^%lu", p, lpb);
-    FATAL_ERROR_CHECK (((uint64_t) p) >> lpb, tmp);
-  }
-#endif
-
   if (renumber_info->rat == -1)
   {
     vp = (p << 1) + 1;
@@ -589,13 +643,34 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     vr = (side == renumber_info->rat) ? vp : r;
   }
 
-  if (p >> MAX_LOG_CACHED) // p is not cached
+  /**************************************************************************/
+  /* Search for i such that
+        renumber_info->table[i] = vp
+        this is the beginning of a decreasing sequence
+  */
+
+  /* For small value of p, the corresponding value of i is cached */
+  if (p < renumber_info->smallest_prime_not_cached)
+  {
+    i = renumber_info->cached[p];
+    if (UNLIKELY(tab[i] != vp))
+    {
+      /* There is a problem, most probably p is not prime. */
+      fprintf(stderr, "Fatal error in %s at %s:%d\nError with the cached part of"
+                      " the renumbering table\n  p = %" PRpr "\n  vp = %" PRpr
+                      "\n  i = cached[p] = %" PRid "\n  tab[i] = %" PRpr "\n",
+                      __func__, __FILE__, __LINE__, p, vp, i, tab[i]);
+      abort();
+    }
+  }
+  /* p is not cached and below the lpb[side] */
+  else if (p <= renumber_info->biggest_prime_below_lpb[side])
   {
 #ifdef RENUMBER_DO_EXPENSIVE_CHECK
     int nstep = 0;
 #endif
-    index_t max = renumber_info->size - 1;
-    index_t min = renumber_info->first_not_cached;
+    index_t max = renumber_info->index_biggest_prime_below_lpb[side];
+    index_t min = renumber_info->index_smallest_prime_not_cached;
 
     float hint = 2.0 * (((float) p) / logf ((float) p));
     i = (index_t) hint;
@@ -640,19 +715,16 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 #endif
     }
   }
-  else /* p is cached */
+  else /* Error */
   {
-    i = renumber_info->cached[p];
-    if (tab[i] != vp)
-    {
-      /* There is a problem, most probably p is not prime. */
-      fprintf(stderr,"Fatal error in %s at %s:%d\nError with the cached part of "
-                     "the renumbering table\n  p = %" PRpr "\n  vp = %" PRpr
-                     "\n  i = cached[p] = %" PRid "\n  tab[i] = %" PRpr "\n",
-                     __func__, __FILE__, __LINE__, p, vp, i, tab[i]);
-      abort();
-    }
+    /* prime p is bigger than lpb[side] => Fatal error */
+    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, r, side) = (%" PRpr
+                    ", %" PRpr ", %d) is bigger that large prime bound 2^%ld\n",
+                    __func__, __FILE__, __LINE__, p, r, side,
+                    renumber_info->lpb[side]);
+    abort();
   }
+
 
   /**************************************************************************/
   /* Now i points at the beginning of a decreasing sequence of values of vr */
@@ -668,7 +740,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
                                  || tab[i] <= tab[i+1]
                                  || vr > tab[i+1])
     return i;
-  else
+  else /* else we go through the sequence until we find vr */
   {
     while(i != renumber_info->size - 1 && tab[i] > tab[i+1])
     {
@@ -678,9 +750,9 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     }
     /* if we arrive here, there is a problem, the ideal was not found in the
        renumbering table */
-    fprintf(stderr,"Fatal error in %s at %s:%d\nIdeal (p, r, side) = (%" PRpr
-                   ", %" PRpr ", %d) was not found on the renumbering table\n",
-                   __func__, __FILE__, __LINE__, p, r, side);
+    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, r, side) = (%" PRpr
+                    ", %" PRpr ", %d) was not found on the renumbering table\n",
+                    __func__, __FILE__, __LINE__, p, r, side);
     abort();
   }
 }
@@ -729,8 +801,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   else
   {
     *p = tab[j] - 1;
-    unsigned long lpbr = (renumber_info->rat == 0) ? renumber_info->lpb[0] :
-                                                     renumber_info->lpb[1];
+    unsigned long lpbr = renumber_info->lpb[renumber_info->rat];
     if (*p > (1UL << lpbr) && i == j)
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest
