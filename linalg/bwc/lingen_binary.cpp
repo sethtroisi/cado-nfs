@@ -54,6 +54,8 @@
 /* Name of the source a file */
 char input_file[FILENAME_MAX]={'\0'};
 
+char output_file[FILENAME_MAX]={'\0'};
+
 /* threshold for the recursive algorithm */
 unsigned int lingen_threshold = 0;
 
@@ -465,7 +467,12 @@ void bw_commit_f(polmat& F)
     unsigned long * buf;
     size_t rz;
 
-    FILE * f = fopen(LINGEN_F_FILE, "wb");
+    FILE * f;
+    if (!strlen(output_file)) {
+        f = fopen(LINGEN_F_FILE, "wb");
+    } else {
+        f = fopen(output_file, "wb");
+    }
     DIE_ERRNO_DIAG(f == NULL, "fopen", LINGEN_F_FILE);
 
     buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
@@ -1889,6 +1896,7 @@ int main(int argc, char *argv[])
     bw_common_decl_usage(pl);
     /* {{{ declare local parameters and switches */
     param_list_decl_usage(pl, "lingen-input-file", "input file for lingen. Defaults to auto fetched from wdir");
+    param_list_decl_usage(pl, "lingen-output-file", "output file for lingen. Defaults to [wdir]/F");
     param_list_decl_usage(pl, "lingen-threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor-threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
     param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
@@ -1906,6 +1914,14 @@ int main(int argc, char *argv[])
             size_t rc = strlcpy(input_file, tmp, sizeof(input_file));
             if (rc >= sizeof(input_file)) {
                 fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(input_file));
+                exit(EXIT_FAILURE);
+            }
+        }
+        tmp = param_list_lookup_string(pl, "lingen-output-file");
+        if (tmp) {
+            size_t rc = strlcpy(output_file, tmp, sizeof(output_file));
+            if (rc >= sizeof(output_file)) {
+                fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(output_file));
                 exit(EXIT_FAILURE);
             }
         }
