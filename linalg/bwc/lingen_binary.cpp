@@ -41,6 +41,7 @@
 #include "utils.h"
 #include "bw-common.h"
 #include "filenames.h"
+#include "tree_stats.h"
 #include "logline.h"
 
 
@@ -58,6 +59,9 @@ unsigned int lingen_threshold = 0;
 
 /* threshold for cantor fft algorithm */
 unsigned int cantor_threshold = UINT_MAX;
+
+
+tree_stats stats;
 
 /* {{{ macros used here only -- could be bumped to macros.h if there is
  * need.
@@ -1311,6 +1315,7 @@ static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
 static bool go_quadratic(polmat& pi)/*{{{*/
 {
     using namespace globals;
+    tree_stats_enter(stats, __func__, E.ncoef);
 
     unsigned int piv[m];
     unsigned int deg = E.ncoef - 1;
@@ -1366,6 +1371,7 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     }
 #endif
 
+    tree_stats_leave(stats, finished);
     return finished;
 }/*}}}*/
 
@@ -1403,7 +1409,7 @@ struct recursive_tree_timer_t {
         stack.push_back(std::make_pair(st, children));
     }
 
-    void pop(unsigned int t) {
+    void pop(unsigned int t MAYBE_UNUSED) {
         unsigned int level = stack.size() - 1;
 
         double st = stack.back().first;
@@ -1424,7 +1430,10 @@ struct recursive_tree_timer_t {
 
         spent[level].proper += ptime;
 
+#if 0
+        /* tree_stats is much nicer, so we get rid of this. */
         double pct_loc = spent[level].step / (double) (1 << level);
+#endif
 
         /* make up some guess about the total time of all levels */
         unsigned int outermost = level;
@@ -1447,6 +1456,8 @@ struct recursive_tree_timer_t {
             spent_above += spent[i].proper;
         }
 
+#if 0
+        /* tree_stats is much nicer, so we get rid of this. */
         bool leaf = level == spent.size() - 1;
 
         printf("%-8u", t);
@@ -1479,6 +1490,7 @@ struct recursive_tree_timer_t {
         printf("%-27s", buf);
             free(buf);
         printf("\n");
+#endif
     }
     void final_info()
     {
@@ -1502,6 +1514,11 @@ template<typename fft_type>/*{{{*/
 static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 {
     using namespace globals;
+#ifdef  __GNUC__
+    tree_stats_enter(stats, __PRETTY_FUNCTION__, E.ncoef);
+#else
+    tree_stats_enter(stats, __func__, E.ncoef);
+#endif
 
     /* E is known up to O(X^E.ncoef), so we'll consider this is a problem
      * of degree E.ncoef -- this is exactly the number of increases we
@@ -1566,6 +1583,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
         printf("%-8u" "deg(pi_l) = %ld ; escaping\n",
                 t, pi_l_deg);
         pi.swap(pi_left);
+        tree_stats_leave(stats, 1);
         return true;
     }
 
@@ -1639,7 +1657,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
             t,
             (unsigned long) (E_length - (llen - pi_l_deg)),
             pi_left_length,
-            E_length,
+            E_length - llen,
             fft_type::name());
     compose(E_middle_hat, E_hat, pi_l_hat, o);
     logline_end(&t_mp, "");
@@ -1718,6 +1736,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
         printf("%-8u" "deg(pi_r) = %ld ; escaping\n",
                 t, pi.maxdeg());
     }
+    tree_stats_leave(stats, finished_early);
     return finished_early;
 }/*}}}*/
 
@@ -1970,6 +1989,7 @@ int main(int argc, char *argv[])
         sequence_length = sbuf->st_size / one_mat;
         fprintf(stderr, "Automatically detected sequence length %u\n", sequence_length);
     }
+    stats->tree_total_breadth = sequence_length;
 
     m = bw->m;
     n = bw->n;
