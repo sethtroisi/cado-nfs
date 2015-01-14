@@ -45,7 +45,6 @@ typedef struct {
   /* used to decide global bounds */
   double init_lognorm;
   double bound_lognorm;
-  double bound_lognorm_ratio;
   double exp_min_alpha;
 } _ropt_bound_t;
 typedef _ropt_bound_t ropt_bound_t[1];
