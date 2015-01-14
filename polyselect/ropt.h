@@ -22,6 +22,6 @@ void ropt_get_bestpoly ( ropt_poly_t poly,
                          ropt_bestpoly_t bestpoly );
 
 void ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
-                      const int effort, const int verbose);
+                      ropt_param_t param);
 
 #endif /* ROPT_H */

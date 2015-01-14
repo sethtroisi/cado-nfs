@@ -17,6 +17,10 @@
 #define EC_METHOD 4
 #define MPQS_METHOD 5
 
+/* TODO */
+/* #define ECM_MONT_METHOD xxx */
+/* #define ECM_TWED_METHOD xxx */
+
 #define FACUL_NOT_SMOOTH (-1)
 #define FACUL_MAYBE (0)
 #define FACUL_SMOOTH (1)

@@ -210,89 +210,104 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   /* Make bytecode for stage 1 */
   plan->B1 = B1;
   plan->parameterization = parameterization;
-  plan->sigma = sigma;
-  bc_state = bytecoder_init (compress ? &ecm_dict : NULL);
-  p = (unsigned int) getprime (2UL);
-  ASSERT (p == 3);
-  /* If group order is divisible by 12, add another 3 to stage 1 primes */
-  if (extra_primes && 
-      (parameterization == BRENT12 || parameterization == MONTY12))
-    totalcost += prac_bytecode (3, addcost, doublecost, bytecost, 
-                                changecost, bc_state);
-  for ( ; p <= B1; p = (unsigned int) getprime (p))
+  if (parameterization & FULLMONTY)
     {
-      for (q = 1; q <= B1 / p; q *= p)
-	totalcost += prac_bytecode (p, addcost, doublecost, bytecost, 
-	                            changecost, bc_state);
-    }
-  bytecoder ((literal_t) 12, bc_state);
-  bytecoder_flush (bc_state);
-  plan->bc_len = bytecoder_size (bc_state);
-  plan->bc = (char *) malloc (plan->bc_len);
-  ASSERT (plan->bc);
-  bytecoder_read (plan->bc, bc_state);
-  bytecoder_clear (bc_state);
-  getprime (0);
+      plan->sigma = sigma;
+      bc_state = bytecoder_init (compress ? &ecm_dict : NULL);
+      p = (unsigned int) getprime (2UL);
+      ASSERT (p == 3);
+      /* If group order is divisible by 12, add another 3 to stage 1 primes */
+      if (extra_primes && 
+	  (parameterization == BRENT12 || parameterization == MONTY12))
+	totalcost += prac_bytecode (3, addcost, doublecost, bytecost, 
+				    changecost, bc_state);
+      for ( ; p <= B1; p = (unsigned int) getprime (p))
+	{
+	  for (q = 1; q <= B1 / p; q *= p)
+	    totalcost += prac_bytecode (p, addcost, doublecost, bytecost, 
+					changecost, bc_state);
+	}
+      bytecoder ((literal_t) 12, bc_state);
+      bytecoder_flush (bc_state);
+      plan->bc_len = bytecoder_size (bc_state);
+      plan->bc = (char *) malloc (plan->bc_len);
+      ASSERT (plan->bc);
+      bytecoder_read (plan->bc, bc_state);
+      bytecoder_clear (bc_state);
+      getprime (0);
+      
+      if (!compress)
+	{
+	  /* The very first chain init and very last chain end are hard-coded
+	     in the stage 1 code and must be removed from the byte code. */
+	  size_t i;
+	  ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
+	  ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last 
+							code is chain end */
+	  /* check that last code is bytecode end */
+	  ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
+	  /* Remove first code 10 and last code 11 */
+	  for (i = 1; i < plan->bc_len; i++)
+	    plan->bc[i - 1] = plan->bc[i];
+	  plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
+	  plan->bc_len -= 2;
+	}
 
-  if (!compress)
-    {
-      /* The very first chain init and very last chain end are hard-coded
-	 in the stage 1 code and must be removed from the byte code. */
-      size_t i;
-      ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
-      ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last 
-						    code is chain end */
-      /* check that last code is bytecode end */
-      ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
-      /* Remove first code 10 and last code 11 */
-      for (i = 1; i < plan->bc_len; i++)
-	plan->bc[i - 1] = plan->bc[i];
-      plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
-      plan->bc_len -= 2;
+      if (verbose)
+	{
+	  int changes = 0;
+	  printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
+	  printf ("Byte code for stage 1: ");
+	  for (p = 0; p < plan->bc_len; p++)
+	    {
+	      printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+	      changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
+	    }
+	  printf ("\n");
+	  printf ("Length %d, %d code changes, total cost: %f\n", 
+		  plan->bc_len, changes, totalcost);
+	}
     }
-
-  if (verbose)
-    {
-      int changes = 0;
-      printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
-      printf ("Byte code for stage 1: ");
-      for (p = 0; p < plan->bc_len; p++)
-        {
-	  printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
-	  changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
-        }
-      printf ("\n");
-      printf ("Length %d, %d code changes, total cost: %f\n", 
-              plan->bc_len, changes, totalcost);
-    }
-    
+  if (parameterization == TWED16)
+    plan->E = &Ecurve14;
+  
   /* Make stage 2 plan */
   stage2_make_plan (&(plan->stage2), B1, B2, verbose);
 }
+  
 
 void 
 ecm_clear_plan (ecm_plan_t *plan)
 {
   stage2_clear_plan (&(plan->stage2));
-  free (plan->bc);
-  plan->bc = NULL;
-  plan->bc_len = 0;
   plan->B1 = 0;
+
+  if (plan->parameterization & FULLMONTY)
+    {
+      free (plan->bc);
+      plan->bc = NULL;
+      plan->bc_len = 0;
+    }
+  
+  if (plan->parameterization == TWED16)
+    {
+      plan->E = NULL;
+    }
 }
 
 
-void
-ecmE_make_plan (ecmE_plan_t *plan, const unsigned int B1, const int parameterization)
-{
-  fprintf(stderr, "In ecmE_make_plan\n");
+/* void */
+/* ecmE_make_plan (ecmE_plan_t *plan, const unsigned int B1, const int parameterization) */
+/* { */
+/*   fprintf(stderr, "In ecmE_make_plan\n"); */
 
-  plan->exp2 = 0;
-  plan->B1 = B1;
-  plan->parameterization = parameterization;
-  plan->E = &Ecurve14;
-}
+/*   plan->exp2 = 0; */
+/*   plan->B1 = B1; */
+/*   plan->parameterization = parameterization; */
+/*   plan->E = &Ecurve14; */
+/* } */
 
-void 
-ecmE_clear_plan (ecmE_plan_t *plan MAYBE_UNUSED)
-{
-}
+/* void  */
+/* ecmE_clear_plan (ecmE_plan_t *plan MAYBE_UNUSED) */
+/* { */
+/* } */

@@ -277,6 +277,7 @@ struct polmat { /* {{{ */
         }
         return m;
     }/*}}}*/
+    inline unsigned long maxlength() const { return 1 + maxdeg(); }
     void alloc() {
         /* we don't care about exceptions */
         x = mynew<unsigned long>(ncols*colstride());
@@ -834,6 +835,42 @@ template<typename fft_type> struct tpolmat /* {{{ */
     uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * po->size() * sizeof(typename fft_type::t)/sizeof(unsigned long)); }
 };
 /*}}}*/
+
+std::ostream& operator<<(std::ostream& o, polmat const& E)/*{{{*/
+{
+    o << "dims " << E.nrows << " " << E.ncols << " " << E.ncoef << "\n";
+    
+    unsigned long pbits = BITS_TO_WORDS(E.ncoef, ULONG_BITS) * ULONG_BITS;
+    size_t strsize = pbits / 4 + 32;
+    char * str = new char[strsize];
+    for(unsigned int i = 0 ; i < E.nrows ; i++) {
+        for(unsigned int j = 0 ; j < E.ncols ; j++) {
+            const unsigned long * p = E.poly(i,j);
+            *str='\0';
+            char * q = str;
+            unsigned long nbits = 1 + E.deg(j);
+            for(unsigned long top = pbits ; top ; ) {
+                top -= ULONG_BITS;
+                unsigned long w = 0;
+                if (top < nbits) {
+                    w = *p++;
+                    if (nbits-top < ULONG_BITS) {
+                        w &= (1UL << (nbits-top)) - 1;
+                    }
+                }
+                q += snprintf(q, strsize - (q - str),
+                        (ULONG_BITS == 64) ?  "%016lx" :
+                        ((ULONG_BITS == 32) ?  "%08lx" : ",%lx"),
+                        w);
+                ASSERT_ALWAYS((q - str) < (ptrdiff_t) strsize);
+            }
+            o << str << "\n";
+        }
+        o << "\n";
+    }
+    delete str;
+    return o;
+}/*}}}*/
 
 template<typename fft_type>
 void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
