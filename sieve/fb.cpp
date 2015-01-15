@@ -119,11 +119,11 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
     {
         if (i_roots == MAXDEGREE) {
             fprintf (stderr,
-                    "# Error, too many roots for prime %" FBPRIME_FORMAT
-                    " in factor base line %lu\n", p, linenr);
+                    "# Error, too many roots for prime (power) %" FBPRIME_FORMAT
+                    " in factor base line %lu\n", q, linenr);
             exit(EXIT_FAILURE);
         }
-        /* Projective roots r, i.e., ar == b (mod p), are stored as q + r in
+        /* Projective roots r, i.e., ar == b (mod q), are stored as q + r in
            the factor base file; since q can be a 32-bit value, we read the
            root as a 64-bit integer first and subtract q if necessary. */
         const unsigned long long t = strtoull_const (lineptr, &lineptr, 10);
@@ -146,8 +146,8 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
     }
 
     if (i_roots == 0) {
-        fprintf (stderr, "# Error, no root for prime %" FBPRIME_FORMAT
-                " in factor base line %lu\n", p, linenr - 1);
+        fprintf (stderr, "# Error, no root for prime (power) %" FBPRIME_FORMAT
+                " in factor base line %lu\n", q, linenr - 1);
         exit(EXIT_FAILURE);
     }
     nr_roots = i_roots;
