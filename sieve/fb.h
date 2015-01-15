@@ -98,6 +98,12 @@ public:
   void fprint(FILE *out) const;
   bool is_simple() const;
   void transform_roots(fb_general_entry &, qlattice_basis_srcptr) const;
+  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
+    if (k == 1 && p <= pmax && p <= nr_roots * td_thresh) {
+      // printf("Extracting p = %" FBPRIME_FORMAT "\n", p);
+      extracted.push_back(static_cast<unsigned long>(p));
+    }
+  }
 };
 
 class fb_general_vector;
@@ -130,6 +136,7 @@ class fb_slices_interface: public fb_interface {
   virtual fb_vector_interface *get_vector(size_t) const = 0;
   virtual int get_nr_roots() = 0;
   virtual bool is_general() = 0;
+  virtual void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const = 0;
 };
 
 
@@ -143,6 +150,7 @@ public:
   int get_nr_roots(){return 0;};
   bool is_general(){return true;};
   fb_general_vector * transform_roots(qlattice_basis_srcptr) const;
+  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
 };
 
 
@@ -164,6 +172,10 @@ public:
   }
   void fprint(FILE *) const;
   void transform_roots(fb_general_entry &, qlattice_basis_srcptr) const;
+  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
+    if (p <= pmax && p <= Nr_roots * td_thresh)
+      extracted.push_back(static_cast<unsigned long>(p));
+  }
 };
 
 
@@ -179,6 +191,7 @@ class fb_vector: public std::vector<fb_entry_x_roots<Nr_roots> >, public fb_vect
   int get_nr_roots(){return Nr_roots;};
   bool is_general(){return false;};
   fb_general_vector * transform_roots(qlattice_basis_srcptr) const;
+  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
 };
 
 
@@ -199,6 +212,7 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   fb_vector<Nr_roots> *get_vector(const size_t n) const {
     return (n < nr_slices) ? &vectors[n] : NULL;
   }
+  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
 };
 
 
@@ -278,6 +292,7 @@ public:
   fb_vector_interface *get_n_roots_vector(const int n, const size_t slice) {
     return get_slices(n)->get_vector(slice);
   }
+  void extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const;
 };
 
 /* Splits the factor base for a polynomial into disjoint parts which are
@@ -298,12 +313,12 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void make_linear (const mpz_t *poly, fbprime_t powbound, bool do_projective);
   bool mmap_fbc(const char *) {return false;};
   void dump_fbc(const char *) {return;};
-  unsigned long *extract_bycost(size_t &n, fbprime_t pmax, fbprime_t td_thresh);
   size_t size() const {return 0;}
   void fprint(FILE *) const;
   void append(const fb_general_entry &);
   void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
+  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
 };
 
 

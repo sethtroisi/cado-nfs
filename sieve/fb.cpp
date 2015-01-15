@@ -292,6 +292,13 @@ void fb_general_vector::fprint(FILE *out) const {
   }
 }
 
+void fb_general_vector::extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const
+{
+  for (size_t i = 0; i < size(); i++) {
+    (*this)[i].extract_bycost(extracted, pmax, td_thresh);
+  }
+}
+
 template <int Nr_roots>
 void
 fb_entry_x_roots<Nr_roots>::transform_roots(fb_general_entry &result, qlattice_basis_srcptr basis) const
@@ -378,6 +385,15 @@ fb_vector<Nr_roots>::fprint(FILE *out) const
     (*this)[i].fprint(out);
 }
 
+template <int Nr_roots>
+void
+fb_vector<Nr_roots>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
+{
+  for (size_t i = 0; i < this->size(); i++)
+    (*this)[i].extract_bycost(p, pmax, td_thresh);
+}
+
+
 /* http://stackoverflow.com/questions/24130093/gdb-could-not-find-operator */
 template class std::vector<fb_general_entry>;
 
@@ -422,6 +438,15 @@ fb_slices<Nr_roots>::fprint(FILE *out) const
   for (size_t slice = 0; slice < nr_slices; slice++) {
     fprintf (out, "#    Slice %zu:\n", slice);
     vectors[slice].fprint(out);
+  }
+}
+
+template <int Nr_roots>
+void
+fb_slices<Nr_roots>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
+{
+  for (size_t slice = 0; slice < nr_slices; slice++) {
+    vectors[slice].extract_bycost(p, pmax, td_thresh);
   }
 }
 
@@ -506,6 +531,18 @@ fb_part::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
       get_slices(i_roots)->count_entries(nprimes, nroots, weight);
   }
   general_vector.count_entries(nprimes, nroots, weight);  
+}
+
+
+void
+fb_part::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
+{
+  if (!only_general) {
+    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
+      get_slices(i_roots)->extract_bycost(p, pmax, td_thresh);
+  }
+
+  general_vector.extract_bycost(p, pmax, td_thresh);
 }
 
 
@@ -845,6 +882,15 @@ fb_factorbase::count_entries(size_t *nprimes, size_t *nroots, double *weight) co
   }
 }
 
+void
+fb_factorbase::extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const
+{
+  for (size_t part = 0; part < FB_MAX_PARTS; part++) {
+    parts[part]->extract_bycost(extracted, pmax, td_thresh);
+  }
+}
+
+
 
 #ifdef TESTDRIVE
 
@@ -893,6 +939,15 @@ int main(int argc, char **argv)
   fb1 = new fb_factorbase(thresholds, nr_slices, only_general);
   fb1->make_linear(poly, powbound, true);
   output(fb1, "from linear polynomial, only_general = false");
+
+  printf("Trialdiv primes:\n");
+  std::vector<unsigned long> *extracted = new std::vector<unsigned long>;
+  fb1->extract_bycost(*extracted, 100, 200);
+  for (std::vector<unsigned long>::iterator it = extracted->begin(); it != extracted->end(); it++) {
+    printf("%lu ", *it);
+  }
+  printf("\n");
+
   delete fb1;
   mpz_clear(poly[0]);
   mpz_clear(poly[1]);
