@@ -6,8 +6,6 @@
 #include "portability.h"
 #include "utils.h"
 
-//#define RENUMBER_DO_EXPENSIVE_CHECK
-
 /********************** internal functions *****************************/
 
 static const int ugly[256] = {
@@ -680,47 +678,59 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     index_t max = renumber_info->index_biggest_prime_below_lpb[side];
     index_t min = renumber_info->index_smallest_prime_not_cached;
 
-    float hint = 2.0 * (((float) p) / logf ((float) p));
-    i = (index_t) hint;
-    if (i < min)
-      i = min;
-    else if (i > max)
+    if (UNLIKELY(p == renumber_info->biggest_prime_below_lpb[side]))
       i = max;
-
-    /* Looking for vp: the values of vp are ordered in increasing order and are
-       always at the beginning of a decreasing sequence */
-    while (1)
+    else if (UNLIKELY(p == renumber_info->smallest_prime_not_cached))
+      i = min;
+    else /* We have to look for i such that tab[i] == vp between min and max. */
     {
-      index_t old_i = i;
+      i = (min + max) / 2;
 
-      while (i > 0 && tab[i-1] > tab[i])
-        i--;
-
-      if (tab[i] == vp)
-        break;
-      else if (tab[i] < vp)
+      /* Looking for vp: the values of vp are ordered in increasing order and are
+        always at the beginning of a decreasing sequence */
+      while (1)
       {
-        min = old_i;
-        i = (old_i + max)/2;
-        if (i == old_i)
-          i++;
-      }
-      else
-      {
-        max = old_i;
-        i = (old_i + min)/2;
-        if (i == old_i)
+        index_t i_bak = i;
+        while (i > 0 && tab[i-1] > tab[i])
           i--;
+
+        if (i != min)
+        {
+          if (vp == tab[i])
+            break;
+          else if (vp < tab[i])
+            max = i;
+          else /* vp > tab[i] */
+            min = i;
+        }
+        else
+        {
+          i = i_bak + 1;
+          while (i < max && tab[i-1] > tab[i])
+            i++;
+
+          if (i != max)
+          {
+            if (vp == tab[i])
+              break;
+            else if (vp < tab[i])
+              max = i;
+            else /* vp > tab[i] */
+              min = i;
+          }
+          else
+          {
+            /* prime p is not in the table => Fatal error */
+            fprintf(stderr, "Fatal error in %s at %s:%d\nIdeals above p = "
+                            "%" PRpr " are not in the renumbering table\n"
+                            "Maybe p is not prime ?\n", __func__, __FILE__,
+                            __LINE__, p);
+            abort();
+          }
+        }
+
+        i = (min + max)/2;
       }
-#ifdef RENUMBER_DO_EXPENSIVE_CHECK
-      {
-        /* Stop infinite loops (which indicate bug) */
-        nstep++;
-        char tmp[256];
-        snprintf (tmp, 256, "ntep=%d >= 64 (p=%" PRpr " not prime?)", nstep, p);
-        FATAL_ERROR_CHECK ((nstep >= 64), tmp);
-      }
-#endif
     }
   }
   else /* Error */
