@@ -635,7 +635,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         /* We have a new entry to parse */
         if (hint_size >= hint_alloc) {
             hint_alloc = 2 * hint_alloc + 8;
-            las->hint_table = realloc(las->hint_table, hint_alloc * sizeof(descent_hint));
+            las->hint_table = (descent_hint *) realloc(las->hint_table, hint_alloc * sizeof(descent_hint));
         }
 
         descent_hint_ptr h = las->hint_table[hint_size++];
@@ -694,16 +694,16 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
     }
     if (hint_size >= hint_alloc) {
         hint_alloc = 2 * hint_alloc + 8;
-        las->hint_table = realloc(las->hint_table, hint_alloc * sizeof(descent_hint));
+        las->hint_table = (descent_hint *) realloc(las->hint_table, hint_alloc * sizeof(descent_hint));
     }
     las->hint_table[hint_size++]->conf->bitsize = 0;
-    las->hint_table = realloc(las->hint_table, hint_size * sizeof(descent_hint));
+    las->hint_table = (descent_hint *) realloc(las->hint_table, hint_size * sizeof(descent_hint));
 
     /* Allocate the quick lookup tables */
 
     for(int s = 0 ; s < 2 ; s++) {
         unsigned int n = las->max_hint_bitsize[s] + 1;
-        las->hint_lookups[s] = malloc(n * sizeof(unsigned int));
+        las->hint_lookups[s] = (int *)malloc(n * sizeof(int));
         for(unsigned int i = 0 ; i < n ; i++) {
             las->hint_lookups[s][i] = -1;
         }
@@ -961,7 +961,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* }}} */
     las_info_init_hint_table(las, pl);
     /* Allocate room for only one sieve_info */
-    las->sievers = malloc(sizeof(sieve_info));
+    las->sievers = (sieve_info_ptr) malloc(sizeof(sieve_info));
     memset(las->sievers, 0, sizeof(sieve_info));
 }/*}}}*/
 
@@ -997,7 +997,7 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     if (si->conf->bitsize)
         return si;
     /* We've hit the end marker. Need to add a new config. */
-    las->sievers = realloc(las->sievers, (n+2) * sizeof(sieve_info));
+    las->sievers = (sieve_info_ptr) realloc(las->sievers, (n+2) * sizeof(sieve_info));
     si = las->sievers + n;
     verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on the %s side\n",
             sc->bitsize, sidenames[sc->side]);
@@ -1009,7 +1009,7 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
 
 void las_todo_push_withdepth(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
 {
-    las_todo_ptr nd = malloc(sizeof(las_todo));
+    las_todo_ptr nd = (las_todo_ptr) malloc(sizeof(las_todo));
     memset(nd, 0, sizeof(las_todo));
     mpz_init_set(nd->p, p);
     mpz_init_set(nd->r, r);
@@ -1024,7 +1024,7 @@ void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side)
 }
 void las_todo_push_closing_brace(las_todo_ptr * d, int depth)
 {
-    las_todo_ptr nd = malloc(sizeof(las_todo));
+    las_todo_ptr nd = (las_todo_ptr) malloc(sizeof(las_todo));
     memset(nd, 0, sizeof(las_todo));
     mpz_init(nd->p);
     mpz_init(nd->r);
@@ -1324,7 +1324,7 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
         (*f)(thrs[0]);
         return;
     }
-    pthread_t * th = malloc(n * sizeof(pthread_t)); 
+    pthread_t * th = (pthread_t *) malloc(n * sizeof(pthread_t)); 
     ASSERT_ALWAYS(th);
 
 #if 0
@@ -1395,7 +1395,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
       uint16_t x;
 #ifdef HAVE_SSE2
-      _mm_prefetch(((void *) read_ptr)+256, _MM_HINT_NTA);
+      _mm_prefetch(((unsigned char *) read_ptr)+256, _MM_HINT_NTA);
 #endif
       x0 = ((uint64_t *) read_ptr)[0];
       x1 = ((uint64_t *) read_ptr)[1];
