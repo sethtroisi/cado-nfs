@@ -1179,3 +1179,5 @@ linalg/bwc/tree_stats.c
 linalg/bwc/tree_stats.h
 tests/linalg/bwc/perlrandom.pl
 tests/linalg/bwc/test-lingen.sh
+linalg/bwc/lingen_qcode.c
+linalg/bwc/lingen_qcode.h
