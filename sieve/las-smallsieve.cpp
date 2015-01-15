@@ -286,6 +286,7 @@ int * small_sieve_copy_start(int * base, int bounds[2])
     memcpy(res, base + bounds[0], (bounds[1] - bounds[0]) * sizeof(int));
     return res;
 }
+
 /* Only compute the initial ssdpos fields. */
 int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_srcptr si)
 {
@@ -302,7 +303,7 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             ssp_t * ssp = &(ssd->ssp[i]);
             unsigned int compensate = si->I / 2;
             compensate += j0 * ssp->r;
-            ssdpos[i] = compensate %ssp->p;
+            ssdpos[i] = compensate % ssp->p;
         }
         if (event & SSP_END) break;
         // Remark: even in the case of discard, we want to precompute the
@@ -326,8 +327,8 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             if (j1 == 0) {
                 j1 += ssp->g;
             }
-            compensate += (j1/ssp->g) * ssp->U;
-            ssdpos[i] = (j1-j0) * si->I + compensate % ssp->q;
+            compensate += (j1 / ssp->g) * ssp->U;
+            ssdpos[i] = (j1 - j0) * si->I + compensate % ssp->q;
         } else if (event & SSP_POW2) {
             /* For powers of 2, we sieve only odd lines (*) and 
              * ssdpos needs to point at line j=1. We assume
