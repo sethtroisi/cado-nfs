@@ -1,3 +1,8 @@
+/* TODO:
+   - implement Knuth-Schroeppel choice for multiplier
+   - implement Alex's idea in is_smooth (see FIXME)
+ */
+
 /* tiny MPQS implementation, specially tuned for 64- to 128-bit input */
 
 // #define LARGE_PRIME
@@ -5,7 +10,11 @@
 // #define TRACE -23830
 // #define TRACE_P 937
 
+/* minimum difference between number of relations and factor base size */
 #define WANT_EXCESS 11
+
+/* number of small primes we skip (should be >= 1 since we always skip 2) */
+#define SKIP 10
 
 #include "cado.h"
 #include <stdio.h>
@@ -168,13 +177,13 @@ findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
   modul_init (uu, pp);
   modul_init (vv, pp);
   modul_set_ul (tt, inva, pp);
-  modul_set_ul (vv, k1, pp);
+  modul_set_ul_reduced (vv, k1, pp);
   modul_neg (uu, vv, pp);
-  modul_sub_ul (uu, uu, bmodp, pp);
-  modul_mul (uu, uu, tt, pp);
+  modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
+  modul_mul (uu, uu, tt, pp);       /* (-r-b)/a */
   *k2 = mod_get_ul (uu, pp);
-  modul_sub_ul (uu, vv, bmodp, pp);
-  modul_mul (uu, uu, tt, pp);
+  modul_sub_ul (uu, vv, bmodp, pp); /* r-b */
+  modul_mul (uu, uu, tt, pp);       /* (r-b)/a */
   k1 = mod_get_ul (uu, pp);
   modul_clear (tt, pp);
   modul_clear (uu, pp);
@@ -269,6 +278,8 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
       unsigned long q = R * invp[i];
       unsigned long r0, r1;
 
+      /* FIXME: q*p >= 2^64 iff q > (2^64-1)/p, which can be precomputed,
+         see the trialdiv code */
       ularith_mul_ul_ul_2ul (&r0, &r1, q, p);
       if (r1 == 0)
         {
@@ -603,8 +614,11 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   else
     {
       M = 1 << (11 + ((Nbits - 56) >> 4));
-      ncol = 75 << ((Nbits - 56) >> 4);
+      ncol = 47 << ((Nbits - 56) >> 4);
     }
+  /* in case M fills the L1 cache, reduce it a bit */
+  if (M == 32768)
+    M -= M / 12;
 
   mpz_init (N);
   k = best_multiplier (N0, Nbits, Nbits);
@@ -740,12 +754,22 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 #ifdef TRACE
       printf ("radix=%f logradix=%f\n", radix, logradix);
 #endif
+#define ROUND round
       for (j = 0; j < lim; j++)
-        Logp[j] = (char) floor (log ((double) P[j]) / logradix);
-      log2[1] = (char) floor (log ((double) 8) / logradix);
-      log2[3] = (char) floor (log ((double) 2) / logradix);
-      log2[5] = (char) floor (log ((double) 4) / logradix);
+        Logp[j] = (char) ROUND (log ((double) P[j]) / logradix);
+      log2[1] = (char) ROUND (log ((double) 8) / logradix);
+      log2[3] = (char) ROUND (log ((double) 2) / logradix);
+      log2[5] = (char) ROUND (log ((double) 4) / logradix);
       log2[7] = log2[3];
+
+      /* take into account the skipped primes */
+      double skip_value = 0;
+      for (j = 1; j < SKIP; j++)
+        /* the extra value of 0.5 ensures experimentally that the number of
+           found relations does not decrease when SKIP increases, but a
+           theoretical justification is still needed... */
+        skip_value += 2.0 * log ((double) P[j]) / (double) (P[j] - 1) + 0.5;
+
       for (i = 0; i <= M; i++)
         {
           /* At location i, the norm is ((a*i+b)^2-N)/a. Since 0 <= b < a,
@@ -755,11 +779,16 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           /* Note: we don't consider the +b term here, which makes the norm
              approximation not very reliable near roots of (a*x+b)^2 = N */
           x = (x * x - Nd) / ad;
-          T[M - i] = (unsigned char) ceil (log (fabs (x)) / logradix);
+          x = fabs (x);
+          x = (log (x) - skip_value) / logradix;
+          T[M - i] = (unsigned char) ceil (x < 0 ? 0 : x);
           if (i < M)
             T[M + i] = T[M - i];
         }
-      threshold = T[0] - (char) floor (log ((double) P[ncol - 1]) / logradix);
+
+      threshold = T[0] - (char) ROUND (log ((double) P[ncol - 1]) / logradix);
+      if (threshold < 128)
+        threshold = 128;
       ASSERT_ALWAYS(threshold >= 128);
       mask = 128;
       mask8 = (mask << 8) | mask;
@@ -790,7 +819,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_submul_ui (b, a, M);
   batch_invert (Q, P, lim, sqrtaa, inva);
   /* skip prime p=2 which is already taken into account in T[] */
-  for (j = 1; j < lim; j++)
+  for (j = SKIP; j < lim; j++)
     {
       unsigned long k2 = -1;
       long i2;

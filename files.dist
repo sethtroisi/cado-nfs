@@ -1161,6 +1161,7 @@ sieve/strategies/finding_good_strategy.h
 sieve/strategies/gen_decomp.c
 sieve/strategies/gen_decomp.h
 sieve/strategies/test_gen_decomp.c
+sieve/strategies/create_strat_file.sh
 tests/sieve/strategies/CMakeLists.txt
 tests/sieve/strategies/utils_st/CMakeLists.txt
 tests/sieve/strategies/utils_st/test_strategy.c
@@ -1176,3 +1177,5 @@ sieve/iqsort.h
 tests/sieve/test_memset_things.c
 linalg/bwc/tree_stats.c
 linalg/bwc/tree_stats.h
+tests/linalg/bwc/perlrandom.pl
+tests/linalg/bwc/test-lingen.sh

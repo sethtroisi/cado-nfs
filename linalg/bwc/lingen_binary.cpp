@@ -41,6 +41,7 @@
 #include "utils.h"
 #include "bw-common.h"
 #include "filenames.h"
+#include "tree_stats.h"
 #include "logline.h"
 
 
@@ -53,11 +54,16 @@
 /* Name of the source a file */
 char input_file[FILENAME_MAX]={'\0'};
 
+char output_file[FILENAME_MAX]={'\0'};
+
 /* threshold for the recursive algorithm */
 unsigned int lingen_threshold = 0;
 
 /* threshold for cantor fft algorithm */
 unsigned int cantor_threshold = UINT_MAX;
+
+
+tree_stats stats;
 
 /* {{{ macros used here only -- could be bumped to macros.h if there is
  * need.
@@ -461,7 +467,12 @@ void bw_commit_f(polmat& F)
     unsigned long * buf;
     size_t rz;
 
-    FILE * f = fopen(LINGEN_F_FILE, "wb");
+    FILE * f;
+    if (!strlen(output_file)) {
+        f = fopen(LINGEN_F_FILE, "wb");
+    } else {
+        f = fopen(output_file, "wb");
+    }
     DIE_ERRNO_DIAG(f == NULL, "fopen", LINGEN_F_FILE);
 
     buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
@@ -750,7 +761,7 @@ static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
 {
     /* Sort the columns. It might seem merely cosmetic and useless to
      * sort w.r.t both the global and local nominal degrees. In fact, it
-     * is crucial for the corectness of the computations. (Imagine a
+     * is crucial for the correctness of the computations. (Imagine a
      * 2-step increase, starting with uneven global deltas, and hitting
      * an even situation in the middle. One has to sort out the local
      * deltas to prevent trashing the whole picture).
@@ -1311,9 +1322,20 @@ static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
 static bool go_quadratic(polmat& pi)/*{{{*/
 {
     using namespace globals;
+    using namespace std;
+    tree_stats_enter(stats, __func__, E.ncoef);
 
     unsigned int piv[m];
     unsigned int deg = E.ncoef - 1;
+    for(unsigned int j = 0 ; j < E.ncols ; j++) {
+        E.deg(j) = deg;
+    }
+
+#ifdef VERBOSE_4PAUL
+    cout << "input go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
+    cout << E << "\n";
+    double ttq = -seconds();
+#endif
 
     polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
     for(unsigned int i = 0 ; i < m + n ; i++) {
@@ -1366,6 +1388,14 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     }
 #endif
 
+#ifdef VERBOSE_4PAUL
+    ttq += seconds();
+    cout << "output go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
+    cout << pi << "\n";
+    cout << "Time taken: " << ttq << "\n";
+#endif
+
+    tree_stats_leave(stats, finished);
     return finished;
 }/*}}}*/
 
@@ -1403,7 +1433,7 @@ struct recursive_tree_timer_t {
         stack.push_back(std::make_pair(st, children));
     }
 
-    void pop(unsigned int t) {
+    void pop(unsigned int t MAYBE_UNUSED) {
         unsigned int level = stack.size() - 1;
 
         double st = stack.back().first;
@@ -1424,7 +1454,10 @@ struct recursive_tree_timer_t {
 
         spent[level].proper += ptime;
 
+#if 0
+        /* tree_stats is much nicer, so we get rid of this. */
         double pct_loc = spent[level].step / (double) (1 << level);
+#endif
 
         /* make up some guess about the total time of all levels */
         unsigned int outermost = level;
@@ -1447,6 +1480,8 @@ struct recursive_tree_timer_t {
             spent_above += spent[i].proper;
         }
 
+#if 0
+        /* tree_stats is much nicer, so we get rid of this. */
         bool leaf = level == spent.size() - 1;
 
         printf("%-8u", t);
@@ -1479,6 +1514,7 @@ struct recursive_tree_timer_t {
         printf("%-27s", buf);
             free(buf);
         printf("\n");
+#endif
     }
     void final_info()
     {
@@ -1502,6 +1538,11 @@ template<typename fft_type>/*{{{*/
 static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 {
     using namespace globals;
+#ifdef  __GNUC__
+    tree_stats_enter(stats, __PRETTY_FUNCTION__, E.ncoef);
+#else
+    tree_stats_enter(stats, __func__, E.ncoef);
+#endif
 
     /* E is known up to O(X^E.ncoef), so we'll consider this is a problem
      * of degree E.ncoef -- this is exactly the number of increases we
@@ -1566,6 +1607,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
         printf("%-8u" "deg(pi_l) = %ld ; escaping\n",
                 t, pi_l_deg);
         pi.swap(pi_left);
+        tree_stats_leave(stats, 1);
         return true;
     }
 
@@ -1639,7 +1681,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
             t,
             (unsigned long) (E_length - (llen - pi_l_deg)),
             pi_left_length,
-            E_length,
+            E_length - llen,
             fft_type::name());
     compose(E_middle_hat, E_hat, pi_l_hat, o);
     logline_end(&t_mp, "");
@@ -1718,6 +1760,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
         printf("%-8u" "deg(pi_r) = %ld ; escaping\n",
                 t, pi.maxdeg());
     }
+    tree_stats_leave(stats, finished_early);
     return finished_early;
 }/*}}}*/
 
@@ -1870,6 +1913,7 @@ int main(int argc, char *argv[])
     bw_common_decl_usage(pl);
     /* {{{ declare local parameters and switches */
     param_list_decl_usage(pl, "lingen-input-file", "input file for lingen. Defaults to auto fetched from wdir");
+    param_list_decl_usage(pl, "lingen-output-file", "output file for lingen. Defaults to [wdir]/F");
     param_list_decl_usage(pl, "lingen-threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor-threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
     param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
@@ -1887,6 +1931,14 @@ int main(int argc, char *argv[])
             size_t rc = strlcpy(input_file, tmp, sizeof(input_file));
             if (rc >= sizeof(input_file)) {
                 fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(input_file));
+                exit(EXIT_FAILURE);
+            }
+        }
+        tmp = param_list_lookup_string(pl, "lingen-output-file");
+        if (tmp) {
+            size_t rc = strlcpy(output_file, tmp, sizeof(output_file));
+            if (rc >= sizeof(output_file)) {
+                fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(output_file));
                 exit(EXIT_FAILURE);
             }
         }
@@ -1968,8 +2020,9 @@ int main(int argc, char *argv[])
                     input_file, (size_t) sbuf->st_size, one_mat, bw->m, bw->n);
         }
         sequence_length = sbuf->st_size / one_mat;
-        fprintf(stderr, "Automatically detected sequence length %u\n", sequence_length);
+        printf("Automatically detected sequence length %u\n", sequence_length);
     }
+    stats->tree_total_breadth = sequence_length;
 
     m = bw->m;
     n = bw->n;
