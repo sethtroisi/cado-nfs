@@ -72,7 +72,7 @@
  */
 
 /* define prime_hint_t to uint32_t to use 32-bit prime hints */
-typedef uint16_t prime_hint_t;
+typedef uint32_t prime_hint_t;
 
 /* THE ORDER IS MANDATORY! */
 typedef struct {
