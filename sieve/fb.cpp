@@ -134,7 +134,7 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
             exit(EXIT_FAILURE);
         }
 
-        roots[i_roots++] = fb_general_root(static_cast<fbroot_t>(t - ((t >= p) ? p : 0)), nexp, oldexp, (t >= p));
+        roots[i_roots++] = fb_general_root(static_cast<fbroot_t>(t - ((t >= q) ? q : 0)), nexp, oldexp, (t >= q));
         if (*lineptr != '\0' && *lineptr != ',') {
             fprintf(stderr,
                     "# Incorrect format in factor base file line %lu\n",
