@@ -491,7 +491,7 @@ renumber_read_table (renumber_t tab, const char * filename)
       allocated += RENUMBER_DEFAULT_SIZE;
       size_t new_size = allocated * sizeof (p_r_values_t);
       tab->table = (p_r_values_t *) realloc (tab->table, new_size);
-      // TODO: Check that realloc did not fail
+      ASSERT_ALWAYS (tab->table != NULL);
     }
     tab->table[tab->size] = parse_one_line(s);
 
