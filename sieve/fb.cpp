@@ -721,6 +721,56 @@ fb_log (double n, double log_scale, double offset)
 }
 
 
+/* Search for the minimum n in [1, fbb] such that fb_log(n, scale, 0.) >= i */
+static fbprime_t
+find_one_step(const unsigned char i, const fbprime_t fbb, const double scale)
+{
+  fbprime_t imin = 1, imax = fbb;
+  ASSERT_ALWAYS(fbb > 0);
+
+  while (imin < imax)
+    {
+      fbprime_t imid = imin + (imax - imin) / 2; /* No overflow */
+      if (fb_log(imid, scale, 0.) < i)
+        imin = imid + 1;
+      else
+        imax = imid;
+    }
+ 
+  ASSERT_ALWAYS(imin == imax);
+  ASSERT_ALWAYS(fb_log(imin, scale, 0.) >= i);
+  ASSERT_ALWAYS(imin == 1 || fb_log(imin - 1, scale, 0.) < i);
+  return imin;
+}
+
+
+unsigned char
+fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
+{
+    unsigned char i;
+    // const double base = exp(1. / scale);
+
+    if (fbb == 0)
+      return 0;
+    const unsigned char max = fb_log(fbb, scale, 0.);
+    // fprintf(stderr, "fbb = %lu, scale = %f, base = %f, max = %hu\n", (unsigned long) fbb, scale, base, max);
+    for (i = 0; i < max; i++) {
+        fbprime_t step = find_one_step(i + 1, fbb, scale);
+        ASSERT_ALWAYS(step > 0);
+        steps[i] = step - 1;
+    }
+    steps[max] = fbb;
+
+    /* One last test. steps[i] contains the largest integer such that
+       fb_log(steps[i]) <= i, and steps[max] contains FBB. */
+    for (i = 0; i < max; i++) {
+        ASSERT_ALWAYS(fb_log(steps[i], scale, 0.) <= i);
+        ASSERT_ALWAYS(fb_log(steps[i] + 1, scale, 0.) > i);
+    }
+    ASSERT_ALWAYS(fb_log(steps[max], scale, 0.) == max);
+    return max;
+}
+
 /* Make one factor base entry for a linear polynomial poly[1] * x + poly[0]
    and the prime (power) q. We assume that poly[0] and poly[1] are coprime.
    Non-projective roots a/b such that poly[1] * a + poly[0] * b == 0 (mod q)
