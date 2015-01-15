@@ -15,7 +15,7 @@ $ctx->add($seed);
 
 while ($nbytes > 0) {
     my $crap = $ctx->clone->digest;
-    my $take = ($nbytes >= 20) ? 20 : $nbytes;
+    my $take = ($nbytes >= 16) ? 16 : $nbytes;
     syswrite(STDOUT, $crap, $take);
     $nbytes -= $take;
     $ctx->add($crap);

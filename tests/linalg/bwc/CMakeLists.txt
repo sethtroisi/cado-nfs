@@ -56,7 +56,7 @@ macro(add_lingen_binary_test testname)
     add_test(test-bwc-lingen-binary-${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/test-lingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
 endmacro(add_lingen_binary_test)
 
-add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75 64 64 200 1 lingen-threshold=10 ${extra})
+add_lingen_binary_test(test0 30b90451fb828f08caa160f96c585c4b1c0951a8 64 64 200 1 lingen-threshold=10 ${extra})
 
 foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(extra)
