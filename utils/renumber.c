@@ -169,24 +169,26 @@ print_info (FILE * f, renumber_t r, int after_reading)
 {
   char pre[9] = "# INFO: ";
   fprintf (f, "# Information on renumber struct:\n%ssizeof(p_r_values_t) = %zu\n"
-              "%snb_bits = %" PRIu8 "\n%srat = %d %s\n%s#badideals = %d\n"
-              "%sadd_full_col = %d\n%slpb0 = %lu\n%slpb1 = %lu\n",
-              pre, sizeof(p_r_values_t), pre, r->nb_bits, pre, r->rat,
-              (r->rat == -1) ? "(no rational side)" : "", pre, r->bad_ideals.n,
-              pre, r->add_full_col, pre, r->lpb[0], pre, r->lpb[1]);
+              "%snb_bits = %" PRIu8 "\n%snumber of polynomials = %u\n", pre,
+              sizeof(p_r_values_t), pre, r->nb_bits, pre, r->nb_polys);
+  if (r->rat == -1)
+    fprintf (f, "%sThere is no rational side\n", pre);
+  else
+    fprintf (f, "%sPolynomial on side %d is rational\n", pre, r->rat);
+  fprintf (f, "%s#badideals = %d\n%sadd_full_col = %d\n", pre, r->bad_ideals.n,
+              pre, r->add_full_col);
+  for (unsigned int i = 0; i < r->nb_polys; i++)
+    fprintf (f, "%slpb%d = %lu\n", pre, i, r->lpb[i]);
 
   if (after_reading) /* there is more info to print*/
   {
-    fprintf (f, "%ssize = %" PRIu64 "\n"
-             "%ssmallest prime not cached = 0x%" PRpr " at index 0x%" PRid "\n"
-             "%sbiggest prime below lbp0 is 0x%" PRpr " at index 0x%" PRid "\n"
-             "%sbiggest prime below lbp1 is 0x%" PRpr " at index 0x%" PRid "\n",
-             pre, r->size, pre, r->smallest_prime_not_cached,
-             r->index_smallest_prime_not_cached, pre,
-             r->biggest_prime_below_lpb[0],
-             r->index_biggest_prime_below_lpb[0], pre,
-             r->biggest_prime_below_lpb[1],
-             r->index_biggest_prime_below_lpb[1]);
+    fprintf (f, "%ssize = %" PRIu64 "\n%ssmallest prime not cached = "
+             "0x%" PRpr " at index 0x%" PRid "\n", pre, r->size, pre,
+             r->smallest_prime_not_cached, r->index_smallest_prime_not_cached);
+    for (unsigned int i = 0; i < r->nb_polys; i++)
+      fprintf (f, "%sbiggest prime below lbp%d is 0x%" PRpr " at index "
+                  "0x%" PRid "\n", pre, i, r->biggest_prime_below_lpb[i],
+                  r->index_biggest_prime_below_lpb[i]);
   }
   fflush (stdout);
 }
@@ -228,18 +230,20 @@ renumber_sort_ul (unsigned long *r, size_t n)
 
 /* return zero if no roots mod p, else non-zero */
 static int
-get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
+get_largest_root_mod_p (p_r_values_t *r, mpz_poly_srcptr f, p_r_values_t p)
 {
-  // if there is a proj root, this the largest (r = p by convention)
-  if (mpz_divisible_ui_p (pol[deg], p)) {
+  int deg = f->deg;
+  /* If there is a projective root, it is the largest (r = p by convention) */
+  if (mpz_divisible_ui_p (f->coeff[deg], p))
+  {
     *r = p;
     return 1;
   }
 
-  mpz_poly_t f = {{ .coeff = pol, .deg = deg }};
   unsigned long roots[deg];
-  size_t k = (size_t) mpz_poly_roots_ulong (roots, f, p);
-  if (k) {
+  size_t k = (size_t) mpz_poly_roots_ulong (roots, (mpz_poly_ptr) f, p);
+  if (k)
+  {
     unsigned long max = roots[--k];
     while (k--)
       if (UNLIKELY (roots[k] > max)) max = roots[k];
@@ -253,33 +257,57 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
 static void
 renumber_write_first_line (renumber_t renum)
 {
-  fprintf (renum->file, "%" PRIu8 " %d %d %d %lu %lu\n", renum->nb_bits,
-           renum->rat, renum->bad_ideals.n, renum->add_full_col, renum->lpb[0],
-           renum->lpb[1]);
+  fprintf (renum->file, "%" PRIu8 " %d %d %d %u", renum->nb_bits, renum->rat,
+                    renum->bad_ideals.n, renum->add_full_col, renum->nb_polys);
+  for (unsigned int i = 0; i < renum->nb_polys; i++)
+    fprintf (renum->file, " %lu", renum->lpb[i]);
+  fprintf (renum->file, "\n");
 }
 
 static void
 renumber_read_first_line (renumber_t renum)
 {
   int ret;
-  ret = fscanf (renum->file, "%" SCNu8 " %d %d %d %lu %lu\n", &(renum->nb_bits),
-                &(renum->rat), &(renum->bad_ideals.n), &(renum->add_full_col),
-                &(renum->lpb[0]), &(renum->lpb[1]));
-  ASSERT_ALWAYS (ret == 6);
-  ASSERT_ALWAYS (-1 <= renum->rat && renum->rat <= 1);
+  ret = fscanf (renum->file, "%" SCNu8 " %d %d %d %u", &(renum->nb_bits),
+                             &(renum->rat), &(renum->bad_ideals.n),
+                             &(renum->add_full_col), &(renum->nb_polys));
+  ASSERT_ALWAYS (ret == 5);
+  ASSERT_ALWAYS (renum->nb_polys >= 2);
+  ASSERT_ALWAYS (-1 <= renum->rat && renum->rat < (int) renum->nb_polys);
   ASSERT_ALWAYS (renum->add_full_col == 0 || renum->add_full_col == 1);
   ASSERT_ALWAYS (renum->nb_bits <= 8 * sizeof(p_r_values_t));
   ASSERT_ALWAYS (renum->nb_bits == 32 || renum->nb_bits == 64);
+  renum->lpb = (unsigned long *) malloc (renum->nb_polys*sizeof(unsigned long));
+  ASSERT_ALWAYS (renum->lpb != NULL);
+
+  for (unsigned int i = 0; i < renum->nb_polys; i++)
+  {
+    if (i == renum->nb_polys - 1)
+      ret = fscanf (renum->file, " %lu\n", &(renum->lpb[i]));
+    else
+      ret = fscanf (renum->file, " %lu", &(renum->lpb[i]));
+    ASSERT_ALWAYS (ret == 1);
+  }
 }
 
-/* Assume v correspond to p + 1 or 2p + 1 (i.e. v > 0) */
+/* Assume v correspond to k*p + 1, k depends on nb_polys and rat */
 static inline p_r_values_t
 get_p_from_table_value (renumber_t tab, p_r_values_t v)
 {
-  if (tab->rat >= 0) /* One alg and one rat side -> p is v-1 */
+  if (tab->nb_polys == 2)
+  {
+    if (tab->rat >= 0) /* One alg and one rat side -> p is v-1 */
       return (v - 1);
-  else               /* Two alg sides -> p is (v-1)/2 */
+    else               /* Two alg sides -> p is (v-1)/2 */
       return (v >> 1);
+  }
+  else
+  {
+    if (tab->rat >= 0) /* One rat side and (nb_polys-1) alg side */
+      return (v - 1)/(tab->nb_polys - 1);
+    else               /* nb_polys alg sides -> p is (v-1)/nb_polys */
+      return (v - 1)/tab->nb_polys;
+  }
 }
 
 /*********************** End internal functions  ******************************/
@@ -292,27 +320,43 @@ renumber_init_for_reading (renumber_t renumber_info)
    * line of the renumber file */
 }
 
-/* rat contains the rational side (0 or 1) or -1 if two algebraic sides.
+/* nb_polys contains the number of polynomials (must be at least 2).
+ * rat contains the rational side or -1 if no rational side.
  * add_full_col is non-zero if we need to add a column of 1 in the matrix, 0
  * otherwise (for factorization, always 0, for DL 1 if one of the polynomials is
  * not monic). */
 void
-renumber_init_for_writing (renumber_t renumber_info, int rat, int add_full_col,
-                           unsigned long lpb[])
+renumber_init_for_writing (renumber_t renumber_info, unsigned int nb_polys,
+                           int rat, int add_full_col, unsigned long *lpb)
 {
   memset(renumber_info, 0, sizeof(renumber_t));
 
-  ASSERT_ALWAYS (-1 <= rat && rat <= 1);
+  ASSERT_ALWAYS (nb_polys >= 2);
+  ASSERT_ALWAYS (-1 <= rat && rat < (int) nb_polys);
   ASSERT_ALWAYS (add_full_col == 0 || add_full_col == 1);
   ASSERT_ALWAYS (lpb != NULL);
+  renumber_info->nb_polys = nb_polys;
   renumber_info->rat = rat;
   renumber_info->add_full_col = add_full_col;
-  renumber_info->lpb[0] = lpb[0];
-  renumber_info->lpb[1] = lpb[1];
 
-  int max_nb_bits = MAX(lpb[0], lpb[1]);
-  if (renumber_info->rat == -1) /* for two alg side, we need an extra bit. */
-    max_nb_bits++;
+  /* Set lpb table */
+  size_t size_ul = nb_polys * sizeof (unsigned long);
+  renumber_info->lpb = (unsigned long *) malloc (size_ul);
+  ASSERT_ALWAYS (renumber_info->lpb != NULL);
+  memcpy (renumber_info->lpb, lpb, size_ul);
+
+  /* Set max_lpb */
+  renumber_info->max_lpb = MAX(lpb[0], lpb[1]); /* There are at least 2 sides */
+  for (unsigned int i = 2; i < nb_polys; i++)
+    renumber_info->max_lpb = MAX(renumber_info->max_lpb, lpb[i]);
+
+  /* Set max_nb_bits */
+  int max_nb_bits;
+  if (renumber_info->rat == -1)
+     max_nb_bits = nbits (nb_polys) - 1;
+  else
+     max_nb_bits = nbits (nb_polys - 1) - 1;
+  max_nb_bits += renumber_info->max_lpb;
 
   if (max_nb_bits <= 32)
     renumber_info->nb_bits = 32;
@@ -325,21 +369,32 @@ void
 renumber_clear (renumber_t renumber_info)
 {
   if (renumber_info->table != NULL)
-    free(renumber_info->table);
+    free (renumber_info->table);
   if (renumber_info->cached != NULL)
-    free(renumber_info->cached);
+    free (renumber_info->cached);
 
   renumber_info->table = NULL;
   renumber_info->cached = NULL;
 
+ if (renumber_info->lpb != NULL)
+  free (renumber_info->lpb);
+ if (renumber_info->biggest_prime_below_lpb != NULL)
+  free (renumber_info->biggest_prime_below_lpb);
+ if (renumber_info->index_biggest_prime_below_lpb != NULL)
+  free (renumber_info->index_biggest_prime_below_lpb);
+
+ renumber_info->lpb = NULL;
+ renumber_info->biggest_prime_below_lpb = NULL;
+ renumber_info->index_biggest_prime_below_lpb = NULL;
+
   if (renumber_info->bad_ideals.p != NULL)
-    free(renumber_info->bad_ideals.p);
+    free (renumber_info->bad_ideals.p);
   if (renumber_info->bad_ideals.r != NULL)
-    free(renumber_info->bad_ideals.r);
+    free (renumber_info->bad_ideals.r);
   if (renumber_info->bad_ideals.nb != NULL)
-    free(renumber_info->bad_ideals.nb);
+    free (renumber_info->bad_ideals.nb);
   if (renumber_info->bad_ideals.side != NULL)
-    free(renumber_info->bad_ideals.side);
+    free (renumber_info->bad_ideals.side);
 
   renumber_info->bad_ideals.r = NULL;
   renumber_info->bad_ideals.p = NULL;
@@ -380,10 +435,12 @@ renumber_write_open (renumber_t tab, const char *tablefile, const char *badfile,
   /* Write the two polynomials on a line beginning by #, if given */
   if (poly != NULL)
   {
-    fprintf (tab->file, "# ");
-    mpz_poly_fprintf (tab->file, poly->pols[0]);
-    fprintf (tab->file, "# ");
-    mpz_poly_fprintf (tab->file, poly->pols[1]);
+    ASSERT_ALWAYS (poly->nb_polys == tab->nb_polys);
+    for (unsigned int i = 0; i < poly->nb_polys; i++)
+    {
+      fprintf (tab->file, "# pol%u: ", i);
+      mpz_poly_fprintf_coeffs (tab->file, poly->pols[i], ',');
+    }
   }
 
   /* Write first the bad ideals information at the beginning of file */
@@ -428,22 +485,28 @@ renumber_read_table (renumber_t tab, const char * filename)
   size_t badideals_pr_size = tab->bad_ideals.n * sizeof (p_r_values_t);
   size_t badideals_int_size = tab->bad_ideals.n * sizeof (int);
   size_t cached_table_size = (2 << MAX_LOG_CACHED) * sizeof (index_t);
+  size_t primes_nb_polys_size = tab->nb_polys * sizeof (p_r_values_t);
+  size_t index_nb_polys_size = tab->nb_polys * sizeof (index_t);
 
-    /* Do not know the size yet. Reallocating while reading */
-    /* We assume that RENUMBER_DEFAULT_SIZE is enough to hold at least the bad
-     * ideals and the added column (if add_full_col is set) */
+  /* Do not know the size yet. Reallocating while reading.
+     We assume that RENUMBER_DEFAULT_SIZE is enough to hold at least the bad
+     ideals and the added column (if add_full_col is set) */
   uint64_t allocated = RENUMBER_DEFAULT_SIZE;
   size_t default_size = RENUMBER_DEFAULT_SIZE * sizeof (p_r_values_t);
 
-  tab->table           = (p_r_values_t *) malloc (default_size);
-  tab->cached          = (index_t *)      malloc (cached_table_size);
-  tab->bad_ideals.p    = (p_r_values_t *) malloc (badideals_pr_size);
-  tab->bad_ideals.r    = (p_r_values_t *) malloc (badideals_pr_size);
-  tab->bad_ideals.side = (int *)          malloc (badideals_int_size);
-  tab->bad_ideals.nb   = (int *)          malloc (badideals_int_size);
+  tab->table           = (p_r_values_t *)  malloc (default_size);
+  tab->cached          = (index_t *)       malloc (cached_table_size);
+  tab->biggest_prime_below_lpb = (p_r_values_t *) malloc (primes_nb_polys_size);
+  tab->index_biggest_prime_below_lpb = (index_t *) malloc (index_nb_polys_size);
+  tab->bad_ideals.p    = (p_r_values_t *)  malloc (badideals_pr_size);
+  tab->bad_ideals.r    = (p_r_values_t *)  malloc (badideals_pr_size);
+  tab->bad_ideals.side = (int *)           malloc (badideals_int_size);
+  tab->bad_ideals.nb   = (int *)           malloc (badideals_int_size);
 
   ASSERT_ALWAYS (tab->table != NULL);
   ASSERT_ALWAYS (tab->cached != NULL);
+  ASSERT_ALWAYS (tab->biggest_prime_below_lpb != NULL);
+  ASSERT_ALWAYS (tab->index_biggest_prime_below_lpb != NULL);
   ASSERT_ALWAYS (tab->bad_ideals.p != NULL);
   ASSERT_ALWAYS (tab->bad_ideals.r != NULL);
   ASSERT_ALWAYS (tab->bad_ideals.nb != NULL);
@@ -472,9 +535,10 @@ renumber_read_table (renumber_t tab, const char * filename)
   }
 
   p_r_values_t prime_cache_limit = next_prime_of_powers_of_2[MAX_LOG_CACHED];
-  p_r_values_t expected_biggest_prime_lpb[2];
-  expected_biggest_prime_lpb[0] = previous_prime_of_powers_of_2[tab->lpb[0]];
-  expected_biggest_prime_lpb[1] = previous_prime_of_powers_of_2[tab->lpb[1]];
+  p_r_values_t * expected_biggest_prime_lpb =
+                                 (p_r_values_t *) malloc (primes_nb_polys_size);
+  for (unsigned int i = 0; i < tab->nb_polys; i++)
+    expected_biggest_prime_lpb[i] = previous_prime_of_powers_of_2[tab->lpb[i]];
   int has_smallest = 0;
 
   /* Reading the renumbering table */
@@ -509,15 +573,13 @@ renumber_read_table (renumber_t tab, const char * filename)
         tab->smallest_prime_not_cached = p;
       }
 
-      if (p <= expected_biggest_prime_lpb[0])
+      for (unsigned int i = 0; i < tab->nb_polys; i++)
       {
-        tab->index_biggest_prime_below_lpb[0] = tab->size;
-        tab->biggest_prime_below_lpb[0] = p;
-      }
-      if (p <= expected_biggest_prime_lpb[1])
-      {
-        tab->index_biggest_prime_below_lpb[1] = tab->size;
-        tab->biggest_prime_below_lpb[1] = p;
+        if (p <= expected_biggest_prime_lpb[i])
+        {
+          tab->index_biggest_prime_below_lpb[i] = tab->size;
+          tab->biggest_prime_below_lpb[i] = p;
+        }
       }
     }
     tab->size++;
@@ -672,9 +734,6 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   /* p is not cached and below the lpb[side] */
   else if (p <= renumber_info->biggest_prime_below_lpb[side])
   {
-#ifdef RENUMBER_DO_EXPENSIVE_CHECK
-    int nstep = 0;
-#endif
     index_t max = renumber_info->index_biggest_prime_below_lpb[side];
     index_t min = renumber_info->index_smallest_prime_not_cached;
 
@@ -792,12 +851,12 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
     if (i == j)
     {
       int ret;
-      //if we have at least one root on side 1, it is the largest
-      if (get_largest_root_mod_p(r, pol->pols[1]->coeff, pol->pols[1]->deg, *p))
+      /* If we have at least one root on side 1, it is the largest */
+      if (get_largest_root_mod_p(r, pol->pols[1], *p))
         *side = 1;
-      else // else this is the largest on side 0
+      else /* Else it is the largest on side 0 */
       {
-        ret=get_largest_root_mod_p(r, pol->pols[0]->coeff, pol->pols[0]->deg, *p);
+        ret=get_largest_root_mod_p(r, pol->pols[0], *p);
         ASSERT_ALWAYS (ret > 0);
         *side = 0;
       }
@@ -824,7 +883,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest
       // root on alg side (i == j)
-      int ret = get_largest_root_mod_p(r, pol->alg->coeff, pol->alg->deg, *p);
+      int ret = get_largest_root_mod_p(r, pol->alg, *p);
       ASSERT_ALWAYS (ret > 0);
       *side = 1 - renumber_info->rat;
     }

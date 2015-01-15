@@ -673,7 +673,8 @@ main (int argc, char *argv[])
     }
 
     int ratside = cado_poly_get_ratside (cpoly);
-    renumber_init_for_writing (renumber_table, ratside, add_full_col, lpb);
+    renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside,
+                                                              add_full_col, lpb);
     renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
                          cpoly);
 
