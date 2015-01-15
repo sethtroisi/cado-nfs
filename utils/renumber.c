@@ -178,15 +178,15 @@ print_info (FILE * f, renumber_t r, int after_reading)
   if (after_reading) /* there is more info to print*/
   {
     fprintf (f, "%ssize = %" PRIu64 "\n"
-                "%ssmallest prime not cached = %" PRpr " at index %" PRid "\n"
-                "%sbiggest prime below lbp0 = %" PRpr " at index %" PRid "\n"
-                "%sbiggest prime below lbp1 = %" PRpr " at index %" PRid "\n",
-                pre, r->size, pre, r->smallest_prime_not_cached,
-                r->index_smallest_prime_not_cached, pre,
-                r->biggest_prime_below_lpb[0],
-                r->index_biggest_prime_below_lpb[0], pre,
-                r->biggest_prime_below_lpb[1],
-                r->index_biggest_prime_below_lpb[1]);
+             "%ssmallest prime not cached = 0x%" PRpr " at index 0x%" PRid "\n"
+             "%sbiggest prime below lbp0 is 0x%" PRpr " at index 0x%" PRid "\n"
+             "%sbiggest prime below lbp1 is 0x%" PRpr " at index 0x%" PRid "\n",
+             pre, r->size, pre, r->smallest_prime_not_cached,
+             r->index_smallest_prime_not_cached, pre,
+             r->biggest_prime_below_lpb[0],
+             r->index_biggest_prime_below_lpb[0], pre,
+             r->biggest_prime_below_lpb[1],
+             r->index_biggest_prime_below_lpb[1]);
   }
   fflush (stdout);
 }
@@ -663,9 +663,9 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     {
       /* There is a problem, most probably p is not prime. */
       fprintf(stderr, "Fatal error in %s at %s:%d\nError with the cached part of"
-                      " the renumbering table\n  p = %" PRpr "\n  vp = %" PRpr
-                      "\n  i = cached[p] = %" PRid "\n  tab[i] = %" PRpr "\n",
-                      __func__, __FILE__, __LINE__, p, vp, i, tab[i]);
+              " the renumbering table\n  p = 0x%" PRpr "\n  vp = 0x%" PRpr "\n"
+              "  i = cached[p] = 0x%" PRid "\n  tab[i] = 0x%" PRpr "\n",
+              __func__, __FILE__, __LINE__, p, vp, i, tab[i]);
       abort();
     }
   }
@@ -721,7 +721,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
           else
           {
             /* prime p is not in the table => Fatal error */
-            fprintf(stderr, "Fatal error in %s at %s:%d\nIdeals above p = "
+            fprintf(stderr, "Fatal error in %s at %s:%d\nIdeals above p = 0x"
                             "%" PRpr " are not in the renumbering table\n"
                             "Maybe p is not prime ?\n", __func__, __FILE__,
                             __LINE__, p);
@@ -736,9 +736,9 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   else /* Error */
   {
     /* prime p is bigger than lpb[side] => Fatal error */
-    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, r, side) = (%" PRpr
-                    ", %" PRpr ", %d) is bigger that large prime bound 2^%ld\n",
-                    __func__, __FILE__, __LINE__, p, r, side,
+    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, r, side) = (0x%" PRpr
+                    ", 0x%" PRpr ", %d) is bigger that large prime bound "
+                    "2^%ld\n", __func__, __FILE__, __LINE__, p, r, side,
                     renumber_info->lpb[side]);
     abort();
   }
@@ -768,9 +768,9 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     }
     /* if we arrive here, there is a problem, the ideal was not found in the
        renumbering table */
-    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, r, side) = (%" PRpr
-                    ", %" PRpr ", %d) was not found on the renumbering table\n",
-                    __func__, __FILE__, __LINE__, p, r, side);
+    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, r, side) = (0x%" PRpr
+                    ", 0x%" PRpr ", %d) was not found on the renumbering "
+                    "table\n", __func__, __FILE__, __LINE__, p, r, side);
     abort();
   }
 }
