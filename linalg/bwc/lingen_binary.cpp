@@ -44,6 +44,9 @@
 #include "tree_stats.h"
 #include "logline.h"
 
+#ifdef  USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
+#include "lingen_qcode.h"
+#endif
 
 #include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
@@ -1330,6 +1333,7 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     for(unsigned int j = 0 ; j < E.ncols ; j++) {
         E.deg(j) = deg;
     }
+    polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
 
 #ifdef VERBOSE_4PAUL
     cout << "input go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
@@ -1337,7 +1341,30 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     double ttq = -seconds();
 #endif
 
-    polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
+#ifdef  USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
+    lingen_qcode_data qq;
+
+    lingen_qcode_init(qq, E.nrows, E.ncols, E.ncoef, tmp_pi.ncoef);
+    for(unsigned int i = 0 ; i < E.nrows ; i++) {
+        for(unsigned int j = 0 ; j < E.ncols ; j++) {
+            lingen_qcode_hook_input(qq, i, j, E.poly(i,j));
+        }
+    }
+    for(unsigned int i = 0 ; i < E.ncols ; i++) {
+        for(unsigned int j = 0 ; j < E.ncols ; j++) {
+            lingen_qcode_hook_output(qq, i, j, tmp_pi.poly(i,j));
+        }
+    }
+    lingen_qcode_hook_delta(qq, delta);
+    lingen_qcode_do(qq);
+    for(unsigned int j = 0 ; j < tmp_pi.ncols ; j++) {
+        tmp_pi.deg(j) = lingen_qcode_output_column_length(qq, j);
+    }
+    lingen_qcode_clear(qq);
+    pi.swap(tmp_pi);
+
+#else   /* USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE */
+
     for(unsigned int i = 0 ; i < m + n ; i++) {
         tmp_pi.addcoeff(i,i,0,1UL);
         tmp_pi.deg(i) = 0;
@@ -1387,6 +1414,8 @@ static bool go_quadratic(polmat& pi)/*{{{*/
         E_saved.setdeg(j);
     }
 #endif
+
+#endif  /* USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE */
 
 #ifdef VERBOSE_4PAUL
     ttq += seconds();
@@ -2059,12 +2088,21 @@ int main(int argc, char *argv[])
     delta.assign(m + n, (unsigned int) -1);
     chance_list.assign(m + n, 0);
 
+#if 0
+    /* I have the impression that the F_INIT_QUICK file can be dropped
+     * altogether. Its contents are deterministic, and trivial to
+     * compute...
+     */
     if (!recover_f0_data()) {
         // This is no longer useful
 	// give_poly_rank_info(A, read_coeffs - 1);
 	compute_f_init(A);
 	write_f0_data();
     }
+    set_t0_delta_from_F0();
+#endif
+
+    compute_f_init(A);
     set_t0_delta_from_F0();
 
     t = t0;
