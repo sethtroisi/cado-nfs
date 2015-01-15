@@ -438,7 +438,7 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
 
 /*
   Sieve for a special-q of degree 1 and Tqr with a non-zero coefficient at the
-  first place. This function sieve a c in the q lattice with c0 positive.
+  first place. This function sieve a c in the q lattice.
 
   array: in which we store the norms.
   c: element of the q lattice.
@@ -446,13 +446,12 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
   c0: the possible first coordinate of c to have c in the sieving region.
   H: the sieving interval.
 */
-void sieve_c0_positive(array_ptr array, int64_vector_ptr c,
-                       ideal_1_srcptr ideal, int64_t c0,
-                       sieving_interval_srcptr H)
+void sieve_c0(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
+              int64_t c0, sieving_interval_srcptr H)
 {
   uint64_t index = 0;
 
-  if (c0 <= (int64_t)H->h[0]) {
+  if (c0 >= -(int64_t)H->h[0]) {
     int64_vector_setcoordinate(c, 0, c0);
     array_int64_vector_index(&index, c, H, array->number_element);
     array->array[index] = array->array[index] - ideal->log;
@@ -469,67 +468,8 @@ void sieve_c0_positive(array_ptr array, int64_vector_ptr c,
     }
 #endif
 
-    int64_t tmp = c0;
-    tmp = tmp + (int64_t)ideal->ideal->r;
-    while(tmp <= (int64_t)H->h[0]) {
-      index = index + ideal->ideal->r;
-      array->array[index] = array->array[index] - ideal->log;
-
-#ifdef NUMBER_HIT
-    number_of_hit = number_of_hit + 1;
-#endif // NUMBER_HIT
-
-#ifdef TRACE_POS
-      if (index == TRACE_POS) {
-        fprintf(file, "The ideal is: ");
-        ideal_1_fprintf(file, ideal, H->t);
-        fprintf(file, "The new value of the norm is %u.\n",
-                array->array[index]);
-      }
-#endif
-
-      tmp = tmp + ideal->ideal->r;
-    }
-  }
-}
-
-/*
-  Sieve for a special-q of degree 1 and Tqr with a non-zero coefficient at the
-  first place. This function sieve a c in the q lattice with c0 negative.
-
-  array: in which we store the norms.
-  c: element of the q lattice.
-  ideal: an ideal with r < q.
-  c0: the possible first coordinate of c to have c in the sieving region.
-  H: the sieving interval.
-*/
-void sieve_c0_negative(array_ptr array, int64_vector_ptr c,
-                       ideal_1_srcptr ideal, int64_t c0,
-                       sieving_interval_srcptr H)
-{
-  uint64_t index = 0;
-  int64_t tmp = c0;
-  tmp = tmp - (int64_t)ideal->ideal->r;
-
-  if (tmp >= -(int64_t)H->h[0]) {
-    int64_vector_setcoordinate(c, 0, tmp);
-    array_int64_vector_index(&index, c, H, array->number_element);
-    array->array[index] = array->array[index] - ideal->log;
-
-#ifdef NUMBER_HIT
-    number_of_hit = number_of_hit + 1;
-#endif // NUMBER_HIT
-
-#ifdef TRACE_POS
-    if (index == TRACE_POS) {
-      fprintf(file, "The ideal is: ");
-      ideal_1_fprintf(file, ideal, H->t);
-      fprintf(file, "The new value of the norm is %u.\n", array->array[index]);
-    }
-#endif
-
-    tmp = tmp - (int64_t)ideal->ideal->r;
-    while(tmp >= -(int64_t)H->h[0]) {
+    c0 = c0 - (int64_t)ideal->ideal->r;
+    while(c0 >= -(int64_t)H->h[0]) {
       index = index - ideal->ideal->r;
       array->array[index] = array->array[index] - ideal->log;
 
@@ -546,7 +486,7 @@ void sieve_c0_negative(array_ptr array, int64_vector_ptr c,
       }
 #endif
 
-      tmp = tmp - (int64_t)ideal->ideal->r;
+      c0 = c0 - (int64_t)ideal->ideal->r;
     }
   }
 }
@@ -584,8 +524,15 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
   }
   ASSERT(* c0 >= 0 && * c0 < (int64_t)ideal->ideal->r);
 
-  sieve_c0_positive(array, c, ideal, * c0, H);
-  sieve_c0_negative(array, c, ideal, * c0, H);
+  int64_t k = ((int64_t)H->h[0] - * c0) / ((int64_t) ideal->ideal->r);
+  if (((int64_t)H->h[0] - * c0) < 0) {
+    k--;
+  }
+  int64_t c0_tmp = k * (int64_t)ideal->ideal->r + * c0;
+
+  ASSERT(c0_tmp <= (int64_t)(H->h[0]));
+
+  sieve_c0(array, c, ideal, c0_tmp, H);
 }
 
 #ifdef SIEVE_TQR
@@ -1386,13 +1333,14 @@ int main(int argc, char * argv[])
         sec = seconds();
         sec_tot = sec;
 
+        //LLL part
+        build_Mq_ideal_1(matrix, special_q);
+
 #ifdef TRACE_POS
         fprintf(file, "Mq:\n");
         mat_Z_fprintf(file, matrix);
 #endif
 
-        //LLL part
-        build_Mq_ideal_1(matrix, special_q);
         mat_Z_LLL_transpose(matrix);
 
 #ifdef TRACE_POS
