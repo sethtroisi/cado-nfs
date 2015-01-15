@@ -318,7 +318,7 @@ fb_general_vector *
 fb_general_vector::transform_roots(qlattice_basis_srcptr basis) const
 {
   fb_general_entry transformed;
-  fb_general_vector *result = new fb_general_vector(this->size());
+  fb_general_vector *result = new fb_general_vector();
   for (typename fb_general_vector::const_iterator it = this->begin(); it != this->end(); it++) {
     it->transform_roots(transformed, basis);
     result->append(transformed);
@@ -332,7 +332,7 @@ fb_general_vector *
 fb_vector<Nr_roots>::transform_roots(qlattice_basis_srcptr basis) const
 {
   fb_general_entry transformed;
-  fb_general_vector *result = new fb_general_vector(this->size());
+  fb_general_vector *result = new fb_general_vector();
   for (typename fb_vector<Nr_roots>::const_iterator it = this->begin(); it != this->end(); it++) {
     it->transform_roots(transformed, basis);
     result->append(transformed);
