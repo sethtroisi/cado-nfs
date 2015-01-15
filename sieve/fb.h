@@ -266,6 +266,14 @@ public:
     ASSERT_ALWAYS(only_general);
     return general_vector.end();
   }
+  fb_general_vector::const_iterator cbegin() const {
+    ASSERT_ALWAYS(only_general);
+    return general_vector.cbegin();
+  }
+  fb_general_vector::const_iterator cend() const {
+    ASSERT_ALWAYS(only_general);
+    return general_vector.cend();
+  }
   fb_general_vector *get_general_vector(){return &general_vector;}
   fb_vector_interface *get_n_roots_vector(const int n, const size_t slice) {
     return get_slices(n)->get_vector(slice);
