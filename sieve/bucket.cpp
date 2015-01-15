@@ -328,16 +328,22 @@ QSORT(bucket_prime_t, BP->start, BP->write - BP->start, islt);
   } while (0)
 #endif
 #else
-#define PURGE_BUCKET_HEART(A) do {					\
-    prime_hint_t up = (u + (A))->p;					\
-    if (UNLIKELY(up < last_p)) phigh += BUCKET_P_WRAP;			\
-    last_p = up;							\
-    uint16_t ux = (u + (A))->x;						\
-    if (UNLIKELY(S[ux] != 255)) {					\
-      bucket_prime_t bp;						\
-      bp.x = ux; bp.p = phigh + bucket_decode_prime(up);		\
-      push_bucket_prime (BP, bp); }					\
-  } while (0)
+static inline
+void purge_bucket_heart(bucket_primes_t *BP, const bucket_update_t *u,
+                        prime_hint_t &last_p, uint32_t &phigh,
+                        const unsigned char *S) {
+    prime_hint_t up = u->p;
+    if (sizeof(bucket_update_t) == 4 && UNLIKELY(up < last_p))
+      phigh += BUCKET_P_WRAP;
+    last_p = up;
+    uint16_t ux = u->x;
+    if (UNLIKELY(S[ux] != 255)) {
+      bucket_prime_t bp;
+      bp.x = ux;
+      bp.p = phigh + bucket_decode_prime(up);
+      push_bucket_prime (BP, bp);
+    }
+}
 #endif
 
 void
@@ -348,14 +354,33 @@ purge_bucket (bucket_primes_t *BP, const bucket_array_t BA,
   prime_hint_t last_p = 0;
   uint32_t phigh = 0;
 
-  for (; u + 16 <= end_u; u += 16) {
+  if (sizeof(bucket_update_t) == 4) {
+    for (; u + 16 <= end_u; u += 16) {
 #ifdef HAVE_SSE2
-    _mm_prefetch((uint8_t *) u + 0x100, _MM_HINT_T0);
+      _mm_prefetch((uint8_t *) u + 0x100, _MM_HINT_T0);
 #endif
-    PURGE_BUCKET_HEART( 0); PURGE_BUCKET_HEART( 1); PURGE_BUCKET_HEART( 2); PURGE_BUCKET_HEART( 3);
-    PURGE_BUCKET_HEART( 4); PURGE_BUCKET_HEART( 5); PURGE_BUCKET_HEART( 6); PURGE_BUCKET_HEART( 7);
-    PURGE_BUCKET_HEART( 8); PURGE_BUCKET_HEART( 9); PURGE_BUCKET_HEART(10); PURGE_BUCKET_HEART(11);
-    PURGE_BUCKET_HEART(12); PURGE_BUCKET_HEART(13); PURGE_BUCKET_HEART(14); PURGE_BUCKET_HEART(15);
+      purge_bucket_heart(BP, u, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 1, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 2, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 3, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 4, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 5, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 6, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 7, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 8, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 9, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 10, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 11, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 12, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 13, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 14, last_p, phigh, S);
+      purge_bucket_heart(BP, u + 15, last_p, phigh, S);
+    }
   }
-  for (; u < end_u; ++u) PURGE_BUCKET_HEART(0);
+  for (; u < end_u; ++u)
+    purge_bucket_heart(BP, u, last_p, phigh, S);
+  // If we use 32-bit hints, no overflow must occur
+  if (sizeof(bucket_update_t) != 4) {
+    ASSERT_ALWAYS(phigh == 0);
+  }
 }
