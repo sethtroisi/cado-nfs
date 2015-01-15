@@ -1,5 +1,4 @@
 /* TODO:
-   - implement Knuth-Schroeppel choice for multiplier
    - implement Alex's idea in is_smooth (see FIXME)
  */
 
@@ -9,6 +8,10 @@
 
 // #define TRACE -23830
 // #define TRACE_P 937
+
+/* if CHECK_OVERFLOW is defined, check that no overflow occurs in the
+   additions on unsigned chars (0..255) */
+// #define CHECK_OVERFLOW
 
 /* minimum difference between number of relations and factor base size */
 #define WANT_EXCESS 11
@@ -343,6 +346,10 @@ static inline void
 update (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
         unsigned char logp, unsigned int M MAYBE_UNUSED)
 {
+#ifdef CHECK_OVERFLOW
+  unsigned char tmp = S[i] + logp;
+  ASSERT_ALWAYS(tmp >= S[i]);
+#endif
   S[i] += logp;
 #ifdef TRACE
   if (i == M + TRACE)
@@ -519,6 +526,58 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t N,
   mpz_clear (y);
 }
 
+#if 0
+/* implements the modified Knuth-Schroeppel function, as in Silverman,
+   "The Multiple Polynomial Quadratic Sieve", page 335.
+   This is kept for reference only, since it does not seem to give better
+   results than best_multiplier().
+ */
+static int
+best_multiplier2 (const mpz_t N, unsigned long ncol, unsigned long K)
+{
+  unsigned long k, best_k = 1, i, j, p, Np;
+  double alpha, best_alpha = DBL_MAX, g;
+  mpz_t kN, P;
+
+  mpz_init (kN);
+  mpz_init (P);
+  for (k = 1; k <= K; k += 2)
+    {
+      mpz_mul_ui (kN, N, k);
+      alpha = 0.5 * log ((double) k);
+      for (i = j = 0; i < MAX_PRIMES && j < ncol; i++)
+        {
+          p = Primes[i];
+          if (p == 2)
+            {
+              Np = mpz_fdiv_ui (kN, 8);
+              g = (Np == 1) ? 2 : 0;
+            }
+          else
+            {
+              mpz_set_ui (P, p);
+              if (k % p == 0)
+                g = 1.0 / (double) p;
+              else if (mpz_jacobi (kN, P) == 1)
+                g = 2.0 / (double) p;
+              else
+                g = 0.0;
+            }
+          alpha -= g * log ((double) p);
+          j += (g > 0.0);
+        }
+      if (alpha < best_alpha)
+        {
+          best_alpha = alpha;
+          best_k = k;
+        }
+    }
+  mpz_clear (kN);
+  mpz_clear (P);
+  return best_k;
+}
+#endif
+
 /* consider all primes up to B, and all odd multipliers up to K */
 static int
 best_multiplier (const mpz_t N, unsigned long B, unsigned long K)
@@ -586,12 +645,12 @@ void
 mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 {
   mpz_t N, *Mat, *X;
-  unsigned char *S, *T, *Logp, logp, log2[8], threshold = 0, mask = 128;
+  unsigned char *S, *T, *Logp, logp, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
   unsigned long *P, *Q, p, k, Nbits;
   long M, i, j, *K, wrel, nrel = 0, lim, ncolw = 0, ncol;
   mpz_t a, b, c, sqrta;
-  double maxnorm, radix, logradix = 0;
+  double radix, logradix = 0;
   long st;
   static long init_time = 0, sieve_time = 0, check_time = 0;
   static long gauss_time = 0, total_time = 0;
@@ -746,10 +805,16 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   /* we initialize radix only once, assuming it will not vary very much */
   if (pols++ == 0)
     {
-      double Nd = mpz_get_d (N), ad = (double) aa;
+      double Nd = mpz_get_d (N), ad = (double) aa, maxnorm, maxnorm1;
+      /* The maximal norm (in absolute value) is a*M^2-n/a for x=-M or M,
+         and n/a for x=0. Keep the largest one in case 'a' is not the optimal
+         value sqrt(2N)/M. */
+      maxnorm1 = Nd / ad;
+      maxnorm = ad * (double) M * (double) M - maxnorm1;
+      maxnorm = (maxnorm > maxnorm1) ? maxnorm : maxnorm1;
       /* initialize radix and Logp[]: we want radix^255 = maxnorm ~ a*M^2 */
-      maxnorm = mpz_get_d (a) * (double) M * (double) M;
-      radix = pow (maxnorm, 1.0 / 255.0);
+#define MAXNORM 128
+      radix = pow (maxnorm, 1.0 / (double) MAXNORM);
       logradix = log (radix);
 #ifdef TRACE
       printf ("radix=%f logradix=%f\n", radix, logradix);
@@ -757,18 +822,39 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 #define ROUND round
       for (j = 0; j < lim; j++)
         Logp[j] = (char) ROUND (log ((double) P[j]) / logradix);
-      log2[1] = (char) ROUND (log ((double) 8) / logradix);
-      log2[3] = (char) ROUND (log ((double) 2) / logradix);
-      log2[5] = (char) ROUND (log ((double) 4) / logradix);
-      log2[7] = log2[3];
 
       /* take into account the skipped primes */
-      double skip_value = 0;
+      double skip_value;
+      /* if N = 1 (mod 8), the average power of 2 dividing x^2-N is 2,
+         if N = 3 (mod 8), the average power of 2 dividing x^2-N is 1/2,
+         if N = 5 (mod 8), the average power of 2 dividing x^2-N is 1,
+         if N = 7 (mod 8), the average power of 2 dividing x^2-N is 1/2
+         (cf Status Report on Factoring, by Davis, Holdridge and Simmons,
+         Eurocrypt'84, page 203) */
+      switch (mpz_getlimbn (N, 0) & 7)
+        {
+        case 1:
+          skip_value = 2.0 * log (2.0);
+          break;
+        case 5:
+          skip_value = 1.0 * log (2.0);
+          break;
+        case 3:
+        case 7:
+          skip_value = 0.5 * log (2.0);
+          break;
+        default:
+          ASSERT_ALWAYS(0);
+        }
+#define SKIP_FACTOR 1.5
+      skip_value *= SKIP_FACTOR;
       for (j = 1; j < SKIP; j++)
-        /* the extra value of 0.5 ensures experimentally that the number of
-           found relations does not decrease when SKIP increases, but a
-           theoretical justification is still needed... */
-        skip_value += 2.0 * log ((double) P[j]) / (double) (P[j] - 1) + 0.5;
+        /* the factor 1.5 increases the probability to find relations for which
+           the contribution of skipped primes is less than average, but on the
+           other hand it increases the pressure on trial division for relations
+           where that contribution is more than average */
+        skip_value += SKIP_FACTOR * 2.0 * log ((double) P[j])
+          / (double) (P[j] - 1);
 
       for (i = 0; i <= M; i++)
         {
@@ -786,9 +872,17 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
             T[M + i] = T[M - i];
         }
 
-      threshold = T[0] - (char) ROUND (log ((double) P[ncol - 1]) / logradix);
+      unsigned char Tmax;
+      Tmax = (T[0] >  T[M]) ? T[0] : T[M];
+      threshold = Tmax - (char) ROUND (log ((double) P[ncol - 1]) / logradix);
       if (threshold < 128)
-        threshold = 128;
+        {
+          /* we increase Tmax by the difference to 128, so that in
+             T[i] = Tmax - T[i] below T[i] is increased by the same
+             amount to reach the increased threshold */
+          Tmax += 128 - threshold;
+          threshold = 128;
+        }
       ASSERT_ALWAYS(threshold >= 128);
       mask = 128;
       mask8 = (mask << 8) | mask;
@@ -797,17 +891,10 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 #ifdef TRACE
       printf ("T[%d]=%u threshold=%u\n", TRACE, T[M + TRACE], threshold);
 #endif
-      /* we want S[i] >= T[i] - xxx, thus S[i] + T[0] >= T[i] + T[0] - xxx
-         thus S[i] + (T[0] - T[i]) >= T[0] - xxx */
-      for (i = 1; i < 2*M; i++)
-        T[i] = T[0] - T[i];
-      T[0] = 0;
-      /* sieve for 2, 4, 8 */
-      logp = log2[mpz_getlimbn (N, 0) & 7];
-#ifdef TRACE
-      printf ("T[%d]=%u\n", TRACE, T[M +  TRACE]);
-#endif
-      update8 (T, 1, 2, logp, M);
+      /* We want S[i] >= T[i] - xxx, thus S[i] + Tmax >= T[i] + Tmax - xxx
+         thus S[i] + (Tmax - T[i]) >= Tmax - xxx. */
+      for (i = 0; i < 2*M; i++)
+        T[i] = Tmax - T[i];
 #ifdef TRACE
       printf ("T[%d]=%u\n", TRACE, T[M +  TRACE]);
 #endif
