@@ -6,6 +6,7 @@
 #include "portability.h"
 #include "utils.h"
 
+//TODO remove lpbr lpba in comment, replace by appropirate lpb[i]
 /********************** internal functions *****************************/
 
 static const int ugly[256] = {
@@ -290,24 +291,86 @@ renumber_read_first_line (renumber_t renum)
   }
 }
 
-/* Assume v correspond to k*p + 1, k depends on nb_polys and rat */
 static inline p_r_values_t
-get_p_from_table_value (renumber_t tab, p_r_values_t v)
+compute_vp_from_p (renumber_t tab, p_r_values_t p)
+{
+  if (tab->nb_polys == 2)
+  {
+    if (tab->rat >= 0) /* If there is a rational side */
+      return p + 1;
+    else
+      return (p << 1) + 1;
+  }
+  else
+  {
+    if (tab->rat >= 0) /* If there is a rational side */
+      return (tab->nb_polys - 1) * (p + 1);
+    else
+      return tab->nb_polys * (p + 1) - 1;
+  }
+}
+
+static inline p_r_values_t
+compute_vr_from_p_r (renumber_t tab, p_r_values_t p, p_r_values_t r, int side)
+{
+  if (tab->nb_polys == 2)
+  {
+    if (tab->rat >= 0) /* If there is a rational side */
+      return (side == tab->rat) ? (p + 1) : r;
+    else
+      return (side == 1) ? (p + 1 + r) : r;
+  }
+  else
+  {
+    if (tab->rat >= 0) /* If there is a rational side */
+    {
+      if (side == tab->rat)
+        return RENUMBER_ROOT_ON_RAT_SIDE;
+      else if (side < tab->rat)
+        return side * (p + 1) + r;
+      else
+        return (side-1) * (p + 1) + r;
+    }
+    else
+      return side * (p + 1) + r;
+  }
+}
+
+/* Inverse function of compute_vp_from_p */
+static inline p_r_values_t
+compute_p_from_vp (renumber_t tab, p_r_values_t vp)
 {
   if (tab->nb_polys == 2)
   {
     if (tab->rat >= 0) /* One alg and one rat side -> p is v-1 */
-      return (v - 1);
+      return (vp - 1);
     else               /* Two alg sides -> p is (v-1)/2 */
-      return (v >> 1);
+      return (vp >> 1);
   }
   else
   {
     if (tab->rat >= 0) /* One rat side and (nb_polys-1) alg side */
-      return (v - 1)/(tab->nb_polys - 1);
-    else               /* nb_polys alg sides -> p is (v-1)/nb_polys */
-      return (v - 1)/tab->nb_polys;
+      return (vp/(tab->nb_polys - 1)) - 1;
+    else               /* nb_polys alg sides -> p = (vp+1)/nb_polys - 1 */
+      return ((vp + 1)/tab->nb_polys) - 1;
   }
+}
+
+static inline void
+compute_r_side_from_p_vr (p_r_values_t *r, int *side, renumber_t tab,
+                          p_r_values_t p, p_r_values_t vr)
+{
+  *side = 0;
+  *r = vr;
+  while (*r > p)
+  {
+    *r -= (p + 1);
+    *side += 1;
+  }
+
+  if (tab->rat >= 0) /* If there is a rational side */
+    if (*side >= tab->rat)
+      *side += 1;
 }
 
 /*********************** End internal functions  ******************************/
@@ -351,14 +414,14 @@ renumber_init_for_writing (renumber_t renumber_info, unsigned int nb_polys,
     renumber_info->max_lpb = MAX(renumber_info->max_lpb, lpb[i]);
 
   /* Set max_nb_bits */
-  int max_nb_bits;
-  if (renumber_info->rat == -1)
-     max_nb_bits = nbits (nb_polys) - 1;
+  uint64_t max_p = previous_prime_of_powers_of_2[renumber_info->max_lpb];
+  uint64_t max_vp; /* same as compute_vp_from_p but with uint64_t */
+  if (rat >= 0)
+    max_vp = (nb_polys - 1) * (max_p + 1);
   else
-     max_nb_bits = nbits (nb_polys - 1) - 1;
-  max_nb_bits += renumber_info->max_lpb;
+    max_vp = nb_polys * (max_p + 1) - 1;
 
-  if (max_nb_bits <= 32)
+  if (nbits (max_vp) <= 32)
     renumber_info->nb_bits = 32;
   else
     renumber_info->nb_bits = 64;
@@ -563,7 +626,7 @@ renumber_read_table (renumber_t tab, const char * filename)
       /* We just switch to a new prime in the renumbering table, see if we need
        * to cache it (we cached primes below 2^MAX_LOG_CACHED)
        */
-      p_r_values_t p = get_p_from_table_value (tab, tab->table[tab->size]);
+      p_r_values_t p = compute_p_from_vp (tab, tab->table[tab->size]);
       if (p < prime_cache_limit) /* p < 2^MAX_LOG_CACHED */
         tab->cached[p] = tab->size;
       else if (!has_smallest)
@@ -700,16 +763,8 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   p_r_values_t *tab = renumber_info->table;
   p_r_values_t vr, vp; /* values of r and p as they are stored in the table*/
 
-  if (renumber_info->rat == -1)
-  {
-    vp = (p << 1) + 1;
-    vr = (side == 1) ? (p + 1 + r) : r;
-  }
-  else
-  {
-    vp = p + 1;
-    vr = (side == renumber_info->rat) ? vp : r;
-  }
+  vp = compute_vp_from_p (renumber_info,  p);
+  vr = compute_vr_from_p_r (renumber_info,  p, r, side);
 
   /**************************************************************************/
   /* Search for i such that
@@ -845,57 +900,34 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   for (j = i; j > 0 && tab[j-1] > tab[j] && tab[j-1] != RENUMBER_SPECIAL_VALUE;)
     j--;
 
-  if (renumber_info->rat == -1)
+  *p = compute_p_from_vp (renumber_info, tab[j]);
+
+  if (i != j)
+    compute_r_side_from_p_vr (r, side, renumber_info, *p, tab[i]);
+  else /* i = j */
   {
-    *p = (tab[j] - 1) >> 1;
-    if (i == j)
+    /* If there is no rational side or if there is one but p is greater than the
+       lpb on the rational side, r is the largest root of the last poly that
+       has at least one root.
+       If the second condition is evaluated, we knows that it means that
+       renumber_info->rat >= 0.
+    */
+    if (renumber_info->rat == -1 ||
+        *p > renumber_info->biggest_prime_below_lpb[renumber_info->rat])
     {
-      int ret;
-      /* If we have at least one root on side 1, it is the largest */
-      if (get_largest_root_mod_p(r, pol->pols[1], *p))
-        *side = 1;
-      else /* Else it is the largest on side 0 */
+      *side = renumber_info->nb_polys - 1;
+      while (*side >= 0 && !get_largest_root_mod_p (r, pol->pols[*side], *p))
       {
-        ret=get_largest_root_mod_p(r, pol->pols[0], *p);
-        ASSERT_ALWAYS (ret > 0);
-        *side = 0;
+        *side -= 1;
+        if (*side == renumber_info->rat) /* skip rational poly, if it exists */
+          *side -= 1;
       }
+      ASSERT_ALWAYS (*side >= 0);
     }
     else
     {
-      if (tab[i] <= *p)
-      {
-        *r = tab[i];
-        *side = 0;
-      }
-      else
-      {
-        *r = tab[i] - *p - 1;
-        *side = 1;
-      }
-    }
-  }
-  else
-  {
-    *p = tab[j] - 1;
-    unsigned long lpbr = renumber_info->lpb[renumber_info->rat];
-    if (*p > (1UL << lpbr) && i == j)
-    {
-      // Case where there is only alg side (p >= lpbr) and we are on the largest
-      // root on alg side (i == j)
-      int ret = get_largest_root_mod_p(r, pol->alg, *p);
-      ASSERT_ALWAYS (ret > 0);
-      *side = 1 - renumber_info->rat;
-    }
-    else if (i == j)
-    {
-      *r = *p + 1; // old convention (r = p+1 in rat side). Has no meaning now.
+      *r = RENUMBER_ROOT_ON_RAT_SIDE; /* root has no meaning on rat side */
       *side = renumber_info->rat;
-    }
-    else
-    {
-      *r = tab[i];
-      *side = 1 - renumber_info->rat;
     }
   }
 }

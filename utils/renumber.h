@@ -16,6 +16,7 @@
 #define RENUMBER_MAX_ABOVE_BADIDEALS 8
 #define RENUMBER_SPECIAL_VALUE ((p_r_values_t) -1)
 #define RENUMBER_DEFAULT_SIZE (1 << 22)
+#define RENUMBER_ROOT_ON_RAT_SIDE ((p_r_values_t) -1)
 
 struct __bad_ideals_t
 {
