@@ -527,6 +527,14 @@ renumber_read_table (renumber_t tab, const char * filename)
     if (stats_test_progress(infostats))
       stats_print_progress (infostats, tab->size, 0, bytes_read, 0);
   }
+
+  if (!has_smallest) /* Every prime is cached. */
+  {
+    tab->index_smallest_prime_not_cached = tab->size;
+    tab->smallest_prime_not_cached =
+           next_prime_of_powers_of_2[MAX(tab->lpb[0],tab->lpb[1])];
+  }
+
   stats_print_progress (infostats, tab->size, 0, bytes_read, 1);
   size_t final_size = tab->size * sizeof (p_r_values_t);
   tab->table = (p_r_values_t *) realloc (tab->table, final_size);
