@@ -56,9 +56,13 @@ void renumber_init_for_writing (renumber_t, unsigned int, int, int,
    polynomials on the file */
 void renumber_write_open (renumber_t, const char *, const char *, cado_poly);
 void renumber_sort_ul(unsigned long *, size_t);
-size_t renumber_write_p_rat_alg (unsigned long, size_t, unsigned long *, size_t, char *);
-size_t renumber_write_p_2algs (unsigned long, unsigned long *, size_t, unsigned long *, size_t, char *);
-void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
+size_t renumber_write_p_buffer_rat_alg (char *, unsigned long, size_t,
+                                        unsigned long *, size_t);
+size_t renumber_write_p_buffer_2algs (char *, unsigned long, unsigned long *,
+                                      size_t, unsigned long *, size_t);
+size_t renumber_write_p_buffer_generic (char *, unsigned long, renumber_t,
+                                        unsigned long **, int *);
+void renumber_write_p (renumber_t, unsigned long, unsigned long **, int *);
 void renumber_write_close (renumber_t, const char*);
 
 void renumber_init_for_reading (renumber_t);
