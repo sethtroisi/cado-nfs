@@ -1938,6 +1938,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       }
     mod_mul (Q->y, yn, u, m);
     
+    mod_set1 (Q->z, m);
+
     /* Reduce d = dn/dd mod m */
     mod_set_ul (d, Ecurve14.d_numer, m);
     mod_set_ul (dd, Ecurve14.d_denom, m);
@@ -1949,6 +1951,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	return 0;
       }
     mod_mul (d, d, u, m);
+
+    /* fprintf (stderr, "ecm: Edwards parameterization done\n"); */
+
   }
   else
   {
@@ -2026,11 +2031,17 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       mod_neg (a, a, m);
       
       for (i=2; i<= plan->B1; i++)
-	ellE_mul_ul (Q, Q, i, m, a);
+	{
+	  ellE_mul_ul (Q, Q, i, m, a);
+	}
       
-      mod_gcd (f, Q->z, m);    /* FIXME (from above): 
-				  skip this gcd and let the extgcd
-				  in stage 2 init find factors? */
+      mod_gcd (f, Q->z, m);
+
+      /* if (mod_intcmp_ul(f, 1UL) != 0) { */
+      /*   fprintf (stderr, "f = %lu\n", mod_intget_ul(f)); */
+      /* 	fprintf (stderr, "gcd != 1, bt = %d\n", bt); */
+      /* } */
+
       mod_clear (a, m);
       ellE_clear (Q, m);
     }

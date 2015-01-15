@@ -50,6 +50,14 @@ macro(add_plingen_test testname)
         "${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
 endmacro(add_plingen_test testname)
 
+macro(add_lingen_binary_test testname)
+    string_join(tail " " ${ARGN})
+    # Don't split this line !
+    add_test(test-bwc-lingen-binary-${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/test-lingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
+endmacro(add_lingen_binary_test)
+
+add_lingen_binary_test(test0 30b90451fb828f08caa160f96c585c4b1c0951a8 64 64 200 1 lingen-threshold=10 ${extra})
+
 foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(extra)
     string(REGEX MATCH "p_([0-9]+)" t "${gfp_layer}")
