@@ -3,6 +3,9 @@
 
 #include "utils.h"
 #include "las-cofactor.h"
+#include "modredc_ul.h"
+#include "modredc_15ul.h"
+#include "modredc_2ul2.h"
 
 /* {{{ factor_leftover_norm */
 
