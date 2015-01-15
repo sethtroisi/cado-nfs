@@ -241,8 +241,10 @@ verbose_output_init(const size_t nr_channels)
     if (pthread_mutex_lock(io_mutex) != 0)
         return 0;
     _channel_outputs = (struct outputs_s *) malloc(nr_channels * sizeof(struct outputs_s));
-    if (_channel_outputs == NULL)
+    if (_channel_outputs == NULL) {
+        pthread_mutex_unlock(io_mutex);
         return 0;
+    }
     _nr_channels = nr_channels;
     for (size_t i = 0; i < nr_channels; i++)
         init_output(&_channel_outputs[i]);
