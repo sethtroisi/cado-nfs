@@ -143,66 +143,56 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     double tfb;
     const char * fbcfilename = param_list_lookup_string(pl, "fbc");
 
-    if (fbcfilename != NULL) {
-        /* Try to read the factor base cache file. If that fails, because
-           the file does not exist or is not compatible with our parameters,
-           it will be written after we generate the factor bases. */
-        verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
-               fbcfilename);
-        if (fb_mmap_fbc(&si->sides[0]->fb, &si->sides[0]->fb_bucket_threads,
-                        &si->sides[1]->fb, &si->sides[1]->fb_bucket_threads,
-                        fbcfilename, las->nb_threads)) {
-            si->sides[0]->fb_is_mmapped = 1;
-            si->sides[1]->fb_is_mmapped = 1;
-            verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
-            return;
-        } else {
-            verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
-        }
-    }
-
     for(int side = 0 ; side < 2 ; side++) {
         mpz_poly_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
-        unsigned long lim = si->conf->sides[side]->lim;
+
+        const fbprime_t bk_thresh = si->conf->bucket_thresh;
+        const fbprime_t fbb = si->conf->sides[side]->lim;
+        const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
+        const size_t nr_slices[4] = {1, 1, 1, 1};
+        const bool only_general[4]={true, false, false, false};
+        sis->fb = new fb_factorbase(thresholds, nr_slices, only_general);
+
+        if (fbcfilename != NULL) {
+            /* Try to read the factor base cache file. If that fails, because
+               the file does not exist or is not compatible with our parameters,
+               it will be written after we generate the factor bases. */
+            verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
+                   fbcfilename);
+            if (sis->fb->mmap_fbc(fbcfilename)) {
+                verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
+                continue;
+            } else {
+                verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
+            }
+        }
+
         if (pol->deg > 1) {
             tfb = seconds ();
             char fbparamname[4];
             snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
             verbose_output_print(0, 1, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
-                              si->conf->bucket_thresh, las->nb_threads,
-                              lim, si->conf->sides[side]->powlim);
-            FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
-            ASSERT_ALWAYS(sis->fb != NULL);
-            sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
+            sis->fb->read(fbfilename);
             verbose_output_print(0, 1,
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
                     sidenames[side],
-                    fb_size (sis->fb) >> 20, tfb);
+                    sis->fb->size() >> 20, tfb);
         } else {
             tfb = seconds ();
-            int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
-                                     (const mpz_t *) pol->coeff, (fbprime_t) lim,
-                                     si->conf->bucket_thresh, las->nb_threads,
-                                     si->conf->sides[side]->powlim, 1);
-            FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
-            sis->fb_is_mmapped = 0;
+            sis->fb->make_linear ((const mpz_t *) pol->coeff, si->conf->sides[side]->powlim, true);
             tfb = seconds () - tfb;
             verbose_output_print(0, 1, "# Creating rational factor base of %zuMb took %1.1fs\n",
-                     fb_size (sis->fb) >> 20, tfb);
+                     sis->fb->size() >> 20, tfb);
         }
-    }
-    if (fbcfilename != NULL) {
-        verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
-        fb_dump_fbc(si->sides[0]->fb,
-                    (const factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
-                    si->sides[1]->fb,
-                    (const factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
-                    fbcfilename, las->nb_threads);
-        verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
+
+        if (fbcfilename != NULL) {
+            verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
+            sis->fb->dump_fbc(fbcfilename);
+            verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
+        }
     }
 }
 /*}}}*/
