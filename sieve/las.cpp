@@ -10,6 +10,8 @@
 #include <pthread.h>
 #include <fcntl.h>   /* for _O_BINARY */
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
+#include <algorithm>
+#include <vector>
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -120,17 +122,18 @@ static void sieve_info_init_trialdiv(sieve_info_ptr si, int side)/*{{{*/
     sieve_side_info_ptr s = si->sides[side];
     unsigned long pmax = MIN((unsigned long) si->conf->bucket_thresh,
                              trialdiv_get_max_p());
-    s->trialdiv_primes = fb_extract_bycost (s->fb, pmax, si->conf->td_thresh);
-    int n;
-    for (n = 0; s->trialdiv_primes[n] != FB_END; n++);
-    int skip2 = n > 0 && s->trialdiv_primes[0] == 2;
-    s->trialdiv_data = trialdiv_init (s->trialdiv_primes + skip2, n - skip2);
+    std::vector<unsigned long> *trialdiv_primes = new std::vector<unsigned long>;
+    s->fb->extract_bycost(*trialdiv_primes, pmax, si->conf->td_thresh);
+    std::sort(trialdiv_primes->begin(), trialdiv_primes->end());
+    size_t n = trialdiv_primes->size();
+    int skip2 = n > 0 && (*trialdiv_primes)[0] == 2;
+    s->trialdiv_data = trialdiv_init (&trialdiv_primes->front() + skip2, n - skip2);
+    delete trialdiv_primes;
 }/*}}}*/
 
 static void sieve_info_clear_trialdiv(sieve_info_ptr si, int side)/*{{{*/
 {
         trialdiv_clear (si->sides[side]->trialdiv_data);
-        free (si->sides[side]->trialdiv_primes);
 }/*}}}*/
 
 /* {{{ Factor base handling */
