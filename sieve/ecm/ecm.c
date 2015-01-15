@@ -26,7 +26,6 @@
 #endif
 #endif
 
-
 #define COUNT_ELLM_OPS 0
 #if COUNT_ELLM_OPS
 static unsigned long ellM_add_count, ellM_double_count;
@@ -391,6 +390,69 @@ ellEe_swap (ellEe_point_t Q, ellEe_point_t P, const modulus_t m)
   mod_swap (Q->z, P->z, m);
 }
 
+/* 
+   Computes Q=2P in E using dedicated doubling in Projective twisted Edwards
+   coordinates from [Bernstein et al. 2008] 
+
+   Formulae only depends on the curve constant a (curve constant d is not
+   necessary).  
+
+   Cost: 3m + 4s + 1d (where d stands for a multiplication by a constant)
+
+   @InProceedings{BerBirJoyLanPet08,
+   author = 	 {D. J. Bernstein and P. Birkner M. Joye and T. Lange and C. Peters},
+   title = 	 {Twisted {E}dwards Curves },
+   booktitle = {Progress in Cryptology -- {AFRICACRYPT 2008}},
+   pages = 	 {389--405},
+   year = 	 2008,
+   volume = 	 5023,
+   series = 	 LNCS,
+   publisher = {Springer}
+   }
+   
+*/
+static void
+ellE_double (ellE_point_t Q, const ellE_point_t P, const modulus_t m, const residue_t a)
+{
+  /* FIXME: optimize registers */
+  residue_t B, C, D, E, F, H, J;
+
+#if COUNT_ELLE_OPS
+  ellE_double_count++;
+#endif
+
+  mod_init_noset0 (B, m);
+  mod_init_noset0 (C, m);
+  mod_init_noset0 (D, m);
+  mod_init_noset0 (E, m);
+  mod_init_noset0 (F, m);
+  mod_init_noset0 (H, m);
+  mod_init_noset0 (J, m);
+
+  mod_add (B, P->x, P->y, m);
+  mod_sqr (B, B, m);                  /* B := (X1 + Y1)^2 */
+  mod_sqr (C, P->x, m);               /* C := X1^2 */
+  mod_sqr (D, P->y, m);               /* D := Y1^2 */
+  mod_mul (E, C, a, m);               /* E := aC */
+  mod_add (F, E, D, m);               /* F := E + D */
+  mod_sqr (H, P->z, m);               /* H := Z1^2 */
+  mod_add (H, H, H, m);               /* H := 2H (Any better way to multiply by 2?) */
+  mod_sub (J, F, H, m);               /* J := F - 2H */
+  mod_sub (H, B, C, m);
+  mod_sub (H, H, D, m);
+  mod_mul (Q->x, H, J, m);            /* X3 := (B - C - D) * J */
+  mod_sub (H, E, D, m);
+  mod_mul (Q->y, F, H, m);            /* Y3 := F * (E - D) */
+  mod_mul (Q->z, F, J, m);            /* Z3 := F * J */
+
+  mod_clear (B, m);
+  mod_clear (C, m);
+  mod_clear (D, m);
+  mod_clear (E, m);
+  mod_clear (F, m);
+  mod_clear (H, m);
+  mod_clear (J, m);  
+}
 
 /* 
    Computes Q=2P in Ee using dedicated doubling in extended twisted Edwards
@@ -400,10 +462,17 @@ ellEe_swap (ellEe_point_t Q, ellEe_point_t P, const modulus_t m)
    necessary).  
 
    Cost: 4m + 4s + 1d (where d stands for a multiplication by a constant)
-   
-   [Hisil et al. 2008] H. Hisil, K. K.-H. Wong, G. Carter and E. Dawson. Twisted
-   Edwards Curves Revisited. ASIACRYPT 2008, vol 5350 of LNCS, pp. 326--343,
-   Springer.
+  
+   @InProceedings{HisWonCarDaw08:twed_revisited,
+   author = 	 {H. Hisil and Wong, K. K.-H. and G. Carter and E. Dawson},
+   title = 	 {Twisted {Edwards} Curves Revisited},
+   booktitle = 	 {Advances in Cryptology, {ASIACRYPT 2008}},
+   pages = 	 {326--343},
+   year = 	 2008,
+   volume = 	 5350,
+   series = 	 LNCS,
+   publisher =    {Springer}
+   }
 */
 static void
 ellEe_double (ellEe_point_t Q, const ellEe_point_t P, const modulus_t m, 
@@ -577,7 +646,7 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
 {
   unsigned long j;
   long k;
-  ellEe_point_t T, PP;
+  ellEe_point_t T, Pe;
   
   if (e == 0UL)
     {
@@ -593,29 +662,23 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
       return;
     }
   
+  if (e == 2UL)
+    {
+      ellE_double (R, P, m, a);
+      return;
+    }
+
+  if (e == 4UL)
+    {
+      ellE_double (R, P, m, a);
+      ellE_double (R, R, m, a);
+      return;
+    }
+
   ellEe_init (T, m);
-  ellEe_init (PP, m);
-  ellEe_set_from_E (PP, P, m);
+  ellEe_init (Pe, m);
+  ellEe_set_from_E (Pe, P, m);
   
-  /* if (e == 2UL) */
-  /*   { */
-  /*     /\* doubling directly in E is probably faster *\/ */
-  /*     ellEe_set_from_E (T, P, m); */
-  /*     ellEe_double (T, T, m, b); */
-  /*     ellE_set_from_Ee (R, T, m); */
-  /*     return; */
-  /*   } */
-
-  /* if (e == 4UL) */
-  /*   { */
-  /*     /\* doubling twice directly in E is also probably faster *\/ */
-  /*     ellEe_set_from_E (T, P, m); */
-  /*     ellEe_double (T, T, m, b); */
-  /*     ellEe_double (T, T, m, b); */
-  /*     ellE_set_from_Ee (R, T, m); */
-  /*     return; */
-  /*   } */
-
   /* basic double-and-add */
   
   /* fprintf (stdout, "Running ellE_mul_ul for e = %lu\n", e); */
@@ -632,14 +695,14 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
     {
       ellEe_double (T, T, m, a);
       if (j & e)
-	ellEe_add (T, T, PP, a, m);
+	ellEe_add (T, T, Pe, a, m);
       j >>= 1;
     }
 
   ellE_set_from_Ee (R, T, m);
    
   ellEe_clear (T, m);
-  ellEe_clear (PP, m);
+  ellEe_clear (Pe, m);
 }
 
 
@@ -1836,7 +1899,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 int 
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, b;
+  residue_t u, b, d;
   ellM_point_t P, Pt;
   ellE_point_t Q;
   ellM_init (P, m);
@@ -1912,7 +1975,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     /* Construct Edwards16 curve [Barbulescu et. al 2012] */
     /* Curve is constant for now */
     
-    residue_t xn, xd, yn, yd, d, dd;
+    residue_t xn, xd, yn, yd, dd;
 
     mod_set_ul (xn, Ecurve14.x_numer, m);
     mod_set_ul (xd, Ecurve14.x_denom, m);
@@ -1951,9 +2014,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	return 0;
       }
     mod_mul (d, d, u, m);
-
-    /* fprintf (stderr, "ecm: Edwards parameterization done\n"); */
-
   }
   else
   {
@@ -1970,8 +2030,10 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     }
   else if (plan->parameterization == TWED16)
     {
-      printf ("starting point: (%lu:%lu:%lu) on twisted Edwards curve -x^2 + y^2 = 1 + %lu * x^2 * y^2\n", 
-	      mod_get_ul (P->x, m), mod_get_ul (P->y, m), mod_get_ul (P->z, m), mod_get_ul(d, m));
+      printf ("starting point: (%lu:%lu:%lu) on twisted Edwards curve\
+               -x^2 + y^2 = 1 + %lu * x^2 * y^2\n", 
+	      mod_get_ul (Q->x, m), mod_get_ul (Q->y, m), mod_get_ul (Q->z, m), 
+	      mod_get_ul(d, m));
     }
 #endif
 
@@ -2016,8 +2078,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	ellM_set (Pt, P, m);
 #endif
       }
-    mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
-                               in stage 2 init find factors? */
+    mod_gcd (f, P[0].z, m);
   }
   else if (plan->parameterization == TWED16)
     {
@@ -2036,11 +2097,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	}
       
       mod_gcd (f, Q->z, m);
-
-      /* if (mod_intcmp_ul(f, 1UL) != 0) { */
-      /*   fprintf (stderr, "f = %lu\n", mod_intget_ul(f)); */
-      /* 	fprintf (stderr, "gcd != 1, bt = %d\n", bt); */
-      /* } */
 
       mod_clear (a, m);
       ellE_clear (Q, m);
