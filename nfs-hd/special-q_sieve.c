@@ -538,7 +538,7 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
 #ifdef SIEVE_TQR
 /*
   Sieve for a special-q of degree 1 and Tqr with a zero coefficient at the
-  first place. This function sieve a c in the q lattice with c0 positive.
+  first place. This function sieve a c in the q lattice.
 
   array: in which we store the norms.
   c: element of the q lattice.
@@ -548,10 +548,9 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
   i: index of the first non-zero coefficient in Tqr.
   number_c_l: number of possible c with the same ci, ci+1, …, ct.
 */
-void sieve_ci_positive(array_ptr array, int64_vector_ptr c,
-                       ideal_1_srcptr ideal, int64_t ci,
-                       sieving_interval_srcptr H, unsigned int i,
-                       uint64_t number_c_l)
+void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
+              int64_t ci, sieving_interval_srcptr H, unsigned int i,
+              uint64_t number_c_l)
 {
   uint64_t index = 0;
 
@@ -583,8 +582,10 @@ void sieve_ci_positive(array_ptr array, int64_vector_ptr c,
 
     int64_t tmp = ci;
     tmp = tmp + (int64_t)ideal->ideal->r;
+
     while(tmp <= (int64_t)H->h[i]) {
-      index = index + ideal->ideal->r;
+      index = index + ideal->ideal->r + number_c_l;
+
       array->array[index] = array->array[index] - ideal->log;
 
 #ifdef TRACE_POS
@@ -614,78 +615,10 @@ void sieve_ci_positive(array_ptr array, int64_vector_ptr c,
   }
 }
 
-void sieve_ci_negative(array_ptr array, int64_vector_ptr c,
-                       ideal_1_srcptr ideal, int64_t ci,
-                       sieving_interval_srcptr H, unsigned int i,
-                       uint64_t number_c_l)
-{
-  uint64_t index = 0;
-  int64_t tmp = ci - (int64_t)ideal->ideal->r;
-
-  if (tmp >= -(int64_t)H->h[i]) {
-    int64_vector_setcoordinate(c, i, tmp);
-
-    array_int64_vector_index(&index, c, H, array->number_element);
-    array->array[index] = array->array[index] - ideal->log;
-
-#ifdef TRACE_POS
-    if (index == TRACE_POS) {
-      fprintf(file, "The ideal is: ");
-      ideal_1_fprintf(file, ideal, H->t);
-      fprintf(file, "The new value of the norm is %u.\n", array->array[index]);
-    }
-#endif
-
-    for (uint64_t k = 1; k < number_c_l; k++) {
-      array->array[index + k] = array->array[index + k] - ideal->log;
-
-#ifdef TRACE_POS
-      if (index + k == TRACE_POS) {
-        fprintf(file, "The ideal is: ");
-        ideal_1_fprintf(file, ideal, H->t);
-        fprintf(file, "The new value of the norm is %u.\n",
-                array->array[index + k]);
-      }
-#endif
-
-    }
-
-    tmp = tmp - (int64_t)ideal->ideal->r;
-    while(tmp >= -(int64_t)H->h[i]) {
-      index = index - ideal->ideal->r;
-      array->array[index] = array->array[index] - ideal->log;
-
-#ifdef TRACE_POS
-      if (index == TRACE_POS) {
-        fprintf(file, "The ideal is: ");
-        ideal_1_fprintf(file, ideal, H->t);
-        fprintf(file, "The new value of the norm is %u.\n",
-                array->array[index]);
-      }
-#endif
-
-      for (uint64_t k = 1; k < number_c_l; k++) {
-        array->array[index + k] = array->array[index + k] - ideal->log;
-
-#ifdef TRACE_POS
-        if (index + k == TRACE_POS) {
-          fprintf(file, "The ideal is: ");
-          ideal_1_fprintf(file, ideal, H->t);
-          fprintf(file, "The new value of the norm is %u.\n",
-                  array->array[index + k]);
-        }
-#endif
-
-      }
-      tmp = tmp - (int64_t)ideal->ideal->r;
-    }
-  }
-}
-
-void sieve_1_tqr_i(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
-                   ideal_1_srcptr ideal, sieving_interval_srcptr H,
-                   unsigned int i, uint64_t number_c_l, int64_t * ci,
-                   unsigned int pos)
+void sieve_1_tqr(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
+                 ideal_1_srcptr ideal, sieving_interval_srcptr H,
+                 unsigned int i, uint64_t number_c_l, int64_t * ci,
+                 unsigned int pos)
 {
   ASSERT(pos >= i);
 
@@ -704,11 +637,15 @@ void sieve_1_tqr_i(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
   }
   ASSERT(* ci >= 0 && * ci < (int64_t)ideal->ideal->r);
 
-  sieve_ci_positive(array, c, ideal, * ci, H, i, number_c_l);
+  int64_t lb = (i < H->t - 1) ? -(int64_t)H->h[i] : 0;
+  int64_t k = (lb - * ci) / (-(int64_t) ideal->ideal->r);
+  if ((lb - * ci) > 0) {
+    k--;
+  }
+  int64_t ci_tmp = -k * (int64_t)ideal->ideal->r + * ci;
+  ASSERT(ci_tmp >= lb);
 
-  /* if (i != H->t - 1) { */
-  /*   sieve_ci_negative(array, c, ideal, * ci, H, i, number_c_l); */
-  /* } */
+  sieve_ci(array, c, ideal, ci_tmp, H, i, number_c_l);
 }
 #endif // SIEVE_TQR
 
@@ -877,12 +814,12 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       number_c_u = number_c_u / (2 * H->h[index] + 1);
 
       pos = int64_vector_add_one_i(c, index + 1, H);
-      sieve_1_tqr_i(array, c, Tqr, fb->factor_base_1[i], H, index,
-                    number_c_l, &ci, pos);
+      sieve_1_tqr(array, c, Tqr, fb->factor_base_1[i], H, index,
+                  number_c_l, &ci, pos);
       for (uint64_t j = 1; j < number_c_u; j++) {
         pos = int64_vector_add_one_i(c, index + 1, H);
-        sieve_1_tqr_i(array, c, Tqr, fb->factor_base_1[i], H, index,
-                      number_c_l, &ci, pos);
+        sieve_1_tqr(array, c, Tqr, fb->factor_base_1[i], H, index,
+                    number_c_l, &ci, pos);
       }
 #endif // SIEVE_TQR
     }
