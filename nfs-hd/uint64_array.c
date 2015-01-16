@@ -36,6 +36,9 @@ void uint64_array_clear(uint64_array_ptr array)
 
 void uint64_array_fprintf(FILE * file, uint64_array_srcptr array)
 {
+  if (array->length == 0) {
+    fprintf(file, "[emptyset]\n");
+  }
   fprintf(file, "[");
   for (uint64_t i = 0; i < array->length - 1; i++) {
     fprintf(file, "%" PRIu64 ", ", array->array[i]);
