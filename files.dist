@@ -665,6 +665,7 @@ sieve/las-duplicate.cpp
 sieve/las-duplicate.h
 sieve/las-norms.cpp
 sieve/las-norms.h
+sieve/las-plattice.h
 sieve/las-qlattice.cpp
 sieve/las-qlattice.h
 sieve/las-report-stats.cpp
