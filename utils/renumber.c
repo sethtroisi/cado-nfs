@@ -802,7 +802,8 @@ renumber_write_p (renumber_t tab, unsigned long p, unsigned long **r, int *k)
     size_buffer = renumber_write_p_buffer_generic (buffer, p, tab, r, k);
 
   fwrite ((void *) buffer, size_buffer, 1, tab->file);
-  tab->size += k[0] + k[1];
+  for (unsigned int i = 0; i < tab->nb_polys; i++)
+    tab->size += k[i];
 }
 
 /* side is 0 if (p,r) corresponds to the left part in the relation,
