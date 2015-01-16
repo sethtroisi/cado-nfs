@@ -437,106 +437,6 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
 }
 
 /*
-  Sieve for a special-q of degree 1 and Tqr with a non-zero coefficient at the
-  first place. This function sieve a c in the q lattice.
-
-  array: in which we store the norms.
-  c: element of the q lattice.
-  ideal: an ideal with r < q.
-  c0: the possible first coordinate of c to have c in the sieving region.
-  H: the sieving interval.
-*/
-void sieve_c0(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
-              int64_t c0, sieving_interval_srcptr H)
-{
-  uint64_t index = 0;
-
-  if (c0 >= -(int64_t)H->h[0]) {
-    int64_vector_setcoordinate(c, 0, c0);
-    array_int64_vector_index(&index, c, H, array->number_element);
-    array->array[index] = array->array[index] - ideal->log;
-
-#ifdef NUMBER_HIT
-    number_of_hit = number_of_hit + 1;
-#endif // NUMBER_HIT
-
-#ifdef TRACE_POS
-    if (index == TRACE_POS) {
-      fprintf(file, "The ideal is: ");
-      ideal_1_fprintf(file, ideal, H->t);
-      fprintf(file, "The new value of the norm is %u.\n", array->array[index]);
-    }
-#endif
-
-    c0 = c0 - (int64_t)ideal->ideal->r;
-    while(c0 >= -(int64_t)H->h[0]) {
-      index = index - ideal->ideal->r;
-      array->array[index] = array->array[index] - ideal->log;
-
-#ifdef NUMBER_HIT
-    number_of_hit = number_of_hit + 1;
-#endif // NUMBER_HIT
-
-#ifdef TRACE_POS
-      if (index == TRACE_POS) {
-        fprintf(file, "The ideal is: ");
-        ideal_1_fprintf(file, ideal, H->t);
-        fprintf(file, "The new value of the norm is %u.\n",
-                array->array[index]);
-      }
-#endif
-
-      c0 = c0 - (int64_t)ideal->ideal->r;
-    }
-  }
-}
-
-/*
-  Sieve for a special-q of degree 1 and Tqr with a non-zero coefficient at the
-  first place.
-
-  array: in which we store the norms.
-  c: the vector c in the q lattice.
-  Tqr: the Tqr matrix.
-  ideal: an ideal r that divides c.
-  H: the sieving interval.
-  c0: the first coordinate of c.
-  pos: when there is an addition one to c, upper index wich is modified.
-*/
-void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
-             ideal_1_srcptr ideal, sieving_interval_srcptr H, int64_t * c0,
-             unsigned int pos)
-{
-  ASSERT(pos >= 1);
-
-  for (unsigned int j = 1; j < pos; j++) {
-    * c0 = * c0 - ((int64_t)Tqr[j] * 2 * (int64_t)H->h[j]);
-    if (* c0 >= (int64_t)ideal->ideal->r || * c0 < 0) {
-      * c0 = * c0 % (int64_t)ideal->ideal->r;
-    }
-  }
-  * c0 = * c0 + Tqr[pos];
-  if (* c0 >= (int64_t)ideal->ideal->r) {
-    * c0 = * c0 - (int64_t)ideal->ideal->r;
-  }
-  if (* c0 < 0) {
-    * c0 = * c0 + (int64_t)ideal->ideal->r;
-  }
-  ASSERT(* c0 >= 0 && * c0 < (int64_t)ideal->ideal->r);
-
-  int64_t k = ((int64_t)H->h[0] - * c0) / ((int64_t) ideal->ideal->r);
-  if (((int64_t)H->h[0] - * c0) < 0) {
-    k--;
-  }
-  int64_t c0_tmp = k * (int64_t)ideal->ideal->r + * c0;
-
-  ASSERT(c0_tmp <= (int64_t)(H->h[0]));
-
-  sieve_c0(array, c, ideal, c0_tmp, H);
-}
-
-#ifdef SIEVE_TQR
-/*
   Sieve for a special-q of degree 1 and Tqr with a zero coefficient at the
   first place. This function sieve a c in the q lattice.
 
@@ -615,7 +515,7 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
   }
 }
 
-void sieve_1_tqr(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
+void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
                  ideal_1_srcptr ideal, sieving_interval_srcptr H,
                  unsigned int i, uint64_t number_c_l, int64_t * ci,
                  unsigned int pos)
@@ -647,8 +547,8 @@ void sieve_1_tqr(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
 
   sieve_ci(array, c, ideal, ci_tmp, H, i, number_c_l);
 }
-#endif // SIEVE_TQR
 
+#ifdef SIEVE_U
 void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
              mpz_vector_srcptr c, sieving_interval_srcptr H)
 {
@@ -689,6 +589,7 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
   }
   free(tmp);
 }
+#endif // SIEVE_U
 
 void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
                      factor_base_srcptr fb, sieving_interval_srcptr H,
@@ -754,11 +655,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // TIMER_SIEVE
 
       pos = int64_vector_add_one_i(c, 1, H);
-      sieve_1(array, c, Tqr, fb->factor_base_1[i], H, &c0, pos);
+      sieve_1(array, c, Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos);
 
       for (uint64_t j = 1; j < number_c;  j++) {
         pos = int64_vector_add_one_i(c, 1, H);
-        sieve_1(array, c, Tqr, fb->factor_base_1[i], H, &c0, pos);
+        sieve_1(array, c, Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos);
       }
 
 #ifdef TIMER_SIEVE
@@ -814,11 +715,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       number_c_u = number_c_u / (2 * H->h[index] + 1);
 
       pos = int64_vector_add_one_i(c, index + 1, H);
-      sieve_1_tqr(array, c, Tqr, fb->factor_base_1[i], H, index,
+      sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
                   number_c_l, &ci, pos);
       for (uint64_t j = 1; j < number_c_u; j++) {
         pos = int64_vector_add_one_i(c, index + 1, H);
-        sieve_1_tqr(array, c, Tqr, fb->factor_base_1[i], H, index,
+        sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
                     number_c_l, &ci, pos);
       }
 #endif // SIEVE_TQR
@@ -904,7 +805,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     }
     free(Tqr);
   }
-#endif
+#endif // SIEVE_U
 }
 
 void find_index(uint64_array_ptr indexes, array_srcptr array,
