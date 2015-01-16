@@ -291,35 +291,49 @@ void reorder_fb(sieve_info_ptr si, int side)
  * is used to verify that per-thread allocation for buckets is
  * sufficient.
  * */
-void sieve_info_print_fb_statistics(las_info_ptr las, sieve_info_ptr si, int side)
+void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_ptr si, int side)
 {
-    const int n = las->nb_threads;
     sieve_side_info_ptr s = si->sides[side];
-    double bucket_fill_ratio[n];
+    double max_weight = 0;
 
-    verbose_output_print(0, 1, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
-
-    /* Counting the bucket-sieved primes per thread.  */
-    unsigned long * nn = (unsigned long *) malloc(n * sizeof(unsigned long));
-    ASSERT_ALWAYS(nn);
-    memset(nn, 0, n * sizeof(unsigned long));
-    for (int i = 0; i < n; ++i) {
-        bucket_fill_ratio[i] = 0;
-        factorbase_degn_t *fb = s->fb_bucket_threads[i];
-        for (; fb->p != FB_END; fb = fb_next(fb)) {
-            nn[i] += fb->nr_roots;
-            bucket_fill_ratio[i] += fb->nr_roots / (double) fb->p;
+    for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++)
+    {
+        size_t nr_primes;
+        double weight;
+        s->fb->get_part(i_part)->count_entries(&nr_primes, NULL, &weight);
+        max_weight = MAX(max_weight, weight);
+        if (nr_primes != 0 || weight != 0.) {
+            verbose_output_print(0, 1, "# Number of primes in %s factor base part %d = %zu\n",
+                                 sidenames[side], i_part, nr_primes);
+            verbose_output_print(0, 1, "# Weight of primes in %s factor base part %d = %0.5g\n",
+                                 sidenames[side], i_part, weight);
         }
+    }
+    s->max_bucket_fill_ratio = max_weight * 1.07;
+
+    // How do we write updates to buckets? How much space should we allocate? With a thread-pool, how do we determine how much memory each bucket array needs?
+#if 0
+
+    const int n = las->nb_threads;
+    double bucket_fill_ratio[n];
+    size_t nr_primes[n], nr_roots[n];
+    /* Counting the bucket-sieved primes per thread. */
+    for (int i = 0; i < n; ++i) {
+        s->fb->get_part(1)->count_entries(&nr_primes[i], &nr_roots[i], &bucket_fill_ratio[i]);
     }
     verbose_output_print(0, 1, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
     for(int i = 0 ; i < n ; i++)
-        verbose_output_print(0, 1, " %lu", nn[i]);
+        verbose_output_print(0, 1, " %lu", nr_primes[i]);
     verbose_output_print(0, 1, "\n");
-    verbose_output_print(0, 1, "# Inverse sum of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
+    verbose_output_print(0, 1, "# Number of bucket-sieved prime ideals in %s factor base per thread =", sidenames[side]);
+    for(int i = 0 ; i < n ; i++)
+        verbose_output_print(0, 1, " %lu", nr_roots[i]);
+    verbose_output_print(0, 1, "\n");
+    verbose_output_print(0, 1, "# Inverse sum of bucket-sieved prime ideals in %s factor base per thread =", sidenames[side]);
     for(int i = 0 ; i < n ; i++)
         verbose_output_print(0, 1, " %.5f", bucket_fill_ratio[i]);
 
-    double min_bucket_fill_ratio = bucket_fill_ratio[n-1];
+    double min_bucket_fill_ratio = bucket_fill_ratio[n-1]; /* Why not [0]? */
     double max_bucket_fill_ratio = bucket_fill_ratio[0];
     for(int i = 0 ; i < n ; i++) {
         double r = bucket_fill_ratio[i];
@@ -330,7 +344,7 @@ void sieve_info_print_fb_statistics(las_info_ptr las, sieve_info_ptr si, int sid
             (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
     /* enable some margin in the bucket size */
     s->max_bucket_fill_ratio = max_bucket_fill_ratio * 1.07;
-    free(nn);
+#endif
 }
 /*}}}*/
 
@@ -408,8 +422,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
             sieve_side_info_ptr sis = si->sides[side];
             sieve_side_info_ptr sis0 = las->sievers->sides[side];
             sis->fb = sis0->fb;
-            sis->fb_bucket_threads = sis0->fb_bucket_threads;
-            sis->fb_is_mmapped = sis0->fb_is_mmapped;
         }
     }
 
@@ -446,17 +458,17 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     if (file != NULL)
       fclose (file);
 
-    for(int s = 0 ; s < 2 ; s++) {
-        sieve_info_print_fb_statistics(las, si, s);
-	/* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
-	sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
-	mpz_init (si->BB[s]);
-	mpz_init (si->BBB[s]);
-	mpz_init (si->BBBB[s]);
-	unsigned long lim = si->conf->sides[s]->lim;
-	mpz_ui_pow_ui (si->BB[s], lim, 2);
-	mpz_mul_ui (si->BBB[s], si->BB[s], lim);
-	mpz_mul_ui (si->BBBB[s], si->BBB[s], lim);
+    for(int side = 0 ; side < 2 ; side++) {
+        sieve_info_print_fb_statistics(las, si, side);
+	/* init_norms (si, side); */ /* only depends on scale, logmax, lognorm_table */
+	sieve_info_init_trialdiv(si, side); /* Init refactoring stuff */
+	mpz_init (si->BB[side]);
+	mpz_init (si->BBB[side]);
+	mpz_init (si->BBBB[side]);
+	unsigned long lim = si->conf->sides[side]->lim;
+	mpz_ui_pow_ui (si->BB[side], lim, 2);
+	mpz_mul_ui (si->BBB[side], si->BB[side], lim);
+	mpz_mul_ui (si->BBBB[side], si->BBB[side], lim);
 
 	//todo: unused code: if(){...}.
 	//{{
@@ -465,34 +477,42 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	    /* The strategies also depend on the special-q used within the
 	     * descent, assuming lim / lpb depend on the sq bitsize */
 	    verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
-				 sc->bitsize, sidenames[sc->side][0], sidenames[s],
-				 sc->sides[s]->lim, sc->sides[s]->lpb);
+				 sc->bitsize, sidenames[sc->side][0], sidenames[side],
+				 sc->sides[side]->lim, sc->sides[side]->lpb);
 	    verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
-				 sc->sides[s]->ncurves > -1
-				 ? sc->sides[s]->ncurves
-				 : nb_curves (sc->sides[s]->lpb));
-	    si->sides[s]->strategy =
-	      facul_make_strategy(sc->sides[s]->lim, sc->sides[s]->lpb,
-				  sc->sides[s]->ncurves, 0);
+				 sc->sides[side]->ncurves > -1
+				 ? sc->sides[side]->ncurves
+				 : nb_curves (sc->sides[side]->lpb));
+	    si->sides[side]->strategy =
+	      facul_make_strategy(sc->sides[side]->lim, sc->sides[side]->lpb,
+				  sc->sides[side]->ncurves, 0);
 	  }
 	else //always in this case!
-	  si->sides[s]->strategy = NULL;
+	  si->sides[side]->strategy = NULL;
 	//}}
-	reorder_fb(si, s);
+	reorder_fb(si, side);
 
-	verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
-        factorbase_degn_t ** q;
-        q = si->sides[s]->fb_parts->pow2;
-        verbose_output_print(0, 2, ": %d pow2", fb_diff(q[1], q[0]));
-        q = si->sides[s]->fb_parts->pow3;
-        verbose_output_print(0, 2, ", %d pow3", fb_diff(q[1], q[0]));
-        q = si->sides[s]->fb_parts->td;
-        verbose_output_print(0, 2, ", %d td", fb_diff(q[1], q[0]));
-        q = si->sides[s]->fb_parts->rs;
-        verbose_output_print(0, 2, ", %d rs", fb_diff(q[1], q[0]));
-        q = si->sides[s]->fb_parts->rest;
-        verbose_output_print(0, 2, ", %d rest", fb_diff(q[1], q[0]));
-        verbose_output_print(0, 2, " (total %zu)\n", fb_nroots_total(si->sides[s]->fb));
+        sieve_info_print_fb_statistics(las, si, side);
+        /* init_norms (si, side); */ /* only depends on scale, logmax, lognorm_table */
+
+        /* The strategies also depend on the special-q used within the
+         * descent, assuming lim / lpb depend on the sq bitsize */
+        verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
+                sc->bitsize, sidenames[sc->side][0], sidenames[side],
+                sc->sides[side]->lim, sc->sides[side]->lpb);
+        verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
+                             sc->sides[side]->ncurves > 0
+                             ? sc->sides[side]->ncurves
+                             : nb_curves (sc->sides[side]->lpb));
+        si->sides[side]->strategy = facul_make_strategy(
+                sc->sides[side]->lim, sc->sides[side]->lpb,
+                sc->sides[side]->ncurves, 0);
+
+        reorder_fb(si, side);
+        verbose_output_print(0, 2, "# small %s factor base", sidenames[side]);
+        size_t nr_roots;
+        si->sides[side]->fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
+        verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
     }
 }
 /* }}} */
@@ -549,13 +569,7 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
 	si->sides[s]->strategy = NULL;
 	sieve_info_clear_trialdiv(si, s);
         if (si == las->sievers) {
-            free(si->sides[s]->fb);
-            if (! si->sides[s]->fb_is_mmapped) {
-                for(int i = 0 ; i < las->nb_threads ; i++) {
-                    free(si->sides[s]->fb_bucket_threads[i]);
-                }
-            }
-            free(si->sides[s]->fb_bucket_threads);
+            delete si->sides[s]->fb;
         }
 
         mpz_clear (si->BB[s]);
@@ -1191,23 +1205,25 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
                    ASSERT_ALWAYS(rc == 2);  /* %n does not count */
                    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
                    break;
-        case 'r' : side = RATIONAL_SIDE; 
-                   mpz_set_ui(r, 0);
-                   for( ; *x && !isdigit(*x) ; x++) ;
-                   rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
-                   x+=nread;
-                   ASSERT_ALWAYS(rc >= 1);  /* %n does not count */
-                   ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
-                   if (rc == 2)
+        case 'r' : {
+                       side = RATIONAL_SIDE; 
+                       mpz_set_ui(r, 0);
+                       for( ; *x && !isdigit(*x) ; x++) ;
+                       rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
+                       x+=nread;
+                       ASSERT_ALWAYS(rc >= 1);  /* %n does not count */
+                       ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
+                       if (rc == 2)
+                           break;
+                       // If the root is not specified, then we assume that
+                       // the side is really rational, and then we compute
+                       // the root.
+                       mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
+                       ASSERT_ALWAYS(f->deg == 1);
+                       int nroots = mpz_poly_roots (&r, f, p);
+                       ASSERT_ALWAYS(nroots == 1);
                        break;
-                   // If the root is not specified, then we assume that
-                   // the side is really rational, and then we compute
-                   // the root.
-                   mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
-                   ASSERT_ALWAYS(f->deg == 1);
-                   int nroots = mpz_poly_roots (&r, f, p);
-                   ASSERT_ALWAYS(nroots == 1);
-                   break;
+                   }
         default:
                    /* We may as well default on the command-line switch
                     */
@@ -1512,7 +1528,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N M
 
 NOPROFILE_STATIC void
 trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
-           factorbase_degn_t *fb, bucket_primes_t *primes,
+           const bool handle_2, bucket_primes_t *primes,
 	   trialdiv_divisor_t *trialdiv_data, const unsigned long fbb,
            int64_t a MAYBE_UNUSED, uint64_t b MAYBE_UNUSED)
 {
@@ -1524,7 +1540,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
         verbose_output_vfprint(1, 0, gmp_vfprintf, "# trial_div() entry, x = %d, norm = %Zd\n", x, norm);
 
     // handle 2 separately, if it is in fb
-    if (fb->p == 2) {
+    if (handle_2) {
         int bit = mpz_scan1(norm, 0);
         int i;
         for (i = 0; i < bit; ++i) {
@@ -1534,7 +1550,6 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
         if (trial_div_very_verbose)
             verbose_output_vfprint(1, 0, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
 
     // remove primes in "primes" that map to x
@@ -1856,8 +1871,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
                 }
 #endif
+                verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
+                const bool handle_2 = true; /* FIXME */
                 trial_div (&factors[side], norm[side], N, x,
-                        si->sides[side]->fb,
+                        handle_2,
                         &primes[side], si->sides[side]->trialdiv_data,
                         lim, a, b);
 
@@ -2219,7 +2236,9 @@ void * process_bucket_region(thread_data_ptr th)
         sieve_side_info_ptr s = si->sides[side];
         thread_side_data_ptr ts = th->sides[side];
 
+        /* Compute first sieve locations hit by small primes */
         ts->ssdpos = small_sieve_start(s->ssd, my_row0, si);
+        /* Copy those locations that correspond to re-sieved primes */
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
@@ -2233,14 +2252,14 @@ void * process_bucket_region(thread_data_ptr th)
       {
         WHERE_AM_I_UPDATE(w, N, i);
 
-        {
-            const int side = RATIONAL_SIDE;
+        for (int side = 0; side < 2; side++)
+          {
             WHERE_AM_I_UPDATE(w, side, side);
 
             sieve_side_info_ptr s = si->sides[side];
             thread_side_data_ptr ts = th->sides[side];
         
-            /* Init rational norms */
+            /* Init norms */
             rep->tn[side] -= seconds_thread ();
 #ifdef SMART_NORM
 	    init_norms_bucket_region(S[side], i, si, side, 1);
@@ -2248,7 +2267,7 @@ void * process_bucket_region(thread_data_ptr th)
 	    init_norms_bucket_region(S[side], i, si, side, 0);
 #endif
             // Invalidate the first row except (1,0)
-            if (!i) {
+            if (side == 0 && i == 0) {
                 int pos10 = 1+((si->I)>>1);
                 unsigned char n10 = S[side][pos10];
                 memset(S[side], 255, si->I);
@@ -2257,10 +2276,11 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# After rationals init_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# After %s init_norms_bucket_region, N=%u S[%u]=%u\n",
+                       sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
-            /* Apply rational buckets */
+            /* Apply buckets */
             rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
@@ -2269,51 +2289,13 @@ void * process_bucket_region(thread_data_ptr th)
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
 
-            /* Sieve small rational primes */
+            /* Sieve small primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# Final value on rational side, N=%u rat_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
-#endif
-        }
-
-        {
-            const int side = ALGEBRAIC_SIDE;
-            WHERE_AM_I_UPDATE(w, side, side);
-
-            sieve_side_info_ptr s = si->sides[side];
-            thread_side_data_ptr ts = th->sides[side];
-
-            /* Init algebraic norms */
-            rep->tn[side] -= seconds_thread ();
-
-#ifdef SMART_NORM
-	    init_norms_bucket_region(S[side], i, si, side, 1);
-#else
-            init_norms_bucket_region(S[side], i, si, side, 0);
-#endif
-            rep->tn[side] += seconds_thread ();
-#if defined(TRACE_K) 
-            if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# After algebraics init_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
-#endif
-
-            /* Apply algebraic buckets */
-            rep->ttbuckets_apply -= seconds_thread();
-            for (int j = 0; j < las->nb_threads; ++j) {
-                thread_data_ptr ot = th + j - th->id;
-                apply_one_bucket(SS, ot->sides[side]->BA, i, w);
-            }
-	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
-            rep->ttbuckets_apply += seconds_thread();
-
-            /* Sieve small algebraic primes */
-            sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
-	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
-#if defined(TRACE_K) 
-            if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# Final value on algebraic side, N=%u alg_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# Final value on %s side, N=%u rat_S[%u]=%u\n",
+                       sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
         }
 
@@ -2394,7 +2376,7 @@ void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
     for (int i = 0; i < n ; ++i) {
         thrs[i]->si = si;
         for(int s = 0 ; s < 2 ; s++) {
-            thrs[i]->sides[s]->fb_bucket = si->sides[s]->fb_bucket_threads[i];
+            thrs[i]->sides[s]->fb = si->sides[s]->fb->get_part(1);
             thrs[i]->sides[s]->log_steps = si->sides[s]->log_steps;
             thrs[i]->sides[s]->log_steps_max = si->sides[s]->log_steps_max;
         }
@@ -2449,9 +2431,9 @@ static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
 
 static double thread_buckets_max_full(thread_data * thrs, int n)/*{{{*/
 {
-    double mf, mf0 = 0;
+    double mf0 = 0;
     for (int i = 0; i < n ; ++i) {
-        mf = buckets_max_full (thrs[i]->sides[RATIONAL_SIDE]->BA);
+        double mf = buckets_max_full (thrs[i]->sides[RATIONAL_SIDE]->BA);
         if (mf > mf0) mf0 = mf;
         mf = buckets_max_full (thrs[i]->sides[ALGEBRAIC_SIDE]->BA);
         if (mf > mf0) mf0 = mf;
