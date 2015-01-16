@@ -116,8 +116,14 @@ public:
   virtual ~fb_interface(){}
   virtual void append(const fb_general_entry &) = 0;
   virtual void fprint(FILE *) const = 0;
-  virtual void count_entries(size_t *nprimes, size_t *nroots, double *weight)
+  virtual void _count_entries(size_t *nprimes, size_t *nroots, double *weight)
     const = 0;
+  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const {
+    if (nprimes != NULL) *nprimes = 0;
+    if (nroots != NULL) *nroots = 0;
+    if (weight != NULL) *weight = 0;
+    _count_entries(nprimes, nroots, weight);
+  }
 };
 
 /* The work queue of slices that need to be sieved must return a common base
@@ -149,7 +155,7 @@ public:
   fb_general_vector(size_type n) : std::vector<fb_general_entry>(n){}
   void append(const fb_general_entry &e) {push_back(e);}
   void fprint(FILE *) const;
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   int get_nr_roots(){return 0;};
   bool is_general(){return true;};
   fb_general_vector * transform_roots(qlattice_basis_srcptr) const;
@@ -190,7 +196,7 @@ class fb_vector: public std::vector<fb_entry_x_roots<Nr_roots> >, public fb_vect
   fb_vector(size_t n) : std::vector<fb_entry_x_roots<Nr_roots> >(n){}
   void append(const fb_general_entry &e){this->push_back(e);};
   void fprint(FILE *) const;
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   int get_nr_roots(){return Nr_roots;};
   bool is_general(){return false;};
   fb_general_vector * transform_roots(qlattice_basis_srcptr) const;
@@ -209,7 +215,7 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   ~fb_slices();
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   int get_nr_roots(){return Nr_roots;};
   bool is_general(){return false;};
   fb_vector<Nr_roots> *get_vector(const size_t n) const {
@@ -273,7 +279,7 @@ public:
   ~fb_part();
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   bool is_only_general() const {return only_general;}
   fb_general_vector::iterator begin() {
     ASSERT_ALWAYS(only_general);
@@ -319,7 +325,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   size_t size() const {return 0;}
   void fprint(FILE *) const;
   void append(const fb_general_entry &);
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
+  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
 };

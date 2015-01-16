@@ -270,7 +270,7 @@ fb_general_entry::transform_roots(fb_general_entry &result,
 
 
 void
-fb_general_vector::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_general_vector::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
     *nprimes += this->size();
@@ -363,7 +363,7 @@ fb_entry_x_roots<Nr_roots>::fprint(FILE *out) const
 
 template <int Nr_roots>
 void
-fb_vector<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_vector<Nr_roots>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
     *nprimes += this->size();
@@ -423,10 +423,10 @@ fb_slices<Nr_roots>::append(const fb_general_entry &fb_cur)
 
 template <int Nr_roots>
 void
-fb_slices<Nr_roots>::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_slices<Nr_roots>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   for (size_t slice = 0; slice < nr_slices; slice++) {
-    vectors[slice].count_entries(nprimes, nroots, weight);
+    vectors[slice]._count_entries(nprimes, nroots, weight);
   }
 }
 
@@ -524,13 +524,13 @@ fb_part::fprint(FILE *out) const
 }
 
 void
-fb_part::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_part::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
-      get_slices(i_roots)->count_entries(nprimes, nroots, weight);
+      get_slices(i_roots)->_count_entries(nprimes, nroots, weight);
   }
-  general_vector.count_entries(nprimes, nroots, weight);  
+  general_vector._count_entries(nprimes, nroots, weight);
 }
 
 
@@ -925,10 +925,10 @@ fb_factorbase::fprint(FILE *out) const
 }
 
 void
-fb_factorbase::count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_factorbase::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   for (size_t part = 0; part < FB_MAX_PARTS; part++) {
-    parts[part]->count_entries(nprimes, nroots, weight);
+    parts[part]->_count_entries(nprimes, nroots, weight);
   }
 }
 
@@ -948,7 +948,7 @@ void output(fb_factorbase *fb, const char *name)
 {
   size_t n_primes = 0, n_roots = 0;
   double weight = 0.;
-  fb->count_entries(&n_primes, &n_roots, &weight);
+  fb->_count_entries(&n_primes, &n_roots, &weight);
   fprintf (stdout,
 	   "# Factor base %s (%zu primes, %zu roots, %f weight):\n",
 	   name, n_primes, n_roots, weight);
