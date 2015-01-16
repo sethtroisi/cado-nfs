@@ -405,7 +405,8 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
   mpz_clear(tmp);
 
 #ifdef PRINT_TQR
-  printf("\b\b] mod %" PRIu64 "\n", ideal->ideal->r);
+  printf("\b\b] mod %" PRIu64 ", h: ", ideal->ideal->r);
+  mpz_poly_fprintf(stdout, ideal->ideal->h);
   mpz_clear(invert);
 #endif // PRINT_TQR
 }
@@ -459,10 +460,19 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
     array_int64_vector_index(&index, c, H, array->number_element);
     array->array[index] = array->array[index] - ideal->log;
 
+#ifdef NUMBER_HIT
+    if (number_c_l == 0) {
+      number_of_hit = number_of_hit + 1;
+    } else {
+      number_of_hit = number_of_hit + number_c_l;
+    }
+#endif // NUMBER_HIT
+
 #ifdef TRACE_POS
     if (index == TRACE_POS) {
       fprintf(file, "The ideal is: ");
-      ideal_1_fprintf(file, ideal, H->t);
+      ideal_fprintf(file, ideal->ideal);
+      fprintf(file, "log: %u\n", ideal->log);
       fprintf(file, "The new value of the norm is %u.\n", array->array[index]);
     }
 #endif
@@ -473,7 +483,8 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
 #ifdef TRACE_POS
       if (index + k == TRACE_POS) {
         fprintf(file, "The ideal is: ");
-        ideal_1_fprintf(file, ideal, H->t);
+        ideal_fprintf(file, ideal->ideal);
+        fprintf(file, "log: %u\n", ideal->log);
         fprintf(file, "The new value of the norm is %u.\n",
                 array->array[index + k]);
       }
@@ -488,10 +499,19 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
 
       array->array[index] = array->array[index] - ideal->log;
 
+#ifdef NUMBER_HIT
+    if (number_c_l == 0) {
+      number_of_hit = number_of_hit + 1;
+    } else {
+      number_of_hit = number_of_hit + number_c_l;
+    }
+#endif // NUMBER_HIT
+
 #ifdef TRACE_POS
       if (index == TRACE_POS) {
         fprintf(file, "The ideal is: ");
-        ideal_1_fprintf(file, ideal, H->t);
+        ideal_fprintf(file, ideal->ideal);
+        fprintf(file, "log: %u\n", ideal->log);
         fprintf(file, "The new value of the norm is %u.\n",
                 array->array[index]);
       }
@@ -503,7 +523,8 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
 #ifdef TRACE_POS
         if (index + k == TRACE_POS) {
           fprintf(file, "The ideal is: ");
-          ideal_1_fprintf(file, ideal, H->t);
+        ideal_fprintf(file, ideal->ideal);
+        fprintf(file, "log: %u\n", ideal->log);
           fprintf(file, "The new value of the norm is %u.\n",
                   array->array[index + k]);
         }
@@ -678,7 +699,6 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // NUMBER_HIT
 
     } else {
-#ifdef SIEVE_TQR
       unsigned int pos = 0;
 
       unsigned int index = 1;
@@ -722,7 +742,6 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
                     number_c_l, &ci, pos);
       }
-#endif // SIEVE_TQR
     }
 #ifdef PROJECTIVE_ROOT
     mpz_t mod;
