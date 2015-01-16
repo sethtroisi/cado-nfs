@@ -717,7 +717,7 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t 
 
 /* {{{ */
 void
-fill_in_buckets(thread_data_ptr th, int side, fb_vector_interface *slice,
+fill_in_buckets(thread_data_ptr th, int side, const fb_general_vector *transformed_vector,
                 where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
@@ -730,11 +730,9 @@ fill_in_buckets(thread_data_ptr th, int side, fb_vector_interface *slice,
   // being for the moment unconditionally set to FBPRIME_MAX by the
   // caller of dispatch_fb).
   
-  fb_general_vector *transformed_vector = slice->transform_roots(si->qbasis);
-
   unsigned char last_logp = 0;
 
-  for (fb_general_vector::iterator it = transformed_vector->begin(); 
+  for (fb_general_vector::const_iterator it = transformed_vector->cbegin();
        it != transformed_vector->end(); it++) {
     const fbprime_t p = (*it).q;
     const size_t nr_roots = (*it).nr_roots;
@@ -1391,11 +1389,14 @@ fill_in_buckets_one_side(thread_data_ptr th, const int side)
           fb_vector_interface *slice = fb->get_n_roots_vector(nr_roots, slice_nr);
           if (slice == NULL)
             break;
-          fill_in_buckets(th, side, slice, w);
+          fb_general_vector *transformed_vector = slice->transform_roots(th->si->qbasis);
+          fill_in_buckets(th, side, transformed_vector, w);
         }
         fb_vector_interface *slice = fb->get_general_vector();
-        if (slice != NULL)
-          fill_in_buckets(th, side, slice, w);
+        if (slice != NULL) {
+          fb_general_vector *transformed_vector = slice->transform_roots(th->si->qbasis);
+          fill_in_buckets(th, side, transformed_vector, w);
+        }
       }
     }
 #ifdef HAVE_K_BUCKETS
@@ -1403,6 +1404,8 @@ fill_in_buckets_one_side(thread_data_ptr th, const int side)
       fill_in_k_buckets(th, side, w);
     else
       fill_in_m_buckets(th, side, w);
+#else
+    else abort();
 #endif
 }
 
