@@ -517,6 +517,8 @@ unsigned char find_logp(thread_data_ptr th, const int side, const fbprime_t p)
 DECLARE_CACHE_BUFFER(bucket_update_t, 256)
 #endif
 
+#if 0
+
 /* Returns -(-1)^neg num/den (mod p). If gcd(den, p) > 1, returns p. */
 static inline unsigned long
 compute_1_root_ul(const unsigned long p, const unsigned long num,
@@ -550,13 +552,11 @@ compute_1_root_ul(const unsigned long p, const unsigned long num,
   return r;
 }
 
-
 static inline unsigned long
 compute_1_root_mpz(const unsigned long p, const mpz_t f0, const mpz_t f1)
 {
   return compute_1_root_ul(p, mpz_fdiv_ui(f0, p), mpz_fdiv_ui(f1, p), 0, 0);
 }
-
 
 struct contexts_s {
   modredc2ul2_batch_Q_to_Fp_context_t *context_2ul2;
@@ -575,7 +575,6 @@ modredc2ul2_set_mpz(modintredc2ul2_t r, const mpz_t a)
   modredc2ul2_intset_uls(r, t, n);
 }
 
-#if 0
 static void
 init_Q_to_Fp_context(struct contexts_s *contexts, mpz_poly_srcptr f)
 {
