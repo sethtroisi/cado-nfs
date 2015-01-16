@@ -1,6 +1,5 @@
 #include "cado.h"
 
-#include <pthread.h>
 #include "fb.h"
 #include "utils.h"           /* lots of stuff */
 #include "bucket.h"
@@ -17,8 +16,6 @@
 #ifdef USE_CACHEBUFFER
 #include "cachebuf.h"
 #endif
-
-extern pthread_mutex_t io_mutex;
 
 /* For memcpy in fill_in_k_buckets & fill_in_m_buckets.
    When you have to move data whose length is a
@@ -781,13 +778,11 @@ fill_in_buckets(thread_data_ptr th, int side, const fb_general_vector *transform
          or saved for later use within the factor base structure. */
       plattice_info_t pli;
       if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
-        pthread_mutex_lock(&io_mutex);
-        fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
-                 FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
-          pthread_mutex_unlock(&io_mutex);
-          continue; /* Simply don't consider that (p,r) for now.
-                       FIXME: can we find the locations to sieve? */
-        }
+        verbose_output_print (1, 1, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
+                              FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
+        continue; /* Simply don't consider that (p,r) for now.
+                     FIXME: can we find the locations to sieve? */
+      }
       /* OK, all special cases are done. */
 
       const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
@@ -933,13 +928,11 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
        or saved for later use within the factor base structure. */
     plattice_info_t pli;
     if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
-      pthread_mutex_lock(&io_mutex);
-      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
-	       FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
-	pthread_mutex_unlock(&io_mutex);
-	continue; /* Simply don't consider that (p,r) for now.
-		     FIXME: can we find the locations to sieve? */
-      }
+      verbose_output_print (1, 1, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
+	                    FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
+      continue; /* Simply don't consider that (p,r) for now.
+                   FIXME: can we find the locations to sieve? */
+    }
     /* OK, all special cases are done. */
 
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
@@ -1179,13 +1172,11 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
        or saved for later use within the factor base structure. */
     plattice_info_t pli;
     if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
-      pthread_mutex_lock(&io_mutex);
-      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
-	       FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
-	pthread_mutex_unlock(&io_mutex);
-	continue; /* Simply don't consider that (p,r) for now.
-		     FIXME: can we find the locations to sieve? */
-      }
+      verbose_output_print (1, 1, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
+	                    FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
+      continue; /* Simply don't consider that (p,r) for now.
+                   FIXME: can we find the locations to sieve? */
+    }
     /* OK, all special cases are done. */
 
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
