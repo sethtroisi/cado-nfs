@@ -426,7 +426,7 @@ thread_root(void * context_data, earlyparsed_relation_ptr rel)
     return NULL;
 }
 
-int check_whether_file_is_renumbered(const char * filename)
+int check_whether_file_is_renumbered(const char * filename, unsigned int npoly)
 {
     unsigned int count = 0;
     char s[1024];
@@ -461,11 +461,13 @@ int check_whether_file_is_renumbered(const char * filename)
     
     if (count == 1)
         return 1;
-    else if (count == 2)
+    else if (count == npoly)
         return 0;
-    else {
-      fprintf (stderr, "Error: invalid line in %s (has %u colons):\n %s", filename, count, s);
-      exit(EXIT_FAILURE);
+    else
+    {
+      fprintf (stderr, "Error: invalid line in %s (line has %u colons but %u "
+                       "were expected):\n %s", filename, count, npoly, s);
+      abort();
     }
 }
 
@@ -642,7 +644,7 @@ main (int argc, char *argv[])
       for (char ** p = files; *p; p++) {
           /* always strdup these, so that we can safely call
            * filelist_clear in the end */
-          if (check_whether_file_is_renumbered(*p)) {
+          if (check_whether_file_is_renumbered(*p, renumber_tab->nb_polys)) {
               files_already_renumbered[nb_f_renumbered++] = strdup(*p);
           } else {
               files_new[nb_f_new++] = strdup(*p);

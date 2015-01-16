@@ -315,7 +315,8 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 	}
 
 	// Second, we fill my_roots->current buffer by the computed roots
-	my_roots->current += renumber_write_p_rat_alg (p, nb_roots[0], computed_roots[1], nb_roots[1], my_roots->current);
+	my_roots->current += renumber_write_p_buffer_rat_alg (my_roots->current, p,
+                                    nb_roots[0], computed_roots[1], nb_roots[1]);
 	resize_buf ((buf_t *) &(my_roots->begin), MIN_BUF_ROOTS);
 	
 	// Third, we fill my_free_rels->current buffer by the possible free rels, on the form
@@ -355,7 +356,8 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 	}
 	
 	// Second, we fill my_roots->current buffer by the computed roots
-	my_roots->current += renumber_write_p_2algs (p, computed_roots[0], nb_roots[0], computed_roots[1], nb_roots[1], my_roots->current);
+	my_roots->current += renumber_write_p_buffer_2algs (my_roots->current, p,
+                computed_roots[0], nb_roots[0], computed_roots[1], nb_roots[1]);
 	resize_buf ((buf_t *) &(my_roots->begin), MIN_BUF_ROOTS);
 
 	// Third, we fill my_free_rels->current buffer by the possible free rels, on the form
@@ -673,7 +675,8 @@ main (int argc, char *argv[])
     }
 
     int ratside = cado_poly_get_ratside (cpoly);
-    renumber_init_for_writing (renumber_table, ratside, add_full_col, lpb);
+    renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside,
+                                                              add_full_col, lpb);
     renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
                          cpoly);
 

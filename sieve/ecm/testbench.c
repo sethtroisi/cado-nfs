@@ -54,6 +54,8 @@ print_pointorder (const unsigned long p, const unsigned long s,
     knownfac = 12;
   else if (parameterization == MONTY16)
     knownfac = 16;
+  else if (parameterization == TWED16)
+    knownfac = 16;
   else
     abort();
   
@@ -118,6 +120,7 @@ void print_help (char *programname)
   printf ("-ecm <B1> <B2> <s>  Run ECM with B1, B2 and parameter s, using BRENT12 curve\n");
   printf ("-ecmm12 <B1> <B2> <s>  Same, but using Montgomery torsion 12 curve\n");
   printf ("-ecmm16 <B1> <B2> <s>  Same, but using Montgomery torsion 16 curve\n");
+  printf ("-ecme16 <B1> <B2> <s>  Same, but using Edwards torsion 16 curve\n");
   printf ("-strat   Use the facul default strategy. Don't use with -pm1, -pp1, -ecm\n");
   printf ("-fbb <n> Use <n> as factor base bound, e.g. for primality checks\n");
   printf ("-lpb <n> Use <n> as large prime bound, e.g. for early abort\n");
@@ -161,6 +164,7 @@ int main (int argc, char **argv)
   int inp_raw = 0;
   int strat = 0;
   int extra_primes = 0;
+  int ncurves = -1;
   unsigned long *primmod = NULL, *hitsmod = NULL;
   uint64_t starttime, endtime;
 
@@ -238,6 +242,8 @@ int main (int argc, char **argv)
 	    parameterization = MONTY12;
 	  if (strcmp (argv[1], "-ecmm16") == 0)
 	    parameterization = MONTY16;
+	  if (strcmp (argv[1], "-ecme16") == 0)
+	    parameterization = TWED16;
           if (parameterization == MONTY12 && sigma == 1)
             {
               fprintf (stderr, "Parameter 1 does not lead to a valid curve. "
@@ -249,15 +255,25 @@ int main (int argc, char **argv)
               fprintf (stderr, "Only parameter 1 for MONTY16 curves so far.\n");
               exit (EXIT_FAILURE);
             }
+	  /* FIXME */
+	  /* Only 1 Edwards curve that is fixed for now */
+	  /* No param check necessary */
 	  strategy->methods[nr_methods].method = EC_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-                         parameterization, labs (sigma), extra_primes, 
-                         (verbose >= 3));
+			 parameterization, labs (sigma), extra_primes, 
+			 (verbose >= 3));
 	  nr_methods++;
 	  argc -= 4;
 	  argv += 4;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-ncurves") == 0 &&
+	       nr_methods == 0)
+        {
+	  ncurves = strtoul (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
 	}
       else if (argc > 1 && strcmp (argv[1], "-strat") == 0 && 
 	       nr_methods == 0)
@@ -274,6 +290,9 @@ int main (int argc, char **argv)
 	    po_parameterization = MONTY12;
 	  if (strcmp (argv[1], "-pom16") == 0)
 	    po_parameterization = MONTY16;
+	  /* TODO: add code to compute point order for twisted Edward curves */
+	  if (strcmp (argv[1], "-poe16") == 0)
+	    po_parameterization = TWED16;
 	  po_sigma = strtol (argv[2], NULL, 10);
 	  argc -= 2;
 	  argv += 2;
@@ -388,7 +407,7 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (fbb, lpb, 0, (verbose >= 3));
+      strategy = facul_make_strategy (fbb, lpb, ncurves, (verbose >= 3));
     }
   else
     {

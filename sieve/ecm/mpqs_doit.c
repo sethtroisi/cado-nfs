@@ -5,7 +5,15 @@
 // #define TRACE -23830
 // #define TRACE_P 937
 
+/* if CHECK_OVERFLOW is defined, check that no overflow occurs in the
+   additions on unsigned chars (0..255) */
+// #define CHECK_OVERFLOW
+
+/* minimum difference between number of relations and factor base size */
 #define WANT_EXCESS 11
+
+/* number of small primes we skip (should be >= 1 since we always skip 2) */
+#define SKIP 10
 
 #include "cado.h"
 #include <stdio.h>
@@ -20,7 +28,14 @@
 #include "macros.h"
 #include "mod_ul_default.h"
 
-#define DIM 256
+typedef struct {
+  unsigned int p;
+  unsigned int r;      /* root of x^2 = k*N (mod p) */
+  uint64_t invp;       /* 1/p mod 2^64, needed for trial division */
+  unsigned char logp;  /* log(p) / log(radix), needed for sieve */
+  unsigned long q;     /* 1/p mod sqrt(a) */
+  unsigned long invp2; /* floor(ULONG_MAX/p), needed for trial division */
+} fb_t;
 
 /* For i < 50, isprime_table[i] == 1 iff i is prime */
 static unsigned char isprime_table[] = {
@@ -118,8 +133,7 @@ tonelli_shanks (uint64_t rr, uint64_t p)
    Assumes a*p[i] and a^2 fit into an unsigned long.
  */
 static void
-batch_invert (unsigned long *q, unsigned long *p, long n, unsigned long a,
-              unsigned long inva)
+batch_invert (fb_t *F, long n, unsigned long a, unsigned long inva)
 {
   long i;
   unsigned long t, u;
@@ -127,28 +141,28 @@ batch_invert (unsigned long *q, unsigned long *p, long n, unsigned long a,
   residueul_t uu;
 
   modul_initmod_ul (aa, a);
-  q[0] = p[0];
+  F[0].q = F[0].p;
   for (i = 1; i < n; i++)
-    q[i] = (q[i-1] * p[i]) % a;
+    F[i].q = (F[i-1].q * F[i].p) % a;
   /* now q[i] = p[1] * p[2] * ... * p[i] mod a */
   modul_init (uu, aa);
-  modul_set_ul (uu, q[n-1], aa);
+  modul_set_ul (uu, F[n-1].q, aa);
   modul_inv (uu, uu, aa);
   u = mod_get_ul (uu, aa);
   modul_clear (uu, aa);
   for (i = n - 1; i > 0; i--)
     {
       /* invariant: u = 1/(p[1] * ... * p[i]) mod a */
-      t = (u * q[i-1]) % a;
+      t = (u * F[i-1].q) % a;
       /* now t = 1/p[i] mod a, thus t*p[i] + k*a = 1 */
-      t = t * p[i] - 1;
+      t = t * F[i].p - 1;
       /* divide by a */
       t = t * inva;
-      ASSERT (0 < t && t < p[i]);
-      q[i] = p[i] - t;
-      u = (u * p[i]) % a;
+      ASSERT (0 < t && t < F[i].p);
+      F[i].q = F[i].p - t;
+      u = (u * F[i].p) % a;
     }
-  q[0] = u;
+  F[0].q = u;
   modul_clearmod (aa);
 }
 
@@ -168,13 +182,13 @@ findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
   modul_init (uu, pp);
   modul_init (vv, pp);
   modul_set_ul (tt, inva, pp);
-  modul_set_ul (vv, k1, pp);
+  modul_set_ul_reduced (vv, k1, pp);
   modul_neg (uu, vv, pp);
-  modul_sub_ul (uu, uu, bmodp, pp);
-  modul_mul (uu, uu, tt, pp);
+  modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
+  modul_mul (uu, uu, tt, pp);       /* (-r-b)/a */
   *k2 = mod_get_ul (uu, pp);
-  modul_sub_ul (uu, vv, bmodp, pp);
-  modul_mul (uu, uu, tt, pp);
+  modul_sub_ul (uu, vv, bmodp, pp); /* r-b */
+  modul_mul (uu, uu, tt, pp);       /* (r-b)/a */
   k1 = mod_get_ul (uu, pp);
   modul_clear (tt, pp);
   modul_clear (uu, pp);
@@ -196,8 +210,6 @@ static unsigned int Primes[MAX_PRIMES] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31
 
 static int prime_index[INDEX];
 
-static uint64_t *invp;
-
 static inline void
 setbit (mpz_t row, int shift, unsigned long i, unsigned short *W, long *ncolw)
 {
@@ -211,13 +223,13 @@ setbit (mpz_t row, int shift, unsigned long i, unsigned short *W, long *ncolw)
    We put relations in column 'shift' and above.
 */
 static int
-is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
+is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, fb_t *F,
            unsigned long ncol, int shift, mpz_t row, unsigned short *W,
            long *ncolw)
 {
   mpz_t r;
   int res = 0;
-  unsigned long B = P[ncol-1], R;
+  unsigned long B = F[ncol-1].p, R;
   unsigned long BB = B * B;
 
   mpz_set_ui (row, 0);
@@ -236,7 +248,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
 
   for (i = 0; i < ncol; i++)
     {
-      unsigned long p = P[i];
+      unsigned long p = F[i].p;
 
       if (mpz_divisible_ui_p (r, p))
         {
@@ -265,20 +277,21 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
   R = mpz_get_ui (r);
   for (; i < ncol; i++)
     {
-      unsigned long p = P[i];
-      unsigned long q = R * invp[i];
-      unsigned long r0, r1;
+      unsigned long p = F[i].p;
+      unsigned long q = R * F[i].invp;
 
-      ularith_mul_ul_ul_2ul (&r0, &r1, q, p);
-      if (r1 == 0)
+      /* F[i].invp is 1/p mod 2^64, thus q = R/p mod 2^64:
+         the division R/p is exact iff q*p fits in a 64-bit word,
+         i.e., when q <= F[i].invp2 = floor(ULONG_MAX/p) [we assume
+         unsigned long has 64 bits here] */
+      if (q <= F[i].invp2)
         {
           int e = 0;
           do {
             R = q;
             e ++;
-            q = R * invp[i];
-            ularith_mul_ul_ul_2ul (&r0, &r1, q, p);
-          } while (r1 == 0);
+            q = R * F[i].invp;
+          } while (q <= F[i].invp2);
           if (e & 1)
             setbit (row, shift, i + 1, W, ncolw);
           /* now since R has no factor <= p it is either 1 or a prime > p,
@@ -290,7 +303,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, unsigned long *P,
               if (R > 1)
                 {
                   i = prime_index[R];
-                  ASSERT(R == P[i]);
+                  ASSERT(R == F[i].p);
                   setbit (row, shift, i + 1, W, ncolw);
                 }
               res = 1;
@@ -332,31 +345,15 @@ static inline void
 update (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
         unsigned char logp, unsigned int M MAYBE_UNUSED)
 {
+#ifdef CHECK_OVERFLOW
+  unsigned char tmp = S[i] + logp;
+  ASSERT_ALWAYS(tmp >= S[i]);
+#endif
   S[i] += logp;
 #ifdef TRACE
   if (i == M + TRACE)
     printf ("%d: %lu %u\n", TRACE, p, S[i]);
 #endif
-}
-
-/* Update 8 bytes at a time for p=2. If b is even, since a and N are odd,
-   the double root of (a*x+b)^2 = N (mod 2) is i=1. */
-static inline void
-update8 (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
-        unsigned char logp, unsigned int M MAYBE_UNUSED)
-{
-  uint64_t l8, *S8 = (uint64_t*) S;
-
-  /* Sieve 2, 4 and 8 simultaneously:
-     if N = 1 (mod 8) then 8 divides x^2-N for x = 1, 3, 5, 7
-     if N = 3 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7
-     if N = 5 (mod 8) then 4 divides x^2-N for x = 1, 3, 5, 7
-     if N = 7 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7. */
-  l8 = logp;
-  ASSERT_ALWAYS(i == 1);
-  l8 = (l8 << 56) | (l8 << 40) | (l8 << 24) | (l8 << 8);
-  for (i = 0; i < 2*M; i+=8)
-    S8[i>>3] += l8;
 }
 
 /* put factor in z */
@@ -508,6 +505,58 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t N,
   mpz_clear (y);
 }
 
+#if 0
+/* implements the modified Knuth-Schroeppel function, as in Silverman,
+   "The Multiple Polynomial Quadratic Sieve", page 335.
+   This is kept for reference only, since it does not seem to give better
+   results than best_multiplier().
+ */
+static int
+best_multiplier2 (const mpz_t N, unsigned long ncol, unsigned long K)
+{
+  unsigned long k, best_k = 1, i, j, p, Np;
+  double alpha, best_alpha = DBL_MAX, g;
+  mpz_t kN, P;
+
+  mpz_init (kN);
+  mpz_init (P);
+  for (k = 1; k <= K; k += 2)
+    {
+      mpz_mul_ui (kN, N, k);
+      alpha = 0.5 * log ((double) k);
+      for (i = j = 0; i < MAX_PRIMES && j < ncol; i++)
+        {
+          p = Primes[i];
+          if (p == 2)
+            {
+              Np = mpz_fdiv_ui (kN, 8);
+              g = (Np == 1) ? 2 : 0;
+            }
+          else
+            {
+              mpz_set_ui (P, p);
+              if (k % p == 0)
+                g = 1.0 / (double) p;
+              else if (mpz_jacobi (kN, P) == 1)
+                g = 2.0 / (double) p;
+              else
+                g = 0.0;
+            }
+          alpha -= g * log ((double) p);
+          j += (g > 0.0);
+        }
+      if (alpha < best_alpha)
+        {
+          best_alpha = alpha;
+          best_k = k;
+        }
+    }
+  mpz_clear (kN);
+  mpz_clear (P);
+  return best_k;
+}
+#endif
+
 /* consider all primes up to B, and all odd multipliers up to K */
 static int
 best_multiplier (const mpz_t N, unsigned long B, unsigned long K)
@@ -575,16 +624,17 @@ void
 mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 {
   mpz_t N, *Mat, *X;
-  unsigned char *S, *T, *Logp, logp, log2[8], threshold = 0, mask = 128;
+  unsigned char *S, *T, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
-  unsigned long *P, *Q, p, k, Nbits;
-  long M, i, j, *K, wrel, nrel = 0, lim, ncolw = 0, ncol;
+  unsigned long p, k, Nbits;
+  long M, i, j, wrel, nrel = 0, lim, ncolw = 0, ncol;
   mpz_t a, b, c, sqrta;
-  double maxnorm, radix, logradix = 0;
+  double radix, logradix = 0;
   long st;
   static long init_time = 0, sieve_time = 0, check_time = 0;
   static long gauss_time = 0, total_time = 0;
   unsigned short *W; /* column weight */
+  fb_t *F;
 
   /* assume N0 is odd */
   ASSERT_ALWAYS (mpz_fdiv_ui (N0, 2) == 1);
@@ -603,13 +653,18 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   else
     {
       M = 1 << (11 + ((Nbits - 56) >> 4));
-      ncol = 75 << ((Nbits - 56) >> 4);
+      ncol = 47 << ((Nbits - 56) >> 4);
     }
+  /* in case M fills the L1 cache, reduce it a bit */
+  if (M == 32768)
+    M -= M / 12;
+  /* ensure M is a multiple of 8 */
+  M = 8 * (M / 8);
 
   mpz_init (N);
   k = best_multiplier (N0, Nbits, Nbits);
   if (verbose)
-    printf ("Using multiplier k=%lu\n", k);
+    printf ("Using multiplier k=%lu, M=%lu, ncol=%lu\n", k, M, ncol);
   mpz_mul_ui (N, N0, k);
 
   mpz_init (a);
@@ -618,9 +673,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_init (c);
 
   /* compute factor base */
-  P = malloc (ncol * sizeof (unsigned long));
-  K = malloc (ncol * sizeof (unsigned long));
-  invp = malloc (ncol * sizeof (uint64_t));
+  F = malloc (ncol * sizeof (fb_t));
   W = malloc ((ncol + 1) * sizeof (unsigned short));
   /* a prime p can appear in x^2 mod N only if p is a square modulo N */
   mpz_ui_pow_ui (b, 2, 64);
@@ -632,20 +685,21 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
      /* a prime p can be in the factor base only if N is a square mod p */
       if (p == 2 || mpz_jacobi (N, a) != -1)
         {
-          P[j] = p;
+          F[j].p = p;
           prime_index[p] = j;
           for (int k = p - 1; k >= 0 && prime_index[k] == 0; k--)
             prime_index[k] = j;
           mpz_invert (c, a, b); /* c = 1/p mod 2^64 */
-          invp[j] = mpz_get_ui (c);
+          F[j].invp = mpz_get_ui (c);
+          F[j].invp2 = ULONG_MAX / p;
           j++;
         }
     }
 #ifdef TRACE
-  printf ("largest prime in factor base is %lu\n", P[ncol-1]);
+  printf ("largest prime in factor base is %lu\n", F[ncol-1].p);
 #endif
   ASSERT_ALWAYS(i < MAX_PRIMES);
-  ASSERT_ALWAYS(P[0] == 2); /* required by the sieve */
+  ASSERT_ALWAYS(SKIP >= 1);
   lim = ncol;       /* factor base bound */
   wrel = ncol + 1 + WANT_EXCESS; /* +1 is for -1 */
   Mat = (mpz_t*) malloc (wrel * sizeof (mpz_t));
@@ -659,16 +713,14 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   S = malloc (2 * M * sizeof (char));
   T = malloc (2 * M * sizeof (char));
   ASSERT_ALWAYS(((long) S & 7) == 0);
-  Logp = malloc (lim * sizeof (char));
-  Q = malloc (lim * sizeof (unsigned long));
 
   /* initialize square roots mod p */
   for (j = 0; j < lim; j++)
     {
       unsigned long Np;
-      p = P[j];
+      p = F[j].p;
       Np = mpz_fdiv_ui (N, p);
-      K[j] = tonelli_shanks (Np, p);
+      F[j].r = tonelli_shanks (Np, p);
     }
 
   /* we want 'a' near sqrt(2*N)/M */
@@ -680,8 +732,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_sqrt (sqrta, a);
 
   /* we also want sqrt(a) greater than the largest factor base prime */
-  if (mpz_cmp_ui (sqrta, P[lim-1]) <= 0)
-    mpz_set_ui (sqrta, P[lim-1] + 1);
+  if (mpz_cmp_ui (sqrta, F[lim-1].p) <= 0)
+    mpz_set_ui (sqrta, F[lim-1].p + 1);
 
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
@@ -732,20 +784,59 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   /* we initialize radix only once, assuming it will not vary very much */
   if (pols++ == 0)
     {
-      double Nd = mpz_get_d (N), ad = (double) aa;
-      /* initialize radix and Logp[]: we want radix^255 = maxnorm ~ a*M^2 */
-      maxnorm = mpz_get_d (a) * (double) M * (double) M;
-      radix = pow (maxnorm, 1.0 / 255.0);
+      double Nd = mpz_get_d (N), ad = (double) aa, maxnorm, maxnorm1;
+      /* The maximal norm (in absolute value) is a*M^2-n/a for x=-M or M,
+         and n/a for x=0. Keep the largest one in case 'a' is not the optimal
+         value sqrt(2N)/M. */
+      maxnorm1 = Nd / ad;
+      maxnorm = ad * (double) M * (double) M - maxnorm1;
+      maxnorm = (maxnorm > maxnorm1) ? maxnorm : maxnorm1;
+      /* initialize radix: we want radix^255 = maxnorm ~ a*M^2 */
+#define MAXNORM 128
+      radix = pow (maxnorm, 1.0 / (double) MAXNORM);
       logradix = log (radix);
 #ifdef TRACE
       printf ("radix=%f logradix=%f\n", radix, logradix);
 #endif
-      for (j = 0; j < lim; j++)
-        Logp[j] = (char) floor (log ((double) P[j]) / logradix);
-      log2[1] = (char) floor (log ((double) 8) / logradix);
-      log2[3] = (char) floor (log ((double) 2) / logradix);
-      log2[5] = (char) floor (log ((double) 4) / logradix);
-      log2[7] = log2[3];
+
+      /* initialize logp values */
+#define ROUND round
+      for (j = SKIP; j < lim; j++)
+        F[j].logp = (char) ROUND (log ((double) F[j].p) / logradix);
+
+      /* take into account the skipped primes */
+      double skip_value;
+      /* if N = 1 (mod 8), the average power of 2 dividing x^2-N is 2,
+         if N = 3 (mod 8), the average power of 2 dividing x^2-N is 1/2,
+         if N = 5 (mod 8), the average power of 2 dividing x^2-N is 1,
+         if N = 7 (mod 8), the average power of 2 dividing x^2-N is 1/2
+         (cf Status Report on Factoring, by Davis, Holdridge and Simmons,
+         Eurocrypt'84, page 203) */
+      switch (mpz_getlimbn (N, 0) & 7)
+        {
+        case 1:
+          skip_value = 2.0 * log (2.0);
+          break;
+        case 5:
+          skip_value = 1.0 * log (2.0);
+          break;
+        case 3:
+        case 7:
+          skip_value = 0.5 * log (2.0);
+          break;
+        default:
+          ASSERT_ALWAYS(0);
+        }
+#define SKIP_FACTOR 1.5
+      skip_value *= SKIP_FACTOR;
+      for (j = 1; j < SKIP; j++)
+        /* the factor 1.5 increases the probability to find relations for which
+           the contribution of skipped primes is less than average, but on the
+           other hand it increases the pressure on trial division for relations
+           where that contribution is more than average */
+        skip_value += SKIP_FACTOR * 2.0 * log ((double) F[j].p)
+          / (double) (F[j].p - 1);
+
       for (i = 0; i <= M; i++)
         {
           /* At location i, the norm is ((a*i+b)^2-N)/a. Since 0 <= b < a,
@@ -755,11 +846,24 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           /* Note: we don't consider the +b term here, which makes the norm
              approximation not very reliable near roots of (a*x+b)^2 = N */
           x = (x * x - Nd) / ad;
-          T[M - i] = (unsigned char) ceil (log (fabs (x)) / logradix);
+          x = fabs (x);
+          x = (log (x) - skip_value) / logradix;
+          T[M - i] = (unsigned char) ceil (x < 0 ? 0 : x);
           if (i < M)
             T[M + i] = T[M - i];
         }
-      threshold = T[0] - (char) floor (log ((double) P[ncol - 1]) / logradix);
+
+      unsigned char Tmax;
+      Tmax = (T[0] >  T[M]) ? T[0] : T[M];
+      threshold = Tmax - (char) ROUND (log ((double) F[ncol-1].p) / logradix);
+      if (threshold < 128)
+        {
+          /* we increase Tmax by the difference to 128, so that in
+             T[i] = Tmax - T[i] below T[i] is increased by the same
+             amount to reach the increased threshold */
+          Tmax += 128 - threshold;
+          threshold = 128;
+        }
       ASSERT_ALWAYS(threshold >= 128);
       mask = 128;
       mask8 = (mask << 8) | mask;
@@ -768,17 +872,10 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 #ifdef TRACE
       printf ("T[%d]=%u threshold=%u\n", TRACE, T[M + TRACE], threshold);
 #endif
-      /* we want S[i] >= T[i] - xxx, thus S[i] + T[0] >= T[i] + T[0] - xxx
-         thus S[i] + (T[0] - T[i]) >= T[0] - xxx */
-      for (i = 1; i < 2*M; i++)
-        T[i] = T[0] - T[i];
-      T[0] = 0;
-      /* sieve for 2, 4, 8 */
-      logp = log2[mpz_getlimbn (N, 0) & 7];
-#ifdef TRACE
-      printf ("T[%d]=%u\n", TRACE, T[M +  TRACE]);
-#endif
-      update8 (T, 1, 2, logp, M);
+      /* We want S[i] >= T[i] - xxx, thus S[i] + Tmax >= T[i] + Tmax - xxx
+         thus S[i] + (Tmax - T[i]) >= Tmax - xxx. */
+      for (i = 0; i < 2*M; i++)
+        T[i] = Tmax - T[i];
 #ifdef TRACE
       printf ("T[%d]=%u\n", TRACE, T[M +  TRACE]);
 #endif
@@ -788,16 +885,18 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   /* sieve */
   mpz_submul_ui (b, a, M);
-  batch_invert (Q, P, lim, sqrtaa, inva);
-  /* skip prime p=2 which is already taken into account in T[] */
-  for (j = 1; j < lim; j++)
+  batch_invert (F + SKIP, lim - SKIP, sqrtaa, inva);
+  /* skip the small primes whose average contribution is already taken into
+     account */
+  for (j = SKIP; j < lim; j++)
     {
       unsigned long k2 = -1;
       long i2;
+      unsigned char logp;
 
-      p = P[j];
-      k = findroot (&k2, mpz_fdiv_ui (b, p), p, K[j], Q[j] * Q[j]);
-      logp = Logp[j];
+      p = F[j].p;
+      k = findroot (&k2, mpz_fdiv_ui (b, p), p, F[j].r, F[j].q * F[j].q);
+      logp = F[j].logp;
       if (k != k2)
         {
           for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
@@ -810,6 +909,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         }
       else
         {
+          /* FIXME: if we ensure the divisors of kN are all in the skipped
+             primes, we could avoid this case */
           for (i = k; i < 2*M; i += p)
             update (S, i, p, logp, M);
         }
@@ -833,7 +934,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         {
           if (S[M + i] >= threshold)
             {
-              if (is_smooth (a, M + i, b, N, P, ncol, wrel, Mat[nrel], W,
+              if (is_smooth (a, M + i, b, N, F, ncol, wrel, Mat[nrel], W,
                              &ncolw))
                 {
                   /* matrix M has nrel rows, the left part has wrel columns and
@@ -860,7 +961,6 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   gauss_time += st;
   total_time = st;
 
-  free (Logp);
   free (S);
   free (T);
   for (i = 0; i < wrel; i++)
@@ -869,10 +969,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   for (i = 0; i < wrel; i++)
     mpz_clear (X[i]);
   free (X);
-  free (invp);
-  free (K);
-  free (P);
-  free (Q);
+  free (F);
   free (W);
   mpz_clear (c);
   mpz_clear (b);
