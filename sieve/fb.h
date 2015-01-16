@@ -104,6 +104,9 @@ public:
       extracted.push_back(static_cast<unsigned long>(p));
     }
   }
+  /* Allow sorting by q */
+  bool operator<(const fb_general_entry &other) {return this->q < other.q;}
+  bool operator>(const fb_general_entry &other) {return this->q > other.q;}
 };
 
 class fb_general_vector;
