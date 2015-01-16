@@ -176,7 +176,7 @@ static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsig
 }/*}}}*/
 
 void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
-                      const fb_part *fb, sieve_info_srcptr si, int side)
+                      const fb_general_vector *fb, sieve_info_srcptr si, int side)
 {
     const unsigned int thresh = si->conf->bucket_thresh;
     const int verbose = 0;
