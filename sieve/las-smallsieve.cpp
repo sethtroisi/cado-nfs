@@ -96,14 +96,14 @@ void small_sieve_info(const char * what, int side, small_sieve_data_t * r)
 /* }}} */
 
 /* This macro is used for sieve initialization */
-
-#define PUSH_SSP_MARKER(ssd, nmarkers, __index, __event) do {		\
-    ssd->markers = (ssp_marker_t *) realloc(ssd->markers,               \
-            (nmarkers + 1) * sizeof(ssp_marker_t));                     \
-    ssd->markers[nmarkers].index = __index;				\
-    ssd->markers[nmarkers].event = __event;				\
-    nmarkers++;								\
-} while (0)
+void push_ssp_marker(small_sieve_data_t *ssd, int &nmarkers, const int __index, const int __event)
+{
+    ssd->markers = (ssp_marker_t *) realloc(ssd->markers, (nmarkers + 1) * sizeof(ssp_marker_t));
+    ASSERT_ALWAYS(ssd->markers != NULL);
+    ssd->markers[nmarkers].index = __index;
+    ssd->markers[nmarkers].event = __event;
+    nmarkers++;
+}
 
 /* {{{ Sieve initialization / clearing : first the easy ones */
 void small_sieve_clear(small_sieve_data_t * ssd)
@@ -132,9 +132,9 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
     for( ; next_marker->index < bounds[1] ; next_marker++) {
         int fence = next_marker->index;
         unsigned int event = next_marker->event;
-        PUSH_SSP_MARKER(r, r_nmarkers, fence - bounds[0], event);
+        push_ssp_marker(r, r_nmarkers, fence - bounds[0], event);
     }
-    PUSH_SSP_MARKER(r, r_nmarkers, bounds[1] - bounds[0], SSP_END);
+    push_ssp_marker(r, r_nmarkers, bounds[1] - bounds[0], SSP_END);
 }
 
 /* }}} */
@@ -269,15 +269,13 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
             }
             tail++;
             if (event)
-                PUSH_SSP_MARKER(ssd, nmarkers, index, event);
+                push_ssp_marker(ssd, nmarkers, index, event);
         }
     }
-    PUSH_SSP_MARKER(ssd, nmarkers, index, SSP_END);
+    push_ssp_marker(ssd, nmarkers, index, SSP_END);
     ssd->nb_ssp = size;
 }
 /* }}} */
-
-#undef PUSH_SSP_MARKER
 
 /* {{{ Creation of the ssdpos tables */
 int * small_sieve_copy_start(int * base, int bounds[2])
