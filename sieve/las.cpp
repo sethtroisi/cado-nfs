@@ -224,91 +224,67 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
 
 void reorder_fb(sieve_info_ptr si, int side)
 {
-    factorbase_degn_t * fb_pow2, * fb_pow2_base;
-    factorbase_degn_t * fb_pow3, * fb_pow3_base;
-    factorbase_degn_t * fb_td, * fb_td_base;
-    // factorbase_degn_t * fb_pow_td, * fb_pow_td_base;
-    factorbase_degn_t * fb_rs, * fb_rs_base;
-    factorbase_degn_t * fb_rest, * fb_rest_base;
+    /* We go through all the primes in FB part 0 and sort them into one of
+       5 vectors, and some we discard */
 
-    factorbase_degn_t * fb_base = si->sides[side]->fb;
-    factorbase_degn_t * fb = fb_base;
+    /* alloc the 5 vectors */
+    enum {POW2, POW3, TD, RS, REST};
+    fb_general_vector *pieces = new fb_general_vector[5];
 
-    size_t sz = fb_size(fb);
-
-    fb_pow2 = fb_pow2_base = (factorbase_degn_t *) malloc(sz);
-    fb_pow3 = fb_pow3_base = (factorbase_degn_t *) malloc(sz);
-    fb_td = fb_td_base = (factorbase_degn_t *) malloc(sz);
-    // fb_pow_td = fb_pow_td_base = (factorbase_degn_t *) malloc(sz);
-    fb_rs = fb_rs_base = (factorbase_degn_t *) malloc(sz);
-    fb_rest = fb_rest_base = (factorbase_degn_t *) malloc(sz);
+    fb_part *small_part = si->sides[side]->fb->get_part(0);
+    ASSERT_ALWAYS(small_part->is_only_general());
+    fb_general_vector *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si->conf->bucket_thresh;
     fbprime_t costlim = si->conf->td_thresh;
 
-#define PUSH_LIST(x) do {						\
-            memcpy(fb_## x, fb, fb_entrysize(fb));			\
-            fb_## x = fb_next(fb_## x);					\
-} while (0)
-
-    size_t pattern2_size = sizeof(unsigned long) * 2;
-    for( ; fb->p != FB_END ; fb = fb_next(fb)) {
+    const size_t pattern2_size = sizeof(unsigned long) * 2;
+    printf("FIXME: remove ASSERT_ALWAYS below\n");
+    for(fb_general_vector::const_iterator it = small_entries->cbegin();
+        it != small_entries->cend();
+        it++)
+    {
+        ASSERT_ALWAYS(it->q == fb_pow(it->p, it->k));
+        ASSERT_ALWAYS(it->nr_roots > 0);
         /* The extra conditions on powers of 2 and 3 are related to how
          * pattern-sieving is done.
          */
-        if ((fb->p%2)==0 && fb->p <= pattern2_size) {
-            PUSH_LIST(pow2);
-        } else if (fb->p == 3) {
-            PUSH_LIST(pow3);
-        } else if (fb->p <= plim && fb->p <= costlim * fb->nr_roots) {
-            if (!is_prime_power(fb->p)) {
-                PUSH_LIST(td);
-            } else {
-                // PUSH_LIST(pow_td);
-                PUSH_LIST(rest);
-            }
+        if (it->p == 2 && it->q <= pattern2_size) {
+            pieces[POW2].append(*it);
+        } else if (it->q == 3) { /* Currently only q=3 is pattern sieved */
+            pieces[POW3].append(*it);
+        } else if (it->k != 1) {
+            /* prime powers always go into "rest" */
+            pieces[REST].append(*it);
+        } else if (it->q <= plim && it->q <= costlim * it->nr_roots) {
+            pieces[TD].append(*it);
+        } else if (it->q <= plim) {
+            pieces[RS].append(*it);
         } else {
-            if (!is_prime_power(fb->p)) {
-                PUSH_LIST(rs);
-            } else {
-                PUSH_LIST(rest);
-            }
+            abort();
         }
     }
-#undef PUSH_LIST
-
-#define APPEND_LIST(x) do {						\
-    char * pb = (char*) (void*) fb_ ## x ## _base;			\
-    char * p  = (char*) (void*) fb_ ## x;				\
-    si->sides[side]->fb_parts->x[0] = fb;                               \
-    si->sides[side]->fb_parts_x->x[0] = n;                              \
-    memcpy(fb, pb, p - pb);						\
-    fb = fb_skip(fb, p - pb);						\
-    n += fb_diff(fb_ ## x, fb_ ## x ## _base);                          \
-    si->sides[side]->fb_parts->x[1] = fb;                               \
-    si->sides[side]->fb_parts_x->x[1] = n;                              \
-} while (0)
-    unsigned int n = 0;
-    fb = fb_base;
-
-    APPEND_LIST(pow2);
-    APPEND_LIST(pow3);
-    APPEND_LIST(td);
-    APPEND_LIST(rs);
-    APPEND_LIST(rest);
-    fb->p = FB_END;
-
-    free(fb_pow2_base);
-    free(fb_pow3_base);
-    free(fb_td_base);
-    free(fb_rs_base);
-    free(fb_rest_base);
-
-#undef  APPEND_LIST
-
+    /* Concatenate the 5 vectors into one, and store the beginning and ending
+       index of each part in fb_parts_x */
+    fb_general_vector *s = new fb_general_vector;
+    /* FIXME: hack to be able to access the struct fb_parts_x entries via
+       an index */
+    typedef int interval_t[2];
+    interval_t *parts_as_array = &si->sides[side]->fb_parts_x->pow2;
+    for (int i = 0; i < 5; i++) {
+        size_t nr_roots;
+        s->count_entries(NULL, &nr_roots, NULL);
+        parts_as_array[i][0] = nr_roots;
+        std::sort(pieces[i].begin(), pieces[i].end());
+        s->insert(s->end(), pieces[i].cbegin(), pieces[i].cend());
+        s->count_entries(NULL, &nr_roots, NULL);
+        parts_as_array[i][1] = nr_roots;
+    }
+    delete[] pieces;
+    si->sides[side]->fb_smallsieved = s;
 }
 
-/* }}} */
+
 
 /* {{{ Print some statistics about the factor bases
  * This also fills the field si->sides[*]->max_bucket_fill_ratio, which
@@ -2905,7 +2881,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
 
-            small_sieve_init(s->ssd, las, s->fb, si, side);
+            small_sieve_init(s->ssd, las, s->fb_smallsieved, si, side);
             small_sieve_info("small sieve", side, s->ssd);
 
             small_sieve_extract_interval(s->rsd, s->ssd, s->fb_parts_x->rs);

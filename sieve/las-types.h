@@ -116,13 +116,15 @@ struct sieve_side_info_s {
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
                             at most "bound" on each side */
     trialdiv_divisor_t *trialdiv_data;
-    struct fb_parts_s {
-        fb_general_vector * pow2;
-        fb_general_vector * pow3;
-        fb_general_vector * td;
-        fb_general_vector * rs;
-        fb_general_vector * rest;
-    } fb_parts[1];
+    fb_general_vector *fb_smallsieved;
+    struct {
+        int pow2[2];
+        int pow3[2];
+        int td[2];
+        int rs[2];
+        int rest[2];
+    } fb_parts_x[1];
+    
     /* The reading, mapping or generating the factor base all create the
      * factor base in several pieces: small primes, and large primes split
      * into one piece for each thread.
