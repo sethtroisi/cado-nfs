@@ -105,39 +105,25 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
     if (pmin <= p && p <= pmax)
     {
+      index_t begin_i = old_table_size;
       for (unsigned int i = 0; i < renumber_table->nb_polys; i++)
       {
+        if (i > 0)
+          begin_i += k[i-1];
+        index_t begin_j = begin_i;
         for (unsigned int j = i+1; j < renumber_table->nb_polys; j++)
         {
+          begin_j += k[j-1];
           if (k[i] == d[i] && k[j] == d[j]) /* freerel between side i and j */
           {
             fprintf (fpout, "# Freerel for p = %lu between side %u and %u\n",
                             p, i, j);
-            index_t begin = old_table_size;
             fprintf (fpout, "%lx,0:", p);
-            for (unsigned int s = 0; s < i; s++)
-            {
-              fputc (':', fpout);
-              begin += k[s];
-            }
             for (int l = 0; l < k[i]; l++)
-              fprintf (fpout, "%" PRid "%s", (index_t) begin + l,
-                                             (l == k[i]-1) ? "" : ",");
-            for (unsigned int s = i; s < j; s++)
-            {
-              fputc (':', fpout);
-              begin += k[s];
-            }
+              fprintf (fpout, "%" PRid ",", (index_t) begin_i + l);
             for (int l = 0; l < k[j]; l++)
-              fprintf (fpout, "%" PRid "%s", (index_t) begin + l,
-                                             (l == k[j]-1) ? "" : ",");
-            for (unsigned int s = j; s < renumber_table->nb_polys; s++)
-            {
-              if (s == renumber_table->nb_polys - 1)
-                fputc ('\n', fpout);
-              else
-                fputc (':', fpout);
-            }
+              fprintf (fpout, "%" PRid "%s", (index_t) begin_j + l,
+                                             (l == k[j]-1) ? "\n" : ",");
             nfree++;
           }
         }
