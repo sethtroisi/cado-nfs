@@ -887,7 +887,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       printf("Number of hits: %" PRIu64 " for r: %" PRIu64 "\n", number_of_hit,
              fb->factor_base_1[i]->ideal->r);
       printf("Estimated number of hits: %u.\n",
-             (unsigned int) ceil((double) array->number_element /
+             (unsigned int) nearbyint((double) array->number_element /
                   (double) fb->factor_base_1[i]->ideal->r));
       number_of_hit = 0;
 #endif // NUMBER_HIT
@@ -1046,114 +1046,174 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
   uint64_array_realloc(indexes, ind);
 }
 
-void printf_relation(factor_ptr factor0, factor_ptr factor1, mpz_poly_srcptr a,
-                     int t)
+void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
+                     mpz_poly_srcptr a, unsigned int t, unsigned int V,
+                     unsigned int size)
 {
   printf("# ");
   mpz_poly_fprintf(stdout, a);
   for (int i = 0; i < a->deg; i++) {
     gmp_printf("%Zd,", a->coeff[i]);
   }
-  if (t - 1 == a->deg) {
+  if ((int)t - 1 == a->deg) {
     gmp_printf("%Zd:", a->coeff[a->deg]);
   } else {
     gmp_printf("%Zd,", a->coeff[a->deg]);
-    for (int i = a->deg + 1; i < t - 1; i++) {
+    for (int i = a->deg + 1; i < (int)t - 1; i++) {
       printf("0,");
     }
     printf("0:");
   }
-  for (unsigned int i = 0; i < factor0->number - 1; i++) {
-    gmp_printf("%Zd,", factor0->factorization[i]);
-  }
-  gmp_printf("%Zd:", factor0->factorization[factor0->number - 1]);
-  for (unsigned int i = 0; i < factor1->number - 1; i++) {
-    gmp_printf("%Zd,", factor1->factorization[i]);
-  }
-  gmp_printf("%Zd\n", factor1->factorization[factor1->number - 1]);
-}
 
-void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb, int t)
-{
-  mpz_t res0;
-  mpz_t res1;
-  mpz_init(res0);
-  mpz_init(res1);
-
-  mpz_poly_resultant(res0, f[0], a);
-  mpz_poly_resultant(res1, f[1], a);
-  mpz_abs(res0, res0);
-  mpz_abs(res1, res1);
-
-  factor_t factor0;
-  factor_t factor1;
-
-  gmp_factorize(factor0, res0);
-  gmp_factorize(factor1, res1);
-
-  if (factor_is_smooth(factor0, lpb[0]) && factor_is_smooth(factor1, lpb[1])) {
-    printf_relation(factor0, factor1, a, t);
-  }
-  factor_clear(factor0);
-  factor_clear(factor1);
-  mpz_clear(res0);
-  mpz_clear(res1);
-}
-
-void find_relation(uint64_array_t * indexes, uint64_t number_element, mpz_t *
-                   lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
-                   sieving_interval_srcptr H)
-{
-  if (0 != MIN(indexes[0]->length, indexes[1]->length)) {
-    //Verify that if there is an element in both indexes. If not, do other thing.
-    uint64_t stop = MAX(indexes[0]->length, indexes[1]->length);
-    //Master side.
-    int mside = 0;
-    //Other side.
-    int oside = 1;
-    if (stop == indexes[1]->length) {
-      mside = 1;
-      oside = 0;
-    }
-
-    uint64_t j = 0;
-
-    for (uint64_t i = 0; i < stop; i++) {
-      if(indexes[oside]->array[j] < indexes[mside]->array[i]) {
-        if (j < indexes[oside]->length - 1) {
-          j++;
+  unsigned int index = 0;
+  for (unsigned int i = 0; i < V; i++) {
+    if (index < size) {
+      if (i == L[index]) {
+        if (I[index]) {
+          for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
+            gmp_printf("%Zd,", factor[index]->factorization[j]);
+          }
+          gmp_printf("%Zd:", factor[index]->factorization[
+                       factor[index]->number - 1]);
+        } else {
+          printf(":");
         }
-      } else if(indexes[oside]->array[j] == indexes[mside]->array[i]) {
-
-        mpz_vector_t c;
-        mpz_t gcd;
-        mpz_init(gcd);
-        mpz_vector_init(c, H->t);
-        array_index_mpz_vector(c, indexes[oside]->array[j], H,
-                               number_element);
-
-        mpz_poly_t a;
-        mpz_poly_init(a, 0);
-        mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, c);
-        mpz_poly_content(gcd, a);
-
-        //a must be irreducible.
-        if (mpz_cmp_ui(gcd, 1) == 0 && a->deg > 0 &&
-            mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
-          good_polynomial(a, f, lpb, (int)H->t);
-        }
-
-        mpz_poly_clear(a);
-
-        mpz_clear(gcd);
-        mpz_vector_clear(c);
-
-        if (j < indexes[oside]->length - 1) {
-          j++;
-        }
+        index++;
+      } else {
+        printf(":");
       }
+    } else {
+      printf(":");
+    }
+  }
+  printf("\b\n");
+}
+
+void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
+                     unsigned int * L, unsigned int size, unsigned int t,
+                     unsigned int V)
+{
+  mpz_t * res = malloc(sizeof(mpz_t) * size);
+  factor_t * factor = malloc(sizeof(factor_t) * size);
+  unsigned int * I = malloc(sizeof(unsigned int) * size);
+  unsigned int find = 0;
+  /* Not optimal */
+  for (unsigned int i = 0; i < size; i++) {
+    mpz_init(res[i]);
+    mpz_poly_resultant(res[i], f[L[i]], a);
+    mpz_abs(res[i], res[i]);
+    gmp_factorize(factor[i], res[i]);
+    if (factor_is_smooth(factor[i], lpb[L[i]])) {
+      find++;
+      I[i] = 1;
+    } else {
+      I[i] = 0;
+    }
+  }
+  if (find >= 2) {
+    printf_relation(factor, I, L, a, t, V, size);
+  }
+
+  for (unsigned int i = 0; i < size; i++) {
+    factor_clear(factor[i]);
+    mpz_clear(res[i]);
+  }
+  free(res);
+  free(factor);
+  free(I);
+}
+
+static uint64_t sum_index(uint64_t * index, unsigned int V)
+{
+  uint64_t sum = 0;
+  for (unsigned int i = 0; i < V; i++) {
+    sum += index[i];
+  }
+  return sum;
+}
+
+static unsigned int find_indexes_min(unsigned int ** L, uint64_array_t * indexes,
+                                     uint64_t * index, unsigned int V)
+{
+  * L = malloc(sizeof(unsigned int) * (V));
+  unsigned int size = 0;
+  uint64_t min = indexes[0]->array[index[0]];
+  for (unsigned int i = 1; i < V; i++) {
+    if (index[i] < indexes[i]->length) {
+      min = MIN(min, indexes[i]->array[index[i]]);
+    }
+  }
+  for (unsigned int i = 0; i < V; i++) {
+    if (min == indexes[i]->array[index[i]]) {
+      (*L)[size] = i;
+      size++;
+    }
+  }
+  * L = realloc(* L, size * sizeof(unsigned int));
+  return size;
+}
+
+static void find_relation(uint64_array_t * indexes, uint64_t * index,
+                          uint64_t number_element, mpz_t * lpb,
+                          mat_Z_srcptr matrix, mpz_poly_t * f,
+                          sieving_interval_srcptr H, unsigned int V)
+{
+  unsigned int * L;
+  unsigned int size = find_indexes_min(&L, indexes, index, V);
+  if (size >= 2) {
+    mpz_vector_t c;
+    mpz_t gcd;
+    mpz_init(gcd);
+    mpz_vector_init(c, H->t);
+    array_index_mpz_vector(c, indexes[L[0]]->array[index[L[0]]], H,
+                           number_element);
+
+    mpz_poly_t a;
+    mpz_poly_init(a, 0);
+    mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, c);
+    mpz_poly_content(gcd, a);
+
+    //a must be irreducible.
+    if (mpz_cmp_ui(gcd, 1) == 0 && a->deg > 0 &&
+        mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
+      good_polynomial(a, f, lpb, L, size, H->t, V);
     }
 
+    mpz_poly_clear(a);
+
+    mpz_clear(gcd);
+    mpz_vector_clear(c);
+
+    for (unsigned int i = 0; i < size; i++) {
+      index[L[i]] = index[L[i]] + 1;
+    }
+  } else {
+    index[L[0]] = index[L[0]] + 1;
+  }
+  free(L);
+}
+
+void find_relations(uint64_array_t * indexes, uint64_t number_element,
+                    mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
+                    sieving_interval_srcptr H, unsigned int V)
+{
+  uint64_t * index = malloc(sizeof(uint64_t) * V);
+  /* Compute sum of the length of all the uint64_array. */
+  uint64_t length_tot = 0;
+  for (unsigned int i = 0; i < V; i++) {
+    index[i] = 0;
+    ASSERT(indexes[i]->length != 0);
+    length_tot += (indexes[i]->length - 1);
+  }
+
+  if (0 != length_tot) {
+    while(sum_index(index, V) < length_tot) {
+      find_relation(indexes, index, number_element, lpb, matrix, f, H, V);
+    }
+    find_relation(indexes, index, number_element, lpb, matrix, f, H, V);
+    free(index);
+  } else {
+    printf("# No relations\n");
   }
 }
 
@@ -1172,6 +1232,25 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "q_min", "minimum of the special-q");
   param_list_decl_usage(pl, "q_max", "maximum of the special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
+
+  /* MNFS */
+
+  param_list_decl_usage(pl, "fbb2", "factor base bound on the number field 2");
+  param_list_decl_usage(pl, "fbb3", "factor base bound on the number field 3");
+  param_list_decl_usage(pl, "fbb4", "factor base bound on the number field 4");
+  param_list_decl_usage(pl, "fbb5", "factor base bound on the number field 5");
+  param_list_decl_usage(pl, "thresh2", "threshold on the number field 2");
+  param_list_decl_usage(pl, "thresh3", "threshold on the number field 3");
+  param_list_decl_usage(pl, "thresh4", "threshold on the number field 4");
+  param_list_decl_usage(pl, "thresh5", "threshold on the number field 5");
+  param_list_decl_usage(pl, "lpb2", "threshold on the number field 2");
+  param_list_decl_usage(pl, "lpb3", "threshold on the number field 3");
+  param_list_decl_usage(pl, "lpb4", "threshold on the number field 4");
+  param_list_decl_usage(pl, "lpb5", "threshold on the number field 5");
+  param_list_decl_usage(pl, "f2", "polynomial that defines the number field 2");
+  param_list_decl_usage(pl, "f3", "polynomial that defines the number field 3");
+  param_list_decl_usage(pl, "f4", "polynomial that defines the number field 4");
+  param_list_decl_usage(pl, "f5", "polynomial that defines the number field 5");
 }
 
 /*
@@ -1431,7 +1510,7 @@ int main(int argc, char * argv[])
           special_q_sieve(array, matrix, fb[j], H, f[j], special_q);
           time[j][1] = seconds() - sec;
           sec = seconds();
-          /* find_index(indexes[j], array, thresh[j]); */
+          find_index(indexes[j], array, thresh[j]);
 
 #ifdef MEAN_NORM_BOUND_SIEVE
         norms_bound_sieve[j] = norm_bound_sieve;
@@ -1447,7 +1526,7 @@ int main(int argc, char * argv[])
 
         sec = seconds();
         //TODO: do the MNFS way fo find_relation.
-        /* find_relation(indexes, array->number_element, lpb, matrix, f, H); */
+        find_relations(indexes, array->number_element, lpb, matrix, f, H, V);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
