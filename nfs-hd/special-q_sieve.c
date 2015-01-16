@@ -234,7 +234,7 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
       mpz_clear(res);
       fprintf(file, "Initialization (without special-q): %u\n",
               (unsigned char) log2(bound_resultant));
-      fprintf(file, "Initialization (special-q side): %u\n", array->array[i]);
+      fprintf(file, "Initialization (with special-q): %u\n", array->array[i]);
       mpz_poly_clear(tmp);
     }
 #endif
@@ -613,9 +613,7 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
 #endif // SIEVE_U
 
 void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
-                     factor_base_srcptr fb, sieving_interval_srcptr H,
-                     MAYBE_UNUSED mpz_poly_srcptr f,
-                     MAYBE_UNUSED ideal_1_srcptr special_q)
+                     factor_base_srcptr fb, sieving_interval_srcptr H)
 
 {
 #ifdef TIMER_SIEVE
@@ -655,7 +653,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       if (H->t == 2) {
         int64_vector_setcoordinate(c, 1, (int64_t)(- 1));
       } else {
-        int64_vector_setcoordinate(c, 1, -(int64_t)H->h[1] - 1);
+        int64_vector_setcoordinate(c, 1, c->c[1] - 1);
       }
       for (unsigned int j = 1; j < H->t; j++) {
         c0 = c0 + (int64_t)Tqr[j] * c->c[j];
@@ -699,85 +697,96 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // NUMBER_HIT
 
     } else {
-      unsigned int pos = 0;
-
       unsigned int index = 1;
       while (Tqr[index] == 0 && index < H->t) {
         index++;
       }
 
-      int64_t ci = 0;
-      if (index + 1 < H->t - 1) {
-        int64_vector_setcoordinate(c, index + 1, -(int64_t)H->h[index + 1] - 1);
-      } else if (index + 1 == H->t - 1) {
-        int64_vector_setcoordinate(c, index + 1, -1);
-      }
+      if (index == H->t - 1) {
+        uint64_t number_c_u = array->number_element;
+        uint64_t number_c_l = 1;
+        for (uint64_t j = 0; j < index; j++) {
+          number_c_u = number_c_u / (2 * H->h[j] + 1);
+          number_c_l = number_c_l * (2 * H->h[j] + 1);
+        }
 
-      if (index < H->t - 1) {
-        for (unsigned int j = index + 1; j < H->t; j++) {
-          ci = ci + (int64_t)Tqr[j] * c->c[j];
-          if (ci >= (int64_t)fb->factor_base_1[i]->ideal->r || ci < 0) {
-            ci = ci % (int64_t)fb->factor_base_1[i]->ideal->r;
+	sieve_ci(array, c, fb->factor_base_1[i], 0, H, index, number_c_l);
+      } else {
+        int64_t ci = 0;
+        if (index + 1 < H->t - 1) {
+          int64_vector_setcoordinate(c, index + 1, c->c[index + 1] - 1);
+        } else if (index + 1 == H->t - 1) {
+          int64_vector_setcoordinate(c, index + 1, -1);
+        }
+
+        if (index < H->t - 1) {
+          for (unsigned int j = index + 1; j < H->t; j++) {
+            ci = ci + (int64_t)Tqr[j] * c->c[j];
+            if (ci >= (int64_t)fb->factor_base_1[i]->ideal->r || ci < 0) {
+              ci = ci % (int64_t)fb->factor_base_1[i]->ideal->r;
+            }
           }
+          if (ci < 0) {
+            ci = ci + (int64_t)fb->factor_base_1[i]->ideal->r;
+          }
+          ASSERT(ci >= 0);
         }
-        if (ci < 0) {
-          ci = ci + (int64_t)fb->factor_base_1[i]->ideal->r;
+
+        uint64_t number_c_u = array->number_element;
+        uint64_t number_c_l = 1;
+        for (uint64_t j = 0; j < index; j++) {
+          number_c_u = number_c_u / (2 * H->h[j] + 1);
+          number_c_l = number_c_l * (2 * H->h[j] + 1);
         }
-        ASSERT(ci >= 0);
-      }
+        number_c_u = number_c_u / (2 * H->h[index] + 1);
 
-      uint64_t number_c_u = array->number_element;
-      uint64_t number_c_l = 1;
-      for (uint64_t j = 0; j < index; j++) {
-        number_c_u = number_c_u / (2 * H->h[j] + 1);
-        number_c_l = number_c_l * (2 * H->h[j] + 1);
-      }
-      number_c_u = number_c_u / (2 * H->h[index] + 1);
-
-      pos = int64_vector_add_one_i(c, index + 1, H);
-      sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
-                  number_c_l, &ci, pos);
-      for (uint64_t j = 1; j < number_c_u; j++) {
+	unsigned int pos = 0;
         pos = int64_vector_add_one_i(c, index + 1, H);
         sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
-                    number_c_l, &ci, pos);
-      }
-    }
-#ifdef PROJECTIVE_ROOT
-    mpz_t mod;
-    mpz_init(mod);
-    mpz_mod_ui(mod, mpz_poly_lc_const(f), fb->factor_base_1[i]->ideal->r);
-    if (mpz_cmp_ui(mod, 0) == 0) {
-      mpz_t g0;
-      mpz_init(g0);
-      mpz_set(g0, fb->factor_base_1[i]->ideal->g->coeff[0]);
-      /* WARNING: if g0 is equal to 0, the projective root maps to infinity, */
-      /* therefore the polynomial do not exist. */
-      if (mpz_cmp_ui(g0, 0) != 0) {
-        mpz_t q;
-        mpz_init(q);
-        mpz_set_ui(r, special_q->ideal->r);
-        mpz_invert(g0, g0, q);
-
-        //Build Tqr
-        mpz_t * Tqr = (mpz_t *) malloc(sizeof(mpz_t) * (H->t));
-        mpz_set(Tqr[0], q);
-        mpz_set(Tqr[1], g0);
-        mpz_mul_si(g0, -1);
-        for (unsigned int j = 2; j < H->t; j++) {
-          mpz_mul(Tqr[j], g0, Tqr[j - 1]);
-          mpz_mod_ui(Tqr[j], Tqr[j], ideal->ideal->r);
+                number_c_l, &ci, pos);
+        for (uint64_t j = 1; j < number_c_u; j++) {
+          pos = int64_vector_add_one_i(c, index + 1, H);
+          sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
+                  number_c_l, &ci, pos);
         }
-        mpz_clear(q);
-
-        //TODO: to be continued.
-
       }
-
-      mpz_clear(g0);
     }
-    mpz_clear(mod);
-#endif
+
+/* #ifdef PROJECTIVE_ROOT */
+/*     mpz_t mod; */
+/*     mpz_init(mod); */
+/*     mpz_mod_ui(mod, mpz_poly_lc_const(f), fb->factor_base_1[i]->ideal->r); */
+/*     if (mpz_cmp_ui(mod, 0) == 0) { */
+/*       mpz_t g0; */
+/*       mpz_init(g0); */
+/*       mpz_set(g0, fb->factor_base_1[i]->ideal->g->coeff[0]); */
+/*       /\* WARNING: if g0 is equal to 0, the projective root maps to infinity, *\/ */
+/*       /\* therefore the polynomial do not exist. *\/ */
+/*       if (mpz_cmp_ui(g0, 0) != 0) { */
+/*         mpz_t q; */
+/*         mpz_init(q); */
+/*         mpz_set_ui(r, special_q->ideal->r); */
+/*         mpz_invert(g0, g0, q); */
+
+/*         //Build Tqr */
+/*         mpz_t * Tqr = (mpz_t *) malloc(sizeof(mpz_t) * (H->t)); */
+/*         mpz_set(Tqr[0], q); */
+/*         mpz_set(Tqr[1], g0); */
+/*         mpz_mul_si(g0, -1); */
+/*         for (unsigned int j = 2; j < H->t; j++) { */
+/*           mpz_mul(Tqr[j], g0, Tqr[j - 1]); */
+/*           mpz_mod_ui(Tqr[j], Tqr[j], ideal->ideal->r); */
+/*         } */
+/*         mpz_clear(q); */
+
+/*         //TODO: to be continued. */
+
+/*       } */
+
+/*       mpz_clear(g0); */
+/*     } */
+/*     mpz_clear(mod); */
+/* #endif */
 
     int64_vector_clear(c);
     free(Tqr);
@@ -1233,7 +1242,7 @@ int main(int argc, char * argv[])
 #endif // MEAN_NORM
 
           sec = seconds();
-          special_q_sieve(array, matrix, fb[j], H, f[j], special_q);
+          special_q_sieve(array, matrix, fb[j], H);
           time[j][1] = seconds() - sec;
           sec = seconds();
           /* find_index(indexes[j], array, thresh[j]); */
