@@ -166,13 +166,15 @@ batch_invert (fb_t *F, long n, unsigned long a, unsigned long inva)
   modul_clearmod (aa);
 }
 
-/* Given k1 such that k1^2 = N (mod p),
-   return k1 and k2 which are the roots of (a*x+b)^2 = N (mod p).
+/* Given k1 containing initially r such that r^2 = N (mod p),
+   return k1 and k2 which are the roots of (a*x+b)^2 = N (mod p),
+   i.e., k1 = (r-b)/a+M (mod p) and k2 = (-r-b)/a+M (mod p).
    Assume p is odd, and inva = 1/sqrt(a) mod p.
+   Ensures k1 <= k2 at the end.
 */
 static unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
-          unsigned long k1, unsigned long inva)
+          unsigned long k1, unsigned long inva, unsigned long M)
 {
   /* the two roots are (k1-b)/a and (-k1-b)/a */
   modulus_t pp;
@@ -186,9 +188,11 @@ findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
   modul_neg (uu, vv, pp);
   modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
   modul_mul (uu, uu, tt, pp);       /* (-r-b)/a */
+  modul_add_ul (uu, uu, M, pp);     /* (-r-b)/a + M */
   *k2 = mod_get_ul (uu, pp);
   modul_sub_ul (uu, vv, bmodp, pp); /* r-b */
   modul_mul (uu, uu, tt, pp);       /* (r-b)/a */
+  modul_add_ul (uu, uu, M, pp);     /* (r-b)/a + M */
   k1 = mod_get_ul (uu, pp);
   modul_clear (tt, pp);
   modul_clear (uu, pp);
@@ -218,28 +222,42 @@ setbit (mpz_t row, int shift, unsigned long i, unsigned short *W, long *ncolw)
   W[i] ++;
 }
 
+void
+smooth_stat (int res)
+{
+  static unsigned long tested = 0, smooth = 0;
+
+  if (res == 0 || res == 1)
+    {
+      tested ++;
+      smooth += res;
+    }
+  else
+    printf ("Tested %lu norms, %lu smooth (%.0f%%)\n", tested, smooth,
+            100.0 * (double) smooth / (double) tested);
+}
+
 /* Check that ((a*i+b)^2-N)/a is smooth. By construction, almost all inputs
    are smooth.
    We put relations in column 'shift' and above.
 */
 static int
-is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, fb_t *F,
-           unsigned long ncol, int shift, mpz_t row, unsigned short *W,
-           long *ncolw)
+is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
+           long ncol, int shift, mpz_t row, unsigned short *W, long *ncolw,
+           mpz_t r)
 {
-  mpz_t r;
   int res = 0;
   unsigned long B = F[ncol-1].p, R;
   unsigned long BB = B * B;
 
   mpz_set_ui (row, 0);
-  mpz_init (r);
-  mpz_mul_si (r, a, i);
-  mpz_add (r, r, b);
-  mpz_mul (r, r, r);
-  mpz_sub (r, r, N);
-  ASSERT (mpz_divisible_p (r, a));
-  mpz_divexact (r, r, a);
+
+  mpz_set_ui (r, a);
+  mpz_mul_si (r, r, i);
+  mpz_add_ui (r, r, 2*b);
+  mpz_mul_si (r, r, i);
+  mpz_add (r, r, c);
+
   if (mpz_sgn (r) < 0)
     {
       setbit (row, shift, 0, W, ncolw); /* sign is in column 0 */
@@ -337,7 +355,7 @@ is_smooth (mpz_t a, unsigned long i, mpz_t b, mpz_t N, fb_t *F,
   else
     ASSERT(R > B);
  end:
-  mpz_clear (r);
+  smooth_stat (res);
   return res;
 }
 
@@ -626,9 +644,9 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_t N, *Mat, *X;
   unsigned char *S, *T, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
-  unsigned long p, k, Nbits;
-  long M, i, j, wrel, nrel = 0, lim, ncolw = 0, ncol;
-  mpz_t a, b, c, sqrta;
+  unsigned long p, k, Nbits, M, i, wrel;
+  long j, nrel = 0, lim, ncolw = 0, ncol;
+  mpz_t a, b, c, sqrta, r;
   double radix, logradix = 0;
   long st;
   static long init_time = 0, sieve_time = 0, check_time = 0;
@@ -663,8 +681,6 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   mpz_init (N);
   k = best_multiplier (N0, Nbits, Nbits);
-  if (verbose)
-    printf ("Using multiplier k=%lu, M=%lu, ncol=%lu\n", k, M, ncol);
   mpz_mul_ui (N, N0, k);
 
   mpz_init (a);
@@ -695,9 +711,9 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           j++;
         }
     }
-#ifdef TRACE
-  printf ("largest prime in factor base is %lu\n", F[ncol-1].p);
-#endif
+  if (verbose)
+    printf ("Using multiplier k=%lu, M=%lu, ncol=%lu, Pmax=%u\n",
+            k, M, ncol, F[ncol-1].p);
   ASSERT_ALWAYS(i < MAX_PRIMES);
   ASSERT_ALWAYS(SKIP >= 1);
   lim = ncol;       /* factor base bound */
@@ -740,6 +756,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   init_time += milliseconds ();
 
   int pols = 0;
+  mpz_init (r);
   while (nrel < ncolw + WANT_EXCESS) {
   sieve_time -= milliseconds ();
   do
@@ -765,19 +782,26 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_add_ui (b, b, k);
   /* we want b even to ensure k=1 is a root of (a*k+b)^2 = N (mod 2) */
   if (mpz_tstbit (b, 0) == 1)
-    mpz_sub (b, b, a);
+    mpz_add (b, b, a);
+  /* c = (b^2 - N)/a */
+  mpz_mul (c, b, b);
+  mpz_sub (c, c, N);
+  ASSERT (mpz_divisible_p (c, a));
+  mpz_divexact (c, c, a);
 #ifdef TRACE
   gmp_printf ("a=%Zd b=%Zd\n", a, b);
 #endif
-  unsigned long aa, inva, sqrtaa;
+  unsigned long aa, bb, inva, sqrtaa;
   ASSERT (mpz_fits_ulong_p (a));
   aa = mpz_get_ui (a);
+  ASSERT (mpz_fits_ulong_p (b));
+  bb = mpz_get_ui (b);
   sqrtaa = mpz_get_ui (sqrta);
   aa = sqrtaa * sqrtaa;
   /* inva <- 1/sqrta mod (unsigned long) */
-  mpz_ui_pow_ui (c, 2, sizeof (unsigned long) * 8);
-  mpz_invert (c, sqrta, c);
-  inva = mpz_get_ui (c);
+  mpz_ui_pow_ui (r, 2, sizeof (unsigned long) * 8);
+  mpz_invert (r, sqrta, r);
+  inva = mpz_get_ui (r);
 
   /* we now have (a*x+b)^2 - N = a*Q(x) where Q(x) = a*x^2 + 2*b*x + c */
 
@@ -884,36 +908,28 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   memcpy (S, T, 2 * M);
 
   /* sieve */
-  mpz_submul_ui (b, a, M);
   batch_invert (F + SKIP, lim - SKIP, sqrtaa, inva);
   /* skip the small primes whose average contribution is already taken into
      account */
   for (j = SKIP; j < lim; j++)
     {
-      unsigned long k2 = -1;
-      long i2;
+      unsigned long k2 = -1, i2;
       unsigned char logp;
 
       p = F[j].p;
-      k = findroot (&k2, mpz_fdiv_ui (b, p), p, F[j].r, F[j].q * F[j].q);
       logp = F[j].logp;
-      if (k != k2)
+      k = findroot (&k2, bb % p, p, F[j].r, F[j].q * F[j].q, M);
+      /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
+         when k*N is divisible by p (and then the root is 0) we will count
+         twice this root, but this will be very rare, and by not considering
+         this special case we speed up the general case */
+      for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
         {
-          for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
-            {
-              update (S, i, p, logp, M);
-              update (S, i2, p, logp, M);
-            }
-          if (i < 2*M)
-            update (S, i, p, logp, M);
+          update (S, i, p, logp, M);
+          update (S, i2, p, logp, M);
         }
-      else
-        {
-          /* FIXME: if we ensure the divisors of kN are all in the skipped
-             primes, we could avoid this case */
-          for (i = k; i < 2*M; i += p)
-            update (S, i, p, logp, M);
-        }
+      if (i < 2*M)
+        update (S, i, p, logp, M);
     }
 
   st = milliseconds ();
@@ -926,23 +942,24 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   /* find smooth locations */
   /* ncolw <= ncol+1, and we allocated a matrix of ncol+1+WANT_EXCESS rows */
-  for (S8 = (uint64_t*) S, i = -M; i < M; S8++)
+  for (S8 = (uint64_t*) S, i = 0; i < 2*M; S8++)
     if ((S8[0] & mask8) == 0)
       i += 8;
     else
       for (int ii = 0; ii < 8; ii++, i++)
         {
-          if (S[M + i] >= threshold)
+          if (S[i] >= threshold)
             {
-              if (is_smooth (a, M + i, b, N, F, ncol, wrel, Mat[nrel], W,
-                             &ncolw))
+              long ii = (long) i - (long) M;
+              if (is_smooth (aa, ii, bb, c, F, ncol, wrel, Mat[nrel], W,
+                             &ncolw, r))
                 {
                   /* matrix M has nrel rows, the left part has wrel columns and
                      is initially the identity matrix, the right part has
                      ncol+1 columns and contains initially the relations */
                   mpz_setbit (Mat[nrel], nrel);
-                  mpz_mul_ui (X[nrel], a, M + i);
-                  mpz_add (X[nrel], X[nrel], b);
+                  mpz_mul_si (X[nrel], a, ii);
+                  mpz_add_ui (X[nrel], X[nrel], bb);
                   if (++nrel >= ncolw + WANT_EXCESS)
                     goto end_check;
                 }
@@ -951,6 +968,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   end_check:
   check_time += milliseconds ();
   }
+  mpz_clear (r);
   if (verbose)
     printf ("%ld rels with %d polynomials: %f per poly\n",
             nrel, pols, (double) nrel / (double) pols);
