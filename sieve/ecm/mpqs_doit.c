@@ -1,7 +1,5 @@
 /* tiny MPQS implementation, specially tuned for 64- to 128-bit input */
 
-// #define LARGE_PRIME
-
 // #define TRACE -23830
 // #define TRACE_P 937
 
@@ -37,10 +35,20 @@ typedef struct {
   unsigned long invp2; /* floor(ULONG_MAX/p), needed for trial division */
 } fb_t;
 
+typedef struct {
+  unsigned int alloc; /* size of the hash table */
+  unsigned int size;  /* number of values in the table */
+  unsigned int *p;    /* values of large primes */
+  mpz_t *row;         /* bit-vector over the factor base */
+  mpz_t *x;           /* value of a*i+b */
+  mpz_t *y;           /* value of x^2-N */
+} hash_struct;
+typedef hash_struct hash_t[1];
+
 /* For i < 50, isprime_table[i] == 1 iff i is prime */
 static unsigned char isprime_table[] = {
-0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 
-0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 
+0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0,
+0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 
 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
 
@@ -222,33 +230,117 @@ setbit (mpz_t row, int shift, unsigned long i, unsigned short *W, long *ncolw)
   W[i] ++;
 }
 
+/* res=2: found a new full relation from two partial relations */
 void
 smooth_stat (int res)
 {
-  static unsigned long tested = 0, smooth = 0;
+  static unsigned long tested = 0, smooth[2] = {0,0}, full2 = 0;
 
-  if (res == 0 || res == 1)
+  if (res >= 0)
     {
       tested ++;
-      smooth += res;
+      if (res == 1)
+        smooth[0] ++;   /* 0 large prime */
+      else if (res == 2)
+        full2 ++;
+      else if (res > 1)
+        smooth[1] ++;   /* 1 large prime */
     }
   else
-    printf ("Tested %lu norms, %lu smooth (%.0f%%)\n", tested, smooth,
-            100.0 * (double) smooth / (double) tested);
+    printf ("Tested %lu norms, %lu+%lu smooth, %lu 1LP-smooth, total %lu (%.0f%%)\n",
+            tested, smooth[0], full2, smooth[1], smooth[0] + smooth[1],
+            100.0 * (double) (smooth[0] + smooth[1]) / (double) tested);
+}
+
+void
+hash_init (hash_t H)
+{
+  unsigned long i;
+
+  H->alloc = 20011;
+  H->size = 0;
+  H->p = malloc (H->alloc * sizeof (unsigned int));
+  H->row = malloc (H->alloc * sizeof (mpz_t));
+  H->x = malloc (H->alloc * sizeof (mpz_t));
+  H->y = malloc (H->alloc * sizeof (mpz_t));
+  for (i = 0; i < H->alloc; i++)
+    {
+      H->p[i] = 0;
+      mpz_init (H->row[i]);
+      mpz_init (H->x[i]);
+      mpz_init (H->y[i]);
+    }
+}
+
+/* Return 0 when large prime p appears for first time,
+   return 1 when it already appeared before, and puts then in 'row' the
+   bit-vector corresponding to the sum of both relations, and in 'x' the
+   product of the two a*i+b values. */
+int
+hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y)
+{
+  unsigned int h;
+
+  ASSERT_ALWAYS (2 * H->size <= H->alloc);
+  h = p % H->alloc;
+  while (H->p[h] != 0 && H->p[h] != p)
+    if (++h == H->alloc)
+      h = 0;
+  if (H->p[h] == 0)
+    {
+      H->p[h] = p;
+      mpz_swap (H->row[h], row);
+      mpz_swap (H->x[h], x);
+      mpz_swap (H->y[h], y);
+      H->size ++;
+      return 0;
+    }
+  else /* found two relations with same large prime! */
+    {
+      mpz_xor (row, row, H->row[h]);
+      mpz_mul (x, x, H->x[h]);
+      mpz_mul (y, y, H->y[h]);
+      return 1;
+    }
+}
+
+void
+hash_clear (hash_t H)
+{
+  unsigned long i;
+
+  for (i = 0; i < H->alloc; i++)
+    {
+      mpz_clear (H->row[i]);
+      mpz_clear (H->x[i]);
+      mpz_clear (H->y[i]);
+    }
+  free (H->row);
+  free (H->x);
+  free (H->y);
 }
 
 /* Check that ((a*i+b)^2-N)/a is smooth. By construction, almost all inputs
    are smooth.
    We put relations in column 'shift' and above.
+   Return:
+   - 1 if relation factors completely over factor base (full)
+   - p > 1 if relation factors completely over factor base with large-prime
+     factor p <= L
+   - 0 otherwise
+   In case 1 or p, it fills the corresponding bit-vector 'row' for factor base.
 */
-static int
+static unsigned int
 is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
            long ncol, int shift, mpz_t row, unsigned short *W, long *ncolw,
            mpz_t r)
 {
-  int res = 0;
+  unsigned int res = 0;
   unsigned long B = F[ncol-1].p, R;
   unsigned long BB = B * B;
+  unsigned long L = BB; /* large prime bound */
+
+  ASSERT (L <= BB);
 
   mpz_set_ui (row, 0);
 
@@ -327,10 +419,13 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
               res = 1;
               goto end;
             }
-#ifdef LARGE_PRIME
-          else if (R <= p * p) /* if B < R <= p^2 it cannot be B-smooth */
-            goto end;
-#endif
+          /* now R > B or R > p^2 */
+          else if (R <= L && R <= p * p)
+            {
+              res = R; /* one large prime */
+              goto end;
+            }
+          /* now R > L or R > p^2 */
           else if (R <= BB && R <= p * p * p)
             {
               /* if R = q0 * q1 with p < q0 < q1 < B, then q0 >= R/B */
@@ -343,17 +438,17 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
                   continue;
                 }
             }
-#ifdef LARGE_PRIME
-          else if (R <= p * p * p) /* B^2 < R <= p^3 cannot be B-smooth */
-            goto end;
-#endif
-          /* we don't check for primality of R > B^2 since it is rare */
+          /* now R > B^2 >= L or R > p^3 */
         }
     }
   if (R == 1)
     res = 1;
   else
-    ASSERT(R > B);
+    {
+      ASSERT(R > B);
+      if (R <= L)
+        res = R;
+    }
  end:
   smooth_stat (res);
   return res;
@@ -376,7 +471,7 @@ update (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
 
 /* put factor in z */
 static void
-gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t N,
+gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t *Y,
        const mpz_t N0, int verbose)
 {
   int i, j, k, k2, j2;
@@ -483,9 +578,7 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t N,
         if (mpz_tstbit (Mat[i], j))
           {
             mpz_mul (x, x, X[j]);
-            mpz_mul (z, X[j], X[j]);
-            mpz_sub (z, z, N);
-            mpz_mul (y, y, z);
+            mpz_mul (y, y, Y[j]);
           }
 #if 0
       if (mpz_perfect_square_p (y) == 0)
@@ -641,7 +734,7 @@ best_multiplier (const mpz_t N, unsigned long B, unsigned long K)
 void
 mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 {
-  mpz_t N, *Mat, *X;
+  mpz_t N, *Mat, *X, *Y;
   unsigned char *S, *T, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
   unsigned long p, k, Nbits, M, i, wrel;
@@ -653,6 +746,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   static long gauss_time = 0, total_time = 0;
   unsigned short *W; /* column weight */
   fb_t *F;
+  hash_t H;
 
   /* assume N0 is odd */
   ASSERT_ALWAYS (mpz_fdiv_ui (N0, 2) == 1);
@@ -722,8 +816,12 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   for (i = 0; i < wrel; i++)
     mpz_init (Mat[i]);
   X = (mpz_t*) malloc (wrel * sizeof (mpz_t));
+  Y = (mpz_t*) malloc (wrel * sizeof (mpz_t));
   for (i = 0; i < wrel; i++)
-    mpz_init (X[i]);
+    {
+      mpz_init (X[i]);
+      mpz_init (Y[i]);
+    }
 
   /* initialize sieve area [-M, M-1] */
   S = malloc (2 * M * sizeof (char));
@@ -752,6 +850,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
     mpz_set_ui (sqrta, F[lim-1].p + 1);
 
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
+
+  hash_init (H); /* hash table storing relations with large primes */
 
   init_time += milliseconds ();
 
@@ -879,7 +979,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
       unsigned char Tmax;
       Tmax = (T[0] >  T[M]) ? T[0] : T[M];
-      threshold = Tmax - (char) ROUND (log ((double) F[ncol-1].p) / logradix);
+      double lambda = 1.0;
+      threshold = Tmax - (char) ROUND (lambda * log ((double) F[ncol-1].p) / logradix);
       if (threshold < 128)
         {
           /* we increase Tmax by the difference to 128, so that in
@@ -951,15 +1052,28 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           if (S[i] >= threshold)
             {
               long ii = (long) i - (long) M;
-              if (is_smooth (aa, ii, bb, c, F, ncol, wrel, Mat[nrel], W,
-                             &ncolw, r))
+              unsigned int res;
+              res = is_smooth (aa, ii, bb, c, F, ncol, wrel, Mat[nrel], W,
+                               &ncolw, r);
+              if (res >= 1) /* full or partial relation */
+                {
+                  mpz_mul_si (X[nrel], a, ii);
+                  mpz_add_ui (X[nrel], X[nrel], bb);
+                  mpz_mul (Y[nrel], X[nrel], X[nrel]);
+                  mpz_sub (Y[nrel], Y[nrel], N);
+                }
+              if (res > 1)
+                {
+                  res = hash_insert (H, res, Mat[nrel], X[nrel], Y[nrel]);
+                  if (res == 1)
+                    smooth_stat (2);
+                }
+              if (res == 1) /* new relation */
                 {
                   /* matrix M has nrel rows, the left part has wrel columns and
                      is initially the identity matrix, the right part has
                      ncol+1 columns and contains initially the relations */
                   mpz_setbit (Mat[nrel], nrel);
-                  mpz_mul_si (X[nrel], a, ii);
-                  mpz_add_ui (X[nrel], X[nrel], bb);
                   if (++nrel >= ncolw + WANT_EXCESS)
                     goto end_check;
                 }
@@ -969,12 +1083,13 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   check_time += milliseconds ();
   }
   mpz_clear (r);
+  hash_clear (H);
   if (verbose)
     printf ("%ld rels with %d polynomials: %f per poly\n",
             nrel, pols, (double) nrel / (double) pols);
 
   gauss_time -= milliseconds ();
-  gauss (f, Mat, nrel, wrel, ncol + 1, X, N, N0, verbose);
+  gauss (f, Mat, nrel, wrel, ncol + 1, X, Y, N0, verbose);
   st = milliseconds ();
   gauss_time += st;
   total_time = st;
@@ -985,8 +1100,12 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
     mpz_clear (Mat[i]);
   free (Mat);
   for (i = 0; i < wrel; i++)
-    mpz_clear (X[i]);
+    {
+      mpz_clear (X[i]);
+      mpz_clear (Y[i]);
+    }
   free (X);
+  free (Y);
   free (F);
   free (W);
   mpz_clear (c);
