@@ -1,3 +1,5 @@
+/* TODO: look at http://sourceforge.net/p/msieve/code/HEAD/tree/branches/RDS/cofactorize_siqs.c */
+
 /* tiny MPQS implementation, specially tuned for 64- to 128-bit input */
 
 // #define TRACE -23830
@@ -25,6 +27,7 @@
 #include "timing.h"
 #include "macros.h"
 #include "mod_ul_default.h"
+#include "gmp_aux.h"
 
 typedef struct {
   unsigned int p;
@@ -253,11 +256,12 @@ smooth_stat (int res)
 }
 
 void
-hash_init (hash_t H)
+hash_init (hash_t H, unsigned long L)
 {
   unsigned long i;
+  double pi = (double) L / log ((double) L);
 
-  H->alloc = 20011;
+  H->alloc = ulong_nextprime ((unsigned long) pi);
   H->size = 0;
   H->p = malloc (H->alloc * sizeof (unsigned int));
   H->row = malloc (H->alloc * sizeof (mpz_t));
@@ -329,16 +333,16 @@ hash_clear (hash_t H)
      factor p <= L
    - 0 otherwise
    In case 1 or p, it fills the corresponding bit-vector 'row' for factor base.
+   L is the large prime bound.
 */
 static unsigned int
 is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
            long ncol, int shift, mpz_t row, unsigned short *W, long *ncolw,
-           mpz_t r)
+           mpz_t r, unsigned long L)
 {
   unsigned int res = 0;
   unsigned long B = F[ncol-1].p, R;
   unsigned long BB = B * B;
-  unsigned long L = BB; /* large prime bound */
 
   ASSERT (L <= BB);
 
@@ -426,6 +430,8 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
               goto end;
             }
           /* now R > L or R > p^2 */
+          else if (R <= p * p) /* L < R < p^2 cannot be smooth */
+            goto end;
           else if (R <= BB && R <= p * p * p)
             {
               /* if R = q0 * q1 with p < q0 < q1 < B, then q0 >= R/B */
@@ -737,7 +743,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_t N, *Mat, *X, *Y;
   unsigned char *S, *T, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
-  unsigned long p, k, Nbits, M, i, wrel;
+  unsigned long p, k, Nbits, M, i, wrel, L = 0;
   long j, nrel = 0, lim, ncolw = 0, ncol;
   mpz_t a, b, c, sqrta, r;
   double radix, logradix = 0;
@@ -765,7 +771,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   else
     {
       M = 1 << (11 + ((Nbits - 56) >> 4));
-      ncol = 47 << ((Nbits - 56) >> 4);
+      ncol = 43 << ((Nbits - 56) >> 4);
     }
   /* in case M fills the L1 cache, reduce it a bit */
   if (M == 32768)
@@ -805,9 +811,11 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           j++;
         }
     }
+  double lambda = 1.2;
+  L = (unsigned long) pow ((double) F[ncol-1].p, lambda);
   if (verbose)
-    printf ("Using multiplier k=%lu, M=%lu, ncol=%lu, Pmax=%u\n",
-            k, M, ncol, F[ncol-1].p);
+    printf ("Using multiplier k=%lu, M=%lu, ncol=%lu, B=%u, L=%lu\n",
+            k, M, ncol, F[ncol-1].p, L);
   ASSERT_ALWAYS(i < MAX_PRIMES);
   ASSERT_ALWAYS(SKIP >= 1);
   lim = ncol;       /* factor base bound */
@@ -851,7 +859,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   memset (W, 0, (ncol + 1) * sizeof (unsigned short));
 
-  hash_init (H); /* hash table storing relations with large primes */
+  hash_init (H, L); /* hash table storing relations with large primes */
 
   init_time += milliseconds ();
 
@@ -979,7 +987,6 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
       unsigned char Tmax;
       Tmax = (T[0] >  T[M]) ? T[0] : T[M];
-      double lambda = 1.0;
       threshold = Tmax - (char) ROUND (lambda * log ((double) F[ncol-1].p) / logradix);
       if (threshold < 128)
         {
@@ -1054,7 +1061,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
               long ii = (long) i - (long) M;
               unsigned int res;
               res = is_smooth (aa, ii, bb, c, F, ncol, wrel, Mat[nrel], W,
-                               &ncolw, r);
+                               &ncolw, r, L);
               if (res >= 1) /* full or partial relation */
                 {
                   mpz_mul_si (X[nrel], a, ii);
