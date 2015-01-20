@@ -5,6 +5,7 @@
 #include "ecm.h"
 #include "ularith.h"
 #include "portability.h"
+#include "getprime.h"
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -2083,6 +2084,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   else if (plan->parameterization == TWED16)
     {
       residue_t a;
+      unsigned long p, q;
 
       /* Naive scalar mult on Edwards curve */
       
@@ -2090,12 +2092,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       /* a = -1 */
       mod_set1 (a, m);
       mod_neg (a, a, m);
-      
-      for (i=2; i<= plan->B1; i++)
-	{
-	  ellE_mul_ul (Q, Q, i, m, a);
-	}
-      
+
+      for (p = 2; p <= plan->B1; p = getprime (p))
+      	for (q = p; q <= plan->B1; q *= p)
+      	  ellE_mul_ul (Q, Q, q, m, a);
+	  
       mod_gcd (f, Q->z, m);
 
       mod_clear (a, m);
