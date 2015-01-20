@@ -772,6 +772,12 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
+    
+    if (las->nb_threads != 1) {
+	fprintf(stderr, "More than 1 thread is currently broken. Using 1.\n");
+	las->nb_threads = 1;
+    }
+    
     /* }}} */
     /* {{{ Parse polynomial */
     cado_poly_init(las->cpoly);
