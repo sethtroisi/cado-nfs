@@ -2095,8 +2095,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
       for (p = 2; p <= plan->B1; p = getprime (p))
 	{
-	  for (q = p; q <= plan->B1 / p; q *= p)
-	    ellE_mul_ul (Q, Q, p, m, a);
+	  for (q = p; q <= plan->B1 / p; q *= p);
+	  ellE_mul_ul (Q, Q, q, m, a);
 	}
 
       mod_gcd (f, Q->z, m);
