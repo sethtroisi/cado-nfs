@@ -337,8 +337,7 @@ modredc15ul_intshr (modintredc15ul_t r, const modintredc15ul_t s, const int i)
     r[0] = s[1] >> (i - LONG_BIT);
     r[1] = 0UL; /* May overwrite s[1] */
   } else { /* i < LONG_BIT */
-    r[0] = s[0];
-    ularith_shrd (&(r[0]), s[1], i);
+    ularith_shrd (&(r[0]), s[1], s[0], i);
     r[1] = s[1] >> i;
   }
 }
@@ -383,9 +382,9 @@ modredc15ul_intdivexact (modintredc15ul_t r, const modintredc15ul_t n,
   while (d1[0] % 2 == 0UL)
     {
       ASSERT_EXPENSIVE (n1[0] % 2 == 0UL);
-      ularith_shrd (&(d1[0]), d1[1], 1);
+      ularith_shrd (&(d1[0]), d1[1], d1[0], 1);
       d1[1] >>= 1;
-      ularith_shrd (&(n1[0]), n1[1], 1);
+      ularith_shrd (&(n1[0]), n1[1], n1[0], 1);
       n1[1] >>= 1;
     }
   
@@ -823,7 +822,7 @@ modredc15ul_div2 (residueredc15ul_t r, const residueredc15ul_t a,
   modredc15ul_intset (r, a);
   if (r[0] % 2UL == 1UL)
     ularith_add_2ul_2ul (&(r[0]), &(r[1]), m[0].m[0], m[0].m[1]);
-  ularith_shrd (&(r[0]), r[1], 1);
+  ularith_shrd (&(r[0]), r[1], r[0], 1);
   r[1] >>= 1;
 }
 

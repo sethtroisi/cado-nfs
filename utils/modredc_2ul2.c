@@ -191,8 +191,8 @@ modredc2ul2_inv (residueredc2ul2_t r, const residueredc2ul2_t A,
       ularith_add_2ul_2ul (&(s[1]), &(s[2]), s[3], s[4]);
 
       /* Now shift s[2]:s[1]:s[0] right by t */
-      ularith_shrd (&(s[0]), s[1], t);
-      ularith_shrd (&(s[1]), s[2], t);
+      ularith_shrd (&(s[0]), s[1], s[0], t);
+      ularith_shrd (&(s[1]), s[2], s[1], t);
 
       u[0] = s[0];
       u[1] = s[1];

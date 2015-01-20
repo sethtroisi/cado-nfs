@@ -110,7 +110,7 @@ modredcul_inv (residueredcul_t r, const residueredcul_t A,
       ularith_add_ul_2ul (&tlow, &thigh, u); /* thigh:tlow <= m*2^t-1 (since u<m) */
       /* Now the low t bits of tlow are 0 */
       ASSERT_EXPENSIVE ((tlow & ((1UL << t) - 1UL)) == 0UL);
-      ularith_shrd (&tlow, thigh, t);
+      ularith_shrd (&tlow, thigh, tlow, t);
       u = tlow;
       ASSERT_EXPENSIVE ((thigh >> t) == 0UL && u < m[0].m);
     }
@@ -233,7 +233,7 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
       ularith_add_ul_2ul (&tlow, &thigh, u); /* thigh:tlow <= m*2^t-1 (since u<m) */
       /* Now the low t bits of tlow are 0 */
       ASSERT_EXPENSIVE ((tlow & ((1UL << t) - 1UL)) == 0UL);
-      ularith_shrd (&tlow, thigh, t);
+      ularith_shrd (&tlow, thigh, tlow, t);
       u = tlow;
       ASSERT_EXPENSIVE ((thigh >> t) == 0UL && u < m[0].m);
     }
