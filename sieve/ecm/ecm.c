@@ -2093,9 +2093,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       mod_set1 (a, m);
       mod_neg (a, a, m);
 
-      for (p = 2; p <= plan->B1 / p; p = getprime (p))
+      for (p = 2; p <= plan->B1; p = getprime (p))
 	{
-	  for (q = p; q <= plan->B1; q *= p);
+	  for (q = p; q <= plan->B1 / p; q *= p);
 	  ellE_mul_ul (Q, Q, q, m, a);
 	}
 
