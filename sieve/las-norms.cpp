@@ -343,7 +343,7 @@ static void set_lg_page()
 void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots)
 {
 
-  const double_poly_t f = {{ degree, coeff }};
+  const double_poly_t f = {{ (int) degree, coeff }};
   double_poly_t df, ddf, f_ddf, df_df, d2f;
   mpz_t           p[(degree << 1) + 1];
   root_struct Roots[degree << 1];
