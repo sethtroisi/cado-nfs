@@ -354,7 +354,7 @@ endif(WITH_MPIR)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(plingen_${v}_sources
         bw-common.c
-        plingen.c
+        plingen.cpp
         plingen-tuning.cpp
         tree_stats.c
         logline.c

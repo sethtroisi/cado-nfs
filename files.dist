@@ -897,7 +897,7 @@ linalg/bwc/mpfq/mpfq_p_3.c
 linalg/bwc/mpfq/mpfq_p_3.h
 linalg/bwc/mpfq/mpfq_p_3_t.c
 linalg/bwc/mpfq/mpfq_p_3_t.h
-linalg/bwc/plingen.c
+linalg/bwc/plingen.cpp
 linalg/bwc/plingen.h
 linalg/bwc/plingen-tuning.h
 linalg/bwc/plingen-tuning.cpp

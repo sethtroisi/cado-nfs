@@ -283,7 +283,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     /* Also keep track of the
      * number of coefficients for the columns of pi. Set pi to Id */
 
-    unsigned int *pi_lengths = malloc(b * sizeof(unsigned int));
+    unsigned int *pi_lengths = (unsigned int*) malloc(b * sizeof(unsigned int));
     for(unsigned int i = 0 ; i < b ; i++) {
         abset_ui(ab, matpoly_coeff(ab, pi, i, i, 0), 1);
         pi_lengths[i] = 1;
@@ -294,8 +294,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
 
     /* Keep a list of columns which have been used as pivots at the
      * previous iteration */
-    unsigned int * pivots = malloc(m * sizeof(unsigned int));
-    int * is_pivot = malloc(b * sizeof(int));
+    unsigned int * pivots = (unsigned int*) malloc(m * sizeof(unsigned int));
+    int * is_pivot = (int*) malloc(b * sizeof(int));
     memset(is_pivot, 0, b * sizeof(int));
 
     matpoly e;
@@ -383,7 +383,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
 
         if (generator_found) break;
 
-        int (*ctable)[2] = malloc(b * 2 * sizeof(int));
+        int (*ctable)[2] = (int(*)[2]) malloc(b * 2 * sizeof(int));
         /* {{{ Now see in which order I may look at the columns of pi, so
          * as to keep the nominal degrees correct. In contrast with what
          * we used to do before, we no longer apply the permutation to
@@ -1534,7 +1534,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
     unsigned int window = aa->F->alloc;
 
     /* Which columns of F*pi will make the final generator ? */
-    unsigned int * sols = malloc(n * sizeof(unsigned int));
+    unsigned int * sols = (unsigned int *) malloc(n * sizeof(unsigned int));
     for(unsigned int j = 0, jj=0 ; j < m + n ; j++) {
         if (bm->lucky[j] <= 0)
             continue;
@@ -1728,7 +1728,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
             /* Now comes the time to prioritize the different solutions. Our
              * goal is to get the unessential solutions last ! */
             int (*sol_score)[2];
-            sol_score = malloc(n * 2 * sizeof(int));
+            sol_score = (int (*)[2]) malloc(n * 2 * sizeof(int));
             memset(sol_score, 0, n * 2 * sizeof(int));
             /* score per solution is the number of non-zero coefficients,
              * that's it. Since we have access to lexcmp2, we want to use it.
@@ -2046,7 +2046,7 @@ void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
     aa->f = fopen(aa->input_file, aa->ascii ? "r" : "rb");
 
     DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->input_file);
-    aa->iobuf = malloc(2 * io_block_size);
+    aa->iobuf = (char*) malloc(2 * io_block_size);
     setbuffer(aa->f, aa->iobuf, 2 * io_block_size);
 
     /* read the first coefficient ahead of time. This is because in most
@@ -2096,7 +2096,7 @@ void bm_io_begin_write(bm_io_ptr aa)/*{{{*/
     }
     DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->output_file);
     if (!random_input_length) {
-        aa->iobuf = malloc(2 * io_block_size);
+        aa->iobuf = (char*) malloc(2 * io_block_size);
         setbuffer(aa->f, aa->iobuf, 2 * io_block_size);
     }
 }/*}}}*/
@@ -2185,7 +2185,7 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
     unsigned int n = d->n;
     matpoly_ptr A = aa->A;
 
-    unsigned int (*fdesc)[2] = malloc(2 * m * sizeof(unsigned int));
+    unsigned int (*fdesc)[2] = (unsigned int(*)[2])malloc(2 * m * sizeof(unsigned int));
 
     int rank;
     MPI_Comm_rank(aa->bm->com[0], &rank);
@@ -2213,9 +2213,9 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
          * from column cnum[i] of coeff exponent[i] of A which, once reduced modulo
          * the other ones, has coefficient at row pivots[i] unequal to zero.
          */
-        unsigned int *pivots = malloc(m * sizeof(unsigned int));
-        unsigned int *exponents = malloc(m * sizeof(unsigned int));
-        unsigned int *cnum = malloc(m * sizeof(unsigned int));
+        unsigned int *pivots = (unsigned int*) malloc(m * sizeof(unsigned int));
+        unsigned int *exponents = (unsigned int*) malloc(m * sizeof(unsigned int));
+        unsigned int *cnum = (unsigned int*) malloc(m * sizeof(unsigned int));
         unsigned int r = 0;
 
         for (unsigned int k = 0; r < m ; k++) {
@@ -2479,7 +2479,7 @@ void bmstatus_init(bmstatus_ptr bm, unsigned int m, unsigned int n)/*{{{*/
     memset(bm, 0, sizeof(bmstatus));
     bm->d->m = m;
     bm->d->n = n;
-    bm->lucky = malloc((m + n) * sizeof(int));
+    bm->lucky = (int*) malloc((m + n) * sizeof(int));
     memset(bm->lucky, 0, (m + n) * sizeof(int));
 }/*}}}*/
 
@@ -2575,7 +2575,7 @@ void print_node_assignment(MPI_Comm comm)
     int rc = uname(me);
     if (rc < 0) { perror("uname"); MPI_Abort(comm, 1); }
     size_t sz = 1 + sizeof(me->nodename);
-    char * global = malloc(size * sz);
+    char * global = (char*) malloc(size * sz);
     memset(global, 0, size * sz);
     memcpy(global + rank * sz, me->nodename, sizeof(me->nodename));
 
@@ -2774,7 +2774,8 @@ int main(int argc, char *argv[])
         int newrank = irank * mpi[1] * thr[1] + jrank;
 
         MPI_Comm_split(MPI_COMM_WORLD, 0, newrank, &(bm->com[0]));
-        MPI_Comm_set_name(bm->com[0], "world");
+        /* MPI Api has some very deprecated prototypes */
+        MPI_Comm_set_name(bm->com[0], (char*) "world");
 
         char commname[12];
         snprintf(commname, 12, "row%d\n", irank);
@@ -2821,7 +2822,7 @@ int main(int argc, char *argv[])
 
     /* this is somewhat ugly, too */
     unsigned int t0 = bm->t;
-    unsigned int * delta = malloc((m + n) * sizeof(unsigned int));
+    unsigned int * delta = (unsigned int*) malloc((m + n) * sizeof(unsigned int));
     for(unsigned int j = 0 ; j < m + n ; delta[j++]=t0);
 
     stats->tree_total_breadth = aa->guessed_length;
