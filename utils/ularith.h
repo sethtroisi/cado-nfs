@@ -81,7 +81,7 @@ ularith_inc_nz (unsigned long *r, const unsigned long a)
     : "cc");
 #else
   if (a != 0)
-    r += 1;
+    *r += 1;
 #endif
 }
 
