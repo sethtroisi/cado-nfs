@@ -140,27 +140,6 @@ tonelli_shanks (uint64_t rr, uint64_t p)
   return hh;
 }
 
-/* F[i].q <- 1/a mod F[i].p for 0 <= i < n, using batch inversion.
-   Assume inva = 1/a mod 2^K where K is the number of bits of an unsigned long.
-   Assumes a*p[i] and a^2 fit into an unsigned long.
- */
-static void
-batch_invert (fb_t *F, long n, unsigned long a)
-{
-  unsigned long *r, *p;
-  long i;
-
-  p = malloc (n * sizeof (unsigned long));
-  r = malloc (n * sizeof (unsigned long));
-  for (i = 0; i < n; i++)
-    p[i] = F[i].p;
-  modredcul_batch_Q_to_Fp (r, 1, a, 0, p, n);
-  for (i = 0; i < n; i++)
-    F[i].q = r[i];
-  free (p);
-  free (r);
-}
-
 /* Given k1 containing initially r such that r^2 = N (mod p),
    return k1 and k2 which are the roots of (a*x+b)^2 = N (mod p),
    i.e., k1 = (r-b)/a+M (mod p) and k2 = (-r-b)/a+M (mod p).
@@ -727,7 +706,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_t N, *Mat, *X, *Y;
   unsigned char *S, *T, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
-  unsigned long p, k, Nbits, M, i, wrel, L = 0;
+  unsigned long p, k, Nbits, M, i, wrel, L = 0, *P, *Q;
   long j, nrel = 0, lim, ncolw = 0, ncol;
   mpz_t a, b, c, sqrta, r;
   double radix, logradix = 0;
@@ -774,6 +753,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   /* compute factor base */
   F = malloc (ncol * sizeof (fb_t));
+  P = malloc (ncol * sizeof (unsigned long));
+  Q = malloc (ncol * sizeof (unsigned long));
   W = malloc ((ncol + 1) * sizeof (unsigned short));
   /* a prime p can appear in x^2 mod N only if p is a square modulo N */
   mpz_ui_pow_ui (b, 2, 64);
@@ -785,7 +766,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
      /* a prime p can be in the factor base only if N is a square mod p */
       if (p == 2 || mpz_jacobi (N, a) != -1)
         {
-          F[j].p = p;
+          F[j].p = P[j] = p;
           prime_index[p] = j;
           for (int k = p - 1; k >= 0 && prime_index[k] == 0; k--)
             prime_index[k] = j;
@@ -996,7 +977,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   memcpy (S, T, 2 * M);
 
   /* sieve */
-  batch_invert (F + SKIP, lim - SKIP, sqrtaa);
+  modredcul_batch_Q_to_Fp (Q + SKIP, 1, sqrtaa, 0, P + SKIP, lim - SKIP);
   /* skip the small primes whose average contribution is already taken into
      account */
   for (j = SKIP; j < lim; j++)
@@ -1006,7 +987,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
       p = F[j].p;
       logp = F[j].logp;
-      k = findroot (&k2, bb % p, p, F[j].r, F[j].q * F[j].q, M);
+      k = findroot (&k2, bb % p, p, F[j].r, Q[j] * Q[j], M);
       /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
          when k*N is divisible by p (and then the root is 0) we will count
          twice this root, but this will be very rare, and by not considering
@@ -1094,6 +1075,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   free (X);
   free (Y);
   free (F);
+  free (P);
+  free (Q);
   free (W);
   mpz_clear (c);
   mpz_clear (b);
