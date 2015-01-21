@@ -183,7 +183,8 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
   if (a->deg > 0) {
     uint64_t tmp = 0;
     int64_poly_infinite_norm(&tmp, a);
-    bound_resultant = pow((double)tmp, f->deg) * pre_compute[a->deg];
+
+    bound_resultant = pow((double)tmp, (double)f->deg) * pre_compute[a->deg];
   } else {
     bound_resultant = 1;
   }
@@ -207,8 +208,7 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 
   //WARNING: an assert here is necessary.
   if (special_q) {
-    array->array[i] = (unsigned char) (log2(bound_resultant) -
-                                       ideal->log);
+    array->array[i] = (unsigned char)log2(bound_resultant) - ideal->log;
 
 #ifdef TRACE_POS
     if (i == TRACE_POS) {
@@ -240,7 +240,7 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 #endif
 
   } else {
-    array->array[i] = (unsigned char) log(bound_resultant);
+    array->array[i] = (unsigned char) log2(bound_resultant);
 
 #ifdef TRACE_POS
     if (i == TRACE_POS) {
@@ -696,7 +696,9 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       number_of_hit = 0;
 #endif // NUMBER_HIT
 
-    } else {
+    }
+#ifdef SIEVE_TQR
+    else {
       unsigned int index = 1;
       while (Tqr[index] == 0 && index < H->t) {
         index++;
@@ -751,6 +753,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         }
       }
     }
+#endif // SIEVE_TQR
 
 /* #ifdef PROJECTIVE_ROOT */
 /*     mpz_t mod; */
