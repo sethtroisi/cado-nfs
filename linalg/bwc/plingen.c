@@ -23,12 +23,25 @@
 #include "utils.h"
 #include "mpfq_layer.h"
 #include "memusage.h"
+
+/* lingen-matpoly is the default code. */
 #include "lingen-matpoly.h"
 
-#include "lingen-bigmatpoly.h"
+#define ENABLE_MPI_LINGEN
+#ifdef  MPIR
+#define ENABLE_CACHING_MPI_LINGEN
+#endif
 
+#ifdef  ENABLE_MPI_LINGEN
+#include "lingen-bigmatpoly.h"
+#endif
+
+#ifdef  ENABLE_CACHING_MPI_LINGEN
 #ifdef HAVE_MPIR
 #include "lingen-bigmatpoly-ft.h"
+#else
+#error "ENABLE_CACHING_MPI_LINGEN requires MPIR"
+#endif
 #endif
 
 #include "bw-common.h"		/* Handy. Allows Using global functions
@@ -859,6 +872,7 @@ int save_checkpoint_file(bmstatus_ptr bm, matpoly pi, unsigned int t0, unsigned 
     return ok;
 }/*}}}*/
 
+#ifdef  ENABLE_MPI_LINGEN
 int load_mpi_checkpoint_file_scattered(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, unsigned int t1, unsigned int *delta, int * p_done)/*{{{*/
 {
     int size;
@@ -1120,6 +1134,7 @@ int save_mpi_checkpoint_file(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, u
         return save_mpi_checkpoint_file_scattered(bm, xpi, t0, t1, delta, done);
     }
 }/*}}}*/
+#endif  /* ENABLE_MPI_LINGEN */
 
 /*}}}*/
 
@@ -1129,7 +1144,10 @@ int save_mpi_checkpoint_file(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, u
 
 /* Forward declaration, it's used by the recursive version */
 static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
+
+#ifdef  ENABLE_MPI_LINGEN
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta);
+#endif
 
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
@@ -1187,6 +1205,37 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     return tree_stats_leave(stats, done);
 }/*}}}*/
 
+static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
+{
+    int rank;
+    MPI_Comm_rank(bm->com[0], &rank);
+    ASSERT_ALWAYS(!rank);
+    unsigned int t0 = bm->t;
+    unsigned int t1 = bm->t + E->size;
+
+    int done;
+
+    if (load_checkpoint_file(bm, pi, t0, t1, delta, &done))
+        return done;
+
+    // ASSERT_ALWAYS(E->size < bm->lingen_mpi_threshold);
+
+    // fprintf(stderr, "Enter %s\n", __func__);
+    if (E->size < bm->lingen_threshold) {
+        bm->t_basecase -= seconds();
+        done = bw_lingen_basecase(bm, pi, E, delta);
+        bm->t_basecase += seconds();
+    } else {
+        done = bw_lingen_recursive(bm, pi, E, delta);
+    }
+    // fprintf(stderr, "Leave %s\n", __func__);
+
+    save_checkpoint_file(bm, pi, t0, t1, delta, done);
+
+    return done;
+}/*}}}*/
+
+#ifdef  ENABLE_MPI_LINGEN
 static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
@@ -1232,7 +1281,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     logline_begin(stdout, z, "t=%u MPI-MP%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
-#ifdef  HAVE_MPIR
+#ifdef  ENABLE_CACHING_MPI_LINGEN
     if (caching)
         bigmatpoly_mp_caching(ab, E_right, E, pi_left);
     else
@@ -1246,7 +1295,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     logline_begin(stdout, z, "t=%u MPI-MUL%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
-#ifdef  HAVE_MPIR
+#ifdef  ENABLE_CACHING_MPI_LINGEN
     if (caching)
         bigmatpoly_mul_caching(ab, pi, pi_left, pi_right);
     else
@@ -1258,36 +1307,6 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 
     // fprintf(stderr, "Leave %s\n", __func__);
     return tree_stats_leave(stats, done);
-}/*}}}*/
-
-static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
-{
-    int rank;
-    MPI_Comm_rank(bm->com[0], &rank);
-    ASSERT_ALWAYS(!rank);
-    unsigned int t0 = bm->t;
-    unsigned int t1 = bm->t + E->size;
-
-    int done;
-
-    if (load_checkpoint_file(bm, pi, t0, t1, delta, &done))
-        return done;
-
-    // ASSERT_ALWAYS(E->size < bm->lingen_mpi_threshold);
-
-    // fprintf(stderr, "Enter %s\n", __func__);
-    if (E->size < bm->lingen_threshold) {
-        bm->t_basecase -= seconds();
-        done = bw_lingen_basecase(bm, pi, E, delta);
-        bm->t_basecase += seconds();
-    } else {
-        done = bw_lingen_recursive(bm, pi, E, delta);
-    }
-    // fprintf(stderr, "Leave %s\n", __func__);
-
-    save_checkpoint_file(bm, pi, t0, t1, delta, done);
-
-    return done;
 }/*}}}*/
 
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
@@ -1340,6 +1359,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
 
     return done;
 }/*}}}*/
+#endif  /* ENABLE_MPI_LINGEN */
 
 /*}}}*/
 
@@ -2640,9 +2660,9 @@ int main(int argc, char *argv[])
         ASSERT_ALWAYS(rc >= 0);
     }
 
-#ifndef HAVE_MPIR
+#ifndef ENABLE_CACHING_MPI_LINGEN
     if (caching) {
-        fprintf(stderr, "--caching=1 only supported with MPIR\n");
+        fprintf(stderr, "--caching=1 only supported with ENABLE_CACHING_MPI_LINGEN\n");
         exit(EXIT_FAILURE);
     }
 #endif
