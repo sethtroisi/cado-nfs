@@ -35,7 +35,6 @@ typedef struct {
   unsigned int r;      /* root of x^2 = k*N (mod p) */
   uint64_t invp;       /* 1/p mod 2^64, needed for trial division */
   unsigned char logp;  /* log(p) / log(radix), needed for sieve */
-  unsigned long q;     /* 1/p mod sqrt(a) */
   unsigned long invp2; /* floor(ULONG_MAX/p), needed for trial division */
 } fb_t;
 
