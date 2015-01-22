@@ -58,6 +58,7 @@
 #define ULARITH_CONSTRAINT_G "rme"
 #endif
 
+#ifdef DEAD_CODE /* Unused and untested. Here be dragons. */
 /* Increases r if a != 0 */
 static inline void
 ularith_inc_nz (unsigned long *r, const unsigned long a)
@@ -84,6 +85,7 @@ ularith_inc_nz (unsigned long *r, const unsigned long a)
     *r += 1;
 #endif
 }
+#endif
 
 /* Let a = a1 + 2^k * a2, b = b1 + 2^k * b2, where k is number of bits
    in an unsigned long. Return 1 if a > b, and 0 if a <= b. */
