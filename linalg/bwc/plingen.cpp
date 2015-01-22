@@ -1597,7 +1597,7 @@ class matpoly_read_task {/*{{{*/
         return matpoly_coeff_const(ab, pi, i, j, k);
     }
     inline absrc_elt coeff_const(unsigned int i, unsigned int j, unsigned int k) {
-        return coeff_const(i, j, k);
+        return coeff_const_locked(i, j, k);
     }
 
     ~matpoly_read_task() { }
@@ -1653,7 +1653,7 @@ class bigmatpoly_write_task { /* {{{ */
 
     inline unsigned int chunk_size() const { return B; }
 
-    inline unsigned int size() { return xE->size; }
+    // inline unsigned int size() { return xE->size; }
     inline void set_size(unsigned int s) {
         bigmatpoly_set_size(xE, s);
     }
@@ -1733,7 +1733,7 @@ class matpoly_write_task { /* {{{ */
 
     inline unsigned int chunk_size() const { return 1; }
     inline void set_size(unsigned int s) { E->size = s; }
-    inline unsigned int size() { return E->size; }
+    // inline unsigned int size() { return E->size; }
 
     abdst_elt coeff_locked(unsigned int i, unsigned int j, unsigned int k) {
         E->size += (E->size == k);
@@ -2465,7 +2465,7 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
 }				/*}}} */
 
 template<class Writer>
-void bm_io_compute_E(bm_io_ptr aa, Writer& E, unsigned int expected)/*{{{*/
+void bm_io_compute_E(bm_io_ptr aa, Writer& E, unsigned int expected, unsigned int allocated)/*{{{*/
 {
     // F0 is exactly the n x n identity matrix, plus the
     // X^(s-exponent)e_{cnum} vectors. fdesc has the (exponent, cnum)
@@ -2478,8 +2478,6 @@ void bm_io_compute_E(bm_io_ptr aa, Writer& E, unsigned int expected)/*{{{*/
     int rank;
     MPI_Comm_rank(aa->bm->com[0], &rank);
 
-    unsigned int safe_guess = E.size();
-
     unsigned int window = aa->t0 + 2;
 
     double tt0 = wct_seconds();
@@ -2489,7 +2487,7 @@ void bm_io_compute_E(bm_io_ptr aa, Writer& E, unsigned int expected)/*{{{*/
     int over = 0;
     unsigned int final_length = UINT_MAX;
 
-    for(unsigned int kE = 0 ; kE + aa->t0 < safe_guess ; kE ++) {
+    for(unsigned int kE = 0 ; kE + aa->t0 < allocated ; kE ++) {
 
         if (kE % E.chunk_size() || kE + aa->t0 >= expected) {
             MPI_Bcast(&over, 1, MPI_INT, 0, bm->com[0]);
@@ -2508,7 +2506,7 @@ void bm_io_compute_E(bm_io_ptr aa, Writer& E, unsigned int expected)/*{{{*/
         if (over || rank)
             continue;
 
-        if (kE + aa->t0 > safe_guess) {
+        if (kE + aa->t0 > allocated) {
             fprintf(stderr, "Going way past guessed length%s ???\n", aa->ascii ? " (more than 5%%)" : "");
         }
 
@@ -2926,57 +2924,89 @@ int main(int argc, char *argv[])
         }
     }
 
-    bigmatpoly model;
-    bigmatpoly xpi, xE;
-    bigmatpoly_init_model(model, bm->com, bm->mpi_dims[0], bm->mpi_dims[1]);
-    bigmatpoly_init(ab, xE, model, 0, 0, 0);
-    bigmatpoly_init(ab, xpi, model, 0, 0, 0);   /* pre-init for now */
-
-    {
+    if (size > 1) {
         unsigned int m = aa->bm->d->m;
         unsigned int n = aa->bm->d->n;
         unsigned int b = m + n;
         unsigned int guess = aa->guessed_length;
-        ASSERT(bigmatpoly_check_pre_init(xE));
         size_t safe_guess = aa->ascii ? ceil(1.05 * guess) : guess;
-        bigmatpoly_finish_init(ab, xE, m, b, safe_guess);
-        bigmatpoly_write_task writer(aa, xE);
-        /* This is a dispatching read */
-        bm_io_compute_E(aa, writer, guess);
-    }
-    bm_io_end_read(aa);
+        bigmatpoly model;
+        bigmatpoly xpi, xE;
 
-    if (size > 1) {
+        bigmatpoly_init_model(model, bm->com, bm->mpi_dims[0], bm->mpi_dims[1]);
+        bigmatpoly_init(ab, xE, model, 0, 0, 0);
+        bigmatpoly_init(ab, xpi, model, 0, 0, 0);   /* pre-init for now */
+        bigmatpoly_finish_init(ab, xE, m, b, safe_guess);
+
+        bigmatpoly_write_task writer(aa, xE);
+
+        bm_io_compute_E(aa, writer, guess, safe_guess);
+
+        bm_io_end_read(aa);
+
         bw_biglingen_collective(bm, xpi, xE, delta);
+
+        display_deltas(bm, delta);
+        if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
+
+        if (check_luck_condition(bm)) {
+            /* this is a gathering write */
+            bm_io_begin_write(aa);
+
+            /* this reallocates F */
+            bm_io_set_write_behind_size(aa, delta);
+            bigmatpoly_read_task xpi_reader(aa, xpi);
+            bm_io_compute_final_F(aa, xpi_reader, delta);
+            bm_io_end_write(aa);
+        }
+
+        /* clear everything */
+        bigmatpoly_clear(ab, xE);
+        bigmatpoly_clear(ab, xpi);
+        bigmatpoly_clear_model(model);
     } else {
-        /* We have to gather and scatter, but these are fairly trivial.
-         * Avoid copies, and wrap around bw_lingen_single. */
-        matpoly E, pi;
-        matpoly_init(ab, E, 0, 0, 0);
-        matpoly_init(ab, pi, 0, 0, 0);
-        matpoly_swap(E, bigmatpoly_my_cell(xE));
+        unsigned int m = aa->bm->d->m;
+        unsigned int n = aa->bm->d->n;
+        unsigned int b = m + n;
+        unsigned int guess = aa->guessed_length;
+        size_t safe_guess = aa->ascii ? ceil(1.05 * guess) : guess;
+
+        matpoly pi, E;
+
+
+        matpoly_init(ab, E, m, b, safe_guess);
+        matpoly_init(ab, pi, b, b, expected_pi_length(aa->bm->d, guess));
+
+
+        matpoly_write_task E_writer(aa, E);
+
+        bm_io_compute_E(aa, E_writer, guess, safe_guess);
+
+        bm_io_end_read(aa);
+
         bw_lingen_single(bm, pi, E, delta);
-        matpoly_swap(E, bigmatpoly_my_cell(xE));
-        bigmatpoly_finish_init(ab, xpi, m + n, m + n, 1);
-        xpi->size = pi->size;
-        matpoly_swap(pi, bigmatpoly_my_cell(xpi));
+
+        display_deltas(bm, delta);
+        if (!rank) printf("(pi->alloc = %zu)\n", pi->alloc);
+
+        if (check_luck_condition(bm)) {
+            /* this is a gathering write */
+            bm_io_begin_write(aa);
+
+            /* this reallocates F */
+            bm_io_set_write_behind_size(aa, delta);
+            matpoly_read_task pi_reader(aa, pi);
+            bm_io_compute_final_F(aa, pi_reader, delta);
+            bm_io_end_write(aa);
+        }
+
+        /* clear everything */
         matpoly_clear(ab, E);
         matpoly_clear(ab, pi);
+
     }
 
-    display_deltas(bm, delta);
-    if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
 
-    if (check_luck_condition(bm)) {
-        /* this is a gathering write */
-        bm_io_begin_write(aa);
-
-        /* this reallocates F */
-        bm_io_set_write_behind_size(aa, delta);
-        bigmatpoly_read_task xpi_reader(aa, xpi);
-        bm_io_compute_final_F(aa, xpi_reader, delta);
-        bm_io_end_write(aa);
-    }
 
     if (!rank) {
         printf("t_basecase = %.2f\n", bm->t_basecase);
@@ -2985,10 +3015,6 @@ int main(int argc, char *argv[])
         printf("t_cp_io = %.2f\n", bm->t_cp_io);
     }
 
-    /* clear everything */
-    bigmatpoly_clear(ab, xE);
-    bigmatpoly_clear(ab, xpi);
-    bigmatpoly_clear_model(model);
     bm_io_clear(aa);
     free(delta);
     abmpi_ops_clear(ab);
