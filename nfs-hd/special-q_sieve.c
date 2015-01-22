@@ -12,6 +12,8 @@
 #include "uint64_array.h"
 #include "utils_mpz.h"
 
+//TODO: change % in test + add or substract.
+
 /*
   p = 10822639589
   n = 6
@@ -330,23 +332,23 @@ void init_norm_1(array_ptr array, double * pre_compute,
 }
 
 /*
-  Compute Tqr for an ideal (r, h) with deg(h) = 1.
-  In fact, Tqr is not just computed. For example, if Tqr[0] != 0, the output is
+  Compute a pseudo Tqr for an ideal (r, h) with deg(h) = 1.
+  For example, if Tqr[0] != 0, the output is
    equal to [-Tqr[0]^{-1} mod r = a, a * Tqr[1] mod r, …].
   The PRINT_TQR mode print the true Tqr matrix.
 
-  Tqr: Tqr is just a line in this case.
+  pseudo_Tqr: pseudo_Tqr is just a line in this case.
   matrix: MqLLL.
   t: dimension of the lattice.
   ideal: special-q.
 */
-void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
-                   ideal_1_srcptr ideal)
+void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, mat_Z_srcptr matrix,
+                          unsigned int t, ideal_1_srcptr ideal)
 {
   mpz_t tmp;
   mpz_init(tmp);
   unsigned int i = 0;
-  Tqr[i] = 0;
+  pseudo_Tqr[i] = 0;
   //Tqr = Mq,1 - Tr * Mq,2.
 
 #ifdef PRINT_TQR
@@ -363,20 +365,24 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
                  matrix->coeff[k + 2][j + 1]);
     }
 
-    if (Tqr[i] == 0) {
+    if (pseudo_Tqr[i] == 0) {
       mpz_mod_ui(tmp, tmp, ideal->ideal->r);
       if (mpz_cmp_ui(tmp, 0) != 0) {
         mpz_invert_ui(tmp, tmp, ideal->ideal->r);
 
 #ifdef PRINT_TQR
         mpz_set(invert, tmp);
-        gmp_printf("1, ", invert);
+        if (j != t - 1) {
+          gmp_printf("1, ", invert);
+        } else {
+          gmp_printf("1", invert);
+        }
 #endif // PRINT_TQR
 
         mpz_mul_si(tmp, tmp, -1);
         mpz_mod_ui(tmp, tmp, ideal->ideal->r);
         ASSERT(mpz_cmp_ui(tmp, ideal->ideal->r) <= 0);
-        Tqr[j] = mpz_get_ui(tmp);
+        pseudo_Tqr[j] = mpz_get_ui(tmp);
         i = j;
       } else {
 
@@ -384,7 +390,7 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
         printf("0, ");
 #endif // PRINT_TQR
 
-        Tqr[j] = 0;
+        pseudo_Tqr[j] = 0;
       }
     } else {
 
@@ -393,19 +399,23 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix, unsigned int t,
       mpz_init(tmp2);
       mpz_mul(tmp2, tmp, invert);
       mpz_mod_ui(tmp2, tmp2, ideal->ideal->r);
-      gmp_printf("%Zd, ", tmp2);
+      if (j != t - 1) {
+        gmp_printf("%Zd, ", tmp2);
+      } else {
+        gmp_printf("%Zd", tmp2);
+      }
       mpz_clear(tmp2);
 #endif // PRINT_TQR
 
-      mpz_mul_ui(tmp, tmp, Tqr[i]);
+      mpz_mul_ui(tmp, tmp, pseudo_Tqr[i]);
       mpz_mod_ui(tmp, tmp, ideal->ideal->r);
-      Tqr[j] = mpz_get_ui(tmp);
+      pseudo_Tqr[j] = mpz_get_ui(tmp);
     }
   }
   mpz_clear(tmp);
 
 #ifdef PRINT_TQR
-  printf("\b\b] mod %" PRIu64 ", h: ", ideal->ideal->r);
+  printf("] mod %" PRIu64 ", h: ", ideal->ideal->r);
   mpz_poly_fprintf(stdout, ideal->ideal->h);
   mpz_clear(invert);
 #endif // PRINT_TQR
@@ -446,7 +456,7 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
   ideal: an ideal with r < q.
   ci: the possible first coordinate of c to have c in the sieving region.
   H: the sieving interval.
-  i: index of the first non-zero coefficient in Tqr.
+  i: index of the first non-zero coefficient in pseudo_Tqr.
   number_c_l: number of possible c with the same ci, ci+1, …, ct.
 */
 void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
@@ -536,7 +546,7 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
   }
 }
 
-void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
+void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
                  ideal_1_srcptr ideal, sieving_interval_srcptr H,
                  unsigned int i, uint64_t number_c_l, int64_t * ci,
                  unsigned int pos)
@@ -544,12 +554,12 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
   ASSERT(pos >= i);
 
   for (unsigned int j = i + 1; j < pos; j++) {
-    * ci = * ci - ((int64_t)Tqr[j] * 2 * (int64_t)H->h[j]);
+    * ci = * ci - ((int64_t)pseudo_Tqr[j] * 2 * (int64_t)H->h[j]);
     if (* ci >= (int64_t)ideal->ideal->r || * ci < 0) {
       * ci = * ci % (int64_t)ideal->ideal->r;
     }
   }
-  * ci = * ci + Tqr[pos];
+  * ci = * ci + pseudo_Tqr[pos];
   if (* ci >= (int64_t)ideal->ideal->r) {
     * ci = * ci - (int64_t)ideal->ideal->r;
   }
@@ -565,6 +575,24 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * Tqr,
   }
   int64_t ci_tmp = -k * (int64_t)ideal->ideal->r + * ci;
   ASSERT(ci_tmp >= lb);
+
+#ifndef NDEBUG
+  int64_t tmp_ci = ci_tmp;
+  tmp_ci = tmp_ci % (int64_t) ideal->ideal->r;
+  if (tmp_ci < 0) {
+    tmp_ci = tmp_ci + (int64_t) ideal->ideal->r;
+  }
+  int64_t tmp = 0;
+
+  for (unsigned int j = i + 1; j < H->t; j++) {
+    tmp = tmp + ((int64_t)pseudo_Tqr[j] * c->c[j]);
+    tmp = tmp % (int64_t) ideal->ideal->r;
+    if (tmp < 0) {
+      tmp = tmp + (int64_t) ideal->ideal->r;
+    }
+  }
+  ASSERT(tmp == tmp_ci);
+#endif
 
   sieve_ci(array, c, ideal, ci_tmp, H, i, number_c_l);
 }
@@ -630,8 +658,8 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     }
 #endif // TIMER_SIEVE
 
-    uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
-    compute_Tqr_1(Tqr, matrix, H->t, fb->factor_base_1[i]);
+    uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
+    compute_pseudo_Tqr_1(pseudo_Tqr, matrix, H->t, fb->factor_base_1[i]);
 
 #ifdef TIMER_SIEVE
     if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
@@ -646,7 +674,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     }
     int64_vector_setcoordinate(c, H->t - 1, 0);
 
-    if (Tqr[0] != 0) {
+    if (pseudo_Tqr[0] != 0) {
       unsigned int pos = 0;
 
       int64_t c0 = 0;
@@ -656,7 +684,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         int64_vector_setcoordinate(c, 1, c->c[1] - 1);
       }
       for (unsigned int j = 1; j < H->t; j++) {
-        c0 = c0 + (int64_t)Tqr[j] * c->c[j];
+        c0 = c0 + (int64_t)pseudo_Tqr[j] * c->c[j];
         if (c0 >= (int64_t)fb->factor_base_1[i]->ideal->r || c0 < 0) {
           c0 = c0 % (int64_t)fb->factor_base_1[i]->ideal->r;
         }
@@ -674,11 +702,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // TIMER_SIEVE
 
       pos = int64_vector_add_one_i(c, 1, H);
-      sieve_1(array, c, Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos);
+      sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos);
 
       for (uint64_t j = 1; j < number_c;  j++) {
         pos = int64_vector_add_one_i(c, 1, H);
-        sieve_1(array, c, Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos);
+        sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos);
       }
 
 #ifdef TIMER_SIEVE
@@ -700,7 +728,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #ifdef SIEVE_TQR
     else {
       unsigned int index = 1;
-      while (Tqr[index] == 0 && index < H->t) {
+      while (pseudo_Tqr[index] == 0 && index < H->t) {
         index++;
       }
 
@@ -712,7 +740,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
           number_c_l = number_c_l * (2 * H->h[j] + 1);
         }
 
-	sieve_ci(array, c, fb->factor_base_1[i], 0, H, index, number_c_l);
+        sieve_ci(array, c, fb->factor_base_1[i], 0, H, index, number_c_l);
       } else {
         int64_t ci = 0;
         if (index + 1 < H->t - 1) {
@@ -723,7 +751,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
         if (index < H->t - 1) {
           for (unsigned int j = index + 1; j < H->t; j++) {
-            ci = ci + (int64_t)Tqr[j] * c->c[j];
+            ci = ci + (int64_t)pseudo_Tqr[j] * c->c[j];
             if (ci >= (int64_t)fb->factor_base_1[i]->ideal->r || ci < 0) {
               ci = ci % (int64_t)fb->factor_base_1[i]->ideal->r;
             }
@@ -742,13 +770,13 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         }
         number_c_u = number_c_u / (2 * H->h[index] + 1);
 
-	unsigned int pos = 0;
+        unsigned int pos = 0;
         pos = int64_vector_add_one_i(c, index + 1, H);
-        sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
+        sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, index,
                 number_c_l, &ci, pos);
         for (uint64_t j = 1; j < number_c_u; j++) {
           pos = int64_vector_add_one_i(c, index + 1, H);
-          sieve_1(array, c, Tqr, fb->factor_base_1[i], H, index,
+          sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, index,
                   number_c_l, &ci, pos);
         }
       }
@@ -792,12 +820,12 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 /* #endif */
 
     int64_vector_clear(c);
-    free(Tqr);
+    free(pseudo_Tqr);
   }
 
 #ifdef TIMER_SIEVE
   printf("Bound: %d\n", TIMER_SIEVE);
-  printf("Build Tqr: %f\n", time_tqr);
+  printf("Build pseudo_Tqr: %f\n", time_tqr);
   printf("Perform sieve: %f\n", time_sieve);
 #endif // TIMER_SIEVE
 
