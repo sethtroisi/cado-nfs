@@ -1263,9 +1263,9 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     unsigned long llen = E_length - rlen;
 
 #if 1
-    /* Arrange so that we recurse on sizes which are multiples of 64. */
-    if (E_length > 64 && llen % 64 != 0) {
-        llen += 64 - (llen % 64);
+    /* Arrange so that we recurse on sizes which are multiples of ULONG_BITS. */
+    if (E_length > ULONG_BITS && llen % ULONG_BITS != 0) {
+        llen += ULONG_BITS - (llen % ULONG_BITS);
         rlen = E_length - llen;
     }
 #endif
