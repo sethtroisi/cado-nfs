@@ -20,11 +20,11 @@ using namespace std;
 #define SWAP_PI
 
 class ulmat_rowmajor {
-    unsigned int m, n;
+    unsigned int n;
     unsigned long * x;
     ulmat_rowmajor(ulmat_rowmajor const&) {}
 public:
-    ulmat_rowmajor(unsigned int m, unsigned int n) : m(m), n(n)
+    ulmat_rowmajor(unsigned int m, unsigned int n) : n(n)
     {
         x = new unsigned long[m*n];
         memset(x, 0, m*n*sizeof(unsigned long));
@@ -41,11 +41,11 @@ public:
 };
 
 class ulmat_colmajor {
-    unsigned int m, n;
+    unsigned int m;
     unsigned long * x;
     ulmat_colmajor(ulmat_colmajor const&) {}
 public:
-    ulmat_colmajor(unsigned int m, unsigned int n) : m(m), n(n)
+    ulmat_colmajor(unsigned int m, unsigned int n) : m(m)
     {
         x = new unsigned long[m*n];
         memset(x, 0, m*n*sizeof(unsigned long));
