@@ -40,7 +40,7 @@
 
 #ifdef TRACE_POS
 FILE * file;
-#endif
+#endif // TRACE_POS
 
 #ifdef NUMBER_HIT
 uint64_t number_of_hit = 0;
@@ -57,6 +57,10 @@ double norm_bound_sieve = 0;
 #ifdef MEAN_NORM
 double norm = 0;
 #endif // MEAN_NORM
+
+#ifdef ASSERT_SIEVE
+uint64_t index_old = 0;
+#endif // ASSERT_SIEVE
 
 /*
   Build the matrix Mq for an ideal (q, g) with deg(g) = 1. The matrix need Tq
@@ -134,6 +138,80 @@ void pre_computation(double * pre_compute, mpz_poly_srcptr f, unsigned int t)
   }
 }
 
+#ifdef MEAN_NORM
+void mean_norm(mpz_poly_srcptr f, int64_poly_srcptr a, double r)
+{
+  mpz_poly_t b;
+  mpz_poly_init(b, -1);
+  mpz_t res;
+  mpz_init(res);
+  int64_poly_to_mpz_poly(b, a);
+  mpz_poly_resultant(res, f, b);
+  mpz_abs(res, res);
+  norm = norm + mpz_get_d(res) / r;
+  mpz_poly_clear(b);
+  mpz_clear(res);
+}
+#endif // MEAN_NORM
+
+#ifdef TRACE_POS
+void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
+                    mpz_poly_srcptr f, double bound_resultant, int special_q,
+                    array_srcptr array)
+{
+  if (i == TRACE_POS) {
+    fprintf(file, "c = ");
+    int64_vector_fprintf(file, vector);
+    fprintf(file, "a = ");
+    int64_poly_fprintf(file, a);
+    fprintf(file, "f = ");
+    mpz_poly_fprintf(file, f);
+    mpz_t res;
+    mpz_init(res);
+    mpz_poly_t tmp;
+    mpz_poly_init(tmp, -1);
+    int64_poly_to_mpz_poly(tmp, a);
+    mpz_poly_resultant(res, f, tmp);
+    factor_t factor;
+    mpz_abs(res, res);
+    gmp_factorize(factor, res);
+    gmp_fprintf(file, "Resultant: %Zd\n", res);
+    fprintf(file, "Factorization: ");
+    factor_fprintf(file, factor);
+    factor_clear(factor);
+    mpz_clear(res);
+    if (special_q) {
+      fprintf(file, "Initialization (without special-q): %u\n",
+              (unsigned char) log2(bound_resultant));
+      fprintf(file, "Initialization (with special-q): %u\n", array->array[i]);
+    } else {
+      fprintf(file, "Initialization: %u\n", array->array[i]);
+    }
+    mpz_poly_clear(tmp);
+  }
+}
+#endif // TRACE_POS
+
+void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
+                    MAYBE_UNUSED int64_poly_srcptr a, MAYBE_UNUSED double r,
+                    MAYBE_UNUSED double bound_resultant,
+                    MAYBE_UNUSED uint64_t i,
+                    MAYBE_UNUSED int64_vector_srcptr vector,
+                    MAYBE_UNUSED array_srcptr array)
+{
+#ifdef MEAN_NORM
+  mean_norm(f, a, r);
+#endif // MEAN_NORM
+
+#ifdef MEAN_NORM_BOUND
+  norm_bound = norm_bound + bound_resultant / r;
+#endif // MEAN_NORM_BOUND
+
+#ifdef TRACE_POS
+  trace_pos_init(i, vector, a, f, bound_resultant, special_q, array);
+#endif // TRACE_POS
+}
+
 /*
   Compute the norm of a case in the array.
 
@@ -194,100 +272,11 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
   //WARNING: an assert here is necessary.
   if (special_q) {
     array->array[i] = (unsigned char)log2(bound_resultant) - ideal->log;
-
-#ifdef MEAN_NORM
-    mpz_poly_t b;
-    mpz_poly_init(b, -1);
-    mpz_t res;
-    mpz_init(res);
-    int64_poly_to_mpz_poly(b, a);
-    mpz_poly_resultant(res, f, b);
-    mpz_abs(res, res);
-    norm = norm + mpz_get_d(res) / (double)ideal->ideal->r;
-    mpz_poly_clear(b);
-    mpz_clear(res);
-#endif // MEAN_NORM
-
-#ifdef MEAN_NORM_BOUND
-    norm_bound = norm_bound + bound_resultant / (double)ideal->ideal->r;
-#endif // MEAN_NORM_BOUND
-
-#ifdef TRACE_POS
-    if (i == TRACE_POS) {
-      fprintf(file, "c = ");
-      int64_vector_fprintf(file, vector);
-      fprintf(file, "a = ");
-      int64_poly_fprintf(file, a);
-      fprintf(file, "f = ");
-      mpz_poly_fprintf(file, f);
-      mpz_t res;
-      mpz_init(res);
-      mpz_poly_t tmp;
-      mpz_poly_init(tmp, -1);
-      int64_poly_to_mpz_poly(tmp, a);
-      mpz_poly_resultant(res, f, tmp);
-      factor_t factor;
-      mpz_abs(res, res);
-      gmp_factorize(factor, res);
-      gmp_fprintf(file, "Resultant: %Zd\n", res);
-      fprintf(file, "Factorization: ");
-      factor_fprintf(file, factor);
-      factor_clear(factor);
-      mpz_clear(res);
-      fprintf(file, "Initialization (without special-q): %u\n",
-              (unsigned char) log2(bound_resultant));
-      fprintf(file, "Initialization (with special-q): %u\n", array->array[i]);
-      mpz_poly_clear(tmp);
-    }
-#endif
-
+    mode_init_norm(special_q, f, a, (double)ideal->ideal->r, bound_resultant, i,
+                   vector, array);
   } else {
     array->array[i] = (unsigned char) log2(bound_resultant);
-
-#ifdef MEAN_NORM
-    mpz_poly_t b;
-    mpz_poly_init(b, -1);
-    mpz_t res;
-    mpz_init(res);
-    int64_poly_to_mpz_poly(b, a);
-    mpz_poly_resultant(res, f, b);
-    mpz_abs(res, res);
-    norm = norm + mpz_get_d(res);
-    mpz_poly_clear(b);
-    mpz_clear(res);
-#endif // MEAN_NORM
-
-#ifdef MEAN_NORM_BOUND
-    norm_bound = norm_bound + bound_resultant;
-#endif // MEAN_NORM_BOUND
-
-#ifdef TRACE_POS
-    if (i == TRACE_POS) {
-      fprintf(file, "c = ");
-      int64_vector_fprintf(file, vector);
-      fprintf(file, "a = ");
-      int64_poly_fprintf(file, a);
-      fprintf(file, "f = ");
-      mpz_poly_fprintf(file, f);
-      mpz_t res;
-      mpz_init(res);
-      mpz_poly_t tmp;
-      mpz_poly_init(tmp, -1);
-      int64_poly_to_mpz_poly(tmp, a);
-      mpz_poly_resultant(res, f, tmp);
-      factor_t factor;
-      mpz_abs(res, res);
-      gmp_factorize(factor, res);
-      gmp_fprintf(file, "Norm: %Zd\n", res);
-      fprintf(file, "Factorization: ");
-      factor_fprintf(file, factor);
-      factor_clear(factor);
-      mpz_clear(res);
-      mpz_poly_clear(tmp);
-      fprintf(file, "Initialization: %u\n", array->array[i]);
-    }
-#endif
-
+    mode_init_norm(special_q, f, a, 1.0, bound_resultant, i, vector, array);
   }
 }
 
@@ -464,6 +453,99 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
   }
 }
 
+#ifdef ASSERT_SIEVE
+void assert_sieve(sieving_interval_srcptr H, uint64_t index,
+                  uint64_t number_element, mat_Z_srcptr matrix,
+                  mpz_poly_srcptr f, ideal_1_srcptr ideal,
+                  int64_vector_srcptr c)
+{
+  if (index_old == 0) {
+    ASSERT(index_old <= index);
+  } else {
+    ASSERT(index_old < index);
+  }
+  index_old = index;
+
+  mpz_vector_t v;
+  mpz_vector_init(v, H->t);
+  mpz_poly_t a;
+  mpz_poly_init(a, -1);
+  mpz_t res;
+  mpz_init(res);
+
+  array_index_mpz_vector(v, index, H, number_element);
+  mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
+  mpz_poly_resultant(res, a, f);
+  mpz_abs(res, res);
+  ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
+
+  if (c != NULL) {
+    mpz_vector_t v_tmp;
+    mpz_vector_init(v_tmp, c->dim);
+    int64_vector_to_mpz_vector(v_tmp, c);
+    ASSERT(mpz_vector_cmp(v, v_tmp) == 0);
+    mpz_vector_clear(v_tmp);
+  }
+
+  if (a->deg != -1) {
+    mpz_poly_t r;
+    mpz_poly_init(r, -1);
+    mpz_poly_t q;
+    mpz_poly_init(q, -1);
+    mpz_t p;
+    mpz_init(p);
+    mpz_set_uint64(p, ideal->ideal->r);
+
+    ASSERT(mpz_poly_div_qr(q, r, a, ideal->ideal->h, p));
+    ASSERT(r->deg == -1);
+    mpz_poly_clear(r);
+    mpz_poly_clear(q);
+    mpz_clear(p);
+  }
+
+  mpz_clear(res);
+  mpz_poly_clear(a);
+  mpz_vector_clear(v);
+}
+#endif // ASSERT_SIEVE
+
+#ifdef TRACE_POS
+void trace_pos_sieve(uint64_t index, ideal_1_srcptr ideal, array_srcptr array)
+{
+  if (index == TRACE_POS) {
+    fprintf(file, "The ideal is: ");
+    ideal_fprintf(file, ideal->ideal);
+    fprintf(file, "log: %u\n", ideal->log);
+    fprintf(file, "The new value of the norm is %u.\n", array->array[index]);
+  }
+}
+#endif // TRACE_POS
+
+void mode_sieve(MAYBE_UNUSED sieving_interval_srcptr H,
+                MAYBE_UNUSED uint64_t index,
+                MAYBE_UNUSED array_srcptr array,
+                MAYBE_UNUSED mat_Z_srcptr matrix,
+                MAYBE_UNUSED mpz_poly_srcptr f,
+                MAYBE_UNUSED ideal_1_srcptr ideal,
+                MAYBE_UNUSED int64_vector_srcptr c,
+                MAYBE_UNUSED uint64_t number_c_l,
+                MAYBE_UNUSED unsigned int nbint)
+{
+#ifdef ASSERT_SIEVE
+  assert_sieve(H, index, array->number_element, matrix, f, ideal, c);
+#endif // ASSERT_SIEVE
+
+#ifdef NUMBER_HIT
+  if (nbint) {
+    number_of_hit = number_of_hit + number_c_l;
+  }
+#endif // NUMBER_HIT
+
+#ifdef TRACE_POS
+  trace_pos_sieve(index, ideal, array);
+#endif // TRACE_POS
+}
+
 /*
   Sieve for a special-q of degree 1 and Tqr with a zero coefficient at the
   first place. This function sieve a c in the q lattice.
@@ -491,80 +573,19 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
 
   uint64_t index = 0;
 
+#ifdef ASSERT_SIEVE
+  index_old = 0;
+#endif // ASSERT_SIEVE
+
   if (ci <= (int64_t)H->h[i]) {
     int64_vector_setcoordinate(c, i, ci);
     array_int64_vector_index(&index, c, H, array->number_element);
     array->array[index] = array->array[index] - ideal->log;
-
-#ifdef ASSERT_SIEVE
-    mpz_vector_t v;
-    mpz_vector_init(v, H->t);
-    mpz_poly_t a;
-    mpz_poly_init(a, -1);
-    mpz_t res;
-    mpz_init(res);
-
-    array_index_mpz_vector(v, index, H, array->number_element);
-    mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
-    mpz_poly_resultant(res, a, f);
-    mpz_abs(res, res);
-    ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
-
-    mpz_vector_t v_tmp;
-    mpz_vector_init(v_tmp, c->dim);
-    int64_vector_to_mpz_vector(v_tmp, c);
-    ASSERT(mpz_vector_cmp(v, v_tmp) == 0);
-    mpz_vector_clear(v_tmp);
-
-    mpz_clear(res);
-    mpz_poly_clear(a);
-    mpz_vector_clear(v);
-#endif // ASSERT_SIEVE
-
-#ifdef NUMBER_HIT
-    number_of_hit = number_of_hit + number_c_l;
-#endif // NUMBER_HIT
-
-#ifdef TRACE_POS
-    if (index == TRACE_POS) {
-      fprintf(file, "The ideal is: ");
-      ideal_fprintf(file, ideal->ideal);
-      fprintf(file, "log: %u\n", ideal->log);
-      fprintf(file, "The new value of the norm is %u.\n", array->array[index]);
-    }
-#endif
+    mode_sieve(H, index, array, matrix, f, ideal, c, number_c_l, 1);
 
     for (uint64_t k = 1; k < number_c_l; k++) {
       array->array[index + k] = array->array[index + k] - ideal->log;
-
-#ifdef ASSERT_SIEVE
-      mpz_vector_t v;
-      mpz_vector_init(v, H->t);
-      mpz_poly_t a;
-      mpz_poly_init(a, -1);
-      mpz_t res;
-      mpz_init(res);
-
-      array_index_mpz_vector(v, index + k, H, array->number_element);
-      mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
-      mpz_poly_resultant(res, a, f);
-      mpz_abs(res, res);
-      ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
-
-      mpz_clear(res);
-      mpz_poly_clear(a);
-      mpz_vector_clear(v);
-#endif // ASSERT_SIEVE
-
-#ifdef TRACE_POS
-      if (index + k == TRACE_POS) {
-        fprintf(file, "The ideal is: ");
-        ideal_fprintf(file, ideal->ideal);
-        fprintf(file, "log: %u\n", ideal->log);
-        fprintf(file, "The new value of the norm is %u.\n",
-                array->array[index + k]);
-      }
-#endif
+      mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l, 0);
     }
 
     int64_t tmp = ci;
@@ -574,73 +595,13 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
       index = index + ideal->ideal->r * number_c_l;
 
       array->array[index] = array->array[index] - ideal->log;
-
-#ifdef ASSERT_SIEVE
-      mpz_vector_t v;
-      mpz_vector_init(v, H->t);
-      mpz_poly_t a;
-      mpz_poly_init(a, -1);
-      mpz_t res;
-      mpz_init(res);
-
-      array_index_mpz_vector(v, index, H, array->number_element);
-      mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
-      mpz_poly_resultant(res, a, f);
-      mpz_abs(res, res);
-      ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
-
-      mpz_clear(res);
-      mpz_poly_clear(a);
-      mpz_vector_clear(v);
-#endif // ASSERT_SIEVE
-
-#ifdef NUMBER_HIT
-      number_of_hit = number_of_hit + number_c_l;
-#endif // NUMBER_HIT
-
-#ifdef TRACE_POS
-      if (index == TRACE_POS) {
-        fprintf(file, "The ideal is: ");
-        ideal_fprintf(file, ideal->ideal);
-        fprintf(file, "log: %u\n", ideal->log);
-        fprintf(file, "The new value of the norm is %u.\n",
-                array->array[index]);
-      }
-#endif
+      mode_sieve(H, index, array, matrix, f, ideal, NULL, number_c_l, 0);
 
       for (uint64_t k = 1; k < number_c_l; k++) {
         array->array[index + k] = array->array[index + k] - ideal->log;
-
-#ifdef ASSERT_SIEVE
-        mpz_vector_t v;
-        mpz_vector_init(v, H->t);
-        mpz_poly_t a;
-        mpz_poly_init(a, -1);
-        mpz_t res;
-        mpz_init(res);
-
-        array_index_mpz_vector(v, index + k, H, array->number_element);
-        mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
-        mpz_poly_resultant(res, a, f);
-        mpz_abs(res, res);
-        ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
-
-        mpz_clear(res);
-        mpz_poly_clear(a);
-        mpz_vector_clear(v);
-#endif // ASSERT_SIEVE
-
-#ifdef TRACE_POS
-        if (index + k == TRACE_POS) {
-          fprintf(file, "The ideal is: ");
-        ideal_fprintf(file, ideal->ideal);
-        fprintf(file, "log: %u\n", ideal->log);
-          fprintf(file, "The new value of the norm is %u.\n",
-                  array->array[index + k]);
-        }
-#endif
-
+        mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l, 0);
       }
+
       tmp = tmp + (int64_t)ideal->ideal->r;
     }
   }
@@ -693,7 +654,7 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
     }
   }
   ASSERT(tmp == tmp_ci);
-#endif
+#endif // NDEBUG
 
   sieve_ci(array, c, ideal, ci_tmp, H, i, number_c_l, matrix, f);
 }
@@ -730,7 +691,7 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
       ideal_u_fprintf(file, ideal, H->t);
       fprintf(file, "The new value of the norm is %u.\n", array->array[index]);
     }
-#endif
+#endif // TRACE_POS
   }
 
   for (int row = 0; row < ideal->ideal->h->deg;
@@ -922,7 +883,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 /*       mpz_clear(g0); */
 /*     } */
 /*     mpz_clear(mod); */
-/* #endif */
+/* #endif // PROJECTIVE_ROOT */
 
     int64_vector_clear(c);
     free(pseudo_Tqr);
@@ -1390,7 +1351,7 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
   file = fopen("TRACE_POS.txt", "w+");
   fprintf(file, "TRACE_POS: %d\n", TRACE_POS);
-#endif
+#endif // TRACE_POS
 
   double sec = seconds();
   makefb(fb, f, fbb, H->t, lpb, V);
@@ -1424,25 +1385,25 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
         fprintf(file, "Special-q: q: %" PRIu64 ", g: ", q);
         mpz_poly_fprintf(file, l->factors[i]->f);
-#endif
+#endif // TRACE_POS
 
         sec = seconds();
         sec_tot = sec;
 
-        //LLL part
+        /* LLL part */
         build_Mq_ideal_1(matrix, special_q);
 
 #ifdef TRACE_POS
         fprintf(file, "Mq:\n");
         mat_Z_fprintf(file, matrix);
-#endif
+#endif // TRACE_POS
 
         mat_Z_LLL_transpose(matrix);
 
 #ifdef TRACE_POS
         fprintf(file, "MqLLL:\n");
         mat_Z_fprintf(file, matrix);
-#endif
+#endif // TRACE_POS
 
 #ifdef MEAN_NORM_BOUND
         double * norms_bound = malloc(sizeof(double) * V);
@@ -1486,7 +1447,7 @@ int main(int argc, char * argv[])
 
 #ifdef TRACE_POS
             fprintf(file, "********************\n");
-#endif
+#endif // TRACE_POS
         }
 
         sec = seconds();
@@ -1537,7 +1498,7 @@ int main(int argc, char * argv[])
 
 #ifdef TRACE_POS
         fprintf(file, "----------------------------------------\n");
-#endif
+#endif // TRACE_POS
 
       }
     }
@@ -1551,7 +1512,7 @@ int main(int argc, char * argv[])
 
 #ifdef TRACE_POS
   fclose(file);
-#endif
+#endif // TRACE_POS
 
   mat_Z_clear(matrix);
   for (unsigned int i = 0; i < V; i++) {
