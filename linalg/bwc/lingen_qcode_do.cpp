@@ -3,6 +3,7 @@
 #include <ostream>
 #include <sstream>
 #include <algorithm>
+#include <vector>
 
 #include "lingen_mat_types.hpp"
 #include "lingen_qcode.h"
