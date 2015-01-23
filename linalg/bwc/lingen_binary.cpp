@@ -44,9 +44,7 @@
 #include "tree_stats.h"
 #include "logline.h"
 
-#ifdef  USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
 #include "lingen_qcode.h"
-#endif
 
 #include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
@@ -67,6 +65,43 @@ unsigned int cantor_threshold = UINT_MAX;
 
 
 tree_stats stats;
+
+bool polmat::critical = false;
+std::ostream& operator<<(std::ostream& o, polmat const& E)/*{{{*/
+{
+    o << "dims " << E.nrows << " " << E.ncols << " " << E.ncoef << "\n";
+    
+    unsigned long pbits = BITS_TO_WORDS(E.ncoef, ULONG_BITS) * ULONG_BITS;
+    size_t strsize = pbits / 4 + 32;
+    char * str = new char[strsize];
+    for(unsigned int i = 0 ; i < E.nrows ; i++) {
+        for(unsigned int j = 0 ; j < E.ncols ; j++) {
+            const unsigned long * p = E.poly(i,j);
+            *str='\0';
+            char * q = str;
+            unsigned long nbits = 1 + E.deg(j);
+            for(unsigned long top = pbits ; top ; ) {
+                top -= ULONG_BITS;
+                unsigned long w = 0;
+                if (top < nbits) {
+                    w = *p++;
+                    if (nbits-top < ULONG_BITS) {
+                        w &= (1UL << (nbits-top)) - 1;
+                    }
+                }
+                q += snprintf(q, strsize - (q - str),
+                        (ULONG_BITS == 64) ?  "%016lx" :
+                        ((ULONG_BITS == 32) ?  "%08lx" : ",%lx"),
+                        w);
+                ASSERT_ALWAYS((q - str) < (ptrdiff_t) strsize);
+            }
+            o << str << "\n";
+        }
+        o << "\n";
+    }
+    delete str;
+    return o;
+}/*}}}*/
 
 /* {{{ macros used here only -- could be bumped to macros.h if there is
  * need.
@@ -760,150 +795,6 @@ void print_deltas()/*{{{*/
     printf("\n");
 }/*}}}*/
 
-static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
-{
-    /* Sort the columns. It might seem merely cosmetic and useless to
-     * sort w.r.t both the global and local nominal degrees. In fact, it
-     * is crucial for the correctness of the computations. (Imagine a
-     * 2-step increase, starting with uneven global deltas, and hitting
-     * an even situation in the middle. One has to sort out the local
-     * deltas to prevent trashing the whole picture).
-     *
-     * The positional sort, however, *is* cosmetic (makes debugging
-     * easier).
-     */
-    using namespace std;
-    using namespace globals;
-    typedef pair<pair<unsigned int,unsigned int>, int> corresp_t;
-    vector<corresp_t> corresp(m+n);
-    for(unsigned int i = 0 ; i < m + n ; i++) {
-        int pideg = PI.deg(i);
-        if (pideg == -1) { /* overflowed ! */
-            pideg = INT_MAX;
-        }
-        corresp[i] = make_pair(make_pair(delta[i],pideg), i);
-    }
-    sort(corresp.begin(), corresp.end(), less<corresp_t>());
-    unsigned int p[m+n];
-    for(unsigned int i = 0 ; i < m + n ; i++) {
-        p[corresp[i].second] = i;
-    }
-    permute(delta, p);
-    permute(chance_list, p);
-    if (piv) {
-        for(unsigned int i = 0 ; i < m ; i++) {
-            piv[i] = p[piv[i]];
-        }
-    }
-    PI.perm(p);
-    e0.perm(p);
-}/*}}}*/
-
-static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
-{
-    /* Do one step of (column) gaussian elimination on e0. The columns
-     * are assumed to be in the exact order that corresponds to the
-     * ordering of the columns of PI (therefore relative to delta)
-     */
-
-    /* Note that we do *NOT* modify E. It seems to be the fastest option,
-     * although the other deserves being investigated as well (see
-     * old/lingen2.c, there are two versions of the quadratic algorithm).
-     */
-    unsigned int i,j,k;
-    unsigned int rank;
-    rank = 0 ;
-
-    using namespace globals;
-
-    /*
-    std::cout << "Input matrix\n";
-    dbmat(&e0);
-    */
-
-    std::vector<unsigned int> overflowed;
-
-    for(j = 0 ; j < e0.ncols ; j++) {
-        /* Find the pivot inside the column. */
-        i = e0.ffs(j);
-        if (i == UINT_MAX)
-            continue;
-        ASSERT(rank < e0.nrows && rank < e0.ncols);
-        // std::cout << fmt("col % is the %-th pivot\n") % j % rank;
-        piv[rank++] = j;
-        /* Cancel this coeff in all other columns. */
-        for(k = j + 1 ; k < e0.ncols ; k++) {
-            /* TODO : Over the binary field, this branch avoiding trick
-             * could most probably be deleted, I doubt it gains anything. */
-            unsigned long c = e0.coeff(i,k);
-            /* add c times column j to column k */
-            e0.acol(k,j,i,c);
-            // E.acol(k,j,c);
-            // This one is tempting, but it's a wrong assert.
-            // ASSERT(PI.deg(j) <= PI.deg(k));
-            // ASSERT(delta[j] <= delta[k]);
-            ASSERT(std::make_pair(delta[j],PI.deg(j)) <= std::make_pair(delta[k],PI.deg(k)));
-            PI.acol(k,j,c);
-        }
-        PI.xmul_col(j);
-        // E.xmul_col(j);
-        delta[j]++;
-        if (PI.deg(j) >= (int) PI.ncoef - 1) {
-            overflowed.push_back(j);
-            /* Then don't hesitate. Set the degree to -1 altoghether.
-             * There's not much meaning remaining in this vector anyway,
-             * so we'd better trash it */
-        }
-    }
-    ASSERT_ALWAYS (rank == m);
-
-    /* Normally our bound is set up so that we're assured to have at
-     * least one generator found.
-     */
-    if (!overflowed.empty()) {
-        std::string s = intlist_to_string(overflowed.begin(), overflowed.end());
-
-        printf("%-8u** %zu cols (%s) exceed maxdeg=%ld (normal at the end) **\n",
-                t, overflowed.size(), s.c_str(), PI.ncoef - 1);
-        unsigned ctot = 0;
-        for (unsigned int j = 0; j < m + n; j++) {
-            ctot += chance_list[j];
-        }
-        ASSERT_ALWAYS(ctot > 0);
-    }
-
-    return !overflowed.empty();
-    /*
-    std::cout << "Invertible e0 matrix\n";
-    for(unsigned int i = 0 ; i < m ; i++) {
-        for(unsigned int j = 0 ; j < m ; j++) {
-            std::cout << e0.coeff(i,piv[j]);
-        }
-        std::cout << "\n";
-    }
-    std::cout << "[ rows";
-    for(unsigned int j = 0 ; j < m ; j++) {
-        std::cout << " " << piv[j];
-    }
-    std::cout << " ]\n";
-    */
-
-    /*
-    std::cout << "Invertible e0 matrix\n";
-    for(unsigned int i = 0 ; i < m ; i++) {
-        for(unsigned int j = 0 ; j < m ; j++) {
-            std::cout << e0.coeff(i,piv[j]);
-        }
-        std::cout << "\n";
-    }
-    std::cout << "[ rows";
-    for(unsigned int j = 0 ; j < m ; j++) {
-        std::cout << " " << piv[j];
-    }
-    std::cout << " ]\n";
-    */
-}/*}}}*/
-
 #if 0/* {{{ */
 const char *pi_meta_filename = "pi-%d-%d";
 
@@ -1161,139 +1052,6 @@ static void bw_traditional_algo_2(struct e_coeff * ec, int * delta,
 }
 #endif/*}}}*/
 
-/* This function returns the coefficient of degree t (0 or 1) in a*b,
-   where a is a polynomial over GF(2) of degree da, and b is a polynomial
-   over GF(2) of degree db.
-   Note: it seems in most cases less than 64 values of a and b are used,
-   thus one might extract the corresponding 64-bits of a and b (possibly
-   with shifts) and use PCLMULQDQ or the corresponding GF2X routine.
-*/
-static unsigned long extract_coeff_degree_t(unsigned int t, unsigned long const * a, unsigned int da, unsigned long const * b, unsigned int db)/*{{{*/
-{
-    unsigned long c = 0;
-    /*
-    0 <= s <= t
-    0 <= s <= na
-    0 <= t-s <= nb
-    t-nb <= s <= t
-    */
-    unsigned int high = std::min(t, da);
-    unsigned int low = std::max(0u, t - db);
-    for(unsigned int s = low ; s <= high ; s++) {
-        unsigned int si = s / ULONG_BITS;
-        unsigned int ss = s % ULONG_BITS;
-        unsigned int ri = (t-s) / ULONG_BITS;
-        unsigned int rs = (t-s) % ULONG_BITS;
-        c ^= a[si] >> ss & b[ri] >> rs;
-    }
-    return c & 1UL;
-}/*}}}*/
-
-
-static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigned int piv[], polmat const& PI)/*{{{*/
-{
-    using namespace std;
-    using namespace globals;
-    vector<bool> known(m+n,false);
-    if (piv != NULL) {
-        for(unsigned int i = 0 ; i < m ; i++)
-            known[piv[i]] = true;
-    }
-
-    vector<unsigned int> z;
-
-    /* Note 1: this routine is not optimal for locality. It would be better
-       to first loop on i, then k, then j. But then the if (known[j]) continue
-       would be in the inner loop. Otherwise first loop on j, then k, then i.
-       Note 2: the inner routine extract_coeff_degree_t() requires to reverse
-       the coefficients of PI.poly(k, j) [or E.poly(i, k), since the popcount
-       is symmetrical]. If we first loop on (i,k) or (j,k), then we could
-       precompute the reverse polynomial, and give it to the inner routine,
-       which would then just perform a xor of the relevant bit part, and a
-       popcount. */
-    for(unsigned int j = 0 ; j < m+n ; j++) {
-        if (known[j]) continue;
-        e0.zcol(j);
-        unsigned long some_nonzero = 0;
-        for(unsigned int i = 0 ; i < m ; i++) {
-            unsigned long c = 0;
-            for(unsigned int k = 0 ; k < m + n ; k++) {
-                c ^= extract_coeff_degree_t(dt,
-                        E.poly(i, k), E.ncoef + 1,
-                        PI.poly(k, j), PI.deg(j));
-            }
-            e0.addcoeff(i,j,c);
-            some_nonzero |= c;
-        }
-        if (!some_nonzero) {
-            z.push_back(j);
-        }
-    }
-    vector<unsigned int> ncha(m + n, 0);
-    if (z.empty()) {
-        chance_list.swap(ncha);
-    } else {
-        for(unsigned int i = 0 ; i < z.size() ; i++) {
-            ++ncha[z[i]];
-        }
-
-        /* resets the global chance_list counter */
-        for(unsigned int i = 0 ; i < m + n ; i++) {
-            if (ncha[i] == 0) {
-                chance_list[i] = 0;
-            } else {
-                chance_list[i] += ncha[i];
-            }
-        }
-
-        printf("%-8u%zucols=0:", tstart + dt, z.size());
-
-        vector<pair<unsigned int, unsigned int> > zz;
-        for(unsigned int i = 0 ; i < z.size() ; i++) {
-            zz.push_back(make_pair(z[i], chance_list[z[i]]));
-        }
-
-        // Now print this out more nicely.
-        sort(zz.begin(),zz.end());
-        for( ; zz.size() ; ) {
-            unsigned int mi = UINT_MAX;
-            for(unsigned int i = 0 ; i < zz.size() ; i++) {
-                if (zz[i].second < mi) {
-                    mi = zz[i].second;
-                }
-            }
-            printf(" [");
-            for(unsigned int i = 0 ; i < zz.size() ; ) {
-                unsigned int j;
-                for(j = i; j < zz.size() ; j++) {
-                    if (zz[j].first-zz[i].first != j-i) break;
-                }
-                if (i) printf(",");
-                if (zz[i].first == zz[j-1].first - 1) {
-                    printf("%u,%u", zz[i].first, zz[j-1].first);
-                } else if (zz[i].first < zz[j-1].first) {
-                    printf("%u..%u", zz[i].first, zz[j-1].first);
-                } else {
-                    printf("%u", zz[i].first);
-                }
-                i = j;
-            }
-            printf("]");
-            if (mi > 1)
-                printf("*%u",mi);
-
-            vector<pair<unsigned int, unsigned int> > zz2;
-            for(unsigned int i = 0 ; i < zz.size() ; i++) {
-                if (zz[i].second > mi) {
-                    zz2.push_back(make_pair(zz[i].first,zz[i].second));
-                }
-            }
-            zz.swap(zz2);
-        }
-        printf("\n");
-    }
-}/*}}}*/
-
 static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
 {
     using namespace globals;
@@ -1328,7 +1086,6 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     using namespace std;
     tree_stats_enter(stats, __func__, E.ncoef);
 
-    unsigned int piv[m];
     unsigned int deg = E.ncoef - 1;
     for(unsigned int j = 0 ; j < E.ncols ; j++) {
         E.deg(j) = deg;
@@ -1338,84 +1095,48 @@ static bool go_quadratic(polmat& pi)/*{{{*/
 #ifdef VERBOSE_4PAUL
     cout << "input go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
     cout << E << "\n";
+    cout << "delta";
+    copy(delta.begin(), delta.end(), ostream_iterator<cout>(" "));
+    cout << "\n";
+    cout << "ch";
+    copy(delta.begin(), delta.end(), ostream_iterator<cout>(" "));
+    cout << "\n";
     double ttq = -seconds();
 #endif
 
-#ifdef  USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
-    lingen_qcode_data qq;
-
-    lingen_qcode_init(qq, E.nrows, E.ncols, E.ncoef, tmp_pi.ncoef);
-    for(unsigned int i = 0 ; i < E.nrows ; i++) {
-        for(unsigned int j = 0 ; j < E.ncols ; j++) {
-            lingen_qcode_hook_input(qq, i, j, E.poly(i,j));
-        }
-    }
-    for(unsigned int i = 0 ; i < E.ncols ; i++) {
-        for(unsigned int j = 0 ; j < E.ncols ; j++) {
-            lingen_qcode_hook_output(qq, i, j, tmp_pi.poly(i,j));
-        }
-    }
-    lingen_qcode_hook_delta(qq, delta);
-    lingen_qcode_do(qq);
-    for(unsigned int j = 0 ; j < tmp_pi.ncols ; j++) {
-        tmp_pi.deg(j) = lingen_qcode_output_column_length(qq, j);
-    }
-    lingen_qcode_clear(qq);
-    pi.swap(tmp_pi);
-
-#else   /* USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE */
-
-    for(unsigned int i = 0 ; i < m + n ; i++) {
-        tmp_pi.addcoeff(i,i,0,1UL);
-        tmp_pi.deg(i) = 0;
-    }
-
-    rearrange_ordering(tmp_pi, NULL);
-
-    unsigned int tstart = t;
     bool finished = false;
-    for (unsigned int dt = 0; !finished && dt <= deg ; dt++) {
-#ifdef  VERBOSE
-        double delta;
-        delta = seconds() - start_time;
-        double percent = (double) dt / (deg + 1);
-        percent = percent * percent;
-        double estim_final = delta / percent;
-        percent *= 100.0;
-        printf("%5.0f / est %-7.0f (%2.0f%%) ",
-                delta, estim_final, percent);
-        print_deltas();
-#endif
-	extract_coeff_degree_t(tstart, dt, dt ? piv : NULL, tmp_pi);
-        finished = gauss(piv, tmp_pi);
-        rearrange_ordering(tmp_pi, piv);
-        t++;
-        // if (t % 60 < 10 || deg-dt < 30)
-        // write_pi(tmp_pi,tstart,t);
+
+    {
+        lingen_qcode_data qq;
+        lingen_qcode_init(qq, E.nrows, E.ncols, E.ncoef, tmp_pi.ncoef);
+        for(unsigned int i = 0 ; i < E.nrows ; i++) {
+            for(unsigned int j = 0 ; j < E.ncols ; j++) {
+                lingen_qcode_hook_input(qq, i, j, E.poly(i,j));
+            }
+        }
+        for(unsigned int i = 0 ; i < E.ncols ; i++) {
+            for(unsigned int j = 0 ; j < E.ncols ; j++) {
+                lingen_qcode_hook_output(qq, i, j, tmp_pi.poly(i,j));
+            }
+        }
+        unsigned int vdelta[m + n];
+        unsigned int vch[m + n];
+        copy(delta.begin(), delta.end(), vdelta);
+        copy(chance_list.begin(), chance_list.end(), vch);
+        lingen_qcode_hook_delta(qq, vdelta);
+        lingen_qcode_hook_chance_list(qq, vch);
+        qq->t = t;
+        lingen_qcode_do(qq);
+        finished = qq->t < t + qq->length;
+        t = qq->t;
+        for(unsigned int j = 0 ; j < tmp_pi.ncols ; j++) {
+            tmp_pi.deg(j) = lingen_qcode_output_column_length(qq, j);
+        }
+        copy(vdelta, vdelta + m + n, delta.begin());
+        copy(vch, vch + m + n, chance_list.begin());
+        lingen_qcode_clear(qq);
     }
     pi.swap(tmp_pi);
-#ifdef  DO_EXPENSIVE_CHECKS
-        write_pi(pi,tstart,t);
-#else
-    // if (bw->checkpoints) write_pi(pi,tstart,t);
-#endif
-
-#ifdef  VERBOSE
-    print_deltas();
-#endif
-
-#ifdef  DO_EXPENSIVE_CHECKS
-    printf("Checking\n");
-    multiply_slow(E_saved,E_saved,pi);
-    unsigned long v = E_saved.valuation();
-    ASSERT(v == t-tstart);
-    E_saved.xdiv_resize(t-tstart, E_saved.ncoef-(t-tstart));
-    for (uint j = 0; j < E_saved.ncols; j++) {
-        E_saved.setdeg(j);
-    }
-#endif
-
-#endif  /* USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE */
 
 #ifdef VERBOSE_4PAUL
     ttq += seconds();
@@ -1483,11 +1204,6 @@ struct recursive_tree_timer_t {
 
         spent[level].proper += ptime;
 
-#if 0
-        /* tree_stats is much nicer, so we get rid of this. */
-        double pct_loc = spent[level].step / (double) (1 << level);
-#endif
-
         /* make up some guess about the total time of all levels */
         unsigned int outermost = level;
         for(unsigned int back = 0 ; back <= level ; back++) {
@@ -1509,41 +1225,6 @@ struct recursive_tree_timer_t {
             spent_above += spent[i].proper;
         }
 
-#if 0
-        /* tree_stats is much nicer, so we get rid of this. */
-        bool leaf = level == spent.size() - 1;
-
-        printf("%-8u", t);
-        /*
-        if (leaf) {
-            printf(" %.2f", ptime);
-        } else {
-            printf(" %.2f+%.2f", ptime, children);
-        }
-        */
-        // printf(" (total %.2f)\n", spent_tot);
-        // printf("      est:");
-        char * buf;
-        int rc = 0;
-        if (leaf) {
-            rc = asprintf(&buf, "[%u]: %.1f/%.1f",
-                    level, spent[level].proper, spent[level].proper / pct_loc);
-            ASSERT_ALWAYS(rc >= 0);
-        } else {
-            rc = asprintf(&buf, "[%u,%u+]: %.1f/%.1f,%.1f",
-                    level, level, spent[level].proper, spent[level].proper / pct_loc,
-                    estim_above);
-            ASSERT_ALWAYS(rc >= 0);
-        }
-        printf("%-36s", buf);
-        free(buf);
-        rc = asprintf(&buf, "[%u+]: %.1f/%.1f (%.0f%%)",
-                outermost, spent_tot, estim_tot, 100.0 * spent_tot/estim_tot);
-        ASSERT_ALWAYS(rc >= 0);
-        printf("%-27s", buf);
-            free(buf);
-        printf("\n");
-#endif
     }
     void final_info()
     {
@@ -1580,6 +1261,14 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     unsigned long E_length = E.ncoef;
     unsigned long rlen = E_length / 2;
     unsigned long llen = E_length - rlen;
+
+#if 0
+    /* Arrange so that we recurse on sizes which are multiples of 64. */
+    if (E_length > 64 && llen % 64 != 0) {
+        llen += 64 - (llen % 64);
+        rlen = E_length - llen;
+    }
+#endif
 
     ASSERT(llen && rlen && llen + rlen == E_length);
 

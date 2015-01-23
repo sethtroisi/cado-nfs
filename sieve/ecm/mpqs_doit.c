@@ -27,6 +27,7 @@
 #include "timing.h"
 #include "macros.h"
 #include "mod_ul_default.h"
+#include "modredc_ul.h"
 #include "gmp_aux.h"
 
 typedef struct {
@@ -34,7 +35,6 @@ typedef struct {
   unsigned int r;      /* root of x^2 = k*N (mod p) */
   uint64_t invp;       /* 1/p mod 2^64, needed for trial division */
   unsigned char logp;  /* log(p) / log(radix), needed for sieve */
-  unsigned long q;     /* 1/p mod sqrt(a) */
   unsigned long invp2; /* floor(ULONG_MAX/p), needed for trial division */
   unsigned int Mp;     /* M mod p */
 } fb_t;
@@ -53,10 +53,10 @@ typedef hash_struct hash_t[1];
 static unsigned char isprime_table[] = {
 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0,
 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
-0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 
+0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0,
 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
 
-static const size_t isprime_table_size = 
+static const size_t isprime_table_size =
     sizeof(isprime_table) / sizeof(isprime_table[0]);
 
 static int
@@ -86,7 +86,7 @@ mod_pow_uint64 (uint64_t b, uint64_t e, uint64_t n)
       f <<= 1;
       y = (y * y) % n;
     }
-  
+
   return r;
 }
 
@@ -108,7 +108,7 @@ tonelli_shanks (uint64_t rr, uint64_t p)
 
   /* write p-1 = q*2^s with q odd */
   for (q = p-1, s = 0; (q&1) == 0; q/=2, s++);
-  
+
   zz = 1;
   i = 1;
   do {
@@ -138,44 +138,6 @@ tonelli_shanks (uint64_t rr, uint64_t p)
   hh = (hh * delta) % p;
 
   return hh;
-}
-
-/* q[i] <- 1/p[i] mod a for 0 <= i < n, using batch inversion.
-   Assume inva = 1/a mod 2^K where K is the number of bits of an unsigned long.
-   Assumes a*p[i] and a^2 fit into an unsigned long.
- */
-static void
-batch_invert (fb_t *F, long n, unsigned long a, unsigned long inva)
-{
-  long i;
-  unsigned long t, u;
-  modulus_t aa;
-  residueul_t uu;
-
-  modul_initmod_ul (aa, a);
-  F[0].q = F[0].p;
-  for (i = 1; i < n; i++)
-    F[i].q = (F[i-1].q * F[i].p) % a;
-  /* now q[i] = p[1] * p[2] * ... * p[i] mod a */
-  modul_init (uu, aa);
-  modul_set_ul (uu, F[n-1].q, aa);
-  modul_inv (uu, uu, aa);
-  u = mod_get_ul (uu, aa);
-  modul_clear (uu, aa);
-  for (i = n - 1; i > 0; i--)
-    {
-      /* invariant: u = 1/(p[1] * ... * p[i]) mod a */
-      t = (u * F[i-1].q) % a;
-      /* now t = 1/p[i] mod a, thus t*p[i] + k*a = 1 */
-      t = t * F[i].p - 1;
-      /* divide by a */
-      t = t * inva;
-      ASSERT (0 < t && t < F[i].p);
-      F[i].q = F[i].p - t;
-      u = (u * F[i].p) % a;
-    }
-  F[0].q = u;
-  modul_clearmod (aa);
 }
 
 /* Given k1 containing initially r such that r^2 = N (mod p),
@@ -748,7 +710,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_t N, *Mat, *X, *Y;
   unsigned char *S, *T, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
-  unsigned long p, k, Nbits, M, i, wrel, L = 0;
+  unsigned long p, k, Nbits, M, i, wrel, L = 0, *P, *Q;
   long j, nrel = 0, lim, ncolw = 0, ncol;
   mpz_t a, b, c, sqrta, r;
   double radix, logradix = 0;
@@ -795,6 +757,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   /* compute factor base */
   F = malloc (ncol * sizeof (fb_t));
+  P = malloc (ncol * sizeof (unsigned long));
+  Q = malloc (ncol * sizeof (unsigned long));
   W = malloc ((ncol + 1) * sizeof (unsigned short));
   /* a prime p can appear in x^2 mod N only if p is a square modulo N */
   mpz_ui_pow_ui (b, 2, 64);
@@ -806,7 +770,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
      /* a prime p can be in the factor base only if N is a square mod p */
       if (p == 2 || mpz_jacobi (N, a) != -1)
         {
-          F[j].p = p;
+          F[j].p = P[j] = p;
           prime_index[p] = j;
           for (int k = p - 1; k >= 0 && prime_index[k] == 0; k--)
             prime_index[k] = j;
@@ -905,17 +869,13 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 #ifdef TRACE
   gmp_printf ("a=%Zd b=%Zd\n", a, b);
 #endif
-  unsigned long aa, bb, inva, sqrtaa;
+  unsigned long aa, bb, sqrtaa;
   ASSERT (mpz_fits_ulong_p (a));
   aa = mpz_get_ui (a);
   ASSERT (mpz_fits_ulong_p (b));
   bb = mpz_get_ui (b);
   sqrtaa = mpz_get_ui (sqrta);
   aa = sqrtaa * sqrtaa;
-  /* inva <- 1/sqrta mod (unsigned long) */
-  mpz_ui_pow_ui (r, 2, sizeof (unsigned long) * 8);
-  mpz_invert (r, sqrta, r);
-  inva = mpz_get_ui (r);
 
   /* we now have (a*x+b)^2 - N = a*Q(x) where Q(x) = a*x^2 + 2*b*x + c */
 
@@ -1022,28 +982,26 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   memcpy (S, T, 2 * M);
 
   /* sieve */
-  batch_invert (F + SKIP, lim - SKIP, sqrtaa, inva);
+  modredcul_batch_Q_to_Fp (Q + SKIP, 1, sqrtaa, 0, P + SKIP, lim - SKIP);
   /* skip the small primes whose average contribution is already taken into
      account */
   for (j = SKIP; j < lim; j++)
     {
       unsigned long k2 = -1, i2;
-      unsigned char logp;
 
       p = F[j].p;
-      logp = F[j].logp;
-      k = findroot (&k2, bb % p, p, F[j].r, F[j].q * F[j].q, F[j].Mp);
+      k = findroot (&k2, bb % p, p, F[j].r, Q[j] * Q[j], F[j].Mp);
       /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
          when k*N is divisible by p (and then the root is 0) we will count
          twice this root, but this will be very rare, and by not considering
          this special case we speed up the general case */
       for (i = k, i2 = k2; i2 < 2*M; i += p, i2 += p)
         {
-          update (S, i, p, logp, M);
-          update (S, i2, p, logp, M);
+          update (S, i, p, F[j].logp, M);
+          update (S, i2, p, F[j].logp, M);
         }
       if (i < 2*M)
-        update (S, i, p, logp, M);
+        update (S, i, p, F[j].logp, M);
     }
 
   st = milliseconds ();
@@ -1120,6 +1078,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   free (X);
   free (Y);
   free (F);
+  free (P);
+  free (Q);
   free (W);
   mpz_clear (c);
   mpz_clear (b);

@@ -325,7 +325,8 @@ link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 link_directories (${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs)
 
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/gf2x-fft)
-add_executable(lingen lingen_binary.cpp tree_stats.c logline.c lingen_qcode.c)
+add_executable(lingen lingen_binary.cpp tree_stats.c logline.c
+    lingen_qcode.c lingen_qcode_do.cpp)
 install(TARGETS lingen RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 target_link_libraries(lingen bwc_base utils gf2x-fft gf2x cantor128)
 add_dependencies(lingen gf2x-build)
@@ -354,7 +355,7 @@ endif(WITH_MPIR)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(plingen_${v}_sources
         bw-common.c
-        plingen.c
+        plingen.cpp
         plingen-tuning.cpp
         tree_stats.c
         logline.c
