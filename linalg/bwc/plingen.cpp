@@ -28,7 +28,7 @@
 #include "lingen-matpoly.h"
 
 #define ENABLE_MPI_LINGEN
-#ifdef  MPIR
+#ifdef  HAVE_MPIR
 #define ENABLE_CACHING_MPI_LINGEN
 #endif
 
