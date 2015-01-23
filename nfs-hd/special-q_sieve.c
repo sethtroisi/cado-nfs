@@ -191,25 +191,25 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
     bound_resultant = 1;
   }
 
-#ifdef MEAN_NORM
-  mpz_poly_t b;
-  mpz_poly_init(b, -1);
-  mpz_t res;
-  mpz_init(res);
-  int64_poly_to_mpz_poly(b, a);
-  mpz_poly_resultant(res, f, b);
-  mpz_abs(res, res);
-  norm = norm + mpz_get_d(res);
-  mpz_poly_clear(b);
-  mpz_clear(res);
-#endif // MEAN_NORM
-
   //WARNING: an assert here is necessary.
   if (special_q) {
     array->array[i] = (unsigned char)log2(bound_resultant) - ideal->log;
 
+#ifdef MEAN_NORM
+    mpz_poly_t b;
+    mpz_poly_init(b, -1);
+    mpz_t res;
+    mpz_init(res);
+    int64_poly_to_mpz_poly(b, a);
+    mpz_poly_resultant(res, f, b);
+    mpz_abs(res, res);
+    norm = norm + mpz_get_d(res) / (double)ideal->ideal->r;
+    mpz_poly_clear(b);
+    mpz_clear(res);
+#endif // MEAN_NORM
+
 #ifdef MEAN_NORM_BOUND
-    norm_bound = norm_bound + bound_resultant - (double)ideal->ideal->r;
+    norm_bound = norm_bound + bound_resultant / (double)ideal->ideal->r;
 #endif // MEAN_NORM_BOUND
 
 #ifdef TRACE_POS
@@ -243,6 +243,19 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 
   } else {
     array->array[i] = (unsigned char) log2(bound_resultant);
+
+#ifdef MEAN_NORM
+    mpz_poly_t b;
+    mpz_poly_init(b, -1);
+    mpz_t res;
+    mpz_init(res);
+    int64_poly_to_mpz_poly(b, a);
+    mpz_poly_resultant(res, f, b);
+    mpz_abs(res, res);
+    norm = norm + mpz_get_d(res);
+    mpz_poly_clear(b);
+    mpz_clear(res);
+#endif // MEAN_NORM
 
 #ifdef MEAN_NORM_BOUND
     norm_bound = norm_bound + bound_resultant;
@@ -468,6 +481,14 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
               uint64_t number_c_l, MAYBE_UNUSED mat_Z_srcptr matrix,
               MAYBE_UNUSED mpz_poly_srcptr f)
 {
+#ifndef NDEBUG
+  if (i == 0) {
+    ASSERT(number_c_l == 1);
+  } else {
+    ASSERT(number_c_l % 2 == 1);
+  }
+#endif // NDEBUG
+
   uint64_t index = 0;
 
   if (ci <= (int64_t)H->h[i]) {
@@ -482,15 +503,12 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
     mpz_poly_init(a, -1);
     mpz_t res;
     mpz_init(res);
-    mpz_t r;
-    mpz_init(r);
 
     array_index_mpz_vector(v, index, H, array->number_element);
     mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
     mpz_poly_resultant(res, a, f);
     mpz_abs(res, res);
-    mpz_fdiv_r_ui(r, res, ideal->ideal->r);
-    ASSERT(mpz_cmp_ui(r, 0) == 0);
+    ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
 
     mpz_vector_t v_tmp;
     mpz_vector_init(v_tmp, c->dim);
@@ -498,18 +516,13 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
     ASSERT(mpz_vector_cmp(v, v_tmp) == 0);
     mpz_vector_clear(v_tmp);
 
-    mpz_clear(r);
     mpz_clear(res);
     mpz_poly_clear(a);
     mpz_vector_clear(v);
 #endif // ASSERT_SIEVE
 
 #ifdef NUMBER_HIT
-    if (number_c_l == 0) {
-      number_of_hit = number_of_hit + 1;
-    } else {
-      number_of_hit = number_of_hit + number_c_l;
-    }
+    number_of_hit = number_of_hit + number_c_l;
 #endif // NUMBER_HIT
 
 #ifdef TRACE_POS
@@ -531,17 +544,13 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
       mpz_poly_init(a, -1);
       mpz_t res;
       mpz_init(res);
-      mpz_t r;
-      mpz_init(r);
 
       array_index_mpz_vector(v, index + k, H, array->number_element);
       mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
       mpz_poly_resultant(res, a, f);
       mpz_abs(res, res);
-      mpz_fdiv_r_ui(r, res, ideal->ideal->r);
-      ASSERT(mpz_cmp_ui(r, 0) == 0);
+      ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
 
-      mpz_clear(r);
       mpz_clear(res);
       mpz_poly_clear(a);
       mpz_vector_clear(v);
@@ -562,7 +571,7 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
     tmp = tmp + (int64_t)ideal->ideal->r;
 
     while(tmp <= (int64_t)H->h[i]) {
-      index = index + ideal->ideal->r + number_c_l;
+      index = index + ideal->ideal->r * number_c_l;
 
       array->array[index] = array->array[index] - ideal->log;
 
@@ -573,28 +582,20 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
       mpz_poly_init(a, -1);
       mpz_t res;
       mpz_init(res);
-      mpz_t r;
-      mpz_init(r);
 
       array_index_mpz_vector(v, index, H, array->number_element);
       mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
       mpz_poly_resultant(res, a, f);
       mpz_abs(res, res);
-      mpz_fdiv_r_ui(r, res, ideal->ideal->r);
-      ASSERT(mpz_cmp_ui(r, 0) == 0);
+      ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
 
-      mpz_clear(r);
       mpz_clear(res);
       mpz_poly_clear(a);
       mpz_vector_clear(v);
 #endif // ASSERT_SIEVE
 
 #ifdef NUMBER_HIT
-    if (number_c_l == 0) {
-      number_of_hit = number_of_hit + 1;
-    } else {
       number_of_hit = number_of_hit + number_c_l;
-    }
 #endif // NUMBER_HIT
 
 #ifdef TRACE_POS
@@ -617,17 +618,13 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
         mpz_poly_init(a, -1);
         mpz_t res;
         mpz_init(res);
-        mpz_t r;
-        mpz_init(r);
 
         array_index_mpz_vector(v, index + k, H, array->number_element);
         mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
         mpz_poly_resultant(res, a, f);
         mpz_abs(res, res);
-        mpz_fdiv_r_ui(r, res, ideal->ideal->r);
-        ASSERT(mpz_cmp_ui(r, 0) == 0);
+        ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
 
-        mpz_clear(r);
         mpz_clear(res);
         mpz_poly_clear(a);
         mpz_vector_clear(v);
@@ -807,12 +804,12 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // TIMER_SIEVE
 
       pos = int64_vector_add_one_i(c, 1, H);
-      sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos,
+      sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 1, &c0, pos,
               matrix, f);
 
       for (uint64_t j = 1; j < number_c;  j++) {
         pos = int64_vector_add_one_i(c, 1, H);
-        sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 0, &c0, pos,
+        sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 1, &c0, pos,
                 matrix, f);
       }
 
@@ -840,14 +837,15 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       }
 
       if (index == H->t - 1) {
-        uint64_t number_c_u = array->number_element;
-        uint64_t number_c_l = 1;
-        for (uint64_t j = 0; j < index; j++) {
-          number_c_u = number_c_u / (2 * H->h[j] + 1);
-          number_c_l = number_c_l * (2 * H->h[j] + 1);
-        }
+        /* uint64_t number_c_u = array->number_element; */
+        /* uint64_t number_c_l = 1; */
+        /* for (uint64_t j = 0; j < index; j++) { */
+        /*   number_c_u = number_c_u / (2 * H->h[j] + 1); */
+        /*   number_c_l = number_c_l * (2 * H->h[j] + 1); */
+        /* } */
 
-        sieve_ci(array, c, fb->factor_base_1[i], 0, H, index, number_c_l);
+        /* sieve_ci(array, c, fb->factor_base_1[i], 0, H, index, number_c_l, */
+        /*          matrix, f); */
       } else {
         int64_t ci = 0;
         if (index + 1 < H->t - 1) {
