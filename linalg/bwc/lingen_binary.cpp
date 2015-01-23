@@ -44,6 +44,8 @@
 #include "tree_stats.h"
 #include "logline.h"
 
+#define USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
+
 #ifdef  USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
 #include "lingen_qcode.h"
 #endif
@@ -67,6 +69,43 @@ unsigned int cantor_threshold = UINT_MAX;
 
 
 tree_stats stats;
+
+bool polmat::critical = false;
+std::ostream& operator<<(std::ostream& o, polmat const& E)/*{{{*/
+{
+    o << "dims " << E.nrows << " " << E.ncols << " " << E.ncoef << "\n";
+    
+    unsigned long pbits = BITS_TO_WORDS(E.ncoef, ULONG_BITS) * ULONG_BITS;
+    size_t strsize = pbits / 4 + 32;
+    char * str = new char[strsize];
+    for(unsigned int i = 0 ; i < E.nrows ; i++) {
+        for(unsigned int j = 0 ; j < E.ncols ; j++) {
+            const unsigned long * p = E.poly(i,j);
+            *str='\0';
+            char * q = str;
+            unsigned long nbits = 1 + E.deg(j);
+            for(unsigned long top = pbits ; top ; ) {
+                top -= ULONG_BITS;
+                unsigned long w = 0;
+                if (top < nbits) {
+                    w = *p++;
+                    if (nbits-top < ULONG_BITS) {
+                        w &= (1UL << (nbits-top)) - 1;
+                    }
+                }
+                q += snprintf(q, strsize - (q - str),
+                        (ULONG_BITS == 64) ?  "%016lx" :
+                        ((ULONG_BITS == 32) ?  "%08lx" : ",%lx"),
+                        w);
+                ASSERT_ALWAYS((q - str) < (ptrdiff_t) strsize);
+            }
+            o << str << "\n";
+        }
+        o << "\n";
+    }
+    delete str;
+    return o;
+}/*}}}*/
 
 /* {{{ macros used here only -- could be bumped to macros.h if there is
  * need.
@@ -760,6 +799,7 @@ void print_deltas()/*{{{*/
     printf("\n");
 }/*}}}*/
 
+#ifndef USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
 static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
 {
     /* Sort the columns. It might seem merely cosmetic and useless to
@@ -842,7 +882,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
             // This one is tempting, but it's a wrong assert.
             // ASSERT(PI.deg(j) <= PI.deg(k));
             // ASSERT(delta[j] <= delta[k]);
-            ASSERT(std::make_pair(delta[j],PI.deg(j)) <= std::make_pair(delta[k],PI.deg(k)));
+            ASSERT(std::make_pair(qq->delta[j],PI.deg(j)) <= std::make_pair(qq->delta[k],PI.deg(k)));
             PI.acol(k,j,c);
         }
         PI.xmul_col(j);
@@ -903,6 +943,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
     std::cout << " ]\n";
     */
 }/*}}}*/
+#endif  /* USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE */
 
 #if 0/* {{{ */
 const char *pi_meta_filename = "pi-%d-%d";
@@ -1161,6 +1202,7 @@ static void bw_traditional_algo_2(struct e_coeff * ec, int * delta,
 }
 #endif/*}}}*/
 
+#ifndef USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
 /* This function returns the coefficient of degree t (0 or 1) in a*b,
    where a is a polynomial over GF(2) of degree da, and b is a polynomial
    over GF(2) of degree db.
@@ -1293,7 +1335,7 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
         printf("\n");
     }
 }/*}}}*/
-
+#endif  /* USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE */
 static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
 {
     using namespace globals;
@@ -1328,7 +1370,6 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     using namespace std;
     tree_stats_enter(stats, __func__, E.ncoef);
 
-    unsigned int piv[m];
     unsigned int deg = E.ncoef - 1;
     for(unsigned int j = 0 ; j < E.ncols ; j++) {
         E.deg(j) = deg;
@@ -1338,32 +1379,52 @@ static bool go_quadratic(polmat& pi)/*{{{*/
 #ifdef VERBOSE_4PAUL
     cout << "input go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
     cout << E << "\n";
+    cout << "delta";
+    copy(delta.begin(), delta.end(), ostream_iterator<cout>(" "));
+    cout << "\n";
+    cout << "ch";
+    copy(delta.begin(), delta.end(), ostream_iterator<cout>(" "));
+    cout << "\n";
     double ttq = -seconds();
 #endif
 
 #ifdef  USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE
-    lingen_qcode_data qq;
+    bool finished = false;
 
-    lingen_qcode_init(qq, E.nrows, E.ncols, E.ncoef, tmp_pi.ncoef);
-    for(unsigned int i = 0 ; i < E.nrows ; i++) {
-        for(unsigned int j = 0 ; j < E.ncols ; j++) {
-            lingen_qcode_hook_input(qq, i, j, E.poly(i,j));
+    {
+        lingen_qcode_data qq;
+        lingen_qcode_init(qq, E.nrows, E.ncols, E.ncoef, tmp_pi.ncoef);
+        for(unsigned int i = 0 ; i < E.nrows ; i++) {
+            for(unsigned int j = 0 ; j < E.ncols ; j++) {
+                lingen_qcode_hook_input(qq, i, j, E.poly(i,j));
+            }
         }
-    }
-    for(unsigned int i = 0 ; i < E.ncols ; i++) {
-        for(unsigned int j = 0 ; j < E.ncols ; j++) {
-            lingen_qcode_hook_output(qq, i, j, tmp_pi.poly(i,j));
+        for(unsigned int i = 0 ; i < E.ncols ; i++) {
+            for(unsigned int j = 0 ; j < E.ncols ; j++) {
+                lingen_qcode_hook_output(qq, i, j, tmp_pi.poly(i,j));
+            }
         }
+        unsigned int vdelta[m + n];
+        unsigned int vch[m + n];
+        copy(delta.begin(), delta.end(), vdelta);
+        copy(chance_list.begin(), chance_list.end(), vch);
+        lingen_qcode_hook_delta(qq, vdelta);
+        lingen_qcode_hook_chance_list(qq, vch);
+        qq->t = t;
+        lingen_qcode_do(qq);
+        finished = qq->t < t + qq->length;
+        t = qq->t;
+        for(unsigned int j = 0 ; j < tmp_pi.ncols ; j++) {
+            tmp_pi.deg(j) = lingen_qcode_output_column_length(qq, j);
+        }
+        copy(vdelta, vdelta + m + n, delta.begin());
+        copy(vch, vch + m + n, chance_list.begin());
+        lingen_qcode_clear(qq);
     }
-    lingen_qcode_hook_delta(qq, delta);
-    lingen_qcode_do(qq);
-    for(unsigned int j = 0 ; j < tmp_pi.ncols ; j++) {
-        tmp_pi.deg(j) = lingen_qcode_output_column_length(qq, j);
-    }
-    lingen_qcode_clear(qq);
     pi.swap(tmp_pi);
 
 #else   /* USE_EXTERNAL_CODE_FOR_LINGEN_BASECASE */
+    unsigned int piv[m];
 
     for(unsigned int i = 0 ; i < m + n ; i++) {
         tmp_pi.addcoeff(i,i,0,1UL);
@@ -1580,6 +1641,14 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     unsigned long E_length = E.ncoef;
     unsigned long rlen = E_length / 2;
     unsigned long llen = E_length - rlen;
+
+#if 0
+    /* Arrange so that we recurse on sizes which are multiples of 64. */
+    if (E_length > 64 && llen % 64 != 0) {
+        llen += 64 - (llen % 64);
+        rlen = E_length - llen;
+    }
+#endif
 
     ASSERT(llen && rlen && llen + rlen == E_length);
 

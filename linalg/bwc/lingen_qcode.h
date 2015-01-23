@@ -10,6 +10,7 @@ struct lingen_qcode_data_s {
      * dimension is not called n in order to avoid confusion with the n
      * in BW ; in fact we have b = m + n */
     unsigned int m, b;
+    unsigned int t;
     unsigned long length, outlength;
 
     /* matrices we are working on. */
@@ -21,10 +22,12 @@ struct lingen_qcode_data_s {
     unsigned int * local_delta;
 
     /* where we grab our input and store our output */
-    /* Now that we don't own the data corresponding to the innermost
+    /* Note that we don't own the data corresponding to the innermost
      * level (while we do own the outermost level for iptrs and optrs).
      */
     unsigned int * delta;
+    unsigned int * ch;
+
     const unsigned long ** iptrs;
     unsigned long ** optrs;
 };
@@ -44,6 +47,11 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq);
 static inline void lingen_qcode_hook_delta(lingen_qcode_data_ptr qq, unsigned int * delta)
 {
     qq->delta = delta;
+}
+
+static inline void lingen_qcode_hook_chance_list(lingen_qcode_data_ptr qq, unsigned int * ch)
+{
+    qq->ch = ch;
 }
 
 static inline void lingen_qcode_hook_input(lingen_qcode_data_ptr qq, unsigned int i, unsigned int j, unsigned long * poly)

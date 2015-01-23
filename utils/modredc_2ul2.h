@@ -421,8 +421,7 @@ modredc2ul2_intshr (modintredc2ul2_t r, const modintredc2ul2_t s, const int i)
     r[0] = s[1] >> (i - LONG_BIT);
     r[1] = 0UL; /* May overwrite s[1] */
   } else { /* i < LONG_BIT */
-    r[0] = s[0];
-    ularith_shrd (&(r[0]), s[1], i);
+    ularith_shrd (&(r[0]), s[1], s[0], i);
     r[1] = s[1] >> i;
   }
 }
@@ -473,10 +472,10 @@ modredc2ul2_intdivexact (modintredc2ul2_t r, const modintredc2ul2_t n,
     }
   ASSERT(d1[0] != 0UL);
   i = ularith_ctz (d1[0]);
-  ularith_shrd (&(d1[0]), d1[1], i);
+  ularith_shrd (&(d1[0]), d1[1], d1[0], i);
   d1[1] >>= i;
   ASSERT((n1[0] & ((1UL << i) - 1UL)) == 0UL);
-  ularith_shrd (&(n1[0]), n1[1], i);
+  ularith_shrd (&(n1[0]), n1[1], n1[0], i);
   n1[1] >>= i;
   
   invf = ularith_invmod (d1[0]);
@@ -509,19 +508,18 @@ modredc2ul2_intmod_ul (const modintredc2ul2_t n, const unsigned long d)
   unsigned long r;
   if (n[1] < d)
     {
-      unsigned long dummy;
-      ularith_div_2ul_ul_ul (&dummy, &r, n[0], n[1], d);
+      ularith_div_2ul_ul_ul_r (&r, n[0], n[1], d);
     }
   else
     {
-      unsigned long t, dummy;
-      ularith_div_2ul_ul_ul (&dummy, &t, n[1], 0UL, d);
-      ularith_div_2ul_ul_ul (&dummy, &r, n[0], t, d);
+      unsigned long t;
+      ularith_div_2ul_ul_ul_r (&t, n[1], 0UL, d);
+      ularith_div_2ul_ul_ul_r (&r, n[0], t, d);
     }
   return r;
 }
 
-/* r = n%d */
+/* r = n % d */
 MAYBE_UNUSED
 static inline void
 modredc2ul2_intmod (modintredc2ul2_t r, const modintredc2ul2_t n,
@@ -532,7 +530,7 @@ modredc2ul2_intmod (modintredc2ul2_t r, const modintredc2ul2_t n,
       r[0] = modredc2ul2_intmod_ul (n, d[0]);
       r[1] = 0;
     }
-  else    
+  else
     {
       modintredc2ul2_t t1, t2;
       unsigned long q, dummy;

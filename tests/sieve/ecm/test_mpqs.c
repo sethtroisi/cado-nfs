@@ -45,6 +45,7 @@ main (int argc, const char *argv[])
   mpz_clear (f);
 
   printf ("Found %lu factors out of %lu composites\n", found, iter);
+  smooth_stat (-1);
 
   tests_common_clear ();
 

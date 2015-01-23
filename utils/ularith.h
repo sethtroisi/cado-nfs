@@ -58,6 +58,7 @@
 #define ULARITH_CONSTRAINT_G "rme"
 #endif
 
+#ifdef DEAD_CODE /* Unused and untested. Here be dragons. */
 /* Increases r if a != 0 */
 static inline void
 ularith_inc_nz (unsigned long *r, const unsigned long a)
@@ -81,9 +82,10 @@ ularith_inc_nz (unsigned long *r, const unsigned long a)
     : "cc");
 #else
   if (a != 0)
-    r += 1;
+    *r += 1;
 #endif
 }
+#endif
 
 /* Let a = a1 + 2^k * a2, b = b1 + 2^k * b2, where k is number of bits
    in an unsigned long. Return 1 if a > b, and 0 if a <= b. */
@@ -597,33 +599,45 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
 }
 
 
-/* Shift *r right by i bits, filling in the low bits from a into the high
-   bits of *r. Assumes 0 <= i < LONG_BIT */
+/* Set *r to lo shifted right by i bits, filling in the low bits from "hi" into the high
+   bits of *r. I.e., *r = (hi * 2^64 + lo) / 2^i. Assumes 0 <= i < LONG_BIT. */
 MAYBE_UNUSED
 static inline void
-ularith_shrd (unsigned long *r, const unsigned long a, const int i)
+ularith_shrd (unsigned long *r, const unsigned long hi, const unsigned long lo,
+              const unsigned char i)
 {
   ASSERT_EXPENSIVE (0 <= i && i < LONG_BIT);
 #ifdef ULARITH_VERBOSE_ASM
-  __asm__ ("# ularith_shrd (%0, %1, %2)\n" : : 
-           "X" (*r), "X" (a), "X" (i));
+/* Disable the "uninitialized" warning here, as *r is only written to and
+   does not need to be initialized, but we need to write (*r) here so the
+   "X" constraint can be resolved even when r does not have an address, e.g.,
+   when it is passed around in a register. It seems that "X" is assumed by
+   gcc as possibly referring to an input, and since "X" matches anything,
+   that's probably a neccessary assumtion to make. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+  __asm__ ("# ularith_shrd (*r=%0, hi=%1, lo=%2, i=%3)\n" : : 
+           "X" (*r), "X" (hi), "X" (lo), "X" (i));
+#pragma GCC diagnostic pop
 #endif
+
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   __asm__ __VOLATILE (
-    "shrdq %b2, %1, %0\n"
-  /* the b modifier makes gcc print the byte part of the register (%cl) */
-    : "+rm" (*r)
-    : "r" (a), "cJ" (i) /* i can be in %cx or a constant < 64 */
+    "shrdq %3, %1, %0\n"
+    : "=rm" (*r)
+    : "r" (hi), "0" (lo), "cJ" (i) /* i can be in %cl or a literal constant < 64 */
     : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ __VOLATILE (
-    "shrdl %b2, %1, %0\n"
-    : "+rm" (*r)
-    : "r" (a), "cI" (i) /* i can be in %cx or a constant < 32 */
+    "shrdl %3, %1, %0\n # shift %0 right by %3 bits, shifting in the low bits from %1"
+    : "=rm" (*r)
+    : "r" (hi), "0" (lo), "cI" (i) /* i can be in %cl or a literal constant < 32 */
     : "cc");
 #else
   if (i > 0) /* shl by LONG_BIT is no-op on x86! */
-    *r = (*r >> i) | (a << (LONG_BIT - i));
+    *r = (lo >> i) | (hi << (LONG_BIT - i));
+  else
+    *r = lo;
 #endif
 }
 

@@ -7,6 +7,7 @@ void lingen_qcode_init(lingen_qcode_data_ptr qq, unsigned int m, unsigned int b,
     qq->m = m;
     qq->b = b;
     qq->length = length;
+    qq->outlength = outlength;
     qq->A = malloc(length * sizeof(unsigned long*));
     {
         size_t msize = m * b / ULONG_BITS;
@@ -45,6 +46,7 @@ void lingen_qcode_clear(lingen_qcode_data_ptr qq)
     memset(qq, 0, sizeof(*qq));
 }
 
+#if 0
 unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
 {
     /* It's not technically necessary, but the typical use case is really
@@ -91,16 +93,12 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
             }
         }
     }
-
     return qq->length;
 }
+#endif
 
-
-unsigned int lingen_qcode_output_column_length(lingen_qcode_data_srcptr qq, unsigned int j MAYBE_UNUSED)
+unsigned int lingen_qcode_output_column_length(lingen_qcode_data_srcptr qq, unsigned int j)
 {
-    /* please implement me ! */
-    abort();
-    /* Certainly not a good idea to return this ! */
-    return qq->outlength;
+    return qq->local_delta[j];
 }
 

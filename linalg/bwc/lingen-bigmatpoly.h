@@ -39,6 +39,7 @@ void bigmatpoly_finish_init(abdst_field ab, bigmatpoly_ptr p, unsigned int m, un
 void bigmatpoly_init_model(bigmatpoly_ptr model, MPI_Comm * comm, unsigned int m, unsigned int n);
 int bigmatpoly_check_pre_init(bigmatpoly_srcptr p);
 matpoly_ptr bigmatpoly_my_cell(bigmatpoly_ptr p);
+matpoly_srcptr bigmatpoly_my_cell_const(bigmatpoly_srcptr p);
 // void bigmatpoly_realloc(bigmatpoly_ptr p, int newalloc);
 void bigmatpoly_zero(abdst_field ab, bigmatpoly_ptr p);
 void bigmatpoly_clear(abdst_field ab, bigmatpoly_ptr p);
@@ -66,15 +67,21 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
         bigmatpoly_ptr dst, matpoly_ptr src,
         size_t offset, size_t length);
 void bigmatpoly_gather_mat_partial(abdst_field ab,
-        matpoly dst, bigmatpoly src,
+        matpoly_ptr dst, bigmatpoly_srcptr src,
         size_t offset, size_t length);
 
 /* {{{ access interface for bigmatpoly */
 static inline matpoly * bigmatpoly_part(bigmatpoly_ptr p, unsigned int i, unsigned int j) {
     return p->cells+i*p->n1+j;
 }
+static inline matpoly * bigmatpoly_part_const(bigmatpoly_srcptr p, unsigned int i, unsigned int j) {
+    return p->cells+i*p->n1+j;
+}
 static inline matpoly_ptr bigmatpoly_cell(bigmatpoly_ptr p, unsigned int i, unsigned int j) {
     return *bigmatpoly_part(p,i,j);
+}
+static inline matpoly_srcptr bigmatpoly_cell_const(bigmatpoly_srcptr p, unsigned int i, unsigned int j) {
+    return *bigmatpoly_part_const(p,i,j);
 }
 /* }}} */
 
