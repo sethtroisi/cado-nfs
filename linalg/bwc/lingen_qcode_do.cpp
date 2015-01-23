@@ -126,7 +126,7 @@ static void extract_coeff_degree_t(lingen_qcode_data_ptr qq, bmat & e0,
 
 	printf("%-8u%zucols=0:", qq->t + dt, z.size());
 
-	vector < pair < unsigned int, unsigned int >>zz;
+	vector < pair < unsigned int, unsigned int > > zz;
 	for (unsigned int i = 0; i < z.size(); i++) {
 	    zz.push_back(make_pair(z[i], qq->ch[z[i]]));
 	}
@@ -162,7 +162,7 @@ static void extract_coeff_degree_t(lingen_qcode_data_ptr qq, bmat & e0,
 	    if (mi > 1)
 		printf("*%u", mi);
 
-	    vector < pair < unsigned int, unsigned int >>zz2;
+	    vector < pair < unsigned int, unsigned int > > zz2;
 	    for (unsigned int i = 0; i < zz.size(); i++) {
 		if (zz[i].second > mi) {
 		    zz2.push_back(make_pair(zz[i].first, zz[i].second));
