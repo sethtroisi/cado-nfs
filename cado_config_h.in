@@ -57,6 +57,7 @@
 #cmakedefine    HAVE_NUMA
 #cmakedefine    HAVE_HWLOC
 #cmakedefine    HAVE_CXX11
+#cmakedefine    HAVE_MPN_XOR_N
 /* In the C source files, we may of course check MPI_VERSION and
  * MPI_SUBVERSION by ourselves. However we would like to possibly
  * dismiss, on the per-implementation basis, the claim of MPI-3 support.

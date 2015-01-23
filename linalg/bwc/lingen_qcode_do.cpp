@@ -191,13 +191,13 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
                 if (k == pivot) continue;
 		if (!(E(i, k) & mask)) continue;
                 is_modified[k] = true;
-#ifdef SWAP_E
+#if defined(SWAP_E) && defined(HAVE_MPN_XOR_N)
                 mpn_xor_n (E.column(k), E.column(k), E.column(pivot), m);
 #else
                 for (unsigned int l = 0; l < m; l++)
                     E(l, k) ^= E(l, pivot);
 #endif
-#ifdef  SWAP_PI
+#if defined(SWAP_PI) && defined(HAVE_MPN_XOR_N)
                 mpn_xor_n (P.column(k), P.column(k), P.column(pivot), m + n);
 #else
                 for (unsigned int l = 0; l < m + n; l++)
