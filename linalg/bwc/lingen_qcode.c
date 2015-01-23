@@ -8,24 +8,7 @@ void lingen_qcode_init(lingen_qcode_data_ptr qq, unsigned int m, unsigned int b,
     qq->b = b;
     qq->length = length;
     qq->outlength = outlength;
-    qq->A = malloc(length * sizeof(unsigned long*));
-    {
-        size_t msize = m * b / ULONG_BITS;
-        qq->A[0] = malloc(length * msize * sizeof(unsigned long));
-        for(unsigned int k = 0 ; k < length ; k++) {
-            qq->A[k] = qq->A[0] + k * msize;
-        }
-        memset(qq->A[0], 0, length * msize * sizeof(unsigned long));
-    }
-    qq->X = malloc(outlength * sizeof(unsigned long*)); 
-    {
-        size_t msize = b * b / ULONG_BITS;
-        qq->X[0] = malloc(outlength * msize * sizeof(unsigned long));
-        for(unsigned int k = 0 ; k < outlength ; k++) {
-            qq->X[k] = qq->X[0] + k * msize;
-        }
-        memset(qq->X[0], 0, outlength * msize * sizeof(unsigned long));
-    }
+    ASSERT_ALWAYS(length <= ULONG_BITS);
     qq->iptrs = malloc(m * b * sizeof(unsigned long *));
     qq->optrs = malloc(b * b * sizeof(unsigned long *));
     memset(qq->iptrs, 0, m * b * sizeof(unsigned long *));
@@ -38,10 +21,6 @@ void lingen_qcode_clear(lingen_qcode_data_ptr qq)
 {
     free(qq->iptrs);
     free(qq->optrs);
-    free(qq->A[0]);
-    free(qq->X[0]);
-    free(qq->A);
-    free(qq->X);
     free(qq->local_delta);
     memset(qq, 0, sizeof(*qq));
 }

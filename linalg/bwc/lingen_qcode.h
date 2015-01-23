@@ -13,12 +13,6 @@ struct lingen_qcode_data_s {
     unsigned int t;
     unsigned long length, outlength;
 
-    /* matrices we are working on. */
-    unsigned long ** A;
-
-    /* matrices which solve A*X = 0 */
-    unsigned long ** X;
-
     unsigned int * local_delta;
 
     /* where we grab our input and store our output */
