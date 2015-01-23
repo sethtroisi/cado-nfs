@@ -2,6 +2,8 @@
 #define INT64_VECTOR_H
 
 #include <stdio.h>
+#include "cado.h"
+#include "utils.h"
 #include "sieving_interval.h"
 
 typedef struct
@@ -33,5 +35,7 @@ void int64_vector_add_one(int64_vector_ptr v, sieving_interval_srcptr H);
 
 unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
                                     sieving_interval_srcptr H);
+
+void int64_vector_to_mpz_vector(mpz_vector_ptr a, int64_vector_srcptr b);
 
 #endif

@@ -77,6 +77,13 @@ mpz_vector_setcoordinate_uint64 (mpz_vector_t v, unsigned int i, uint64_t z)
   mpz_set_uint64 (v->c[i], z);
 }
 
+void
+mpz_vector_setcoordinate_int64 (mpz_vector_t v, unsigned int i, int64_t z)
+{
+  ASSERT_ALWAYS (i < v->dim);
+  mpz_set_int64 (v->c[i], z);
+}
+
 int
 mpz_vector_is_coordinate_zero (mpz_vector_t v, unsigned int i)
 {
@@ -89,6 +96,25 @@ mpz_vector_get_mpz_poly (mpz_poly_t p, mpz_vector_t v)
 {
   for (unsigned int i = 0; i < v->dim; i++)
     mpz_poly_setcoeff (p, i, v->c[i]);
+}
+
+int mpz_vector_cmp (mpz_vector_srcptr a, mpz_vector_srcptr b)
+{
+  int r = (a->dim > b->dim) - (b->dim > a->dim);
+  if (r) return r;
+  for(int d = a->dim - 1; d >= 0 ; d--) {
+    r = mpz_cmp(a->c[d], b->c[d]);
+    if (r) return r;
+  }
+  return 0;
+}
+
+void mpz_vector_fprintf(FILE * file, mpz_vector_srcptr v)
+{
+  fprintf(file, "[");
+  for (unsigned int i = 0; i < v->dim - 1; i++)
+    gmp_fprintf(file, "%Zd, ", v->c[i]);
+  gmp_fprintf(file, "%Zd]\n", v->c[v->dim - 1]);
 }
 
 void

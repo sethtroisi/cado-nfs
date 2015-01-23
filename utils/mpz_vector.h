@@ -24,7 +24,14 @@ void mpz_vector_setcoordinate (mpz_vector_t, unsigned int, mpz_t);
 void mpz_vector_setcoordinate_ui (mpz_vector_t, unsigned int, unsigned int);
 void mpz_vector_setcoordinate_si (mpz_vector_t, unsigned int, int);
 void mpz_vector_setcoordinate_uint64 (mpz_vector_t, unsigned int, uint64_t);
+void mpz_vector_setcoordinate_int64 (mpz_vector_t, unsigned int, int64_t);
 int mpz_vector_is_coordinate_zero (mpz_vector_t, unsigned int);
+/*
+  Return 0 if a and b are equal,
+  -1 if a is smaller and 1 if a is bigger.
+*/
+int mpz_vector_cmp (mpz_vector_srcptr a, mpz_vector_srcptr b);
+void mpz_vector_fprintf(FILE * file, mpz_vector_srcptr v);
 
 /* Implementation of dot product and norm (skew and non-skew version) */
 void mpz_vector_dot_product (mpz_t, mpz_vector_t, mpz_vector_t);

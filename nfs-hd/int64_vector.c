@@ -112,3 +112,11 @@ unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
 
   return k;
 }
+
+void int64_vector_to_mpz_vector(mpz_vector_ptr a, int64_vector_srcptr b)
+{
+  ASSERT(a->dim == b->dim);
+  for (unsigned int i = 0; i < b->dim; i++) {
+    mpz_vector_setcoordinate_int64 (a, i, b->c[i]);
+  }
+}
