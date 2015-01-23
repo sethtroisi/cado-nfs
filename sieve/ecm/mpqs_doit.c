@@ -36,6 +36,7 @@ typedef struct {
   unsigned char logp;  /* log(p) / log(radix), needed for sieve */
   unsigned long q;     /* 1/p mod sqrt(a) */
   unsigned long invp2; /* floor(ULONG_MAX/p), needed for trial division */
+  unsigned int Mp;     /* M mod p */
 } fb_t;
 
 typedef struct {
@@ -185,7 +186,7 @@ batch_invert (fb_t *F, long n, unsigned long a, unsigned long inva)
 */
 static unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
-          unsigned long k1, unsigned long inva, unsigned long M)
+          unsigned long k1, unsigned long inva, unsigned long Mp)
 {
   /* the two roots are (k1-b)/a and (-k1-b)/a */
   modulus_t pp;
@@ -199,12 +200,16 @@ findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
   modul_neg (uu, vv, pp);
   modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
   modul_mul (uu, uu, tt, pp);       /* (-r-b)/a */
-  modul_add_ul (uu, uu, M, pp);     /* (-r-b)/a + M */
   *k2 = mod_get_ul (uu, pp);
+  *k2 += Mp;                        /* (-r-b)/a + M */
+  if (*k2 >= p)
+    *k2 -= p;
   modul_sub_ul (uu, vv, bmodp, pp); /* r-b */
   modul_mul (uu, uu, tt, pp);       /* (r-b)/a */
-  modul_add_ul (uu, uu, M, pp);     /* (r-b)/a + M */
   k1 = mod_get_ul (uu, pp);
+  k1 += Mp;                         /* (r-b)/a + M */
+  if (k1 >= p)
+    k1 -= p;
   modul_clear (tt, pp);
   modul_clear (uu, pp);
   modul_clear (vv, pp);
@@ -808,6 +813,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           mpz_invert (c, a, b); /* c = 1/p mod 2^64 */
           F[j].invp = mpz_get_ui (c);
           F[j].invp2 = ULONG_MAX / p;
+          F[j].Mp = M % p;
           j++;
         }
     }
@@ -1026,7 +1032,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
       p = F[j].p;
       logp = F[j].logp;
-      k = findroot (&k2, bb % p, p, F[j].r, F[j].q * F[j].q, M);
+      k = findroot (&k2, bb % p, p, F[j].r, F[j].q * F[j].q, F[j].Mp);
       /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
          when k*N is divisible by p (and then the root is 0) we will count
          twice this root, but this will be very rare, and by not considering
