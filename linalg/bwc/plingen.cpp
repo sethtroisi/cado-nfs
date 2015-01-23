@@ -1553,8 +1553,8 @@ class bigmatpoly_read_task { /* {{{ */
     inline unsigned int size() { return xpi->size; }
 
     inline absrc_elt coeff_const_locked(unsigned int i, unsigned int j, unsigned int k) {
-        ASSERT_ALWAYS(!rank);
-        ASSERT_ALWAYS(k0 != UINT_MAX && k - k0 < B);
+        ASSERT(!rank);
+        ASSERT(k0 != UINT_MAX && k - k0 < B);
         return matpoly_coeff_const(ab, pi, i, j, k - k0);
     }
 
@@ -1659,11 +1659,11 @@ class bigmatpoly_write_task { /* {{{ */
     }
 
     inline abdst_elt coeff_locked(unsigned int i, unsigned int j, unsigned int k) {
-        ASSERT_ALWAYS(k0 != UINT_MAX && k - k0 < B);
-        ASSERT_ALWAYS(!rank);
+        ASSERT(k0 != UINT_MAX && k - k0 < B);
+        ASSERT(!rank);
 
         E->size += (E->size == k - k0);
-        ASSERT_ALWAYS(E->size == k - k0 + 1);
+        ASSERT(E->size == k - k0 + 1);
 
         return matpoly_coeff(ab, E, i, j, k - k0);
     }
@@ -1672,18 +1672,18 @@ class bigmatpoly_write_task { /* {{{ */
         if (k0 == UINT_MAX) {
             matpoly_zero(ab, E);
             E->size = 0;
-            ASSERT_ALWAYS(k == 0);
+            ASSERT(k == 0);
             k0 = 0;
         } else {
             if (k >= (k0 + B)) {
                 /* We require progressive reads */
-                ASSERT_ALWAYS(k == k0 + B);
+                ASSERT(k == k0 + B);
                 bigmatpoly_scatter_mat_partial(ab, xE, E, k0, B);
                 matpoly_zero(ab, E);
                 k0 += B;
             }
         }
-        ASSERT_ALWAYS(k0 != UINT_MAX && k - k0 < B);
+        ASSERT(k0 != UINT_MAX && k - k0 < B);
         if (rank) return NULL;
         return coeff_locked(i, j, k);
     }
@@ -1691,7 +1691,7 @@ class bigmatpoly_write_task { /* {{{ */
     void finalize(unsigned int length) {
         if (length > k0) {
             /* Probably the last chunk hasn't been dispatched yet */
-            ASSERT_ALWAYS(length < k0 + B);
+            ASSERT(length < k0 + B);
             bigmatpoly_scatter_mat_partial(ab, xE, E, k0, length - k0);
         }
         set_size(length);
@@ -1737,7 +1737,7 @@ class matpoly_write_task { /* {{{ */
 
     abdst_elt coeff_locked(unsigned int i, unsigned int j, unsigned int k) {
         E->size += (E->size == k);
-        ASSERT_ALWAYS(E->size == k + 1);
+        ASSERT(E->size == k + 1);
         return matpoly_coeff(ab, E, i, j, k);
     }
     inline abdst_elt coeff(unsigned int i, unsigned int j, unsigned int k) {
