@@ -1515,6 +1515,7 @@ void bm_io_clear_one_F_coeff(bm_io_ptr aa, unsigned int deg)
  * Pay attention to the fact that the calls to these structures are
  * collective calls.
  */
+#ifdef  ENABLE_MPI_LINGEN
 class bigmatpoly_read_task { /* {{{ */
     /* This reads a bigmatpoly, by chunks, so that the memory footprint
      * remains reasonable. */
@@ -1573,35 +1574,6 @@ class bigmatpoly_read_task { /* {{{ */
         matpoly_clear(ab, pi);
     }
 };      /* }}} */
-class matpoly_read_task {/*{{{*/
-    /* This does the same, but for a simple matpoly. Of course this is
-     * much simpler ! */
-    matpoly_srcptr pi;
-    abdst_field ab;
-
-    public:
-    matpoly_read_task(bm_io_ptr aa, matpoly_srcptr pi) :
-            pi(pi),
-            ab(aa->bm->d->ab)
-    {
-        if (!random_input_length) {
-            printf("Writing F to %s\n", aa->output_file);
-        }
-    }
-
-    inline unsigned int chunk_size() const { return 1; }
-
-    inline unsigned int size() { return pi->size; }
-
-    absrc_elt coeff_const_locked(unsigned int i, unsigned int j, unsigned int k) {
-        return matpoly_coeff_const(ab, pi, i, j, k);
-    }
-    inline absrc_elt coeff_const(unsigned int i, unsigned int j, unsigned int k) {
-        return coeff_const_locked(i, j, k);
-    }
-
-    ~matpoly_read_task() { }
-};/*}}}*/
 class bigmatpoly_write_task { /* {{{ */
     /* This writes a bigmatpoly, by chunks, so that the memory footprint
      * remains reasonable.
@@ -1714,6 +1686,36 @@ void matpoly_extract_column(abdst_field ab,
 }
 
 /* }}} */
+#endif  /* ENABLE_MPI_LINGEN */
+class matpoly_read_task {/*{{{*/
+    /* This does the same, but for a simple matpoly. Of course this is
+     * much simpler ! */
+    matpoly_srcptr pi;
+    abdst_field ab;
+
+    public:
+    matpoly_read_task(bm_io_ptr aa, matpoly_srcptr pi) :
+            pi(pi),
+            ab(aa->bm->d->ab)
+    {
+        if (!random_input_length) {
+            printf("Writing F to %s\n", aa->output_file);
+        }
+    }
+
+    inline unsigned int chunk_size() const { return 1; }
+
+    inline unsigned int size() { return pi->size; }
+
+    absrc_elt coeff_const_locked(unsigned int i, unsigned int j, unsigned int k) {
+        return matpoly_coeff_const(ab, pi, i, j, k);
+    }
+    inline absrc_elt coeff_const(unsigned int i, unsigned int j, unsigned int k) {
+        return coeff_const_locked(i, j, k);
+    }
+
+    ~matpoly_read_task() { }
+};/*}}}*/
 class matpoly_write_task { /* {{{ */
     matpoly_ptr E;
     abdst_field ab;
@@ -2925,6 +2927,7 @@ int main(int argc, char *argv[])
     }
 
     if (size > 1) {
+#ifdef  ENABLE_MPI_LINGEN
         unsigned int m = aa->bm->d->m;
         unsigned int n = aa->bm->d->n;
         unsigned int b = m + n;
@@ -2950,10 +2953,7 @@ int main(int argc, char *argv[])
         if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
 
         if (check_luck_condition(bm)) {
-            /* this is a gathering write */
             bm_io_begin_write(aa);
-
-            /* this reallocates F */
             bm_io_set_write_behind_size(aa, delta);
             bigmatpoly_read_task xpi_reader(aa, xpi);
             bm_io_compute_final_F(aa, xpi_reader, delta);
@@ -2964,6 +2964,12 @@ int main(int argc, char *argv[])
         bigmatpoly_clear(ab, xE);
         bigmatpoly_clear(ab, xpi);
         bigmatpoly_clear_model(model);
+#else
+        /* The ENABLE_MPI_LINGEN flag should be turned on for a proper
+         * MPI run.
+         */
+        ASSERT_ALWAYS(0);
+#endif
     } else {
         unsigned int m = aa->bm->d->m;
         unsigned int n = aa->bm->d->n;
@@ -2990,10 +2996,7 @@ int main(int argc, char *argv[])
         if (!rank) printf("(pi->alloc = %zu)\n", pi->alloc);
 
         if (check_luck_condition(bm)) {
-            /* this is a gathering write */
             bm_io_begin_write(aa);
-
-            /* this reallocates F */
             bm_io_set_write_behind_size(aa, delta);
             matpoly_read_task pi_reader(aa, pi);
             bm_io_compute_final_F(aa, pi_reader, delta);
