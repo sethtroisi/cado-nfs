@@ -274,7 +274,6 @@ struct polmat { /* {{{ */
     {
         alloc();
         memset(x, 0, ncols*colstride()*sizeof(unsigned long));
-        for(unsigned int j = 0 ; j < ncols ; j++) j=j;
         for(unsigned int j = 0 ; j < ncols ; j++) _deg[j]=-1;
     }
     polmat() {
@@ -711,7 +710,6 @@ template<typename fft_type> struct tpolmat /* {{{ */
         x(o.alloc(nrows * ncols)),
         _deg(mynew<int>(ncols))
     {
-        for(unsigned int j = 0 ; j < ncols ; j++) j=j;
         for(unsigned int j = 0 ; j < ncols ; j++) _deg[j]=-1;
     }
     void zero()
