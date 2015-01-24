@@ -8,6 +8,7 @@ void uint64_array_init(uint64_array_ptr array, uint64_t length)
 {
   array->length = length;
   array->array = malloc(sizeof(uint64_t) * length);
+
 #ifndef NDEBUG
   for (uint64_t i = 0; i < length; i++) {
     array->array[i] = 0;
@@ -37,11 +38,12 @@ void uint64_array_clear(uint64_array_ptr array)
 void uint64_array_fprintf(FILE * file, uint64_array_srcptr array)
 {
   if (array->length == 0) {
-    fprintf(file, "[emptyset]\n");
+    fprintf(file, "[]\n");
+  } else {
+    fprintf(file, "[");
+    for (uint64_t i = 0; i < array->length - 1; i++) {
+      fprintf(file, "%" PRIu64 ", ", array->array[i]);
+    }
+    fprintf(file, "%" PRIu64 "]\n", array->array[array->length - 1]);
   }
-  fprintf(file, "[");
-  for (uint64_t i = 0; i < array->length - 1; i++) {
-    fprintf(file, "%" PRIu64 ", ", array->array[i]);
-  }
-  fprintf(file, "%" PRIu64 "]\n", array->array[array->length - 1]);
 }
