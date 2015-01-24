@@ -62,7 +62,7 @@ public:
 };
 
 
-bool report_spontaneous_zeros(lingen_qcode_data_ptr qq, unsigned int dt, vector<bool>const& is_modified)
+bool report_spontaneous_zeros(lingen_qcode_data_ptr qq, unsigned int dt, vector<int>const& is_modified)
 {
     unsigned int m = qq->m;
     unsigned int b = qq->b;
@@ -72,7 +72,8 @@ bool report_spontaneous_zeros(lingen_qcode_data_ptr qq, unsigned int dt, vector<
     for(unsigned int i = 0 ; i < m + n ; i++) {
         if (is_modified[i]) {
             qq->ch[i] = 0;
-            changed=true;
+            if (is_modified[i] & 1)
+                changed=true;
         } else {
             qq->ch[i]++;
             magic.push_back(make_pair(i, qq->ch[i]));
@@ -170,7 +171,7 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
     unsigned int e = 0;
     for ( ; e < qq->length; e++) {
 	uint64_t mask = (uint64_t) 1 << e;
-        vector<bool> is_modified(m + n, false);
+        vector<int> is_modified(m + n, false);
 #if 0
 	unsigned int md = UINT_MAX;
 	for (unsigned int j = 0; j < m + n; j++)
@@ -186,11 +187,17 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
 		    pivot = j;
 		}
 	    ASSERT_ALWAYS(pivot < m + n);
-            is_modified[pivot]=1;
+            /* A pivot column does not count as undergoing a modification
+             * the same way as the other columns. This is because for our
+             * stop criterion, what we need is to count the number of
+             * transvection matrices by which we multiply. However, as
+             * far as detection of spontaneous zeros goes, of course we
+             * must make sure that we don't take pivots into account ! */
+            is_modified[pivot] |= 2;
 	    for (unsigned int k = 0; k < m + n; k++) {
                 if (k == pivot) continue;
 		if (!(E(i, k) & mask)) continue;
-                is_modified[k] = true;
+                is_modified[k] |= 1;
 #if defined(SWAP_E) && defined(HAVE_MPN_XOR_N)
                 mpn_xor_n (E.column(k), E.column(k), E.column(pivot), m);
 #else
