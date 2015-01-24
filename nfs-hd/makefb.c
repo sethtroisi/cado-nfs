@@ -47,10 +47,26 @@ static void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
   mpz_poly_init(fcopy, f->deg);
   mpz_poly_set(fcopy, f);
 
+  mpz_t coeff;
+  mpz_init(coeff);
+  for (int i = 0; i <= f->deg; i++) {
+    mpz_poly_getcoeff(coeff, i, f);
+    mpz_mod(coeff, coeff, p);
+    mpz_poly_setcoeff(fcopy, i, coeff);
+  }
+
   mpz_poly_factor_list_flush(list);
 
+  if (fcopy->deg <= 1) {
+    mpz_clear(coeff);
+    mpz_poly_clear(fcopy);
+    mpz_clear(p);
+    ASSERT(list->size == 0);
+    return;
+  }
+
   if (mpz_poly_is_irreducible(f, p)) {
-    mpz_poly_factor_list_push(list, f, 1);
+    mpz_poly_factor_list_push(list, fcopy, 1);
   } else {
     mpz_poly_t tmp;
     mpz_poly_init(tmp, 1);
@@ -85,8 +101,6 @@ static void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
 
 #ifndef NDBEBUG
   mpz_poly_cleandeg(fcopy, -1);
-  mpz_t coeff;
-  mpz_init(coeff);
   for (int i = 0; i <= f->deg; i++) {
     mpz_poly_getcoeff(coeff, i, f);
     mpz_mod(coeff, coeff, p);
@@ -109,13 +123,13 @@ static void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
     mpz_mod(coeff, coeff, p);
     mpz_poly_setcoeff(fmul, i, coeff);
   }
-  mpz_clear(coeff);
 
   ASSERT(mpz_poly_cmp(fcopy, fmul) == 0);
 
   mpz_poly_clear(fmul);
 #endif // NDBEBUG
 
+  mpz_clear(coeff);
   mpz_poly_clear(fcopy);
   mpz_clear(p);
 }
