@@ -209,8 +209,6 @@ namespace globals {
 #ifndef NDEBUG
     polmat E_saved;
 #endif
-    bmat e0;
-
     // F0 is exactly the n x n identity matrix, plus the X^(s-exponent)e_{cnum}
     // vectors. Here we store the cnum,exponent pairs.
     std::vector<std::pair<unsigned int, unsigned int> > f0_data;
@@ -745,20 +743,6 @@ void compute_f_init(polmat& A)/*{{{*/
     t0 = exponent[r-1] + 1;
     printf("Found satisfying init data for t0=%d\n", t0);
                     
-    /*
-    printf("Init e0 matrix\n");
-    for(unsigned int i = 0 ; i < m ; i++) {
-        for(unsigned int j = 0 ; j < n ; j++) {
-            std::cout << A.coeff(i,j,t0);
-        }
-        for(unsigned int j = 0 ; j < m ; j++) {
-            std::cout << A.coeff(i,cnum[j],exponent[j]);
-        }
-        std::cout << "\n";
-    }
-    */
-
-
     if (r!=m) {
         printf("This amount of data is insufficient. "
                 "Cannot find %u independent cols within A\n",m);
@@ -980,77 +964,6 @@ static void banner_traditional(int t, int deg, double inner, double * last)
  *
  * The complexity curve is steeper with the first version.
  */
-
-#if 0/*{{{*/
-static void bw_traditional_algo_1(struct e_coeff * ec, int * delta,
-        struct t_poly * pi, int check_chance)
-{
-    unsigned int * perm;
-    int t;
-    bw_mbmat e;
-    unsigned int * pivlist;
-    double inner_1,inner_2,last;
-    int k;
-
-    perm=(unsigned int *) malloc((m+n)*sizeof(unsigned int));
-    pivlist=(unsigned int *) malloc(m*sizeof(unsigned int));
-
-    mbmat_alloc(e);
-    mbmat_zero(e);
-
-    ASSERT(!ec_is_twisted(ec));
-    last=0.0;
-
-    for(t=0;t<=ec->degree;t++) {
-        compute_ctaf(e,ec,pi,t,t?pivlist:NULL, &inner_1);
-        column_order(perm,delta,pi);
-        tp_apply_perm(pi,perm);
-        if (check_chance)
-            bw_check_chance(e,pi->clist);
-        bw_gauss_onestep(e,ec,pi,delta,pivlist,	&inner_2);
-        t_counter++;
-        banner_traditional(t, ec->degree, inner_1 + inner_2, &last);
-    }
-    printf("DELTA : ( ");
-    for(k=0;k< m + n ;k++) printf("%d ",delta[k]);
-    printf(")\n");
-
-    ec_advance(ec,ec->degree+1);	/* cosmetic */
-    mbmat_free(e);
-    free(pivlist);
-    free(perm);
-}
-
-static void bw_traditional_algo_2(struct e_coeff * ec, int * delta,
-        struct t_poly * pi, int check_chance)
-{
-    unsigned int * perm;
-    int t;
-    int deg;
-    double inner,last;
-
-    perm=(unsigned int *) malloc((m+n)*sizeof(unsigned int));
-
-    ASSERT(!ec_is_twisted(ec));
-
-    deg=ec->degree;
-    last=0.0;
-
-    for(t=0;t<=deg;t++) {
-        if (check_chance)
-            bw_check_chance(mbpoly_coeff(ec->p,0),ec->clist);
-        column_order(perm,delta,pi);
-        tp_apply_perm(pi,perm);
-        ec_apply_perm(ec,perm);
-        bw_gauss_onestep(mbpoly_coeff(ec->p,0),ec,pi,delta,NULL,&inner);
-        ec_advance(ec,1);
-        t_counter++;
-        banner_traditional(t, deg, inner, &last);
-    }
-
-    free(perm);
-}
-#endif/*}}}*/
 
 static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
 {
@@ -1827,8 +1740,6 @@ int main(int argc, char *argv[])
     using namespace std;
 
     printf("E: %ld coeffs, t=%u\n", E.ncoef, t);
-
-    { bmat tmp_e0(m,m + n); e0.swap(tmp_e0); }
 
     for(unsigned int i = 0 ; i < m + n ; i++) {
         E.deg(i) = E.ncoef - 1;
