@@ -8,7 +8,6 @@ void lingen_qcode_init(lingen_qcode_data_ptr qq, unsigned int m, unsigned int b,
     qq->b = b;
     qq->length = length;
     qq->outlength = outlength;
-    ASSERT_ALWAYS(length <= ULONG_BITS);
     qq->iptrs = malloc(m * b * sizeof(unsigned long *));
     qq->optrs = malloc(b * b * sizeof(unsigned long *));
     memset(qq->iptrs, 0, m * b * sizeof(unsigned long *));

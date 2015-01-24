@@ -1594,9 +1594,6 @@ int main(int argc, char *argv[])
     if (lingen_threshold == 0) {
         fprintf(stderr, "no lingen_threshold value set\n");
         exit(1);
-    } else if (lingen_threshold > ULONG_BITS) {
-        fprintf(stderr, "capping lingen_threshold to %u bits\n", ULONG_BITS);
-        lingen_threshold = ULONG_BITS;
     }
 
     if (!strlen(input_file)) {

@@ -19,46 +19,48 @@ using namespace std;
 /* if SWAP_PI is defined, put pi[i,j] into pi[j][i] */
 #define SWAP_PI
 
+template<int WIDTH>
 class ulmat_rowmajor {
     unsigned int n;
-    unsigned long * x;
+    unsigned long (*x)[WIDTH];
     ulmat_rowmajor(ulmat_rowmajor const&) {}
 public:
     ulmat_rowmajor(unsigned int m, unsigned int n) : n(n)
     {
-        x = new unsigned long[m*n];
-        memset(x, 0, m*n*sizeof(unsigned long));
+        x = new unsigned long[m*n][WIDTH];
+        memset(x, 0, m*n*sizeof(unsigned long[WIDTH]));
     }
     ~ulmat_rowmajor() { delete[] x; }
-    inline unsigned long& operator()(unsigned int i, unsigned int j) {
+    inline unsigned long (&operator()(unsigned int i, unsigned int j))[WIDTH] {
         return x[i * n + j];
     }
-    inline const unsigned long& operator()(unsigned int i, unsigned int j) const {
+    inline const unsigned long (&operator()(unsigned int i, unsigned int j)const)[WIDTH] {
         return x[i * n + j];
     }
-    inline unsigned long * row(unsigned int i) { return x + i * n; }
-    inline const unsigned long * row(unsigned int i) const { return x + i * n; }
+    inline unsigned long (*row(unsigned int i))[WIDTH] { return x + i * n; }
+    inline const unsigned long (*row(unsigned int i)const)[WIDTH] { return x + i * n; }
 };
 
+template<int WIDTH>
 class ulmat_colmajor {
     unsigned int m;
-    unsigned long * x;
+    unsigned long (*x)[WIDTH];
     ulmat_colmajor(ulmat_colmajor const&) {}
 public:
     ulmat_colmajor(unsigned int m, unsigned int n) : m(m)
     {
-        x = new unsigned long[m*n];
-        memset(x, 0, m*n*sizeof(unsigned long));
+        x = new unsigned long[m*n][WIDTH];
+        memset(x, 0, m*n*sizeof(unsigned long[WIDTH]));
     }
     ~ulmat_colmajor() { delete[] x; }
-    inline unsigned long& operator()(unsigned int i, unsigned int j) {
+    inline unsigned long (&operator()(unsigned int i, unsigned int j))[WIDTH] {
         return x[j * m + i];
     }
-    inline const unsigned long& operator()(unsigned int i, unsigned int j) const {
+    inline const unsigned long (&operator()(unsigned int i, unsigned int j)const)[WIDTH] {
         return x[j * m + i];
     }
-    inline unsigned long * column(unsigned int j) { return x + j * m; }
-    inline const unsigned long * column(unsigned int j) const { return x + j * m; }
+    inline unsigned long (*column(unsigned int j))[WIDTH] { return x + j * m; }
+    inline const unsigned long (*column(unsigned int j)const)[WIDTH] { return x + j * m; }
 };
 
 
@@ -129,34 +131,57 @@ bool report_spontaneous_zeros(lingen_qcode_data_ptr qq, unsigned int dt, vector<
     return changed;
 }
 
+inline void lshift1(unsigned long&x) { x <<= 1; }
 
-unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
+template<int WIDTH> inline void lshift1(unsigned long (&x)[WIDTH])
+{
+    mpn_lshift(x, x, WIDTH, 1);
+}
+
+template<> inline void lshift1<1>(unsigned long (&x)[1]) { x[0] <<= 1; }
+template<> inline void lshift1<2>(unsigned long (&x)[2]) {
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    asm(
+            "addq %0,%0\n"
+            "adcq %1,%1\n"
+            : "=r"(x[0]), "=r"(x[1])
+            : "0" (x[0]), "1"(x[1])
+            :);
+#else
+    x[1] <<= 1;
+    x[1] |= ((long)x[0]) < 0;
+    x[0] <<= 1;
+#endif
+}
+
+template<int WIDTH>
+unsigned int lingen_qcode_do_tmpl(lingen_qcode_data_ptr qq)
 {
     unsigned int m = qq->m;
     unsigned int b = qq->b;
     unsigned int n = b - m;
 
 #ifdef  SWAP_E
-    ulmat_colmajor E(m, b);
+    ulmat_colmajor<WIDTH> E(m, b);
 #else
-    ulmat_rowmajor E(m, b);
+    ulmat_rowmajor<WIDTH> E(m, b);
 #endif
 
 #ifdef  SWAP_PI
-    ulmat_colmajor P(b, b);
+    ulmat_colmajor<WIDTH> P(b, b);
 #else
-    ulmat_rowmajor P(b, b);
+    ulmat_rowmajor<WIDTH> P(b, b);
 #endif
 
-    ASSERT_ALWAYS(qq->length <= ULONG_BITS);
+    ASSERT_ALWAYS(qq->length <= WIDTH * ULONG_BITS);
     for (unsigned int i = 0; i < m; i++) {
         for(unsigned int j = 0 ; j < b ; j++) {
-            E(i, j) = qq->iptrs[i * b + j][0];
+            memcpy(E(i, j), qq->iptrs[i * b + j], WIDTH * sizeof(unsigned long));
         }
     }
 
     for (unsigned int i = 0; i < b; i++) {
-        P(i, i) = 1;
+        P(i, i)[0] = 1;
         qq->local_delta[i] = 0;
     }
 
@@ -170,7 +195,8 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
 
     unsigned int e = 0;
     for ( ; e < qq->length; e++) {
-	uint64_t mask = (uint64_t) 1 << e;
+	uint64_t mask = (uint64_t) 1 << (e % ULONG_BITS);
+	int mpos = e / ULONG_BITS;
         vector<int> is_modified(m + n, false);
 #if 0
 	unsigned int md = UINT_MAX;
@@ -182,7 +208,7 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
 	    unsigned int min_degree = UINT_MAX;
             unsigned int pivot = m + n;
 	    for (unsigned int j = 0; j < m + n; j++)
-		if ((E(i, j) & mask) && (qq->delta[j] < min_degree)) {
+		if ((E(i, j)[mpos] & mask) && (qq->delta[j] < min_degree)) {
 		    min_degree = qq->delta[j];
 		    pivot = j;
 		}
@@ -196,27 +222,29 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
             is_modified[pivot] |= 2;
 	    for (unsigned int k = 0; k < m + n; k++) {
                 if (k == pivot) continue;
-		if (!(E(i, k) & mask)) continue;
+		if (!(E(i, k)[mpos] & mask)) continue;
                 is_modified[k] |= 1;
 #if defined(SWAP_E) && defined(HAVE_MPN_XOR_N)
-                mpn_xor_n (E.column(k), E.column(k), E.column(pivot), m);
+                mpn_xor_n ((unsigned long*)E.column(k),(unsigned long*) E.column(k),(unsigned long*) E.column(pivot), m * WIDTH);
 #else
                 for (unsigned int l = 0; l < m; l++)
-                    E(l, k) ^= E(l, pivot);
+                    for (unsigned int s = 0; s < WIDTH; s++)
+                        E(l, k)[s] ^= E(l, pivot)[s];
 #endif
 #if defined(SWAP_PI) && defined(HAVE_MPN_XOR_N)
-                mpn_xor_n (P.column(k), P.column(k), P.column(pivot), m + n);
+                mpn_xor_n ((unsigned long*)P.column(k), (unsigned long*)P.column(k), (unsigned long*)P.column(pivot), (m + n) * WIDTH);
 #else
                 for (unsigned int l = 0; l < m + n; l++)
-                    P(l, k) ^= P(l, pivot);
+                    for (unsigned int s = 0; s < WIDTH; s++)
+                        P(l, k)[s] ^= P(l, pivot)[s];
 #endif
                 if (qq->local_delta[pivot] > qq->local_delta[k])
                     qq->local_delta[k] = qq->local_delta[pivot];
 	    }
 	    for (unsigned int l = 0; l < m; l++)
-                E(l, pivot) <<= 1;
+                lshift1(E(l, pivot));
 	    for (unsigned int l = 0; l < m + n; l++)
-                P(l, pivot) <<= 1;
+                lshift1(P(l, pivot));
 	    qq->delta[pivot] += 1;
             qq->local_delta[pivot]++;
 	}
@@ -232,9 +260,25 @@ unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
 
     for (unsigned int i = 0; i < b; i++) {
         for(unsigned int j = 0 ; j < b ; j++) {
-            qq->optrs[i * b + j][0] = P(i, j);
+            memcpy(qq->optrs[i * b + j], P(i, j), WIDTH * sizeof(unsigned long));
         }
     }
     qq->t += e;
     return e;
+}
+
+unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
+{
+    if (qq->length <= ULONG_BITS) {
+        return lingen_qcode_do_tmpl<1>(qq);
+    } else if (qq->length <= 2 * ULONG_BITS) {
+        return lingen_qcode_do_tmpl<2>(qq);
+    } else if (qq->length <= 3 * ULONG_BITS) {
+        return lingen_qcode_do_tmpl<3>(qq);
+    } else if (qq->length <= 4 * ULONG_BITS) {
+        return lingen_qcode_do_tmpl<4>(qq);
+    }
+    cerr << "quadratic algorithm not supported for base length " << qq->length << endl;
+    abort();
+    return 0;
 }
