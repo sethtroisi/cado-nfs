@@ -1069,9 +1069,11 @@ static unsigned int find_indexes_min(unsigned int ** L, uint64_array_t * indexes
     }
   }
   for (unsigned int i = 0; i < V; i++) {
-    if (min == indexes[i]->array[index[i]]) {
-      (*L)[size] = i;
-      size++;
+    if (indexes[i]->length != 0) {
+      if (min == indexes[i]->array[index[i]]) {
+        (*L)[size] = i;
+        size++;
+      }
     }
   }
   * L = realloc(* L, size * sizeof(unsigned int));
@@ -1127,8 +1129,9 @@ void find_relations(uint64_array_t * indexes, uint64_t number_element,
   uint64_t length_tot = 0;
   for (unsigned int i = 0; i < V; i++) {
     index[i] = 0;
-    ASSERT(indexes[i]->length != 0);
-    length_tot += (indexes[i]->length - 1);
+    if (indexes[i]->length != 0) {
+      length_tot += (indexes[i]->length - 1);
+    }
   }
 
   if (0 != length_tot) {
@@ -1164,18 +1167,34 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "fbb3", "factor base bound on the number field 3");
   param_list_decl_usage(pl, "fbb4", "factor base bound on the number field 4");
   param_list_decl_usage(pl, "fbb5", "factor base bound on the number field 5");
+  param_list_decl_usage(pl, "fbb6", "factor base bound on the number field 6");
+  param_list_decl_usage(pl, "fbb7", "factor base bound on the number field 7");
+  param_list_decl_usage(pl, "fbb8", "factor base bound on the number field 8");
+  param_list_decl_usage(pl, "fbb9", "factor base bound on the number field 9");
   param_list_decl_usage(pl, "thresh2", "threshold on the number field 2");
   param_list_decl_usage(pl, "thresh3", "threshold on the number field 3");
   param_list_decl_usage(pl, "thresh4", "threshold on the number field 4");
   param_list_decl_usage(pl, "thresh5", "threshold on the number field 5");
+  param_list_decl_usage(pl, "thresh6", "threshold on the number field 6");
+  param_list_decl_usage(pl, "thresh7", "threshold on the number field 7");
+  param_list_decl_usage(pl, "thresh8", "threshold on the number field 8");
+  param_list_decl_usage(pl, "thresh9", "threshold on the number field 9");
   param_list_decl_usage(pl, "lpb2", "threshold on the number field 2");
   param_list_decl_usage(pl, "lpb3", "threshold on the number field 3");
   param_list_decl_usage(pl, "lpb4", "threshold on the number field 4");
   param_list_decl_usage(pl, "lpb5", "threshold on the number field 5");
+  param_list_decl_usage(pl, "lpb6", "threshold on the number field 6");
+  param_list_decl_usage(pl, "lpb7", "threshold on the number field 7");
+  param_list_decl_usage(pl, "lpb8", "threshold on the number field 8");
+  param_list_decl_usage(pl, "lpb9", "threshold on the number field 9");
   param_list_decl_usage(pl, "f2", "polynomial that defines the number field 2");
   param_list_decl_usage(pl, "f3", "polynomial that defines the number field 3");
   param_list_decl_usage(pl, "f4", "polynomial that defines the number field 4");
   param_list_decl_usage(pl, "f5", "polynomial that defines the number field 5");
+  param_list_decl_usage(pl, "f6", "polynomial that defines the number field 6");
+  param_list_decl_usage(pl, "f7", "polynomial that defines the number field 7");
+  param_list_decl_usage(pl, "f8", "polynomial that defines the number field 8");
+  param_list_decl_usage(pl, "f9", "polynomial that defines the number field 9");
 }
 
 /*
@@ -1226,7 +1245,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   }
 
   param_list_parse_uint(pl, "V", V);
-  ASSERT(* V >= 2 && * V < 10);
+  ASSERT(* V >= 2 && * V < 11);
 
   unsigned int t;
   int * r;
@@ -1451,7 +1470,6 @@ int main(int argc, char * argv[])
         }
 
         sec = seconds();
-        //TODO: do the MNFS way fo find_relation.
         find_relations(indexes, array->number_element, lpb, matrix, f, H, V);
         sec_cofact = seconds() - sec;
 
