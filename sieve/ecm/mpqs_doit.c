@@ -49,6 +49,23 @@ typedef struct {
 } hash_struct;
 typedef hash_struct hash_t[1];
 
+typedef struct
+{
+  mpz_t z;              /* P[0] * P[1] * ... * P[n-1] */
+  mpz_t **x;            /* product tree */
+  mpz_t *y;             /* smooth parts of x[0][] */
+  mpz_t *axb;           /* values of a*i+b */
+  unsigned int logm;
+  unsigned int m;       /* m = 2^logm */
+  unsigned int size;    /* number of elements stored in x[0][] */
+} bernstein_struct;
+typedef bernstein_struct bernstein_t[1];
+
+void init_tree (bernstein_t, unsigned int, unsigned long *, unsigned int);
+void clear_tree (bernstein_t);
+void accumulate (bernstein_t, mpz_t, mpz_t);
+void get_smooth (bernstein_t);
+
 /* For i < 50, isprime_table[i] == 1 iff i is prime */
 static unsigned char isprime_table[] = {
 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0,
@@ -198,17 +215,6 @@ setbit (mpz_t row, int shift, unsigned long i)
   mpz_setbit (row, shift + i);
 }
 
-static inline void
-update_W (mpz_t row, int shift, int ncol, unsigned short *W, long *ncolw)
-{
-  for (int i = 0; i <= ncol; i++)
-    if (mpz_tstbit (row, shift + i))
-      {
-        *ncolw += (W[i] == 0);
-        W[i] ++;
-      }
-}
-
 /* res=2: found a new full relation from two partial relations */
 void
 smooth_stat (int res)
@@ -269,9 +275,9 @@ hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y)
   if (H->p[h] == 0)
     {
       H->p[h] = p;
-      mpz_swap (H->row[h], row);
-      mpz_swap (H->x[h], x);
-      mpz_swap (H->y[h], y);
+      mpz_set (H->row[h], row);
+      mpz_set (H->x[h], x);
+      mpz_set (H->y[h], y);
       H->size ++;
       return 0;
     }
@@ -295,39 +301,22 @@ hash_clear (hash_t H)
       mpz_clear (H->x[i]);
       mpz_clear (H->y[i]);
     }
+  free (H->p);
   free (H->row);
   free (H->x);
   free (H->y);
 }
 
-/* Check that ((a*i+b)^2-N)/a is smooth. By construction, almost all inputs
-   are smooth.
+/* Trial divide r (which should be smooth) over the factor base.
    We put relations in column 'shift' and above.
-   Return:
-   - 1 if relation factors completely over factor base (full)
-   - p > 1 if relation factors completely over factor base with large-prime
-     factor p <= L
-   - 0 otherwise
-   In case 1 or p, it fills the corresponding bit-vector 'row' for factor base.
-   L is the large prime bound.
 */
-static unsigned int
-is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
-           long ncol, int shift, mpz_t row, mpz_t r, unsigned long L)
+static void
+trialdiv (mpz_t r, fb_t *F, long ncol, int shift, mpz_t row)
 {
-  unsigned int res = 0;
+  unsigned int i;
   unsigned long B = F[ncol-1].p, R;
-  unsigned long BB = B * B;
-
-  ASSERT (L <= BB);
 
   mpz_set_ui (row, 0);
-
-  mpz_set_ui (r, a);
-  mpz_mul_si (r, r, i);
-  mpz_add_ui (r, r, 2*b);
-  mpz_mul_si (r, r, i);
-  mpz_add (r, r, c);
 
   if (mpz_sgn (r) < 0)
     {
@@ -395,44 +384,11 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
                   ASSERT(R == F[i].p);
                   setbit (row, shift, i + 1);
                 }
-              res = 1;
-              goto end;
+              return;
             }
-          /* now R > B or R > p^2 */
-          else if (R <= L && R <= p * p)
-            {
-              res = R; /* one large prime */
-              goto end;
-            }
-          /* now R > L or R > p^2 */
-          else if (R <= p * p) /* L < R < p^2 cannot be smooth */
-            goto end;
-          else if (R <= BB && R <= p * p * p)
-            {
-              /* if R = q0 * q1 with p < q0 < q1 < B, then q0 >= R/B */
-              q = R / B;
-              if (q > p)
-                {
-                  i = prime_index[q];
-                  /* we might have R < P[i]^2 since the sieving is not 100%
-                     accurate, and thus we might have q1 > B */
-                  continue;
-                }
-            }
-          /* now R > B^2 >= L or R > p^3 */
         }
     }
-  if (R == 1)
-    res = 1;
-  else
-    {
-      ASSERT(R > B);
-      if (R <= L)
-        res = R;
-    }
- end:
-  smooth_stat (res);
-  return res;
+  ASSERT(0);
 }
 
 static inline void
@@ -720,7 +676,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   uint64_t *S8, mask8 = 0;
   unsigned long p, k, Nbits, M, i, wrel, L = 0, *P, *Q;
   long j, nrel = 0, lim, ncolw = 0, ncol;
-  mpz_t a, b, c, sqrta, r;
+  mpz_t a, b, c, sqrta, r, axb;
   double radix, logradix = 0;
   long st;
   static long init_time = 0, sieve_time = 0, check_time = 0;
@@ -728,6 +684,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   unsigned short *W; /* column weight */
   fb_t *F;
   hash_t H;
+  bernstein_t Z;
 
   /* assume N0 is odd */
   ASSERT_ALWAYS (mpz_fdiv_ui (N0, 2) == 1);
@@ -748,6 +705,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       M = 1 << (11 + ((Nbits - 56) >> 4));
       ncol = 43 << ((Nbits - 56) >> 4);
     }
+
   /* in case M fills the L1 cache, reduce it a bit */
   if (M == 32768)
     M -= M / 12;
@@ -762,6 +720,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   mpz_init (sqrta);
   mpz_init (b);
   mpz_init (c);
+  mpz_init (axb);
 
   /* compute factor base */
   F = malloc (ncol * sizeof (fb_t));
@@ -808,6 +767,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       mpz_init (X[i]);
       mpz_init (Y[i]);
     }
+  /* FIXME: the constant 4 here should depend on the number size */
+  init_tree (Z, 4, P, lim);
 
   /* initialize sieve area [-M, M-1] */
   S = malloc (2 * M * sizeof (char));
@@ -1031,30 +992,58 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           if (S[i] >= threshold)
             {
               long ii = (long) i - (long) M;
-              unsigned int res;
-              res = is_smooth (aa, ii, bb, c, F, ncol, wrel, Mat[nrel], r, L);
-              if (res >= 1) /* full or partial relation */
+              unsigned int q;
+
+              mpz_mul_si (axb, a, ii);
+              mpz_add_ui (axb, axb, bb);
+              mpz_add_ui (r, axb, bb);
+              mpz_mul_si (r, r, ii);
+              mpz_add (r, r, c);
+              accumulate (Z, r, axb);
+              if (Z->size == Z->m)
                 {
-                  mpz_mul_si (X[nrel], a, ii);
-                  mpz_add_ui (X[nrel], X[nrel], bb);
-                  mpz_mul (Y[nrel], X[nrel], X[nrel]);
-                  mpz_sub (Y[nrel], Y[nrel], N);
-                }
-              if (res > 1)
-                {
-                  res = hash_insert (H, res, Mat[nrel], X[nrel], Y[nrel]);
-                  if (res == 1)
-                    smooth_stat (2);
-                }
-              if (res == 1) /* new relation */
-                {
-                  /* matrix M has nrel rows, the left part has wrel columns and
-                     is initially the identity matrix, the right part has
-                     ncol+1 columns and contains initially the relations */
-                  mpz_setbit (Mat[nrel], nrel);
-                  update_W (Mat[nrel], wrel, ncol, W, &ncolw);
-                  if (++nrel >= ncolw + WANT_EXCESS)
-                    goto end_check;
+                  get_smooth (Z);
+                  for (unsigned int i = 0; i < Z->size; i++)
+                    {
+                    if (mpz_cmp_ui (Z->x[0][i], L) > 0)
+                      smooth_stat (0); /* non smooth */
+                    else
+                      {
+                        mpz_set (X[nrel], Z->axb[i]);
+                        mpz_mul (Y[nrel], Z->axb[i], Z->axb[i]);
+                        mpz_sub (Y[nrel], Y[nrel], N);
+                        q = mpz_get_ui (Z->x[0][i]);
+                        /* FIXME: only perform trial division for smooth
+                           relations */
+                        trialdiv (Z->y[i], F, ncol, wrel, Mat[nrel]);
+
+                        smooth_stat (q);
+                        if (q > 1)
+                          {
+                            q = hash_insert (H, q, Mat[nrel], X[nrel], Y[nrel]);
+                            if (q == 1)
+                              smooth_stat (2);
+                          }
+
+                        if (q == 1) /* new relation */
+                          {
+                            /* matrix M has nrel rows, the left part has wrel
+                               columns and is initially the identity matrix,
+                               the right part has ncol+1 columns and contains
+                               initially the relations */
+                            mpz_setbit (Mat[nrel], nrel);
+                            for (int i = 0; i <= ncol; i++)
+                              if (mpz_tstbit (Mat[nrel], wrel + i))
+                                {
+                                  ncolw += W[i] == 0;
+                                  W[i] ++;
+                                }
+                            if (++nrel >= ncolw + WANT_EXCESS)
+                              goto end_check;
+                          }
+                      }
+                    }
+                  Z->size = 0;
                 }
             }
         }
@@ -1089,14 +1078,129 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   free (P);
   free (Q);
   free (W);
+  mpz_clear (axb);
   mpz_clear (c);
   mpz_clear (b);
   mpz_clear (sqrta);
   mpz_clear (a);
   mpz_clear (N);
+  clear_tree (Z);
 
   if (verbose)
     printf ("Total time: %ldms (init %ld, sieve %ld, check %ld, gauss %ld)\n",
             total_time, init_time, sieve_time, check_time, gauss_time);
+}
+
+/******************* Bernstein smooth part algorithm *************************/
+
+/* put in z the product P[0] * P[1] * ... * P[n-1] */
+void
+compute_P (mpz_t z, unsigned long *P, unsigned int n)
+{
+  if (n == 1)
+    mpz_set_ui (z, P[0]);
+  else
+    {
+      unsigned int k = (n + 1) / 2;
+      mpz_t t;
+
+      compute_P (z, P, k);
+      mpz_init (t);
+      compute_P (t, P + k, n - k);
+      mpz_mul (z, z, t);
+      mpz_clear (t);
+    }
+}
+
+/* m = 2^logm is the number of x[] we accumulate */
+void
+init_tree (bernstein_t T, unsigned int logm, unsigned long *P, unsigned int n)
+{
+  unsigned int m = 1 << logm, i, j;
+
+  mpz_init (T->z);
+  compute_P (T->z, P, n);
+  T->logm = logm;
+  T->m = m;
+  T->size = 0;
+  T->x = malloc ((logm + 1) * sizeof (mpz_t*));
+  for (i = 0; i <= logm; i++)
+    {
+      T->x[i] = malloc ((m >> i) * sizeof (mpz_t));
+      for (j = 0; j < (m >> i); j++)
+        mpz_init (T->x[i][j]);
+    }
+  T->y = malloc (m * sizeof (mpz_t));
+  for (i = 0; i < m; i++)
+    mpz_init (T->y[i]);
+  T->axb = malloc (m * sizeof (mpz_t));
+  for (i = 0; i < m; i++)
+    mpz_init (T->axb[i]);
+}
+
+void
+clear_tree (bernstein_t T)
+{
+  unsigned int logm = T->logm, m = T->m, i, j;
+
+  mpz_clear (T->z);
+  for (i = 0; i <= logm; i++)
+    {
+      for (j = 0; j < (m >> i); j++)
+        mpz_clear (T->x[i][j]);
+      free (T->x[i]);
+    }
+  free (T->x);
+  T->size = 0;
+  for (i = 0; i < m; i++)
+    mpz_clear (T->y[i]);
+  free (T->y);
+  for (i = 0; i < m; i++)
+    mpz_clear (T->axb[i]);
+  free (T->axb);
+}
+
+/* put in y[0], ..., y[n-1] the smooth parts of x[0], ..., x[n-1] */
+void
+get_smooth (bernstein_t T)
+{
+  unsigned int logm = T->logm, m = T->m, i, j, e;
+
+  /* product tree */
+  for (i = 1; i <= logm; i++)
+    for (j = 0; j < (m >> i); j++)
+      mpz_mul (T->x[i][j], T->x[i-1][2*j], T->x[i-1][2*j+1]);
+
+  /* remainder tree */
+  mpz_mod (T->x[logm][0], T->z, T->x[logm][0]);
+  for (i = logm; i-- > 0;)
+    for (j = 0; j < (m >> i); j++)
+      mpz_mod ((i > 0) ? T->x[i][j] : T->y[j], T->x[i+1][j/2], T->x[i][j]);
+
+  e = 8; /* we want to get all prime powers up to p^e in the smooth part */
+
+  /* compute modular powers */
+  for (i = 0; i < T->size; i++)
+    mpz_powm_ui (T->y[i], T->y[i], e, T->x[0][i]);
+
+  /* compute gcd's */
+  for (i = 0; i < T->size; i++)
+    {
+      mpz_gcd (T->y[i], T->y[i], T->x[0][i]);
+      if (mpz_sgn (T->x[0][i]) < 0)
+        mpz_neg (T->y[i], T->y[i]);
+      mpz_divexact (T->x[0][i], T->x[0][i], T->y[i]);
+      /* y[i] contains the smooth part, x[0][i] the non-smooth part */
+    }
+}
+
+/* add a new value of x */
+void
+accumulate (bernstein_t T, mpz_t x, mpz_t axb)
+{
+  ASSERT_ALWAYS(T->size < T->m);
+  mpz_set (T->x[0][T->size], x);
+  mpz_set (T->axb[T->size], axb);
+  T->size ++;
 }
 
