@@ -311,7 +311,7 @@ hash_clear (hash_t H)
    We put relations in column 'shift' and above.
 */
 static void
-trialdiv (mpz_t r, fb_t *F, long ncol, int shift, mpz_t row)
+trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
 {
   unsigned int i;
   unsigned long B = F[ncol-1].p, R;
