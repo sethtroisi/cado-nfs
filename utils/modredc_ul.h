@@ -124,6 +124,7 @@ modredcul_redc (residueredcul_t r, const unsigned long plow,
 
   modredcul_add (r, &t, &thigh, m);
 #endif
+  ASSERT_EXPENSIVE (r[0] < m[0].m);
 }
 
 
@@ -714,6 +715,35 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 
 #if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
+#endif
+}
+
+
+/* For a residue class a (mod m) and non-negative integer b, set r to
+   the smallest non-negative integer in the residue class a*b (mod m). */
+
+MAYBE_UNUSED
+static inline void
+modredcul_mul_ul_ul (unsigned long *r, const residueredcul_t a,
+                     const unsigned long b, const modulusredcul_t m)
+{
+  unsigned long plow, phigh;
+
+  ASSERT_EXPENSIVE (m[0].m % 2 != 0);
+  ASSERT_EXPENSIVE (a[0] < m[0].m);
+#if defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%d) %% %lu", a[0], b, LONG_BIT, m[0].m);
+#endif
+
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b);
+  /* We have a <= m-1, b <= 2^LONG_BIT - 1. Thus the product
+     phigh:plow <= (m-1)*(2^LONG_BIT - 1) = m*2^LONG_BIT - 2^LONG_BIT - m + 1,
+     and with m >= 1,
+     phigh:plow <= m*2^LONG_BIT - 2^LONG_BIT, so phigh < m. */
+  modredcul_redc (r, plow, phigh, m);
+
+#if defined(MODTRACE)
+  printf (" == %lu /* PARI */ \n", *r);
 #endif
 }
 
