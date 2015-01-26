@@ -64,6 +64,12 @@ class Polynomial(list):
     >>> p[0] = 1
     >>> p.degree == 0
     True
+    >>> p[42] = 1
+    >>> p.degree == 42
+    True
+    >>> p[42] = 0
+    >>> p.degree == 0
+    True
     """
     @property
     def degree(self):
@@ -73,6 +79,9 @@ class Polynomial(list):
         if index >= len(self):
             self.extend([0]*(index + 1 - len(self)))
         list.__setitem__(self, index, value)
+        # Remove leading zeroes
+        while len(self) > 0 and self[len(self) - 1] == 0:
+            self.pop()
 
     def __str__(self):
         xpow = ["", "*x"] + ["*x^%d" % i for i in range(2, len(self))]
