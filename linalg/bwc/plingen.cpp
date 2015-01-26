@@ -2981,7 +2981,7 @@ int main(int argc, char *argv[])
 
 
         matpoly_init(ab, E, m, b, safe_guess);
-        matpoly_init(ab, pi, b, b, expected_pi_length(aa->bm->d, guess));
+        matpoly_init(ab, pi, 0, 0, 0);  /* pre-init for now */
 
 
         matpoly_write_task E_writer(aa, E);
