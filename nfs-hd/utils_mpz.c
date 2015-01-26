@@ -120,10 +120,10 @@ static int compare(const void * p1, const void * p2)
 void sort_factor(factor_ptr factor)
 {
   qsort(factor->factorization, factor->number, sizeof(factor->factorization[0]),
-	compare);
+        compare);
 }
 
-void gmp_factorize(factor_ptr factor, mpz_t z)
+unsigned int gmp_factorize(factor_ptr factor, mpz_t z)
 {
   unsigned int number = mpz_sizeinbase(z, 2);
   factor_init(factor, number);
@@ -136,15 +136,19 @@ void gmp_factorize(factor_ptr factor, mpz_t z)
   }
   factor_realloc(factor, nb);
   sort_factor(factor);
-}
 
-void factor_printf(factor_srcptr factor)
-{
-  printf("[");
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_set_ui(tmp, 1);
   for (unsigned int i = 0; i < factor->number - 1; i++) {
-    gmp_printf("%Zd, ", factor->factorization[i]);
+    mpz_mul(tmp, tmp, factor->factorization[i]);
   }
-  gmp_printf("%Zd]\n", factor->factorization[factor->number - 1]);
+  unsigned int assert_facto = 1;
+  if (mpz_cmp(tmp, z)) {
+    assert_facto = 0;
+  }
+  mpz_clear(tmp);
+  return assert_facto;
 }
 
 void factor_fprintf(FILE * file, factor_srcptr factor)

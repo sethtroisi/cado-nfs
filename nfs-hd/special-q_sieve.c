@@ -956,12 +956,53 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
   uint64_array_realloc(indexes, ind);
 }
 
+#ifdef ASSERT_FACTO
+void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
+                     mpz_poly_srcptr a, unsigned int t, unsigned int V,
+                     unsigned int size, unsigned int * assert_facto)
+#else
 void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
                      mpz_poly_srcptr a, unsigned int t, unsigned int V,
                      unsigned int size)
+#endif
 {
   printf("# ");
   mpz_poly_fprintf(stdout, a);
+
+#ifdef ASSERT_FACTO
+  unsigned int index = 0;
+  printf("# ");
+  for (unsigned int i = 0; i < V - 1; i++) {
+    if (index < size) {
+      if (i == L[index]) {
+        if (I[index]) {
+          printf("%u:", assert_facto[index]);
+        } else {
+          printf(":");
+        }
+        index++;
+      } else {
+        printf(":");
+      }
+    } else {
+      printf(":");
+    }
+  }
+
+  if (index < size) {
+    if (V - 1 == L[index]) {
+      if (I[index]) {
+        printf("%u", assert_facto[index]);
+      }
+      index++;
+    }
+  }
+
+  printf("\n");
+#else
+  unsigned int index = 0;
+#endif
+
 
   for (int i = 0; i < a->deg; i++) {
     gmp_printf("%Zd,", a->coeff[i]);
@@ -976,7 +1017,7 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
     printf("0:");
   }
 
-  unsigned int index = 0;
+  index = 0;
   for (unsigned int i = 0; i < V - 1; i++) {
     if (index < size) {
       if (i == L[index]) {
@@ -1021,13 +1062,24 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
   mpz_t * res = malloc(sizeof(mpz_t) * size);
   factor_t * factor = malloc(sizeof(factor_t) * size);
   unsigned int * I = malloc(sizeof(unsigned int) * size);
+
+#ifdef ASSERT_FACTO
+  unsigned int * assert_facto = malloc(sizeof(unsigned int) * size);
+#endif
+
   unsigned int find = 0;
   /* Not optimal */
   for (unsigned int i = 0; i < size; i++) {
     mpz_init(res[i]);
     mpz_poly_resultant(res[i], f[L[i]], a);
     mpz_abs(res[i], res[i]);
+
+#ifdef ASSERT_FACTO
+    assert_facto[i] = gmp_factorize(factor[i], res[i]);
+#else
     gmp_factorize(factor[i], res[i]);
+#endif
+
     if (factor_is_smooth(factor[i], lpb[L[i]])) {
       find++;
       I[i] = 1;
@@ -1036,7 +1088,11 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
     }
   }
   if (find >= 2) {
+#ifdef ASSERT_FACTO
+    printf_relation(factor, I, L, a, t, V, size, assert_facto);
+#else
     printf_relation(factor, I, L, a, t, V, size);
+#endif
   }
 
   for (unsigned int i = 0; i < size; i++) {
@@ -1046,6 +1102,9 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
   free(res);
   free(factor);
   free(I);
+#ifdef ASSERT_FACTO
+  free(assert_facto);
+#endif
 }
 
 static uint64_t sum_index(uint64_t * index, unsigned int V)
