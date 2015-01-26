@@ -389,10 +389,8 @@ trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
         }
     }
 
-  /* if we reach here, then R was not completely factored, which should not
-     happen */
-  printf ("R=%lu\n", R);
-  ASSERT(0);
+  /* if we reach here, then R should be completely factored */
+  ASSERT(R == 1);
 }
 
 static inline void
