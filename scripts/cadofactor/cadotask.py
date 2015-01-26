@@ -864,13 +864,13 @@ class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.did_import = False
+        self._did_import = False
 
     def run(self):
         super().run()
-        if "import" in self.params and not self.did_import:
+        if "import" in self.params and not self._did_import:
             self.import_files(self.params["import"])
-            self.did_import = True
+            self._did_import = True
 
     def import_files(self, input_filename):
         if input_filename.startswith('@'):
@@ -882,6 +882,9 @@ class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
             filenames = [input_filename]
         for filename in filenames:
             self.import_one_file(filename)
+
+    def did_import(self):
+        return self._did_import
 
     @abc.abstractmethod
     def import_one_file(self, filename):
@@ -1496,7 +1499,8 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "adrange": int, "admin": 0, "admax": int,
-            "I": int, "alim": int, "rlim": int, "nrkeep": 20})
+            "I": int, "alim": int, "rlim": int, "nrkeep": 20,
+            "import_sopt": [str]})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
@@ -1670,6 +1674,18 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
 
     def run(self):
         super().run()
+
+        if self.did_import() and "import_sopt" in self.params:
+            self.logger.critical("The import and import_sopt parameters "
+                                 "are mutually exclusive")
+            return False
+
+        if self.did_import():
+            self.logger.info("Imported polynomial, skipping this phase")
+            return True
+
+        if "import_sopt" in self.params:
+            self.import_files(self.params["import_sopt"])
 
         worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
                 if self.poly_heap else ""
@@ -1940,7 +1956,8 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "I": int, "alim": int, "rlim": int, "batch": [int]})
+            "I": int, "alim": int, "rlim": int, "batch": [int],
+            "import_ropt": [str]})
     @property
     def stat_conversions(self):
         return (
@@ -1993,6 +2010,18 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                              "Murphy_E = %g",
                              self.state["bestfile"], self.bestpoly.MurphyE)
         
+        if self.did_import() and "import_ropt" in self.params:
+            self.logger.critical("The import and import_ropt parameters "
+                                 "are mutually exclusive")
+            return False
+
+        if self.did_import():
+            self.logger.info("Imported polynomial, skipping this phase")
+            return True
+
+        if "import_ropt" in self.params:
+            self.import_files(self.params["import_sopt"])
+
         # Get the list of polynomials to submit
         self.poly_to_submit = self.send_request(Request.GET_RAW_POLYNOMIALS)
         
@@ -2154,7 +2183,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
     def print_rank(self):
-        if not self.did_import:
+        if not self.did_import():
             rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
             if not rank is None:
                 self.logger.info("Best overall polynomial was %d-th in list "
