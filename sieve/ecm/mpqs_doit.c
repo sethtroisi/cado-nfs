@@ -193,11 +193,20 @@ static unsigned int Primes[MAX_PRIMES] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31
 static int prime_index[INDEX];
 
 static inline void
-setbit (mpz_t row, int shift, unsigned long i, unsigned short *W, long *ncolw)
+setbit (mpz_t row, int shift, unsigned long i)
 {
   mpz_setbit (row, shift + i);
-  *ncolw += (W[i] == 0);
-  W[i] ++;
+}
+
+static inline void
+update_W (mpz_t row, int shift, int ncol, unsigned short *W, long *ncolw)
+{
+  for (int i = 0; i <= ncol; i++)
+    if (mpz_tstbit (row, shift + i))
+      {
+        *ncolw += (W[i] == 0);
+        W[i] ++;
+      }
 }
 
 /* res=2: found a new full relation from two partial relations */
@@ -304,8 +313,7 @@ hash_clear (hash_t H)
 */
 static unsigned int
 is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
-           long ncol, int shift, mpz_t row, unsigned short *W, long *ncolw,
-           mpz_t r, unsigned long L)
+           long ncol, int shift, mpz_t row, mpz_t r, unsigned long L)
 {
   unsigned int res = 0;
   unsigned long B = F[ncol-1].p, R;
@@ -323,7 +331,7 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
 
   if (mpz_sgn (r) < 0)
     {
-      setbit (row, shift, 0, W, ncolw); /* sign is in column 0 */
+      setbit (row, shift, 0); /* sign is in column 0 */
       mpz_neg (r, r);
     }
 
@@ -341,7 +349,7 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
           } while (mpz_divisible_ui_p (r, p));
 
           if (e & 1)
-            setbit (row, shift, i + 1, W, ncolw);
+            setbit (row, shift, i + 1);
 
           /* we don't check for cases where r = 1 or is a prime <= B here,
              since they will have very rarely */
@@ -374,7 +382,7 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
             q = R * F[i].invp;
           } while (q <= F[i].invp2);
           if (e & 1)
-            setbit (row, shift, i + 1, W, ncolw);
+            setbit (row, shift, i + 1);
           /* now since R has no factor <= p it is either 1 or a prime > p,
              or a product > p^2 of at least two primes */
           if (R <= B && R <= p * p)
@@ -385,7 +393,7 @@ is_smooth (unsigned long a, long i, unsigned long b, mpz_t c, fb_t *F,
                 {
                   i = prime_index[R];
                   ASSERT(R == F[i].p);
-                  setbit (row, shift, i + 1, W, ncolw);
+                  setbit (row, shift, i + 1);
                 }
               res = 1;
               goto end;
@@ -1024,8 +1032,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
             {
               long ii = (long) i - (long) M;
               unsigned int res;
-              res = is_smooth (aa, ii, bb, c, F, ncol, wrel, Mat[nrel], W,
-                               &ncolw, r, L);
+              res = is_smooth (aa, ii, bb, c, F, ncol, wrel, Mat[nrel], r, L);
               if (res >= 1) /* full or partial relation */
                 {
                   mpz_mul_si (X[nrel], a, ii);
@@ -1045,6 +1052,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                      is initially the identity matrix, the right part has
                      ncol+1 columns and contains initially the relations */
                   mpz_setbit (Mat[nrel], nrel);
+                  update_W (Mat[nrel], wrel, ncol, W, &ncolw);
                   if (++nrel >= ncolw + WANT_EXCESS)
                     goto end_check;
                 }
