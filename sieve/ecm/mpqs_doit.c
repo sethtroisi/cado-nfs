@@ -258,10 +258,12 @@ hash_init (hash_t H, unsigned long L)
     }
 }
 
-/* Return 0 when large prime p appears for first time,
+/* Return 0 when large prime p appears for first time, and put then in 'row'
+   the smooth part of ((a*i+b)^2-N)/a, in 'x' the value of a*i+b, and in
+   y the value of (a*i+b)^2-N;
    return 1 when it already appeared before, and puts then in 'row' the
-   bit-vector corresponding to the sum of both relations, and in 'x' the
-   product of the two a*i+b values. */
+   product of the two smooth parts, in 'x' the product of the a*i+b values,
+   and in 'y' the product of the (a*i+b)^2-N values. */
 int
 hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y)
 {
@@ -283,7 +285,7 @@ hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y)
     }
   else /* found two relations with same large prime! */
     {
-      mpz_xor (row, row, H->row[h]);
+      mpz_mul (row, row, H->row[h]);
       mpz_mul (x, x, H->x[h]);
       mpz_mul (y, y, H->y[h]);
       return 1;
@@ -632,7 +634,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   unsigned char *S, *T, threshold = 0, mask = 128;
   uint64_t *S8, mask8 = 0;
   unsigned long p, k, Nbits, M, i, wrel, L = 0, *P, *Q;
-  long j, nrel = 0, lim, ncolw = 0, ncol;
+  long j, nrel = 0, lim, ncol;
   mpz_t a, b, c, sqrta, r, axb;
   double radix, logradix = 0;
   long st;
@@ -706,7 +708,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         }
     }
   ASSERT_ALWAYS(F[0].p == 2);
-  double lambda = 1.2;
+  double lambda = 1.25;
   L = (unsigned long) pow ((double) F[ncol-1].p, lambda);
   if (verbose)
     printf ("Using multiplier k=%lu, M=%lu, ncol=%lu, B=%u, L=%lu\n",
@@ -762,7 +764,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   int pols = 0;
   mpz_init (r);
-  while (nrel < ncolw + WANT_EXCESS) {
+  while (nrel < ncol + WANT_EXCESS) {
   sieve_time -= milliseconds ();
   do
     mpz_nextprime (sqrta, sqrta);
@@ -940,7 +942,6 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 #endif
 
   /* find smooth locations */
-  /* ncolw <= ncol+1, and we allocated a matrix of ncol+1+WANT_EXCESS rows */
   for (S8 = (uint64_t*) S, i = 0; i < 2*M; S8++)
     if ((S8[0] & mask8) == 0)
       i += 8;
@@ -976,14 +977,11 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                         mpz_mul (Y[nrel], Z->axb[i], Z->axb[i]);
                         mpz_sub (Y[nrel], Y[nrel], N);
                         q = mpz_get_ui (Z->x[0][i]);
-                        /* FIXME: only perform trial division for smooth
-                           relations */
-                        trialdiv (Z->y[i], F, ncol, wrel, Mat[nrel]);
 
                         smooth_stat (q);
                         if (q > 1)
                           {
-                            q = hash_insert (H, q, Mat[nrel], X[nrel], Y[nrel]);
+                            q = hash_insert (H, q, Z->y[i], X[nrel], Y[nrel]);
                             if (q == 1)
                               smooth_stat (2);
                           }
@@ -994,14 +992,9 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                                columns and is initially the identity matrix,
                                the right part has ncol+1 columns and contains
                                initially the relations */
+                            trialdiv (Z->y[i], F, ncol, wrel, Mat[nrel]);
                             mpz_setbit (Mat[nrel], nrel);
-                            for (int i = 0; i <= ncol; i++)
-                              if (mpz_tstbit (Mat[nrel], wrel + i))
-                                {
-                                  ncolw += W[i] == 0;
-                                  W[i] ++;
-                                }
-                            if (++nrel >= ncolw + WANT_EXCESS)
+                            if (++nrel >= ncol + WANT_EXCESS)
                               goto end_check;
                           }
                       }
