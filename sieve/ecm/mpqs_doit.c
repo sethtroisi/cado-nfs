@@ -315,6 +315,7 @@ trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
 {
   unsigned int i;
   unsigned long B = F[ncol-1].p, R;
+  int e;
 
   mpz_set_ui (row, 0);
 
@@ -324,13 +325,19 @@ trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
       mpz_neg (r, r);
     }
 
-  for (i = 0; i < ncol; i++)
+  /* special case for prime 2 */
+  e = mpz_scan1 (r, 0);
+  mpz_tdiv_q_2exp (r, r, e);
+  if (e & 1)
+    setbit (row, shift, 1);
+
+  for (i = 1; i < ncol; i++)
     {
       unsigned long p = F[i].p;
 
       if (mpz_divisible_ui_p (r, p))
         {
-          int e = 0;
+          e = 0;
 
           do {
             mpz_divexact_ui (r, r, p);
@@ -555,58 +562,6 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t *Y,
   mpz_clear (y);
 }
 
-#if 0
-/* implements the modified Knuth-Schroeppel function, as in Silverman,
-   "The Multiple Polynomial Quadratic Sieve", page 335.
-   This is kept for reference only, since it does not seem to give better
-   results than best_multiplier().
- */
-static int
-best_multiplier2 (const mpz_t N, unsigned long ncol, unsigned long K)
-{
-  unsigned long k, best_k = 1, i, j, p, Np;
-  double alpha, best_alpha = DBL_MAX, g;
-  mpz_t kN, P;
-
-  mpz_init (kN);
-  mpz_init (P);
-  for (k = 1; k <= K; k += 2)
-    {
-      mpz_mul_ui (kN, N, k);
-      alpha = 0.5 * log ((double) k);
-      for (i = j = 0; i < MAX_PRIMES && j < ncol; i++)
-        {
-          p = Primes[i];
-          if (p == 2)
-            {
-              Np = mpz_fdiv_ui (kN, 8);
-              g = (Np == 1) ? 2 : 0;
-            }
-          else
-            {
-              mpz_set_ui (P, p);
-              if (k % p == 0)
-                g = 1.0 / (double) p;
-              else if (mpz_jacobi (kN, P) == 1)
-                g = 2.0 / (double) p;
-              else
-                g = 0.0;
-            }
-          alpha -= g * log ((double) p);
-          j += (g > 0.0);
-        }
-      if (alpha < best_alpha)
-        {
-          best_alpha = alpha;
-          best_k = k;
-        }
-    }
-  mpz_clear (kN);
-  mpz_clear (P);
-  return best_k;
-}
-#endif
-
 /* consider all primes up to B, and all odd multipliers up to K */
 static int
 best_multiplier (const mpz_t N, unsigned long B, unsigned long K)
@@ -750,6 +705,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           j++;
         }
     }
+  ASSERT_ALWAYS(F[0].p == 2);
   double lambda = 1.2;
   L = (unsigned long) pow ((double) F[ncol-1].p, lambda);
   if (verbose)
@@ -1011,6 +967,11 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                       smooth_stat (0); /* non smooth */
                     else
                       {
+                        /* We have (a*x+b)^2 - N = a * y[i] * x[0][i]
+                           where y[i] is the smooth-part (factors <= B)
+                           and x[0][i] is 1 or a large-prime in [B, L].
+                           Warning: the 'a' value might differ between
+                           two partial relations. */
                         mpz_set (X[nrel], Z->axb[i]);
                         mpz_mul (Y[nrel], Z->axb[i], Z->axb[i]);
                         mpz_sub (Y[nrel], Y[nrel], N);
@@ -1201,8 +1162,8 @@ void
 accumulate (bernstein_t T, mpz_t x, mpz_t axb)
 {
   ASSERT_ALWAYS(T->size < T->m);
-  mpz_set (T->x[0][T->size], x);
-  mpz_set (T->axb[T->size], axb);
+  mpz_swap (T->x[0][T->size], x);
+  mpz_swap (T->axb[T->size], axb);
   T->size ++;
 }
 
