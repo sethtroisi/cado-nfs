@@ -1498,7 +1498,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "adrange": int, "admin": 0, "admax": int,
+            "N": int, "adrange": int, "admin": 0, "admax": int,
             "I": int, "alim": int, "rlim": int, "nrkeep": 20,
             "import_sopt": [str]})
     @staticmethod
@@ -1809,6 +1809,10 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         poly = self.parse_poly(text, filename)
         if poly is None:
             return (0, 0)
+        if poly.getN() != self.params["N"]:
+            self.logger.error("Polynomial is for the wrong number to be factored:\n%s",
+                              poly)
+            return (0, 0)
         if not poly.lognorm:
             self.logger.warn("Polynomial in file %s has no lognorm, skipping it",
                              filename)
@@ -1965,7 +1969,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "I": int, "alim": int, "rlim": int, "batch": [int],
+            "N": int, "I": int, "alim": int, "rlim": int, "batch": [int],
             "import_ropt": [str]})
     @property
     def stat_conversions(self):
@@ -2130,6 +2134,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         
         if not poly:
             self.logger.info('No polynomial found in %s', filename)
+            return None
+        if poly.getN() != self.params["N"]:
+            self.logger.error("Polynomial is for the wrong number to be factored:\n%s",
+                              poly)
             return None
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
