@@ -1615,6 +1615,11 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         self._check_best_polynomials()
 
         self.poly_heap = []
+        # If we have "import", discard any existing polynomials
+        if "import" in self.params and self.best_polynomials:
+            self.logger.warning('Have "import" parameter, discarding '
+                                'previously found polynomials')
+            self.best_polynomials.clear()
         self.import_existing_polynomials()
         self._check_best_polynomials()
         self._compare_heap_db()
@@ -1673,6 +1678,10 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                     print("Adding lognorm=%f, key=%s" % (poly.lognorm, oldkey))
 
     def run(self):
+        if self.send_request(Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL):
+            self.logger.info("Skipping this phase, as we will import the final polynomial")
+            return True
+
         super().run()
 
         if self.did_import() and "import_sopt" in self.params:
@@ -1681,7 +1690,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             return False
 
         if self.did_import():
-            self.logger.info("Imported polynomial, skipping this phase")
+            self.logger.info("Imported polynomial(s), skipping this phase")
             return True
 
         if "import_sopt" in self.params:
@@ -2020,7 +2029,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             return True
 
         if "import_ropt" in self.params:
-            self.import_files(self.params["import_sopt"])
+            self.import_files(self.params["import_ropt"])
 
         # Get the list of polynomials to submit
         self.poly_to_submit = self.send_request(Request.GET_RAW_POLYNOMIALS)
@@ -2188,6 +2197,9 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             if not rank is None:
                 self.logger.info("Best overall polynomial was %d-th in list "
                                  "after size optimization", rank)
+    def get_will_import(self):
+        return "import" in self.params
+
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
@@ -4674,6 +4686,7 @@ class Request(Message):
     GET_POLYNOMIAL = object()
     GET_POLYNOMIAL_FILENAME = object()
     GET_HAVE_TWO_ALG_SIDES = object()
+    GET_WILL_IMPORT_FINAL_POLYNOMIAL = object()
     GET_POLY_RANK = object()
     GET_FACTORBASE_FILENAME = object()
     GET_FACTORBASE0_FILENAME = object()
@@ -4871,6 +4884,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             Request.GET_POLYNOMIAL: self.polysel2.get_poly,
             Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
             Request.GET_HAVE_TWO_ALG_SIDES: self.polysel2.get_have_two_alg_sides,
+            Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL: self.polysel2.get_will_import,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FACTORBASE0_FILENAME: self.fb.get_filename0,
             Request.GET_FACTORBASE1_FILENAME: self.fb.get_filename1,
