@@ -70,6 +70,19 @@ class Polynomial(list):
     >>> p[42] = 0
     >>> p.degree == 0
     True
+    >>> p = Polynomial([3,2,1]) # x^2 + 2*x + 3
+    >>> p.eval(0)
+    3
+    >>> p.eval(1)
+    6
+    >>> p.eval(2)
+    11
+    >>> p.eval(-3)
+    6
+    >>> p.eval_h(2,7)
+    179
+    >>> p.eval_h(-3,5)
+    54
     """
     @property
     def degree(self):
@@ -100,6 +113,15 @@ class Polynomial(list):
         for i in range(deg):
             value = value * x + self[deg - i - 1]
         return value
+
+    def eval_h(self, a, b):
+        """ Evaluate homogenized bi-variate polynomial at a,b  """
+        if len(self) == 0:
+            return 0
+        powers_a = [a**i for i in range(self.degree + 1)]
+        powers_b = [b**i for i in range(self.degree + 1)]
+        return sum([coeff * pow_a * pow_b for (coeff, pow_a, pow_b)
+                    in zip(self, powers_a, reversed(powers_b))])
 
     def same_lc(self, other):
         """ Return true if the two polynomials have the same degree
