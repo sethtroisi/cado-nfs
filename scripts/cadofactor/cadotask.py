@@ -320,6 +320,15 @@ class Polynomials(object):
         return self.polyf.same_lc(other.polyf) and \
                self.polyg.same_lc(other.polyg)
 
+    def get_polynomial(self, side):
+        """ Returns one of the two polynomial as indexed by side """
+        assert side == 0 or side == 1
+        # Welp, f is side 1 and g is side 0 :(
+        if side == 0:
+            return self.polyg
+        else:
+            return self.polyf
+
 
 class FilePath(object):
     """ A class that represents a path to a file, where the path should be
@@ -2637,7 +2646,29 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                          rels, filename, self.get_nrels(),
                          self.state["rels_wanted"])
         return True
-    
+
+    re_rel = re.compile(b"(-?\d*),(\d*):(.*)")
+    def verify_relation(self, line, poly):
+        """ Check that the primes listed for a relation divide the value of
+            the polynomials """
+        match = self.re_rel.match(line)
+        if match:
+            a, b, rest = match.groups()
+            a, b = int(a), int(b)
+            sides = rest.split(b":")
+            assert len(sides) == 2
+            for side, primes_as_str in enumerate(sides):
+                value = poly.get_polynomial(side).eval_h(a, b)
+                primes = [int(s, 16) for s in primes_as_str.split(b",")]
+                for prime in primes:
+                    # self.logger.debug("Checking if %d divides %d for a=%d, b=%d", prime, value, a, b)
+                    if value % prime != 0:
+                        self.logger.error("Relation %d,%d invalid: %d does not divide %d",
+                                          a, b, prime, value)
+                        return False
+            return True
+        return None
+
     def parse_rel_count(self, filename):
         (name, ext) = os.path.splitext(filename)
         try:
@@ -2653,8 +2684,19 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                 return None
             else:
                 raise
+        relations_to_check = 10
+        poly = self.send_request(Request.GET_POLYNOMIAL)
         try:
             for line in f:
+                if relations_to_check > 0:
+                    result =  self.verify_relation(line, poly)
+                    if result is True:
+                        relations_to_check -= 1
+                    elif result is False:
+                        f.close()
+                        return None
+                    else: # Did not match: try again
+                        pass
                 match = re.match(br"# Total (\d+) reports ", line)
                 if match:
                     rels = int(match.group(1))
