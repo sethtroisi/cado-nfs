@@ -417,6 +417,23 @@ update (unsigned char *S, unsigned long i, unsigned long p MAYBE_UNUSED,
 #endif
 }
 
+/* Update 8 bytes at a time for p=2. Since b is even, and a, N are odd,
+   the double root of (a*x+b)^2 = N (mod 2) is i=1.
+   Assume M is a multiple of 8.
+*/
+static inline void
+update8 (unsigned char *S, unsigned long M, unsigned char logp)
+{
+  uint64_t l8, *S8 = (uint64_t*) S;
+  unsigned long i;
+
+  ASSERT((M % 8) == 0);
+  l8 = logp;
+  l8 = (l8 << 56) | (l8 << 40) | (l8 << 24) | (l8 << 8);
+  for (i = 0; i < 2*M; i+=8)
+    S8[i>>3] -= l8;
+}
+
 /* put factor in z */
 static void
 gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t *Y,
@@ -728,7 +745,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       mpz_init (Y[i]);
     }
   /* FIXME: the constant 4 here should depend on the number size */
-  init_tree (Z, 4, P, lim);
+  init_tree (Z, 5, P, lim);
 
   /* initialize sieve area [-M, M-1] */
   S = malloc (2 * M * sizeof (char));
@@ -832,32 +849,10 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         F[j].logp = (char) ROUND (log ((double) F[j].p) / logradix);
 
       /* take into account the skipped primes */
-      double skip_value;
-      /* if N = 1 (mod 8), the average power of 2 dividing x^2-N is 2,
-         if N = 3 (mod 8), the average power of 2 dividing x^2-N is 1/2,
-         if N = 5 (mod 8), the average power of 2 dividing x^2-N is 1,
-         if N = 7 (mod 8), the average power of 2 dividing x^2-N is 1/2
-         (cf Status Report on Factoring, by Davis, Holdridge and Simmons,
-         Eurocrypt'84, page 203) */
-      switch (mpz_getlimbn (N, 0) & 7)
-        {
-        case 1:
-          skip_value = 2.0 * log (2.0);
-          break;
-        case 5:
-          skip_value = 1.0 * log (2.0);
-          break;
-        case 3:
-        case 7:
-          skip_value = 0.5 * log (2.0);
-          break;
-        default:
-          ASSERT_ALWAYS(0);
-        }
-#define SKIP_FACTOR 1.5
-      skip_value *= SKIP_FACTOR;
+      double skip_value = 0;
+#define SKIP_FACTOR 1.7
       for (j = 1; j < SKIP; j++)
-        /* the factor 1.5 increases the probability to find relations for which
+        /* SKIP_FACTOR increases the probability to find relations for which
            the contribution of skipped primes is less than average, but on the
            other hand it increases the pressure on trial division for relations
            where that contribution is more than average */
@@ -879,6 +874,31 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           if (i < M)
             T[M + i] = T[M - i];
         }
+
+      /* Sieve 2, 4 and 8 simultaneously:
+         if N = 1 (mod 8) then 8 divides x^2-N for x = 1, 3, 5, 7
+         (but on average 2 divides 4 times)
+         if N = 3 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7
+         if N = 5 (mod 8) then 4 divides x^2-N for x = 1, 3, 5, 7
+         if N = 7 (mod 8) then 2 divides x^2-N for x = 1, 3, 5, 7. */
+      double log2;
+      switch (mpz_getlimbn (N, 0) & 7)
+        {
+        case 1:
+          log2 = 16.0;
+          break;
+        case 5:
+          log2 = 4.0;
+          break;
+        case 3:
+        case 7:
+          log2 = 2.0;
+          break;
+        default:
+          ASSERT_ALWAYS(0);
+        }
+      log2 = ROUND (SKIP_FACTOR * log (log2) / logradix);
+      update8 (T, M, (unsigned char) log2);
 
       unsigned char Tmax;
       Tmax = (T[0] >  T[M]) ? T[0] : T[M];
