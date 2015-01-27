@@ -46,6 +46,7 @@ typedef struct {
   mpz_t *row;         /* bit-vector over the factor base */
   mpz_t *x;           /* value of a*i+b */
   mpz_t *y;           /* value of x^2-N */
+  unsigned long *w;    /* bit pattern of small primes */
 } hash_struct;
 typedef hash_struct hash_t[1];
 
@@ -53,8 +54,9 @@ typedef struct
 {
   mpz_t z;              /* P[0] * P[1] * ... * P[n-1] */
   mpz_t **x;            /* product tree */
-  mpz_t *y;             /* smooth parts of x[0][] */
+  mpz_t *r;             /* smooth part of x[0][] */
   mpz_t *axb;           /* values of a*i+b */
+  unsigned long *w;     /* bit pattern for small primes */
   unsigned int logm;
   unsigned int m;       /* m = 2^logm */
   unsigned int size;    /* number of elements stored in x[0][] */
@@ -63,8 +65,9 @@ typedef bernstein_struct bernstein_t[1];
 
 void init_tree (bernstein_t, unsigned int, unsigned long *, unsigned int);
 void clear_tree (bernstein_t);
-void accumulate (bernstein_t, mpz_t, mpz_t);
+void accumulate (bernstein_t, mpz_t, mpz_t, fb_t *);
 void get_smooth (bernstein_t);
+void setsmall (unsigned long, int, mpz_t);
 
 /* For i < 50, isprime_table[i] == 1 iff i is prime */
 static unsigned char isprime_table[] = {
@@ -249,6 +252,7 @@ hash_init (hash_t H, unsigned long L)
   H->row = malloc (H->alloc * sizeof (mpz_t));
   H->x = malloc (H->alloc * sizeof (mpz_t));
   H->y = malloc (H->alloc * sizeof (mpz_t));
+  H->w = malloc (H->alloc * sizeof (unsigned long));
   for (i = 0; i < H->alloc; i++)
     {
       H->p[i] = 0;
@@ -265,7 +269,8 @@ hash_init (hash_t H, unsigned long L)
    product of the two smooth parts, in 'x' the product of the a*i+b values,
    and in 'y' the product of the (a*i+b)^2-N values. */
 int
-hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y)
+hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y,
+             unsigned long *w)
 {
   unsigned int h;
 
@@ -277,9 +282,10 @@ hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y)
   if (H->p[h] == 0)
     {
       H->p[h] = p;
-      mpz_set (H->row[h], row);
-      mpz_set (H->x[h], x);
-      mpz_set (H->y[h], y);
+      mpz_swap (H->row[h], row);
+      mpz_swap (H->x[h], x);
+      mpz_swap (H->y[h], y);
+      H->w[h] = *w;
       H->size ++;
       return 0;
     }
@@ -288,6 +294,7 @@ hash_insert (hash_t H, unsigned int p, mpz_t row, mpz_t x, mpz_t y)
       mpz_mul (row, row, H->row[h]);
       mpz_mul (x, x, H->x[h]);
       mpz_mul (y, y, H->y[h]);
+      *w ^= H->w[h];
       return 1;
     }
 }
@@ -307,10 +314,12 @@ hash_clear (hash_t H)
   free (H->row);
   free (H->x);
   free (H->y);
+  free (H->w);
 }
 
 /* Trial divide r (which should be smooth) over the factor base.
    We put relations in column 'shift' and above.
+   Assume r > 0.
 */
 static void
 trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
@@ -319,21 +328,18 @@ trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
   unsigned long B = F[ncol-1].p, R;
   int e;
 
-  mpz_set_ui (row, 0);
+  ASSERT (mpz_sgn (r) > 0);
 
-  if (mpz_sgn (r) < 0)
-    {
-      setbit (row, shift, 0); /* sign is in column 0 */
-      mpz_neg (r, r);
-    }
-
+#if SKIP == 0
   /* special case for prime 2 */
   e = mpz_scan1 (r, 0);
   mpz_tdiv_q_2exp (r, r, e);
   if (e & 1)
     setbit (row, shift, 1);
-
   for (i = 1; i < ncol; i++)
+#else
+  for (i = SKIP; i < ncol; i++)
+#endif
     {
       unsigned long p = F[i].p;
 
@@ -745,7 +751,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       mpz_init (Y[i]);
     }
   /* FIXME: the constant 4 here should depend on the number size */
-  init_tree (Z, 5, P, lim);
+  init_tree (Z, 5, P + SKIP, lim - SKIP);
 
   /* initialize sieve area [-M, M-1] */
   S = malloc (2 * M * sizeof (char));
@@ -850,7 +856,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
       /* take into account the skipped primes */
       double skip_value = 0;
-#define SKIP_FACTOR 1.7
+#define SKIP_FACTOR 1.4
       for (j = 1; j < SKIP; j++)
         /* SKIP_FACTOR increases the probability to find relations for which
            the contribution of skipped primes is less than average, but on the
@@ -978,7 +984,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
               mpz_add_ui (r, axb, bb);
               mpz_mul_si (r, r, ii);
               mpz_add (r, r, c);
-              accumulate (Z, r, axb);
+              accumulate (Z, r, axb, F);
               if (Z->size == Z->m)
                 {
                   get_smooth (Z);
@@ -988,7 +994,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                       smooth_stat (0); /* non smooth */
                     else
                       {
-                        /* We have (a*x+b)^2 - N = a * y[i] * x[0][i]
+                        /* We have (a*x+b)^2 - N = a * (-1)^w[i]*y[i]*x[0][i]
                            where y[i] is the smooth-part (factors <= B)
                            and x[0][i] is 1 or a large-prime in [B, L].
                            Warning: the 'a' value might differ between
@@ -1001,7 +1007,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                         smooth_stat (q);
                         if (q > 1)
                           {
-                            q = hash_insert (H, q, Z->y[i], X[nrel], Y[nrel]);
+                            q = hash_insert (H, q, Z->r[i], X[nrel], Y[nrel],
+                                             &(Z->w[i]));
                             if (q == 1)
                               smooth_stat (2);
                           }
@@ -1012,7 +1019,9 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                                columns and is initially the identity matrix,
                                the right part has ncol+1 columns and contains
                                initially the relations */
-                            trialdiv (Z->y[i], F, ncol, wrel, Mat[nrel]);
+                            mpz_set_ui (Mat[nrel], 0);
+                            setsmall (Z->w[i], wrel, Mat[nrel]);
+                            trialdiv (Z->r[i], F, ncol, wrel, Mat[nrel]);
                             mpz_setbit (Mat[nrel], nrel);
                             if (++nrel >= ncol + WANT_EXCESS)
                               goto end_check;
@@ -1106,12 +1115,13 @@ init_tree (bernstein_t T, unsigned int logm, unsigned long *P, unsigned int n)
       for (j = 0; j < (m >> i); j++)
         mpz_init (T->x[i][j]);
     }
-  T->y = malloc (m * sizeof (mpz_t));
+  T->r = malloc (m * sizeof (mpz_t));
   for (i = 0; i < m; i++)
-    mpz_init (T->y[i]);
+    mpz_init (T->r[i]);
   T->axb = malloc (m * sizeof (mpz_t));
   for (i = 0; i < m; i++)
     mpz_init (T->axb[i]);
+  T->w = malloc (m * sizeof (unsigned long));
 }
 
 void
@@ -1129,18 +1139,19 @@ clear_tree (bernstein_t T)
   free (T->x);
   T->size = 0;
   for (i = 0; i < m; i++)
-    mpz_clear (T->y[i]);
-  free (T->y);
+    mpz_clear (T->r[i]);
+  free (T->r);
   for (i = 0; i < m; i++)
     mpz_clear (T->axb[i]);
   free (T->axb);
+  free (T->w);
 }
 
 /* put in y[0], ..., y[n-1] the smooth parts of x[0], ..., x[n-1] */
 void
 get_smooth (bernstein_t T)
 {
-  unsigned int logm = T->logm, m = T->m, i, j, e;
+  unsigned int logm = T->logm, m = T->m, i, j;
 
   /* product tree */
   for (i = 1; i <= logm; i++)
@@ -1151,32 +1162,60 @@ get_smooth (bernstein_t T)
   mpz_mod (T->x[logm][0], T->z, T->x[logm][0]);
   for (i = logm; i-- > 0;)
     for (j = 0; j < (m >> i); j++)
-      mpz_mod ((i > 0) ? T->x[i][j] : T->y[j], T->x[i+1][j/2], T->x[i][j]);
+      mpz_mod ((i > 0) ? T->x[i][j] : T->r[j], T->x[i+1][j/2], T->x[i][j]);
 
-  e = 8; /* we want to get all prime powers up to p^e in the smooth part */
-
-  /* compute modular powers */
+  /* compute squares to detect p^2 */
   for (i = 0; i < T->size; i++)
-    mpz_powm_ui (T->y[i], T->y[i], e, T->x[0][i]);
+    mpz_mul (T->r[i], T->r[i], T->r[i]);
 
   /* compute gcd's */
   for (i = 0; i < T->size; i++)
     {
-      mpz_gcd (T->y[i], T->y[i], T->x[0][i]);
+      mpz_gcd (T->r[i], T->r[i], T->x[0][i]);
       if (mpz_sgn (T->x[0][i]) < 0)
-        mpz_neg (T->y[i], T->y[i]);
-      mpz_divexact (T->x[0][i], T->x[0][i], T->y[i]);
-      /* y[i] contains the smooth part, x[0][i] the non-smooth part */
+        mpz_neg (T->r[i], T->r[i]);
+      mpz_divexact (T->x[0][i], T->x[0][i], T->r[i]);
+      /* r[i] contains the smooth part, x[0][i] the non-smooth part */
     }
 }
 
 /* add a new value of x */
 void
-accumulate (bernstein_t T, mpz_t x, mpz_t axb)
+accumulate (bernstein_t T, mpz_t x, mpz_t axb, fb_t *F)
 {
   ASSERT_ALWAYS(T->size < T->m);
+  if (mpz_sgn (x) >= 0)
+    T->w[T->size] = 0;
+  else
+    {
+      T->w[T->size] = 1;
+      mpz_neg (x, x);
+    }
+  /* FIXME: special case for p=2 */
+  for (int j = 0; j < SKIP; j++)
+    {
+      unsigned long p = F[j].p;
+
+      if (mpz_divisible_ui_p (x, p))
+        {
+          int e = 0;
+          do {
+            mpz_divexact_ui (x, x, p);
+            e ++;
+          } while (mpz_divisible_ui_p (x, p));
+          T->w[T->size] |= (e & 1) << (j + 1);
+        }
+    }
   mpz_swap (T->x[0][T->size], x);
   mpz_swap (T->axb[T->size], axb);
   T->size ++;
+}
+
+void
+setsmall (unsigned long w, int shift, mpz_t r)
+{
+  for (int j = 0; j <= SKIP; j++)
+    if ((w >> j) & 1)
+      mpz_setbit (r, shift + j);
 }
 
