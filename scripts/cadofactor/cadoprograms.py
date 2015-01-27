@@ -988,6 +988,8 @@ class BWC(Program):
                  bwc_bindir: ParameterEq()=None,
                  mm_impl: ParameterEq()=None,
                  cpubinding: ParameterEq()=None,
+                 cantor_threshold: ParameterEq()=None,
+                 lingen_threshold: ParameterEq()=None,
                  precmd: ParameterEq()=None,
                  **kwargs):
         if os.name == "nt":

@@ -58,7 +58,7 @@ char input_file[FILENAME_MAX]={'\0'};
 char output_file[FILENAME_MAX]={'\0'};
 
 /* threshold for the recursive algorithm */
-unsigned int lingen_threshold = 0;
+unsigned int lingen_threshold = 64;
 
 /* threshold for cantor fft algorithm */
 unsigned int cantor_threshold = UINT_MAX;
@@ -1545,10 +1545,8 @@ int main(int argc, char *argv[])
     /* {{{ declare local parameters and switches */
     param_list_decl_usage(pl, "lingen-input-file", "input file for lingen. Defaults to auto fetched from wdir");
     param_list_decl_usage(pl, "lingen-output-file", "output file for lingen. Defaults to [wdir]/F");
-    param_list_decl_usage(pl, "lingen-threshold", "sequence length above which we use the recursive algorithm for lingen");
-    param_list_decl_usage(pl, "cantor-threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
-    param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
-    param_list_configure_alias(pl, "cantor-threshold", "cantor_threshold");
+    param_list_decl_usage(pl, "lingen_threshold", "sequence length above which we use the recursive algorithm for lingen");
+    param_list_decl_usage(pl, "cantor_threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
     /* }}} */
     logline_decl_usage(pl);
 
@@ -1574,8 +1572,8 @@ int main(int argc, char *argv[])
             }
         }
     }
-    param_list_parse_uint(pl, "lingen-threshold", &lingen_threshold);
-    param_list_parse_uint(pl, "cantor-threshold", &cantor_threshold);
+    param_list_parse_uint(pl, "lingen_threshold", &lingen_threshold);
+    param_list_parse_uint(pl, "cantor_threshold", &cantor_threshold);
     /* }}} */
     logline_interpret_parameters(pl);
 

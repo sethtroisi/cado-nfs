@@ -166,9 +166,9 @@ void plingen_decl_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "io-block-size",
             "chunk size for reading the input or writing the output");
 
-    param_list_decl_usage(pl, "lingen-mpi-threshold",
+    param_list_decl_usage(pl, "lingen_mpi_threshold",
             "use MPI matrix operations above this size");
-    param_list_decl_usage(pl, "lingen-threshold",
+    param_list_decl_usage(pl, "lingen_threshold",
             "use recursive algorithm above this size");
     param_list_decl_usage(pl, "save_gathered_checkpoints",
             "save global checkpoints files, instead of per-job files");
@@ -2777,17 +2777,17 @@ int main(int argc, char *argv[])
 
     bm->lingen_threshold = 10;
     bm->lingen_mpi_threshold = 1000;
-    param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
+    param_list_parse_uint(pl, "lingen_threshold", &(bm->lingen_threshold));
     param_list_parse_uint(pl, "display-threshold", &(display_threshold));
 #ifdef HAVE_MPIR
     param_list_parse_uint(pl, "caching-threshold", &(caching_threshold));
 #endif
-    param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
+    param_list_parse_uint(pl, "lingen_mpi_threshold", &(bm->lingen_mpi_threshold));
     param_list_parse_uint(pl, "io-block-size", &(io_block_size));
     gmp_randseed_ui(rstate, bw->seed);
     if (bm->lingen_mpi_threshold < bm->lingen_threshold) {
         bm->lingen_mpi_threshold = bm->lingen_threshold;
-        fprintf(stderr, "Argument fixing: setting lingen-mpi-threshold=%u (because lingen-threshold=%u)\n",
+        fprintf(stderr, "Argument fixing: setting lingen_mpi_threshold=%u (because lingen_threshold=%u)\n",
                 bm->lingen_mpi_threshold, bm->lingen_threshold);
     }
     checkpoint_directory = param_list_lookup_string(pl, "checkpoint-directory");

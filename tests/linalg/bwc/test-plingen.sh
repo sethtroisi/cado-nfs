@@ -42,7 +42,7 @@ dotest() {
     for x in "$@" ; do
         case "$x" in
             plingen_program=*) eval "$x";;
-            lingen-mpi-threshold*) mt_args=("${mt_args[@]}" "$x");;
+            lingen_mpi_threshold*) mt_args=("${mt_args[@]}" "$x");;
             thr*) mt_args=("${mt_args[@]}" "$x"); thr="${x#thr=}";;
             *) args=("${args[@]}" "$x");
                 if [[ "$x" =~ ascii ]] ; then
