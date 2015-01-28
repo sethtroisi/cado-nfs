@@ -2031,6 +2031,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.bestpoly = None
+        if "import" in self.params and "bestpoly" in self.state:
+            self.logger.warning('Have "import" parameter, discarding '
+                                'previously found best polynomial')
+            self.state.clear(["bestpoly", "bestfile"])
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.state.setdefault("nr_poly_submitted", 0)
