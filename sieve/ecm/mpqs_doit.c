@@ -750,7 +750,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       mpz_init (X[i]);
       mpz_init (Y[i]);
     }
-  /* FIXME: the constant 4 here should depend on the number size */
+  /* FIXME: the 2nd argument here should depend on the number size */
   init_tree (Z, 5, P + SKIP, lim - SKIP);
 
   /* initialize sieve area [-M, M-1] */
@@ -1191,14 +1191,20 @@ accumulate (bernstein_t T, mpz_t x, mpz_t axb, fb_t *F)
       T->w[T->size] = 1;
       mpz_neg (x, x);
     }
-  /* FIXME: special case for p=2 */
-  for (int j = 0; j < SKIP; j++)
+  int e;
+#if SKIP >= 1
+  e = mpz_scan1 (x, 0);
+  mpz_tdiv_q_2exp (x, x, e);
+  if (e & 1)
+    T->w[T->size] |= 2;
+#endif
+  for (int j = 1; j < SKIP; j++)
     {
       unsigned long p = F[j].p;
 
       if (mpz_divisible_ui_p (x, p))
         {
-          int e = 0;
+          e = 0;
           do {
             mpz_divexact_ui (x, x, p);
             e ++;
