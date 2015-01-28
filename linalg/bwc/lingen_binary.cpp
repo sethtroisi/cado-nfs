@@ -1005,18 +1005,6 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     }
     polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
 
-#ifdef VERBOSE_4PAUL
-    cout << "input go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
-    cout << E << "\n";
-    cout << "delta";
-    copy(delta.begin(), delta.end(), ostream_iterator<cout>(" "));
-    cout << "\n";
-    cout << "ch";
-    copy(delta.begin(), delta.end(), ostream_iterator<cout>(" "));
-    cout << "\n";
-    double ttq = -seconds();
-#endif
-
     bool finished = false;
 
     {
@@ -1050,13 +1038,6 @@ static bool go_quadratic(polmat& pi)/*{{{*/
         lingen_qcode_clear(qq);
     }
     pi.swap(tmp_pi);
-
-#ifdef VERBOSE_4PAUL
-    ttq += seconds();
-    cout << "output go_quadratic ; t=" << t << "; E_size=" << E.ncoef << "\n";
-    cout << pi << "\n";
-    cout << "Time taken: " << ttq << "\n";
-#endif
 
     tree_stats_leave(stats, finished);
     return finished;
