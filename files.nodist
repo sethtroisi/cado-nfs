@@ -136,3 +136,4 @@ sieve/strategies/test_strategy_cado.c
 sieve/strategies/F9.sh
 sieve/freerel_multipoly.c
 linalg/bwc/lingen.txt
+sieve/CMakeLists-nodist.txt

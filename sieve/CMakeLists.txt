@@ -46,9 +46,6 @@ add_library (las-norms las-norms.c)
 add_executable(freerel freerel.c fb.c)
 target_link_libraries(freerel utils)
 
-add_executable(freerel_multipoly EXCLUDE_FROM_ALL freerel_multipoly.c)
-target_link_libraries(freerel_multipoly utils)
-
 add_subdirectory(ecm)
 add_subdirectory(strategies)
 
