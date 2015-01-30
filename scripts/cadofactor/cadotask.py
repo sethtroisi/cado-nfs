@@ -64,6 +64,25 @@ class Polynomial(list):
     >>> p[0] = 1
     >>> p.degree == 0
     True
+    >>> p[42] = 1
+    >>> p.degree == 42
+    True
+    >>> p[42] = 0
+    >>> p.degree == 0
+    True
+    >>> p = Polynomial([3,2,1]) # x^2 + 2*x + 3
+    >>> p.eval(0)
+    3
+    >>> p.eval(1)
+    6
+    >>> p.eval(2)
+    11
+    >>> p.eval(-3)
+    6
+    >>> p.eval_h(2,7)
+    179
+    >>> p.eval_h(-3,5)
+    54
     """
     @property
     def degree(self):
@@ -73,6 +92,9 @@ class Polynomial(list):
         if index >= len(self):
             self.extend([0]*(index + 1 - len(self)))
         list.__setitem__(self, index, value)
+        # Remove leading zeroes
+        while len(self) > 0 and self[len(self) - 1] == 0:
+            self.pop()
 
     def __str__(self):
         xpow = ["", "*x"] + ["*x^%d" % i for i in range(2, len(self))]
@@ -91,6 +113,15 @@ class Polynomial(list):
         for i in range(deg):
             value = value * x + self[deg - i - 1]
         return value
+
+    def eval_h(self, a, b):
+        """ Evaluate homogenized bi-variate polynomial at a,b  """
+        if len(self) == 0:
+            return 0
+        powers_a = [a**i for i in range(self.degree + 1)]
+        powers_b = [b**i for i in range(self.degree + 1)]
+        return sum([coeff * pow_a * pow_b for (coeff, pow_a, pow_b)
+                    in zip(self, powers_a, reversed(powers_b))])
 
     def same_lc(self, other):
         """ Return true if the two polynomials have the same degree
@@ -288,6 +319,15 @@ class Polynomials(object):
         """
         return self.polyf.same_lc(other.polyf) and \
                self.polyg.same_lc(other.polyg)
+
+    def get_polynomial(self, side):
+        """ Returns one of the two polynomial as indexed by side """
+        assert side == 0 or side == 1
+        # Welp, f is side 1 and g is side 0 :(
+        if side == 0:
+            return self.polyg
+        else:
+            return self.polyf
 
 
 class FilePath(object):
@@ -855,13 +895,13 @@ class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.did_import = False
+        self._did_import = False
 
     def run(self):
         super().run()
-        if "import" in self.params and not self.did_import:
+        if "import" in self.params and not self._did_import:
             self.import_files(self.params["import"])
-            self.did_import = True
+            self._did_import = True
 
     def import_files(self, input_filename):
         if input_filename.startswith('@'):
@@ -873,6 +913,9 @@ class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
             filenames = [input_filename]
         for filename in filenames:
             self.import_one_file(filename)
+
+    def did_import(self):
+        return self._did_import
 
     @abc.abstractmethod
     def import_one_file(self, filename):
@@ -1486,8 +1529,9 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "adrange": int, "admin": 0, "admax": int,
-            "I": int, "alim": int, "rlim": int, "nrkeep": 20})
+            "N": int, "adrange": int, "admin": 0, "admax": int,
+            "I": int, "alim": int, "rlim": int, "nrkeep": 20,
+            "import_sopt": [str]})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
@@ -1602,6 +1646,11 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         self._check_best_polynomials()
 
         self.poly_heap = []
+        # If we have "import", discard any existing polynomials
+        if "import" in self.params and self.best_polynomials:
+            self.logger.warning('Have "import" parameter, discarding '
+                                'previously found polynomials')
+            self.best_polynomials.clear()
         self.import_existing_polynomials()
         self._check_best_polynomials()
         self._compare_heap_db()
@@ -1660,7 +1709,23 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                     print("Adding lognorm=%f, key=%s" % (poly.lognorm, oldkey))
 
     def run(self):
+        if self.send_request(Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL):
+            self.logger.info("Skipping this phase, as we will import the final polynomial")
+            return True
+
         super().run()
+
+        if self.did_import() and "import_sopt" in self.params:
+            self.logger.critical("The import and import_sopt parameters "
+                                 "are mutually exclusive")
+            return False
+
+        if self.did_import():
+            self.logger.info("Imported polynomial(s), skipping this phase")
+            return True
+
+        if "import_sopt" in self.params:
+            self.import_files(self.params["import_sopt"])
 
         worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
                 if self.poly_heap else ""
@@ -1774,6 +1839,10 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         """
         poly = self.parse_poly(text, filename)
         if poly is None:
+            return (0, 0)
+        if poly.getN() != self.params["N"]:
+            self.logger.error("Polynomial is for the wrong number to be factored:\n%s",
+                              poly)
             return (0, 0)
         if not poly.lognorm:
             self.logger.warn("Polynomial in file %s has no lognorm, skipping it",
@@ -1931,7 +2000,8 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "I": int, "alim": int, "rlim": int, "batch": [int]})
+            "N": int, "I": int, "alim": int, "rlim": int, "batch": [int],
+            "import_ropt": [str]})
     @property
     def stat_conversions(self):
         return (
@@ -1961,6 +2031,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.bestpoly = None
+        if "import" in self.params and "bestpoly" in self.state:
+            self.logger.warning('Have "import" parameter, discarding '
+                                'previously found best polynomial')
+            self.state.clear(["bestpoly", "bestfile"])
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.state.setdefault("nr_poly_submitted", 0)
@@ -1984,6 +2058,18 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                              "Murphy_E = %g",
                              self.state["bestfile"], self.bestpoly.MurphyE)
         
+        if self.did_import() and "import_ropt" in self.params:
+            self.logger.critical("The import and import_ropt parameters "
+                                 "are mutually exclusive")
+            return False
+
+        if self.did_import():
+            self.logger.info("Imported polynomial, skipping this phase")
+            return True
+
+        if "import_ropt" in self.params:
+            self.import_files(self.params["import_ropt"])
+
         # Get the list of polynomials to submit
         self.poly_to_submit = self.send_request(Request.GET_RAW_POLYNOMIALS)
         
@@ -2084,6 +2170,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         if not poly:
             self.logger.info('No polynomial found in %s', filename)
             return None
+        if poly.getN() != self.params["N"]:
+            self.logger.error("Polynomial is for the wrong number to be factored:\n%s",
+                              poly)
+            return None
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
@@ -2145,11 +2235,14 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
     def print_rank(self):
-        if not self.did_import:
+        if not self.did_import():
             rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
             if not rank is None:
                 self.logger.info("Best overall polynomial was %d-th in list "
                                  "after size optimization", rank)
+    def get_will_import(self):
+        return "import" in self.params
+
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
@@ -2557,7 +2650,29 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                          rels, filename, self.get_nrels(),
                          self.state["rels_wanted"])
         return True
-    
+
+    re_rel = re.compile(b"(-?\d*),(\d*):(.*)")
+    def verify_relation(self, line, poly):
+        """ Check that the primes listed for a relation divide the value of
+            the polynomials """
+        match = self.re_rel.match(line)
+        if match:
+            a, b, rest = match.groups()
+            a, b = int(a), int(b)
+            sides = rest.split(b":")
+            assert len(sides) == 2
+            for side, primes_as_str in enumerate(sides):
+                value = poly.get_polynomial(side).eval_h(a, b)
+                primes = [int(s, 16) for s in primes_as_str.split(b",")]
+                for prime in primes:
+                    # self.logger.debug("Checking if %d divides %d for a=%d, b=%d", prime, value, a, b)
+                    if value % prime != 0:
+                        self.logger.error("Relation %d,%d invalid: %d does not divide %d",
+                                          a, b, prime, value)
+                        return False
+            return True
+        return None
+
     def parse_rel_count(self, filename):
         (name, ext) = os.path.splitext(filename)
         try:
@@ -2573,8 +2688,19 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                 return None
             else:
                 raise
+        relations_to_check = 10
+        poly = self.send_request(Request.GET_POLYNOMIAL)
         try:
             for line in f:
+                if relations_to_check > 0:
+                    result =  self.verify_relation(line, poly)
+                    if result is True:
+                        relations_to_check -= 1
+                    elif result is False:
+                        f.close()
+                        return None
+                    else: # Did not match: try again
+                        pass
                 match = re.match(br"# Total (\d+) reports ", line)
                 if match:
                     rels = int(match.group(1))
@@ -4636,6 +4762,7 @@ class Request(Message):
     GET_POLYNOMIAL = object()
     GET_POLYNOMIAL_FILENAME = object()
     GET_HAVE_TWO_ALG_SIDES = object()
+    GET_WILL_IMPORT_FINAL_POLYNOMIAL = object()
     GET_POLY_RANK = object()
     GET_FACTORBASE_FILENAME = object()
     GET_FACTORBASE0_FILENAME = object()
@@ -4833,6 +4960,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             Request.GET_POLYNOMIAL: self.polysel2.get_poly,
             Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
             Request.GET_HAVE_TWO_ALG_SIDES: self.polysel2.get_have_two_alg_sides,
+            Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL: self.polysel2.get_will_import,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FACTORBASE0_FILENAME: self.fb.get_filename0,
             Request.GET_FACTORBASE1_FILENAME: self.fb.get_filename1,

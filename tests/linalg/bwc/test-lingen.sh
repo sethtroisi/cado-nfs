@@ -56,8 +56,14 @@ dotest() {
     SHA1="${SHA1%% *}"
 
     if [ "$REFERENCE_SHA1" ] ; then
-        if [ "${SHA1}" != "${REFERENCE_SHA1}" ] ; then
-            echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}. Files remain in ${TMPDIR}" >&2
+        reftab=(`echo $REFERENCE_SHA1 | tr ',' ' '`)
+        for ref in "${reftab[@]}" ; do
+            if [ "${SHA1}" = "$ref" ] ; then
+                match="$ref"
+            fi
+        done
+        if ! [ "$match" ] ; then
+            echo "$0: Got SHA1 of ${SHA1}; matches none of ${REFERENCE_SHA1}${REFMSG}. Files remain in ${TMPDIR}" >&2
             exit 1
         fi
     else

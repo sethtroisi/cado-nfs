@@ -1232,10 +1232,13 @@ sub task_common_run {
     # peculiarities).
     @_ = grep !/^(cpubinding|balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /(lingen|acollect$)/;
     if ($program =~ /plingen/) {
-        @_ = map { s/^lingen_mpi/mpi/; $_; } @_;
+        @_ = map { s/^lingen_mpi\b/mpi/; $_; } @_;
     } else {
         @_ = grep !/^lingen_mpi?=/, @_;
     }
+    @_ = grep !/cantor_threshold/, @_ unless $program =~ /lingen/ && $prime == 2;
+    @_ = grep !/lingen_threshold/, @_ unless $program =~ /lingen/;
+    @_ = grep !/lingen_mpi_threshold/, @_ unless $program =~ /lingen/;
     @_ = grep !/allow_zero_on_rhs/, @_ unless $program =~ /^plingen/;
     @_ = grep !/^splits?=/, @_ unless $program =~ /split$/;
     @_ = grep !/^save_submatrices?=/, @_ unless $program =~ /^(dispatch|prep|krylov|mksol|gather)$/;
@@ -1781,7 +1784,7 @@ sub task_lingen {
     # obvious though.
     if ($prime == 2) {
         my @args = @main_args;
-        task_common_run("lingen", @args, qw/--lingen-threshold 64/);
+        task_common_run("lingen", @args);
         task_common_run('split',
             (grep { /^(?:mn|m|n|wdir|prime|splits|verbose_flags)=/ } @main_args),
             split(' ', "--ifile F --ofile-fmt F.sols0-$n.%u-%u"));
@@ -1791,8 +1794,8 @@ sub task_lingen {
         my @args;
         my $lt = $param->{'lingen_threshold'} || 10;
         my $lmt = $param->{'lingen_mpi_threshold'} || 100;
-        push @args, "lingen-threshold=$lt";
-        push @args, "lingen-mpi-threshold=$lt";
+        push @args, "lingen_threshold=$lt";
+        push @args, "lingen_mpi_threshold=$lt";
         push @args, "afile=$concatenated_A";
         push @args, grep { /^(?:mn|m|n|wdir|prime|rhs|lingen_mpi)=/ || /allow_zero_on_rhs/ } @main_args;
         if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {

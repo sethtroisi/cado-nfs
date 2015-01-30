@@ -1,6 +1,8 @@
 #include "cado.h"
 
 #include <ostream>
+#include <iostream>
+#include <iterator>
 #include <sstream>
 #include <algorithm>
 #include <vector>
@@ -9,327 +11,274 @@
 #include "lingen_qcode.h"
 #include "utils.h"
 
-/* {{{ utility */
-template < typename iterator >
-    std::string intlist_to_string(iterator t0, iterator t1)
-{
-    std::ostringstream cset;
-    for (iterator t = t0; t != t1;) {
-	iterator u;
-	for (u = t; u != t1; u++) {
-	    if ((typename std::iterator_traits <
-		 iterator >::difference_type) (*u - *t) != (u - t))
-		break;
-	}
-	if (t != t0)
-	    cset << ',';
-	if (u - t == 1) {
-	    cset << *t;
-	} else {
-	    cset << *t << "-" << u[-1];
-	}
-	t = u;
+using namespace std;
+
+/* if SWAP_E is defined, put E[i,j] into E[j][i] */
+#define SWAP_E
+
+/* if SWAP_PI is defined, put pi[i,j] into pi[j][i] */
+#define SWAP_PI
+
+template<int WIDTH>
+class ulmat_rowmajor {
+    unsigned int n;
+    unsigned long (*x)[WIDTH];
+    ulmat_rowmajor(ulmat_rowmajor const&) {}
+public:
+    ulmat_rowmajor(unsigned int m, unsigned int n) : n(n)
+    {
+        x = new unsigned long[m*n][WIDTH];
+        memset(x, 0, m*n*sizeof(unsigned long[WIDTH]));
     }
-    return cset.str();
+    ~ulmat_rowmajor() { delete[] x; }
+    inline unsigned long (&operator()(unsigned int i, unsigned int j))[WIDTH] {
+        return x[i * n + j];
+    }
+    inline const unsigned long (&operator()(unsigned int i, unsigned int j)const)[WIDTH] {
+        return x[i * n + j];
+    }
+    inline unsigned long (*row(unsigned int i))[WIDTH] { return x + i * n; }
+    inline const unsigned long (*row(unsigned int i)const)[WIDTH] { return x + i * n; }
+};
+
+template<int WIDTH>
+class ulmat_colmajor {
+    unsigned int m;
+    unsigned long (*x)[WIDTH];
+    ulmat_colmajor(ulmat_colmajor const&) {}
+public:
+    ulmat_colmajor(unsigned int m, unsigned int n) : m(m)
+    {
+        x = new unsigned long[m*n][WIDTH];
+        memset(x, 0, m*n*sizeof(unsigned long[WIDTH]));
+    }
+    ~ulmat_colmajor() { delete[] x; }
+    inline unsigned long (&operator()(unsigned int i, unsigned int j))[WIDTH] {
+        return x[j * m + i];
+    }
+    inline const unsigned long (&operator()(unsigned int i, unsigned int j)const)[WIDTH] {
+        return x[j * m + i];
+    }
+    inline unsigned long (*column(unsigned int j))[WIDTH] { return x + j * m; }
+    inline const unsigned long (*column(unsigned int j)const)[WIDTH] { return x + j * m; }
+};
+
+
+bool report_spontaneous_zeros(lingen_qcode_data_ptr qq, unsigned int dt, vector<int>const& is_modified)
+{
+    unsigned int m = qq->m;
+    unsigned int b = qq->b;
+    unsigned int n = b - m;
+    vector<pair<unsigned int, unsigned int> > magic;
+    bool changed = false;
+    for(unsigned int i = 0 ; i < m + n ; i++) {
+        if (is_modified[i]) {
+            qq->ch[i] = 0;
+            if (is_modified[i] & 1)
+                changed=true;
+        } else {
+            qq->ch[i]++;
+            magic.push_back(make_pair(i, qq->ch[i]));
+        }
+    }
+
+    if (magic.empty()) {
+        ASSERT_ALWAYS(changed);
+        return changed;
+    }
+
+    printf("%-8u%zucols=0:", qq->t + dt, magic.size());
+
+    // Now print this out more nicely.
+    sort(magic.begin(),magic.end());
+    for( ; magic.size() ; ) {
+        unsigned int mi = UINT_MAX;
+        for(unsigned int i = 0 ; i < magic.size() ; i++) {
+            if (magic[i].second < mi) {
+                mi = magic[i].second;
+            }
+        }
+        printf(" [");
+        for(unsigned int i = 0 ; i < magic.size() ; ) {
+            unsigned int j;
+            for(j = i; j < magic.size() ; j++) {
+                if (magic[j].first-magic[i].first != j-i) break;
+            }
+            if (i) printf(",");
+            if (magic[i].first == magic[j-1].first - 1) {
+                printf("%u,%u", magic[i].first, magic[j-1].first);
+            } else if (magic[i].first < magic[j-1].first) {
+                printf("%u..%u", magic[i].first, magic[j-1].first);
+            } else {
+                printf("%u", magic[i].first);
+            }
+            i = j;
+        }
+        printf("]");
+        if (mi > 1)
+            printf("*%u",mi);
+
+        vector<pair<unsigned int, unsigned int> > zz2;
+        for(unsigned int i = 0 ; i < magic.size() ; i++) {
+            if (magic[i].second > mi) {
+                zz2.push_back(make_pair(magic[i].first,magic[i].second));
+            }
+        }
+        magic.swap(zz2);
+    }
+    printf("\n");
+
+    return changed;
 }
 
-/* }}} */
+inline void lshift1(unsigned long&x) { x <<= 1; }
 
-static unsigned long extract_coeff_degree_t(unsigned int t,
-					    unsigned long const *a,
-					    unsigned int da,
-					    unsigned long const *b,
-					    unsigned int db)
-{				/*{{{ */
-    unsigned long c = 0;
-    /*
-       0 <= s <= t
-       0 <= s <= na
-       0 <= t-s <= nb
-       t-nb <= s <= t
-     */
-    unsigned int high = std::min(t, da);
-    unsigned int low = std::max(0u, t - db);
-    for (unsigned int s = low; s <= high; s++) {
-	unsigned int si = s / ULONG_BITS;
-	unsigned int ss = s % ULONG_BITS;
-	unsigned int ri = (t - s) / ULONG_BITS;
-	unsigned int rs = (t - s) % ULONG_BITS;
-	c ^= a[si] >> ss & b[ri] >> rs;
-    }
-    return c & 1UL;
-}				/*}}} */
+template<int WIDTH> inline void lshift1(unsigned long (&x)[WIDTH])
+{
+    mpn_lshift(x, x, WIDTH, 1);
+}
 
+template<> inline void lshift1<1>(unsigned long (&x)[1]) { x[0] <<= 1; }
+template<> inline void lshift1<2>(unsigned long (&x)[2]) {
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    asm(
+            "addq %0,%0\n"
+            "adcq %1,%1\n"
+            : "=r"(x[0]), "=r"(x[1])
+            : "0" (x[0]), "1"(x[1])
+            :);
+#else
+    x[1] <<= 1;
+    x[1] |= ((long)x[0]) < 0;
+    x[0] <<= 1;
+#endif
+}
 
-static void extract_coeff_degree_t(lingen_qcode_data_ptr qq, bmat & e0,
-				   unsigned int dt,
-				   unsigned int piv[], polmat const &PI)
-{				/*{{{ */
-    using namespace std;
+template<int WIDTH>
+unsigned int lingen_qcode_do_tmpl(lingen_qcode_data_ptr qq)
+{
     unsigned int m = qq->m;
     unsigned int b = qq->b;
     unsigned int n = b - m;
 
-    vector < bool > known(m + n, false);
-    if (piv != NULL) {
-	for (unsigned int i = 0; i < m; i++)
-	    known[piv[i]] = true;
-    }
+#ifdef  SWAP_E
+    ulmat_colmajor<WIDTH> E(m, b);
+#else
+    ulmat_rowmajor<WIDTH> E(m, b);
+#endif
 
-    vector < unsigned int >z;
+#ifdef  SWAP_PI
+    ulmat_colmajor<WIDTH> P(b, b);
+#else
+    ulmat_rowmajor<WIDTH> P(b, b);
+#endif
 
-    /* Note 1: this routine is not optimal for locality. It would be better
-       to first loop on i, then k, then j. But then the if (known[j]) continue
-       would be in the inner loop. Otherwise first loop on j, then k, then i.
-       Note 2: the inner routine extract_coeff_degree_t() requires to reverse
-       the coefficients of PI.poly(k, j) [or E.poly(i, k), since the popcount
-       is symmetrical]. If we first loop on (i,k) or (j,k), then we could
-       precompute the reverse polynomial, and give it to the inner routine,
-       which would then just perform a xor of the relevant bit part, and a
-       popcount. */
-    for (unsigned int j = 0; j < m + n; j++) {
-	if (known[j])
-	    continue;
-	e0.zcol(j);
-	unsigned long some_nonzero = 0;
-	for (unsigned int i = 0; i < m; i++) {
-	    unsigned long c = 0;
-	    for (unsigned int k = 0; k < m + n; k++) {
-		c ^= extract_coeff_degree_t(dt,
-					    qq->iptrs[i * b + k],
-					    qq->length - 1, PI.poly(k, j),
-					    PI.deg(j));
-	    }
-	    e0.addcoeff(i, j, c);
-	    some_nonzero |= c;
-	}
-	if (!some_nonzero) {
-	    z.push_back(j);
-	}
-    }
-    vector < unsigned int >ncha(m + n, 0);
-    if (z.empty()) {
-	memset(qq->ch, 0, (m + n) * sizeof(unsigned int));
-    } else {
-	for (unsigned int i = 0; i < z.size(); i++) {
-	    ++ncha[z[i]];
-	}
-
-	/* resets the global chance_list counter */
-	for (unsigned int i = 0; i < m + n; i++) {
-	    if (ncha[i] == 0) {
-		qq->ch[i] = 0;
-	    } else {
-		qq->ch[i]++;
-	    }
-	}
-
-	printf("%-8u%zucols=0:", qq->t + dt, z.size());
-
-	vector < pair < unsigned int, unsigned int > > zz;
-	for (unsigned int i = 0; i < z.size(); i++) {
-	    zz.push_back(make_pair(z[i], qq->ch[z[i]]));
-	}
-
-	// Now print this out more nicely.
-	sort(zz.begin(), zz.end());
-	for (; zz.size();) {
-	    unsigned int mi = UINT_MAX;
-	    for (unsigned int i = 0; i < zz.size(); i++) {
-		if (zz[i].second < mi) {
-		    mi = zz[i].second;
-		}
-	    }
-	    printf(" [");
-	    for (unsigned int i = 0; i < zz.size();) {
-		unsigned int j;
-		for (j = i; j < zz.size(); j++) {
-		    if (zz[j].first - zz[i].first != j - i)
-			break;
-		}
-		if (i)
-		    printf(",");
-		if (zz[i].first == zz[j - 1].first - 1) {
-		    printf("%u,%u", zz[i].first, zz[j - 1].first);
-		} else if (zz[i].first < zz[j - 1].first) {
-		    printf("%u..%u", zz[i].first, zz[j - 1].first);
-		} else {
-		    printf("%u", zz[i].first);
-		}
-		i = j;
-	    }
-	    printf("]");
-	    if (mi > 1)
-		printf("*%u", mi);
-
-	    vector < pair < unsigned int, unsigned int > > zz2;
-	    for (unsigned int i = 0; i < zz.size(); i++) {
-		if (zz[i].second > mi) {
-		    zz2.push_back(make_pair(zz[i].first, zz[i].second));
-		}
-	    }
-	    zz.swap(zz2);
-	}
-	printf("\n");
-    }
-}				/*}}} */
-
-// applies a permutation on the source indices/*{{{*/
-template < typename T > void permute(T * a, unsigned int n, unsigned int p[])
-{
-    T *b = new T[n];
-    for (unsigned int i = 0; i < n ; i++) {
-	b[p[i]] = a[i];
-    }
-    memcpy(a, b, n * sizeof(T));
-    delete[]b;
-}				/*}}} */
-
-static void rearrange_ordering(lingen_qcode_data_ptr qq, bmat & e0,
-			       polmat & PI, unsigned int piv[])
-{				/*{{{ */
-    unsigned int m = qq->m;
-    unsigned int n = qq->b - m;
-    /* Sort the columns. It might seem merely cosmetic and useless to
-     * sort w.r.t both the global and local nominal degrees. In fact, it
-     * is crucial for the correctness of the computations. (Imagine a
-     * 2-step increase, starting with uneven global deltas, and hitting
-     * an even situation in the middle. One has to sort out the local
-     * deltas to prevent trashing the whole picture).
-     *
-     * The positional sort, however, *is* cosmetic (makes debugging
-     * easier).
-     */
-    using namespace std;
-    typedef pair < pair < unsigned int, unsigned int >, int >corresp_t;
-    vector < corresp_t > corresp(m + n);
-    for (unsigned int i = 0; i < m + n; i++) {
-	int pideg = PI.deg(i);
-	if (pideg == -1) {	/* overflowed ! */
-	    pideg = INT_MAX;
-	}
-	corresp[i] = make_pair(make_pair(qq->delta[i], pideg), i);
-    }
-    sort(corresp.begin(), corresp.end(), less < corresp_t > ());
-    unsigned int p[m + n];
-    for (unsigned int i = 0; i < m + n; i++) {
-	p[corresp[i].second] = i;
-    }
-    permute(qq->delta, m + n, p);
-    permute(qq->ch, m + n, p);
-    if (piv) {
-	for (unsigned int i = 0; i < m; i++) {
-	    piv[i] = p[piv[i]];
-	}
-    }
-    PI.perm(p);
-    e0.perm(p);
-}				/*}}} */
-
-static bool gauss(lingen_qcode_data_ptr qq, bmat & e0, unsigned int dt, unsigned int piv[],
-		  polmat & PI)
-{				/*{{{ */
-    unsigned int m = qq->m;
-    unsigned int n = qq->b - m;
-    unsigned int i, j, k;
-    unsigned int rank;
-    rank = 0;
-
-    std::vector < unsigned int >overflowed;
-
-    for (j = 0; j < e0.ncols; j++) {
-	/* Find the pivot inside the column. */
-	i = e0.ffs(j);
-	if (i == UINT_MAX)
-	    continue;
-	ASSERT(rank < e0.nrows && rank < e0.ncols);
-	// std::cout << fmt("col % is the %-th pivot\n") % j % rank;
-	piv[rank++] = j;
-	/* Cancel this coeff in all other columns. */
-	for (k = j + 1; k < e0.ncols; k++) {
-	    /* TODO : Over the binary field, this branch avoiding trick
-	     * could most probably be deleted, I doubt it gains anything. */
-	    unsigned long c = e0.coeff(i, k);
-	    /* add c times column j to column k */
-	    e0.acol(k, j, i, c);
-	    // E.acol(k,j,c);
-	    // This one is tempting, but it's a wrong assert.
-	    // ASSERT(PI.deg(j) <= PI.deg(k));
-	    // ASSERT(delta[j] <= delta[k]);
-	    ASSERT(std::make_pair(qq->delta[j], PI.deg(j)) <=
-		   std::make_pair(qq->delta[k], PI.deg(k)));
-	    PI.acol(k, j, c);
-	}
-	PI.xmul_col(j);
-	// E.xmul_col(j);
-	qq->delta[j]++;
-	if (PI.deg(j) >= (int) PI.ncoef - 1) {
-	    overflowed.push_back(j);
-	    /* Then don't hesitate. Set the degree to -1 altoghether.
-	     * There's not much meaning remaining in this vector anyway,
-	     * so we'd better trash it */
-	}
-    }
-    ASSERT_ALWAYS(rank == m);
-
-    bool finished = !overflowed.empty();
-
-    if (finished) {
-        std::string s = intlist_to_string(overflowed.begin(), overflowed.end());
-
-        printf
-            ("%-8u** %zu cols (%s) exceed maxdeg=%ld (normal at the end) **\n",
-             qq->t + dt, overflowed.size(), s.c_str(), PI.ncoef - 1);
-        unsigned ctot = 0;
-        for (unsigned int j = 0; j < m + n; j++) {
-            ctot += qq->ch[j];
+    ASSERT_ALWAYS(qq->length <= WIDTH * ULONG_BITS);
+    for (unsigned int i = 0; i < m; i++) {
+        for(unsigned int j = 0 ; j < b ; j++) {
+            memcpy(E(i, j), qq->iptrs[i * b + j], WIDTH * sizeof(unsigned long));
         }
-        ASSERT_ALWAYS(ctot > 0);
     }
 
-    return finished;
-}				/*}}} */
+    for (unsigned int i = 0; i < b; i++) {
+        P(i, i)[0] = 1;
+        qq->local_delta[i] = 0;
+    }
 
+    /* We need to keep track of the qq->ch array. It checks how many
+     * times in a row a given column turns out to be magically zero. 
+     *
+     * For this, we'll use a local table (is_modified[] below), and we
+     * will use it to report which columns happen to be zero, and update
+     * the qq->ch array.
+     */
+
+    unsigned int e = 0;
+    for ( ; e < qq->length; e++) {
+	uint64_t mask = (uint64_t) 1 << (e % ULONG_BITS);
+	int mpos = e / ULONG_BITS;
+        vector<int> is_modified(m + n, false);
+#if 0
+	unsigned int md = UINT_MAX;
+	for (unsigned int j = 0; j < m + n; j++)
+	    if (qq->delta[j] > md)
+		md = qq->delta[j];
+#endif
+	for (unsigned int i = 0; i < m; i++) {
+	    unsigned int min_degree = UINT_MAX;
+            unsigned int pivot = m + n;
+	    for (unsigned int j = 0; j < m + n; j++)
+		if ((E(i, j)[mpos] & mask) && (qq->delta[j] < min_degree)) {
+		    min_degree = qq->delta[j];
+		    pivot = j;
+		}
+	    ASSERT_ALWAYS(pivot < m + n);
+            /* A pivot column does not count as undergoing a modification
+             * the same way as the other columns. This is because for our
+             * stop criterion, what we need is to count the number of
+             * transvection matrices by which we multiply. However, as
+             * far as detection of spontaneous zeros goes, of course we
+             * must make sure that we don't take pivots into account ! */
+            is_modified[pivot] |= 2;
+	    for (unsigned int k = 0; k < m + n; k++) {
+                if (k == pivot) continue;
+		if (!(E(i, k)[mpos] & mask)) continue;
+                is_modified[k] |= 1;
+#if defined(SWAP_E) && defined(HAVE_MPN_XOR_N)
+                mpn_xor_n ((unsigned long*)E.column(k),(unsigned long*) E.column(k),(unsigned long*) E.column(pivot), m * WIDTH);
+#else
+                for (unsigned int l = 0; l < m; l++)
+                    for (unsigned int s = 0; s < WIDTH; s++)
+                        E(l, k)[s] ^= E(l, pivot)[s];
+#endif
+#if defined(SWAP_PI) && defined(HAVE_MPN_XOR_N)
+                mpn_xor_n ((unsigned long*)P.column(k), (unsigned long*)P.column(k), (unsigned long*)P.column(pivot), (m + n) * WIDTH);
+#else
+                for (unsigned int l = 0; l < m + n; l++)
+                    for (unsigned int s = 0; s < WIDTH; s++)
+                        P(l, k)[s] ^= P(l, pivot)[s];
+#endif
+                if (qq->local_delta[pivot] > qq->local_delta[k])
+                    qq->local_delta[k] = qq->local_delta[pivot];
+	    }
+	    for (unsigned int l = 0; l < m; l++)
+                lshift1(E(l, pivot));
+	    for (unsigned int l = 0; l < m + n; l++)
+                lshift1(P(l, pivot));
+	    qq->delta[pivot] += 1;
+            qq->local_delta[pivot]++;
+	}
+        /* Columns which have not been changed here are those which
+         * are magically zero. Count whether this happens often or
+         * not.
+         *
+         * While we're doing this, we can also detect whether our
+         * computation stays still. */
+        if (!report_spontaneous_zeros(qq, e, is_modified))
+            break;
+    }
+
+    for (unsigned int i = 0; i < b; i++) {
+        for(unsigned int j = 0 ; j < b ; j++) {
+            memcpy(qq->optrs[i * b + j], P(i, j), WIDTH * sizeof(unsigned long));
+        }
+    }
+    qq->t += e;
+    return e;
+}
 
 unsigned int lingen_qcode_do(lingen_qcode_data_ptr qq)
 {
-    unsigned int m = qq->m;
-    unsigned int b = qq->b;
-    unsigned int n = b - m;
-
-    polmat tmp_pi(m + n, m + n, qq->outlength);
-    bmat e0(m, m + n);
-    unsigned int piv[m];
-
-    for (unsigned int i = 0; i < m + n; i++) {
-	tmp_pi.addcoeff(i, i, 0, 1UL);
-	tmp_pi.deg(i) = 0;
+    if (qq->length <= ULONG_BITS) {
+        return lingen_qcode_do_tmpl<1>(qq);
+    } else if (qq->length <= 2 * ULONG_BITS) {
+        return lingen_qcode_do_tmpl<2>(qq);
+    } else if (qq->length <= 3 * ULONG_BITS) {
+        return lingen_qcode_do_tmpl<3>(qq);
+    } else if (qq->length <= 4 * ULONG_BITS) {
+        return lingen_qcode_do_tmpl<4>(qq);
     }
-    for (unsigned int i = 0; i < m; i++) {
-        piv[m] = 0;
-    }
-
-
-    rearrange_ordering(qq, e0, tmp_pi, NULL);
-
-    /* qq->t will remain equal to tstart for the duration of the
-     * computation */
-
-    bool finished = false;
-    unsigned int dt = 0;
-    for (dt = 0; !finished && dt < qq->length ; dt++) {
-	extract_coeff_degree_t(qq, e0, dt, dt ? piv : NULL, tmp_pi);
-	finished = gauss(qq, e0, dt, piv, tmp_pi);
-	rearrange_ordering(qq, e0, tmp_pi, piv);
-    }
-    for(unsigned int i = 0 ; i < m + n ; i++) {
-        for(unsigned int j = 0 ; j < m + n ; j++) {
-            memcpy(qq->optrs[i * b + j], tmp_pi.poly(i,j), iceildiv(qq->outlength, ULONG_BITS) * sizeof(unsigned long));
-        }
-    }
-    for(unsigned int j = 0 ; j < m + n ; j++) {
-        qq->local_delta[j] = tmp_pi.deg(j);
-    }
-    qq->t += dt;
-    return qq->length;
+    cerr << "quadratic algorithm not supported for base length " << qq->length << endl;
+    abort();
+    return 0;
 }

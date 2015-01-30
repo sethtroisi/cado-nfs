@@ -56,10 +56,10 @@ macro(add_lingen_binary_test testname)
     add_test(test-bwc-lingen-binary-${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/test-lingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
 endmacro(add_lingen_binary_test)
 
-add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75 64 64 160 1 lingen-threshold=10)
+add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75,d0e758e619c8e81b3e28bbd4fe69c32826e9a4bd 64 64 160 1 lingen_threshold=10)
 
 # The test below fails on 32bit. This should be investigated.
-# add_lingen_binary_test(test1 30b90451fb828f08caa160f96c585c4b1c0951a8 64 64 200 1 lingen-threshold=10)
+# add_lingen_binary_test(test1 30b90451fb828f08caa160f96c585c4b1c0951a8 64 64 200 1 lingen_threshold=10)
 
 foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(extra)
@@ -114,26 +114,26 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
         add_plingen_test(test0
             2b6428178054fc0d3931dcdc9257ccf3bdea62f9 4 2 36 1009 17042
-            lingen-threshold=10 lingen-mpi-threshold=10 thr=2x2 --ascii
+            lingen_threshold=10 lingen_mpi_threshold=10 thr=2x2 --ascii
             ${extra})
         add_plingen_test(test1
             f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9 4 2 200 1009 88888
-            lingen-threshold=10 lingen-mpi-threshold=10 thr=2x2 --ascii
+            lingen_threshold=10 lingen_mpi_threshold=10 thr=2x2 --ascii
             ${extra})
         add_plingen_test(test2
             f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9 4 2 200 1009 88888
-            lingen-threshold=10 lingen-mpi-threshold=40 thr=2x2 --ascii
+            lingen_threshold=10 lingen_mpi_threshold=40 thr=2x2 --ascii
             ${extra})
         add_plingen_test(test3
             b448493e04299d8d54be6cc1273c43293520ac9e 3 3 1000 1009 1111
-            lingen-threshold=10 lingen-mpi-threshold=40 thr=3x3 --ascii
+            lingen_threshold=10 lingen_mpi_threshold=40 thr=3x3 --ascii
             ${extra})
     endif(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
     if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_3")
         add_plingen_test(test4
             00a481d0e0e2ee7403fa234b7f8b818dc2ec8db4 3 3 1000
             1532495540865888858358347027150309183618739122183602191 1111
-            lingen-threshold=10 lingen-mpi-threshold=40 thr=3x3
+            lingen_threshold=10 lingen_mpi_threshold=40 thr=3x3
             ${extra})
     endif(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_3")
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})

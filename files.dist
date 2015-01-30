@@ -1183,3 +1183,4 @@ tests/linalg/bwc/test-lingen.sh
 linalg/bwc/lingen_qcode.c
 linalg/bwc/lingen_qcode_do.cpp
 linalg/bwc/lingen_qcode.h
+config/mpn_xor_n.cmake

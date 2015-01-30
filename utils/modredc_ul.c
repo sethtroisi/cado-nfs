@@ -243,14 +243,17 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
 }
 
 
+/* r_ul and a_ul must be non-overlapping */
+
 int
-modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
+modredcul_batchinv_ul (unsigned long *restrict r_ul,
+                       const unsigned long *restrict a_ul,
                        const unsigned long c, const size_t n,
                        const modulusredcul_t m)
 {
-  residueredcul_t *r = (residueredcul_t *) r_ul;
-  const residueredcul_t *a = (const residueredcul_t *) a_ul;
   residueredcul_t R;
+  unsigned long t; /* Not using the temp var, and writing directly into r[i],
+                      is slower, in spite of the restrict hint :( */
   
   /* We simply don't convert to or from Montgomery representation, but we
      have to divide the big inverse by \beta twice.
@@ -259,24 +262,29 @@ modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
   if (n == 0)
     return 1;
   
-  r[0][0] = a_ul[0] % m[0].m;
+  /* Reduce a[0] % m, and store in r_ul[0]. We multiply by 1 (in REDC form),
+     which produces a reduced representative */
+  modredcul_mul_ul_ul(&t, m[0].one, a_ul[0], m);
+  ASSERT_ALWAYS(t < m[0].m);
+  r_ul[0] = t;
   for (size_t i = 1; i < n; i++) {
-    modredcul_mul(r[i], r[i-1], a[i], m);
-    ASSERT_ALWAYS(r[i][0] < m[0].m);
+    modredcul_mul_ul_ul(&t, &t, a_ul[i], m);
+    ASSERT_ALWAYS(t < m[0].m);
+    r_ul[i] = t;
   }
-  
+
   modredcul_init_noset0(R, m);
-  int rc = modredcul_inv(R, r[n-1], m);
+  int rc = modredcul_inv(R, &r_ul[n-1], m);
   if (rc == 0)
     return 0;
-  modredcul_mul(R, R, &c, m);
-  R[0] = modredcul_get_ul(R, m);
+  modredcul_mul_ul_ul(R, R, c, m);
+  modredcul_frommontgomery (R, R, m);
 
   for (size_t i = n-1; i > 0; i--) {
-    modredcul_mul(r[i], R, r[i-1], m);
-    modredcul_mul(R, R, a[i], m);
+    modredcul_mul_ul_ul(&r_ul[i], R, r_ul[i-1], m);
+    modredcul_mul_ul_ul(R, R, a_ul[i], m);
   }
-  modredcul_set(r[0], R, m);
+  modredcul_set(&r_ul[0], R, m);
   modredcul_clear(R, m);
   return 1;
 }
@@ -306,6 +314,7 @@ check_divisible(const unsigned long lo, const unsigned long hi,
 
 /* For each 0 <= i < n, compute r[i] = num/(den*2^k) mod p[i].
    den must be odd. If k > 0, then all p[i] must be odd.
+   The memory pointed to be r and p must be non-overlapping.
    Returns 1 if successful. If any modular inverse does not exist,
    returns 0 and the contents of r are undefined. */
 int
