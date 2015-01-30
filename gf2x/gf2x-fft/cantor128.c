@@ -189,6 +189,7 @@ static void Kmul(Kdst_elt a0, Ksrc_elt a1, Ksrc_elt a2) {
     {
         unsigned long z;
         z = tmp[3];
+#if 1
         /* tmp[2],tmp[1] += z * X^128 = z * (X^7 + X^2 + X + 1) */
         tmp[1] ^= (z << 7) ^ (z << 2) ^ (z << 1) ^ z;
         tmp[2] ^= (z >> 57) ^ (z >> 62) ^ (z >> 63);
@@ -196,6 +197,15 @@ static void Kmul(Kdst_elt a0, Ksrc_elt a1, Ksrc_elt a2) {
         z = tmp[2];
         a0[0] = tmp[0] ^ (z << 7) ^ (z << 2) ^ (z << 1) ^ z;
         a0[1] = tmp[1] ^ (z >> 57) ^ (z >> 62) ^ (z >> 63);
+#else
+        /* Using x^128 + x^64 + x^13 + x^11 + 1 instead.
+           If you use this, you must change the coefficients beta_i too! */
+        tmp[1] ^= (z << 13) ^ (z << 11) ^ z;
+        tmp[2] ^= z ^ (z >> 51) ^ (z >> 53);
+        z = tmp[2];
+        a0[0] = tmp[0] ^ (z << 13) ^ (z << 11) ^ z;
+        a0[1] = tmp[1] ^ z ^ (z >> 51) ^ (z >> 53);
+#endif
     }
 #endif 
 #ifdef  COUNT_MULTS
