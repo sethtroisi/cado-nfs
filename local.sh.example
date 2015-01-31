@@ -108,9 +108,7 @@
 # PREFIX=<path-to-source-tree>/installed
 # PREFIX=/usr/local/cado
 #
-# This is for ``make install'', and using ``make install'' is not
-# recommended. While an install procedure is sort of present, it is not
-# tested. Therefore it cannot be expected to work.
+# This is for ``make install'': binaries will be installed in $PREFIX/bin.
 
 ############################################################
 # CADO_VERSION_STRING: set package version
