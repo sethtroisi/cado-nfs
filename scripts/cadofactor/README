@@ -74,12 +74,12 @@ the first phase searches for polynomials with good size property and keeps
 in a priority queue the "nrkeep" most promising ones, then the second phase
 root-optimizes these to find the overall best polynomial by Murphy E value.
 
-You can import files that were previously produced by phase 1 (phase 2) into
-phase 1 (phase 2) again; the imported files will be processed as if phase 1
-(phase 2) had generated them by itself. Phase 1 will add any polynomials
-from the imported files into its priority and forward the kept ones to
-phase 2, while phase 2 chooses the best polynomial by Murphy E from the
-imported ones and the ones it computes by itself.
+You can import files that were previously produced by phase 1 (resp. phase 2)
+into phase 1 (resp. phase 2) again; the imported files will be processed as if
+phase 1 (resp. phase 2) had generated them by itself. Phase 1 will add any
+polynomials from the imported files into its priority queue and forward the kept
+ones to phase 2, while phase 2 will choose the best polynomial by Murphy E from
+the imported ones and the ones it computes by itself.
 
 
 If you want to import size-optimized polynomials into phase 1 of polynomial
@@ -103,7 +103,7 @@ the admax value given in the parameter file.
 
 
 If you want to import root-optimized polynomials into phase 2 of polynomial
-selection and then continue polynomial seach, use
+selection and then continue polynomial search, use
 
 tasks.polyselect.polyselect2.import_ropt=file
 or
