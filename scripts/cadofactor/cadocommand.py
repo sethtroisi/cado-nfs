@@ -7,7 +7,7 @@ from os import environ as os_environ
 
 logger = logging.getLogger("Command")
 
-def shellquote(s):
+def shellquote(s, first=True):
     ''' Quote a command line argument
     
     Currently does it the hard way: encloses the argument in single
@@ -15,6 +15,9 @@ def shellquote(s):
     '''
     # If only characters that are known to be shell-safe occur, don't quote
     if re.match("^[a-zA-Z0-9_.:@/+-]*$", s):
+        return s
+    # An equals sign is safe, except in the first word of the command line
+    if not first and re.match("^[a-zA-Z0-9_.:@/+-]+=[a-zA-Z0-9_.:@/+-]+$", s):
         return s
     return "'" + s.replace("'", "'\\''") + "'"
 

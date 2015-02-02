@@ -59,7 +59,7 @@ if __name__ == '__main__':
     logger.addHandler(filehandler)
     
     logger.info("Command line parameters: %s", 
-                " ".join(map(shellquote, sys.argv)))
+                " ".join([shellquote(arg, idx == 0) for idx, arg in enumerate(sys.argv)]))
 
     logger.debug("Root parameter dictionary:\n%s", parameters)
 
