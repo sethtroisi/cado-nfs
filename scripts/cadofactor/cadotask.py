@@ -4410,7 +4410,7 @@ class ReconstructLogTask(Task):
         else:
             return [ 0, 0 ]
 
-class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
+class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     """ Starts HTTP server """
     @property
     def name(self):
@@ -4422,7 +4422,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
     def paramnames(self):
         return {"name": str, "workdir": None, "address": None, "port": 8001,
                 "threaded": False, "ssl": True, "whitelist": None,
-                "only_registered": True}
+                "only_registered": True, "forgetport": False}
     @property
     def param_nodename(self):
         return self.name
@@ -4456,6 +4456,15 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         if "whitelist" in self.params:
             server_whitelist += [h.strip() for h in self.params["whitelist"].split(",")]
 
+        # If we should auto-assign an available port, try to use the same one
+        # as last time, if we had run before. This can be overridden with
+        # server.forgetport=yes
+        if self.params["forgetport"] and "port" in self.state:
+            del(self.state["port"])
+
+        if serverport == 0 and "port" in self.state:
+            serverport = self.state["port"]
+
         # If (1) any clients are to be started on localhost, but (2) the server
         # is listening on a network-visible address, then we need to whitelist
         # the network-visible address(es) of the current host as well, because
@@ -4481,6 +4490,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
             threaded, self.get_db_filename(), self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
             whitelist=server_whitelist)
+        self.state["port"] = self.server.get_port()
 
     def run(self):
         self.server.serve()

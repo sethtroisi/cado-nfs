@@ -746,6 +746,9 @@ subjectAltName=@altnames
             self.logger.warn("Server is listening on the loopback device. "
                     "Clients on other hosts will not be able to connect.")
 
+    def get_port(self):
+        return self.port
+
     def get_url(self):
         return self.url
 
