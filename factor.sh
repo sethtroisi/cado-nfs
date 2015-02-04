@@ -151,12 +151,14 @@ if [ "$0" -ef "$cado_prefix/lib/$archive_name/factor.sh" ] ; then
     scriptpath="$bindir"
     cadofactor="$scriptpath/cadofactor.py"
     paramdir="$cado_prefix/share/$archive_name"
+    cpubinding_file="$cado_prefix/share/$archive_name/misc/cpubinding.conf"
 elif [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     # We're called in the install tree.
     bindir="$cado_prefix/bin"
     scriptpath="$bindir"
     cadofactor="$scriptpath/cadofactor.py"
     paramdir="$cado_prefix/share/$archive_name"
+    cpubinding_file="$cado_prefix/share/$archive_name/misc/cpubinding.conf"
 elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     # We're called in the build tree.
     scriptpath="$cado_source_dir/scripts/cadofactor"
@@ -164,6 +166,7 @@ elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     cadofactor="$scriptpath/cadofactor.py"
     # Make the path absolute.
     bindir="$cado_build_dir"
+    cpubinding_file="$cado_source_dir/linalg/bwc/cpubinding.conf"
 elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
     # Otherwise we're called from the source tree (or we hope so)
     srcdir=$(cd "`dirname $0`" ; pwd)
@@ -179,6 +182,7 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
       paramdir="${srcdir}/params"
       # Make the path absolute.
       bindir=`cd "$build_tree" ; pwd`
+      cpubinding_file="$srcdir/linalg/bwc/cpubinding.conf"
     fi
 fi
 if [ -z "$cadofactor" ] ; then
@@ -250,7 +254,9 @@ mkdir $t/tmp
 tasks.threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
 slaves.nrclients=$slaves \
 slaves.scriptpath="$scriptpath" "$server_address" \
-slaves.basepath="$t/client/" "$@"
+slaves.basepath="$t/client/" \
+tasks.linalg.bwc.cpubinding="$cpubinding_file"  \
+"$@"
 
 rc=$?
 
