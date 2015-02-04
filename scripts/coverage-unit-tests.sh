@@ -131,9 +131,10 @@ if ! doit ; then
     rc=1
 fi
 
-[ "$NOWIPE" ] || rm -rf $DIR $F
-
+# Do this *before* we rm-rf ourselves !
 rsync -a  "$TARGET_DIRECTORY"/*png "$TARGET_DIRECTORY"/gcov.css "$TARGET_DIRECTORY"/index.html  "$TARGET_DIRECTORY-$(date +%Y%m%d)"/  || :
+
+[ "$NOWIPE" ] || rm -rf $DIR $F
 
 exit $rc
 
