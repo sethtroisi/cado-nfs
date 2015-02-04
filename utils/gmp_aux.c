@@ -5,8 +5,8 @@
 #include "gmp_aux.h"
 #include "macros.h"
 
-/* old versions of GMP do not provide mpn_neg */
-#ifdef MISSING_MPN_NEG
+/* old versions of GMP do not provide mpn_neg (was mpn_neg_n) and mpn_xor_n */
+#if GMP_VERSION_ATMOST(4,3,2)
 mp_limb_t
 mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n)
 {
@@ -16,10 +16,7 @@ mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n)
     rp[i] = ~sp[i];
   return mpn_add_1 (rp, rp, n, 1);
 }
-#endif
 
-/* old versions of GMP do not provide mpn_xor_n */
-#ifdef MISSING_MPN_XOR_N
 void
 mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
 	   mp_size_t n)

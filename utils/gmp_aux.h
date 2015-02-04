@@ -3,6 +3,7 @@
 
 #include <gmp.h>
 #include <stdint.h>
+#include <macros.h>
 
 /* the following function is missing in GMP */
 #ifndef mpz_addmul_si
@@ -44,15 +45,10 @@ extern int mpz_coprime_p (mpz_t a, mpz_t b);
 extern int nbits (uintmax_t p);
 extern long double mpz_get_ld (mpz_t z);
 
-#ifndef mpn_neg
+#if GMP_VERSION_ATMOST(4,3,2)
 mp_limb_t mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n);
-#define MISSING_MPN_NEG
-#endif
-
-#ifndef mpn_xor_n
 void mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
 		mp_size_t n);
-#define MISSING_MPN_XOR_N
 #endif
 
 #ifdef __cplusplus
