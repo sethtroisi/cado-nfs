@@ -3465,7 +3465,7 @@ int main(int argc, char **argv)
 
     /* {{{ parameter parsing */
     /* print the command line */
-    fprintf(stderr, "%s.r%s", argv[0], CADO_REV);
+    fprintf(stderr, "%s.r%s", argv[0], cado_revision_string);
     for (i = 1; i < argc; i++)
         fprintf(stderr, " %s", argv[i]);
     fprintf(stderr, "\n");

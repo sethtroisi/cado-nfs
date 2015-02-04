@@ -1,6 +1,6 @@
 
 add_executable(cachesize EXCLUDE_FROM_ALL cachesize.c cachesize_cpuid.c
-    cachesize_guess.c timing.cpp memusage.c)
+    cachesize_guess.c timing.cpp memusage.c version_info.c)
 
 add_executable(qrange_to_qlist qrange_to_qlist.c)
 target_link_libraries(qrange_to_qlist utils)

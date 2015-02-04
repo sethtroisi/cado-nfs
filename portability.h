@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef CADO_PORTABILITY_H_
 #define CADO_PORTABILITY_H_
 
-#ifndef CADO_VERSION_MAJOR
+#ifndef CADO_CONFIG_H_
 #error cado_config.h must be included before portability.h
 #endif
 

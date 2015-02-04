@@ -12,7 +12,7 @@
 #include "macros.h"
 #include "misc.h"
 #include "portability.h"
-#include "modified_files.h"
+#include "version_info.h"
 #include "verbose.h"
 
 static pthread_mutex_t mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
@@ -968,7 +968,7 @@ void param_list_print_command_line(FILE * stream, param_list pl)
 
     if (verbose_enabled(CADO_VERBOSE_PRINT_CMDLINE)) {
         /* print command line */
-        fprintf (stream, "# (%s) %s", CADO_REV, argv[0]);
+        fprintf (stream, "# (%s) %s", cado_revision_string, argv[0]);
         for (int i = 1; i < argc; i++)
             fprintf (stream, " %s", argv[i]);
         fprintf (stream, "\n");

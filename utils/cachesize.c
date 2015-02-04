@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "portability.h"
+#include "version_info.h"
 
 int cachesize_cpuid(int verbose);
 int cachesize_guess(int verbose);
@@ -10,7 +11,7 @@ int cachesize_guess(int verbose);
 int main (int argc, char **argv)
 {
   int i, ret;
-  fprintf (stderr, "# %s.r%s", *argv, CADO_REV);
+  fprintf (stderr, "# %s.r%s", *argv, cado_revision_string);
   for (i = 1; i < argc; i++)
     fprintf (stderr, " %s", *(argv+i));
   fprintf (stderr, "\n");

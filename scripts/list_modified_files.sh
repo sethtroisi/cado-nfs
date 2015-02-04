@@ -5,6 +5,8 @@ OUTPUT_FILE="$1"
 if ! [ -d .git ] ; then
     if ! [ -f "$OUTPUT_FILE" ] ; then
         cat > "$OUTPUT_FILE" <<'EOF'
+#include "cado.h"
+#include "version_info.h"
 const char * cado_modified_files = "# (tarball extracted)\n";
 EOF
     fi
@@ -20,7 +22,11 @@ if ! type -p "$SHA1BIN" > /dev/null ; then
 fi
 
 function list_modified() {
-  echo 'const char * cado_modified_files = '
+  cat << 'EOF'
+#include "cado.h"
+#include "version_info.h"
+const char * cado_modified_files = 
+EOF
   git status --porcelain -uno | while read STATUS FILE
   do
     if [[ "$STATUS" = M  ||  "$STATUS" = A ]]

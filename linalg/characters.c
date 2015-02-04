@@ -89,6 +89,7 @@
 
 #include "cado-endian.h"
 #include "portability.h"
+#include "utils.h"
 #include "utils_with_io.h"
 #include "blockmatrix.h"
 #include "gauss.h"
@@ -608,7 +609,7 @@ int main(int argc, char **argv)
     char *argv0 = argv[0];
 
     /* print the command line */
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    fprintf (stderr, "%s.r%s", argv[0], cado_revision_string);
     for (int i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");

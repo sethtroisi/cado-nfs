@@ -1,9 +1,5 @@
-/* CADO_REV indicates the scm-level revision */
-#define    CADO_REV        "@CADO_REV@"
-
-#define CADO_VERSION_MAJOR     @CADO_VERSION_MAJOR@
-#define CADO_VERSION_MINOR     @CADO_VERSION_MINOR@
-#define CADO_VERSION_STRING    "@CADO_VERSION_STRING@"
+#ifndef CADO_CONFIG_H_
+#define CADO_CONFIG_H_
 
 #define CFLAGS      "@CMAKE_C_FLAGS@"
 #define CXXFLAGS    "@CMAKE_CXX_FLAGS@"
@@ -79,3 +75,5 @@
 #ifdef HAVE_EXECUTABLE_SUFFIX
 #define EXECUTABLE_SUFFIX "@CMAKE_EXECUTABLE_SUFFIX@"
 #endif
+
+#endif  /* CADO_CONFIG_H_ */

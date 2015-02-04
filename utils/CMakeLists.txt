@@ -9,6 +9,7 @@ set (sources
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
         ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c stats.c lll.c
         verbose.c lognorm_skewness.c
+        version_info.c
 	modified_files.c
 )
 if (NOT MINGW)
@@ -34,11 +35,13 @@ add_custom_target(list_modified_files
     WORKING_DIRECTORY "${CADO_NFS_SOURCE_DIR}"
     COMMENT "Generating list of modified files in working tree"
 )
-set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/modified_files.c" PROPERTIES GENERATED TRUE)
+configure_file(version_info.c.in version_info.c ESCAPE_QUOTES @ONLY)
+set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/version_info.c" PROPERTIES GENERATED TRUE)
 
 # the utils library is used by some shared objects (prominently the
 # matmul shared libs in bwc), and therefore must be shared.
 add_library (utils ${CADO_SHARED} ${sources})
+set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/modified_files.c" PROPERTIES GENERATED TRUE)
 add_dependencies(utils list_modified_files)
 target_link_libraries(utils pthread ${gmp_libname} m)
 

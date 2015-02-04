@@ -1184,4 +1184,5 @@ linalg/bwc/lingen_qcode.c
 linalg/bwc/lingen_qcode_do.cpp
 linalg/bwc/lingen_qcode.h
 config/mpn_xor_n.cmake
-utils/modified_files.h
+utils/version_info.h
+utils/version_info.c.in
