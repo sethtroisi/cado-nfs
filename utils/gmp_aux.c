@@ -6,7 +6,7 @@
 #include "macros.h"
 
 /* old versions of GMP do not provide mpn_neg (was mpn_neg_n) and mpn_xor_n */
-#if !GMP_VERSION_ATMOST(5,0,0)
+#if !GMP_VERSION_ATLEAST(5,0,0)
 mp_limb_t
 mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n)
 {
