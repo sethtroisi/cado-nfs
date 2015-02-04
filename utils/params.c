@@ -974,10 +974,9 @@ void param_list_print_command_line(FILE * stream, param_list pl)
         fprintf (stream, "\n");
     }
     if (verbose_enabled(CADO_VERBOSE_PRINT_MODIFIED_FILES)) {
-        const char *modified_files = CADO_MODIFIED_FILES;
-        if (strlen(modified_files) > 1)
+        if (strlen(cado_modified_files) > 1)
           fprintf (stream, "# List of modified files in working directory and "
-                   "their SHA1 sum:\n%s", modified_files);
+                   "their SHA1 sum:\n%s", cado_modified_files);
     }
     if (verbose_enabled(CADO_VERBOSE_PRINT_COMPILATION_INFO)) {
 #ifdef  __GNUC__

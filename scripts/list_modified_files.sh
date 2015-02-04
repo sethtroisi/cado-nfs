@@ -5,7 +5,7 @@ OUTPUT_FILE="$1"
 if ! [ -d .git ] ; then
     if ! [ -f "$OUTPUT_FILE" ] ; then
         cat > "$OUTPUT_FILE" <<'EOF'
-#define CADO_MODIFIED_FILES "# (tarball extracted)\n"
+const char * cado_modified_files = "# (tarball extracted)\n";
 EOF
     fi
     exit 0
@@ -20,18 +20,18 @@ if ! type -p "$SHA1BIN" > /dev/null ; then
 fi
 
 function list_modified() {
-  echo '#define CADO_MODIFIED_FILES "\'
+  echo 'const char * cado_modified_files = '
   git status --porcelain -uno | while read STATUS FILE
   do
     if [[ "$STATUS" = M  ||  "$STATUS" = A ]]
     then
       SHA1="`$SHA1BIN "$FILE" | cut -d " " -f 1`"
-      echo "# $STATUS" "$FILE" "$SHA1"'\n\'
+      echo \""# $STATUS $FILE $SHA1"'\n'\"
     else
-      echo "# $STATUS" "$FILE"'\n\'
+      echo \""# $STATUS $FILE"'\n'\"
     fi
   done
-  echo '"'
+  echo '"";'
 }
 
 TEMPFILE="`mktemp /tmp/XXXXXXX`"
