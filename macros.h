@@ -99,32 +99,32 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifndef GNUC_VERSION
 #define GNUC_VERSION(X,Y,Z)     \
-    defined(__GNUC__) &&        \
-(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z)
+    (defined(__GNUC__) &&        \
+(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z))
 #endif
 
 #ifndef GNUC_VERSION_ATLEAST
 #define GNUC_VERSION_ATLEAST(X,Y,Z)     \
-    defined(__GNUC__) &&        \
-LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+    (defined(__GNUC__) &&        \
+LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z))
 #endif
 
 #ifndef GNUC_VERSION_ATMOST
 #define GNUC_VERSION_ATMOST(X,Y,Z)     \
-    defined(__GNUC__) &&        \
-LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+    (defined(__GNUC__) &&        \
+LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z))
 #endif
 
 #ifndef GMP_VERSION_ATLEAST
 #define GMP_VERSION_ATLEAST(X,Y,Z)     \
-    defined(__GNU_MP__) &&        \
-LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+    (defined(__GNU_MP__) &&        \
+LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
 #endif
 
 #ifndef GMP_VERSION_ATMOST
 #define GMP_VERSION_ATMOST(X,Y,Z)     \
-    defined(__GNU_MP__) &&        \
-LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+    (defined(__GNU_MP__) &&        \
+LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
 #endif
 
 #ifndef MPI_VERSION_ATLEAST
