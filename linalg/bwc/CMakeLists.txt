@@ -98,9 +98,8 @@ set(bwc_base_sources
     ${bwc_base_sources}
     cpubinding.cpp
     )
-endif(HAVE_CXX11 AND HAVE_HWLOC)
-
 install(FILES cpubinding.conf DESTINATION ${DATASUFFIX}/misc)
+endif(HAVE_CXX11 AND HAVE_HWLOC)
 
 add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
