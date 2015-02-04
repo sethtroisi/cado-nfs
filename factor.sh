@@ -262,13 +262,21 @@ mkdir $t/tmp
 # provided, in the case there is no python3 script in the path, or if
 # one which is named otherwise, or placed in a non-prority location
 # is the path, is preferred. If $PYTHON is empty, this is a no-op
-"${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n tasks.execpath="$bindir" \
-tasks.threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
-slaves.nrclients=$slaves \
-slaves.scriptpath="$scriptpath" "$server_address" \
-slaves.basepath="$t/client/" \
-tasks.linalg.bwc.cpubinding="$cpubinding_file"  \
-"$@"
+
+extra_args=(
+    tasks.execpath="$bindir" \
+    tasks.threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
+    slaves.nrclients=$slaves \
+    slaves.scriptpath="$scriptpath" "$server_address" \
+    slaves.basepath="$t/client/" \
+)
+
+if [ "$cpubinding_file" ] ; then
+    extra_args=("${extra_args[@]}" \
+        tasks.linalg.bwc.cpubinding="$cpubinding_file")
+fi
+
+"${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n "${extra_args[@]}" "$@"
 
 rc=$?
 
