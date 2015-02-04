@@ -134,8 +134,8 @@ class fb_vector_interface: public fb_interface {
   public:
   fb_vector_interface(){}
   virtual ~fb_vector_interface(){}
-  virtual int get_nr_roots() = 0;
-  virtual bool is_general() = 0;
+  virtual int get_nr_roots() const = 0;
+  virtual bool is_general() const = 0;
   virtual fb_general_vector * transform_roots(qlattice_basis_srcptr) const = 0;
 };
 
@@ -143,8 +143,8 @@ class fb_slices_interface: public fb_interface {
   public:
   virtual ~fb_slices_interface(){}
   virtual fb_vector_interface *get_vector(size_t) const = 0;
-  virtual int get_nr_roots() = 0;
-  virtual bool is_general() = 0;
+  virtual int get_nr_roots() const = 0;
+  virtual bool is_general() const = 0;
   virtual void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const = 0;
 };
 
@@ -156,8 +156,8 @@ public:
   void append(const fb_general_entry &e) {push_back(e);}
   void fprint(FILE *) const;
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  int get_nr_roots(){return 0;};
-  bool is_general(){return true;};
+  int get_nr_roots() const {return 0;};
+  bool is_general() const {return true;};
   fb_general_vector * transform_roots(qlattice_basis_srcptr) const;
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
 };
@@ -197,8 +197,8 @@ class fb_vector: public std::vector<fb_entry_x_roots<Nr_roots> >, public fb_vect
   void append(const fb_general_entry &e){this->push_back(e);};
   void fprint(FILE *) const;
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  int get_nr_roots(){return Nr_roots;};
-  bool is_general(){return false;};
+  int get_nr_roots() const {return Nr_roots;};
+  bool is_general() const {return false;};
   fb_general_vector * transform_roots(qlattice_basis_srcptr) const;
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
 };
@@ -216,8 +216,8 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  int get_nr_roots(){return Nr_roots;};
-  bool is_general(){return false;};
+  int get_nr_roots() const {return Nr_roots;};
+  bool is_general() const {return false;};
   fb_vector<Nr_roots> *get_vector(const size_t n) const {
     return (n < nr_slices) ? &vectors[n] : NULL;
   }
