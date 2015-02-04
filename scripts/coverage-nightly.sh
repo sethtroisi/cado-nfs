@@ -48,5 +48,8 @@ if ! doit ; then
 fi
 
 rm -rf $DIR $F
+
+rsync -a  "$TARGET_DIRECTORY"/*png "$TARGET_DIRECTORY"/gcov.css "$TARGET_DIRECTORY"/index.html  "$TARGET_DIRECTORY-$(date +%Y%m%d)"/  || :
+
 exit $rc
 
