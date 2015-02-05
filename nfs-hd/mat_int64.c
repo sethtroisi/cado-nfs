@@ -102,6 +102,29 @@ void mat_int64_fprintf(FILE * file, mat_int64_srcptr matrix)
   gmp_fprintf(file, "%" PRId64 "]]\n", matrix->coeff[matrix->NumRows][matrix->NumCols]);
 }
 
+void mat_int64_fprintf_comment(FILE * file, mat_int64_srcptr matrix)
+{
+  fprintf(file, "# [");
+  fprintf(file, "[");
+  for (unsigned int col = 1; col < matrix->NumCols; col++) {
+    fprintf(file, "%" PRId64 ", ", matrix->coeff[1][col]);
+  }
+  gmp_fprintf(file, "%" PRId64 "],\n", matrix->coeff[1][matrix->NumCols]);
+
+  for (unsigned int row = 2; row < matrix->NumRows; row++) {
+    fprintf(file, "# [");
+    for (unsigned int col = 1; col < matrix->NumCols; col++) {
+      fprintf(file, "%" PRId64 ", ", matrix->coeff[row][col]);
+    }
+    gmp_fprintf(file, "%" PRId64 "],\n", matrix->coeff[row][matrix->NumCols]);
+  }
+  fprintf(file, "# [");
+  for (unsigned int col = 1; col < matrix->NumCols; col++) {
+    gmp_fprintf(file, "%" PRId64 ", ", matrix->coeff[matrix->NumRows][col]);
+  }
+  gmp_fprintf(file, "%" PRId64 "]]\n", matrix->coeff[matrix->NumRows][matrix->NumCols]);
+}
+
 void mat_int64_transpose(mat_int64_ptr matrix, mat_int64_srcptr matrix_src)
 {
   ASSERT(matrix->NumRows == matrix_src->NumCols);

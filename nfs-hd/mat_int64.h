@@ -84,6 +84,8 @@ void mat_int64_clear(mat_int64_ptr matrix);
 */
 void mat_int64_fprintf(FILE * file, mat_int64_srcptr matrix);
 
+void mat_int64_fprintf_comment(FILE * file, mat_int64_srcptr matrix);
+
 /*
   Transpose a matrix_src, and set the result in matrix. Assume that matrix have
    the good size and is already initialized.
