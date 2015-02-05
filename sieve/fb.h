@@ -50,10 +50,8 @@ struct fb_general_root {
   bool proj;
 
   fb_general_root (){}
-  /* Constructor for simple entries */
-  fb_general_root (const fbroot_t r) : r(r), exp(1), oldexp(0), proj(false){} 
-  fb_general_root (const fbroot_t r, const unsigned char nexp,
-                   const unsigned char oldexp, const bool proj) :
+  fb_general_root (const fbroot_t r, const unsigned char nexp=1,
+                   const unsigned char oldexp=0, const bool proj=false) :
                    r(r), exp(nexp), oldexp(oldexp), proj(proj) {}
 
   /* A root is simple if it not projective, and the exp goes from 0 to 1 */
