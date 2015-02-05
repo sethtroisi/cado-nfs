@@ -146,7 +146,7 @@ void mat_int64_mul_int64_vector_to_int64_poly(int64_poly_ptr a, mat_int64_srcptr
 }
 
 void mat_int64_mul_int64_vector(int64_vector_ptr a, mat_int64_srcptr A,
-				int64_vector_srcptr c)
+                                int64_vector_srcptr c)
 {
   ASSERT(A->NumCols == c->dim);
   int64_vector_t v;
@@ -185,3 +185,18 @@ void mat_Z_to_mat_int64(mat_int64_ptr matrix_int, mat_Z_srcptr matrix)
   }
 }
 
+void mat_int64_extract(mat_int64_ptr matrix_out, MAYBE_UNUSED mat_int64_srcptr matrix_in,
+                       unsigned int ulx, unsigned int uly, unsigned int drx,
+                       unsigned int dry)
+{
+  ASSERT(drx - ulx > 0);
+  ASSERT(dry - uly > 0);
+
+  mat_int64_init(matrix_out, drx - ulx, dry - uly);
+  for (unsigned int i = 0; i < drx - ulx; i++) {
+    for (unsigned int j = 0; j < dry - uly; j++) {
+      matrix_out->coeff[i + 1][j + 1] =
+        matrix_in->coeff[i + ulx + 1][j + uly + 1];
+    }
+  }
+}

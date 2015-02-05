@@ -111,10 +111,10 @@ void mat_int64_mul_mat_int64(mat_int64_ptr C, mat_int64_srcptr A, mat_int64_srcp
   c: a vector.
 */
 void mat_int64_mul_int64_vector_to_int64_poly(int64_poly_ptr a, mat_int64_srcptr A,
-					      int64_vector_srcptr c);
+                                              int64_vector_srcptr c);
 
 void mat_int64_mul_int64_vector(int64_vector_ptr a, mat_int64_srcptr A,
-				int64_vector_srcptr c);
+                                int64_vector_srcptr c);
 
 /*
   Compute the product A * c (the coefficients of c is considered as coefficients
@@ -127,5 +127,19 @@ void mat_int64_mul_int64_vector(int64_vector_ptr a, mat_int64_srcptr A,
 void mat_int64_mul_mpz_poly(mpz_poly_ptr a, mat_int64_srcptr A, mpz_poly_srcptr c);
 
 void mat_Z_to_mat_int64(mat_int64_ptr matrix_int, mat_Z_srcptr matrix);
+
+/*
+  Extract a submatrix of matrix_in and put it in matrix_out. The point defined
+   by (ulx, uly) is the left up corner of the submatrix, and (drx - 1, dry -
+  1) define the right down corner.
+
+  matrix_out: the output matrix.
+  matrix_in: the input matrix.
+  ulx, uly: coordinate of the left up corner.
+  drx, dry: coordinate of the right down corner.
+*/
+void mat_int64_extract(mat_int64_ptr matrix_out, mat_int64_srcptr matrix_in,
+                       unsigned int ulx, unsigned int uly, unsigned int drx,
+                       unsigned int dry);
 
 #endif // MAT_INT64_H
