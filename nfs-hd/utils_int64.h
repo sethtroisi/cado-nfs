@@ -2,6 +2,10 @@
 #define UTILSINT64_T_H
 
 #include <stdint.h>
+#include "cado.h"
+#include "utils.h"
+#include "mod_ul_default.h"
+#include "mod_ul.h"
 
 /*
   Compute d^e.
@@ -39,5 +43,13 @@ void factorial(int64_t * res, int64_t f);
 
  */
 void int64_abs(uint64_t * res, int64_t a);
+
+/*
+ Compute the modular inverse of xx mod mm.
+
+  xx:
+  mm:
+*/
+uint64_t invmod_uint64(uint64_t xx, uint64_t mm);
 
 #endif /* UTILSINT64_T_H */
