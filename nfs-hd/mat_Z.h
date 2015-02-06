@@ -94,19 +94,20 @@ void mat_Z_set_coeff_uint64(mat_Z_ptr matrix, uint64_t i, unsigned int row,
 void mat_Z_clear(mat_Z_ptr matrix);
 
 /*
-  Print a matrix.
-
-  matrix: mat_Z_ptr, the matrix.
-*/
-void mat_Z_printf(mat_Z_srcptr matrix);
-
-/*
   Write a matrix in a file.
 
   file: the file.
   matrix: the matrix.
 */
 void mat_Z_fprintf(FILE * file, mat_Z_srcptr matrix);
+
+/*
+  Write a matrix in a file. All the lines are preceded by #.
+
+  file: the file.
+  matrix: the matrix.
+*/
+void mat_Z_fprintf_comment(FILE * file, mat_Z_srcptr matrix);
 
 /*
   Transpose a matrix_src, and set the result in matrix. Assume that matrix have

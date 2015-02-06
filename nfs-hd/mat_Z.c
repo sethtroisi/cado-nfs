@@ -112,23 +112,6 @@ void mat_Z_clear(mat_Z_ptr matrix)
   free(matrix->coeff);
 }
 
-void mat_Z_printf(mat_Z_srcptr matrix)
-{
-  printf("[");
-  for (unsigned int row = 1; row < matrix->NumRows; row++) {
-    printf("[");
-    for (unsigned int col = 1; col < matrix->NumCols; col++) {
-      gmp_printf("%Zd, ", matrix->coeff[row][col]);
-    }
-    gmp_printf("%Zd],\n", matrix->coeff[row][matrix->NumCols]);
-  }
-  printf("[");
-  for (unsigned int col = 1; col < matrix->NumCols; col++) {
-    gmp_printf("%Zd, ", matrix->coeff[matrix->NumRows][col]);
-  }
-  gmp_printf("%Zd]]\n", matrix->coeff[matrix->NumRows][matrix->NumCols]);
-}
-
 void mat_Z_fprintf(FILE * file, mat_Z_srcptr matrix)
 {
   fprintf(file, "[");
@@ -140,6 +123,28 @@ void mat_Z_fprintf(FILE * file, mat_Z_srcptr matrix)
     gmp_fprintf(file, "%Zd],\n", matrix->coeff[row][matrix->NumCols]);
   }
   fprintf(file, "[");
+  for (unsigned int col = 1; col < matrix->NumCols; col++) {
+    gmp_fprintf(file, "%Zd, ", matrix->coeff[matrix->NumRows][col]);
+  }
+  gmp_fprintf(file, "%Zd]]\n", matrix->coeff[matrix->NumRows][matrix->NumCols]);
+}
+
+void mat_Z_fprintf_comment(FILE * file, mat_Z_srcptr matrix)
+{
+  fprintf(file, "# [");
+  fprintf(file, "[");
+  for (unsigned int col = 1; col < matrix->NumCols; col++) {
+    gmp_fprintf(file, "%Zd, ", matrix->coeff[1][col]);
+  }
+  gmp_fprintf(file, "%Zd],\n", matrix->coeff[1][matrix->NumCols]);
+  for (unsigned int row = 2; row < matrix->NumRows; row++) {
+    fprintf(file, "# [");
+    for (unsigned int col = 1; col < matrix->NumCols; col++) {
+      gmp_fprintf(file, "%Zd, ", matrix->coeff[row][col]);
+    }
+    gmp_fprintf(file, "%Zd],\n", matrix->coeff[row][matrix->NumCols]);
+  }
+  fprintf(file, "# [");
   for (unsigned int col = 1; col < matrix->NumCols; col++) {
     gmp_fprintf(file, "%Zd, ", matrix->coeff[matrix->NumRows][col]);
   }
