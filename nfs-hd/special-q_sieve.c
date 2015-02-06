@@ -1,4 +1,4 @@
-#include <cado.h>
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -11,6 +11,7 @@
 #include "array.h"
 #include "uint64_array.h"
 #include "utils_mpz.h"
+#include "utils_int64.h"
 
 //TODO: change % in test + add or substract.
 
@@ -338,30 +339,52 @@ void init_norm_1(array_ptr array, double * pre_compute,
 }
 
 /*
-  Compute a pseudo Tqr for an ideal (r, h) with deg(h) = 1.
-  For example, if Tqr[0] != 0, the output is
-   equal to [-Tqr[0]^{-1} mod r = a, a * Tqr[1] mod r, …].
-  The PRINT_TQR mode print the true Tqr matrix.
+  Tqr is the normalised Tqr obtained by compute_Tqr_1. If Tqr[0] != 0,
+   pseudo_Tqr = [(-Tqr[0])^-1 mod r = a, a * Tqr[1], …].
 
-  pseudo_Tqr: pseudo_Tqr is just a line in this case.
-  matrix: MqLLL.
-  t: dimension of the lattice.
-  ideal: special-q.
+   pseudo_Tqr: a matrix (a line here) obtained as describe above.
+   Tqr: the Tqr matrix.
+   t: dimension of the lattice.
+   ideal: the ideal r.
 */
-void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, mat_Z_srcptr matrix,
+void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, uint64_t * Tqr,
                           unsigned int t, ideal_1_srcptr ideal)
+{
+  unsigned int i = 0;
+  while (Tqr[i] == 0 && i < t) {
+    pseudo_Tqr[i] = 0;
+    i++;
+  }
+
+  uint64_t inverse = ideal->ideal->r - 1;
+  ASSERT(inverse ==
+         invmod_uint64((uint64_t)(-Tqr[i] + (int64_t)ideal->ideal->r),
+                       ideal->ideal->r));
+  pseudo_Tqr[i] = inverse;
+  for (unsigned int j = i + 1; j < t; j++) {
+    pseudo_Tqr[j] = (inverse * Tqr[j]) % ((int64_t)ideal->ideal->r);
+  }
+}
+
+/*
+  Compute Tqr for r an ideal of degree 1 and normalised it.
+
+  Tqr: the Tqr matrix (Tqr is a line).
+  matrix: the MqLLL matrix.
+  t: dimension of the lattice.
+  ideal: the ideal r.
+*/
+void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix,
+                   unsigned int t, ideal_1_srcptr ideal)
 {
   mpz_t tmp;
   mpz_init(tmp);
   unsigned int i = 0;
-  pseudo_Tqr[i] = 0;
+  Tqr[i] = 0;
   //Tqr = Mq,1 - Tr * Mq,2.
 
-#ifdef PRINT_TQR
   mpz_t invert;
   mpz_init(invert);
-  printf("# Tqr = [");
-#endif // PRINT_TQR
 
   for (unsigned int j = 0; j < t; j++) {
     mpz_set(tmp, matrix->coeff[1][j + 1]);
@@ -371,60 +394,63 @@ void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, mat_Z_srcptr matrix,
                  matrix->coeff[k + 2][j + 1]);
     }
 
-    if (pseudo_Tqr[i] == 0) {
+    if (Tqr[i] == 0) {
       mpz_mod_ui(tmp, tmp, ideal->ideal->r);
       if (mpz_cmp_ui(tmp, 0) != 0) {
         mpz_invert_ui(tmp, tmp, ideal->ideal->r);
-
-#ifdef PRINT_TQR
         mpz_set(invert, tmp);
-        if (j != t - 1) {
-          gmp_printf("1, ", invert);
-        } else {
-          gmp_printf("1", invert);
-        }
-#endif // PRINT_TQR
-
-        mpz_mul_si(tmp, tmp, -1);
-        mpz_mod_ui(tmp, tmp, ideal->ideal->r);
-        ASSERT(mpz_cmp_ui(tmp, ideal->ideal->r) <= 0);
-        pseudo_Tqr[j] = mpz_get_ui(tmp);
+        Tqr[j] = 1;
         i = j;
       } else {
-
-#ifdef PRINT_TQR
-        printf("0, ");
-#endif // PRINT_TQR
-
-        pseudo_Tqr[j] = 0;
+        Tqr[j] = 0;
       }
     } else {
-
-#ifdef PRINT_TQR
-      mpz_t tmp2;
-      mpz_init(tmp2);
-      mpz_mul(tmp2, tmp, invert);
-      mpz_mod_ui(tmp2, tmp2, ideal->ideal->r);
-      if (j != t - 1) {
-        gmp_printf("%Zd, ", tmp2);
-      } else {
-        gmp_printf("%Zd", tmp2);
-      }
-      mpz_clear(tmp2);
-#endif // PRINT_TQR
-
-      mpz_mul_ui(tmp, tmp, pseudo_Tqr[i]);
+      mpz_mul(tmp, tmp, invert);
       mpz_mod_ui(tmp, tmp, ideal->ideal->r);
-      pseudo_Tqr[j] = mpz_get_ui(tmp);
+      Tqr[j] = mpz_get_ui(tmp);
     }
   }
-  mpz_clear(tmp);
 
-#ifdef PRINT_TQR
-  printf("] mod %" PRIu64 ", h: ", ideal->ideal->r);
-  mpz_poly_fprintf(stdout, ideal->ideal->h);
+  mpz_clear(tmp);
   mpz_clear(invert);
-#endif // PRINT_TQR
+}
+
+/*
+  Generate the Mqr matrix, r is an ideal of degree 1.
+
+  Mqr: the matrix.
+  Tqr: the Tqr matrix (Tqr is a line).
+  t: dimension of the lattice.
+  ideal: the ideal r.
+*/
+void generate_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr,
+                    unsigned int t, ideal_1_srcptr ideal)
+{
+  ASSERT(Tqr[0] != 0);
+  ASSERT(t == Mqr->NumCols);
+  ASSERT(t == Mqr->NumRows);
+
+#ifndef NDEBUG
+  for (unsigned int row = 1; row <= Mqr->NumRows; row++) {
+    for (unsigned int col = 1; col <= Mqr->NumCols; col++) {
+      ASSERT(Mqr->coeff[row][col] == 0);
+    }
+  }
+#endif // NDEBUG
+
+  Mqr->coeff[1][1] = ideal->ideal->r;
+  for (unsigned int col = 2; col <= Mqr->NumRows; col++) {
+    if (Tqr[col] == 0) {
+      Mqr->coeff[1][col] = 0;
+    } else {
+      Mqr->coeff[1][col] = (-Tqr[col - 1]) + ideal->ideal->r;
+    }
+    ASSERT(Mqr->coeff[col][1] < (int64_t)ideal->ideal->r);
+  }
+
+  for (unsigned int row = 2; row <= Mqr->NumRows; row++) {
+    Mqr->coeff[row][row] = 1;
+  }
 }
 
 /*
@@ -721,8 +747,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     }
 #endif // TIMER_SIEVE
 
+    uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
     uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
-    compute_pseudo_Tqr_1(pseudo_Tqr, matrix, H->t, fb->factor_base_1[i]);
+    compute_Tqr_1(Tqr, matrix, H->t, fb->factor_base_1[i]);
+    compute_pseudo_Tqr_1(pseudo_Tqr, Tqr, H->t, fb->factor_base_1[i]);
+
 
 #ifdef TIMER_SIEVE
     if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
@@ -887,6 +916,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
     int64_vector_clear(c);
     free(pseudo_Tqr);
+    free(Tqr);
   }
 
 #ifdef TIMER_SIEVE
