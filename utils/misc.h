@@ -11,9 +11,11 @@
 #include "macros.h"
 #include "portability.h"
 
-/* we require GMP 5 at least */
-#if !GMP_VERSION_ATLEAST(5,0,0)
-#error "GNU MP 5 (at least) is required to compile CADO-NFS"
+/* we prefer GMP 5 or later, but the history of the why and how seems
+ * lost. It seems that the late GMP-4.3 versions are fine, and the few
+ * missing functions are provided as fallbacks */
+#if !GMP_VERSION_ATLEAST(4,3,0)
+#error "GNU MP 4.3.0 (at least) is required to compile CADO-NFS"
 #endif
 
 #ifdef __cplusplus

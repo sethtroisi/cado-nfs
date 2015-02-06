@@ -5,6 +5,29 @@
 #include "gmp_aux.h"
 #include "macros.h"
 
+/* old versions of GMP do not provide mpn_neg (was mpn_neg_n) and mpn_xor_n */
+#if !GMP_VERSION_ATLEAST(5,0,0)
+mp_limb_t
+mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n)
+{
+  mp_size_t i;
+
+  for (i = 0; i < n; i++)
+    rp[i] = ~sp[i];
+  return mpn_add_1 (rp, rp, n, 1);
+}
+
+void
+mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
+	   mp_size_t n)
+{
+  mp_size_t i;
+
+  for (i = 0; i < n; i++)
+    rp[i] = s1p[i] ^ s2p[i];
+}
+#endif
+
 /* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */
 void
 mpz_set_uint64 (mpz_t z, uint64_t q)

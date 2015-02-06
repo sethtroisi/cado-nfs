@@ -622,7 +622,6 @@ subjectAltName=@altnames
         self.logger.setLevel(logging.NOTSET)
         self.address = address if address else "0.0.0.0"
         self.url_address = address if address else socket.gethostname()
-        self.port = port
         self.cafile = cafile
         self.only_registered = only_registered
         upload_scriptname = "upload.py"
@@ -711,9 +710,7 @@ subjectAltName=@altnames
             if not self.cert_sha1 is None:
                 scheme = "https"
 
-        self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
-        
-        addr = (self.address, self.port)
+        addr = (self.address, port)
         try:
             if threaded and scheme == "http":
                 self.logger.info("Using threaded HTTP server")
@@ -740,11 +737,17 @@ subjectAltName=@altnames
                 self.logger.critical("You can choose a different port with "
                         "server.port=<integer>.")
                 sys.exit(1)
+
+        self.port = self.httpd.server_address[1]
+        self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
         self.httpd.server_name = self.name
 
         if self.address == "localhost" or self.address.startswith("127."):
             self.logger.warn("Server is listening on the loopback device. "
                     "Clients on other hosts will not be able to connect.")
+
+    def get_port(self):
+        return self.port
 
     def get_url(self):
         return self.url

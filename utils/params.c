@@ -12,7 +12,7 @@
 #include "macros.h"
 #include "misc.h"
 #include "portability.h"
-#include "modified_files.h"
+#include "version_info.h"
 #include "verbose.h"
 
 static pthread_mutex_t mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
@@ -1018,16 +1018,15 @@ void param_list_print_command_line(FILE * stream, param_list pl)
 
     if (verbose_enabled(CADO_VERBOSE_PRINT_CMDLINE)) {
         /* print command line */
-        fprintf (stream, "# (%s) %s", CADO_REV, argv[0]);
+        fprintf (stream, "# (%s) %s", cado_revision_string, argv[0]);
         for (int i = 1; i < argc; i++)
             fprintf (stream, " %s", argv[i]);
         fprintf (stream, "\n");
     }
     if (verbose_enabled(CADO_VERBOSE_PRINT_MODIFIED_FILES)) {
-        const char *modified_files = CADO_MODIFIED_FILES;
-        if (strlen(modified_files) > 1)
+        if (strlen(cado_modified_files) > 1)
           fprintf (stream, "# List of modified files in working directory and "
-                   "their SHA1 sum:\n%s", modified_files);
+                   "their SHA1 sum:\n%s", cado_modified_files);
     }
     if (verbose_enabled(CADO_VERBOSE_PRINT_COMPILATION_INFO)) {
 #ifdef  __GNUC__

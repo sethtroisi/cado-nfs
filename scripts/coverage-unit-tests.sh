@@ -65,6 +65,8 @@ EOF
 
     (cd $SOURCETREE ; echo "Checking out revision $(git rev-parse $REVISION)" ; git checkout -b local $REVISION)
 
+    commit=$("$SOURCETREE/scripts/version.sh")
+
     # first build a tarball
     make -C $SOURCETREE dist
 
@@ -86,6 +88,8 @@ EOF
     echo "Starting tests at: `date`"
     cat > $DIR/epilog.html <<EOF
 <p style="text-align: center;">See also the <a href="./@basedir@/make-test.txt">test results</a></p>
+</body>
+</html>
 EOF
     maketest() {
     if make -j8 check ; then
@@ -93,6 +97,8 @@ EOF
     else
         cat > $DIR/epilog.html <<EOF
 <p style="text-align: center;">Warning: some tests have failed, see <a href="./@basedir@/make-test.txt">test results</a></p>
+</body>
+</html>
 EOF
     fi
     }
@@ -108,7 +114,7 @@ EOF
     rm -rf "$TARGET_DIRECTORY"/ || :
     /bin/cp -pf $(which genhtml) $DIR/genhtml
     ex $DIR/genhtml <<EOF
-/sub get_date_string()$
+/sub get_date_string()\$
 /{
 mark a
 /}
@@ -117,6 +123,11 @@ mark b
 {
        return scalar localtime;
 }
+.
+/headerValue.*date
+a
+        push(@row_left, [[undef, "headerItem", "Commit:"],
+                         [undef, "headerValue", "<a href=\"https://gforge.inria.fr/plugins/scmgit/cgi-bin/gitweb.cgi?p=cado-nfs/cado-nfs.git;a=shortlog;h=$commit\">$commit</a>"]]);
 .
 wq
 EOF
@@ -131,7 +142,11 @@ if ! doit ; then
     rc=1
 fi
 
+# Do this *before* we rm-rf ourselves !
+rsync -a  "$TARGET_DIRECTORY"/*png "$TARGET_DIRECTORY"/gcov.css "$TARGET_DIRECTORY"/index.html  "$TARGET_DIRECTORY-$(date +%Y%m%d)"/  || :
+
 [ "$NOWIPE" ] || rm -rf $DIR $F
+
 exit $rc
 
 

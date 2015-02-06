@@ -151,12 +151,16 @@ if [ "$0" -ef "$cado_prefix/lib/$archive_name/factor.sh" ] ; then
     scriptpath="$bindir"
     cadofactor="$scriptpath/cadofactor.py"
     paramdir="$cado_prefix/share/$archive_name"
+    cpubinding_file="$cado_prefix/share/$archive_name/misc/cpubinding.conf"
+    if ! [ -f "$cpubinding_file" ] ; then cpubinding_file= ; fi
 elif [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     # We're called in the install tree.
     bindir="$cado_prefix/bin"
     scriptpath="$bindir"
     cadofactor="$scriptpath/cadofactor.py"
     paramdir="$cado_prefix/share/$archive_name"
+    cpubinding_file="$cado_prefix/share/$archive_name/misc/cpubinding.conf"
+    if ! [ -f "$cpubinding_file" ] ; then cpubinding_file= ; fi
 elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     # We're called in the build tree.
     scriptpath="$cado_source_dir/scripts/cadofactor"
@@ -164,6 +168,12 @@ elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     cadofactor="$scriptpath/cadofactor.py"
     # Make the path absolute.
     bindir="$cado_build_dir"
+    cpubinding_file="$cado_source_dir/linalg/bwc/cpubinding.conf"
+    for flag in HAVE_CXX11 HAVE_HWLOC ; do
+        if ! grep -q "define.*$flag" "$bindir/cado_config.h" ; then
+            cpubinding_file=
+        fi
+    done
 elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
     # Otherwise we're called from the source tree (or we hope so)
     srcdir=$(cd "`dirname $0`" ; pwd)
@@ -179,6 +189,12 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
       paramdir="${srcdir}/params"
       # Make the path absolute.
       bindir=`cd "$build_tree" ; pwd`
+      cpubinding_file="$srcdir/linalg/bwc/cpubinding.conf"
+      for flag in HAVE_CXX11 HAVE_HWLOC ; do
+          if ! grep -q "define.*$flag" "$bindir/cado_config.h" ; then
+              cpubinding_file=
+          fi
+      done
     fi
 fi
 if [ -z "$cadofactor" ] ; then
@@ -246,11 +262,21 @@ mkdir $t/tmp
 # provided, in the case there is no python3 script in the path, or if
 # one which is named otherwise, or placed in a non-prority location
 # is the path, is preferred. If $PYTHON is empty, this is a no-op
-"${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n tasks.execpath="$bindir" \
-tasks.threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
-slaves.nrclients=$slaves \
-slaves.scriptpath="$scriptpath" "$server_address" \
-slaves.basepath="$t/client/" "$@"
+
+extra_args=(
+    tasks.execpath="$bindir" \
+    tasks.threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
+    slaves.nrclients=$slaves \
+    slaves.scriptpath="$scriptpath" "$server_address" \
+    slaves.basepath="$t/client/" \
+)
+
+if [ "$cpubinding_file" ] ; then
+    extra_args=("${extra_args[@]}" \
+        tasks.linalg.bwc.cpubinding="$cpubinding_file")
+fi
+
+"${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n "${extra_args[@]}" "$@"
 
 rc=$?
 

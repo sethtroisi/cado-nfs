@@ -205,7 +205,7 @@ void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
 void banner(int argc, char * argv[])
 {
     /* print command line */
-    fprintf (stderr, "# (%s) %s", CADO_REV, (argv)[0]);
+    fprintf (stderr, "# (%s) %s", cado_revision_string, (argv)[0]);
     for (int i = 1; i < (argc); i++)
         fprintf (stderr, " %s", (argv)[i]);
     fprintf (stderr, "\n");

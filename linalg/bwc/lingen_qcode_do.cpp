@@ -224,14 +224,14 @@ unsigned int lingen_qcode_do_tmpl(lingen_qcode_data_ptr qq)
                 if (k == pivot) continue;
 		if (!(E(i, k)[mpos] & mask)) continue;
                 is_modified[k] |= 1;
-#if defined(SWAP_E) && defined(HAVE_MPN_XOR_N)
+#if defined(SWAP_E)
                 mpn_xor_n ((unsigned long*)E.column(k),(unsigned long*) E.column(k),(unsigned long*) E.column(pivot), m * WIDTH);
 #else
                 for (unsigned int l = 0; l < m; l++)
                     for (unsigned int s = 0; s < WIDTH; s++)
                         E(l, k)[s] ^= E(l, pivot)[s];
 #endif
-#if defined(SWAP_PI) && defined(HAVE_MPN_XOR_N)
+#if defined(SWAP_PI)
                 mpn_xor_n ((unsigned long*)P.column(k), (unsigned long*)P.column(k), (unsigned long*)P.column(pivot), (m + n) * WIDTH);
 #else
                 for (unsigned int l = 0; l < m + n; l++)

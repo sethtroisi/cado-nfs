@@ -243,7 +243,11 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
 }
 
 
-/* r_ul and a_ul must be non-overlapping */
+/* Compute r[i] = a[i]^(-1) mod m, for 0 <= i < n, where a[i] are
+   non-negative integers and r[i] are integers with 0 <= r[i] < m.
+   a[i] need not be reduced modulo m. r_ul and a_ul must be non-overlapping.
+   If any inverse does not exists, returns 0 and contents of r are undefined,
+   otherwise returns 1. */
 
 int
 modredcul_batchinv_ul (unsigned long *restrict r_ul,

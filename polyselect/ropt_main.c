@@ -469,7 +469,7 @@ main (int argc, char **argv)
   ropt_param_init (param);
 
   /* print command-line arguments */
-  fprintf (stderr, "# %s.r%s", *argv, CADO_REV);
+  fprintf (stderr, "# %s.r%s", *argv, cado_revision_string);
   for (i = 1; i < argc; i++)
     fprintf (stderr, " %s", *(argv+i));
   fprintf (stderr, "\n");
