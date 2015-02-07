@@ -63,6 +63,11 @@ double norm = 0;
 uint64_t index_old = 0;
 #endif // ASSERT_SIEVE
 
+#ifdef NUMBER_SURVIVALS
+uint64_t number_survivals = 0;
+uint64_t number_survivals_facto = 0;
+#endif // NUMBER_SURVIVALS
+
 /*
   Build the matrix Mq for an ideal (q, g) with deg(g) = 1. The matrix need Tq
    with the good coefficients, i.e. t the coeffecients not reduced modulo q.
@@ -1189,9 +1194,18 @@ static void find_relation(uint64_array_t * indexes, uint64_t * index,
     mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, c);
     mpz_poly_content(gcd, a);
 
+#ifdef NUMBER_SURVIVALS
+      number_survivals++;
+#endif // NUMBER_SURVIVALS
+
     //a must be irreducible.
     if (mpz_cmp_ui(gcd, 1) == 0 && a->deg > 0 &&
         mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
+
+#ifdef NUMBER_SURVIVALS
+      number_survivals_facto++;
+#endif // NUMBER_SURVIVALS
+
       good_polynomial(a, f, lpb, L, size, H->t, V);
     }
 
@@ -1456,6 +1470,10 @@ int main(int argc, char * argv[])
   double sec_tot;
   double sec_cofact;
 
+#ifdef NUMBER_SURVIVALS
+  uint64_t * numbers_survivals = malloc(sizeof(uint64_t) * V);
+#endif // NUMBER_SURVIVALS
+
 #ifdef TRACE_POS
   file = fopen("TRACE_POS.txt", "w+");
   fprintf(file, "TRACE_POS: %d\n", TRACE_POS);
@@ -1545,16 +1563,14 @@ int main(int argc, char * argv[])
           time[j][1] = seconds() - sec;
           sec = seconds();
           find_index(indexes[j], array, thresh[j]);
+          time[j][2] = seconds() - sec;
 
 #ifdef MEAN_NORM_BOUND_SIEVE
         norms_bound_sieve[j] = norm_bound_sieve;
 #endif // MEAN_NORM_BOUND_SIEVE
 
-          time[j][2] = seconds() - sec;
-          sec = seconds();
-
 #ifdef TRACE_POS
-            fprintf(file, "********************\n");
+        fprintf(file, "********************\n");
 #endif // TRACE_POS
         }
 
@@ -1563,6 +1579,11 @@ int main(int argc, char * argv[])
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
+
+#ifdef NUMBER_SURVIVALS
+          numbers_survivals[j] = indexes[j]->length;
+#endif // NUMBER_SURVIVALS
+
           uint64_array_clear(indexes[j]);
         }
 
@@ -1587,8 +1608,26 @@ int main(int argc, char * argv[])
 
           printf("# Time to sieve %d: %fs.\n", j, time[j][1]);
           printf("# Time to find indexes %d: %fs.\n", j, time [j][2]);
+
+#ifdef NUMBER_SURVIVALS
+          printf("# Number of survivals %d: %" PRIu64 ".\n", j,
+                 numbers_survivals[j]);
+#endif // NUMBER_SURVIVALS
         }
+
+#ifdef NUMBER_SURVIVALS
+        free(numbers_survivals);
+#endif // NUMBER_SURVIVALS
+
         printf("# Time to factorize: %fs.\n", sec_cofact);
+
+#ifdef NUMBER_SURVIVALS
+        printf("# Number total of survivals: %" PRIu64 ".\n",
+               number_survivals);
+        printf("# Number total of polynomial a survivals: %" PRIu64 ".\n",
+               number_survivals_facto);
+#endif // NUMBER_SURVIVALS
+
         printf("# ----------------------------------------\n");
 
 #ifdef MEAN_NORM
