@@ -14,6 +14,7 @@
 
 
 static unsigned int fb_log_2 (fbprime_t);
+static bool fb_linear_root (fbroot_t *, const mpz_t *, fbprime_t);
 
 /* strtoul(), but with const char ** for second argument.
    Otherwise it's not possible to do, e.g., strtoul(p, &p, 10) when p is
@@ -77,6 +78,15 @@ fb_is_power (fbprime_t q, unsigned long *final_k)
 }
 
 
+/* Allow construction of a root from a linear polynomial and a prime (power) */
+fb_general_root::fb_general_root (fbprime_t q, const mpz_t *poly,
+  const unsigned char nexp, const unsigned char oldexp)
+  : exp(nexp), oldexp(oldexp)
+{
+  proj = fb_linear_root (&r, poly, q);
+}
+
+
 /* Allow assignment-construction of general entries from simple entries */
 template <int Nr_roots>
 fb_general_entry::fb_general_entry (const fb_entry_x_roots<Nr_roots> &e) {
@@ -112,12 +122,12 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
                               const unsigned char oldexp,
                               const unsigned long linenr)
 {
-    size_t i_roots = 0;
     unsigned long long last_t = 0;
 
+    nr_roots = 0;
     while (*lineptr != '\0')
     {
-        if (i_roots == MAXDEGREE) {
+        if (nr_roots == MAXDEGREE) {
             fprintf (stderr,
                     "# Error, too many roots for prime (power) %" FBPRIME_FORMAT
                     " in factor base line %lu\n", q, linenr);
@@ -127,14 +137,15 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
            the factor base file; since q can be a 32-bit value, we read the
            root as a 64-bit integer first and subtract q if necessary. */
         const unsigned long long t = strtoull_const (lineptr, &lineptr, 10);
-        if (i_roots > 0 && t <= last_t) {
+        if (nr_roots > 0 && t <= last_t) {
             fprintf (stderr,
                 "# Error, roots must be sorted in the fb file, line %lu\n",
                 linenr);
             exit(EXIT_FAILURE);
         }
+        last_t = t;
 
-        roots[i_roots++] = fb_general_root(static_cast<fbroot_t>(t - ((t >= q) ? q : 0)), nexp, oldexp, (t >= q));
+        roots[nr_roots++] = fb_general_root(t, q, nexp, oldexp);
         if (*lineptr != '\0' && *lineptr != ',') {
             fprintf(stderr,
                     "# Incorrect format in factor base file line %lu\n",
@@ -145,12 +156,11 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
             lineptr++;
     }
 
-    if (i_roots == 0) {
+    if (nr_roots == 0) {
         fprintf (stderr, "# Error, no root for prime (power) %" FBPRIME_FORMAT
                 " in factor base line %lu\n", q, linenr - 1);
         exit(EXIT_FAILURE);
     }
-    nr_roots = i_roots;
 }
 
 /* Parse a factor base line.

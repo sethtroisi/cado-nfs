@@ -22,7 +22,7 @@
 #include "fb-types.h"
 #include "las-qlattice.h"
 
-/* Base class with private copy-constructor and assigmnet operator.
+/* Base class with private copy-constructor and assignment operator.
    Classes which are not copy-constructible can inherit this with:
    private NonCopyable */
 class NonCopyable {
@@ -53,24 +53,39 @@ struct fb_general_root {
   fb_general_root (const fbroot_t r, const unsigned char nexp=1,
                    const unsigned char oldexp=0, const bool proj=false) :
                    r(r), exp(nexp), oldexp(oldexp), proj(proj) {}
+  /* Create a root from a linear polynomial */
+  fb_general_root (fbprime_t q, const mpz_t *poly, const unsigned char nexp=1,
+                   const unsigned char oldexp=0);
 
-  /* A root is simple if it not projective, and the exp goes from 0 to 1 */
+  /* Constructor from the old format of storing projective roots, which has q
+     added to the root if the root is projective */
+  fb_general_root (const unsigned long long old_r, const fbprime_t q,
+                   const unsigned char nexp=1, const unsigned char oldexp=0) :
+                   exp(nexp), oldexp(oldexp), proj(old_r >= q) {
+    r = proj ? (old_r - q) : old_r;
+  }
+
+  /* A root is simple if it is not projective and the exp goes from 0 to 1 */
   bool is_simple() const {return exp == 1 && oldexp == 0 && !proj;}
+
+  /* Convert a root to the old format of storing projective roots with q added */
+  unsigned long long to_old_format(const fbprime_t q) const {
+    return (unsigned long long) r + (proj ? q : 0);
+  }
+
   /* Print one root. Projective roots are printed as r+q */
   void fprint(FILE *out, const fbprime_t q) const {
-    fprintf(out, "%llu", (unsigned long long) r + (proj ? q : 0));
+    fprintf(out, "%llu", to_old_format(q));
     if (oldexp != 0 || this->exp != 1)
       fprintf(out, ":%hhu:%hhu", oldexp, this->exp);
   }
+
   void transform(fb_general_root &result, const fbprime_t q,
                  const redc_invp_t invq,
                  qlattice_basis_srcptr basis) const {
-    result.exp = this->exp;
-    result.oldexp = oldexp;
-    fbprime_t t = r + (proj ? q : 0);
+    unsigned long long t = to_old_format(q);
     t = fb_root_in_qlattice(q, t, invq, basis);
-    result.proj = (t >= q);
-    result.r = t - ( (t >= q) ? q : 0);
+    result = fb_general_root(t, q, exp, oldexp);
   }
 };
 
