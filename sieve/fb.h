@@ -102,10 +102,15 @@ public:
 		       the size of redc_invp_t */
   fb_general_root roots[MAXDEGREE];
   unsigned char k, nr_roots;
+  /* Static class members to allow fb_vector<> to distinguish between and
+     operate on both kind of entries */
+  static const bool is_general_type = true;
+  static const unsigned char fixed_nr_roots = 0;
 
   fb_general_entry(){}
   template <int Nr_roots>
   fb_general_entry (const fb_entry_x_roots<Nr_roots> &e);
+  fbprime_t get_q() const {return q;}
   void parse_line (const char *line, unsigned long linenr);
   void merge (const fb_general_entry &);
   void fprint(FILE *out) const;
@@ -183,6 +188,11 @@ class fb_entry_x_roots {
 public:
   fbprime_t p;
   fbroot_t roots[Nr_roots];
+  /* Static class members to allow fb_vector<> to distinguish between and
+     operate on both kind of entries */
+  static const unsigned char k = 1, nr_roots = Nr_roots;
+  static const bool is_general_type = false;
+  static const unsigned char fixed_nr_roots = Nr_roots;
   fb_entry_x_roots(){};
   /* Allow assignment-construction from general entries */
   fb_entry_x_roots(const fb_general_entry &e) {
@@ -192,6 +202,10 @@ public:
     for (size_t i = 0; i < Nr_roots; i++)
       roots[i] = e.roots[i].r;
   }
+  fbprime_t get_q() const {return p;}
+  /* Allow sorting by p */
+  bool operator<(const fb_general_entry &other) {return this->p < other.p;}
+  bool operator>(const fb_general_entry &other) {return this->p > other.p;}
   void fprint(FILE *) const;
   void transform_roots(fb_general_entry &, qlattice_basis_srcptr) const;
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
