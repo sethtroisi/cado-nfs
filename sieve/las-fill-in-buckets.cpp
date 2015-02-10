@@ -381,7 +381,7 @@ fill_in_buckets(thread_data_ptr th, int side, const fb_general_vector *transform
          above, this initialization should in fact either be done for each congruence class,
          or saved for later use within the factor base structure. */
       plattice_info_t pli;
-      if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
+      if (UNLIKELY(!reduce_plattice(&pli, p, r, si->I))) {
         verbose_output_print (1, 1, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
                               FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
         continue; /* Simply don't consider that (p,r) for now.
@@ -389,9 +389,9 @@ fill_in_buckets(thread_data_ptr th, int side, const fb_general_vector *transform
       }
       /* OK, all special cases are done. */
 
-      const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
+      const uint32_t bound0 = plattice_bound0(&pli, logI), bound1 = plattice_bound1(&pli, logI);
 #if !MOD2_CLASSES_BS
-      const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+      const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
       uint64_t x = 1ULL << (logI-1);
       uint32_t i = x;
 #ifdef SKIP_GCD_UV
@@ -404,7 +404,7 @@ fill_in_buckets(thread_data_ptr th, int side, const fb_general_vector *transform
         // The sieving point (0,0) is I/2 in x-coordinate
         uint64_t x = plattice_starting_vector(&pli, si, parity);
         if (x >= IJ) continue;
-        const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+        const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
 #endif
         const prime_hint_t hint = bucket_encode_prime (p);
         
@@ -531,7 +531,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
        above, this initialization should in fact either be done for each congruence class,
        or saved for later use within the factor base structure. */
     plattice_info_t pli;
-    if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
+    if (UNLIKELY(!reduce_plattice(&pli, p, r, si->I))) {
       verbose_output_print (1, 1, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
 	                    FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
       continue; /* Simply don't consider that (p,r) for now.
@@ -539,9 +539,9 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     }
     /* OK, all special cases are done. */
 
-    const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
+    const uint32_t bound0 = plattice_bound0(&pli, logI), bound1 = plattice_bound1(&pli, logI);
 #if !MOD2_CLASSES_BS
-    const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+    const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
     uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
 #ifdef SKIP_GCD_UV
@@ -554,7 +554,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       // The sieving point (0,0) is I/2 in x-coordinate
       uint64_t x = plattice_starting_vector(&pli, si, parity);
       if (x >= IJ) continue;
-      const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+      const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
 #endif
       const prime_hint_t hint = bucket_encode_prime (p);
       
@@ -775,7 +775,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
        above, this initialization should in fact either be done for each congruence class,
        or saved for later use within the factor base structure. */
     plattice_info_t pli;
-    if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
+    if (UNLIKELY(!reduce_plattice(&pli, p, r, si->I))) {
       verbose_output_print (1, 1, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
 	                    FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
       continue; /* Simply don't consider that (p,r) for now.
@@ -783,9 +783,9 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     }
     /* OK, all special cases are done. */
 
-    const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
+    const uint32_t bound0 = plattice_bound0(&pli, logI), bound1 = plattice_bound1(&pli, logI);
 #if !MOD2_CLASSES_BS
-    const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+    const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
     uint64_t x = 1ULL << (si->conf->logI-1);
     uint32_t i = x;
 #ifdef SKIP_GCD_UV
@@ -798,7 +798,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       // The sieving point (0,0) is I/2 in x-coordinate
       uint64_t x = plattice_starting_vector(&pli, si, parity);
       if (x >= IJ) continue;
-      const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+      const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
 #endif
       const prime_hint_t hint = bucket_encode_prime (p);
 

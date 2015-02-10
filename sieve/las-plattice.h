@@ -141,12 +141,12 @@ typedef struct {
 } plattice_info_t;
 
 NOPROFILE_INLINE int
-reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbroot_t r, sieve_info_srcptr si)
+reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbroot_t r, const uint32_t I)
 {
 #if MOD2_CLASSES_BS
-  const int32_t hI = (int32_t) ((si->I) >> 1);
+  const int32_t hI = (int32_t) (I >> 1);
 #else
-  const int32_t hI = (int32_t) (si->I);
+  const int32_t hI = (int32_t) I;
 #endif
   int32_t a0 = - (int32_t) p, b0 = (int32_t) r, a1, b1;
   
@@ -273,28 +273,28 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbroot_t r, siev
 #else
 #define PLI_COEFF(pli, ab01) (pli->ab01)
 #endif
-static inline plattice_x_t plattice_a(const plattice_info_t * pli, sieve_info_srcptr si)
+static inline plattice_x_t plattice_a(const plattice_info_t * pli, const int logI)
 {
     int64_t a0 = PLI_COEFF(pli, a0);
     uint64_t a1 = PLI_COEFF(pli, a1);
-    return (a1 << si->conf->logI) + a0;
+    return (a1 << logI) + a0;
 }
 
-static inline plattice_x_t plattice_c(const plattice_info_t * pli, sieve_info_srcptr si)
+static inline plattice_x_t plattice_c(const plattice_info_t * pli, const int logI)
 {
     int64_t b0 = PLI_COEFF(pli, b0);
     uint64_t b1 = PLI_COEFF(pli, b1);
-    return (b1 << si->conf->logI) + b0;
+    return (b1 << logI) + b0;
 }
 
-static inline uint32_t plattice_bound0(const plattice_info_t * pli, sieve_info_srcptr si MAYBE_UNUSED)
+static inline uint32_t plattice_bound0(const plattice_info_t * pli, const int logI MAYBE_UNUSED)
 {
     return - PLI_COEFF(pli, a0);
 }
 
-static inline uint32_t plattice_bound1(const plattice_info_t * pli, sieve_info_srcptr si)
+static inline uint32_t plattice_bound1(const plattice_info_t * pli, const int logI)
 {
-    return si->I - PLI_COEFF(pli, b0);
+    return (1U << logI) - PLI_COEFF(pli, b0);
 }
 
 
