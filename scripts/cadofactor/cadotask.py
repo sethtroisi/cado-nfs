@@ -141,6 +141,10 @@ class Polynomials(object):
     >>> Polynomials([""])
     Traceback (most recent call last):
     cadotask.PolynomialParseException: No polynomials found
+    >>> t="n: 1021\nc0: 1\nc5: -1\nc5: 1\nY0: 4\nY1: -1\nskew: 1.0\n"
+    >>> p=Polynomials(t.splitlines())
+    Traceback (most recent call last):
+    cadotask.PolynomialParseException: Line 'c5: 1' redefines coefficient of x^5
     >>> t="n: 1021\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\nskew: 1.0\n"
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
@@ -149,6 +153,8 @@ class Polynomials(object):
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
     'n: 1021\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
+    >>> t="n: 1021\npoly0: 1, 2, 3\npoly1: 4, 5, 6\nskew: 1.0\n"
+    >>> p=Polynomials(t.splitlines())
     """
 
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
@@ -186,7 +192,8 @@ class Polynomials(object):
                 (idx, coeff) = map(int, match.groups())
                 if idx <= poly.degree and poly[idx]:
                     raise PolynomialParseException(
-                        "Line '%s' redefines value %d" % line)
+                        "Line '%s' redefines coefficient of x^%d"
+                        % (line, idx))
                 poly[idx] = coeff
                 return True
             return False
