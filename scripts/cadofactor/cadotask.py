@@ -93,7 +93,7 @@ class Polynomial(list):
             self.extend([0]*(index + 1 - len(self)))
         list.__setitem__(self, index, value)
         # Remove leading zeroes
-        while len(self) > 0 and self[len(self) - 1] == 0:
+        while len(self) > 0 and self[-1] == 0:
             self.pop()
 
     def __str__(self):
@@ -212,6 +212,9 @@ class Polynomials(object):
             # extract the value and store it
             match = self.re_Murphy.match(line)
             if match:
+                if self.MurphyParams or self.MurphyE:
+                    raise PolynomialParseException(
+                        "Line '%s' redefines Murphy E value" % line)
                 self.MurphyParams = match.group(1)
                 self.MurphyE = float(match.group(2))
                 continue
@@ -219,6 +222,9 @@ class Polynomials(object):
             # extract the value and store it
             match = self.re_lognorm.match(line)
             if match:
+                if self.lognorm != 0:
+                    raise PolynomialParseException(
+                        "Line '%s' redefines lognorm value" % line)
                 self.lognorm = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
