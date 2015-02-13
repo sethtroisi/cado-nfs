@@ -490,7 +490,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	else //always in this case!
 	  si->sides[side]->strategy = NULL;
 	//}}
-	reorder_fb(si, side);
 
         sieve_info_print_fb_statistics(las, si, side);
         /* init_norms (si, side); */ /* only depends on scale, logmax, lognorm_table */
