@@ -128,8 +128,8 @@ public:
     }
   }
   /* Allow sorting by q */
-  bool operator<(const fb_general_entry &other) {return this->q < other.q;}
-  bool operator>(const fb_general_entry &other) {return this->q > other.q;}
+  bool operator<(const fb_general_entry &other) const {return this->q < other.q;}
+  bool operator>(const fb_general_entry &other) const {return this->q > other.q;}
 };
 
 template <int Nr_roots>
@@ -171,8 +171,8 @@ public:
   }
   fbprime_t get_q() const {return p;}
   /* Allow sorting by p */
-  bool operator<(const fb_general_entry &other) {return this->p < other.p;}
-  bool operator>(const fb_general_entry &other) {return this->p > other.p;}
+  bool operator<(const fb_general_entry &other) const {return this->p < other.p;}
+  bool operator>(const fb_general_entry &other) const {return this->p > other.p;}
   void fprint(FILE *) const;
   void transform_roots(transformed_entry_t &, qlattice_basis_srcptr) const;
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
