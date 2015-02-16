@@ -71,8 +71,8 @@ is_divisible_3_u32 (uint32_t a)
     if (trace_on_spot_x(X)) {						\
       WHERE_AM_I_UPDATE(w, N, (X) >> 16);				\
       WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
-      fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",	\
-	       (unsigned int) slice_idx, (unsigned int) (uint16_t) (X), p, sidenames[side],	\
+      fprintf (stderr, "# Pushed factor base entry (%u, %u) (x=%u, %s) to BA[%u]\n",	\
+	       (unsigned int) slice_index, (unsigned int) hint, (unsigned int) (uint16_t) (X), sidenames[side],	\
 	       (unsigned int) ((X) >> 16));				\
       ASSERT(test_divisible(w));					\
     }									\
@@ -288,14 +288,16 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
 
 static inline
-void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_index_t idx,
-                       const int side MAYBE_UNUSED, where_am_I_ptr w MAYBE_UNUSED) {
+void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_t hint,
+                       const int side MAYBE_UNUSED,
+                       const slice_index_t slice_index MAYBE_UNUSED, 
+                       where_am_I_ptr w MAYBE_UNUSED) {
   bucket_update_t **pbut = BA.bucket_write + (x >> 16);
   bucket_update_t *but = *pbut;
   FILL_BUCKET_TRACE_K(x);
   WHERE_AM_I_UPDATE(w, N, x >> 16);
   WHERE_AM_I_UPDATE(w, x, (uint16_t) x);
-  but->p = idx;
+  but->p = hint;
   but->x = (uint16_t) x;
   *pbut = ++but;
   FILL_BUCKET_PREFETCH(but);
@@ -311,7 +313,7 @@ fill_in_buckets(thread_data_ptr th, const int side,
 {
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
-  // const slice_index_t slice_idx = transformed_vector->get_index();
+  const slice_index_t slice_index = transformed_vector->get_index();
   bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
   // Loop over all primes in the factor base.
   //
@@ -352,7 +354,7 @@ fill_in_buckets(thread_data_ptr th, const int side,
          (if any) do we sieve? */
       uint64_t x = (pl_it->b1 == 0 ? 1 : I) + (I >> 1);
      /*****************************************************************/
-      fill_bucket_heart(BA, x, hint, side, w);
+      fill_bucket_heart(BA, x, hint, side, slice_index, w);
       continue;
     }
 
@@ -368,7 +370,7 @@ fill_in_buckets(thread_data_ptr th, const int side,
 #define FILL_BUCKET() do {						\
         unsigned int i = x & maskI;					\
         if (LIKELY(((x & even_mask))		\
-                   )) fill_bucket_heart(BA, x, hint, side, w);	\
+                   )) fill_bucket_heart(BA, x, hint, slice_index, side, w);	\
         FILL_BUCKET_INC_X();						\
       } while (0)
       /***************************************************************/
