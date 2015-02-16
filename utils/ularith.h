@@ -667,7 +667,7 @@ ularith_shld (unsigned long *r, const unsigned long lo, const unsigned long hi,
   __asm__ __VOLATILE (
     "shldl %3, %1, %0\n"
     : "+rm" (*r)
-    : "r" (lo), "1" (hi), "cI" (i) /* i can be in %cl or a literal constant < 32 */
+    : "r" (lo), "0" (hi), "cI" (i) /* i can be in %cl or a literal constant < 32 */
     : "cc");
 #else
   if (i > 0) /* shr by LONG_BIT is no-op on x86! */
