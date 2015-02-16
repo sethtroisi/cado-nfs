@@ -49,7 +49,7 @@
 #define ASSERT_EXPENSIVE(x)
 #endif
 
-/* On 32 bit x86, the general constrains for, e.g., the source operand
+/* On 32 bit x86, the general constraint for, e.g., the source operand
    of add is "g". For x86_64, it is "rme", since immediate constants
    must be 32 bit. */
 #if defined(__i386__) && defined(__GNUC__)
@@ -103,8 +103,8 @@ ularith_gt_2ul_2ul(const unsigned long a1, const unsigned long a2,
    low word (r1) to high word (r2). Any carry out from high word is lost. */
 
 static inline void
-ularith_add_ul_2ul (unsigned long *r1, unsigned long *r2, 
-			const unsigned long a)
+ularith_add_ul_2ul (unsigned long *r1, unsigned long *r2,
+                    const unsigned long a)
 {
 #ifdef ULARITH_VERBOSE_ASM
   __asm__ ("# ularith_add_ul_2ul (%0, %1, %2)\n" : : 
@@ -599,8 +599,8 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
 }
 
 
-/* Set *r to lo shifted right by i bits, filling in the low bits from "hi" into the high
-   bits of *r. I.e., *r = (hi * 2^64 + lo) / 2^i. Assumes 0 <= i < LONG_BIT. */
+/* Set *r to lo shifted right by i bits, filling in the low bits from hi into the high
+   bits of *r. I.e., *r = (hi * 2^LONG_BIT + lo) / 2^i. Assumes 0 <= i < LONG_BIT. */
 MAYBE_UNUSED
 static inline void
 ularith_shrd (unsigned long *r, const unsigned long hi, const unsigned long lo,
@@ -629,7 +629,7 @@ ularith_shrd (unsigned long *r, const unsigned long hi, const unsigned long lo,
     : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ __VOLATILE (
-    "shrdl %3, %1, %0\n # shift %0 right by %3 bits, shifting in the low bits from %1"
+    "shrdl %3, %1, %0\n"
     : "=rm" (*r)
     : "r" (hi), "0" (lo), "cI" (i) /* i can be in %cl or a literal constant < 32 */
     : "cc");
@@ -641,33 +641,39 @@ ularith_shrd (unsigned long *r, const unsigned long hi, const unsigned long lo,
 #endif
 }
 
-/* Shift *r left by i bits, filling in the high bits from a into the low
-   bits of *r. Assumes 0 <= i < LONG_BIT */
+/* Set *r to hi shifted left by i bits, filling in the high bits from lo into the low
+   bits of *r. I.e., *r = (hi + lo*2^-LONG_BIT) * 2^i. Assumes 0 <= i < LONG_BIT. */
 MAYBE_UNUSED
 static inline void
-ularith_shld (unsigned long *r, const unsigned long a, const int i)
+ularith_shld (unsigned long *r, const unsigned long lo, const unsigned long hi,
+              const unsigned char i)
 {
   ASSERT_EXPENSIVE (0 <= i && i < LONG_BIT);
 #ifdef ULARITH_VERBOSE_ASM
-  __asm__ ("# ularith_shld (%0, %1, %2)\n" : : 
-           "X" (*r), "X" (a), "X" (i));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+  __asm__ ("# ularith_shld (*r=%0, lo=%1, hi=%2, i=%3)\n" : : 
+           "X" (*r), "X" (lo), "X" (hi), "X" (i));
+#pragma GCC diagnostic pop
 #endif
+
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   __asm__ __VOLATILE (
-  "shldq %b2, %1, %0\n"
-  /* the b modifier makes gcc print the byte part of the register (%cl) */
-  : "+rm" (*r)
-  : "r" (a), "cJ" (i) /* i can be in %cx or a constant < 64 */
-  : "cc");
+    "shldq %3, %1, %0\n"
+    : "=rm" (*r)
+    : "r" (lo), "0" (hi), "cJ" (i) /* i can be in %cl or a literal constant < 64 */
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ __VOLATILE (
-    "shldl %b2, %1, %0\n"
+    "shldl %3, %1, %0\n"
     : "+rm" (*r)
-    : "r" (a), "cI" (i) /* i can be in %cx or a constant < 32 */
+    : "r" (lo), "1" (hi), "cI" (i) /* i can be in %cl or a literal constant < 32 */
     : "cc");
 #else
   if (i > 0) /* shr by LONG_BIT is no-op on x86! */
-  *r = (*r << i) | (a >> (LONG_BIT - i));
+    *r = (hi << i) | (lo >> (LONG_BIT - i));
+  else
+    *r = hi;
 #endif
 }
 

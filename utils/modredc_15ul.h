@@ -354,8 +354,7 @@ modredc15ul_intshl (modintredc15ul_t r, const modintredc15ul_t s, const int i)
     r[1] = s[0] << (i - LONG_BIT);
     r[0] = 0UL;
   } else { /* i < LONG_BIT */
-    r[1] = s[1];
-    ularith_shld (&(r[1]), s[0], i);
+    ularith_shld (&(r[1]), s[0], s[1], i);
     r[0] = s[0] << i;
   }
 }
