@@ -1,5 +1,10 @@
 #include "cado.h"
 #include <inttypes.h>
+#include <stdlib.h>   // for malloc and friends
+#include <string.h>   // for memcpy
+#if defined(HAVE_SSE2)
+#include <emmintrin.h>
+#endif
 #include "bucket.h"
 #include "portability.h"
 #include "memory.h"

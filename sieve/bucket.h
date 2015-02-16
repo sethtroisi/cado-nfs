@@ -2,17 +2,11 @@
 #define BUCKET_H_
 
 /*
- * Some bucket stuff.
+ * Bucket sieving: radix-sort sieve updates as they are created.
  */
 
-#include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
-#include <string.h>
-#if defined(HAVE_SSE2)
-#include <emmintrin.h>
-#endif
 #include "cado-endian.h"
-
 // #define SAFE_BUCKETS
 #ifdef SAFE_BUCKETS
 #include <stdio.h>
