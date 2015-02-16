@@ -40,6 +40,10 @@ add_executable (las_mbucket EXCLUDE_FROM_ALL ${las_sources})
 set_property(TARGET las_mbucket PROPERTY COMPILE_DEFINITIONS THRESHOLD_K_BUCKETS=16 THRESHOLD_M_BUCKETS=64)
 target_link_libraries (las_mbucket ${las_libraries})
 
+add_executable (fb_test EXCLUDE_FROM_ALL fb.cpp)
+set_property(TARGET fb_test PROPERTY COMPILE_DEFINITIONS TESTDRIVE=1)
+target_link_libraries (fb_test utils)
+
 add_library (trialdiv trialdiv.c)
 add_library (las-norms las-norms.cpp)
 
