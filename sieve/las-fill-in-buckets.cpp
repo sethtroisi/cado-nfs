@@ -339,10 +339,26 @@ fill_in_buckets(thread_data_ptr th, const int side,
     const uint32_t maskI = I-1;
     const uint64_t even_mask = (1ULL << logI) | 1ULL;
     const uint64_t IJ = ((uint64_t) si->J) << logI;
+    const prime_hint_t hint = slice->get_prime(pl_it->hint);
+
+    if (pl_it->get_b0() == 0 || pl_it->get_b1() == 0) {
+      /* r == 0 or r == 1/0.
+         1. If r == 0 (mod p), this prime hits for i == 0 (mod p), but since p > I,
+         this implies i = 0 or i > I. We don't sieve i > I. Since gcd(i,j) |
+         gcd(a,b), for i = 0 we only need to sieve j = 1. 
+         So, x = j*I + (i + I/2) = I + I/2.
+         2. r == p means root at infinity, which hits for j == 0 (mod p). Since q > I > J,
+         this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
+         FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
+         (if any) do we sieve? */
+      uint64_t x = (pl_it->b1 == 0 ? 1 : I) + (I >> 1);
+     /*****************************************************************/
+      fill_bucket_heart(BA, x, hint, side, w);
+      continue;
+    }
 
     const uint32_t bound0 = pl_it->get_bound0(logI), bound1 = pl_it->get_bound1(logI);
     const uint64_t inc_a = pl_it->get_inc_a(logI), inc_c = pl_it->get_inc_c(logI);
-    const prime_hint_t hint = slice->get_prime(pl_it->hint);
     uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();

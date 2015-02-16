@@ -160,7 +160,7 @@ struct plattice_info_t {
   uint32_t b1;
 
   plattice_info_t(const fbprime_t p, const fbroot_t r, const bool proj, const int logI) {
-    if (0 && proj && r == 0) {
+    if (UNLIKELY(proj && r == 0)) {
       /* This lattice basis might work in principle, but it generates hits in
          all locations i=1, ..., I/2-1, j = 0, all of which are useless except
          I=1, j=0.  */
@@ -168,6 +168,11 @@ struct plattice_info_t {
       a0 = -((int32_t)1 << logI) + 1;
       b1 = 0;
       b0 = 1;
+    } else if (UNLIKELY(!proj && r == 0)) {
+      a1 = ((int32_t)1 << logI) + 1;
+      a0 = -p; /* Thus bound0 = p > I, inc_c is always added */
+      b1 = 1;
+      b0 = 0; /* Thus bound1 = I - b0 = I, inc_a is never added */
     } else {
       ASSERT_ALWAYS(!proj);
       int rc = reduce_plattice (this, p, r, 1U << logI);

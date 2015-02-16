@@ -357,10 +357,8 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(qlattice_basis_srcptr basis, const i
     for (unsigned char i_root = 0; i_root < transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);
       const bool proj = transformed.get_proj(i_root);
-      if (r > 0 && !proj) {
-        plattice_sieve_entry pli = plattice_sieve_entry(transformed.p, r, proj, logI, (prime_hint_t)i_entry);
-        result->push_back(pli);
-      }
+      plattice_sieve_entry pli = plattice_sieve_entry(transformed.p, r, proj, logI, (prime_hint_t)i_entry);
+      result->push_back(pli);
     }
   }
   return result;
