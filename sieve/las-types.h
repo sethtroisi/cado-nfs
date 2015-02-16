@@ -116,7 +116,7 @@ struct sieve_side_info_s {
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
                             at most "bound" on each side */
     trialdiv_divisor_t *trialdiv_data;
-    fb_general_vector *fb_smallsieved;
+    fb_vector<fb_general_entry> *fb_smallsieved;
     struct {
         int pow2[2];
         int pow3[2];
@@ -130,11 +130,6 @@ struct sieve_side_info_s {
      * into one piece for each thread.
      */
     fb_factorbase * fb;
-    /* log_steps[i] contains the largest integer x <= FBB such that 
-       fb_log(x, scale, 0.) <= i. For i > log_steps_max, log_steps[i] is
-       undefined. */
-    fbprime_t log_steps[256];
-    unsigned char log_steps_max;
     /* When threads pick up this sieve_info structure, they should check
      * their bucket allocation */
     double max_bucket_fill_ratio;
@@ -269,8 +264,6 @@ struct thread_side_data_s {
   bucket_array_t BA;    /* Always used */
   fb_part *fb;
   // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
-  const fbprime_t *log_steps;
-  unsigned char log_steps_max;
   
   /* For small sieve */
   int * ssdpos;

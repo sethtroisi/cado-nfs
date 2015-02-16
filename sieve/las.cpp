@@ -150,9 +150,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
         const fbprime_t fbb = si->conf->sides[side]->lim;
         const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
-        const size_t nr_slices[4] = {1, 1, 1, 1};
         const bool only_general[4]={true, false, false, false};
-        sis->fb = new fb_factorbase(thresholds, nr_slices, only_general);
+        sis->fb = new fb_factorbase(thresholds, only_general);
 
         if (fbcfilename != NULL) {
             /* Try to read the factor base cache file. If that fails, because
@@ -182,7 +181,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     sis->fb->size() >> 20, tfb);
         } else {
             tfb = seconds ();
-            sis->fb->make_linear ((const mpz_t *) pol->coeff, si->conf->sides[side]->powlim, true);
+            sis->fb->make_linear ((const mpz_t *) pol->coeff, si->conf->sides[side]->powlim);
             tfb = seconds () - tfb;
             verbose_output_print(0, 1, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      sis->fb->size() >> 20, tfb);
@@ -229,18 +228,18 @@ void reorder_fb(sieve_info_ptr si, int side)
 
     /* alloc the 5 vectors */
     enum {POW2, POW3, TD, RS, REST};
-    fb_general_vector *pieces = new fb_general_vector[5];
+    fb_vector<fb_general_entry> *pieces = new fb_vector<fb_general_entry>[5];
 
     fb_part *small_part = si->sides[side]->fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
-    fb_general_vector *small_entries = small_part->get_general_vector();
+    fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si->conf->bucket_thresh;
     fbprime_t costlim = si->conf->td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
     printf("FIXME: remove ASSERT_ALWAYS below\n");
-    for(fb_general_vector::const_iterator it = small_entries->cbegin();
+    for(fb_vector<fb_general_entry>::const_iterator it = small_entries->cbegin();
         it != small_entries->cend();
         it++)
     {
@@ -266,7 +265,7 @@ void reorder_fb(sieve_info_ptr si, int side)
     }
     /* Concatenate the 5 vectors into one, and store the beginning and ending
        index of each part in fb_parts_x */
-    fb_general_vector *s = new fb_general_vector;
+    fb_vector<fb_general_entry> *s = new fb_vector<fb_general_entry>;
     /* FIXME: hack to be able to access the struct fb_parts_x entries via
        an index */
     typedef int interval_t[2];
@@ -546,11 +545,10 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
   /* update number of buckets */
   si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
 
-  /* Update the steps of the log of factor base primes */
+  /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
       sieve_side_info_ptr sis = si->sides[side];
-      unsigned long lim = si->conf->sides[side]->lim;
-      sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
+      sis->fb->make_slices(sis->scale * LOG_SCALE);
   }
 
 }/*}}}*/
@@ -2384,8 +2382,6 @@ void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
         thrs[i]->si = si;
         for(int s = 0 ; s < 2 ; s++) {
             thrs[i]->sides[s]->fb = si->sides[s]->fb->get_part(1);
-            thrs[i]->sides[s]->log_steps = si->sides[s]->log_steps;
-            thrs[i]->sides[s]->log_steps_max = si->sides[s]->log_steps_max;
         }
     }
 }/*}}}*/

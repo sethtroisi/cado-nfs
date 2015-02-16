@@ -265,7 +265,7 @@ fb_general_entry::merge (const fb_general_entry &other)
 }
 
 void
-fb_general_entry::transform_roots(fb_general_entry &result,
+fb_general_entry::transform_roots(fb_general_entry::transformed_entry_t &result,
                                   qlattice_basis_srcptr basis) const
 {
   result.p = p;
@@ -279,82 +279,18 @@ fb_general_entry::transform_roots(fb_general_entry &result,
 }
 
 
-void
-fb_general_vector::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
-{
-  if (nprimes != NULL)
-    *nprimes += this->size();
-  double w = 0.;
-  size_t nr = 0;
-  for (size_t i = 0; i < this->size(); i++) {
-    nr += (*this)[i].nr_roots;
-    w += (double) (*this)[i].nr_roots / (double) (*this)[i].q;
-  }
-  if (nroots != NULL)
-    *nroots += nr;
-  if (weight != NULL)
-    *weight += w;
-}
-
-void fb_general_vector::fprint(FILE *out) const {
-  for (size_t i = 0; i < size(); i++) {
-    (*this)[i].fprint(out);
-  }
-}
-
-void fb_general_vector::extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const
-{
-  for (size_t i = 0; i < size(); i++) {
-    (*this)[i].extract_bycost(extracted, pmax, td_thresh);
-  }
-}
-
 template <int Nr_roots>
 void
-fb_entry_x_roots<Nr_roots>::transform_roots(fb_general_entry &result, qlattice_basis_srcptr basis) const
+fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transformed_entry_t &result, qlattice_basis_srcptr basis) const
 {
   result.p = p;
-  result.q = p;
-  result.invq = compute_invq(p);
-  result.k = 1;
-  result.nr_roots = Nr_roots;
+  const redc_invp_t invq = compute_invq(p);
   /* TODO: Use batch-inversion here */
-  for (unsigned char i_root = 0; i_root < Nr_roots; i_root++) {
-    result.roots[i_root].exp = 1;
-    result.roots[i_root].oldexp = 0;
-    fbprime_t t = fb_root_in_qlattice(p, roots[i_root], result.invq, basis);
-    result.roots[i_root].proj = (t >= p);
-    result.roots[i_root].r = t - ( (t >= p) ? p : 0);
+  for (unsigned char i_root = 0; i_root < nr_roots; i_root++) {
+    const unsigned long long t = fb_root_in_qlattice(p, roots[i_root], invq, basis);
+    result.proj[i_root] = (t >= p);
+    result.roots[i_root] = (t < p) ? t : (t - p);
   }
-}
-
-
-/* These two are exactly identical, except for the class in which they are
-   defined. How to unify that? */
-fb_general_vector *
-fb_general_vector::transform_roots(qlattice_basis_srcptr basis) const
-{
-  fb_general_entry transformed;
-  fb_general_vector *result = new fb_general_vector();
-  for (typename fb_general_vector::const_iterator it = this->begin(); it != this->end(); it++) {
-    it->transform_roots(transformed, basis);
-    result->append(transformed);
-  }
-  return result;
-}
-
-
-template <int Nr_roots>
-fb_general_vector *
-fb_vector<Nr_roots>::transform_roots(qlattice_basis_srcptr basis) const
-{
-  fb_general_entry transformed;
-  fb_general_vector *result = new fb_general_vector();
-  for (typename fb_vector<Nr_roots>::const_iterator it = this->begin(); it != this->end(); it++) {
-    it->transform_roots(transformed, basis);
-    result->append(transformed);
-  }
-  return result;
 }
 
 
@@ -371,36 +307,72 @@ fb_entry_x_roots<Nr_roots>::fprint(FILE *out) const
 }
 
 
-template <int Nr_roots>
+template <class FB_ENTRY_TYPE>
 void
-fb_vector<Nr_roots>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
     *nprimes += this->size();
-  if (nroots != NULL)
-    *nroots += Nr_roots * this->size();
-  if (weight != NULL) {
-    double w = 0.;
-    for (size_t i = 0; i < this->size(); i++)
-      w += (double) Nr_roots / (double) (*this)[i].p;
-      *weight += w;
+  double w = 0.;
+  size_t nr = 0;
+  for (size_t i = 0; i < this->size(); i++) {
+    nr += (*this)[i].nr_roots;
+    w += (double) (*this)[i].nr_roots / (double) (*this)[i].get_q();
   }
+  if (nroots != NULL)
+    *nroots += nr;
+  if (weight != NULL)
+    *weight += w;
 }
 
-template <int Nr_roots>
+template <class FB_ENTRY_TYPE>
 void
-fb_vector<Nr_roots>::fprint(FILE *out) const
+fb_vector<FB_ENTRY_TYPE>::fprint(FILE *out) const
 {
   for (size_t i = 0; i < this->size(); i++)
     (*this)[i].fprint(out);
 }
 
-template <int Nr_roots>
+template <class FB_ENTRY_TYPE>
 void
-fb_vector<Nr_roots>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
+fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
 {
   for (size_t i = 0; i < this->size(); i++)
     (*this)[i].extract_bycost(p, pmax, td_thresh);
+}
+
+
+template <class FB_ENTRY_TYPE>
+fb_transformed_vector *
+fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(qlattice_basis_srcptr basis, const int logI) const
+{
+  typename FB_ENTRY_TYPE::transformed_entry_t transformed;
+  /* Create a transformed vector and store the index of the slice we currently
+     transform */
+  fb_transformed_vector *result = new fb_transformed_vector(get_index());
+  size_t i_entry = 0;
+  for (const FB_ENTRY_TYPE *it = cbegin(); it != cend(); it++, i_entry++) {
+    it->transform_roots(transformed, basis);
+    for (unsigned char i_root = 0; i_root < transformed.nr_roots; i_root++) {
+      const fbroot_t r = transformed.get_r(i_root);
+      const bool proj = transformed.get_proj(i_root);
+      if (r > 0 && !proj) {
+        plattice_sieve_entry pli = plattice_sieve_entry(transformed.p, r, proj, logI, (prime_hint_t)i_entry);
+        result->push_back(pli);
+      }
+    }
+  }
+  return result;
+}
+
+
+template <class FB_ENTRY_TYPE>
+void
+fb_slice<FB_ENTRY_TYPE>::fprint(FILE *out) const
+{
+  for (const FB_ENTRY_TYPE *it = cbegin(); it != cend(); it++) {
+    it->fprint(out);
+  }
 }
 
 
@@ -408,90 +380,68 @@ fb_vector<Nr_roots>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pma
 template class std::vector<fb_general_entry>;
 
 
-template <int Nr_roots>
-fb_slices<Nr_roots>::fb_slices(const size_t nr_slices)
-{
-  this->nr_slices = nr_slices;
-  vectors = new fb_vector<Nr_roots>[nr_slices];
-  next_slice = 0;
-}
-
-template <int Nr_roots>
-fb_slices<Nr_roots>::~fb_slices()
-{
-  delete[] vectors;
-}
-
-template <int Nr_roots>
+template <class FB_ENTRY_TYPE>
 void
-fb_slices<Nr_roots>::append(const fb_general_entry &fb_cur)
+fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, slice_index_t &next_index)
 {
-  vectors[next_slice++].push_back(fb_cur);
-  if (next_slice == nr_slices)
-    next_slice = 0;
-}
+  /* Entries in vec must be sorted */
 
-template <int Nr_roots>
-void
-fb_slices<Nr_roots>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
-{
-  for (size_t slice = 0; slice < nr_slices; slice++) {
-    vectors[slice]._count_entries(nprimes, nroots, weight);
+  /* Remove old entries in slices */
+  slices.clear();
+
+  size_t cur_slice_start = 0;
+
+  while (cur_slice_start < vec.size()) {
+    const unsigned char cur_logp = fb_log (vec[cur_slice_start].p, scale, 0.);
+
+    size_t next_slice_start = std::min(cur_slice_start + max_slice_len, vec.size());
+    ASSERT_ALWAYS(cur_slice_start != next_slice_start);
+
+    /* See if last element of the current slice has a greater log(p) than
+       the first element */
+    if (cur_logp < fb_log (vec[next_slice_start - 1].p, scale, 0.)) {
+      /* Find out the first place where log(p) changes occurs, and make that
+         next_slice_start */
+      for (next_slice_start = cur_slice_start;
+           cur_logp == fb_log (vec[next_slice_start].p, scale, 0.);
+           next_slice_start++);
+      /* We know that a log(p) change occurs so the slice len cannot exceed
+         the max allowed */
+      ASSERT_ALWAYS(next_slice_start <= cur_slice_start + max_slice_len);
+    }
+
+    printf("Slice %u starts at offset %zu (p = %" FBPRIME_FORMAT ", log(p) = %u) and ends at offset %zu (p = %" FBPRIME_FORMAT ", log(p) = %u)\n",
+           (unsigned int) next_index, cur_slice_start, vec[cur_slice_start].p, (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
+           next_slice_start - 1, vec[next_slice_start - 1].p, (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.));
+    fb_slice<FB_ENTRY_TYPE> s = fb_slice<FB_ENTRY_TYPE>(vec, vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
+    slices.push_back(s);
+
+    cur_slice_start = next_slice_start;
   }
 }
 
-
-template <int Nr_roots>
+template <class FB_ENTRY_TYPE>
 void
-fb_slices<Nr_roots>::fprint(FILE *out) const
+fb_slices<FB_ENTRY_TYPE>::sort()
 {
-  for (size_t slice = 0; slice < nr_slices; slice++) {
-    fprintf (out, "#    Slice %zu:\n", slice);
-    vectors[slice].fprint(out);
-  }
+  std::sort(vec.begin(), vec.end());
 }
 
-template <int Nr_roots>
+
+template <class FB_ENTRY_TYPE>
 void
-fb_slices<Nr_roots>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
+fb_slices<FB_ENTRY_TYPE>::fprint(FILE *out) const
 {
-  for (size_t slice = 0; slice < nr_slices; slice++) {
-    vectors[slice].extract_bycost(p, pmax, td_thresh);
-  }
-}
-
-
-fb_part::fb_part(const size_t nr_slices, const bool only_general)
-  : only_general(only_general)
-{
-  if (!only_general) {
-    fb0_slices = new fb_slices<0>(nr_slices);
-    fb1_slices = new fb_slices<1>(nr_slices);
-    fb2_slices = new fb_slices<2>(nr_slices);
-    fb3_slices = new fb_slices<3>(nr_slices);
-    fb4_slices = new fb_slices<4>(nr_slices);
-    fb5_slices = new fb_slices<5>(nr_slices);
-    fb6_slices = new fb_slices<6>(nr_slices);
-    fb7_slices = new fb_slices<7>(nr_slices);
-    fb8_slices = new fb_slices<8>(nr_slices);
-    fb9_slices = new fb_slices<9>(nr_slices);
-    fb10_slices = new fb_slices<10>(nr_slices);
-  }
-}
-
-fb_part::~fb_part() {
-  if (!only_general) {
-    delete fb0_slices;
-    delete fb1_slices;
-    delete fb2_slices;
-    delete fb3_slices;
-    delete fb4_slices;
-    delete fb5_slices;
-    delete fb6_slices;
-    delete fb7_slices;
-    delete fb8_slices;
-    delete fb9_slices;
-    delete fb10_slices;
+  /* If we have sliced the entries, we print them one slice at a time */
+  if (!slices.empty()) {
+    for (typename std::vector<fb_slice<FB_ENTRY_TYPE> >::const_iterator it = slices.begin(); it != slices.end(); it++) {
+      fprintf(out, "#    Slice index = %u, logp = %hhu:\n", (unsigned int) it->get_index(), it->get_logp());
+      it->fprint(out);
+    }
+  } else {
+    /* Otherwise we delegate to the vector */
+    fprintf(out, "#    Not sliced\n");
+    vec.fprint(out);
   }
 }
 
@@ -508,7 +458,7 @@ fb_part::append(const fb_general_entry &fb_cur)
   /* Non-simple ones go in the general vector, or, if this is an only_general
      part, then all entries do */
   if (only_general || !fb_cur.is_simple()) {
-    general_vector.push_back(fb_cur);
+    general_vector.append(fb_cur);
     return;
   }
 
@@ -518,12 +468,23 @@ fb_part::append(const fb_general_entry &fb_cur)
 }
 
 void
+fb_part::finalize()
+{
+  if (!only_general) {
+    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
+      get_slices(i_roots)->finalize();
+    }
+  }
+  general_vector.finalize();
+}
+
+void
 fb_part::fprint(FILE *out) const
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
       fprintf(out, "#   Entries with %d roots:\n", i_roots);
-      get_slices(i_roots)->fprint(out);
+      cget_slices(i_roots)->fprint(out);
     }
   }
 
@@ -538,7 +499,7 @@ fb_part::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
-      get_slices(i_roots)->_count_entries(nprimes, nroots, weight);
+      cget_slices(i_roots)->_count_entries(nprimes, nroots, weight);
   }
   general_vector._count_entries(nprimes, nroots, weight);
 }
@@ -549,22 +510,34 @@ fb_part::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
-      get_slices(i_roots)->extract_bycost(p, pmax, td_thresh);
+      cget_slices(i_roots)->extract_bycost(p, pmax, td_thresh);
   }
 
   general_vector.extract_bycost(p, pmax, td_thresh);
 }
 
 
+void
+fb_part::make_slices(const double scale, slice_index_t &next_index)
+{
+  if (!only_general) {
+    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
+      get_slices(i_roots)->make_slices(scale, next_index);
+    /* If we store all entries as general entries, we don't slice them,
+       as those are the small primes in part 0 which get line sieved */
+  }
+}
+
+
 fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
-			     const size_t *nr_slices,
 			     const bool *only_general)
 {
   for (size_t i = 0; i < FB_MAX_PARTS; i++) {
+    ASSERT_ALWAYS(i == 0 || thresholds[i - 1] <= thresholds[i]);
     this->thresholds[i] = thresholds[i];
     // By default, only_general is true for part 0, and false for all others
     const bool og = (only_general == NULL) ? (i == 0) : only_general[i];
-    parts[i] = new fb_part(nr_slices[i], og);
+    parts[i] = new fb_part(og);
   }
 }
 
@@ -699,6 +672,7 @@ fb_factorbase::read(const char * const filename)
   
   fclose_maybe_compressed (fbfile, filename);
   
+  finalize();
   return;
 }
 
@@ -731,55 +705,8 @@ fb_log (double n, double log_scale, double offset)
 }
 
 
-/* Search for the minimum n in [1, fbb] such that fb_log(n, scale, 0.) >= i */
-static fbprime_t
-find_one_step(const unsigned char i, const fbprime_t fbb, const double scale)
-{
-  fbprime_t imin = 1, imax = fbb;
-  ASSERT_ALWAYS(fbb > 0);
-
-  while (imin < imax)
-    {
-      fbprime_t imid = imin + (imax - imin) / 2; /* No overflow */
-      if (fb_log(imid, scale, 0.) < i)
-        imin = imid + 1;
-      else
-        imax = imid;
-    }
- 
-  ASSERT_ALWAYS(imin == imax);
-  ASSERT_ALWAYS(fb_log(imin, scale, 0.) >= i);
-  ASSERT_ALWAYS(imin == 1 || fb_log(imin - 1, scale, 0.) < i);
-  return imin;
-}
 
 
-unsigned char
-fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
-{
-    unsigned char i;
-    // const double base = exp(1. / scale);
-
-    if (fbb == 0)
-      return 0;
-    const unsigned char max = fb_log(fbb, scale, 0.);
-    // fprintf(stderr, "fbb = %lu, scale = %f, base = %f, max = %hu\n", (unsigned long) fbb, scale, base, max);
-    for (i = 0; i < max; i++) {
-        fbprime_t step = find_one_step(i + 1, fbb, scale);
-        ASSERT_ALWAYS(step > 0);
-        steps[i] = step - 1;
-    }
-    steps[max] = fbb;
-
-    /* One last test. steps[i] contains the largest integer such that
-       fb_log(steps[i]) <= i, and steps[max] contains FBB. */
-    for (i = 0; i < max; i++) {
-        ASSERT_ALWAYS(fb_log(steps[i], scale, 0.) <= i);
-        ASSERT_ALWAYS(fb_log(steps[i] + 1, scale, 0.) > i);
-    }
-    ASSERT_ALWAYS(fb_log(steps[max], scale, 0.) == max);
-    return max;
-}
 
 /* Make one factor base entry for a linear polynomial poly[1] * x + poly[0]
    and the prime (power) q. We assume that poly[0] and poly[1] are coprime.
@@ -790,7 +717,7 @@ fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
    Returns true if the roots was projective, and false otherwise. */
 
 static bool
-fb_linear_root (fbroot_t *root, const mpz_t *poly, fbprime_t q)
+fb_linear_root (fbroot_t *root, const mpz_t *poly, const fbprime_t q)
 {
   modulusul_t m;
   residueul_t r0, r1;
@@ -878,8 +805,8 @@ fb_powers::fb_powers (const fbprime_t lim)
    Returns 1 on success, 0 on error. */
 
 void
-fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
-			    const bool do_projective)
+fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound)
+			    
 {
   fbprime_t next_prime;
   fb_general_entry fb_cur;
@@ -912,10 +839,6 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
     fb_cur.roots[0].exp = fb_cur.k;
     fb_cur.roots[0].oldexp = fb_cur.k - 1U;
     fb_cur.roots[0].proj = fb_linear_root (&fb_cur.roots[0].r, poly, fb_cur.q);
-    if (fb_cur.roots[0].proj && !do_projective)
-      continue; /* If root is projective and we don't want those,
-                   skip to next prime */
-
     fb_cur.invq = compute_invq(fb_cur.q);
     append(fb_cur);
   }
@@ -923,6 +846,15 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
   getprime (0); /* free prime iterator */
 
   delete (powers);
+  finalize();
+}
+
+void
+fb_factorbase::finalize()
+{
+  for (size_t part = 0; part < FB_MAX_PARTS; part++) {
+    parts[part]->finalize();
+  }
 }
 
 void
@@ -950,6 +882,14 @@ fb_factorbase::extract_bycost(std::vector<unsigned long> &extracted, fbprime_t p
   }
 }
 
+void
+fb_factorbase::make_slices(const double scale)
+{
+  slice_index_t next_index = 0;
+  for (size_t part = 0; part < FB_MAX_PARTS; part++) {
+    parts[part]->make_slices(scale, next_index);
+  }
+}
 
 
 #ifdef TESTDRIVE
@@ -968,10 +908,9 @@ void output(fb_factorbase *fb, const char *name)
 int main(int argc, char **argv)
 {
   fbprime_t thresholds[4] = {200, 1000, 1000, 1000};
-  size_t nr_slices[4] = {3, 5, 0, 0};
   fbprime_t powbound = 100;
-  fb_factorbase *fb1 = new fb_factorbase(thresholds, nr_slices),
-    *fb2 = new fb_factorbase(thresholds, nr_slices);
+  fb_factorbase *fb1 = new fb_factorbase(thresholds),
+    *fb2 = new fb_factorbase(thresholds);
 
   mpz_t poly[2];
 
@@ -981,7 +920,8 @@ int main(int argc, char **argv)
   mpz_set_ui(poly[0], 727);
   mpz_set_ui(poly[1], 210); /* Bunch of projective primes */
 
-  fb1->make_linear(poly, powbound, true);
+  fb1->make_linear(poly, powbound);
+  fb1->make_slices(2.0);
   output(fb1, "from linear polynomial");
 
   // This line does (and should) fail to compile, as fb_factorbase is
@@ -990,14 +930,16 @@ int main(int argc, char **argv)
 
   if (argc > 1) {
     fb2->read(argv[1]);
+    fb2->make_slices(2.0);
     output(fb2, "from file");
   }
 
   delete fb1;
   delete fb2;
   bool only_general[4] = {false, false, false, false};
-  fb1 = new fb_factorbase(thresholds, nr_slices, only_general);
-  fb1->make_linear(poly, powbound, true);
+  fb1 = new fb_factorbase(thresholds, only_general);
+  fb1->make_linear(poly, powbound);
+  fb1->make_slices(2.0);
   output(fb1, "from linear polynomial, only_general = false");
 
   printf("Trialdiv primes:\n");

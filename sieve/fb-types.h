@@ -18,6 +18,9 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
 
 #define FB_MAX_PARTS 4
 
+/* Each slice in a factor base has a unique index */
+typedef size_t slice_index_t;
+
 /* If SUPPORT_LARGE_Q is defined, 64-bit redc is used in the function that
    converts roots to the p-lattice, and the redc code needs a 64-bit
    precomputed inverse. If SUPPORT_LARGE_Q is not defined, we store only a

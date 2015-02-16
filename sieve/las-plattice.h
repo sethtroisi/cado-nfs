@@ -1,3 +1,6 @@
+#ifndef LAS_PLATTICE_H
+#define LAS_PLATTICE_H 1
+
 /*******************************************************************/
 /********        Walking in p-lattices                    **********/
 
@@ -134,11 +137,68 @@
 // overflow).  In fact, these guards are 99.99999% useless.
 
 typedef uint64_t plattice_x_t;
+typedef uint32_t prime_hint_t;
+
+class plattice_info_t;
+static int reduce_plattice (plattice_info_t *, fbprime_t, fbroot_t, uint32_t);
+
+
+/* Information on a p-lattice: lattice basis coordinates, and auxiliary
+   values that can be derived directly from them, such as the constants
+   used by the Franke-Kleinjung algorithm */
+struct plattice_info_t {
+#if MOD2_CLASSES_BS
+  static const int shift = 1;
+#else
+  static const int shift = 0;
+#endif
+
 /* DONT modify this: asm code writes in this with hardcoded deplacement */
-typedef struct {
-  int32_t a0; uint32_t a1;
-  int32_t b0; uint32_t b1;
-} plattice_info_t;
+  int32_t a0;
+  uint32_t a1;
+  int32_t b0;
+  uint32_t b1;
+
+  plattice_info_t(const fbprime_t p, const fbroot_t r, const bool proj, const int logI) {
+    if (0 && proj && r == 0) {
+      /* This lattice basis might work in principle, but it generates hits in
+         all locations i=1, ..., I/2-1, j = 0, all of which are useless except
+         I=1, j=0.  */
+      a1 = p;
+      a0 = -((int32_t)1 << logI) + 1;
+      b1 = 0;
+      b0 = 1;
+    } else {
+      ASSERT_ALWAYS(!proj);
+      int rc = reduce_plattice (this, p, r, 1U << logI);
+      ASSERT_ALWAYS(rc != 0);
+    }
+  }
+
+  /* Return the four coordinates, but multiplied by 2 if we use mod 2 classes */
+  int32_t get_a0() const {return a0 << shift;}
+  uint32_t get_a1() const {return a1 << shift;}
+  int32_t get_b0() const {return b0 << shift;}
+  uint32_t get_b1() const {return b1 << shift;}
+
+  uint32_t get_bound0(const int logI MAYBE_UNUSED) const {
+      return -get_a0();
+  }
+
+  uint32_t get_bound1(const int logI) const {
+      return (1U << logI) - get_b0();
+  }
+
+  plattice_x_t get_inc_a(const int logI) const {
+      return ((uint64_t)get_a1() << logI) + (int64_t)get_a0();
+  }
+
+  plattice_x_t get_inc_c(const int logI) const {
+    return ((uint64_t)get_b1() << logI) + (int64_t)get_b0();
+  }
+
+  uint32_t det() const {return (-a0)*b1 + a1*b0;};
+};
 
 NOPROFILE_INLINE int
 reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbroot_t r, const uint32_t I)
@@ -268,34 +328,47 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbroot_t r, cons
   return 1;
 }
 
-#if MOD2_CLASSES_BS
-#define PLI_COEFF(pli, ab01) (pli->ab01 << 1)
-#else
-#define PLI_COEFF(pli, ab01) (pli->ab01)
-#endif
-static inline plattice_x_t plattice_a(const plattice_info_t * pli, const int logI)
-{
-    int64_t a0 = PLI_COEFF(pli, a0);
-    uint64_t a1 = PLI_COEFF(pli, a1);
-    return (a1 << logI) + a0;
-}
 
-static inline plattice_x_t plattice_c(const plattice_info_t * pli, const int logI)
-{
-    int64_t b0 = PLI_COEFF(pli, b0);
-    uint64_t b1 = PLI_COEFF(pli, b1);
-    return (b1 << logI) + b0;
-}
+/* Like plattice_info_t, but remembers the offset of the factor base entry
+   that generated each lattice basis. This offset becomes the "prime hint"
+   in the bucket updates. */
+struct plattice_sieve_entry : public plattice_info_t {
+  prime_hint_t hint;
+  plattice_sieve_entry(const fbprime_t p, const fbroot_t r, const bool proj, const int logI, const prime_hint_t hint)
+     : plattice_info_t(p, r, proj, logI), hint(hint) {};
+};
 
-static inline uint32_t plattice_bound0(const plattice_info_t * pli, const int logI MAYBE_UNUSED)
-{
-    return - PLI_COEFF(pli, a0);
-}
 
-static inline uint32_t plattice_bound1(const plattice_info_t * pli, const int logI)
-{
-    return (1U << logI) - PLI_COEFF(pli, b0);
-}
+class plattice_sieve_info : public plattice_sieve_entry {
+    plattice_x_t x;
+    plattice_x_t inc_a, inc_c;
+    uint32_t bound0, bound1;
+    uint32_t maskI;
+    
+    plattice_sieve_info(const fbprime_t p, const fbroot_t r, const bool proj, const int logI, const prime_hint_t hint)
+        : plattice_sieve_entry(p, r, proj, logI, hint) {
+      inc_a = get_inc_a(logI);
+      inc_c = get_inc_c(logI);
+      bound0 = get_bound0(logI);
+      bound1 = get_bound1(logI);
+      x = (plattice_x_t)1 << (logI-1);
+      maskI = (1U << logI) - 1U;
+    }
+
+    void operator++() {
+      uint32_t i = x & maskI;
+      if (i >= bound1)
+        x += inc_a;
+      if (i < bound0)
+        x += inc_c;
+    }
+
+    bool operator<(const plattice_x_t limit) {
+      return x < limit;
+    }
+
+    plattice_x_t get_x() const {return x;}
+};
 
 
 /* This is for working with congruence classes only */
@@ -394,4 +467,4 @@ static inline uint32_t plattice_bound1(const plattice_info_t * pli, const int lo
 
 /* }}} */
 
-
+#endif

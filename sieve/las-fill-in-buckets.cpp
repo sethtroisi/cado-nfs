@@ -72,7 +72,7 @@ is_divisible_3_u32 (uint32_t a)
       WHERE_AM_I_UPDATE(w, N, (X) >> 16);				\
       WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
       fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",	\
-	       (unsigned int) (uint16_t) (X), logp, p, sidenames[side],	\
+	       (unsigned int) slice_idx, (unsigned int) (uint16_t) (X), p, sidenames[side],	\
 	       (unsigned int) ((X) >> 16));				\
       ASSERT(test_divisible(w));					\
     }									\
@@ -100,19 +100,6 @@ is_divisible_3_u32 (uint32_t a)
     }									\
   } while (0)
 /************************************************************************/
-
-static inline
-unsigned char find_logp(thread_data_ptr th, const int side, const fbprime_t p)
-{
-    unsigned char logp = 0;
-    for (unsigned char i = th->sides[side]->log_steps_max; i > 0; i--)
-        if (th->sides[side]->log_steps[i - 1] < p) {
-            logp = i;
-            break;
-        }
-    ASSERT_ALWAYS(logp != 0);
-    return logp;
-}
 
 #ifdef USE_CACHEBUFFER
 DECLARE_CACHE_BUFFER(bucket_update_t, 256)
@@ -301,15 +288,14 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
 
 static inline
-void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t hint,
-                       const fbprime_t p MAYBE_UNUSED, unsigned char logp MAYBE_UNUSED,
+void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_index_t idx,
                        const int side MAYBE_UNUSED, where_am_I_ptr w MAYBE_UNUSED) {
   bucket_update_t **pbut = BA.bucket_write + (x >> 16);
   bucket_update_t *but = *pbut;
   FILL_BUCKET_TRACE_K(x);
   WHERE_AM_I_UPDATE(w, N, x >> 16);
   WHERE_AM_I_UPDATE(w, x, (uint16_t) x);
-  but->p = hint;
+  but->p = idx;
   but->x = (uint16_t) x;
   *pbut = ++but;
   FILL_BUCKET_PREFETCH(but);
@@ -318,11 +304,14 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t 
 
 /* {{{ */
 void
-fill_in_buckets(thread_data_ptr th, int side, const fb_general_vector *transformed_vector,
+fill_in_buckets(thread_data_ptr th, const int side,
+                const fb_transformed_vector *transformed_vector,
+                const fb_slice_interface *slice,
                 where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
+  // const slice_index_t slice_idx = transformed_vector->get_index();
   bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
   // Loop over all primes in the factor base.
   //
@@ -331,102 +320,46 @@ fill_in_buckets(thread_data_ptr th, int side, const fb_general_vector *transform
   // being for the moment unconditionally set to FBPRIME_MAX by the
   // caller of dispatch_fb).
   
-  unsigned char last_logp = 0;
+  /* Write new set of pointers if the logp value changed */
+  aligned_medium_memcpy((uint8_t *)BA.logp_idx + BA.size_b_align * BA.nr_logp, BA.bucket_write, BA.size_b_align);
+  BA.logp_val[BA.nr_logp++] = slice->get_logp();
 
-  for (fb_general_vector::const_iterator it = transformed_vector->cbegin();
-       it != transformed_vector->end(); it++) {
-    const fbprime_t p = (*it).q;
-    const size_t nr_roots = (*it).nr_roots;
-    for (size_t i_root = 0; i_root < nr_roots; i_root++) {
-      fbroot_t r = (*it).roots[i_root].r + ((*it).roots[i_root].proj ? p : 0);
-      // fprintf (stderr, "sieving p = %u, transformed-r = %u\n", p, r);
-      unsigned char logp = find_logp(th, side, p);
+  for (fb_transformed_vector::const_iterator pl_it = transformed_vector->cbegin();
+       pl_it != transformed_vector->cend(); pl_it++) {
+    /* If we sieve for special-q's smaller than the factor
+       base bound, the prime p might equal the special-q prime q. */
 
-      WHERE_AM_I_UPDATE(w, p, p);
-      /* Write new set of pointers if the logp value changed */
-      if (UNLIKELY(last_logp != logp)) {
-        aligned_medium_memcpy((uint8_t *)BA.logp_idx + BA.size_b_align * BA.nr_logp, BA.bucket_write, BA.size_b_align);
-        BA.logp_val[BA.nr_logp++] = last_logp = logp;
-      }
-      /* If we sieve for special-q's smaller than the factor
-         base bound, the prime p might equal the special-q prime q. */
-      if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
-      
-      const uint32_t I = si->I;
-      const unsigned int logI = si->conf->logI;
-      const uint32_t maskI = I-1;
-      const uint64_t even_mask = (1ULL << logI) | 1ULL;
-      const uint64_t IJ = ((uint64_t) si->J) << logI;
-      /* Special cases */
-      if (UNLIKELY((!r) || (r >= p))) {
-        if (r > p) /* should only happen for lattice-sieved prime powers,
-                      which is not possible currently since maxbits < I */
-          continue;
-        /* r == p or r == 0.
-           1. If r == 0 (mod p), this prime hits for i == 0 (mod p), but since p > I,
-           this implies i = 0 or i > I. We don't sieve i > I. Since gcd(i,j) |
-           gcd(a,b), for i = 0 we only need to sieve j = 1. 
-           So, x = j*I + (i + I/2) = I + I/2.
-           2. r == p means root at infinity, which hits for j == 0 (mod p). Since q > I > J,
-           this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
-           FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
-           (if any) do we sieve? */
-        uint64_t x = (r ? 1 : I) + (I >> 1);
-        prime_hint_t hint = bucket_encode_prime (p);
-        /*****************************************************************/
-        fill_bucket_heart(BA, x, hint, p, logp, side, w);
-        continue;
-      }
-      /* If working with congruence classes, once the loop on the parity goes at the level
-         above, this initialization should in fact either be done for each congruence class,
-         or saved for later use within the factor base structure. */
-      plattice_info_t pli;
-      if (UNLIKELY(!reduce_plattice(&pli, p, r, si->I))) {
-        verbose_output_print (1, 1, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
-                              FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
-        continue; /* Simply don't consider that (p,r) for now.
-                     FIXME: can we find the locations to sieve? */
-      }
-      /* OK, all special cases are done. */
-
-      const uint32_t bound0 = plattice_bound0(&pli, logI), bound1 = plattice_bound1(&pli, logI);
-#if !MOD2_CLASSES_BS
-      const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
-      uint64_t x = 1ULL << (logI-1);
-      uint32_t i = x;
-#ifdef SKIP_GCD_UV
-      unsigned long u = 0, v = 0;
+#if 0
+    printf("%s(): sieving side=%d, p=%u, logp = %u, a = (%d, %u), b = (%u, %u)\n", 
+           __func__, side, pl_it->det(), (unsigned int) slice->get_logp(), pl_it->get_a0(), pl_it->get_a1(), pl_it->get_b0(), pl_it->get_b1());
 #endif
-      FILL_BUCKET_INC_X();
-      if (x >= IJ) continue;
-#else
-      for(unsigned int parity = 1 ; parity < 4; parity++) {
-        // The sieving point (0,0) is I/2 in x-coordinate
-        uint64_t x = plattice_starting_vector(&pli, si, parity);
-        if (x >= IJ) continue;
-        const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
-#endif
-        const prime_hint_t hint = bucket_encode_prime (p);
-        
-        /* Now, do the real work: the filling of the buckets */
-        do {
-          /***************************************************************/
+    
+    const uint32_t I = si->I;
+    const unsigned int logI = si->conf->logI;
+    const uint32_t maskI = I-1;
+    const uint64_t even_mask = (1ULL << logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << logI;
+
+    const uint32_t bound0 = pl_it->get_bound0(logI), bound1 = pl_it->get_bound1(logI);
+    const uint64_t inc_a = pl_it->get_inc_a(logI), inc_c = pl_it->get_inc_c(logI);
+    const prime_hint_t hint = slice->get_prime(pl_it->hint);
+    uint64_t x = 1ULL << (logI-1);
+    uint32_t i = x;
+    FILL_BUCKET_INC_X();
+
+    /* Now, do the real work: the filling of the buckets */
+    while (x < IJ){
+      /***************************************************************/
 #define FILL_BUCKET() do {						\
-            unsigned int i = x & maskI;					\
-            if (LIKELY((MOD2_CLASSES_BS || (x & even_mask))		\
-                       && PROBABLY_COPRIME_IJ(u,v)			\
-                       )) fill_bucket_heart(BA, x, hint, p, logp, side, w);	\
-            FILL_BUCKET_INC_X();						\
-          } while (0)
-          /***************************************************************/
-          FILL_BUCKET();
-        } while (x < IJ);
-#if MOD2_CLASSES_BS
-      }
-#endif
+        unsigned int i = x & maskI;					\
+        if (LIKELY(((x & even_mask))		\
+                   )) fill_bucket_heart(BA, x, hint, side, w);	\
+        FILL_BUCKET_INC_X();						\
+      } while (0)
+      /***************************************************************/
+      FILL_BUCKET();
     }
   }
-  delete transformed_vector;
   th->sides[side]->BA = BA;
 }
 
@@ -448,18 +381,10 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   
   fb_iterator t;
   fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
-  unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
-    unsigned char logp = find_logp(th, side, p);
     ASSERT_ALWAYS (p & 1);
     WHERE_AM_I_UPDATE(w, p, p);
-    
-    /* Write new set of pointers if the logp value changed */
-    if (UNLIKELY(last_logp != logp)) {
-      aligned_medium_memcpy((uint8_t *)kBA.logp_idx + kBA.size_b_align * BA.nr_logp, kBA.bucket_write, kBA.size_b_align);
-      BA.logp_val[BA.nr_logp++] = last_logp = logp;
-    }
     
     /* If we sieve for special-q's smaller than the factor
        base bound, the prime p might equal the special-q prime q. */
@@ -979,19 +904,14 @@ fill_in_buckets_one_side(thread_data_ptr th, const int side)
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, th->si);
     if (th->sides[side]->BA.n_bucket < THRESHOLD_K_BUCKETS) {
-      for (int nr_roots = 0; nr_roots <= MAXDEGREE; nr_roots++) {
-        for (size_t slice_nr = 0; ; slice_nr++) {
-          fb_vector_interface *slice = fb->get_n_roots_vector(nr_roots, slice_nr);
-          if (slice == NULL)
-            break;
-          fb_general_vector *transformed_vector = slice->transform_roots(th->si->qbasis);
-          fill_in_buckets(th, side, transformed_vector, w);
-        }
-        fb_vector_interface *slice = fb->get_general_vector();
-        if (slice != NULL) {
-          fb_general_vector *transformed_vector = slice->transform_roots(th->si->qbasis);
-          fill_in_buckets(th, side, transformed_vector, w);
-        }
+      /* Process all slices in this factor base part */
+      const fb_slice_interface *slice;
+      for (slice_index_t slice_index = fb->get_first_slice_index();
+           (slice = fb->get_slice(slice_index)) != NULL;
+           slice_index++) {
+          const fb_transformed_vector *transformed_vector = slice->make_lattice_bases(th->si->qbasis, th->si->conf->logI);
+          fill_in_buckets(th, side, transformed_vector, slice, w);
+          delete transformed_vector;
       }
     }
 #ifdef HAVE_K_BUCKETS
