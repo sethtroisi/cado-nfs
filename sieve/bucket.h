@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include "portability.h"
 #endif
+#include "misc.h"
 
 /* If BUCKET_ENCODE3 is defined, we encode primes p as
    (floor(p/6) * 2 + p%3-1) % 2^16,
@@ -245,6 +246,14 @@ rewind_bucket_by_1 (bucket_array_t BA, const int i);
 /* If you want to access updates in a non-sequential way: */
 static inline bucket_update_t
 get_kth_bucket_update(const bucket_array_t BA, const int i, const int k);
+
+static inline void
+bucket_add_logp(bucket_array_t *BA, const unsigned char logp)
+{
+  /* Write new set of pointers if the logp value changed */
+  aligned_medium_memcpy((uint8_t *)BA->logp_idx + BA->size_b_align * BA->nr_logp, BA->bucket_write, BA->size_b_align);
+  BA->logp_val[BA->nr_logp++] = logp;
+}
 
 /* Functions for handling entries with x and complete prime p */
 

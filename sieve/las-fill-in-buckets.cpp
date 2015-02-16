@@ -321,8 +321,7 @@ fill_in_buckets(thread_data_ptr th, const int side,
   // caller of dispatch_fb).
   
   /* Write new set of pointers if the logp value changed */
-  aligned_medium_memcpy((uint8_t *)BA.logp_idx + BA.size_b_align * BA.nr_logp, BA.bucket_write, BA.size_b_align);
-  BA.logp_val[BA.nr_logp++] = slice->get_logp();
+  bucket_add_logp(&BA, slice->get_logp());
 
   for (fb_transformed_vector::const_iterator pl_it = transformed_vector->cbegin();
        pl_it != transformed_vector->cend(); pl_it++) {
