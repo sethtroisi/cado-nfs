@@ -20,6 +20,8 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
 
 /* Each slice in a factor base has a unique index */
 typedef size_t slice_index_t;
+/* Each factor base entry withing a slice has a unique offset */
+typedef uint16_t slice_offset_t;
 
 /* If SUPPORT_LARGE_Q is defined, 64-bit redc is used in the function that
    converts roots to the p-lattice, and the redc code needs a 64-bit
