@@ -128,7 +128,7 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
     while (*lineptr != '\0')
     {
         if (nr_roots == MAXDEGREE) {
-            fprintf (stderr,
+            verbose_output_print (1, 0,
                     "# Error, too many roots for prime (power) %" FBPRIME_FORMAT
                     " in factor base line %lu\n", q, linenr);
             exit(EXIT_FAILURE);
@@ -138,7 +138,7 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
            root as a 64-bit integer first and subtract q if necessary. */
         const unsigned long long t = strtoull_const (lineptr, &lineptr, 10);
         if (nr_roots > 0 && t <= last_t) {
-            fprintf (stderr,
+            verbose_output_print (1, 0,
                 "# Error, roots must be sorted in the fb file, line %lu\n",
                 linenr);
             exit(EXIT_FAILURE);
@@ -147,7 +147,7 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
 
         roots[nr_roots++] = fb_general_root(t, q, nexp, oldexp);
         if (*lineptr != '\0' && *lineptr != ',') {
-            fprintf(stderr,
+            verbose_output_print (1, 0,
                     "# Incorrect format in factor base file line %lu\n",
                     linenr);
             exit(EXIT_FAILURE);
@@ -157,8 +157,8 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
     }
 
     if (nr_roots == 0) {
-        fprintf (stderr, "# Error, no root for prime (power) %" FBPRIME_FORMAT
-                " in factor base line %lu\n", q, linenr - 1);
+        verbose_output_print (1, 0, "# Error, no root for prime (power) %"
+                FBPRIME_FORMAT " in factor base line %lu\n", q, linenr - 1);
         exit(EXIT_FAILURE);
     }
 }
@@ -173,11 +173,11 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
 {
     q = strtoul_const (lineptr, &lineptr, 10);
     if (q == 0) {
-        fprintf(stderr, "# fb_read: prime is not an integer on line %lu\n",
-                linenr);
+        verbose_output_print (1, 0, "# fb_read: prime is not an integer on line %lu\n",
+                              linenr);
         exit (EXIT_FAILURE);
     } else if (*lineptr != ':') {
-        fprintf(stderr,
+        verbose_output_print (1, 0,
                 "# fb_read: prime is not followed by colon on line %lu",
                 linenr);
         exit (EXIT_FAILURE);
@@ -207,12 +207,13 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
         nexp = strtoul_const (lineptr, &lineptr, 10);
 
         if (nexp == 0) {
-            fprintf(stderr, "# Error in fb_read: could not parse the integer "
-		    "after the colon of prime %" FBPRIME_FORMAT "\n", q);
+            verbose_output_print (1, 0, "# Error in fb_read: could not parse "
+                "the integer after the colon of prime %" FBPRIME_FORMAT "\n",
+                q);
             exit (EXIT_FAILURE);
         }
         if (*lineptr != ',') {
-            fprintf(stderr,
+            verbose_output_print (1, 0,
 		    "# fb_read: exp is not followed by comma on line %lu",
 		    linenr);
             exit (EXIT_FAILURE);
@@ -220,7 +221,7 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
         lineptr++; /* skip comma */
         oldexp = strtoul_const (lineptr, &lineptr, 10);
         if (*lineptr != ':') {
-            fprintf(stderr,
+            verbose_output_print (1, 0,
 		    "# fb_read: oldlogp is not followed by colon on line %lu",
 		    linenr);
             exit (EXIT_FAILURE);
@@ -410,9 +411,13 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, slice_index_t &next_in
       ASSERT_ALWAYS(next_slice_start <= cur_slice_start + max_slice_len);
     }
 
-    printf("Slice %u starts at offset %zu (p = %" FBPRIME_FORMAT ", log(p) = %u) and ends at offset %zu (p = %" FBPRIME_FORMAT ", log(p) = %u)\n",
-           (unsigned int) next_index, cur_slice_start, vec[cur_slice_start].p, (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
-           next_slice_start - 1, vec[next_slice_start - 1].p, (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.));
+    verbose_output_print (0, 4, "# Slice %u starts at offset %zu (p = %"
+        FBPRIME_FORMAT ", log(p) = %u) and ends at offset %zu (p = %"
+        FBPRIME_FORMAT ", log(p) = %u)\n",
+           (unsigned int) next_index, cur_slice_start, vec[cur_slice_start].p,
+           (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
+           next_slice_start - 1, vec[next_slice_start - 1].p,
+           (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.));
     fb_slice<FB_ENTRY_TYPE> s = fb_slice<FB_ENTRY_TYPE>(vec, vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
     slices.push_back(s);
 
@@ -631,7 +636,8 @@ fb_factorbase::read(const char * const filename)
   
   fbfile = fopen_maybe_compressed (filename, "r");
   if (fbfile == NULL) {
-    fprintf (stderr, "# Could not open file %s for reading\n", filename);
+    verbose_output_print (1, 0, "# Could not open file %s for reading\n",
+        filename);
     return;
   }
   
@@ -899,7 +905,7 @@ void output(fb_factorbase *fb, const char *name)
   size_t n_primes = 0, n_roots = 0;
   double weight = 0.;
   fb->_count_entries(&n_primes, &n_roots, &weight);
-  fprintf (stdout,
+  verbose_output_print (0, 1,
 	   "# Factor base %s (%zu primes, %zu roots, %f weight):\n",
 	   name, n_primes, n_roots, weight);
   fb->fprint(stdout);
