@@ -2085,7 +2085,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             /* Beware, cpoly->m mod p would be wrong ! */
             /* This can't work on 32-bits */
             mpz_set_ui(rho, relation_compute_r (winner->a, winner->b, p));
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
             las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
         }
         relation_compute_all_r(winner);
@@ -2113,7 +2113,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (k < 0) continue;
             mpz_set_ui(q, p);
             mpz_set_ui(rho, winner->ap[i].r);
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
             las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
         }
         mpz_clear(q);
@@ -2817,7 +2817,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * extreme cases, see bug 15617
          */
         if (sieve_info_adjust_IJ(si, las->nb_threads) == 0) {
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
                     sidenames[si->conf->side],
                     si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,
                     si->J);
@@ -2825,7 +2825,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 
 
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Sieving %s q=%Zd; rho=%Zd;" HILIGHT_END " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
                 sidenames[si->conf->side],
                 si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1);
         if (si->doing->depth) {
