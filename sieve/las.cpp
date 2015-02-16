@@ -238,13 +238,10 @@ void reorder_fb(sieve_info_ptr si, int side)
     fbprime_t costlim = si->conf->td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
-    printf("FIXME: remove ASSERT_ALWAYS below\n");
     for(fb_vector<fb_general_entry>::const_iterator it = small_entries->cbegin();
         it != small_entries->cend();
         it++)
     {
-        ASSERT_ALWAYS(it->q == fb_pow(it->p, it->k));
-        ASSERT_ALWAYS(it->nr_roots > 0);
         /* The extra conditions on powers of 2 and 3 are related to how
          * pattern-sieving is done.
          */
