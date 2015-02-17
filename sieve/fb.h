@@ -110,7 +110,7 @@ public:
   static const bool is_general_type = true;
   static const unsigned char fixed_nr_roots = 0;
 
-  fb_general_entry(){}
+  fb_general_entry() {}
   template <int Nr_roots>
   fb_general_entry (const fb_entry_x_roots<Nr_roots> &e);
   fbprime_t get_q() const {return q;}
@@ -155,17 +155,20 @@ class fb_entry_x_roots {
 public:
   typedef fb_transformed_entry_x_roots<Nr_roots> transformed_entry_t;
   fbprime_t p;
+  redc_invp_t invq; /* invq = -1/q (mod 2^32), or (mod 2^64), depending on
+		       the size of redc_invp_t */
   fbroot_t roots[Nr_roots];
   /* Static class members to allow fb_vector<> to distinguish between and
      operate on both kind of entries */
   static const unsigned char k = 1, nr_roots = Nr_roots;
   static const bool is_general_type = false;
   static const unsigned char fixed_nr_roots = Nr_roots;
-  fb_entry_x_roots(){};
+  fb_entry_x_roots() {};
   /* Allow assignment-construction from general entries */
   fb_entry_x_roots(const fb_general_entry &e) {
     ASSERT_ALWAYS(Nr_roots == e.nr_roots);
     p = e.p;
+    invq = e.invq;
     for (size_t i = 0; i < Nr_roots; i++)
       roots[i] = e.roots[i].r;
   }
