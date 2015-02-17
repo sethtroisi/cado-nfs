@@ -1457,6 +1457,7 @@ int factor_list_fprint(FILE *f, factor_list_t fl) {
 
 static const int bucket_prime_stats = 0;
 static long nr_bucket_primes = 0;
+static long nr_bucket_complete_hints = 0;
 static long nr_div_tests = 0;
 static long nr_composite_tests = 0;
 static long nr_wrap_was_composite = 0;
@@ -1490,11 +1491,45 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
 }
 
 
+/* The entries in BP must be sorted in order of increasing x */
+static void
+divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
+                          bucket_array_complete *purged, const fb_factorbase *fb)
+{
+  while (!purged->is_end()) {
+      const bucket_complete_update_t complete_hint = purged->get_next_update();
+      if (complete_hint.x > x)
+        {
+          purged->rewind_by_1();
+          break;
+        }
+      if (complete_hint.x == x) {
+          if (bucket_prime_stats) nr_bucket_complete_hints++;
+          const fb_slice_interface *slice = fb->get_slice(complete_hint.index);
+          ASSERT_ALWAYS(slice != NULL);
+          const unsigned long p = slice->get_prime(complete_hint.hint);
+          if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
+              verbose_output_print(1, 0,
+                       "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
+                       p, N, x);
+              abort();
+          }
+          do {
+              factor_list_add(fl, p);
+              mpz_divexact_ui (norm, norm, p);
+          } while (mpz_divisible_ui_p (norm, p));
+      }
+  }
+}
+
+
 NOPROFILE_STATIC void
 trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
            const bool handle_2, bucket_primes_t *primes,
+           bucket_array_complete *purged,
 	   trialdiv_divisor_t *trialdiv_data,
-           int64_t a MAYBE_UNUSED, uint64_t b MAYBE_UNUSED)
+           int64_t a MAYBE_UNUSED, uint64_t b MAYBE_UNUSED,
+           const fb_factorbase *fb)
 {
     const int trial_div_very_verbose = 0;
     int nr_factors;
@@ -1518,6 +1553,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
     // remove primes in "primes" that map to x
     divide_primes_from_bucket (fl, norm, N, x, primes);
+    divide_hints_from_bucket (fl, norm, N, x, purged, fb);
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_ab(a,b) && fl->n) {
         verbose_output_print(1, 0, "# divided by 2 + primes from bucket that map to %u: ", x);
@@ -1622,6 +1658,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     mpz_array_t *f[2] = { NULL, };
     uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
     bucket_primes_t primes[2] = {bucket_primes_t(BUCKET_REGION), bucket_primes_t(BUCKET_REGION)};
+    bucket_array_complete purged[2] = {bucket_array_complete(BUCKET_REGION), bucket_array_complete(BUCKET_REGION)};
     mpz_t BLPrat;       /* alone ? */
 #ifdef  DLP_DESCENT
     double deadline = DBL_MAX;
@@ -1704,8 +1741,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
         for (int i = 0; i < las->nb_threads; ++i) {
             thread_data_ptr other = th + i - th->id;
-            const fb_part *fb = th->sides[side]->fb;
-            primes[side].purge(other->sides[side]->BA, N, fb, SS);
+            purged[side].purge(other->sides[side]->BA, N, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
@@ -1714,6 +1750,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
         /* Sort the entries to avoid O(n^2) complexity when looking for
            primes during trial division */
+        purged[side].sort();
         primes[side].sort();
     }
 
@@ -1836,10 +1873,12 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif
                 verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
                 const bool handle_2 = true; /* FIXME */
+                const fb_factorbase *fb = th->si->sides[side]->fb;
                 trial_div (&factors[side], norm[side], N, x,
                         handle_2,
-                        &primes[side], si->sides[side]->trialdiv_data,
-                        a, b);
+                        &primes[side], &purged[side],
+                        si->sides[side]->trialdiv_data,
+                        a, b, fb);
 
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
