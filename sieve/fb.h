@@ -442,8 +442,11 @@ public:
        or return NULL if all are empty */
     const fb_slice_interface *slice = NULL;
     if (!only_general) {
-      for (unsigned int nr_roots = 0; slice == NULL && nr_roots <= MAXDEGREE; nr_roots++)
-        slice = cget_slices(nr_roots)->get_first_slice();
+      for (unsigned int nr_roots = 0; slice == NULL && nr_roots <= MAXDEGREE; nr_roots++) {
+        const fb_slices_interface *slices = cget_slices(nr_roots);
+        if (slices != NULL)
+          slice = slices->get_first_slice();
+      }
     }
     if (slice == NULL)
       slice = general_vector.get_first_slice();
@@ -458,8 +461,11 @@ public:
   }
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
     for (unsigned int nr_roots = 0; nr_roots <= MAXDEGREE; nr_roots++) {
-      const fb_slice_interface *slice;
-      if ((slice = cget_slices(nr_roots)->get_slice(slice_idx)) != NULL) return slice;
+      const fb_slices_interface *slices = cget_slices(nr_roots);
+      if (slices != NULL) {
+        const fb_slice_interface *slice;
+        if ((slice = slices->get_slice(slice_idx)) != NULL) return slice;
+      }
     }
     return general_vector.get_slice(slice_idx);
   }
