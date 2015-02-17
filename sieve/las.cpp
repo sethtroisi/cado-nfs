@@ -1341,55 +1341,57 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
 NOPROFILE_STATIC
 #endif
+void
+apply_one_update (unsigned char * const S, const bucket_update_t * const u,
+                  const unsigned char logp, where_am_I_ptr w)
+{
+  WHERE_AM_I_UPDATE(w, h, u->slice_offset);
+  WHERE_AM_I_UPDATE(w, x, u->x);
+  sieve_increase(S + (u->x), logp, w);
+}
 
+#ifndef TRACE_K
+/* backtrace display can't work for static symbols (see backtrace_symbols) */
+NOPROFILE_STATIC
+#endif
 void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
-        where_am_I_ptr w)
+        const fb_part *fb, where_am_I_ptr w)
 {
-  unsigned int next_logp_j;
-  unsigned char logp;
-  bucket_update_t *next_logp_change, *next_align, **pnlc, *read_ptr;
-
-  read_ptr = BA.bucket_read[i];
-  pnlc = BA.logp_idx + i;
-  next_logp_j = 0;
   WHERE_AM_I_UPDATE(w, p, 0);
-  while (read_ptr < BA.bucket_write[i]) {
-    logp = BA.logp_val[next_logp_j++];
-    if (LIKELY(next_logp_j < (unsigned int) BA.nr_logp)) {
-      pnlc = (bucket_update_t **)((size_t) pnlc + BA.size_b_align);
-      next_logp_change = *pnlc;
-    }
-    else
-      next_logp_change = BA.bucket_write[i];
+
+  for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
+    const bucket_update_t *it = BA.cbegin(i, i_slice);
+    const bucket_update_t * const it_end = BA.cend(i, i_slice);
+    const slice_index_t slice_index = BA.get_slice_index(i_slice);
+    const unsigned char logp = fb->get_slice(slice_index)->get_logp();
+
+    const bucket_update_t *next_align;
     if (sizeof(bucket_update_t) == 4) {
-        next_align = (bucket_update_t *) (((size_t) read_ptr + 0x3F) & ~((size_t) 0x3F));
+      next_align = (bucket_update_t *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
+      if (UNLIKELY(next_align > it_end)) next_align = it_end;
     } else {
-        next_align = next_logp_change;
+      next_align = it_end;
     }
-    if (UNLIKELY(next_align > next_logp_change)) next_align = next_logp_change;
-    while (read_ptr < next_align) {
-      uint16_t x;
-      WHERE_AM_I_UPDATE(w, h, read_ptr->p);
-      x = (read_ptr++)->x;
-      WHERE_AM_I_UPDATE(w, x, x);
-      sieve_increase(S + x, logp, w);
-    }
-    while (read_ptr + 16 <= next_logp_change) {
+
+    while (it != next_align)
+      apply_one_update (S, it++, logp, w);
+
+    while (it + 16 <= it_end) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
       uint16_t x;
 #ifdef HAVE_SSE2
-      _mm_prefetch(((unsigned char *) read_ptr)+256, _MM_HINT_NTA);
+      _mm_prefetch(((unsigned char *) it)+256, _MM_HINT_NTA);
 #endif
-      x0 = ((uint64_t *) read_ptr)[0];
-      x1 = ((uint64_t *) read_ptr)[1];
-      x2 = ((uint64_t *) read_ptr)[2];
-      x3 = ((uint64_t *) read_ptr)[3];
-      x4 = ((uint64_t *) read_ptr)[4];
-      x5 = ((uint64_t *) read_ptr)[5];
-      x6 = ((uint64_t *) read_ptr)[6];
-      x7 = ((uint64_t *) read_ptr)[7];
-      read_ptr += 16;
+      x0 = ((uint64_t *) it)[0];
+      x1 = ((uint64_t *) it)[1];
+      x2 = ((uint64_t *) it)[2];
+      x3 = ((uint64_t *) it)[3];
+      x4 = ((uint64_t *) it)[4];
+      x5 = ((uint64_t *) it)[5];
+      x6 = ((uint64_t *) it)[6];
+      x7 = ((uint64_t *) it)[7];
+      it += 16;
       __asm__ __volatile__ (""); /* To be sure all x? are read together in one operation */
 #ifdef CADO_LITTLE_ENDIAN
 #define INSERT_2_VALUES(X) do {						\
@@ -1410,12 +1412,8 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
       INSERT_2_VALUES(x0); INSERT_2_VALUES(x1); INSERT_2_VALUES(x2); INSERT_2_VALUES(x3);
       INSERT_2_VALUES(x4); INSERT_2_VALUES(x5); INSERT_2_VALUES(x6); INSERT_2_VALUES(x7);
     }
-    while (read_ptr < next_logp_change) {
-      uint16_t x;
-      x = (read_ptr++)->x;
-      WHERE_AM_I_UPDATE(w, x, x);
-      sieve_increase(S + x, logp, w);
-    }
+    while (it != it_end)
+      apply_one_update (S, it++, logp, w);
   }
 }
 
@@ -1464,59 +1462,23 @@ static long nr_composite_tests = 0;
 static long nr_wrap_was_composite = 0;
 /* The entries in BP must be sorted in order of increasing x */
 static void
-divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N MAYBE_UNUSED, const int x,
-                           bucket_primes_t *BP, const unsigned long fbb)
+divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
+                           bucket_primes_t *BP)
 {
-  bucket_prime_t prime;
-  while (!bucket_primes_is_end (BP)) {
-      prime = get_next_bucket_prime (BP);
+  while (!BP->is_end()) {
+      const bucket_prime_t prime = BP->get_next_update();
       if (prime.x > x)
         {
-          rewind_primes_by_1 (BP);
+          BP->rewind_by_1();
           break;
         }
       if (prime.x == x) {
           if (bucket_prime_stats) nr_bucket_primes++;
-          unsigned long p = prime.p;
-          while (p <= fbb) {
-              if (bucket_prime_stats) nr_div_tests++;
-              if (LIKELY(mpz_divisible_ui_p (norm, p))) {
-                  // FIXME: This is very tempting to just skip
-                  // this block for small sizes. For large factorization
-                  // this will create failed assertions, though...
-                  // So, you might comment the following line, but
-                  // proceed at your own risk:
-                  //
-                  // break;
-                  int isprime;
-                  modulusul_t m; 
-                  modul_initmod_ul (m, p);
-                  if (bucket_prime_stats) nr_composite_tests++;
-                  isprime = modul_isprime (m);
-                  modul_clearmod (m);
-                  if (LIKELY(isprime)) {
-                      break;
-                  } else {
-                    if (bucket_prime_stats) nr_wrap_was_composite++;
-                  }
-              }
-
-              /* It may have been a case of incorrectly reconstructing p
-                 from bits 1...16, so let's try if a bigger prime works.
-
-                 Warning: this strategy may fail, since we might find a
-                 composite p+k1*BUCKET_P_WRAP dividing the norm, while we
-                 really want a larger prime p+k2*BUCKET_P_WRAP. In that case,
-                 if a prime dividing p+k1*BUCKET_P_WRAP also divides the norm,
-                 it might lead to a bucket error (p = ... does not divide),
-                 moreover the wanted prime p+k2*BUCKET_P_WRAP will not be found
-                 and we might miss some relations. */
-              p += BUCKET_P_WRAP;
-          }
-          if (UNLIKELY(p > fbb)) {
+          const unsigned long p = prime.p;
+          if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
               verbose_output_print(1, 0,
                        "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
-                       (unsigned long) prime.p, N, x);
+                       p, N, x);
               abort();
           }
           do {
@@ -1531,7 +1493,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N M
 NOPROFILE_STATIC void
 trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
            const bool handle_2, bucket_primes_t *primes,
-	   trialdiv_divisor_t *trialdiv_data, const unsigned long fbb,
+	   trialdiv_divisor_t *trialdiv_data,
            int64_t a MAYBE_UNUSED, uint64_t b MAYBE_UNUSED)
 {
     const int trial_div_very_verbose = 0;
@@ -1555,7 +1517,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
     }
 
     // remove primes in "primes" that map to x
-    divide_primes_from_bucket (fl, norm, N, x, primes, fbb);
+    divide_primes_from_bucket (fl, norm, N, x, primes);
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_ab(a,b) && fl->n) {
         verbose_output_print(1, 0, "# divided by 2 + primes from bucket that map to %u: ", x);
@@ -1659,7 +1621,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     factor_list_t factors[2];
     mpz_array_t *f[2] = { NULL, };
     uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
-    bucket_primes_t primes[2];
+    bucket_primes_t primes[2] = {bucket_primes_t(BUCKET_REGION), bucket_primes_t(BUCKET_REGION)};
     mpz_t BLPrat;       /* alone ? */
 #ifdef  DLP_DESCENT
     double deadline = DBL_MAX;
@@ -1739,11 +1701,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
     for(int side = 0 ; side < 2 ; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
-        primes[side] = init_bucket_primes (BUCKET_REGION);
 
         for (int i = 0; i < las->nb_threads; ++i) {
             thread_data_ptr other = th + i - th->id;
-            purge_bucket (&primes[side], other->sides[side]->BA, N, SS);
+            const fb_part *fb = th->sides[side]->fb;
+            primes[side].purge(other->sides[side]->BA, N, fb, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
@@ -1752,7 +1714,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
         /* Sort the entries to avoid O(n^2) complexity when looking for
            primes during trial division */
-        bucket_sortbucket (&primes[side]);
+        primes[side].sort();
     }
 
     /* Scan array one long word at a time. If any byte is <255, i.e. if
@@ -1858,7 +1820,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             unsigned int j;
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                int lim = si->conf->sides[side]->lim;
 
                 // Trial divide rational norm
                 /* Compute the norms using the polynomials transformed to 
@@ -1878,7 +1839,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 trial_div (&factors[side], norm[side], N, x,
                         handle_2,
                         &primes[side], si->sides[side]->trialdiv_data,
-                        lim, a, b);
+                        a, b);
 
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
@@ -2119,7 +2080,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     mpz_clear (BLPrat);
 
     for(int side = 0 ; side < 2 ; side++) {
-        clear_bucket_primes (&primes[side]);
         mpz_clear(norm[side]);
         factor_list_clear(&factors[side]);
         clear_uint32_array (m[side]);
@@ -2286,7 +2246,7 @@ void * process_bucket_region(thread_data_ptr th)
             rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
-                apply_one_bucket(SS, ot->sides[side]->BA, i, w);
+                apply_one_bucket(SS, ot->sides[side]->BA, i, ts->fb, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();

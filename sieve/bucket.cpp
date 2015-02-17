@@ -56,29 +56,29 @@ bucket_start_init(void **ps, void **eps, size_t init, size_t add) {
 
 /* Set the write pointers of the normal/kilo/mega buckets, and the read
    pointers of the normal buckets, back to the respective bucket start,
-   and set nr_logp back to 0. */
+   and set nr_slices back to 0. */
 static void
 re_init_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA) {
   if (mBA->bucket_start) aligned_medium_memcpy (mBA->bucket_write, mBA->bucket_start, mBA->size_b_align);
   if (kBA->bucket_start) aligned_medium_memcpy (kBA->bucket_write, kBA->bucket_start, kBA->size_b_align);
   aligned_medium_memcpy (BA->bucket_write, BA->bucket_start, BA->size_b_align);
   aligned_medium_memcpy (BA->bucket_read,  BA->bucket_start, BA->size_b_align);
-  BA->nr_logp = 0;
+  BA->nr_slices = 0;
 }
 
 static void
-init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA)
+init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t max_slice_index, bucket_array_t *BA)
 {
   BA->n_bucket = n_bucket;
   BA->bucket_size = size_bucket;
   BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
-  BA->nr_logp = 0;
-  BA->size_arr_logp = diff_logp;
+  BA->nr_slices = 0;
+  BA->max_slice_index = max_slice_index;
   BA->bucket_write = (bucket_update_t **) malloc_pagealigned (BA->size_b_align);
   BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
   BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->logp_val = (unsigned char *) malloc_check (BA->size_arr_logp);
-  BA->logp_idx = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->size_arr_logp, 0x40);
+  BA->slice_index = (slice_index_t  *) malloc_check (BA->max_slice_index * sizeof(slice_index_t));
+  BA->slice_start = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->max_slice_index, 0x40);
 }
 
 /* This function is called only in the one pass sort in big buckets sieve.
@@ -86,9 +86,9 @@ init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, co
    in the corresponding fb_iterators.
  */
 static void
-init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
+init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t max_slice_index, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
-  init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
+  init_bucket_array_common(n_bucket, size_bucket, max_slice_index, BA);
   BA->big_size = BA->n_bucket * BA->bucket_size * sizeof(bucket_update_t);
 
 #ifdef PRINT_ALLOC
@@ -115,7 +115,7 @@ init_k_bucket_array_common(bucket_array_t *BA, k_bucket_array_t *kBA)
   kBA->size_b_align = (sizeof(void *) * kBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
   kBA->bucket_write = (k_bucket_update_t **) malloc_pagealigned (kBA->size_b_align);
   kBA->bucket_start = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align, 0x40);
-  kBA->logp_idx = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align * BA->size_arr_logp, 0x40);
+  kBA->logp_idx = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align * BA->max_slice_index, 0x40);
 }
 
 /* This function is called only in the two passes sort in big buckets sieve.
@@ -163,7 +163,7 @@ init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const u
   mBA->size_b_align = (sizeof(void *) * mBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
   mBA->bucket_write = (m_bucket_update_t **) malloc_pagealigned (mBA->size_b_align);
   mBA->bucket_start = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align, 0x40);
-  mBA->logp_idx = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align * BA->size_arr_logp, 0x40);
+  mBA->logp_idx = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align * BA->max_slice_index, 0x40);
 
   BA->big_size = mBA->bucket_size * (mBA->n_bucket * sizeof(m_bucket_update_t) + sizeof(k_bucket_update_t)) + kBA->bucket_size * sizeof(bucket_update_t);
 
@@ -199,7 +199,7 @@ init_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA,
   const size_t bucket_size = bucket_misalignment((size_t) (max_bucket_fill_ratio * bucket_region), sizeof(bucket_update_t));
   /* The previous buckets are identical ? */
   if (BA->n_bucket == nb_buckets && BA->bucket_size == bucket_size) {
-    /* Yes; so (bucket_write & bucket_read) = bucket_start; nr_logp = 0 */
+    /* Yes; so (bucket_write & bucket_read) = bucket_start; nr_slices = 0 */
     re_init_bucket_array(BA, kBA, mBA);
     /* Buckets are ready to be filled */
   } else {
@@ -234,8 +234,8 @@ clear_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
   memset(kBA, 0, sizeof(*kBA));
 
   physical_free (BA->bucket_start[0], BA->big_size); /* Always = big_data in all BA, kBA, mBA init functions */
-  free (BA->logp_val);
-  free_aligned(BA->logp_idx, 0x40);
+  free (BA->slice_index);
+  free_aligned(BA->slice_start, 0x40);
   free_aligned(BA->bucket_read, 0x40);
   free_aligned(BA->bucket_start, 0x40);
   free_pagealigned(BA->bucket_write);
@@ -255,31 +255,10 @@ buckets_max_full (const bucket_array_t BA)
   return (double) max / (double) BA.bucket_size;
 }
 
-bucket_primes_t
-init_bucket_primes (const int size)
-{
-  bucket_primes_t BP;
-  BP.size = size;
-  BP.start = (bucket_prime_t *) malloc_check (size * sizeof(bucket_prime_t));
-  BP.read = BP.start;
-  BP.write = BP.start;
-  return BP;
-}
-
-void
-clear_bucket_primes (bucket_primes_t *BP)
-{
-  free (BP->start);
-  BP->start = NULL;
-  BP->read = NULL;
-  BP->write = NULL;
-  BP->size = 0;
-}
-
 /* A compare function suitable for sorting updates in order of ascending x
    with qsort() */
 int
-bucket_cmp_x (const bucket_prime_t *a, const bucket_prime_t *b)
+bucket_cmp_x (const bucket_complete_update_t *a, const bucket_complete_update_t *b)
 {
   if (a->x < b->x)
     return -1;
@@ -288,104 +267,60 @@ bucket_cmp_x (const bucket_prime_t *a, const bucket_prime_t *b)
   return 1;
 }
 
+template <class UPDATE_TYPE>
 void
-bucket_sortbucket (bucket_primes_t *BP)
+bucket_single<UPDATE_TYPE>::sort()
 {
-//  qsort (BP->start, BP->write - BP->start, sizeof (bucket_prime_t),
+//  qsort (start, write - start, sizeof (bucket_complete_update_t),
 //	 (int(*)(const void *, const void *)) &bucket_cmp_x);
-
 #define islt(a,b) ((a)->x < (b)->x)
-QSORT(bucket_prime_t, BP->start, BP->write - BP->start, islt);
+  QSORT(UPDATE_TYPE, start, write - start, islt);
+#undef islt  
 }
-
-
-/* Copy only those bucket entries where x yields a sieve report.
- * These entries get sorted, to speed up trial division. 
- * Due to the purging and sorting, it will not be possible to
- * reconstruct the correct p from its low 16 bits, so the
- * reconstruction is done here and the full p is stored in the output.
- */
-
-#ifdef BUCKET_CAREFUL_DECODE
-#ifdef BUCKET_ENCODE3
-#define PURGE_BUCKET_HEART(A) do {					\
-    prime_hint_t up = (u + (A))->p;					\
-    if (UNLIKELY(up < last_p)) phigh += BUCKET_P_WRAP;			\
-    uint32_t decoded = phigh + bucket_decode_prime(up); last_p = up;	\
-    if (UNLIKELY(decoded * 0xCCCCCCCDU <= 0x33333333U)) { /* Divisible by 5? */ \
-      decoded += BUCKET_P_WRAP; phigh += BUCKET_P_WRAP; }		\
-    uint16_t ux = (u + (A))->x;						\
-    if (UNLIKELY(S[ux] != 255)) {					\
-      bucket_prime_t bp;						\
-      bp.x = ux; bp.p = decoded; push_bucket_prime (BP, bp); }		\
-  } while (0)
-#else
-#define PURGE_BUCKET_HEART(A) do {					\
-    prime_hint_t up = (u + (A))->p;					\
-    if (UNLIKELY(up < last_p)) phigh += BUCKET_P_WRAP;			\
-    uint32_t decoded = phigh + bucket_decode_prime(up); last_p = up;	\
-    if (UNLIKELY(decoded * 0xAAAAAAABU <= 0x55555555U)) { /* Divisible by 3? */ \
-      decoded += BUCKET_P_WRAP; phigh += BUCKET_P_WRAP; }		\
-    uint16_t ux = (u + (A))->x;						\
-    if (UNLIKELY(S[ux] != 255)) {					\
-      bucket_prime_t bp;						\
-      bp.x = ux; bp.p = decoded; push_bucket_prime (BP, bp); }		\
-  } while (0)
-#endif
-#else
-static inline
-void purge_bucket_heart(bucket_primes_t *BP, const bucket_update_t *u,
-                        prime_hint_t &last_p, uint32_t &phigh,
-                        const unsigned char *S) {
-    prime_hint_t up = u->p;
-    if (sizeof(bucket_update_t) == 4 && UNLIKELY(up < last_p))
-      phigh += BUCKET_P_WRAP;
-    last_p = up;
-    uint16_t ux = u->x;
-    if (UNLIKELY(S[ux] != 255)) {
-      bucket_prime_t bp;
-      bp.x = ux;
-      bp.p = phigh + bucket_decode_prime(up);
-      push_bucket_prime (BP, bp);
-    }
-}
-#endif
 
 void
-purge_bucket (bucket_primes_t *BP, const bucket_array_t BA, 
+bucket_primes_t::purge (const bucket_array_t BA, 
+              const int i, const fb_part *fb, const unsigned char *S)
+{
+  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.cbegin(i, 0) == BA.bucket_start[i]);
+
+  for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
+    const slice_index_t slice_index = BA.slice_index[i_slice];
+    const bucket_update_t *it = BA.cbegin(i, i_slice);
+    const bucket_update_t * const end_it = BA.cend(i, i_slice);
+
+    for ( ; it != end_it ; it++) {
+      if (UNLIKELY(S[it->x] != 255)) {
+        const fb_slice_interface *slice = fb->get_slice(slice_index);
+        ASSERT_ALWAYS(slice != NULL);
+        fbprime_t p = slice->get_prime(it->hint);
+        bucket_prime_t buc = {it->x, p};
+        push_update(buc);
+      }
+    }
+  }
+}
+
+void
+bucket_array_complete::purge (const bucket_array_t BA, 
               const int i, const unsigned char *S)
 {
-  bucket_update_t *u = BA.bucket_start[i], *end_u = BA.bucket_write[i];
-  prime_hint_t last_p = 0;
-  uint32_t phigh = 0;
+  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.slice_start[0] == BA.bucket_start[i]);
 
-  if (sizeof(bucket_update_t) == 4) {
-    for (; u + 16 <= end_u; u += 16) {
-#ifdef HAVE_SSE2
-      _mm_prefetch((uint8_t *) u + 0x100, _MM_HINT_T0);
-#endif
-      purge_bucket_heart(BP, u, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 1, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 2, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 3, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 4, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 5, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 6, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 7, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 8, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 9, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 10, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 11, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 12, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 13, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 14, last_p, phigh, S);
-      purge_bucket_heart(BP, u + 15, last_p, phigh, S);
+  for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
+    const slice_index_t slice_index = BA.slice_index[i_slice];
+    const bucket_update_t *it = BA.cbegin(i, i_slice);
+    const bucket_update_t * const end_it = BA.cend(i, i_slice);
+
+    for ( ; it != end_it ; it++) {
+      if (UNLIKELY(S[it->x] != 255)) {
+        bucket_complete_update_t buc = {it->x, slice_index, it->hint};
+        push_update(buc);
+      }
     }
   }
-  for (; u < end_u; ++u)
-    purge_bucket_heart(BP, u, last_p, phigh, S);
-  // If we use 32-bit hints, no overflow must occur
-  if (sizeof(bucket_update_t) != 4) {
-    ASSERT_ALWAYS(phigh == 0);
-  }
 }
+
+template class bucket_single<bucket_prime_t>;
+template class bucket_single<bucket_complete_update_t>;
+

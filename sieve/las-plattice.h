@@ -137,7 +137,7 @@
 // overflow).  In fact, these guards are 99.99999% useless.
 
 typedef uint64_t plattice_x_t;
-typedef uint32_t prime_hint_t;
+typedef slice_offset_t prime_hint_t;
 
 class plattice_info_t;
 static int reduce_plattice (plattice_info_t *, fbprime_t, fbroot_t, uint32_t);

@@ -72,7 +72,7 @@ is_divisible_3_u32 (uint32_t a)
       WHERE_AM_I_UPDATE(w, N, (X) >> 16);				\
       WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
       fprintf (stderr, "# Pushed factor base entry (%u, %u) (x=%u, %s) to BA[%u]\n",	\
-	       (unsigned int) slice_index, (unsigned int) hint, (unsigned int) (uint16_t) (X), sidenames[side],	\
+	       (unsigned int) slice_index, (unsigned int) slice_offset, (unsigned int) (uint16_t) (X), sidenames[side],	\
 	       (unsigned int) ((X) >> 16));				\
       ASSERT(test_divisible(w));					\
     }									\
@@ -288,19 +288,29 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
 
 static inline
-void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_t hint,
+void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t hint,
                        const int side MAYBE_UNUSED,
                        const slice_index_t slice_index MAYBE_UNUSED, 
-                       where_am_I_ptr w MAYBE_UNUSED) {
+                       where_am_I_ptr w MAYBE_UNUSED)
+{
+#if 0
   bucket_update_t **pbut = BA.bucket_write + (x >> 16);
   bucket_update_t *but = *pbut;
   FILL_BUCKET_TRACE_K(x);
   WHERE_AM_I_UPDATE(w, N, x >> 16);
   WHERE_AM_I_UPDATE(w, x, (uint16_t) x);
-  but->p = hint;
+  but->slice_offset = slice_offset;
   but->x = (uint16_t) x;
   *pbut = ++but;
   FILL_BUCKET_PREFETCH(but);
+#else
+  const int i = (x >> 16);
+  bucket_update_t update;
+  update.x = (uint16_t) x;
+  update.hint = hint;
+  push_bucket_update(BA, i, update);
+                     
+#endif
 }
 
 
@@ -308,7 +318,7 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_
 void
 fill_in_buckets(thread_data_ptr th, const int side,
                 const fb_transformed_vector *transformed_vector,
-                const fb_slice_interface *slice,
+                const fb_slice_interface *slice MAYBE_UNUSED,
                 where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
@@ -322,8 +332,8 @@ fill_in_buckets(thread_data_ptr th, const int side,
   // being for the moment unconditionally set to FBPRIME_MAX by the
   // caller of dispatch_fb).
   
-  /* Write new set of pointers if the logp value changed */
-  bucket_add_logp(&BA, slice->get_logp());
+  /* Write new set of pointers for the new slice */
+  bucket_add_slice_index(&BA, slice_index);
 
   for (fb_transformed_vector::const_iterator pl_it = transformed_vector->cbegin();
        pl_it != transformed_vector->cend(); pl_it++) {
@@ -340,7 +350,7 @@ fill_in_buckets(thread_data_ptr th, const int side,
     const uint32_t maskI = I-1;
     const uint64_t even_mask = (1ULL << logI) | 1ULL;
     const uint64_t IJ = ((uint64_t) si->J) << logI;
-    const prime_hint_t hint = slice->get_prime(pl_it->hint);
+    const prime_hint_t hint = pl_it->hint;
 
     if (pl_it->get_b0() == 0 || pl_it->get_b1() == 0) {
       /* r == 0 or r == 1/0.

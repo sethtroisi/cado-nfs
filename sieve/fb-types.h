@@ -18,6 +18,8 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
 
 #define FB_MAX_PARTS 4
 
+/* Within one factor base, there is exactly one (index, offset) tuple per
+   factor base entry. */
 /* Each slice in a factor base has a unique index */
 typedef size_t slice_index_t;
 /* Each factor base entry withing a slice has a unique offset */

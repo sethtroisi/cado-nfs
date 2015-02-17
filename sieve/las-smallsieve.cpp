@@ -989,7 +989,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                     prime.p = p;
                     prime.x = x;
                     ASSERT(prime.p >= si->conf->td_thresh);
-                    push_bucket_prime (BP, prime);
+                    BP->push_update(prime);
                 }
                 i0 += r;
                 if (i0 >= p)
@@ -1017,7 +1017,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 prime.p = g;
                 prime.x = 1+(I>>1);
                 ASSERT(prime.p >= si->conf->td_thresh);
-                push_bucket_prime (BP, prime);
+                BP->push_update(prime);
             }
             // Same as in sieving: we discard after checking for row 0.
             if (event == SSP_DISCARD)
@@ -1046,7 +1046,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             prime.p = g;
                             prime.x = x;
                             ASSERT(prime.p >= si->conf->td_thresh);
-                            push_bucket_prime (BP, prime);
+                            BP->push_update(prime);
                         }
                     }
                 } else {
@@ -1063,7 +1063,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             prime.p = g;
                             prime.x = x;
                             ASSERT(prime.p >= si->conf->td_thresh);
-                            push_bucket_prime (BP, prime);
+                            BP->push_update(prime);
                         }
                     }
                 }
