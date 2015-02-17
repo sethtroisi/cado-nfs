@@ -305,7 +305,7 @@ void
 bucket_array_complete::purge (const bucket_array_t BA, 
               const int i, const unsigned char *S)
 {
-  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.slice_start[0] == BA.bucket_start[i]);
+  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.cbegin(i, 0) == BA.bucket_start[i]);
 
   for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
     const slice_index_t slice_index = BA.slice_index[i_slice];
