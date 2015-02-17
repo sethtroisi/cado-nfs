@@ -296,7 +296,7 @@ class fb_slice : public fb_slice_interface {
   unsigned char get_logp() const {return logp;};
   slice_index_t get_index() const {return index;}
   void fprint(FILE *out) const;
-  fbprime_t get_prime(const slice_offset_t offset) const {return _begin[offset].p;};
+  fbprime_t get_prime(const slice_offset_t offset) const {ASSERT_ALWAYS(offset < _vec.size()); return _begin[offset].p;};
   fb_transformed_vector * make_lattice_bases(qlattice_basis_srcptr, int) const;
 };
 
