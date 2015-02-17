@@ -456,7 +456,7 @@ public:
     const fb_slice_interface *slice = get_first_slice();
     return (slice == NULL) ? 0 : slice->get_index();
   }
-  const fb_slice_interface *get_slice(const slice_index_t slice_idx) {
+  const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
     for (unsigned int nr_roots = 0; nr_roots <= MAXDEGREE; nr_roots++) {
       const fb_slice_interface *slice;
       if ((slice = cget_slices(nr_roots)->get_slice(slice_idx)) != NULL) return slice;
@@ -493,6 +493,14 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
   void make_slices(double);
+  const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
+    for (unsigned int i_part = 0; i_part <= FB_MAX_PARTS; i_part++) {
+      const fb_slice_interface *slice;
+      if ((slice = parts[i_part]->get_slice(slice_idx)) != NULL)
+        return slice;
+    }
+    return NULL;
+  }
 };
 
 
