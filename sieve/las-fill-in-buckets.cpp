@@ -921,9 +921,6 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 #endif
 
 
-/* TODO: Write loop over all slices in this factor base part, for each slice
-   transform loops, call fill_in_buckets() with transformed roots. */
-
 static void
 fill_in_buckets_one_side(thread_data_ptr th, const int side)
 {
