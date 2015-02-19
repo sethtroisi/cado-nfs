@@ -92,7 +92,7 @@ template <int Nr_roots>
 fb_general_entry::fb_general_entry (const fb_entry_x_roots<Nr_roots> &e) {
   p = q = e.p;
   k = 1;
-  invq = compute_invq(q);
+  invq = e.invq;
   for (int i = 0; i < Nr_roots; i++) {
     /* Use simple constructor for root */
     roots[i] = e.roots[i];
@@ -285,7 +285,6 @@ void
 fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transformed_entry_t &result, qlattice_basis_srcptr basis) const
 {
   result.p = p;
-  const redc_invp_t invq = compute_invq(p);
   /* TODO: Use batch-inversion here */
   for (unsigned char i_root = 0; i_root < nr_roots; i_root++) {
     const unsigned long long t = fb_root_in_qlattice(p, roots[i_root], invq, basis);
