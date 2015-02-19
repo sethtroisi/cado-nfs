@@ -165,17 +165,15 @@ public:
   static const unsigned char fixed_nr_roots = Nr_roots;
   fb_entry_x_roots() {};
   /* Allow assignment-construction from general entries */
-  fb_entry_x_roots(const fb_general_entry &e) {
+  fb_entry_x_roots(const fb_general_entry &e) : p(e.p), invq(e.invq) {
     ASSERT_ALWAYS(Nr_roots == e.nr_roots);
-    p = e.p;
-    invq = e.invq;
     for (size_t i = 0; i < Nr_roots; i++)
       roots[i] = e.roots[i].r;
   }
   fbprime_t get_q() const {return p;}
   /* Allow sorting by p */
-  bool operator<(const fb_general_entry &other) const {return this->p < other.p;}
-  bool operator>(const fb_general_entry &other) const {return this->p > other.p;}
+  bool operator<(const fb_entry_x_roots<Nr_roots> &other) const {return this->p < other.p;}
+  bool operator>(const fb_entry_x_roots<Nr_roots> &other) const {return this->p > other.p;}
   void fprint(FILE *) const;
   void transform_roots(transformed_entry_t &, qlattice_basis_srcptr) const;
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
