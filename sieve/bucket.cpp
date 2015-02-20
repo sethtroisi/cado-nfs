@@ -10,6 +10,7 @@
 #include "memory.h"
 #include "las-config.h"
 #include "iqsort.h"
+#include "verbose.h"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
@@ -91,10 +92,8 @@ init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const sli
   init_bucket_array_common(n_bucket, size_bucket, max_slice_index, BA);
   BA->big_size = BA->n_bucket * BA->bucket_size * sizeof(bucket_update_t);
 
-#ifdef PRINT_ALLOC
-  printf("# Allocating %zu bytes for %" PRIu32 " buckets of %" PRIu64 " update entries of %zu bytes each\n",
-         BA->big_size, BA->n_bucket, BA->bucket_size, sizeof(bucket_update_t));
-#endif
+  verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %" PRIu64 " update entries of %zu bytes each\n",
+                       BA->big_size, BA->n_bucket, BA->bucket_size, sizeof(bucket_update_t));
   uint8_t *big_data = (uint8_t *) physical_malloc (BA->big_size, 1);
 
   bucket_start_init((void **) BA->bucket_start, (void **) (BA->bucket_start + BA->n_bucket),
