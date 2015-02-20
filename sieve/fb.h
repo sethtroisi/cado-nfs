@@ -276,13 +276,13 @@ class fb_slices_interface: public fb_interface {
    memory address in the "+ offset" operation.  */
 template <class FB_ENTRY_TYPE>
 class fb_slice : public fb_slice_interface {
-  const fb_vector<FB_ENTRY_TYPE> &_vec;
+  const fb_vector<FB_ENTRY_TYPE> *_vec;
   const FB_ENTRY_TYPE *_begin, *_end;
   unsigned char logp;
   slice_index_t index;
   public:
   typedef typename FB_ENTRY_TYPE::transformed_entry_t transformed_entry_t;
-  fb_slice(const fb_vector<FB_ENTRY_TYPE> &vec,
+  fb_slice(const fb_vector<FB_ENTRY_TYPE> *vec,
            const FB_ENTRY_TYPE *begin,
            const FB_ENTRY_TYPE *end,
            const unsigned char logp,
@@ -292,12 +292,12 @@ class fb_slice : public fb_slice_interface {
   const FB_ENTRY_TYPE *cbegin() const {return _begin;}
   const FB_ENTRY_TYPE *cend() const {return _end;}
   /* Implement the fb_slice_interface */
-  int get_nr_roots() const {return _vec.get_nr_roots();} /* Delegate */
-  bool is_general() const {return _vec.is_general();} /* Delegate */
+  int get_nr_roots() const {return _vec->get_nr_roots();} /* Delegate */
+  bool is_general() const {return _vec->is_general();} /* Delegate */
   unsigned char get_logp() const {return logp;};
   slice_index_t get_index() const {return index;}
   void fprint(FILE *out) const;
-  fbprime_t get_prime(const slice_offset_t offset) const {ASSERT_ALWAYS(offset < _vec.size()); return _begin[offset].p;};
+  fbprime_t get_prime(const slice_offset_t offset) const {ASSERT_ALWAYS(offset < _vec->size()); return _begin[offset].p;};
   fb_transformed_vector * make_lattice_bases(qlattice_basis_srcptr, int) const;
 };
 

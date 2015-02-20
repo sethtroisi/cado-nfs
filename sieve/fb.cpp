@@ -419,7 +419,7 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, slice_index_t &next_in
            (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
            next_slice_start - 1, vec[next_slice_start - 1].p,
            (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.));
-    fb_slice<FB_ENTRY_TYPE> s = fb_slice<FB_ENTRY_TYPE>(vec, vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
+    fb_slice<FB_ENTRY_TYPE> s(&vec, vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
     slices.push_back(s);
 
     cur_slice_start = next_slice_start;
