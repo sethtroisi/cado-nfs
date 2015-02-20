@@ -335,8 +335,8 @@ fill_in_buckets(thread_data_ptr th, const int side,
   /* Write new set of pointers for the new slice */
   bucket_add_slice_index(&BA, slice_index);
 
-  for (fb_transformed_vector::const_iterator pl_it = transformed_vector->cbegin();
-       pl_it != transformed_vector->cend(); pl_it++) {
+  for (fb_transformed_vector::const_iterator pl_it = transformed_vector->begin();
+       pl_it != transformed_vector->end(); pl_it++) {
     /* If we sieve for special-q's smaller than the factor
        base bound, the prime p might equal the special-q prime q. */
 

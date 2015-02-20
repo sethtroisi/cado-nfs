@@ -207,7 +207,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
     // the ssp struct.
     
     const unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
-    for (fb_vector<fb_general_entry>::const_iterator iter = fb->cbegin() ; iter != fb->cend() ; iter++) {
+    for (fb_vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);

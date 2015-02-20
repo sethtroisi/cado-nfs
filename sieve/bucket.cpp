@@ -281,12 +281,12 @@ void
 bucket_primes_t::purge (const bucket_array_t BA, 
               const int i, const fb_part *fb, const unsigned char *S)
 {
-  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.cbegin(i, 0) == BA.bucket_start[i]);
+  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);
 
   for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
     const slice_index_t slice_index = BA.slice_index[i_slice];
-    const bucket_update_t *it = BA.cbegin(i, i_slice);
-    const bucket_update_t * const end_it = BA.cend(i, i_slice);
+    const bucket_update_t *it = BA.begin(i, i_slice);
+    const bucket_update_t * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
@@ -304,12 +304,12 @@ void
 bucket_array_complete::purge (const bucket_array_t BA, 
               const int i, const unsigned char *S)
 {
-  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.cbegin(i, 0) == BA.bucket_start[i]);
+  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);
 
   for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
     const slice_index_t slice_index = BA.slice_index[i_slice];
-    const bucket_update_t *it = BA.cbegin(i, i_slice);
-    const bucket_update_t * const end_it = BA.cend(i, i_slice);
+    const bucket_update_t *it = BA.begin(i, i_slice);
+    const bucket_update_t * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {

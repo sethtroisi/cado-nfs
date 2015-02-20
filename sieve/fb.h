@@ -289,8 +289,8 @@ class fb_slice : public fb_slice_interface {
            const slice_index_t index)
            : _vec(vec), _begin(begin), _end(end), logp(logp), index(index) {}
   /* Iterators */
-  const FB_ENTRY_TYPE *cbegin() const {return _begin;}
-  const FB_ENTRY_TYPE *cend() const {return _end;}
+  const FB_ENTRY_TYPE *begin() const {return _begin;}
+  const FB_ENTRY_TYPE *end() const {return _end;}
   /* Implement the fb_slice_interface */
   int get_nr_roots() const {return _vec->get_nr_roots();} /* Delegate */
   bool is_general() const {return _vec->is_general();} /* Delegate */

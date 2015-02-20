@@ -232,14 +232,14 @@ void reorder_fb(sieve_info_ptr si, int side)
 
     fb_part *small_part = si->sides[side]->fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
-    fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
+    const fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si->conf->bucket_thresh;
     fbprime_t costlim = si->conf->td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
-    for(fb_vector<fb_general_entry>::const_iterator it = small_entries->cbegin();
-        it != small_entries->cend();
+    for(fb_vector<fb_general_entry>::const_iterator it = small_entries->begin();
+        it != small_entries->end();
         it++)
     {
         /* The extra conditions on powers of 2 and 3 are related to how
@@ -272,7 +272,7 @@ void reorder_fb(sieve_info_ptr si, int side)
         s->count_entries(NULL, &nr_roots, NULL);
         parts_as_array[i][0] = nr_roots;
         std::sort(pieces[i].begin(), pieces[i].end());
-        s->insert(s->end(), pieces[i].cbegin(), pieces[i].cend());
+        s->insert(s->end(), pieces[i].begin(), pieces[i].end());
         s->count_entries(NULL, &nr_roots, NULL);
         parts_as_array[i][1] = nr_roots;
     }
@@ -1364,8 +1364,8 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
   WHERE_AM_I_UPDATE(w, p, 0);
 
   for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
-    const bucket_update_t *it = BA.cbegin(i, i_slice);
-    const bucket_update_t * const it_end = BA.cend(i, i_slice);
+    const bucket_update_t *it = BA.begin(i, i_slice);
+    const bucket_update_t * const it_end = BA.end(i, i_slice);
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fb->get_slice(slice_index)->get_logp();
 

@@ -351,7 +351,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(qlattice_basis_srcptr basis, const i
      transform */
   fb_transformed_vector *result = new fb_transformed_vector(get_index());
   size_t i_entry = 0;
-  for (const FB_ENTRY_TYPE *it = cbegin(); it != cend(); it++, i_entry++) {
+  for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
     it->transform_roots(transformed, basis);
     for (unsigned char i_root = 0; i_root < transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);
@@ -372,7 +372,7 @@ template <class FB_ENTRY_TYPE>
 void
 fb_slice<FB_ENTRY_TYPE>::fprint(FILE *out) const
 {
-  for (const FB_ENTRY_TYPE *it = cbegin(); it != cend(); it++) {
+  for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++) {
     it->fprint(out);
   }
 }
