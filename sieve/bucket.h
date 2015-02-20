@@ -299,10 +299,6 @@ bucket_add_slice_index(bucket_array_t *BA, const slice_index_t slice_index)
 
 /* Functions for handling entries with x and complete prime p */
 
-extern bucket_primes_t init_bucket_primes (const int size);
-
-extern void clear_bucket_primes (bucket_primes_t *BP);
-
 extern size_t bucket_misalignment(const size_t sz, const size_t sr);
 
 /* We also forward-define some auxiliary functions which are defined in
