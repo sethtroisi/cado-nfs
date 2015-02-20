@@ -11,7 +11,7 @@
 void
 trialdiv_stdinput(const unsigned long pmax, const int verbose)
 {
-  fbprime_t *primes;
+  unsigned long *primes;
   trialdiv_divisor_t *d;
   unsigned long *factors;
   int nr_primes = 0;
@@ -21,7 +21,7 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
 
   for (p = getprime(1UL); p <= pmax; p = getprime(1UL))
     nr_primes++;
-  primes = malloc (nr_primes * sizeof (fbprime_t));
+  primes = malloc (nr_primes * sizeof (unsigned long));
 
   getprime(0UL);
   nr_primes = 0;
@@ -79,7 +79,7 @@ test_trialdiv (int n, unsigned long iter)
 {
   mpz_t N;
   trialdiv_divisor_t *d;
-  fbprime_t f[1];
+  unsigned long f[1];
   unsigned long p, g[1], i, pmax;
   size_t s;
   int ret;
@@ -125,7 +125,7 @@ test_trialdiv (int n, unsigned long iter)
 
 int main (int argc, const char **argv)
 {
-  fbprime_t *primes;
+  unsigned long *primes;
   trialdiv_divisor_t *d;
   const size_t max_div = 16;
   unsigned long *factors;
@@ -190,7 +190,7 @@ int main (int argc, const char **argv)
 
   for (i = 0; i < 0; i++) /* To skip some primes */
     getprime(1UL);
-  primes = malloc (nr_primes * sizeof (fbprime_t));
+  primes = malloc (nr_primes * sizeof (unsigned long));
 
   mpz_add_ui (M, N, nr_N - 1); /* We'll divide integers in [N, M] */
   mpz_sub_ui (N, N, 1UL);
