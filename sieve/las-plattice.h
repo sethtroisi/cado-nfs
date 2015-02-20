@@ -139,7 +139,7 @@
 typedef uint64_t plattice_x_t;
 typedef slice_offset_t prime_hint_t;
 
-class plattice_info_t;
+struct plattice_info_t;
 static int reduce_plattice (plattice_info_t *, fbprime_t, fbroot_t, uint32_t);
 
 
