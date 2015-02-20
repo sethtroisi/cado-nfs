@@ -167,7 +167,7 @@ public:
   /* Allow assignment-construction from general entries */
   fb_entry_x_roots(const fb_general_entry &e) : p(e.p), invq(e.invq) {
     ASSERT_ALWAYS(Nr_roots == e.nr_roots);
-    for (size_t i = 0; i < Nr_roots; i++)
+    for (int i = 0; i < Nr_roots; i++)
       roots[i] = e.roots[i].r;
   }
   fbprime_t get_q() const {return p;}
