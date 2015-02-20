@@ -299,7 +299,7 @@ void
 fb_entry_x_roots<Nr_roots>::fprint(FILE *out) const
 {
   fprintf(out, "%" FBPRIME_FORMAT ": ", p);
-  for (size_t i = 0; i < Nr_roots; i++) {
+  for (int i = 0; i < Nr_roots; i++) {
     fprintf(out, "%" FBROOT_FORMAT "%s", roots[i],
 	    (i + 1 < Nr_roots) ? "," : "");
   }
