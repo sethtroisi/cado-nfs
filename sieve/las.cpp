@@ -1348,7 +1348,7 @@ void
 apply_one_update (unsigned char * const S, const bucket_update_t * const u,
                   const unsigned char logp, where_am_I_ptr w)
 {
-  WHERE_AM_I_UPDATE(w, h, u->slice_offset);
+  WHERE_AM_I_UPDATE(w, h, u->hint);
   WHERE_AM_I_UPDATE(w, x, u->x);
   sieve_increase(S + (u->x), logp, w);
 }
