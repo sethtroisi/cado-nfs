@@ -761,7 +761,7 @@ tests/tests_common.c
 tests/test_iceildiv.c
 tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
-tests/sieve/test_init_norms_bucket_region.c
+tests/sieve/test_init_norms_bucket_region.cpp
 tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh
@@ -1178,7 +1178,7 @@ tests/sieve/strategies/test_generate_strategies.c
 sieve/strategies/script_gen_dec.sh
 sieve/strategies/README.rsa704
 sieve/iqsort.h
-tests/sieve/test_memset_things.c
+tests/sieve/test_memset_things.cpp
 linalg/bwc/tree_stats.c
 linalg/bwc/tree_stats.h
 tests/linalg/bwc/perlrandom.pl
