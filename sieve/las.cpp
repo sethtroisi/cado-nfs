@@ -44,11 +44,6 @@
 #define HILIGHT_START   ""
 #define HILIGHT_END   ""
 
-/* This global mutex should be locked in multithreaded parts when a
- * thread does a read / write, especially on stdout, stderr...
- */
-pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 int create_descent_hints = 0;
 double tt_qstart;
 
@@ -1832,17 +1827,16 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             {
                 th->rep->both_even++;
                 continue;
-                /*
-                pthread_mutex_lock(&io_mutex);
-                fprintf (stderr, "# Error: a and b both even for N = %d, x = %d,\n"
+#if 0
+                verbose_output_print (1, 0,
+                        "# Error: a and b both even for N = %d, x = %d,\n"
                         "i = %d, j = %d, a = %ld, b = %lu\n",
                         N, x, ((x + N*BUCKET_REGION) & (si->I - 1))
                         - (si->I >> 1),
                         (x + N*BUCKET_REGION) >> si->conf->logI,
                         (long) a, (unsigned long) b);
                 abort();
-                pthread_mutex_unlock(&io_mutex);
-                */
+#endif
             }
 
             /* Since the q-lattice is exactly those (a, b) with
@@ -1956,16 +1950,21 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 int is_dup = do_check && relation_is_duplicate(rel,
                         las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
+                FILE *output;
                 if (!is_dup)
                     cpt++;
-                pthread_mutex_lock(&io_mutex);
+                verbose_output_start_batch();
                 if (create_descent_hints) {
                     verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
                 }
                 verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
                         i, j, S[0][x], S[1][x]);
-                fprint_relation(las->output, rel, comment);
-                pthread_mutex_unlock(&io_mutex);
+                for (size_t i_output = 0;
+                     (output = verbose_output_get(0, 0, i_output)) != NULL;
+                     i_output++) {
+                    fprint_relation(output, rel, comment);
+                }
+                verbose_output_end_batch();
             }
 
             /* Build histogram of lucky S[x] values */
