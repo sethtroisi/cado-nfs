@@ -790,11 +790,6 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       }
     /* OK, all special cases are done. */
 
-#if 0
-    printf("%s(): sieving side=%d, p=%u, logp = %u, a = (%d, %u), b = (%u, %u)\n",
-           __func__, side, p, logp, pli.a0, pli.a1, pli.b0, pli.b1);
-#endif
-
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
 #if !MOD2_CLASSES_BS
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
