@@ -3,6 +3,9 @@
 
 #include "utils.h"
 #include "las-cofactor.h"
+#include "modredc_ul.h"
+#include "modredc_15ul.h"
+#include "modredc_2ul2.h"
 
 /* {{{ factor_leftover_norm */
 
@@ -212,9 +215,9 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
   int is_smooth[2] = {FACUL_MAYBE, FACUL_MAYBE};
   /* To remember if a cofactor is already factored.*/
 
-  unsigned long** ul_factors = malloc(sizeof (*ul_factors) * 2);
+  unsigned long** ul_factors = (unsigned long**) malloc(sizeof (*ul_factors) * 2);
   for (int i = 0; i < 2; i++)
-    ul_factors[i] = calloc(16, sizeof (*ul_factors[i]));
+    ul_factors[i] = (unsigned long*) calloc(16, sizeof (*ul_factors[i]));
 
 
   for (int side = 0; side < 2; side++)

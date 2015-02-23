@@ -120,7 +120,7 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
 
     new_si->sides[side]->strategy = strategy[side];
   }
-  SkewGauss(new_si);  
+  SkewGauss(new_si->qbasis, new_si->doing->p, new_si->doing->r, new_si->conf->skewness);
   return new_si;
 }
 
@@ -266,6 +266,9 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   const size_t max_large_primes = 10;
   unsigned long large_primes[2][max_large_primes];
   unsigned int nr_lp[2] = {0, 0};
+  int i, pass, ok;
+  unsigned int j;
+
 
   /* Extract the list of large primes for each side */
   for (int side = 0; side < 2; side++) {
@@ -294,6 +297,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   const unsigned long r = mpz_get_ui(si->doing->r);
 
   const uint32_t oldI = si->I, oldJ = si->J;
+  uint32_t I, J; /* Can't declare further down due to goto :( */
   /* If resulting optimal J is so small that it's not worth sieving,
      this special-q gets skipped, so relation is not a duplicate */
   if (sieve_info_adjust_IJ(si, nb_threads) == 0) {
@@ -305,15 +309,13 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   }
 
   sieve_info_update_norm_data(si, nb_threads);
-
   if (verbose) {
     verbose_output_print(0, 1, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", relation->a, relation->b, sq, r);
-    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
+    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
   }
 
-  const uint32_t I = si->I, J = si->J;
-  int i;
-  unsigned int j;
+  I = si->I;
+  J = si->J;
 
   if (verbose && (oldI != I || oldJ != J)) {
     verbose_output_print(0, 1, "# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
@@ -321,7 +323,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   
   /* Compute i,j-coordinates of this relation in the special-q lattice when
      p was used as the special-q value. */
-  int ok = ABToIJ(&i, &j, relation->a, relation->b, si);
+  ok = ABToIJ(&i, &j, relation->a, relation->b, si);
 
   if (!ok)
     abort();
@@ -370,7 +372,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
       m[side] = alloc_uint32_array (1);
   }
 
-  int pass = factor_both_leftover_norms(cof, BLPrat, f, m, si);
+  pass = factor_both_leftover_norms(cof, BLPrat, f, m, si);
 
   if (pass <= 0) {
     if (verbose) {

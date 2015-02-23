@@ -343,7 +343,7 @@ static void set_lg_page()
 void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots)
 {
 
-  const double_poly_t f = {{ degree, coeff }};
+  const double_poly_t f = {{ (int) degree, coeff }};
   double_poly_t df, ddf, f_ddf, df_df, d2f;
   mpz_t           p[(degree << 1) + 1];
   root_struct Roots[degree << 1];
@@ -924,7 +924,7 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
     int x;
     double fx; } x_fx_t;
   size_t current_stack, max_stack = SIZE_STACK;
-  x_fx_t begin, current, *stack = malloc_check (sizeof(*stack) *  max_stack);
+  x_fx_t begin, current, *stack = (x_fx_t *) malloc_check (sizeof(*stack) *  max_stack);
 
   /* At least 3 segments: -Idiv2, neighbourhood of 0., Idiv2 - 1 */
   ASSERT(nsg >= 3);
@@ -946,7 +946,7 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
 	  current = possible_new;
 	  if (UNLIKELY(current_stack == max_stack)) {
 	    max_stack += (max_stack >> 1);
-	    if ((stack = realloc (stack, sizeof(*stack) * max_stack)) == NULL) {
+	    if ((stack = (x_fx_t *) realloc (stack, sizeof(*stack) * max_stack)) == NULL) {
 	      fprintf (stderr, "Error, realloc of %zu bytes failed\n", sizeof(*stack) * max_stack);
 	      abort ();
 	    }
@@ -1002,7 +1002,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     /* Insertion of point (-Idiv2, F(-Idiv2)) in sg[0] : an artificial one-point segment. */
     g = compute_f (d, u, (double) -Idiv2);
     g = lg2abs (g, add, scale);
-    sg[0] = (sg_t) { .begin = -Idiv2, .end = -Idiv2, .f_begin = g, .f_end = g };
+    sg[0] = (sg_t) { .begin = -(int)Idiv2, .end = -(int)Idiv2, .f_begin = g, .f_end = g };
     nsg = 1;
     S[-Idiv2] = (uint8_t) g;
 
@@ -1428,20 +1428,21 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
     if (verbose) {
         printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
                "; a1=%" PRId64 "; b1=%" PRId64 "), p=%lu, skew=%f, nb_threads=%d)\n",
-               si->a0, si->b0, si->a1, si->b1, mpz_get_ui(si->doing->p), skewness, nb_threads);
+               si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1,
+               mpz_get_ui(si->doing->p), skewness, nb_threads);
     }
     double maxab1, maxab0;
-    maxab1 = si->b1 * skewness;
-    maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
-    maxab0 = si->b0 * skewness;
-    maxab0 = maxab0 * maxab0 + si->a0 * si->a0;
+    maxab1 = si->qbasis->b1 * skewness;
+    maxab1 = maxab1 * maxab1 + si->qbasis->a1 * si->qbasis->a1;
+    maxab0 = si->qbasis->b0 * skewness;
+    maxab0 = maxab0 * maxab0 + si->qbasis->a0 * si->qbasis->a0;
     if (maxab0 > maxab1) { /* exchange u and v, thus I and J */
-        int64_t oa[2] = { si->a0, si->a1 };
-        int64_t ob[2] = { si->b0, si->b1 };
-        si->a0 = oa[1]; si->a1 = oa[0];
-        si->b0 = ob[1]; si->b1 = ob[0];
+        int64_t oa[2] = { si->qbasis->a0, si->qbasis->a1 };
+        int64_t ob[2] = { si->qbasis->b0, si->qbasis->b1 };
+        si->qbasis->a0 = oa[1]; si->qbasis->a1 = oa[0];
+        si->qbasis->b0 = ob[1]; si->qbasis->b1 = ob[0];
     }
-    maxab1 = MAX(labs(si->a1), labs(si->b1) * skewness);
+    maxab1 = MAX(labs(si->qbasis->a1), labs(si->qbasis->b1) * skewness);
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
@@ -1487,7 +1488,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
 void
 sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
 {
-  int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+  int64_t H[4] = { si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1 };
 
   double step, begin;
   double r, maxlog2;

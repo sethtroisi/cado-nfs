@@ -11,6 +11,7 @@
 #include "ecm/facul.h"
 #include "relation.h"
 #include "las-unsieve.h"
+#include "las-qlattice.h"
 
 /* These must be forward-declared, because the header file below uses
  * them */
@@ -114,15 +115,8 @@ typedef struct sg_s {
 struct sieve_side_info_s {
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
                             at most "bound" on each side */
-    fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
-    struct {
-        factorbase_degn_t * pow2[2];
-        factorbase_degn_t * pow3[2];
-        factorbase_degn_t * td[2];
-        factorbase_degn_t * rs[2];
-        factorbase_degn_t * rest[2];
-    } fb_parts[1];
+    fb_vector<fb_general_entry> *fb_smallsieved;
     struct {
         int pow2[2];
         int pow3[2];
@@ -130,20 +124,12 @@ struct sieve_side_info_s {
         int rs[2];
         int rest[2];
     } fb_parts_x[1];
+    
     /* The reading, mapping or generating the factor base all create the
      * factor base in several pieces: small primes, and large primes split
      * into one piece for each thread.
      */
-    factorbase_degn_t * fb;
-    factorbase_degn_t ** fb_bucket_threads;
-    /* fb_is_mmapped is 1 if the factor memory is created by mmap(), and 0
-       if it is created by malloc() */
-    int fb_is_mmapped;
-    /* log_steps[i] contains the largest integer x <= FBB such that 
-       fb_log(x, scale, 0.) <= i. For i > log_steps_max, log_steps[i] is
-       undefined. */
-    fbprime_t log_steps[256];
-    unsigned char log_steps_max;
+    fb_factorbase * fb;
     /* When threads pick up this sieve_info structure, they should check
      * their bucket allocation */
     double max_bucket_fill_ratio;
@@ -161,7 +147,7 @@ struct sieve_side_info_s {
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
     unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
     root_ptr roots;     /* F, F', F" and maybe F'" - cf las-norms.c,init_norms */
-			    
+
     /* This updated by applying the special-q lattice transform to the
      * factor base. */
     small_sieve_data_t ssd[1];
@@ -197,7 +183,7 @@ struct sieve_info_s {
     // description of the q-lattice. The values here should remain
     // compatible with those in ->conf (this concerns notably the bit
     // size as well as the special-q side).
-    int64_t a0, b0, a1, b1;
+    qlattice_basis_t qbasis;
 
     // parameters for bucket sieving
     uint32_t nb_buckets; /* Actual number of buckets used by current special-q */
@@ -276,10 +262,8 @@ struct thread_side_data_s {
   m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
   k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
   bucket_array_t BA;    /* Always used */
-  factorbase_degn_t *fb_bucket; /* copied from sieve_info. Keep ? XXX */
+  fb_part *fb;
   // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
-  const fbprime_t *log_steps;
-  unsigned char log_steps_max;
   
   /* For small sieve */
   int * ssdpos;
@@ -317,6 +301,7 @@ struct where_am_I_s {
 #ifdef TRACK_CODE_PATH
     fbprime_t p;        /* current prime or prime power, when applicable */
     fbprime_t r;        /* current root */
+    prime_hint_t h;     /* Prime hint, if not decoded yet */
     int fb_idx;         /* index into the factor base si->sides[side]->fb
                            or into th->sides[side]->fb_bucket */
     unsigned int j;     /* row number in bucket */
