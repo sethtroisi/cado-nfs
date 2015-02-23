@@ -26,4 +26,5 @@ build_and_run_test(test_modul_poly.c "utils;tests")
 build_and_run_test(test_modredcul_batchinv.c "utils;tests")
 build_and_run_test(test_modredcul_batchinv_ul.c "utils;tests")
 build_and_run_test(test_dllist.c "tests")
+build_test(test_verbose test_verbose.c "utils;tests") # Should be run under Helgrind or other thread checkers
 build_test(test_modredc2ul2_Q_to_Fp test_modredc2ul2_Q_to_Fp.c "utils;tests")

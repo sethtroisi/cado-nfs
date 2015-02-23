@@ -753,6 +753,7 @@ tests/utils/test_intinv.c
 tests/utils/test_modredcul_batchinv.c
 tests/utils/test_modredcul_batchinv_ul.c
 tests/utils/test_dllist.c
+tests/utils/test_verbose.c
 tests/utils/test_modredc2ul2_Q_to_Fp.c
 tests/test_iter.c
 tests/test_iter.h
