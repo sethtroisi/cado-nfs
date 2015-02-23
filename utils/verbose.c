@@ -11,6 +11,9 @@
 
 /* Mutex for verbose_output_*() functions */
 static pthread_mutex_t io_mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
+static pthread_cond_t io_cond[1] = {PTHREAD_COND_INITIALIZER};
+static int batch_locked = 0;
+static pthread_t batch_owner;
 
 const char * verbose_flag_list[] = 
 {
@@ -142,6 +145,63 @@ int verbose_printf(int flag, const char * fmt, ...)
     return rc;
 }
 
+
+/* Lock the output system for exclusive use for a while.
+   Useful for, e.g., printing lines with multiple calls, or multiple
+   consecutive lines, through multiple verbose_output_*() calls. */
+
+/* Blocks until no other thread is in the monitor and
+   no other thread holds a batch lock */
+static int
+monitor_enter()
+{
+    if (pthread_mutex_lock(io_mutex) != 0)
+        return 1;
+    while (batch_locked && batch_owner != pthread_self()) {
+        /* Queue this thread as waiting for the condition variable, release
+           the mutex and put thread to sleep */
+        if (pthread_cond_wait(io_cond, io_mutex) != 0)
+          return 1; /* Should we unlock first? */
+    }
+    /* Now we own the mutex and no other thread holds the batch lock */
+    return 0;
+}
+
+static int
+monitor_leave()
+{
+    return pthread_mutex_unlock(io_mutex);
+}
+
+int
+verbose_output_start_batch()
+{
+    if (monitor_enter() != 0)
+        return 1;
+    batch_locked = 1;
+    batch_owner = pthread_self();
+    if (monitor_leave() != 0)
+        return 1;
+    return 0;
+}
+
+/* Unlock the output system again. Only the locking thread may call it. */
+
+int
+verbose_output_end_batch()
+{
+    if (monitor_enter() != 0)
+        return 1;
+    ASSERT_ALWAYS(batch_locked);
+    ASSERT_ALWAYS(batch_owner == pthread_self());
+    batch_locked = 0;
+    if (pthread_cond_signal(io_cond) != 0)
+        return 1;
+    if (monitor_leave() != 0)
+        return 1;
+    return 0;
+}
+
 /*
   The program can initialise zero or more "channels".
   To each "channel", zero or more "outputs" (FILE handles) can be attached,
@@ -238,7 +298,7 @@ static struct outputs_s *_channel_outputs = NULL;
 int
 verbose_output_init(const size_t nr_channels)
 {
-    if (pthread_mutex_lock(io_mutex) != 0)
+    if (monitor_enter() != 0)
         return 0;
     _channel_outputs = (struct outputs_s *) malloc(nr_channels * sizeof(struct outputs_s));
     if (_channel_outputs == NULL) {
@@ -248,7 +308,7 @@ verbose_output_init(const size_t nr_channels)
     _nr_channels = nr_channels;
     for (size_t i = 0; i < nr_channels; i++)
         init_output(&_channel_outputs[i]);
-    if (pthread_mutex_unlock(io_mutex) != 0)
+    if (monitor_leave() != 0)
         return 0;
     return 1;
 }
@@ -258,14 +318,14 @@ verbose_output_init(const size_t nr_channels)
 int
 verbose_output_clear()
 {
-    if (pthread_mutex_lock(io_mutex) != 0)
+    if (monitor_enter() != 0)
         return 0;
     for (size_t i = 0; i < _nr_channels; i++)
         clear_output(&_channel_outputs[i]);
     free(_channel_outputs);
     _nr_channels = 0;
     _channel_outputs = NULL;
-    if (pthread_mutex_unlock(io_mutex) != 0)
+    if (monitor_leave() != 0)
         return 0;
     return 1;
 }
@@ -274,11 +334,11 @@ verbose_output_clear()
 int
 verbose_output_add(const size_t channel, FILE * const out, const int verbose)
 {
-    if (pthread_mutex_lock(io_mutex) != 0)
+    if (monitor_enter() != 0)
         return 0;
     ASSERT_ALWAYS(channel < _nr_channels);
     int rc = add_output(&_channel_outputs[channel], out, verbose);
-    if (pthread_mutex_unlock(io_mutex) != 0)
+    if (monitor_leave() != 0)
         return 0;
     return rc;
 }
@@ -292,7 +352,7 @@ verbose_output_print(const size_t channel, const int verbose,
     va_list ap;
     int rc = 0;
 
-    if (pthread_mutex_lock(io_mutex) != 0)
+    if (monitor_enter() != 0)
         return -1;
     va_start(ap, fmt);
     if (_channel_outputs == NULL) {
@@ -308,7 +368,7 @@ verbose_output_print(const size_t channel, const int verbose,
                             fmt, ap);
     }
     va_end(ap);
-    if (pthread_mutex_unlock(io_mutex) != 0)
+    if (monitor_leave() != 0)
         return -1;
     return rc;
 }
@@ -330,7 +390,7 @@ verbose_output_print(const size_t channel, const int verbose,
 FILE *
 verbose_output_get(const size_t channel, const int verbose, const size_t index)
 {
-    if (pthread_mutex_lock(io_mutex) != 0)
+    if (monitor_enter() != 0)
         return NULL;
 
     FILE *output = NULL;
@@ -360,7 +420,7 @@ verbose_output_get(const size_t channel, const int verbose, const size_t index)
         }
     }
 
-    if (pthread_mutex_unlock(io_mutex) != 0)
+    if (monitor_leave() != 0)
         return NULL;
     return output;
 }
@@ -380,7 +440,7 @@ verbose_output_vfprint(const size_t channel, const int verbose,
     va_list ap;
     int rc = 0;
 
-    if (pthread_mutex_lock(io_mutex) != 0)
+    if (monitor_enter() != 0)
         return -1;
     va_start(ap, fmt);
     if (_channel_outputs == NULL) {
@@ -396,7 +456,7 @@ verbose_output_vfprint(const size_t channel, const int verbose,
                             ap);
     }
     va_end(ap);
-    if (pthread_mutex_unlock(io_mutex) != 0)
+    if (monitor_leave() != 0)
         return -1;
     return rc;
 }

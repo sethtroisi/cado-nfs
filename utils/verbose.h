@@ -38,6 +38,8 @@ extern int verbose_vfprintf(FILE * f, int flag, const char * fmt, va_list ap);
 extern int verbose_vprintf(int flag, const char * fmt, va_list ap);
 extern int verbose_fprintf(FILE * f, int flag, const char * fmt, ...);
 extern int verbose_printf(int flag, const char * fmt, ...);
+int verbose_output_start_batch();
+int verbose_output_end_batch();
 int verbose_output_init(size_t);
 int verbose_output_clear();
 int verbose_output_add(size_t, FILE *, int);
