@@ -93,7 +93,7 @@ fb_general_entry::fb_general_entry (const fb_entry_x_roots<Nr_roots> &e) {
   p = q = e.p;
   k = 1;
   invq = e.invq;
-  for (int i = 0; i < Nr_roots; i++) {
+  for (int i = 0; i != Nr_roots; i++) {
     /* Use simple constructor for root */
     roots[i] = e.roots[i];
   }
@@ -106,7 +106,7 @@ bool
 fb_general_entry::is_simple() const
 {
   bool is_simple = (k == 1);
-  for (unsigned char i = 0; i < nr_roots; i++) {
+  for (unsigned char i = 0; i != nr_roots; i++) {
     is_simple &= roots[i].is_simple();
   }
   return is_simple;
@@ -247,7 +247,7 @@ void
 fb_general_entry::fprint(FILE *out) const
 {
   fprintf(out, "%" FBPRIME_FORMAT ": ", q);
-  for (unsigned char i_root = 0; i_root < nr_roots; i_root++) {
+  for (unsigned char i_root = 0; i_root != nr_roots; i_root++) {
     roots[i_root].fprint(out, q);
     if (i_root + 1 < nr_roots)
       fprintf(out, ",");
@@ -275,7 +275,7 @@ fb_general_entry::transform_roots(fb_general_entry::transformed_entry_t &result,
   result.k = k;
   result.nr_roots = nr_roots;
   /* TODO: Use batch-inversion here */
-  for (unsigned char i_root = 0; i_root < nr_roots; i_root++)
+  for (unsigned char i_root = 0; i_root != nr_roots; i_root++)
     roots[i_root].transform(result.roots[i_root], q, invq, basis);
 }
 
@@ -286,7 +286,7 @@ fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transfor
 {
   result.p = p;
   /* TODO: Use batch-inversion here */
-  for (unsigned char i_root = 0; i_root < nr_roots; i_root++) {
+  for (unsigned char i_root = 0; i_root != nr_roots; i_root++) {
     const unsigned long long t = fb_root_in_qlattice(p, roots[i_root], invq, basis);
     result.proj[i_root] = (t >= p);
     result.roots[i_root] = (t < p) ? t : (t - p);
@@ -299,7 +299,7 @@ void
 fb_entry_x_roots<Nr_roots>::fprint(FILE *out) const
 {
   fprintf(out, "%" FBPRIME_FORMAT ": ", p);
-  for (int i = 0; i < Nr_roots; i++) {
+  for (int i = 0; i != Nr_roots; i++) {
     fprintf(out, "%" FBROOT_FORMAT "%s", roots[i],
 	    (i + 1 < Nr_roots) ? "," : "");
   }
@@ -353,7 +353,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(qlattice_basis_srcptr basis, const i
   size_t i_entry = 0;
   for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
     it->transform_roots(transformed, basis);
-    for (unsigned char i_root = 0; i_root < transformed.nr_roots; i_root++) {
+    for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);
       const bool proj = transformed.get_proj(i_root);
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
