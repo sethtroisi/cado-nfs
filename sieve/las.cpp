@@ -876,10 +876,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             sc->sides[side]->powlim = sc->bucket_thresh - 1;
             verbose_output_print(0, 1, "# Using default value of %lu for -%s\n",
                      sc->sides[side]->powlim, powlim_params[side]);
-        } else if (sc->sides[side]->powlim >= sc->bucket_thresh) {
-            sc->sides[side]->powlim = sc->bucket_thresh - 1;
-            verbose_output_print(0, 1, "# -%s reduced to %lu\n",
-                    powlim_params[side], sc->sides[side]->powlim);
         }
     }
 
