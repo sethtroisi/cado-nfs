@@ -1008,7 +1008,8 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     /* Insertion of point (-Idiv2, F(-Idiv2)) in sg[0] : an artificial one-point segment. */
     g = compute_f (d, u, (double) -Idiv2);
     g = lg2abs (g, add, scale);
-    sg[0] = (sg_t) { .begin = -(int)Idiv2, .end = -(int)Idiv2, .f_begin = g, .f_end = g };
+    sg[0].begin   = sg[0].end = -(int)Idiv2;
+    sg[0].f_begin = sg[0].f_end = g;
     nsg = 1;
     S[-Idiv2] = (uint8_t) g;
 
