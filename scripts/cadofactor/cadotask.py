@@ -4436,7 +4436,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         return "Server Launcher"
     @property
     def paramnames(self):
-        return {"name": str, "workdir": None, "address": None, "port": 8001,
+        return {"name": str, "workdir": None, "address": None, "port": 0,
                 "threaded": False, "ssl": True, "whitelist": None,
                 "only_registered": True, "forgetport": False}
     @property
