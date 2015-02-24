@@ -333,7 +333,7 @@ fill_in_buckets(thread_data_ptr th, const int side,
   // caller of dispatch_fb).
   
   /* Write new set of pointers for the new slice */
-  bucket_add_slice_index(&BA, slice_index);
+  BA.add_slice_index(slice_index);
 
   for (fb_transformed_vector::const_iterator pl_it = transformed_vector->begin();
        pl_it != transformed_vector->end(); pl_it++) {

@@ -68,18 +68,18 @@ re_init_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t
 }
 
 static void
-init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t max_slice_index, bucket_array_t *BA)
+init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t prealloc_slices, bucket_array_t *BA)
 {
   BA->n_bucket = n_bucket;
   BA->bucket_size = size_bucket;
   BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
   BA->nr_slices = 0;
-  BA->max_slice_index = max_slice_index;
+  BA->alloc_slices = prealloc_slices;
   BA->bucket_write = (bucket_update_t **) malloc_pagealigned (BA->size_b_align);
   BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
   BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->slice_index = (slice_index_t  *) malloc_check (BA->max_slice_index * sizeof(slice_index_t));
-  BA->slice_start = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->max_slice_index, 0x40);
+  BA->slice_index = (slice_index_t  *) malloc_check (BA->alloc_slices * sizeof(slice_index_t));
+  BA->slice_start = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->alloc_slices, 0x40);
 }
 
 /* This function is called only in the one pass sort in big buckets sieve.
@@ -87,9 +87,9 @@ init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, co
    in the corresponding fb_iterators.
  */
 static void
-init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t max_slice_index, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
+init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t prealloc_slices, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
-  init_bucket_array_common(n_bucket, size_bucket, max_slice_index, BA);
+  init_bucket_array_common(n_bucket, size_bucket, prealloc_slices, BA);
   BA->big_size = BA->n_bucket * BA->bucket_size * sizeof(bucket_update_t);
 
   verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %" PRIu64 " update entries of %zu bytes each\n",
@@ -114,15 +114,15 @@ init_k_bucket_array_common(bucket_array_t *BA, k_bucket_array_t *kBA)
   kBA->size_b_align = (sizeof(void *) * kBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
   kBA->bucket_write = (k_bucket_update_t **) malloc_pagealigned (kBA->size_b_align);
   kBA->bucket_start = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align, 0x40);
-  kBA->logp_idx = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align * BA->max_slice_index, 0x40);
+  kBA->logp_idx = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align * BA->alloc_slices, 0x40);
 }
 
 /* This function is called only in the two passes sort in big buckets sieve.
  */
 static void 
-init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
+init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t nr_slices, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
-  init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
+  init_bucket_array_common(n_bucket, size_bucket, nr_slices, BA);
   init_k_bucket_array_common(BA, kBA);
   
   BA->big_size = kBA->bucket_size * (kBA->n_bucket * sizeof(k_bucket_update_t) + sizeof(bucket_update_t));
@@ -148,9 +148,9 @@ init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const u
 /* This function is called only in the three passes sort in big buckets sieve.
  */
 static void
-init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
+init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t nr_slices, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
-  init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
+  init_bucket_array_common(n_bucket, size_bucket, nr_slices, BA);
   init_k_bucket_array_common(BA, kBA);
   
   mBA->n_bucket = (kBA->n_bucket >> 8) + ((unsigned char) kBA->n_bucket != 0 ? 1 : 0); 
@@ -162,7 +162,7 @@ init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const u
   mBA->size_b_align = (sizeof(void *) * mBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
   mBA->bucket_write = (m_bucket_update_t **) malloc_pagealigned (mBA->size_b_align);
   mBA->bucket_start = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align, 0x40);
-  mBA->logp_idx = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align * BA->max_slice_index, 0x40);
+  mBA->logp_idx = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align * BA->alloc_slices, 0x40);
 
   BA->big_size = mBA->bucket_size * (mBA->n_bucket * sizeof(m_bucket_update_t) + sizeof(k_bucket_update_t)) + kBA->bucket_size * sizeof(bucket_update_t);
 
@@ -207,11 +207,11 @@ init_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA,
       clear_buckets(BA, kBA, mBA);
     /* We (re)create the buckets */
     if (nb_buckets < THRESHOLD_K_BUCKETS) {
-      init_bucket_array   (nb_buckets, bucket_size, 255, BA, kBA, mBA);
+      init_bucket_array   (nb_buckets, bucket_size, BA->initial_slice_alloc, BA, kBA, mBA);
     } else if (nb_buckets < THRESHOLD_M_BUCKETS) {
-      init_k_bucket_array (nb_buckets, bucket_size, 255, BA, kBA, mBA);
+      init_k_bucket_array (nb_buckets, bucket_size, BA->initial_slice_alloc, BA, kBA, mBA);
     } else {
-      init_m_bucket_array (nb_buckets, bucket_size, 255, BA, kBA, mBA);
+      init_m_bucket_array (nb_buckets, bucket_size, BA->initial_slice_alloc, BA, kBA, mBA);
     }
   }
 }
@@ -240,6 +240,23 @@ clear_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
   free_pagealigned(BA->bucket_write);
   memset(BA, 0, sizeof(*BA));
 }
+
+
+void bucket_array_t::realloc_slice_start(const size_t extra_space)
+{
+  const size_t old_nr_entries = alloc_slices;
+  alloc_slices += extra_space;
+  verbose_output_print(0, 3, "# Reallocating BA->slice_start from %zu entries to %zu entries\n",
+                       nr_slices, old_nr_entries);
+
+  const size_t old_size = size_b_align * old_nr_entries;
+  const size_t new_size = size_b_align * alloc_slices;
+  slice_start = (bucket_update_t **) realloc_aligned(slice_start, old_size, new_size, 0x40);
+  ASSERT_ALWAYS(slice_start != NULL);
+  slice_index = (slice_index_t *) realloc(slice_index, alloc_slices * sizeof(slice_index_t));
+  ASSERT_ALWAYS(slice_index != NULL);
+}
+
 
 /* Returns how full the fullest bucket is */
 double
