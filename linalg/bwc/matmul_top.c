@@ -92,7 +92,7 @@
 #ifdef  ALWAYS_ALIGN_LARGE_MALLOCS
 #include "memory.h"       /* malloc/free_aligned are in utils */
 #define alignable_malloc(s)  malloc_aligned((s), ALWAYS_ALIGN_LARGE_MALLOCS)
-#define alignable_free(p,s)  free_aligned((p), ALWAYS_ALIGN_LARGE_MALLOCS)
+#define alignable_free(p,s)  free_aligned(p)
 #else
 #define alignable_malloc(s)  malloc((s))
 #define alignable_free(p,s)  free((p))

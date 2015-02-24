@@ -149,7 +149,7 @@ void tune_las_memset()
         verbose_output_print(0, 2, "# rep-stosq / movntps cutoff: %zu(0x%zx)\n",
                 max_cache, max_cache);
     }
-    free_aligned(S, nmax + 0x40);
+    free_aligned(S);
 }
 
 #else /* defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET) */

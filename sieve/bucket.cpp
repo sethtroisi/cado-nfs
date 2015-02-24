@@ -221,22 +221,22 @@ void
 clear_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
   /* Never free mBA->bucket_start[0]. This is done by free BA->bucket_start[0] */
-  if (mBA->logp_idx) free_aligned(mBA->logp_idx, 0x40);
+  if (mBA->logp_idx) free_aligned(mBA->logp_idx);
   if (mBA->bucket_write) free_pagealigned(mBA->bucket_write);
-  if (mBA->bucket_start) free_aligned(mBA->bucket_start, 0x40);
+  if (mBA->bucket_start) free_aligned(mBA->bucket_start);
   memset(mBA, 0, sizeof(*mBA));
 
   /* Never free kBA->bucket_start[0]. This is done by free BA->bucket_start[0] */
-  if (kBA->logp_idx) free_aligned(kBA->logp_idx, 0x40);
+  if (kBA->logp_idx) free_aligned(kBA->logp_idx);
   if (kBA->bucket_write) free_pagealigned(kBA->bucket_write);
-  if (kBA->bucket_start) free_aligned(kBA->bucket_start, 0x40);
+  if (kBA->bucket_start) free_aligned(kBA->bucket_start);
   memset(kBA, 0, sizeof(*kBA));
 
   physical_free (BA->bucket_start[0], BA->big_size); /* Always = big_data in all BA, kBA, mBA init functions */
   free (BA->slice_index);
-  free_aligned(BA->slice_start, 0x40);
-  free_aligned(BA->bucket_read, 0x40);
-  free_aligned(BA->bucket_start, 0x40);
+  free_aligned(BA->slice_start);
+  free_aligned(BA->bucket_read);
+  free_aligned(BA->bucket_start);
   free_pagealigned(BA->bucket_write);
   memset(BA, 0, sizeof(*BA));
 }

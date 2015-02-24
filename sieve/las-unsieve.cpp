@@ -65,7 +65,7 @@ init_unsieve_data(uint32_t I)
 void clear_unsieve_data(unsieve_aux_data_srcptr us)
 {
   free (us->entries);
-  free_aligned (us, 16);
+  free_aligned (us);
 }
 
 static inline void

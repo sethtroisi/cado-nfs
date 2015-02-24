@@ -131,7 +131,7 @@ free_hugepages(const void *m, const size_t size MAYBE_UNUSED)
     dllist_ptr node = dll_find (malloced_regions, (void *) m);
     if (node != NULL) {
       dll_delete(node);
-      free_aligned(m, LARGE_PAGE_SIZE);
+      free_aligned(m);
       return;
     }
   }
@@ -197,17 +197,15 @@ void *malloc_aligned(size_t size, size_t alignment)
 #endif
 }
 
-void free_aligned(const void * p, size_t alignment MAYBE_UNUSED)
+void free_aligned(const void * p)
 {
 #ifdef HAVE_POSIX_MEMALIGN
     free((void *) p);
 #else
     const char * res = (const char *) p;
-    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
     size_t displ;
     memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
     res -= displ;
-    ASSERT_ALWAYS((displ + (uintptr_t) res) % alignment == 0);
     res -= sizeof(size_t);
     free((void *)res);
 #endif
@@ -236,7 +234,7 @@ void *malloc_pagealigned(size_t sz)
 
 void free_pagealigned(const void * p)
 {
-    free_aligned(p, pagesize ());
+    free_aligned(p);
 }
 
 /* Functions for allocating contiguous physical memory, if huge pages are available.
