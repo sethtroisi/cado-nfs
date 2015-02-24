@@ -55,7 +55,8 @@ tasks.filter.merge.forbw = 3
 
 tasks.linalg.bwc.interval = 100
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.m = 64
+tasks.linalg.bwc.n = 64
 tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
