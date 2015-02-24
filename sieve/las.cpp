@@ -485,7 +485,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	  si->sides[side]->strategy = NULL;
 	//}}
 
-        sieve_info_print_fb_statistics(las, si, side);
         /* init_norms (si, side); */ /* only depends on scale, logmax, lognorm_table */
 
         /* The strategies also depend on the special-q used within the
