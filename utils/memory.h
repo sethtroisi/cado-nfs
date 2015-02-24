@@ -14,6 +14,8 @@ extern void physical_free(const void *, size_t);
 void *malloc_hugepages(size_t);
 extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);
+void * realloc_aligned(void * p, const size_t old_size, const size_t new_size,
+                       const size_t alignment);
 extern void free_aligned(const void * ptr);
 
 extern void * malloc_pagealigned(size_t sz);

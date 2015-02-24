@@ -197,6 +197,42 @@ void *malloc_aligned(size_t size, size_t alignment)
 #endif
 }
 
+/* Reallocate aligned memory.
+   p must have been allocated via malloc_aligned() or realloc_aligned().
+   old_size must be equal to the size parameter of malloc_aligned(), or
+   to the new_size parameter of realloc_aligned(), respectively. */
+
+void *
+realloc_aligned(void * p, const size_t old_size, const size_t new_size,
+                const size_t alignment)
+{
+#ifdef HAVE_POSIX_MEMALIGN
+  /*  Alas, there is no posix_realloc_aligned(). Try to realloc(); if it
+      happens to result in the desired alignment, there is nothing left
+      to do. If it does not result in the desired alignment, then we
+      actually do two data copies: one as part of realloc(), and another
+      below. Let's hope this happens kinda rarely. */
+  p = realloc(p, new_size);
+  if (((uintptr_t) p) % alignment == 0) {
+    return p;
+  }
+#else
+  /* Without posix_memalign(), we always alloc/copy/free */
+#endif
+  /* We did not get the desired alignment, or we don't have posix_memalign().
+     Allocate new memory with the desired alignment and copy the data */
+  void * const alloc_p = malloc_aligned(new_size, alignment);
+  memcpy(alloc_p, p, MIN(old_size, new_size));
+  /* If we have posix_memalign(), then maybe_aligned_p was allocated by
+     realloc() and can be freed with free(), which is what free_aligned()
+     does. If we don't have posix_memalign(), then maybe_aligned_p = p
+     which was allocated by malloc_aligned(), so using free_aligned() is
+     correct again. */
+  free_aligned(p);
+  return alloc_p;
+}
+
+
 void free_aligned(const void * p)
 {
 #ifdef HAVE_POSIX_MEMALIGN
