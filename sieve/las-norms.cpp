@@ -362,8 +362,10 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
   if (degree) {
     /* The roots of F are inserted in roots */
     n = numberOfRealRoots (p, degree, max_abs_root, 0, Roots);
-    for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
-	.derivate = 0, .value = rootRefine (&(Roots[k]), p, degree, precision) } );
+    for (k = n; k--; ) {
+        roots[k + cumul_nroots].derivate = 0;
+        roots[k + cumul_nroots].value = rootRefine (&(Roots[k]), p, degree, precision);
+    }
     cumul_nroots += n;
 
     /* Computation of F' */
@@ -373,8 +375,10 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     /* The roots of F' are inserted in roots */
     for (k = df->deg + 1; k--; mpz_set_d (p[k], df->coeff[k]));
     n = numberOfRealRoots (p, df->deg, max_abs_root, 0, Roots);
-    for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
-	.derivate = 1, .value = rootRefine (&(Roots[k]), p, df->deg, precision) } );
+    for (k = n; k--; ) {
+        roots[k + cumul_nroots].derivate = 1;
+        roots[k + cumul_nroots].value = rootRefine (&(Roots[k]), p, df->deg, precision);
+    }
     cumul_nroots += n;
 
     /* Computation of F" */
@@ -390,8 +394,10 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     /* The roots of F" are inserted in roots */
     for (k = d2f->deg + 1; k--; mpz_set_d (p[k], d2f->coeff[k]));
     n = numberOfRealRoots (p, d2f->deg, max_abs_root, 0, Roots);
-    for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
-	.derivate = 2, .value = rootRefine (&(Roots[k]), p, d2f->deg, precision) } );
+    for (k = n; k--; ) {
+        roots[k + cumul_nroots].derivate = 2;
+        roots[k + cumul_nroots].value = rootRefine (&(Roots[k]), p, d2f->deg, precision);
+    }
     cumul_nroots += n;
 
     /* Clear double poly */
