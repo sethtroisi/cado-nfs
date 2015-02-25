@@ -2738,8 +2738,11 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (!allow_largesq) {
             if ((int)mpz_sizeinbase(si->doing->p, 2) >
                     si->conf->sides[si->conf->side]->lpb) {
-                fprintf(stderr, "ERROR: The special q is larger than the "
-                        "large prime bound.\n");
+                fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
+                        "large prime bound on %s side (%d bits).\n",
+                        (int)mpz_sizeinbase(si->doing->p, 2),
+                        sidenames[si->conf->side],
+                        si->conf->sides[si->conf->side]->lpb);
                 fprintf(stderr, "       You can disable this check with "
                         "the -allow-largesq argument,\n");
                 fprintf(stderr, "       It is for instance useful for the "
