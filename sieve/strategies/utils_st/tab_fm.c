@@ -160,7 +160,7 @@ static int is_elem(const char c)
     return (c >= 48 && c <= 57) || c == '|';
 }
 
-static void next_elem(FILE * file, char *current_char)
+static void next_elem(FILE * file, int *current_char)
 {
     //end the current element
     while (*current_char != EOF && is_elem(*current_char))
@@ -173,7 +173,7 @@ static void next_elem(FILE * file, char *current_char)
     fseek(file, -1, SEEK_CUR);
 }
 
-static fm_t *sub_routine_fm_fscanf(FILE * file, char *current_char)
+static fm_t *sub_routine_fm_fscanf(FILE * file, int *current_char)
 {
     fm_t *fm = fm_create();
 
@@ -222,7 +222,7 @@ tabular_fm_t* tabular_fm_fscan(FILE * file)
     if (file == NULL)
 	return NULL;
     tabular_fm_t * res = tabular_fm_create ();
-    char current_char = fgetc(file);
+    int current_char = fgetc(file);
     fseek(file, -1, SEEK_CUR);
     while (current_char != EOF) {
 	fm_t *fm = sub_routine_fm_fscanf(file, &current_char);
