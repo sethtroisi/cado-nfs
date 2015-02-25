@@ -247,20 +247,6 @@ void free_aligned(const void * p)
 #endif
 }
 
-long pagesize (void)
-{
-#if defined(_WIN32) || defined(_WIN64)
-  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
-  SYSTEM_INFO si;
-  GetSystemInfo(&si);
-  return si.dwPageSize;
-#elif defined(HAVE_SYSCONF)
-  return sysconf (_SC_PAGESIZE);
-#else
-  #error "Cannot determine page size"
-#endif
-}
-
 void *malloc_pagealigned(size_t sz)
 {
     void *p = malloc_aligned (sz, pagesize ());

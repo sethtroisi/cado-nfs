@@ -296,4 +296,21 @@ static inline char __cdecl
 }
 #endif
 
+#if defined(HAVE_SYSCONF)
+#include <unistd.h>
+#endif
+static inline long pagesize ()
+{
+#if defined(_WIN32) || defined(_WIN64)
+  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return si.dwPageSize;
+#elif defined(HAVE_SYSCONF)
+  return sysconf (_SC_PAGESIZE);
+#else
+  #error "Cannot determine page size"
+#endif
+}
+
 #endif /* ifndef CADO_PORTABILITY_H_ */
