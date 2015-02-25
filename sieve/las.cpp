@@ -32,6 +32,7 @@
 #include "las-descent-helpers.h"
 #include "las-cofactor.h"
 #include "las-fill-in-buckets.h"
+#include "memusage.h"
 
 #ifdef HAVE_SSE41
 /* #define SSE_SURVIVOR_SEARCH 1 */
@@ -2935,9 +2936,12 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
+    verbose_output_print (2, 1, "# PeakMemusage (MB) = %ld \n",
+            PeakMemusage() >> 10);
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) nr_sq_processed);
+
 
     /*}}}*/
 
