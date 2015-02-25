@@ -241,8 +241,9 @@ public:
 /* Stores info containing the complete prime instead of only the low 16 bits */
 
 class bucket_primes_t : public bucket_single<bucket_prime_t> {
+    typedef bucket_single<bucket_prime_t> super;
 public:  
-  bucket_primes_t (const size_t size) : bucket_single(size){}
+  bucket_primes_t (const size_t size) : super(size){}
   ~bucket_primes_t(){}
   void purge (const bucket_array_t BA, 
           int i, const fb_part *fb, const unsigned char *S);
@@ -251,8 +252,9 @@ public:
 /* Stores info containing both slice index and offset instead of only the offset */
 
 class bucket_array_complete : public bucket_single<bucket_complete_update_t> {
+    typedef bucket_single<bucket_complete_update_t> super;
 public:  
-  bucket_array_complete (const size_t size) : bucket_single(size){}
+  bucket_array_complete (const size_t size) : super(size){}
   ~bucket_array_complete(){}
   void purge (const bucket_array_t BA, int i, const unsigned char *S);
 };
