@@ -621,7 +621,7 @@ read_strip_comment (char *const line)
    opened, or memory allocation failed)
 */
 
-void
+int
 fb_factorbase::read(const char * const filename)
 {
   fb_general_entry fb_cur, fb_last;
@@ -639,7 +639,7 @@ fb_factorbase::read(const char * const filename)
   if (fbfile == NULL) {
     verbose_output_print (1, 0, "# Could not open file %s for reading\n",
         filename);
-    return;
+    return 0;
   }
   
   while (!feof(fbfile)) {
@@ -680,7 +680,7 @@ fb_factorbase::read(const char * const filename)
   fclose_maybe_compressed (fbfile, filename);
   
   finalize();
-  return;
+  return 1;
 }
 
 /* Return p^e. Trivial exponentiation for small e, no check for overflow */

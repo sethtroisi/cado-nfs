@@ -170,7 +170,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
             verbose_output_print(0, 1, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             tfb = seconds () - tfb;
-            sis->fb->read(fbfilename);
+            if (!sis->fb->read(fbfilename))
+                exit(EXIT_FAILURE);
             verbose_output_print(0, 1,
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
                     sidenames[side],
