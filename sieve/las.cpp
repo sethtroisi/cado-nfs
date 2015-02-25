@@ -1598,7 +1598,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
    bucket regions per thread. Thus the checksums are not necessarily
    comparable between runs with different numbers of threads. */
 
-static const unsigned int checksum_prime = 4294967291; /* < 2^32 */
+static const unsigned int checksum_prime = 4294967291u; /* < 2^32 */
 
 /* Combine two checksums. Simply (checksum+checksum2) % checksum_prime,
    but using modul_*() to handle sums >= 2^32 correctly. */
@@ -2756,8 +2756,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
 #ifndef SUPPORT_LARGE_Q
-        if (si->qbasis->a0 <= -2147483648L || 2147483648L <= si->qbasis->a0 ||
-            si->qbasis->a1 <= -2147483648L || 2147483648L <= si->qbasis->a1)
+        if (si->qbasis->a0 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis->a0 ||
+            si->qbasis->a1 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis->a1)
           {
             fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q. Skipping this special-q.\n");
             continue;
