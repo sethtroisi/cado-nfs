@@ -13,7 +13,7 @@
 #ifdef HAVE_LINUX_BINFMTS_H
 /* linux/binfmts.h defines MAX_ARG_STRLEN in terms of PAGE_SIZE, but does not
    include a header where PAGE_SIZE is defined, so we include sys/user.h
-   as well. */
+   as well. Alas, on some systems, PAGE_SIZE is not defined even there. */
 #include <sys/user.h>
 #include <linux/binfmts.h>
 #endif
@@ -47,6 +47,11 @@ long get_arg_max(void)
      "sh" "-c" "actual_command", this limit is effectively the limit on the
      command line length. */
 #ifdef MAX_ARG_STRLEN
+  /* MAX_ARG_STRLEN may be defined in terms of PAGE_SIZE, but PAGE_SIZE may
+     not actually be defined in any header.  */
+#ifndef PAGE_SIZE
+  const unsigned int PAGE_SIZE = pagesize();
+#endif
   if ((size_t) arg_max > (size_t) MAX_ARG_STRLEN)
     arg_max = MAX_ARG_STRLEN;
 #endif
