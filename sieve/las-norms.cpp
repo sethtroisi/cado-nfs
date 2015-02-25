@@ -236,7 +236,7 @@ MAYBE_UNUSED static inline void w64lg2abs(double i, double add, double scale, ui
 #endif
 }
 
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#if defined(HAVE_SSE2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 /* This function is for the SSE2 init algebraics.
    I prefer use X86 ASM directly and avoid intrinsics because the trick of
    cvtdq2pd (I insert 2 doubles values and do a cvtdq2pd on them in order to
@@ -284,7 +284,7 @@ static inline __m128i _mm_lg2abs(__m128d *i, const __m128d add, const __m128d sc
 	   : "+&x"(*i));
   return *(__m128i *) i;
 }
-#endif /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+#endif  /* defined(HAVE_SSE2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) */
 
 static inline double compute_f (const unsigned int d, const double *u, const double h) {
   size_t k = (size_t) d;
@@ -687,14 +687,14 @@ poly_scale_double (double  *u, const double *t, unsigned int d, const double h)
   for (double hpow = h; d--; hpow *= h) u[d] = t[d] * hpow;
 }
 
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#if defined(HAVE_SSE2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 static inline void
 poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
 {
   u[d] = _mm_set1_pd (t[d]);
   for (double hpow = h; d--; hpow *= h) u[d] = _mm_set1_pd (t[d] * hpow);
 }
-#endif
+#endif  /* defined(HAVE_SSE2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) */
 
 /* Exact initialisation of F(i,j) with degre >= 2 (not mandatory). Slow.
    Internal function, only with simple types, for unit/integration testing. */
