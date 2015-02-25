@@ -3879,7 +3879,8 @@ class LinAlgDLPTask(Task):
             nmaps = self.send_request(Request.GET_NMAPS)
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir,
-                                 mn = nmaps[0] + nmaps[1],
+                                 m = nmaps[0] + nmaps[1],
+                                 n = nmaps[0] + nmaps[1],
                                  prime=self.send_request(Request.GET_ELL),
                                  rhs=smfile,
                                  mm_impl="basicp",
