@@ -299,6 +299,10 @@ static inline char __cdecl
 #if defined(HAVE_SYSCONF)
 #include <unistd.h>
 #endif
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#endif
 static inline long pagesize ()
 {
 #if defined(_WIN32) || defined(_WIN64)
