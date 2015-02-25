@@ -157,7 +157,7 @@ monitor_enter()
 {
     if (pthread_mutex_lock(io_mutex) != 0)
         return 1;
-    while (batch_locked && batch_owner != pthread_self()) {
+    while (batch_locked && !pthread_equal(batch_owner, pthread_self())) {
         /* Queue this thread as waiting for the condition variable, release
            the mutex and put thread to sleep */
         if (pthread_cond_wait(io_cond, io_mutex) != 0)
@@ -193,7 +193,7 @@ verbose_output_end_batch()
     if (monitor_enter() != 0)
         return 1;
     ASSERT_ALWAYS(batch_locked);
-    ASSERT_ALWAYS(batch_owner == pthread_self());
+    ASSERT_ALWAYS(pthread_equal(batch_owner, pthread_self()));
     batch_locked = 0;
     if (pthread_cond_signal(io_cond) != 0)
         return 1;
