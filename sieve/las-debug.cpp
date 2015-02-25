@@ -1,8 +1,5 @@
 #include "cado.h"
 
-#define __STDC_LIMIT_MACROS
-#define __STDC_FORMAT_MACROS
-
 #include <limits.h>
 #include <inttypes.h>
 #include <string.h>
