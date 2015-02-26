@@ -200,7 +200,8 @@ void *malloc_aligned(size_t size, size_t alignment)
 /* Reallocate aligned memory.
    p must have been allocated via malloc_aligned() or realloc_aligned().
    old_size must be equal to the size parameter of malloc_aligned(), or
-   to the new_size parameter of realloc_aligned(), respectively. */
+   to the new_size parameter of realloc_aligned(), of the function that
+   allocated p. */
 
 void *
 realloc_aligned(void * p, const size_t old_size, const size_t new_size,
@@ -223,11 +224,10 @@ realloc_aligned(void * p, const size_t old_size, const size_t new_size,
      Allocate new memory with the desired alignment and copy the data */
   void * const alloc_p = malloc_aligned(new_size, alignment);
   memcpy(alloc_p, p, MIN(old_size, new_size));
-  /* If we have posix_memalign(), then maybe_aligned_p was allocated by
-     realloc() and can be freed with free(), which is what free_aligned()
-     does. If we don't have posix_memalign(), then maybe_aligned_p = p
-     which was allocated by malloc_aligned(), so using free_aligned() is
-     correct again. */
+  /* If we have posix_memalign(), then p was allocated by realloc() and can be
+     freed with free(), which is what free_aligned() does. If we don't have
+     posix_memalign(), then p was allocated by malloc_aligned() or
+     realloc_aligned(), so using free_aligned() is correct again. */
   free_aligned(p);
   return alloc_p;
 }
