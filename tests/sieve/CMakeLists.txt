@@ -33,9 +33,9 @@ SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS "F9_sievetest_cleanup;F9_ma
 # again.
 add_test(F9_sievetest_unsieve1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -unsievethresh 1")
 SET_TESTS_PROPERTIES(F9_sievetest_unsieve1 PROPERTIES DEPENDS F9_sievetest)
-add_test(F9_kbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+add_test(F9_kbucket_test bash -c "env EXPECTED_FAIL=1 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
 SET_TESTS_PROPERTIES(F9_kbucket_test PROPERTIES DEPENDS F9_sievetest WILL_FAIL True)
-add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+add_test(F9_mbucket_test bash -c "env EXPECTED_FAIL=1 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
 SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest WILL_FAIL True)
 add_test(F9_cofactest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.cofactest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -file-cofact \"${CADO_NFS_SOURCE_DIR}/params/F9.st\"")
 SET_TESTS_PROPERTIES(F9_cofactest PROPERTIES DEPENDS F9_sievetest)
