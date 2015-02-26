@@ -306,6 +306,22 @@ fb_entry_x_roots<Nr_roots>::fprint(FILE *out) const
   fprintf(out, "\n");
 }
 
+/* workaround for compiler bug. gcc-4.2.1 on openbsd 5.3 does not seem to
+ * accept the access to foo.nr_roots when nr_roots is in fact a static
+ * const member. That's a pity, really. I think the code below is
+ * innocuous performance-wise. */
+template <class FB_ENTRY_TYPE>
+struct get_nroots {
+    FB_ENTRY_TYPE const & r;
+    get_nroots(FB_ENTRY_TYPE const & r) : r(r) {}
+    inline unsigned char operator()() const { return r.nr_roots; }
+};
+
+template <int n>
+struct get_nroots<fb_entry_x_roots<n> > {
+    get_nroots(fb_entry_x_roots<n> const &) {}
+    inline unsigned char operator()() const { return fb_entry_x_roots<n>::nr_roots; }
+};
 
 template <class FB_ENTRY_TYPE>
 void
@@ -316,8 +332,15 @@ fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double
   double w = 0.;
   size_t nr = 0;
   for (size_t i = 0; i < this->size(); i++) {
-    nr += (*this)[i].nr_roots;
-    w += (double) (*this)[i].nr_roots / (double) (*this)[i].get_q();
+#if 0
+      /* see compiler bug section above... */
+      unsigned char nr_i = (*this)[i].nr_roots;
+#else
+      /* use workaround */
+      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>((*this)[i])();
+#endif
+      nr += nr_i;
+      w += (double) nr_i / (double) (*this)[i].get_q();
   }
   if (nroots != NULL)
     *nroots += nr;
