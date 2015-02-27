@@ -43,6 +43,8 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
     d->w[0] = 0UL; /* DIV would cause quotient overflow */
   else
     ularith_div_2ul_ul_ul_r (&(d->w[0]), 0UL, 1UL, p);
+  /* Warning: the array d->w[] has size TRIALDIV_MAXLEN-1, not
+   * TRIALDIV_MAXLEN (see definition of trialdiv_divisor_t) */
   for (i = 1; i < TRIALDIV_MAXLEN-1; i++)
     ularith_div_2ul_ul_ul_r (&(d->w[i]), 0UL, d->w[i - 1], p);
 #endif
