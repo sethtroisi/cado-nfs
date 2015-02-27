@@ -113,7 +113,7 @@ is_number (const char c)
 }
 
 static void
-next_number (FILE* file, char* current_char)
+next_number (FILE* file, int* current_char)
 {
   //end the current number
   while (is_number (*current_char))
@@ -138,7 +138,7 @@ tabular_strategy_fscan (FILE* file)
   tabular_strategy_t* tab = tabular_strategy_create ();
 
   //collect data
-  char current_char = fgetc (file);
+  int current_char = fgetc (file);
   int side;
 
   while (current_char != EOF)

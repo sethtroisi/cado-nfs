@@ -131,7 +131,7 @@ free_hugepages(const void *m, const size_t size MAYBE_UNUSED)
     dllist_ptr node = dll_find (malloced_regions, (void *) m);
     if (node != NULL) {
       dll_delete(node);
-      free_aligned(m, LARGE_PAGE_SIZE);
+      free_aligned(m);
       return;
     }
   }
@@ -197,33 +197,53 @@ void *malloc_aligned(size_t size, size_t alignment)
 #endif
 }
 
-void free_aligned(const void * p, size_t alignment MAYBE_UNUSED)
+/* Reallocate aligned memory.
+   p must have been allocated via malloc_aligned() or realloc_aligned().
+   old_size must be equal to the size parameter of malloc_aligned(), or
+   to the new_size parameter of realloc_aligned(), of the function that
+   allocated p. */
+
+void *
+realloc_aligned(void * p, const size_t old_size, const size_t new_size,
+                const size_t alignment)
+{
+#ifdef HAVE_POSIX_MEMALIGN
+  /*  Alas, there is no posix_realloc_aligned(). Try to realloc(); if it
+      happens to result in the desired alignment, there is nothing left
+      to do. If it does not result in the desired alignment, then we
+      actually do two data copies: one as part of realloc(), and another
+      below. Let's hope this happens kinda rarely. */
+  p = realloc(p, new_size);
+  if (((uintptr_t) p) % alignment == 0) {
+    return p;
+  }
+#else
+  /* Without posix_memalign(), we always alloc/copy/free */
+#endif
+  /* We did not get the desired alignment, or we don't have posix_memalign().
+     Allocate new memory with the desired alignment and copy the data */
+  void * const alloc_p = malloc_aligned(new_size, alignment);
+  memcpy(alloc_p, p, MIN(old_size, new_size));
+  /* If we have posix_memalign(), then p was allocated by realloc() and can be
+     freed with free(), which is what free_aligned() does. If we don't have
+     posix_memalign(), then p was allocated by malloc_aligned() or
+     realloc_aligned(), so using free_aligned() is correct again. */
+  free_aligned(p);
+  return alloc_p;
+}
+
+
+void free_aligned(const void * p)
 {
 #ifdef HAVE_POSIX_MEMALIGN
     free((void *) p);
 #else
     const char * res = (const char *) p;
-    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
     size_t displ;
     memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
     res -= displ;
-    ASSERT_ALWAYS((displ + (uintptr_t) res) % alignment == 0);
     res -= sizeof(size_t);
     free((void *)res);
-#endif
-}
-
-long pagesize (void)
-{
-#if defined(_WIN32) || defined(_WIN64)
-  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
-  SYSTEM_INFO si;
-  GetSystemInfo(&si);
-  return si.dwPageSize;
-#elif defined(HAVE_SYSCONF)
-  return sysconf (_SC_PAGESIZE);
-#else
-  #error "Cannot determine page size"
 #endif
 }
 
@@ -236,7 +256,7 @@ void *malloc_pagealigned(size_t sz)
 
 void free_pagealigned(const void * p)
 {
-    free_aligned(p, pagesize ());
+    free_aligned(p);
 }
 
 /* Functions for allocating contiguous physical memory, if huge pages are available.

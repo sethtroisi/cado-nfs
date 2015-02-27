@@ -26,6 +26,7 @@ static const double smart_err_max[(MAX_SMART_ERR<<1)+1] = {
   1.,
   .25, 0.022, 0.00003, 1E-8, 1E-10 };
 
+#include "cado.h"
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -53,9 +54,9 @@ main(int argc, const char *argv[]) {
   size_t l, logI, k, d;
   uint32_t J, beginJ, endJ;
   double scale, log2max, h, g;
-  unsigned char *S1 = malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), 
-    *S2 = malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN),
-    *S3 = malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), *cS3;
+  unsigned char *S1 = (unsigned char *) malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN),
+    *S2 = (unsigned char *) malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN),
+    *S3 = (unsigned char *) malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), *cS3;
   double_poly_t poly;
   unsigned long long count, smart_err[(MAX_SMART_ERR<<1)+1], exact_err[(MAX_EXACT_ERR<<1)+1];
   unsigned long iter = NB_TESTS;

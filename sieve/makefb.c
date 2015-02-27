@@ -451,6 +451,7 @@ static void declare_usage(param_list pl)
             RATIONAL_SIDE, ALGEBRAIC_SIDE, ALGEBRAIC_SIDE);
     param_list_decl_usage(pl, "side", str);
     param_list_decl_usage(pl, "t", "number of threads");
+    verbose_decl_usage(pl);
 }
 
 int
@@ -486,6 +487,8 @@ main (int argc, char *argv[])
       param_list_print_usage(pl, argv0, stderr);
       exit (EXIT_FAILURE);
   }
+  verbose_interpret_parameters(pl);
+  param_list_print_command_line(stdout, pl);
 
   const char * filename;
   if ((filename = param_list_lookup_string(pl, "poly")) == NULL) {
@@ -530,6 +533,8 @@ main (int argc, char *argv[])
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
+
+  param_list_warn_unused(pl);
 
   // TODO: clean this; we keep the first lines for compatibility reasons
   if (side == ALGEBRAIC_SIDE)

@@ -26,18 +26,17 @@ add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \
 # We have to make this a "test" so that ctest runs it, even though it does
 # not actually test anything
 add_test(F9_sievetest_cleanup "${CMAKE_COMMAND}" -E remove -f "${CMAKE_CURRENT_BINARY_DIR}/F9.checksums")
-SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS F9_sievetest_cleanup)
-SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS F9_makefbtest)
+SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS "F9_sievetest_cleanup;F9_makefbtest")
 
 # We make these depend on sievetest, for checking the checksum file.
 # Since sievetest depends on makefbtest, we don't have to specify it
 # again.
 add_test(F9_sievetest_unsieve1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -unsievethresh 1")
 SET_TESTS_PROPERTIES(F9_sievetest_unsieve1 PROPERTIES DEPENDS F9_sievetest)
-add_test(F9_kbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
-SET_TESTS_PROPERTIES(F9_kbucket_test PROPERTIES DEPENDS F9_sievetest)
-add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
-SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest)
+add_test(F9_kbucket_test bash -c "env EXPECTED_FAIL=1 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+SET_TESTS_PROPERTIES(F9_kbucket_test PROPERTIES DEPENDS F9_sievetest WILL_FAIL True)
+add_test(F9_mbucket_test bash -c "env EXPECTED_FAIL=1 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest WILL_FAIL True)
 add_test(F9_cofactest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.cofactest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -file-cofact \"${CADO_NFS_SOURCE_DIR}/params/F9.st\"")
 SET_TESTS_PROPERTIES(F9_cofactest PROPERTIES DEPENDS F9_sievetest)
 
@@ -57,7 +56,7 @@ add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trial
 target_link_libraries(test_trialdiv utils tests)
 run_test(test_trialdiv test_trialdiv)
 
-add_executable(test_memset_things test_memset_things.c)
+add_executable(test_memset_things test_memset_things.cpp)
 target_link_libraries(test_memset_things las-norms utils)
 add_dependencies(check test_memset_things)
 run_test(test_memset_things test_memset_things)
@@ -70,7 +69,7 @@ macro (add_trialdiv_test MAXLEN)
 endmacro(add_trialdiv_test)
 
 macro (add_init_norms_bucket_region)
-  add_executable(test_init_norms_bucket_region test_init_norms_bucket_region.c )
+  add_executable(test_init_norms_bucket_region test_init_norms_bucket_region.cpp )
   set_property(TARGET test_init_norms_bucket_region PROPERTY COMPILE_DEFINITIONS)
   target_link_libraries(test_init_norms_bucket_region las-norms utils tests)
   run_test(test_init_norms_bucket_region test_init_norms_bucket_region)
@@ -86,7 +85,7 @@ add_trialdiv_test(6)
 
 add_init_norms_bucket_region()
 
-add_executable(test_fb_make_step test_fb_make_step.c "${CADO_NFS_SOURCE_DIR}/sieve/fb.c")
+add_executable(test_fb_make_step test_fb_make_step.c "${CADO_NFS_SOURCE_DIR}/sieve/fb.cpp")
 target_link_libraries(test_fb_make_step utils tests)
 
 add_subdirectory (ecm)

@@ -6,8 +6,8 @@
 void las_report_init(las_report_ptr p)
 {
     memset(p, 0, sizeof(las_report));
-    p->report_sizes = malloc(sizeof(unsigned long) << 16);
-    p->survivor_sizes = malloc(sizeof(unsigned long) << 16);
+    p->report_sizes = (long unsigned int (*)[256]) malloc(sizeof(unsigned long) << 16);
+    p->survivor_sizes = (long unsigned int (*)[256]) malloc(sizeof(unsigned long) << 16);
 }
 
 void las_report_clear(las_report_ptr p)

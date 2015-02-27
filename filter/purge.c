@@ -570,10 +570,10 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   while (pt > pth->clique_graph)
     *nrels -= delete_connected_component_nopth (pth, (--pt)->i, nprimes);
   
-  fprintf(stdout, "    deleted %lu heavier connected components at %2.2lf\n",
+  fprintf(stdout, "    deleted %zu heavier connected components at %2.2lf\n",
 	  pth->size_clique_graph, seconds());
 #if DEBUG >= 1
-  fprintf(stdout, "    DEBUG: nb heaviest cliques=%lu chunk=%u target=%u\n",
+  fprintf(stdout, "    DEBUG: nb heaviest cliques=%zu chunk=%u target=%u\n",
 	  pth->size_clique_graph, chunk, target_excess);
 #endif
   // We could suppress pth[0] and pth itself

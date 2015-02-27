@@ -25,7 +25,7 @@ unsieve_aux_data_srcptr
 init_unsieve_data(uint32_t I)
 {
   unsieve_aux_data_ptr us;
-  us = malloc_aligned(sizeof(unsieve_aux_data), 16);
+  us = (unsieve_aux_data_ptr) malloc_aligned(sizeof(unsieve_aux_data), 16);
   /* Store largest prime factor of k in us->lpf[k], 0 for k=0, 1 for k=1 */
   us->entries = (unsieve_entry_t *) malloc (sizeof (unsieve_entry_t) * I);
   FATAL_ERROR_CHECK(us->entries == NULL, "malloc failed");
@@ -65,7 +65,7 @@ init_unsieve_data(uint32_t I)
 void clear_unsieve_data(unsieve_aux_data_srcptr us)
 {
   free (us->entries);
-  free_aligned (us, 16);
+  free_aligned (us);
 }
 
 static inline void
@@ -94,7 +94,7 @@ unsieve_3(unsigned char *line_start, const unsigned int start_idx,
   const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i, pattern_idx;
   unsieve_pattern_t p0, p1, p2;
-  unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
+  unsieve_pattern_t * ul_line_start = (unsieve_pattern_t *) line_start;
 
   if (sizeof(unsieve_pattern_t) == 4) {
     /* -4^(-1) == 2 (mod 3) */
@@ -135,7 +135,7 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
   const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i;
   unsieve_pattern_t p0, p1, p2, p3, p4;
-  unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
+  unsieve_pattern_t * ul_line_start = (unsieve_pattern_t *) line_start;
   size_t pattern_idx;
 
   if (sizeof(unsieve_pattern_t) == 4) {
@@ -184,7 +184,7 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
   const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i;
   unsieve_pattern_t p0, p1, p2, p3, p4, p5, p6;
-  unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
+  unsieve_pattern_t * ul_line_start = (unsieve_pattern_t *) line_start;
   size_t pattern_idx;
 
   if (sizeof(unsieve_pattern_t) == 4) {
@@ -236,7 +236,7 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
 
 
 static void
-unsieve_not_coprime_line(unsigned char * restrict line_start,
+unsieve_not_coprime_line(unsigned char * line_start,
                          const unsigned int j, const unsigned int min_p,
                          const unsigned int I, unsieve_aux_data_srcptr us)
 {
@@ -364,8 +364,8 @@ sieve_info_test_lognorm (const unsigned char C1, const unsigned char C2,
 
 #ifdef HAVE_SSE2
 static inline int 
-sieve_info_test_lognorm_sse2(__m128i * restrict S0, const __m128i pattern0,
-                             const __m128i *restrict S1, const __m128i pattern1)
+sieve_info_test_lognorm_sse2(__m128i * S0, const __m128i pattern0,
+                             const __m128i *S1, const __m128i pattern1)
 {
     const __m128i zero = _mm_set1_epi8(0);
     const __m128i ff = _mm_set1_epi8(0xff);
@@ -426,7 +426,7 @@ sieve_info_test_lognorm_sse2(__m128i * restrict S0, const __m128i pattern0,
    divisibility of the resulting i value by the trial-divided primes.
    Return the number of survivors found. */
 static inline int
-search_single_survivors(unsigned char * const restrict SS[2],
+search_single_survivors(unsigned char * const SS[2],
         const unsigned char bound[2] MAYBE_UNUSED, const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED,
         const int x_start, const int x_step, const unsigned int nr_div,
@@ -489,7 +489,7 @@ search_single_survivors(unsigned char * const restrict SS[2],
 
 /* This function works for all j */
 static int
-search_survivors_in_line1(unsigned char * const restrict SS[2],
+search_survivors_in_line1(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
         const unsigned int td_max)
@@ -545,7 +545,7 @@ search_survivors_in_line1(unsigned char * const restrict SS[2],
    i-coordinates with i % 3 == 0 are set to a bound of 0. */
 #ifdef HAVE_SSE2
 int
-search_survivors_in_line3(unsigned char * const restrict SS[2], 
+search_survivors_in_line3(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
         const unsigned int td_max)
@@ -610,10 +610,10 @@ search_survivors_in_line3(unsigned char * const restrict SS[2],
    pattern where i-coordinates with i % 5 == 0 are set to a bound of 0,
    and trial divies only by primes > 5. */
 int
-search_survivors_in_line5(unsigned char * const restrict SS[2], 
+search_survivors_in_line5(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, 
-        j_div_srcptr restrict j_div, const unsigned int td_max)
+        j_div_srcptr j_div, const unsigned int td_max)
 {
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
     const int nr_patterns = 5;
@@ -676,7 +676,7 @@ search_survivors_in_line5(unsigned char * const restrict SS[2],
 #define USE_PATTERN_5 1
 
 int
-search_survivors_in_line(unsigned char * const restrict SS[2], 
+search_survivors_in_line(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N, j_div_srcptr j_div,
         const unsigned int td_max, unsieve_aux_data_srcptr us)

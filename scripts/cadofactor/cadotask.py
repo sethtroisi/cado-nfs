@@ -2417,10 +2417,11 @@ class FreeRelTask(Task):
             self.progparams[0].setdefault("addfullcol", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"]) and
-        # the lpba value used in self.state["lpba"]
+        # the lpba/lpbr values used in self.state["lpba"] / ["lpbr"]
         if "freerelfilename" in self.state:
             assert "poly" in self.state
             assert "lpba" in self.state
+            assert "lpbr" in self.state
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
@@ -2442,17 +2443,19 @@ class FreeRelTask(Task):
                 self.logger.warn("Received different polynomial, discarding "
                                  "old free relations file")
                 discard = True
-            elif self.state["lpba"] != self.progparams[0]["lpba"]:
-                self.logger.warn("Parameter lpba changed, discarding old free "
-                                 "relations file")
+            elif self.state["lpba"] != self.progparams[0]["lpba"] or \
+                 self.state["lpbr"] != self.progparams[0]["lpbr"]:
+                self.logger.warn("Parameter lpba/lpbr changed, discarding old "
+                                 "free relations file")
                 discard = True
             if discard:
                 del(self.state["freerelfilename"])
                 del(self.state["renumberfilename"])
         # If outputfile is not in state, because we never produced it or because
-        # input parameters changed, we remember our currnet input parameters
+        # input parameters changed, we remember our current input parameters
         if not "freerelfilename" in self.state:
-            self.state.update({"poly": str(poly), "lpba": self.progparams[0]["lpba"]})
+            self.state.update({"poly": str(poly), "lpba": self.progparams[0]["lpba"],
+                               "lpbr": self.progparams[0]["lpbr"]})
 
         if not "freerelfilename" in self.state or self.have_new_input_files():
             # Make file name for factor base/free relations file
@@ -3876,7 +3879,8 @@ class LinAlgDLPTask(Task):
             nmaps = self.send_request(Request.GET_NMAPS)
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir,
-                                 mn = nmaps[0] + nmaps[1],
+                                 m = nmaps[0] + nmaps[1],
+                                 n = nmaps[0] + nmaps[1],
                                  prime=self.send_request(Request.GET_ELL),
                                  rhs=smfile,
                                  mm_impl="basicp",
@@ -4433,7 +4437,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         return "Server Launcher"
     @property
     def paramnames(self):
-        return {"name": str, "workdir": None, "address": None, "port": 8001,
+        return {"name": str, "workdir": None, "address": None, "port": 0,
                 "threaded": False, "ssl": True, "whitelist": None,
                 "only_registered": True, "forgetport": False}
     @property

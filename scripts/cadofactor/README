@@ -123,6 +123,10 @@ without Murphy E, use "tasks.polyselect.import", and not "import_ropt".
 Importing relations
 ===================
 
+Important: when importing relations, it is assumed one also imports the
+corresponding polynomial (a few relations from each file will be checked
+against that polynomial). If no polynomial is imported, anything can happen.
+
 If you want to import already computed relations, use:
 
 tasks.sieve.import=foo
