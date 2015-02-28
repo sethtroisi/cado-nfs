@@ -19,7 +19,7 @@ set(las_kbucket_path    ${CADO_NFS_BINARY_DIR}/sieve/las_kbucket)
 set(las_mbucket_path    ${CADO_NFS_BINARY_DIR}/sieve/las_mbucket)
 
 set(F9_roots "${CMAKE_CURRENT_BINARY_DIR}/F9.roots")
-add_test(F9_makefbtest "${makefb_path}" -poly "${CADO_NFS_SOURCE_DIR}/params/F9.poly" -alim 2300000 -maxbits 10 -out "${F9_roots}")
+add_test(F9_makefbtest "${makefb_path}" -poly "${CADO_NFS_SOURCE_DIR}/params/F9.poly" -alim 1200000 -maxbits 10 -out "${F9_roots}")
 
 add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
 # Before running F9_sievetest, remove the file with the captured checksums
