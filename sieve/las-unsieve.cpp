@@ -156,8 +156,13 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
   p3 = us->pattern5[(pattern_idx + 3) % 5];
   p4 = us->pattern5[(pattern_idx + 4) % 5];
 
-  ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
-  
+  if (start_idx < sizeof(p0)) {
+      ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
+  } else {
+      ASSERT_ALWAYS(start_idx < 2 * sizeof(p0));
+      ASSERT_ALWAYS(((unsigned char *)&p1)[start_idx - sizeof(p0)] == 255);
+  }
+
   /* Apply pattern to array */
   for (i = 0U; i < I_upt - 4U; i += 5U)
     {
@@ -207,8 +212,13 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
   p5 = us->pattern7[(pattern_idx + 5) % 7];
   p6 = us->pattern7[(pattern_idx + 6) % 7];
 
-  ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
-  
+  if (start_idx < sizeof(p0)) {
+      ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
+  } else {
+      ASSERT_ALWAYS(start_idx < 2 * sizeof(p0));
+      ASSERT_ALWAYS(((unsigned char *)&p1)[start_idx - sizeof(p0)] == 255);
+  }
+
   /* Apply pattern to array */
   for (i = 0U; i < I_upt - 6U; i += 7U)
     {
