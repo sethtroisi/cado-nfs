@@ -1461,7 +1461,7 @@ static long nr_wrap_was_composite = 0;
 /* The entries in BP must be sorted in order of increasing x */
 static void
 divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
-                           bucket_primes_t *BP)
+                           bucket_primes_t *BP, const int very_verbose)
 {
   while (!BP->is_end()) {
       const bucket_prime_t prime = BP->get_next_update();
@@ -1473,6 +1473,11 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
       if (prime.x == x) {
           if (bucket_prime_stats) nr_bucket_primes++;
           const unsigned long p = prime.p;
+          if (very_verbose) {
+              verbose_output_vfprint(0, 1, gmp_vfprintf,
+                                     "# N = %u, x = %d, dividing out prime hint p = %lu, norm = %Zd\n",
+                                     N, x, p, norm);
+          }
           if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
               verbose_output_print(1, 0,
                        "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
@@ -1491,7 +1496,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
 /* The entries in BP must be sorted in order of increasing x */
 static void
 divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
-                          bucket_array_complete *purged, const fb_factorbase *fb)
+                          bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
 {
   while (!purged->is_end()) {
       const bucket_complete_update_t complete_hint = purged->get_next_update();
@@ -1505,6 +1510,11 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
           const fb_slice_interface *slice = fb->get_slice(complete_hint.index);
           ASSERT_ALWAYS(slice != NULL);
           const unsigned long p = slice->get_prime(complete_hint.hint);
+          if (very_verbose) {
+              verbose_output_vfprint(0, 1, gmp_vfprintf,
+                                     "# N = %d, x = %d, dividing out slice hint, slice index = %lu, slice offset = %lu, p = %lu, norm = %Zd\n",
+                                     N, x, (unsigned long) complete_hint.index, (unsigned long) complete_hint.hint, p, norm);
+          }
           if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
               verbose_output_print(1, 0,
                        "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
@@ -1525,15 +1535,21 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
            const bool handle_2, bucket_primes_t *primes,
            bucket_array_complete *purged,
 	   trialdiv_divisor_t *trialdiv_data,
-           int64_t a MAYBE_UNUSED, uint64_t b MAYBE_UNUSED,
+           int64_t a, uint64_t b,
            const fb_factorbase *fb)
 {
+#ifdef TRACE_K
+    const int trial_div_very_verbose = trace_on_spot_ab(a,b);
+#else
     const int trial_div_very_verbose = 0;
+#endif
     int nr_factors;
     fl->n = 0; /* reset factor list */
 
-    if (trial_div_very_verbose)
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "# trial_div() entry, x = %d, norm = %Zd\n", x, norm);
+    if (trial_div_very_verbose) {
+        verbose_output_start_batch();
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = %Zd\n", N, x, a, b, norm);
+    }
 
     // handle 2 separately, if it is in fb
     if (handle_2) {
@@ -1544,23 +1560,15 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
             fl->n++;
         }
         if (trial_div_very_verbose)
-            verbose_output_vfprint(1, 0, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
     }
 
     // remove primes in "primes" that map to x
-    divide_primes_from_bucket (fl, norm, N, x, primes);
-    divide_hints_from_bucket (fl, norm, N, x, purged, fb);
-#ifdef TRACE_K /* {{{ */
-    if (trace_on_spot_ab(a,b) && fl->n) {
-        verbose_output_print(1, 0, "# divided by 2 + primes from bucket that map to %u: ", x);
-        if (!factor_list_fprint(stderr, *fl))
-            verbose_output_print(1, 0, "(none)");
-        verbose_output_vfprint(1, 0, gmp_vfprintf, ", remaining norm is %Zd\n", norm);
-    }
-#endif /* }}} */
+    divide_primes_from_bucket (fl, norm, N, x, primes, trial_div_very_verbose);
+    divide_hints_from_bucket (fl, norm, N, x, purged, fb, trial_div_very_verbose);
     if (trial_div_very_verbose)
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
 
     do {
       /* Trial divide primes with precomputed tables */
@@ -1568,11 +1576,10 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       int i;
       unsigned long factors[TRIALDIV_MAX_FACTORS];
       if (trial_div_very_verbose) {
-          /* FIXME: Multi-threading can garble this */
-          verbose_output_print(1, 0, "# Trial division by ");
+          verbose_output_print(0, 1, "# Trial division by");
           for (i = 0; trialdiv_data[i].p != 1; i++)
-              verbose_output_print(1, 0, " %lu", trialdiv_data[i].p);
-          verbose_output_print(1, 0, "\n");
+              verbose_output_print(0, 1, " %lu", trialdiv_data[i].p);
+          verbose_output_print(0, 1, "\n");
       }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, TRIALDIV_MAX_FACTORS);
@@ -1580,12 +1587,16 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       for (i = 0; i < MIN(nr_factors, TRIALDIV_MAX_FACTORS); i++)
       {
           if (trial_div_very_verbose)
-              verbose_output_print (1, 0, " %lu", factors[i]);
+              verbose_output_print (0, 1, " %lu", factors[i]);
           factor_list_add (fl, factors[i]);
       }
-      if (trial_div_very_verbose)
-          verbose_output_vfprint(1, 0, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
+      if (trial_div_very_verbose) {
+          verbose_output_vfprint(0, 1, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
+      }
     } while (nr_factors == TRIALDIV_MAX_FACTORS + 1);
+
+    if (trial_div_very_verbose)
+        verbose_output_end_batch();
 }
 /* }}} */
 
