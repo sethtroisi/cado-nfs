@@ -291,9 +291,9 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
 
     for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++)
     {
-        size_t nr_primes;
+        size_t nr_primes, nr_roots;
         double weight;
-        s->fb->get_part(i_part)->count_entries(&nr_primes, NULL, &weight);
+        s->fb->get_part(i_part)->count_entries(&nr_primes, &nr_roots, &weight);
         /* Part 0 gets line-sieved and thus should not be taken into
            consideration for the bucket size */
         if (i_part > 0)
@@ -301,6 +301,8 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
         if (nr_primes != 0 || weight != 0.) {
             verbose_output_print(0, 1, "# Number of primes in %s factor base part %d = %zu\n",
                                  sidenames[side], i_part, nr_primes);
+            verbose_output_print(0, 1, "# Number of prime ideals in %s factor base part %d = %zu\n",
+                                 sidenames[side], i_part, nr_roots);
             verbose_output_print(0, 1, "# Weight of primes in %s factor base part %d = %0.5g\n",
                                  sidenames[side], i_part, weight);
         }
