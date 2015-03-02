@@ -86,7 +86,7 @@ unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
 
   unsigned int k = i;
   while(k < v->dim) {
-    if (v->c[k] == H->h[k]) {
+    if (v->c[k] == H->h[k] - 1) {
       int64_vector_setcoordinate(v, k, -(int64_t)H->h[k]);
       k++;
     } else {
@@ -100,14 +100,12 @@ unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
 #ifndef NDEBUG
   for (unsigned int j = 0; j < v->dim - 1; j++) {
     tmp = v->c[j];
-    if (tmp < 0) {
-      tmp = -tmp;
-    }
-    ASSERT(tmp <= (int64_t)H->h[j]);
+    ASSERT(tmp >= -(int64_t)H->h[j]);
+    ASSERT(tmp < (int64_t)H->h[j]);
   }
   tmp = v->c[v->dim -1];
   ASSERT(tmp >= 0);
-  ASSERT(tmp <= H->h[v->dim - 1]);
+  ASSERT(tmp < H->h[v->dim - 1]);
 #endif
 
   return k;

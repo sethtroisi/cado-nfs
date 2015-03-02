@@ -33,17 +33,17 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
   ASSERT(v->dim == H->t);
 
   unsigned int k = v->dim - 1;
-  uint64_t prod = number_element / ((uint64_t)H->h[k] + 1);
+  uint64_t prod = number_element / ((uint64_t)H->h[k]);
   uint64_t res = index / prod;
   mpz_vector_setcoordinate_si(v, k, res);
   index = index - res * prod;
   k = k - 1;
-  prod = prod / (2 * H->h[k] + 1);
+  prod = prod / (2 * H->h[k]);
   for ( ; k > 0; k--) {
     res = index / prod;
     mpz_vector_setcoordinate_si(v, k, res - H->h[k]);
     index = index - res * prod;
-    prod = prod / (2 * H->h[k - 1] + 1);
+    prod = prod / (2 * H->h[k - 1]);
   }
   res = index / prod;
   mpz_vector_setcoordinate_si(v, k, res - H->h[k]);
@@ -53,12 +53,12 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
   mpz_init(tmp);
   for (unsigned int i = 0; i < v->dim - 1; i++) {
     mpz_set(tmp, v->c[i]);
-    mpz_abs(tmp, tmp);
-    ASSERT(mpz_cmp_ui(tmp, H->h[i]) <= 0);
+    ASSERT(mpz_cmp_si(tmp, -(int64_t)H->h[i]) >= 0);
+    ASSERT(mpz_cmp_ui(tmp, H->h[i]) < 0);
   }
   mpz_set(tmp, v->c[v->dim - 1]);
   ASSERT(mpz_cmp_ui(tmp, 0) >= 0);
-  ASSERT(mpz_cmp_ui(tmp, H->h[H->t - 1]) <= 0);
+  ASSERT(mpz_cmp_ui(tmp, H->h[H->t - 1]) < 0);
   mpz_clear(tmp);
 #endif
 }
@@ -74,12 +74,12 @@ void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
   mpz_init(tmp);
   for (unsigned int i = 0; i < v->dim - 1; i++) {
     mpz_set(tmp, v->c[i]);
-    mpz_abs(tmp, tmp);
-    ASSERT(mpz_cmp_ui(tmp, H->h[i]) <= 0);
+    ASSERT(mpz_cmp_si(tmp, -(int64_t)H->h[i]) >= 0);
+    ASSERT(mpz_cmp_ui(tmp, H->h[i]) < 0);
   }
   mpz_set(tmp, v->c[v->dim - 1]);
   ASSERT(mpz_cmp_ui(tmp, 0) >= 0);
-  ASSERT(mpz_cmp_ui(tmp, H->h[H->t - 1]) <= 0);
+  ASSERT(mpz_cmp_ui(tmp, H->h[H->t - 1]) < 0);
   mpz_clear(tmp);
 #else
   mpz_t tmp;
@@ -92,11 +92,11 @@ void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
   * index = (uint64_t)(mpz_get_si(tmp) + H->h[k]);
 
   for (k = 1; k < v->dim - 1; k++) {
-    prod = prod * (2 * H->h[k - 1] + 1);
+    prod = prod * (2 * H->h[k - 1]);
     mpz_set(tmp, v->c[k]);
     * index = * index + (uint64_t)(mpz_get_si(tmp) + H->h[k]) * prod;
   }
-  prod = prod * (2 * H->h[k - 1] + 1);
+  prod = prod * (2 * H->h[k - 1]);
   mpz_set(tmp, v->c[k]);
   * index = * index + (uint64_t)(mpz_get_si(tmp)) * prod;
   mpz_clear(tmp);
@@ -113,14 +113,12 @@ void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
   int64_t tmp = 0;
   for (unsigned int i = 0; i < v->dim - 1; i++) {
     tmp = v->c[i];
-    if (tmp < 0) {
-      tmp = -tmp;
-    }
-    ASSERT(tmp <= (int64_t)H->h[i]);
+    ASSERT(tmp >= -(int64_t)H->h[i]);
+    ASSERT(tmp < (int64_t)H->h[i]);
   }
   tmp = v->c[v->dim - 1];
   ASSERT(tmp >= 0);
-  ASSERT(tmp <= (int64_t)H->h[H->t - 1]);
+  ASSERT(tmp < (int64_t)H->h[H->t - 1]);
 #endif
 
   uint64_t prod = 1;
@@ -128,10 +126,10 @@ void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
   * index = (uint64_t)v->c[k] + H->h[k];
 
   for (k = 1; k < v->dim - 1; k++) {
-    prod = prod * (2 * H->h[k - 1] + 1);
+    prod = prod * (2 * H->h[k - 1]);
     * index = * index + ((uint64_t)v->c[k] + H->h[k]) * prod;
   }
-  prod = prod * (2 * H->h[k - 1] + 1);
+  prod = prod * (2 * H->h[k - 1]);
   * index = * index + (uint64_t)(v->c[k]) * prod;
 
   ASSERT(* index < number_element);

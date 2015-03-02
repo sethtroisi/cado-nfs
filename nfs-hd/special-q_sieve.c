@@ -251,7 +251,7 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
   for (unsigned int k = 0; k < beg; k++) {
     for (unsigned int j = 0; j < H->t; j++) {
       int64_t tmp = a->coeff[j];
-      tmp = tmp - matrix->coeff[j + 1][k + 1] * 2 * H->h[j];
+      tmp = tmp - matrix->coeff[j + 1][k + 1] * (2 * H->h[j] - 1);
       int64_poly_setcoeff(a, j, tmp);
     }
   }
@@ -598,7 +598,7 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
   if (i == 0) {
     ASSERT(number_c_l == 1);
   } else {
-    ASSERT(number_c_l % 2 == 1);
+    ASSERT(number_c_l % 2 == 0);
   }
 #endif // NDEBUG
 
@@ -608,7 +608,7 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
   index_old = 0;
 #endif // ASSERT_SIEVE
 
-  if (ci <= (int64_t)H->h[i]) {
+  if (ci < (int64_t)H->h[i]) {
     int64_vector_setcoordinate(c, i, ci);
     array_int64_vector_index(&index, c, H, array->number_element);
     array->array[index] = array->array[index] - ideal->log;
@@ -622,7 +622,7 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
     int64_t tmp = ci;
     tmp = tmp + (int64_t)ideal->ideal->r;
 
-    while(tmp <= (int64_t)H->h[i]) {
+    while(tmp < (int64_t)H->h[i]) {
       index = index + ideal->ideal->r * number_c_l;
 
       array->array[index] = array->array[index] - ideal->log;
@@ -647,7 +647,7 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
   ASSERT(pos >= i);
 
   for (unsigned int j = i + 1; j < pos; j++) {
-    * ci = * ci - ((int64_t)pseudo_Tqr[j] * 2 * (int64_t)H->h[j]);
+    * ci = * ci - ((int64_t)pseudo_Tqr[j] * (2 * (int64_t)H->h[j] - 1));
     if (* ci >= (int64_t)ideal->ideal->r || * ci < 0) {
       * ci = * ci % (int64_t)ideal->ideal->r;
     }
@@ -736,7 +736,6 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
 void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
                      factor_base_srcptr fb, sieving_interval_srcptr H,
                      MAYBE_UNUSED mpz_poly_srcptr f)
-
 {
 #ifdef TIMER_SIEVE
   double time_tqr = 0;
@@ -790,7 +789,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         c0 = c0 + (int64_t)fb->factor_base_1[i]->ideal->r;
       }
       ASSERT(c0 >= 0);
-      uint64_t number_c = array->number_element / (2 * H->h[0] + 1);
+      uint64_t number_c = array->number_element / (2 * H->h[0]);
 
 #ifdef TIMER_SIEVE
       if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
@@ -865,10 +864,10 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         uint64_t number_c_u = array->number_element;
         uint64_t number_c_l = 1;
         for (uint64_t j = 0; j < index; j++) {
-          number_c_u = number_c_u / (2 * H->h[j] + 1);
-          number_c_l = number_c_l * (2 * H->h[j] + 1);
+          number_c_u = number_c_u / (2 * H->h[j]);
+          number_c_l = number_c_l * (2 * H->h[j]);
         }
-        number_c_u = number_c_u / (2 * H->h[index] + 1);
+        number_c_u = number_c_u / (2 * H->h[index]);
 
         unsigned int pos = 0;
         pos = int64_vector_add_one_i(c, index + 1, H);
@@ -1525,6 +1524,21 @@ int main(int argc, char * argv[])
 #endif // TRACE_POS
 
         mat_Z_LLL_transpose(matrix);
+
+        /* /\* */
+        /*   TODO: continue here. */
+        /*   If the last coefficient of the last vector is negative, we do not */
+        /*    sieve in the good direction. We therefore take the opposite vector */
+        /*    because we want that a = MqLLL * c, with c in the sieving region */
+        /*    has the last coordinate positive. */
+        /* *\/ */
+        /* if (mpz_cmp_ui(matrix->coeff[matrix->NumRows] */
+        /*                [matrix->NumCols], 0) < 0) { */
+        /*   for (unsigned int rows = 1; rows <= matrix->NumRows; rows++) { */
+        /*     mpz_mul_si(matrix->coeff[rows][matrix->NumCols], */
+        /*                matrix->coeff[rows][matrix->NumCols], -1); */
+        /*   } */
+        /* } */
 
 #ifdef TRACE_POS
         fprintf(file, "MqLLL:\n");
