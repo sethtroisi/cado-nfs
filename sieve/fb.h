@@ -22,19 +22,7 @@
 #include "fb-types.h"
 #include "las-qlattice.h"
 #include "las-plattice.h"
-
-/* Base class with private copy-constructor and assignment operator.
-   Classes which are not copy-constructible can inherit this with:
-   private NonCopyable */
-class NonCopyable {
- protected:
-   NonCopyable() {}
-   ~NonCopyable() {}
- private:
-   NonCopyable(const NonCopyable&);
-   NonCopyable& operator=(const NonCopyable&);
-};
-
+#include "las-base.hpp"
 
 /* Forward declaration so fb_general_entry can use it in constructors */
 template <int Nr_roots>

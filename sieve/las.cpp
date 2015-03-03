@@ -32,6 +32,7 @@
 #include "las-descent-helpers.h"
 #include "las-cofactor.h"
 #include "las-fill-in-buckets.h"
+#include "las-threads.h"
 #include "memusage.h"
 
 #ifdef HAVE_SSE41
@@ -1295,42 +1296,6 @@ void init_trace_k(sieve_info_srcptr si, param_list pl)
         have_trace_ij ? &ij : NULL);
 }
 
-/* utility. Can go elsewhere */
-void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
-{
-    if (n == 1) {
-        /* Then don't bother with pthread calls */
-        (*f)(thrs[0]);
-        return;
-    }
-    pthread_t * th = (pthread_t *) malloc(n * sizeof(pthread_t)); 
-    ASSERT_ALWAYS(th);
-
-#if 0
-    /* As a debug measure, it's possible to activate this branch instead
-     * of the latter. In effect, this causes las to run in a
-     * non-multithreaded way, albeit strictly following the code path of
-     * the multithreaded case.
-     */
-    for (int i = 0; i < n ; ++i) {
-        (*f)(thrs[i]);
-    }
-#else
-    for (int i = 0; i < n ; ++i) {
-        int ret = pthread_create(&(th[i]), NULL, 
-		(void * (*)(void *)) f,
-                (void *)(thrs[i]));
-        ASSERT_ALWAYS(ret == 0);
-    }
-    for (int i = 0; i < n ; ++i) {
-        int ret = pthread_join(th[i], NULL);
-        ASSERT_ALWAYS(ret == 0);
-    }
-#endif
-
-    free(th);
-}/*}}}*/
-
 /* {{{ apply_buckets */
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
@@ -1654,7 +1619,7 @@ bucket_checksum(const unsigned char *bucket, const unsigned int prev_checksum)
 NOPROFILE_STATIC int
 factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
 {
-    las_info_ptr las = th->las;
+    las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
     las_report_ptr rep = th->rep;
     int cpt = 0;
@@ -2227,7 +2192,7 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
 void * process_bucket_region(thread_data_ptr th)
 {
     where_am_I w MAYBE_UNUSED;
-    las_info_ptr las = th->las;
+    las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
 
     WHERE_AM_I_UPDATE(w, si, si);
@@ -2336,120 +2301,6 @@ void * process_bucket_region(thread_data_ptr th)
     return NULL;
 }/*}}}*/
 
-/* thread handling */
-static thread_data * thread_data_alloc(las_info_ptr las, int n)/*{{{*/
-{
-    thread_data * thrs = (thread_data *) malloc(n * sizeof(thread_data));
-    ASSERT_ALWAYS(thrs);
-    memset(thrs, 0, n * sizeof(thread_data));
-
-    for(int i = 0 ; i < n ; i++) {
-        thrs[i]->id = i;
-        thrs[i]->las = las;
-        las_report_init(thrs[i]->rep);
-        thrs[i]->checksum_post_sieve[0] = thrs[i]->checksum_post_sieve[1] = 0;
-
-        /* Allocate memory for each thread's two bucket regions (one for each
-           side) and for the intermediate sum (only one for both sides) */
-        for (int side = 0; side < 2; side++) {
-          thread_side_data_ptr ts = thrs[i]->sides[side];
-          // printf ("# Allocating thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          ts->bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
-        }
-        thrs[i]->SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
-
-        
-    }
-    return thrs;
-}/*}}}*/
-
-static void thread_data_free(thread_data * thrs, int n)/*{{{*/
-{
-    for (int i = 0; i < n ; ++i) {
-        las_report_clear(thrs[i]->rep);
-        ASSERT_ALWAYS(thrs[i]->SS != NULL);
-
-        /* Free the memory for the bucket regions */
-        for (int side = 0; side < 2; side++) {
-          thread_side_data_ptr ts = thrs[i]->sides[side];
-          // printf ("# Freeing thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          contiguous_free(ts->bucket_region);
-          ts->bucket_region = NULL;
-        }
-        contiguous_free(thrs[i]->SS);
-        thrs[i]->SS = NULL;
-    }
-    free(thrs);
-}/*}}}*/
-
-void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
-{
-    for (int i = 0; i < n ; ++i) {
-        thrs[i]->si = si;
-        for(int s = 0 ; s < 2 ; s++) {
-            thrs[i]->sides[s]->fb = si->sides[s]->fb->get_part(1);
-        }
-    }
-}/*}}}*/
-
-/* {{{ thread_buckets_alloc
- * TODO: Allow allocating larger buckets if bucket_fill_ratio ever grows
- * above the initial guess. This can easily be made a permanent choice.
- *
- * Note also that we could consider having bucket_fill_ratio global.
- */
-static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
-{
-  for (unsigned int i = 0; i < n ; ++i) {
-    for(unsigned int side = 0 ; side < 2 ; side++) {
-      thread_side_data_ptr ts = thrs[i]->sides[side];
-      sieve_info_srcptr si = thrs[i]->si;
-      /* We used to re-allocate whenever the number of buckets changed. Now we
-         always allocate memory for the max. number of buckets, so that we
-         never have to re-allocate */
-      uint32_t nb_buckets;
-      /* If shell environment variable LAS_REALLOC_BUCKETS is *not* set,
-         always allocate memory for the max. number of buckets, so that we
-         never have to re-allocate. If it is set, allocate just enough for
-         for the current number of buckets, which will re-allocate memory
-         if number of buckets changes. */
-      if (getenv("LAS_REALLOC_BUCKETS") == NULL) {
-        nb_buckets = si->nb_buckets_max;
-      } else {
-        nb_buckets = si->nb_buckets;
-      }
-      init_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA),
-                   si->sides[side]->max_bucket_fill_ratio, nb_buckets);
-    }
-  }
-}/*}}}*/
-
-static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
-{
-  for (unsigned int i = 0; i < n ; ++i) {
-    thread_side_data_ptr ts;
-    for(unsigned int side = 0 ; side < 2 ; side++) {
-      // fprintf ("# Freeing buckets, thread->id=%d, side=%d\n", thrs[i]->id, side);
-      ts = thrs[i]->sides[side];
-      /* if there is no special-q in the interval, the arrays are not malloced */
-      if (ts->BA.bucket_write != NULL)
-        clear_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA));
-    }
-  }
-}/*}}}*/
-
-static double thread_buckets_max_full(thread_data * thrs, int n)/*{{{*/
-{
-    double mf0 = 0;
-    for (int i = 0; i < n ; ++i) {
-        double mf = buckets_max_full (thrs[i]->sides[RATIONAL_SIDE]->BA);
-        if (mf > mf0) mf0 = mf;
-        mf = buckets_max_full (thrs[i]->sides[ALGEBRAIC_SIDE]->BA);
-        if (mf > mf0) mf0 = mf;
-    }
-    return mf0;
-}/*}}}*/
-
 /* {{{ las_report_accumulate_threads_and_display
  * This function does three distinct things.
  *  - accumulates the timing reports for all threads into a collated report
@@ -2457,7 +2308,7 @@ static double thread_buckets_max_full(thread_data * thrs, int n)/*{{{*/
  *    timing argument (in seconds).
  *  - merge the per-sq report into a global report
  */
-void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_data * thrs, double qt0)
+void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_data_ptr thrs, double qt0)
 {
     /* Display results for this special q */
     las_report rep;
@@ -2465,9 +2316,9 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     unsigned int checksum_post_sieve[2] = {0, 0};
     
     for (int i = 0; i < las->nb_threads; ++i) {
-        las_report_accumulate(rep, thrs[i]->rep);
+        las_report_accumulate(rep, thrs[i].rep);
         for (int side = 0; side < 2; side++)
-            checksum_post_sieve[side] = combine_checksum(checksum_post_sieve[side], thrs[i]->checksum_post_sieve[side]);
+            checksum_post_sieve[side] = combine_checksum(checksum_post_sieve[side], thrs[i].checksum_post_sieve[side]);
     }
     verbose_output_print(0, 2, "# ");
     /* verbose_output_print(0, 2, "%lu survivors after rational sieve,", rep->survivors0); */
@@ -2664,7 +2515,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     tune_las_memset();
     
-    thread_data * thrs = thread_data_alloc(las, las->nb_threads);
+    thread_data_ptr thrs = thread_data_alloc(las, las->nb_threads);
 
     las_report report;
     las_report_init(report);
@@ -2828,7 +2679,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * las_report_accumulate_threads_and_display further down, hence
          * this hack).
          */
-        thrs[0]->rep->ttbuckets_fill -= seconds();
+        thrs[0].rep->ttbuckets_fill -= seconds();
 
         thread_pickup_si(thrs, si, las->nb_threads);
 
@@ -2869,7 +2720,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif /* }}} */
 
-        thrs[0]->rep->ttbuckets_fill += seconds();
+        thrs[0].rep->ttbuckets_fill += seconds();
 
         /* This can now be factored out ! */
         for(int side = 0 ; side < 2 ; side++) {
@@ -2978,7 +2829,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 	fclose (cof_stats_file);
     }
     //}}
-    thread_data_free(thrs, las->nb_threads);
+    thread_data_free(thrs);
 
     las_report_clear(report);
 
@@ -2988,3 +2839,4 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     return 0;
 }/*}}}*/
+

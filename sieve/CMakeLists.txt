@@ -15,7 +15,7 @@ set (las_sources las.cpp fb.cpp
   las-coordinates.cpp las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.cpp bucket.cpp las-smallsieve.cpp las-unsieve.cpp las-arith.cpp
   las-qlattice.cpp las-descent-helpers.cpp las-cofactor.cpp
-  las-fill-in-buckets.cpp)
+  las-fill-in-buckets.cpp las-threads.cpp)
 # set (las_sources las.cpp las-norms.cpp fb.cpp
 #     las-coordinates.cpp las-debug.cpp las-report-stats.cpp las-duplicate.cpp
 #     las-config.cpp bucket.cpp las-smallsieve.cpp las-unsieve.cpp las-arith.cpp
