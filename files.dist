@@ -1189,3 +1189,7 @@ linalg/bwc/lingen_qcode_do.cpp
 linalg/bwc/lingen_qcode.h
 utils/version_info.h
 utils/version_info.c.in
+sieve/las-base.hpp
+sieve/las-forwardtypes.h
+sieve/las-threads.cpp
+sieve/las-threads.h

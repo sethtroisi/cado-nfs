@@ -17,8 +17,10 @@ thread_side_data_s::~thread_side_data_s()
   bucket_region = NULL;
 }
 
-thread_data_s::thread_data_s() : checksum_post_sieve{0, 0}, is_initialized(false)
+thread_data_s::thread_data_s() : is_initialized(false)
 {
+  checksum_post_sieve[0] = 0;
+  checksum_post_sieve[1] = 0;
   /* Allocate memory for the intermediate sum (only one for both sides) */
   SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
 }
