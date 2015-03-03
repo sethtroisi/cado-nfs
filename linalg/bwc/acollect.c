@@ -158,12 +158,14 @@ int main(int argc, char * argv[])
 
     param_list_clear(pl);
 
+    int rc = 0;
     struct afile_list a[1];
     memset(a,0,sizeof(a));
-    if (read_afiles(a) == 0)
-        return 0;
+    if (read_afiles(a) == 0) {
+        rc = 0;
+        goto paradise;
+    }
 
-    int rc = 0;
 
 
     /* First merge all files we find with similar [n0..n1[ range. Since
@@ -260,8 +262,10 @@ int main(int argc, char * argv[])
     final->j0 = UINT_MAX;
     final->j1 = UINT_MAX;
 
-    if (read_afiles(a) == 0)
-        return 0;
+    if (read_afiles(a) == 0) {
+        rc = 0;
+        goto paradise;
+    }
 
     FILE * f = fopen("A.temp", "wb");
     for(int k0=0, k1 ; k0 < a->n ; k0 = k1) {
@@ -380,6 +384,8 @@ int main(int argc, char * argv[])
         free(tmp);
     }
     free(a->a);
+
+paradise:
     bw_common_clear_new(bw);
 
     return rc;
