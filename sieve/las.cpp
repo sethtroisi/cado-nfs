@@ -1546,7 +1546,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
     if (trial_div_very_verbose) {
         verbose_output_start_batch();
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = %Zd\n", N, x, a, b, norm);
+        verbose_output_vfprint(1, 1, gmp_vfprintf, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = %Zd\n", N, x, a, b, norm);
     }
 
     // handle 2 separately, if it is in fb
@@ -1558,7 +1558,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
             fl->n++;
         }
         if (trial_div_very_verbose)
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
+            verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
     }
 
@@ -1566,7 +1566,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
     divide_primes_from_bucket (fl, norm, N, x, primes, trial_div_very_verbose);
     divide_hints_from_bucket (fl, norm, N, x, purged, fb, trial_div_very_verbose);
     if (trial_div_very_verbose)
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
+        verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
 
     do {
       /* Trial divide primes with precomputed tables */
@@ -1574,10 +1574,10 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       int i;
       unsigned long factors[TRIALDIV_MAX_FACTORS];
       if (trial_div_very_verbose) {
-          verbose_output_print(0, 1, "# Trial division by");
+          verbose_output_print(1, 1, "# Trial division by");
           for (i = 0; trialdiv_data[i].p != 1; i++)
-              verbose_output_print(0, 1, " %lu", trialdiv_data[i].p);
-          verbose_output_print(0, 1, "\n");
+              verbose_output_print(1, 1, " %lu", trialdiv_data[i].p);
+          verbose_output_print(1, 1, "\n# Factors found: ");
       }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, TRIALDIV_MAX_FACTORS);
@@ -1585,11 +1585,11 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       for (i = 0; i < MIN(nr_factors, TRIALDIV_MAX_FACTORS); i++)
       {
           if (trial_div_very_verbose)
-              verbose_output_print (0, 1, " %lu", factors[i]);
+              verbose_output_print (1, 1, " %lu", factors[i]);
           factor_list_add (fl, factors[i]);
       }
       if (trial_div_very_verbose) {
-          verbose_output_vfprint(0, 1, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
+          verbose_output_vfprint(1, 1, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
       }
     } while (nr_factors == TRIALDIV_MAX_FACTORS + 1);
 
