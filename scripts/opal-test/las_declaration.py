@@ -19,6 +19,8 @@ lpbr = Parameter(kind='integer', default=22, bound=(18, 25), name='lpbr', descri
 lpba = Parameter(kind='integer', default=22, bound=(18, 25), name='lpba', description='Large prime bound, algebraic side')
 mfbr = Parameter(kind='integer', default=25, bound=(20, 30), name='mfbr', description='Cofactorization bound, rational side')
 mfba = Parameter(kind='integer', default=25, bound=(20, 30), name='mfba', description='Cofactorization bound, algebraic side')
+ncurves0 = Parameter(kind='integer', default=6, bound=(3,10), name='ncurves0', description='Cofactorization curves, side 0')
+ncurves1 = Parameter(kind='integer', default=6, bound=(3,10), name='ncurves1', description='Cofactorization curves, side 1')
 I = Parameter(kind='integer', default=11, bound=(10, 12), name='I', description='Sieve region size')
 LAS.add_param(rlim)
 LAS.add_param(alim)
@@ -26,6 +28,8 @@ LAS.add_param(lpbr)
 LAS.add_param(lpba)
 LAS.add_param(mfbr)
 LAS.add_param(mfba)
+LAS.add_param(ncurves0)
+LAS.add_param(ncurves1)
 LAS.add_param(I)
 
 # Define relevant measure and register with algorithm.

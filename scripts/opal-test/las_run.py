@@ -41,6 +41,8 @@ def run(param_file, problem):
         "mfba": 22,
         "rlambda": 1.2,
         "alambda": 1.2,
+        "ncurves0": 6,
+        "ncurves1": 6,
         "t": 2
     }
     makefb_params = {
@@ -59,7 +61,7 @@ def run(param_file, problem):
     las_params["alambda"] = 1.0 * las_params["mfba"] / las_params["lpba"] + 0.1
     las_params["rlambda"] = 1.0 * las_params["mfbr"] / las_params["lpbr"] + 0.1
 
-    to_print = ["I", "alim", "lpba", "mfba", "alambda", "rlim", "lpbr", "mfbr", "rlambda"]
+    to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     # Update parameters for makefb (which may depend on las parameters)
