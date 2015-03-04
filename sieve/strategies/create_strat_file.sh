@@ -92,6 +92,14 @@ PP1-65   50   300   20  50  200  10
 PP1-65   300  600   20  50  200  10 
 PP1-65   600  1500  20  10  50   5 
 PP1-65   600  1500  20  50  200  10
+=======
+done << EOF
+PM1      50   150   50  10  30   10 
+ECM-M12  50   150   50  10  30   10 
+ECM-M16  50   150   50  10  30   10 
+ECM-B12  50   150   50  10  30   10 
+PP1-27   50   150   50  10  30   10 
+PP1-65   50   150   50  10  30   10 
 EOF
 
 wait
@@ -134,7 +142,7 @@ cat PP1 PM1 ECM_M16 ECM_RC > All_methods
 
 echo "######## Generate decompositions"
 # Generate decompositions
-mkdir decomp
+mkdir -p decomp
 xmin=`echo "l($lim0*$lim0)/l(2)" | bc -l | cut -d "." -f 1`
 for x in `seq $xmin $mfb0`; do
     cmd="$GST -gdc -lim0 $lim0 -mfb0 $x -out decomp/decomp_${lim0}_${x}"
@@ -150,7 +158,7 @@ done
 
 echo "######## Strategies"
 # precompute strategies
-mkdir res_precompt_st
+mkdir -p res_precompt_st
 for r0 in `seq 0 $mfb0`; do
     $GST -gst_r -lim0 $lim0 -lpb0 $lpb0 -r0 $r0 -ncurves 20 -in All_methods -decomp decomp -out res_precompt_st
 done
@@ -159,7 +167,7 @@ for r0 in `seq 0 $mfb1`; do
 done
 
 # create strategies
-mkdir res_matrix
+mkdir -p res_matrix
 for r0 in `seq 0 $mfb0`; do
     for r1 in `seq 0 $mfb1`; do
         $GST -gst -mfb0 $mfb0 -lim0 $lim0 -mfb1 $mfb1 -lim1 $lim1 -r0 $r0 -r1 $r1 -in res_precompt_st -out res_matrix
@@ -181,4 +189,6 @@ t=`echo $t0-$t1 | bc -l`
 
 echo "######## Final strategy"
 # emulator
-$FINALST -st res_matrix -dist cofactors.stats -t $t -mfb0 $mfb0 -mfb1 $mfb1 final_st
+cmd="$FINALST -st res_matrix -dist cofactors.stats -t $t -mfb0 $mfb0 -mfb1 $mfb1 -out final_st"
+echo $cmd
+$cmd

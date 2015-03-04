@@ -1,3 +1,9 @@
+------------------------------------------------------------------------
+WARNING: This walk-through example script might be broken, since the
+command-line options of the binaries changed a bit since it was written.
+The general idea is still valid.
+------------------------------------------------------------------------
+
 Steps to produce a strategy-file for a c120
 
 Polynomial file (c120.polyselect2.poly):
