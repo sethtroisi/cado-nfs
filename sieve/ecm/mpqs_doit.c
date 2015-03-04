@@ -179,26 +179,29 @@ findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
 {
   /* the two roots are (k1-b)/a and (-k1-b)/a */
   modulus_t pp;
-  residueul_t tt, uu, vv;
+  residueul_t tt, uu, vv, bb;
   modul_initmod_ul (pp, p);
+  modul_init (bb, pp);
   modul_init (tt, pp);
   modul_init (uu, pp);
   modul_init (vv, pp);
+  modul_set_ul_reduced (bb, bmodp, pp);
   modul_set_ul_reduced (tt, inva, pp);
   modul_set_ul_reduced (vv, k1, pp);
   modul_neg (uu, vv, pp);
-  modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
+  modul_sub (uu, uu, bb, pp);       /* -r-b */
   modul_mul (uu, uu, tt, pp);       /* (-r-b)/a */
   *k2 = mod_get_ul (uu, pp);
   *k2 += Mp;                        /* (-r-b)/a + M */
   if (*k2 >= p)
     *k2 -= p;
-  modul_sub_ul (uu, vv, bmodp, pp); /* r-b */
+  modul_sub (uu, vv, bb, pp);       /* r-b */
   modul_mul (uu, uu, tt, pp);       /* (r-b)/a */
   k1 = mod_get_ul (uu, pp);
   k1 += Mp;                         /* (r-b)/a + M */
   if (k1 >= p)
     k1 -= p;
+  modul_clear (bb, pp);
   modul_clear (tt, pp);
   modul_clear (uu, pp);
   modul_clear (vv, pp);
