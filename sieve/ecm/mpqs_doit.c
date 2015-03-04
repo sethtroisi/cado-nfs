@@ -30,6 +30,13 @@
 #include "modredc_ul.h"
 #include "gmp_aux.h"
 
+#if 1
+/* Allows disabling static for profiling */
+#define STATIC static
+#else
+#define STATIC
+#endif
+
 typedef struct {
   unsigned int p;
   unsigned int r;      /* root of x^2 = k*N (mod p) */
@@ -79,7 +86,7 @@ static unsigned char isprime_table[] = {
 static const size_t isprime_table_size =
     sizeof(isprime_table) / sizeof(isprime_table[0]);
 
-static int
+STATIC int
 jacobi (unsigned long a, unsigned long b)
 {
   mpz_t aa, bb;
@@ -94,7 +101,7 @@ jacobi (unsigned long a, unsigned long b)
 }
 
 /* return b^e mod n, assuming n has at most 32 bits */
-static uint64_t
+STATIC uint64_t
 mod_pow_uint64 (uint64_t b, uint64_t e, uint64_t n)
 {
   uint64_t r = 1, f = 1, y = b;
@@ -115,7 +122,7 @@ mod_pow_uint64 (uint64_t b, uint64_t e, uint64_t n)
    Qian Sha, Xiao Fan, 2011, http://arxiv.org/abs/1111.4877.
    Solve x^2 = rr (mod p).
 */
-static uint64_t
+STATIC uint64_t
 tonelli_shanks (uint64_t rr, uint64_t p)
 {
   uint64_t q, s, i, j, l;
@@ -166,7 +173,7 @@ tonelli_shanks (uint64_t rr, uint64_t p)
    Assume p is odd, and inva = 1/sqrt(a) mod p.
    Ensures k1 <= k2 at the end.
 */
-static unsigned long
+STATIC unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
           unsigned long k1, unsigned long inva, unsigned long Mp)
 {
@@ -321,7 +328,7 @@ hash_clear (hash_t H)
    We put relations in column 'shift' and above.
    Assume r > 0.
 */
-static void
+STATIC void
 trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
 {
   unsigned int i;
@@ -441,7 +448,7 @@ update8 (unsigned char *S, unsigned long M, unsigned char logp)
 }
 
 /* put factor in z */
-static void
+STATIC void
 gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t *Y,
        const mpz_t N0, int verbose)
 {
@@ -588,7 +595,7 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t *Y,
 }
 
 /* consider all primes up to B, and all odd multipliers up to K */
-static int
+STATIC int
 best_multiplier (const mpz_t N, unsigned long B, unsigned long K)
 {
   unsigned long i, n, *Q, p, q, j, t, Nq, k, best_k = 1;
