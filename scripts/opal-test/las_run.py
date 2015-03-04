@@ -97,7 +97,7 @@ def run(param_file, problem):
         if not stats.parse_one_file(outputfile):
             raise Exception("Could not read statistics from %s" % outputfile)
         os.unlink(outputfile)
-        sys.stderr.write("   Up to q=%u, estimate %u/%u relations\n" % (q0, stats.get_rels(), rels_wanted))
+        # sys.stderr.write("   Up to q=%u, estimate %u/%u relations\n" % (q0, stats.get_rels(), rels_wanted))
         # set q_inc so that we do about 10 sieving tests of length q_range
         if q_inc == 0:
            v = stats.relations_int.lastvalue[0]
