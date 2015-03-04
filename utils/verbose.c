@@ -278,21 +278,10 @@ vfprint_output(const struct outputs_s * const output, const int verbosity,
     for (size_t i = 0; i < output->nr_outputs; i++) {
         /* print string if output verbosity is at least "verbosity" */
         if (output->verbosity[i] >= verbosity) {
-#ifndef HAVE_MINGW
             va_list va_copied;
             va_copy(va_copied, va);
             rc = func(output->outputs[i], fmt, va_copied);
             va_end(va_copied);
-#else
-            /* C99 says that when va is passed to a function which does
-             * va_arg() on it, then its value is undefined upon return.
-             * So using va_copy as above is the way to go. However it
-             * seems that mingw has trouble with it, let's try something
-             * simpler, which is not standard-clean. (but being dirty and
-             * being on windows are not incompatible).
-             */
-            rc = func(output->outputs[i], fmt, va);
-#endif
             if (rc < 0)
                 return rc;
         }
