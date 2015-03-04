@@ -8,6 +8,10 @@ Some binaries are available in this directory :
   3- gst
   4- finalst
 
+For an example of what is described in this README, you can have a look
+at the create_strat_file.sh script that does all the steps described
+here.
+
 Firstly, gfm allows to choose the optimal parameters (B1, B2) for each
 factoring methods (PM1, PP1-27, PP1-65, ECM-M12, ECM-M16, ECM-B12) to
 find a prime number in [2^(lb-1), 2^ub]. Potentially, there are
@@ -15,9 +19,6 @@ infintely many couples of parameters. So, you can specify the
 region that you want to test with several options:
    - b1min, b1_max, b1step
    - cmin, cmax, cstep (where c equal to B2/B1).
-
-Remark: An example is given by the script script_fm.sh
-------
 
 Now, you have got your optimal parameters for each type of factoring
 methods. In the context of the sieving step, the goal is to define
@@ -29,9 +30,6 @@ of certain bit size.
 To do this, the binary benchfm is available. In input, you give a file
 with factoring methods, and you can compute the probabilities and/or
 the time for each one of them. 
-
-Remark: An example is given by the script script_bench.sh
-------
 
 If you consider that you have to many methods, you can use the -f option
 of the binary ./benchfm to filter them and keep only the given number of
@@ -86,14 +84,8 @@ cat decomp_tmp/decomp_524288_40
 ./gst -gdc -lim0 524288 -mfb0 43 -out decomp_tmp/decomp_524288_43
 etc ... until mfb.
 
-Remark: An example is given by the script script_gen_dec.sh
-------
-
 Secondly, you should distribute the precomputation of strategies for each
 size and side.
-
-Remark: An example is given by the script script_str_r.sh
-------
 
 Note that the resulting files are stored in the directory 'out' and the
 convention for the filenames is: strategies$lim_$r, where lim is the factor
@@ -101,9 +93,6 @@ base bound and r the bit size of the cofactor.
 
 Then, you merge the results to compute the matrix which stores the
 differents strategies for each pair of bit sizes.
-
-Remark: An example is given by the script script_str.sh
-------
 
 Note that the format name of files is: strategies_r0_r1, where r0 and r1
 are the bit sizes of the studied pair of cofactors (r0,r1).
@@ -186,7 +175,3 @@ And each [S: m, b1, b2] is a factoring method given by the
 method m and these parameters b1 and b2, and S is the side where
 this factoring method is apply (S0 for r0 and S1 for r1).
 
-
-
-Remark: an example of this procedure is given in README.rsa704.
-------
