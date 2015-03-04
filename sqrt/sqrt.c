@@ -74,7 +74,7 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
       if (i + 2 > *lprd)
         {
           lprd[0] ++;
-          prd = (mpz_t*) realloc (prd, *lprd * sizeof (mpz_t));
+          prd = (mpz_t*) realloc (prd, lprd[0] * sizeof (mpz_t));
           mpz_init_set_ui (prd[i + 1], 1);
         }
       my_mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
@@ -153,6 +153,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   mpz_t v, *prd;
   unsigned long lprd; /* number of elements in prd[] */
   unsigned long nprd; /* number of accumulated products in prd[] */
+  unsigned long i;
   unsigned long res, peakres = 0;
 
   if (pol->rat->deg != 1)
@@ -323,7 +324,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
            milliseconds ());
   pthread_mutex_unlock (&lock);
 
-  mpz_clear (prd[0]);
+  for (i = 0; i < lprd; i++)
+    mpz_clear (prd[i]);
+  free (prd);
 
   mpz_clear (v);
   return 0;
@@ -488,7 +491,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_t A, *P;
   int v;
   int d = F->deg;
-  int k, lk, target_k, logk, K[32];
+  int k, lk, target_k, logk, logk0, K[32];
   size_t target_size; /* target bit size for Hensel lifting */
 
   /* The size of the coefficients of the square root of A should be about half
@@ -552,7 +555,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   k = 1; /* invariant: pk = p^k */
   lk = 0; /* k = 2^lk */
   st = seconds ();
-  P = mpz_poly_base_modp_init (A, p, K, logk);
+  P = mpz_poly_base_modp_init (A, p, K, logk0 = logk);
   fprintf (stderr, "mpz_poly_base_modp_init took %2.2lf\n", seconds () - st);
 
   mpz_poly_set (a, P[0]);
@@ -655,7 +658,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
   mpz_poly_mod_center (tmp, pk);
 
-  mpz_poly_base_modp_clear (P, logk);
+  mpz_poly_base_modp_clear (P, logk0);
 
   mpz_poly_set(res->p, tmp);
   res->v = v;
