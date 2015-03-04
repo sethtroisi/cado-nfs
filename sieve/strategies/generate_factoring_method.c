@@ -37,8 +37,7 @@ const double EPSILON_DBL = LDBL_EPSILON;
   If the probability to find a prime number of p bits is less than 3%, 
   we can suppose that the probability to find p+i bits (i>0) is equal to 0.
 */
-//const double BENCH_MIN_PROBA = 0.03;
-const double BENCH_MIN_PROBA = 0.1;
+const double BENCH_MIN_PROBA = 0.03;
 
 /************************************************************************/
 /*                      To generate numbers n=pq                        */
