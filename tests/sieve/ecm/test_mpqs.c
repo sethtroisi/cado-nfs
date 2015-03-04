@@ -7,7 +7,7 @@
 
 /* Set N to a crude approximation to 2^(b/2) */
 void
-set_sqrt_2exp(mpz_t N, const mp_bitcnt_t e)
+set_sqrt_2exp(mpz_t N, const unsigned int e)
 {
   mpz_set_ui (N, 1);
   if (e <= 1) {
