@@ -184,7 +184,7 @@ findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
   modul_init (tt, pp);
   modul_init (uu, pp);
   modul_init (vv, pp);
-  modul_set_ul (tt, inva, pp);
+  modul_set_ul_reduced (tt, inva, pp);
   modul_set_ul_reduced (vv, k1, pp);
   modul_neg (uu, vv, pp);
   modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
@@ -947,7 +947,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   memcpy (S, T, 2 * M);
 
   /* sieve */
-  modredcul_batch_Q_to_Fp (Q + SKIP, 1, sqrtaa, 0, P + SKIP, lim - SKIP);
+  modredcul_batch_Q_to_Fp (Q + SKIP, 1, aa, 0, P + SKIP, lim - SKIP);
   /* skip the small primes whose average contribution is already taken into
      account */
   for (j = SKIP; j < lim; j++)
@@ -955,7 +955,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       unsigned long k2 = -1, i2;
 
       p = F[j].p;
-      k = findroot (&k2, bb % p, p, F[j].r, Q[j] * Q[j], F[j].Mp);
+      k = findroot (&k2, bb % p, p, F[j].r, Q[j], F[j].Mp);
       /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
          when k*N is divisible by p (and then the root is 0) we will count
          twice this root, but this will be very rare, and by not considering
