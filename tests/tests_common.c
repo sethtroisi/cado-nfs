@@ -12,7 +12,7 @@ static int rng_state_inited = 0;
 gmp_randstate_t state;
 static int parsed_iter = 0;
 unsigned long iter;
-static int verbose = 0;
+static int verbose = 0, quiet = 0;
 
 /* Return non-zero iff |d2| is in the interval |d1| * (1 +- err_margin) */
 int
@@ -65,6 +65,12 @@ int
 tests_common_get_verbose()
 {
   return verbose;
+}
+
+int
+tests_common_get_quiet()
+{
+  return quiet;
 }
 
 static int
@@ -139,6 +145,15 @@ tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
         strcmp(name, (*argv)[1]) == 0) {
       verbose = 1;
       printf ("Using verbose output\n");
+      *argc -= 1;
+      *argv += 1;
+      continue;
+    }
+
+    name = "-q";
+    if ((flags & PARSE_QUIET) != 0 && (*argc) > 1 && 
+        strcmp(name, (*argv)[1]) == 0) {
+      quiet = 1;
       *argc -= 1;
       *argv += 1;
       continue;
