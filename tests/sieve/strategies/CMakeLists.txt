@@ -45,5 +45,8 @@ add_executable(test_benchfm
 target_link_libraries(test_benchfm ${LIB_EXEC})
 run_test (test_benchfm test_benchfm)
 
+if(DEFINED ENV{CHECKS_EXPENSIVE})
+    run_test(strategies_main_script ${CMAKE_CURRENT_SOURCE_DIR}/test_main_script.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
+endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
 add_subdirectory (utils_st)

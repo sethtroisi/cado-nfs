@@ -291,17 +291,17 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min,
         int p_max, int nb_test_max)
 {
     int len = fm->index;	//number of methods!
-    double *proba = malloc(p_max * sizeof(double));
-    ASSERT(proba != NULL);
     if (p_max == 0)
         p_max = 100;
     if (nb_test_max == 0)
         nb_test_max = 10000;
+    double *proba = malloc(p_max * sizeof(double));
+    ASSERT(proba != NULL);
 
     unsigned long *param;
     fm_t *elem;
     //{{Will contain the our composite integers!
-    mpz_t*N[p_max];
+    mpz_t* N[p_max];
     for (int i = 0; i < p_max; i++)
 	{
 	    N[i] = malloc(sizeof (mpz_t) * (nb_test_max+1));

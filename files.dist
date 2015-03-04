@@ -1177,6 +1177,7 @@ tests/sieve/strategies/test_generate_composite_numbers.c
 tests/sieve/strategies/test_filtering.c
 tests/sieve/strategies/test_benchfm.c
 tests/sieve/strategies/test_generate_strategies.c
+tests/sieve/strategies/test_main_script.sh
 sieve/strategies/script_gen_dec.sh
 sieve/strategies/README.rsa704
 sieve/iqsort.h

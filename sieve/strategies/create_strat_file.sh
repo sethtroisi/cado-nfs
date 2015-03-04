@@ -3,6 +3,10 @@
 
 # Remark: lim is the factor base bound, fbb is the log in base 2 of it.
 
+# If CREATE_STRAT_FILE_TEST is defined, then the scripts goes into
+# test-mode, that is only a few methods are generated, and the benchs
+# will be very unprecise.
+
 if [ $# != 9 ]; then
     echo "usage: ./create_strat_file.sh <lim0> <lpb0> <mfb0> <lim1> <lpb1> <mfb1> <poly> <I> <cado_bindir>";
     exit;
@@ -23,39 +27,22 @@ lpb=$(($lpb0>$lpb1?$lpb1:$lpb0))
 fbb=`echo "l($lim)/l(2)" | bc -l | cut -d "." -f 1`
 
 GFM=$cadodir/sieve/strategies/gfm
-BENCHFM=$cadodir/sieve/strategies/benchfm
 GST=$cadodir/sieve/strategies/gst
 FINALST=$cadodir/sieve/strategies/finalst
 MAKEFB=$cadodir/sieve/makefb
 LAS=$cadodir/sieve/las
+if ! [ "$CREATE_STRAT_FILE_TEST" ] ; then
+    BENCHFM=$cadodir/sieve/strategies/benchfm
+else
+    BENCHFM="$cadodir/sieve/strategies/benchfm -N 1000"
+fi
 
 for m in PM1 ECM-M12 ECM-M16 ECM-B12 PP1-27 PP1-65; do 
     rm -f data_${m}_*
 done
 
-echo "### First selection of methods"
-x=0
-while read m b1min b1max b1step cmin cmax cstep; do
-    outfile=`mktemp -p . data_${m}_XXXXXXX`
-    sleep 1
-    cmd="$GFM -lb $fbb -ub $lpb  -m $m -b1min $b1min -b1max $b1max -b1step $b1step -cmin $cmin -cmax $cmax -cstep $cstep -out $outfile"
-    echo $cmd
-    let x=$x+1
-    if [ $x == 10 ]; then
-        x=0
-        $cmd
-    else
-        $cmd &
-    fi
-# done << EOF
-# PM1      50   150   50  10  30   10 
-# ECM-M12  50   150   50  10  30   10 
-# ECM-M16  50   150   50  10  30   10 
-# ECM-B12  50   150   50  10  30   10 
-# PP1-27   50   150   50  10  30   10 
-# PP1-65   50   150   50  10  30   10 
-# EOF
-done <<EOF
+if ! [ "$CREATE_STRAT_FILE_TEST" ] ; then
+    cat > gfm_params << EOF
 PM1      50   300   20  10  50   5 
 PM1      300  600   20  10  50   5 
 PM1      50   300   20  50  200  10 
@@ -93,6 +80,32 @@ PP1-65   300  600   20  50  200  10
 PP1-65   600  1500  20  10  50   5 
 PP1-65   600  1500  20  50  200  10
 EOF
+else
+    cat > gfm_params << EOF
+PM1      50   150   50  10  30   10 
+ECM-M12  50   150   50  10  30   10 
+ECM-M16  50   150   50  10  30   10 
+ECM-B12  50   150   50  10  30   10 
+PP1-27   50   150   50  10  30   10 
+PP1-65   50   150   50  10  30   10 
+EOF
+fi
+
+echo "### First selection of methods"
+x=0
+while read m b1min b1max b1step cmin cmax cstep; do
+    outfile=`mktemp -p . data_${m}_XXXXXXX`
+    sleep 1
+    cmd="$GFM -lb $fbb -ub $lpb  -m $m -b1min $b1min -b1max $b1max -b1step $b1step -cmin $cmin -cmax $cmax -cstep $cstep -out $outfile"
+    echo $cmd
+    let x=$x+1
+    if [ $x == 10 ]; then
+        x=0
+        $cmd
+    else
+        $cmd &
+    fi
+done < gfm_params
 
 wait
 
