@@ -9,9 +9,12 @@ main (int argc, const char *argv[])
 {
   mpz_t N, f;
   unsigned long bits, iter = 100, i, found = 0;
+  int verbose, quiet;
 
-  tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER);
+  tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER | PARSE_QUIET);
   tests_common_get_iter (&iter);
+  quiet = tests_common_get_quiet();
+  verbose = tests_common_get_verbose();
 
   if (argc > 1)
     bits = atoi (argv[1]);
@@ -19,7 +22,8 @@ main (int argc, const char *argv[])
     /* generate a random size between one and two words */
 #define BITS_PER_ULONG (8 * sizeof(unsigned long))
     bits = BITS_PER_ULONG + (rand () % (BITS_PER_ULONG + 1));
-  printf ("bits=%lu iter=%lu\n", bits, iter);
+  if (!quiet)
+    printf ("bits=%lu iter=%lu\n", bits, iter);
 
   mpz_init (N);
   mpz_init (f);
@@ -36,15 +40,17 @@ main (int argc, const char *argv[])
           mpz_mul (N, N, f);
         }
       while (mpz_sizeinbase (N, 2) != bits);
-      gmp_printf ("N=%Zd\n", N);
-      mpqs_doit (f, N, 1);
+      if (verbose)
+        gmp_printf ("N=%Zd\n", N);
+      mpqs_doit (f, N, verbose);
       if (mpz_cmp_ui (f, 1) > 0 && mpz_cmp (f, N) < 0)
         found ++;
     }
   mpz_clear (N);
   mpz_clear (f);
 
-  printf ("Found %lu factors out of %lu composites\n", found, iter);
+  if (!quiet)
+    printf ("Found %lu factors out of %lu composites\n", found, iter);
   smooth_stat (-1);
 
   tests_common_clear ();
