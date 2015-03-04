@@ -49,8 +49,6 @@
 int create_descent_hints = 0;
 double tt_qstart;
 
-#define BUCKET_REGION (1 << LOG_BUCKET_REGION)
-
 /* {{{ for cofactorization statistics */
 
 int cof_stats = 0; /* write stats file: necessary to generate our strategy.*/

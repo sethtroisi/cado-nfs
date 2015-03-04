@@ -176,6 +176,8 @@
 #error "LOG_BUCKET_REGION must (mandatory!) be equal to 16."
 #endif
 
+#define BUCKET_REGION (1 << LOG_BUCKET_REGION)
+
 /* This flag is necessary to support I=16. Otherwise it's a useless
  * burden
  */
