@@ -3,6 +3,8 @@
 # Usage: optimize.sh params.cxx cxx.polyselect2.poly
 # Puts the optimized file in params.cxx.opt in the current directory.
 # Remark: the 'nomad' binary must be in $PATH (see README)
+# The CADO_BUILD environment variable must contain the CADO-NFS build
+# directory (makefb and las are taken from $CADO_BUILD/sieve)
 
 cwd=`pwd`
 params=$1

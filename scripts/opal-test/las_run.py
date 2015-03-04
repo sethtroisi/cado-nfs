@@ -23,8 +23,7 @@ def primepi(x):
 def run(param_file, problem):
     "Run las with given parameters until the required number of relations is found."
 
-    home_dir = os.environ["HOME"]
-    build_dir = "%s/build/cado-nfs/normal" % home_dir
+    build_dir = os.environ["CADO_BUILD"]
 
     makefb = "%s/sieve/makefb" % build_dir
     las = "%s/sieve/las" % build_dir
@@ -43,7 +42,7 @@ def run(param_file, problem):
         "alambda": 1.2,
         "ncurves0": 6,
         "ncurves1": 6,
-        "t": 2
+        "t": 1 # las currently does not work with -t 2 or more
     }
     makefb_params = {
         "poly" : las_params["poly"],
