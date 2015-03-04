@@ -11,6 +11,7 @@
 #endif
 #include <sys/stat.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "utils_with_io.h"
 #include "portability.h"
