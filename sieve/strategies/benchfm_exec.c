@@ -123,10 +123,10 @@ int main(int argc, char *argv[])
 		    param_list_clear(pl);
 		    exit(EXIT_FAILURE);
 		}
-	    bench_proba(state, c, len_p_min);
+	    bench_proba(state, c, len_p_min, 0, 0);
 	}
     if (opt_time)
-	bench_time(state, c);
+	bench_time(state, c, 0);
 
     if (final_nb_fm != -1)
 	{

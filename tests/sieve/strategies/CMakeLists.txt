@@ -38,7 +38,12 @@ add_executable(test_filtering
 target_link_libraries(test_filtering ${LIB_EXEC})
 run_test (test_filtering test_filtering)
 
-
+add_executable(test_benchfm
+  test_benchfm.c
+  ${SUF_SRC}/generate_factoring_method.c
+  ${SRC_UTILS})
+target_link_libraries(test_benchfm ${LIB_EXEC})
+run_test (test_benchfm test_benchfm)
 
 
 add_subdirectory (utils_st)

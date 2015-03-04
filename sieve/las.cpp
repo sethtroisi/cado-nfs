@@ -1437,10 +1437,6 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
           if (bucket_prime_stats) nr_bucket_primes++;
           const unsigned long p = prime.p;
           if (very_verbose) {
-#ifdef HAVE_MINGW
-	    printf ("divide_primes_from_bucket 1441\n");
-	    fflush (stdout);
-#endif
               verbose_output_vfprint(0, 1, gmp_vfprintf,
                                      "# N = %u, x = %d, dividing out prime hint p = %lu, norm = %Zd\n",
                                      N, x, p, norm);
@@ -1478,10 +1474,6 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
           ASSERT_ALWAYS(slice != NULL);
           const unsigned long p = slice->get_prime(complete_hint.hint);
           if (very_verbose) {
-#ifdef HAVE_MINGW
-	    printf ("divide_hints_from_bucket 1482\n");
-	    fflush (stdout);
-#endif
               verbose_output_vfprint(0, 1, gmp_vfprintf,
                                      "# N = %d, x = %d, dividing out slice hint, slice index = %lu, slice offset = %lu, p = %lu, norm = %Zd\n",
                                      N, x, (unsigned long) complete_hint.index, (unsigned long) complete_hint.hint, p, norm);
@@ -1518,20 +1510,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
     fl->n = 0; /* reset factor list */
 
     if (trial_div_very_verbose) {
-#ifdef HAVE_MINGW
-      printf ("trial_div 1522\n");
-      fflush (stdout);
-#endif
-        verbose_output_start_batch ();
-#ifdef HAVE_MINGW
-      printf ("trial_div 1527\n");
-      fflush (stdout);
-#endif
-        verbose_output_vfprint (1, 1, gmp_vfprintf, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = %Zd\n", N, x, a, b, norm);
-#ifdef HAVE_MINGW
-      printf ("trial_div 1532\n");
-      fflush (stdout);
-#endif
+        verbose_output_start_batch();
+        verbose_output_vfprint(1, 1, gmp_vfprintf, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = %Zd\n", N, x, a, b, norm);
     }
 
     // handle 2 separately, if it is in fb
@@ -1543,13 +1523,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
             fl->n++;
         }
         if (trial_div_very_verbose)
-	  {
-#ifdef HAVE_MINGW
-	  printf ("line 1539\n");
-	  fflush (stdout);
-#endif
             verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
-	  }
         mpz_tdiv_q_2exp(norm, norm, bit);
     }
 
@@ -1557,13 +1531,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
     divide_primes_from_bucket (fl, norm, N, x, primes, trial_div_very_verbose);
     divide_hints_from_bucket (fl, norm, N, x, purged, fb, trial_div_very_verbose);
     if (trial_div_very_verbose)
-      {
-#ifdef HAVE_MINGW
-	printf ("line 1554\n");
-	fflush (stdout);
-#endif
         verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
-      }
 
     do {
       /* Trial divide primes with precomputed tables */
@@ -1571,10 +1539,6 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       int i;
       unsigned long factors[TRIALDIV_MAX_FACTORS];
       if (trial_div_very_verbose) {
-#ifdef HAVE_MINGW
-        printf ("line 1567\n");
-        fflush (stdout);
-#endif
           verbose_output_print(1, 1, "# Trial division by");
           for (i = 0; trialdiv_data[i].p != 1; i++)
               verbose_output_print(1, 1, " %lu", trialdiv_data[i].p);
@@ -1586,34 +1550,16 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       for (i = 0; i < MIN(nr_factors, TRIALDIV_MAX_FACTORS); i++)
       {
           if (trial_div_very_verbose)
-	    {
-#ifdef HAVE_MINGW
-	      printf ("line 1583\n");
-	      fflush (stdout);
-#endif
               verbose_output_print (1, 1, " %lu", factors[i]);
-	    }
           factor_list_add (fl, factors[i]);
       }
       if (trial_div_very_verbose) {
-	{
-#ifdef HAVE_MINGW
-	  printf ("line 1593\n");
-	  fflush (stdout);
-#endif
           verbose_output_vfprint(1, 1, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
-	}
       }
     } while (nr_factors == TRIALDIV_MAX_FACTORS + 1);
 
     if (trial_div_very_verbose)
-      {
-#ifdef HAVE_MINGW
-	printf ("line 1604\n");
-	fflush (stdout);
-#endif
         verbose_output_end_batch();
-      }
 }
 /* }}} */
 

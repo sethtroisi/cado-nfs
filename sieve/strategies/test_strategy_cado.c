@@ -1476,8 +1476,8 @@ int main(int argc, char *argv[])
     //select our methods
     //tabular_fm_t *methods = generate_methods_cado(lpb);
     //benchmark
-    //bench_proba(state, methods, fbb);
-    //bench_time(state, methods);
+    //bench_proba(state, methods, fbb, 0, 0);
+    //bench_time(state, methods, 0);
     //FILE* filee = fopen ("bench_data_cado","w");
     //tabular_fm_fprint (filee, methods);
     //fclose (filee);
