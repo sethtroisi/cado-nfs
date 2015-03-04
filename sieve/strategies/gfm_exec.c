@@ -192,10 +192,12 @@ int main(int argc, char *argv[])
 	if (!(param[0] == 0 || param[1] == 0 || param[2] == 0 ||
 	      param[3] == 0 || param[4] == 0 || param[5] == 0)) {
 	    param_sieve = param;
+            /*
 	    printf("param_sieve: b1min= %d, b1max=%d, b1step=%d"
 		   "       cmin= %d, cmax=%d, cstep=%d\n",
 		   param_sieve[0], param_sieve[1], param_sieve[2],
 		   param_sieve[3], param_sieve[4], param_sieve[5]);
+                   */
 	}
 
 	if (method == -1)
