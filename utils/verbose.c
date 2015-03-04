@@ -274,14 +274,39 @@ vfprint_output(const struct outputs_s * const output, const int verbosity,
                vfprintf_func_t func, const char * const fmt, va_list va)
 {
     int rc = 0;
+#ifdef HAVE_MINGW
+    printf ("enter vfprint_output, output->nr_outputs=%zu\n",
+            output->nr_outputs);
+    fflush (stdout);
+#endif
     /* For each output attached to this channel */
     for (size_t i = 0; i < output->nr_outputs; i++) {
+#ifdef HAVE_MINGW
+      printf ("vfprint_output: i=%zu\n", i);
+      fflush (stdout);
+#endif
         /* print string if output verbosity is at least "verbosity" */
         if (output->verbosity[i] >= verbosity) {
             va_list va_copied;
+#ifdef HAVE_MINGW
+            printf ("output->verbosity[i] >= verbosity\n");
+            fflush (stdout);
+#endif
             va_copy(va_copied, va);
+#ifdef HAVE_MINGW
+            printf ("line 297\n");
+            fflush (stdout);
+#endif
             rc = func(output->outputs[i], fmt, va_copied);
+#ifdef HAVE_MINGW
+            printf ("line 302: rc=%d\n", rc);
+            fflush (stdout);
+#endif
             va_end(va_copied);
+#ifdef HAVE_MINGW
+            printf ("line 307\n");
+            fflush (stdout);
+#endif
             if (rc < 0)
                 return rc;
         }
@@ -440,10 +465,24 @@ verbose_output_vfprint(const size_t channel, const int verbose,
     va_list ap;
     int rc = 0;
 
+#ifdef HAVE_MINGW
+    printf ("enter verbose_output_vfprint\n");
+    fflush (stdout);
+#endif
     if (monitor_enter() != 0)
+      {
+#ifdef HAVE_MINGW
+        printf ("monitor_enter() != 0\n");
+        fflush (stdout);
+#endif
         return -1;
+      }
     va_start(ap, fmt);
     if (_channel_outputs == NULL) {
+#ifdef HAVE_MINGW
+      printf ("_channel_outputs == NULL\n");
+      fflush (stdout);
+#endif
         /* Default behaviour: print to stdout or stderr */
         ASSERT_ALWAYS(channel < 2);
         if (verbose <= 1) {
@@ -451,12 +490,30 @@ verbose_output_vfprint(const size_t channel, const int verbose,
             rc = func(out, fmt, ap);
         }
     } else {
+#ifdef HAVE_MINGW
+      printf ("_channel_outputs != NULL\n");
+      fflush (stdout);
+#endif
         ASSERT_ALWAYS(channel < _nr_channels);
         rc = vfprint_output(&_channel_outputs[channel], verbose, func, fmt,
                             ap);
     }
+#ifdef HAVE_MINGW
+    printf ("line 477\n");
+    fflush (stdout);
+#endif
     va_end(ap);
+#ifdef HAVE_MINGW
+    printf ("line 482\n");
+    fflush (stdout);
+#endif
     if (monitor_leave() != 0)
+      {
+#ifdef HAVE_MINGW
+        printf ("monitor_leave() != 0\n");
+        fflush (stdout);
+#endif
         return -1;
+      }
     return rc;
 }
