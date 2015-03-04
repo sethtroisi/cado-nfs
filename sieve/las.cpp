@@ -1522,7 +1522,11 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       printf ("trial_div 1522\n");
       fflush (stdout);
 #endif
-        verbose_output_start_batch();
+        verbose_output_start_batch ();
+#ifdef HAVE_MINGW
+      printf ("trial_div 1527\n");
+      fflush (stdout);
+#endif
         verbose_output_vfprint(1, 1, gmp_vfprintf, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = %Zd\n", N, x, a, b, norm);
     }
 
