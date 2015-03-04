@@ -277,16 +277,16 @@ vfprint_output(const struct outputs_s * const output, const int verbosity,
     /* For each output attached to this channel */
     for (size_t i = 0; i < output->nr_outputs; i++) {
         /* print string if output verbosity is at least "verbosity" */
-#ifndef HAVE_MINGW
         if (output->verbosity[i] >= verbosity) {
             va_list va_copied;
             va_copy(va_copied, va);
+#ifndef HAVE_MINGW
             rc = func(output->outputs[i], fmt, va_copied);
+#endif
             va_end(va_copied);
             if (rc < 0)
                 return rc;
         }
-#endif
     }
     return rc;
 }
