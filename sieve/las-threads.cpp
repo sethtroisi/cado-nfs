@@ -5,6 +5,10 @@
 #include "las-types.h"
 #include "las-config.h"
 
+#ifndef BUCKET_REGION
+#define BUCKET_REGION (1 << LOG_BUCKET_REGION)
+#endif
+
 thread_side_data_s::thread_side_data_s()
 {
   /* Allocate memory for each side's bucket region */
