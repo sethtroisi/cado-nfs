@@ -659,7 +659,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   unsigned long p, k, Nbits, M, i, wrel, L = 0, *P, *Q;
   long j, nrel = 0, lim, ncol;
   mpz_t a, b, c, sqrta, r, axb;
-  double radix, logradix = 0;
+  const double radix = sqrt(2.);
+  const double inv_logradix = 1. / log(radix);
   long st;
   static long init_time = 0, sieve_time = 0, check_time = 0;
   static long gauss_time = 0, total_time = 0;
@@ -841,18 +842,15 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       maxnorm1 = Nd / ad;
       maxnorm = ad * (double) M * (double) M - maxnorm1;
       maxnorm = (maxnorm > maxnorm1) ? maxnorm : maxnorm1;
-      /* initialize radix: we want radix^255 = maxnorm ~ a*M^2 */
-#define MAXNORM 128
-      radix = pow (maxnorm, 1.0 / (double) MAXNORM);
-      logradix = log (radix);
+      assert(log(maxnorm) * inv_logradix < 256.);
 #ifdef TRACE
-      printf ("radix=%f logradix=%f\n", radix, logradix);
+      printf ("radix=%f logradix=%f\n", radix, 1. / inv_logradix);
 #endif
 
       /* initialize logp values */
 #define ROUND round
       for (j = SKIP; j < lim; j++)
-        F[j].logp = (char) ROUND (log ((double) F[j].p) / logradix);
+        F[j].logp = (char) ROUND (log ((double) F[j].p) * inv_logradix);
 
       /* take into account the skipped primes */
       double skip_value = 0;
@@ -865,17 +863,22 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         skip_value += SKIP_FACTOR * 2.0 * log ((double) F[j].p)
           / (double) (F[j].p - 1);
 
+      assert(FLT_RADIX == 2);
+      const double N_div_a2 = Nd / (ad * ad);
+      const double to_add = (log((double) ad) - skip_value) * inv_logradix;
+      const double sqrt2 = sqrt(2.);
+
       for (i = 0; i <= M; i++)
         {
           /* At location i, the norm is ((a*i+b)^2-N)/a. Since 0 <= b < a,
              we approximate it by ((a*i)^2-N)/a. Since a is not changing
              much, we assume it only depends on i. */
-          double x = ad * (double) i;
+          double x = (double) i;
           /* Note: we don't consider the +b term here, which makes the norm
              approximation not very reliable near roots of (a*x+b)^2 = N */
-          x = (x * x - Nd) / ad;
-          x = fabs (x);
-          x = (log (x) - skip_value) / logradix;
+          x = x * x - N_div_a2;
+          const double log_x = logb(sqrt2 * x * x) + to_add;
+          x = log_x;
           T[M - i] = (unsigned char) ceil (x < 0 ? 0 : x);
           if (i < M)
             T[M + i] = T[M - i];
@@ -903,12 +906,12 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         default:
           ASSERT_ALWAYS(0);
         }
-      log2 = ROUND (SKIP_FACTOR * log (log2) / logradix);
+      log2 = ROUND (SKIP_FACTOR * log (log2) * inv_logradix);
       update8 (T, M, (unsigned char) log2);
 
       unsigned char Tmax;
       Tmax = (T[0] >  T[M]) ? T[0] : T[M];
-      threshold = Tmax - (char) ROUND (lambda * log ((double) F[ncol-1].p) / logradix);
+      threshold = Tmax - (char) ROUND (lambda * log(F[ncol-1].p) * inv_logradix);
       if (threshold < 128)
         {
           /* we increase Tmax by the difference to 128, so that in
