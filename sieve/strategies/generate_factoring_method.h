@@ -61,13 +61,14 @@ double bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
  		      unsigned long len_p, unsigned long len_n, mpz_t* N,
 		      int nb_test_max);
 
-void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min);
+void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min,
+        int p_max, int nb_test_max);
 
 
 double bench_time_fm_onelength(facul_strategy_t * method, mpz_t* N,
 			       int nb_test);
 
-void bench_time(gmp_randstate_t state, tabular_fm_t * fm);
+void bench_time(gmp_randstate_t state, tabular_fm_t * fm, int nb_test);
 
 
 tabular_fm_t *filtering(tabular_fm_t * fm, int final_nb_methods);
