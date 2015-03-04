@@ -1086,7 +1086,7 @@ class Sqrt(Program):
                  index: Parameter(),
                  kernel: Parameter("ker"),
                  dep: Parameter()=None,
-                 threads : Parameter("t", checktype=int)=None,
+                 # threads : Parameter("t", checktype=int)=None,
                  ab: Toggle()=None,
                  rat: Toggle()=None,
                  alg: Toggle()=None,
