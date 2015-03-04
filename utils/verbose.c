@@ -271,7 +271,8 @@ add_output(struct outputs_s *output, FILE * const out, const int verbosity)
    If no outputs are attached to this channel, returns 0. */
 static int
 vfprint_output(const struct outputs_s * const output, const int verbosity,
-               vfprintf_func_t func, const char * const fmt, va_list va)
+               vfprintf_func_t func MAYBE_UNUSED,
+               const char * const fmt MAYBE_UNUSED, va_list va)
 {
     int rc = 0;
     /* For each output attached to this channel */
