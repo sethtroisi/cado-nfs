@@ -4,7 +4,7 @@ add_definitions(-DWITH_MPI)
 endif (${WITH_MPI})
 
 add_executable(sqrt sqrt.c)
-target_link_libraries(sqrt utils_with_io)
+target_link_libraries(sqrt utils_with_io ${pthread_libs})
 
 add_executable(checkdep ${EXCLUDE_FROM_RELEASE_BUILD} checkdep.c)
 target_link_libraries(checkdep utils)
