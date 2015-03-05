@@ -2569,6 +2569,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->conf->skewness) != 0)
             continue;
+        si->qbasis->set_q(si->doing->p);
 
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
 #ifndef SUPPORT_LARGE_Q
