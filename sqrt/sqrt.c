@@ -92,7 +92,11 @@ accumulate_fast_end (mpz_t *prd, unsigned long lprd)
   unsigned long i;
 
   for (i = 1; i < lprd; i++)
-    my_mpz_mul (prd[0], prd[0], prd[i]);
+    {
+      fprintf (stderr, "accumulate_fast_end: multiplying %zu*%zu limbs\n",
+               mpz_size (prd[0]), mpz_size (prd[i]));
+      my_mpz_mul (prd[0], prd[0], prd[i]);
+    }
 }
 
 static size_t
