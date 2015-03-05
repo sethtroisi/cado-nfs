@@ -1568,7 +1568,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
    number of survivors with coprime a, b to *coprimes */
 
 NOPROFILE_STATIC int
-factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
+factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 {
     las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
@@ -1591,6 +1591,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
     const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+    unsigned char * S[2] = {th->sides[0]->bucket_region, th->sides[1]->bucket_region};
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (1);
@@ -1614,11 +1615,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     }
 #endif  /* }}} */
 
-    if (las->verbose >= 2) {
-        /* Update the checksums over the bucket regions */
-        for (int side = 0; side < 2; side++)
-            th->sides[side]->checksum_post_sieve.update(S[side], BUCKET_REGION);
-    }
+    if (las->verbose >= 2)
+        th->update_checksums();
 
     /* This is the one which gets the merged information in the end */
     unsigned char * SS = S[0];
@@ -2231,7 +2229,7 @@ void * process_bucket_region(thread_data_ptr th)
 
         /* Factor survivors */
         rep->ttf -= seconds_thread ();
-        rep->reports += factor_survivors (th, i, S, w);
+        rep->reports += factor_survivors (th, i, w);
         rep->ttf += seconds_thread ();
 
         /* For the descent mode, we bail out as early as possible */

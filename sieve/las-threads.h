@@ -25,6 +25,7 @@ struct thread_side_data_s : private NonCopyable {
   thread_side_data_s();
   ~thread_side_data_s();
   void set_fb(const fb_part *_fb) {fb = _fb;}
+  void update_checksum(){checksum_post_sieve.update(bucket_region, BUCKET_REGION);}
 };
 typedef struct thread_side_data_s thread_side_data[1];
 typedef struct thread_side_data_s * thread_side_data_ptr;
@@ -42,6 +43,7 @@ struct thread_data_s : private NonCopyable {
   ~thread_data_s();
   void init(int id, las_info_srcptr las);
   void pickup_si(sieve_info_ptr si);
+  void update_checksums();
 };
 typedef struct thread_data_s *thread_data_ptr;
 typedef const struct thread_data_s *thread_data_srcptr;

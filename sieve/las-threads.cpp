@@ -48,6 +48,12 @@ void thread_data_s::pickup_si(sieve_info_ptr _si)
   }
 }
 
+void thread_data_s::update_checksums()
+{
+  for(int s = 0 ; s < 2 ; s++)
+    sides[s]->update_checksum();
+}
+
 
 thread_data_ptr thread_data_alloc(las_info_ptr las, int n)
 {
