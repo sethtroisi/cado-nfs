@@ -7,7 +7,6 @@
 #include <math.h>   // for ceiling, floor in cfrac
 #include <ctype.h>
 #include <float.h>
-#include <pthread.h>
 #include <fcntl.h>   /* for _O_BINARY */
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
