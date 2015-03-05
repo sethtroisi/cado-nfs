@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <inttypes.h>
 #include "portability.h" /* For vasprintf */
 #include "verbose.h"
 
