@@ -1511,7 +1511,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
     if (trial_div_very_verbose) {
         verbose_output_start_batch();
-        verbose_output_vfprint(1, 1, gmp_vfprintf, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = %Zd\n", N, x, a, b, norm);
+        verbose_output_print(1, 1, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = ", N, x, a, b);
+        verbose_output_vfprint(1, 1, gmp_vfprintf, "%Zd\n", norm);
     }
 
     // handle 2 separately, if it is in fb
@@ -1838,7 +1839,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
+                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
+                    verbose_output_print(1, 0, "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
                 }
 #endif
                 verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
@@ -1853,7 +1855,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# checked leftover norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",norm[side],sidenames[side],a,b,pass);
+                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# checked leftover norm=%Zd", norm[side]);
+                    verbose_output_print(1, 0, " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n", sidenames[side], a, b, pass);
                 }
 #endif
             }
@@ -1876,9 +1879,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
 	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
-            if (trace_on_spot_ab(a, b) && pass == 0)
-              verbose_output_vfprint(1, 0, gmp_vfprintf, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), remains %Zd, %Zd unfactored\n",
-                           a, b, norm[0], norm[1]);
+            if (trace_on_spot_ab(a, b) && pass == 0) {
+              verbose_output_print(1, 0, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
+              verbose_output_vfprint(1, 0, gmp_vfprintf, "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
+            }
 #endif
             if (pass <= 0) continue; /* a factor was > 2^lpb, or some
                                         factorization was incomplete */
@@ -2636,17 +2640,19 @@ int main (int argc0, char *argv0[])/*{{{*/
          * extreme cases, see bug 15617
          */
         if (sieve_info_adjust_IJ(si, las->nb_threads) == 0) {
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
-                    sidenames[si->conf->side],
-                    si->doing->p, si->doing->r, si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1,
-                    si->J);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END,
+                                   sidenames[si->conf->side], si->doing->p, si->doing->r);
+            verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n", 
+                                 si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1, si->J);
             continue;
         }
 
 
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Sieving %s q=%Zd; rho=%Zd;" HILIGHT_END " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
-                sidenames[si->conf->side],
-                si->doing->p, si->doing->r, si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Sieving %s q=%Zd; rho=%Zd;" HILIGHT_END,
+                               sidenames[si->conf->side], si->doing->p, si->doing->r);
+
+        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
+                             si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
         if (si->doing->depth) {
             verbose_output_print(0, 1, " # within descent, currently at depth %d", si->doing->depth);
         }
