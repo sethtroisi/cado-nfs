@@ -1564,56 +1564,6 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 }
 /* }}} */
 
-/* Compute a checksum over the bucket region.
-
-   We import the bucket region into an mpz_t and take it modulo
-   checksum_prime. The checksums for different bucket regions are added up,
-   modulo checksum_prime. This makes the combined checksum independent of
-   the order in which buckets are processed, but it is dependent on size of
-   the bucket region. Note that the selection of the sieve region, i.e., of J
-   depends somewhat on the number of threads, as we want an equal number of
-   bucket regions per thread. Thus the checksums are not necessarily
-   comparable between runs with different numbers of threads. */
-
-static const unsigned int checksum_prime = 4294967291u; /* < 2^32 */
-
-/* Combine two checksums. Simply (checksum+checksum2) % checksum_prime,
-   but using modul_*() to handle sums >= 2^32 correctly. */
-static unsigned int
-combine_checksum(const unsigned int checksum1, const unsigned int checksum2)
-{
-    modulusul_t m;
-    residueul_t r1, r2;
-    unsigned int checksum;
-
-    modul_initmod_ul(m, checksum_prime);
-    modul_init(r1, m);
-    modul_set_ul(r1, checksum1, m);
-    modul_init(r2, m);
-    modul_set_ul(r2, checksum2, m);
-    modul_add(r1, r1, r2, m);
-    checksum = modul_get_ul(r1, m);
-    modul_clear(r1, m);
-    modul_clear(r2, m);
-    modul_clearmod(m);
-    return checksum;
-}
-
-static unsigned int
-bucket_checksum(const unsigned char *bucket, const unsigned int prev_checksum)
-{
-    mpz_t mb;
-    unsigned long checksum;
-
-    mpz_init(mb);
-    mpz_import(mb, BUCKET_REGION, -1, sizeof(unsigned char), -1, 0, bucket);
-    checksum = mpz_tdiv_ui(mb, checksum_prime);
-    mpz_clear(mb);
-    checksum = combine_checksum (checksum, prev_checksum);
-
-    return checksum;
-}
-
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
@@ -1667,7 +1617,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     if (las->verbose >= 2) {
         /* Update the checksums over the bucket regions */
         for (int side = 0; side < 2; side++)
-            th->checksum_post_sieve[side] = bucket_checksum(S[side], th->checksum_post_sieve[side]);
+            th->sides[side]->checksum_post_sieve.update(S[side], BUCKET_REGION);
     }
 
     /* This is the one which gets the merged information in the end */
@@ -2317,18 +2267,18 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     /* Display results for this special q */
     las_report rep;
     las_report_init(rep);
-    unsigned int checksum_post_sieve[2] = {0, 0};
+    sieve_checksum checksum_post_sieve[2];
     
     for (int i = 0; i < las->nb_threads; ++i) {
         las_report_accumulate(rep, thrs[i].rep);
         for (int side = 0; side < 2; side++)
-            checksum_post_sieve[side] = combine_checksum(checksum_post_sieve[side], thrs[i].checksum_post_sieve[side]);
+            checksum_post_sieve[side].update(thrs[i].sides[side]->checksum_post_sieve);
     }
     verbose_output_print(0, 2, "# ");
     /* verbose_output_print(0, 2, "%lu survivors after rational sieve,", rep->survivors0); */
     verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
     verbose_output_print(0, 2, "coprime: %lu\n", rep->survivors2);
-    verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0], checksum_post_sieve[1]);
+    verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0].get_checksum(), checksum_post_sieve[1].get_checksum());
     verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     if (rep->both_even) {

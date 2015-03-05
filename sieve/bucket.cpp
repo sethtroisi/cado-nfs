@@ -2,6 +2,7 @@
 #include <inttypes.h>
 #include <stdlib.h>   // for malloc and friends
 #include <string.h>   // for memcpy
+#include <gmp.h>
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
 #endif
@@ -11,6 +12,7 @@
 #include "las-config.h"
 #include "iqsort.h"
 #include "verbose.h"
+#include "ularith.h"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
@@ -340,3 +342,24 @@ bucket_array_complete::purge (const bucket_array_t BA,
 template class bucket_single<bucket_prime_t>;
 template class bucket_single<bucket_complete_update_t>;
 
+
+void
+sieve_checksum::update(const unsigned int other)
+{
+    unsigned long r;
+    ularith_addmod_ul_ul(&r, checksum, other, checksum_prime);
+    checksum = r;
+}
+
+void
+sieve_checksum::update(const unsigned char *data, const size_t len)
+{
+    mpz_t mb;
+    unsigned int new_checksum;
+
+    mpz_init(mb);
+    mpz_import(mb, len, -1, sizeof(unsigned char), -1, 0, data);
+    new_checksum = mpz_tdiv_ui(mb, checksum_prime);
+    mpz_clear(mb);
+    this->update(new_checksum);
+}

@@ -20,6 +20,7 @@ struct thread_side_data_s : private NonCopyable {
   int * rsdpos;
 
   unsigned char *bucket_region;
+  sieve_checksum checksum_post_sieve;
 
   thread_side_data_s();
   ~thread_side_data_s();
@@ -35,7 +36,6 @@ struct thread_data_s : private NonCopyable {
   las_info_srcptr las;
   sieve_info_ptr si;
   las_report rep;
-  unsigned int checksum_post_sieve[2];
   unsigned char *SS;
   bool is_initialized;
   thread_data_s();
