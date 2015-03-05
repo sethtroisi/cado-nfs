@@ -1475,7 +1475,7 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
           const unsigned long p = slice->get_prime(complete_hint.hint);
           if (very_verbose) {
               verbose_output_vfprint(0, 1, gmp_vfprintf,
-                                     "# N = %d, x = %d, dividing out slice hint, slice index = %lu, slice offset = %lu, p = %lu, norm = %Zd\n",
+                                     "# N = %u, x = %d, dividing out slice hint, slice index = %lu, slice offset = %lu, p = %lu, norm = %Zd\n",
                                      N, x, (unsigned long) complete_hint.index, (unsigned long) complete_hint.hint, p, norm);
           }
           if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
