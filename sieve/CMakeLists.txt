@@ -44,6 +44,10 @@ add_executable (fb_test EXCLUDE_FROM_ALL fb.cpp)
 set_property(TARGET fb_test PROPERTY COMPILE_DEFINITIONS TESTDRIVE=1)
 target_link_libraries (fb_test utils)
 
+add_executable (las_descent EXCLUDE_FROM_ALL ${las_sources})
+set_property(TARGET las_descent PROPERTY COMPILE_DEFINITIONS DLP_DESCENT SUPPORT_LARGE_Q)
+target_link_libraries (las_descent ${las_libraries})
+
 add_library (trialdiv trialdiv.c)
 add_library (las-norms las-norms.cpp)
 
