@@ -222,6 +222,54 @@ static unsigned int Primes[MAX_PRIMES] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31
 
 static int prime_index[INDEX];
 
+mpz_t nextprime_bitfield;
+unsigned long nextprime_start = 0;
+/* Code below is meant to be correct for any nextprime_len > 0 */
+const size_t nextprime_len = 8192;
+
+void nextprime_init(const unsigned long first)
+{
+  /* nextprime_bitfield = 2^nextprime_len - 1 */
+  mpz_set_ui(nextprime_bitfield, 1);
+  mpz_mul_2exp(nextprime_bitfield, nextprime_bitfield, nextprime_len);
+  mpz_sub_ui(nextprime_bitfield, nextprime_bitfield, 1);
+
+  const unsigned long last = first + nextprime_len;
+  for (size_t i = 0; Primes[i] * Primes[i] < last; i++) {
+    const unsigned long p = Primes[i];
+    unsigned long next_hit = first % p;
+    if (next_hit > 0)
+      next_hit = p - next_hit;
+    while (next_hit < nextprime_len) {
+      mpz_clrbit(nextprime_bitfield, next_hit);
+      next_hit += p;
+    }
+  }
+  nextprime_start = first;
+}
+
+/* Returns the smallest prime >= n */
+unsigned long nextprime_get_next(const unsigned long n)
+{
+  if (n == 0)
+    return 2; /* Rest assumes n > 0 */
+
+  if (nextprime_start == 0)
+    nextprime_init(n);
+
+  unsigned long next_n = n;
+
+  do {
+    if (next_n < nextprime_start || next_n >= nextprime_start + nextprime_len)
+      nextprime_init(next_n);
+    const unsigned long offset = mpz_scan1 (nextprime_bitfield, next_n - nextprime_start);
+    next_n = nextprime_start + MIN(nextprime_len, offset);
+  } while (next_n >= nextprime_start + nextprime_len);
+  // printf("nextprime(%lu) == %lu\n", n, next_n);
+  return next_n;
+}
+
+
 static inline void
 setbit (mpz_t row, int shift, unsigned long i)
 {
@@ -798,11 +846,14 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   int pols = 0;
   mpz_init (r);
+  mpz_init(nextprime_bitfield);
+  nextprime_init(mpz_get_ui(sqrta));
   while (nrel < ncol + WANT_EXCESS) {
   sieve_time -= milliseconds ();
-  do
-    mpz_nextprime (sqrta, sqrta);
-  while (mpz_jacobi (N, sqrta) != 1);
+  do {
+    unsigned long next_p = nextprime_get_next (mpz_get_ui(sqrta) + 1);
+    mpz_set_ui(sqrta, next_p);
+  } while (mpz_jacobi (N, sqrta) != 1);
   /* we want N to be a square mod a: N = b^2 (mod a) */
   unsigned long aui = mpz_get_ui (sqrta);
   mpz_mul (a, sqrta, sqrta);
@@ -1048,6 +1099,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   end_check:
   check_time += milliseconds ();
   }
+  mpz_clear(nextprime_bitfield);
   mpz_clear (r);
   hash_clear (H);
   if (verbose)
