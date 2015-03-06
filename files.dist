@@ -1175,7 +1175,9 @@ tests/sieve/strategies/utils_st/test_decomp.c
 tests/sieve/strategies/utils_st/test_convex_hull.c
 tests/sieve/strategies/test_generate_composite_numbers.c
 tests/sieve/strategies/test_filtering.c
+tests/sieve/strategies/test_benchfm.c
 tests/sieve/strategies/test_generate_strategies.c
+tests/sieve/strategies/test_main_script.sh
 sieve/strategies/script_gen_dec.sh
 sieve/strategies/README.rsa704
 sieve/iqsort.h
@@ -1189,3 +1191,7 @@ linalg/bwc/lingen_qcode_do.cpp
 linalg/bwc/lingen_qcode.h
 utils/version_info.h
 utils/version_info.c.in
+sieve/las-base.hpp
+sieve/las-forwardtypes.h
+sieve/las-threads.cpp
+sieve/las-threads.h

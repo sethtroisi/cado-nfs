@@ -1,5 +1,5 @@
 /*****************************************************************************/
-/*                   to generate our factoring methods                       */
+/*                   to generate the factoring methods                       */
 /*****************************************************************************/
 
 Some binaries are available in this directory :
@@ -8,40 +8,38 @@ Some binaries are available in this directory :
   3- gst
   4- finalst
 
+For an example of what is described in this README, you can have a look
+at the create_strat_file.sh script that does all the steps described
+here.
+
 Firstly, gfm allows to choose the optimal parameters (B1, B2) for each
 factoring methods (PM1, PP1-27, PP1-65, ECM-M12, ECM-M16, ECM-B12) to
 find a prime number in [2^(lb-1), 2^ub]. Potentially, there are
-innumerable couples of parameters. So, you can specify the sieve
+infintely many couples of parameters. So, you can specify the
 region that you want to test with several options:
    - b1min, b1_max, b1step
    - cmin, cmax, cstep (where c equal to B2/B1).
 
-Remark: An example is given by the script script_fm.sh
-------
-
 Now, you have got your optimal parameters for each type of factoring
 methods. In the context of the sieving step, the goal is to define
-strategies to find quickly the most relations. Before choosing these
-strategies, you must do a benchmark over your factoring methods to
-know exatly what is the probability and the cost to find a prime
-number of certain bit size.
+strategies to find quickly as many relations as possible. Before choosing
+these strategies, you must do a benchmark over your factoring methods to
+know exatly what is the probability and the cost to find a prime number
+of certain bit size.
 
 To do this, the binary benchfm is available. In input, you give a file
 with factoring methods, and you can compute the probabilities and/or
 the time for each one of them. 
 
-Remark: An example is given by the script script_bench.sh
-------
-
-Note that you consider to have so much methods, you can use the option
--f of the binary ./bench to keep only a certain number of factoring
-methods.
+If you consider that you have to many methods, you can use the -f option
+of the binary ./benchfm to filter them and keep only the given number of
+factoring methods.
 
 
 output file format :
 ------------------
+One line for each factoring method:
 m c B1 B2 | p propa_p proba_(p+1) ...  | c1 c2 c3 c4 |
-etc... one line equals to one factoring method.
 where:
   - m denotes a type of method and c denotes the curve
     (PM1=1 0, PP1-27=2 0, PP1-65=3 0, ECM-M12=4 2, ECM-M16=4 4, ECM-B12=4 1)
@@ -55,25 +53,24 @@ where:
 
 
 /*****************************************************************************/
-/*                       to generate our strategies                          */
+/*                       to generate the strategies                          */
 /*****************************************************************************/
 
-Now, you have generated our factoring methods, but you must chain them
-to optain the best performances. In order to do that, we can use the
+Now that you have generated the factoring methods, you must chain them
+to optain the best performance. In order to do that, you can use the
 binary gst to build the optimal strategies for each pair of bit
 lengths. 
- This program works firstly side by side. On each side, for
-each bit size of cofactor, you generate many strategies and keep only
-the best ones. After these different computations, it merges them to
-generate on each pair of cofactors the best strategies to find 
-a prime divisor.
 
-In what follows, we give an example to illustrate a procedure to
-achieve our objective:
+First, this program works on each side independatly. On each side, for
+each bit size of cofactor, you generate many strategies and keep only the
+best ones. After these different computations, it merges them to generate
+on each pair of cofactors the best strategies to find a prime divisor.
 
-Firsly, you should precompute all decompositions of cofactors of less than mfb
-bits given that  it has no prime divisors less than fbb. To do it, assuming you
-have created a directory decomp_tmp/:
+Let's give an example.
+
+First, you should precompute all decompositions of cofactors of less than
+mfb bits given that it has no prime divisors less than fbb. To do it,
+assuming you have created a directory decomp_tmp/:
 
 #524288 = 2^19
 ./gst -gdc -lim0 524288 -mfb0 39 -out decomp_tmp/decomp_524288_39
@@ -85,36 +82,25 @@ cat decomp_tmp/decomp_524288_40
 ./gst -gdc -lim0 524288 -mfb0 41 -out decomp_tmp/decomp_524288_41
 ./gst -gdc -lim0 524288 -mfb0 42 -out decomp_tmp/decomp_524288_42
 ./gst -gdc -lim0 524288 -mfb0 43 -out decomp_tmp/decomp_524288_43
-etc ... until mfb!
-
-Remark: An example is given by the script script_gen_dec.sh
-------
+etc ... until mfb.
 
 Secondly, you should distribute the precomputation of strategies for each
 size and side.
 
-Remark: An example is given by the script script_str_r.sh
-------
-
-Note that the files results are stored in the directory 'out' and the
-format name of files is: strategies$lim_$r, where lim is the factor
+Note that the resulting files are stored in the directory 'out' and the
+convention for the filenames is: strategies$lim_$r, where lim is the factor
 base bound and r the bit size of the cofactor.
 
-Then, you merge our results to compute the matrix which stores the
-differents strategies for each pair of bit size.
-
-Remark: An example is given by the script script_str.sh
-------
+Then, you merge the results to compute the matrix which stores the
+differents strategies for each pair of bit sizes.
 
 Note that the format name of files is: strategies_r0_r1, where r0 and r1
-are the bit size of the studied pair of cofactors (r0,r1).
+are the bit sizes of the studied pair of cofactors (r0,r1).
 
 Note that: Without options '-gst' or '-gst_r' the binary 'gst'
-computes our matrix of strategies without precompution. For more
+computes the matrix of strategies without precompution. For more
 information, see the function generate_matrix() in
 generate_strategies.c.
-
-
 
 output file format :
 ------------------
@@ -130,7 +116,7 @@ with: m the factoring method
       b1 and b2 the parameters
       side is the side where one applies this factoring method.
       p and t the probability and the time to find a non
-      trivial factor in our cofactor.
+      trivial factor in the cofactor.
 
 
 /******************************************************************************/
@@ -162,7 +148,7 @@ For example, if one runs las with:
 -lim1 16777216 -lpb0 29 -lpb1 29 -mfb0 90 -mfb1 90 -mt 1 -stats-cofact
 cofactors.stats -fb1 rsa155.roots
 
-one optains:
+one obtains:
 # Total cpu time 373.77s [norm 0.29+1.3, sieving 81.9
 (37.7 + 4.4 + 39.8), factor 290.2 (53.5 + 236.7)]
 
@@ -189,7 +175,3 @@ And each [S: m, b1, b2] is a factoring method given by the
 method m and these parameters b1 and b2, and S is the side where
 this factoring method is apply (S0 for r0 and S1 for r1).
 
-
-
-Remark: an example of this procedure is given in README.rsa704.
-------

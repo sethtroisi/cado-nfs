@@ -222,7 +222,7 @@ compute_rational_approximation (double *Q, double q, unsigned int nb_approx,
   return n;
 }
 
-/* Compute the skewness value that are going to be used for LLL */
+/* Compute the skewness values that are going to be used for LLL */
 static inline void
 sopt_list_skewness_values (mpz_t *skew, mpz_poly_srcptr f, mpz_poly_srcptr g,
                            const int verbose)

@@ -372,9 +372,13 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(qlattice_basis_srcptr basis, const i
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
   /* Create a transformed vector and store the index of the slice we currently
      transform */
+  const unsigned long special_q = mpz_fits_ulong_p(basis->q) ? mpz_get_ui(basis->q) : 0;
+
   fb_transformed_vector *result = new fb_transformed_vector(get_index());
   size_t i_entry = 0;
   for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
+    if (it->p == special_q) /* Assumes it->p != 0 */
+      continue;
     it->transform_roots(transformed, basis);
     for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);

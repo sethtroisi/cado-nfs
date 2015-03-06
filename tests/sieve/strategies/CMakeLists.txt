@@ -38,7 +38,15 @@ add_executable(test_filtering
 target_link_libraries(test_filtering ${LIB_EXEC})
 run_test (test_filtering test_filtering)
 
+add_executable(test_benchfm
+  test_benchfm.c
+  ${SUF_SRC}/generate_factoring_method.c
+  ${SRC_UTILS})
+target_link_libraries(test_benchfm ${LIB_EXEC})
+run_test (test_benchfm test_benchfm)
 
-
+if(DEFINED ENV{CHECKS_EXPENSIVE})
+    run_test(strategies_main_script ${CMAKE_CURRENT_SOURCE_DIR}/test_main_script.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
+endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
 add_subdirectory (utils_st)

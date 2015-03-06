@@ -921,21 +921,27 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 #endif
 
 
+void
+fill_in_buckets_one_slice(thread_data_ptr th, const int side, const fb_slice_interface *slice)
+{
+    where_am_I w;
+    WHERE_AM_I_UPDATE(w, si, th->si);
+    const fb_transformed_vector *transformed_vector = slice->make_lattice_bases(th->si->qbasis, th->si->conf->logI);
+    fill_in_buckets(th, side, transformed_vector, slice, w);
+    delete transformed_vector;
+}
+
 static void
 fill_in_buckets_one_side(thread_data_ptr th, const int side)
 {
-    fb_part *fb = th->sides[side]->fb;
-    where_am_I w;
-    WHERE_AM_I_UPDATE(w, si, th->si);
+    const fb_part *fb = th->sides[side]->fb;
     if (th->sides[side]->BA.n_bucket < THRESHOLD_K_BUCKETS) {
       /* Process all slices in this factor base part */
       const fb_slice_interface *slice;
       for (slice_index_t slice_index = fb->get_first_slice_index();
            (slice = fb->get_slice(slice_index)) != NULL;
            slice_index++) {
-          const fb_transformed_vector *transformed_vector = slice->make_lattice_bases(th->si->qbasis, th->si->conf->logI);
-          fill_in_buckets(th, side, transformed_vector, slice, w);
-          delete transformed_vector;
+          fill_in_buckets_one_slice(th, side, slice);
       }
     }
 #ifdef HAVE_K_BUCKETS

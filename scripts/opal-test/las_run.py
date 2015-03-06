@@ -23,8 +23,7 @@ def primepi(x):
 def run(param_file, problem):
     "Run las with given parameters until the required number of relations is found."
 
-    home_dir = os.environ["HOME"]
-    build_dir = "%s/build/cado-nfs/normal" % home_dir
+    build_dir = os.environ["CADO_BUILD"]
 
     makefb = "%s/sieve/makefb" % build_dir
     las = "%s/sieve/las" % build_dir
@@ -41,7 +40,9 @@ def run(param_file, problem):
         "mfba": 22,
         "rlambda": 1.2,
         "alambda": 1.2,
-        "t": 2
+        "ncurves0": 6,
+        "ncurves1": 6,
+        "t": 1 # las currently does not work with -t 2 or more
     }
     makefb_params = {
         "poly" : las_params["poly"],
@@ -59,7 +60,7 @@ def run(param_file, problem):
     las_params["alambda"] = 1.0 * las_params["mfba"] / las_params["lpba"] + 0.1
     las_params["rlambda"] = 1.0 * las_params["mfbr"] / las_params["lpbr"] + 0.1
 
-    to_print = ["I", "alim", "lpba", "mfba", "alambda", "rlim", "lpbr", "mfbr", "rlambda"]
+    to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     # Update parameters for makefb (which may depend on las parameters)
@@ -95,7 +96,7 @@ def run(param_file, problem):
         if not stats.parse_one_file(outputfile):
             raise Exception("Could not read statistics from %s" % outputfile)
         os.unlink(outputfile)
-        sys.stderr.write("   Up to q=%u, estimate %u/%u relations\n" % (q0, stats.get_rels(), rels_wanted))
+        # sys.stderr.write("   Up to q=%u, estimate %u/%u relations\n" % (q0, stats.get_rels(), rels_wanted))
         # set q_inc so that we do about 10 sieving tests of length q_range
         if q_inc == 0:
            v = stats.relations_int.lastvalue[0]

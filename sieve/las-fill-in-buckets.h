@@ -2,6 +2,7 @@
 #define LAS_FILL_IN_BUCKETS_H_
 
 #include "las-types.h"
+#include "las-threads.h"
 
 #ifdef __cplusplus
 extern "C" {

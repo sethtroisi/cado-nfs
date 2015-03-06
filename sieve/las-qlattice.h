@@ -2,6 +2,7 @@
 #define LAS_QLATTICE_H_
 
 #include <stdint.h>
+#include <gmp.h>
 #include "fb-types.h"         /* fbprime_t */
 #include "portability.h"
 
@@ -14,6 +15,16 @@ extern "C" {
 
 struct qlattice_basis_s {
     int64_t a0, b0, a1, b1;
+    mpz_srcptr q;
+    void set_q(mpz_srcptr special_q) {
+      /* Currently requires prime special-q values.
+         For powers, the base prime would have to be determined and stored in
+         a variable, so that powers of that prime in the factor base can be
+         skipped over. For composite special-q, a list of primes would have to
+         be stored and skipped. */
+      ASSERT_ALWAYS(!mpz_perfect_power_p(special_q));
+      q = special_q;
+    };
 };
 typedef struct qlattice_basis_s qlattice_basis_t[1];
 typedef struct qlattice_basis_s *qlattice_basis_ptr;

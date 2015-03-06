@@ -193,7 +193,7 @@ ropt_do_both_stages ( ropt_poly_t poly,
   else if (poly->d == 6 || poly->d == 7)
     ropt_quadratic (poly, bestpoly, param, info);
   else {
-    fprintf (stderr, "Error: only support deg 4, 5, 6 and 7.\n");
+    fprintf (stderr, "Error: only support deg 3, 4, 5, 6 and 7.\n");
     exit(1);
   }
 }

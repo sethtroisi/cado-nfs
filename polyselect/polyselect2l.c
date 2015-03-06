@@ -68,17 +68,13 @@ double optimize_time = 0.0;
 static void
 mutex_lock(pthread_mutex_t *lock)
 {
-#ifdef MAX_THREADS
   pthread_mutex_lock (lock);
-#endif
 }
 
 static void
 mutex_unlock(pthread_mutex_t *lock)
 {
-#ifdef MAX_THREADS
   pthread_mutex_unlock (lock);
-#endif
 }
 
 /* inline function */
@@ -1812,9 +1808,7 @@ main (int argc, char *argv[])
   int quiet = 0, tries = 0, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
-#ifdef MAX_THREADS
   pthread_t tid[MAX_THREADS];
-#endif
 
   mpz_init (N);
   mpz_init (admin);
@@ -1920,12 +1914,10 @@ main (int argc, char *argv[])
   }
 
   /* check nthreads */
-#ifdef MAX_THREADS
   if (nthreads > MAX_THREADS) {
     fprintf (stderr, "Error, nthreads should be <= %d\n", MAX_THREADS);
     exit (1);
   }
-#endif
 
   /* quiet mode */
   if (quiet == 1)
@@ -2011,19 +2003,13 @@ main (int argc, char *argv[])
       if (verbose >= 1)
         gmp_printf ("# %d ad=%Zd\n", tries, admin);
       mpz_set (T[i]->ad, admin);
-#ifndef MAX_THREADS
-      newAlgo (N, d, admin);
-#else
       pthread_create (&tid[i], NULL, one_thread, (void *) (T+i));
-#endif
       mpz_add_ui (admin, admin, incr);
     }
-#ifdef MAX_THREADS
     /* we have created i threads, with i = nthreads usually, except at the
        end of the [admin, admax-1] range where we might have i < nthreads */
     while (i > 0)
       pthread_join (tid[--i], NULL);
-#endif
 
     if (milliseconds () > (unsigned long) target_time || verbose > 0)
     {

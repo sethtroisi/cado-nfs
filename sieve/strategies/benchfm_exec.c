@@ -26,6 +26,7 @@ static void declare_usage(param_list pl)
 			  "to begin the benchmark with prime numbers of 'lb' bits.");
     param_list_decl_usage(pl, "p", "(switch) to bench the probabilities.");
     param_list_decl_usage(pl, "t", "(switch) to bench the times.");
+    param_list_decl_usage(pl, "N", "number of tests to run for each bench");
     param_list_decl_usage(pl, "in",
 			  "to locate the file which contains our factoring methods.");
     param_list_decl_usage(pl, "f",
@@ -41,6 +42,7 @@ static void declare_usage(param_list pl)
 
 int main(int argc, char *argv[])
 {
+    int nb_test = 0;
     param_list pl;
     param_list_init(pl);
     declare_usage(pl);
@@ -84,6 +86,7 @@ int main(int argc, char *argv[])
     int opt_time = param_list_parse_switch(pl, "-t");
     param_list_parse_int(pl, "lb", &len_p_min);
     param_list_parse_int(pl, "f", &final_nb_fm);
+    param_list_parse_int(pl, "N", &nb_test);
 
     const char *pathname_in;
     const char *pathname_out;
@@ -123,10 +126,10 @@ int main(int argc, char *argv[])
 		    param_list_clear(pl);
 		    exit(EXIT_FAILURE);
 		}
-	    bench_proba(state, c, len_p_min);
+	    bench_proba(state, c, len_p_min, 0, nb_test);
 	}
     if (opt_time)
-	bench_time(state, c);
+	bench_time(state, c, nb_test);
 
     if (final_nb_fm != -1)
 	{

@@ -287,18 +287,21 @@ bench_time_fm_onelength(facul_strategy_t * method, mpz_t* N, int nb_test)
   from 'len_p_min' until the probability become null. 
 */
 
-void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
+void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min,
+        int p_max, int nb_test_max)
 {
     int len = fm->index;	//number of methods!
-    int p_max = 100;
+    if (p_max == 0)
+        p_max = 100;
+    if (nb_test_max == 0)
+        nb_test_max = 10000;
     double *proba = malloc(p_max * sizeof(double));
     ASSERT(proba != NULL);
 
     unsigned long *param;
     fm_t *elem;
     //{{Will contain the our composite integers!
-    int nb_test_max = 10000;
-    mpz_t*N[p_max];
+    mpz_t* N[p_max];
     for (int i = 0; i < p_max; i++)
 	{
 	    N[i] = malloc(sizeof (mpz_t) * (nb_test_max+1));
@@ -359,14 +362,15 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
   bits size (MODREDCUL_MAXBITS, MODREDC15UL_MAXBITS,
   MODREDC2UL2_MAXBITS and MODREDC2UL2_MAXBITS+30).
 */
-void bench_time(gmp_randstate_t state, tabular_fm_t * fm)
+void bench_time(gmp_randstate_t state, tabular_fm_t * fm, int nb_test)
 {
     unsigned long *param;
     fm_t *elem;
     int len = fm->index;	//number of methods!
     //precompute 4 arrays for our bench_time!
     //{{
-    int nb_test = 100000;
+    if (nb_test == 0)
+        nb_test = 100000;
     mpz_t* N1 = malloc(sizeof(mpz_t) * nb_test);
     mpz_t* N2 = malloc(sizeof(mpz_t) * nb_test);
     mpz_t* N3 = malloc(sizeof(mpz_t) * nb_test);

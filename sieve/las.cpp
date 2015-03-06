@@ -7,7 +7,6 @@
 #include <math.h>   // for ceiling, floor in cfrac
 #include <ctype.h>
 #include <float.h>
-#include <pthread.h>
 #include <fcntl.h>   /* for _O_BINARY */
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
@@ -32,6 +31,7 @@
 #include "las-descent-helpers.h"
 #include "las-cofactor.h"
 #include "las-fill-in-buckets.h"
+#include "las-threads.h"
 #include "memusage.h"
 
 #ifdef HAVE_SSE41
@@ -47,8 +47,6 @@
 
 int create_descent_hints = 0;
 double tt_qstart;
-
-#define BUCKET_REGION (1 << LOG_BUCKET_REGION)
 
 /* {{{ for cofactorization statistics */
 
@@ -291,9 +289,9 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
 
     for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++)
     {
-        size_t nr_primes;
+        size_t nr_primes, nr_roots;
         double weight;
-        s->fb->get_part(i_part)->count_entries(&nr_primes, NULL, &weight);
+        s->fb->get_part(i_part)->count_entries(&nr_primes, &nr_roots, &weight);
         /* Part 0 gets line-sieved and thus should not be taken into
            consideration for the bucket size */
         if (i_part > 0)
@@ -301,6 +299,8 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
         if (nr_primes != 0 || weight != 0.) {
             verbose_output_print(0, 1, "# Number of primes in %s factor base part %d = %zu\n",
                                  sidenames[side], i_part, nr_primes);
+            verbose_output_print(0, 1, "# Number of prime ideals in %s factor base part %d = %zu\n",
+                                 sidenames[side], i_part, nr_roots);
             verbose_output_print(0, 1, "# Weight of primes in %s factor base part %d = %0.5g\n",
                                  sidenames[side], i_part, weight);
         }
@@ -1295,42 +1295,6 @@ void init_trace_k(sieve_info_srcptr si, param_list pl)
         have_trace_ij ? &ij : NULL);
 }
 
-/* utility. Can go elsewhere */
-void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
-{
-    if (n == 1) {
-        /* Then don't bother with pthread calls */
-        (*f)(thrs[0]);
-        return;
-    }
-    pthread_t * th = (pthread_t *) malloc(n * sizeof(pthread_t)); 
-    ASSERT_ALWAYS(th);
-
-#if 0
-    /* As a debug measure, it's possible to activate this branch instead
-     * of the latter. In effect, this causes las to run in a
-     * non-multithreaded way, albeit strictly following the code path of
-     * the multithreaded case.
-     */
-    for (int i = 0; i < n ; ++i) {
-        (*f)(thrs[i]);
-    }
-#else
-    for (int i = 0; i < n ; ++i) {
-        int ret = pthread_create(&(th[i]), NULL, 
-		(void * (*)(void *)) f,
-                (void *)(thrs[i]));
-        ASSERT_ALWAYS(ret == 0);
-    }
-    for (int i = 0; i < n ; ++i) {
-        int ret = pthread_join(th[i], NULL);
-        ASSERT_ALWAYS(ret == 0);
-    }
-#endif
-
-    free(th);
-}/*}}}*/
-
 /* {{{ apply_buckets */
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
@@ -1459,7 +1423,7 @@ static long nr_wrap_was_composite = 0;
 /* The entries in BP must be sorted in order of increasing x */
 static void
 divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
-                           bucket_primes_t *BP)
+                           bucket_primes_t *BP, const int very_verbose)
 {
   while (!BP->is_end()) {
       const bucket_prime_t prime = BP->get_next_update();
@@ -1471,6 +1435,11 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
       if (prime.x == x) {
           if (bucket_prime_stats) nr_bucket_primes++;
           const unsigned long p = prime.p;
+          if (very_verbose) {
+              verbose_output_vfprint(0, 1, gmp_vfprintf,
+                                     "# N = %u, x = %d, dividing out prime hint p = %lu, norm = %Zd\n",
+                                     N, x, p, norm);
+          }
           if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
               verbose_output_print(1, 0,
                        "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
@@ -1489,7 +1458,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
 /* The entries in BP must be sorted in order of increasing x */
 static void
 divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
-                          bucket_array_complete *purged, const fb_factorbase *fb)
+                          bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
 {
   while (!purged->is_end()) {
       const bucket_complete_update_t complete_hint = purged->get_next_update();
@@ -1503,6 +1472,11 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
           const fb_slice_interface *slice = fb->get_slice(complete_hint.index);
           ASSERT_ALWAYS(slice != NULL);
           const unsigned long p = slice->get_prime(complete_hint.hint);
+          if (very_verbose) {
+              verbose_output_vfprint(0, 1, gmp_vfprintf,
+                                     "# N = %u, x = %d, dividing out slice hint, slice index = %lu, slice offset = %lu, p = %lu, norm = %Zd\n",
+                                     N, x, (unsigned long) complete_hint.index, (unsigned long) complete_hint.hint, p, norm);
+          }
           if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
               verbose_output_print(1, 0,
                        "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
@@ -1523,15 +1497,22 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
            const bool handle_2, bucket_primes_t *primes,
            bucket_array_complete *purged,
 	   trialdiv_divisor_t *trialdiv_data,
-           int64_t a MAYBE_UNUSED, uint64_t b MAYBE_UNUSED,
+           int64_t a, uint64_t b,
            const fb_factorbase *fb)
 {
+#ifdef TRACE_K
+    const int trial_div_very_verbose = trace_on_spot_ab(a,b);
+#else
     const int trial_div_very_verbose = 0;
+#endif
     int nr_factors;
     fl->n = 0; /* reset factor list */
 
-    if (trial_div_very_verbose)
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "# trial_div() entry, x = %d, norm = %Zd\n", x, norm);
+    if (trial_div_very_verbose) {
+        verbose_output_start_batch();
+        verbose_output_print(1, 1, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = ", N, x, a, b);
+        verbose_output_vfprint(1, 1, gmp_vfprintf, "%Zd\n", norm);
+    }
 
     // handle 2 separately, if it is in fb
     if (handle_2) {
@@ -1542,23 +1523,15 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
             fl->n++;
         }
         if (trial_div_very_verbose)
-            verbose_output_vfprint(1, 0, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
+            verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
     }
 
     // remove primes in "primes" that map to x
-    divide_primes_from_bucket (fl, norm, N, x, primes);
-    divide_hints_from_bucket (fl, norm, N, x, purged, fb);
-#ifdef TRACE_K /* {{{ */
-    if (trace_on_spot_ab(a,b) && fl->n) {
-        verbose_output_print(1, 0, "# divided by 2 + primes from bucket that map to %u: ", x);
-        if (!factor_list_fprint(stderr, *fl))
-            verbose_output_print(1, 0, "(none)");
-        verbose_output_vfprint(1, 0, gmp_vfprintf, ", remaining norm is %Zd\n", norm);
-    }
-#endif /* }}} */
+    divide_primes_from_bucket (fl, norm, N, x, primes, trial_div_very_verbose);
+    divide_hints_from_bucket (fl, norm, N, x, purged, fb, trial_div_very_verbose);
     if (trial_div_very_verbose)
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
+        verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
 
     do {
       /* Trial divide primes with precomputed tables */
@@ -1566,11 +1539,10 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       int i;
       unsigned long factors[TRIALDIV_MAX_FACTORS];
       if (trial_div_very_verbose) {
-          /* FIXME: Multi-threading can garble this */
-          verbose_output_print(1, 0, "# Trial division by ");
+          verbose_output_print(1, 1, "# Trial division by");
           for (i = 0; trialdiv_data[i].p != 1; i++)
-              verbose_output_print(1, 0, " %lu", trialdiv_data[i].p);
-          verbose_output_print(1, 0, "\n");
+              verbose_output_print(1, 1, " %lu", trialdiv_data[i].p);
+          verbose_output_print(1, 1, "\n# Factors found: ");
       }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, TRIALDIV_MAX_FACTORS);
@@ -1578,72 +1550,26 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       for (i = 0; i < MIN(nr_factors, TRIALDIV_MAX_FACTORS); i++)
       {
           if (trial_div_very_verbose)
-              verbose_output_print (1, 0, " %lu", factors[i]);
+              verbose_output_print (1, 1, " %lu", factors[i]);
           factor_list_add (fl, factors[i]);
       }
-      if (trial_div_very_verbose)
-          verbose_output_vfprint(1, 0, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
+      if (trial_div_very_verbose) {
+          verbose_output_vfprint(1, 1, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
+      }
     } while (nr_factors == TRIALDIV_MAX_FACTORS + 1);
+
+    if (trial_div_very_verbose)
+        verbose_output_end_batch();
 }
 /* }}} */
-
-/* Compute a checksum over the bucket region.
-
-   We import the bucket region into an mpz_t and take it modulo
-   checksum_prime. The checksums for different bucket regions are added up,
-   modulo checksum_prime. This makes the combined checksum independent of
-   the order in which buckets are processed, but it is dependent on size of
-   the bucket region. Note that the selection of the sieve region, i.e., of J
-   depends somewhat on the number of threads, as we want an equal number of
-   bucket regions per thread. Thus the checksums are not necessarily
-   comparable between runs with different numbers of threads. */
-
-static const unsigned int checksum_prime = 4294967291u; /* < 2^32 */
-
-/* Combine two checksums. Simply (checksum+checksum2) % checksum_prime,
-   but using modul_*() to handle sums >= 2^32 correctly. */
-static unsigned int
-combine_checksum(const unsigned int checksum1, const unsigned int checksum2)
-{
-    modulusul_t m;
-    residueul_t r1, r2;
-    unsigned int checksum;
-
-    modul_initmod_ul(m, checksum_prime);
-    modul_init(r1, m);
-    modul_set_ul(r1, checksum1, m);
-    modul_init(r2, m);
-    modul_set_ul(r2, checksum2, m);
-    modul_add(r1, r1, r2, m);
-    checksum = modul_get_ul(r1, m);
-    modul_clear(r1, m);
-    modul_clear(r2, m);
-    modul_clearmod(m);
-    return checksum;
-}
-
-static unsigned int
-bucket_checksum(const unsigned char *bucket, const unsigned int prev_checksum)
-{
-    mpz_t mb;
-    unsigned long checksum;
-
-    mpz_init(mb);
-    mpz_import(mb, BUCKET_REGION, -1, sizeof(unsigned char), -1, 0, bucket);
-    checksum = mpz_tdiv_ui(mb, checksum_prime);
-    mpz_clear(mb);
-    checksum = combine_checksum (checksum, prev_checksum);
-
-    return checksum;
-}
 
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
 NOPROFILE_STATIC int
-factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
+factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 {
-    las_info_ptr las = th->las;
+    las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
     las_report_ptr rep = th->rep;
     int cpt = 0;
@@ -1664,6 +1590,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
     const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+    unsigned char * S[2] = {th->sides[0]->bucket_region, th->sides[1]->bucket_region};
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (1);
@@ -1687,11 +1614,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     }
 #endif  /* }}} */
 
-    if (las->verbose >= 2) {
-        /* Update the checksums over the bucket regions */
-        for (int side = 0; side < 2; side++)
-            th->checksum_post_sieve[side] = bucket_checksum(S[side], th->checksum_post_sieve[side]);
-    }
+    if (las->verbose >= 2)
+        th->update_checksums();
 
     /* This is the one which gets the merged information in the end */
     unsigned char * SS = S[0];
@@ -1862,7 +1786,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
+                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
+                    verbose_output_print(1, 0, "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
                 }
 #endif
                 verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
@@ -1877,7 +1802,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# checked leftover norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",norm[side],sidenames[side],a,b,pass);
+                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# checked leftover norm=%Zd", norm[side]);
+                    verbose_output_print(1, 0, " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n", sidenames[side], a, b, pass);
                 }
 #endif
             }
@@ -1900,9 +1826,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
 	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
-            if (trace_on_spot_ab(a, b) && pass == 0)
-              verbose_output_vfprint(1, 0, gmp_vfprintf, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), remains %Zd, %Zd unfactored\n",
-                           a, b, norm[0], norm[1]);
+            if (trace_on_spot_ab(a, b) && pass == 0) {
+              verbose_output_print(1, 0, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
+              verbose_output_vfprint(1, 0, gmp_vfprintf, "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
+            }
 #endif
             if (pass <= 0) continue; /* a factor was > 2^lpb, or some
                                         factorization was incomplete */
@@ -2216,7 +2143,7 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
 void * process_bucket_region(thread_data_ptr th)
 {
     where_am_I w MAYBE_UNUSED;
-    las_info_ptr las = th->las;
+    las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
 
     WHERE_AM_I_UPDATE(w, si, si);
@@ -2301,7 +2228,7 @@ void * process_bucket_region(thread_data_ptr th)
 
         /* Factor survivors */
         rep->ttf -= seconds_thread ();
-        rep->reports += factor_survivors (th, i, S, w);
+        rep->reports += factor_survivors (th, i, w);
         rep->ttf += seconds_thread ();
 
         /* For the descent mode, we bail out as early as possible */
@@ -2325,120 +2252,6 @@ void * process_bucket_region(thread_data_ptr th)
     return NULL;
 }/*}}}*/
 
-/* thread handling */
-static thread_data * thread_data_alloc(las_info_ptr las, int n)/*{{{*/
-{
-    thread_data * thrs = (thread_data *) malloc(n * sizeof(thread_data));
-    ASSERT_ALWAYS(thrs);
-    memset(thrs, 0, n * sizeof(thread_data));
-
-    for(int i = 0 ; i < n ; i++) {
-        thrs[i]->id = i;
-        thrs[i]->las = las;
-        las_report_init(thrs[i]->rep);
-        thrs[i]->checksum_post_sieve[0] = thrs[i]->checksum_post_sieve[1] = 0;
-
-        /* Allocate memory for each thread's two bucket regions (one for each
-           side) and for the intermediate sum (only one for both sides) */
-        for (int side = 0; side < 2; side++) {
-          thread_side_data_ptr ts = thrs[i]->sides[side];
-          // printf ("# Allocating thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          ts->bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
-        }
-        thrs[i]->SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
-
-        
-    }
-    return thrs;
-}/*}}}*/
-
-static void thread_data_free(thread_data * thrs, int n)/*{{{*/
-{
-    for (int i = 0; i < n ; ++i) {
-        las_report_clear(thrs[i]->rep);
-        ASSERT_ALWAYS(thrs[i]->SS != NULL);
-
-        /* Free the memory for the bucket regions */
-        for (int side = 0; side < 2; side++) {
-          thread_side_data_ptr ts = thrs[i]->sides[side];
-          // printf ("# Freeing thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          contiguous_free(ts->bucket_region);
-          ts->bucket_region = NULL;
-        }
-        contiguous_free(thrs[i]->SS);
-        thrs[i]->SS = NULL;
-    }
-    free(thrs);
-}/*}}}*/
-
-void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
-{
-    for (int i = 0; i < n ; ++i) {
-        thrs[i]->si = si;
-        for(int s = 0 ; s < 2 ; s++) {
-            thrs[i]->sides[s]->fb = si->sides[s]->fb->get_part(1);
-        }
-    }
-}/*}}}*/
-
-/* {{{ thread_buckets_alloc
- * TODO: Allow allocating larger buckets if bucket_fill_ratio ever grows
- * above the initial guess. This can easily be made a permanent choice.
- *
- * Note also that we could consider having bucket_fill_ratio global.
- */
-static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
-{
-  for (unsigned int i = 0; i < n ; ++i) {
-    for(unsigned int side = 0 ; side < 2 ; side++) {
-      thread_side_data_ptr ts = thrs[i]->sides[side];
-      sieve_info_srcptr si = thrs[i]->si;
-      /* We used to re-allocate whenever the number of buckets changed. Now we
-         always allocate memory for the max. number of buckets, so that we
-         never have to re-allocate */
-      uint32_t nb_buckets;
-      /* If shell environment variable LAS_REALLOC_BUCKETS is *not* set,
-         always allocate memory for the max. number of buckets, so that we
-         never have to re-allocate. If it is set, allocate just enough for
-         for the current number of buckets, which will re-allocate memory
-         if number of buckets changes. */
-      if (getenv("LAS_REALLOC_BUCKETS") == NULL) {
-        nb_buckets = si->nb_buckets_max;
-      } else {
-        nb_buckets = si->nb_buckets;
-      }
-      init_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA),
-                   si->sides[side]->max_bucket_fill_ratio, nb_buckets);
-    }
-  }
-}/*}}}*/
-
-static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
-{
-  for (unsigned int i = 0; i < n ; ++i) {
-    thread_side_data_ptr ts;
-    for(unsigned int side = 0 ; side < 2 ; side++) {
-      // fprintf ("# Freeing buckets, thread->id=%d, side=%d\n", thrs[i]->id, side);
-      ts = thrs[i]->sides[side];
-      /* if there is no special-q in the interval, the arrays are not malloced */
-      if (ts->BA.bucket_write != NULL)
-        clear_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA));
-    }
-  }
-}/*}}}*/
-
-static double thread_buckets_max_full(thread_data * thrs, int n)/*{{{*/
-{
-    double mf0 = 0;
-    for (int i = 0; i < n ; ++i) {
-        double mf = buckets_max_full (thrs[i]->sides[RATIONAL_SIDE]->BA);
-        if (mf > mf0) mf0 = mf;
-        mf = buckets_max_full (thrs[i]->sides[ALGEBRAIC_SIDE]->BA);
-        if (mf > mf0) mf0 = mf;
-    }
-    return mf0;
-}/*}}}*/
-
 /* {{{ las_report_accumulate_threads_and_display
  * This function does three distinct things.
  *  - accumulates the timing reports for all threads into a collated report
@@ -2446,23 +2259,23 @@ static double thread_buckets_max_full(thread_data * thrs, int n)/*{{{*/
  *    timing argument (in seconds).
  *  - merge the per-sq report into a global report
  */
-void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_data * thrs, double qt0)
+void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_data_ptr thrs, double qt0)
 {
     /* Display results for this special q */
     las_report rep;
     las_report_init(rep);
-    unsigned int checksum_post_sieve[2] = {0, 0};
+    sieve_checksum checksum_post_sieve[2];
     
     for (int i = 0; i < las->nb_threads; ++i) {
-        las_report_accumulate(rep, thrs[i]->rep);
+        las_report_accumulate(rep, thrs[i].rep);
         for (int side = 0; side < 2; side++)
-            checksum_post_sieve[side] = combine_checksum(checksum_post_sieve[side], thrs[i]->checksum_post_sieve[side]);
+            checksum_post_sieve[side].update(thrs[i].sides[side]->checksum_post_sieve);
     }
     verbose_output_print(0, 2, "# ");
     /* verbose_output_print(0, 2, "%lu survivors after rational sieve,", rep->survivors0); */
     verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
     verbose_output_print(0, 2, "coprime: %lu\n", rep->survivors2);
-    verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0], checksum_post_sieve[1]);
+    verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0].get_checksum(), checksum_post_sieve[1].get_checksum());
     verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     if (rep->both_even) {
@@ -2653,7 +2466,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     tune_las_memset();
     
-    thread_data * thrs = thread_data_alloc(las, las->nb_threads);
+    thread_data_ptr thrs = thread_data_alloc(las, las->nb_threads);
 
     las_report report;
     las_report_init(report);
@@ -2756,6 +2569,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->conf->skewness) != 0)
             continue;
+        si->qbasis->set_q(si->doing->p);
 
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
 #ifndef SUPPORT_LARGE_Q
@@ -2774,17 +2588,19 @@ int main (int argc0, char *argv0[])/*{{{*/
          * extreme cases, see bug 15617
          */
         if (sieve_info_adjust_IJ(si, las->nb_threads) == 0) {
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
-                    sidenames[si->conf->side],
-                    si->doing->p, si->doing->r, si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1,
-                    si->J);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END,
+                                   sidenames[si->conf->side], si->doing->p, si->doing->r);
+            verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n", 
+                                 si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1, si->J);
             continue;
         }
 
 
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Sieving %s q=%Zd; rho=%Zd;" HILIGHT_END " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
-                sidenames[si->conf->side],
-                si->doing->p, si->doing->r, si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Sieving %s q=%Zd; rho=%Zd;" HILIGHT_END,
+                               sidenames[si->conf->side], si->doing->p, si->doing->r);
+
+        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
+                             si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
         if (si->doing->depth) {
             verbose_output_print(0, 1, " # within descent, currently at depth %d", si->doing->depth);
         }
@@ -2817,7 +2633,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * las_report_accumulate_threads_and_display further down, hence
          * this hack).
          */
-        thrs[0]->rep->ttbuckets_fill -= seconds();
+        thrs[0].rep->ttbuckets_fill -= seconds();
 
         thread_pickup_si(thrs, si, las->nb_threads);
 
@@ -2858,7 +2674,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif /* }}} */
 
-        thrs[0]->rep->ttbuckets_fill += seconds();
+        thrs[0].rep->ttbuckets_fill += seconds();
 
         /* This can now be factored out ! */
         for(int side = 0 ; side < 2 ; side++) {
@@ -2967,7 +2783,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 	fclose (cof_stats_file);
     }
     //}}
-    thread_data_free(thrs, las->nb_threads);
+    thread_data_free(thrs);
 
     las_report_clear(report);
 
@@ -2977,3 +2793,4 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     return 0;
 }/*}}}*/
+

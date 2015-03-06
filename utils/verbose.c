@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <inttypes.h>
 #include "portability.h" /* For vasprintf */
 #include "verbose.h"
 
@@ -425,6 +426,24 @@ verbose_output_get(const size_t channel, const int verbose, const size_t index)
     return output;
 }
 
+/* On Windows, the format strings for PRId64 and PRIu64 are "I64d" and "I64u",
+   resp., but GMP's printf does not understand those. This is the source of
+   hard-to-debug crashes, so we try to protect against this error here.
+   We don't include gmp.h here and we don't require that this module be linked
+   against GMP, so we try to guess whether the format string is intended for
+   GMP's printf by looking for the %Zd conversion, rather than, say, comparing
+   the function pointer to GMP's gmp_vfprintf() function. */
+static void
+die_on_MINGW_PRI64(const char * const fmt MAYBE_UNUSED)
+{
+#ifdef HAVE_MINGW
+  if (strstr(fmt, "%Zd") == NULL)
+    return;
+  ASSERT_ALWAYS(strstr(fmt, "%" PRId64) == NULL);
+  ASSERT_ALWAYS(strstr(fmt, "%" PRIu64) == NULL);
+#endif
+}
+
 /* Print to every attached output, using a print function with a vfprintf()-
    like interface. E.g.,
 
@@ -439,6 +458,8 @@ verbose_output_vfprint(const size_t channel, const int verbose,
 {
     va_list ap;
     int rc = 0;
+
+    die_on_MINGW_PRI64(fmt);
 
     if (monitor_enter() != 0)
         return -1;

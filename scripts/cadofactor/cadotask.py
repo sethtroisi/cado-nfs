@@ -4151,7 +4151,8 @@ class SqrtTask(Task):
                     if line == "Failed":
                         break
                     self.add_factor(int(line))
-                self.state.update({"next_dep": dep+1})
+                t = self.progparams[0].get("threads", 1)
+                self.state.update({"next_dep": dep+t})
             self.remember_input_versions(commit=True)
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))

@@ -45,7 +45,8 @@ Required software tools:
     including gmp.h, which is not installed by default).
     Note: make sure to configure GMP with --enable-shared so that a shared
     library is installed (libgmp.so under Linux) otherwise CADO-NFS might not
-    compile. GMP 5 (or newer) is required.
+    compile. GMP 5 (or newer) is required. On some platforms, --disable-alloca
+    is required to get thread-safe operations.
 *) The GCC compiler works ; some others might, but it is untested. C and
    C++ are required, with C99 support.
 *) GNU make and CMake for building (CMake is installed on the fly if missing

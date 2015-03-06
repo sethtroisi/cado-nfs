@@ -88,6 +88,8 @@ int main(int argc, char * argv[])
         exit(1);
     }
 
+    if (argv != NULL){}
+
     int sb;
     printf ("Checking gf2x_mul_1_n against gf2x_addmul_1_n...");
     fflush(stdout);

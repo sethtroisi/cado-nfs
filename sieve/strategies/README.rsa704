@@ -1,3 +1,9 @@
+------------------------------------------------------------------------
+WARNING: This walk-through example script might be broken, since the
+command-line options of the binaries changed a bit since it was written.
+The general idea is still valid.
+------------------------------------------------------------------------
+
 Steps to produce a strategy-file for a rsa704
 
 Polynomial file (from params/rsa704.poly)

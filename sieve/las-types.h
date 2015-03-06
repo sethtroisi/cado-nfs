@@ -10,23 +10,12 @@
 #include "cado_poly.h"
 #include "ecm/facul.h"
 #include "relation.h"
+#include "las-forwardtypes.h"
 #include "las-unsieve.h"
 #include "las-qlattice.h"
 
-/* These must be forward-declared, because the header file below uses
- * them */
-
-struct sieve_info_s;
-typedef struct sieve_info_s * sieve_info_ptr;
-typedef const struct sieve_info_s * sieve_info_srcptr;
-struct las_info_s;
-typedef struct las_info_s * las_info_ptr;
-typedef const struct las_info_s * las_info_srcptr;
-struct where_am_I_s;
-typedef struct where_am_I_s * where_am_I_ptr;
-typedef const struct where_am_I_s * where_am_I_srcptr;
-
 #include "las-smallsieve.h"
+
 
 /* {{{ siever_config */
 /* The following structure lists the fields with an impact on the siever.
@@ -254,39 +243,6 @@ struct las_info_s {
 };
 
 typedef struct las_info_s las_info[1];
-/* }}} */
-
-/* {{{ thread-related defines */
-/* All of this exists _for each thread_ */
-struct thread_side_data_s {
-  m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
-  k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
-  bucket_array_t BA;    /* Always used */
-  fb_part *fb;
-  // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
-  
-  /* For small sieve */
-  int * ssdpos;
-  int * rsdpos;
-
-  unsigned char *bucket_region;
-};
-typedef struct thread_side_data_s thread_side_data[1];
-typedef struct thread_side_data_s * thread_side_data_ptr;
-typedef const struct thread_side_data_s * thread_side_data_srcptr;
-
-struct thread_data_s {
-  int id;
-  thread_side_data sides[2];
-  las_info_ptr las;
-  sieve_info_ptr si;
-  las_report rep;
-  unsigned int checksum_post_sieve[2];
-  unsigned char *SS;
-};
-typedef struct thread_data_s thread_data[1];
-typedef struct thread_data_s * thread_data_ptr;
-typedef const struct thread_data_s * thread_data_srcptr;
 /* }}} */
 
 /* FIXME: This does not seem to work well */

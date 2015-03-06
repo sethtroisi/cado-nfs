@@ -30,6 +30,13 @@
 #include "modredc_ul.h"
 #include "gmp_aux.h"
 
+#if 1
+/* Allows disabling static for profiling */
+#define STATIC static
+#else
+#define STATIC
+#endif
+
 typedef struct {
   unsigned int p;
   unsigned int r;      /* root of x^2 = k*N (mod p) */
@@ -79,7 +86,7 @@ static unsigned char isprime_table[] = {
 static const size_t isprime_table_size =
     sizeof(isprime_table) / sizeof(isprime_table[0]);
 
-static int
+STATIC int
 jacobi (unsigned long a, unsigned long b)
 {
   mpz_t aa, bb;
@@ -94,7 +101,7 @@ jacobi (unsigned long a, unsigned long b)
 }
 
 /* return b^e mod n, assuming n has at most 32 bits */
-static uint64_t
+STATIC uint64_t
 mod_pow_uint64 (uint64_t b, uint64_t e, uint64_t n)
 {
   uint64_t r = 1, f = 1, y = b;
@@ -115,7 +122,7 @@ mod_pow_uint64 (uint64_t b, uint64_t e, uint64_t n)
    Qian Sha, Xiao Fan, 2011, http://arxiv.org/abs/1111.4877.
    Solve x^2 = rr (mod p).
 */
-static uint64_t
+STATIC uint64_t
 tonelli_shanks (uint64_t rr, uint64_t p)
 {
   uint64_t q, s, i, j, l;
@@ -166,32 +173,35 @@ tonelli_shanks (uint64_t rr, uint64_t p)
    Assume p is odd, and inva = 1/sqrt(a) mod p.
    Ensures k1 <= k2 at the end.
 */
-static unsigned long
+STATIC unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
           unsigned long k1, unsigned long inva, unsigned long Mp)
 {
   /* the two roots are (k1-b)/a and (-k1-b)/a */
   modulus_t pp;
-  residueul_t tt, uu, vv;
+  residueul_t tt, uu, vv, bb;
   modul_initmod_ul (pp, p);
+  modul_init (bb, pp);
   modul_init (tt, pp);
   modul_init (uu, pp);
   modul_init (vv, pp);
-  modul_set_ul (tt, inva, pp);
+  modul_set_ul_reduced (bb, bmodp, pp);
+  modul_set_ul_reduced (tt, inva, pp);
   modul_set_ul_reduced (vv, k1, pp);
   modul_neg (uu, vv, pp);
-  modul_sub_ul (uu, uu, bmodp, pp); /* -r-b */
+  modul_sub (uu, uu, bb, pp);       /* -r-b */
   modul_mul (uu, uu, tt, pp);       /* (-r-b)/a */
   *k2 = mod_get_ul (uu, pp);
   *k2 += Mp;                        /* (-r-b)/a + M */
   if (*k2 >= p)
     *k2 -= p;
-  modul_sub_ul (uu, vv, bmodp, pp); /* r-b */
+  modul_sub (uu, vv, bb, pp);       /* r-b */
   modul_mul (uu, uu, tt, pp);       /* (r-b)/a */
   k1 = mod_get_ul (uu, pp);
   k1 += Mp;                         /* (r-b)/a + M */
   if (k1 >= p)
     k1 -= p;
+  modul_clear (bb, pp);
   modul_clear (tt, pp);
   modul_clear (uu, pp);
   modul_clear (vv, pp);
@@ -211,6 +221,54 @@ static unsigned int Primes[MAX_PRIMES] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31
 #define INDEX 25392 /* should be larger than the last prime above */
 
 static int prime_index[INDEX];
+
+mpz_t nextprime_bitfield;
+unsigned long nextprime_start = 0;
+/* Code below is meant to be correct for any nextprime_len > 0 */
+const size_t nextprime_len = 8192;
+
+void nextprime_init(const unsigned long first)
+{
+  /* nextprime_bitfield = 2^nextprime_len - 1 */
+  mpz_set_ui(nextprime_bitfield, 1);
+  mpz_mul_2exp(nextprime_bitfield, nextprime_bitfield, nextprime_len);
+  mpz_sub_ui(nextprime_bitfield, nextprime_bitfield, 1);
+
+  const unsigned long last = first + nextprime_len;
+  for (size_t i = 0; Primes[i] * Primes[i] < last; i++) {
+    const unsigned long p = Primes[i];
+    unsigned long next_hit = first % p;
+    if (next_hit > 0)
+      next_hit = p - next_hit;
+    while (next_hit < nextprime_len) {
+      mpz_clrbit(nextprime_bitfield, next_hit);
+      next_hit += p;
+    }
+  }
+  nextprime_start = first;
+}
+
+/* Returns the smallest prime >= n */
+unsigned long nextprime_get_next(const unsigned long n)
+{
+  if (n == 0)
+    return 2; /* Rest assumes n > 0 */
+
+  if (nextprime_start == 0)
+    nextprime_init(n);
+
+  unsigned long next_n = n;
+
+  do {
+    if (next_n < nextprime_start || next_n >= nextprime_start + nextprime_len)
+      nextprime_init(next_n);
+    const unsigned long offset = mpz_scan1 (nextprime_bitfield, next_n - nextprime_start);
+    next_n = nextprime_start + MIN(nextprime_len, offset);
+  } while (next_n >= nextprime_start + nextprime_len);
+  // printf("nextprime(%lu) == %lu\n", n, next_n);
+  return next_n;
+}
+
 
 static inline void
 setbit (mpz_t row, int shift, unsigned long i)
@@ -321,8 +379,8 @@ hash_clear (hash_t H)
    We put relations in column 'shift' and above.
    Assume r > 0.
 */
-static void
-trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
+STATIC void
+trialdiv_mpqs (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
 {
   unsigned int i;
   unsigned long B = F[ncol-1].p, R;
@@ -441,7 +499,7 @@ update8 (unsigned char *S, unsigned long M, unsigned char logp)
 }
 
 /* put factor in z */
-static void
+STATIC void
 gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t *Y,
        const mpz_t N0, int verbose)
 {
@@ -588,7 +646,7 @@ gauss (mpz_t z, mpz_t *Mat, int nrel, int wrel, int ncol, mpz_t *X, mpz_t *Y,
 }
 
 /* consider all primes up to B, and all odd multipliers up to K */
-static int
+STATIC int
 best_multiplier (const mpz_t N, unsigned long B, unsigned long K)
 {
   unsigned long i, n, *Q, p, q, j, t, Nq, k, best_k = 1;
@@ -659,7 +717,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   unsigned long p, k, Nbits, M, i, wrel, L = 0, *P, *Q;
   long j, nrel = 0, lim, ncol;
   mpz_t a, b, c, sqrta, r, axb;
-  double radix, logradix = 0;
+  const double radix = sqrt(2.);
+  const double inv_logradix = 1. / log(radix);
   long st;
   static long init_time = 0, sieve_time = 0, check_time = 0;
   static long gauss_time = 0, total_time = 0;
@@ -787,11 +846,14 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
 
   int pols = 0;
   mpz_init (r);
+  mpz_init(nextprime_bitfield);
+  nextprime_init(mpz_get_ui(sqrta));
   while (nrel < ncol + WANT_EXCESS) {
   sieve_time -= milliseconds ();
-  do
-    mpz_nextprime (sqrta, sqrta);
-  while (mpz_jacobi (N, sqrta) != 1);
+  do {
+    unsigned long next_p = nextprime_get_next (mpz_get_ui(sqrta) + 1);
+    mpz_set_ui(sqrta, next_p);
+  } while (mpz_jacobi (N, sqrta) != 1);
   /* we want N to be a square mod a: N = b^2 (mod a) */
   unsigned long aui = mpz_get_ui (sqrta);
   mpz_mul (a, sqrta, sqrta);
@@ -841,18 +903,15 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       maxnorm1 = Nd / ad;
       maxnorm = ad * (double) M * (double) M - maxnorm1;
       maxnorm = (maxnorm > maxnorm1) ? maxnorm : maxnorm1;
-      /* initialize radix: we want radix^255 = maxnorm ~ a*M^2 */
-#define MAXNORM 128
-      radix = pow (maxnorm, 1.0 / (double) MAXNORM);
-      logradix = log (radix);
+      assert(log(maxnorm) * inv_logradix < 256.);
 #ifdef TRACE
-      printf ("radix=%f logradix=%f\n", radix, logradix);
+      printf ("radix=%f logradix=%f\n", radix, 1. / inv_logradix);
 #endif
 
       /* initialize logp values */
 #define ROUND round
       for (j = SKIP; j < lim; j++)
-        F[j].logp = (char) ROUND (log ((double) F[j].p) / logradix);
+        F[j].logp = (char) ROUND (log ((double) F[j].p) * inv_logradix);
 
       /* take into account the skipped primes */
       double skip_value = 0;
@@ -865,17 +924,22 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         skip_value += SKIP_FACTOR * 2.0 * log ((double) F[j].p)
           / (double) (F[j].p - 1);
 
+      assert(FLT_RADIX == 2);
+      const double N_div_a2 = Nd / (ad * ad);
+      const double to_add = (log((double) ad) - skip_value) * inv_logradix;
+      const double sqrt2 = sqrt(2.);
+
       for (i = 0; i <= M; i++)
         {
           /* At location i, the norm is ((a*i+b)^2-N)/a. Since 0 <= b < a,
              we approximate it by ((a*i)^2-N)/a. Since a is not changing
              much, we assume it only depends on i. */
-          double x = ad * (double) i;
+          double x = (double) i;
           /* Note: we don't consider the +b term here, which makes the norm
              approximation not very reliable near roots of (a*x+b)^2 = N */
-          x = (x * x - Nd) / ad;
-          x = fabs (x);
-          x = (log (x) - skip_value) / logradix;
+          x = x * x - N_div_a2;
+          const double log_x = logb(sqrt2 * x * x) + to_add;
+          x = log_x;
           T[M - i] = (unsigned char) ceil (x < 0 ? 0 : x);
           if (i < M)
             T[M + i] = T[M - i];
@@ -903,12 +967,12 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
         default:
           ASSERT_ALWAYS(0);
         }
-      log2 = ROUND (SKIP_FACTOR * log (log2) / logradix);
+      log2 = ROUND (SKIP_FACTOR * log (log2) * inv_logradix);
       update8 (T, M, (unsigned char) log2);
 
       unsigned char Tmax;
       Tmax = (T[0] >  T[M]) ? T[0] : T[M];
-      threshold = Tmax - (char) ROUND (lambda * log ((double) F[ncol-1].p) / logradix);
+      threshold = Tmax - (char) ROUND (lambda * log(F[ncol-1].p) * inv_logradix);
       if (threshold < 128)
         {
           /* we increase Tmax by the difference to 128, so that in
@@ -937,7 +1001,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   memcpy (S, T, 2 * M);
 
   /* sieve */
-  modredcul_batch_Q_to_Fp (Q + SKIP, 1, sqrtaa, 0, P + SKIP, lim - SKIP);
+  modredcul_batch_Q_to_Fp (Q + SKIP, 1, aa, 0, P + SKIP, lim - SKIP);
   /* skip the small primes whose average contribution is already taken into
      account */
   for (j = SKIP; j < lim; j++)
@@ -945,7 +1009,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       unsigned long k2 = -1, i2;
 
       p = F[j].p;
-      k = findroot (&k2, bb % p, p, F[j].r, Q[j] * Q[j], F[j].Mp);
+      k = findroot (&k2, bb % p, p, F[j].r, Q[j], F[j].Mp);
       /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
          when k*N is divisible by p (and then the root is 0) we will count
          twice this root, but this will be very rare, and by not considering
@@ -1021,7 +1085,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                                initially the relations */
                             mpz_set_ui (Mat[nrel], 0);
                             setsmall (Z->w[i], wrel, Mat[nrel]);
-                            trialdiv (Z->r[i], F, ncol, wrel, Mat[nrel]);
+                            trialdiv_mpqs (Z->r[i], F, ncol, wrel, Mat[nrel]);
                             mpz_setbit (Mat[nrel], nrel);
                             if (++nrel >= ncol + WANT_EXCESS)
                               goto end_check;
@@ -1035,6 +1099,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
   end_check:
   check_time += milliseconds ();
   }
+  mpz_clear(nextprime_bitfield);
   mpz_clear (r);
   hash_clear (H);
   if (verbose)
