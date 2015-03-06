@@ -117,6 +117,25 @@ mod_pow_uint64 (uint64_t b, uint64_t e, uint64_t n)
   return r;
 }
 
+static inline unsigned long
+test_divisible(const unsigned long x, const fb_t * const F)
+{
+  const unsigned long r = x * F->invp;
+  return (r <= F->invp2) ? r : 0;
+}
+
+static inline int
+divide_out(unsigned long * const x, const fb_t * const F)
+{
+  unsigned long cofac;
+  int e = 0;
+  while ((cofac = test_divisible(*x, F)) != 0) {
+    e++;
+    *x = cofac;
+  }
+  return e;
+}
+
 /* Uses Tonelli-Shanks, more precisely Algorithm from Table 1 in [1].
    [1] Adleman-Manders-Miller Root Extraction Method Revisited, Zhengjun Cao,
    Qian Sha, Xiao Fan, 2011, http://arxiv.org/abs/1111.4877.
@@ -399,34 +418,37 @@ trialdiv_mpqs (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
   mpz_tdiv_q_2exp (r, r, e);
   if (e & 1)
     setbit (row, shift, 1);
-  for (i = 1; i < ncol; i++)
+  i = 1;
 #else
-  for (i = SKIP; i < ncol; i++)
+  i = SKIP;
 #endif
-    {
-      unsigned long p = F[i].p;
+  if (!mpz_fits_ulong_p (r)) {
+    for ( ; i < ncol; i++)
+      {
+        unsigned long p = F[i].p;
 
-      if (mpz_divisible_ui_p (r, p))
-        {
-          e = 0;
+        if (mpz_divisible_ui_p (r, p))
+          {
+            e = 0;
 
-          do {
-            mpz_divexact_ui (r, r, p);
-            e ++;
-          } while (mpz_divisible_ui_p (r, p));
+            do {
+              mpz_divexact_ui (r, r, p);
+              e ++;
+            } while (mpz_divisible_ui_p (r, p));
 
-          if (e & 1)
-            setbit (row, shift, i + 1);
+            if (e & 1)
+              setbit (row, shift, i + 1);
 
-          /* we don't check for cases where r = 1 or is a prime <= B here,
-             since they will have very rarely */
+            /* we don't check for cases where r = 1 or is a prime <= B here,
+               since they will have very rarely */
 
-          if (mpz_fits_ulong_p (r))
-            {
-              i = i + 1;
-              break;
-            }
-        }
+            if (mpz_fits_ulong_p (r))
+              {
+                i = i + 1;
+                break;
+              }
+          }
+      }
     }
 
   /* now r fits into an unsigned long */
@@ -434,20 +456,14 @@ trialdiv_mpqs (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
   for (; i < ncol; i++)
     {
       unsigned long p = F[i].p;
-      unsigned long q = R * F[i].invp;
 
       /* F[i].invp is 1/p mod 2^64, thus q = R/p mod 2^64:
          the division R/p is exact iff q*p fits in a 64-bit word,
          i.e., when q <= F[i].invp2 = floor(ULONG_MAX/p) [we assume
          unsigned long has 64 bits here] */
-      if (q <= F[i].invp2)
+      const int e = divide_out (&R, &F[i]);
+      if (e)
         {
-          int e = 0;
-          do {
-            R = q;
-            e ++;
-            q = R * F[i].invp;
-          } while (q <= F[i].invp2);
           if (e & 1)
             setbit (row, shift, i + 1);
           /* now since R has no factor <= p it is either 1 or a prime > p,
@@ -1261,27 +1277,41 @@ accumulate (bernstein_t T, mpz_t x, mpz_t axb, fb_t *F)
       T->w[T->size] = 1;
       mpz_neg (x, x);
     }
-  int e;
-#if SKIP >= 1
-  e = mpz_scan1 (x, 0);
-  mpz_tdiv_q_2exp (x, x, e);
-  if (e & 1)
-    T->w[T->size] |= 2;
-#endif
-  for (int j = 1; j < SKIP; j++)
-    {
-      unsigned long p = F[j].p;
 
-      if (mpz_divisible_ui_p (x, p))
-        {
-          e = 0;
-          do {
-            mpz_divexact_ui (x, x, p);
-            e ++;
-          } while (mpz_divisible_ui_p (x, p));
+#if SKIP >= 1
+  {
+    int e = mpz_scan1 (x, 0);
+    mpz_tdiv_q_2exp (x, x, e);
+    if (e & 1)
+      T->w[T->size] |= 2;
+  }
+#endif
+
+  if (mpz_fits_ulong_p(x)) {
+    unsigned long ux = mpz_get_ui(x);
+    for (int j = 1; j < SKIP; j++)
+      {
+        const int e = divide_out(&ux, &F[j]);
+        if (e)
           T->w[T->size] |= (e & 1) << (j + 1);
-        }
-    }
+      }
+    mpz_set_ui(x, ux);
+  } else {
+    for (int j = 1; j < SKIP; j++)
+      {
+        unsigned long p = F[j].p;
+
+        if (mpz_divisible_ui_p (x, p))
+          {
+            int e = 0;
+            do {
+              mpz_divexact_ui (x, x, p);
+              e ++;
+            } while (mpz_divisible_ui_p (x, p));
+            T->w[T->size] |= (e & 1) << (j + 1);
+          }
+      }
+  }
   mpz_swap (T->x[0][T->size], x);
   mpz_swap (T->axb[T->size], axb);
   T->size ++;
