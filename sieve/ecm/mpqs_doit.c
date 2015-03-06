@@ -332,7 +332,7 @@ hash_clear (hash_t H)
    Assume r > 0.
 */
 STATIC void
-trialdiv (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
+trialdiv_mpqs (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
 {
   unsigned int i;
   unsigned long B = F[ncol-1].p, R;
@@ -1034,7 +1034,7 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
                                initially the relations */
                             mpz_set_ui (Mat[nrel], 0);
                             setsmall (Z->w[i], wrel, Mat[nrel]);
-                            trialdiv (Z->r[i], F, ncol, wrel, Mat[nrel]);
+                            trialdiv_mpqs (Z->r[i], F, ncol, wrel, Mat[nrel]);
                             mpz_setbit (Mat[nrel], nrel);
                             if (++nrel >= ncol + WANT_EXCESS)
                               goto end_check;
