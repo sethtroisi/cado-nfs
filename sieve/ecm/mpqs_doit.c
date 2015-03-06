@@ -172,6 +172,9 @@ tonelli_shanks (uint64_t rr, uint64_t p)
    i.e., k1 = (r-b)/a+M (mod p) and k2 = (-r-b)/a+M (mod p).
    Assume p is odd, and inva = 1/sqrt(a) mod p.
    Ensures k1 <= k2 at the end.
+
+   TODO: The two DIV instructions in this function (as part of modul_mul)
+   take about 7% of the total time for factoring 128-bit composites.
 */
 STATIC unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
@@ -227,7 +230,8 @@ unsigned long nextprime_start = 0;
 /* Code below is meant to be correct for any nextprime_len > 0 */
 const size_t nextprime_len = 8192;
 
-void nextprime_init(const unsigned long first)
+STATIC void
+nextprime_init(const unsigned long first)
 {
   /* nextprime_bitfield = 2^nextprime_len - 1 */
   mpz_set_ui(nextprime_bitfield, 1);
@@ -249,7 +253,8 @@ void nextprime_init(const unsigned long first)
 }
 
 /* Returns the smallest prime >= n */
-unsigned long nextprime_get_next(const unsigned long n)
+STATIC unsigned long
+nextprime_get_next(const unsigned long n)
 {
   if (n == 0)
     return 2; /* Rest assumes n > 0 */
