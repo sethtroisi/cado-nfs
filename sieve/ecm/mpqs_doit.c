@@ -43,6 +43,7 @@ typedef struct {
   uint64_t invp;       /* 1/p mod 2^64, needed for trial division */
   unsigned char logp;  /* log(p) / log(radix), needed for sieve */
   unsigned long invp2; /* floor(ULONG_MAX/p), needed for trial division */
+  unsigned long conv;  /* 2^(2*LONG_BITS) % p, used for converting to REDC */
   unsigned int Mp;     /* M mod p */
 } fb_t;
 
@@ -195,7 +196,68 @@ tonelli_shanks (uint64_t rr, uint64_t p)
    TODO: The two DIV instructions in this function (as part of modul_mul)
    take about 7% of the total time for factoring 128-bit composites.
 */
+
+static inline unsigned long
+mul_redc(const unsigned long a, const unsigned long b, const fb_t * const F)
+{
+  unsigned long plow, phigh, r;
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a, b);
+  ularith_redc(&r, plow, phigh, F->p, -F->invp);
+  return r;
+}
+
+static inline unsigned long
+findroot2 (unsigned long *k2, const unsigned long b,
+           const fb_t * const F)
+{
+  *k2 = (b + F->r + F->Mp) % 2;
+  return *k2;
+}
+
 STATIC unsigned long
+findroot_new (unsigned long *k2, const unsigned long b,
+              unsigned long inva, const fb_t * const F)
+{
+  /* the two roots are (k1-b)/a and (-k1-b)/a */
+  /* Given conv = 2^128 % p,
+     Compute redc_inva = -redc(conv * inva) == -inva/2^64 (mod p)
+     Compute redc((b + r) * redc_inva) == (-b - r) * inva (mod p)
+     Compute redc((b - r) * redc_inva) == (-b + r) * inva (mod p)
+  */
+  const unsigned long p = F->p;
+  const unsigned long r = F->r;
+  const unsigned long Mp = F->Mp;
+
+  unsigned long t1, t2;
+
+#if 0
+  ASSERT_ALWAYS(p > 2);
+  ASSERT_ALWAYS(ULONG_MAX - b >= r);
+#endif
+
+  const unsigned long redc_inva = mul_redc(p - inva, F->conv, F);
+  t1 = mul_redc(labs(b - r), redc_inva, F);
+  if (b < r && t1 != 0)
+    t1 = p - t1;
+  ularith_addmod_ul_ul (&t1, t1, Mp, p);
+  t2 = mul_redc(b + r, redc_inva, F);
+  ularith_addmod_ul_ul (&t2, t2, Mp, p);
+
+  unsigned long k1;
+  if (t1 < t2)
+    {
+      k1 = t1;
+      *k2 = t2;
+    }
+  else
+    {
+      k1 = t2;
+      *k2 = t1;
+    }
+  return k1;
+}
+
+unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
           unsigned long k1, unsigned long inva, unsigned long Mp)
 {
@@ -806,6 +868,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           mpz_invert (c, a, b); /* c = 1/p mod 2^64 */
           F[j].invp = mpz_get_ui (c);
           F[j].invp2 = ULONG_MAX / p;
+          ularith_div_2ul_ul_ul_r(&F[j].conv, 0, 1, p);
+          ularith_div_2ul_ul_ul_r(&F[j].conv, 0, F[j].conv, p);
           F[j].Mp = M % p;
           j++;
         }
@@ -1030,7 +1094,18 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       unsigned long k2 = -1, i2;
 
       p = F[j].p;
-      k = findroot (&k2, bb % p, p, F[j].r, Q[j], F[j].Mp);
+#if SKIP == 0
+      if (j == 0 && F[0].p == 2)
+        k = findroot2 (&k2, bb, &F[j]);
+      else
+#endif
+        k = findroot_new (&k2, bb, Q[j], &F[j]);
+#if 0
+      unsigned long old1, old2;
+      old1 = findroot (&old2, bb % p, p, F[j].r, Q[j], F[j].Mp);
+      ASSERT_ALWAYS(old1 == k);
+      ASSERT_ALWAYS(old2 == k2);
+#endif
       /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
          when k*N is divisible by p (and then the root is 0) we will count
          twice this root, but this will be very rare, and by not considering
