@@ -139,9 +139,9 @@ sieve/strategies/F9.sh
 sieve/freerel_multipoly.c
 linalg/bwc/lingen.txt
 sieve/CMakeLists-nodist.txt
+nfs-hd/
 nfs-hd/array.c
 nfs-hd/array.h
-nfs-hd/CMakeLists.txt
 nfs-hd/factor_base.c
 nfs-hd/factor_base.h
 nfs-hd/gmp-ecm.h
@@ -158,6 +158,12 @@ nfs-hd/mat_int64.c
 nfs-hd/mat_int64.h
 nfs-hd/mat_Z.c
 nfs-hd/mat_Z.h
+nfs-hd/polyselect-hd
+nfs-hd/polyselect-hd/functions.c
+nfs-hd/polyselect-hd/functions.h
+nfs-hd/polyselect-hd/main.c
+nfs-hd/polyselect-hd/parameters.c
+nfs-hd/polyselect-hd/parameters.h
 nfs-hd/sieving_interval.c
 nfs-hd/sieving_interval.h
 nfs-hd/special-q_sieve.c
@@ -167,4 +173,6 @@ nfs-hd/utils_int64.c
 nfs-hd/utils_int64.h
 nfs-hd/utils_mpz.c
 nfs-hd/utils_mpz.h
+nfs-hd/utils_lattice.c
+nfs-hd/utils_lattice.h
 tests/nfs-hd/
