@@ -22,12 +22,12 @@ void int64_vector_clear(int64_vector_ptr v)
   free(v->c);
 }
 
-void int64_vector_swap(int64_vector_ptr v1, int64_vector_ptr v2)
+void int64_vector_swap(int64_vector_ptr v0, int64_vector_ptr v1)
 {
-  ASSERT(v1->dim == v2->dim);
-  int64_t * tmp = v1->c;
-  v1->c = v2->c;
-  v2->c = tmp;
+  ASSERT(v0->dim == v1->dim);
+  int64_t * tmp = v0->c;
+  v0->c = v1->c;
+  v1->c = tmp;
 }
 
 void int64_vector_set(int64_vector_ptr v, int64_vector_srcptr s)
@@ -114,7 +114,33 @@ unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
 void int64_vector_to_mpz_vector(mpz_vector_ptr a, int64_vector_srcptr b)
 {
   ASSERT(a->dim == b->dim);
+
   for (unsigned int i = 0; i < b->dim; i++) {
     mpz_vector_setcoordinate_int64 (a, i, b->c[i]);
   }
+}
+
+double int64_vector_norml2sqr(int64_vector_srcptr a)
+{
+  double norm = 0;
+  for (unsigned int i = 0; i < a->dim; i++) {
+    norm += (double)(a->c[i] * a->c[i]);
+  }
+  return norm;
+}
+
+double int64_vector_norml2(int64_vector_srcptr a)
+{
+  return sqrt(int64_vector_norml2sqr(a));
+}
+
+int64_t int64_vector_dot_product(int64_vector_srcptr v0, int64_vector_srcptr v1)
+{
+  ASSERT(v0->dim == v1->dim);
+
+  int64_t dot = 0;
+  for (unsigned int i = 0; i < v0->dim; i++) {
+    dot += v0->c[i] * v1->c[i];
+  }
+  return dot;
 }
