@@ -1064,7 +1064,11 @@ calculateGcd (const char *prefix, int numdep, mpz_t Np)
     mpz_clear(g2);
 
     if (!found)
-      printf("Failed\n");
+      {
+        pthread_mutex_lock (&lock);
+        printf ("Failed\n");
+        pthread_mutex_unlock (&lock);
+      }
   
     mpz_clear(ratsqrt);
     mpz_clear(algsqrt);
