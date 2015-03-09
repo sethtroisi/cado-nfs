@@ -28,32 +28,6 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 /********** RATSQRT **********/
 
-static void
-my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
-{
-#if 0
-  int large, st = 0;
-
-  large = mpz_size (b) + mpz_size (c) >= 5000000;
-  if (large)
-    {
-      fprintf (stderr, "[multiplying %zu*%zu limbs: ",
-               mpz_size (b), mpz_size (c));
-      fflush (stderr);
-      st = milliseconds ();
-    }
-#endif
-  mpz_mul (a, b, c);
-  mpz_realloc2 (c, 0);
-#if 0
-  if (large)
-    {
-      fprintf (stderr, "%lums]\n", milliseconds () - st);
-      fflush (stderr);
-    }
-#endif
-}
-
 #define THRESHOLD 2 /* must be >= 2 */
 
 /* accumulate up to THRESHOLD products in prd[0], 2^i*THRESHOLD in prd[i].
@@ -66,7 +40,7 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
 {
   unsigned long i;
 
-  my_mpz_mul (prd[0], prd[0], a);
+  mpz_mul (prd[0], prd[0], a);
   nprd ++;
 
   for (i = 0; nprd % THRESHOLD == 0; i++, nprd /= THRESHOLD)
@@ -78,7 +52,7 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
           prd = (mpz_t*) realloc (prd, lprd[0] * sizeof (mpz_t));
           mpz_init_set_ui (prd[i + 1], 1);
         }
-      my_mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
+      mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
       mpz_set_ui (prd[i], 1);
     }
 
@@ -95,7 +69,7 @@ accumulate_fast_end (mpz_t *prd, unsigned long lprd)
     {
       fprintf (stderr, "accumulate_fast_end: multiplying %zu*%zu limbs\n",
                mpz_size (prd[0]), mpz_size (prd[i]));
-      my_mpz_mul (prd[0], prd[0], prd[i]);
+      mpz_mul (prd[0], prd[0], prd[i]);
     }
 }
 
