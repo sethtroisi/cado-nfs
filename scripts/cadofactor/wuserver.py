@@ -737,6 +737,10 @@ subjectAltName=@altnames
                 self.logger.critical("You can choose a different port with "
                         "server.port=<integer>.")
                 sys.exit(1)
+            else:
+                self.logger.critical("Socket error while setting up server "
+                        "on %s:%d : %s", address, port, str(e));
+                sys.exit(1)
 
         self.port = self.httpd.server_address[1]
         self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
