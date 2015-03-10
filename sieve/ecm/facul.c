@@ -767,6 +767,11 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
       ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
       int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
+      // There is an hardcoded bound on the number of methods.
+      // If ncurves0 or ncurves1 passed by the user is too large,
+      // we can not handle that.
+      // TODO: is this really a limitation?
+      ASSERT_ALWAYS (2*(max_ncurves + 4) <= NB_MAX_METHODS);
       strategies->precomputed_methods =
 	facul_make_default_strategy (max_ncurves,verbose);
       for (r = 0; r <= rmfb; r++)
