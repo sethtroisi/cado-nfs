@@ -2352,6 +2352,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
+  param_list_decl_usage(pl, "exit-early", "(switch) stop after some relations have been found");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
   param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorization step");
@@ -2375,6 +2376,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     double t0, tts, wct;
     unsigned long nr_sq_processed = 0;
     int allow_largesq = 0;
+    int exit_after_rel_found = 0;
     double totJ = 0.0;
     int argc = argc0;
     char **argv = argv0;
@@ -2395,6 +2397,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
+    param_list_configure_switch(pl, "-exit-early", &exit_after_rel_found);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_switch(pl, "-dup", NULL);
@@ -2706,7 +2709,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 #ifdef TRACE_K
         trace_per_sq_clear(si);
 #endif
-
+        if (exit_after_rel_found && report->reports > 0)
+            break;
       } // end of loop over special q ideals.
 
     thread_buckets_free(thrs, las->nb_threads);
