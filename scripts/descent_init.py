@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+#
+# Example for the p59 in tests/test_full_p59
+# scripts/descent_init.py
+#   --p 43341748620473677010074177283795146221310971425909898235183
+#   --target 15384226356769205532939362866999574621778419520781718884300
+#   --cadobindir /tmp/cado-nfs-build-master
+#   --mfb 40 --lpb 25 --lim 1000000 --tkewness 8388608 --I 10
+#   --ncurves 20
+
 import os
 import subprocess
 import sys
@@ -64,10 +73,10 @@ if __name__ == '__main__':
     polyfile = open(polyfilename, 'w')
     polyfile.write("n: " + str(p) + "\n")
     polyfile.write("skew: 1\n")
-    polyfile.write("Y1: " + str(gg[0][0]) + "\n")
-    polyfile.write("Y0: " + str(gg[1][0]) + "\n")
-    polyfile.write("c1: " + str(gg[0][1]) + "\n")
-    polyfile.write("c0: " + str(gg[1][1]) + "\n")
+    polyfile.write("c1: " + str(gg[0][0]) + "\n")
+    polyfile.write("c0: " + str(gg[1][0]) + "\n")
+    polyfile.write("Y1: " + str(gg[0][1]) + "\n")
+    polyfile.write("Y0: " + str(gg[1][1]) + "\n")
     polyfile.close()
 
     print ("Creating factor bases.")
