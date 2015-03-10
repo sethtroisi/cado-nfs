@@ -92,6 +92,8 @@ if __name__ == '__main__':
             print(" ".join(factors))
     else:
         if checkdlp:
+            if factors is None:
+                sys.exit("Error occurred, terminating")
             p = int(factors[0])
             ell = int(factors[1])
             log2 = int(factors[2])
