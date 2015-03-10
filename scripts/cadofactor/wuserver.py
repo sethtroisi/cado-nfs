@@ -746,7 +746,7 @@ subjectAltName=@altnames
         self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
         self.httpd.server_name = self.name
 
-        if self.address == "localhost" or self.address.startswith("127."):
+        if self.address == "localhost" or self.httpd.server_address[0].startswith("127."):
             self.logger.warn("Server is listening on the loopback device. "
                     "Clients on other hosts will not be able to connect.")
 
