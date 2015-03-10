@@ -21,7 +21,7 @@
 
 static int verbose = 0;
 
-#define MAX_THREADS 16
+#define MAX_THREADS 32
 
 /* mutual exclusion lock for output */
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
