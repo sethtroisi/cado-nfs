@@ -130,8 +130,8 @@ if __name__ == '__main__':
     Den = a*gg[0][1] + b*gg[1][1]
     assert (z*Den-Num) % p == 0
 
-    factNum = [ int(x, 16) for x in rel[1].split(',') ]
-    factDen = [ int(x, 16) for x in rel[2].split(',') ]
+    factNum = [ int(x, 16) for x in rel[2].split(',') ]
+    factDen = [ int(x, 16) for x in rel[1].split(',') ]
     NN = 1
     for x in factNum:
         NN = NN*x
