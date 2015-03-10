@@ -238,6 +238,9 @@ bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
 {
     int nb_success_max = 1000, nb_success = 0;
     int nb_test = 0;
+    mpz_t f[2];
+    mpz_init(f[0]);
+    mpz_init(f[1]);
 
     while (nb_success < nb_success_max && (nb_test < nb_test_max)) {
 	/* 
@@ -245,19 +248,20 @@ bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
 	   found.  Note that N is composed by two prime factors by the
 	   previous function.
 	*/
-	unsigned long f[2];
 	if (mpz_cmp_ui (N[nb_test], 0) == 0) {
 	    generate_composite_integer(N[nb_test], state, len_p, len_n);
 	    mpz_init (N[nb_test+1]);
 	    mpz_set_ui (N[nb_test+1], 0);
 	}
-	f[0] = 0;
+        mpz_set_ui(f[0], 0);
 	facul(f, N[nb_test], strategy);
 
-	if (f[0] != 0)
+	if (mpz_cmp_ui(f[0], 0) != 0)
 	    nb_success++;
 	nb_test++;
     }
+    mpz_clear(f[0]);
+    mpz_clear(f[1]);
 
     return nb_success / ((double)nb_test);
 }
@@ -266,7 +270,9 @@ double
 bench_time_fm_onelength(facul_strategy_t * method, mpz_t* N, int nb_test)
 {
     double tps = 0;
-    unsigned long f[2];
+    mpz_t f[2];
+    mpz_init(f[0]);
+    mpz_init(f[1]);
 
     uint64_t starttime, endtime;
     starttime = microseconds();
@@ -276,9 +282,11 @@ bench_time_fm_onelength(facul_strategy_t * method, mpz_t* N, int nb_test)
     
     endtime = microseconds();
     tps += endtime - starttime;
+    
+    mpz_clear(f[0]);
+    mpz_clear(f[1]);
 
     return tps / ((double)nb_test);
-
 }
 
 /*
@@ -529,6 +537,10 @@ static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
 
     double starttime, endtime;
     starttime = microseconds();
+	
+    mpz_t f[2];
+    mpz_init(f[0]);
+    mpz_init(f[1]);
 
     while ((nb_succes < nb_succes_lim) && (nb_test < nb_test_max)) {
 
@@ -538,12 +550,11 @@ static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
 	   found.  Note that N is composed by two prime factors by the
 	   previous function.
 	 */
-	unsigned long f[2];
-	f[0] = 0;
+        mpz_set_ui(f[0], 0);
 
 	facul(f, N[nb_test], strategy);
 
-	if (f[0] != 0)
+	if (mpz_cmp_ui(f[0], 0) != 0)
 	    nb_succes++;
 	nb_test++;
     }
@@ -551,6 +562,8 @@ static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
     double tps = endtime - starttime;
 
     //clear
+    mpz_clear(f[0]);
+    mpz_clear(f[1]);
 
     res[0] = nb_succes / ((double)nb_test);
     res[1] = tps / ((double)nb_test);

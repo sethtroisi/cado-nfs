@@ -72,8 +72,11 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
            const int verbose, const int printfactors, const int printnonfactors, 
            const int printcofactors)
 {
-  unsigned long f[16];
+  mpz_t f[16];
   int facul_code;
+
+  for (int i = 0; i < 16; ++i)
+      mpz_init(f[i]);
 
   if (verbose >= 2)
     gmp_printf ("Trying to factor %Zd\n", N);
@@ -86,14 +89,14 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
   if (printfactors && facul_code > 0)
     {
       int j;
-      printf ("%lu", f[0]);
+      gmp_printf ("%Zd", f[0]);
       for (j = 1; j < facul_code; j++)
-        printf (" %lu", f[j]);
+        gmp_printf (" %Zd", f[j]);
       if (printcofactors) {
         mpz_t c;
         mpz_init_set (c, N);
         for (j = 0; j < facul_code; j++)
-          mpz_divexact_ui (c, c, f[j]);
+          mpz_divexact (c, c, f[j]);
         if (mpz_cmp_ui (c, 1) != 0)
           gmp_printf (" %Zd", c);
         mpz_clear (c);
@@ -105,6 +108,8 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
     {
       gmp_printf ("%Zd\n", N);
     }
+  for (int i = 0; i < 16; ++i)
+      mpz_clear(f[i]);
   
   return facul_code;
 }
