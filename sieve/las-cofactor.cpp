@@ -126,9 +126,12 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
   unsigned int lpb = si->conf->sides[side]->lpb;
   facul_strategy_t *strategy = si->sides[side]->strategy;
   uint32_t i, nr_factors;
-  unsigned long ul_factors[16];
+  mpz_t mpz_factors[16];
   int facul_code;
 
+  for (int i = 0; i < 16; ++i)
+      mpz_init(mpz_factors[i]);
+  
   /* For the moment this code can't cope with too large factors */
   ASSERT(lpb <= ULONG_BITS);
 
@@ -139,65 +142,66 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
   if (mpz_cmp (n, si->BB[side]) < 0)
     {
       /* if n > L, return -1 */
-      if (mpz_sizeinbase (n, 2) > lpb)
-        return -1;
+      if (mpz_sizeinbase (n, 2) > lpb) {
+          for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
+          return -1;
+      }
 
       if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
         {
           append_mpz_to_array (factors, n);
           append_uint32_to_array (multis, 1);
         }
+      for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
       return 1;
     }
 
   /* use the facul library */
   //gmp_printf ("facul: %Zd\n", n);
-  facul_code = facul (ul_factors, n, strategy);
+  facul_code = facul (mpz_factors, n, strategy);
 
   if (facul_code == FACUL_NOT_SMOOTH)
     return -1;
 
-  ASSERT (facul_code == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
-
-  /* we use this mask to trap prime factors above bound */
-  unsigned long oversize_mask = (-1UL) << lpb;
-  if (lpb == ULONG_BITS) oversize_mask = 0;
+  ASSERT (facul_code == 0 || mpz_cmp (n, mpz_factors[0]) != 0);
 
   if (facul_code > 0)
     {
       nr_factors = facul_code;
       for (i = 0; i < nr_factors; i++)
 	{
-	  unsigned long r;
-	  mpz_t t;
-	 if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
-            return -1;
-	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
-	  ASSERT_ALWAYS (r == 0UL);
-	  mpz_init (t);
-	  mpz_set_ui (t, ul_factors[i]);
-	  append_mpz_to_array (factors, t);
-	  mpz_clear (t);
+          if (mpz_sizeinbase(mpz_factors[i], 2) > lpb) {
+              for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
+              return -1;
+          }
+	  mpz_divexact (n, n, mpz_factors[i]);
+	  append_mpz_to_array (factors, mpz_factors[i]);
 	  append_uint32_to_array (multis, 1); /* FIXME, deal with repeated
 						 factors correctly */
 	}
 
       if (mpz_cmp (n, si->BB[side]) < 0)
         {
-          if (mpz_sizeinbase (n, 2) > lpb)
-            return -1;
+          if (mpz_sizeinbase (n, 2) > lpb) {
+              for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
+              return -1;
+          }
 
           if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
             {
               append_mpz_to_array (factors, n);
               append_uint32_to_array (multis, 1);
             }
+          for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
           return 1;
         }
 
-      if (check_leftover_norm (n, si, side) == 0)
-        return -1;
+      if (check_leftover_norm (n, si, side) == 0) {
+          for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
+          return -1;
+      }
     }
+  for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
   return 0; /* unable to completely factor n */
 }
 
@@ -215,17 +219,25 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
   int is_smooth[2] = {FACUL_MAYBE, FACUL_MAYBE};
   /* To remember if a cofactor is already factored.*/
 
-  unsigned long** ul_factors = (unsigned long**) malloc(sizeof (*ul_factors) * 2);
-  for (int i = 0; i < 2; i++)
-    ul_factors[i] = (unsigned long*) calloc(16, sizeof (*ul_factors[i]));
-
+  mpz_t ** mpz_factors = (mpz_t **) malloc(sizeof (mpz_t*) * 2);
+  for (int i = 0; i < 2; i++) {
+    mpz_factors[i] = (mpz_t *) calloc(16, sizeof (*mpz_factors[i]));
+    for (int j = 0; j < 16; ++j) {
+        mpz_init(mpz_factors[i][j]);
+    }
+  }
+#define FREE_MPZ_FACTOR do {          \
+    for (int i = 0; i < 2; ++i) {       \
+        for (int j = 0; j < 16; ++j)    \
+            mpz_clear(mpz_factors[i][j]);\
+        free(mpz_factors[i]);           \
+    }                                   \
+    free(mpz_factors);                  \
+} while (0)
 
   for (int side = 0; side < 2; side++)
     {
       unsigned int lpb = si->strategies->lpb[side];
-      /* For the moment this code can't cope with too large factors */
-      ASSERT(lpb <= ULONG_BITS);
-
       factors[side]->length = 0;
       multis[side]->length = 0;
 
@@ -235,10 +247,7 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
 	  /* if n > L, return -1 */
 	  if (mpz_sizeinbase (n[side], 2) > lpb)
 	    {
-	      //free
-	      free (ul_factors[0]);
-	      free (ul_factors[1]);
-	      free (ul_factors);
+              FREE_MPZ_FACTOR;
 	      return -1;
 	    }
 	  if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
@@ -252,49 +261,37 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
 
   /* use the facul library */
   //gmp_printf ("facul: %Zd, %Zd\n", n[0], n[1]);
-  int* facul_code = facul_both (ul_factors, n, si->strategies, is_smooth);
+  int* facul_code = facul_both (mpz_factors, n, si->strategies, is_smooth);
 
   if (facul_code[0] == FACUL_NOT_SMOOTH ||
       facul_code[1] == FACUL_NOT_SMOOTH)
     {
       //free ul
-      free (ul_factors[0]);
-      free (ul_factors[1]);
-      free (ul_factors);
+      FREE_MPZ_FACTOR;
       free (facul_code);
       return -1;
     }
 
-  ASSERT (facul_code[0] == 0 || mpz_cmp_ui (n[0], ul_factors[0][0]) != 0);
-  ASSERT (facul_code[1] == 0 || mpz_cmp_ui (n[1], ul_factors[1][0]) != 0);
+  ASSERT (facul_code[0] == 0 || mpz_cmp (n[0], mpz_factors[0][0]) != 0);
+  ASSERT (facul_code[1] == 0 || mpz_cmp (n[1], mpz_factors[1][0]) != 0);
   int ret = is_smooth[0] == 1 && is_smooth[1] == 1;
   for (int side = 0; ret == 1 && side < 2; side++)
     {
       unsigned int lpb = si->strategies->lpb[side];
       uint32_t i, nr_factors;
-      /* we use this mask to trap prime factors above bound */
-      unsigned long oversize_mask = (-1UL) << lpb;
-      if (lpb == ULONG_BITS) oversize_mask = 0;
-
       if (facul_code[side] > 0)
 	{
 	  nr_factors = facul_code[side];
 	  for (i = 0; i < nr_factors; i++)
 	    {
-	      unsigned long r;
-	      mpz_t t;
-	      if (ul_factors[side][i] & oversize_mask)
+              if (mpz_sizeinbase(mpz_factors[side][i], 2) > lpb)
 		/* Larger than large prime bound? */
 		{
 		  ret = -1;
 		  break;
 		}
-	      r = mpz_tdiv_q_ui (n[side], n[side], ul_factors[side][i]);
-	      ASSERT_ALWAYS (r == 0UL);
-	      mpz_init (t);
-	      mpz_set_ui (t, ul_factors[side][i]);
-	      append_mpz_to_array (factors[side], t);
-	      mpz_clear (t);
+	      mpz_divexact (n[side], n[side], mpz_factors[side][i]);
+	      append_mpz_to_array (factors[side], mpz_factors[side][i]);
 	      append_uint32_to_array (multis[side], 1);
 	      /* FIXME, deal with repeated
 		 factors correctly */
@@ -326,9 +323,7 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
 	}
     }
   //free
-  free (ul_factors[0]);
-  free (ul_factors[1]);
-  free (ul_factors);
+  FREE_MPZ_FACTOR;
   free (facul_code);
   /* ret = 0  => unable to completely factor n */
   return ret; 

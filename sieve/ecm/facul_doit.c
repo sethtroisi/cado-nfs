@@ -9,6 +9,18 @@ extern unsigned long stats_called[];
 extern unsigned long stats_found_n[];
 extern int stats_current_index;
 
+
+#define mod_intget_mpz MOD_RENAME(int_get_mpz)
+void
+mod_intget_mpz(mpz_t z, const modint_t x) {
+#ifdef MOD_SIZE
+    mpz_import(z, MOD_SIZE, -1, sizeof(unsigned long), 0, 0, x);
+#else
+    mpz_set(z, x);
+#endif
+}
+
+
 int
 primetest (const modulus_t m)
 {
@@ -104,7 +116,7 @@ modset_primetest (modset_t *modset)
 }
 
 static inline int 
-modset_call_facul(unsigned long *factors, const modset_t *modset, 
+modset_call_facul(mpz_t *factors, const modset_t *modset, 
                   const facul_strategy_t *strategy, const int method_start)
 {
   switch (modset->arith) {
@@ -130,7 +142,7 @@ modset_call_facul(unsigned long *factors, const modset_t *modset,
 }
 
 int
-facul_doit (unsigned long *factors, const modulus_t m, 
+facul_doit (mpz_t *factors, const modulus_t m, 
 	    const facul_strategy_t *strategy, const int method_start)
 {
   residue_t r;
@@ -329,8 +341,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	 or is composite */
 
       if (fprime) {
-          if (mod_intfits_ul(f))
-	    factors[found++] = mod_intget_ul(f);
+          mod_intget_mpz(factors[found++], f);
 	}
       else
 	{
@@ -349,8 +360,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	}
       
       if (cfprime) {
-          if (mod_intfits_ul(n))
-	    factors[found++] = mod_intget_ul(n);
+          mod_intget_mpz(factors[found++], n);
         }
       else
 	{
@@ -399,7 +409,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
   the values of our composite factor is stored in fm (or/and cfm).
 */
 int
-facul_doit_onefm (unsigned long* factors, const modulus_t m,
+facul_doit_onefm (mpz_t *factors, const modulus_t m,
 		  const facul_method_t method,
 		  modset_t* fm, modset_t* cfm, unsigned long lpb,
 		  double assume_prime_thresh, double BBB)
@@ -586,14 +596,10 @@ facul_doit_onefm (unsigned long* factors, const modulus_t m,
        or is composite */
 
     if (fprime)
-      if (mod_intfits_ul(f))
-	factors[found++] = mod_intget_ul(f);
+	mod_intget_mpz(factors[found++], f);
       
     if (cfprime) 
-      if (mod_intfits_ul(n))
-	factors[found++] = mod_intget_ul(n);
-
-    goto clean_up;
+	mod_intget_mpz(factors[found++], n);
 
     //Free
  clean_up:
