@@ -113,6 +113,21 @@ get_depalgname (const char *prefix, int numdep)
   return get_depname (prefix, "alg.", numdep);
 }
 
+static int
+check_dep (const char *prefix, int numdep)
+{
+  char *depname;
+  FILE *depfile;
+
+  depname = get_depname (prefix, "", numdep);
+  depfile = fopen (depname, "r");
+  free (depname);
+  if (depfile == NULL)
+    return 0;
+  fclose (depfile);
+  return 1;
+}
+
 int 
 calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
                   mpz_t Np)
@@ -1392,6 +1407,29 @@ int main(int argc, char *argv[])
         create_dependencies(prefix, indexname, purgedname, kername);
     }
 
+    if (opt_rat || opt_alg || opt_gcd)
+      {
+        int i;
+
+        for (i = 0; i < nthreads; i++)
+          if (check_dep (prefix, numdep + i) == 0)
+            {
+              fprintf (stderr, "Warning: dependency %d does not exist, reducing the number of threads to %d\n",
+                       numdep + i, i);
+              nthreads = i;
+              break;
+            }
+      }
+
+    if (nthreads == 0)
+      {
+        fprintf (stderr, "Error, no more dependency\n");
+        cado_poly_clear (pol);
+        param_list_clear (pl);
+        mpz_clear (Np);
+        return 1;
+      }
+
     if (opt_rat) {
         ASSERT_ALWAYS(numdep != -1);
         if (pol->rat->deg == 1)
@@ -1411,7 +1449,7 @@ int main(int argc, char *argv[])
     }
     
     cado_poly_clear (pol);
-    param_list_clear(pl);
-    mpz_clear(Np);
+    param_list_clear (pl);
+    mpz_clear (Np);
     return 0;
 }
