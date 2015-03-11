@@ -1842,6 +1842,10 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
             relation_t rel[1];
+            mpz_t mpz_lp[2];
+            mpz_init(mpz_lp[0]);
+            mpz_init(mpz_lp[1]);
+            mpz_ptr lp[2] = {NULL, NULL};
             memset(rel, 0, sizeof(rel));
             rel->a = a;
             rel->b = b; 
@@ -1849,11 +1853,24 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 for(int i = 0 ; i < factors[side].n ; i++)
                     relation_add_prime(rel, side, factors[side].fac[i]);
                 for (unsigned int i = 0; i < f[side]->length; ++i) {
-                    if (!mpz_fits_ulong_p(f[side]->data[i]))
-                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%" PRId64 ",%" PRIu64 ")\n",
-                                mpz_sizeinbase(f[side]->data[i], 2), a, b);
-                    for (unsigned int j = 0; j < m[side]->data[i]; j++) {
-                        relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
+                    if (!mpz_fits_ulong_p(f[side]->data[i])) {
+                        if (lp[side] != NULL) {
+                            // FIXME!
+                            // We can handle only one huge large prime on
+                            // each side. We print a warning and
+                            // continue, since only the printing is
+                            // wrong.
+                            fprintf(stderr, "Error: two large primes more than the size of ulong on the same side at (%" PRId64 ",%" PRIu64 ")\n",
+                                a, b);
+                        } else {
+                            lp[side] = &mpz_lp[side][0];
+                            mpz_set(lp[side], f[side]->data[i]);
+                            ASSERT_ALWAYS(m[side]->data[i] == 1);
+                        }
+                    } else {
+                        for (unsigned int j = 0; j < m[side]->data[i]; j++) {
+                            relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
+                        }
                     }
                 }
             }
@@ -1868,11 +1885,10 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 fprintf(stderr, "# Relation for (%" PRId64 ",%" PRIu64 ") printed\n", a, b);
             }
 #endif
-
             {
                 int do_check = th->las->suppress_duplicates;
-                int is_dup = do_check && relation_is_duplicate(rel,
-                        las->nb_threads, si);
+                int is_dup = do_check && (!lp[0]) && (!lp[1])
+                    && relation_is_duplicate(rel, las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
                 FILE *output;
                 if (!is_dup)
@@ -1886,10 +1902,12 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 for (size_t i_output = 0;
                      (output = verbose_output_get(0, 0, i_output)) != NULL;
                      i_output++) {
-                    fprint_relation(output, rel, comment);
+                    fprint_relation(output, rel, comment, lp[0], lp[1]);
                 }
                 verbose_output_end_batch();
             }
+            mpz_clear(mpz_lp[0]);
+            mpz_clear(mpz_lp[1]);
 
             /* Build histogram of lucky S[x] values */
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;

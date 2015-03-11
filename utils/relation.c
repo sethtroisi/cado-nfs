@@ -193,7 +193,8 @@ d64toa16 (char *p, int64_t m)
 /*}}}*/
 
 void
-fprint_relation (FILE *file, relation_t * rel, const char *prefix)
+fprint_relation (FILE *file, relation_t * rel, const char *prefix,
+    mpz_srcptr lp0, mpz_srcptr lp1)
 {
   char buf[1<<10], *p = buf, *op;
   size_t lg;
@@ -219,6 +220,10 @@ fprint_relation (FILE *file, relation_t * rel, const char *prefix)
 	    p += lg;
 	  }
       }
+  if (lp0) {
+    int c = gmp_sprintf(p, "%Zx,", lp0);
+    p += c;
+  }
   p[-1] = ':';
   for (i = 0; i < rel->nb_ap; ++i)
     if (rel->ap[i].e)
@@ -233,6 +238,10 @@ fprint_relation (FILE *file, relation_t * rel, const char *prefix)
 	    p += lg;
 	  }
       }
+  if (lp1) {
+    int c = gmp_sprintf(p, "%Zx,", lp1);
+    p += c;
+  }
   p[-1] = '\n';
   size_t written = fwrite (buf, sizeof(*buf), p - buf, file);
   if (written != (size_t) (p - buf)) {

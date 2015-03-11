@@ -28,7 +28,7 @@ dupsup (FILE *output, relation_t * rel, const mpz_t sq, const mpz_t rho, const i
 {
   if (0)
     gmp_fprintf (output, "# sq = %Zd, rho = %Zd, side = %d\n", sq, rho, side);
-  fprint_relation(output, rel, is_dupe ? "# DUPE " : "");
+  fprint_relation(output, rel, is_dupe ? "# DUPE " : "", NULL, NULL);
   return NULL;
 }
 
