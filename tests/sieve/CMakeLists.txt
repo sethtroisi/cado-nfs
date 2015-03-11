@@ -4,6 +4,7 @@
 # Build makefb and las before running check
 include_directories(${PROJECT_SOURCE_DIR}/sieve)
 add_dependencies(check makefb las las_tracek las_kbucket las_mbucket)
+add_dependencies(check las_descent)
 
 # Get paths to the makefb and las binaries and store in variables
 # makefb_path and las_path, resp.

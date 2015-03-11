@@ -2023,7 +2023,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             /* This can't work on 32-bits */
             mpz_set_ui(rho, relation_compute_r (winner->a, winner->b, p));
             verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
-            las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
+#warning "The explicit cast is wrong. Fix the design bug soon, please!"
+            las_todo_push_withdepth((las_todo_s **) &(las->todo), q, rho, side, si->doing->depth + 1);
         }
         relation_compute_all_r(winner);
         for(int i = 0 ; i < winner->nb_ap ; i++) {
@@ -2051,7 +2052,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             mpz_set_ui(q, p);
             mpz_set_ui(rho, winner->ap[i].r);
             verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
-            las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
+#warning "The explicit cast is wrong. Fix the design bug soon, please!"
+            las_todo_push_withdepth((las_todo_s **) &(las->todo), q, rho, side, si->doing->depth + 1);
         }
         mpz_clear(q);
         mpz_clear(rho);
