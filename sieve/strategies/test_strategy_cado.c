@@ -939,6 +939,9 @@ bench_proba_time_st(gmp_randstate_t state, facul_strategy_t* strategy,
       }
     //}}
     double starttime = microseconds();
+    mpz_t f[2];
+    mpz_init(f[0]);
+    mpz_init(f[1]);
     while (nb_test < nb_test_max)
 	{
 	    /*
@@ -946,15 +949,16 @@ bench_proba_time_st(gmp_randstate_t state, facul_strategy_t* strategy,
 	       found.  Note that N is composed by two prime factors by the
 	       previous function.
 	    */
-	    unsigned long f[2];
-	    f[0] = 0;
+            mpz_set_ui(f[0], 0);
 	    facul(f, N[nb_test], strategy);
-	    if (f[0] != 0)
+	    if (mpz_cmp_ui(f[0], 0) != 0)
 		{
 		  nb_success++;
 		}
 	    nb_test++;
 	}
+    mpz_clear(f[0]);
+    mpz_clear(f[1]);
     double endtime = microseconds();
     time = endtime - starttime;
     
@@ -1235,27 +1239,33 @@ bench_proba_time_st_both(gmp_randstate_t state, strategy_t*t,
     nb_success = 0;
     nb_test = 0;
     starttime = microseconds();
-    while (nb_test < nb_test_max)
-      {
-	/*
-	  f will contain the prime factor of N that the strategy
-	  found.  Note that N is composed by two prime factors by the
-	  previous function.
-	*/
-	unsigned long f[2];
-	f[0] = 0;
-	facul(f, N[nb_test][0], facul_st_s0);
-	if (f[0] != 0)
-	  {
-	    unsigned long f2[2];
-	    f2[0] = 0;
-	    facul(f2, N[nb_test][1], facul_st_s1);
-	    if (f2[0] != 0)
-	      nb_success++;
-	  }
-	nb_test++;
-	//getchar ();
-      }
+    {
+        mpz_t f[2], f2[2];
+        mpz_init(f[0]); mpz_init(f[1]);
+        mpz_init(f2[0]); mpz_init(f2[1]);
+        while (nb_test < nb_test_max)
+        {
+            /*
+               f will contain the prime factor of N that the strategy
+               found.  Note that N is composed by two prime factors by the
+               previous function.
+               */
+            mpz_set_ui(f[0], 0);
+            facul(f, N[nb_test][0], facul_st_s0);
+            if (mpz_cmp_ui(f[0], 0) != 0)
+            {
+                mpz_set_ui(f2[0], 0);
+                facul(f2, N[nb_test][1], facul_st_s1);
+                if (mpz_cmp_ui(f2[0], 0) != 0)
+                    nb_success++;
+            }
+            nb_test++;
+            //getchar ();
+        }
+        mpz_clear(f[0]);  mpz_clear(f[1]);
+        mpz_clear(f2[0]); mpz_clear(f2[1]);
+    }
+
     endtime = microseconds();
     time = endtime - starttime;
     res2[0] = nb_success / ((double)nb_test);
@@ -1270,9 +1280,13 @@ bench_proba_time_st_both(gmp_randstate_t state, strategy_t*t,
     nb_success = 0;
     nb_test = 0;
 
-    unsigned long* f[2];
-    f[0] = malloc (sizeof (unsigned long) * 15);
-    f[1] = malloc (sizeof (unsigned long) * 15);
+    mpz_t * f[2];
+    f[0] = (mpz_t *)malloc (sizeof (mpz_t) * 15);
+    f[1] = (mpz_t *)malloc (sizeof (mpz_t) * 15);
+    for (int i = 0; i < 15; ++i) {
+        mpz_init(f[0][i]);
+        mpz_init(f[1][i]);
+    }
     starttime = microseconds();
     while (nb_test < nb_test_max)
       {
@@ -1281,8 +1295,8 @@ bench_proba_time_st_both(gmp_randstate_t state, strategy_t*t,
 	  found.  Note that N is composed by two prime factors by the
 	  previous function.
 	*/
-	f[0][0] = 0;
-	f[1][1] = 0;
+        mpz_set_ui(f[0][0], 0);
+        mpz_set_ui(f[1][1], 0);
 	int is_smooth[2] = {0,0};
 	facul_both(f, N[nb_test], facul_st, is_smooth);
 	if (is_smooth[0]==1 && is_smooth[1]==1)
@@ -1295,6 +1309,12 @@ bench_proba_time_st_both(gmp_randstate_t state, strategy_t*t,
 	/* printf ("nb_success = %d\n", nb_success); */
 	//getchar();
       }
+    for (int i = 0; i < 15; ++i) {
+        mpz_clear(f[0][i]);
+        mpz_clear(f[1][i]);
+    }
+    free(f[0]);
+    free(f[1]);
     endtime = microseconds();
     time = endtime - starttime;
     res[0] = nb_success / ((double)nb_test);

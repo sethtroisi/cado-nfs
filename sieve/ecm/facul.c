@@ -161,6 +161,7 @@ facul_clear_strategy (facul_strategy_t *strategy)
   free (strategy);
 }
 
+#if 0
 static int
 cmp_ul (const unsigned long *a, const unsigned long *b)
 {
@@ -168,6 +169,14 @@ cmp_ul (const unsigned long *a, const unsigned long *b)
   if (*a == *b) return 0;
   return 1;
 }
+#endif
+
+static int
+my_cmp_mpz (const mpz_t *a, const mpz_t *b)
+{
+  return mpz_cmp(*a, *b);
+}
+
 
 
 void facul_print_stats (FILE *stream)
@@ -216,7 +225,7 @@ void facul_print_stats (FILE *stream)
 
 
 int
-facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
+facul (mpz_t *factors, const mpz_t N, const facul_strategy_t *strategy)
 {
   int found = 0;
   size_t bits;
@@ -282,21 +291,9 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
   if (found > 1)
     {
       /* Sort the factors we found */
-      qsort (factors, found, sizeof (unsigned long), 
-	     (int (*)(const void *, const void *)) &cmp_ul);
+      qsort (factors, found, sizeof (mpz_t), 
+	     (int (*)(const void *, const void *)) &my_cmp_mpz);
     }
-
-#ifdef PARI
-  if (found > 1)
-    {
-      fprintf (stderr, " == ");
-      for (i = 0; i < found; i++)
-	fprintf (stderr, "%lu%s", factors[i], 
-		 (i+1 < found) ? " * " : " /* PARI */\n");
-    }
-  else
-    fprintf (stderr, "; /* PARI */\n");
-#endif
 
   return found;
 }
@@ -969,7 +966,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
  * factors.
  */
 static int
-facul_aux (unsigned long *factors, const modset_t m,
+facul_aux (mpz_t *factors, const modset_t m,
 	   const facul_strategies_t *strategies, int method_start, int side)
 {
   int found = 0;
@@ -1090,7 +1087,7 @@ facul_aux (unsigned long *factors, const modset_t m,
 */
 
 static int*
-facul_both_src (unsigned long **factors, const modset_t* m,
+facul_both_src (mpz_t **factors, const modset_t* m,
 		const facul_strategies_t *strategies, int* cof,
 		int* is_smooth)
 {
@@ -1237,7 +1234,7 @@ facul_both_src (unsigned long **factors, const modset_t* m,
   It returns the number of factors for each side!
 */
 int*
-facul_both (unsigned long **factors, mpz_t* N,
+facul_both (mpz_t **factors, mpz_t* N,
 	    const facul_strategies_t *strategies, int* is_smooth)
 {
   int cof[2];
@@ -1313,21 +1310,9 @@ facul_both (unsigned long **factors, mpz_t* N,
       if (found[side] > 1)
 	{
 	  /* Sort the factors we found */
-	  qsort (factors[side], found[side], sizeof (unsigned long),
-		 (int (*)(const void *, const void *)) &cmp_ul);
+	  qsort (factors[side], found[side], sizeof (mpz_t),
+		 (int (*)(const void *, const void *)) &my_cmp_mpz);
 	}
-
-#ifdef PARI
-      if (found[side] > 1)
-	{
-	  fprintf (stderr, " == ");
-	  for (int i = 0; i < found[side]; i++)
-	    fprintf (stderr, "%lu%s", factors[side][i],
-		     (i+1 < found[side]) ? " * " : " /* PARI */\n");
-	}
-      else
-	fprintf (stderr, "; /* PARI */\n");
-#endif
     }
 
   //Free

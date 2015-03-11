@@ -111,7 +111,7 @@ int nb_curves (unsigned int);
 facul_strategy_t * facul_make_strategy (unsigned long, unsigned int, int, int);
 void facul_clear_strategy (facul_strategy_t *);
 void facul_print_stats (FILE *);
-int facul (unsigned long *, const mpz_t, const facul_strategy_t *);
+int facul (mpz_t *, const mpz_t, const facul_strategy_t *);
 
 facul_strategies_t* facul_make_strategies (unsigned long, unsigned int,
 					   unsigned int, unsigned long,
@@ -128,7 +128,7 @@ void
 modset_clear (modset_t *modset);
 
 int*
-facul_both (unsigned long**, mpz_t* ,
+facul_both (mpz_t**, mpz_t* ,
 	    const facul_strategies_t *, int*);
 #ifdef __cplusplus
 }

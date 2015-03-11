@@ -6,12 +6,13 @@ Using CADO-NFS for DLP in large characteristic fields.
 The cadofactor.py script and the factor.sh wrapper can be used to compute
 discrete logarithms in a prime field GF(p).
 
-For the moment, it is required to have Magma installed (it seems to fail
-with version of Magma before 2.19). It is only capable to handle tiny
-examples, since the linear algebra is currently done within Magma. This
-should change soon (hopefully). Using the linalg/bwc/bwc-ptrace.sh
-script, it might be possible to run the linear algebra step by hand for
-larger examples.
+For the moment, it is required to have Magma installed. It is used just
+for some number-theoretic computations, after the polynomial selection
+has been done.
+Cf scripts/badideals.mag .
+This script has been written without using any high-level functionality
+of Magma, so that it will be easy to convert it to C/C++.
+This step is very cheap, so it is possible to run it on any computer.
 
 In principle, just typing
   ./factor.sh p -dlp
@@ -24,7 +25,7 @@ parameter file is given in params_dl/param.p59. The main difference is
 the presence of the "dlp=true" line, and the lines related to characters
 and sqrt disappear.
 
-By default, the script will factor p-1 and compute discrete logs modulo
+By default, the Magma script will factor p-1 and compute discrete logs modulo
 the largest prime factor ell of p-1. This can be overridden by giving
 explicitly ell=... in the parameter file.
 
@@ -35,6 +36,10 @@ phase. The result is in the $wordir/$name.reconstruclog.dlog file.
 Individual logarithms, using a descent stage, must be computed by hand
 with the help of the sieve/las binary. See sieve/README.descent for some
 guidelines.
+
+Note: the logarithms are given in an arbitrary base. If you want to
+define them with respect to a specific generator g, then you'll have to
+compute the logarithm of g and then divide all the logs by this value.
 
 **** Using non-linear polynomials
 
