@@ -873,4 +873,57 @@ ularith_post_process_inverse(const unsigned long r, const unsigned long p,
   return t;
 }
 
+
+/* Computes r = ((phigh * 2^LONG_BITS + plow) / 2^LONG_BITS) % m
+   Requires phigh < m and invm = -1/m (mod 2^LONG_BITS). */
+
+static inline void
+ularith_redc(unsigned long *r, const unsigned long plow,
+             const unsigned long phigh, const unsigned long m,
+             const unsigned long invm)
+{
+  unsigned long t = phigh;
+#ifndef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+  unsigned long tlow, thigh;
+#endif
+
+  ASSERT_EXPENSIVE (phigh < m);
+
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+
+  /* TODO: are the register constraints watertight?
+     %rax gets modified but putting tlow as an output constraint with "+"
+     will keep r from getting allocated in %rax, which is a shame
+     since we often want the result in %rax for the next multiply. */
+
+  __asm__ __VOLATILE (
+    "imulq %[invm], %%rax\n\t"
+    "cmpq $1, %%rax \n\t"                /* if plow != 0, increase t */
+    "sbbq $-1, %[t]\n\t"
+    "mulq %[m]\n\t"
+    "lea (%[t],%%rdx,1), %[r]\n\t"  /* compute (rdx + thigh) mod m */
+    "subq %[m], %[t]\n\t"
+    "addq %%rdx, %[t]\n\t"
+    "cmovcq %[t], %[r]\n\t"
+    : [t] "+&r" (t), [r] "=&r" (r[0])
+    : [invm] "rm" (invm), [m] "rm" (m), "a" (plow)
+    : "%rdx", "cc"
+  );
+#else
+  tlow = plow * invm;
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m);
+  /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow)
+     == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0.
+     In the former case we want phigh + thigh + 1, in the latter
+     phigh + thigh. Since t = phigh < m, and modredcul_add can handle the
+     case where the second operand is equal to m, adding 1 is safe */
+
+  t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */
+
+  ularith_addmod_ul_ul(r, t, thigh, m);
+#endif
+  ASSERT_EXPENSIVE (r[0] < m);
+}
+
+
 #endif /* ifndef UL_ARITH_H__ */

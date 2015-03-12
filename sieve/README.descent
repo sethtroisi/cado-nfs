@@ -72,7 +72,10 @@ polynomial in the *.poly file modulo q. All of those must be put in a
 "todo file", each on one line, with the format
   r <q> <root>
 where "r" stands for "rational".
-TODO: can be make this 0/1?
+
+The letters r or a are actually aliases to specifying the side. Giving an
+integer (currently only 0 or 1, respectively) has exactly the same
+meaning.
 
 Running las with appropriate arguments
 --------------------------------------

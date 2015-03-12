@@ -4,6 +4,7 @@
 # Build makefb and las before running check
 include_directories(${PROJECT_SOURCE_DIR}/sieve)
 add_dependencies(check makefb las las_tracek las_kbucket las_mbucket)
+add_dependencies(check las_descent)
 
 # Get paths to the makefb and las binaries and store in variables
 # makefb_path and las_path, resp.
@@ -50,6 +51,10 @@ add_test(F9_rlambdatest bash -c "rlambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.trac
 SET_TESTS_PROPERTIES(F9_rlambdatest PROPERTIES DEPENDS F9_makefbtest)
 add_test(F9_alambdatest bash -c "alambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"alambda>.* does not make sense\"")
 SET_TESTS_PROPERTIES(F9_alambdatest PROPERTIES DEPENDS F9_makefbtest)
+
+# Try the todo-list mode of las
+add_test(F9_todotest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.todotest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" ${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.todo")
+SET_TESTS_PROPERTIES(F9_todotest PROPERTIES DEPENDS F9_makefbtest)
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")

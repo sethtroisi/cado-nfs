@@ -16,7 +16,7 @@ unset SMEXP1
 unset NMAPS0
 unset NMAPS1
 unset ABUNITS
-unset MT
+unset mtopts
 
 EXPLICIT0="no"
 EXPLICIT1="no"
@@ -73,7 +73,7 @@ do
     shift 2
   elif [ "$1" = "-t" ]
   then
-    MT="$2"
+    mtopts="-t $2"
     shift 2
   elif [ "$1" = "-explicit_units0" ]
   then
@@ -117,7 +117,7 @@ if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
     else
 	# out contains SM's for side=0..1 in that order, or 0 or 1 depending
 	# on the unit side if any
-	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts -t $MT"
+	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts $mtopts"
 	echo $CMD; $CMD
     fi
 else

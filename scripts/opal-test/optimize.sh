@@ -8,7 +8,7 @@
 
 cwd=`pwd`
 params=$1
-poly=$2
+poly=`basename $2`
 d=`mktemp -d`
 echo "Working directory:" $d
 cp $2 las_optimize.py report.py $d
@@ -19,8 +19,18 @@ lpbr=`grep lpbr $params | cut -d= -f2`
 lpba=`grep lpba $params | cut -d= -f2`
 mfbr=`grep mfbr $params | cut -d= -f2`
 mfba=`grep mfba $params | cut -d= -f2`
-ncurves0=`grep ncurves0 $params | cut -d= -f2`
-ncurves1=`grep ncurves1 $params | cut -d= -f2`
+grep ncurves0 $params
+if [ $? -eq 0 ]; then
+   ncurves0=`grep ncurves0 $params | cut -d= -f2`
+else
+   ncurves0=10
+fi
+grep ncurves1 $params
+if [ $? -eq 0 ]; then
+   ncurves1=`grep ncurves1 $params | cut -d= -f2`
+else
+   ncurves1=10
+fi
 I=`grep I $params | cut -d= -f2`
 rlim_min=`expr $rlim / 2`
 rlim_max=`expr $rlim \* 2`

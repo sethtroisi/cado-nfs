@@ -117,6 +117,9 @@ bench_proba_time_st(gmp_randstate_t state, facul_strategy_t* strategy,
 	sum_dec += init_tab->tab[i]->nb_elem;
     //struct timeval st_test, end_test;
 
+    mpz_t f[2];
+    mpz_init(f[0]);
+    mpz_init(f[1]);
     while (nb_succes < nb_succes_max && (nb_test<nb_test_max))
 	{
 	    int index = select_random_index_dec(sum_dec, init_tab);
@@ -128,8 +131,7 @@ bench_proba_time_st(gmp_randstate_t state, facul_strategy_t* strategy,
 	       found.  Note that N is composed by two prime factors by the
 	       previous function.
 	    */
-	    unsigned long f[2];
-	    f[0] = 0;
+            mpz_set_ui(f[0], 0);
 
 	    double starttime = microseconds();
 	    //gettimeofday (&st_test, NULL);
@@ -139,14 +141,16 @@ bench_proba_time_st(gmp_randstate_t state, facul_strategy_t* strategy,
 	    /* time += (end_test.tv_sec - st_test.tv_sec)*1000000L */
 	    /* 	+ end_test.tv_usec - st_test.tv_usec; */
       	    time += endtime - starttime;
-	    if (f[0] != 0)
+	    if (mpz_cmp_ui(f[0], 0) != 0)
 		{
-		    int len_factor = floor(log(f[0])/log(2))+1;
+		    int len_factor = mpz_sizeinbase(f[0], 2);
 		    if (len_factor <= lpb && (r-len_factor) <= lpb)
 			nb_succes++;
 		}
 	    nb_test++;
 	}
+    mpz_clear(f[0]);
+    mpz_clear(f[1]);
     mpz_clear(N);
     res[0] = nb_succes / ((double)nb_test);
     res[1] = time / ((double)nb_test);

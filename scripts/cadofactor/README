@@ -189,3 +189,12 @@ The wudb.py script can be used to print info on the workunits. For example,
 
 prints all currently assigned work units.
 
+Using several threads for the square root step
+==============================================
+
+By default the given number of threads (-t option of factor.sh, or
+tasks.threads for cadofactor.py) is used in the square root step. To use say
+16 threads in parallel, add the following to the cadofactor.py command line:
+
+tasks.sqrt.threads = 16
+
