@@ -22,13 +22,17 @@ void array_clear(array_ptr array)
 
 void array_fprintf(FILE * filew, array_srcptr array)
 {
-  for (uint64_t i = 0; i < array->number_element; i++) {
-    fprintf(filew, "%u\n", array->array[i]);
+  ASSERT(array->number_element != 0);
+  
+  fprintf(filew, "[");
+  for (uint64_t i = 0; i < array->number_element - 1; i++) {
+    fprintf(filew, "%u, ", array->array[i]);
   }
+  fprintf(filew, "%u]\n", array->array[array->number_element -1]);
 }
 
 void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
-                            sieving_interval_srcptr H, uint64_t number_element)
+    sieving_interval_srcptr H, uint64_t number_element)
 {
   ASSERT(v->dim == H->t);
 
@@ -64,9 +68,7 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
 }
 
 void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
-                            sieving_interval_srcptr H,
-                            MAYBE_UNUSED uint64_t number_element)
-
+    sieving_interval_srcptr H, MAYBE_UNUSED uint64_t number_element)
 {
 #ifndef NDEBUG
   ASSERT(v->dim == H->t);
@@ -105,8 +107,7 @@ void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
 }
 
 void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
-                              sieving_interval_srcptr H,
-                              MAYBE_UNUSED uint64_t number_element)
+    sieving_interval_srcptr H, MAYBE_UNUSED uint64_t number_element)
 {
 #ifndef NDEBUG
   ASSERT(v->dim == H->t);
