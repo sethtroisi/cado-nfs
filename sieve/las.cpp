@@ -2799,7 +2799,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                  wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
     const long peakmem = PeakMemusage();
     if (peakmem > 0)
-        verbose_output_print (2, 1, "# PeakMemusage = %ldMB\n",
+        verbose_output_print (2, 1, "# PeakMemusage (MB) = %ld \n",
                 peakmem >> 10);
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
