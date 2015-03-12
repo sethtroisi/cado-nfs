@@ -61,7 +61,9 @@ one relation.
 
 An example hint-file will be given as example in the future.
 TODO: explain mkhint?
-TODO: how to replace r and a for "55r"...? Say "55 0"?
+
+Alternatively, the hint file may also use the syntax "55@0" instead of "55r", to mean
+"bitsize 55 on size 0".
 
 Preparing the Todo file
 -----------------------

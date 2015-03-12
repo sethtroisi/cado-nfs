@@ -620,6 +620,10 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         switch(*x++) {
             case 'a' : sc->side = ALGEBRAIC_SIDE; break;
             case 'r' : sc->side = RATIONAL_SIDE; break;
+            case '@' :
+                       sc->side = strtoul(x, &x, 0);
+                       ASSERT_ALWAYS(sc->side < 2);
+                       break;
             default:
                        fprintf(stderr, "%s: parse error at %s\n", filename, line);
                        exit(1);
