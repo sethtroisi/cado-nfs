@@ -60,7 +60,7 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
 }
 
 /* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
-static void
+void
 accumulate_fast_end (mpz_t *prd, unsigned long lprd)
 {
   unsigned long i;
@@ -218,7 +218,15 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
            numdep, ab_pairs, freerels);
   pthread_mutex_unlock (&lock);
 
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "SqrtRat(%d): before accumulate_fast_end\n", numdep);
+  fflush (stderr);
+  pthread_mutex_unlock (&lock);
   accumulate_fast_end (prd, lprd);
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "SqrtRat(%d): after accumulate_fast_end\n", numdep);
+  fflush (stderr);
+  pthread_mutex_unlock (&lock);
 
   /* we must divide by g1^ab_pairs: if the number of (a,b) pairs is odd, we
      multiply by g1, and divide by g1^(ab_pairs+1) */
