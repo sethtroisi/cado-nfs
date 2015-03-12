@@ -76,7 +76,6 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
   return u;
 }
 
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 #define HAVE_redc_64
 /* This does a full mul, and should grok slightly larger bounds than the
  * version above. Presumably, as long as x fits within 64 bits, (63 bits,
@@ -87,13 +86,44 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
 {
   int64_t t = ((uint64_t)x)*invp;
   uint64_t u;
+
+  // First, compute:
+  //    u = (p*t + x) / 2^64
+  // This requires 128-bit word addition.
+#if LONG_BIT == 64
   /* Need the high part of a 64x64 mul */
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
 			"    mulq    %[p]\n"
 			"    addq    %[x], %%rax\n"
 			"    adcq    $0, %%rdx\n"
 			: "=&d" (u)
 			: "a" (t), [x] "rm" (x), [p] "r" ((uint64_t) p));
+#else
+  ASSERT (sizeof(unsigned long) == 8);
+  uint64_t rax, rdx;
+  ularith_mul_ul_ul_2ul(&rdx, &rax, p, t);
+  ularith_add_ul_2ul(&rdx, &rax, x);
+  u = rdx;
+#endif
+#else // 32-bit support, via gmp
+    mpz_t xx, pp;
+    mpz_t tt, uu;
+    mpz_init(xx); mpz_init(pp);
+    mpz_init(tt); mpz_init(uu);
+    mpz_set_uint64(xx, x);
+    mpz_set_ui(pp, p);
+    mpz_set_int64(tt, t);
+
+    mpz_mul(uu, pp, tt);
+    mpz_add(uu, uu, xx);
+    mpz_tdiv_q_2exp(uu, uu, 64);
+    u = mpz_get_uint64(uu);
+
+    mpz_clear(xx); mpz_clear(pp);
+    mpz_clear(tt); mpz_clear(uu);
+#endif
+
   /* As per the early clobber on rdx, x can't be put in there.
    * Furthermore, since t goes to rax, x doesn't go there either. Thus
    * it is reasonable to assume that it is still unmodified after the
@@ -106,7 +136,7 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
   if ((int64_t) t >= 0) u = t;
   return u;
 }
-#endif
+
 
 MAYBE_UNUSED
 static inline fbprime_t
