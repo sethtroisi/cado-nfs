@@ -32,6 +32,7 @@
 #include "las-cofactor.h"
 #include "las-fill-in-buckets.h"
 #include "las-threads.h"
+#include "las-todo.h"
 #include "memusage.h"
 
 #ifdef HAVE_SSE41
@@ -345,6 +346,7 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
 /*}}}*/
 
 /*}}}*/
+/* }}} */
 
 /* {{{ sieve_info_init_... */
 static void
@@ -387,8 +389,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
-    mpz_init(si->doing->p);
-    mpz_init(si->doing->r);
+    si->doing = NULL;
 
     /* Allocate memory for transformed polynomials */
     sieve_info_init_norm_data(si);
@@ -515,15 +516,13 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
  * into si->doing.  The field todo->next is not accessed, since it does
  * not make sense for si->doing, which is only a single item. The head of
  * the todo list is pruned */
-void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
+void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_queue * todo)
 {
-    ASSERT_ALWAYS(mpz_poly_is_root(si->cpoly->pols[(*todo)->side], (*todo)->r, (*todo)->p));
-    mpz_clear(si->doing->p);
-    mpz_clear(si->doing->r);
-    memcpy(si->doing, *todo, sizeof(las_todo));
-    free(*todo);
-    *todo = si->doing->next;
-    si->doing->next = 0;
+    delete si->doing;
+    si->doing = todo->front();
+    todo->pop();
+    ASSERT_ALWAYS(mpz_poly_is_root(si->cpoly->pols[si->doing->side],
+                  si->doing->r, si->doing->p));
     /* sanity check */
     if (!mpz_probab_prime_p(si->doing->p, 1)) {
         verbose_output_vfprint(1, 0, gmp_vfprintf, "Error, %Zd is not prime\n",
@@ -571,11 +570,10 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
         mpz_clear (si->BBB[s]);
         mpz_clear (si->BBBB[s]);
     }
+    delete si->doing;
     facul_clear_strategies (si->strategies);
     si->strategies = NULL;
     sieve_info_clear_norm_data(si);
-    mpz_clear(si->doing->p);
-    mpz_clear(si->doing->r);
 }/*}}}*/
 
 /* las_info stuff */
@@ -890,7 +888,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* }}} */
 
 
-    //{{parse option stats_cofact
+    //{{{ parse option stats_cofact
     const char *statsfilename = param_list_lookup_string (pl, "stats-cofact");
     if (statsfilename != NULL) /* a file was given */
       {
@@ -915,14 +913,15 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 		      cof_call[i][j] = cof_succ[i][j] = 0;
 	      }
       }
-    //}}
+    //}}}
 
     
     /* {{{ Init and parse info regarding work to be done by the siever */
     /* Actual parsing of the command-line fragments is done within
      * las_todo_feed, but this is an admittedly contrived way to work */
-    mpz_init_set_ui(las->todo_q0, 0);
-    mpz_init_set_ui(las->todo_q1, 0);
+    las->todo = new las_todo_queue;
+    mpz_init(las->todo_q0);
+    mpz_init(las->todo_q1);
     const char * filename = param_list_lookup_string(pl, "todo");
     if (filename) {
         las->todo_list_fd = fopen(filename, "r");
@@ -959,6 +958,8 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     if (las->todo_list_fd)
         fclose(las->todo_list_fd);
     cado_poly_clear(las->cpoly);
+    ASSERT_ALWAYS(las->todo->empty());
+    delete las->todo;
 }/*}}}*/
 
 /* Look for an existing sieve_info in las->sievers with configuration matching
@@ -984,52 +985,121 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     return si;
 }/*}}}*/
 
-void las_todo_push_withdepth(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
+void las_todo_push_withdepth(las_todo_queue * queue, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
 {
-    las_todo_ptr nd = (las_todo_ptr) malloc(sizeof(las_todo));
-    memset(nd, 0, sizeof(las_todo));
-    mpz_init_set(nd->p, p);
-    mpz_init_set(nd->r, r);
-    nd->side = side;
-    nd->depth = depth;
-    nd->next = *d;
-    *d = nd;
+    queue->push(new las_todo_entry(p, r, side, depth));
 }
-void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side)
+void las_todo_push(las_todo_queue * queue, mpz_srcptr p, mpz_srcptr r, int side)
 {
-    las_todo_push_withdepth(d, p, r, side, 0);
+    las_todo_push_withdepth(queue, p, r, side, 0);
 }
-void las_todo_push_closing_brace(las_todo_ptr * d, int depth)
+void las_todo_push_closing_brace(las_todo_queue * queue, int depth)
 {
-    las_todo_ptr nd = (las_todo_ptr) malloc(sizeof(las_todo));
-    memset(nd, 0, sizeof(las_todo));
-    mpz_init(nd->p);
-    mpz_init(nd->r);
-    nd->side = -1;
-    nd->depth = depth;
-    nd->next = *d;
-    *d = nd;
+    queue->push(new las_todo_entry(-1, depth));
 }
 
 /*}}}*/
 
-void las_todo_pop(las_todo_ptr * d)/*{{{*/
+void las_todo_pop(las_todo_queue * queue)/*{{{*/
 {
-    las_todo_ptr nd = *d;
-    *d = nd->next;
-    mpz_clear(nd->p);
-    mpz_clear(nd->r);
-    free(nd);
+    delete queue->front();
+    queue->pop();
 }
 
-int las_todo_pop_closing_brace(las_todo_ptr * d)
+int las_todo_pop_closing_brace(las_todo_queue * queue)
 {
-    if ((*d)->side >= 0)
+    if (queue->front()->side >= 0)
         return 0;
-    las_todo_pop(d);
+    las_todo_pop(queue);
     return 1;
 }
 /*}}}*/
+
+/* Put in r the smallest legitimate special-q value that it at least
+   s + diff (note that if s+diff is already legitimate, then r = s+diff
+   will result. */
+static void
+next_legitimate_specialq(mpz_t r, const mpz_t s, const unsigned long diff)
+{
+    mpz_add_ui(r, s, diff);
+    /* At some point in the future, we might want to allow prime-power or 
+       composite special-q here. */
+    /* mpz_nextprime() returns a prime *greater than* its input argument,
+       which we don't always want, so we subtract 1 first. */
+    mpz_sub_ui(r, r, 1);
+    mpz_nextprime(r, r);
+}
+
+static void
+parse_command_line_q0_q1(las_todo_queue *queue, mpz_ptr q, mpz_ptr q1, param_list pl, const int qside)
+{
+    ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q));
+    if (param_list_parse_mpz(pl, "q1", q1)) {
+        next_legitimate_specialq(q, q, 0);
+        return;
+    }
+
+    /* We don't have -q1. If we have -rho, we sieve only <q0, rho>. If we
+       don't have -rho, we sieve only q0, but all roots of it. If -q0 does
+       not give a legitimate special-q value, advance to the next legitimate
+       one and print a warning. */
+    mpz_t t;
+    mpz_init_set(t, q);
+    next_legitimate_specialq(q, q, 0);
+    if (mpz_cmp(t, q) != 0)
+        verbose_output_vfprint(1, 0, gmp_vfprintf, "Warning: fixing q=%Zd to next prime q=%Zd\n", t, q);
+
+    mpz_set(q1, q);
+    if (param_list_parse_mpz(pl, "rho", t)) {
+        las_todo_push(queue, q, t, qside);
+        /* Set empty interval [q + 1, q] as special-q interval */
+        mpz_add_ui (q, q, 1);
+    } else {
+        /* Special-q are chosen from [q, q]. Nothing more to do here. */
+    }
+    mpz_clear(t);
+}
+
+static int
+skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots)
+{
+    int nroots = orig_nroots;
+    if (nroots % 2) {
+        fprintf(stderr, "Number of roots modulo q is odd. Don't know how to interpret -galois.\n");
+        ASSERT_ALWAYS(0);
+    }
+    // Keep only one root among {r, 1/r} orbits.
+    modulusul_t mm;
+    unsigned long qq = mpz_get_ui(q);
+    modul_initmod_ul(mm, qq);
+    residueul_t r1, r2;
+    modul_init(r1, mm);
+    modul_init(r2, mm);
+    for (int k = 0; k < nroots; k++) {
+        unsigned long rr = mpz_get_ui(roots[k]);
+        modul_set_ul(r1, rr, mm);
+        int kk = 0;
+        for (int l = k+1; l < nroots; ++l) {
+            unsigned long ss = mpz_get_ui(roots[l]);
+            modul_set_ul(r2, ss, mm);
+            modul_mul(r2, r2, r1, mm);
+            if (modul_is1(r2, mm)) {
+                kk = l;
+                break;
+            }
+        }
+        ASSERT_ALWAYS(kk != 0); // Should always find an inverse.
+        // Remove it from the list
+        for (int l = kk; l < nroots-1; ++l) {
+            mpz_set(roots[l], roots[l+1]);
+        }
+        nroots--;
+    }
+    modul_clear(r1, mm);
+    modul_clear(r2, mm);
+    modul_clearmod(mm);
+    return nroots;
+}
 
 /* {{{ Populating the todo list */
 /* See below in main() for documentation about the q-range and q-list
@@ -1037,51 +1107,21 @@ int las_todo_pop_closing_brace(las_todo_ptr * d)
 /* These functions return non-zero if the todo list is not empty */
 int las_todo_feed_qrange(las_info_ptr las, param_list pl)
 {
-    if (las->todo) return 1; /* keep going */
+    /* If we still have entries in the queue, don't add more now */
+    if (!las->todo->empty())
+        return 1;
+
+    const unsigned long push_at_least_this_many = 10;
+
     /* handy aliases */
     mpz_ptr q = las->todo_q0;
     mpz_ptr q1 = las->todo_q1;
 
-    int pushed = 0;
-
     int qside = las->default_config->side;
 
-    if (mpz_cmp_ui(q, 0) == 0) {
-        ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q));
-        if (!param_list_parse_mpz(pl, "q1", q1)) {
-            mpz_t r;
-            mpz_init(r);
-            if (!param_list_parse_mpz(pl, "rho", r)) {
-                if (qside != RATIONAL_SIDE) {
-                    fprintf(stderr, "Error: single special-q requires -rho on algebraic side\n");
-                    exit(EXIT_FAILURE);
-                }
-                if (!mpz_probab_prime_p(q, 2)) {
-                    mpz_t q2;
-                    mpz_init(q2);
-                    mpz_nextprime(q2, q);
-                    verbose_output_vfprint(1, 0, gmp_vfprintf, "Warning: fixing q=%Zd to next prime q=%Zd\n", q, q2);
-                    mpz_set(q, q2);
-                    mpz_clear(q2);
-                }
-                /* Arrange so that the normal code handles this q and
-                 * computes rho. */
-                mpz_add_ui(q1, q, 1);
-                mpz_sub_ui(q, q, 1);
-            } else {
-                ASSERT_ALWAYS(mpz_probab_prime_p(q, 2));
-                las_todo_push(& las->todo, q, r, qside);
-                pushed++;
-                /* Anyway we're not subtracting anything from q, so that
-                 * the tail code won't do anything */
-                mpz_add_ui(q1, q, 1);
-            }
-            mpz_clear(r);
-        } else {
-            /* Nextprime should return q0 if q0 is prime */
-            mpz_sub_ui(q, q, 1);
-        }
-    }
+    if (mpz_cmp_ui(q, 0) == 0)
+        parse_command_line_q0_q1(las->todo, q, q1, pl, qside);
+
     /* Otherwise we're going to process the next few sq's and put them
      * into the list */
     mpz_t * roots;
@@ -1091,73 +1131,30 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
         mpz_init(roots[i]);
     }
 
-    las_todo_ptr * pnext = &(las->todo);
-    for( ; pushed < 10 && mpz_cmp(q, q1) < 0 ; ) {
-        mpz_nextprime(q, q);
-        if (mpz_cmp(q, q1) >= 0)
-            break;
-        mpz_poly_ptr f = las->cpoly->pols[qside];
+    mpz_poly_ptr f = las->cpoly->pols[qside];
+    /* The loop processes all special-q in [q, q1]. On loop entry, the value
+       in q is required to be a legitimate special-q, and will be added to
+       the queue. */
+    for ( ; las->todo->size() < push_at_least_this_many && mpz_cmp(q, q1) <= 0 ; ) {
         int nroots = mpz_poly_roots (roots, f, q);
-        if (param_list_parse_switch(pl, "-galois")) {
-            if (nroots % 2) {
-                fprintf(stderr, "Number of roots modulo q is odd. Don't know how to interpret -galois.\n");
-                ASSERT_ALWAYS(0);
-            }
-            // Keep only one root among {r, 1/r} orbits.
-            modulusul_t mm;
-            unsigned long qq = mpz_get_ui(q);
-            modul_initmod_ul(mm, qq);
-            residueul_t r1, r2;
-            modul_init(r1, mm);
-            modul_init(r2, mm);
-            for (int k = 0; k < nroots; k++) {
-                unsigned long rr = mpz_get_ui(roots[k]);
-                modul_set_ul(r1, rr, mm);
-                int kk = 0;
-                for (int l = k+1; l < nroots; ++l) {
-                    unsigned long ss = mpz_get_ui(roots[l]);
-                    modul_set_ul(r2, ss, mm);
-                    modul_mul(r2, r2, r1, mm);
-                    if (modul_is1(r2, mm)) {
-                        kk = l;
-                        break;
-                    }
-                }
-                ASSERT_ALWAYS(kk != 0); // Should always find an inverse.
-                // Remove it from the list
-                for (int l = kk; l < nroots-1; ++l) {
-                    mpz_set(roots[l], roots[l+1]);
-                }
-                nroots--;
-            }
-            modul_clear(r1, mm);
-            modul_clear(r2, mm);
-            modul_clearmod(mm);
+        if (nroots == 0) {
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# polynomial has no roots for q = %Zu\n", q);
         }
-        /* {{{ This print is now dead (or we're going to print it at
-         * weird times)
-         *
-                if (nroots > 0) {
-                    gmp_fprintf (las->output, "### q=%Zd: root%s", q0,
-                            (nroots == 1) ? "" : "s");
-                    for (i = 1; i <= (int) nroots; i++)
-                        gmp_fprintf (las->output, " %Zd", roots[nroots-i]);
-                    fprintf (las->output, "\n");
-                }
-         * }}} */
 
-        for(int i = 0 ; i < nroots ; i++) {
-            las_todo_push(pnext, q, roots[i], qside);
-            pnext = &((*pnext)->next);
-            pushed++;
-        }
+        if (param_list_parse_switch(pl, "-galois"))
+            nroots = skip_galois_roots(nroots, q, roots);
+
+        for(int i = 0 ; i < nroots ; i++)
+            las_todo_push(las->todo, q, roots[i], qside);
+
+        next_legitimate_specialq(q, q, 1);
     }
 
     for(int i = 0 ; i < deg  ; i++) {
         mpz_clear(roots[i]);
     }
     free(roots);
-    return pushed;
+    return las->todo->size();
 }
 
 /* Format of a file with a list of special-q (-todo option):
@@ -1170,7 +1167,9 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
  */
 int las_todo_feed_qlist(las_info_ptr las, param_list pl)
 {
-    if (las->todo) return 1; /* keep going */
+    if (!las->todo->empty())
+        return 1;
+
     char line[1024];
     FILE * f = las->todo_list_fd;
     /* The fgets call below is blocking, so flush las->output here just to
@@ -1192,44 +1191,60 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
     int side = -1;
     mpz_init(p);
     mpz_init(r);
-    int nread;
     int rc;
     switch(*x++) {
         case 'a' : side = ALGEBRAIC_SIDE;
-                   for( ; *x && !isdigit(*x) ; x++) ;
-                   rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
-                   x+=nread;
-                   ASSERT_ALWAYS(rc == 2);  /* %n does not count */
-                   ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
                    break;
-        case 'r' : {
-                       side = RATIONAL_SIDE; 
-                       mpz_set_ui(r, 0);
-                       for( ; *x && !isdigit(*x) ; x++) ;
-                       rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
-                       x+=nread;
-                       ASSERT_ALWAYS(rc >= 1);  /* %n does not count */
-                       ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
-                       if (rc == 2)
-                           break;
-                       // If the root is not specified, then we assume that
-                       // the side is really rational, and then we compute
-                       // the root.
-                       mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
-                       ASSERT_ALWAYS(f->deg == 1);
-                       int nroots = mpz_poly_roots (&r, f, p);
-                       ASSERT_ALWAYS(nroots == 1);
-                       break;
-                   }
+        case 'r' : side = RATIONAL_SIDE; 
+                   break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+                   x--;
+                   errno = 0;
+                   side = strtoul(x, &x, 0);
+                   ASSERT_ALWAYS(!errno);
+                   ASSERT_ALWAYS(side < 2);
+                   break;
         default:
-                   /* We may as well default on the command-line switch
-                    */
                    fprintf(stderr, "%s: parse error at %s\n",
                            param_list_lookup_string(pl, "todo"), line);
+                   /* We may as well default on the command-line switch */
                    exit(1);
     }
+
+    int nread1 = 0;
+    int nread2 = 0;
+
+    mpz_set_ui(r, 0);
+    for( ; *x && !isdigit(*x) ; x++) ;
+    rc = gmp_sscanf(x, "%Zi%n %Zi%n", p, &nread1, r, &nread2);
+    ASSERT_ALWAYS(rc == 1 || rc == 2); /* %n does not count */
+    x += (rc==1) ? nread1 : nread2;
+    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
+    {
+        mpz_poly_ptr f = las->cpoly->pols[side];
+        /* specifying the rational root as <0
+         * means that it must be recomputed. Putting 0 does not have this
+         * effect, since it is a legitimate value after all.
+         */
+        if (rc < 2 || (f->deg == 1 && rc == 2 && mpz_cmp_ui(r, 0) < 0)) {
+            // For rational side, we can compute the root easily.
+            ASSERT_ALWAYS(f->deg == 1);
+            int nroots = mpz_poly_roots (&r, f, p);
+            ASSERT_ALWAYS(nroots == 1);
+        }
+    }
+
     for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
-    las_todo_push(&(las->todo), p, r, side);
+    las_todo_push(las->todo, p, r, side);
     mpz_clear(p);
     mpz_clear(r);
     return 1;
@@ -1238,7 +1253,8 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
 
 int las_todo_feed(las_info_ptr las, param_list pl)
 {
-    if (las->todo) return 1; /* keep going */
+    if (!las->todo->empty())
+        return 1;
     if (las->todo_list_fd)
         return las_todo_feed_qlist(las, pl);
     else
@@ -1842,6 +1858,10 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
             relation_t rel[1];
+            mpz_t mpz_lp[2];
+            mpz_init(mpz_lp[0]);
+            mpz_init(mpz_lp[1]);
+            mpz_ptr lp[2] = {NULL, NULL};
             memset(rel, 0, sizeof(rel));
             rel->a = a;
             rel->b = b; 
@@ -1849,11 +1869,24 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 for(int i = 0 ; i < factors[side].n ; i++)
                     relation_add_prime(rel, side, factors[side].fac[i]);
                 for (unsigned int i = 0; i < f[side]->length; ++i) {
-                    if (!mpz_fits_ulong_p(f[side]->data[i]))
-                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%" PRId64 ",%" PRIu64 ")\n",
-                                mpz_sizeinbase(f[side]->data[i], 2), a, b);
-                    for (unsigned int j = 0; j < m[side]->data[i]; j++) {
-                        relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
+                    if (!mpz_fits_ulong_p(f[side]->data[i])) {
+                        if (lp[side] != NULL) {
+                            // FIXME!
+                            // We can handle only one huge large prime on
+                            // each side. We print a warning and
+                            // continue, since only the printing is
+                            // wrong.
+                            fprintf(stderr, "Error: two large primes more than the size of ulong on the same side at (%" PRId64 ",%" PRIu64 ")\n",
+                                a, b);
+                        } else {
+                            lp[side] = &mpz_lp[side][0];
+                            mpz_set(lp[side], f[side]->data[i]);
+                            ASSERT_ALWAYS(m[side]->data[i] == 1);
+                        }
+                    } else {
+                        for (unsigned int j = 0; j < m[side]->data[i]; j++) {
+                            relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
+                        }
                     }
                 }
             }
@@ -1868,11 +1901,10 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 fprintf(stderr, "# Relation for (%" PRId64 ",%" PRIu64 ") printed\n", a, b);
             }
 #endif
-
             {
                 int do_check = th->las->suppress_duplicates;
-                int is_dup = do_check && relation_is_duplicate(rel,
-                        las->nb_threads, si);
+                int is_dup = do_check && (!lp[0]) && (!lp[1])
+                    && relation_is_duplicate(rel, las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
                 FILE *output;
                 if (!is_dup)
@@ -1886,10 +1918,12 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 for (size_t i_output = 0;
                      (output = verbose_output_get(0, 0, i_output)) != NULL;
                      i_output++) {
-                    fprint_relation(output, rel, comment);
+                    fprint_relation(output, rel, comment, lp[0], lp[1]);
                 }
                 verbose_output_end_batch();
             }
+            mpz_clear(mpz_lp[0]);
+            mpz_clear(mpz_lp[1]);
 
             /* Build histogram of lucky S[x] values */
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
@@ -2005,7 +2039,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             /* This can't work on 32-bits */
             mpz_set_ui(rho, relation_compute_r (winner->a, winner->b, p));
             verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
-            las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
+            las_todo_push_withdepth(las->todo, q, rho, side, si->doing->depth + 1);
         }
         relation_compute_all_r(winner);
         for(int i = 0 ; i < winner->nb_ap ; i++) {
@@ -2033,7 +2067,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             mpz_set_ui(q, p);
             mpz_set_ui(rho, winner->ap[i].r);
             verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
-            las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
+            las_todo_push_withdepth(las->todo, q, rho, side, si->doing->depth + 1);
         }
         mpz_clear(q);
         mpz_clear(rho);
@@ -2352,6 +2386,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
+  param_list_decl_usage(pl, "exit-early", "(switch) stop after some relations have been found");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
   param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorization step");
@@ -2375,6 +2410,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     double t0, tts, wct;
     unsigned long nr_sq_processed = 0;
     int allow_largesq = 0;
+    int exit_after_rel_found = 0;
     double totJ = 0.0;
     int argc = argc0;
     char **argv = argv0;
@@ -2395,6 +2431,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
+    param_list_configure_switch(pl, "-exit-early", &exit_after_rel_found);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_switch(pl, "-dup", NULL);
@@ -2498,7 +2535,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     /* pop() is achieved by sieve_info_pick_todo_item */
     for( ; las_todo_feed(las, pl) ; ) {
-        if (descent_lower && las_todo_pop_closing_brace(&(las->todo))) {
+        if (descent_lower && las_todo_pop_closing_brace(las->todo)) {
             las_descent_helper_done_node(las->descent_helper);
             if (las_descent_helper_current_depth(las->descent_helper) == 0)
                 las_descent_helper_display_last_tree(las->descent_helper, las->output);
@@ -2507,8 +2544,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         siever_config current_config;
         memcpy(current_config, las->default_config, sizeof(siever_config));
-        current_config->bitsize = mpz_sizeinbase(las->todo->p, 2);
-        current_config->side = las->todo->side;
+        {
+            const las_todo_entry * const next_todo = las->todo->front();
+            current_config->bitsize = mpz_sizeinbase(next_todo->p, 2);
+            current_config->side = next_todo->side;
+        }
 
         /* Do we have a hint table with specifically tuned parameters,
          * well suited to this problem size ? */
@@ -2525,11 +2565,11 @@ int main (int argc0, char *argv0[])/*{{{*/
         sieve_info_ptr si = get_sieve_info_from_config(las, current_config, pl);
         WHERE_AM_I_UPDATE(w, si, si);
 
-        sieve_info_pick_todo_item(si, &(las->todo));
+        sieve_info_pick_todo_item(si, las->todo);
 
         las_descent_helper_new_node(las->descent_helper, si->conf, si->doing->depth);
         if (descent_lower)
-            las_todo_push_closing_brace(&(las->todo), si->doing->depth);
+            las_todo_push_closing_brace(las->todo, si->doing->depth);
 #if 0
         /* I think that there is sufficient provision in las_todo_feed now */
         ASSERT_ALWAYS(mpz_cmp_ui(las->todo->r, 0) != 0);
@@ -2706,7 +2746,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 #ifdef TRACE_K
         trace_per_sq_clear(si);
 #endif
-
+        if (exit_after_rel_found && report->reports > 0)
+            break;
       } // end of loop over special q ideals.
 
     thread_buckets_free(thrs, las->nb_threads);
@@ -2758,7 +2799,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                  wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
     const long peakmem = PeakMemusage();
     if (peakmem > 0)
-        verbose_output_print (2, 1, "# PeakMemusage (MB) = %ld \n",
+        verbose_output_print (2, 1, "# PeakMemusage = %ldMB\n",
                 peakmem >> 10);
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
@@ -2767,7 +2808,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     /*}}}*/
 
-    //{{print the stats of the cofactorization.
+    //{{{ print the stats of the cofactorization.
     if (cof_stats == 1) {
 	int mfbr = las->default_config->sides[RATIONAL_SIDE]->mfb;
 	int mfba = las->default_config->sides[ALGEBRAIC_SIDE]->mfb;
@@ -2782,7 +2823,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 	free (cof_succ);
 	fclose (cof_stats_file);
     }
-    //}}
+    //}}}
     thread_data_free(thrs);
 
     las_report_clear(report);

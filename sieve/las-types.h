@@ -13,7 +13,7 @@
 #include "las-forwardtypes.h"
 #include "las-unsieve.h"
 #include "las-qlattice.h"
-
+#include "las-todo.h"
 #include "las-smallsieve.h"
 
 
@@ -63,28 +63,6 @@ typedef struct descent_hint_s descent_hint[1];
 typedef struct descent_hint_s * descent_hint_ptr;
 typedef const struct descent_hint_s * descent_hint_srcptr;
 
-/* }}} */
-
-/* {{{ las_todo */
-struct las_todo_s;
-struct las_todo_s {
-    mpz_t p;
-    /* even when side == RATIONAL_SIDE, the field below is used, since
-     * it is needed for the initialization of the q-lattice. All callers
-     * of las_todo_push must therefore make sure that a proper argument
-     * is provided.
-     */
-    mpz_t r;
-    int side;
-    int depth;  /* used for the descent only. The normal value is zero. */
-    struct las_todo_s * next;
-};
-typedef struct las_todo_s las_todo[1];
-typedef struct las_todo_s * las_todo_ptr;
-typedef const struct las_todo_s * las_todo_srcptr;
-
-void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side);
-void las_todo_pop(las_todo_ptr * d);
 /* }}} */
 
 struct root_s {
@@ -163,7 +141,7 @@ struct sieve_info_s {
      * sides[0,1], as well as some other members */
     siever_config conf;
 
-    las_todo doing;     /* not a todo list, but just one item => next==null */
+    las_todo_entry *doing;
 
     // sieving area
     uint32_t J;
@@ -235,7 +213,7 @@ struct las_info_s {
     /* This is an opaque pointer to C++ code. */
     void * descent_helper;
 
-    las_todo_ptr todo;
+    las_todo_queue *todo;
     /* These are used for reading the todo list */
     mpz_t todo_q0;
     mpz_t todo_q1;

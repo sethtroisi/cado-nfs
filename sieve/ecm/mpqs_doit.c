@@ -43,6 +43,7 @@ typedef struct {
   uint64_t invp;       /* 1/p mod 2^64, needed for trial division */
   unsigned char logp;  /* log(p) / log(radix), needed for sieve */
   unsigned long invp2; /* floor(ULONG_MAX/p), needed for trial division */
+  unsigned long conv;  /* 2^(2*LONG_BITS) % p, used for converting to REDC */
   unsigned int Mp;     /* M mod p */
 } fb_t;
 
@@ -117,6 +118,25 @@ mod_pow_uint64 (uint64_t b, uint64_t e, uint64_t n)
   return r;
 }
 
+static inline unsigned long
+test_divisible(const unsigned long x, const fb_t * const F)
+{
+  const unsigned long r = x * F->invp;
+  return (r <= F->invp2) ? r : 0;
+}
+
+static inline int
+divide_out(unsigned long * const x, const fb_t * const F)
+{
+  unsigned long cofac;
+  int e = 0;
+  while ((cofac = test_divisible(*x, F)) != 0) {
+    e++;
+    *x = cofac;
+  }
+  return e;
+}
+
 /* Uses Tonelli-Shanks, more precisely Algorithm from Table 1 in [1].
    [1] Adleman-Manders-Miller Root Extraction Method Revisited, Zhengjun Cao,
    Qian Sha, Xiao Fan, 2011, http://arxiv.org/abs/1111.4877.
@@ -172,8 +192,72 @@ tonelli_shanks (uint64_t rr, uint64_t p)
    i.e., k1 = (r-b)/a+M (mod p) and k2 = (-r-b)/a+M (mod p).
    Assume p is odd, and inva = 1/sqrt(a) mod p.
    Ensures k1 <= k2 at the end.
+
+   TODO: The two DIV instructions in this function (as part of modul_mul)
+   take about 7% of the total time for factoring 128-bit composites.
 */
+
+static inline unsigned long
+mul_redc(const unsigned long a, const unsigned long b, const fb_t * const F)
+{
+  unsigned long plow, phigh, r;
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a, b);
+  ularith_redc(&r, plow, phigh, F->p, -F->invp);
+  return r;
+}
+
+static inline unsigned long
+findroot2 (unsigned long *k2, const unsigned long b,
+           const fb_t * const F)
+{
+  *k2 = (b + F->r + F->Mp) % 2;
+  return *k2;
+}
+
 STATIC unsigned long
+findroot_new (unsigned long *k2, const unsigned long b,
+              unsigned long inva, const fb_t * const F)
+{
+  /* the two roots are (k1-b)/a and (-k1-b)/a */
+  /* Given conv = 2^128 % p,
+     Compute redc_inva = -redc(conv * inva) == -inva/2^64 (mod p)
+     Compute redc((b + r) * redc_inva) == (-b - r) * inva (mod p)
+     Compute redc((b - r) * redc_inva) == (-b + r) * inva (mod p)
+  */
+  const unsigned long p = F->p;
+  const unsigned long r = F->r;
+  const unsigned long Mp = F->Mp;
+
+  unsigned long t1, t2;
+
+#if 0
+  ASSERT_ALWAYS(p > 2);
+  ASSERT_ALWAYS(ULONG_MAX - b >= r);
+#endif
+
+  const unsigned long redc_inva = mul_redc(p - inva, F->conv, F);
+  t1 = mul_redc(labs(b - r), redc_inva, F);
+  if (b < r && t1 != 0)
+    t1 = p - t1;
+  ularith_addmod_ul_ul (&t1, t1, Mp, p);
+  t2 = mul_redc(b + r, redc_inva, F);
+  ularith_addmod_ul_ul (&t2, t2, Mp, p);
+
+  unsigned long k1;
+  if (t1 < t2)
+    {
+      k1 = t1;
+      *k2 = t2;
+    }
+  else
+    {
+      k1 = t2;
+      *k2 = t1;
+    }
+  return k1;
+}
+
+unsigned long
 findroot (unsigned long *k2, unsigned long bmodp, unsigned long p,
           unsigned long k1, unsigned long inva, unsigned long Mp)
 {
@@ -227,7 +311,8 @@ unsigned long nextprime_start = 0;
 /* Code below is meant to be correct for any nextprime_len > 0 */
 const size_t nextprime_len = 8192;
 
-void nextprime_init(const unsigned long first)
+STATIC void
+nextprime_init(const unsigned long first)
 {
   /* nextprime_bitfield = 2^nextprime_len - 1 */
   mpz_set_ui(nextprime_bitfield, 1);
@@ -249,7 +334,8 @@ void nextprime_init(const unsigned long first)
 }
 
 /* Returns the smallest prime >= n */
-unsigned long nextprime_get_next(const unsigned long n)
+STATIC unsigned long
+nextprime_get_next(const unsigned long n)
 {
   if (n == 0)
     return 2; /* Rest assumes n > 0 */
@@ -394,34 +480,37 @@ trialdiv_mpqs (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
   mpz_tdiv_q_2exp (r, r, e);
   if (e & 1)
     setbit (row, shift, 1);
-  for (i = 1; i < ncol; i++)
+  i = 1;
 #else
-  for (i = SKIP; i < ncol; i++)
+  i = SKIP;
 #endif
-    {
-      unsigned long p = F[i].p;
+  if (!mpz_fits_ulong_p (r)) {
+    for ( ; i < ncol; i++)
+      {
+        unsigned long p = F[i].p;
 
-      if (mpz_divisible_ui_p (r, p))
-        {
-          e = 0;
+        if (mpz_divisible_ui_p (r, p))
+          {
+            e = 0;
 
-          do {
-            mpz_divexact_ui (r, r, p);
-            e ++;
-          } while (mpz_divisible_ui_p (r, p));
+            do {
+              mpz_divexact_ui (r, r, p);
+              e ++;
+            } while (mpz_divisible_ui_p (r, p));
 
-          if (e & 1)
-            setbit (row, shift, i + 1);
+            if (e & 1)
+              setbit (row, shift, i + 1);
 
-          /* we don't check for cases where r = 1 or is a prime <= B here,
-             since they will have very rarely */
+            /* we don't check for cases where r = 1 or is a prime <= B here,
+               since they will have very rarely */
 
-          if (mpz_fits_ulong_p (r))
-            {
-              i = i + 1;
-              break;
-            }
-        }
+            if (mpz_fits_ulong_p (r))
+              {
+                i = i + 1;
+                break;
+              }
+          }
+      }
     }
 
   /* now r fits into an unsigned long */
@@ -429,20 +518,14 @@ trialdiv_mpqs (mpz_t r, fb_t *F, unsigned int ncol, int shift, mpz_t row)
   for (; i < ncol; i++)
     {
       unsigned long p = F[i].p;
-      unsigned long q = R * F[i].invp;
 
       /* F[i].invp is 1/p mod 2^64, thus q = R/p mod 2^64:
          the division R/p is exact iff q*p fits in a 64-bit word,
          i.e., when q <= F[i].invp2 = floor(ULONG_MAX/p) [we assume
          unsigned long has 64 bits here] */
-      if (q <= F[i].invp2)
+      const int e = divide_out (&R, &F[i]);
+      if (e)
         {
-          int e = 0;
-          do {
-            R = q;
-            e ++;
-            q = R * F[i].invp;
-          } while (q <= F[i].invp2);
           if (e & 1)
             setbit (row, shift, i + 1);
           /* now since R has no factor <= p it is either 1 or a prime > p,
@@ -785,6 +868,8 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
           mpz_invert (c, a, b); /* c = 1/p mod 2^64 */
           F[j].invp = mpz_get_ui (c);
           F[j].invp2 = ULONG_MAX / p;
+          ularith_div_2ul_ul_ul_r(&F[j].conv, 0, 1, p);
+          ularith_div_2ul_ul_ul_r(&F[j].conv, 0, F[j].conv, p);
           F[j].Mp = M % p;
           j++;
         }
@@ -1009,7 +1094,18 @@ mpqs_doit (mpz_t f, const mpz_t N0, int verbose)
       unsigned long k2 = -1, i2;
 
       p = F[j].p;
-      k = findroot (&k2, bb % p, p, F[j].r, Q[j], F[j].Mp);
+#if SKIP == 0
+      if (j == 0 && F[0].p == 2)
+        k = findroot2 (&k2, bb, &F[j]);
+      else
+#endif
+        k = findroot_new (&k2, bb, Q[j], &F[j]);
+#if 0
+      unsigned long old1, old2;
+      old1 = findroot (&old2, bb % p, p, F[j].r, Q[j], F[j].Mp);
+      ASSERT_ALWAYS(old1 == k);
+      ASSERT_ALWAYS(old2 == k2);
+#endif
       /* Note: if x^2 = k*N (mod p) has only one root, which can happen only
          when k*N is divisible by p (and then the root is 0) we will count
          twice this root, but this will be very rare, and by not considering
@@ -1256,27 +1352,41 @@ accumulate (bernstein_t T, mpz_t x, mpz_t axb, fb_t *F)
       T->w[T->size] = 1;
       mpz_neg (x, x);
     }
-  int e;
-#if SKIP >= 1
-  e = mpz_scan1 (x, 0);
-  mpz_tdiv_q_2exp (x, x, e);
-  if (e & 1)
-    T->w[T->size] |= 2;
-#endif
-  for (int j = 1; j < SKIP; j++)
-    {
-      unsigned long p = F[j].p;
 
-      if (mpz_divisible_ui_p (x, p))
-        {
-          e = 0;
-          do {
-            mpz_divexact_ui (x, x, p);
-            e ++;
-          } while (mpz_divisible_ui_p (x, p));
+#if SKIP >= 1
+  {
+    int e = mpz_scan1 (x, 0);
+    mpz_tdiv_q_2exp (x, x, e);
+    if (e & 1)
+      T->w[T->size] |= 2;
+  }
+#endif
+
+  if (mpz_fits_ulong_p(x)) {
+    unsigned long ux = mpz_get_ui(x);
+    for (int j = 1; j < SKIP; j++)
+      {
+        const int e = divide_out(&ux, &F[j]);
+        if (e)
           T->w[T->size] |= (e & 1) << (j + 1);
-        }
-    }
+      }
+    mpz_set_ui(x, ux);
+  } else {
+    for (int j = 1; j < SKIP; j++)
+      {
+        unsigned long p = F[j].p;
+
+        if (mpz_divisible_ui_p (x, p))
+          {
+            int e = 0;
+            do {
+              mpz_divexact_ui (x, x, p);
+              e ++;
+            } while (mpz_divisible_ui_p (x, p));
+            T->w[T->size] |= (e & 1) << (j + 1);
+          }
+      }
+  }
   mpz_swap (T->x[0][T->size], x);
   mpz_swap (T->axb[T->size], axb);
   T->size ++;

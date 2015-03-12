@@ -583,6 +583,7 @@ scripts/version.sh
 scripts/winlinks.sh
 scripts/oar_start_clients.sh
 scripts/list_modified_files.sh
+scripts/descent_init.py
 scripts/cadofactor/cadocommand.py
 scripts/cadofactor/cadofactor.py
 scripts/cadofactor/cadologger.py
@@ -679,6 +680,7 @@ sieve/las-cofactor.cpp
 sieve/las-cofactor.h
 sieve/las-fill-in-buckets.cpp
 sieve/las-fill-in-buckets.h
+sieve/las-todo.h
 sieve/las.cpp
 sieve/makefb.c
 sieve/makefb.sage
@@ -767,6 +769,8 @@ tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh
 tests/sieve/F9.cofactest.sh
+tests/sieve/F9.todotest.sh
+tests/sieve/F9.todo
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
 tests/sieve/test_fb_make_step.c
