@@ -346,6 +346,7 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
 /*}}}*/
 
 /*}}}*/
+/* }}} */
 
 /* {{{ sieve_info_init_... */
 static void
@@ -887,7 +888,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* }}} */
 
 
-    //{{parse option stats_cofact
+    //{{{ parse option stats_cofact
     const char *statsfilename = param_list_lookup_string (pl, "stats-cofact");
     if (statsfilename != NULL) /* a file was given */
       {
@@ -912,7 +913,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 		      cof_call[i][j] = cof_succ[i][j] = 0;
 	      }
       }
-    //}}
+    //}}}
 
     
     /* {{{ Init and parse info regarding work to be done by the siever */
@@ -1190,42 +1191,58 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
     int side = -1;
     mpz_init(p);
     mpz_init(r);
-    int nread;
     int rc;
     switch(*x++) {
         case 'a' : side = ALGEBRAIC_SIDE;
-                   for( ; *x && !isdigit(*x) ; x++) ;
-                   rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
-                   x+=nread;
-                   ASSERT_ALWAYS(rc == 2);  /* %n does not count */
-                   ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
                    break;
-        case 'r' : {
-                       side = RATIONAL_SIDE; 
-                       mpz_set_ui(r, 0);
-                       for( ; *x && !isdigit(*x) ; x++) ;
-                       rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
-                       x+=nread;
-                       ASSERT_ALWAYS(rc >= 1);  /* %n does not count */
-                       ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
-                       if (rc == 2)
-                           break;
-                       // If the root is not specified, then we assume that
-                       // the side is really rational, and then we compute
-                       // the root.
-                       mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
-                       ASSERT_ALWAYS(f->deg == 1);
-                       int nroots = mpz_poly_roots (&r, f, p);
-                       ASSERT_ALWAYS(nroots == 1);
-                       break;
-                   }
+        case 'r' : side = RATIONAL_SIDE; 
+                   break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+                   x--;
+                   errno = 0;
+                   side = strtoul(x, &x, 0);
+                   ASSERT_ALWAYS(!errno);
+                   ASSERT_ALWAYS(side < 2);
+                   break;
         default:
-                   /* We may as well default on the command-line switch
-                    */
                    fprintf(stderr, "%s: parse error at %s\n",
                            param_list_lookup_string(pl, "todo"), line);
+                   /* We may as well default on the command-line switch */
                    exit(1);
     }
+
+    int nread1 = 0;
+    int nread2 = 0;
+
+    mpz_set_ui(r, 0);
+    for( ; *x && !isdigit(*x) ; x++) ;
+    rc = gmp_sscanf(x, "%Zi%n %Zi%n", p, &nread1, r, &nread2);
+    ASSERT_ALWAYS(rc == 1 || rc == 2); /* %n does not count */
+    x += (rc==1) ? nread1 : nread2;
+    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
+    {
+        mpz_poly_ptr f = las->cpoly->pols[side];
+        /* specifying the rational root as <0
+         * means that it must be recomputed. Putting 0 does not have this
+         * effect, since it is a legitimate value after all.
+         */
+        if (rc < 2 || (f->deg == 1 && rc == 2 && mpz_cmp_ui(r, 0) < 0)) {
+            // For rational side, we can compute the root easily.
+            ASSERT_ALWAYS(f->deg == 1);
+            int nroots = mpz_poly_roots (&r, f, p);
+            ASSERT_ALWAYS(nroots == 1);
+        }
+    }
+
     for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
     las_todo_push(las->todo, p, r, side);
     mpz_clear(p);
@@ -2791,7 +2808,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     /*}}}*/
 
-    //{{print the stats of the cofactorization.
+    //{{{ print the stats of the cofactorization.
     if (cof_stats == 1) {
 	int mfbr = las->default_config->sides[RATIONAL_SIDE]->mfb;
 	int mfba = las->default_config->sides[ALGEBRAIC_SIDE]->mfb;
@@ -2806,7 +2823,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 	free (cof_succ);
 	fclose (cof_stats_file);
     }
-    //}}
+    //}}}
     thread_data_free(thrs);
 
     las_report_clear(report);
