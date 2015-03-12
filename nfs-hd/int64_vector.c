@@ -6,15 +6,14 @@
 #include "int64_vector.h"
 #include <inttypes.h>
 
-void int64_vector_init(int64_vector_ptr v, unsigned int d)
+void int64_vector_init(int64_vector_ptr v, unsigned int d)  
 {
   ASSERT(d > 0);
+
   v->dim = d;
   v->c = (int64_t *) malloc(sizeof(int64_t) * d);
+
   ASSERT_ALWAYS (v->c != NULL);
-  for (unsigned k = 0; k < d; k++) {
-    v->c[k] = 0;
-  }
 }
 
 void int64_vector_clear(int64_vector_ptr v)
@@ -25,6 +24,7 @@ void int64_vector_clear(int64_vector_ptr v)
 void int64_vector_swap(int64_vector_ptr v0, int64_vector_ptr v1)
 {
   ASSERT(v0->dim == v1->dim);
+
   int64_t * tmp = v0->c;
   v0->c = v1->c;
   v1->c = tmp;
@@ -33,15 +33,10 @@ void int64_vector_swap(int64_vector_ptr v0, int64_vector_ptr v1)
 void int64_vector_set(int64_vector_ptr v, int64_vector_srcptr s)
 {
   ASSERT(v->dim == s->dim);
-  for (unsigned int i = 0; i < v->dim; i++)
-    v->c[i] = s->c[i];
-}
 
-void int64_vector_setcoordinate(int64_vector_ptr v, unsigned int i,
-                                int64_t z)
-{
-  ASSERT(i < v->dim);
-  v->c[i] = z;
+  for (unsigned int i = 0; i < v->dim; i++) {
+    v->c[i] = s->c[i];
+  }
 }
 
 int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b)
@@ -55,12 +50,39 @@ int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b)
   return 0;
 }
 
+void int64_vector_add(int64_vector_ptr a, int64_vector_srcptr b,
+                     int64_vector_srcptr c)
+{
+  ASSERT(a->dim == b->dim);
+  ASSERT(c->dim == b->dim);
+
+  for (unsigned int i = 0; i < a->dim; i++) {
+    a->c[i] = b->c[i] + c->c[i];
+  }
+}
+
+void int64_vector_sub(int64_vector_ptr a, int64_vector_srcptr b,
+                      int64_vector_srcptr c)
+{
+  ASSERT(a->dim == b->dim);
+  ASSERT(c->dim == b->dim);
+
+  for (unsigned int i = 0; i < a->dim; i++) {
+    a->c[i] = b->c[i] - c->c[i];
+  }
+}
+
+
 void int64_vector_fprintf(FILE * file, int64_vector_srcptr v)
 {
   fprintf(file, "[");
   for (unsigned int i = 0; i < v->dim - 1; i++)
     fprintf(file, "%" PRId64 ", ", v->c[i]);
-  fprintf(file, "%" PRId64 "]\n", v->c[v->dim - 1]);
+  if (v->dim != 0) {
+    fprintf(file, "%" PRId64 "]\n", v->c[v->dim - 1]);
+  } else {
+    fprintf(file, "]\n");
+  }
 }
 
 void int64_vector_add_one(int64_vector_ptr v, sieving_interval_srcptr H)
@@ -113,7 +135,7 @@ unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
 
 void int64_vector_to_mpz_vector(mpz_vector_ptr a, int64_vector_srcptr b)
 {
-  ASSERT(a->dim == b->dim);
+  ASSERT(a->dim == b->dim);  
 
   for (unsigned int i = 0; i < b->dim; i++) {
     mpz_vector_setcoordinate_int64 (a, i, b->c[i]);
@@ -122,6 +144,8 @@ void int64_vector_to_mpz_vector(mpz_vector_ptr a, int64_vector_srcptr b)
 
 double int64_vector_norml2sqr(int64_vector_srcptr a)
 {
+  ASSERT(a->dim >= 2);
+
   double norm = 0;
   for (unsigned int i = 0; i < a->dim; i++) {
     norm += (double)(a->c[i] * a->c[i]);
@@ -131,6 +155,8 @@ double int64_vector_norml2sqr(int64_vector_srcptr a)
 
 double int64_vector_norml2(int64_vector_srcptr a)
 {
+  ASSERT(a->dim >= 2);
+
   return sqrt(int64_vector_norml2sqr(a));
 }
 
@@ -143,4 +169,20 @@ int64_t int64_vector_dot_product(int64_vector_srcptr v0, int64_vector_srcptr v1)
     dot += v0->c[i] * v1->c[i];
   }
   return dot;
+}
+
+int int64_vector_in_sieving_region(int64_vector_srcptr v,
+    sieving_interval_srcptr H)
+{
+  ASSERT(v->dim == H->t);
+
+  for (unsigned int i = 0; i < v->dim - 1; i++) {
+    if (-(int64_t)H->h[i] > v->c[i] || (int64_t)H->h[i] <= v->c[i]) {
+      return 0;
+    }
+  }
+  if (0 > v->c[v->dim - 1] || (int64_t)H->h[v->dim - 1] <= v->c[v->dim - 1]) {
+    return 0;
+  }
+  return 1;
 }
