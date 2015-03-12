@@ -168,11 +168,11 @@ void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, 
     const char * caller = "";
 #endif
     if (w->p) 
-        fprintf(stderr, "# Add log(%" FBPRIME_FORMAT ",%.3s) = %u to "
+        fprintf(stderr, "# Add log(%" FBPRIME_FORMAT ",%.3s) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
             w->p, sidenames[w->side], logp, w->x, *S, w->N, (unsigned char)(*S+logp), caller);
     else
-        fprintf(stderr, "# Add log(hint=%lu,%.3s) = %u to "
+        fprintf(stderr, "# Add log(hint=%lu,%.3s) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
             (unsigned long) w->h, sidenames[w->side], logp, w->x, *S, w->N, (unsigned char)(*S+logp), caller);
 #ifdef __GLIBC__
