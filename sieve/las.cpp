@@ -741,16 +741,25 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
     las->verbose = param_list_parse_switch(pl, "-v");
 
-    verbose_output_init(3);
+    verbose_output_init(NR_CHANNELS);
     verbose_output_add(0, las->output, las->verbose + 1);
     verbose_output_add(1, stderr, 1);
-
     /* Channel 2 is for statistics. We always print them to las' normal output */
     verbose_output_add(2, las->output, 1);
     if (param_list_parse_switch(pl, "-stats-stderr")) {
         /* If we should also print stats to stderr, add stderr to channel 2 */
         verbose_output_add(2, stderr, 1);
     }
+
+#ifdef TRACE_K
+    const char *trace_file_name = param_list_lookup_string(pl, "traceout");
+    FILE *trace_file = stderr;
+    if (trace_file_name != NULL) {
+        trace_file = fopen(trace_file_name, "w");
+        DIE_ERRNO_DIAG(trace_file == NULL, "fopen", trace_file_name);
+    }
+    verbose_output_add(TRACE_CHANNEL, trace_file, 1);
+#endif
 
     verbose_interpret_parameters(pl);
     param_list_print_command_line(las->output, pl);
@@ -1532,8 +1541,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
     if (trial_div_very_verbose) {
         verbose_output_start_batch();
-        verbose_output_print(1, 1, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = ", N, x, a, b);
-        verbose_output_vfprint(1, 1, gmp_vfprintf, "%Zd\n", norm);
+        verbose_output_print(TRACE_CHANNEL, 0, "# trial_div() entry, N = %u, x = %d, a = %" PRId64 ", b = %" PRIu64 ", norm = ", N, x, a, b);
+        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "%Zd\n", norm);
     }
 
     // handle 2 separately, if it is in fb
@@ -1545,7 +1554,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
             fl->n++;
         }
         if (trial_div_very_verbose)
-            verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
+            verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
     }
 
@@ -1553,7 +1562,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
     divide_primes_from_bucket (fl, norm, N, x, primes, trial_div_very_verbose);
     divide_hints_from_bucket (fl, norm, N, x, purged, fb, trial_div_very_verbose);
     if (trial_div_very_verbose)
-        verbose_output_vfprint(1, 1, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
+        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
 
     do {
       /* Trial divide primes with precomputed tables */
@@ -1561,10 +1570,10 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       int i;
       unsigned long factors[TRIALDIV_MAX_FACTORS];
       if (trial_div_very_verbose) {
-          verbose_output_print(1, 1, "# Trial division by");
+          verbose_output_print(TRACE_CHANNEL, 0, "# Trial division by");
           for (i = 0; trialdiv_data[i].p != 1; i++)
-              verbose_output_print(1, 1, " %lu", trialdiv_data[i].p);
-          verbose_output_print(1, 1, "\n# Factors found: ");
+              verbose_output_print(TRACE_CHANNEL, 0, " %lu", trialdiv_data[i].p);
+          verbose_output_print(TRACE_CHANNEL, 0, "\n# Factors found: ");
       }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, TRIALDIV_MAX_FACTORS);
@@ -1572,11 +1581,11 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
       for (i = 0; i < MIN(nr_factors, TRIALDIV_MAX_FACTORS); i++)
       {
           if (trial_div_very_verbose)
-              verbose_output_print (1, 1, " %lu", factors[i]);
+              verbose_output_print (TRACE_CHANNEL, 0, " %lu", factors[i]);
           factor_list_add (fl, factors[i]);
       }
       if (trial_div_very_verbose) {
-          verbose_output_vfprint(1, 1, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
+          verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
       }
     } while (nr_factors == TRIALDIV_MAX_FACTORS + 1);
 
@@ -1630,9 +1639,9 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
     unsigned char * rat_S = S[RATIONAL_SIDE];
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
-        fprintf(stderr, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
+        verbose_output_print(TRACE_CHANNEL, 0, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
                 trace_Nx.N, trace_Nx.x, alg_S[trace_Nx.x], trace_Nx.x, rat_S[trace_Nx.x]);
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
+        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
     }
 #endif  /* }}} */
 
@@ -1647,7 +1656,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
     for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
         if (trace_on_spot_Nx(N, x)) {
-            fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
+            verbose_output_print(TRACE_CHANNEL, 0, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
                     alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
                     rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
@@ -1713,7 +1722,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
         size_t trace_offset = (const unsigned char *) SS_lw - SS;
         if ((unsigned int) N == trace_Nx.N && (unsigned int) trace_offset <= trace_Nx.x && 
             (unsigned int) trace_offset + together > trace_Nx.x) {
-            fprintf(stderr, "# Slot [%u] in bucket %u has value %u\n",
+            verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
                     trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
         }
 #endif
@@ -1758,7 +1767,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             NxToAB (&a, &b, N, x, si);
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b))
-              fprintf (stderr, "# about to start cofactorization for (%"
+              verbose_output_print(TRACE_CHANNEL, 0, "# about to start cofactorization for (%"
                        PRId64 ",%" PRIu64 ")  %zu %u\n", a, b, x, SS[x]);
 #endif
             /* since a,b both even were not sieved, either a or b should
@@ -1808,8 +1817,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
-                    verbose_output_print(1, 0, "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
+                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0, "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
                 }
 #endif
                 verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
@@ -1824,8 +1833,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# checked leftover norm=%Zd", norm[side]);
-                    verbose_output_print(1, 0, " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n", sidenames[side], a, b, pass);
+                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# checked leftover norm=%Zd", norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0, " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n", sidenames[side], a, b, pass);
                 }
 #endif
             }
@@ -1849,8 +1858,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b) && pass == 0) {
-              verbose_output_print(1, 0, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
-              verbose_output_vfprint(1, 0, gmp_vfprintf, "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
+              verbose_output_print(TRACE_CHANNEL, 0, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
+              verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
             }
 #endif
             if (pass <= 0) continue; /* a factor was > 2^lpb, or some
@@ -1904,7 +1913,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# Relation for (%" PRId64 ",%" PRIu64 ") printed\n", a, b);
+                verbose_output_print(TRACE_CHANNEL, 0, "# Relation for (%" PRId64 ",%" PRIu64 ") printed\n", a, b);
             }
 #endif
             {
@@ -2243,7 +2252,7 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# After %s init_norms_bucket_region, N=%u S[%u]=%u\n",
+              verbose_output_print(TRACE_CHANNEL, 0, "# After %s init_norms_bucket_region, N=%u S[%u]=%u\n",
                        sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
@@ -2261,7 +2270,7 @@ void * process_bucket_region(thread_data_ptr th)
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# Final value on %s side, N=%u rat_S[%u]=%u\n",
+              verbose_output_print(TRACE_CHANNEL, 0, "# Final value on %s side, N=%u rat_S[%u]=%u\n",
                        sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
         }
@@ -2406,6 +2415,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
   param_list_decl_usage(pl, "traceij", "Relation to trace, in i,j format");
   param_list_decl_usage(pl, "traceNx", "Relation to trace, in N,x format");
+  param_list_decl_usage(pl, "traceout", "Output file for trace output, default: stderr");
 #endif
   verbose_decl_usage(pl);
 }

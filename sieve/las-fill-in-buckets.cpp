@@ -71,7 +71,7 @@ is_divisible_3_u32 (uint32_t a)
     if (trace_on_spot_x(X)) {						\
       WHERE_AM_I_UPDATE(w, N, (X) >> 16);				\
       WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
-      fprintf (stderr, "# Pushed factor base entry (%u, %u) (x=%u, %s) to BA[%u]\n",	\
+      verbose_output_print (TRACE_CHANNEL, 0, "# Pushed factor base entry (%u, %u) (x=%u, %s) to BA[%u]\n",	\
 	       (unsigned int) slice_index, (unsigned int) slice_offset, (unsigned int) (uint16_t) (X), sidenames[side],	\
 	       (unsigned int) ((X) >> 16));				\
       ASSERT(test_divisible(w));					\

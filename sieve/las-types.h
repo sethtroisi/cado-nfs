@@ -249,6 +249,14 @@ struct where_am_I_s {
 
 typedef struct where_am_I_s where_am_I[1];
 
+enum {
+  OUTPUT_CHANNEL,
+  ERROR_CHANNEL,
+  STATS_CHANNEL,
+  TRACE_CHANNEL,
+  NR_CHANNELS /* This must be the last element of the enum */
+};
+
 
 #ifdef TRACK_CODE_PATH
 #define WHERE_AM_I_UPDATE(w, field, value) (w)->field = (value)

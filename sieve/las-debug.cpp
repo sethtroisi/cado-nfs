@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <inttypes.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "las-config.h"
 #include "las-types.h"
@@ -52,7 +53,7 @@ void trace_per_sq_init(sieve_info_srcptr si, const struct trace_Nx_t *Nx,
       if (ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
           IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
       } else {
-          fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced "
+          verbose_output_print(TRACE_CHANNEL, 0, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced "
                   "is outside of the current q-lattice\n",
                   trace_ab.a, trace_ab.b);
           trace_ij.i=0;
@@ -71,7 +72,7 @@ void trace_per_sq_init(sieve_info_srcptr si, const struct trace_Nx_t *Nx,
     }
 
     if (trace_ij.j < UINT_MAX && trace_ij.j >= si->J) {
-        fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is "
+        verbose_output_print(TRACE_CHANNEL, 0, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is "
                 "outside of the current (i,j)-rectangle (j=%u)\n",
                 trace_ab.a, trace_ab.b, trace_ij.j);
         trace_ij.i=0;
@@ -80,7 +81,7 @@ void trace_per_sq_init(sieve_info_srcptr si, const struct trace_Nx_t *Nx,
         trace_Nx.x=UINT_MAX;
     }
     if (trace_ij.i || trace_ij.j < UINT_MAX) {
-        fprintf(stderr, "# Tracing relation (a,b)=(%" PRId64 ",%" PRIu64 ") "
+        verbose_output_print(TRACE_CHANNEL, 0, "# Tracing relation (a,b)=(%" PRId64 ",%" PRIu64 ") "
                 "(i,j)=(%d,%u), (N,x)=(%u,%u)\n",
                 trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, trace_Nx.N,
                 trace_Nx.x);
@@ -128,7 +129,7 @@ int test_divisible(where_am_I_ptr w)
     if (rc)
         mpz_divexact_ui (traced_norms[w->side], traced_norms[w->side], (unsigned long) q);
     else
-        gmp_fprintf(stderr, "# FAILED test_divisible(p=%" FBPRIME_FORMAT
+        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# FAILED test_divisible(p=%" FBPRIME_FORMAT
                 ", N=%d, x=%lu, %.3s): i = %ld, j = %lu, norm = %Zd\n",
                 w->p, w->N, w->x, sidenames[w->side], i, j, traced_norms[w->side]);
 
@@ -168,11 +169,11 @@ void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, 
     const char * caller = "";
 #endif
     if (w->p) 
-        fprintf(stderr, "# Add log(%" FBPRIME_FORMAT ",%.3s) = %hhu to "
+        verbose_output_print(TRACE_CHANNEL, 0, "# Add log(%" FBPRIME_FORMAT ",%.3s) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
             w->p, sidenames[w->side], logp, w->x, *S, w->N, (unsigned char)(*S+logp), caller);
     else
-        fprintf(stderr, "# Add log(hint=%lu,%.3s) = %hhu to "
+        verbose_output_print(TRACE_CHANNEL, 0, "# Add log(hint=%lu,%.3s) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
             (unsigned long) w->h, sidenames[w->side], logp, w->x, *S, w->N, (unsigned char)(*S+logp), caller);
 #ifdef __GLIBC__
@@ -216,7 +217,7 @@ void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, w
     if ((unsigned int) logp + *S > maxdiff)
       {
         maxdiff = logp - *S;
-        fprintf(stderr, "# Error, underflow at (N,x)=(%u, %u), "
+        verbose_output_print(TRACE_CHANNEL, 0, "# Error, underflow at (N,x)=(%u, %u), "
                 "(i,j)=(%d, %u), (a,b)=(%ld, %lu), S[x] = %hhu, log(%"
                 FBPRIME_FORMAT ") = %hhu\n",
                 w->N, w->x, i, j, a, b, *S, w->p, logp);
