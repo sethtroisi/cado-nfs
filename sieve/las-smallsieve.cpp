@@ -58,6 +58,30 @@ static const int bucket_region = 1 << LOG_BUCKET_REGION;
 
 /* {{{ Some code for information purposes only */
 
+
+int
+small_sieve_dump(FILE *f, const char *header, va_list va)
+{
+    const small_sieve_data_t * ssd = va_arg(va, const small_sieve_data_t *);
+    const ssp_marker_t * next_marker = ssd->markers;
+    const ssp_t *ssp = ssd->ssp;
+
+    fprintf(f, "%s", header);
+    for (int i = 0; !(next_marker->index == i && next_marker->event == SSP_END); i++) {
+        fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT,
+            ssp[i].p, ssp[i].r, ssp[i].offset);
+        for ( ; next_marker->index == i; next_marker++) {
+            switch (next_marker->event) {
+                case SSP_POW2 : fprintf(f, " (power of 2)"); break;
+                case SSP_PROJ : fprintf(f, " (projective root)"); break;
+                case SSP_DISCARD : fprintf(f, "(discarded)"); break;
+            }
+        }
+        fprintf(f, "\n");
+    }
+    return 1;
+}
+
 static void small_sieve_print_contents(const char * prefix, small_sieve_data_t * ssd)
 {
     ssp_marker_t * next_marker = ssd->markers;
@@ -81,6 +105,8 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
     verbose_output_print(0, 1, ".");
     if (ndiscard) verbose_output_print(0, 1, " %d discarded.", ndiscard);
     verbose_output_print(0, 1, "\n");
+    /* With -v -v -v, dump all the small sieve data */
+    verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", ssd);
 }
 
 
