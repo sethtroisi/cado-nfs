@@ -60,9 +60,6 @@ SET_TESTS_PROPERTIES(F9_todotest PROPERTIES DEPENDS F9_makefbtest)
 # Try the descent 
 add_test(F9_descenttest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.descenttest.sh\" \"${F9_roots}\" \"${las_descent_path}\" \"${CADO_NFS_SOURCE_DIR}\" ${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.hint")
 SET_TESTS_PROPERTIES(F9_descenttest PROPERTIES DEPENDS F9_makefbtest)
-### FIXME !!! This is not supposed to fail, but for the moment it does.
-SET_TESTS_PROPERTIES(F9_descenttest PROPERTIES WILL_FAIL 1)
-
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")

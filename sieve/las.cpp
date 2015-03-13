@@ -516,10 +516,10 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
  * into si->doing.  The field todo->next is not accessed, since it does
  * not make sense for si->doing, which is only a single item. The head of
  * the todo list is pruned */
-void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_queue * todo)
+void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_stack * todo)
 {
     delete si->doing;
-    si->doing = todo->front();
+    si->doing = todo->top();
     todo->pop();
     ASSERT_ALWAYS(mpz_poly_is_root(si->cpoly->pols[si->doing->side],
                   si->doing->r, si->doing->p));
@@ -620,6 +620,10 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         switch(*x++) {
             case 'a' : sc->side = ALGEBRAIC_SIDE; break;
             case 'r' : sc->side = RATIONAL_SIDE; break;
+            case '@' :
+                       sc->side = strtoul(x, &x, 0);
+                       ASSERT_ALWAYS(sc->side < 2);
+                       break;
             default:
                        fprintf(stderr, "%s: parse error at %s\n", filename, line);
                        exit(1);
@@ -835,7 +839,10 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         sc->bitsize = mpz_sizeinbase(q0, 2);
     }
     mpz_clear(q0);
-    sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+    /* sqside is now the preferred parameter */
+    if (!param_list_parse_int(pl, "sqside", &sc->side)) {
+        sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+    }
     param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
     param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
     int seen = 1;
@@ -930,7 +937,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* {{{ Init and parse info regarding work to be done by the siever */
     /* Actual parsing of the command-line fragments is done within
      * las_todo_feed, but this is an admittedly contrived way to work */
-    las->todo = new las_todo_queue;
+    las->todo = new las_todo_stack;
     mpz_init(las->todo_q0);
     mpz_init(las->todo_q1);
     const char * filename = param_list_lookup_string(pl, "todo");
@@ -950,25 +957,46 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* Allocate room for only one sieve_info */
     las->sievers = (sieve_info_ptr) malloc(sizeof(sieve_info));
     memset(las->sievers, 0, sizeof(sieve_info));
+
+    las->nq_max = UINT_MAX;
+
+    gmp_randinit_default(las->rstate);
+
+    if (param_list_parse_uint(pl, "random-sample", &las->nq_max)) {
+        las->random_sampling = 1;
+        unsigned long seed = 0;
+        if (param_list_parse_ulong(pl, "seed", &seed)) {
+            gmp_randseed_ui(las->rstate, seed);
+        }
+    } else {
+        if (param_list_parse_uint(pl, "nq", &las->nq_max)) {
+            if (param_list_lookup_string(pl, "q1") || param_list_lookup_string(pl, "rho")) {
+                fprintf(stderr, "Error: argument -nq is incompatible with -q1 or -rho\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
 }/*}}}*/
 
-void las_todo_pop(las_todo_queue * queue)/*{{{*/
+void las_todo_pop(las_todo_stack * stack)/*{{{*/
 {
-    delete queue->front();
-    queue->pop();
+    delete stack->top();
+    stack->pop();
 }
 
-int las_todo_pop_closing_brace(las_todo_queue * queue)
+int las_todo_pop_closing_brace(las_todo_stack * stack)
 {
-    if (queue->front()->side >= 0)
+    if (stack->top()->side >= 0)
         return 0;
-    las_todo_pop(queue);
+    las_todo_pop(stack);
     return 1;
 }
 /*}}}*/
 
 void las_info_clear(las_info_ptr las)/*{{{*/
 {
+    gmp_randclear(las->rstate);
+
     las_info_clear_hint_table(las);
 
     for(sieve_info_ptr si = las->sievers ; si->conf->bitsize ; si++) {
@@ -984,7 +1012,7 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     if (las->todo_list_fd)
         fclose(las->todo_list_fd);
     cado_poly_clear(las->cpoly);
-    // The queue might not be empty, with the option -exit-early
+    // The stack might not be empty, with the option -exit-early
     while (!las->todo->empty()) {
         las_todo_pop(las->todo);
     }
@@ -1014,17 +1042,17 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     return si;
 }/*}}}*/
 
-void las_todo_push_withdepth(las_todo_queue * queue, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
+void las_todo_push_withdepth(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
 {
-    queue->push(new las_todo_entry(p, r, side, depth));
+    stack->push(new las_todo_entry(p, r, side, depth));
 }
-void las_todo_push(las_todo_queue * queue, mpz_srcptr p, mpz_srcptr r, int side)
+void las_todo_push(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side)
 {
-    las_todo_push_withdepth(queue, p, r, side, 0);
+    las_todo_push_withdepth(stack, p, r, side, 0);
 }
-void las_todo_push_closing_brace(las_todo_queue * queue, int depth)
+void las_todo_push_closing_brace(las_todo_stack * stack, int depth)
 {
-    queue->push(new las_todo_entry(-1, depth));
+    stack->push(new las_todo_entry(-1, depth));
 }
 
 /*}}}*/
@@ -1046,11 +1074,11 @@ next_legitimate_specialq(mpz_t r, const mpz_t s, const unsigned long diff)
 }
 
 static void
-parse_command_line_q0_q1(las_todo_queue *queue, mpz_ptr q, mpz_ptr q1, param_list pl, const int qside)
+parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_list pl, const int qside)
 {
-    ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q));
+    ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q0));
     if (param_list_parse_mpz(pl, "q1", q1)) {
-        next_legitimate_specialq(q, q, 0);
+        next_legitimate_specialq(q0, q0, 0);
         return;
     }
 
@@ -1059,16 +1087,18 @@ parse_command_line_q0_q1(las_todo_queue *queue, mpz_ptr q, mpz_ptr q1, param_lis
        not give a legitimate special-q value, advance to the next legitimate
        one and print a warning. */
     mpz_t t;
-    mpz_init_set(t, q);
-    next_legitimate_specialq(q, q, 0);
-    if (mpz_cmp(t, q) != 0)
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "Warning: fixing q=%Zd to next prime q=%Zd\n", t, q);
+    mpz_init_set(t, q0);
+    next_legitimate_specialq(q0, q0, 0);
+    /*
+    if (mpz_cmp(t, q0) != 0)
+        verbose_output_vfprint(1, 0, gmp_vfprintf, "Warning: fixing q=%Zd to next prime q=%Zd\n", t, q0);
+        */
 
-    mpz_set(q1, q);
+    mpz_set(q1, q0);
     if (param_list_parse_mpz(pl, "rho", t)) {
-        las_todo_push(queue, q, t, qside);
-        /* Set empty interval [q + 1, q] as special-q interval */
-        mpz_add_ui (q, q, 1);
+        las_todo_push(stack, q0, t, qside);
+        /* Set empty interval [q0 + 1, q0] as special-q interval */
+        mpz_add_ui (q0, q0, 1);
     } else {
         /* Special-q are chosen from [q, q]. Nothing more to do here. */
     }
@@ -1122,50 +1152,115 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots)
 /* These functions return non-zero if the todo list is not empty */
 int las_todo_feed_qrange(las_info_ptr las, param_list pl)
 {
-    /* If we still have entries in the queue, don't add more now */
+    /* If we still have entries in the stack, don't add more now */
     if (!las->todo->empty())
         return 1;
 
-    const unsigned long push_at_least_this_many = 10;
+    const unsigned long push_at_least_this_many = 1;
 
-    /* handy aliases */
-    mpz_ptr q = las->todo_q0;
+    mpz_ptr q0 = las->todo_q0;
     mpz_ptr q1 = las->todo_q1;
 
     int qside = las->default_config->side;
 
-    if (mpz_cmp_ui(q, 0) == 0)
-        parse_command_line_q0_q1(las->todo, q, q1, pl, qside);
-
-    /* Otherwise we're going to process the next few sq's and put them
-     * into the list */
     mpz_t * roots;
-    int deg = MAX(las->cpoly->rat->deg, las->cpoly->alg->deg);
-    roots = (mpz_t *) malloc (deg * sizeof (mpz_t));
-    for(int i = 0 ; i < deg  ; i++) {
+    mpz_poly_ptr f = las->cpoly->pols[qside];
+    roots = (mpz_t *) malloc (f->deg * sizeof (mpz_t));
+    for(int i = 0 ; i < f->deg  ; i++) {
         mpz_init(roots[i]);
     }
 
-    mpz_poly_ptr f = las->cpoly->pols[qside];
-    /* The loop processes all special-q in [q, q1]. On loop entry, the value
-       in q is required to be a legitimate special-q, and will be added to
-       the queue. */
-    for ( ; las->todo->size() < push_at_least_this_many && mpz_cmp(q, q1) <= 0 ; ) {
-        int nroots = mpz_poly_roots (roots, f, q);
-        if (nroots == 0) {
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# polynomial has no roots for q = %Zu\n", q);
+    if (mpz_cmp_ui(q0, 0) == 0) {
+        parse_command_line_q0_q1(las->todo, q0, q1, pl, qside);
+        if (las->random_sampling) {
+            /* For random sampling, it's important that for all integers in
+             * the range [q0, q1[, their nextprime() is within the range, and
+             * that at least one such has roots mod f. Make sure that
+             * this is the case.
+             */
+            mpz_t q, q1_orig;
+            mpz_init(q);
+            mpz_init_set(q1_orig, q1);
+            /* we need to know the limit of the q range */
+            for(unsigned long i = 0 ; ; i++) {
+                mpz_sub_ui(q, q1, i);
+                next_legitimate_specialq(q, q, 0);
+                if (mpz_cmp(q, q1) > 0) 
+                    continue;
+                if (mpz_poly_roots (roots, f, q) > 0)
+                    break;
+                /* small optimization: avoid redoing root finding
+                 * several times */
+                mpz_sub_ui(q1, q, 1);
+                i = 0;
+            }
+            /* now q is prevprime(q1) */
+            mpz_set(q1, q);
+            /* so now if we pick an integer in [q0, q1[, then its nextprime()
+             * will be in [q0, q1_orig[, which is what we look for,
+             * really.
+             */
+            if (mpz_cmp(q0, q1) > 0) {
+                gmp_fprintf(stderr, "Error: range [%Zd,%Zd[ contains no prime with roots mod f\n", q0, q1_orig);
+                exit(EXIT_FAILURE);
+            }
+            mpz_clear(q);
+            mpz_clear(q1_orig);
         }
-
-        if (param_list_parse_switch(pl, "-galois"))
-            nroots = skip_galois_roots(nroots, q, roots);
-
-        for(int i = 0 ; i < nroots ; i++)
-            las_todo_push(las->todo, q, roots[i], qside);
-
-        next_legitimate_specialq(q, q, 1);
     }
 
-    for(int i = 0 ; i < deg  ; i++) {
+    /* Otherwise we're going to process the next few sq's and put them
+     * into the list */
+    /* The loop processes all special-q in [q, q1]. On loop entry, the value
+       in q is required to be a legitimate special-q, and will be added to
+       the stack. */
+    if (!las->random_sampling) {
+        /* handy aliases */
+        mpz_ptr q = q0;
+
+        /* If nq_max is specified, then q1 has no effect, even though it
+         * has been set equal to q */
+        for ( ; las->todo->size() < push_at_least_this_many &&
+                (las->nq_max < UINT_MAX || mpz_cmp(q, q1) <= 0) &&
+                las->nq_pushed < las->nq_max ; )
+        {
+            int nroots = mpz_poly_roots (roots, f, q);
+            if (nroots == 0) {
+                verbose_output_vfprint(0, 1, gmp_vfprintf, "# polynomial has no roots for q = %Zu\n", q);
+            }
+
+            if (param_list_parse_switch(pl, "-galois"))
+                nroots = skip_galois_roots(nroots, q, roots);
+
+            for(int i = 0 ; i < nroots && las->nq_pushed < las->nq_max; i++) {
+                las->nq_pushed++;
+                las_todo_push(las->todo, q, roots[nroots-1-i], qside);
+            }
+
+            next_legitimate_specialq(q, q, 1);
+        }
+    } else {
+        /* we don't care much about being truly uniform here */
+        mpz_t q;
+        mpz_init(q);
+        for ( ; las->todo->size() < push_at_least_this_many && las->nq_pushed < las->nq_max ; ) {
+            mpz_sub(q, q1, q0);
+            mpz_add_ui(q, q, 1);
+            mpz_urandomm(q, las->rstate, q);
+            mpz_add(q, q, q0);
+            next_legitimate_specialq(q, q, 0);
+            int nroots = mpz_poly_roots (roots, f, q);
+            if (!nroots) continue;
+            if (param_list_parse_switch(pl, "-galois"))
+                nroots = skip_galois_roots(nroots, q, roots);
+            unsigned long i = gmp_urandomm_ui(las->rstate, nroots);
+            las->nq_pushed++;
+            las_todo_push(las->todo, q, roots[i], qside);
+        }
+        mpz_clear(q);
+    }
+
+    for(int i = 0 ; i < f->deg  ; i++) {
         mpz_clear(roots[i]);
     }
     free(roots);
@@ -2380,7 +2475,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
   param_list_decl_usage(pl, "t",   "number of threads to use");
-  param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
+  param_list_decl_usage(pl, "ratq", "[deprecated, alias to --sqside 0] (switch) use rational special-q");
+  param_list_decl_usage(pl, "sqside", "put special-q on this side");
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
   param_list_decl_usage(pl, "skew", "(alias S) skewness");
@@ -2417,6 +2513,10 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "traceNx", "Relation to trace, in N,x format");
   param_list_decl_usage(pl, "traceout", "Output file for trace output, default: stderr");
 #endif
+  param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
+  param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
+  param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
+  param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
   verbose_decl_usage(pl);
 }
 
@@ -2425,8 +2525,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_info las;
     double t0, tts, wct;
     unsigned long nr_sq_processed = 0;
+    unsigned long nr_sq_discarded = 0;
     int allow_largesq = 0;
     int exit_after_rel_found = 0;
+    int never_discard = 0;
     double totJ = 0.0;
     int argc = argc0;
     char **argv = argv0;
@@ -2448,6 +2550,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
     param_list_configure_switch(pl, "-exit-early", &exit_after_rel_found);
+    param_list_configure_switch(pl, "-never-discard", &never_discard);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_switch(pl, "-dup", NULL);
@@ -2561,7 +2664,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         siever_config current_config;
         memcpy(current_config, las->default_config, sizeof(siever_config));
         {
-            const las_todo_entry * const next_todo = las->todo->front();
+            const las_todo_entry * const next_todo = las->todo->top();
             current_config->bitsize = mpz_sizeinbase(next_todo->p, 2);
             current_config->side = next_todo->side;
         }
@@ -2644,11 +2747,16 @@ int main (int argc0, char *argv0[])/*{{{*/
          * extreme cases, see bug 15617
          */
         if (sieve_info_adjust_IJ(si, las->nb_threads) == 0) {
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END,
-                                   sidenames[si->conf->side], si->doing->p, si->doing->r);
-            verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n", 
-                                 si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1, si->J);
-            continue;
+            if (never_discard) {
+                si->J = las->nb_threads << (LOG_BUCKET_REGION - si->conf->logI);
+            } else {
+                nr_sq_discarded++;
+                verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END,
+                                       sidenames[si->conf->side], si->doing->p, si->doing->r);
+                verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n", 
+                                     si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1, si->J);
+                continue;
+            }
         }
 
 
@@ -2778,6 +2886,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     wct = wct_seconds() - wct;
     verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
             totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
+    verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
+            nr_sq_discarded, las->nq_pushed);
     tts = t0;
     tts -= report->tn[0];
     tts -= report->tn[1];
