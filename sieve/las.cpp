@@ -1065,7 +1065,7 @@ next_legitimate_specialq(mpz_t r, const mpz_t s, const unsigned long diff)
 }
 
 static void
-parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q, mpz_ptr q1, param_list pl, const int qside)
+parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_list pl, const int qside)
 {
     ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q0));
     if (param_list_parse_mpz(pl, "q1", q1)) {
@@ -1087,9 +1087,9 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q, mpz_ptr q1, param_lis
 
     mpz_set(q1, q0);
     if (param_list_parse_mpz(pl, "rho", t)) {
-        las_todo_push(stack, q, t, qside);
-        /* Set empty interval [q + 1, q] as special-q interval */
-        mpz_add_ui (q, q, 1);
+        las_todo_push(stack, q0, t, qside);
+        /* Set empty interval [q0 + 1, q0] as special-q interval */
+        mpz_add_ui (q0, q0, 1);
     } else {
         /* Special-q are chosen from [q, q]. Nothing more to do here. */
     }
