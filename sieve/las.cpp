@@ -941,6 +941,21 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     memset(las->sievers, 0, sizeof(sieve_info));
 }/*}}}*/
 
+void las_todo_pop(las_todo_queue * queue)/*{{{*/
+{
+    delete queue->front();
+    queue->pop();
+}
+
+int las_todo_pop_closing_brace(las_todo_queue * queue)
+{
+    if (queue->front()->side >= 0)
+        return 0;
+    las_todo_pop(queue);
+    return 1;
+}
+/*}}}*/
+
 void las_info_clear(las_info_ptr las)/*{{{*/
 {
     las_info_clear_hint_table(las);
@@ -958,7 +973,10 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     if (las->todo_list_fd)
         fclose(las->todo_list_fd);
     cado_poly_clear(las->cpoly);
-    ASSERT_ALWAYS(las->todo->empty());
+    // The queue might not be empty, with the option -exit-early
+    while (!las->todo->empty()) {
+        las_todo_pop(las->todo);
+    }
     delete las->todo;
 }/*}}}*/
 
@@ -1000,20 +1018,6 @@ void las_todo_push_closing_brace(las_todo_queue * queue, int depth)
 
 /*}}}*/
 
-void las_todo_pop(las_todo_queue * queue)/*{{{*/
-{
-    delete queue->front();
-    queue->pop();
-}
-
-int las_todo_pop_closing_brace(las_todo_queue * queue)
-{
-    if (queue->front()->side >= 0)
-        return 0;
-    las_todo_pop(queue);
-    return 1;
-}
-/*}}}*/
 
 /* Put in r the smallest legitimate special-q value that it at least
    s + diff (note that if s+diff is already legitimate, then r = s+diff
