@@ -231,7 +231,7 @@ MAYBE_UNUSED static inline void w64lg2abs(double i, double add, double scale, ui
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
-  *(uint64_t *)&addr[decal] = 0x0101010101010101ULL * (uint64_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
+  *(uint64_t *)&addr[decal] = UINT64_C(0x0101010101010101) * (uint64_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
 #endif
 }
 
