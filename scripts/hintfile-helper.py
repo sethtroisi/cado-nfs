@@ -224,7 +224,7 @@ if __name__ == '__main__':
         # parsing of the qrange is complicated.
         # it's a comma-separated list of ranges
         last_bitsizes=[0,0]
-        for qq in args.qrange.split(","):
+        for qq in sum([a.split() for a in args.qrange.split(',')],[]):
             side,bitsize = parse_selector(qq)
             if bitsize <= last_bitsizes[side]:
                 raise NameError("Arguments for --qrange not in increasing order for side %d" % side)
