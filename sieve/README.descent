@@ -123,6 +123,14 @@ The process can then continue iteratively. Note that hintfile-helper.py
 also accepts the --replace option, which rewrites the lines of the
 hintfile you provide witht the measurements it does.
 
+Here are a few hints about the influential parameters. Increasing I will
+augment the time significantly, and might as well yield better success.
+For special-q on the rational side, then the algebraic side parameters
+need to be bumped up somewhat, because then there is a significant
+unbalance in the norms. lambda has to increase, especially if lim remains
+unchanged. Setting lpb to above the current special-q size is allowed,
+but might trigger loops of course (if on the same side as the special-q).
+
 Preparing the Todo file
 -----------------------
 

@@ -199,7 +199,7 @@ if __name__ == '__main__':
     if args.ntrials:
         ntrials=args.ntrials
     las_args['--random-sample'] = str(ntrials)
-    las_binary = args.cadobindir + "/sieve/las"
+    las_binary = args.cadobindir + "/sieve/las_descent"
 
     if args.datadir and args.prefix:
         if (args.poly or args.fb):
