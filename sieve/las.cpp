@@ -516,10 +516,10 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
  * into si->doing.  The field todo->next is not accessed, since it does
  * not make sense for si->doing, which is only a single item. The head of
  * the todo list is pruned */
-void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_queue * todo)
+void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_stack * todo)
 {
     delete si->doing;
-    si->doing = todo->front();
+    si->doing = todo->top();
     todo->pop();
     ASSERT_ALWAYS(mpz_poly_is_root(si->cpoly->pols[si->doing->side],
                   si->doing->r, si->doing->p));
@@ -928,7 +928,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* {{{ Init and parse info regarding work to be done by the siever */
     /* Actual parsing of the command-line fragments is done within
      * las_todo_feed, but this is an admittedly contrived way to work */
-    las->todo = new las_todo_queue;
+    las->todo = new las_todo_stack;
     mpz_init(las->todo_q0);
     mpz_init(las->todo_q1);
     const char * filename = param_list_lookup_string(pl, "todo");
@@ -969,17 +969,17 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
 }/*}}}*/
 
-void las_todo_pop(las_todo_queue * queue)/*{{{*/
+void las_todo_pop(las_todo_stack * stack)/*{{{*/
 {
-    delete queue->front();
-    queue->pop();
+    delete stack->top();
+    stack->pop();
 }
 
-int las_todo_pop_closing_brace(las_todo_queue * queue)
+int las_todo_pop_closing_brace(las_todo_stack * stack)
 {
-    if (queue->front()->side >= 0)
+    if (stack->top()->side >= 0)
         return 0;
-    las_todo_pop(queue);
+    las_todo_pop(stack);
     return 1;
 }
 /*}}}*/
@@ -1003,7 +1003,7 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     if (las->todo_list_fd)
         fclose(las->todo_list_fd);
     cado_poly_clear(las->cpoly);
-    // The queue might not be empty, with the option -exit-early
+    // The stack might not be empty, with the option -exit-early
     while (!las->todo->empty()) {
         las_todo_pop(las->todo);
     }
@@ -1033,17 +1033,17 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     return si;
 }/*}}}*/
 
-void las_todo_push_withdepth(las_todo_queue * queue, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
+void las_todo_push_withdepth(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
 {
-    queue->push(new las_todo_entry(p, r, side, depth));
+    stack->push(new las_todo_entry(p, r, side, depth));
 }
-void las_todo_push(las_todo_queue * queue, mpz_srcptr p, mpz_srcptr r, int side)
+void las_todo_push(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side)
 {
-    las_todo_push_withdepth(queue, p, r, side, 0);
+    las_todo_push_withdepth(stack, p, r, side, 0);
 }
-void las_todo_push_closing_brace(las_todo_queue * queue, int depth)
+void las_todo_push_closing_brace(las_todo_stack * stack, int depth)
 {
-    queue->push(new las_todo_entry(-1, depth));
+    stack->push(new las_todo_entry(-1, depth));
 }
 
 /*}}}*/
@@ -1065,7 +1065,7 @@ next_legitimate_specialq(mpz_t r, const mpz_t s, const unsigned long diff)
 }
 
 static void
-parse_command_line_q0_q1(las_todo_queue *queue, mpz_ptr q0, mpz_ptr q1, param_list pl, const int qside)
+parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q, mpz_ptr q1, param_list pl, const int qside)
 {
     ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q0));
     if (param_list_parse_mpz(pl, "q1", q1)) {
@@ -1087,9 +1087,9 @@ parse_command_line_q0_q1(las_todo_queue *queue, mpz_ptr q0, mpz_ptr q1, param_li
 
     mpz_set(q1, q0);
     if (param_list_parse_mpz(pl, "rho", t)) {
-        las_todo_push(queue, q0, t, qside);
-        /* Set empty interval [q0 + 1, q0] as special-q interval */
-        mpz_add_ui (q0, q0, 1);
+        las_todo_push(stack, q, t, qside);
+        /* Set empty interval [q + 1, q] as special-q interval */
+        mpz_add_ui (q, q, 1);
     } else {
         /* Special-q are chosen from [q, q]. Nothing more to do here. */
     }
@@ -1143,11 +1143,11 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots)
 /* These functions return non-zero if the todo list is not empty */
 int las_todo_feed_qrange(las_info_ptr las, param_list pl)
 {
-    /* If we still have entries in the queue, don't add more now */
+    /* If we still have entries in the stack, don't add more now */
     if (!las->todo->empty())
         return 1;
 
-    const unsigned long push_at_least_this_many = 10;
+    const unsigned long push_at_least_this_many = 1;
 
     mpz_ptr q0 = las->todo_q0;
     mpz_ptr q1 = las->todo_q1;
@@ -1204,7 +1204,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
      * into the list */
     /* The loop processes all special-q in [q, q1]. On loop entry, the value
        in q is required to be a legitimate special-q, and will be added to
-       the queue. */
+       the stack. */
     if (!las->random_sampling) {
         /* handy aliases */
         mpz_ptr q = q0;
@@ -1225,7 +1225,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
 
             for(int i = 0 ; i < nroots && las->nq_pushed < las->nq_max; i++) {
                 las->nq_pushed++;
-                las_todo_push(las->todo, q, roots[i], qside);
+                las_todo_push(las->todo, q, roots[nroots-1-i], qside);
             }
 
             next_legitimate_specialq(q, q, 1);
@@ -2654,7 +2654,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         siever_config current_config;
         memcpy(current_config, las->default_config, sizeof(siever_config));
         {
-            const las_todo_entry * const next_todo = las->todo->front();
+            const las_todo_entry * const next_todo = las->todo->top();
             current_config->bitsize = mpz_sizeinbase(next_todo->p, 2);
             current_config->side = next_todo->side;
         }

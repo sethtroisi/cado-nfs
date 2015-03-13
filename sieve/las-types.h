@@ -213,7 +213,7 @@ struct las_info_s {
     /* This is an opaque pointer to C++ code. */
     void * descent_helper;
 
-    las_todo_queue *todo;
+    las_todo_stack *todo;
     unsigned int nq_pushed;
     unsigned int nq_max;
 
