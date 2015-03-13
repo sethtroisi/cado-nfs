@@ -65,11 +65,12 @@ small_sieve_dump(FILE *f, const char *header, va_list va)
     const small_sieve_data_t * ssd = va_arg(va, const small_sieve_data_t *);
     const ssp_marker_t * next_marker = ssd->markers;
     const ssp_t *ssp = ssd->ssp;
+    const unsigned char *logp = ssd->logp;
 
     fprintf(f, "%s", header);
     for (int i = 0; !(next_marker->index == i && next_marker->event == SSP_END); i++) {
-        fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT,
-            ssp[i].p, ssp[i].r, ssp[i].offset);
+        fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
+            ssp[i].p, ssp[i].r, ssp[i].offset, logp[i]);
         for ( ; next_marker->index == i; next_marker++) {
             switch (next_marker->event) {
                 case SSP_POW2 : fprintf(f, " (power of 2)"); break;
