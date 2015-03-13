@@ -858,8 +858,14 @@ calculateSqrtAlg (const char *prefix, int numdep,
        *    - this should finally give an even power of f_d in the
        *      denominator, and the algorithm can continue.
        */
+      pthread_mutex_lock (&lock);
+      fprintf (stderr, "AlgSqrt(%d): before accumulate_fast_F_end\n", numdep);
+      fflush (stderr);
+      pthread_mutex_unlock (&lock);
       accumulate_fast_F_end (prd_tab, F, lprd);
       pthread_mutex_lock (&lock);
+      fprintf (stderr, "AlgSqrt(%d): after accumulate_fast_F_end\n", numdep);
+      fflush (stderr);
       fclose_maybe_compressed (depfile, depname);
       pthread_mutex_unlock (&lock);
       free (depname);
