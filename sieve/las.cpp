@@ -660,6 +660,8 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         sc->unsieve_thresh = las->default_config->unsieve_thresh;
         sc->sides[0]->powlim = las->default_config->sides[0]->powlim;
         sc->sides[1]->powlim = las->default_config->sides[1]->powlim;
+        sc->sides[0]->ncurves = las->default_config->sides[0]->ncurves;
+        sc->sides[1]->ncurves = las->default_config->sides[1]->ncurves;
     }
     if (las->hint_table == NULL) {
         fprintf(stderr, "%s: no data ??\n", filename);
