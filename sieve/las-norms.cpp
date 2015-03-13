@@ -1405,9 +1405,10 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 }
 
 
-/* return 0 if we should discard that special-q, in which case we intend
- * to discard this special-q. For this reason, si->J is then set to an
- * unrounded value, for diagnostic.
+/* return 0 if we should discard that special-q because the rounded
+ * region in the (a,b)-plane is flat to the point of having height 0.
+ * For diagnostic, we set si->J to the unrounded value (rounding would
+ * give 0) and then we return "false".
  *
  * The current check for discarding is whether we do fill one bucket or
  * not. If we don't even achieve that, we should of course discard.

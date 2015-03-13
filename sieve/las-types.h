@@ -214,6 +214,12 @@ struct las_info_s {
     void * descent_helper;
 
     las_todo_queue *todo;
+    unsigned int nq_pushed;
+    unsigned int nq_max;
+
+    int random_sampling;
+    gmp_randstate_t rstate;
+
     /* These are used for reading the todo list */
     mpz_t todo_q0;
     mpz_t todo_q1;

@@ -1201,3 +1201,4 @@ sieve/las-base.hpp
 sieve/las-forwardtypes.h
 sieve/las-threads.cpp
 sieve/las-threads.h
+scripts/hintfile-helper.py

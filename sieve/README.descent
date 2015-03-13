@@ -60,10 +60,68 @@ and the parameters must be so that there is a high chance to get at least
 one relation.
 
 An example hint-file will be given as example in the future.
-TODO: explain mkhint?
 
 Alternatively, the hint file may also use the syntax "55@0" instead of "55r", to mean
 "bitsize 55 on size 0".
+
+Writing a hint file can be done by hand. There is a helper script,
+though, which can assist in this task. It can be used as follows (the
+following information may also be used as a guide for how a hint file
+should be created). First, one should start with a draft file, containing
+rough guess data for the smallest large primes, at least one line for
+each special-q side. For example:
+    22@0 0 0 I=9 50000,22,24,1.2 100000,22,24,1.2
+    22@1 0 0 I=9 50000,22,24,1.2 100000,22,24,1.2
+because this is a guess, the 0 values for the average time and success
+probability are normal.
+
+Based on this, and replicating the configuration for the larger values,
+the script will provide timing data as follows:
+
+$ ./scripts/hintfile-helper.py --cadobindir ./build/cassoulet   --ntrials 100 --hintfile /tmp/p59.hint --datadir ~/Local/p59/ --prefix p59  --ntrials 100 --hintfile /tmp/p59.hint  --qrange $(echo {22..37}{r,a} | tr ' ' ',')
+22@0 0.0027 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+22@1 0.0030 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+23@0 0.0029 0.9900 I=9 50000,22,24,1.2 100000,22,24,1.2
+23@1 0.0033 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+24@0 0.0028 0.9700 I=9 50000,22,24,1.2 100000,22,24,1.2
+24@1 0.0034 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+25@0 0.0031 0.9500 I=9 50000,22,24,1.2 100000,22,24,1.2
+
+Note the --qrange argument, which specifies the order in which the sizes
+are tried.
+
+You should pay attention to two things here. The success probability,
+and the average time. Tinkering with parameters so as to lower the average time
+is ok, as long as it leaves the success probability high. As q grows,
+things get awry at some point, and you have to modify the parameters so
+as to increase the success probability. In the experiment above, success
+probability only 97% for 24r is unsatisfactory.
+
+We can use the script to test alternative settings for this special-q
+side:
+
+$ ./scripts/hintfile-helper.py --cadobindir ./build/cassoulet   --ntrials
+100 --hintfile /tmp/p59.hint --datadir ~/Local/p59/ --prefix p59
+--ntrials 100 --hintfile /tmp/p59.hint  --hintline "24r 0.0035 1.0000 I=9
+50000,22,24,1.2 100000,24,45,1.5"
+24@0 0.0034 1.0000 I=9 50000,22,24,1.2 100000,24,45,1.5
+
+Another way to do the same thing is to first keep the first four lines of
+the output of the first script run into our hint file, modify the one for
+24r, and re-run. We get the following:
+22@0 0.0033 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+22@1 0.0031 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+23@0 0.0034 0.9900 I=9 50000,22,24,1.2 100000,22,24,1.2
+23@1 0.0030 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+24@0 0.0032 1.0000 I=9 50000,23,26,1.2 100000,24,45,1.5
+24@1 0.0028 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+25@0 0.0029 0.9900 I=9 50000,23,26,1.2 100000,24,45,1.5
+25@1 0.0032 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+26@0 0.0038 0.9700 I=9 50000,23,26,1.2 100000,24,45,1.5
+
+The process can then continue iteratively. Note that hintfile-helper.py
+also accepts the --replace option, which rewrites the lines of the
+hintfile you provide witht the measurements it does.
 
 Preparing the Todo file
 -----------------------

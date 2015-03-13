@@ -25,8 +25,9 @@ struct helper {
         string operator()() const {
             ostringstream os;
             os << sc->bitsize;
-            char sn[]="ra";
-            os << sn[sc->side];
+            os << '@' << sc->side;
+            // char sn[]="ra";
+            // os << sn[sc->side];
             return os.str();
         }
         bool operator<(const tree_label& o) const {
