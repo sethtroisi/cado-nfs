@@ -770,7 +770,9 @@ tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh
 tests/sieve/F9.cofactest.sh
 tests/sieve/F9.todotest.sh
+tests/sieve/F9.descenttest.sh
 tests/sieve/F9.todo
+tests/sieve/F9.hint
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
 tests/sieve/test_fb_make_step.c
