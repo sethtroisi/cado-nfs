@@ -215,7 +215,9 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     if (rhs_name != NULL) {
-        get_rhs_file_header(rhs_name, NULL, &nrhs, NULL);
+        if (pi->m->jrank == 0 && pi->m->trank == 0)
+            get_rhs_file_header(rhs_name, NULL, &nrhs, NULL);
+        global_broadcast(pi->m, &nrhs, sizeof(unsigned int), 0, 0);
     }
 
     if (tcan_print && nrhs) {
