@@ -161,15 +161,6 @@ facul_clear_strategy (facul_strategy_t *strategy)
   free (strategy);
 }
 
-#if 0
-static int
-cmp_ul (const unsigned long *a, const unsigned long *b)
-{
-  if (*a < *b) return -1;
-  if (*a == *b) return 0;
-  return 1;
-}
-#endif
 
 static int
 my_cmp_mpz (const mpz_t *a, const mpz_t *b)

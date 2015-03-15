@@ -44,7 +44,7 @@ It contains the table that links an ideal (p on rational side, (p,r) on
 algebraic side) to its index that going to be used during filtering.
 
 The first line has the following format:
-nbits ratside nbad add lpb0 lpb1
+nbits ratside nbad add nbpolys lpb0 lpb1
 where
   - nbits is 32 or 64 (depending on the maximum value of p possible, ie the large
     prime bounds).
@@ -56,10 +56,11 @@ where
   - add is 0 or 1 (should be 0 for factorization). If add is 1, a column is
     added to the matrix. It is useful to take into account the logarithm of
     the denominator ideal (often denoted J) for DLP problems.
+  - nbpolys is the number of polynomials (usually 2)
   - lpb0 is the large prime bound on side 0
   - lpb1 is the large prime bound on side 1
 
-nbits, ratside, nbad, add, lpb0 and lpb1 are written in decimal.
+nbits, ratside, nbad, add, nb_polys, lpb0 and lpb1 are written in decimal.
 
 Then, the file may contains two lines, beginning by #, with the two polynomials
 used (polynomials on side 0 is written first).
