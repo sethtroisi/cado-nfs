@@ -267,8 +267,7 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 #endif // NDEBUG
 
   if (a->deg > 0) {
-    uint64_t tmp = 0;
-    int64_poly_infinite_norm(&tmp, a);
+    uint64_t tmp = int64_poly_infinite_norm(a);
 
     bound_resultant = pow((double)tmp, (double)f->deg) * pre_compute[a->deg];
   } else {
@@ -368,6 +367,35 @@ void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, uint64_t * Tqr,
   pseudo_Tqr[i] = inverse;
   for (unsigned int j = i + 1; j < t; j++) {
     pseudo_Tqr[j] = (inverse * Tqr[j]) % ((int64_t)ideal->ideal->r);
+  }
+}
+
+/*
+  Mqr is the a matrix that can generate vector c such that Tqr * c = 0 mod r.
+  Mqr = [[r a 0 … 0]
+         [0 1 b … 0]
+         [| | | | |]
+         [0 0 0 0 1]]
+
+  Mqr: the Mqr matrix.
+  Tqr: the Tqr matrix.
+  t: dimension of the lattice.
+  ideal: the ideal r.
+*/
+void compute_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, unsigned int t,
+                   ideal_1_srcptr ideal)
+{
+  mat_int64_init(Mqr, t, t);
+  Mqr->coeff[1][1] = ideal->ideal->r;
+  for (unsigned int i = 2; i <= t; i++) {
+    Mqr->coeff[i][i] = 1;
+  }
+  for (unsigned int col = 2; col <= t; col++) {
+    if (Tqr[col-1] != 0) {
+      Mqr->coeff[1][col] = (-(int64_t)Tqr[col-1]) + ideal->ideal->r;
+    } else {
+      Mqr->coeff[1][col] = 0;
+    }
   }
 }
 
@@ -754,6 +782,20 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
     uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
     compute_Tqr_1(Tqr, matrix, H->t, fb->factor_base_1[i]);
+
+#ifdef TEST_MQR
+    printf("Tqr = [");
+    for (unsigned int i = 0; i < H->t - 1; i++) {
+      printf("%" PRIu64 ", ", Tqr[i]);
+    }
+    printf("%" PRIu64 "]\n Mqr =\n", Tqr[H->t - 1]);
+    mat_int64_t Mqr;
+    compute_Mqr_1(Mqr, Tqr, H->t, fb->factor_base_1[i]);
+    mat_int64_fprintf(stdout, Mqr);
+    mat_int64_clear(Mqr);
+    getchar();
+#endif // TEST_MQR
+
     compute_pseudo_Tqr_1(pseudo_Tqr, Tqr, H->t, fb->factor_base_1[i]);
 
 

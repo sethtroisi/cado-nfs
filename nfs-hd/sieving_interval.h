@@ -8,11 +8,11 @@ typedef struct
 {
   unsigned int * h;
   unsigned int t;
-}  s_sieving_inverval_t;
+}  s_sieving_interval_t;
 
-typedef s_sieving_inverval_t sieving_interval_t[1];
-typedef s_sieving_inverval_t * sieving_interval_ptr;
-typedef const s_sieving_inverval_t * sieving_interval_srcptr;
+typedef s_sieving_interval_t sieving_interval_t[1];
+typedef s_sieving_interval_t * sieving_interval_ptr;
+typedef const s_sieving_interval_t * sieving_interval_srcptr;
 
 /*
   Initialise a sieving interval.

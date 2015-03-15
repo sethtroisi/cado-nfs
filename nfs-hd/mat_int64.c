@@ -21,15 +21,15 @@ void mat_int64_init(mat_int64_ptr matrix, unsigned int NumRows, unsigned int
     matrix->coeff[row] = malloc(sizeof(int64_t) * (NumCols + 1));
   }
 
-  for (unsigned int row = 0; row < NumRows + 1; row++) {
-    for (unsigned int col = 0; col < NumCols + 1; col++) {
-      matrix->coeff[row][col] = 0;
-    }
-  }
+  /*for (unsigned int row = 0; row < NumRows + 1; row++) {*/
+    /*for (unsigned int col = 0; col < NumCols + 1; col++) {*/
+      /*matrix->coeff[row][col] = 0;*/
+    /*}*/
+  /*}*/
 }
 
-void mat_int64_init_with_array(mat_int64_ptr matrix, unsigned int NumRows, unsigned int
-                           NumCols, int64_t * coeff)
+void mat_int64_init_with_array(mat_int64_ptr matrix, unsigned int NumRows,
+    unsigned int NumCols, int64_t * coeff)
 {
   ASSERT(1 <= NumRows);
   ASSERT(1 <= NumCols);
@@ -42,15 +42,14 @@ void mat_int64_init_with_array(mat_int64_ptr matrix, unsigned int NumRows, unsig
     matrix->coeff[row] = malloc(sizeof(int64_t) * (NumCols + 1));
   }
 
-  for (unsigned int row = 0; row < NumRows + 1; row++) {
-    for (unsigned int col = 0; col < NumCols + 1; col++) {
-      matrix->coeff[row][col] = 0;
-    }
-  }
+  /*for (unsigned int row = 0; row < NumRows + 1; row++) {*/
+    /*for (unsigned int col = 0; col < NumCols + 1; col++) {*/
+      /*matrix->coeff[row][col] = 0;*/
+    /*}*/
+  /*}*/
 
   for (unsigned int row = 1; row < NumRows + 1; row++) {
     for (unsigned int col = 1; col < NumCols + 1; col++) {
-      //Test how the matrix is set.
       matrix->coeff[row][col] = coeff[(col - 1) + NumCols * (row - 1)];
     }
   }
@@ -60,21 +59,12 @@ void mat_int64_copy(mat_int64_ptr B, mat_int64_srcptr A)
 {
   ASSERT(B->NumRows == A->NumRows);
   ASSERT(B->NumCols == A->NumCols);
+
   for (unsigned int row = 1; row < B->NumRows + 1; row++) {
     for (unsigned int col = 1; col < B->NumCols + 1; col++) {
       B->coeff[row][col] = A->coeff[row][col];
     }
   }
-}
-
-void mat_int64_set_coeff(mat_int64_ptr matrix, int64_t i, unsigned int row, unsigned int
-                         col)
-{
-  ASSERT(row <= matrix->NumRows);
-  ASSERT(col <= matrix->NumCols);
-  ASSERT(1 <= row);
-  ASSERT(1 <= col);
-  matrix->coeff[row][col] = i;
 }
 
 void mat_int64_clear(mat_int64_ptr matrix)
@@ -87,48 +77,57 @@ void mat_int64_clear(mat_int64_ptr matrix)
 
 void mat_int64_fprintf(FILE * file, mat_int64_srcptr matrix)
 {
+  ASSERT(matrix->NumRows >= 1);
+  ASSERT(matrix->NumCols >= 1);
+
   fprintf(file, "[");
   for (unsigned int row = 1; row < matrix->NumRows; row++) {
     fprintf(file, "[");
     for (unsigned int col = 1; col < matrix->NumCols; col++) {
       fprintf(file, "%" PRId64 ", ", matrix->coeff[row][col]);
     }
-    gmp_fprintf(file, "%" PRId64 "],\n", matrix->coeff[row][matrix->NumCols]);
+    fprintf(file, "%" PRId64 "],\n", matrix->coeff[row][matrix->NumCols]);
   }
   fprintf(file, "[");
   for (unsigned int col = 1; col < matrix->NumCols; col++) {
-    gmp_fprintf(file, "%" PRId64 ", ", matrix->coeff[matrix->NumRows][col]);
+    fprintf(file, "%" PRId64 ", ", matrix->coeff[matrix->NumRows][col]);
   }
-  gmp_fprintf(file, "%" PRId64 "]]\n", matrix->coeff[matrix->NumRows][matrix->NumCols]);
+  fprintf(file, "%" PRId64 "]]\n",
+      matrix->coeff[matrix->NumRows][matrix->NumCols]);
 }
 
 void mat_int64_fprintf_comment(FILE * file, mat_int64_srcptr matrix)
 {
+  ASSERT(matrix->NumRows >= 1);
+  ASSERT(matrix->NumCols >= 1);
+
   fprintf(file, "# [");
   fprintf(file, "[");
   for (unsigned int col = 1; col < matrix->NumCols; col++) {
     fprintf(file, "%" PRId64 ", ", matrix->coeff[1][col]);
   }
-  gmp_fprintf(file, "%" PRId64 "],\n", matrix->coeff[1][matrix->NumCols]);
+  fprintf(file, "%" PRId64 "],\n", matrix->coeff[1][matrix->NumCols]);
 
   for (unsigned int row = 2; row < matrix->NumRows; row++) {
     fprintf(file, "# [");
     for (unsigned int col = 1; col < matrix->NumCols; col++) {
       fprintf(file, "%" PRId64 ", ", matrix->coeff[row][col]);
     }
-    gmp_fprintf(file, "%" PRId64 "],\n", matrix->coeff[row][matrix->NumCols]);
+    fprintf(file, "%" PRId64 "],\n", matrix->coeff[row][matrix->NumCols]);
   }
   fprintf(file, "# [");
   for (unsigned int col = 1; col < matrix->NumCols; col++) {
-    gmp_fprintf(file, "%" PRId64 ", ", matrix->coeff[matrix->NumRows][col]);
+    fprintf(file, "%" PRId64 ", ", matrix->coeff[matrix->NumRows][col]);
   }
-  gmp_fprintf(file, "%" PRId64 "]]\n", matrix->coeff[matrix->NumRows][matrix->NumCols]);
+  fprintf(file, "%" PRId64 "]]\n",
+      matrix->coeff[matrix->NumRows][matrix->NumCols]);
 }
 
 void mat_int64_transpose(mat_int64_ptr matrix, mat_int64_srcptr matrix_src)
 {
   ASSERT(matrix->NumRows == matrix_src->NumCols);
   ASSERT(matrix->NumCols == matrix_src->NumRows);
+  
   mat_int64_t tmp;
   mat_int64_init(tmp, matrix_src->NumRows, matrix_src->NumCols);
   mat_int64_copy(tmp, matrix_src);
@@ -140,27 +139,39 @@ void mat_int64_transpose(mat_int64_ptr matrix, mat_int64_srcptr matrix_src)
   mat_int64_clear(tmp);
 }
 
-void mat_int64_mul_mat_int64(mat_int64_ptr C, mat_int64_srcptr A, mat_int64_srcptr B)
+void mat_int64_mul_mat_int64(mat_int64_ptr C, mat_int64_srcptr A, 
+    mat_int64_srcptr B)
 {
   ASSERT(A->NumCols == B->NumRows);
   ASSERT(A->NumRows == C->NumRows);
   ASSERT(B->NumCols == C->NumCols);
 
-  for (unsigned int row = 1; row < A->NumRows + 1; row++) {
-    for (unsigned int col = 1; col < B->NumCols + 1; col++) {
-      for (unsigned int k = 1; k < A->NumCols + 1; k++) {
-        C->coeff[row][col] = C->coeff[row][col] + A->coeff[row][k] * B->coeff[k][col];
+  mat_int64_t A_tmp;
+  mat_int64_init(A_tmp, A->NumRows, A->NumCols);
+  mat_int64_copy(A_tmp, A);
+  mat_int64_t B_tmp;
+  mat_int64_init(B_tmp, B->NumRows, B->NumCols);
+  mat_int64_copy(B_tmp, B);
+  for (unsigned int row = 1; row < A_tmp->NumRows + 1; row++) {
+    for (unsigned int col = 1; col < B_tmp->NumCols + 1; col++) {
+      for (unsigned int k = 1; k < A_tmp->NumCols + 1; k++) {
+        C->coeff[row][col] = C->coeff[row][col] +
+          A_tmp->coeff[row][k] * B_tmp->coeff[k][col];
       }
     }
   }
+  mat_int64_clear(A_tmp);
+  mat_int64_clear(B_tmp);
 }
 
-void mat_int64_mul_int64_vector_to_int64_poly(int64_poly_ptr a, mat_int64_srcptr A,
-                                              int64_vector_srcptr c)
+void mat_int64_mul_int64_vector_to_int64_poly(int64_poly_ptr a,
+    mat_int64_srcptr A, int64_vector_srcptr c)
 {
   ASSERT(A->NumCols == c->dim);
+  
+  int64_t tmp = 0;
   for (unsigned int row = 1; row < A->NumRows + 1; row++) {
-    int64_t tmp = 0;
+    tmp = 0;
     for (unsigned int col = 1; col < A->NumCols + 1; col++) {
       tmp = tmp + A->coeff[row][col] * c->c[col - 1];
     }
@@ -169,31 +180,45 @@ void mat_int64_mul_int64_vector_to_int64_poly(int64_poly_ptr a, mat_int64_srcptr
 }
 
 void mat_int64_mul_int64_vector(int64_vector_ptr a, mat_int64_srcptr A,
-                                int64_vector_srcptr c)
+    int64_vector_srcptr c)
 {
   ASSERT(A->NumCols == c->dim);
+  ASSERT(A->NumRows == a->dim);//TODO: verify the test.
+
   int64_vector_t v;
   int64_vector_init(v, A->NumRows);
+  int64_t tmp = 0;
   for (unsigned int row = 1; row < A->NumRows + 1; row++) {
-    int64_t tmp = 0;
+    tmp = 0;
     for (unsigned int col = 1; col < A->NumCols + 1; col++) {
       tmp = tmp + A->coeff[row][col] * c->c[col - 1];
     }
     int64_vector_setcoordinate(v, row - 1, tmp);
   }
   int64_vector_set(a, v);
+  int64_vector_clear(v);
 }
 
-void mat_int64_mul_int64_poly(int64_poly_ptr a, mat_int64_srcptr A, int64_poly_srcptr c)
+//TODO: problem here if c has a deg not equal to A->NumCols - 1.
+void mat_int64_mul_int64_poly(int64_poly_ptr a, mat_int64_srcptr A,
+    int64_poly_srcptr c)
 {
   ASSERT(A->NumCols >= (unsigned int) (c->deg + 1));
+ 
+  int64_poly_t p_tmp;
+  int64_poly_init(p_tmp, c->deg);
+  int64_t tmp = 0;
   for (unsigned int row = 1; row < A->NumRows + 1; row++) {
-    int64_t tmp = 0;
+    tmp = 0;
     for (unsigned int col = 1; col < (unsigned int) (c->deg + 2); col++) {
-      tmp = tmp + A->coeff[row][col] * c->coeff[col - 1];
+      if (c->coeff[col - 1] != 0) {
+        tmp = tmp + A->coeff[row][col] * c->coeff[col - 1];
+      }
     }
-    int64_poly_setcoeff(a, row - 1, tmp);
+    int64_poly_setcoeff(p_tmp, row - 1, tmp);
   }
+  int64_poly_copy(a, p_tmp);
+  int64_poly_clear(p_tmp);
 }
 
 void mat_Z_to_mat_int64(mat_int64_ptr matrix_int, mat_Z_srcptr matrix)
@@ -208,9 +233,9 @@ void mat_Z_to_mat_int64(mat_int64_ptr matrix_int, mat_Z_srcptr matrix)
   }
 }
 
-void mat_int64_extract(mat_int64_ptr matrix_out, MAYBE_UNUSED mat_int64_srcptr matrix_in,
-                       unsigned int ulx, unsigned int uly, unsigned int drx,
-                       unsigned int dry)
+//TODO: Wahoo! No initialisation here and I do not know what it does!
+void mat_int64_extract(mat_int64_ptr matrix_out, mat_int64_srcptr matrix_in,
+    unsigned int ulx, unsigned int uly, unsigned int drx, unsigned int dry)
 {
   ASSERT(drx - ulx > 0);
   ASSERT(dry - uly > 0);
@@ -221,5 +246,16 @@ void mat_int64_extract(mat_int64_ptr matrix_out, MAYBE_UNUSED mat_int64_srcptr m
       matrix_out->coeff[i + 1][j + 1] =
         matrix_in->coeff[i + ulx + 1][j + uly + 1];
     }
+  }
+}
+
+void mat_int64_extract_vector(int64_vector_ptr v, mat_int64_srcptr matrix,
+    unsigned int col)
+{
+  ASSERT(col < matrix->NumCols);
+  ASSERT(v->dim == matrix->NumRows);
+
+  for (unsigned int i = 1; i <= matrix->NumRows; i++) {
+    v->c[i - 1] = matrix->coeff[i][col + 1];
   }
 }
