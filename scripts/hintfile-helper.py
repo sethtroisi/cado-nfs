@@ -24,6 +24,7 @@ las_args={}
 tmphintfilename=None
 hintfile_configs={}
 last_active_config=[None,None]
+verbose=False
 
 def make_selector(side, bitsize):
     return "%d@%d" % (bitsize,side)
@@ -136,7 +137,8 @@ def testoneline(selector, implied, *args, **kwargs):
         "-allow-largesq",
         ]
 
-    # print "las command line", " ".join(argseq)
+    if verbose:
+        print("las command line:\n" + " ".join(argseq))
     subprocess.check_call(argseq)
 
     # now parse the output
@@ -191,6 +193,8 @@ if __name__ == '__main__':
     parser.add_argument("--qrange", help="Comma-separated list of special-q sizes to optimize")
     parser.add_argument("--hintline", type=str, help="Example hint line to be evaluated")
     parser.add_argument("--replace", action="store_true")
+    parser.add_argument("--uselogtable", action="store_true")
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
     wdir = args.workdir
@@ -200,26 +204,33 @@ if __name__ == '__main__':
         ntrials=args.ntrials
     las_args['--random-sample'] = str(ntrials)
     las_binary = args.cadobindir + "/sieve/las_descent"
+    if args.verbose:
+        verbose=True
 
     if args.datadir and args.prefix:
         if (args.poly or args.fb):
-            raise NameError("Please specify either datadir&prefix or poly&fb")
+            raise ValueError("Please specify either datadir&prefix or poly&fb")
         las_args["--poly"] = args.datadir+"/"+args.prefix+".polyselect2.poly"
         las_args["--fb1"]  = args.datadir+"/"+args.prefix+".factorbase.roots.gz"
+        if args.uselogtable:
+            las_args["--renumber"] = args.datadir+"/"+args.prefix+".freerel.renumber.gz"
+            las_args["--log"] = args.datadir+"/"+args.prefix+".reconstructlog.dlog"
     elif args.poly and args.fb:
         if (args.datadir or args.prefix):
-            raise NameError("Please specify either datadir&prefix or poly&fb")
+            raise ValueError("Please specify either datadir&prefix or poly&fb")
         las_args["--poly"] = args.poly
         las_args["--fb1"] = args.fb1
+        if args.uselogtable:
+            raise ValueError("--uselogtable requires --datadir & --prefix")
     else:
-        raise NameError("Please specify either datadir&prefix or poly&fb")
+        raise ValueError("Please specify either datadir&prefix or poly&fb")
 
 
     qranges=[]        # list of (side,bitsize)
 
     if args.qrange:
         if args.hintline:
-            raise NameError("--qrange and hintline are incompatible")
+            raise ValueError("--qrange and hintline are incompatible")
         qranges=[]
         # parsing of the qrange is complicated.
         # it's a comma-separated list of ranges
@@ -227,7 +238,7 @@ if __name__ == '__main__':
         for qq in sum([a.split() for a in args.qrange.split(',')],[]):
             side,bitsize = parse_selector(qq)
             if bitsize <= last_bitsizes[side]:
-                raise NameError("Arguments for --qrange not in increasing order for side %d" % side)
+                raise ValueError("Arguments for --qrange not in increasing order for side %d" % side)
             last_bitsizes[side] = bitsize
             qranges.append((side,bitsize))
 
@@ -246,10 +257,10 @@ if __name__ == '__main__':
 
     if args.hintline:
         if args.qrange is not None:
-            raise NameError("--qrange and hintline are incompatible")
+            raise ValueError("--qrange and hintline are incompatible")
         res = parse_config_line(args.hintline)
         if not res:
-            raise NameError("Error parsing %s"%args.hintline)
+            raise ValueError("Error parsing %s"%args.hintline)
         implied, selector, confstring = res[:3]
         hintfile_configs[selector] = (implied, confstring)
         side,bitsize = parse_selector(selector)

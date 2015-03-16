@@ -15,6 +15,7 @@
 #include "las-qlattice.h"
 #include "las-todo.h"
 #include "las-smallsieve.h"
+#include "las-dlog-base.h"
 
 
 /* {{{ siever_config */
@@ -42,8 +43,8 @@ struct siever_config_s {
     } sides[2][1];
 };
 typedef struct siever_config_s siever_config[1];
-typedef struct siever_config_s * siever_config_ptr;
-typedef const struct siever_config_s * siever_config_srcptr;
+/* siever_config_*ptr defined in las-forwardtypes.h */
+
 /* }}} */
 
 /* {{{ descent_hint
@@ -224,6 +225,10 @@ struct las_info_s {
     mpz_t todo_q0;
     mpz_t todo_q1;
     FILE * todo_list_fd;
+
+#ifdef  DLP_DESCENT
+    las_dlog_base * dlog_base;
+#endif
 };
 
 typedef struct las_info_s las_info[1];

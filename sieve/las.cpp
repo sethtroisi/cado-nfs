@@ -34,6 +34,9 @@
 #include "las-threads.h"
 #include "las-todo.h"
 #include "memusage.h"
+#ifdef  DLP_DESCENT
+#include "las-dlog-base.h"
+#endif
 
 #ifdef HAVE_SSE41
 /* #define SSE_SURVIVOR_SEARCH 1 */
@@ -601,8 +604,8 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         unsigned long z;
         /* Tolerate comments and blank lines */
         if (x == NULL) break;
-        if (*x == '#') continue;
         for( ; *x && isspace(*x) ; x++) ;
+        if (*x == '#') continue;
         if (!*x) continue;
 
         /* We have a new entry to parse */
@@ -976,6 +979,14 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             }
         }
     }
+
+#ifdef  DLP_DESCENT
+    las->dlog_base = new las_dlog_base();
+    las->dlog_base->lookup_parameters(pl);
+    las->dlog_base->set_default_lpb(las->default_config);
+    las->dlog_base->read();
+#endif
+
 }/*}}}*/
 
 void las_todo_pop(las_todo_stack * stack)/*{{{*/
@@ -1017,6 +1028,9 @@ void las_info_clear(las_info_ptr las)/*{{{*/
         las_todo_pop(las->todo);
     }
     delete las->todo;
+#ifdef DLP_DESCENT
+    delete las->dlog_base;
+#endif
 }/*}}}*/
 
 /* Look for an existing sieve_info in las->sievers with configuration matching
@@ -2001,6 +2015,11 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 }
             }
 
+            /* FIXME: the special-q (si->doing->q) might be an mpz in
+             * descent mode. In which case, not only will we get the
+             * printing wrong, but we'll also have a hard time actually
+             * printing the relation.
+             */
             relation_add_prime(rel, si->conf->side, mpz_get_ui(si->doing->p));
 
             relation_compress_rat_primes(rel);
@@ -2125,12 +2144,15 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
         for(int i = 0 ; i < winner->nb_rp ; i++) {
             int side = RATIONAL_SIDE;
             unsigned long p = winner->rp[i].p;
-            /* See comment above */
+            if (las->dlog_base->is_known(side, p, 0))
+                continue;
+            /*
             if (p <= (1UL<<las->default_config->sides[side]->lpb))
                 continue;
+                */
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
-            // If q > 64 bits, then the preivous comparison does not
+            // If q > 64 bits, then the previous comparison does not
             // work. Let's do a dirty hack, here, because I don't know
             // what would be the best patch. FIXME
             // So we check only the less significant bits to decide
@@ -2155,12 +2177,15 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
         for(int i = 0 ; i < winner->nb_ap ; i++) {
             int side = ALGEBRAIC_SIDE;
             unsigned long p = winner->ap[i].p;
-            /* See comment above */
+            if (las->dlog_base->is_known(side, p, winner->ap[i].r))
+                continue;
+            /*
             if (p <= (1UL<<las->default_config->sides[side]->lpb))
                 continue;
+                */
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
-            // If q > 64 bits, then the preivous comparison does not
+            // If q > 64 bits, then the previous comparison does not
             // work. Let's do a dirty hack, here, because I don't know
             // what would be the best patch. FIXME
             // So we check only the less significant bits to decide
@@ -2516,7 +2541,13 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
   param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
   param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
+#ifdef  DLP_DESCENT
+  /* given that this option is dangerous, we enable it only for
+   * las_descent
+   */
   param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
+  las_dlog_base::declare_parameter_usage(pl);
+#endif
   verbose_decl_usage(pl);
 }
 
@@ -2528,7 +2559,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     unsigned long nr_sq_discarded = 0;
     int allow_largesq = 0;
     int exit_after_rel_found = 0;
-    int never_discard = 0;
+    int never_discard = 0;      /* only enabled for las_descent */
     double totJ = 0.0;
     int argc = argc0;
     char **argv = argv0;
@@ -2550,7 +2581,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
     param_list_configure_switch(pl, "-exit-early", &exit_after_rel_found);
-    param_list_configure_switch(pl, "-never-discard", &never_discard);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_switch(pl, "-dup", NULL);
@@ -2567,6 +2597,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_alias(pl, "-lambda1", "-alambda");
     param_list_configure_alias(pl, "-powlim0", "-rpowlim");
     param_list_configure_alias(pl, "-powlim1", "-apowlim");
+#ifdef  DLP_DESCENT
+    param_list_configure_switch(pl, "-never-discard", &never_discard);
+#endif
 
     argv++, argc--;
     for( ; argc ; ) {

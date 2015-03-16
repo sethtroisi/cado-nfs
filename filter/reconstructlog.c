@@ -16,17 +16,6 @@ stats_data_t stats; /* struct for printing progress */
 /*********************** mutex for multi threaded version ********************/
 /* used as mutual exclusion lock for reading the status of logarithms */
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-static void
-mutex_lock(pthread_mutex_t *lock)
-{
-  pthread_mutex_lock (lock);
-}
-
-static void
-mutex_unlock(pthread_mutex_t *lock)
-{
-  pthread_mutex_unlock (lock);
-}
 
 /**** Relations structure used for computing the logarithms from the rels ****/
 typedef struct
@@ -152,7 +141,7 @@ logtab_insert (logtab_t log, index_t h, mpz_t logvalue)
 }
 
 static void
-logtab_free (logtab_t log)
+logtab_clear (logtab_t log)
 {
   uint64_t size = log->nprimes + log->nbsm;
   for (uint64_t i = 0; i < size; i++)
@@ -462,9 +451,9 @@ nb_unknown_log (read_data_t *data, uint64_t i)
 
   for (j = 0, k = 0; k < len; k++)
   {
-    mutex_lock (&lock);
+    pthread_mutex_lock (&lock);
     int sgn = mpz_sgn(data->log->tab[p[k].id]);
-    mutex_unlock (&lock);
+    pthread_mutex_unlock (&lock);
 
     if (sgn < 0) // we do not know the log if this ideal
     {
@@ -497,7 +486,7 @@ compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
   mpz_mul (vlog, vlog, tmp);
   mpz_mod (tmp, vlog, q);
 
-  mutex_lock (&lock);
+  pthread_mutex_lock (&lock);
 
   if (mpz_sgn(dest) < 0) // we do not already know the log
   {
@@ -508,7 +497,7 @@ compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
   {
     ret = 0;
   }
-  mutex_unlock (&lock);
+  pthread_mutex_unlock (&lock);
 
   mpz_clear (tmp);
   return ret;
@@ -675,7 +664,7 @@ dep_thread_insert (void * context_data, earlyparsed_relation_ptr rel)
 }
 
 /* Return the number of unknown logarithms in the relation and put in h the last
- * unknown logarithm of the relations (usefull when the number of unknown
+ * unknown logarithm of the relations (useful when the number of unknown
  * logarithms is 1) */
 static inline weight_t
 dep_nb_unknown_log (dep_read_data_t *data, uint64_t i, index_t *h)
@@ -685,9 +674,9 @@ dep_nb_unknown_log (dep_read_data_t *data, uint64_t i, index_t *h)
 
   for (nb = 0, k = 0; k < data->rels[i].len; k++)
   {
-    mutex_lock (&lock);
+    pthread_mutex_lock (&lock);
     int unknow = GRAPH_DEP_IS_LOG_UNKNOWN (data->G, p[k]);
-    mutex_unlock (&lock);
+    pthread_mutex_unlock (&lock);
 
     if (unknow) // we do not know the log if this ideal
     {
@@ -1163,7 +1152,7 @@ compute_needed_rels (bit_vector needed_rels,
   filter_rels (fic, (filter_rels_callback_t) &dep_thread_insert, (void *) &data,
                EARLYPARSE_NEED_INDEX, NULL, NULL);
 
-  /* computing dependancies */
+  /* computing dependencies */
   printf ("# Starting to compute dependancies from rels\n");
 
   /* adjust the number of threads based on the number of relations */
@@ -1557,7 +1546,7 @@ main(int argc, char *argv[])
   mpz_clear(smexp1);
   mpz_clear(smexp0);
 #endif
-  logtab_free (log);
+  logtab_clear (log);
   mpz_clear(q);
 
   renumber_clear (renumber_table);

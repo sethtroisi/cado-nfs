@@ -105,7 +105,7 @@ File XXX.rels.deleted.gz
 It is created by purge, and contains all the relations that purge deleted.
 It has the same format as XXX.purged.gz except the first line which does not
 exist in the XXX.rels.deleted.gz file.
-Usefull only for DL.
+Useful only for DL.
 
 
 File XXX.merge.his
@@ -134,7 +134,7 @@ is the index of the column that is used for pivoting.
 File XXX.ideal
 ==============
 
-Usefull only for DL, as it links the columns of the matrix and the ideals.
+Useful only for DL, as it links the columns of the matrix and the ideals.
 It is created by replay. Each line is of the following form:
 i h
 where i is a column number of the matrix produced by replay (see XXX.small)

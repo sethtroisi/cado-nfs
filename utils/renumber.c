@@ -84,7 +84,7 @@ get_one_line (FILE *f, char *s)
 }
 
 static void
-parse_bad_ideals_file (FILE *badfile, renumber_t renum)
+parse_bad_ideals_file (FILE *badfile, renumber_ptr renum)
 {
   renum->bad_ideals.n = 0;
   char s[RENUMBER_MAXLINE];
@@ -115,7 +115,7 @@ parse_bad_ideals_file (FILE *badfile, renumber_t renum)
 }
 
 static void
-parse_one_line_bad_ideals(struct __bad_ideals_t * bad, const char * str, int k)
+parse_one_line_bad_ideals(struct bad_ideals_s * bad, const char * str, int k)
 {
   int t;
   const char *ptr = str;
@@ -166,7 +166,7 @@ parse_one_line (char * str)
 }
 
 static void
-print_info (FILE * f, renumber_t r, int after_reading)
+print_info (FILE * f, renumber_srcptr r, int after_reading)
 {
   char pre[9] = "# INFO: ";
   fprintf (f, "# Information on renumber struct:\n%ssizeof(p_r_values_t) = %zu\n"
@@ -195,7 +195,7 @@ print_info (FILE * f, renumber_t r, int after_reading)
 }
 
 /* sort in decreasing order. Fastest for ~ < 15 values in r[] vs qsort */
-inline void
+static inline void
 renumber_sort_ul (unsigned long *r, size_t n)
 {
   unsigned long rmin;
@@ -256,7 +256,7 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_poly_srcptr f, p_r_values_t p)
 }
 
 static void
-renumber_write_first_line (renumber_t renum)
+renumber_write_first_line (renumber_ptr renum)
 {
   fprintf (renum->file, "%" PRIu8 " %d %d %d %u", renum->nb_bits, renum->rat,
                     renum->bad_ideals.n, renum->add_full_col, renum->nb_polys);
@@ -266,7 +266,7 @@ renumber_write_first_line (renumber_t renum)
 }
 
 static void
-renumber_read_first_line (renumber_t renum)
+renumber_read_first_line (renumber_ptr renum)
 {
   int ret;
   ret = fscanf (renum->file, "%" SCNu8 " %d %d %d %u", &(renum->nb_bits),
@@ -292,7 +292,7 @@ renumber_read_first_line (renumber_t renum)
 }
 
 static inline p_r_values_t
-compute_vp_from_p (renumber_t tab, p_r_values_t p)
+compute_vp_from_p (renumber_srcptr tab, p_r_values_t p)
 {
   if (tab->nb_polys == 2)
   {
@@ -311,7 +311,7 @@ compute_vp_from_p (renumber_t tab, p_r_values_t p)
 }
 
 static inline p_r_values_t
-compute_vr_from_p_r (renumber_t tab, p_r_values_t p, p_r_values_t r, int side)
+compute_vr_from_p_r (renumber_srcptr tab, p_r_values_t p, p_r_values_t r, int side)
 {
   if (tab->nb_polys == 2)
   {
@@ -338,7 +338,7 @@ compute_vr_from_p_r (renumber_t tab, p_r_values_t p, p_r_values_t r, int side)
 
 /* Inverse function of compute_vp_from_p */
 static inline p_r_values_t
-compute_p_from_vp (renumber_t tab, p_r_values_t vp)
+compute_p_from_vp (renumber_srcptr tab, p_r_values_t vp)
 {
   if (tab->nb_polys == 2)
   {
@@ -357,7 +357,7 @@ compute_p_from_vp (renumber_t tab, p_r_values_t vp)
 }
 
 static inline void
-compute_r_side_from_p_vr (p_r_values_t *r, int *side, renumber_t tab,
+compute_r_side_from_p_vr (p_r_values_t *r, int *side, renumber_srcptr tab,
                           p_r_values_t p, p_r_values_t vr)
 {
   *side = 0;
@@ -376,7 +376,7 @@ compute_r_side_from_p_vr (p_r_values_t *r, int *side, renumber_t tab,
 /*********************** End internal functions  ******************************/
 
 void
-renumber_init_for_reading (renumber_t renumber_info)
+renumber_init_for_reading (renumber_ptr renumber_info)
 {
   memset(renumber_info, 0, sizeof(renumber_t));
   /* Will be set later, by renumber_read_table, with the values of the first
@@ -389,7 +389,7 @@ renumber_init_for_reading (renumber_t renumber_info)
  * otherwise (for factorization, always 0, for DL 1 if one of the polynomials is
  * not monic). */
 void
-renumber_init_for_writing (renumber_t renumber_info, unsigned int nb_polys,
+renumber_init_for_writing (renumber_ptr renumber_info, unsigned int nb_polys,
                            int rat, int add_full_col, unsigned long *lpb)
 {
   memset(renumber_info, 0, sizeof(renumber_t));
@@ -429,7 +429,7 @@ renumber_init_for_writing (renumber_t renumber_info, unsigned int nb_polys,
 }
 
 void
-renumber_clear (renumber_t renumber_info)
+renumber_clear (renumber_ptr renumber_info)
 {
   if (renumber_info->table != NULL)
     free (renumber_info->table);
@@ -468,7 +468,7 @@ renumber_clear (renumber_t renumber_info)
 /* The renumber_t struct _must_ have been initialized before
  * poly = NULL is accepted. It will not print the polynomials on the file */
 void
-renumber_write_open (renumber_t tab, const char *tablefile, const char *badfile,
+renumber_write_open (renumber_ptr tab, const char *tablefile, const char *badfile,
                      cado_poly poly)
 {
   printf ("# Opening %s to write the renumbering table\n", tablefile);
@@ -521,7 +521,7 @@ renumber_write_open (renumber_t tab, const char *tablefile, const char *badfile,
 }
 
 void
-renumber_write_close (renumber_t tab, const char *tablefile)
+renumber_write_close (renumber_ptr tab, const char *tablefile)
 {
   fclose_maybe_compressed (tab->file, tablefile);
 }
@@ -529,7 +529,7 @@ renumber_write_close (renumber_t tab, const char *tablefile)
 
 /* The renumber_t struct _must_ have been initialized before */
 void
-renumber_read_table (renumber_t tab, const char * filename)
+renumber_read_table (renumber_ptr tab, const char * filename)
 {
   char s[RENUMBER_MAXLINE];
   size_t bytes_read = 0, bytes_line;
@@ -670,7 +670,7 @@ renumber_read_table (renumber_t tab, const char * filename)
   fclose_maybe_compressed (tab->file, filename);
 }
 
-int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p,
+int renumber_is_bad (int *nb, index_t *first, renumber_srcptr rn, p_r_values_t p,
                      p_r_values_t r, int side)
 {
   *first = (rn->add_full_col) ? 1 : 0;
@@ -745,7 +745,7 @@ renumber_write_p_buffer_rat_alg (char *buffer, unsigned long p,
 }
 
 inline size_t
-renumber_write_p_buffer_generic (char * buffer, unsigned long p, renumber_t tab,
+renumber_write_p_buffer_generic (char * buffer, unsigned long p, renumber_ptr tab,
                                  unsigned long **roots, int *nb_roots)
 {
   size_t size_buffer = 0;
@@ -783,7 +783,7 @@ renumber_write_p_buffer_generic (char * buffer, unsigned long p, renumber_t tab,
 }
 
 void
-renumber_write_p (renumber_t tab, unsigned long p, unsigned long **r, int *k)
+renumber_write_p (renumber_ptr tab, unsigned long p, unsigned long **r, int *k)
 {
   size_t size_buffer;
   char buffer[2048];
@@ -811,7 +811,7 @@ renumber_write_p (renumber_t tab, unsigned long p, unsigned long **r, int *k)
  * If side corresponds to the rational side (if it exists), the value of r is
  * meaningless. */
 index_t
-renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
+renumber_get_index_from_p_r (renumber_srcptr renumber_info, p_r_values_t p,
                              p_r_values_t r, int side)
 {
   index_t i;
@@ -945,7 +945,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 }
 
 void
-renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
+renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
                              p_r_values_t * r, int *side, index_t i,
                              cado_poly pol)
 {
