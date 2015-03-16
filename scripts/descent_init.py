@@ -38,6 +38,23 @@ def Myxgcd(a, b, T):
         y = newy
     return [ [ b, x ], [ a, lastx ] ]
 
+def get_root_modp(polyfile, p):
+    G = [0, 0]
+    with open(polyfile, "r") as file:
+        for line in file:
+            if line[0] == 'Y':
+                ll = line.split()
+                if line[1] == '0':
+                    G[0] = int(ll[1])
+                else:
+                    assert line[1] == '1'
+                    G[1] = int(ll[1])
+    assert G[0] != 0 and G[1] != 0
+    invg1 = pow(G[1], p-2, p)
+    r = (-G[0]*invg1) % p
+    assert (G[0] + r*G[1]) % p == 0
+    return r
+
 if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Descent initialization for DLP")
@@ -59,7 +76,15 @@ if __name__ == '__main__':
             default=80)
     parser.add_argument("--I", help="Sieving range", default=14)
     parser.add_argument("--nthreads", help="How many threads to use", default=4)
+    parser.add_argument("--todofile", help="Output primes to this toto file",
+            type=str)
+    parser.add_argument("--poly", help="Polynomial file", type=str)
+    parser.add_argument("--finallpb", help="Primes smaller than this bound are not printed in the todo file", type=int)
     args = parser.parse_args()
+    if args.todofile != None and args.poly == None:
+        print("--poly option is required if you give a todofile")
+        parser.print_help()
+        sys.exit(1)
     p = args.p
     z = args.target
     Tkew = args.tkewness
@@ -143,5 +168,15 @@ if __name__ == '__main__':
     assert (DD == abs(Den))
     print (Num, Den, factNum, factDen)
 
+    if not args.todofile == None:
+        finallpb = 20
+        if args.finallpb != None:
+            finallpb = args.finallpb
+        with open(args.todofile, "w") as file:
+            for p in factNum + factDen:
+                if p > 1<<finallpb:
+                    r = get_root_modp(args.poly, p)
+                    file.write("0 " + str(p) + " " + str(r) + "\n")
+
     shutil.rmtree(wdir)
- 
+
