@@ -25,6 +25,8 @@ if __name__ == '__main__':
             required=True, type=str)
     parser.add_argument("--rels", help="File of relations of the descent step",
             required=True, type=str)
+    parser.add_argument("--descentinit", help="File created by descent_init",
+            required=True, type=str)
     parser.add_argument("--renumber", help="Renumber file",
             required=True, type=str)
     parser.add_argument("--debug_ren", help="File given by debug_renumber",
@@ -224,4 +226,31 @@ if __name__ == '__main__':
     print ("Workdir is " + wdir)
     print ("Result is in " + result_filename)
 
+    ## Deduce the log of the target, at last...
+    with open(args.descentinit, 'r') as infile:
+        line = infile.readline()
+        ll = line.rstrip().replace(']', "").split('[')
+        num = ll[1].replace(",","").split()
+        den = ll[2].replace(",","").split()
+    with open(wdir + "/patterns", "w") as f:
+        for p in num + den:
+            pp = hex(int(p))[2:]
+            f.write(" " + pp + " 0 rat\n")
+    with open(wdir + "/all_logs", 'w') as file: 
+        subprocess.check_call(["grep", "-f", wdir + "/patterns",
+            result_filename], stdout=file)
+    dict_log = {};
+    with open(wdir + "/all_logs", 'r') as file:
+        for line in file:
+            ll = line.split()
+            dict_log[ll[1]] = int(ll[4])
+    log_target = 0
+    for p in num:
+        pp = hex(int(p))[2:]
+        log_target = log_target + dict_log[pp]
+    for p in den:
+        pp = hex(int(p))[2:]
+        log_target = log_target - dict_log[pp]
+    log_target = log_target % args.gorder
 
+    print ("The log of the target is " + str(log_target))
