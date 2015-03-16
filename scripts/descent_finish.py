@@ -17,8 +17,10 @@ if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Descent final step for DLP")
     # Required
-    parser.add_argument("--lpb", help="Large prime bound", required=True,
-            type=int)
+    parser.add_argument("--lpb0", help="Large prime bound on side 0",
+            required=True, type=int)
+    parser.add_argument("--lpb1", help="Large prime bound on side 1",
+            required=True, type=int)
     parser.add_argument("--cadobindir", help="Cado build directory",
             required=True, type=str)
     parser.add_argument("--rels", help="File of relations of the descent step",
@@ -54,7 +56,7 @@ if __name__ == '__main__':
         wdir = tempfile.mkdtemp(dir="/tmp")
     print ("Working directory is: " + wdir)
     descrels_filename = args.rels
-    LPB = 1<<args.lpb
+    LPB = [ 1<<args.lpb0, 1<<args.lpb1 ]
 
     # Read descent relations
     descrels = []
@@ -79,7 +81,7 @@ if __name__ == '__main__':
             ss[side] = []
             extra[side] = []
             for p in rr:
-                if int(p, 16) < LPB:
+                if int(p, 16) < LPB[side]:
                     ss[side].append(p)
                 else:
                     extra[side].append(p)
@@ -98,7 +100,9 @@ if __name__ == '__main__':
             for p in extra[side]:
                 setextraprimes.add(p)
     listextraprimes = list(setextraprimes)
-    listextraprimes.sort()
+    numlist = [ int(p, 16) for p in listextraprimes ]
+    numlist.sort()
+    listextraprimes = [ hex(p)[2:] for p in numlist ]
     print ("They include " + str(len(listextraprimes)) + " primes above lpb")
     fakerels_filename = wdir + "/fakerels"
     with open(fakerels_filename, 'w') as file:
@@ -217,6 +221,7 @@ if __name__ == '__main__':
         "-purged", descrels_ren_filename,
         "-relsdel", fake_relsdel_filename,
         "-mt", str(args.mt)])
-
     print ("Workdir is " + wdir)
     print ("Result is in " + result_filename)
+
+
