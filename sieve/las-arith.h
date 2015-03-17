@@ -154,9 +154,45 @@ invmod_po2 (fbprime_t n)
   return r;
 }
 
-NOPROFILE_INLINE int
-invmod (uint64_t *pa, uint64_t b)
+// Compute in place 1/x mod p, return if modular inverse exists,
+// for uint64_t.
+// Fallback function for 32-bit archis.
+static inline int
+fallback_invmod_64(uint64_t *x, uint64_t p)
 {
+    mpz_t xx, pp;
+    mpz_init(xx);
+    mpz_init(pp);
+    mpz_set_uint64(xx, *x);
+    mpz_set_uint64(pp, p);
+    int rc = mpz_invert(xx, xx, pp);
+    *x = mpz_get_uint64(xx);
+    mpz_clear(xx);
+    mpz_clear(pp);
+    return rc;
+}
+
+NOPROFILE_INLINE int
+invmod_32 (uint32_t *pa, uint32_t b)
+{
+  ASSERT (sizeof(unsigned long) >= 4);
+  modulusul_t m;
+  residueul_t r;
+  int rc;
+  modul_initmod_ul (m, b);
+  modul_init (r, m);
+  modul_set_ul (r, *pa, m); /* With mod reduction */
+  if ((rc = modul_inv(r, r, m)))
+    *pa = modul_get_ul (r, m);
+  modul_clear (r, m);
+  modul_clearmod (m);
+  return rc;
+}
+
+NOPROFILE_INLINE int
+invmod_64 (uint64_t *pa, uint64_t b)
+{
+#if LONG_BIT == 64
   ASSERT (sizeof(unsigned long) >= 8);
   modulusul_t m;
   residueul_t r;
@@ -169,6 +205,9 @@ invmod (uint64_t *pa, uint64_t b)
   modul_clear (r, m);
   modul_clearmod (m);
   return rc;
+#else
+  return fallback_invmod_64(pa, b);
+#endif
 }
 
 /* TODO: this is a close cousin of modredcul_inv, but the latter does
@@ -184,9 +223,9 @@ invmod_redc_32(uint32_t a, uint32_t b) {
   ASSERT (a < b);
   if (UNLIKELY(!a)) return a; /* or we get infinite loop */
   if (UNLIKELY(!(b & 1))) {
-    uint64_t pa = a;
-    invmod(&pa, (uint64_t) b);
-    return (uint32_t) pa;
+    uint32_t pa = a;
+    invmod_32(&pa, (uint32_t) b);
+    return pa;
   }
   const uint32_t p = b;
   uint32_t u = 1, v = 0, lsh = ctz(a);
@@ -297,7 +336,7 @@ invmod_redc_64(uint64_t a, uint64_t b)
   ASSERT (a < b);
   if (UNLIKELY(!a)) return a; /* or we get infinite loop */
   if (UNLIKELY(!(b & 1))) {
-    invmod(&a, b);
+    invmod_64(&a, b);
     return a;
   }
   const uint64_t p = b;

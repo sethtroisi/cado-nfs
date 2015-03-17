@@ -195,8 +195,8 @@ static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsig
         tail->U = 0;
     } else {
         int rc;
-        uint64_t U = v / g; /* coprime to q */
-        rc = invmod(&U, q);
+        uint32_t U = v / g; /* coprime to q */
+        rc = invmod_32(&U, q);
         ASSERT_ALWAYS(rc != 0);
         tail->U = U;
     }
