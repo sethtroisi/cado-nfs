@@ -1,6 +1,15 @@
 #include "cado.h"
 #include "thread.h"
 
+class worker_thread : private NonCopyable {
+  friend class thread_pool;
+  thread_pool &pool;
+  pthread_t thread;
+public:
+  worker_thread(thread_pool &_pool);
+  ~worker_thread();
+};
+
 worker_thread::worker_thread(thread_pool &_pool) : pool(_pool)
 {
   int rc = pthread_create(&thread, NULL, pool.thread_work_on_tasks, this);
@@ -11,6 +20,22 @@ worker_thread::~worker_thread() {
   int rc = pthread_join(thread, NULL);
   ASSERT_ALWAYS(rc == 0);
 }
+
+class thread_task {
+public:
+  const task_function_t func;
+  const int id;
+  task_parameters * const parameters;
+  const bool please_die;
+  task_result *result;
+
+  thread_task(task_function_t _func, int _id, task_parameters *_parameters) :
+    func(_func), id(_id), parameters(_parameters), please_die(false), result(NULL) {};
+  thread_task(bool _kill)
+    : func(NULL), id(0), parameters(NULL), please_die(true), result(NULL) {
+    ASSERT_ALWAYS(_kill);
+  }
+};
 
 thread_pool::thread_pool(size_t _nr_threads)
   : nr_threads(_nr_threads), tasks_not_empty_cond(PTHREAD_COND_INITIALIZER),
@@ -50,7 +75,8 @@ thread_pool::thread_work_on_tasks(void *arg)
     task_function_t func = task->func;
     task_parameters *params = task->parameters;
     task_result *result = func(params);
-    pool.add_result(result);
+    if (result != NULL)
+      pool.add_result(result);
     delete task;
   }
   return NULL;
@@ -61,13 +87,15 @@ thread_pool::add_task(task_function_t func, task_parameters *const params,
                       const int id)
 {
     enter();
+    ASSERT_ALWAYS(!kill_threads);
     tasks.push(new thread_task(func, id, params));
     signal(tasks_not_empty_cond);
     leave();
 }
   
 thread_task *
-thread_pool::get_task() {
+thread_pool::get_task()
+{
   enter();
   while (!kill_threads && tasks.empty()) {
     /* No work -> tell this thread to wait until work becomes available.

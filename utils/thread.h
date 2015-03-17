@@ -16,10 +16,14 @@ class NonCopyable {
 
 /* Base for classes that hold parameters for worker functions */
 class task_parameters {
+  public:
+  virtual ~task_parameters(){};
 };
 
 /* Base for classes that hold results produced by worker functions */
 class task_result {
+  public:
+  virtual ~task_result(){};
 };
 
 class monitor {
@@ -36,32 +40,9 @@ public:
 
 typedef task_result *(*task_function_t)(const task_parameters *);
 
-class thread_task {
-public:
-  const task_function_t func;
-  const int id;
-  task_parameters * const parameters;
-  const bool please_die;
-  task_result *result;
-
-  thread_task(task_function_t _func, int _id, task_parameters *_parameters) :
-    func(_func), id(_id), parameters(_parameters), please_die(false), result(NULL) {};
-  thread_task(bool _kill)
-    : func(NULL), id(0), parameters(NULL), please_die(true), result(NULL) {
-    ASSERT_ALWAYS(_kill);
-  }
-};
-
+class thread_task;
 class thread_pool;
-
-class worker_thread : private NonCopyable {
-  friend class thread_pool;
-  thread_pool &pool;
-  pthread_t thread;
-public:
-  worker_thread(thread_pool &_pool);
-  ~worker_thread();
-};
+class worker_thread;
 
 class thread_pool : private monitor, private NonCopyable {
   friend class worker_thread;
@@ -74,15 +55,15 @@ class thread_pool : private monitor, private NonCopyable {
 
   pthread_cond_t tasks_not_empty_cond, results_not_empty_cond;
 
-  bool kill_threads; /* If true, hands out kill tasks once queue is empty */
+  bool kill_threads; /* If true, hands out kill tasks once work queue is empty */
 
   static void * thread_work_on_tasks(void *pool);
+  thread_task *get_task();
+  void add_result(task_result *result);
 
 public:
   thread_pool(size_t _nr_threads);
   ~thread_pool();
   void add_task(task_function_t func, task_parameters *params, int id);
-  thread_task *get_task();
-  void add_result(task_result *result);
   task_result *get_result();
 };

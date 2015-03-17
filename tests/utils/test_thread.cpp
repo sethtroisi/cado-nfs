@@ -18,7 +18,7 @@ public:
 
 task_result *print_something(const task_parameters *t_param)
 {
-  const print_parameter *param = static_cast<const print_parameter *>(t_param);
+  const print_parameter *param = dynamic_cast<const print_parameter *>(t_param);
 
   pthread_t tid = pthread_self();
   unsigned int tid_u = 0;
@@ -43,7 +43,7 @@ int main(int argc, const char **argv)
   }
 
   for (unsigned long i = 0; i < iter; i++) {
-    print_result *result = static_cast<print_result *>(pool->get_result());
+    print_result *result = dynamic_cast<print_result *>(pool->get_result());
     printf("I've printed %d characters\n", result->printed);
     delete result;
   }
