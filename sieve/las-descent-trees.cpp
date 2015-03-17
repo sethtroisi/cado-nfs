@@ -70,9 +70,14 @@ void descent_tree::display_all_trees(FILE * o)
             si->second.push_back(w);
         }
     }
+#if 0
+    /* (since we've dropped the dependence on siever_config, we now
+     * longer do this)
+     */
     /* We also use this to provide an updated stats file (whose
      * results are based on actual descents, and thus less
      * speculative) */
+    
     list<string> new_hints;
     for(sit_t si = stats.begin() ; si != stats.end() ; si++) {
         /* Collect and print stats for this sq size */
@@ -130,5 +135,6 @@ void descent_tree::display_all_trees(FILE * o)
     for(list<string>::iterator i = new_hints.begin() ; i != new_hints.end() ; i++) {
         fprintf(o, "# %s\n", i->c_str());
     }
+#endif
 }
 

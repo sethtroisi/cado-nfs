@@ -150,15 +150,6 @@ void relation::fixup_r(bool also_rational)
     }
 }
 
-struct pr_cmp {
-    bool operator()(relation::pr const& a, relation::pr const& b) const {
-        int c = mpz_cmp(a.p, b.p);
-        if (c) { return c < 0; }
-        c = mpz_cmp(a.r, b.r);
-        return c < 0;
-    }
-};
-
 inline bool operator==(relation::pr const& a, relation::pr const& b) {
     return mpz_cmp(a.p, b.p) == 0 && mpz_cmp(a.r, b.r) == 0;
 }

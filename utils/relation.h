@@ -11,7 +11,18 @@
 
 #include "cado_poly.h"
 
-struct relation {
+struct relation_ab {
+    int64_t a;		/* only a is allowed to be negative */
+    uint64_t b;
+    operator bool() const { return a || b; }
+    relation_ab() { a=b=0; }
+    relation_ab(int64_t a, uint64_t b) : a(a), b(b) {}
+    bool operator<(const relation_ab& o) const {
+        return a < o.a || (a == o.a && b < o.b);
+    }
+};
+
+struct relation : public relation_ab {
     /* Note that for the rational side, we do not compute r !!! */
     struct pr {
         mpz_t p,r;
@@ -59,15 +70,13 @@ struct relation {
             return *this;
         }
     };
-    int64_t a;		/* only a is allowed to be negative */
-    uint64_t b;
     int rational_side;    /* index of the rational side, if any */
     std::vector<pr> sides[2];
 
-    relation() { a=b=0; }
-    operator bool() const { return a || b; }
+    relation() {}
+    operator bool() const { return (bool) (relation_ab) *this; }
     relation(int64_t a, uint64_t b, int rational_side = RATIONAL_SIDE)
-        : a(a), b(b), rational_side(rational_side)
+        : relation_ab(a,b), rational_side(rational_side)
     {}
 
     void add(int side, mpz_srcptr p, mpz_srcptr r) {
@@ -89,6 +98,15 @@ struct relation {
 
     void fixup_r(bool also_rational = false);
     void compress();
+};
+
+struct pr_cmp {
+    bool operator()(relation::pr const& a, relation::pr const& b) const {
+        int c = mpz_cmp(a.p, b.p);
+        if (c) { return c < 0; }
+        c = mpz_cmp(a.r, b.r);
+        return c < 0;
+    }
 };
 
 #endif	/* RELATION_H_ */

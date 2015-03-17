@@ -1743,6 +1743,11 @@ bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent
      * updated.
      */
 
+    if (las->tree->must_avoid(rel)) {
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: we have already used this relation for (%Zd,%Zd), avoiding\n", si->doing->p, si->doing->r);
+        return false;
+    }
+
     /* compute rho for all primes, even on the rational side */
     rel.fixup_r(true);
 
@@ -2639,8 +2644,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     for( ; las_todo_feed(las, pl) ; ) {
         if (descent_lower && las_todo_pop_closing_brace(las->todo)) {
             las->tree->done_node();
-            if (las->tree->depth() == 0)
+            if (las->tree->depth() == 0) {
                 las->tree->display_last_tree(las->output);
+                las->tree->visited.clear();
+            }
             continue;
         }
 
@@ -2670,7 +2677,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         sieve_info_pick_todo_item(si, las->todo);
 
         if (descent_lower) {
-            las->tree->new_node(si->conf, si->doing->depth);
+            las->tree->new_node(si->doing);
             las_todo_push_closing_brace(las->todo, si->doing->depth);
         }
 #if 0

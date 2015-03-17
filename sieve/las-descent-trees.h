@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 #include <list>
+#include <set>
+#include <map>
 #include <algorithm>    /* max */
 
 #include "relation.h"
@@ -16,23 +18,20 @@
 
 struct descent_tree {
     struct tree_label {
-        siever_config sc;
-        tree_label() { memset(sc, 0, sizeof(siever_config)); }
-        tree_label(siever_config_s const& c) { memcpy(sc, &c, sizeof(siever_config)); }
-        void set_label(siever_config_s const& c) { memcpy(sc, &c, sizeof(siever_config)); }
+        int side;
+        relation::pr pr;
+        tree_label() { }
+        tree_label(int side, relation::pr const& pr ) : side(side), pr(pr) {}
+        tree_label(int side, mpz_srcptr p, mpz_srcptr r) :side(side), pr(p, r) {}
         std::string operator()() const {
             std::ostringstream os;
-            os << sc->bitsize;
-            os << '@' << sc->side;
-            // char sn[]="ra";
-            // os << sn[sc->side];
+            os << mpz_sizeinbase(pr.p, 2) << '@' << side;
             return os.str();
         }
         bool operator<(const tree_label& o) const {
-            int d = sc->bitsize - o.sc->bitsize;
-            if (d) return d<0;
-            d = sc->side - o.sc->side;
-            return d<0;
+            if (pr_cmp()(pr, o.pr)) return true;
+            if (pr_cmp()(o.pr, pr)) return false;
+            return side < o.side;
         }
     };
     struct tree {
@@ -40,7 +39,7 @@ struct descent_tree {
         double spent;
         relation rel;
         std::list<tree *> children;
-        tree() { }
+        tree(tree_label const& label) : label(label) { }
         ~tree() {
             typedef std::list<tree *>::iterator it_t;
             for(it_t i = children.begin() ; i != children.end() ; i++)
@@ -51,6 +50,14 @@ struct descent_tree {
     std::list<tree *> forest;
     std::list<tree *> current;       /* stack of trees */
 
+    /* This is an ugly temporary hack */
+    typedef std::map<
+                tree_label,
+                std::set<relation_ab>
+            > visited_t;
+    visited_t visited;
+
+
     descent_tree() {
     }
     ~descent_tree() {
@@ -60,10 +67,10 @@ struct descent_tree {
         forest.clear();
     }
 
-    void new_node(siever_config_srcptr label, int level) {
+    void new_node(las_todo_entry const * doing) {
+        int level = doing->depth;
         ASSERT_ALWAYS(level == (int) current.size());
-        tree * kid = new tree;
-        kid->label.set_label(*label);
+        tree * kid = new tree(tree_label(doing->side, doing->p, doing->r));
         kid->spent = -seconds();
         if (current.empty()) {
             forest.push_back(kid);
@@ -81,6 +88,26 @@ struct descent_tree {
 
     void found(relation const& rel) {
         current.back()->rel = rel;
+        relation_ab ab = rel;
+        visited_t::iterator it = visited.find(current.back()->label);
+        if (it == visited.end()) {
+            visited_t::mapped_type v;
+            v.insert(ab);
+            visited.insert(std::make_pair(current.back()->label, v));
+        } else {
+            it->second.insert(ab);
+        }
+    }
+    bool must_avoid(relation const& rel) const {
+        relation_ab ab = rel;
+        visited_t::const_iterator it = visited.find(current.back()->label);
+        if (it == visited.end())
+            return false;
+        visited_t::mapped_type const& w(it->second);
+        visited_t::mapped_type::const_iterator xt = w.find(ab);
+        if (xt == w.end())
+            return false;
+        return true;
     }
     int depth() {
         return current.size();
