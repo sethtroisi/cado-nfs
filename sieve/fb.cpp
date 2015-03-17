@@ -40,12 +40,33 @@ strtoull_const(const char *nptr, const char **endptr, const int base)
   return r;
 }
 
+// Adapted from utils/ularith.h
+// TODO: this function should go somewhere else...
+static inline uint64_t
+uint64_invmod(const uint64_t n)
+{
+    uint64_t r;
+    ASSERT (n % UINT64_C(2) != UINT64_C(0));
+    r = (UINT64_C(3) * n) ^ UINT64_C(2);
+    r = UINT64_C(2) * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+    r = UINT64_C(2) * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+    r = UINT64_C(2) * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+    uint32_t k = (uint32_t)(r * n >> 32);
+    k *= (uint32_t) r;
+    r = r - ((uint64_t)k << 32);
+    return r;
+}
+
 static inline redc_invp_t
 compute_invq(fbprime_t q)
 {
   if (q % 2 != 0) {
-    ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
-    return (redc_invp_t) (- ularith_invmod (q));
+    if (sizeof(unsigned long) >= sizeof(redc_invp_t)) {
+        return (redc_invp_t) (- ularith_invmod (q));
+    } else {
+        ASSERT(sizeof(redc_invp_t) == 8);
+        return (redc_invp_t) (- uint64_invmod (q));
+    }
   } else {
     return 0;
   }

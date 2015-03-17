@@ -157,6 +157,7 @@ invmod_po2 (fbprime_t n)
 NOPROFILE_INLINE int
 invmod (uint64_t *pa, uint64_t b)
 {
+  ASSERT (sizeof(unsigned long) >= 8);
   modulusul_t m;
   residueul_t r;
   int rc;
