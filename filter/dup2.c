@@ -57,6 +57,7 @@
 #include "utils-ffs.h"
 #endif
 #include "filter_badideals.h"
+#include "relation-tools.h"
 
 #define DEBUG 0
 

@@ -1,7 +1,7 @@
 #include "cado.h"
 #include <string.h>
 #include <limits.h>
-#include <math.h>               /* ceil */
+#include <cmath>               /* ceil signbit */
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
@@ -14,11 +14,14 @@
 #endif
 
 #include "las-config.h"
+#include "las-types.h"
 #include "las-debug.h"
 #include "las-norms.h"
 #include "utils.h"
 #include "portability.h"
 #include "verbose.h"
+
+using namespace std;
 
 static long lg_page;
 

@@ -47,6 +47,9 @@ typedef struct siever_config_s siever_config[1];
 
 /* }}} */
 
+/* This one wants to have siever_config defined */
+#include "las-descent-trees.h"
+
 /* {{{ descent_hint
  *
  * This is used for the descent. For each factor size, we provide a
@@ -229,6 +232,7 @@ struct las_info_s {
 #ifdef  DLP_DESCENT
     las_dlog_base * dlog_base;
 #endif
+    descent_tree * tree;
 };
 
 typedef struct las_info_s las_info[1];

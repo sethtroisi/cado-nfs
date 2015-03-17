@@ -51,12 +51,13 @@ void las_dlog_base::set_default_lpb(siever_config_srcptr sc)
 }
 
 bool las_dlog_base::is_known(int side, uint64_t p, uint64_t r) const {
+    if (p >> lpb[side])
+        return false;
     if (renumberfilename) {
         index_t h = renumber_get_index_from_p_r(renumber_table, p, r, side);
         return known_logs[h];
-    } else {
-        return p <= (1UL<<lpb[side]);
     }
+    return true;
 }
 
 

@@ -17,6 +17,7 @@ typedef struct siever_config_s * siever_config_ptr;
 typedef const struct siever_config_s * siever_config_srcptr;
 #ifdef  DLP_DESCENT
 struct las_dlog_base;
+struct descent_tree;
 #endif
 
 #endif

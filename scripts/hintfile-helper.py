@@ -130,7 +130,7 @@ def testoneline(selector, implied, *args, **kwargs):
     for key,value in argdict.items():
         argseq += [key, str(value)]
     argseq += [
-        "--hintfile", tmphintfilename,
+        "--descent-hint", tmphintfilename,
         "--mkhint",
         "--never-discard",  # this is a kludge, we're risking a segfault.
                             # see bug 15617

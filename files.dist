@@ -863,7 +863,7 @@ utils/purgedfile.h
 utils/random_integer.c
 utils/ringbuf.c
 utils/ringbuf.h
-utils/relation.c
+utils/relation.cpp
 utils/relation.h
 utils/renumber.c
 utils/renumber.h
@@ -882,7 +882,7 @@ tests/utils/testbase-rootfinder.quick
 tests/utils/testmpz-rootfinder.quick
 tests/utils/test_sm_utils.c
 tests/utils/test_sm_utils.data
-tests/utils/test_relation.c
+tests/utils/test_relation.cpp
 utils/timing.cpp
 utils/timing.h
 utils/typedefs.h
@@ -922,8 +922,8 @@ linalg/bwc/lingen-bigmatpoly.c
 linalg/bwc/lingen-bigmatpoly.h
 config/asprintf.c
 config/asprintf.cmake
-sieve/las-descent-helpers.cpp
-sieve/las-descent-helpers.h
+sieve/las-descent-trees.cpp
+sieve/las-descent-trees.h
 ffs/AUTHORS
 ffs/HOWTO_PLAY
 ffs/Makefile
@@ -1205,3 +1205,5 @@ sieve/las-threads.h
 scripts/hintfile-helper.py
 sieve/las-dlog-base.cpp
 sieve/las-dlog-base.h
+utils/relation-tools.c
+utils/relation-tools.h

@@ -19,7 +19,6 @@
 #include "portability.h"
 #include "macros.h"
 #include "utils_with_io.h"
-#include "relation.h"
 
 #include "mpz_poly.h"
 

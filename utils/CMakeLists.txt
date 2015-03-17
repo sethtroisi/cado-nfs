@@ -1,6 +1,7 @@
 
 set (sources 
-        cado_poly.c relation.c timing.cpp getprime.c mod_ul.c
+        cado_poly.c timing.cpp getprime.c mod_ul.c relation.cpp
+        relation-tools.c
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
         double_poly.c rootfinder.c params.c gcd.c
         discriminant.c mpz_array.c gzip.c misc.c

@@ -28,7 +28,7 @@
 #include "las-arith.h"
 #include "las-qlattice.h"
 #include "las-smallsieve.h"
-#include "las-descent-helpers.h"
+#include "las-descent-trees.h"
 #include "las-cofactor.h"
 #include "las-fill-in-buckets.h"
 #include "las-threads.h"
@@ -987,6 +987,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     las->dlog_base->read();
 #endif
 
+
 }/*}}}*/
 
 void las_todo_pop(las_todo_stack * stack)/*{{{*/
@@ -1716,15 +1717,14 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
     int surv = 0, copr = 0;
     mpz_t norm[2];
     factor_list_t factors[2];
-    mpz_array_t *f[2] = { NULL, };
-    uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
+    mpz_array_t *lps[2] = { NULL, };
+    uint32_array_t *lps_m[2] = { NULL, }; /* corresponding multiplicities */
     bucket_primes_t primes[2] = {bucket_primes_t(BUCKET_REGION), bucket_primes_t(BUCKET_REGION)};
     bucket_array_complete purged[2] = {bucket_array_complete(BUCKET_REGION), bucket_array_complete(BUCKET_REGION)};
     mpz_t BLPrat;       /* alone ? */
 #ifdef  DLP_DESCENT
     double deadline = DBL_MAX;
-    relation_t winner[1];
-    relation_init(winner);
+    relation winner;
 #endif  /* DLP_DESCENT */
     uint32_t cof_rat_bitsize = 0; /* placate gcc */
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
@@ -1733,8 +1733,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
     unsigned char * S[2] = {th->sides[0]->bucket_region, th->sides[1]->bucket_region};
 
     for(int side = 0 ; side < 2 ; side++) {
-        f[side] = alloc_mpz_array (1);
-        m[side] = alloc_uint32_array (1);
+        lps[side] = alloc_mpz_array (1);
+        lps_m[side] = alloc_uint32_array (1);
 
         factor_list_init(&factors[side]);
         mpz_init (norm[side]);
@@ -1963,7 +1963,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 		cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
             }
 	    rep->ttcof -= microseconds_thread ();
-            pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
+            pass = factor_both_leftover_norms(norm, BLPrat, lps, lps_m, si);
 	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b) && pass == 0) {
@@ -1981,49 +1981,22 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 	    
             // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
-            relation_t rel[1];
-            mpz_t mpz_lp[2];
-            mpz_init(mpz_lp[0]);
-            mpz_init(mpz_lp[1]);
-            mpz_ptr lp[2] = {NULL, NULL};
-            memset(rel, 0, sizeof(rel));
-            rel->a = a;
-            rel->b = b; 
+            /* say that there is a rational side */
+            relation rel(a, b, RATIONAL_SIDE);
+
+            /* Note that we explicitly do not bother about storing r in
+             * the relations below */
             for (int side = 0; side < 2; side++) {
                 for(int i = 0 ; i < factors[side].n ; i++)
-                    relation_add_prime(rel, side, factors[side].fac[i]);
-                for (unsigned int i = 0; i < f[side]->length; ++i) {
-                    if (!mpz_fits_ulong_p(f[side]->data[i])) {
-                        if (lp[side] != NULL) {
-                            // FIXME!
-                            // We can handle only one huge large prime on
-                            // each side. We print a warning and
-                            // continue, since only the printing is
-                            // wrong.
-                            fprintf(stderr, "Error: two large primes more than the size of ulong on the same side at (%" PRId64 ",%" PRIu64 ")\n",
-                                a, b);
-                        } else {
-                            lp[side] = &mpz_lp[side][0];
-                            mpz_set(lp[side], f[side]->data[i]);
-                            ASSERT_ALWAYS(m[side]->data[i] == 1);
-                        }
-                    } else {
-                        for (unsigned int j = 0; j < m[side]->data[i]; j++) {
-                            relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
-                        }
-                    }
-                }
+                    rel.add(side, factors[side].fac[i], 0);
+
+                for (unsigned int i = 0; i < lps[side]->length; ++i)
+                    rel.add(side, lps[side]->data[i], 0);
             }
 
-            /* FIXME: the special-q (si->doing->q) might be an mpz in
-             * descent mode. In which case, not only will we get the
-             * printing wrong, but we'll also have a hard time actually
-             * printing the relation.
-             */
-            relation_add_prime(rel, si->conf->side, mpz_get_ui(si->doing->p));
+            rel.add(si->conf->side, si->doing->p, 0);
 
-            relation_compress_rat_primes(rel);
-            relation_compress_alg_primes(rel);
+            rel.compress();
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
@@ -2032,13 +2005,17 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #endif
             {
                 int do_check = th->las->suppress_duplicates;
-                int is_dup = do_check && (!lp[0]) && (!lp[1])
+                /* note that if we have large primes which don't fit in
+                 * an unsigned long, then the duplicate check will
+                 * quickly return "no".
+                 */
+                int is_dup = do_check
                     && relation_is_duplicate(rel, las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
                 FILE *output;
                 if (!is_dup)
                     cpt++;
-                verbose_output_start_batch();
+                verbose_output_start_batch();   /* lock I/O */
                 if (create_descent_hints) {
                     verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
                 }
@@ -2047,12 +2024,10 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 for (size_t i_output = 0;
                      (output = verbose_output_get(0, 0, i_output)) != NULL;
                      i_output++) {
-                    fprint_relation(output, rel, comment, lp[0], lp[1]);
+                    rel.print(output, comment);
                 }
-                verbose_output_end_batch();
+                verbose_output_end_batch();     /* unlock I/O */
             }
-            mpz_clear(mpz_lp[0]);
-            mpz_clear(mpz_lp[1]);
 
             /* Build histogram of lucky S[x] values */
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
@@ -2074,18 +2049,19 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             if (las->hint_table) {
                 double time_left = 0;
                 for(int side = 0 ; side < 2 ; side++) {
-                    for (unsigned int i = 0; i < f[side]->length; ++i) {
+                    for (unsigned int i = 0; i < lps[side]->length; ++i) {
                         /* We assume that the base of the precomputed log
                          * goes as far as the lpb given on command line.
                          */
-                        if (mpz_cmp_ui(f[side]->data[i],
+                        /* FIXME : use is_known() here */
+                        if (mpz_cmp_ui(lps[side]->data[i],
                             (1UL<<las->default_config->sides[side]->lpb)) <= 0)
                             continue;
                         /*
-                        if (mpz_cmp_ui(f[side]->data[i], si->conf->sides[side]->lim) <= 0)
+                        if (mpz_cmp_ui(lps[side]->data[i], si->conf->sides[side]->lim) <= 0)
                             continue;
                             */
-                        unsigned int n = mpz_sizeinbase(f[side]->data[i], 2);
+                        unsigned int n = mpz_sizeinbase(lps[side]->data[i], 2);
                         int k = las->hint_lookups[side][n];
                         if (k < 0) {
                             /* Having no data is normal. The factor base
@@ -2109,7 +2085,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                     if (deadline != DBL_MAX)
                         delta = (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO;
                     deadline = new_deadline;
-                    relation_copy(winner, rel);
+                    winner = rel;
                     if (time_left == 0) {
                         verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
                         /* break both loops */
@@ -2118,7 +2094,6 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #else
                 SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
 #endif
-                        relation_clear(rel);
                         break;
                     } else if (delta != DBL_MAX) {
                         verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
@@ -2126,7 +2101,6 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 }
             }
 #endif  /* DLP_DESCENT */
-            relation_clear(rel);
         }
     }
 
@@ -2138,76 +2112,31 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
         /* If we've been doing the descent, and assuming we succeeded, we
          * have to reschedule the possibly still missing large primes in the
          * todo list */
-        mpz_t rho, q;
-        mpz_init(rho);
-        mpz_init(q);
-        for(int i = 0 ; i < winner->nb_rp ; i++) {
-            int side = RATIONAL_SIDE;
-            unsigned long p = winner->rp[i].p;
-            if (las->dlog_base->is_known(side, p, 0))
-                continue;
-            /*
-            if (p <= (1UL<<las->default_config->sides[side]->lpb))
-                continue;
-                */
-            if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
-                continue;
-            // If q > 64 bits, then the previous comparison does not
-            // work. Let's do a dirty hack, here, because I don't know
-            // what would be the best patch. FIXME
-            // So we check only the less significant bits to decide
-            // whether we are seeing the current special-q.
-            if (side == si->doing->side &&
-                mpz_sizeinbase(si->doing->p, 2) >= 8*sizeof(unsigned long)) {
-                unsigned long pp = mpz_get_ui(si->doing->p);
-                if (pp == p)
-                    continue;
-            }
-            unsigned int n = ULONG_BITS - clzl(p);
-            int k = las->hint_lookups[side][n];
-            if (k < 0) continue;
-            mpz_set_ui(q, p);
-            /* Beware, cpoly->m mod p would be wrong ! */
-            /* This can't work on 32-bits */
-            mpz_set_ui(rho, relation_compute_r (winner->a, winner->b, p));
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
-            las_todo_push_withdepth(las->todo, q, rho, side, si->doing->depth + 1);
-        }
-        relation_compute_all_r(winner);
-        for(int i = 0 ; i < winner->nb_ap ; i++) {
-            int side = ALGEBRAIC_SIDE;
-            unsigned long p = winner->ap[i].p;
-            if (las->dlog_base->is_known(side, p, winner->ap[i].r))
-                continue;
-            /*
-            if (p <= (1UL<<las->default_config->sides[side]->lpb))
-                continue;
-                */
-            if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
-                continue;
-            // If q > 64 bits, then the previous comparison does not
-            // work. Let's do a dirty hack, here, because I don't know
-            // what would be the best patch. FIXME
-            // So we check only the less significant bits to decide
-            // whether we are seeing the current special-q.
-            if (side == si->doing->side &&
-                mpz_sizeinbase(si->doing->p, 2) >= 8*sizeof(unsigned long)) {
-                unsigned long pp = mpz_get_ui(si->doing->p);
-                if (pp == p)
-                    continue;
-            }
-            unsigned int n = ULONG_BITS - clzl(p);
-            int k = las->hint_lookups[side][n];
-            if (k < 0) continue;
-            mpz_set_ui(q, p);
-            mpz_set_ui(rho, winner->ap[i].r);
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
-            las_todo_push_withdepth(las->todo, q, rho, side, si->doing->depth + 1);
-        }
-        mpz_clear(q);
-        mpz_clear(rho);
 
-        las_descent_helper_found_relation(las->descent_helper, winner);
+        /* compute rho for all primes, even on the rational side */
+        winner.fixup_r(true);
+
+        for(int side = 0 ; side < 2 ; side++) {
+            for(unsigned int i = 0 ; i < winner.sides[side].size() ; i++) {
+                relation::pr const& v(winner.sides[side][i]);
+                if (mpz_cmp(si->doing->p, v.p) == 0)
+                    continue;
+                unsigned long p = mpz_get_ui(v.p);
+                if (mpz_fits_ulong_p(v.p)) {
+                    unsigned long r = mpz_get_ui(v.r);
+                    if (las->dlog_base->is_known(side, p, r))
+                        continue;
+                }
+
+                unsigned int n = mpz_sizeinbase(v.p, 2);
+                int k = las->hint_lookups[side][n];
+                if (k < 0) continue;
+
+                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
+                las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
+            }
+        }
+        las->tree->found(winner);
     }
 #endif  /* DLP_DESCENT */
 
@@ -2216,8 +2145,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
     for(int side = 0 ; side < 2 ; side++) {
         mpz_clear(norm[side]);
         factor_list_clear(&factors[side]);
-        clear_uint32_array (m[side]);
-        clear_mpz_array (f[side]);
+        clear_uint32_array (lps_m[side]);
+        clear_mpz_array (lps[side]);
     }
 
     return cpt;
@@ -2667,8 +2596,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, las, las);
 
-    if (descent_lower)
-        las->descent_helper = las_descent_helper_alloc();
+    las->tree = new descent_tree();
 
     /* {{{ Doc on todo list handling
      * The function las_todo_feed behaves in different
@@ -2688,9 +2616,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     /* pop() is achieved by sieve_info_pick_todo_item */
     for( ; las_todo_feed(las, pl) ; ) {
         if (descent_lower && las_todo_pop_closing_brace(las->todo)) {
-            las_descent_helper_done_node(las->descent_helper);
-            if (las_descent_helper_current_depth(las->descent_helper) == 0)
-                las_descent_helper_display_last_tree(las->descent_helper, las->output);
+            las->tree->done_node();
+            if (las->tree->depth() == 0)
+                las->tree->display_last_tree(las->output);
             continue;
         }
 
@@ -2719,9 +2647,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         sieve_info_pick_todo_item(si, las->todo);
 
-        las_descent_helper_new_node(las->descent_helper, si->conf, si->doing->depth);
-        if (descent_lower)
+        if (descent_lower) {
+            las->tree->new_node(si->conf, si->doing->depth);
             las_todo_push_closing_brace(las->todo, si->doing->depth);
+        }
 #if 0
         /* I think that there is sufficient provision in las_todo_feed now */
         ASSERT_ALWAYS(mpz_cmp_ui(las->todo->r, 0) != 0);
@@ -2911,9 +2840,9 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (descent_lower) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
-        las_descent_helper_display_all_trees(las->descent_helper, las->output);
-        las_descent_helper_free(las->descent_helper);
+        las->tree->display_all_trees(las->output);
     }
+    delete las->tree;
 
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;

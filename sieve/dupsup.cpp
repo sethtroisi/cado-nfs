@@ -24,11 +24,11 @@
 #include "verbose.h"
 
 static void *
-dupsup (FILE *output, relation_t * rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
+dupsup (FILE *output, relation & rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
 {
   if (0)
     gmp_fprintf (output, "# sq = %Zd, rho = %Zd, side = %d\n", sq, rho, side);
-  fprint_relation(output, rel, is_dupe ? "# DUPE " : "", NULL, NULL);
+  rel.print(output, is_dupe ? "# DUPE " : "");
   return NULL;
 }
 
@@ -47,42 +47,6 @@ read_sq_comment(mpz_t sq, mpz_t rho, int *side, const char *line)
   }
   return 0;
 }
-
-static int
-read_relation(relation_t * rel, const char *line)
-{
-  int consumed;
-  int side = 0;
-
-  if (sscanf(line, "%" SCNd64 ",%" SCNu64 ":%n", &rel->a, &rel->b, &consumed) < 2)
-    return 0;
-
-  if (line[consumed] == ':') {
-    side++;
-    consumed++;
-  }
-
-  while(line[consumed] != '\0' && line[consumed] != '\n') {
-    unsigned long p;
-    int consumed_p;
-    if (sscanf(line + consumed, "%lx%n", &p, &consumed_p) < 1)
-      return 0;
-    relation_add_prime(rel, side, p);
-    consumed += consumed_p;
-    if (line[consumed] == ',')
-      consumed++;
-    else if (line[consumed] == ':') {
-      side++;
-      ASSERT_ALWAYS(side < 2);
-      consumed++;
-    }
-  }
-  relation_compress_rat_primes(rel);
-  relation_compress_alg_primes(rel);
-  relation_compute_all_r(rel);
-  return 1;
-}
-
 
 static void
 read_poly(cado_poly_ptr cpoly, param_list pl)
@@ -222,9 +186,7 @@ main (int argc, char * argv[])
       sieve_info_ptr si = NULL;
       while (!feof(f)) {
         char line[1024];
-        relation_t rel;
         int side = 0;
-        relation_init(&rel);
         if (fgets(line, sizeof(line), f) == NULL)
           break;
         if (read_sq_comment(sq, rho, &side, line)) {
@@ -233,13 +195,14 @@ main (int argc, char * argv[])
             clear_sieve_info(si);
           si = fill_in_sieve_info(sq, rho, side, 1U << conf->logI, 1U << (conf->logI - 1),
                                   limits, strategy, cpoly, conf);
-        } else if (read_relation(&rel, line)) {
-          ASSERT_ALWAYS(si != NULL);
-          int is_dupe = relation_is_duplicate(&rel, nb_threads, si);
-          dupsup(stdout, &rel, sq, rho, side, is_dupe);
         } else {
+            relation rel;
+            if (rel.parse(line)) {
+                ASSERT_ALWAYS(si != NULL);
+                int is_dupe = relation_is_duplicate(rel, nb_threads, si);
+                dupsup(stdout, rel, sq, rho, side, is_dupe);
+            }
         }
-        relation_clear(&rel);
       }
       fclose_maybe_compressed(f, argv[argi]);
       clear_sieve_info(si);
