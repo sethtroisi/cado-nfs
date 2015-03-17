@@ -15,10 +15,12 @@ class NonCopyable {
 };
 
 /* Base for classes that hold parameters for worker functions */
-class task_parameters;
+class task_parameters {
+};
 
 /* Base for classes that hold results produced by worker functions */
-class task_result;
+class task_result {
+};
 
 class monitor {
   pthread_mutex_t mutex;
@@ -28,6 +30,7 @@ public:
   void enter() {ASSERT_ALWAYS(pthread_mutex_lock(&mutex) == 0);}
   void leave() {ASSERT_ALWAYS(pthread_mutex_unlock(&mutex) == 0);}
   void signal(pthread_cond_t &cond) {ASSERT_ALWAYS(pthread_cond_signal(&cond) == 0);}
+  void broadcast(pthread_cond_t &cond){ASSERT_ALWAYS(pthread_cond_broadcast(&cond) == 0);}
   void wait(pthread_cond_t &cond) {ASSERT_ALWAYS(pthread_cond_wait(&cond, &mutex) == 0);}
 };
 
@@ -38,13 +41,13 @@ public:
   const task_function_t func;
   const int id;
   task_parameters * const parameters;
-  task_result *result;
   const bool please_die;
+  task_result *result;
 
   thread_task(task_function_t _func, int _id, task_parameters *_parameters) :
-    func(_func), id(_id), parameters(_parameters), result(NULL), please_die(false) {};
+    func(_func), id(_id), parameters(_parameters), please_die(false), result(NULL) {};
   thread_task(bool _kill)
-    : func(NULL), id(0), parameters(NULL), result(NULL), please_die(true) {
+    : func(NULL), id(0), parameters(NULL), please_die(true), result(NULL) {
     ASSERT_ALWAYS(_kill);
   }
 };
@@ -76,64 +79,10 @@ class thread_pool : private monitor, private NonCopyable {
   static void * thread_work_on_tasks(void *pool);
 
 public:
-  thread_pool(size_t _nr_threads) : nr_threads(_nr_threads), kill_threads(false) {
-    threads = new worker_thread_ptr[nr_threads];
-    for (size_t i = 0; i < nr_threads; i++)
-      threads[i] = new worker_thread(*this);
-  };
-  ~thread_pool() {
-    enter();
-    kill_threads = true;
-    leave();
-    for (size_t i = 0; i < nr_threads; i++)
-      delete threads[i];
-    delete threads;
-    ASSERT_ALWAYS(tasks.empty());
-    ASSERT_ALWAYS(results.empty());
-    pthread_cond_destroy(&tasks_not_empty_cond);
-    pthread_cond_destroy(&results_not_empty_cond);
-  }
-
-  void add_task(task_function_t func, task_parameters *params, int id) {
-    enter();
-    tasks.push(new thread_task(func, id, params));
-    signal(tasks_not_empty_cond);
-    leave();
-  }
-  
-  thread_task *get_task() {
-    enter();
-    thread_task *task;
-    if (kill_threads && tasks.empty()) {
-      task = new thread_task(true);
-    } else {
-      while (tasks.empty()) {
-        /* No work -> tell this thread to wait until work becomes available.
-           The while() protects against spurious wake-ups that can fire even
-           if the queue is still empty */
-        wait(tasks_not_empty_cond);
-      }
-      task = tasks.front();
-      tasks.pop();
-    }
-    leave();
-    return task;
-  }
-  
-  void add_result(task_result *const result) {
-    enter();
-    results.push(result);
-    signal(results_not_empty_cond);
-    leave();
-  }
-
-  task_result *get_result() {
-    enter();
-    while (results.empty())
-      wait(results_not_empty_cond);
-    task_result *result = results.front();
-    results.pop();
-    leave();
-    return result;
-  }
+  thread_pool(size_t _nr_threads);
+  ~thread_pool();
+  void add_task(task_function_t func, task_parameters *params, int id);
+  thread_task *get_task();
+  void add_result(task_result *result);
+  task_result *get_result();
 };
