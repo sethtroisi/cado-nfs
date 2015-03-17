@@ -102,8 +102,8 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
 #else
   ASSERT (sizeof(unsigned long) == 8);
   uint64_t rax, rdx;
-  ularith_mul_ul_ul_2ul(&rdx, &rax, p, t);
-  ularith_add_ul_2ul(&rdx, &rax, x);
+  ularith_mul_ul_ul_2ul(&rax, &rdx, p, t);
+  ularith_add_ul_2ul(&rax, &rdx, x);
   u = rdx;
 #endif
 #else // 32-bit support, via gmp
