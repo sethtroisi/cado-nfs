@@ -108,9 +108,12 @@ void relation::add(int side, mpz_srcptr p)
         mpz_set(x.p, p);
 
         mpz_set_uint64(x.r, b);
-        mpz_invert(x.r, x.r, x.p);
-        mpz_mul_int64(x.r, x.r, a);
-        mpz_mod(x.r, x.r, x.p);
+        if (mpz_invert(x.r, x.r, x.p)) {
+            mpz_mul_int64(x.r, x.r, a);
+            mpz_mod(x.r, x.r, x.p);
+        } else {
+            mpz_set(x.r, x.p);
+        }
 
         sides[side].push_back(x);
     }
@@ -136,9 +139,12 @@ void relation::fixup_r(bool also_rational)
                 pr & x(sides[side][i]);
 
                 mpz_set_uint64(x.r, b);
-                mpz_invert(x.r, x.r, x.p);
-                mpz_mul_int64(x.r, x.r, a);
-                mpz_mod(x.r, x.r, x.p);
+                if (mpz_invert(x.r, x.r, x.p)) {
+                    mpz_mul_int64(x.r, x.r, a);
+                    mpz_mod(x.r, x.r, x.p);
+                } else {
+                    mpz_set(x.r, x.p);
+                }
             }
         }
     }

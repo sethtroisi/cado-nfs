@@ -2047,37 +2047,37 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
              */
             
             if (las->hint_table) {
+                /* compute rho for all primes, even on the rational side */
+                rel.fixup_r(true);
+
                 double time_left = 0;
+                int nb_children = 0;
                 for(int side = 0 ; side < 2 ; side++) {
-                    for (unsigned int i = 0; i < lps[side]->length; ++i) {
-                        /* We assume that the base of the precomputed log
-                         * goes as far as the lpb given on command line.
-                         */
-                        /* FIXME : use is_known() here */
-                        if (mpz_cmp_ui(lps[side]->data[i],
-                            (1UL<<las->default_config->sides[side]->lpb)) <= 0)
+                    for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
+                        relation::pr const& v(rel.sides[side][i]);
+                        if (mpz_cmp(si->doing->p, v.p) == 0)
                             continue;
-                        /*
-                        if (mpz_cmp_ui(lps[side]->data[i], si->conf->sides[side]->lim) <= 0)
-                            continue;
-                            */
-                        unsigned int n = mpz_sizeinbase(lps[side]->data[i], 2);
+                        unsigned long p = mpz_get_ui(v.p);
+                        if (mpz_fits_ulong_p(v.p)) {
+                            unsigned long r = mpz_get_ui(v.r);
+                            if (las->dlog_base->is_known(side, p, r))
+                                continue;
+                        }
+
+                        unsigned int n = mpz_sizeinbase(v.p, 2);
                         int k = las->hint_lookups[side][n];
                         if (k < 0) {
-                            /* Having no data is normal. The factor base
-                             * bound does not have to have any connection
-                             * with the database of prime ideals for
-                             * which the virtual log has been saved
-                             * already (factor base extension can enter
-                             * into play here). */
-                            // verbose_output_print(0, 1, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
-                            continue;
+                            /* This is not worrysome per se. We just do
+                             * not have the info in the hint table,
+                             * period.
+                             */
+                            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c (%Zd,%Zd)\n", n, sidenames[side][0], v.p, v.r);
                         }
-                        descent_hint_ptr h = las->hint_table[k];
-                        time_left += h->expected_time;
+                        time_left += las->hint_table[k]->expected_time;
+                        nb_children++;
                     }
                 }
-                // verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process\n", time_left);
+                verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process (%d children)\n", time_left, nb_children);
 
                 double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * time_left;
                 if (new_deadline < deadline) {
@@ -2112,9 +2112,6 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
         /* If we've been doing the descent, and assuming we succeeded, we
          * have to reschedule the possibly still missing large primes in the
          * todo list */
-
-        /* compute rho for all primes, even on the rational side */
-        winner.fixup_r(true);
 
         for(int side = 0 ; side < 2 ; side++) {
             for(unsigned int i = 0 ; i < winner.sides[side].size() ; i++) {
