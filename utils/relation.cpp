@@ -154,7 +154,7 @@ struct pr_cmp {
 };
 
 inline bool operator==(relation::pr const& a, relation::pr const& b) {
-    return a.p == b.p && a.r == b.r;
+    return mpz_cmp(a.p, b.p) == 0 && mpz_cmp(a.r, b.r) == 0;
 }
 
 
