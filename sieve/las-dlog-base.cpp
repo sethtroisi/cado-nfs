@@ -3,7 +3,7 @@
 #include "las-types.h"
 
 #include <cstdio>
-#include <cstdint>
+#include <stdint.h>     /* cstdint is c++11-only */
 #include <cctype>
 
 
