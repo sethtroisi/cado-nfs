@@ -65,7 +65,7 @@ struct relation {
     std::vector<pr> sides[2];
 
     relation() { a=b=0; }
-    operator bool() const { return !a && !b; }
+    operator bool() const { return a || b; }
     relation(int64_t a, uint64_t b, int rational_side = RATIONAL_SIDE)
         : a(a), b(b), rational_side(rational_side)
     {}

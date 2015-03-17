@@ -54,6 +54,12 @@ bool las_dlog_base::is_known(int side, uint64_t p, uint64_t r) const {
     if (p >> lpb[side])
         return false;
     if (renumberfilename) {
+        /* For now we assume that we know the log of all bad ideals */
+        /* If we want to be able to do a complete lookup for bad ideals
+         * too, then we need the badidealinfo file, as well as a piece of
+         * code which is currently in dup2 */
+        if (renumber_is_bad (NULL, NULL, renumber_table, p, r, side))
+            return true;
         index_t h = renumber_get_index_from_p_r(renumber_table, p, r, side);
         return known_logs[h];
     }

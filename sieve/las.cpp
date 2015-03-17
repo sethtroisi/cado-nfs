@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h> /* for PRIx64 macro and strtoumax */
-#include <math.h>   // for ceiling, floor in cfrac
+#include <cmath>   // for ceiling, floor in cfrac
 #include <ctype.h>
 #include <float.h>
 #include <fcntl.h>   /* for _O_BINARY */
@@ -1704,9 +1704,103 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 }
 /* }}} */
 
+
+#ifdef  DLP_DESCENT
+struct descent_node {
+    relation rel;
+    std::vector<std::pair<int, relation::pr> > outstanding;
+    double time_left;
+    operator bool() const { return (bool) rel; }
+};
+
+bool operator<(descent_node const& a, descent_node const& b)
+{
+    if (!b) return true;
+    if (std::isfinite(a.time_left)) { return a.time_left < b.time_left; }
+    return a.outstanding.size() < b.outstanding.size();
+}
+
+/* This returns true when we fonud a relation which completely splits. If
+ * we find one which needs a recursive call, we'll set the [winner]
+ * argument.
+ */
+bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent_node & winner, double & deadline, relation & rel)
+{
+    if (!las->hint_table) {
+        verbose_output_print(0, 1, "# Warning: no hint_table, this is not very useful for the descent\n");
+        return false;
+    }
+    /* For descent mode: compute the expected time to finish given the
+     * factor sizes, and deduce a deadline.  Assuming that not all
+     * encountered factors are below the factor base bound, if we expect
+     * an additional time T to finish the decomposition, we keep looking
+     * for a better decomposition for a grace time which is computed as
+     * x*T, for some configurable ratio x (one might think of x=0.2 for
+     * instance. x is DESCENT_GRACE_TIME_RATIO), which defines a
+     * ``deadline'' for next step.  [If all factors happen to be smooth,
+     * the deadline is _now_.] If within the grace period, a new relation
+     * is found, with an earlier implied deadline, the deadline is
+     * updated.
+     */
+
+    /* compute rho for all primes, even on the rational side */
+    rel.fixup_r(true);
+
+    descent_node contender;
+    contender.rel = rel;
+    contender.time_left = 0;
+
+    for(int side = 0 ; side < 2 ; side++) {
+        for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
+            relation::pr const& v(rel.sides[side][i]);
+            if (mpz_cmp(si->doing->p, v.p) == 0)
+                continue;
+            unsigned long p = mpz_get_ui(v.p);
+            if (mpz_fits_ulong_p(v.p)) {
+                unsigned long r = mpz_get_ui(v.r);
+                if (las->dlog_base->is_known(side, p, r))
+                    continue;
+            }
+
+            unsigned int n = mpz_sizeinbase(v.p, 2);
+            int k = las->hint_lookups[side][n];
+            if (k < 0) {
+                /* This is not worrysome per se. We just do
+                 * not have the info in the hint table,
+                 * period.
+                 */
+                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c (%Zd,%Zd)\n", n, sidenames[side][0], v.p, v.r);
+                contender.time_left = INFINITY;
+            } else {
+                if (std::isfinite(contender.time_left))
+                    contender.time_left += las->hint_table[k]->expected_time;
+            }
+            contender.outstanding.push_back(std::make_pair(side, v));
+        }
+    }
+    verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process (%zu children)\n",
+            contender.time_left, contender.outstanding.size());
+
+    double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * contender.time_left;
+    if (!std::isfinite(deadline) || new_deadline < deadline) {
+        double delta = INFINITY;
+        if (std::isfinite(deadline))
+            delta = (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO;
+        deadline = new_deadline;
+        winner = contender;
+        if (contender.outstanding.empty()) {
+            verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
+            return true;
+        } else if (std::isfinite(delta)) {
+            verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
+        }
+    }
+    return false;
+}
+#endif
+
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
-
 NOPROFILE_STATIC int
 factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
 {
@@ -1723,8 +1817,8 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
     bucket_array_complete purged[2] = {bucket_array_complete(BUCKET_REGION), bucket_array_complete(BUCKET_REGION)};
     mpz_t BLPrat;       /* alone ? */
 #ifdef  DLP_DESCENT
-    double deadline = DBL_MAX;
-    relation winner;
+    double deadline = INFINITY;
+    descent_node winner;
 #endif  /* DLP_DESCENT */
     uint32_t cof_rat_bitsize = 0; /* placate gcc */
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
@@ -2033,73 +2127,15 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
 
 #ifdef  DLP_DESCENT
-            /* For descent mode: compute the expected time to finish given
-             * the factor sizes, and deduce a deadline.  Assuming that not
-             * all encountered factors are below the factor base bound, if we
-             * expect an additional time T to finish the decomposition, we
-             * keep looking for a better decomposition for a grace time which
-             * is computed as x*T, for some configurable ratio x (one might
-             * think of x=0.2 for instance. x is DESCENT_GRACE_TIME_RATIO),
-             * which defines a ``deadline'' for next step.  [If all factors
-             * happen to be smooth, the deadline is _now_.] If within the
-             * grace period, a new relation is found, with an earlier implied
-             * deadline, the deadline is updated.
-             */
-            
-            if (las->hint_table) {
-                /* compute rho for all primes, even on the rational side */
-                rel.fixup_r(true);
-
-                double time_left = 0;
-                int nb_children = 0;
-                for(int side = 0 ; side < 2 ; side++) {
-                    for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
-                        relation::pr const& v(rel.sides[side][i]);
-                        if (mpz_cmp(si->doing->p, v.p) == 0)
-                            continue;
-                        unsigned long p = mpz_get_ui(v.p);
-                        if (mpz_fits_ulong_p(v.p)) {
-                            unsigned long r = mpz_get_ui(v.r);
-                            if (las->dlog_base->is_known(side, p, r))
-                                continue;
-                        }
-
-                        unsigned int n = mpz_sizeinbase(v.p, 2);
-                        int k = las->hint_lookups[side][n];
-                        if (k < 0) {
-                            /* This is not worrysome per se. We just do
-                             * not have the info in the hint table,
-                             * period.
-                             */
-                            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c (%Zd,%Zd)\n", n, sidenames[side][0], v.p, v.r);
-                        }
-                        time_left += las->hint_table[k]->expected_time;
-                        nb_children++;
-                    }
-                }
-                verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process (%d children)\n", time_left, nb_children);
-
-                double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * time_left;
-                if (new_deadline < deadline) {
-                    double delta = DBL_MAX;
-                    if (deadline != DBL_MAX)
-                        delta = (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO;
-                    deadline = new_deadline;
-                    winner = rel;
-                    if (time_left == 0) {
-                        verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
-                        /* break both loops */
+                if (update_descent_best_node(las, si, winner, deadline, rel)) {
+                    /* break both loops */
 #if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-                SS_lw = (const __m128i *)(SS + BUCKET_REGION);
+                    SS_lw = (const __m128i *)(SS + BUCKET_REGION);
 #else
-                SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
+                    SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
 #endif
-                        break;
-                    } else if (delta != DBL_MAX) {
-                        verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
-                    }
+                    break;
                 }
-            }
 #endif  /* DLP_DESCENT */
         }
     }
@@ -2113,27 +2149,16 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
          * have to reschedule the possibly still missing large primes in the
          * todo list */
 
-        for(int side = 0 ; side < 2 ; side++) {
-            for(unsigned int i = 0 ; i < winner.sides[side].size() ; i++) {
-                relation::pr const& v(winner.sides[side][i]);
-                if (mpz_cmp(si->doing->p, v.p) == 0)
-                    continue;
-                unsigned long p = mpz_get_ui(v.p);
-                if (mpz_fits_ulong_p(v.p)) {
-                    unsigned long r = mpz_get_ui(v.r);
-                    if (las->dlog_base->is_known(side, p, r))
-                        continue;
-                }
+        ASSERT_ALWAYS(winner);
 
-                unsigned int n = mpz_sizeinbase(v.p, 2);
-                int k = las->hint_lookups[side][n];
-                if (k < 0) continue;
-
-                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
-                las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
-            }
+        for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
+            int side = winner.outstanding[i].first;
+            relation::pr const& v(winner.outstanding[i].second);
+            unsigned int n = mpz_sizeinbase(v.p, 2);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
+            las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
         }
-        las->tree->found(winner);
+        las->tree->found(winner.rel);
     }
 #endif  /* DLP_DESCENT */
 

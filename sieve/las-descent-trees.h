@@ -87,7 +87,7 @@ struct descent_tree {
     }
     bool is_successful(tree * t) {
         if (!t->rel)
-            return 0;
+            return false;
         typedef std::list<tree *>::iterator it_t;
         for(it_t i = t->children.begin() ; i != t->children.end() ; i++) {
             if (!is_successful(*i))

@@ -673,19 +673,19 @@ renumber_read_table (renumber_ptr tab, const char * filename)
 int renumber_is_bad (int *nb, index_t *first, renumber_srcptr rn, p_r_values_t p,
                      p_r_values_t r, int side)
 {
-  *first = (rn->add_full_col) ? 1 : 0;
+  if (first) *first = (rn->add_full_col) ? 1 : 0;
   int bad = 0;
   for (int i = 0; i < rn->bad_ideals.n; ++i)
   {
     if (p == rn->bad_ideals.p[i] && r == rn->bad_ideals.r[i]
                                  && side == rn->bad_ideals.side[i])
     {
-      *nb = rn->bad_ideals.nb[i];
+      if (nb) *nb = rn->bad_ideals.nb[i];
       bad = 1;
       break;
     }
     else
-      *first += rn->bad_ideals.nb[i];
+      if (first) *first += rn->bad_ideals.nb[i];
   }
   return bad;
 }
