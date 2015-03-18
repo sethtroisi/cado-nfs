@@ -18,8 +18,7 @@ int main()
     sieving_interval_set_hi(H, i, 2);
   }
 
-  uint64_t nb;
-  sieving_interval_number_element(&nb, H);
+  uint64_t nb = sieving_interval_number_element(H);
 
   int64_vector_t vector;
   int64_vector_init(vector, t);
