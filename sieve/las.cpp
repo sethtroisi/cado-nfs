@@ -765,6 +765,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     las->output = stdout;
     if (las->outputname) {
 	if (!(las->output = fopen_maybe_compressed(las->outputname, "w"))) {
+            setbuf(las->output, NULL);
 	    fprintf(stderr, "Could not open %s for writing\n", las->outputname);
 	    exit(EXIT_FAILURE);
 	}
@@ -2039,7 +2040,6 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 NxToIJ (&i, &j, N, x, si);
 		mpz_poly_homogeneous_eval_siui (norm[side], si->sides[side]->fij, i, j);
 
-
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
@@ -2546,6 +2546,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
 
     param_list pl;
     param_list_init(pl);

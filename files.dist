@@ -583,8 +583,6 @@ scripts/version.sh
 scripts/winlinks.sh
 scripts/oar_start_clients.sh
 scripts/list_modified_files.sh
-scripts/descent_init.py
-scripts/descent_finish.py
 scripts/cadofactor/cadocommand.py
 scripts/cadofactor/cadofactor.py
 scripts/cadofactor/cadologger.py
@@ -1208,3 +1206,4 @@ sieve/las-dlog-base.cpp
 sieve/las-dlog-base.h
 utils/relation-tools.c
 utils/relation-tools.h
+scripts/descent.py
