@@ -96,7 +96,7 @@ void int64_poly_set_bxi(int64_poly_ptr f, int i, int64_t b)
   for( ; j < i ; j++) {
     f->coeff[j] = 0;
   }
-  f->coeff[j + 1] = b;
+  f->coeff[i] = b;
   f->deg = i;
 }
 

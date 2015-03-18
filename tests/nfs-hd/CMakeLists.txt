@@ -4,3 +4,11 @@ FIND_LIBRARY(ECM_LIB ecm ${CADO_NFS_SOURCE_DIR}/nfs-hd)
 target_link_libraries(test_array ${ECM_LIB} utils)
 include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
 run_test(test_array test_array)
+
+# -----
+add_executable(test_int64_poly test_int64_poly.c ../../nfs-hd/int64_poly.c
+	../../nfs-hd/sieving_interval.c ../../nfs-hd/utils_int64.c
+	../../utils/mpz_poly.c)
+target_link_libraries(test_int64_poly ${ECM_LIBS} utils)
+include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
+run_test(test_int64_poly test_int64_poly)
