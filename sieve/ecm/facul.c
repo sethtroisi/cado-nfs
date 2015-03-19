@@ -28,14 +28,14 @@ unsigned long stats_called[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
-//for the auxiliary factorization.
+// for the auxiliary factorization.
 unsigned long stats_called_aux[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
-int stats_current_index = 0; //only useful for stats_found_n!
+int stats_current_index = 0; // only useful for stats_found_n
 unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -297,7 +297,7 @@ facul (mpz_t *factors, const mpz_t N, const facul_strategy_t *strategy)
 /*
  * If the plan is already precomputed and stored at the index i, return
  * i. Otherwise return the last index of tab to compute and add this new
- * plan at this index!
+ * plan at this index.
  */
 static int
 get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
@@ -307,7 +307,7 @@ get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
   while (tab[i].method != 0){
     if (tab[i].plan == NULL){
       if(B1 == 0 && B2 == 0)
-	//zero method!
+	// zero method
 	break;
       else
 	{
@@ -348,7 +348,7 @@ static void
 return_data_ex (char** res, regmatch_t *pmatch, size_t nmatch,
 		const char * str_process)
 {
-  //(re)init res
+  // (re)init res
   for (size_t i = 0; i < nmatch;i++)
     res[i] = NULL;
 
@@ -376,7 +376,7 @@ return_data_ex (char** res, regmatch_t *pmatch, size_t nmatch,
 }
 
 /*
- * process one line of our strategy file to collect our strategy book!
+ * process one line of our strategy file to collect our strategy book.
  */
 static int
 process_line (facul_strategies_t* strategies, unsigned int* index_st,
@@ -388,12 +388,12 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
   int is_first_brent12[2] = {true, true};
 
   regex_t preg_index, preg_fm;
-  //regular expression for the sides
+  // regular expression for the sides
   const char *str_preg_index =
         "r0=([[:digit:]]+)"
         ",[[:space:]]*"
         "r1=([[:digit:]]+)";
-  //regular expression for the strategy
+  // regular expression for the strategy
   const char *str_preg_fm =
         "(S[[:alnum:]]+):[[:space:]]*"  /* side, like "S0: " */
         "([[:alnum:]-]+)"               /* method, like "PP1-65" or "ECM-M12" */
@@ -402,12 +402,12 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
   regcomp (&preg_index, str_preg_index, REG_ICASE|REG_EXTENDED);
   regcomp (&preg_fm, str_preg_fm, REG_ICASE|REG_EXTENDED);
 
-  //process the ligne
+  // process the ligne
   const char * str_process = &str[0];
   int side = -1;
   while (str_process[0] != '\0' )
     {
-      //init
+      // init
       size_t nmatch = 5;
       regmatch_t *pmatch= calloc (sizeof(*pmatch), nmatch);
       char **res = malloc (sizeof(char*) * nmatch);
@@ -416,14 +416,14 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
       return_data_ex (res, pmatch, nmatch, str_process);
       if (res[0] != NULL)
 	{
-	  /* changes the current strategy! */
+	  /* changes the current strategy. */
 	  index_st[0] = atoi(res[0]);
 	  index_st[1] = atoi(res[1]);
 	  /* re-init the value of sigma */
 	  SIGMA[0] = 2;
 	  SIGMA[1] = 2;
-	  //todo: change it to add it in the parameters of our function.
-	  //maybe unused if you use only one curve B12 by strategy.
+	  // todo: change it to add it in the parameters of our function.
+	  // maybe unused if you use only one curve B12 by strategy.
 	  is_first_brent12[0] = true;
 	  is_first_brent12[1] = true;
 	}
@@ -435,7 +435,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	  return_data_ex (res, pmatch, nmatch, str_process);
 	  if (res[0] != NULL)
 	    {
-	      /*add the new factoring method to the current strategy! */
+	      /*add the new factoring method to the current strategy. */
 	      if (index_st[0] > strategies->mfb[0] ||
 		  index_st[1] > strategies->mfb[1])
 		return 0;
@@ -453,13 +453,13 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      unsigned int B1 = (unsigned int) atoi (res[2]);
 	      unsigned int B2 = (unsigned int) atoi (res[3]);
 	      if (B1 == 0 && B2 == 0)
-		{ //zero method!
+		{ // zero method
 		  goto next_regex;
 		}
 	      unsigned long sigma = 0;
 	      int curve = 0;
 	      int method = 0;
-	      //method
+	      // method
 	      if (strcmp (res[1], "PM1") == 0)
 		method = PM1_METHOD;
 	      else if (strcmp (res[1], "PP1-27") == 0)
@@ -469,7 +469,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      else 
 		{
 		  method = EC_METHOD;
-		  //curve
+		  // curve
 		  if (strcmp (res[1], "ECM-B12") == 0)
 		    curve = BRENT12;
 		  else if (strcmp (res[1], "ECM-M12") == 0)
@@ -483,7 +483,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 			       res[1]);
 		      return -1;
 		    }
-		  //sigma!
 		  if (curve == MONTY16)
 		    sigma = 1;
 		  else
@@ -497,7 +496,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 			sigma = SIGMA[side]++;
 		    }
 		}
-	      //check if the method is already computed!
+	      // check if the method is already computed
 	      int index_prec_fm = 
 		get_index_method(strategies->precomputed_methods, B1, B2,
 				 method, curve, sigma);
@@ -519,7 +518,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		      plan = malloc (sizeof (pp1_plan_t));
 		      pp1_make_plan (plan, B1, B2, verbose);
 		    }
-		  else { //method == EC_METHOD
+		  else { // method == EC_METHOD
 		    plan = malloc (sizeof (ecm_plan_t));
 		    ecm_make_plan (plan,
 				   B1, B2, curve, sigma, 1, verbose);
@@ -528,7 +527,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		  strategies->precomputed_methods[index_prec_fm].plan = plan;
 		  
 		  ASSERT_ALWAYS (index_prec_fm+1 < NB_MAX_METHODS);
-		  //to show the end of plan!
+		  // to show the end of plan
 		  strategies->precomputed_methods[index_prec_fm+1].plan = NULL;
 		  strategies->precomputed_methods[index_prec_fm+1].method = 0;
 		}
@@ -542,17 +541,17 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      index_method++;
 	      ASSERT_ALWAYS (index_method < NB_MAX_METHODS);
 	      
-	      //to show the end of methods!
+	      // to show the end of methods
 	      methods[index_method].method = NULL;
 	    }
-	  else//to end the while
+	  else// to end the while
 	    {
 	      pmatch[0].rm_eo = strlen(str_process);
 	    }
 	}
       next_regex:
       str_process = &str_process[pmatch[0].rm_eo];
-      //free
+      // free
       for (size_t i = 0; i < nmatch; i++)
 	free(res[i]);
       free(res);
@@ -572,7 +571,7 @@ facul_method_t*
 facul_make_aux_methods (int n, const int verbose)
 {
   if (n <= 0)
-    n = 30;//nb_curves
+    n = 30;// nb_curves
 
   facul_method_t *methods = malloc ((n+1) * sizeof (facul_method_t));
 
@@ -716,7 +715,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      const unsigned int alpb, const unsigned int amfb,
 		      int n0, int n1, FILE* file, const int verbose)
 {
-  //printf ("create strategies!\n");
+  // printf ("create strategies\n");
   facul_strategies_t* strategies = malloc (sizeof(facul_strategies_t));
   ASSERT (strategies != NULL);
   strategies->mfb[0] = rmfb;
@@ -731,10 +730,10 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   strategies->BBB[0] = (double) rfbb * strategies->assume_prime_thresh[0];
   strategies->BBB[1] = (double) afbb * strategies->assume_prime_thresh[1];
 
-  //alloc methods!
+  // alloc methods
   facul_method_side_t*** methods = malloc (sizeof (*methods) * (rmfb+1));
   unsigned int r, a;
-  //init methods!
+  // init methods
   for (r = 0; r <= rmfb; r++) {
     methods[r] = malloc (sizeof (*methods[r]) * (amfb+1));
     ASSERT (methods[r] != NULL);
@@ -749,7 +748,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   
   /*Default strategy. */ 
   if (file == NULL)
-    {//make_default_strategy
+    {// make_default_strategy
       verbose_output_print(0, 1, "# Using default strategy for the cofactorization\n");
       int ncurves[2];
       ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
@@ -765,7 +764,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       for (r = 0; r <= rmfb; r++)
 	for (a = 0; a <= amfb; a++) {
 	  int index = 0;
-	  int first = (r < a);//begin by the largest cofactor.
+	  int first = (r < a);// begin by the largest cofactor.
 	  for (int z  = 0; z < 2; z++)
 	    {
 	      int side = first ^ z;
@@ -777,7 +776,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		  index++;
 		}
 	    }
-	  //add NULL to show the end of the strategy.
+	  // add NULL to show the end of the strategy.
 	  methods[r][a][index].method = NULL;
 	}
     }
@@ -797,7 +796,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       fseek (file, 0, SEEK_SET);
       while (fgets (line, sizeof(line), file) != NULL)
 	{
-	  //process each line of 'file'
+	  // process each line of 'file'
 	  int err = process_line (strategies, index_strategies,
 				  line, verbose);
 	  if (err == -1)
@@ -814,22 +813,22 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 	strategies->methods[r][a];
       if (methods == NULL)
 	continue;
-      int index_last_method[2] = {-1, -1};      //the default_values
+      int index_last_method[2] = {-1, -1};      // the default_values
       unsigned int i;
       for (i = 0; methods[i].method != 0; i++) {
 	methods[i].is_the_last = 0;
 	index_last_method[methods[i].side] = i;
       }
-      //== -1 if it exists zero method for this side!
+      // == -1 if it exists zero method for this side
       if (index_last_method[0] != -1)
 	  methods[index_last_method[0]].is_the_last = 1;
       if (index_last_method[1] != -1)
 	  methods[index_last_method[1]].is_the_last = 1;
     }
   
-  //Create the auxiliary methods!
-  //add test to check if it's necessary to create our aux methods!
-  //todo: choose a better choice of our number of curves!
+  // Create the auxiliary methods
+  // add test to check if it's necessary to create our aux methods
+  // TODO: choose a better choice of our number of curves!
   strategies->methods_aux = facul_make_aux_methods (30, verbose);
 
   return strategies;
@@ -842,7 +841,7 @@ facul_clear_strategies (facul_strategies_t *strategies)
   if (strategies == NULL)
     return ;
 
-  //free precomputed_methods
+  // free precomputed_methods
   facul_method_t* fm = strategies->precomputed_methods;
   for (int j = 0; fm[j].method!=0; j++)
     {
@@ -862,7 +861,7 @@ facul_clear_strategies (facul_strategies_t *strategies)
   free (fm);
   fm = NULL;
 
-  //free methods
+  // free methods
   unsigned int r;
   for (r = 0; r <= strategies->mfb[0]; r++) {
     unsigned int a;
@@ -872,10 +871,10 @@ facul_clear_strategies (facul_strategies_t *strategies)
   }
   free (strategies->methods);
 
-  //free methods_aux
+  // free methods_aux
   facul_clear_aux_methods (strategies->methods_aux);
 
-  //free strategies
+  // free strategies
   free (strategies);
 
 }
@@ -887,7 +886,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
   if (file == NULL)
     return -1;
   unsigned int r;
-  //print info lpb ...
+  // print info lpb ...
   fprintf (file,
 	  "(lpb = [%ld,%ld], as...=[%lf, %lf], BBB = [%lf, %lf])\n",
 	  strategies->lpb[0], strategies->lpb[1],
@@ -910,7 +909,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 	  facul_method_t* fm = methods[i].method;
 	  if (fm == NULL || fm->method == 0)
 	    break;
-	  if (fm->plan == NULL)//zero method!!!
+	  if (fm->plan == NULL) // zero method
 	    fprintf (file,
 		    "[side=%d, FM=%ld, B1=0, B2=0] ", methods[i].side,
 		    fm->method);
@@ -1005,8 +1004,8 @@ facul_aux (mpz_t *factors, const modset_t m,
 	break;
       default: abort();
       }
-      //check our result!
-      //res_fac contains the number of factors found!
+      // check our result
+      // res_fac contains the number of factors found
       if (res_fac == -1)
 	{
 	  /*
@@ -1020,7 +1019,7 @@ facul_aux (mpz_t *factors, const modset_t m,
 	{
 	  /* Zero factor found. If it was the last method for this
 	     side, then one stops the cofactorization. Otherwise, one
-	     tries with an other method! */
+	     tries with an other method */
 	    continue;
 	}
 
@@ -1029,14 +1028,14 @@ facul_aux (mpz_t *factors, const modset_t m,
 	break;
 
       /*
-	res_fac == 1!  Only one factor has been found. Hence, our
+	res_fac == 1  Only one factor has been found. Hence, our
 	factorization is not finished.
       */
       if (fm.arith != CHOOSE_NONE)
 	{
 	  int found2 = facul_aux (factors+res_fac, fm, strategies,
 				  i+1, side);
-	  if (found2 == FACUL_NOT_SMOOTH)
+          if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
 	    {
 	      found = FACUL_NOT_SMOOTH;
 	      modset_clear (&cfm);
@@ -1051,15 +1050,7 @@ facul_aux (mpz_t *factors, const modset_t m,
 	{
 	  int found2 = facul_aux (factors+res_fac, cfm, strategies,
 				  i+1, side);
-          /* FIXME. BUG here.
-           * If we are already within facul_aux (called from line
-           * 1210-ish below where we have a FIXME item too), and found==1
-           * because we have found a factor, yet found2 is zero, then
-           * found+=found2 will eventually have us return 1, accepted as
-           * meaning we have factored the number, even though this is not
-           * the case.
-           */
-	  if (found2 == FACUL_NOT_SMOOTH)
+          if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
 	    found = FACUL_NOT_SMOOTH;
 	  else
 	    found += found2;
@@ -1105,22 +1096,22 @@ facul_both_src (mpz_t **factors, const modset_t* m,
   int stats_nb_side = 0, stats_index_transition = 0;
   for (int i = 0; methods[i].method != NULL; i++)
     {
-      //{for the stats
+      // {for the stats
       stats_current_index = i - stats_nb_side * stats_index_transition;
       if (methods[i].is_the_last)
 	{
 	  stats_nb_side = 1;
 	  stats_index_transition = i+1;
 	}
-      //}
+      // }
       int side = methods[i].side;
       if (is_smooth[side] != FACUL_MAYBE)
 	continue;
 
-      //{for the stats
+      // {for the stats
       if (stats_current_index < STATS_LEN)
 	stats_called[stats_current_index]++;
-      //}
+      // }
       int res_fac = 0;
       switch (m[side].arith) {
       case CHOOSE_UL:
@@ -1153,8 +1144,8 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	break;
       default: abort();
       }
-      //check our result!
-      //res_fac contains the number of factors found!
+      // check our result
+      // res_fac contains the number of factors found
       if (res_fac == -1)
 	{
 	  /*
@@ -1180,42 +1171,38 @@ facul_both_src (mpz_t **factors, const modset_t* m,
       if (res_fac == 2)
 	{
 	  /*
-	    Indeed, using only one factoring method, you found two
-	    primes factors of m (f, m/f) then m is factored and your
-	    work is finished for this cofactor!!
+            Indeed, if using only one factoring method we found two
+            primes factors of m (f, m/f) then m is factored and work is
+            finished for this cofactor.
 	  */
 	  is_smooth[side] = FACUL_SMOOTH;
 	  continue;
 	}
       /*
 	res_fac == 1. Only one factor has been found. Hence, an
-	auxiliary factorization will be necessary!
+	auxiliary factorization will be necessary.
        */
       is_smooth[side] = FACUL_AUX;
     }
-  //begin the auxiliary factorization!
+  // begin the auxiliary factorization
   if (is_smooth[0] >= 1 && is_smooth[1] >= 1)
     for (int side = 0; side < 2; side++)
       if (is_smooth[side] == FACUL_AUX)
 	for (int ind_cof = 0; ind_cof < 2; ind_cof++)
 	  {
-	    //factor f[side][0] or/and f[side][1]
+	    // factor f[side][0] or/and f[side][1]
 	    if (f[side][ind_cof].arith != CHOOSE_NONE)
 	      {
 		int found2 = facul_aux (factors[side]+found[side],
 					f[side][ind_cof], strategies, 0, side);
-		if (found2 < 1)//FACUL_NOT_SMOOTH or FACUL_MAYBE
+		if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
 		  {
 		    is_smooth[side] = FACUL_NOT_SMOOTH;
-		    found[side] = found2;//FACUL_NOT_SMOOTH or FACUL_MAYBE
+		    found[side] = found2;// FACUL_NOT_SMOOTH or FACUL_MAYBE
 		    goto clean_up;
 		  }
 		else
 		  {
-                      /* FIXME: there is a bug here. Even if the
-                       * auxiliary factorization has found a factor, it
-                       * does not mean that we have something smooth.
-                       */
 		    is_smooth[side] = FACUL_SMOOTH;
 		    found[side] += found2;
 		  }
@@ -1233,8 +1220,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 
 /*
   This function is like facul, but we will work with the both norms
-  together.
-  It returns the number of factors for each side!
+  together.  It returns the number of factors for each side.
 */
 int*
 facul_both (mpz_t **factors, mpz_t* N,
@@ -1318,7 +1304,7 @@ facul_both (mpz_t **factors, mpz_t* N,
 	}
     }
 
-  //Free
+  // Free
   modset_clear (&n[0]);
   modset_clear (&n[1]);
 
