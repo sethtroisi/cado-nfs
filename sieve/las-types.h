@@ -154,7 +154,7 @@ struct sieve_info_s {
     // description of the q-lattice. The values here should remain
     // compatible with those in ->conf (this concerns notably the bit
     // size as well as the special-q side).
-    qlattice_basis_t qbasis;
+    qlattice_basis qbasis;
 
     // parameters for bucket sieving
     uint32_t nb_buckets; /* Actual number of buckets used by current special-q */

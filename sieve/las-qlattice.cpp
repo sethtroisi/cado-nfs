@@ -124,7 +124,7 @@ generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
 }
 
 int
-SkewGauss (qlattice_basis_ptr basis, const mpz_t p, const mpz_t r,
+SkewGauss (qlattice_basis &basis, const mpz_t p, const mpz_t r,
            const double skewness)
 {
     mpz_t a[2], b[2];
@@ -141,10 +141,10 @@ SkewGauss (qlattice_basis_ptr basis, const mpz_t p, const mpz_t r,
     fits = fits && mpz_fits_int64_p (b[1]);
     if (fits)
       {
-        basis->a0 = mpz_get_int64 (a[0]);
-        basis->a1 = mpz_get_int64 (a[1]);
-        basis->b0 = mpz_get_int64 (b[0]);
-        basis->b1 = mpz_get_int64 (b[1]);
+        basis.a0 = mpz_get_int64 (a[0]);
+        basis.a1 = mpz_get_int64 (a[1]);
+        basis.b0 = mpz_get_int64 (b[0]);
+        basis.b1 = mpz_get_int64 (b[1]);
       }
     mpz_clear (a[0]);
     mpz_clear (a[1]);

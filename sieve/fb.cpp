@@ -288,7 +288,7 @@ fb_general_entry::merge (const fb_general_entry &other)
 
 void
 fb_general_entry::transform_roots(fb_general_entry::transformed_entry_t &result,
-                                  qlattice_basis_srcptr basis) const
+                                  const qlattice_basis &basis) const
 {
   result.p = p;
   result.q = q;
@@ -303,7 +303,7 @@ fb_general_entry::transform_roots(fb_general_entry::transformed_entry_t &result,
 
 template <int Nr_roots>
 void
-fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transformed_entry_t &result, qlattice_basis_srcptr basis) const
+fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transformed_entry_t &result, const qlattice_basis &basis) const
 {
   result.p = p;
   /* TODO: Use batch-inversion here */
@@ -388,12 +388,12 @@ fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p, fbprime_
 
 template <class FB_ENTRY_TYPE>
 fb_transformed_vector *
-fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(qlattice_basis_srcptr basis, const int logI) const
+fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const int logI) const
 {
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
   /* Create a transformed vector and store the index of the slice we currently
      transform */
-  const unsigned long special_q = mpz_fits_ulong_p(basis->q) ? mpz_get_ui(basis->q) : 0;
+  const unsigned long special_q = mpz_fits_ulong_p(basis.q) ? mpz_get_ui(basis.q) : 0;
 
   fb_transformed_vector *result = new fb_transformed_vector(get_index());
   size_t i_entry = 0;

@@ -311,7 +311,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   sieve_info_update_norm_data(si, nb_threads);
   if (verbose) {
     verbose_output_print(0, 1, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
-    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
+    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1);
   }
 
   I = si->I;

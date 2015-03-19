@@ -2719,12 +2719,12 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->conf->skewness) != 0)
             continue;
-        si->qbasis->set_q(si->doing->p);
+        si->qbasis.set_q(si->doing->p);
 
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
 #ifndef SUPPORT_LARGE_Q
-        if (si->qbasis->a0 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis->a0 ||
-            si->qbasis->a1 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis->a1)
+        if (si->qbasis.a0 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis.a0 ||
+            si->qbasis.a1 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis.a1)
           {
             fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q. Skipping this special-q.\n");
             continue;
@@ -2745,7 +2745,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Discarding %s q=%Zd; rho=%Zd;" HILIGHT_END,
                                        sidenames[si->conf->side], si->doing->p, si->doing->r);
                 verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n", 
-                                     si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1, si->J);
+                                     si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1, si->J);
                 continue;
             }
         }
@@ -2755,7 +2755,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                                sidenames[si->conf->side], si->doing->p, si->doing->r);
 
         verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
-                             si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
+                             si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1);
         if (si->doing->depth) {
             verbose_output_print(0, 1, " # within descent, currently at depth %d", si->doing->depth);
         }
