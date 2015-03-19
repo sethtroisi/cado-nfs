@@ -46,12 +46,18 @@ struct thread_data : private NonCopyable {
   void update_checksums();
 };
 
-void thread_do(thread_data *, void * (*) (thread_data *), int);
-thread_data *thread_data_alloc(las_info_ptr las, int n);
-void thread_data_free(thread_data *thrs);
-void thread_pickup_si(thread_data *thrs, sieve_info_ptr si, int n);
-void thread_buckets_alloc(thread_data *thrs, unsigned int n);
-void thread_buckets_free(thread_data *thrs, unsigned int n);
-double thread_buckets_max_full(thread_data *thrs, int n);
+class thread_workspaces {
+  thread_data *thrs;
+  const size_t nr_workspaces;
+public:
+  thread_workspaces(size_t n, las_info_ptr _las);
+  ~thread_workspaces();
+  void pickup_si(sieve_info_ptr si);
+  void thread_do(void * (*) (thread_data *));
+  void buckets_alloc();
+  void buckets_free();
+  double buckets_max_full();
+  void accumulate(las_report_ptr, sieve_checksum *);
+};
 
 #endif

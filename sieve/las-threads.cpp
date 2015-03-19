@@ -55,37 +55,38 @@ void thread_data::update_checksums()
     sides[s]->update_checksum();
 }
 
-
-thread_data *thread_data_alloc(las_info_ptr las, int n)
+thread_workspaces::thread_workspaces(const size_t n, las_info_ptr las)
+  : nr_workspaces(n)
 {
-    thread_data *thrs = new thread_data[n];
+    thrs = new thread_data[n];
     ASSERT_ALWAYS(thrs != NULL);
 
-    for(int i = 0 ; i < n ; i++)
+    for(size_t i = 0 ; i < nr_workspaces; i++)
         thrs[i].init(i, las);
-    return thrs;
 }
 
-void thread_data_free(thread_data *thrs)
+thread_workspaces::~thread_workspaces()
 {
     delete[] thrs;
 }
 
-void thread_pickup_si(thread_data *thrs, sieve_info_ptr si, int n)
+void
+thread_workspaces::pickup_si(sieve_info_ptr si)
 {
-    for (int i = 0; i < n ; ++i) {
+    for (size_t i = 0; i < nr_workspaces; ++i) {
         thrs[i].pickup_si(si);
     }
 }
 
-void thread_do(thread_data *thrs, void * (*f) (thread_data *), int n)/*{{{*/
+void
+thread_workspaces::thread_do(void * (*f) (thread_data *))
 {
-    if (n == 1) {
+    if (nr_workspaces == 1) {
         /* Then don't bother with pthread calls */
         (*f)(&thrs[0]);
         return;
     }
-    pthread_t * th = (pthread_t *) malloc(n * sizeof(pthread_t)); 
+    pthread_t * th = (pthread_t *) malloc(nr_workspaces * sizeof(pthread_t)); 
     ASSERT_ALWAYS(th);
 
 #if 0
@@ -94,17 +95,17 @@ void thread_do(thread_data *thrs, void * (*f) (thread_data *), int n)/*{{{*/
      * non-multithreaded way, albeit strictly following the code path of
      * the multithreaded case.
      */
-    for (int i = 0; i < n ; ++i) {
+    for (size_t i = 0; i < nr_workspaces; ++i) {
         (*f)(&thrs[i]);
     }
 #else
-    for (int i = 0; i < n ; ++i) {
+    for (size_t i = 0; i < nr_workspaces; ++i) {
         int ret = pthread_create(&(th[i]), NULL, 
 		(void * (*)(void *)) f,
                 (void *)(&thrs[i]));
         ASSERT_ALWAYS(ret == 0);
     }
-    for (int i = 0; i < n ; ++i) {
+    for (size_t i = 0; i < nr_workspaces; ++i) {
         int ret = pthread_join(th[i], NULL);
         ASSERT_ALWAYS(ret == 0);
     }
@@ -119,9 +120,10 @@ void thread_do(thread_data *thrs, void * (*f) (thread_data *), int n)/*{{{*/
  *
  * Note also that we could consider having bucket_fill_ratio global.
  */
-void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
+void
+thread_workspaces::buckets_alloc()
 {
-  for (unsigned int i = 0; i < n ; ++i) {
+  for (size_t i = 0; i < nr_workspaces; ++i) {
     for(unsigned int side = 0 ; side < 2 ; side++) {
       thread_side_data_ptr ts = thrs[i].sides[side];
       sieve_info_srcptr si = thrs[i].si;
@@ -143,11 +145,12 @@ void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
                    si->sides[side]->max_bucket_fill_ratio, nb_buckets);
     }
   }
-}/*}}}*/
+}
 
-void thread_buckets_free(thread_data *thrs, unsigned int n)/*{{{*/
+void
+thread_workspaces::buckets_free()
 {
-  for (unsigned int i = 0; i < n ; ++i) {
+  for (size_t i = 0; i < nr_workspaces; ++i) {
     for(unsigned int side = 0 ; side < 2 ; side++) {
       // fprintf ("# Freeing buckets, thread->id=%d, side=%d\n", thrs[i].id, side);
       thread_side_data_ptr ts = thrs[i].sides[side];
@@ -156,17 +159,27 @@ void thread_buckets_free(thread_data *thrs, unsigned int n)/*{{{*/
         clear_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA));
     }
   }
-}/*}}}*/
+}
 
-double thread_buckets_max_full(thread_data *thrs, int n)/*{{{*/
+double
+thread_workspaces::buckets_max_full()
 {
     double mf0 = 0;
-    for (int i = 0; i < n ; ++i) {
-        double mf = buckets_max_full (thrs[i].sides[RATIONAL_SIDE]->BA);
+    for (size_t i = 0; i < nr_workspaces; ++i) {
+      for(unsigned int side = 0 ; side < 2 ; side++) {
+        double mf = ::buckets_max_full (thrs[i].sides[side]->BA);
         if (mf > mf0) mf0 = mf;
-        mf = buckets_max_full (thrs[i].sides[ALGEBRAIC_SIDE]->BA);
-        if (mf > mf0) mf0 = mf;
+      }
     }
     return mf0;
-}/*}}}*/
+}
 
+void
+thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
+{
+    for (size_t i = 0; i < nr_workspaces; ++i) {
+        las_report_accumulate(rep, thrs[i].rep);
+        for (int side = 0; side < 2; side++)
+            checksum[side].update(thrs[i].sides[side]->checksum_post_sieve);
+    }
+}

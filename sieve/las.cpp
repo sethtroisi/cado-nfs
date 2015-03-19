@@ -2384,18 +2384,15 @@ void * process_bucket_region(thread_data *th)
  *    timing argument (in seconds).
  *  - merge the per-sq report into a global report
  */
-void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_data *thrs, double qt0)
+void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_workspaces *ws, double qt0)
 {
     /* Display results for this special q */
     las_report rep;
     las_report_init(rep);
     sieve_checksum checksum_post_sieve[2];
     
-    for (int i = 0; i < las->nb_threads; ++i) {
-        las_report_accumulate(rep, thrs[i].rep);
-        for (int side = 0; side < 2; side++)
-            checksum_post_sieve[side].update(thrs[i].sides[side]->checksum_post_sieve);
-    }
+    ws->accumulate(rep, checksum_post_sieve);
+
     verbose_output_print(0, 2, "# ");
     /* verbose_output_print(0, 2, "%lu survivors after rational sieve,", rep->survivors0); */
     verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
@@ -2611,7 +2608,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     tune_las_memset();
     
-    thread_data *thrs = thread_data_alloc(las, las->nb_threads);
+    thread_workspaces *workspaces = new thread_workspaces(las->nb_threads, las);
 
     las_report report;
     las_report_init(report);
@@ -2788,48 +2785,22 @@ int main (int argc0, char *argv0[])/*{{{*/
          * las_report_accumulate_threads_and_display further down, hence
          * this hack).
          */
-        thrs[0].rep->ttbuckets_fill -= seconds();
 
-        thread_pickup_si(thrs, si, las->nb_threads);
+//        thrs[0].rep->ttbuckets_fill -= seconds();
+
+        workspaces->pickup_si(si);
 
         /* Allocate buckets */
-        thread_buckets_alloc(thrs, las->nb_threads);
+        workspaces->buckets_alloc();
 
         /* Fill in rat and alg buckets */
-        thread_do(thrs, &fill_in_buckets_both, las->nb_threads);
+        workspaces->thread_do(&fill_in_buckets_both);
 
-        max_full = MAX(max_full, thread_buckets_max_full(thrs, las->nb_threads));
+        max_full = MAX(max_full, workspaces->buckets_max_full());
         ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
                  fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
-#if 0   /* {{{ I no longer believe we can save something if this happens */
-        /* See bug #14987 on the tracker */
-        if (max_full >= 1.0) {
-            for (i = 0; i < las->nb_threads; ++i) {
-                fprintf(stderr, "intend to free [%d] max_full=%f %f\n",
-                        i,
-                        buckets_max_full (thrs[i]->sides[RATIONAL_SIDE]->BA),
-                        buckets_max_full (thrs[i]->sides[ALGEBRAIC_SIDE]->BA));
-            }
-            thread_buckets_free(thrs); /* may crash. See below */
 
-            si->bucket_limit_multiplier *= 1.1 * max_full;
-            max_full = 1.0/1.1;
-            nroots++;   // ugly: redo the same class
-            // when doing one big malloc, there's some chance that the
-            // bucket overrun actually stepped over the next bucket. In
-            // this case, the freeing of buckets in the code above might
-            // have succeeded, so we can hope to resume with this special
-            // q. On the other hand, if we have one malloc per bucket,
-            // the free() calls above are guaranteed to crash.
-            // Thus it's okay to proceed, if we're lucky enough to reach
-            // here. Note that increasing bucket_limit will have a
-            // permanent effect on the rest of this run.
-            // abort();
-            continue;
-        }
-#endif /* }}} */
-
-        thrs[0].rep->ttbuckets_fill += seconds();
+//        thrs[0].rep->ttbuckets_fill += seconds();
 
         /* This can now be factored out ! */
         for(int side = 0 ; side < 2 ; side++) {
@@ -2848,7 +2819,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * read-write lock, or something like that.
          */
         /* Process bucket regions in parallel */
-        thread_do(thrs, &process_bucket_region, las->nb_threads);
+        workspaces->thread_do(&process_bucket_region);
 
         /* clear */
         for(int side = 0 ; side < 2 ; side++) {
@@ -2856,7 +2827,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             small_sieve_clear(si->sides[side]->rsd);
         }
         qt0 = seconds() - qt0;
-        las_report_accumulate_threads_and_display(las, si, report, thrs, qt0);
+        las_report_accumulate_threads_and_display(las, si, report, workspaces, qt0);
 
 #ifdef TRACE_K
         trace_per_sq_clear(si);
@@ -2865,7 +2836,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             break;
       } // end of loop over special q ideals.
 
-    thread_buckets_free(thrs, las->nb_threads);
+    workspaces->buckets_free();
 
     if (descent_lower) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
@@ -2941,7 +2912,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 	fclose (cof_stats_file);
     }
     //}}}
-    thread_data_free(thrs);
+    delete workspaces;
 
     las_report_clear(report);
 
