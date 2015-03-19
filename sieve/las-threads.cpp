@@ -21,6 +21,7 @@ thread_data_s::thread_data_s() : is_initialized(false)
 {
   /* Allocate memory for the intermediate sum (only one for both sides) */
   SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
+  las_report_init(rep);
 }
 
 thread_data_s::~thread_data_s()
@@ -34,9 +35,9 @@ thread_data_s::~thread_data_s()
 
 void thread_data_s::init(const int _id, las_info_srcptr _las)
 {
+  ASSERT_ALWAYS(!is_initialized);
   id = _id;
   las = _las;
-  las_report_init(rep);
   is_initialized = true;
 }
 
