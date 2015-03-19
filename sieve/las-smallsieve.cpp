@@ -622,7 +622,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ((unsigned char *)pattern)[i] = 0;
         }
 
-        if (pattern[0]) {
+        /* We want to test if there is a non-zero entry in the pattern
+         * within the first 6 entries (we sieve mod 3 and mod 2).
+         * For compatibility with 32-bit machines, we test the first two
+         * pattern unsigned longs */
+        if (pattern[0] || pattern[1]) {
           unsigned long *S_ptr = (unsigned long *) (S + (j << si->conf->logI));
           const unsigned long *end = (unsigned long *)(S + (j << si->conf->logI) + I) - 2;
             
