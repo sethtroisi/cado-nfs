@@ -1180,7 +1180,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	  continue;
 	}
       /*
-	res_fac == 1. Only one factor has been found. Hence, a
+	res_fac == 1. Only one factor has been found. Hence, an
 	auxiliary factorization will be necessary!
        */
       is_smooth[side] = FACUL_AUX;
@@ -1204,6 +1204,10 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 		  }
 		else
 		  {
+                      /* FIXME: there is a bug here. Even if the
+                       * auxiliary factorization has found a factor, it
+                       * does not mean that we have something smooth.
+                       */
 		    is_smooth[side] = FACUL_SMOOTH;
 		    found[side] += found2;
 		  }
