@@ -1051,6 +1051,14 @@ facul_aux (mpz_t *factors, const modset_t m,
 	{
 	  int found2 = facul_aux (factors+res_fac, cfm, strategies,
 				  i+1, side);
+          /* FIXME. BUG here.
+           * If we are already within facul_aux (called from line
+           * 1210-ish below where we have a FIXME item too), and found==1
+           * because we have found a factor, yet found2 is zero, then
+           * found+=found2 will eventually have us return 1, accepted as
+           * meaning we have factored the number, even though this is not
+           * the case.
+           */
 	  if (found2 == FACUL_NOT_SMOOTH)
 	    found = FACUL_NOT_SMOOTH;
 	  else
