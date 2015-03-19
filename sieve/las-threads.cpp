@@ -1,5 +1,4 @@
 #include "cado.h"
-#include <pthread.h>
 #include "memory.h"
 #include "las-threads.h"
 #include "las-types.h"
@@ -56,25 +55,32 @@ void thread_data::update_checksums()
 }
 
 thread_workspaces::thread_workspaces(const size_t n, las_info_ptr las)
-  : nr_workspaces(n)
+  : nr_workspaces(n), mutex(PTHREAD_MUTEX_INITIALIZER)
 {
     thrs = new thread_data[n];
     ASSERT_ALWAYS(thrs != NULL);
+    used = new bool[n];
+    ASSERT_ALWAYS(used != NULL);
 
-    for(size_t i = 0 ; i < nr_workspaces; i++)
+    for(size_t i = 0 ; i < nr_workspaces; i++) {
         thrs[i].init(i, las);
+        used[i] = false;
+    }
 }
 
 thread_workspaces::~thread_workspaces()
 {
     delete[] thrs;
+    delete[] used;
+    pthread_mutex_destroy(&mutex);
 }
 
 void
-thread_workspaces::pickup_si(sieve_info_ptr si)
+thread_workspaces::pickup_si(sieve_info_ptr _si)
 {
+    si = _si;
     for (size_t i = 0; i < nr_workspaces; ++i) {
-        thrs[i].pickup_si(si);
+        thrs[i].pickup_si(_si);
     }
 }
 
@@ -182,4 +188,34 @@ thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
         for (int side = 0; side < 2; side++)
             checksum[side].update(thrs[i].sides[side]->checksum_post_sieve);
     }
+}
+
+thread_data &
+thread_workspaces::reserve_workspace()
+{
+  pthread_mutex_lock(&mutex);
+  size_t i;
+  for (i = 0; i < nr_workspaces; ++i) {
+    if (!used[i])
+      break;
+  }
+  /* Currently no logic to make threads wait until workspace becomes available */
+  ASSERT_ALWAYS(i < nr_workspaces);
+  used[i] = true;
+  pthread_mutex_unlock(&mutex);
+  return thrs[i];
+}
+
+void 
+thread_workspaces::release_workspace(thread_data &ws)
+{
+  pthread_mutex_lock(&mutex);
+  size_t i;
+  for (i = 0; i < nr_workspaces; ++i) {
+    if (&ws == &thrs[i])
+      break;
+  }
+  ASSERT_ALWAYS(i < nr_workspaces);
+  used[i] = false;
+  pthread_mutex_unlock(&mutex);
 }

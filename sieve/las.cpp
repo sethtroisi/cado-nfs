@@ -2807,7 +2807,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         workspaces->buckets_alloc();
 
         /* Fill in rat and alg buckets */
-        workspaces->thread_do(&fill_in_buckets_both);
+        fill_in_buckets_both(*workspaces, 1, si);
 
         max_full = MAX(max_full, workspaces->buckets_max_full());
         ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */

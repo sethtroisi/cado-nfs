@@ -5,6 +5,7 @@
 #include "bucket.h"
 #include "modredc_ul.h"
 #include "modredc_2ul2.h"
+#include "thread.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
@@ -316,15 +317,15 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t 
 
 /* {{{ */
 void
-fill_in_buckets(thread_data *th, const int side,
+fill_in_buckets(bucket_array_t &orig_BA, sieve_info_srcptr const si,
                 const fb_transformed_vector *transformed_vector,
+                const int side MAYBE_UNUSED,
                 const fb_slice_interface *slice MAYBE_UNUSED,
                 where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
-  sieve_info_srcptr si = th->si;
   const slice_index_t slice_index = transformed_vector->get_index();
-  bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
+  bucket_array_t BA = orig_BA;  /* local copy. Gain a register + use stack */
   // Loop over all primes in the factor base.
   //
   // Note that dispatch_fb already arranged so that all the primes
@@ -387,7 +388,7 @@ fill_in_buckets(thread_data *th, const int side,
       FILL_BUCKET();
     }
   }
-  th->sides[side]->BA = BA;
+  orig_BA = BA;
 }
 
 #ifdef HAVE_K_BUCKETS
@@ -920,44 +921,51 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 }
 #endif
 
+class fill_in_buckets_parameters: public task_parameters {
+public:
+  thread_workspaces &ws;
+  const int side;
+  sieve_info_srcptr const si;
+  const fb_slice_interface * const slice;
+  fill_in_buckets_parameters(thread_workspaces &_ws, const int _side, sieve_info_srcptr const _si, const fb_slice_interface *_slice)
+  : ws(_ws), side(_side), si(_si), slice(_slice) {}
+};
 
-void
-fill_in_buckets_one_slice(thread_data *th, const int side, const fb_slice_interface *slice)
+task_result *
+fill_in_buckets_one_slice(fill_in_buckets_parameters *param)
 {
     where_am_I w;
-    WHERE_AM_I_UPDATE(w, si, th->si);
-    const fb_transformed_vector *transformed_vector = slice->make_lattice_bases(th->si->qbasis, th->si->conf->logI);
-    fill_in_buckets(th, side, transformed_vector, slice, w);
+    WHERE_AM_I_UPDATE(w, si, param->si);
+
+    /* Get an unused bucket array that we can write to */
+    thread_data &th = param->ws.reserve_workspace();
+    /* Do the root transform and lattice basis reduction for this factor base slice */
+    const fb_transformed_vector *transformed_vector = param->slice->make_lattice_bases(param->si->qbasis, param->si->conf->logI);
+    /* Fill the buckets */
+    fill_in_buckets(th.sides[param->side]->BA, param->si, transformed_vector, param->side, param->slice, w);
+    /* Release bucket array again */
+    param->ws.release_workspace(th);
     delete transformed_vector;
+    delete param;
+    return (task_result *) NULL;
 }
 
 static void
-fill_in_buckets_one_side(thread_data *th, const int side)
+fill_in_buckets_one_side(thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
 {
-    const fb_part *fb = th->sides[side]->fb;
-    if (th->sides[side]->BA.n_bucket < THRESHOLD_K_BUCKETS) {
-      /* Process all slices in this factor base part */
-      const fb_slice_interface *slice;
-      for (slice_index_t slice_index = fb->get_first_slice_index();
-           (slice = fb->get_slice(slice_index)) != NULL;
-           slice_index++) {
-          fill_in_buckets_one_slice(th, side, slice);
-      }
+    /* Process all slices in this factor base part */
+    const fb_slice_interface *slice;
+    for (slice_index_t slice_index = fb->get_first_slice_index();
+         (slice = fb->get_slice(slice_index)) != NULL;
+         slice_index++) {
+        fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice);
+        fill_in_buckets_one_slice(param);
     }
-#ifdef HAVE_K_BUCKETS
-    else if (th->sides[side]->BA.n_bucket < THRESHOLD_M_BUCKETS)
-      fill_in_k_buckets(th, side, w);
-    else
-      fill_in_m_buckets(th, side, w);
-#else
-    else abort();
-#endif
 }
 
-void * fill_in_buckets_both(thread_data *th)
+void fill_in_buckets_both(thread_workspaces &ws, const int part, sieve_info_srcptr si)
 {
-    fill_in_buckets_one_side(th, ALGEBRAIC_SIDE);
-    fill_in_buckets_one_side(th, RATIONAL_SIDE);
-    return NULL;
+    fill_in_buckets_one_side(ws, si->sides[ALGEBRAIC_SIDE]->fb->get_part(part), si, ALGEBRAIC_SIDE);
+    fill_in_buckets_one_side(ws, si->sides[RATIONAL_SIDE]->fb->get_part(part), si, RATIONAL_SIDE);
 }
 /* }}} */

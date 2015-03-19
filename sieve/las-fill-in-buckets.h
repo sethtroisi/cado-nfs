@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void * fill_in_buckets_both(thread_data *th);
+void fill_in_buckets_both(thread_workspaces &, int, sieve_info_srcptr);
 
 
 #ifdef __cplusplus
