@@ -84,13 +84,13 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
 static inline uint64_t
 redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
 {
+#if LONG_BIT == 64
   int64_t t = ((uint64_t)x)*invp;
   uint64_t u;
 
   // First, compute:
   //    u = (p*t + x) / 2^64
   // This requires 128-bit word addition.
-#if LONG_BIT == 64
   /* Need the high part of a 64x64 mul */
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
@@ -106,24 +106,6 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
   ularith_add_ul_2ul(&rax, &rdx, x);
   u = rdx;
 #endif
-#else // 32-bit support, via gmp
-    mpz_t xx, pp;
-    mpz_t tt, uu;
-    mpz_init(xx); mpz_init(pp);
-    mpz_init(tt); mpz_init(uu);
-    mpz_set_uint64(xx, x);
-    mpz_set_ui(pp, p);
-    mpz_set_int64(tt, t);
-
-    mpz_mul(uu, pp, tt);
-    mpz_add(uu, uu, xx);
-    mpz_tdiv_q_2exp(uu, uu, 64);
-    u = mpz_get_uint64(uu);
-
-    mpz_clear(xx); mpz_clear(pp);
-    mpz_clear(tt); mpz_clear(uu);
-#endif
-
   /* As per the early clobber on rdx, x can't be put in there.
    * Furthermore, since t goes to rax, x doesn't go there either. Thus
    * it is reasonable to assume that it is still unmodified after the
@@ -135,6 +117,30 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
   t -= p;
   if ((int64_t) t >= 0) u = t;
   return u;
+#else // 32-bit support, via gmp
+    uint64_t u;
+    mpz_t xx, pp, invpp;
+    mpz_t tt, uu;
+    mpz_init(xx); mpz_init(pp); mpz_init(invpp);
+    mpz_init(tt); mpz_init(uu);
+    mpz_set_int64(xx, x);
+    mpz_set_ui(pp, p);
+    mpz_set_uint64(invpp, invp);
+
+    mpz_mul(tt, xx, invpp);
+    mpz_fdiv_r_2exp(tt, tt, 64); // mod 2^64, take non-negative remainder.
+    mpz_mul(uu, pp, tt);
+    mpz_add(uu, uu, xx);
+    ASSERT(mpz_divisible_2exp_p(uu, 64));
+    mpz_tdiv_q_2exp(uu, uu, 64);
+    u = mpz_get_uint64(uu);
+    while (u >= p) {
+        u -= p;
+    }
+    mpz_clear(xx); mpz_clear(pp); mpz_clear(invpp);
+    mpz_clear(tt); mpz_clear(uu);
+    return u;
+#endif
 }
 
 
