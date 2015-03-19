@@ -1807,7 +1807,7 @@ bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 NOPROFILE_STATIC int
-factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
+factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 {
     las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
@@ -1898,7 +1898,7 @@ factor_survivors (thread_data_ptr th, int N, where_am_I_ptr w MAYBE_UNUSED)
         WHERE_AM_I_UPDATE(w, side, side);
 
         for (int i = 0; i < las->nb_threads; ++i) {
-            thread_data_ptr other = th + i - th->id;
+            thread_data *other = th + i - th->id;
             purged[side].purge(other->sides[side]->BA, N, SS);
         }
 
@@ -2265,7 +2265,7 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
  * The other threads are accessed by combining the thread pointer th and
  * the thread id: the i-th thread is at th - id + i
  */
-void * process_bucket_region(thread_data_ptr th)
+void * process_bucket_region(thread_data *th)
 {
     where_am_I w MAYBE_UNUSED;
     las_info_srcptr las = th->las;
@@ -2335,7 +2335,7 @@ void * process_bucket_region(thread_data_ptr th)
             /* Apply buckets */
             rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j)  {
-                thread_data_ptr ot = th + j - th->id;
+                thread_data *ot = th + j - th->id;
                 apply_one_bucket(SS, ot->sides[side]->BA, i, ts->fb, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
@@ -2384,7 +2384,7 @@ void * process_bucket_region(thread_data_ptr th)
  *    timing argument (in seconds).
  *  - merge the per-sq report into a global report
  */
-void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_data_ptr thrs, double qt0)
+void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_data *thrs, double qt0)
 {
     /* Display results for this special q */
     las_report rep;
@@ -2611,7 +2611,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     tune_las_memset();
     
-    thread_data_ptr thrs = thread_data_alloc(las, las->nb_threads);
+    thread_data *thrs = thread_data_alloc(las, las->nb_threads);
 
     las_report report;
     las_report_init(report);

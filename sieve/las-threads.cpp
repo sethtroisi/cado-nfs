@@ -17,14 +17,14 @@ thread_side_data_s::~thread_side_data_s()
   bucket_region = NULL;
 }
 
-thread_data_s::thread_data_s() : is_initialized(false)
+thread_data::thread_data() : is_initialized(false)
 {
   /* Allocate memory for the intermediate sum (only one for both sides) */
   SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
   las_report_init(rep);
 }
 
-thread_data_s::~thread_data_s()
+thread_data::~thread_data()
 {
   ASSERT_ALWAYS(is_initialized);
   ASSERT_ALWAYS(SS != NULL);
@@ -33,7 +33,7 @@ thread_data_s::~thread_data_s()
   las_report_clear(rep);
 }
 
-void thread_data_s::init(const int _id, las_info_srcptr _las)
+void thread_data::init(const int _id, las_info_srcptr _las)
 {
   ASSERT_ALWAYS(!is_initialized);
   id = _id;
@@ -41,7 +41,7 @@ void thread_data_s::init(const int _id, las_info_srcptr _las)
   is_initialized = true;
 }
 
-void thread_data_s::pickup_si(sieve_info_ptr _si)
+void thread_data::pickup_si(sieve_info_ptr _si)
 {
   si = _si;
   for(int s = 0 ; s < 2 ; s++) {
@@ -49,16 +49,16 @@ void thread_data_s::pickup_si(sieve_info_ptr _si)
   }
 }
 
-void thread_data_s::update_checksums()
+void thread_data::update_checksums()
 {
   for(int s = 0 ; s < 2 ; s++)
     sides[s]->update_checksum();
 }
 
 
-thread_data_ptr thread_data_alloc(las_info_ptr las, int n)
+thread_data *thread_data_alloc(las_info_ptr las, int n)
 {
-    thread_data_ptr thrs = new thread_data_s[n];
+    thread_data *thrs = new thread_data[n];
     ASSERT_ALWAYS(thrs != NULL);
 
     for(int i = 0 ; i < n ; i++)
@@ -66,19 +66,19 @@ thread_data_ptr thread_data_alloc(las_info_ptr las, int n)
     return thrs;
 }
 
-void thread_data_free(thread_data_ptr thrs)
+void thread_data_free(thread_data *thrs)
 {
     delete[] thrs;
 }
 
-void thread_pickup_si(thread_data_ptr thrs, sieve_info_ptr si, int n)
+void thread_pickup_si(thread_data *thrs, sieve_info_ptr si, int n)
 {
     for (int i = 0; i < n ; ++i) {
         thrs[i].pickup_si(si);
     }
 }
 
-void thread_do(thread_data_ptr thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
+void thread_do(thread_data *thrs, void * (*f) (thread_data *), int n)/*{{{*/
 {
     if (n == 1) {
         /* Then don't bother with pthread calls */
@@ -119,7 +119,7 @@ void thread_do(thread_data_ptr thrs, void * (*f) (thread_data_ptr), int n)/*{{{*
  *
  * Note also that we could consider having bucket_fill_ratio global.
  */
-void thread_buckets_alloc(thread_data_ptr thrs, unsigned int n)/*{{{*/
+void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
 {
   for (unsigned int i = 0; i < n ; ++i) {
     for(unsigned int side = 0 ; side < 2 ; side++) {
@@ -145,13 +145,12 @@ void thread_buckets_alloc(thread_data_ptr thrs, unsigned int n)/*{{{*/
   }
 }/*}}}*/
 
-void thread_buckets_free(thread_data_ptr thrs, unsigned int n)/*{{{*/
+void thread_buckets_free(thread_data *thrs, unsigned int n)/*{{{*/
 {
   for (unsigned int i = 0; i < n ; ++i) {
-    thread_side_data_ptr ts;
     for(unsigned int side = 0 ; side < 2 ; side++) {
       // fprintf ("# Freeing buckets, thread->id=%d, side=%d\n", thrs[i].id, side);
-      ts = thrs[i].sides[side];
+      thread_side_data_ptr ts = thrs[i].sides[side];
       /* if there is no special-q in the interval, the arrays are not malloced */
       if (ts->BA.bucket_write != NULL)
         clear_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA));
@@ -159,7 +158,7 @@ void thread_buckets_free(thread_data_ptr thrs, unsigned int n)/*{{{*/
   }
 }/*}}}*/
 
-double thread_buckets_max_full(thread_data_ptr thrs, int n)/*{{{*/
+double thread_buckets_max_full(thread_data *thrs, int n)/*{{{*/
 {
     double mf0 = 0;
     for (int i = 0; i < n ; ++i) {
