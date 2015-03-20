@@ -771,7 +771,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	    exit(EXIT_FAILURE);
 	}
     }
-    setlinebuf(las->output);
+    setvbuf(las->output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
 
     las->verbose = param_list_parse_switch(pl, "-v");
 
