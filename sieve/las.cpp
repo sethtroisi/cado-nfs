@@ -665,6 +665,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
                 if (t < 10) {
                     sc->sides[s]->lambda = t;
                     sc->sides[s]->mfb = t * sc->sides[s]->lpb;
+                    /* Then no "lambda" is allowed */
                     continue;
                 } else {
                     sc->sides[s]->mfb = t;

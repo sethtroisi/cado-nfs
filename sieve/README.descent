@@ -51,9 +51,13 @@ means (in order):
   400000,47,65 : parameters for the rational side (0 side) 
   		     lim0,lpb0,mfb0
   400000,48,94 : same for the other side (1).
-  (additionnally, the last two blocks accept an optional fourth field for
-  the lambda value, defaulting to mfb0/lpb0+0.1 as everywhere else in
-  cado-nfs).
+
+There are in fact three ways to specify the parameters on both sides.
+400000,47,65 : set lim, lpb, mfb
+400000,47,1.2 : set lim, lpb, lambda (based on the fact the the third field is < 10)
+400000,47,65,1.2 : set lim, lpb, mfb, lambda
+(in the first case, lambda defaults to mfb0/lpb0+0.1 as everywhere else
+in cado-nfs).
 
 At the moment, it is *mandatory* to have the same values for I, lim0, lim1
 on each line. This might change if we see a clear need to make them vary.

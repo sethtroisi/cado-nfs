@@ -104,12 +104,12 @@ def parse_config_line(configline):
     implied['--lim1'] = int(lim1)
     implied['--lpb1'] = int(lpb1)
 
-    if float(mix0) < 10:
+    if float(mix0) >= 10:
         implied['--mfb0'] = int(float(mix0))
     else:
         implied['--mfb0'] = int(float(mix0)*int(lpb0))
         implied['--lambda0'] = float(mix0)
-    if float(mix1) < 10:
+    if float(mix1) >= 10:
         implied['--mfb1'] = int(float(mix1))
     else:
         implied['--mfb1'] = int(float(mix1)*int(lpb1))
