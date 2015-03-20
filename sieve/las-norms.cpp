@@ -1566,11 +1566,11 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
           r = MIN(si->conf->sides[RATIONAL_SIDE]->mfb, maxlog2 - GUARD / rat->scale);
       } else {
           r = MIN(lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
-          if (lambda > max_rlambda)
-              verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
       }
       rat->bound = (unsigned char) (r * rat->scale + GUARD);
       verbose_output_print (0, 1, " bound=%u\n", rat->bound);
+      if (lambda > max_rlambda)
+          verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
   }
 
   /************************** algebraic side *********************************/
@@ -1614,11 +1614,11 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
           r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->mfb, maxlog2 - GUARD / alg->scale);
       } else {
           r = MIN(lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
-          if (lambda > max_alambda)
-              verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
       }
       alg->bound = (unsigned char) (r * alg->scale + GUARD);
       verbose_output_print (0, 1, " bound=%u\n", alg->bound);
+      if (lambda > max_alambda)
+          verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
 
   /* improve bound on J if possible */
