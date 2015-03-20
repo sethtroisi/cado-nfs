@@ -570,9 +570,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 facul_method_t*
 facul_make_aux_methods (int n, const int verbose)
 {
-  if (n <= 0)
-    n = 30;// nb_curves
-
   facul_method_t *methods = malloc ((n+1) * sizeof (facul_method_t));
 
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
@@ -599,7 +596,7 @@ facul_make_aux_methods (int n, const int verbose)
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
       ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
-		     MONTY12, i + 1, 1, 0);
+		     MONTY12, i + 1 + NB_MAX_METHODS, 1, 0);
     }
 
   methods[n].method = 0;
@@ -746,19 +743,20 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   }
   strategies->methods = methods;
   
+  int ncurves[2];
+  ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
+  ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
+  int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
+  // There is an hardcoded bound on the number of methods.
+  // If ncurves0 or ncurves1 passed by the user is too large,
+  // we can not handle that.
+  // TODO: is this really a limitation?
+  ASSERT_ALWAYS (2*(max_ncurves + 4) <= NB_MAX_METHODS);
+
   /*Default strategy. */ 
   if (file == NULL)
     {// make_default_strategy
       verbose_output_print(0, 1, "# Using default strategy for the cofactorization\n");
-      int ncurves[2];
-      ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
-      ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
-      int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
-      // There is an hardcoded bound on the number of methods.
-      // If ncurves0 or ncurves1 passed by the user is too large,
-      // we can not handle that.
-      // TODO: is this really a limitation?
-      ASSERT_ALWAYS (2*(max_ncurves + 4) <= NB_MAX_METHODS);
       strategies->precomputed_methods =
 	facul_make_default_strategy (max_ncurves,verbose);
       for (r = 0; r <= rmfb; r++)
@@ -829,7 +827,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   // Create the auxiliary methods
   // add test to check if it's necessary to create our aux methods
   // TODO: choose a better choice of our number of curves!
-  strategies->methods_aux = facul_make_aux_methods (30, verbose);
+  strategies->methods_aux = facul_make_aux_methods (max_ncurves, verbose);
 
   return strategies;
 }
