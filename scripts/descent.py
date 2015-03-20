@@ -229,7 +229,8 @@ class GeneralClass(object):
         return int(args.threads)
     def poly_data(self):
         d={}
-        for line in open(self.poly(), "r"):
+        with open(self.poly(), "r") as file:
+            for line in file:
                 if re.match("^\s*#", line):
                     continue
                 if re.match("^\s*$", line):
@@ -314,10 +315,11 @@ class GeneralClass(object):
 class RatLogBase(object):
     def __init__(self, general):
         self.known=set()
-        for line in open(general.log(),'r'):
-            foo = re.match("^(\w+) (\w+) (\w+) rat (\d+)$", line)
-            if foo:
-                self.known.add(int(foo.groups()[1], 16))
+        with open(general.log(),'r') as file:
+            for line in file:
+                foo = re.match("^(\w+) (\w+) (\w+) rat (\d+)$", line)
+                if foo:
+                    self.known.add(int(foo.groups()[1], 16))
         print("Found %d known rational logs in %s" %(len(self.known), general.log()))
     def has(self, p):
         return p in self.known
@@ -430,23 +432,21 @@ class DescentUpperClass(object):
             ]
         call_that = [str(x) for x in call_that]
         print("command line:\n" + " ".join(call_that))
-        las = subprocess.Popen(call_that, stdout=subprocess.PIPE)
-
-        rel = None
-        for line in las.stdout:
-            line=line.decode("utf-8")
-            if line[0] == '#':
-                if (re.match("^# \d+ relation", line)):
-                    sys.stdout.write('\n')
-                    print(line.rstrip())
+        with subprocess.Popen(call_that, stdout=subprocess.PIPE) as las:
+            rel = None
+            for line in las.stdout:
+                line=line.decode("utf-8")
+                if line[0] == '#':
+                    if (re.match("^# \d+ relation", line)):
+                        sys.stdout.write('\n')
+                        print(line.rstrip())
+                    else:
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
+                    continue;
                 else:
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                continue;
-            else:
-                rel = line.strip()
-                las.kill()
-                break
+                    rel = line.strip()
+                    break
         sys.stdout.write('\n')
         if not rel:
             raise NameError("No relation found!")
@@ -507,20 +507,23 @@ class DescentMiddleClass(object):
         values_I.add(args.I)
         values_lim0.add(args.lim0)
         values_lim1.add(args.lim1)
-        for line in open(args.descent_hint):
-            if re.match("^\s*#", line):
-                continue
-            if re.match("^\s*$", line):
-                continue
-            line = line.strip()
-            foo=re.match("^.*I=(\d+)\s+(\d+),[\d.,]+\s+(\d+),[\d.,]+$", line)
-            if not foo:
-                print("Warning, parse error in hint file at line:\n" + line);
-                continue
-            I,lim0,lim1 = foo.groups()
-            values_I.add(int(I))
-            values_lim0.add(int(lim0))
-            values_lim1.add(int(lim1))
+        with open(args.descent_hint, 'r') as file:
+            for line in file:
+                if re.match("^\s*#", line):
+                    continue
+                if re.match("^\s*$", line):
+                    continue
+                line = line.strip()
+                foo = re.match("^.*I=(\d+)\s+(\d+),[\d.,]+\s+(\d+),[\d.,]+$",
+                        line)
+                if not foo:
+                    print("Warning, parse error in hint file at line:\n"
+                            + line);
+                    continue
+                I,lim0,lim1 = foo.groups()
+                values_I.add(int(I))
+                values_lim0.add(int(lim0))
+                values_lim1.add(int(lim1))
         if len(values_lim0)>1:
             raise ValueError("lim0 values should match between cmdline and hint file")
         if len(values_lim1)>1:
@@ -536,7 +539,9 @@ class DescentMiddleClass(object):
     def do_descent(self, todofile):
         tmpdir = general.tmpdir()
         prefix = general.prefix() + "-descent_middle."
-        ntodo = len(list(open(todofile, 'r')))
+        f = open(todofile, 'r')
+        ntodo = len(list(f))
+        f.close()
         print ("--- Sieving (middle, %d rational primes) ---" % ntodo)
         s=general.lasMiddle_base_args()
         if args.descent_hint:
@@ -575,7 +580,9 @@ class DescentLowerClass(object):
                             "-renumber", general.renumber(),
                         ]
             call_that = [str(x) for x in call_that]
-            subprocess.check_call(call_that, stdout=open(general.debug_renumber(), 'w'))
+            outfile = open(general.debug_renumber(), 'w')
+            subprocess.check_call(call_that, stdout=outfile)
+            outfile.close()
 
         last_renumber_line = None
 
@@ -594,7 +601,8 @@ class DescentLowerClass(object):
 
         # Read descent relations
         noncomment=lambda x: not re.match("^#",x)
-        descrels = list(filter(noncomment, open(relsfile, 'r')))
+        with open(relsfile, 'r') as file:
+            descrels = list(filter(noncomment, file))
         nrels = len(descrels)
         print ("--- Final reconstruction (from %d relations) ---" % nrels)
 
@@ -669,11 +677,12 @@ class DescentLowerClass(object):
             # of relations to reconstructlog.
             outfile.write("# %d 0 0\n" % nrels)
             extra = iter(extraprimes)
-            for rel in open(fakefilename2, 'r'):
-                rel = rel.rstrip()
-                for p in sum(next(extra),[]):
-                    rel += "," + hex(dictextraprimes[p])[2:]
-                outfile.write(rel + "\n")
+            with open(fakefilename2, 'r') as infile:
+                for rel in infile:
+                    rel = rel.rstrip()
+                    for p in sum(next(extra),[]):
+                        rel += "," + hex(dictextraprimes[p])[2:]
+                    outfile.write(rel + "\n")
 
         newrenumberfilename = os.path.join(tmpdir, prefix + "new-renumber.txt")
         print("--- generating temporary %s ---" % newrenumberfilename)
@@ -682,19 +691,19 @@ class DescentLowerClass(object):
         newlpb = math.ceil(math.log(int(listextraprimes[-1], 16), 2))
         with open(newrenumberfilename, 'w') as file:
             # decompress the old one.
-            old = subprocess.Popen([ "gzip", "-dc", general.renumber() ],
-                    stdout=subprocess.PIPE)
-            # tweak the header
-            header = old.stdout.readline().decode("utf-8").strip().split()
-            header[-1] = str(newlpb)
-            header[-2] = str(newlpb)
-            file.write(" ".join(header) + "\n")
-            # leave the bulk of the file unchanged
-            for x in old.stdout:
-                file.write(x.decode("utf-8"))
-            # add our crap
-            for p in listextraprimes:
-                file.write(hex(int(p, 16)+1)[2:]+'\n')
+            with subprocess.Popen([ "gzip", "-dc", general.renumber() ],
+                    stdout=subprocess.PIPE) as old:
+                # tweak the header
+                header = old.stdout.readline().decode("utf-8").strip().split()
+                header[-1] = str(newlpb)
+                header[-2] = str(newlpb)
+                file.write(" ".join(header) + "\n")
+                # leave the bulk of the file unchanged
+                for x in old.stdout:
+                    file.write(x.decode("utf-8"))
+                # add our crap
+                for p in listextraprimes:
+                    file.write(hex(int(p, 16)+1)[2:]+'\n')
 
         newdlogfilename = os.path.join(tmpdir, prefix + "new-dlog.txt")
         print("--- generating temporary %s ---" % newdlogfilename)
@@ -704,14 +713,15 @@ class DescentLowerClass(object):
         nsm = general.nmaps0() + general.nmaps1()
         with open(newdlogfilename, 'w') as outfile:
             count_sm=0
-            for line in open(general.log(), 'r'):
-                if "SM" in line:
-                    count_sm += 1
-                    ll = line.split()
-                    assert len(ll) == 5
-                    ll[0] = hex(int(ll[0], 16) + len(listextraprimes))[2:]
-                    line = " ".join(ll) + "\n"
-                outfile.write(line)
+            with open(general.log(), 'r') as infile:
+                for line in infile:
+                    if "SM" in line:
+                        count_sm += 1
+                        ll = line.split()
+                        assert len(ll) == 5
+                        ll[0] = hex(int(ll[0], 16) + len(listextraprimes))[2:]
+                        line = " ".join(ll) + "\n"
+                    outfile.write(line)
             assert nsm == count_sm
 
         # create an empty relsdel file
@@ -742,12 +752,13 @@ class DescentLowerClass(object):
         # consistency easily
         wanted["2"]=None
         wanted["3"]=None
-        for line in open(resultfilename, 'r'):
-            foo=re.match("^\w+ (\w+) 0 rat (\d+)$", line)
-            if foo:
-                pp = foo.groups()[0]
-                if pp in wanted:
-                    wanted[pp]=int(foo.groups()[1])
+        with open(resultfilename, 'r') as file:
+            for line in file:
+                foo=re.match("^\w+ (\w+) 0 rat (\d+)$", line)
+                if foo:
+                    pp = foo.groups()[0]
+                    if pp in wanted:
+                        wanted[pp]=int(foo.groups()[1])
         log_target = 0
         for p in factNum:
             pp = hex(int(p))[2:]
