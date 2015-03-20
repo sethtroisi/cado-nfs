@@ -13,12 +13,13 @@
 #include <emmintrin.h>
 #endif
 
+#include "portability.h"
+
 #include "las-config.h"
 #include "las-types.h"
 #include "las-debug.h"
 #include "las-norms.h"
 #include "utils.h"
-#include "portability.h"
 #include "verbose.h"
 
 using namespace std;
