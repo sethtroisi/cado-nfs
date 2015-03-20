@@ -8,7 +8,7 @@
 #   --cadobindir $PWD/build/`hostname`	\
 #   --init-I 9		                \
 #   --init-ncurves 20	                \
-#   --init-lpb 25	                \
+#   --init-lpb 24	                \
 #   --init-lim 1000000	                \
 #   --init-mfb 40	                \
 #   --init-tkewness 8388608		\
@@ -470,7 +470,9 @@ class DescentUpperClass(object):
             for q in factNum + factDen:
                 if known.has(q):
                     continue
-                print("Will do further descent for rational prime %d" % q)
+                logq = math.ceil(math.log(q, 2))
+                print("Will do further descent for %d-bit rational prime %d"
+                        % (logq, q))
                 # las can understand when the rational root is missing
                 f.write("0 %d\n" % q)
         return todofilename, [Num, Den, factNum, factDen]
@@ -545,7 +547,7 @@ class DescentMiddleClass(object):
         print ("--- Sieving (middle, %d rational primes) ---" % ntodo)
         s=general.lasMiddle_base_args()
         if args.descent_hint:
-            s += [ "--descent-hint", args.descent_hint ]
+            s += [ "--descent-hint-table", args.descent_hint ]
         s += [
                 "--I", self.args.I,
                 "--lim0", self.args.lim0,
