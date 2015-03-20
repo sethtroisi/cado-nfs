@@ -6,6 +6,7 @@
 #include <list>
 #include <set>
 #include <map>
+#include <pthread.h>
 #include <algorithm>    /* max */
 
 #include "relation.h"
