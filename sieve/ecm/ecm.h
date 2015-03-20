@@ -1,3 +1,6 @@
+#ifndef ECM_H_
+#define ECM_H_
+
 #include "modredc_ul.h"
 #include "modredc_15ul.h"
 #include "modredc_2ul2.h"
@@ -68,6 +71,10 @@ typedef struct {
 /*   const Edwards_curve_t *E;   /\* Parameters for Edwards curve *\/ */
 /* } ecmE_plan_t; */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* TODO */
 /* ecm_* --> ecmM_* and ecmE_* */
 int ecm_ul (modintredcul_t, const modulusredcul_t, const ecm_plan_t *);
@@ -113,3 +120,9 @@ void ecm_clear_plan (ecm_plan_t *);
 
 /* void ecmE_make_plan (ecmE_plan_t *, const unsigned int, const int);  */
 /* void ecmE_clear_plan (ecmE_plan_t *); */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* ECM_H_ */

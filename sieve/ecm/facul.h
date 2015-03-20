@@ -84,7 +84,7 @@ typedef struct {
 } facul_strategies_t;
 
 
-typedef struct {
+struct modset_t {
   /* The arith variable tells which modulus type has been initialised for 
      arithmetic. It has a value of CHOOSE_NONE if no modulus currently 
      initialised. */
@@ -100,11 +100,11 @@ typedef struct {
   modulusredc15ul_t m_15ul;
   modulusredc2ul2_t m_2ul2;
   modulusmpz_t m_mpz;
-} modset_t;
+};
 
 
 void
-modset_clear (modset_t *);
+modset_clear (struct modset_t *);
 
 
 int nb_curves (unsigned int);
@@ -125,7 +125,7 @@ facul_fprint_strategies (FILE*, facul_strategies_t* );
 
 
 void
-modset_clear (modset_t *modset);
+modset_clear (struct modset_t *modset);
 
 int*
 facul_both (mpz_t**, mpz_t* ,

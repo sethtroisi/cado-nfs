@@ -616,7 +616,7 @@ sieve/ecm/ecm_15ul.c
 sieve/ecm/ecm_2ul2.c
 sieve/ecm/ecm_mpz.c
 sieve/ecm/ecm_ul.c
-sieve/ecm/facul.c
+sieve/ecm/facul.cpp
 sieve/ecm/facul.h
 sieve/ecm/facul_doit.c
 sieve/ecm/facul_doit.h

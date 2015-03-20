@@ -81,36 +81,36 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
 
   if (n == -1)
     n = nb_curves (lpb);
-  strategy = malloc (sizeof (facul_strategy_t));
+  strategy = (facul_strategy_t*) malloc (sizeof (facul_strategy_t));
   strategy->lpb = lpb;
   /* Store fbb^2 in assume_prime_thresh */
   strategy->assume_prime_thresh = (double) fbb * (double) fbb;
   strategy->BBB = (double) fbb * strategy->assume_prime_thresh;
 
-  methods = malloc ((n + 4) * sizeof (facul_method_t));
+  methods = (facul_method_t*) malloc ((n + 4) * sizeof (facul_method_t));
   strategy->methods = methods;
 
   /* run one P-1 curve with B1=315 and B2=2205 */
   methods[0].method = PM1_METHOD;
-  methods[0].plan = malloc (sizeof (pm1_plan_t));
-  pm1_make_plan (methods[0].plan, 315, 2205, verbose);
+  methods[0].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
+  pm1_make_plan ((pm1_plan_t*) methods[0].plan, 315, 2205, verbose);
 
   /* run one P+1 curve with B1=525 and B2=3255 */
   methods[1].method = PP1_27_METHOD;
-  methods[1].plan = malloc (sizeof (pp1_plan_t));
-  pp1_make_plan (methods[1].plan, 525, 3255, verbose);
+  methods[1].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
+  pp1_make_plan ((pp1_plan_t*) methods[1].plan, 525, 3255, verbose);
 
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
   methods[2].method = EC_METHOD;
-  methods[2].plan = malloc (sizeof (ecm_plan_t));
+  methods[2].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
   
-  ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
+  ecm_make_plan ((ecm_plan_t*) methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
 
   if (n > 0)
     {
       methods[3].method = EC_METHOD;
-      methods[3].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+      methods[3].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+      ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
     }
   /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
   double B1 = 105.0;
@@ -125,8 +125,8 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
 	 B2/210-0.5 */
       k = B2 / 210.0;
       methods[i].method = EC_METHOD;
-      methods[i].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+      methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+      ecm_make_plan ((ecm_plan_t*) methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
 		     MONTY12, i - 1, 1, 0);
     }
   methods[n + 3].method = 0;
@@ -145,13 +145,13 @@ facul_clear_strategy (facul_strategy_t *strategy)
   for (i = 0; methods[i].method != 0; i++)
     {
       if (methods[i].method == PM1_METHOD)
-	pm1_clear_plan (methods[i].plan);
+	pm1_clear_plan ((pm1_plan_t*) methods[i].plan);
       else if (methods[i].method == PP1_27_METHOD)
-	pp1_clear_plan (methods[i].plan);
+	pp1_clear_plan ((pp1_plan_t*) methods[i].plan);
       else if (methods[i].method == PP1_65_METHOD)
-	pp1_clear_plan (methods[i].plan);
+	pp1_clear_plan ((pp1_plan_t*) methods[i].plan);
       else if (methods[i].method == EC_METHOD)
-	ecm_clear_plan (methods[i].plan);
+	ecm_clear_plan ((ecm_plan_t*) methods[i].plan);
       methods[i].method = 0;
       free (methods[i].plan);
       methods[i].plan = NULL;
@@ -359,13 +359,11 @@ return_data_ex (char** res, regmatch_t *pmatch, size_t nmatch,
 	  int start = pmatch[i].rm_so;
 	  int end = pmatch[i].rm_eo;
 	  if (start == -1)
-	    {
 	      break;
-	    }
 	  else
 	    {
 	      int size = end-start;
-	      char* el = malloc (sizeof(char)*(size+1));
+	      char* el = (char*) malloc (size+1);
 	      assert (el != NULL);
 	      strncpy (el, &str_process[start], size);
 	      el[size] = '\0';
@@ -409,8 +407,8 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
     {
       // init
       size_t nmatch = 5;
-      regmatch_t *pmatch= calloc (sizeof(*pmatch), nmatch);
-      char **res = malloc (sizeof(char*) * nmatch);
+      regmatch_t *pmatch= (regmatch_t*) calloc (sizeof(*pmatch), nmatch);
+      char **res = (char**) malloc (sizeof(char*) * nmatch);
       /*TEST REGULAR EXPRESSION  'preg_index*/
       regexec (&preg_index, str_process, nmatch, pmatch, 0);
       return_data_ex (res, pmatch, nmatch, str_process);
@@ -509,18 +507,18 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		  void* plan = NULL;
 		  if (method == PM1_METHOD)
 		    {
-		      plan = malloc (sizeof (pm1_plan_t));
-		      pm1_make_plan (plan, B1, B2, verbose);
+		      plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
+		      pm1_make_plan ((pm1_plan_t*) plan, B1, B2, verbose);
 		    }
 		  else if (method == PP1_27_METHOD ||
 			   method == PP1_65_METHOD)
 		    {
-		      plan = malloc (sizeof (pp1_plan_t));
-		      pp1_make_plan (plan, B1, B2, verbose);
+		      plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
+		      pp1_make_plan ((pp1_plan_t*) plan, B1, B2, verbose);
 		    }
 		  else { // method == EC_METHOD
-		    plan = malloc (sizeof (ecm_plan_t));
-		    ecm_make_plan (plan,
+		    plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+		    ecm_make_plan ((ecm_plan_t*) plan,
 				   B1, B2, curve, sigma, 1, verbose);
 		  }
 		  strategies->precomputed_methods[index_prec_fm].method =method;
@@ -570,16 +568,16 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 facul_method_t*
 facul_make_aux_methods (int n, const int verbose)
 {
-  facul_method_t *methods = malloc ((n+1) * sizeof (facul_method_t));
+  facul_method_t *methods = (facul_method_t*) malloc ((n+1) * sizeof (facul_method_t));
 
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
   methods[0].method = EC_METHOD;
-  methods[0].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (methods[0].plan, 105, 3255, MONTY12, 2, 1, verbose);
+  methods[0].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+  ecm_make_plan ((ecm_plan_t*) methods[0].plan, 105, 3255, MONTY12, 2, 1, verbose);
 
   methods[1].method = EC_METHOD;
-  methods[1].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (methods[1].plan, 315, 5355, BRENT12, 11, 1, verbose);
+  methods[1].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+  ecm_make_plan ((ecm_plan_t*) methods[1].plan, 315, 5355, BRENT12, 11, 1, verbose);
 
   /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
   double B1 = 105.0;
@@ -594,8 +592,8 @@ facul_make_aux_methods (int n, const int verbose)
 	 B2/210-0.5 */
       k = B2 / 210.0;
       methods[i].method = EC_METHOD;
-      methods[i].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+      methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+      ecm_make_plan ((ecm_plan_t*) methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
 		     MONTY12, i + 1 + NB_MAX_METHODS, 1, 0);
     }
 
@@ -619,28 +617,28 @@ facul_method_t*
 facul_make_default_strategy (int n, const int verbose)
 {
   ASSERT_ALWAYS (n >= 0);  
-  facul_method_t *methods = malloc ((n+4) * sizeof (facul_method_t));
+  facul_method_t *methods = (facul_method_t*) malloc ((n+4) * sizeof (facul_method_t));
 
   /* run one P-1 curve with B1=315 and B2=2205 */
   methods[0].method = PM1_METHOD;
-  methods[0].plan = malloc (sizeof (pm1_plan_t));
-  pm1_make_plan (methods[0].plan, 315, 2205, verbose);
+  methods[0].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
+  pm1_make_plan ((pm1_plan_t*) methods[0].plan, 315, 2205, verbose);
 
   /* run one P+1 curve with B1=525 and B2=3255 */
   methods[1].method = PP1_27_METHOD;
-  methods[1].plan = malloc (sizeof (pp1_plan_t));
-  pp1_make_plan (methods[1].plan, 525, 3255, verbose);
+  methods[1].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
+  pp1_make_plan ((pp1_plan_t*) methods[1].plan, 525, 3255, verbose);
 
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
   methods[2].method = EC_METHOD;
-  methods[2].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
+  methods[2].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+  ecm_make_plan ((ecm_plan_t*) methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
 
   if (n > 0)
     {
       methods[3].method = EC_METHOD;
-      methods[3].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+      methods[3].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+      ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
     }
 
   /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
@@ -656,8 +654,8 @@ facul_make_default_strategy (int n, const int verbose)
 	 B2/210-0.5 */
       k = B2 / 210.0;
       methods[i].method = EC_METHOD;
-      methods[i].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+      methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+      ecm_make_plan ((ecm_plan_t*) methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
 		     MONTY12, i - 1, 1, 0);
     }
 
@@ -686,13 +684,13 @@ facul_clear_aux_methods (facul_method_t *methods)
   for (int i = 0; methods[i].method != 0; i++)
     {
       if (methods[i].method == PM1_METHOD)
-	pm1_clear_plan (methods[i].plan);
+	pm1_clear_plan ((pm1_plan_t*) methods[i].plan);
       else if (methods[i].method == PP1_27_METHOD)
-	pp1_clear_plan (methods[i].plan);
+	pp1_clear_plan ((pp1_plan_t*) methods[i].plan);
       else if (methods[i].method == PP1_65_METHOD)
-	pp1_clear_plan (methods[i].plan);
+	pp1_clear_plan ((pp1_plan_t*) methods[i].plan);
       else if (methods[i].method == EC_METHOD)
-	ecm_clear_plan (methods[i].plan);
+	ecm_clear_plan ((ecm_plan_t*) methods[i].plan);
       methods[i].method = 0;
       free (methods[i].plan);
       methods[i].plan = NULL;
@@ -713,7 +711,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      int n0, int n1, FILE* file, const int verbose)
 {
   // printf ("create strategies\n");
-  facul_strategies_t* strategies = malloc (sizeof(facul_strategies_t));
+  facul_strategies_t* strategies = (facul_strategies_t*) malloc (sizeof(facul_strategies_t));
   ASSERT (strategies != NULL);
   strategies->mfb[0] = rmfb;
   strategies->mfb[1] = amfb;
@@ -728,15 +726,15 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   strategies->BBB[1] = (double) afbb * strategies->assume_prime_thresh[1];
 
   // alloc methods
-  facul_method_side_t*** methods = malloc (sizeof (*methods) * (rmfb+1));
+  facul_method_side_t*** methods = (facul_method_side_t***) malloc (sizeof (*methods) * (rmfb+1));
   unsigned int r, a;
   // init methods
   for (r = 0; r <= rmfb; r++) {
-    methods[r] = malloc (sizeof (*methods[r]) * (amfb+1));
+    methods[r] = (facul_method_side_t**) malloc (sizeof (*methods[r]) * (amfb+1));
     ASSERT (methods[r] != NULL);
     for (a = 0; a <= amfb; a++)
       {
-	methods[r][a] = malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
+	methods[r][a] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
 	ASSERT (methods[r][a] != NULL);
 	methods[r][a][0].method = NULL;
       }
@@ -782,7 +780,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     {/* to precompute our method from the file.*/
       verbose_output_print(0, 1, "# Read the cofactorization strategy file\n");
       facul_method_t* precomputed_methods =
-	malloc (sizeof(facul_method_t) * NB_MAX_METHODS);
+	(facul_method_t*) malloc (sizeof(facul_method_t) * NB_MAX_METHODS);
       precomputed_methods[0].method = 0;
       precomputed_methods[0].plan = NULL;
       
@@ -846,12 +844,12 @@ facul_clear_strategies (facul_strategies_t *strategies)
       if (fm[j].plan == NULL)
 	continue;
       if (fm[j].method == PM1_METHOD)
-	pm1_clear_plan (fm[j].plan);
+	pm1_clear_plan ((pm1_plan_t*) fm[j].plan);
       else if (fm[j].method == PP1_27_METHOD ||
 	       fm[j].method == PP1_65_METHOD)
-	pp1_clear_plan (fm[j].plan);
+	pp1_clear_plan ((pp1_plan_t*) fm[j].plan);
       else if (fm[j].method == EC_METHOD)
-	ecm_clear_plan (fm[j].plan);
+	ecm_clear_plan ((ecm_plan_t*) fm[j].plan);
       free (fm[j].plan);
       fm[j].method = 0;
       fm[j].plan = NULL;
@@ -972,28 +970,28 @@ facul_aux (mpz_t *factors, const modset_t m,
       int res_fac = 0;
 
       switch (m.arith) {
-      case CHOOSE_UL:
+          case modset_t::CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors, m.m_ul,
 				      methods[i], &fm, &cfm,
 				      strategies->lpb[side],
 				      strategies->assume_prime_thresh[side],
 				      strategies->BBB[side]);
 	break;
-      case CHOOSE_15UL:
+          case modset_t::CHOOSE_15UL:
 	res_fac = facul_doit_onefm_15ul(factors, m.m_15ul,
 					methods[i], &fm, &cfm,
 					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
-      case CHOOSE_2UL2:
+          case modset_t::CHOOSE_2UL2:
 	res_fac = facul_doit_onefm_2ul2 (factors, m.m_2ul2,
 					 methods[i], &fm, &cfm,
 					 strategies->lpb[side],
 					 strategies->assume_prime_thresh[side],
 					 strategies->BBB[side]);
 	break;
-      case CHOOSE_MPZ:
+          case modset_t::CHOOSE_MPZ:
 	res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
 					methods[i], &fm, &cfm,
 					strategies->lpb[side],
@@ -1029,7 +1027,7 @@ facul_aux (mpz_t *factors, const modset_t m,
 	res_fac == 1  Only one factor has been found. Hence, our
 	factorization is not finished.
       */
-      if (fm.arith != CHOOSE_NONE)
+      if (fm.arith != modset_t::CHOOSE_NONE)
 	{
 	  int found2 = facul_aux (factors+res_fac, fm, strategies,
 				  i+1, side);
@@ -1044,7 +1042,7 @@ facul_aux (mpz_t *factors, const modset_t m,
 	    found += found2;
 	  modset_clear (&fm);
 	}
-      if (cfm.arith != CHOOSE_NONE)
+      if (cfm.arith != modset_t::CHOOSE_NONE)
 	{
 	  int found2 = facul_aux (factors+res_fac, cfm, strategies,
 				  i+1, side);
@@ -1079,7 +1077,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 		const facul_strategies_t *strategies, int* cof,
 		int* is_smooth)
 {
-  int* found = calloc(2, sizeof(int));
+  int* found = (int*) calloc(2, sizeof(int));
 
   facul_method_side_t* methods = strategies->methods[cof[0]][cof[1]];
 
@@ -1087,10 +1085,10 @@ facul_both_src (mpz_t **factors, const modset_t* m,
     return found;
 
   modset_t f[2][2];
-  f[0][0].arith = CHOOSE_NONE;
-  f[0][1].arith = CHOOSE_NONE;
-  f[1][0].arith = CHOOSE_NONE;
-  f[1][1].arith = CHOOSE_NONE;
+  f[0][0].arith = modset_t::CHOOSE_NONE;
+  f[0][1].arith = modset_t::CHOOSE_NONE;
+  f[1][0].arith = modset_t::CHOOSE_NONE;
+  f[1][1].arith = modset_t::CHOOSE_NONE;
   int stats_nb_side = 0, stats_index_transition = 0;
   for (int i = 0; methods[i].method != NULL; i++)
     {
@@ -1112,28 +1110,28 @@ facul_both_src (mpz_t **factors, const modset_t* m,
       // }
       int res_fac = 0;
       switch (m[side].arith) {
-      case CHOOSE_UL:
+          case modset_t::CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors[side], m[side].m_ul,
 				      *methods[i].method, &f[side][0], &f[side][1],
 				      strategies->lpb[side],
 				      strategies->assume_prime_thresh[side],
 				      strategies->BBB[side]);
 	break;
-      case CHOOSE_15UL:
+          case modset_t::CHOOSE_15UL:
 	res_fac = facul_doit_onefm_15ul(factors[side], m[side].m_15ul,
 					*methods[i].method, &f[side][0], &f[side][1],
 					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
-      case CHOOSE_2UL2:
+          case modset_t::CHOOSE_2UL2:
 	res_fac = facul_doit_onefm_2ul2 (factors[side], m[side].m_2ul2,
 					 *methods[i].method, &f[side][0], &f[side][1],
 					 strategies->lpb[side],
 					 strategies->assume_prime_thresh[side],
 					 strategies->BBB[side]);
 	break;
-      case CHOOSE_MPZ:
+          case modset_t::CHOOSE_MPZ:
 	res_fac = facul_doit_onefm_mpz (factors[side], m[side].m_mpz,
 					*methods[i].method, &f[side][0], &f[side][1],
 					strategies->lpb[side],
@@ -1189,7 +1187,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	for (int ind_cof = 0; ind_cof < 2; ind_cof++)
 	  {
 	    // factor f[side][0] or/and f[side][1]
-	    if (f[side][ind_cof].arith != CHOOSE_NONE)
+	    if (f[side][ind_cof].arith != modset_t::CHOOSE_NONE)
 	      {
 		int found2 = facul_aux (factors[side]+found[side],
 					f[side][ind_cof], strategies, 0, side);
@@ -1229,8 +1227,8 @@ facul_both (mpz_t **factors, mpz_t* N,
   int* found = NULL;
 
   modset_t n[2];
-  n[0].arith = CHOOSE_NONE;
-  n[1].arith = CHOOSE_NONE;
+  n[0].arith = modset_t::CHOOSE_NONE;
+  n[1].arith = modset_t::CHOOSE_NONE;
 
 #ifdef PARI
   gmp_fprintf (stderr, "(%Zd %Zd)", N[0], N[1]);
@@ -1259,7 +1257,7 @@ facul_both (mpz_t **factors, mpz_t* N,
 	{
 	  ASSERT(mpz_fits_ulong_p(N[side]));
 	  modredcul_initmod_ul (n[side].m_ul, mpz_get_ui(N[side]));
-	  n[side].arith = CHOOSE_UL;
+	  n[side].arith = modset_t::CHOOSE_UL;
 	}
       else if (bits <= MODREDC15UL_MAXBITS)
 	{
@@ -1270,7 +1268,7 @@ facul_both (mpz_t **factors, mpz_t* N,
 	  ASSERT_ALWAYS(written <= 2);
 	  modredc15ul_intset_uls (m, t, written);
 	  modredc15ul_initmod_int (n[side].m_15ul, m);
-	  n[side].arith = CHOOSE_15UL;
+	  n[side].arith = modset_t::CHOOSE_15UL;
 	}
       else if (bits <= MODREDC2UL2_MAXBITS)
 	{
@@ -1281,14 +1279,14 @@ facul_both (mpz_t **factors, mpz_t* N,
 	  ASSERT_ALWAYS(written <= 2);
 	  modredc2ul2_intset_uls (m, t, written);
 	  modredc2ul2_initmod_int (n[side].m_2ul2, m);
-	  n[side].arith = CHOOSE_2UL2;
+	  n[side].arith = modset_t::CHOOSE_2UL2;
 	}
       else
 	{
 	  modmpz_initmod_int (n[side].m_mpz, N[side]);
-	  n[side].arith = CHOOSE_MPZ;
+	  n[side].arith = modset_t::CHOOSE_MPZ;
 	}
-      ASSERT (n[side].arith != CHOOSE_NONE);
+      ASSERT (n[side].arith != modset_t::CHOOSE_NONE);
     }
 
   found = facul_both_src (factors, n, strategies, cof, is_smooth);
@@ -1319,22 +1317,22 @@ void
 modset_clear (modset_t *modset)
 {
   switch (modset->arith) {
-  case CHOOSE_NONE: /* already clear */
+      case modset_t::CHOOSE_NONE: /* already clear */
     break;
-  case CHOOSE_UL:
+      case modset_t::CHOOSE_UL:
     modredcul_clearmod (modset->m_ul);
     break;
-  case CHOOSE_15UL:
+      case modset_t::CHOOSE_15UL:
     modredc15ul_clearmod (modset->m_15ul);
     break;
-  case CHOOSE_2UL2:
+      case modset_t::CHOOSE_2UL2:
     modredc2ul2_clearmod (modset->m_2ul2);
     break;
-  case CHOOSE_MPZ:
+      case modset_t::CHOOSE_MPZ:
     modmpz_clearmod (modset->m_mpz);
     break;
   default:
     abort();
   }
-  modset->arith = CHOOSE_NONE;
+  modset->arith = modset_t::CHOOSE_NONE;
 }
