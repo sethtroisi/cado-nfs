@@ -58,6 +58,31 @@ static const int bucket_region = 1 << LOG_BUCKET_REGION;
 
 /* {{{ Some code for information purposes only */
 
+
+int
+small_sieve_dump(FILE *f, const char *header, va_list va)
+{
+    const small_sieve_data_t * ssd = va_arg(va, const small_sieve_data_t *);
+    const ssp_marker_t * next_marker = ssd->markers;
+    const ssp_t *ssp = ssd->ssp;
+    const unsigned char *logp = ssd->logp;
+
+    fprintf(f, "%s", header);
+    for (int i = 0; !(next_marker->index == i && next_marker->event == SSP_END); i++) {
+        fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
+            ssp[i].p, ssp[i].r, ssp[i].offset, logp[i]);
+        for ( ; next_marker->index == i; next_marker++) {
+            switch (next_marker->event) {
+                case SSP_POW2 : fprintf(f, " (power of 2)"); break;
+                case SSP_PROJ : fprintf(f, " (projective root)"); break;
+                case SSP_DISCARD : fprintf(f, "(discarded)"); break;
+            }
+        }
+        fprintf(f, "\n");
+    }
+    return 1;
+}
+
 static void small_sieve_print_contents(const char * prefix, small_sieve_data_t * ssd)
 {
     ssp_marker_t * next_marker = ssd->markers;
@@ -81,6 +106,8 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
     verbose_output_print(0, 1, ".");
     if (ndiscard) verbose_output_print(0, 1, " %d discarded.", ndiscard);
     verbose_output_print(0, 1, "\n");
+    /* With -v -v -v, dump all the small sieve data */
+    verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", ssd);
 }
 
 
@@ -168,8 +195,8 @@ static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsig
         tail->U = 0;
     } else {
         int rc;
-        uint64_t U = v / g; /* coprime to q */
-        rc = invmod(&U, q);
+        uint32_t U = v / g; /* coprime to q */
+        rc = invmod_32(&U, q);
         ASSERT_ALWAYS(rc != 0);
         tail->U = U;
     }
@@ -595,7 +622,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ((unsigned char *)pattern)[i] = 0;
         }
 
-        if (pattern[0]) {
+        /* We want to test if there is a non-zero entry in the pattern
+         * within the first 6 entries (we sieve mod 3 and mod 2).
+         * For compatibility with 32-bit machines, we test the first two
+         * pattern unsigned longs */
+        if (pattern[0] || pattern[1]) {
           unsigned long *S_ptr = (unsigned long *) (S + (j << si->conf->logI));
           const unsigned long *end = (unsigned long *)(S + (j << si->conf->logI) + I) - 2;
             

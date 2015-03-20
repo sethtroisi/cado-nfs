@@ -1,5 +1,7 @@
 #include "cado.h"
 #include "utils.h"
+#include "relation.h"
+#include "relation-tools.h"
 #include "tests_common.h"
 
 unsigned long
@@ -77,55 +79,46 @@ test_compute_r (unsigned int nb)
 int test_compute_all_r (unsigned int nb)
 {
   int err = 0;
-  relation_t t1[1], t2[1];
   mpz_t tp, ta, tb;
   mpz_init (tp);
   mpz_init (ta);
   mpz_init (tb);
-  unsigned long p;
 
   for (unsigned int i = 0; i < nb; i++)
   {
-    relation_init (t1);
-    relation_init (t2);
-    t1->a = random_int64 ();
-    t1->b = random_uint64 () + 1; /* b > 0 */
+    relation t1(random_int64(), random_uint64 () + 1); // b > 0
 
     for (uint8_t k = 0; k <= lrand48() % 5; k++)
     {
       mpz_set_ui (tp, lrand48());
       mpz_nextprime(tp, tp);
-      p = mpz_get_ui (tp);
-      relation_add_prime(t1, RATIONAL_SIDE, p);
+      t1.add(RATIONAL_SIDE, tp, NULL);
     }
     for (uint8_t k = 0; k <= lrand48() % 5; k++)
     {
       mpz_set_ui (tp, lrand48());
       mpz_nextprime(tp, tp);
-      p = mpz_get_ui (tp);
-      relation_add_prime(t1, ALGEBRAIC_SIDE, p);
+      t1.add(ALGEBRAIC_SIDE, tp, NULL);
     }
 
-    relation_copy (t2, t1);
-    relation_compute_all_r (t1);
+    relation t2 = t1;
+    t1.fixup_r();
 
-    for (uint8_t k = 0; k < t2->nb_ap; k++)
+    for (uint8_t k = 0; k < t2.sides[1].size() ; k++)
     {
-      mpz_set_int64 (ta, t2->a);
-      mpz_set_uint64 (tb, t2->b);
-      mpz_set_ui (tp, t2->ap[k].p);
+      mpz_set_int64 (ta, t2.a);
+      mpz_set_uint64 (tb, t2.b);
+      mpz_set (tp, t2.sides[1][k].p);
       unsigned long r = mpz_compute_r (ta, tb, tp);
-      if (r != t1->ap[k].r)
+      if (r != mpz_get_ui(t1.sides[1][k].r))
       {
         gmp_fprintf (stderr, "ERROR: a=%" PRId64 " b=%" PRIu64" p=%" PRpr "\n"
-                     "Got r=%" PRpr " instead of %" PRpr "\n", t2->a, t2->b,
-                     t2->ap[k].p, t1->ap[k].r, r);
+                     "Got r=%" PRpr " instead of %" PRpr "\n",
+                     t2.a, t2.b,
+                     t2.sides[1][k].p, t1.sides[1][k].r, r);
         err++;
       }
     }
-
-    relation_clear (t1);
-    relation_clear (t2);
   }
 
   mpz_clear (ta);

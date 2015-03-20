@@ -60,7 +60,7 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
 }
 
 /* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
-static void
+void
 accumulate_fast_end (mpz_t *prd, unsigned long lprd)
 {
   unsigned long i;
@@ -113,6 +113,29 @@ get_depalgname (const char *prefix, int numdep)
   return get_depname (prefix, "alg.", numdep);
 }
 
+static FILE*
+fopen_maybe_compressed_lock (const char * name, const char * mode)
+{
+  FILE *fp;
+
+  pthread_mutex_lock (&lock);
+  fp = fopen_maybe_compressed (name, mode);
+  pthread_mutex_unlock (&lock);
+  return fp;
+}
+
+static int
+fclose_maybe_compressed_lock (FILE * f, const char * name)
+{
+  int ret;
+
+  pthread_mutex_lock (&lock);
+  ret = fclose_maybe_compressed (f, name);
+  pthread_mutex_unlock (&lock);
+  return ret;
+}
+
+/* this function is run sequentially, thus no need to be thread-safe */
 static int
 check_dep (const char *prefix, int numdep)
 {
@@ -158,9 +181,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
 #else
   fprintf (stderr, "Using GMP %s\n", gmp_version);
 #endif
-  depfile = fopen_maybe_compressed (depname, "rb");
-  ASSERT_ALWAYS(depfile != NULL);
   pthread_mutex_unlock (&lock);
+  depfile = fopen_maybe_compressed_lock (depname, "rb");
+  ASSERT_ALWAYS(depfile != NULL);
 
   mpz_init (v);
 
@@ -210,10 +233,10 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
         if (feof (depfile))
           break;
       }
-  pthread_mutex_lock (&lock);
-  fclose_maybe_compressed (depfile, depname);
+  fclose_maybe_compressed_lock (depfile, depname);
   free (depname);
 
+  pthread_mutex_lock (&lock);
   fprintf (stderr, "SqrtRat(%d): read %lu (a,b) pairs, including %lu free\n",
            numdep, ab_pairs, freerels);
   pthread_mutex_unlock (&lock);
@@ -296,16 +319,18 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   pthread_mutex_lock (&lock);
   fprintf (stderr, "SqrtRat(%d): computed g1^(nab/2) mod n at %lums\n",
            numdep, milliseconds ());
-  ratfile = fopen_maybe_compressed (ratname, "wb");
+  pthread_mutex_unlock (&lock);
+  ratfile = fopen_maybe_compressed_lock (ratname, "wb");
 
   mpz_invert (v, v, Np);
   mpz_mul (prd[0], prd[0], v);
   mpz_mod (prd[0], prd[0], Np);
   
   gmp_fprintf (ratfile, "%Zd\n", prd[0]);
-  fclose_maybe_compressed (ratfile, ratname);
+  fclose_maybe_compressed_lock (ratfile, ratname);
   free (ratname);
 
+  pthread_mutex_lock (&lock);
   gmp_fprintf (stderr, "SqrtRat(%d): square root is %Zd\n", numdep, prd[0]);
   fprintf (stderr, "SqrtRat(%d): square root time: %lums\n", numdep,
            milliseconds ());
@@ -774,9 +799,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
     algname = get_depalgname (prefix, numdep);
   else
     algname = get_depratname (prefix, numdep);
-  pthread_mutex_lock (&lock);
-  depfile = fopen_maybe_compressed (depname, "rb");
-  pthread_mutex_unlock (&lock);
+  depfile = fopen_maybe_compressed_lock (depname, "rb");
   ASSERT_ALWAYS(depfile != NULL);
 
   deg = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->deg;
@@ -851,9 +874,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
        *      denominator, and the algorithm can continue.
        */
       accumulate_fast_F_end (prd_tab, F, lprd);
-      pthread_mutex_lock (&lock);
-      fclose_maybe_compressed (depfile, depname);
-      pthread_mutex_unlock (&lock);
+      fclose_maybe_compressed_lock (depfile, depname);
       free (depname);
   
       mpz_poly_set(prd->p, prd_tab[0]->p);
@@ -899,11 +920,11 @@ calculateSqrtAlg (const char *prefix, int numdep,
     mpz_mul(algsqrt, algsqrt, aux);
     mpz_mod(algsqrt, algsqrt, Np);
   
-    pthread_mutex_lock (&lock);
-    algfile = fopen_maybe_compressed (algname, "wb");
+    algfile = fopen_maybe_compressed_lock (algname, "wb");
     gmp_fprintf (algfile, "%Zd\n", algsqrt);
-    fclose_maybe_compressed (algfile, algname);
+    fclose_maybe_compressed_lock (algfile, algname);
 
+    pthread_mutex_lock (&lock);
     gmp_fprintf (stderr, "AlgSqrt(%d): square root is: %Zd\n",
                  numdep, algsqrt);
     fprintf (stderr, "AlgSqrt(%d): square root time is %2.2lf\n",
@@ -1001,10 +1022,8 @@ calculateGcd (const char *prefix, int numdep, mpz_t Np)
     mpz_init(g1);
     mpz_init(g2);
   
-    pthread_mutex_lock (&lock);
-    ratfile = fopen_maybe_compressed (ratname, "rb");
-    algfile = fopen_maybe_compressed (algname, "rb");
-    pthread_mutex_unlock (&lock);
+    ratfile = fopen_maybe_compressed_lock (ratname, "rb");
+    algfile = fopen_maybe_compressed_lock (algname, "rb");
     if (ratfile == NULL)
       {
         fprintf(stderr, "Error, cannot open file %s for reading\n", ratname);
@@ -1018,10 +1037,8 @@ calculateGcd (const char *prefix, int numdep, mpz_t Np)
     ASSERT_ALWAYS(algfile != NULL);
     gmp_fscanf(ratfile, "%Zd", ratsqrt);
     gmp_fscanf(algfile, "%Zd", algsqrt);
-    pthread_mutex_lock (&lock);
-    fclose_maybe_compressed (ratfile, ratname);
-    fclose_maybe_compressed (algfile, algname);
-    pthread_mutex_unlock (&lock);
+    fclose_maybe_compressed_lock (ratfile, ratname);
+    fclose_maybe_compressed_lock (algfile, algname);
     free (ratname);
     free (algname);
 

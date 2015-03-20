@@ -2764,7 +2764,9 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     if (rhs_name) {
-        get_rhs_file_header(rhs_name, NULL, &(bm->d->nrhs), NULL);
+        if (!rank)
+            get_rhs_file_header(rhs_name, NULL, &(bm->d->nrhs), NULL);
+        MPI_Bcast(&bm->d->nrhs, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
     }
 
     unsigned int m = d->m;

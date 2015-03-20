@@ -295,11 +295,16 @@ tasks.linalg.characters.threads = 2
 # Work unit server
 ###########################################################################
 
-# address: The server of the client/server set-up will listen at this
-# address. Note that listening on address "localhost" will allow only
-# clients running on the same machine to connect. If not specified, the
-# "*" (a.k.a 0.0.0.0) wild-card address is used, which listens on all
-# network devices so other machines can connect.
+# address: The IP address where the server will listen for incoming
+# connections from clients.  The default behavior if not set is to
+# listen on all network devices (that is, to listen on the wild-card
+# address 0.0.0.0).  If a hostname is given, will call gethostbyname()
+# to discover the associated IP address and listen for connections
+# only on that interface.  For example, listening on address
+# "localhost" will only allow clients running on the same machine to
+# connect.  You should not set this explicitly unless you really only
+# want to listen on that particular address and interface.
+
 # server.address = localhost
 
 # port: The server of the client/server set-up will listen at this port

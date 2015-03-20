@@ -96,6 +96,12 @@
 #include "worker-threads.h"
 
 
+typedef struct {
+    unsigned long p;      /* algebraic prime */
+    unsigned long r;      /* corresponding root: r = a/b mod p */
+    int e;                /* exponent (may want negative exponent in sqrt) */
+} alg_prime_t;
+
 /* Calculates a 64-bit word with the values of the characters chi(a,b), where
  * chi ranges from chars to chars+64
  */

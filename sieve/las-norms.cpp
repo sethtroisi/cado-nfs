@@ -1,7 +1,8 @@
 #include "cado.h"
 #include <string.h>
 #include <limits.h>
-#include <math.h>               /* ceil */
+#include <cmath>               /* ceil signbit */
+#include <pthread.h>
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
@@ -13,12 +14,16 @@
 #include <emmintrin.h>
 #endif
 
+#include "portability.h"
+
 #include "las-config.h"
+#include "las-types.h"
 #include "las-debug.h"
 #include "las-norms.h"
 #include "utils.h"
-#include "portability.h"
 #include "verbose.h"
+
+using namespace std;
 
 static long lg_page;
 
@@ -231,7 +236,7 @@ MAYBE_UNUSED static inline void w64lg2abs(double i, double add, double scale, ui
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
-  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
+  *(uint64_t *)&addr[decal] = UINT64_C(0x0101010101010101) * (uint64_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
 #endif
 }
 
@@ -1405,9 +1410,10 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 }
 
 
-/* return 0 if we should discard that special-q, in which case we intend
- * to discard this special-q. For this reason, si->J is then set to an
- * unrounded value, for diagnostic.
+/* return 0 if we should discard that special-q because the rounded
+ * region in the (a,b)-plane is flat to the point of having height 0.
+ * For diagnostic, we set si->J to the unrounded value (rounding would
+ * give 0) and then we return "false".
  *
  * The current check for discarding is whether we do fill one bucket or
  * not. If we don't even achieve that, we should of course discard.
@@ -1434,21 +1440,21 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
     if (verbose) {
         printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
                "; a1=%" PRId64 "; b1=%" PRId64 "), p=%lu, skew=%f, nb_threads=%d)\n",
-               si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1,
+               si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1,
                mpz_get_ui(si->doing->p), skewness, nb_threads);
     }
     double maxab1, maxab0;
-    maxab1 = si->qbasis->b1 * skewness;
-    maxab1 = maxab1 * maxab1 + si->qbasis->a1 * si->qbasis->a1;
-    maxab0 = si->qbasis->b0 * skewness;
-    maxab0 = maxab0 * maxab0 + si->qbasis->a0 * si->qbasis->a0;
+    maxab1 = si->qbasis.b1 * skewness;
+    maxab1 = maxab1 * maxab1 + si->qbasis.a1 * si->qbasis.a1;
+    maxab0 = si->qbasis.b0 * skewness;
+    maxab0 = maxab0 * maxab0 + si->qbasis.a0 * si->qbasis.a0;
     if (maxab0 > maxab1) { /* exchange u and v, thus I and J */
-        int64_t oa[2] = { si->qbasis->a0, si->qbasis->a1 };
-        int64_t ob[2] = { si->qbasis->b0, si->qbasis->b1 };
-        si->qbasis->a0 = oa[1]; si->qbasis->a1 = oa[0];
-        si->qbasis->b0 = ob[1]; si->qbasis->b1 = ob[0];
+        int64_t oa[2] = { si->qbasis.a0, si->qbasis.a1 };
+        int64_t ob[2] = { si->qbasis.b0, si->qbasis.b1 };
+        si->qbasis.a0 = oa[1]; si->qbasis.a1 = oa[0];
+        si->qbasis.b0 = ob[1]; si->qbasis.b1 = ob[0];
     }
-    maxab1 = MAX(labs(si->qbasis->a1), labs(si->qbasis->b1) * skewness);
+    maxab1 = MAX(labs(si->qbasis.a1), labs(si->qbasis.b1) * skewness);
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
@@ -1494,7 +1500,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
 void
 sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
 {
-  int64_t H[4] = { si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1 };
+  int64_t H[4] = { si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1 };
 
   double step, begin;
   double r, maxlog2;
@@ -1554,13 +1560,20 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
-  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
-  rat->bound = (unsigned char) (r * rat->scale + GUARD);
-  verbose_output_print (0, 1, " bound=%u\n", rat->bound);
-  double max_rlambda = (maxlog2 - GUARD / rat->scale) /
-      si->conf->sides[RATIONAL_SIDE]->lpb;
-  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda)
-    verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  {
+      double max_rlambda = (maxlog2 - GUARD / rat->scale) /
+          si->conf->sides[RATIONAL_SIDE]->lpb;
+      double lambda = si->conf->sides[RATIONAL_SIDE]->lambda;
+      if (lambda == 0) {
+          r = MIN(si->conf->sides[RATIONAL_SIDE]->mfb, maxlog2 - GUARD / rat->scale);
+      } else {
+          r = MIN(lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
+      }
+      rat->bound = (unsigned char) (r * rat->scale + GUARD);
+      verbose_output_print (0, 1, " bound=%u\n", rat->bound);
+      if (lambda > max_rlambda)
+          verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  }
 
   /************************** algebraic side *********************************/
 
@@ -1595,13 +1608,20 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
-  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
-  alg->bound = (unsigned char) (r * alg->scale + GUARD);
-  verbose_output_print (0, 1, " bound=%u\n", alg->bound);
-  double max_alambda = (maxlog2 - GUARD / alg->scale) /
-      si->conf->sides[ALGEBRAIC_SIDE]->lpb;
-  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda)
-    verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  {
+      double max_alambda = (maxlog2 - GUARD / alg->scale) /
+          si->conf->sides[ALGEBRAIC_SIDE]->lpb;
+      double lambda = si->conf->sides[ALGEBRAIC_SIDE]->lambda;
+      if (lambda == 0) {
+          r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->mfb, maxlog2 - GUARD / alg->scale);
+      } else {
+          r = MIN(lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
+      }
+      alg->bound = (unsigned char) (r * alg->scale + GUARD);
+      verbose_output_print (0, 1, " bound=%u\n", alg->bound);
+      if (lambda > max_alambda)
+          verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  }
 
   /* improve bound on J if possible */
   unsigned int Jmax;

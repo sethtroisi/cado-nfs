@@ -306,53 +306,118 @@ static unsigned int Primes[MAX_PRIMES] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31
 
 static int prime_index[INDEX];
 
-mpz_t nextprime_bitfield;
+/* nextprime_start must be odd, unless it is uninitialised. */
 unsigned long nextprime_start = 0;
+/* The i-th bit (0-based) of nextprime_bitfield is 1 iff nextprime_start + 2*i
+   is prime. */
+mpz_t nextprime_bitfield;
 /* Code below is meant to be correct for any nextprime_len > 0 */
-const size_t nextprime_len = 8192;
+const size_t nextprime_len = 4096;
+
+static unsigned long
+nextprime_idx_to_n(const unsigned long idx)
+{
+  return nextprime_start + 2*idx;
+}
+
+static inline unsigned long
+nextprime_n_to_idx(const unsigned long n)
+{
+  // ASSERT_ALWAYS(n % 2 == 1);
+  // ASSERT_ALWAYS(nextprime_start % 2 == 1);
+  // ASSERT_ALWAYS(n >= nextprime_start);
+  return (n - nextprime_start) / 2;
+}
+
+/* The smallest n which is above the current nextprime_bitfield.
+   Non-mapped n (i.e., even ones) count as being in the bitfield. */
+static inline unsigned long
+nextprime_end()
+{
+  return nextprime_idx_to_n(nextprime_len);
+}
+
+static inline unsigned long
+negmod(const unsigned long a, const unsigned long p)
+{
+  if (a == 0)
+    return 0;
+  else
+    return p - a;
+}
+
+static inline unsigned long
+div2mod(const unsigned long a, const unsigned long p)
+{
+  if (a % 2 == 0)
+    return a / 2;
+  else
+    return (a + p) / 2;
+  /* Risk of overflow here - do we care? Could be rewritten as
+     return p - (p - a) / 2;
+     which is correct so long as a < p */
+}
 
 STATIC void
-nextprime_init(const unsigned long first)
+nextprime_init(const unsigned long _first)
 {
+  /* Always start at an odd index */
+  nextprime_start = _first | 1;
+
   /* nextprime_bitfield = 2^nextprime_len - 1 */
   mpz_set_ui(nextprime_bitfield, 1);
   mpz_mul_2exp(nextprime_bitfield, nextprime_bitfield, nextprime_len);
   mpz_sub_ui(nextprime_bitfield, nextprime_bitfield, 1);
 
-  const unsigned long last = first + nextprime_len;
-  for (size_t i = 0; Primes[i] * Primes[i] < last; i++) {
+  const unsigned long end = nextprime_end();
+
+  for (size_t i = 0; Primes[i] * Primes[i] < end; i++) {
     const unsigned long p = Primes[i];
-    unsigned long next_hit = first % p;
-    if (next_hit > 0)
-      next_hit = p - next_hit;
-    while (next_hit < nextprime_len) {
+    if (p == 2)
+      continue;
+
+    /* We want 2*next_hit + nextprime_start == 0 (mod p), i.e.,
+       next_hit = -nextprime_start/2 (mod p) */
+    unsigned long next_hit = nextprime_start % p;
+    next_hit = negmod(next_hit, p);
+    next_hit = div2mod(next_hit, p);
+
+    for ( ; next_hit < nextprime_len; next_hit += p) {
       mpz_clrbit(nextprime_bitfield, next_hit);
-      next_hit += p;
     }
   }
-  nextprime_start = first;
+  if (0) {
+    for (size_t idx = mpz_scan1 (nextprime_bitfield, 0);
+         idx < nextprime_len;
+         idx = mpz_scan1 (nextprime_bitfield, idx + 1)) {
+      printf("isprime(%lu) == 1\n", nextprime_idx_to_n(idx));
+    }
+  }
 }
 
 /* Returns the smallest prime >= n */
 STATIC unsigned long
 nextprime_get_next(const unsigned long n)
 {
-  if (n == 0)
+  if (n <= 2)
     return 2; /* Rest assumes n > 0 */
 
-  if (nextprime_start == 0)
+  if (nextprime_start == 0 || n < nextprime_start ||
+      n >= nextprime_end())
     nextprime_init(n);
 
-  unsigned long next_n = n;
+  unsigned long idx = nextprime_n_to_idx(n | 1);
+  idx = mpz_scan1 (nextprime_bitfield, idx);
+  while (idx >= nextprime_len) {
+    nextprime_init(nextprime_end());
+    idx = mpz_scan1 (nextprime_bitfield, 0);
+  }
 
-  do {
-    if (next_n < nextprime_start || next_n >= nextprime_start + nextprime_len)
-      nextprime_init(next_n);
-    const unsigned long offset = mpz_scan1 (nextprime_bitfield, next_n - nextprime_start);
-    next_n = nextprime_start + MIN(nextprime_len, offset);
-  } while (next_n >= nextprime_start + nextprime_len);
-  // printf("nextprime(%lu) == %lu\n", n, next_n);
-  return next_n;
+  const unsigned long next_p = nextprime_idx_to_n(idx);
+  if (0) {
+    printf("nextprime(%lu) == %lu\n", n, next_p);
+  }
+  return next_p;
 }
 
 

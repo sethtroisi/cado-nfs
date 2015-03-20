@@ -18,6 +18,7 @@ set(las_path            ${CADO_NFS_BINARY_DIR}/sieve/las)
 set(las_tracek_path     ${CADO_NFS_BINARY_DIR}/sieve/las_tracek)
 set(las_kbucket_path    ${CADO_NFS_BINARY_DIR}/sieve/las_kbucket)
 set(las_mbucket_path    ${CADO_NFS_BINARY_DIR}/sieve/las_mbucket)
+set(las_descent_path    ${CADO_NFS_BINARY_DIR}/sieve/las_descent)
 
 set(F9_roots "${CMAKE_CURRENT_BINARY_DIR}/F9.roots")
 add_test(F9_makefbtest "${makefb_path}" -poly "${CADO_NFS_SOURCE_DIR}/params/F9.poly" -alim 1200000 -maxbits 10 -out "${F9_roots}")
@@ -55,6 +56,10 @@ SET_TESTS_PROPERTIES(F9_alambdatest PROPERTIES DEPENDS F9_makefbtest)
 # Try the todo-list mode of las
 add_test(F9_todotest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.todotest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" ${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.todo")
 SET_TESTS_PROPERTIES(F9_todotest PROPERTIES DEPENDS F9_makefbtest)
+
+# Try the descent 
+add_test(F9_descenttest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.descenttest.sh\" \"${F9_roots}\" \"${las_descent_path}\" \"${CADO_NFS_SOURCE_DIR}\" ${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.hint")
+SET_TESTS_PROPERTIES(F9_descenttest PROPERTIES DEPENDS F9_makefbtest)
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")

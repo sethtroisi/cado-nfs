@@ -18,7 +18,7 @@
 #define RENUMBER_DEFAULT_SIZE (1 << 22)
 #define RENUMBER_ROOT_ON_RAT_SIDE ((p_r_values_t) -1)
 
-struct __bad_ideals_t
+struct bad_ideals_s
 {
   int n; // number of p_r_values that correspond to more than one ideals.
   p_r_values_t * p;  // these p_r_values in two separate tables
@@ -27,10 +27,10 @@ struct __bad_ideals_t
   int * nb;               // the number of ideals for each
 };
 
-struct __renumber_t
+struct renumber_s
 {
   FILE * file;                      // file containing the renumbering table
-  struct __bad_ideals_t bad_ideals; // the bad ideals
+  struct bad_ideals_s bad_ideals; // the bad ideals
   p_r_values_t * table;             // renumbering table
   uint64_t size;                    // size of the renumbering table
   unsigned int nb_polys;            // Between 2 and NB_POLYS_MAX
@@ -48,30 +48,40 @@ struct __renumber_t
   index_t index_smallest_prime_not_cached;
   int add_full_col;                 // do we add a col of 1 to all relations
 };
-typedef struct __renumber_t renumber_t[1];
+typedef struct renumber_s renumber_t[1];
+typedef struct renumber_s * renumber_ptr;
+typedef const struct renumber_s * renumber_srcptr;
 
-void renumber_init_for_writing (renumber_t, unsigned int, int, int,
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void renumber_init_for_writing (renumber_ptr, unsigned int, int, int,
                                                               unsigned long *);
 /* Last argument of renumber_write_open can be NULL. It will not print the
    polynomials on the file */
-void renumber_write_open (renumber_t, const char *, const char *, cado_poly);
-void renumber_sort_ul(unsigned long *, size_t);
+void renumber_write_open (renumber_ptr, const char *, const char *, cado_poly);
 size_t renumber_write_p_buffer_rat_alg (char *, unsigned long, size_t,
                                         unsigned long *, size_t);
 size_t renumber_write_p_buffer_2algs (char *, unsigned long, unsigned long *,
                                       size_t, unsigned long *, size_t);
 size_t renumber_write_p_buffer_generic (char *, unsigned long, renumber_t,
                                         unsigned long **, int *);
-void renumber_write_p (renumber_t, unsigned long, unsigned long **, int *);
-void renumber_write_close (renumber_t, const char*);
+void renumber_write_p (renumber_ptr, unsigned long, unsigned long **, int *);
+void renumber_write_close (renumber_ptr, const char*);
 
-void renumber_init_for_reading (renumber_t);
-void renumber_read_table (renumber_t, const char *);
+void renumber_init_for_reading (renumber_ptr);
+void renumber_read_table (renumber_ptr, const char *);
 
-void renumber_clear (renumber_t);
+void renumber_clear (renumber_ptr);
 
-int renumber_is_bad(int *, index_t*,renumber_t, p_r_values_t, p_r_values_t, int);
-index_t renumber_get_index_from_p_r (renumber_t, p_r_values_t, p_r_values_t,int);
-void renumber_get_p_r_from_index (renumber_t, p_r_values_t *, p_r_values_t *,
+int renumber_is_bad(int *, index_t*,renumber_srcptr, p_r_values_t, p_r_values_t, int);
+index_t renumber_get_index_from_p_r (renumber_srcptr, p_r_values_t, p_r_values_t,int);
+void renumber_get_p_r_from_index (renumber_srcptr, p_r_values_t *, p_r_values_t *,
                                                     int *, index_t, cado_poly);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

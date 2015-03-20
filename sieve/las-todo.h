@@ -2,7 +2,7 @@
 #define LAS_TODO_H_
 
 #include <gmp.h>
-#include <queue>
+#include <stack>
 #include "las-base.hpp"
 
 struct las_todo_entry {
@@ -56,6 +56,6 @@ private:
   }
 };
 
-typedef std::queue<las_todo_entry *> las_todo_queue;
+typedef std::stack<las_todo_entry *> las_todo_stack;
 
 #endif

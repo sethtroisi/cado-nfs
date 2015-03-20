@@ -1,6 +1,7 @@
 #ifndef LAS_SMALLSIEVE_H_
 #define LAS_SMALLSIEVE_H_
 
+#include <stdarg.h>
 #include "fb-types.h"
 
 /* Structures for small sieves */
@@ -46,6 +47,7 @@ typedef struct {
 #include "bucket.h"
 
 extern void small_sieve_info(const char * what, int side, small_sieve_data_t * r);
+extern int small_sieve_dump(FILE *, const char *, va_list);
 extern void small_sieve_clear(small_sieve_data_t * ssd);
 extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
 extern void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const fb_vector<fb_general_entry> *fb,

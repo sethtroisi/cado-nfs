@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void * fill_in_buckets_both(thread_data_ptr th);
+void * fill_in_buckets_both(thread_data *th);
 
 
 #ifdef __cplusplus

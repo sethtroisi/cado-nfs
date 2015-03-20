@@ -76,6 +76,8 @@ utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
 utils/cachesize.c
 utils/build-testcases-rootfinder.m
+utils/thread.cpp
+utils/thread.h
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
