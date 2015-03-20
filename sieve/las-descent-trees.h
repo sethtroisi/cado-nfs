@@ -17,6 +17,10 @@
 #endif
 
 struct descent_tree {
+    private:
+        /* we have const members which need to lock the mutex */
+        mutable pthread_mutex_t tree_lock;
+    public:
     struct tree_label {
         int side;
         relation::pr pr;
@@ -59,8 +63,10 @@ struct descent_tree {
 
 
     descent_tree() {
+        pthread_mutex_init(&tree_lock, NULL);
     }
     ~descent_tree() {
+        pthread_mutex_destroy(&tree_lock);
         typedef std::list<tree *>::iterator it_t;
         for(it_t i = forest.begin() ; i != forest.end() ; i++)
             delete *i;
@@ -86,7 +92,15 @@ struct descent_tree {
         current.pop_back();
     }
 
+    bool found() const {
+        pthread_mutex_lock(&tree_lock);
+        bool res = current.back()->rel;
+        pthread_mutex_unlock(&tree_lock);
+        return res;
+    }
+
     void found(relation const& rel) {
+        pthread_mutex_lock(&tree_lock);
         current.back()->rel = rel;
         relation_ab ab = rel;
         visited_t::iterator it = visited.find(current.back()->label);
@@ -97,17 +111,15 @@ struct descent_tree {
         } else {
             it->second.insert(ab);
         }
+        pthread_mutex_unlock(&tree_lock);
     }
     bool must_avoid(relation const& rel) const {
         relation_ab ab = rel;
+        pthread_mutex_lock(&tree_lock);
         visited_t::const_iterator it = visited.find(current.back()->label);
-        if (it == visited.end())
-            return false;
-        visited_t::mapped_type const& w(it->second);
-        visited_t::mapped_type::const_iterator xt = w.find(ab);
-        if (xt == w.end())
-            return false;
-        return true;
+        bool answer = it != visited.end() && it->second.find(ab) != it->second.end();
+        pthread_mutex_unlock(&tree_lock);
+        return answer;
     }
     int depth() {
         return current.size();

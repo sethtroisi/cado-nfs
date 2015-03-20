@@ -38,8 +38,8 @@ struct siever_config_s {
         unsigned long powlim; /* bound on powers in the factor base */
         int lpb;           /* large prime bound is 2^lpbr */
         int mfb;           /* bound for residuals is 2^mfbr */
-        double lambda;     /* lambda sieve parameter */
         int ncurves;       /* number of cofactorization curves */
+        double lambda;     /* lambda sieve parameter */
     } sides[2][1];
 };
 typedef struct siever_config_s siever_config[1];

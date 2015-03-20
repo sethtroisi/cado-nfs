@@ -49,7 +49,10 @@
 #define HILIGHT_START   ""
 #define HILIGHT_END   ""
 
-int create_descent_hints = 0;
+int recursive_descent = 0;
+int prepend_relation_time = 0;
+int exit_after_rel_found = 0;
+
 double tt_qstart;
 
 /* {{{ for cofactorization statistics */
@@ -81,11 +84,15 @@ void siever_config_display(siever_config_srcptr sc)/*{{{*/
             sc->sides[RATIONAL_SIDE]->lpb,
 	    sc->sides[ALGEBRAIC_SIDE]->lpb);
     verbose_output_print(0, 1,
-	    "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
+	    "#                     mfbr=%d mfba=%d\n",
 	    sc->sides[RATIONAL_SIDE]->mfb,
-            sc->sides[ALGEBRAIC_SIDE]->mfb,
+            sc->sides[ALGEBRAIC_SIDE]->mfb);
+    if (sc->sides[RATIONAL_SIDE]->lambda != 0 || sc->sides[ALGEBRAIC_SIDE]->lambda != 0) {
+        verbose_output_print(0, 1,
+                "#                     rlambda=%1.1f alambda=%1.1f\n",
             sc->sides[RATIONAL_SIDE]->lambda,
 	    sc->sides[ALGEBRAIC_SIDE]->lambda);
+    }
     verbose_output_print(0, 1, "#                     skewness=%1.1f\n",
 	    sc->skewness);
 }/*}}}*/
@@ -581,9 +588,10 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
 
 /* las_info stuff */
 
+#ifdef  DLP_DESCENT
 static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
 {
-    const char * filename = param_list_lookup_string(pl, "descent-hint");
+    const char * filename = param_list_lookup_string(pl, "descent-hint-table");
     if (filename == NULL) return;
     char line[1024];
     unsigned int hint_alloc = 0;
@@ -649,12 +657,27 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
             for( ; *x && !isdigit(*x) ; x++) ;
             z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
             sc->sides[s]->lpb = z;
-            for( ; *x && !isdigit(*x) ; x++) ;
-            z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
-            sc->sides[s]->mfb = z;
-            for( ; *x && !isdigit(*x) ; x++) ;
-            t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
-            sc->sides[s]->lambda = t;
+            /* recognize this as a double. If it's < 10, we'll consider
+             * this means lambda */
+            {
+                for( ; *x && !isdigit(*x) ; x++) ;
+                double t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+                if (t < 10) {
+                    sc->sides[s]->lambda = t;
+                    sc->sides[s]->mfb = t * sc->sides[s]->lpb;
+                    continue;
+                } else {
+                    sc->sides[s]->mfb = t;
+                }
+            }
+            if (*x == ',') {
+                for( ; *x && !isdigit(*x) ; x++) ;
+                t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+                sc->sides[s]->lambda = t;
+            } else {
+                /* this means "automatic" */
+                sc->sides[s]->lambda = 0;
+            }
         }
         for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
 
@@ -719,6 +742,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
 
     fclose(f);
 }/*}}}*/
+#endif
 
 static void las_info_clear_hint_table(las_info_ptr las)/*{{{*/
 {
@@ -745,6 +769,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	    exit(EXIT_FAILURE);
 	}
     }
+    setlinebuf(las->output);
 
     las->verbose = param_list_parse_switch(pl, "-v");
 
@@ -867,16 +892,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
 
 
-    /* compute lambda0 from mfb0 and lpb0 if not given */
-    if (sc->sides[RATIONAL_SIDE]->lambda == 0.0)
-      sc->sides[RATIONAL_SIDE]->lambda = (double) sc->sides[RATIONAL_SIDE]->mfb
-        / (double) sc->sides[RATIONAL_SIDE]->lpb;
-
-    /* compute lambda1 from mfb1 and lpb1 if not given */
-    if (sc->sides[ALGEBRAIC_SIDE]->lambda == 0.0)
-      sc->sides[ALGEBRAIC_SIDE]->lambda = (double) sc->sides[ALGEBRAIC_SIDE]->mfb
-        / (double) sc->sides[ALGEBRAIC_SIDE]->lpb;
-
     /* Parse optional siever configuration parameters */
     sc->td_thresh = 1024;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
@@ -956,7 +971,9 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         }
     }
     /* }}} */
+#ifdef  DLP_DESCENT
     las_info_init_hint_table(las, pl);
+#endif
     /* Allocate room for only one sieve_info */
     las->sievers = (sieve_info_ptr) malloc(sizeof(sieve_info));
     memset(las->sievers, 0, sizeof(sieve_info));
@@ -1727,7 +1744,7 @@ bool operator<(descent_node const& a, descent_node const& b)
 bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent_node & winner, double & deadline, relation & rel)
 {
     if (!las->hint_table) {
-        verbose_output_print(0, 1, "# Warning: no hint_table, this is not very useful for the descent\n");
+        verbose_output_print(0, 1, "# Warning: no descent-hint-table, this is not very useful for the descent\n");
         return false;
     }
     /* For descent mode: compute the expected time to finish given the
@@ -1771,7 +1788,7 @@ bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent
             int k = las->hint_lookups[side][n];
             if (k < 0) {
                 /* This is not worrysome per se. We just do
-                 * not have the info in the hint table,
+                 * not have the info in the descent hint table,
                  * period.
                  */
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c (%Zd,%Zd)\n", n, sidenames[side][0], v.p, v.r);
@@ -2115,7 +2132,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 if (!is_dup)
                     cpt++;
                 verbose_output_start_batch();   /* lock I/O */
-                if (create_descent_hints) {
+                if (prepend_relation_time) {
                     verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
                 }
                 verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
@@ -2149,20 +2166,22 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     th->rep->survivors2 += copr;
 
 #ifdef  DLP_DESCENT
-    if (las->hint_table && cpt) {
-        /* If we've been doing the descent, and assuming we succeeded, we
-         * have to reschedule the possibly still missing large primes in the
-         * todo list */
+    if (winner) {
+        if (recursive_descent) {
+            /* reschedule the possibly still missing large primes in the
+             * todo list */
 
-        ASSERT_ALWAYS(winner);
-
-        for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
-            int side = winner.outstanding[i].first;
-            relation::pr const& v(winner.outstanding[i].second);
-            unsigned int n = mpz_sizeinbase(v.p, 2);
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
-            las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
+            for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
+                int side = winner.outstanding[i].first;
+                relation::pr const& v(winner.outstanding[i].second);
+                unsigned int n = mpz_sizeinbase(v.p, 2);
+                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
+                las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
+            }
         }
+        /* Even if not going for recursion, store this as being a winning
+         * relation. This is useful for preparing the hint file.
+         */
         las->tree->found(winner.rel);
     }
 #endif  /* DLP_DESCENT */
@@ -2304,6 +2323,15 @@ void * process_bucket_region(thread_data *th)
       {
         WHERE_AM_I_UPDATE(w, N, i);
 
+        if (recursive_descent || exit_after_rel_found) {
+            /* For the descent mode, we bail out as early as possible. We
+             * need to do so in a multithread-compatible way, though.
+             * Therefore the following access is mutex-protected within
+             * las->tree. */
+            if (las->tree->found())
+                break;
+        }
+
         for (int side = 0; side < 2; side++)
           {
             WHERE_AM_I_UPDATE(w, side, side);
@@ -2355,9 +2383,6 @@ void * process_bucket_region(thread_data *th)
         rep->ttf -= seconds_thread ();
         rep->reports += factor_survivors (th, i, w);
         rep->ttf += seconds_thread ();
-
-        /* For the descent mode, we bail out as early as possible */
-        if (las->hint_table && rep->reports) break;
 
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
@@ -2475,14 +2500,13 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
-  param_list_decl_usage(pl, "exit-early", "(switch) stop after some relations have been found");
+  param_list_decl_usage(pl, "exit-early", "once a relation has been found, go to next special-q (value==1), or exit (value==2)");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
   param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorization step");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
-  param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
-  param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
-  param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
+  param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
+  param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
   param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
@@ -2495,6 +2519,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
   param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
 #ifdef  DLP_DESCENT
+  param_list_decl_usage(pl, "descent-hint-table", "filename with tuned data for the descent, for each special-q bitsize");
+  param_list_decl_usage(pl, "recursive-descent", "descend primes recursively");
   /* given that this option is dangerous, we enable it only for
    * las_descent
    */
@@ -2511,7 +2537,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     unsigned long nr_sq_processed = 0;
     unsigned long nr_sq_discarded = 0;
     int allow_largesq = 0;
-    int exit_after_rel_found = 0;
     int never_discard = 0;      /* only enabled for las_descent */
     double totJ = 0.0;
     int argc = argc0;
@@ -2531,11 +2556,10 @@ int main (int argc0, char *argv0[])/*{{{*/
      * param_list_parse_switch later on */
     param_list_configure_switch(pl, "-v", NULL);
     param_list_configure_switch(pl, "-ratq", NULL);
-    param_list_configure_switch(pl, "-no-prepare-hints", NULL);
+    param_list_configure_switch(pl, "-ondemand-siever-config", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
-    param_list_configure_switch(pl, "-exit-early", &exit_after_rel_found);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
-    param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
+    param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "-skew", "-S");
@@ -2551,6 +2575,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_alias(pl, "-powlim0", "-rpowlim");
     param_list_configure_alias(pl, "-powlim1", "-apowlim");
 #ifdef  DLP_DESCENT
+    param_list_configure_switch(pl, "-recursive-descent", &recursive_descent);
     param_list_configure_switch(pl, "-never-discard", &never_discard);
 #endif
 
@@ -2570,12 +2595,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
-    las_info_init(las, pl);    /* side effects: prints cmdline and flags */
+    param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
 
-    /*
-    int descent_bootstrap = param_list_lookup_string(pl, "target") != NULL;
-    */
-    int descent_lower = param_list_lookup_string(pl, "descent-hint") != NULL;
+    las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
     /* We have the following dependency chain (not sure the account below
      * is exhaustive).
@@ -2591,7 +2613,7 @@ int main (int argc0, char *argv0[])/*{{{*/
      * for the given sizes.
      */
 
-    if (!param_list_parse_switch(pl, "-no-prepare-hints")) {
+    if (!param_list_parse_switch(pl, "-ondemand-siever-config")) {
         /* Create a default siever instance among las->sievers if needed */
         if (las->default_config->bitsize)
             get_sieve_info_from_config(las, las->default_config, pl);
@@ -2620,6 +2642,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, las, las);
 
+    /* This is used only for the descent. It's harmless otherwise. */
     las->tree = new descent_tree();
 
     /* {{{ Doc on todo list handling
@@ -2639,10 +2662,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     /* pop() is achieved by sieve_info_pick_todo_item */
     for( ; las_todo_feed(las, pl) ; ) {
-        if (descent_lower && las_todo_pop_closing_brace(las->todo)) {
+        if (las_todo_pop_closing_brace(las->todo)) {
             las->tree->done_node();
             if (las->tree->depth() == 0) {
-                las->tree->display_last_tree(las->output);
+                if (recursive_descent)
+                    las->tree->display_last_tree(las->output);
                 las->tree->visited.clear();
             }
             continue;
@@ -2673,22 +2697,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         sieve_info_pick_todo_item(si, las->todo);
 
-        if (descent_lower) {
-            las->tree->new_node(si->doing);
-            las_todo_push_closing_brace(las->todo, si->doing->depth);
-        }
-#if 0
-        /* I think that there is sufficient provision in las_todo_feed now */
-        ASSERT_ALWAYS(mpz_cmp_ui(las->todo->r, 0) != 0);
-        if (si->cpoly->pols[si->doing->pside]->deg == 1) {
-            /* compute the good rho */
-            int n;
-            n = mpz_poly_roots (&si->doing->r, si->cpoly->pols[si->doing->pside], si->doing->p);
-            ASSERT_ALWAYS(n);
-        } else {
-            mpz_set(si->doing->r, las->todo->r);
-        }
-#endif
+        las->tree->new_node(si->doing);
+        las_todo_push_closing_brace(las->todo, si->doing->depth);
 
         /* Check whether q is larger than the large prime bound.
          * This can create some problems, for instance in characters.
@@ -2813,11 +2823,6 @@ int main (int argc0, char *argv0[])/*{{{*/
             small_sieve_info("resieve", side, s->rsd);
         }
 
-        /* FIXME: For the descent, the current logic is not
-         * multithread-capable, as the two threads each try to produce a
-         * winning relation. There should be a global counter with a
-         * read-write lock, or something like that.
-         */
         /* Process bucket regions in parallel */
         workspaces->thread_do(&process_bucket_region);
 
@@ -2832,13 +2837,13 @@ int main (int argc0, char *argv0[])/*{{{*/
 #ifdef TRACE_K
         trace_per_sq_clear(si);
 #endif
-        if (exit_after_rel_found && report->reports > 0)
+        if (exit_after_rel_found > 1 && report->reports > 0)
             break;
       } // end of loop over special q ideals.
 
     workspaces->buckets_free();
 
-    if (descent_lower) {
+    if (recursive_descent) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
         las->tree->display_all_trees(las->output);
     }

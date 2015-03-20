@@ -1558,13 +1558,23 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
-  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
-  rat->bound = (unsigned char) (r * rat->scale + GUARD);
-  verbose_output_print (0, 1, " bound=%u\n", rat->bound);
-  double max_rlambda = (maxlog2 - GUARD / rat->scale) /
-      si->conf->sides[RATIONAL_SIDE]->lpb;
-  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda)
-    verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  {
+      double lambda = si->conf->sides[RATIONAL_SIDE]->lambda;
+      int auto_lambda = 0;
+      if (lambda == 0) {
+          lambda = (double) si->conf->sides[RATIONAL_SIDE]->mfb / si->conf->sides[RATIONAL_SIDE]->lpb + 0.1;
+          auto_lambda = 1;
+      }
+      r = MIN(lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
+      rat->bound = (unsigned char) (r * rat->scale + GUARD);
+      verbose_output_print (0, 1, " bound=%u\n", rat->bound);
+      if (auto_lambda)
+          verbose_output_print (0, 1, "# rlambda set by default to %.1f\n", lambda);
+      double max_rlambda = (maxlog2 - GUARD / rat->scale) /
+          si->conf->sides[RATIONAL_SIDE]->lpb;
+      if (lambda > max_rlambda)
+          verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  }
 
   /************************** algebraic side *********************************/
 
@@ -1599,13 +1609,23 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
-  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
-  alg->bound = (unsigned char) (r * alg->scale + GUARD);
-  verbose_output_print (0, 1, " bound=%u\n", alg->bound);
-  double max_alambda = (maxlog2 - GUARD / alg->scale) /
-      si->conf->sides[ALGEBRAIC_SIDE]->lpb;
-  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda)
-    verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  {
+      double lambda = si->conf->sides[ALGEBRAIC_SIDE]->lambda;
+      int auto_lambda = 0;
+      if (lambda == 0) {
+          lambda = (double) si->conf->sides[ALGEBRAIC_SIDE]->mfb / si->conf->sides[ALGEBRAIC_SIDE]->lpb + 0.1;
+          auto_lambda = 1;
+      }
+      r = MIN(lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
+      alg->bound = (unsigned char) (r * alg->scale + GUARD);
+      verbose_output_print (0, 1, " bound=%u\n", alg->bound);
+      if (auto_lambda)
+          verbose_output_print (0, 1, "# alambda set by default to %.1f\n", lambda);
+      double max_alambda = (maxlog2 - GUARD / alg->scale) /
+          si->conf->sides[ALGEBRAIC_SIDE]->lpb;
+      if (lambda > max_alambda)
+        verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  }
 
   /* improve bound on J if possible */
   unsigned int Jmax;

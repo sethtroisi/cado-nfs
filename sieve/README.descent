@@ -34,23 +34,26 @@ Then recompile cado-nfs, maybe in a separate build-directory.  If you are
 on a 32-bit machine, then this might actually fail at compile or
 execution time. It is highly recommended to choose a 64-bit platform.
 
-Writing a Hint File
+Writing a hint table
 -------------------
 
-The descent requires a "hint file" that contains information about how to
-tune the parameters along the descent.
+The descent requires a "descent hint table" that contains information
+about how to tune the parameters along the descent.
 
 Each line correspond to a bit-size of a special-q for one side. For
 example:
-  55r 0.028 1.00 I=15 400000,47,65,1.4 400000,48,94,2.0
+  55r 0.028 1.00 I=15 400000,47,65 400000,48,94
 means (in order):
   55r   : this line is about a 55-bit special-q on the rational side
   0.028 : expected time in seconds to find a relation
   1.00  : probability of success
   I=15  : the I to use
-  400000,47,65,1.4 : parameters for the rational side (0 side) 
-  		     lim0,lpb0,mfb0,lambda0
-  400000,48,94,2.0 : same for the other side (1).
+  400000,47,65 : parameters for the rational side (0 side) 
+  		     lim0,lpb0,mfb0
+  400000,48,94 : same for the other side (1).
+  (additionnally, the last two blocks accept an optional fourth field for
+  the lambda value, defaulting to mfb0/lpb0+0.1 as everywhere else in
+  cado-nfs).
 
 At the moment, it is *mandatory* to have the same values for I, lim0, lim1
 on each line. This might change if we see a clear need to make them vary.
@@ -59,7 +62,8 @@ There must be one line for each size that can occur during the descent,
 and the parameters must be so that there is a high chance to get at least
 one relation.
 
-An example hint-file will be given as example in the future.
+An example descent-hint-table is given with the ./scripts/descent.py
+script.
 
 Alternatively, the hint file may also use the syntax "55@0" instead of
 "55r", to mean "bitsize 55 on size 0".
@@ -70,22 +74,23 @@ following information may also be used as a guide for how a hint file
 should be created). First, one should start with a draft file, containing
 rough guess data for the smallest large primes, at least one line for
 each special-q side. For example:
-    22@0 0 0 I=9 50000,22,24,1.2 100000,22,24,1.2
-    22@1 0 0 I=9 50000,22,24,1.2 100000,22,24,1.2
+    22@0 0 0 I=9 50000,22,24 100000,22,24
+    22@1 0 0 I=9 50000,22,24 100000,22,24
 because this is a guess, the 0 values for the average time and success
 probability are normal.
 
 Based on this, and replicating the configuration for the larger values,
-the script will provide timing data as follows:
+the script will provide timing data as follows (we assume a bash-like
+shell is used).
 
 $ ./scripts/hintfile-helper.py --cadobindir ./build/`hostname` --datadir ~/Local/p59/ --prefix p59  --ntrials 100 --hintfile /tmp/p59.hint --qrange "$(echo {22..37}{r,a})"
-22@0 0.0027 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
-22@1 0.0030 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
-23@0 0.0029 0.9900 I=9 50000,22,24,1.2 100000,22,24,1.2
-23@1 0.0033 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
-24@0 0.0028 0.9700 I=9 50000,22,24,1.2 100000,22,24,1.2
-24@1 0.0034 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
-25@0 0.0031 0.9500 I=9 50000,22,24,1.2 100000,22,24,1.2
+22@0 0.0027 1.0000 I=9 50000,22,24 100000,22,24
+22@1 0.0030 1.0000 I=9 50000,22,24 100000,22,24
+23@0 0.0029 0.9900 I=9 50000,22,24 100000,22,24
+23@1 0.0033 1.0000 I=9 50000,22,24 100000,22,24
+24@0 0.0028 0.9700 I=9 50000,22,24 100000,22,24
+24@1 0.0034 1.0000 I=9 50000,22,24 100000,22,24
+25@0 0.0031 0.9500 I=9 50000,22,24 100000,22,24
 
 Note the --qrange argument, which specifies the order in which the sizes
 are tried.
@@ -127,9 +132,10 @@ augment the time significantly, and will probably yield better success.
 For special-q on the rational side, then the algebraic side parameters
 need to be bumped up somewhat, because then there is a significant
 unbalance in the norms. Beyond that, all parameters are bound to increase
-mildly as q grows. lambda0 has to grow if lim remains unchanged. Setting
-lpb to above the current special-q size is allowed, but might trigger
-loops of course (if on the same side as the special-q).
+mildly as q grows. mfb0 has to grow first, especially because lim remains
+unchanged. Next lpb should grow. Setting lpb to above the current
+special-q size is allowed, but might trigger loops of course (if on the
+same side as the special-q).
 
 Preparing the Todo file
 -----------------------

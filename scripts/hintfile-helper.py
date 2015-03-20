@@ -4,11 +4,11 @@
 # scripts/hintfile-helper.py
 #   --cadobindir /tmp/cado-nfs-build-master
 #   --ntrials 100
-#   --hintfile ~/Local/p59.hint
+#   --descent-hint-table ~/Local/p59.hint
 #   "27a 0 0 I=15 400000,47,65,1.4 400000,48,94,2.0"
 
 # where the last line has exactly the same format as what should be put
-# in a hintfile, except that the second and third items are zero.
+# in a descent hint table, except that the second and third items are zero.
 
 
 import os
@@ -72,11 +72,11 @@ def write_hintfile(filename):
 
 def parse_config_line(configline):
     match = re.match(
-            "^((\d+)([ra]|@\d+))\s+([\d\.]+)\s+([\d\.]+)\s+(I=(\d+)\s+(\d+),(\d+),(\d+),([\d\.]+)\s+(\d+),(\d+),(\d+),([\d\.]+))\s*$",
+            "^((\d+)([ra]|@\d+))\s+([\d\.]+)\s+([\d\.]+)\s+(I=(\d+)\s+(\d+),(\d+),([\d.]+)\s+(\d+),(\d+),([\d.]+))\s*$",
             configline)
     if not match:
         return
-    selector, bitsize, side, time, suxs, confstring, I, lim0, lpb0, mfb0, lambda0, lim1, lpb1, mfb1, lambda1 = match.groups()
+    selector, bitsize, side, time, suxs, confstring, I, lim0, lpb0, mix0, lim1, lpb1, mix1 = match.groups()
 
     time = float(time)
     suxs = float(suxs)
@@ -95,15 +95,25 @@ def parse_config_line(configline):
 
     implied['-I'] = int(I)
 
+    # FIXME: this is really a problem. We give the impression that these
+    # parameters are important, even though they are not. In truth, las
+    # will look inside the hint table for the parameters to use.
     implied['--lim0'] = int(lim0)
     implied['--lpb0'] = int(lpb0)
-    implied['--mfb0'] = int(mfb0)
-    implied['--lambda0'] = float(lambda0)
 
     implied['--lim1'] = int(lim1)
     implied['--lpb1'] = int(lpb1)
-    implied['--mfb1'] = int(mfb1)
-    implied['--lambda1'] = float(lambda1)
+
+    if float(mix0) < 10:
+        implied['--mfb0'] = int(float(mix0))
+    else:
+        implied['--mfb0'] = int(float(mix0)*int(lpb0))
+        implied['--lambda0'] = float(mix0)
+    if float(mix1) < 10:
+        implied['--mfb1'] = int(float(mix1))
+    else:
+        implied['--mfb1'] = int(float(mix1)*int(lpb1))
+        implied['--lambda1'] = float(mix1)
 
     return implied, selector, confstring, time, suxs
 
@@ -122,16 +132,17 @@ def testoneline(selector, implied, *args, **kwargs):
 
 
     side,bitsize = parse_selector(selector)
-    argdict['--q0'] = int(2**bitsize)
-    argdict['--q1'] = int(2**(bitsize+1))
+    argdict['--q0'] = int(2**(bitsize-1))
+    argdict['--q1'] = int(2**bitsize)
     argdict['--sqside'] = str(side)
 
     argseq=[las_binary]
     for key,value in argdict.items():
         argseq += [key, str(value)]
     argseq += [
-        "--descent-hint", tmphintfilename,
-        "--mkhint",
+        "--descent-hint-table", tmphintfilename,
+        "--prepend-relation-time",
+        "--exit-early", "1",
         "--never-discard",  # this is a kludge, we're risking a segfault.
                             # see bug 15617
         "-allow-largesq",
@@ -188,7 +199,7 @@ if __name__ == '__main__':
     parser.add_argument("--poly", help="poly file name")
     parser.add_argument("--fb", help="factor base file name")
     parser.add_argument("--workdir", help="Temporary working directory")
-    parser.add_argument("--hintfile", help="Preliminary hint file")
+    parser.add_argument("--descent-hint-table", help="Preliminary hint file")
     parser.add_argument("--ntrials", type=int, help="Number of special-q's to generate and test")
     parser.add_argument("--qrange", help="Comma-separated list of special-q sizes to optimize")
     parser.add_argument("--hintline", type=str, help="Example hint line to be evaluated")
@@ -245,8 +256,8 @@ if __name__ == '__main__':
 
     # read the preliminary hint file. It may contain some config defaults
     # which we are going to use.
-    if args.hintfile:
-        oldhintfile = open(args.hintfile, 'r')
+    if args.descent_hint_table:
+        oldhintfile = open(args.descent_hint_table, 'r')
         for l in oldhintfile.readlines():
             res = parse_config_line(l)
             if not res:
@@ -297,8 +308,8 @@ if __name__ == '__main__':
         os.rmdir(wdir)
 
     if args.replace:
-        if not args.hintfile:
-            raise ValueError("--replace requires --hintfile")
-        write_hintfile(args.hintfile)
+        if not args.descent_hint_table:
+            raise ValueError("--replace requires --descent-hint-table")
+        write_hintfile(args.descent_hint_table)
 
 
