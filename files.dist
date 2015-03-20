@@ -1084,6 +1084,7 @@ linalg/bwc/flint-fft/transform_interface.c
 linalg/bwc/test-flint.c
 filter/filter_badideals.c
 params_dl/params.p59
+params_dl/p59.hint
 scripts/badideals.mag
 scripts/linalg.mag
 scripts/magma-linalg-wrapper.sh
