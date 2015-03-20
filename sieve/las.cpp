@@ -767,7 +767,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     las->output = stdout;
     if (las->outputname) {
 	if (!(las->output = fopen_maybe_compressed(las->outputname, "w"))) {
-            setbuf(las->output, NULL);
 	    fprintf(stderr, "Could not open %s for writing\n", las->outputname);
 	    exit(EXIT_FAILURE);
 	}
