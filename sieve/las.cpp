@@ -1720,7 +1720,6 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 }
 /* }}} */
 
-
 #ifdef  DLP_DESCENT
 struct descent_node {
     relation rel;
@@ -2178,7 +2177,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             }
         }
         /* Even if not going for recursion, store this as being a winning
-         * relation. This is useful for preparing the hint file.
+         * relation. This is useful for preparing the hint file, and also for
+         * the initialization of the descent.
          */
         las->tree->found(winner.rel);
     }
@@ -2321,12 +2321,15 @@ void * process_bucket_region(thread_data *th)
       {
         WHERE_AM_I_UPDATE(w, N, i);
 
-        if (recursive_descent || exit_after_rel_found) {
+        if (recursive_descent) {
             /* For the descent mode, we bail out as early as possible. We
              * need to do so in a multithread-compatible way, though.
              * Therefore the following access is mutex-protected within
              * las->tree. */
             if (las->tree->found())
+                break;
+        } else if (exit_after_rel_found) {
+            if (rep->reports)
                 break;
         }
 
