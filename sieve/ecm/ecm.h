@@ -14,10 +14,10 @@
 
 /* Twisted Edwards curve with a = -1 */
 typedef struct {
-  unsigned long g_numer, g_denom;
-  unsigned long d_numer, d_denom;        /* d parameter for twisted Edwards curves */
-  unsigned long x_numer, x_denom, 
-                y_numer, y_denom;        /* non-torsion point on the curve */
+  long g_numer, g_denom;
+  long d_numer, d_denom;        /* d parameter for twisted Edwards curves */
+  long x_numer, x_denom, 
+       y_numer, y_denom;        /* non-torsion point on the curve */
 } Edwards_curve_t;
 
 static const Edwards_curve_t Ecurve14 = {
