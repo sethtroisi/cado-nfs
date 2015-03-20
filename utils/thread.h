@@ -5,13 +5,13 @@
 
 #include "macros.h"
 
-class NonCopyable {
+class ThreadNonCopyable {
  protected:
-   NonCopyable() {}
-   ~NonCopyable() {}
+   ThreadNonCopyable() {}
+   ~ThreadNonCopyable() {}
  private:
-   NonCopyable(const NonCopyable&);
-   NonCopyable& operator=(const NonCopyable&);
+   ThreadNonCopyable(const ThreadNonCopyable&);
+   ThreadNonCopyable& operator=(const ThreadNonCopyable&);
 };
 
 /* Base for classes that hold parameters for worker functions */
@@ -44,7 +44,7 @@ class thread_task;
 class thread_pool;
 class worker_thread;
 
-class thread_pool : private monitor, private NonCopyable {
+class thread_pool : private monitor, private ThreadNonCopyable {
   friend class worker_thread;
   typedef worker_thread *worker_thread_ptr;
   worker_thread_ptr *threads;

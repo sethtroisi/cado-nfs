@@ -1,7 +1,7 @@
 #include "cado.h"
 #include "thread.h"
 
-class worker_thread : private NonCopyable {
+class worker_thread : private ThreadNonCopyable {
   friend class thread_pool;
   thread_pool &pool;
   pthread_t thread;
