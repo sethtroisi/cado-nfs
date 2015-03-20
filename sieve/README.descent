@@ -1,6 +1,11 @@
 Using las for the descent
 =========================
 
+NOTE: there is now a general script that can compute the logarithm of a
+given target. See scripts/descent.py . The documentation below is still
+important, since, for instance, it describes how to create a hint file.
+
+
 The 'las' binary can be used not only for generating relations in the
 factorization or dlp context, but also to "descend" elements in order to
 compute the logarithms of elements that are not in the factor base.
