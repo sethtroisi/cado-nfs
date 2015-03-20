@@ -891,9 +891,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         exit(EXIT_FAILURE);
     }
 
-
-
-
     /* Parse optional siever configuration parameters */
     sc->td_thresh = 1024;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
@@ -2565,18 +2562,18 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_switch(pl, "-galois", NULL);
-    param_list_configure_alias(pl, "-skew", "-S");
-    param_list_configure_alias(pl, "-fb1", "-fb");
-    param_list_configure_alias(pl, "-lim0", "-rlim");
-    param_list_configure_alias(pl, "-lim1", "-alim");
-    param_list_configure_alias(pl, "-lpb0", "-lpbr");
-    param_list_configure_alias(pl, "-lpb1", "-lpba");
-    param_list_configure_alias(pl, "-mfb0", "-mfbr");
-    param_list_configure_alias(pl, "-mfb1", "-mfba");
-    param_list_configure_alias(pl, "-lambda0", "-rlambda");
-    param_list_configure_alias(pl, "-lambda1", "-alambda");
-    param_list_configure_alias(pl, "-powlim0", "-rpowlim");
-    param_list_configure_alias(pl, "-powlim1", "-apowlim");
+    param_list_configure_alias(pl, "skew", "S");
+    param_list_configure_alias(pl, "fb1", "fb");
+    param_list_configure_alias(pl, "lim0", "rlim");
+    param_list_configure_alias(pl, "lim1", "alim");
+    param_list_configure_alias(pl, "lpb0", "lpbr");
+    param_list_configure_alias(pl, "lpb1", "lpba");
+    param_list_configure_alias(pl, "mfb0", "mfbr");
+    param_list_configure_alias(pl, "mfb1", "mfba");
+    param_list_configure_alias(pl, "lambda0", "rlambda");
+    param_list_configure_alias(pl, "lambda1", "alambda");
+    param_list_configure_alias(pl, "powlim0", "rpowlim");
+    param_list_configure_alias(pl, "powlim1", "apowlim");
 #ifdef  DLP_DESCENT
     param_list_configure_switch(pl, "-recursive-descent", &recursive_descent);
     param_list_configure_switch(pl, "-never-discard", &never_discard);

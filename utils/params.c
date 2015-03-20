@@ -359,13 +359,16 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
 
     ASSERT_ALWAYS(alias != NULL);
     ASSERT_ALWAYS(key != NULL);
-    /* A switch may be aliases, but only as another switch !!! */
+
+    /* A switch may be aliased, but only as another switch !!! */
     ASSERT_ALWAYS(key[0] != '-' || (alias[0] == '-' && alias[len-1] != '='));
 
     if (alias[0] != '-' && alias[len-1] != '=') {
-        /* Then, accept both the --xxx and xxx= forms */
+        /* Then, accept both the -xxx, --xxx, and xxx= forms */
         char * tmp;
         tmp = malloc(len + 4);
+        snprintf(tmp, len+4, "-%s", alias);
+        param_list_configure_alias(pl, key, tmp);
         snprintf(tmp, len+4, "--%s", alias);
         param_list_configure_alias(pl, key, tmp);
         snprintf(tmp, len+4, "%s=", alias);
