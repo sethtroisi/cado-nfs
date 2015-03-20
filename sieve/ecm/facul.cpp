@@ -568,7 +568,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 facul_method_t*
 facul_make_aux_methods (int n, const int verbose)
 {
-  facul_method_t *methods = (facul_method_t*) malloc ((n+1) * sizeof (facul_method_t));
+  facul_method_t *methods = (facul_method_t*) malloc ((MAX(2,n)+1) * sizeof (facul_method_t));
 
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
   methods[0].method = EC_METHOD;
