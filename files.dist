@@ -1207,3 +1207,4 @@ sieve/las-dlog-base.h
 utils/relation-tools.c
 utils/relation-tools.h
 scripts/descent.py
+sieve/ecm/facul.sage
