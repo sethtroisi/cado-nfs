@@ -40,12 +40,33 @@ strtoull_const(const char *nptr, const char **endptr, const int base)
   return r;
 }
 
+// Adapted from utils/ularith.h
+// TODO: this function should go somewhere else...
+static inline uint64_t
+uint64_invmod(const uint64_t n)
+{
+    uint64_t r;
+    ASSERT (n % UINT64_C(2) != UINT64_C(0));
+    r = (UINT64_C(3) * n) ^ UINT64_C(2);
+    r = UINT64_C(2) * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+    r = UINT64_C(2) * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+    r = UINT64_C(2) * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+    uint32_t k = (uint32_t)(r * n >> 32);
+    k *= (uint32_t) r;
+    r = r - ((uint64_t)k << 32);
+    return r;
+}
+
 static inline redc_invp_t
 compute_invq(fbprime_t q)
 {
   if (q % 2 != 0) {
-    ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
-    return (redc_invp_t) (- ularith_invmod (q));
+    if (sizeof(unsigned long) >= sizeof(redc_invp_t)) {
+        return (redc_invp_t) (- ularith_invmod (q));
+    } else {
+        ASSERT(sizeof(redc_invp_t) == 8);
+        return (redc_invp_t) (- uint64_invmod (q));
+    }
   } else {
     return 0;
   }
@@ -267,7 +288,7 @@ fb_general_entry::merge (const fb_general_entry &other)
 
 void
 fb_general_entry::transform_roots(fb_general_entry::transformed_entry_t &result,
-                                  qlattice_basis_srcptr basis) const
+                                  const qlattice_basis &basis) const
 {
   result.p = p;
   result.q = q;
@@ -282,7 +303,7 @@ fb_general_entry::transform_roots(fb_general_entry::transformed_entry_t &result,
 
 template <int Nr_roots>
 void
-fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transformed_entry_t &result, qlattice_basis_srcptr basis) const
+fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transformed_entry_t &result, const qlattice_basis &basis) const
 {
   result.p = p;
   /* TODO: Use batch-inversion here */
@@ -367,12 +388,12 @@ fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p, fbprime_
 
 template <class FB_ENTRY_TYPE>
 fb_transformed_vector *
-fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(qlattice_basis_srcptr basis, const int logI) const
+fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const int logI) const
 {
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
   /* Create a transformed vector and store the index of the slice we currently
      transform */
-  const unsigned long special_q = mpz_fits_ulong_p(basis->q) ? mpz_get_ui(basis->q) : 0;
+  const unsigned long special_q = mpz_fits_ulong_p(basis.q) ? mpz_get_ui(basis.q) : 0;
 
   fb_transformed_vector *result = new fb_transformed_vector(get_index());
   size_t i_entry = 0;

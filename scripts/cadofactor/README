@@ -185,7 +185,7 @@ Printing the database
 
 The wudb.py script can be used to print info on the workunits. For example,
 
-./wudb.py -dbname /tmp/work/testrun.db -dump -assigned
+./wudb.py -dbfile /tmp/work/testrun.db -dump -assigned
 
 prints all currently assigned work units.
 

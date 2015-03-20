@@ -71,7 +71,7 @@ is_divisible_3_u32 (uint32_t a)
     if (trace_on_spot_x(X)) {						\
       WHERE_AM_I_UPDATE(w, N, (X) >> 16);				\
       WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
-      fprintf (stderr, "# Pushed factor base entry (%u, %u) (x=%u, %s) to BA[%u]\n",	\
+      verbose_output_print (TRACE_CHANNEL, 0, "# Pushed factor base entry (%u, %u) (x=%u, %s) to BA[%u]\n",	\
 	       (unsigned int) slice_index, (unsigned int) slice_offset, (unsigned int) (uint16_t) (X), sidenames[side],	\
 	       (unsigned int) ((X) >> 16));				\
       ASSERT(test_divisible(w));					\
@@ -316,7 +316,7 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t 
 
 /* {{{ */
 void
-fill_in_buckets(thread_data_ptr th, const int side,
+fill_in_buckets(thread_data *th, const int side,
                 const fb_transformed_vector *transformed_vector,
                 const fb_slice_interface *slice MAYBE_UNUSED,
                 where_am_I_ptr w MAYBE_UNUSED)
@@ -393,7 +393,7 @@ fill_in_buckets(thread_data_ptr th, const int side,
 #ifdef HAVE_K_BUCKETS
 /* Same than fill_in_buckets, but with 2 passes (k_buckets & buckets). */
 void
-fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
+fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
@@ -628,7 +628,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 }
 
 void
-fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
+fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
@@ -922,7 +922,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 
 
 void
-fill_in_buckets_one_slice(thread_data_ptr th, const int side, const fb_slice_interface *slice)
+fill_in_buckets_one_slice(thread_data *th, const int side, const fb_slice_interface *slice)
 {
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, th->si);
@@ -932,7 +932,7 @@ fill_in_buckets_one_slice(thread_data_ptr th, const int side, const fb_slice_int
 }
 
 static void
-fill_in_buckets_one_side(thread_data_ptr th, const int side)
+fill_in_buckets_one_side(thread_data *th, const int side)
 {
     const fb_part *fb = th->sides[side]->fb;
     if (th->sides[side]->BA.n_bucket < THRESHOLD_K_BUCKETS) {
@@ -954,7 +954,7 @@ fill_in_buckets_one_side(thread_data_ptr th, const int side)
 #endif
 }
 
-void * fill_in_buckets_both(thread_data_ptr th)
+void * fill_in_buckets_both(thread_data *th)
 {
     fill_in_buckets_one_side(th, ALGEBRAIC_SIDE);
     fill_in_buckets_one_side(th, RATIONAL_SIDE);

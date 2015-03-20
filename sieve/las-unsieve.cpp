@@ -477,7 +477,7 @@ search_single_survivors(unsigned char * const SS[2],
               ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) != 1);
 #ifdef TRACE_K
           if (trace_on_spot_Nx(N, x)) {
-              fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+              verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
                       x, N, i, j);
           }
 #endif
@@ -487,7 +487,7 @@ search_single_survivors(unsigned char * const SS[2],
               ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
 #ifdef TRACE_K
           if (trace_on_spot_Nx(N, x)) {
-              fprintf(stderr, "# Slot [%u] in bucket %u is survivor with coprime (i,j)\n",
+              verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u is survivor with coprime (i,j)\n",
                       x, N);
           }
 #endif

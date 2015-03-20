@@ -666,7 +666,7 @@ ularith_shld (unsigned long *r, const unsigned long lo, const unsigned long hi,
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ __VOLATILE (
     "shldl %3, %1, %0\n"
-    : "+rm" (*r)
+    : "=rm" (*r)
     : "r" (lo), "0" (hi), "cI" (i) /* i can be in %cl or a literal constant < 32 */
     : "cc");
 #else

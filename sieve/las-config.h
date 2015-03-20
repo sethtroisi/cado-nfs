@@ -104,18 +104,16 @@
    make them show up on profiler output */
 //#define PROFILE
 
-/* (for debugging only) define TRACE_K, and exactly one of the TRACE_*
- * values to something non-zero, in order to get tracing information on a
+/* (for debugging only) define TRACE_K, to something non-zero,
+ * in order to get tracing information on a
  * particular relation.  In particular this traces the sieve array entry
  * corresponding to the relation. Upon startup, the three values below
  * are reconciled.
  *
- * (see also las-coordinates.c)
+ * This activates new command lines arguments: -traceab, -traceij, -traceNx.
+ * (see las-coordinates.c for the description of these)
  */
 #define xxxTRACE_K
-// #define TRACE_AB { 2039914353344275UL,6656604L }
-// #define TRACE_IJ
-// #define TRACE_Nx { 0,1655 }
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */

@@ -223,16 +223,16 @@ bounded_pow(const unsigned long b, const unsigned long e, const unsigned long li
      set l := l - log_b(p^k)
 */
 static unsigned char
-subtract_fb_log(const unsigned char lognorm, const relation_t *relation,
+subtract_fb_log(const unsigned char lognorm, relation const& rel,
                 sieve_info_srcptr si, const int side)
 {
   const unsigned long fbb = si->conf->sides[side]->lim;
-  const unsigned int nb_p = relation_get_nb_p(relation, side);
+  const unsigned int nb_p = rel.sides[side].size();
   unsigned char new_lognorm = lognorm;
 
   for (unsigned int i = 0; i < nb_p; i++) {
-    const unsigned long p = relation_get_p(relation, side, i);
-    const int e = relation_get_e(relation, side, i);
+    const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
+    const int e = rel.sides[side][i].e;
     ASSERT_ALWAYS(e > 0);
     if (p <= fbb) {
       const unsigned long p_pow = bounded_pow(p, e, si->conf->sides[side]->powlim);
@@ -240,7 +240,7 @@ subtract_fb_log(const unsigned char lognorm, const relation_t *relation,
       if (p_pow_log > new_lognorm) {
         if (0)
           fprintf(stderr, "Warning: lognorm underflow for relation a,b = %" PRId64 ", %" PRIu64 "\n",
-                  relation->a, relation->b);
+                  rel.a, rel.b);
         new_lognorm = 0;
       } else {
         new_lognorm -= p_pow_log;
@@ -255,7 +255,7 @@ subtract_fb_log(const unsigned char lognorm, const relation_t *relation,
    duplicate */
 int
 sq_finds_relation(const unsigned long sq, const int sq_side,
-                  const relation_t *relation,
+                  relation const& rel,
                   const int nb_threads, sieve_info_srcptr old_si)
 {
   mpz_array_t *f[2] = { NULL, }; /* Factors of the relation's norms */
@@ -272,11 +272,11 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 
   /* Extract the list of large primes for each side */
   for (int side = 0; side < 2; side++) {
-    unsigned int nb_p = relation_get_nb_p(relation, side);
+    unsigned int nb_p = rel.sides[side].size();
     for (unsigned int i = 0; i < nb_p; i++) {
       const unsigned long fbb = old_si->conf->sides[side]->lim;
-      const unsigned long p = relation_get_p(relation, side, i);
-      const int e = relation_get_e(relation, side, i);
+      const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
+      const int e = rel.sides[side][i].e;
       ASSERT_ALWAYS(e > 0);
       if (p > fbb) {
         for (int i = 0; i < e; i++) {
@@ -293,7 +293,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   // si = get_sieve_info_from_config(las, sc, pl);
   /* Create a dummy sieve_info struct with just enough info to let us use
      the lattice-reduction and coordinate-conversion functions */
-  si = fill_in_sieve_info_from_si (sq, relation->a, relation->b, old_si);
+  si = fill_in_sieve_info_from_si (sq, rel.a, rel.b, old_si);
   const unsigned long r = mpz_get_ui(si->doing->r);
 
   const uint32_t oldI = si->I, oldJ = si->J;
@@ -310,8 +310,8 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 
   sieve_info_update_norm_data(si, nb_threads);
   if (verbose) {
-    verbose_output_print(0, 1, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", relation->a, relation->b, sq, r);
-    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis->a0, si->qbasis->b0, si->qbasis->a1, si->qbasis->b1);
+    verbose_output_print(0, 1, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
+    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1);
   }
 
   I = si->I;
@@ -323,7 +323,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   
   /* Compute i,j-coordinates of this relation in the special-q lattice when
      p was used as the special-q value. */
-  ok = ABToIJ(&i, &j, relation->a, relation->b, si);
+  ok = ABToIJ(&i, &j, rel.a, rel.b, si);
 
   if (!ok)
     abort();
@@ -341,7 +341,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   uint8_t remaining_lognorm[2];
   for (int side = 0; side < 2; side++) {
     const uint8_t lognorm = estimate_lognorm(si, i, j, side);
-    remaining_lognorm[side] = subtract_fb_log(lognorm, relation, si, side);
+    remaining_lognorm[side] = subtract_fb_log(lognorm, rel, si, side);
     if (remaining_lognorm[side] > si->sides[side]->bound) {
       verbose_output_print(0, 1, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
               side, remaining_lognorm[side], si->sides[side]->bound);
@@ -432,13 +432,18 @@ sq_cmp(const unsigned long sq, const int side, sieve_info_srcptr si)
    parameters specified in si->conf. */ 
 
 int
-check_one_prime(const unsigned long sq, const int side,
-                const relation_t *relation, const int nb_threads,
+check_one_prime(mpz_srcptr zsq, const int side,
+                relation const & rel, const int nb_threads,
                 sieve_info_srcptr si)
 {
+  if (!mpz_fits_ulong_p(zsq)) {
+      /* move on. Probably not a duplicate */
+      return 0;
+  }
+  unsigned long sq = mpz_get_ui(zsq);
   int is_dupe = 0;
   if (sq_is_sieved(sq, side, si) && sq_cmp(sq, side, si) < 0) {
-    is_dupe = sq_finds_relation(sq, side, relation, nb_threads, si);
+    is_dupe = sq_finds_relation(sq, side, rel, nb_threads, si);
     if (verbose) {
       verbose_output_print(0, 1, "# DUPECHECK relation is probably%s a dupe\n",
              is_dupe ? "" : " not");
@@ -450,7 +455,7 @@ check_one_prime(const unsigned long sq, const int side,
 /* Return 1 if the relation is probably a duplicate of a relation found
    "earlier", and 0 if it is probably not a duplicate */
 int
-relation_is_duplicate(relation_t *relation, const int nb_threads,
+relation_is_duplicate(relation const& rel, const int nb_threads,
                       sieve_info_srcptr si)
 {
   /* If the special-q does not fit in an unsigned long, we assume it's not a
@@ -459,20 +464,21 @@ relation_is_duplicate(relation_t *relation, const int nb_threads,
     return 0;
   }
 
-  int is_dupe = 0;
-  /* Test the prime factors on the rational side. It would be nice to test
-     both sides in a loop (int side=0; side<2; side++) but the relation_t
-     stores primes on the rational and algebraic sides differently... */
-  for (unsigned int i = 0; i < relation->nb_rp && !is_dupe; i++) {
-    is_dupe = check_one_prime(relation->rp[i].p, RATIONAL_SIDE,
-                              relation, nb_threads, si);
+  /* If any large prime doesn't fit in an unsigned long, then we assume
+   * we don't have a duplicate */
+  for(int side = 0 ; side < 2 ; side++) {
+      for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
+          if (!mpz_fits_ulong_p(rel.sides[side][i].p))
+              return false;
+      }
   }
 
-  /* Now the primes on the algebraic side */
-  for (unsigned int i = 0; i < relation->nb_ap && !is_dupe; i++) {
-    is_dupe = check_one_prime(relation->ap[i].p, ALGEBRAIC_SIDE,
-                              relation, nb_threads, si);
+  for(int side = 0 ; side < 2 ; side++) {
+      for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
+          if (check_one_prime(rel.sides[side][i].p, side, rel, nb_threads, si))
+              return true;
+      }
   }
 
-  return is_dupe;
+  return false;
 }

@@ -601,6 +601,8 @@ facul_doit_onefm (mpz_t *factors, const modulus_t m,
     if (cfprime) 
 	mod_intget_mpz(factors[found++], n);
 
+    /* if either f of cf is composite, it is returned in fm or cfm */
+
     //Free
  clean_up:
     mod_clear (r, m);

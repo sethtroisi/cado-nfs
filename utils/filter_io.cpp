@@ -66,7 +66,7 @@ static const struct timespec wait_classical = { 0, 1<<21 };
 struct ifb_locking_lightweight {/*{{{*/
     /* we don't support several threads wanting to write to the same
      * location (we could, if we were relying on atomic compare and swap,
-     * for instance */
+     * for instance) */
     static const int max_supported_concurrent = 1;
     template<typename T> struct critical_datatype { typedef volatile T t; };
     typedef int lock_t;
@@ -86,7 +86,7 @@ struct ifb_locking_lightweight {/*{{{*/
 };
 /*}}}*/
 
-/* {{{ status table (utility for inflight_rels_buffer.
+/* {{{ status table (utility for inflight_rels_buffer).
  *
  * In fact, when we use simple busy waits, we are restricted to
  * scheduled[k]==completed[k]+(0 or 1), and keeping track of the

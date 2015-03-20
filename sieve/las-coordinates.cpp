@@ -52,8 +52,8 @@ void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
        sieve_info_srcptr si)
 {
     int64_t s, t;
-    s = (int64_t)i * (int64_t) si->qbasis->a0 + (int64_t)j * (int64_t)si->qbasis->a1;
-    t = (int64_t)i * (int64_t) si->qbasis->b0 + (int64_t)j * (int64_t)si->qbasis->b1;
+    s = (int64_t)i * (int64_t) si->qbasis.a0 + (int64_t)j * (int64_t)si->qbasis.a1;
+    t = (int64_t)i * (int64_t) si->qbasis.b0 + (int64_t)j * (int64_t)si->qbasis.b1;
     if (t >= 0)
       {
         *a = s;
@@ -78,16 +78,16 @@ int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_inf
     mpz_init(a0); mpz_init(b0);
     mpz_init(a1); mpz_init(b1);
     mpz_set_int64(za, a); mpz_set_uint64(zb, b);
-    mpz_set_int64(a0, si->qbasis->a0);
-    mpz_set_int64(b0, si->qbasis->b0);
-    mpz_set_int64(a1, si->qbasis->a1);
-    mpz_set_int64(b1, si->qbasis->b1);
+    mpz_set_int64(a0, si->qbasis.a0);
+    mpz_set_int64(b0, si->qbasis.b0);
+    mpz_set_int64(a1, si->qbasis.a1);
+    mpz_set_int64(b1, si->qbasis.b1);
     int ok = 1;
     mpz_mul(ii, za, b1); mpz_submul(ii, zb, a1);
     mpz_mul(jj, zb, a0); mpz_submul(jj, za, b0);
     /*
-    int64_t ii =   a * (int64_t) si->qbasis->b1 - b * (int64_t)si->qbasis->a1;
-    int64_t jj = - a * (int64_t) si->qbasis->b0 + b * (int64_t)si->qbasis->a0;
+    int64_t ii =   a * (int64_t) si->qbasis.b1 - b * (int64_t)si->qbasis.a1;
+    int64_t jj = - a * (int64_t) si->qbasis.b0 + b * (int64_t)si->qbasis.a0;
     */
     if (!mpz_divisible_p(ii, si->doing->p)) ok = 0;
     if (!mpz_divisible_p(jj, si->doing->p)) ok = 0;

@@ -72,7 +72,7 @@ struct fb_general_root {
 
   void transform(fb_general_root &result, const fbprime_t q,
                  const redc_invp_t invq,
-                 qlattice_basis_srcptr basis) const {
+                 const qlattice_basis &basis) const {
     unsigned long long t = to_old_format(q);
     t = fb_root_in_qlattice(q, t, invq, basis);
     result = fb_general_root(t, q, exp, oldexp);
@@ -106,7 +106,7 @@ public:
   void merge (const fb_general_entry &);
   void fprint(FILE *out) const;
   bool is_simple() const;
-  void transform_roots(transformed_entry_t &, qlattice_basis_srcptr) const;
+  void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
   fbroot_t get_r(const size_t i) const {return roots[i].r;};
   fbroot_t get_proj(const size_t i) const {return roots[i].proj;};
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
@@ -163,7 +163,7 @@ public:
   bool operator<(const fb_entry_x_roots<Nr_roots> &other) const {return this->p < other.p;}
   bool operator>(const fb_entry_x_roots<Nr_roots> &other) const {return this->p > other.p;}
   void fprint(FILE *) const;
-  void transform_roots(transformed_entry_t &, qlattice_basis_srcptr) const;
+  void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
     if (p <= pmax && p <= Nr_roots * td_thresh)
       extracted.push_back(static_cast<unsigned long>(p));
@@ -231,7 +231,7 @@ class fb_slice_interface {
   virtual ~fb_slice_interface(){}
   virtual int get_nr_roots() const = 0;
   virtual bool is_general() const = 0;
-  virtual fb_transformed_vector * make_lattice_bases(qlattice_basis_srcptr, int) const = 0;
+  virtual fb_transformed_vector * make_lattice_bases(const qlattice_basis &, int) const = 0;
   virtual unsigned char get_logp() const = 0;
   virtual slice_index_t get_index() const = 0;
   virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
@@ -286,7 +286,7 @@ class fb_slice : public fb_slice_interface {
   slice_index_t get_index() const {return index;}
   void fprint(FILE *out) const;
   fbprime_t get_prime(const slice_offset_t offset) const {ASSERT_ALWAYS(offset < _vec->size()); return _begin[offset].p;};
-  fb_transformed_vector * make_lattice_bases(qlattice_basis_srcptr, int) const;
+  fb_transformed_vector * make_lattice_bases(const qlattice_basis &, int) const;
 };
 
 

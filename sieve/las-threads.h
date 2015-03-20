@@ -31,7 +31,7 @@ typedef struct thread_side_data_s thread_side_data[1];
 typedef struct thread_side_data_s * thread_side_data_ptr;
 typedef const struct thread_side_data_s * thread_side_data_srcptr;
 
-struct thread_data_s : private NonCopyable {
+struct thread_data : private NonCopyable {
   int id;
   thread_side_data sides[2];
   las_info_srcptr las;
@@ -39,21 +39,25 @@ struct thread_data_s : private NonCopyable {
   las_report rep;
   unsigned char *SS;
   bool is_initialized;
-  thread_data_s();
-  ~thread_data_s();
+  thread_data();
+  ~thread_data();
   void init(int id, las_info_srcptr las);
   void pickup_si(sieve_info_ptr si);
   void update_checksums();
 };
-typedef struct thread_data_s *thread_data_ptr;
-typedef const struct thread_data_s *thread_data_srcptr;
 
-void thread_do(thread_data_ptr, void * (*) (thread_data_ptr), int);
-thread_data_ptr thread_data_alloc(las_info_ptr las, int n);
-void thread_data_free(thread_data_ptr thrs);
-void thread_pickup_si(thread_data_ptr thrs, sieve_info_ptr si, int n);
-void thread_buckets_alloc(thread_data_ptr thrs, unsigned int n);
-void thread_buckets_free(thread_data_ptr thrs, unsigned int n);
-double thread_buckets_max_full(thread_data_ptr thrs, int n);
+class thread_workspaces {
+  thread_data *thrs;
+  const size_t nr_workspaces;
+public:
+  thread_workspaces(size_t n, las_info_ptr _las);
+  ~thread_workspaces();
+  void pickup_si(sieve_info_ptr si);
+  void thread_do(void * (*) (thread_data *));
+  void buckets_alloc();
+  void buckets_free();
+  double buckets_max_full();
+  void accumulate(las_report_ptr, sieve_checksum *);
+};
 
 #endif

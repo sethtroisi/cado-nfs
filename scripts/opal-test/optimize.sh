@@ -40,10 +40,10 @@ lpbr_min=`expr $lpbr - 1`
 lpbr_max=`expr $lpbr + 1`
 lpba_min=`expr $lpba - 1`
 lpba_max=`expr $lpba + 1`
-mfbr_min=`expr $mfbr - $lpbr`
-mfbr_max=`expr $mfbr + $lpbr`
-mfba_min=`expr $mfba - $lpba`
-mfba_max=`expr $mfba + $lpba`
+mfbr_min=$lpbr_min
+mfbr_max=`expr $lpbr_max \* 3`
+mfba_min=$lpba_min
+mfba_max=`expr $lpba_max \* 3`
 if [ $ncurves0 -gt 3 ]; then
 ncurves0_min=`expr $ncurves0 - 3`
 else

@@ -147,10 +147,6 @@ int verbose_printf(int flag, const char * fmt, ...)
 }
 
 
-/* Lock the output system for exclusive use for a while.
-   Useful for, e.g., printing lines with multiple calls, or multiple
-   consecutive lines, through multiple verbose_output_*() calls. */
-
 /* Blocks until no other thread is in the monitor and
    no other thread holds a batch lock */
 static int
@@ -186,8 +182,6 @@ verbose_output_start_batch()
     return 0;
 }
 
-/* Unlock the output system again. Only the locking thread may call it. */
-
 int
 verbose_output_end_batch()
 {
@@ -202,20 +196,6 @@ verbose_output_end_batch()
         return 1;
     return 0;
 }
-
-/*
-  The program can initialise zero or more "channels".
-  To each "channel", zero or more "outputs" (FILE handles) can be attached,
-  each with an output verbosity value.
-  Text can be printed to a channel, with a verbosity v, then the text is
-  sent to each output attached to this channel for which the output verbosity
-  is at least v.
-  The default behaviour, before calling the verbose_output_init() function or
-  after calling verbose_output_clear(), has 2 channels:
-  channel 0 with 1 output, going to stdout with verbosity 1, and
-  channel 1 with 1 output, going to stderr with verbosity 1.
-  All functions are mutex-protected, i.e., output system forms a "monitor."
-*/
 
 struct outputs_s {
     size_t nr_outputs;
@@ -294,8 +274,6 @@ vfprint_output(const struct outputs_s * const output, const int verbosity,
 static size_t _nr_channels = 0;
 static struct outputs_s *_channel_outputs = NULL;
 
-/* Init nr_channels channels, with no outputs attached
-   Returns 1 on success, and 0 on error. */
 int
 verbose_output_init(const size_t nr_channels)
 {
@@ -314,8 +292,6 @@ verbose_output_init(const size_t nr_channels)
     return 1;
 }
 
-/* Reset channels back to the 2 default channels.
-   Returns 1 on success, and 0 on error. */
 int
 verbose_output_clear()
 {
@@ -331,7 +307,6 @@ verbose_output_clear()
     return 1;
 }
 
-/* Returns 1 on success, and 0 on error. */
 int
 verbose_output_add(const size_t channel, FILE * const out, const int verbose)
 {
@@ -344,8 +319,6 @@ verbose_output_add(const size_t channel, FILE * const out, const int verbose)
     return rc;
 }
 
-/* Returns the return value of the last *printf() call on success,
-   or 0 if nothing gets printed. Returns a negative value on error. */
 int
 verbose_output_print(const size_t channel, const int verbose,
                      const char * const fmt, ...)
@@ -373,20 +346,6 @@ verbose_output_print(const size_t channel, const int verbose,
         return -1;
     return rc;
 }
-
-/* Get the index-th FILE handle attached to a channel, counting only those
-   outputs whose output verbosity is at least "verbose."
-   If there are fewer than index such handles, returns NULL.
-
-   This is rather hackish, but we need it to be able to pass a FILE handle
-   to functions that, e.g., print complex data to a stream.
-
-   The idiom to use to print to every attached output would be something like
-
-   FILE *out;
-   for (size_t i=0; (out=verbose_output_get(c, v, i)) != NULL; i++)
-       print_something(out, ...);
-*/
 
 FILE *
 verbose_output_get(const size_t channel, const int verbose, const size_t index)
@@ -444,13 +403,6 @@ die_on_MINGW_PRI64(const char * const fmt MAYBE_UNUSED)
 #endif
 }
 
-/* Print to every attached output, using a print function with a vfprintf()-
-   like interface. E.g.,
-
-   verbose_output_vfprint(0, 1, gmp_vfprintf, "%Zd\n", bigint);
-
-   Note that GMP requires stdarg.h to be included BEFORE gmp.h to be able
-   to declare prototypes for functions that take va_list */
 
 int
 verbose_output_vfprint(const size_t channel, const int verbose,
