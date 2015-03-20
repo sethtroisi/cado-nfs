@@ -2,6 +2,7 @@
 #include <string.h>
 #include <limits.h>
 #include <cmath>               /* ceil signbit */
+#include <pthread.h>
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
