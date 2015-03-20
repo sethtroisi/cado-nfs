@@ -279,6 +279,7 @@ class GeneralClass(object):
         # TODO add threads once it's fixed.
         s=[
             self.las_bin() + "_descent",
+            "--recursive-descent",
             "--allow-largesq",
             "--never-discard",  # useful for small computations.
             "--renumber", self.renumber(),
