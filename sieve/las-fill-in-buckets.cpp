@@ -932,8 +932,9 @@ public:
 };
 
 task_result *
-fill_in_buckets_one_slice(fill_in_buckets_parameters *param)
+fill_in_buckets_one_slice(const task_parameters *const _param)
 {
+    const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
 
@@ -947,25 +948,31 @@ fill_in_buckets_one_slice(fill_in_buckets_parameters *param)
     param->ws.release_workspace(th);
     delete transformed_vector;
     delete param;
-    return (task_result *) NULL;
+    return new task_result;
 }
 
 static void
-fill_in_buckets_one_side(thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
+fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
 {
     /* Process all slices in this factor base part */
     const fb_slice_interface *slice;
+    slice_index_t slices_pushed = 0;
     for (slice_index_t slice_index = fb->get_first_slice_index();
          (slice = fb->get_slice(slice_index)) != NULL;
          slice_index++) {
         fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice);
-        fill_in_buckets_one_slice(param);
+        pool.add_task(fill_in_buckets_one_slice, param, 0);
+        slices_pushed++;
+    }
+    for (slice_index_t slices_completed = 0; slices_completed < slices_pushed; slices_completed++) {
+      task_result *result = pool.get_result();
+      delete result;
     }
 }
 
-void fill_in_buckets_both(thread_workspaces &ws, const int part, sieve_info_srcptr si)
+void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, const int part, sieve_info_srcptr si)
 {
-    fill_in_buckets_one_side(ws, si->sides[ALGEBRAIC_SIDE]->fb->get_part(part), si, ALGEBRAIC_SIDE);
-    fill_in_buckets_one_side(ws, si->sides[RATIONAL_SIDE]->fb->get_part(part), si, RATIONAL_SIDE);
+    fill_in_buckets_one_side(pool, ws, si->sides[ALGEBRAIC_SIDE]->fb->get_part(part), si, ALGEBRAIC_SIDE);
+    fill_in_buckets_one_side(pool, ws, si->sides[RATIONAL_SIDE]->fb->get_part(part), si, RATIONAL_SIDE);
 }
 /* }}} */

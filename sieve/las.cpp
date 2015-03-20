@@ -11,6 +11,7 @@
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
+#include "thread.h"
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -807,11 +808,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 		"Error, please provide a positive number of threads\n");
 	param_list_clear(pl);
 	exit(EXIT_FAILURE);
-    }
-    
-    if (las->nb_threads != 1) {
-	fprintf(stderr, "More than 1 thread is currently broken. Using 1.\n");
-	las->nb_threads = 1;
     }
     
     /* }}} */
@@ -2806,8 +2802,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Allocate buckets */
         workspaces->buckets_alloc();
 
+        thread_pool *pool = new thread_pool(las->nb_threads);
         /* Fill in rat and alg buckets */
-        fill_in_buckets_both(*workspaces, 1, si);
+        fill_in_buckets_both(*pool, *workspaces, 1, si);
+        delete pool;
 
         max_full = MAX(max_full, workspaces->buckets_max_full());
         ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
