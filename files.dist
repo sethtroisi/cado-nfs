@@ -139,6 +139,11 @@ gf2x/already_tuned/x86_sse2/gf2x_mul6.h
 gf2x/already_tuned/x86_sse2/gf2x_mul7.h
 gf2x/already_tuned/x86_sse2/gf2x_mul8.h
 gf2x/already_tuned/x86_sse2/gf2x_mul9.h
+gf2x/already_tuned/armv7l/gf2x-thresholds.h
+gf2x/already_tuned/armv7l/gf2x_mul1.h
+gf2x/already_tuned/armv7l/gf2x_mul3.h
+gf2x/already_tuned/armv7l/gf2x_mul5.h
+gf2x/already_tuned/armv7l/gf2x_mul6.h
 gf2x/config/acinclude.m4
 gf2x/config/compile
 gf2x/config/config.guess
