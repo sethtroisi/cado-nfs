@@ -1,5 +1,5 @@
 #include "cado.h"
-#include "thread.h"
+#include "threadpool.h"
 
 class worker_thread : private ThreadNonCopyable {
   friend class thread_pool;

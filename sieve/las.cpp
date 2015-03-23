@@ -11,7 +11,7 @@
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
-#include "thread.h"
+#include "threadpool.h"
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */

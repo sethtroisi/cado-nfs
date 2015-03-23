@@ -1214,6 +1214,6 @@ utils/relation-tools.c
 utils/relation-tools.h
 scripts/descent.py
 sieve/ecm/facul.sage
-utils/thread.cpp
-utils/thread.h
+utils/threadpool.cpp
+utils/threadpool.h
 misc/extra_renumber.c

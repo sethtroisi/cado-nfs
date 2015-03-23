@@ -5,7 +5,7 @@
 #include "bucket.h"
 #include "modredc_ul.h"
 #include "modredc_2ul2.h"
-#include "thread.h"
+#include "threadpool.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
