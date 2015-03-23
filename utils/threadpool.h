@@ -64,6 +64,6 @@ class thread_pool : private monitor, private ThreadNonCopyable {
 public:
   thread_pool(size_t _nr_threads);
   ~thread_pool();
-  void add_task(task_function_t func, task_parameters *params, int id);
+  void add_task(task_function_t func, const task_parameters *params, int id);
   task_result *get_result();
 };

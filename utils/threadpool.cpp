@@ -25,11 +25,11 @@ class thread_task {
 public:
   const task_function_t func;
   const int id;
-  task_parameters * const parameters;
+  const task_parameters * const parameters;
   const bool please_die;
   task_result *result;
 
-  thread_task(task_function_t _func, int _id, task_parameters *_parameters) :
+  thread_task(task_function_t _func, int _id, const task_parameters *_parameters) :
     func(_func), id(_id), parameters(_parameters), please_die(false), result(NULL) {};
   thread_task(bool _kill)
     : func(NULL), id(0), parameters(NULL), please_die(true), result(NULL) {
@@ -73,7 +73,7 @@ thread_pool::thread_work_on_tasks(void *arg)
       break;
     }
     task_function_t func = task->func;
-    task_parameters *params = task->parameters;
+    const task_parameters *params = task->parameters;
     task_result *result = func(params);
     if (result != NULL)
       pool.add_result(result);
@@ -83,7 +83,7 @@ thread_pool::thread_work_on_tasks(void *arg)
 }
 
 void
-thread_pool::add_task(task_function_t func, task_parameters *const params,
+thread_pool::add_task(task_function_t func, const task_parameters *const params,
                       const int id)
 {
     enter();
