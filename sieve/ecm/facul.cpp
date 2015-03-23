@@ -727,17 +727,28 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 
   // alloc methods
   facul_method_side_t*** methods = (facul_method_side_t***) malloc (sizeof (*methods) * (rmfb+1));
-  unsigned int r, a;
+
+  if (file == NULL) {
+      /* we have just one strategy, really. So we just allocate once. */
+      strategies->uniform_strategy[0] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
+      strategies->uniform_strategy[1] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
+  } else {
+      strategies->uniform_strategy[0] = NULL;
+      strategies->uniform_strategy[1] = NULL;
+  }
+
   // init methods
-  for (r = 0; r <= rmfb; r++) {
+  for (unsigned int r = 0; r <= rmfb; r++) {
     methods[r] = (facul_method_side_t**) malloc (sizeof (*methods[r]) * (amfb+1));
     ASSERT (methods[r] != NULL);
-    for (a = 0; a <= amfb; a++)
-      {
-	methods[r][a] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
-	ASSERT (methods[r][a] != NULL);
-	methods[r][a][0].method = NULL;
-      }
+    if (file != NULL) {
+        for (unsigned int a = 0; a <= amfb; a++)
+        {
+            methods[r][a] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
+            methods[r][a][0].method = NULL;
+            ASSERT (methods[r][a] != NULL);
+        }
+    }
   }
   strategies->methods = methods;
   
@@ -757,24 +768,28 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       verbose_output_print(0, 1, "# Using default strategy for the cofactorization\n");
       strategies->precomputed_methods =
 	facul_make_default_strategy (max_ncurves,verbose);
-      for (r = 0; r <= rmfb; r++)
-	for (a = 0; a <= amfb; a++) {
-	  int index = 0;
+      /* make two well-behaved facul_method_side_t* lists, based on which
+       * side is first */
+      for (int first = 0 ; first < 2 ; first++) {
+          facul_method_side_t * next = strategies->uniform_strategy[first];
+          for (int z = 0; z < 2; z++) {
+              int side = first ^ z;
+              for (int i = 0; i < ncurves[side] + 3; i++) {
+                  next->method = strategies->precomputed_methods + i;
+                  next->side = side;
+                  next++;
+              }
+          }
+          next->method = NULL;
+      }
+      /* now have all entries in our huge 2d array point to either of
+       * these */
+      for (unsigned int r = 0; r <= rmfb; r++) {
+	for (unsigned int a = 0; a <= amfb; a++) {
 	  int first = (r < a);// begin by the largest cofactor.
-	  for (int z  = 0; z < 2; z++)
-	    {
-	      int side = first ^ z;
-	      for (int i = 0; i < ncurves[side] + 3; i++)
-		{
-		  methods[r][a][index].method =
-		    &strategies->precomputed_methods[i];
-		  methods[r][a][index].side = side;
-		  index++;
-		}
-	    }
-	  // add NULL to show the end of the strategy.
-	  methods[r][a][index].method = NULL;
-	}
+          methods[r][a] = strategies->uniform_strategy[first];
+        }
+      }
     }
   else
     {/* to precompute our method from the file.*/
@@ -803,8 +818,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     For each strategy, one finds what is the last method used on each
     side.
   */
-  for (r = 1; r <= rmfb; r++)
-    for (a = 1; a <= amfb; a++){
+  for (unsigned int r = 1; r <= rmfb; r++)
+    for (unsigned int a = 1; a <= amfb; a++){
       facul_method_side_t* methods =
 	strategies->methods[r][a];
       if (methods == NULL)
@@ -837,6 +852,8 @@ facul_clear_strategies (facul_strategies_t *strategies)
   if (strategies == NULL)
     return ;
 
+  int uniform = (strategies->uniform_strategy[0] != NULL);
+
   // free precomputed_methods
   facul_method_t* fm = strategies->precomputed_methods;
   for (int j = 0; fm[j].method!=0; j++)
@@ -861,11 +878,17 @@ facul_clear_strategies (facul_strategies_t *strategies)
   unsigned int r;
   for (r = 0; r <= strategies->mfb[0]; r++) {
     unsigned int a;
-    for (a = 0; a <= strategies->mfb[1]; a++)
-      free (strategies->methods[r][a]);
+    if (!uniform) {
+        for (a = 0; a <= strategies->mfb[1]; a++)
+            free (strategies->methods[r][a]);
+    }
     free (strategies->methods[r]);
   }
   free (strategies->methods);
+  if (uniform) {
+      free(strategies->uniform_strategy[0]);
+      free(strategies->uniform_strategy[1]);
+  }
 
   // free methods_aux
   facul_clear_aux_methods (strategies->methods_aux);
@@ -881,7 +904,6 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 {
   if (file == NULL)
     return -1;
-  unsigned int r;
   // print info lpb ...
   fprintf (file,
 	  "(lpb = [%ld,%ld], as...=[%lf, %lf], BBB = [%lf, %lf])\n",
@@ -891,9 +913,8 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 	  strategies->BBB[0], strategies->BBB[1]);
   fprintf (file,
 	  "mfb = [%d, %d]\n", strategies->mfb[0], strategies->mfb[1]);
-  for (r = 0; r <= strategies->mfb[0]; r++) {
-    unsigned int a;
-    for (a = 0; a <= strategies->mfb[1]; a++) {
+  for (unsigned int r = 0; r <= strategies->mfb[0]; r++) {
+    for (unsigned int a = 0; a <= strategies->mfb[1]; a++) {
       fprintf (file, "[r = %d, a = %d]", r, a);
       facul_method_side_t* methods = strategies->methods[r][a];
       if (methods == NULL)

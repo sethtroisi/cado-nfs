@@ -28,7 +28,7 @@
 
 #define STATS_LEN 128
 
-#define NB_MAX_METHODS 200 /* We authorize at most NB_MAX_METHOD
+#define NB_MAX_METHODS 500 /* We authorize at most NB_MAX_METHOD
 			     differents methods in our strategies */
 
 typedef struct {
@@ -81,6 +81,13 @@ typedef struct {
 					   facul_make_strategies ().*/
 
   facul_method_t* methods_aux;
+
+  facul_method_side_t * uniform_strategy[2]; /* this is 0 if we have a
+                                                strategy file, and 1 if we
+                                                just have a uniform
+                                                one-size-fits-all strategy.
+                                                In the latter case, we avoid
+                                                most of the allocation */
 } facul_strategies_t;
 
 
