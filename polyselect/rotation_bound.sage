@@ -105,6 +105,30 @@ def l2norm_tk_circular(f,s):
       n = 6 * (a3 * a1 + a1 * a5 + a4 * a2 + a0 * a4) + 14 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5) + 7 * (a4 * a4 + a1 * a1) + 3 * (a3 * a3 + a2 * a2)
       n = n * pi / 1536
       return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s)))
+   elif f.degree()==4:
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      a4 = f[4] * s^4
+      n = 35 * (a4^2 + a0^2) + 10 * (a4*a2 + a2*a0) + 5 * (a3^2 + a1^2) + 6 * (a4*a0 + a3*a1) + 3 * a2^2
+      n = n * pi / 640
+      return RealField(PRECISION)(1/2 * log(n / (s * s * s * s)))
+   elif f.degree()==3:
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      n = 5 * (a3^2 + a0^2) + 2 * (a3*a1 + a0*a2) + a1^2 + a2^2
+      n = n * pi / 64
+      return RealField(PRECISION)(1/2 * log(n / (s * s * s)))
+   elif f.degree()==2:
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      n = 3 * (a2 * a2 + a0 * a0) + 2 * a0 * a2 + a1 * a1
+      n = n * pi / 24
+      return RealField(PRECISION)(1/2 * log(n / (s * s)))
    else:
       raise ValueError, "circular norm not yet implemented for this degree"
 
@@ -239,6 +263,38 @@ def skew_l2norm_tk_circular(f):
       if len(root_pos) <> 1:
          raise ValueError, "number of positive roots <> 1"
       return root_pos[0]
+   elif f.degree()==4:
+      R.<s> = RealField(PRECISION)[]
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      a4 = f[4] * s^4
+      e = 14*a4^2 + (a3^2 + 2*a2*a4) - (a1^2 + 2*a0*a2) - 14*a0^2
+      n = 35 * (a4^2 + a0^2) + 10 * (a4*a2 + a2*a0) + 5 * (a3^2 + a1^2) + 6 * (a4*a0 + a3*a1) + 3 * a2^2
+      r = e.real_roots()
+      root_pos=[s for s in r if s > 0]
+      i0 = 0
+      v0 = n(root_pos[0])
+      for i in range(1,len(root_pos)):
+         v = n(root_pos[i])
+         if v < v0:
+           i0, v0 = i, v
+      return root_pos[i0]
+   elif f.degree()==3:
+      R.<s> = RealField(PRECISION)[]
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      e = 15*a3^2 + (a2^2 + 2*a1*a3) - (a1^2 + 2*a0*a2) - 15*a0^2
+      r = e.real_roots()
+      root_pos=[s for s in r if s > 0]
+      if len(root_pos) <> 1:
+         raise ValueError, "number of positive roots <> 1"
+      return root_pos[0]
+   elif f.degree()==2:
+      return abs(f[0]/f[2])
    else:
       raise ValueError, "circular norm not yet implemented for this degree"
 
