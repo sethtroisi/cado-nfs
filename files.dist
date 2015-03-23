@@ -886,7 +886,7 @@ tests/utils/testmpz-rootfinder.quick
 tests/utils/test_sm_utils.c
 tests/utils/test_sm_utils.data
 tests/utils/test_relation.cpp
-tests/utils/test_thread.cpp
+tests/utils/test_threadpool.cpp
 utils/timing.cpp
 utils/timing.h
 utils/typedefs.h
