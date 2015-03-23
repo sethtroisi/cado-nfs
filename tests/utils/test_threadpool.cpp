@@ -34,17 +34,19 @@ int main(int argc, const char **argv)
   unsigned long iter = 10;
   tests_common_get_iter(&iter);
 
-  thread_pool *pool = new thread_pool(5);
+  thread_pool *pool = new thread_pool(5, 2);
 
   print_parameter param("Hello world!\n");
 
   for (unsigned long i = 0; i < iter; i++) {
-    pool->add_task(print_something, &param, 1);
+    size_t queue = i % 2;
+    pool->add_task(print_something, &param, 1, queue);
   }
 
   for (unsigned long i = 0; i < iter; i++) {
-    print_result *result = dynamic_cast<print_result *>(pool->get_result());
-    printf("I've printed %d characters\n", result->printed);
+    size_t queue = i % 2;
+    print_result *result = dynamic_cast<print_result *>(pool->get_result(queue));
+    printf("Queue %zu: I've printed %d characters\n", queue, result->printed);
     delete result;
   }
 

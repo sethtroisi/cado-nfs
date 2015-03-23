@@ -2,6 +2,7 @@
 #include <queue>
 #include <vector>
 #include <stdarg.h>
+#include <errno.h>
 
 #include "macros.h"
 
@@ -12,6 +13,64 @@ class ThreadNonCopyable {
  private:
    ThreadNonCopyable(const ThreadNonCopyable&);
    ThreadNonCopyable& operator=(const ThreadNonCopyable&);
+};
+
+#if 0
+/* Verbosely log all mutex and condition variable operations */
+#include <typeinfo>
+#include <verbose.h>
+static inline void
+thread_log(const char *c, const char *m, const void *p)
+{
+  unsigned long id;
+  const pthread_t pid = pthread_self();
+  memcpy(&id, &pid, MIN(sizeof(id), sizeof(pid)));
+  verbose_output_print(0, 0, "Thread %lx: %s.%s(%p)\n", id, c, m, p);
+  fflush(stdout);
+}
+#define LOG do{thread_log(typeid(this).name(), __func__, this);}while(0)
+#else
+#define LOG
+#endif
+
+/* C++11 already has classes for mutex and condition_variable */
+/* All the synchronization stuff could be moved to the implementation if
+   thread_pool used monitor as a dynamically allocated object. Tempting. */
+
+class mutex {
+  friend class condition_variable;
+  pthread_mutex_t m;
+  public:
+  mutex() : m(PTHREAD_MUTEX_INITIALIZER){LOG;}
+  ~mutex() {LOG; ASSERT_ALWAYS(pthread_mutex_destroy(&m) == 0);}
+  void lock(){LOG; ASSERT_ALWAYS(pthread_mutex_lock(&m) == 0);}
+  bool try_lock() {
+    LOG;
+    int rc = pthread_mutex_trylock(&m);
+    ASSERT_ALWAYS(rc == 0 || rc == EBUSY);
+    return rc;
+  }
+  void unlock(){LOG; ASSERT_ALWAYS(pthread_mutex_unlock(&m) == 0);}
+};
+
+class condition_variable {
+  pthread_cond_t cv;
+  public:
+  condition_variable() : cv(PTHREAD_COND_INITIALIZER){LOG;}
+  ~condition_variable() {LOG; pthread_cond_destroy(&cv);}
+  void signal() {LOG; ASSERT_ALWAYS(pthread_cond_signal(&cv) == 0);}
+  void broadcast(){LOG; ASSERT_ALWAYS(pthread_cond_broadcast(&cv) == 0);}
+  void wait(mutex &m) {LOG; ASSERT_ALWAYS(pthread_cond_wait(&cv, &m.m) == 0);}
+};
+
+class monitor {
+  mutex m;
+public:
+  void enter() {m.lock();}
+  void leave() {m.unlock();}
+  void signal(condition_variable &cond) {cond.signal();}
+  void broadcast(condition_variable &cond){cond.broadcast();}
+  void wait(condition_variable &cond) {cond.wait(m);}
 };
 
 /* Base for classes that hold parameters for worker functions */
@@ -26,44 +85,33 @@ class task_result {
   virtual ~task_result(){};
 };
 
-class monitor {
-  pthread_mutex_t mutex;
-public:
-  monitor() : mutex(PTHREAD_MUTEX_INITIALIZER) {}
-  ~monitor(){ASSERT_ALWAYS(pthread_mutex_destroy(&mutex) == 0);}
-  void enter() {ASSERT_ALWAYS(pthread_mutex_lock(&mutex) == 0);}
-  void leave() {ASSERT_ALWAYS(pthread_mutex_unlock(&mutex) == 0);}
-  void signal(pthread_cond_t &cond) {ASSERT_ALWAYS(pthread_cond_signal(&cond) == 0);}
-  void broadcast(pthread_cond_t &cond){ASSERT_ALWAYS(pthread_cond_broadcast(&cond) == 0);}
-  void wait(pthread_cond_t &cond) {ASSERT_ALWAYS(pthread_cond_wait(&cond, &mutex) == 0);}
-};
-
 typedef task_result *(*task_function_t)(const task_parameters *);
 
 class thread_task;
-class thread_pool;
 class worker_thread;
+class tasks_queue;
+class results_queue;
+
 
 class thread_pool : private monitor, private ThreadNonCopyable {
   friend class worker_thread;
   typedef worker_thread *worker_thread_ptr;
+
   worker_thread_ptr *threads;
-  std::queue<thread_task *> tasks;
-  std::queue<task_result *> results;
+  tasks_queue *tasks;
+  results_queue *results;
 
-  const size_t nr_threads;
+  const size_t nr_threads, nr_queues;
 
-  pthread_cond_t tasks_not_empty_cond, results_not_empty_cond;
-
-  bool kill_threads; /* If true, hands out kill tasks once work queue is empty */
+  bool kill_threads; /* If true, hands out kill tasks once work queues are empty */
 
   static void * thread_work_on_tasks(void *pool);
-  thread_task *get_task();
-  void add_result(task_result *result);
-
+  thread_task *get_task(const size_t queue);
+  void add_result(size_t queue, task_result *result);
+  bool all_task_queues_empty() const;
 public:
-  thread_pool(size_t _nr_threads);
+  thread_pool(size_t _nr_threads, size_t nr_queues = 1);
   ~thread_pool();
-  void add_task(task_function_t func, const task_parameters *params, int id);
-  task_result *get_result();
+  void add_task(task_function_t func, const task_parameters *params, int id, const size_t queue = 0);
+  task_result *get_result(const size_t queue = 0);
 };
