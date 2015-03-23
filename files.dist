@@ -1216,3 +1216,4 @@ scripts/descent.py
 sieve/ecm/facul.sage
 utils/thread.cpp
 utils/thread.h
+misc/extra_renumber.c
