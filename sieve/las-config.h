@@ -185,7 +185,8 @@
  * descent. The mid-term plan is to remove this compile-time flag.
  */
 #define xxxDLP_DESCENT
-#define DESCENT_GRACE_TIME_RATIO 0.4
+
+#define DESCENT_GRACE_TIME_RATIO 0.2    /* default value */
 
 /* Define this to support larger q. This is almost mandatory for the
  * descent. */

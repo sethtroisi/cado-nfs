@@ -11,18 +11,20 @@
 
 using namespace std;
 
+double descent_tree::grace_time_ratio = DESCENT_GRACE_TIME_RATIO;
+
 int descent_tree::display_tree(FILE* o, tree * t, string const& prefix) {
     int res = 1;
-    fprintf(o, "%s%s [%1.4f]%s\n",
+    fprintf(o, "%s%s [%1.4f]%s\t\t%s\n",
             prefix.c_str(), t->label().c_str(), t->spent,
-            t->rel ? "" : " ###");
+            t->contender ? "" : " ###", t->label.fullname().c_str());
     string new_prefix = prefix + "  ";
     typedef list<tree *>::iterator it_t;
     for(it_t i = t->children.begin() ; i != t->children.end() ; i++) {
         if (!display_tree(o, *i, new_prefix))
             res = 0;
     }
-    if (!t->rel)
+    if (!t->contender)
         res = 0;
     return res;
 }

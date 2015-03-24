@@ -1716,54 +1716,27 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 /* }}} */
 
 #ifdef  DLP_DESCENT
-struct descent_node {
-    relation rel;
-    std::vector<std::pair<int, relation::pr> > outstanding;
-    double time_left;
-    operator bool() const { return (bool) rel; }
-};
-
-bool operator<(descent_node const& a, descent_node const& b)
-{
-    if (!b) return true;
-    if (std::isfinite(a.time_left)) { return a.time_left < b.time_left; }
-    return a.outstanding.size() < b.outstanding.size();
-}
-
-/* This returns true when we fonud a relation which completely splits. If
- * we find one which needs a recursive call, we'll set the [winner]
- * argument.
- */
-bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent_node & winner, double & deadline, relation & rel)
+/* This returns true only if this descent node is now done, either based
+ * on the new relation we have registered, or because the previous
+ * relation is better anyway */
+bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, relation & rel)
 {
     if (!las->hint_table) {
         verbose_output_print(0, 1, "# Warning: no descent-hint-table, this is not very useful for the descent\n");
-        return false;
+        return true;
     }
-    /* For descent mode: compute the expected time to finish given the
-     * factor sizes, and deduce a deadline.  Assuming that not all
-     * encountered factors are below the factor base bound, if we expect
-     * an additional time T to finish the decomposition, we keep looking
-     * for a better decomposition for a grace time which is computed as
-     * x*T, for some configurable ratio x (one might think of x=0.2 for
-     * instance. x is DESCENT_GRACE_TIME_RATIO), which defines a
-     * ``deadline'' for next step.  [If all factors happen to be smooth,
-     * the deadline is _now_.] If within the grace period, a new relation
-     * is found, with an earlier implied deadline, the deadline is
-     * updated.
-     */
 
     if (las->tree->must_avoid(rel)) {
         verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: we have already used this relation for (%Zd,%Zd), avoiding\n", si->doing->p, si->doing->r);
-        return false;
+        return true;
     }
 
     /* compute rho for all primes, even on the rational side */
     rel.fixup_r(true);
 
-    descent_node contender;
+    descent_tree::candidate_relation contender;
     contender.rel = rel;
-    contender.time_left = 0;
+    double time_left = 0;
 
     for(int side = 0 ; side < 2 ; side++) {
         for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
@@ -1785,32 +1758,19 @@ bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent
                  * period.
                  */
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c (%Zd,%Zd)\n", n, sidenames[side][0], v.p, v.r);
-                contender.time_left = INFINITY;
+                time_left = INFINITY;
             } else {
-                if (std::isfinite(contender.time_left))
-                    contender.time_left += las->hint_table[k]->expected_time;
+                if (std::isfinite(time_left))
+                    time_left += las->hint_table[k]->expected_time;
             }
             contender.outstanding.push_back(std::make_pair(side, v));
         }
     }
     verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process (%zu children)\n",
-            contender.time_left, contender.outstanding.size());
+            time_left, contender.outstanding.size());
+    contender.set_time_left(time_left);
 
-    double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * contender.time_left;
-    if (!std::isfinite(deadline) || new_deadline < deadline) {
-        double delta = INFINITY;
-        if (std::isfinite(deadline))
-            delta = (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO;
-        deadline = new_deadline;
-        winner = contender;
-        if (contender.outstanding.empty()) {
-            verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
-            return true;
-        } else if (std::isfinite(delta)) {
-            verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
-        }
-    }
-    return false;
+    return las->tree->new_candidate_relation(contender);
 }
 #endif
 
@@ -1831,10 +1791,6 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     bucket_primes_t primes[2] = {bucket_primes_t(BUCKET_REGION), bucket_primes_t(BUCKET_REGION)};
     bucket_array_complete purged[2] = {bucket_array_complete(BUCKET_REGION), bucket_array_complete(BUCKET_REGION)};
     mpz_t BLPrat;       /* alone ? */
-#ifdef  DLP_DESCENT
-    double deadline = INFINITY;
-    descent_node winner;
-#endif  /* DLP_DESCENT */
     uint32_t cof_rat_bitsize = 0; /* placate gcc */
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
@@ -1936,6 +1892,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #endif
 
     for ( ; (unsigned char *) SS_lw < SS + BUCKET_REGION; SS_lw++) {
+        if (las->tree->must_take_decision())
+            break;
 #ifdef TRACE_K
         size_t trace_offset = (const unsigned char *) SS_lw - SS;
         if ((unsigned int) N == trace_Nx.N && (unsigned int) trace_offset <= trace_Nx.x && 
@@ -1965,21 +1923,6 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
              */
             int64_t a;
             uint64_t b;
-
-#ifdef  DLP_DESCENT
-            double t = seconds();
-
-            if (t >= deadline) {
-                /* Also break the outer loop (ugly!) */
-#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-                SS_lw = (const __m128i *)(SS + BUCKET_REGION);
-#else
-                SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
-#endif
-                verbose_output_print(0, 1, "# [descent] Aborting, deadline passed\n");
-                break;
-            }
-#endif  /* DLP_DESCENT */
 
             // Compute algebraic and rational norms.
             NxToAB (&a, &b, N, x, si);
@@ -2141,43 +2084,14 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
 
 #ifdef  DLP_DESCENT
-                if (update_descent_best_node(las, si, winner, deadline, rel)) {
-                    /* break both loops */
-#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-                    SS_lw = (const __m128i *)(SS + BUCKET_REGION);
-#else
-                    SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
-#endif
-                    break;
-                }
+            if (register_contending_relation(las, si, rel))
+                break;
 #endif  /* DLP_DESCENT */
         }
     }
 
     th->rep->survivors1 += surv;
     th->rep->survivors2 += copr;
-
-#ifdef  DLP_DESCENT
-    if (winner) {
-        if (recursive_descent) {
-            /* reschedule the possibly still missing large primes in the
-             * todo list */
-
-            for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
-                int side = winner.outstanding[i].first;
-                relation::pr const& v(winner.outstanding[i].second);
-                unsigned int n = mpz_sizeinbase(v.p, 2);
-                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
-                las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
-            }
-        }
-        /* Even if not going for recursion, store this as being a winning
-         * relation. This is useful for preparing the hint file, and also for
-         * the initialization of the descent.
-         */
-        las->tree->found(winner.rel);
-    }
-#endif  /* DLP_DESCENT */
 
     mpz_clear (BLPrat);
 
@@ -2321,7 +2235,7 @@ void * process_bucket_region(thread_data *th)
              * need to do so in a multithread-compatible way, though.
              * Therefore the following access is mutex-protected within
              * las->tree. */
-            if (las->tree->found())
+            if (las->tree->must_take_decision())
                 break;
         } else if (exit_after_rel_found) {
             if (rep->reports)
@@ -2521,6 +2435,7 @@ static void declare_usage(param_list pl)
    * las_descent
    */
   param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
+  param_list_decl_usage(pl, "grace-time-ratio", "Fraction of the estimated further descent time which should be spent processing the current special-q, to find a possibly better relation");
   las_dlog_base::declare_parameter_usage(pl);
 #endif
   verbose_decl_usage(pl);
@@ -2594,6 +2509,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
 
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
+#if DLP_DESCENT
+    param_list_parse_double(pl, "grace-time-ratio", &descent_tree::grace_time_ratio);
+#endif
 
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
@@ -2825,6 +2743,28 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* Process bucket regions in parallel */
         workspaces->thread_do(&process_bucket_region);
+
+#ifdef  DLP_DESCENT
+        descent_tree::candidate_relation const& winner(las->tree->current_best_candidate());
+        if (winner) {
+            /* Even if not going for recursion, store this as being a
+             * winning relation. This is useful for preparing the hint
+             * file, and also for the initialization of the descent.
+             */
+            las->tree->take_decision();
+            if (recursive_descent) {
+                /* reschedule the possibly still missing large primes in the
+                 * todo list */
+                for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
+                    int side = winner.outstanding[i].first;
+                    relation::pr const& v(winner.outstanding[i].second);
+                    unsigned int n = mpz_sizeinbase(v.p, 2);
+                    verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
+                    las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
+                }
+            }
+        }
+#endif  /* DLP_DESCENT */
 
         /* clear */
         for(int side = 0 ; side < 2 ; side++) {

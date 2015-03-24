@@ -22,6 +22,7 @@ struct descent_tree {
         /* we have const members which need to lock the mutex */
         mutable pthread_mutex_t tree_lock;
     public:
+    static double grace_time_ratio;
     struct tree_label {
         int side;
         relation::pr pr;
@@ -33,16 +34,57 @@ struct descent_tree {
             os << mpz_sizeinbase(pr.p, 2) << '@' << side;
             return os.str();
         }
+        std::string fullname() const {
+            char * str;
+            gmp_asprintf(&str, "%d %Zd %Zd", side, pr.p, pr.r);
+            std::string s = str;
+            free(str);
+            return s;
+        }
         bool operator<(const tree_label& o) const {
             if (pr_cmp()(pr, o.pr)) return true;
             if (pr_cmp()(o.pr, pr)) return false;
             return side < o.side;
         }
     };
+    /* For descent mode: we compute the expected time to finish given the
+     * factor sizes, and deduce a deadline.  Assuming that not all
+     * encountered factors are below the factor base bound, if we expect
+     * an additional time T to finish the decomposition, we keep looking
+     * for a better decomposition for a grace time which is computed as
+     * x*T, for some configurable ratio x (one might think of x=0.2 for
+     * instance. x is the grace_time_ratio member), which defines a
+     * ``deadline'' for next step.  [If all factors happen to be smooth,
+     * the deadline is immediate, of course.] If within the grace period,
+     * a new relation is found, with an earlier implied deadline, the
+     * deadline is updated. We say that the "decision is taken" when the
+     * deadline passes, and the las machinery is told to decide that it
+     * should proceed with the descent, and stop processing the current
+     * special-q.
+     */
+    struct candidate_relation {
+        relation rel;
+        std::vector<std::pair<int, relation::pr> > outstanding;
+        double deadline;
+        // bool marked_taken;      /* false until we take the decision */
+        candidate_relation() : deadline(INFINITY) {} // , marked_taken(false) {}
+        bool operator<(candidate_relation const& b) const
+        {
+            if (!rel) return false;
+            if (!b.rel) return true;
+            if (std::isfinite(deadline)) { return deadline < b.deadline; }
+            return outstanding.size() < b.outstanding.size();
+        }
+        operator bool() const { return (bool) rel; }
+        bool decision_taken() const { return (bool) rel && seconds() >= deadline; }
+        void set_time_left(double t) {
+            deadline = seconds() + grace_time_ratio * t;
+        }
+    };
     struct tree {
         tree_label label;
         double spent;
-        relation rel;
+        candidate_relation contender;
         std::list<tree *> children;
         tree(tree_label const& label) : label(label) { }
         ~tree() {
@@ -93,17 +135,25 @@ struct descent_tree {
         current.pop_back();
     }
 
-    bool found() const {
+    candidate_relation const& current_best_candidate() const {
+        /* outside multithreaded context */
+        return current.back()->contender;
+    }
+
+    /* return true if the decision to go to the next step of the descent
+     * should be taken now, and register this relation has having been
+     * taken */
+    bool must_take_decision() {
         pthread_mutex_lock(&tree_lock);
-        bool res = current.back()->rel;
+        bool res = current.back()->contender.decision_taken();
         pthread_mutex_unlock(&tree_lock);
         return res;
     }
 
-    void found(relation const& rel) {
-        pthread_mutex_lock(&tree_lock);
-        current.back()->rel = rel;
-        relation_ab ab = rel;
+    void take_decision() {
+        /* must be called outside multithreaded context */
+        // current.back()->contender.marked_taken = true;
+        relation_ab ab = current.back()->contender.rel;
         visited_t::iterator it = visited.find(current.back()->label);
         if (it == visited.end()) {
             visited_t::mapped_type v;
@@ -112,8 +162,37 @@ struct descent_tree {
         } else {
             it->second.insert(ab);
         }
-        pthread_mutex_unlock(&tree_lock);
     }
+
+    /* this returns true if the decision should be taken now */
+    bool new_candidate_relation(candidate_relation& newcomer)
+    {
+        pthread_mutex_lock(&tree_lock);
+        candidate_relation & tenant(current.back()->contender);
+        if (newcomer < tenant) {
+            if (newcomer.outstanding.empty()) {
+                verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
+            } else if (std::isfinite(tenant.deadline)) {
+                /* This implies that newcomer.deadline is also finite */
+                double delta = (tenant.deadline-newcomer.deadline)/grace_time_ratio;
+                verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
+            } else if (tenant) {
+                /* This implies that we have fewer outstanding
+                 * special-q's */
+                verbose_output_print(0, 1, "# [descent] Improved number of children to split from %u to %u\n",
+                        (unsigned int) tenant.outstanding.size(),
+                        (unsigned int) newcomer.outstanding.size());
+            }
+            if (!newcomer.outstanding.empty()) {
+                verbose_output_print(0, 1, "# [descent] still searching for %.2f\n", newcomer.deadline - seconds());
+            }
+            tenant = newcomer;
+        }
+        bool res = tenant.decision_taken();
+        pthread_mutex_unlock(&tree_lock);
+        return res;
+    }
+
     bool must_avoid(relation const& rel) const {
         relation_ab ab = rel;
         pthread_mutex_lock(&tree_lock);
@@ -126,7 +205,7 @@ struct descent_tree {
         return current.size();
     }
     bool is_successful(tree * t) {
-        if (!t->rel)
+        if (!t->contender.rel)
             return false;
         typedef std::list<tree *>::iterator it_t;
         for(it_t i = t->children.begin() ; i != t->children.end() ; i++) {
