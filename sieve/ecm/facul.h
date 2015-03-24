@@ -28,8 +28,11 @@
 
 #define STATS_LEN 128
 
-#define NB_MAX_METHODS 500 /* We authorize at most NB_MAX_METHOD
-			     differents methods in our strategies */
+/* We authorize at most NB_MAX_METHODS different methods in our
+ * strategies. For the descent, we do have an interest in raising this
+ * number somewhat.
+ */
+#define NB_MAX_METHODS 500
 
 typedef struct {
   long method; /* Which method to use (P-1, P+1 or ECM) */
