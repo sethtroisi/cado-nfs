@@ -69,19 +69,30 @@ struct descent_tree {
     struct candidate_relation {
         relation rel;
         std::vector<std::pair<int, relation::pr> > outstanding;
+        double time_left;
         double deadline;
         // bool marked_taken;      /* false until we take the decision */
-        candidate_relation() : deadline(INFINITY) {} // , marked_taken(false) {}
+        candidate_relation() : time_left(INFINITY), deadline(INFINITY) {} // , marked_taken(false) {}
+        candidate_relation& operator=(candidate_relation const& o) {
+            /* nothing very fancy, except that we keep the old deadline.
+             * */
+            rel = o.rel;
+            outstanding = o.outstanding;
+            time_left = o.time_left;
+            if (o.deadline < deadline) deadline = o.deadline;
+            return *this;
+        }
         bool operator<(candidate_relation const& b) const
         {
             if (!rel) return false;
             if (!b.rel) return true;
-            if (std::isfinite(deadline)) { return deadline < b.deadline; }
+            if (std::isfinite(time_left)) { return time_left < b.time_left; }
             return outstanding.size() < b.outstanding.size();
         }
         operator bool() const { return (bool) rel; }
         bool decision_taken() const { return (bool) rel && seconds() >= deadline; }
         void set_time_left(double t) {
+            time_left = t;
             deadline = seconds() + grace_time_ratio * t;
         }
     };
@@ -178,7 +189,7 @@ struct descent_tree {
                 verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
             } else if (std::isfinite(tenant.deadline)) {
                 /* This implies that newcomer.deadline is also finite */
-                double delta = (tenant.deadline-newcomer.deadline)/grace_time_ratio;
+                double delta = tenant.time_left-newcomer.time_left;
                 verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
             } else if (tenant) {
                 /* This implies that we have fewer outstanding
@@ -187,10 +198,10 @@ struct descent_tree {
                         (unsigned int) tenant.outstanding.size(),
                         (unsigned int) newcomer.outstanding.size());
             }
-            if (!newcomer.outstanding.empty()) {
-                verbose_output_print(0, 1, "# [descent] still searching for %.2f\n", newcomer.deadline - seconds());
-            }
             tenant = newcomer;
+            if (!tenant.outstanding.empty()) {
+                verbose_output_print(0, 1, "# [descent] still searching for %.2f\n", tenant.deadline - seconds());
+            }
         }
         bool res = tenant.decision_taken();
         pthread_mutex_unlock(&tree_lock);
