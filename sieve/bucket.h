@@ -44,17 +44,15 @@
  * For the moment, we store the bucket updates and a 16-bit field
  * that can contain, for instance, the low bits of p.
  */
-typedef slice_offset_t prime_hint_t;
-
 
 /* THE ORDER IS MANDATORY! */
 typedef struct {
 #ifdef CADO_LITTLE_ENDIAN
-    prime_hint_t hint;
+    slice_offset_t hint;
     uint16_t x;
 #else
     uint16_t x;
-    prime_hint_t hint;
+    slice_offset_t hint;
 #endif
 } bucket_update_t;
 
@@ -84,7 +82,7 @@ typedef struct {
 typedef struct {
     uint16_t x;
     slice_index_t index;
-    prime_hint_t hint;
+    slice_offset_t hint;
 } bucket_complete_update_t;
 
 

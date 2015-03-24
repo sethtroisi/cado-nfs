@@ -250,7 +250,7 @@ struct where_am_I_s {
 #ifdef TRACK_CODE_PATH
     fbprime_t p;        /* current prime or prime power, when applicable */
     fbprime_t r;        /* current root */
-    prime_hint_t h;     /* Prime hint, if not decoded yet */
+    slice_offset_t h;   /* Prime hint, if not decoded yet */
     int fb_idx;         /* index into the factor base si->sides[side]->fb
                            or into th->sides[side]->fb_bucket */
     unsigned int j;     /* row number in bucket */
