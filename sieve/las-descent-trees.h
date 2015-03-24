@@ -8,6 +8,10 @@
 #include <map>
 #include <pthread.h>
 #include <algorithm>    /* max */
+#include <cmath>        /* isfinite is c99 and std::isfinite is c++11 ;
+                         * it's not totally clear that #include <cmath> +
+                         * accessing std::isfinite works.
+                         */
 
 #include "relation.h"
 #include "las-forwardtypes.h"
