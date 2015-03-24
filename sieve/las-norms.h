@@ -5,10 +5,6 @@
 #include "las-types.h"
 #include "double_poly.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* initializing norms */
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
@@ -253,9 +249,5 @@ void init_degree_one_norms_bucket_region_internal     (unsigned char *S, uint32_
 void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd);
 void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd, unsigned int nroots, root_ptr roots);
 void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_NORMS_H_ */

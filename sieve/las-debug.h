@@ -7,10 +7,6 @@
 #include "las-config.h"
 #include "las-types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct trace_Nx_t { unsigned int N; unsigned int x; };
 struct trace_ab_t { int64_t a; uint64_t b; };
 struct trace_ij_t { int i; unsigned int j; };
@@ -85,9 +81,5 @@ static inline void sieve_increase(unsigned char *S, const unsigned char logp, wh
 }
 
 #endif  /* TRACE_K */
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_DEBUG_H_ */

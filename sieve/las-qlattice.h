@@ -10,10 +10,6 @@
 /* implementations for inlines */
 #include "las-arith.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct qlattice_basis : private NonCopyable {
     int64_t a0, b0, a1, b1;
     mpz_t q;
@@ -42,10 +38,6 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
 #endif
 
 
-#ifdef __cplusplus
-}
-#endif
-
 /* fb_root_in_qlattice returns (R*b1-a1)/(a0-R*b0) mod p */
 #if defined(SUPPORT_LARGE_Q)
 #ifndef  HAVE_redc_64
@@ -56,15 +48,9 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
  * it does not seem to be exactly 31 or 63 bits. This should be
  * investigated */
 #define MAX_SPECIALQ_BITSIZE    60
-#ifdef __cplusplus
-extern "C" {
-#endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const redc_invp_t invp, const qlattice_basis &basis);
-#ifdef __cplusplus
-}
-#endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const redc_invp_t invp, const qlattice_basis &basis)
@@ -76,15 +62,9 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
 #else
 
 #define MAX_SPECIALQ_BITSIZE    30
-#ifdef __cplusplus
-extern "C" {
-#endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const redc_invp_t invp, const qlattice_basis &basis);
-#ifdef __cplusplus
-}
-#endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const redc_invp_t invp, const qlattice_basis &basis)

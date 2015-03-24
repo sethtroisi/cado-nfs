@@ -407,7 +407,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const i
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_sieve_entry pli = plattice_sieve_entry(transformed.p, r, proj, logI, (prime_hint_t)i_entry);
+        plattice_sieve_entry pli = plattice_sieve_entry(transformed.p, r, proj, logI, (slice_offset_t)i_entry);
         result->push_back(pli);
       }
     }

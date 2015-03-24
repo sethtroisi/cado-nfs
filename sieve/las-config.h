@@ -238,14 +238,6 @@
 
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 void las_display_config_flags();
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_CONFIG_H_ */

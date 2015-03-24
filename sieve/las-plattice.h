@@ -137,7 +137,6 @@
 // overflow).  In fact, these guards are 99.99999% useless.
 
 typedef uint64_t plattice_x_t;
-typedef slice_offset_t prime_hint_t;
 
 struct plattice_info_t;
 static int reduce_plattice (plattice_info_t *, fbprime_t, fbroot_t, uint32_t);
@@ -338,8 +337,8 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbroot_t r, cons
    that generated each lattice basis. This offset becomes the "prime hint"
    in the bucket updates. */
 struct plattice_sieve_entry : public plattice_info_t {
-  prime_hint_t hint;
-  plattice_sieve_entry(const fbprime_t p, const fbroot_t r, const bool proj, const int logI, const prime_hint_t hint)
+  slice_offset_t hint;
+  plattice_sieve_entry(const fbprime_t p, const fbroot_t r, const bool proj, const int logI, const slice_offset_t hint)
      : plattice_info_t(p, r, proj, logI), hint(hint) {};
 };
 
@@ -350,7 +349,7 @@ class plattice_sieve_info : public plattice_sieve_entry {
     uint32_t bound0, bound1;
     uint32_t maskI;
     
-    plattice_sieve_info(const fbprime_t p, const fbroot_t r, const bool proj, const int logI, const prime_hint_t hint)
+    plattice_sieve_info(const fbprime_t p, const fbroot_t r, const bool proj, const int logI, const slice_offset_t hint)
         : plattice_sieve_entry(p, r, proj, logI, hint) {
       inc_a = get_inc_a(logI);
       inc_c = get_inc_c(logI);

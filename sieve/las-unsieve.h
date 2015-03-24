@@ -43,10 +43,6 @@ typedef struct j_div_s * j_div_ptr;
 typedef const struct j_div_s * j_div_srcptr;
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 unsieve_aux_data_srcptr init_unsieve_data(uint32_t);
 void clear_unsieve_data(unsieve_aux_data_srcptr);
 
@@ -55,9 +51,5 @@ void clear_j_div(j_div_srcptr);
 int  search_survivors_in_line(unsigned char * const restrict[2], const unsigned char[2], 
         unsigned int, unsigned int, int, j_div_srcptr, unsigned int,
         unsieve_aux_data_srcptr);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_UNSIEVE_H_ */
