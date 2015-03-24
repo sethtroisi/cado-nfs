@@ -83,7 +83,6 @@ parse_config(siever_config_ptr sc, param_list pl)
     seen &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
     seen &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
     seen &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
-    seen &= param_list_parse_double(pl, "skew",    &(sc->skewness));
     return seen;
 }
 
@@ -158,6 +157,7 @@ main (int argc, char * argv[])
     cado_poly cpoly;
     read_poly(cpoly, pl);
     int ok = parse_config(conf, pl);
+    ok = ok && param_list_parse_double(pl, "skew",    &(cpoly->skew));
     if (!ok) {
         fprintf(stderr, "Error: mandatory parameter missing.\n");
 	param_list_clear(pl);
