@@ -75,6 +75,7 @@
 # TODO: make output less verbose.
 
 import os
+import io
 import sqlite3
 import subprocess
 import sys
@@ -351,7 +352,7 @@ class GeneralClass(object):
                 errors.append("%s missing" % f)
         if len(errors):
             msg = "Some data files and/or binaries missing:\n"
-            msg += "\n".join(["\t"+x for x in e])
+            msg += "\n".join(["\t"+x for x in errors])
             raise RuntimeError(msg)
 
 
@@ -373,6 +374,42 @@ class RatLogBase(object):
 
     def has(self, p):
         return p in self.known
+
+class important_file(object):
+    def __init__(self, outfile, call_that):
+        self.child = None
+        print("command line:\n" + " ".join(call_that))
+        if os.path.exists(outfile):
+            print("reusing file %s" % outfile)
+            self.reader = open(outfile,'r')
+            self.writer = None
+        else:
+            self.child = subprocess.Popen(call_that, stdout=subprocess.PIPE)
+            self.reader = io.TextIOWrapper(self.child.stdout, 'utf-8')
+            self.writer = open(outfile, 'w')
+
+    def streams(self):
+        return self.reader, self.writer
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        line = next(self.reader)
+        if self.writer is not None:
+            self.writer.write(line)
+        return line
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if self.child is not None:
+            self.writer.close()
+            self.child.kill()
+            self.reader.close()   # do I need to put it before ? broken pipe ?
+        else:
+            self.reader.close()
 
 class DescentUpperClass(object):
     def declare_args(parser):
@@ -479,45 +516,24 @@ class DescentUpperClass(object):
             "-q1", q1,
             "--exit-early", 2,
             ]
+        call_that = [str(x) for x in call_that]
 
         outfile=os.path.join(general.datadir(), prefix + "rels.txt")
 
-        relstream = None
-        savestream = None
-        child = None
-        if os.path.exists(outfile):
-            print("reusing file %s" % outfile)
-            relstream = open(outfile,'r')
-        else:
-            call_that = [str(x) for x in call_that]
-            print("command line:\n" + " ".join(call_that))
-            child = subprocess.Popen(call_that, stdout=subprocess.PIPE)
-            relstream = child.stdout
-            savestream = open(outfile, 'w')
-
         rel = None
-        for line in relstream:
-            if type(line) != str:
-                line=line.decode("utf-8")
-            if savestream is not None:
-                savestream.write(line)
-            if line[0] == '#':
-                if (re.match("^# \d+ relation", line)):
-                    sys.stdout.write('\n')
-                    print(line.rstrip())
+        with important_file(outfile, call_that) as relstream:
+            for line in relstream:
+                if line[0] == '#':
+                    if (re.match("^# \d+ relation", line)):
+                        sys.stdout.write('\n')
+                        print(line.rstrip())
+                    else:
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
+                    continue
                 else:
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                continue
-            else:
-                rel = line.strip()
-                break
-        if savestream is not None:
-            savestream.close()
-            child.kill()
-            relstream.close()   # do I need to put it before ? broken pipe ?
-        else:
-            relstream.close()
+                    rel = line.strip()
+                    break
 
         sys.stdout.write('\n')
         if not rel:
@@ -613,10 +629,7 @@ class DescentMiddleClass(object):
     def do_descent(self, todofile):
         tmpdir = general.tmpdir()
         prefix = general.prefix() + "-%s.descent_middle." % args.target
-        relsfilename = os.path.join(general.datadir(), prefix + "rels")
-        if os.path.exists(relsfilename):
-            print("reusing file %s" % relsfilename)
-            return relsfilename
+
         f = open(todofile, 'r')
         ntodo = len(list(f))
         f.close()
@@ -634,10 +647,27 @@ class DescentMiddleClass(object):
                 # "--mfb1", self.args.mfb1,
              ]
         s += [ "--todo", todofile ]
-        s += [ "--out", relsfilename ]
         call_that=[str(x) for x in s]
-        print("command line:\n" + " ".join(call_that))
-        subprocess.check_call(call_that)
+        relsfilename = os.path.join(general.datadir(), prefix + "rels")
+
+        printing = False
+        failed = []
+        with important_file(relsfilename, call_that) as relstream:
+            for line in relstream:
+                if re.match("^# END TREE", line):
+                    printing = False
+                elif printing:
+                    print(line.rstrip())
+                    foo = re.match("# FAILED ([\d@]+).*###", line)
+                    if foo:
+                        failed.append(foo.groups()[0])
+                elif re.match("^# BEGIN TREE", line):
+                    print("")
+                    printing=True
+
+        if failed:
+            raise RuntimeError("Failed descents for: " + ", ".join(failed))
+
         return relsfilename
 
 class DescentLowerClass(object):
