@@ -25,7 +25,6 @@ public:
     las_dlog_base();
     ~las_dlog_base();
     void read();
-    void set_default_lpb(siever_config_srcptr sc);
 
     static void declare_parameter_usage(param_list pl);
 };

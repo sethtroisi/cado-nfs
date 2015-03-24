@@ -94,8 +94,10 @@ void siever_config_display(siever_config_srcptr sc)/*{{{*/
             sc->sides[RATIONAL_SIDE]->lambda,
 	    sc->sides[ALGEBRAIC_SIDE]->lambda);
     }
+    /*
     verbose_output_print(0, 1, "#                     skewness=%1.1f\n",
 	    sc->skewness);
+            */
 }/*}}}*/
 
 int siever_config_cmp(siever_config_srcptr a, siever_config_srcptr b)/*{{{*/
@@ -310,11 +312,11 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
             max_weight = MAX(max_weight, weight);
         if (nr_primes != 0 || weight != 0.) {
             verbose_output_print(0, 1, "# Number of primes in %s factor base part %d = %zu\n",
-                                 sidenames[side], i_part, nr_primes);
+                    sidenames[side], i_part, nr_primes);
             verbose_output_print(0, 1, "# Number of prime ideals in %s factor base part %d = %zu\n",
-                                 sidenames[side], i_part, nr_roots);
+                    sidenames[side], i_part, nr_roots);
             verbose_output_print(0, 1, "# Weight of primes in %s factor base part %d = %0.5g\n",
-                                 sidenames[side], i_part, weight);
+                    sidenames[side], i_part, weight);
         }
     }
     s->max_bucket_fill_ratio = max_weight * 1.07;
@@ -390,14 +392,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
     si->nb_buckets_max = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
-    verbose_output_print(0, 1, "# bucket_region = %u\n", BUCKET_REGION);
-    if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
-      verbose_output_print(0, 1, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
-    else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
-      verbose_output_print(0, 1, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
-    else
-      verbose_output_print(0, 1, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
-
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
     si->doing = NULL;
@@ -413,23 +407,35 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * are exactly the same and can be shared.
      */
     if (las->sievers == si) {
+        verbose_output_print(0, 1, "# bucket_region = %u\n", BUCKET_REGION);
+        if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
+            verbose_output_print(0, 1, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
+        else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
+            verbose_output_print(0, 1, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
+        else
+            verbose_output_print(0, 1, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
+
         sieve_info_init_factor_bases(las, si, pl);
+        for (int side = 0; side < 2; side++) {
+            sieve_info_print_fb_statistics(las, si, side);
+        }
     } else {
         // We are in descent mode, it seems, so let's not duplicate the
         // factor base data.
         // A few sanity checks, first.
         ASSERT_ALWAYS(las->sievers->conf->logI == si->conf->logI);
         ASSERT_ALWAYS(las->sievers->conf->bucket_thresh == si->conf->bucket_thresh);
-        ASSERT_ALWAYS(las->sievers->conf->sides[0]->lim == si->conf->sides[0]->lim);
-        ASSERT_ALWAYS(las->sievers->conf->sides[0]->powlim == si->conf->sides[0]->powlim);
-        ASSERT_ALWAYS(las->sievers->conf->sides[1]->lim == si->conf->sides[1]->lim);
-        ASSERT_ALWAYS(las->sievers->conf->sides[1]->powlim == si->conf->sides[1]->powlim);
         // Then, copy relevant data from the first sieve_info
         verbose_output_print(0, 1, "# Do not regenerate factor base data: copy it from first siever\n");
         for (int side = 0; side < 2; side++) {
+            ASSERT_ALWAYS(las->sievers->conf->sides[side]->lim == si->conf->sides[side]->lim);
+            ASSERT_ALWAYS(las->sievers->conf->sides[side]->powlim == si->conf->sides[side]->powlim);
             sieve_side_info_ptr sis = si->sides[side];
             sieve_side_info_ptr sis0 = las->sievers->sides[side];
             sis->fb = sis0->fb;
+            /* important ! Otherwise we'll have 0, and badness will
+             * occur. */
+            sis->max_bucket_fill_ratio = sis0->max_bucket_fill_ratio;
         }
     }
 
@@ -467,7 +473,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
       fclose (file);
 
     for(int side = 0 ; side < 2 ; side++) {
-        sieve_info_print_fb_statistics(las, si, side);
 	/* init_norms (si, side); */ /* only depends on scale, logmax, lognorm_table */
 	sieve_info_init_trialdiv(si, side); /* Init refactoring stuff */
 	mpz_init (si->BB[side]);
@@ -686,14 +691,14 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         if (sc->bitsize > las->max_hint_bitsize[sc->side])
             las->max_hint_bitsize[sc->side] = sc->bitsize;
         // Copy default value for non-given parameters
-        sc->skewness = las->default_config->skewness;
-        sc->bucket_thresh = las->default_config->bucket_thresh;
-        sc->td_thresh = las->default_config->td_thresh;
-        sc->unsieve_thresh = las->default_config->unsieve_thresh;
-        sc->sides[0]->powlim = las->default_config->sides[0]->powlim;
-        sc->sides[1]->powlim = las->default_config->sides[1]->powlim;
-        sc->sides[0]->ncurves = las->default_config->sides[0]->ncurves;
-        sc->sides[1]->ncurves = las->default_config->sides[1]->ncurves;
+        // sc->skewness = las->default_config->skewness;
+        sc->bucket_thresh = las->config_base->bucket_thresh;
+        sc->td_thresh = las->config_base->td_thresh;
+        sc->unsieve_thresh = las->config_base->unsieve_thresh;
+        for(int side = 0 ; side < 2 ; side++) {
+            sc->sides[side]->powlim = las->config_base->sides[side]->powlim;
+            sc->sides[side]->ncurves = las->config_base->sides[side]->ncurves;
+        }
     }
     if (las->hint_table == NULL) {
         fprintf(stderr, "%s: no data ??\n", filename);
@@ -828,17 +833,12 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	exit(EXIT_FAILURE);
     }
 
-    /* {{{ Parse default siever config (fill all possible fields) */
-
-    siever_config_ptr sc = las->default_config;
-    memset(sc, 0, sizeof(siever_config));
-
-    sc->skewness = las->cpoly->skew;
+    // sc->skewness = las->cpoly->skew;
     /* -skew (or -S) may override (or set) the skewness given in the
      * polynomial file */
-    param_list_parse_double(pl, "skew", &(sc->skewness));
+    param_list_parse_double(pl, "skew", &(las->cpoly->skew));
 
-    if (sc->skewness <= 0.0) {
+    if (las->cpoly->skew <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
 	cado_poly_clear(las->cpoly);
 	param_list_clear(pl);
@@ -846,82 +846,115 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     /* }}} */
 
-    /* The default config is not necessarily a complete bit of
-     * information.
-     *
-     * The field with the bitsize of q is here filled with q0 as found in
-     * the command line. Note though that this is only one choice among
-     * several possible (q1, or just no default).
-     * For the descent, we do not intend to have a default config, thus
-     * specifying q0 makes no sense. Likewise, for file-based todo lists,
-     * we have no default either, and no siever is configured to provide
-     * this ``default'' behaviour (yet, the default bits here are used to
-     * pre-fill the config data later on).
-     */
-    mpz_t q0;
-    mpz_init(q0);
-    if (param_list_parse_mpz(pl, "q0", q0)) {
-        sc->bitsize = mpz_sizeinbase(q0, 2);
-    }
-    mpz_clear(q0);
-    /* sqside is now the preferred parameter */
-    if (!param_list_parse_int(pl, "sqside", &sc->side)) {
-        sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
-    }
-    param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
-    param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
-    int seen = 1;
-    seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
-    seen &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
-    seen &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
-    if (!seen) {
-        fprintf(stderr, "Error: options -I, -lim0, -lpb0, -mfb0, "
-                " -lim1, -lpb1, -mfb1 are mandatory.\n");
-	cado_poly_clear(las->cpoly);
-	param_list_clear(pl);
-        exit(EXIT_FAILURE);
-    }
+    /* {{{ Parse default siever config (fill all possible fields) */
+    {
+        siever_config_ptr sc = las->config_base;
+        memset(sc, 0, sizeof(siever_config));
 
-    /* Parse optional siever configuration parameters */
-    sc->td_thresh = 1024;	/* default value */
-    param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
 
-    sc->unsieve_thresh = 100;
-    if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
-        verbose_output_print(0, 1, "# Un-sieving primes > %u\n",
-                sc->unsieve_thresh);
-    }
-
-    sc->bucket_thresh = 1 << sc->logI;	/* default value */
-    /* overrides default only if parameter is given */
-    param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
-
-    const char *powlim_params[2] = {"powlim0", "powlim1"};
-    for (int side = 0; side < 2; side++) {
-        if (!param_list_parse_ulong(pl, powlim_params[side], &sc->sides[side]->powlim)) {
-            sc->sides[side]->powlim = sc->bucket_thresh - 1;
-            verbose_output_print(0, 1, "# Using default value of %lu for -%s\n",
-                     sc->sides[side]->powlim, powlim_params[side]);
+        /* The default config is not necessarily a complete bit of
+         * information.
+         *
+         * The field with the bitsize of q is here filled with q0 as found in
+         * the command line. Note though that this is only one choice among
+         * several possible (q1, or just no default).
+         * For the descent, we do not intend to have a default config, thus
+         * specifying q0 makes no sense. Likewise, for file-based todo lists,
+         * we have no default either, and no siever is configured to provide
+         * this ``default'' behaviour (yet, the default bits here are used to
+         * pre-fill the config data later on).
+         */
+        mpz_t q0;
+        mpz_init(q0);
+        if (param_list_parse_mpz(pl, "q0", q0)) {
+            sc->bitsize = mpz_sizeinbase(q0, 2);
         }
+        mpz_clear(q0);
+        /* sqside is now the preferred parameter */
+        if (!param_list_parse_int(pl, "sqside", &sc->side)) {
+            sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+        }
+        param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
+        param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
+        int complete = 1;
+        complete &= param_list_parse_int   (pl, "I",       &(sc->logI));
+        complete &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
+        complete &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
+        if (!complete) {
+            /* ok. Now in fact, for the moment we really need these to be
+             * specified, because the call to "new fb_interface" of
+             * course depends on the factor base limits. For the very
+             * reason that presently, we want these to be common across
+             * several siever config values in the hint table, we cannot
+             * leave default_config half-baked.
+             *
+             * since bucket_thresh depends on I, we need I too.
+             */
+            fprintf(stderr, "Error: as long as per-qrange factor bases are not fully supported, we need to know at least the I and lim[01] fields\n");
+            exit(EXIT_FAILURE);
+        }
+
+        complete &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
+        complete &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
+        complete &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
+        complete &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
+        if (!complete) {
+            verbose_output_print(0, 1, "# default siever configuration is incomplete ; required parameters are I, lim[01], lpb[01], mfb[01]\n");
+
+        }
+
+
+        /* Parse optional siever configuration parameters */
+        sc->td_thresh = 1024;	/* default value */
+        param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
+
+        sc->unsieve_thresh = 100;
+        if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
+            verbose_output_print(0, 1, "# Un-sieving primes > %u\n",
+                    sc->unsieve_thresh);
+        }
+
+        sc->bucket_thresh = 1 << sc->logI;	/* default value */
+        /* overrides default only if parameter is given */
+        param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
+
+        const char *powlim_params[2] = {"powlim0", "powlim1"};
+        for (int side = 0; side < 2; side++) {
+            if (!param_list_parse_ulong(pl, powlim_params[side], &sc->sides[side]->powlim)) {
+                sc->sides[side]->powlim = sc->bucket_thresh - 1;
+                verbose_output_print(0, 1, "# Using default value of %lu for -%s\n",
+                        sc->sides[side]->powlim, powlim_params[side]);
+            }
+        }
+
+        const char *ncurves_params[2] = {"ncurves0", "ncurves1"};
+        for (int side = 0; side < 2; side++)
+            if (!param_list_parse_int(pl, ncurves_params[side],
+                        &sc->sides[side]->ncurves))
+                sc->sides[side]->ncurves = -1;
+
+        if (complete)
+            las->default_config = sc;
     }
-
-    const char *ncurves_params[2] = {"ncurves0", "ncurves1"};
-    for (int side = 0; side < 2; side++)
-      if (!param_list_parse_int(pl, ncurves_params[side],
-                                &sc->sides[side]->ncurves))
-        sc->sides[side]->ncurves = -1;
-
     /* }}} */
 
+    if (!las->default_config && !param_list_lookup_string(pl, "descent-hint-table")) {
+        fprintf(stderr, "Error: no default config set, and no hint table either\n");
+        exit(EXIT_FAILURE);
+    }
 
     //{{{ parse option stats_cofact
     const char *statsfilename = param_list_lookup_string (pl, "stats-cofact");
     if (statsfilename != NULL) /* a file was given */
       {
+          siever_config_srcptr sc = las->default_config;
+          if (sc == NULL) {
+              fprintf(stderr, "Error: option stats-cofact works only with a default config\n");
+              exit(EXIT_FAILURE);
+          } else if (param_list_lookup_string(pl, "descent-hint-table")) {
+              verbose_output_print(0, 1, "# Warning: option stats-cofact only applies to the default siever config\n");
+          }
+
 	  cof_stats_file = fopen (statsfilename, "w");
 	  if (cof_stats_file == NULL)
               {
@@ -944,7 +977,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	      }
       }
     //}}}
-
     
     /* {{{ Init and parse info regarding work to be done by the siever */
     /* Actual parsing of the command-line fragments is done within
@@ -994,7 +1026,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 #ifdef  DLP_DESCENT
     las->dlog_base = new las_dlog_base();
     las->dlog_base->lookup_parameters(pl);
-    las->dlog_base->set_default_lpb(las->default_config);
     las->dlog_base->read();
 #endif
 
@@ -1187,7 +1218,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
     mpz_ptr q0 = las->todo_q0;
     mpz_ptr q1 = las->todo_q1;
 
-    int qside = las->default_config->side;
+    int qside = las->config_base->side;
 
     mpz_t * roots;
     mpz_poly_ptr f = las->cpoly->pols[qside];
@@ -2531,7 +2562,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (!param_list_parse_switch(pl, "-ondemand-siever-config")) {
         /* Create a default siever instance among las->sievers if needed */
-        if (las->default_config->bitsize)
+        if (las->default_config)
             get_sieve_info_from_config(las, las->default_config, pl);
 
         /* Create all siever configurations from the preconfigured hints */
@@ -2581,15 +2612,19 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (las_todo_pop_closing_brace(las->todo)) {
             las->tree->done_node();
             if (las->tree->depth() == 0) {
-                if (recursive_descent)
+                if (recursive_descent) {
+                    /* BEGIN TREE / END TREE are for the python script */
+                    fprintf(las->output, "# BEGIN TREE\n");
                     las->tree->display_last_tree(las->output);
+                    fprintf(las->output, "# END TREE\n");
+                }
                 las->tree->visited.clear();
             }
             continue;
         }
 
         siever_config current_config;
-        memcpy(current_config, las->default_config, sizeof(siever_config));
+        memcpy(current_config, las->config_base, sizeof(siever_config));
         {
             const las_todo_entry * const next_todo = las->todo->top();
             current_config->bitsize = mpz_sizeinbase(next_todo->p, 2);
@@ -2640,7 +2675,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         double qt0 = seconds();
         tt_qstart = seconds();
 
-        if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->conf->skewness) != 0)
+        if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->cpoly->skew) != 0)
             continue;
         si->qbasis.set_q(si->doing->p);
 

@@ -1435,7 +1435,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
        |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
        |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
     */
-    const double skewness = si->conf->skewness;
+    const double skewness = si->cpoly->skew;
     const int verbose = 0;
     if (verbose) {
         printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64

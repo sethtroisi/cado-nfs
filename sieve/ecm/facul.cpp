@@ -49,13 +49,13 @@ nb_curves (const unsigned int lpb)
   /* the following table, computed with the proba_cofactor() function in the
      facul.sage file, ensures a probability of at least about 90% to find a
      factor below 2^lpb with n = T[lpb] */
-#define LPB_MAX 64
-  int T[LPB_MAX+1] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0-9 */
+  int T[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0-9 */
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 10-19 */
                       0, 0, 1 /*22:0.9074*/, 2 /*23:0.9059*/, 3 /*24:0.8990*/,
                       5 /*25:0.9194*/, 6 /*26:0.9065*/, 8 /*27:0.9053*/,
                       10 /*28:0.9010*/, 13 /*29:0.9091*/, 16 /*30:0.9134*/,
                       18 /*31:0.9039*/, 21 /*32:0.9076*/, 24/*33:0.8963*/,
+#if 0
 /* The extra ones below are computed with 200 trials */
          /* lpb=34 */ 27, /* 26:0.855, 27:0.9 */
          /* lpb=35 */ 35, /* 34:0.885, 35:0.915 */
@@ -89,7 +89,9 @@ nb_curves (const unsigned int lpb)
          /* 62 */ 197,
          /* 63 */ 203,
          /* 64 */ 209,
+#endif
   };
+  const int LPB_MAX = sizeof(T)/sizeof(int) - 1;
   return (lpb <= LPB_MAX) ? T[lpb] : T[LPB_MAX];
 #undef LPB_MAX
 }

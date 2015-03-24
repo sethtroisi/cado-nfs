@@ -120,7 +120,7 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
 
     new_si->sides[side]->strategy = strategy[side];
   }
-  SkewGauss(new_si->qbasis, new_si->doing->p, new_si->doing->r, new_si->conf->skewness);
+  SkewGauss(new_si->qbasis, new_si->doing->p, new_si->doing->r, new_si->cpoly->skew);
   return new_si;
 }
 

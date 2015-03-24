@@ -29,7 +29,6 @@ struct siever_config_s {
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
     int side;
     int logI;
-    double skewness;
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned int td_thresh;
     unsigned int unsieve_thresh;
@@ -194,7 +193,12 @@ struct las_info_s {
     /* It's not ``general operational'', but global enough to be here */
     cado_poly cpoly;
 
-    siever_config default_config;
+    siever_config_srcptr default_config;
+
+    /* This needs not be complete. The default_config field points here
+     * if is. If not, the fields here are just used as a base for
+     * initializing the other configurations */
+    siever_config config_base;
 
     /* There may be several configured sievers. This is used mostly for
      * the descent.
