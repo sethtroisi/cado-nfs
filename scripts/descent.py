@@ -736,9 +736,9 @@ class DescentLowerClass(object):
         prefix = general.prefix() + ".descent.%s.lower." % args.target
 
         # Read descent relations
-        noncomment=lambda x: not re.match("^#",x)
+        useful=lambda x: re.match("^Taken:",x)
         with open(relsfile, 'r') as file:
-            descrels = list(filter(noncomment, file))
+            descrels = list(filter(useful, file))
         nrels = len(descrels)
         print ("--- Final reconstruction (from %d relations) ---" % nrels)
 
@@ -754,7 +754,8 @@ class DescentLowerClass(object):
         more_extraprimes = set()
         extraprimes_per_rel = []
         for rel in descrels:
-            r = rel.split(':')
+            r = rel.split(':')[1:]
+            r[0] = r[0].lstrip()
             a,b = r[0].split(',')
             a=int(a)
             b=int(b)
@@ -813,6 +814,7 @@ class DescentLowerClass(object):
                         fakefilename2
                     ]
         call_that = [str(x) for x in call_that]
+        print("command line:\n" + " ".join(call_that))
         subprocess.check_call(call_that, stderr=subprocess.DEVNULL)
 
         last_index = self._last_renumber_index()

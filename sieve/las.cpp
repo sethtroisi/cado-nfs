@@ -2787,6 +2787,14 @@ int main (int argc0, char *argv0[])/*{{{*/
              * file, and also for the initialization of the descent.
              */
             las->tree->take_decision();
+            verbose_output_start_batch();
+            FILE * output;
+            for (size_t i = 0;
+                    (output = verbose_output_get(0, 0, i)) != NULL;
+                    i++) {
+                winner.rel.print(output, "Taken: ");
+            }
+            verbose_output_end_batch();
             if (recursive_descent) {
                 /* reschedule the possibly still missing large primes in the
                  * todo list */
