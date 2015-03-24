@@ -63,10 +63,6 @@
 # the power of the cadofactor python programs. I need to understand that
 # stuff better.
 
-# FIXME: we must be resilient to the case where a prime appears twice,
-# once rational, once algebraic ; or two algebraic, but with a different
-# prime ideal above. This means we must have the extraprimes list richer.
-
 # TODO: this currently fails when the target is ridiculously small, as
 # target=1009 for instance -- see why.
 
@@ -472,7 +468,7 @@ class DescentUpperClass(object):
         p = general.p()
         gg = self.__myxgcd(z, p, self.tkewness)
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + "-%s.descent_init." % args.target
+        prefix = general.prefix() + ".descent.%s.init." % args.target
 
         polyfilename = os.path.join(tmpdir, prefix + "poly")
         with open(polyfilename, 'w') as f:
@@ -518,7 +514,7 @@ class DescentUpperClass(object):
             ]
         call_that = [str(x) for x in call_that]
 
-        outfile=os.path.join(general.datadir(), prefix + "rels.txt")
+        outfile=os.path.join(general.datadir(), prefix + "rels")
 
         rel = None
         with important_file(outfile, call_that) as relstream:
@@ -553,18 +549,35 @@ class DescentUpperClass(object):
         assert(abs(Num) == functools.reduce(lambda x,y:x*y,factNum,1))
         assert(abs(Den) == functools.reduce(lambda x,y:x*y,factDen,1))
 
-        known = RatLogBase(general)
-        todofilename = os.path.join(tmpdir, prefix + "todo")
-        with open(todofilename, "w") as f:
-            for q in factNum + factDen:
-                if known.has(q):
-                    continue
-                logq = math.ceil(math.log(q, 2))
-                print("Will do further descent for %d-bit rational prime %d"
-                        % (logq, q))
-                # las can understand when the rational root is missing
-                f.write("0 %d\n" % q)
+        todofilename = os.path.join(general.datadir(), prefix + "todo")
+
+        if not os.path.exists(todofilename):
+            known = RatLogBase(general)
+            with open(todofilename, "w") as f:
+                for q in factNum + factDen:
+                    if known.has(q):
+                        continue
+                    logq = math.ceil(math.log(q, 2))
+                    print("Will do further descent for %d-bit rational prime %d"
+                            % (logq, q))
+                    # las can understand when the rational root is missing
+                    f.write("0 %d\n" % q)
+        else:
+            with open(todofilename, "r") as f:
+                for line in f:
+                    side,q = line.strip().split(' ')
+                    q=int(q)
+                    logq = math.ceil(math.log(q, 2))
+                    print("Will do further descent for %d-bit rational prime %d" % (logq, q))
+
+
         return todofilename, [Num, Den, factNum, factDen]
+
+def a_over_b_mod_p(a, b, p):
+    if b%p == 0:
+        return p
+    ib = pow(b, p-2, p)
+    return (a*ib) % p
 
 
 class DescentMiddleClass(object):
@@ -628,7 +641,7 @@ class DescentMiddleClass(object):
 
     def do_descent(self, todofile):
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + "-%s.descent_middle." % args.target
+        prefix = general.prefix() + ".descent.%s.middle." % args.target
 
         f = open(todofile, 'r')
         ntodo = len(list(f))
@@ -670,6 +683,18 @@ class DescentMiddleClass(object):
 
         return relsfilename
 
+def prime_ideal_mixedprint(pr):
+    p = pr[0]
+    side = pr[1]
+    if side == 0:
+        machine = "%x 0 rat" % p
+        human = "0,%d" % p
+    else:
+        r = pr[2]
+        machine = "%x %d %x" % pr
+        human = "%d,%d,%d" % (side,p,r)
+    return machine,human
+
 class DescentLowerClass(object):
     def declare_args(parser):
         pass
@@ -708,7 +733,7 @@ class DescentLowerClass(object):
     def do_descent(self, relsfile, initial_split):
         args = parser.parse_args()
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + "-%s.descent_lower." % args.target
+        prefix = general.prefix() + ".descent.%s.lower." % args.target
 
         # Read descent relations
         noncomment=lambda x: not re.match("^#",x)
@@ -725,27 +750,49 @@ class DescentLowerClass(object):
         # FIXME -- we must create proper renumber table entries for extra
         # primes, otherwise the birthday paradox will kill us.
         fakerels = []
-        extraprimes = []
+        extraprimes = set()
+        more_extraprimes = set()
+        extraprimes_per_rel = []
         for rel in descrels:
             r = rel.split(':')
+            a,b = r[0].split(',')
+            a=int(a)
+            b=int(b)
             ss = [ [], [] ]
             extra = [ [], [] ]
             for side in range(2):
                 for p in r[side+1].strip().split(','):
-                    if int(p, 16) >> lpb[side]:
-                        extra[side].append(p)
+                    ip=int(p, 16)
+                    if ip >> lpb[side]:
+                        if side == 0:
+                            extra[side].append("%s 0 rat" % p) 
+                            extraprimes.add((ip, side))
+                        else:
+                            rho = a_over_b_mod_p(a,b,ip)
+                            extra[side].append("%s %d %x" % (p,side,rho)) 
+                            extraprimes.add((ip,side,rho))
+                            # We forcibly add this one too, because it
+                            # makes it easier to have a correct table in
+                            # the end.
+                            more_extraprimes.add((ip,0))
                     else:
                         ss[side].append(p)
             fake = ":".join([r[0]] + [",".join(x) for x in ss])
             fakerels.append(fake)
-            extraprimes.append(extra)
-        setextraprimes = set(sum(sum(extraprimes,[]),[]))
-        listextraprimes = list(setextraprimes)
-        numlist = [ int(p, 16) for p in listextraprimes ]
-        numlist.sort()
-        listextraprimes = [ hex(p)[2:] for p in numlist ]
-        print ("They include %s primes above lpb:" % len(listextraprimes),
-                ", ".join(listextraprimes))
+            extraprimes_per_rel.append(extra)
+        for pr in more_extraprimes:
+            if pr in extraprimes:
+                machine,human = prime_ideal_mixedprint(pr)
+                print("Note: prime %s is here both for itself, and because an algebraic prime with same p exists" % human)
+        listextraprimes = list(set.union(extraprimes, more_extraprimes))
+        listextraprimes.sort()
+        print ("They include %s primes above lpb:" % len(extraprimes))
+        for pr in listextraprimes:
+            desc = "%s\t# %s" % prime_ideal_mixedprint(pr)
+            if pr in more_extraprimes and pr not in extraprimes:
+                desc += "\t\t(for technical reasons only)"
+            print(desc)
+
         fakefilename = os.path.join(tmpdir, prefix + "fakerels")
         with open(fakefilename, 'w') as f:
             for rel in fakerels:
@@ -778,28 +825,30 @@ class DescentLowerClass(object):
         # accordingly.
         dictextraprimes = {}
         for i in range(len(listextraprimes)):
-            dictextraprimes[listextraprimes[i]] = last_index+1+i
-        print(dictextraprimes)
+            machine,human = prime_ideal_mixedprint(listextraprimes[i])
+            dictextraprimes[machine] = last_index+1+i
+            print("%x %s" % (last_index+1+i, machine))
 
-        descentrelsfilename = os.path.join(tmpdir, prefix + "descentrels-renumbered.txt")
+        descentrelsfilename = os.path.join(tmpdir, prefix + "rels-renumbered.txt")
         # relations
         with open(descentrelsfilename, 'w') as outfile:
             # add first line like in purged.gz, just to give the number
             # of relations to reconstructlog.
             outfile.write("# %d 0 0\n" % nrels)
-            extra = iter(extraprimes)
+            extra = iter(extraprimes_per_rel)
             with open(fakefilename2, 'r') as infile:
                 for rel in infile:
                     rel = rel.rstrip()
                     for p in sum(next(extra),[]):
                         rel += "," + hex(dictextraprimes[p])[2:]
                     outfile.write(rel + "\n")
+                    # print(rel)
 
         newrenumberfilename = os.path.join(tmpdir, prefix + "new-renumber.txt")
         print("--- generating temporary %s ---" % newrenumberfilename)
         # we now have to create a new temp file which contains the
         # renumber table + our extra crap appended.
-        newlpb = math.ceil(math.log(int(listextraprimes[-1], 16), 2))
+        newlpb = math.ceil(math.log(listextraprimes[-1][0], 2))
         with open(newrenumberfilename, 'w') as file:
             # decompress the old one.
             call_that = [ "gzip", "-dc", general.renumber() ]
@@ -815,8 +864,19 @@ class DescentLowerClass(object):
                 for x in old.stdout:
                     file.write(x.decode("utf-8"))
                 # add our crap
-                for p in listextraprimes:
-                    file.write(hex(int(p, 16)+1)[2:]+'\n')
+                # we don't want to find all roots mod p. It suffices to
+                # pretend that there's just one.
+                lastp=None
+                for pr in listextraprimes:
+                    if not lastp or lastp != pr[0]:
+                        line="%x"%(pr[0]+1)
+                        file.write(line+"\n")
+                        print(line)
+                    lastp=pr[0]
+                    if pr[1] > 0:
+                        line = "%x"%pr[2]
+                        file.write(line+"\n")
+                        print(line)
 
         newdlogfilename = os.path.join(tmpdir, prefix + "new-dlog.txt")
         print("--- generating temporary %s ---" % newdlogfilename)
