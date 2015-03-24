@@ -295,10 +295,6 @@ class sieve_checksum {
 
 /******** MAIN FUNCTIONS **************/
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Set an allocated array of <nb_buckets> buckets each having size
  * max_bucket_fill_ratio * BUCKET_REGION.
  * Must be freed with clear_buckets().
@@ -348,10 +344,6 @@ extern size_t bucket_misalignment(const size_t sz, const size_t sr);
  * bucket.c (alongside with the non-inlined functions already listed).
  */
 extern double buckets_max_full (const bucket_array_t BA);
-
-#ifdef __cplusplus
-}
-#endif
 
 
 /******** Bucket array implementation **************/

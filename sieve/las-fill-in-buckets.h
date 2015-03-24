@@ -4,16 +4,6 @@
 #include "las-types.h"
 #include "las-threads.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 void fill_in_buckets_both(thread_pool &, thread_workspaces &, int, sieve_info_srcptr);
-
-
-#ifdef __cplusplus
-}
-#endif
-
 
 #endif
