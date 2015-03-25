@@ -752,7 +752,7 @@ class DescentLowerClass(object):
         fakerels = []
         extraprimes = set()
         more_extraprimes = set()
-        extraprimes_per_rel = []
+        extraprimes_per_rel = {}
         for rel in descrels:
             r = rel.split(':')[1:]
             r[0] = r[0].lstrip()
@@ -780,7 +780,7 @@ class DescentLowerClass(object):
                         ss[side].append(p)
             fake = ":".join([r[0]] + [",".join(x) for x in ss])
             fakerels.append(fake)
-            extraprimes_per_rel.append(extra)
+            extraprimes_per_rel["%x,%x"%(a,b)]=extra
         for pr in more_extraprimes:
             if pr in extraprimes:
                 machine,human = prime_ideal_mixedprint(pr)
@@ -837,11 +837,14 @@ class DescentLowerClass(object):
             # add first line like in purged.gz, just to give the number
             # of relations to reconstructlog.
             outfile.write("# %d 0 0\n" % nrels)
-            extra = iter(extraprimes_per_rel)
             with open(fakefilename2, 'r') as infile:
                 for rel in infile:
                     rel = rel.rstrip()
-                    for p in sum(next(extra),[]):
+                    ab = rel.split(':')[0]
+                    if ab not in extraprimes_per_rel:
+                        raise RuntimeError("weird, can't find relation for" + ab)
+                    extra = sum(extraprimes_per_rel[ab],[])
+                    for p in extra:
                         rel += "," + hex(dictextraprimes[p])[2:]
                     outfile.write(rel + "\n")
                     # print(rel)
