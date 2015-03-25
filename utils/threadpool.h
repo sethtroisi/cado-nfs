@@ -41,7 +41,10 @@ class mutex {
   friend class condition_variable;
   pthread_mutex_t m;
   public:
-  mutex() : m(PTHREAD_MUTEX_INITIALIZER){LOG;}
+  mutex(const pthread_mutexattr_t *mutexattr = NULL) {
+    LOG;
+    pthread_mutex_init(&m, mutexattr);
+  }
   ~mutex() {LOG; ASSERT_ALWAYS(pthread_mutex_destroy(&m) == 0);}
   void lock(){LOG; ASSERT_ALWAYS(pthread_mutex_lock(&m) == 0);}
   bool try_lock() {
@@ -56,7 +59,10 @@ class mutex {
 class condition_variable {
   pthread_cond_t cv;
   public:
-  condition_variable() : cv(PTHREAD_COND_INITIALIZER){LOG;}
+  condition_variable(pthread_condattr_t *cond_attr = NULL) {
+    LOG;
+    ASSERT_ALWAYS(pthread_cond_init(&cv, cond_attr) == 0);
+  }
   ~condition_variable() {LOG; pthread_cond_destroy(&cv);}
   void signal() {LOG; ASSERT_ALWAYS(pthread_cond_signal(&cv) == 0);}
   void broadcast(){LOG; ASSERT_ALWAYS(pthread_cond_broadcast(&cv) == 0);}
