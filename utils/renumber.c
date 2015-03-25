@@ -52,7 +52,7 @@ static uint64_t previous_prime_of_powers_of_2[65] = { 0x0, 0x0, 0x3, 0x7, 0xd,
         0xfffffffffef, 0x1fffffffffc9, 0x3fffffffffeb, 0x7fffffffff8d,
         0xffffffffffc5, 0x1ffffffffffaf, 0x3ffffffffffe5, 0x7ffffffffff7f,
         0xfffffffffffd1, 0x1fffffffffff91, 0x3fffffffffffdf, 0x7fffffffffffc9,
-        0xfffffffffffffb, 0xfffffffffffff3, 0x3ffffffffffffe5, 0xffffffffffffc9,
+        0xfffffffffffffb, 0x1fffffffffffff3, 0x3ffffffffffffe5, 0x7ffffffffffffc9,
         0xfffffffffffffa3, 0x1fffffffffffffff, 0x3fffffffffffffc7,
         0x7fffffffffffffe7, 0xffffffffffffffc5 };
 
@@ -951,10 +951,6 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
 {
   index_t j;
   p_r_values_t *tab = renumber_info->table;
-
-  if (i == 0xe80454) {
-      fprintf(stderr, "Hi there !\n");
-  }
 
   for (j = i; j > 0 && tab[j-1] > tab[j] && tab[j-1] != RENUMBER_SPECIAL_VALUE;)
     j--;
