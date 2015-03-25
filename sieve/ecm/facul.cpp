@@ -91,7 +91,7 @@ nb_curves (const unsigned int lpb)
          /* 64 */ 209,
 #endif
   };
-  const int LPB_MAX = sizeof(T)/sizeof(int) - 1;
+  const unsigned int LPB_MAX = sizeof(T)/sizeof(int) - 1;
   return (lpb <= LPB_MAX) ? T[lpb] : T[LPB_MAX];
 #undef LPB_MAX
 }
