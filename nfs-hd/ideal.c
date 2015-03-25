@@ -68,7 +68,7 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 #ifdef LINESIEVE
     mpz_mod_ui(ideal->Tr[i], ideal->Tr[i], r);
     ASSERT(mpz_cmp(ideal->Tr[i], r) < 0);
-#endif
+#endif // LINESIEVE
   }
 
   ideal->ideal->r = r;
@@ -134,6 +134,12 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     }
   }
 
+#ifdef NDEBUG
+  else {
+    ASSERT(h->deg == ideal->h->deg);
+  }
+#endif // NDEBUG
+
   //Initialize the elements of Tr.
   for (int col = 0; col < (int) t - h->deg; col++) {
     for (int row = col; row < h->deg; row++) {
@@ -142,7 +148,7 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 #ifdef LINESIEVE
       mpz_mod_ui(ideal->Tr[row][col], ideal->Tr[row][col], r);
       ASSERT(mpz_cmp(ideal->Tr[row][col], r) < 0);
-#endif
+#endif // LINESIEVE
     }
   }
 
@@ -157,7 +163,7 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 #ifdef LINESIEVE
       mpz_mod_ui(ideal->Tr[row][col], ideal->Tr[row][col], r);
       ASSERT(mpz_cmp(ideal->Tr[row][col], r) < 0);
-#endif
+#endif // LINESIEVE
         }
       }
     }
