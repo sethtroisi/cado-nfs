@@ -380,6 +380,7 @@ class important_file(object):
             self.reader = open(outfile,'r')
             self.writer = None
         else:
+            print("running program, saving output to %s" % outfile)
             self.child = subprocess.Popen(call_that, stdout=subprocess.PIPE)
             self.reader = io.TextIOWrapper(self.child.stdout, 'utf-8')
             self.writer = open(outfile, 'w')
