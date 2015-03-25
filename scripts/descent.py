@@ -78,6 +78,7 @@ import sys
 import argparse
 import re
 import math
+import time
 import tempfile
 import shutil
 import functools
@@ -985,18 +986,35 @@ class DescentLowerClass(object):
 # python3 doesn't grok sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 # setting PYTHONUNBUFFERED here is too late.
 class drive_me_crazy(object):
-   def __init__(self, stream):
-       self.stream = stream
-   def write(self, data):
-       self.stream.write(data)
-       self.stream.flush()
-   def __getattr__(self, attr):
-       return getattr(self.stream, attr)
+    def __init__(self, stream, timestamp=False):
+        self.stream = stream
+        self.eol = 1
+        self.timestamp = timestamp
+    def write(self, data):
+        if self.timestamp:
+            p=0
+            while len(data) > p:
+                d = data.find('\n', p)
+                if d < 0:
+                    break
+                if self.eol:
+                    self.stream.write(time.asctime() + " ")
+                self.stream.write(data[p:d+1])
+                self.eol=True
+                p = d + 1
+            if len(data) > p:
+                if self.eol:
+                    self.stream.write(time.asctime() + " ")
+                self.stream.write(data[p:])
+                self.eol= False
+        else:
+            self.stream.write(data)
+        self.stream.flush()
+    def __getattr__(self, attr):
+        return getattr(self.stream, attr)
 
 
 if __name__ == '__main__':
-
-    sys.stdout = drive_me_crazy(sys.stdout)
 
     print("THIS IS AN EXPERIMENTAL SCRIPT ONLY ! STILL AT WORK.")
 
@@ -1006,6 +1024,10 @@ if __name__ == '__main__':
     # Required
     parser.add_argument("--target", help="Element whose DL is wanted",
             type=int, required=True)
+    parser.add_argument("--timestamp",
+            help="Prefix all lines with a time stamp",
+            action="store_true")
+
 
     GeneralClass.declare_args(parser)
     DescentUpperClass.declare_args(parser)
@@ -1013,6 +1035,9 @@ if __name__ == '__main__':
     DescentLowerClass.declare_args(parser)
 
     args = parser.parse_args()
+
+    sys.stdout = drive_me_crazy(sys.stdout, args.timestamp)
+
 
     general = GeneralClass(args)
     init = DescentUpperClass(general, args)
