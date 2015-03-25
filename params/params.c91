@@ -290,6 +290,15 @@ tasks.linalg.bwc.shuffled_product = 1
 tasks.linalg.characters.nchar = 50		# number of characters
 tasks.linalg.characters.threads = 2
 
+###########################################################################
+# Square root task
+###########################################################################
+
+# Maximum number of threads possible for this stage is 16.  It will crash
+# if a larger number of threads is specified, for example by setting
+# tasks.threads = 24 above.  You must manually specify a smaller number of
+# threads for the square root in this case.
+# tasks.sqrt.threads = 16
 
 ###########################################################################
 # Work unit server
