@@ -671,7 +671,7 @@ class DescentMiddleClass(object):
                     printing = False
                 elif printing:
                     print(line.rstrip())
-                    foo = re.match("# FAILED ([\d@]+).*###", line)
+                    foo = re.match("# FAILED (\d+\@\d+)", line)
                     if foo:
                         failed.append(foo.groups()[0])
                 elif re.match("^# BEGIN TREE", line):
@@ -937,13 +937,26 @@ class DescentLowerClass(object):
                     pp = foo.groups()[0]
                     if pp in wanted:
                         wanted[pp]=int(foo.groups()[1])
+        for u,v in wanted.items():
+            print(u,v)
         log_target = 0
+        errors=[]
         for p in factNum:
             pp = hex(int(p))[2:]
-            log_target = log_target + wanted[pp]
+            if wanted[pp] is None:
+                errors.append(pp)
+            else:
+                log_target = log_target + wanted[pp]
         for p in factDen:
             pp = hex(int(p))[2:]
-            log_target = log_target - wanted[pp]
+            if wanted[pp] is None:
+                errors.append(pp)
+            else:
+                log_target = log_target - wanted[pp]
+        if len(errors):
+            msg = "Some logarithms missing:\n"
+            msg += "\n".join(["\t"+x for x in errors])
+            raise RuntimeError(msg)
         p=general.p()
         ell=general.ell()
         print("# p=%d" % p)
