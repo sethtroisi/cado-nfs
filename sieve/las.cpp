@@ -1755,11 +1755,6 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
  * relation is better anyway */
 bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, relation & rel)
 {
-    if (!las->hint_table) {
-        verbose_output_print(0, 1, "# Warning: no descent-hint-table, this is not very useful for the descent\n");
-        return true;
-    }
-
     if (las->tree->must_avoid(rel)) {
         verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: we have already used this relation, avoiding\n");
         return true;
@@ -1785,7 +1780,7 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
             }
 
             unsigned int n = mpz_sizeinbase(v.p, 2);
-            int k = las->hint_lookups[side][n];
+            int k = (n <= las->max_hint_bitsize[side] ? las->hint_lookups[side][n] : -1);
             if (k < 0) {
                 /* This is not worrysome per se. We just do
                  * not have the info in the descent hint table,
@@ -2651,7 +2646,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         {
             const las_todo_entry * const next_todo = las->todo->top();
             if (next_todo->iteration) {
-                verbose_output_print(0, 1, "#\n# NOTE: we are re-playing this special-q because of %d previous attempt(s)\n#\n", next_todo->iteration);
+                verbose_output_print(0, 1, "#\n# NOTE: we are re-playing this special-q because of %d previous failed attempt(s)\n#\n", next_todo->iteration);
                 /* update sieving parameters here */
                 current_config->sides[0]->lpb += next_todo->iteration;
                 current_config->sides[1]->lpb += next_todo->iteration;
@@ -2812,6 +2807,23 @@ int main (int argc0, char *argv0[])/*{{{*/
                 winner.rel.print(output, "Taken: ");
             }
             verbose_output_end_batch();
+            {
+                las_todo_entry const& me(*si->doing);
+                unsigned int n = mpz_sizeinbase(me.p, 2);
+                verbose_output_start_batch();
+                verbose_output_print (0, 1, "# taking path: %d%c ->", n, sidenames[me.side][0]);
+                for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
+                    int side = winner.outstanding[i].first;
+                    relation::pr const& v(winner.outstanding[i].second);
+                    unsigned int n = mpz_sizeinbase(v.p, 2);
+                    verbose_output_print (0, 1, " %d%c", n, sidenames[side][0]);
+                }
+                if (winner.outstanding.empty()) {
+                    verbose_output_print (0, 1, " done");
+                }
+                verbose_output_print (0, 1, "\n");
+                verbose_output_end_batch();
+            }
             if (recursive_descent) {
                 /* reschedule the possibly still missing large primes in the
                  * todo list */
@@ -2824,11 +2836,11 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
         } else {
-            las_todo_entry const& v(*si->doing);
-            las->tree->mark_try_again(v.iteration + 1);
-            unsigned int n = mpz_sizeinbase(v.p, 2);
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "%s (%Zd,%Zd) [%d%c]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", sidenames[v.side], v.p, v.r, n, sidenames[v.side][0], v.iteration);
-            las_todo_push_withdepth(las->todo, v.p, v.r, v.side, v.depth + 1, v.iteration + 1);
+            las_todo_entry const& me(*si->doing);
+            las->tree->mark_try_again(me.iteration + 1);
+            unsigned int n = mpz_sizeinbase(me.p, 2);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "%s (%Zd,%Zd) [%d%c]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", sidenames[me.side], me.p, me.r, n, sidenames[me.side][0], me.iteration);
+            las_todo_push_withdepth(las->todo, me.p, me.r, me.side, me.depth + 1, me.iteration + 1);
         }
 #endif  /* DLP_DESCENT */
 
