@@ -5,7 +5,9 @@
 #include "factor_base.h"
 
 /*
- * Factorise a polynomial in characteristic 2.
+ * Factorise a polynomial in characteristic 2. If l is empty, f % 2 is a
+ *  polynomial of degree 0 or 0.
+ * Not optimal for large polynomials.
  *
  * list: list of factors of f.
  * f: the polynomial we want to factorise.

@@ -54,14 +54,20 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
 
   //Purge list.
   mpz_poly_factor_list_flush(list);
-
-  //TODO: something strange here.
+ 
   //If deg(f) in F2 is less than 1, we have the factor.
-  if (fcopy->deg <= 1) {
+  if (fcopy->deg < 1) {
     mpz_clear(coeff);
     mpz_poly_clear(fcopy);
     mpz_clear(p);
     ASSERT(list->size == 0);
+    return;
+  } else if (fcopy->deg == 1) {
+    mpz_clear(coeff);
+    mpz_poly_factor_list_push(list, fcopy, 1);
+    mpz_poly_clear(fcopy);
+    mpz_clear(p);
+    ASSERT(list->size == 1);
     return;
   }
 
@@ -227,9 +233,9 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   //Factorise in Fq. 
   uint64_t q = 2;
   //Count number of ideal_1, ideal_u and ideal_pr for each sides.
-  uint64_t * index1 = malloc(sizeof(uint64_t) * V);
-  uint64_t * indexu = malloc(sizeof(uint64_t) * V);
-  uint64_t * indexpr = malloc(sizeof(uint64_t) * V);
+  uint64_t * index1 = (uint64_t * ) malloc(sizeof(uint64_t) * V);
+  uint64_t * indexu = (uint64_t * ) malloc(sizeof(uint64_t) * V);
+  uint64_t * indexpr = (uint64_t * ) malloc(sizeof(uint64_t) * V);
   gmp_randstate_t state;
   //a = q in mpz. We need a to use mpz_poly_factor.
   mpz_t a;
