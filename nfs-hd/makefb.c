@@ -326,3 +326,156 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   mpz_clear(a);
   getprime(0);
 }
+
+#ifdef MAIN
+void declare_usage(param_list pl)
+{
+  param_list_decl_usage(pl, "t", "dimension of the lattice");
+  param_list_decl_usage(pl, "V", "number of number field");
+  param_list_decl_usage(pl, "fbb0", "factor base bound on the number field 0");
+  param_list_decl_usage(pl, "fbb1", "factor base bound on the number field 1");
+  param_list_decl_usage(pl, "lpb0", "threshold on the number field 0");
+  param_list_decl_usage(pl, "lpb1", "threshold on the number field 1");
+  param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
+  param_list_decl_usage(pl, "f1", "polynomial that defines the number field 1");
+  param_list_decl_usage(pl, "file0", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file1", "file in which we write the factor bases");
+
+  /* MNFS */
+
+  param_list_decl_usage(pl, "fbb2", "factor base bound on the number field 2");
+  param_list_decl_usage(pl, "fbb3", "factor base bound on the number field 3");
+  param_list_decl_usage(pl, "fbb4", "factor base bound on the number field 4");
+  param_list_decl_usage(pl, "fbb5", "factor base bound on the number field 5");
+  param_list_decl_usage(pl, "fbb6", "factor base bound on the number field 6");
+  param_list_decl_usage(pl, "fbb7", "factor base bound on the number field 7");
+  param_list_decl_usage(pl, "fbb8", "factor base bound on the number field 8");
+  param_list_decl_usage(pl, "fbb9", "factor base bound on the number field 9");
+  param_list_decl_usage(pl, "lpb2", "threshold on the number field 2");
+  param_list_decl_usage(pl, "lpb3", "threshold on the number field 3");
+  param_list_decl_usage(pl, "lpb4", "threshold on the number field 4");
+  param_list_decl_usage(pl, "lpb5", "threshold on the number field 5");
+  param_list_decl_usage(pl, "lpb6", "threshold on the number field 6");
+  param_list_decl_usage(pl, "lpb7", "threshold on the number field 7");
+  param_list_decl_usage(pl, "lpb8", "threshold on the number field 8");
+  param_list_decl_usage(pl, "lpb9", "threshold on the number field 9");
+  param_list_decl_usage(pl, "f2", "polynomial that defines the number field 2");
+  param_list_decl_usage(pl, "f3", "polynomial that defines the number field 3");
+  param_list_decl_usage(pl, "f4", "polynomial that defines the number field 4");
+  param_list_decl_usage(pl, "f5", "polynomial that defines the number field 5");
+  param_list_decl_usage(pl, "f6", "polynomial that defines the number field 6");
+  param_list_decl_usage(pl, "f7", "polynomial that defines the number field 7");
+  param_list_decl_usage(pl, "f8", "polynomial that defines the number field 8");
+  param_list_decl_usage(pl, "f9", "polynomial that defines the number field 9");
+  param_list_decl_usage(pl, "file2", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file3", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file4", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file5", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file6", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file7", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file8", "file in which we write the factor bases");
+  param_list_decl_usage(pl, "file9", "file in which we write the factor bases");
+}
+
+void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
+    uint64_t ** fbb, factor_base_t ** fb, unsigned int * t, mpz_t ** lpb,
+    unsigned int * V)
+{
+  param_list pl;
+  param_list_init(pl);
+  declare_usage(pl);
+  FILE * fpl;
+  char * argv0 = argv[0];
+
+  argv++, argc--;
+  for( ; argc ; ) {
+    if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+
+    /* Could also be a file */
+    if ((fpl = fopen(argv[0], "r")) != NULL) {
+      param_list_read_stream(pl, fpl, 0);
+      fclose(fpl);
+      argv++,argc--;
+      continue;
+    }
+
+    fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+    param_list_print_usage(pl, argv0, stderr);
+    exit (EXIT_FAILURE);
+  }
+
+  param_list_parse_uint(pl, "V", V);
+  ASSERT(* V >= 2 && * V < 11);
+
+  * fbb = malloc(sizeof(uint64_t) * (* V));
+  * fb = malloc(sizeof(factor_base_t) * (* V));
+  * f = malloc(sizeof(mpz_poly_t) * (* V));
+  * lpb = malloc(sizeof(mpz_t) * (* V));
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [4];
+    sprintf(str, "fbb%u", i);
+    param_list_parse_uint64(pl, str, (* fbb) + i);
+    factor_base_init((*fb)[i], (*fbb)[i], (*fbb)[i], (*fbb)[i]);
+  }
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [2];
+    sprintf(str, "f%u", i);
+    param_list_parse_mpz_poly(pl, str, (**f) + i, ".,");
+  }
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [4];
+    sprintf(str, "lpb%u", i);
+    mpz_init((**lpb) + i);
+    param_list_parse_mpz(pl, str, (**lpb) + i);
+    ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);
+  }
+
+  param_list_parse_uint(pl, "t", t);
+  ASSERT(* t > 2);
+
+  /*for (unsigned int i = 0; i < * V; i++) {*/
+    /*char str [5];*/
+    /*sprintf(str, "file%u", i);*/
+    /*const char * filename;*/
+    /*filename = param_list_lookup_string(pl, str);*/
+    /*printf("%s, %zd\n", filename, strlen(filename));*/
+    /** (file[i]) = (char * )malloc(sizeof(char) * strlen(filename));*/
+    /*strcpy(*(file[i]), filename);*/
+    /*printf("%s\n", *(file[i]));*/
+  /*}*/
+  param_list_clear(pl);
+}
+
+
+int main(int argc, char ** argv)
+{
+  unsigned int V;
+  mpz_poly_t * f;
+  uint64_t * fbb;
+  unsigned int t;
+  mpz_t * lpb;
+  factor_base_t * fb;
+
+  initialise_parameters(argc, argv, &f, &fbb, &fb, &t, &lpb, &V);
+
+  makefb(fb, f, fbb, t, lpb, V);
+
+  for (unsigned int i = 0; i < V; i++) {
+    mpz_poly_fprintf(stdout, f[i]);
+    factor_base_fprintf(stdout, fb[i], t);
+    fprintf(stdout, "--------------------------------------------------------------------------------\n"); 
+    mpz_clear(lpb[i]);
+    mpz_poly_clear(f[i]);
+    factor_base_clear(fb[i], t);
+  }
+  free(f);
+  free(fbb);
+  free(lpb);
+  free(fb);
+
+  return 0;
+}
+#endif // MAIN
