@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 -u
+#!/usr/bin/env python3
 #
 # Example for the p59 in tests/test_full_p59
 #
@@ -972,7 +972,23 @@ class DescentLowerClass(object):
                 % (log_target, args.target, wanted["2"], ell, p))
 
 
+# http://stackoverflow.com/questions/107705/disable-output-buffering
+# shebang takes only one arg...
+# python3 doesn't grok sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+# setting PYTHONUNBUFFERED here is too late.
+class drive_me_crazy(object):
+   def __init__(self, stream):
+       self.stream = stream
+   def write(self, data):
+       self.stream.write(data)
+       self.stream.flush()
+   def __getattr__(self, attr):
+       return getattr(self.stream, attr)
+
+
 if __name__ == '__main__':
+
+    sys.stdout = drive_me_crazy(sys.stdout)
 
     print("THIS IS AN EXPERIMENTAL SCRIPT ONLY ! STILL AT WORK.")
 

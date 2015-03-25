@@ -26,7 +26,6 @@ struct descent_tree {
         /* we have const members which need to lock the mutex */
         mutable pthread_mutex_t tree_lock;
     public:
-    static double grace_time_ratio;
     struct tree_label {
         int side;
         relation::pr pr;
@@ -90,10 +89,16 @@ struct descent_tree {
             return outstanding.size() < b.outstanding.size();
         }
         operator bool() const { return (bool) rel; }
-        bool decision_taken() const { return (bool) rel && seconds() >= deadline; }
-        void set_time_left(double t) {
+        bool wins_the_game() const {
+            return (bool) rel && (outstanding.empty() || seconds() >= deadline);
+        }
+        void set_time_left(double t, double grace_time_ratio) {
             time_left = t;
-            deadline = seconds() + grace_time_ratio * t;
+            if (outstanding.empty()) {
+                deadline = seconds();
+            } else {
+                deadline = seconds() + grace_time_ratio * t;
+            }
         }
     };
     struct tree {
@@ -101,22 +106,30 @@ struct descent_tree {
         double spent;
         candidate_relation contender;
         std::list<tree *> children;
-        tree(tree_label const& label) : label(label) { }
+        int try_again;
+        tree(tree_label const& label) : label(label), try_again(0) { }
         ~tree() {
             typedef std::list<tree *>::iterator it_t;
             for(it_t i = children.begin() ; i != children.end() ; i++)
                 delete *i;
             children.clear();
         }
+        bool is_successful() const {
+            if (!contender.rel && !try_again)
+                return false;
+            typedef std::list<tree *>::const_iterator it_t;
+            for(it_t i = children.begin() ; i != children.end() ; i++) {
+                if (!(*i)->is_successful())
+                    return false;
+            }
+            return true;
+        }
     };
     std::list<tree *> forest;
     std::list<tree *> current;       /* stack of trees */
 
     /* This is an ugly temporary hack */
-    typedef std::map<
-                tree_label,
-                std::set<relation_ab>
-            > visited_t;
+    typedef std::set<relation_ab> visited_t;
     visited_t visited;
 
 
@@ -155,12 +168,16 @@ struct descent_tree {
         return current.back()->contender;
     }
 
+    void mark_try_again(int i) {
+        current.back()->try_again = i;
+    }
+
     /* return true if the decision to go to the next step of the descent
      * should be taken now, and register this relation has having been
      * taken */
     bool must_take_decision() {
         pthread_mutex_lock(&tree_lock);
-        bool res = current.back()->contender.decision_taken();
+        bool res = current.back()->contender.wins_the_game();
         pthread_mutex_unlock(&tree_lock);
         return res;
     }
@@ -169,41 +186,34 @@ struct descent_tree {
         /* must be called outside multithreaded context */
         // current.back()->contender.marked_taken = true;
         relation_ab ab = current.back()->contender.rel;
-        visited_t::iterator it = visited.find(current.back()->label);
-        if (it == visited.end()) {
-            visited_t::mapped_type v;
-            v.insert(ab);
-            visited.insert(std::make_pair(current.back()->label, v));
-        } else {
-            it->second.insert(ab);
-        }
+        visited.insert(ab);
     }
 
     /* this returns true if the decision should be taken now */
     bool new_candidate_relation(candidate_relation& newcomer)
     {
         pthread_mutex_lock(&tree_lock);
-        candidate_relation & tenant(current.back()->contender);
-        if (newcomer < tenant) {
+        candidate_relation & defender(current.back()->contender);
+        if (newcomer < defender) {
             if (newcomer.outstanding.empty()) {
                 verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
-            } else if (std::isfinite(tenant.deadline)) {
+            } else if (std::isfinite(defender.deadline)) {
                 /* This implies that newcomer.deadline is also finite */
-                double delta = tenant.time_left-newcomer.time_left;
+                double delta = defender.time_left-newcomer.time_left;
                 verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
-            } else if (tenant) {
+            } else if (defender) {
                 /* This implies that we have fewer outstanding
                  * special-q's */
                 verbose_output_print(0, 1, "# [descent] Improved number of children to split from %u to %u\n",
-                        (unsigned int) tenant.outstanding.size(),
+                        (unsigned int) defender.outstanding.size(),
                         (unsigned int) newcomer.outstanding.size());
             }
-            tenant = newcomer;
-            if (!tenant.outstanding.empty()) {
-                verbose_output_print(0, 1, "# [descent] still searching for %.2f\n", tenant.deadline - seconds());
+            defender = newcomer;
+            if (!defender.outstanding.empty()) {
+                verbose_output_print(0, 1, "# [descent] still searching for %.2f\n", defender.deadline - seconds());
             }
         }
-        bool res = tenant.decision_taken();
+        bool res = defender.wins_the_game();
         pthread_mutex_unlock(&tree_lock);
         return res;
     }
@@ -211,8 +221,7 @@ struct descent_tree {
     bool must_avoid(relation const& rel) const {
         relation_ab ab = rel;
         pthread_mutex_lock(&tree_lock);
-        visited_t::const_iterator it = visited.find(current.back()->label);
-        bool answer = it != visited.end() && it->second.find(ab) != it->second.end();
+        bool answer = visited.find(ab) != visited.end();
         pthread_mutex_unlock(&tree_lock);
         return answer;
     }
@@ -220,14 +229,7 @@ struct descent_tree {
         return current.size();
     }
     bool is_successful(tree * t) {
-        if (!t->contender.rel)
-            return false;
-        typedef std::list<tree *>::iterator it_t;
-        for(it_t i = t->children.begin() ; i != t->children.end() ; i++) {
-            if (!is_successful(*i))
-                return false;
-        }
-        return true;
+        return t->is_successful();
     }
     int tree_depth(tree * t) {
         int d = 0;

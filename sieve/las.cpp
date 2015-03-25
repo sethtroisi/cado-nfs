@@ -54,6 +54,9 @@ int recursive_descent = 0;
 int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
 
+double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
+
+
 double tt_qstart;
 
 /* {{{ for cofactorization statistics */
@@ -1099,9 +1102,9 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     return si;
 }/*}}}*/
 
-void las_todo_push_withdepth(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
+void las_todo_push_withdepth(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side, int depth, int iteration = 0)/*{{{*/
 {
-    stack->push(new las_todo_entry(p, r, side, depth));
+    stack->push(new las_todo_entry(p, r, side, depth, iteration));
 }
 void las_todo_push(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side)
 {
@@ -1758,7 +1761,7 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
     }
 
     if (las->tree->must_avoid(rel)) {
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: we have already used this relation for (%Zd,%Zd), avoiding\n", si->doing->p, si->doing->r);
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: we have already used this relation, avoiding\n");
         return true;
     }
 
@@ -1799,7 +1802,10 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
     }
     verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process (%zu children)\n",
             time_left, contender.outstanding.size());
-    contender.set_time_left(time_left);
+
+    /* when we're re-examining this special-q because of a previous
+     * failure, there's absolutely no reason to hurry up on a relation */
+    contender.set_time_left(time_left, si->doing->iteration ? INFINITY : general_grace_time_ratio);
 
     return las->tree->new_candidate_relation(contender);
 }
@@ -2541,7 +2547,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
 #if DLP_DESCENT
-    param_list_parse_double(pl, "grace-time-ratio", &descent_tree::grace_time_ratio);
+    param_list_parse_double(pl, "grace-time-ratio", &general_grace_time_ratio);
 #endif
 
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
@@ -2639,6 +2645,17 @@ int main (int argc0, char *argv0[])/*{{{*/
                 if (!siever_config_match(sc, current_config)) continue;
                 verbose_output_print(0, 1, "# Using existing sieving parameters from hint list for q~2^%d on the %s side [%d%c]\n", sc->bitsize, sidenames[sc->side], sc->bitsize, sidenames[sc->side][0]);
                 memcpy(current_config, sc, sizeof(siever_config));
+            }
+        }
+
+        {
+            const las_todo_entry * const next_todo = las->todo->top();
+            if (next_todo->iteration) {
+                verbose_output_print(0, 1, "#\n# NOTE: we are re-playing this special-q because of %d previous attempt(s)\n#\n", next_todo->iteration);
+                /* update sieving parameters here */
+                current_config->sides[0]->lpb += next_todo->iteration;
+                current_config->sides[1]->lpb += next_todo->iteration;
+                /* TODO: do we update the mfb or not ? */
             }
         }
 
@@ -2806,6 +2823,12 @@ int main (int argc0, char *argv0[])/*{{{*/
                     las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
                 }
             }
+        } else {
+            las_todo_entry const& v(*si->doing);
+            las->tree->mark_try_again(v.iteration + 1);
+            unsigned int n = mpz_sizeinbase(v.p, 2);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "%s (%Zd,%Zd) [%d%c]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", sidenames[v.side], v.p, v.r, n, sidenames[v.side][0], v.iteration);
+            las_todo_push_withdepth(las->todo, v.p, v.r, v.side, v.depth + 1, v.iteration + 1);
         }
 #endif  /* DLP_DESCENT */
 
