@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 -u
 #
 # Example for the p59 in tests/test_full_p59
 #
@@ -394,6 +394,7 @@ class important_file(object):
         line = next(self.reader)
         if self.writer is not None:
             self.writer.write(line)
+            self.writer.flush()
         return line
 
     def __enter__(self):
@@ -511,6 +512,7 @@ class DescentUpperClass(object):
             "-q0", q0,
             "-q1", q1,
             "--exit-early", 2,
+            "-t", 4
             ]
         call_that = [str(x) for x in call_that]
 
