@@ -952,6 +952,10 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
   index_t j;
   p_r_values_t *tab = renumber_info->table;
 
+  if (i == 0xe80454) {
+      fprintf(stderr, "Hi there !\n");
+  }
+
   for (j = i; j > 0 && tab[j-1] > tab[j] && tab[j-1] != RENUMBER_SPECIAL_VALUE;)
     j--;
 
