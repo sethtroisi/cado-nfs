@@ -403,9 +403,16 @@ class important_file(object):
 
     def __exit__(self, *args):
         if self.child is not None:
+            # self.writer.close()
+            print("Waiting for child to finish")
+            # self.child.kill()
+            # self.reader.close()   # do I need to put it before ? broken pipe ?
+            for line in self.reader:
+                self.writer.write(line)
+                self.writer.flush()
+            self.reader.close()
             self.writer.close()
-            self.child.kill()
-            self.reader.close()   # do I need to put it before ? broken pipe ?
+            print("ok, done")
         else:
             self.reader.close()
 
