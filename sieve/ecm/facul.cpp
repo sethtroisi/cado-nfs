@@ -91,14 +91,56 @@ nb_curves (const unsigned int lpb)
          /* 64 */ 209,
 #endif
   };
-  const unsigned int LPB_MAX = sizeof(T)/sizeof(int) - 1;
-  return (lpb <= LPB_MAX) ? T[lpb] : T[LPB_MAX];
-#undef LPB_MAX
+  const unsigned int nT = sizeof(T)/sizeof(int) - 1;
+  return (lpb <= nT) ? T[lpb] : T[nT];
 }
 
 // ncurves = 100 corresponds to looking for 50-bit factors.
 // ncurves = 200 corresponds to looking for 64-bit factors.
 
+int
+nb_curves_aux (const unsigned int lpb)
+{
+    /* same, but with target probability 99% */
+    /* do_table(10,64,ntries=100,target_prob=0.99)
+     */
+  int T[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0-9 */
+        /* lpb=10 */ 0, /* 0:1.000000 */
+        /* lpb=11 */ 0, /* 0:1.000000 */
+        /* lpb=12 */ 0, /* 0:1.000000 */
+        /* lpb=13 */ 0, /* 0:1.000000 */
+        /* lpb=14 */ 0, /* 0:1.000000 */
+        /* lpb=15 */ 0, /* 0:1.000000 */
+        /* lpb=16 */ 0, /* 0:1.000000 */
+        /* lpb=17 */ 1, /* 0:0.980000, 1:1.000000 */
+        /* lpb=18 */ 1, /* 1:0.990000 */
+        /* lpb=19 */ 2, /* 1:0.980000, 2:1.000000 */
+        /* lpb=20 */ 2, /* 2:0.990000 */
+        /* lpb=21 */ 3, /* 2:0.980000, 3:1.000000 */
+        /* lpb=22 */ 4, /* 3:0.980000, 4:1.000000 */
+        /* lpb=23 */ 7, /* 6:0.980000, 7:1.000000 */
+        /* lpb=24 */ 7, /* 7:1.000000 */
+        /* lpb=25 */ 8, /* 7:0.970000, 8:0.990000 */
+        /* lpb=26 */ 14, /* 13:0.980000, 14:0.990000 */
+        /* lpb=27 */ 14, /* 14:0.990000 */
+        /* lpb=28 */ 18, /* 17:0.980000, 18:0.990000 */
+        /* lpb=29 */ 18, /* 18:0.990000 */
+        /* lpb=30 */ 23, /* 22:0.980000, 23:0.990000 */
+        /* lpb=31 */ 25, /* 24:0.970000, 25:0.990000 */
+        /* lpb=32 */ 34, /* 33:0.980000, 34:0.990000 */
+        /* lpb=33 */ 37, /* 36:0.980000, 37:0.990000 */
+        /* lpb=34 */ 43, /* 42:0.980000, 43:0.990000 */
+        /* lpb=35 */ 44, /* 43:0.980000, 44:0.990000 */
+        /* lpb=36 */ 51, /* 50:0.980000, 51:0.990000 */
+        /* lpb=37 */ 52, /* 51:0.980000, 52:0.990000 */
+        /* lpb=38 */ 56, /* 55:0.980000, 56:0.990000 */
+        /* lpb=39 */ 59, /* 58:0.980000, 59:0.990000 */
+        /* lpb=40 */ 73, /* 72:0.980000, 73:0.990000 */
+        /* lpb=41 */ 73, /* 73:1.000000 */
+  };
+  const unsigned int nT = sizeof(T)/sizeof(int) - 1;
+  return (lpb <= nT) ? T[lpb] : T[nT];
+}
 
 /* Make a simple minded strategy for factoring. We start with P-1 and
    P+1 (with x0=2/7), then an ECM curve with low bounds, then a bunch of
@@ -788,19 +830,19 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   }
   strategies->methods = methods;
   
-  int ncurves[2];
-  ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
-  ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
-  int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
-  // There is an hardcoded bound on the number of methods.
-  // If ncurves0 or ncurves1 passed by the user is too large,
-  // we can not handle that.
-  // TODO: is this really a limitation?
-  ASSERT_ALWAYS (2*(max_ncurves + 4) <= NB_MAX_METHODS);
-
   /*Default strategy. */ 
   if (file == NULL)
     {// make_default_strategy
+      int ncurves[2];
+      ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
+      ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
+      int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
+      // There is an hardcoded bound on the number of methods.
+      // If ncurves0 or ncurves1 passed by the user is too large,
+      // we can not handle that.
+      // TODO: is this really a limitation?
+      ASSERT_ALWAYS (2*(max_ncurves + 4) <= NB_MAX_METHODS);
+
       verbose_output_print(0, 1, "# Using default strategy for the cofactorization\n");
       strategies->precomputed_methods =
 	facul_make_default_strategy (max_ncurves,verbose);
@@ -875,8 +917,19 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   
   // Create the auxiliary methods
   // add test to check if it's necessary to create our aux methods
-  // TODO: choose a better choice of our number of curves!
-  strategies->methods_aux = facul_make_aux_methods (max_ncurves, verbose);
+
+  // rationale: we have selected some number of curves to catch our LPs
+  // of some desired size with probability 90%.  We found one, so we'll
+  // strive hard to not miss the others.  Therefore, the goal is rather
+  // 99% here.
+  //
+  // We have a secondary table which tells how many curves this means.
+  //
+  // Note that strategies->methods_aux is common to both sides.
+  int ncurves_aux[2];
+  ncurves_aux[0] = (n0 > -1) ? n0 : nb_curves_aux (rlpb);
+  ncurves_aux[1] = (n1 > -1) ? n1 : nb_curves_aux (alpb);
+  strategies->methods_aux = facul_make_aux_methods (MAX(ncurves_aux[0], ncurves_aux[1]), verbose);
 
   return strategies;
 }
