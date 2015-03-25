@@ -12,7 +12,7 @@ void sieving_interval_init(sieving_interval_ptr H, unsigned int t)
 }
 
 void sieving_interval_set_hi(sieving_interval_ptr H, unsigned int i, unsigned
-                             int value)
+    int value)
 
 {
   ASSERT(i < H->t);
@@ -20,15 +20,17 @@ void sieving_interval_set_hi(sieving_interval_ptr H, unsigned int i, unsigned
   H->h[i] = value;
 }
 
-void sieving_interval_number_element(uint64_t * nb, sieving_interval_srcptr H)
+uint64_t sieving_interval_number_element(sieving_interval_srcptr H)
 {
-  * nb = 1;
+  uint64_t nb = 1;
   for (unsigned int i = 0; i < H->t - 1; i++) {
-    * nb = * nb * (2 * (uint64_t)H->h[i]);
+    nb = nb * (2 * (uint64_t)H->h[i]);
   }
-  * nb = *nb * ((uint64_t)H->h[H->t - 1]);
+  nb = nb * ((uint64_t)H->h[H->t - 1]);
 
-  ASSERT(* nb != 1);
+  ASSERT(nb != 1);
+
+  return nb;
 }
 
 void sieving_interval_clear(sieving_interval_ptr H)
