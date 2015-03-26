@@ -47,7 +47,7 @@ struct thread_data : private NonCopyable {
   void update_checksums();
 };
 
-class thread_workspaces {
+class thread_workspaces : private NonCopyable {
   thread_data *thrs;
   bool *used;
   const size_t nr_workspaces;

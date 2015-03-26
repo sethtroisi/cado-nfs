@@ -55,8 +55,9 @@ void thread_data::update_checksums()
 }
 
 thread_workspaces::thread_workspaces(const size_t n, las_info_ptr las)
-  : nr_workspaces(n), mutex(PTHREAD_MUTEX_INITIALIZER)
+  : nr_workspaces(n)
 {
+    pthread_mutex_init(&mutex, NULL);
     thrs = new thread_data[n];
     ASSERT_ALWAYS(thrs != NULL);
     used = new bool[n];
