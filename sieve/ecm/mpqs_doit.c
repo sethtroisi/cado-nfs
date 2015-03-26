@@ -206,6 +206,7 @@ mul_redc(const unsigned long a, const unsigned long b, const fb_t * const F)
   return r;
 }
 
+#if SKIP == 0
 static inline unsigned long
 findroot2 (unsigned long *k2, const unsigned long b,
            const fb_t * const F)
@@ -213,6 +214,7 @@ findroot2 (unsigned long *k2, const unsigned long b,
   *k2 = (b + F->r + F->Mp) % 2;
   return *k2;
 }
+#endif
 
 STATIC unsigned long
 findroot_new (unsigned long *k2, const unsigned long b,
