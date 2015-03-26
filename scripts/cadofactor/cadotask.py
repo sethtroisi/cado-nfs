@@ -4149,7 +4149,7 @@ class SqrtTask(Task):
                 # of what the smaller factors did
                 for line in lines[:-1]:
                     if line == "Failed":
-                        break
+                        continue # try next lines (if any) in multi-thread mode
                     self.add_factor(int(line))
                 t = self.progparams[0].get("threads", 1)
                 self.state.update({"next_dep": dep+t})
