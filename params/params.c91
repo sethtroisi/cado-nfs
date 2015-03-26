@@ -300,6 +300,9 @@ tasks.linalg.characters.threads = 2
 # number of remaining dependencies.
 # tasks.sqrt.threads = 16
 
+# To start again at the first dependency (might be useful in debug mode):
+# tasks.sqrt.first_dep = 0
+
 ###########################################################################
 # Work unit server
 ###########################################################################
