@@ -283,9 +283,11 @@ class GeneralClass(object):
         d=self.poly_data()
         return [int(x) for x in d["c"]]
 
-    def __del__(self):
+    def cleanup(self):
         if not self.args.tmpdir and not self.args.no_wipe:
             shutil.rmtree(self.tmpdir())
+
+    def __del__(self):
         if self._conn:
             self._conn.close()
 
@@ -678,7 +680,10 @@ class DescentMiddleClass(object):
         failed = []
         with important_file(relsfilename, call_that) as relstream:
             for line in relstream:
-                if re.match("^# END TREE", line):
+                if re.match("^# taking path", line):
+                    print(line.rstrip())
+                elif re.match("^# END TREE", line):
+                    print("")
                     printing = False
                 elif printing:
                     print(line.rstrip())
@@ -1048,3 +1053,4 @@ if __name__ == '__main__':
     relsfile = middle.do_descent(todofile)
     lower.do_descent(relsfile, initial_split)
 
+    general.cleanup()
