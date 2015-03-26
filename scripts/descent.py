@@ -532,16 +532,21 @@ class DescentUpperClass(object):
         rel = None
         with important_file(outfile, call_that) as relstream:
             for line in relstream:
-                if line[0] == '#':
-                    if (re.match("^# \d+ relation", line)):
-                        sys.stdout.write('\n')
-                        print(line.rstrip())
-                    else:
-                        sys.stdout.write('.')
-                        sys.stdout.flush()
-                    continue
-                else:
+                if line[0] != '#':
                     rel = line.strip()
+                    continue
+                if re.match("^# Sieving.*q=", line):
+                    sys.stdout.write('\n')
+                    print(line.rstrip())
+                    continue
+                foo = re.match("^# (\d+) relation", line)
+                if not foo:
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+                    continue
+                sys.stdout.write('\n')
+                print(line.rstrip())
+                if int(foo.groups()[0]) > 0:
                     break
 
         sys.stdout.write('\n')
