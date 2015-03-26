@@ -2844,6 +2844,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             las->tree->mark_try_again(me.iteration + 1);
             unsigned int n = mpz_sizeinbase(me.p, 2);
             verbose_output_print (0, 1, "# taking path: %d%c -> loop (#%d)", n, sidenames[me.side][0], me.iteration + 1);
+            verbose_output_vfprint (0, 1, gmp_vfprintf, " \t%d %Zd %Zd\n", me.side,me.p,me.r);
             verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "%s (%Zd,%Zd) [%d%c]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", sidenames[me.side], me.p, me.r, n, sidenames[me.side][0], me.iteration);
             las_todo_push_withdepth(las->todo, me.p, me.r, me.side, me.depth + 1, me.iteration + 1);
         }
