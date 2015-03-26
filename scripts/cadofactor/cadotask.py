@@ -4105,14 +4105,16 @@ class SqrtTask(Task):
                  input), )
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"N": int, "gzip": True})
+        return self.join_params(super().paramnames, {"N": int, "gzip": True, "first_dep": [int]})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.factors = self.make_db_dict(self.make_tablename("factors"), connection=self.db_connection)
         self.add_factor(self.params["N"])
-    
+        if "first_dep" in self.params:
+            self.state["next_dep"] = self.params["first_dep"]
+
     def run(self):
         super().run()
 
