@@ -45,6 +45,13 @@ void mat_int64_init_with_array(mat_int64_ptr matrix, unsigned int NumRows,
     unsigned int NumCols, int64_t * coeff);
 
 /*
+ * All the coeffecients of the matrix are equal to 0.
+ *
+ * matrix: the matrix.
+ */
+void mat_int64_set_zero(mat_int64_ptr matrix);
+
+/*
  * Copy A in B. Assume that B and A have the same size.
  *
  * B: the new matrix.

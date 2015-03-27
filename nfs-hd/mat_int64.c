@@ -16,16 +16,10 @@ void mat_int64_init(mat_int64_ptr matrix, unsigned int NumRows, unsigned int
   matrix->NumRows = NumRows;
   matrix->NumCols = NumCols;
 
-  matrix->coeff = malloc(sizeof(int64_t *) * (NumRows + 1));
+  matrix->coeff = (int64_t ** ) malloc(sizeof(int64_t *) * (NumRows + 1));
   for (unsigned int row = 0; row < (NumRows + 1); row++) {
-    matrix->coeff[row] = malloc(sizeof(int64_t) * (NumCols + 1));
+    matrix->coeff[row] = (int64_t * ) malloc(sizeof(int64_t) * (NumCols + 1));
   }
-
-  /*for (unsigned int row = 0; row < NumRows + 1; row++) {*/
-    /*for (unsigned int col = 0; col < NumCols + 1; col++) {*/
-      /*matrix->coeff[row][col] = 0;*/
-    /*}*/
-  /*}*/
 }
 
 void mat_int64_init_with_array(mat_int64_ptr matrix, unsigned int NumRows,
@@ -37,20 +31,23 @@ void mat_int64_init_with_array(mat_int64_ptr matrix, unsigned int NumRows,
   matrix->NumRows = NumRows;
   matrix->NumCols = NumCols;
 
-  matrix->coeff = malloc(sizeof(int64_t *) * (NumRows + 1));
+  matrix->coeff = (int64_t ** ) malloc(sizeof(int64_t *) * (NumRows + 1));
   for (unsigned int row = 0; row < (NumRows + 1); row++) {
-    matrix->coeff[row] = malloc(sizeof(int64_t) * (NumCols + 1));
+    matrix->coeff[row] = (int64_t * ) malloc(sizeof(int64_t) * (NumCols + 1));
   }
-
-  /*for (unsigned int row = 0; row < NumRows + 1; row++) {*/
-    /*for (unsigned int col = 0; col < NumCols + 1; col++) {*/
-      /*matrix->coeff[row][col] = 0;*/
-    /*}*/
-  /*}*/
 
   for (unsigned int row = 1; row < NumRows + 1; row++) {
     for (unsigned int col = 1; col < NumCols + 1; col++) {
       matrix->coeff[row][col] = coeff[(col - 1) + NumCols * (row - 1)];
+    }
+  }
+}
+
+void mat_int64_set_zero(mat_int64_ptr matrix)
+{
+  for (unsigned int row = 1; row < matrix->NumRows + 1; row++) {
+    for (unsigned int col = 1; col < matrix->NumCols + 1; col++) {
+      matrix->coeff[row][col] = 0;
     }
   }
 }
