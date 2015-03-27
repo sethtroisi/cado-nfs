@@ -12,32 +12,33 @@
 #include "uint64_array.h"
 #include "utils_mpz.h"
 #include "utils_int64.h"
+#include "utils_lattice.h"
 
 //TODO: change % in test + add or substract.
 
 /*
-  p = 10822639589
-  n = 6
-  f0 = 4598*x^6 + 4598*x^5 + 4597*x^4 + 4598*x^3 + 4595*x^2 + 4598*x + 4596
-  4596,4598,4585,4598,4597,4598,4598
-  f1 = -2353645*x^6 - 2353645*x^5 + 638*x^4 - 2353645*x^3 + 4709204*x^2 -
-    2353645*x + 2354921
-  2354921,-2353645,4709204,-2353645,638,-2353645,-2353645
-  t = 4
-  lpb = 28
-  N_a = 2^40
-*/
+ * p = 10822639589
+ * n = 6
+ * f0 = 4598*x^6 + 4598*x^5 + 4597*x^4 + 4598*x^3 + 4595*x^2 + 4598*x + 4596
+ * 4596,4598,4585,4598,4597,4598,4598
+ * f1 = -2353645*x^6 - 2353645*x^5 + 638*x^4 - 2353645*x^3 + 4709204*x^2 -
+ *   2353645*x + 2354921
+ * 2354921,-2353645,4709204,-2353645,638,-2353645,-2353645
+ * t = 4
+ * lpb = 28
+ * N_a = 2^40
+ */
 
 /*
-  Different mode:
-    - TRACE_POS: follow all the operation make in a case of the array;
-    - NUMBER_HIT: count the number of hit;
-    - MEAN_NORM_BOUND: mean of the initialized norms;
-    - MEAN_NORM_BOUND_SIEVE: mean of the log2 of the residual norms;
-    - MEAN_NORM: mean of the norm we can expected if the initialisation compute
-       the true norms;
-    - …
-*/
+ * Different mode:
+   - TRACE_POS: follow all the operation make in a case of the array;
+   - NUMBER_HIT: count the number of hit;
+   - MEAN_NORM_BOUND: mean of the initialized norms;
+   - MEAN_NORM_BOUND_SIEVE: mean of the log2 of the residual norms;
+   - MEAN_NORM: mean of the norm we can expected if the initialisation compute
+      the true norms;
+   - …
+ */
 
 #ifdef TRACE_POS
 FILE * file;
@@ -69,36 +70,45 @@ uint64_t number_survivals_facto = 0;
 #endif // NUMBER_SURVIVALS
 
 /*
-  Build the matrix Mq for an ideal (q, g) with deg(g) = 1. The matrix need Tq
-   with the good coefficients, i.e. t the coeffecients not reduced modulo q.
-
-  matrix: the matrix with the good initialization for the number of rows and
-   columns. We can not assert here if the numbers of values for Tq and matrix is
-   good or not.
-  ideal: the ideal (q, g) with deg(g) = 1.
-*/
+ * Build the matrix Mq for an ideal (q, g) with deg(g) = 1. The matrix need Tq
+ *  with the good coefficients, i.e. t the coeffecients not reduced modulo q.
+ *  Suppose that the matrix is good initialized. Can not verify if ideal->Tq
+ *  and matrix has the good size.
+ *
+ * matrix: the matrix with the good initialization for the number of rows and
+ * columns. We can not assert here if the numbers of values for Tq and matrix is
+ *  good or not.
+ * ideal: the ideal (q, g) with deg(g) = 1.
+ */
 void build_Mq_ideal_1(mat_Z_ptr matrix, ideal_1_srcptr ideal)
 {
+  ASSERT(matrix->NumRows == matrix->NumCols);
+
+  //Reinitialize the coefficients.
   for (unsigned int row = 1; row <= matrix->NumRows; row++) {
     for (unsigned int col = 1; col <= matrix->NumCols; col++) {
       mat_Z_set_coeff_uint64(matrix, 0, row, col);
     }
   }
+  //Coeffecients of the diagonal.
   mat_Z_set_coeff_uint64(matrix, ideal->ideal->r, 1, 1);
   for (unsigned int row = 2; row <= matrix->NumRows; row++) {
     mat_Z_set_coeff_uint64(matrix, 1, row, row);
   }
+  //Coefficients of the first line.
   for (unsigned int col = 2; col <= matrix->NumCols; col++) {
     mat_Z_set_coeff(matrix, ideal->Tr[col - 2], 1, col);
   }
 }
 
 /*
-  Build the matrix Mq for an ideal (q, g) with deg(g) > 1. This is probably
-   non-sens.
-*/
+ * Build the matrix Mq for an ideal (q, g) with deg(g) > 1. This is probably
+ *  non-sens.
+ */
 void build_Mq_ideal_u(mat_Z_ptr matrix, ideal_u_srcptr ideal)
 {
+  ASSERT(matrix->NumRows == matrix->NumCols);
+
   for (unsigned int row = 1; row <= matrix->NumRows; row++) {
     for (unsigned int col = 1; col <= matrix->NumCols; col++) {
       mat_Z_set_coeff_uint64(matrix, 0, row, col);
@@ -122,48 +132,85 @@ void build_Mq_ideal_u(mat_Z_ptr matrix, ideal_u_srcptr ideal)
 }
 
 /*
-  Precompute some part of the computation of the bound on the resultant between
-   f and ha. We precompute (deg(f) + 1) ^ (i/2) * (i + 1) ^ (deg(f) / 2) *
-   infinite_norm(f), with i the degree of ha.
-  pre_compute: an array in which we store the precompute elements.
-  f: a polynomial that defines the side.
-  t: t gives the degree of ha.
-*/
-void pre_computation(double * pre_compute, mpz_poly_srcptr f, unsigned int t)
+ * Precompute some part of the computation of the bound on the resultant between
+ *  f and ha. We precompute (deg(f) + 1) ^ (i/2) * (i + 1) ^ (deg(f) / 2) *
+ *  infinite_norm(f), with i the degree of ha.
+ *
+ * pre_compute: an array in which we store the precompute elements. Need to be
+ *  alloc for #(dimension of the lattice) coefficients.
+ * f: a polynomial that defines the side.
+ * d: degree of ha.
+ */
+void pre_computation(double * pre_compute, mpz_poly_srcptr f, unsigned int d)
 {
   pre_compute[0] = 1;
   mpz_t infinite_norm_f_tmp;
   mpz_init(infinite_norm_f_tmp);
+  //Infinite norm of f.
   mpz_poly_infinite_norm(infinite_norm_f_tmp, f);
   double infinite_norm_f = mpz_get_d(infinite_norm_f_tmp);
   mpz_clear(infinite_norm_f_tmp);
-  for (unsigned int i = 1; i < t; i++) {
+  //Do the computation for each i.
+  for (unsigned int i = 1; i < d; i++) {
     pre_compute[i] = pow(infinite_norm_f, (double)i) *
       pow((double)(i + 1), ((double)f->deg / 2)) * pow((double)(f->deg + 1),
                                                        ((double)i / 2));
   }
 }
 
+/*
+ * Compute the norm of a in the number field defined by f.
+ *
+ * res: the result.
+ * f: a polynomial.
+ * a: the polynomial for which we want to compute the norm.
+ */
+void norm(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
+{
+  mpz_poly_resultant(res, f, a);
+  mpz_abs(res, res);
+}
+
 #ifdef MEAN_NORM
-void mean_norm(mpz_poly_srcptr f, int64_poly_srcptr a, double r)
+/*
+ * Compute the norm of a polynomial a and add an approximation of the norm to
+ *  the mean of all the polynomial a. If the special-q is set in this number
+ *  field, divide the norm by the value q.
+ *
+ * f: the polynomial that defines the number field.
+ * a: the polynomial for which we compute the norm.
+ * q: value of the special-q, 1.0 if no special-q.
+ */
+void mean_norm(mpz_poly_srcptr f, int64_poly_srcptr a, double q)
 {
   mpz_poly_t b;
   mpz_poly_init(b, -1);
   mpz_t res;
   mpz_init(res);
   int64_poly_to_mpz_poly(b, a);
-  mpz_poly_resultant(res, f, b);
-  mpz_abs(res, res);
-  norm = norm + mpz_get_d(res) / r;
+  norm(res, f, b);
+  norm = norm + mpz_get_d(res) / q;
   mpz_poly_clear(b);
   mpz_clear(res);
 }
 #endif // MEAN_NORM
 
 #ifdef TRACE_POS
+/*
+ * Do the first step for the TRACE_POS mode, i.e. print c, a, f, the resultant
+ * and the norm we store.
+ *
+ * i: index of the array we want to follow.
+ * vector: the vector corresponding to the ith position in array.
+ * a: the polynomial in the original lattice.
+ * f: the polynomial that defines the number field.
+ * bound_resultant: an approximation of the resultant.
+ * special_q: 1 if the special-q is set in this number field, 0 otherwise.
+ * array: the array in which we store the norms.
+ */
 void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
-                    mpz_poly_srcptr f, double bound_resultant, int special_q,
-                    array_srcptr array)
+    mpz_poly_srcptr f, double bound_resultant, int special_q,
+    array_srcptr array)
 {
   if (i == TRACE_POS) {
     fprintf(file, "c = ");
@@ -177,9 +224,8 @@ void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
     mpz_poly_t tmp;
     mpz_poly_init(tmp, -1);
     int64_poly_to_mpz_poly(tmp, a);
-    mpz_poly_resultant(res, f, tmp);
+    norm(res, f, tmp);
     factor_t factor;
-    mpz_abs(res, res);
     gmp_factorize(factor, res);
     gmp_fprintf(file, "Resultant: %Zd\n", res);
     fprintf(file, "Factorization: ");
@@ -198,19 +244,28 @@ void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
 }
 #endif // TRACE_POS
 
+/*
+ * Contains all the mode we can activate during the initialisation of the norms. *
+ * special_q: 1 if there is a special_q, 0 otherwise.
+ * f: the polynomial that defines the number field.
+ * a: the polynomial.
+ * q: the q of the special-q.
+ * bound_resulant: an approximation of the resultant between a and f.
+ * i: position in the array we want to follow.
+ * vector: the vector corresponding to the ith position.
+ * array: the array in which we store the norm.
+ */
 void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
-                    MAYBE_UNUSED int64_poly_srcptr a, MAYBE_UNUSED double r,
-                    MAYBE_UNUSED double bound_resultant,
-                    MAYBE_UNUSED uint64_t i,
-                    MAYBE_UNUSED int64_vector_srcptr vector,
-                    MAYBE_UNUSED array_srcptr array)
+    MAYBE_UNUSED int64_poly_srcptr a, MAYBE_UNUSED double q,
+    MAYBE_UNUSED double bound_resultant, MAYBE_UNUSED uint64_t i,
+    MAYBE_UNUSED int64_vector_srcptr vector, MAYBE_UNUSED array_srcptr array)
 {
 #ifdef MEAN_NORM
-  mean_norm(f, a, r);
+  mean_norm(f, a, q);
 #endif // MEAN_NORM
 
 #ifdef MEAN_NORM_BOUND
-  norm_bound = norm_bound + bound_resultant / r;
+  norm_bound = norm_bound + bound_resultant / q;
 #endif // MEAN_NORM_BOUND
 
 #ifdef TRACE_POS
@@ -219,35 +274,32 @@ void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
 }
 
 /*
-  Compute the norm of a case in the array.
-
-  array: array in which we store the norm.
-  i: index of the array in which we store the computed norm.
-  a: polynomial equal to matrix * vector.
-  pre_compute: array with precomputed value to compute upper bound of the norm.
-  H: sieving interval.
-  matrix: to compute the current value of a.
-  beg: index of the upper changed coordinate during the addition of 1 in the
-   sieving region for vector.
-  f: function that defines the number field.
-  ideal: the special-q we set.
-  special_q: if the special-q is set in this side, special-q is equal to 1.
-  vector: only for TRACE_POS mode.
-*/
+ * Compute the norm of a case in the array.
+ *
+ * array: array in which we store the norm.
+ * i: index of the array in which we store the computed norm.
+ * a: polynomial equal to matrix * vector.
+ * pre_compute: array with precomputed value to compute upper bound of the norm.
+ * H: sieving interval.
+ * matrix: to compute the current value of a.
+ * beg: index of the upper changed coordinate during the addition of 1 in the
+ *  sieving region for vector.
+ * f: function that defines the number field.
+ * spq: the special-q we set.
+ * special_q: if the special-q is set in this side, special-q is equal to 1.
+ * vector: only for TRACE_POS mode.
+ */
 void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
-                    double * pre_compute, sieving_interval_srcptr H,
-                    mat_int64_srcptr matrix, unsigned int beg,
-                    mpz_poly_srcptr f, ideal_1_srcptr ideal, int special_q,
-                    MAYBE_UNUSED int64_vector_srcptr vector)
+    double * pre_compute, sieving_interval_srcptr H, mat_int64_srcptr matrix,
+    unsigned int beg, mpz_poly_srcptr f, ideal_1_srcptr spq, int special_q,
+    MAYBE_UNUSED int64_vector_srcptr vector)
 {
   double bound_resultant;
-
   //a = a + sum(matrix[j][beg + 1], j, 1, H->t + 1) * x^beg.
   for (unsigned int j = 0; j < H->t; j++) {
     int64_poly_setcoeff(a, j, a->coeff[j] + matrix->coeff[j + 1][beg + 1]);
   }
-
-  //Substract -2 * H[i] when you change an other coordinate than c0.
+  //Substract -(2 * H[i] - 1) when you change an other coordinate than c0.
   for (unsigned int k = 0; k < beg; k++) {
     for (unsigned int j = 0; j < H->t; j++) {
       int64_t tmp = a->coeff[j];
@@ -257,7 +309,7 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
   }
 
   ASSERT(a->deg >= -1);
-
+  //Verify if the computation is good.
 #ifndef NDEBUG
   int64_poly_t a_tmp;
   int64_poly_init(a_tmp, -1);
@@ -266,19 +318,21 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
   int64_poly_clear(a_tmp);
 #endif // NDEBUG
 
+  //Compute an approximation of the norm.
   if (a->deg > 0) {
     uint64_t tmp = int64_poly_infinite_norm(a);
-
     bound_resultant = pow((double)tmp, (double)f->deg) * pre_compute[a->deg];
   } else {
     bound_resultant = 1;
   }
-
-  //WARNING: an assert here is necessary.
+  /*
+   * Store in array the value of the norm, without the contribution of the
+   *  special-q if it is set in this number field.
+   */
   if (special_q) {
-    array->array[i] = (unsigned char)log2(bound_resultant) - ideal->log;
-    mode_init_norm(special_q, f, a, (double)ideal->ideal->r, bound_resultant, i,
-                   vector, array);
+    array->array[i] = (unsigned char)log2(bound_resultant) - spq->log;
+    mode_init_norm(special_q, f, a, (double)spq->ideal->r, bound_resultant, i,
+        vector, array);
   } else {
     array->array[i] = (unsigned char) log2(bound_resultant);
     mode_init_norm(special_q, f, a, 1.0, bound_resultant, i, vector, array);
@@ -286,19 +340,19 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 }
 
 /*
-  Init the norm for a special-q (q, g) with deg(g) = 1.
-
-  array: the array in which the norms are initialized.
-  pre_compute: the array of precomputed value obtained with pre_computation.
-  H: the sieving interval which gives the sieving region.
-  matrix: the MqLLL matrix.
-  f: the f which defines the side.
-  ideal: the special-q.
-  special_q: 0 if there is no special-q in this side, else 1.
-*/
+ * Init the norm for a special-q (q, g) with deg(g) = 1.
+ *
+ * array: the array in which the norms are initialized.
+ * pre_compute: the array of precomputed value obtained with pre_computation.
+ * H: the sieving interval which gives the sieving region.
+ * matrix: the MqLLL matrix.
+ * f: the f which defines the side.
+ * spq: the special-q.
+ * special_q: 0 if there is no special-q in this side, else 1.
+ */
 void init_norm_1(array_ptr array, double * pre_compute,
-                 sieving_interval_srcptr H, mat_Z_srcptr matrix,
-                 mpz_poly_srcptr f, ideal_1_srcptr ideal, int special_q)
+    sieving_interval_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
+    ideal_1_srcptr spq, int special_q)
 {
   ASSERT(special_q == 0 || special_q == 1);
 
@@ -309,16 +363,22 @@ void init_norm_1(array_ptr array, double * pre_compute,
     int64_vector_setcoordinate(vector, i, -(int64_t)H->h[i]);
   }
   int64_vector_setcoordinate(vector, (int64_t)H->t - 1, 0);
+  /*
+   * Store the index of the upper changed coordinate during the addition of 1
+   *  in the sieving region for vector.
+   */
   unsigned int beg = 0;
 
   mat_int64_t matrix_int;
   mat_int64_init(matrix_int, matrix->NumRows, matrix->NumCols);
   mat_Z_to_mat_int64(matrix_int, matrix);
 
+  //Comupte a from vector and MqLLL.
   int64_poly_t a;
   int64_poly_init(a, H->t - 1);
   mat_int64_mul_int64_vector_to_int64_poly(a, matrix_int, vector);
 
+  //Reinitialise the value that store the mean of the norms.
 #ifdef MEAN_NORM_BOUND
     norm_bound = 0;
 #endif // MEAN_NORM_BOUND
@@ -328,13 +388,13 @@ void init_norm_1(array_ptr array, double * pre_compute,
 #endif // MEAN_NORM
 
   int64_vector_setcoordinate(vector, 0, -(int64_t)H->h[0]);
-  init_each_case(array, 0, a, pre_compute, H, matrix_int, beg, f, ideal, special_q,
-                 vector);
+  init_each_case(array, 0, a, pre_compute, H, matrix_int, beg, f, spq,
+      special_q, vector);
 
   for (uint64_t i = 1; i < array->number_element; i++) {
     beg = int64_vector_add_one_i(vector, 0, H);
-    init_each_case(array, i, a, pre_compute, H, matrix_int, beg, f, ideal,
-                   special_q, vector);
+    init_each_case(array, i, a, pre_compute, H, matrix_int, beg, f, spq,
+        special_q, vector);
   }
 
   int64_poly_clear(a);
@@ -343,24 +403,25 @@ void init_norm_1(array_ptr array, double * pre_compute,
 }
 
 /*
-  Tqr is the normalised Tqr obtained by compute_Tqr_1. If Tqr[0] != 0,
-   pseudo_Tqr = [(-Tqr[0])^-1 mod r = a, a * Tqr[1], …].
-
-   pseudo_Tqr: a matrix (a line here) obtained as describe above.
-   Tqr: the Tqr matrix.
-   t: dimension of the lattice.
-   ideal: the ideal r.
-*/
+ * Tqr is the normalised Tqr obtained by compute_Tqr_1. If Tqr[0] != 0,
+ *  pseudo_Tqr = [(-Tqr[0])^-1 mod r = a, a * Tqr[1], …].
+ *
+ * pseudo_Tqr: a matrix (a line here) obtained as describe above.
+ * Tqr: the Tqr matrix.
+ * t: dimension of the lattice.
+ * ideal: the ideal r.
+ */
 void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, uint64_t * Tqr,
-                          unsigned int t, ideal_1_srcptr ideal)
+    unsigned int t, ideal_1_srcptr ideal)
 {
   unsigned int i = 0;
   while (Tqr[i] == 0 && i < t) {
     pseudo_Tqr[i] = 0;
     i++;
   }
-
   uint64_t inverse = ideal->ideal->r - 1;
+
+  ASSERT(Tqr[i] == 1);
   ASSERT(inverse ==
          invmod_uint64((uint64_t)(-Tqr[i] + (int64_t)ideal->ideal->r),
                        ideal->ideal->r));
@@ -371,28 +432,29 @@ void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, uint64_t * Tqr,
 }
 
 /*
-  Mqr is the a matrix that can generate vector c such that Tqr * c = 0 mod r.
-  Mqr = [[r a 0 … 0]
-         [0 1 b … 0]
-         [| | | | |]
-         [0 0 0 0 1]]
-
-  Mqr: the Mqr matrix.
-  Tqr: the Tqr matrix.
-  t: dimension of the lattice.
-  ideal: the ideal r.
-*/
+ * Mqr is the a matrix that can generate vector c such that Tqr * c = 0 mod r.
+ * Mqr = [[r a 0 … 0]
+ *       [0 1 b … 0]
+ *       [| | | | |]
+ *       [0 0 0 0 1]]
+ *
+ * Mqr: the Mqr matrix.
+ * Tqr: the Tqr matrix.
+ * t: dimension of the lattice.
+ * ideal: the ideal r.
+ */
 void compute_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, unsigned int t,
-                   ideal_1_srcptr ideal)
+    ideal_1_srcptr ideal)
 {
   mat_int64_init(Mqr, t, t);
+  mat_int64_set_zero(Mqr);
   Mqr->coeff[1][1] = ideal->ideal->r;
   for (unsigned int i = 2; i <= t; i++) {
     Mqr->coeff[i][i] = 1;
   }
   for (unsigned int col = 2; col <= t; col++) {
     if (Tqr[col-1] != 0) {
-      Mqr->coeff[1][col] = (-(int64_t)Tqr[col-1]) + ideal->ideal->r;
+      Mqr->coeff[1][col] = (-(int64_t)Tqr[col-1]) + (int64_t)ideal->ideal->r;
     } else {
       Mqr->coeff[1][col] = 0;
     }
@@ -400,33 +462,29 @@ void compute_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, unsigned int t,
 }
 
 /*
-  Compute Tqr for r an ideal of degree 1 and normalised it.
-
-  Tqr: the Tqr matrix (Tqr is a line).
-  matrix: the MqLLL matrix.
-  t: dimension of the lattice.
-  ideal: the ideal r.
-*/
+ * Compute Tqr for r an ideal of degree 1 and normalised it.
+ *
+ * Tqr: the Tqr matrix (Tqr is a line).
+ * matrix: the MqLLL matrix.
+ * t: dimension of the lattice.
+ * ideal: the ideal r.
+ */
 void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix,
-                   unsigned int t, ideal_1_srcptr ideal)
+    unsigned int t, ideal_1_srcptr ideal)
 {
   mpz_t tmp;
   mpz_init(tmp);
   unsigned int i = 0;
   Tqr[i] = 0;
-  //Tqr = Mq,1 - Tr * Mq,2.
-
   mpz_t invert;
   mpz_init(invert);
 
+  //Tqr = Mq,1 - Tr * Mq,2.
   for (unsigned int j = 0; j < t; j++) {
     mpz_set(tmp, matrix->coeff[1][j + 1]);
     for (unsigned int k = 0; k < t - 1; k++) {
-
-      mpz_submul(tmp, ideal->Tr[k],
-                 matrix->coeff[k + 2][j + 1]);
+      mpz_submul(tmp, ideal->Tr[k], matrix->coeff[k + 2][j + 1]);
     }
-
     if (Tqr[i] == 0) {
       mpz_mod_ui(tmp, tmp, ideal->ideal->r);
       if (mpz_cmp_ui(tmp, 0) != 0) {
@@ -449,15 +507,15 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix,
 }
 
 /*
-  Generate the Mqr matrix, r is an ideal of degree 1.
-
-  Mqr: the matrix.
-  Tqr: the Tqr matrix (Tqr is a line).
-  t: dimension of the lattice.
-  ideal: the ideal r.
-*/
+ * Generate the Mqr matrix, r is an ideal of degree 1.
+ *
+ * Mqr: the matrix.
+ * Tqr: the Tqr matrix (Tqr is a line).
+ * t: dimension of the lattice.
+ * ideal: the ideal r.
+ */
 void generate_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr,
-                    unsigned int t, ideal_1_srcptr ideal)
+    unsigned int t, ideal_1_srcptr ideal)
 {
   ASSERT(Tqr[0] != 0);
   ASSERT(t == Mqr->NumCols);
@@ -487,16 +545,16 @@ void generate_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr,
 }
 
 /*
-  WARNING: Need to assert if the function does what it is supposed to do.
-  Compute Tqr for an ideal (r, h) with deg(h) > 1.
-
-  Tqr: Tqr is a matrix in this case.
-  matrix: MqLLL.
-  t: dimension of the lattice.
-  ideal: (r, h).
-*/
+ * WARNING: Need to assert if the function does what it is supposed to do.
+ * Compute Tqr for an ideal (r, h) with deg(h) > 1.
+ *
+ * Tqr: Tqr is a matrix in this case.
+ * matrix: MqLLL.
+ * t: dimension of the lattice.
+ * ideal: (r, h).
+ */
 void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
-                   ideal_u_srcptr ideal)
+    ideal_u_srcptr ideal)
 {
   /* Tqr = Mq,1 - Tr * Mq,2. */
   for (int row = 0; row < ideal->ideal->h->deg; row++) {
@@ -505,7 +563,7 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
       mpz_set(Tqr[row][col], matrix->coeff[row + 1][col + 1]);
       for (int k = 0; k < (int)t - ideal->ideal->h->deg; k++) {
         mpz_submul(Tqr[row][col], ideal->Tr[row][k],
-                   matrix->coeff[k + ideal->ideal->h->deg + 1][col + 1]);
+            matrix->coeff[k + ideal->ideal->h->deg + 1][col + 1]);
       }
       mpz_mod_ui(Tqr[row][col], Tqr[row][col], ideal->ideal->r);
     }
@@ -513,11 +571,27 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
 }
 
 #ifdef ASSERT_SIEVE
+/*
+ * To assert that the ideal is a factor of a = matrix * c mapped in the number
+ *  field defined by f.
+ *
+ * H: the sieving interval.
+ * index: index of c in the array in which we store the norm.
+ * number_element: number of element contains in the sieving region.
+ * matrix: MqLLL.
+ * f: the polynomial that defines the number field.
+ * ideal: the ideal involved in the factorisation in ideals.
+ * c: the vector corresponding to the ith value of the array in which we store
+ *  the norm.
+ */
 void assert_sieve(sieving_interval_srcptr H, uint64_t index,
-                  uint64_t number_element, mat_Z_srcptr matrix,
-                  mpz_poly_srcptr f, ideal_1_srcptr ideal,
-                  int64_vector_srcptr c)
+    uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_srcptr f,
+    ideal_1_srcptr ideal, int64_vector_srcptr c)
 {
+  /*
+   * Verify if we do not sieve the same index, because we do not sieve the power
+   *  of an ideal.
+   */
   if (index_old == 0) {
     ASSERT(index_old <= index);
   } else {
@@ -534,10 +608,11 @@ void assert_sieve(sieving_interval_srcptr H, uint64_t index,
 
   array_index_mpz_vector(v, index, H, number_element);
   mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
-  mpz_poly_resultant(res, a, f);
-  mpz_abs(res, res);
+  norm(res, a, f);
+  //Verify if res = r * …
   ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
 
+  //Verify c and v are the same.
   if (c != NULL) {
     mpz_vector_t v_tmp;
     mpz_vector_init(v_tmp, c->dim);
@@ -546,6 +621,7 @@ void assert_sieve(sieving_interval_srcptr H, uint64_t index,
     mpz_vector_clear(v_tmp);
   }
 
+  //Verify if h divides a mod r.
   if (a->deg != -1) {
     mpz_poly_t r;
     mpz_poly_init(r, -1);
@@ -569,6 +645,13 @@ void assert_sieve(sieving_interval_srcptr H, uint64_t index,
 #endif // ASSERT_SIEVE
 
 #ifdef TRACE_POS
+/*
+ * Say all the ideal we delete in the ith position.
+ *
+ * index: index in array we want to follow.
+ * ideal: the ideal we delete to the norm.
+ * array: the array in which we store the resulting norm.
+ */
 void trace_pos_sieve(uint64_t index, ideal_1_srcptr ideal, array_srcptr array)
 {
   if (index == TRACE_POS) {
@@ -580,15 +663,24 @@ void trace_pos_sieve(uint64_t index, ideal_1_srcptr ideal, array_srcptr array)
 }
 #endif // TRACE_POS
 
+/*
+ * All the mode we can active during the sieving step.
+ *
+ * H: the sieving interval.
+ * index: index of the array in which we store the resulting norm.
+ * array: the array in which we store the resulting norm.
+ * matrix: MqLLL.
+ * f: the polynomial that defines the number field.
+ * ideal: the ideal we want to delete.
+ * c: the vector corresponding to indexth position in array.
+ * number_c_l: number of possible c with the same ci, ci+1, …, ct. (cf line_sieve_ci)
+ * nbint: say if we have already count the number_c_l or not.
+ */
 void mode_sieve(MAYBE_UNUSED sieving_interval_srcptr H,
-                MAYBE_UNUSED uint64_t index,
-                MAYBE_UNUSED array_srcptr array,
-                MAYBE_UNUSED mat_Z_srcptr matrix,
-                MAYBE_UNUSED mpz_poly_srcptr f,
-                MAYBE_UNUSED ideal_1_srcptr ideal,
-                MAYBE_UNUSED int64_vector_srcptr c,
-                MAYBE_UNUSED uint64_t number_c_l,
-                MAYBE_UNUSED unsigned int nbint)
+    MAYBE_UNUSED uint64_t index, MAYBE_UNUSED array_srcptr array,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
+    MAYBE_UNUSED ideal_1_srcptr ideal, MAYBE_UNUSED int64_vector_srcptr c,
+    MAYBE_UNUSED uint64_t number_c_l, MAYBE_UNUSED unsigned int nbint)
 {
 #ifdef ASSERT_SIEVE
   assert_sieve(H, index, array->number_element, matrix, f, ideal, c);
@@ -606,21 +698,20 @@ void mode_sieve(MAYBE_UNUSED sieving_interval_srcptr H,
 }
 
 /*
-  Sieve for a special-q of degree 1 and Tqr with a zero coefficient at the
-  first place. This function sieve a c in the q lattice.
-
-  array: in which we store the norms.
-  c: element of the q lattice.
-  ideal: an ideal with r < q.
-  ci: the possible first coordinate of c to have c in the sieving region.
-  H: the sieving interval.
-  i: index of the first non-zero coefficient in pseudo_Tqr.
-  number_c_l: number of possible c with the same ci, ci+1, …, ct.
-*/
-void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
-              int64_t ci, sieving_interval_srcptr H, unsigned int i,
-              uint64_t number_c_l, MAYBE_UNUSED mat_Z_srcptr matrix,
-              MAYBE_UNUSED mpz_poly_srcptr f)
+ * Sieve for a special-q of degree 1 and Tqr with a zero coefficient at the
+ *  first place. This function sieve a c in the q lattice.
+ *
+ * array: in which we store the norms.
+ * c: element of the q lattice.
+ * ideal: an ideal with r < q.
+ * ci: the possible first coordinate of c to have c in the sieving region.
+ * H: the sieving interval.
+ * i: index of the first non-zero coefficient in pseudo_Tqr.
+ * number_c_l: number of possible c with the same ci, ci+1, …, ct.
+ */
+void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
+    int64_t ci, sieving_interval_srcptr H, unsigned int i, uint64_t number_c_l,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
 {
 #ifndef NDEBUG
   if (i == 0) {
@@ -637,13 +728,16 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
 #endif // ASSERT_SIEVE
 
   if (ci < (int64_t)H->h[i]) {
+    //Change the ith coordinate of c.
     int64_vector_setcoordinate(c, i, ci);
     array_int64_vector_index(&index, c, H, array->number_element);
     array->array[index] = array->array[index] - ideal->log;
+
     mode_sieve(H, index, array, matrix, f, ideal, c, number_c_l, 1);
 
     for (uint64_t k = 1; k < number_c_l; k++) {
       array->array[index + k] = array->array[index + k] - ideal->log;
+    
       mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l, 0);
     }
 
@@ -654,10 +748,13 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
       index = index + ideal->ideal->r * number_c_l;
 
       array->array[index] = array->array[index] - ideal->log;
+ 
+      //TODO: nbint = 0 is strange.
       mode_sieve(H, index, array, matrix, f, ideal, NULL, number_c_l, 0);
 
       for (uint64_t k = 1; k < number_c_l; k++) {
         array->array[index + k] = array->array[index + k] - ideal->log;
+ 
         mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l, 0);
       }
 
@@ -666,14 +763,20 @@ void sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
   }
 }
 
-void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
-             ideal_1_srcptr ideal, sieving_interval_srcptr H,
-             unsigned int i, uint64_t number_c_l, int64_t * ci,
-             unsigned int pos, MAYBE_UNUSED mat_Z_srcptr matrix,
-             MAYBE_UNUSED mpz_poly_srcptr f)
+/*
+ *
+ *
+ * array: the array in which we store the resulting norms.
+ * c: the 
+ */
+void line_sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
+    ideal_1_srcptr ideal, sieving_interval_srcptr H, unsigned int i,
+    uint64_t number_c_l, int64_t * ci, unsigned int pos,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
 {
   ASSERT(pos >= i);
 
+  //Recompute ci.
   for (unsigned int j = i + 1; j < pos; j++) {
     * ci = * ci - ((int64_t)pseudo_Tqr[j] * (2 * (int64_t)H->h[j] - 1));
     if (* ci >= (int64_t)ideal->ideal->r || * ci < 0) {
@@ -689,7 +792,12 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
   }
   ASSERT(* ci >= 0 && * ci < (int64_t)ideal->ideal->r);
 
-  int64_t lb = (i < H->t - 1) ? -(int64_t)H->h[i] : 0;
+  //Compute the lowest value such that Tqr*(c[0], …, c[i], …, c[t-1]) = 0 mod r.
+  //lb: the minimal accessible value in the sieving region for this coordinate.
+  int64_t lb = 0;
+  if (i < H->t - 1) {
+    lb =  -(int64_t)H->h[i];
+  }
   int64_t k = (lb - * ci) / (-(int64_t) ideal->ideal->r);
   if ((lb - * ci) > 0) {
     k--;
@@ -715,12 +823,12 @@ void sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
   ASSERT(tmp == tmp_ci);
 #endif // NDEBUG
 
-  sieve_ci(array, c, ideal, ci_tmp, H, i, number_c_l, matrix, f);
+  line_sieve_ci(array, c, ideal, ci_tmp, H, i, number_c_l, matrix, f);
 }
 
 #ifdef SIEVE_U
 void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
-             mpz_vector_srcptr c, sieving_interval_srcptr H)
+    mpz_vector_srcptr c, sieving_interval_srcptr H)
 {
   //Not optimal
   int nul = 1;
@@ -761,9 +869,18 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
 }
 #endif // SIEVE_U
 
+/*
+ *
+ *
+ * array: the array in which we store the resulting norms.
+ * matrix: MqLLL.
+ * fb: factor base of this side.
+ * H: sieving interval.
+ * f: the polynomial that defines the number field.
+ */
 void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
-                     factor_base_srcptr fb, sieving_interval_srcptr H,
-                     MAYBE_UNUSED mpz_poly_srcptr f)
+    factor_base_srcptr fb, sieving_interval_srcptr H,
+    MAYBE_UNUSED mpz_poly_srcptr f)
 {
 #ifdef TIMER_SIEVE
   double time_tqr = 0;
@@ -771,100 +888,130 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   double sec = 0;
 #endif // TIMER_SIEVE
 
+  //For all the ideal_1 of the factor base.
   for (uint64_t i = 0; i < fb->number_element_1; i++) {
 
+    ideal_1_t r;
+    ideal_1_init(r);
+    ideal_1_set(r, fb->factor_base_1[i], H->t);
+
 #ifdef TIMER_SIEVE
-    if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
+    if (r->ideal->r > TIMER_SIEVE) {
       sec = seconds();
     }
 #endif // TIMER_SIEVE
 
     uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
-    uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
-    compute_Tqr_1(Tqr, matrix, H->t, fb->factor_base_1[i]);
+    
+    //Compute the true Tqr
+    compute_Tqr_1(Tqr, matrix, H->t, r);
 
-#ifdef TEST_MQR
-    printf("Tqr = [");
-    for (unsigned int i = 0; i < H->t - 1; i++) {
-      printf("%" PRIu64 ", ", Tqr[i]);
-    }
-    printf("%" PRIu64 "]\n Mqr =\n", Tqr[H->t - 1]);
-    mat_int64_t Mqr;
-    compute_Mqr_1(Mqr, Tqr, H->t, fb->factor_base_1[i]);
-    mat_int64_fprintf(stdout, Mqr);
-    mat_int64_clear(Mqr);
-    getchar();
-#endif // TEST_MQR
-
-    compute_pseudo_Tqr_1(pseudo_Tqr, Tqr, H->t, fb->factor_base_1[i]);
-
+    if (r->ideal->r < 2 * (uint64_t) H->h[0]) {
+      uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
+      //Compute a usefull pseudo_Tqr for line_sieve.
+      compute_pseudo_Tqr_1(pseudo_Tqr, Tqr, H->t, r);
 
 #ifdef TIMER_SIEVE
-    if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
-      time_tqr = time_tqr + seconds() - sec;
-    }
+      if (r->ideal->r > TIMER_SIEVE) {
+        time_tqr = time_tqr + seconds() - sec;
+      }
 #endif // TIMER_SIEVE
 
-    int64_vector_t c;
-    int64_vector_init(c, H->t);
-    for (unsigned int j = 0; j < H->t - 1; j++) {
-      int64_vector_setcoordinate(c, j, -(int64_t)H->h[j]);
-    }
-    int64_vector_setcoordinate(c, H->t - 1, 0);
+      //Initialise c = (-H[0], -H[1], …, 0).
+      int64_vector_t c;
+      int64_vector_init(c, H->t);
+      for (unsigned int j = 0; j < H->t - 1; j++) {
+        int64_vector_setcoordinate(c, j, -(int64_t)H->h[j]);
+      }
+      int64_vector_setcoordinate(c, H->t - 1, 0);
 
-    if (pseudo_Tqr[0] != 0) {
-      unsigned int pos = 0;
+      if (pseudo_Tqr[0] != 0) {
+        unsigned int pos = 0;
 
-      int64_t c0 = 0;
-      if (H->t == 2) {
-        int64_vector_setcoordinate(c, 1, (int64_t)(- 1));
-      } else {
+        //Set c = (-H[0] - 1, -H[1], …, 0).
+        int64_t c0 = 0;
         int64_vector_setcoordinate(c, 1, c->c[1] - 1);
-      }
-      for (unsigned int j = 1; j < H->t; j++) {
-        c0 = c0 + (int64_t)pseudo_Tqr[j] * c->c[j];
-        if (c0 >= (int64_t)fb->factor_base_1[i]->ideal->r || c0 < 0) {
-          c0 = c0 % (int64_t)fb->factor_base_1[i]->ideal->r;
+        //Compute c0 = (-Tqr[0])^(-1) * (Tqr[1]*c[1] + …) mod r.
+        for (unsigned int j = 1; j < H->t; j++) {
+          c0 = c0 + (int64_t)pseudo_Tqr[j] * c->c[j];
+          if (c0 >= (int64_t)r->ideal->r || c0 < 0) {
+            c0 = c0 % (int64_t)r->ideal->r;
+          }
         }
-      }
-      if (c0 < 0) {
-        c0 = c0 + (int64_t)fb->factor_base_1[i]->ideal->r;
-      }
-      ASSERT(c0 >= 0);
-      uint64_t number_c = array->number_element / (2 * H->h[0]);
+        if (c0 < 0) {
+          c0 = c0 + (int64_t)r->ideal->r;
+        }
+        ASSERT(c0 >= 0);
+        //Number of c with the same c[1], …, c[t-1].
+        uint64_t number_c = array->number_element / (2 * H->h[0]);
 
 #ifdef TIMER_SIEVE
-      if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
-        sec = seconds();
-      }
+        if (r->ideal->r > TIMER_SIEVE) {
+          sec = seconds();
+        }
 #endif // TIMER_SIEVE
 
-      pos = int64_vector_add_one_i(c, 1, H);
-      sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 1, &c0, pos,
+        for (uint64_t j = 0; j < number_c; j++) {
+          pos = int64_vector_add_one_i(c, 1, H);
+          line_sieve_1(array, c, pseudo_Tqr, r, H, 0, 1, &c0, pos,
               matrix, f);
-
-      for (uint64_t j = 1; j < number_c;  j++) {
-        pos = int64_vector_add_one_i(c, 1, H);
-        sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, 0, 1, &c0, pos,
-                matrix, f);
-      }
+        }
 
 #ifdef TIMER_SIEVE
-      if (fb->factor_base_1[i]->ideal->r > TIMER_SIEVE) {
-        time_sieve = time_sieve + seconds() - sec;
-      }
+        if (r->ideal->r > TIMER_SIEVE) {
+          time_sieve = time_sieve + seconds() - sec;
+        }
 #endif // TIMER_SIEVE
 
 #ifdef NUMBER_HIT
-      printf("Number of hits: %" PRIu64 " for r: %" PRIu64 "\n", number_of_hit,
-             fb->factor_base_1[i]->ideal->r);
-      printf("Estimated number of hits: %u.\n",
-             (unsigned int) nearbyint((double) array->number_element /
-                  (double) fb->factor_base_1[i]->ideal->r));
-      number_of_hit = 0;
+        printf("Number of hits: %" PRIu64 " for r: %" PRIu64 "\n", number_of_hit,
+            r->ideal->r);
+        printf("Estimated number of hits: %u.\n",
+            (unsigned int) nearbyint((double) array->number_element /
+              (double) r->ideal->r));
+        number_of_hit = 0;
 #endif // NUMBER_HIT
 
+        free(pseudo_Tqr);
+      }
+
+      ideal_1_clear(r, H->t);
+      int64_vector_clear(c);
+    } else if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
+#ifdef TEST_MQR
+        printf("# Tqr = [");
+        for (unsigned int i = 0; i < H->t - 1; i++) {
+          printf("%" PRIu64 ", ", Tqr[i]);
+        }
+        printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+        mat_int64_t Mqr_test;
+        compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+        mat_int64_fprintf_comment(stdout, Mqr_test);
+        mat_int64_clear(Mqr_test);
+#endif // TEST_MQR
+
+        ASSERT(H->t == 3);
+
+        mat_int64_t Mqr;
+        mat_int64_init(Mqr, H->t, H->t);
+
+        compute_Mqr_1(Mqr, Tqr, H->t, r);
+        plane_sieve(Mqr, H);
+
+        mat_int64_clear(Mqr);
     }
+    free(Tqr);
+  }
+
+#ifdef TIMER_SIEVE
+  printf("Bound: %d\n", TIMER_SIEVE);
+  printf("Build pseudo_Tqr: %f\n", time_tqr);
+  printf("Perform sieve: %f\n", time_sieve);
+#endif // TIMER_SIEVE
+
+}
+
+#if 0
 #ifdef SIEVE_TQR
     else {
       unsigned int index = 1;
@@ -880,7 +1027,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         /*   number_c_l = number_c_l * (2 * H->h[j] + 1); */
         /* } */
 
-        /* sieve_ci(array, c, fb->factor_base_1[i], 0, H, index, number_c_l, */
+        /* line_sieve(array, c, r, 0, H, index, number_c_l, */
         /*          matrix, f); */
       } else {
         int64_t ci = 0;
@@ -893,12 +1040,12 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         if (index < H->t - 1) {
           for (unsigned int j = index + 1; j < H->t; j++) {
             ci = ci + (int64_t)pseudo_Tqr[j] * c->c[j];
-            if (ci >= (int64_t)fb->factor_base_1[i]->ideal->r || ci < 0) {
-              ci = ci % (int64_t)fb->factor_base_1[i]->ideal->r;
+            if (ci >= (int64_t)r->ideal->r || ci < 0) {
+              ci = ci % (int64_t)r->ideal->r;
             }
           }
           if (ci < 0) {
-            ci = ci + (int64_t)fb->factor_base_1[i]->ideal->r;
+            ci = ci + (int64_t)r->ideal->r;
           }
           ASSERT(ci >= 0);
         }
@@ -913,63 +1060,16 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
         unsigned int pos = 0;
         pos = int64_vector_add_one_i(c, index + 1, H);
-        sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, index,
+        line_sieve_1(array, c, pseudo_Tqr, r, H, index,
                 number_c_l, &ci, pos, matrix, f);
         for (uint64_t j = 1; j < number_c_u; j++) {
           pos = int64_vector_add_one_i(c, index + 1, H);
-          sieve_1(array, c, pseudo_Tqr, fb->factor_base_1[i], H, index,
+          line_sieve_1(array, c, pseudo_Tqr, r, H, index,
                   number_c_l, &ci, pos, matrix, f);
         }
       }
     }
 #endif // SIEVE_TQR
-
-/* #ifdef PROJECTIVE_ROOT */
-/*     mpz_t mod; */
-/*     mpz_init(mod); */
-/*     mpz_mod_ui(mod, mpz_poly_lc_const(f), fb->factor_base_1[i]->ideal->r); */
-/*     if (mpz_cmp_ui(mod, 0) == 0) { */
-/*       mpz_t g0; */
-/*       mpz_init(g0); */
-/*       mpz_set(g0, fb->factor_base_1[i]->ideal->g->coeff[0]); */
-/*       /\* WARNING: if g0 is equal to 0, the projective root maps to infinity, *\/ */
-/*       /\* therefore the polynomial do not exist. *\/ */
-/*       if (mpz_cmp_ui(g0, 0) != 0) { */
-/*         mpz_t q; */
-/*         mpz_init(q); */
-/*         mpz_set_ui(r, special_q->ideal->r); */
-/*         mpz_invert(g0, g0, q); */
-
-/*         //Build Tqr */
-/*         mpz_t * Tqr = (mpz_t *) malloc(sizeof(mpz_t) * (H->t)); */
-/*         mpz_set(Tqr[0], q); */
-/*         mpz_set(Tqr[1], g0); */
-/*         mpz_mul_si(g0, -1); */
-/*         for (unsigned int j = 2; j < H->t; j++) { */
-/*           mpz_mul(Tqr[j], g0, Tqr[j - 1]); */
-/*           mpz_mod_ui(Tqr[j], Tqr[j], ideal->ideal->r); */
-/*         } */
-/*         mpz_clear(q); */
-
-/*         //TODO: to be continued. */
-
-/*       } */
-
-/*       mpz_clear(g0); */
-/*     } */
-/*     mpz_clear(mod); */
-/* #endif // PROJECTIVE_ROOT */
-
-    int64_vector_clear(c);
-    free(pseudo_Tqr);
-    free(Tqr);
-  }
-
-#ifdef TIMER_SIEVE
-  printf("Bound: %d\n", TIMER_SIEVE);
-  printf("Build pseudo_Tqr: %f\n", time_tqr);
-  printf("Perform sieve: %f\n", time_sieve);
-#endif // TIMER_SIEVE
 
 #ifdef SIEVE_U
   for (uint64_t i = 0; i < fb->number_element_u; i++) {
@@ -1007,10 +1107,10 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     free(Tqr);
   }
 #endif // SIEVE_U
-}
+#endif // Draft for special-q_sieve
 
 void find_index(uint64_array_ptr indexes, array_srcptr array,
-                unsigned char thresh)
+    unsigned char thresh)
 {
 #ifdef MEAN_NORM_BOUND_SIEVE
   norm_bound_sieve = 0;
@@ -1032,19 +1132,33 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
   uint64_array_realloc(indexes, ind);
 }
 
+/*
+ * Print a relation.
+ *
+ * factor: factorisation of a if the norm is smooth is the corresponding number
+ *  field.
+ * I:
+ * L:
+ * a: the polynomial in the original lattice.
+ * t: dimension of the lattice.
+ * V: number of number fields.
+ * size:
+ * assert_facto: 1 if the factorisation is correct, 0 otherwise.
+ */
 #ifdef ASSERT_FACTO
 void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
-                     mpz_poly_srcptr a, unsigned int t, unsigned int V,
-                     unsigned int size, unsigned int * assert_facto)
+    mpz_poly_srcptr a, unsigned int t, unsigned int V, unsigned int size,
+    unsigned int * assert_facto)
 #else
 void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
-                     mpz_poly_srcptr a, unsigned int t, unsigned int V,
-                     unsigned int size)
+    mpz_poly_srcptr a, unsigned int t, unsigned int V, unsigned int size)
 #endif
 {
+  //Print a.
   printf("# ");
   mpz_poly_fprintf(stdout, a);
 
+  //Print if the factorisation is good.
 #ifdef ASSERT_FACTO
   unsigned int index = 0;
   printf("# ");
@@ -1079,7 +1193,7 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
   unsigned int index = 0;
 #endif
 
-
+  //Print the coefficient of a.
   for (int i = 0; i < a->deg; i++) {
     gmp_printf("%Zd,", a->coeff[i]);
   }
@@ -1093,6 +1207,7 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
     printf("0:");
   }
 
+  //Print the factorisation in the different number field.
   index = 0;
   for (unsigned int i = 0; i < V - 1; i++) {
     if (index < size) {
@@ -1131,24 +1246,34 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
   printf("\n");
 }
 
+/*
+ * A potential polynomial is found. Factorise it to verify if it gives a
+ *  relation.
+ *
+ * a: the polynomial in the original lattice.
+ * f: the polynomials that define the number fields.
+ * lpb: the large prime bands.
+ * L:
+ * size:
+ * t: dimension of the lattice.
+ * V: number of number fields.
+ */
 void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
-                     unsigned int * L, unsigned int size, unsigned int t,
-                     unsigned int V)
+    unsigned int * L, unsigned int size, unsigned int t, unsigned int V)
 {
-  mpz_t * res = malloc(sizeof(mpz_t) * size);
-  factor_t * factor = malloc(sizeof(factor_t) * size);
-  unsigned int * I = malloc(sizeof(unsigned int) * size);
+  mpz_t * res = (mpz_t * ) malloc(sizeof(mpz_t) * size);
+  factor_t * factor = (factor_t * ) malloc(sizeof(factor_t) * size);
+  unsigned int * I = (unsigned int * ) malloc(sizeof(unsigned int) * size);
 
 #ifdef ASSERT_FACTO
-  unsigned int * assert_facto = malloc(sizeof(unsigned int) * size);
+  unsigned int * assert_facto = (unsigned int * ) malloc(sizeof(unsigned int) * size);
 #endif
 
   unsigned int find = 0;
   /* Not optimal */
   for (unsigned int i = 0; i < size; i++) {
     mpz_init(res[i]);
-    mpz_poly_resultant(res[i], f[L[i]], a);
-    mpz_abs(res[i], res[i]);
+    norm(res[i], f[L[i]], a);
 
 #ifdef ASSERT_FACTO
     assert_facto[i] = gmp_factorize(factor[i], res[i]);
@@ -1183,7 +1308,13 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
 #endif
 }
 
-static uint64_t sum_index(uint64_t * index, unsigned int V)
+/*
+ * Return the sum of the element in index. index has size V.
+ *
+ * index: array of index.
+ * V: number of element, number of number fields.
+ */
+uint64_t sum_index(uint64_t * index, unsigned int V)
 {
   uint64_t sum = 0;
   for (unsigned int i = 0; i < V; i++) {
@@ -1192,18 +1323,30 @@ static uint64_t sum_index(uint64_t * index, unsigned int V)
   return sum;
 }
 
-static unsigned int find_indexes_min(unsigned int ** L, uint64_array_t * indexes,
-                                     uint64_t * index, unsigned int V)
+/*
+ * Find in all the indexes which one has the smallest value.
+ *
+ *
+ *
+ */
+unsigned int find_indexes_min(unsigned int ** L,
+    uint64_array_t * indexes, uint64_t * index, unsigned int V)
 {
-  * L = malloc(sizeof(unsigned int) * (V));
+  * L = (unsigned int * ) malloc(sizeof(unsigned int) * (V));
+  unsigned int i = 0;
   unsigned int size = 0;
-  uint64_t min = indexes[0]->array[index[0]];
-  for (unsigned int i = 1; i < V; i++) {
+  while(indexes[i]->length == 0)
+  {
+    i++;
+  }
+  uint64_t min = indexes[i]->array[index[i]];
+
+  for (; i < V; i++) {
     if (index[i] < indexes[i]->length) {
       min = MIN(min, indexes[i]->array[index[i]]);
     }
   }
-  for (unsigned int i = 0; i < V; i++) {
+  for (i = 0; i < V; i++) {
     if (indexes[i]->length != 0) {
       if (min == indexes[i]->array[index[i]]) {
         (*L)[size] = i;
@@ -1215,10 +1358,12 @@ static unsigned int find_indexes_min(unsigned int ** L, uint64_array_t * indexes
   return size;
 }
 
-static void find_relation(uint64_array_t * indexes, uint64_t * index,
-                          uint64_t number_element, mpz_t * lpb,
-                          mat_Z_srcptr matrix, mpz_poly_t * f,
-                          sieving_interval_srcptr H, unsigned int V)
+/*
+ * For 
+ */
+void find_relation(uint64_array_t * indexes, uint64_t * index,
+    uint64_t number_element, mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
+    sieving_interval_srcptr H, unsigned int V)
 {
   unsigned int * L;
   unsigned int size = find_indexes_min(&L, indexes, index, V);
@@ -1228,7 +1373,7 @@ static void find_relation(uint64_array_t * indexes, uint64_t * index,
     mpz_init(gcd);
     mpz_vector_init(c, H->t);
     array_index_mpz_vector(c, indexes[L[0]]->array[index[L[0]]], H,
-                           number_element);
+        number_element);
 
     mpz_poly_t a;
     mpz_poly_init(a, 0);
@@ -1264,11 +1409,24 @@ static void find_relation(uint64_array_t * indexes, uint64_t * index,
   free(L);
 }
 
+/*
+ * To find the relations.
+ *
+ * indexes: for each number field, position where the norm is less as the
+ *  threshold.
+ * number_element: number of element in the sieving region.
+ * lpb: large prime bands.
+ * matrix: MqLLL.
+ * f: polynomials that define the number fields.
+ * H: sieving interval.
+ * V: number of number fields.
+ */
 void find_relations(uint64_array_t * indexes, uint64_t number_element,
-                    mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
-                    sieving_interval_srcptr H, unsigned int V)
+    mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_interval_srcptr H,
+    unsigned int V)
 {
-  uint64_t * index = malloc(sizeof(uint64_t) * V);
+  //Index is the current index to move in the indexes array.
+  uint64_t * index = (uint64_t * ) malloc(sizeof(uint64_t) * V);
   /* Compute sum of the length of all the uint64_array. */
   uint64_t length_tot = 0;
   for (unsigned int i = 0; i < V; i++) {
@@ -1342,28 +1500,25 @@ void declare_usage(param_list pl)
 }
 
 /*
-  Initialise the parameters of the special-q sieve.
-  f: the V functions to define the number fields.
-  fbb: the V factor base bounds.
-  t: dimension of the lattice.
-  H: sieving interval.
-  q_min: lower bound of the special-q range.
-  q_max: upper bound of the special-q range.
-  thresh: the V threshold.
-  lpb: the V large prime bounds.
-  array: array in which the norms are stored.
-  matrix: the Mq matrix (set with zero coefficients).
-  q_side: side of the special-q.
-  V: number of number fields.
+ * Initialise the parameters of the special-q sieve.
+ *
+ * f: the V functions to define the number fields.
+ * fbb: the V factor base bounds.
+ * t: dimension of the lattice.
+ * H: sieving interval.
+ * q_min: lower bound of the special-q range.
+ * q_max: upper bound of the special-q range.
+ * thresh: the V threshold.
+ * lpb: the V large prime bounds.
+ * array: array in which the norms are stored.
+ * matrix: the Mq matrix (set with zero coefficients).
+ * q_side: side of the special-q.
+ * V: number of number fields.
  */
-
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
-                           uint64_t ** fbb, factor_base_t ** fb,
-                           sieving_interval_ptr H,
-                           uint64_t * q_min, uint64_t * q_max,
-                           unsigned char ** thresh, mpz_t ** lpb,
-                           array_ptr array, mat_Z_ptr matrix,
-                           unsigned int * q_side , unsigned int * V)
+    uint64_t ** fbb, factor_base_t ** fb, sieving_interval_ptr H,
+    uint64_t * q_min, uint64_t * q_max, unsigned char ** thresh, mpz_t ** lpb,
+    array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V)
 {
   param_list pl;
   param_list_init(pl);
@@ -1394,15 +1549,17 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   unsigned int t;
   int * r;
   param_list_parse_int_list_size(pl, "H", &r, &t, ".,");
-  ASSERT(t >= 2);
+  ASSERT(t > 2);
+  ASSERT(t == 3); // TODO: remove as soon as possible.
   sieving_interval_init(H, t);
   for (unsigned int i = 0; i < t; i++) {
     sieving_interval_set_hi(H, i, (unsigned int) r[i]);
   }
   free(r);
 
-  * fbb = malloc(sizeof(uint64_t * ) * (* V));
-  * thresh = malloc(sizeof(unsigned char *) * (* V));
+  //TODO: something strange here.
+  * fbb = malloc(sizeof(uint64_t) * (* V));
+  * thresh = malloc(sizeof(unsigned char) * (* V));
   * fb = malloc(sizeof(factor_base_t) * (* V));
   * f = malloc(sizeof(mpz_poly_t) * (* V));
   * lpb = malloc(sizeof(mpz_t) * (* V));
@@ -1434,10 +1591,10 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     ASSERT(mpz_cmp_ui((*lpb)[i], fbb[0][i]) >= 0);
   }
 
-  uint64_t number_element = 0;
-  sieving_interval_number_element(&number_element, H);
+  uint64_t number_element = sieving_interval_number_element(H);
   ASSERT(number_element >= 6);
 
+  //TODO: q_side is an unsigned int.
   param_list_parse_int(pl, "q_side", (int *)q_side);
   ASSERT(* q_side < * V);
   param_list_parse_uint64(pl, "q_min", q_min);
@@ -1496,23 +1653,24 @@ int main(int argc, char * argv[])
   printf("q_side = %u\n", q_side);
 #endif // PRINT_PARAMETERS
 
-  uint64_array_t * indexes = malloc(sizeof(uint64_array_t) * V);
+  uint64_array_t * indexes =
+    (uint64_array_t * ) malloc(sizeof(uint64_array_t) * V);
 
-  double ** pre_compute = malloc(sizeof(double * ) * V);
+  double ** pre_compute = (double ** ) malloc(sizeof(double * ) * V);
   for (unsigned int i = 0; i < V; i++) {
-    pre_compute[i] = malloc((H->t) * sizeof(double));
+    pre_compute[i] = (double * ) malloc((H->t) * sizeof(double));
     pre_computation(pre_compute[i], f[i], H->t);
   }
 
-  double ** time = malloc(sizeof(double * ) * V);
+  double ** time = (double ** ) malloc(sizeof(double * ) * V);
   for (unsigned int i = 0; i < V; i++) {
-    time[i] = malloc(sizeof(double) * 3);
+    time[i] = (double * ) malloc(sizeof(double) * 3);
   }
   double sec_tot;
   double sec_cofact;
 
 #ifdef NUMBER_SURVIVALS
-  uint64_t * numbers_survivals = malloc(sizeof(uint64_t) * V);
+  uint64_t * numbers_survivals = (uint64_t * ) malloc(sizeof(uint64_t) * V);
 #endif // NUMBER_SURVIVALS
 
 #ifdef TRACE_POS
@@ -1588,15 +1746,15 @@ int main(int argc, char * argv[])
 #endif // TRACE_POS
 
 #ifdef MEAN_NORM_BOUND
-        double * norms_bound = malloc(sizeof(double) * V);
+        double * norms_bound = (double * ) malloc(sizeof(double) * V);
 #endif // MEAN_NORM_BOUND
 
 #ifdef MEAN_NORM
-        double * norms = malloc(sizeof(double) * V);
+        double * norms = (double * ) malloc(sizeof(double) * V);
 #endif // MEAN_NORM
 
 #ifdef MEAN_NORM_BOUND_SIEVE
-        double * norms_bound_sieve = malloc(sizeof(double) * V);
+        double * norms_bound_sieve = (double * ) malloc(sizeof(double) * V);
 #endif // MEAN_NORM_BOUND_SIEVE
 
         for (unsigned int j = 0; j < V; j++) {
