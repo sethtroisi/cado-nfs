@@ -48,12 +48,12 @@
 
 typedef unsigned long residueredc15ul_t[MODREDC15UL_SIZE];
 typedef unsigned long modintredc15ul_t[MODREDC15UL_SIZE];
-typedef struct { 
+struct __modulusredc15ul_t { 
   modintredc15ul_t m;
   residueredc15ul_t one;
   unsigned long invm;
-} __modulusredc15ul_t;
-typedef __modulusredc15ul_t modulusredc15ul_t[1];
+};
+typedef struct __modulusredc15ul_t modulusredc15ul_t[1];
 
 
 /* ==================== Functions used internally ==================== */

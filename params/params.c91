@@ -290,6 +290,18 @@ tasks.linalg.bwc.shuffled_product = 1
 tasks.linalg.characters.nchar = 50		# number of characters
 tasks.linalg.characters.threads = 2
 
+###########################################################################
+# Square root task
+###########################################################################
+
+# Number of threads used for the square root. Dependencies will be processed
+# by blocks of 16 for example. If the number of dependencies is not a multiple
+# of say 16, then the last block (if needed) will be reduced to the actual
+# number of remaining dependencies.
+# tasks.sqrt.threads = 16
+
+# To start again at the first dependency (might be useful in debug mode):
+# tasks.sqrt.first_dep = 0
 
 ###########################################################################
 # Work unit server

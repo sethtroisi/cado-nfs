@@ -185,7 +185,8 @@
  * descent. The mid-term plan is to remove this compile-time flag.
  */
 #define xxxDLP_DESCENT
-#define DESCENT_GRACE_TIME_RATIO 0.4
+
+#define DESCENT_DEFAULT_GRACE_TIME_RATIO 0.2    /* default value */
 
 /* Define this to support larger q. This is almost mandatory for the
  * descent. */
@@ -237,14 +238,6 @@
 
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 void las_display_config_flags();
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_CONFIG_H_ */

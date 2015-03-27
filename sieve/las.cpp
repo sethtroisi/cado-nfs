@@ -11,6 +11,7 @@
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
+#include "threadpool.h"
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -53,6 +54,9 @@ int recursive_descent = 0;
 int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
 
+double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
+
+
 double tt_qstart;
 
 /* {{{ for cofactorization statistics */
@@ -93,8 +97,10 @@ void siever_config_display(siever_config_srcptr sc)/*{{{*/
             sc->sides[RATIONAL_SIDE]->lambda,
 	    sc->sides[ALGEBRAIC_SIDE]->lambda);
     }
+    /*
     verbose_output_print(0, 1, "#                     skewness=%1.1f\n",
 	    sc->skewness);
+            */
 }/*}}}*/
 
 int siever_config_cmp(siever_config_srcptr a, siever_config_srcptr b)/*{{{*/
@@ -309,11 +315,11 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
             max_weight = MAX(max_weight, weight);
         if (nr_primes != 0 || weight != 0.) {
             verbose_output_print(0, 1, "# Number of primes in %s factor base part %d = %zu\n",
-                                 sidenames[side], i_part, nr_primes);
+                    sidenames[side], i_part, nr_primes);
             verbose_output_print(0, 1, "# Number of prime ideals in %s factor base part %d = %zu\n",
-                                 sidenames[side], i_part, nr_roots);
+                    sidenames[side], i_part, nr_roots);
             verbose_output_print(0, 1, "# Weight of primes in %s factor base part %d = %0.5g\n",
-                                 sidenames[side], i_part, weight);
+                    sidenames[side], i_part, weight);
         }
     }
     s->max_bucket_fill_ratio = max_weight * 1.07;
@@ -389,14 +395,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
     si->nb_buckets_max = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
-    verbose_output_print(0, 1, "# bucket_region = %u\n", BUCKET_REGION);
-    if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
-      verbose_output_print(0, 1, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
-    else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
-      verbose_output_print(0, 1, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
-    else
-      verbose_output_print(0, 1, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
-
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
     si->doing = NULL;
@@ -412,23 +410,35 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * are exactly the same and can be shared.
      */
     if (las->sievers == si) {
+        verbose_output_print(0, 1, "# bucket_region = %u\n", BUCKET_REGION);
+        if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
+            verbose_output_print(0, 1, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
+        else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
+            verbose_output_print(0, 1, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
+        else
+            verbose_output_print(0, 1, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
+
         sieve_info_init_factor_bases(las, si, pl);
+        for (int side = 0; side < 2; side++) {
+            sieve_info_print_fb_statistics(las, si, side);
+        }
     } else {
         // We are in descent mode, it seems, so let's not duplicate the
         // factor base data.
         // A few sanity checks, first.
         ASSERT_ALWAYS(las->sievers->conf->logI == si->conf->logI);
         ASSERT_ALWAYS(las->sievers->conf->bucket_thresh == si->conf->bucket_thresh);
-        ASSERT_ALWAYS(las->sievers->conf->sides[0]->lim == si->conf->sides[0]->lim);
-        ASSERT_ALWAYS(las->sievers->conf->sides[0]->powlim == si->conf->sides[0]->powlim);
-        ASSERT_ALWAYS(las->sievers->conf->sides[1]->lim == si->conf->sides[1]->lim);
-        ASSERT_ALWAYS(las->sievers->conf->sides[1]->powlim == si->conf->sides[1]->powlim);
         // Then, copy relevant data from the first sieve_info
         verbose_output_print(0, 1, "# Do not regenerate factor base data: copy it from first siever\n");
         for (int side = 0; side < 2; side++) {
+            ASSERT_ALWAYS(las->sievers->conf->sides[side]->lim == si->conf->sides[side]->lim);
+            ASSERT_ALWAYS(las->sievers->conf->sides[side]->powlim == si->conf->sides[side]->powlim);
             sieve_side_info_ptr sis = si->sides[side];
             sieve_side_info_ptr sis0 = las->sievers->sides[side];
             sis->fb = sis0->fb;
+            /* important ! Otherwise we'll have 0, and badness will
+             * occur. */
+            sis->max_bucket_fill_ratio = sis0->max_bucket_fill_ratio;
         }
     }
 
@@ -466,7 +476,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
       fclose (file);
 
     for(int side = 0 ; side < 2 ; side++) {
-        sieve_info_print_fb_statistics(las, si, side);
 	/* init_norms (si, side); */ /* only depends on scale, logmax, lognorm_table */
 	sieve_info_init_trialdiv(si, side); /* Init refactoring stuff */
 	mpz_init (si->BB[side]);
@@ -685,14 +694,14 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         if (sc->bitsize > las->max_hint_bitsize[sc->side])
             las->max_hint_bitsize[sc->side] = sc->bitsize;
         // Copy default value for non-given parameters
-        sc->skewness = las->default_config->skewness;
-        sc->bucket_thresh = las->default_config->bucket_thresh;
-        sc->td_thresh = las->default_config->td_thresh;
-        sc->unsieve_thresh = las->default_config->unsieve_thresh;
-        sc->sides[0]->powlim = las->default_config->sides[0]->powlim;
-        sc->sides[1]->powlim = las->default_config->sides[1]->powlim;
-        sc->sides[0]->ncurves = las->default_config->sides[0]->ncurves;
-        sc->sides[1]->ncurves = las->default_config->sides[1]->ncurves;
+        // sc->skewness = las->default_config->skewness;
+        sc->bucket_thresh = las->config_base->bucket_thresh;
+        sc->td_thresh = las->config_base->td_thresh;
+        sc->unsieve_thresh = las->config_base->unsieve_thresh;
+        for(int side = 0 ; side < 2 ; side++) {
+            sc->sides[side]->powlim = las->config_base->sides[side]->powlim;
+            sc->sides[side]->ncurves = las->config_base->sides[side]->ncurves;
+        }
     }
     if (las->hint_table == NULL) {
         fprintf(stderr, "%s: no data ??\n", filename);
@@ -766,7 +775,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     las->output = stdout;
     if (las->outputname) {
 	if (!(las->output = fopen_maybe_compressed(las->outputname, "w"))) {
-            setbuf(las->output, NULL);
 	    fprintf(stderr, "Could not open %s for writing\n", las->outputname);
 	    exit(EXIT_FAILURE);
 	}
@@ -809,11 +817,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	exit(EXIT_FAILURE);
     }
     
-    if (las->nb_threads != 1) {
-	fprintf(stderr, "More than 1 thread is currently broken. Using 1.\n");
-	las->nb_threads = 1;
-    }
-    
     /* }}} */
     /* {{{ Parse polynomial */
     cado_poly_init(las->cpoly);
@@ -833,17 +836,12 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	exit(EXIT_FAILURE);
     }
 
-    /* {{{ Parse default siever config (fill all possible fields) */
-
-    siever_config_ptr sc = las->default_config;
-    memset(sc, 0, sizeof(siever_config));
-
-    sc->skewness = las->cpoly->skew;
+    // sc->skewness = las->cpoly->skew;
     /* -skew (or -S) may override (or set) the skewness given in the
      * polynomial file */
-    param_list_parse_double(pl, "skew", &(sc->skewness));
+    param_list_parse_double(pl, "skew", &(las->cpoly->skew));
 
-    if (sc->skewness <= 0.0) {
+    if (las->cpoly->skew <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
 	cado_poly_clear(las->cpoly);
 	param_list_clear(pl);
@@ -851,82 +849,115 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     /* }}} */
 
-    /* The default config is not necessarily a complete bit of
-     * information.
-     *
-     * The field with the bitsize of q is here filled with q0 as found in
-     * the command line. Note though that this is only one choice among
-     * several possible (q1, or just no default).
-     * For the descent, we do not intend to have a default config, thus
-     * specifying q0 makes no sense. Likewise, for file-based todo lists,
-     * we have no default either, and no siever is configured to provide
-     * this ``default'' behaviour (yet, the default bits here are used to
-     * pre-fill the config data later on).
-     */
-    mpz_t q0;
-    mpz_init(q0);
-    if (param_list_parse_mpz(pl, "q0", q0)) {
-        sc->bitsize = mpz_sizeinbase(q0, 2);
-    }
-    mpz_clear(q0);
-    /* sqside is now the preferred parameter */
-    if (!param_list_parse_int(pl, "sqside", &sc->side)) {
-        sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
-    }
-    param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
-    param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
-    int seen = 1;
-    seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
-    seen &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
-    seen &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
-    if (!seen) {
-        fprintf(stderr, "Error: options -I, -lim0, -lpb0, -mfb0, "
-                " -lim1, -lpb1, -mfb1 are mandatory.\n");
-	cado_poly_clear(las->cpoly);
-	param_list_clear(pl);
-        exit(EXIT_FAILURE);
-    }
+    /* {{{ Parse default siever config (fill all possible fields) */
+    {
+        siever_config_ptr sc = las->config_base;
+        memset(sc, 0, sizeof(siever_config));
 
-    /* Parse optional siever configuration parameters */
-    sc->td_thresh = 1024;	/* default value */
-    param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
 
-    sc->unsieve_thresh = 100;
-    if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
-        verbose_output_print(0, 1, "# Un-sieving primes > %u\n",
-                sc->unsieve_thresh);
-    }
-
-    sc->bucket_thresh = 1 << sc->logI;	/* default value */
-    /* overrides default only if parameter is given */
-    param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
-
-    const char *powlim_params[2] = {"powlim0", "powlim1"};
-    for (int side = 0; side < 2; side++) {
-        if (!param_list_parse_ulong(pl, powlim_params[side], &sc->sides[side]->powlim)) {
-            sc->sides[side]->powlim = sc->bucket_thresh - 1;
-            verbose_output_print(0, 1, "# Using default value of %lu for -%s\n",
-                     sc->sides[side]->powlim, powlim_params[side]);
+        /* The default config is not necessarily a complete bit of
+         * information.
+         *
+         * The field with the bitsize of q is here filled with q0 as found in
+         * the command line. Note though that this is only one choice among
+         * several possible (q1, or just no default).
+         * For the descent, we do not intend to have a default config, thus
+         * specifying q0 makes no sense. Likewise, for file-based todo lists,
+         * we have no default either, and no siever is configured to provide
+         * this ``default'' behaviour (yet, the default bits here are used to
+         * pre-fill the config data later on).
+         */
+        mpz_t q0;
+        mpz_init(q0);
+        if (param_list_parse_mpz(pl, "q0", q0)) {
+            sc->bitsize = mpz_sizeinbase(q0, 2);
         }
+        mpz_clear(q0);
+        /* sqside is now the preferred parameter */
+        if (!param_list_parse_int(pl, "sqside", &sc->side)) {
+            sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+        }
+        param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
+        param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
+        int complete = 1;
+        complete &= param_list_parse_int   (pl, "I",       &(sc->logI));
+        complete &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
+        complete &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
+        if (!complete) {
+            /* ok. Now in fact, for the moment we really need these to be
+             * specified, because the call to "new fb_interface" of
+             * course depends on the factor base limits. For the very
+             * reason that presently, we want these to be common across
+             * several siever config values in the hint table, we cannot
+             * leave default_config half-baked.
+             *
+             * since bucket_thresh depends on I, we need I too.
+             */
+            fprintf(stderr, "Error: as long as per-qrange factor bases are not fully supported, we need to know at least the I and lim[01] fields\n");
+            exit(EXIT_FAILURE);
+        }
+
+        complete &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
+        complete &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
+        complete &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
+        complete &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
+        if (!complete) {
+            verbose_output_print(0, 1, "# default siever configuration is incomplete ; required parameters are I, lim[01], lpb[01], mfb[01]\n");
+
+        }
+
+
+        /* Parse optional siever configuration parameters */
+        sc->td_thresh = 1024;	/* default value */
+        param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
+
+        sc->unsieve_thresh = 100;
+        if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
+            verbose_output_print(0, 1, "# Un-sieving primes > %u\n",
+                    sc->unsieve_thresh);
+        }
+
+        sc->bucket_thresh = 1 << sc->logI;	/* default value */
+        /* overrides default only if parameter is given */
+        param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
+
+        const char *powlim_params[2] = {"powlim0", "powlim1"};
+        for (int side = 0; side < 2; side++) {
+            if (!param_list_parse_ulong(pl, powlim_params[side], &sc->sides[side]->powlim)) {
+                sc->sides[side]->powlim = sc->bucket_thresh - 1;
+                verbose_output_print(0, 1, "# Using default value of %lu for -%s\n",
+                        sc->sides[side]->powlim, powlim_params[side]);
+            }
+        }
+
+        const char *ncurves_params[2] = {"ncurves0", "ncurves1"};
+        for (int side = 0; side < 2; side++)
+            if (!param_list_parse_int(pl, ncurves_params[side],
+                        &sc->sides[side]->ncurves))
+                sc->sides[side]->ncurves = -1;
+
+        if (complete)
+            las->default_config = sc;
     }
-
-    const char *ncurves_params[2] = {"ncurves0", "ncurves1"};
-    for (int side = 0; side < 2; side++)
-      if (!param_list_parse_int(pl, ncurves_params[side],
-                                &sc->sides[side]->ncurves))
-        sc->sides[side]->ncurves = -1;
-
     /* }}} */
 
+    if (!las->default_config && !param_list_lookup_string(pl, "descent-hint-table")) {
+        fprintf(stderr, "Error: no default config set, and no hint table either\n");
+        exit(EXIT_FAILURE);
+    }
 
     //{{{ parse option stats_cofact
     const char *statsfilename = param_list_lookup_string (pl, "stats-cofact");
     if (statsfilename != NULL) /* a file was given */
       {
+          siever_config_srcptr sc = las->default_config;
+          if (sc == NULL) {
+              fprintf(stderr, "Error: option stats-cofact works only with a default config\n");
+              exit(EXIT_FAILURE);
+          } else if (param_list_lookup_string(pl, "descent-hint-table")) {
+              verbose_output_print(0, 1, "# Warning: option stats-cofact only applies to the default siever config\n");
+          }
+
 	  cof_stats_file = fopen (statsfilename, "w");
 	  if (cof_stats_file == NULL)
               {
@@ -949,7 +980,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	      }
       }
     //}}}
-
     
     /* {{{ Init and parse info regarding work to be done by the siever */
     /* Actual parsing of the command-line fragments is done within
@@ -999,7 +1029,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 #ifdef  DLP_DESCENT
     las->dlog_base = new las_dlog_base();
     las->dlog_base->lookup_parameters(pl);
-    las->dlog_base->set_default_lpb(las->default_config);
     las->dlog_base->read();
 #endif
 
@@ -1073,9 +1102,9 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     return si;
 }/*}}}*/
 
-void las_todo_push_withdepth(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
+void las_todo_push_withdepth(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side, int depth, int iteration = 0)/*{{{*/
 {
-    stack->push(new las_todo_entry(p, r, side, depth));
+    stack->push(new las_todo_entry(p, r, side, depth, iteration));
 }
 void las_todo_push(las_todo_stack * stack, mpz_srcptr p, mpz_srcptr r, int side)
 {
@@ -1192,7 +1221,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
     mpz_ptr q0 = las->todo_q0;
     mpz_ptr q1 = las->todo_q1;
 
-    int qside = las->default_config->side;
+    int qside = las->config_base->side;
 
     mpz_t * roots;
     mpz_poly_ptr f = las->cpoly->pols[qside];
@@ -1721,54 +1750,22 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 /* }}} */
 
 #ifdef  DLP_DESCENT
-struct descent_node {
-    relation rel;
-    std::vector<std::pair<int, relation::pr> > outstanding;
-    double time_left;
-    operator bool() const { return (bool) rel; }
-};
-
-bool operator<(descent_node const& a, descent_node const& b)
+/* This returns true only if this descent node is now done, either based
+ * on the new relation we have registered, or because the previous
+ * relation is better anyway */
+bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, relation & rel)
 {
-    if (!b) return true;
-    if (std::isfinite(a.time_left)) { return a.time_left < b.time_left; }
-    return a.outstanding.size() < b.outstanding.size();
-}
-
-/* This returns true when we fonud a relation which completely splits. If
- * we find one which needs a recursive call, we'll set the [winner]
- * argument.
- */
-bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent_node & winner, double & deadline, relation & rel)
-{
-    if (!las->hint_table) {
-        verbose_output_print(0, 1, "# Warning: no descent-hint-table, this is not very useful for the descent\n");
-        return false;
-    }
-    /* For descent mode: compute the expected time to finish given the
-     * factor sizes, and deduce a deadline.  Assuming that not all
-     * encountered factors are below the factor base bound, if we expect
-     * an additional time T to finish the decomposition, we keep looking
-     * for a better decomposition for a grace time which is computed as
-     * x*T, for some configurable ratio x (one might think of x=0.2 for
-     * instance. x is DESCENT_GRACE_TIME_RATIO), which defines a
-     * ``deadline'' for next step.  [If all factors happen to be smooth,
-     * the deadline is _now_.] If within the grace period, a new relation
-     * is found, with an earlier implied deadline, the deadline is
-     * updated.
-     */
-
     if (las->tree->must_avoid(rel)) {
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: we have already used this relation for (%Zd,%Zd), avoiding\n", si->doing->p, si->doing->r);
-        return false;
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: we have already used this relation, avoiding\n");
+        return true;
     }
 
     /* compute rho for all primes, even on the rational side */
     rel.fixup_r(true);
 
-    descent_node contender;
+    descent_tree::candidate_relation contender;
     contender.rel = rel;
-    contender.time_left = 0;
+    double time_left = 0;
 
     for(int side = 0 ; side < 2 ; side++) {
         for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
@@ -1783,39 +1780,29 @@ bool update_descent_best_node(las_info_srcptr las, sieve_info_srcptr si, descent
             }
 
             unsigned int n = mpz_sizeinbase(v.p, 2);
-            int k = las->hint_lookups[side][n];
+            int k = (n <= las->max_hint_bitsize[side] ? las->hint_lookups[side][n] : -1);
             if (k < 0) {
                 /* This is not worrysome per se. We just do
                  * not have the info in the descent hint table,
                  * period.
                  */
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c (%Zd,%Zd)\n", n, sidenames[side][0], v.p, v.r);
-                contender.time_left = INFINITY;
+                time_left = INFINITY;
             } else {
-                if (std::isfinite(contender.time_left))
-                    contender.time_left += las->hint_table[k]->expected_time;
+                if (std::isfinite(time_left))
+                    time_left += las->hint_table[k]->expected_time;
             }
             contender.outstanding.push_back(std::make_pair(side, v));
         }
     }
     verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process (%zu children)\n",
-            contender.time_left, contender.outstanding.size());
+            time_left, contender.outstanding.size());
 
-    double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * contender.time_left;
-    if (!std::isfinite(deadline) || new_deadline < deadline) {
-        double delta = INFINITY;
-        if (std::isfinite(deadline))
-            delta = (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO;
-        deadline = new_deadline;
-        winner = contender;
-        if (contender.outstanding.empty()) {
-            verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
-            return true;
-        } else if (std::isfinite(delta)) {
-            verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
-        }
-    }
-    return false;
+    /* when we're re-examining this special-q because of a previous
+     * failure, there's absolutely no reason to hurry up on a relation */
+    contender.set_time_left(time_left, si->doing->iteration ? INFINITY : general_grace_time_ratio);
+
+    return las->tree->new_candidate_relation(contender);
 }
 #endif
 
@@ -1836,10 +1823,6 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     bucket_primes_t primes[2] = {bucket_primes_t(BUCKET_REGION), bucket_primes_t(BUCKET_REGION)};
     bucket_array_complete purged[2] = {bucket_array_complete(BUCKET_REGION), bucket_array_complete(BUCKET_REGION)};
     mpz_t BLPrat;       /* alone ? */
-#ifdef  DLP_DESCENT
-    double deadline = INFINITY;
-    descent_node winner;
-#endif  /* DLP_DESCENT */
     uint32_t cof_rat_bitsize = 0; /* placate gcc */
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
@@ -1941,6 +1924,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #endif
 
     for ( ; (unsigned char *) SS_lw < SS + BUCKET_REGION; SS_lw++) {
+        if (las->tree->must_take_decision())
+            break;
 #ifdef TRACE_K
         size_t trace_offset = (const unsigned char *) SS_lw - SS;
         if ((unsigned int) N == trace_Nx.N && (unsigned int) trace_offset <= trace_Nx.x && 
@@ -1970,21 +1955,6 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
              */
             int64_t a;
             uint64_t b;
-
-#ifdef  DLP_DESCENT
-            double t = seconds();
-
-            if (t >= deadline) {
-                /* Also break the outer loop (ugly!) */
-#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-                SS_lw = (const __m128i *)(SS + BUCKET_REGION);
-#else
-                SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
-#endif
-                verbose_output_print(0, 1, "# [descent] Aborting, deadline passed\n");
-                break;
-            }
-#endif  /* DLP_DESCENT */
 
             // Compute algebraic and rational norms.
             NxToAB (&a, &b, N, x, si);
@@ -2146,43 +2116,14 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
 
 #ifdef  DLP_DESCENT
-                if (update_descent_best_node(las, si, winner, deadline, rel)) {
-                    /* break both loops */
-#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-                    SS_lw = (const __m128i *)(SS + BUCKET_REGION);
-#else
-                    SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
-#endif
-                    break;
-                }
+            if (register_contending_relation(las, si, rel))
+                break;
 #endif  /* DLP_DESCENT */
         }
     }
 
     th->rep->survivors1 += surv;
     th->rep->survivors2 += copr;
-
-#ifdef  DLP_DESCENT
-    if (winner) {
-        if (recursive_descent) {
-            /* reschedule the possibly still missing large primes in the
-             * todo list */
-
-            for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
-                int side = winner.outstanding[i].first;
-                relation::pr const& v(winner.outstanding[i].second);
-                unsigned int n = mpz_sizeinbase(v.p, 2);
-                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
-                las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
-            }
-        }
-        /* Even if not going for recursion, store this as being a winning
-         * relation. This is useful for preparing the hint file, and also for
-         * the initialization of the descent.
-         */
-        las->tree->found(winner.rel);
-    }
-#endif  /* DLP_DESCENT */
 
     mpz_clear (BLPrat);
 
@@ -2326,7 +2267,7 @@ void * process_bucket_region(thread_data *th)
              * need to do so in a multithread-compatible way, though.
              * Therefore the following access is mutex-protected within
              * las->tree. */
-            if (las->tree->found())
+            if (las->tree->must_take_decision())
                 break;
         } else if (exit_after_rel_found) {
             if (rep->reports)
@@ -2526,6 +2467,7 @@ static void declare_usage(param_list pl)
    * las_descent
    */
   param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
+  param_list_decl_usage(pl, "grace-time-ratio", "Fraction of the estimated further descent time which should be spent processing the current special-q, to find a possibly better relation");
   las_dlog_base::declare_parameter_usage(pl);
 #endif
   verbose_decl_usage(pl);
@@ -2599,6 +2541,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
 
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
+#if DLP_DESCENT
+    param_list_parse_double(pl, "grace-time-ratio", &general_grace_time_ratio);
+#endif
 
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
@@ -2618,7 +2563,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (!param_list_parse_switch(pl, "-ondemand-siever-config")) {
         /* Create a default siever instance among las->sievers if needed */
-        if (las->default_config->bitsize)
+        if (las->default_config)
             get_sieve_info_from_config(las, las->default_config, pl);
 
         /* Create all siever configurations from the preconfigured hints */
@@ -2668,15 +2613,19 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (las_todo_pop_closing_brace(las->todo)) {
             las->tree->done_node();
             if (las->tree->depth() == 0) {
-                if (recursive_descent)
+                if (recursive_descent) {
+                    /* BEGIN TREE / END TREE are for the python script */
+                    fprintf(las->output, "# BEGIN TREE\n");
                     las->tree->display_last_tree(las->output);
+                    fprintf(las->output, "# END TREE\n");
+                }
                 las->tree->visited.clear();
             }
             continue;
         }
 
         siever_config current_config;
-        memcpy(current_config, las->default_config, sizeof(siever_config));
+        memcpy(current_config, las->config_base, sizeof(siever_config));
         {
             const las_todo_entry * const next_todo = las->todo->top();
             current_config->bitsize = mpz_sizeinbase(next_todo->p, 2);
@@ -2691,6 +2640,17 @@ int main (int argc0, char *argv0[])/*{{{*/
                 if (!siever_config_match(sc, current_config)) continue;
                 verbose_output_print(0, 1, "# Using existing sieving parameters from hint list for q~2^%d on the %s side [%d%c]\n", sc->bitsize, sidenames[sc->side], sc->bitsize, sidenames[sc->side][0]);
                 memcpy(current_config, sc, sizeof(siever_config));
+            }
+        }
+
+        {
+            const las_todo_entry * const next_todo = las->todo->top();
+            if (next_todo->iteration) {
+                verbose_output_print(0, 1, "#\n# NOTE: we are re-playing this special-q because of %d previous failed attempt(s)\n#\n", next_todo->iteration);
+                /* update sieving parameters here */
+                current_config->sides[0]->lpb += next_todo->iteration;
+                current_config->sides[1]->lpb += next_todo->iteration;
+                /* TODO: do we update the mfb or not ? */
             }
         }
 
@@ -2727,7 +2687,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         double qt0 = seconds();
         tt_qstart = seconds();
 
-        if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->conf->skewness) != 0)
+        if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->cpoly->skew) != 0)
             continue;
         si->qbasis.set_q(si->doing->p);
 
@@ -2806,8 +2766,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Allocate buckets */
         workspaces->buckets_alloc();
 
+        thread_pool *pool = new thread_pool(las->nb_threads);
         /* Fill in rat and alg buckets */
-        workspaces->thread_do(&fill_in_buckets_both);
+        fill_in_buckets_both(*pool, *workspaces, 1, si);
+        delete pool;
 
         max_full = MAX(max_full, workspaces->buckets_max_full());
         ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
@@ -2828,6 +2790,65 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* Process bucket regions in parallel */
         workspaces->thread_do(&process_bucket_region);
+
+#ifdef  DLP_DESCENT
+        descent_tree::candidate_relation const& winner(las->tree->current_best_candidate());
+        if (winner) {
+            /* Even if not going for recursion, store this as being a
+             * winning relation. This is useful for preparing the hint
+             * file, and also for the initialization of the descent.
+             */
+            las->tree->take_decision();
+            verbose_output_start_batch();
+            FILE * output;
+            for (size_t i = 0;
+                    (output = verbose_output_get(0, 0, i)) != NULL;
+                    i++) {
+                winner.rel.print(output, "Taken: ");
+            }
+            verbose_output_end_batch();
+            {
+                las_todo_entry const& me(*si->doing);
+                unsigned int n = mpz_sizeinbase(me.p, 2);
+                verbose_output_start_batch();
+                verbose_output_print (0, 1, "# taking path: ");
+                for(int i = 0 ; i < me.depth ; i++) {
+                    verbose_output_print (0, 1, " ");
+                }
+                verbose_output_print (0, 1, "%d%c ->", n, sidenames[me.side][0]);
+                for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
+                    int side = winner.outstanding[i].first;
+                    relation::pr const& v(winner.outstanding[i].second);
+                    unsigned int n = mpz_sizeinbase(v.p, 2);
+                    verbose_output_print (0, 1, " %d%c", n, sidenames[side][0]);
+                }
+                if (winner.outstanding.empty()) {
+                    verbose_output_print (0, 1, " done");
+                }
+                verbose_output_vfprint (0, 1, gmp_vfprintf, " \t%d %Zd %Zd\n", me.side,me.p,me.r);
+                verbose_output_end_batch();
+            }
+            if (recursive_descent) {
+                /* reschedule the possibly still missing large primes in the
+                 * todo list */
+                for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
+                    int side = winner.outstanding[i].first;
+                    relation::pr const& v(winner.outstanding[i].second);
+                    unsigned int n = mpz_sizeinbase(v.p, 2);
+                    verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
+                    las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
+                }
+            }
+        } else {
+            las_todo_entry const& me(*si->doing);
+            las->tree->mark_try_again(me.iteration + 1);
+            unsigned int n = mpz_sizeinbase(me.p, 2);
+            verbose_output_print (0, 1, "# taking path: %d%c -> loop (#%d)", n, sidenames[me.side][0], me.iteration + 1);
+            verbose_output_vfprint (0, 1, gmp_vfprintf, " \t%d %Zd %Zd\n", me.side,me.p,me.r);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "%s (%Zd,%Zd) [%d%c]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", sidenames[me.side], me.p, me.r, n, sidenames[me.side][0], me.iteration);
+            las_todo_push_withdepth(las->todo, me.p, me.r, me.side, me.depth + 1, me.iteration + 1);
+        }
+#endif  /* DLP_DESCENT */
 
         /* clear */
         for(int side = 0 ; side < 2 ; side++) {

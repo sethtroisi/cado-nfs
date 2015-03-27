@@ -28,6 +28,14 @@ void las_dlog_base::lookup_parameters(param_list pl)
         fprintf(stderr, "In descent mode, want either renumber+log, or none\n");
         exit(EXIT_FAILURE);
     }
+    if (!param_list_parse_ulong(pl, "lpb0", &(lpb[0]))) {
+        fprintf(stderr, "In descent mode, want lpb0 for the final descent\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!param_list_parse_ulong(pl, "lpb1", &(lpb[1]))) {
+        fprintf(stderr, "In descent mode, want lpb1 for the final descent\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 las_dlog_base::las_dlog_base()
@@ -42,12 +50,6 @@ las_dlog_base::~las_dlog_base()
     renumber_clear (renumber_table);
     free(renumberfilename);
     free(logfilename);
-}
-
-void las_dlog_base::set_default_lpb(siever_config_srcptr sc)
-{
-    lpb[0] = sc->sides[0]->lpb;
-    lpb[1] = sc->sides[1]->lpb;
 }
 
 bool las_dlog_base::is_known(int side, uint64_t p, uint64_t r) const {

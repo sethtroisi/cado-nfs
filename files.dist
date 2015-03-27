@@ -139,6 +139,11 @@ gf2x/already_tuned/x86_sse2/gf2x_mul6.h
 gf2x/already_tuned/x86_sse2/gf2x_mul7.h
 gf2x/already_tuned/x86_sse2/gf2x_mul8.h
 gf2x/already_tuned/x86_sse2/gf2x_mul9.h
+gf2x/already_tuned/armv7l/gf2x-thresholds.h
+gf2x/already_tuned/armv7l/gf2x_mul1.h
+gf2x/already_tuned/armv7l/gf2x_mul3.h
+gf2x/already_tuned/armv7l/gf2x_mul5.h
+gf2x/already_tuned/armv7l/gf2x_mul6.h
 gf2x/config/acinclude.m4
 gf2x/config/compile
 gf2x/config/config.guess
@@ -616,7 +621,7 @@ sieve/ecm/ecm_15ul.c
 sieve/ecm/ecm_2ul2.c
 sieve/ecm/ecm_mpz.c
 sieve/ecm/ecm_ul.c
-sieve/ecm/facul.c
+sieve/ecm/facul.cpp
 sieve/ecm/facul.h
 sieve/ecm/facul_doit.c
 sieve/ecm/facul_doit.h
@@ -881,7 +886,7 @@ tests/utils/testmpz-rootfinder.quick
 tests/utils/test_sm_utils.c
 tests/utils/test_sm_utils.data
 tests/utils/test_relation.cpp
-tests/utils/test_thread.cpp
+tests/utils/test_threadpool.cpp
 utils/timing.cpp
 utils/timing.h
 utils/typedefs.h
@@ -1209,3 +1214,6 @@ utils/relation-tools.c
 utils/relation-tools.h
 scripts/descent.py
 sieve/ecm/facul.sage
+utils/threadpool.cpp
+utils/threadpool.h
+misc/extra_renumber.c

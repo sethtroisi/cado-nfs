@@ -44,7 +44,7 @@ primetest (const modulus_t m)
 }
 
 static inline void 
-modset_init (modset_t *modset, modint_t m)
+modset_init (struct modset_t *modset, modint_t m)
 {
   const size_t bits = mod_intbits (m);
   ASSERT(bits <= MOD_MAXBITS);
@@ -93,7 +93,7 @@ modset_init (modset_t *modset, modint_t m)
 
 /* Run the primetest() function, using the arithmetic selected in the modset */
 static inline int 
-modset_primetest (modset_t *modset)
+modset_primetest (struct modset_t *modset)
 {
   switch (modset->arith) {
     case CHOOSE_UL:
@@ -116,7 +116,7 @@ modset_primetest (modset_t *modset)
 }
 
 static inline int 
-modset_call_facul(mpz_t *factors, const modset_t *modset, 
+modset_call_facul(mpz_t *factors, const struct modset_t *modset, 
                   const facul_strategy_t *strategy, const int method_start)
 {
   switch (modset->arith) {
@@ -147,7 +147,7 @@ facul_doit (mpz_t *factors, const modulus_t m,
 {
   residue_t r;
   modint_t n, f;
-  modset_t fm, cfm;
+  struct modset_t fm, cfm;
   int i, found = 0, bt, fprime, cfprime;
   
   mod_intinit (n);
@@ -411,7 +411,7 @@ facul_doit (mpz_t *factors, const modulus_t m,
 int
 facul_doit_onefm (mpz_t *factors, const modulus_t m,
 		  const facul_method_t method,
-		  modset_t* fm, modset_t* cfm, unsigned long lpb,
+		  struct modset_t* fm, struct modset_t* cfm, unsigned long lpb,
 		  double assume_prime_thresh, double BBB)
 {
   residue_t r;

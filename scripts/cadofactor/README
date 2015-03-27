@@ -180,14 +180,20 @@ the current number of relations. For example if you have say 1000000 relations
 
 tasks.sieve.rels_wanted=1000001
 
-Printing the database
-=====================
+Printing and manipulating the database
+======================================
 
 The wudb.py script can be used to print info on the workunits. For example,
 
 ./wudb.py -dbfile /tmp/work/testrun.db -dump -assigned
 
 prints all currently assigned work units.
+
+This script can also be used to manipulate the database, for example:
+
+./wudb.py -dbfile /tmp/work/testrun.db -setdict sqrt next_dep int 0
+
+sets the "next_dep" variable in the SqrtTask's state to the integer value 0.
 
 Using several threads for the square root step
 ==============================================

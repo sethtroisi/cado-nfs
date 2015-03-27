@@ -9,10 +9,6 @@
 #include "las-config.h"
 #include "utils/misc.h" /* ctzl */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Redc_32 based on 64-bit arithmetic
 // Assume:
 //   * p is an odd prime < 2^32. FIXME: p < 2^31? (see below)
@@ -449,9 +445,5 @@ invmod_redc_64(uint64_t a, uint64_t b)
 }
 
 fbprime_t is_prime_power(fbprime_t q);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_ARITH_H_ */

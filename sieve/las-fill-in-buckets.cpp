@@ -5,6 +5,7 @@
 #include "bucket.h"
 #include "modredc_ul.h"
 #include "modredc_2ul2.h"
+#include "threadpool.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
@@ -288,7 +289,7 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
 
 static inline
-void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t hint,
+void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_t hint,
                        const int side MAYBE_UNUSED,
                        const slice_index_t slice_index MAYBE_UNUSED, 
                        where_am_I_ptr w MAYBE_UNUSED)
@@ -316,15 +317,15 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const prime_hint_t 
 
 /* {{{ */
 void
-fill_in_buckets(thread_data *th, const int side,
+fill_in_buckets(bucket_array_t &orig_BA, sieve_info_srcptr const si,
                 const fb_transformed_vector *transformed_vector,
+                const int side MAYBE_UNUSED,
                 const fb_slice_interface *slice MAYBE_UNUSED,
                 where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
-  sieve_info_srcptr si = th->si;
   const slice_index_t slice_index = transformed_vector->get_index();
-  bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
+  bucket_array_t BA = orig_BA;  /* local copy. Gain a register + use stack */
   // Loop over all primes in the factor base.
   //
   // Note that dispatch_fb already arranged so that all the primes
@@ -350,7 +351,7 @@ fill_in_buckets(thread_data *th, const int side,
     const uint32_t maskI = I-1;
     const uint64_t even_mask = (1ULL << logI) | 1ULL;
     const uint64_t IJ = ((uint64_t) si->J) << logI;
-    const prime_hint_t hint = pl_it->hint;
+    const slice_offset_t hint = pl_it->hint;
 
     if (pl_it->get_b0() == 0 || pl_it->get_b1() == 0) {
       /* r == 0 or r == 1/0.
@@ -387,7 +388,7 @@ fill_in_buckets(thread_data *th, const int side,
       FILL_BUCKET();
     }
   }
-  th->sides[side]->BA = BA;
+  orig_BA = BA;
 }
 
 #ifdef HAVE_K_BUCKETS
@@ -439,7 +440,7 @@ fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
       uint64_t x = (r ? 1 : I) + (I >> 1);
-      prime_hint_t hint = bucket_encode_prime(p);
+      slice_offset_t hint = bucket_encode_prime(p);
       /* 1. pkbut must be volatile in BIG_ENDIAN: the write order of prime & x
 	 is need because the last byte of x (always 0 because x <<= 8) must
 	 be overwritten by the first byte of prime.
@@ -455,9 +456,9 @@ fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
-	memcpy(kbut, &hint, sizeof(prime_hint_t));			\
+	memcpy(kbut, &hint, sizeof(slice_offset_t));			\
 	uint32_t i = (uint32_t) x;					\
-	memcpy((uint8_t *) kbut + sizeof(prime_hint_t), &i, 4);		\
+	memcpy((uint8_t *) kbut + sizeof(slice_offset_t), &i, 4);		\
 	*pkbut = ++kbut;						\
 	FILL_BUCKET_PREFETCH(kbut);					\
       } while (0)
@@ -470,7 +471,7 @@ fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
 	uint32_t i = (uint32_t) x << 8;					\
 	memcpy(kbut, &i, 4);						\
-	memcpy((uint8_t *) kbut + 3, &hint, sizeof(prime_hint_t));	\
+	memcpy((uint8_t *) kbut + 3, &hint, sizeof(slice_offset_t));	\
 	*pkbut = ++kbut;						\
 	FILL_BUCKET_PREFETCH(kbut);					\
       } while(0)
@@ -508,7 +509,7 @@ fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
       if (x >= IJ) continue;
       const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
 #endif
-      const prime_hint_t hint = bucket_encode_prime (p);
+      const slice_offset_t hint = bucket_encode_prime (p);
       
       /* Now, do the real work: the filling of the k-buckets */
       do { 
@@ -686,7 +687,7 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
       uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
-      prime_hint_t hint = bucket_encode_prime(p);
+      slice_offset_t hint = bucket_encode_prime(p);
       /* memcpy is good because it's its job to know if it's possible to
 	 write an int to all even addresses.
 	 gcc does a optimal job with memcpy & a little + constant length.
@@ -699,9 +700,9 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
-	memcpy(mbut, &hint, sizeof(prime_hint_t));			\
+	memcpy(mbut, &hint, sizeof(slice_offset_t));			\
 	uint32_t i = (uint32_t) x;					\
-	memcpy((uint8_t *) mbut + sizeof(prime_hint_t), &i, 4);	\
+	memcpy((uint8_t *) mbut + sizeof(slice_offset_t), &i, 4);	\
 	*pmbut = ++mbut;						\
 	FILL_BUCKET_PREFETCH(mbut);					\
       } while (0)
@@ -714,7 +715,7 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
 	uint32_t i = (uint32_t) x;					\
 	memcpy(mbut, &i, 4);						\
-	memcpy((uint8_t *) mbut + 4, &hint, sizeof(prime_hint_t));	\
+	memcpy((uint8_t *) mbut + 4, &hint, sizeof(slice_offset_t));	\
 	*pmbut = ++mbut;						\
 	FILL_BUCKET_PREFETCH(mbut);					\
       } while (0)
@@ -752,7 +753,7 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
       if (x >= IJ) continue;
       const uint64_t inc_a = plattice_a(&pli, logI), inc_c = plattice_c(&pli, logI);
 #endif
-      const prime_hint_t hint = bucket_encode_prime (p);
+      const slice_offset_t hint = bucket_encode_prime (p);
 
       /* Now, do the real work: the filling of the m-buckets */
       do {
@@ -920,44 +921,58 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
 }
 #endif
 
+class fill_in_buckets_parameters: public task_parameters {
+public:
+  thread_workspaces &ws;
+  const int side;
+  sieve_info_srcptr const si;
+  const fb_slice_interface * const slice;
+  fill_in_buckets_parameters(thread_workspaces &_ws, const int _side, sieve_info_srcptr const _si, const fb_slice_interface *_slice)
+  : ws(_ws), side(_side), si(_si), slice(_slice) {}
+};
 
-void
-fill_in_buckets_one_slice(thread_data *th, const int side, const fb_slice_interface *slice)
+task_result *
+fill_in_buckets_one_slice(const task_parameters *const _param)
 {
+    const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     where_am_I w;
-    WHERE_AM_I_UPDATE(w, si, th->si);
-    const fb_transformed_vector *transformed_vector = slice->make_lattice_bases(th->si->qbasis, th->si->conf->logI);
-    fill_in_buckets(th, side, transformed_vector, slice, w);
+    WHERE_AM_I_UPDATE(w, si, param->si);
+
+    /* Get an unused bucket array that we can write to */
+    thread_data &th = param->ws.reserve_workspace();
+    /* Do the root transform and lattice basis reduction for this factor base slice */
+    const fb_transformed_vector *transformed_vector = param->slice->make_lattice_bases(param->si->qbasis, param->si->conf->logI);
+    /* Fill the buckets */
+    fill_in_buckets(th.sides[param->side]->BA, param->si, transformed_vector, param->side, param->slice, w);
+    /* Release bucket array again */
+    param->ws.release_workspace(th);
     delete transformed_vector;
+    delete param;
+    return new task_result;
 }
 
 static void
-fill_in_buckets_one_side(thread_data *th, const int side)
+fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
 {
-    const fb_part *fb = th->sides[side]->fb;
-    if (th->sides[side]->BA.n_bucket < THRESHOLD_K_BUCKETS) {
-      /* Process all slices in this factor base part */
-      const fb_slice_interface *slice;
-      for (slice_index_t slice_index = fb->get_first_slice_index();
-           (slice = fb->get_slice(slice_index)) != NULL;
-           slice_index++) {
-          fill_in_buckets_one_slice(th, side, slice);
-      }
+    /* Process all slices in this factor base part */
+    const fb_slice_interface *slice;
+    slice_index_t slices_pushed = 0;
+    for (slice_index_t slice_index = fb->get_first_slice_index();
+         (slice = fb->get_slice(slice_index)) != NULL;
+         slice_index++) {
+        fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice);
+        pool.add_task(fill_in_buckets_one_slice, param, 0);
+        slices_pushed++;
     }
-#ifdef HAVE_K_BUCKETS
-    else if (th->sides[side]->BA.n_bucket < THRESHOLD_M_BUCKETS)
-      fill_in_k_buckets(th, side, w);
-    else
-      fill_in_m_buckets(th, side, w);
-#else
-    else abort();
-#endif
+    for (slice_index_t slices_completed = 0; slices_completed < slices_pushed; slices_completed++) {
+      task_result *result = pool.get_result();
+      delete result;
+    }
 }
 
-void * fill_in_buckets_both(thread_data *th)
+void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, const int part, sieve_info_srcptr si)
 {
-    fill_in_buckets_one_side(th, ALGEBRAIC_SIDE);
-    fill_in_buckets_one_side(th, RATIONAL_SIDE);
-    return NULL;
+    fill_in_buckets_one_side(pool, ws, si->sides[ALGEBRAIC_SIDE]->fb->get_part(part), si, ALGEBRAIC_SIDE);
+    fill_in_buckets_one_side(pool, ws, si->sides[RATIONAL_SIDE]->fb->get_part(part), si, RATIONAL_SIDE);
 }
 /* }}} */

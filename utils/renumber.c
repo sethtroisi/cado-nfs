@@ -52,7 +52,7 @@ static uint64_t previous_prime_of_powers_of_2[65] = { 0x0, 0x0, 0x3, 0x7, 0xd,
         0xfffffffffef, 0x1fffffffffc9, 0x3fffffffffeb, 0x7fffffffff8d,
         0xffffffffffc5, 0x1ffffffffffaf, 0x3ffffffffffe5, 0x7ffffffffff7f,
         0xfffffffffffd1, 0x1fffffffffff91, 0x3fffffffffffdf, 0x7fffffffffffc9,
-        0xfffffffffffffb, 0xfffffffffffff3, 0x3ffffffffffffe5, 0xffffffffffffc9,
+        0xfffffffffffffb, 0x1fffffffffffff3, 0x3ffffffffffffe5, 0x7ffffffffffffc9,
         0xfffffffffffffa3, 0x1fffffffffffffff, 0x3fffffffffffffc7,
         0x7fffffffffffffe7, 0xffffffffffffffc5 };
 

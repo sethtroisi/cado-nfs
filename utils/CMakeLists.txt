@@ -11,7 +11,7 @@ set (sources
         ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c stats.c lll.c
         verbose.c lognorm_skewness.c
         version_info.c
-	modified_files.c thread.cpp
+	modified_files.c threadpool.cpp
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)

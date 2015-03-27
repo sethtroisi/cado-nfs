@@ -13,16 +13,26 @@ using namespace std;
 
 int descent_tree::display_tree(FILE* o, tree * t, string const& prefix) {
     int res = 1;
-    fprintf(o, "%s%s [%1.4f]%s\n",
+    char comment[10] = {'\0'};
+    if (!t->contender) {
+        if (t->try_again) {
+            snprintf(comment, sizeof(comment), " try%d", t->try_again);
+        } else {
+            size_t rc = strlcpy(comment, " ###", sizeof(comment));
+            ASSERT_ALWAYS(rc < sizeof(comment));
+        }
+    }
+    fprintf(o, "%s%s [%1.4f]%s\t\t%s\n",
             prefix.c_str(), t->label().c_str(), t->spent,
-            t->rel ? "" : " ###");
+            comment,
+            t->label.fullname().c_str());
     string new_prefix = prefix + "  ";
     typedef list<tree *>::iterator it_t;
     for(it_t i = t->children.begin() ; i != t->children.end() ; i++) {
         if (!display_tree(o, *i, new_prefix))
             res = 0;
     }
-    if (!t->rel)
+    if (!t->contender)
         res = 0;
     return res;
 }
