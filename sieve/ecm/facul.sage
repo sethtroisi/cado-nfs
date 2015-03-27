@@ -124,6 +124,8 @@ def do_table(lpbmin, lpbmax, **kwargs):
             # print("\t\t/* %d,%d:%f */" % (lpb, ncurves, p))
             printed.append("%d:%f" % (ncurves, p))
             results.append((ncurves, p))
+        if len(printed) > 2:
+            printed=printed[-2:]
         print("/* lpb=%d */ %d, /* %s */" % (lpb, ncurves, ", ".join(printed)))
 
 do_table(10,64,ntries=10000)

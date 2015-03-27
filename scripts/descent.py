@@ -63,10 +63,6 @@
 # the power of the cadofactor python programs. I need to understand that
 # stuff better.
 
-# FIXME: we must be resilient to the case where a prime appears twice,
-# once rational, once algebraic ; or two algebraic, but with a different
-# prime ideal above. This means we must have the extraprimes list richer.
-
 # TODO: this currently fails when the target is ridiculously small, as
 # target=1009 for instance -- see why.
 
@@ -75,12 +71,14 @@
 # TODO: make output less verbose.
 
 import os
+import io
 import sqlite3
 import subprocess
 import sys
 import argparse
 import re
 import math
+import time
 import tempfile
 import shutil
 import functools
@@ -285,9 +283,11 @@ class GeneralClass(object):
         d=self.poly_data()
         return [int(x) for x in d["c"]]
 
-    def __del__(self):
+    def cleanup(self):
         if not self.args.tmpdir and not self.args.no_wipe:
             shutil.rmtree(self.tmpdir())
+
+    def __del__(self):
         if self._conn:
             self._conn.close()
 
@@ -304,6 +304,7 @@ class GeneralClass(object):
         # TODO add threads once it's fixed.
         s=[
             self.las_bin() + "_descent",
+            "-ondemand-siever-config",
             "--recursive-descent",
             "--allow-largesq",
             "--never-discard",  # useful for small computations.
@@ -334,6 +335,24 @@ class GeneralClass(object):
         print("Working in GF(p), p=%d" % self.p())
         print("Subgroup considered in GF(p)^* has size %d" % self.ell())
         print("prefix is %s" % self.prefix())
+        errors=[]
+        if not os.path.exists(self.las_bin()):
+            errors.append("las not found (make las ?)")
+        if not os.path.exists(self.las_bin() + "_descent"):
+            errors.append("las_descent not found (make las_descent ?)")
+        if not os.path.exists(self.dup2_bin()):
+            errors.append("dup2 not found (make dup2 ?)")
+        if not os.path.exists(self.reconstructlog_bin()):
+            errors.append("reconstructlog-dl not found (make reconstructlog-dl ?)")
+        if not os.path.exists(self.debug_renumber_bin()):
+            errors.append("debug_renumber not found (make debug_renumber ?)")
+        for f in [ self.log(), self.badidealinfo(), self.poly(), self.renumber(), self.log(), self.fb1() ]:
+            if not os.path.exists(f):
+                errors.append("%s missing" % f)
+        if len(errors):
+            msg = "Some data files and/or binaries missing:\n"
+            msg += "\n".join(["\t"+x for x in errors])
+            raise RuntimeError(msg)
 
 
 # We need this in order to see which are the rational primes we need to
@@ -341,14 +360,64 @@ class GeneralClass(object):
 class RatLogBase(object):
     def __init__(self, general):
         self.known=set()
-        with open(general.log(),'r') as file:
-            for line in file:
-                foo = re.match("^(\w+) (\w+) (\w+) rat (\d+)$", line)
-                if foo:
-                    self.known.add(int(foo.groups()[1], 16))
-        print("Found %d known rational logs in %s" %(len(self.known), general.log()))
+        try:
+            print ("--- Reading %s to find which are the known logs ---" % general.log())
+            with open(general.log(),'r') as file:
+                for line in file:
+                    foo = re.match("^(\w+) (\w+) (\w+) rat (\d+)$", line)
+                    if foo:
+                        self.known.add(int(foo.groups()[1], 16))
+            print("Found %d known rational logs in %s" %(len(self.known), general.log()))
+        except:
+            raise ValueError("Error while reading %s" % general.log())
+
     def has(self, p):
         return p in self.known
+
+class important_file(object):
+    def __init__(self, outfile, call_that):
+        self.child = None
+        print("command line:\n" + " ".join(call_that))
+        if os.path.exists(outfile):
+            print("reusing file %s" % outfile)
+            self.reader = open(outfile,'r')
+            self.writer = None
+        else:
+            print("running program, saving output to %s" % outfile)
+            self.child = subprocess.Popen(call_that, stdout=subprocess.PIPE)
+            self.reader = io.TextIOWrapper(self.child.stdout, 'utf-8')
+            self.writer = open(outfile, 'w')
+
+    def streams(self):
+        return self.reader, self.writer
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        line = next(self.reader)
+        if self.writer is not None:
+            self.writer.write(line)
+            self.writer.flush()
+        return line
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if self.child is not None:
+            # self.writer.close()
+            print("Waiting for child to finish")
+            # self.child.kill()
+            # self.reader.close()   # do I need to put it before ? broken pipe ?
+            for line in self.reader:
+                self.writer.write(line)
+                self.writer.flush()
+            self.reader.close()
+            self.writer.close()
+            print("ok, done")
+        else:
+            self.reader.close()
 
 class DescentUpperClass(object):
     def declare_args(parser):
@@ -373,9 +442,8 @@ class DescentUpperClass(object):
                 help="Sieving range"+c,
                 default=14)
 
-    def __init__(self, general, known, args):
+    def __init__(self, general, args):
         self.general = general
-        self.known = known
 
         self.tkewness = int(args.init_tkewness)
         self.lim      = int(args.init_lim)
@@ -412,7 +480,7 @@ class DescentUpperClass(object):
         p = general.p()
         gg = self.__myxgcd(z, p, self.tkewness)
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + "-descent_init."
+        prefix = general.prefix() + ".descent.%s.init." % args.target
 
         polyfilename = os.path.join(tmpdir, prefix + "poly")
         with open(polyfilename, 'w') as f:
@@ -455,24 +523,32 @@ class DescentUpperClass(object):
             "-q0", q0,
             "-q1", q1,
             "--exit-early", 2,
+            "-t", 4
             ]
         call_that = [str(x) for x in call_that]
-        print("command line:\n" + " ".join(call_that))
-        with subprocess.Popen(call_that, stdout=subprocess.PIPE) as las:
-            rel = None
-            for line in las.stdout:
-                line=line.decode("utf-8")
-                if line[0] == '#':
-                    if (re.match("^# \d+ relation", line)):
-                        sys.stdout.write('\n')
-                        print(line.rstrip())
-                    else:
-                        sys.stdout.write('.')
-                        sys.stdout.flush()
-                    continue;
-                else:
+
+        outfile=os.path.join(general.datadir(), prefix + "rels")
+
+        rel = None
+        with important_file(outfile, call_that) as relstream:
+            for line in relstream:
+                if line[0] != '#':
                     rel = line.strip()
+                    continue
+                if re.match("^# Sieving.*q=", line):
+                    sys.stdout.write('\n')
+                    print(line.rstrip())
+                    continue
+                foo = re.match("^# (\d+) relation", line)
+                if not foo:
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+                    continue
+                sys.stdout.write('\n')
+                print(line.rstrip())
+                if int(foo.groups()[0]) > 0:
                     break
+
         sys.stdout.write('\n')
         if not rel:
             raise NameError("No relation found!")
@@ -491,17 +567,35 @@ class DescentUpperClass(object):
         assert(abs(Num) == functools.reduce(lambda x,y:x*y,factNum,1))
         assert(abs(Den) == functools.reduce(lambda x,y:x*y,factDen,1))
 
-        todofilename = os.path.join(tmpdir, prefix + "todo")
-        with open(todofilename, "w") as f:
-            for q in factNum + factDen:
-                if known.has(q):
-                    continue
-                logq = math.ceil(math.log(q, 2))
-                print("Will do further descent for %d-bit rational prime %d"
-                        % (logq, q))
-                # las can understand when the rational root is missing
-                f.write("0 %d\n" % q)
+        todofilename = os.path.join(general.datadir(), prefix + "todo")
+
+        if not os.path.exists(todofilename):
+            known = RatLogBase(general)
+            with open(todofilename, "w") as f:
+                for q in factNum + factDen:
+                    if known.has(q):
+                        continue
+                    logq = math.ceil(math.log(q, 2))
+                    print("Will do further descent for %d-bit rational prime %d"
+                            % (logq, q))
+                    # las can understand when the rational root is missing
+                    f.write("0 %d\n" % q)
+        else:
+            with open(todofilename, "r") as f:
+                for line in f:
+                    side,q = line.strip().split(' ')
+                    q=int(q)
+                    logq = math.ceil(math.log(q, 2))
+                    print("Will do further descent for %d-bit rational prime %d" % (logq, q))
+
+
         return todofilename, [Num, Den, factNum, factDen]
+
+def a_over_b_mod_p(a, b, p):
+    if b%p == 0:
+        return p
+    ib = pow(b, p-2, p)
+    return (a*ib) % p
 
 
 class DescentMiddleClass(object):
@@ -545,8 +639,7 @@ class DescentMiddleClass(object):
                 foo = re.match("^.*I=(\d+)\s+(\d+),[\d.,]+\s+(\d+),[\d.,]+$",
                         line)
                 if not foo:
-                    print("Warning, parse error in hint file at line:\n"
-                            + line);
+                    print("Warning, parse error in hint file at line:\n" + line)
                     continue
                 I,lim0,lim1 = foo.groups()
                 values_I.add(int(I))
@@ -558,7 +651,7 @@ class DescentMiddleClass(object):
             raise ValueError("lim1 values should match between cmdline and hint file")
         if len(values_I)>1:
             raise ValueError("I values should match between cmdline and hint file")
-        print("Consistency check for las_descent passed");
+        print("Consistency check for las_descent passed")
         print("\tI=%d" % values_I.pop())
         print("\tlim0=%d" % values_lim0.pop())
         print("\tlim1=%d" % values_lim1.pop())
@@ -566,7 +659,8 @@ class DescentMiddleClass(object):
 
     def do_descent(self, todofile):
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + "-descent_middle."
+        prefix = general.prefix() + ".descent.%s.middle." % args.target
+
         f = open(todofile, 'r')
         ntodo = len(list(f))
         f.close()
@@ -577,19 +671,50 @@ class DescentMiddleClass(object):
         s += [
                 "--I", self.args.I,
                 "--lim0", self.args.lim0,
-                "--lpb0", general.lpb0(),
-                "--mfb0", self.args.mfb0,
                 "--lim1", self.args.lim1,
+                "--lpb0", general.lpb0(),
+                # "--mfb0", self.args.mfb0,
                 "--lpb1", general.lpb1(),
-                "--mfb1", self.args.mfb1,
+                # "--mfb1", self.args.mfb1,
              ]
         s += [ "--todo", todofile ]
-        relsfilename = os.path.join(tmpdir, prefix + "rels")
-        s += [ "--out", relsfilename ]
         call_that=[str(x) for x in s]
-        print("command line:\n" + " ".join(call_that))
-        subprocess.check_call(call_that)
+        relsfilename = os.path.join(general.datadir(), prefix + "rels")
+
+        printing = False
+        failed = []
+        with important_file(relsfilename, call_that) as relstream:
+            for line in relstream:
+                if re.match("^# taking path", line):
+                    print(line.rstrip())
+                elif re.match("^# END TREE", line):
+                    print("")
+                    printing = False
+                elif printing:
+                    print(line.rstrip())
+                    foo = re.match("# FAILED (\d+\@\d+)", line)
+                    if foo:
+                        failed.append(foo.groups()[0])
+                elif re.match("^# BEGIN TREE", line):
+                    print("")
+                    printing=True
+
+        if failed:
+            raise RuntimeError("Failed descents for: " + ", ".join(failed))
+
         return relsfilename
+
+def prime_ideal_mixedprint(pr):
+    p = pr[0]
+    side = pr[1]
+    if side == 0:
+        machine = "%x 0 rat" % p
+        human = "0,%d" % p
+    else:
+        r = pr[2]
+        machine = "%x %d %x" % pr
+        human = "%d,%d,%d" % (side,p,r)
+    return machine,human
 
 class DescentLowerClass(object):
     def declare_args(parser):
@@ -613,24 +738,28 @@ class DescentLowerClass(object):
             outfile.close()
 
         last_renumber_line = None
-
-        with subprocess.Popen(["tail", "-10", general.debug_renumber()],
-                stdout=subprocess.PIPE) as p:
-            for line in p.stdout:
-                ll = line.decode("utf-8")
-                if ll[0] == 'i':
-                    last_renumber_line = ll.rstrip()
-        return int(last_renumber_line.split()[0].split('=')[1], 16)
+        call_that = ["tail", "-10", general.debug_renumber()]
+        call_that = [str(x) for x in call_that]
+        print("command line:\n" + " ".join(call_that))
+        try:
+            with subprocess.Popen(call_that, stdout=subprocess.PIPE) as p:
+                for line in p.stdout:
+                    ll = line.decode("utf-8")
+                    if ll[0] == 'i':
+                        last_renumber_line = ll.rstrip()
+            return int(last_renumber_line.split()[0].split('=')[1], 16)
+        except:
+            raise ValueError("Error while reading %s" % general.debug_renumber())
 
     def do_descent(self, relsfile, initial_split):
         args = parser.parse_args()
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + "-descent_lower."
+        prefix = general.prefix() + ".descent.%s.lower." % args.target
 
         # Read descent relations
-        noncomment=lambda x: not re.match("^#",x)
+        useful=lambda x: re.match("^Taken:",x)
         with open(relsfile, 'r') as file:
-            descrels = list(filter(noncomment, file))
+            descrels = list(filter(useful, file))
         nrels = len(descrels)
         print ("--- Final reconstruction (from %d relations) ---" % nrels)
 
@@ -642,27 +771,50 @@ class DescentLowerClass(object):
         # FIXME -- we must create proper renumber table entries for extra
         # primes, otherwise the birthday paradox will kill us.
         fakerels = []
-        extraprimes = []
+        extraprimes = set()
+        more_extraprimes = set()
+        extraprimes_per_rel = {}
         for rel in descrels:
-            r = rel.split(':')
+            r = rel.split(':')[1:]
+            r[0] = r[0].lstrip()
+            a,b = r[0].split(',')
+            a=int(a)
+            b=int(b)
             ss = [ [], [] ]
             extra = [ [], [] ]
             for side in range(2):
                 for p in r[side+1].strip().split(','):
-                    if int(p, 16) >> lpb[side]:
-                        extra[side].append(p)
+                    ip=int(p, 16)
+                    if ip >> lpb[side]:
+                        if side == 0:
+                            extra[side].append("%s 0 rat" % p) 
+                            extraprimes.add((ip, side))
+                        else:
+                            rho = a_over_b_mod_p(a,b,ip)
+                            extra[side].append("%s %d %x" % (p,side,rho)) 
+                            extraprimes.add((ip,side,rho))
+                            # We forcibly add this one too, because it
+                            # makes it easier to have a correct table in
+                            # the end.
+                            more_extraprimes.add((ip,0))
                     else:
                         ss[side].append(p)
             fake = ":".join([r[0]] + [",".join(x) for x in ss])
             fakerels.append(fake)
-            extraprimes.append(extra)
-        setextraprimes = set(sum(sum(extraprimes,[]),[]))
-        listextraprimes = list(setextraprimes)
-        numlist = [ int(p, 16) for p in listextraprimes ]
-        numlist.sort()
-        listextraprimes = [ hex(p)[2:] for p in numlist ]
-        print ("They include %s primes above lpb:" % len(listextraprimes),
-                ", ".join(listextraprimes))
+            extraprimes_per_rel["%x,%x"%(a,b)]=extra
+        for pr in more_extraprimes:
+            if pr in extraprimes:
+                machine,human = prime_ideal_mixedprint(pr)
+                print("Note: prime %s is here both for itself, and because an algebraic prime with same p exists" % human)
+        listextraprimes = list(set.union(extraprimes, more_extraprimes))
+        listextraprimes.sort()
+        print ("They include %s primes above lpb:" % len(extraprimes))
+        for pr in listextraprimes:
+            desc = "%s\t# %s" % prime_ideal_mixedprint(pr)
+            if pr in more_extraprimes and pr not in extraprimes:
+                desc += "\t\t(for technical reasons only)"
+            print(desc)
+
         fakefilename = os.path.join(tmpdir, prefix + "fakerels")
         with open(fakefilename, 'w') as f:
             for rel in fakerels:
@@ -683,6 +835,7 @@ class DescentLowerClass(object):
                         fakefilename2
                     ]
         call_that = [str(x) for x in call_that]
+        print("command line:\n" + " ".join(call_that))
         subprocess.check_call(call_that, stderr=subprocess.DEVNULL)
 
         last_index = self._last_renumber_index()
@@ -695,32 +848,39 @@ class DescentLowerClass(object):
         # accordingly.
         dictextraprimes = {}
         for i in range(len(listextraprimes)):
-            dictextraprimes[listextraprimes[i]] = last_index+1+i
-        print(dictextraprimes)
+            machine,human = prime_ideal_mixedprint(listextraprimes[i])
+            dictextraprimes[machine] = last_index+1+i
+            print("%x %s" % (last_index+1+i, machine))
 
-        descentrelsfilename = os.path.join(tmpdir, prefix + "descentrels-renumbered.txt")
+        descentrelsfilename = os.path.join(tmpdir, prefix + "rels-renumbered.txt")
         # relations
         with open(descentrelsfilename, 'w') as outfile:
             # add first line like in purged.gz, just to give the number
             # of relations to reconstructlog.
             outfile.write("# %d 0 0\n" % nrels)
-            extra = iter(extraprimes)
             with open(fakefilename2, 'r') as infile:
                 for rel in infile:
                     rel = rel.rstrip()
-                    for p in sum(next(extra),[]):
+                    ab = rel.split(':')[0]
+                    if ab not in extraprimes_per_rel:
+                        raise RuntimeError("weird, can't find relation for" + ab)
+                    extra = sum(extraprimes_per_rel[ab],[])
+                    for p in extra:
                         rel += "," + hex(dictextraprimes[p])[2:]
                     outfile.write(rel + "\n")
+                    # print(rel)
 
         newrenumberfilename = os.path.join(tmpdir, prefix + "new-renumber.txt")
         print("--- generating temporary %s ---" % newrenumberfilename)
         # we now have to create a new temp file which contains the
         # renumber table + our extra crap appended.
-        newlpb = math.ceil(math.log(int(listextraprimes[-1], 16), 2))
+        newlpb = math.ceil(math.log(listextraprimes[-1][0], 2))
         with open(newrenumberfilename, 'w') as file:
             # decompress the old one.
-            with subprocess.Popen([ "gzip", "-dc", general.renumber() ],
-                    stdout=subprocess.PIPE) as old:
+            call_that = [ "gzip", "-dc", general.renumber() ]
+            call_that = [str(x) for x in call_that]
+            print("command line:\n" + " ".join(call_that))
+            with subprocess.Popen(call_that, stdout=subprocess.PIPE) as old:
                 # tweak the header
                 header = old.stdout.readline().decode("utf-8").strip().split()
                 header[-1] = str(newlpb)
@@ -730,8 +890,19 @@ class DescentLowerClass(object):
                 for x in old.stdout:
                     file.write(x.decode("utf-8"))
                 # add our crap
-                for p in listextraprimes:
-                    file.write(hex(int(p, 16)+1)[2:]+'\n')
+                # we don't want to find all roots mod p. It suffices to
+                # pretend that there's just one.
+                lastp=None
+                for pr in listextraprimes:
+                    if not lastp or lastp != pr[0]:
+                        line="%x"%(pr[0]+1)
+                        file.write(line+"\n")
+                        print(line)
+                    lastp=pr[0]
+                    if pr[1] > 0:
+                        line = "%x"%pr[2]
+                        file.write(line+"\n")
+                        print(line)
 
         newdlogfilename = os.path.join(tmpdir, prefix + "new-dlog.txt")
         print("--- generating temporary %s ---" % newdlogfilename)
@@ -787,13 +958,26 @@ class DescentLowerClass(object):
                     pp = foo.groups()[0]
                     if pp in wanted:
                         wanted[pp]=int(foo.groups()[1])
+        for u,v in wanted.items():
+            print(u,v)
         log_target = 0
+        errors=[]
         for p in factNum:
             pp = hex(int(p))[2:]
-            log_target = log_target + wanted[pp]
+            if wanted[pp] is None:
+                errors.append(pp)
+            else:
+                log_target = log_target + wanted[pp]
         for p in factDen:
             pp = hex(int(p))[2:]
-            log_target = log_target - wanted[pp]
+            if wanted[pp] is None:
+                errors.append(pp)
+            else:
+                log_target = log_target - wanted[pp]
+        if len(errors):
+            msg = "Some logarithms missing:\n"
+            msg += "\n".join(["\t"+x for x in errors])
+            raise RuntimeError(msg)
         p=general.p()
         ell=general.ell()
         print("# p=%d" % p)
@@ -807,6 +991,39 @@ class DescentLowerClass(object):
                 % (log_target, args.target, wanted["2"], ell, p))
 
 
+# http://stackoverflow.com/questions/107705/disable-output-buffering
+# shebang takes only one arg...
+# python3 doesn't grok sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+# setting PYTHONUNBUFFERED here is too late.
+class drive_me_crazy(object):
+    def __init__(self, stream, timestamp=False):
+        self.stream = stream
+        self.eol = 1
+        self.timestamp = timestamp
+    def write(self, data):
+        if self.timestamp:
+            p=0
+            while len(data) > p:
+                d = data.find('\n', p)
+                if d < 0:
+                    break
+                if self.eol:
+                    self.stream.write(time.asctime() + " ")
+                self.stream.write(data[p:d+1])
+                self.eol=True
+                p = d + 1
+            if len(data) > p:
+                if self.eol:
+                    self.stream.write(time.asctime() + " ")
+                self.stream.write(data[p:])
+                self.eol= False
+        else:
+            self.stream.write(data)
+        self.stream.flush()
+    def __getattr__(self, attr):
+        return getattr(self.stream, attr)
+
+
 if __name__ == '__main__':
 
     print("THIS IS AN EXPERIMENTAL SCRIPT ONLY ! STILL AT WORK.")
@@ -817,6 +1034,10 @@ if __name__ == '__main__':
     # Required
     parser.add_argument("--target", help="Element whose DL is wanted",
             type=int, required=True)
+    parser.add_argument("--timestamp",
+            help="Prefix all lines with a time stamp",
+            action="store_true")
+
 
     GeneralClass.declare_args(parser)
     DescentUpperClass.declare_args(parser)
@@ -825,9 +1046,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    sys.stdout = drive_me_crazy(sys.stdout, args.timestamp)
+
+
     general = GeneralClass(args)
-    known = RatLogBase(general)
-    init = DescentUpperClass(general, known, args)
+    init = DescentUpperClass(general, args)
     middle = DescentMiddleClass(general, args)
     lower = DescentLowerClass(general, args)
 
@@ -835,3 +1058,4 @@ if __name__ == '__main__':
     relsfile = middle.do_descent(todofile)
     lower.do_descent(relsfile, initial_split)
 
+    general.cleanup()

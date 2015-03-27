@@ -28,8 +28,11 @@
 
 #define STATS_LEN 128
 
-#define NB_MAX_METHODS 200 /* We authorize at most NB_MAX_METHOD
-			     differents methods in our strategies */
+/* We authorize at most NB_MAX_METHODS different methods in our
+ * strategies. For the descent, we do have an interest in raising this
+ * number somewhat.
+ */
+#define NB_MAX_METHODS 200
 
 typedef struct {
   long method; /* Which method to use (P-1, P+1 or ECM) */
@@ -81,10 +84,17 @@ typedef struct {
 					   facul_make_strategies ().*/
 
   facul_method_t* methods_aux;
+
+  facul_method_side_t * uniform_strategy[2]; /* this is 0 if we have a
+                                                strategy file, and 1 if we
+                                                just have a uniform
+                                                one-size-fits-all strategy.
+                                                In the latter case, we avoid
+                                                most of the allocation */
 } facul_strategies_t;
 
 
-typedef struct {
+struct modset_t {
   /* The arith variable tells which modulus type has been initialised for 
      arithmetic. It has a value of CHOOSE_NONE if no modulus currently 
      initialised. */
@@ -100,11 +110,11 @@ typedef struct {
   modulusredc15ul_t m_15ul;
   modulusredc2ul2_t m_2ul2;
   modulusmpz_t m_mpz;
-} modset_t;
+};
 
 
 void
-modset_clear (modset_t *);
+modset_clear (struct modset_t *);
 
 
 int nb_curves (unsigned int);
@@ -125,7 +135,7 @@ facul_fprint_strategies (FILE*, facul_strategies_t* );
 
 
 void
-modset_clear (modset_t *modset);
+modset_clear (struct modset_t *modset);
 
 int*
 facul_both (mpz_t**, mpz_t* ,

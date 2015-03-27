@@ -1,6 +1,7 @@
 #ifndef LAS_THREADS_H_
 #define LAS_THREADS_H_
 
+#include <pthread.h>
 #include "las-forwardtypes.h"
 #include "bucket.h"
 #include "fb.h"
@@ -46,9 +47,12 @@ struct thread_data : private NonCopyable {
   void update_checksums();
 };
 
-class thread_workspaces {
+class thread_workspaces : private NonCopyable {
   thread_data *thrs;
+  bool *used;
   const size_t nr_workspaces;
+  pthread_mutex_t mutex;
+  sieve_info_ptr si;
 public:
   thread_workspaces(size_t n, las_info_ptr _las);
   ~thread_workspaces();
@@ -58,6 +62,8 @@ public:
   void buckets_free();
   double buckets_max_full();
   void accumulate(las_report_ptr, sieve_checksum *);
+  thread_data &reserve_workspace();
+  void release_workspace(thread_data &);
 };
 
 #endif

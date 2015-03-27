@@ -1,3 +1,6 @@
+#ifndef SIEVE_ECM_PM1_H_
+#define SIEVE_ECM_PM1_H_
+
 #include "modredc_ul.h"
 #include "modredc_15ul.h"
 #include "modredc_2ul2.h"
@@ -34,6 +37,9 @@ typedef struct {
   
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void pm1_stage1_ul (residueredcul_t, const unsigned long *, const int, 
                  const modulusredcul_t);
@@ -52,3 +58,10 @@ int pm1_mpz (modintmpz_t, const modulusmpz_t, const pm1_plan_t *);
 
 void pm1_make_plan (pm1_plan_t *, const unsigned int, const unsigned int, int);
 void pm1_clear_plan (pm1_plan_t *);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* SIEVE_ECM_PM1_H_ */
+

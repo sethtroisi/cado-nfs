@@ -41,12 +41,12 @@
 
 typedef unsigned long residueredcul_t[MODREDCUL_SIZE];
 typedef unsigned long modintredcul_t[MODREDCUL_SIZE];
-typedef struct {
+struct __modulusredcul_t {
   unsigned long m;
   unsigned long invm;
   residueredcul_t one;
-} __modulusredcul_t;
-typedef __modulusredcul_t modulusredcul_t[1];
+};
+typedef struct __modulusredcul_t modulusredcul_t[1];
 
 
 /* ==================== Functions used internally ==================== */

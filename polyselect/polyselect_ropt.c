@@ -46,7 +46,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
      polynomial by the content. */
   mpz_init (t);
   mpz_poly_content (t, input_poly->alg);
-  if (mpz_cmp_ui (t, 1) != 0)
+  if (mpz_cmp_ui (t, 1) != 0 && !mpz_divisible_p (input_poly->n, t))
   {
     gmp_printf ("# WARNING: the content of the algebraic side of polynomial %u "
                 "is not 1 (%Zd). The input polynomial will be divided by its "

@@ -241,7 +241,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
            numdep, ab_pairs, freerels);
   pthread_mutex_unlock (&lock);
 
+  pthread_mutex_lock (&lock);
   accumulate_fast_end (prd, lprd);
+  pthread_mutex_unlock (&lock);
 
   /* we must divide by g1^ab_pairs: if the number of (a,b) pairs is odd, we
      multiply by g1, and divide by g1^(ab_pairs+1) */
@@ -1229,10 +1231,12 @@ void
 calculateTaskN (int task, const char *prefix, int numdep, int nthreads,
                 cado_poly pol, int side, mpz_t Np)
 {
-  pthread_t tid[MAX_THREADS];
-  tab_t T[MAX_THREADS];
+  pthread_t *tid;
+  tab_t *T;
   int j;
 
+  tid = (pthread_t*) malloc (nthreads * sizeof (pthread_t));
+  T = (tab_t*) malloc (nthreads * sizeof (tab_t));
   for (j = 0; j < nthreads; j++)
     {
       T[j]->prefix = prefix;
@@ -1246,6 +1250,8 @@ calculateTaskN (int task, const char *prefix, int numdep, int nthreads,
     pthread_create (&tid[j], NULL, one_thread, (void *) (T+j));
   while (j > 0)
     pthread_join (tid[--j], NULL);
+  free (tid);
+  free (T);
 }
 
 void declare_usage(param_list pl)

@@ -76,8 +76,6 @@ utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
 utils/cachesize.c
 utils/build-testcases-rootfinder.m
-utils/thread.cpp
-utils/thread.h
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
@@ -113,7 +111,6 @@ misc/phi.c
 misc/psi.c
 misc/cacheline.c
 misc/get_valid_lines.c
-misc/extra_renumber.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
