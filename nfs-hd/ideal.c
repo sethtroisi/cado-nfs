@@ -45,7 +45,7 @@ void ideal_1_init(ideal_1_ptr ideal)
    modulo r. Enable this with LINESIEVE.
 */
 void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-                      unsigned int t)
+    unsigned int t)
 {
   ASSERT(h->deg == 1);
   ASSERT(mpz_cmp_ui(mpz_poly_lc_const(h), 1) == 0);
@@ -86,6 +86,19 @@ void ideal_1_clear(ideal_1_ptr ideal, unsigned int t)
 
   ideal_clear(ideal->ideal);
   ideal->log = 0;
+}
+
+void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old,
+    unsigned int t)
+{
+  mpz_poly_set(ideal_new->ideal->h, ideal_old->ideal->h);
+  ideal_new->ideal->r = ideal_old->ideal->r;
+  ideal_new->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+  for (unsigned int i = 0; i < t - 1; i++) {
+    mpz_init(ideal_new->Tr[i]);
+    mpz_set(ideal_new->Tr[i], ideal_old->Tr[i]);
+  }
+  ideal_new->log = ideal_old->log;
 }
 
 void ideal_1_fprintf(FILE * file, ideal_1_srcptr ideal, unsigned int t)

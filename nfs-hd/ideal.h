@@ -112,6 +112,14 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 void ideal_1_clear(ideal_1_ptr ideal, unsigned int t);
 
 /*
+ * Copy an ideal_1 in an other.
+ *
+ * ideal_new: the new ideal.
+ * ideal_old: the old ideal.
+ */
+void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old, unsigned int t);
+
+/*
  * Write an ideal_1.
  *
  * ideal: the ideal we want to delete.
@@ -130,7 +138,7 @@ void ideal_u_init(ideal_u_ptr ideal);
 
 /*
  * Set an ideal_u, compute Tr and the logarithm.
-
+ *
  * ideal: the ideal we want to set.
  * r: r is equal to the r of the ideal.
  * h: h is equal to the h of the ideal.
@@ -141,7 +149,7 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 
 /*
  * Delete an ideal_u.
-
+ *
  * ideal: ideal_u_srcptr, the ideal we want to delete.
  * t: t is the dimension of the lattice we explore.
  */
