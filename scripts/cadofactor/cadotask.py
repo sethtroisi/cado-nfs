@@ -4132,9 +4132,14 @@ class SqrtTask(Task):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
+            t = self.progparams[0].get("threads", 1)
             while not self.is_done():
                 dep = self.state.get("next_dep", 0)
-                self.logger.info("Trying dependency %d", dep)
+                if t == 1:
+                   self.logger.info("Trying dependency %d", dep)
+                else:
+                   self.logger.info("Trying dependencies %d to %d",
+                                    dep, dep+t-1)
                 (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Sqrt.name)
                 p = cadoprograms.Sqrt(ab=False, rat=True,
@@ -4153,7 +4158,6 @@ class SqrtTask(Task):
                     if line == "Failed":
                         continue # try next lines (if any) in multi-thread mode
                     self.add_factor(int(line))
-                t = self.progparams[0].get("threads", 1)
                 self.state.update({"next_dep": dep+t})
             self.remember_input_versions(commit=True)
             self.logger.info("finished")
