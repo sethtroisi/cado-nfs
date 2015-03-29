@@ -83,6 +83,8 @@ import tempfile
 import shutil
 import functools
 import itertools
+from queue import Queue, Empty
+from threading import Thread
 
 # This gives the boring info about the file names for everything, and
 # the boilerplate arguments to be fed to binaries.
@@ -441,6 +443,10 @@ class DescentUpperClass(object):
         parser.add_argument("--init-I",
                 help="Sieving range"+c,
                 default=14)
+        # Slave las processes in the initial step.
+        parser.add_argument("--slaves",
+                help="Number of slavess to use",
+                type=int, default=1)
 
     def __init__(self, general, args):
         self.general = general
@@ -451,6 +457,7 @@ class DescentUpperClass(object):
         self.mfb      = int(args.init_mfb)
         self.ncurves  = int(args.init_ncurves)
         self.I        = int(args.init_I)
+        self.slaves   = int(args.slaves)
 
     def __myxgcd(self, a, b, T):
         assert type(a) == int
@@ -491,47 +498,49 @@ class DescentUpperClass(object):
             f.write("Y1: %d\n" % gg[0][1])
             f.write("Y0: %d\n" % gg[1][1])
 
-#       These are not read anyway, and the code in las is much faster.
-#        print ("Creating factor bases.")
-#        for side in range(2):
-#            subprocess.check_call([args.cadobindir + "/sieve/makefb",
-#                "-t", str(args.nthreads),
-#                "-poly", polyfilename,
-#                "-alim", str(args.lim),
-#                "-side", str(side),
-#                "-out", wdir + str("/desc.fb") + str(side)],
-#                stdout=subprocess.DEVNULL)
-        
         print ("--- Sieving (initial) ---")
-        q0 = self.tkewness
-        q1 = self.tkewness + 100000
-        # relsfilename = os.path.join(tmpdir, prefix + "rels")
 
-        call_that = [ general.las_bin(),
-            "-poly", polyfilename,
-            # "-fb0", wdir + str("/desc.fb") + str(0),
-            # "-fb1", wdir + str("/desc.fb") + str(1),
-            "-lim0", self.lim,
-            "-lim1", self.lim,
-            "-lpb0", self.lpb,
-            "-lpb1", self.lpb,
-            "-mfb0", self.mfb,
-            "-mfb1", self.mfb,
-            "-ncurves0", self.ncurves,
-            "-ncurves1", self.ncurves,
-            "-I", self.I,
-            "-q0", q0,
-            "-q1", q1,
-            "--exit-early", 2,
-            "-t", 4
-            ]
-        call_that = [str(x) for x in call_that]
+        def construct_call(q0,q1):
+            call_that = [ general.las_bin(),
+                          "-poly", polyfilename,
+                          "-lim0", self.lim,
+                          "-lim1", self.lim,
+                          "-lpb0", self.lpb,
+                          "-lpb1", self.lpb,
+                          "-mfb0", self.mfb,
+                          "-mfb1", self.mfb,
+                          "-ncurves0", self.ncurves,
+                          "-ncurves1", self.ncurves,
+                          "-I", self.I,
+                          "-q0", q0,
+                          "-q1", q1,
+                          "--exit-early", 2,
+                          "-t", 4
+                      ]
+            call_that = [str(x) for x in call_that]
+            return call_that
 
-        outfile=os.path.join(general.datadir(), prefix + "rels")
+        call_params = [(os.path.join(general.datadir(),prefix + "rels"+"."+str(i)), # outfile
+                        self.tkewness+100000*i, #q0
+                        self.tkewness+100000*(i+1)) for i in range(self.slaves)] #q1
+        processes = [important_file(outfile, construct_call(q0,q1)) for (outfile,q0,q1) in call_params]
+
+        q = Queue()
+        def enqueue_output(i,out,queue):
+            for line in out:
+                queue.put((i,line))
+        threads = [Thread(target=enqueue_output, args=(i,process,q)) for (i,process) in enumerate(processes)]
+        for t in threads:
+            t.daemon = True
+            t.start()
 
         rel = None
-        with important_file(outfile, call_that) as relstream:
-            for line in relstream:
+        while True:
+            try:
+                i,line = q.get_nowait()
+            except Empty:
+                pass
+            else:
                 if line[0] != '#':
                     rel = line.strip()
                     continue
@@ -547,6 +556,8 @@ class DescentUpperClass(object):
                 sys.stdout.write('\n')
                 print(line.rstrip())
                 if int(foo.groups()[0]) > 0:
+                    shutil.copyfile(os.path.join(general.datadir(), prefix + "rels"+"."+str(i)),
+                                    os.path.join(general.datadir(), prefix + "rels"))
                     break
 
         sys.stdout.write('\n')
