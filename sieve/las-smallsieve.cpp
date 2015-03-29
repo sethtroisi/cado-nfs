@@ -440,6 +440,14 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
              * must not cancel the high bits.
              */
             // ssdpos[i] &= ssp->p - 1;
+
+            // However, when p == I, we might get something >= 2*I, which
+            // is just an artefact.
+            // See bug #18814
+            const unsigned int I = 1U << si->conf->logI;
+            if ((ssp->p == I) && ((unsigned int)ssdpos[i] >= 2*I)) {
+                ssdpos[i] -= I;
+            }
         }
     }
 }
