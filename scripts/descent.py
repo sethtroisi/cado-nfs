@@ -526,9 +526,11 @@ class DescentUpperClass(object):
         processes = [important_file(outfile, construct_call(q0,q1)) for (outfile,q0,q1) in call_params]
 
         q = Queue()
-        def enqueue_output(i,out,queue):
+        def enqueue_output(i,out,q):
             for line in out:
-                queue.put((i,line))
+                q.put((i,line))
+            #q.close()
+
         threads = [Thread(target=enqueue_output, args=(i,process,q)) for (i,process) in enumerate(processes)]
         for t in threads:
             t.daemon = True
@@ -539,7 +541,8 @@ class DescentUpperClass(object):
             try:
                 i,line = q.get_nowait()
             except Empty:
-                pass
+                if all([not t.isAlive() for t in threads]):
+                    break
             else:
                 if line[0] != '#':
                     rel = line.strip()
