@@ -280,7 +280,7 @@ void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
  * i: index of the array in which we store the computed norm.
  * a: polynomial equal to matrix * vector.
  * pre_compute: array with precomputed value to compute upper bound of the norm.
- * H: sieving interval.
+ * H: sieving bound.
  * matrix: to compute the current value of a.
  * beg: index of the upper changed coordinate during the addition of 1 in the
  *  sieving region for vector.
@@ -290,7 +290,7 @@ void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
  * vector: only for TRACE_POS mode.
  */
 void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
-    double * pre_compute, sieving_interval_srcptr H, mat_int64_srcptr matrix,
+    double * pre_compute, sieving_bound_srcptr H, mat_int64_srcptr matrix,
     unsigned int beg, mpz_poly_srcptr f, ideal_1_srcptr spq, int special_q,
     MAYBE_UNUSED int64_vector_srcptr vector)
 {
@@ -344,14 +344,14 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
  *
  * array: the array in which the norms are initialized.
  * pre_compute: the array of precomputed value obtained with pre_computation.
- * H: the sieving interval which gives the sieving region.
+ * H: the sieving bound which gives the sieving region.
  * matrix: the MqLLL matrix.
  * f: the f which defines the side.
  * spq: the special-q.
  * special_q: 0 if there is no special-q in this side, else 1.
  */
 void init_norm_1(array_ptr array, double * pre_compute,
-    sieving_interval_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
+    sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
     ideal_1_srcptr spq, int special_q)
 {
   ASSERT(special_q == 0 || special_q == 1);
@@ -575,7 +575,7 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
  * To assert that the ideal is a factor of a = matrix * c mapped in the number
  *  field defined by f.
  *
- * H: the sieving interval.
+ * H: the sieving bound.
  * index: index of c in the array in which we store the norm.
  * number_element: number of element contains in the sieving region.
  * matrix: MqLLL.
@@ -584,7 +584,7 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
  * c: the vector corresponding to the ith value of the array in which we store
  *  the norm.
  */
-void assert_sieve(sieving_interval_srcptr H, uint64_t index,
+void assert_sieve(sieving_bound_srcptr H, uint64_t index,
     uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_srcptr f,
     ideal_1_srcptr ideal, int64_vector_srcptr c)
 {
@@ -666,7 +666,7 @@ void trace_pos_sieve(uint64_t index, ideal_1_srcptr ideal, array_srcptr array)
 /*
  * All the mode we can active during the sieving step.
  *
- * H: the sieving interval.
+ * H: the sieving bound.
  * index: index of the array in which we store the resulting norm.
  * array: the array in which we store the resulting norm.
  * matrix: MqLLL.
@@ -676,7 +676,7 @@ void trace_pos_sieve(uint64_t index, ideal_1_srcptr ideal, array_srcptr array)
  * number_c_l: number of possible c with the same ci, ci+1, …, ct. (cf line_sieve_ci)
  * nbint: say if we have already count the number_c_l or not.
  */
-void mode_sieve(MAYBE_UNUSED sieving_interval_srcptr H,
+void mode_sieve(MAYBE_UNUSED sieving_bound_srcptr H,
     MAYBE_UNUSED uint64_t index, MAYBE_UNUSED array_srcptr array,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
     MAYBE_UNUSED ideal_1_srcptr ideal, MAYBE_UNUSED int64_vector_srcptr c,
@@ -705,12 +705,12 @@ void mode_sieve(MAYBE_UNUSED sieving_interval_srcptr H,
  * c: element of the q lattice.
  * ideal: an ideal with r < q.
  * ci: the possible first coordinate of c to have c in the sieving region.
- * H: the sieving interval.
+ * H: the sieving bound.
  * i: index of the first non-zero coefficient in pseudo_Tqr.
  * number_c_l: number of possible c with the same ci, ci+1, …, ct.
  */
 void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
-    int64_t ci, sieving_interval_srcptr H, unsigned int i, uint64_t number_c_l,
+    int64_t ci, sieving_bound_srcptr H, unsigned int i, uint64_t number_c_l,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
 {
 #ifndef NDEBUG
@@ -770,7 +770,7 @@ void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
  * c: the 
  */
 void line_sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
-    ideal_1_srcptr ideal, sieving_interval_srcptr H, unsigned int i,
+    ideal_1_srcptr ideal, sieving_bound_srcptr H, unsigned int i,
     uint64_t number_c_l, int64_t * ci, unsigned int pos,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
 {
@@ -828,7 +828,7 @@ void line_sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
 
 #ifdef SIEVE_U
 void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
-    mpz_vector_srcptr c, sieving_interval_srcptr H)
+    mpz_vector_srcptr c, sieving_bound_srcptr H)
 {
   //Not optimal
   int nul = 1;
@@ -875,11 +875,11 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
  * array: the array in which we store the resulting norms.
  * matrix: MqLLL.
  * fb: factor base of this side.
- * H: sieving interval.
+ * H: sieving bound.
  * f: the polynomial that defines the number field.
  */
 void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
-    factor_base_srcptr fb, sieving_interval_srcptr H,
+    factor_base_srcptr fb, sieving_bound_srcptr H,
     MAYBE_UNUSED mpz_poly_srcptr f)
 {
 #ifdef TIMER_SIEVE
@@ -1363,7 +1363,7 @@ unsigned int find_indexes_min(unsigned int ** L,
  */
 void find_relation(uint64_array_t * indexes, uint64_t * index,
     uint64_t number_element, mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
-    sieving_interval_srcptr H, unsigned int V)
+    sieving_bound_srcptr H, unsigned int V)
 {
   unsigned int * L;
   unsigned int size = find_indexes_min(&L, indexes, index, V);
@@ -1418,11 +1418,11 @@ void find_relation(uint64_array_t * indexes, uint64_t * index,
  * lpb: large prime bands.
  * matrix: MqLLL.
  * f: polynomials that define the number fields.
- * H: sieving interval.
+ * H: sieving bound.
  * V: number of number fields.
  */
 void find_relations(uint64_array_t * indexes, uint64_t number_element,
-    mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_interval_srcptr H,
+    mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
     unsigned int V)
 {
   //Index is the current index to move in the indexes array.
@@ -1505,7 +1505,7 @@ void declare_usage(param_list pl)
  * f: the V functions to define the number fields.
  * fbb: the V factor base bounds.
  * t: dimension of the lattice.
- * H: sieving interval.
+ * H: sieving bound.
  * q_min: lower bound of the special-q range.
  * q_max: upper bound of the special-q range.
  * thresh: the V threshold.
@@ -1516,7 +1516,7 @@ void declare_usage(param_list pl)
  * V: number of number fields.
  */
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
-    uint64_t ** fbb, factor_base_t ** fb, sieving_interval_ptr H,
+    uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
     uint64_t * q_min, uint64_t * q_max, unsigned char ** thresh, mpz_t ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V)
 {
@@ -1551,9 +1551,9 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   param_list_parse_int_list_size(pl, "H", &r, &t, ".,");
   ASSERT(t > 2);
   ASSERT(t == 3); // TODO: remove as soon as possible.
-  sieving_interval_init(H, t);
+  sieving_bound_init(H, t);
   for (unsigned int i = 0; i < t; i++) {
-    sieving_interval_set_hi(H, i, (unsigned int) r[i]);
+    sieving_bound_set_hi(H, i, (unsigned int) r[i]);
   }
   free(r);
 
@@ -1591,7 +1591,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     ASSERT(mpz_cmp_ui((*lpb)[i], fbb[0][i]) >= 0);
   }
 
-  uint64_t number_element = sieving_interval_number_element(H);
+  uint64_t number_element = sieving_bound_number_element(H);
   ASSERT(number_element >= 6);
 
   //TODO: q_side is an unsigned int.
@@ -1617,7 +1617,7 @@ int main(int argc, char * argv[])
   unsigned int V;
   mpz_poly_t * f;
   uint64_t * fbb;
-  sieving_interval_t H;
+  sieving_bound_t H;
   uint64_t q_min;
   uint64_t q_max;
   unsigned int q_side;
@@ -1633,7 +1633,7 @@ int main(int argc, char * argv[])
 
 #ifdef PRINT_PARAMETERS
   printf("H =\n");
-  sieving_interval_fprintf(stdout, H);
+  sieving_bound_fprintf(stdout, H);
   printf("V = %u\n", V);
   for (unsigned int i = 0; i < V; i++) {
     printf("fbb%u = %" PRIu64 "\n", i, fbb[i]);
@@ -1889,7 +1889,7 @@ int main(int argc, char * argv[])
   free(lpb);
   free(f);
   free(fb);
-  sieving_interval_clear(H);
+  sieving_bound_clear(H);
   free(fbb);
   free(thresh);
 

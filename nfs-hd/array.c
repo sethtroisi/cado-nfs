@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 #include "array.h"
 #include "int64_vector.h"
 
@@ -32,7 +32,7 @@ void array_fprintf(FILE * filew, array_srcptr array)
 }
 
 void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
-    sieving_interval_srcptr H, uint64_t number_element)
+    sieving_bound_srcptr H, uint64_t number_element)
 {
   ASSERT(v->dim == H->t);
 
@@ -68,7 +68,7 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
 }
 
 void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
-    sieving_interval_srcptr H, MAYBE_UNUSED uint64_t number_element)
+    sieving_bound_srcptr H, MAYBE_UNUSED uint64_t number_element)
 {
 #ifndef NDEBUG
   ASSERT(v->dim == H->t);
@@ -107,7 +107,7 @@ void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
 }
 
 void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
-    sieving_interval_srcptr H, MAYBE_UNUSED uint64_t number_element)
+    sieving_bound_srcptr H, MAYBE_UNUSED uint64_t number_element)
 {
 #ifndef NDEBUG
   ASSERT(v->dim == H->t);

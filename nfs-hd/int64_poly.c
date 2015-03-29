@@ -5,7 +5,7 @@
 #include <string.h>
 #include "int64_poly.h"
 #include "macros.h"
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 #include "macros.h"
 #include "utils_int64.h"
 

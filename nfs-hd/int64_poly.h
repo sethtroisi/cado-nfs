@@ -2,7 +2,7 @@
 #define INT64_POLY_H
 
 #include <stdint.h>
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 #include "mpz_poly.h"
 
 typedef struct {

@@ -6,7 +6,7 @@
 #include "utils_lattice.h"
 #include "ideal.h"
 #include "utils_mpz.h"
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 
 /*
  * To deal with the list of short vectors.
@@ -496,13 +496,13 @@ void SV4_Mqr(SV_ptr SV, mat_int64_srcptr Mqr)
 }
 /*
  * Return the gap between the x coordinate and the closer border of the sieving
- * region defined by the sieving interval H.
+ * region defined by the sieving bound H.
  *
  * v: current vector.
- * H: sieving interval.
+ * H: sieving bound.
  */
 static int64_t difference_bound_x(int64_vector_srcptr v,
-    sieving_interval_srcptr H)
+    sieving_bound_srcptr H)
 {
   return MIN(ABS(-(int64_t)H->h[0] - v->c[0]), ABS((int64_t)H->h[0] - 1 -
         v->c[0]));
@@ -514,12 +514,12 @@ static int64_t difference_bound_x(int64_vector_srcptr v,
  * classification val_stamp.
  *
  * SV: list of vector.
- * H: sieving interval.
+ * H: sieving bound.
  * stamp: array with length equal to SV, gives the classification of the
  *  vectors.
  * val_stamp: value we want for the stamp of the vector.
  */
-static unsigned int find_min_x(SV_srcptr SV, sieving_interval_srcptr H,
+static unsigned int find_min_x(SV_srcptr SV, sieving_bound_srcptr H,
     unsigned char * stamp, unsigned char val_stamp)
 {
   int64_t x = -1; 
@@ -547,10 +547,10 @@ static unsigned int find_min_x(SV_srcptr SV, sieving_interval_srcptr H,
  * v: current vector.
  * e0: a vector given by the Franke-Kleinjung algorithm.
  * e1: a vector given by the Franke-Kleinjung algorithm.
- * H: sieving interval.
+ * H: sieving bound.
  */
 static void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
-    int64_vector_srcptr e1, sieving_interval_srcptr H)
+    int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
   ASSERT(v->c[0] < -(int64_t)H->h[0] || v->c[0] >= (int64_t)H->h[0]);
 
@@ -583,7 +583,7 @@ static void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
   ASSERT(v->c[0] >= -(int64_t)H->h[0]);
 }
 
-void plane_sieve(mat_int64_srcptr Mqr, sieving_interval_srcptr H)
+void plane_sieve(mat_int64_srcptr Mqr, sieving_bound_srcptr H)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
@@ -780,8 +780,8 @@ int main()
   /*Mqr->coeff[3][2] = 0;*/
   /*Mqr->coeff[3][3] = 1;*/
   
-  sieving_interval_t H;
-  sieving_interval_init(H, 3);
+  sieving_bound_t H;
+  sieving_bound_init(H, 3);
   H->h[0] = 128;
   H->h[1] = 128;
   H->h[2] = 128;
@@ -794,7 +794,7 @@ int main()
 
   plane_sieve(Mqr, H);
   mat_int64_clear(Mqr);
-  sieving_interval_clear(H);
+  sieving_bound_clear(H);
 
   return 0;
 }

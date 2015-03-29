@@ -63,6 +63,6 @@ void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
 
 void SV4_Mqr(SV_ptr SV, mat_int64_srcptr Mqr);
 
-void plane_sieve(mat_int64_srcptr Mqr, sieving_interval_srcptr H);
+void plane_sieve(mat_int64_srcptr Mqr, sieving_bound_srcptr H);
 
 #endif // UTILS_SIEVE_H

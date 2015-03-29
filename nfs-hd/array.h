@@ -68,34 +68,34 @@ void array_fprintf(FILE * filew, array_srcptr array);
  *
  * v: a vector.
  * index: index.
- * H: the sieving interval.
+ * H: the sieving bound.
  * number_element: number of element in the sieving region.
  */
 void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
-    sieving_interval_srcptr H, uint64_t number_element);
+    sieving_bound_srcptr H, uint64_t number_element);
 
 /*
  * Give the index associated with a vector (mpz_vector).
  * 
  * index: the index of the polynomial.
  * v: the vector.
- * H: the sieving interval.
+ * H: the sieving bound.
  * number_element: number of element in the sieving region, only used in the
  *  NDEBUG mode.
  */
 void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
-                            sieving_interval_srcptr H, uint64_t number_element);
+                            sieving_bound_srcptr H, uint64_t number_element);
 
 /*
  * Give the index associated with a vector (int64_vector).
  *
  * index: the index of the polynomial.
  * v: the vector.
- * H: the sieving interval.
+ * H: the sieving bound.
  * number_element: number of element in the sieving region, only used in the
  *  NDEBUG mode.
  */
 void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
-    sieving_interval_srcptr H, uint64_t number_element);
+    sieving_bound_srcptr H, uint64_t number_element);
 
 #endif /* ARRAY_H */

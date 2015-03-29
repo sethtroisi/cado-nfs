@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <inttypes.h>
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 #include "array.h"
 #include "cado.h"
 #include "utils.h"
@@ -10,15 +10,15 @@
 
 int main()
 {
-  sieving_interval_t H;
+  sieving_bound_t H;
   unsigned int t = 4;
 
-  sieving_interval_init(H, t);
+  sieving_bound_init(H, t);
   for (unsigned int i = 0; i < t; i++) {
-    sieving_interval_set_hi(H, i, 2);
+    sieving_bound_set_hi(H, i, 2);
   }
 
-  uint64_t nb = sieving_interval_number_element(H);
+  uint64_t nb = sieving_bound_number_element(H);
 
   int64_vector_t vector;
   int64_vector_init(vector, t);
@@ -49,7 +49,7 @@ int main()
 
   mpz_vector_clear(v);
   int64_vector_clear(vector);
-  sieving_interval_clear(H);
+  sieving_bound_clear(H);
 
   return 0;
 }

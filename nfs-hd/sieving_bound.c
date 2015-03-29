@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "macros.h"
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 
-void sieving_interval_init(sieving_interval_ptr H, unsigned int t)
+void sieving_bound_init(sieving_bound_ptr H, unsigned int t)
 {
   ASSERT(t != 0);
 
@@ -11,7 +11,7 @@ void sieving_interval_init(sieving_interval_ptr H, unsigned int t)
   H->h = (unsigned int * ) malloc(sizeof(unsigned int) * t);
 }
 
-void sieving_interval_set_hi(sieving_interval_ptr H, unsigned int i, unsigned
+void sieving_bound_set_hi(sieving_bound_ptr H, unsigned int i, unsigned
     int value)
 
 {
@@ -20,7 +20,7 @@ void sieving_interval_set_hi(sieving_interval_ptr H, unsigned int i, unsigned
   H->h[i] = value;
 }
 
-uint64_t sieving_interval_number_element(sieving_interval_srcptr H)
+uint64_t sieving_bound_number_element(sieving_bound_srcptr H)
 {
   uint64_t nb = 1;
   for (unsigned int i = 0; i < H->t - 1; i++) {
@@ -33,13 +33,13 @@ uint64_t sieving_interval_number_element(sieving_interval_srcptr H)
   return nb;
 }
 
-void sieving_interval_clear(sieving_interval_ptr H)
+void sieving_bound_clear(sieving_bound_ptr H)
 {
   free(H->h);
   H->t = 0;
 }
 
-void sieving_interval_fprintf(FILE * filew, sieving_interval_srcptr H)
+void sieving_bound_fprintf(FILE * filew, sieving_bound_srcptr H)
 {
   for (unsigned int i = 0 ; i < H->t - 1; i++) {
     fprintf(filew, "-H%u: -%u -- H%u: %u\n", i, H->h[i], i, H->h[i] - 1);

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "macros.h"
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 #include "int64_vector.h"
 #include <inttypes.h>
 
@@ -85,13 +85,13 @@ void int64_vector_fprintf(FILE * file, int64_vector_srcptr v)
   }
 }
 
-void int64_vector_add_one(int64_vector_ptr v, sieving_interval_srcptr H)
+void int64_vector_add_one(int64_vector_ptr v, sieving_bound_srcptr H)
 {
   int64_vector_add_one_i(v, 0, H);
 }
 
 unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
-                                    sieving_interval_srcptr H)
+                                    sieving_bound_srcptr H)
 {
   ASSERT(v->dim == H->t);
   ASSERT(i < v->dim);
@@ -172,7 +172,7 @@ int64_t int64_vector_dot_product(int64_vector_srcptr v0, int64_vector_srcptr v1)
 }
 
 int int64_vector_in_sieving_region(int64_vector_srcptr v,
-    sieving_interval_srcptr H)
+    sieving_bound_srcptr H)
 {
   ASSERT(v->dim == H->t);
 

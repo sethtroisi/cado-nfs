@@ -5,7 +5,7 @@
 #include <math.h>
 #include "cado.h"
 #include "utils.h"
-#include "sieving_interval.h"
+#include "sieving_bound.h"
 
 typedef struct
 {
@@ -115,18 +115,18 @@ void int64_vector_fprintf(FILE * file, int64_vector_srcptr v);
  * Add one to the first coordinate of v while v is in the sieving region.
  *
  * v: vector.
- * H: sieving interval that describes the sieving region.
+ * H: sieving bound that describes the sieving region.
  */
-void int64_vector_add_one(int64_vector_ptr v, sieving_interval_srcptr H);
+void int64_vector_add_one(int64_vector_ptr v, sieving_bound_srcptr H);
 
 /*
  * Add one the the ith coordinate of v while v is in the sieving region.
  *
  * v: vector.
- * H: sieving interval that describes the sieving region.
+ * H: sieving bound that describes the sieving region.
  */
 unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
-                                    sieving_interval_srcptr H);
+                                    sieving_bound_srcptr H);
 
 /*
  * Build a mpz_vector from a int64_vector.
@@ -163,9 +163,9 @@ int64_t int64_vector_dot_product(int64_vector_srcptr v0,
  * Return 1 if a vector is in the sieving region, 0 otherwise.
  *
  * v: vector.
- * H: sieving interval that gives a sieving region.
+ * H: sieving bound that gives a sieving region.
  */
 int int64_vector_in_sieving_region(int64_vector_srcptr v,
-    sieving_interval_srcptr H);
+    sieving_bound_srcptr H);
 
 #endif
