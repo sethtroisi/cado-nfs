@@ -48,7 +48,7 @@ set_test_dependencies(F9_cofactest F9_sievetest)
 # The TRACE_K test does only a single special-q, so we don't compare output
 # relations or checksums
 add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_tracek_path}\" \"${CADO_NFS_SOURCE_DIR}\" -traceab -8517,584707")
-set_test_build_depends(F9_tracektest las)
+set_test_build_depends(F9_tracektest las_tracek)
 set_test_dependencies(F9_tracektest F9_makefbtest)
 
 # Try a too-large lambda value
