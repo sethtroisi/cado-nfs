@@ -28,7 +28,7 @@ macro(set_test_build_depends test_name)
 endmacro(set_test_build_depends test_name ${ARGN})
 
 macro(update_test_build_depends test_name)
-    set_target_properties(${test_name}_dependencies PROPERTIES DEPENDS ${ARGN})
+    add_dependencies(${test_name}_dependencies ${ARGN})
 endmacro(update_test_build_depends test_name)
 
 macro(set_test_dependencies test_name)

@@ -1,5 +1,7 @@
 
-# Build makefb and las before running check
+# NOTE: most GF(p) checks here depend on plingen_pz ; this is artifical,
+# and caused by the fact that bwc.pl is for the moment unable to call
+# anything else than plingen_pz
 
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
@@ -29,7 +31,8 @@ macro(add_plingen_test testname)
     # Don't split this line !
     add_test(test-bwc-plingen-${gfp_layer}-${testname} bash -c
         "${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
-    set_test_build_depends(test-bwc-plingen-${gfp_layer}-${testname} plingen_${gfp_layer})
+    set_test_build_depends(test-bwc-plingen-${gfp_layer}-${testname}
+        plingen_${gfp_layer})
 endmacro(add_plingen_test testname)
 
 macro(add_lingen_binary_test testname)
@@ -58,6 +61,8 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     endif(t)
     set(p "${prime_${width}}")
     add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
+    update_test_build_depends(test-bwc-modp-inhomogeneous-${gfp_layer}
+        plingen_pz plingen_${gfp_layer})
     if(gfp_layer STREQUAL "p_1")
         set(mextra)
         # Only try to enable magma if CHECKS_EXPENSIVE is set.
@@ -66,29 +71,33 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         endif(DEFINED ENV{CHECKS_EXPENSIVE} AND DEFINED ENV{MAGMA})
         add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
             random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
-        update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6 plingen_${gfp_layer})
+        update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6
+            plingen_pz plingen_${gfp_layer})
 
         add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
             prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
-        update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4 plingen_${gfp_layer})
+        update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4
+            plingen_pz plingen_${gfp_layer})
 
         if(DEFINED ENV{CHECKS_EXPENSIVE})
             add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
                 prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
             update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive
-                plingen_${gfp_layer})
+                plingen_pz plingen_${gfp_layer})
         endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
         add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
             prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
         update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1
-            plingen_${gfp_layer})
+            plingen_pz plingen_${gfp_layer})
 #        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
 #            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
-#        update_test_build_depends(modp-homogeneous-minimal-mn4 plingen_${gfp_layer})
+#        update_test_build_depends(modp-homogeneous-minimal-mn4
+#        plingen_pz plingen_${gfp_layer})
 #        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
 #            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
-#        update_test_build_depends(modp-inhomogeneous-minimal-2rhs-mn2 plingen_${gfp_layer})
+#        update_test_build_depends(modp-inhomogeneous-minimal-2rhs-mn2
+#        plingen_pz plingen_${gfp_layer})
     endif(gfp_layer STREQUAL "p_1")
 
     # Also add some plingen tests if it so occurs that the current
