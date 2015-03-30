@@ -65,6 +65,12 @@ int int64_vector_in_SV(int64_vector_srcptr vec, SV_srcptr SV)
   }
 #endif // NDEBUG
 
+  for (unsigned int i = 0; i < SV->length; i++) {
+    if (int64_vector_equal(vec, SV->v[i]) == 1) {
+      return 1;
+    }  
+  }
+
   int c = 0;
   unsigned i = 0;
   unsigned j = 0;
@@ -107,7 +113,10 @@ static double angle_2_coordinate(int64_vector_srcptr v0, int64_vector_srcptr v1)
   return acos(dot);
 }
 
-int determinant2(mat_int64_srcptr matrix)
+/*
+ * Compute the determinant of a 2 * 2 matrix.
+ */
+static int determinant2(mat_int64_srcptr matrix)
 {
   return (int) matrix->coeff[1][1] * matrix->coeff[2][2] - matrix->coeff[2][1] *
     matrix->coeff[1][2];
@@ -116,6 +125,7 @@ int determinant2(mat_int64_srcptr matrix)
 int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1,
     mat_int64_ptr U, int64_vector_srcptr v0_root, int64_vector_srcptr v1_root)
 {
+  //Verify that the vector are in the same plane.
   ASSERT(v0_root->dim == v1_root->dim);
   ASSERT(v0_root->dim >= 2);
 #ifndef NDEBUG
@@ -123,7 +133,6 @@ int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1,
     ASSERT(v0_root->c[i] == v1_root->c[i]);
   }
 
-  int det = 0;
   if (U != NULL) {
     ASSERT(U->NumRows == U->NumCols);
     ASSERT(U->NumRows == 2);
@@ -143,6 +152,9 @@ int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1,
   int64_vector_set(v0, v0_root);
   int64_vector_set(v1, v1_root);
 
+  //determinant of U, 0 if U is NULL.
+  int det = 0;
+  
   double B0 = int64_vector_norml2sqr(v0);
   double m = (double)int64_vector_dot_product(v0, v1) / B0;
   for (unsigned int i = 0; i < 2; i++) {
@@ -167,6 +179,7 @@ int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1,
       v1->c[i] = v1->c[i] - (int64_t)round(m) * v0->c[i];
     }
 
+    //Update U by U = U * transformation_matrix.
     if (U != NULL) {
       int64_t tmp = U->coeff[1][2];
       U->coeff[1][2] = U->coeff[1][1] - (int64_t)round(m) * U->coeff[1][2];
@@ -180,17 +193,18 @@ int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1,
     B1 = int64_vector_norml2sqr(v1);
 
     //To have an acute basis.
-    if (M_PI_2 < angle_2_coordinate(v0, v1))
-    {
-      for (unsigned int i = 0; i < 2; i++) {
-        v1->c[i] = -v1->c[i];
-      }
+  }
 
-      if (U != NULL) {
-        U->coeff[1][2] = -U->coeff[1][2];
-        U->coeff[2][2] = -U->coeff[2][2];
-        det = -det;
-      }
+  if (M_PI_2 < angle_2_coordinate(v0, v1))
+  {
+    for (unsigned int i = 0; i < 2; i++) {
+      v1->c[i] = -v1->c[i];
+    }
+
+    if (U != NULL) {
+      U->coeff[1][2] = -U->coeff[1][2];
+      U->coeff[2][2] = -U->coeff[2][2];
+      det = -det;
     }
   }
 
@@ -228,6 +242,7 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
   return det; 
 }
 
+//TODO: why not merge with gauss reduction?
 int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
     int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I)
 {
@@ -313,81 +328,8 @@ int reduce_qlattice_zero(int64_vector_ptr v0, int64_vector_ptr v1,
   return res;
 }
 
-void enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
-    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I)
-{
-  //v0 = (alpha, beta) and v1 = (gamma, delta)
-  ASSERT(I > 0);
-  ASSERT(v0->c[0] > -I);
-  ASSERT(v0->c[0] <= 0);
-  ASSERT(v0->c[1] > 0);
-  ASSERT(v1->c[0] < I);
-  ASSERT(v1->c[0] >= 0);
-  ASSERT(v1->c[1] > 0);
-  ASSERT(v1->c[0] - v0->c[0] >= I);
-#ifndef NDEBUG
-  for (unsigned int j = 3; j < v0->dim; j++) {
-    ASSERT(v0->c[j] == 0);
-    ASSERT(v1->c[j] == 0);
-  }
-#endif // NDEBUG
-  ASSERT(v_old->c[0] < A + I);
-  ASSERT(v_old->c[0] >= A);
-
-  if (v_old->c[0] >= A - v0->c[0]) {
-    int64_vector_add(v, v_old, v0);
-  } else if (v_old->c[0] < A + I - v1->c[0]) {
-    int64_vector_add(v, v_old, v1);
-  } else {
-    int64_vector_add(v, v_old, v0);
-    int64_vector_add(v, v, v1);
-  }
-}
-
-void enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
-    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I)
-{
-  //v0 = (alpha, beta) and v1 = (gamma, delta)
-  ASSERT(I > 0);
-  ASSERT(v0->c[0] > -I);
-  ASSERT(v0->c[0] <= 0);
-  ASSERT(v0->c[1] > 0);
-  ASSERT(v1->c[0] < I);
-  ASSERT(v1->c[0] >= 0);
-  ASSERT(v1->c[1] > 0);
-  ASSERT(v1->c[0] - v0->c[0] >= I);
-#ifndef NDEBUG
-  for (unsigned int j = 3; j < v0->dim; j++) {
-    ASSERT(v0->c[j] == 0);
-    ASSERT(v1->c[j] == 0);
-  }
-#endif // NDEBUG
-  ASSERT(v_old->c[0] > -A - I);
-  ASSERT(v_old->c[0] <= -A);
-
-  if (v_old->c[0] <= -A + v0->c[0]) {
-    int64_vector_sub(v, v_old, v0);
-  } else if (v_old->c[0] > -A - I + v1->c[0]) {
-    int64_vector_sub(v, v_old, v1);
-  } else {
-    int64_vector_sub(v, v_old, v0);
-    int64_vector_sub(v, v, v1);
-  }
-}
-
-MAYBE_UNUSED static int sign(int64_t n)
-{
-  if (n == 0)
-    return 0;
-  else if (n > 0)
-    return 1;
-  else if (n < 0)
-    return -1;
-}
-
 /*
  * For instance, it is SV3.
- * TODO: assert that the projection of v2 is in the triangle define by SV.
  */
 void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
     int64_vector_srcptr v1_root, int64_vector_srcptr v2)
@@ -428,6 +370,7 @@ void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
   u->c[2] = 0;
   SV_add_int64_vector(SV, u);
 
+  //Build a triangle around the projection of v2 in the plane z = 0.
   if (v2_new_base_x - (double)a < 0) {
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] - v0->c[i];
@@ -455,16 +398,16 @@ void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
     u->c[2] = 0;
     SV_add_int64_vector(SV, u);
   }
-//TODO: ASSERT if the projection of v2 is in SV.
+
 #ifndef NDEBUG
-  /*int64_vector_t v_tmp;*/
-  /*int64_vector_init(v_tmp, v2->dim);*/
-  /*int64_vector_set(v_tmp, v2);*/
-  /*for (unsigned int i = 2; i < v_tmp->dim; i++) {*/
-    /*v_tmp->c[i] = 0;*/
-  /*}*/
-  /*ASSERT(int64_vector_in_SV(v_tmp, SV) == 1);*/
-  /*int64_vector_clear(v_tmp);*/
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, v2->dim);
+  int64_vector_set(v_tmp, v2);
+  for (unsigned int i = 2; i < v_tmp->dim; i++) {
+    v_tmp->c[i] = 0;
+  }
+  ASSERT(int64_vector_in_SV(v_tmp, SV) == 1);
+  int64_vector_clear(v_tmp);
 #endif // NDEBUG
 
   for (unsigned int i = 0; i < 3; i++) {
@@ -494,6 +437,7 @@ void SV4_Mqr(SV_ptr SV, mat_int64_srcptr Mqr)
   }
   free(v);
 }
+
 /*
  * Return the gap between the x coordinate and the closer border of the sieving
  * region defined by the sieving bound H.
@@ -578,16 +522,136 @@ static void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
       }
     }
   }
-
-  ASSERT(v->c[0] < (int64_t)H->h[0] - 1);
+  
+  ASSERT(v->c[0] < (int64_t)H->h[0]);
   ASSERT(v->c[0] >= -(int64_t)H->h[0]);
 }
 
-void plane_sieve(mat_int64_srcptr Mqr, sieving_bound_srcptr H)
+/*
+ * Return 0 if v0 is added, 1 if v1 is added, 2 if v0 + v1 is added.
+ */
+unsigned int enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I)
+{
+  //v0 = (alpha, beta) and v1 = (gamma, delta)
+  ASSERT(I > 0);
+  ASSERT(v0->c[0] > -I);
+  ASSERT(v0->c[0] <= 0);
+  ASSERT(v0->c[1] > 0);
+  ASSERT(v1->c[0] < I);
+  ASSERT(v1->c[0] >= 0);
+  ASSERT(v1->c[1] > 0);
+  ASSERT(v1->c[0] - v0->c[0] >= I);
+#ifndef NDEBUG
+  for (unsigned int j = 3; j < v0->dim; j++) {
+    ASSERT(v0->c[j] == 0);
+    ASSERT(v1->c[j] == 0);
+  }
+#endif // NDEBUG
+  ASSERT(v_old->c[0] < A + I);
+  ASSERT(v_old->c[0] >= A);
+
+  if (v_old->c[0] >= A - v0->c[0]) {
+    int64_vector_add(v, v_old, v0);
+    return 0;
+  } else if (v_old->c[0] < A + I - v1->c[0]) {
+    int64_vector_add(v, v_old, v1);
+    return 1;
+  } else {
+    int64_vector_add(v, v_old, v0);
+    int64_vector_add(v, v, v1);
+    return 2;
+  }
+}
+
+unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I)
+{
+  //v0 = (alpha, beta) and v1 = (gamma, delta)
+  ASSERT(I > 0);
+  ASSERT(v0->c[0] > -I);
+  ASSERT(v0->c[0] <= 0);
+  ASSERT(v0->c[1] > 0);
+  ASSERT(v1->c[0] < I);
+  ASSERT(v1->c[0] >= 0);
+  ASSERT(v1->c[1] > 0);
+  ASSERT(v1->c[0] - v0->c[0] >= I);
+#ifndef NDEBUG
+  for (unsigned int j = 3; j < v0->dim; j++) {
+    ASSERT(v0->c[j] == 0);
+    ASSERT(v1->c[j] == 0);
+  }
+#endif // NDEBUG
+  ASSERT(v_old->c[0] > -A - I);
+  ASSERT(v_old->c[0] <= -A);
+
+  if (v_old->c[0] <= -A + v0->c[0]) {
+    int64_vector_sub(v, v_old, v0);
+    return 0;
+  } else if (v_old->c[0] > -A - I + v1->c[0]) {
+    int64_vector_sub(v, v_old, v1);
+    return 1;
+  } else {
+    int64_vector_sub(v, v_old, v0);
+    int64_vector_sub(v, v, v1);
+    return 2;
+  }
+}
+
+static void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
+    uint64_t number_element)
+{
+  ASSERT(2*H->h[0] > 0);
+  ASSERT(v0->c[0] > -2*(int64_t)H->h[0]);
+  ASSERT(v0->c[0] <= 0);
+  ASSERT(v0->c[1] > 0);
+  ASSERT(v1->c[0] < 2*(int64_t)H->h[0]);
+  ASSERT(v1->c[0] >= 0);
+  ASSERT(v1->c[1] > 0);
+  ASSERT(v1->c[0] - v0->c[0] >= 2*(int64_t)H->h[0]);
+#ifndef NDEBUG
+  for (unsigned int j = 3; j < v0->dim; j++) {
+    ASSERT(v0->c[j] == 0);
+    ASSERT(v1->c[j] == 0);
+  }
+#endif // NDEBUG
+
+  int64_vector_t e0;
+  int64_vector_init(e0, v0->dim);
+  int64_vector_set(e0, v0);
+  int64_vector_t e1;
+  int64_vector_init(e1, v1->dim);
+  int64_vector_set(e1, v1);
+ 
+  e0->c[0] = e0->c[0] + (int64_t)(H->h[0] - 1);
+  e1->c[0] = e1->c[0] - (int64_t)(H->h[0]);
+  e0->c[1] = e0->c[1] - (int64_t)(H->h[1]);
+  e1->c[1] = e1->c[1] - (int64_t)(H->h[1]);
+
+  if (int64_vector_in_sieving_region(e0, H)) {
+    * coord_v0 = array_int64_vector_index(e0, H, number_element) - (2 *
+        (int64_t) H->h[0] - 1);
+  } else {
+    * coord_v0 = 0; 
+  }
+  if (int64_vector_in_sieving_region(e1, H)) {
+    * coord_v1 = array_int64_vector_index(e1, H, number_element);
+  } else {
+    * coord_v1 = 0;
+  }
+
+  int64_vector_clear(e0);
+  int64_vector_clear(e1);
+}
+
+void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
 
+  //Perform the Franke-Kleinjung algorithm.
   int64_vector_t * vec = malloc(sizeof(int64_vector_t) * Mqr->NumRows);
   for (unsigned int i = 0; i < Mqr->NumCols; i++) {
     int64_vector_init(vec[i], Mqr->NumRows);
@@ -599,23 +663,27 @@ void plane_sieve(mat_int64_srcptr Mqr, sieving_bound_srcptr H)
   int64_vector_init(e1, vec[1]->dim);
   int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], 2*H->h[0]);
   
+  //Find some short vectors to go from z = d to z = d + 1.
+  SV_t SV;
+  SV_init(SV);
+  SV4(SV, vec[0], vec[1], vec[2]);
+
+  //Reduce q-lattice is not possible.
   if (boolean == 0) {
-    printf("# Something strange append.\n");
     mat_int64_fprintf_comment(stdout, Mqr);
-    
+ 
+    //plane_sieve_whithout_FK(SV, vec);
+
     int64_vector_clear(e0);  
     int64_vector_clear(e1);
     for (unsigned int i = 0; i < Mqr->NumCols; i++) {
       int64_vector_clear(vec[i]);
     }
     free(vec);
+    SV_clear(SV);
 
     return;
   }
-
-  SV_t SV;
-  SV_init(SV);
-  SV4(SV, vec[0], vec[1], vec[2]);
 
   for (unsigned int i = 0; i < Mqr->NumCols; i++) {
     int64_vector_clear(vec[i]);
@@ -624,44 +692,100 @@ void plane_sieve(mat_int64_srcptr Mqr, sieving_bound_srcptr H)
 
   int64_vector_t vs;
   int64_vector_init(vs, e0->dim);
-  for (unsigned int i = 0; i < vs->dim; i++) {
-    vs->c[i] = 0;
-  }
+  int64_vector_set_zero(vs);
   int64_vector_t v;
   int64_vector_init(v, vs->dim);
 
   int64_vector_t vs_tmp;
   int64_vector_init(vs_tmp, vs->dim);
 
+  uint64_t coord_e0 = 0, coord_e1 = 0;
+  coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H, array->number_element);
+
+  //Enumerate the element of the sieving region.
   for (unsigned int d = 0; d < H->h[2]; d++) {
     int64_vector_set(v, vs);
     int64_vector_set(vs_tmp, vs);
+
+    unsigned int FK_value = 0;
+    //Say if we have a vector in the sieving region.
+    unsigned int flag_sr = 0;
+    uint64_t index_v = 0;
+
+    //Perform Franke-Kleinjung enumeration.
     while (v->c[1] < (int64_t)H->h[1]) {
       if (v->c[1] >= -(int64_t)H->h[1]) {
+        if (!flag_sr) {
+          index_v = array_int64_vector_index(v, H, array->number_element);
+          flag_sr = 1;
+        } else {
+          if (FK_value == 0) {
+            index_v = index_v + coord_e0;
+          } else if (FK_value == 1) {
+            index_v = index_v + coord_e1;
+          } else {
+            ASSERT(FK_value == 2);
+            index_v = index_v + coord_e0 + coord_e1;
+          }
+
+#ifndef NDEBUG
+          uint64_t index_tmp = array_int64_vector_index(v, H,
+              array->number_element);
+          ASSERT(index_tmp == index_v);
+#endif // NDEBUG
+
+        }
+        array->array[index_v] = array->array[index_v] - r->log;
         /*int64_vector_fprintf(stdout, v);*/
       }
       if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
         int64_vector_set(vs_tmp, v);
       }
-      enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2*(int64_t)H->h[0]);
+      FK_value = enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2 * (int64_t)
+          H->h[0]);
     }
 
+    flag_sr = 0;
     int64_vector_set(v, vs);
-    enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2*(int64_t)H->h[0]);
+    FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
+        (int64_t)H->h[0]);
     while (v->c[1] >= -(int64_t)H->h[1]) {
       if (v->c[1] < (int64_t)H->h[1]) {
+        if (!flag_sr) {
+          index_v = array_int64_vector_index(v, H, array->number_element);
+          flag_sr = 1;
+        } else {
+          if (FK_value == 0) {
+            index_v = index_v - coord_e0;
+          } else if (FK_value == 1) {
+            index_v = index_v - coord_e1;
+          } else {
+            ASSERT(FK_value == 2);
+            index_v = index_v - coord_e0 - coord_e1;
+          }
+
+#ifndef NDEBUG
+          uint64_t index_tmp = array_int64_vector_index(v, H,
+              array->number_element);
+          ASSERT(index_tmp == index_v);
+#endif // NDEBUG
+
+        }
+        array->array[index_v] = array->array[index_v] - r->log;
         /*int64_vector_fprintf(stdout, v);*/
       }
       if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
         int64_vector_set(vs_tmp, v);
       }
-      enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2*(int64_t)H->h[0]);
+      FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
+          (int64_t) H->h[0]);
     }
     int64_vector_set(vs, vs_tmp);
 
     /*printf("# Starting point: ");*/
     /*int64_vector_fprintf(stdout, vs);*/
 
+    //Jump in the next plane.
     SV_t SV_tmp;
     SV_init(SV_tmp);
     int64_vector_t v_tmp;
@@ -738,64 +862,3 @@ void plane_sieve(mat_int64_srcptr Mqr, sieving_bound_srcptr H)
   int64_vector_clear(e0);
   int64_vector_clear(e1);
 }
-
-/*Tqr = [1, 0, 707]*/
-/*[[2311, 0, 1604],
-[0, 1, 0],
-[0, 0, 1]]*/
-
-#ifdef MAIN
-int main()
-{
-  mat_int64_t Mqr;
-  mat_int64_init(Mqr, 3, 3);
-
-  /*Mqr->coeff[1][1] = 269;*/
-  /*Mqr->coeff[1][2] = 58;*/
-  /*Mqr->coeff[1][3] = 225;*/
-  /*Mqr->coeff[2][1] = 0;*/
-  /*Mqr->coeff[2][2] = 1;*/
-  /*Mqr->coeff[2][3] = 0;*/
-  /*Mqr->coeff[3][1] = 0;*/
-  /*Mqr->coeff[3][2] = 0;*/
-  /*Mqr->coeff[3][3] = 1;*/
-
-  Mqr->coeff[1][1] = 2311;
-  Mqr->coeff[1][2] = 0;
-  Mqr->coeff[1][3] = 1604;
-  Mqr->coeff[2][1] = 0;
-  Mqr->coeff[2][2] = 1;
-  Mqr->coeff[2][3] = 0;
-  Mqr->coeff[3][1] = 0;
-  Mqr->coeff[3][2] = 0;
-  Mqr->coeff[3][3] = 1;
-
-  /*Mqr->coeff[1][1] = 1117;*/
-  /*Mqr->coeff[1][2] = 559;*/
-  /*Mqr->coeff[1][3] = 381;*/
-  /*Mqr->coeff[2][1] = 0;*/
-  /*Mqr->coeff[2][2] = 1;*/
-  /*Mqr->coeff[2][3] = 0;*/
-  /*Mqr->coeff[3][1] = 0;*/
-  /*Mqr->coeff[3][2] = 0;*/
-  /*Mqr->coeff[3][3] = 1;*/
-  
-  sieving_bound_t H;
-  sieving_bound_init(H, 3);
-  H->h[0] = 128;
-  H->h[1] = 128;
-  H->h[2] = 128;
-
-  /*SV_t SV;*/
-  /*SV_init(SV);*/
-  /*SV4_Mqr(SV, Mqr);*/
-  /*SV_fprintf(stdout, SV);*/
-  /*SV_clear(SV);*/
-
-  plane_sieve(Mqr, H);
-  mat_int64_clear(Mqr);
-  sieving_bound_clear(H);
-
-  return 0;
-}
-#endif // MAIN

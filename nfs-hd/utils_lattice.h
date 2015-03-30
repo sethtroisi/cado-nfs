@@ -6,6 +6,8 @@
 #include "utils.h"
 #include "int64_vector.h"
 #include "mat_int64.h"
+#include "array.h"
+#include "ideal.h"
 
 typedef struct
 {
@@ -45,10 +47,15 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
 int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
     int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I);
 
+void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
+         int64_vector_srcptr v1_root, int64_vector_srcptr v2);
+
+void SV4_Mqr(SV_ptr SV, mat_int64_srcptr Mqr);
+
 int reduce_qlattice_zero(int64_vector_ptr v0, int64_vector_ptr v1,
                          int64_vector_srcptr v0_root,
                          int64_vector_srcptr v1_root, int64_t I);
-
+#if 0
 void enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
                       int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A,
                       int64_t I);
@@ -58,11 +65,17 @@ void enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
                       int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A,
                       int64_t I);
 
-void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
-         int64_vector_srcptr v1_root, int64_vector_srcptr v2);
-
-void SV4_Mqr(SV_ptr SV, mat_int64_srcptr Mqr);
-
 void plane_sieve(mat_int64_srcptr Mqr, sieving_bound_srcptr H);
+#else
 
+unsigned int enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I);
+
+unsigned int enum_res_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I);
+
+void plane_sieve_array(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
+    sieving_bound_srcptr H);
+
+#endif
 #endif // UTILS_SIEVE_H

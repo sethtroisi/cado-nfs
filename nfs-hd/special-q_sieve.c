@@ -730,7 +730,7 @@ void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
   if (ci < (int64_t)H->h[i]) {
     //Change the ith coordinate of c.
     int64_vector_setcoordinate(c, i, ci);
-    array_int64_vector_index(&index, c, H, array->number_element);
+    index = array_int64_vector_index(c, H, array->number_element);
     array->array[index] = array->array[index] - ideal->log;
 
     mode_sieve(H, index, array, matrix, f, ideal, c, number_c_l, 1);
@@ -848,7 +848,7 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
 
   if (nul == 1) {
     uint64_t index = 0;
-    array_mpz_vector_index(&index, c, H, array->number_element);
+    index = array_mpz_vector_index(c, H, array->number_element);
     array->array[index] = array->array[index] -
       ideal->log;
 
@@ -996,7 +996,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         mat_int64_init(Mqr, H->t, H->t);
 
         compute_Mqr_1(Mqr, Tqr, H->t, r);
-        plane_sieve(Mqr, H);
+        plane_sieve_array(array, r, Mqr, H);
 
         mat_int64_clear(Mqr);
     }
