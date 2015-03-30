@@ -4,36 +4,10 @@
 #include <stdlib.h>
 #include "macros.h"
 
-void gmp_abs(mpz_ptr a, mpz_srcptr b)
-{
-  if (mpz_cmp_si(b, 0) < 0) {
-    mpz_mul_si(a, b, -1);
-    return;
-  }
-  mpz_set(a, b);
-}
-
-void gmp_max(mpz_ptr max, mpz_srcptr a, mpz_srcptr b)
-{
-  if (mpz_cmp(a, b) < 0) {
-    mpz_set(max, b);
-  } else if (mpz_cmp(a, b) > 0) {
-    mpz_set(max, a);
-  } else {
-    mpz_set(max, a);
-  }
-}
-
-void gmp_factorial_int(mpz_ptr res, int a)
-{
-  mpz_set_si(res, 1);
-  for (int i = 2; i <= a; i++) {
-    mpz_mul_si(res, res, i);
-  }
-}
-
 void factor_init(factor_ptr factor, unsigned int number)
 {
+  ASSERT(number > 0);
+
   factor->number = number;
   factor->factorization = (mpz_t * ) malloc(sizeof(mpz_t) * number);
   for (unsigned int i = 0; i < number; i++) {
@@ -53,6 +27,7 @@ void factor_clear(factor_ptr factor)
 void factor_realloc(factor_ptr factor, unsigned int number)
 {
   ASSERT(factor->number > number);
+
   for (unsigned int i = number; i < factor->number; i++) {
     mpz_clear(factor->factorization[i]);
   }
@@ -148,6 +123,7 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_t z)
     assert_facto = 0;
   }
   mpz_clear(tmp);
+
   return assert_facto;
 }
 
@@ -160,13 +136,24 @@ void factor_fprintf(FILE * file, factor_srcptr factor)
   gmp_fprintf(file, "%Zd]\n", factor->factorization[factor->number - 1]);
 }
 
-int factor_is_smooth(factor_srcptr factor, mpz_t B)
+unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort)
 {
-  for (unsigned int i = 0; i < factor->number; i++) {
-    if (mpz_cmp(factor->factorization[i], B) >= 0) {
+  if (sort) {
+    ASSERT(sort == 1);
+
+    if (mpz_cmp(factor->factorization[factor->number - 1], B) > 0) {
       return 0;
     }
+  } else {
+    ASSERT(sort == 0);
+
+    for (unsigned int i = 0; i < factor->number; i++) {
+      if (mpz_cmp(factor->factorization[i], B) > 0) {
+        return 0;
+      }
+    }
   }
+
   return 1;
 }
 
@@ -177,5 +164,6 @@ int mpz_invert_ui(mpz_ptr rop, mpz_srcptr op1, const uint64_t op2)
   mpz_set_ui(op3, op2);
   int res = mpz_invert(rop, op1, op3);
   mpz_clear(op3);
+
   return res;
 }
