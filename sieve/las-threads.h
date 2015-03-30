@@ -13,7 +13,7 @@
 struct thread_side_data_s : private NonCopyable {
   // m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
   // k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
-  bucket_array_t BA;    /* Always used */
+  bucket_array_t<bucket_update_shorthint_t> BA;    /* Always used */
   const fb_part *fb;
 
   /* For small sieve */

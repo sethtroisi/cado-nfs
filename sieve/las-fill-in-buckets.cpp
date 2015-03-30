@@ -289,7 +289,7 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
 
 static inline
-void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_t hint,
+void fill_bucket_heart(bucket_array_t<bucket_update_shorthint_t> &BA, const uint64_t x, const slice_offset_t hint,
                        const int side MAYBE_UNUSED,
                        const slice_index_t slice_index MAYBE_UNUSED, 
                        where_am_I_ptr w MAYBE_UNUSED)
@@ -317,7 +317,7 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_
 
 /* {{{ */
 void
-fill_in_buckets(bucket_array_t &orig_BA, sieve_info_srcptr const si,
+fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_srcptr const si,
                 const fb_transformed_vector *transformed_vector,
                 const int side MAYBE_UNUSED,
                 const fb_slice_interface *slice MAYBE_UNUSED,
@@ -325,7 +325,7 @@ fill_in_buckets(bucket_array_t &orig_BA, sieve_info_srcptr const si,
 {
   WHERE_AM_I_UPDATE(w, side, side);
   const slice_index_t slice_index = transformed_vector->get_index();
-  bucket_array_t BA;  /* local copy. Gain a register + use stack */
+  bucket_array_t<bucket_update_shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
   // Loop over all primes in the factor base.
   //

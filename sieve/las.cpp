@@ -1501,7 +1501,7 @@ apply_one_update (unsigned char * const S, const bucket_update_shorthint_t * con
 NOPROFILE_STATIC
 #endif
 void
-apply_one_bucket (unsigned char *S, bucket_array_t &BA, const int i,
+apply_one_bucket (unsigned char *S, bucket_array_t<bucket_update_shorthint_t> &BA, const int i,
         const fb_part *fb, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);

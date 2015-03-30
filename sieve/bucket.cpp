@@ -43,22 +43,25 @@ bucket_misalignment(const size_t sz, const size_t sr) {
 
 /* Set the read and write pointers of the buckets back to the respective bucket
    start, and set nr_slices back to 0. */
+template <typename UPDATE_TYPE>
 void
-bucket_array_t::reset_pointers()
+bucket_array_t<UPDATE_TYPE>::reset_pointers()
 {
   aligned_medium_memcpy (bucket_write, bucket_start, size_b_align);
   aligned_medium_memcpy (bucket_read,  bucket_start, size_b_align);
   nr_slices = 0;
 }
 
-bucket_array_t::bucket_array_t()
+template <typename UPDATE_TYPE>
+bucket_array_t<UPDATE_TYPE>::bucket_array_t()
   : big_data(NULL), big_size(0), bucket_write(NULL), bucket_start(NULL),
   bucket_read(NULL), slice_index(NULL), slice_start(NULL), n_bucket(0),
   bucket_size(0), size_b_align(0), nr_slices(0), alloc_slices(0)
 {
 }
 
-bucket_array_t::~bucket_array_t()
+template <typename UPDATE_TYPE>
+bucket_array_t<UPDATE_TYPE>::~bucket_array_t()
 {
   physical_free (big_data, big_size);
   free (slice_index);
@@ -68,8 +71,9 @@ bucket_array_t::~bucket_array_t()
   free_pagealigned(bucket_write);
 }
 
+template <typename UPDATE_TYPE>
 void
-bucket_array_t::move(bucket_array_t &other)
+bucket_array_t<UPDATE_TYPE>::move(bucket_array_t<UPDATE_TYPE> &other)
 {
 #define MOVE_ENTRY(x, zero) do {x = other.x; other.x = zero;} while(0)
   MOVE_ENTRY(big_data, NULL);
@@ -90,31 +94,32 @@ bucket_array_t::move(bucket_array_t &other)
 /* Allocate enough memory to be able to store _n_bucket buckets, each of at
    least min_bucket_size entries. If enough (or more) memory was already
    allocated, does not shrink the allocation. */
+template <typename UPDATE_TYPE>
 void
-bucket_array_t::allocate_memory(const uint32_t new_n_bucket,
+bucket_array_t<UPDATE_TYPE>::allocate_memory(const uint32_t new_n_bucket,
                                 const size_t min_bucket_size,
                                 const slice_index_t prealloc_slices)
 {
-  const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(bucket_update_shorthint_t));
-  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(bucket_update_shorthint_t);
+  const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(UPDATE_TYPE));
+  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(UPDATE_TYPE);
   const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
 
   if (new_big_size > big_size) {
     if (big_data != NULL)
       physical_free (big_data, big_size);
     verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %zu update entries of %zu bytes each\n",
-                         new_big_size, new_n_bucket, new_bucket_size, sizeof(bucket_update_shorthint_t));
+                         new_big_size, new_n_bucket, new_bucket_size, sizeof(UPDATE_TYPE));
     big_size = new_big_size;
-    big_data = (bucket_update_shorthint_t *) physical_malloc (big_size, 1);
+    big_data = (UPDATE_TYPE *) physical_malloc (big_size, 1);
   }
   bucket_size = new_bucket_size;
   n_bucket = new_n_bucket;
 
   if (new_size_b_align > size_b_align) {
     size_b_align = new_size_b_align;
-    bucket_write = (bucket_update_shorthint_t **) malloc_pagealigned (size_b_align);
-    bucket_start = (bucket_update_shorthint_t **) malloc_aligned (size_b_align, 0x40);
-    bucket_read = (bucket_update_shorthint_t **) malloc_aligned (size_b_align, 0x40);
+    bucket_write = (UPDATE_TYPE **) malloc_pagealigned (size_b_align);
+    bucket_start = (UPDATE_TYPE **) malloc_aligned (size_b_align, 0x40);
+    bucket_read = (UPDATE_TYPE **) malloc_aligned (size_b_align, 0x40);
   }
 
   /* This requires size_b_align to have been set to the new value */
@@ -128,8 +133,9 @@ bucket_array_t::allocate_memory(const uint32_t new_n_bucket,
   reset_pointers();
 }
 
+template <typename UPDATE_TYPE>
 void
-bucket_array_t::realloc_slice_start(const size_t extra_space)
+bucket_array_t<UPDATE_TYPE>::realloc_slice_start(const size_t extra_space)
 {
   const size_t new_alloc_slices = alloc_slices + extra_space;
   verbose_output_print(0, 3, "# Reallocating BA->slice_start from %zu entries to %zu entries\n",
@@ -137,7 +143,7 @@ bucket_array_t::realloc_slice_start(const size_t extra_space)
 
   const size_t old_size = size_b_align * alloc_slices;
   const size_t new_size = size_b_align * new_alloc_slices;
-  slice_start = (bucket_update_shorthint_t **) realloc_aligned(slice_start, old_size, new_size, 0x40);
+  slice_start = (UPDATE_TYPE **) realloc_aligned(slice_start, old_size, new_size, 0x40);
   ASSERT_ALWAYS(slice_start != NULL);
   slice_index = (slice_index_t *) realloc(slice_index, new_alloc_slices * sizeof(slice_index_t));
   ASSERT_ALWAYS(slice_index != NULL);
@@ -145,8 +151,9 @@ bucket_array_t::realloc_slice_start(const size_t extra_space)
 }
 
 /* Returns how full the fullest bucket is, as a fraction of its size */
+template <typename UPDATE_TYPE>
 double
-bucket_array_t::max_full () const
+bucket_array_t<UPDATE_TYPE>::max_full () const
 {
   unsigned int max = 0;
   for (unsigned int i = 0; i < n_bucket; ++i)
@@ -156,6 +163,10 @@ bucket_array_t::max_full () const
     }
   return (double) max / (double) bucket_size;
 }
+
+/* Instantiate concrete classes that we need or some methods do not get
+   compiled and cause "undefined reference" errors during linking. */
+template class bucket_array_t<bucket_update_shorthint_t>;
 
 
 #ifdef HAVE_K_BUCKETS
@@ -332,7 +343,7 @@ bucket_single<UPDATE_TYPE>::sort()
 }
 
 void
-bucket_primes_t::purge (const bucket_array_t &BA,
+bucket_primes_t::purge (const bucket_array_t<bucket_update_shorthint_t> &BA,
               const int i, const fb_part *fb, const unsigned char *S)
 {
   ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);
@@ -355,7 +366,7 @@ bucket_primes_t::purge (const bucket_array_t &BA,
 }
 
 void
-bucket_array_complete::purge (const bucket_array_t &BA, 
+bucket_array_complete::purge (const bucket_array_t<bucket_update_shorthint_t> &BA, 
               const int i, const unsigned char *S)
 {
   ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);
