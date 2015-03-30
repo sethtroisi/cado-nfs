@@ -67,7 +67,7 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
 #endif
 }
 
-void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
+uint64_t array_mpz_vector_index(mpz_vector_srcptr v,
     sieving_bound_srcptr H, MAYBE_UNUSED uint64_t number_element)
 {
 #ifndef NDEBUG
@@ -91,22 +91,24 @@ void array_mpz_vector_index(uint64_t * index, mpz_vector_srcptr v,
   uint64_t prod = 1;
   unsigned int k = 0;
   mpz_set(tmp, v->c[k]);
-  * index = (uint64_t)(mpz_get_si(tmp) + H->h[k]);
+  uint64_t index = (uint64_t)(mpz_get_si(tmp) + H->h[k]);
 
   for (k = 1; k < v->dim - 1; k++) {
     prod = prod * (2 * H->h[k - 1]);
     mpz_set(tmp, v->c[k]);
-    * index = * index + (uint64_t)(mpz_get_si(tmp) + H->h[k]) * prod;
+    index = index + (uint64_t)(mpz_get_si(tmp) + H->h[k]) * prod;
   }
   prod = prod * (2 * H->h[k - 1]);
   mpz_set(tmp, v->c[k]);
-  * index = * index + (uint64_t)(mpz_get_si(tmp)) * prod;
+  index = index + (uint64_t)(mpz_get_si(tmp)) * prod;
   mpz_clear(tmp);
 
-  ASSERT(* index < number_element);
+  ASSERT(index < number_element);
+
+  return index;
 }
 
-void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
+uint64_t array_int64_vector_index(int64_vector_srcptr v,
     sieving_bound_srcptr H, MAYBE_UNUSED uint64_t number_element)
 {
 #ifndef NDEBUG
@@ -124,14 +126,16 @@ void array_int64_vector_index(uint64_t * index, int64_vector_srcptr v,
 
   uint64_t prod = 1;
   unsigned int k = 0;
-  * index = (uint64_t)v->c[k] + H->h[k];
+  uint64_t index = (uint64_t)v->c[k] + H->h[k];
 
   for (k = 1; k < v->dim - 1; k++) {
     prod = prod * (2 * H->h[k - 1]);
-    * index = * index + ((uint64_t)v->c[k] + H->h[k]) * prod;
+    index = index + ((uint64_t)v->c[k] + H->h[k]) * prod;
   }
   prod = prod * (2 * H->h[k - 1]);
-  * index = * index + (uint64_t)(v->c[k]) * prod;
+  index = index + (uint64_t)(v->c[k]) * prod;
 
-  ASSERT(* index < number_element);
+  ASSERT(index < number_element);
+
+  return index;
 }
