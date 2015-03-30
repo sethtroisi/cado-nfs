@@ -20,6 +20,7 @@ add_executable(test_generate_composite_numbers
   ${SRC_UTILS})
 target_link_libraries(test_generate_composite_numbers ${LIB_EXEC})
 run_test (test_generate_composite_numbers test_generate_composite_numbers)
+set_test_build_depends (test_generate_composite_numbers test_generate_composite_numbers)
 
 
 add_executable(test_generate_strategies
@@ -29,6 +30,7 @@ add_executable(test_generate_strategies
   ${SRC_UTILS})
 target_link_libraries(test_generate_strategies ${LIB_EXEC})
 run_test (test_generate_strategies test_generate_strategies)
+set_test_build_depends (test_generate_strategies test_generate_strategies)
 
 add_executable(test_filtering
   test_filtering.c
@@ -37,6 +39,7 @@ add_executable(test_filtering
 
 target_link_libraries(test_filtering ${LIB_EXEC})
 run_test (test_filtering test_filtering)
+set_test_build_depends(test_filtering test_filtering)
 
 add_executable(test_benchfm
   test_benchfm.c
@@ -44,10 +47,12 @@ add_executable(test_benchfm
   ${SRC_UTILS})
 target_link_libraries(test_benchfm ${LIB_EXEC})
 run_test (test_benchfm test_benchfm)
+set_test_build_depends(test_benchfm test_benchfm)
+
 
 if(DEFINED ENV{CHECKS_EXPENSIVE})
-    add_dependencies(check gfm benchfm gst finalst)
     run_test(strategies_main_script ${CMAKE_CURRENT_SOURCE_DIR}/test_main_script.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
+    set_test_build_depends(strategies_main_script gfm benchfm gst finalst)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
 add_subdirectory (utils_st)
