@@ -166,7 +166,7 @@ bucket_array_t<UPDATE_TYPE>::max_full () const
 
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */
-template struct bucket_array_t<bucket_update_shorthint_t>;
+template class bucket_array_t<bucket_update_shorthint_t>;
 
 
 /* A compare function suitable for sorting updates in order of ascending x
