@@ -345,6 +345,7 @@ struct plattice_sieve_entry : public plattice_info_t {
 
 /* Class for enumerating lattice points with the Franke-Kleinjung algorithm */
 class plattice_enumerate_t {
+protected:
     const plattice_x_t inc_a, inc_c;
     const uint32_t bound0, bound1;
     const plattice_x_t IJ;
@@ -374,6 +375,27 @@ public:
     plattice_x_t get_x() const {return x;}
 };
 
+/* Also enumerates lattice points, but probably_coprime() does a full gcd()
+   to ensure that points are really coprime. Very slow. */
+class plattice_enumerate_coprime_t : public plattice_enumerate_t {
+  unsigned long u, v;
+public:
+  plattice_enumerate_coprime_t(const plattice_info_t &basis, const int logI, uint32_t J)
+    : plattice_enumerate_t(basis, logI, J), u(0), v(0) {}
+  void next() {
+    uint32_t i = x & maskI;
+    if (i >= bound1) {
+      x += inc_a; u++;
+    }
+    if (i < bound0) {
+      x += inc_c;
+      v++;
+    }
+  }
+  bool probably_coprime() const {
+    return (x & even_mask) != 0 && gcd_ul(u, v) == 1;
+  }
+};
 
 /* This is for working with congruence classes only */
 /* NOPROFILE_INLINE */

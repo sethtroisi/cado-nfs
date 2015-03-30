@@ -35,38 +35,6 @@ static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 1
  * Global DEFINEs for fill_in_buckets, fill_in_k_buckets, fill_in_m_buckets 
  **************************************************************************/
 
-/* Do we test for co-primality of i,j before writing a bucket update?
-   With SKIP_GCD_UV, we test that gcd(u,v) = 1, where (i,j)~ = M_p (u,v)~.
-   Without SKIP_GCD_UV, but with SKIP_GCD3, we test whether 3 | gcd(i,j).
-   With neither defined, we don't test except for the hard-coded test of
-   2 | gcd(i,j) */
-
-// #define SKIP_GCD_UV 1
-
-/* Return if a is divisible by 3 */
-#ifdef SKIP_GCD3
-static inline int 
-is_divisible_3_u32 (uint32_t a)
-{
-  return (a * (- (UINT32_MAX / 3)) <= UINT32_MAX / 3);
-}
-#endif
-
-#ifdef SKIP_GCD_UV
-    #define INCREASE_UV(uv) do {(uv)++;} while(0)
-    #define PROBABLY_COPRIME_IJ(u,v) (gcd_ul(u, v) == 1)
-#else
-    #define INCREASE_UV(uv) do {} while(0)
-    #ifdef SKIP_GCD3
-    #define PROBABLY_COPRIME_IJ(u,v)			\
-         (!is_divisible_3_u32 (i + I) ||			\
-          !is_divisible_3_u32 ((uint32_t) (x >> logI)))			
-    #else
-    #define PROBABLY_COPRIME_IJ(u,v) 1
-    #endif
-#endif
-
-
 #ifdef HAVE_SSE2							
 #define FILL_BUCKET_PREFETCH(PT) do {				\
     _mm_prefetch((char *)(PT), _MM_HINT_T0);			\
@@ -75,17 +43,6 @@ is_divisible_3_u32 (uint32_t a)
 #define FILL_BUCKET_PREFETCH(PT)
 #endif
 
-#define FILL_BUCKET_INC_X() do {					\
-    if (i >= bound1) {							\
-      x += inc_a;							\
-      INCREASE_UV(u);							\
-    }									\
-    if (i < bound0) {							\
-      x += inc_c;							\
-      INCREASE_UV(v);							\
-    }									\
-  } while (0)
-/************************************************************************/
 
 #ifdef USE_CACHEBUFFER
 DECLARE_CACHE_BUFFER(bucket_update_shorthint_t, 256)
@@ -288,20 +245,12 @@ fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_s
   const uint32_t logI = si->conf->logI;
   bucket_array_t<bucket_update_shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
-  // Loop over all primes in the factor base.
-  //
-  // Note that dispatch_fb already arranged so that all the primes
-  // which appear here are >= bucket_thresh and <= pmax (the latter
-  // being for the moment unconditionally set to FBPRIME_MAX by the
-  // caller of dispatch_fb).
   
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
 
   for (fb_transformed_vector::const_iterator pl_it = transformed_vector->begin();
        pl_it != transformed_vector->end(); pl_it++) {
-    /* If we sieve for special-q's smaller than the factor
-       base bound, the prime p might equal the special-q prime q. */
 
 #if 0
     printf("%s(): sieving side=%d, p=%u, logp = %u, a = (%d, %u), b = (%u, %u)\n", 
