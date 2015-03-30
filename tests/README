@@ -1,9 +1,10 @@
 This tests/ directory contains many tests.
 
 To run them, run "make check" at the top-level cado-nfs directory.
-Be aware that "make test" is *not* equivalent: this will skip some
-test-specific compilation and might fail, depending on what you did
-before.
+
+Note that "make check" and "make test" do the same thing (although the
+former enables some extra verbose flags). The reason why both exist is
+historical only.
 
 ** Running tests in parallel
 ----------------------------
@@ -16,6 +17,11 @@ In order to get parallelism during the tests themselves, use:
 The combination
   make -j check ARGS="-j"
 should work and use parallelism at every level.
+
+Of course you are free to cap the number of processes spawned, by
+providing an integer argument to the -j option. Note that running tests
+also entails some build work, since tests may have dependencies which are
+not otherwise built by default.
 
 ** Running only one test
 ------------------------

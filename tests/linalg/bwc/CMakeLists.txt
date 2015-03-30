@@ -165,7 +165,7 @@ macro(test_dispatch_matmul testname)
     string_join(tail " " ${ARGN})
     # Don't split this line !
     add_test(${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-dispatch-matmul.sh bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc ${tail}")
-    set_test_build_depends(${testname} bwc_matmul dispatch mf_scan)
+    set_test_build_depends(${testname} bwc_matmul dispatch mf_scan mf_bal random_matrix)
 endmacro(test_dispatch_matmul testname)
 
 # mingw has antique bash (3.1) with different regexp syntax, and having
