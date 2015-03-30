@@ -309,7 +309,7 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_
   bucket_update_t update;
   update.x = (uint16_t) x;
   update.hint = hint;
-  push_bucket_update(BA, i, update);
+  BA.push_bucket_update(i, update);
                      
 #endif
 }
@@ -325,7 +325,8 @@ fill_in_buckets(bucket_array_t &orig_BA, sieve_info_srcptr const si,
 {
   WHERE_AM_I_UPDATE(w, side, side);
   const slice_index_t slice_index = transformed_vector->get_index();
-  bucket_array_t BA = orig_BA;  /* local copy. Gain a register + use stack */
+  bucket_array_t BA;  /* local copy. Gain a register + use stack */
+  BA.move(orig_BA);
   // Loop over all primes in the factor base.
   //
   // Note that dispatch_fb already arranged so that all the primes
@@ -388,7 +389,7 @@ fill_in_buckets(bucket_array_t &orig_BA, sieve_info_srcptr const si,
       FILL_BUCKET();
     }
   }
-  orig_BA = BA;
+  orig_BA.move(BA);
 }
 
 #ifdef HAVE_K_BUCKETS

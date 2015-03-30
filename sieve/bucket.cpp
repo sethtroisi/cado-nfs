@@ -26,7 +26,7 @@
    of the buckets which reach at the same time the end of their page is
    sufficient to slow down the code.
 */
-size_t
+static size_t
 bucket_misalignment(const size_t sz, const size_t sr) {
   size_t size; 
   if ((sz * sr * 4) & (pagesize() - 1))
@@ -41,71 +41,128 @@ bucket_misalignment(const size_t sz, const size_t sr) {
   return size;
 }
 
-/* Not really interesting to do this in SSE2: this function is called max 6 times... */
+/* Set the read and write pointers of the buckets back to the respective bucket
+   start, and set nr_slices back to 0. */
 void
-bucket_start_init(void **ps, void **eps, size_t init, size_t add) {
-  for ( ; ps + 8 <= eps; ps += 8) {
-    ps[0] = (void *) init; init += add;
-    ps[1] = (void *) init; init += add;
-    ps[2] = (void *) init; init += add;
-    ps[3] = (void *) init; init += add;
-    ps[4] = (void *) init; init += add;
-    ps[5] = (void *) init; init += add;
-    ps[6] = (void *) init; init += add;
-    ps[7] = (void *) init; init += add;
+bucket_array_t::reset_pointers()
+{
+  aligned_medium_memcpy (bucket_write, bucket_start, size_b_align);
+  aligned_medium_memcpy (bucket_read,  bucket_start, size_b_align);
+  nr_slices = 0;
+}
+
+bucket_array_t::bucket_array_t()
+  : big_data(NULL), big_size(0), bucket_write(NULL), bucket_start(NULL),
+  bucket_read(NULL), slice_index(NULL), slice_start(NULL), n_bucket(0),
+  bucket_size(0), size_b_align(0), nr_slices(0), alloc_slices(0)
+{
+}
+
+bucket_array_t::~bucket_array_t()
+{
+  physical_free (big_data, big_size);
+  free (slice_index);
+  free_aligned(slice_start);
+  free_aligned(bucket_read);
+  free_aligned(bucket_start);
+  free_pagealigned(bucket_write);
+}
+
+void
+bucket_array_t::move(bucket_array_t &other)
+{
+#define MOVE_ENTRY(x, zero) do {x = other.x; other.x = zero;} while(0)
+  MOVE_ENTRY(big_data, NULL);
+  MOVE_ENTRY(big_size, 0);
+  MOVE_ENTRY(bucket_write, NULL);
+  MOVE_ENTRY(bucket_start, NULL);
+  MOVE_ENTRY(bucket_read, NULL);
+  MOVE_ENTRY(slice_index, NULL);
+  MOVE_ENTRY(slice_start, NULL);
+  MOVE_ENTRY(n_bucket, 0);
+  MOVE_ENTRY(bucket_size, 0);
+  MOVE_ENTRY(size_b_align, 0);
+  MOVE_ENTRY(nr_slices, 0);
+  MOVE_ENTRY(alloc_slices, 0);
+#undef MOVE_ENTRY
+}
+
+/* Allocate enough memory to be able to store _n_bucket buckets, each of at
+   least min_bucket_size entries. If enough (or more) memory was already
+   allocated, does not shrink the allocation. */
+void
+bucket_array_t::allocate_memory(const uint32_t new_n_bucket,
+                                const size_t min_bucket_size,
+                                const slice_index_t prealloc_slices)
+{
+  const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(bucket_update_t));
+  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(bucket_update_t);
+  const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
+
+  if (new_big_size > big_size) {
+    if (big_data != NULL)
+      physical_free (big_data, big_size);
+    verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %zu update entries of %zu bytes each\n",
+                         new_big_size, new_n_bucket, new_bucket_size, sizeof(bucket_update_t));
+    big_size = new_big_size;
+    big_data = (bucket_update_t *) physical_malloc (big_size, 1);
   }
-  for (; ps < eps; *ps++ = (void *) init, init += add);
+  bucket_size = new_bucket_size;
+  n_bucket = new_n_bucket;
+
+  if (new_size_b_align > size_b_align) {
+    size_b_align = new_size_b_align;
+    bucket_write = (bucket_update_t **) malloc_pagealigned (size_b_align);
+    bucket_start = (bucket_update_t **) malloc_aligned (size_b_align, 0x40);
+    bucket_read = (bucket_update_t **) malloc_aligned (size_b_align, 0x40);
+  }
+
+  /* This requires size_b_align to have been set to the new value */
+  if (prealloc_slices > alloc_slices)
+    realloc_slice_start(prealloc_slices - alloc_slices);
+
+  /* Spread bucket_start pointers equidistantly over the big_data array */
+  for (uint32_t i_bucket = 0; i_bucket < n_bucket; i_bucket++) {
+    bucket_start[i_bucket] = big_data + i_bucket * bucket_size;
+  }
+  reset_pointers();
 }
 
-/* Set the write pointers of the normal/kilo/mega buckets, and the read
-   pointers of the normal buckets, back to the respective bucket start,
-   and set nr_slices back to 0. */
+void
+bucket_array_t::realloc_slice_start(const size_t extra_space)
+{
+  const size_t new_alloc_slices = alloc_slices + extra_space;
+  verbose_output_print(0, 3, "# Reallocating BA->slice_start from %zu entries to %zu entries\n",
+                       alloc_slices, new_alloc_slices);
+
+  const size_t old_size = size_b_align * alloc_slices;
+  const size_t new_size = size_b_align * new_alloc_slices;
+  slice_start = (bucket_update_t **) realloc_aligned(slice_start, old_size, new_size, 0x40);
+  ASSERT_ALWAYS(slice_start != NULL);
+  slice_index = (slice_index_t *) realloc(slice_index, new_alloc_slices * sizeof(slice_index_t));
+  ASSERT_ALWAYS(slice_index != NULL);
+  alloc_slices = new_alloc_slices;
+}
+
+/* Returns how full the fullest bucket is, as a fraction of its size */
+double
+bucket_array_t::max_full () const
+{
+  unsigned int max = 0;
+  for (unsigned int i = 0; i < n_bucket; ++i)
+    {
+      unsigned int j = nb_of_updates (i);
+      if (max < j) max = j;
+    }
+  return (double) max / (double) bucket_size;
+}
+
+
+#ifdef HAVE_K_BUCKETS
+
 static void
-re_init_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA) {
-  if (mBA->bucket_start) aligned_medium_memcpy (mBA->bucket_write, mBA->bucket_start, mBA->size_b_align);
+re_init_kbucket_array(k_bucket_array_t *kBA) {
   if (kBA->bucket_start) aligned_medium_memcpy (kBA->bucket_write, kBA->bucket_start, kBA->size_b_align);
-  aligned_medium_memcpy (BA->bucket_write, BA->bucket_start, BA->size_b_align);
-  aligned_medium_memcpy (BA->bucket_read,  BA->bucket_start, BA->size_b_align);
-  BA->nr_slices = 0;
-}
-
-static void
-init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t prealloc_slices, bucket_array_t *BA)
-{
-  BA->n_bucket = n_bucket;
-  BA->bucket_size = size_bucket;
-  BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
-  BA->nr_slices = 0;
-  BA->alloc_slices = prealloc_slices;
-  BA->bucket_write = (bucket_update_t **) malloc_pagealigned (BA->size_b_align);
-  BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->slice_index = (slice_index_t  *) malloc_check (BA->alloc_slices * sizeof(slice_index_t));
-  BA->slice_start = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->alloc_slices, 0x40);
-}
-
-/* This function is called only in the one pass sort in big buckets sieve.
-   The parameter diff_logp should be size_arr_logp, the number of different logp
-   in the corresponding fb_iterators.
- */
-static void
-init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const slice_index_t prealloc_slices, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
-{
-  init_bucket_array_common(n_bucket, size_bucket, prealloc_slices, BA);
-  BA->big_size = BA->n_bucket * BA->bucket_size * sizeof(bucket_update_t);
-
-  verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %" PRIu64 " update entries of %zu bytes each\n",
-                       BA->big_size, BA->n_bucket, BA->bucket_size, sizeof(bucket_update_t));
-  uint8_t *big_data = (uint8_t *) physical_malloc (BA->big_size, 1);
-
-  bucket_start_init((void **) BA->bucket_start, (void **) (BA->bucket_start + BA->n_bucket),
-		    (size_t) big_data, BA->bucket_size * sizeof(bucket_update_t));
-
-  memset (kBA, 0, sizeof(*kBA));
-
-  memset (mBA, 0, sizeof(*mBA));
-
-  re_init_bucket_array(BA, kBA, mBA);
 }
 
 static void 
@@ -144,7 +201,13 @@ init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const s
 
   memset (mBA, 0, sizeof(*mBA));
 
-  re_init_bucket_array(BA, kBA, mBA);
+  re_init_bucket_array(BA);
+  re_init_kbucket_array(kBA);
+}
+
+static void
+re_init_mbucket_array(m_bucket_array_t *mBA) {
+  if (mBA->bucket_start) aligned_medium_memcpy (mBA->bucket_write, mBA->bucket_start, mBA->size_b_align);
 }
 
 /* This function is called only in the three passes sort in big buckets sieve.
@@ -189,8 +252,11 @@ init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const s
 		    mBA->bucket_size * sizeof(k_bucket_update_t),
 		    mBA->bucket_size * sizeof(m_bucket_update_t));
 
-  re_init_bucket_array(BA, kBA, mBA);
+  re_init_bucket_array(BA);
+  re_init_kbucket_array(kBA);
+  re_init_mbucket_array(mBA);
 }
+
 
 void
 init_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA,
@@ -201,20 +267,25 @@ init_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA,
   /* The previous buckets are identical ? */
   if (BA->n_bucket == nb_buckets && BA->bucket_size == bucket_size) {
     /* Yes; so (bucket_write & bucket_read) = bucket_start; nr_slices = 0 */
-    re_init_bucket_array(BA, kBA, mBA);
+    BA->reset_pointers();
+#ifdef HAVE_K_BUCKETS
+    re_init_kbucket_array(kBA);
+    re_init_mbucket_array(mBA);
+#endif
     /* Buckets are ready to be filled */
   } else {
     /* No. We free the buckets, if we have already malloc them. */
     if (BA->n_bucket)
       clear_buckets(BA, kBA, mBA);
     /* We (re)create the buckets */
-    if (nb_buckets < THRESHOLD_K_BUCKETS) {
-      init_bucket_array   (nb_buckets, bucket_size, BA->initial_slice_alloc, BA, kBA, mBA);
-    } else if (nb_buckets < THRESHOLD_M_BUCKETS) {
+    init_bucket_array   (nb_buckets, bucket_size, BA->initial_slice_alloc, BA, kBA, mBA);
+#ifdef HAVE_K_BUCKETS
+    if (nb_buckets < THRESHOLD_M_BUCKETS) {
       init_k_bucket_array (nb_buckets, bucket_size, BA->initial_slice_alloc, BA, kBA, mBA);
     } else {
       init_m_bucket_array (nb_buckets, bucket_size, BA->initial_slice_alloc, BA, kBA, mBA);
     }
+#endif
   }
 }
 
@@ -233,45 +304,9 @@ clear_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
   if (kBA->bucket_write) free_pagealigned(kBA->bucket_write);
   if (kBA->bucket_start) free_aligned(kBA->bucket_start);
   memset(kBA, 0, sizeof(*kBA));
-
-  physical_free (BA->bucket_start[0], BA->big_size); /* Always = big_data in all BA, kBA, mBA init functions */
-  free (BA->slice_index);
-  free_aligned(BA->slice_start);
-  free_aligned(BA->bucket_read);
-  free_aligned(BA->bucket_start);
-  free_pagealigned(BA->bucket_write);
-  memset(BA, 0, sizeof(*BA));
 }
 
-
-void bucket_array_t::realloc_slice_start(const size_t extra_space)
-{
-  const size_t old_nr_entries = alloc_slices;
-  alloc_slices += extra_space;
-  verbose_output_print(0, 3, "# Reallocating BA->slice_start from %zu entries to %zu entries\n",
-                       nr_slices, old_nr_entries);
-
-  const size_t old_size = size_b_align * old_nr_entries;
-  const size_t new_size = size_b_align * alloc_slices;
-  slice_start = (bucket_update_t **) realloc_aligned(slice_start, old_size, new_size, 0x40);
-  ASSERT_ALWAYS(slice_start != NULL);
-  slice_index = (slice_index_t *) realloc(slice_index, alloc_slices * sizeof(slice_index_t));
-  ASSERT_ALWAYS(slice_index != NULL);
-}
-
-
-/* Returns how full the fullest bucket is */
-double
-buckets_max_full (const bucket_array_t BA)
-{
-  unsigned int max = 0;
-  for (unsigned int i = 0; i < BA.n_bucket; ++i)
-    {
-      unsigned int j = nb_of_updates (BA, i);
-      if (max < j) max = j;
-    }
-  return (double) max / (double) BA.bucket_size;
-}
+#endif
 
 /* A compare function suitable for sorting updates in order of ascending x
    with qsort() */
@@ -297,7 +332,7 @@ bucket_single<UPDATE_TYPE>::sort()
 }
 
 void
-bucket_primes_t::purge (const bucket_array_t BA, 
+bucket_primes_t::purge (const bucket_array_t &BA,
               const int i, const fb_part *fb, const unsigned char *S)
 {
   ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);
@@ -320,7 +355,7 @@ bucket_primes_t::purge (const bucket_array_t BA,
 }
 
 void
-bucket_array_complete::purge (const bucket_array_t BA, 
+bucket_array_complete::purge (const bucket_array_t &BA, 
               const int i, const unsigned char *S)
 {
   ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);

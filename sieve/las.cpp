@@ -1500,7 +1500,7 @@ apply_one_update (unsigned char * const S, const bucket_update_t * const u,
 NOPROFILE_STATIC
 #endif
 void
-apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
+apply_one_bucket (unsigned char *S, bucket_array_t &BA, const int i,
         const fb_part *fb, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
@@ -2761,10 +2761,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 //        thrs[0].rep->ttbuckets_fill -= seconds();
 
-        workspaces->pickup_si(si);
-
         /* Allocate buckets */
-        workspaces->buckets_alloc();
+        workspaces->pickup_si(si);
 
         thread_pool *pool = new thread_pool(las->nb_threads);
         /* Fill in rat and alg buckets */
@@ -2864,8 +2862,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (exit_after_rel_found > 1 && report->reports > 0)
             break;
       } // end of loop over special q ideals.
-
-    workspaces->buckets_free();
 
     if (recursive_descent) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");

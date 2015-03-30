@@ -11,8 +11,8 @@
 /* {{{ thread-related defines */
 /* All of this exists _for each thread_ */
 struct thread_side_data_s : private NonCopyable {
-  m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
-  k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
+  // m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
+  // k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
   bucket_array_t BA;    /* Always used */
   const fb_part *fb;
 
@@ -25,6 +25,9 @@ struct thread_side_data_s : private NonCopyable {
 
   thread_side_data_s();
   ~thread_side_data_s();
+  /* Allocate enough memory to be able to store at least n_bucket buckets,
+     each of size at least fill_ratio * bucket region size. */
+  void allocate_bucket_array(uint32_t n_bucket, double fill_ratio);
   void set_fb(const fb_part *_fb) {fb = _fb;}
   void update_checksum(){checksum_post_sieve.update(bucket_region, BUCKET_REGION);}
 };
