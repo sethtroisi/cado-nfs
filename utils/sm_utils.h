@@ -3,6 +3,28 @@
 
 #define MAX_LEN_RELSET 1024
 
+#include "mpz_poly.h"
+
+struct sm_side_info_s {
+    int nsm;
+    mpz_t ell;
+    mpz_t ell2;
+    mpz_t invl2;
+    mpz_poly_srcptr f0;
+    mpz_poly_t f;       /* monic */
+    mpz_poly_factor_list fac;
+    mpz_t exponent;
+    mpz_t * exponents;
+    mpz_t * matrix;
+};
+typedef struct sm_side_info_s sm_side_info[1];
+typedef struct sm_side_info_s * sm_side_info_ptr;
+typedef const struct sm_side_info_s * sm_side_info_srcptr;
+
+void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell);
+void sm_side_info_clear(sm_side_info_ptr sm);
+void sm_side_info_print(FILE * out, sm_side_info_srcptr sm);
+
 typedef struct {
   mpz_poly_t num[2];
   mpz_poly_t denom[2];
@@ -34,10 +56,17 @@ void sm_single_rel (mpz_poly_ptr *SM, int64_t a, uint64_t b,
 
 // Taking a polynomial modulo F as input, compute the corresponding SM
 // as a polynomial.
-void compute_sm (mpz_poly_t, mpz_poly_t, const mpz_poly_t, const mpz_t,
+void compute_sm (mpz_poly_t, mpz_poly_srcptr, const mpz_poly_t, const mpz_t,
                  const mpz_t, const mpz_t, const mpz_t);
 
 // Print coeffs of the SM polynomial
 void print_sm (FILE *, mpz_poly_t, int, int);
+
+/* This does the same as compute_sm, except that it works piecewise on
+ * the different components. It is thus noticeably faster. Results are
+ * compatible, as the change of basis is precomputed within the
+ * sm_side_info structure.
+ */
+void compute_sm_splitchunks(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm);
 
 #endif /* SM_UTILS_H_ */

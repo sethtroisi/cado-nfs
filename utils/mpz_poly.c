@@ -21,7 +21,6 @@
 #define max(a,b) ((a)<(b) ? (b) : (a))
 #endif
 
-
 MAYBE_UNUSED static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
 {
     assert(f->deg >= 0);
@@ -33,6 +32,7 @@ MAYBE_UNUSED static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f)
     assert(f->deg >= 0);
     return f->coeff[f->deg];
 }
+
 
 /* --------------------------------------------------------------------------
    Static functions
@@ -450,6 +450,7 @@ void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
         return;
     }
     if (g == f) {
+        /* rotate the coefficients, don't do any freeing */
         mpz_t * temp = malloc(i * sizeof(mpz_t));
         memcpy(temp, g->coeff, i * sizeof(mpz_t));
         memmove(g->coeff, g->coeff + i, (g->deg + 1 - i) * sizeof(mpz_t));
@@ -466,6 +467,31 @@ void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
     g->deg = f->deg - i;
 }
 
+void
+mpz_poly_mul_xi (mpz_poly_ptr g, mpz_poly_srcptr f, int i)
+{
+    if (i == 0) {
+        if (g != f) mpz_poly_set(g, f);
+        return;
+    }
+
+    mpz_poly_realloc(g, 1 + f->deg + i);
+
+    if (g == f) {
+        for(int j = g->deg ; j >= 0 ; j--) {
+            mpz_swap(g->coeff[j + i], g->coeff[j]);
+        }
+    } else {
+        for(int j = g->deg ; j >= 0 ; j--) {
+            mpz_set(g->coeff[j + i], g->coeff[j]);
+        }
+    }
+    for(int j = 0 ; j < i ; j++) {
+        mpz_set_ui(g->coeff[j], 0);
+    }
+    g->deg = f->deg + i;
+}
+
 void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a)
 {
     mpz_t aux;
@@ -476,7 +502,7 @@ void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a)
          * (coeff_i, aux) <- (coeff_{i-1} + a * coeff_i, coeff_i)
          *                   (aux + a * coeff_i, coeff_i)
          */
-        mpz_addmul(aux, f->coeff[i], a);
+        if (a) mpz_addmul(aux, f->coeff[i], a);
         mpz_swap(g->coeff[i], aux);
         if (f != g) {
             mpz_set(aux, f->coeff[i]);
@@ -1230,7 +1256,7 @@ void polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
  * Coefficients of Q are reduced mod m
  */
 void
-mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
+mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
 {
   int i;
   mpz_t aux;
@@ -1336,7 +1362,7 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
  * reduction mod m */
 void
 mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
-                                    mpz_poly_srcptr F, mpz_srcptr m)
+                                    mpz_poly_srcptr F, mpz_srcptr m, mpz_srcptr invm)
 {
   if (denom->deg == 0)
   {
@@ -1345,7 +1371,7 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
     mpz_poly_getcoeff (inv, 0, denom); /* inv <- denom[0] */
     mpz_invert (inv, inv, m);          /* inv <- denom[0]^-1 */
     mpz_poly_mul_mpz (num, num, inv);  /* num <- num * inv */
-    mpz_poly_mod_mpz (num, num, m, NULL); /* num <- num * inv mod m */
+    mpz_poly_mod_mpz (num, num, m, invm); /* num <- num * inv mod m */
     mpz_clear (inv);
   } else {
     mpz_poly_t g, U, V;
@@ -1354,7 +1380,7 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
     mpz_poly_init (V, 0);
     mpz_poly_xgcd_mpz (g, F, denom, U, V, m);
     mpz_poly_mul (num, num, V);
-    mpz_poly_mod_f_mod_mpz (num, F, m, NULL);
+    mpz_poly_mod_f_mod_mpz (num, F, m, invm);
     mpz_poly_clear (g);
     mpz_poly_clear (U);
     mpz_poly_clear (V);
@@ -1758,6 +1784,10 @@ mpz_poly_xgcd_mpz (mpz_poly_ptr d, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_pol
   mpz_poly_t q, tmp;
   mpz_poly_t gg;
 
+  if (f->deg < g->deg) {
+      mpz_poly_xgcd_mpz(d, g, f, v, u, p);
+      return;
+  }
   mpz_poly_init(gg, g->alloc);
   mpz_poly_set(d, f);
   mpz_poly_set(gg, g);
@@ -2078,7 +2108,7 @@ int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_src
      */
     mpz_poly_t f;
     mpz_poly_init(f, f0->deg);
-    mpz_poly_reduce_makemonic_mod_mpz(f, f0, p);
+    mpz_poly_makemonic_mod_mpz(f, f0, p);
     assert(mpz_cmp_ui(mpz_poly_lc_const(f), 1) == 0);
 
     int m = 0;
@@ -2137,7 +2167,7 @@ static int mpz_poly_factor_ddf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcpt
     /* factoring 0 doesn't make sense, really */
     assert(f0->deg >= 0);
 
-    mpz_poly_reduce_makemonic_mod_mpz(f, f0, p);
+    mpz_poly_makemonic_mod_mpz(f, f0, p);
     assert(mpz_cmp_ui(mpz_poly_lc_const(f), 1) == 0);
 
     /* reset the factor list completely */
@@ -2398,7 +2428,7 @@ int mpz_poly_factor(mpz_poly_factor_list lf, mpz_poly_srcptr f, mpz_srcptr p, gm
                 /* cheat a bit... */
                 mpz_poly_factor_list_prepare_write(lf, lf->size);
                 mpz_poly_swap(lf->factors[lf->size-1]->f, edfs->factors[j]->f);
-                mpz_poly_reduce_makemonic_mod_mpz(lf->factors[lf->size-1]->f, lf->factors[lf->size-1]->f, p);
+                mpz_poly_makemonic_mod_mpz(lf->factors[lf->size-1]->f, lf->factors[lf->size-1]->f, p);
                 lf->factors[lf->size-1]->m = m;
             }
         }
@@ -2407,8 +2437,105 @@ int mpz_poly_factor(mpz_poly_factor_list lf, mpz_poly_srcptr f, mpz_srcptr p, gm
     mpz_poly_factor_list_clear(ddfs);
     mpz_poly_factor_list_clear(sqfs);
 
-    /* sort factors by degree */
+    /* sort factors by degree and lexicographically */
     qsort(lf->factors, lf->size, sizeof(mpz_poly_with_m), (sortfunc_t) &mpz_poly_with_m_cmp);
 
     return lf->size;
 }
+
+int mpz_poly_number_of_real_roots(mpz_poly_srcptr f)
+{
+    /* This is coded in usp.c, with an interface pretty different from
+     * what we have here.
+     *
+     * 0.0 in usp.c means: find a bound by yourself.
+     */
+    return numberOfRealRoots(f->coeff, f->deg, 0.0, 0, NULL);
+}
+
+int mpz_poly_factor_list_lift(mpz_poly_factor_list_ptr fac, mpz_poly_srcptr f, mpz_srcptr ell, mpz_srcptr ell2)
+{
+    mpz_poly_t f1; /* f - the product of its factors mod ell */
+
+    mpz_poly_init(f1, -1);
+    mpz_poly_set(f1, f);
+
+    /* Lift all factors. Take g0 h0 unitary, g1 h1 of lesser
+     * degree.
+     * want (g0+ell*g1) * (h0 + ell*h1) = f
+     *    g1 * h0 + h1 * g0 = f1 = (f - g0 * h0) / ell
+     *
+     * say a*g0 + b*h0 = 1
+     *
+     *    a*f1 = a*g1*h0+a*h1*g0 = h1 mod h0
+     *    b*f1 = b*g1*h0+b*h1*g0 = g1 mod g0
+     *
+     */
+    mpz_poly_set_xi(f1, 0);
+    for(int i = 0 ; i < fac->size ; i++) {
+        mpz_poly_srcptr g0 = fac->factors[i]->f;
+        mpz_poly_mul_mod_f_mod_mpz(f1, f1, g0, 0, ell2, NULL);
+    }
+    mpz_poly_sub_mod_mpz(f1, f, f1, ell2);
+    mpz_poly_divexact_mpz(f1, f1, ell);
+
+    for(int i = 0 ; i < fac->size ; i++) {
+        mpz_poly_t g1, d, a, b, h0;
+        mpz_poly_ptr g = fac->factors[i]->f;
+        mpz_poly_srcptr g0 = g;   /* alias */
+        mpz_poly_init(g1, g0->deg - 1);
+        mpz_poly_init(h0, f->deg - g0->deg);
+        mpz_poly_init(d, 0);
+        mpz_poly_init(a, f->deg - g0->deg - 1);
+        mpz_poly_init(b, g0->deg - 1);
+        if (fac->factors[i]->m != 1) {
+            fprintf(stderr, "Ramified ell not supported\n");
+            exit(EXIT_FAILURE);
+        }
+        ASSERT_ALWAYS(mpz_cmp_ui(mpz_poly_lc_const(g), 1) == 0);
+        /* compute h0 = product of other factors */
+        mpz_poly_divexact(h0, f, g0, ell);
+
+        /* say a*g0 + b*h0 = 1 */
+        mpz_poly_xgcd_mpz(d, g0, h0, a, b, ell);
+        ASSERT_ALWAYS(d->deg == 0);
+        ASSERT_ALWAYS(mpz_cmp_ui(d->coeff[0], 1) == 0);
+
+        /* b*f1 = b*g1*h0+b*h1*g0 = g1 mod g0 */
+        mpz_poly_mul_mod_f_mod_mpz(g1, f1, b, g0, ell, NULL);
+
+        /* now update g */
+        mpz_poly_mul_mpz(g1, g1, ell);
+        mpz_poly_add(g, g, g1);
+
+        mpz_poly_clear(g1);
+        mpz_poly_clear(a);
+        mpz_poly_clear(b);
+        mpz_poly_clear(d);
+        mpz_poly_clear(h0);
+    }
+
+    mpz_poly_clear(f1);
+
+    return 1;
+}
+
+int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_srcptr f, mpz_srcptr ell, int prec, gmp_randstate_t rstate)
+{
+    ASSERT_ALWAYS(mpz_cmp_ui(mpz_poly_lc_const(f), 1) == 0);
+
+    mpz_poly_factor(fac, f, ell, rstate);
+    mpz_t ellx;
+    mpz_init_set(ellx, ell);
+
+    /* keep for a rainy day: compute the list of prime powers we want to
+     * pass by. (the mpz_poly_factor_list_lift function is happy to take
+     * ell^m and ell^n, with n being 2m or 2m-1). */
+    ASSERT_ALWAYS(prec == 2);
+    mpz_mul(ellx, ell, ell);
+    mpz_poly_factor_list_lift(fac, f, ell, ellx);
+    mpz_clear(ellx);
+
+    return 1;
+}
+
