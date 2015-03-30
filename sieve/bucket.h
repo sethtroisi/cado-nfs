@@ -10,6 +10,7 @@
 // #define SAFE_BUCKETS
 #ifdef SAFE_BUCKETS
 #include <stdio.h>
+#include <limits>
 #include "portability.h"
 #endif
 #include "misc.h"
@@ -45,6 +46,14 @@
  * that can contain, for instance, the low bits of p.
  */
 
+template <typename A, typename B>
+A limit_cast(const B &b)
+{
+  ASSERT_EXPENSIVE(b >= std::numeric_limits<A>::min());
+  ASSERT_EXPENSIVE(b <= std::numeric_limits<A>::max());
+  return static_cast<A>(b);
+}
+
 /* THE ORDER IS MANDATORY! */
 class bucket_update_shorthint_t {
 public:
@@ -53,19 +62,19 @@ public:
   slice_offset_t hint;
   uint16_t x;
   bucket_update_shorthint_t(){}
-  bucket_update_shorthint_t(const uint32_t offset, const slice_offset_t slice_offset)
-    : hint(slice_offset), x(offset % bucket_region) {}
-  bucket_update_shorthint_t(const uint32_t offset, const fbprime_t p MAYBE_UNUSED, const slice_offset_t slice_offset, const slice_index_t slice_index MAYBE_UNUSED)
-    : hint(slice_offset), x(offset % bucket_region) {}
+  bucket_update_shorthint_t(const uint64_t offset, const slice_offset_t slice_offset)
+    : hint(slice_offset), x(limit_cast<uint16_t>(offset)) {}
+  bucket_update_shorthint_t(const uint64_t offset, const fbprime_t p MAYBE_UNUSED, const slice_offset_t slice_offset, const slice_index_t slice_index MAYBE_UNUSED)
+    : hint(slice_offset), x(limit_cast<uint16_t>(offset)) {}
 #else
   uint16_t x;
   slice_offset_t hint;
   bucket_update_shorthint_t(){}
-  bucket_update_shorthint_t(const uint32_t offset, const slice_offset_t slice_offset)
-    : x(offset % bucket_region), hint(slice_offset) {}
+  bucket_update_shorthint_t(const uint64_t offset, const slice_offset_t slice_offset)
+    : x(limit_cast<uint16_t>(offset)), hint(slice_offset) {}
   /* Uniform interface for all update types, for use in templated functions */
-  bucket_update_shorthint_t(const uint32_t offset, const fbprime_t p MAYBE_UNUSED, const slice_offset_t slice_offset, const slice_index_t slice_index MAYBE_UNUSED)
-    : x(offset % bucket_region), hint(slice_offset) {}
+  bucket_update_shorthint_t(const uint64_t offset, const fbprime_t p MAYBE_UNUSED, const slice_offset_t slice_offset, const slice_index_t slice_index MAYBE_UNUSED)
+    : x(limit_cast<uint16_t>(offset)), hint(slice_offset) {}
 #endif
 };
 
@@ -75,12 +84,12 @@ class bucket_update_prime_t {
 public:
   static const size_t bucket_region = BUCKET_REGION;
   uint16_t x;
-  uint32_t p;
+  fbprime_t p;
   bucket_update_prime_t(){}
-  bucket_update_prime_t(const uint32_t offset, const fbprime_t p)
-    : x(offset % bucket_region), p(p) {}
-  bucket_update_prime_t(const uint32_t offset, const fbprime_t p, const slice_offset_t slice_offset MAYBE_UNUSED, const slice_index_t slice_index MAYBE_UNUSED)
-    : x(offset % bucket_region), p(p) {}
+  bucket_update_prime_t(const uint64_t offset, const fbprime_t p)
+    : x(limit_cast<uint16_t>(offset)), p(p) {}
+  bucket_update_prime_t(const uint64_t offset, const fbprime_t p, const slice_offset_t slice_offset MAYBE_UNUSED, const slice_index_t slice_index MAYBE_UNUSED)
+    : x(limit_cast<uint16_t>(offset)), p(p) {}
 };
 
 /* When purging a bucket, we don't store pointer arrays to indicate where in
@@ -95,10 +104,10 @@ public:
   slice_index_t index;
   slice_offset_t hint;
   bucket_update_longhint_t(){}
-  bucket_update_longhint_t(const uint32_t offset, const slice_offset_t slice_offset, const slice_index_t slice_index)
-    : x(offset % bucket_region), index(slice_index), hint(slice_offset) {}
-  bucket_update_longhint_t(const uint32_t offset, const fbprime_t p MAYBE_UNUSED, const slice_offset_t slice_offset, const slice_index_t slice_index)
-    : x(offset % bucket_region), index(slice_index), hint(slice_offset) {}
+  bucket_update_longhint_t(const uint64_t offset, const slice_offset_t slice_offset, const slice_index_t slice_index)
+    : x(limit_cast<uint16_t>(offset)), index(slice_index), hint(slice_offset) {}
+  bucket_update_longhint_t(const uint64_t offset, const fbprime_t p MAYBE_UNUSED, const slice_offset_t slice_offset, const slice_index_t slice_index)
+    : x(limit_cast<uint16_t>(offset)), index(slice_index), hint(slice_offset) {}
 };
 
 
@@ -215,7 +224,7 @@ public:
   }
   void push_update(const uint32_t offset, const fbprime_t p, const slice_offset_t slice_offset, const slice_index_t slice_index) {
     ASSERT_EXPENSIVE(offset / bucket_region < n_bucket);
-    push_update(offset / bucket_region, UPDATE_TYPE(offset, p, slice_offset, slice_index));
+    push_update(offset / bucket_region, UPDATE_TYPE(offset % bucket_region, p, slice_offset, slice_index));
   }
 };
 
