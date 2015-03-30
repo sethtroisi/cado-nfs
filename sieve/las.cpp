@@ -2123,6 +2123,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         }
     }
 
+    verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", surv, N);
     th->rep->survivors1 += surv;
     th->rep->survivors2 += copr;
 
