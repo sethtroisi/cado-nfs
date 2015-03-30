@@ -209,22 +209,44 @@ public:
     slice_index[nr_slices++] = new_slice_index;
   }
   double max_full () const;
-  void push_update(const int i, const UPDATE_TYPE update) {
-      
-      *bucket_write[i]++ = update; /* Pretty! */
-      if (0)
-        printf("Pushed (x=%u, hint=%u) to bucket %d, nr_slices = %u\n",
-               update.x, update.hint, i, (unsigned int) nr_slices);
+  /* Push an update to the designated bucket. Also check for overflow, if
+     SAFE_BUCKETS is defined. */
+  void push_update(const int i, const UPDATE_TYPE &update) {
 #ifdef SAFE_BUCKETS
-      if (bucket_start[i] + bucket_size <= bucket_write[i]) {
+      if (bucket_start[i] + bucket_size == bucket_write[i]) {
           fprintf(stderr, "# Warning: hit end of bucket nb %d\n", i);
-          bucket_write[i]--;
+          return;
       }
 #endif
+      *bucket_write[i]++ = update;
   }
-  void push_update(const uint32_t offset, const fbprime_t p, const slice_offset_t slice_offset, const slice_index_t slice_index) {
-    ASSERT_EXPENSIVE(offset / bucket_region < n_bucket);
-    push_update(offset / bucket_region, UPDATE_TYPE(offset % bucket_region, p, slice_offset, slice_index));
+  /* Create an update for a hit at location offset and push it to the
+     coresponding bucket */
+  void push_update(const uint64_t offset, const fbprime_t p,
+      const slice_offset_t slice_offset, const slice_index_t slice_index)
+  {
+    const uint64_t bucket_number = offset / bucket_region;
+    ASSERT_EXPENSIVE(bucket_number < n_bucket);
+    UPDATE_TYPE update(offset % bucket_region, p, slice_offset, slice_index);
+#if 0 && defined(TRACE_K)
+    /* TODO: don't define where_am_I_ptr in las-types.h, to avoid cyclic header
+       file dependencies */
+    /* TODO: need to be able to set the current region size in WHERE_AM_I,
+       so we can compute N * regionsize + offset correctly for different
+       sieving levels */
+    WHERE_AM_I_UPDATE(w, N, bucket_number);
+    WHERE_AM_I_UPDATE(w, x, update.x);
+    
+    if (trace_on_spot_x(offset)) {
+        verbose_output_print (TRACE_CHANNEL, 0, "# Pushed factor base entry (slice_index=%u, slice_offset=%u, p=%"
+                              FBPRIME_FORMAT "), hit at location (x=%u, %s) to BA[%u]\n",
+                 (unsigned int) slice_index, (unsigned int) slice_offset, p,
+                 (unsigned int) update.x, sidenames[side],
+                 (unsigned int) bucket_number);
+        ASSERT(test_divisible(w));
+      }
+#endif
+    push_update(bucket_number, update);
   }
 };
 
