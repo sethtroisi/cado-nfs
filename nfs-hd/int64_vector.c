@@ -39,6 +39,13 @@ void int64_vector_set(int64_vector_ptr v, int64_vector_srcptr s)
   }
 }
 
+void int64_vector_set_zero(int64_vector_ptr v)
+{
+  for (unsigned int i = 0; i < v->dim; i++) {
+    v->c[i] = 0;
+  }
+}
+
 int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b)
 {
   int r = (a->dim > b->dim) - (b->dim > a->dim);

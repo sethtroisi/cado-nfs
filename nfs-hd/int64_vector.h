@@ -49,6 +49,13 @@ void int64_vector_swap(int64_vector_ptr v0, int64_vector_ptr v1);
 void int64_vector_set(int64_vector_ptr v, int64_vector_srcptr s);
 
 /*
+ * Set all the coordinate of v to 0.
+ *
+ * v: the vector.
+ */
+
+void int64_vector_set_zero(int64_vector_ptr v);
+/*
  * Get the ith coefficient of v.
  *
  * v: vector.
