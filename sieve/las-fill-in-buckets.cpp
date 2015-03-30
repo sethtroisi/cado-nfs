@@ -67,21 +67,6 @@ is_divisible_3_u32 (uint32_t a)
 #endif
 
 
-#ifdef TRACE_K								
-#define FILL_BUCKET_TRACE_K(X) do {					\
-    if (trace_on_spot_x(X)) {						\
-      WHERE_AM_I_UPDATE(w, N, (X) >> 16);				\
-      WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
-      verbose_output_print (TRACE_CHANNEL, 0, "# Pushed factor base entry (%u, %u) (x=%u, %s) to BA[%u]\n",	\
-	       (unsigned int) slice_index, (unsigned int) slice_offset, (unsigned int) (uint16_t) (X), sidenames[side],	\
-	       (unsigned int) ((X) >> 16));				\
-      ASSERT(test_divisible(w));					\
-    }									\
-  } while(0)
-#else
-#define FILL_BUCKET_TRACE_K(X)
-#endif
-
 #ifdef HAVE_SSE2							
 #define FILL_BUCKET_PREFETCH(PT) do {				\
     _mm_prefetch((char *)(PT), _MM_HINT_T0);			\
@@ -288,32 +273,6 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 #endif
 
 
-static inline
-void fill_bucket_heart(bucket_array_t<bucket_update_shorthint_t> &BA, const uint64_t x, const slice_offset_t hint,
-                       const int side MAYBE_UNUSED,
-                       const slice_index_t slice_index MAYBE_UNUSED, 
-                       where_am_I_ptr w MAYBE_UNUSED)
-{
-#if 0
-  bucket_update_shorthint_t **pbut = BA.bucket_write + (x >> 16);
-  bucket_update_shorthint_t *but = *pbut;
-  FILL_BUCKET_TRACE_K(x);
-  WHERE_AM_I_UPDATE(w, N, x >> 16);
-  WHERE_AM_I_UPDATE(w, x, (uint16_t) x);
-  but->slice_offset = slice_offset;
-  but->x = (uint16_t) x;
-  *pbut = ++but;
-  FILL_BUCKET_PREFETCH(but);
-#else
-  const int i = (x >> 16);
-  bucket_update_shorthint_t update;
-  update.x = (uint16_t) x;
-  update.hint = hint;
-  BA.push_update(i, update);
-#endif
-}
-
-
 /* {{{ */
 void
 fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_srcptr const si,
@@ -324,6 +283,9 @@ fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_s
 {
   WHERE_AM_I_UPDATE(w, side, side);
   const slice_index_t slice_index = transformed_vector->get_index();
+  const uint32_t I = si->I;
+  const uint32_t J = si->J;
+  const uint32_t logI = si->conf->logI;
   bucket_array_t<bucket_update_shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
   // Loop over all primes in the factor base.
@@ -346,12 +308,12 @@ fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_s
            __func__, side, pl_it->det(), (unsigned int) slice->get_logp(), pl_it->get_a0(), pl_it->get_a1(), pl_it->get_b0(), pl_it->get_b1());
 #endif
     
-    const uint32_t I = si->I;
-    const unsigned int logI = si->conf->logI;
-    const uint32_t maskI = I-1;
-    const uint64_t even_mask = (1ULL << logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << logI;
     const slice_offset_t hint = pl_it->hint;
+#ifdef TRACE_K
+    const fbprime_t p = pl_it->det();
+#else
+    const fbprime_t p = 0;
+#endif
 
     if (pl_it->get_b0() == 0 || pl_it->get_b1() == 0) {
       /* r == 0 or r == 1/0.
@@ -365,27 +327,18 @@ fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_s
          (if any) do we sieve? */
       uint64_t x = (pl_it->b1 == 0 ? 1 : I) + (I >> 1);
      /*****************************************************************/
-      fill_bucket_heart(BA, x, hint, side, slice_index, w);
+      BA.push_update(x, p, hint, slice_index);
       continue;
     }
 
-    const uint32_t bound0 = pl_it->get_bound0(logI), bound1 = pl_it->get_bound1(logI);
-    const uint64_t inc_a = pl_it->get_inc_a(logI), inc_c = pl_it->get_inc_c(logI);
-    uint64_t x = 1ULL << (logI-1);
-    uint32_t i = x;
-    FILL_BUCKET_INC_X();
+    plattice_enumerate_t points(*pl_it, logI, J);
+    points.next(); /* Skip point (0,0) */
 
     /* Now, do the real work: the filling of the buckets */
-    while (x < IJ){
-      /***************************************************************/
-#define FILL_BUCKET() do {						\
-        unsigned int i = x & maskI;					\
-        if (LIKELY(((x & even_mask))		\
-                   )) fill_bucket_heart(BA, x, hint, slice_index, side, w);	\
-        FILL_BUCKET_INC_X();						\
-      } while (0)
-      /***************************************************************/
-      FILL_BUCKET();
+    while (!points.finished()) {
+      if (LIKELY(points.probably_coprime()))
+        BA.push_update(points.get_x(), p, hint, slice_index);
+      points.next();
     }
   }
   orig_BA.move(BA);
