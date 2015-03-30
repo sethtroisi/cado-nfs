@@ -166,7 +166,7 @@ bucket_array_t<UPDATE_TYPE>::max_full () const
 
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */
-template class bucket_array_t<bucket_update_shorthint_t>;
+template struct bucket_array_t<bucket_update_shorthint_t>;
 
 
 #ifdef HAVE_K_BUCKETS
