@@ -499,9 +499,12 @@ class DescentUpperClass(object):
             f.write("Y0: %d\n" % gg[1][1])
 
         print ("--- Sieving (initial) ---")
-
-        def construct_call(q0,q1):
-            call_that = [ general.las_bin(),
+        relsfilename = os.path.join(general.datadir(), prefix + "rels")
+        if os.path.exists(relsfilename):
+            processes = [important_file(relsfilename,[])]
+        else:
+            def construct_call(q0,q1):
+                call_that = [ general.las_bin(),
                           "-poly", polyfilename,
                           "-lim0", self.lim,
                           "-lim1", self.lim,
@@ -516,14 +519,14 @@ class DescentUpperClass(object):
                           "-q1", q1,
                           "--exit-early", 2,
                           "-t", 4
-                      ]
-            call_that = [str(x) for x in call_that]
-            return call_that
+                ]
+                call_that = [str(x) for x in call_that]
+                return call_that
 
-        call_params = [(os.path.join(general.datadir(),prefix + "rels"+"."+str(i)), # outfile
-                        self.tkewness+100000*i, #q0
-                        self.tkewness+100000*(i+1)) for i in range(self.slaves)] #q1
-        processes = [important_file(outfile, construct_call(q0,q1)) for (outfile,q0,q1) in call_params]
+            call_params = [(os.path.join(relsfilename+"."+str(i)), # outfile
+                            self.tkewness+100000*i, #q0
+                            self.tkewness+100000*(i+1)) for i in range(self.slaves)] #q1
+            processes = [important_file(outfile, construct_call(q0,q1)) for (outfile,q0,q1) in call_params]
 
         q = Queue()
         def enqueue_output(i,out,q):
@@ -542,7 +545,10 @@ class DescentUpperClass(object):
                 i,line = q.get_nowait()
             except Empty:
                 if all([not t.isAlive() for t in threads]):
-                    break
+                    if q.empty():
+                        break
+                    else:
+                        continue
             else:
                 if line[0] != '#':
                     rel = line.strip()
@@ -559,8 +565,8 @@ class DescentUpperClass(object):
                 sys.stdout.write('\n')
                 print(line.rstrip())
                 if int(foo.groups()[0]) > 0:
-                    shutil.copyfile(os.path.join(general.datadir(), prefix + "rels"+"."+str(i)),
-                                    os.path.join(general.datadir(), prefix + "rels"))
+                    if not os.path.exists(relsfilename):
+                        shutil.copyfile(relsfilename+"."+str(i),relsfilename)
                     break
 
         sys.stdout.write('\n')
