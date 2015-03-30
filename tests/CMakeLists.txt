@@ -23,7 +23,7 @@ macro(set_test_build_depends test_name)
     add_test("builddep_${test_name}" "${CMAKE_COMMAND}" --build
         ${CMAKE_BINARY_DIR} --target ${test_name}_dependencies)
     set("${test_name}_has_build_depends" 1)
-    message(STATUS "Creating dependencies for ${test_name} -- ${ARGN}")
+    # message(STATUS "Creating dependencies for ${test_name} -- ${ARGN}")
     set_tests_properties (${test_name} PROPERTIES DEPENDS "builddep_${test_name}")
 endmacro(set_test_build_depends test_name ${ARGN})
 
@@ -38,7 +38,7 @@ macro(set_test_dependencies test_name)
     endif("${test_name}_has_build_depends")
     # cmake has very quirky syntax...
     string_join(alldeps ";" ${deps})
-    message(STATUS "Updating dependencies for ${test_name} -- ${alldeps}")
+    # message(STATUS "Updating dependencies for ${test_name} -- ${alldeps}")
     set_tests_properties (${test_name} PROPERTIES DEPENDS "${alldeps}")
 endmacro(set_test_dependencies test_name ${ARGN})
 macro(build_test DSTFILE SRCFILE LIBRARIES)
