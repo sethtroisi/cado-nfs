@@ -779,6 +779,23 @@ int param_list_parse_uint(param_list pl, const char * key, unsigned int * r)
     return rc;
 }
 
+int param_list_parse_uchar(param_list pl, const char * key, unsigned char * r)
+{
+    unsigned long res;
+    int rc = param_list_parse_ulong(pl, key, &res);
+    if (rc == 0)
+        return 0;
+    if (res > UINT_MAX) {
+        fprintf(stderr, "Parse error:"
+                " parameter for key %s does not fit within an unsigned int: %ld\n",
+                key, res);
+        exit(1);
+    }
+    if (r)
+        ASSERT(res <= 255);
+        *r  = (unsigned char) res;
+    return rc;
+}
 
 int param_list_parse_double(param_list pl, const char * key, double * r)
 {
