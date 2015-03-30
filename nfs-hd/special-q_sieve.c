@@ -1281,7 +1281,7 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
     gmp_factorize(factor[i], res[i]);
 #endif
 
-    if (factor_is_smooth(factor[i], lpb[L[i]])) {
+    if (factor_is_smooth(factor[i], lpb[L[i]], 0)) {
       find++;
       I[i] = 1;
     } else {
@@ -1574,7 +1574,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   for (unsigned int i = 0; i < * V; i++) {
     char str [7];
     sprintf(str, "thresh%u", i);
-    param_list_parse_uint(pl, str, (unsigned int *) &thresh[0][i]);
+    param_list_parse_uchar(pl, str, (* thresh) + i);
   }
 
   for (unsigned int i = 0; i < * V; i++) {
