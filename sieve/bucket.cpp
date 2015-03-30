@@ -95,26 +95,26 @@ bucket_array_t::allocate_memory(const uint32_t new_n_bucket,
                                 const size_t min_bucket_size,
                                 const slice_index_t prealloc_slices)
 {
-  const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(bucket_update_t));
-  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(bucket_update_t);
+  const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(bucket_update_shorthint_t));
+  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(bucket_update_shorthint_t);
   const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
 
   if (new_big_size > big_size) {
     if (big_data != NULL)
       physical_free (big_data, big_size);
     verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %zu update entries of %zu bytes each\n",
-                         new_big_size, new_n_bucket, new_bucket_size, sizeof(bucket_update_t));
+                         new_big_size, new_n_bucket, new_bucket_size, sizeof(bucket_update_shorthint_t));
     big_size = new_big_size;
-    big_data = (bucket_update_t *) physical_malloc (big_size, 1);
+    big_data = (bucket_update_shorthint_t *) physical_malloc (big_size, 1);
   }
   bucket_size = new_bucket_size;
   n_bucket = new_n_bucket;
 
   if (new_size_b_align > size_b_align) {
     size_b_align = new_size_b_align;
-    bucket_write = (bucket_update_t **) malloc_pagealigned (size_b_align);
-    bucket_start = (bucket_update_t **) malloc_aligned (size_b_align, 0x40);
-    bucket_read = (bucket_update_t **) malloc_aligned (size_b_align, 0x40);
+    bucket_write = (bucket_update_shorthint_t **) malloc_pagealigned (size_b_align);
+    bucket_start = (bucket_update_shorthint_t **) malloc_aligned (size_b_align, 0x40);
+    bucket_read = (bucket_update_shorthint_t **) malloc_aligned (size_b_align, 0x40);
   }
 
   /* This requires size_b_align to have been set to the new value */
@@ -137,7 +137,7 @@ bucket_array_t::realloc_slice_start(const size_t extra_space)
 
   const size_t old_size = size_b_align * alloc_slices;
   const size_t new_size = size_b_align * new_alloc_slices;
-  slice_start = (bucket_update_t **) realloc_aligned(slice_start, old_size, new_size, 0x40);
+  slice_start = (bucket_update_shorthint_t **) realloc_aligned(slice_start, old_size, new_size, 0x40);
   ASSERT_ALWAYS(slice_start != NULL);
   slice_index = (slice_index_t *) realloc(slice_index, new_alloc_slices * sizeof(slice_index_t));
   ASSERT_ALWAYS(slice_index != NULL);
@@ -169,11 +169,11 @@ static void
 init_k_bucket_array_common(bucket_array_t *BA, k_bucket_array_t *kBA)
 {
   kBA->n_bucket = (BA->n_bucket >> 8) + ((unsigned char) BA->n_bucket != 0 ? 1 : 0); 
-  kBA->bucket_size = bucket_misalignment (BA->bucket_size << 8, sizeof(k_bucket_update_t));
+  kBA->bucket_size = bucket_misalignment (BA->bucket_size << 8, sizeof(k_bucket_update_shorthint_t));
   kBA->size_b_align = (sizeof(void *) * kBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
-  kBA->bucket_write = (k_bucket_update_t **) malloc_pagealigned (kBA->size_b_align);
-  kBA->bucket_start = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align, 0x40);
-  kBA->logp_idx = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align * BA->alloc_slices, 0x40);
+  kBA->bucket_write = (k_bucket_update_shorthint_t **) malloc_pagealigned (kBA->size_b_align);
+  kBA->bucket_start = (k_bucket_update_shorthint_t **) malloc_aligned (kBA->size_b_align, 0x40);
+  kBA->logp_idx = (k_bucket_update_shorthint_t **) malloc_aligned (kBA->size_b_align * BA->alloc_slices, 0x40);
 }
 
 /* This function is called only in the two passes sort in big buckets sieve.
@@ -184,20 +184,20 @@ init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const s
   init_bucket_array_common(n_bucket, size_bucket, nr_slices, BA);
   init_k_bucket_array_common(BA, kBA);
   
-  BA->big_size = kBA->bucket_size * (kBA->n_bucket * sizeof(k_bucket_update_t) + sizeof(bucket_update_t));
+  BA->big_size = kBA->bucket_size * (kBA->n_bucket * sizeof(k_bucket_update_shorthint_t) + sizeof(bucket_update_shorthint_t));
 
 #ifdef PRINT_ALLOC
   printf("# Allocating %zu bytes for %" PRIu32 " kilo-buckets of %" PRIu64 " k-update entries of %zu bytes each and one bucket of %" PRIu64 " update entries of %zu bytes each\n",
-         BA->big_size, kBA->n_bucket, kBA->bucket_size, sizeof(k_bucket_update_t), kBA->bucket_size, sizeof(bucket_update_t));
+         BA->big_size, kBA->n_bucket, kBA->bucket_size, sizeof(k_bucket_update_shorthint_t), kBA->bucket_size, sizeof(bucket_update_shorthint_t));
 #endif
   uint8_t *big_data = (uint8_t *) physical_malloc (BA->big_size, 1);
 
   bucket_start_init((void **) BA->bucket_start, (void **) (BA->bucket_start + BA->n_bucket),
-		    (size_t) big_data, BA->bucket_size * sizeof(bucket_update_t));
+		    (size_t) big_data, BA->bucket_size * sizeof(bucket_update_shorthint_t));
 
   bucket_start_init((void **) kBA->bucket_start, (void **) (kBA->bucket_start + kBA->n_bucket),
-		    (size_t) big_data + kBA->bucket_size * sizeof(bucket_update_t),
-		    kBA->bucket_size * sizeof(k_bucket_update_t));
+		    (size_t) big_data + kBA->bucket_size * sizeof(bucket_update_shorthint_t),
+		    kBA->bucket_size * sizeof(k_bucket_update_shorthint_t));
 
   memset (mBA, 0, sizeof(*mBA));
 
@@ -219,38 +219,38 @@ init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const s
   init_k_bucket_array_common(BA, kBA);
   
   mBA->n_bucket = (kBA->n_bucket >> 8) + ((unsigned char) kBA->n_bucket != 0 ? 1 : 0); 
-  mBA->bucket_size = bucket_misalignment (kBA->bucket_size << 8, sizeof(m_bucket_update_t));
+  mBA->bucket_size = bucket_misalignment (kBA->bucket_size << 8, sizeof(m_bucket_update_shorthint_t));
 
   if (mBA->n_bucket == 1) /* Only for tests */
     mBA->bucket_size = kBA->n_bucket * (kBA->bucket_size + (kBA->bucket_size >> 2));
 
   mBA->size_b_align = (sizeof(void *) * mBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
-  mBA->bucket_write = (m_bucket_update_t **) malloc_pagealigned (mBA->size_b_align);
-  mBA->bucket_start = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align, 0x40);
-  mBA->logp_idx = (m_bucket_update_t **) malloc_aligned (mBA->size_b_align * BA->alloc_slices, 0x40);
+  mBA->bucket_write = (m_bucket_update_shorthint_t **) malloc_pagealigned (mBA->size_b_align);
+  mBA->bucket_start = (m_bucket_update_shorthint_t **) malloc_aligned (mBA->size_b_align, 0x40);
+  mBA->logp_idx = (m_bucket_update_shorthint_t **) malloc_aligned (mBA->size_b_align * BA->alloc_slices, 0x40);
 
-  BA->big_size = mBA->bucket_size * (mBA->n_bucket * sizeof(m_bucket_update_t) + sizeof(k_bucket_update_t)) + kBA->bucket_size * sizeof(bucket_update_t);
+  BA->big_size = mBA->bucket_size * (mBA->n_bucket * sizeof(m_bucket_update_shorthint_t) + sizeof(k_bucket_update_shorthint_t)) + kBA->bucket_size * sizeof(bucket_update_shorthint_t);
 
 #ifdef PRINT_ALLOC
   printf("# Allocating %zu bytes for %" PRIu32 " mega-buckets of %" PRIu64 " update entries each\n",
          BA->big_size, mBA->n_bucket, mBA->bucket_size);
 
   printf("# Allocating %zu bytes for %" PRIu32 " kilo-buckets of %" PRIu64 " k-update entries of %zu bytes each and one bucket of %" PRIu64 " update entries of %zu bytes each\n",
-         BA->big_size, kBA->n_bucket, kBA->bucket_size, sizeof(k_bucket_update_t), kBA->bucket_size, sizeof(bucket_update_t));
+         BA->big_size, kBA->n_bucket, kBA->bucket_size, sizeof(k_bucket_update_shorthint_t), kBA->bucket_size, sizeof(bucket_update_shorthint_t));
 #endif
   uint8_t *big_data = (uint8_t *) physical_malloc (BA->big_size, 1);
 
   bucket_start_init((void **) BA->bucket_start, (void **) (BA->bucket_start + BA->n_bucket),
-		    (size_t) big_data, BA->bucket_size * sizeof(bucket_update_t));
+		    (size_t) big_data, BA->bucket_size * sizeof(bucket_update_shorthint_t));
   
   bucket_start_init((void **) kBA->bucket_start, (void **) (kBA->bucket_start + kBA->n_bucket),
-		    (size_t) big_data + kBA->bucket_size * sizeof(bucket_update_t),
-		    kBA->bucket_size * sizeof(k_bucket_update_t));
+		    (size_t) big_data + kBA->bucket_size * sizeof(bucket_update_shorthint_t),
+		    kBA->bucket_size * sizeof(k_bucket_update_shorthint_t));
 
   bucket_start_init((void **) mBA->bucket_start, (void **) (mBA->bucket_start + mBA->n_bucket),
-		    (size_t) big_data + kBA->bucket_size * sizeof(bucket_update_t) +
-		    mBA->bucket_size * sizeof(k_bucket_update_t),
-		    mBA->bucket_size * sizeof(m_bucket_update_t));
+		    (size_t) big_data + kBA->bucket_size * sizeof(bucket_update_shorthint_t) +
+		    mBA->bucket_size * sizeof(k_bucket_update_shorthint_t),
+		    mBA->bucket_size * sizeof(m_bucket_update_shorthint_t));
 
   re_init_bucket_array(BA);
   re_init_kbucket_array(kBA);
@@ -263,7 +263,7 @@ init_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA,
              const double max_bucket_fill_ratio, const uint32_t nb_buckets)
 {
   const size_t bucket_region = (size_t) 1 << LOG_BUCKET_REGION;
-  const size_t bucket_size = bucket_misalignment((size_t) (max_bucket_fill_ratio * bucket_region), sizeof(bucket_update_t));
+  const size_t bucket_size = bucket_misalignment((size_t) (max_bucket_fill_ratio * bucket_region), sizeof(bucket_update_shorthint_t));
   /* The previous buckets are identical ? */
   if (BA->n_bucket == nb_buckets && BA->bucket_size == bucket_size) {
     /* Yes; so (bucket_write & bucket_read) = bucket_start; nr_slices = 0 */
@@ -311,7 +311,7 @@ clear_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 /* A compare function suitable for sorting updates in order of ascending x
    with qsort() */
 int
-bucket_cmp_x (const bucket_complete_update_t *a, const bucket_complete_update_t *b)
+bucket_cmp_x (const bucket_update_longhint_t *a, const bucket_update_longhint_t *b)
 {
   if (a->x < b->x)
     return -1;
@@ -324,7 +324,7 @@ template <class UPDATE_TYPE>
 void
 bucket_single<UPDATE_TYPE>::sort()
 {
-//  qsort (start, write - start, sizeof (bucket_complete_update_t),
+//  qsort (start, write - start, sizeof (bucket_update_longhint_t),
 //	 (int(*)(const void *, const void *)) &bucket_cmp_x);
 #define islt(a,b) ((a)->x < (b)->x)
   QSORT(UPDATE_TYPE, start, write - start, islt);
@@ -339,15 +339,15 @@ bucket_primes_t::purge (const bucket_array_t &BA,
 
   for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
     const slice_index_t slice_index = BA.slice_index[i_slice];
-    const bucket_update_t *it = BA.begin(i, i_slice);
-    const bucket_update_t * const end_it = BA.end(i, i_slice);
+    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
+    const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
         const fb_slice_interface *slice = fb->get_slice(slice_index);
         ASSERT_ALWAYS(slice != NULL);
         fbprime_t p = slice->get_prime(it->hint);
-        bucket_prime_t buc = {it->x, p};
+        bucket_update_prime_t buc = {it->x, p};
         push_update(buc);
       }
     }
@@ -362,20 +362,20 @@ bucket_array_complete::purge (const bucket_array_t &BA,
 
   for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
     const slice_index_t slice_index = BA.slice_index[i_slice];
-    const bucket_update_t *it = BA.begin(i, i_slice);
-    const bucket_update_t * const end_it = BA.end(i, i_slice);
+    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
+    const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        bucket_complete_update_t buc = {it->x, slice_index, it->hint};
+        bucket_update_longhint_t buc = {it->x, slice_index, it->hint};
         push_update(buc);
       }
     }
   }
 }
 
-template class bucket_single<bucket_prime_t>;
-template class bucket_single<bucket_complete_update_t>;
+template class bucket_single<bucket_update_prime_t>;
+template class bucket_single<bucket_update_longhint_t>;
 
 
 void

@@ -103,7 +103,7 @@ is_divisible_3_u32 (uint32_t a)
 /************************************************************************/
 
 #ifdef USE_CACHEBUFFER
-DECLARE_CACHE_BUFFER(bucket_update_t, 256)
+DECLARE_CACHE_BUFFER(bucket_update_shorthint_t, 256)
 #endif
 
 #if 0
@@ -295,8 +295,8 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_
                        where_am_I_ptr w MAYBE_UNUSED)
 {
 #if 0
-  bucket_update_t **pbut = BA.bucket_write + (x >> 16);
-  bucket_update_t *but = *pbut;
+  bucket_update_shorthint_t **pbut = BA.bucket_write + (x >> 16);
+  bucket_update_shorthint_t *but = *pbut;
   FILL_BUCKET_TRACE_K(x);
   WHERE_AM_I_UPDATE(w, N, x >> 16);
   WHERE_AM_I_UPDATE(w, x, (uint16_t) x);
@@ -306,7 +306,7 @@ void fill_bucket_heart(bucket_array_t &BA, const uint64_t x, const slice_offset_
   FILL_BUCKET_PREFETCH(but);
 #else
   const int i = (x >> 16);
-  bucket_update_t update;
+  bucket_update_shorthint_t update;
   update.x = (uint16_t) x;
   update.hint = hint;
   BA.push_bucket_update(i, update);
@@ -452,8 +452,8 @@ fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
       /**************************************************************************/
 #ifdef CADO_LITTLE_ENDIAN
 #define FILL_K_BUCKET_HEART() do {					\
-	k_bucket_update_t **pkbut = kBA.bucket_write + (x >> 24);	\
-	k_bucket_update_t *kbut = *pkbut;				\
+	k_bucket_update_shorthint_t **pkbut = kBA.bucket_write + (x >> 24);	\
+	k_bucket_update_shorthint_t *kbut = *pkbut;				\
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
@@ -465,8 +465,8 @@ fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
       } while (0)
 #else
 #define FILL_K_BUCKET_HEART() do {					\
-	k_bucket_update_t **pkbut = kBA.bucket_write + (x >> 24);	\
-	volatile k_bucket_update_t *kbut = *pkbut;			\
+	k_bucket_update_shorthint_t **pkbut = kBA.bucket_write + (x >> 24);	\
+	volatile k_bucket_update_shorthint_t *kbut = *pkbut;			\
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
@@ -535,94 +535,94 @@ fill_in_k_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
   th->sides[side]->kBA = kBA;
   
   /* sort : 2nd pass; kBA -> BA */
-  bucket_update_t **pbw = BA.bucket_write;
+  bucket_update_shorthint_t **pbw = BA.bucket_write;
   for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
     uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
 #ifdef USE_CACHEBUFFER
-    bucket_update_t_256_cachebuffer cachebuf;
+    bucket_update_shorthint_t_256_cachebuffer cachebuf;
 #endif
     /* First part: we rewrite 1->256 buckets, and in the same time,
        we have to deal with the rewriting of logp_idx.
        I use a block in these part to see the range of variables */
     {
       size_t lg = (size_t) BA.bucket_write + BA.size_b_align - (size_t) pbw;
-      if (LIKELY(lg > sizeof(bucket_update_t **) << 8)) lg = sizeof(bucket_update_t **) << 8;
-      bucket_update_t **pbl = BA.logp_idx + (kb << 8);
-      k_bucket_update_t **pkbl = kBA.logp_idx + kb;
+      if (LIKELY(lg > sizeof(bucket_update_shorthint_t **) << 8)) lg = sizeof(bucket_update_shorthint_t **) << 8;
+      bucket_update_shorthint_t **pbl = BA.logp_idx + (kb << 8);
+      k_bucket_update_shorthint_t **pkbl = kBA.logp_idx + kb;
       uint8_t *kbl = (uint8_t *) *pkbl;
       /* There are BA.nr_logp duplicates of all kBA.bucket_write in kBA.logp_idx. */
       for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
 #ifdef USE_CACHEBUFFER
-        init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+        init_bucket_update_shorthint_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
 #endif
 	/* Twelve kBA records in one time : it's the nearest of a cache line (60 bytes) */
 	for (;
-	     kbs +  sizeof(k_bucket_update_t)*12 <= kbl;
-	     kbs += sizeof(k_bucket_update_t)*12) {
+	     kbs +  sizeof(k_bucket_update_shorthint_t)*12 <= kbl;
+	     kbs += sizeof(k_bucket_update_shorthint_t)*12) {
 	  /*****************************************************************/
 #ifdef CADO_LITTLE_ENDIAN
 #ifdef USE_CACHEBUFFER
 #define KBA_2_BA(A) do {						\
-	    const size_t bucket_idx = kbs[(A) + sizeof(bucket_update_t)]; \
-	    add_bucket_update_t_256_to_cachebuffer(cachebuf, bucket_idx, \
-	                                           *(bucket_update_t *) (kbs + (A))); \
+	    const size_t bucket_idx = kbs[(A) + sizeof(bucket_update_shorthint_t)]; \
+	    add_bucket_update_shorthint_t_256_to_cachebuffer(cachebuf, bucket_idx, \
+	                                           *(bucket_update_shorthint_t *) (kbs + (A))); \
 	  } while (0)
 #else
 #define KBA_2_BA(A) do {						\
-	    bucket_update_t **pbut, *but;				\
-	    pbut = pbw + kbs[(A) + sizeof(bucket_update_t)];		\
+	    bucket_update_shorthint_t **pbut, *but;				\
+	    pbut = pbw + kbs[(A) + sizeof(bucket_update_shorthint_t)];		\
 	    but = *pbut;						\
-	    memcpy(but, kbs + (A), optimal_move[sizeof(bucket_update_t)]); \
+	    memcpy(but, kbs + (A), optimal_move[sizeof(bucket_update_shorthint_t)]); \
 	    *pbut = ++but;						\
 	  } while (0)
 #endif /* USE_CACHEBUFFER */
 #else
 #define KBA_2_BA(A) do {						\
-	    bucket_update_t **pbut, *but;				\
+	    bucket_update_shorthint_t **pbut, *but;				\
 	    pbut = pbw + kbs[A];					\
 	    but = *pbut;						\
-	    memcpy(but, kbs+(A)+1, optimal_move[sizeof(bucket_update_t)]); \
+	    memcpy(but, kbs+(A)+1, optimal_move[sizeof(bucket_update_shorthint_t)]); \
 	    *pbut = ++but;						\
 	  } while (0)
 #endif
 	  /*****************************************************************/
-	  KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
-	  KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+	  KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_shorthint_t));
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*2);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*3);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*4);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*5);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*6);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*7);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*8);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*9);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*10); KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*11);
 	}
-	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+	for (; kbs < kbl; kbs += sizeof(k_bucket_update_shorthint_t)) KBA_2_BA(0);
 #ifdef USE_CACHEBUFFER
-        flush_bucket_update_t_256_cachebuffer(cachebuf);
+        flush_bucket_update_shorthint_t_256_cachebuffer(cachebuf);
 #endif
 	/* OK, let's duplicate the current (at most) 256 pointers from
 	   BA.bucket_write in BA.logp_idx */
 	aligned_medium_memcpy(pbl, pbw, lg);
-	pbl =    (bucket_update_t **) ((size_t)  pbl +  BA.size_b_align);
-	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
+	pbl =    (bucket_update_shorthint_t **) ((size_t)  pbl +  BA.size_b_align);
+	pkbl = (k_bucket_update_shorthint_t **) ((size_t) pkbl + kBA.size_b_align);
 	kbl = (uint8_t *) *pkbl;
       }
     }
     /* 2nd part: BA.logp_idx is rewritten. We finish the rewrite of the current bucket */
     const uint8_t *kbw = (uint8_t *) (kBA.bucket_write[kb]);
 #ifdef USE_CACHEBUFFER
-    init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+    init_bucket_update_shorthint_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
 #endif
     for (;
-	 kbs +  sizeof(k_bucket_update_t)*12 <= kbw;
-	 kbs += sizeof(k_bucket_update_t)*12) {
-      KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
-      KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
-      KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
-      KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
-      KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
-      KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+	 kbs +  sizeof(k_bucket_update_shorthint_t)*12 <= kbw;
+	 kbs += sizeof(k_bucket_update_shorthint_t)*12) {
+      KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_shorthint_t));
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*2);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*3);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*4);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*5);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*6);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*7);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*8);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*9);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*10); KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*11);
     }
-    for (; kbs < kbw; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+    for (; kbs < kbw; kbs += sizeof(k_bucket_update_shorthint_t)) KBA_2_BA(0);
 #ifdef USE_CACHEBUFFER
-    flush_bucket_update_t_256_cachebuffer(cachebuf);
+    flush_bucket_update_shorthint_t_256_cachebuffer(cachebuf);
 #endif
     pbw += 256;
   }
@@ -696,8 +696,8 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
       /**************************************************************************/
 #ifdef CADO_LITTLE_ENDIAN
 #define FILL_M_BUCKET_HEART() do {					\
-	m_bucket_update_t **pmbut = mBA.bucket_write + (x >> 32);	\
-	m_bucket_update_t *mbut = *pmbut;				\
+	m_bucket_update_shorthint_t **pmbut = mBA.bucket_write + (x >> 32);	\
+	m_bucket_update_shorthint_t *mbut = *pmbut;				\
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
@@ -709,8 +709,8 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
       } while (0)
 #else
 #define FILL_M_BUCKET_HEART() do {					\
-	m_bucket_update_t **pmbut = mBA.bucket_write + (x >> 32);	\
-	m_bucket_update_t *mbut = *pmbut;				\
+	m_bucket_update_shorthint_t **pmbut = mBA.bucket_write + (x >> 32);	\
+	m_bucket_update_shorthint_t *mbut = *pmbut;				\
 	FILL_BUCKET_TRACE_K(x);						\
 	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
 	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
@@ -779,7 +779,7 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
   th->sides[side]->mBA = mBA;
 
   /* sort : 2nd pass; mBA -> kBA */
-  k_bucket_update_t **pkbw = kBA.bucket_write;
+  k_bucket_update_shorthint_t **pkbw = kBA.bucket_write;
   for (uint32_t mb = 0; mb < mBA.n_bucket; ++mb) {
     uint8_t *mbs = (uint8_t *) (mBA.bucket_start[mb]);
     /* First part: we rewrite 1->256 buckets, and in the same time,
@@ -787,75 +787,75 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
        I use a block in these part to see the range of variables */
     {
       size_t lg = (size_t) kBA.bucket_write + kBA.size_b_align - (size_t) pkbw;
-      if (LIKELY(lg > sizeof(k_bucket_update_t **) << 8)) lg = sizeof(k_bucket_update_t **) << 8;
-      k_bucket_update_t **pkbl = kBA.logp_idx + (mb << 8);
-      m_bucket_update_t **pmbl = mBA.logp_idx + mb;
+      if (LIKELY(lg > sizeof(k_bucket_update_shorthint_t **) << 8)) lg = sizeof(k_bucket_update_shorthint_t **) << 8;
+      k_bucket_update_shorthint_t **pkbl = kBA.logp_idx + (mb << 8);
+      m_bucket_update_shorthint_t **pmbl = mBA.logp_idx + mb;
       uint8_t *mbl = (uint8_t *) *pmbl;
       /* There are BA.nr_logp duplicates of all mBA.bucket_write in mBA.logp_idx. */
       for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
 	/* Ten mBA records in one time : it's the nearest of a cache line (60 bytes) */
 	for (;
-	     mbs +  sizeof(m_bucket_update_t)*10 <= mbl;
-	     mbs += sizeof(m_bucket_update_t)*10) {
+	     mbs +  sizeof(m_bucket_update_shorthint_t)*10 <= mbl;
+	     mbs += sizeof(m_bucket_update_shorthint_t)*10) {
 	  /*****************************************************************/
 #ifdef CADO_LITTLE_ENDIAN
 #define MBA_2_KBA(A) do {						\
-	    k_bucket_update_t **pkbut, *kbut;				\
-	    pkbut = pkbw + mbs[(A)+sizeof(k_bucket_update_t)];		\
+	    k_bucket_update_shorthint_t **pkbut, *kbut;				\
+	    pkbut = pkbw + mbs[(A)+sizeof(k_bucket_update_shorthint_t)];		\
 	    kbut = *pkbut;						\
-	    memcpy(kbut, mbs+(A), optimal_move[sizeof(k_bucket_update_t)]); \
+	    memcpy(kbut, mbs+(A), optimal_move[sizeof(k_bucket_update_shorthint_t)]); \
 	    *pkbut = ++kbut;						\
 	  } while (0)
 #else
 #define MBA_2_KBA(A) do {						\
-	    k_bucket_update_t **pkbut, *kbut;				\
+	    k_bucket_update_shorthint_t **pkbut, *kbut;				\
 	    pkbut = pkbw + mbs[A];					\
 	    kbut = *pkbut;						\
-	    memcpy(kbut, mbs+(A)+1, optimal_move[sizeof(k_bucket_update_t)]); \
+	    memcpy(kbut, mbs+(A)+1, optimal_move[sizeof(k_bucket_update_shorthint_t)]); \
 	    *pkbut = ++kbut;						\
 	  } while (0)
 #endif
 	  /*****************************************************************/
-	  MBA_2_KBA(0);	                          MBA_2_KBA(sizeof(m_bucket_update_t));
-	  MBA_2_KBA(sizeof(m_bucket_update_t)*2); MBA_2_KBA(sizeof(m_bucket_update_t)*3);
-	  MBA_2_KBA(sizeof(m_bucket_update_t)*4); MBA_2_KBA(sizeof(m_bucket_update_t)*5);
-	  MBA_2_KBA(sizeof(m_bucket_update_t)*6); MBA_2_KBA(sizeof(m_bucket_update_t)*7);
-	  MBA_2_KBA(sizeof(m_bucket_update_t)*8); MBA_2_KBA(sizeof(m_bucket_update_t)*9);
+	  MBA_2_KBA(0);	                          MBA_2_KBA(sizeof(m_bucket_update_shorthint_t));
+	  MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*2); MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*3);
+	  MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*4); MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*5);
+	  MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*6); MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*7);
+	  MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*8); MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*9);
 	}
-	for (; mbs < mbl; mbs += sizeof(m_bucket_update_t)) MBA_2_KBA(0);
+	for (; mbs < mbl; mbs += sizeof(m_bucket_update_shorthint_t)) MBA_2_KBA(0);
 	/* OK, let's duplicate the current (at most) 256 pointers in
 	   kBA.bucket_write in kBA.logp_idx */
 	aligned_medium_memcpy(pkbl, pkbw, lg);
-	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
-	pmbl = (m_bucket_update_t **) ((size_t) pmbl + mBA.size_b_align);
+	pkbl = (k_bucket_update_shorthint_t **) ((size_t) pkbl + kBA.size_b_align);
+	pmbl = (m_bucket_update_shorthint_t **) ((size_t) pmbl + mBA.size_b_align);
 	mbl = (uint8_t *) *pmbl;
       }
     }
     /* 2nd part: kBA.logp_idx is rewritten. We finish the rewrite of the current bucket */
     const uint8_t *mbw = (uint8_t *) (mBA.bucket_write[mb]);
     for (;
-	 mbs +  sizeof(m_bucket_update_t)*10 <= mbw;
-	 mbs += sizeof(m_bucket_update_t)*10) {
+	 mbs +  sizeof(m_bucket_update_shorthint_t)*10 <= mbw;
+	 mbs += sizeof(m_bucket_update_shorthint_t)*10) {
       MBA_2_KBA(0);
-      MBA_2_KBA(sizeof(m_bucket_update_t));
-      MBA_2_KBA(sizeof(m_bucket_update_t)*2);
-      MBA_2_KBA(sizeof(m_bucket_update_t)*3);
-      MBA_2_KBA(sizeof(m_bucket_update_t)*4);
-      MBA_2_KBA(sizeof(m_bucket_update_t)*5);
-      MBA_2_KBA(sizeof(m_bucket_update_t)*6);
-      MBA_2_KBA(sizeof(m_bucket_update_t)*7);
-      MBA_2_KBA(sizeof(m_bucket_update_t)*8);
-      MBA_2_KBA(sizeof(m_bucket_update_t)*9);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t));
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*2);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*3);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*4);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*5);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*6);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*7);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*8);
+      MBA_2_KBA(sizeof(m_bucket_update_shorthint_t)*9);
     }
-    for (; mbs < mbw; mbs += sizeof(m_bucket_update_t)) MBA_2_KBA(0);
+    for (; mbs < mbw; mbs += sizeof(m_bucket_update_shorthint_t)) MBA_2_KBA(0);
     pkbw += 256;
   }
   th->sides[side]->kBA = kBA;
 
   /* sort : 3th pass; kBA -> BA */
-  bucket_update_t **pbw = BA.bucket_write;
+  bucket_update_shorthint_t **pbw = BA.bucket_write;
 #ifdef USE_CACHEBUFFER
-  bucket_update_t_256_cachebuffer cachebuf;
+  bucket_update_shorthint_t_256_cachebuffer cachebuf;
 #endif
   for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
     uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
@@ -864,57 +864,57 @@ fill_in_m_buckets(thread_data *th, int side, where_am_I_ptr w MAYBE_UNUSED)
        I use a block in these part to see the range of variables */
     {
       size_t lg = (size_t) BA.bucket_write + BA.size_b_align - (size_t) pbw;
-      if (LIKELY(lg > sizeof(bucket_update_t **) << 8)) lg = sizeof(bucket_update_t **) << 8;
-      bucket_update_t **pbl = BA.logp_idx + (kb << 8);
-      k_bucket_update_t **pkbl = kBA.logp_idx + kb;
+      if (LIKELY(lg > sizeof(bucket_update_shorthint_t **) << 8)) lg = sizeof(bucket_update_shorthint_t **) << 8;
+      bucket_update_shorthint_t **pbl = BA.logp_idx + (kb << 8);
+      k_bucket_update_shorthint_t **pkbl = kBA.logp_idx + kb;
       uint8_t *kbl = (uint8_t *) *pkbl;
       /* There are BA.nr_logp duplicates of all kBA.bucket_write in kBA.logp_idx. */
       for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
 #ifdef USE_CACHEBUFFER
-        init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+        init_bucket_update_shorthint_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
 #endif
 	/* Twelve kBA records in one time : it's the nearest of a cache line (60 bytes) */
 	for (;
-	     kbs +  sizeof(k_bucket_update_t)*12 <= kbl;
-	     kbs += sizeof(k_bucket_update_t)*12) {
+	     kbs +  sizeof(k_bucket_update_shorthint_t)*12 <= kbl;
+	     kbs += sizeof(k_bucket_update_shorthint_t)*12) {
 	  /* See the define of KBA_2_BA in fill_in_k_buckets */
-	  KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
-	  KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
-	  KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+	  KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_shorthint_t));
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*2);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*3);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*4);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*5);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*6);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*7);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*8);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*9);
+	  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*10); KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*11);
 	}
-	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+	for (; kbs < kbl; kbs += sizeof(k_bucket_update_shorthint_t)) KBA_2_BA(0);
 #ifdef USE_CACHEBUFFER
-        flush_bucket_update_t_256_cachebuffer(cachebuf);
+        flush_bucket_update_shorthint_t_256_cachebuffer(cachebuf);
 #endif
 	/* OK, let's duplicate the current (at most) 256 pointers from
 	   BA.bucket_write in BA.logp_idx */
 	aligned_medium_memcpy(pbl, pbw, lg);
-	pbl =    (bucket_update_t **) ((size_t)  pbl +  BA.size_b_align);
-	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
+	pbl =    (bucket_update_shorthint_t **) ((size_t)  pbl +  BA.size_b_align);
+	pkbl = (k_bucket_update_shorthint_t **) ((size_t) pkbl + kBA.size_b_align);
 	kbl = (uint8_t *) *pkbl;
       }
     }
     /* 2nd part: BA.logp_idx is rewritten. We finish the rewrite of the current bucket */
     const uint8_t *kbw = (uint8_t *) (kBA.bucket_write[kb]);
 #ifdef USE_CACHEBUFFER
-    init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+    init_bucket_update_shorthint_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
 #endif
     for (;
-	 kbs +  sizeof(k_bucket_update_t)*12 <= kbw;
-	 kbs += sizeof(k_bucket_update_t)*12) {
-      KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
-      KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
-      KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
-      KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
-      KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
-      KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+	 kbs +  sizeof(k_bucket_update_shorthint_t)*12 <= kbw;
+	 kbs += sizeof(k_bucket_update_shorthint_t)*12) {
+      KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_shorthint_t));
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*2);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*3);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*4);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*5);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*6);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*7);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*8);  KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*9);
+      KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*10); KBA_2_BA(sizeof(k_bucket_update_shorthint_t)*11);
     }
-    for (; kbs < kbw; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+    for (; kbs < kbw; kbs += sizeof(k_bucket_update_shorthint_t)) KBA_2_BA(0);
 #ifdef USE_CACHEBUFFER
-    flush_bucket_update_t_256_cachebuffer(cachebuf);
+    flush_bucket_update_shorthint_t_256_cachebuffer(cachebuf);
 #endif
     pbw += 256;
   }

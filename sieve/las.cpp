@@ -1488,7 +1488,7 @@ void init_trace_k(sieve_info_srcptr si, param_list pl)
 NOPROFILE_STATIC
 #endif
 void
-apply_one_update (unsigned char * const S, const bucket_update_t * const u,
+apply_one_update (unsigned char * const S, const bucket_update_shorthint_t * const u,
                   const unsigned char logp, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, h, u->hint);
@@ -1507,14 +1507,14 @@ apply_one_bucket (unsigned char *S, bucket_array_t &BA, const int i,
   WHERE_AM_I_UPDATE(w, p, 0);
 
   for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
-    const bucket_update_t *it = BA.begin(i, i_slice);
-    const bucket_update_t * const it_end = BA.end(i, i_slice);
+    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
+    const bucket_update_shorthint_t * const it_end = BA.end(i, i_slice);
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fb->get_slice(slice_index)->get_logp();
 
-    const bucket_update_t *next_align;
-    if (sizeof(bucket_update_t) == 4) {
-      next_align = (bucket_update_t *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
+    const bucket_update_shorthint_t *next_align;
+    if (sizeof(bucket_update_shorthint_t) == 4) {
+      next_align = (bucket_update_shorthint_t *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
       if (UNLIKELY(next_align > it_end)) next_align = it_end;
     } else {
       next_align = it_end;
@@ -1603,7 +1603,7 @@ int factor_list_fprint(FILE *f, factor_list_t fl) {
 
 static const int bucket_prime_stats = 0;
 static long nr_bucket_primes = 0;
-static long nr_bucket_complete_hints = 0;
+static long nr_bucket_longhints = 0;
 static long nr_div_tests = 0;
 static long nr_composite_tests = 0;
 static long nr_wrap_was_composite = 0;
@@ -1613,7 +1613,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
                            bucket_primes_t *BP, const int very_verbose)
 {
   while (!BP->is_end()) {
-      const bucket_prime_t prime = BP->get_next_update();
+      const bucket_update_prime_t prime = BP->get_next_update();
       if (prime.x > x)
         {
           BP->rewind_by_1();
@@ -1648,14 +1648,14 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
                           bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
 {
   while (!purged->is_end()) {
-      const bucket_complete_update_t complete_hint = purged->get_next_update();
+      const bucket_update_longhint_t complete_hint = purged->get_next_update();
       if (complete_hint.x > x)
         {
           purged->rewind_by_1();
           break;
         }
       if (complete_hint.x == x) {
-          if (bucket_prime_stats) nr_bucket_complete_hints++;
+          if (bucket_prime_stats) nr_bucket_longhints++;
           const fb_slice_interface *slice = fb->get_slice(complete_hint.index);
           ASSERT_ALWAYS(slice != NULL);
           const unsigned long p = slice->get_prime(complete_hint.hint);

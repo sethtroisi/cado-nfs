@@ -1017,7 +1017,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 WHERE_AM_I_UPDATE(w, j, j);
                 for (unsigned int i = i0 + (q& -!(i0&1)) ; i < I; i += p+q) {
                     if (LIKELY(S_ptr[i] == 255)) continue;
-                    bucket_prime_t prime;
+                    bucket_update_prime_t prime;
                     unsigned int x = (j << (si->conf->logI)) + i;
                     if (resieve_very_verbose) {
                         verbose_output_print(0, 1, "resieve_small_bucket_region: root %"
@@ -1052,7 +1052,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             unsigned int i0 = ssdpos[i];
             // This block is for the case where p divides at (1,0).
             if (UNLIKELY(N == 0 && i0 == gI)) {
-                bucket_prime_t prime;
+                bucket_update_prime_t prime;
                 prime.p = g;
                 prime.x = 1+(I>>1);
                 ASSERT(prime.p >= si->conf->td_thresh);
@@ -1075,7 +1075,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                     /* Yes, test only odd ii-coordinates */
                     for (ii = 1; ii < I; ii += 2) {
                         if (S_ptr[ii] != 255) {
-                            bucket_prime_t prime;
+                            bucket_update_prime_t prime;
                             const unsigned int x = i0 + ii;
                             if (resieve_very_verbose_bad) {
                                 verbose_output_print(0, 1, "# resieve_small_bucket_region even j: root %"
@@ -1092,7 +1092,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                     /* No, test all ii-coordinates */
                     for (ii = 0; ii < I; ii++) {
                         if (S_ptr[ii] != 255) {
-                            bucket_prime_t prime;
+                            bucket_update_prime_t prime;
                             const unsigned int x = i0 + ii;
                             if (resieve_very_verbose_bad) {
                                 verbose_output_print(0, 1, "# resieve_small_bucket_region odd j: root %"
