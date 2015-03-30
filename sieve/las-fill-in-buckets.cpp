@@ -309,8 +309,7 @@ void fill_bucket_heart(bucket_array_t<bucket_update_shorthint_t> &BA, const uint
   bucket_update_shorthint_t update;
   update.x = (uint16_t) x;
   update.hint = hint;
-  BA.push_bucket_update(i, update);
-                     
+  BA.push_update(i, update);
 #endif
 }
 

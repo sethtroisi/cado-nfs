@@ -1506,7 +1506,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t<bucket_update_shorthint_t> &B
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
-  for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
+  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
     const bucket_update_shorthint_t * const it_end = BA.end(i, i_slice);
     const slice_index_t slice_index = BA.get_slice_index(i_slice);

@@ -196,10 +196,8 @@ void
 bucket_primes_t::purge (const bucket_array_t<bucket_update_shorthint_t> &BA,
               const int i, const fb_part *fb, const unsigned char *S)
 {
-  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);
-
-  for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
-    const slice_index_t slice_index = BA.slice_index[i_slice];
+  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+    const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
     const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
 
@@ -208,8 +206,7 @@ bucket_primes_t::purge (const bucket_array_t<bucket_update_shorthint_t> &BA,
         const fb_slice_interface *slice = fb->get_slice(slice_index);
         ASSERT_ALWAYS(slice != NULL);
         fbprime_t p = slice->get_prime(it->hint);
-        bucket_update_prime_t buc = {it->x, p};
-        push_update(buc);
+        push_update(bucket_update_prime_t(it->x, p));
       }
     }
   }
@@ -219,17 +216,14 @@ void
 bucket_array_complete::purge (const bucket_array_t<bucket_update_shorthint_t> &BA, 
               const int i, const unsigned char *S)
 {
-  ASSERT_ALWAYS(BA.nr_slices == 0 || BA.begin(i, 0) == BA.bucket_start[i]);
-
-  for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
-    const slice_index_t slice_index = BA.slice_index[i_slice];
+  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+    const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
     const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        bucket_update_longhint_t buc = {it->x, slice_index, it->hint};
-        push_update(buc);
+        push_update(bucket_update_longhint_t(it->x, it->hint, slice_index));
       }
     }
   }
