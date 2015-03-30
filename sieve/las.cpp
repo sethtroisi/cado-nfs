@@ -160,9 +160,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
 
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
         const fbprime_t fbb = si->conf->sides[side]->lim;
+        const fbprime_t powlim = si->conf->sides[side]->powlim;
         const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
-        sis->fb = new fb_factorbase(thresholds, only_general);
+        sis->fb = new fb_factorbase(thresholds, powlim, only_general);
 
         if (fbcfilename != NULL) {
             /* Try to read the factor base cache file. If that fails, because
@@ -193,7 +194,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     sis->fb->size() >> 20, tfb);
         } else {
             tfb = seconds ();
-            sis->fb->make_linear ((const mpz_t *) pol->coeff, si->conf->sides[side]->powlim);
+            sis->fb->make_linear ((const mpz_t *) pol->coeff);
             tfb = seconds () - tfb;
             verbose_output_print(0, 1, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      sis->fb->size() >> 20, tfb);
