@@ -1828,7 +1828,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
     const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
-    unsigned char * S[2] = {th->sides[0]->bucket_region, th->sides[1]->bucket_region};
+    unsigned char * S[2] = {th->sides[0].bucket_region, th->sides[1].bucket_region};
 
     for(int side = 0 ; side < 2 ; side++) {
         lps[side] = alloc_mpz_array (1);
@@ -1898,12 +1898,12 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
         for (int i = 0; i < las->nb_threads; ++i) {
             thread_data *other = th + i - th->id;
-            purged[side].purge(other->sides[side]->BA, N, SS);
+            purged[side].purge(other->sides[side].BA, N, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
            together with the primes recovered from the bucket updates */
-        resieve_small_bucket_region (&primes[side], N, SS, th->si->sides[side]->rsd, th->sides[side]->rsdpos, si, w);
+        resieve_small_bucket_region (&primes[side], N, SS, th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
 
         /* Sort the entries to avoid O(n^2) complexity when looking for
            primes during trial division */
@@ -2245,15 +2245,15 @@ void * process_bucket_region(thread_data *th)
     /* This is local to this thread */
     for(int side = 0 ; side < 2 ; side++) {
         sieve_side_info_ptr s = si->sides[side];
-        thread_side_data_ptr ts = th->sides[side];
+        thread_side_data &ts = th->sides[side];
 
         /* Compute first sieve locations hit by small primes */
-        ts->ssdpos = small_sieve_start(s->ssd, my_row0, si);
+        ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
         /* Copy those locations that correspond to re-sieved primes */
-        ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
+        ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = ts->bucket_region;
+        S[side] = ts.bucket_region;
     }
     unsigned char *SS = th->SS;
     memset(SS, 0, BUCKET_REGION);
@@ -2280,7 +2280,7 @@ void * process_bucket_region(thread_data *th)
             WHERE_AM_I_UPDATE(w, side, side);
 
             sieve_side_info_ptr s = si->sides[side];
-            thread_side_data_ptr ts = th->sides[side];
+            thread_side_data &ts = th->sides[side];
         
             /* Init norms */
             rep->tn[side] -= seconds_thread ();
@@ -2307,13 +2307,13 @@ void * process_bucket_region(thread_data *th)
             rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data *ot = th + j - th->id;
-                apply_one_bucket(SS, ot->sides[side]->BA, i, ts->fb, w);
+                apply_one_bucket(SS, ot->sides[side].BA, i, ts.fb, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
 
             /* Sieve small primes */
-            sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
+            sieve_small_bucket_region(SS, i, s->ssd, ts.ssdpos, si, side, w);
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
@@ -2329,17 +2329,17 @@ void * process_bucket_region(thread_data *th)
 
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
-            thread_side_data_ptr ts = th->sides[side];
-            small_sieve_skip_stride(s->ssd, ts->ssdpos, skiprows, si);
+            thread_side_data &ts = th->sides[side];
+            small_sieve_skip_stride(s->ssd, ts.ssdpos, skiprows, si);
             int * b = s->fb_parts_x->rs;
-            memcpy(ts->rsdpos, ts->ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
+            memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
         }
       }
 
     for(int side = 0 ; side < 2 ; side++) {
-        thread_side_data_ptr ts = th->sides[side];
-        free(ts->ssdpos);
-        free(ts->rsdpos);
+        thread_side_data &ts = th->sides[side];
+        free(ts.ssdpos);
+        free(ts.rsdpos);
     }
 
     return NULL;

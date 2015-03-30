@@ -315,7 +315,7 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
     /* Do the root transform and lattice basis reduction for this factor base slice */
     const fb_transformed_vector *transformed_vector = param->slice->make_lattice_bases(param->si->qbasis, param->si->conf->logI);
     /* Fill the buckets */
-    fill_in_buckets(th.sides[param->side]->BA, param->si, transformed_vector, param->side, param->slice, w);
+    fill_in_buckets(th.sides[param->side].BA, param->si, transformed_vector, param->side, param->slice, w);
     /* Release bucket array again */
     param->ws.release_workspace(th);
     delete transformed_vector;

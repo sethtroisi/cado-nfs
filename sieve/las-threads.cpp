@@ -4,20 +4,20 @@
 #include "las-types.h"
 #include "las-config.h"
 
-thread_side_data_s::thread_side_data_s()
+thread_side_data::thread_side_data()
 {
   /* Allocate memory for each side's bucket region */
   bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
 }
 
-thread_side_data_s::~thread_side_data_s()
+thread_side_data::~thread_side_data()
 {
   contiguous_free(bucket_region);
   bucket_region = NULL;
 }
 
 void
-thread_side_data_s::allocate_bucket_array(const uint32_t n_bucket, const double fill_ratio)
+thread_side_data::allocate_bucket_array(const uint32_t n_bucket, const double fill_ratio)
 {
   const size_t bucket_region = (size_t) 1 << LOG_BUCKET_REGION;
   const size_t bucket_size = bucket_region * fill_ratio;
@@ -52,18 +52,18 @@ void thread_data::pickup_si(sieve_info_ptr _si)
 {
   si = _si;
   for (int side = 0 ; side < 2 ; side++) {
-    sides[side]->set_fb(si->sides[side]->fb->get_part(1));
+    sides[side].set_fb(si->sides[side]->fb->get_part(1));
     /* Always allocate the max number of buckets (i.e., as if we were using the
        max value for J), even if we use a smaller J due to a poor q-lattice
        basis */
-    sides[side]->allocate_bucket_array(si->nb_buckets_max, si->sides[side]->max_bucket_fill_ratio);
+    sides[side].allocate_bucket_array(si->nb_buckets_max, si->sides[side]->max_bucket_fill_ratio);
   }
 }
 
 void thread_data::update_checksums()
 {
   for(int s = 0 ; s < 2 ; s++)
-    sides[s]->update_checksum();
+    sides[s].update_checksum();
 }
 
 thread_workspaces::thread_workspaces(const size_t n, las_info_ptr las)
@@ -142,7 +142,7 @@ thread_workspaces::buckets_max_full()
     double mf0 = 0;
     for (size_t i = 0; i < nr_workspaces; ++i) {
       for(unsigned int side = 0 ; side < 2 ; side++) {
-        double mf = thrs[i].sides[side]->BA.max_full();
+        double mf = thrs[i].sides[side].BA.max_full();
         if (mf > mf0) mf0 = mf;
       }
     }
@@ -155,7 +155,7 @@ thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
     for (size_t i = 0; i < nr_workspaces; ++i) {
         las_report_accumulate(rep, thrs[i].rep);
         for (int side = 0; side < 2; side++)
-            checksum[side].update(thrs[i].sides[side]->checksum_post_sieve);
+            checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }
 }
 
