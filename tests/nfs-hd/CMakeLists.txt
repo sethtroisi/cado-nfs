@@ -27,3 +27,9 @@ add_executable(test_makefb test_makefb.c ../../nfs-hd/makefb.c
 target_link_libraries(test_makefb ${ECM_LIBS} utils)
 include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
 run_test(test_makefb test_makefb)
+
+# -----
+add_executable(test_utils_int64 test_utils_int64.c ../../nfs-hd/utils_int64.c)
+target_link_libraries(test_utils_int64 utils)
+include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
+run_test(test_utils_int64 test_utils_int64)
