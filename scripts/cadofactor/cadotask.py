@@ -3449,8 +3449,7 @@ class FilterGaloisTask(Task):
         return "Filtering - Galois"
     @property
     def programs(self):
-        input = {"merged": Request.GET_MERGED_FILENAME,
-                 "poly": Request.GET_POLYNOMIAL_FILENAME,
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
                  "renumber": Request.GET_RENUMBER_FILENAME}
         return ((cadoprograms.GaloisFilter, ("nrels",), input),)
     @property
