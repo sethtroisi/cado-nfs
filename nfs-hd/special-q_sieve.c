@@ -165,7 +165,7 @@ void pre_computation(double * pre_compute, mpz_poly_srcptr f, unsigned int d)
  * f: a polynomial.
  * a: the polynomial for which we want to compute the norm.
  */
-void norm(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
+void norm_poly(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
 {
   mpz_poly_resultant(res, f, a);
   mpz_abs(res, res);
@@ -188,7 +188,7 @@ void mean_norm(mpz_poly_srcptr f, int64_poly_srcptr a, double q)
   mpz_t res;
   mpz_init(res);
   int64_poly_to_mpz_poly(b, a);
-  norm(res, f, b);
+  norm_poly(res, f, b);
   norm = norm + mpz_get_d(res) / q;
   mpz_poly_clear(b);
   mpz_clear(res);
@@ -224,7 +224,7 @@ void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
     mpz_poly_t tmp;
     mpz_poly_init(tmp, -1);
     int64_poly_to_mpz_poly(tmp, a);
-    norm(res, f, tmp);
+    norm_poly(res, f, tmp);
     factor_t factor;
     gmp_factorize(factor, res);
     gmp_fprintf(file, "Resultant: %Zd\n", res);
@@ -608,7 +608,7 @@ void assert_sieve(sieving_bound_srcptr H, uint64_t index,
 
   array_index_mpz_vector(v, index, H, number_element);
   mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, v);
-  norm(res, a, f);
+  norm_poly(res, a, f);
   //Verify if res = r * …
   ASSERT(mpz_congruent_ui_p(res, 0, ideal->ideal->r));
 
@@ -826,6 +826,220 @@ void line_sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
   line_sieve_ci(array, c, ideal, ci_tmp, H, i, number_c_l, matrix, f);
 }
 
+/*
+ * Plane sieve.
+ *
+ * array: the array in which we store the norms.
+ * r: the ideal we consider.
+ * Mqr: the Mqr matrix.
+ * H: the sieving bound that defines the sieving region.
+ */
+void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
+{
+  ASSERT(Mqr->NumRows == Mqr->NumCols);
+  ASSERT(Mqr->NumRows == 3);
+
+  //Perform the Franke-Kleinjung algorithm.
+  int64_vector_t * vec = malloc(sizeof(int64_vector_t) * Mqr->NumRows);
+  for (unsigned int i = 0; i < Mqr->NumCols; i++) {
+    int64_vector_init(vec[i], Mqr->NumRows);
+    mat_int64_extract_vector(vec[i], Mqr, i);
+  }
+  int64_vector_t e0;
+  int64_vector_t e1;
+  int64_vector_init(e0, vec[0]->dim);
+  int64_vector_init(e1, vec[1]->dim);
+  int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], 2*H->h[0]);
+  
+  //Find some short vectors to go from z = d to z = d + 1.
+  list_vector_t SV;
+  list_vector_init(SV);
+  SV4(SV, vec[0], vec[1], vec[2]);
+
+  //Reduce q-lattice is not possible.
+  if (boolean == 0) {
+    mat_int64_fprintf_comment(stdout, Mqr);
+ 
+    //plane_sieve_whithout_FK(SV, vec);
+
+    int64_vector_clear(e0);  
+    int64_vector_clear(e1);
+    for (unsigned int i = 0; i < Mqr->NumCols; i++) {
+      int64_vector_clear(vec[i]);
+    }
+    free(vec);
+    list_vector_clear(SV);
+
+    return;
+  }
+
+  for (unsigned int i = 0; i < Mqr->NumCols; i++) {
+    int64_vector_clear(vec[i]);
+  }
+  free(vec);
+
+  int64_vector_t vs;
+  int64_vector_init(vs, e0->dim);
+  int64_vector_set_zero(vs);
+  int64_vector_t v;
+  int64_vector_init(v, vs->dim);
+
+  int64_vector_t vs_tmp;
+  int64_vector_init(vs_tmp, vs->dim);
+
+  uint64_t coord_e0 = 0, coord_e1 = 0;
+  coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H, array->number_element);
+
+  //Enumerate the element of the sieving region.
+  for (unsigned int d = 0; d < H->h[2]; d++) {
+    int64_vector_set(v, vs);
+    int64_vector_set(vs_tmp, vs);
+
+    unsigned int FK_value = 0;
+    //Say if we have a vector in the sieving region.
+    unsigned int flag_sr = 0;
+    uint64_t index_v = 0;
+
+    //Perform Franke-Kleinjung enumeration.
+    while (v->c[1] < (int64_t)H->h[1]) {
+      if (v->c[1] >= -(int64_t)H->h[1]) {
+        if (!flag_sr) {
+          index_v = array_int64_vector_index(v, H, array->number_element);
+          flag_sr = 1;
+        } else {
+          if (FK_value == 0) {
+            index_v = index_v + coord_e0;
+          } else if (FK_value == 1) {
+            index_v = index_v + coord_e1;
+          } else {
+            ASSERT(FK_value == 2);
+            index_v = index_v + coord_e0 + coord_e1;
+          }
+
+          mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+
+        }
+        array->array[index_v] = array->array[index_v] - r->log;
+      }
+      if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
+        int64_vector_set(vs_tmp, v);
+      }
+      FK_value = enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2 * (int64_t)
+          H->h[0]);
+    }
+
+    flag_sr = 0;
+    int64_vector_set(v, vs);
+    FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
+        (int64_t)H->h[0]);
+    while (v->c[1] >= -(int64_t)H->h[1]) {
+      if (v->c[1] < (int64_t)H->h[1]) {
+        if (!flag_sr) {
+          index_v = array_int64_vector_index(v, H, array->number_element);
+          flag_sr = 1;
+        } else {
+          if (FK_value == 0) {
+            index_v = index_v - coord_e0;
+          } else if (FK_value == 1) {
+            index_v = index_v - coord_e1;
+          } else {
+            ASSERT(FK_value == 2);
+            index_v = index_v - coord_e0 - coord_e1;
+          }
+
+          mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+
+        }
+        array->array[index_v] = array->array[index_v] - r->log;
+      }
+      if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
+        int64_vector_set(vs_tmp, v);
+      }
+      FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
+          (int64_t) H->h[0]);
+    }
+    int64_vector_set(vs, vs_tmp);
+
+    //Jump in the next plane.
+    list_vector_t list_vector_tmp;
+    list_vector_init(list_vector_tmp);
+    int64_vector_t v_tmp;
+    int64_vector_init(v_tmp, SV->v[0]->dim);
+    /*
+     * 0: in the sieving region.
+     * 1: in [-H_0, H_0[
+     * 2: outside
+     */
+    unsigned char * assert = malloc(sizeof(unsigned char) * SV->length);
+    unsigned char found = 2;
+
+    for (unsigned int i = 0; i < SV->length; i++) {
+      int64_vector_add(v_tmp, vs, SV->v[i]);
+      list_vector_add_int64_vector(list_vector_tmp, v_tmp);
+
+      if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
+        if (-(int64_t) H->h[1] <= v_tmp->c[1] && (int64_t)H->h[1] > v_tmp->c[1])
+        {
+          assert[i] = 0;
+          found = 0;
+        } else {
+          assert[i] = 1;
+          if (found > 1) {
+            found = 1;
+          }
+        }
+      } else {
+        assert[i] = 2;
+      }
+    }
+    int64_vector_clear(v_tmp);
+
+    unsigned int pos = 0;
+    if (found == 0) {
+      int64_t min = -1;
+      for (unsigned int i = 1; i < list_vector_tmp->length; i++) {
+        if (assert[i] == 0) {
+          int64_t tmp= ABS(vs->c[0] - list_vector_tmp->v[i]->c[0]);
+          if (min == -1) {
+            min = tmp;
+          }
+          if (min >= tmp) {
+            min = tmp;
+            pos = i;
+          }
+        }
+      }
+      int64_vector_set(vs, list_vector_tmp->v[pos]);
+      ASSERT(vs->c[0] < (int64_t)H->h[0]);
+      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+    } else if (found == 1) {
+      pos = find_min_x(list_vector_tmp, H, assert, 1);
+      int64_vector_set(vs, list_vector_tmp->v[pos]);
+      ASSERT(vs->c[0] < (int64_t)H->h[0]);
+      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+    } else {
+      ASSERT(found == 2);
+      pos = find_min_x(list_vector_tmp, H, assert, 2);
+      int64_vector_set(vs, list_vector_tmp->v[pos]);
+      add_FK_vector(vs, e0, e1, H);
+      ASSERT(vs->c[0] < (int64_t)H->h[0]);
+      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+    }
+
+    free(assert);
+    list_vector_clear(list_vector_tmp);
+  }
+
+  list_vector_clear(SV);
+  int64_vector_clear(v);
+  int64_vector_clear(vs);
+  int64_vector_clear(vs_tmp);
+  int64_vector_clear(e0);
+  int64_vector_clear(e1);
+}
+
 #ifdef SIEVE_U
 void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
     mpz_vector_srcptr c, sieving_bound_srcptr H)
@@ -883,7 +1097,6 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     MAYBE_UNUSED mpz_poly_srcptr f)
 {
 #ifdef TIMER_SIEVE
-  double time_tqr = 0;
   double time_sieve = 0;
   double sec = 0;
 #endif // TIMER_SIEVE
@@ -902,7 +1115,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // TIMER_SIEVE
 
     uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
-    
+
     //Compute the true Tqr
     compute_Tqr_1(Tqr, matrix, H->t, r);
 
@@ -910,12 +1123,6 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
       //Compute a usefull pseudo_Tqr for line_sieve.
       compute_pseudo_Tqr_1(pseudo_Tqr, Tqr, H->t, r);
-
-#ifdef TIMER_SIEVE
-      if (r->ideal->r > TIMER_SIEVE) {
-        time_tqr = time_tqr + seconds() - sec;
-      }
-#endif // TIMER_SIEVE
 
       //Initialise c = (-H[0], -H[1], …, 0).
       int64_vector_t c;
@@ -975,37 +1182,50 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         free(pseudo_Tqr);
       }
 
-      ideal_1_clear(r, H->t);
       int64_vector_clear(c);
     } else if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
+
 #ifdef TEST_MQR
-        printf("# Tqr = [");
-        for (unsigned int i = 0; i < H->t - 1; i++) {
-          printf("%" PRIu64 ", ", Tqr[i]);
-        }
-        printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
-        mat_int64_t Mqr_test;
-        compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-        mat_int64_fprintf_comment(stdout, Mqr_test);
-        mat_int64_clear(Mqr_test);
+      printf("# Tqr = [");
+      for (unsigned int i = 0; i < H->t - 1; i++) {
+        printf("%" PRIu64 ", ", Tqr[i]);
+      }
+      printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+      mat_int64_t Mqr_test;
+      compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+      mat_int64_fprintf_comment(stdout, Mqr_test);
+      mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
-        ASSERT(H->t == 3);
+      ASSERT(H->t == 3);
 
-        mat_int64_t Mqr;
-        mat_int64_init(Mqr, H->t, H->t);
+      mat_int64_t Mqr;
+      mat_int64_init(Mqr, H->t, H->t);
 
-        compute_Mqr_1(Mqr, Tqr, H->t, r);
-        plane_sieve_array(array, r, Mqr, H);
+      compute_Mqr_1(Mqr, Tqr, H->t, r);
 
-        mat_int64_clear(Mqr);
+#ifdef TIMER_SIEVE
+      if (r->ideal->r > TIMER_SIEVE) {
+        sec = seconds();
+      }
+#endif // TIMER_SIEVE
+
+      plane_sieve_1(array, r, Mqr, H, matrix, f);
+
+#ifdef TIMER_SIEVE
+      if (r->ideal->r > TIMER_SIEVE) {
+        time_sieve = time_sieve + seconds() - sec;
+      }
+#endif // TIMER_SIEVE
+
+      mat_int64_clear(Mqr);
     }
+    ideal_1_clear(r, H->t);
     free(Tqr);
   }
 
 #ifdef TIMER_SIEVE
   printf("Bound: %d\n", TIMER_SIEVE);
-  printf("Build pseudo_Tqr: %f\n", time_tqr);
   printf("Perform sieve: %f\n", time_sieve);
 #endif // TIMER_SIEVE
 
@@ -1273,7 +1493,7 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
   /* Not optimal */
   for (unsigned int i = 0; i < size; i++) {
     mpz_init(res[i]);
-    norm(res[i], f[L[i]], a);
+    norm_poly(res[i], f[L[i]], a);
 
 #ifdef ASSERT_FACTO
     assert_facto[i] = gmp_factorize(factor[i], res[i]);
@@ -1632,25 +1852,25 @@ int main(int argc, char * argv[])
                         &thresh, &lpb, array, matrix, &q_side, &V);
 
 #ifdef PRINT_PARAMETERS
-  printf("H =\n");
-  sieving_bound_fprintf(stdout, H);
-  printf("V = %u\n", V);
+  printf("# H =\n");
+  sieving_bound_fprintf_comment(stdout, H);
+  printf("# V = %u\n", V);
   for (unsigned int i = 0; i < V; i++) {
-    printf("fbb%u = %" PRIu64 "\n", i, fbb[i]);
+    printf("# fbb%u = %" PRIu64 "\n", i, fbb[i]);
   }
   for (unsigned int i = 0; i < V; i++) {
-    printf("thresh%u = %u\n", i, (unsigned int)thresh[i]);
+    printf("# thresh%u = %u\n", i, (unsigned int)thresh[i]);
   }
   for (unsigned int i = 0; i < V; i++) {
-    gmp_printf("lpb%u = %Zd\n", i, lpb[i]);
+    gmp_printf("# lpb%u = %Zd\n", i, lpb[i]);
   }
   for (unsigned int i = 0; i < V; i++) {
-    printf("f%u = ", i);
+    printf("# f%u = ", i);
     mpz_poly_fprintf(stdout, f[i]);
   }
-  printf("q_min = %" PRIu64 "\n", q_min);
-  printf("q_max = %" PRIu64 "\n", q_min);
-  printf("q_side = %u\n", q_side);
+  printf("# q_min = %" PRIu64 "\n", q_min);
+  printf("# q_max = %" PRIu64 "\n", q_min);
+  printf("# q_side = %u\n", q_side);
 #endif // PRINT_PARAMETERS
 
   uint64_array_t * indexes =

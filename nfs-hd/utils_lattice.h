@@ -115,18 +115,30 @@ unsigned int enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
  * A: how the interval is centered.
  * I: the width of the interval.
  */
-unsigned int enum_res_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
+unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
     int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I);
 
 /*
- * Plane sieve.
+ * Add an FK vector (e0 or e1) if v is outside of the sieving region defined by
+ * H to have the x coordinate of v in [-H0, H0[.
  *
- * array: the array in which we store the norms.
- * r: the ideal we consider.
- * Mqr: the Mqr matrix.
- * H: the sieving bound that defines the sieving region.
+ * v: current vector.
+ * e0: a vector given by the Franke-Kleinjung algorithm.
+ * e1: a vector given by the Franke-Kleinjung algorithm.
+ * H: sieving bound.
  */
-void plane_sieve_array(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
-    sieving_bound_srcptr H);
+void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
+    int64_vector_srcptr e1, sieving_bound_srcptr H);
+
+unsigned int find_min_x(list_vector_srcptr SV, sieving_bound_srcptr H,
+    unsigned char * stamp, unsigned char val_stamp);
+
+void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
+    int64_vector_srcptr e1, sieving_bound_srcptr H);
+
+
+void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
+    uint64_t number_element);
 
 #endif // UTILS_SIEVE_H

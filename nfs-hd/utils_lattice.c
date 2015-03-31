@@ -463,7 +463,7 @@ static int64_t difference_bound_x(int64_vector_srcptr v,
  *  vectors.
  * val_stamp: value we want for the stamp of the vector.
  */
-static unsigned int find_min_x(list_vector_srcptr SV, sieving_bound_srcptr H,
+unsigned int find_min_x(list_vector_srcptr SV, sieving_bound_srcptr H,
     unsigned char * stamp, unsigned char val_stamp)
 {
   int64_t x = -1; 
@@ -493,7 +493,7 @@ static unsigned int find_min_x(list_vector_srcptr SV, sieving_bound_srcptr H,
  * e1: a vector given by the Franke-Kleinjung algorithm.
  * H: sieving bound.
  */
-static void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
+void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
     int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
   ASSERT(v->c[0] < -(int64_t)H->h[0] || v->c[0] >= (int64_t)H->h[0]);
@@ -598,7 +598,7 @@ unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
   }
 }
 
-static void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
+void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
     uint64_t number_element)
 {
@@ -645,220 +645,3 @@ static void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
   int64_vector_clear(e1);
 }
 
-void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H)
-{
-  ASSERT(Mqr->NumRows == Mqr->NumCols);
-  ASSERT(Mqr->NumRows == 3);
-
-  //Perform the Franke-Kleinjung algorithm.
-  int64_vector_t * vec = malloc(sizeof(int64_vector_t) * Mqr->NumRows);
-  for (unsigned int i = 0; i < Mqr->NumCols; i++) {
-    int64_vector_init(vec[i], Mqr->NumRows);
-    mat_int64_extract_vector(vec[i], Mqr, i);
-  }
-  int64_vector_t e0;
-  int64_vector_t e1;
-  int64_vector_init(e0, vec[0]->dim);
-  int64_vector_init(e1, vec[1]->dim);
-  int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], 2*H->h[0]);
-  
-  //Find some short vectors to go from z = d to z = d + 1.
-  list_vector_t SV;
-  list_vector_init(SV);
-  SV4(SV, vec[0], vec[1], vec[2]);
-
-  //Reduce q-lattice is not possible.
-  if (boolean == 0) {
-    mat_int64_fprintf_comment(stdout, Mqr);
- 
-    //plane_sieve_whithout_FK(SV, vec);
-
-    int64_vector_clear(e0);  
-    int64_vector_clear(e1);
-    for (unsigned int i = 0; i < Mqr->NumCols; i++) {
-      int64_vector_clear(vec[i]);
-    }
-    free(vec);
-    list_vector_clear(SV);
-
-    return;
-  }
-
-  for (unsigned int i = 0; i < Mqr->NumCols; i++) {
-    int64_vector_clear(vec[i]);
-  }
-  free(vec);
-
-  int64_vector_t vs;
-  int64_vector_init(vs, e0->dim);
-  int64_vector_set_zero(vs);
-  int64_vector_t v;
-  int64_vector_init(v, vs->dim);
-
-  int64_vector_t vs_tmp;
-  int64_vector_init(vs_tmp, vs->dim);
-
-  uint64_t coord_e0 = 0, coord_e1 = 0;
-  coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H, array->number_element);
-
-  //Enumerate the element of the sieving region.
-  for (unsigned int d = 0; d < H->h[2]; d++) {
-    int64_vector_set(v, vs);
-    int64_vector_set(vs_tmp, vs);
-
-    unsigned int FK_value = 0;
-    //Say if we have a vector in the sieving region.
-    unsigned int flag_sr = 0;
-    uint64_t index_v = 0;
-
-    //Perform Franke-Kleinjung enumeration.
-    while (v->c[1] < (int64_t)H->h[1]) {
-      if (v->c[1] >= -(int64_t)H->h[1]) {
-        if (!flag_sr) {
-          index_v = array_int64_vector_index(v, H, array->number_element);
-          flag_sr = 1;
-        } else {
-          if (FK_value == 0) {
-            index_v = index_v + coord_e0;
-          } else if (FK_value == 1) {
-            index_v = index_v + coord_e1;
-          } else {
-            ASSERT(FK_value == 2);
-            index_v = index_v + coord_e0 + coord_e1;
-          }
-
-#ifndef NDEBUG
-          uint64_t index_tmp = array_int64_vector_index(v, H,
-              array->number_element);
-          ASSERT(index_tmp == index_v);
-#endif // NDEBUG
-
-        }
-        array->array[index_v] = array->array[index_v] - r->log;
-        /*int64_vector_fprintf(stdout, v);*/
-      }
-      if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
-        int64_vector_set(vs_tmp, v);
-      }
-      FK_value = enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2 * (int64_t)
-          H->h[0]);
-    }
-
-    flag_sr = 0;
-    int64_vector_set(v, vs);
-    FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
-        (int64_t)H->h[0]);
-    while (v->c[1] >= -(int64_t)H->h[1]) {
-      if (v->c[1] < (int64_t)H->h[1]) {
-        if (!flag_sr) {
-          index_v = array_int64_vector_index(v, H, array->number_element);
-          flag_sr = 1;
-        } else {
-          if (FK_value == 0) {
-            index_v = index_v - coord_e0;
-          } else if (FK_value == 1) {
-            index_v = index_v - coord_e1;
-          } else {
-            ASSERT(FK_value == 2);
-            index_v = index_v - coord_e0 - coord_e1;
-          }
-
-#ifndef NDEBUG
-          uint64_t index_tmp = array_int64_vector_index(v, H,
-              array->number_element);
-          ASSERT(index_tmp == index_v);
-#endif // NDEBUG
-
-        }
-        array->array[index_v] = array->array[index_v] - r->log;
-        /*int64_vector_fprintf(stdout, v);*/
-      }
-      if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
-        int64_vector_set(vs_tmp, v);
-      }
-      FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
-          (int64_t) H->h[0]);
-    }
-    int64_vector_set(vs, vs_tmp);
-
-    /*printf("# Starting point: ");*/
-    /*int64_vector_fprintf(stdout, vs);*/
-
-    //Jump in the next plane.
-    list_vector_t list_vector_tmp;
-    list_vector_init(list_vector_tmp);
-    int64_vector_t v_tmp;
-    int64_vector_init(v_tmp, SV->v[0]->dim);
-    /*
-     * 0: in the sieving region.
-     * 1: in [-H_0, H_0[
-     * 2: outside
-     */
-    unsigned char * assert = malloc(sizeof(unsigned char) * SV->length);
-    unsigned char found = 2;
-
-    for (unsigned int i = 0; i < SV->length; i++) {
-      int64_vector_add(v_tmp, vs, SV->v[i]);
-      list_vector_add_int64_vector(list_vector_tmp, v_tmp);
-
-      if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
-        if (-(int64_t) H->h[1] <= v_tmp->c[1] && (int64_t)H->h[1] > v_tmp->c[1])
-        {
-          assert[i] = 0;
-          found = 0;
-        } else {
-          assert[i] = 1;
-          if (found > 1) {
-            found = 1;
-          }
-        }
-      } else {
-        assert[i] = 2;
-      }
-    }
-    int64_vector_clear(v_tmp);
-
-    unsigned int pos = 0;
-    if (found == 0) {
-      int64_t min = -1;
-      for (unsigned int i = 1; i < list_vector_tmp->length; i++) {
-        if (assert[i] == 0) {
-          int64_t tmp= ABS(vs->c[0] - list_vector_tmp->v[i]->c[0]);
-          if (min == -1) {
-            min = tmp;
-          }
-          if (min >= tmp) {
-            min = tmp;
-            pos = i;
-          }
-        }
-      }
-      int64_vector_set(vs, list_vector_tmp->v[pos]);
-      ASSERT(vs->c[0] < (int64_t)H->h[0]);
-      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-    } else if (found == 1) {
-      pos = find_min_x(list_vector_tmp, H, assert, 1);
-      int64_vector_set(vs, list_vector_tmp->v[pos]);
-      ASSERT(vs->c[0] < (int64_t)H->h[0]);
-      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-    } else {
-      ASSERT(found == 2);
-      pos = find_min_x(list_vector_tmp, H, assert, 2);
-      int64_vector_set(vs, list_vector_tmp->v[pos]);
-      add_FK_vector(vs, e0, e1, H);
-      ASSERT(vs->c[0] < (int64_t)H->h[0]);
-      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-    }
-
-    free(assert);
-    list_vector_clear(list_vector_tmp);
-  }
-
-  list_vector_clear(SV);
-  int64_vector_clear(v);
-  int64_vector_clear(vs);
-  int64_vector_clear(vs_tmp);
-  int64_vector_clear(e0);
-  int64_vector_clear(e1);
-}
