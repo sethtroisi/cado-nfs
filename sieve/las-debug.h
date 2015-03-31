@@ -43,7 +43,7 @@ static inline int trace_on_range_Nx(unsigned int N, unsigned int x0, unsigned in
     return N == trace_Nx.N && x0 <= trace_Nx.x && trace_Nx.x < x1;
 }
 
-static inline int trace_on_spot_x(unsigned int x) {
+static inline int trace_on_spot_x(uint64_t x) {
     return x == (trace_Nx.N << LOG_BUCKET_REGION) + trace_Nx.x;
 }
 

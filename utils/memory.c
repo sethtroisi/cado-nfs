@@ -112,6 +112,8 @@ void
 free_hugepages(const void *m, const size_t size MAYBE_UNUSED)
 {
   ASSERT_ALWAYS(inited_lists);
+  if (m == NULL)
+    return;
 
 #if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
   {
@@ -238,6 +240,8 @@ void free_aligned(const void * p)
 #ifdef HAVE_POSIX_MEMALIGN
     free((void *) p);
 #else
+    if (p == NULL)
+      return;
     const char * res = (const char *) p;
     size_t displ;
     memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
@@ -345,6 +349,9 @@ void contiguous_free(const void *ptr)
   ASSERT_ALWAYS(chunks_inited);
   dllist_ptr node;
   struct chunk_s *chunk;
+  
+  if (ptr == NULL)
+    return;
   
   for (node = chunks->next; node != NULL; node = node->next) {
     chunk = node->data;

@@ -160,9 +160,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
 
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
         const fbprime_t fbb = si->conf->sides[side]->lim;
+        const fbprime_t powlim = si->conf->sides[side]->powlim;
         const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
-        sis->fb = new fb_factorbase(thresholds, only_general);
+        sis->fb = new fb_factorbase(thresholds, powlim, only_general);
 
         if (fbcfilename != NULL) {
             /* Try to read the factor base cache file. If that fails, because
@@ -193,7 +194,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     sis->fb->size() >> 20, tfb);
         } else {
             tfb = seconds ();
-            sis->fb->make_linear ((const mpz_t *) pol->coeff, si->conf->sides[side]->powlim);
+            sis->fb->make_linear ((const mpz_t *) pol->coeff);
             tfb = seconds () - tfb;
             verbose_output_print(0, 1, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      sis->fb->size() >> 20, tfb);
@@ -1487,7 +1488,7 @@ void init_trace_k(sieve_info_srcptr si, param_list pl)
 NOPROFILE_STATIC
 #endif
 void
-apply_one_update (unsigned char * const S, const bucket_update_t * const u,
+apply_one_update (unsigned char * const S, const bucket_update_shorthint_t * const u,
                   const unsigned char logp, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, h, u->hint);
@@ -1500,20 +1501,20 @@ apply_one_update (unsigned char * const S, const bucket_update_t * const u,
 NOPROFILE_STATIC
 #endif
 void
-apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
+apply_one_bucket (unsigned char *S, bucket_array_t<bucket_update_shorthint_t> &BA, const int i,
         const fb_part *fb, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
-  for (slice_index_t i_slice = 0; i_slice < BA.nr_slices; i_slice++) {
-    const bucket_update_t *it = BA.begin(i, i_slice);
-    const bucket_update_t * const it_end = BA.end(i, i_slice);
+  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
+    const bucket_update_shorthint_t * const it_end = BA.end(i, i_slice);
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fb->get_slice(slice_index)->get_logp();
 
-    const bucket_update_t *next_align;
-    if (sizeof(bucket_update_t) == 4) {
-      next_align = (bucket_update_t *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
+    const bucket_update_shorthint_t *next_align;
+    if (sizeof(bucket_update_shorthint_t) == 4) {
+      next_align = (bucket_update_shorthint_t *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
       if (UNLIKELY(next_align > it_end)) next_align = it_end;
     } else {
       next_align = it_end;
@@ -1602,7 +1603,7 @@ int factor_list_fprint(FILE *f, factor_list_t fl) {
 
 static const int bucket_prime_stats = 0;
 static long nr_bucket_primes = 0;
-static long nr_bucket_complete_hints = 0;
+static long nr_bucket_longhints = 0;
 static long nr_div_tests = 0;
 static long nr_composite_tests = 0;
 static long nr_wrap_was_composite = 0;
@@ -1612,7 +1613,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
                            bucket_primes_t *BP, const int very_verbose)
 {
   while (!BP->is_end()) {
-      const bucket_prime_t prime = BP->get_next_update();
+      const bucket_update_prime_t prime = BP->get_next_update();
       if (prime.x > x)
         {
           BP->rewind_by_1();
@@ -1647,14 +1648,14 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
                           bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
 {
   while (!purged->is_end()) {
-      const bucket_complete_update_t complete_hint = purged->get_next_update();
+      const bucket_update_longhint_t complete_hint = purged->get_next_update();
       if (complete_hint.x > x)
         {
           purged->rewind_by_1();
           break;
         }
       if (complete_hint.x == x) {
-          if (bucket_prime_stats) nr_bucket_complete_hints++;
+          if (bucket_prime_stats) nr_bucket_longhints++;
           const fb_slice_interface *slice = fb->get_slice(complete_hint.index);
           ASSERT_ALWAYS(slice != NULL);
           const unsigned long p = slice->get_prime(complete_hint.hint);
@@ -1827,7 +1828,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
     const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
-    unsigned char * S[2] = {th->sides[0]->bucket_region, th->sides[1]->bucket_region};
+    unsigned char * S[2] = {th->sides[0].bucket_region, th->sides[1].bucket_region};
 
     for(int side = 0 ; side < 2 ; side++) {
         lps[side] = alloc_mpz_array (1);
@@ -1897,12 +1898,12 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
         for (int i = 0; i < las->nb_threads; ++i) {
             thread_data *other = th + i - th->id;
-            purged[side].purge(other->sides[side]->BA, N, SS);
+            purged[side].purge(other->sides[side].BA, N, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
            together with the primes recovered from the bucket updates */
-        resieve_small_bucket_region (&primes[side], N, SS, th->si->sides[side]->rsd, th->sides[side]->rsdpos, si, w);
+        resieve_small_bucket_region (&primes[side], N, SS, th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
 
         /* Sort the entries to avoid O(n^2) complexity when looking for
            primes during trial division */
@@ -2122,6 +2123,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         }
     }
 
+    verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", surv, N);
     th->rep->survivors1 += surv;
     th->rep->survivors2 += copr;
 
@@ -2244,15 +2246,15 @@ void * process_bucket_region(thread_data *th)
     /* This is local to this thread */
     for(int side = 0 ; side < 2 ; side++) {
         sieve_side_info_ptr s = si->sides[side];
-        thread_side_data_ptr ts = th->sides[side];
+        thread_side_data &ts = th->sides[side];
 
         /* Compute first sieve locations hit by small primes */
-        ts->ssdpos = small_sieve_start(s->ssd, my_row0, si);
+        ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
         /* Copy those locations that correspond to re-sieved primes */
-        ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
+        ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = ts->bucket_region;
+        S[side] = ts.bucket_region;
     }
     unsigned char *SS = th->SS;
     memset(SS, 0, BUCKET_REGION);
@@ -2279,7 +2281,7 @@ void * process_bucket_region(thread_data *th)
             WHERE_AM_I_UPDATE(w, side, side);
 
             sieve_side_info_ptr s = si->sides[side];
-            thread_side_data_ptr ts = th->sides[side];
+            thread_side_data &ts = th->sides[side];
         
             /* Init norms */
             rep->tn[side] -= seconds_thread ();
@@ -2306,13 +2308,13 @@ void * process_bucket_region(thread_data *th)
             rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data *ot = th + j - th->id;
-                apply_one_bucket(SS, ot->sides[side]->BA, i, ts->fb, w);
+                apply_one_bucket(SS, ot->sides[side].BA, i, ts.fb, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
 
             /* Sieve small primes */
-            sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
+            sieve_small_bucket_region(SS, i, s->ssd, ts.ssdpos, si, side, w);
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
@@ -2328,17 +2330,17 @@ void * process_bucket_region(thread_data *th)
 
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
-            thread_side_data_ptr ts = th->sides[side];
-            small_sieve_skip_stride(s->ssd, ts->ssdpos, skiprows, si);
+            thread_side_data &ts = th->sides[side];
+            small_sieve_skip_stride(s->ssd, ts.ssdpos, skiprows, si);
             int * b = s->fb_parts_x->rs;
-            memcpy(ts->rsdpos, ts->ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
+            memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
         }
       }
 
     for(int side = 0 ; side < 2 ; side++) {
-        thread_side_data_ptr ts = th->sides[side];
-        free(ts->ssdpos);
-        free(ts->rsdpos);
+        thread_side_data &ts = th->sides[side];
+        free(ts.ssdpos);
+        free(ts.rsdpos);
     }
 
     return NULL;
@@ -2761,10 +2763,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 //        thrs[0].rep->ttbuckets_fill -= seconds();
 
-        workspaces->pickup_si(si);
-
         /* Allocate buckets */
-        workspaces->buckets_alloc();
+        workspaces->pickup_si(si);
 
         thread_pool *pool = new thread_pool(las->nb_threads);
         /* Fill in rat and alg buckets */
@@ -2864,8 +2864,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (exit_after_rel_found > 1 && report->reports > 0)
             break;
       } // end of loop over special q ideals.
-
-    workspaces->buckets_free();
 
     if (recursive_descent) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");

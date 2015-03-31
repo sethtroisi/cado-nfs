@@ -4,16 +4,24 @@
 #include "las-types.h"
 #include "las-config.h"
 
-thread_side_data_s::thread_side_data_s()
+thread_side_data::thread_side_data()
 {
   /* Allocate memory for each side's bucket region */
   bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
 }
 
-thread_side_data_s::~thread_side_data_s()
+thread_side_data::~thread_side_data()
 {
   contiguous_free(bucket_region);
   bucket_region = NULL;
+}
+
+void
+thread_side_data::allocate_bucket_array(const uint32_t n_bucket, const double fill_ratio)
+{
+  const size_t bucket_region = (size_t) 1 << LOG_BUCKET_REGION;
+  const size_t bucket_size = bucket_region * fill_ratio;
+  BA.allocate_memory(n_bucket, bucket_size);
 }
 
 thread_data::thread_data() : is_initialized(false)
@@ -43,15 +51,19 @@ void thread_data::init(const int _id, las_info_srcptr _las)
 void thread_data::pickup_si(sieve_info_ptr _si)
 {
   si = _si;
-  for(int s = 0 ; s < 2 ; s++) {
-    sides[s]->set_fb(si->sides[s]->fb->get_part(1));
+  for (int side = 0 ; side < 2 ; side++) {
+    sides[side].set_fb(si->sides[side]->fb->get_part(1));
+    /* Always allocate the max number of buckets (i.e., as if we were using the
+       max value for J), even if we use a smaller J due to a poor q-lattice
+       basis */
+    sides[side].allocate_bucket_array(si->nb_buckets_max, si->sides[side]->max_bucket_fill_ratio);
   }
 }
 
 void thread_data::update_checksums()
 {
   for(int s = 0 ; s < 2 ; s++)
-    sides[s]->update_checksum();
+    sides[s].update_checksum();
 }
 
 thread_workspaces::thread_workspaces(const size_t n, las_info_ptr las)
@@ -76,6 +88,9 @@ thread_workspaces::~thread_workspaces()
     pthread_mutex_destroy(&mutex);
 }
 
+/* Prepare to work on sieving a special-q as described by _si.
+   This implies allocating all the memory we need for bucket arrays,
+   sieve regions, etc. */
 void
 thread_workspaces::pickup_si(sieve_info_ptr _si)
 {
@@ -121,60 +136,13 @@ thread_workspaces::thread_do(void * (*f) (thread_data *))
     free(th);
 }
 
-/* {{{ thread_buckets_alloc
- * TODO: Allow allocating larger buckets if bucket_fill_ratio ever grows
- * above the initial guess. This can easily be made a permanent choice.
- *
- * Note also that we could consider having bucket_fill_ratio global.
- */
-void
-thread_workspaces::buckets_alloc()
-{
-  for (size_t i = 0; i < nr_workspaces; ++i) {
-    for(unsigned int side = 0 ; side < 2 ; side++) {
-      thread_side_data_ptr ts = thrs[i].sides[side];
-      sieve_info_srcptr si = thrs[i].si;
-      /* We used to re-allocate whenever the number of buckets changed. Now we
-         always allocate memory for the max. number of buckets, so that we
-         never have to re-allocate */
-      uint32_t nb_buckets;
-      /* If shell environment variable LAS_REALLOC_BUCKETS is *not* set,
-         always allocate memory for the max. number of buckets, so that we
-         never have to re-allocate. If it is set, allocate just enough for
-         for the current number of buckets, which will re-allocate memory
-         if number of buckets changes. */
-      if (getenv("LAS_REALLOC_BUCKETS") == NULL) {
-        nb_buckets = si->nb_buckets_max;
-      } else {
-        nb_buckets = si->nb_buckets;
-      }
-      init_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA),
-                   si->sides[side]->max_bucket_fill_ratio, nb_buckets);
-    }
-  }
-}
-
-void
-thread_workspaces::buckets_free()
-{
-  for (size_t i = 0; i < nr_workspaces; ++i) {
-    for(unsigned int side = 0 ; side < 2 ; side++) {
-      // fprintf ("# Freeing buckets, thread->id=%d, side=%d\n", thrs[i].id, side);
-      thread_side_data_ptr ts = thrs[i].sides[side];
-      /* if there is no special-q in the interval, the arrays are not malloced */
-      if (ts->BA.bucket_write != NULL)
-        clear_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA));
-    }
-  }
-}
-
 double
 thread_workspaces::buckets_max_full()
 {
     double mf0 = 0;
     for (size_t i = 0; i < nr_workspaces; ++i) {
       for(unsigned int side = 0 ; side < 2 ; side++) {
-        double mf = ::buckets_max_full (thrs[i].sides[side]->BA);
+        double mf = thrs[i].sides[side].BA.max_full();
         if (mf > mf0) mf0 = mf;
       }
     }
@@ -187,7 +155,7 @@ thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
     for (size_t i = 0; i < nr_workspaces; ++i) {
         las_report_accumulate(rep, thrs[i].rep);
         for (int side = 0; side < 2; side++)
-            checksum[side].update(thrs[i].sides[side]->checksum_post_sieve);
+            checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }
 }
 

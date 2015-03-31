@@ -145,7 +145,7 @@ test_sm (FILE * datafile)
       mpz_poly_set (Nc, relset->num[0]);
       mpz_poly_set (Dc, relset->denom[0]);
       mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num[0], relset->denom[0],
-              F, ell2);
+              F, ell2, invl2);
       compute_sm (SMc, relset->num[0], F, ell, smexp, ell2, invl2);
       sm_relset_clear (relset);
     }

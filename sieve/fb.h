@@ -356,7 +356,8 @@ class fb_part: public fb_interface, private NonCopyable {
      0 entries, or a NULL pointer? */
 
   /* If true, all entries go in the general vector */
-  bool only_general;
+  const fbprime_t powlim;
+  const bool only_general;
 
   /* These vectors are filled when we read or generate the factor base.
      The slices point into the vectors' storage. */
@@ -418,7 +419,8 @@ class fb_part: public fb_interface, private NonCopyable {
   }
   void make_slices(double, slice_index_t &);
 public:
-  fb_part(const bool only_general=false) : only_general(only_general){}
+  fb_part(const fbprime_t _powlim, const bool only_general=false)
+    : powlim(_powlim), only_general(only_general){}
   ~fb_part(){}
   void append(const fb_general_entry &);
   void fprint(FILE *) const;
@@ -475,10 +477,11 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void finalize();
  public:
   fb_factorbase(const fbprime_t *thresholds,
+                fbprime_t powlim,
 		const bool *only_general=NULL);
   ~fb_factorbase();
   int read(const char * const filename);
-  void make_linear (const mpz_t *poly, fbprime_t powbound);
+  void make_linear (const mpz_t *poly);
   bool mmap_fbc(const char *) {return false;};
   void dump_fbc(const char *) {return;};
   size_t size() const {return 0;}

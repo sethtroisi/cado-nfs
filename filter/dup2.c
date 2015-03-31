@@ -6,8 +6,8 @@
 
    Input files can be given on command line, or via a filelist file.
 
-   By default dup2 overwrites inputs file. To modify this behaviour an output
-   directory can be given with '-outidir'.
+   By default dup2 overwrites input files. To modify this behaviour an output
+   directory can be given with '-outdir'.
    In case a filelist is given, the -basepath option enables to tell in which
    directory those files are.
 
@@ -21,13 +21,13 @@
 
        a,b:p1,p2,...,pj:q1,q2,...,qk                                 (*)
 
-   where p1,p2,...,pj are rational ideals (possibly duplicate), and
-   q1,q2,...,qk are algebraic ideals (possibly duplicate). Output is:
+   where p1,p2,...,pj are rational (side 0) ideals (possibly duplicate), and
+   q1,q2,...,qk are algebraic (side 1) ideals (possibly duplicate). Output is:
 
        a,b:r1,r2,...,rm                                              (**)
 
    where each index r1,r2,...,rm refering to ideals via the renumbering table.
-   By default valuations are reduce modulo 2. This can by cancel by using the
+   By default valuations are reduced modulo 2. This can be changed by using the
    '-dl' argument.
 
    The format of each file is recognized by counting the number of ':' in the
@@ -132,7 +132,7 @@ print_warning_size ()
    with a (signed) and b (unsigned) written in hexa and
    and i_1 ... i_k (hexadecimal) are the indices of the ideals
 
-    The function add a column of 1 if necessary, the added column is always
+    The function adds a column of 1 if necessary, which is always
     column 0.
 */
 static inline void

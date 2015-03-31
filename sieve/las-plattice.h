@@ -343,23 +343,25 @@ struct plattice_sieve_entry : public plattice_info_t {
 };
 
 
-class plattice_sieve_info : public plattice_sieve_entry {
+/* Class for enumerating lattice points with the Franke-Kleinjung algorithm */
+class plattice_enumerate_t {
+protected:
+    const plattice_x_t inc_a, inc_c;
+    const uint32_t bound0, bound1;
+    const plattice_x_t IJ;
+    const uint32_t maskI;
+    const plattice_x_t even_mask;
     plattice_x_t x;
-    plattice_x_t inc_a, inc_c;
-    uint32_t bound0, bound1;
-    uint32_t maskI;
-    
-    plattice_sieve_info(const fbprime_t p, const fbroot_t r, const bool proj, const int logI, const slice_offset_t hint)
-        : plattice_sieve_entry(p, r, proj, logI, hint) {
-      inc_a = get_inc_a(logI);
-      inc_c = get_inc_c(logI);
-      bound0 = get_bound0(logI);
-      bound1 = get_bound1(logI);
-      x = (plattice_x_t)1 << (logI-1);
-      maskI = (1U << logI) - 1U;
-    }
+public:
+    plattice_enumerate_t(const plattice_info_t &basis, const int logI, uint32_t J)
+        : inc_a(basis.get_inc_a(logI)), inc_c(basis.get_inc_c(logI)), 
+          bound0(basis.get_bound0(logI)), bound1(basis.get_bound1(logI)),
+          IJ(plattice_x_t(J) << logI), maskI((1U << logI) - 1U),
+          even_mask((plattice_x_t(1) << logI) | plattice_x_t(1)),
+          x(plattice_x_t(1) << (logI-1))
+    {}
 
-    void operator++() {
+    void next() {
       uint32_t i = x & maskI;
       if (i >= bound1)
         x += inc_a;
@@ -367,13 +369,33 @@ class plattice_sieve_info : public plattice_sieve_entry {
         x += inc_c;
     }
 
-    bool operator<(const plattice_x_t limit) {
-      return x < limit;
-    }
-
+    /* Currently merely checks that not both are even */
+    bool probably_coprime() const {return (x & even_mask) != 0;}
+    bool finished() const {return x >= IJ;}
     plattice_x_t get_x() const {return x;}
 };
 
+/* Also enumerates lattice points, but probably_coprime() does a full gcd()
+   to ensure that points are really coprime. Very slow. */
+class plattice_enumerate_coprime_t : public plattice_enumerate_t {
+  unsigned long u, v;
+public:
+  plattice_enumerate_coprime_t(const plattice_info_t &basis, const int logI, uint32_t J)
+    : plattice_enumerate_t(basis, logI, J), u(0), v(0) {}
+  void next() {
+    uint32_t i = x & maskI;
+    if (i >= bound1) {
+      x += inc_a; u++;
+    }
+    if (i < bound0) {
+      x += inc_c;
+      v++;
+    }
+  }
+  bool probably_coprime() const {
+    return (x & even_mask) != 0 && gcd_ul(u, v) == 1;
+  }
+};
 
 /* This is for working with congruence classes only */
 /* NOPROFILE_INLINE */
