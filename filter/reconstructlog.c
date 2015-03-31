@@ -295,7 +295,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
             mpz_poly_setcoeff_int64(u, 1, -b);
             compute_sm_piecewise(u, u, S);
             ASSERT_ALWAYS(u->deg < S->f->deg);
-            for(int i = 0; i <= u->deg; i++)
+            for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
                 mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
             mpz_mod(l, l, q);
             mpz_poly_clear(u);
