@@ -487,7 +487,6 @@ int main (int argc, char **argv)
   }
 
   for (int side = 0; side < 2; side++) {
-      if (F[side] == NULL) continue;
       fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
       mpz_poly_fprintf(stdout, F[side]);
       gmp_fprintf(stdout,
@@ -508,7 +507,7 @@ int main (int argc, char **argv)
       /* command line wins */
       sm_info[side]->nsm = nsm[side];
 
-      if (mpz_cmp(eps[side], sm_info[side]->exponent) != 0) {
+      if (nsm[side] && mpz_cmp(eps[side], sm_info[side]->exponent) != 0) {
           gmp_fprintf(stderr, "On side %d, command line asks for exponent %Zd, while we computed %Zd\n", side, eps[side], sm_info[side]->exponent);
           /* really not sure I want to proceed, here */
           ASSERT_ALWAYS(0);
