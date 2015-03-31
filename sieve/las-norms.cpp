@@ -462,7 +462,7 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
   endJ = (1U << endJ) + J;
 
 #ifdef DEBUG_INIT_RAT
-  fprintf (stderr, "Begin: j=%u, u0=%.20e u1=%.20e, scale=%.20e, rac=%.20e\n", J, u0, u1, scale, u0 * j * (-invu1));
+  fprintf (stderr, "Begin: j=%u, u0=%.20e u1=%.20e, scale=%.20e, rac=%.20e\n", J, u0, u1, scale, u0 * J * (-invu1));
 #endif
 
   scale *= 1./0x100000;
@@ -647,7 +647,7 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
       fprintf (stderr, "B3 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
 #endif
       *S++ = y;
-      if (++int_i == Idiv2) goto nextj;
+      if (++int_i >= Idiv2) goto nextj;
       oy = y;
       g += u1;
       y = COMPUTE_Y(g);
