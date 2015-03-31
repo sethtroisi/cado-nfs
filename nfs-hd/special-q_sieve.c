@@ -682,6 +682,7 @@ void mode_sieve(MAYBE_UNUSED sieving_bound_srcptr H,
     MAYBE_UNUSED ideal_1_srcptr ideal, MAYBE_UNUSED int64_vector_srcptr c,
     MAYBE_UNUSED uint64_t number_c_l, MAYBE_UNUSED unsigned int nbint)
 {
+  /*printf("Gugu\n");*/
 #ifdef ASSERT_SIEVE
   assert_sieve(H, index, array->number_element, matrix, f, ideal, c);
 #endif // ASSERT_SIEVE
@@ -689,6 +690,8 @@ void mode_sieve(MAYBE_UNUSED sieving_bound_srcptr H,
 #ifdef NUMBER_HIT
   if (nbint) {
     number_of_hit = number_of_hit + number_c_l;
+    /*printf("Hit: %" PRIu64 "\n", number_of_hit);*/
+    /*getchar();*/
   }
 #endif // NUMBER_HIT
 
@@ -750,7 +753,7 @@ void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
       array->array[index] = array->array[index] - ideal->log;
  
       //TODO: nbint = 0 is strange.
-      mode_sieve(H, index, array, matrix, f, ideal, NULL, number_c_l, 0);
+      mode_sieve(H, index, array, matrix, f, ideal, NULL, number_c_l, 1);
 
       for (uint64_t k = 1; k < number_c_l; k++) {
         array->array[index + k] = array->array[index + k] - ideal->log;
@@ -917,11 +920,11 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
             ASSERT(FK_value == 2);
             index_v = index_v + coord_e0 + coord_e1;
           }
-
-          mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
-
         }
         array->array[index_v] = array->array[index_v] - r->log;
+
+        mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+
       }
       if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
         int64_vector_set(vs_tmp, v);
@@ -948,11 +951,11 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
             ASSERT(FK_value == 2);
             index_v = index_v - coord_e0 - coord_e1;
           }
-
-          mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
-
         }
         array->array[index_v] = array->array[index_v] - r->log;
+        
+        mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+
       }
       if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
         int64_vector_set(vs_tmp, v);
@@ -1171,12 +1174,14 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // TIMER_SIEVE
 
 #ifdef NUMBER_HIT
-        printf("Number of hits: %" PRIu64 " for r: %" PRIu64 "\n", number_of_hit,
+        printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ", number_of_hit,
             r->ideal->r);
-        printf("Estimated number of hits: %u.\n",
+        mpz_poly_fprintf(stdout, r->ideal->h);
+        printf("# Estimated number of hits: %u.\n",
             (unsigned int) nearbyint((double) array->number_element /
               (double) r->ideal->r));
         number_of_hit = 0;
+        /*getchar();*/
 #endif // NUMBER_HIT
 
         free(pseudo_Tqr);
@@ -1218,6 +1223,16 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       }
 #endif // TIMER_SIEVE
 
+#ifdef NUMBER_HIT
+      printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
+          number_of_hit, r->ideal->r);
+      mpz_poly_fprintf(stdout, r->ideal->h);
+      printf("# Estimated number of hits: %u.\n",
+          (unsigned int) nearbyint((double) array->number_element /
+            (double) r->ideal->r));
+      number_of_hit = 0;
+#endif // NUMBER_HIT
+
       mat_int64_clear(Mqr);
     }
     ideal_1_clear(r, H->t);
@@ -1225,8 +1240,8 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   }
 
 #ifdef TIMER_SIEVE
-  printf("Bound: %d\n", TIMER_SIEVE);
-  printf("Perform sieve: %f\n", time_sieve);
+  printf("# Bound: %d\n", TIMER_SIEVE);
+  printf("# Perform sieve: %f\n", time_sieve);
 #endif // TIMER_SIEVE
 
 }
