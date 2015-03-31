@@ -486,14 +486,6 @@ int main (int argc, char **argv)
       sm_side_info_init(sm_info[side], F[side], ell);
   }
 
-  // If nsm is 0 on one side, then set F[side] to NULL to desactivate the
-  // corresponding computations.
-  // TODO: this will go.
-  for (int side = 0; side < 2; ++side) {
-      if (nsm[side] == 0)
-          F[side] = NULL;
-  }
-  
   for (int side = 0; side < 2; side++) {
       if (F[side] == NULL) continue;
       fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
@@ -525,6 +517,14 @@ int main (int argc, char **argv)
   }
 
   t0 = seconds();
+
+  // If nsm is 0 on one side, then set F[side] to NULL to desactivate the
+  // corresponding computations.
+  // TODO: this will go.
+  for (int side = 0; side < 2; ++side) {
+      if (nsm[side] == 0)
+          F[side] = NULL;
+  }
   rels = build_rel_sets(purgedfile, indexfile, &nb_relsets, F, ell2);
 
   /* adjust the number of threads based on the number of relations */
