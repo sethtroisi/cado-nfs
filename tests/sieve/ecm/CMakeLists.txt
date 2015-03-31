@@ -1,5 +1,4 @@
 # Build testbench before running check
-add_dependencies(check testbench)
 
 # Get path to the testbench binary and store in variable testbench_path
 # see comment in tests/sieve/CMakeLists.txt
@@ -7,16 +6,26 @@ add_dependencies(check testbench)
 set(testbench_path ${CADO_NFS_BINARY_DIR}/sieve/ecm/testbench)
 
 add_test(test_factor_pm1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_pm1_2_100_1000.inp\" -q -vf -vcf -pm1 100 1000")
+set_test_build_depends(test_factor_pm1 testbench)
 add_test(test_factor_pp1_27 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_pp1_27_100_1000.inp\" -q -vf -vcf -pp1_27 100 1000")
+set_test_build_depends(test_factor_pp1_27 testbench)
 add_test(test_factor_pp1_65 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_pp1_65_100_1000.inp\" -q -vf -vcf -pp1_65 100 1000")
+set_test_build_depends(test_factor_pp1_65 testbench)
 add_test(test_factor_ecm_10 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_ecm_10_100_1000.inp\" -q -vf -vcf -ecm 100 1000 10")
+set_test_build_depends(test_factor_ecm_10 testbench)
 add_test(test_factor_ecm_11 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_ecm_11_100_1000.inp\" -q -vf -vcf -ecm 100 1000 11")
+set_test_build_depends(test_factor_ecm_11 testbench)
+
 add_test(test_factor_ecmm12_2 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_ecmm12_2_100_1000.inp\" -q -vf -vcf -ecmm12 100 1000 2")
+set_test_build_depends(test_factor_ecmm12_2 testbench)
 add_test(test_factor_ecmm12_3 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_ecmm12_4_100_1000.inp\" -q -vf -vcf -ecmm12 100 1000 4")
+set_test_build_depends(test_factor_ecmm12_3 testbench)
 add_test(test_factor_ecmm16_1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_factor_ecmm16_1_100_1000.inp\" -q -vf -vcf -ecmm16 100 1000 1")
+set_test_build_depends(test_factor_ecmm16_1 testbench)
 
 macro(add_order_test METHOD SIGMA PMIN PMAX)
   add_test("test_order_ecm${METHOD}_${SIGMA}_${PMIN}_${PMAX}" bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh\" \"${testbench_path}\" \"${CMAKE_CURRENT_SOURCE_DIR}/test_order_ecm${METHOD}_${SIGMA}_${PMIN}_${PMAX}.inp\" -q -vf \"-po${METHOD}\" ${SIGMA}")
+  set_test_build_depends("test_order_ecm${METHOD}_${SIGMA}_${PMIN}_${PMAX}" testbench)
 endmacro(add_order_test)
 
 add_order_test("" 10 1000 2000)

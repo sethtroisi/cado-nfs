@@ -253,7 +253,7 @@ typedef struct las_info_s las_info[1];
 struct where_am_I_s {
 #ifdef TRACK_CODE_PATH
     fbprime_t p;        /* current prime or prime power, when applicable */
-    fbprime_t r;        /* current root */
+    fbroot_t r;         /* current root */
     slice_offset_t h;   /* Prime hint, if not decoded yet */
     int fb_idx;         /* index into the factor base si->sides[side]->fb
                            or into th->sides[side]->fb_bucket */

@@ -20,8 +20,6 @@
 #include "macros.h"
 #include "utils_with_io.h"
 
-#include "mpz_poly.h"
-
 uint64_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
 uint64_t nrels_toolarge;
 cado_poly cpoly;

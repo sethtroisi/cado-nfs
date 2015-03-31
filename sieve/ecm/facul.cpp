@@ -975,8 +975,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   //
   // Note that strategies->methods_aux is common to both sides.
   int ncurves_aux[2];
-  ncurves_aux[0] = (n0 > -1) ? n0 : MAX(nb_curves95 (rlpb), nb_curves90(rlpb));
-  ncurves_aux[1] = (n1 > -1) ? n1 : MAX(nb_curves95 (alpb), nb_curves90(alpb));
+  ncurves_aux[0] = (n0 > -1) ? n0 : nb_curves95 (rlpb);
+  ncurves_aux[1] = (n1 > -1) ? n1 : nb_curves95 (alpb);
   strategies->methods_aux = facul_make_aux_methods (MAX(ncurves_aux[0], ncurves_aux[1]), verbose);
   // old way was:
   // strategies->methods_aux = facul_make_aux_methods (30, verbose);

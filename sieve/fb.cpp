@@ -512,7 +512,9 @@ fb_part::append(const fb_general_entry &fb_cur)
   /* Non-simple ones go in the general vector, or, if this is an only_general
      part, then all entries do */
   if (only_general || !fb_cur.is_simple()) {
-    general_vector.append(fb_cur);
+    /* Append powers only up to this part's powlim */
+    if (fb_cur.k == 1 || fb_cur.q < powlim)
+      general_vector.append(fb_cur);
     return;
   }
 
@@ -582,8 +584,9 @@ fb_part::make_slices(const double scale, slice_index_t &next_index)
   }
 }
 
-
+/* powlim could well be one value per part, like thresholds */
 fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
+                             const fbprime_t powlim,
 			     const bool *only_general)
 {
   for (size_t i = 0; i < FB_MAX_PARTS; i++) {
@@ -591,7 +594,7 @@ fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
     this->thresholds[i] = thresholds[i];
     // By default, only_general is true for part 0, and false for all others
     const bool og = (only_general == NULL) ? (i == 0) : only_general[i];
-    parts[i] = new fb_part(og);
+    parts[i] = new fb_part(powlim, og);
   }
 }
 
@@ -860,13 +863,19 @@ fb_powers::fb_powers (const fbprime_t lim)
    Returns 1 on success, 0 on error. */
 
 void
-fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound)
+fb_factorbase::make_linear (const mpz_t *poly)
 			    
 {
   fbprime_t next_prime;
   fb_general_entry fb_cur;
+  fbprime_t powlim = 0;
+  
+  /* Find out the largest powlim among all parts */
+  for (size_t i = 0; i < FB_MAX_PARTS; i++)
+    powlim = MAX(powlim, parts[i]->powlim);
 
-  fb_powers *powers = new fb_powers(powbound);
+  /* Prepare for computing powers up to that limit */
+  fb_powers *powers = new fb_powers(powlim);
   size_t next_pow = 0;
 
   verbose_output_vfprint(0, 1, gmp_vfprintf,
@@ -874,7 +883,7 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound)
                "# including primes up to %" FBPRIME_FORMAT
                " and prime powers up to %" FBPRIME_FORMAT ".\n",
                poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
-               poly[0], thresholds[FB_MAX_PARTS-1], powbound);
+               poly[0], thresholds[FB_MAX_PARTS-1], powlim);
 
   for (next_prime = 2; next_prime <= thresholds[FB_MAX_PARTS-1]; ) {
     /* Handle any prime powers that are smaller than next_prime */

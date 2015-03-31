@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <gmp.h>
 #include "macros.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -95,7 +96,7 @@ void mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
 void mpz_poly_translation (mpz_poly_ptr, mpz_poly_srcptr, const mpz_t);
 void mpz_poly_rotation (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const mpz_t, int);
 void mpz_poly_rotation_int64 (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const int64_t, int);
-void mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
+void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
 int mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
                         mpz_srcptr invm);
 int mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
@@ -103,12 +104,15 @@ void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_src
                             mpz_poly_srcptr f, mpz_srcptr m,
                             mpz_srcptr invm);
 void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
-                                         mpz_poly_srcptr F, mpz_srcptr m);
+                                         mpz_poly_srcptr F, mpz_srcptr m, mpz_srcptr invm);
 int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
 int mpz_poly_div_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr p);
 int mpz_poly_divexact (mpz_poly_ptr q, mpz_poly_srcptr h, mpz_poly_srcptr f, mpz_srcptr p);
 void mpz_poly_div_2_mod_mpz(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_srcptr m);
 void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i);
+void mpz_poly_mul_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i);
+void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a);
+
   
 void mpz_poly_eval(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x);
 void mpz_poly_eval_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x);
@@ -153,6 +157,8 @@ void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
 void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q);
 
+int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
+
 struct mpz_poly_with_m_s {
     mpz_poly_t f;
     int m;
@@ -179,8 +185,32 @@ void mpz_poly_factor_list_fprintf(FILE* ff, mpz_poly_factor_list lf);
 int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, mpz_srcptr p);
 int mpz_poly_factor_ddf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p);
 int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate);
+
+/* output is sorted by degree and lexicographically */
 int mpz_poly_factor(mpz_poly_factor_list lf, mpz_poly_srcptr f, mpz_srcptr p, gmp_randstate_t rstate);
 int mpz_poly_is_irreducible(mpz_poly_srcptr f, mpz_srcptr p);
+
+/* lift from a factor list mod ell to a factor list mod ell2.
+ * ell does not need to be prime, provided all factors considered are
+ * unitary.
+ *
+ * ell and ell2 must be powers of the same prime, with ell2 <= ell^2
+ * (NOTE that this is not checked)
+ */
+int mpz_poly_factor_list_lift(mpz_poly_factor_list_ptr fac, mpz_poly_srcptr f, mpz_srcptr ell, mpz_srcptr ell2);
+
+/* This computes the ell-adic lifts of the factors of f, assuming
+ * we have no multiplicities, using Newton lifting.
+ * This requires that f be monic 
+ *
+ * I'm terribly lazy, so at the moment this is working only for prec==2.
+ * Extending to arbitrary p is an easy exercise.
+ *
+ * The output is sorted based on the order of the factors mod p (that is,
+ * factors are the lifts of the factors returned by mpz_poly_factor mod
+ * p, in the same order).
+ */
+int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_srcptr f, mpz_srcptr ell, int prec, gmp_randstate_t rstate);
 
 #ifdef __cplusplus
 }

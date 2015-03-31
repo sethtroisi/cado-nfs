@@ -29,24 +29,6 @@ mpz_poly_random (mpz_poly_t f, int d, int k)
   f->deg = d;
 }
 
-static void
-mpz_poly_mul_xk (mpz_poly_t f, int k)
-{
-  int i;
-
-  ASSERT_ALWAYS (k >= 0);
-
-  if (k == 0)
-    return;
-
-  mpz_poly_realloc (f, f->deg + k + 1);
-  for (i = f->deg; i >= 0; i--)
-    mpz_set (f->coeff[i + k], f->coeff[i]);
-  for (i = 0; i < k; i++)
-    mpz_set_ui (f->coeff[i], 0);
-  f->deg += k;
-}
-
 static void mpz_poly_setcoeffs_ui_var(mpz_poly_t f, int d, ...)
 {
     va_list ap;
@@ -140,7 +122,7 @@ test_polymodF_mul ()
                   mpz_divexact (c, T->coeff[T->deg], F->coeff[F->deg]);
                   mpz_poly_mul_mpz (U, F, c);
                   /* multiply U by x^(T->deg - F->deg) */
-                  mpz_poly_mul_xk (U, T->deg - F->deg);
+                  mpz_poly_mul_xi (U, U, T->deg - F->deg);
                   mpz_poly_sub (T, T, U);
                   ASSERT_ALWAYS (T->deg < oldd);
                 }
@@ -778,7 +760,7 @@ void test_mpz_poly_factor(unsigned long iter)
             mpz_poly_mul(g, g, fx->f);
             mpz_poly_mod_mpz(g, g, p, NULL);
         }
-        mpz_poly_reduce_makemonic_mod_mpz(f, f, p);
+        mpz_poly_makemonic_mod_mpz(f, f, p);
         ASSERT_ALWAYS(mpz_poly_cmp(f, g) == 0);
         mpz_poly_clear(g);
     }
@@ -884,7 +866,7 @@ void test_mpz_poly_trivialities()
     /* multiply by p, then reduce mod p */
     mpz_poly_random(f, 10, 10);
     mpz_poly_mul_mpz (f, f, p);
-    mpz_poly_reduce_makemonic_mod_mpz(f, f, p);
+    mpz_poly_makemonic_mod_mpz(f, f, p);
     ASSERT_ALWAYS(f->deg < 0);
 
     /* a non-irreducible polynomial */

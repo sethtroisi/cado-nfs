@@ -243,7 +243,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_t f, const mpz_t p)
   mpz_poly_init (h, 2*d-1);
 
   /* reduce f to monic and modulo p */
-  mpz_poly_reduce_makemonic_mod_mpz (fp, f, p);
+  mpz_poly_makemonic_mod_mpz (fp, f, p);
   if (fp->deg <= 0)
     goto clear_and_exit;
   /* h=x^p-x (mod mpz_poly_fp) */
