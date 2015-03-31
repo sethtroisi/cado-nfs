@@ -44,5 +44,17 @@ void sieving_bound_fprintf(FILE * filew, sieving_bound_srcptr H)
   for (unsigned int i = 0 ; i < H->t - 1; i++) {
     fprintf(filew, "-H%u: -%u -- H%u: %u\n", i, H->h[i], i, H->h[i] - 1);
   }
-  fprintf(filew, "H%u: 0 -- H%u: %u\n", H->t - 1, H->t - 1, H->h[H->t - 1]);
+  fprintf(filew, "H%u: 0 -- H%u: %u\n", H->t - 1, H->t - 1, H->h[H->t - 1] - 1);
+}
+
+void sieving_bound_fprintf_comment(FILE * filew, sieving_bound_srcptr H)
+{
+  ASSERT(H->t >= 2);
+
+  fprintf(filew, "# [-H%u: -%u -- H%u: %u\n", 0, H->h[0], 0, H->h[0] - 1);
+
+  for (unsigned int i = 1 ; i < H->t - 1; i++) {
+    fprintf(filew, "# -H%u: -%u -- H%u: %u\n", i, H->h[i], i, H->h[i] - 1);
+  }
+  fprintf(filew, "# H%u: 0 -- H%u: %u]\n", H->t - 1, H->t - 1, H->h[H->t - 1] - 1);
 }
