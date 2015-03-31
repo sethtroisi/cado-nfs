@@ -212,7 +212,8 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
     ASSERT_ALWAYS(ret2);
     mpz_mul(inv, inv, f[0]->coeff[0]);
     mpz_neg(inv, inv);
-    mpz_mod(m, inv, N);
+    if (m != NULL)
+      mpz_mod(m, inv, N);
     mpz_clear(inv);
 
     for (int i = 0; i < 2; ++i)
