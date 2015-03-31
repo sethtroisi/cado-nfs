@@ -8,16 +8,13 @@
 #include "utils_mpz.h"
 #include "sieving_bound.h"
 
-/*
- * To deal with the list of short vectors.
- */
-void SV_init(SV_ptr SV)
+void list_vector_init(list_vector_ptr SV)
 {
   SV->length = 0;
   SV->v = (int64_vector_t * ) malloc(sizeof(int64_vector_t) * 4);
 }
 
-void SV_add_int64_vector(SV_ptr SV, int64_vector_srcptr v)
+void list_vector_add_int64_vector(list_vector_ptr SV, int64_vector_srcptr v)
 {
   if ((SV->length % 4) == 0) {
     SV->v = realloc(SV->v, sizeof(int64_vector_t) * (SV->length + 4));
@@ -27,7 +24,7 @@ void SV_add_int64_vector(SV_ptr SV, int64_vector_srcptr v)
   SV->length++;
 }
 
-void SV_clear(SV_ptr SV)
+void list_vector_clear(list_vector_ptr SV)
 {
   for (unsigned int i = 0; i < SV->length; i++) {
     ASSERT(SV->v[i]->dim != 0);
@@ -37,7 +34,7 @@ void SV_clear(SV_ptr SV)
   SV->length = 0;
 }
 
-void SV_fprintf(FILE * file, SV_srcptr SV)
+void list_vector_fprintf(FILE * file, list_vector_srcptr SV)
 {
   fprintf(file, "[\n");
   for (unsigned int i = 0; i < SV->length - 1; i++) {
@@ -52,7 +49,7 @@ void SV_fprintf(FILE * file, SV_srcptr SV)
 /*
  * From PNpoly
  */
-int int64_vector_in_SV(int64_vector_srcptr vec, SV_srcptr SV)
+int int64_vector_in_SV(int64_vector_srcptr vec, list_vector_srcptr SV)
 {
   ASSERT(SV->length > 2);
   ASSERT(vec->dim > 1);
@@ -331,15 +328,18 @@ int reduce_qlattice_zero(int64_vector_ptr v0, int64_vector_ptr v1,
 /*
  * For instance, it is SV3.
  */
-void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
+void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
     int64_vector_srcptr v1_root, int64_vector_srcptr v2)
 {
   ASSERT(v0_root->dim == v1_root->dim);
 #ifndef NDEBUG
   for (unsigned int j = 3; j < v0_root->dim; j++) {
     ASSERT(v0_root->c[j] == v1_root->c[j]);
+    ASSERT(v0_root->c[j] == 0);
   }
 #endif // NDEBUG
+  ASSERT(v2->c[1] == 0);
+  ASSERT(v2->c[2] == 1);
 
   int64_vector_t u;
   int64_vector_init(u, v0_root->dim);
@@ -368,7 +368,7 @@ void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
     u->c[i] = a * v0->c[i] + b * v1->c[i];
   }
   u->c[2] = 0;
-  SV_add_int64_vector(SV, u);
+  list_vector_add_int64_vector(SV, u);
 
   //Build a triangle around the projection of v2 in the plane z = 0.
   if (v2_new_base_x - (double)a < 0) {
@@ -376,13 +376,13 @@ void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
       u->c[i] = SV->v[0]->c[i] - v0->c[i];
     }
     u->c[2] = 0;
-    SV_add_int64_vector(SV, u);
+    list_vector_add_int64_vector(SV, u);
   } else {
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] + v0->c[i];
     }
     u->c[2] = 0;
-    SV_add_int64_vector(SV, u);
+    list_vector_add_int64_vector(SV, u);
   }
 
   if (v2_new_base_y - (double)b < 0) {
@@ -390,13 +390,13 @@ void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
       u->c[i] = SV->v[0]->c[i] - v1->c[i];
     }
     u->c[2] = 0;
-    SV_add_int64_vector(SV, u);
+    list_vector_add_int64_vector(SV, u);
   } else {
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] + v1->c[i];
     }
     u->c[2] = 0;
-    SV_add_int64_vector(SV, u);
+    list_vector_add_int64_vector(SV, u);
   }
 
 #ifndef NDEBUG
@@ -420,7 +420,7 @@ void SV4(SV_ptr SV, int64_vector_srcptr v0_root,
   mat_int64_clear(U);
 }
 
-void SV4_Mqr(SV_ptr SV, mat_int64_srcptr Mqr)
+void SV4_Mqr(list_vector_ptr SV, mat_int64_srcptr Mqr)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
@@ -463,7 +463,7 @@ static int64_t difference_bound_x(int64_vector_srcptr v,
  *  vectors.
  * val_stamp: value we want for the stamp of the vector.
  */
-static unsigned int find_min_x(SV_srcptr SV, sieving_bound_srcptr H,
+static unsigned int find_min_x(list_vector_srcptr SV, sieving_bound_srcptr H,
     unsigned char * stamp, unsigned char val_stamp)
 {
   int64_t x = -1; 
@@ -664,8 +664,8 @@ void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
   int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], 2*H->h[0]);
   
   //Find some short vectors to go from z = d to z = d + 1.
-  SV_t SV;
-  SV_init(SV);
+  list_vector_t SV;
+  list_vector_init(SV);
   SV4(SV, vec[0], vec[1], vec[2]);
 
   //Reduce q-lattice is not possible.
@@ -680,7 +680,7 @@ void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
       int64_vector_clear(vec[i]);
     }
     free(vec);
-    SV_clear(SV);
+    list_vector_clear(SV);
 
     return;
   }
@@ -786,8 +786,8 @@ void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
     /*int64_vector_fprintf(stdout, vs);*/
 
     //Jump in the next plane.
-    SV_t SV_tmp;
-    SV_init(SV_tmp);
+    list_vector_t list_vector_tmp;
+    list_vector_init(list_vector_tmp);
     int64_vector_t v_tmp;
     int64_vector_init(v_tmp, SV->v[0]->dim);
     /*
@@ -800,7 +800,7 @@ void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
 
     for (unsigned int i = 0; i < SV->length; i++) {
       int64_vector_add(v_tmp, vs, SV->v[i]);
-      SV_add_int64_vector(SV_tmp, v_tmp);
+      list_vector_add_int64_vector(list_vector_tmp, v_tmp);
 
       if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
         if (-(int64_t) H->h[1] <= v_tmp->c[1] && (int64_t)H->h[1] > v_tmp->c[1])
@@ -822,9 +822,9 @@ void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
     unsigned int pos = 0;
     if (found == 0) {
       int64_t min = -1;
-      for (unsigned int i = 1; i < SV_tmp->length; i++) {
+      for (unsigned int i = 1; i < list_vector_tmp->length; i++) {
         if (assert[i] == 0) {
-          int64_t tmp= ABS(vs->c[0] - SV_tmp->v[i]->c[0]);
+          int64_t tmp= ABS(vs->c[0] - list_vector_tmp->v[i]->c[0]);
           if (min == -1) {
             min = tmp;
           }
@@ -834,28 +834,28 @@ void plane_sieve_array(array_ptr array, ideal_1_srcptr r,
           }
         }
       }
-      int64_vector_set(vs, SV_tmp->v[pos]);
+      int64_vector_set(vs, list_vector_tmp->v[pos]);
       ASSERT(vs->c[0] < (int64_t)H->h[0]);
       ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
     } else if (found == 1) {
-      pos = find_min_x(SV_tmp, H, assert, 1);
-      int64_vector_set(vs, SV_tmp->v[pos]);
+      pos = find_min_x(list_vector_tmp, H, assert, 1);
+      int64_vector_set(vs, list_vector_tmp->v[pos]);
       ASSERT(vs->c[0] < (int64_t)H->h[0]);
       ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
     } else {
       ASSERT(found == 2);
-      pos = find_min_x(SV_tmp, H, assert, 2);
-      int64_vector_set(vs, SV_tmp->v[pos]);
+      pos = find_min_x(list_vector_tmp, H, assert, 2);
+      int64_vector_set(vs, list_vector_tmp->v[pos]);
       add_FK_vector(vs, e0, e1, H);
       ASSERT(vs->c[0] < (int64_t)H->h[0]);
       ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
     }
 
     free(assert);
-    SV_clear(SV_tmp);
+    list_vector_clear(list_vector_tmp);
   }
 
-  SV_clear(SV);
+  list_vector_clear(SV);
   int64_vector_clear(v);
   int64_vector_clear(vs);
   int64_vector_clear(vs_tmp);
