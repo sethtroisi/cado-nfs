@@ -13,9 +13,9 @@ void mat_Z_init(mat_Z_ptr matrix, unsigned int NumRows, unsigned int
   matrix->NumRows = NumRows;
   matrix->NumCols = NumCols;
 
-  matrix->coeff = malloc(sizeof(mpz_t *) * (NumRows + 1));
+  matrix->coeff = (mpz_t ** ) malloc(sizeof(mpz_t *) * (NumRows + 1));
   for (unsigned int row = 0; row < (NumRows + 1); row++) {
-    matrix->coeff[row] = malloc(sizeof(mpz_t) * (NumCols + 1));
+    matrix->coeff[row] = (mpz_t * )malloc(sizeof(mpz_t) * (NumCols + 1));
   }
 
   for (unsigned int row = 0; row < NumRows + 1; row++) {
@@ -34,9 +34,9 @@ void mat_Z_init_with_array(mat_Z_ptr matrix, unsigned int NumRows, unsigned int
   matrix->NumRows = NumRows;
   matrix->NumCols = NumCols;
 
-  matrix->coeff = malloc(sizeof(mpz_t *) * (NumRows + 1));
+  matrix->coeff = (mpz_t ** )malloc(sizeof(mpz_t *) * (NumRows + 1));
   for (unsigned int row = 0; row < (NumRows + 1); row++) {
-    matrix->coeff[row] = malloc(sizeof(mpz_t) * (NumCols + 1));
+    matrix->coeff[row] = (mpz_t * ) malloc(sizeof(mpz_t) * (NumCols + 1));
   }
 
   for (unsigned int row = 0; row < NumRows + 1; row++) {

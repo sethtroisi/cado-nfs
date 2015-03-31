@@ -7,7 +7,7 @@
 void uint64_array_init(uint64_array_ptr array, uint64_t length)
 {
   array->length = length;
-  array->array = malloc(sizeof(uint64_t) * length);
+  array->array = (uint64_t * ) malloc(sizeof(uint64_t) * length);
 
 #ifndef NDEBUG
   for (uint64_t i = 0; i < length; i++) {

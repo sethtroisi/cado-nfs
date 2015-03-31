@@ -164,8 +164,8 @@ nfs-hd/polyselect-hd/functions.h
 nfs-hd/polyselect-hd/main.c
 nfs-hd/polyselect-hd/parameters.c
 nfs-hd/polyselect-hd/parameters.h
-nfs-hd/sieving_interval.c
-nfs-hd/sieving_interval.h
+nfs-hd/sieving_bound.c
+nfs-hd/sieving_bound.h
 nfs-hd/special-q_sieve.c
 nfs-hd/uint64_array.c
 nfs-hd/uint64_array.h
