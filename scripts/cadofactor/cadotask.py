@@ -3164,7 +3164,7 @@ class PurgeTask(Task):
         return "Filtering - Singleton removal"
     @property
     def programs(self):
-        override = ("nrels", "out", "minindex", "outdel", "nprimes", "filelist")
+        override = ("nrels", "out", "outdel", "nprimes", "filelist")
         return ((cadoprograms.Purge, override, {"_freerel": Request.GET_FREEREL_FILENAME}),)
     @property
     def paramnames(self):
@@ -3196,11 +3196,15 @@ class PurgeTask(Task):
                 return False
 
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
-        minindex = int(nprimes / 20.0)
-        # For small cases, we want to avoid degenerated cases, so let's
-        # keep most of the ideals: memory is not an issue in that case.
-        if (minindex < 10000):
-            minindex = 500
+        # If the user didn't give minindex, let's compute it.
+        minindex = int(self.progparams[0].get("minindex", -1))
+        if minindex == -1:
+            minindex = int(nprimes / 20.0)
+            # For small cases, we want to avoid degenerated cases, so let's
+            # keep most of the ideals: memory is not an issue in that case.
+            if (minindex < 10000):
+                minindex = 500
+            self.progparams[0].setdefault("minindex", minindex)
         
         if "purgedfile" in self.state and not self.have_new_input_files() and \
                 input_nrels == self.state["input_nrels"]:
@@ -3241,14 +3245,14 @@ class PurgeTask(Task):
             p = cadoprograms.Purge(*files,
                                    nrels=input_nrels, out=purgedfile,
                                    outdel=relsdelfile, keep=keep,
-                                   minindex=minindex, nprimes=nprimes,
+                                   nprimes=nprimes,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         else:
             filelistname = self.make_filelist(files)
             p = cadoprograms.Purge(nrels=input_nrels,
-                                   out=purgedfile, minindex=minindex,
+                                   out=purgedfile,
                                    outdel=relsdelfile, keep=keep,
                                    nprimes=nprimes,
                                    filelist=filelistname,
