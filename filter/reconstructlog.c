@@ -154,91 +154,35 @@ typedef struct
 {
   log_rel_t *rels;
   logtab_ptr log;
-  unsigned int nbsm0;
-  unsigned int nbsm1;
-  const char * abunits0dirname;
-  const char * abunits1dirname;
+  sm_side_info sm_info[2];
+  const char * abunitsdirname[2];
+  mpz_t * smlogs[2];    /* the known logarithms of the SMs */
 } read_data_t;
 
 /* Init a read_data_t structure for nrels rels and nprimes primes. Assume the
  * table of log is already allocated, but not the table of log_rel_t     */
 static void
-read_data_init (read_data_t *data, logtab_t log, uint64_t nrels, 
-		const unsigned int nbsm0, const unsigned int nbsm1,
-		const char * abunits0dirname, const char * abunits1dirname)
+read_data_init (read_data_t *data, logtab_t log, uint64_t nrels)
 {
   data->rels = log_rel_init(nrels);
   data->log = log;
-  data->nbsm0 = nbsm0;
-  data->nbsm1 = nbsm1;
-  data->abunits0dirname = abunits0dirname;
-  data->abunits1dirname = abunits1dirname;
 }
 
 static void
 read_data_free (read_data_t *data, uint64_t nrels)
 {
-  log_rel_free (data->rels, nrels);
-}
-
-/***************** utils functions for adding logarithms *********************/
-/* Compute a <- (a + l*e) mod q  , with e being a int32_t */
-static inline void
-mpz_add_log_mod_si (mpz_t a, mpz_t l, int32_t e, mpz_t q)
-{
-  if (e > 0)
-    mpz_addmul_ui (a, l, e);
-  else
-    mpz_submul_ui (a, l, -e);
-  mpz_mod (a, a, q);
-}
-
-/* Compute a <- (a + l*e) mod q  , with e being a mpz_t */
-static inline void
-mpz_add_log_mod_mpz (mpz_ptr a, mpz_t l, mpz_t e, mpz_t q)
-{
-  mpz_t t;
-  mpz_init(t);
-  mpz_mul(t, l, e);  // t <- l*e
-  mpz_mod(t, t, q);  // t <- l*e mod q
-  mpz_add(t, a, t);  // t <- l*e mod q + a
-  mpz_mod (a, t, q); // a <- (a+l*e) mod q
-  mpz_clear(t);
+    sm_side_info_clear(data->sm_info[0]);
+    sm_side_info_clear(data->sm_info[1]);
+    log_rel_free (data->rels, nrels);
 }
 
 /************************ Handling of the SMs *******************************/
 /* number of SM that must be used for side 1. Must be 0 for FFS */
 
 #ifndef FOR_FFS /* Not needed for FFS */
-mpz_t smexp0; /* exponent for SM on the 0 side */
-mpz_t smexp1; /* exponent for SM on the 1 side */
 mpz_poly_ptr F0;
 mpz_poly_ptr F1;
 #endif
-mpz_t q2;    /* q^2 */
-mpz_t invq2;
-mpz_t *smlog;
-
-/* Init the data needed for SM computation, given the polynomial,
- * the group order and the exponent */
-static void
-sm_data_init (mpz_t q, logtab_t log)
-{
-  mpz_init(q2);
-  mpz_mul(q2, q, q);
-
-  mpz_init(invq2);
-  barrett_init(invq2, q2);
-
-  smlog = &(log->tab[log->nprimes]);
-}
-
-static void
-sm_data_free ()
-{
-  mpz_clear(q2);
-  mpz_clear(invq2);
-}
 
 /* Very naive code for finding the valuations of the units. */
 static int
@@ -314,101 +258,51 @@ get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname,
     return ok;
 }
 
-/* we need retrieve the exponents of the units in a-b*x. */
-static inline void
-add_unit_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		       const char * abunitsdirname, unsigned int nunits,
-                       mpz_t *smlog)
-{
-    int u[10];
-    if(get_units_for_ab(u, a, b, abunitsdirname, nunits)){
-	/* add contrib */
-	for(int i = 0; i < (int)nunits; i++)
-	    mpz_add_log_mod_si (l, smlog[i], u[i], q);
-    }
-}
-
-/* Given a and b, compute the SM and add the contribution to l.
-   smlg[0..nbsm0[           contains the logs of the SM's on side 0
-   smlg[nbsm0..nbsm0+nbsm1[ contains the logs of the SM's on side 1
-*/
-static inline void
-add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		     mpz_poly_ptr F0, mpz_t smexp0, unsigned int nbsm0,
-		     mpz_poly_ptr F1, mpz_t smexp1, unsigned int nbsm1,
-		     mpz_t *smlg)
-{
-  mpz_poly_ptr F[2] = {F0, F1};
-  mpz_ptr smexp[2] = {smexp0, smexp1};
-  mpz_poly_t SMres[2];
-  int degF0 = 0;
-  int degF1 = 0;
-  if (F0 != NULL)
-      degF0 = F0->deg;
-  if (F1 != NULL)
-      degF1 = F1->deg;
-  mpz_poly_init(SMres[0], degF0);
-  mpz_poly_init(SMres[1], degF1);
-  SMres[0]->deg = 0;
-  SMres[1]->deg = 0;
-  mpz_poly_setcoeff_si(SMres[0], 0, 1);
-  mpz_poly_setcoeff_si(SMres[1], 0, 1);
-  mpz_poly_ptr Res[2] = { &SMres[0][0], &SMres[1][0] };
-  sm_single_rel(Res, a, b, F, smexp, q, q2, invq2);
-  unsigned int i;
-  if (F0 != NULL) {
-    for (i = degF0 - SMres[0]->deg - 1; i < nbsm0; i++)
-      mpz_add_log_mod_mpz (l, smlg[i], SMres[0]->coeff[degF0-1-i], q);
-  }
-  if (F1 != NULL) {
-    for (i = degF1 - SMres[1]->deg - 1; i < nbsm1; i++)
-      mpz_add_log_mod_mpz (l, smlg[i+nbsm0], SMres[1]->coeff[degF1-1-i], q);
-  }
-  mpz_poly_clear(SMres[0]);
-  mpz_poly_clear(SMres[1]);
-}
-
 /* 
-   smlog[0..nbsm0[           contains the logs of the SM on side 0
-   smlog[nbsm0..nbsm0+nbsm1[ contains the logs of the SM on side 1
+ * given S ==  data->sm_info[i], the range data->smlogs[i][0..S->nsm[
+ * contains the logs of the SMs on side i.
+ *
  */
-static inline void
-add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		      unsigned int nbsm0, unsigned int nbsm1,
-		      const char * abunits0dirname MAYBE_UNUSED,
-		      const char * abunits1dirname MAYBE_UNUSED)
-{
-    mpz_poly_ptr FF0 = F0, FF1 = F1;
-
-    if (abunits0dirname){
-	/* add unit contrib with smlog[0..nbsm0[ */
-	add_unit_contribution(l, a, b, q, abunits0dirname, nbsm0, smlog);
-	FF0 = NULL;
-    }
-    if (abunits1dirname){
-	/* add unit contrib with smlog[nbsm0..nbsm0+nbsm1[ */
-	add_unit_contribution(l, a, b, q, abunits1dirname,
-			      nbsm1, smlog+nbsm0);
-	FF1 = NULL;
-    }
-    add_sm_contribution(l, a, b, q,
-			FF0, smexp0, nbsm0, 
-			FF1, smexp1, nbsm1, 
-			smlog);
-}
-
 /* Callback function called by filter_rels in compute_log_from_rels */
 void *
 thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 {
-  read_data_t *data = (read_data_t *) context_data;
-  log_rel_t *lrel = &(data->rels[rel->num]);
+    read_data_t *data = (read_data_t *) context_data;
+    log_rel_t *lrel = &(data->rels[rel->num]);
 
-  add_sm_contributions (lrel->log_known_part, rel->a, rel->b, data->log->q,
-			data->nbsm0, data->nbsm1,
-			data->abunits0dirname, data->abunits1dirname);
+    mpz_ptr l = lrel->log_known_part;
+    int64_t a = rel->a;
+    uint64_t b = rel->b;
 
-  return NULL;
+    mpz_srcptr q = data->log->q;
+    for(int side = 0 ; side < 2 ; side++) {
+        sm_side_info_srcptr S = data->sm_info[side];
+        if (S->nsm == 0) continue;
+        if (data->abunitsdirname[side]) {
+            int e[S->nsm];
+            /* This function returns an int, but an error is fatal, and
+             * in fact trapped well before. If it derps, then there's no
+             * point in trying to do anything, since we're dead already
+             */
+            get_units_for_ab(e, a, b, data->abunitsdirname[side], S->nsm);
+            for(int i = 0; i < S->nsm; i++)
+                mpz_addmul_si (l, data->smlogs[side][i], e[i]);
+            mpz_mod(l, l, q);
+        } else {
+            mpz_poly_t u;
+            mpz_poly_init(u, MAX(1, S->f->deg-1));
+            mpz_poly_setcoeff_int64(u, 0, a);
+            mpz_poly_setcoeff_int64(u, 1, -b);
+            compute_sm_piecewise(u, u, S);
+            ASSERT_ALWAYS(u->deg < S->f->deg);
+            for(int i = 0; i <= u->deg; i++)
+                mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
+            mpz_mod(l, l, q);
+            mpz_poly_clear(u);
+        }
+    }
+
+    return NULL;
 }
 
 /****************** Computation of missing logarithms ************************/
@@ -420,18 +314,19 @@ thread_insert (void * context_data, earlyparsed_relation_ptr rel)
   log_rel_t *lrel = &(data->rels[rel->num]);
   unsigned int next = 0;
   ideal_merge_t buf[REL_MAX_SIZE];
-
+  int c = 0;
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
     exponent_t e = rel->primes[i].e;
 
-    if (mpz_sgn(data->log->tab[h]) >= 0)
-      mpz_add_log_mod_si (lrel->log_known_part, data->log->tab[h], e,
-                          data->log->q);
-    else
+    if (mpz_sgn(data->log->tab[h]) >= 0) {
+      mpz_addmul_si (lrel->log_known_part, data->log->tab[h], e);
+      c++;
+    } else
       buf[next++] = (ideal_merge_t) {.id = h, .e = e};
   }
+  if (c) mpz_mod(lrel->log_known_part, lrel->log_known_part, data->log->q);
 
   lrel->unknown = idealmerge_my_malloc (next);
   lrel->nb_unknown = next;
@@ -446,9 +341,10 @@ thread_insert (void * context_data, earlyparsed_relation_ptr rel)
 static inline weight_t
 nb_unknown_log (read_data_t *data, uint64_t i)
 {
-  weight_t j, k, len = data->rels[i].nb_unknown;
-  ideal_merge_t *p = data->rels[i].unknown;
-
+  log_rel_t * lrel = &(data->rels[i]);
+  weight_t j, k, len = lrel->nb_unknown;
+  ideal_merge_t *p = lrel->unknown;
+  int c = 0;
   for (j = 0, k = 0; k < len; k++)
   {
     pthread_mutex_lock (&lock);
@@ -461,12 +357,15 @@ nb_unknown_log (read_data_t *data, uint64_t i)
         p[j] = p[k];
       j++;
     }
-    else // We know this log, add it to log_know_part
-      mpz_add_log_mod_si (data->rels[i].log_known_part, data->log->tab[p[k].id],
-                          p[k].e, data->log->q);
+    else { // We know this log, add it to log_know_part
+      mpz_addmul_si(lrel->log_known_part, data->log->tab[p[k].id],
+                          p[k].e);
+        c++;
+    }
   }
+  if (c) mpz_mod(lrel->log_known_part, lrel->log_known_part, data->log->q);
 
-  data->rels[i].nb_unknown = j;
+  lrel->nb_unknown = j;
   return j;
 }
 
@@ -1042,17 +941,13 @@ static uint64_t
 compute_log_from_rels (bit_vector needed_rels,
                        const char *relspfilename, uint64_t nrels_purged,
                        const char *relsdfilename, uint64_t nrels_del,
-                       uint64_t nrels_needed, logtab_t log, int nt,
-		       const unsigned int nbsm0, const unsigned int nbsm1,
-		       const char *abunits0dirname,
-		       const char *abunits1dirname)
+                       uint64_t nrels_needed, int nt,
+                       read_data_t * data)
 {
   double wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
   uint64_t nrels = nrels_purged + nrels_del;
   ASSERT_ALWAYS (nrels_needed > 0);
-  read_data_t data;
-  read_data_init(&data, log, nrels, nbsm0, nbsm1, abunits0dirname, abunits1dirname);
 
   /* Reading all relations */
   printf ("# Reading relations from %s and %s\n", relspfilename, relsdfilename);
@@ -1065,9 +960,9 @@ compute_log_from_rels (bit_vector needed_rels,
   fflush(stdout);
   char *fic[3] = {(char *) relspfilename, (char *) relsdfilename, NULL};
   struct filter_rels_description desc[3] = {
-                   { .f = thread_insert, .arg=&data, .n=1},
+                   { .f = thread_insert, .arg=data, .n=1},
 #ifndef FOR_FFS
-                   { .f = thread_sm,     .arg=&data, .n=nt},
+                   { .f = thread_sm,     .arg=data, .n=nt},
 #endif
                    { .f = NULL,          .arg=0,     .n=0}
       };
@@ -1095,9 +990,9 @@ compute_log_from_rels (bit_vector needed_rels,
     wct_tt = wct_seconds();
 
     if (nt > 1)
-      computed = log_do_one_iter_mt (&data, needed_rels, nt, nrels);
+      computed = log_do_one_iter_mt (data, needed_rels, nt, nrels);
     else
-      computed = log_do_one_iter_mono (&data, needed_rels, nrels);
+      computed = log_do_one_iter_mono (data, needed_rels, nrels);
     total_computed += computed;
 
     printf ("# Iteration %" PRIu64 ": %" PRIu64 " new logarithms computed\n",
@@ -1115,7 +1010,6 @@ compute_log_from_rels (bit_vector needed_rels,
   if (c != 0)
     fprintf(stderr, "### Warning, %zu relations were not used\n", c);
 
-  read_data_free(&data, nrels);
   return total_computed;
 }
 
@@ -1333,19 +1227,22 @@ main(int argc, char *argv[])
   param_list_parse_uint64(pl, "nrels", &nrels_tot);
   param_list_parse_mpz(pl, "gorder", q);
 #ifndef FOR_FFS
+  /* eek. */
+  mpz_t smexp0;
   param_list_parse_uint(pl, "sm0", &nbsm0);
   mpz_init (smexp0);
   param_list_parse_mpz(pl, "smexp0", smexp0);
+  const char * abunits0dirname = NULL;
+  abunits0dirname = param_list_lookup_string(pl, "abunits0");
+  if(units0 == 0)
+      abunits0dirname = NULL;
+
+  mpz_t smexp1;
   param_list_parse_uint(pl, "sm1", &nbsm1);
   mpz_init (smexp1);
   param_list_parse_mpz(pl, "smexp1", smexp1);
-  const char * abunits0dirname = NULL;
-  abunits0dirname = param_list_lookup_string(pl, "abunits0");
   const char * abunits1dirname = NULL;
   abunits1dirname = param_list_lookup_string(pl, "abunits1");
-  /* humf */
-  if(units0 == 0)
-      abunits0dirname = NULL;
   if(units1 == 0)
       abunits1dirname = NULL;
 #endif
@@ -1473,6 +1370,7 @@ main(int argc, char *argv[])
 
   set_antebuffer_path (argv0, path_antebuffer);
 
+
   /* Reading renumber file */
   printf ("\n###### Reading renumber file ######\n");
   renumber_init_for_reading (renumber_table);
@@ -1517,20 +1415,30 @@ main(int argc, char *argv[])
     nrels_needed = nrels_tot;
   }
 
-#ifndef FOR_FFS
-  sm_data_init(q, log); /* Init data needed to compute SM */
-#endif
-
   /* Computing logs using rels in purged file */
   printf ("\n###### Computing logarithms using rels ######\n");
   if (nrels_needed > 0)
   {
-    log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
-                                          nrels_purged, relsdfilename,
-                                          nrels_del, nrels_needed, log, mt,
-					  nbsm0, nbsm1,
-                                          abunits0dirname, abunits1dirname);
-    printf ("# %" PRIu64 " logarithms are known.\n", log->nknown);
+      read_data_t data;
+      read_data_init(&data, log, nrels_purged + nrels_del);
+      data.abunitsdirname[0] = abunits0dirname;
+      data.abunitsdirname[1] = abunits1dirname;
+      for(int side = 0 ; side < 2 ; side++) {
+          sm_side_info_init(data.sm_info[side], poly->pols[side], q);
+          printf("# SM info on side %d:\n", side);
+          sm_side_info_print(stdout, data.sm_info[side]);
+      }
+      data.smlogs[0] = &(log->tab[log->nprimes]);
+      data.smlogs[1] = data.smlogs[0] + data.sm_info[0]->nsm;
+
+      log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
+              nrels_purged, relsdfilename,
+              nrels_del, nrels_needed, mt,
+              &data);
+      printf ("# %" PRIu64 " logarithms are known.\n", log->nknown);
+      read_data_free(&data, nrels_purged + nrels_del);
+      extern double m_seconds;
+      fprintf(stderr, "# %.2f\n", m_seconds);
   }
   else
     printf ("# All wanted logarithms are already known, skipping this step\n");
@@ -1542,7 +1450,6 @@ main(int argc, char *argv[])
 
   /* freeing and closing */
 #ifndef FOR_FFS
-  sm_data_free();
   mpz_clear(smexp1);
   mpz_clear(smexp0);
 #endif
