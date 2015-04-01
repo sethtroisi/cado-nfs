@@ -667,6 +667,7 @@ renumber_read_table (renumber_ptr tab, const char * filename)
 
   print_info (stdout, tab, 1);
 
+  free (expected_biggest_prime_lpb);
   fclose_maybe_compressed (tab->file, filename);
 }
 
