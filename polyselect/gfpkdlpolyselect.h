@@ -19,14 +19,13 @@
 #if DEG_PY > 2
 #error "the code works only for Py of degree <= 2, sorry."
 #else
-#define VARPHI_COEFF_INT 1
-
+#define VARPHI_COEFF_INT 1 // ?
 
 typedef struct {
   long int t;     // parameter t
   long int PY[DEG_PY + 1]; // no --> use one of the poly stuct of cado-nfs!
   long int f[MAXDEGREE + 1];  // polynomial f of degree at most MAXDEGREE 
-                         // set to 10 at the moment in cado_poly.h
+                         // set to 10 at the moment in utils/cado_poly.h
 }row_f_poly_t;
 
 // tables containing polynomials f
@@ -39,6 +38,46 @@ typedef struct {
   long int varphi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
   //(a root of PY) modulo PY so of degree at most DEG_PY-1 --> of DEG_PY coeffs.
 }table_f_poly_t;
+
+// for keeping parameters of each poly (each side) along the process of polyselect
+
+typedef struct {
+  int deg;
+  int sgtr[2];
+  int deg_subfield;
+  int sgtr_subfield[2];
+  int smexp; // from 1 to deg
+  int nb_max_easybadideals;
+  int nb_max_verybadideals;
+}ppf_t;
+/*
+global input params for GF(p^2):
+ p
+ ell
+ k(=2)
+ mnfs (>= 1) By Convention, this will be the number of polynomials g.
+
+that's all.
+code writer designs 
+deg_f = 4
+deg_g = 2
+smfexp
+smgexp
+
+ */
+
+  /* 
+params->p
+      ->ell
+      ->k
+      ->deg_f
+      ->deg_g
+      ->smfexp
+      ->smgexp
+      ->mnfs
+  */
+
+
 
 void get_degree_CONJ_f_g(unsigned int k, unsigned int *deg_f, unsigned int *deg_g);
 

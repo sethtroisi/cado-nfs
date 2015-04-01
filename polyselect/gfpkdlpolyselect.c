@@ -8,15 +8,9 @@
  *        extension fields, with the conjugation method.
  *
  * \test TODO
+ * \version 1: dedicated for GF(p^2).
  */
 
-
-#include "cado.h"
-#include "auxiliary.h"
-#include "area.h"
-#include "utils.h"
-#include "portability.h"
-#include "murphyE.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,9 +18,17 @@
 #include <stdbool.h>
 //#include <time.h> 
 
+#include "cado.h"
+#include "auxiliary.h"
+#include "area.h"
+#include "utils.h"
+#include "murphyE.h"
+
 #include "cado_poly.h"
+//#include "portability.h"
 #include "gfpkdlpolyselect.h"
 
+//TODO : change the table because polys do not satisfy new constrains (h, badideals, subfields...)
 #include "table_t_Py_f_deg4_type0_h1_t-200--200.c"
 /*extern const row_f_poly_t tab_t_Py_f_deg4_type0_h1[26];
 extern const unsigned int table_f4_size;
@@ -43,8 +45,8 @@ extern const table_f_poly_t table_f4;*/
  * note that deg_f >= deg_g by general convention in all this cado-nfs library.
  */
 void get_degree_CONJ_f_g(unsigned int k, unsigned int *deg_f, unsigned int *deg_g){
-  *deg_f = 2*k;
-  *deg_g = k;
+    *deg_f = 2*k;
+    *deg_g = k;
 }
 
 /**
