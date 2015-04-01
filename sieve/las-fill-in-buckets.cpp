@@ -18,14 +18,6 @@
 #include "cachebuf.h"
 #endif
 
-/* For memcpy in fill_in_k_buckets & fill_in_m_buckets.
-   When you have to move data whose length is a
-   static const uint8_t N <= 16 bytes,
-   it is faster to move optimal_move[N]>=N bytes with a memcpy
-   (if possible, of course) :
-   it is done with one or two instructions */
-MAYBE_UNUSED static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 16, 16, 16, 16, 16 };
-
 #include "las-plattice.h"
 
 /***************************************************************************/
