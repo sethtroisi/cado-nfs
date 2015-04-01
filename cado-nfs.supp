@@ -23,7 +23,8 @@
    fun:malloc
    fun:vasprintf
    fun:asprintf
+   ...
    fun:derived_filename
-   fun:build_mat_auxfile
+   ...
    fun:main
 }
