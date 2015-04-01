@@ -24,7 +24,7 @@
    it is faster to move optimal_move[N]>=N bytes with a memcpy
    (if possible, of course) :
    it is done with one or two instructions */
-static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 16, 16, 16, 16, 16 };
+MAYBE_UNUSED static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 16, 16, 16, 16, 16 };
 
 #include "las-plattice.h"
 
