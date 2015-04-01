@@ -1465,6 +1465,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             goto pi_save_file_leader_init_done;
         }
 
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
@@ -1472,7 +1473,6 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             close(fd);
             goto pi_save_file_leader_init_done;
         }
-#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1496,7 +1496,7 @@ pi_save_file_leader_init_done:
         thread_broadcast(w, &recvbuf, sizeof(void*), 0);
     }
 
-    /* Rather unfortunate, but error checking requires some checking. As
+    /* Rather unfortunate, but error checking requires some communication. As
      * mentioned earlier, we don't feel concerned a lot by this, since
      * in our context I/Os are rare enough
      */
@@ -1526,20 +1526,25 @@ pi_save_file_leader_init_done:
     free(displs);
 
     if (leader) {
-        ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
 #ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
+        ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
         munmap(recvbuf, wsiz);
         rc = ftruncate(fd, sizeondisk);
-#else
-        write(fd, recvbuf, sizeondisk);
-        free(recvbuf);
-        rc = 0;
-#endif
-        close(fd);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
-            /* If only ftruncate failed, don't return an error */
+        }
+#else
+        ssize_t n = write(fd, recvbuf, sizeondisk);
+        free(recvbuf);
+        if (n < 0 || (size_t) n != sizeondisk) {
+            fprintf(stderr, "%s: short write: %s\n", filename_pre, strerror(errno));
+            rc = -1;
         } else {
+            rc = 0;
+        }
+#endif
+        close(fd);
+        if (rc == 0) {
             /* unlink before rename is necessary under windows */
             unlink(filename);
             rc = rename(filename_pre, filename);
@@ -1590,6 +1595,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
             goto pi_save_file_2d_leader_init_done;
         }
 
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
@@ -1597,7 +1603,6 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
-#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1654,16 +1659,22 @@ pi_save_file_2d_leader_init_done:
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
 #ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
-#else
-        write(fd, recvbuf, wsiz);
-        free(recvbuf);
-#endif
         rc = ftruncate(fd, sizeondisk);
-        close(fd);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
-            /* If only ftruncate failed, don't return an error */
+        }
+#else
+        ssize_t n = write(fd, recvbuf, sizeondisk);
+        free(recvbuf);
+        if (n < 0 || (size_t) n != sizeondisk) {
+            fprintf(stderr, "%s: short write: %s\n", filename_pre, strerror(errno));
+            rc = -1;
         } else {
+            rc = 0;
+        }
+#endif
+        close(fd);
+        if (rc == 0) {
             /* unlink before rename is necessary under windows */
             unlink(filename);
             rc = rename(filename_pre, filename);
