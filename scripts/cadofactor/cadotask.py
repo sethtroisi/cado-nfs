@@ -4507,8 +4507,12 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
                 and set(server_whitelist) & {"localhost", "127.0.0.1"}:
             hostname = socket.gethostname()
             if not hostname in server_whitelist:
-                self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
-                server_whitelist.append(hostname)
+                try:
+                    foo=socket.gethostbyname(hostname)
+                    self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
+                    server_whitelist.append(hostname)
+                except socket.gaierror as e:
+                    self.logger.info("Not adding %s to whitelist (cannot be resolved), clients will only be allowed to connect on 127.0.0.1", hostname)
         if not server_whitelist:
             server_whitelist = None
 
