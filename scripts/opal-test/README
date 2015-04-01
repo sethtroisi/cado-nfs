@@ -37,3 +37,16 @@ in the order they are defined in las_declaration.py, for example:
 For larger numbers, you should also update the hard-coded parameters in
 las_declaration.py, especially if one of the optimized parameters equals
 one of its bounds defined in that file.
+
+Optimizing parameters for a SNFS computation
+============================================
+
+The current optimization code assumes we use special-q's on the algebraic side.
+With special-q's on the rational side, some changes have to be made:
+
+1) report.py, line 15: change 'algebraic' into 'rational'
+
+2) las_run.py, line 77: change q0 = las_params["alim"] into
+                               q0 = las_params["rlim"]
+
+3) some other changes might be needed...
