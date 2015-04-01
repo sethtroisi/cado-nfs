@@ -1219,3 +1219,4 @@ utils/threadpool.cpp
 utils/threadpool.h
 misc/extra_renumber.c
 cado-nfs.supp
+scripts/valgrind-slave.sh
