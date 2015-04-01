@@ -1529,11 +1529,12 @@ pi_save_file_leader_init_done:
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
 #ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
-#else
-        write(fd, recvbuf, wsiz);
-        free(recvbuf);
-#endif
         rc = ftruncate(fd, sizeondisk);
+#else
+        write(fd, recvbuf, sizeondisk);
+        free(recvbuf);
+        rc = 0
+#endif
         close(fd);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
