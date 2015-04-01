@@ -176,8 +176,7 @@ int cado_poly_read(cado_poly poly, const char *filename)
 /* TODO: adapt for more than 2 polynomials:
  * compute for each pair (0,i) the corresponding common root m_i
  * check all m_i are equal
- * If NULL is passed for m, then, just checked that N divides the 
- * resultant.
+ * If NULL is passed for m, then, just check that N divides the resultant.
  */
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
