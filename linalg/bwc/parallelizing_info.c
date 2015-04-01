@@ -1533,7 +1533,7 @@ pi_save_file_leader_init_done:
 #else
         write(fd, recvbuf, sizeondisk);
         free(recvbuf);
-        rc = 0
+        rc = 0;
 #endif
         close(fd);
         if (rc < 0) {
