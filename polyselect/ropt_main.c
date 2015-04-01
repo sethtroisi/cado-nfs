@@ -172,10 +172,12 @@ usage (char **argv)
   fprintf (stderr, " -c C          Fix the constant rotation of the sublattice by C.\n");
   fprintf (stderr, " -mod M        M is the sublattice modulus.\n");
   fprintf (stderr, " --skip_ropt   (switch) skip root sieve (use with option -fm).\n");
+  fprintf (stderr, " --sopt        (switch) do size optimization for polynomial.\n");
+  fprintf (stderr, " --gen_raw     (switch) regenerate raw polynomial and skip root sieve.\n");
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
-  fprintf (stderr, " -rseffort M   sieving effort ranging from 1 to 10 (default %d).\n", DEFAULT_RSEFFORT);
+  fprintf (stderr, " -ropteffort M   sieving effort ranging from 1 to 10 (default %d).\n", DEFAULT_ROPTEFFORT);
 
   fprintf (stderr, "\nExample 1: %s -f fname\n", argv[0]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
@@ -298,13 +300,13 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-rseffort") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-ropteffort") == 0)
         {
           param->effort = atoi (argv[2]);
           argv += 2;
           argc -= 2;
           if (param->effort < 1 || param->effort > 10) {
-            fprintf (stderr, "Error: -rseffort not in range (1-10).\n");
+            fprintf (stderr, "Error: -ropteffort not in range (1-10).\n");
             exit(1);
           }       
         }
@@ -313,9 +315,14 @@ ropt_parse_param ( int argc,
           fprintf (stderr, "Error: cannot use --skip_ropt with --s2.\n");
           exit(1);
         }
-        else if (argc >= 3 && strcmp (argv[1], "--skip_ropt2") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "--gen_raw") == 0)
         {
-          fprintf (stderr, "Error: cannot use --skip_ropt with --s2.\n");
+          fprintf (stderr, "Error: cannot use --gen_raw with --s2.\n");
+          exit(1);
+        }
+        else if (argc >= 3 && strcmp (argv[1], "--sopt") == 0)
+        {
+          fprintf (stderr, "Error: cannot use --sopt with --s2.\n");
           exit(1);
         }
         else {
@@ -396,13 +403,13 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-rseffort") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-ropteffort") == 0)
         {
           param->effort = atoi (argv[2]);
           argv += 2;
           argc -= 2;
           if (param->effort < 1 || param->effort > 10) {
-            fprintf (stderr, "Error: -rseffort not in range (1-10).\n");
+            fprintf (stderr, "Error: -ropteffort not in range (1-10).\n");
             exit(1);
           }
         }
@@ -412,9 +419,15 @@ ropt_parse_param ( int argc,
           argv += 1;
           argc -= 1;
         }
-        else if (argc >= 2 && strcmp (argv[1], "--skip_ropt2") == 0)
+        else if (argc >= 2 && strcmp (argv[1], "--gen_raw") == 0)
         {
-          param->skip_ropt2 = 1;
+          param->gen_raw = 1;
+          argv += 1;
+          argc -= 1;
+        }
+        else if (argc >= 2 && strcmp (argv[1], "--sopt") == 0)
+        {
+          param->sopt = 1;
           argv += 1;
           argc -= 1;
         }
@@ -456,7 +469,7 @@ main (int argc, char **argv)
   ropt_param_init (param);
 
   /* print command-line arguments */
-  fprintf (stderr, "# %s.r%s", *argv, CADO_REV);
+  fprintf (stderr, "# %s.r%s", *argv, cado_revision_string);
   for (i = 1; i < argc; i++)
     fprintf (stderr, " %s", *(argv+i));
   fprintf (stderr, "\n");

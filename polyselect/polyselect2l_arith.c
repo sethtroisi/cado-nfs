@@ -202,7 +202,7 @@ comp_sq_roots ( header_t header,
   /* prepare the special-q's */
   for (i = 1; (q = SPECIAL_Q[i]) != 0 ; i++)
   {
-    if ((header->d * header->ad) % q == 0)
+    if (header_skip (header, q))
       continue;
 
     if ( mpz_fdiv_ui (header->Ntilde, q) == 0 )

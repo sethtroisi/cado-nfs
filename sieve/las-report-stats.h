@@ -12,6 +12,7 @@ struct las_report_s {
     double ttbuckets_fill;
     double ttbuckets_apply;
     double ttf;                 /* factor_survivors */
+    double ttcof;                /* cofactorisation */
     unsigned long (*survivor_sizes)[256]; /* First index: rational side */
     unsigned long (*report_sizes)[256];
     unsigned long both_even;
@@ -21,17 +22,9 @@ typedef struct las_report_s * las_report_ptr;
 typedef const struct las_report_s * las_report_srcptr;
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 void las_report_init(las_report_ptr p);
 void las_report_clear(las_report_ptr p);
 void las_report_accumulate(las_report_ptr p, las_report_ptr q);
 void las_report_copy(las_report_ptr p, las_report_ptr q);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_REPORT_STATS_H_ */

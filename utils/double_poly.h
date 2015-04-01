@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 typedef struct {
-  unsigned int deg;
+  int deg;
   double *coeff;         /* array of deg+1 entries */
 } double_poly_struct_t;
 
@@ -35,6 +35,10 @@ void double_poly_scale(double_poly_ptr, double_poly_srcptr, double);
 void double_poly_revert(double_poly_ptr);
 double double_poly_bound_roots (double_poly_srcptr p);
 unsigned int double_poly_compute_roots(double *, double_poly_srcptr, double);
+unsigned int double_poly_compute_all_roots_with_bound(double *,
+                                                      double_poly_srcptr,
+                                                      double);
+unsigned int double_poly_compute_all_roots(double *, double_poly_srcptr);
 void double_poly_print (FILE *, double_poly_srcptr, char *name);
 void double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q);
 

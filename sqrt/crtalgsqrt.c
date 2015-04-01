@@ -1045,21 +1045,6 @@ struct sqrt_globals {
 
 struct sqrt_globals glob = { .lll_maxdim=50, .ncores = 2 };
 
-// {{{ trivial utility
-static const char * size_disp(size_t s, char buf[16])
-{
-    char * prefixes = "bkMGT";
-    double ds = s;
-    const char * px = prefixes;
-    for( ; px[1] && ds > 500.0 ; ) {
-        ds /= 1024.0;
-        px++;
-    }
-    snprintf(buf, 10, "%.1f%c", ds, *px);
-    return buf;
-}
-// }}}
-
 
 
 // {{{ TODO: Now that the v field is gone, replace the polymodF layer.
@@ -1077,7 +1062,7 @@ mpz_poly_from_ab_monic(mpz_poly_t tmp, long a, unsigned long b) {
 mpz_poly_reducemodF_monic(mpz_poly_t P, mpz_poly_t p, const mpz_poly_t F)
 {
     if (p->deg < F->deg) {
-        mpz_poly_copy(P, p);
+        mpz_poly_set(P, p);
         return;
     }
     const int d = F->deg;
@@ -1089,7 +1074,7 @@ mpz_poly_reducemodF_monic(mpz_poly_t P, mpz_poly_t p, const mpz_poly_t F)
         mpz_poly_cleandeg (p, k-1);
     }
 
-    mpz_poly_copy(P, p);
+    mpz_poly_set(P, p);
 }
 
     void
@@ -1451,7 +1436,7 @@ alg_ptree_t * alg_ptree_build(struct prime_data * p, int i0, int i1)
     res->t1 = alg_ptree_build(p, i0+d, i1);
     mpz_poly_mul(res->s, res->t0->s, res->t1->s);
     mpz_poly_reducemodF_monic(res->s, res->s, glob.F);
-    mpz_poly_reduce_mod_mpz (res->s, res->s, px);
+    mpz_poly_mod_mpz (res->s, res->s, px);
     return res;
 }
 #endif
@@ -3480,7 +3465,7 @@ int main(int argc, char **argv)
 
     /* {{{ parameter parsing */
     /* print the command line */
-    fprintf(stderr, "%s.r%s", argv[0], CADO_REV);
+    fprintf(stderr, "%s.r%s", argv[0], cado_revision_string);
     for (i = 1; i < argc; i++)
         fprintf(stderr, " %s", argv[i]);
     fprintf(stderr, "\n");
@@ -3831,7 +3816,7 @@ int main(int argc, char **argv)
 
 // Init F to be the algebraic polynomial
 mpz_poly_init(F, degree);
-mpz_poly_copy (F, pol->alg);
+mpz_poly_set (F, pol->alg);
 
 // Init prd to 1.
 mpz_poly_init(prd->p, pol->alg->deg);
@@ -3886,7 +3871,7 @@ int nab = 0, nfree = 0;
     accumulate_fast_end(prd_tab, F, lprd);
     fclose(depfile);
 
-    mpz_poly_copy(prd->p, prd_tab[0]->p);
+    mpz_poly_set(prd->p, prd_tab[0]->p);
     prd->v = prd_tab[0]->v;
     for (i = 0; i < (long) lprd; ++i)
         mpz_poly_clear(prd_tab[i]->p);

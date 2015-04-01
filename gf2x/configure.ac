@@ -80,6 +80,7 @@ if test x$hwdir = x ; then
  # Yet there are several situations in which we select another directory.
  # This refined selection mechanism is impacted by the ABI= setting.
  case "$target_cpu" in
+  armv7l) hwdir=armv7l ;;
   # All 32-bit pentium patterns
   i?86|pentium*|athlon|prescott)
    if test "$gf2x_cv_cc_supports_sse2" = "no" ; then

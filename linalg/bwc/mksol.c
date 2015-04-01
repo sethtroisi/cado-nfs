@@ -11,7 +11,7 @@
 #include "xymats.h"
 #include "portability.h"
 #include "misc.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "async.h"
 #include "filenames.h"
 #include "xdotprod.h"
@@ -21,6 +21,7 @@
 
 void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
     struct timing_data timing[1];
@@ -36,14 +37,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
-    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
     /* Hmmm. This would deserve better thought. Surely we don't need 64
@@ -53,7 +51,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      */
     mpfq_vbase Ac;
     mpfq_vbase_oo_field_init_byfeatures(Ac,
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
@@ -84,7 +82,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     unsigned int multi = 1;
     unsigned int nsolvecs_pervec = nsolvecs;
 
-    if (mpz_cmp_ui(p,2) != 0 && nsolvecs > 1) {
+    if (mpz_cmp_ui(bw->p,2) != 0 && nsolvecs > 1) {
         if (tcan_print) {
             fprintf(stderr,
 "Note: the present code is a quick hack.\n"
@@ -101,10 +99,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     mpfq_vbase Ar;
     mpfq_vbase_oo_field_init_byfeatures(Ar,
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
-    mpz_clear(p);
 
     if (pi->m->trank == 0) Ar->mpi_ops_init(Ar);
 
@@ -125,7 +122,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     unsigned int nx = 0;
     
     if (!bw->skip_online_checks) {
-        load_x(&gxvecs, bw->m, &nx, pi);
+        if (!fake) {
+            load_x(&gxvecs, bw->m, &nx, pi);
+        } else {
+            set_x_fake(&gxvecs, bw->m, &nx, pi);
+        }
         /*
         indices_apply_S(mmt, gxvecs, nx * bw->m, bw->dir);
         if (bw->dir == 0)
@@ -133,14 +134,31 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             */
     }
 
-    int rc;
+    char * v_name = NULL;
+    int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
+    ASSERT_ALWAYS(rc >= 0);
+    if (!fake) {
+        if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
+        matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
+        if (tcan_print) { printf("done\n"); }
+    } else {
+        gmp_randstate_t rstate;
+        gmp_randinit_default(rstate);
+        if (pi->m->trank == 0 && !bw->seed) {
+            bw->seed = time(NULL);
+            MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
+        }
+        serialize_threads(pi->m);
+        gmp_randseed_ui(rstate, bw->seed);
+        if (tcan_print) {
+            printf("// Random generator seeded with %d\n", bw->seed);
+        }
+        if (tcan_print) { printf("Creating fake %s...", v_name); fflush(stdout); }
+        matmul_top_set_random_and_save_vector(mmt, v_name, bw->dir, bw->start, unpadded, rstate);
+        if (tcan_print) { printf("done\n"); }
+        gmp_randclear(rstate);
+    }
 
-    char * v_name;
-    rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
-
-    if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-    matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
-    if (tcan_print) { printf("done\n"); }
 
     mmt_vec check_vector;
     /* Our ``ahead zone'' will also be used for storing the data prior to
@@ -219,17 +237,15 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      */
 
     unsigned int ii0, ii1;
-    unsigned int di = mcol->i1 - mcol->i0;
+    unsigned int eblock = (mcol->i1 - mcol->i0) / picol->totalsize;
 
-    ii0 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank) /
-        picol->totalsize;
-    ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
-        picol->totalsize;
+    ii0 = mcol->i0 + eblock * (picol->jrank * picol->ncores + picol->trank);
+    ii1 = ii0 + eblock;
 
     mmt_vec * sum;
     sum = malloc(multi * sizeof(mmt_vec));
     for(unsigned int k = 0 ; k < multi ; k++) {
-        vec_init_generic(mmt->pi->m, Ar, sum[k], 0, ii1-ii0);
+        vec_init_generic(mmt->pi->m, Ar, sum[k], 0, eblock);
     }
 
     if (bw->end == 0) {
@@ -411,16 +427,17 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          */
         /* Since S is possibly wider than one single vector, we need
          * several passes. Each corresponds to one batch of potential
-         * solutions in the end.
+         * solutions in the end. There are two levels:
          *
-         * We first make sure that an integral number of passes is
-         * needed.
+         *  - npasses: this is made of nsolvecs_pervec vectors over the
+         *  base field, which correspond to one of several of the vectors
+         *  we work with. Those get saved *together* in S files.
          *
-         * TODO: I've just added the "multi" wrap around existing code. I
-         * don't quite get recall what npasses does, but it's quite
-         * possible that the overlap between the two functionalities is
-         * nontrivial. Well, at least for my q&d adaptation of mksol, I'm
-         * happy with the "multi" thing.
+         *  - multi: these are saved to distinct files.
+         *
+         * in reality this corresponds to the same functionality. It's
+         * just a design choice to force one behaviour in a situation and
+         * not in the other. This mess ought to be fixed. (TODO)
          */
         serialize(pi->m);
         size_t  stride =  A->vec_elt_stride(A, 1);
@@ -430,7 +447,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         for(unsigned int k = 0 ; k < multi ; k++) {
             for(int i = 0 ; i < npasses ; i++) {
                 serialize(pi->m);
-                A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
+                matmul_top_zero_vec_area(mmt, bw->dir);
                 serialize(pi->m);
                 /* Each job/thread copies its data share to mcol->v */
                 void * dst;
@@ -467,6 +484,19 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             }
             char * s_name;
             rc = asprintf(&s_name, S_FILE_BASE_PATTERN, k, k + nsolvecs_pervec, ys[0], ys[1]);
+            // TODO: There is not much preventing us from using simply
+            // something like:
+            // matmul_top_save_vector(mmt, s_name, bw->dir, s +
+            // bw->interval, unpadded);
+            // since after the matmul_top_untwist_vector call, we really
+            // have something which is ready to go trhough
+            // matmul_top_save_vector.
+            // the difficulty is that if we do so, we need to do so
+            // within the loop over i. Which means that we'll create
+            // (npasses) files instead of just one. When we provide the
+            // preferred-io-width modification (see TODO), this whole
+            // code branch should be simplified, and at least the
+            // pi_save_file_2d call here should go away.
             pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum[k]->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
             free(s_name);
         }
@@ -517,33 +547,38 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     return NULL;
 }
 
-
-void usage()
-{
-    fprintf(stderr, "Usage: ./mksol <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval start ys\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches: none here (so far). */
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters: none here (so far). */
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
-
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
-
     catch_control_signals();
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
+
     pi_go(mksol_prog, pl, 0);
+
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
 
     return 0;
 }
+
 

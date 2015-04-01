@@ -67,6 +67,10 @@ struct mmt_vec_s {
 typedef struct mmt_vec_s mmt_vec[1];
 typedef struct mmt_vec_s * mmt_vec_ptr;
 
+/* some handy macros to access portions of mmt_vec's */
+#define SUBVEC(v,w,offset) (v)->abase->vec_subvec(v->abase, (v)->w, offset)
+#define SUBVEC_const(v,w,offset) (v)->abase->vec_subvec_const(v->abase, (v)->w, offset)
+
 /*
 struct mmt_generic_vec_s {
     void * v;
@@ -78,20 +82,6 @@ typedef struct mmt_generic_vec_s mmt_generic_vec[1];
 typedef struct mmt_generic_vec_s * mmt_generic_vec_ptr;
 */
 
-/* some handy inlines to access portions of mmt_vec's */
-static inline void* mmt_vec_subvec(mmt_vec_ptr v, void * p, ptrdiff_t offset)
-{
-    return pointer_arith(p, v->abase->vec_elt_stride(v->abase, offset));
-}
-static inline const void* mmt_vec_subvec_const(mmt_vec_ptr v, const void * p, ptrdiff_t offset)
-{
-    return pointer_arith_const(p, v->abase->vec_elt_stride(v->abase, offset));
-}
-
-#define SUBVEC(v,w,offset) mmt_vec_subvec((v), (v)->w, (offset))
-#define SUBVEC_const(v,w,offset) mmt_vec_subvec_const((v), (v)->w, (offset))
-
-
 struct mmt_wiring_s {
     unsigned int i0;
     unsigned int i1;
@@ -99,7 +89,7 @@ struct mmt_wiring_s {
      * the two following fields are not ! */
     mmt_vec v;
     size_t rsbuf_size;          // auto-expanded on demand.
-    void * rsbuf[2];             // only for USE_ALTERNATIVE_REDUCE_SCATTER
+    void * rsbuf[2];            // only for USE_ALTERNATIVE_REDUCE_SCATTER
 };
 typedef struct mmt_wiring_s mmt_wiring[1];
 typedef struct mmt_wiring_s * mmt_wiring_ptr;
@@ -174,13 +164,22 @@ extern void matmul_top_init(matmul_top_data_ptr mmt,
         int optimized_direction);
 
 
+void matmul_top_decl_usage(param_list_ptr pl);
+void matmul_top_lookup_parameters(param_list_ptr pl);
 extern void matmul_top_clear(matmul_top_data_ptr mmt);
 #if 0
 extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
 #endif
 extern void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 extern void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
+extern void matmul_top_set_random_and_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate);
+/* do not use this function if you want consistency when the splitting
+ * changes ! */
+extern void matmul_top_set_random_inconsistent(matmul_top_data_ptr mmt, int d, gmp_randstate_t rstate);
+
+
 extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_mul_comm(matmul_top_data_ptr mmt, int d);
 static inline void matmul_top_mul(matmul_top_data_ptr mmt, int d)
 {
@@ -197,12 +196,15 @@ static inline void matmul_top_mul(matmul_top_data_ptr mmt, int d)
  * is appropriate. The multiplications are transposed in the case of
  * d==!bw->dir
  */
+extern void matmul_top_zero_vec_area(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_apply_P_apply_S(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_unapply_S_unapply_P(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_apply_P(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_unapply_P(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_apply_S(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_unapply_S(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_apply_T(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_unapply_T(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_twist_vector(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_untwist_vector(matmul_top_data_ptr mmt, int d);
 extern void indices_apply_S(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);

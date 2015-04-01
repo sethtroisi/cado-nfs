@@ -26,6 +26,7 @@ to let it start two clients on localhost. The scriptpath parameter must be the p
 
 
 For complex set-ups, it is preferable to write a parameter file. Some examples are in "parameters", "parameters.oar", and "parameters.rsa512.oar".
+The params/params.c91 file contains extensive comments describing the most common parameters.
 
 The .oar parameter files are meant for cadofactor scripts that run *inside* an OAR submission on clusters that use OAR as the job scheduler,
 such as Grid5000, as they read the list of slave hostnames from the OAR node file.
@@ -42,60 +43,89 @@ which tells the script to launch 8 clients on each unique host name (=node); the
 threads=2
 causes all the programs to use two threads, resulting in 16 threads per node.
 
+If a factorization is interrupted, it is usually possible to resume it where
+it left off, simply by running cadofactor.py again with the same command
+line parameters. These command line parameters are printed to the screen and
+written to the .log file in the factorization's working directory on each
+run.
+
+If a factorization cannot be resumed for whatever reason, it is often
+possible to salvage some of the output files which can then be imported into
+a new factorization run of the same number, but with a new working
+directory.
+
+
 Importing a polynomial file
 ===========================
 
 If you want to import a polynomial file (either an SNFS polynomial, or
-if polynomial selection was already done), use:
+if polynomial selection was already completed in an earlier run), use:
 
 tasks.polyselect.import=xxx.poly
 
 where xxx.poly is the name of the polynomial file (in CADO-NFS format).
 
-This imports the polynomial and then performs any polynomial selection
-specified in the parameter file; the best polynomial (rated by the Murphy E
-value) will be used for the sieving. If you want to use the imported
-polynomial without any additional polynomial search, set a zero-sized search
-range for polynomial selection:
+This imports the polynomial and prevents any additional polynomial selection
+from running, i.e., the imported polynomial is used unconditionally.
 
-tasks.polyselect.admin=0
-tasks.polyselect.admax=0
-
-Note that this empty search range must be specified even after interrupting
-and restarting cadofactor to prevent it from running polynomial selection;
-if after interruption a larger admax is given, cadofactor will perform
-polynomial search from the point where it left off (i.e., from ad=0) up to
-the new upper limit, admax.
 
 The polynomial selection run by cadofactor is performed in two phases:
 the first phase searches for polynomials with good size property and keeps
 in a priority queue the "nrkeep" most promising ones, then the second phase
-root-optimizes these to find the overall best polynomial.
+root-optimizes these to find the overall best polynomial by Murphy E value.
 
-Care should be taken when trying to import size-optimized polynomials into
-phase 1's priority queue (so that they will be forwarded to the second
-phase). It is advisable to give the full parameter path to the "import"
-statement, so that the polynomials aren't misinterpreted as being both
-size- and root-optimized already. E.g., write
+You can import files that were previously produced by phase 1 (resp. phase 2)
+into phase 1 (resp. phase 2) again; the imported files will be processed as if
+phase 1 (resp. phase 2) had generated them by itself. Phase 1 will add any
+polynomials from the imported files into its priority queue and forward the kept
+ones to phase 2, while phase 2 will choose the best polynomial by Murphy E from
+the imported ones and the ones it computes by itself.
 
-tasks.polyselect.polyselect1.import = size_optimized_polynomials.txt
 
-(and not just tasks.polyselect.import = ...) to import them to phase 1's
-priority queue, so that phase 2 will later root-optimize them.
+If you want to import size-optimized polynomials into phase 1 of polynomial
+selection and then continue polynomial search, use
 
-To import polynomials that are fully optimized already (as produced by an
-earlier factorization, or an SNFS polynomials), it is sufficient to use
+tasks.polyselect.polyselect1.import_sopt=file
+or
+tasks.polyselect.polyselect1.import_sopt=@file
 
-tasks.polyselect.import = polynomial.txt
+With @file, file should contain a list of files to import, one file name
+per line. All polynomials from the given file(s) are imported and added to
+the phase 1 priority queue, keeping the nrkeep best ones. Polynomial
+selection phase 1 then continues normally. For example, if an earlier run
+completed ad values up to ad=200000 and you want to resume the search from
+there, you could use
 
-If the polynomial in the polynomial.txt file does not specify a "lognorm",
-it is simply ignored by the first phase and does not get added to the
-priority queue, but is imported as an already optimized polynomial into
-the second phase.
+tasks.polyselect.polyselect1.import_sopt=@list_of_existing_files tasks.polyselect.admin=200000
+
+which imports the existing files, then resumes searching at ad=200000 up to
+the admax value given in the parameter file.
+
+
+If you want to import root-optimized polynomials into phase 2 of polynomial
+selection and then continue polynomial search, use
+
+tasks.polyselect.polyselect2.import_ropt=file
+or
+tasks.polyselect.polyselect2.import_ropt=@file
+
+This reads the polynomial(s) in the given file(s), then root-optimizes any
+polynomials found in phase 1; the best polynomial (rated by the Murphy E
+value) will be used for the sieving.
+
+Warning: if a polynomial file does not specify a Murphy E value and is
+imported into phase 2, its Murphy E value is set to 0 by default. Since any
+polynomials found by the polynomial search have positive Murphy E, the
+imported one will always "lose". To import, e.g., an SNFS polynomial
+without Murphy E, use "tasks.polyselect.import", and not "import_ropt".
 
 
 Importing relations
 ===================
+
+Important: when importing relations, it is assumed one also imports the
+corresponding polynomial (a few relations from each file will be checked
+against that polynomial). If no polynomial is imported, anything can happen.
 
 If you want to import already computed relations, use:
 
@@ -142,3 +172,35 @@ tasks.filter.purge.required_excess=0.2
 If any positive excess is enough:
 
 tasks.filter.purge.required_excess=0.0
+
+Note: if your factorization already started the linear algebra step, and you
+want to do more sieving, you can restart it with a larger "rels_wanted" than
+the current number of relations. For example if you have say 1000000 relations
+(grep "is now" in the log file), just add in the cadofactor.py line:
+
+tasks.sieve.rels_wanted=1000001
+
+Printing and manipulating the database
+======================================
+
+The wudb.py script can be used to print info on the workunits. For example,
+
+./wudb.py -dbfile /tmp/work/testrun.db -dump -assigned
+
+prints all currently assigned work units.
+
+This script can also be used to manipulate the database, for example:
+
+./wudb.py -dbfile /tmp/work/testrun.db -setdict sqrt next_dep int 0
+
+sets the "next_dep" variable in the SqrtTask's state to the integer value 0.
+
+Using several threads for the square root step
+==============================================
+
+By default the given number of threads (-t option of factor.sh, or
+tasks.threads for cadofactor.py) is used in the square root step. To use say
+16 threads in parallel, add the following to the cadofactor.py command line:
+
+tasks.sqrt.threads = 16
+

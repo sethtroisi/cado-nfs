@@ -84,6 +84,32 @@ class Option(object, metaclass=abc.ABCMeta):
         self.defaultname = None
 
     def set_defaultname(self, defaultname):
+        """ Sets default name for the command line parameter. It must be specified
+        before calling map().
+
+        The reason for this is that command line parameters can be specified
+        in the constructor of Program sub-classes as, e.g.,
+          class Las(Program):
+            def __init__(lpba : Parameter()=None):
+        and the name "lpba" of the Las constructor's parameter should also be
+        the default name of command line parameter. However, the Parameter()
+        gets instantiated when the ":" annotation gets parsed, i.e., at the 
+        time the class definition of Las is parsed, and the fact that this
+        Parameter instance will act as an annotation to the "lpba" parameter
+        is not known to the Parameter() instance. I.e., at its instantiation,
+        the Parameter instance cannot tell to which parameter it will belong.
+
+        This information must be filled in later, via set_defaultname(), which
+        is called from Program.__init__(). It uses introspection to find out
+        which Option objects belong to which Program constructor parameter, and
+        fills in the constructor parameters' name via set_defaultname("lpba").
+
+        If the Option constructor had received an arg parameter, then that is
+        used instead of the defaultname, which allows for using different names
+        for the Program constructor's parameter and the command line parameter,
+        such as in
+          __init__(threads: Parameter("t")):
+        """
         self.defaultname = defaultname
 
     def get_arg(self):
@@ -94,16 +120,17 @@ class Option(object, metaclass=abc.ABCMeta):
         return self.checktype
 
     def map(self, value):
-        """ Public class that converts the Option instance into an array of
+        """ Public method that converts the Option instance into an array of
         strings with command line parameters. It also checks the type, if
         checktype was specified in the constructor.
         """
+        assert not self.defaultname is None
         if not self.checktype is None:
             # If checktype is float, we allow both float and int as the type of
             # value. Some programs accept parameters that are integers (such as
             # admax) in scientific notation which is typed as floating point,
             # thus we want to allow float parameters to be given in both
-            # integer and float typee, so that passing, e.g., admax as an int
+            # integer and float type, so that passing, e.g., admax as an int
             # does not trip the assertion
             if self.checktype is float and type(value) is int:
                 # Write it to command line as an int
@@ -127,7 +154,7 @@ class Option(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def _map(self, value):
-        """ Private class that does the actual translation to an array of string
+        """ Private method that does the actual translation to an array of string
         with command line parameters. Subclasses need to implement it.
 
         A simple case of the Template Method pattern.
@@ -523,7 +550,7 @@ class Program(object, metaclass=InspectType):
         # Begin command line with program to execute
         command = []
         if not self.runprefix is None:
-            command.append(self.runprefix)
+            command=self.runprefix.split(' ')
         command.append(self.translate_path(self.get_exec_file(), filenametrans))
 
         # Add keyword command line parameters, then positional parameters
@@ -622,26 +649,53 @@ class Polyselect2l(Program):
                  degree : Parameter(checktype=int)=None,
                  verbose : Toggle("v")=None,
                  quiet : Toggle("q")=None,
-                 sizeonly : Toggle("r")=None,
                  threads : Parameter("t", checktype=int)=None,
                  admin : Parameter(checktype=int)=None,
                  admax : Parameter(checktype=int)=None,
                  incr : Parameter(checktype=int)=None,
                  nq : Parameter(checktype=int)=None,
-                 save : Parameter(is_output_file=True)=None,
-                 resume : Parameter(is_input_file=True)=None,
-                 rootsieve : Parameter(is_input_file=True)=None,
                  maxtime : Parameter(checktype=float)=None,
-                 rseffort: Parameter(checktype=int)=None,
                  out : Parameter(is_output_file=True)=None,
                  printdelay : Parameter("s", checktype=int)=None,
-                 area : Parameter(checktype=float)=None,
-                 Bf : Parameter(checktype=float)=None,
-                 Bg : Parameter(checktype=float)=None,
                  keep: Parameter(checktype=int)=None,
+                 sopteffort: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+
+class PolyselectRopt(Program):
+    """
+    >>> p = PolyselectRopt(ropteffort=5, inputpolys="foo.polys", verbose=True)
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
+    'polyselect_ropt -v -inputpolys foo.polys -ropteffort 5'
+    """
+    binary = "polyselect_ropt"
+    name = binary
+    subdir = "polyselect"
+
+    def __init__(self, *,
+                 verbose : Toggle("v")=None,
+                 threads : Parameter("t", checktype=int)=None,
+                 inputpolys : Parameter(is_input_file=True)=None,
+                 ropteffort: Parameter(checktype=int)=None,
+                 area : Parameter(checktype=float)=None,
+                 Bf : Parameter(checktype=float)=None,
+                 Bg : Parameter(checktype=float)=None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
+class PolyselectGFpn(Program):
+    binary = "polyselect_gfpn"
+    name = binary
+    subdir = "polyselect"
+
+    def __init__(self, *,
+                 verbose : Toggle("v")=None,
+                 p: Parameter(checktype=int)=None,
+                 n: Parameter(checktype=int)=None,
+                 out: Parameter(is_output_file=True)=None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
 
 class MakeFB(Program):
     """
@@ -662,6 +716,7 @@ class MakeFB(Program):
                  maxbits: Parameter(checktype=int)=None,
                  out: Parameter(is_output_file=True)=None,
                  side: Parameter(checktype=int)=None,
+                 threads : Parameter("t", checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -688,6 +743,7 @@ class FreeRel(Program):
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
                  addfullcol: Toggle() = None,
+                 threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -711,6 +767,8 @@ class Las(Program):
                  mfba: Parameter(checktype=int)=None,
                  rlambda: Parameter(checktype=float)=None,
                  alambda: Parameter(checktype=float)=None,
+                 ncurves0: Parameter(checktype=int)=None,
+                 ncurves1: Parameter(checktype=int)=None,
                  skewness: Parameter("S", checktype=float)=None,
                  verbose: Toggle("v")=None,
                  rpowlim: Parameter(checktype=int)=None,
@@ -719,7 +777,7 @@ class Las(Program):
                  factorbase0: Parameter("fb0", is_input_file=True)=None,
                  factorbase1: Parameter("fb1", is_input_file=True)=None,
                  out: Parameter(is_output_file=True)=None,
-                 threads: Parameter("mt", checktype=int)=None,
+                 threads: Parameter("t", checktype=int)=None,
                  ratq: Toggle()=None,
                  dup: Toggle()=None,
                  galois: Toggle()=None,
@@ -767,7 +825,6 @@ class Duplicates2(Program):
     def __init__(self,
                  *args: PositionalParameter(is_input_file=True),
                  rel_count: Parameter("nrels", checktype=int),
-                 poly: Parameter(is_input_file=True),
                  renumber: Parameter(is_input_file=True),
                  filelist: Parameter(is_input_file=True)=None,
                  badidealinfo: Parameter(is_input_file=True)=None,
@@ -821,7 +878,7 @@ class Merge(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 mat: Parameter(is_input_file=True),
+                 purged: Parameter("mat", is_input_file=True),
                  out: Parameter(is_output_file=True),
                  maxlevel: Parameter(checktype=int)=None,
                  keep: Parameter(checktype=int)=None,
@@ -842,7 +899,7 @@ class MergeDLP(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 mat: Parameter(is_input_file=True),
+                 purged: Parameter("mat", is_input_file=True),
                  out: Parameter(is_output_file=True),
                  maxlevel: Parameter(checktype=int)=None,
                  keep: Parameter(checktype=int)=None,
@@ -868,6 +925,7 @@ class Replay(Program):
                  index: Parameter()=None,
                  out: Parameter()=None,
                  for_msieve: Toggle()=None,
+                 skip: Parameter(checktype=int)=None,
                  force_posix_threads: Toggle("force-posix-threads")=None,
                  bwcostmin: Parameter(checktype=int)=None,
                  **kwargs):
@@ -920,16 +978,20 @@ class BWC(Program):
     subdir = "linalg/bwc"
     def __init__(self,
                  complete: Toggle(prefix=":")=None,
-                 wipeout: Toggle(prefix=":")=None,
                  dryrun: Toggle("d")=None,
                  verbose: Toggle("v")=None,
                  mpi: ParameterEq()=None,
+                 lingen_mpi: ParameterEq()=None,
+                 allow_zero_on_rhs: ParameterEq()=None,
                  threads: ParameterEq("thr")=None,
-                 mn: ParameterEq()=None,
+                 m: ParameterEq()=None,
+                 n: ParameterEq()=None,
                  nullspace: ParameterEq()=None,
                  interval: ParameterEq()=None,
                  ys: ParameterEq()=None,
                  matrix: ParameterEq()=None,
+                 rhs: ParameterEq()=None,
+                 prime: ParameterEq()=None,
                  wdir: ParameterEq()=None,
                  mpiexec: ParameterEq()=None,
                  hosts: ParameterEq()=None,
@@ -937,6 +999,11 @@ class BWC(Program):
                  interleaving: ParameterEq()=None,
                  shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
+                 mm_impl: ParameterEq()=None,
+                 cpubinding: ParameterEq()=None,
+                 cantor_threshold: ParameterEq()=None,
+                 lingen_threshold: ParameterEq()=None,
+                 precmd: ParameterEq()=None,
                  **kwargs):
         if os.name == "nt":
             kwargs.setdefault("runprefix", "perl.exe")
@@ -963,10 +1030,14 @@ class SM(Program):
                  index: Parameter(),
                  out: Parameter(),
                  ell: Parameter("gorder"),
-                 smexp: Parameter(),
-                 explicit_units: Toggle()=None,
-                 nmaps: Parameter("nsm")=None,
-                 threads: Parameter("mt")=None,
+                 smexp0: Parameter(),
+                 smexp1: Parameter(),
+                 explicit_units0: Toggle()=None,
+                 explicit_units1: Toggle()=None,
+		 abunits: Parameter(),
+                 nmaps0: Parameter("nsm0")=None,
+                 nmaps1: Parameter("nsm1")=None,
+                 threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
  
@@ -976,7 +1047,6 @@ class ReconstructLog(Program):
     subdir = "filter"
     def __init__(self, *,
                  ell: Parameter("gorder"),
-                 smexp: Parameter(),
                  ker: Parameter("log"),
                  dlog: Parameter("out"),
                  renumber: Parameter(),
@@ -986,7 +1056,14 @@ class ReconstructLog(Program):
                  relsdel: Parameter(),
                  nrels: Parameter(),
                  partial: Toggle()=None,
-                 nmaps: Parameter("sm"),
+                 nmaps0: Parameter("sm0"),
+                 smexp0: Parameter(),
+                 nmaps1: Parameter("sm1"),
+                 smexp1: Parameter(),
+                 explicit_units0: Toggle()=None,
+                 explicit_units1: Toggle()=None,
+    		 abunits0: Parameter(is_input_file=True),
+    		 abunits1: Parameter(is_input_file=True),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -1021,6 +1098,7 @@ class Sqrt(Program):
                  index: Parameter(),
                  kernel: Parameter("ker"),
                  dep: Parameter()=None,
+                 threads : Parameter("t", checktype=int)=None,
                  ab: Toggle()=None,
                  rat: Toggle()=None,
                  alg: Toggle()=None,

@@ -60,7 +60,7 @@ stats_print_progress (stats_data_t r, uint64_t i, uint64_t outof, size_t nByte,
   }
   if (outof > 0)
     snprintf (outofpart, 64, "(out of %" PRIu64 " %s) ", outof, r->outofname);
-  const char * prefix = (end) ? "Done: " : "";
+  const char * prefix = (end) ? "# Done: " : "# ";
   fprintf(r->out, "%s%s %" PRIu64 " %s %sin %.1fs %s-- %.1f %s/s\n",
           prefix, r->verb, i, r->name, outofpart, dt, MBpart, speed, r->abbrv);
   fflush(r->out);

@@ -15,11 +15,11 @@
 #include "portability.h"
 
 void match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
-            uint64_t ad, unsigned long d, mpz_t N, unsigned long q,
+            mpz_t ad, unsigned long d, mpz_t N, unsigned long q,
             mpz_t rq);
 
 void gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
-		uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
+		mpz_t ad, unsigned long d, mpz_t N, uint64_t q,
 		mpz_t rq);
 
 /* LEN_SPECIAL_Q in the header */
@@ -115,17 +115,17 @@ void
 header_init ( header_t header,
               mpz_t N,
               unsigned long d,
-              uint64_t ad )
+              mpz_t ad )
 {
   /* compute Ntilde, m0 */
   mpz_init_set (header->N, N);
   mpz_init (header->Ntilde);
   mpz_init (header->m0);
   header->d = d;
-  header->ad = ad;
+  mpz_init_set (header->ad, ad);
 
   /* compute Ntilde, ... from N, ... */
-  mpz_set_uint64 (header->Ntilde, header->ad);
+  mpz_set (header->Ntilde, header->ad);
   mpz_mul_ui (header->Ntilde, header->Ntilde, header->d);
   mpz_pow_ui (header->Ntilde, header->Ntilde, header->d - 1);
   mpz_mul_ui (header->Ntilde, header->Ntilde, header->d);
@@ -141,8 +141,14 @@ header_clear ( header_t header )
   mpz_clear (header->m0);
   mpz_clear (header->Ntilde);
   mpz_clear (header->N);
+  mpz_clear (header->ad);
 }
 
+int
+header_skip (header_t header, unsigned long p)
+{
+  return header->d % p == 0 || mpz_divisible_ui_p (header->ad, p);
+}
 
 /* init proots_t */
 void
@@ -394,7 +400,7 @@ shash_init (shash_t H, unsigned int init_size)
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
-hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
+hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, mpz_t ad,
           unsigned long d, mpz_t N, unsigned long q, mpz_t rq)
 {
   uint32_t h;
@@ -1097,7 +1103,7 @@ MAYBE_UNUSED shash_find_collision_old (shash_t H)
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
-gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, uint64_t ad,
+gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, mpz_t ad,
               unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
 {
   unsigned long h;

@@ -6,12 +6,11 @@
 #include "cado_poly.h"
 #include "portability.h"
 
-struct cado_poly_s cado_poly_struct;
-
 const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
 
+/* Be conservative and allocate two polynomials by default. */
 void cado_poly_init(cado_poly poly)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
@@ -19,7 +18,9 @@ void cado_poly_init(cado_poly poly)
     poly->rat = poly->pols[RATIONAL_SIDE];
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
-    for(int side = 0 ; side < 2 ; side++)
+    /* By default allocate 2 polynomials */
+    poly->nb_polys = 2;
+    for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_init (poly->pols[side], MAXDEGREE);
 
     mpz_init_set_ui(poly->n, 0);
@@ -27,7 +28,7 @@ void cado_poly_init(cado_poly poly)
 
 void cado_poly_clear(cado_poly poly)
 {
-    for(int side = 0 ; side < 2 ; side++)
+    for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_clear (poly->pols[side]);
 
     mpz_clear(poly->n);
@@ -40,58 +41,120 @@ cado_poly_set (cado_poly p, cado_poly q)
 {
     mpz_set (p->n, q->n);
     p->skew = q->skew;
-    for(int side = 0 ; side < 2 ; side++)
-      mpz_poly_copy (p->pols[side], q->pols[side]);
+    p->nb_polys = q->nb_polys;
+    for(unsigned int side = 0 ; side < q->nb_polys ; side++)
+      mpz_poly_set (p->pols[side], q->pols[side]);
 }
 
 // This function is no longer exported
+#define BUF_MAX 10000
+
+// returns 0 on failure, 1 on success.
 static
 int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
-    int have_n = 0;
-    int have_f[2][(MAXDEGREE + 1)] = {{ 0, }, {0,}};
-    int i;
+  int ret = 1;
 
-    have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
-    poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
-                         it is not given */
-    param_list_parse_double(pl, "skew", &(poly->skew));
-    for (i = 0; i < (MAXDEGREE + 1); i++) {
-        char tag[4];
-        snprintf(tag, sizeof(tag), "c%d", i);
-        have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-        if (!have_f[ALGEBRAIC_SIDE][i]) {
-            snprintf(tag, sizeof(tag), "X%d", i);
-            have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-        }
-        snprintf(tag, sizeof(tag), "Y%d", i);
-        have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
+  /* Parse skew value. Set to 0.0 to ensure that we get an invalid skewness
+     in case it is not given */
+  poly->skew = 0.0;
+  param_list_parse_double(pl, "skew", &(poly->skew));
+
+  /* Parse polynomials. Either in line format (poly%d=%Zd,%Zd,...) either given
+   * by coefficients. */
+  for(unsigned int i = 0; i < NB_POLYS_MAX; i++)
+  {
+    char tag[6], buf[BUF_MAX];
+    snprintf(tag, sizeof(tag), "poly%d", i);
+    if(param_list_parse_string(pl, tag, buf, BUF_MAX))
+    {
+      /* feeding poly->pols[i] from buf="c0,c1,..." */
+      char *tmp = buf;
+      if(i >= 2)
+        mpz_poly_init (poly->pols[i], MAXDEGREE);
+      for(unsigned int j = 0; ; j++)
+      {
+        gmp_sscanf(tmp, "%Zd", poly->pols[i]->coeff[j]);
+        for( ; *tmp != '\0' && *tmp != ','; tmp++);
+        if(*tmp == '\0')
+          break;
+        tmp++;
+      }
+    }
+    else
+    {
+      poly->nb_polys = i;
+      break;
+    }
+  }
+  if (poly->nb_polys == 0) /* No polynomials so far. Try other format. */
+  {
+    poly->nb_polys = 2;
+    /* reading polynomials coefficient by coefficient */
+    for (unsigned int i = 0; i <= MAXDEGREE; i++)
+    {
+      char tag[4];
+      snprintf(tag, sizeof(tag), "c%d", i);
+      int b = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+      if (!b) /* coeffs of alg poly can be given by c%d or X%d */
+      {
+        snprintf(tag, sizeof(tag), "X%d", i);
+        param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+      }
+      snprintf(tag, sizeof(tag), "Y%d", i);
+      param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
+    }
+  }
+  /* setting degrees */
+  for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
+    mpz_poly_cleandeg(poly->pols[side], MAXDEGREE);
+
+  /* Parse value of N. Two keys possible: n or None. Return 0 if not found. */
+  if (!param_list_parse_mpz(pl, "n", poly->n) &&
+      !param_list_parse_mpz(pl, NULL, poly->n))
+  {
+    fprintf (stderr, "Error, no value for N in cado_poly_set_plist\n");
+    ret = 0;
+  }
+
+  for (unsigned int side = 0; side < poly->nb_polys; side++)
+    if (poly->pols[side]->deg < 0)
+    {
+      fprintf (stderr, "Error, polynomial on side %u has degree < 0 in "
+                       "cado_poly_set_plist\n", side);
+      ret = 0;
     }
 
-    for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr ps = poly->pols[side];
-        int d;
-        for (d = MAXDEGREE; d >= 0 && !have_f[side][d]; d--) {
-            if (have_f[side][d] && mpz_cmp_ui(ps->coeff[d], 0) != 0)
-                break;
-        }
-        ps->deg = d;
-    }
+  /* check that N divides the resultant */
+  cado_poly_getm (NULL, poly, poly->n);
 
-    ASSERT_ALWAYS(have_n);
-
-    return 1;
+  return ret;
 }
 
 // returns 0 on failure, 1 on success.
-int cado_poly_read_stream(cado_poly poly, FILE * f)
+int cado_poly_read_stream (cado_poly_ptr poly, FILE * f)
 {
-    param_list pl;
-    param_list_init(pl);
-    param_list_read_stream(pl, f);
-    int r = cado_poly_set_plist(poly, pl);
-    param_list_clear(pl);
-    return r;
+  param_list pl;
+  param_list_init (pl);
+  param_list_read_stream (pl, f, 0);
+  int r = cado_poly_set_plist (poly, pl);
+  param_list_clear (pl);
+  return r;
+}
+
+// returns 0 on failure, 1 on success.
+int cado_poly_read_next_poly_from_stream (cado_poly_ptr poly, FILE * f)
+{
+  int r;
+  param_list pl;
+  param_list_init (pl);
+  r = param_list_read_stream (pl, f, 1);
+  if (r && pl->size > 0)
+    r = cado_poly_set_plist (poly, pl);
+  else
+    r = 0;
+  param_list_clear (pl);
+  return r;
 }
 
 // returns 0 on failure, 1 on success.
@@ -100,28 +163,55 @@ int cado_poly_read(cado_poly poly, const char *filename)
     FILE *file;
     int r;
     file = fopen(filename, "r");
-    if (file == NULL) {
-	fprintf(stderr, "read_polynomial: could not open %s\n", filename);
-	return 0;
+    if (file == NULL)
+    {
+      fprintf(stderr, "Error, in cado_poly_read: could not open %s\n", filename);
+      return 0;
     }
     r = cado_poly_read_stream(poly, file);
     fclose(file);
     return r;
 }
 
-
+/* TODO: adapt for more than 2 polynomials:
+ * compute for each pair (0,i) the corresponding common root m_i
+ * check all m_i are equal
+ * If NULL is passed for m, then, just check that N divides the resultant.
+ */
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
     // have to work with copies, because pseudo_gcd destroys its input
     mpz_poly_t f[2];
+
+    ASSERT_ALWAYS(cpoly->nb_polys == 2);
+
     for (int i = 0; i < 2; ++i) {
         mpz_poly_init(f[i], cpoly->pols[i]->alloc);
-        mpz_poly_copy(f[i], cpoly->pols[i]);
+        mpz_poly_set(f[i], cpoly->pols[i]);
     }
     int ret;
-    ret = mpz_poly_pseudogcd_mpz(f[0], f[1], N, m); 
-    if (ret) {
-        ASSERT_ALWAYS(f[0]->deg == 1);
+    ret = mpz_poly_pseudogcd_mpz (f[0], f[1], N, m);
+
+    /* if ret=0, a factor of N was found during the pseudo-gcd,
+       we assume N divides the resultant */
+
+    if (m == NULL) {
+        if (f[0]->deg < 1) {
+            fprintf (stderr, "Error, N does not divide resultant of given polynomials\n");
+            ASSERT_ALWAYS(0);
+        }
+        return ret;
+    }
+
+    if (ret) /* pseudo-gcd was successful */
+      {
+        if (f[0]->deg != 1)
+          {
+            fprintf (stderr, "Error, N does not divide resultant of given polynomials, or there are multiplicities.\n");
+            fprintf (stderr, "Can not compute m.\n");
+            exit (EXIT_FAILURE);
+          }
+
         mpz_t inv;
         mpz_init(inv);
         int ret2 = mpz_invert(inv, f[0]->coeff[1], N);
@@ -134,12 +224,14 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
         mpz_neg(inv, inv);
         mpz_mod(m, inv, N);
         mpz_clear(inv);
-    }
+      }
+
     for (int i = 0; i < 2; ++i)
         mpz_poly_clear(f[i]);
     return ret;
 }
 
+/* TODO: adapt for more than 2 polynomials */
 /* Return the rational side or -1 if two algebraic sides */
 int
 cado_poly_get_ratside (cado_poly_ptr pol)
@@ -150,4 +242,56 @@ cado_poly_get_ratside (cado_poly_ptr pol)
     return 0;
   else
     return 1;
+}
+
+void
+cado_poly_fprintf (FILE *fp, cado_poly_srcptr poly, const char *prefix)
+{
+  if (prefix)
+    fputs (prefix, fp);
+  gmp_fprintf (fp, "n: %Zd\n", poly->n);
+
+  if (poly->nb_polys == 2)
+  {
+    mpz_poly_fprintf_cado_format (fp, poly->rat, 'Y', prefix);
+    mpz_poly_fprintf_cado_format (fp, poly->alg, 'c', prefix);
+  }
+  else
+  {
+    for (unsigned int side = 0; side < poly->nb_polys; side++)
+    {
+      if (prefix)
+        fputs (prefix, fp);
+      fprintf (fp, "poly%u=", side);
+      mpz_poly_fprintf_coeffs (fp, poly->pols[side], ',');
+    }
+  }
+
+  if (prefix)
+    fputs (prefix, fp);
+  fprintf (fp, "skew: %1.3f\n", poly->skew);
+}
+
+void
+cado_poly_fprintf_info (FILE *fp, double lognorm, double alpha,
+                        double alpha_proj, unsigned int nrroots,
+                        const char *prefix)
+{
+  if (prefix)
+    fputs (prefix, fp);
+  /* Always print "# " after the prefix and before the info line. */
+  fprintf (fp, "# lognorm %1.2f, alpha %1.2f (proj %1.2f), E %1.2f, "
+               "%u real root%s\n", lognorm, alpha, alpha_proj, lognorm + alpha,
+               nrroots, (nrroots <= 1) ? "" : "s");
+}
+
+void
+cado_poly_fprintf_MurphyE (FILE *fp, double MurphyE, double bound_f,
+                           double bound_g, double area, const char *prefix)
+{
+  if (prefix)
+    fputs (prefix, fp);
+  /* Always print "# " after the prefix and before the MurphyE line. */
+  fprintf (fp, "# MurphyE(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e\n", bound_f, bound_g,
+               area, MurphyE);
 }

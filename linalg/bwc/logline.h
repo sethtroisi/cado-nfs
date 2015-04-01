@@ -10,8 +10,9 @@ extern "C" {
 #endif
 
 
+void logline_decl_usage(param_list_ptr pl);
 void logline_init_timer();
-int logline_parse_params(param_list pl);
+int logline_interpret_parameters(param_list pl);
 int logline_begin(FILE * f, size_t size, const char * fmt, ...) ATTR_PRINTF(3,4);
 int logline_end(double *, const char * fmt, ...);
 int logline_vprintf(int level, const char * fmt, va_list ap);

@@ -6,7 +6,7 @@
 #include "select_mpi.h"
 #include "params.h"
 #include "xvectors.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
@@ -36,17 +36,13 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
-    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
-    mpz_clear(p);
 
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
@@ -173,17 +169,27 @@ void usage()
 int main(int argc, char * argv[])
 {
     param_list pl;
-    param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
+    bw_common_init_new(bw, &argc, &argv);
+    param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
     pi_go(tst_prog, pl, 0);
 
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
+
     return 0;
 }
 

@@ -36,7 +36,7 @@ tasks.sieve.mfba = 90
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.8
 
-tasks.I = 13
+tasks.I = 14
 tasks.sieve.qrange = 8000
 tasks.sieve.rels_wanted = 81000000
 
@@ -55,7 +55,8 @@ tasks.filter.merge.forbw = 3
 
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.m = 64
+tasks.linalg.bwc.n = 64
 tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################

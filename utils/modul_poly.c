@@ -4,6 +4,7 @@
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdarg.h>
 #include "mod_ul.h"
 #include "modul_poly.h"
@@ -36,9 +37,13 @@ realloc_long_array (residueul_t *f, int d)
 void
 modul_poly_init (modul_poly_t f, int d)
 {
-  ASSERT (d >= 0);
   f->degree = -1; /* initialize to 0 */
-  f->coeff = alloc_long_array (d + 1);
+  /* The zero polynomial has no coeffs allocated */
+  if (d >= 0) {
+      f->coeff = alloc_long_array (d + 1);
+  } else {
+      f->coeff = NULL;
+  }
   f->alloc = d + 1;
 }
 
@@ -47,7 +52,8 @@ void
 modul_poly_clear (modul_poly_t f)
 {
   free (f->coeff);
-  f->alloc = 0;
+  memset(f, 0, sizeof(modul_poly_t));
+  f->degree = -1;
 }
 
 /* realloc f to (at least) n coefficients */
@@ -92,7 +98,7 @@ modul_poly_make_monic (modul_poly_t f, modulusul_t p)
 
 /* f(x) = g'(x) (mod p) */
 static void
-modul_poly_deriv(modul_poly_t f, const modul_poly_t g, modulusul_t p)
+modul_poly_derivative(modul_poly_t f, const modul_poly_t g, modulusul_t p)
 {
   const int d = g->degree;
   residueul_t multiplier;
@@ -174,7 +180,7 @@ static void
 modul_poly_set_linear (modul_poly_t f, residueul_t a, residueul_t b, modulusul_t p)
 {
   modul_poly_realloc (f, 2);
-  f->degree = 1;
+  f->degree = a ? 1 : (b ? 0 : -1);
   modul_set(f->coeff[1], a, p);
   modul_set(f->coeff[0], b, p);
 }
@@ -358,7 +364,7 @@ modul_poly_div_r (modul_poly_t h, const modul_poly_t f, modulusul_t p)
 
 /* q <- divexact(h, f) mod p, f not necessarily monic. Clobbers h. */
 static void
-modul_poly_divexact (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modulusul_t p)
+modul_poly_divexact_clobber (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modulusul_t p)
 {
   int i, d = f->degree, dh = h->degree, monic;
   residueul_t *hc = h->coeff, t;
@@ -390,10 +396,22 @@ modul_poly_divexact (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modul
   modul_poly_normalize (q, p);
 }
 
+/* q <- divexact(h, f) mod p, f not necessarily monic. */
+static void
+modul_poly_divexact (modul_poly_t q, const modul_poly_t h, const modul_poly_t f, modulusul_t p)
+{
+    modul_poly_t hh;
+    modul_poly_init(hh, h->degree);
+    modul_poly_set(hh, h, p);
+    modul_poly_divexact_clobber(q, hh, f, p);
+    modul_poly_clear(hh);
+}
+
 /* fp <- gcd (fp, g), clobbers g */
 static void
-modul_poly_gcd (modul_poly_t fp, modul_poly_t g, modulusul_t p)
+modul_poly_gcd_clobber (modul_poly_t fp, modul_poly_t g, modulusul_t p)
 {
+    assert(fp != g);
   while (g->degree >= 0)
     {
       modul_poly_div_r (fp, g, p);
@@ -401,6 +419,24 @@ modul_poly_gcd (modul_poly_t fp, modul_poly_t g, modulusul_t p)
       /* now deg(fp) < deg(g): swap f and g */
       modul_poly_swap (fp, g);
     }
+}
+
+/* f <- gcd(a, b). */
+static void modul_poly_gcd(modul_poly_t f, const modul_poly_t a, const modul_poly_t b, modulusul_t p)
+{
+    modul_poly_t hh;
+    if (f == b) {
+        modul_poly_init(hh, a->degree);
+        modul_poly_set(hh, a, p);
+    } else {
+        modul_poly_init(hh, b->degree);
+        modul_poly_set(hh, b, p);
+        if (f != a) {
+            modul_poly_set(f, a, p);
+        }
+    }
+    modul_poly_gcd_clobber(f, hh, p);
+    modul_poly_clear(hh);
 }
 
 #if 0
@@ -441,34 +477,34 @@ int
 modul_poly_is_squarefree (modul_poly_t f, modulusul_t p)
 {
   const int d = f->degree;
-  modul_poly_t f_deriv, t;
+  modul_poly_t f_derivative;
   
   /* Constant polynomial, any g(x)^2 divides over F_p */
   if (d <= 0)
     return 0;
 
-  modul_poly_init(f_deriv, d - 1);
-  modul_poly_deriv(f_deriv, f, p);
-  /* Need a temp polynomial because modul_poly_gcd() clobbers its input :( */
-  modul_poly_init(t, d - 1);
-  modul_poly_set (t, f, p);
-  modul_poly_gcd(f_deriv, t, p);
-  ASSERT_ALWAYS(f_deriv->degree >= 0);
-  int squarefree = (f_deriv->degree == 0);
-  modul_poly_clear(f_deriv);
-  modul_poly_clear(t);
+  modul_poly_init(f_derivative, d - 1);
+  modul_poly_derivative(f_derivative, f, p);
+  modul_poly_gcd(f_derivative, f_derivative, f, p);
+  ASSERT_ALWAYS(f_derivative->degree >= 0);
+  int squarefree = (f_derivative->degree == 0);
+  modul_poly_clear(f_derivative);
   return squarefree;
 }
 
-/* Return the number n of roots of f mod p using a naive algorithm.
-   If r is not NULL, put the roots in r[0], ..., r[n-1]. */
+/* Return the number n of roots of f mod p (without multiplicities)
+   using a naive algorithm.
+   If r is not NULL, put the roots in r[0], ..., r[n-1].
+   TODO: rewrite using a table of differences, with cost O(d*p) additions
+   after an initialization of O(d^2), instead of O(d*p) multiplications.
+*/
 static int
 modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulusul_t p)
 {
   int n = 0;
   residueul_t x;
   modul_set0(x, p);
-  for ( ; !modul_finished(x, p) ; modul_next(x, p) ) {
+  for ( ; !modul_finished(x, p); modul_next(x, p) ) {
       residueul_t v;
     modul_poly_eval (v, f, x, p);
     if (modul_is0(v, p))
@@ -476,17 +512,26 @@ modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulusul_t p)
 	if (r != NULL)
 	  modul_set(r[n], x, p);
 	n ++;
+	/* Let d = f->degree: if we have already d roots, then we have
+	   them all. Warning: if we have already d-1 roots, one of them
+           might have order 2, thus the return value is either d-1 or d,
+           but we can't conclude at that point. */
+	if (n == f->degree)
+          break;
       }
   }
   return n;
 }
 
-/* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */
+/* g <- (x+a)^e mod (fp, p) */
 static void
-modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, residueul_t a,
-		     unsigned long e, modulusul_t p)
+modul_poly_xpowmod_ui (modul_poly_t g, residueul_t a,
+		     unsigned long e, modul_poly_t fp, modulusul_t p)
 {
   int k = nbits (e);
+
+  modul_poly_t h;
+  modul_poly_init(h, 2 * fp->degree);
 
   modul_poly_make_monic (fp, p);
 
@@ -505,20 +550,30 @@ modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, residueul
       modul_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       modul_poly_set (g, h, p);       /* g <- h  */
     }
+
+  modul_poly_clear(h);
 }
 
-/* g <- g^e mod (fp, p), using auxiliary polynomial h */
+/* g <- g^e mod (fp, p) */
 static void
-modul_poly_general_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h,
-		     unsigned long e, modulusul_t p)
+modul_poly_powmod_ui (modul_poly_t g, modul_poly_t a,
+		     unsigned long e, modul_poly_t fp, modulusul_t p)
 {
   int k = nbits (e);
-  modul_poly_t g_sav;
 
-  modul_poly_init(g_sav, g->degree);
-  modul_poly_set(g_sav, g, p);
+  if (a == g) {
+      modul_poly_t a_saved;
+      modul_poly_init(a_saved, a->degree);
+      modul_poly_set(a_saved, a, p);
+      modul_poly_powmod_ui(g, a_saved, e, fp, p);
+      modul_poly_clear(a_saved);
+      return;
+  }
 
   modul_poly_make_monic (fp, p);
+
+  modul_poly_t h;
+  modul_poly_init(h, 2 * fp->degree);
 
   ASSERT (e > 0);
   for (k -= 2; k >= 0; k--)
@@ -527,11 +582,11 @@ modul_poly_general_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h,
       modul_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       modul_poly_set (g, h, p);       /* g <- h */
       if (e & (1UL << k))
-        modul_poly_mul (h, h, g_sav, p);            /* h <- g_sav*h */
+        modul_poly_mul (h, h, a, p);            /* h <- a*h */
       modul_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       modul_poly_set (g, h, p);       /* g <- h */
     }
-  modul_poly_clear(g_sav);
+  modul_poly_clear(h);
 }
 /* Assuming f is a (squarefree) product of linear factors mod p, splits it
    and put the corresponding roots mod p in r[]. 
@@ -542,7 +597,7 @@ int
 modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p)
 {
   residueul_t a;
-  modul_poly_t q, h, ff;
+  modul_poly_t q, h;
   int d = f->degree, dq, n, m;
 
   ASSERT (p[0] & 1);
@@ -561,22 +616,19 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p)
      algorithm */
   modul_poly_init (q, 2 * d - 1);
   modul_poly_init (h, 2 * d - 1);
-  modul_poly_init (ff, d);
   modul_set_ul(a, lrand48(), p);
   for (;;)
     {
-      modul_poly_powmod_ui (q, f, h, a, (modul_getmod_ul(p) - 1) / 2, p);
+      modul_poly_xpowmod_ui (q, a, (modul_getmod_ul(p) - 1) / 2, f, p);
       modul_poly_sub_1 (q, q, p);
-      modul_poly_set (h, f, p);
-      modul_poly_gcd (q, h, p);
+      modul_poly_gcd (q, q, f, p);
       dq = q->degree;
       ASSERT (dq >= 0);
       if (0 < dq && dq < d)
 	{
 	  n = modul_poly_cantor_zassenhaus (r, q, p);
 	  ASSERT (n == dq);
-	  modul_poly_set (ff, f, p); /* modul_poly_divexact clobbers its 2nd arg */
-	  modul_poly_divexact (h, ff, q, p);
+	  modul_poly_divexact (h, f, q, p);
 	  m = modul_poly_cantor_zassenhaus (r + n, h, p);
 	  ASSERT (m == h->degree);
 	  n += m;
@@ -588,7 +640,6 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p)
     }
   modul_poly_clear (q);
   modul_poly_clear (h);
-  modul_poly_clear (ff);
   return n;
 }
 
@@ -663,7 +714,7 @@ modul_poly_roots(residueul_t *r, mpz_poly_t F, modulusul_t p)
   /* g <- x^p mod fp */
   residueul_t zero;
   modul_init(zero,p);
-  modul_poly_powmod_ui (g, fp, h, zero, p[0], p);
+  modul_poly_xpowmod_ui (g, zero, p[0], fp, p);
   modul_clear(zero,p);
 
 
@@ -671,7 +722,7 @@ modul_poly_roots(residueul_t *r, mpz_poly_t F, modulusul_t p)
   modul_poly_sub_x (g, g, p);
 
   /* fp <- gcd (fp, g) */
-  modul_poly_gcd (fp, g, p);
+  modul_poly_gcd_clobber (fp, g, p);
 
   /* now fp contains gcd(x^p-x, f) */
 
@@ -735,27 +786,26 @@ modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
   modul_init(zero, p);
   modul_poly_init (g, 2 * d - 1);
   modul_poly_init (gmx, 2 * d - 1);
-  modul_poly_init (h, 2 * d - 1);
+  modul_poly_init (h, d);
 
   for (i = 1; 2*i <= d; ++i) {
-    /* we first compute x^(p^i) mod fp; since fp has degree d, all operations can
-       be done with polynomials of degree < 2d: a square give at most degree
-       2d-2, and multiplication by x gives 2d-1. */
+    /* we first compute x^(p^i) mod fp; since fp has degree d, all
+     * operations can be done with polynomials of degree < 2d: a square
+     * gives at most degree 2d-2, and multiplication by x gives 2d-1. */
 
     if (i == 1) {
       /* g <- x^p mod fp */
-      modul_poly_powmod_ui (g, fp, h, zero, p[0], p);
+      modul_poly_xpowmod_ui (g, zero, p[0], fp, p);
     } else {
       /* g <- g^p mod fp */
-      modul_poly_general_powmod_ui (g, fp, h, p[0], p);
+      modul_poly_powmod_ui (g, g, p[0], fp, p);
     }
 
     /* subtract x */
     modul_poly_sub_x (gmx, g, p);
 
     /* h <- gcd (fp, x^(p^i)-x) */
-    modul_poly_set(h, fp, p);
-    modul_poly_gcd (h, gmx, p);
+    modul_poly_gcd(h, fp, gmx, p);
 
     if (h->degree > 0) {
       is_irreducible = 0;

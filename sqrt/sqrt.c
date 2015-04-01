@@ -11,6 +11,7 @@
 #endif
 #include <sys/stat.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "utils_with_io.h"
 #include "portability.h"
@@ -20,34 +21,12 @@
 
 static int verbose = 0;
 
+#define MAX_THREADS 32
+
+/* mutual exclusion lock for output */
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 /********** RATSQRT **********/
-
-static void
-my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
-{
-#if 0
-  int large, st = 0;
-
-  large = mpz_size (b) + mpz_size (c) >= 5000000;
-  if (large)
-    {
-      fprintf (stderr, "[multiplying %zu*%zu limbs: ",
-               mpz_size (b), mpz_size (c));
-      fflush (stderr);
-      st = milliseconds ();
-    }
-#endif
-  mpz_mul (a, b, c);
-  mpz_realloc2 (c, 0);
-#if 0
-  if (large)
-    {
-      fprintf (stderr, "%lums]\n", milliseconds () - st);
-      fflush (stderr);
-    }
-#endif
-}
 
 #define THRESHOLD 2 /* must be >= 2 */
 
@@ -61,7 +40,7 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
 {
   unsigned long i;
 
-  my_mpz_mul (prd[0], prd[0], a);
+  mpz_mul (prd[0], prd[0], a);
   nprd ++;
 
   for (i = 0; nprd % THRESHOLD == 0; i++, nprd /= THRESHOLD)
@@ -70,10 +49,10 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
       if (i + 2 > *lprd)
         {
           lprd[0] ++;
-          prd = (mpz_t*) realloc (prd, *lprd * sizeof (mpz_t));
+          prd = (mpz_t*) realloc (prd, lprd[0] * sizeof (mpz_t));
           mpz_init_set_ui (prd[i + 1], 1);
         }
-      my_mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
+      mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
       mpz_set_ui (prd[i], 1);
     }
 
@@ -81,13 +60,13 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
 }
 
 /* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
-static void
+void
 accumulate_fast_end (mpz_t *prd, unsigned long lprd)
 {
   unsigned long i;
 
   for (i = 1; i < lprd; i++)
-    my_mpz_mul (prd[0], prd[0], prd[i]);
+    mpz_mul (prd[0], prd[0], prd[i]);
 }
 
 static size_t
@@ -134,21 +113,60 @@ get_depalgname (const char *prefix, int numdep)
   return get_depname (prefix, "alg.", numdep);
 }
 
+static FILE*
+fopen_maybe_compressed_lock (const char * name, const char * mode)
+{
+  FILE *fp;
+
+  pthread_mutex_lock (&lock);
+  fp = fopen_maybe_compressed (name, mode);
+  pthread_mutex_unlock (&lock);
+  return fp;
+}
+
+static int
+fclose_maybe_compressed_lock (FILE * f, const char * name)
+{
+  int ret;
+
+  pthread_mutex_lock (&lock);
+  ret = fclose_maybe_compressed (f, name);
+  pthread_mutex_unlock (&lock);
+  return ret;
+}
+
+/* this function is run sequentially, thus no need to be thread-safe */
+static int
+check_dep (const char *prefix, int numdep)
+{
+  char *depname;
+  FILE *depfile;
+
+  depname = get_depname (prefix, "", numdep);
+  depfile = fopen (depname, "r");
+  free (depname);
+  if (depfile == NULL)
+    return 0;
+  fclose (depfile);
+  return 1;
+}
+
 int 
-calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
+calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
+                  mpz_t Np)
 {
   char *depname, *ratname;
   depname = get_depname (prefix, "", numdep);
   ratname = get_depratname (prefix, numdep);
   FILE *depfile = NULL;
   FILE *ratfile;
-  //int sign;
   long a, b;
   int ret;
   unsigned long ab_pairs = 0, line_number, freerels = 0;
   mpz_t v, *prd;
   unsigned long lprd; /* number of elements in prd[] */
   unsigned long nprd; /* number of accumulated products in prd[] */
+  unsigned long i;
   unsigned long res, peakres = 0;
 
   if (pol->rat->deg != 1)
@@ -157,11 +175,15 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
       exit (EXIT_FAILURE);
     }
 
+  pthread_mutex_lock (&lock);
 #ifdef __MPIR_VERSION
   fprintf (stderr, "Using MPIR %s\n", mpir_version);
 #else
   fprintf (stderr, "Using GMP %s\n", gmp_version);
 #endif
+  pthread_mutex_unlock (&lock);
+  depfile = fopen_maybe_compressed_lock (depname, "rb");
+  ASSERT_ALWAYS(depfile != NULL);
 
   mpz_init (v);
 
@@ -170,9 +192,6 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   prd = (mpz_t*) malloc (lprd * sizeof (mpz_t));
   mpz_init_set_ui (prd[0], 1);
 
-  depfile = fopen_maybe_compressed (depname, "rb");
-  ASSERT_ALWAYS(depfile != NULL);
-    
   line_number = 2;
   for (;;)
     {
@@ -194,10 +213,12 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
           res = Memusage2 ();
           if (res > peakres)
             peakres = res;
-            fprintf (stderr, "SqrtRat: %lu pairs: size %zuMb, %lums, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
-                       ab_pairs, stats (prd, lprd) >> 17, milliseconds (),
-                       Memusage () >> 10, PeakMemusage () >> 10,
-                       res >> 10, peakres >> 10);
+          pthread_mutex_lock (&lock);
+          fprintf (stderr, "SqrtRat(%d): %lu pairs: size %zuMb, %lums, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
+                   numdep, ab_pairs, stats (prd, lprd) >> 17, milliseconds (),
+                   Memusage () >> 10, PeakMemusage () >> 10,
+                   res >> 10, peakres >> 10);
+          pthread_mutex_unlock (&lock);
         }
 
         if (b == 0)
@@ -212,23 +233,27 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
         if (feof (depfile))
           break;
       }
-  fprintf (stderr, "SqrtRat: %lu (a,b) pairs\n", line_number);
-
-  fclose_maybe_compressed (depfile, depname);
+  fclose_maybe_compressed_lock (depfile, depname);
   free (depname);
 
-  fprintf (stderr, "SqrtRat: read %lu (a,b) pairs, including %lu free\n",
-           ab_pairs, freerels);
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "SqrtRat(%d): read %lu (a,b) pairs, including %lu free\n",
+           numdep, ab_pairs, freerels);
+  pthread_mutex_unlock (&lock);
 
+  pthread_mutex_lock (&lock);
   accumulate_fast_end (prd, lprd);
+  pthread_mutex_unlock (&lock);
 
   /* we must divide by g1^ab_pairs: if the number of (a,b) pairs is odd, we
      multiply by g1, and divide by g1^(ab_pairs+1) */
   if (ab_pairs & 1)
     mpz_mul (prd[0], prd[0], pol->rat->coeff[1]);
 
-  fprintf (stderr, "SqrtRat: size of product = %zu bits\n",
-           mpz_sizeinbase (prd[0], 2));
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "SqrtRat(%d): size of product = %zu bits\n",
+           numdep, mpz_sizeinbase (prd[0], 2));
+  pthread_mutex_unlock (&lock);
 
   if (mpz_sgn (prd[0]) < 0)
     {
@@ -236,12 +261,18 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
       exit (1);
     }
 
-  fprintf (stderr, "Starting rational square root at %lums\n", milliseconds ());
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "Starting rational square root for dep %d at %lums\n",
+           numdep, milliseconds ());
+  pthread_mutex_unlock (&lock);
 
   /* since we know we have a square, take the square root */
   mpz_sqrtrem (prd[0], v, prd[0]);
   
-  fprintf (stderr, "Computed rational square root at %lums\n", milliseconds ());
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "Computed rational square root for dep %d at %lums\n",
+           numdep, milliseconds ());
+  pthread_mutex_unlock (&lock);
 
   if (mpz_cmp_ui (v, 0) != 0)
     {
@@ -278,34 +309,53 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
   mpz_mod (prd[0], prd[0], Np);
 
-  fprintf (stderr, "SqrtRat: reduced mod n at %lums\n", milliseconds ());
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "SqrtRat(%d): reduced mod n at %lums\n",
+           numdep, milliseconds ());
+  pthread_mutex_unlock (&lock);
 
   /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
      if ab_pairs is odd */
   
   mpz_powm_ui (v, pol->rat->coeff[1], (ab_pairs + 1) / 2, Np);
-  fprintf (stderr, "SqrtRat: computed g1^(nab/2) mod n at %lums\n", milliseconds ());
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "SqrtRat(%d): computed g1^(nab/2) mod n at %lums\n",
+           numdep, milliseconds ());
+  pthread_mutex_unlock (&lock);
+  ratfile = fopen_maybe_compressed_lock (ratname, "wb");
 
   mpz_invert (v, v, Np);
   mpz_mul (prd[0], prd[0], v);
   mpz_mod (prd[0], prd[0], Np);
   
-  ratfile = fopen_maybe_compressed (ratname, "wb");
   gmp_fprintf (ratfile, "%Zd\n", prd[0]);
-  fclose_maybe_compressed (ratfile, ratname);
+  fclose_maybe_compressed_lock (ratfile, ratname);
   free (ratname);
 
-  gmp_fprintf (stderr, "rational square root is %Zd\n", prd[0]);
+  pthread_mutex_lock (&lock);
+  gmp_fprintf (stderr, "SqrtRat(%d): square root is %Zd\n", numdep, prd[0]);
+  fprintf (stderr, "SqrtRat(%d): square root time: %lums\n", numdep,
+           milliseconds ());
+  pthread_mutex_unlock (&lock);
 
-  fprintf (stderr, "Rational square root time: %lums\n", milliseconds ());
-
-  mpz_clear (prd[0]);
+  for (i = 0; i < lprd; i++)
+    mpz_clear (prd[i]);
+  free (prd);
 
   mpz_clear (v);
   return 0;
 }
 
-
+typedef struct
+{
+  const char *prefix;
+  int task;            /* 0:ratsqrt 1:algsqrt 2:gcd */
+  int numdep;
+  cado_poly_ptr pol;
+  int side;
+  mpz_ptr Np;
+} __tab_struct;
+typedef __tab_struct tab_t[1];
 
 /********** ALGSQRT **********/
 static void
@@ -455,7 +505,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_t A, *P;
   int v;
   int d = F->deg;
-  int k, lk, target_k, logk, K[32];
+  int k, lk, target_k, logk, logk0, K[32];
   size_t target_size; /* target bit size for Hensel lifting */
 
   /* The size of the coefficients of the square root of A should be about half
@@ -477,7 +527,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   // then multiply num and denom by fd to make it even.
   if (((AA->v)&1) == 0) {
     v = AA->v / 2;
-    mpz_poly_copy(A, AA->p);
+    mpz_poly_set(A, AA->p);
   } else {
     v = (1+AA->v) / 2;
     mpz_poly_mul_mpz(A, AA->p, F->coeff[d]);
@@ -507,7 +557,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
       mpz_mul_ui (pk, pk, p);
       target_k ++;
     }
-  mpz_poly_reduce_mod_mpz (A, A, pk);
+  mpz_poly_mod_mpz (A, A, pk, NULL);
   for (k = target_k, logk = 0; k > 1; k = (k + 1) / 2, logk ++)
     K[logk] = k;
   K[logk] = 1;
@@ -519,10 +569,10 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   k = 1; /* invariant: pk = p^k */
   lk = 0; /* k = 2^lk */
   st = seconds ();
-  P = mpz_poly_base_modp_init (A, p, K, logk);
+  P = mpz_poly_base_modp_init (A, p, K, logk0 = logk);
   fprintf (stderr, "mpz_poly_base_modp_init took %2.2lf\n", seconds () - st);
 
-  mpz_poly_copy (a, P[0]);
+  mpz_poly_set (a, P[0]);
 
   // First compute the inverse square root modulo p
   {
@@ -606,7 +656,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
 #ifdef VERBOSE
     fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
-    mpz_poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
+    mpz_poly_sub_ui (tmp, tmp, 1); /* a*invsqrtA^2-1 */
     mpz_poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
     st = seconds ();
     mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
@@ -622,9 +672,9 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
   mpz_poly_mod_center (tmp, pk);
 
-  mpz_poly_base_modp_clear (P);
+  mpz_poly_base_modp_clear (P, logk0);
 
-  mpz_poly_copy(res->p, tmp);
+  mpz_poly_set(res->p, tmp);
   res->v = v;
 
   mpz_clear (pk);
@@ -724,10 +774,11 @@ accumulate_fast_F_end (polymodF_t *prd, const mpz_poly_t F, unsigned long lprd)
 
 /* side=0: consider the polynomial f
    side=1: consider the polynomial g
+   Process dependencies numdep to numdep + nthreads - 1.
 */
 int
-calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side, 
-        mpz_t Np)
+calculateSqrtAlg (const char *prefix, int numdep,
+                  cado_poly_ptr pol, int side, mpz_t Np)
 {
   char *depname, *algname;
   FILE *depfile = NULL;
@@ -750,7 +801,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
     algname = get_depalgname (prefix, numdep);
   else
     algname = get_depratname (prefix, numdep);
-  depfile = fopen_maybe_compressed (depname, "rb");
+  depfile = fopen_maybe_compressed_lock (depname, "rb");
   ASSERT_ALWAYS(depfile != NULL);
 
   deg = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->deg;
@@ -772,21 +823,8 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   // Allocate tmp
   mpz_poly_init (tmp->p, 1);
   
-  // Accumulate product
-  #if 0
-    // Naive version, without subproduct tree
-    while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
-      if(!(nab % 100000))
-        fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
-      if((a == 0) && (b == 0))
-        break;
-      polymodF_from_ab (tmp, a, b);
-      polymodF_mul (prd, prd, tmp, F);
-      nab++;
-    }
-  #else
-    // With a subproduct tree
-    {
+  // Accumulate product with a subproduct tree
+  {
       polymodF_t *prd_tab;
       unsigned long lprd = 1; /* number of elements in prd_tab[] */
       unsigned long nprd = 0; /* number of accumulated products in prd_tab[] */
@@ -797,7 +835,12 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
       prd_tab[0]->v = 0;
       while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
         if(!(nab % 100000))
-    fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n", nab, seconds ());
+          {
+            pthread_mutex_lock (&lock);
+            fprintf(stderr, "# AlgSqrt(%d): reading ab pair #%d at %2.2lf\n",
+                    numdep, nab, seconds ());
+            pthread_mutex_unlock (&lock);
+          }
         if((a == 0) && (b == 0))
     break;
         polymodF_from_ab(tmp, a, b);
@@ -806,7 +849,10 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
         if(b == 0)
       nfree++;
       }
-      fprintf (stderr, "# Read %d including %d free relations\n", nab, nfree);
+      pthread_mutex_lock (&lock);
+      fprintf (stderr, "# AlgSqrt(%d): read %d including %d free relations\n",
+               numdep, nab, nfree);
+      pthread_mutex_unlock (&lock);
       ASSERT_ALWAYS ((nab & 1) == 0);
       ASSERT_ALWAYS ((nfree & 1) == 0);
       /* nfree being even is forced by a specific character column added
@@ -830,28 +876,32 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
        *      denominator, and the algorithm can continue.
        */
       accumulate_fast_F_end (prd_tab, F, lprd);
-      fclose_maybe_compressed (depfile, depname);
+      fclose_maybe_compressed_lock (depfile, depname);
       free (depname);
   
-      mpz_poly_copy(prd->p, prd_tab[0]->p);
+      mpz_poly_set(prd->p, prd_tab[0]->p);
       prd->v = prd_tab[0]->v;
       for (i = 0; i < (long)lprd; ++i)
         mpz_poly_clear(prd_tab[i]->p);
       free(prd_tab);
     }
-  #endif
   
-    fprintf(stderr, "Finished accumulating the product at %2.2lf\n", seconds());
-    fprintf(stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
+    pthread_mutex_lock (&lock);
+    fprintf (stderr, "AlgSqrt(%d): finished accumulating product at %2.2lf\n",
+             numdep, seconds());
+    fprintf (stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
     fprintf (stderr, "maximal polynomial bit-size = %lu\n",
              (unsigned long) mpz_poly_sizeinbase (prd->p, deg - 1, 2));
-  
     p = FindSuitableModP(F, Np);
-    fprintf(stderr, "Using p=%lu for lifting\n", p);
+    fprintf (stderr, "Using p=%lu for lifting\n", p);
+    pthread_mutex_unlock (&lock);
   
     double tm = seconds();
     polymodF_sqrt (prd, prd, F, p);
-    fprintf (stderr, "Square root lifted in %2.2lf\n", seconds()-tm);
+    pthread_mutex_lock (&lock);
+    fprintf (stderr, "AlgSqrt(%d): square root lifted in %2.2lf\n",
+             numdep, seconds() - tm);
+    pthread_mutex_unlock (&lock);
   
     mpz_init(algsqrt);
     mpz_init(aux);
@@ -872,13 +922,17 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
     mpz_mul(algsqrt, algsqrt, aux);
     mpz_mod(algsqrt, algsqrt, Np);
   
-    algfile = fopen_maybe_compressed (algname, "wb");
+    algfile = fopen_maybe_compressed_lock (algname, "wb");
     gmp_fprintf (algfile, "%Zd\n", algsqrt);
-    fclose_maybe_compressed (algfile, algname);
-    free (algname);
+    fclose_maybe_compressed_lock (algfile, algname);
 
-    gmp_fprintf(stderr, "algebraic square root is: %Zd\n", algsqrt);
-    fprintf (stderr, "Algebraic square root time is %2.2lf\n", seconds() - t0);
+    pthread_mutex_lock (&lock);
+    gmp_fprintf (stderr, "AlgSqrt(%d): square root is: %Zd\n",
+                 numdep, algsqrt);
+    fprintf (stderr, "AlgSqrt(%d): square root time is %2.2lf\n",
+             numdep, seconds() - t0);
+    pthread_mutex_unlock (&lock);
+    free (algname);
     mpz_clear(aux);
     mpz_clear(algsqrt);
     mpz_poly_clear(prd->p);
@@ -937,6 +991,7 @@ void print_nonsmall(mpz_t zx)
 void print_factor(mpz_t N) 
 {
     unsigned long xx = mpz_get_ui(N);
+    pthread_mutex_lock (&lock);
     if (mpz_cmp_ui(N, xx) == 0) {
         xx = trialdivide_print(xx, 1000000);
         if (xx != 1) {
@@ -948,12 +1003,13 @@ void print_factor(mpz_t N)
         }
     } else 
         print_nonsmall(N);
+    pthread_mutex_unlock (&lock);
 }
 
 
 /********** GCD **********/
 int
-calculateGcd(const char *prefix, int numdep, mpz_t Np)
+calculateGcd (const char *prefix, int numdep, mpz_t Np)
 {
     char *ratname, *algname;
     ratname = get_depratname (prefix, numdep);
@@ -968,15 +1024,24 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     mpz_init(g1);
     mpz_init(g2);
   
-    ratfile = fopen_maybe_compressed (ratname, "rb");
-    algfile = fopen_maybe_compressed (algname, "rb");
-    ASSERT_ALWAYS(ratfile != NULL);
+    ratfile = fopen_maybe_compressed_lock (ratname, "rb");
+    algfile = fopen_maybe_compressed_lock (algname, "rb");
+    if (ratfile == NULL)
+      {
+        fprintf(stderr, "Error, cannot open file %s for reading\n", ratname);
+        exit (1);
+      }
+    if (algfile == NULL)
+      {
+        fprintf(stderr, "Error, cannot open file %s for reading\n", algname);
+        exit (1);
+      }
     ASSERT_ALWAYS(algfile != NULL);
     gmp_fscanf(ratfile, "%Zd", ratsqrt);
     gmp_fscanf(algfile, "%Zd", algsqrt);
-    fclose_maybe_compressed (ratfile, ratname);
+    fclose_maybe_compressed_lock (ratfile, ratname);
+    fclose_maybe_compressed_lock (algfile, algname);
     free (ratname);
-    fclose_maybe_compressed (algfile, algname);
     free (algname);
 
     // reduce mod Np
@@ -1017,7 +1082,11 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     mpz_clear(g2);
 
     if (!found)
-      printf("Failed\n");
+      {
+        pthread_mutex_lock (&lock);
+        printf ("Failed\n");
+        pthread_mutex_unlock (&lock);
+      }
   
     mpz_clear(ratsqrt);
     mpz_clear(algsqrt);
@@ -1141,6 +1210,49 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     free (abs);
 }
 
+/* perform one task (rat or alg or gcd) on one dependency */
+void*
+one_thread (void* args)
+{
+  tab_t *tab = (tab_t*) args;
+  if (tab[0]->task == 0) /* rat */
+    calculateSqrtRat (tab[0]->prefix, tab[0]->numdep, tab[0]->pol, tab[0]->Np);
+  else if (tab[0]->task == 1) /* alg */
+    calculateSqrtAlg (tab[0]->prefix, tab[0]->numdep, tab[0]->pol,
+                      tab[0]->side, tab[0]->Np);
+  else /* gcd */
+    calculateGcd (tab[0]->prefix, tab[0]->numdep, tab[0]->Np);
+  return NULL;
+}
+
+/* process task (0=rat, 1=alg, 2=gcd) in parallel for
+   dependencies numdep to numdep + nthreads - 1 */
+void
+calculateTaskN (int task, const char *prefix, int numdep, int nthreads,
+                cado_poly pol, int side, mpz_t Np)
+{
+  pthread_t *tid;
+  tab_t *T;
+  int j;
+
+  tid = (pthread_t*) malloc (nthreads * sizeof (pthread_t));
+  T = (tab_t*) malloc (nthreads * sizeof (tab_t));
+  for (j = 0; j < nthreads; j++)
+    {
+      T[j]->prefix = prefix;
+      T[j]->task = task;
+      T[j]->numdep = numdep + j;
+      T[j]->pol = pol;
+      T[j]->side = side;
+      T[j]->Np = Np;
+    }
+  for (j = 0; j < nthreads; j++)
+    pthread_create (&tid[j], NULL, one_thread, (void *) (T+j));
+  while (j > 0)
+    pthread_join (tid[--j], NULL);
+  free (tid);
+  free (T);
+}
 
 void declare_usage(param_list pl)
 {
@@ -1153,7 +1265,8 @@ void declare_usage(param_list pl)
     param_list_decl_usage(pl, "rat", "(switch) Compute square root for the rational side and store in file");
     param_list_decl_usage(pl, "alg", "(switch) Compute square root for the algebraic side and store in file");
     param_list_decl_usage(pl, "gcd", "(switch) Compute gcd of the two square roots. Requires alg and rat square roots");
-    param_list_decl_usage(pl, "dep", "The number of the dependency for which to compute square roots");
+    param_list_decl_usage(pl, "dep", "The initial dependency for which to compute square roots");
+    param_list_decl_usage(pl, "t",   "The number of dependencies to process (default 1)");
     param_list_decl_usage(pl, "v", "More verbose output");
     param_list_decl_usage(pl, "force-posix-threads", "(switch)");
 }
@@ -1161,9 +1274,9 @@ void declare_usage(param_list pl)
 void usage(param_list pl, const char * argv0, FILE *f)
 {
     param_list_print_usage(pl, argv0, f);
-    fprintf(f, "Usage: %s [-ab || -rat || -alg || -gcd] -poly polyname -prefix prefix -dep numdep", argv0);
+    fprintf(f, "Usage: %s [-ab || -rat || -alg || -gcd] -poly polyname -prefix prefix -dep numdep -t ndep", argv0);
     fprintf(f, " -purged purgedname -index indexname -ker kername\n");
-    fprintf(f, "or %s (-rat || -alg || -gcd) -poly polyname -prefix prefix -dep numdep\n\n", argv0);
+    fprintf(f, "or %s (-rat || -alg || -gcd) -poly polyname -prefix prefix -dep numdep -t ndep\n\n", argv0);
     fprintf(f, "(a,b) pairs of dependency relation 'numdep' will be r/w in file 'prefix.numdep',");
     fprintf(f, " rational sqrt in 'prefix.rat.numdep' ...\n");
     exit(EXIT_FAILURE);
@@ -1172,11 +1285,11 @@ void usage(param_list pl, const char * argv0, FILE *f)
 int main(int argc, char *argv[])
 {
     cado_poly pol;
-    int numdep = -1, ret MAYBE_UNUSED, i;
+    int numdep = -1, nthreads = 1, ret MAYBE_UNUSED, i;
 
     char * me = *argv;
     /* print the command line */
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    fprintf (stderr, "%s.r%s", argv[0], cado_revision_string);
     for (i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
@@ -1221,6 +1334,8 @@ int main(int argc, char *argv[])
     }
 
     param_list_parse_int (pl, "dep", &numdep);
+    param_list_parse_int (pl, "t", &nthreads);
+    ASSERT_ALWAYS(nthreads <= MAX_THREADS);
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * kername = param_list_lookup_string(pl, "ker");
@@ -1315,27 +1430,49 @@ int main(int argc, char *argv[])
         create_dependencies(prefix, indexname, purgedname, kername);
     }
 
+    if (opt_rat || opt_alg || opt_gcd)
+      {
+        int i;
+
+        for (i = 0; i < nthreads; i++)
+          if (check_dep (prefix, numdep + i) == 0)
+            {
+              fprintf (stderr, "Warning: dependency %d does not exist, reducing the number of threads to %d\n",
+                       numdep + i, i);
+              nthreads = i;
+              break;
+            }
+      }
+
+    if (nthreads == 0)
+      {
+        fprintf (stderr, "Error, no more dependency\n");
+        cado_poly_clear (pol);
+        param_list_clear (pl);
+        mpz_clear (Np);
+        return 1;
+      }
+
     if (opt_rat) {
         ASSERT_ALWAYS(numdep != -1);
         if (pol->rat->deg == 1)
-            calculateSqrtRat (prefix, numdep, pol, Np);
+          calculateTaskN (0, prefix, numdep, nthreads, pol, 0, Np);
         else
-            calculateSqrtAlg (prefix, numdep, pol, 1, Np);
+          calculateTaskN (1, prefix, numdep, nthreads, pol, 1, Np);
     }
 
     if (opt_alg) {
         ASSERT_ALWAYS(numdep != -1);
-        calculateSqrtAlg (prefix, numdep, pol, 0, Np);
+        calculateTaskN (1, prefix, numdep, nthreads, pol, 0, Np);
     }
 
     if (opt_gcd) {
         ASSERT_ALWAYS(numdep != -1);
-        calculateGcd (prefix, numdep, Np);
+        calculateTaskN (2, prefix, numdep, nthreads, pol, 0, Np);
     }
     
     cado_poly_clear (pol);
-    param_list_clear(pl);
-    mpz_clear(Np);
+    param_list_clear (pl);
+    mpz_clear (Np);
     return 0;
 }
-  

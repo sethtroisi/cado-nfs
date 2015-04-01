@@ -387,10 +387,7 @@ MAYBE_UNUSED
 static inline void 
 modul_set1 (residueul_t r, const modulusul_t m MAYBE_UNUSED) 
 { 
-  if (m[0] == 1UL)
-    r[0] = 0UL;
-  else
-    r[0] = 1UL;
+    r[0] = m[0] != 1UL;
 }
 
 
@@ -807,6 +804,9 @@ modul_finished (const residueul_t r, const modulusul_t m)
     return (r[0] == m[0]);
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* prototypes of non-inline functions */
 int modul_div3 (residueul_t, const residueul_t, const modulusul_t);
@@ -835,5 +835,9 @@ int modul_inv_powerof2 (residueul_t, const residueul_t, const modulusul_t);
 int modul_batchinv (residueul_t *, const residueul_t *, size_t,
                     const residueul_t, const modulusul_t);
 int modul_jacobi (const residueul_t, const modulusul_t);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* MOD_UL_H */

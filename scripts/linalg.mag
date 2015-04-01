@@ -57,7 +57,7 @@ if nmaps gt 0 then
     printf "Reading the SM part %o...\n", smfile;
     SMFile := Read(smfile);
     Lines := Split(SMFile);
-    mm := StringToInteger(Lines[1]);
+    mm := StringToIntegerSequence(Lines[1])[1];
     assert mm eq m;
 
     for i := 1 to m do
@@ -82,7 +82,7 @@ end if;
 
 // Computing...
 printf "Computing kernel...\n";
-time v := ModularSolution(M, ell : Lanczos := true);
+time v := ModularSolution(M, ell : Lanczos := false);
 
 printf "Write result to %o...\n", kerfile;
 SetOutputFile(kerfile: Overwrite:=true);

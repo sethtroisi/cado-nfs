@@ -20,3 +20,4 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
 double dickman_rho (double x);
+double dickman_rho_local (double x, double N);

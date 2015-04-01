@@ -866,8 +866,7 @@ resume(report_t *rep, filter_matrix_t *mat, const char *resumename)
 	    printf (" I stop reading and go to the next phase\n");
 	    break;
 	}
-	if(strncmp(str, "BWCOST", 6) != 0)
-	    doAllAdds(rep, mat, str);
+        doAllAdds(rep, mat, str);
     }
     fclose(resumefile);
     for(j = 0; j < mat->ncols; j++)

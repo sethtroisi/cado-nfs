@@ -3,6 +3,7 @@
 
 #include <gmp.h>
 #include <stdint.h>
+#include <macros.h>
 
 /* the following function is missing in GMP */
 #ifndef mpz_addmul_si
@@ -33,7 +34,10 @@ extern void mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
 extern int mpz_fits_int64_p(mpz_srcptr);
 extern unsigned long ulong_nextprime (unsigned long);
 extern int ulong_isprime (unsigned long);
+extern void mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d);
+extern void mpz_ndiv_qr_ui (mpz_t q, mpz_t r, mpz_t n, unsigned long int d);
 extern void mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d);
+extern void mpz_ndiv_q_ui (mpz_t q, mpz_t n, unsigned long int d);
 extern int mpz_divisible_uint64_p (mpz_t a, uint64_t c);
 extern int mpz_coprime_p (mpz_t a, mpz_t b);
 
@@ -41,6 +45,11 @@ extern int mpz_coprime_p (mpz_t a, mpz_t b);
 extern int nbits (uintmax_t p);
 extern long double mpz_get_ld (mpz_t z);
 
+#if !GMP_VERSION_ATLEAST(5,0,0)
+mp_limb_t mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n);
+void mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
+		mp_size_t n);
+#endif
 
 #ifdef __cplusplus
 }

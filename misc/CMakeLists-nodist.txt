@@ -9,5 +9,7 @@ add_executable(debug_renumber-ffs-f3 EXCLUDE_FROM_ALL debug_renumber.c)
 target_link_libraries(debug_renumber-ffs-f3 utils-ffs-f3)
 set_target_properties(debug_renumber-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 
+add_executable(psi EXCLUDE_FROM_ALL psi.c)
+target_link_libraries (psi utils)
 
 # vim: set ft=cmake:

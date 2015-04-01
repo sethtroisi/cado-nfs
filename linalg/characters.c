@@ -89,11 +89,18 @@
 
 #include "cado-endian.h"
 #include "portability.h"
+#include "utils.h"
 #include "utils_with_io.h"
 #include "blockmatrix.h"
 #include "gauss.h"
 #include "worker-threads.h"
 
+
+typedef struct {
+    unsigned long p;      /* algebraic prime */
+    unsigned long r;      /* corresponding root: r = a/b mod p */
+    int e;                /* exponent (may want negative exponent in sqrt) */
+} alg_prime_t;
 
 /* Calculates a 64-bit word with the values of the characters chi(a,b), where
  * chi ranges from chars to chars+64
@@ -337,10 +344,8 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
         }
         i += bs;
     }
-    free(all_A);
-    fprintf (stderr, "all_A freed\n");
-    free(all_B);
-    fprintf (stderr, "all_B freed\n");
+    free (all_A);
+    free (all_B);
 
     return res;
 }
@@ -457,10 +462,10 @@ read_heavyblock_matrix_ascii(const char * heavyblockname)
 
     for(unsigned int i = 0 ; i < nrows ; i++) {
         uint32_t len;
-        int r = fscanf(f, "%"SCNu32, &len); ASSERT_ALWAYS(r == 1);
+        int r = fscanf(f, "%" SCNu32, &len); ASSERT_ALWAYS(r == 1);
         for( ; len-- ; ) {
             uint32_t v;
-            r = fscanf(f, "%"SCNu32, &v); ASSERT_ALWAYS(r == 1);
+            r = fscanf(f, "%" SCNu32, &v); ASSERT_ALWAYS(r == 1);
             res->mb[(i/64) + (v/64) * res->nrblocks][i%64] ^= ((uint64_t)1) << (v%64);
         }
     }
@@ -610,7 +615,7 @@ int main(int argc, char **argv)
     char *argv0 = argv[0];
 
     /* print the command line */
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    fprintf (stderr, "%s.r%s", argv[0], cado_revision_string);
     for (int i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
@@ -680,6 +685,12 @@ int main(int argc, char **argv)
      if (indexname == NULL)
        {
          fprintf (stderr, "Error: parameter -index is mandatory\n");
+         param_list_print_usage (pl, argv0, stderr);
+         exit (EXIT_FAILURE);
+       }
+     if (outname == NULL)
+       {
+         fprintf (stderr, "Error: parameter -out is mandatory\n");
          param_list_print_usage (pl, argv0, stderr);
          exit (EXIT_FAILURE);
        }

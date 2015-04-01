@@ -1,6 +1,11 @@
 Using las for the descent
 =========================
 
+NOTE: there is now a general script that can compute the logarithm of a
+given target. See scripts/descent.py . The documentation below is still
+important, since, for instance, it describes how to create a hint file.
+
+
 The 'las' binary can be used not only for generating relations in the
 factorization or dlp context, but also to "descend" elements in order to
 compute the logarithms of elements that are not in the factor base.
@@ -18,46 +23,128 @@ to deduce the log of the target element.
 WARNING: We assume that these not-too-large integers are a few bits below
 64 bits. Even for record-scale computations, this should not be a problem
 to initialize the descent up to 55 bits smooth elements.
+TODO: still true?
 
 Recompiling las
 ---------------
 
-The las binary must be recompiled to run in "descent" mode:
-In las-config.h, uncomment the following parameters:
-  #define DLP_DESCENT
-  #define SUPPORT_LARGE_Q
+A special las binary must used for the "descent" mode. It is called
+"las_descent", and has to be built explicitly (just type "make
+las_descent").
 Furthermore, in local.sh, uncomment the line:
   FLAGS_SIZE="-D__SIZEOF_P_R_VALUES__=8"
+[FIXME: does this still hold ?]
 
 Then recompile cado-nfs, maybe in a separate build-directory.  If you are
 on a 32-bit machine, then this might actually fail at compile or
 execution time. It is highly recommended to choose a 64-bit platform.
 
-Writing a Hint File
+Writing a hint table
 -------------------
 
-The descent requires a "hint file" that contains information about how to
-tune the parameters along the descent.
+The descent requires a "descent hint table" that contains information
+about how to tune the parameters along the descent.
 
 Each line correspond to a bit-size of a special-q for one side. For
 example:
-  55r 0.028 1.00 I=15 400000,47,65,1.4 400000,48,94,2.0
+  55r 0.028 1.00 I=15 400000,47,65 400000,48,94
 means (in order):
   55r   : this line is about a 55-bit special-q on the rational side
-  28.2  : expected time in seconds to find a relation
+  0.028 : expected time in seconds to find a relation
   1.00  : probability of success
   I=15  : the I to use
-  400000,47,65,1.4 : parameters for the rational side lim,lpb,mfb,lambda
-  400000,48,94,2.0 : same for the other side.
+  400000,47,65 : parameters for the rational side (0 side) 
+  		     lim0,lpb0,mfb0
+  400000,48,94 : same for the other side (1).
 
-At the moment, it *mandatory* to have the same values for I, lim0, lim1
+There are in fact three ways to specify the parameters on both sides.
+400000,47,65 : set lim, lpb, mfb
+400000,47,1.2 : set lim, lpb, lambda (based on the fact the the third field is < 10)
+400000,47,65,1.2 : set lim, lpb, mfb, lambda
+(in the first case, lambda defaults to mfb0/lpb0+0.1 as everywhere else
+in cado-nfs).
+
+At the moment, it is *mandatory* to have the same values for I, lim0, lim1
 on each line. This might change if we see a clear need to make them vary.
 
 There must be one line for each size that can occur during the descent,
 and the parameters must be so that there is a high chance to get at least
 one relation.
 
-An example hint-file will be given as example in the future.
+An example descent-hint-table is given with the ./scripts/descent.py
+script.
+
+Alternatively, the hint file may also use the syntax "55@0" instead of
+"55r", to mean "bitsize 55 on size 0".
+
+Writing a hint file can be done by hand. There is a helper script,
+though, which can assist in this task. It can be used as follows (the
+following information may also be used as a guide for how a hint file
+should be created). First, one should start with a draft file, containing
+rough guess data for the smallest large primes, at least one line for
+each special-q side. For example:
+    22@0 0 0 I=9 50000,22,24 100000,22,24
+    22@1 0 0 I=9 50000,22,24 100000,22,24
+because this is a guess, the 0 values for the average time and success
+probability are normal.
+
+Based on this, and replicating the configuration for the larger values,
+the script will provide timing data as follows (we assume a bash-like
+shell is used).
+
+$ ./scripts/hintfile-helper.py --cadobindir ./build/`hostname` --datadir ~/Local/p59/ --prefix p59  --ntrials 100 --hintfile /tmp/p59.hint --qrange "$(echo {22..37}{r,a})"
+22@0 0.0027 1.0000 I=9 50000,22,24 100000,22,24
+22@1 0.0030 1.0000 I=9 50000,22,24 100000,22,24
+23@0 0.0029 0.9900 I=9 50000,22,24 100000,22,24
+23@1 0.0033 1.0000 I=9 50000,22,24 100000,22,24
+24@0 0.0028 0.9700 I=9 50000,22,24 100000,22,24
+24@1 0.0034 1.0000 I=9 50000,22,24 100000,22,24
+25@0 0.0031 0.9500 I=9 50000,22,24 100000,22,24
+
+Note the --qrange argument, which specifies the order in which the sizes
+are tried.
+
+You should pay attention to two things here. The success probability, and
+the average time. Tinkering with parameters so as to lower the average
+time is ok, as long as it leaves the success probability high. As q
+grows, things get awry at some point, and you have to modify the
+parameters so as to increase the success probability. In the experiment
+above, success probability only 97% for 24r is unsatisfactory.
+
+We can use the script to test alternative settings for this special-q
+side:
+
+$ ./scripts/hintfile-helper.py --cadobindir ./build/cassoulet --datadir ~/Local/p59/ --prefix p59 --ntrials 100 --hintfile /tmp/p59.hint --hintline "24r 0.0035 1.0000 I=9 50000,22,24,1.2 100000,24,45,1.5"
+24@0 0.0034 1.0000 I=9 50000,22,24,1.2 100000,24,45,1.5
+
+Another way to do the same thing is to first keep the first five lines of
+the output of the first script run into our hint file, modify the fifth
+(the one for 24r), and re-run. We get the following:
+22@0 0.0033 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+22@1 0.0031 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+23@0 0.0034 0.9900 I=9 50000,22,24,1.2 100000,22,24,1.2
+23@1 0.0030 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+24@0 0.0032 1.0000 I=9 50000,23,26,1.2 100000,24,45,1.5
+24@1 0.0028 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+25@0 0.0029 0.9900 I=9 50000,23,26,1.2 100000,24,45,1.5
+25@1 0.0032 1.0000 I=9 50000,22,24,1.2 100000,22,24,1.2
+26@0 0.0038 0.9700 I=9 50000,23,26,1.2 100000,24,45,1.5
+
+The process can then continue iteratively. Note that hintfile-helper.py
+also accepts the --replace option, which rewrites the lines of the
+hintfile you provide witht the measurements it does (which means, if you
+have an editor open on this file, that you will have to explicitly reload
+the file).
+
+Here are a few hints about the influential parameters. Increasing I will
+augment the time significantly, and will probably yield better success.
+For special-q on the rational side, then the algebraic side parameters
+need to be bumped up somewhat, because then there is a significant
+unbalance in the norms. Beyond that, all parameters are bound to increase
+mildly as q grows. mfb0 has to grow first, especially because lim remains
+unchanged. Next lpb should grow. Setting lpb to above the current
+special-q size is allowed, but might trigger loops of course (if on the
+same side as the special-q).
 
 Preparing the Todo file
 -----------------------
@@ -69,6 +156,10 @@ polynomial in the *.poly file modulo q. All of those must be put in a
   r <q> <root>
 where "r" stands for "rational".
 
+The letters r or a are actually aliases to specifying the side. Giving an
+integer (currently only 0 or 1, respectively) has exactly the same
+meaning.
+
 Running las with appropriate arguments
 --------------------------------------
 
@@ -76,7 +167,7 @@ The command line for las must be something like (assuming the prefix name
 for files is p120):
 
 /buildpath/sieve/las -poly p120.poly -fb p120.roots.gz -I 15 \
-  -rlim 4000000 -alim 4000000 -lpbr 25 -lpba 26 -mfbr 100 -mfba 100 \
+  -lim0 4000000 -lim1 4000000 -lpb0 25 -lpb1 26 -mfb0 100 -mfb1 100 \
   -todo p120.todo -allow-largesq -descent-hint p120.hints
 
 Note that:

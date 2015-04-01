@@ -46,7 +46,9 @@ dickman_rho (double x)
 	 then using Maple:
 	 p:=numapprox[minimax](f1,x=-1..1,10,1/f1).
 	 It gives a relative error less than 1.2e-9
-	 (numapprox[infnorm](f1/p-1,x=-1..1)) */
+	 (numapprox[infnorm](f1/p-1,x=-1..1))
+	 In this interval, rho(x) = 1 - log(x), but the math library log()
+	 function is slower than the (relatively short) power series here. */
       return .59453489206592253066+(-.33333334045356381396+(.55555549124525324224e-1+(-.12345536626584334599e-1+(.30864445307049269724e-2+(-.82383544119364408582e-3+(.22867526556051420719e-3+(-.63554707267886054080e-4+(.18727717457043009514e-4+(-.73223168705152723341e-5+.21206262864513086463e-5*x)*x)*x)*x)*x)*x)*x)*x)*x)*x;
     }
 
@@ -219,4 +221,15 @@ dickman_rho (double x)
       fprintf (stderr, "# Warning: Dickman rho is imprecise for x > 15\n");
   }
   return 0.0332357434363490 * pow (x, -x);
+}
+
+#ifndef M_EULER
+#define M_EULER 0.57721566490153286060651209008240243104
+#endif
+
+/* Return the probability that a random integer close to N is N^(1/x)-smooth */
+double
+dickman_rho_local (const double x, const double N)
+{
+  return dickman_rho(x) - M_EULER * dickman_rho(x - 1.) / log(N);
 }

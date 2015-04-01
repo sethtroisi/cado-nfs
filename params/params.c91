@@ -136,19 +136,27 @@ tasks.polyselect.degree = 4		# degree of the algebraic polynomial
 tasks.polyselect.threads = 2
     # How many threads to use per polyselect process
 
-tasks.polyselect.P = 16000		# choose lc(g) with two prime factors in [P,2P]
+tasks.polyselect.P = 10000		# choose lc(g) with two prime factors in [P,2P]
     # Setting a large value will most likely find better polynomials,
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
 
-tasks.polyselect.admin = 0		# min value for leading coefficient of f(x)
+tasks.polyselect.admin = 0          # min value for leading coefficient of f(x)
     # If not set, the default is 0.
 
-tasks.polyselect.admax = 250e3		# max value for leading coefficient of f(x)
-tasks.polyselect.nrkeep = 100
+tasks.polyselect.admax = 150e3      # max value for leading coefficient of f(x)
+
+tasks.polyselect.incr = 60	    # increment for leading coefficient of f(x)
+    # This factor is usually a smooth number, which forces projective roots in
+    # the algebraic polynomial. 60 is a good start, 210 is popular as well.
+    # Warning: to ensure lc(f) is divisible by incr, admin should be divisible
+    # by incr too.
+
     # The polynomial selection search time is proportional to the
-    # length of the search interval is [admin, admax]
+    # length of the search interval, i.e., (admax-admin)/incr.
+
+tasks.polyselect.nrkeep = 40
 
 tasks.polyselect.adrange = 5000		# size of individual tasks
     # Polynomial selection is split into several individual tasks. The
@@ -157,13 +165,11 @@ tasks.polyselect.adrange = 5000		# size of individual tasks
     # (polsel_admax-polsel_admin)/polsel_adrange. Each such task is issued as
     # a workunit to a slave for computation.
 
-tasks.polyselect.incr = 60		# forced divisor of lc(f)
-    # This factor is usually a smooth number, which forces projective roots in
-    # the algebraic polynomial. 60 is a good start, 210 is popular as well.
-
 tasks.polyselect.nq = 1000
     # Number of small primes in the leading coefficient of the linear polynomial
     # Safe to leave at the default value
+    # Recommended values are powers of the degree, e.g., 625 for degree 5,
+    # or 1296 for degree 6.
 
 
 ###########################################################################
@@ -176,7 +182,7 @@ tasks.sieve.mfba = 48
     # to split into large primes.
 
 tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.2
+tasks.sieve.alambda = 2.1
     # rlambda/alambda is the early-abort ratio: if after sieving, and
     # subtracting from the log of the norm the contribution of the
     # sieved primes, the approximation of the log of the remaining
@@ -184,8 +190,19 @@ tasks.sieve.alambda = 2.2
     # Note that this has in particular the effect that if e.g. rlambda <
     # some integer k+1, then at most k large primes are allowed on the
     # rational side. It is customary, when at most k large primes are
-    # allowed, to set rlambda to e.g. k + 0.2, in order to compensate for
+    # allowed, to set rlambda to e.g. k + 0.1, in order to compensate for
     # inaccuracies due to sieving.
+
+tasks.sieve.ncurves0 = 3
+tasks.sieve.ncurves1 = 3
+    # ncurves0 controls the number of P-1/P+1/ECM curves used in the
+    # cofactorization on side 0 (i.e., rational side), more precisely we
+    # use 3+ncurves0 curves. If one increases ncurves0, one will find more
+    # relations, but the cofactorization cost will increase.
+    # Same for ncurves1 on side 1 (algebraic side).
+    # If unspecified, the number of curves is deduced from the value of lpbr
+    # or lpba, see function nb_curves() in file sieve/ecm/facul.c.
+
 
 tasks.I = 11		# Sieving range in lattice siever
     # The lattice siever sieves over a range in the (i,j) plane which is
@@ -233,7 +250,7 @@ tasks.sieve.threads = 2
 tasks.filter.purge.keep = 160		# maximal excess wanted after purge
 					# (purge shrinks if needed)
 tasks.filter.maxlevel = 15		# perform up to <maxlevel>-way merges
-tasks.filter.ratio = 1.1		# used only when bwstrat=0 (see below)
+tasks.filter.ratio = 1.1		# used only when forbw=0 (see below)
 tasks.filter.merge.forbw = 3 # forbw=0: stops the merge when the weight of the
 			     #    matrix multiplied by the number of rows c*N
 			     #    exceeds ratio*min(c*N)
@@ -267,21 +284,39 @@ tasks.linalg.bwc.threads = 2x2		# Multithreading level of Block-Wiedemann ; Use
 					# integer is given, a split close to sqrt(mn) is chosen
 tasks.linalg.bwc.interval = 100		# checkpointing interval for bwc.
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.m = 64
+tasks.linalg.bwc.n = 64
 tasks.linalg.bwc.shuffled_product = 1
 tasks.linalg.characters.nchar = 50		# number of characters
 tasks.linalg.characters.threads = 2
 
+###########################################################################
+# Square root task
+###########################################################################
+
+# Number of threads used for the square root. Dependencies will be processed
+# by blocks of 16 for example. If the number of dependencies is not a multiple
+# of say 16, then the last block (if needed) will be reduced to the actual
+# number of remaining dependencies.
+# tasks.sqrt.threads = 16
+
+# To start again at the first dependency (might be useful in debug mode):
+# tasks.sqrt.first_dep = 0
 
 ###########################################################################
 # Work unit server
 ###########################################################################
 
-# address: The server of the client/server set-up will listen at this
-# address. Note that listening on address "localhost" will allow only
-# clients running on the same machine to connect. If not specified, the
-# "*" (a.k.a 0.0.0.0) wild-card address is used, which listens on all
-# network devices so other machines can connect.
+# address: The IP address where the server will listen for incoming
+# connections from clients.  The default behavior if not set is to
+# listen on all network devices (that is, to listen on the wild-card
+# address 0.0.0.0).  If a hostname is given, will call gethostbyname()
+# to discover the associated IP address and listen for connections
+# only on that interface.  For example, listening on address
+# "localhost" will only allow clients running on the same machine to
+# connect.  You should not set this explicitly unless you really only
+# want to listen on that particular address and interface.
+
 # server.address = localhost
 
 # port: The server of the client/server set-up will listen at this port

@@ -39,7 +39,10 @@ struct bw_params {
      *
      * By default we have nrhs=0
      */
-    int nrhs;
+    // we make this a phantom parameter. It's deduced from reading the
+    // rhs file, and we have no compelling need for allotting room for it
+    // in the global struct, given its rare use.
+    // int nrhs;
 
     /* modulus */
     mpz_t p;
@@ -89,9 +92,6 @@ struct bw_params {
 
     /* Only prep and lingen are not deterministic. */
     int seed;
-
-    /* Save checkpoints or not */
-    int checkpoints;
 
     /* If enabled, do not check the intermediate results while running
      * (the possibility of doing the checks offline still exists,
@@ -147,14 +147,39 @@ extern struct bw_params bw[1];
 extern "C" {
 #endif
 
-extern int bw_common_init(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv);
-extern int bw_common_clear(struct bw_params * bw);
-extern const char * bw_common_usage_string();
+/* Typical use pattern:
+     
+    bw_common_init_new(bw, &argc, &argv);
+    param_list_init(pl);
 
-/* Some stuff which is shared as well by bw-common-mpi.h, but not within
- * the public interface nevertheless */
-extern int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv);
-extern int bw_common_init_defaults(struct bw_params * bw);
+    bw_common_decl_usage(pl);
+    // more decl_usage functions.
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    // bw_common_cheat_parameter_lookup(pl);
+    // more interpret_parameters functions.
+
+    param_list_warn_unused(pl);
+    param_list_clear(pl);
+
+    // program !
+
+    bw_common_clear_new(bw);
+
+*/
+
+void bw_common_decl_usage(param_list);
+void bw_common_parse_cmdline(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv);
+void bw_common_interpret_parameters(struct bw_params * bw, param_list pl);
+int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv);
+int bw_common_clear_new(struct bw_params * bw);
+
+
+/* utility function. */
+extern int get_rhs_file_header(const char * filename, uint32_t * p_nrows, unsigned int * p_nrhs, mpz_ptr p_p);
+extern int get_rhs_file_header_stream(FILE * f, uint32_t * p_nrows, unsigned int * p_nrhs, mpz_ptr p_p);
 
 #ifdef __cplusplus
 }

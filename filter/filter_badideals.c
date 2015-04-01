@@ -104,11 +104,12 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
         compute_pk_r_wrapper (&(item.pk), &(item.r), p, rk, k);
         item.ncol = 0;
         do {
+            errno = 0;
             /* here we read exponents, always base 10 */
             long v = strtol(nptr, &ptr, 10);
-            ASSERT_ALWAYS(errno == 0);
             if (ptr == nptr)
                 break;
+            ASSERT_ALWAYS(errno == 0);
             item.val[item.ncol] = v;
             item.ncol++;
             nptr = ptr;

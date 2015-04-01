@@ -4,10 +4,6 @@
 #include <stdint.h>
 #include "las-types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*  Forward declarations of conversion functions */
 void xToIJ(int *i, unsigned int *j, const unsigned int X, sieve_info_srcptr si);
 void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, sieve_info_srcptr si);
@@ -31,8 +27,8 @@ static inline void xToAB(int64_t *a, uint64_t *b, const unsigned int x, sieve_in
 
     i = (x & (I - 1)) - (I >> 1);
     j = x >> si->conf->logI;
-    *a = (int64_t) i * si->a0 + (int64_t) j * si->a1;
-    c =  (int64_t) i * si->b0 + (int64_t) j * si->b1;
+    *a = (int64_t) i * si->qbasis.a0 + (int64_t) j * si->qbasis.a1;
+    c =  (int64_t) i * si->qbasis.b0 + (int64_t) j * si->qbasis.b1;
     if (c >= 0)
       *b = c;
     else
@@ -45,9 +41,5 @@ static inline void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const u
 {
     xToAB(a, b, (N << LOG_BUCKET_REGION) + x, si);
 }
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_COORDINATES_H_ */

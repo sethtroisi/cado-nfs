@@ -2,32 +2,41 @@
 #define LAS_QLATTICE_H_
 
 #include <stdint.h>
-#include "las-types.h"
-#include "fb.h"         /* fbprime_t */
+#include <gmp.h>
+#include "fb-types.h"         /* fbprime_t */
+#include "las-base.hpp"
 #include "portability.h"
 
 /* implementations for inlines */
 #include "las-arith.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct qlattice_basis : private NonCopyable {
+    int64_t a0, b0, a1, b1;
+    mpz_t q;
+    qlattice_basis(){mpz_init(q);}
+    ~qlattice_basis(){mpz_clear(q);}
+    void set_q(const mpz_t special_q) {
+      /* Currently requires prime special-q values.
+         For powers, the base prime would have to be determined and stored in
+         a variable, so that powers of that prime in the factor base can be
+         skipped over. For composite special-q, a list of primes would have to
+         be stored and skipped. */
+      ASSERT_ALWAYS(!mpz_perfect_power_p(special_q));
+      mpz_set(q, special_q);
+    };
+};
 
-int SkewGauss (sieve_info_ptr si);
+int SkewGauss (qlattice_basis &, const mpz_t, const mpz_t, double);
 
 static inline fbprime_t
 fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
-        const uint32_t invp, sieve_info_srcptr si);
+        const uint32_t invp, const qlattice_basis &basis);
 #ifdef  HAVE_redc_64
 static inline fbprime_t
 fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
-        const uint64_t invp, sieve_info_srcptr si);
+        const uint64_t invp, const qlattice_basis &basis);
 #endif
 
-
-#ifdef __cplusplus
-}
-#endif
 
 /* fb_root_in_qlattice returns (R*b1-a1)/(a0-R*b0) mod p */
 #if defined(SUPPORT_LARGE_Q)
@@ -39,40 +48,28 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
  * it does not seem to be exactly 31 or 63 bits. This should be
  * investigated */
 #define MAX_SPECIALQ_BITSIZE    60
-#ifdef __cplusplus
-extern "C" {
-#endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const redc_invp_t invp, sieve_info_srcptr si);
-#ifdef __cplusplus
-}
-#endif
+        const redc_invp_t invp, const qlattice_basis &basis);
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const redc_invp_t invp, sieve_info_srcptr si)
+        const redc_invp_t invp, const qlattice_basis &basis)
 {
-    return fb_root_in_qlattice_63bits(p, R, invp, si);
+    return fb_root_in_qlattice_63bits(p, R, invp, basis);
 }
 #endif
 
 #else
 
 #define MAX_SPECIALQ_BITSIZE    30
-#ifdef __cplusplus
-extern "C" {
-#endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const redc_invp_t invp, sieve_info_srcptr si);
-#ifdef __cplusplus
-}
-#endif
+        const redc_invp_t invp, const qlattice_basis &basis);
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const redc_invp_t invp, sieve_info_srcptr si)
+        const redc_invp_t invp, const qlattice_basis &basis)
 {
-    return fb_root_in_qlattice_31bits(p, R, invp, si);
+    return fb_root_in_qlattice_31bits(p, R, invp, basis);
 }
 #endif
 
@@ -84,18 +81,18 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
 /* This helper function is used for powers of 2. See below */
 static inline fbprime_t
 fb_root_in_qlattice_po2 (const fbprime_t p, const fbprime_t R,
-        sieve_info_srcptr si);
+        const qlattice_basis &basis);
 
 static inline fbprime_t
 fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
-        const uint32_t invp, sieve_info_srcptr si)
+        const uint32_t invp, const qlattice_basis &basis)
 {
   int64_t aux1, aux2;
   uint32_t u, v;
 
     /* Handle powers of 2 separately, REDC doesn't like them */
   if (UNLIKELY(!(p & 1)))
-    return fb_root_in_qlattice_po2(p, R, si);
+    return fb_root_in_qlattice_po2(p, R, basis);
 
     // Use Signed Redc for the computation:
     // Numerator and denominator will get divided by 2^32, but this does
@@ -103,13 +100,13 @@ fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
 
   if (LIKELY(R < p)) /* Root in a,b-plane is affine */
     {
-      aux1 = (int64_t)R * si->b1 - si->a1;
-      aux2 = si->a0 - (int64_t)R *si->b0;
+      aux1 = (int64_t)R * basis.b1 - basis.a1;
+      aux2 = basis.a0 - (int64_t)R *basis.b0;
     }
   else /* Root in a,b-plane is projective */
     {
-      aux1 = si->b1 - (int64_t)(R - p) * si->a1;
-      aux2 = (int64_t)(R - p) * si->a0 - si->b0;
+      aux1 = basis.b1 - (int64_t)(R - p) * basis.a1;
+      aux2 = (int64_t)(R - p) * basis.a0 - basis.b0;
     }
   u = redc_32(aux1, p, invp); /* 0 <= u < p */
   v = redc_32(aux2, p, invp); /* 0 <= v < p */
@@ -139,24 +136,24 @@ fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
  * condition that p be at most 63 bits or so */
 static inline fbprime_t
 fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
-        const uint64_t invp, sieve_info_srcptr si)
+        const uint64_t invp, const qlattice_basis &basis)
 {
   int64_t aux1, aux2;
   uint64_t u, v;
   
     /* Handle powers of 2 separately, REDC doesn't like them */
   if (UNLIKELY(!(p & 1 )))
-    return fb_root_in_qlattice_po2(p, R, si);
+    return fb_root_in_qlattice_po2(p, R, basis);
   
   if (LIKELY(R < p)) /* Root in a,b-plane is affine */
     {
-      aux1 = ((int64_t)R)*si->b1 - si->a1;
-      aux2 = si->a0 - ((int64_t)R)*si->b0;
+      aux1 = ((int64_t)R)*basis.b1 - basis.a1;
+      aux2 = basis.a0 - ((int64_t)R)*basis.b0;
     }
   else /* Root in a,b-plane is projective */
     {
-      aux1 = si->b1 - ((int64_t)(R - p))*si->a1;
-      aux2 = ((int64_t)(R - p))*si->a0 - si->b0;
+      aux1 = basis.b1 - ((int64_t)(R - p))*basis.a1;
+      aux2 = ((int64_t)(R - p))*basis.a0 - basis.b0;
     }
   
   /* The root in the (i,j) plane is (aux1:aux2). Now let's put it
@@ -194,19 +191,19 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
 
 /* This is just for powers of 2, and is used by both versions above */
 
-static inline fbprime_t fb_root_in_qlattice_po2 (const fbprime_t p, const fbprime_t R, sieve_info_srcptr si)
+static inline fbprime_t fb_root_in_qlattice_po2 (const fbprime_t p, const fbprime_t R, const qlattice_basis &basis)
 {
     fbprime_t u, v;
     ASSERT(p == (p & -p)); /* Test that p is power of 2 */
     if (R < p) /* Root in a,b-plane is non-projective */
       {
-	u = (int64_t)R * si->b1 - si->a1;
-	v = si->a0 - (int64_t)R * si->b0;
+	u = (int64_t)R * basis.b1 - basis.a1;
+	v = basis.a0 - (int64_t)R * basis.b0;
       }
     else /* Root in a,b-plane is projective */
       {
-        u = si->b1 - (int64_t)(R - p) * si->a1;
-        v = (int64_t)(R - p) * si->a0 - si->b0;
+        u = basis.b1 - (int64_t)(R - p) * basis.a1;
+        v = (int64_t)(R - p) * basis.a0 - basis.b0;
       }
     
     if (v & 1)

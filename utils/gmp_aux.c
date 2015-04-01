@@ -5,6 +5,29 @@
 #include "gmp_aux.h"
 #include "macros.h"
 
+/* old versions of GMP do not provide mpn_neg (was mpn_neg_n) and mpn_xor_n */
+#if !GMP_VERSION_ATLEAST(5,0,0)
+mp_limb_t
+mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n)
+{
+  mp_size_t i;
+
+  for (i = 0; i < n; i++)
+    rp[i] = ~sp[i];
+  return mpn_add_1 (rp, rp, n, 1);
+}
+
+void
+mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
+	   mp_size_t n)
+{
+  mp_size_t i;
+
+  for (i = 0; i < n; i++)
+    rp[i] = s1p[i] ^ s2p[i];
+}
+#endif
+
 /* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */
 void
 mpz_set_uint64 (mpz_t z, uint64_t q)
@@ -194,9 +217,10 @@ ulong_nextprime (unsigned long q)
 
 #define REPS 3 /* number of Miller-Rabin tests in isprime */
 
-/* with REPS=1, the smallest composite reported prime is 1537381
+/* For GMP 6.0.0:
+   with REPS=1, the smallest composite reported prime is 1537381
    with REPS=2, it is 1943521
-   with REPS=3, correct for p < 300M
+   with REPS=3, it is 465658903
 */
 int
 ulong_isprime (unsigned long p)
@@ -223,7 +247,7 @@ int nbits (uintmax_t p)
    r <- n - q*d
    Output: -d/2 <= r < d/2
 */
-static void
+void
 mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d)
 {
   int s;
@@ -240,6 +264,23 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d)
     }
 }
 
+void
+mpz_ndiv_qr_ui (mpz_t q, mpz_t r, mpz_t n, unsigned long int d)
+{
+  int s;
+
+  ASSERT (d != 0);
+  mpz_fdiv_qr_ui (q, r, n, d); /* round towards -inf, r has same sign as d */
+  mpz_mul_2exp (r, r, 1);
+  s = mpz_cmpabs_ui (r, d);
+  mpz_div_2exp (r, r, 1);
+  if (s > 0) /* |r| > |d|/2 */
+    {
+      mpz_add_ui (q, q, 1);
+      mpz_sub_ui (r, r, d);
+    }
+}
+
 /* q <- n/d rounded to nearest, assuming d <> 0
    Output satisfies |n-q*d| <= |d|/2
 */
@@ -250,6 +291,16 @@ mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d)
 
   mpz_init (r);
   mpz_ndiv_qr (q, r, n, d);
+  mpz_clear (r);
+}
+
+void
+mpz_ndiv_q_ui (mpz_t q, mpz_t n, unsigned long int d)
+{
+  mpz_t r;
+
+  mpz_init (r);
+  mpz_ndiv_qr_ui (q, r, n, d);
   mpz_clear (r);
 }
 

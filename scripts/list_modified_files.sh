@@ -5,25 +5,39 @@ OUTPUT_FILE="$1"
 if ! [ -d .git ] ; then
     if ! [ -f "$OUTPUT_FILE" ] ; then
         cat > "$OUTPUT_FILE" <<'EOF'
-#define CADO_MODIFIED_FILES "# (tarball extracted)\n"
+#include "cado.h"
+#include "version_info.h"
+const char * cado_modified_files = "# (tarball extracted)\n";
 EOF
     fi
     exit 0
 fi
 
+SHA1BIN=sha1sum
+if ! type -p "$SHA1BIN" > /dev/null ; then SHA1BIN=sha1 ; fi
+if ! type -p "$SHA1BIN" > /dev/null ; then SHA1BIN=shasum ; fi
+if ! type -p "$SHA1BIN" > /dev/null ; then
+    echo "Could not find a SHA-1 checksumming binary !" >&2
+    exit 1
+fi
+
 function list_modified() {
-  echo '#define CADO_MODIFIED_FILES "\'
+  cat << 'EOF'
+#include "cado.h"
+#include "version_info.h"
+const char * cado_modified_files = 
+EOF
   git status --porcelain -uno | while read STATUS FILE
   do
     if [[ "$STATUS" = M  ||  "$STATUS" = A ]]
     then
-      SHA1="`sha1sum "$FILE" | cut -d " " -f 1`"
-      echo "# $STATUS" "$FILE" "$SHA1"'\n\'
+      SHA1="`$SHA1BIN "$FILE" | cut -d " " -f 1`"
+      echo \""# $STATUS $FILE $SHA1"'\n'\"
     else
-      echo "# $STATUS" "$FILE"'\n\'
+      echo \""# $STATUS $FILE"'\n'\"
     fi
   done
-  echo '"'
+  echo '"";'
 }
 
 TEMPFILE="`mktemp /tmp/XXXXXXX`"

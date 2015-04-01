@@ -10,22 +10,13 @@
 #include "cado_poly.h"
 #include "ecm/facul.h"
 #include "relation.h"
-
-/* These must be forward-declared, because the header files below use
- * them */
-
-struct sieve_info_s;
-typedef struct sieve_info_s * sieve_info_ptr;
-typedef const struct sieve_info_s * sieve_info_srcptr;
-struct las_info_s;
-typedef struct las_info_s * las_info_ptr;
-typedef const struct las_info_s * las_info_srcptr;
-struct where_am_I_s;
-typedef struct where_am_I_s * where_am_I_ptr;
-typedef const struct where_am_I_s * where_am_I_srcptr;
-
+#include "las-forwardtypes.h"
 #include "las-unsieve.h"
+#include "las-qlattice.h"
+#include "las-todo.h"
 #include "las-smallsieve.h"
+#include "las-dlog-base.h"
+
 
 /* {{{ siever_config */
 /* The following structure lists the fields with an impact on the siever.
@@ -38,7 +29,6 @@ struct siever_config_s {
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
     int side;
     int logI;
-    double skewness;
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned int td_thresh;
     unsigned int unsieve_thresh;
@@ -47,13 +37,17 @@ struct siever_config_s {
         unsigned long powlim; /* bound on powers in the factor base */
         int lpb;           /* large prime bound is 2^lpbr */
         int mfb;           /* bound for residuals is 2^mfbr */
+        int ncurves;       /* number of cofactorization curves */
         double lambda;     /* lambda sieve parameter */
     } sides[2][1];
 };
 typedef struct siever_config_s siever_config[1];
-typedef struct siever_config_s * siever_config_ptr;
-typedef const struct siever_config_s * siever_config_srcptr;
+/* siever_config_*ptr defined in las-forwardtypes.h */
+
 /* }}} */
+
+/* This one wants to have siever_config defined */
+#include "las-descent-trees.h"
 
 /* {{{ descent_hint
  *
@@ -74,28 +68,6 @@ typedef const struct descent_hint_s * descent_hint_srcptr;
 
 /* }}} */
 
-/* {{{ las_todo */
-struct las_todo_s;
-struct las_todo_s {
-    mpz_t p;
-    /* even when side == RATIONAL_SIDE, the field below is used, since
-     * it is needed for the initialization of the q-lattice. All callers
-     * of las_todo_push must therefore make sure that a proper argument
-     * is provided.
-     */
-    mpz_t r;
-    int side;
-    int depth;  /* used for the descent only. The normal value is zero. */
-    struct las_todo_s * next;
-};
-typedef struct las_todo_s las_todo[1];
-typedef struct las_todo_s * las_todo_ptr;
-typedef const struct las_todo_s * las_todo_srcptr;
-
-void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side);
-void las_todo_pop(las_todo_ptr * d);
-/* }}} */
-
 struct root_s {
   unsigned char derivate; /* 0 = root of F; 1 = root of F'; and so on */
   double value;           /* root of F(i,1) or derivates of F. */
@@ -113,15 +85,8 @@ typedef struct sg_s {
 struct sieve_side_info_s {
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
                             at most "bound" on each side */
-    fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
-    struct {
-        factorbase_degn_t * pow2[2];
-        factorbase_degn_t * pow3[2];
-        factorbase_degn_t * td[2];
-        factorbase_degn_t * rs[2];
-        factorbase_degn_t * rest[2];
-    } fb_parts[1];
+    fb_vector<fb_general_entry> *fb_smallsieved;
     struct {
         int pow2[2];
         int pow3[2];
@@ -129,20 +94,12 @@ struct sieve_side_info_s {
         int rs[2];
         int rest[2];
     } fb_parts_x[1];
+    
     /* The reading, mapping or generating the factor base all create the
      * factor base in several pieces: small primes, and large primes split
      * into one piece for each thread.
      */
-    factorbase_degn_t * fb;
-    factorbase_degn_t ** fb_bucket_threads;
-    /* fb_is_mmapped is 1 if the factor memory is created by mmap(), and 0
-       if it is created by malloc() */
-    int fb_is_mmapped;
-    /* log_steps[i] contains the largest integer x <= FBB such that 
-       fb_log(x, scale, 0.) <= i. For i > log_steps_max, log_steps[i] is
-       undefined. */
-    fbprime_t log_steps[256];
-    unsigned char log_steps_max;
+    fb_factorbase * fb;
     /* When threads pick up this sieve_info structure, they should check
      * their bucket allocation */
     double max_bucket_fill_ratio;
@@ -160,7 +117,7 @@ struct sieve_side_info_s {
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
     unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
     root_ptr roots;     /* F, F', F" and maybe F'" - cf las-norms.c,init_norms */
-			    
+
     /* This updated by applying the special-q lattice transform to the
      * factor base. */
     small_sieve_data_t ssd[1];
@@ -187,7 +144,7 @@ struct sieve_info_s {
      * sides[0,1], as well as some other members */
     siever_config conf;
 
-    las_todo doing;     /* not a todo list, but just one item => next==null */
+    las_todo_entry *doing;
 
     // sieving area
     uint32_t J;
@@ -196,7 +153,7 @@ struct sieve_info_s {
     // description of the q-lattice. The values here should remain
     // compatible with those in ->conf (this concerns notably the bit
     // size as well as the special-q side).
-    int64_t a0, b0, a1, b1;
+    qlattice_basis qbasis;
 
     // parameters for bucket sieving
     uint32_t nb_buckets; /* Actual number of buckets used by current special-q */
@@ -204,6 +161,8 @@ struct sieve_info_s {
 
     sieve_side_info sides[2];
 
+    facul_strategies_t* strategies;
+  
     /* Data for unsieving locations where gcd(i,j) > 1 */
     unsieve_aux_data_srcptr us;
     /* Data for divisibility tests p|i in lines where p|j */
@@ -234,7 +193,12 @@ struct las_info_s {
     /* It's not ``general operational'', but global enough to be here */
     cado_poly cpoly;
 
-    siever_config default_config;
+    siever_config_srcptr default_config;
+
+    /* This needs not be complete. The default_config field points here
+     * if is. If not, the fields here are just used as a base for
+     * initializing the other configurations */
+    siever_config config_base;
 
     /* There may be several configured sievers. This is used mostly for
      * the descent.
@@ -257,57 +221,26 @@ struct las_info_s {
     /* This is an opaque pointer to C++ code. */
     void * descent_helper;
 
-    las_todo_ptr todo;
+    las_todo_stack *todo;
+    unsigned int nq_pushed;
+    unsigned int nq_max;
+
+    int random_sampling;
+    gmp_randstate_t rstate;
+
     /* These are used for reading the todo list */
     mpz_t todo_q0;
     mpz_t todo_q1;
     FILE * todo_list_fd;
+
+#ifdef  DLP_DESCENT
+    las_dlog_base * dlog_base;
+#endif
+    descent_tree * tree;
 };
 
 typedef struct las_info_s las_info[1];
 /* }}} */
-
-/* {{{ thread-related defines */
-/* All of this exists _for each thread_ */
-struct thread_side_data_s {
-  m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
-  k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
-  bucket_array_t BA;    /* Always used */
-  factorbase_degn_t *fb_bucket; /* copied from sieve_info. Keep ? XXX */
-  // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
-  const fbprime_t *log_steps;
-  unsigned char log_steps_max;
-  
-  /* For small sieve */
-  int * ssdpos;
-  int * rsdpos;
-
-  unsigned char *bucket_region;
-};
-typedef struct thread_side_data_s thread_side_data[1];
-typedef struct thread_side_data_s * thread_side_data_ptr;
-typedef const struct thread_side_data_s * thread_side_data_srcptr;
-
-struct thread_data_s {
-  int id;
-  thread_side_data sides[2];
-  las_info_ptr las;
-  sieve_info_ptr si;
-  las_report rep;
-  unsigned int checksum_post_sieve[2];
-  unsigned char *SS;
-};
-typedef struct thread_data_s thread_data[1];
-typedef struct thread_data_s * thread_data_ptr;
-typedef const struct thread_data_s * thread_data_srcptr;
-/* }}} */
-
-typedef uint64_t plattice_x_t;
-/* DONT modify this: asm code writes in this with hardcoded deplacement */
-typedef struct {
-  int32_t a0; uint32_t a1;
-  int32_t b0; uint32_t b1;
-} plattice_info_t;
 
 /* FIXME: This does not seem to work well */
 #ifdef  __GNUC__
@@ -320,7 +253,8 @@ typedef struct {
 struct where_am_I_s {
 #ifdef TRACK_CODE_PATH
     fbprime_t p;        /* current prime or prime power, when applicable */
-    fbprime_t r;        /* current root */
+    fbroot_t r;         /* current root */
+    slice_offset_t h;   /* Prime hint, if not decoded yet */
     int fb_idx;         /* index into the factor base si->sides[side]->fb
                            or into th->sides[side]->fb_bucket */
     unsigned int j;     /* row number in bucket */
@@ -333,6 +267,14 @@ struct where_am_I_s {
 } TYPE_MAYBE_UNUSED;
 
 typedef struct where_am_I_s where_am_I[1];
+
+enum {
+  OUTPUT_CHANNEL,
+  ERROR_CHANNEL,
+  STATS_CHANNEL,
+  TRACE_CHANNEL,
+  NR_CHANNELS /* This must be the last element of the enum */
+};
 
 
 #ifdef TRACK_CODE_PATH

@@ -21,7 +21,7 @@
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
-     [ u64k1, u64k2, ],
+     [ u64k1, u64k2, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
@@ -36,8 +36,9 @@
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
-     u64k1=[ u64k1, u64k2, ],
-     u64k2=[ u64k1, u64k2, ],
+     u64k1=[ u64k1, u64k2, u64k4, ],
+     u64k2=[ u64k1, u64k2, u64k4, ],
+     u64k4=[ u64k1, u64k2, u64k4, ],
      },
     vc:includes=[ <stdarg.h>, ],
     },

@@ -154,7 +154,8 @@ tasks.filter.forbw = 3
 tasks.filter.coverNmax  = 100
 tasks.filter.maxlevel = 15
 tasks.filter.ratio = 1.1
-tasks.linalg.mn = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 tasks.linalg.verbose = 0
 tasks.linalg.nchar = 64
 # tasks.linalg.bwc.threads can be of the form 2x3 or in the form 6, in the

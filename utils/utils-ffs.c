@@ -154,7 +154,7 @@ int ffs_poly_read(cado_poly poly, const char *filename)
     }
     
     param_list_init(pl);
-    param_list_read_stream(pl, file);
+    param_list_read_stream(pl, file, 0);
     r = ffs_poly_set_plist(poly, pl);
 
     param_list_clear(pl);

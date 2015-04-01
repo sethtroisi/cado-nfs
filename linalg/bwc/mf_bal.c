@@ -457,7 +457,11 @@ int main(int argc, char * argv[])
         modul_clear(bi, M);
         modul_clearmod(M);
     }
-    if (param_list_lookup_string(pl, "noshuffle")) { /* internal, for debugging. don't use */
+    if (param_list_lookup_string(pl, "skip_decorrelating_permutation")) {
+        /* internal, for debugging. This removes the de-correlating
+         * permutation. Nothing to do with what is called
+         * "shuffled-product" elsewhere, except that both hare taken care
+         * of within mf_bal. */
         bal->h->pshuf[0] = 1;
         bal->h->pshuf[1] = 0;
         bal->h->pshuf_inv[0] = 1;

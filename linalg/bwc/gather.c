@@ -15,7 +15,7 @@
 #include "xvectors.h"
 #include "portability.h"
 #include "misc.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "balancing.h"
 #include "mpfq/mpfq.h"
@@ -164,19 +164,23 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, bw->nsolvecs,
             MPFQ_DONE);
-    mpz_clear(p);
 
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+
+    /* this is really a misnomer, because in the typical case, M is
+     * rectangular, and then the square matrix does induce some padding.
+     * This is however not the padding we are interested in. The padding
+     * we're referring to in the naming of this variable is the one which
+     * is related to the number of jobs and threads: internal dimensions
+     * are arranged to be multiples */
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
+    unsigned int nrhs = 0;
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
@@ -186,13 +190,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (sl->nsols == 0) {
         if (tcan_print) {
             fprintf(stderr, "Found zero S files. Problem with command line ?\n");
-            exitcode = 1;
+            pthread_mutex_lock(pi->m->th->m);
+            exitcode=1;
+            pthread_mutex_unlock(pi->m->th->m);
         }
         serialize_threads(pi->m);
         return NULL;
     }
 
-    pi_wiring_ptr picol = mmt->pi->wr[bw->dir];
+    pi_wiring_ptr picol = pi->wr[bw->dir];
 
     unsigned int ii0, ii1;
     unsigned int di = mcol->i1 - mcol->i0;
@@ -204,16 +210,39 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     mmt_vec svec;
     mmt_vec tvec;
-    vec_init_generic(mmt->pi->m, A, svec, 0, ii1-ii0);
-    vec_init_generic(mmt->pi->m, A, tvec, 0, ii1-ii0);
+    vec_init_generic(pi->m, A, svec, 0, ii1-ii0);
+    vec_init_generic(pi->m, A, tvec, 0, ii1-ii0);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
-    FILE * rhs = NULL;
-    mmt_vec rhsvec;
-    if (rhs_name) {
+    if (rhs_name != NULL) {
+        if (pi->m->jrank == 0 && pi->m->trank == 0)
+            get_rhs_file_header(rhs_name, NULL, &nrhs, NULL);
+        global_broadcast(pi->m, &nrhs, sizeof(unsigned int), 0, 0);
+    }
+
+    if (tcan_print && nrhs) {
+        if (nrhs) {
+            printf("** Informational note about GF(p) inhomogeneous system:\n");
+            printf("   Original matrix dimensions: %" PRIu32" %" PRIu32"\n", mmt->n0[0], mmt->n0[1]);
+            printf("   We expect to obtain a vector of size %" PRIu32"\n",
+                    mmt->n0[!bw->dir] + nrhs);
+            printf("   which we hope will be a kernel vector for (M_square||RHS).\n"
+                   "   We will discard the coefficients which correspond to padding columns\n"
+                   "   This entails keeping coordinates in the intervals\n"
+                   "   [0..%" PRIu32"[ and [%" PRIu32"..%" PRIu32"[\n"
+                   "   in the result.\n"
+                   "** end note.\n",
+            mmt->n0[bw->dir], mmt->n0[!bw->dir], mmt->n0[!bw->dir] + nrhs);
+        }
+    }
+
+    const char * rhscoeffs_name = param_list_lookup_string(pl, "rhscoeffs");
+    FILE * rhscoeffs_file = NULL;
+    mmt_vec rhscoeffs_vec;
+    if (rhscoeffs_name) {
         if (!pi->m->trank && !pi->m->jrank)
-            rhs = fopen(rhs_name, "rb");
-        matmul_top_vec_init_generic(mmt, A, rhsvec, bw->dir, 0);
+            rhscoeffs_file = fopen(rhscoeffs_name, "rb");
+        matmul_top_vec_init_generic(mmt, A, rhscoeffs_vec, bw->dir, 0);
     }
 
     for(int s = 0 ; s < sl->nsols ; s++) {
@@ -231,40 +260,44 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
 
-        /* This array receives the bw->nrhs coefficients affecting the
+        /* This array receives the nrhs coefficients affecting the
          * rhs * columns in the identities obtained */
         void * rhscoeffs;
 
-        if (rhs_name) {
-            A->vec_init(A, &rhscoeffs, bw->nrhs);
+        if (rhscoeffs_name) {
+            A->vec_init(A, &rhscoeffs, nrhs);
 
             if (tcan_print) {
                 printf("Reading rhs coefficients for solution %u\n", sf->s0);
             }
-            if (rhs) {      /* main thread */
-                for(int j = 0 ; j < bw->nrhs ; j++) {
+            if (rhscoeffs_file) {      /* main thread */
+                for(unsigned int j = 0 ; j < nrhs ; j++) {
                     /* We're implicitly supposing that elements are stored
                      * alone, not grouped à la SIMD (which does happen for
                      * GF(2), of course). */
                     ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
-                    rc = fseek(rhs, A->vec_elt_stride(A, j * bw->n + sf->s0), SEEK_SET);
+                    rc = fseek(rhscoeffs_file, A->vec_elt_stride(A, j * bw->n + sf->s0), SEEK_SET);
                     ASSERT_ALWAYS(rc >= 0);
-                    rc = fread(A->vec_coeff_ptr(A, rhscoeffs, j), A->vec_elt_stride(A,1), 1, rhs);
+                    rc = fread(A->vec_coeff_ptr(A, rhscoeffs, j), A->vec_elt_stride(A,1), 1, rhscoeffs_file);
                     if (A->is_zero(A, A->vec_coeff_ptr_const(A, rhscoeffs, j))) {
                         printf("Notice: coefficient for vector " V_FILE_BASE_PATTERN " in solution %d is zero\n", j, j+1, sf->s0);
                     }
                     ASSERT_ALWAYS(rc == 1);
                 }
             }
-            global_broadcast(pi->m, rhscoeffs, A->vec_elt_stride(A,bw->nrhs), 0, 0);
+            global_broadcast(pi->m, rhscoeffs, A->vec_elt_stride(A,nrhs), 0, 0);
 
             A->vec_set_zero(A, tvec->v, ii1 - ii0);
-            for(int j = 0 ; j < bw->nrhs ; j++) {
+            for(unsigned int j = 0 ; j < nrhs ; j++) {
                 /* Add c_j times v_j to tvec */
                 ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
                 char * tmp;
                 int rc = asprintf(&tmp, V_FILE_BASE_PATTERN, j, j + 1);
                 ASSERT_ALWAYS(rc >= 0);
+                /* equivalently, we may load the data in mmt->wr[1]->v
+                 * with
+                 * matmul_top_load_vector(mmt, v_name, bw->dir, 0, unpadded);
+                 */
 
                 pi_load_file_2d(pi, bw->dir, tmp, 0, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
                 A->vec_scal_mul(A, svec->v, svec->v, A->vec_coeff_ptr(A, rhscoeffs, j), ii1 - ii0);
@@ -283,8 +316,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
         }
 
-        /* Let now tvec be the sum of the LHS contributions */
-        A->vec_set_zero(A, tvec->v, ii1 - ii0);
+        /* Collect now the sum of the LHS contributions */
+        matmul_top_zero_vec_area(mmt, bw->dir);
+        void * sv = A->vec_subvec(A, mcol->v->v, ii0-mcol->i0);
+
         for(int i = 0 ; i < sf->nsfiles ; i++) {
             char * tmp;
             int rc = asprintf(&tmp, S_FILE_BASE_PATTERN,
@@ -292,25 +327,25 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     sf->sfiles[i]->n0, sf->sfiles[i]->n1);
             ASSERT_ALWAYS(rc >= 0);
 
-            if (tcan_print) {
+            if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
                 printf("loading %s.%u\n", tmp, sf->sfiles[i]->iter);
             }
             pi_load_file_2d(pi, bw->dir, tmp, sf->sfiles[i]->iter, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
             free(tmp);
-            A->vec_add(A, tvec->v, tvec->v, svec->v, ii1 - ii0);
+            A->vec_add(A, sv, sv, svec->v, ii1 - ii0);
         }
 
-        /* As before, we're simply using file I/O as a means of
-         * broadcast. It's much easier, since we'll be doing I/O
-         * anyway...  */
-        pi_save_file_2d(pi, bw->dir, kprefix, 0, tvec->v, A->vec_elt_stride(A, ii1 - ii0),  A->vec_elt_stride(A, unpadded));
-        
+        /* allgather, really */
+        allreduce_across(mmt, bw->dir);
 
-
+        /* This is a noop if bw->dir == 0 */
+        matmul_top_unapply_T(mmt, bw->dir);
+        matmul_top_save_vector(mmt, kprefix, bw->dir, 0, unpadded);
+        matmul_top_apply_T(mmt, bw->dir);
+                
         int is_zero = 0;
 
         serialize(pi->m);
-        matmul_top_load_vector(mmt, kprefix, bw->dir, 0, unpadded);
         matmul_top_twist_vector(mmt, bw->dir);
 
         unsigned int how_many;
@@ -340,13 +375,13 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
             matmul_top_untwist_vector(mmt, bw->dir);
 
-            if (rhs_name) {
+            if (rhscoeffs_name) {
                 char * tmp;
                 int rc = asprintf(&tmp, R_FILE_BASE_PATTERN, sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
-                matmul_top_load_vector_generic(mmt, rhsvec, tmp, bw->dir, 0, unpadded);
+                matmul_top_load_vector_generic(mmt, rhscoeffs_vec, tmp, bw->dir, 0, unpadded);
                 free(tmp);
-                if (rhs) {
+                if (rhscoeffs_file) {
                     /* Now get rid of the R file, we don't need it */
                     rc = asprintf(&tmp, R_FILE_BASE_PATTERN ".%u", sf->s0, sf->s1, 0);
                     ASSERT_ALWAYS(rc >= 0);
@@ -356,7 +391,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 }
 
                 A->vec_add(A, check_area, check_area,
-                        SUBVEC(rhsvec, v, offset_v), how_many);
+                        SUBVEC(rhscoeffs_vec, v, offset_v), how_many);
             }
 
             is_zero = A->vec_is_zero(A, check_area, how_many);
@@ -364,7 +399,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             serialize(pi->m);
             if (agree_on_flag(pi->m, is_zero)) {
                 if (tcan_print) {
-                    if (rhs_name) {
+                    if (rhscoeffs_name) {
                         printf("M^%u * V + R is zero\n", i);
                         // printf("M^%u * V + R is zero [" K_FILE_BASE_PATTERN ".%u contains M^%u * V, R.sols%u-%u contains R]!\n", i, sf->s0, sf->s1, i-1, i-1, sf->s0, sf->s1);
                     } else {
@@ -373,45 +408,74 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 }
                 break;
             }
-            if (rhs_name) break;
+            if (rhscoeffs_name) break;
 
+            matmul_top_unapply_T(mmt, bw->dir);
             matmul_top_save_vector(mmt, kprefix, bw->dir, i, unpadded);
+            matmul_top_apply_T(mmt, bw->dir);
             matmul_top_twist_vector(mmt, bw->dir);
         }
         if (!is_zero) {
             if (tcan_print) {
                 printf("Solution range %u..%u: no solution found, most probably a bug\n", sf->s0, sf->s1);
             }
+            pthread_mutex_lock(pi->m->th->m);
             exitcode=1;
+            pthread_mutex_unlock(pi->m->th->m);
             return NULL;
         }
-        if (rhs) {
+        if (rhscoeffs_file) {   /* leader node only ! */
             /* We now append the rhs coefficients to the vector we
              * have just saved. Of course only the I/O thread does this. */
             char * tmp;
             int rc = asprintf(&tmp, "%s.%u", kprefix, 0);
             ASSERT_ALWAYS(rc >= 0);
-            printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, bw->nrhs);
+            printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, nrhs);
+
             FILE * f = fopen(tmp, "ab");
+            ASSERT_ALWAYS(f);
             rc = fseek(f, 0, SEEK_END);
             ASSERT_ALWAYS(rc >= 0);
-            rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), bw->nrhs, f);
-            ASSERT_ALWAYS(rc == bw->nrhs);
+            rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), nrhs, f);
+            ASSERT_ALWAYS(rc == (int) nrhs);
             fclose(f);
-            printf("%s is now a right nullspace vector for (M|RHS).\n", tmp);
+            printf("%s is now a right nullspace vector for (M|RHS) (for a square M of dimension %" PRIu32"x%" PRIu32").\n", tmp, unpadded, unpadded);
+
+            char * tmp2;
+            rc = asprintf(&tmp2, "%s.%u.truncated.txt", kprefix, 0);
+            ASSERT_ALWAYS(rc >= 0);
+
+            f = fopen(tmp, "rb");
+
+            FILE *f2 = fopen(tmp2, "w");
+            ASSERT_ALWAYS(f2);
+            void * data = malloc( A->vec_elt_stride(A, 1));
+            for(uint32_t i = 0 ; i < mmt->n0[bw->dir] ; i++) {
+                fread(data, A->vec_elt_stride(A, 1), 1, f);
+                A->fprint(A, f2, data);
+                fprintf(f2, "\n");
+            }
+            free(data);
+            for(uint32_t i = 0 ; i < nrhs ; i++) {
+                A->fprint(A, f2, A->vec_coeff_ptr(A, rhscoeffs, i));
+                fprintf(f2, "\n");
+            }
+            fclose(f2);
+            printf("%s (in ascii) is now a right nullspace vector for (M|RHS) (for the original M, of dimension %" PRIu32"x%" PRIu32").\n", tmp2, mmt->n0[0], mmt->n0[1]);
+            free(tmp2);
             free(tmp);
         }
 
         serialize(pi->m);
         free(kprefix);
-        if (rhs_name) A->vec_clear(A, &rhscoeffs, bw->nrhs);
+        if (rhscoeffs_name) A->vec_clear(A, &rhscoeffs, nrhs);
     }
 
-    if (rhs) fclose(rhs);
-    if (rhs_name) matmul_top_vec_clear_generic(mmt, rhsvec, bw->dir);
+    if (rhscoeffs_file) fclose(rhscoeffs_file);
+    if (rhscoeffs_name) matmul_top_vec_clear_generic(mmt, rhscoeffs_vec, bw->dir);
 
-    vec_clear_generic(mmt->pi->m, svec, ii1-ii0);
-    vec_clear_generic(mmt->pi->m, tvec, ii1-ii0);
+    vec_clear_generic(pi->m, svec, ii1-ii0);
+    vec_clear_generic(pi->m, tvec, ii1-ii0);
 
     matmul_top_clear(mmt);
     A->oo_field_clear(A);
@@ -425,30 +489,41 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 }
 
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./gather <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    fprintf(stderr, "All S* files are taken in wdir. Spurious leftover data may corrupt result !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
-    param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
+    bw_common_init_new(bw, &argc, &argv);
+    param_list_init(pl);
+
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches: none here (so far). */
+    param_list_decl_usage(pl, "rhs",
+            "file with the right-hand side vectors for inhomogeneous systems mod p (only the header is read by this program)");
+    param_list_decl_usage(pl, "rhscoeffs",
+            "for the solution vector(s), this corresponds to the contribution(s) on the columns concerned by the rhs");
+
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters: none here (so far). */
+    param_list_lookup_string(pl, "rhs");
+    param_list_lookup_string(pl, "rhscoeffs");
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
     pi_go(gather_prog, pl, 0);
 
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
+
     return exitcode;
 }
 

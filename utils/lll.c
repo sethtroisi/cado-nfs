@@ -30,6 +30,35 @@
 
 #define ROW /* each row represents a vector */
 
+void
+LLL_init (mat_Z *m, int nRows, int nCols)
+{
+  m->NumRows = nRows;
+  m->NumCols = nCols;
+  /* indices in the LLL code start at 1, thus we allocate one more row */
+  m->coeff = (mpz_t **) malloc ((m->NumRows + 1) * sizeof(mpz_t*));
+  ASSERT_ALWAYS (m->coeff != NULL);
+  for (int j = 1; j <= m->NumRows; j++)
+  {
+    m->coeff[j] = (mpz_t *) malloc ((m->NumCols + 1) * sizeof(mpz_t));
+    ASSERT_ALWAYS (m->coeff[j] != NULL);
+    for (int i = 1; i <= m->NumCols; i++)
+      mpz_init (m->coeff[j][i]);
+  }
+}
+
+void
+LLL_clear (mat_Z *m)
+{
+  for (int j = 1; j <= m->NumRows; j++)
+  {
+    for (int i = 1; i <= m->NumCols; i++)
+      mpz_clear (m->coeff[j][i]);
+    free (m->coeff[j]);
+  }
+  free (m->coeff);
+}
+
 static void
 ident (mat_Z X, long n)
 {
@@ -171,7 +200,7 @@ reduce ( long k, long l, mat_Z B, long *P, mpz_t *D,
    MulSubN (B.coeff[k], B.coeff[l], r, B.NumCols, t1);
 
    if (U)
-     MulSubN (U->coeff[k], U->coeff[l], r, B.NumCols, t1);
+     MulSubN (U->coeff[k], U->coeff[l], r, B.NumRows, t1);
 
    for (j = 1; j <= l-1; j++)
      if (P[j] != 0)
@@ -290,7 +319,7 @@ RowTransformN ( mpz_t *c1,
 
 static void
 swapLLL ( long k, mat_Z B, long *P, mpz_t *D, 
-          mpz_t **lam, mat_Z* U, long m, long verbose )
+          mpz_t **lam, mat_Z* U, long m )
 /* swaps vectors k-1 and k;  assumes P(k-1) != 0 */
 {
    long i, j;
@@ -304,8 +333,6 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
    mpz_init(y);
 
    if (P[k] != 0) {
-      if (verbose) fprintf(stderr, "swap case 1: %ld\n", k);
-
       mpz_swap_n(B.coeff[k-1], B.coeff[k]);
       if (U)
         mpz_swap_n(U->coeff[k-1], U->coeff[k]);
@@ -326,7 +353,6 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
                 D[P[k]-2], lam[k][P[k]-1], D[P[k]-1], t2, t3);
    }
    else if (mpz_cmp_ui(lam[k][P[k-1]], 0) != 0) {
-      if (verbose) fprintf(stderr, "swap case 2: %ld\n", k);
       mpz_gcdext(e, x, y, lam[k][P[k-1]], D[P[k-1]]);
 
       mpz_divexact(t1, lam[k][P[k-1]], e);
@@ -359,8 +385,6 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
       swap(P[k-1], P[k]);
    }
    else {
-      if (verbose) fprintf(stderr, "swap case 3: %ld\n", k);
-
       mpz_swap_n(B.coeff[k-1], B.coeff[k]);
       if (U)
         mpz_swap_n(U->coeff[k-1], U->coeff[k]);
@@ -385,12 +409,10 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
  * det (output) is the determinant
  * U (output) is the transformation matrix (NULL if not needed)
  * a, b are parameters (a/b=3/4 classically, we should have 1/4 < a/b < 1)
- * verbose controls the verbose level (0 = nothing)
  m is the number of vectors (i.e., number of rows)
  n is the number of columns (i.e., length of each vector)
  */
-long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_t a,
-           mpz_t b, long verbose )
+long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_t a, mpz_t b )
 {
    long m, n, *P, j, s, k, max_k;
    mpz_t *D, **lam, tmp1, tmp2;
@@ -439,7 +461,7 @@ long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_t a,
       if (P[k-1] != 0 && 
           (P[k] == 0 || 
            SwapTest(D[P[k]], D[P[k]-1], D[P[k]-2], lam[k][P[k]-1], a, b, tmp1, tmp2))) {
-         swapLLL (k, B, P, D, lam, U, max_k, verbose);
+         swapLLL (k, B, P, D, lam, U, max_k);
          k--;
       }
       else {	

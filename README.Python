@@ -50,6 +50,16 @@ and then running
 emerge  --deep --newuse world
 
 
+If you compile Python 3 yourself from source code, be aware that the sqlite3
+development package with the header files for the sqlite3 library must be
+installed on the system; without them, the Python 3 build will seem to
+succeed but will not include the sqlite3 interface. When compiling Python 3,
+be sure that the "make" output does NOT include a warning of the form:
+
+The necessary bits to build these optional modules were not found:
+_sqlite3
+
+
 3. Python 2 or 3 for the workunit client
 
 The client script wuclient2.py can run under both Python 2, version 2.6 or

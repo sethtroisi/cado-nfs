@@ -23,7 +23,7 @@ parse_poly_str (double_poly_ptr poly, const char *str)
     if (sscanf(next, "%lf", &coeff) != 1)
       break;
     if (poly) {
-      ASSERT_ALWAYS((unsigned int) i <= poly->deg);
+      ASSERT_ALWAYS(i <= poly->deg);
       poly->coeff[i] = coeff;
     }
     i++;
@@ -48,6 +48,7 @@ parse_poly(double_poly_ptr poly, const char *str)
   parse_poly_str(poly, str);
 }
 
+/* This computes only roots in [0,s] */
 void 
 test_double_poly_compute_roots1(const char *poly_str, const char *roots_str, 
                                const double err_margin, const double s,
@@ -124,6 +125,9 @@ test_double_poly_compute_roots(const int verbose)
 
   /* false position needs many iterations */
   test_double_poly_compute_roots1("416305583514625790805142742552103399071483895746667754265057484511150866432 202399505763732049099628933992141454064175135567823362216516742332052144128 0 -2677221347026437285957968988912544408687885411868999680 21555240319368651153052935288520704 5123362746908340224", "8694859813.27109836187832047186 720776737597677797.826174347519", 10, 1e20, verbose);
+
+  /* false position produces b=NaN */
+  test_double_poly_compute_roots1 ("-5.1229871591623088e+251 4.8231399628079727e+240 -7.5683722678735590e+228 -1.8935837380523070e+224 -3.4853123818766583e+152", "", 1e60, 1e72, verbose);
 }
 
 void
@@ -179,12 +183,21 @@ test_double_poly_derivative (void)
   double_poly_init (f, 1);
   double_poly_init (df, 0);
 
+  f->deg = 1;
   f->coeff[0] = 17.0;
   f->coeff[1] = 42.0;
   double_poly_derivative (df, f);
   ASSERT_ALWAYS (df->deg == 0 && df->coeff[0] == 42.0);
 
+  /* Test in-place operation */
+  f->deg = 1;
+  f->coeff[0] = 17.0;
+  f->coeff[1] = 42.0;
+  double_poly_derivative (f, f);
+  ASSERT_ALWAYS (f->deg == 0 && f->coeff[0] == 42.0);
+
   f->deg = 0;
+  f->coeff[0] = 17.0;
   double_poly_derivative (df, f);
   ASSERT_ALWAYS (df->deg == 0 && df->coeff[0] == 0.0);
 

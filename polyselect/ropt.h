@@ -21,12 +21,7 @@ void ropt_get_bestpoly ( ropt_poly_t poly,
                          MurphyE_pq *global_E_pqueue,
                          ropt_bestpoly_t bestpoly );
 
-void ropt_polyselect ( mpz_t *f,
-                       int d,
-                       mpz_t m,
-                       mpz_t l,
-                       const mpz_t N,
-                       int effort,
-                       int verbose );
+void ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
+                      ropt_param_t param);
 
 #endif /* ROPT_H */

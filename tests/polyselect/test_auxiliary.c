@@ -1,9 +1,10 @@
 #include "cado.h"
 #include "utils.h"
 #include "polyselect/auxiliary.h"
+#include "polyselect/size_optimization.h"
 #include "tests_common.h"
 
-int
+static int
 check_num (double x, double y, double emax)
 {
   double e = fabs (x - y) / fabs (y);
@@ -87,7 +88,7 @@ test_L2_lognorm (void)
 /* t=0: generate polynomial with skewness < 1
    t=1: generate polynomial with skewness > 1
    t=2: generate random polynomial */
-void
+static void
 test_L2_skewness (int t)
 {
   mpz_poly_t p;
@@ -109,7 +110,7 @@ test_L2_skewness (int t)
       if (t == 0)
         mpz_set_ui (p->coeff[d], 4294967295UL);
       else if (t == 1)
-        mpz_set_ui (p->coeff[0], 1);
+        mpz_set_ui (p->coeff[d], 1);
       else
         {
           do
@@ -148,6 +149,51 @@ test_L2_skewness (int t)
   mpz_poly_clear (p);
 }
 
+// TODO: add test based on experiments done with rsa896 polynomials
+static void
+test_size_optimization (void)
+{
+  mpz_poly_t f, g, f_opt, g_opt;
+  double n;
+
+  /* check size-optimization of some RSA-1024 polynomial */
+  mpz_poly_init (f, 6);
+  mpz_poly_init (f_opt, 6);
+  mpz_poly_init (g, 1);
+  mpz_poly_init (g_opt, 1);
+  mpz_set_str (g->coeff[1], "479811439908216194249453", 10);
+  mpz_set_str (g->coeff[0],
+                    "-1817512374557883972669278009547068402044185664937", 10);
+  g->deg = 1;
+  mpz_set_str (f->coeff[6], "3746994889972677420", 10);
+  mpz_set_str (f->coeff[5], "11057269082141058123", 10);
+  mpz_set_str (f->coeff[4], "-476255458524556917851536204692614007", 10);
+  mpz_set_str (f->coeff[3], "571753863783554395130237455946021515899994741285",
+               10);
+  mpz_set_str (f->coeff[2],
+               "-119215284531776978224224998903910352781670761348", 10);
+  mpz_set_str (f->coeff[1],
+               "776740771444910094386701822648133452751778906680", 10);
+  mpz_set_str (f->coeff[0],
+               "-690339709954574842053460672118938320489859967550", 10);
+  f->deg = 6;
+  n = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
+  ASSERT_ALWAYS(106.895 <= n && n <= 106.905);
+
+  size_optimization (f_opt, g_opt, f, g, SOPT_DEFAULT_EFFORT, 0);
+  n = L2_skew_lognorm (f_opt, SKEWNESS_DEFAULT_PREC);
+  ASSERT_ALWAYS(n <= 87.415);
+
+  size_optimization (f_opt, g_opt, f, g, 1, 0);
+  n = L2_skew_lognorm (f_opt, SKEWNESS_DEFAULT_PREC);
+  ASSERT_ALWAYS(n <= 87.197);
+
+  mpz_poly_clear (f);
+  mpz_poly_clear (g);
+  mpz_poly_clear (f_opt);
+  mpz_poly_clear (g_opt);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -156,6 +202,7 @@ main (int argc, const char *argv[])
   test_L2_skewness (0);
   test_L2_skewness (1);
   test_L2_skewness (2);
+  test_size_optimization ();
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }

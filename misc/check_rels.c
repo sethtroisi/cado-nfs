@@ -19,9 +19,6 @@
 #include "portability.h"
 #include "macros.h"
 #include "utils_with_io.h"
-#include "relation.h"
-
-#include "mpz_poly.h"
 
 uint64_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
 uint64_t nrels_toolarge;
@@ -413,6 +410,7 @@ main (int argc, char * argv[])
     /* Update parameter list at least once to register argc/argv pointers. */
     param_list_update_cmdline (pl, &argc, &argv);
     /* print command-line arguments */
+    verbose_interpret_parameters(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 

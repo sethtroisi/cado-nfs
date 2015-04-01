@@ -48,12 +48,12 @@
 
 typedef unsigned long residueredc15ul_t[MODREDC15UL_SIZE];
 typedef unsigned long modintredc15ul_t[MODREDC15UL_SIZE];
-typedef struct { 
+struct __modulusredc15ul_t { 
   modintredc15ul_t m;
   residueredc15ul_t one;
   unsigned long invm;
-} __modulusredc15ul_t;
-typedef __modulusredc15ul_t modulusredc15ul_t[1];
+};
+typedef struct __modulusredc15ul_t modulusredc15ul_t[1];
 
 
 /* ==================== Functions used internally ==================== */
@@ -337,8 +337,7 @@ modredc15ul_intshr (modintredc15ul_t r, const modintredc15ul_t s, const int i)
     r[0] = s[1] >> (i - LONG_BIT);
     r[1] = 0UL; /* May overwrite s[1] */
   } else { /* i < LONG_BIT */
-    r[0] = s[0];
-    ularith_shrd (&(r[0]), s[1], i);
+    ularith_shrd (&(r[0]), s[1], s[0], i);
     r[1] = s[1] >> i;
   }
 }
@@ -355,8 +354,7 @@ modredc15ul_intshl (modintredc15ul_t r, const modintredc15ul_t s, const int i)
     r[1] = s[0] << (i - LONG_BIT);
     r[0] = 0UL;
   } else { /* i < LONG_BIT */
-    r[1] = s[1];
-    ularith_shld (&(r[1]), s[0], i);
+    ularith_shld (&(r[1]), s[0], s[1], i);
     r[0] = s[0] << i;
   }
 }
@@ -383,9 +381,9 @@ modredc15ul_intdivexact (modintredc15ul_t r, const modintredc15ul_t n,
   while (d1[0] % 2 == 0UL)
     {
       ASSERT_EXPENSIVE (n1[0] % 2 == 0UL);
-      ularith_shrd (&(d1[0]), d1[1], 1);
+      ularith_shrd (&(d1[0]), d1[1], d1[0], 1);
       d1[1] >>= 1;
-      ularith_shrd (&(n1[0]), n1[1], 1);
+      ularith_shrd (&(n1[0]), n1[1], n1[0], 1);
       n1[1] >>= 1;
     }
   
@@ -823,7 +821,7 @@ modredc15ul_div2 (residueredc15ul_t r, const residueredc15ul_t a,
   modredc15ul_intset (r, a);
   if (r[0] % 2UL == 1UL)
     ularith_add_2ul_2ul (&(r[0]), &(r[1]), m[0].m[0], m[0].m[1]);
-  ularith_shrd (&(r[0]), r[1], 1);
+  ularith_shrd (&(r[0]), r[1], r[0], 1);
   r[1] >>= 1;
 }
 
@@ -1243,6 +1241,10 @@ modredc15ul_divn (residueredc15ul_t r, const residueredc15ul_t a,
 
 
 /* prototypes of non-inline functions */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t, 
 		      const modulusredc15ul_t);
 int modredc15ul_div5 (residueredc15ul_t, const residueredc15ul_t, 
@@ -1278,4 +1280,9 @@ int modredc15ul_batchinv (residueredc15ul_t *, const residueredc15ul_t *,
                           size_t, const residueredc15ul_t,
                           const modulusredc15ul_t);
 int modredc15ul_jacobi (const residueredc15ul_t, const modulusredc15ul_t);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif  /* MODREDC_15UL_H */

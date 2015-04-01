@@ -15,9 +15,8 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
-  param_list_decl_usage(pl, "lpb0", "large prime bound on side 0");
-  param_list_decl_usage(pl, "lpb1", "large prime bound on side 1");
   param_list_decl_usage(pl, "check", "(switch) check the renumbering table");
+  verbose_decl_usage(pl);
 }
 
 static void
@@ -34,7 +33,6 @@ main (int argc, char *argv[])
     char *argv0 = argv[0];
     cado_poly cpoly;
     renumber_t tab;
-    unsigned long lpb[2] = {0, 0};
 
     param_list pl;
     param_list_init(pl);
@@ -52,14 +50,12 @@ main (int argc, char *argv[])
         usage (pl, argv0);
     }
     /* print command-line arguments */
+    verbose_interpret_parameters(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 
     const char *polyfilename = param_list_lookup_string(pl, "poly");
     const char *renumberfilename = param_list_lookup_string(pl, "renumber");
-
-    param_list_parse_ulong(pl, "lpb0", &lpb[0]);
-    param_list_parse_ulong(pl, "lpb1", &lpb[1]);
 
     if (polyfilename == NULL)
     {

@@ -20,11 +20,11 @@ trialdiv_get_max_p()
      in ULONG_MAX / (TRIALDIV_MAXLEN - 1), so have to use preprocessor to get
      gcc to shut up */
 #if TRIALDIV_MAXLEN == 1
-  return FBPRIME_MAX;
+  return ULONG_MAX;
 #else
   double s = sqrt(ULONG_MAX / (TRIALDIV_MAXLEN - 1));
   ASSERT(s >= 1.);
-  return MIN((unsigned long)s - 1, FBPRIME_MAX);
+  return MIN((unsigned long)s - 1, ULONG_MAX);
 #endif
 }
 
@@ -43,7 +43,9 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
     d->w[0] = 0UL; /* DIV would cause quotient overflow */
   else
     ularith_div_2ul_ul_ul_r (&(d->w[0]), 0UL, 1UL, p);
-  for (i = 1; i < TRIALDIV_MAXLEN; i++)
+  /* Warning: the array d->w[] has size TRIALDIV_MAXLEN-1, not
+   * TRIALDIV_MAXLEN (see definition of trialdiv_divisor_t) */
+  for (i = 1; i < TRIALDIV_MAXLEN-1; i++)
     ularith_div_2ul_ul_ul_r (&(d->w[i]), 0UL, d->w[i - 1], p);
 #endif
   d->pinv = ularith_invmod (p);
@@ -270,7 +272,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
    This function allcates memory for the array, inits each entry, and puts
    a sentinel at the end. */
 trialdiv_divisor_t *
-trialdiv_init (const fbprime_t *f, const unsigned int nr)
+trialdiv_init (const unsigned long *f, const unsigned int nr)
 {
   trialdiv_divisor_t *d;
   unsigned int i;
@@ -278,7 +280,7 @@ trialdiv_init (const fbprime_t *f, const unsigned int nr)
   d = (trialdiv_divisor_t *) malloc ((nr + 1) * sizeof (trialdiv_divisor_t));
   ASSERT (d != NULL);
   for (i = 0; i < nr; i++)
-    trialdiv_init_divisor (&(d[i]), (unsigned long) (f[i]));
+    trialdiv_init_divisor (&(d[i]), f[i]);
   trialdiv_init_divisor (&(d[nr]), 1UL);
 
   return d;

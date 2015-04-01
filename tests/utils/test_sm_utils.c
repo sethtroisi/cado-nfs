@@ -28,7 +28,7 @@ test_sm (FILE * datafile)
     int ret, degF, degN, degD, nb_ab, nbSM;
     unsigned int nb_test_single_rel = 0;
     mpz_poly_t F, N, Nc, D, Dc, SM, SMc;
-    mpz_t tmp, ell, ell2, smexp, invl2;
+    mpz_t tmp, ell;
     int64_t a, e[MAX_LEN_RELSET];
     uint64_t b, len_relset, r[MAX_LEN_RELSET];
     mpz_poly_t ab_polys[TEST_MAX_AB];
@@ -43,9 +43,6 @@ test_sm (FILE * datafile)
     mpz_poly_init (F, degF);
     mpz_init (tmp);
     mpz_init (ell);
-    mpz_init (ell2);
-    mpz_init (smexp);
-    mpz_init (invl2);
 
     for (int i = 0; i <= degF; i++)
     {
@@ -54,8 +51,12 @@ test_sm (FILE * datafile)
     }
 
     gmp_fscanf (datafile, " %Zi", ell);
-    gmp_fscanf (datafile, " %Zi", ell2);
-    gmp_fscanf (datafile, " %Zi", smexp);
+
+    sm_side_info sm_info;
+    sm_side_info_init(sm_info, F, ell);
+
+    gmp_fscanf (datafile, " %*Zi"); // , ell2);
+    gmp_fscanf (datafile, " %*Zi"); // , smexp);
     
     ret = fscanf(datafile, " %d", &nb_ab);
     ASSERT_ALWAYS (ret == 1);
@@ -111,33 +112,43 @@ test_sm (FILE * datafile)
     ASSERT_ALWAYS (ret == 1 && c == '\n');
     
 
+    mpz_poly_init(SMc, F->deg);
 
-    /* Real tests begin here */
-    barrett_init(invl2, ell2);
-    mpz_poly_init (SMc, degF);
+    //     /* Real tests begin here */
+    //     barrett_init(invl2, ell2);
+    //     mpz_poly_init (SMc, degF);
     mpz_poly_init (Nc, degF);
     mpz_poly_init (Dc, degF);
+    //     /* artificially duplicate data, to test both sides */
+    //     mpz_poly_ptr FF[2];
+    //     FF[0] = &F[0]; FF[1] = &F[0];
+    //     mpz_poly_t SMc2;
+    //     mpz_poly_init(SMc2, degF);
+    //     mpz_poly_ptr SSMc[2];
+    //     SSMc[0] = &SMc[0]; SSMc[1] = &SMc2[0];
+    //     mpz_ptr Eeps[2];
+    //     Eeps[0] = &smexp[0]; Eeps[1] = &smexp[0];
     if (len_relset == 1 && e[0] == 1 && nb_test_single_rel % FREQ == 0)
     {
       nb_test_single_rel++;
-      mpz_poly_getcoeff_wrapper (tmp, 0, ab_polys[r[0]]);
-      a = mpz_get_si (tmp);
-      mpz_poly_getcoeff_wrapper (tmp, 1, ab_polys[r[0]]);
-      b = mpz_get_ui (tmp);
-      sm_single_rel(SMc, a, b, F, smexp, ell, ell2, invl2);
-      mpz_poly_copy (Nc, ab_polys[r[0]]);
-      mpz_poly_setcoeff_si (Dc, 0, 1);
-    }
-    else
-    {
-      sm_relset_init (relset, degF);
-      sm_build_one_relset (relset, r, e, len_relset, ab_polys, F, ell2);
-      mpz_poly_copy (Nc, relset->num);
-      mpz_poly_copy (Dc, relset->denom);
-      mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num, relset->denom, F, ell2);
-      compute_sm (SMc, relset->num, F, ell, smexp, ell2, invl2);
+      if (nb_test_single_rel % (FREQ + 1))
+          compute_sm_piecewise(SMc, ab_polys[r[0]], sm_info);
+      else
+          compute_sm_straightforward(SMc, ab_polys[r[0]], sm_info);
+
+    } else {
+        mpz_poly_ptr FF[2] = {F, F};
+        int dd[2] = {degF, degF};
+      sm_relset_init (relset, dd);
+      sm_build_one_relset (relset, r, e, len_relset, ab_polys, FF, sm_info->ell2);
+      mpz_poly_set (Nc, relset->num[0]);
+      mpz_poly_set (Dc, relset->denom[0]);
+      mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num[0], relset->denom[0],
+              F, sm_info->ell2, sm_info->invl2);
+      compute_sm_straightforward (SMc, relset->num[0], sm_info);
       sm_relset_clear (relset);
     }
+    // mpz_poly_clear(SMc2);
 
     /* In case of error, print all relevant information */
     if (mpz_poly_cmp(SM, SMc) != 0)
@@ -145,8 +156,8 @@ test_sm (FILE * datafile)
       err++;
       fprintf (stderr, "### ERROR: computation of SM is wrong with:\nF = ");
       mpz_poly_fprintf(stderr, F);
-      gmp_fprintf(stderr, "ell = %Zi\nell2 = %Zi\nsmexp = %Zi\n", ell, ell2,
-                          smexp);
+      gmp_fprintf(stderr, "ell = %Zi\nell2 = %Zi\n\n", ell, sm_info->ell2);
+      sm_side_info_print(stderr, sm_info);
       fprintf (stderr, "# Relation-set is:\n%" PRIu64 "", len_relset);
       for (uint64_t i = 0; i < len_relset; i++)
         fprintf (stderr, " %" PRIu64 ":%" PRId64 "", r[i], e[i]);
@@ -195,9 +206,6 @@ test_sm (FILE * datafile)
       mpz_poly_clear (ab_polys[i]);
     mpz_clear (tmp);
     mpz_clear (ell);
-    mpz_clear (ell2);
-    mpz_clear (smexp);
-    mpz_clear (invl2);
     mpz_poly_clear (F);
     mpz_poly_clear (N);
     mpz_poly_clear (Nc);

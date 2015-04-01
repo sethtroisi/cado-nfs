@@ -52,12 +52,12 @@
 
 typedef unsigned long residueredc2ul2_t[MODREDC2UL2_SIZE];
 typedef unsigned long modintredc2ul2_t[MODREDC2UL2_SIZE];
-typedef struct { 
+struct __modulusredc2ul2_t { 
   modintredc2ul2_t m;
   residueredc2ul2_t one;
   unsigned long invm;
-} __modulusredc2ul2_t;
-typedef __modulusredc2ul2_t modulusredc2ul2_t[1];
+};
+typedef struct __modulusredc2ul2_t modulusredc2ul2_t[1];
 
 
 /* ==================== Functions used internally ==================== */
@@ -121,6 +121,97 @@ modredc2ul2_frommontgomery (residueredc2ul2_t r, const residueredc2ul2_t s,
   /* Do two REDC steps */
   modredc2ul2_redc1 (r, s, m);
   modredc2ul2_redc1 (r, r, m);
+}
+
+
+#ifdef WANT_ASSERT_EXPENSIVE
+#if defined(__x86_64__)
+#define ABORT_IF_CY "jnc 1f\n\tlea _GLOBAL_OFFSET_TABLE_(%%rip), %%rbx\n\tcall abort@plt\n1:\n\t"
+#elif defined(__i386__)
+#define ABORT_IF_CY "jnc 1f\n\tcall abort\n1:\n\t"
+#endif
+#else
+#define ABORT_IF_CY
+#endif
+
+MAYBE_UNUSED
+static inline void
+_modredc2ul2_mul_ul (residueredc2ul2_t r, const residueredc2ul2_t a,
+                     const unsigned long b, const modulusredc2ul2_t m)
+{
+  ASSERT_EXPENSIVE (modredc2ul2_intlt (a, m[0].m));
+#if defined(MODTRACE)
+  printf ("((%lu * 2^%d + %lu) * %lu / 2^%d) %% (%lu * 2^%d + %lu)",
+          a[1], LONG_BIT, a[0], b, LONG_BIT, m[0].m[1], LONG_BIT, m[0].m[0]);
+#endif
+
+#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  unsigned long u = m[0].invm, a0 = a[0];
+  __asm__ __VOLATILE (
+    /* Product of low words */
+    "mulq %[b]\n\t"          /* rdx:rax = a0*b <= (2^64-1)^2 */
+    "movq %%rdx, %[t0]\n\t"  /* t0:rax = a0*b <= (2^64-1)^2 */
+    /* Compute u such that a0*b + u*m == 0 (mod 2^64), compute u*m, add to t0:rax */
+    "imulq %[u], %%rax\n\t"
+    "movq %%rax, %[u]\n\t"  /* u <= 2^64-1 */
+    "xorl %k[t1], %k[t1]\n\t"
+    "mulq %[m0]\n\t"         /* rdx:rax = u*m0 <= (2^64-1)^2 */
+    "negq %%rax\n\t"         /* if low word != 0, carry to high word */
+    "movq %[u], %%rax\n\t"  /* rax = u, independent, goes in pipe 0 */
+    "adcq %%rdx, %[t0]\n\t"
+    "setc %b[t1]\n\t"        /* t1:t0 = (a0*b + u*m0) / 2^64 <= 2*2^64 - 4 */
+    "mulq %[m1]\n\t"         /* rdx:rax = u*m1 */
+    "addq %%rax, %[t0]\n\t"
+    "movq %[a1], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = (a0*b+u*m)/2^64 <= 2^126 - 2^62 */
+    /* Free slot in pipe 2 here */
+    ABORT_IF_CY
+
+    /* Product of low and high word */
+    "mulq %[b]\n\t"          /* rdx:rax = a1*b <= (2^63-2^32-1)*(2^64-1) */
+    "addq %%rax, %[t0]\n\t"
+    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = ((a1*2^64 + a0)*b + u*m) / 2^64
+                                     <= ((2^126-1)*(2^64-1) + (2^64-1)*(2^126-1)) / 2^64
+                                      < 2^127 - 2^63 - 1, thus no carry */
+    ABORT_IF_CY
+                             /* t1:t0 = ((a1*2^64 + a0)*b + u*m) / 2^64
+                                     <= ((m-1)*(2^64-1) + (2^64-1)*m) / 2^64
+                                      = 2*m*(1-1/2^64) - 1*(1-1/2^64). May need to subtract m. */
+    "movq %[t0], %%rax\n\t" /* See if result > m */
+    "movq %[t1], %%rdx\n\t"
+    "subq %[m0], %[t0]\n\t" /* Try subtracting m, see if there's a carry */
+    "sbbq %[m1], %[t1]\n\t"
+    "cmovc %%rax, %[t0]\n\t" /* Carry -> restore old result */
+    "cmovc %%rdx, %[t1]\n\t"
+    : [u] "+&r" (u), [t0] "=&r" (r[0]), [t1] "=&r" (r[1]), [a0] "+&a" (a0)
+    : [a1] "g" (a[1]), [b] "rm" (b),
+      [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1])
+    : "%rdx", "cc"
+  );
+#else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+  unsigned long pl, ph, t[2];
+
+  /* m < 1/4 W^2,  a < m, b < W */
+
+  /* Product of b and low word */
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], b); /* t1:t0 = a0*b < W^2 */
+
+  /* One REDC step */
+  modredc2ul2_redc1 (t, t, m); /* t1:t0 = (a0*b + k*m) / W < m + W < 1/4 W^2 + W */
+
+  /* Product of b and high word  */
+  ularith_mul_ul_ul_2ul (&pl, &ph, a[1], b);   /* ph:pl < 1/4 W^2 */
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), pl, ph); /* t1:t0 < 1/2 W^2 + W */
+
+  ularith_sub_2ul_2ul_ge (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+
+  r[0] = t[0];
+  r[1] = t[1];
+#endif
+#if defined(MODTRACE)
+  printf (" == (%lu * 2^%d + %lu) /* PARI */ \n", r[1], LONG_BIT, r[0]);
+#endif
+  ASSERT_EXPENSIVE (modredc2ul2_intlt (r, m[0].m));
 }
 
 
@@ -330,8 +421,7 @@ modredc2ul2_intshr (modintredc2ul2_t r, const modintredc2ul2_t s, const int i)
     r[0] = s[1] >> (i - LONG_BIT);
     r[1] = 0UL; /* May overwrite s[1] */
   } else { /* i < LONG_BIT */
-    r[0] = s[0];
-    ularith_shrd (&(r[0]), s[1], i);
+    ularith_shrd (&(r[0]), s[1], s[0], i);
     r[1] = s[1] >> i;
   }
 }
@@ -348,8 +438,7 @@ modredc2ul2_intshl (modintredc2ul2_t r, const modintredc2ul2_t s, const int i)
     r[1] = s[0] << (i - LONG_BIT);
     r[0] = 0UL;
   } else { /* i < LONG_BIT */
-    r[1] = s[1];
-    ularith_shld (&(r[1]), s[0], i);
+    ularith_shld (&(r[1]), s[0], s[1], i);
     r[0] = s[0] << i;
   }
 }
@@ -382,10 +471,10 @@ modredc2ul2_intdivexact (modintredc2ul2_t r, const modintredc2ul2_t n,
     }
   ASSERT(d1[0] != 0UL);
   i = ularith_ctz (d1[0]);
-  ularith_shrd (&(d1[0]), d1[1], i);
+  ularith_shrd (&(d1[0]), d1[1], d1[0], i);
   d1[1] >>= i;
   ASSERT((n1[0] & ((1UL << i) - 1UL)) == 0UL);
-  ularith_shrd (&(n1[0]), n1[1], i);
+  ularith_shrd (&(n1[0]), n1[1], n1[0], i);
   n1[1] >>= i;
   
   invf = ularith_invmod (d1[0]);
@@ -418,19 +507,18 @@ modredc2ul2_intmod_ul (const modintredc2ul2_t n, const unsigned long d)
   unsigned long r;
   if (n[1] < d)
     {
-      unsigned long dummy;
-      ularith_div_2ul_ul_ul (&dummy, &r, n[0], n[1], d);
+      ularith_div_2ul_ul_ul_r (&r, n[0], n[1], d);
     }
   else
     {
-      unsigned long t, dummy;
-      ularith_div_2ul_ul_ul (&dummy, &t, n[1], 0UL, d);
-      ularith_div_2ul_ul_ul (&dummy, &r, n[0], t, d);
+      unsigned long t;
+      ularith_div_2ul_ul_ul_r (&t, n[1], 0UL, d);
+      ularith_div_2ul_ul_ul_r (&r, n[0], t, d);
     }
   return r;
 }
 
-/* r = n%d */
+/* r = n % d */
 MAYBE_UNUSED
 static inline void
 modredc2ul2_intmod (modintredc2ul2_t r, const modintredc2ul2_t n,
@@ -441,7 +529,7 @@ modredc2ul2_intmod (modintredc2ul2_t r, const modintredc2ul2_t n,
       r[0] = modredc2ul2_intmod_ul (n, d[0]);
       r[1] = 0;
     }
-  else    
+  else
     {
       modintredc2ul2_t t1, t2;
       unsigned long q, dummy;
@@ -827,16 +915,6 @@ modredc2ul2_div2 (residueredc2ul2_t r, const residueredc2ul2_t a,
 }
 
 
-#ifdef WANT_ASSERT_EXPENSIVE
-#if defined(__x86_64__)
-#define ABORT_IF_CY "jnc 1f\n\tlea _GLOBAL_OFFSET_TABLE_(%%rip), %%rbx\n\tcall abort@plt\n1:\n\t"
-#elif defined(__i386__)
-#define ABORT_IF_CY "jnc 1f\n\tcall abort\n1:\n\t"
-#endif
-#else
-#define ABORT_IF_CY
-#endif
-
 MAYBE_UNUSED
 static inline void
 modredc2ul2_mul (residueredc2ul2_t r, const residueredc2ul2_t a, 
@@ -980,121 +1058,6 @@ modredc2ul2_mul (residueredc2ul2_t r, const residueredc2ul2_t a,
 #endif
   ASSERT_EXPENSIVE (modredc2ul2_intlt (r, m[0].m));
 }
-
-MAYBE_UNUSED
-static inline void
-_modredc2ul2_mul_ul (residueredc2ul2_t r, const residueredc2ul2_t a, 
-                     const unsigned long b, const modulusredc2ul2_t m)
-{
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-
-  ASSERT_EXPENSIVE (modredc2ul2_intlt (a, m[0].m));
-#if defined(MODTRACE)
-  printf ("((%lu * 2^%d + %lu) * (%lu * 2^%d + %lu) / 2^%d) %% "
-	  "(%lu * 2^%d + %lu)", 
-          a[1], LONG_BIT, a[0], 0UL, LONG_BIT, b, 2 * LONG_BIT,
-	  m[0].m[1], LONG_BIT, m[0].m[0]);
-#endif
-
-  unsigned long dummy;
-  __asm__ __VOLATILE (
-    /* Product of low words */
-    "movq %[a0], %%rax\n\t"
-    "mulq %[b]\n\t"          /* rdx:rax = a0*b <= (2^64-1)^2 */
-    "movq %%rdx, %[t0]\n\t"  /* t0:rax = a0*b <= (2^64-1)^2 */
-    /* Compute u such that a0*b + u*m == 0 (mod 2^64), compute u*m, add to t0:rax */
-    "imulq %[invm], %%rax\n\t"
-    "movq %%rax, %[u]\n\t"  /* u <= 2^64-1 */
-    "xorl %k[t1], %k[t1]\n\t"
-    "mulq %[m0]\n\t"         /* rdx:rax = u*m0 <= (2^64-1)^2 */
-    "negq %%rax\n\t"         /* if low word != 0, carry to high word */
-    "movq %[u], %%rax\n\t"  /* rax = u, independent, goes in pipe 0 */
-    "adcq %%rdx, %[t0]\n\t"
-    "setc %b[t1]\n\t"        /* t1:t0 = (a0*b + u*m0) / 2^64 <= 2*2^64 - 4 */
-    "mulq %[m1]\n\t"         /* rdx:rax = u*m1 */
-    "addq %%rax, %[t0]\n\t"
-    "movq %[a0], %%rax\n\t"  /* independent, goes in pipe 0 */
-    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = (a0*b+u*m)/2^64 <= 2^126 - 2^62 */
-    ABORT_IF_CY
-
-    /* Product of low and high word */
-    "movq %[a1], %%rax\n\t"
-    "mulq %[b]\n\t"          /* rdx:rax = a1*b <= (2^63-2^32-1)*(2^64-1) */
-    "addq %%rax, %[t0]\n\t"
-    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = ((a1*2^64 + a0)*b + u*m) / 2^64
-                                     <= ((2^126-1)*(2^64-1) + (2^64-1)*(2^126-1)) / 2^64
-                                      < 2^127 - 2^63 - 1, thus no carry */
-    ABORT_IF_CY
-                             /* t1:t0 = ((a1*2^64 + a0)*b + u*m) / 2^64
-                                     <= ((m-1)*(2^64-1) + (2^64-1)*m) / 2^64
-                                      = 2*m*(1-1/2^64) - 1*(1-1/2^64). May need to subtract m. */
-    "movq %[t0], %%rax\n\t" /* See if result > m */
-    "movq %[t1], %%rdx\n\t"
-    "subq %[m0], %[t0]\n\t" /* Try subtracting m, see if there's a carry */
-    "sbbq %[m1], %[t1]\n\t"
-    "cmovc %%rax, %[t0]\n\t" /* Carry -> restore old result */
-    "cmovc %%rdx, %[t1]\n\t"
-    : [u] "=&r" (dummy), [t0] "=&r" (r[0]), [t1] "=&r" (r[1])
-    : [a0] "g" (a[0]), [a1] "g" (a[1]), [b] "rm" (b),
-      [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), [invm] "rm" (m[0].invm)
-    : "%rax", "%rdx", "cc"
-  );
-#else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
-  /* THIS CODE DOES NOT WORK */
-#include <stdlib.h>
-  unsigned long pl, ph, t[4], k;
-  
-  abort();
-  ASSERT_EXPENSIVE (modredc2ul2_intlt (a, m[0].m));
-  ASSERT_EXPENSIVE (modredc2ul2_intlt (b, m[0].m));
-#if defined(MODTRACE)
-  printf ("((%lu * 2^%d + %lu) * (%lu * 2^%d + %lu) / 2^%d) %% "
-	  "(%lu * 2^%d + %lu)", 
-          a[1], LONG_BIT, a[0], 0, LONG_BIT, b, 2 * LONG_BIT, 
-	  m[0].m[1], LONG_BIT, m[0].m[0]);
-#endif
-
-  /* m < 1/4 W^2,  a,b < m */
-  
-  /* Product of the two low words */
-  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], b); 
-
-  /* One REDC step */
-  modredc2ul2_redc1 (t, t, m); /* t < 2m < 1/2 W^2 */
-
-  /* Products of one low and one high word  */
-  ularith_mul_ul_ul_2ul (&pl, &ph, a[1], b);   /* ph:pl < 1/4 W^2 */
-  ularith_add_2ul_2ul (&(t[0]), &(t[1]), pl, ph); /* t1:t0 < 3/4 W^2 */
-  ularith_mul_ul_ul_2ul (&pl, &ph, a[0], 0);      /* ph:pl < 1/4 W^2 */
-  ularith_add_2ul_2ul (&(t[0]), &(t[1]), pl, ph); /* t1:t0 < W^2 */
-
-  /* Product of the two high words */
-  ularith_mul_ul_ul_2ul (&pl, &(t[2]), a[1], 0); /* t2:pl < 1/16 W^2 */
-  ularith_add_ul_2ul (&(t[1]), &(t[2]), pl); /* t2:t1:t0 < 1/16 W^3 + W^2 */
-
-  /* Compute t2:t1:t0 := t2:t1:t0 + km, km < Wm < 1/4 W^3 */
-  k = t[0] * m[0].invm;
-  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]);
-  if (t[0] != 0UL)
-    ph++; /* t[0] = 0 */
-  ularith_add_ul_2ul (&(t[1]), &(t[2]), ph);
-  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl < 1/4 W^2 */
-  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph);
-  /* t2:t1:0 < 1/16 W^3 + W^2 + 1/4 W^3 < 5/16 W^3 + W^2 */
-
-  /* Result may be larger than m, but is < 2*m */
-
-  ularith_sub_2ul_2ul_ge (&(t[1]), &(t[2]), m[0].m[0], m[0].m[1]);
-
-  r[0] = t[1];
-  r[1] = t[2];
-#endif
-#if defined(MODTRACE)
-  printf (" == (%lu * 2^%d + %lu) /* PARI */ \n", r[1], LONG_BIT, r[0]);
-#endif
-  ASSERT_EXPENSIVE (modredc2ul2_intlt (r, m[0].m));
-}
-
 
 MAYBE_UNUSED
 static inline void
@@ -1336,8 +1299,17 @@ modredc2ul2_divn (residueredc2ul2_t r, const residueredc2ul2_t a,
   return 1;
 }
 
+struct modredc2ul2_batch_Q_to_Fp_context_s {
+  modintredc2ul2_t c;
+  unsigned long rem_ul, ratio_ul, den_inv;
+  modulusredc2ul2_t m;
+};
+typedef struct modredc2ul2_batch_Q_to_Fp_context_s modredc2ul2_batch_Q_to_Fp_context_t;
 
 /* prototypes of non-inline functions */
+#ifdef __cplusplus
+extern "C" {
+#endif
 int modredc2ul2_div3 (residueredc2ul2_t, const residueredc2ul2_t, 
 		      const modulusredc2ul2_t);
 int modredc2ul2_div5 (residueredc2ul2_t, const residueredc2ul2_t, 
@@ -1372,8 +1344,16 @@ int modredc2ul2_inv (residueredc2ul2_t, const residueredc2ul2_t,
 int modredc2ul2_batchinv (residueredc2ul2_t *, const residueredc2ul2_t *,
                           size_t n, const residueredc2ul2_t,
                           const modulusredc2ul2_t);
-int modredc2ul2_batch_Q_to_Fp (unsigned long *, const modintredc2ul2_t,
-                               const modintredc2ul2_t, unsigned long,
-                               const unsigned long *, size_t);
+modredc2ul2_batch_Q_to_Fp_context_t *
+modredc2ul2_batch_Q_to_Fp_init (const modintredc2ul2_t, const modintredc2ul2_t);
+void modredc2ul2_batch_Q_to_Fp_clear (modredc2ul2_batch_Q_to_Fp_context_t *);
+
+int modredc2ul2_batch_Q_to_Fp (unsigned long *,
+                               const modredc2ul2_batch_Q_to_Fp_context_t *,
+                               unsigned long, int, const unsigned long *, size_t);
 int modredc2ul2_jacobi (const residueredc2ul2_t, const modulusredc2ul2_t);
+#ifdef __cplusplus
+}
+#endif
+
 #endif  /* MODREDC_2UL2_H */

@@ -1,17 +1,13 @@
 #ifndef LAS_ARITH_H_
 #define LAS_ARITH_H_
 
-#include "cado.h"
 #include <stdint.h>
+#include <inttypes.h>
 
-#include "fb.h"
+#include "fb-types.h"
 #include "utils.h"
 #include "las-config.h"
 #include "utils/misc.h" /* ctzl */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 // Redc_32 based on 64-bit arithmetic
 // Assume:
@@ -55,14 +51,14 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
     fprintf(stderr, "BUG in redc_32. x = %" PRId64
 	    " p = %u, invp = %u, u = %d\n", x, p, invp, u);
     if (x < 0) {
-      fprintf(stderr, "x/2^32 = -%"PRId64, (-x)>>32);
+      fprintf(stderr, "x/2^32 = -%" PRId64, (-x)>>32);
       if (((-x)>>32) < p) {
 	fprintf(stderr, ", within bounds\n");
       } else {
 	fprintf(stderr, ", OUT OF BOUNDS\n");
       }
     } else {
-      fprintf(stderr, "x/2^32 = -%"PRId64, x>>32);
+      fprintf(stderr, "x/2^32 = -%" PRId64, x>>32);
       if ((x>>32) < p) {
 	fprintf(stderr, ", within bounds\n");
       } else {
@@ -76,7 +72,6 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
   return u;
 }
 
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 #define HAVE_redc_64
 /* This does a full mul, and should grok slightly larger bounds than the
  * version above. Presumably, as long as x fits within 64 bits, (63 bits,
@@ -85,15 +80,28 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
 static inline uint64_t
 redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
 {
+#if LONG_BIT == 64
   int64_t t = ((uint64_t)x)*invp;
   uint64_t u;
+
+  // First, compute:
+  //    u = (p*t + x) / 2^64
+  // This requires 128-bit word addition.
   /* Need the high part of a 64x64 mul */
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
 			"    mulq    %[p]\n"
 			"    addq    %[x], %%rax\n"
 			"    adcq    $0, %%rdx\n"
 			: "=&d" (u)
 			: "a" (t), [x] "rm" (x), [p] "r" ((uint64_t) p));
+#else
+  ASSERT (sizeof(unsigned long) == 8);
+  uint64_t rax, rdx;
+  ularith_mul_ul_ul_2ul(&rax, &rdx, p, t);
+  ularith_add_ul_2ul(&rax, &rdx, x);
+  u = rdx;
+#endif
   /* As per the early clobber on rdx, x can't be put in there.
    * Furthermore, since t goes to rax, x doesn't go there either. Thus
    * it is reasonable to assume that it is still unmodified after the
@@ -105,8 +113,32 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
   t -= p;
   if ((int64_t) t >= 0) u = t;
   return u;
-}
+#else // 32-bit support, via gmp
+    uint64_t u;
+    mpz_t xx, pp, invpp;
+    mpz_t tt, uu;
+    mpz_init(xx); mpz_init(pp); mpz_init(invpp);
+    mpz_init(tt); mpz_init(uu);
+    mpz_set_int64(xx, x);
+    mpz_set_ui(pp, p);
+    mpz_set_uint64(invpp, invp);
+
+    mpz_mul(tt, xx, invpp);
+    mpz_fdiv_r_2exp(tt, tt, 64); // mod 2^64, take non-negative remainder.
+    mpz_mul(uu, pp, tt);
+    mpz_add(uu, uu, xx);
+    ASSERT(mpz_divisible_2exp_p(uu, 64));
+    mpz_tdiv_q_2exp(uu, uu, 64);
+    u = mpz_get_uint64(uu);
+    while (u >= p) {
+        u -= p;
+    }
+    mpz_clear(xx); mpz_clear(pp); mpz_clear(invpp);
+    mpz_clear(tt); mpz_clear(uu);
+    return u;
 #endif
+}
+
 
 MAYBE_UNUSED
 static inline fbprime_t
@@ -124,9 +156,28 @@ invmod_po2 (fbprime_t n)
   return r;
 }
 
-NOPROFILE_INLINE int
-invmod (uint64_t *pa, uint64_t b)
+// Compute in place 1/x mod p, return if modular inverse exists,
+// for uint64_t.
+// Fallback function for 32-bit archis.
+static inline int
+fallback_invmod_64(uint64_t *x, uint64_t p)
 {
+    mpz_t xx, pp;
+    mpz_init(xx);
+    mpz_init(pp);
+    mpz_set_uint64(xx, *x);
+    mpz_set_uint64(pp, p);
+    int rc = mpz_invert(xx, xx, pp);
+    *x = mpz_get_uint64(xx);
+    mpz_clear(xx);
+    mpz_clear(pp);
+    return rc;
+}
+
+NOPROFILE_INLINE int
+invmod_32 (uint32_t *pa, uint32_t b)
+{
+  ASSERT (sizeof(unsigned long) >= 4);
   modulusul_t m;
   residueul_t r;
   int rc;
@@ -138,6 +189,27 @@ invmod (uint64_t *pa, uint64_t b)
   modul_clear (r, m);
   modul_clearmod (m);
   return rc;
+}
+
+NOPROFILE_INLINE int
+invmod_64 (uint64_t *pa, uint64_t b)
+{
+#if LONG_BIT == 64
+  ASSERT (sizeof(unsigned long) >= 8);
+  modulusul_t m;
+  residueul_t r;
+  int rc;
+  modul_initmod_ul (m, b);
+  modul_init (r, m);
+  modul_set_ul (r, *pa, m); /* With mod reduction */
+  if ((rc = modul_inv(r, r, m)))
+    *pa = modul_get_ul (r, m);
+  modul_clear (r, m);
+  modul_clearmod (m);
+  return rc;
+#else
+  return fallback_invmod_64(pa, b);
+#endif
 }
 
 /* TODO: this is a close cousin of modredcul_inv, but the latter does
@@ -153,9 +225,9 @@ invmod_redc_32(uint32_t a, uint32_t b) {
   ASSERT (a < b);
   if (UNLIKELY(!a)) return a; /* or we get infinite loop */
   if (UNLIKELY(!(b & 1))) {
-    uint64_t pa = a;
-    invmod(&pa, (uint64_t) b);
-    return (uint32_t) pa;
+    uint32_t pa = a;
+    invmod_32(&pa, (uint32_t) b);
+    return pa;
   }
   const uint32_t p = b;
   uint32_t u = 1, v = 0, lsh = ctz(a);
@@ -266,7 +338,7 @@ invmod_redc_64(uint64_t a, uint64_t b)
   ASSERT (a < b);
   if (UNLIKELY(!a)) return a; /* or we get infinite loop */
   if (UNLIKELY(!(b & 1))) {
-    invmod(&a, b);
+    invmod_64(&a, b);
     return a;
   }
   const uint64_t p = b;
@@ -373,9 +445,5 @@ invmod_redc_64(uint64_t a, uint64_t b)
 }
 
 fbprime_t is_prime_power(fbprime_t q);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LAS_ARITH_H_ */

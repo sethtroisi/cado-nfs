@@ -3,14 +3,17 @@
 set -e
 set -x
 
-bindir="$1" ; shift
 script="$1" ; shift
 
-wdir=`mktemp -d /tmp/bwc-test.XXXXXXXXXX`
-matdir=`mktemp -d /tmp/bwc-test-mats.XXXXXXXX`
+: ${TMPDIR:=/tmp}
 
-$script mats=$matdir bindir=$bindir wipe=1 wdir=$wdir nomagma=1 "$@"
+wdir=`mktemp -d $TMPDIR/bwc-test.XXXXXXXXXX`
+matdir=`mktemp -d $TMPDIR/bwc-test-mats.XXXXXXXX`
 
-rm -rf $wdir
-rm -rf $matdir
+$script mats=$matdir wdir=$wdir "$@"
+
+if ! [ "$CADO_DEBUG" ] ; then
+    rm -rf $wdir
+    rm -rf $matdir
+fi
 

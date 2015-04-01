@@ -54,9 +54,15 @@ add_library(facul
         pp1_mpz.c
         facul_doit_mpz.c
         stage2.c prac_bc.c
-	makeplan.c facul.c)
+	makeplan.c facul.cpp
+        mpqs_doit.c mpqs_ul.c mpqs_15ul.c mpqs_2ul2.c mpqs_mpz.c)
+
+if(MINGW)
+target_link_libraries(facul gnurx)
+endif(MINGW)
 
 add_executable(testbench testbench.c)
+
 target_link_libraries(testbench facul utils m)
 
 include(CMakeLists-nodist.txt OPTIONAL)

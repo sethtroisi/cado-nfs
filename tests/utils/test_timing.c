@@ -45,7 +45,7 @@ int test_microseconds ()
 {
     uint64_t t = microseconds();
     do_some_silly_thing();
-    printf("%s %"PRIu64"\n", __func__, microseconds()-t);
+    printf("%s %" PRIu64"\n", __func__, microseconds()-t);
     return 1;
 }
 
@@ -79,7 +79,7 @@ int test_microseconds_thread()
     generic_mutltithread_test(&test_microseconds_thread_subthread, ptrs);
     uint64_t s=0;
     for(int i = 0 ; i < NTHREADS_TEST ; s += timers[i++]);
-    printf("%s %"PRIu64"\n", __func__, s);
+    printf("%s %" PRIu64"\n", __func__, s);
     return 1;
 }
 

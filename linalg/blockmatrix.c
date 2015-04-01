@@ -95,7 +95,7 @@ void blockmatrix_print(blockmatrix b, const char *vname)
 		for (unsigned int jj = 0; jj < 64 && j + jj < b->ncols; jj++) {
 		    if (j + jj)
 			fprintf(f,",");
-		    fprintf(f,"%"PRIu64, (bl[ii] >> jj) & ((uint64_t)1));
+		    fprintf(f,"%" PRIu64, (bl[ii] >> jj) & ((uint64_t)1));
 		}
 	    }
 	}

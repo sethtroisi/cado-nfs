@@ -13,6 +13,7 @@
 #include "ropt.h"
 #include "portability.h"
 #include "area.h"
+#include "size_optimization.h"
 
 
 /**
@@ -26,7 +27,7 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   double ave_MurphyE = 0.0, best_E = 0.0;
   int i, old_i, k;
   mpz_t m, t, *fuv, *guv;
-  mpz_poly_t Fuv;
+  mpz_poly_t Fuv, Guv;
 
   mpz_init_set (m, poly->g[0]);
   mpz_neg (m, m);
@@ -34,18 +35,15 @@ ropt_get_bestpoly ( ropt_poly_t poly,
 
   /* var for computing E */
   mpz_poly_init (Fuv, poly->d);
+  mpz_poly_init (Guv, 1);
   Fuv->deg = poly->d;
+  Guv->deg = 1;
   fuv = Fuv->coeff;
-  guv = (mpz_t*) malloc (2 * sizeof (mpz_t));
-  if (guv == NULL) {
-    fprintf (stderr, "Error, cannot allocate memory in "
-             "ropt_get_bestpoly().\n");
-    exit (1);
-  }
+  guv = Guv->coeff;
   for (i = 0; i <= poly->d; i++)
     mpz_set (fuv[i], poly->f[i]);
   for (i = 0; i < 2; i++)
-    mpz_init_set (guv[i], poly->g[i]);
+    mpz_set (guv[i], poly->g[i]);
 
   /* output all polys in the global queue */
   for (i = 1; i < global_E_pqueue->used; i ++) {
@@ -63,7 +61,9 @@ ropt_get_bestpoly ( ropt_poly_t poly,
     compute_fuv_mp (fuv, poly->f, poly->g, poly->d, global_E_pqueue->u[i],
                     global_E_pqueue->v[i]);
 
-    optimize_aux (Fuv, guv, 0, 0);
+    sopt_local_descent (Fuv, Guv, Fuv, Guv, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+    fuv = Fuv->coeff;
+    guv = Guv->coeff;
 
     ave_MurphyE = print_poly_fg (Fuv, guv, poly->n, 0);
 
@@ -84,11 +84,9 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   }
 
   mpz_poly_clear (Fuv);
-  for (i = 0; i < 2; i++)
-    mpz_clear (guv[i]);
+  mpz_poly_clear (Guv);
   mpz_clear (m);
   mpz_clear (t);
-  free (guv);
 }
 
 
@@ -195,7 +193,7 @@ ropt_do_both_stages ( ropt_poly_t poly,
   else if (poly->d == 6 || poly->d == 7)
     ropt_quadratic (poly, bestpoly, param, info);
   else {
-    fprintf (stderr, "Error: only support deg 4, 5, 6 and 7.\n");
+    fprintf (stderr, "Error: only support deg 3, 4, 5, 6 and 7.\n");
     exit(1);
   }
 }
@@ -229,37 +227,27 @@ ropt ( ropt_poly_t poly,
 
 
 /**
- * Called by polyselect2l.
+ * Called by polyselect_ropt.
  */
 void
-ropt_polyselect ( mpz_t *f,
-                  const int d,
-                  mpz_t m,
-                  mpz_t l,
-                  const mpz_t N ,
-                  const int effort,
-                  const int verbose )
+ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
+                 ropt_param_t param)
 {
   int i;
   ropt_poly_t poly;
   ropt_poly_init (poly);
 
   /* setup poly */
-  mpz_set (poly->g[1], l);
-  mpz_set (poly->g[0], m);
-  for (i = 0; i <=d; i ++)
-    mpz_set (poly->f[i], f[i]);
-  mpz_set (poly->n, N);
+  for (i = 0; i <= input_poly->rat->deg; i++)
+    mpz_set (poly->g[i], input_poly->rat->coeff[i]);
+  for (i = 0; i <= input_poly->alg->deg; i++)
+    mpz_set (poly->f[i], input_poly->alg->coeff[i]);
+  mpz_set (poly->n, input_poly->n);
   ropt_poly_setup (poly);
 
   ropt_info_t info;
   ropt_info_init (info);
 
-  /* passed params from polyselect2l */
-  ropt_param_t param;
-  ropt_param_init (param);
-  param->verbose = verbose;
-  param->effort = effort;
 
   ropt_bestpoly_t bestpoly;
   ropt_bestpoly_init (bestpoly, poly->d);
@@ -268,14 +256,16 @@ ropt_polyselect ( mpz_t *f,
   /* cal main function */
   ropt_do_both_stages (poly, bestpoly, param, info);
   
-  /* bring bestpoly back to polyselect2l */
-  for (i = 0; i <= d; i++)
-    mpz_set (f[i], bestpoly->f[i]);
-  mpz_set (m, bestpoly->g[0]);
-  mpz_set (l, bestpoly->g[1]);
+  /* bring bestpoly back to polyselect_ropt */
+  for (i = 0; i <= input_poly->rat->deg; i++)
+    mpz_set (output_poly->rat->coeff[i], bestpoly->g[i]);
+  mpz_poly_cleandeg (output_poly->rat, input_poly->rat->deg);
+  for (i = 0; i <= input_poly->alg->deg; i++)
+    mpz_set (output_poly->alg->coeff[i], bestpoly->f[i]);
+  mpz_poly_cleandeg (output_poly->alg, input_poly->alg->deg);
+  mpz_set (output_poly->n, input_poly->n);
 
   /* free */
-  ropt_param_free (param);
   ropt_bestpoly_free (bestpoly, poly->d);
   ropt_info_free (info);
   ropt_poly_free (poly);

@@ -15,11 +15,12 @@
  */
 #define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
 
+#define RELATION_MAX_BYTES 4096
+
 #include "modul_poly.h"
 #include "double_poly.h"
 #include "getprime.h"
 #include "timing.h"
-#include "relation.h"
 #include "gmp_aux.h"
 #include "cado_poly.h"
 #include "rootfinder.h"
@@ -43,7 +44,12 @@
 #include "memalloc.h"
 #include "mpz_vector.h"
 #include "memory.h"
+#include "relation-tools.h"
 #include "stats.h"
 #include "lll.h"
+#include "verbose.h"
+#include "lognorm_skewness.h"
+#include "mpz_poly.h"
+#include "version_info.h"
 
 #endif	/* CADO_UTILS_H_ */

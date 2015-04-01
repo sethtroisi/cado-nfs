@@ -1,3 +1,46 @@
+macro(string_join var delimiter str_list)
+    set(_ret "")
+    foreach(_str ${str_list})
+        if(_ret STREQUAL "")
+            set(_ret "${_str}")
+        else(_ret STREQUAL "")
+            set(_ret "${_ret}${delimiter}${_str}")
+        endif(_ret STREQUAL "")
+    endforeach(_str ${str_list})
+    foreach(_str ${ARGN})
+        if(_ret STREQUAL "")
+            set(_ret "${_str}")
+        else(_ret STREQUAL "")
+            set(_ret "${_ret}${delimiter}${_str}")
+        endif(_ret STREQUAL "")
+    endforeach(_str ${ARGN})
+    set(${var} "${_ret}")
+endmacro(string_join var delimiter str_list)
+
+macro(set_test_build_depends test_name)
+    add_custom_target(${test_name}_dependencies)
+    add_dependencies(${test_name}_dependencies ${ARGN})
+    add_test("builddep_${test_name}" "${CMAKE_COMMAND}" --build
+        ${CMAKE_BINARY_DIR} --target ${test_name}_dependencies)
+    set("${test_name}_has_build_depends" 1)
+    # message(STATUS "Creating dependencies for ${test_name} -- ${ARGN}")
+    set_tests_properties (${test_name} PROPERTIES DEPENDS "builddep_${test_name}")
+endmacro(set_test_build_depends test_name ${ARGN})
+
+macro(update_test_build_depends test_name)
+    add_dependencies(${test_name}_dependencies ${ARGN})
+endmacro(update_test_build_depends test_name)
+
+macro(set_test_dependencies test_name)
+    set(deps ${ARGN})
+    if("${test_name}_has_build_depends")
+        list(APPEND deps "builddep_${test_name}")
+    endif("${test_name}_has_build_depends")
+    # cmake has very quirky syntax...
+    string_join(alldeps ";" ${deps})
+    # message(STATUS "Updating dependencies for ${test_name} -- ${alldeps}")
+    set_tests_properties (${test_name} PROPERTIES DEPENDS "${alldeps}")
+endmacro(set_test_dependencies test_name ${ARGN})
 macro(build_test DSTFILE SRCFILE LIBRARIES)
     # Add a build target for the test binary
     add_executable("${DSTFILE}" "${SRCFILE}")
@@ -9,6 +52,10 @@ macro(run_test NAME DSTFILE)
     # current source and binary directories. The ctest program then builds
     # the DSTFILE binary by calling cmake (which we suppress here) and make,
     # and then runs DSTFILE
+    set(binary ${DSTFILE})
+    if (${DSTFILE} MATCHES ".sh$")
+        set(binary env bash ${DSTFILE})
+    endif (${DSTFILE} MATCHES ".sh$")
     add_test ("${NAME}" "${CMAKE_CTEST_COMMAND}"
               # Specify the source and build directories for the Cmake/make
               # steps that gets executed by CTest (except we suppress the
@@ -59,7 +106,7 @@ macro(run_test NAME DSTFILE)
               --output-on-failure
 
               # And finally the binary that should be run as the actual test
-              --test-command "${DSTFILE}" ${ARGN})
+              --test-command ${binary} ${ARGN})
 endmacro(run_test NAME DSTFILE)
 
 # The SRCFILE parameter to this macro is the file name of the source file to
@@ -75,11 +122,25 @@ macro(build_and_run_test SRCFILE LIBRARIES)
     # The name of the test here is the same as the name of the test
     # executable file
     run_test ("${DSTFILE}" "${DSTFILE}" ${ARGN})
+    set_test_build_depends(${DSTFILE} ${DSTFILE})
 endmacro(build_and_run_test)
+
+
+if(DEFINED ENV{CHECKS_EXPENSIVE})
+    run_test(full_c59 ${CADO_NFS_SOURCE_DIR}/factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2)
+    set_test_build_depends(full_c59 polyselect2l polyselect_ropt freerel makefb las dup1 dup2 purge merge merge-dl replay replay-dl sm reconstructlog-dl characters bwc_full plingen_pz sqrt)
+    find_program(MAGMA magma)
+    if (MAGMA)
+        run_test(full_p59 ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh ${CADO_NFS_SOURCE_DIR})
+        set_test_build_depends(full_p59 full_c59_dependencies debug_renumber)
+        run_test(test_gfp3 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
+        set_test_build_depends(test_gfp3 full_c59_dependencies debug_renumber)
+    endif(MAGMA)
+endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 add_library (tests STATIC test_iter.c tests_common.c)
-target_link_libraries (tests gmp)
+target_link_libraries (tests ${gmp_libname})
 
 build_test(test_tests_common test_tests_common.c tests)
 run_test(tests_common_1 test_tests_common)
@@ -99,3 +160,4 @@ add_subdirectory (sieve)
 add_subdirectory (polyselect)
 add_subdirectory (filter)
 add_subdirectory (linalg)
+add_subdirectory (gf2x)

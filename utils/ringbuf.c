@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include "macros.h"
 #include "ringbuf.h"
-#include "memory.h"
 #include "portability.h"
 
 /* This is a hack. Define to 1 to disable */

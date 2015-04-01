@@ -1,5 +1,6 @@
 #include "cado.h"
 
+#include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <sys/time.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -35,6 +36,19 @@
 #include <ostream>
 #include <iostream>
 #include <sstream>
+
+void plingen_tuning_decl_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "B",
+            "minimum end of bench span window");
+    param_list_decl_usage(pl, "catchsig",
+            "enable intercepting ^C");
+}
+void plingen_tuning_lookup_parameters(param_list_ptr pl)
+{
+    param_list_lookup_string(pl, "B");
+    param_list_lookup_string(pl, "catchsig");
+}
 
 /* interface to C programs for list of cutoffs we compute *//*{{{*/
 /* This is the simple C-type cutoff table which is used down the line by
@@ -564,7 +578,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
 
     typedef vector<pair<unsigned int, int> >::iterator it_t;
     for(it_t x = table.begin() ; x != table.end() ; ++x)
-        x.second = nadjs-1-x.second;
+        x->second = nadjs-1-x->second;
 
     cout << "/* FFT depth adjustments for "
                 << (m)<<"*"<<(m+n)
@@ -735,7 +749,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
 
     typedef vector<pair<unsigned int, int> >::iterator it_t;
     for(it_t x = table.begin() ; x != table.end() ; ++x)
-        x.second = nadjs-1-x.second;
+        x->second = nadjs-1-x->second;
 
     cout << "/* FFT depth adjustments for "
                 << (m)<<"*"<<(m+n)

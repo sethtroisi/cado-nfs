@@ -16,6 +16,15 @@ matpoly_ptr bigmatpoly_my_cell(bigmatpoly_ptr p)
     return bigmatpoly_cell(p, irank, jrank);
 }
 
+matpoly_srcptr bigmatpoly_my_cell_const(bigmatpoly_srcptr p)
+{
+    int irank;
+    int jrank;
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
+    return bigmatpoly_cell_const(p, irank, jrank);
+}
+
 void bigmatpoly_init_model(bigmatpoly_ptr model, MPI_Comm * comm, unsigned int m, unsigned int n)
 {
     memset(model, 0, sizeof(bigmatpoly));
@@ -295,8 +304,8 @@ void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
         MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[1]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
-        ASSERT_ALWAYS((data->m * data->n * data->size) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[1]);
+        ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
+        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[1]);
     }
 }
 void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
@@ -313,8 +322,8 @@ void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
         MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[2]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
-        ASSERT_ALWAYS((data->m * data->n * data->size) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[2]);
+        ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
+        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[2]);
     }
 }
 /* scatter from node 0. This is not a very interesting function, in fact
@@ -790,7 +799,7 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
  * and that dst has indeed room for length elements (we set the size, but
  * don't realloc dst).
  */
-void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
+void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_srcptr src,
         size_t offset, size_t length)
 {
     int rank;
@@ -826,9 +835,9 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
 
                         if (peer == 0) {
                             /* talk to ourself */
-                            matpoly_ptr me = bigmatpoly_my_cell(src);
+                            matpoly_srcptr me = bigmatpoly_my_cell_const(src);
                             ASSERT_ALWAYS(offset + length <= me->alloc);
-                            abdst_vec from = matpoly_part(ab, me, i0, j0, offset);
+                            absrc_vec from = matpoly_part_const(ab, me, i0, j0, offset);
                             abvec_set(ab, to, from, length);
                         } else {
                             MPI_Irecv(to, length, abmpi_datatype(ab),
@@ -859,7 +868,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
         MPI_Request * reqs = malloc(src->m0 * src->n0 * sizeof(MPI_Request));
         MPI_Request * req = reqs;
         /* receive. Each job will receive exactly dst->m0 transfers */
-        matpoly_ptr me = bigmatpoly_my_cell(src);
+        matpoly_srcptr me = bigmatpoly_my_cell_const(src);
         for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
             for(unsigned int j0 = 0 ; j0 < src->n0 ; j0++) {
                 unsigned int i1 = irank;
@@ -867,8 +876,9 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
                 unsigned int ii = i1 * src->m0 + i0;
                 unsigned int jj = j1 * src->n0 + j0;
                 unsigned int tag = ii * src->n + jj;
-                abdst_vec from = matpoly_part(ab, me, i0, j0, offset);
-                MPI_Isend(from, length, abmpi_datatype(ab),
+                absrc_vec from = matpoly_part_const(ab, me, i0, j0, offset);
+                /* battle with const-deprived MPI prototypes... */
+                MPI_Isend((void*)from, length, abmpi_datatype(ab),
                         0, tag, src->com[0], req);
                 req++;
             }

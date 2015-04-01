@@ -104,18 +104,16 @@
    make them show up on profiler output */
 //#define PROFILE
 
-/* (for debugging only) define TRACE_K, and exactly one of the TRACE_*
- * values to something non-zero, in order to get tracing information on a
+/* (for debugging only) define TRACE_K, to something non-zero,
+ * in order to get tracing information on a
  * particular relation.  In particular this traces the sieve array entry
  * corresponding to the relation. Upon startup, the three values below
  * are reconciled.
  *
- * (see also las-coordinates.c)
+ * This activates new command lines arguments: -traceab, -traceij, -traceNx.
+ * (see las-coordinates.c for the description of these)
  */
 #define xxxTRACE_K
-// #define TRACE_AB { 2039914353344275UL,6656604L }
-// #define TRACE_IJ
-// #define TRACE_Nx { 0,1655 }
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */
@@ -176,6 +174,8 @@
 #error "LOG_BUCKET_REGION must (mandatory!) be equal to 16."
 #endif
 
+#define BUCKET_REGION (1 << LOG_BUCKET_REGION)
+
 /* This flag is necessary to support I=16. Otherwise it's a useless
  * burden
  */
@@ -185,7 +185,8 @@
  * descent. The mid-term plan is to remove this compile-time flag.
  */
 #define xxxDLP_DESCENT
-#define DESCENT_GRACE_TIME_RATIO 0.4
+
+#define DESCENT_DEFAULT_GRACE_TIME_RATIO 0.2    /* default value */
 
 /* Define this to support larger q. This is almost mandatory for the
  * descent. */
@@ -233,18 +234,10 @@
 
 /* A special ultrafast memset for las. Independant of MEMSET_MIN.
    Only for x86 64. */
-#define LAS_MEMSET
+// #define LAS_MEMSET
 
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void las_display_config_flags(FILE * stream);
-
-#ifdef __cplusplus
-}
-#endif
+void las_display_config_flags();
 
 #endif	/* LAS_CONFIG_H_ */

@@ -184,7 +184,7 @@ mod_gcd (unsigned long *r, const residue_t A, const modulus_t m)
 #if LOOKUP_TRAILING_ZEROS
       do {
 	sh = trailing_zeros [(unsigned char) a[0]];
-	ularith_shrd (&(a[0]), a[1], sh);
+	ularith_shrd (&(a[0]), a[1], a[0], sh);
 	*(long *) &(a[1]) >>= sh;
       } while (sh == 8);
 #else
@@ -194,7 +194,7 @@ mod_gcd (unsigned long *r, const residue_t A, const modulus_t m)
 	  a[1] = ((long)a[1] < 0L) ? (unsigned long) (-1L) : 0UL;
 	}
       sh = ularith_ctz (a[0]);
-      ularith_shrd (&(a[0]), a[1], sh);
+      ularith_shrd (&(a[0]), a[1], a[0], sh);
       *(long *) &(a[1]) >>= sh;
 #endif
       
@@ -224,7 +224,7 @@ mod_gcd (unsigned long *r, const residue_t A, const modulus_t m)
 #if LOOKUP_TRAILING_ZEROS
       do {
 	sh = trailing_zeros [(unsigned char) b[0]];
-	ularith_shrd (&(b[0]), b[1], sh);
+	ularith_shrd (&(b[0]), b[1], b[0], sh);
 	*(long *) &(b[1]) >>= sh;
       } while (sh == 8);
 #else
@@ -234,7 +234,7 @@ mod_gcd (unsigned long *r, const residue_t A, const modulus_t m)
 	  b[1] = ((long)b[1] < 0) ? (unsigned long) (-1L) : 0UL;
 	}
       sh = ularith_ctz (b[0]);
-      ularith_shrd (&(b[0]), b[1], sh);
+      ularith_shrd (&(b[0]), b[1], b[0], sh);
       *(long *) &(b[1]) >>= sh;
 #endif
       ASSERT_EXPENSIVE (a[0] % 2UL == 1UL);
@@ -430,7 +430,7 @@ mod_sprp (const residue_t b, const modulus_t m)
       po2 += LONG_BIT;
     }
   ASSERT (mm1[0] != 0UL);
-  i = ularith_clz (mm1[0]);
+  i = ularith_ctz (mm1[0]);
   mod_intshr (mm1, mm1, i);
   po2 += i;
 
@@ -474,7 +474,7 @@ mod_sprp2 (const modulus_t m)
       po2 += LONG_BIT;
     }
   ASSERT (mm1[0] != 0UL);
-  i = ularith_clz (mm1[0]);
+  i = ularith_ctz (mm1[0]);
   mod_intshr (mm1, mm1, i);
   po2 += i;
 

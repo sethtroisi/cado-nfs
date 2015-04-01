@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>   /* for fabs */
+#include <float.h> /* for DBL_MAX */
 #include "utils.h"
 #include "portability.h"
 
@@ -29,7 +30,7 @@ void
 double_poly_set (double_poly_ptr r, double_poly_srcptr s)
 {
   r->deg = s->deg;
-  for (unsigned int i = 0; i <= s->deg; i++) {
+  for (int i = 0; i <= s->deg; i++) {
     r->coeff[i] = s->coeff[i];
   }
 }
@@ -94,6 +95,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
 {
   double pb;
   int side=0;
+  double a0=a, b0=b, pa0=pa;
 
   pb = double_poly_eval(p, b);
 
@@ -128,25 +130,27 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
           if (side==-1) pa /= 2;
           side=-1;
       }
+      if (isnan(b)) {
+          return double_poly_dichotomy(p, a0, b0, pa0, 0);
+      }
   }
 }
 
-/* Stores the derivative of f in df. Assumes df different from f.
+/* Stores the derivative of f in df. f and df may be identical.
    Assumes df has been initialized with degree at least f->deg-1. */
 void
 double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
 {
-  unsigned int n;
-  double d_n;
+  int n;
   if (f->deg == 0) {
     df->deg = 0; /* How do we store deg -\infty polynomials? */
     df->coeff[0] = 0.;
     return;
   }
   // at this point, f->deg >=1
+  for (n = 1; n <= f->deg; n++)
+    df->coeff[n - 1] = f->coeff[n] * (double) n;
   df->deg = f->deg - 1;
-  for(n = 0, d_n = 1.; n < f->deg; n++, d_n += 1.)
-    df->coeff[n] = f->coeff[n + 1] * d_n;
 }
 
 /* Stores the product of f and g in h (h = f * g).
@@ -173,7 +177,7 @@ double_poly_product(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr 
 void
 MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  size_t i;
+  int i;
   if (f->deg <= g->deg) {
     ASSERT(h->deg >= g->deg);
     h->deg = g->deg;
@@ -193,7 +197,7 @@ MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_pol
 void
 double_poly_subtract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  size_t i;
+  int i;
   if (f->deg <= g->deg) {
     ASSERT(h->deg >= g->deg);
     h->deg = g->deg;
@@ -211,13 +215,13 @@ double_poly_subtract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr
 void
 double_poly_revert (double_poly_ptr f)
 {
-  const unsigned int d = f->deg;
+  const int d = f->deg;
 
   if (d <= 0)
     return;
 
   /* if d is even, nothing to do for k=d/2 */
-  for (unsigned int k = 0; k <= (d - 1) / 2; k++)
+  for (int k = 0; k <= (d - 1) / 2; k++)
     {
       double tmp = f->coeff[k];
       f->coeff[k] = f->coeff[d - k];
@@ -225,6 +229,19 @@ double_poly_revert (double_poly_ptr f)
     }
 }
 
+/* Change sign of variable: x -> -x */
+static void
+double_poly_neg_x (double_poly_ptr r, double_poly_srcptr s)
+{
+  int i;
+  r->deg = s->deg;
+  for (i = 0; i < s->deg; i += 2) {
+    r->coeff[i]     = s->coeff[i]; /* Even power coeff */
+    r->coeff[i + 1] = -s->coeff[i + 1]; /* Odd power */
+  }
+  if (i == s->deg) /* iff deg is even */
+    r->coeff[i] = s->coeff[i];
+}
 
 static unsigned int
 recurse_roots(double_poly_srcptr poly, double *roots,
@@ -331,6 +348,39 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
   return sign_changes;
 }
 
+/* compute all roots whose absolute value is <= B */
+unsigned int
+double_poly_compute_all_roots_with_bound (double *roots,
+                                          double_poly_srcptr poly,
+                                          double B)
+{
+  /* Positive roots */
+  double bound = double_poly_bound_roots (poly);
+  if (B < bound)
+    bound = B;
+  unsigned int nr_roots_pos = double_poly_compute_roots (roots, poly, bound);
+  /* Negative roots */
+  double_poly_t t; /* Copy of poly which gets sign-flipped */
+  double_poly_init (t, poly->deg);
+  double_poly_neg_x (t, poly);
+  bound = double_poly_bound_roots (t);
+  if (B < bound)
+    bound = B;
+  unsigned int nr_roots_neg =
+    double_poly_compute_roots (roots + nr_roots_pos, t, bound);
+  double_poly_clear(t);
+  /* Flip sign of negative roots */
+  for (unsigned int i = 0; i < nr_roots_neg; i++)
+    roots[nr_roots_pos + i] *= -1.;
+  return nr_roots_pos + nr_roots_neg;
+}
+
+unsigned int
+double_poly_compute_all_roots (double *roots, double_poly_srcptr poly)
+{
+  return double_poly_compute_all_roots_with_bound (roots, poly, DBL_MAX);
+}
+
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 
@@ -343,24 +393,24 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
   fprintf (stream, "%s", name);
 
   if (deg == 0)
-    fprintf (stream, "%f", f[0]);
+    fprintf (stream, "%.16e", f[0]);
 
   if (deg == 1)
-    fprintf (stream, "%f*x", f[1]);
+    fprintf (stream, "%.16e*x", f[1]);
 
   if (deg > 1)
-    fprintf (stream, "%f*x^%d", f[deg], deg);
+    fprintf (stream, "%.16e*x^%d", f[deg], deg);
 
   for (i = deg - 1; i >= 0; i--)
     {
       if (f[i] == 0.)
 	continue;
       if (i == 0)
-	fprintf (stream, " %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else if (i == 1)
-	fprintf (stream, " %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else 
-	fprintf (stream, " %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
+	fprintf (stream, " %s %.16e*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
     }
 
   fprintf (stream, "\n");

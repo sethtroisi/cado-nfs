@@ -13,16 +13,18 @@ int main(int argc, const char **argv)
 
   /* Try small FBB */
   for (fbb = 0; fbb < 20; fbb++) {
-    double scale = 0.5 + 5. * drand48();
+    double scale = 0.5 + 5. * ldexp(random_uint64(), -64);
     fb_make_steps(steps, fbb, scale);
   }
   
   /* Try random FBB */
   for (i = 0; i < iter; i++) {
     fbb = lrand48();
-    double scale = 0.5 + 5. * drand48();
+    double scale = 0.5 + 5. * ldexp(random_uint64(), -64);
     fb_make_steps(steps, fbb, scale);
   }
+
+  tests_common_clear ();
   
   return 0;
 }

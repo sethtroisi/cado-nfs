@@ -59,7 +59,7 @@ if __name__ == '__main__':
     logger.addHandler(filehandler)
     
     logger.info("Command line parameters: %s", 
-                " ".join(map(shellquote, sys.argv)))
+                " ".join([shellquote(arg, idx == 0) for idx, arg in enumerate(sys.argv)]))
 
     logger.debug("Root parameter dictionary:\n%s", parameters)
 
@@ -80,24 +80,32 @@ if __name__ == '__main__':
                                                path_prefix = [])
     factors = factorjob.run()
     
-    dlp_param = parameters.myparams(("dlp",), "")
-    dlp = dlp_param.get("dlp", False)
+    dlp_param = parameters.myparams({"dlp": False,}, "")
+    dlp = dlp_param["dlp"]
+    checkdlp_param = parameters.myparams({"checkdlp": True ,}, "")
+    checkdlp = checkdlp_param["checkdlp"]
+
     if not dlp:
         if factors is None:
             sys.exit("Error occurred, terminating")
         else:
             print(" ".join(factors))
     else:
-        p = int(factors[0])
-        ell = int(factors[1])
-        log2 = int(factors[2])
-        log3 = int(factors[3])
-        assert (p-1) % ell == 0
-        assert pow(3, log2*((p-1) // ell), p) == pow(2, log3*((p-1) // ell), p)
-        print("p = " + str(p))
-        print("ell = " + str(ell))
-        print("log2 = " + str(log2))
-        print("log3 = " + str(log3))
-        print("The other logarithms of the factor base elements are in %s" %
-                tasksparams["workdir"] + os.sep + tasksparams["name"] +
-                ".reconstructlog.dlog")
+        if checkdlp:
+            if factors is None:
+                sys.exit("Error occurred, terminating")
+            p = int(factors[0])
+            ell = int(factors[1])
+            log2 = int(factors[2])
+            log3 = int(factors[3])
+            assert (p-1) % ell == 0
+            assert pow(3, log2*((p-1) // ell), p) == pow(2, log3*((p-1) // ell), p)
+            print("p = " + str(p))
+            print("ell = " + str(ell))
+            print("log2 = " + str(log2))
+            print("log3 = " + str(log3))
+            print("The other logarithms of the factor base elements are in %s" %
+                    tasksparams["workdir"] + os.sep + tasksparams["name"] +
+                    ".reconstructlog.dlog")
+        else:
+            print("No check was performed. Logarithms of the factor base elements are in %s" % tasksparams["workdir"] + os.sep + tasksparams["name"] + ".reconstructlog.dlog")

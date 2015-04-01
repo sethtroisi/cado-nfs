@@ -21,6 +21,7 @@ import cadocommand
 import wuserver
 import workunit
 from struct import error as structerror
+from shutil import rmtree
 from workunit import Workunit
 
 # Patterns for floating-point numbers
@@ -63,6 +64,25 @@ class Polynomial(list):
     >>> p[0] = 1
     >>> p.degree == 0
     True
+    >>> p[42] = 1
+    >>> p.degree == 42
+    True
+    >>> p[42] = 0
+    >>> p.degree == 0
+    True
+    >>> p = Polynomial([3,2,1]) # x^2 + 2*x + 3
+    >>> p.eval(0)
+    3
+    >>> p.eval(1)
+    6
+    >>> p.eval(2)
+    11
+    >>> p.eval(-3)
+    6
+    >>> p.eval_h(2,7)
+    179
+    >>> p.eval_h(-3,5)
+    54
     """
     @property
     def degree(self):
@@ -72,6 +92,9 @@ class Polynomial(list):
         if index >= len(self):
             self.extend([0]*(index + 1 - len(self)))
         list.__setitem__(self, index, value)
+        # Remove leading zeroes
+        while len(self) > 0 and self[-1] == 0:
+            self.pop()
 
     def __str__(self):
         xpow = ["", "*x"] + ["*x^%d" % i for i in range(2, len(self))]
@@ -91,6 +114,15 @@ class Polynomial(list):
             value = value * x + self[deg - i - 1]
         return value
 
+    def eval_h(self, a, b):
+        """ Evaluate homogenized bi-variate polynomial at a,b  """
+        if len(self) == 0:
+            return 0
+        powers_a = [a**i for i in range(self.degree + 1)]
+        powers_b = [b**i for i in range(self.degree + 1)]
+        return sum([coeff * pow_a * pow_b for (coeff, pow_a, pow_b)
+                    in zip(self, powers_a, reversed(powers_b))])
+
     def same_lc(self, other):
         """ Return true if the two polynomials have the same degree
         and leading coefficient
@@ -109,6 +141,10 @@ class Polynomials(object):
     >>> Polynomials([""])
     Traceback (most recent call last):
     cadotask.PolynomialParseException: No polynomials found
+    >>> t="n: 1021\nc0: 1\nc5: -1\nc5: 1\nY0: 4\nY1: -1\nskew: 1.0\n"
+    >>> p=Polynomials(t.splitlines())
+    Traceback (most recent call last):
+    cadotask.PolynomialParseException: Line 'c5: 1' redefines coefficient of x^5
     >>> t="n: 1021\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\nskew: 1.0\n"
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
@@ -117,11 +153,14 @@ class Polynomials(object):
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
     'n: 1021\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
+    >>> t="n: 1021\npoly0: 1, 2, 3\npoly1: 4, 5, 6\nskew: 1.0\n"
+    >>> p=Polynomials(t.splitlines())
     """
 
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
-    re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*(?:\(.*\))?\s*=", 1))
+    re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
+    re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
@@ -136,12 +175,16 @@ class Polynomials(object):
     
     def __init__(self, lines):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
+            and polyselect_ropt
         """
         self.MurphyE = 0.
+        self.MurphyParams = None
         self.lognorm = 0.
         self.params = {}
         polyf = Polynomial()
         polyg = Polynomial()
+        # in case of multiple fields
+        tabpoly = {}
 
         def match_poly(line, poly, regex):
             match = regex.match(line)
@@ -149,10 +192,26 @@ class Polynomials(object):
                 (idx, coeff) = map(int, match.groups())
                 if idx <= poly.degree and poly[idx]:
                     raise PolynomialParseException(
-                        "Line '%s' redefines value %d" % line)
+                        "Line '%s' redefines coefficient of x^%d"
+                        % (line, idx))
                 poly[idx] = coeff
                 return True
             return False
+
+        # line = "poly0: 1, 2, 3" => poly[0] = {1, 2, 3} = 1+2*X+3*X^2
+        def match_poly_all(line, regex):
+            match = regex.match(line)
+            if match:
+                line2 = line.split(":")
+                # get index of poly
+                ip = int(line2[0].split("poly")[1])
+                # get coeffs of 1+2*X+3*X^2
+                line3=line2[1].split(",")
+                pol = Polynomial()
+                for idx in range(len(line3)):
+                    pol[idx] = int(line3[idx]);
+                return ip, pol
+            return -1, []
 
         for line in lines:
             # print ("Parsing line: >%s<" % line.strip())
@@ -160,12 +219,19 @@ class Polynomials(object):
             # extract the value and store it
             match = self.re_Murphy.match(line)
             if match:
-                self.MurphyE = float(match.group(1))
+                if self.MurphyParams or self.MurphyE:
+                    raise PolynomialParseException(
+                        "Line '%s' redefines Murphy E value" % line)
+                self.MurphyParams = match.group(1)
+                self.MurphyE = float(match.group(2))
                 continue
             # If this is a comment line telling the lognorm,
             # extract the value and store it
             match = self.re_lognorm.match(line)
             if match:
+                if self.lognorm != 0:
+                    raise PolynomialParseException(
+                        "Line '%s' redefines lognorm value" % line)
                 self.lognorm = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
@@ -176,6 +242,11 @@ class Polynomials(object):
             # Try to parse polynomial coefficients
             if match_poly(line, polyf, self.re_pol_f) or \
                     match_poly(line, polyg, self.re_pol_g):
+                continue
+            # is it in format "poly*: ..."
+            ip,tip=match_poly_all(line, self.re_polys)
+            if ip != -1:
+                tabpoly[ip] = tip
                 continue
             # All remaining lines must be of the form "x: y"
             array = line2.split(":")
@@ -203,23 +274,41 @@ class Polynomials(object):
         for (key, (_type, isrequired)) in self.keys.items():
             if isrequired and not key in self.params:
                 raise PolynomialParseException("Key %s missing" % key)
+        if len(tabpoly) > 0:
+            polyg = tabpoly[0]
+            polyf = tabpoly[1]
         self.polyf = polyf
         self.polyg = polyg
+        self.tabpoly = tabpoly
         return
 
     def __str__(self):
         arr = ["%s: %s\n" % (key, self.params[key])
                for key in self.keys if key in self.params]
-        arr += ["c%d: %d\n" % (idx, coeff) for (idx, coeff)
-                in enumerate(self.polyf) if not coeff == 0]
-        arr += ["Y%d: %d\n" % (idx, coeff) for (idx, coeff)
-                in enumerate(self.polyg) if not coeff == 0]
+        if len(self.tabpoly) > 0:
+            for i in range(len(self.tabpoly)):
+                poltmp = self.tabpoly[i]
+                arr += ["poly%d: %s" % (i, poltmp[0])]
+                arr += [","+str(poltmp[j]) for j in range(1, len(poltmp))]
+                arr += "\n"
+        else:
+            arr += ["c%d: %d\n" % (idx, coeff) for (idx, coeff)
+                    in enumerate(self.polyf) if not coeff == 0]
+            arr += ["Y%d: %d\n" % (idx, coeff) for (idx, coeff)
+                    in enumerate(self.polyg) if not coeff == 0]
         if not self.MurphyE == 0.:
-            arr.append("# MurphyE = %g\n" % self.MurphyE)
+            if self.MurphyParams:
+                arr.append("# MurphyE (%s) = %g\n" % (self.MurphyParams, self.MurphyE))
+            else:
+                arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
             arr.append("# lognorm %g\n" % self.lognorm)
-        arr.append("# f(x) = %s\n" % str(self.polyf))
-        arr.append("# g(x) = %s\n" % str(self.polyg))
+        if len(self.tabpoly) > 0:
+            for i in range(len(self.tabpoly)):
+                arr.append("# poly%d = %s\n" % (i, str(self.tabpoly[i])))
+        else:
+            arr.append("# f(x) = %s\n" % str(self.polyf))
+            arr.append("# g(x) = %s\n" % str(self.polyg))
         return "".join(arr)
 
     def __eq__(self, other):
@@ -244,6 +333,15 @@ class Polynomials(object):
         return self.polyf.same_lc(other.polyf) and \
                self.polyg.same_lc(other.polyg)
 
+    def get_polynomial(self, side):
+        """ Returns one of the two polynomial as indexed by side """
+        assert side == 0 or side == 1
+        # Welp, f is side 1 and g is side 0 :(
+        if side == 0:
+            return self.polyg
+        else:
+            return self.polyf
+
 
 class FilePath(object):
     """ A class that represents a path to a file, where the path should be
@@ -253,11 +351,13 @@ class FilePath(object):
     path relative to the working directory. For persistent storage in the DB,
     the path relative to the workdir should be used, whereas for any file
     accesses, the full path needs to be used.
+    It also piggy-backs a version information field.
     """
 
-    def __init__(self, workdir, filepath):
+    def __init__(self, workdir, filepath, version=None):
         self.workdir = workdir.rstrip(os.sep)
         self.filepath = filepath
+        self.version = version
 
     def __str__(self):
         return "%s%s%s" % (self.workdir, os.sep, self.filepath)
@@ -270,6 +370,9 @@ class FilePath(object):
 
     def isdir(self):
         return os.path.isdir(str(self))
+
+    def get_version(self):
+        return self.version
 
     def mkdir(self, *, parent=False, mode=None):
         """ Creates a directory.
@@ -297,6 +400,8 @@ class FilePath(object):
         return os.path.realpath(str(self))
     def open(self, *args, **kwargs):
         return open(str(self), *args, **kwargs)
+    def rmtree (self, ignore_errors=False):
+        rmtree(str(self), ignore_errors)
 
 
 class WorkDir(object):
@@ -328,8 +433,8 @@ class WorkDir(object):
         self.jobname = jobname
         self.taskname = taskname
     
-    def path_in_workdir(self, filename):
-        return FilePath(self.workdir, filename)
+    def path_in_workdir(self, filename, version=None):
+        return FilePath(self.workdir, filename, version=version)
     
     def make_filename2(self, jobname=None, taskname=None, filename=None):
         if jobname is None:
@@ -401,6 +506,8 @@ class Statistics(object):
         """
         for (key, types, defaults, combine, regex) in self.conversions:
             if key in stats:
+                if key in self.stats:
+                    print("duplicate %s\n" % key)
                 assert not key in self.stats
                 self.stats[key] = self._from_str(stats.get(key, defaults),
                                                  types)
@@ -776,12 +883,12 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         """ Return tuple with number of seconds of cpu and real time spent
         by all programs of this Task
         """
-        times = [self.get_cpu_real_time(p) for p in self.programs]
+        times = [self.get_cpu_real_time(p) for p, o, i in self.programs]
         times = tuple(map(sum, zip(*times)))
         return times[0 if is_cpu else 1]
 
     def print_stats(self):
-        for program in self.programs:
+        for program, o, i in self.programs:
             cputotal, realtotal  = self.get_cpu_real_time(program)
             self.print_cpu_real_time(cputotal, realtotal, program.name)
         super().print_stats()
@@ -801,13 +908,13 @@ class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.did_import = False
+        self._did_import = False
 
     def run(self):
         super().run()
-        if "import" in self.params and not self.did_import:
+        if "import" in self.params and not self._did_import:
             self.import_files(self.params["import"])
-            self.did_import = True
+            self._did_import = True
 
     def import_files(self, input_filename):
         if input_filename.startswith('@'):
@@ -820,10 +927,21 @@ class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
         for filename in filenames:
             self.import_one_file(filename)
 
+    def did_import(self):
+        return self._did_import
+
     @abc.abstractmethod
     def import_one_file(self, filename):
         pass
 
+def chain_dict(d1, d2):
+    """ Chain two mappings.
+
+    If d[x] == y and e[y] == z, then chain_dict(d, e)[x] == z.
+    >>> chain_dict({1: 17}, {17: 42})
+    {1: 42}
+    """
+    return {key: d2[value] for key, value in d1.items()}
 
 class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
            cadoparams.UseParameters, Runnable, metaclass=abc.ABCMeta):
@@ -835,17 +953,13 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     # Properties that subclasses need to define
     @abc.abstractproperty
     def programs(self):
-        # A list of classes of Programs which this tasks uses
-        pass
-    @abc.abstractproperty
-    def progparam_override(self):
-        # A list of lists of program parameters that get overridden by the
-        # Task, such as admin for polyselect2l. Specifying these overridden
-        # parameters here lets cadofactor print a warning message when the
-        # user tries to supply them in the parameter file. Not specifying
-        # them here may also lead to a program abort, when a parameter is
-        # specified both in the progparams dictionary (as extracted via
-        # .myparams()) and as a direct parameter as supplied by the Task.
+        # A tuple of 3-tuples, with each 3-tuple containing
+        # 1. the class of Program which this tasks uses
+        # 2. a tuple of parameters to the Program which the Task computes and
+        #    which therefore should not be filled in from the Parameters file
+        # 3. a dict of parameters which are file names and which should be
+        #    filled in by sending Requests to other Tasks. This also enables
+        #    testing whether input files have been changed by the other Task.
         pass
     @abc.abstractproperty
     def paramnames(self):
@@ -874,8 +988,15 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.debug("self.parameters = %s", self.parameters)
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
+        # The progparams entries should not be modified after a class'
+        # constuctor (within __init__() is fine tho)
         self.progparams = []
-        for prog, override in zip(self.programs, self.progparam_override):
+        for prog, override, needed_input in self.programs:
+            # Parameters listed in needed_input are assumed to be overridden
+            for key in (set(override) & set(needed_input)):
+                self.logger.warning("Parameter %s listed in both overridden "
+                                    "parameters and in input files for %s, "
+                                    "only one is needed", key, prog.name)
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
             for param in set(override) & set(progparams):
@@ -902,13 +1023,84 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
+        # Make set of requests so multiply listed requests are sent only once
+        # The input_file dict maps key -> Request. Make set union of requests
+        requests = set.union(*[set(i.values()) for p, o, i in self.programs])
+        # Make dict mapping Request -> answer (i.e., FileName object)
+        answers = self.batch_request(dict(zip(requests, requests)))
+        # Make list of dicts mapping key -> answer
+        self._input_files = [chain_dict(i, answers) for p, o, i in self.programs]
+        # Since merged_args is re-generated in each run(), the subclass can
+        # modify it as it pleases (unlike progparams)
+        # For each program, merge the progparams and the input_files dicts
+        self.merged_args = [dict(p.items() | i.items())
+                            for p, i in zip(self.progparams, self._input_files)]
 
     def translate_input_filename(self, filename):
         return filename
 
     def test_outputfile_exists(self, filename):
         return filename.isfile()
-    
+
+    def cmp_input_version(self, state_key, version):
+        """ Compare the version of the input file with the version we have
+        processed before
+
+        Returns None if filename does not include file version information,
+        returns -2 if we have never processed the file before,
+        returns -1 if the previously processed file is older,
+        returns 0 if they are the same version,
+        throws an exception if the processed version is newer than the
+        current one.
+        """
+        if version is None:
+            return None
+        if not state_key in self.state:
+            return -2
+        if self.state[state_key] < version:
+            return -1
+        if self.state[state_key] == version:
+            return 0
+        raise ValueError("Previously processed version is newer than current")
+
+
+    @staticmethod
+    def _input_file_to_state_dict(key, index, filename):
+        return ("processed_version_%d_%s" % (index, key), filename.get_version())
+
+    def have_new_input_files(self):
+        # Change this to "self.logger.info" for showing each check on screen
+        log = self.logger.debug
+        result = False
+        for index, input_files in enumerate(self._input_files):
+            for key, filename in input_files.items():
+                (state_key, version) = \
+                    self._input_file_to_state_dict(key, index, filename)
+                c = self.cmp_input_version(state_key, version)
+                if c == -2:
+                    log("File %s was not processed before", filename)
+                    result = True
+                if c == -1:
+                    log("File %s is newer than last time", filename)
+                    result = True
+        # Collapse programs from all dict into one set
+        all = set.union(*[set(i.values()) for i in self._input_files])
+        if result is False and all:
+            (n, v) = (("", "is"), ("s", "are"))[len(all) > 1]
+            log("Input file%s %s %s unchanged since last time",
+                n, ", ".join(map(str, all)), v)
+        return result
+
+    def remember_input_versions(self, commit=True):
+        update = {}
+        for index, input_files in enumerate(self._input_files):
+            for (key, filename) in input_files.items():
+                (state_key, version) = \
+                    self._input_file_to_state_dict(key, index, filename)
+                if version is not None:
+                    update[state_key] = version
+        self.state.update(update, commit)
+
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
         """ Check that the output files in "filenames" exist or don't exist,
@@ -1098,17 +1290,31 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         """
         request = Request(self, key, *args)
         return super().send_request(request)
-    
+
+    def batch_request(self, requests):
+        """ Given a dict from keys to Request objects, return a dict with the
+        same keys to the results of the requests.
+        """
+        return {key: self.send_request(request) for key, request in requests.items()}
+
     def get_number_outstanding_wus(self):
         return 0
     
     def verification(self, wuid, ok, *, commit):
         pass
 
-    def get_state_filename(self, key):
+    def get_state_filename(self, key, version=None):
+        """ Return a file name stored in self.state as a FilePath object
+        
+        If a version parameter is passed, then this version is set as the
+        version field of the FilePath object. If no parameter is passed, but
+        our state includes an "output_version" key, then that is used.
+        """
         if not key in self.state:
             return None
-        return self.workdir.path_in_workdir(self.state[key])
+        if version is None:
+            version = self.state.get("output_version", None)
+        return self.workdir.path_in_workdir(self.state[key], version)
 
     def make_std_paths(self, progname, do_increment=True):
         count = self.state.get("stdiocount", 0)
@@ -1134,6 +1340,14 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
 
+    def make_filelist(self, files):
+        """ Create file file containing a list of files, one per line """
+        filelist_idx = self.state.get("filelist_idx", 0) + 1
+        self.state["filelist_idx"] = filelist_idx
+        filelistname = self.workdir.make_filename("filelist.%d" % filelist_idx)
+        with filelistname.open("w") as filelistfile:
+            filelistfile.write("\n".join(files) + "\n")
+        return filelistname
 
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
@@ -1197,7 +1411,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
                                   (wuid, cmdline))
     
     def verification(self, wuid, ok, *, commit):
-        """ Mark a workunit as received and update wu_received counter """
+        """ Mark a workunit as verified ok or verified with error and update
+        wu_received counter """
         ok_str = "ok" if ok else "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
@@ -1273,7 +1488,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         cutoff = str(datetime.datetime.utcnow() - delta)
         # self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
         #                   cutoff, now)
-        results = self.wuar.query(eq={"status":1}, lt={"timeassigned": cutoff})
+        results = self.wuar.query(eq={"status": wudb.WuStatus.ASSIGNED},
+                                      lt={"timeassigned": cutoff})
         if not results:
             # self.logger.debug("Found no timed-out workunits")
             pass
@@ -1317,20 +1533,18 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         return "Polynomial Selection (size optimized)"
     @property
     def programs(self):
-        return (cadoprograms.Polyselect2l,)
-    @property
-    def progparam_override(self):
         # admin and admax are special, which is a bit ugly: these parameters
         # to the Polyselect2l constructor are supplied by the task, but the
         # task has itself admin, admax parameters, which specify the total
         # size of the search range. Thus we don't include admin, admax here,
         # or PolyselTask would incorrectly warn about them not being used.
-        return [[]]
+        return ((cadoprograms.Polyselect2l, (), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "adrange": int, "admin": 0, "admax": int,
-            "I": int, "alim": int, "rlim": int, "nrkeep": 20})
+            "N": int, "adrange": int, "admin": 0, "admax": int,
+            "I": int, "alim": int, "rlim": int, "nrkeep": 20,
+            "import_sopt": [str]})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
@@ -1424,8 +1638,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                 [" {stats_raw_logmu[%d]}" % i for i in range(10)],
             ["10 best opt logmu:"] +
                 [" {stats_opt_logmu[%d]}" % i for i in range(10)],
-            ["Total time: {stats_total_time[0]:g}",
-             ", rootsieve time: {stats_rootsieve_time[0]:g}"]
+            ["Total time: {stats_total_time[0]:g}"],
             )
     
     
@@ -1435,10 +1648,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         assert self.params["nrkeep"] > 0
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), self.params["admin"])
-        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
-                * self.params["alim"])
-        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
-        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
         # Remove admin and admax from the parameter-file-supplied program
         # parameters as those would conflict with the computed values
         self.progparams[0].pop("admin", None)
@@ -1450,6 +1659,11 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         self._check_best_polynomials()
 
         self.poly_heap = []
+        # If we have "import", discard any existing polynomials
+        if "import" in self.params and self.best_polynomials:
+            self.logger.warning('Have "import" parameter, discarding '
+                                'previously found polynomials')
+            self.best_polynomials.clear()
         self.import_existing_polynomials()
         self._check_best_polynomials()
         self._compare_heap_db()
@@ -1508,7 +1722,23 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                     print("Adding lognorm=%f, key=%s" % (poly.lognorm, oldkey))
 
     def run(self):
+        if self.send_request(Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL):
+            self.logger.info("Skipping this phase, as we will import the final polynomial")
+            return True
+
         super().run()
+
+        if self.did_import() and "import_sopt" in self.params:
+            self.logger.critical("The import and import_sopt parameters "
+                                 "are mutually exclusive")
+            return False
+
+        if self.did_import():
+            self.logger.info("Imported polynomial(s), skipping this phase")
+            return True
+
+        if "import_sopt" in self.params:
+            self.import_files(self.params["import_sopt"])
 
         worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
                 if self.poly_heap else ""
@@ -1623,6 +1853,10 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         poly = self.parse_poly(text, filename)
         if poly is None:
             return (0, 0)
+        if poly.getN() != self.params["N"]:
+            self.logger.error("Polynomial is for the wrong number to be factored:\n%s",
+                              poly)
+            return (0, 0)
         if not poly.lognorm:
             self.logger.warn("Polynomial in file %s has no lognorm, skipping it",
                              filename)
@@ -1725,13 +1959,13 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         # coefficients of both polynomials
         found = None
         for (index, (lognorm, (key, poly))) in enumerate(self.poly_heap):
-            if search_poly.same_lc(poly):
+            if search_poly.polyg.same_lc(poly.polyg):
                if not found is None:
-                   self.logger.error("Found more than one match for %s", search_poly)
+                   self.logger.warning("Found more than one match for %s", search_poly)
                else:
                    found = index
         if found is None:
-            self.logger.error("Could not find polynomial rank for %s", search_poly)
+            self.logger.warning("Could not find polynomial rank for %s", search_poly)
             return None
         # print("search_poly: %s" % search_poly)
         # print("Poly found in heap: %s" % self.poly_heap[found][1][1])
@@ -1756,7 +1990,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         else:
             p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
                                           stdout=str(outputfile),
-                                          sizeonly=True,
                                           **self.progparams[0])
             self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
         self.state.update({"adnext": adend}, commit=True)
@@ -1776,14 +2009,12 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         return "Polynomial Selection (root optimized)"
     @property
     def programs(self):
-        return (cadoprograms.Polyselect2l,)
-    @property
-    def progparam_override(self):
-        return [[]]
+        return ((cadoprograms.PolyselectRopt, (), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "I": int, "alim": int, "rlim": int, "batch": 5})
+            "N": int, "I": int, "alim": int, "rlim": int, "batch": [int],
+            "import_ropt": [str]})
     @property
     def stat_conversions(self):
         return (
@@ -1805,14 +2036,18 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def stat_formats(self):
         return (
-            ["Total time: {stats_total_time[0]:g}",
-             ", rootsieve time: {stats_rootsieve_time[0]:g}"],
+            ["Total time: {stats_total_time[0]:g}"],
+            ["Rootsieve time: {stats_rootsieve_time[0]:g}"],
             )
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.bestpoly = None
+        if "import" in self.params and "bestpoly" in self.state:
+            self.logger.warning('Have "import" parameter, discarding '
+                                'previously found best polynomial')
+            self.state.clear(["bestpoly", "bestfile"])
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.state.setdefault("nr_poly_submitted", 0)
@@ -1820,6 +2055,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                 * self.params["alim"])
         self.progparams[0].setdefault("Bf", float(self.params["alim"]))
         self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+        if not "batch" in self.params:
+            t = self.progparams[0].get("threads", 1)
+            # batch = 5 rounded up to a multiple of t
+            self.params["batch"] = (4 // t + 1) * t
         self.poly_to_submit = None
 
     def run(self):
@@ -1832,6 +2071,18 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                              "Murphy_E = %g",
                              self.state["bestfile"], self.bestpoly.MurphyE)
         
+        if self.did_import() and "import_ropt" in self.params:
+            self.logger.critical("The import and import_ropt parameters "
+                                 "are mutually exclusive")
+            return False
+
+        if self.did_import():
+            self.logger.info("Imported polynomial, skipping this phase")
+            return True
+
+        if "import_ropt" in self.params:
+            self.import_files(self.params["import_ropt"])
+
         # Get the list of polynomials to submit
         self.poly_to_submit = self.send_request(Request.GET_RAW_POLYNOMIALS)
         
@@ -1876,7 +2127,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             # This notification was not for me
             return False
         if self.handle_error_result(message):
-            return False
+            return True
         (filename, ) = message.get_output_files()
         self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
@@ -1932,6 +2183,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         if not poly:
             self.logger.info('No polynomial found in %s', filename)
             return None
+        if poly.getN() != self.params["N"]:
+            self.logger.error("Polynomial is for the wrong number to be factored:\n%s",
+                              poly)
+            return None
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
@@ -1982,22 +2237,82 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            p = cadoprograms.Polyselect2l(rootsieve=str(inputfilename),
-                                          stdout=str(outputfile),
-                                          **self.progparams[0])
+            p = cadoprograms.PolyselectRopt(inputpolys=str(inputfilename),
+                                            stdout=str(outputfile),
+                                            **self.progparams[0])
             self.submit_command(p, "%d" % nr, commit=False)
         self.state.update({"nr_poly_submitted": nr + batchsize}, commit=True)
 
     def get_total_cpu_or_real_time(self, is_cpu):
-        """ Return number of seconds of cpu time spent by polyselect2l """
+        """ Return number of seconds of cpu time spent by polyselect_ropt """
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
     def print_rank(self):
-        if not self.did_import:
+        if not self.did_import():
             rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
             if not rank is None:
                 self.logger.info("Best overall polynomial was %d-th in list "
                                  "after size optimization", rank)
+    def get_will_import(self):
+        return "import" in self.params
+
+class PolyselGFpn(Task, DoesImport):
+    """ Polynomial selection for DL in extension fields """
+    @property
+    def name(self):
+        return "polyselgfpn"
+    @property
+    def title(self):
+        return "Polynomial Selection (for GF(p^n))"
+    @property
+    def programs(self):
+        override = ("p", "n", "out")
+        return ((cadoprograms.PolyselectGFpn, (override), {}),)
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames,
+                {"N": int, "gfpext": int, "import": str})
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        super().run()
+
+        if not "polyfile" in self.state:
+            if gfpext != 2:
+                raise Exception("Polynomial selection not implemented " 
+                    + "for extension degree > 2")
+            polyfilename = self.workdir.make_filename("poly")
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.PolyselectGFpn.name)
+            p = cadoprograms.PolyselectGFpn(p=N, n=gfpext, out=polyfilename,
+                    stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.merged_args[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            import_one_file(polyfilename)
+
+    def import_one_file(self, filename):
+        with open(filename, "r") as inputfile:
+            poly = Polynomials(list(inputfile))
+        assert poly != None
+        update = {"poly": str(poly), "polyfile": filename}
+        self.state.update(update)
+
+    def get_poly(self):
+        return self.state["poly"];
+
+    def get_poly_filename(self):
+        return self.state["poly_filename"];
+
+    def get_have_two_alg_sides(self):
+        P = Polynomials(self.state["poly"].splitlines())
+        return (P.polyf.degree > 1 and P.polyg.degree > 1)
+
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
@@ -2009,10 +2324,7 @@ class FactorBaseTask(Task):
         return "Generate Factor Base"
     @property
     def programs(self):
-        return (cadoprograms.MakeFB,)
-    @property
-    def progparam_override(self):
-        return [["poly", "out", "side"]]
+        return ((cadoprograms.MakeFB, ("out", "side"), {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
@@ -2022,10 +2334,13 @@ class FactorBaseTask(Task):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
-        # must also have a polynomial (in self.state["poly"])
+        # must also have a polynomial (in self.state["poly"] ) and the alim
+        # value used in self.state["alim"]
         if "outputfile" in self.state:
             assert "poly" in self.state
+            assert "alim" in self.state
             # The target file must correspond to the polynomial "poly"
+        self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
     
     def run(self):
         super().run()
@@ -2036,21 +2351,32 @@ class FactorBaseTask(Task):
             raise Exception("FactorBaseTask(): no polynomial "
                             "received from PolyselTask")
         twoalgsides = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        check_params = {key: self.params[key]
+                        for key in ["alim", "rlim"][0:1 + twoalgsides]}
         
-        # Check if we have already computed the target file for this polynomial
-        if "poly" in self.state:
+        # Check if we have already computed the outputfile for this polynomial
+        # and fbb. If any of the inputs mismatch, we remove outputfile from
+        # state
+        if "outputfile" in self.state:
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                if "outputfile" in self.state:
-                    self.logger.info("Received different polynomial, "
-                                     "discarding old one")
-                    del(self.state["outputfile"])
-                self.state["poly"] = str(poly)
-        else:
-            self.state["poly"] = str(poly)
-        
+                self.logger.warn("Received different polynomial, "
+                                 "discarding old factor base file")
+                del(self.state["outputfile"])
+            else:
+                for key in check_params:
+                    if self.state[key] != check_params[key]:
+                        self.logger.warn("Parameter %s changed, discarding old "
+                                         "factor base file", key)
+                        del(self.state["outputfile"])
+                    break
+        # If outputfile is not in state, because we never produced it or because
+        # input parameters changed, we remember our current input parameters
         if not "outputfile" in self.state:
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            check_params["poly"] = str(poly)
+            self.state.update(check_params)
+        
+        if not "outputfile" in self.state or self.have_new_input_files():
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
@@ -2062,37 +2388,33 @@ class FactorBaseTask(Task):
                 outputfilename1 = self.workdir.make_filename("roots1" + use_gz)
 
             # Run command to generate factor base file
-            self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.MakeFB.name)
             if not twoalgsides:
-                p = cadoprograms.MakeFB(poly=polyfilename,
-                                    out=str(outputfilename),
+                p = cadoprograms.MakeFB(out=str(outputfilename),
                                     lim=self.params["alim"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[0])
+                                    **self.merged_args[0])
                 message = self.submit_command(p, "", log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
             else:
-                p = cadoprograms.MakeFB(poly=polyfilename,
-                                    out=str(outputfilename0),
+                p = cadoprograms.MakeFB(out=str(outputfilename0),
                                     side=0,
                                     lim=self.params["rlim"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[0])
+                                    **self.merged_args[0])
                 message = self.submit_command(p, "", log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
-                p = cadoprograms.MakeFB(poly=polyfilename,
-                                    out=str(outputfilename1),
+                p = cadoprograms.MakeFB(out=str(outputfilename1),
                                     side=1,
                                     lim=self.params["alim"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[0])
+                                    **self.merged_args[0])
                 message = self.submit_command(p, "", log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
@@ -2130,14 +2452,15 @@ class FreeRelTask(Task):
         return "Generate Free Relations"
     @property
     def programs(self):
-        return (cadoprograms.FreeRel,)
-    @property
-    def progparam_override(self):
-        return [["poly", "renumber", "badideals", "out"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
+        if self.params["dlp"]:
+            input["badideals"] = Request.GET_BADIDEAL_FILENAME
+        return ((cadoprograms.FreeRel, ("renumber", "out"), input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
                 {"dlp": False, "gzip": True, "addfullcol": None})
+
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -2146,10 +2469,16 @@ class FreeRelTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        if self.params["dlp"]:
+            # default for dlp is addfullcol
+            self.progparams[0].setdefault("addfullcol", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
-        # then we must also have a polynomial (in self.state["poly"])
+        # then we must also have a polynomial (in self.state["poly"]) and
+        # the lpba/lpbr values used in self.state["lpba"] / ["lpbr"]
         if "freerelfilename" in self.state:
             assert "poly" in self.state
+            assert "lpba" in self.state
+            assert "lpbr" in self.state
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
@@ -2160,24 +2489,32 @@ class FreeRelTask(Task):
         if not poly:
             raise Exception("FreerelTask(): no polynomial "
                             "received from PolyselTask")
-        
-        # Check if we have already computed the target file for this polynomial
-        if "poly" in self.state:
+
+        # Check if we have already computed the freerelfile for this polynomial
+        # and lpb. If any of the inputs mismatch, we remove freerelfilename
+        # from state
+        if "freerelfilename" in self.state:
+            discard = False
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                if "freerelfilename" in self.state:
-                    self.logger.info("Received different polynomial, "
-                                     "discarding old one")
-                    del(self.state["freerelfilename"])
-                    del(self.state["renumberfilename"])
-                self.state["poly"] = str(poly)
-        else:
-            self.state["poly"] = str(poly)
-        
+                self.logger.warn("Received different polynomial, discarding "
+                                 "old free relations file")
+                discard = True
+            elif self.state["lpba"] != self.progparams[0]["lpba"] or \
+                 self.state["lpbr"] != self.progparams[0]["lpbr"]:
+                self.logger.warn("Parameter lpba/lpbr changed, discarding old "
+                                 "free relations file")
+                discard = True
+            if discard:
+                del(self.state["freerelfilename"])
+                del(self.state["renumberfilename"])
+        # If outputfile is not in state, because we never produced it or because
+        # input parameters changed, we remember our current input parameters
         if not "freerelfilename" in self.state:
-            # Write polynomial to a file
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            
+            self.state.update({"poly": str(poly), "lpba": self.progparams[0]["lpba"],
+                               "lpbr": self.progparams[0]["lpbr"]})
+
+        if not "freerelfilename" in self.state or self.have_new_input_files():
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
@@ -2185,26 +2522,12 @@ class FreeRelTask(Task):
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.FreeRel.name)
-            if self.params["dlp"]:
-                badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
-                # default for dlp is addfullcol
-                if not "addfullcol" in self.progparams[0]:
-                    self.progparams[0]["addfullcol"] = True;
-                p = cadoprograms.FreeRel(poly=polyfilename,
-                                         renumber=renumberfilename,
-                                         badideals=badidealfilename,
-                                         out=str(freerelfilename),
-                                         stdout=str(stdoutpath),
-                                         stderr=str(stderrpath),
-                                         **self.progparams[0])
-            else:
-                # Run command to generate factor base/free relations file
-                p = cadoprograms.FreeRel(poly=polyfilename,
-                                         renumber=renumberfilename,
-                                         out=str(freerelfilename),
-                                         stdout=str(stdoutpath),
-                                         stderr=str(stderrpath),
-                                         **self.progparams[0])
+            # Run command to generate factor base/free relations file
+            p = cadoprograms.FreeRel(renumber=renumberfilename,
+                                     out=str(freerelfilename),
+                                     stdout=str(stdoutpath),
+                                     stderr=str(stderrpath),
+                                     **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -2260,15 +2583,15 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return "Lattice Sieving"
     @property
     def programs(self):
-        return (cadoprograms.Las,)
-    @property
-    def progparam_override(self):
-        return [["q0", "q1", "poly", "factorbase", "out", "stats_stderr"]]
+        override = ("q0", "q1", "factorbase", "out", "stats_stderr")
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
+        return ((cadoprograms.Las, override, input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "qmin": 0, "qrange": int, "rels_wanted": 1, "alim": int, 
             "gzip": True})
+
     @property
     def stat_conversions(self):
         # Average J=1017 for 168 special-q's, max bucket fill 0.737035
@@ -2334,6 +2657,12 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     
     def run(self):
         super().run()
+        have_two_alg = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        if have_two_alg:
+            fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
+            fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
+        else:
+            factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
 
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
@@ -2344,22 +2673,17 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                 self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output",
                                    shouldexist=False)
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            if not self.send_request(Request.GET_HAVE_TWO_ALG_SIDES):
-                factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
+            if not have_two_alg:
                 p = cadoprograms.Las(q0=q0, q1=q1,
-                                     poly=polyfilename, factorbase=factorbase,
+                                     factorbase=factorbase,
                                      out=outputfilename, stats_stderr=True,
-                                     **self.progparams[0])
+                                     **self.merged_args[0])
             else:
-                fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
-                fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
                 p = cadoprograms.Las(q0=q0, q1=q1,
-                                     poly=polyfilename,
                                      factorbase0=fb0,
                                      factorbase1=fb1,
                                      out=outputfilename, stats_stderr=True,
-                                     **self.progparams[0])
+                                     **self.merged_args[0])
             self.submit_command(p, "%d-%d" % (q0, q1), commit=False)
             self.state.update({"qnext": q1}, commit=True)
         self.logger.info("Reached target of %d relations, now have %d",
@@ -2373,7 +2697,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             # This notification was not for me
             return False
         if self.handle_error_result(message):
-            return False
+            return True
         output_files = message.get_output_files()
         assert len(output_files) == 1
         stderrfilename = message.get_stderrfile(0)
@@ -2399,7 +2723,29 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                          rels, filename, self.get_nrels(),
                          self.state["rels_wanted"])
         return True
-    
+
+    re_rel = re.compile(b"(-?\d*),(\d*):(.*)")
+    def verify_relation(self, line, poly):
+        """ Check that the primes listed for a relation divide the value of
+            the polynomials """
+        match = self.re_rel.match(line)
+        if match:
+            a, b, rest = match.groups()
+            a, b = int(a), int(b)
+            sides = rest.split(b":")
+            assert len(sides) == 2
+            for side, primes_as_str in enumerate(sides):
+                value = poly.get_polynomial(side).eval_h(a, b)
+                primes = [int(s, 16) for s in primes_as_str.split(b",")]
+                for prime in primes:
+                    # self.logger.debug("Checking if %d divides %d for a=%d, b=%d", prime, value, a, b)
+                    if value % prime != 0:
+                        self.logger.error("Relation %d,%d invalid: %d does not divide %d",
+                                          a, b, prime, value)
+                        return False
+            return True
+        return None
+
     def parse_rel_count(self, filename):
         (name, ext) = os.path.splitext(filename)
         try:
@@ -2415,8 +2761,19 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                 return None
             else:
                 raise
+        relations_to_check = 10
+        poly = self.send_request(Request.GET_POLYNOMIAL)
         try:
             for line in f:
+                if relations_to_check > 0:
+                    result =  self.verify_relation(line, poly)
+                    if result is True:
+                        relations_to_check -= 1
+                    elif result is False:
+                        f.close()
+                        return None
+                    else: # Did not match: try again
+                        pass
                 match = re.match(br"# Total (\d+) reports ", line)
                 if match:
                     rels = int(match.group(1))
@@ -2493,10 +2850,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
-        return (cadoprograms.Duplicates1,)
-    @property
-    def progparam_override(self):
-        return [["filelist", "prefix", "out"]]
+        return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nslices_log": 1})
@@ -2612,9 +2966,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                                                  stderr=str(stderrpath),
                                                  **self.progparams[0])
                 else:
-                    filelistname = self.workdir.make_filename("filelist")
-                    with filelistname.open("w") as filelistfile:
-                        filelistfile.write("\n".join(newfiles) + "\n")
+                    filelistname = self.make_filelist(newfiles)
                     p = cadoprograms.Duplicates1(filelist=filelistname,
                                                  prefix=prefix,
                                                  out=outputdir,
@@ -2709,14 +3061,15 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, removal pass"
     @property
     def programs(self):
-        return (cadoprograms.Duplicates2,)
-    @property
-    def progparam_override(self):
-        return [["poly", "rel_count", "badidealinfo", "renumber", "filelist"]]
+        input = { "renumber": Request.GET_RENUMBER_FILENAME}
+        if self.params["dlp"]:
+            input["badidealinfo"] = Request.GET_BADIDEALINFO_FILENAME
+        return ((cadoprograms.Duplicates2, ("rel_count", "filelist"), input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "nslices_log": 1})
+
     @property
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
@@ -2751,8 +3104,6 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
 
         input_nrel = 0
         for i in range(0, self.nr_slices):
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            renumber_filename = self.send_request(Request.GET_RENUMBER_FILENAME)
             files = self.send_request(Request.GET_DUP1_FILENAMES, i.__eq__)
             rel_count = self.send_request(Request.GET_DUP1_RELCOUNT, i)
             input_nrel += rel_count
@@ -2773,32 +3124,20 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(name, do_increment=(i == 0))
              
-            if self.params["dlp"]:
-                badinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
-            else:
-                badinfofilename = None
 
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
-                                             poly=polyfilename,
                                              rel_count=rel_count,
-                                             badidealinfo=badinfofilename,
-                                             renumber=renumber_filename,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
-                                             **self.progparams[0])
+                                             **self.merged_args[0])
             else:
-                filelistname = self.workdir.make_filename("filelist")
-                with filelistname.open("w") as filelistfile:
-                    filelistfile.write("\n".join(files) + "\n")
-                p = cadoprograms.Duplicates2(poly=polyfilename,
-                                             rel_count=rel_count,
-                                             badidealinfo=badinfofilename,
-                                             renumber=renumber_filename,
+                filelistname = self.make_filelist(files)
+                p = cadoprograms.Duplicates2(rel_count=rel_count,
                                              filelist=filelistname,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
-                                             **self.progparams[0])
+                                             **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -2882,19 +3221,19 @@ class PurgeTask(Task):
         return "Filtering - Singleton removal"
     @property
     def programs(self):
-        return (cadoprograms.Purge,)
-    @property
-    def progparam_override(self):
-        return [["nrels", "out", "minindex", "outdel", "nprimes", "filelist"]]
+        override = ("nrels", "out", "outdel", "nprimes", "filelist")
+        return ((cadoprograms.Purge, override, {"_freerel": Request.GET_FREEREL_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "galois": False, "gzip": True})
-    
+
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.state.setdefault("input_nrels", 0)
+        # We use a computed keep value for DLP
+        self.keep = self.progparams[0].pop("keep", None)
     
     def run(self):
         super().run()
@@ -2914,9 +3253,17 @@ class PurgeTask(Task):
                 return False
 
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
-        minindex = int(nprimes / 20.0)
+        # If the user didn't give minindex, let's compute it.
+        minindex = int(self.progparams[0].get("minindex", -1))
+        if minindex == -1:
+            minindex = int(nprimes / 20.0)
+            # For small cases, we want to avoid degenerated cases, so let's
+            # keep most of the ideals: memory is not an issue in that case.
+            if (minindex < 10000):
+                minindex = 500
+            self.progparams[0].setdefault("minindex", minindex)
         
-        if "purgedfile" in self.state and \
+        if "purgedfile" in self.state and not self.have_new_input_files() and \
                 input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
@@ -2936,50 +3283,50 @@ class PurgeTask(Task):
         purgedfile = self.workdir.make_filename("purged" + use_gz)
         if self.params["dlp"]:
             relsdelfile = self.workdir.make_filename("relsdel" + use_gz)
+            nmaps = self.send_request(Request.GET_NMAPS)
+            keep = sum(nmaps)
         else:
             relsdelfile = None
-        freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
+            keep = self.keep
+        freerel_filename = self.merged_args[0].pop("_freerel", None)
         # Remark: "Galois unique" and "unique" are in the same files
         # because filter_galois works in place. Same request.
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
-        if not self.params["galois"]:
+        if not self.params["galois"] and freerel_filename is not None:
             files = unique_filenames + [str(freerel_filename)]
         else:
             files = unique_filenames
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
         
-        if self.params["dlp"]:
-            nmaps = self.send_request(Request.GET_NMAPS)
-            self.progparams[0]["keep"] = nmaps
-        
         if len(files) <= 10:
             p = cadoprograms.Purge(*files,
                                    nrels=input_nrels, out=purgedfile,
-                                   outdel=relsdelfile,
-                                   minindex=minindex, nprimes=nprimes,
+                                   outdel=relsdelfile, keep=keep,
+                                   nprimes=nprimes,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         else:
-            filelistname = self.workdir.make_filename("filelist")
-            with filelistname.open("w") as filelistfile:
-                filelistfile.write("\n".join(files))
+            filelistname = self.make_filelist(files)
             p = cadoprograms.Purge(nrels=input_nrels,
-                                   out=purgedfile, minindex=minindex,
-                                   outdel=relsdelfile,
-                                   nprimes=nprimes, filelist=filelistname,
+                                   out=purgedfile,
+                                   outdel=relsdelfile, keep=keep,
+                                   nprimes=nprimes,
+                                   filelist=filelistname,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stderr(stderr, input_nrels):
+        if self.parse_stderr(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
+            output_version = self.state.get("output_version", 0) + 1
             update = {"purgedfile": purgedfile.get_wdir_relative(),
-                      "input_nrels": input_nrels }
+                      "input_nrels": input_nrels,
+                      "output_version": output_version}
             if self.params["dlp"]:
                 update["relsdelfile"] = relsdelfile.get_wdir_relative()
             self.state.update(update)
@@ -3123,7 +3470,15 @@ class PurgeTask(Task):
         # but we allow some extra whitespace
         r = {}
         keys = ("nrels", "nprimes", "weight", "excess")
+        final_values_line = "Final values:"
+        had_final_values = False
         for line in stdout.splitlines():
+            # Look for values only after we saw "Final values:" line
+            if not had_final_values:
+                if re.match(final_values_line, line):
+                    had_final_values = True
+                else:
+                    continue
             for key in keys:
                 # Match the key at the start of a line, or after a whitespace
                 # Note: (?:) is non-capturing group
@@ -3132,10 +3487,13 @@ class PurgeTask(Task):
                     if key in r:
                         raise Exception("Found multiple values for %s" % key)
                     r[key] = int(match.group(1))
+        if not had_final_values:
+            raise Exception("%s: output of %s did not contain '%s'" %
+                            (self.title, self.programs[0][0].name, final_values_line))
         for key in keys:
             if not key in r:
                 raise Exception("%s: output of %s did not contain value for %s: %s"
-                                % (self.title, self.programs[0].name, key, stdout))
+                                % (self.title, self.programs[0][0].name, key, stdout))
         return [r[key] for key in keys]
 
 class FilterGaloisTask(Task):
@@ -3148,10 +3506,9 @@ class FilterGaloisTask(Task):
         return "Filtering - Galois"
     @property
     def programs(self):
-        return (cadoprograms.GaloisFilter,)
-    @property
-    def progparam_override(self):
-        return [["nrels", "poly", "renumber"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "renumber": Request.GET_RENUMBER_FILENAME}
+        return ((cadoprograms.GaloisFilter, ("nrels",), input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"galois": False})
@@ -3169,18 +3526,14 @@ class FilterGaloisTask(Task):
 
         files = self.send_request(Request.GET_UNIQUE_FILENAMES)
         nrels = self.send_request(Request.GET_UNIQUE_RELCOUNT)
-        polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-        renumber_filename = self.send_request(Request.GET_RENUMBER_FILENAME)
 
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.GaloisFilter.name)
         # TODO: if there are too many files, pass a filelist (cf PurgeTask)
         p = cadoprograms.GaloisFilter(*files,
                 nrels=nrels,
-                poly=polyfilename,
-                renumber=renumber_filename,
                 stdout=str(stdoutpath),
                 stderr=str(stderrpath),
-                **self.progparams[0])
+                **self.merged_args[0])
         message = self.submit_command(p, "", log_errors=True)
         if message.get_exitcode(0) != 0:
             raise Exception("Program failed")
@@ -3216,11 +3569,9 @@ class MergeDLPTask(Task):
         return "Filtering - Merging"
     @property
     def programs(self):
-        return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
-    @property
-    def progparam_override(self):
-        return [["mat", "out", "keep"],
-            ["purged", "ideals", "history", "index", "out"]]
+        input = {"purged": Request.GET_PURGED_FILENAME}
+        return ((cadoprograms.MergeDLP, ("out", "keep"), input),
+                (cadoprograms.ReplayDLP, ("ideals", "history", "index", "out"), input))
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True})
@@ -3233,7 +3584,8 @@ class MergeDLPTask(Task):
     def run(self):
         super().run()
 
-        if not "mergedfile" in self.state:
+        if not "mergedfile" in self.state or self.have_new_input_files():
+
             if "idealfile" in self.state:
                 del(self.state["idealfile"])
             if "indexfile" in self.state:
@@ -3243,32 +3595,30 @@ class MergeDLPTask(Task):
             if "densefile" in self.state:
                 del(self.state["densefile"])
             
-            purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-            keep = self.send_request(Request.GET_NMAPS)
+            nmaps = self.send_request(Request.GET_NMAPS)
+            keep = nmaps[0] + nmaps[1]
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MergeDLP.name)
-            p = cadoprograms.MergeDLP(mat=purged_filename,
-                                   out=historyfile,
+            p = cadoprograms.MergeDLP(out=historyfile,
                                    keep=keep,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
-                                   **self.progparams[0])
+                                   **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
             indexfile = self.workdir.make_filename("index" + use_gz)
-            mergedfile = self.workdir.make_filename("sparse.txt")
+            mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             idealfile = self.workdir.make_filename("ideal")
-            p = cadoprograms.ReplayDLP(purged=purged_filename,
-                                    ideals=idealfile,
+            p = cadoprograms.ReplayDLP(ideals=idealfile,
                                     history=historyfile, index=indexfile,
                                     out=mergedfile, stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[1])
+                                    **self.merged_args[1])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3279,15 +3629,18 @@ class MergeDLPTask(Task):
                 raise Exception("Output file %s does not exist" % indexfile)
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
+            output_version = self.state.get("output_version", 0) + 1
+            self.remember_input_versions(commit=False)
             update = {"indexfile": indexfile.get_wdir_relative(),
                       "mergedfile": mergedfile.get_wdir_relative(),
-                      "idealfile": idealfile.get_wdir_relative()}
+                      "idealfile": idealfile.get_wdir_relative(),
+                      "output_version": output_version}
             densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
                 update["densefile"] = densefilename.get_wdir_relative()
             self.state.update(update)
             
-        self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+        self.logger.debug("Exit MergeDLPTask.run(" + self.name + ")")
         return True
     
     def get_index_filename(self):
@@ -3313,10 +3666,9 @@ class MergeTask(Task):
         return "Filtering - Merging"
     @property
     def programs(self):
-        return (cadoprograms.Merge, cadoprograms.Replay)
-    @property
-    def progparam_override(self):
-        return [["mat", "out"], ["purged", "history", "index"]]
+        input = {"purged": Request.GET_PURGED_FILENAME}
+        return ((cadoprograms.Merge, ("out",), input),
+                (cadoprograms.Replay, ("history", "index"), input))
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,  \
@@ -3332,24 +3684,25 @@ class MergeTask(Task):
     def run(self):
         super().run()
 
-        if not "mergedfile" in self.state:
+        if "mergedfile" in self.state:
+            fn = self.workdir.path_in_workdir(self.state["mergedfile"])
+            if not fn.isfile():
+                self.logger.warning("Output file %s disappeared, generating it again", fn)
+                del(self.state["mergedfile"])
+        if not "mergedfile" in self.state or self.have_new_input_files():
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
-            if "mergedfile" in self.state:
-                del(self.state["mergedfile"])
             if "densefile" in self.state:
                 del(self.state["densefile"])
             
-            purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
-            p = cadoprograms.Merge(mat=purged_filename,
-                                   out=historyfile,
+            p = cadoprograms.Merge(out=historyfile,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
-                                   **self.progparams[0])
+                                   **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3357,11 +3710,10 @@ class MergeTask(Task):
             indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
-            p = cadoprograms.Replay(purged=purged_filename,
-                                    history=historyfile, index=indexfile,
+            p = cadoprograms.Replay(history=historyfile, index=indexfile,
                                     out=mergedfile, stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[1])
+                                    **self.merged_args[1])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3370,8 +3722,11 @@ class MergeTask(Task):
                 raise Exception("Output file %s does not exist" % indexfile)
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
+            self.remember_input_versions(commit=False)
+            output_version = self.state.get("output_version", 0) + 1
             update = {"indexfile": indexfile.get_wdir_relative(),
-                      "mergedfile": mergedfile.get_wdir_relative()}
+                      "mergedfile": mergedfile.get_wdir_relative(),
+                      "output_version": output_version}
             densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
                 update["densefile"] = densefilename.get_wdir_relative()
@@ -3389,6 +3744,7 @@ class MergeTask(Task):
     def get_dense_filename(self):
         return self.get_state_filename("densefile")
 
+
 class NmbrthryTask(Task):
     """ Number theory tasks for dlp"""
     @property
@@ -3399,13 +3755,11 @@ class NmbrthryTask(Task):
         return "Number Theory for DLP"
     @property
     def programs(self):
-        return (cadoprograms.MagmaNmbrthry,)
-    @property
-    def progparam_override(self):
-        return [["poly", "badidealinfo", "badideals"]]
+        return ((cadoprograms.MagmaNmbrthry, ("badidealinfo", "badideals"),
+                 {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"nsm": -1})
+        return self.join_params(super().paramnames, {"nsm0": -1, "nsm1": -1})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3416,14 +3770,12 @@ class NmbrthryTask(Task):
 
         badfile = self.workdir.make_filename("badideals")
         badinfofile = self.workdir.make_filename("badidealinfo")
-        polyfile = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaNmbrthry.name)
-        p = cadoprograms.MagmaNmbrthry(poly=polyfile,
-                               badidealinfo=badinfofile,
+        p = cadoprograms.MagmaNmbrthry(badidealinfo=badinfofile,
                                badideals=badfile,
                                stdout=str(stdoutpath),
                                stderr=str(stderrpath),
-                               **self.progparams[0])
+                               **self.merged_args[0])
         message = self.submit_command(p, "", log_errors=True)
         if message.get_exitcode(0) != 0:
             raise Exception("Program failed")
@@ -3434,24 +3786,36 @@ class NmbrthryTask(Task):
             match = re.match(r'ell (\d+)', line)
             if match:
                 update["ell"] = int(match.group(1))
-            match = re.match(r'smexp (\d+)', line)
+            match = re.match(r'smexp0 (\d+)', line)
             if match:
-                update["smexp"] = int(match.group(1))
-            match = re.match(r'nmaps (\d+)', line)
+                update["smexp0"] = int(match.group(1))
+            match = re.match(r'smexp1 (\d+)', line)
             if match:
-                update["nmaps"] = int(match.group(1))
+                update["smexp1"] = int(match.group(1))
+            match = re.match(r'nmaps0 (\d+)', line)
+            if match:
+                update["nmaps0"] = int(match.group(1))
+            match = re.match(r'nmaps1 (\d+)', line)
+            if match:
+                update["nmaps1"] = int(match.group(1))
         # Allow user-given parameter to override what we compute:
-        if self.params["nsm"] != -1:
-            update["nmaps"] = self.params["nsm"]
+        if self.params["nsm0"] != -1:
+            update["nmaps0"] = self.params["nsm0"]
+        if self.params["nsm1"] != -1:
+            update["nmaps1"] = self.params["nsm1"]
         update["badinfofile"] = badinfofile.get_wdir_relative()
         update["badfile"] = badfile.get_wdir_relative()
         
         if not "ell" in update:
             raise Exception("Stdout does not give ell")
-        if not "smexp" in update:
-            raise Exception("Stdout does not give smexp")
-        if not "nmaps" in update:
-            raise Exception("Stdout does not give nmaps")
+        if not "smexp0" in update:
+            raise Exception("Stdout does not give smexp0")
+        if not "nmaps0" in update:
+            raise Exception("Stdout does not give nmaps0")
+        if not "smexp1" in update:
+            raise Exception("Stdout does not give smexp1")
+        if not "nmaps1" in update:
+            raise Exception("Stdout does not give nmaps1")
         if not badfile.isfile():
             raise Exception("Output file %s does not exist" % badfile)
         if not badinfofile.isfile():
@@ -3473,13 +3837,13 @@ class NmbrthryTask(Task):
         return self.state["ell"]
     
     def get_smexp(self):
-        return self.state["smexp"]
+        return (self.state["smexp0"], self.state["smexp1"])
     
     def get_nmaps(self):
-        return self.state["nmaps"]
+        return (self.state["nmaps0"], self.state["nmaps1"])
 
 
-class LinAlgDLPTask(Task):
+class LinAlgDLPTask_Magma(Task):
     """ Runs the linear algebra step for dlp"""
     @property
     def name(self):
@@ -3489,10 +3853,9 @@ class LinAlgDLPTask(Task):
         return "Linear Algebra for DLP"
     @property
     def programs(self):
-        return (cadoprograms.MagmaLinalg,)
-    @property
-    def progparam_override(self):
-        return [["sparsemat", "ker", "sm", "ell", "nmaps"]]
+        return ((cadoprograms.MagmaLinalg, ("ker", "ell", "nmaps"),
+                 {"sparsemat": Request.GET_MERGED_FILENAME,
+                  "sm": Request.GET_SM_FILENAME}),)
     @property
     def paramnames(self):
         return super().paramnames
@@ -3504,35 +3867,107 @@ class LinAlgDLPTask(Task):
     def run(self):
         super().run()
 
-        if not "kerfile" in self.state: 
+        if not "kerfile" in self.state or self.have_new_input_files():
             kerfile = self.workdir.make_filename("ker")
-            mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
-            smfile = self.send_request(Request.GET_SM_FILENAME)
             gorder = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
+            nn = nmaps[0] + nmaps[1];
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
-            p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
-                                   ker=kerfile,
-                                   sm=smfile,
+            p = cadoprograms.MagmaLinalg(ker=kerfile,
                                    ell=gorder,
-                                   nmaps=nmaps,
+                                   nmaps=nn,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
-                                   **self.progparams[0])
+                                   **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
             if not kerfile.isfile():
                 raise Exception("Output file %s does not exist" % kerfile)
-            update = {"kerfile": kerfile.get_wdir_relative()}
+            self.remember_input_versions(commit=False)
+            output_version = self.state.get("output_version", 0) + 1
+            update = {"kerfile": kerfile.get_wdir_relative(),
+                      "output_version": output_version}
             self.state.update(update)
             
         self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
         return True
     
-    def get_kernel_filename(self):
+    def get_virtual_logs_filename(self):
         return self.get_state_filename("kerfile")
+
+
+# I've just ditched the statistics bit, cause I don't know to make its
+# despair cry a little bit more useful.
+class LinAlgDLPTask(Task):
+    """ Runs the linear algebra step for DLP """
+    @property
+    def name(self):
+        return "bwc"
+    @property
+    def title(self):
+        return "Linear Algebra"
+    @property
+    def programs(self):
+        return ((cadoprograms.BWC, ("complete", "rhs", "prime", "matrix",  "wdir", "nullspace"),
+                 {"merged": Request.GET_MERGED_FILENAME,
+                  "sm": Request.GET_SM_FILENAME}),)
+    @property
+    def paramnames(self):
+        return super().paramnames
+
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        super().run()
+
+        if not "virtual_logs" in self.state or self.have_new_input_files():
+            workdir = self.workdir.make_dirname()
+            workdir.mkdir(parent=True)
+            mergedfile = self.merged_args[0].pop("merged")
+            smfile = self.merged_args[0].pop("sm")
+            if mergedfile is None:
+                self.logger.critical("No merged file received.")
+                return False
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
+            matrix = mergedfile.realpath()
+            wdir = workdir.realpath()
+            nmaps = self.send_request(Request.GET_NMAPS)
+            p = cadoprograms.BWC(complete=True,
+                                 matrix=matrix,  wdir=wdir,
+                                 m = nmaps[0] + nmaps[1],
+                                 n = nmaps[0] + nmaps[1],
+                                 prime=self.send_request(Request.GET_ELL),
+                                 rhs=smfile,
+                                 mm_impl="basicp",
+                                 nullspace="right",
+                                 stdout=str(stdoutpath),
+                                 stderr=str(stderrpath),
+                                 **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.truncated.txt", use_subdir=True)
+            if not virtual_logs_filename.isfile():
+                raise Exception("Kernel file %s does not exist" % virtual_logs_filename)
+            self.remember_input_versions(commit=False)
+            output_version = self.state.get("output_version", 0) + 1
+            update = {"virtual_logs": virtual_logs_filename.get_wdir_relative(),
+                      "output_version": output_version}
+            self.state.update(update, commit=True)
+        self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
+        return True
+
+    def get_virtual_logs_filename(self):
+        return self.get_state_filename("virtual_logs")
+    
+    def get_prefix(self):
+        return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
+                              self.params["name"], "dep")
 
 
 class LinAlgTask(Task, HasStatistics):
@@ -3545,13 +3980,12 @@ class LinAlgTask(Task, HasStatistics):
         return "Linear Algebra"
     @property
     def programs(self):
-        return (cadoprograms.BWC,)
-    @property
-    def progparam_override(self):
-        return [["complete", "matrix",  "wdir", "nullspace"]]
+        return ((cadoprograms.BWC, ("complete", "matrix",  "wdir", "nullspace"),
+                 {"merged": Request.GET_MERGED_FILENAME}),)
     @property
     def paramnames(self):
-        return super().paramnames
+        return self.join_params(super().paramnames, {"allow_wipeout": False})
+
     @property
     def stat_conversions(self):
         return (
@@ -3602,20 +4036,40 @@ class LinAlgTask(Task, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.state.setdefault("ran_already", False)
     
     def run(self):
         super().run()
 
-        if not "dependency" in self.state:
+        if self.state["ran_already"] and self.have_new_input_files():
+            if self.params["allow_wipeout"]:
+                self.logger.warn("Ran before, but input files have changed. "
+                                 "Wiping out working directory")
+                self.workdir.make_dirname().rmtree()
+                self.state["ran_already"] = False
+                self.state.pop("dependency", None)
+            else:
+                self.logger.critical(
+                    "Ran before, but input files have changed. The "
+                    "allow_wipeout parameter is not set, aborting.")
+                self.logger.critical(
+                    "If it is ok to discard the previous linear algebra run "
+                    "and start it from scratch, please add the "
+                    "allow_wipeout=True parameter and re-run cadofactor.")
+                return False
+
+        if not "dependency" in self.state or self.have_new_input_files():
             workdir = self.workdir.make_dirname()
             workdir.mkdir(parent=True)
-            mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+            mergedfile = self.merged_args[0].pop("merged")
             if mergedfile is None:
                 self.logger.critical("No merged file received.")
                 return False
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()
             wdir = workdir.realpath()
+            self.state["ran_already"] = True
+            self.remember_input_versions(commit=True)
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left",
                                  stdout=str(stdoutpath),
@@ -3628,7 +4082,9 @@ class LinAlgTask(Task, HasStatistics):
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.parse_stats(stdoutpath, commit=False)
-            update = {"dependency": dependencyfilename.get_wdir_relative()}
+            output_version = self.state.get("output_version", 0) + 1
+            update = {"dependency": dependencyfilename.get_wdir_relative(),
+                      "output_version": output_version}
             self.state.update(update, commit=True)
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
         return True
@@ -3651,10 +4107,12 @@ class CharactersTask(Task):
         return "Quadratic Characters"
     @property
     def programs(self):
-        return (cadoprograms.Characters,)
-    @property
-    def progparam_override(self):
-        return [["poly", "purged", "index", "wfile", "out", "heavyblock"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "wfile": Request.GET_DEPENDENCY_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "index": Request.GET_INDEX_FILENAME,
+                 "heavyblock": Request.GET_DENSE_FILENAME}
+        return ((cadoprograms.Characters, ("out",), input),)
     @property
     def paramnames(self):
         return super().paramnames
@@ -3666,29 +4124,22 @@ class CharactersTask(Task):
     def run(self):
         super().run()
 
-        if not "kernel" in self.state:
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+        if not "kernel" in self.state or self.have_new_input_files():
             kernelfilename = self.workdir.make_filename("kernel")
-            
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
-            densefilename = self.send_request(Request.GET_DENSE_FILENAME)
-            dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
-            
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Characters.name)
-            p = cadoprograms.Characters(poly=polyfilename,
-                    purged=purgedfilename, index=indexfilename,
-                    wfile=dependencyfilename, out=kernelfilename,
-                    heavyblock=densefilename, stdout=str(stdoutpath),
+            p = cadoprograms.Characters(out=kernelfilename,
+                    stdout=str(stdoutpath),
                     stderr=str(stderrpath),
-                    **self.progparams[0])
+                    **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             if not kernelfilename.isfile():
                 raise Exception("Output file %s does not exist" % kernelfilename)
-            self.state["kernel"] = kernelfilename.get_wdir_relative()
+            self.remember_input_versions(commit=False)
+            update = {"kernel": kernelfilename.get_wdir_relative()}
+            self.state.update(update)
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
         return True
     
@@ -3706,29 +4157,28 @@ class SqrtTask(Task):
         return "Square Root"
     @property
     def programs(self):
-        return (cadoprograms.Sqrt,)
-    @property
-    def progparam_override(self):
-        return [["ab", "poly", "purged", "index", "kernel", "prefix", "rat",
-                 "alg", "gcd", "dep"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "index": Request.GET_INDEX_FILENAME,
+                 "kernel": Request.GET_KERNEL_FILENAME}
+        return ((cadoprograms.Sqrt, ("ab", "prefix", "rat", "alg", "gcd", "dep"),
+                 input), )
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"N": int, "gzip": True})
+        return self.join_params(super().paramnames, {"N": int, "gzip": True, "first_dep": [int]})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.factors = self.make_db_dict(self.make_tablename("factors"), connection=self.db_connection)
         self.add_factor(self.params["N"])
-    
+        if "first_dep" in self.params:
+            self.state["next_dep"] = self.params["first_dep"]
+
     def run(self):
         super().run()
 
-        if not self.is_done():
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
-            kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
+        if not self.is_done() or self.have_new_input_files():
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
             if self.params["gzip"]:
                 prefix += ".gz"
@@ -3736,25 +4186,26 @@ class SqrtTask(Task):
                 self.make_std_paths(cadoprograms.Sqrt.name)
             self.logger.info("Creating file of (a,b) values")
             p = cadoprograms.Sqrt(ab=True,
-                    poly=polyfilename, purged=purgedfilename,
-                    index=indexfilename, kernel=kernelfilename,
                     prefix=prefix, stdout=str(stdoutpath),
-                    stderr=str(stderrpath), **self.progparams[0])
+                    stderr=str(stderrpath), **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
+            t = self.progparams[0].get("threads", 1)
             while not self.is_done():
                 dep = self.state.get("next_dep", 0)
-                self.logger.info("Trying dependency %d", dep)
+                if t == 1:
+                   self.logger.info("Trying dependency %d", dep)
+                else:
+                   self.logger.info("Trying dependencies %d to %d",
+                                    dep, dep+t-1)
                 (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Sqrt.name)
                 p = cadoprograms.Sqrt(ab=False, rat=True,
-                        alg=True, gcd=True, dep=dep, poly=polyfilename,
-                        purged=purgedfilename, index=indexfilename,
-                        kernel=kernelfilename, prefix=prefix,
+                        alg=True, gcd=True, dep=dep, prefix=prefix,
                         stdout=str(stdoutpath), stderr=str(stderrpath), 
-                        **self.progparams[0])
+                        **self.merged_args[0])
                 message = self.submit_command(p, "dep%d" % dep, log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
@@ -3765,9 +4216,10 @@ class SqrtTask(Task):
                 # of what the smaller factors did
                 for line in lines[:-1]:
                     if line == "Failed":
-                        break
+                        continue # try next lines (if any) in multi-thread mode
                     self.add_factor(int(line))
-                self.state["next_dep"] = dep+1
+                self.state.update({"next_dep": dep+t})
+            self.remember_input_versions(commit=True)
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
@@ -3893,11 +4345,13 @@ class SMTask(Task):
         return "Schirokauer Maps"
     @property
     def programs(self):
-        return (cadoprograms.SM,)
-    @property
-    def progparam_override(self):
-        return [["poly", "renumber", "purged", "index", "ell", "smexp",
-                 "nmaps", "out"]]
+        override = ("ell", "smexp0", "smexp1", "nmaps0", "nmaps1", "out")
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "renumber": Request.GET_RENUMBER_FILENAME,
+                 "badidealinfo": Request.GET_BADIDEALINFO_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "index": Request.GET_INDEX_FILENAME}
+        return ((cadoprograms.SM, override, input),)
     @property
     def paramnames(self):
         return super().paramnames
@@ -3909,43 +4363,44 @@ class SMTask(Task):
     def run(self):
         super().run()
 
-        if not "sm" in self.state:
+        if not "sm" in self.state or self.have_new_input_files():
             nmaps = self.send_request(Request.GET_NMAPS)
-            if nmaps == 0:
+            if nmaps[0]+nmaps[1] == 0:
                 self.logger.info("Number of SM is 0: skipping this part.")
                 return True
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
-            badidealinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             smfilename = self.workdir.make_filename("sm")
+            abunitsdirname = self.workdir.make_filename("abunits")
 
             gorder = self.send_request(Request.GET_ELL)
             smexp = self.send_request(Request.GET_SMEXP)
             
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.SM(poly=polyfilename, renumber=renumberfilename,
-	      	    badidealinfo=badidealinfofilename,
-                    purged=purgedfilename, index=indexfilename,
-                    ell=gorder, smexp=smexp,
-                    nmaps=nmaps,
+            p = cadoprograms.SM(ell=gorder,
+                    smexp0=smexp[0],
+                    smexp1=smexp[1],
+                    nmaps0=nmaps[0],
+                    nmaps1=nmaps[1],
                     out=smfilename,
+		    abunits=abunitsdirname,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
-                    **self.progparams[0])
+                    **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             if not smfilename.isfile():
                 raise Exception("Output file %s does not exist" % smfilename)
             self.state["sm"] = smfilename.get_wdir_relative()
+            self.state["abunits"] = abunitsdirname.get_wdir_relative()
         self.logger.debug("Exit SMTask.run(" + self.name + ")")
         return True
     
     def get_sm_filename(self):
         return self.get_state_filename("sm")
+
+    def get_abunits_dirname(self):
+        return self.get_state_filename("abunits")
 
 class ReconstructLogTask(Task):
     """ Logarithms Reconstruction Task """
@@ -3957,14 +4412,18 @@ class ReconstructLogTask(Task):
         return "Logarithms Reconstruction"
     @property
     def programs(self):
-        return (cadoprograms.ReconstructLog,)
-    @property
-    def progparam_override(self):
-        return [["poly", "purged", "renumber", "dlog",  "ell", "smexp",
-                 "nmaps", "ker", "ideals", "relsdel", "nrels"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "renumber": Request.GET_RENUMBER_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "ker": Request.GET_KERNEL_FILENAME,
+                 "ideals": Request.GET_IDEAL_FILENAME,
+                 "relsdel": Request.GET_RELSDEL_FILENAME}
+        override = ("dlog",  "ell", "smexp0", "nmaps0", "smexp1", "nmaps1", "nrels", "abunits0", "abunits1")
+        return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"partial": True})
+        return self.join_params(super().paramnames,
+                {"checkdlp": True, "partial": True})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3974,14 +4433,7 @@ class ReconstructLogTask(Task):
     def run(self):
         super().run()
 
-
-        if not "dlog" in self.state:
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            kerfilename = self.send_request(Request.GET_KERNEL_FILENAME)
-            idealfilename = self.send_request(Request.GET_IDEAL_FILENAME)
-            relsdelfilename = self.send_request(Request.GET_RELSDEL_FILENAME)
+        if not "dlog" in self.state or self.have_new_input_files():
             dlogfilename = self.workdir.make_filename("dlog")
             gorder = self.send_request(Request.GET_ELL)
             smexp = self.send_request(Request.GET_SMEXP)
@@ -3991,21 +4443,23 @@ class ReconstructLogTask(Task):
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             nrels = nfree+nunique
 
+            abunitsdirname = self.send_request(Request.GET_UNITS_DIRNAME)
+                 
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.ReconstructLog(poly=polyfilename,
-                    purged=purgedfilename,
-                    renumber=renumberfilename,
+            p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
-                    ell=gorder, smexp=smexp,
-                    nmaps=nmaps,
-                    ker=kerfilename,
-                    ideals=idealfilename,
-                    relsdel=relsdelfilename,
+                    ell=gorder,
+                    smexp0=smexp[0],
+                    smexp1=smexp[1],
+                    nmaps0=nmaps[0],
+                    nmaps1=nmaps[1],
                     nrels=nrels,
+		    abunits0=str(abunitsdirname) + ".0",
+		    abunits1=str(abunitsdirname) + ".1",
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
-                    **self.progparams[0])
+                    **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -4019,25 +4473,28 @@ class ReconstructLogTask(Task):
         return self.get_state_filename("dlog")
     
     def get_log2log3(self):
-        filename = self.get_state_filename("dlog").get_wdir_relative()
-        fullfile = self.params["workdir"].rstrip(os.sep) + os.sep + filename
-        log2 = None
-        log3 = None
-        myfile = open(fullfile, "rb")
-        data = myfile.read()
-        for line in data.splitlines():
-            match = re.match(br'(\d+) 2 0 rat (\d+)', line)
-            if match:
-                log2 = match.group(2)
-            match = re.match(br'(\d+) 3 0 rat (\d+)', line)
-            if match:
-                log3 = match.group(2)
-            if log2 != None and log3 != None:
-                myfile.close()
-                return [ log2, log3 ]
-        raise Exception("Could not find log2 and log3 in %s" % filename)
+        if self.params["checkdlp"]:
+            filename = self.get_state_filename("dlog").get_wdir_relative()
+            fullfile = self.params["workdir"].rstrip(os.sep) + os.sep + filename
+            log2 = None
+            log3 = None
+            myfile = open(fullfile, "rb")
+            data = myfile.read()
+            for line in data.splitlines():
+                match = re.match(br'(\d+) 2 0 rat (\d+)', line)
+                if match:
+                    log2 = match.group(2)
+                match = re.match(br'(\d+) 3 0 rat (\d+)', line)
+                if match:
+                    log3 = match.group(2)
+                if log2 != None and log3 != None:
+                    myfile.close()
+                    return [ log2, log3 ]
+            raise Exception("Could not find log2 and log3 in %s" % filename)
+        else:
+            return [ 0, 0 ]
 
-class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
+class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     """ Starts HTTP server """
     @property
     def name(self):
@@ -4047,9 +4504,9 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         return "Server Launcher"
     @property
     def paramnames(self):
-        return {"name": str, "workdir": None, "address": None, "port": 8001,
+        return {"name": str, "workdir": None, "address": None, "port": 0,
                 "threaded": False, "ssl": True, "whitelist": None,
-                "only_registered": True}
+                "only_registered": True, "forgetport": False}
     @property
     def param_nodename(self):
         return self.name
@@ -4083,6 +4540,15 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         if "whitelist" in self.params:
             server_whitelist += [h.strip() for h in self.params["whitelist"].split(",")]
 
+        # If we should auto-assign an available port, try to use the same one
+        # as last time, if we had run before. This can be overridden with
+        # server.forgetport=yes
+        if self.params["forgetport"] and "port" in self.state:
+            del(self.state["port"])
+
+        if serverport == 0 and "port" in self.state:
+            serverport = self.state["port"]
+
         # If (1) any clients are to be started on localhost, but (2) the server
         # is listening on a network-visible address, then we need to whitelist
         # the network-visible address(es) of the current host as well, because
@@ -4098,8 +4564,12 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
                 and set(server_whitelist) & {"localhost", "127.0.0.1"}:
             hostname = socket.gethostname()
             if not hostname in server_whitelist:
-                self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
-                server_whitelist.append(hostname)
+                try:
+                    foo=socket.gethostbyname(hostname)
+                    self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
+                    server_whitelist.append(hostname)
+                except socket.gaierror as e:
+                    self.logger.info("Not adding %s to whitelist (cannot be resolved), clients will only be allowed to connect on 127.0.0.1", hostname)
         if not server_whitelist:
             server_whitelist = None
 
@@ -4108,6 +4578,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
             threaded, self.get_db_filename(), self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
             whitelist=server_whitelist)
+        self.state["port"] = self.server.get_port()
 
     def run(self):
         self.server.serve()
@@ -4161,10 +4632,7 @@ class StartClientsTask(Task):
         return "Client Launcher"
     @property
     def programs(self):
-        return (cadoprograms.WuClient,)
-    @property
-    def progparam_override(self):
-        return [["clientid", "certsha1"]]
+        return ((cadoprograms.WuClient, ("clientid", "certsha1"), {}),)
     @property
     def paramnames(self):
         return {'hostnames': str, 'scriptpath': None, "nrclients": [int], "run": True}
@@ -4392,6 +4860,7 @@ class Request(Message):
     GET_POLYNOMIAL = object()
     GET_POLYNOMIAL_FILENAME = object()
     GET_HAVE_TWO_ALG_SIDES = object()
+    GET_WILL_IMPORT_FINAL_POLYNOMIAL = object()
     GET_POLY_RANK = object()
     GET_FACTORBASE_FILENAME = object()
     GET_FACTORBASE0_FILENAME = object()
@@ -4415,8 +4884,10 @@ class Request(Message):
     GET_DEPENDENCY_FILENAME = object()
     GET_LINALG_PREFIX = object()
     GET_KERNEL_FILENAME = object()
+    GET_VIRTUAL_LOGS_FILENAME = object()
     GET_RELSDEL_FILENAME = object()
     GET_SM_FILENAME = object()
+    GET_UNITS_DIRNAME = object()
     GET_BADIDEAL_FILENAME = object()
     GET_BADIDEALINFO_FILENAME = object()
     GET_SMEXP = object()
@@ -4438,7 +4909,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # This isn't a Task subclass so we don't really need to define
         # paramnames, but we do it out of habit
         return {"name": str, "workdir": str, "N": int, "dlp": False,
-                "trybadwu": False}
+                "gfpext": 1, "trybadwu": False}
     @property
     def title(self):
         return "Complete Factorization"
@@ -4487,14 +4958,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         linalgpath = parampath + ['linalg']
         
         ## tasks that are common to factorization and dlp
-        self.polysel1 = Polysel1Task(mediator=self,
-                                   db=db,
-                                   parameters=self.parameters,
-                                   path_prefix=polyselpath)
-        self.polysel2 = Polysel2Task(mediator=self,
-                                   db=db,
-                                   parameters=self.parameters,
-                                   path_prefix=polyselpath)
         self.fb = FactorBaseTask(mediator=self,
                                  db=db,
                                  parameters=self.parameters,
@@ -4519,6 +4982,23 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                                db=db,
                                parameters=self.parameters,
                                path_prefix=filterpath)
+        ## For DLP in extension fields, we can not use the classical
+        ## polynomial selection, but otherwise we do:
+        if self.params["gfpext"] == 1:
+            self.polysel1 = Polysel1Task(mediator=self,
+                                       db=db,
+                                       parameters=self.parameters,
+                                       path_prefix=polyselpath)
+            self.polysel2 = Polysel2Task(mediator=self,
+                                       db=db,
+                                       parameters=self.parameters,
+                                       path_prefix=polyselpath)
+        else:
+            self.polyselgfpn = PolyselGFpn(mediator=self,
+                    db=db,
+                    parameters=self.parameters,
+                    path_prefix=polyselpath)
+
         if self.params["dlp"]:
             ## Tasks specific to dlp
             self.nmbrthry = NmbrthryTask(mediator=self,
@@ -4567,26 +5047,25 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # Defines an order on tasks in which tasks that want to run should be
         # run
         if self.params["dlp"]:
-            self.tasks = (self.polysel1, self.polysel2, self.nmbrthry, self.fb,
+            if self.params["gfpext"] == 1:
+                self.tasks = (self.polysel1, self.polysel2)
+            else:
+                self.tasks = (self.polyselgfpn)
+            self.tasks = self.tasks + (self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2,
                           self.filtergalois, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
         else:
-            self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
-                          self.dup1, self.dup2, self.purge, self.merge,
-                          self.linalg, self.characters, self.sqrt)
+            self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving, self.dup1, self.dup2, self.purge,
+                          self.merge, self.linalg, self.characters, self.sqrt)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
                                 ".".join(path + [key]), value)
 
         self.request_map = {
-            Request.GET_RAW_POLYNOMIALS: self.polysel1.get_raw_polynomials,
-            Request.GET_POLY_RANK: self.polysel1.get_poly_rank,
-            Request.GET_POLYNOMIAL: self.polysel2.get_poly,
-            Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
-            Request.GET_HAVE_TWO_ALG_SIDES: self.polysel2.get_have_two_alg_sides,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FACTORBASE0_FILENAME: self.fb.get_filename0,
             Request.GET_FACTORBASE1_FILENAME: self.fb.get_filename1,
@@ -4606,6 +5085,20 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result
         }
+
+        ## Set requests related to polynomial selection
+        if self.params["gfpext"] == 1:
+            self.request_map[Request.GET_RAW_POLYNOMIALS] = self.polysel1.get_raw_polynomials
+            self.request_map[Request.GET_POLY_RANK] = self.polysel1.get_poly_rank
+            self.request_map[Request.GET_POLYNOMIAL] = self.polysel2.get_poly
+            self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polysel2.get_poly_filename
+            self.request_map[Request.GET_HAVE_TWO_ALG_SIDES] = self.polysel2.get_have_two_alg_sides
+            self.request_map[Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL] = self.polysel2.get_will_import
+        else:
+            self.request_map[Request.GET_POLYNOMIAL] = self.polyselgfpn.get_poly
+            self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polyselgfpn.get_poly_filename
+            self.request_map[Request.GET_HAVE_TWO_ALG_SIDES] = self.polyselgfpn.get_have_two_alg_sides
+
         ## add requests specific to dlp or factoring
         if self.params["dlp"]:
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
@@ -4616,8 +5109,10 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_SMEXP] = self.nmbrthry.get_smexp
             self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
-            self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_kernel_filename
+            self.request_map[Request.GET_UNITS_DIRNAME] = self.sm.get_abunits_dirname
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
+            self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
+            self.request_map[Request.GET_VIRTUAL_LOGS_FILENAME] = self.linalg.get_virtual_logs_filename
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
             self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename
@@ -4659,7 +5154,11 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # Do we want the sum of real times over all sub-processes for
         # something?
         # realtotal = self.get_sum_of_cpu_or_real_time(False)
-        self.logger.info("Total cpu/elapsed time for entire factorization: %g/%g",
+        if self.params["dlp"]:
+            self.logger.info("Total cpu/elapsed time for entire discrete log: %g/%g",
+                         cputotal, elapsed)
+        else:
+            self.logger.info("Total cpu/elapsed time for entire factorization: %g/%g",
                          cputotal, elapsed)
 
         if last_task and not last_status:

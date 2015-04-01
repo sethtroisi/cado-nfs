@@ -54,6 +54,7 @@ typedef int MPI_Request;
 #define MPI_MAX_OBJECT_NAME     64
 
 #define MPI_STATUS_IGNORE       0
+#define MPI_STATUSES_IGNORE       0
 
 #define MPI_ANY_TAG     -1
 
@@ -69,6 +70,7 @@ typedef int MPI_Request;
 */
 
 static inline int MPI_Wait(MPI_Request *request MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED) { return 0; }
+static inline int MPI_Waitall(int count MAYBE_UNUSED, MPI_Request *request MAYBE_UNUSED, MPI_Status *statuses MAYBE_UNUSED) { return 0; }
 static inline int MPI_Abort(MPI_Comm comm MAYBE_UNUSED, int s) { exit(s); }
 static inline int MPI_Comm_rank(int s MAYBE_UNUSED, int  * p) { *p=0; return 0;}
 static inline int MPI_Comm_size(int s MAYBE_UNUSED, int  * p) { *p=1; return 0;}
@@ -143,6 +145,12 @@ static inline int MPI_Allgather(void * sendbuf MAYBE_UNUSED, int sendcount MAYBE
     if (sendbuf) memcpy(recvbuf, sendbuf, sendcount * st);
     return 0;
 }
+
+static inline int MPI_Iallgather(void *sendbuf, int  sendcount, MPI_Datatype st, void *recvbuf, int recvcount, MPI_Datatype rt, MPI_Comm comm, MPI_Request *request MAYBE_UNUSED)
+{
+    return MPI_Allgather(sendbuf, sendcount, st, recvbuf, recvcount, rt, comm);
+}
+
 static inline int MPI_Allgatherv(void *sendbuf, int sendcount MAYBE_UNUSED,
             MPI_Datatype sendtype MAYBE_UNUSED, void *recvbuf MAYBE_UNUSED, int *recvcount MAYBE_UNUSED,
             int *displs MAYBE_UNUSED, MPI_Datatype recvtype MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)

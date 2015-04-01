@@ -109,8 +109,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         smatfile = fopen_maybe_compressed(smatname, wmode);
         srwfile  = fopen_maybe_compressed(srwname, wmode);
         /* XXX sm-outside-matrix creates a square matrix here */
-        // if (!bin) fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
-        if (!bin) fprintf(smatfile, "%d %d\n", small_ncols, small_ncols - skip);
+        if (!bin) fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
+        //if (!bin) fprintf(smatfile, "%d %d\n", small_ncols, small_ncols - skip);
     }
 
     char * dmatname = NULL;
@@ -138,7 +138,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     }
 
     for(int i = 0; i < small_nrows; i++){
-#ifdef FOR_DL
+//#ifdef FOR_DL
+#if 0
         /* this is for sm-outside-matrix */
         if (i == small_ncols) {
             printf("Rotating file names\n");
@@ -430,24 +431,23 @@ toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
     fflush(stdout);
     renumber (&small_ncols, colweight, ncols, idealsfilename);
 
-    printf("small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
+    printf ("Sparse submatrix: nrows=%d ncols=%d\n", small_nrows, small_ncols);
 
     double tt = seconds();
     printf("Writing sparse representation to %s\n", sparsename);
     fflush(stdout);
     W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight, skip, bin);
     printf("# Writing matrix took %.1lfs\n", seconds()-tt);
-    printf("# Weight of the small part of the matrix: %lu\n", W);
+    printf("# Weight of the sparse submatrix: %lu\n", W);
     fflush(stdout);
 
     return small_ncols;
 }
 
 static void
-build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
-                        index_data_t index_data)
+build_newrows_from_file(typerow_t **newrows, FILE *hisfile,
+                        index_data_t index_data, uint64_t nrows, uint64_t Nmax)
 {
-    uint64_t bwcost;
     uint64_t addread = 0;
     char str[STRLENMAX];
 
@@ -457,7 +457,7 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
     /* will print report at 2^10, 2^11, ... 2^23 computed primes and every
      * 2^23 primes after that */
     stats_init (stats, stdout, &addread, 23, "Read", "row additions", "", "line");
-    while(fgets(str, STRLENMAX, hisfile))
+    while(fgets(str, STRLENMAX, hisfile) && nrows >= Nmax)
     {
       addread++;
 
@@ -470,23 +470,10 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
         fprintf(stderr, " I stop reading and go to the next phase\n");
         break;
       }
-      if(strncmp(str, "BWCOST", 6) != 0)
-        doAllAdds(newrows, str, index_data);
-      else
-      {
-        if(strncmp(str, "BWCOSTMIN", 9) != 0)
-        {
-          sscanf(str+8, "%" PRIu64 "", &bwcost);
-		      //fprintf(stderr, "Read bwcost=%" PRIu64 "\n", bwcost);
-          if((bwcostmin != 0) && (bwcost == bwcostmin))
-          {
-            //what a damn tricky feature!!!!!!!
-		        fprintf(stderr, "Activating tricky stopping feature");
-		        fprintf(stderr, " since I reached %" PRIu64 "\n", bwcostmin);
-            break;
-		      }
-	      }
-	    }
+      doAllAdds(newrows, str, index_data);
+      /* if the line starts with a negative index, the number of rows remains
+         unchanged, otherwise it decreases by one */
+      nrows -= str[0] != '-';
     }
     stats_print_progress (stats, addread, 0, 0, 1);
 }
@@ -623,8 +610,8 @@ generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
 static void
 fasterVersion(typerow_t **newrows, const char *sparsename,
               const char *indexname, const char *hisname,
-              uint64_t bwcostmin, int nrows, uint64_t ncols, int skip, int bin,
-              const char *idealsfilename, int for_msieve)
+              int nrows, uint64_t ncols, int skip, int bin,
+              const char *idealsfilename, int for_msieve, uint64_t Nmax)
 {
     FILE *hisfile;
     int *colweight;
@@ -649,7 +636,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
       index_data = NULL;
 
     // read merges in the *.merge.his file and replay them
-    build_newrows_from_file(newrows, hisfile, bwcostmin, index_data);
+    build_newrows_from_file (newrows, hisfile, index_data, nrows, Nmax);
 
     /* compute column weights */
     colweight = (int*) malloc (ncols * sizeof(int));
@@ -761,7 +748,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "for_msieve", "output matrix in msieve format");
-  param_list_decl_usage(pl, "bwcostmin", "??????");
+  param_list_decl_usage(pl, "Nmax", "stop at Nmax number of rows (default 0)");
+  verbose_decl_usage(pl);
 }
 
 static void
@@ -781,7 +769,7 @@ int
 main(int argc, char *argv[])
 {
   char * argv0 = argv[0];
-  uint64_t bwcostmin = 0;
+  uint64_t Nmax = 0;
   uint64_t nrows, ncols;
   typerow_t **newrows;
   int bin, skip = DEFAULT_MERGE_SKIP, for_msieve = 0;
@@ -811,6 +799,7 @@ main(int argc, char *argv[])
         usage(pl, argv0);
     }
     /* print command-line arguments */
+    verbose_interpret_parameters(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 
@@ -822,7 +811,7 @@ main(int argc, char *argv[])
 #ifndef FOR_DL
     param_list_parse_int(pl, "skip", &skip);
 #endif
-    param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
+    param_list_parse_uint64(pl, "Nmax", &Nmax);
     const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
     /* Some checks on command line arguments */
@@ -892,9 +881,8 @@ main(int argc, char *argv[])
 #endif
 
 
-  fasterVersion (newrows, sparsename, indexname, hisname,
-                 bwcostmin, nrows, ncols, skip, bin,
-                 idealsfilename, for_msieve);
+  fasterVersion (newrows, sparsename, indexname, hisname, nrows, ncols, skip,
+                 bin, idealsfilename, for_msieve, Nmax);
 
 
   param_list_clear(pl);

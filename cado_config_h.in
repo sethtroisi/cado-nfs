@@ -1,9 +1,5 @@
-/* CADO_REV indicates the scm-level revision */
-#define    CADO_REV        "@CADO_REV@"
-
-#define CADO_VERSION_MAJOR     @CADO_VERSION_MAJOR@
-#define CADO_VERSION_MINOR     @CADO_VERSION_MINOR@
-#define CADO_VERSION_STRING    "@CADO_VERSION_STRING@"
+#ifndef CADO_CONFIG_H_
+#define CADO_CONFIG_H_
 
 #define CFLAGS      "@CMAKE_C_FLAGS@"
 #define CXXFLAGS    "@CMAKE_CXX_FLAGS@"
@@ -23,6 +19,7 @@
 #cmakedefine    HAVE_SSE3
 #cmakedefine    HAVE_SSSE3
 #cmakedefine    HAVE_SSE41
+#cmakedefine    HAVE_OPENMP
 #cmakedefine    HAVE_ALLOCA_H
 #cmakedefine    HAVE_CABSL
 #cmakedefine    HAVE_LOG2
@@ -53,6 +50,15 @@
 #cmakedefine    HAVE_STRLCPY
 #cmakedefine    HAVE_STRLCAT
 #cmakedefine    HAVE_LINUX_BINFMTS_H
+#cmakedefine    HAVE_NUMA
+#cmakedefine    HAVE_HWLOC
+#cmakedefine    HAVE_CXX11
+/* In the C source files, we may of course check MPI_VERSION and
+ * MPI_SUBVERSION by ourselves. However we would like to possibly
+ * dismiss, on the per-implementation basis, the claim of MPI-3 support.
+ */
+#cmakedefine    HAVE_MPI2_API
+#cmakedefine    HAVE_MPI3_API
 
 #cmakedefine    HAVE_SYNC_FETCH
 #cmakedefine    HAVE_ASPRINTF
@@ -68,3 +74,5 @@
 #ifdef HAVE_EXECUTABLE_SUFFIX
 #define EXECUTABLE_SUFFIX "@CMAKE_EXECUTABLE_SUFFIX@"
 #endif
+
+#endif  /* CADO_CONFIG_H_ */

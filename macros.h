@@ -99,33 +99,53 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifndef GNUC_VERSION
 #define GNUC_VERSION(X,Y,Z)     \
-    defined(__GNUC__) &&        \
-(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z)
+    (defined(__GNUC__) &&        \
+(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z))
 #endif
 
 #ifndef GNUC_VERSION_ATLEAST
 #define GNUC_VERSION_ATLEAST(X,Y,Z)     \
-    defined(__GNUC__) &&        \
-LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+    (defined(__GNUC__) &&        \
+LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z))
 #endif
 
 #ifndef GNUC_VERSION_ATMOST
 #define GNUC_VERSION_ATMOST(X,Y,Z)     \
-    defined(__GNUC__) &&        \
-LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+    (defined(__GNUC__) &&        \
+LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z))
 #endif
 
 #ifndef GMP_VERSION_ATLEAST
 #define GMP_VERSION_ATLEAST(X,Y,Z)     \
-    defined(__GNU_MP__) &&        \
-LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+    (defined(__GNU_MP__) &&        \
+LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
 #endif
 
 #ifndef GMP_VERSION_ATMOST
 #define GMP_VERSION_ATMOST(X,Y,Z)     \
-    defined(__GNU_MP__) &&        \
-LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+    (defined(__GNU_MP__) &&        \
+LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
 #endif
+
+#ifndef MPI_VERSION_ATLEAST
+#define MPI_VERSION_ATLEAST(X,Y) LEXGE2(MPI_VERSION,MPI_SUBVERSION,X,Y)
+#endif  /* MPI_VERSION_ATLEAST */
+
+#ifndef MPI_VERSION_ATMOST
+#define MPI_VERSION_ATMOST(X,Y) LEXLE2(MPI_VERSION,MPI_SUBVERSION,X,Y)
+#endif  /* MPI_VERSION_ATMOST */
+
+#ifndef OMPI_VERSION_ATLEAST
+#define OMPI_VERSION_ATLEAST(X,Y,Z)     \
+    defined(OPEN_MPI) &&        \
+LEXGE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z)
+#endif  /* OMPI_VERSION_ATLEAST */
+
+#ifndef OMPI_VERSION_ATMOST
+#define OMPI_VERSION_ATMOST(X,Y,Z)     \
+    defined(OPEN_MPI) &&        \
+LEXLE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z)
+#endif  /* OMPI_VERSION_ATMOST */
 
 #ifndef MAYBE_UNUSED
 #if GNUC_VERSION_ATLEAST(3,4,0)
@@ -153,9 +173,15 @@ LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z
 #ifndef EXPECT
 #define EXPECT(x,val)	__builtin_expect(x,val)
 #endif
+#ifndef  HAVE_MINGW
 #ifndef ATTR_PRINTF
-#define ATTR_PRINTF(a,b) __attribute__((__format__(__printf__,a,b)))
+#define ATTR_PRINTF(a,b) __attribute__((format(printf,a,b)))
 #endif
+#else
+/* mingw's gcc is apparently unaware that the c99 format strings _may_ be
+ * recognized by the win32 printf, for who asks nicely... */
+#define ATTR_PRINTF(a,b) /**/
+#endif  /* HAVE_MINGW */
 #ifndef ATTRIBUTE
 #define ATTRIBUTE(x) __attribute__ (x)
 #endif

@@ -20,7 +20,12 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(p "${prime_${width}}")
 
 
-    target_link_libraries(mpfq_test_${gfp_layer} gmp)
+    target_link_libraries(mpfq_test_${gfp_layer} ${gmp_libname})
     run_test(mpfq_test_${gfp_layer} mpfq_test_${gfp_layer} -s 1 -p ${p})
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
+# mpfq_test_fixmp is not seeded as of now, because it uses random2, and
+# there is no mpn_rrandomb as of gmp-6.0.0
+add_executable(mpfq_test_fixmp mpfq_test_fixmp.c)
+target_link_libraries(mpfq_test_fixmp ${gmp_libname})
+run_test(mpfq_test_fixmp mpfq_test_fixmp 40)

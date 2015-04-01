@@ -4,7 +4,7 @@
 #include <string.h>
 
 // we're doing open close mmap truncate...
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
 #include <sys/mman.h>
 #endif
 #include <sys/types.h>
@@ -22,12 +22,16 @@
 #include "portability.h"
 #include "macros.h"
 #include "misc.h"
-#include "memory.h"
+#include "verbose.h"
 
 #include <sys/time.h>   // gettimeofday
 #ifdef  HAVE_UTSNAME_H
 #include <sys/utsname.h>
 #endif
+
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+#include "cpubinding.h"
+#endif  /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
 
 static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * desc)
 {
@@ -84,6 +88,9 @@ struct pi_go_helper_s {
 void * pi_go_helper_func(struct pi_go_helper_s * s)
 {
     pi_interleaving_enter(s->p);
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    cpubinding_do_pinning(s->p->cpubinding_info, s->p->wr[1]->trank, s->p->wr[0]->trank);
+#endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
     void * ret = (s->fcn)(s->p, s->pl, s->arg);
     pi_interleaving_flip(s->p);
     pi_interleaving_leave(s->p);
@@ -246,7 +253,14 @@ static void display_process_grid(parallelizing_info_ptr pi)
         memset(pad, ' ', PI_NAMELEN);
         int node_id_len = strlen(pi->nodenumber_s);
         pad[node_id_len]='\0';
-        if (node_id_len) pad[node_id_len/2]='.';
+        if (node_id_len) {
+            if (pi->thr_orig[0]) {
+                pad[node_id_len/2]='\'';
+            } else {
+                pad[node_id_len/2]='.';
+            }
+        }
+        int mapping_error = 0;
         for(unsigned int i = 0 ; i < pi->wr[1]->njobs ; i++) {       // i == y
         for(unsigned int it = 0 ; it < pi->wr[1]->ncores ; it++) {
             for(unsigned int j = 0 ; j < pi->wr[0]->njobs ; j++) {       // j == x
@@ -255,11 +269,30 @@ static void display_process_grid(parallelizing_info_ptr pi)
                 if (!it && !jt) {
                     what = all_node_ids2 + PI_NAMELEN * (i * pi->wr[0]->njobs + j); 
                 }
+                if (pi->thr_orig[0]) {
+                    /* then we have it==jt==0, but the real leader is not
+                     * this one. Check at least that we have the proper
+                     * identity (same leader)
+                     */
+                    ASSERT_ALWAYS(!it && !jt);
+                    unsigned int i0 = i - (i % pi->thr_orig[0]);
+                    unsigned int j0 = j - (j % pi->thr_orig[1]);
+                    const char * ref = all_node_ids2 + PI_NAMELEN * (i0 * pi->wr[0]->njobs + j0); 
+                    if (strcmp(ref, what) != 0) {
+                        mapping_error=1;
+                    }
+                    if (i != i0 || j != j0)
+                        what = pad;
+                }
                 printf(" %s", what);
             }
             }
             printf("\n");
         }
+        }
+        if (mapping_error) {
+            fprintf(stderr, "Error: we have not obtained the expected node mapping; the only_mpi=1 setting is VERY sensible to the process mapping chosen by the MPI implementation. Chances are you got it wrong. A working setup with openmpi-1.8.2 is a uniqueified host file, with --mca rmaps_base_mapping_policy slot (which is the default setting).\n");
+            exit(1);
         }
         free(pad);
     }
@@ -272,16 +305,6 @@ static void display_process_grid(parallelizing_info_ptr pi)
 static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 {
     int err;
-    int mpi[2] = { 1, 1, };
-    int thr[2] = { 1, 1, };
-
-    param_list_parse_intxint(pl, "mpi", mpi);
-    param_list_parse_intxint(pl, "thr", thr);
-
-    unsigned int nhj = mpi[0];
-    unsigned int nvj = mpi[1];
-    unsigned int nhc = thr[0];
-    unsigned int nvc = thr[1];
 
     memset(pi, 0, sizeof(parallelizing_info));
 
@@ -297,20 +320,66 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 #else
     strncpy(pi->nodename, "unknown", sizeof(pi->nodename));
 #endif
-    pi->m->njobs = nhj * nvj;
-    pi->m->ncores = nhc * nvc;
-    pi->m->totalsize = pi->m->njobs * pi->m->ncores;
 
 #ifndef NDEBUG
     /* Must make sure that we have proper ASSERTS after MPI calls then. */
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 #endif
 
+    int mpi[2] = {1,1};
+    int thr[2] = {1,1};
+    int only_mpi = 0;
+
+    param_list_parse_intxint(pl, "mpi", mpi);
+    param_list_parse_intxint(pl, "thr", thr);
+    param_list_parse_int(pl, "only_mpi", &only_mpi);
+
+    unsigned int nhj = mpi[0];
+    unsigned int nvj = mpi[1];
+    unsigned int nhc = thr[0];
+    unsigned int nvc = thr[1];
+
+    pi->m->njobs = nhj * nvj;
+    pi->m->ncores = nhc * nvc;
+    pi->m->totalsize = pi->m->njobs * pi->m->ncores;
     // MPI_Errhandler my_eh;
     // MPI_Comm_create_errhandler(&pi_errhandler, &my_eh);
     // MPI_Comm_set_errhandler(MPI_COMM_WORLD, my_eh);
 
-    MPI_Comm_dup(MPI_COMM_WORLD, & pi->m->pals);
+    if (only_mpi) {
+        int grank;
+        MPI_Comm_rank(MPI_COMM_WORLD, & grank);
+        if (grank == 0)
+            printf("Making %d independent single-threaded MPI jobs, instead of %d %d-thread jobs\n",
+                pi->m->totalsize, pi->m->njobs, pi->m->ncores);
+        int tt = pi->m->ncores;
+
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        int nnum = rank / tt;
+        int nidx = rank % tt;
+        int ni = nnum / nvj;
+        int nj = nnum % nvj;
+        int ti = nidx / nvc;
+        int tj = nidx % nvc;
+        int i = ni * nhc + ti;
+        int j = nj * nvc + tj;
+        int nrank = i * (nvj * nvc) + j;
+
+        MPI_Comm_split(MPI_COMM_WORLD, 0, nrank, & pi->m->pals);
+        pi->m->ncores = 1;
+        pi->m->njobs = pi->m->totalsize;
+        memcpy(pi->thr_orig, thr, 2*sizeof(int));
+        mpi[0] *= thr[0]; thr[0]=1;
+        mpi[1] *= thr[1]; thr[1]=1;
+        nhj = mpi[0];
+        nvj = mpi[1];
+        nhc = thr[0];
+        nvc = thr[1];
+    } else {
+        pi->m->pals = MPI_COMM_WORLD;
+    }
+
     MPI_Comm_rank(pi->m->pals, (int*) & pi->m->jrank);
 
     int size;
@@ -355,9 +424,62 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 
     get_node_number_and_prefix(pi);
     display_process_grid(pi);
+
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    /* prepare the cpu binding messages, and print the unique messages we
+     * receive */
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_CPUBINDING)) {
+        pi->cpubinding_info = cpubinding_get_info(NULL, pl, thr);
+    } else {
+        char * cpubinding_messages;
+        pi->cpubinding_info = cpubinding_get_info(&cpubinding_messages, pl, thr);
+        int msgsize = 0;
+        if (cpubinding_messages)
+            msgsize = strlen(cpubinding_messages);
+        MPI_Allreduce(MPI_IN_PLACE, &msgsize, 1, MPI_INT, MPI_MAX, pi->m->pals);
+        if (msgsize == 0) {
+            if (cpubinding_messages)
+                free(cpubinding_messages);
+        }
+        msgsize++;
+        int chunksize = PI_NAMELEN + msgsize;
+        char * big_pool = malloc(pi->m->njobs * chunksize);
+        memset(big_pool, 0, pi->m->njobs * chunksize);
+        if (cpubinding_messages) {
+            int rc;
+            rc = strlcpy(big_pool + pi->m->jrank * chunksize, pi->nodename, PI_NAMELEN);
+            ASSERT_ALWAYS(rc == (int) strlen(pi->nodename));
+            rc = strlcpy(big_pool + pi->m->jrank * chunksize + PI_NAMELEN, cpubinding_messages, msgsize);
+            ASSERT_ALWAYS(rc == (int) strlen(cpubinding_messages));
+            free(cpubinding_messages);
+        }
+
+        MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                big_pool, chunksize, MPI_BYTE, pi->m->pals);
+
+        if (pi->m->jrank == 0) {
+            // const char * refnode = NULL;
+            const char * ref = NULL;
+            for(unsigned int i = 0 ; i < pi->m->njobs ; i++) {
+                const char * node = big_pool + i * chunksize;
+                const char * msg = node + PI_NAMELEN;
+                if (!ref || strcmp(msg, ref) != 0) {
+                    printf("cpubinding messages on %s:\n%s", node, msg);
+                    ref = msg;
+                    /*
+                       refnode = node;
+                       } else {
+                       printf("cpubinding messages on %s: same as %s\n", node, refnode);
+                       */
+                }
+            }
+        }
+        free(big_pool);
+    }
+#endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
 }
 
-    static parallelizing_info *
+static parallelizing_info *
 pi_grid_init(parallelizing_info_ptr pi)
 {
     // unsigned int nvj = pi->wr[0]->njobs;
@@ -567,12 +689,18 @@ static void pi_grid_clear(parallelizing_info_ptr pi, parallelizing_info * grid)
 
 static void pi_clear_mpilevel(parallelizing_info_ptr pi)
 {
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    int thr[2] = { pi->wr[0]->ncores, pi->wr[1]->ncores };
+    cpubinding_free_info(pi->cpubinding_info, thr);
+#endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
+
     pi_wiring_destroy_pthread_things(pi->m);
 
     for(int d = 0 ; d < 2 ; d++) {
         MPI_Comm_free(&pi->wr[d]->pals);
     }
-    MPI_Comm_free(&pi->m->pals);
+    if (pi->m->pals != MPI_COMM_WORLD)
+        MPI_Comm_free(&pi->m->pals);
 
     // MPI_Errhandler_free(&my_eh);
 }
@@ -707,14 +835,41 @@ void * pi_load_generic(parallelizing_info_ptr pi, unsigned long key, unsigned lo
     return r;
 }
 
-void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
+void parallelizing_info_decl_usage(param_list pl)/*{{{*/
+{
+    param_list_decl_usage(pl, "mpi", "number of MPI nodes across which the execution will span, with mesh dimensions");
+    param_list_decl_usage(pl, "thr", "number of threads (on each node) for the program, with mesh dimensions");
+    param_list_decl_usage(pl, "interleaving", "whether we should start two interleaved sets of threads. Only supported by some programs, has no effect on others.");
+    param_list_decl_usage(pl, "only_mpi", "replace threads by distinct MPI jobs");
+
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    cpubinding_decl_usage(pl);
+#endif
+}
+/*}}}*/
+
+void parallelizing_info_lookup_parameters(param_list_ptr pl)/*{{{*/
+{
+    /* These will all be looked later (within this file, though).
+     */
+    param_list_lookup_string(pl, "mpi");
+    param_list_lookup_string(pl, "thr");
+    param_list_lookup_string(pl, "interleaving");
+    param_list_lookup_string(pl, "only_mpi");
+
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    cpubinding_lookup_parameters(pl);
+#endif
+}
+/*}}}*/
+
+
+void pi_go(
+        void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         param_list pl,
         void * arg)
 {
     int interleaving = 0;
-#ifndef HAVE_MMAN_H
-    fprintf(stderr, "Warning: copy-based mmaped I/O replacement has never been tested, and could very well be bogus\n");
-#endif
     param_list_parse_int(pl, "interleaving", &interleaving);
     if (interleaving) {
         pi_go_inner_interleaved(fcn, pl, arg);
@@ -853,6 +1008,7 @@ void pi_log_print_all(parallelizing_info_ptr pi)
     free(strings);
 }
 
+
 struct thread_broadcast_arg {
     pi_wiring_ptr wr;
     /* this pointer is written from all threads. Its contents are
@@ -860,6 +1016,8 @@ struct thread_broadcast_arg {
     void * ptr;
     unsigned int root;
     size_t size;
+    thread_reducer_t f;         /* only for reduce */
+    void * dptr;                /* only for reduce */
 };
 
 void thread_broadcast_in(int s MAYBE_UNUSED, struct thread_broadcast_arg * a)
@@ -891,6 +1049,54 @@ void thread_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int i)
     barrier_wait(wr->th->bh,
             (void(*)(int,void*)) &thread_broadcast_in,
             (void(*)(int,void*)) &thread_broadcast_out,
+            a);
+    serialize_threads(wr);
+}
+
+void thread_reducer_int_min(void * mine, const void * other, size_t size MAYBE_UNUSED)
+{
+    int * imine = mine;
+    const int * iother = other;
+    if (*iother < *imine) *imine = *iother;
+}
+
+void thread_reducer_int_max(void * mine, const void * other, size_t size MAYBE_UNUSED)
+{
+    int * imine = mine;
+    const int * iother = other;
+    if (*iother > *imine) *imine = *iother;
+}
+
+void thread_reducer_int_sum(void * mine, const void * other, size_t size MAYBE_UNUSED)
+{
+    int * imine = mine;
+    const int * iother = other;
+    *imine += *iother;
+}
+
+/* this gets called with s = (count-1), (count-2), ..., 0 */
+void thread_allreduce_in(int s, struct thread_broadcast_arg * a)
+{
+    if (s < (int) a->wr->ncores - 1) {
+        (*a->f)(a->ptr, a->wr->th->utility_ptr, a->size);
+    }
+    a->wr->th->utility_ptr = a->ptr;
+    if (!s)
+        memcpy(a->dptr, a->wr->th->utility_ptr, a->size);
+}
+
+void thread_allreduce(pi_wiring_ptr wr, void * dptr, void * ptr, size_t size, thread_reducer_t f)
+{
+    struct thread_broadcast_arg a[1];
+    a->wr = wr;
+    a->ptr = ptr;
+    a->root = 0;        /* meaningless */
+    a->size = size;
+    a->f = f;
+    a->dptr = dptr;
+    barrier_wait(wr->th->bh,
+            (void(*)(int,void*)) &thread_allreduce_in,
+            NULL,
             a);
     serialize_threads(wr);
 }
@@ -1188,21 +1394,7 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
 
     free(alldisps);
 
-#if 0
-    for(unsigned int i = 0 ; i < w->njobs ; i++) {
-        my_pthread_mutex_lock(w->th->m);
-        printf("J%uT%u %u @ %u\n", i, w->trank, counts[i], displs[i]);
-        my_pthread_mutex_unlock(w->th->m);
-    }
-#endif
-
     serialize_threads(w);
-
-#if 0
-    ASSERT_ALWAYS(displs[w->jrank] >= 0);
-    if (displs[w->jrank] == 0)
-        ASSERT_ALWAYS(w->trank == 0);
-#endif
 
     if (w->trank == 0) {
         free(allcounts);
@@ -1252,36 +1444,39 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
-    int rc;
     int err;
 
+    char * filename;
+    char * filename_pre;
+    int rc;
+
     if (leader) {
-        char * filename;
-        int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        rc = asprintf(&filename_pre, "%s_%u.tmp", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
 #ifdef HAVE_MINGW
-        fd = open(filename, O_RDWR | O_CREAT | O_BINARY, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT | O_BINARY, 0666);
 #else
-        fd = open(filename, O_RDWR | O_CREAT, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT, 0666);
 #endif
         if (fd < 0) {
-            fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
+            fprintf(stderr, "open(%s): %s\n", filename_pre, strerror(errno));
             goto pi_save_file_leader_init_done;
         }
 
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             close(fd);
             goto pi_save_file_leader_init_done;
         }
-#ifdef HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             recvbuf = NULL;
             close(fd);
             goto pi_save_file_leader_init_done;
@@ -1291,7 +1486,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         FATAL_ERROR_CHECK(!recvbuf, "out of memory");
 #endif
 pi_save_file_leader_init_done:
-        free(filename);
+        ;
     }
 
     /* Now all threads from job zero see the area mmaped by their leader
@@ -1301,7 +1496,7 @@ pi_save_file_leader_init_done:
         thread_broadcast(w, &recvbuf, sizeof(void*), 0);
     }
 
-    /* Rather unfortunate, but error checking requires some checking. As
+    /* Rather unfortunate, but error checking requires some communication. As
      * mentioned earlier, we don't feel concerned a lot by this, since
      * in our context I/Os are rare enough
      */
@@ -1331,19 +1526,32 @@ pi_save_file_leader_init_done:
     free(displs);
 
     if (leader) {
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
-#ifdef HAVE_MMAN_H
         munmap(recvbuf, wsiz);
-#else
-        write(fd, recvbuf, wsiz);
-        free(recvbuf);
-#endif
         rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
-            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
-            /* If only ftruncate failed, don't return an error */
+            fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
         }
+#else
+        ssize_t n = write(fd, recvbuf, sizeondisk);
+        free(recvbuf);
+        if (n < 0 || (size_t) n != sizeondisk) {
+            fprintf(stderr, "%s: short write: %s\n", filename_pre, strerror(errno));
+            rc = -1;
+        } else {
+            rc = 0;
+        }
+#endif
         close(fd);
+        if (rc == 0) {
+            /* unlink before rename is necessary under windows */
+            unlink(filename);
+            rc = rename(filename_pre, filename);
+            DIE_ERRNO_DIAG(rc < 0, "rename", filename_pre);
+        }
+        free(filename);
+        free(filename_pre);
     }
 
     return 1;
@@ -1369,33 +1577,36 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     int rc;
     int err;
 
+    char * filename;
+    char * filename_pre;
+
     if (leader) {
-        char * filename;
-        int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        rc = asprintf(&filename_pre, "%s_%u.tmp", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
 #ifdef HAVE_MINGW
-        fd = open(filename, O_RDWR | O_CREAT | O_BINARY, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT | O_BINARY, 0666);
 #else
-        fd = open(filename, O_RDWR | O_CREAT, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT, 0666);
 #endif
         if (fd < 0) {
-            fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
+            fprintf(stderr, "fopen(%s): %s\n", filename_pre, strerror(errno));
             goto pi_save_file_2d_leader_init_done;
         }
 
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
-#ifdef HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             recvbuf = NULL;
             close(fd);
             goto pi_save_file_2d_leader_init_done;
@@ -1405,7 +1616,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         FATAL_ERROR_CHECK(!recvbuf, "out of memory");
 #endif
 pi_save_file_2d_leader_init_done:
-        free(filename);
+        ;
     }
 
     /* Now all threads from job zero see the area mmaped by their leader
@@ -1446,18 +1657,31 @@ pi_save_file_2d_leader_init_done:
 
     if (leader) {
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
-#else
-        write(fd, recvbuf, wsiz);
-        free(recvbuf);
-#endif
         rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
-            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
-            /* If only ftruncate failed, don't return an error */
+            fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
         }
+#else
+        ssize_t n = write(fd, recvbuf, sizeondisk);
+        free(recvbuf);
+        if (n < 0 || (size_t) n != sizeondisk) {
+            fprintf(stderr, "%s: short write: %s\n", filename_pre, strerror(errno));
+            rc = -1;
+        } else {
+            rc = 0;
+        }
+#endif
         close(fd);
+        if (rc == 0) {
+            /* unlink before rename is necessary under windows */
+            unlink(filename);
+            rc = rename(filename_pre, filename);
+            DIE_ERRNO_DIAG(rc < 0, "rename", filename_pre);
+        }
+        free(filename);
+        free(filename_pre);
     }
 
     return 1;
@@ -1491,7 +1715,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         fd = open(filename, O_RDONLY, 0666);
 #endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
 #else
@@ -1540,8 +1764,14 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             for(unsigned int j = 0 ; j < w->njobs ; j++) {
                 ts[j] = MIN(chunksize, cs[j]);
                 if (ts[j]) {
-                    if (w->jrank == 0)
+                    if (w->jrank == 0) {
+                        /* If "bus error" appears here, it might be
+                         * because data files are put on /ceph file
+                         * system, which doesn't seem to answer in a very
+                         * satisfactory way to mmaping files...
+                         */
                         memcpy(tsendbuf + j * chunksize, sendbuf + cd[j], ts[j]);
+                    }
                     ts0=0;
                 }
             }
@@ -1582,7 +1812,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     free(displs);
 
     if (leader) {
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(sendbuf, wsiz);
 #else
         free(sendbuf);
@@ -1621,7 +1851,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         fd = open(filename, O_RDONLY, 0666);
 #endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
 #else
@@ -1662,7 +1892,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     free(displs);
 
     if (leader) {
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(sendbuf, wsiz);
 #else
         free(sendbuf);
@@ -1695,6 +1925,10 @@ void pi_interleaving_leave(parallelizing_info_ptr pi)
     my_pthread_barrier_wait(pi->interleaved->b);
 }
 
+#if 0
+/* XXX the name is not very informative, notably about the important
+ * point that pointer must be identical.
+ */
 /* Considering a data area with a pointer identical on all calling
  * threads, tell whether the contents agree on all MPI jobs+threads
  * (returns 1 if this is the case)
@@ -1717,6 +1951,7 @@ int mpi_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
     thread_broadcast(pi->m, &cmp, sizeof(int), 0);
     return cmp == 0;
 }
+#endif
 
 /* Here we assume pointers which are different on several calling
  * threads, and we compare the contents. Results may disagree on the
@@ -1729,10 +1964,21 @@ int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
     bufs[pi->m->trank] = buffer;
     oks[pi->m->trank] = 1;
 
+    /* given 5 threads, here is for example what is done at each step.
+     *
+     * stride=1
+     *  ok0 = (x0==x1)
+     *  ok2 = (x2==x3)
+     * stride=2
+     *  ok0 = x0==x1==x2==x3
+     * stride 4
+     *  ok0 = x0==x1==x2==x3==x4
+     */
     for(unsigned int stride = 1 ; stride < pi->m->ncores ; stride <<= 1) {
         unsigned int i = pi->m->trank;
-        serialize_threads(pi->m);
-        if (i + stride > pi->m->ncores) continue;
+        serialize_threads(pi->m);       /* because of this, we don't
+                                           leave the loop with break */
+        if (i + stride >= pi->m->ncores) continue;
         /* many threads are doing nothing here */
         if (i & stride) continue;
         oks[i] = oks[i] && oks[i + stride] && memcmp(bufs[i], bufs[i + stride], sz) == 0;
@@ -1747,8 +1993,10 @@ int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
 int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
 {
     int ok= thread_data_eq(pi, buffer, sz);
-    MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_BAND, pi->m->pals);
-    if (!ok) return 0;
-    return mpi_data_eq(pi, buffer, sz);
+    if (pi->m->trank == 0) {
+        MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_BAND, pi->m->pals);
+    }
+    thread_broadcast(pi->m, &ok, sizeof(int), 0);
+    return ok;
 }
 

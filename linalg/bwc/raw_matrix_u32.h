@@ -23,9 +23,25 @@ struct matrix_u32_s {
 typedef struct matrix_u32_s matrix_u32[1];
 typedef struct matrix_u32_s * matrix_u32_ptr;
 
-/* Structure of type matrix_u32 are created empty and zeroed out by the
- * caller functions. mfile and bfile are expected from the caller. The
- * rest is obtained by balancing_get_matrix_u32.
+/* The interface around matrix_u32 is pretty thin, as this header defines
+ * no function...
+ */
+/* Constructors:
+ *
+ * It's the entire responsibility of the caller. Structures of type
+ * matrix_u32 are to be created empty and zeroed out by the caller. The
+ * fields mfile and bfile are also expected from the caller.
+ */
+/*
+ * Initialization:
+ *
+ * The main initializer function is balancing_get_matrix_u32 defined in
+ * balancing_workhorse.c
+ * Alternatively, there is also the random_matrix_get_u32 function,
+ * defined in random_matrix.c.
+ */
+/*
+ * Destructors:
  *
  * There is no destructor function for this type. The global assumption
  * is that the mm layer which is fed with this structure has the right to
@@ -39,9 +55,6 @@ typedef struct matrix_u32_s * matrix_u32_ptr;
  * is more efficient eventually.
  */
  
-extern void matrix_u32_init_from_file(matrix_u32_ptr m, const char * file, int stored_transposed);
-
-
 #ifdef __cplusplus
 }
 #endif

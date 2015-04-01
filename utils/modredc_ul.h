@@ -41,12 +41,12 @@
 
 typedef unsigned long residueredcul_t[MODREDCUL_SIZE];
 typedef unsigned long modintredcul_t[MODREDCUL_SIZE];
-typedef struct {
+struct __modulusredcul_t {
   unsigned long m;
   unsigned long invm;
   residueredcul_t one;
-} __modulusredcul_t;
-typedef __modulusredcul_t modulusredcul_t[1];
+};
+typedef struct __modulusredcul_t modulusredcul_t[1];
 
 
 /* ==================== Functions used internally ==================== */
@@ -84,46 +84,7 @@ static inline void
 modredcul_redc (residueredcul_t r, const unsigned long plow,
                 const unsigned long phigh, const modulusredcul_t m)
 {
-  unsigned long t = phigh;
-#ifndef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-  unsigned long tlow, thigh;
-#endif
-
-  ASSERT_EXPENSIVE (phigh < m[0].m);
-
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-
-  /* TODO: are the register constraints watertight?
-     %rax gets modified but putting tlow as an output constraint with "+"
-     will keep r from getting allocated in %rax, which is a shame
-     since we often want the result in %rax for the next multiply. */
-
-  __asm__ __VOLATILE (
-    "imulq %[invm], %%rax\n\t"
-    "cmpq $1, %%rax \n\t"                /* if plow != 0, increase t */
-    "sbbq $-1, %[t]\n\t"
-    "mulq %[m]\n\t"
-    "lea (%[t],%%rdx,1), %[r]\n\t"  /* compute (rdx + thigh) mod m */
-    "subq %[m], %[t]\n\t"
-    "addq %%rdx, %[t]\n\t"
-    "cmovcq %[t], %[r]\n\t"
-    : [t] "+&r" (t), [r] "=&r" (r[0])
-    : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
-    : "%rdx", "cc"
-  );
-#else
-  tlow = plow * m[0].invm;
-  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
-  /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow)
-     == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0.
-     In the former case we want phigh + thigh + 1, in the latter
-     phigh + thigh. Since t = phigh < m, and modredcul_add can handle the
-     case where the second operand is equal to m, adding 1 is safe */
-
-  t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */
-
-  modredcul_add (r, &t, &thigh, m);
-#endif
+  ularith_redc(r, plow, phigh, m[0].m, m[0].invm);
 }
 
 
@@ -718,6 +679,35 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 }
 
 
+/* For a residue class a (mod m) and non-negative integer b, set r to
+   the smallest non-negative integer in the residue class a*b (mod m). */
+
+MAYBE_UNUSED
+static inline void
+modredcul_mul_ul_ul (unsigned long *r, const residueredcul_t a,
+                     const unsigned long b, const modulusredcul_t m)
+{
+  unsigned long plow, phigh;
+
+  ASSERT_EXPENSIVE (m[0].m % 2 != 0);
+  ASSERT_EXPENSIVE (a[0] < m[0].m);
+#if defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%d) %% %lu", a[0], b, LONG_BIT, m[0].m);
+#endif
+
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b);
+  /* We have a <= m-1, b <= 2^LONG_BIT - 1. Thus the product
+     phigh:plow <= (m-1)*(2^LONG_BIT - 1) = m*2^LONG_BIT - 2^LONG_BIT - m + 1,
+     and with m >= 1,
+     phigh:plow <= m*2^LONG_BIT - 2^LONG_BIT, so phigh < m. */
+  modredcul_redc (r, plow, phigh, m);
+
+#if defined(MODTRACE)
+  printf (" == %lu /* PARI */ \n", *r);
+#endif
+}
+
+
 MAYBE_UNUSED
 static inline void
 modredcul_sqr (residueredcul_t r, const residueredcul_t a,
@@ -767,6 +757,10 @@ modredcul_finished (const residueredcul_t r, const modulusredcul_t m)
 
 
 /* prototypes of non-inline functions */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int modredcul_div3 (residueredcul_t, const residueredcul_t,
                      const modulusredcul_t);
 int modredcul_div5 (residueredcul_t, const residueredcul_t,
@@ -808,5 +802,9 @@ int modredcul_batch_Q_to_Fp (unsigned long *, unsigned long,
                              unsigned long, unsigned long,
                              const unsigned long *, size_t);
 int modredcul_jacobi (const residueredcul_t, const modulusredcul_t);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* MODREDC_UL_H */

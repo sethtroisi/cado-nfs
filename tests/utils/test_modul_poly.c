@@ -119,6 +119,18 @@ test_modul_poly_roots_ulong (unsigned long iter)
   ASSERT_ALWAYS(n == 1 && r[0] == 0);
   modul_clearmod (p);
 
+  modul_initmod_ul (p, 13);
+  mpz_set_ui (f[0], 4);
+  mpz_set_ui (f[1], 10);
+  mpz_set_ui (f[2], 12);
+  mpz_set_ui (f[3], 0);
+  mpz_set_ui (f[4], 9);
+  mpz_set_ui (f[5], 3);
+  mpz_set_ui (f[6], 1);
+  F->deg = 6;
+  n = modul_poly_roots (NULL, F, p);
+  ASSERT_ALWAYS (n == 5);
+
   while (iter--)
     {
       d = 1 + lrand48 () % (MAXDEGREE - 1);

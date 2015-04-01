@@ -3,10 +3,14 @@
 #define _BSD_SOURCE     /* asprintf sometimes (I think) */
 /* test_p_2.c is sed- generated from test.c.meta */
 
+#ifdef  NDEBUG
+#undef NDEBUG
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <gmp.h>
 #include <time.h>
@@ -16,43 +20,36 @@
 
 Kfield K;
 
-#define DO_ONE_TEST(name, CODE)						\
+#define TEST_ASSERT(cond) do {						\
+    if (!(cond)) {							\
+        fprintf(stderr, "Test failed [%s]/%d\n", test_name, test_i);    \
+        fprintf(stderr, "Failure: " #cond "\n");			\
+        fprintf(stderr, "Seed=%lu, ntests=%d\n", seed, ntests);		\
+        abort();					                \
+    }									\
+} while (0)
+
+#define TEST_ASSERT0(cond) do { int test_i = -1; TEST_ASSERT(cond); } while (0)
+#define TEST_ASSERT00(name, cond) do { const char * test_name = name; int test_i = -1; TEST_ASSERT(cond); } while (0)
+
+#define DO_ONE_TEST_GENERIC(name, CODE, cond)				\
 	do {								\
-	for(int i = 0 ; i < ntests ; i++) {				\
-		do { CODE } while (0);					\
-		if (Kcmp(r1, r2) == 0)					\
-			continue;					\
-		fprintf(stderr, "Test failed [" name "]/%d\n", i);	\
-		fprintf(stderr, "Seed is %lu, nb_tests is %d\n", seed, ntests);\
-		abort();						\
-	}								\
-	if (!quiet) fprintf(stderr, "ok - [" name "], %d times\n", ntests);\
+            const char * test_name = name;                              \
+            for(int test_i = 0 ; test_i < ntests ; test_i++) {		\
+                    do { CODE } while (0);				\
+                    TEST_ASSERT(cond);                                  \
+            }								\
+            if (!quiet)                                                 \
+                fprintf(stderr, "ok - [%s], %d times\n",                \
+                        test_name, ntests);                             \
         } while (0)
 
-#define DO_ONE_TEST_VEC(name, CODE)					\
-	do {								\
-	for(int i = 0 ; i < ntests ; i++) {				\
-		do { CODE } while (0);					\
-		if (Kvec_cmp(v1, v2, length) == 0)				\
-			continue;					\
-		fprintf(stderr, "Test failed [" name "]/%d\n", i);	\
-		fprintf(stderr, "Seed is %lu, nb_tests is %d\n", seed, ntests);\
-		abort();						\
-	}								\
-	if (!quiet) fprintf(stderr, "ok - [" name "], %d times\n", ntests);\
-        } while (0)
-#define DO_ONE_TEST_POLY(name, CODE)					\
-	do {								\
-	for(int i = 0 ; i < ntests ; i++) {				\
-		do { CODE } while (0);					\
-		if (Kpoly_cmp(p1, p2) == 0)				\
-			continue;					\
-		fprintf(stderr, "Test failed [" name "]/%d\n", i);	\
-		fprintf(stderr, "Seed is %lu, nb_tests is %d\n", seed, ntests);\
-		abort();						\
-	}								\
-	if (!quiet) fprintf(stderr, "ok - [" name "], %d times\n", ntests);\
-        } while (0)
+#define DO_ONE_TEST(name, CODE) \
+            DO_ONE_TEST_GENERIC(name, CODE, Kcmp(r1, r2) == 0)
+#define DO_ONE_TEST_VEC(name, CODE) \
+            DO_ONE_TEST_GENERIC(name, CODE, Kvec_cmp(v1, v2, length) == 0)
+#define DO_ONE_TEST_POLY(name, CODE) \
+            DO_ONE_TEST_GENERIC(name, CODE, Kpoly_cmp(p1, p2) == 0)
 
 
 void usage() {
@@ -88,8 +85,10 @@ int main(int argc, char * argv[])
     Kvec  w1, w2, w3, w4;
     Kpoly  p1, p2;
     Kpoly  q1, q2, q3, q4;
-    unsigned long seed = (unsigned long)time(NULL);
+    unsigned long seed = getpid();
+#if !defined(CHAR2) && !defined(FIX_PRIME)
     const char * prime_str = NULL;
+#endif
 
     while (argc > 1 && argv[1][0] == '-') {
         if (argc > 2 && strcmp(argv[1], "-s") == 0) {
@@ -104,7 +103,7 @@ int main(int argc, char * argv[])
             ntests = atol(argv[2]);
             argc -= 2;
             argv += 2;
-#ifndef FIX_PRIME
+#if !defined(CHAR2) && !defined(FIX_PRIME)
         } else if (argc > 2 && strcmp(argv[1], "-p") == 0) {
             prime_str = argv[2];
             argc -= 2;
@@ -123,8 +122,7 @@ int main(int argc, char * argv[])
 
     if (!quiet) fprintf(stderr, "--- testing for p_2\n");
 
-    int i = 0;
-    while ( (nloops == 0) || (i < nloops) ) {
+    for(int loop_i = 0; (nloops == 0) || (loop_i < nloops) ; loop_i++) {
         gmp_randstate_t  rstate;
 
         Kfield_init();
@@ -134,17 +132,14 @@ int main(int argc, char * argv[])
         gmp_randinit_mt(rstate);
         gmp_randseed_ui(rstate, seed);
 
-#ifndef CHAR2
-#ifndef FIX_PRIME
-#ifndef EXTENSION_OF_GFP
+#if !defined(CHAR2) && !defined(FIX_PRIME) && !defined(EXTENSION_OF_GFP)
         mpz_t p;
         mpz_init(p);
 #ifdef  VARIABLE_SIZE_PRIME
         mp_bitcnt_t size_prime= 12*GMP_NUMB_BITS;
-#endif
-#ifndef VARIABLE_SIZE_PRIME
+#else   /* VARIABLE_SIZE_PRIME */
         mp_bitcnt_t size_prime=Kimpl_max_characteristic_bits();
-#endif
+#endif  /* VARIABLE_SIZE_PRIME */
         if (prime_str) {
             mpz_set_str(p, prime_str, 0);
         } else {
@@ -152,19 +147,21 @@ int main(int argc, char * argv[])
         }
         Kfield_specify(MPFQ_PRIME_MPZ, p);
         mpz_clear(p);
-#endif
-#endif
-#endif
+#endif  /* !defined(CHAR2) && !defined(FIX_PRIME) && !defined(EXTENSION_OF_GFP)  */
 
 #ifdef EXTENSION_OF_GFP
         mpz_t p;
         mpz_init(p);
 #ifdef  VARIABLE_SIZE_PRIME
         mp_bitcnt_t size_prime= 12*GMP_NUMB_BITS;
-#else
+#else   /* VARIABLE_SIZE_PRIME */
         mp_bitcnt_t size_prime=Kimpl_max_characteristic_bits();
-#endif
-        get_random_prime(p, size_prime, quiet, rstate);
+#endif  /* VARIABLE_SIZE_PRIME */
+        if (prime_str) {
+            mpz_set_str(p, prime_str, 0);
+        } else {
+            get_random_prime(p, size_prime, quiet, rstate);
+        }
         Kfield_specify(MPFQ_PRIME_MPZ, p);
         mpz_clear(p);
 
@@ -175,7 +172,7 @@ int main(int argc, char * argv[])
         MPFQ_CREATE_FUNCTION_NAME(BFIELD, poly_setcoeff_ui) (K->kbase, defpol, 1, extdeg);
         MPFQ_CREATE_FUNCTION_NAME(BFIELD, poly_setcoeff_ui) (K->kbase, defpol, 1, 0);
         Kfield_specify(MPFQ_POLYNOMIAL, defpol);
-#endif
+#endif  /* EXTENSION_OF_GFP */
 
 
         Kinit(&a0);
@@ -288,7 +285,6 @@ int main(int argc, char * argv[])
                 Kadd (r2, a4, a5);
                 });
 
-#ifndef HALF_WORD
         DO_ONE_TEST("mul_ui distributivity", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -301,7 +297,6 @@ int main(int argc, char * argv[])
                 Kmul_ui (a5, a2, xx);
                 Kadd (r2, a4, a5);
                 });
-#endif
 
         /* we can't be sure that our polynomial is irreducible... */
         DO_ONE_TEST("inversion", {
@@ -333,75 +328,22 @@ int main(int argc, char * argv[])
                 Kelt_ur_clear(&tmp);
                 Ksqr(r2, a0);
                 });
-        /* currently mpfq_pz does not have sqrt implemented */
-#ifndef VARIABLE_SIZE_PRIME
+#if !defined(VARIABLE_SIZE_PRIME) && !defined(EXTENSION_OF_GFP)
+        /* pz has no Tonelli Shanks for now */
+        /* As for extensions of GF(p), we can't test is_sqr, nor sqrt,
+         * because our test code does not produce prime polynomials
+         * (relevance to sqrt: we need a qnr). This implies that our
+         * x^((q-1)/2) test may fail: for example if we have a degree 5
+         * extension where the polynomial splits as degree 2 * degree 3,
+         * then we surely get garbage
+         */
         DO_ONE_TEST("sqr o sqrt o sqr = sqr", {
                 Krandom2 (a0, rstate);
                 /* force testing x==0 at least once ! */
-                if (i == 0) Kset_ui (a0, 0);
+                if (test_i == 0) Kset_ui (a0, 0);
                 Ksqr(r1, a0);
                 Ksqrt(r2, r1);
                 Ksqr(r2, r2);
-                });
-#endif
-        /*-----------------------------------------------------------*/
-        /*          Tests specific to prime fields                   */
-        /*-----------------------------------------------------------*/
-#ifndef CHAR2
-        DO_ONE_TEST("sscan o asprint = id", {
-                Krandom2 (a0, rstate);
-                /* force testing x==0 at least once ! */
-                if (i == 0) Kset_ui (a0, 0);
-                char *str;
-                Kset(r1, a0);
-                Kasprint(&str, a0);
-                int ret = Ksscan(r2, str);
-                free(str);
-                if (!ret) abort();
-                });
-
-        {
-            /* Now do some I/O tests */
-            char * filename;
-            int rc = asprintf(&filename, "/tmp/mpfq-test.%lu", gmp_urandomb_ui(rstate, 32));
-            if (rc < 0) abort();
-            FILE * f = fopen(filename, "w");
-            if (f == NULL) abort();
-            fprintf(f, "\n");   /* ensure we properly ignore leading ws */
-            DO_ONE_TEST("fprint", {
-                    Kset_ui(a0, i);
-                    Kinv(a0, a0);
-                    Kfprint(f, a0);
-                    fprintf(f, "\n");
-                    Kset_ui(r1, 1);
-                    Kset(r2, r1);
-                    });
-            fclose(f);
-            f = fopen(filename, "r");
-            if (f == NULL) abort();
-            DO_ONE_TEST("fscan", {
-                    Kset_ui(a0, i);
-                    Kfscan(f, a1);
-                    Kinv(r1, a1);
-                    Kset(r2, a0);
-                    });
-            fclose(f);
-            unlink(filename);
-            free(filename);
-        }
-
-        DO_ONE_TEST("mul by 3 = add o add", {
-                Krandom2 (a0, rstate);
-                Kset_ui(a1, 3);
-                Kmul (r1, a0, a1);
-                Kadd (r2, a0, a0);
-                Kadd (r2, r2, a0);
-                });
-#ifndef EXTENSION_OF_GFP
-        DO_ONE_TEST("Fermat by pow", {
-                Krandom2 (a0, rstate);
-                Kset(r1, a0);
-                Kpowz(r2, a0, K->p);
                 });
 #endif
         DO_ONE_TEST("x^(q-1) == 1/x", {
@@ -430,8 +372,69 @@ int main(int argc, char * argv[])
                 Kset(r2, a0);
                 mpz_clear(z);
                 });
-#ifndef VARIABLE_SIZE_PRIME
-        /* pz has no Tonelli Shanks for now */
+        /*-----------------------------------------------------------*/
+        /*          Tests specific to prime fields                   */
+        /*-----------------------------------------------------------*/
+#ifndef CHAR2
+        DO_ONE_TEST("sscan o asprint = id", {
+                Krandom2 (a0, rstate);
+                /* force testing x==0 at least once ! */
+                if (test_i == 0) Kset_ui (a0, 0);
+                char *str;
+                Kset(r1, a0);
+                Kasprint(&str, a0);
+                int ret = Ksscan(r2, str);
+                free(str);
+                TEST_ASSERT(ret);
+                });
+
+        {
+            /* Now do some I/O tests */
+            char * filename;
+            int rc = asprintf(&filename, "/tmp/mpfq-test.%lu", gmp_urandomb_ui(rstate, 32));
+            if (rc < 0) abort();
+            FILE * f = fopen(filename, "w");
+            if (f == NULL) abort();
+            fprintf(f, "\n");   /* ensure we properly ignore leading ws */
+            DO_ONE_TEST("fprint", {
+                    Kset_ui(a0, test_i);
+                    Kinv(a0, a0);
+                    Kfprint(f, a0);
+                    fprintf(f, "\n");
+                    Kset_ui(r1, 1);
+                    Kset(r2, r1);
+                    });
+            fclose(f);
+            f = fopen(filename, "r");
+            if (f == NULL) abort();
+            DO_ONE_TEST("fscan", {
+                    Kset_ui(a0, test_i);
+                    Kfscan(f, a1);
+                    Kinv(r1, a1);
+                    Kset(r2, a0);
+                    });
+            fclose(f);
+            unlink(filename);
+            free(filename);
+        }
+
+        DO_ONE_TEST("mul by 3 = add o add", {
+                Krandom2 (a0, rstate);
+                Kset_ui(a1, 3);
+                Kmul (r1, a0, a1);
+                Kadd (r2, a0, a0);
+                Kadd (r2, r2, a0);
+                });
+#ifndef EXTENSION_OF_GFP
+        DO_ONE_TEST("Fermat by pow", {
+                Krandom2 (a0, rstate);
+                Kset(r1, a0);
+                Kpowz(r2, a0, K->p);
+                });
+#endif
+#if !defined(VARIABLE_SIZE_PRIME) && !defined(EXTENSION_OF_GFP)
+        /* see remark above (relative to sqrt) */
+        TEST_ASSERT00("Tonelli shanks setup done ?", K->ts_info.z);
         DO_ONE_TEST("is_sqr o (mul(sqr,nsqr)) = false", {
                 do {
                     Krandom2 (a0, rstate);
@@ -445,14 +448,17 @@ int main(int argc, char * argv[])
                     Kset_ui(r1, 0);
                 });
 #endif
+#ifndef EXTENSION_OF_GFP
+        /* see remark above (relative to sqrt) */
         DO_ONE_TEST("is_sqr o sqr = true", {
                 do {
                     Krandom2 (a0, rstate);
                 } while (Kcmp_ui(a0, 0) == 0);
                 Kset_ui(r1, 1);
-                Ksqr(a0, a0);
-                Kset_ui(r2, Kis_sqr(a0));
+                Ksqr(a1, a0);
+                Kset_ui(r2, Kis_sqr(a1));
                 });
+#endif
         DO_ONE_TEST("ur_add 500 times and reduce", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -494,6 +500,7 @@ int main(int argc, char * argv[])
                 Kneg(r2, a0);
                 Kmul(r2, r2, a1);
                 Kmul_ui(r2, r2, 500);
+                /* We have a problem here. r1 is not always reduced */
                 });
 
         DO_ONE_TEST("ur_neg o ur_sub = ur_add", {
@@ -551,22 +558,35 @@ int main(int argc, char * argv[])
         DO_ONE_TEST("fscan(long file)", {
             char * filename;
             int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
-            if (rc < 0) abort();
+            TEST_ASSERT(rc >= 0);
             FILE * f = fopen(filename, "w");
-            if (f == NULL) abort();
+            TEST_ASSERT(f);
             mpz_t z;
             mpz_init(z);
             Kfield_characteristic(z);
+#ifdef EXTENSION_OF_GFP
+            gmp_fprintf(f, "[ ");
+#endif
             gmp_fprintf(f, "%Zd", z);
             mpz_clear(z);
-            for(int j = 0 ; j < i ; j++) gmp_fprintf(f, "0");
+            for(int j = 0 ; j < test_i ; j++) gmp_fprintf(f, "0");
             gmp_fprintf(f, "1");
+#ifdef EXTENSION_OF_GFP
+            gmp_fprintf(f, " ]");
+#endif
+            gmp_fprintf(f, "\n");
             fclose(f);
             f = fopen(filename, "r");
-            if (f == NULL) abort();
+            TEST_ASSERT(f);
             Kset_ui(r1, 1);
             Kset_ui(r2, 0);
             Kfscan(f, r2);
+#ifdef CHAR2
+            /* In the characteristic 2 case, it is perfectly legitimate
+             * for this test to return false -- so we're only testing
+             * that it does not bomb out */
+            Kset(r2, r1);       /* force success */
+#endif
             fclose(f);
             unlink(filename);
             free(filename);
@@ -697,7 +717,7 @@ int main(int argc, char * argv[])
                 Kasprint(&str, a0);
                 int ret = Ksscan(r2, str);
                 free(str);
-                if (!ret) abort();
+                TEST_ASSERT(ret);
                 });
 
         DO_ONE_TEST("sscan o asprint = id, base 2", {
@@ -709,7 +729,7 @@ int main(int argc, char * argv[])
                 Kasprint(&str, a0);
                 int ret = Ksscan(r2, str);
                 free(str);
-                if (!ret) abort();
+                TEST_ASSERT(ret);
                 });
 
          DO_ONE_TEST("sscan o asprint = id, base 16", {
@@ -721,7 +741,7 @@ int main(int argc, char * argv[])
                 Kasprint(&str, a0);
                 int ret = Ksscan(r2, str);
                 free(str);
-                if (!ret) abort();
+                TEST_ASSERT(ret);
                 });
 #endif
 
@@ -731,7 +751,7 @@ int main(int argc, char * argv[])
           * assembly, it is likely to trigger register allocation
           * problems in some instances */
          Khadamard(a0,a1,a2,a3);
-#endif
+#endif  /* HAVE_mpfq_p_2_hadamard */
         /*-----------------------------------------------------------*/
         /*          Tests related to vectors                         */
         /*-----------------------------------------------------------*/
@@ -785,8 +805,8 @@ int main(int argc, char * argv[])
 
 
         DO_ONE_TEST("vec_sscan o vec_asprint = id", {
-                /* Do this for vectors of length i */
-                unsigned int cap = i < length ? i : length;
+                /* Do this for vectors of length test_i */
+                unsigned int cap = test_i < length ? test_i : length;
                 Kvec_random2(w1, cap, rstate);
                 char * str;
                 Kvec_asprint(&str, w1, cap);
@@ -794,7 +814,7 @@ int main(int argc, char * argv[])
                 unsigned int tlength = 0;
                 Kvec_init(&tvec, tlength);
                 Kvec_sscan(&tvec, &tlength, str);
-                if (tlength != (unsigned int) cap) abort();
+                assert (tlength == (unsigned int) cap);
                 Kvec_set(v1, w1, cap);
                 Kvec_set(v2, tvec, cap);
                 Kvec_clear(&tvec, tlength);
@@ -810,7 +830,7 @@ int main(int argc, char * argv[])
             if (f == NULL) abort();
             DO_ONE_TEST("vec_fprint", {
                     for(unsigned int j = 0 ; j < (unsigned int) length ; j++) {
-                        Kset_ui(a0, i * length + j);
+                        Kset_ui(a0, test_i * length + j);
                         Kinv(a0, a0);
                         Kset(Kvec_coeff_ptr(v1, j), a0);
                     }
@@ -822,7 +842,7 @@ int main(int argc, char * argv[])
             if (f == NULL) abort();
             DO_ONE_TEST("vec_fscan", {
                     for(unsigned int j = 0 ; j < (unsigned int) length ; j++) {
-                        Kset_ui(a0, i * length + j);
+                        Kset_ui(a0, test_i * length + j);
                         Kinv(a0, a0);
                         Kset(Kvec_coeff_ptr(v1, j), a0);
                     }
@@ -830,7 +850,7 @@ int main(int argc, char * argv[])
                     unsigned int tlength = 0;
                     Kvec_init(&tvec, tlength);
                     Kvec_fscan(f, &tvec, &tlength);
-                    if (tlength != (unsigned int) length) abort();
+                    TEST_ASSERT(tlength == (unsigned int) length);
                     Kvec_set(v2, tvec, length);
                     Kvec_clear(&tvec, tlength);
                     });
@@ -850,7 +870,7 @@ int main(int argc, char * argv[])
                     Kvec_set(v2, v1, length);
                     Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
                     int r = Kvec_sscan(&tvec, &tlength, "garbage");
-                    if (tlength) abort();
+                    TEST_ASSERT(!tlength);
                     Kset_ui(Kvec_coeff_ptr(v2, 0), r);
                     Kvec_clear(&tvec, tlength);
                     });
@@ -862,7 +882,7 @@ int main(int argc, char * argv[])
                     Kvec_set(v2, v1, length);
                     Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
                     int r = Kvec_sscan(&tvec, &tlength, "[garbage]");
-                    if (tlength) abort();
+                    TEST_ASSERT(!tlength);
                     Kset_ui(Kvec_coeff_ptr(v2, 0), r);
                     Kvec_clear(&tvec, tlength);
                     });
@@ -874,7 +894,7 @@ int main(int argc, char * argv[])
                     Kvec_set(v2, v1, length);
                     Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
                     int r = Kvec_sscan(&tvec, &tlength, "[1 2]");
-                    if (tlength) abort();
+                    TEST_ASSERT(!tlength);
                     Kset_ui(Kvec_coeff_ptr(v2, 0), r);
                     Kvec_clear(&tvec, tlength);
                     });
@@ -894,7 +914,7 @@ int main(int argc, char * argv[])
                     Kvec_set(v2, v1, length);
                     Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
                     int r = Kvec_fscan(f, &tvec, &tlength);
-                    if (tlength) abort();
+                    TEST_ASSERT(!tlength);
                     Kset_ui(Kvec_coeff_ptr(v2, 0), r);
                     Kvec_clear(&tvec, tlength);
                     });
@@ -906,23 +926,27 @@ int main(int argc, char * argv[])
         DO_ONE_TEST("vec_fscan(long file)", {
             char * filename;
             int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
-            if (rc < 0) abort();
+            TEST_ASSERT(rc >= 0);
             FILE * f = fopen(filename, "w");
-            if (f == NULL) abort();
+            TEST_ASSERT(f);
             fprintf(f, "[");
-            for(int j = 0 ; j < i ; j++) fprintf(f, " ");
+            for(int j = 0 ; j < test_i ; j++) fprintf(f, " ");
+#ifdef EXTENSION_OF_GFP
+            fprintf(f, "[1]]");
+#else
             fprintf(f, "1]");
+#endif
             fclose(f);
             f = fopen(filename, "r");
-            if (f == NULL) abort();
+            TEST_ASSERT(f);
             unsigned int tlength = 0;
             Kvec tvec;
             Kvec_init(&tvec, tlength);
             Kvec_random(v1, length, rstate);
             Kvec_set(v2, v1, length);
             int r = Kvec_fscan(f, &tvec, &tlength);
-            if (!r) abort();
-            if (tlength != 1) abort();
+            TEST_ASSERT(r);
+            TEST_ASSERT(tlength == 1);
             Kset_ui(Kvec_coeff_ptr(v1, 0), 1);
             Kvec_set(v2, tvec, 1);
             Kvec_clear(&tvec, tlength);
@@ -952,7 +976,7 @@ int main(int argc, char * argv[])
         Kpoly_init(q3, 2*deg);
         Kpoly_init(q4, 2*deg);
         DO_ONE_TEST_POLY("poly_add commutativity", {
-                if (!(i & 0xf)) {
+                if (!(test_i & 0xf)) {
                     /* test realloc every once in a while */
                     Kpoly_clear(q1);
                     Kpoly_init(q1, 1);
@@ -965,7 +989,7 @@ int main(int argc, char * argv[])
         DO_ONE_TEST_POLY("poly_sub = poly_add o poly_neg", {
                 Kpoly_random2 (q1, deg, rstate);
                 Kpoly_random2 (q2, deg, rstate);
-                if (!(i & 0xf)) {
+                if (!(test_i & 0xf)) {
                     /* test realloc every once in a while */
                     Kpoly_clear(p1);
                     Kpoly_init(p1, 1);
@@ -1001,7 +1025,7 @@ int main(int argc, char * argv[])
                 });
 
         DO_ONE_TEST("add_ui o sub_ui = id", {
-                if (!(i & 0xf)) {
+                if (!(test_i & 0xf)) {
                     /* test realloc every once in a while */
                     Kpoly_clear(p1);
                     Kpoly_init(p1, 1);
@@ -1015,7 +1039,7 @@ int main(int argc, char * argv[])
 
         DO_ONE_TEST_POLY("poly linearity", {
                 Krandom2 (a0, rstate);
-                if (!(i & 0xf)) {
+                if (!(test_i & 0xf)) {
                     /* test realloc every once in a while */
                     Kpoly_clear(p2);
                     Kpoly_init(p2, 1);
@@ -1046,7 +1070,7 @@ int main(int argc, char * argv[])
                 do {
                     Kpoly_random(q2, deg, rstate);
                 } while (Kpoly_deg(q2) == 0);
-                if (i < 10) Kpoly_setmonic(q2, q2);
+                if (test_i < 10) Kpoly_setmonic(q2, q2);
                 Kpoly_divmod(q3, q4, p1, q2);
                 Kpoly_mul(q1, q2, q3);
                 Kpoly_add(p2, q1, q4);
@@ -1107,10 +1131,10 @@ int main(int argc, char * argv[])
 #endif
         DO_ONE_TEST_POLY("poly_mod_pre", {
                 do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
-                Kpoly_random(q1, i==0 ? (deg/2) : (2*Kpoly_deg(q2)-2), rstate);
+                Kpoly_random(q1, test_i==0 ? (deg/2) : (2*Kpoly_deg(q2)-2), rstate);
 
                 Kpoly_setmonic(q2, q2);
-                if (i&1) {
+                if (test_i&1) {
                     Kpoly_precomp_mod(q3, q2);
                 } else {
                     /* test realloc feature every once in a while */
@@ -1145,7 +1169,7 @@ int main(int argc, char * argv[])
                     do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
                     Kpoly_set_ui(p1, 0);
                     int r = Kpoly_divmod(p2, q3, p1, q2);
-                    if (!r) abort();
+                    TEST_ASSERT(r);
                     });
             /* same but with a denormalized polynomial */
             DO_ONE_TEST_POLY("poly_divmod(x, denormalized 0) returns 0", {
@@ -1159,7 +1183,7 @@ int main(int argc, char * argv[])
                     do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
                     Kpoly_setcoeff_ui(p1, 0, 1);
                     int r = Kpoly_divmod(p2, q3, p1, q2);
-                    if (!r) abort();
+                    TEST_ASSERT(r);
                     Kpoly_set_ui(p1, 0);
                     });
             DO_ONE_TEST_POLY("poly_divmod(a, larger than a) returns 0+a", {
@@ -1275,7 +1299,6 @@ int main(int argc, char * argv[])
             fflush(stderr);
         }
 
-        i++;
         seed = gmp_urandomb_ui(rstate, 64);
 
         gmp_randclear(rstate);

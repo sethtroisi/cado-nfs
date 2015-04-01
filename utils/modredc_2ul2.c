@@ -191,8 +191,8 @@ modredc2ul2_inv (residueredc2ul2_t r, const residueredc2ul2_t A,
       ularith_add_2ul_2ul (&(s[1]), &(s[2]), s[3], s[4]);
 
       /* Now shift s[2]:s[1]:s[0] right by t */
-      ularith_shrd (&(s[0]), s[1], t);
-      ularith_shrd (&(s[1]), s[2], t);
+      ularith_shrd (&(s[0]), s[1], s[0], t);
+      ularith_shrd (&(s[1]), s[2], s[1], t);
 
       u[0] = s[0];
       u[1] = s[1];
@@ -235,92 +235,126 @@ modredc2ul2_batchinv_ul (residue_t *r, const unsigned long *a, const size_t n,
   /* beta' = 2^64, beta = 2^128 */
   for (size_t i = 1; i < n; i++) {
     _modredc2ul2_mul_ul(r[i], r[i-1], a[i], m);
+    /* r[i] = beta'^{-i} \prod_{0 <= j <= i} a[j] */
   }
-  /* For n = 3, r[0] := a[0], r[1] := a[0]*a[1]/beta', r[2] := a[0]*a[1]*a[2]/beta'^2 */
 
   mod_init_noset0(R, m);
   /* Computes R = beta^2/r[n-1] */
-  if (!mod_inv(R, r[n - 1], m))
+  if (!modredc2ul2_inv(R, r[n - 1], m))
     return 0;
-  /* R := beta^2 beta'^2 / (a[0]*a[1]*a[2]) */
+  /* R = beta^2 beta'^{n-1} \prod_{0 <= j < n} a[j]^{-1} */
 
   if (c != NULL) {
-    mod_mul(R, R, c, m); /* R := beta beta'^2 c / (a[0]*a[1]*a[2]) */
+    mod_mul(R, R, c, m);
   } else {
+    modredc2ul2_redc1(R, R, m); /* Assume c=1 */
     modredc2ul2_redc1(R, R, m);
-    modredc2ul2_redc1(R, R, m); /* Assume c=1, so R := beta beta'^2 / (a[0]*a[1]*a[2]) */
   }
-  modredc2ul2_redc1(R, R, m); /* R := beta beta' / (a[0]*a[1]*a[2]) */
+  /* R = beta beta'^{n-1} c \prod_{0 <= j < n} a[j]^{-1} */
+
+  modredc2ul2_redc1(R, R, m);
+  /* R = beta beta'^{n-2} c \prod_{0 <= j < n} a[j]^{-1} */
 
   for (size_t i = n-1; i > 0; i--) {
+    /* Invariant: R = beta beta'^{i-1} c \prod_{0 <= j <= i} a[j]^{-1} */
+
     mod_mul(r[i], R, r[i-1], m);
-    /* For i=2: r[2] := R * r[1] / beta = beta beta' / (a[0]*a[1]*a[2]) * a[0]*a[1]/beta' / beta = 1 / a[2] */
-    /* For i=1: r[1] := R * r[0] / beta = beta / (a[0]*a[1]) * a[0] / beta = 1 / a[1] */
+    /* r[i] := R * r[i-1] / beta
+            = (beta beta'^{i-1} c \prod_{0 <= j <= i} a[j]^{-1}) * (1/beta'^{i-1} \prod_{0 <= j <= i-1} a[j]) / beta
+            = c a[i]^{-1} */
+
     _modredc2ul2_mul_ul(R, R, a[i], m);
-    /* For i=2: R := R * a[2] / beta' = beta beta' / (a[0]*a[1]*a[2]) * a[2] / beta' = beta / (a[0]*a[1]) */
-    /* For i=1: R := R * a[1] / beta' = beta / (a[0]*a[1]) * a[1] / beta' = beta' / a[0] */
+    /* R := R * a[i] / beta'
+         = (beta beta'^{i-1} c \prod_{0 <= j <= i} a[j]^{-1}) * a[i] / beta'
+         = beta beta'^{i-2} c \prod_{0 <= j < i} a[j]^{-1},
+       thus satisfying the invariant for i := i - 1 */
   }
-  modredc2ul2_redc1(R, R, m); /* R := R / beta' = 1/a[0] */
+  /* Here have R = beta * beta'^{-1} / a[0]. We need to convert the factor
+     beta to a factor of beta', so that the beta' cancel. */
+  modredc2ul2_redc1(R, R, m); /* R := beta * beta'^{-1} / a[0] / beta',
+                                 with beta = beta'^2, this is 1/a[0] */
   mod_set(r[0], R, m);
   mod_clear(R, m);
   return 1;
 }
 
-
-int
-modredc2ul2_batch_Q_to_Fp (unsigned long *r, const modint_t num,
-                           const modint_t den, const unsigned long k,
-                           const unsigned long *p, const size_t n)
+modredc2ul2_batch_Q_to_Fp_context_t *
+modredc2ul2_batch_Q_to_Fp_init (const modint_t num, const modint_t den)
 {
-  modulus_t m;
-  residue_t *tr;
-  modint_t c;
-  unsigned long rem_ul, ratio_ul;
-  int rc = 1;
+  modredc2ul2_batch_Q_to_Fp_context_t *context;
+  modint_t ratio, remainder;
 
-  mod_initmod_int(m, den);
-  mod_intinit(c);
+  context = (modredc2ul2_batch_Q_to_Fp_context_t *) malloc(sizeof(modredc2ul2_batch_Q_to_Fp_context_t));
+  if (context == NULL)
+    return NULL;
+
+  mod_initmod_int(context->m, den);
+  mod_intinit(context->c); /* c = 0 */
 
   /* Compute ratio = floor(num / den), remainder = num % den. We assume that
     ratio fits into unsigned long, and abort if it does not. We need only the
     low word of remainder. */
-  {
-    modint_t ratio, remainder;
-    mod_intinit(remainder);
-    mod_intinit(ratio);
-    mod_intmod(remainder, num, den);
-    mod_intsub(ratio, num, remainder);
-    mod_intdivexact(ratio, ratio, den);
-    ASSERT_ALWAYS(modredc2ul2_intfits_ul(ratio));
-    ratio_ul = modredc2ul2_intget_ul(ratio);
-    rem_ul = modredc2ul2_intget_ul(remainder);
-    if (!mod_intequal_ul(remainder, 0))
-      mod_intsub(c, den, remainder); /* c = -remainder (mod den) */
-    mod_intclear(ratio);
-    mod_intclear(remainder);
-  }
+  mod_intinit(remainder);
+  mod_intinit(ratio);
+  mod_intmod(remainder, num, den);
+  mod_intsub(ratio, num, remainder);
+  mod_intdivexact(ratio, ratio, den);
+  ASSERT_ALWAYS(modredc2ul2_intfits_ul(ratio));
+  context->ratio_ul = modredc2ul2_intget_ul(ratio);
+  context->rem_ul = modredc2ul2_intget_ul(remainder);
+  if (!mod_intequal_ul(remainder, 0))
+    mod_intsub(context->c, den, remainder); /* c = -remainder (mod den) */
+  mod_intclear(ratio);
+  mod_intclear(remainder);
+
+  context->den_inv = ularith_invmod(modredc2ul2_intget_ul(den));
+
+  return context;
+}
+
+
+void
+modredc2ul2_batch_Q_to_Fp_clear (modredc2ul2_batch_Q_to_Fp_context_t * context)
+{
+  mod_clearmod(context->m);
+  mod_intclear(context->c);
+  free(context);
+}
+
+
+int
+modredc2ul2_batch_Q_to_Fp (unsigned long *r,
+                           const modredc2ul2_batch_Q_to_Fp_context_t *context,
+                           const unsigned long k, const int neg,
+                           const unsigned long *p, const size_t n)
+{
+  residue_t *tr;
+  int rc = 1;
 
   tr = (residue_t *) malloc(n * sizeof(residue_t));
   for (size_t i = 0; i < n; i++) {
-    mod_init_noset0(tr[i], m);
+    mod_init_noset0(tr[i], context->m);
   }
 
-  if (!modredc2ul2_batchinv_ul(tr, p, n, c, m)) {
+  if (!modredc2ul2_batchinv_ul(tr, p, n, context->c, context->m)) {
     rc = 0;
     goto clear_and_exit;
   }
 
-  const unsigned long den_inv = ularith_invmod(modredc2ul2_intget_ul(den));
-
-  for (size_t i = 0; i < n; i++)
-    r[i] = ularith_post_process_inverse(mod_intget_ul(tr[i]), p[i], rem_ul,
-                                        den_inv, ratio_ul, k);
+  for (size_t i = 0; i < n; i++) {
+    unsigned long t;
+    t = ularith_post_process_inverse(mod_intget_ul(tr[i]), p[i],
+                                     context->rem_ul, context->den_inv,
+                                     context->ratio_ul, k);
+    if (neg && t != 0)
+      t = p[i] - t;
+    r[i] = t;
+  }
 
 clear_and_exit:
-
-  mod_intclear(c);
   for (size_t i = 0; i < n; i++) {
-    mod_clear(tr[i], m);
+    mod_clear(tr[i], context->m);
   }
+  free(tr);
   return rc;
 }

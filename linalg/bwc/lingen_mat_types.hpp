@@ -14,6 +14,13 @@
 #include <gmp.h>
 
 #include <algorithm>
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#define OMP_ROUND(k) ((k) % omp_get_num_threads() == omp_get_thread_num())
+#else
+#define OMP_ROUND(k) (1)
+#endif
+
 #include "bwc_config.h"
 #include "alloc_proxy.h"
 #include "utils.h"
@@ -27,7 +34,7 @@
  *
  * Unfortunately the apple-bastardized gcc-4.2.1 backported this feature,
  * which gives rise to spurious warnings in that case as well. Since
- * there is no way to tell whether this pragma will be recognize or not,
+ * there is no way to tell whether this pragma will be recognized or not,
  * we accept the change...
  */
 // #if defined(__cplusplus) && GNUC_VERSION_ATLEAST(4,3,0)
@@ -106,33 +113,28 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
     unsigned int ncols;
     private:
     unsigned long * x;
-    unsigned int * order;
     inline unsigned int stride() const { return BITS_TO_WORDS(nrows, ULONG_BITS); }
     public:
     bmat(unsigned int nrows, unsigned int ncols)
-        : nrows(nrows), ncols(ncols), x(mynew<unsigned long>(ncols*stride())),
-        order(mynew<unsigned int>(ncols))
+        : nrows(nrows), ncols(ncols), x(mynew<unsigned long>(ncols*stride()))
+        
     {
         memset(x, 0, ncols*stride()*sizeof(unsigned long));
-        for(unsigned int j = 0 ; j < ncols ; j++) order[j]=j;
     }
     bmat() {
         nrows = ncols = 0;
         x = NULL;
-        order = NULL;
     }
     void clear() {
         mydelete(x, ncols*stride());
-        mydelete(order, ncols);
         nrows = ncols = 0;
     }
 private:
-    bmat(bmat const& a) : nrows(a.nrows), ncols(a.ncols), x(a.x), order(a.order) {}
+    bmat(bmat const& a) : nrows(a.nrows), ncols(a.ncols), x(a.x) {}
     bmat& operator=(bmat const& a) {
         nrows = a.nrows;
         ncols = a.ncols;
         x = a.x;
-        order = a.order;
         return *this;
     }
 public:
@@ -140,28 +142,25 @@ public:
         podswap(nrows, a.nrows);
         podswap(ncols, a.ncols);
         podswap(x,a.x);
-        podswap(order,a.order);
     }
     ~bmat() {
         mydelete(x, ncols*stride());
-        mydelete(order, ncols);
     };
 #if 0
     bmat clone() const {
         bmat dst(nrows, ncols);
         memcpy(dst.x, x, ncols*stride()*sizeof(unsigned long));
-        memcpy(dst.order, order, ncols*sizeof(unsigned int));
         return dst;
     }
 #endif
     /* zero column j */
     void zcol(unsigned int j) {
         ASSERT(j < ncols);
-        memset(x + order[j] * stride(), 0, stride() * sizeof(unsigned long));
+        memset(x + j * stride(), 0, stride() * sizeof(unsigned long));
     }
     bool col_is_zero(unsigned int j) const {
         ASSERT(j < ncols);
-        const unsigned long * src = x + order[j] * stride();
+        const unsigned long * src = x + j * stride();
         for(unsigned int i = 0 ; i < stride() ; i++) {
             if (src[i] != 0) return false;
         }
@@ -179,7 +178,7 @@ public:
         ASSERT(j < ncols);
         unsigned int offset = i / ULONG_BITS;
         unsigned long shift = i % ULONG_BITS;
-        return (x[order[j] * stride() + offset] >> shift) & 1UL;
+        return (x[j * stride() + offset] >> shift) & 1UL;
     }
     /* add column j0 to column j. Optionally, b indicates a number of rows
      * which are known to be zero in both columns.
@@ -188,15 +187,15 @@ public:
     void acol(unsigned int j, unsigned int j0, unsigned int b = 0, unsigned long mask = 1UL) {
         ASSERT(j < ncols);
         ASSERT(j0 < ncols);
-        unsigned long * dst = x + order[j] * stride();
-        const unsigned long * src = x + order[j0] * stride();
+        unsigned long * dst = x + j * stride();
+        const unsigned long * src = x + j0 * stride();
         for(unsigned int l = b / ULONG_BITS ; l < stride() ; l++) {
             dst[l] ^= src[l] & -mask;
         }
     }
     void acol(unsigned int j, bcol& a, unsigned int b = 0, unsigned long mask = 1UL) {
         ASSERT(j < ncols);
-        unsigned long * dst = x + order[j] * stride();
+        unsigned long * dst = x + j * stride();
         const unsigned long * src = a.x;
         for(unsigned int l = b / ULONG_BITS ; l < stride() ; l++) {
             dst[l] ^= src[l] & -mask;
@@ -205,7 +204,7 @@ public:
     unsigned int ffs(unsigned int j) const {
         ASSERT(j < ncols);
         unsigned int z = 0;
-        const unsigned long * src = x + order[j] * stride();
+        const unsigned long * src = x + j * stride();
         unsigned long w;
         unsigned int k;
         for(k = stride() ; k && !(w=*src++) ; k--) z += ULONG_BITS;
@@ -216,25 +215,15 @@ public:
     {
         ASSERT(j < ncols);
         bcol tmp_a(nrows);
-        memcpy(tmp_a.x, x + order[j] * stride(), stride() * sizeof(unsigned long));
+        memcpy(tmp_a.x, x + j * stride(), stride() * sizeof(unsigned long));
         a.swap(tmp_a);
-    }
-    /* permute columns: column presently referred to with index i will
-     * now be accessed at index p[i]
-     */
-    void perm(unsigned int * p) {
-        unsigned int * norder(mynew<unsigned int>(ncols));
-        for(unsigned int i = 0 ; i < ncols ; i++) {
-            norder[p[i]]=order[i];
-        }
-        podswap(order, norder);
     }
     void addcoeff(unsigned int i, unsigned int j, unsigned long z)
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         unsigned int offset = i / ULONG_BITS;
-        x[order[j] * stride() + offset] ^= z << (i % ULONG_BITS);
+        x[j * stride() + offset] ^= z << (i % ULONG_BITS);
     }
 };/*}}}*/
 struct polmat { /* {{{ */
@@ -252,48 +241,44 @@ struct polmat { /* {{{ */
      */
     unsigned int nrows;
     unsigned int ncols;
-    unsigned int ncoef;
+    unsigned long ncoef;
     static bool critical;
     private:
     unsigned long * x;
-    unsigned int  * order;
-    int   * _deg;
-    inline unsigned int stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }/*{{{*/
-    inline unsigned int colstride() const { return nrows * stride(); }/*}}}*/
+    long   * _deg;
+    inline size_t stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }/*{{{*/
+    inline size_t colstride() const { return nrows * stride(); }/*}}}*/
     public:
-    int& deg(unsigned int j) { ASSERT(j < ncols); return _deg[order[j]]; }/*{{{*/
-    int deg(unsigned int j) const { ASSERT(j < ncols); return _deg[order[j]]; }
-    int maxdeg() const {
-        int m = -1;
+    long& deg(unsigned int j) { ASSERT(j < ncols); return _deg[j]; }/*{{{*/
+    long deg(unsigned int j) const { ASSERT(j < ncols); return _deg[j]; }
+    long maxdeg() const {
+        long m = -1;
         for(unsigned int j = 0 ; j < ncols ; j++) {
-            if (_deg[order[j]] > m) m = _deg[order[j]];
+            if (_deg[j] > m) m = _deg[j];
         }
         return m;
     }/*}}}*/
+    inline unsigned long maxlength() const { return 1 + maxdeg(); }
     void alloc() {
         /* we don't care about exceptions */
         x = mynew<unsigned long>(ncols*colstride());
-        order = mynew<unsigned int>(ncols);
-        _deg = mynew<int>(ncols);
+        _deg = mynew<long>(ncols);
     }
     void clear() {
         mydelete(x, ncols*colstride());
-        mydelete(order, ncols);
         mydelete(_deg, ncols);
     }
     /* ctors dtors etc {{{ */
-    polmat(unsigned int nrows, unsigned int ncols, unsigned int ncoef)
+    polmat(unsigned int nrows, unsigned int ncols, unsigned long ncoef)
         : nrows(nrows), ncols(ncols), ncoef(ncoef)
     {
         alloc();
         memset(x, 0, ncols*colstride()*sizeof(unsigned long));
-        for(unsigned int j = 0 ; j < ncols ; j++) order[j]=j;
         for(unsigned int j = 0 ; j < ncols ; j++) _deg[j]=-1;
     }
     polmat() {
         nrows = ncols = ncoef = 0;
         x = NULL;
-        order = NULL;
         _deg = NULL;
     }
     private:
@@ -308,7 +293,6 @@ struct polmat { /* {{{ */
         podswap(ncols,n.ncols);
         podswap(ncoef,n.ncoef);
         podswap(x,n.x);
-        podswap(order,n.order);
         podswap(_deg,n._deg);
     }
     inline void copy(polmat & n) {
@@ -317,8 +301,7 @@ struct polmat { /* {{{ */
         ncols=n.ncols;
         ncoef=n.ncoef;
         alloc();
-        memcpy(order,n.order,ncols*sizeof(unsigned int));
-        memcpy(_deg,n._deg,ncols*sizeof(int));
+        memcpy(_deg,n._deg,ncols*sizeof(long));
         memcpy(x, n.x, ncols*colstride()*sizeof(unsigned long));
     }
     /* }}} */
@@ -327,24 +310,23 @@ struct polmat { /* {{{ */
     polmat clone() {
         polmat dst(nrows, ncols, ncoef);
         memcpy(dst.x, x, ncols*colstride()*sizeof(unsigned long));
-        memcpy(dst.order, order, ncols*sizeof(unsigned int));
-        memcpy(dst._deg, _deg, ncols*sizeof(unsigned int));
+        memcpy(dst._deg, _deg, ncols*sizeof(long));
         return dst;
     }
 #endif
     /* this handles expansion and shrinking */
-    void resize(unsigned int ncoef2) {/*{{{*/
-        unsigned int newstride = BITS_TO_WORDS(ncoef2, ULONG_BITS);
+    void resize(unsigned long ncoef2) {/*{{{*/
+        size_t newstride = BITS_TO_WORDS(ncoef2, ULONG_BITS);
         if (newstride == stride()) {
             ncoef = ncoef2;
             return;
         }
-        unsigned int minstride = std::min(stride(),newstride);
+        size_t minstride = std::min(stride(),newstride);
         /* take the opportunity of reallocation for reordering columns. */
         polmat n(nrows,ncols,ncoef2);
         unsigned long * dst = n.x;
         for(unsigned int j = 0 ; j < ncols ; j++) {
-            const unsigned long * src = x + order[j] * colstride();
+            const unsigned long * src = x + j * colstride();
             for(unsigned int i = 0 ; i < nrows ; i++) {
                 memcpy(dst, src, minstride * sizeof(unsigned long));
                 dst += newstride;
@@ -354,10 +336,10 @@ struct polmat { /* {{{ */
         swap(n);
     }/*}}}*/
     /* Divide by X^k, keep ncoef2 coefficients *//*{{{*/
-    void xdiv_resize(unsigned int k, unsigned int ncoef2) {
+    void xdiv_resize(unsigned long k, unsigned long ncoef2) {
         ASSERT(k + ncoef2 <= ncoef);
         ASSERT(k);
-        unsigned int newstride = BITS_TO_WORDS(ncoef2, ULONG_BITS);
+        size_t newstride = BITS_TO_WORDS(ncoef2, ULONG_BITS);
         if (newstride == stride()) {
             /*
             mp_size_t sw = k / GMP_LIMB_BITS;
@@ -375,7 +357,7 @@ struct polmat { /* {{{ */
         ASSERT(GMP_LIMB_BITS == ULONG_BITS);
         mp_size_t sw = k / GMP_LIMB_BITS;
         mp_size_t sb = k & (GMP_LIMB_BITS - 1);
-        unsigned int input_length = BITS_TO_WORDS(k + ncoef2, ULONG_BITS) - sw;
+        size_t input_length = BITS_TO_WORDS(k + ncoef2, ULONG_BITS) - sw;
 
         /* sb might equal zero here, in which case sw >0. So k is
          * sw * ULONG_BITS, and input_length == newstride
@@ -445,10 +427,10 @@ struct polmat { /* {{{ */
         }
     }
     /*}}}*/
-    void xmul_col(unsigned int j, unsigned int s=1) {/*{{{*/
+    void xmul_col(unsigned int j, unsigned long s=1) {/*{{{*/
         ASSERT(j < ncols);
-        mp_limb_t * dst = x + order[j] * colstride();
-        ASSERT(1u <= s && s <= GMP_LIMB_BITS-1);
+        mp_limb_t * dst = x + j * colstride();
+        ASSERT(1ul <= s && s <= GMP_LIMB_BITS-1);
         mpn_lshift(dst, dst, colstride(), s);
         /* We may have garbage for the low bits. It may matter, or maybe
          * not. If it does, call xclean0_col */
@@ -459,10 +441,10 @@ struct polmat { /* {{{ */
         // Normally not a problem since it is supposed to occur only
         // when sufficiently many generators are known.
     }/*}}}*/
-    void xmul_poly(unsigned int i, unsigned int j, unsigned int s=1) {/*{{{*/
+    void xmul_poly(unsigned int i, unsigned int j, unsigned long s=1) {/*{{{*/
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        unsigned long * dst = x + (order[j] * nrows + i) * stride();
+        unsigned long * dst = x + (j * nrows + i) * stride();
         ASSERT(1 <= s && s <= GMP_LIMB_BITS-1);
         mpn_lshift(dst, dst, stride(), s);
         /* We may have garbage for the low bits. It may matter, or maybe
@@ -472,13 +454,13 @@ struct polmat { /* {{{ */
     void addpoly(unsigned int i, unsigned int j, const unsigned long * src) {/*{{{*/
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        unsigned long * dst = x + (order[j] * nrows + i) * stride();
+        unsigned long * dst = x + (j * nrows + i) * stride();
         for(unsigned int k = 0 ; k < stride() ; k++)
             dst[k] ^= src[k];
     }/*}}}*/
     void xclean0_col(unsigned int j) {/*{{{*/
         ASSERT(j < ncols);
-        unsigned long * dst = x + order[j] * colstride();
+        unsigned long * dst = x + j * colstride();
         for(unsigned int i = 0 ; i < nrows ; i++, dst += stride())
             dst[0] &= ~1UL;
         deg(j) -= deg(j) == 0;
@@ -487,27 +469,15 @@ struct polmat { /* {{{ */
     void acol(unsigned int i, unsigned int j, unsigned long mask = 1UL) {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        unsigned long * dst = x + order[i] * colstride();
-        const unsigned long * src = x + order[j] * colstride();
+        unsigned long * dst = x + i * colstride();
+        const unsigned long * src = x + j * colstride();
         for(unsigned int l = 0 ; l < colstride() ; l++) {
             dst[l] ^= src[l] & -mask;
         }
-        // ASSERT(_deg[order[i]] >= _deg[order[j]]);
+        // ASSERT(_deg[i] >= _deg[j]);
         deg(i) = std::max(deg(j), deg(i));
     }
     /* }}} */
-    /* permute columns: column presently referred to with index i will
-     * now be accessed at index p[i]
-     */
-    void perm(unsigned int * p) {/*{{{*/
-        unsigned int * norder;
-        norder = mynew<unsigned int>(ncols);
-        for(unsigned int i = 0 ; i < ncols ; i++) {
-            norder[p[i]]=order[i];
-        }
-        podswap(order,norder);
-        mydelete(norder, ncols);
-    }/*}}}*/
     unsigned int ffs(unsigned int j, unsigned int k) const {/*{{{*/
         ASSERT(k < nrows);
         ASSERT(j < ncols);
@@ -520,10 +490,14 @@ struct polmat { /* {{{ */
         }
         return UINT_MAX;
     }/*}}}*/
-    unsigned int valuation() const {/*{{{*/
+
+    unsigned long valuation() const {/*{{{*/
+        /* stride() is the number of words it takes for one polynomial.
+         * We'll just be OR'ing all polynomials into one, that's it.
+         */
         /* It's fairly ugly, but not critical */
         unsigned long y[stride() + 1];
-        for(unsigned int k = 0 ; k < stride() ; k++) {
+        for(size_t k = 0 ; k < stride() ; k++) {
             y[k] = 0;
         }
         y[stride()] = 1;
@@ -550,7 +524,7 @@ struct polmat { /* {{{ */
             }
             src += stride();
         }
-        int k;
+        long k;
         /* Keep only (ULONG_BITS-ncoef) mod ULONG BITS in the top word. */
         y[stride()-1] &= ~0UL >> ((-ncoef) & (ULONG_BITS-1));
         for(k = stride() - 1 ; k >= 0 && y[k] == 0 ; k--) ;
@@ -564,13 +538,13 @@ struct polmat { /* {{{ */
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return x + (order[j] * nrows + i) * stride();
+        return x + (j * nrows + i) * stride();
     }
     unsigned long const * poly(unsigned int i, unsigned int j) const
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return x + (order[j] * nrows + i) * stride();
+        return x + (j * nrows + i) * stride();
     }/*}}}*/
     unsigned long * col(unsigned int j) { return poly(0, j); }/*{{{*/
     unsigned long const * col(unsigned int j) const { return poly(0, j); }/*}}}*/
@@ -589,14 +563,14 @@ struct polmat { /* {{{ */
         return true;
     }/*}}}*/
     /* shift is understood ``shift left'' (multiply by X) */
-    void import_col_shift(unsigned int k, polmat const& a, unsigned int j, int s)/*{{{*/
+    void import_col_shift(unsigned int k, polmat const& a, unsigned int j, long s)/*{{{*/
     {
         ASSERT(k < ncols);
         ASSERT(j < a.ncols);
         ASSERT_ALWAYS(a.nrows == nrows);
         unsigned long const * src = a.col(j);
         unsigned long * dst = col(k);
-        unsigned int as = s > 0 ? s : -s;
+        unsigned long as = s > 0 ? s : -s;
         mp_size_t sw = as / GMP_LIMB_BITS;
         mp_size_t sb = as & (GMP_LIMB_BITS - 1);
         /* Beware, trailing bits are lurking here and there */
@@ -664,22 +638,20 @@ struct polmat { /* {{{ */
         }
     }/*}}}*/
     /* these accessors are not the preferred ones for performance */
-    inline unsigned long coeff(unsigned int i, unsigned int j, unsigned int k) const/*{{{*/
+    inline unsigned long coeff(unsigned int i, unsigned int j, unsigned long k) const/*{{{*/
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         ASSERT(k < ncoef);
         ASSERT_ALWAYS(!critical);
-        // brev_warning();
-        unsigned int offset = k / ULONG_BITS;
+        unsigned long offset = k / ULONG_BITS;
         unsigned long shift = k % ULONG_BITS;
-        return poly(i,j)[offset] >> shift & 1UL;
+        return (poly(i,j)[offset] >> shift) & 1UL;
     }/*}}}*/
-    void extract_coeff(bmat& a, unsigned int k) const/*{{{*/
+    void extract_coeff(bmat& a, unsigned long k) const/*{{{*/
     {
         ASSERT(k < ncoef);
         ASSERT_ALWAYS(!critical);
-        // brev_warning();
         bmat tmp_a(nrows, ncols);
         for(unsigned int j = 0 ; j < ncols ; j++) {
             for(unsigned int i = 0 ; i < nrows ; i++) {
@@ -691,18 +663,18 @@ struct polmat { /* {{{ */
         }
         a.swap(tmp_a);
     }/*}}}*/
-    void addcoeff(unsigned int i, unsigned int j, unsigned int k, unsigned long z)/*{{{*/
+    void addcoeff(unsigned int i, unsigned int j, unsigned long k, unsigned long z)/*{{{*/
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         ASSERT(k < ncoef);
         ASSERT_ALWAYS(!critical);
         // brev_warning();
-        unsigned int offset = k / ULONG_BITS;
+        size_t offset = k / ULONG_BITS;
         poly(i,j)[offset] ^= z << (k % ULONG_BITS);
     }/*}}}*/
     void clear_highbits() {/*{{{*/
-        unsigned int offset = ncoef / ULONG_BITS;
+        size_t offset = ncoef / ULONG_BITS;
         unsigned long mask = (1UL << (ncoef % ULONG_BITS)) - 1UL;
         if (!mask) return;
         unsigned long * where = x + offset;
@@ -714,8 +686,6 @@ struct polmat { /* {{{ */
     uint32_t crc() const { return crc32(x, ncols * colstride() * sizeof(uint32_t)); }
 };
 
-
-bool polmat::critical = false;
 
 /*}}}*/
 template<typename fft_type> struct tpolmat /* {{{ */
@@ -729,20 +699,17 @@ template<typename fft_type> struct tpolmat /* {{{ */
     fft_type * po;
     private:
     typename fft_type::t * x;
-    unsigned int  * order;
     int   * _deg;
     // inline unsigned int stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }
     // inline unsigned int colstride() const { return nrows * stride(); }
     public:
-    int& deg(unsigned int j) { ASSERT(j < ncols); return _deg[order[j]]; }
-    int const & deg(unsigned int j) const { ASSERT(j < ncols); return _deg[order[j]]; }
+    int& deg(unsigned int j) { ASSERT(j < ncols); return _deg[j]; }
+    int const & deg(unsigned int j) const { ASSERT(j < ncols); return _deg[j]; }
     tpolmat(unsigned int nrows, unsigned int ncols, fft_type & o)
         : nrows(nrows), ncols(ncols), po(&o),
         x(o.alloc(nrows * ncols)),
-        order(mynew<unsigned int>(ncols)),
         _deg(mynew<int>(ncols))
     {
-        for(unsigned int j = 0 ; j < ncols ; j++) order[j]=j;
         for(unsigned int j = 0 ; j < ncols ; j++) _deg[j]=-1;
     }
     void zero()
@@ -751,14 +718,12 @@ template<typename fft_type> struct tpolmat /* {{{ */
     }
     void clear() {
         po->free(x, nrows * ncols); x = NULL;
-        mydelete(order, ncols);
         mydelete(_deg, ncols);
         nrows = ncols = 0;
     }
     tpolmat() {
         nrows = ncols = 0;
         x = NULL;
-        order = NULL;
         _deg = NULL;
         po = NULL;
     }
@@ -770,7 +735,6 @@ template<typename fft_type> struct tpolmat /* {{{ */
         if (po)
             po->free(x, nrows * ncols);
         x = NULL;
-        mydelete(order, ncols);
         mydelete(_deg, ncols);
     }
     inline void swap(tpolmat & n) {
@@ -778,7 +742,6 @@ template<typename fft_type> struct tpolmat /* {{{ */
         podswap(ncols,n.ncols);
         podswap(po,n.po);
         podswap(x,n.x);
-        podswap(order,n.order);
         podswap(_deg,n._deg);
     }
     public:
@@ -786,33 +749,21 @@ template<typename fft_type> struct tpolmat /* {{{ */
     tpolmat clone() {
         tpolmat dst(nrows, ncols, o);
         memcpy(dst.x, x, ncols*colstride()*sizeof(unsigned long));
-        memcpy(dst.order, order, ncols*sizeof(unsigned int));
         memcpy(dst._deg, _deg, ncols*sizeof(unsigned int));
         return dst;
     }
 #endif
-    /* permute columns: column presently referred to with index i will
-     * now be accessed at index p[i]
-     */
-    void perm(unsigned int * p) {
-        unsigned int * norder(mynew<unsigned int>(ncols));
-        for(unsigned int i = 0 ; i < ncols ; i++) {
-            norder[p[i]]=order[i];
-        }
-        podswap(order,norder);
-        mydelete(norder, ncols);
-    }
     typename fft_type::ptr poly(unsigned int i, unsigned int j)
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return po->get(x, order[j] * nrows + i);
+        return po->get(x, j * nrows + i);
     }
     typename fft_type::srcptr poly(unsigned int i, unsigned int j) const
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return po->get(x, order[j] * nrows + i);
+        return po->get(x, j * nrows + i);
     }
     typename fft_type::ptr col(unsigned int j) { return poly(0, j); }
     typename fft_type::srcptr col(unsigned int j) const { return poly(0, j); }
@@ -833,9 +784,16 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
     tpolmat<fft_type> tmp(src.nrows, src.ncols, o);
     tmp.zero();
     src.clear_highbits();
-    for(unsigned int j = 0 ; j < src.ncols ; j++) {
-        for(unsigned int i = 0 ; i < src.nrows ; i++) {
-            o.dft(tmp.poly(i,j), src.poly(i,j), d);
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int j = 0 ; j < src.ncols ; j++) {
+            for(unsigned int i = 0 ; i < src.nrows ; i++) {
+                if (OMP_ROUND(k++))
+                    o.dft(tmp.poly(i,j), src.poly(i,j), d);
+            }
         }
     }
     dst.swap(tmp);
@@ -859,16 +817,22 @@ void glue4(
 {
     unsigned int nr2 = dst.nrows >> 1;
     unsigned int nc2 = dst.ncols >> 1;
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst.poly(i,j), s00.poly(i,j));
-            o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
-        }
-    }
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
-            o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int i = 0; i < nr2; ++i) {
+            for(unsigned int j = 0; j < nc2; ++j) {
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i,j), s00.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
+            }
         }
     }
 }
@@ -886,16 +850,22 @@ void splitin4(
     ASSERT((s.ncols & 1) == 0);
     unsigned int nr2 = s.nrows >> 1;
     unsigned int nc2 = s.ncols >> 1;
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst00.poly(i,j), s.poly(i,j));
-            o.cpy(dst01.poly(i,j), s.poly(i,j+nc2));
-        }
-    }
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst10.poly(i,j), s.poly(i+nr2,j));
-            o.cpy(dst11.poly(i,j), s.poly(i+nr2,j+nc2));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int i = 0; i < nr2; ++i) {
+            for(unsigned int j = 0; j < nc2; ++j) {
+                if (OMP_ROUND(k++))
+                    o.cpy(dst00.poly(i,j), s.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst01.poly(i,j), s.poly(i,j+nc2));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst10.poly(i,j), s.poly(i+nr2,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst11.poly(i,j), s.poly(i+nr2,j+nc2));
+            }
         }
     }
 }
@@ -909,9 +879,16 @@ void add(
 {
     ASSERT(s1.nrows == s2.nrows);
     ASSERT(s1.ncols == s2.ncols);
-    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-        for(unsigned int j = 0 ; j < s1.ncols ; j++) {
-            o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+            for(unsigned int j = 0 ; j < s1.ncols ; j++) {
+                if (OMP_ROUND(k++))
+                    o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
+            }
         }
     }
 }
@@ -1039,18 +1016,31 @@ void compose_inner(
     if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
         compose_strassen(tmp, s1, s2, o, s);
     } else {
-        typename fft_type::t * x = o.alloc(1);
         tmp.zero();
-        for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-            for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-                for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-                    o.compose(x, s1.poly(i,k), s2.poly(k,j));
-                    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
-                }
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+        {
+            typename fft_type::t * x = o.alloc(1);
+	    /* This way of doing matrix multiplication is better for locality:
+	       in the inner loop, the first element s1[i,k] is constant,
+	       and in the second one s2[k,j], only the second index changes.
+	       If the inner loop was on k, both s1[i,k] and s2[k,j] would
+	       change, and a change on the first index is worse if matrices
+	       are stored row by row. */
+	    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+	      for(unsigned int k = 0 ; k < s1.ncols ; k++) {
+		for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+		  if (OMP_ROUND((int) (i * s2.ncols + j))) {
+		    o.compose(x, s1.poly(i,k), s2.poly(k,j));
+		    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+		  }
+		}
+	      }
             }
+            o.free(x,1);
+            x = NULL;
         }
-        o.free(x,1);
-        x = NULL;
     }
     dst.swap(tmp);
 }
@@ -1096,20 +1086,29 @@ void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
 {
     // clock_t t = clock();
     polmat tmp(src.nrows, src.ncols, d + 1);
-    for(unsigned int j = 0 ; j < src.ncols ; j++) {
-        for(unsigned int i = 0 ; i < src.nrows ; i++) {
-            o.ift(tmp.poly(i,j), d, src.poly(i,j));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int j = 0 ; j < src.ncols ; j++) {
+            for(unsigned int i = 0 ; i < src.nrows ; i++) {
+                if (OMP_ROUND(k++))
+                    o.ift(tmp.poly(i,j), d, src.poly(i,j));
+            }
         }
+    }
+    for(unsigned int j = 0 ; j < src.ncols ; j++) {
         tmp.setdeg(j);
     }
     dst.swap(tmp);
     /*
-    if (o.size() > 10) {
-        printf("i(%u,%u,%u,%u): %.2fs\n",
-                src.nrows,src.ncols,d,o.size(),
-                (double)(clock()-t)/CLOCKS_PER_SEC);
-    }
-    */
+       if (o.size() > 10) {
+       printf("i(%u,%u,%u,%u): %.2fs\n",
+       src.nrows,src.ncols,d,o.size(),
+       (double)(clock()-t)/CLOCKS_PER_SEC);
+       }
+       */
 }
 
 

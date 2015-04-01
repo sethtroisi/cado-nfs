@@ -79,21 +79,20 @@ static double logline_timer()
     return logline_report_wct ? wct_seconds() : seconds();
 }
 
-static const char *size_disp(size_t s, char buf[16])/*{{{*/
+void logline_decl_usage(param_list_ptr pl)
 {
-    char *prefixes = "bkMGT";
-    double ds = s;
-    const char *px = prefixes;
-    for (; px[1] && ds > 500.0;) {
-        ds /= 1024.0;
-        px++;
-    }
-    snprintf(buf, 10, "%.1f%c", ds, *px);
-    return buf;
-}/*}}}*/
+    param_list_decl_usage(pl, "logline_threshold",
+            "print log lines of verbosity level i only for sizes greater than i-th item in this comma-separated list");
+    param_list_decl_usage(pl, "logline_timings",
+            "print timings with log lines");
+    param_list_decl_usage(pl, "logline_report_wct",
+            "print wct taken by each step marked by log lines");
+    param_list_decl_usage(pl, "logline_print_all_mpi_nodes",
+            "enable logline printing on all MPI nodes");
 
+}
 
-int logline_parse_params(param_list pl)
+int logline_interpret_parameters(param_list_ptr pl)
 {
     int thr[10];
     int n = param_list_parse_int_list(pl, "logline_threshold", thr, 10, ",");

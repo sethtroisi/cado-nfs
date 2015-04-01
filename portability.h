@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef CADO_PORTABILITY_H_
 #define CADO_PORTABILITY_H_
 
-#ifndef CADO_VERSION_MAJOR
+#ifndef CADO_CONFIG_H_
 #error cado_config.h must be included before portability.h
 #endif
 
@@ -295,5 +295,26 @@ static inline char __cdecl
   return retname;
 }
 #endif
+
+#if defined(HAVE_SYSCONF)
+#include <unistd.h>
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#endif
+static inline long pagesize ()
+{
+#if defined(_WIN32) || defined(_WIN64)
+  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return si.dwPageSize;
+#elif defined(HAVE_SYSCONF)
+  return sysconf (_SC_PAGESIZE);
+#else
+  #error "Cannot determine page size"
+#endif
+}
 
 #endif /* ifndef CADO_PORTABILITY_H_ */

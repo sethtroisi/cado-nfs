@@ -142,8 +142,12 @@ Aliases:
     // --> means that the switch --pad may be aliased as --square
 
     param_list_configure_alias(pl, "out", "output-name");
-    // means that --out, out=, and so on, may be aliased as
+    // means that --out, -out, out=, and so on, may be aliased as
     // --output-name, etc.
+
+    There's one pitfall. If you use the former syntax for a non-switch
+    argument, (e.g. --out -> --output-name), then the other forms will
+    not be aliased.
 
 
 ###################################################################
@@ -221,7 +225,7 @@ next round.
 After such a test, case (3) can be handled so:
 
       if ((f = fopen(argv[0], "r")) != NULL) {
-          param_list_read_stream(pl, f);
+          param_list_read_stream(pl, f, 0);
           fclose(f);
           argv++,argc--;
           continue;
@@ -270,7 +274,7 @@ it for knowing n:
       if (verbose) {
           fprintf(stderr, "Reading n from stdin\n");
       }
-      param_list_read_stream(pl, stdin);
+      param_list_read_stream(pl, stdin, 0);
       have_n = param_list_parse_mpz(pl, "n", poly->n);
   }
 

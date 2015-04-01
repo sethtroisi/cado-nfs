@@ -1,32 +1,34 @@
 /* dup2: 2nd pass
 
-   Usage: dup2 -poly name.poly [-basepath <dir>] [-filelist <fl>]
-          -K <K> -renumber xxx file1 ... filen
-
-   Put non-duplicate files (among file1 ... filen only) into:
-   <dir>/file1 ... <dir>/filen
+   Usage: dup2 -nrels <nrels> -renumber <renumberfile> [ -outdir <dir> ]
+               [ -outfmt <fmt> ] [ -dl ] [ -badidealinfo <file> ]
+               [ -filelist <fl> [ -basepath <dir> ] | file1 ... filen ]
 
    Input files can be given on command line, or via a filelist file.
 
+   By default dup2 overwrites input files. To modify this behaviour an output
+   directory can be given with '-outdir'.
    In case a filelist is given, the -basepath option enables to tell in which
-   directory those files are. Note that input files will be replaced in-place.
+   directory those files are.
 
    By default, the output will be bzipped/gzipped according to the status
-   of the input file.
+   of the input file. The output format can be chosen with '-outfmt'.
 
-   Allocates a hash-table of 2^k 32-bit entries.
+   Allocates a hash-table of size next_prime(100 + 1.2*nrels).
 
-   The relations are renumbered according to the file xxx, as input we have:
+   The relations are renumbered according to the file given via the
+   '-renumberfile' argument. Input relations are of the following format:
 
        a,b:p1,p2,...,pj:q1,q2,...,qk                                 (*)
 
-   where p1,p2,...,pj are rational ideals (possibly duplicate), and
-   q1,q2,...,qk are algebraic ideals (possibly duplicate). Output is:
+   where p1,p2,...,pj are rational (side 0) ideals (possibly duplicate), and
+   q1,q2,...,qk are algebraic (side 1) ideals (possibly duplicate). Output is:
 
        a,b:r1,r2,...,rm                                              (**)
 
-   where each index r1,r2,...,rm appears only once, and refers to either
-   a rational or to an algebraic ideal.
+   where each index r1,r2,...,rm refering to ideals via the renumbering table.
+   By default valuations are reduced modulo 2. This can be changed by using the
+   '-dl' argument.
 
    The format of each file is recognized by counting the number of ':' in the
    first line: if two we have the raw format (*), if only one we have the
@@ -55,6 +57,7 @@
 #include "utils-ffs.h"
 #endif
 #include "filter_badideals.h"
+#include "relation-tools.h"
 
 #define DEBUG 0
 
@@ -129,7 +132,7 @@ print_warning_size ()
    with a (signed) and b (unsigned) written in hexa and
    and i_1 ... i_k (hexadecimal) are the indices of the ideals
 
-    The function add a column of 1 if necessary, the added column is always
+    The function adds a column of 1 if necessary, which is always
     column 0.
 */
 static inline void
@@ -424,7 +427,7 @@ thread_root(void * context_data, earlyparsed_relation_ptr rel)
     return NULL;
 }
 
-int check_whether_file_is_renumbered(const char * filename)
+int check_whether_file_is_renumbered(const char * filename, unsigned int npoly)
 {
     unsigned int count = 0;
     char s[1024];
@@ -459,11 +462,13 @@ int check_whether_file_is_renumbered(const char * filename)
     
     if (count == 1)
         return 1;
-    else if (count == 2)
+    else if (count == npoly)
         return 0;
-    else {
-      fprintf (stderr, "Error: invalid line in %s (has %u colons):\n %s", filename, count, s);
-      exit(EXIT_FAILURE);
+    else
+    {
+      fprintf (stderr, "Error: invalid line in %s (line has %u colons but %u "
+                       "were expected):\n %s", filename, count, npoly, s);
+      abort();
     }
 }
 
@@ -471,7 +476,6 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "filelist", "file containing a list of input files");
   param_list_decl_usage(pl, "basepath", "path added to all file in filelist");
-  param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
   param_list_decl_usage(pl, "nrels",
                               "number of relations to be found in the slice");
@@ -484,6 +488,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "badidealinfo", "file containing info about bad ideals");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+  verbose_decl_usage(pl);
 }
 
 static void
@@ -497,8 +502,6 @@ int
 main (int argc, char *argv[])
 {
     argv0 = argv[0];
-    //TODO remove useless polynomials
-    cado_poly cpoly;
 
     param_list pl;
     param_list_init(pl);
@@ -530,10 +533,10 @@ main (int argc, char *argv[])
         // abort();
     }
     /* print command-line arguments */
+    verbose_interpret_parameters(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 
-    const char * polyfilename = param_list_lookup_string(pl, "poly");
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
@@ -549,11 +552,6 @@ main (int argc, char *argv[])
       usage(pl, argv0);
     }
 
-    if (polyfilename == NULL)
-    {
-      fprintf(stderr, "Error, missing -poly command line argument\n");
-      usage(pl, argv0);
-    }
     if (renumberfilename == NULL)
     {
       fprintf (stderr, "Error, missing -renumber command line argument\n");
@@ -584,17 +582,6 @@ main (int argc, char *argv[])
     if ((filelist != NULL) + (argc != 0) != 1) {
       fprintf(stderr, "Error, provide either -filelist or freeform file names\n");
       usage(pl, argv0);
-    }
-
-    cado_poly_init (cpoly);
-#ifndef FOR_FFS
-    if (!cado_poly_read (cpoly, polyfilename))
-#else
-    if (!ffs_poly_read (cpoly, polyfilename))
-#endif
-    {
-      fprintf (stderr, "Error reading polynomial file\n");
-      exit (EXIT_FAILURE);
     }
 
     allbad_info_t badinfo;
@@ -658,7 +645,7 @@ main (int argc, char *argv[])
       for (char ** p = files; *p; p++) {
           /* always strdup these, so that we can safely call
            * filelist_clear in the end */
-          if (check_whether_file_is_renumbered(*p)) {
+          if (check_whether_file_is_renumbered(*p, renumber_tab->nb_polys)) {
               files_already_renumbered[nb_f_renumbered++] = strdup(*p);
           } else {
               files_new[nb_f_new++] = strdup(*p);
@@ -749,13 +736,13 @@ main (int argc, char *argv[])
 
   if (!*files_already_renumbered) {
       if (nrels_tot != nrels_expected) {
-          fprintf(stderr, "Warning: number of relations read (%"PRIu64") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+          fprintf(stderr, "Warning: number of relations read (%" PRIu64") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
       }
   } else {
       /* when we have renumbered files, we know that we won't have the
        * total number of relations... */
       if (nrels_tot > nrels_expected) {
-          fprintf(stderr, "Warning: number of relations read (%"PRIu64") exceeds the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+          fprintf(stderr, "Warning: number of relations read (%" PRIu64") exceeds the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
       }
   }
 
@@ -769,6 +756,5 @@ main (int argc, char *argv[])
 
   param_list_clear(pl);
   renumber_clear (renumber_tab);
-  cado_poly_clear (cpoly);
   return 0;
 }

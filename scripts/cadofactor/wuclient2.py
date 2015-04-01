@@ -123,8 +123,9 @@ else:
 # which accepts a bytes input. The fact that the BytesGenerator in these Python
 # versions doesn't is a bug, see http://bugs.python.org/issue16564
 # Update: the first bugfix committed in that bugtracker and shipped in Python
-# versions 3.2.4, 3.2.5, 3.3.2 is still buggy, and we have to use a different
-# work-around...
+# versions 3.2.4, 3.2.5, 3.3.2, ... is still buggy, see
+# http://bugs.python.org/issue19003
+# and we have to use a different work-around...
 
 # These Python version have bug type #1
 BUGGY_MIMEENCODER1 = (
@@ -133,18 +134,49 @@ BUGGY_MIMEENCODER1 = (
     (3,2,0), (3,2,1), (3,2,2), (3,2,3),
     (3,3,0)
 )
-# These Python version have bug type #2
-BUGGY_MIMEENCODER2 = (
-    (3,2,4), (3,2,5),
-    (3,3,2), (3,3,3), (3,3,4)
-)
+BUGGY_MIMEENCODER2 = object()
+
+def test_buggy_mime_encoder():
+    """ Return which kind of bug the MIME encoder in this Python version has
+
+    If it is bug type 1 (the original bug), return BUGGY_MIMEENCODER1.
+    If it is bug type 2 (the incorrectly fixed one, which mangles newlines),
+    return BUGGY_MIMEENCODER2.
+    Otherwise return None.
+    """
+
+    # The version 2 encoder is ok, afaik
+    if tuple(sys.version_info)[0] == 2:
+        return None
+
+    # This bug type 1 was replaced by bug type 2 in all Python branches,
+    # so it should occur only in a well-known set of versions
+    if tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER1:
+        return BUGGY_MIMEENCODER1
+
+    # The "bug 2" type of encoder inserts a '\n' character after the '\x0b'
+    bytesdata = b'a\x0bb'
+    msg = MIMEApplication(bytesdata, _encoder=email.encoders.encode_noop)
+    s = BytesIO()
+    g = email.generator.BytesGenerator(s)
+    g.flatten(msg)
+    wireform = s.getvalue()
+    msg2 = email.message_from_bytes(wireform)
+    decoded = msg2.get_payload(decode=True)
+    # If the decoded data is neither correct, nor mangled in the way the
+    # bug 2 does, then it's some bug we don't know about yet - bail out
+    assert decoded == bytesdata or decoded == b'a\x0b\nb'
+    if decoded != bytesdata:
+        return BUGGY_MIMEENCODER2
+    else:
+        return None
 
 HAVE_WGET = False
 HAVE_CURL = False
 
-if tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER1:
+ENCODERBUG = test_buggy_mime_encoder()
+if ENCODERBUG is BUGGY_MIMEENCODER1:
     class FixedBytesGenerator(email.generator.BytesGenerator):
-        bug_type = BUGGY_MIMEENCODER1
         # pylint: disable=W0232
         # pylint: disable=E1101
         # pylint: disable=E1102
@@ -162,13 +194,14 @@ if tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER1:
                 # Payload is neither bytes nor string - this can't be right
                 raise TypeError('bytes payload expected: %s' % type(payload))
         _writeBody = _handle_bytes
-elif tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER2:
+elif ENCODERBUG is BUGGY_MIMEENCODER2:
+    if tuple(sys.version_info)[0:2] == (3, 2):
+        from email.message import _has_surrogates
+    else:
+        from email.utils import _has_surrogates
     import re
-    from email.utils import _has_surrogates
-
     fcre = re.compile(r'^From ', re.MULTILINE)
     class FixedBytesGenerator(email.generator.BytesGenerator):
-        bug_type = BUGGY_MIMEENCODER2
         # pylint: disable=W0232
         # pylint: disable=E1101
         # pylint: disable=E1102
@@ -176,10 +209,13 @@ elif tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER2:
         def _handle_application(self, msg):
             # If the string has surrogates the original source was bytes,
             # so just write it back out.
+
+            # Python 3.2 does not have the policy attribute; we use the
+            # fixed generator in this case
+            cte_is_7bit = getattr(self, "policy.cte_type", None) == '7bit'
             if msg._payload is None:
                 return
-            if _has_surrogates(msg._payload) and \
-                    not self.policy.cte_type == '7bit':
+            if _has_surrogates(msg._payload) and not cte_is_7bit:
                 if self._mangle_from_:
                     msg._payload = fcre.sub(">From ", msg._payload)
                 # DON'T use _write_lines() here as that mangles data
@@ -303,16 +339,16 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
     # name in handler(). Python3 has 'nonlocal' for that
     sigusr1_received = [False]
     def handler(signum, frame):
-        if signum == signal.SIGUSR1:
+        if signum == signal.SIGUSR2:
             sigusr1_received[0] = True
 
-    # The pid of the original process, used for sending a SIGUSR1 later
+    # The pid of the original process, used for sending a SIGUSR2 later
     original_pid = os.getpid()
 
     # We need to install the signal handler before forking, to guarantee that
     # the original process has the signal handler installed at the time its
     # grand-child sends the signal
-    old_handler = signal.signal(signal.SIGUSR1, handler)
+    old_handler = signal.signal(signal.SIGUSR2, handler)
 
     # Default daemon parameters.
 
@@ -337,7 +373,7 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
 
     if (pid == 0):	# The first child.
         # Un-install the signal handler in the child process
-        signal.signal(signal.SIGUSR1, signal.SIG_DFL)
+        signal.signal(signal.SIGUSR2, signal.SIG_DFL)
 
         # To become the session leader of this new session and the process group
         # leader of the new process group, we call os.setsid().  The process is
@@ -403,7 +439,7 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
             # exit() or _exit()?  See below.
             os._exit(0)	# Exit parent (the first child) of the second child.
     else:
-        # Wait for the child to send a SIGUSR1 signal. This gives the grand-
+        # Wait for the child to send a SIGUSR2 signal. This gives the grand-
         # child time to print its PID to stdout, before the original process
         # exits and possibly closes the SSH connection which started the
         # client - we want to read the PID over the SSH connection, after all.
@@ -426,7 +462,7 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
     sys.stdout.flush()
     
     # Tell the original process that it's ok to terminate now
-    os.kill(original_pid, signal.SIGUSR1)
+    os.kill(original_pid, signal.SIGUSR2)
 
     # Close all open file descriptors.  This prevents the child from keeping
     # open any file descriptors inherited from the parent.  There is a variety
@@ -1530,11 +1566,11 @@ if __name__ == '__main__':
     if logfile:
         logging.getLogger().addHandler(logging.StreamHandler(logfile))
     logging.info("Starting client %s", SETTINGS["CLIENTID"])
+    logging.info("Python version is %d.%d.%d", *sys.version_info[0:3])
 
-    generator_bug_type = getattr(FixedBytesGenerator, "bug_type", None)
-    if generator_bug_type is BUGGY_MIMEENCODER1:
+    if ENCODERBUG is BUGGY_MIMEENCODER1:
         logging.info("Using work-around #1 for buggy BytesGenerator")
-    elif generator_bug_type is BUGGY_MIMEENCODER2:
+    elif ENCODERBUG is BUGGY_MIMEENCODER2:
         logging.info("Using work-around #2 for buggy BytesGenerator")
 
     (scheme, netloc) = urlparse(SETTINGS["SERVER"])[0:2]

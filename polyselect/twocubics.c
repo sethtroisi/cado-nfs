@@ -150,8 +150,7 @@ compute_default_max_skew (mpz_t skew, mpz_t N, int d)
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
-       uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
-       mpz_t rq)
+       mpz_t ad, unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
 {
 #if 0
   unsigned long j;
@@ -188,7 +187,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_poly_init (f, d);
   mpz_poly_init (g, d);
 
-  gmp_printf ("#### MATCH ######\nN = %Zd\nd = %d\nad = %" PRIu64 "\n"
+  gmp_printf ("#### MATCH ######\nN = %Zd\nd = %d\nad = %Zd\n"
               "p1 = %lu\np2 = %lu\nq = %" PRIu64 "\ni = %" PRId64 "\n"
               "rq = %Zd\n", N, d, ad, p1, p2, q, i, rq);
 
@@ -209,8 +208,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
               mpz_sizeinbase(r, 2));
 
   /* k = d^d * ad^(d-1) */
-  mpz_set_ui (k, d);
-  mpz_mul_ui (k, k, ad);
+  mpz_mul_ui (k, ad, d);
   mpz_pow_ui (k, k, d-1);
   mpz_mul_ui (k, k, d);
   gmp_printf ("k = d^d * ad^(d-1)\nk == %Zd\n", k);
@@ -231,8 +229,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   /* adm1 is such that mprime = d*ad*m + adm1*l and -d*ad/2 <= adm1 < d*ad/2
      We have adm1 = mprime/l mod (d*ad). */
-  mpz_set_uint64 (tmp, ad);
-  mpz_mul_ui (tmp, tmp, d); /* tmp = d*ad */
+  mpz_mul_ui (tmp, ad, d); /* tmp = d*ad */
   if (mpz_invert (adm1, l, tmp) == 0)
   {
     fprintf (stderr, "Error in 1/l mod (d*ad)\n");
@@ -250,8 +247,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_sub (m, mprime, m);
   ASSERT_ALWAYS (mpz_divisible_ui_p (m, d));
   mpz_divexact_ui (m, m, d);
-  ASSERT_ALWAYS (mpz_divisible_uint64_p (m, ad));
-  mpz_divexact_uint64 (m, m, ad);
+  ASSERT_ALWAYS (mpz_divisible_p (m, ad));
+  mpz_divexact (m, m, ad);
   gmp_printf ("m = (mprime - adm1*l) / (d*ad)\nm == %Zd\n", m);
 
 
@@ -263,14 +260,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     mpz_vector_setcoordinate_ui (a, j, 0); /* a[j] = 0 */
 
   /* Set vector b = (a0, a1, ..., ai, ..., adm1, ad) */
-  mpz_vector_setcoordinate_uint64 (b, d, ad);  /* b[d] = ad */
+  mpz_vector_setcoordinate (b, d, ad);  /* b[d] = ad */
   mpz_vector_setcoordinate (b, d-1, adm1); /* b[d-1] = adm1 */
 
 
 
 
   mpz_pow_ui (t, m, d);
-  mpz_mul_uint64 (t, t, ad);
+  mpz_mul (t, t, ad);
   mpz_sub (t, N, t);
   ASSERT_ALWAYS (mpz_divisible_p (t, l));
 
@@ -331,7 +328,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mod (root, root, N);
   gmp_printf ("root = (m / l) %% N\nroot == %Zd\n", root);
 
-  gmp_fprintf (stderr, "## Begin poly file for ad = %" PRIu64 " and l = %Zd\n",
+  gmp_fprintf (stderr, "## Begin poly file for ad = %Zd and l = %Zd\n",
                ad, l);
   gmp_fprintf(stderr, "n: %Zd\nm: %Zd\nskew: %Zd\n", N, root, skew);
   for (int i = 0; i <= f->deg; i++)
@@ -437,7 +434,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
 		  pthread_mutex_lock (&lock);
 #endif
-      gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
+      gmp_printf ("# Skip polynomial: %.2f, ad: %Zd, l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
 #ifdef MAX_THREADS
 		  pthread_mutex_unlock (&lock);
@@ -465,8 +462,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 void
 gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
-	   uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
-	   mpz_t rq)
+	   mpz_t ad, unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
 {
   match (p1, p2, i, m0, ad, d, N, q, rq);
 }
@@ -511,7 +507,7 @@ collision_on_p ( header_t header,
       ppl = (int64_t) p * (int64_t) p;
 
       /* add fake roots to keep indices */
-      if ((header->d * header->ad) % p == 0)
+      if (header_skip (header, p))
         {
           R->nr[nprimes] = 0; // nr = 0.
           R->roots[nprimes] = NULL;
@@ -566,7 +562,7 @@ collision_on_p ( header_t header,
         }
 #ifdef DEBUG_POLYSELECT2L
       fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
-      fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
+      gmp_fprintf (stderr, "# p hash_size: %u for ad = %Zd\n", H->size, header->ad);
 #endif
 
 #ifdef DEBUG_HASH_TABLE
@@ -766,7 +762,7 @@ collision_on_each_sq ( header_t header,
       for (nprimes = c = 0; nprimes < lenPrimes; nprimes ++)
         {
           p = Primes[nprimes];
-          if ((header->d * header->ad) % p == 0)
+          if (header_skip (header, p))
             continue;
           pp = p * p;
           ppl = (long) pp;
@@ -1041,7 +1037,7 @@ collision_on_batch_sq ( header_t header,
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
     p = Primes[nprimes];
-    if ((header->d * header->ad) % p == 0)
+    if (header_skip (header, p))
       continue;
     nr = R->nr[nprimes];
     if (nr == 0)
@@ -1134,7 +1130,7 @@ collision_on_sq ( header_t header,
 
 
 static void
-newAlgo (mpz_t N, unsigned long d, uint64_t ad)
+newAlgo (mpz_t N, unsigned long d, mpz_t ad)
 {
   unsigned long c = 0;
   header_t header;
@@ -1169,9 +1165,9 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "n", "(required, alias N) input number");
   param_list_decl_usage(pl, "P", "(required) deg-1 coeff of g(x) has two prime factors in [P,2P]\n");
 
-  param_list_decl_usage(pl, "admax", "max value for ad");
+  param_list_decl_usage(pl, "admax", "max value for ad (+1)");
   param_list_decl_usage(pl, "admin", "min value for ad (default 0)");
-  param_list_decl_usage(pl, "incr", "(alias i) forced factor of ad (default 60)");
+  param_list_decl_usage(pl, "incr", "(alias i) increment of ad (default 60)");
   param_list_decl_usage(pl, "skewness", "maximun skewness possible "
                                         "(default N^(1/9)");
   param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
@@ -1192,6 +1188,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "Bf", str);
   snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
   param_list_decl_usage(pl, "Bg", str);
+  verbose_decl_usage(pl);
 }
 
 static void
@@ -1211,10 +1208,9 @@ main (int argc, char *argv[])
   int argc0 = argc;
   char **argv0 = argv;
   double st0 = seconds (), maxtime = DBL_MAX;
-  mpz_t N;
+  mpz_t N, admin, admax;
   unsigned int d = 3;
-  unsigned long P = 0, admin, admax;
-  double admin_d, admax_d;
+  unsigned long P = 0;
   int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
@@ -1254,7 +1250,7 @@ main (int argc, char *argv[])
 
   if (!have_n) {
     fprintf(stderr, "# Reading n from stdin\n");
-    param_list_read_stream(pl, stdin);
+    param_list_read_stream(pl, stdin, 0);
     have_n = param_list_parse_mpz(pl, "n", N);
   }
 
@@ -1286,14 +1282,14 @@ main (int argc, char *argv[])
     bound_f = BOUND_F;
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
-  if (param_list_parse_double (pl, "admin", &admin_d) == 0) /* no -admin */
-    admin = 0;
-  else
-    admin = (unsigned long) admin_d;
-  if (param_list_parse_double (pl, "admax", &admax_d) == 0) /* no -admax */
-    admax = ULONG_MAX;
-  else
-    admax = (unsigned long) admax_d;
+
+  mpz_init (admin);
+  param_list_parse_mpz (pl, "admin", admin);
+
+  mpz_init (admax);
+  if (param_list_parse_mpz (pl, "admax", admax) == 0) /* no -admax */
+    mpz_set (admax, N);
+
   param_list_parse_ulong (pl, "incr", &incr);
   param_list_parse_double (pl, "maxtime", &maxtime);
 
@@ -1310,6 +1306,7 @@ main (int argc, char *argv[])
     usage (argv0[0], NULL, pl);
 
   /* print command line */
+  verbose_interpret_parameters(pl);
   param_list_print_command_line (stdout, pl);
 
   /* check lq and nq */
@@ -1402,27 +1399,31 @@ main (int argc, char *argv[])
     exit (1);
   }
 
-  /* force admin to be divisible by incr */
-  if (admin == 0)
-    admin = incr;
-  admin = ((admin + incr - 1) / incr) * incr; /* incr * ceil (admin/incr) */
+  /* admin should be nonnegative */
+  if (mpz_cmp_ui (admin, 0) < 0)
+    {
+      fprintf (stderr, "Error, admin should be nonnegative\n");
+      exit (1);
+    }
 
-  while (admin <= admax && seconds () - st0 <= maxtime)
+  /* if admin = 0, start from incr */
+  if (mpz_cmp_ui (admin, 0) == 0)
+    mpz_set_ui (admin, incr);
+
+  while (mpz_cmp (admin, admax) < 0 && seconds () - st0 <= maxtime)
   {
     for (i = 0; i < nthreads ; i++)
     {
       tries ++;
       if (verbose >= 1)
-      {
-        gmp_printf ("# %d ad=%lu\n", tries, admin);
-      }
-      T[i]->ad = admin;
+        gmp_printf ("# %d ad=%Zd\n", tries, admin);
+      mpz_set (T[i]->ad, admin);
 #ifndef MAX_THREADS
       newAlgo (N, d, admin);
 #else
       pthread_create (&tid[i], NULL, one_thread, (void *) (T+i));
 #endif
-      admin += incr;
+      mpz_add_ui (admin, admin, incr);
     }
 #ifdef MAX_THREADS
     for (i = 0 ; i < nthreads ; i++)
@@ -1431,7 +1432,7 @@ main (int argc, char *argv[])
 
     if (milliseconds () > (unsigned long) target_time || verbose > 0)
     {
-      printf ("# Stat: ad=%lu, exp. coll.=%1.2f (%0.2e/s), got %lu with "
+      gmp_printf ("# Stat: ad=%Zd, exp. coll.=%1.2f (%0.2e/s), got %lu with "
               "%lu good ones, time=%lums\n", admin, potential_collisions,
               1000.0 * (double) potential_collisions / milliseconds (),
               collisions, collisions_good, milliseconds () );
@@ -1476,6 +1477,8 @@ main (int argc, char *argv[])
     mpz_clear (T[i]->N);
   free (T);
   mpz_clear (N);
+  mpz_clear (admin);
+  mpz_clear (admax);
   mpz_clear (maxS);
   clearPrimes (&Primes);
   cado_poly_clear (best_poly);

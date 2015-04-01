@@ -1,294 +1,166 @@
-/* 
-   Size-optimize the raw polynomials in a file of format:
-   "Yi: xxxxxx"
-   "ci: xxxxxx"
-   "N: xxxxxx"
+/*
+  Size-optimize all polynomial in a file.
+  File must contains polynomials in CADO format and polynomials must be
+  separated by a newline.
 */
 
-/* standard header files */
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <string.h>
-#include <ctype.h>
-#include <gmp.h>
-
-/* CADO-NFS header files */
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
-#include "area.h"
+#include "size_optimization.h"
 
-#define MAX_LINE_LENGTH 1024
-
-/* Assume the file already contains both raw and optimized polynomial
-   in pairs. SKIP_YES 1 will pick the raw poly and optimize it.
-   So it will ignore the even number of polynomials found, since
-   we assume this is an optimized result. */
-#define SKIP_YES 0
-
-/* optimize anyway regardless of the common root condition
-   this is only used when you want to try wierd things. */
-int fake = 0;
-
-/* only use translation in optimization */
-int translate = 0;
-
-/* 
-   Care: poly_print is named in utils.h
-*/
 static void
-polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N) 
+declare_usage(param_list pl)
 {
-  int i;
-  gmp_printf ("\nn: %Zd\n", N);
-  for (i = deg; i >= 0; i --)
-  {
-    gmp_printf ("c%d: %Zd\n", i, f[i]);
-  }
-  for (i = 1; i >= 0; i --)
-  {
-    gmp_printf ("Y%d: %Zd\n", i, g[i]);
-  }
+  char str[200];
+  param_list_decl_usage(pl, "inputpolys", "size-optimized the polynomials "
+                                          "given in this file");
+  snprintf (str, 200, "size-optimization effort (default %d)", SOPT_DEFAULT_EFFORT);
+  param_list_decl_usage(pl, "sopteffort", str);
+  param_list_decl_usage(pl, "v", "(switch) verbose mode");
+  param_list_decl_usage(pl, "translation-only", "(switch) do not use rotations");
+  verbose_decl_usage(pl);
 }
 
-static unsigned FLAG_TERMINATION[7] = { 0x181, 0x183, 0x187, 0x18f, 0x19f,
-                                        0x1bf, 0x1ff };
-
-/*
-  Optimize all raw polynomial in the file.
-*/
-static int
-opt_file (FILE *file, int deg, mpz_t N) {
-  int i, nroots, skip = 0;
-  unsigned flag = 0UL, count = 0;
-  char str[MAX_LINE_LENGTH];
-  mpz_t g[2];
-  mpz_t *f;
-  mpz_poly_t F;
-  mpz_t t, M;
-  double skew = 0.0, alpha = 0.0, logmu = 0.0;
-  double ave_logmu = 0.0, ave_alpha = 0.0;
-  double min_logmu = DBL_MAX, max_logmu = 0.0;
-
-  mpz_init (t);
-  mpz_init (M);
-  mpz_init (g[1]);
-  mpz_init (g[0]);
-  mpz_poly_init (F, deg);
-  F->deg = deg;
-  f = F->coeff;
-
-  while (1) {
-    /* wrong line or EOF */
-    if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
-      break;
-    if ( str[0] == 'Y' ) {
-      if ( str[1] == '1' ) {
-        gmp_sscanf (str, "Y1: %Zd\n", g[1]);
-        (flag) ^= ( 1<<(8) );
-      }
-      else if ( str[1] == '0' ) {
-        gmp_sscanf (str, "Y0: %Zd\n", g[0]);
-        (flag) ^= ( 1<<(7) );
-      }
-      else {
-        fprintf (stderr, "Error in parsing line %s", str);
-        exit (1);
-      }
-    }
-    else if ( str[0] == 'c') {
-      if ( str[1] == '0' ) {
-        gmp_sscanf (str, "c0: %Zd\n", f[0]);
-        (flag) ^= ( 1<<(0) );
-      }
-      else if ( str[1] == '1' ) {
-        gmp_sscanf (str, "c1: %Zd\n", f[1]);
-        (flag) ^= ( 1<<(1) );
-      }
-      else if ( str[1] == '2' ) {
-        gmp_sscanf (str, "c2: %Zd\n", f[2]);
-        (flag) ^= ( 1<<(2) );
-      }
-      else if ( str[1] == '3' ) {
-        gmp_sscanf (str, "c3: %Zd\n", f[3]);
-        (flag) ^= ( 1<<(3) );
-      }
-      else if ( str[1] == '4' ) {
-        gmp_sscanf (str, "c4: %Zd\n", f[4]);
-        (flag) ^= ( 1<<(4) );
-      }
-      else if ( str[1] == '5' ) {
-        gmp_sscanf (str, "c5: %Zd\n", f[5]);
-        (flag) ^= ( 1<<(5) );
-      }
-      else if ( str[1] == '6' ) {
-        gmp_sscanf (str, "c6: %Zd\n", f[6]);
-        (flag) ^= ( 1<<(6) );
-      }
-      else
-      {
-        fprintf (stderr, "Error in parsing line %s", str);
-        exit (1);
-      }
-    }
-    else
-      continue;
-
-    /* consider raw polynomial only */
-    if ( (flag == FLAG_TERMINATION[deg]) &&  (skip == 0) ) {
-      /* M = -Y0/Y1 mod N */
-      mpz_invert (M, g[1], N);
-      mpz_neg (M, M);
-      mpz_mul (M, M, g[0]);
-      mpz_mod (M, M, N);
-      /* check M ? a root of the algebraic polynomial mod N */
-      mpz_set (t, f[deg]);
-      for (i = deg - 1; i >= 0; i --) {
-        mpz_mul (t, t, M);
-        mpz_add (t, t, f[i]);
-        mpz_mod (t, t, N);
-      }
-         
-      if (!fake) {
-        if (mpz_cmp_ui (t, 0) != 0) {
-          fprintf (stderr, "Given polynomials have no common root mod N:\n");
-          polyprint (f, g, deg, N);
-          exit (1);
-        }
-      }
-
-      /* output raw polynomials */
-      nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
-      skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-      logmu = L2_lognorm (F, skew);
-      alpha = get_alpha (F, ALPHA_BOUND);
-      fprintf (stdout, "\n# Raw polynomial (#%6d):", count + 1);
-      polyprint (f, g, deg, N);
-      printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %f\n",
-              logmu, alpha, logmu + alpha, nroots, skew);
-
-      /* optimize */
-      if (translate)
-        optimize_aux (F, g, 0, 0);
-      else
-        optimize (F, g, 0, 1);
-
-      /* output size-optimized polynomials */
-      nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
-      skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-      logmu = L2_lognorm (F, skew);
-      alpha = get_alpha (F, ALPHA_BOUND);
-      fprintf (stdout, "# Optimized polynomial (#%10d): ", count + 1);
-      polyprint (f, g, deg, N);
-      printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %.2f\n",
-              logmu, alpha, logmu + alpha, nroots, skew);
-
-      ave_logmu += logmu;
-      min_logmu = (logmu < min_logmu) ? logmu : min_logmu;
-      max_logmu = (logmu > max_logmu) ? logmu : max_logmu;
-      ave_alpha += alpha;
-      count += 1;
-      flag = 0UL;
-      skip = SKIP_YES;
-    }
-
-    /* skip optimized (may be by some old opt method) polynomials,
-			 note, we assume "raw" and "optimized" polys appears
-			 in pair and sequential. So it is very fragile if the input file
-			 is broken for some reason (for instance, order of poly is not
-       sequencial due to some threads problem.) */
-    if ( (flag == 511UL || flag == 447UL) && (skip == 1) ) {
-      flag = 0UL;
-      skip = 0;
-    }
-  }
-
-  fprintf(stdout, "\n# total num. of polys: %u\n", count);
-  fprintf(stdout, "# ave. l2norm: %3.3f\n", ave_logmu / count);
-  fprintf(stdout, "# min. l2norm: %3.3f\n", min_logmu);
-  fprintf(stdout, "# max. l2norm: %3.3f\n", max_logmu);
-  fprintf(stdout, "# ave. alpha: %3.3f\n", ave_alpha / count);
-
-  mpz_clear (g[0]);
-  mpz_clear (g[1]);
-  mpz_clear (t);
-  mpz_clear (M);
-  mpz_poly_clear (F);
-  return 0;
-}
-
-
-/*
-   print usage and exit 
-*/
 static void
-usage (void) {
-  fprintf (stdout, "Usage: polyopt [--fake] [--translate] [--lll] -f POLYFILE -d DEGREE -n NUMBER\n");
-  exit(1);
+usage (const char *argv, param_list pl)
+{
+  param_list_print_usage (pl, argv, stderr);
+  param_list_clear (pl);
+  exit (EXIT_FAILURE);
 }
-
 
 /*
    main function 
 */
 int main (int argc, char **argv)
 {
-  int degree = 0;
-  FILE *file = NULL;
-  const char *filename = NULL;
-  mpz_t N;
-  mpz_init (N);
+  char *argv0 = argv[0];
+  int use_only_translation = 0; /* only use translation in optimization */
+  unsigned int sopt_effort = SOPT_DEFAULT_EFFORT; /* size optimization effort */
+  int verbose = 0;
+  FILE *polys_file = NULL;
+  const char *polys_filename = NULL;
+  unsigned int nb_input_polys = 0; /* number of input polynomials */
+  cado_poly poly;
+  /* For statistics */
+  double ave_raw_lognorm = 0.0, ave_raw_alpha = 0.0;
+  double min_raw_lognorm = DBL_MAX, max_raw_lognorm = 0.0;
+  double ave_sopt_lognorm = 0.0, ave_sopt_alpha = 0.0;
+  double min_sopt_lognorm = DBL_MAX, max_sopt_lognorm = 0.0;
+
 
   /* read params */
-  if (argc == 1) usage();
   param_list pl;
   param_list_init (pl);
-  param_list_configure_switch (pl, "--fake", &fake);
-  param_list_configure_switch (pl, "--translate", &translate);
 
+  declare_usage(pl);
+
+  param_list_configure_switch (pl, "-v", &verbose);
+  param_list_configure_switch (pl, "-translation-only", &use_only_translation);
+
+  if (argc == 1)
+    usage (argv0, pl);
+  
+  
   argv++, argc--;
   for ( ; argc; ) {
     if (param_list_update_cmdline (pl, &argc, &argv)) continue;
     fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
-    usage ();
+    usage (argv0, pl);
   }
 
-  /* parse n */
-  int have_n = param_list_parse_mpz(pl, "n", N);
-  if (!have_n) {
-    fprintf(stderr, "No N defined ; sorry.\n");
-    exit(1);
-  }
-  if (mpz_cmp_ui (N, 0) <= 0) usage();
-
-  /* parse degree */
-  param_list_parse_int (pl, "d", &degree);
-  if (degree <= 0) usage();
-  ASSERT_ALWAYS (degree <= 6);
-  
   /* parse poly filename */
-  filename = param_list_lookup_string (pl, "f");
+  polys_filename = param_list_lookup_string (pl, "inputpolys");
+
+  /* parse size optimization effort that passed to size_optimization */
+  param_list_parse_uint (pl, "sopteffort", &sopt_effort);
+
+  if (param_list_warn_unused(pl))
+    usage (argv0, pl);
 
   /* print out commands */
+  verbose_interpret_parameters(pl);
   param_list_print_command_line (stdout, pl);
 
-  if (param_list_warn_unused(pl)) usage();
-
-  /* read */
-  file = fopen(filename, "r");
-  if (file == NULL) {
-    fprintf(stderr, "# Error in reading file\n");
-    mpz_clear (N);
-    exit (1);
+  /* Open file containing polynomials. */
+  printf ("# Reading polynomials from %s\n", polys_filename);
+  polys_file = fopen(polys_filename, "r");
+  if (polys_file == NULL)
+  {
+    perror("Could not open file");
+    exit(EXIT_FAILURE);
   }
 
-  /* optimize the raw polys in the file */
-  opt_file (file, degree, N);
+  cado_poly_init (poly);
 
-  fclose (file);
-  mpz_clear (N);
+  /* Main loop: read all polynomials from file and do size-optimization. */
+  while (cado_poly_read_next_poly_from_stream (poly, polys_file))
+  {
+    unsigned int nrroots;
+    double lognorm, alpha, alpha_proj;
+
+    printf ("\n### Input raw polynomial (%u) ###\n", nb_input_polys);
+    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
+    nrroots = numberOfRealRoots (poly->alg->coeff, poly->alg->deg, 0, 0, NULL);
+    lognorm = L2_lognorm (poly->alg, poly->skew);
+    alpha = get_alpha (poly->alg, ALPHA_BOUND);
+    alpha_proj = get_biased_alpha_projective (poly->alg, ALPHA_BOUND);
+    cado_poly_fprintf (stdout, poly, "# ");
+    cado_poly_fprintf_info (stdout, lognorm, alpha, alpha_proj, nrroots, "# ");
+
+    ave_raw_lognorm += lognorm;
+    min_raw_lognorm = (lognorm < min_raw_lognorm) ? lognorm : min_raw_lognorm;
+    max_raw_lognorm = (lognorm > max_raw_lognorm) ? lognorm : max_raw_lognorm;
+    ave_raw_alpha += alpha;
+
+    /* Size-optimize */
+    if (use_only_translation)
+      sopt_local_descent (poly->alg, poly->rat, poly->alg, poly->rat, 
+                                      1, -1, SOPT_DEFAULT_MAX_STEPS, verbose);
+    else
+      size_optimization (poly->alg, poly->rat, poly->alg, poly->rat,
+                                                        sopt_effort, verbose);
+
+    printf ("### Size-optimized polynomial (%u) ###\n", nb_input_polys);
+    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
+    nrroots = numberOfRealRoots (poly->alg->coeff, poly->alg->deg, 0, 0, NULL);
+    lognorm = L2_lognorm (poly->alg, poly->skew);
+    alpha = get_alpha (poly->alg, ALPHA_BOUND);
+    alpha_proj = get_biased_alpha_projective (poly->alg, ALPHA_BOUND);
+    cado_poly_fprintf (stdout, poly, NULL);
+    cado_poly_fprintf_info (stdout, lognorm, alpha, alpha_proj, nrroots, NULL);
+
+
+    ave_sopt_lognorm += lognorm;
+    min_sopt_lognorm = (lognorm < min_sopt_lognorm) ? lognorm : min_sopt_lognorm;
+    max_sopt_lognorm = (lognorm > max_sopt_lognorm) ? lognorm : max_sopt_lognorm;
+    ave_sopt_alpha += alpha;
+
+    nb_input_polys++;
+  }
+  /* Did we stop at the end of the file or was there an error. */
+  if (!feof (polys_file))
+  {
+    fprintf (stderr, "Error while reading file %s.\n", polys_filename);
+    abort ();
+  }
+
+  printf("\n# Number of polynomials read: %u\n", nb_input_polys);
+  printf("# Average input lognorm: %3.3f\n", ave_raw_lognorm / nb_input_polys);
+  printf("# Minimum input lognorm: %3.3f\n", min_raw_lognorm);
+  printf("# Maximum input lognorm: %3.3f\n", max_raw_lognorm);
+  printf("# Average input alpha value: %3.3f\n", ave_raw_alpha / nb_input_polys);
+  printf("# Average sopt lognorm: %3.3f\n", ave_sopt_lognorm / nb_input_polys);
+  printf("# Minimum sopt lognorm: %3.3f\n", min_sopt_lognorm);
+  printf("# Maximum sopt lognorm: %3.3f\n", max_sopt_lognorm);
+  printf("# Average sopt alpha value: %3.3f\n", ave_sopt_alpha / nb_input_polys);
+
+  cado_poly_clear (poly);
+  fclose (polys_file);
   param_list_clear (pl);
   return 0;
 }

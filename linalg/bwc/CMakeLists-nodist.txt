@@ -4,22 +4,36 @@ link_directories (${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs)
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
 include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
+
+
 add_executable(bench_polmatmul EXCLUDE_FROM_ALL bench_polmatmul.cpp)
+set_target_properties(bench_polmatmul PROPERTIES
+    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "${OpenMP_CXX_FLAGS}")
 target_link_libraries(bench_polmatmul utils gf2x-fft gf2x cantor128)
 add_dependencies(bench_polmatmul gf2x-build)
 
-add_executable(mf_dobal mf_dobal.c)
-target_link_libraries(mf_dobal mf m bwc_base)
-set_target_properties(mf_dobal PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
-
 # This is really only for debugging.
 add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
-target_link_libraries(test_hello utils)
+target_link_libraries(test_hello bwc_base)
 set_target_properties(test_hello PROPERTIES
     COMPILE_FLAGS "--mpi"
     LINK_FLAGS "--mpi")
+
+add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
+target_link_libraries(short_matmul bwc_base)
+
+add_executable(bcast-file EXCLUDE_FROM_ALL bcast-file.c)
+set_target_properties(bcast-file PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+
+bwc_program_extra(spmv_test spmv_test.c)
+bwc_program_extra(build_matcache build_matcache.c)
+target_link_libraries(build_matcache matmul_mf)
+bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)
+target_link_libraries(bench_matcache matmul_mf)
+
 
 # if(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 # add_executable(matops matops.cpp ../gauss.c)
@@ -27,14 +41,5 @@ set_target_properties(test_hello PROPERTIES
 #         COMPILE_FLAGS "-I.")
 # target_link_libraries(matops gmp utils m)
 # endif(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-
-if(HAVE_WAITPID)        # unavailable under mingw
-add_executable(shell shell.c)
-set_target_properties(shell
-    PROPERTIES
-    COMPILE_FLAGS "--mpi"
-    LINK_FLAGS "--mpi")
-target_link_libraries(shell bwc_base)
-endif(HAVE_WAITPID)
 
 # vim: ft=cmake:

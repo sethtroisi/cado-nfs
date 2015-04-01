@@ -25,21 +25,6 @@ int degree;
 mpz_t * f_hat;
 mpz_t * f_hat_diff;
 
-// {{{ trivial utility
-static const char * size_disp(size_t s, char buf[16])
-{
-    char * prefixes = "bkMGT";
-    double ds = s;
-    const char * px = prefixes;
-    for( ; px[1] && ds > 500.0 ; ) {
-        ds /= 1024.0;
-        px++;
-    }
-    snprintf(buf, 10, "%.1f%c", ds, *px);
-    return buf;
-}
-// }}}
-
 /* {{{ wrappers for some gmp operations, so as to report timings */
 // above this threshold, we report each multiplication we do.
 #define MUL_REPORT_THRESHOLD    1000000

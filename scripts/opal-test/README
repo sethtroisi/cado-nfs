@@ -1,0 +1,39 @@
+OPAL is a Python package for automatic parameter optimization based on the
+separate, binary NOMAD library.
+
+Download NOMAD.zip from <http://sourceforge.net/projects/nomad-bb-opt/>
+For entertainment purposes, this .zip file is actually a bzip2-compressed
+tar archive. Build it with:
+  cd nomad.3.6.2 && cd install && ./install.sh
+  Copy ../bin/nomad to some directory in PATH. (Sadly, OPAL insists on
+  executing NOMAD simply as os.system('nomad ' + ...); it does not allow
+  specifying a path)
+
+Download OPAL from <https://github.com/dpo/opal>, or clone with
+  git clone https://github.com/dpo/opal.git
+Install OPAL into your user site directory:
+  cd opal && python setup.py install --user
+
+Copy the polynomial file from a c59 factorization to
+  scripts/opal-test/c59.polyselect2.poly
+Edit las_run.py so that build_dir variable points to your CADO build
+directory. A (very slow) automatic optimization of the 
+{a,r}{lambda,lim,pba} and I parameters can then be started with
+  python las_optimize.py
+
+The optimal parameters are written in a file nomad-solution.xxx.txt,
+in the order they are defined in las_declaration.py, for example:
+
+0.900000000000000 # alambda
+1.100000500679016 # rlambda
+1000000           # alim
+1000000           # rlim
+19                # lpba
+19                # lpbr
+23                # mfba
+21                # mfbr
+11                # I
+
+For larger numbers, you should also update the hard-coded parameters in
+las_declaration.py, especially if one of the optimized parameters equals
+one of its bounds defined in that file.

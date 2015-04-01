@@ -1,5 +1,7 @@
 How to set up MinGW for compiling CADO on a Windows Virtual machine
 
+NOTE: commonly encountered errors are at the end of this file.
+
 ==== System-wide installation and settings ====
 
 1. Set up a Windows virtual machine
@@ -26,6 +28,13 @@ mingw-get install mingw32-libgmp
 8a. Install the autotools: mingw-get install mingw32-autotools
 
 8b. Install the coreutils: mingw-get install msys-coreutils
+
+8c. Install a port of the GNU regex library for mingw (which is LGPL)
+    wget http://sourceforge.net/projects/mingw/files/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-dev.tar.gz/download
+    wget http://sourceforge.net/projects/mingw/files/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-bin.tar.gz/downloadg
+    (cd /c/Mingw ; tar xzf -) < mingw-libgnurx-2.5.1-dev.tar.gz
+    (cd /c/Mingw ; tar xzf -) < mingw-libgnurx-2.5.1-bin.tar.gz
+
 
 9. Download and install CMake from 
 http://www.cmake.org/cmake/resources/software.html
@@ -83,14 +92,26 @@ scripts/winlinks.sh
 ### local.sh start
 GMP=C:/MinGW
 CMAKE_GENERATOR="MSYS Makefiles"
+GF2X_CONFIGURE_EXTRA_FLAGS='--srcdir=../../../gf2x'
 ### local.sh end
 
 17. run
 make
 
-In case you get an error like:
+
+## Commonly encountered errors:
 
 > No rule to make target 'gf2x.lo', needed by 'libgf2x.la'
 
-then add --srcdir=... as configure option to gf2x (or wipe out the content of
-the build/<machine>/gf2x directory, and run there configure again).
+You forgot the "GF2X_CONFIGURE_EXTRA_FLAGS" bit in local.sh ; Once
+local.sh is fixed, you need to do "make cmake" , then "make".
+(alternatively, you may wipe out the content of the build/<machine>/gf2x
+directory, and run there configure again).
+
+
+> ./gf2x/gf2x_mul3.h:42:2: error: #error "This code needs sse-2 support"
+
+Redo steps 12, 14, and 15 above. (more info there
+http://mingw-users.1079350.n2.nabble.com/MinGW-s-awk-3-1-7-config-status-and-CRLF-issues-td7234195.html
+)
+

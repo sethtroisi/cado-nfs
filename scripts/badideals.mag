@@ -14,6 +14,7 @@ if assigned DEBUG then
     badinfofile := "";
     polyfile := "";
     mainp := "";
+    polys := [g, f];
 else
     lines := Split(Read(polyfile));
     f := ZP!0;
@@ -30,6 +31,22 @@ else
         c := StringToInteger(Split(l, " ")[2]);
         g +:= c*x^e;
     end for;
+    if f ne 0 then
+        polys:=[g, f];
+    else
+      polys:=[];
+      // try the new format if any
+      for l in lines do
+        if #l gt 4 and l[1..4] eq "poly" then
+	    // assuming l = "poly%d: c0,c1,..."
+	    tmp:=Split(l, ":");
+	    ind:=Split(tmp[1], "poly");
+	    ind:=StringToInteger(ind[2]);
+	    pol:=ZP![StringToInteger(x) : x in Split(tmp[2], ",")];
+	    polys[ind +1]:=pol;
+	end if;
+      end for;
+    end if;
 end if;
 
 /*
@@ -657,24 +674,22 @@ function NormalizeProjectiveElement(uv, pk)
     end if;
 end function;
 
-polys := [g, f];
-
-
 SBAD := "";
 SBADINFO := "";
 
 SBAD := Sprintf("%o# badideals for pol[0]=%o and pol[1]=%o\n", SBAD,
    polys[1], polys[2]);
 
-for side := 0 to 1 do
+for side := 0 to #polys-1 do
 
 f := polys[side+1];
 if Degree(f) eq 1 then continue; end if;
+SBADINFO := Sprintf("%o# bad ideals for poly[%o]=%o\n", SBADINFO, side, f);
 K<alpha>:=NumberField(f);
 
 d:=Discriminant(f)*LeadingCoefficient(f);
 fff := Factorization(d : ECMLimit:=100, MPQSLimit:=0);
-BadPrimes := [ x[1] : x in fff | x[2] gt 1];
+BadPrimes := [ x[1] : x in fff | x[2] gt 1 and x[1] le 10^6 ];
 
     /* This is only the debug part. Won't go in C */
 /*
@@ -877,21 +892,29 @@ else
         ell := fff[#fff][1];
     end if;
 
-    lcm := 1;
-    ff := Factorization(f, GF(ell));
-    for f in ff do
-        lcm := LCM(lcm, ell^Degree(f[1])-1);
-    end for;
+    smexp := [];
+    nmaps := [];
+    for side := 1 to #polys do 
+        f := polys[side];
+        lcm := 1;
+        ff := Factorization(f, GF(ell));
+        for f in ff do
+            lcm := LCM(lcm, ell^Degree(f[1])-1);
+        end for;
 
-    nr := #Roots(f, RealField());
-    nc := Degree(f)-nr;
-    assert IsEven(nc);
+        nr := #Roots(f, RealField());
+        nc := Degree(f)-nr;
+        assert IsEven(nc);
+        Append(~smexp, lcm);
+        Append(~nmaps, nr + (nc div 2) -1);
+    end for;
 
     SetColumns(0);
     printf "ell %o\n", ell;
-    printf "smexp %o\n", lcm;
-    printf "nmaps %o\n", nr + (nc div 2) -1;
-
+    for side:=1 to #polys do
+        printf "smexp%o %o\nnmaps%o %o\n", 
+	       		side-1, smexp[side], side-1, nmaps[side];
+    end for;
     exit;
 end if;
 

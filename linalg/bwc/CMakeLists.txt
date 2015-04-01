@@ -19,7 +19,7 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # target_link_libraries picks the static or shared ones...
 
 # This is a default setting
-set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2
+set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced threaded
@@ -86,18 +86,32 @@ set(bwc_base_sources
     intersections.c
     xvectors.c
     bw-common.c
-    bw-common-mpi.c
     async.c
     rolling.c
     matmul.c
     matmul_top.c
+    random_matrix.c
 )
 
+if(HAVE_CXX11 AND HAVE_HWLOC)
+set(bwc_base_sources
+    ${bwc_base_sources}
+    cpubinding.cpp
+    )
+install(FILES cpubinding.conf DESTINATION ${DATASUFFIX}/misc)
+endif(HAVE_CXX11 AND HAVE_HWLOC)
+
 add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
+
+target_link_libraries(bwc_base ${gmp_libname})
 
 if (HAVE_CURL)
 target_link_libraries(bwc_base curl)
 endif (HAVE_CURL)
+
+if(HAVE_CXX11 AND HAVE_HWLOC)
+target_link_libraries(bwc_base hwloc)
+endif(HAVE_CXX11 AND HAVE_HWLOC)
 
 
 set_target_properties(bwc_base PROPERTIES
@@ -129,29 +143,14 @@ install(TARGETS mf_bal RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
 add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
+set_property(TARGET random_matrix PROPERTY COMPILE_DEFINITIONS WANT_MAIN)
 
-# balancing.c itself is in fact standalone, and lightweight. We prefer to
-# avoid having the whole thing entangled with too many dependencies all
-# around, since all that split.c actually needs is very, very little.
-add_executable(split split.c bw-common.c balancing.c)
-
-add_executable(acollect acollect.c bw-common.c)
-
-install(TARGETS split acollect RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 
 target_link_libraries(random_matrix utils m)
 
-target_link_libraries(split utils)
-target_link_libraries(acollect utils)
-
-add_executable(bcast-file ${EXCLUDE_FROM_RELEASE_BUILD} bcast-file.c)
-set_target_properties(bcast-file PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
-
 ### bwc_mpfq
 
-set(bwc_abases u64k1 u64k2)
+set(bwc_abases u64k1 u64k2 u64k4)
 
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
 foreach(v ${bwc_abases})
@@ -288,21 +287,29 @@ if(ENABLE_SHARED)
 endif(ENABLE_SHARED)
 ### end matmul_mf
 
-macro(bwc_program v)
+macro(bwc_program_base v)
     add_executable(${v} ${ARGN})
-    install(TARGETS ${v} RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
     set_target_properties(${v} PROPERTIES
             LINKER_LANGUAGE CXX
             COMPILE_FLAGS "--mpi"
             LINK_FLAGS "--mpi")
         # -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${v} bwc_base)
+endmacro(bwc_program_base v)
+
+# The macro bwc_program_extra is mostly used by the binaries specific to
+# the git tree.
+macro(bwc_program_extra v)
+    bwc_program_base(${v} EXCLUDE_FROM_ALL ${ARGN})
+endmacro(bwc_program_extra)
+
+macro(bwc_program v)
+    bwc_program_base(${v} ${ARGN})
+    install(TARGETS ${v} RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 endmacro(bwc_program)
 
-bwc_program(build build.c)
-target_link_libraries(build matmul_mf)
-bwc_program(bench bench.c worker-threads.c)
-target_link_libraries(bench matmul_mf)
+bwc_program(acollect acollect.c)
+bwc_program(split split.c)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 bwc_program(prep prep.c xymats.c ../gauss.c)
 bwc_program(krylov krylov.c xymats.c xdotprod.c)
@@ -310,7 +317,6 @@ bwc_program(dispatch dispatch.c xymats.c xdotprod.c)
 bwc_program(mksol mksol.c xymats.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
-bwc_program(spmv_test spmv_test.c)
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION ${BINSUFFIX}/linalg/bwc)
 
@@ -320,17 +326,17 @@ link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 link_directories (${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs)
 
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/gf2x-fft)
-add_executable(lingen lingen_binary.cpp)
+add_executable(lingen lingen_binary.cpp tree_stats.c logline.c
+    lingen_qcode.c lingen_qcode_do.cpp)
 install(TARGETS lingen RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 target_link_libraries(lingen bwc_base utils gf2x-fft gf2x cantor128)
 add_dependencies(lingen gf2x-build)
 
+# It's ugly. FindOpenMP.cmake doesn't know how to differentiate between
+# required compile-time flags and required link-time flags...
 set_target_properties(lingen PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
-
-add_executable(short_matmul ${EXCLUDE_FROM_RELEASE_BUILD} short_matmul.c)
-target_link_libraries(short_matmul bwc_base)
+    COMPILE_FLAGS "--mpi ${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "--mpi ${OpenMP_CXX_FLAGS}")
 
 add_executable(cleanup cleanup.c ../blockmatrix.c ../bit_matrices.c
     ../gauss.c)
@@ -350,9 +356,9 @@ endif(WITH_MPIR)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(plingen_${v}_sources
         bw-common.c
-        bw-common-mpi.c
-        plingen.c
+        plingen.cpp
         plingen-tuning.cpp
+        tree_stats.c
         logline.c
         lingen-matpoly.c
         lingen-bigmatpoly.c
@@ -367,7 +373,12 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
             lingen-bigmatpoly-ft.c)
     endif(WITH_MPIR)
 
-    add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
+    # make plingen_pz a default target, but not the others.
+    if(v STREQUAL "pz")
+        add_executable(plingen_${v} ${plingen_${v}_sources})
+    else(v STREQUAL "pz")
+        add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
+    endif(v STREQUAL "pz")
 
     if(WITH_MPIR)
         target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)
@@ -381,9 +392,12 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
 endforeach(v)
 
 
+add_custom_target(bwc_matmul)
+add_dependencies(bwc_matmul ${all_matmul_libs})
 
 add_custom_target(bwc_full)
 add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
-    all_matmul_libs)
+    bwc_matmul)
 
+include(CMakeLists-nodist.txt OPTIONAL)

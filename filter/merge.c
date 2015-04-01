@@ -57,15 +57,16 @@ static void declare_usage(param_list pl)
                             "-forbw 0 (default " STR(DEFAULT_MERGE_RATIO) ")");
   param_list_decl_usage(pl, "coverNmax", "stop when c/N exceeds this value with"
                             " -forbw 3 (default " STR(DEFAULT_MERGE_COVERNMAX) ")");
-  param_list_decl_usage(pl, "itermax", "maximum number of columns that can be "
-                                       "removed (0 means no maximum)");
-  param_list_decl_usage(pl, "resume", "resume from history file (cf -itermax)");
+  param_list_decl_usage(pl, "nbmergemax", "Maximum number of merges that can "
+                                          "be done (default is no maximum)");
+  param_list_decl_usage(pl, "resume", "resume from history file");
   param_list_decl_usage(pl, "mkztype", "controls how the weight of a merge is "
                             "approximated (default " STR(DEFAULT_MERGE_MKZTYPE) ")");
   param_list_decl_usage(pl, "wmstmax", "controls until when a mst is used with "
                             "-mkztype 2 (default " STR(DEFAULT_MERGE_WMSTMAX) ")");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+  verbose_decl_usage(pl);
 }
 
 static void
@@ -127,6 +128,7 @@ main (int argc, char *argv[])
       usage (pl, argv0);
     }
     /* print command-line arguments */
+    verbose_interpret_parameters(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 

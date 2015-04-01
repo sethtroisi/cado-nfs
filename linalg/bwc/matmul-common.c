@@ -5,6 +5,7 @@
 #include "matmul-common.h"
 #include "params.h"
 #include "portability.h"
+#include "verbose.h"
 
 #define MM_COMMON_MAGIC 0xb0010002UL
 
@@ -68,7 +69,8 @@ FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm
         abort();
     }
 
-    printf("Saving %s to cache file %s\n", mm->locfile, mm->cachefile_name);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO))
+        printf("Saving %s to cache file %s\n", mm->locfile, mm->cachefile_name);
 
     MATMUL_COMMON_WRITE_ONE32(magic,f);
     MATMUL_COMMON_WRITE_ONE32(MM_COMMON_MAGIC,f);

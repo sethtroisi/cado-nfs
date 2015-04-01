@@ -1,9 +1,6 @@
-all: primedb buildchain
-
-FLAGS=-Wall -std=c99 -g
-
-primedb: primedb.c
-	gcc $(FLAGS) -o primedb primedb.c -lgmp
-
-buildchain: methods.c methods.h buildchain.c
-	gcc $(FLAGS) -o buildchain methods.c buildchain.c -lm
+TOP:=../..
+.NOTPARALLEL:
+# This makefile is a placeholder. Please have a look to $(TOP)/scripts/call_cmake.sh,
+# and (possibly) edit a file $(TOP)/local.sh to tweak your build preferences.
+all: ; +@$(TOP)/scripts/call_cmake.sh $@
+%: ; +@$(TOP)/scripts/call_cmake.sh $@

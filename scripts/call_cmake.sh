@@ -16,6 +16,10 @@ if [ "$up_path" = "$0" ] ; then
 elif [ "$up_path" = "" ] ; then
     up_path=./
 fi
+pwdP="pwd -P"
+if ! $pwdP >/dev/null 2>&1 ; then
+    pwdP=pwd
+fi
 called_from="`pwd`"
 absolute_path_of_source="`cd "$up_path" ; pwd`"
 relative_path_of_cwd="${called_from##$absolute_path_of_source}"
@@ -81,12 +85,19 @@ export PTHREADS
 export CURL
 export CURL_INCDIR
 export CURL_LIBDIR
+export HWLOC
+export HWLOC_INCDIR
+export HWLOC_LIBDIR
+export NUMA
+export NUMA_INCDIR
+export NUMA_LIBDIR
 export GF2X_CONFIGURE_EXTRA_FLAGS
 export CMAKE_DUMP_VARIABLES
 export ENABLE_SHARED
 export NO_PYTHON_CHECK
 export NO_SSE
 export NO_INLINE_ASSEMBLY
+export CHECKS_EXPENSIVE
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -113,6 +124,7 @@ if [ "$1" = "show" ] ; then
     echo "PTHREADS=\"$PTHREADS\""
     echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
     echo "ENABLE_SHARED=\"$ENABLE_SHARED\""
+    echo "CHECKS_EXPENSIVE=\"$CHECKS_EXPENSIVE\""
     exit 0
 fi
 
@@ -123,7 +135,7 @@ if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     echo "CMake not found" >&2
     cmake_path=
 # Recall that (some versions of) bash do not want quoting for regex patterns.
-elif ! [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.[89] ]] ; then
+elif [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ [012] ]] && ! [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.[89] ]] ; then
     echo "CMake found, but not with version 2.8 or newer" >&2
     cmake_path=
 fi
@@ -156,12 +168,13 @@ fi
 
 if [ "$1" = "cmake" ] || [ ! -f "$build_tree/Makefile" ] ; then
     mkdir -p "$build_tree"
+    absolute_path_of_build_tree="`cd "$build_tree" ; $pwdP`"
     if [ ! "x$CMAKE_GENERATOR" == "x" ] ; then
       CMAKE_GENERATOR_OPT="-G$CMAKE_GENERATOR"
     else
       unset CMAKE_GENERATOR_OPT
     fi
-    (cd "$build_tree" ; "$cmake_path" "$CMAKE_GENERATOR_OPT" "$absolute_path_of_source")
+    (cd "$absolute_path_of_build_tree" ; "$cmake_path" "$CMAKE_GENERATOR_OPT" "$absolute_path_of_source")
 fi
 
 if [ "$1" = "cmake" ] ; then
@@ -173,4 +186,5 @@ fi
 # --no-print-directory option -- but it's not the right cure here).
 # env | grep -i make
 unset MAKELEVEL
-(cd "$build_tree$relative_path_of_cwd" ; make "$@")
+absolute_path_of_build_tree="`cd "$build_tree" ; $pwdP`"
+(cd "$absolute_path_of_build_tree$relative_path_of_cwd" ; make "$@")

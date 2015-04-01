@@ -64,6 +64,7 @@ public:                                                                 \
 	inline size_t size() const {	        	                \
 		return CAT(Z,size)(o);	        			\
 	}								\
+        static inline const char * name() { return #visible; }          \
 };
 
 

@@ -13,7 +13,7 @@
 #ifdef HAVE_LINUX_BINFMTS_H
 /* linux/binfmts.h defines MAX_ARG_STRLEN in terms of PAGE_SIZE, but does not
    include a header where PAGE_SIZE is defined, so we include sys/user.h
-   as well. */
+   as well. Alas, on some systems, PAGE_SIZE is not defined even there. */
 #include <sys/user.h>
 #include <linux/binfmts.h>
 #endif
@@ -47,6 +47,11 @@ long get_arg_max(void)
      "sh" "-c" "actual_command", this limit is effectively the limit on the
      command line length. */
 #ifdef MAX_ARG_STRLEN
+  /* MAX_ARG_STRLEN may be defined in terms of PAGE_SIZE, but PAGE_SIZE may
+     not actually be defined in any header.  */
+#ifndef PAGE_SIZE
+  const unsigned int PAGE_SIZE = pagesize();
+#endif
   if ((size_t) arg_max > (size_t) MAX_ARG_STRLEN)
     arg_max = MAX_ARG_STRLEN;
 #endif
@@ -61,11 +66,14 @@ int has_suffix(const char * path, const char * sfx)
     return strcmp(path + lp - ls, sfx) == 0;
 }
 
-// given a path to a file (prefix), and a suffix called (what), returns
-// if the ext parameter is NULL, a malloced string equal to
-// (prefix).(what) ; if ext is non-null AND (ext) is already a suffix of
-// (prefix), say we have (prefix)=(prefix0)(ext), then we return
-// (prefix0).(what)(ext)
+// given a path to a file (prefix), and a suffix called (what), returns:
+// - if the ext parameter is NULL, return (prefix).(what) ;
+// - if ext is non-null AND (ext) is already a suffix of (prefix), say
+//   we have (prefix)=(prefix0)(ext), then we return (prefix0).(what)(ext)
+// - if ext is non-null AND (ext) is NOT a suffix of (prefix), 
+//   we return (prefix).(what)(ext)
+// In all cases the returned string is malloced, and must be freed by the
+// caller later.
 // It is typical to use ".bin" or ".txt" as ext parameters.
 char * derived_filename(const char * prefix, const char * what, const char * ext)
 {
@@ -265,4 +273,19 @@ char * path_resolve(const char * progname, char * resolved)
   }
   return NULL;
 }
+
+//  trivial utility
+const char *size_disp(size_t s, char buf[16])
+{
+    char *prefixes = "bkMGT";
+    double ds = s;
+    const char *px = prefixes;
+    for (; px[1] && ds > 500.0;) {
+	ds /= 1024.0;
+	px++;
+    }
+    snprintf(buf, 10, "%.1f%c", ds, *px);
+    return buf;
+}
+// 
 

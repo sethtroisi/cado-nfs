@@ -30,13 +30,13 @@
 /* Active handler: trivialities */
 /* Active handler: simd_char2 */
 /* Options used:{
-   family=[ u64k1, u64k2, ],
+   family=[ u64k1, u64k2, u64k4, ],
    k=1,
    tag=u64k1,
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
-     [ u64k1, u64k2, ],
+     [ u64k1, u64k2, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
@@ -51,8 +51,9 @@
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
-     u64k1=[ u64k1, u64k2, ],
-     u64k2=[ u64k1, u64k2, ],
+     u64k1=[ u64k1, u64k2, u64k4, ],
+     u64k2=[ u64k1, u64k2, u64k4, ],
+     u64k4=[ u64k1, u64k2, u64k4, ],
      },
     vc:includes=[ <stdarg.h>, ],
     },
@@ -119,13 +120,14 @@ extern "C" {
 #endif
 /* *Mpfq::defaults::code_for_impl_name */
 #define mpfq_u64k1_impl_name()	"u64k1"
-/* missing impl_max_characteristic_bits */
-/* missing impl_max_degree */
+/* *simd_char2::code_for_impl_max_characteristic_bits */
+#define mpfq_u64k1_impl_max_characteristic_bits()	2
+/* *simd_char2::code_for_impl_max_degree */
+#define mpfq_u64k1_impl_max_degree()	1
 
 /* Functions operating on the field structure */
 /* *simd_char2::code_for_field_characteristic */
 #define mpfq_u64k1_field_characteristic(K, z)	mpz_set_ui(z,2)
-/* missing field_characteristic_bits */
 /* *simd_u64k::code_for_field_degree */
 #define mpfq_u64k1_field_degree(f)	1
 static inline
@@ -145,19 +147,12 @@ void mpfq_u64k1_field_specify(mpfq_u64k1_dst_field, unsigned long, void *);
 /* Elementary assignment functions */
 static inline
 void mpfq_u64k1_set(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt, mpfq_u64k1_src_elt);
-/* missing set_ui */
 static inline
 void mpfq_u64k1_set_zero(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt);
-/* missing get_ui */
-/* missing set_mpn */
-/* missing set_mpz */
-/* missing get_mpn */
-/* missing get_mpz */
 
 /* Assignment of random values */
 static inline
 void mpfq_u64k1_random(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt, gmp_randstate_t);
-/* missing random2 */
 
 /* Arithmetic operations on elements */
 static inline
@@ -166,17 +161,6 @@ void mpfq_u64k1_add(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt, mpfq_u64k1_src_elt
 #define mpfq_u64k1_sub(K, r, s1, s2)	mpfq_u64k1_add(K,r,s1,s2)
 /* *simd_char2::code_for_neg */
 #define mpfq_u64k1_neg(K, r, s)	mpfq_u64k1_set(K,r,s)
-/* missing mul */
-/* missing sqr */
-/* missing is_sqr */
-/* missing sqrt */
-/* missing pow */
-/* missing powz */
-/* missing frobenius */
-/* missing add_ui */
-/* missing sub_ui */
-/* missing mul_ui */
-/* missing inv */
 
 /* Operations involving unreduced elements */
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */
@@ -189,21 +173,16 @@ static inline
 void mpfq_u64k1_elt_ur_set_elt(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt_ur, mpfq_u64k1_src_elt);
 static inline
 void mpfq_u64k1_elt_ur_set_zero(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt_ur);
-/* missing elt_ur_set_ui */
 static inline
 void mpfq_u64k1_elt_ur_add(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt_ur, mpfq_u64k1_src_elt_ur, mpfq_u64k1_src_elt_ur);
 /* *simd_char2::code_for_elt_ur_neg */
 #define mpfq_u64k1_elt_ur_neg(K, r, s)	mpfq_u64k1_elt_ur_set(K,r,s)
 /* *simd_char2::code_for_elt_ur_sub */
 #define mpfq_u64k1_elt_ur_sub(K, r, s1, s2)	mpfq_u64k1_elt_ur_add(K,r,s1,s2)
-/* missing mul_ur */
-/* missing sqr_ur */
-/* missing reduce */
 
 /* Comparison functions */
 static inline
 int mpfq_u64k1_cmp(mpfq_u64k1_dst_field, mpfq_u64k1_src_elt, mpfq_u64k1_src_elt);
-/* missing cmp_ui */
 static inline
 int mpfq_u64k1_is_zero(mpfq_u64k1_dst_field, mpfq_u64k1_src_elt);
 
@@ -239,7 +218,6 @@ void mpfq_u64k1_vec_rev(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k1_src
 static inline
 void mpfq_u64k1_vec_sub(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k1_src_vec, unsigned int);
 /* missing vec_scal_mul */
-/* missing vec_conv */
 static inline
 void mpfq_u64k1_vec_random(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, unsigned int, gmp_randstate_t);
 /* missing vec_random2 */
@@ -261,7 +239,7 @@ int mpfq_u64k1_vec_print(mpfq_u64k1_dst_field, mpfq_u64k1_src_vec, unsigned int)
 int mpfq_u64k1_vec_sscan(mpfq_u64k1_dst_field, mpfq_u64k1_vec *, unsigned int *, const char *);
 int mpfq_u64k1_vec_fscan(mpfq_u64k1_dst_field, FILE *, mpfq_u64k1_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */
-#define mpfq_u64k1_vec_scan(K, w, n)	mpfq_u64k1_vec_fscan(K,stdout,w,n)
+#define mpfq_u64k1_vec_scan(K, w, n)	mpfq_u64k1_vec_fscan(K,stdin,w,n)
 void mpfq_u64k1_vec_ur_init(mpfq_u64k1_dst_field, mpfq_u64k1_vec_ur *, unsigned int);
 static inline
 void mpfq_u64k1_vec_ur_set_zero(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec_ur, unsigned int);
@@ -284,7 +262,6 @@ void mpfq_u64k1_vec_ur_neg(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec_ur, mpfq_u64
 static inline
 void mpfq_u64k1_vec_ur_rev(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec_ur, mpfq_u64k1_src_vec_ur, unsigned int);
 /* missing vec_scal_mul_ur */
-/* missing vec_conv_ur */
 /* missing vec_reduce */
 static inline
 mpfq_u64k1_dst_vec_ur mpfq_u64k1_vec_ur_subvec(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec_ur, int);
@@ -300,36 +277,6 @@ mpfq_u64k1_src_elt mpfq_u64k1_vec_ur_coeff_ptr_const(mpfq_u64k1_dst_field, mpfq_
 #define mpfq_u64k1_vec_ur_elt_stride(K, n)	((n)*sizeof(mpfq_u64k1_elt_ur))
 
 /* Polynomial functions */
-/* missing poly_init */
-/* missing poly_clear */
-/* missing poly_set */
-/* missing poly_setmonic */
-/* missing poly_setcoeff */
-/* missing poly_setcoeff_ui */
-/* missing poly_getcoeff */
-/* missing poly_deg */
-/* missing poly_add */
-/* missing poly_sub */
-/* missing poly_set_ui */
-/* missing poly_add_ui */
-/* missing poly_sub_ui */
-/* missing poly_neg */
-/* missing poly_scal_mul */
-/* missing poly_mul */
-/* missing poly_divmod */
-/* missing poly_precomp_mod */
-/* missing poly_mod_pre */
-/* missing poly_gcd */
-/* missing poly_xgcd */
-/* missing poly_random */
-/* missing poly_random2 */
-/* missing poly_cmp */
-/* missing poly_asprint */
-/* missing poly_fprint */
-/* missing poly_print */
-/* missing poly_sscan */
-/* missing poly_fscan */
-/* missing poly_scan */
 
 /* Functions related to SIMD operation */
 /* *simd_u64k::code_for_groupsize */
@@ -359,9 +306,9 @@ MPI_Op mpfq_u64k1_mpi_addition_op_ur(mpfq_u64k1_dst_field);
 void mpfq_u64k1_mpi_ops_clear(mpfq_u64k1_dst_field);
 
 /* Object-oriented interface */
+void mpfq_u64k1_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_u64k1_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_u64k1_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -735,6 +682,8 @@ void mpfq_u64k1_elt_ur_set_ui_all(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k
         }
 }
 
+/* Mpfq::engine::oo::oo_field_clear */
+/* Triggered by: oo */
 static inline
 void mpfq_u64k1_oo_field_clear(mpfq_vbase_ptr f)
 {

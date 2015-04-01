@@ -10,7 +10,7 @@
 #include "params.h"
 #include "xvectors.h"
 #include "xymats.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
@@ -35,16 +35,11 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, bw->n,
             MPFQ_DONE);
-    mpz_clear(p);
-
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
@@ -119,30 +114,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
          * better.
          */
 
-        if (pi->m->trank == 0) {
-            const char * filename = Y_FILE_BASE ".0";
-
-            void * y;
-            A->vec_init(A, &y, mmt->n[bw->dir]);
-            A->vec_set_zero(A, y, mmt->n[bw->dir]);
-            /* Again, important. Generate zero coordinates for padding !
-             * This provides reproducibility of random choices.
-             */
-            if (pi->m->jrank == 0)
-                A->vec_random(A, y, mmt->n0[bw->dir], rstate);
-            int err = MPI_Bcast(y,
-                    mmt->n[bw->dir],
-                    A->mpi_datatype(A),
-                    0, pi->m->pals);
-            ASSERT_ALWAYS(!err);
-            FILE * f = fopen(filename, "wb");
-            ASSERT_ALWAYS(f);
-            int rc = fwrite(y, A->vec_elt_stride(A,1), unpadded, f);
-            ASSERT_ALWAYS(rc == (int) unpadded);
-            fclose(f);
-            A->vec_clear(A, &y, mmt->n[bw->dir]);
-        }
-        matmul_top_load_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded);
+        matmul_top_set_random_and_save_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded, rstate);
 
         if (tcan_print) {
             printf("// vector generated and dispatched (trial # %u)\n", ntri);
@@ -232,37 +204,197 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     A->oo_field_clear(A);
 
-
     free(xvecs);
     return NULL;
 }
 
-void usage()
+/* The GF(p) case is significantly different:
+ *  - this is *NOT* a parallel program, although we're happy to use the
+ *    same tools as everywhere else for some common operations, namely
+ *    the matmul_top layer.
+ *  - we do *NOT* perform the * consistency check.
+ *  - and we possibly inject the RHS in the data produced.
+ */
+void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    fprintf(stderr, "Usage: ./prep <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix\n");
-    exit(1);
+    /* Interleaving does not make sense for this program. So the second
+     * block of threads just leave immediately */
+    if (pi->interleaved && pi->interleaved->idx)
+        return NULL;
+
+
+    matmul_top_data mmt;
+
+    int flags[2];
+    flags[bw->dir] = THREAD_SHARED_VECTOR;
+    flags[!bw->dir] = 0;
+
+    unsigned int nrhs = 0;
+
+    mpfq_vbase A;
+    mpfq_vbase_oo_field_init_byfeatures(A, 
+            MPFQ_PRIME_MPZ, bw->p,
+            MPFQ_GROUPSIZE, 1,
+            MPFQ_DONE);
+
+    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+
+    if (pi->m->trank || pi->m->jrank) {
+        /* as said above, this is *NOT* a parallel program.  */
+        goto leave_prep_prog_gfp;
+    }
+
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+
+    if (pi->m->trank == 0 && !bw->seed) {
+        /* note that bw is shared between threads, thus only thread 0 should
+         * test and update it here.
+         * at pi->m->jrank > 0, we don't care about the seed anyway
+         */
+        bw->seed = time(NULL);
+        MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
+    }
+
+    gmp_randseed_ui(rstate, bw->seed);
+    printf("// Random generator seeded with %d\n", bw->seed);
+
+    const char * rhs_name = param_list_lookup_string(pl, "rhs");
+    FILE * rhs = NULL;
+    if (rhs_name) {
+        rhs = fopen(rhs_name, "r");
+        get_rhs_file_header_stream(rhs, NULL, &nrhs, NULL);
+        ASSERT_ALWAYS(rhs != NULL);
+    }
+
+    /* First create all RHS vectors -- these are just splits of the big
+     * RHS block. Those files get created together. */
+    if (nrhs) {
+        char ** vec_names = malloc(nrhs * sizeof(char *));
+        FILE ** vec_files = malloc(nrhs * sizeof(FILE *));
+        for(unsigned int j = 0 ; j < nrhs ; j++) {
+            int rc = asprintf(&vec_names[j], V_FILE_BASE_PATTERN ".0", j, j+1);
+            ASSERT_ALWAYS(rc >= 0);
+            vec_files[j] = fopen(vec_names[j], "wb");
+            ASSERT_ALWAYS(vec_files[j] != NULL);
+            printf("// Creating %s (extraction from %s)\n", vec_names[j], rhs_name);
+        }
+        void * coeff;
+        A->vec_init(A, &coeff, 1);
+        mpz_t c;
+        mpz_init(c);
+        for(unsigned int i = 0 ; i < mmt->n0[!bw->dir] ; i++) {
+            for(unsigned int j = 0 ; j < nrhs ; j++) {
+                int rc;
+                memset(coeff, 0, A->vec_elt_stride(A, 1));
+                rc = gmp_fscanf(rhs, "%Zd", c);
+                ASSERT_ALWAYS(rc == 1);
+                A->set_mpz(A, A->vec_coeff_ptr(A, coeff, 0), c);
+                rc = fwrite(coeff, A->vec_elt_stride(A,1), 1, vec_files[j]);
+                ASSERT_ALWAYS(rc == 1);
+            }
+        }
+        mpz_clear(c);
+        A->vec_clear(A, &coeff, 1);
+        for(unsigned int j = 0 ; j < nrhs ; j++) {
+            fclose(vec_files[j]);
+            free(vec_names[j]);
+        }
+        free(vec_files);
+        free(vec_names);
+    }
+    /* Now create purely random vectors */
+    for(int j = (int) nrhs ; j < bw->n ; j++) {
+        void * vec;
+        char * vec_name;
+        FILE * vec_file;
+        int rc = asprintf(&vec_name, V_FILE_BASE_PATTERN ".0", j, j+1);
+        ASSERT_ALWAYS(rc >= 0);
+        vec_file = fopen(vec_name, "wb");
+        ASSERT_ALWAYS(vec_file != NULL);
+        printf("// Creating %s\n", vec_name);
+        A->vec_init(A, &vec, mmt->n0[!bw->dir]);
+        A->vec_random(A, vec, mmt->n0[!bw->dir], rstate);
+        rc = fwrite(vec, A->vec_elt_stride(A,1), mmt->n0[!bw->dir], vec_file);
+        ASSERT_ALWAYS(rc >= 0 && ((unsigned int) rc) == mmt->n0[!bw->dir]);
+        A->vec_clear(A, &vec, mmt->n0[!bw->dir]);
+        fclose(vec_file);
+        free(vec_name);
+    }
+
+
+    gmp_randclear(rstate);
+
+    {
+        /* initialize x -- make it completely deterministic. */
+        unsigned int my_nx = 1;
+        uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
+        /* with rhs, consider the strategy where the matrix is kept with
+         * its full size, but the SM block is replaced with zeros. Here
+         * we just force the x vectors to have data there, so as to avoid
+         * the possibility that a solution vector found by BW still has
+         * non-zero coordinates at these locations.
+         */
+        if (bw->m < (int) nrhs) {
+            fprintf(stderr, "m < nrhs is not supported\n");
+            exit(EXIT_FAILURE);
+        }
+        for(unsigned int i = 0 ; i < nrhs ; i++) {
+            xvecs[i] = balancing_pre_shuffle(mmt->bal, mmt->n0[!bw->dir]-nrhs+i);
+            printf("Forced %d-th x vector to be the %" PRIu32"-th canonical basis vector\n", i, xvecs[i]);
+            ASSERT_ALWAYS(xvecs[i] >= (uint32_t) (bw->m - nrhs));
+        }
+        for(int i = (int) nrhs ; i < bw->m ; i++) {
+            xvecs[i] = i - nrhs;
+        }
+        /* save_x operates only on the leader thread */
+        save_x(xvecs, bw->m, my_nx, pi);
+        free(xvecs);
+    }
+
+leave_prep_prog_gfp:
+    matmul_top_clear(mmt);
+    A->oo_field_clear(A);
+    return NULL;
 }
 
 int main(int argc, char * argv[])
 {
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
-    
-    pi_go(prep_prog, pl, 0);
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches */
+    param_list_decl_usage(pl, "rhs",
+            "file with the right-hand side vectors for inhomogeneous systems mod p");
 
-    param_list_remove_key(pl, "sequential_cache_build");
-    param_list_remove_key(pl, "rebuild_cache");
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters: none here (so far). */
+    if (mpz_cmp_ui(bw->p, 2) != 0)
+        param_list_lookup_string(pl, "rhs");
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    if (mpz_cmp_ui(bw->p, 2) == 0) {
+        pi_go(prep_prog, pl, 0);
+    } else {
+        pi_go(prep_prog_gfp, pl, 0);
+    }
 
     param_list_clear(pl);
+    bw_common_clear_new(bw);
 
-    bw_common_clear_mpi(bw);
     return 0;
 }
 

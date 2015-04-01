@@ -83,6 +83,9 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}")
 set (CMAKE_C_FLAGS      "${CMAKE_C_FLAGS} ${CMAKE_FLAGS_SIZE}")
 set (CMAKE_CXX_FLAGS    "${CMAKE_CXX_FLAGS} ${CMAKE_FLAGS_SIZE}")
 
+# oh my... this is really ugly. I'd love to have more usable control
+# structures in cmake...
+
 if(CMAKE_COMPILER_IS_GNUCC)
     # gcc defines __STRICT_ANSI__ with -std=c99, which under MinGW
     # causes many prototypes and macros not to be defined. Using gnu99
@@ -91,12 +94,41 @@ if(CMAKE_COMPILER_IS_GNUCC)
     # Ditto for C++, with the c++98/gnu++98 subtlety.
     if (MINGW)
         set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
-        set (CMAKE_CXX_FLAGS "-std=gnu++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
     else (MINGW)
         set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
-        set (CMAKE_CXX_FLAGS "-std=c++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
     endif (MINGW)
 endif(CMAKE_COMPILER_IS_GNUCC)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
+    else (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
+        # only gcc-4.8 is supposed to be c++11-complete. BUt for what we
+        # use, that'll be ok.
+        message(STATUS "Enabling C++11 support")
+        set(HAVE_CXX11 1)
+    endif (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
+    if(HAVE_CXX11)
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
+        if(MINGW)
+            set (CMAKE_CXX_FLAGS "-std=gnu++11 -g -W -Wall ${CMAKE_CXX_FLAGS}")
+        else(MINGW)
+            set (CMAKE_CXX_FLAGS "-std=c++11 -g -W -Wall ${CMAKE_CXX_FLAGS}")
+        endif(MINGW)
+    else (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
+        if(MINGW)
+            set (CMAKE_CXX_FLAGS "-std=gnu++11 -g -W -Wall -Wno-literal-suffix ${CMAKE_CXX_FLAGS}")
+        else(MINGW)
+            set (CMAKE_CXX_FLAGS "-std=c++11 -g -W -Wall -Wno-literal-suffix ${CMAKE_CXX_FLAGS}")
+        endif(MINGW)
+    endif (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
+    else(HAVE_CXX11)
+        if(MINGW)
+            set (CMAKE_CXX_FLAGS "-std=gnu++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
+        else(MINGW)
+            set (CMAKE_CXX_FLAGS "-std=c++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
+        endif(MINGW)
+    endif(HAVE_CXX11)
+endif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+
 
 #####################################################################
 # Set dependencies for external software.
@@ -145,6 +177,8 @@ include("${CADO_NFS_SOURCE_DIR}/config/test-rand.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/odd_address_io_int.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/strlcpy.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/linux.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/hwloc.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/numa.cmake")
 IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
@@ -189,6 +223,7 @@ endif(ENABLE_SHARED)
 
 include (${CADO_NFS_SOURCE_DIR}/config/pthreads.cmake)
 include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
+include (${CADO_NFS_SOURCE_DIR}/config/openmp.cmake)
 
 message(STATUS "Using libs: ${math_libs} (math) ${pthread_libs} (pthreads)")
 
@@ -283,7 +318,7 @@ configure_file(
 # Copy magma scripts, to make our life easier; this should be removed 
 # once everything will be rewritten in C.
 foreach(script magma-linalg-wrapper.sh magma-nmbrthry-wrapper.sh
-        badideals.mag  linalg.mag magma-sm-wrapper.sh nfsunits.mag)
+        badideals.mag  linalg.mag magma-sm-wrapper.sh nfsunits.mag split.py)
     configure_file(
         ${CADO_NFS_SOURCE_DIR}/scripts/${script}
         ${CADO_NFS_BINARY_DIR}/scripts/${script}
@@ -300,3 +335,7 @@ message(STATUS "Data will go to ${CMAKE_INSTALL_PREFIX}/${DATASUFFIX}")
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
   include("${CADO_NFS_SOURCE_DIR}/config/variables.cmake")
 ENDIF(DEFINED ENV{CMAKE_DUMP_VARIABLES})
+
+if(MINGW)
+    message(STATUS "Please look up dev_docs/howto-MinGW.txt in the git tree for our mingw testing configuration, and frequently encountered errors")
+endif(MINGW)

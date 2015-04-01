@@ -16,7 +16,7 @@ tasks.threads = 2
 
 tasks.polyselect.degree = 5
 
-tasks.polyselect.P = 20000
+tasks.polyselect.P = 10000
 tasks.polyselect.admax = 4e5
 tasks.polyselect.adrange = 4e3
 tasks.polyselect.incr = 60
@@ -27,18 +27,20 @@ tasks.polyselect.nrkeep = 100
 # Sieve
 ###########################################################################
 
-rlim = 4000000
-alim = 8000000
-lpbr = 27
-lpba = 27
+rlim = 2371302
+alim = 3837507
+lpbr = 26
+lpba = 26
 tasks.sieve.mfbr = 54
-tasks.sieve.mfba = 54
-tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.2
-
+tasks.sieve.mfba = 53
+tasks.sieve.rlambda = 2.18
+tasks.sieve.alambda = 2.14
+tasks.sieve.ncurves0 = 6
+tasks.sieve.ncurves1 = 9
 tasks.I = 12
-tasks.sieve.qrange = 5000
-tasks.sieve.rels_wanted = 13000000
+
+tasks.sieve.qrange = 10000
+tasks.sieve.rels_wanted = 7400000
 
 ###########################################################################
 # Filtering
@@ -55,7 +57,8 @@ tasks.filter.merge.forbw = 3
 
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.m = 64
+tasks.linalg.bwc.n = 64
 tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################

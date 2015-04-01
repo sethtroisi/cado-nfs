@@ -32,7 +32,7 @@ size_t mpi_source_get(mpi_source_ptr s, uint32_t ** p, size_t avail)
     } sz_info[1];
     ASSERT_ALWAYS(sizeof(sz_info) == s->tailsize * sizeof(uint32_t));
     MPI_Recv(*p, s->size * sizeof(uint32_t), MPI_BYTE,
-            s->peer, MPI_ANY_TAG, MPI_COMM_WORLD, &x);
+            s->peer, MPI_ANY_TAG, s->comm, &x);
     memcpy(sz_info, *p + s->size - s->tailsize, sizeof(sz_info));
     s->over += sz_info->over != 0;
 
@@ -48,13 +48,14 @@ size_t mpi_source_get(mpi_source_ptr s, uint32_t ** p, size_t avail)
     return sz_info->sz;
 }
 
-data_source_ptr mpi_source_alloc(int peer, size_t queue_size)
+data_source_ptr mpi_source_alloc(MPI_Comm comm, int peer, size_t queue_size)
 {
     mpi_source_ptr s = malloc(sizeof(mpi_source));
     memset(s, 0, sizeof(mpi_source));
     s->b->get = (size_t(*)(void*,uint32_t**,size_t)) mpi_source_get;
     s->tag = 0;
     s->peer = peer;
+    s->comm = comm;
     s->size = queue_size;
     s->nparallel = 1;   // at least we have a default value...
     ASSERT_ALWAYS(sizeof(size_t) % sizeof(uint32_t) == 0);

@@ -4,6 +4,7 @@
  * in fact is of type power_lookup_table
  */
 #include "cado.h"
+#include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <cstdlib>
 #include <cstdio>
 #include <map>

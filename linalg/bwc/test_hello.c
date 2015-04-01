@@ -34,6 +34,7 @@ int main(int argc, char * argv[])
 {
     MPI_Init(&argc, &argv);
     param_list pl;
+    pi_outer_info poi;
 
     int rank;
     int size;
@@ -42,6 +43,7 @@ int main(int argc, char * argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     param_list_init (pl);
+    pi_outer_info_init(poi);
     argv++, argc--;
     param_list_configure_switch(pl, "-v", &verbose);
     for( ; argc ; ) {
@@ -50,11 +52,8 @@ int main(int argc, char * argv[])
         usage();
     }
 
-    int mpi_split[2] = {1,1,};
-    int thr_split[2] = {1,1,};
-
-    param_list_parse_intxint(pl, "mpi", mpi_split);
-    param_list_parse_intxint(pl, "thr", thr_split);
+    pi_interpret_parameters(poi, pl);
+    param_list_lookup_string(pl, "cpubinding");
 
     if (verbose)
         param_list_display (pl, stderr);
@@ -62,11 +61,11 @@ int main(int argc, char * argv[])
         usage();
     }
 
-    pi_go(program, pl, 0);
+    pi_go(poi, program, pl, 0);
 
     MPI_Finalize();
 
-    // param_list_save(pl, "bw-prep.cfg");
+    pi_outer_info_clear(poi);
     param_list_clear(pl);
 
     return 0;

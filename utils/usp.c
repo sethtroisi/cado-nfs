@@ -586,12 +586,15 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   mpz_poly_t P;
   unsigned int count = MAX_LOOPS + 1;
   
+  a = ldexp (mpz_get_d (r[0].a), -r[0].ka); /* a/2^ka */
+  b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
+  if (a == b) /* might be the case for an exact root a/2^k */
+    return a;
+
   P->coeff = p;
   P->deg = n;
   double_poly_init (q, n);
   double_poly_set_mpz_poly (q, P);
-  a = ldexp (mpz_get_d (r[0].a), -r[0].ka); /* a/2^ka */
-  b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
   sa = double_poly_eval (q, a);
   sb = double_poly_eval (q, b);
   ASSERT_ALWAYS (sa * sb < 0.0);

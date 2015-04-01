@@ -45,7 +45,6 @@ typedef struct {
   /* used to decide global bounds */
   double init_lognorm;
   double bound_lognorm;
-  double bound_lognorm_ratio;
   double exp_min_alpha;
 } _ropt_bound_t;
 typedef _ropt_bound_t ropt_bound_t[1];
@@ -118,7 +117,6 @@ typedef struct {
   /* quadratic rotation bound */
   int w_left_bound;
   int w_length;
-  int w_flag;
 
   /* stage 1 parameters */
   unsigned short s1_num_e_sl;
@@ -149,7 +147,10 @@ typedef struct {
   int skip_ropt;
 
   /* skip ropt and output polynomial with short c5 */
-  int skip_ropt2;
+  int gen_raw;
+
+  /* do sopt if true; default not */
+  int sopt;
 
   /* verbose */
   int verbose;

@@ -6,10 +6,11 @@
 #include "select_mpi.h"
 #include "params.h"
 #include "xvectors.h"
-#include "bw-common-mpi.h"
+#include "bw-common.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "async.h"
 #include "portability.h"
 
 /*
@@ -86,6 +87,8 @@ void save_untwisted_transposed_vector(matmul_top_data_ptr mmt, const char * name
 
 void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
+
     /* Interleaving does not make sense for this program. So the second
      * block of threads just leave immediately */
     if (pi->interleaved && pi->interleaved->idx)
@@ -102,17 +105,13 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     flags[bw->dir] = 0;
 
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
-    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
-    mpz_clear(p);
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
@@ -132,7 +131,12 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     uint32_t * gxvecs = NULL;
     unsigned int nx = 0;
 
-    load_x(&gxvecs, bw->m, &nx, mmt->pi);
+    if (!fake) {
+        load_x(&gxvecs, bw->m, &nx, pi);
+    } else {
+        set_x_fake(&gxvecs, bw->m, &nx, pi);
+    }
+
 
     xvec_to_vec(mmt, gxvecs, MIN(nchecks, bw->m), nx, !bw->dir);
 
@@ -216,30 +220,35 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 }
 
 
-void usage()
-{
-    fprintf(stderr, "Usage: ./secure <options>\n");
-    fprintf(stderr, "%s", bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval\n");
-    fprintf(stderr, "Note: data files must be found in wdir !\n");
-    exit(1);
-}
-
 int main(int argc, char * argv[])
 {
     param_list pl;
+
+    bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
-    bw_common_init_mpi(bw, pl, &argc, &argv);
-    if (param_list_warn_unused(pl)) usage();
 
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
+    bw_common_decl_usage(pl);
+    parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches: none here (so far). */
 
+    bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    bw_common_interpret_parameters(bw, pl);
+    parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
+    /* interpret our parameters */
+    catch_control_signals();
+
+    if (param_list_warn_unused(pl)) {
+        param_list_print_usage(pl, bw->original_argv[0], stderr);
+        exit(EXIT_FAILURE);
+    }
 
     pi_go(sec_prog, pl, 0);
 
     param_list_clear(pl);
-    bw_common_clear_mpi(bw);
+    bw_common_clear_new(bw);
     return 0;
 }
 

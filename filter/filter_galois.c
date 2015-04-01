@@ -267,6 +267,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "nrels", "(approximate) number of input relations");
+  verbose_decl_usage(pl);
 }
 
 static void
@@ -305,6 +306,7 @@ main (int argc, char *argv[])
     break;
   }
   /* print command-line arguments */
+  verbose_interpret_parameters(pl);
   param_list_print_command_line (stdout, pl);
   fflush(stdout);
 
