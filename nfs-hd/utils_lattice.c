@@ -645,3 +645,74 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
   int64_vector_clear(e1);
 }
 
+void plane_sieve_next_plane(int64_vector_ptr vs, list_vector_srcptr SV,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
+{
+  list_vector_t list_vector_tmp;
+  list_vector_init(list_vector_tmp);
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, SV->v[0]->dim);
+  /*
+   * 0: in the sieving region.
+   * 1: in [-H_0, H_0[
+   * 2: outside
+   */
+  unsigned char * assert = malloc(sizeof(unsigned char) * SV->length);
+  unsigned char found = 2;
+
+  for (unsigned int i = 0; i < SV->length; i++) {
+    int64_vector_add(v_tmp, vs, SV->v[i]);
+    list_vector_add_int64_vector(list_vector_tmp, v_tmp);
+
+    if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
+      if (-(int64_t) H->h[1] <= v_tmp->c[1] && (int64_t)H->h[1] > v_tmp->c[1])
+      {
+        assert[i] = 0;
+        found = 0;
+      } else {
+        assert[i] = 1;
+        if (found > 1) {
+          found = 1;
+        }
+      }
+    } else {
+      assert[i] = 2;
+    }
+  }
+  int64_vector_clear(v_tmp);
+
+  unsigned int pos = 0;
+  if (found == 0) {
+    int64_t min = -1;
+    for (unsigned int i = 1; i < list_vector_tmp->length; i++) {
+      if (assert[i] == 0) {
+        int64_t tmp= ABS(vs->c[0] - list_vector_tmp->v[i]->c[0]);
+        if (min == -1) {
+          min = tmp;
+        }
+        if (min >= tmp) {
+          min = tmp;
+          pos = i;
+        }
+      }
+    }
+    int64_vector_set(vs, list_vector_tmp->v[pos]);
+    ASSERT(vs->c[0] < (int64_t)H->h[0]);
+    ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+  } else if (found == 1) {
+    pos = find_min_x(list_vector_tmp, H, assert, 1);
+    int64_vector_set(vs, list_vector_tmp->v[pos]);
+    ASSERT(vs->c[0] < (int64_t)H->h[0]);
+    ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+  } else {
+    ASSERT(found == 2);
+    pos = find_min_x(list_vector_tmp, H, assert, 2);
+    int64_vector_set(vs, list_vector_tmp->v[pos]);
+    add_FK_vector(vs, e0, e1, H);
+    ASSERT(vs->c[0] < (int64_t)H->h[0]);
+    ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+  }
+
+  free(assert);
+  list_vector_clear(list_vector_tmp);
+}

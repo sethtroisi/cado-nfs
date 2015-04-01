@@ -830,6 +830,123 @@ void line_sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
 }
 
 /*
+ * Perform the plane sieve in all the plane z = v->c[2].
+ * Two different signature: if PLANE_SIEVE_STARTING_POINT is set, vs can be
+ *  updated if an other vector has an x coordinate closer to zero.
+ *
+ * array: the array in which we store the norm.
+ * vs: starting point vector.
+ * e0: a vector of the Franke-Kleinjung algorithm, e0->c[0] < 0.
+ * e1: a vector of the Franke-Kleinjung algorithm, e1->c[0] > 0.
+ * coord_e0: deplacement in array given by e0.
+ * coord_e1: deplacement in array given by e1.
+ * H: sieving bound that give the sieving region.
+ * r: the ideal we consider.
+ * matrix: MqLLL.
+ * f: the polynomial that defines the number field.
+ */
+#ifdef PLANE_SIEVE_STARTING_POINT
+void plane_sieve_1_enum_plane(array_ptr array, int64_vector_ptr vs,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, uint64_t coord_e0,
+    uint64_t coord_e1, sieving_bound_srcptr H, ideal_1_srcptr r, MAYBE_UNUSED
+    mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
+#else
+void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, uint64_t coord_e0,
+    uint64_t coord_e1, sieving_bound_srcptr H, ideal_1_srcptr r, MAYBE_UNUSED
+    mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
+#endif // PLANE_SIEVE_STARTING_POINT
+{
+  int64_vector_t v;
+  int64_vector_init(v, vs->dim);
+  int64_vector_set(v, vs);
+
+#ifdef PLANE_SIEVE_STARTING_POINT
+  int64_vector_t vs_tmp;
+  int64_vector_init(vs_tmp, vs->dim);
+  int64_vector_set(vs_tmp, vs);
+#endif // PLANE_SIEVE_STARTING_POINT
+
+  unsigned int FK_value = 0;
+  //1 if we have v was in the sieving region, 0 otherwise.
+  unsigned int flag_sr = 0;
+  uint64_t index_v = 0;
+
+  //Perform Franke-Kleinjung enumeration.
+  //x increases.
+  while (v->c[1] < (int64_t)H->h[1]) {
+    if (v->c[1] >= -(int64_t)H->h[1]) {
+      if (!flag_sr) {
+        ASSERT(flag_sr == 0);
+        index_v = array_int64_vector_index(v, H, array->number_element);
+        flag_sr = 1;
+      } else {
+        ASSERT(flag_sr == 1);
+        if (FK_value == 0) {
+          index_v = index_v + coord_e0;
+        } else if (FK_value == 1) {
+          index_v = index_v + coord_e1;
+        } else {
+          ASSERT(FK_value == 2);
+          index_v = index_v + coord_e0 + coord_e1;
+        }
+      }
+      array->array[index_v] = array->array[index_v] - r->log;
+
+      mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+
+    }
+#ifdef PLANE_SIEVE_STARTING_POINT
+    if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
+      int64_vector_set(vs_tmp, v);
+    }
+#endif // PLANE_SIEVE_STARTING_POINT
+    FK_value = enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2 * (int64_t)
+        H->h[0]);
+  }
+
+  //x decreases.
+  flag_sr = 0;
+  int64_vector_set(v, vs);
+  FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
+      (int64_t)H->h[0]);
+  while (v->c[1] >= -(int64_t)H->h[1]) {
+    if (v->c[1] < (int64_t)H->h[1]) {
+      if (!flag_sr) {
+        index_v = array_int64_vector_index(v, H, array->number_element);
+        flag_sr = 1;
+      } else {
+        if (FK_value == 0) {
+          index_v = index_v - coord_e0;
+        } else if (FK_value == 1) {
+          index_v = index_v - coord_e1;
+        } else {
+          ASSERT(FK_value == 2);
+          index_v = index_v - coord_e0 - coord_e1;
+        }
+      }
+      array->array[index_v] = array->array[index_v] - r->log;
+
+      mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+
+    }
+#ifdef PLANE_SIEVE_STARTING_POINT
+    if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
+      int64_vector_set(vs_tmp, v);
+    }
+#endif // PLANE_SIEVE_STARTING_POINT
+    FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
+        (int64_t) H->h[0]);
+  }
+#ifdef PLANE_SIEVE_STARTING_POINT
+  int64_vector_set(vs, vs_tmp);
+  int64_vector_clear(vs_tmp);
+#endif // PLANE_SIEVE_STARTING_POINT
+
+  int64_vector_clear(v);
+}
+
+/*
  * Plane sieve.
  *
  * array: the array in which we store the norms.
@@ -886,159 +1003,21 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
   int64_vector_t vs;
   int64_vector_init(vs, e0->dim);
   int64_vector_set_zero(vs);
-  int64_vector_t v;
-  int64_vector_init(v, vs->dim);
-
-  int64_vector_t vs_tmp;
-  int64_vector_init(vs_tmp, vs->dim);
 
   uint64_t coord_e0 = 0, coord_e1 = 0;
   coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H, array->number_element);
 
   //Enumerate the element of the sieving region.
   for (unsigned int d = 0; d < H->h[2]; d++) {
-    int64_vector_set(v, vs);
-    int64_vector_set(vs_tmp, vs);
-
-    unsigned int FK_value = 0;
-    //Say if we have a vector in the sieving region.
-    unsigned int flag_sr = 0;
-    uint64_t index_v = 0;
-
-    //Perform Franke-Kleinjung enumeration.
-    while (v->c[1] < (int64_t)H->h[1]) {
-      if (v->c[1] >= -(int64_t)H->h[1]) {
-        if (!flag_sr) {
-          index_v = array_int64_vector_index(v, H, array->number_element);
-          flag_sr = 1;
-        } else {
-          if (FK_value == 0) {
-            index_v = index_v + coord_e0;
-          } else if (FK_value == 1) {
-            index_v = index_v + coord_e1;
-          } else {
-            ASSERT(FK_value == 2);
-            index_v = index_v + coord_e0 + coord_e1;
-          }
-        }
-        array->array[index_v] = array->array[index_v] - r->log;
-
-        mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
-
-      }
-      if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
-        int64_vector_set(vs_tmp, v);
-      }
-      FK_value = enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2 * (int64_t)
-          H->h[0]);
-    }
-
-    flag_sr = 0;
-    int64_vector_set(v, vs);
-    FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
-        (int64_t)H->h[0]);
-    while (v->c[1] >= -(int64_t)H->h[1]) {
-      if (v->c[1] < (int64_t)H->h[1]) {
-        if (!flag_sr) {
-          index_v = array_int64_vector_index(v, H, array->number_element);
-          flag_sr = 1;
-        } else {
-          if (FK_value == 0) {
-            index_v = index_v - coord_e0;
-          } else if (FK_value == 1) {
-            index_v = index_v - coord_e1;
-          } else {
-            ASSERT(FK_value == 2);
-            index_v = index_v - coord_e0 - coord_e1;
-          }
-        }
-        array->array[index_v] = array->array[index_v] - r->log;
-        
-        mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
-
-      }
-      if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
-        int64_vector_set(vs_tmp, v);
-      }
-      FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
-          (int64_t) H->h[0]);
-    }
-    int64_vector_set(vs, vs_tmp);
+    plane_sieve_1_enum_plane(array, vs, e0, e1, coord_e0, coord_e1, H, r,
+        matrix, f);
 
     //Jump in the next plane.
-    list_vector_t list_vector_tmp;
-    list_vector_init(list_vector_tmp);
-    int64_vector_t v_tmp;
-    int64_vector_init(v_tmp, SV->v[0]->dim);
-    /*
-     * 0: in the sieving region.
-     * 1: in [-H_0, H_0[
-     * 2: outside
-     */
-    unsigned char * assert = malloc(sizeof(unsigned char) * SV->length);
-    unsigned char found = 2;
-
-    for (unsigned int i = 0; i < SV->length; i++) {
-      int64_vector_add(v_tmp, vs, SV->v[i]);
-      list_vector_add_int64_vector(list_vector_tmp, v_tmp);
-
-      if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
-        if (-(int64_t) H->h[1] <= v_tmp->c[1] && (int64_t)H->h[1] > v_tmp->c[1])
-        {
-          assert[i] = 0;
-          found = 0;
-        } else {
-          assert[i] = 1;
-          if (found > 1) {
-            found = 1;
-          }
-        }
-      } else {
-        assert[i] = 2;
-      }
-    }
-    int64_vector_clear(v_tmp);
-
-    unsigned int pos = 0;
-    if (found == 0) {
-      int64_t min = -1;
-      for (unsigned int i = 1; i < list_vector_tmp->length; i++) {
-        if (assert[i] == 0) {
-          int64_t tmp= ABS(vs->c[0] - list_vector_tmp->v[i]->c[0]);
-          if (min == -1) {
-            min = tmp;
-          }
-          if (min >= tmp) {
-            min = tmp;
-            pos = i;
-          }
-        }
-      }
-      int64_vector_set(vs, list_vector_tmp->v[pos]);
-      ASSERT(vs->c[0] < (int64_t)H->h[0]);
-      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-    } else if (found == 1) {
-      pos = find_min_x(list_vector_tmp, H, assert, 1);
-      int64_vector_set(vs, list_vector_tmp->v[pos]);
-      ASSERT(vs->c[0] < (int64_t)H->h[0]);
-      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-    } else {
-      ASSERT(found == 2);
-      pos = find_min_x(list_vector_tmp, H, assert, 2);
-      int64_vector_set(vs, list_vector_tmp->v[pos]);
-      add_FK_vector(vs, e0, e1, H);
-      ASSERT(vs->c[0] < (int64_t)H->h[0]);
-      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-    }
-
-    free(assert);
-    list_vector_clear(list_vector_tmp);
+    plane_sieve_next_plane(vs, SV, e0, e1, H);
   }
 
   list_vector_clear(SV);
-  int64_vector_clear(v);
   int64_vector_clear(vs);
-  int64_vector_clear(vs_tmp);
   int64_vector_clear(e0);
   int64_vector_clear(e1);
 }
@@ -2100,7 +2079,11 @@ int main(int argc, char * argv[])
   }
 
   mpz_poly_factor_list_clear(l);
-  ideal_1_clear(special_q, H->t);
+  if (special_q->ideal->r == 0) {
+    mpz_poly_clear(special_q->ideal->h);
+  } else {
+    ideal_1_clear(special_q, H->t);
+  }
   gmp_randclear(state);
   mpz_clear(a);
   getprime(0);

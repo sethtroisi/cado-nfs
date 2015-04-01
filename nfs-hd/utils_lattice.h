@@ -141,4 +141,6 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
     uint64_t number_element);
 
+void plane_sieve_next_plane(int64_vector_ptr vs, list_vector_srcptr SV,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H);
 #endif // UTILS_SIEVE_H
