@@ -50,6 +50,14 @@ typedef struct {
   int nb_max_easybadideals;
   int nb_max_verybadideals;
 }ppf_t;
+
+typedef struct {
+  int n; // also written k in earlier versions
+  mpz_t p;
+  mpz_t ell;
+  int mnfs;
+}pp_t;
+
 /*
 global input params for GF(p^2):
  p
@@ -84,20 +92,24 @@ void get_degree_CONJ_f_g(unsigned int k, unsigned int *deg_f, unsigned int *deg_
 // works only if PY is of degree 2
 void eval_varphi_mpz(mpz_poly_t g, mpz_t** varphi_coeff, unsigned int deg_varphi, mpz_t u, mpz_t v);
 void eval_varphi_si(mpz_poly_t g, long int** varphi_coeff, unsigned int deg_varphi, mpz_t u, mpz_t v);
+// return the table of suitable polynomials f according to deg_f.
+// apparently, for GF(p^2) with CONJ and GF(p^4) with JLSV1, the same table is used.
 bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
 			    table_f_poly_t** table_f, \
 			    unsigned int* table_f_size);
 bool is_irreducible_ZZ(mpz_poly_t varphi);
 bool is_irreducible_mod_p(mpz_poly_t varphi, mpz_t p);
 bool is_irreducible_mod_p_si(mpz_poly_t varphi, mpz_t p); //???
-// I need a function that works also for polynomials of small coafficients (signed long int)
+// I need a function that works also for polynomials of small coefficients (signed long int)
 bool is_good_varphi(mpz_poly_t varphi, unsigned int k, mpz_t p);
 bool is_good_f_PY(row_f_poly_t* row_t_Py_f, mpz_poly_t** varphi);
 void polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f );
 void polygen_CONJ_g ( mpz_t p, unsigned int k, mpz_poly_t f, mpz_poly_t g );
 
+// same as ***<to be completed>*** function in gfpk/magma/polyselect_utils.mag
 unsigned int get_index_next_poly_in_tab_f(table_f_poly_t * table_f, unsigned int table_f_size);
 
+// 04 2015 ??? what's that function ??? what for ?
 void gfpkdlpolyselect( mpz_t p, unsigned int k, char* label);
 
 #endif // DEG_PY > 2 is not supported

@@ -134,11 +134,11 @@ bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
  * A suitable f is such that
  * f is irreducible over the integers ZZ
  * f has an irreducible degree n factor modulo p
- * By design, the table is made of polynomials coming in pairs (f, Py), so that
+ * By design, the table is made of polynomials comming in pairs (f, Py), so that
  * if Py (of degree 2) has a root mod p, then f factors and has a degree n factor varphi.
  *
  */
-unsigned int get_index_next_poly_in_tab_f(table_f_poly_t * table_f, unsigned int table_f_size){
+unsigned int get_index_next_poly_in_tab_f(ppf_t f, pp_t pp, table_f_poly_t * table_f, unsigned int table_f_size){
 
 
 
