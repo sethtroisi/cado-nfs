@@ -176,6 +176,8 @@ int cado_poly_read(cado_poly poly, const char *filename)
 /* TODO: adapt for more than 2 polynomials:
  * compute for each pair (0,i) the corresponding common root m_i
  * check all m_i are equal
+ * If NULL is passed for m, then, just checked that N divides the 
+ * resultant.
  */
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
@@ -194,11 +196,20 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
     /* if ret=0, a factor of N was found during the pseudo-gcd,
        we assume N divides the resultant */
 
+    if (m == NULL) {
+        if (f[0]->deg < 1) {
+            fprintf (stderr, "Error, N does not divide resultant of given polynomials\n");
+            ASSERT_ALWAYS(0);
+        }
+        return ret;
+    }
+
     if (ret) /* pseudo-gcd was successful */
       {
         if (f[0]->deg != 1)
           {
-            fprintf (stderr, "Error, N does not divide resultant of given polynomials\n");
+            fprintf (stderr, "Error, N does not divide resultant of given polynomials, or there are multiplicities.\n");
+            fprintf (stderr, "Can not compute m.\n");
             exit (EXIT_FAILURE);
           }
 
@@ -212,8 +223,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
         ASSERT_ALWAYS(ret2);
         mpz_mul(inv, inv, f[0]->coeff[0]);
         mpz_neg(inv, inv);
-        if (m != NULL)
-          mpz_mod(m, inv, N);
+        mpz_mod(m, inv, N);
         mpz_clear(inv);
       }
 
