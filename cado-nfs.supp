@@ -1,5 +1,8 @@
 # This is a suppression file for valgrind
 
+# In order to generate it, re-run valgrind as follows:
+# valgrind --leak-check=full --gen-suppressions=all ./my_program arg1 # arg2 ... 
+# The "..." joker matches several possible lines in the call trace.
 
 {
    hwloc_is_known_to_leak_a_bit
@@ -13,3 +16,14 @@
    fun:pi_init_mpilevel
 }
 
+{
+   in_mf_bal_we_have_an_intentional_tiny_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:vasprintf
+   fun:asprintf
+   fun:derived_filename
+   fun:build_mat_auxfile
+   fun:main
+}
