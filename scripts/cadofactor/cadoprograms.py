@@ -684,6 +684,18 @@ class PolyselectRopt(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class PolyselectGFpn(Program):
+    binary = "polyselect_gfpn"
+    name = binary
+    subdir = "polyselect"
+
+    def __init__(self, *,
+                 verbose : Toggle("v")=None,
+                 p: Parameter(checktype=int)=None,
+                 n: Parameter(checktype=int)=None,
+                 out: Parameter(is_output_file=True)=None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
 
 class MakeFB(Program):
     """

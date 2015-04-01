@@ -538,6 +538,7 @@ polyselect/auxiliary.c
 polyselect/auxiliary.h
 polyselect/murphyE.c
 polyselect/murphyE.h
+polyselect/polyselect2l_gfpn.c
 polyselect/polyselect2l.c
 polyselect/polyselect2l.h
 polyselect/polyselect2l_arith.c
