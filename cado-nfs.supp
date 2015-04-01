@@ -1,0 +1,15 @@
+# This is a suppression file for valgrind
+
+
+{
+   hwloc_is_known_to_leak_a_bit
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:hwloc_topology_init
+   fun:_ZN9cpubinderC1ERSo
+   fun:cpubinding_get_info
+   fun:pi_init_mpilevel
+}
+
