@@ -550,7 +550,7 @@ class Program(object, metaclass=InspectType):
         # Begin command line with program to execute
         command = []
         if not self.runprefix is None:
-            command.append(self.runprefix)
+            command=self.runprefix.split(' ')
         command.append(self.translate_path(self.get_exec_file(), filenametrans))
 
         # Add keyword command line parameters, then positional parameters
