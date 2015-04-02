@@ -1221,5 +1221,3 @@ utils/threadpool.h
 misc/extra_renumber.c
 cado-nfs.supp
 scripts/valgrind-slave.sh
-params/c60.poly
-params/c65.poly
