@@ -2256,6 +2256,81 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     def get_will_import(self):
         return "import" in self.params
 
+class PolyselGFpn(Task, DoesImport):
+    """ Polynomial selection for DL in extension fields """
+    @property
+    def name(self):
+        return "polyselgfpn"
+    @property
+    def title(self):
+        return "Polynomial Selection (for GF(p^n))"
+    @property
+    def programs(self):
+        override = ("p", "n", "out")
+        return ((cadoprograms.PolyselectGFpn, (override), {}),)
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames,
+                {"N": int, "gfpext": int, "import": None})
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        super().run()
+
+        if not "polyfile" in self.state:
+            polyfilename = self.workdir.make_filename("poly")
+            # Import mode
+            if self.did_import():
+                if not self.state["imported_poly"]:
+                    raise Exception("Import failed?")
+                with open(str(polyfilename), "w") as outfile:
+                    outfile.write(self.state["imported_poly"])
+                update = {"poly": self.state["imported_poly"],
+                        "polyfile": str(polyfilename)}
+                self.state.update(update)
+                return True
+
+            # Check that user does not ask for degree > 2
+            if self.params["gfpext"] != 2:
+                raise Exception("Polynomial selection not implemented " 
+                    + "for extension degree > 2")
+
+            # Call binary
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.PolyselectGFpn.name)
+            p = cadoprograms.PolyselectGFpn(p=self.params["N"],
+                    n=self.params["gfpext"], out=polyfilename,
+                    stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.merged_args[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            with open(str(polyfilename), "r") as inputfile:
+                poly = Polynomials(list(inputfile))
+            update = {"poly": str(poly), "polyfile": str(polyfilename)}
+            self.state.update(update)
+        return True
+
+    def import_one_file(self, filename):
+        with open(filename, "r") as inputfile:
+            poly = Polynomials(list(inputfile))
+        update = {"imported_poly": str(poly)}
+        self.state.update(update)
+
+    def get_poly(self):
+        return self.state["poly"];
+
+    def get_poly_filename(self):
+        return self.state["polyfile"];
+
+    def get_have_two_alg_sides(self):
+        P = Polynomials(self.state["poly"].splitlines())
+        return (P.polyf.degree > 1 and P.polyg.degree > 1)
+
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
@@ -4507,8 +4582,12 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
                 and set(server_whitelist) & {"localhost", "127.0.0.1"}:
             hostname = socket.gethostname()
             if not hostname in server_whitelist:
-                self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
-                server_whitelist.append(hostname)
+                try:
+                    foo=socket.gethostbyname(hostname)
+                    self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
+                    server_whitelist.append(hostname)
+                except socket.gaierror as e:
+                    self.logger.info("Not adding %s to whitelist (cannot be resolved), clients will only be allowed to connect on 127.0.0.1", hostname)
         if not server_whitelist:
             server_whitelist = None
 
@@ -4848,7 +4927,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # This isn't a Task subclass so we don't really need to define
         # paramnames, but we do it out of habit
         return {"name": str, "workdir": str, "N": int, "dlp": False,
-                "trybadwu": False}
+                "gfpext": 1, "trybadwu": False}
     @property
     def title(self):
         return "Complete Factorization"
@@ -4897,14 +4976,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         linalgpath = parampath + ['linalg']
         
         ## tasks that are common to factorization and dlp
-        self.polysel1 = Polysel1Task(mediator=self,
-                                   db=db,
-                                   parameters=self.parameters,
-                                   path_prefix=polyselpath)
-        self.polysel2 = Polysel2Task(mediator=self,
-                                   db=db,
-                                   parameters=self.parameters,
-                                   path_prefix=polyselpath)
         self.fb = FactorBaseTask(mediator=self,
                                  db=db,
                                  parameters=self.parameters,
@@ -4929,6 +5000,23 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                                db=db,
                                parameters=self.parameters,
                                path_prefix=filterpath)
+        ## For DLP in extension fields, we can not use the classical
+        ## polynomial selection, but otherwise we do:
+        if self.params["gfpext"] == 1:
+            self.polysel1 = Polysel1Task(mediator=self,
+                                       db=db,
+                                       parameters=self.parameters,
+                                       path_prefix=polyselpath)
+            self.polysel2 = Polysel2Task(mediator=self,
+                                       db=db,
+                                       parameters=self.parameters,
+                                       path_prefix=polyselpath)
+        else:
+            self.polyselgfpn = PolyselGFpn(mediator=self,
+                    db=db,
+                    parameters=self.parameters,
+                    path_prefix=polyselpath)
+
         if self.params["dlp"]:
             ## Tasks specific to dlp
             self.nmbrthry = NmbrthryTask(mediator=self,
@@ -4977,27 +5065,25 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # Defines an order on tasks in which tasks that want to run should be
         # run
         if self.params["dlp"]:
-            self.tasks = (self.polysel1, self.polysel2, self.nmbrthry, self.fb,
+            if self.params["gfpext"] == 1:
+                self.tasks = (self.polysel1, self.polysel2)
+            else:
+                self.tasks = (self.polyselgfpn,)
+            self.tasks = self.tasks + (self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2,
                           self.filtergalois, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
         else:
-            self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
-                          self.dup1, self.dup2, self.purge, self.merge,
-                          self.linalg, self.characters, self.sqrt)
+            self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving, self.dup1, self.dup2, self.purge,
+                          self.merge, self.linalg, self.characters, self.sqrt)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
                                 ".".join(path + [key]), value)
 
         self.request_map = {
-            Request.GET_RAW_POLYNOMIALS: self.polysel1.get_raw_polynomials,
-            Request.GET_POLY_RANK: self.polysel1.get_poly_rank,
-            Request.GET_POLYNOMIAL: self.polysel2.get_poly,
-            Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
-            Request.GET_HAVE_TWO_ALG_SIDES: self.polysel2.get_have_two_alg_sides,
-            Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL: self.polysel2.get_will_import,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FACTORBASE0_FILENAME: self.fb.get_filename0,
             Request.GET_FACTORBASE1_FILENAME: self.fb.get_filename1,
@@ -5017,6 +5103,20 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result
         }
+
+        ## Set requests related to polynomial selection
+        if self.params["gfpext"] == 1:
+            self.request_map[Request.GET_RAW_POLYNOMIALS] = self.polysel1.get_raw_polynomials
+            self.request_map[Request.GET_POLY_RANK] = self.polysel1.get_poly_rank
+            self.request_map[Request.GET_POLYNOMIAL] = self.polysel2.get_poly
+            self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polysel2.get_poly_filename
+            self.request_map[Request.GET_HAVE_TWO_ALG_SIDES] = self.polysel2.get_have_two_alg_sides
+            self.request_map[Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL] = self.polysel2.get_will_import
+        else:
+            self.request_map[Request.GET_POLYNOMIAL] = self.polyselgfpn.get_poly
+            self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polyselgfpn.get_poly_filename
+            self.request_map[Request.GET_HAVE_TWO_ALG_SIDES] = self.polyselgfpn.get_have_two_alg_sides
+
         ## add requests specific to dlp or factoring
         if self.params["dlp"]:
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
@@ -5072,7 +5172,11 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # Do we want the sum of real times over all sub-processes for
         # something?
         # realtotal = self.get_sum_of_cpu_or_real_time(False)
-        self.logger.info("Total cpu/elapsed time for entire factorization: %g/%g",
+        if self.params["dlp"]:
+            self.logger.info("Total cpu/elapsed time for entire discrete log: %g/%g",
+                         cputotal, elapsed)
+        else:
+            self.logger.info("Total cpu/elapsed time for entire factorization: %g/%g",
                          cputotal, elapsed)
 
         if last_task and not last_status:

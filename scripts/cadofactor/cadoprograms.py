@@ -550,7 +550,7 @@ class Program(object, metaclass=InspectType):
         # Begin command line with program to execute
         command = []
         if not self.runprefix is None:
-            command.append(self.runprefix)
+            command=self.runprefix.split(' ')
         command.append(self.translate_path(self.get_exec_file(), filenametrans))
 
         # Add keyword command line parameters, then positional parameters
@@ -684,6 +684,18 @@ class PolyselectRopt(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class PolyselectGFpn(Program):
+    binary = "polyselect_gfpn"
+    name = binary
+    subdir = "polyselect"
+
+    def __init__(self, *,
+                 verbose : Toggle("v")=None,
+                 p: Parameter(checktype=int)=None,
+                 n: Parameter(checktype=int)=None,
+                 out: Parameter(is_output_file=True)=None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
 
 class MakeFB(Program):
     """

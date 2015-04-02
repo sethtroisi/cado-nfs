@@ -200,7 +200,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
             fprintf (stderr, "Error, N does not divide resultant of given polynomials\n");
             ASSERT_ALWAYS(0);
         }
-        return ret;
+        goto clear_and_return;
     }
 
     if (ret) /* pseudo-gcd was successful */
@@ -226,6 +226,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
         mpz_clear(inv);
       }
 
+ clear_and_return:
     for (int i = 0; i < 2; ++i)
         mpz_poly_clear(f[i]);
     return ret;
