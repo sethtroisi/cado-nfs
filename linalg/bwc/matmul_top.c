@@ -2384,7 +2384,7 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
 
     matmul_top_vec_clear(mmt,0);
     matmul_top_vec_clear(mmt,1);
-#if defined(USE_ALTERNATIVE_REDUCE_SCATTER) || defined(USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL)
+#if RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL
     for(int d = 0 ; d < 2 ; d++)  {
         free(mmt->wr[d]->rsbuf[0]); mmt->wr[d]->rsbuf[0] = NULL;
         free(mmt->wr[d]->rsbuf[1]); mmt->wr[d]->rsbuf[1] = NULL;
@@ -2393,7 +2393,7 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
         // (mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores))
         // elements, corresponding to the largest abase encountered.
     }
-#endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
+#endif  /* RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL */
     serialize(mmt->pi->m);
     if (!mmt->pi->interleaved) {
         matmul_clear(mmt->mm);
