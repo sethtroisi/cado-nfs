@@ -57,7 +57,7 @@ def run(param_file, problem):
         "alambda": 1.2,
         "ncurves0": 6,
         "ncurves1": 6,
-        "t": 1 # las currently does not work with -t 2 or more
+        "t": 1 # number of threads for las
     }
     makefb_params = {
         "poly" : las_params["poly"],

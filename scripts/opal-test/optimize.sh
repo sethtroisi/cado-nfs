@@ -19,13 +19,13 @@ lpbr=`grep lpbr $params | cut -d= -f2`
 lpba=`grep lpba $params | cut -d= -f2`
 mfbr=`grep mfbr $params | cut -d= -f2`
 mfba=`grep mfba $params | cut -d= -f2`
-grep ncurves0 $params
+grep ncurves0 $params > /dev/null
 if [ $? -eq 0 ]; then
    ncurves0=`grep ncurves0 $params | cut -d= -f2`
 else
    ncurves0=10
 fi
-grep ncurves1 $params
+grep ncurves1 $params > /dev/null
 if [ $? -eq 0 ]; then
    ncurves1=`grep ncurves1 $params | cut -d= -f2`
 else
@@ -100,7 +100,7 @@ echo "ncurves0=" $ncurves0_opt
 echo "ncurves1=" $ncurves1_opt
 echo "I=" $I_opt
 cd $cwd
-sed "s/rlim.*=.*$/rlim = $rlim_opt/g" | \
+sed "s/rlim.*=.*$/rlim = $rlim_opt/g" $params | \
 sed "s/alim.*=.*$/alim = $alim_opt/g" | \
 sed "s/lpbr.*=.*$/lpbr = $lpbr_opt/g" | \
 sed "s/lpba.*=.*$/lpba = $lpba_opt/g" | \
@@ -108,5 +108,5 @@ sed "s/mfbr.*=.*$/mfbr = $mfbr_opt/g" | \
 sed "s/mfba.*=.*$/mfba = $mfba_opt/g" | \
 sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
-sed "s/I.*=.*$/I = $I_opt/g" $params > $params.opt
+sed "s/I.*=.*$/I = $I_opt/g" > $params.opt
 /bin/rm -fr $d

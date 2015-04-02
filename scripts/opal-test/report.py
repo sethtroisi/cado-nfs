@@ -59,18 +59,22 @@ class NumInt(object):
         prev_sum = self.sum - self.trapez_area()
         diff = value - prev_sum
         t = (self.lastvalue[0] - self.lastvalue[1]) / (self.lastcoord[0] - self.lastcoord[1])
-        # Choose offset x such that, with c0 = c1 + x and v0 = v1 + x * t,
-        # prev_sum + (c0 - c1)*(v0 + v1) / 2. = value
-        # (c0 - c1)*(v0 + v1) / 2. = diff
-        # c0 - c1 = x, v0 + v1 = 2*v1 + x*t
-        # x*(2*v1 + x*t) / 2. = diff
+        if t <= 0: # can happen due to special-q correction
+            # we estimate the function is constant to (v0+v1)/2
+            v = (self.lastvalue[0] + self.lastvalue[1]) / 2
+            return self.lastcoord[0] + diff / v
+        # Choose offset x such that, with c = c1 + x and v = v1 + x * t,
+        # prev_sum + (c - c1)*(v + v1) / 2 = value
+        # thus (c - c1)*(v + v1) / 2 = diff
+        # c - c1 = x, v + v1 = 2*v1 + x*t
+        # x*(2*v1 + x*t) / 2 = diff
         # t/2*x^2 + v1*x - diff = 0
         # x = (-v1 +- sqrt(v1^2 + 2*t*diff)) / t
         # We need only the positive solution
         v1 = self.lastvalue[1]
         disc = v1**2 + 2*t*diff
         if disc < 0:
-            sys.stderr.write("discriminant = %f < 0! t = %f, diff = %d, lv=%s, lc=%s\n" % (disc, t, diff, self.lastvalue, self.lastcoord))
+            sys.stderr.write("discriminant = %f < 0! t = %f, diff = %d, lv=%s, lc=%s, prev_sum = %f, value = %f\n" % (disc, t, diff, self.lastvalue, self.lastcoord, prev_sum, value))
         x = (-v1 + sqrt(disc)) / t
         return self.lastcoord[1] + x
     def interpolate_at_coord(self, coord):
@@ -195,7 +199,7 @@ class LasStats(object):
         sq_correction = 1./nr_sq/log(sq)
         self.relations_int.add(sq, reports * sq_correction)
         self.dupes_int.add(sq, new_dupes * sq_correction)
-        self.elapsed_int.add(sq, eltimes[0]  * sq_correction)
+        self.elapsed_int.add(sq, eltimes[0] * sq_correction)
         if verbose:
             names = ("sq", "avgJ", "nr_sq", "sq_sum", "max_fill", "cputimes_str", "elapsed", "elapsed/sq", "elapsed/rel", "reports", "reports/nr_sq", "reports/sqrange", "dupes")
             values = (sq, self.J_sum / self.nr_sq, nr_sq, self.nr_sq, self.max_fill, cputimes_str, eltimes_str, reports, reports/nr_sq, reports * sq_correction, self.dupes)
