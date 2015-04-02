@@ -20,8 +20,10 @@ set +e
 rc=$?
 set -e
 (cd valgrind.$BUILD_NUMBER.$FOO ; mkdir ok nok ; grep -l 'ERROR SUMMARY: [^0]' pid-* | xargs -r mv -t nok ; ls | grep pid | xargs -r grep -l 'ERROR SUMMARY: 0' | xargs -r mv -t ok)
+set +e
 ls valgrind.${BUILD_NUMBER}.${FOO}/nok | grep -q .
 found_nok_files=$?
+set -e
 ls valgrind.${BUILD_NUMBER}.${FOO}/nok | while read f ; do
   echo "Errors in file valgrind.${BUILD_NUMBER}.${FOO}/nok/$f"
   cat valgrind.${BUILD_NUMBER}.${FOO}/nok/$f
