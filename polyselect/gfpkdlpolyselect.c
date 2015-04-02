@@ -51,7 +51,7 @@ void get_degree_CONJ_f_g(unsigned int n, unsigned int *deg_f, unsigned int *deg_
  * NOTE: maybe input phi and deg_phi directly ? Or a poly structure ?
  */
 // works only if PY is of degree 2
-void eval_phi_mpz(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v)
+void eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
@@ -67,13 +67,23 @@ void eval_phi_mpz(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u
     // list_f.phi[i][1] * u
     // phi_i = phi_i0 + phi_i1 * Y
     // the function does not use modular arithmetic but exact integer arithmetic
-void eval_phi_si(mpz_poly_t g, long int** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v)
+void eval_si_phi_mpz_uv(mpz_poly_t g, long int** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
     // if phi has coefficients of type (signed) long int
     mpz_mul_si(g->coeff[i], v, phi_coeff[i][0]);    // gi <- phi_i0 * v
     mpz_addmul_si(g->coeff[i], u, phi_coeff[i][1]); // gi <- gi + phi_i1 * u
+  }
+}
+
+void eval_si_phi_mpz_y(mpz_poly_t g, long int** phi_coeff, unsigned int deg_phi, mpz_t y)
+{
+  unsigned int i;
+  for (i=0; i <= deg_phi; i++){
+    // if phi has coefficients of type (signed) long int
+    mpz_set_si(g->coeff[i], phi_coeff[i][0]);    // gi <- phi_i0
+    mpz_addmul_si(g->coeff[i], y, phi_coeff[i][1]); // gi <- phi_i0 + phi_i1 * y
   }
 }
 
@@ -109,6 +119,7 @@ bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
 //int is_good_poly_light(pp_t params, ppf_t poly_params, mpz_poly_t f){}
 
   /* check: 
+     + deg f
      + f irreducible over Q
      + f has a degree params->n factor mod params->p
      o [ Galois group of f: assume that the table is already checked.]
@@ -125,6 +136,7 @@ bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
 //int is_good_poly(pp_t params, ppf_t poly_params, mpz_poly_t f){}
 
   /* check: 
+     - deg f
      - f irreducible over Q
      - f has a degree params->n factor mod params->p
        for CONJ: check 
@@ -253,9 +265,9 @@ bool is_irreducible_mod_p(mpz_poly_t phi, mpz_t p)
       sign_D = mpz_cmp(D, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
       if (sign_D == 0){
 	// very easy, D = 0 and phi is reducible
-	is_irreducible = true;
+	is_irreducible = false;
       }else{
-	mpz_sub(D, D, tmp); //   D <- b^2 - 4*a*c and is > 0
+	mpz_sub(D, D, tmp); //   D <- b^2 - 4*a*c and is != 0
 	// is_square mod p ?
 	// compute Legendre symbol
 	Legendre_D_p = mpz_legendre(D, p);
@@ -273,9 +285,47 @@ bool is_irreducible_mod_p(mpz_poly_t phi, mpz_t p)
   return is_irreducible;
 }
 
-// same as above but with a poly with "small" coeffs
-bool is_irreducible_mod_p_si(long int * phi, mpz_t p){
-
+// same as above but with a poly with "small" coeffs given in a tab, with size <-> deg.
+bool is_irreducible_mod_p_si(long int * f, int deg_f, mpz_t p){
+  int sign_D, Legendre_D_p;
+  bool is_irreducible = false;
+  mpz_t D, tmp;
+  mpz_t a, b, c;
+  if (deg_f <= 1){
+    is_irreducible = true;
+  }
+  else{
+    if (deg_f == 2){
+      //compute discriminant, phi = a*x^2 + b*x + c
+      mpz_init(D);
+      mpz_init(tmp);
+      mpz_init_set_si(a, f[0]);
+      mpz_init_set_si(b, f[1]);
+      mpz_init_set_si(c, f[2]);
+      mpz_mul(D, b, b); //   D <- b^2
+      mpz_mul(tmp, a, c); // tmp <- a*c
+      mpz_mul_ui(tmp, tmp, 4);      // tmp <- 4*a*c
+      sign_D = mpz_cmp(D, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
+      if (sign_D == 0){
+	// very easy, D = 0 and phi is reducible
+	is_irreducible = false;
+      }else{
+	mpz_sub(D, D, tmp); //   D <- b^2 - 4*a*c and is != 0
+	// is_square mod p ?
+	// compute Legendre symbol
+	Legendre_D_p = mpz_legendre(D, p);
+	  if (Legendre_D_p >= 0){ // indeed, (D/p) can be 0 if D is a multiple of p.
+	    is_irreducible = false;
+	  }else{ // (D/p) = -1
+	    is_irreducible = true;
+	  }
+      }// sign_D == 0
+    }else{
+      // degree > 2, use a function that tests irreducibility. But the function does not exists yet.
+      is_irreducible = false;
+    }// degree == 2
+  }// degree <= 1
+  return is_irreducible;
 }
 
 /**
@@ -303,12 +353,13 @@ bool is_irreducible_mod_p_si(long int * phi, mpz_t p){
  * \return false otherwise 
  */
 
-int get_f_CONJ( mpz_t p, fPyphi_poly_t * list_f, mpz_t * list_phi){
-  int i = 0;// index of first good f in table
+int get_f_CONJ( mpz_t p, fPyphi_poly_t * list_f, mpz_poly_t * list_phi){
+  int i = 0, j=0;// index of first good f in table
   bool found_good_f = false;
-  long int *fi = NULL;
+  //long int *fi = NULL;
   long int *Pyi = NULL;
   long int **phii = NULL;
+  mpz_t y;
 
 
   if(list_f != NULL){
@@ -318,14 +369,22 @@ int get_f_CONJ( mpz_t p, fPyphi_poly_t * list_f, mpz_t * list_phi){
     while ((found_good_f != true) && (i < list_f->size)){// nothing found
       // i.e. the i-th polynomial in f is not irreducible mod p,
       // or is but PY has no root.
-      fi = ((list_f->table_f[i]).f);
+      //fi = ((list_f->table_f[i]).f);
       Pyi = ((list_f->table_f[i]).Py);
       phii = ((list_f->table_f[i]).phi);
 
-      if (is_irreducible_mod_p_si(Pyi, p)){
+      if (is_irreducible_mod_p_si(Pyi, list_f->deg_Py, p)){
 	// compute the two roots of Pyi, 
-	// compute the possible phi
+	// --> compute a square root mod p
+	// HOW TO DO THAT ?
+	// we obtain y a root of Py mod p.
+
+	// compute the possible phi(s)
+	j = 0;
+	eval_si_phi_mpz_y(list_phi[j], phii, list_f->deg_phi, y);
 	// test if at least one phi is irreducible
+	// is_irreducible_mod_p(phii_j, p)
+	// add in table each irreducible phii_j
 	
 	
       }
@@ -343,14 +402,15 @@ int get_f_CONJ( mpz_t p, fPyphi_poly_t * list_f, mpz_t * list_phi){
  * 
  */
 
-int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs, char* label){
+// , mpz_t ell, unsigned int mnfs
+int gfpkdlpolyselect( unsigned int n, mpz_t p, char* label){
 
   int dd_p;
   unsigned int deg_f = 2*n, deg_g = 2*n;
   // take the largest possibility as default init for deg_f and deg_g.
   mpz_poly_t f, g;
   fPyphi_poly_t* list_f = NULL;
-  mpz_t table_phi[DEG_PY];
+  mpz_poly_t table_phi[DEG_PY];
 
   if (n==2){
     get_degree_CONJ_f_g(n, &deg_f, &deg_g);
@@ -368,7 +428,7 @@ int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs, cha
 
       if ((f_id >= 0) && (f_id < (list_f->size))){
 	// 2. find a good g with LLL.
-	ppf_t pg = {{2, {0,1}, 0, {0,0}, 2, -1, 0}}; 
+	// ppf_t pg = {{2, {0,1}, 0, {0,0}, 2, -1, 0}}; 
 	mpz_poly_init(g, deg_g);
 
 	

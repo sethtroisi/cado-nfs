@@ -31,7 +31,7 @@
 #if DEG_PY > 2
 #error "the code works only for Py of degree <= 2, sorry."
 #else
-#define PHI_COEFF_INT 1 // ?
+//#define PHI_COEFF_INT 1 // ?
 
 // table structure, old version.
 
@@ -98,15 +98,16 @@ typedef polyselect_parameters_t pp_t[1];
 void get_degree_CONJ_f_g(unsigned int n, unsigned int *deg_f, unsigned int *deg_g);
 
 // works only if PY is of degree 2
-void eval_phi_mpz(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
-void eval_phi_si(mpz_poly_t g, long int** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
+void eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
+void eval_si_phi_mpz_y(mpz_poly_t g, long int** phi_coeff, unsigned int deg_phi, mpz_t y);
+void eval_si_phi_mpz_uv(mpz_poly_t g, long int** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
 // return the table of suitable polynomials f according to deg_f.
 // apparently, for GF(p^2) with CONJ and GF(p^4) with JLSV1, the same table is used.
 bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
 			    fPyphi_poly_t** table_f);
 bool is_irreducible_ZZ(mpz_poly_t phi);
 bool is_irreducible_mod_p(mpz_poly_t phi, mpz_t p);
-bool is_irreducible_mod_p_si(long int* phi, mpz_t p);
+bool is_irreducible_mod_p_si(long int* Py, int deg_Py, mpz_t p);
 
 // same as is_good_poly_check_all in gfpk/magma/polyselect_utils.mag
 // return: error_code, see above
@@ -119,11 +120,12 @@ bool is_good_f_PY(row_fPyphi_poly_t* row_f_Py_phi, mpz_poly_t** phi);
 unsigned int get_index_next_poly_in_tab_f(fPyphi_poly_t * list_f);
 
 // renvoie i l'indice de la bonne ligne du tableau de {F, Py, phi}
-int get_f_CONJ( mpz_t p, fPyphi_poly_t * list_f, mpz_t * list_phi);
+int get_f_CONJ( mpz_t p, fPyphi_poly_t * list_f, mpz_poly_t * list_phi);
 // list_f->list_f[i] is the line with a right f.
 
 // the function to call for generating a .poly file.
 // works only for n=2 at the moment.
-int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs, char* label);
+// , mpz_t ell, unsigned int mnfs
+int gfpkdlpolyselect( unsigned int n, mpz_t p, char* label);
 #endif // DEG_PY > 2 is not supported
 #endif // GFPKDLPOLYSELECT_H
