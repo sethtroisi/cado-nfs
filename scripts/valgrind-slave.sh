@@ -14,7 +14,7 @@ CHECKS_EXPENSIVE=1 make -j4 full_c59_dependencies
 export FOO=$(uuidgen)
 mkdir valgrind.$BUILD_NUMBER.$FOO
 # Don't use --error-exitcode, so that we get a chance to be notified of all potential errors at once.
-VALGRIND="valgrind --suppressions=cado-nfs.supp --trace-children=yes --trace-children-skip=/bin/sh,gzip,*perl*,*python* --log-file=valgrind.%q{BUILD_NUMBER}.%q{FOO}/pid-%p --leak-check=full --errors-for-leak-kinds=all"
+VALGRIND="valgrind --suppressions=cado-nfs.supp --trace-children=yes --trace-children-skip=/bin/sh,gzip,*perl*,*python* --log-file=valgrind.%q{BUILD_NUMBER}.%q{FOO}/pid-%p --leak-check=full"
 set +e
 ./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2 tasks.runprefix="$VALGRIND" tasks.linalg.bwc.precmd="$VALGRIND"
 rc=$?
@@ -37,4 +37,3 @@ if [ $found_nok_files ] ; then
   echo "See archive of log files in `hostname`:$PWD/valgrind.${BUILD_NUMBER}.${FOO}.tar.gz"
   exit 1
 fi
-
