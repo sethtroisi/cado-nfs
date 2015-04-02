@@ -18,6 +18,10 @@ Usage: $0 <integer> [options] [arguments passed to cadofactor.py]
                     optimized only for 85 digits and above]
 options:
     -dlp          - don't factor, solve dlp in GF(integer)
+    -gfpext <integer>
+                  - (with DLP) solve dlp in GF(integer^gfpext)
+    -ell <integer>
+                  - (with DLP) solve dlp modulo ell
     -t <integer>  - numbers of cores to be used
     -s <integer>  - numbers of slave scripts to be used
     -h <host1>,<host2>,...,<hostn>
@@ -84,6 +88,8 @@ cores=1
 slaves=1
 verbose=false
 dlp=false
+gfpext=1
+ell=1
 while [ -n "$1" ] ; do
   if [ "$1" = "-t" ]; then
     cores=$2
@@ -118,8 +124,19 @@ while [ -n "$1" ] ; do
     shift 2
   elif [ "$1" = "-dlp" ]; then
     dlp=true
-    CADO_DEBUG="Yes, pleas"
+    CADO_DEBUG="Yes, please"
     shift
+  elif [ "$1" = "-gfpext" ]; then
+    gfpext="$2"
+    if [ $gfpext != "2" ]; then 
+      echo "Error, only extensions of degree 2 are supported atm" >&2
+      usage
+      exit 1
+    fi
+    shift 2
+  elif [ "$1" = "-ell" ]; then
+    ell=$2
+    shift 2
   elif [ "$1" = "-v" ]; then
     verbose=true
     shift
@@ -127,6 +144,15 @@ while [ -n "$1" ] ; do
     break
   fi
 done
+
+# If gfpext is 2, then ell must be given
+if [ $gfpext = "2" ]; then
+  if [ $ell = "1" ]; then
+    echo "Error, with gfpext=2, ell (a factor of p+1) must be given" >&2
+    usage
+    exit 1
+  fi
+fi
 
 # Set default value
 : ${hostnames:=localhost}
@@ -223,7 +249,11 @@ size=${#n}
 # Try n, n+1, n-1, n+2...
 for ((i=1; i<=4; i=i+1)) ; do
   if $dlp ; then
-    file="$paramdir/params.p$size"
+    if [ $gfpext = "1" ]; then
+      file="$paramdir/params.p$size"
+    else
+      file="$paramdir/params.p${gfpext}dd$size"
+    fi
   else 
     file="$paramdir/params.c$size"
   fi
@@ -274,6 +304,10 @@ extra_args=(
 if [ "$cpubinding_file" ] ; then
     extra_args=("${extra_args[@]}" \
         tasks.linalg.bwc.cpubinding="$cpubinding_file")
+fi
+
+if [ $ell != "1" ]; then
+    extra_args=("${extra_args[@]}" gorder=$ell)
 fi
 
 "${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n "${extra_args[@]}" "$@"
