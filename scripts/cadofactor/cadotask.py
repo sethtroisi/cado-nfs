@@ -2271,7 +2271,7 @@ class PolyselGFpn(Task, DoesImport):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
-                {"N": int, "gfpext": int, "import": str})
+                {"N": int, "gfpext": int, "import": None})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -2281,33 +2281,51 @@ class PolyselGFpn(Task, DoesImport):
         super().run()
 
         if not "polyfile" in self.state:
-            if gfpext != 2:
+            polyfilename = self.workdir.make_filename("poly")
+            # Import mode
+            if self.did_import():
+                if not self.state["imported_poly"]:
+                    raise Exception("Import failed?")
+                with open(str(polyfilename), "w") as outfile:
+                    outfile.write(self.state["imported_poly"])
+                update = {"poly": self.state["imported_poly"],
+                        "polyfile": str(polyfilename)}
+                self.state.update(update)
+                return True
+
+            # Check that user does not ask for degree > 2
+            if self.params["gfpext"] != 2:
                 raise Exception("Polynomial selection not implemented " 
                     + "for extension degree > 2")
-            polyfilename = self.workdir.make_filename("poly")
+
+            # Call binary
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.PolyselectGFpn.name)
-            p = cadoprograms.PolyselectGFpn(p=N, n=gfpext, out=polyfilename,
+            p = cadoprograms.PolyselectGFpn(p=self.params["N"],
+                    n=self.params["gfpext"], out=polyfilename,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            import_one_file(polyfilename)
+            with open(str(polyfilename), "r") as inputfile:
+                poly = Polynomials(list(inputfile))
+            update = {"poly": str(poly), "polyfile": str(polyfilename)}
+            self.state.update(update)
+        return True
 
     def import_one_file(self, filename):
         with open(filename, "r") as inputfile:
             poly = Polynomials(list(inputfile))
-        assert poly != None
-        update = {"poly": str(poly), "polyfile": filename}
+        update = {"imported_poly": str(poly)}
         self.state.update(update)
 
     def get_poly(self):
         return self.state["poly"];
 
     def get_poly_filename(self):
-        return self.state["poly_filename"];
+        return self.state["polyfile"];
 
     def get_have_two_alg_sides(self):
         P = Polynomials(self.state["poly"].splitlines())
@@ -5050,7 +5068,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             if self.params["gfpext"] == 1:
                 self.tasks = (self.polysel1, self.polysel2)
             else:
-                self.tasks = (self.polyselgfpn)
+                self.tasks = (self.polyselgfpn,)
             self.tasks = self.tasks + (self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2,

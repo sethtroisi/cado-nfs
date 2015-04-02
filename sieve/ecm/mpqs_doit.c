@@ -1,4 +1,16 @@
-/* TODO: look at http://sourceforge.net/p/msieve/code/HEAD/tree/branches/RDS/cofactorize_siqs.c */
+/* TODO:
+ * look at http://sourceforge.net/p/msieve/code/HEAD/tree/branches/RDS/cofactorize_siqs.c
+ * if we implement SIQS, one could try the idea presented by T. Kleinjung
+   at the factorization workshop in Essen (April 2008):
+   http://www.exp-math.uni-essen.de/zahlentheorie/ss08/abstracts.html
+   For a prime p > S (sieve length), there is (at most) a unique sieved
+   value z = b_1 +/- b_2 +/- ... +/- b_k such that 0 <= z < S.
+   Compute U the set of all b_1 +/- ... +/- b_{k/2} values, and V the set
+   of all +/- b_{k/2+1} +/- ... +/- b_k values.
+   We want z = u - v for u in U and v in V, with 0 <= u - v < S,
+   this v <= u < v+S. If the sets U and V are sorted, this is easy,
+   and the initialization cost drops from about 2^k to 2^(k/2).
+ */
 
 /* tiny MPQS implementation, specially tuned for 64- to 128-bit input */
 
