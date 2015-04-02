@@ -15,16 +15,3 @@
    fun:cpubinding_get_info
    fun:pi_init_mpilevel
 }
-
-{
-   in_mf_bal_we_have_an_intentional_tiny_leak
-   Memcheck:Leak
-   match-leak-kinds: definite
-   fun:malloc
-   fun:vasprintf
-   fun:asprintf
-   ...
-   fun:derived_filename
-   ...
-   fun:main
-}
