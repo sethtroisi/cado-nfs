@@ -11,7 +11,7 @@ set (ropt_sources
 add_library(polyselect_common ${CADO_SHARED} auxiliary.c rho.c murphyE.c area.c size_optimization.c)
 add_executable (polyselect2l polyselect2l.c polyselect2l_str.c polyselect2l_arith.c ${ropt_sources})
 add_executable (polyselect_ropt polyselect_ropt.c ${ropt_sources})
-add_executable (polyselect_gfpn polyselect_gfpn.c)
+add_executable (polyselect_gfpn polyselect_gfpn.c gfpkdlpolyselect.c)
 
 # the utils library already includes -lgmp and -lm
 target_link_libraries (polyselect_gfpn utils)

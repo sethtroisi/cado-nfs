@@ -14,103 +14,116 @@
 #ifndef GFPKDLPOLYSELECT_H
 #define GFPKDLPOLYSELECT_H
 
+#define ERROR_UNSPECIFIED 0
+#define POLY_OK 1
+#define ERROR_DEGREE 2
+#define ERROR_NOT_IRREDUCIBLE 3
+#define ERROR_NO_DEGREE_FACTOR 4
+#define ERROR_SIGNATURE 5
+#define ERROR_SUBFIELD 6
+#define ERROR_SMEXP 7
+#define ERROR_EASYBADIDEALS 8
+#define ERROR_VERYBADIDEALS 9
+#define ERROR_MAX 10
+
 
 #define DEG_PY 2
 #if DEG_PY > 2
 #error "the code works only for Py of degree <= 2, sorry."
 #else
-#define VARPHI_COEFF_INT 1 // ?
+#define PHI_COEFF_INT 1 // ?
+
+// table structure, old version.
 
 typedef struct {
   long int t;     // parameter t
   long int PY[DEG_PY + 1]; // no --> use one of the poly stuct of cado-nfs!
   long int f[MAXDEGREE + 1];  // polynomial f of degree at most MAXDEGREE 
                          // set to 10 at the moment in utils/cado_poly.h
-}row_f_poly_t;
+}row_ftPy_poly_t;
 
 // tables containing polynomials f
-// how to encode varphi form ?
+// how to encode phi form ?
 typedef struct {
   unsigned int deg_f;
   unsigned int deg_Py;
-  unsigned int deg_varphi;
-  const row_f_poly_t* table_f;
-  long int varphi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
+  unsigned int deg_phi;
+  int size;
+  const row_ftPy_poly_t* table_f; // la table de {f, Py, phi}
+  long int phi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
   //(a root of PY) modulo PY so of degree at most DEG_PY-1 --> of DEG_PY coeffs.
-}table_f_poly_t;
+}ftPy_poly_t;
+
+
+// table structure for CONJ with Fp2 (and JLSV1 Fp4 ?).
+
+typedef struct {
+  long int f[MAXDEGREE + 1];  // polynomial f of degree at most MAXDEGREE 
+                              // set to 10 at the moment in utils/cado_poly.h
+  long int Py[DEG_PY + 1];    // no --> use one of the poly stuct of cado-nfs!
+  long int phi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
+}row_fPyphi_poly_t;
+
+typedef struct {
+  unsigned int deg_f;
+  unsigned int deg_Py;
+  unsigned int deg_phi;
+  int size;
+  const row_fPyphi_poly_t* table_f;
+}fPyphi_poly_t;
 
 // for keeping parameters of each poly (each side) along the process of polyselect
 
 typedef struct {
-  int deg;
-  int sgtr[2];
-  int deg_subfield;
-  int sgtr_subfield[2];
-  int smexp; // from 1 to deg
+  unsigned int deg;
+  unsigned int sgtr[2];
+  unsigned int deg_subfield;
+  unsigned int sgtr_subfield[2];
+  unsigned int smexp; // from 1 to deg
   int nb_max_easybadideals;
   int nb_max_verybadideals;
-}ppf_t;
+}polyselect_parameter_poly_t;
+
+typedef polyselect_parameter_poly_t ppf_t[1];
 
 typedef struct {
-  int n; // also written k in earlier versions
+  unsigned int n; // also written k in earlier versions
   mpz_t p;
   mpz_t ell;
-  int mnfs;
-}pp_t;
+  unsigned int mnfs;
+}polyselect_parameters_t;
 
-/*
-global input params for GF(p^2):
- p
- ell
- k(=2)
- mnfs (>= 1) By Convention, this will be the number of polynomials g.
+typedef polyselect_parameters_t pp_t[1];
 
-that's all.
-code writer designs 
-deg_f = 4
-deg_g = 2
-smfexp
-smgexp
-
- */
-
-  /* 
-params->p
-      ->ell
-      ->k
-      ->deg_f
-      ->deg_g
-      ->smfexp
-      ->smgexp
-      ->mnfs
-  */
-
-
-
-void get_degree_CONJ_f_g(unsigned int k, unsigned int *deg_f, unsigned int *deg_g);
+void get_degree_CONJ_f_g(unsigned int n, unsigned int *deg_f, unsigned int *deg_g);
 
 // works only if PY is of degree 2
-void eval_varphi_mpz(mpz_poly_t g, mpz_t** varphi_coeff, unsigned int deg_varphi, mpz_t u, mpz_t v);
-void eval_varphi_si(mpz_poly_t g, long int** varphi_coeff, unsigned int deg_varphi, mpz_t u, mpz_t v);
+void eval_phi_mpz(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
+void eval_phi_si(mpz_poly_t g, long int** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
 // return the table of suitable polynomials f according to deg_f.
 // apparently, for GF(p^2) with CONJ and GF(p^4) with JLSV1, the same table is used.
 bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
-			    table_f_poly_t** table_f, \
-			    unsigned int* table_f_size);
-bool is_irreducible_ZZ(mpz_poly_t varphi);
-bool is_irreducible_mod_p(mpz_poly_t varphi, mpz_t p);
-bool is_irreducible_mod_p_si(mpz_poly_t varphi, mpz_t p); //???
+			    fPyphi_poly_t** table_f);
+bool is_irreducible_ZZ(mpz_poly_t phi);
+bool is_irreducible_mod_p(mpz_poly_t phi, mpz_t p);
+bool is_irreducible_mod_p_si(long int* phi, mpz_t p);
+
+// same as is_good_poly_check_all in gfpk/magma/polyselect_utils.mag
+// return: error_code, see above
+int is_good_poly(pp_t pp, ppf_t ppf, mpz_poly_t f);
 // I need a function that works also for polynomials of small coefficients (signed long int)
-bool is_good_varphi(mpz_poly_t varphi, unsigned int k, mpz_t p);
-bool is_good_f_PY(row_f_poly_t* row_t_Py_f, mpz_poly_t** varphi);
-void polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f );
-void polygen_CONJ_g ( mpz_t p, unsigned int k, mpz_poly_t f, mpz_poly_t g );
+bool is_good_phi(mpz_poly_t phi, unsigned int n, mpz_t p);
+bool is_good_f_PY(row_fPyphi_poly_t* row_f_Py_phi, mpz_poly_t** phi);
 
 // same as ***<to be completed>*** function in gfpk/magma/polyselect_utils.mag
-unsigned int get_index_next_poly_in_tab_f(table_f_poly_t * table_f, unsigned int table_f_size);
+unsigned int get_index_next_poly_in_tab_f(fPyphi_poly_t * list_f);
 
-// 04 2015 ??? what's that function ??? what for ?
-void gfpkdlpolyselect( mpz_t p, unsigned int k, char* label);
+// renvoie i l'indice de la bonne ligne du tableau de {F, Py, phi}
+int get_f_CONJ( mpz_t p, fPyphi_poly_t * list_f, mpz_t * list_phi);
+// list_f->list_f[i] is the line with a right f.
 
+// the function to call for generating a .poly file.
+// works only for n=2 at the moment.
+int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs, char* label);
 #endif // DEG_PY > 2 is not supported
 #endif // GFPKDLPOLYSELECT_H
