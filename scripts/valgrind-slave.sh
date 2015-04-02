@@ -34,7 +34,7 @@ if [ $rc != 0 ] ; then
  echo "Cadofactor exit code was $rc"
  exit $rc
 fi
-if [ $found_nok_files ] ; then
+if [ $found_nok_files != 0 ] ; then
   echo "Found valgrind errors"
   echo "See archive of log files in `hostname`:$PWD/valgrind.${BUILD_NUMBER}.${FOO}.tar.gz"
   exit 1
