@@ -20,6 +20,21 @@ def primepi(x):
     l = [0, 1, 2, 4, 6, 11, 18, 31, 54, 97, 172, 309, 564, 1028, 1900, 3512, 6542, 12251, 23000, 43390, 82025, 155611, 295947, 564163, 1077871, 2063689, 3957809, 7603553, 14630843, 28192750, 54400028, 105097565, 203280221, 393615806, 762939111, 1480206279, 2874398515, 5586502348, 10866266172, 21151907950, 41203088796]
     return l[x]
 
+# return the best time so far (or 1e308 at the beginning)
+def get_best_time(file):
+    try:
+        f = open(file, "r")
+        best_time = float(f.read())
+        f.close()
+    except (OSError, IOError):
+        best_time = 1e308
+    return best_time
+
+def set_best_time(file, t):
+    f = open(file, "w")
+    f.write(str(t) + "\n")
+    f.close()
+
 def run(param_file, problem):
     "Run las with given parameters until the required number of relations is found."
 
@@ -78,8 +93,13 @@ def run(param_file, problem):
     q_range = 1000
     q_inc = 0
     rels_wanted = int(primepi(las_params["lpba"]) + primepi(las_params["lpbr"]))
-    # sys.stderr.write("Estimate %u relations needed\n" % rels_wanted)
-    
+    # read the best time so far (if any)
+    best_time = get_best_time ("las.best")
+    if best_time >= 1e308:
+       sys.stderr.write("Estimate %u relations needed\n" % rels_wanted)
+    else:
+       sys.stderr.write("Estimate %u relations needed, best time so far is %.0f seconds\n" % (rels_wanted, best_time))
+
     while stats.get_rels() < rels_wanted:
         # Set q0, q1
         outputfile = "las.%d.out" % q0
@@ -96,7 +116,17 @@ def run(param_file, problem):
         if not stats.parse_one_file(outputfile):
             raise Exception("Could not read statistics from %s" % outputfile)
         os.unlink(outputfile)
-        # sys.stderr.write("   Up to q=%u, estimate %u/%u relations\n" % (q0, stats.get_rels(), rels_wanted))
+        cur_rels = stats.get_rels()
+        if cur_rels == 0:
+           cur_time = 0
+        else:
+           cur_time = stats.get_time(cur_rels)
+        # sys.stderr.write("   Up to q=%u, estimate %u/%u relations in %.0f seconds\n" % (q0, cur_rels, rels_wanted, cur_time))
+
+        # if the total time so far exceeds 1.5*best_time, we can stop here
+        if cur_time > 1.5 * best_time:
+           break
+
         # set q_inc so that we do about 10 sieving tests of length q_range
         if q_inc == 0:
            v = stats.relations_int.lastvalue[0]
@@ -104,7 +134,9 @@ def run(param_file, problem):
         q0 += q_inc
     qmax = stats.get_qmax(rels_wanted)
     sievetime = stats.get_time(rels_wanted)
-    sys.stderr.write("Estimated special-q up to %.0f and %.2f seconds for %d relations\n"
+    if sievetime < best_time: # store the new best time
+        set_best_time ("las.best", sievetime)
+    sys.stderr.write("Estimated special-q up to %.0f and %.0f seconds for %d relations\n"
                       % (qmax, sievetime, rels_wanted))
     # Estimate how far the sieving should have gone to get the desired number
     # of relations

@@ -99,6 +99,7 @@ echo "mfba=" $mfba_opt
 echo "ncurves0=" $ncurves0_opt
 echo "ncurves1=" $ncurves1_opt
 echo "I=" $I_opt
+cd $cwd
 sed "s/rlim.*=.*$/rlim = $rlim_opt/g" | \
 sed "s/alim.*=.*$/alim = $alim_opt/g" | \
 sed "s/lpbr.*=.*$/lpbr = $lpbr_opt/g" | \
@@ -107,6 +108,5 @@ sed "s/mfbr.*=.*$/mfbr = $mfbr_opt/g" | \
 sed "s/mfba.*=.*$/mfba = $mfba_opt/g" | \
 sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
-sed "s/I.*=.*$/I = $I_opt/g" $params > $cwd/$params.opt
-cd $cwd
+sed "s/I.*=.*$/I = $I_opt/g" $params > $params.opt
 /bin/rm -fr $d
