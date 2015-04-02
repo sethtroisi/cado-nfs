@@ -5,7 +5,7 @@
 # The "..." joker matches several possible lines in the call trace.
 
 {
-   hwloc_is_known_to_leak_a_bit
+   hwloc_is_known_to_leak_a_bit_mangled_names
    Memcheck:Leak
    match-leak-kinds: definite
    fun:malloc
@@ -14,4 +14,17 @@
    fun:_ZN9cpubinderC1ERSo
    fun:cpubinding_get_info
    fun:pi_init_mpilevel
+}
+
+{
+   hwloc_is_known_to_leak_a_bit_unmangled_names
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:hwloc_topology_init
+   fun:cpubinder
+   fun:cpubinding_get_info
+   fun:pi_init_mpilevel
+   fun:pi_go_inner_not_interleaved
 }
