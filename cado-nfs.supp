@@ -28,3 +28,18 @@
    fun:pi_init_mpilevel
    fun:pi_go_inner_not_interleaved
 }
+{
+   openmp_leak
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create*
+   ...
+   fun:GOMP_parallel
+   ...
+   fun:main
+}
+
