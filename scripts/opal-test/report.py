@@ -62,7 +62,7 @@ class NumInt(object):
         if t <= 0: # can happen due to special-q correction
             # we estimate the function is constant to (v0+v1)/2
             v = (self.lastvalue[0] + self.lastvalue[1]) / 2
-            return self.lastcoord[0] + diff / v
+            return self.lastcoord[1] + diff / v
         # Choose offset x such that, with c = c1 + x and v = v1 + x * t,
         # prev_sum + (c - c1)*(v + v1) / 2 = value
         # thus (c - c1)*(v + v1) / 2 = diff
@@ -199,7 +199,7 @@ class LasStats(object):
         sq_correction = 1./nr_sq/log(sq)
         self.relations_int.add(sq, reports * sq_correction)
         self.dupes_int.add(sq, new_dupes * sq_correction)
-        self.elapsed_int.add(sq, eltimes[0] * sq_correction)
+        self.elapsed_int.add(sq, cputimes[0] * sq_correction)
         if verbose:
             names = ("sq", "avgJ", "nr_sq", "sq_sum", "max_fill", "cputimes_str", "elapsed", "elapsed/sq", "elapsed/rel", "reports", "reports/nr_sq", "reports/sqrange", "dupes")
             values = (sq, self.J_sum / self.nr_sq, nr_sq, self.nr_sq, self.max_fill, cputimes_str, eltimes_str, reports, reports/nr_sq, reports * sq_correction, self.dupes)
