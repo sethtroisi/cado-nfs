@@ -63,6 +63,8 @@ void mpz_poly_setcoeffs(mpz_poly_ptr f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_ptr f);
 void mpz_poly_set_xi(mpz_poly_ptr f, int i);
 
+void mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b);
+
 void mpz_poly_setcoeff(mpz_poly_ptr f, int i, mpz_srcptr z);
 void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, int z);
 void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z);

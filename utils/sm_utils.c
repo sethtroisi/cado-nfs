@@ -3,34 +3,39 @@
 #include "portability.h"
 #include "utils.h"
 
-/* Init polynomial rel and set it to a - b*x */
-void
-mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
-{
-  mpz_poly_init(rel, 1);
-  mpz_poly_setcoeff_int64(rel, 0, a);
-  mpz_poly_setcoeff_int64(rel, 1, -b);
-}
-
 /* compute the SM */
-void
-compute_sm (mpz_poly_t SM, mpz_poly_srcptr num, const mpz_poly_t F, const mpz_t ell,
+static void
+compute_sm_lowlevel (mpz_poly_t SM, mpz_poly_srcptr num, const mpz_poly_t F, const mpz_t ell,
             const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
 {
-  mpz_poly_power_mod_f_mod_mpz_barrett(SM, num, F, smexp, ell2, invl2);
-  mpz_poly_sub_ui(SM, SM, 1);
-
-  for(int j = 0; j <= SM->deg; j++)
-  {
-    ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
-    mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
-    ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
-  }
+    int use_barrett = 0;
+    /* It *seeems* that for the applicable range of SM computations,
+     * barrett reduction offer no gain (the mpz_poly layer was designed
+     * with the sqrt application in mind, not SM !). We might want to
+     * take the decision here though, depending on:
+     *  - the bit size of ell2
+     *  - the bit size of num (we mutliply by it often)
+     *  - the bit size of the coefficients of F
+     */
+    mpz_poly_power_mod_f_mod_mpz_barrett(SM, num, F, smexp, ell2, use_barrett ? invl2 : NULL);
+    mpz_poly_sub_ui(SM, SM, 1);
+    mpz_poly_divexact_mpz(SM, SM, ell);
 }
 
-void compute_sm_splitchunks(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
+void compute_sm_straightforward(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
 {
-    /* now for a split-chunk compute_sm */
+    if (sm->nsm == 0)
+        return;
+    compute_sm_lowlevel (dst,
+            u, sm->f0, sm->ell, sm->exponent, sm->ell2, sm->invl2);
+}
+
+double m_seconds = 0;
+
+/* u and dst may be equal */
+void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
+{
+    /* now for a split-chunk compute_sm_straightforward */
 
     if (sm->nsm == 0)
         return;
@@ -52,17 +57,37 @@ void compute_sm_splitchunks(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_sr
     for(int j = 0, s = 0 ; j < fac->size ; j++) {
         /* simply call the usual function here */
         mpz_poly_srcptr g = fac->factors[j]->f;
-        compute_sm (chunks[j],
-                u,
-                g,
-                sm->ell,
-                sm->exponents[j],
-                sm->ell2,
-                sm->invl2);
+        /* it is tempting to reduce u mod g ; depending on the context,
+         * it may even be a good idea. However, doing so automatically is
+         * wrong, since this function may also be called with tiny data
+         * such as a-bx ; there, multiplying by a-bx with word-size a and
+         * b is better than multiplying by a-bx mod g, which may be a
+         * much longer integer (in the case deg(g)=1 ; otherwise reducing
+         * is a noop in such a case).
+         */
+#if 0
+        if (g->deg > 1) {
+            compute_sm_lowlevel (chunks[j], u,
+                    g, sm->ell, sm->exponents[j], sm->ell2, sm->invl2);
+        } else {
+            ASSERT_ALWAYS(mpz_cmp_ui(g->coeff[1], 1) == 0);
+            mpz_poly_set(chunks[j], u);
+            mpz_poly_mod_f_mod_mpz(chunks[j], g, sm->ell2, sm->invl2);
+            ASSERT_ALWAYS(chunks[j]->deg == 0);
+            mpz_ptr c = chunks[j]->coeff[0];
+            mpz_powm(c, c, sm->exponents[j], sm->ell2);
+            mpz_sub_ui(c, c, 1);
+            mpz_divexact(c, c, sm->ell);
+        }
+#else
+        compute_sm_lowlevel (chunks[j], u,
+                g, sm->ell, sm->exponents[j], sm->ell2, sm->invl2);
+#endif
         for(int k = 0 ; k < g->deg ; k++, s++) {
             mpz_swap(temp->coeff[s], chunks[j]->coeff[k]);
         }
     }
+
     temp->deg = n - 1;
 
     /* now apply the change of basis matrix */
@@ -75,6 +100,7 @@ void compute_sm_splitchunks(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_sr
         }
         mpz_mod(dst->coeff[s], dst->coeff[s], sm->ell);
     }
+
 
     dst->deg = n - 1;
 
@@ -105,23 +131,6 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
       gmp_fprintf(f, " %Zu", SM->coeff[d]);
   }
   //fprintf(f, "\n");
-}
-
-/* Compute the Shirokauer maps of a single pair (a,b). 
-   SM must be allocated and is viewed as a polynomial of degree F->deg. */
-void
-sm_single_rel(mpz_poly_ptr *SM, int64_t a, uint64_t b, mpz_poly_ptr *F,
-              const mpz_ptr *eps, const mpz_t ell, const mpz_t ell2,
-              const mpz_t invl2)
-{
-  mpz_poly_t rel;
-
-  mpz_poly_init_set_ab(rel, a, b);
-  for (int s = 0; s < 2; s++) {
-    if(F[s] != NULL)
-      compute_sm (SM[s], rel, F[s], ell, eps[s], ell2, invl2);
-  }
-  mpz_poly_clear(rel);
 }
 
 void
@@ -276,7 +285,8 @@ void sm_side_info_print(FILE * out, sm_side_info_srcptr sm)
     }
     fprintf(out, "# lifted factors of f modulo ell^2\n");
     for(int i = 0 ; i < sm->fac->size ; i++) {
-        fprintf(out, "# ");
+        gmp_fprintf(out, "# factor %d, exponent ell^%d-1=%Zd:\n# ",
+                i, sm->fac->factors[i]->f->deg, sm->exponents[i]);
         mpz_poly_fprintf(out, sm->fac->factors[i]->f);
     }
     fprintf(out, "# change of basis matrix to OK/ell*OK from piecewise representation\n");

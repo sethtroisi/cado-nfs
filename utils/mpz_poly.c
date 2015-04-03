@@ -316,6 +316,16 @@ void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f)
     mpz_poly_setcoeff (g, i, f->coeff[i]);
 }
 
+/* Init polynomial rel and set it to a - b*x */
+void
+mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
+{
+    mpz_poly_init(rel, 1);
+    mpz_poly_setcoeff_int64(rel, 0, a);
+    mpz_poly_setcoeff_int64(rel, 1, -b);
+}
+
+
 /* swap f and g */
 void
 mpz_poly_swap (mpz_poly_ptr f, mpz_poly_ptr g)
@@ -1578,7 +1588,7 @@ mpz_poly_power_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
       mpz_poly_mul_mod_f_mod_mpz(R, R, P, f, p, invp);  // R <- R*P
   }
 
-  mpz_poly_set(Q, R);
+  mpz_poly_swap(Q, R);
   mpz_poly_clear(R);
 }
 
