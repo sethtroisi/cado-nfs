@@ -150,7 +150,7 @@ void * thread_start(void *arg) {
                     ti->sm_info[side]->invl2
                     );
 
-            compute_sm_splitchunks(ti->dst[i][side],
+            compute_sm_piecewise(ti->dst[i][side],
                     rels[offset+i].num[side],
                     ti->sm_info[side]);
         }
@@ -314,7 +314,7 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t nb_relsets,
               sm_info[side]->ell2,
               sm_info[side]->invl2
               );
-      compute_sm (SM,
+      compute_sm_straightforward (SM,
               rels[i].num[side],
               sm_info[side]->f0,
               sm_info[side]->ell,
@@ -486,16 +486,7 @@ int main (int argc, char **argv)
       sm_side_info_init(sm_info[side], F[side], ell);
   }
 
-  // If nsm is 0 on one side, then set F[side] to NULL to desactivate the
-  // corresponding computations.
-  // TODO: this will go.
-  for (int side = 0; side < 2; ++side) {
-      if (nsm[side] == 0)
-          F[side] = NULL;
-  }
-  
   for (int side = 0; side < 2; side++) {
-      if (F[side] == NULL) continue;
       fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
       mpz_poly_fprintf(stdout, F[side]);
       gmp_fprintf(stdout,
@@ -516,7 +507,7 @@ int main (int argc, char **argv)
       /* command line wins */
       sm_info[side]->nsm = nsm[side];
 
-      if (mpz_cmp(eps[side], sm_info[side]->exponent)) {
+      if (nsm[side] && mpz_cmp(eps[side], sm_info[side]->exponent) != 0) {
           gmp_fprintf(stderr, "On side %d, command line asks for exponent %Zd, while we computed %Zd\n", side, eps[side], sm_info[side]->exponent);
           /* really not sure I want to proceed, here */
           ASSERT_ALWAYS(0);
@@ -525,6 +516,14 @@ int main (int argc, char **argv)
   }
 
   t0 = seconds();
+
+  // If nsm is 0 on one side, then set F[side] to NULL to desactivate the
+  // corresponding computations.
+  // TODO: this will go.
+  for (int side = 0; side < 2; ++side) {
+      if (nsm[side] == 0)
+          F[side] = NULL;
+  }
   rels = build_rel_sets(purgedfile, indexfile, &nb_relsets, F, ell2);
 
   /* adjust the number of threads based on the number of relations */

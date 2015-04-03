@@ -49,6 +49,30 @@ my_poly_scale (double *u, const double *t, unsigned int d, double h)
   for (double hpow = h; d--; hpow *= h) u[d] = t[d] * hpow;
 }
 
+/* unit test for bug #18810 */
+static void
+bug_18810 (void)
+{
+  unsigned char S[65536 + MEMSET_MIN];
+  uint32_t J = 11;
+  uint32_t I = 2048;
+  double scale = 2.0506330998967459e+00;
+  double u0 = -3.4581508374226092e+33;
+  double u1 = 1.2676506002282293e+33;
+  double cexp2[256];
+
+  cexp2[0] = 7.1318374377891458e-01;
+  cexp2[246] = 9.2394971599398293e+35;
+  cexp2[233] = 1.1409510070349870e+34;
+  cexp2[247] = 1.2955282899443179e+36;
+  cexp2[232] = 8.1370771066553413e+33;
+  cexp2[248] = 1.8165420920557745e+36;
+  cexp2[249] = 2.5470884718018755e+36;
+  cexp2[250] = 3.5714337210011752e+36;
+
+  init_degree_one_norms_bucket_region_internal (S, J, I, scale, u0, u1, cexp2);
+}
+
 int
 main(int argc, const char *argv[]) {
   size_t l, logI, k, d;
@@ -64,6 +88,8 @@ main(int argc, const char *argv[]) {
   
   tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER | PARSE_VERBOSE);
   tests_common_get_iter (&iter);
+
+  bug_18810 ();
 
   memset(smart_err, 0, sizeof(smart_err));
   memset(exact_err, 0, sizeof(exact_err));

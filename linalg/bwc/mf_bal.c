@@ -239,6 +239,9 @@ int main(int argc, char * argv[])
     int shuffled_product = 0;
     // const char * ref_balance = NULL;
     int display_correlation = 0;
+    /* we sometimes allocate strings, which need to be freed eventually
+     * */
+    char * freeit[2] = { NULL, NULL, };
 
     param_list_init(pl);
     argv++,argc--;
@@ -298,13 +301,11 @@ int main(int argc, char * argv[])
     }
 
     if (mfile && !rwfile) {
-        char * leakme;
-        rwfile = leakme = build_mat_auxfile(mfile, "rw", ".bin");
+        rwfile = freeit[0] = build_mat_auxfile(mfile, "rw", ".bin");
     }
 
     if (mfile && !cwfile) {
-        char * leakme;
-        cwfile = leakme = build_mat_auxfile(mfile, "cw", ".bin");
+        cwfile = freeit[1] = build_mat_auxfile(mfile, "cw", ".bin");
     }
 
     if (rowperm) {
@@ -574,6 +575,9 @@ int main(int argc, char * argv[])
     balancing_clear(bal);
 
     param_list_clear(pl);
+
+    if (freeit[0]) free(freeit[0]);
+    if (freeit[1]) free(freeit[1]);
 
     return 0;
 }
