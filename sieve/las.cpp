@@ -370,6 +370,11 @@ static void
 sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_config_srcptr sc, param_list pl)
 {
     memset(si, 0, sizeof(sieve_info));
+    /* This is a kludge, really. We don't get the chance to call the ctor
+     * and dtor of sieve_info properly here. This ought to be fixed...
+     * Someday */
+    mpz_init(si->qbasis.q);
+
     si->cpoly = las->cpoly;
     memcpy(si->conf, sc, sizeof(siever_config));
     ASSERT_ALWAYS(sc->logI > 0);
@@ -594,6 +599,10 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
     facul_clear_strategies (si->strategies);
     si->strategies = NULL;
     sieve_info_clear_norm_data(si);
+    /* This is a kludge, really. We don't get the chance to call the ctor
+     * and dtor of sieve_info properly here. This ought to be fixed...
+     * Someday */
+    mpz_clear(si->qbasis.q);
 }/*}}}*/
 
 /* las_info stuff */

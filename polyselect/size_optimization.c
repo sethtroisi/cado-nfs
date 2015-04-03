@@ -1138,6 +1138,11 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
         gmp_fprintf (stderr, "# sopt:   calling LLL with skew = %Zd\n",
                              list_skew[j]);
 
+      /* TODO: Here we use the matrix U instead of the new matrix m.
+         so we could avoid computing division by skew^i.
+         As the new matrix m is never used, one could avoid its computation and
+         do LLL on the Gram matrix instead. It would avoid scalar product
+         computations in LLL and allow to use any scalar product. */
       LLL (tmp, m, &U, a, b);
 
       int npoly = 0;

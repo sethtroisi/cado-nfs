@@ -538,6 +538,7 @@ polyselect/auxiliary.c
 polyselect/auxiliary.h
 polyselect/murphyE.c
 polyselect/murphyE.h
+polyselect/polyselect_gfpn.c
 polyselect/polyselect2l.c
 polyselect/polyselect2l.h
 polyselect/polyselect2l_arith.c
@@ -1090,6 +1091,7 @@ linalg/bwc/test-flint.c
 filter/filter_badideals.c
 params_dl/params.p59
 params_dl/p59.hint
+params_dl/params.p2dd20
 scripts/badideals.mag
 scripts/linalg.mag
 scripts/magma-linalg-wrapper.sh
@@ -1217,3 +1219,5 @@ sieve/ecm/facul.sage
 utils/threadpool.cpp
 utils/threadpool.h
 misc/extra_renumber.c
+cado-nfs.supp
+scripts/valgrind-slave.sh
