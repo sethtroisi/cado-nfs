@@ -968,10 +968,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error, option -out is mandatory\n");
         exit(EXIT_FAILURE);
     }
-    if (!deletedname) {
-        fprintf(stderr, "Error, option -outdel is mandatory\n");
-        exit(EXIT_FAILURE);
-    }
     /* }}} */
 
 
