@@ -97,7 +97,6 @@ void mpfq_pz_field_clear(mpfq_pz_dst_field k)
 /* *pz::code_for_field_specify */
 void mpfq_pz_field_specify(mpfq_pz_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
 {
-        k->url_margin = LONG_MAX;
         if (dummy == MPFQ_PRIME_MPN) {
             fprintf(stderr, "MPFQ_PRIME_MPN is deprecated\n");
             return;
@@ -324,6 +323,13 @@ void mpfq_pz_mul_ui(mpfq_pz_dst_field k, mpfq_pz_dst_elt z, mpfq_pz_src_elt x, u
         mpz_clear(p);
 }
 
+/* *pz::code_for_normalize */
+void mpfq_pz_normalize(mpfq_pz_dst_field k, mpfq_pz_dst_elt z)
+{
+        mp_limb_t tmp;
+        mpn_tdiv_qr(&tmp, z, 0, z, mpz_size(k->p), k->p->_mp_d, mpz_size(k->p));
+}
+
 /* *pz::code_for_inv */
 int mpfq_pz_inv(mpfq_pz_dst_field k, mpfq_pz_dst_elt z, mpfq_pz_src_elt x)
 {
@@ -409,13 +415,6 @@ void mpfq_pz_reduce(mpfq_pz_dst_field k, mpfq_pz_dst_elt z, mpfq_pz_dst_elt_ur x
     //    if (neg)
     //        mpfq_pz_neg(k, z, z);
     mpfq_free(tmp, (mpz_size(k->bigmul_p) + 1) * sizeof(mp_limb_t));
-}
-
-/* *pz::code_for_normalize */
-void mpfq_pz_normalize(mpfq_pz_dst_field k, mpfq_pz_dst_elt z)
-{
-        mp_limb_t tmp;
-        mpn_tdiv_qr(&tmp, z, 0, z, mpz_size(k->p), k->p->_mp_d, mpz_size(k->p));
 }
 
 
@@ -1881,12 +1880,6 @@ static void mpfq_pz_wrapper_addmul_si_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq
     mpfq_pz_addmul_si_ur(vbase->obj, w, u, v);
 }
 
-static void mpfq_pz_wrapper_normalize(mpfq_vbase_ptr, mpfq_pz_dst_elt);
-static void mpfq_pz_wrapper_normalize(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_elt z MAYBE_UNUSED)
-{
-    mpfq_pz_normalize(vbase->obj, z);
-}
-
 static void mpfq_pz_wrapper_reduce(mpfq_vbase_ptr, mpfq_pz_dst_elt, mpfq_pz_dst_elt_ur);
 static void mpfq_pz_wrapper_reduce(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_elt z MAYBE_UNUSED, mpfq_pz_dst_elt_ur x MAYBE_UNUSED)
 {
@@ -1963,6 +1956,12 @@ static int mpfq_pz_wrapper_inv(mpfq_vbase_ptr, mpfq_pz_dst_elt, mpfq_pz_src_elt)
 static int mpfq_pz_wrapper_inv(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_elt z MAYBE_UNUSED, mpfq_pz_src_elt x MAYBE_UNUSED)
 {
     return mpfq_pz_inv(vbase->obj, z, x);
+}
+
+static void mpfq_pz_wrapper_normalize(mpfq_vbase_ptr, mpfq_pz_dst_elt);
+static void mpfq_pz_wrapper_normalize(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_elt z MAYBE_UNUSED)
+{
+    mpfq_pz_normalize(vbase->obj, z);
 }
 
 static void mpfq_pz_wrapper_mul_ui(mpfq_vbase_ptr, mpfq_pz_dst_elt, mpfq_pz_src_elt, unsigned long);
@@ -2211,6 +2210,7 @@ void mpfq_pz_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->add_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_pz_wrapper_add_ui;
     vbase->sub_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_pz_wrapper_sub_ui;
     vbase->mul_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_pz_wrapper_mul_ui;
+    vbase->normalize = (void (*) (mpfq_vbase_ptr, void *)) mpfq_pz_wrapper_normalize;
     vbase->inv = (int (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_pz_wrapper_inv;
     vbase->elt_ur_init = (void (*) (mpfq_vbase_ptr, void *)) mpfq_pz_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (mpfq_vbase_ptr, void *)) mpfq_pz_wrapper_elt_ur_clear;
@@ -2224,7 +2224,6 @@ void mpfq_pz_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->mul_ur = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_pz_wrapper_mul_ur;
     vbase->sqr_ur = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_pz_wrapper_sqr_ur;
     vbase->reduce = (void (*) (mpfq_vbase_ptr, void *, void *)) mpfq_pz_wrapper_reduce;
-    vbase->normalize = (void (*) (mpfq_vbase_ptr, void *)) mpfq_pz_wrapper_normalize;
     vbase->addmul_si_ur = (void (*) (mpfq_vbase_ptr, void *, const void *, long)) mpfq_pz_wrapper_addmul_si_ur;
     vbase->cmp = (int (*) (mpfq_vbase_ptr, const void *, const void *)) mpfq_pz_wrapper_cmp;
     vbase->cmp_ui = (int (*) (mpfq_vbase_ptr, const void *, unsigned long)) mpfq_pz_wrapper_cmp_ui;

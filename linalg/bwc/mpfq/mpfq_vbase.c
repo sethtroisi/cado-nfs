@@ -40,19 +40,61 @@ void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr v, ...)
         mpz_t p;
         mpz_init_set_ui(p, 2);
         int groupsize = 1;
+        const char * mandatory_tag = NULL;
         for(int a ; (a = va_arg(ap, int)) != 0 ; ) {
             if (a == MPFQ_PRIME_MPZ) {
                 mpz_set(p, va_arg(ap, mpz_srcptr));
             } else if (a == MPFQ_GROUPSIZE) {
                 groupsize = va_arg(ap, int);
+            } else if (a == MPFQ_MANDATORY_TAG) {
+                mandatory_tag = va_arg(ap, const char *);
+            } else if (a == MPFQ_PRIME_MPN) {
+                fprintf(stderr, "Feature code MPFQ_PRIME_MPN unsupported\n");
+                exit(EXIT_FAILURE);
             } else {
                 /* We do not support MPFQ_PRIME_MPN. Only MPFQ_PRIME_MPZ*/
                 fprintf(stderr, "Feature code %d unsupported\n", a);
-                exit(1);
+                exit(EXIT_FAILURE);
             }
         }
         va_end(ap);
-        if (0) {
+        if (mandatory_tag) {
+            if (0) {
+            } else if (strcmp(mandatory_tag, "u64k1") == 0 && groupsize == 64 && mpz_cmp_ui(p, 2) == 0) {
+                mpfq_u64k1_oo_field_init(v);
+            } else if (strcmp(mandatory_tag, "u64k2") == 0 && groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
+                mpfq_u64k2_oo_field_init(v);
+            } else if (strcmp(mandatory_tag, "u64k4") == 0 && groupsize == 256 && mpz_cmp_ui(p, 2) == 0) {
+                mpfq_u64k4_oo_field_init(v);
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_1
+            } else if (strcmp(mandatory_tag, "p_1") == 0 && groupsize == 1 && mpz_size(p) == 1) {
+                mpfq_p_1_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_1 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_2
+            } else if (strcmp(mandatory_tag, "p_2") == 0 && groupsize == 1 && mpz_size(p) == 2) {
+                mpfq_p_2_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_2 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_3
+            } else if (strcmp(mandatory_tag, "p_3") == 0 && groupsize == 1 && mpz_size(p) == 3) {
+                mpfq_p_3_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_3 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_4
+            } else if (strcmp(mandatory_tag, "p_4") == 0 && groupsize == 1 && mpz_size(p) == 4) {
+                mpfq_p_4_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_4 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_8
+            } else if (strcmp(mandatory_tag, "p_8") == 0 && groupsize == 1 && mpz_size(p) == 8) {
+                mpfq_p_8_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_8 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_pz
+            } else if (strcmp(mandatory_tag, "pz") == 0 && groupsize == 1 && 1) {
+                mpfq_pz_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_pz */
+            } else {
+                gmp_fprintf(stderr, "Unsupported combination: mandatory tag = %s, group size = %d, p = %Zd, %zu limbs\n", mandatory_tag, groupsize, p, mpz_size(p));
+                exit(1);
+            }
+        /* now for the case where there is no mandatory tag */
         } else if (groupsize == 64 && mpz_cmp_ui(p, 2) == 0) {
             mpfq_u64k1_oo_field_init(v);
         } else if (groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {

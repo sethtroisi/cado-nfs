@@ -201,6 +201,9 @@ static inline
 void mpfq_p_3_sub_ui(mpfq_p_3_dst_field, mpfq_p_3_dst_elt, mpfq_p_3_src_elt, unsigned long);
 static inline
 void mpfq_p_3_mul_ui(mpfq_p_3_dst_field, mpfq_p_3_dst_elt, mpfq_p_3_src_elt, unsigned long);
+#define HAVE_mpfq_p_3_normalize
+static inline
+void mpfq_p_3_normalize(mpfq_p_3_dst_field, mpfq_p_3_dst_elt);
 static inline
 int mpfq_p_3_inv(mpfq_p_3_dst_field, mpfq_p_3_dst_elt, mpfq_p_3_src_elt);
 #define HAVE_mpfq_p_3_hadamard
@@ -232,9 +235,6 @@ static inline
 void mpfq_p_3_sqr_ur(mpfq_p_3_dst_field, mpfq_p_3_dst_elt_ur, mpfq_p_3_src_elt);
 static inline
 void mpfq_p_3_reduce(mpfq_p_3_dst_field, mpfq_p_3_dst_elt, mpfq_p_3_dst_elt_ur);
-#define HAVE_mpfq_p_3_normalize
-static inline
-void mpfq_p_3_normalize(mpfq_p_3_dst_field, mpfq_p_3_dst_elt);
 #define HAVE_mpfq_p_3_addmul_si_ur
 static inline
 void mpfq_p_3_addmul_si_ur(mpfq_p_3_dst_field, mpfq_p_3_dst_elt_ur, mpfq_p_3_src_elt, long);
@@ -435,9 +435,9 @@ MPI_Op mpfq_p_3_mpi_addition_op_ur(mpfq_p_3_dst_field);
 void mpfq_p_3_mpi_ops_clear(mpfq_p_3_dst_field);
 
 /* Object-oriented interface */
+void mpfq_p_3_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_3_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_3_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -727,6 +727,18 @@ void mpfq_p_3_mul_ui(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt z, mpfq_p_3_src_elt 
     mpn_tdiv_qr(q, z, 0, tmp, 3+1, k->p->_mp_d, 3);
 }
 
+/* *Mpfq::gfp::elt::code_for_normalize, Mpfq::gfp */
+static inline
+void mpfq_p_3_normalize(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt x)
+{
+    if (mpfq_fixmp_3_cmp(x,k->p->_mp_d)>=0) {
+      mp_limb_t q[3+1];
+      mpfq_p_3_elt r;
+      mpn_tdiv_qr(q, r, 0, x, 3, k->p->_mp_d, 3);
+      mpfq_p_3_set(k, x, r);
+    }
+}
+
 /* *Mpfq::gfp::elt::code_for_inv, Mpfq::gfp */
 static inline
 int mpfq_p_3_inv(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt z, mpfq_p_3_src_elt x)
@@ -854,18 +866,6 @@ void mpfq_p_3_reduce(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt z, mpfq_p_3_dst_elt_
         mpn_add_n(x, x, k->bigmul_p->_mp_d, 7);
     }
     mpn_tdiv_qr(q, z, 0, x, 7, k->p->_mp_d, 3);
-}
-
-/* *Mpfq::gfp::elt::code_for_normalize, Mpfq::gfp */
-static inline
-void mpfq_p_3_normalize(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt x)
-{
-    if (mpfq_fixmp_3_cmp(x,k->p->_mp_d)>=0) {
-      mp_limb_t q[3+1];
-      mpfq_p_3_elt r;
-      mpn_tdiv_qr(q, r, 0, x, 3, k->p->_mp_d, 3);
-      mpfq_p_3_set(k, x, r);
-    }
 }
 
 /* *simd_gfp::code_for_addmul_si_ur */
