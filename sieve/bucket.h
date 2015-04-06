@@ -46,12 +46,12 @@
  * that can contain, for instance, the low bits of p.
  */
 
-template <typename A, typename B>
-A limit_cast(const B &b)
+template <typename TARGET_TYPE, typename SOURCE_TYPE>
+TARGET_TYPE limit_cast(const SOURCE_TYPE &b)
 {
-  ASSERT_EXPENSIVE(b >= std::numeric_limits<A>::min());
-  ASSERT_EXPENSIVE(b <= std::numeric_limits<A>::max());
-  return static_cast<A>(b);
+  ASSERT_EXPENSIVE(b >= std::numeric_limits<TARGET_TYPE>::min());
+  ASSERT_EXPENSIVE(b <= std::numeric_limits<TARGET_TYPE>::max());
+  return static_cast<TARGET_TYPE>(b);
 }
 
 /* THE ORDER IS MANDATORY! */
