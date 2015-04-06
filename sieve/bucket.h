@@ -285,6 +285,15 @@ public:
   }
 };
 
+/* Downsort sorts the updates in the bucket_index-th bucket of a level-n
+   bucket array into a level n-1 bucket array. The update type of the level n
+   bucket array can be short or long hint; the level n-1 bucket array is
+   always longhint. */
+template <int INPUT_LEVEL, typename INPUT_HINT>
+void
+downsort(bucket_array_tx<INPUT_LEVEL - 1, longhint_t> &BA_out,
+         const bucket_array_t<INPUT_LEVEL, INPUT_HINT> &BA_in,
+         uint32_t bucket_index);
 
 /* A class that stores updates in a single "bucket".
    It's really just a container class with pre-allocated array for storage,
