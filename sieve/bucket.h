@@ -291,7 +291,7 @@ public:
    always longhint. */
 template <int INPUT_LEVEL, typename INPUT_HINT>
 void
-downsort(bucket_array_tx<INPUT_LEVEL - 1, longhint_t> &BA_out,
+downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, INPUT_HINT> &BA_in,
          uint32_t bucket_index);
 
