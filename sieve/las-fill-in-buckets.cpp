@@ -224,7 +224,7 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
 /* {{{ */
 void
-fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_srcptr const si,
+fill_in_buckets(bucket_array_t<bucket_update_t<1, shorthint_t> > &orig_BA, sieve_info_srcptr const si,
                 const fb_transformed_vector *transformed_vector,
                 const int side MAYBE_UNUSED,
                 const fb_slice_interface *slice MAYBE_UNUSED,
@@ -235,7 +235,7 @@ fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_s
   const uint32_t I = si->I;
   const uint32_t J = si->J;
   const uint32_t logI = si->conf->logI;
-  bucket_array_t<bucket_update_shorthint_t> BA;  /* local copy. Gain a register + use stack */
+  bucket_array_t<bucket_update_t<1, shorthint_t> > BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
   
   /* Write new set of pointers for the new slice */

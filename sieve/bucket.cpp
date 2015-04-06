@@ -166,13 +166,13 @@ bucket_array_t<UPDATE_TYPE>::max_full () const
 
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */
-template class bucket_array_t<bucket_update_shorthint_t>;
+template class bucket_array_t<bucket_update_t<1, shorthint_t> >;
 
 
 /* A compare function suitable for sorting updates in order of ascending x
    with qsort() */
 int
-bucket_cmp_x (const bucket_update_longhint_t *a, const bucket_update_longhint_t *b)
+bucket_cmp_x (const bucket_update_t<1, longhint_t>  *a, const bucket_update_t<1, longhint_t>  *b)
 {
   if (a->x < b->x)
     return -1;
@@ -185,7 +185,7 @@ template <class UPDATE_TYPE>
 void
 bucket_single<UPDATE_TYPE>::sort()
 {
-//  qsort (start, write - start, sizeof (bucket_update_longhint_t),
+//  qsort (start, write - start, sizeof (bucket_update_t<1, longhint_t> ),
 //	 (int(*)(const void *, const void *)) &bucket_cmp_x);
 #define islt(a,b) ((a)->x < (b)->x)
   QSORT(UPDATE_TYPE, start, write - start, islt);
@@ -193,44 +193,44 @@ bucket_single<UPDATE_TYPE>::sort()
 }
 
 void
-bucket_primes_t::purge (const bucket_array_t<bucket_update_shorthint_t> &BA,
+bucket_primes_t::purge (const bucket_array_t<bucket_update_t<1, shorthint_t> > &BA,
               const int i, const fb_part *fb, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
-    const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
+    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, shorthint_t> * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
         const fb_slice_interface *slice = fb->get_slice(slice_index);
         ASSERT_ALWAYS(slice != NULL);
         fbprime_t p = slice->get_prime(it->hint);
-        push_update(bucket_update_prime_t(it->x, p));
+        push_update(bucket_update_t<1, primehint_t>(it->x, p, 0, 0));
       }
     }
   }
 }
 
 void
-bucket_array_complete::purge (const bucket_array_t<bucket_update_shorthint_t> &BA, 
+bucket_array_complete::purge (const bucket_array_t<bucket_update_t<1, shorthint_t> > &BA,
               const int i, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
-    const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
+    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, shorthint_t> * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        push_update(bucket_update_longhint_t(it->x, it->hint, slice_index));
+        push_update(bucket_update_t<1, longhint_t> (it->x, 0, it->hint, slice_index));
       }
     }
   }
 }
 
-template class bucket_single<bucket_update_prime_t>;
-template class bucket_single<bucket_update_longhint_t>;
+template class bucket_single<bucket_update_t<1, primehint_t> >;
+template class bucket_single<bucket_update_t<1, longhint_t> >;
 
 
 void
