@@ -1,5 +1,10 @@
-#include <stdint.h>
+#include "cado.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <gmp.h>
+#include <inttypes.h>
+#include "utils.h"
 #include "macros.h"
 #include "getprime.h"
 #include "makefb.h"
@@ -328,8 +333,90 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
 }
 
 #ifdef MAIN
+void write_ideal(FILE * file, ideal_srcptr ideal)
+{
+  fprintf(file, "%" PRIu64 ":", ideal->r);
+  fprintf(file, "%d", ideal->h->deg);
+  for (int i = 0; i <= ideal->h->deg; i++) {
+    gmp_fprintf(file, ",%Zd", ideal->h->coeff[i]);
+  }
+  fprintf(file, ":");
+}
+
+void write_ideal_1(FILE * file, ideal_1_srcptr ideal, unsigned int t) {
+  write_ideal(file, ideal->ideal);
+  for (unsigned int i = 0; i < t - 2; i++) {
+    gmp_fprintf(file, "%Zd,", ideal->Tr[i]);
+  }
+  gmp_fprintf(file, "%Zd:", ideal->Tr[t - 2]);
+  fprintf(file, "%u\n", ideal->log);
+}
+
+void write_ideal_u(FILE * file, ideal_u_srcptr ideal, unsigned int t) {
+  ideal_u_fprintf(stdout, ideal, t);
+  write_ideal(file, ideal->ideal);
+  for (int row = 0; row < ideal->ideal->h->deg - 1; row++) {
+    for (int col = 0; col < (int)t - ideal->ideal->h->deg - 1; col++) {
+      gmp_fprintf(file, "%Zd,", ideal->Tr[row][col]);
+    }
+    gmp_fprintf(file, "%Zd,", ideal->Tr[row]
+                [t - (unsigned int)ideal->ideal->h->deg - 1]);
+  }
+  for (int col = 0; col < (int)t - ideal->ideal->h->deg - 1; col++) {
+    gmp_fprintf(file, "%Zd,", ideal->Tr[ideal->ideal->h->deg - 1][col]);
+  }
+  gmp_fprintf(file, "%Zd:", ideal->Tr[ideal->ideal->h->deg - 1]
+              [t - (unsigned int)ideal->ideal->h->deg - 1]);
+  fprintf(file, "%u\n", ideal->log);
+}
+void write_ideal_pr(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
+{
+  write_ideal(file, ideal->ideal);
+  for (unsigned int i = 0; i < t - 2; i++) {
+    gmp_fprintf(file, "%Zd,", ideal->Tr[i]);
+  }
+  gmp_fprintf(file, "%Zd:", ideal->Tr[t - 2]);
+  fprintf(file, "%u\n", ideal->log);
+}
+
+void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
+    int64_t fbb, mpz_srcptr lpb, unsigned int t)
+{
+  fprintf(file, "# f: ");
+  mpz_poly_fprintf(file, f);
+  fprintf(file, "# fbb: ");
+  fprintf(file, "%" PRIu64 "\n", fbb);
+  fprintf(file, "# lpb: ");
+  gmp_fprintf(file, "%Zd\n", lpb);
+
+  fprintf(file, "f: ");
+  for (int i = 0; i < f->deg; i++) {
+    gmp_fprintf(file, "%Zd,", f->coeff[i]);
+  }
+  gmp_fprintf(file, "%Zd\n", f->coeff[f->deg]);
+  fprintf(file, "t: %u\n", t);
+  fprintf(file, "1\n");
+
+  for (uint64_t i = 0; i < fb->number_element_1; i++) {
+    write_ideal_1(file, fb->factor_base_1[i], t);
+  }
+  fprintf(file, "u\n");
+  
+  for (uint64_t i = 0; i < fb->number_element_u; i++) {
+    write_ideal_u(file, fb->factor_base_u[i], t);
+  }
+  fprintf(file, "p\n");
+  
+  for (uint64_t i = 0; i < fb->number_element_pr; i++) {
+    write_ideal_pr(file, fb->factor_base_pr[i], t);
+  }
+
+}
+
 void declare_usage(param_list pl)
 {
+  param_list_decl_usage(pl, "p", "prime number");
+  param_list_decl_usage(pl, "n", "extension");
   param_list_decl_usage(pl, "t", "dimension of the lattice");
   param_list_decl_usage(pl, "V", "number of number field");
   param_list_decl_usage(pl, "fbb0", "factor base bound on the number field 0");
@@ -338,8 +425,6 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lpb1", "threshold on the number field 1");
   param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
   param_list_decl_usage(pl, "f1", "polynomial that defines the number field 1");
-  param_list_decl_usage(pl, "file0", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file1", "file in which we write the factor bases");
 
   /* MNFS */
 
@@ -367,19 +452,11 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "f7", "polynomial that defines the number field 7");
   param_list_decl_usage(pl, "f8", "polynomial that defines the number field 8");
   param_list_decl_usage(pl, "f9", "polynomial that defines the number field 9");
-  param_list_decl_usage(pl, "file2", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file3", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file4", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file5", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file6", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file7", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file8", "file in which we write the factor bases");
-  param_list_decl_usage(pl, "file9", "file in which we write the factor bases");
 }
 
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     uint64_t ** fbb, factor_base_t ** fb, unsigned int * t, mpz_t ** lpb,
-    unsigned int * V)
+    unsigned int * V, uint64_t * p, unsigned int * n)
 {
   param_list pl;
   param_list_init(pl);
@@ -436,19 +513,12 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   param_list_parse_uint(pl, "t", t);
   ASSERT(* t > 2);
 
-  /*for (unsigned int i = 0; i < * V; i++) {*/
-    /*char str [5];*/
-    /*sprintf(str, "file%u", i);*/
-    /*const char * filename;*/
-    /*filename = param_list_lookup_string(pl, str);*/
-    /*printf("%s, %zd\n", filename, strlen(filename));*/
-    /** (file[i]) = (char * )malloc(sizeof(char) * strlen(filename));*/
-    /*strcpy(*(file[i]), filename);*/
-    /*printf("%s\n", *(file[i]));*/
-  /*}*/
+  param_list_parse_uint64(pl, "p", p);
+
+  param_list_parse_uint(pl, "n", n);
+
   param_list_clear(pl);
 }
-
 
 int main(int argc, char ** argv)
 {
@@ -458,19 +528,34 @@ int main(int argc, char ** argv)
   unsigned int t;
   mpz_t * lpb;
   factor_base_t * fb;
+  uint64_t p;
+  unsigned int n;
 
-  initialise_parameters(argc, argv, &f, &fbb, &fb, &t, &lpb, &V);
+  initialise_parameters(argc, argv, &f, &fbb, &fb, &t, &lpb, &V, &p, &n);
 
   makefb(fb, f, fbb, t, lpb, V);
 
+  //5 because name of the file is p,n,V.
+  unsigned int strlength =
+    (unsigned int)(log((double) p) + log((double) n)) + 5;
+  char str [strlength];
   for (unsigned int i = 0; i < V; i++) {
-    mpz_poly_fprintf(stdout, f[i]);
-    factor_base_fprintf(stdout, fb[i], t);
-    fprintf(stdout, "--------------------------------------------------------------------------------\n"); 
-    mpz_clear(lpb[i]);
-    mpz_poly_clear(f[i]);
-    factor_base_clear(fb[i], t);
+    sprintf(str, "%" PRIu64 ",%u,%u", p, n, i);
+    FILE * file;
+    file = fopen (str, "w+");
+    export_factor_base(file, fb[i], f[i], fbb[i], lpb[i], t);
+    fclose(file);
   }
+
+  /*for (unsigned int i = 0; i < V; i++) {*/
+    /*mpz_poly_fprintf(stdout, f[i]);*/
+    /*factor_base_fprintf(stdout, fb[i], t);*/
+    /*fprintf(stdout, "--------------------------------------------------------------------------------\n"); */
+    /*mpz_clear(lpb[i]);*/
+    /*mpz_poly_clear(f[i]);*/
+    /*factor_base_clear(fb[i], t);*/
+  /*}*/
+
   free(f);
   free(fbb);
   free(lpb);
