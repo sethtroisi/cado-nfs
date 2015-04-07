@@ -6,16 +6,7 @@
 #include "cado.h"
 #include "utils.h"
 #include "sieving_bound.h"
-
-typedef struct
-{
-  unsigned int dim;
-  int64_t * c;
-} int64_vector_struct_t;
-
-typedef int64_vector_struct_t int64_vector_t[1];
-typedef int64_vector_struct_t * int64_vector_ptr;
-typedef const int64_vector_struct_t * int64_vector_srcptr;
+#include "vector.h"
 
 /*
  * Initialise a vector.
@@ -148,7 +139,7 @@ void int64_vector_to_mpz_vector(mpz_vector_ptr a, int64_vector_srcptr b);
  *
  * a: vector.
  */
-double int64_vector_norml2sqr(int64_vector_srcptr a);
+uint64_t int64_vector_norml2sqr(int64_vector_srcptr a);
 
 /*
  * Compute the norm of a vector a.
@@ -175,4 +166,13 @@ int64_t int64_vector_dot_product(int64_vector_srcptr v0,
 int int64_vector_in_sieving_region(int64_vector_srcptr v,
     sieving_bound_srcptr H);
 
-#endif
+/*
+ * Transform a double_vector in an int64_vector.
+ *
+ * v_i: the int64 vector.
+ * v_d: the double vector.
+ */
+void double_vector_in_int64_vector(int64_vector_ptr v_i,
+    double_vector_srcptr v_d);
+
+#endif // INT64_VECTOR_H

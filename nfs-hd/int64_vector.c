@@ -149,13 +149,15 @@ void int64_vector_to_mpz_vector(mpz_vector_ptr a, int64_vector_srcptr b)
   }
 }
 
-double int64_vector_norml2sqr(int64_vector_srcptr a)
+uint64_t int64_vector_norml2sqr(int64_vector_srcptr a)
 {
   ASSERT(a->dim >= 2);
 
-  double norm = 0;
+  uint64_t norm = 0;
   for (unsigned int i = 0; i < a->dim; i++) {
-    norm += (double)(a->c[i] * a->c[i]);
+    ASSERT(a->c[i] * a->c[i] >= 0);
+
+    norm += (uint64_t)(a->c[i] * a->c[i]);
   }
   return norm;
 }
@@ -164,7 +166,7 @@ double int64_vector_norml2(int64_vector_srcptr a)
 {
   ASSERT(a->dim >= 2);
 
-  return sqrt(int64_vector_norml2sqr(a));
+  return sqrt((double)int64_vector_norml2sqr(a));
 }
 
 int64_t int64_vector_dot_product(int64_vector_srcptr v0, int64_vector_srcptr v1)
@@ -193,3 +195,27 @@ int int64_vector_in_sieving_region(int64_vector_srcptr v,
   }
   return 1;
 }
+
+void double_vector_in_int64_vector(int64_vector_ptr v_i,
+    double_vector_srcptr v_d)
+{
+  ASSERT(v_i->dim == v_d->dim);
+
+  for (unsigned int i = 0; i < v_i->dim; i++) {
+    v_d->c[i] = (int64_t) v_i->c[i];
+  }
+}
+
+/*int64_t int64_vector_orthogonal_projection(int64_vector_ptr res,*/
+    /*int64_vector_srcptr u, int64_vector_srcptr v)*/
+/*{*/
+  /*ASSERT(res->dim == u->dim);*/
+  /*ASSERT(u->dim == v->dim);*/
+  
+  /*int64 coeff =*/
+    /*int64_vector_dot_product(u, v);*/
+  /*for (unsigned int i = 0; i < res->dim; i++) {*/
+    /*res->c[i] = coeff * u->c[i];*/
+  /*}*/
+  /*return coeff;*/
+/*}*/
