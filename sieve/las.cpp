@@ -2770,7 +2770,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * this hack).
          */
 
-//        thrs[0].rep->ttbuckets_fill -= seconds();
+       report->ttbuckets_fill -= seconds();
 
         /* Allocate buckets */
         workspaces->pickup_si(si);
@@ -2784,7 +2784,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
                  fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
 
-//        thrs[0].rep->ttbuckets_fill += seconds();
+        report->ttbuckets_fill += seconds();
 
         /* This can now be factored out ! */
         for(int side = 0 ; side < 2 ; side++) {
