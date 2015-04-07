@@ -5,27 +5,75 @@
 #include "cado.h"
 #include "utils.h"
 #include "int64_vector.h"
+#include "double_vector.h"
 #include "mat_int64.h"
 #include "array.h"
 #include "ideal.h"
 
+/*
+ * List of int64_vector.
+ */
 typedef struct
 {
   int64_vector_t * v;
   unsigned int length;
-}  s_list_vector_t;
+}  s_list_int64_vector_t;
 
-typedef s_list_vector_t list_vector_t[1];
-typedef s_list_vector_t * list_vector_ptr;
-typedef const s_list_vector_t * list_vector_srcptr;
+typedef s_list_int64_vector_t list_int64_vector_t[1];
+typedef s_list_int64_vector_t * list_int64_vector_ptr;
+typedef const s_list_int64_vector_t * list_int64_vector_srcptr;
 
-void list_vector_init(list_vector_ptr SV);
+void list_int64_vector_init(list_int64_vector_ptr SV);
 
-void list_vector_add_int64_vector(list_vector_ptr SV, int64_vector_srcptr v);
+void list_int64_vector_add_int64_vector(list_int64_vector_ptr SV, int64_vector_srcptr v);
 
-void list_vector_clear(list_vector_ptr SV);
+void list_int64_vector_clear(list_int64_vector_ptr SV);
 
-void list_vector_fprintf(FILE * file, list_vector_srcptr SV);
+void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr SV);
+
+/*
+ * Extract all the vector (in column) of the matrix and put them in a list.
+ *
+ * list: the list of vector.
+ * matrix: the matrix.
+ */
+void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
+    mat_int64_srcptr matrix);
+
+/*
+ * List of double vector.
+ */
+
+typedef struct
+{
+  double_vector_t * v;
+  unsigned int length;
+}  s_list_double_vector_t;
+
+typedef s_list_double_vector_t list_double_vector_t[1];
+typedef s_list_double_vector_t * list_double_vector_ptr;
+typedef const s_list_double_vector_t * list_double_vector_srcptr;
+
+void list_double_vector_init(list_double_vector_ptr SV);
+
+void list_double_vector_add_double_vector(list_double_vector_ptr SV, double_vector_srcptr v);
+
+void list_double_vector_clear(list_double_vector_ptr SV);
+
+void list_double_vector_fprintf(FILE * file, list_double_vector_srcptr SV);
+
+/*
+ * Extract all the vector (in column) of the matrix and put them in a list.
+ *
+ * list: the list of vector.
+ * matrix: the matrix.
+ */
+void list_double_vector_extract_mat_int64(list_double_vector_ptr list,
+    mat_int64_srcptr matrix);
+
+/*
+ * Utils.
+ */
 
 /*
  * Compute the acute Gauss reduction of two vector (v0_root and v1_root) if they
@@ -81,14 +129,14 @@ int reduce_qlattice_zero(int64_vector_ptr v0, int64_vector_ptr v1,
  * SV: the list of short vector close to v2.
  * v0_root, v1_root, v2: three vectors that gives a basis of a lattice.
  */
-void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
+void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
          int64_vector_srcptr v1_root, int64_vector_srcptr v2);
 
 /*
  * Same thing as SV4, but the basis vector is in a Mqr matrix (vector in
  * columns).
  */
-void SV4_Mqr(list_vector_ptr SV, mat_int64_srcptr Mqr);
+void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr);
 
 /*
  * Enumerate with the Franke-Kleinjung algorithm for x increasing. v->c[0]
@@ -130,7 +178,7 @@ unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
 void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
     int64_vector_srcptr e1, sieving_bound_srcptr H);
 
-unsigned int find_min_x(list_vector_srcptr SV, sieving_bound_srcptr H,
+unsigned int find_min_x(list_int64_vector_srcptr SV, sieving_bound_srcptr H,
     unsigned char * stamp, unsigned char val_stamp);
 
 void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
@@ -141,6 +189,6 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
     uint64_t number_element);
 
-void plane_sieve_next_plane(int64_vector_ptr vs, list_vector_srcptr SV,
+void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
     int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H);
 #endif // UTILS_SIEVE_H

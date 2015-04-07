@@ -7,63 +7,88 @@
 #include "ideal.h"
 #include "utils_mpz.h"
 #include "sieving_bound.h"
+#include "mat_double.h"
+#include "double_vector.h"
 
-void list_vector_init(list_vector_ptr SV)
+#define DEFAULT_LENGTH_LIST_VECTOR 3
+/*
+ * List of int64_vector
+ */
+
+void list_int64_vector_init(list_int64_vector_ptr list)
 {
-  SV->length = 0;
-  SV->v = (int64_vector_t * ) malloc(sizeof(int64_vector_t) * 4);
+  list->length = 0;
+  list->v = (int64_vector_t * ) malloc(sizeof(int64_vector_t) *
+      DEFAULT_LENGTH_LIST_VECTOR);
 }
 
-void list_vector_add_int64_vector(list_vector_ptr SV, int64_vector_srcptr v)
+void list_int64_vector_add_int64_vector(list_int64_vector_ptr list, int64_vector_srcptr v)
 {
-  if ((SV->length % 4) == 0) {
-    SV->v = realloc(SV->v, sizeof(int64_vector_t) * (SV->length + 4));
+  if ((list->length % DEFAULT_LENGTH_LIST_VECTOR) == 0 && list->length != 0) {
+  list->v = realloc(list->v, sizeof(int64_vector_t) * (list->length +
+        DEFAULT_LENGTH_LIST_VECTOR));
   }
-  int64_vector_init(SV->v[SV->length], v->dim);
-  int64_vector_set(SV->v[SV->length], v);
-  SV->length++;
+  int64_vector_init(list->v[list->length], v->dim);
+  int64_vector_set(list->v[list->length], v);
+  list->length++;
 }
 
-void list_vector_clear(list_vector_ptr SV)
+void list_int64_vector_clear(list_int64_vector_ptr list)
 {
-  for (unsigned int i = 0; i < SV->length; i++) {
-    ASSERT(SV->v[i]->dim != 0);
-    int64_vector_clear(SV->v[i]);
+  for (unsigned int i = 0; i < list->length; i++) {
+    ASSERT(list->v[i]->dim != 0);
+    int64_vector_clear(list->v[i]);
   }
-  free(SV->v);
-  SV->length = 0;
+  free(list->v);
+  list->length = 0;
 }
 
-void list_vector_fprintf(FILE * file, list_vector_srcptr SV)
+void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list)
 {
   fprintf(file, "[\n");
-  for (unsigned int i = 0; i < SV->length - 1; i++) {
-    int64_vector_fprintf(file, SV->v[i]);
+  for (unsigned int i = 0; i < list->length - 1; i++) {
+    int64_vector_fprintf(file, list->v[i]);
   }
-  if (SV->length != 0) {
-    int64_vector_fprintf(file, SV->v[SV->length - 1]);
+  if (list->length != 0) {
+    int64_vector_fprintf(file, list->v[list->length - 1]);
   }
   fprintf(file, "]\n");
+}
+
+void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
+    mat_int64_srcptr matrix)
+{
+  ASSERT(list->length == 0);
+
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, matrix->NumRows);
+
+  for (unsigned int i = 0; i < matrix->NumCols; i++) {
+    mat_int64_extract_vector(v_tmp, matrix, i);
+    list_int64_vector_add_int64_vector(list, v_tmp);
+  }
+
+  int64_vector_clear(v_tmp);
 }
 
 /*
  * From PNpoly
  */
-int int64_vector_in_SV(int64_vector_srcptr vec, list_vector_srcptr SV)
+static int int64_vector_in_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list)
 {
-  ASSERT(SV->length > 2);
+  ASSERT(list->length > 2);
   ASSERT(vec->dim > 1);
 #ifndef NDEBUG
-  for (unsigned int i = 0; i < SV->length; i++) {
-    ASSERT(vec->dim == SV->v[i]->dim);
+  for (unsigned int i = 0; i < list->length; i++) {
+    ASSERT(vec->dim == list->v[i]->dim);
     for (unsigned int j = 2; j < vec->dim; j++) {
-      ASSERT(vec->c[j] == SV->v[i]->c[j]);
+      ASSERT(vec->c[j] == list->v[i]->c[j]);
     }
   }
 #endif // NDEBUG
 
-  for (unsigned int i = 0; i < SV->length; i++) {
-    if (int64_vector_equal(vec, SV->v[i]) == 1) {
+  for (unsigned int i = 0; i < list->length; i++) {
+    if (int64_vector_equal(vec, list->v[i]) == 1) {
       return 1;
     }  
   }
@@ -71,17 +96,80 @@ int int64_vector_in_SV(int64_vector_srcptr vec, list_vector_srcptr SV)
   int c = 0;
   unsigned i = 0;
   unsigned j = 0;
-  for (i = 0, j = SV->length - 1; i < SV->length; j =
+  for (i = 0, j = list->length - 1; i < list->length; j =
       i++) {
-    if ( ((SV->v[i]->c[1] > vec->c[1]) != (SV->v[j]->c[1] > vec->c[1])) &&
-        (vec->c[0] < (SV->v[j]->c[0] - SV->v[i]->c[0]) *
-         (vec->c[1] - SV->v[i]->c[1]) / (SV->v[j]->c[1] - SV->v[i]->c[1]) +
-         SV->v[i]->c[0]) ) {
+    if ( ((list->v[i]->c[1] > vec->c[1]) != (list->v[j]->c[1] > vec->c[1])) &&
+        (vec->c[0] < (list->v[j]->c[0] - list->v[i]->c[0]) *
+         (vec->c[1] - list->v[i]->c[1]) / (list->v[j]->c[1] - list->v[i]->c[1]) +
+         list->v[i]->c[0]) ) {
       c = !c;
     }
   }
 
   return c;
+}
+
+/*
+ * List of double vector.
+ */
+void list_double_vector_init(list_double_vector_ptr list)
+{
+  list->length = 0;
+  list->v = (double_vector_t * ) malloc(sizeof(double_vector_t) *
+      DEFAULT_LENGTH_LIST_VECTOR);
+}
+
+void list_double_vector_add_double_vector(list_double_vector_ptr list, double_vector_srcptr v)
+{
+  if ((list->length % DEFAULT_LENGTH_LIST_VECTOR) == 0 && list->length != 0) {
+    list->v = realloc(list->v, sizeof(double_vector_t) * (list->length +
+          DEFAULT_LENGTH_LIST_VECTOR));
+  }
+  double_vector_init(list->v[list->length], v->dim);
+  double_vector_set(list->v[list->length], v);
+  list->length++;
+}
+
+void list_double_vector_clear(list_double_vector_ptr list)
+{
+  for (unsigned int i = 0; i < list->length; i++) {
+    ASSERT(list->v[i]->dim != 0);
+    double_vector_clear(list->v[i]);
+  }
+  free(list->v);
+  list->length = 0;
+}
+
+void list_double_vector_fprintf(FILE * file, list_double_vector_srcptr list)
+{
+  fprintf(file, "[\n");
+  for (unsigned int i = 0; i < list->length - 1; i++) {
+    double_vector_fprintf(file, list->v[i]);
+  }
+  if (list->length != 0) {
+    double_vector_fprintf(file, list->v[list->length - 1]);
+  }
+  fprintf(file, "]\n");
+}
+
+void list_double_vector_extract_mat_int64(list_double_vector_ptr list,
+    mat_int64_srcptr matrix)
+{
+  ASSERT(list->length == 0);
+
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, matrix->NumRows);
+  double_vector_t vd_tmp;
+  double_vector_init(vd_tmp, v_tmp->dim);
+
+  for (unsigned int i = 0; i < matrix->NumCols; i++) {
+    mat_int64_extract_vector(v_tmp, matrix, i);
+    int64_vector_to_double_vector(vd_tmp, v_tmp);
+    list_double_vector_add_double_vector(list, vd_tmp);
+  }
+
+  int64_vector_clear(v_tmp);
+  double_vector_clear(vd_tmp);
 }
 
 /*
@@ -328,7 +416,7 @@ int reduce_qlattice_zero(int64_vector_ptr v0, int64_vector_ptr v1,
 /*
  * For instance, it is SV3.
  */
-void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
+void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
     int64_vector_srcptr v1_root, int64_vector_srcptr v2)
 {
   ASSERT(v0_root->dim == v1_root->dim);
@@ -368,7 +456,7 @@ void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
     u->c[i] = a * v0->c[i] + b * v1->c[i];
   }
   u->c[2] = 0;
-  list_vector_add_int64_vector(SV, u);
+  list_int64_vector_add_int64_vector(SV, u);
 
   //Build a triangle around the projection of v2 in the plane z = 0.
   if (v2_new_base_x - (double)a < 0) {
@@ -376,13 +464,13 @@ void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
       u->c[i] = SV->v[0]->c[i] - v0->c[i];
     }
     u->c[2] = 0;
-    list_vector_add_int64_vector(SV, u);
+    list_int64_vector_add_int64_vector(SV, u);
   } else {
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] + v0->c[i];
     }
     u->c[2] = 0;
-    list_vector_add_int64_vector(SV, u);
+    list_int64_vector_add_int64_vector(SV, u);
   }
 
   if (v2_new_base_y - (double)b < 0) {
@@ -390,13 +478,13 @@ void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
       u->c[i] = SV->v[0]->c[i] - v1->c[i];
     }
     u->c[2] = 0;
-    list_vector_add_int64_vector(SV, u);
+    list_int64_vector_add_int64_vector(SV, u);
   } else {
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] + v1->c[i];
     }
     u->c[2] = 0;
-    list_vector_add_int64_vector(SV, u);
+    list_int64_vector_add_int64_vector(SV, u);
   }
 
 #ifndef NDEBUG
@@ -406,7 +494,7 @@ void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
   for (unsigned int i = 2; i < v_tmp->dim; i++) {
     v_tmp->c[i] = 0;
   }
-  ASSERT(int64_vector_in_SV(v_tmp, SV) == 1);
+  ASSERT(int64_vector_in_list_int64_vector(v_tmp, SV) == 1);
   int64_vector_clear(v_tmp);
 #endif // NDEBUG
 
@@ -420,7 +508,7 @@ void SV4(list_vector_ptr SV, int64_vector_srcptr v0_root,
   mat_int64_clear(U);
 }
 
-void SV4_Mqr(list_vector_ptr SV, mat_int64_srcptr Mqr)
+void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
@@ -463,7 +551,7 @@ static int64_t difference_bound_x(int64_vector_srcptr v,
  *  vectors.
  * val_stamp: value we want for the stamp of the vector.
  */
-unsigned int find_min_x(list_vector_srcptr SV, sieving_bound_srcptr H,
+unsigned int find_min_x(list_int64_vector_srcptr SV, sieving_bound_srcptr H,
     unsigned char * stamp, unsigned char val_stamp)
 {
   int64_t x = -1; 
@@ -645,11 +733,11 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
   int64_vector_clear(e1);
 }
 
-void plane_sieve_next_plane(int64_vector_ptr vs, list_vector_srcptr SV,
+void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
     int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
-  list_vector_t list_vector_tmp;
-  list_vector_init(list_vector_tmp);
+  list_int64_vector_t list_int64_vector_tmp;
+  list_int64_vector_init(list_int64_vector_tmp);
   int64_vector_t v_tmp;
   int64_vector_init(v_tmp, SV->v[0]->dim);
   /*
@@ -662,7 +750,7 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_vector_srcptr SV,
 
   for (unsigned int i = 0; i < SV->length; i++) {
     int64_vector_add(v_tmp, vs, SV->v[i]);
-    list_vector_add_int64_vector(list_vector_tmp, v_tmp);
+    list_int64_vector_add_int64_vector(list_int64_vector_tmp, v_tmp);
 
     if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
       if (-(int64_t) H->h[1] <= v_tmp->c[1] && (int64_t)H->h[1] > v_tmp->c[1])
@@ -684,9 +772,9 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_vector_srcptr SV,
   unsigned int pos = 0;
   if (found == 0) {
     int64_t min = -1;
-    for (unsigned int i = 1; i < list_vector_tmp->length; i++) {
+    for (unsigned int i = 1; i < list_int64_vector_tmp->length; i++) {
       if (assert[i] == 0) {
-        int64_t tmp= ABS(vs->c[0] - list_vector_tmp->v[i]->c[0]);
+        int64_t tmp= ABS(vs->c[0] - list_int64_vector_tmp->v[i]->c[0]);
         if (min == -1) {
           min = tmp;
         }
@@ -696,23 +784,296 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_vector_srcptr SV,
         }
       }
     }
-    int64_vector_set(vs, list_vector_tmp->v[pos]);
+    int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
     ASSERT(vs->c[0] < (int64_t)H->h[0]);
     ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   } else if (found == 1) {
-    pos = find_min_x(list_vector_tmp, H, assert, 1);
-    int64_vector_set(vs, list_vector_tmp->v[pos]);
+    pos = find_min_x(list_int64_vector_tmp, H, assert, 1);
+    int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
     ASSERT(vs->c[0] < (int64_t)H->h[0]);
     ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   } else {
     ASSERT(found == 2);
-    pos = find_min_x(list_vector_tmp, H, assert, 2);
-    int64_vector_set(vs, list_vector_tmp->v[pos]);
+    pos = find_min_x(list_int64_vector_tmp, H, assert, 2);
+    int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
     add_FK_vector(vs, e0, e1, H);
     ASSERT(vs->c[0] < (int64_t)H->h[0]);
     ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   }
 
   free(assert);
-  list_vector_clear(list_vector_tmp);
+  list_int64_vector_clear(list_int64_vector_tmp);
 }
+#ifdef MAIN
+void double_vector_gram_schmidt(list_double_vector_ptr list_new,
+    mat_double_ptr m, list_double_vector_srcptr list_old)
+{
+  for (unsigned int i = 0; i < list_old->length; i++) {
+    list_double_vector_add_double_vector(list_new, list_old->v[i]);
+  }
+
+  double_vector_t v_tmp;
+  double_vector_init(v_tmp, list_new->v[0]->dim);
+  for (unsigned int i = 0; i < list_new->length; i++) {
+    m->coeff[i + 1][i + 1] = 1;
+  }
+
+  for (unsigned int i = 0; i < list_new->length; i++) {
+    for (unsigned int j = 0; j < i; j++) {
+      m->coeff[i + 1][j + 1] = double_vector_orthogonal_projection(v_tmp,
+          list_new->v[j], list_new->v[i]); 
+      double_vector_sub(list_new->v[i], list_new->v[i], v_tmp);
+    }
+  }
+
+  double_vector_clear(v_tmp);
+}
+
+static double sum_mi(int64_vector_srcptr x, mat_double_srcptr m, unsigned int i)
+{
+  double sum = 0;
+  for (unsigned int j = i + 1; j < x->dim; j++) {
+    sum = sum + (double)x->c[j] * m->coeff[j + 1][i + 1];
+  }
+  return sum;
+}
+
+static double sum_li(double_vector_srcptr l, unsigned int i)
+{
+  double sum = 0;
+  for (unsigned int j = i; j < l->dim; j++) {
+    sum = sum + l->c[j];
+  }
+  return sum;
+}
+
+static void construct_v(int64_vector_ptr v, int64_vector_srcptr x,
+    list_int64_vector_srcptr list)
+{
+  ASSERT(x->dim == list->length);
+  ASSERT(v->dim == list->v[0]->dim);
+
+  for (unsigned int i = 0; i < v->dim; i++) {
+    for (unsigned int j = 0; j < x->dim; j++) {
+      v->c[i] = v->c[i] + x->c[j] * list->v[j]->c[i];
+    }
+  }
+}
+
+/*
+ * cf http://perso.ens-lyon.fr/guillaume.hanrot/Papers/iwcc.pdf
+ */
+void enum_lattice(mat_int64_srcptr Mqr, sieving_bound_srcptr H)
+{
+  ASSERT(Mqr->NumRows == Mqr->NumCols);
+  ASSERT(Mqr->NumRows == 3);
+  ASSERT(H->t == Mqr->NumRows);
+
+  //Original basis of the lattice.
+  list_int64_vector_t b_root;
+  list_int64_vector_init(b_root);
+  list_int64_vector_extract_mat_int64(b_root, Mqr);
+
+  /* To compute and store the result of Gram-Schmidt. */
+  list_double_vector_t list_e;
+  list_double_vector_init(list_e);
+  list_double_vector_extract_mat_int64(list_e, Mqr);
+
+  //Matrix with the coefficient mu_{i, j}.
+  mat_double_t M;
+  mat_double_init(M, Mqr->NumRows, Mqr->NumCols);
+  mat_double_set_zero(M);
+
+  //Gram Schmidt orthogonalisation.
+  list_double_vector_t list;
+  list_double_vector_init(list);
+  double_vector_gram_schmidt(list, M, list_e);
+  
+  /* Compute the square of the L2 norm for all the Gram-Schmidt vectors. */
+  double_vector_t b;
+  double_vector_init(b, list->length);
+  for (unsigned int i = 0; i < b->dim; i++) {
+    b->c[i] = double_vector_norml2sqr(list->v[i]);
+  }
+
+  /* Center of the cuboid. */
+  double_vector_t t;
+  double_vector_init(t, Mqr->NumRows);
+  double_vector_set_zero(t);
+  t->c[t->dim - 1] = round((double) H->h[t->dim - 1] / 2);
+
+  //This A is equal to the A^2 in the paper we cite.
+  double A = 0;
+  for (unsigned int i = 0; i < t->dim - 1; i++) {
+    A = A + (double)(H->h[0] * H->h[0]);
+  }
+  A = A + (t->c[t->dim - 1] * t->c[t->dim - 1]);
+
+  //Verify if the matrix M has the good properties.
+#ifdef NDEBUG
+  for (unsigned int j = 0; j < list->v[0]->dim; j++) {
+    if (j == 0) {
+      ASSERT(0 != list->v[0]->c[j]);
+    } else {
+      ASSERT(0 == list->v[0]->c[j]);
+    }
+  }
+  for(unsigned int i = 1; i < list->length; i++) {
+    for (unsigned int j = 0; j < list->v[i]->dim; j++) {
+      if (j == i) {
+        ASSERT(1 == list->v[i]->c[j]);
+      } else {
+        ASSERT(0 == list->v[i]->c[j]);
+      }
+    }
+  }
+#endif
+
+  //Coefficient of t in the Gram-Schmidt basis.
+  double_vector_t ti;
+  double_vector_init(ti, t->dim);
+  double_vector_set_zero(ti);
+  ti->c[ti->dim - 1] = t->c[ti->dim - 1];
+
+  //The vector in the classical basis.
+  int64_vector_t x;
+  int64_vector_init(x, list->length);
+  int64_vector_set_zero(x);
+  x->c[x->dim - 1] = (int64_t) ceil(ti->c[x->dim - 1] -
+      sqrt(A) / sqrt(b->c[x->dim - 1]));
+  unsigned int i = list->length - 1;
+
+  double_vector_t l;
+  double_vector_init(l, x->dim);
+  double_vector_set_zero(l);
+
+  /*printf("Vector b: \n");*/
+  /*list_double_vector_fprintf(stdout, list);*/
+  /*printf("A: %f\n", A);*/
+  /*printf("Vector t: ");*/
+  /*double_vector_fprintf(stdout, t);*/
+  /*printf("Mu: \n");*/
+  /*mat_double_fprintf(stdout, M);*/
+  /*printf("Norm^2 b: ");*/
+  /*double_vector_fprintf(stdout, b);*/
+  /*printf("Coeff ti: ");*/
+  /*double_vector_fprintf(stdout, ti);*/
+  /*printf("l: ");*/
+  /*double_vector_fprintf(stdout, l);*/
+  /*printf("x: ");*/
+  /*int64_vector_fprintf(stdout, x);*/
+
+  //TODO: is it true else if? is it true sqrt(A) in the last condition?
+  while (i < list->length) {
+    double tmp = (double)x->c[i] - ti->c[i] + sum_mi(x, M, i);
+    l->c[i] = (tmp * tmp) * b->c[i];
+    
+    if (i == 0 && sum_li(l, 0) <= A) {
+      int64_vector_t v_h;
+      int64_vector_init(v_h, x->dim);
+      int64_vector_set_zero(v_h);
+      //x * orig_base.
+      construct_v(v_h, x, b_root);
+      if (int64_vector_in_sieving_region(v_h, H)) {
+        int64_vector_fprintf(stdout, v_h);
+      }
+      int64_vector_clear(v_h);
+      x->c[0] = x->c[0] + 1;
+    } else if (i != 0 && sum_li(l, i) <= A) {
+      i = i - 1;
+      x->c[i] = (int64_t)ceil(ti->c[i] -
+          sum_mi(x, M, i) - sqrt((A - sum_li(l, i + 1)) / b->c[i]));
+    } else if (sum_li(l, i)> sqrt(A)) {
+      i = i + 1;
+      if (i < list->length) {
+        x->c[i] = x->c[i] + 1;
+      }
+    }
+  }
+
+  double_vector_clear(l);
+  double_vector_clear(b);
+  int64_vector_clear(x);
+  double_vector_clear(ti);
+  mat_double_clear(M);
+  double_vector_clear(t);
+  list_double_vector_clear(list);
+  list_double_vector_clear(list_e);
+  list_int64_vector_clear(b_root);
+}
+
+// Tqr = [1, 144994, 40026]
+
+int main()
+{
+  /*double_vector_t v0;*/
+  /*double_vector_t v1;*/
+  /*double_vector_t v2;*/
+  /*mat_double_t M;*/
+  /*double_vector_init(v0, 3);*/
+  /*double_vector_init(v1, 3);*/
+  /*double_vector_init(v2, 3);*/
+  /*mat_double_init(M, 3, 3);*/
+  /*mat_double_set_zero(M);*/
+
+  /*v0->c[0] = 262109;*/
+  /*v0->c[1] = 117115;*/
+  /*v0->c[2] = 222083;*/
+  /*v1->c[0] = 0;*/
+  /*v1->c[1] = 1;*/
+  /*v1->c[2] = 0;*/
+  /*v2->c[0] = 0;*/
+  /*v2->c[1] = 0;*/
+  /*v2->c[2] = 1;*/
+
+  /*list_double_vector_t lo;*/
+  /*list_double_vector_t ln;*/
+  /*list_double_vector_init(lo);*/
+  /*list_double_vector_init(ln);*/
+  /*list_double_vector_add_double_vector(lo, v0);*/
+  /*list_double_vector_add_double_vector(lo, v1);*/
+  /*list_double_vector_add_double_vector(lo, v2);*/
+
+  /*double_vector_gram_schmidt(ln, M, lo);*/
+  /*list_double_vector_fprintf(stdout, lo);*/
+  /*mat_double_fprintf(stdout, M);*/
+  /*list_double_vector_fprintf(stdout, ln);*/
+
+  /*double_vector_clear(v0);*/
+  /*double_vector_clear(v1);*/
+  /*double_vector_clear(v2);*/
+  /*mat_double_clear(M);*/
+  /*list_double_vector_clear(lo);*/
+  /*list_double_vector_clear(ln);*/
+ 
+  sieving_bound_t H;
+  sieving_bound_init(H, 3);
+  H->h[0] = 128;
+  H->h[1] = 128;
+  H->h[2] = 128;
+  /*H->h[0] = 1;*/
+  /*H->h[1] = 1;*/
+  /*H->h[2] = 1;*/
+  mat_int64_t Mqr;
+  mat_int64_init(Mqr, 3, 3);
+  Mqr->coeff[1][1] = 262109;
+  Mqr->coeff[1][2] = 117115;
+  Mqr->coeff[1][3] = 222083;
+  Mqr->coeff[2][1] = 0;
+  Mqr->coeff[2][2] = 1;
+  Mqr->coeff[2][3] = 0;
+  Mqr->coeff[3][1] = 0;
+  Mqr->coeff[3][2] = 0;
+  Mqr->coeff[3][3] = 1;
+
+  /*mat_int64_fprintf(stdout, Mqr);*/
+
+  enum_lattice(Mqr, H);
+
+  sieving_bound_clear(H);
+  mat_int64_clear(Mqr);
+
+  return 0;
+}
+
+#endif // MAIN

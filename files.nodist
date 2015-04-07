@@ -177,4 +177,9 @@ nfs-hd/utils_mpz.c
 nfs-hd/utils_mpz.h
 nfs-hd/utils_lattice.c
 nfs-hd/utils_lattice.h
+nfs-hd/vector.h
+nfs-hd/double_vector.c
+nfs-hd/double_vector.h
+nfs-hd/mat_double.c
+nfs-hd/mat_double.h
 tests/nfs-hd/
