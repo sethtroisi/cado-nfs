@@ -19,14 +19,12 @@
 /*
  * p = 10822639589
  * n = 6
- * f0 = 4598*x^6 + 4598*x^5 + 4597*x^4 + 4598*x^3 + 4595*x^2 + 4598*x + 4596
- * 4596,4598,4585,4598,4597,4598,4598
- * f1 = -2353645*x^6 - 2353645*x^5 + 638*x^4 - 2353645*x^3 + 4709204*x^2 -
- *   2353645*x + 2354921
- * 2354921,-2353645,4709204,-2353645,638,-2353645,-2353645
- * t = 4
- * lpb = 28
- * N_a = 2^40
+ * f0 = 1366+1366*x^1+1368*x^2+1368*x^3+1368*x^4+1366*x^5+1365*x^6
+ * f1 = 7917871+7917871*x^1-7916275*x^2-7916275*x^3-7916275*x^4+7917871*x^5
+ *  +15834944*x^6
+ * t = 3
+ * lpb = 26
+ * N_a = 2^23
  */
 
 /*
@@ -974,12 +972,13 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
   int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], 2*H->h[0]);
   
   //Find some short vectors to go from z = d to z = d + 1.
-  list_vector_t SV;
-  list_vector_init(SV);
+  list_int64_vector_t SV;
+  list_int64_vector_init(SV);
   SV4(SV, vec[0], vec[1], vec[2]);
 
   //Reduce q-lattice is not possible.
   if (boolean == 0) {
+    printf("# Plane sieve does not support this type of Mqr.\n");
     mat_int64_fprintf_comment(stdout, Mqr);
  
     //plane_sieve_whithout_FK(SV, vec);
@@ -990,7 +989,7 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
       int64_vector_clear(vec[i]);
     }
     free(vec);
-    list_vector_clear(SV);
+    list_int64_vector_clear(SV);
 
     return;
   }
@@ -1016,7 +1015,7 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
     plane_sieve_next_plane(vs, SV, e0, e1, H);
   }
 
-  list_vector_clear(SV);
+  list_int64_vector_clear(SV);
   int64_vector_clear(vs);
   int64_vector_clear(e0);
   int64_vector_clear(e1);
@@ -1162,12 +1161,23 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         number_of_hit = 0;
         /*getchar();*/
 #endif // NUMBER_HIT
-
-        free(pseudo_Tqr);
+      } else {
+        printf("# Line sieve does not support this type of Tqr.\n");  
+        printf("# Tqr = [");
+        for (unsigned int i = 0; i < H->t - 1; i++) {
+          printf("%" PRIu64 ", ", Tqr[i]);
+        }
+        printf("%" PRIu64 "]\n# pseudo_Tqr = [", Tqr[H->t - 1]);
+        for (unsigned int i = 0; i < H->t - 1; i++) {
+          printf("%" PRIu64 ", ", pseudo_Tqr[i]);
+        }
+        printf("%" PRIu64 "]\n", pseudo_Tqr[H->t - 1]);
       }
 
+      free(pseudo_Tqr);
       int64_vector_clear(c);
-    } else if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
+
+    } else {//if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
 
 #ifdef TEST_MQR
       printf("# Tqr = [");
@@ -1655,10 +1665,10 @@ void find_relations(uint64_array_t * indexes, uint64_t number_element,
       find_relation(indexes, index, number_element, lpb, matrix, f, H, V);
     }
     find_relation(indexes, index, number_element, lpb, matrix, f, H, V);
-    free(index);
   } else {
     printf("# No relations\n");
   }
+  free(index);
 }
 
 void declare_usage(param_list pl)
