@@ -91,6 +91,7 @@ params/rsa190.poly
 params/rsa704.poly
 params/c60.poly
 params/c65.poly
+params/c70.poly
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh
 scripts/polsel_params.sage
