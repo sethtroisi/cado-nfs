@@ -97,6 +97,7 @@ params/c80.poly
 params/c85.poly
 params/c90.poly
 params/c95.poly
+params/c100.poly
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh
 scripts/polsel_params.sage
