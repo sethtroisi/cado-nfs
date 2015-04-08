@@ -28,20 +28,20 @@ tasks.polyselect.ropteffort = 2
 # Sieve
 ###########################################################################
 
-rlim = 400000
-alim = 100000
-lpbr = 22
-lpba = 23
-tasks.sieve.mfbr = 22
-tasks.sieve.mfba = 46
-tasks.sieve.rlambda = 1.1
-tasks.sieve.alambda = 2.1
-tasks.sieve.ncurves0 = 1
-tasks.sieve.ncurves1 = 3
+rlim = 161807
+alim = 71619
+lpbr = 21
+lpba = 21
+tasks.sieve.mfbr = 43
+tasks.sieve.mfba = 43
+tasks.sieve.rlambda = 2.15
+tasks.sieve.alambda = 2.15
+tasks.sieve.ncurves0 = 10
+tasks.sieve.ncurves1 = 2
+tasks.I = 10
 
-tasks.I = 11
 tasks.sieve.qrange = 5000
-tasks.sieve.rels_wanted = 630000
+tasks.sieve.rels_wanted = 310000
 
 ###########################################################################
 # Filtering
