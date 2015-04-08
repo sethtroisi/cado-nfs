@@ -182,6 +182,69 @@ trialdiv_div6 (const unsigned long *n, const trialdiv_divisor_t *d)
   return x0 <= d->plim;
 }
 
+/* Trial division for integers with 7 unsigned long */
+static inline int
+trialdiv_div7 (const unsigned long *n, const trialdiv_divisor_t *d)
+{
+  unsigned long r0, r1, x0, x1;
+#ifdef __GNUC__
+  __asm__ ("# trialdiv_div7");
+#endif
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[1], d->w[0]); /* n_1 * (w^1 % p) */
+  r0 = n[0];
+  r1 = x1;
+  ularith_add_ul_2ul (&r0, &r1, x0);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[2], d->w[1]); /* n_2 * (w^2 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[3], d->w[2]); /* n_3 * (w^3 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[4], d->w[3]); /* n_4 * (w^4 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[5], d->w[4]); /* n_5 * (w^5 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[6], d->w[5]); /* n_6 * (w^6 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  x0 = r1 * d->w[0];
+  x0 += r0;
+  if (x0 < r0)
+    x0 += d->w[0];
+  x0 *= d->pinv;
+  return x0 <= d->plim;
+}
+
+/* Trial division for integers with 8 unsigned long */
+static inline int
+trialdiv_div8 (const unsigned long *n, const trialdiv_divisor_t *d)
+{
+  unsigned long r0, r1, x0, x1;
+#ifdef __GNUC__
+  __asm__ ("# trialdiv_div8");
+#endif
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[1], d->w[0]); /* n_1 * (w^1 % p) */
+  r0 = n[0];
+  r1 = x1;
+  ularith_add_ul_2ul (&r0, &r1, x0);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[2], d->w[1]); /* n_2 * (w^2 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[3], d->w[2]); /* n_3 * (w^3 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[4], d->w[3]); /* n_4 * (w^4 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[5], d->w[4]); /* n_5 * (w^5 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[6], d->w[5]); /* n_6 * (w^6 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ularith_mul_ul_ul_2ul (&x0, &x1, n[7], d->w[6]); /* n_7 * (w^7 % p) */
+  ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  x0 = r1 * d->w[0];
+  x0 += r0;
+  if (x0 < r0)
+    x0 += d->w[0];
+  x0 *= d->pinv;
+  return x0 <= d->plim;
+}
+
+
 
 /* Divides primes in d out of N and stores them (with multiplicity) in f.
    Never stores more than max_div primes in f. Returns the number of
@@ -196,7 +259,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 {
   size_t n = 0;
 
-#if TRIALDIV_MAXLEN > 6
+#if TRIALDIV_MAXLEN > 8
 #error trialdiv not implemented for input sizes of more than 6 words
 #endif
 
@@ -245,6 +308,21 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
       else if (s == 6)
         {
           while (!trialdiv_div6 (N[0]._mp_d, d))
+            d++;
+        }
+#endif
+#if TRIALDIV_MAXLEN >= 7
+      else if (s == 7)
+        {
+          while (!trialdiv_div7 (N[0]._mp_d, d))
+            d++;
+        }
+#endif
+
+#if TRIALDIV_MAXLEN >= 8
+      else if (s == 8)
+        {
+          while (!trialdiv_div8 (N[0]._mp_d, d))
             d++;
         }
 #endif
