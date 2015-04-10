@@ -183,21 +183,6 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
 void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr);
 
 /*
- * Return the position of the vector with a x coordinate minimal, according to
- * the classification defined by the stamp array and the value of the
- * classification val_stamp.
- *
- * SV: list of vector.
- * H: sieving bound.
- * stamp: array with length equal to SV, gives the classification of the
- *  vectors.
- * val_stamp: value we want for the stamp of the vector.
- */
-//TODO: not sure that we want x min, maybe we want y min.
-unsigned int find_min_x(list_int64_vector_srcptr SV, sieving_bound_srcptr H,
-    unsigned char * stamp, unsigned char val_stamp);
-
-/*
  * Add an FK vector (e0 or e1) if v is outside of the sieving region defined by
  * H to have the x coordinate of v in [-H0, H0[.
  *

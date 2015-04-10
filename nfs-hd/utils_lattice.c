@@ -527,7 +527,7 @@ void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr)
 }
 
 /*
- * Return the gap between the x coordinate and the closer border of the sieving
+ * Return the gap between the x coordinate and the closest border of the sieving
  * region defined by the sieving bound H.
  *
  * v: current vector.
@@ -538,27 +538,6 @@ static int64_t difference_bound_x(int64_vector_srcptr v,
 {
   return MIN(ABS(-(int64_t)H->h[0] - v->c[0]), ABS((int64_t)H->h[0] - 1 -
         v->c[0]));
-}
-
-unsigned int find_min_x(list_int64_vector_srcptr SV, sieving_bound_srcptr H,
-    unsigned char * stamp, unsigned char val_stamp)
-{
-  int64_t x = -1; 
-  unsigned int pos = 0;
-
-  for (unsigned int i = 1; i < SV->length; i++) {
-    if (stamp[i] == val_stamp) {
-      int64_t tmp = difference_bound_x(SV->v[i], H);
-      if (x == -1) {
-        x = tmp;
-      }
-      if (x >= tmp) {
-        x = tmp;
-        pos = i;
-      }
-    }
-  }
-  return pos;
 }
 
 void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
@@ -710,9 +689,43 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
   int64_vector_clear(e1);
 }
 
+/*
+ * Return the position of the vector with a x coordinate minimal, according to
+ * the classification defined by the stamp array and the value of the
+ * classification val_stamp.
+ *
+ * SV: list of vector.
+ * H: sieving bound.
+ * stamp: array with length equal to SV, gives the classification of the
+ *  vectors.
+ * val_stamp: value we want for the stamp of the vector.
+ */
+unsigned int find_min_y(list_int64_vector_srcptr SV, unsigned char * stamp,
+    unsigned char val_stamp)
+{
+  int64_t y = -1; 
+  unsigned int pos = 0;
+
+  for (unsigned int i = 0; i < SV->length; i++) {
+    if (stamp[i] == val_stamp) {
+      //Find the closest y to 0.
+      int64_t tmp = ABS(SV->v[i]->c[1]);
+      if (y == -1) {
+        y = tmp;
+      }
+      if (y >= tmp) {
+        y = tmp;
+        pos = i;
+      }
+    }
+  }
+  return pos;
+}
+
 void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
     int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
+  // Contain all the possible vectors to go from z=d to z=d+1.
   list_int64_vector_t list_int64_vector_tmp;
   list_int64_vector_init(list_int64_vector_tmp);
   int64_vector_t v_tmp;
@@ -746,41 +759,18 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
   }
   int64_vector_clear(v_tmp);
 
-  unsigned int pos = 0;
-  if (found == 0) {
-    int64_t min = -1;
-    for (unsigned int i = 1; i < list_int64_vector_tmp->length; i++) {
-      if (assert[i] == 0) {
-        int64_t tmp= ABS(vs->c[0] - list_int64_vector_tmp->v[i]->c[0]);
-        if (min == -1) {
-          min = tmp;
-        }
-        if (min >= tmp) {
-          min = tmp;
-          pos = i;
-        }
-      }
-    }
-    int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
-    ASSERT(vs->c[0] < (int64_t)H->h[0]);
-    ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-  } else if (found == 1) {
-    pos = find_min_x(list_int64_vector_tmp, H, assert, 1);
-    int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
-    ASSERT(vs->c[0] < (int64_t)H->h[0]);
-    ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
-  } else {
-    ASSERT(found == 2);
-    
-    pos = find_min_x(list_int64_vector_tmp, H, assert, 2);
-    int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
+  unsigned pos = find_min_y(list_int64_vector_tmp, assert, found);
+  int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
+  if (found == 2) {
     add_FK_vector(vs, e0, e1, H);
-
-    ASSERT(vs->c[0] < (int64_t)H->h[0]);
-    ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   }
+  printf("# New vector: ");
+  int64_vector_fprintf(stdout, vs);
   
+  ASSERT(vs->c[0] < (int64_t)H->h[0]);
+  ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   free(assert);
+  
   list_int64_vector_clear(list_int64_vector_tmp);
 }
 

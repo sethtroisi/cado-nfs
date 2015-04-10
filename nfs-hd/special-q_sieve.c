@@ -914,7 +914,7 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
     }
 
 #ifdef PLANE_SIEVE_STARTING_POINT
-    if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
+    if (ABS(v->c[1]) < ABS(vs_tmp->c[1])) {
       int64_vector_set(vs_tmp, v);
     }
 #endif // PLANE_SIEVE_STARTING_POINT
@@ -954,7 +954,7 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
 
     }
 #ifdef PLANE_SIEVE_STARTING_POINT
-    if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
+    if (ABS(v->c[1]) < ABS(vs_tmp->c[1])) {
       int64_vector_set(vs_tmp, v);
     }
 #endif // PLANE_SIEVE_STARTING_POINT
