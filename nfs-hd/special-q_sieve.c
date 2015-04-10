@@ -101,8 +101,13 @@ void build_Mq_ideal_1(mat_Z_ptr matrix, ideal_1_srcptr ideal)
 }
 
 /*
- * Build the matrix Mq for an ideal (q, g) with deg(g) > 1. This is probably
- *  non-sens.
+ * Build the matrix Mq for an ideal (q, g) with deg(g) > 1. The matrix need Tq
+ *  with the good coefficients, i.e. t the coeffecients not reduced modulo q.
+ *  Suppose that the matrix is good initialized. Can not verify if ideal->Tq
+ *  and matrix has the good size.
+ *
+ * matrix: Mq.
+ * ideal: an ideal (q, g) with deg(g) > 1.
  */
 void build_Mq_ideal_u(mat_Z_ptr matrix, ideal_u_srcptr ideal)
 {
@@ -880,7 +885,7 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
 
   //Perform Franke-Kleinjung enumeration.
   //x increases.
-  //
+
 #ifdef ASSERT_SIEVE
   index_old = 0;
 #endif // ASSERT_SIEVE
@@ -907,11 +912,13 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
       mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1, 1);
 
     }
+
 #ifdef PLANE_SIEVE_STARTING_POINT
     if (ABS(v->c[0]) < ABS(vs_tmp->c[0])) {
       int64_vector_set(vs_tmp, v);
     }
 #endif // PLANE_SIEVE_STARTING_POINT
+
     FK_value = enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2 * (int64_t)
         H->h[0]);
   }
@@ -920,8 +927,8 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
 
 #ifdef ASSERT_SIEVE
   index_old = 0;
-
 #endif // ASSERT_SIEVE
+
   flag_sr = 0;
   int64_vector_set(v, vs);
   FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
@@ -976,10 +983,6 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
     mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
 {
-#ifdef COME_BACK_TIME
-  double sec = 0;
-#endif // COME_BACK_TIME
-
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
 
@@ -1110,9 +1113,12 @@ void construct_v(int64_vector_ptr v, int64_vector_srcptr x,
  * ideal: the ideal we consider.
  * Mqr: the Mqr matrix.
  * H: the sieving bound that generates a sieving region.
+ * f: the polynomial that defines the number field.
+ * matrix: MqLLL.
  */
 void enum_lattice(array_ptr array, ideal_1_srcptr ideal,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H)
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED mat_Z_srcptr matrix)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
@@ -1211,6 +1217,11 @@ void enum_lattice(array_ptr array, ideal_1_srcptr ideal,
         uint64_t index =
           array_int64_vector_index(v_h, H, array->number_element);
         array->array[index] = array->array[index] - ideal->log;
+
+#ifdef ASSERT_SIEVE
+        index_old = 0;
+#endif // ASSERT_SIEVE
+        mode_sieve(H, index, array, matrix, f, ideal, v_h, 1, 1, 1);
       }
       int64_vector_clear(v_h);
       x->c[0] = x->c[0] + 1;
@@ -1462,7 +1473,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
       compute_Mqr_1(Mqr, Tqr, H->t, r);
 
-      enum_lattice(array, r, Mqr, H);
+      enum_lattice(array, r, Mqr, H, f, matrix);
 
       mat_int64_clear(Mqr);
 
@@ -1645,6 +1656,8 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
   }
   uint64_array_realloc(indexes, ind);
 }
+
+/* ----- Cofactorisation ----- */
 
 /*
  * Print a relation.
@@ -1961,6 +1974,8 @@ void find_relations(uint64_array_t * indexes, uint64_t number_element,
   free(index);
 }
 
+/* ----- Usage and main ----- */
+
 void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "H", "the sieving region");
@@ -2215,9 +2230,10 @@ int main(int argc, char * argv[])
     mpz_set_si(a, q);
     mpz_poly_factor(l, f[q_side], a, state);
     for (int i = 0; i < l->size ; i++) {
-      //Only deal with special-q of degre
+
       if (l->factors[i]->f->deg == 1) {
         ideal_1_set_part(special_q, q, l->factors[i]->f, H->t);
+
         printf("# Special-q: q: %" PRIu64 ", g: ", q);
         mpz_poly_fprintf(stdout, l->factors[i]->f);
 
