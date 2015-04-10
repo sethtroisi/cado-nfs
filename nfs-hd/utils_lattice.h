@@ -9,6 +9,7 @@
 #include "mat_int64.h"
 #include "array.h"
 #include "ideal.h"
+#include "mat_double.h"
 
 /*
  * List of int64_vector.
@@ -23,13 +24,35 @@ typedef s_list_int64_vector_t list_int64_vector_t[1];
 typedef s_list_int64_vector_t * list_int64_vector_ptr;
 typedef const s_list_int64_vector_t * list_int64_vector_srcptr;
 
-void list_int64_vector_init(list_int64_vector_ptr SV);
+/*
+ * Initialise a list of int64_vector.
+ * 
+ * list: the list.
+ */
+void list_int64_vector_init(list_int64_vector_ptr list);
 
-void list_int64_vector_add_int64_vector(list_int64_vector_ptr SV, int64_vector_srcptr v);
+/*
+ * Add a vector in the list.
+ *
+ * list: the list of vector.
+ * v: the vector we add.
+ */
+void list_int64_vector_add_int64_vector(list_int64_vector_ptr list, int64_vector_srcptr v);
 
-void list_int64_vector_clear(list_int64_vector_ptr SV);
+/*
+ * Delete the list.
+ *
+ * list: the list.
+ */
+void list_int64_vector_clear(list_int64_vector_ptr list);
 
-void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr SV);
+/*
+ * Write a list in a file.
+ *
+ * file: the file in which we write.
+ * lest: the list.
+ */
+void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list);
 
 /*
  * Extract all the vector (in column) of the matrix and put them in a list.
@@ -43,7 +66,6 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
 /*
  * List of double vector.
  */
-
 typedef struct
 {
   double_vector_t * v;
@@ -54,13 +76,35 @@ typedef s_list_double_vector_t list_double_vector_t[1];
 typedef s_list_double_vector_t * list_double_vector_ptr;
 typedef const s_list_double_vector_t * list_double_vector_srcptr;
 
-void list_double_vector_init(list_double_vector_ptr SV);
+/*
+ * Initialise a list of int64_vector.
+ * 
+ * list: the list.
+ */
+void list_double_vector_init(list_double_vector_ptr list);
 
-void list_double_vector_add_double_vector(list_double_vector_ptr SV, double_vector_srcptr v);
+/*
+ * Add a vector in the list.
+ *
+ * list: the list of vector.
+ * v: the vector we add.
+ */
+void list_double_vector_add_double_vector(list_double_vector_ptr list, double_vector_srcptr v);
 
-void list_double_vector_clear(list_double_vector_ptr SV);
+/*
+ * Delete the list.
+ *
+ * list: the list.
+ */
+void list_double_vector_clear(list_double_vector_ptr list);
 
-void list_double_vector_fprintf(FILE * file, list_double_vector_srcptr SV);
+/*
+ * Write a list in a file.
+ *
+ * file: the file in which we write.
+ * lest: the list.
+ */
+void list_double_vector_fprintf(FILE * file, list_double_vector_srcptr list);
 
 /*
  * Extract all the vector (in column) of the matrix and put them in a list.
@@ -139,32 +183,19 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
 void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr);
 
 /*
- * Enumerate with the Franke-Kleinjung algorithm for x increasing. v->c[0]
- *  is in [A, A + I[.
+ * Return the position of the vector with a x coordinate minimal, according to
+ * the classification defined by the stamp array and the value of the
+ * classification val_stamp.
  *
- * v: v_old + l v0 + m v1, (l, m) in [0, 1]^2. v->c[0] > v_old->c[0].
- * v_old: the starting point vector.
- * v0: a vector given by reduce_qlattice, v0->c[0] < 0.
- * v1: a vector given by reduce_qlattice, v1->c[0] > 0.
- * A: how the interval is centered.
- * I: the width of the interval.
+ * SV: list of vector.
+ * H: sieving bound.
+ * stamp: array with length equal to SV, gives the classification of the
+ *  vectors.
+ * val_stamp: value we want for the stamp of the vector.
  */
-unsigned int enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
-    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I);
-
-/*
- * Enumerate with the same technique as in Franke-Kleinjung algorithm but for x
- *  decreasing. v->c[0] is in ]-A - I, -A].
- *
- * v: v_old + l v0 + m v1, (l, m) in [0, 1]^2. v->c[0] < v_old->c[0].
- * v_old: the starting point vector.
- * v0: a vector given by reduce_qlattice, v0->c[0] < 0.
- * v1: a vector given by reduce_qlattice, v1->c[0] > 0.
- * A: how the interval is centered.
- * I: the width of the interval.
- */
-unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
-    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I);
+//TODO: not sure that we want x min, maybe we want y min.
+unsigned int find_min_x(list_int64_vector_srcptr SV, sieving_bound_srcptr H,
+    unsigned char * stamp, unsigned char val_stamp);
 
 /*
  * Add an FK vector (e0 or e1) if v is outside of the sieving region defined by
@@ -178,17 +209,75 @@ unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
 void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
     int64_vector_srcptr e1, sieving_bound_srcptr H);
 
-unsigned int find_min_x(list_int64_vector_srcptr SV, sieving_bound_srcptr H,
-    unsigned char * stamp, unsigned char val_stamp);
+/*
+ * Enumerate with the Franke-Kleinjung algorithm for x increasing. v->c[0]
+ *  is in [A, A + I[. Return 0 if v0 is added, 1 if v1 is added, 2 if v0 + v1 is added.
+ *
+ * v: v_old + l v0 + m v1, (l, m) in [0, 1]^2. v->c[0] > v_old->c[0].
+ * v_old: the starting point vector.
+ * v0: a vector given by reduce_qlattice, v0->c[0] < 0.
+ * v1: a vector given by reduce_qlattice, v1->c[0] > 0.
+ * A: how the interval is centered.
+ * I: the width of the interval.
+ */
+unsigned int enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I);
 
-void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
-    int64_vector_srcptr e1, sieving_bound_srcptr H);
+/*
+ * Enumerate with the same technique as in Franke-Kleinjung algorithm but for x
+ *  decreasing. v->c[0] is in ]-A - I, -A]. Return 0 if v0 is added, 1 if v1 is added,
+ *  2 if v0 + v1 is added.
+ *
+ * v: v_old + l v0 + m v1, (l, m) in [0, 1]^2. v->c[0] < v_old->c[0].
+ * v_old: the starting point vector.
+ * v0: a vector given by reduce_qlattice, v0->c[0] < 0.
+ * v1: a vector given by reduce_qlattice, v1->c[0] > 0.
+ * A: how the interval is centered.
+ * I: the width of the interval.
+ */
+unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
+    int64_vector_srcptr v0, int64_vector_srcptr v1, int64_t A, int64_t I);
 
-
+/*
+ * Compute the contribution of adding v0 or v1 to the index of the array in
+ *  which we store the norm to go from v to v + l * v0 + m * v1.
+ *
+ * coord_v0: the contribution of v0.
+ * coord_v1: the contribution of v1.
+ * v0: the vector v0 given by the Franke-Kleinjung algorithm.
+ * v1: the vector v0 given by the Franke-Kleinjung algorithm.
+ * H: the sieving bound.
+ * number_element: number of element in the array.
+ */
 void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
     uint64_t number_element);
 
+/*
+ * Go from the plane z=d to the plane z=d+1 and keep the x coordinate of vs in
+ *  [-H0, H0[.
+ *
+ * vs: the starting point vector in the plane z=d (at beginning) and z=d+1 (at
+ *  the end).
+ * SV: the possible short vector to go from z=d to z=d+1.
+ * e0: a Franke-Kleinjung vector.
+ * e1: a Franke-Kleinjung vector.
+ * H: the sieving bound.
+ */
 void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
     int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H);
+
+/*
+ * Compute the Gram-Schmidt orthogonalisation of the vector in list_old to
+ *  produce list_new and the m matrix, the matrix with the result of the
+ *  orthogonal projection (see page 164 of "Algorithms for the Shortest and Closest
+ *  Lattice Vector Problems" by Guillaume Hanrot, Xavier Pujol, and Damien Stehlé,
+ *  IWCC 2011).
+ *
+ * list_new: the Gram-Schmidt basis.
+ * m: the matrix with the coefficient \mu_{i, j}.
+ * list_old: the original basis.
+ */
+void double_vector_gram_schmidt(list_double_vector_ptr list_new,
+    mat_double_ptr m, list_double_vector_srcptr list_old);
 #endif // UTILS_SIEVE_H

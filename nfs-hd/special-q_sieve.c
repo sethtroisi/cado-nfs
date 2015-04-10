@@ -5,7 +5,7 @@
 #include <inttypes.h>
 #include "utils.h"
 #include "makefb.h"
-#include "int64_vector.h"
+#include "vector.h"
 #include "int64_poly.h"
 #include "mat_int64.h"
 #include "array.h"
@@ -13,6 +13,7 @@
 #include "utils_mpz.h"
 #include "utils_int64.h"
 #include "utils_lattice.h"
+#include "mat_double.h"
 
 //TODO: change % in test + add or substract.
 
@@ -581,10 +582,11 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
  * ideal: the ideal involved in the factorisation in ideals.
  * c: the vector corresponding to the ith value of the array in which we store
  *  the norm.
+ * pos: 1 if index must increase, 0 otherwise.
  */
 void assert_sieve(sieving_bound_srcptr H, uint64_t index,
     uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_srcptr f,
-    ideal_1_srcptr ideal, int64_vector_srcptr c)
+    ideal_1_srcptr ideal, int64_vector_srcptr c, unsigned int pos)
 {
   /*
    * Verify if we do not sieve the same index, because we do not sieve the power
@@ -593,7 +595,11 @@ void assert_sieve(sieving_bound_srcptr H, uint64_t index,
   if (index_old == 0) {
     ASSERT(index_old <= index);
   } else {
-    ASSERT(index_old < index);
+    if (pos == 1) {
+      ASSERT(index_old < index);
+    } else {
+      ASSERT(index_old > index);
+    }
   }
   index_old = index;
 
@@ -673,16 +679,18 @@ void trace_pos_sieve(uint64_t index, ideal_1_srcptr ideal, array_srcptr array)
  * c: the vector corresponding to indexth position in array.
  * number_c_l: number of possible c with the same ci, ci+1, …, ct. (cf line_sieve_ci)
  * nbint: say if we have already count the number_c_l or not.
+ * pos: 1 if index must increase, 0 otherwise.
  */
 void mode_sieve(MAYBE_UNUSED sieving_bound_srcptr H,
     MAYBE_UNUSED uint64_t index, MAYBE_UNUSED array_srcptr array,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
     MAYBE_UNUSED ideal_1_srcptr ideal, MAYBE_UNUSED int64_vector_srcptr c,
-    MAYBE_UNUSED uint64_t number_c_l, MAYBE_UNUSED unsigned int nbint)
+    MAYBE_UNUSED uint64_t number_c_l, MAYBE_UNUSED unsigned int nbint,
+    MAYBE_UNUSED unsigned int pos)
 {
   /*printf("Gugu\n");*/
 #ifdef ASSERT_SIEVE
-  assert_sieve(H, index, array->number_element, matrix, f, ideal, c);
+  assert_sieve(H, index, array->number_element, matrix, f, ideal, c, pos);
 #endif // ASSERT_SIEVE
 
 #ifdef NUMBER_HIT
@@ -734,12 +742,12 @@ void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
     index = array_int64_vector_index(c, H, array->number_element);
     array->array[index] = array->array[index] - ideal->log;
 
-    mode_sieve(H, index, array, matrix, f, ideal, c, number_c_l, 1);
+    mode_sieve(H, index, array, matrix, f, ideal, c, number_c_l, 1, 1);
 
     for (uint64_t k = 1; k < number_c_l; k++) {
       array->array[index + k] = array->array[index + k] - ideal->log;
     
-      mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l, 0);
+      mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l, 0, 1);
     }
 
     int64_t tmp = ci;
@@ -750,13 +758,13 @@ void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
 
       array->array[index] = array->array[index] - ideal->log;
  
-      //TODO: nbint = 0 is strange.
-      mode_sieve(H, index, array, matrix, f, ideal, NULL, number_c_l, 1);
+      mode_sieve(H, index, array, matrix, f, ideal, NULL, number_c_l, 1, 1);
 
       for (uint64_t k = 1; k < number_c_l; k++) {
         array->array[index + k] = array->array[index + k] - ideal->log;
  
-        mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l, 0);
+        mode_sieve(H, index + k, array, matrix, f, ideal, NULL, number_c_l,
+            1, 1);
       }
 
       tmp = tmp + (int64_t)ideal->ideal->r;
@@ -872,6 +880,11 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
 
   //Perform Franke-Kleinjung enumeration.
   //x increases.
+  //
+#ifdef ASSERT_SIEVE
+  index_old = 0;
+#endif // ASSERT_SIEVE
+ 
   while (v->c[1] < (int64_t)H->h[1]) {
     if (v->c[1] >= -(int64_t)H->h[1]) {
       if (!flag_sr) {
@@ -891,7 +904,7 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
       }
       array->array[index_v] = array->array[index_v] - r->log;
 
-      mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+      mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1, 1);
 
     }
 #ifdef PLANE_SIEVE_STARTING_POINT
@@ -904,6 +917,11 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
   }
 
   //x decreases.
+
+#ifdef ASSERT_SIEVE
+  index_old = 0;
+
+#endif // ASSERT_SIEVE
   flag_sr = 0;
   int64_vector_set(v, vs);
   FK_value = enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
@@ -925,7 +943,7 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
       }
       array->array[index_v] = array->array[index_v] - r->log;
 
-      mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1);
+      mode_sieve(H, index_v, array, matrix, f, r, v, 1, 1, 0);
 
     }
 #ifdef PLANE_SIEVE_STARTING_POINT
@@ -951,11 +969,17 @@ void plane_sieve_1_enum_plane(array_ptr array, int64_vector_srcptr vs,
  * r: the ideal we consider.
  * Mqr: the Mqr matrix.
  * H: the sieving bound that defines the sieving region.
+ * matrix: MqLLL.
+ * f: polynomial that defines the number field.
  */
 void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
     mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f)
 {
+#ifdef COME_BACK_TIME
+  double sec = 0;
+#endif // COME_BACK_TIME
+
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
 
@@ -1019,6 +1043,198 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
   int64_vector_clear(vs);
   int64_vector_clear(e0);
   int64_vector_clear(e1);
+}
+
+/* ----- Enumeration algorithm ----- */
+
+/*
+ * Compute sum(m[j][i] * x^j, j > i).
+ *
+ * x: the coefficients of a linear combination of the vector of a basis of the
+ *  lattice we enumerate.
+ * m: the \mu{i, j} matrix given by Gram-Schmidt orthogonalisation.
+ * i: index.
+ */
+double sum_mi(int64_vector_srcptr x, mat_double_srcptr m, unsigned int i)
+{
+  double sum = 0;
+  for (unsigned int j = i + 1; j < x->dim; j++) {
+    sum = sum + (double)x->c[j] * m->coeff[j + 1][i + 1];
+  }
+  return sum;
+}
+
+/*
+ * Compute sum(l_j, j >= i.
+ *
+ * l: 
+ * i: index.
+ */
+double sum_li(double_vector_srcptr l, unsigned int i)
+{
+  double sum = 0;
+  for (unsigned int j = i; j < l->dim; j++) {
+    sum = sum + l->c[j];
+  }
+  return sum;
+}
+
+/*
+ * Construct v from x (the coefficients of the linear combination of the vector
+ *  of a basis of the lattice) and list (a basis of the lattice).
+ *
+ * v: the vector we build.
+ * x: the coefficients.
+ * list: a basis of the lattice.
+ */
+void construct_v(int64_vector_ptr v, int64_vector_srcptr x,
+    list_int64_vector_srcptr list)
+{
+  ASSERT(x->dim == list->length);
+  ASSERT(v->dim == list->v[0]->dim);
+
+  for (unsigned int i = 0; i < v->dim; i++) {
+    for (unsigned int j = 0; j < x->dim; j++) {
+      v->c[i] = v->c[i] + x->c[j] * list->v[j]->c[i];
+    }
+  }
+}
+
+/*
+ * An enumeration algorithm of the element of the lattice generated by Mqr,
+ *  which are in a sphere (see page 164 of "Algorithms for the Shortest and Closest
+ *  Lattice Vector Problems" by Guillaume Hanrot, Xavier Pujol, and Damien Stehlé,
+ *  IWCC 2011).
+ *
+ * array: the array in which we store the norms.
+ * ideal: the ideal we consider.
+ * Mqr: the Mqr matrix.
+ * H: the sieving bound that generates a sieving region.
+ */
+void enum_lattice(array_ptr array, ideal_1_srcptr ideal,
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H)
+{
+  ASSERT(Mqr->NumRows == Mqr->NumCols);
+  ASSERT(Mqr->NumRows == 3);
+  ASSERT(H->t == Mqr->NumRows);
+
+  //Original basis of the lattice.
+  list_int64_vector_t b_root;
+  list_int64_vector_init(b_root);
+  list_int64_vector_extract_mat_int64(b_root, Mqr);
+
+  /* To compute and store the result of Gram-Schmidt. */
+  list_double_vector_t list_e;
+  list_double_vector_init(list_e);
+  list_double_vector_extract_mat_int64(list_e, Mqr);
+
+  //Matrix with the coefficient mu_{i, j}.
+  mat_double_t M;
+  mat_double_init(M, Mqr->NumRows, Mqr->NumCols);
+  mat_double_set_zero(M);
+
+  //Gram Schmidt orthogonalisation.
+  list_double_vector_t list;
+  list_double_vector_init(list);
+  double_vector_gram_schmidt(list, M, list_e);
+  
+  /* Compute the square of the L2 norm for all the Gram-Schmidt vectors. */
+  double_vector_t b;
+  double_vector_init(b, list->length);
+  for (unsigned int i = 0; i < b->dim; i++) {
+    b->c[i] = double_vector_norml2sqr(list->v[i]);
+  }
+
+  /* Center of the cuboid. */
+  double_vector_t t;
+  double_vector_init(t, Mqr->NumRows);
+  double_vector_set_zero(t);
+  t->c[t->dim - 1] = round((double) H->h[t->dim - 1] / 2);
+
+  //This A is equal to the A^2 in the paper we cite.
+  double A = 0;
+  for (unsigned int i = 0; i < t->dim - 1; i++) {
+    A = A + (double)(H->h[0] * H->h[0]);
+  }
+  A = A + (t->c[t->dim - 1] * t->c[t->dim - 1]);
+
+  //Verify if the matrix M has the good properties.
+#ifdef NDEBUG
+  for (unsigned int j = 0; j < list->v[0]->dim; j++) {
+    if (j == 0) {
+      ASSERT(0 != list->v[0]->c[j]);
+    } else {
+      ASSERT(0 == list->v[0]->c[j]);
+    }
+  }
+  for(unsigned int i = 1; i < list->length; i++) {
+    for (unsigned int j = 0; j < list->v[i]->dim; j++) {
+      if (j == i) {
+        ASSERT(1 == list->v[i]->c[j]);
+      } else {
+        ASSERT(0 == list->v[i]->c[j]);
+      }
+    }
+  }
+#endif
+
+  //Coefficient of t in the Gram-Schmidt basis.
+  double_vector_t ti;
+  double_vector_init(ti, t->dim);
+  double_vector_set_zero(ti);
+  ti->c[ti->dim - 1] = t->c[ti->dim - 1];
+
+  //The vector in the classical basis.
+  int64_vector_t x;
+  int64_vector_init(x, list->length);
+  int64_vector_set_zero(x);
+  x->c[x->dim - 1] = (int64_t) ceil(ti->c[x->dim - 1] -
+      sqrt(A) / sqrt(b->c[x->dim - 1]));
+  unsigned int i = list->length - 1;
+
+  double_vector_t l;
+  double_vector_init(l, x->dim);
+  double_vector_set_zero(l);
+
+  //TODO: is it true else if? is it true sqrt(A) in the last condition?
+  while (i < list->length) {
+    double tmp = (double)x->c[i] - ti->c[i] + sum_mi(x, M, i);
+    l->c[i] = (tmp * tmp) * b->c[i];
+    
+    if (i == 0 && sum_li(l, 0) <= A) {
+      int64_vector_t v_h;
+      int64_vector_init(v_h, x->dim);
+      int64_vector_set_zero(v_h);
+      //x * orig_base.
+      construct_v(v_h, x, b_root);
+      if (int64_vector_in_sieving_region(v_h, H)) {
+        uint64_t index =
+          array_int64_vector_index(v_h, H, array->number_element);
+        array->array[index] = array->array[index] - ideal->log;
+      }
+      int64_vector_clear(v_h);
+      x->c[0] = x->c[0] + 1;
+    } else if (i != 0 && sum_li(l, i) <= A) {
+      i = i - 1;
+      x->c[i] = (int64_t)ceil(ti->c[i] -
+          sum_mi(x, M, i) - sqrt((A - sum_li(l, i + 1)) / b->c[i]));
+    } else if (sum_li(l, i)> sqrt(A)) {
+      i = i + 1;
+      if (i < list->length) {
+        x->c[i] = x->c[i] + 1;
+      }
+    }
+  }
+
+  double_vector_clear(l);
+  double_vector_clear(b);
+  int64_vector_clear(x);
+  double_vector_clear(ti);
+  mat_double_clear(M);
+  double_vector_clear(t);
+  list_double_vector_clear(list);
+  list_double_vector_clear(list_e);
+  list_int64_vector_clear(b_root);
 }
 
 #ifdef SIEVE_U
@@ -1159,8 +1375,8 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
             (unsigned int) nearbyint((double) array->number_element /
               (double) r->ideal->r));
         number_of_hit = 0;
-        /*getchar();*/
 #endif // NUMBER_HIT
+
       } else {
         printf("# Line sieve does not support this type of Tqr.\n");  
         printf("# Tqr = [");
@@ -1177,7 +1393,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       free(pseudo_Tqr);
       int64_vector_clear(c);
 
-    } else {//if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
+    } else if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
 
 #ifdef TEST_MQR
       printf("# Tqr = [");
@@ -1223,6 +1439,80 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // NUMBER_HIT
 
       mat_int64_clear(Mqr);
+
+    } else {
+
+#ifdef ENUM_LATTICE
+#ifdef TEST_MQR
+      printf("# Tqr = [");
+      for (unsigned int i = 0; i < H->t - 1; i++) {
+        printf("%" PRIu64 ", ", Tqr[i]);
+      }
+      printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+      mat_int64_t Mqr_test;
+      compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+      mat_int64_fprintf_comment(stdout, Mqr_test);
+      mat_int64_clear(Mqr_test);
+#endif // TEST_MQR
+
+      ASSERT(H->t == 3);
+
+      mat_int64_t Mqr;
+      mat_int64_init(Mqr, H->t, H->t);
+
+      compute_Mqr_1(Mqr, Tqr, H->t, r);
+
+      enum_lattice(array, r, Mqr, H);
+
+      mat_int64_clear(Mqr);
+
+#else // ENUM_LATTICE
+
+#ifdef TEST_MQR
+      printf("# Tqr = [");
+      for (unsigned int i = 0; i < H->t - 1; i++) {
+        printf("%" PRIu64 ", ", Tqr[i]);
+      }
+      printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+      mat_int64_t Mqr_test;
+      compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+      mat_int64_fprintf_comment(stdout, Mqr_test);
+      mat_int64_clear(Mqr_test);
+#endif // TEST_MQR
+
+      ASSERT(H->t == 3);
+
+      mat_int64_t Mqr;
+      mat_int64_init(Mqr, H->t, H->t);
+
+      compute_Mqr_1(Mqr, Tqr, H->t, r);
+
+#ifdef TIMER_SIEVE
+      if (r->ideal->r > TIMER_SIEVE) {
+        sec = seconds();
+      }
+#endif // TIMER_SIEVE
+
+      plane_sieve_1(array, r, Mqr, H, matrix, f);
+
+#ifdef TIMER_SIEVE
+      if (r->ideal->r > TIMER_SIEVE) {
+        time_sieve = time_sieve + seconds() - sec;
+      }
+#endif // TIMER_SIEVE
+
+#ifdef NUMBER_HIT
+      printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
+          number_of_hit, r->ideal->r);
+      mpz_poly_fprintf(stdout, r->ideal->h);
+      printf("# Estimated number of hits: %u.\n",
+          (unsigned int) nearbyint((double) array->number_element /
+            (double) r->ideal->r));
+      number_of_hit = 0;
+#endif // NUMBER_HIT
+
+      mat_int64_clear(Mqr);
+#endif // ENUM_LATTICE
     }
     ideal_1_clear(r, H->t);
     free(Tqr);
