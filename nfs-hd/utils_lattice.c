@@ -533,45 +533,79 @@ void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr)
  * v: current vector.
  * H: sieving bound.
  */
-static int64_t difference_bound_x(int64_vector_srcptr v,
-    sieving_bound_srcptr H)
+/*static uint64_t difference_bound_x(int64_vector_srcptr v,*/
+    /*sieving_bound_srcptr H)*/
+/*{*/
+  /*return (uint64_t) MIN(ABS(-(int64_t)H->h[0] - v->c[0]),*/
+      /*ABS((int64_t)H->h[0] - 1 - v->c[0]));*/
+/*}*/
+
+static int64_t compute_k(int64_t x, int64_t xfk, int64_t H0)
 {
-  return MIN(ABS(-(int64_t)H->h[0] - v->c[0]), ABS((int64_t)H->h[0] - 1 -
-        v->c[0]));
+  /*printf("%" PRId64 ", %" PRId64 ", %" PRId64 "\n", x, xfk, H0);*/
+  /*printf("%f\n", (double)(-H0 - x) / (double)xfk);*/
+  /*printf("%f\n", (double)(H0 - 1 - x) / (double)xfk);*/
+
+  /*ASSERT(ceil((double)(-H0 - x) / (double)xfk) ==*/
+      /*floor((double)(H0 - 1 - x) / (double)xfk - 1));*/
+
+  return (int64_t)ceil((double)(-H0 - x) / (double)xfk);
 }
 
-void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
-    int64_vector_srcptr e1, sieving_bound_srcptr H)
+void add_FK_vector(int64_vector_ptr v, list_int64_vector_srcptr list,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
-  ASSERT(v->c[0] < -(int64_t)H->h[0] || v->c[0] >= (int64_t)H->h[0]);
+  ASSERT(v->dim == 3);
 
-  int64_t dist = difference_bound_x(v, H);
+  int64_vector_t v_use;
+  int64_vector_init(v_use, e0->dim);
+
+  //Select the Franke-Kleinjung vector which have the larger x coordinate.
   if (-e0->c[0] > e1->c[0]) {
-    unsigned int nb = (unsigned int)ceil((double)dist / -(double)e0->c[0]);
-    if (v->c[0] > 0) {
-      for (unsigned int i = 0; i < nb; i++) {
-        int64_vector_add(v, v, e0);
-      }
-    } else {
-      for (unsigned int i = 0; i < nb; i++) {
-        int64_vector_sub(v, v, e0);
-      }
+    ASSERT(v->dim == e0->dim);
+    //Set v_use = -e0;
+    for (unsigned int i = 0; i < e0->dim; i++) {
+      v_use->c[i] = -e0->c[i];
     }
   } else {
-    unsigned int nb = (unsigned int)ceil((double)dist / (double)e1->c[0]);
-    if (v->c[0] > 0) {
-      for (unsigned int i = 0; i < nb; i++) {
-        int64_vector_sub(v, v, e1);
-      }
-    } else {
-      for (unsigned int i = 0; i < nb; i++) {
-        int64_vector_add(v, v, e1);
-      }
+    int64_vector_set(v_use, e1);
+  }
+
+  ASSERT(v_use->c[0] > 0);
+
+  //Compute the distance.
+  unsigned int pos = 0;
+  int64_t k = compute_k(list->v[0]->c[0], v_use->c[0], (int64_t)H->h[0]);
+
+  ASSERT(list->v[0]->c[0] + k * v_use->c[0] < (int64_t)H->h[0]);
+  ASSERT(list->v[0]->c[0] + k * v_use->c[0] >= -(int64_t)H->h[0]);
+
+  uint64_t min_y = (uint64_t)ABS(list->v[0]->c[1] + k * v_use->c[1]);
+
+  for (unsigned int i = 1; i < list->length; i++) {
+    int64_t k_tmp = compute_k(list->v[i]->c[0], v_use->c[0], (int64_t)H->h[0]);
+   
+    ASSERT(list->v[i]->c[0] + k_tmp * v_use->c[0] < (int64_t)H->h[0]);
+    ASSERT(list->v[i]->c[0] + k_tmp * v_use->c[0] >= -(int64_t)H->h[0]);
+
+    uint64_t tmp = (uint64_t)ABS(list->v[i]->c[1] + k_tmp * v_use->c[1]);
+    if (tmp < min_y) {
+      min_y = tmp;
+      pos = i;
+      k = k_tmp;
     }
   }
-  
+
+  int64_vector_set(v, list->v[pos]);
+
+  for (unsigned int i = 0; i < 2; i++) {
+    v->c[i] = v->c[i] + k * v_use->c[i];
+  }
+
   ASSERT(v->c[0] < (int64_t)H->h[0]);
   ASSERT(v->c[0] >= -(int64_t)H->h[0]);
+
+  int64_vector_clear(v_use);
 }
 
 unsigned int enum_pos_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
@@ -726,8 +760,8 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
     int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
   // Contain all the possible vectors to go from z=d to z=d+1.
-  list_int64_vector_t list_int64_vector_tmp;
-  list_int64_vector_init(list_int64_vector_tmp);
+  list_int64_vector_t list;
+  list_int64_vector_init(list);
   int64_vector_t v_tmp;
   int64_vector_init(v_tmp, SV->v[0]->dim);
   /*
@@ -740,7 +774,7 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
 
   for (unsigned int i = 0; i < SV->length; i++) {
     int64_vector_add(v_tmp, vs, SV->v[i]);
-    list_int64_vector_add_int64_vector(list_int64_vector_tmp, v_tmp);
+    list_int64_vector_add_int64_vector(list, v_tmp);
 
     if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
       if (-(int64_t) H->h[1] <= v_tmp->c[1] && (int64_t)H->h[1] > v_tmp->c[1])
@@ -759,19 +793,19 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
   }
   int64_vector_clear(v_tmp);
 
-  unsigned pos = find_min_y(list_int64_vector_tmp, assert, found);
-  int64_vector_set(vs, list_int64_vector_tmp->v[pos]);
-  if (found == 2) {
-    add_FK_vector(vs, e0, e1, H);
+  if (found < 2) {
+    unsigned pos = find_min_y(list, assert, found);
+    int64_vector_set(vs, list->v[pos]);
+  } else {
+    ASSERT(found == 2);
+    add_FK_vector(vs, list, e0, e1, H);
   }
-  printf("# New vector: ");
-  int64_vector_fprintf(stdout, vs);
   
   ASSERT(vs->c[0] < (int64_t)H->h[0]);
   ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   free(assert);
   
-  list_int64_vector_clear(list_int64_vector_tmp);
+  list_int64_vector_clear(list);
 }
 
 void double_vector_gram_schmidt(list_double_vector_ptr list_new,

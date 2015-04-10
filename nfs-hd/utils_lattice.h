@@ -191,8 +191,8 @@ void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr);
  * e1: a vector given by the Franke-Kleinjung algorithm.
  * H: sieving bound.
  */
-void add_FK_vector(int64_vector_ptr v, int64_vector_srcptr e0,
-    int64_vector_srcptr e1, sieving_bound_srcptr H);
+void add_FK_vector(int64_vector_ptr v, list_int64_vector_srcptr list,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H);
 
 /*
  * Enumerate with the Franke-Kleinjung algorithm for x increasing. v->c[0]
