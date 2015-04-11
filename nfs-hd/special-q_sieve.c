@@ -127,11 +127,21 @@ void build_Mq_ideal_u(mat_Z_ptr matrix, ideal_u_srcptr ideal)
   }
   for (int col = ideal->ideal->h->deg + 1; col <= (int)matrix->NumCols;
        col++) {
-    for (int row = 1; row <= ideal->ideal->h->deg + 1; row++) {
+    for (int row = 1; row <= ideal->ideal->h->deg; row++) {
       mat_Z_set_coeff(matrix,
-                      ideal->Tr[row - 1]
-                      [col - ideal->ideal->h->deg + 1], row, col);
+          ideal->Tr[row - 1][col - ideal->ideal->h->deg + 1], row, col);
     }
+  }
+}
+
+void build_Mq_ideal_spq(mat_Z_ptr matrix, ideal_spq_srcptr ideal)
+{
+  ASSERT(matrix->NumRows == matrix->NumCols);
+
+  if (ideal->type == 0) {
+    build_Mq_ideal_1(matrix, ideal->ideal_1);
+  } else if (ideal->type == 1) {
+    build_Mq_ideal_u(matrix, ideal->ideal_u);
   }
 }
 
@@ -183,7 +193,7 @@ void norm_poly(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
  *
  * f: the polynomial that defines the number field.
  * a: the polynomial for which we compute the norm.
- * q: value of the special-q, 1.0 if no special-q.
+ * q: value of the special-q (ie, q^(deg(g))), 1.0 if no special-q.
  */
 void mean_norm(mpz_poly_srcptr f, int64_poly_srcptr a, double q)
 {
@@ -258,18 +268,29 @@ void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
  * i: position in the array we want to follow.
  * vector: the vector corresponding to the ith position.
  * array: the array in which we store the norm.
+ * deg_g: the degree of the g of the special-q.
  */
 void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED int64_poly_srcptr a, MAYBE_UNUSED double q,
+    MAYBE_UNUSED int64_poly_srcptr a, MAYBE_UNUSED ideal_spq_srcptr spq,
     MAYBE_UNUSED double bound_resultant, MAYBE_UNUSED uint64_t i,
     MAYBE_UNUSED int64_vector_srcptr vector, MAYBE_UNUSED array_srcptr array)
 {
 #ifdef MEAN_NORM
-  mean_norm(f, a, q);
+  if (special_q == 1) {
+    mean_norm(f, a, pow(((double) ideal_spq_get_q(spq), (double)
+            ideal_spq_get_deg_h(spq)));
+  } else {
+    mean_norm(f, a, 1.0);
+  }
 #endif // MEAN_NORM
 
 #ifdef MEAN_NORM_BOUND
-  norm_bound = norm_bound + bound_resultant / q;
+  if (special_q == 1) {
+    norm_bound = norm_bound + bound_resultant /
+    pow(((double) ideal_spq_get_q(spq), (double) ideal_spq_get_deg_h(spq)));
+  } else {
+    norm_bound = norm_bound + bound_resultant;
+  }
 #endif // MEAN_NORM_BOUND
 
 #ifdef TRACE_POS
@@ -295,7 +316,7 @@ void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
  */
 void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
     double * pre_compute, sieving_bound_srcptr H, mat_int64_srcptr matrix,
-    unsigned int beg, mpz_poly_srcptr f, ideal_1_srcptr spq, int special_q,
+    unsigned int beg, mpz_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
     MAYBE_UNUSED int64_vector_srcptr vector)
 {
   double bound_resultant;
@@ -334,17 +355,20 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
    *  special-q if it is set in this number field.
    */
   if (special_q) {
-    array->array[i] = (unsigned char)log2(bound_resultant) - spq->log;
-    mode_init_norm(special_q, f, a, (double)spq->ideal->r, bound_resultant, i,
+    ASSERT(special_q == 1);
+
+    array->array[i] = (unsigned char)log2(bound_resultant) -
+      ideal_spq_get_log(spq);
+    mode_init_norm(special_q, f, a, spq, bound_resultant, i,
         vector, array);
   } else {
     array->array[i] = (unsigned char) log2(bound_resultant);
-    mode_init_norm(special_q, f, a, 1.0, bound_resultant, i, vector, array);
+    mode_init_norm(special_q, f, a, spq, bound_resultant, i, vector, array);
   }
 }
 
 /*
- * Init the norm for a special-q (q, g) with deg(g) = 1.
+ * Init the norm for a special-q (q, g).
  *
  * array: the array in which the norms are initialized.
  * pre_compute: the array of precomputed value obtained with pre_computation.
@@ -354,9 +378,9 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
  * spq: the special-q.
  * special_q: 0 if there is no special-q in this side, else 1.
  */
-void init_norm_1(array_ptr array, double * pre_compute,
+void init_norm(array_ptr array, double * pre_compute,
     sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
-    ideal_1_srcptr spq, int special_q)
+    ideal_spq_srcptr spq, int special_q)
 {
   ASSERT(special_q == 0 || special_q == 1);
 
@@ -2213,7 +2237,6 @@ int main(int argc, char * argv[])
   printf("# Time for makefb: %f.\n", seconds() - sec);
 
   ASSERT(q_min >= fbb[q_side]);
-  ideal_1_t special_q;
   gmp_randstate_t state;
   mpz_t a;
   mpz_poly_factor_list l;
@@ -2221,18 +2244,32 @@ int main(int argc, char * argv[])
   mpz_poly_factor_list_init(l);
   gmp_randinit_default(state);
   mpz_init(a);
-  ideal_1_init(special_q);
 
   //Pass all the prime less than q_min.
   for (q = 2; q < q_min; q = getprime(q)) {}
 
+#ifdef SPECIAL_Q_IDEAL_U
+    int deg_bound_factorise = (int)H->t;
+#else // SPECIAL_Q_IDEAL_U
+    int deg_bound_factorise = 2;
+#endif // SPECIAL_Q_IDEAL_U
+
   for ( ; q <= q_max; q = getprime(q)) {
+    ideal_spq_t special_q;
+    ideal_spq_init(special_q);
     mpz_set_si(a, q);
     mpz_poly_factor(l, f[q_side], a, state);
+
     for (int i = 0; i < l->size ; i++) {
 
-      if (l->factors[i]->f->deg == 1) {
-        ideal_1_set_part(special_q, q, l->factors[i]->f, H->t);
+      if (l->factors[i]->f->deg < deg_bound_factorise) {
+        if (l->factors[i]->f->deg == 1) {
+          ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 0);
+        } else {
+          ASSERT(l->factors[i]->f->deg > 1);
+
+          ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 1);
+        } 
 
         printf("# Special-q: q: %" PRIu64 ", g: ", q);
         mpz_poly_fprintf(stdout, l->factors[i]->f);
@@ -2246,7 +2283,7 @@ int main(int argc, char * argv[])
         sec_tot = sec;
 
         /* LLL part */
-        build_Mq_ideal_1(matrix, special_q);
+        build_Mq_ideal_spq(matrix, special_q);
 
 #ifdef TRACE_POS
         fprintf(file, "Mq:\n");
@@ -2290,8 +2327,8 @@ int main(int argc, char * argv[])
         for (unsigned int j = 0; j < V; j++) {
           sec = seconds();
           uint64_array_init(indexes[j], array->number_element);
-          init_norm_1(array, pre_compute[j], H, matrix, f[j], special_q,
-                      !(j ^ q_side));
+          init_norm(array, pre_compute[j], H, matrix, f[j], special_q,
+              !(j ^ q_side));
           time[j][0] = seconds() - sec;
 
 #ifdef MEAN_NORM_BOUND
@@ -2392,14 +2429,11 @@ int main(int argc, char * argv[])
 
       }
     }
+
+    ideal_spq_clear(special_q, H->t);
   }
 
   mpz_poly_factor_list_clear(l);
-  if (special_q->ideal->r == 0) {
-    mpz_poly_clear(special_q->ideal->h);
-  } else {
-    ideal_1_clear(special_q, H->t);
-  }
   gmp_randclear(state);
   mpz_clear(a);
   getprime(0);

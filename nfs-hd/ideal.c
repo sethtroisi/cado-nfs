@@ -284,3 +284,122 @@ void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
   }
   gmp_fprintf(file, "%Zd]\n", ideal->Tr[t - 2]);
 }
+
+/* Ideal special-q. */
+void ideal_spq_init(ideal_spq_ptr ideal)
+{
+  ideal->type = -1; 
+}
+
+void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+    unsigned int t, char type)
+{
+  ASSERT(type >= 0 && type < 3);
+#ifdef NDEBUG
+  if (h->deg == 1) {
+    ASSERT(type == 0 || type == 2);
+  } else {
+    ASSERT(type == 1);
+  }
+#endif // NDEBUG
+
+  ideal->type = type;
+  if (type == 0) {
+    ideal_1_init(ideal->ideal_1);
+    ideal_1_set_part(ideal->ideal_1, r, h, t);
+  } else if (type == 1) {
+    ideal_u_init(ideal->ideal_u);
+    ideal_u_set_part(ideal->ideal_u, r, h, t);
+  } else {
+    ASSERT(type == 2);
+    ASSERT(h->deg == 1);
+#ifdef NDEBUG
+    mpz_t tmp;
+    mpz_init(tmp);
+    mpz_poly_getcoeff(tmp, h, 0);
+    ASSERT(gmp_cmp_ui(tmp, 0) == 1);
+    mpz_poly_getcoeff(tmp, h, 1);
+    ASSERT(gmp_cmp_ui(tmp, 1) == 1);
+    mpz_clear(tmp);
+#endif // NDEBUG
+
+    ideal_pr_init(ideal->ideal_pr);
+    ideal_pr_set_part(ideal->ideal_pr, r, t);
+  }
+}
+
+void ideal_spq_clear(ideal_spq_ptr ideal, unsigned int t)
+{
+  if (ideal->type == 0) {
+    ideal_1_clear(ideal->ideal_1, t);
+  } else if (ideal->type == 1) {
+    ideal_u_clear(ideal->ideal_u, t);
+  } else if (ideal->type == 2) {
+    ideal_pr_clear(ideal->ideal_pr, t);
+  } else {
+    ASSERT(ideal->type = -1);
+  }
+
+  ideal->type = -1;
+}
+
+void ideal_spq_fprintf(FILE * file, ideal_spq_srcptr ideal, unsigned int t)
+{
+  if (ideal->type == -1) {
+    fprintf(file, "No special-q ideal.\n");
+  }
+  if (ideal->type == 0) {
+    ideal_1_fprintf(file, ideal->ideal_1, t);
+  } else if (ideal->type == 1) {
+    ideal_u_fprintf(file, ideal->ideal_u, t);
+  } else {
+    ASSERT(ideal->type == 2);
+
+    ideal_pr_fprintf(file, ideal->ideal_pr, t);
+  }
+}
+
+unsigned char ideal_spq_get_log(ideal_spq_srcptr ideal)
+{
+  unsigned char log = 0;
+  if (ideal->type == 0) {
+    log = ideal->ideal_1->log;
+  } else if (ideal->type == 1) {
+    log = ideal->ideal_u->log;
+  } else {
+    ASSERT(ideal->type == 2);
+
+    log = ideal->ideal_pr->log;
+  }
+  return log;
+}
+
+uint64_t ideal_spq_get_q(ideal_spq_srcptr ideal)
+{
+  uint64_t q = 0;
+  if (ideal->type == 0) {
+    q = ideal->ideal_1->ideal->r;
+  } else if (ideal->type == 1) {
+    q = ideal->ideal_u->ideal->r;
+  } else {
+    ASSERT(ideal->type == 2);
+
+    q = ideal->ideal_pr->ideal->r;
+  }
+  return q;
+}
+
+int ideal_spq_get_deg_g(ideal_spq_srcptr ideal)
+{
+  int deg_g = 0;
+  if (ideal->type == 0) {
+    deg_g = ideal->ideal_1->ideal->h->deg;
+  } else if (ideal->type == 1) {
+    deg_g = ideal->ideal_u->ideal->h->deg;
+  } else {
+    ASSERT(ideal->type == 2);
+
+    deg_g = ideal->ideal_pr->ideal->h->deg;
+  }
+  return deg_g;
+}

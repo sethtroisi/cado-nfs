@@ -50,6 +50,19 @@ typedef s_ideal_pr_t ideal_pr_t[1];
 typedef s_ideal_pr_t * ideal_pr_ptr;
 typedef const s_ideal_pr_t * ideal_pr_srcptr;
 
+// spq for special-q.
+typedef struct {
+  ideal_1_t ideal_1;
+  ideal_u_t ideal_u;
+  ideal_pr_t ideal_pr;
+  // 0 if ideal_1, 1 if ideal_u, 2 if ideal_pr.
+  char type;
+} s_ideal_spq_t;
+
+typedef s_ideal_spq_t ideal_spq_t[1];
+typedef s_ideal_spq_t * ideal_spq_ptr;
+typedef const s_ideal_spq_t * ideal_spq_srcptr;
+
 /* Ideal: (r, h) */
 
 /*
@@ -193,5 +206,22 @@ void ideal_pr_clear(ideal_pr_ptr ideal, unsigned int t);
  * t: t is the dimension of the lattice we explore.
  */
 void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t);
+
+/* Special-q ideal */
+
+void ideal_spq_init(ideal_spq_ptr ideal);
+
+void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+    unsigned int t, char type);
+
+void ideal_spq_clear(ideal_spq_ptr ideal, unsigned int t);
+
+void ideal_spq_fprintf(FILE * file, ideal_spq_srcptr ideal, unsigned int t);
+
+unsigned char ideal_spq_get_log(ideal_spq_srcptr ideal);
+
+uint64_t ideal_spq_get_q(ideal_spq_srcptr ideal);
+
+int ideal_spq_get_deg_g(ideal_spq_srcptr ideal);
 
 #endif /* IDEAL_H */
