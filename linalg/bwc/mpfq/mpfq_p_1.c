@@ -98,7 +98,6 @@ void mpfq_p_1_field_clear(mpfq_p_1_dst_field k)
 /* *Mpfq::gfp::field::code_for_field_specify, Mpfq::gfp */
 void mpfq_p_1_field_specify(mpfq_p_1_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
 {
-        k->url_margin = LONG_MAX;
         if (dummy == MPFQ_PRIME_MPN) {
             fprintf(stderr, "MPFQ_PRIME_MPN is deprecated\n");
             return;
@@ -1592,12 +1591,6 @@ static void mpfq_p_1_wrapper_addmul_si_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpf
     mpfq_p_1_addmul_si_ur(vbase->obj, w, u, v);
 }
 
-static void mpfq_p_1_wrapper_normalize(mpfq_vbase_ptr, mpfq_p_1_dst_elt);
-static void mpfq_p_1_wrapper_normalize(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_elt x MAYBE_UNUSED)
-{
-    mpfq_p_1_normalize(vbase->obj, x);
-}
-
 static void mpfq_p_1_wrapper_reduce(mpfq_vbase_ptr, mpfq_p_1_dst_elt, mpfq_p_1_dst_elt_ur);
 static void mpfq_p_1_wrapper_reduce(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_elt z MAYBE_UNUSED, mpfq_p_1_dst_elt_ur x MAYBE_UNUSED)
 {
@@ -1680,6 +1673,12 @@ static int mpfq_p_1_wrapper_inv(mpfq_vbase_ptr, mpfq_p_1_dst_elt, mpfq_p_1_src_e
 static int mpfq_p_1_wrapper_inv(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_elt z MAYBE_UNUSED, mpfq_p_1_src_elt x MAYBE_UNUSED)
 {
     return mpfq_p_1_inv(vbase->obj, z, x);
+}
+
+static void mpfq_p_1_wrapper_normalize(mpfq_vbase_ptr, mpfq_p_1_dst_elt);
+static void mpfq_p_1_wrapper_normalize(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_elt x MAYBE_UNUSED)
+{
+    mpfq_p_1_normalize(vbase->obj, x);
 }
 
 static void mpfq_p_1_wrapper_mul_ui(mpfq_vbase_ptr, mpfq_p_1_dst_elt, mpfq_p_1_src_elt, unsigned long);
@@ -1934,6 +1933,7 @@ void mpfq_p_1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->add_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_p_1_wrapper_add_ui;
     vbase->sub_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_p_1_wrapper_sub_ui;
     vbase->mul_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_p_1_wrapper_mul_ui;
+    vbase->normalize = (void (*) (mpfq_vbase_ptr, void *)) mpfq_p_1_wrapper_normalize;
     vbase->inv = (int (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_p_1_wrapper_inv;
     vbase->hadamard = (void (*) (mpfq_vbase_ptr, void *, void *, void *, void *)) mpfq_p_1_wrapper_hadamard;
     vbase->elt_ur_init = (void (*) (mpfq_vbase_ptr, void *)) mpfq_p_1_wrapper_elt_ur_init;
@@ -1948,7 +1948,6 @@ void mpfq_p_1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->mul_ur = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_p_1_wrapper_mul_ur;
     vbase->sqr_ur = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_p_1_wrapper_sqr_ur;
     vbase->reduce = (void (*) (mpfq_vbase_ptr, void *, void *)) mpfq_p_1_wrapper_reduce;
-    vbase->normalize = (void (*) (mpfq_vbase_ptr, void *)) mpfq_p_1_wrapper_normalize;
     vbase->addmul_si_ur = (void (*) (mpfq_vbase_ptr, void *, const void *, long)) mpfq_p_1_wrapper_addmul_si_ur;
     vbase->cmp = (int (*) (mpfq_vbase_ptr, const void *, const void *)) mpfq_p_1_wrapper_cmp;
     vbase->cmp_ui = (int (*) (mpfq_vbase_ptr, const void *, unsigned long)) mpfq_p_1_wrapper_cmp_ui;

@@ -77,7 +77,11 @@ void get_random_prime(mpz_t z, mp_bitcnt_t n, int quiet, gmp_randstate_t rnd) {
 int main(int argc, char * argv[])
 {
     int ntests = 100;
+#ifndef RNS
     int nloops = 1;
+#else
+    int nloops = 2;
+#endif
     int quiet = 0;
     Kelt a0, a1, a2, a3, a4, a5;
     Kelt  r1, r2;
@@ -140,6 +144,10 @@ int main(int argc, char * argv[])
 #else   /* VARIABLE_SIZE_PRIME */
         mp_bitcnt_t size_prime=Kimpl_max_characteristic_bits();
 #endif  /* VARIABLE_SIZE_PRIME */
+#ifdef  RNS
+	size_prime/=(1+(nloops % 2));
+#endif
+
         if (prime_str) {
             mpz_set_str(p, prime_str, 0);
         } else {
@@ -260,7 +268,9 @@ int main(int argc, char * argv[])
                 Kneg (r2, a1);
                 Kadd (r2, r2, a0);
                 });
-
+#ifdef RNS
+	if (nloops % 2==1) {
+#endif
         DO_ONE_TEST("mul commutativity", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -284,6 +294,9 @@ int main(int argc, char * argv[])
                 Kmul (a5, a0, a2);
                 Kadd (r2, a4, a5);
                 });
+#ifdef RNS
+	}
+#endif
 
         DO_ONE_TEST("mul_ui distributivity", {
                 Krandom2 (a0, rstate);
@@ -298,6 +311,9 @@ int main(int argc, char * argv[])
                 Kadd (r2, a4, a5);
                 });
 
+#ifdef RNS
+	if (nloops % 2==1) {
+#endif
         /* we can't be sure that our polynomial is irreducible... */
         DO_ONE_TEST("inversion", {
                 do {
@@ -307,7 +323,10 @@ int main(int argc, char * argv[])
                 Kmul (a2, a1, r1);
                 Kmul (r2, r1, a2);
                 });
-
+#ifdef RNS
+	}
+#endif
+#ifndef NOT_URE
         DO_ONE_TEST("reduce o mul_ur = mul", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -328,6 +347,10 @@ int main(int argc, char * argv[])
                 Kelt_ur_clear(&tmp);
                 Ksqr(r2, a0);
                 });
+#endif
+#ifdef RNS
+	if (nloops % 2==1) {
+#endif
 #if !defined(VARIABLE_SIZE_PRIME) && !defined(EXTENSION_OF_GFP)
         /* pz has no Tonelli Shanks for now */
         /* As for extensions of GF(p), we can't test is_sqr, nor sqrt,
@@ -372,6 +395,9 @@ int main(int argc, char * argv[])
                 Kset(r2, a0);
                 mpz_clear(z);
                 });
+#ifdef RNS
+	}
+#endif
         /*-----------------------------------------------------------*/
         /*          Tests specific to prime fields                   */
         /*-----------------------------------------------------------*/
@@ -425,6 +451,9 @@ int main(int argc, char * argv[])
                 Kadd (r2, a0, a0);
                 Kadd (r2, r2, a0);
                 });
+#ifdef RNS
+	if (nloops % 2==1) {
+#endif
 #ifndef EXTENSION_OF_GFP
         DO_ONE_TEST("Fermat by pow", {
                 Krandom2 (a0, rstate);
@@ -459,6 +488,10 @@ int main(int argc, char * argv[])
                 Kset_ui(r2, Kis_sqr(a1));
                 });
 #endif
+#ifdef RNS
+	}
+#endif
+#ifndef NOT_URE
         DO_ONE_TEST("ur_add 500 times and reduce", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -525,7 +558,7 @@ int main(int argc, char * argv[])
                 Kelt_ur_clear(&tmp1);
                 Kelt_ur_clear(&tmp2);
                 });
-
+#endif //NOT_URE
 #endif
 
         /*-----------------------------------------------------------*/
@@ -1037,6 +1070,9 @@ int main(int argc, char * argv[])
                 Kpoly_add_ui (p2, p2, x);
                 });
 
+#ifdef RNS
+	if (nloops % 2==1) {
+#endif
         DO_ONE_TEST_POLY("poly linearity", {
                 Krandom2 (a0, rstate);
                 if (!(test_i & 0xf)) {
@@ -1276,6 +1312,9 @@ int main(int argc, char * argv[])
                     });
         }
 
+#ifdef RNS
+	}
+#endif
         Kpoly_clear(p1);
         Kpoly_clear(p2);
         Kpoly_clear(q1);

@@ -642,6 +642,12 @@ one might use Cantor's algorithm to speed up the computations
 because it was not fully tested yet. To use Cantor's algorithm, add
 for example cantor_threshold=128 to the cadofactor.py command line.
 
+Using several sequences
+=======================
+
+See https://gforge.inria.fr/tracker/index.php?func=detail&aid=16857&group_id=2065&atid=7445 and
+https://lists.gforge.inria.fr/pipermail/cado-nfs-discuss/2015-April/000389.html
+
 Notes:
 ======
 

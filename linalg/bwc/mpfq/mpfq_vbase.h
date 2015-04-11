@@ -52,6 +52,7 @@ struct mpfq_vbase_s {
     void (*add_ui)(mpfq_vbase_ptr, void *, const void *, unsigned long);
     void (*sub_ui)(mpfq_vbase_ptr, void *, const void *, unsigned long);
     void (*mul_ui)(mpfq_vbase_ptr, void *, const void *, unsigned long);
+    void (*normalize)(mpfq_vbase_ptr, void *);
     int (*inv)(mpfq_vbase_ptr, void *, const void *);
     void (*hadamard)(mpfq_vbase_ptr, void *, void *, void *, void *);
     void (*elt_ur_init)(mpfq_vbase_ptr, void *);
@@ -66,7 +67,6 @@ struct mpfq_vbase_s {
     void (*mul_ur)(mpfq_vbase_ptr, void *, const void *, const void *);
     void (*sqr_ur)(mpfq_vbase_ptr, void *, const void *);
     void (*reduce)(mpfq_vbase_ptr, void *, void *);
-    void (*normalize)(mpfq_vbase_ptr, void *);
     void (*addmul_si_ur)(mpfq_vbase_ptr, void *, const void *, long);
     int (*cmp)(mpfq_vbase_ptr, const void *, const void *);
     int (*cmp_ui)(mpfq_vbase_ptr, const void *, unsigned long);

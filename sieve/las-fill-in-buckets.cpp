@@ -223,8 +223,9 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
 
 /* {{{ */
+template <int LEVEL>
 void
-fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_srcptr const si,
+fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA, sieve_info_srcptr const si,
                 const fb_transformed_vector *transformed_vector,
                 const int side MAYBE_UNUSED,
                 const fb_slice_interface *slice MAYBE_UNUSED,
@@ -235,7 +236,7 @@ fill_in_buckets(bucket_array_t<bucket_update_shorthint_t> &orig_BA, sieve_info_s
   const uint32_t I = si->I;
   const uint32_t J = si->J;
   const uint32_t logI = si->conf->logI;
-  bucket_array_t<bucket_update_shorthint_t> BA;  /* local copy. Gain a register + use stack */
+  bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
   
   /* Write new set of pointers for the new slice */
@@ -302,12 +303,12 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
 
-    /* Get an unused bucket array that we can write to */
-    thread_data &th = param->ws.reserve_workspace();
     /* Do the root transform and lattice basis reduction for this factor base slice */
     const fb_transformed_vector *transformed_vector = param->slice->make_lattice_bases(param->si->qbasis, param->si->conf->logI);
+    /* Get an unused bucket array that we can write to */
+    thread_data &th = param->ws.reserve_workspace();
     /* Fill the buckets */
-    fill_in_buckets(th.sides[param->side].BA, param->si, transformed_vector, param->side, param->slice, w);
+    fill_in_buckets<1>(th.sides[param->side].BA, param->si, transformed_vector, param->side, param->slice, w);
     /* Release bucket array again */
     param->ws.release_workspace(th);
     delete transformed_vector;
