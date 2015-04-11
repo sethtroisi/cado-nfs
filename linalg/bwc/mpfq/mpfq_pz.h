@@ -183,6 +183,8 @@ void mpfq_pz_powz(mpfq_pz_dst_field, mpfq_pz_dst_elt, mpfq_pz_src_elt, mpz_srcpt
 void mpfq_pz_add_ui(mpfq_pz_dst_field, mpfq_pz_dst_elt, mpfq_pz_src_elt, unsigned long);
 void mpfq_pz_sub_ui(mpfq_pz_dst_field, mpfq_pz_dst_elt, mpfq_pz_src_elt, unsigned long);
 void mpfq_pz_mul_ui(mpfq_pz_dst_field, mpfq_pz_dst_elt, mpfq_pz_src_elt, unsigned long);
+#define HAVE_mpfq_pz_normalize
+void mpfq_pz_normalize(mpfq_pz_dst_field, mpfq_pz_dst_elt);
 int mpfq_pz_inv(mpfq_pz_dst_field, mpfq_pz_dst_elt, mpfq_pz_src_elt);
 
 /* Operations involving unreduced elements */
@@ -202,8 +204,6 @@ void mpfq_pz_elt_ur_sub(mpfq_pz_dst_field, mpfq_pz_dst_elt_ur, mpfq_pz_src_elt_u
 void mpfq_pz_mul_ur(mpfq_pz_dst_field, mpfq_pz_dst_elt_ur, mpfq_pz_src_elt, mpfq_pz_src_elt);
 void mpfq_pz_sqr_ur(mpfq_pz_dst_field, mpfq_pz_dst_elt_ur, mpfq_pz_src_elt);
 void mpfq_pz_reduce(mpfq_pz_dst_field, mpfq_pz_dst_elt, mpfq_pz_dst_elt_ur);
-#define HAVE_mpfq_pz_normalize
-void mpfq_pz_normalize(mpfq_pz_dst_field, mpfq_pz_dst_elt);
 #define HAVE_mpfq_pz_addmul_si_ur
 static inline
 void mpfq_pz_addmul_si_ur(mpfq_pz_dst_field, mpfq_pz_dst_elt_ur, mpfq_pz_src_elt, long);

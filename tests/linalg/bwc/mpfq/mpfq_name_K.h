@@ -52,6 +52,8 @@
 
 
 
+
+
 #define Kimpl_name()	Kcommon_name_(impl_name) ()
 #define Kimpl_max_characteristic_bits()	Kcommon_name_(impl_max_characteristic_bits) ()
 #define Kimpl_max_degree()	Kcommon_name_(impl_max_degree) ()
@@ -99,6 +101,7 @@
 #define Kadd_ui(a0,a1,a2)	Kcommon_name_(add_ui) (K,a0,a1,a2)
 #define Ksub_ui(a0,a1,a2)	Kcommon_name_(sub_ui) (K,a0,a1,a2)
 #define Kmul_ui(a0,a1,a2)	Kcommon_name_(mul_ui) (K,a0,a1,a2)
+#define Knormalize(a0)	Kcommon_name_(normalize) (K,a0)
 #define Kadd_uipoly(a0,a1,a2)	Kcommon_name_(add_uipoly) (K,a0,a1,a2)
 #define Ksub_uipoly(a0,a1,a2)	Kcommon_name_(sub_uipoly) (K,a0,a1,a2)
 #define Kmul_uipoly(a0,a1,a2)	Kcommon_name_(mul_uipoly) (K,a0,a1,a2)
@@ -106,6 +109,7 @@
 #define Kas_solve(a0,a1)	Kcommon_name_(as_solve) (K,a0,a1)
 #define Ktrace(a0)	Kcommon_name_(trace) (K,a0)
 #define Khadamard(a0,a1,a2,a3)	Kcommon_name_(hadamard) (K,a0,a1,a2,a3)
+
 
 #define Kelt_ur_init(a0)	Kcommon_name_(elt_ur_init) (K,a0)
 #define Kelt_ur_clear(a0)	Kcommon_name_(elt_ur_clear) (K,a0)
@@ -119,8 +123,8 @@
 #define Kmul_ur(a0,a1,a2)	Kcommon_name_(mul_ur) (K,a0,a1,a2)
 #define Ksqr_ur(a0,a1)	Kcommon_name_(sqr_ur) (K,a0,a1)
 #define Kreduce(a0,a1)	Kcommon_name_(reduce) (K,a0,a1)
-#define Knormalize(a0)	Kcommon_name_(normalize) (K,a0)
 #define Kaddmul_si_ur(a0,a1,a2)	Kcommon_name_(addmul_si_ur) (K,a0,a1,a2)
+
 
 #define Kcmp(a0,a1)	Kcommon_name_(cmp) (K,a0,a1)
 #define Kcmp_ui(a0,a1)	Kcommon_name_(cmp_ui) (K,a0,a1)
@@ -141,6 +145,8 @@
 #define Kimportdata(a0,a1,a2,a3)	Kcommon_name_(importdata) (K,a0,a1,a2,a3)
 #define Kwrite(a0,a1)	Kcommon_name_(write) (K,a0,a1)
 #define Kexportdata(a0,a1,a2,a3)	Kcommon_name_(exportdata) (K,a0,a1,a2,a3)
+
+
 
 
 
@@ -176,6 +182,7 @@
 #define Kvec_write(a0,a1,a2)	Kcommon_name_(vec_write) (K,a0,a1,a2)
 #define Kvec_import(a0,a1,a2,a3)	Kcommon_name_(vec_import) (K,a0,a1,a2,a3)
 #define Kvec_export(a0,a1,a2,a3)	Kcommon_name_(vec_export) (K,a0,a1,a2,a3)
+
 #define Kvec_ur_init(a0,a1)	Kcommon_name_(vec_ur_init) (K,a0,a1)
 #define Kvec_ur_set_zero(a0,a1)	Kcommon_name_(vec_ur_set_zero) (K,a0,a1)
 #define Kvec_ur_set_vec(a0,a1,a2)	Kcommon_name_(vec_ur_set_vec) (K,a0,a1,a2)
@@ -195,8 +202,11 @@
 #define Kvec_ur_subvec_const(a0,a1)	Kcommon_name_(vec_ur_subvec_const) (K,a0,a1)
 #define Kvec_ur_coeff_ptr(a0,a1)	Kcommon_name_(vec_ur_coeff_ptr) (K,a0,a1)
 #define Kvec_ur_coeff_ptr_const(a0,a1)	Kcommon_name_(vec_ur_coeff_ptr_const) (K,a0,a1)
+
 #define Kvec_elt_stride(a0)	Kcommon_name_(vec_elt_stride) (K,a0)
+
 #define Kvec_ur_elt_stride(a0)	Kcommon_name_(vec_ur_elt_stride) (K,a0)
+
 
 
 
@@ -238,8 +248,10 @@
 #define Kstride()	Kcommon_name_(stride) (K)
 #define Kset_ui_at(a0,a1,a2)	Kcommon_name_(set_ui_at) (K,a0,a1,a2)
 #define Kset_ui_all(a0,a1)	Kcommon_name_(set_ui_all) (K,a0,a1)
+
 #define Kelt_ur_set_ui_at(a0,a1,a2)	Kcommon_name_(elt_ur_set_ui_at) (K,a0,a1,a2)
 #define Kelt_ur_set_ui_all(a0,a1)	Kcommon_name_(elt_ur_set_ui_all) (K,a0,a1)
+
 #define Kdotprod(a0,a1,a2,a3)	Kcommon_name_(dotprod) (K,a0,a1,a2,a3)
 #define Kmul_constant_ui(a0,a1,a2)	Kcommon_name_(mul_constant_ui) (K,a0,a1,a2)
 

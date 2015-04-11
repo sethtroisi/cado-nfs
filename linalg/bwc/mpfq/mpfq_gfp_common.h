@@ -35,7 +35,6 @@ typedef struct {
 typedef struct {
   mpz_t p;
   mpz_t bigmul_p; // largest multiple of p that fits in an ur_elt
-  long url_margin;  // number of adds of unreduced elts that are allowed (>=500)
   mgy_info_struct mgy_info;
   ts_info_struct ts_info;
   mpz_t factor;

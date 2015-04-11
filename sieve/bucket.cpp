@@ -43,25 +43,25 @@ bucket_misalignment(const size_t sz, const size_t sr) {
 
 /* Set the read and write pointers of the buckets back to the respective bucket
    start, and set nr_slices back to 0. */
-template <typename UPDATE_TYPE>
+template <int LEVEL, typename HINT>
 void
-bucket_array_t<UPDATE_TYPE>::reset_pointers()
+bucket_array_t<LEVEL, HINT>::reset_pointers()
 {
   aligned_medium_memcpy (bucket_write, bucket_start, size_b_align);
   aligned_medium_memcpy (bucket_read,  bucket_start, size_b_align);
   nr_slices = 0;
 }
 
-template <typename UPDATE_TYPE>
-bucket_array_t<UPDATE_TYPE>::bucket_array_t()
+template <int LEVEL, typename HINT>
+bucket_array_t<LEVEL, HINT>::bucket_array_t()
   : big_data(NULL), big_size(0), bucket_write(NULL), bucket_start(NULL),
   bucket_read(NULL), slice_index(NULL), slice_start(NULL), n_bucket(0),
   bucket_size(0), size_b_align(0), nr_slices(0), alloc_slices(0)
 {
 }
 
-template <typename UPDATE_TYPE>
-bucket_array_t<UPDATE_TYPE>::~bucket_array_t()
+template <int LEVEL, typename HINT>
+bucket_array_t<LEVEL, HINT>::~bucket_array_t()
 {
   physical_free (big_data, big_size);
   free (slice_index);
@@ -71,9 +71,9 @@ bucket_array_t<UPDATE_TYPE>::~bucket_array_t()
   free_pagealigned(bucket_write);
 }
 
-template <typename UPDATE_TYPE>
+template <int LEVEL, typename HINT>
 void
-bucket_array_t<UPDATE_TYPE>::move(bucket_array_t<UPDATE_TYPE> &other)
+bucket_array_t<LEVEL, HINT>::move(bucket_array_t<LEVEL, HINT> &other)
 {
 #define MOVE_ENTRY(x, zero) do {x = other.x; other.x = zero;} while(0)
   MOVE_ENTRY(big_data, NULL);
@@ -94,32 +94,32 @@ bucket_array_t<UPDATE_TYPE>::move(bucket_array_t<UPDATE_TYPE> &other)
 /* Allocate enough memory to be able to store _n_bucket buckets, each of at
    least min_bucket_size entries. If enough (or more) memory was already
    allocated, does not shrink the allocation. */
-template <typename UPDATE_TYPE>
+template <int LEVEL, typename HINT>
 void
-bucket_array_t<UPDATE_TYPE>::allocate_memory(const uint32_t new_n_bucket,
+bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
                                 const size_t min_bucket_size,
                                 const slice_index_t prealloc_slices)
 {
-  const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(UPDATE_TYPE));
-  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(UPDATE_TYPE);
+  const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(update_t));
+  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(update_t);
   const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
 
   if (new_big_size > big_size) {
     if (big_data != NULL)
       physical_free (big_data, big_size);
     verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %zu update entries of %zu bytes each\n",
-                         new_big_size, new_n_bucket, new_bucket_size, sizeof(UPDATE_TYPE));
+                         new_big_size, new_n_bucket, new_bucket_size, sizeof(update_t));
     big_size = new_big_size;
-    big_data = (UPDATE_TYPE *) physical_malloc (big_size, 1);
+    big_data = (update_t *) physical_malloc (big_size, 1);
   }
   bucket_size = new_bucket_size;
   n_bucket = new_n_bucket;
 
   if (new_size_b_align > size_b_align) {
     size_b_align = new_size_b_align;
-    bucket_write = (UPDATE_TYPE **) malloc_pagealigned (size_b_align);
-    bucket_start = (UPDATE_TYPE **) malloc_aligned (size_b_align, 0x40);
-    bucket_read = (UPDATE_TYPE **) malloc_aligned (size_b_align, 0x40);
+    bucket_write = (update_t **) malloc_pagealigned (size_b_align);
+    bucket_start = (update_t **) malloc_aligned (size_b_align, 0x40);
+    bucket_read = (update_t **) malloc_aligned (size_b_align, 0x40);
   }
 
   /* This requires size_b_align to have been set to the new value */
@@ -133,9 +133,9 @@ bucket_array_t<UPDATE_TYPE>::allocate_memory(const uint32_t new_n_bucket,
   reset_pointers();
 }
 
-template <typename UPDATE_TYPE>
+template <int LEVEL, typename HINT>
 void
-bucket_array_t<UPDATE_TYPE>::realloc_slice_start(const size_t extra_space)
+bucket_array_t<LEVEL, HINT>::realloc_slice_start(const size_t extra_space)
 {
   const size_t new_alloc_slices = alloc_slices + extra_space;
   verbose_output_print(0, 3, "# Reallocating BA->slice_start from %zu entries to %zu entries\n",
@@ -143,7 +143,7 @@ bucket_array_t<UPDATE_TYPE>::realloc_slice_start(const size_t extra_space)
 
   const size_t old_size = size_b_align * alloc_slices;
   const size_t new_size = size_b_align * new_alloc_slices;
-  slice_start = (UPDATE_TYPE **) realloc_aligned(slice_start, old_size, new_size, 0x40);
+  slice_start = (update_t **) realloc_aligned(slice_start, old_size, new_size, 0x40);
   ASSERT_ALWAYS(slice_start != NULL);
   slice_index = (slice_index_t *) realloc(slice_index, new_alloc_slices * sizeof(slice_index_t));
   ASSERT_ALWAYS(slice_index != NULL);
@@ -151,9 +151,9 @@ bucket_array_t<UPDATE_TYPE>::realloc_slice_start(const size_t extra_space)
 }
 
 /* Returns how full the fullest bucket is, as a fraction of its size */
-template <typename UPDATE_TYPE>
+template <int LEVEL, typename HINT>
 double
-bucket_array_t<UPDATE_TYPE>::max_full () const
+bucket_array_t<LEVEL, HINT>::max_full () const
 {
   unsigned int max = 0;
   for (unsigned int i = 0; i < n_bucket; ++i)
@@ -166,13 +166,13 @@ bucket_array_t<UPDATE_TYPE>::max_full () const
 
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */
-template class bucket_array_t<bucket_update_shorthint_t>;
+template class bucket_array_t<1, shorthint_t>;
 
 
 /* A compare function suitable for sorting updates in order of ascending x
    with qsort() */
 int
-bucket_cmp_x (const bucket_update_longhint_t *a, const bucket_update_longhint_t *b)
+bucket_cmp_x (const bucket_update_t<1, longhint_t>  *a, const bucket_update_t<1, longhint_t>  *b)
 {
   if (a->x < b->x)
     return -1;
@@ -181,57 +181,111 @@ bucket_cmp_x (const bucket_update_longhint_t *a, const bucket_update_longhint_t 
   return 1;
 }
 
-template <class UPDATE_TYPE>
+template <int LEVEL, typename HINT>
 void
-bucket_single<UPDATE_TYPE>::sort()
+bucket_single<LEVEL, HINT>::sort()
 {
-//  qsort (start, write - start, sizeof (bucket_update_longhint_t),
+//  qsort (start, write - start, sizeof (bucket_update_t<1, longhint_t> ),
 //	 (int(*)(const void *, const void *)) &bucket_cmp_x);
 #define islt(a,b) ((a)->x < (b)->x)
-  QSORT(UPDATE_TYPE, start, write - start, islt);
+  QSORT(update_t, start, write - start, islt);
 #undef islt  
 }
 
 void
-bucket_primes_t::purge (const bucket_array_t<bucket_update_shorthint_t> &BA,
+bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
               const int i, const fb_part *fb, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
-    const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
+    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, shorthint_t> * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
         const fb_slice_interface *slice = fb->get_slice(slice_index);
         ASSERT_ALWAYS(slice != NULL);
         fbprime_t p = slice->get_prime(it->hint);
-        push_update(bucket_update_prime_t(it->x, p));
+        push_update(bucket_update_t<1, primehint_t>(it->x, p, 0, 0));
       }
     }
   }
 }
 
 void
-bucket_array_complete::purge (const bucket_array_t<bucket_update_shorthint_t> &BA, 
+bucket_array_complete::purge (const bucket_array_t<1, shorthint_t> &BA,
               const int i, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_shorthint_t *it = BA.begin(i, i_slice);
-    const bucket_update_shorthint_t * const end_it = BA.end(i, i_slice);
+    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, shorthint_t> * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        push_update(bucket_update_longhint_t(it->x, it->hint, slice_index));
+        push_update(bucket_update_t<1, longhint_t> (it->x, 0, it->hint, slice_index));
       }
     }
   }
 }
 
-template class bucket_single<bucket_update_prime_t>;
-template class bucket_single<bucket_update_longhint_t>;
+template class bucket_single<1, primehint_t>;
+template class bucket_single<1, longhint_t>;
 
+template<int INPUT_LEVEL>
+void
+downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
+         const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
+         uint32_t bucket_number)
+{
+  /* Rather similar to purging, except it doesn't purge */
+  for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
+    const slice_index_t slice_index = BA_in.get_slice_index(i_slice);
+    const bucket_update_t<INPUT_LEVEL, shorthint_t> *it = BA_in.begin(bucket_number, i_slice);
+    const bucket_update_t<INPUT_LEVEL, shorthint_t> * const end_it = BA_in.end(bucket_number, i_slice);
+
+    for ( ; it != end_it ; it++)
+      BA_out.push_update(it->x, 0, it->hint, slice_index);
+  }
+}
+
+template<int INPUT_LEVEL>
+void
+downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
+         const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
+         uint32_t bucket_number)
+{
+  /* longhint updates don't write slice end pointers, so there must be
+     exactly 1 slice per bucket */
+  ASSERT_ALWAYS(BA_in.get_nr_slices() == 1);
+  const bucket_update_t<INPUT_LEVEL, longhint_t> *it = BA_in.begin(bucket_number, 0);
+  const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
+
+  for ( ; it != end_it ; it++) {
+    push_update(it->x, 0, it->hint, it->index);
+  }
+}
+
+/* Explicitly instantiate the versions of downsort() that we'll need:
+   downsorting shorthint from level 3 and level 2, and downsorting
+   longhint from level 2. */
+template<>
+void
+downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
+            const bucket_array_t<2, shorthint_t> &BA_in,
+            uint32_t bucket_number);
+
+template<>
+void
+downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
+            const bucket_array_t<3, shorthint_t> &BA_in,
+            uint32_t bucket_number);
+
+template<>
+void
+downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
+            const bucket_array_t<2, longhint_t> &BA_in,
+            uint32_t bucket_number);
 
 void
 sieve_checksum::update(const unsigned int other)
