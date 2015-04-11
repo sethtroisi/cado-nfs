@@ -19,9 +19,7 @@ thread_side_data::~thread_side_data()
 void
 thread_side_data::allocate_bucket_array(const uint32_t n_bucket, const double fill_ratio)
 {
-  const size_t bucket_region = (size_t) 1 << LOG_BUCKET_REGION;
-  const size_t bucket_size = bucket_region * fill_ratio;
-  BA.allocate_memory(n_bucket, bucket_size);
+  BA.allocate_memory(n_bucket, fill_ratio);
 }
 
 thread_data::thread_data() : is_initialized(false)
