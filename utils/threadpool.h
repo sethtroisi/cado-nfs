@@ -1,3 +1,6 @@
+#ifndef THREADPOOL_H_
+#define THREADPOOL_H_
+
 #include <pthread.h>
 #include <queue>
 #include <vector>
@@ -121,3 +124,5 @@ public:
   void add_task(task_function_t func, const task_parameters *params, int id, const size_t queue = 0);
   task_result *get_result(const size_t queue = 0);
 };
+
+#endif
