@@ -289,10 +289,16 @@ public:
    bucket array into a level n-1 bucket array. The update type of the level n
    bucket array can be short or long hint; the level n-1 bucket array is
    always longhint. */
-template <int INPUT_LEVEL, typename INPUT_HINT>
+template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
-         const bucket_array_t<INPUT_LEVEL, INPUT_HINT> &BA_in,
+         const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
+         uint32_t bucket_index);
+
+template <int INPUT_LEVEL>
+void
+downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
+         const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
          uint32_t bucket_index);
 
 /* A class that stores updates in a single "bucket".
