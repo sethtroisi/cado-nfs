@@ -168,6 +168,10 @@ bucket_array_t<LEVEL, HINT>::max_full () const
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */
 template class bucket_array_t<1, shorthint_t>;
+template class bucket_array_t<2, shorthint_t>;
+template class bucket_array_t<3, shorthint_t>;
+template class bucket_array_t<1, longhint_t>;
+template class bucket_array_t<2, longhint_t>;
 
 
 /* A compare function suitable for sorting updates in order of ascending x
