@@ -267,7 +267,7 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
   const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
 
   for ( ; it != end_it ; it++) {
-    push_update(it->x, 0, it->hint, it->index);
+    BA_out.push_update(it->x, 0, it->hint, it->index);
   }
 }
 
