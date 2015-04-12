@@ -801,6 +801,25 @@ void line_sieve_ci(array_ptr array, int64_vector_ptr c, ideal_1_srcptr ideal,
   }
 }
 
+void compute_ci_1(int64_t * ci, unsigned int i, unsigned int pos,
+    uint64_t * pseudo_Tqr, uint64_t ideal_r, sieving_bound_srcptr H)
+{
+  for (unsigned int j = i + 1; j < pos; j++) {
+    * ci = * ci - ((int64_t)pseudo_Tqr[j] * (2 * (int64_t)H->h[j] - 1));
+    if (* ci >= (int64_t)ideal_r || * ci < 0) {
+      * ci = * ci % (int64_t)ideal_r;
+    }
+  }
+  * ci = * ci + pseudo_Tqr[pos];
+  if (* ci >= (int64_t)ideal_r) {
+    * ci = * ci - (int64_t)ideal_r;
+  }
+  if (* ci < 0) {
+    * ci = * ci + (int64_t)ideal_r;
+  }
+  ASSERT(* ci >= 0 && * ci < (int64_t)ideal_r);
+}
+
 /*
  *
  *
@@ -815,20 +834,7 @@ void line_sieve_1(array_ptr array, int64_vector_ptr c, uint64_t * pseudo_Tqr,
   ASSERT(pos >= i);
 
   //Recompute ci.
-  for (unsigned int j = i + 1; j < pos; j++) {
-    * ci = * ci - ((int64_t)pseudo_Tqr[j] * (2 * (int64_t)H->h[j] - 1));
-    if (* ci >= (int64_t)ideal->ideal->r || * ci < 0) {
-      * ci = * ci % (int64_t)ideal->ideal->r;
-    }
-  }
-  * ci = * ci + pseudo_Tqr[pos];
-  if (* ci >= (int64_t)ideal->ideal->r) {
-    * ci = * ci - (int64_t)ideal->ideal->r;
-  }
-  if (* ci < 0) {
-    * ci = * ci + (int64_t)ideal->ideal->r;
-  }
-  ASSERT(* ci >= 0 && * ci < (int64_t)ideal->ideal->r);
+  compute_ci_1(ci, i, pos, pseudo_Tqr, ideal->ideal->r, H);
 
   //Compute the lowest value such that Tqr*(c[0], …, c[i], …, c[t-1]) = 0 mod r.
   //lb: the minimal accessible value in the sieving region for this coordinate.
@@ -1758,6 +1764,8 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
     printf("0:");
   }
 
+#ifdef PRINT_DECIMAL
+
   //Print the factorisation in the different number field.
   index = 0;
   for (unsigned int i = 0; i < V - 1; i++) {
@@ -1793,6 +1801,48 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
       index++;
     }
   }
+
+#else // PRINT_DECIMAL
+
+  //Print the factorisation in the different number field.
+  index = 0;
+  for (unsigned int i = 0; i < V - 1; i++) {
+    if (index < size) {
+      if (i == L[index]) {
+        if (I[index]) {
+          for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
+            printf("%s,",
+                mpz_get_str(NULL, 16, factor[index]->factorization[j]));
+          }
+          printf("%s:", mpz_get_str(NULL, 16,
+                factor[index]->factorization[factor[index]->number - 1]));
+        } else {
+          printf(":");
+        }
+        index++;
+      } else {
+        printf(":");
+      }
+    } else {
+      printf(":");
+    }
+  }
+
+  if (index < size) {
+    if (V - 1 == L[index]) {
+      if (I[index]) {
+        for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
+          printf("%s,",
+                mpz_get_str(NULL, 16, factor[index]->factorization[j]));
+        }
+        printf("%s", mpz_get_str(NULL, 16,
+              factor[index]->factorization[factor[index]->number - 1]));
+      }
+      index++;
+    }
+  }
+
+#endif // PRINT_DECIMAL
 
   printf("\n");
 }
