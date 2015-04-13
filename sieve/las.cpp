@@ -303,17 +303,12 @@ void reorder_fb(sieve_info_ptr si, int side)
 void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_ptr si, int side)
 {
     sieve_side_info_ptr s = si->sides[side];
-    double max_weight = 0.;
 
     for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++)
     {
         size_t nr_primes, nr_roots;
         double weight;
         s->fb->get_part(i_part)->count_entries(&nr_primes, &nr_roots, &weight);
-        /* Part 0 gets line-sieved and thus should not be taken into
-           consideration for the bucket size */
-        if (i_part > 0)
-            max_weight = MAX(max_weight, weight);
         if (nr_primes != 0 || weight != 0.) {
             verbose_output_print(0, 1, "# Number of primes in %s factor base part %d = %zu\n",
                     sidenames[side], i_part, nr_primes);
@@ -322,8 +317,8 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
             verbose_output_print(0, 1, "# Weight of primes in %s factor base part %d = %0.5g\n",
                     sidenames[side], i_part, weight);
         }
+        s->max_bucket_fill_ratio[i_part] = weight * 1.07;
     }
-    s->max_bucket_fill_ratio = max_weight * 1.07;
 
     // How do we write updates to buckets? How much space should we allocate? With a thread-pool, how do we determine how much memory each bucket array needs?
 #if 0
@@ -444,7 +439,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
             sis->fb = sis0->fb;
             /* important ! Otherwise we'll have 0, and badness will
              * occur. */
-            sis->max_bucket_fill_ratio = sis0->max_bucket_fill_ratio;
+            for (int i = 0; i < FB_MAX_PARTS; i++)
+                sis->max_bucket_fill_ratio[i] = sis0->max_bucket_fill_ratio[i];
         }
     }
 
@@ -1510,7 +1506,7 @@ apply_one_update (unsigned char * const S, const bucket_update_t<1, shorthint_t>
 NOPROFILE_STATIC
 #endif
 void
-apply_one_bucket (unsigned char *S, bucket_array_t<1, shorthint_t> &BA, const int i,
+apply_one_bucket (unsigned char *S, const bucket_array_t<1, shorthint_t> &BA, const int i,
         const fb_part *fb, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
@@ -1905,9 +1901,12 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     for(int side = 0 ; side < 2 ; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
 
-        for (int i = 0; i < las->nb_threads; ++i) {
-            thread_data *other = th + i - th->id;
-            purged[side].purge(other->sides[side].BA, N, SS);
+        const bucket_array_t<1, shorthint_t> *BA =
+            th->ws->cbegin_BA<1, shorthint_t>(side);
+        const bucket_array_t<1, shorthint_t> * const BA_end =
+            th->ws->cend_BA<1, shorthint_t>(side);
+        for (; BA != BA_end; BA++)  {
+            purged[side].purge(*BA, N, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
@@ -2315,9 +2314,12 @@ void * process_bucket_region(thread_data *th)
 
             /* Apply buckets */
             rep->ttbuckets_apply -= seconds_thread();
-            for (int j = 0; j < las->nb_threads; ++j)  {
-                thread_data *ot = th + j - th->id;
-                apply_one_bucket(SS, ot->sides[side].BA, i, ts.fb, w);
+            const bucket_array_t<1, shorthint_t> *BA =
+                th->ws->cbegin_BA<1, shorthint_t>(side);
+            const bucket_array_t<1, shorthint_t> * const BA_end =
+                th->ws->cend_BA<1, shorthint_t>(side);
+            for (; BA != BA_end; BA++)  {
+                apply_one_bucket(SS, *BA, i, ts.fb, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
@@ -2589,7 +2591,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     tune_las_memset();
     
-    thread_workspaces *workspaces = new thread_workspaces(las->nb_threads, las);
+    thread_workspaces *workspaces = new thread_workspaces(las->nb_threads, 2, las);
 
     las_report report;
     las_report_init(report);
@@ -2770,7 +2772,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * this hack).
          */
 
-       report->ttbuckets_fill -= seconds();
+        report->ttbuckets_fill -= seconds();
 
         /* Allocate buckets */
         workspaces->pickup_si(si);
@@ -2780,7 +2782,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         fill_in_buckets_both(*pool, *workspaces, 1, si);
         delete pool;
 
-        max_full = MAX(max_full, workspaces->buckets_max_full());
+        max_full = std::max(max_full, workspaces->buckets_max_full<1, shorthint_t>());
         ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
                  fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
 

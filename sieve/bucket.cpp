@@ -100,6 +100,11 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
                                 const double fill_ratio,
                                 const slice_index_t prealloc_slices)
 {
+  /* Don't try to allocate anything, nor print a message, for sieving levels
+     where the corresponding factor base part is empty. */
+  if (fill_ratio == 0.)
+    return;
+
   const size_t min_bucket_size = fill_ratio * bucket_region;
   const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(update_t));
   const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(update_t);
