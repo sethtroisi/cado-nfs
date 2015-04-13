@@ -259,9 +259,68 @@ void mat_Z_LLL(mat_Z_ptr C, mat_Z_srcptr A)
   LLL_clear(&B);
 }
 
-void mat_Z_LLL_transpose(mat_Z_ptr matrix)
+void mat_Z_LLL_transpose(mat_Z_ptr matrix_new, mat_Z_srcptr matrix_old)
 {
-  mat_Z_transpose(matrix, matrix);
-  mat_Z_LLL(matrix, matrix);
-  mat_Z_transpose(matrix, matrix);
+  mat_Z_transpose(matrix_new, matrix_old);
+  mat_Z_LLL(matrix_new, matrix_new);
+  mat_Z_transpose(matrix_new, matrix_new);
+}
+
+void mat_Z_LLL_unimodular(mat_Z_ptr C, mat_Z_srcptr A)
+{
+  mpz_t a;
+  mpz_t b;
+  mpz_t det;
+  mpz_init(a);
+  mpz_init(b);
+  mpz_init(det);
+
+  mpz_set_ui(a, 3);
+  mpz_set_ui(b, 4);
+
+  mat_Z B;
+  LLL_init(&B, A->NumRows, A->NumCols);
+  mat_Z U;
+  LLL_init(&U, A->NumRows, A->NumCols);
+  for (unsigned int row = 1; row < A->NumRows + 1; row++) {
+    for (unsigned int col = 1; col < A->NumCols + 1; col++) {
+      mpz_set(B.coeff[row][col], A->coeff[row][col]);
+    }
+  }
+
+  LLL(det, B, &U, a, b);
+
+  ASSERT(B.NumRows == (int)C->NumRows);
+  ASSERT(B.NumCols == (int)C->NumCols);
+
+  for (unsigned int row = 1; row < A->NumRows + 1; row++) {
+    for (unsigned int col = 1; col < A->NumCols + 1; col++) {
+      mpz_set(C->coeff[row][col], U.coeff[row][col]);
+    }
+  }
+
+  mpz_clear(a);
+  mpz_clear(b);
+  mpz_clear(det);
+  LLL_clear(&B);
+  LLL_clear(&U);
+}
+
+void mat_Z_LLL_unimodular_transpose(mat_Z_ptr mat_new, mat_Z_srcptr mat_old)
+{
+  mat_Z_transpose(mat_new, mat_old);
+  mat_Z_LLL_unimodular(mat_new, mat_new);
+  mat_Z_transpose(mat_new, mat_new);
+}
+
+void mat_int64_to_mat_Z(mat_Z_ptr mat_Z, mat_int64_srcptr mat_int)
+{
+  ASSERT(mat_Z->NumRows == mat_int->NumRows);
+  ASSERT(mat_Z->NumCols == mat_int->NumCols);
+
+  for (unsigned int row = 1; row < mat_int->NumRows + 1; row++) {
+    for (unsigned int col = 1; col < mat_int->NumCols + 1; col++) {
+      mpz_set_si(mat_Z->coeff[row][col], mat_int->coeff[row][col]);
+    }
+  }
 }

@@ -5,16 +5,7 @@
 #include "utils.h"
 #include <gmp.h>
 #include <stdint.h>
-
-typedef struct {
-  mpz_t **coeff;
-  unsigned int NumRows;
-  unsigned int NumCols;
-} s_mat_Z_t;
-
-typedef s_mat_Z_t mat_Z_t[1];
-typedef s_mat_Z_t * mat_Z_ptr;
-typedef const s_mat_Z_t * mat_Z_srcptr;
+#include "matrix.h"
 
 /*
   WARNING: to correspond to the LLL algorithm in cado-nfs, all the matrix have
@@ -161,6 +152,12 @@ void mat_Z_LLL(mat_Z_ptr C, mat_Z_srcptr A);
  *
  * matrix: perform LLL on the matrix and set the result in this matrix.
 .*/
-void mat_Z_LLL_transpose(mat_Z_ptr matrix);
+void mat_Z_LLL_transpose(mat_Z_ptr matrix_new, mat_Z_srcptr matrix_old);
+
+void mat_Z_LLL_unimodular(mat_Z_ptr C, mat_Z_srcptr A);
+
+void mat_Z_LLL_unimodular_transpose(mat_Z_ptr mat_new, mat_Z_srcptr mat_old);
+
+void mat_int64_to_mat_Z(mat_Z_ptr mat_Z, mat_int64_srcptr mat_int);
 
 #endif  /* MAT_Z_H */

@@ -6,16 +6,7 @@
 #include "int64_vector.h"
 #include "int64_poly.h"
 #include "macros.h"
-
-typedef struct {
-  int64_t **coeff;
-  unsigned int NumRows;
-  unsigned int NumCols;
-} s_mat_int64_t;
-
-typedef s_mat_int64_t mat_int64_t[1];
-typedef s_mat_int64_t * mat_int64_ptr;
-typedef const s_mat_int64_t * mat_int64_srcptr;
+#include "matrix.h"
 
 /*
  * WARNING: to correspond to the definition of mat_Z, the first column and line
@@ -194,4 +185,13 @@ void mat_int64_extract(mat_int64_ptr matrix_out, mat_int64_srcptr matrix_in,
 void mat_int64_extract_vector(int64_vector_ptr v, mat_int64_srcptr matrix,
     unsigned int col);
 
+void mat_int64_set_diag(mat_int64_ptr matrix, int64_t * x);
+
+void mat_int64_LLL(mat_int64_ptr C, mat_int64_srcptr A);
+
+void mat_int64_LLL_transpose(mat_int64_ptr C, mat_int64_srcptr A);
+
+void mat_int64_LLL_unimodular(mat_int64_ptr C, mat_int64_srcptr A);
+
+void mat_int64_LLL_unimodular_transpose(mat_int64_ptr C, mat_int64_srcptr A);
 #endif // MAT_INT64_H

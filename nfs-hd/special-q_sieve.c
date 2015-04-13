@@ -2340,7 +2340,7 @@ int main(int argc, char * argv[])
         mat_Z_fprintf(file, matrix);
 #endif // TRACE_POS
 
-        mat_Z_LLL_transpose(matrix);
+        mat_Z_LLL_transpose(matrix, matrix);
 
         /* /\* */
         /*   TODO: continue here. */

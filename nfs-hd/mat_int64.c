@@ -143,6 +143,7 @@ void mat_int64_mul_mat_int64(mat_int64_ptr C, mat_int64_srcptr A,
   ASSERT(A->NumRows == C->NumRows);
   ASSERT(B->NumCols == C->NumCols);
 
+  mat_int64_set_zero(C);
   mat_int64_t A_tmp;
   mat_int64_init(A_tmp, A->NumRows, A->NumCols);
   mat_int64_copy(A_tmp, A);
@@ -255,4 +256,89 @@ void mat_int64_extract_vector(int64_vector_ptr v, mat_int64_srcptr matrix,
   for (unsigned int i = 1; i <= matrix->NumRows; i++) {
     v->c[i - 1] = matrix->coeff[i][col + 1];
   }
+}
+
+void mat_int64_set_diag(mat_int64_ptr matrix, int64_t * x)
+{
+  ASSERT(matrix->NumRows == matrix->NumCols);
+
+  mat_int64_set_zero(matrix);
+  for (unsigned int i = 0; i < matrix->NumCols; i++) {
+    matrix->coeff[i + 1][i + 1] = x[i];
+  }
+}
+
+void mat_int64_LLL(mat_int64_ptr C, mat_int64_srcptr A)
+{
+  ASSERT(A->NumRows == C->NumRows);
+  ASSERT(A->NumCols == C->NumCols);
+
+  mat_Z_t A_Z;
+  mat_Z_init(A_Z, A->NumRows, A->NumCols);
+  mat_int64_to_mat_Z(A_Z, A);
+
+  mat_Z_t C_Z;
+  mat_Z_init(C_Z, C->NumRows, C->NumCols);
+
+  mat_Z_LLL(C_Z, A_Z);
+
+  mat_Z_to_mat_int64(C, C_Z);
+
+  mat_Z_clear(C_Z);
+  mat_Z_clear(A_Z);
+}
+
+void mat_int64_LLL_transpose(mat_int64_ptr C, mat_int64_srcptr A)
+{
+  ASSERT(A->NumRows == C->NumRows);
+  ASSERT(A->NumCols == C->NumCols);
+
+  mat_Z_t A_Z;
+  mat_Z_init(A_Z, A->NumRows, A->NumCols);
+  mat_int64_to_mat_Z(A_Z, A);
+
+  mat_Z_t C_Z;
+  mat_Z_init(C_Z, C->NumRows, C->NumCols);
+
+  mat_Z_LLL_transpose(C_Z, A_Z);
+
+  mat_Z_to_mat_int64(C, C_Z);
+
+  mat_Z_clear(C_Z);
+  mat_Z_clear(A_Z);
+
+}
+
+void mat_int64_LLL_unimodular(mat_int64_ptr C, mat_int64_srcptr A)
+{
+  mat_Z_t A_Z;
+  mat_Z_init(A_Z, A->NumRows, A->NumCols);
+  mat_int64_to_mat_Z(A_Z, A);
+
+  mat_Z_t C_Z;
+  mat_Z_init(C_Z, C->NumRows, C->NumCols);
+
+  mat_Z_LLL_unimodular(C_Z, A_Z);
+
+  mat_Z_to_mat_int64(C, C_Z);
+
+  mat_Z_clear(C_Z);
+  mat_Z_clear(A_Z);
+}
+
+void mat_int64_LLL_unimodular_transpose(mat_int64_ptr C, mat_int64_srcptr A)
+{
+  mat_Z_t A_Z;
+  mat_Z_init(A_Z, A->NumRows, A->NumCols);
+  mat_int64_to_mat_Z(A_Z, A);
+
+  mat_Z_t C_Z;
+  mat_Z_init(C_Z, C->NumRows, C->NumCols);
+
+  mat_Z_LLL_unimodular_transpose(C_Z, A_Z);
+
+  mat_Z_to_mat_int64(C, C_Z);
+
+  mat_Z_clear(C_Z);
+  mat_Z_clear(A_Z);
 }
