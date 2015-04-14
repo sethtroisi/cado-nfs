@@ -194,7 +194,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     sis->fb->size() >> 20, tfb);
         } else {
             tfb = seconds ();
-            sis->fb->make_linear ((const mpz_t *) pol->coeff);
+            sis->fb->make_linear_parallel ((const mpz_t *) pol->coeff,
+                    las->nb_threads);
             tfb = seconds () - tfb;
             verbose_output_print(0, 1, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      sis->fb->size() >> 20, tfb);

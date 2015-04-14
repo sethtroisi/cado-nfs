@@ -860,7 +860,7 @@ fb_powers::fb_powers (const fbprime_t lim)
 /* Generate a factor base with primes <= bound and prime powers <= powbound
    for a linear polynomial. If projective != 0, adds projective roots
    (for primes that divide leading coefficient).
-   Returns 1 on success, 0 on error. */
+*/
 
 void
 fb_factorbase::make_linear (const mpz_t *poly)
@@ -912,6 +912,124 @@ fb_factorbase::make_linear (const mpz_t *poly)
   delete (powers);
   finalize();
 }
+
+/*
+  Parallel version.
+  Thread 0: compute primes and powers, and assign them to threads, by block of 1024.
+            fill-in the database.
+  Other threads: compute the root and the inverse of q.
+  TODO: there is some redundancy with the code in makefb.c, here.
+*/
+
+#define GROUP 1024
+typedef struct {
+  const mpz_t *poly;
+  unsigned int n;
+
+  fbprime_t p[GROUP];
+  fbprime_t q[GROUP];
+  unsigned char k[GROUP];
+
+  fbroot_t r[GROUP];
+  bool proj[GROUP];
+  redc_invp_t invq[GROUP];
+} tab_t;
+
+
+static void *
+make_linear_one_thread(void *args)
+{
+  tab_t *T = (tab_t *)args;
+  for (unsigned int i = 0; i < T->n; ++i) {
+    T->proj[i] = fb_linear_root (&T->r[i], T->poly, T->q[i]);
+    T->invq[i] = compute_invq(T->q[i]);
+  }
+  return NULL;
+}
+
+void
+fb_factorbase::make_linear_parallel (const mpz_t *poly,
+    const unsigned int nb_threads)
+{
+  fbprime_t next_prime;
+  fbprime_t powlim = 0;
+  
+  /* Find out the largest powlim among all parts */
+  for (size_t i = 0; i < FB_MAX_PARTS; i++)
+    powlim = MAX(powlim, parts[i]->powlim);
+
+  /* Prepare for computing powers up to that limit */
+  fb_powers *powers = new fb_powers(powlim);
+  size_t next_pow = 0;
+
+  verbose_output_vfprint(0, 1, gmp_vfprintf,
+               "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
+               "# including primes up to %" FBPRIME_FORMAT
+               " and prime powers up to %" FBPRIME_FORMAT
+               " using %u threads.\n",
+               poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
+               poly[0], thresholds[FB_MAX_PARTS-1], powlim, nb_threads);
+
+  tab_t T[nb_threads];
+  pthread_t tid[nb_threads];
+  for (unsigned int i = 0; i < nb_threads; ++i)
+    T[i].poly = poly;
+
+  fbprime_t maxp = thresholds[FB_MAX_PARTS-1];
+  for (next_prime = 2; next_prime <= maxp; ) {
+    unsigned int th;
+    for (th = 0; th < nb_threads && next_prime <= maxp; th++) {
+      // Give 1024 entries for thread nb th.
+      unsigned int i;
+      for (i = 0; i < 1024 && next_prime <= maxp; ++i) {
+        /* Handle any prime powers that are smaller than next_prime */
+        if (next_pow < powers->size() && (*powers)[next_pow].q <= next_prime) {
+          /* The list of powers must not include primes */
+          ASSERT_ALWAYS((*powers)[next_pow].q < next_prime);
+          T[th].q[i] = (*powers)[next_pow].q;
+          T[th].p[i] = (*powers)[next_pow].p;
+          T[th].k[i] = (*powers)[next_pow].k;
+          next_pow++;
+        } else {
+          T[th].q[i] = T[th].p[i] = next_prime;
+          T[th].k[i] = 1;
+          next_prime = getprime(next_prime);
+        }
+      }
+      T[th].n = i;
+    }
+    // Now let the threads to the work.
+    // Here, we know that only th have to be started.
+    for (unsigned int t = 0; t < th; ++t) {
+      pthread_create(&tid[t], NULL, make_linear_one_thread, (void *)(&T[t]));
+    }
+    for (unsigned int t = 0; t < th; ++t) {
+      pthread_join(tid[t], NULL);
+    }
+    // Copy the results into structure
+    for (unsigned int t = 0; t < th; ++t) {
+      for (unsigned int j = 0; j < T[t].n; ++j) {
+        fb_general_entry fb_cur;
+        fb_cur.q = T[t].q[j];
+        fb_cur.p = T[t].p[j];
+        fb_cur.k = T[t].k[j];
+        fb_cur.nr_roots = 1;
+        fb_cur.roots[0].exp = fb_cur.k;
+        fb_cur.roots[0].oldexp = fb_cur.k - 1U;
+        fb_cur.roots[0].proj = T[t].proj[j];
+        fb_cur.roots[0].r = T[t].r[j];
+        fb_cur.invq = T[t].invq[j];
+        append(fb_cur);
+      }
+    }
+  }
+
+  getprime (0); /* free prime iterator */
+
+  delete (powers);
+  finalize();
+}
+
 
 void
 fb_factorbase::finalize()
