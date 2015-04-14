@@ -110,12 +110,12 @@ class thread_workspaces : private NonCopyable {
   thread_data *thrs;
   const size_t nr_workspaces;
   sieve_info_ptr si;
-  const int nr_sides; /* Usually 2 */
+  const unsigned int nr_sides; /* Usually 2 */
   reservation_group_ptr *groups; /* one per side. Need pointer array due to
     lacking new[] without default constructor prior to C++11 :( */
 
 public:
-  thread_workspaces(size_t nr_workspaces, int nr_sides, las_info_ptr _las);
+  thread_workspaces(size_t nr_workspaces, unsigned int nr_sides, las_info_ptr _las);
   ~thread_workspaces();
   void pickup_si(sieve_info_ptr si);
   void thread_do(void * (*) (thread_data *));
