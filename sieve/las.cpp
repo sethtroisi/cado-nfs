@@ -488,41 +488,9 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 	mpz_mul_ui (si->BBB[side], si->BB[side], lim);
 	mpz_mul_ui (si->BBBB[side], si->BBB[side], lim);
 
-	//todo: unused code: if(){...}.
-	//{{
-	if (si->strategies == NULL) /* old cofactorization. */
-	  {
-	    /* The strategies also depend on the special-q used within the
-	     * descent, assuming lim / lpb depend on the sq bitsize */
-	    verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
-				 sc->bitsize, sidenames[sc->side][0], sidenames[side],
-				 sc->sides[side]->lim, sc->sides[side]->lpb);
-	    verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
-				 sc->sides[side]->ncurves > -1
-				 ? sc->sides[side]->ncurves
-				 : nb_curves (sc->sides[side]->lpb));
-	    si->sides[side]->strategy =
-	      facul_make_strategy(sc->sides[side]->lim, sc->sides[side]->lpb,
-				  sc->sides[side]->ncurves, 0);
-	  }
-	else //always in this case!
-	  si->sides[side]->strategy = NULL;
-	//}}
-
-        /* init_norms (si, side); */ /* only depends on scale, logmax, lognorm_table */
-
-        /* The strategies also depend on the special-q used within the
-         * descent, assuming lim / lpb depend on the sq bitsize */
-        verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
-                sc->bitsize, sidenames[sc->side][0], sidenames[side],
-                sc->sides[side]->lim, sc->sides[side]->lpb);
-        verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
-                             sc->sides[side]->ncurves > 0
-                             ? sc->sides[side]->ncurves
-                             : nb_curves (sc->sides[side]->lpb));
-        si->sides[side]->strategy = facul_make_strategy(
-                sc->sides[side]->lim, sc->sides[side]->lpb,
-                sc->sides[side]->ncurves, 0);
+        // This variable is obsolete (but las-duplicates.cpp still reads
+        // it) FIXME
+        si->sides[side]->strategy = NULL;
 
         reorder_fb(si, side);
         verbose_output_print(0, 2, "# small %s factor base", sidenames[side]);
@@ -2055,7 +2023,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 		cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
             }
 	    rep->ttcof -= microseconds_thread ();
-            pass = factor_both_leftover_norms(norm, BLPrat, lps, lps_m, si);
+            pass = factor_both_leftover_norms(norm, lps, lps_m, si);
 	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b) && pass == 0) {
