@@ -980,9 +980,9 @@ fb_factorbase::make_linear_parallel (const mpz_t *poly,
   for (next_prime = 2; next_prime <= maxp; ) {
     unsigned int th;
     for (th = 0; th < nb_threads && next_prime <= maxp; th++) {
-      // Give 1024 entries for thread nb th.
+      // Give GROUP entries for thread nb th.
       unsigned int i;
-      for (i = 0; i < 1024 && next_prime <= maxp; ++i) {
+      for (i = 0; i < GROUP && next_prime <= maxp; ++i) {
         /* Handle any prime powers that are smaller than next_prime */
         if (next_pow < powers->size() && (*powers)[next_pow].q <= next_prime) {
           /* The list of powers must not include primes */
@@ -1004,11 +1004,9 @@ fb_factorbase::make_linear_parallel (const mpz_t *poly,
     for (unsigned int t = 0; t < th; ++t) {
       pthread_create(&tid[t], NULL, make_linear_one_thread, (void *)(&T[t]));
     }
+    // Collect the results and copy into structure
     for (unsigned int t = 0; t < th; ++t) {
       pthread_join(tid[t], NULL);
-    }
-    // Copy the results into structure
-    for (unsigned int t = 0; t < th; ++t) {
       for (unsigned int j = 0; j < T[t].n; ++j) {
         fb_general_entry fb_cur;
         fb_cur.q = T[t].q[j];
