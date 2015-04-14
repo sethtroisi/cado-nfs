@@ -459,6 +459,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     FILE* file = NULL;
     if (cofactfilename != NULL) /* a file was given */
       file = fopen (cofactfilename, "r");
+    double time_strat = seconds();
     si->strategies = facul_make_strategies (sc->sides[0]->lim,
 					    sc->sides[0]->lpb,
 					    sc->sides[0]->mfb,
@@ -468,6 +469,9 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 					    sc->sides[0]->ncurves,
 					    sc->sides[1]->ncurves,
 					    file, 0);
+    verbose_output_print(0, 1, "# Building/reading strategies took %1.1fs\n",
+            seconds() - time_strat);
+
     if (si->strategies == NULL)
       {
 	fprintf (stderr, "impossible to read %s\n",
