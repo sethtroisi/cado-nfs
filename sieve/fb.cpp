@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cctype>
 #include <gmp.h>
+#include <pthread.h>
 #include "fb.h"
 #include "mod_ul.h"
 #include "verbose.h"
