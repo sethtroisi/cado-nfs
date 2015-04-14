@@ -209,7 +209,7 @@ reservation_group::cget() const
 
 
 thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
-  const int _nr_sides, las_info_ptr las)
+  const unsigned int _nr_sides, las_info_ptr las)
   : nr_workspaces(_nr_workspaces), nr_sides(_nr_sides)
 {
     thrs = new thread_data[_nr_workspaces];
@@ -220,14 +220,14 @@ thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
     for(size_t i = 0 ; i < nr_workspaces; i++) {
         thrs[i].init(*this, i, las);
     }
-    for (int i = 0; i < nr_sides; i++)
+    for (unsigned int i = 0; i < nr_sides; i++)
       groups[i] = new reservation_group(_nr_workspaces);
 }
 
 thread_workspaces::~thread_workspaces()
 {
     delete[] thrs;
-    for (int i = 0; i < nr_sides; i++)
+    for (unsigned int i = 0; i < nr_sides; i++)
       delete groups[i];
     delete[] groups;
 }
@@ -245,7 +245,7 @@ thread_workspaces::pickup_si(sieve_info_ptr _si)
     /* Always allocate the max number of buckets (i.e., as if we were using the
        max value for J), even if we use a smaller J due to a poor q-lattice
        basis */
-    for (int i_side = 0; i_side < nr_sides; i_side++)
+    for (unsigned int i_side = 0; i_side < nr_sides; i_side++)
       groups[i_side]->allocate_buckets(si->nb_buckets_max, si->sides[i_side]->max_bucket_fill_ratio);
 }
 
@@ -307,7 +307,7 @@ thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
 {
     for (size_t i = 0; i < nr_workspaces; ++i) {
         las_report_accumulate(rep, thrs[i].rep);
-        for (int side = 0; side < nr_sides; side++)
+        for (unsigned int side = 0; side < nr_sides; side++)
             checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }
 }
