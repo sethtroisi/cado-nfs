@@ -961,7 +961,7 @@ public:
     }
 };
 
-task_result *
+static task_result *
 process_one_task(const task_parameters *_param)
 {
   const make_linear_thread_param *param =
@@ -979,7 +979,7 @@ process_one_task(const task_parameters *_param)
 // Otherwise, return the number of ideals put in the task.
 static int
 get_new_task(task_info_t &T, fbprime_t &next_prime, const fbprime_t maxp,
-    size_t &next_pow, fb_powers &powers)
+    size_t &next_pow, const fb_powers &powers)
 {
   unsigned int i;
   for (i = 0; i < GROUP && next_prime <= maxp; ++i) {
@@ -999,7 +999,7 @@ get_new_task(task_info_t &T, fbprime_t &next_prime, const fbprime_t maxp,
   return i;
 }
 
-void
+static void
 store_task_result(fb_factorbase *fb, task_info_t *T)
 {
   fb_general_entry fb_cur;
