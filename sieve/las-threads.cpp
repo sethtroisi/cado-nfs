@@ -60,23 +60,43 @@ void
 reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fill_ratio)
 {
   /* We estimate that the updates will be evenly distrubuted among the n
-     different bucket arrays, so each gets fill_ratio / n.
-
-     FIXME: We need bucket array fill balancing for this to work, or bucket
-     arrays that happen to get many FB slices with small primes will overflow.
-     Thus, currently we allocate fill_ratio instad of fill_ratio / n.
-     THIS WASTES MEMORY. */
+     different bucket arrays, so each gets fill_ratio / n. */
   for (size_t i = 0; i < n; i++)
-    BAs[i].allocate_memory(n_bucket, fill_ratio);
+    BAs[i].allocate_memory(n_bucket, fill_ratio / n);
 }
 
 template <typename T>
 T &reservation_array<T>::reserve()
 {
   enter();
+  const bool verbose = false;
+  const bool choose_least_full = true;
   size_t i;
+
   while ((i = find_free()) == n)
     wait(cv);
+
+  if (choose_least_full) {
+    /* Find the least-full bucket array */
+    size_t best_i = n;
+    double best_full = 1.;
+    if (verbose)
+      verbose_output_print(0, 3, "# Looking for least full bucket\n");
+    for (size_t i = 0; i < n; i++) {
+      if (in_use[i])
+        continue;
+      double full = BAs[i].max_full();
+      if (verbose)
+        verbose_output_print(0, 3, "# Bucket %zu is %.0f%% full\n",
+                             i, full * 100.);
+      if (full < best_full) {
+        best_full = full;
+        best_i = i;
+      }
+    }
+    ASSERT_ALWAYS(best_i != n && best_full < 1.);
+    i = best_i;
+  }
   in_use[i] = true;
   leave();
   return BAs[i];

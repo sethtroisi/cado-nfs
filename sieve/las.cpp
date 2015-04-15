@@ -2567,7 +2567,12 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     tune_las_memset();
     
-    thread_workspaces *workspaces = new thread_workspaces(las->nb_threads, 2, las);
+    /* We allocate one more workspace per kind of bucket than there are
+       threads, so that threads have some freedom in avoiding the fullest
+       bucket array. With only one thread, no balancing needs to be done,
+       so we use only one bucket array. */
+    size_t nr_workspaces = las->nb_threads + (las->nb_threads > 1);
+    thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
 
     las_report report;
     las_report_init(report);
