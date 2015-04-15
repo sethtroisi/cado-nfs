@@ -195,7 +195,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         } else {
             tfb = seconds ();
             double tfb_wct = wct_seconds ();
-            sis->fb->make_linear_parallel ((const mpz_t *) pol->coeff,
+            sis->fb->make_linear_threadpool ((const mpz_t *) pol->coeff,
                     las->nb_threads);
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;

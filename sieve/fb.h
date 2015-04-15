@@ -483,6 +483,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   int read(const char * const filename);
   void make_linear (const mpz_t *poly);
   void make_linear_parallel (const mpz_t *poly, const unsigned int nb_threads);
+  void make_linear_threadpool(const mpz_t *poly, const unsigned int nb_threads);
   bool mmap_fbc(const char *) {return false;};
   void dump_fbc(const char *) {return;};
   size_t size() const {return 0;}
