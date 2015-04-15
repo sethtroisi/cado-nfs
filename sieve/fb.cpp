@@ -916,14 +916,17 @@ fb_factorbase::make_linear (const mpz_t *poly)
 }
 
 /*
-  Parallel version.
-  Thread 0: compute primes and powers, and assign them to threads, by block of 1024.
-            fill-in the database.
-  Other threads: compute the root and the inverse of q.
-  TODO: there is some redundancy with the code in makefb.c, here.
+  Parallel version, using thread pool.
 */
 
 #define GROUP 1024
+
+// A task will handle 1024 entries before returning the result to the
+// master thread.
+// This task_info structure contains:
+//   - general info (poly, number of valid entries)
+//   - input for the computation
+//   - output of the computation
 typedef struct {
   const mpz_t *poly;
   unsigned int n;
@@ -935,113 +938,24 @@ typedef struct {
   fbroot_t r[GROUP];
   bool proj[GROUP];
   redc_invp_t invq[GROUP];
-} tab_t;
+} task_info_t;
 
-
-static void *
-make_linear_one_thread(void *args)
-{
-  tab_t *T = (tab_t *)args;
-  for (unsigned int i = 0; i < T->n; ++i) {
-    T->proj[i] = fb_linear_root (&T->r[i], T->poly, T->q[i]);
-    T->invq[i] = compute_invq(T->q[i]);
-  }
-  return NULL;
-}
-
-void
-fb_factorbase::make_linear_parallel (const mpz_t *poly,
-    const unsigned int nb_threads)
-{
-  fbprime_t next_prime;
-  fbprime_t powlim = 0;
-  
-  /* Find out the largest powlim among all parts */
-  for (size_t i = 0; i < FB_MAX_PARTS; i++)
-    powlim = MAX(powlim, parts[i]->powlim);
-
-  /* Prepare for computing powers up to that limit */
-  fb_powers *powers = new fb_powers(powlim);
-  size_t next_pow = 0;
-
-  verbose_output_vfprint(0, 1, gmp_vfprintf,
-               "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
-               "# including primes up to %" FBPRIME_FORMAT
-               " and prime powers up to %" FBPRIME_FORMAT
-               " using %u threads.\n",
-               poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
-               poly[0], thresholds[FB_MAX_PARTS-1], powlim, nb_threads);
-
-  tab_t T[nb_threads];
-  pthread_t tid[nb_threads];
-  for (unsigned int i = 0; i < nb_threads; ++i)
-    T[i].poly = poly;
-
-  fbprime_t maxp = thresholds[FB_MAX_PARTS-1];
-  for (next_prime = 2; next_prime <= maxp; ) {
-    unsigned int th;
-    for (th = 0; th < nb_threads && next_prime <= maxp; th++) {
-      // Give GROUP entries for thread nb th.
-      unsigned int i;
-      for (i = 0; i < GROUP && next_prime <= maxp; ++i) {
-        /* Handle any prime powers that are smaller than next_prime */
-        if (next_pow < powers->size() && (*powers)[next_pow].q <= next_prime) {
-          /* The list of powers must not include primes */
-          ASSERT_ALWAYS((*powers)[next_pow].q < next_prime);
-          T[th].q[i] = (*powers)[next_pow].q;
-          T[th].p[i] = (*powers)[next_pow].p;
-          T[th].k[i] = (*powers)[next_pow].k;
-          next_pow++;
-        } else {
-          T[th].q[i] = T[th].p[i] = next_prime;
-          T[th].k[i] = 1;
-          next_prime = getprime(next_prime);
-        }
-      }
-      T[th].n = i;
-    }
-    // Now let the threads to the work.
-    // Here, we know that only th have to be started.
-    for (unsigned int t = 0; t < th; ++t) {
-      pthread_create(&tid[t], NULL, make_linear_one_thread, (void *)(&T[t]));
-    }
-    // Collect the results and copy into structure
-    for (unsigned int t = 0; t < th; ++t) {
-      pthread_join(tid[t], NULL);
-      for (unsigned int j = 0; j < T[t].n; ++j) {
-        fb_general_entry fb_cur;
-        fb_cur.q = T[t].q[j];
-        fb_cur.p = T[t].p[j];
-        fb_cur.k = T[t].k[j];
-        fb_cur.nr_roots = 1;
-        fb_cur.roots[0].exp = fb_cur.k;
-        fb_cur.roots[0].oldexp = fb_cur.k - 1U;
-        fb_cur.roots[0].proj = T[t].proj[j];
-        fb_cur.roots[0].r = T[t].r[j];
-        fb_cur.invq = T[t].invq[j];
-        append(fb_cur);
-      }
-    }
-  }
-
-  getprime (0); /* free prime iterator */
-
-  delete (powers);
-  finalize();
-}
-
-/* another attempt, with threadpool */
 
 class make_linear_thread_param: public task_parameters {
 public:
-  tab_t *T;
-  make_linear_thread_param(tab_t *_T) : T(_T) {}
+  task_info_t *T;
+  make_linear_thread_param(task_info_t *_T) : T(_T) {}
+  make_linear_thread_param() {}
 };
 
 class make_linear_thread_result: public task_result {
 public:
-  tab_t *T;
-  make_linear_thread_result(tab_t *_T) : T(_T) {}
+  task_info_t *T;
+  const make_linear_thread_param *orig_param;
+  make_linear_thread_result(task_info_t *_T, const make_linear_thread_param *_p)
+    : T(_T), orig_param(_p) {
+      ASSERT_ALWAYS(T == orig_param->T);
+    }
 };
 
 task_result *
@@ -1049,41 +963,41 @@ process_one_task(const task_parameters *_param)
 {
   const make_linear_thread_param *param =
     static_cast<const make_linear_thread_param *>(_param);
-  tab_t *T = param->T;
+  task_info_t *T = param->T;
   for (unsigned int i = 0; i < T->n; ++i) {
     T->proj[i] = fb_linear_root (&T->r[i], T->poly, T->q[i]);
     T->invq[i] = compute_invq(T->q[i]);
   }
-  return new make_linear_thread_result(T);
+  return new make_linear_thread_result(T, param);
 }
 
 
 // Prepare a new task. Return 0 if there are no new task to schedule.
 // Otherwise, return the number of ideals put in the task.
 static int
-get_new_task(tab_t *T, fbprime_t *next_prime, const fbprime_t maxp,
-    size_t *next_pow, fb_powers *powers)
+get_new_task(task_info_t &T, fbprime_t &next_prime, const fbprime_t maxp,
+    size_t &next_pow, fb_powers &powers)
 {
   unsigned int i;
-  for (i = 0; i < GROUP && *next_prime <= maxp; ++i) {
-    if (*next_pow < powers->size() && (*powers)[*next_pow].q <= *next_prime) {
-      ASSERT_ALWAYS((*powers)[*next_pow].q < *next_prime);
-      T->q[i] = (*powers)[*next_pow].q;
-      T->p[i] = (*powers)[*next_pow].p;
-      T->k[i] = (*powers)[*next_pow].k;
-      (*next_pow)++;
+  for (i = 0; i < GROUP && next_prime <= maxp; ++i) {
+    if (next_pow < powers.size() && powers[next_pow].q <= next_prime) {
+      ASSERT_ALWAYS(powers[next_pow].q < next_prime);
+      T.q[i] = powers[next_pow].q;
+      T.p[i] = powers[next_pow].p;
+      T.k[i] = powers[next_pow].k;
+      next_pow++;
     } else {
-      T->q[i] = T->p[i] = *next_prime;
-      T->k[i] = 1;
-      *next_prime = getprime(*next_prime);
+      T.q[i] = T.p[i] = next_prime;
+      T.k[i] = 1;
+      next_prime = getprime(next_prime);
     }
   }
-  T->n = i;
+  T.n = i;
   return i;
 }
 
 void
-store_task_result(fb_factorbase *fb, tab_t *T)
+store_task_result(fb_factorbase *fb, task_info_t *T)
 {
   fb_general_entry fb_cur;
   for (unsigned int j = 0; j < T->n; ++j) {
@@ -1104,14 +1018,12 @@ void
 fb_factorbase::make_linear_threadpool (const mpz_t *poly,
     const unsigned int nb_threads)
 {
-  fbprime_t powlim = 0;
- 
   /* Find out the largest powlim among all parts */
+  fbprime_t powlim = 0;
   for (size_t i = 0; i < FB_MAX_PARTS; i++)
     powlim = MAX(powlim, parts[i]->powlim);
-
   /* Prepare for computing powers up to that limit */
-  fb_powers *powers = new fb_powers(powlim);
+  fb_powers powers(powlim);
   size_t next_pow = 0;
 
   verbose_output_vfprint(0, 1, gmp_vfprintf,
@@ -1124,25 +1036,27 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
 
 #define MARGIN 3
   // Prepare more tasks, so that threads keep being busy.
-  unsigned int nb_tab = nb_threads+MARGIN;
-  tab_t T[nb_tab];
-  for (unsigned int i = 0; i < nb_tab; ++i)
+  unsigned int nb_tab = nb_threads + MARGIN;
+  task_info_t * T = new task_info_t[nb_tab];
+  make_linear_thread_param * params = new make_linear_thread_param[nb_tab];
+  for (unsigned int i = 0; i < nb_tab; ++i) {
     T[i].poly = poly;
+    params[i].T = &T[i];
+  }
   
   fbprime_t maxp = thresholds[FB_MAX_PARTS-1];
   fbprime_t next_prime = 2;
 
-  thread_pool *pool = new thread_pool(nb_threads);
+  thread_pool pool(nb_threads);
 
   // Stage 0: prepare tasks
   unsigned int active_task = 0;
   for (unsigned int i = 0; i < nb_tab; ++i) {
     int ret;
-    ret = get_new_task(&T[i], &next_prime, maxp, &next_pow, powers);
+    ret = get_new_task(T[i], next_prime, maxp, next_pow, powers);
     if (!ret)
       break;
-    make_linear_thread_param *param = new make_linear_thread_param(&T[i]);
-    pool->add_task(process_one_task, param, 0);
+    pool.add_task(process_one_task, &params[i], 0);
     active_task++;
   }
 
@@ -1151,45 +1065,35 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
   int cont = 1;
   do {
     ASSERT_ALWAYS(active_task > 0);
-    task_result *result = pool->get_result();
+    task_result *result = pool.get_result();
     make_linear_thread_result *res =
       static_cast<make_linear_thread_result *>(result);
     active_task--;
-    tab_t * curr_T = res->T;
+    task_info_t * curr_T = res->T;
     store_task_result(this, curr_T);
-    delete result;
-    cont = get_new_task(curr_T, &next_prime, maxp, &next_pow, powers);
+    cont = get_new_task(*curr_T, next_prime, maxp, next_pow, powers);
     if (cont) {
       active_task++;
-      make_linear_thread_param *param = new make_linear_thread_param(curr_T);
-      pool->add_task(process_one_task, param, 0);
+      pool.add_task(process_one_task, res->orig_param, 0);
     }
+    delete result;
   } while (cont);
 
   // Stage 2: purge last tasks
   for (unsigned int i = 0; i < active_task; ++i) {
-    task_result *result = pool->get_result();
+    task_result *result = pool.get_result();
     make_linear_thread_result *res =
       static_cast<make_linear_thread_result *>(result);
-    tab_t * curr_T = res->T;
+    task_info_t * curr_T = res->T;
     store_task_result(this, curr_T);
     delete result;
   }
 
-  delete pool;
+  delete [] T;
+  delete [] params;
   getprime (0); /* free prime iterator */
-  delete (powers);
   finalize();
 }
-
-
-
-
-
-
-
-
-
 
 
 void
