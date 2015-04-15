@@ -832,10 +832,13 @@ class fb_powers {
   public:
   fb_powers(fbprime_t);
   ~fb_powers(){delete this->powers;};
-  fb_power_t operator[] (const size_t i) {
+  fb_power_t &operator[] (const size_t i) {
     return (*this->powers)[i];
   }
-  size_t size() {return powers->size();}
+  const fb_power_t &operator[] (const size_t i) const {
+    return (*this->powers)[i];
+  }
+  size_t size() const {return powers->size();}
 };
 
 /* Create a list of prime powers (with exponent >1) up to lim */
