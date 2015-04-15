@@ -67,7 +67,7 @@ public:
 };
 
 /* When purging a bucket, we don't store pointer arrays to indicate where in
-   the puged data a new slice begins, as each slice will have only very few
+   the purged data a new slice begins, as each slice will have only very few
    updates surviving. Instead, we re-write each update to store both slice
    index and offset. */
 class longhint_t {
