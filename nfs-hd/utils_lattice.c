@@ -55,6 +55,21 @@ void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list)
   fprintf(file, "]\n");
 }
 
+void list_int64_vector_fprintf_comment(FILE * file,
+    list_int64_vector_srcptr list)
+{
+  fprintf(file, "# [\n");
+  for (unsigned int i = 0; i < list->length - 1; i++) {
+    fprintf(file, "# ");
+    int64_vector_fprintf(file, list->v[i]);
+  }
+  if (list->length != 0) {
+    fprintf(file, "# ");
+    int64_vector_fprintf(file, list->v[list->length - 1]);
+  }
+  fprintf(file, "# ]\n");
+}
+
 void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
     mat_int64_srcptr matrix)
 {
@@ -327,6 +342,51 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
   return det; 
 }
 
+#ifdef SKEW_LLL
+static void skew_LLL_2(list_int64_vector_ptr list, int64_vector_srcptr v0_root,
+    int64_vector_srcptr v1_root, int64_t I)
+{
+  ASSERT(v0_root->c[1] == 0);
+  ASSERT(v1_root->c[1] == 1);
+  ASSERT(v0_root->dim == v1_root->dim);
+  ASSERT(I > 0);
+#ifndef NDEBUG
+  for (unsigned int i = 3; i < v1_root->dim; i++) {
+    ASSERT(v0_root->c[i] == v1_root->c[i]);
+  }
+#endif // NDEBUG
+
+  mat_int64_t Mqr;
+  mat_int64_init(Mqr, 2, 2);
+  for (unsigned row = 0; row < 2; row++) {
+    Mqr->coeff[row + 1][1] = v0_root->c[row];
+    Mqr->coeff[row + 1][2] = v1_root->c[row];
+  }
+
+  int64_t diag[2] = {1,
+    (int64_t)round(((double)(2 * (I / 2) * (I / 2))) / (double)v0_root->c[0])};
+  mat_int64_t Il;
+  mat_int64_init(Il, 2, 2);
+  mat_int64_set_diag(Il, diag);
+
+  mat_int64_t M;
+  mat_int64_init(M, 2, 2);
+  mat_int64_mul_mat_int64(M, Il, Mqr);
+
+  mat_int64_t U;
+  mat_int64_init(U, 2, 2);
+  mat_int64_LLL_unimodular_transpose(U, M);
+  mat_int64_mul_mat_int64(M, Mqr, U);
+
+  list_int64_vector_extract_mat_int64(list, M);
+
+  mat_int64_clear(M);
+  mat_int64_clear(U);
+  mat_int64_clear(Mqr);
+  mat_int64_clear(Il);
+}
+#endif // SKEW_LLL
+
 //TODO: why not merge with gauss reduction?
 int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
     int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I)
@@ -396,6 +456,13 @@ int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
   v0->c[1] = a1;
   v1->c[0] = b0;
   v1->c[1] = b1;
+
+#ifdef SKEW_LLL  
+  list_int64_vector_t list;
+  list_int64_vector_init(list);
+  skew_LLL_2(list, v0_root, v1_root, I);
+  list_int64_vector_fprintf_comment(stdout, list);
+#endif // SKEW_LLL  
 
   return 1;
 }

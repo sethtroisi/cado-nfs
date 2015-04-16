@@ -54,6 +54,8 @@ void list_int64_vector_clear(list_int64_vector_ptr list);
  */
 void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list);
 
+void list_int64_vector_fprintf_comment(FILE * file,
+    list_int64_vector_srcptr list);
 /*
  * Extract all the vector (in column) of the matrix and put them in a list.
  *
