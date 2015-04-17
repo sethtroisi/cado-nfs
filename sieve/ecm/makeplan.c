@@ -30,6 +30,58 @@ static bc_dict_t ecm_dict =
   {ECM_DICT_NRENTRIES, ecm_dict_len, ecm_dict_entry, ecm_dict_code};
 
 
+/* Store already computed ECM stage 1 chains in a global variable.
+ * WARNING: for the moment, this is not thread safe
+ */
+static unsigned int nb_saved_chains = 0;
+static unsigned int * saved_chains_B1 = NULL;
+static unsigned int * saved_chains_len = NULL;
+static char ** saved_chains = NULL;
+
+void save_chain(unsigned int B1, unsigned int len, const char * ch)
+{
+  nb_saved_chains++;
+  saved_chains_B1 = (unsigned int *)realloc(saved_chains_B1,
+      nb_saved_chains*sizeof(unsigned int));
+  saved_chains_len = (unsigned int *)realloc(saved_chains_len,
+      nb_saved_chains*sizeof(unsigned int));
+  saved_chains = (char **)realloc(saved_chains, nb_saved_chains*sizeof(char *));
+  saved_chains_B1[nb_saved_chains-1] = B1;
+  saved_chains_len[nb_saved_chains-1] = len;
+  saved_chains[nb_saved_chains-1] = (char *)malloc(len);
+  memcpy(saved_chains[nb_saved_chains-1], ch, len);
+}
+
+// Return 0 if not found, len if found.
+// If successful, a new array is allocated in ch.
+unsigned int lookup_saved_chain(char ** ch, unsigned int B1)
+{
+  int found = 0;
+  unsigned int i;
+  for (i = 0; i < nb_saved_chains; ++i) {
+    if (B1 == saved_chains_B1[i]) {
+      found = 1;
+      break;
+    }
+  }
+  if (!found)
+    return 0;
+
+  unsigned int len = saved_chains_len[i];
+  *ch = (char *)malloc(len);
+  memcpy(*ch, saved_chains[i], len);
+  return len;
+}
+
+void free_saved_chains() {
+  for (unsigned int i = 0; i < nb_saved_chains; ++i)
+    free(saved_chains[i]);
+  free(saved_chains);
+  free(saved_chains_B1);
+  free(saved_chains_len);
+}
+
+
 void 
 pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       int verbose)
@@ -213,28 +265,35 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   if (parameterization & FULLMONTY)
     {
       plan->sigma = sigma;
-      bc_state = bytecoder_init (compress ? &ecm_dict : NULL);
-      p = (unsigned int) getprime (2UL);
-      ASSERT (p == 3);
-      /* If group order is divisible by 12, add another 3 to stage 1 primes */
-      if (extra_primes && 
-	  (parameterization == BRENT12 || parameterization == MONTY12))
-	totalcost += prac_bytecode (3, addcost, doublecost, bytecost, 
-				    changecost, bc_state);
-      for ( ; p <= B1; p = (unsigned int) getprime (p))
-	{
-	  for (q = 1; q <= B1 / p; q *= p)
-	    totalcost += prac_bytecode (p, addcost, doublecost, bytecost, 
-					changecost, bc_state);
-	}
-      bytecoder ((literal_t) 12, bc_state);
-      bytecoder_flush (bc_state);
-      plan->bc_len = bytecoder_size (bc_state);
-      plan->bc = (char *) malloc (plan->bc_len);
-      ASSERT (plan->bc);
-      bytecoder_read (plan->bc, bc_state);
-      bytecoder_clear (bc_state);
-      getprime (0);
+      plan->bc_len = lookup_saved_chain(&plan->bc, B1);
+      if (plan->bc_len == 0) {
+        bc_state = bytecoder_init (compress ? &ecm_dict : NULL);
+        p = (unsigned int) getprime (2UL);
+        ASSERT (p == 3);
+        /* If group order is divisible by 12, add another 3 to stage 1 primes */
+        if (extra_primes && 
+            (parameterization == BRENT12 || parameterization == MONTY12))
+          totalcost += prac_bytecode (3, addcost, doublecost, bytecost, 
+          			    changecost, bc_state);
+        for ( ; p <= B1; p = (unsigned int) getprime (p))
+          {
+            for (q = 1; q <= B1 / p; q *= p)
+              totalcost += prac_bytecode (p, addcost, doublecost, bytecost, 
+          				changecost, bc_state);
+          }
+        bytecoder ((literal_t) 12, bc_state);
+        bytecoder_flush (bc_state);
+        plan->bc_len = bytecoder_size (bc_state);
+        plan->bc = (char *) malloc (plan->bc_len);
+        ASSERT (plan->bc);
+        bytecoder_read (plan->bc, bc_state);
+        bytecoder_clear (bc_state);
+        getprime (0);
+        // save chain for future use (global variable).
+        // If this get multithreaded someday, we should have a mutex
+        // here.
+        save_chain(B1, plan->bc_len, plan->bc);
+      }
       
       if (!compress)
 	{

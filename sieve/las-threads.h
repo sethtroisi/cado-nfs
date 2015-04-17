@@ -2,20 +2,20 @@
 #define LAS_THREADS_H_
 
 #include <pthread.h>
+#include <algorithm>
+#include "threadpool.h"
 #include "las-forwardtypes.h"
 #include "bucket.h"
 #include "fb.h"
 #include "las-report-stats.h"
 #include "las-base.hpp"
 
+class thread_workspaces;
+
 /* {{{ thread-related defines */
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
-  // m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
-  // k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
-  bucket_array_t<1, shorthint_t> BA;    /* Always used */
   const fb_part *fb;
-
   /* For small sieve */
   int * ssdpos;
   int * rsdpos;
@@ -27,12 +27,12 @@ struct thread_side_data : private NonCopyable {
   ~thread_side_data();
   /* Allocate enough memory to be able to store at least n_bucket buckets,
      each of size at least fill_ratio * bucket region size. */
-  void allocate_bucket_array(uint32_t n_bucket, double fill_ratio);
   void set_fb(const fb_part *_fb) {fb = _fb;}
   void update_checksum(){checksum_post_sieve.update(bucket_region, BUCKET_REGION);}
 };
 
 struct thread_data : private NonCopyable {
+  const thread_workspaces *ws;
   int id;
   thread_side_data sides[2];
   las_info_srcptr las;
@@ -42,28 +42,107 @@ struct thread_data : private NonCopyable {
   bool is_initialized;
   thread_data();
   ~thread_data();
-  void init(int id, las_info_srcptr las);
+  void init(const thread_workspaces &_ws, int id, las_info_srcptr las);
   void pickup_si(sieve_info_ptr si);
   void update_checksums();
 };
 
-class thread_workspaces : private NonCopyable {
-  thread_data *thrs;
-  bool *used;
-  const size_t nr_workspaces;
-  pthread_mutex_t mutex;
-  sieve_info_ptr si;
+/* A set of n bucket arrays, all of the same type, and methods to reserve one
+   of them for exclusive use and to release it again. */
+template <typename T>
+class reservation_array : private NonCopyable, private monitor {
+  T * const BAs;
+  bool * const in_use;
+  const size_t n;
+  condition_variable cv;
+  /* Return the index of the first entry that's currently not in use, or the
+     first index out of array bounds if all are in use */
+  size_t find_free() const {
+    return std::find(&in_use[0], &in_use[n], false) - &in_use[0];
+  }
 public:
-  thread_workspaces(size_t n, las_info_ptr _las);
+  reservation_array(size_t n)
+    : BAs(new T[n]), in_use(new bool[n]), n(n)
+  {
+    for (size_t i = 0; i < n; i++) {
+      in_use[i] = false;
+    }
+  }
+  ~reservation_array() {
+    delete[] BAs;
+    delete[] in_use;
+  }
+
+  void allocate_buckets(const uint32_t n_bucket, double fill_ratio);
+  const T* cbegin() const {return &BAs[0];}
+  const T* cend() const {return &BAs[n];}
+
+  T &reserve();
+  void release(T &BA);
+};
+
+/* A group of reservation arrays, one for each possible update type.
+   Also defines a getter function, templated by the desired type of
+   update, that returns the corresponding reservation array, i.e.,
+   it provides a type -> object mapping. */
+class reservation_group {
+  friend class thread_workspaces;
+  reservation_array<bucket_array_t<1, shorthint_t> > RA1_short;
+  reservation_array<bucket_array_t<2, shorthint_t> > RA2_short;
+  reservation_array<bucket_array_t<3, shorthint_t> > RA3_short;
+  reservation_array<bucket_array_t<1, longhint_t> > RA1_long;
+  reservation_array<bucket_array_t<2, longhint_t> > RA2_long;
+protected:
+  template<int LEVEL, typename HINT>
+  reservation_array<bucket_array_t<LEVEL, HINT> > &
+  get();
+
+  template <int LEVEL, typename HINT>
+  const reservation_array<bucket_array_t<LEVEL, HINT> > &
+  cget() const;
+public:
+  reservation_group(size_t nr_bucket_arrays);
+  void allocate_buckets(const uint32_t n_bucket, const double *fill_ratio);
+};
+
+class thread_workspaces : private NonCopyable {
+  typedef reservation_group * reservation_group_ptr;
+  thread_data *thrs;
+  const size_t nr_workspaces;
+  sieve_info_ptr si;
+  const unsigned int nr_sides; /* Usually 2 */
+  reservation_group_ptr *groups; /* one per side. Need pointer array due to
+    lacking new[] without default constructor prior to C++11 :( */
+
+public:
+  thread_workspaces(size_t nr_workspaces, unsigned int nr_sides, las_info_ptr _las);
   ~thread_workspaces();
   void pickup_si(sieve_info_ptr si);
   void thread_do(void * (*) (thread_data *));
   void buckets_alloc();
   void buckets_free();
+  template <int LEVEL, typename HINT>
   double buckets_max_full();
   void accumulate(las_report_ptr, sieve_checksum *);
-  thread_data &reserve_workspace();
-  void release_workspace(thread_data &);
+
+  template <int LEVEL, typename HINT>
+  bucket_array_t<LEVEL, HINT> &
+  reserve_BA(const int side) {return groups[side]->get<LEVEL, HINT>().reserve();}
+
+  template <int LEVEL, typename HINT>
+  void
+  release_BA(const int side, bucket_array_t<LEVEL, HINT> &BA) {
+    return groups[side]->get<LEVEL, HINT>().release(BA);
+  }
+
+  /* Iterator over all the bucket arrays of a given type on a given side */
+  template <int LEVEL, typename HINT>
+  const bucket_array_t<LEVEL, HINT> *
+  cbegin_BA(const int side) const {return groups[side]->cget<LEVEL, HINT>().cbegin();}
+
+  template <int LEVEL, typename HINT>
+  const bucket_array_t<LEVEL, HINT> *
+  cend_BA(const int side) const {return groups[side]->cget<LEVEL, HINT>().cend();}
 };
 
 #endif

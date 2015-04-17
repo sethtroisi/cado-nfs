@@ -1,3 +1,6 @@
+#ifndef THREADPOOL_H_
+#define THREADPOOL_H_
+
 #include <pthread.h>
 #include <queue>
 #include <vector>
@@ -112,12 +115,14 @@ class thread_pool : private monitor, private ThreadNonCopyable {
   bool kill_threads; /* If true, hands out kill tasks once work queues are empty */
 
   static void * thread_work_on_tasks(void *pool);
-  thread_task *get_task(const size_t queue);
+  thread_task *get_task(size_t queue);
   void add_result(size_t queue, task_result *result);
   bool all_task_queues_empty() const;
 public:
   thread_pool(size_t _nr_threads, size_t nr_queues = 1);
   ~thread_pool();
-  void add_task(task_function_t func, const task_parameters *params, int id, const size_t queue = 0);
-  task_result *get_result(const size_t queue = 0);
+  void add_task(task_function_t func, const task_parameters *params, int id, size_t queue = 0);
+  task_result *get_result(size_t queue = 0, bool blocking = true);
 };
+
+#endif
