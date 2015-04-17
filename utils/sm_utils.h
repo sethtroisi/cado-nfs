@@ -35,6 +35,10 @@ typedef sm_relset_struct_t sm_relset_t[1];
 typedef sm_relset_struct_t * sm_relset_ptr;
 typedef const sm_relset_struct_t * sm_relset_srcptr;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void sm_relset_init (sm_relset_t r, int *d);
 void sm_relset_clear (sm_relset_t r);
 
@@ -61,6 +65,10 @@ void print_sm (FILE *, mpz_poly_t, int, int);
  * sm_side_info structure.
  */
 void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm);
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif /* SM_UTILS_H_ */
