@@ -353,7 +353,6 @@ void write_ideal_1(FILE * file, ideal_1_srcptr ideal, unsigned int t) {
 }
 
 void write_ideal_u(FILE * file, ideal_u_srcptr ideal, unsigned int t) {
-  ideal_u_fprintf(stdout, ideal, t);
   write_ideal(file, ideal->ideal);
   for (int row = 0; row < ideal->ideal->h->deg - 1; row++) {
     for (int col = 0; col < (int)t - ideal->ideal->h->deg - 1; col++) {
@@ -395,17 +394,17 @@ void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
   }
   gmp_fprintf(file, "%Zd\n", f->coeff[f->deg]);
   fprintf(file, "t: %u\n", t);
-  fprintf(file, "1\n");
+  fprintf(file, "1:%" PRIu64 "\n", fb->number_element_1);
 
   for (uint64_t i = 0; i < fb->number_element_1; i++) {
     write_ideal_1(file, fb->factor_base_1[i], t);
   }
-  fprintf(file, "u\n");
+  fprintf(file, "u:%" PRIu64 "\n", fb->number_element_u);
   
   for (uint64_t i = 0; i < fb->number_element_u; i++) {
     write_ideal_u(file, fb->factor_base_u[i], t);
   }
-  fprintf(file, "p\n");
+  fprintf(file, "p:%" PRIu64 "\n", fb->number_element_pr);
   
   for (uint64_t i = 0; i < fb->number_element_pr; i++) {
     write_ideal_pr(file, fb->factor_base_pr[i], t);
@@ -546,15 +545,6 @@ int main(int argc, char ** argv)
     export_factor_base(file, fb[i], f[i], fbb[i], lpb[i], t);
     fclose(file);
   }
-
-  /*for (unsigned int i = 0; i < V; i++) {*/
-    /*mpz_poly_fprintf(stdout, f[i]);*/
-    /*factor_base_fprintf(stdout, fb[i], t);*/
-    /*fprintf(stdout, "--------------------------------------------------------------------------------\n"); */
-    /*mpz_clear(lpb[i]);*/
-    /*mpz_poly_clear(f[i]);*/
-    /*factor_base_clear(fb[i], t);*/
-  /*}*/
 
   free(f);
   free(fbb);
