@@ -2,16 +2,7 @@
 #define MAT_DOUBLE_H 
 
 #include "macros.h"
-
-typedef struct {
-  double **coeff;
-  unsigned int NumRows;
-  unsigned int NumCols;
-} s_mat_double_t;
-
-typedef s_mat_double_t mat_double_t[1];
-typedef s_mat_double_t * mat_double_ptr;
-typedef const s_mat_double_t * mat_double_srcptr;
+#include "matrix.h"
 
 /*
  * WARNING: to correspond to the definition of mat_Z, the first column and line
