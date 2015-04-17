@@ -97,9 +97,15 @@ bucket_array_t<LEVEL, HINT>::move(bucket_array_t<LEVEL, HINT> &other)
 template <int LEVEL, typename HINT>
 void
 bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
-                                const size_t min_bucket_size,
+                                const double fill_ratio,
                                 const slice_index_t prealloc_slices)
 {
+  /* Don't try to allocate anything, nor print a message, for sieving levels
+     where the corresponding factor base part is empty. */
+  if (fill_ratio == 0.)
+    return;
+
+  const size_t min_bucket_size = fill_ratio * bucket_region;
   const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(update_t));
   const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(update_t);
   const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
@@ -167,6 +173,10 @@ bucket_array_t<LEVEL, HINT>::max_full () const
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */
 template class bucket_array_t<1, shorthint_t>;
+template class bucket_array_t<2, shorthint_t>;
+template class bucket_array_t<3, shorthint_t>;
+template class bucket_array_t<1, longhint_t>;
+template class bucket_array_t<2, longhint_t>;
 
 
 /* A compare function suitable for sorting updates in order of ascending x
@@ -262,7 +272,7 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
   const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
 
   for ( ; it != end_it ; it++) {
-    push_update(it->x, 0, it->hint, it->index);
+    BA_out.push_update(it->x, 0, it->hint, it->index);
   }
 }
 

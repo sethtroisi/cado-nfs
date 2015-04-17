@@ -16,14 +16,6 @@ thread_side_data::~thread_side_data()
   bucket_region = NULL;
 }
 
-void
-thread_side_data::allocate_bucket_array(const uint32_t n_bucket, const double fill_ratio)
-{
-  const size_t bucket_region = (size_t) 1 << LOG_BUCKET_REGION;
-  const size_t bucket_size = bucket_region * fill_ratio;
-  BA.allocate_memory(n_bucket, bucket_size);
-}
-
 thread_data::thread_data() : is_initialized(false)
 {
   /* Allocate memory for the intermediate sum (only one for both sides) */
@@ -40,9 +32,10 @@ thread_data::~thread_data()
   las_report_clear(rep);
 }
 
-void thread_data::init(const int _id, las_info_srcptr _las)
+void thread_data::init(const thread_workspaces &_ws, const int _id, las_info_srcptr _las)
 {
   ASSERT_ALWAYS(!is_initialized);
+  ws = &_ws;
   id = _id;
   las = _las;
   is_initialized = true;
@@ -53,10 +46,6 @@ void thread_data::pickup_si(sieve_info_ptr _si)
   si = _si;
   for (int side = 0 ; side < 2 ; side++) {
     sides[side].set_fb(si->sides[side]->fb->get_part(1));
-    /* Always allocate the max number of buckets (i.e., as if we were using the
-       max value for J), even if we use a smaller J due to a poor q-lattice
-       basis */
-    sides[side].allocate_bucket_array(si->nb_buckets_max, si->sides[side]->max_bucket_fill_ratio);
   }
 }
 
@@ -66,26 +55,201 @@ void thread_data::update_checksums()
     sides[s].update_checksum();
 }
 
-thread_workspaces::thread_workspaces(const size_t n, las_info_ptr las)
-  : nr_workspaces(n)
+template <typename T>
+void
+reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fill_ratio)
 {
-    pthread_mutex_init(&mutex, NULL);
-    thrs = new thread_data[n];
+  /* We estimate that the updates will be evenly distrubuted among the n
+     different bucket arrays, so each gets fill_ratio / n. */
+  for (size_t i = 0; i < n; i++)
+    BAs[i].allocate_memory(n_bucket, fill_ratio / n);
+}
+
+template <typename T>
+T &reservation_array<T>::reserve()
+{
+  enter();
+  const bool verbose = false;
+  const bool choose_least_full = true;
+  size_t i;
+
+  while ((i = find_free()) == n)
+    wait(cv);
+
+  if (choose_least_full) {
+    /* Find the least-full bucket array */
+    size_t best_i = n;
+    double best_full = 1.;
+    if (verbose)
+      verbose_output_print(0, 3, "# Looking for least full bucket\n");
+    for (size_t i = 0; i < n; i++) {
+      if (in_use[i])
+        continue;
+      double full = BAs[i].max_full();
+      if (verbose)
+        verbose_output_print(0, 3, "# Bucket %zu is %.0f%% full\n",
+                             i, full * 100.);
+      if (full < best_full) {
+        best_full = full;
+        best_i = i;
+      }
+    }
+    ASSERT_ALWAYS(best_i != n && best_full < 1.);
+    i = best_i;
+  }
+  in_use[i] = true;
+  leave();
+  return BAs[i];
+}
+
+template <typename T>
+void reservation_array<T>::release(T &BA) {
+  enter();
+  size_t i;
+  for (i = 0; i < n; i++) {
+    /* Compare object identity (=address), not contents */
+    if (&BAs[i] == &BA)
+      break;
+  }
+  ASSERT_ALWAYS(i < n);
+  in_use[i] = false;
+  signal(cv);
+  leave();
+}
+
+template class reservation_array<bucket_array_t<1, shorthint_t> >;
+template class reservation_array<bucket_array_t<2, shorthint_t> >;
+template class reservation_array<bucket_array_t<3, shorthint_t> >;
+template class reservation_array<bucket_array_t<1, longhint_t> >;
+template class reservation_array<bucket_array_t<2, longhint_t> >;
+
+/* Reserve the required number of bucket arrays. For shorthint BAs, we need 
+   as many as there are threads filling them (or more, for balancing).
+   For longhint, we need only one each, as those are filled only by
+   downsorting, and all the downsorting of one level n bucket into a level
+   n-1 bucket array is done as a single task, by a single thread. */
+reservation_group::reservation_group(const size_t nr_bucket_arrays)
+  : RA1_short(nr_bucket_arrays),
+    RA2_short(nr_bucket_arrays),
+    RA3_short(nr_bucket_arrays),
+    RA1_long(1),
+    RA2_long(1)
+{
+}
+
+void
+reservation_group::allocate_buckets(const uint32_t n_bucket, const double *fill_ratio)
+{
+  /* Short hint updates are generated only by fill_in_buckets(), so each BA
+     gets filled only by its respective FB part */
+  RA1_short.allocate_buckets(n_bucket, fill_ratio[1]);
+  RA2_short.allocate_buckets(n_bucket, fill_ratio[2]);
+  RA3_short.allocate_buckets(n_bucket, fill_ratio[3]);
+
+  /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
+     array gets the shorthint updates from level 3 sieving, and the level-1
+     longhint array gets the shorthint updates from level 2 sieving as well
+     as the previously downsorted longhint updates from level 3 sieving. */
+  RA1_long.allocate_buckets(n_bucket, fill_ratio[2] + fill_ratio[3]);
+  RA2_long.allocate_buckets(n_bucket, fill_ratio[3]);
+}
+
+/* 
+   We want to map the desired bucket_array type to the appropriate
+   reservation_array in reservation_group, which we do by explicit
+   specialization. Endless copy-paste here...  maybe use a virtual
+   base class and an array of base-class-pointers, which then get
+   dynamic_cast to the desired return type?
+*/
+template<>
+reservation_array<bucket_array_t<1, shorthint_t> > &
+reservation_group::get()
+{
+  return RA1_short;
+}
+template<>
+reservation_array<bucket_array_t<2, shorthint_t> > &
+reservation_group::get()
+{
+  return RA2_short;
+}
+template<>
+reservation_array<bucket_array_t<3, shorthint_t> > &
+reservation_group::get() {
+  return RA3_short;
+}
+
+template<>
+reservation_array<bucket_array_t<1, longhint_t> > &
+reservation_group::get()
+{
+  return RA1_long;
+}
+template<>
+reservation_array<bucket_array_t<2, longhint_t> > &
+reservation_group::get()
+{
+  return RA2_long;
+}
+
+/* Fricken C++. There has to be a better way of handling const getter methods
+   than duplicating all the code. */
+template<>
+const reservation_array<bucket_array_t<1, shorthint_t> > &
+reservation_group::cget() const
+{
+  return RA1_short;
+}
+template<>
+const reservation_array<bucket_array_t<2, shorthint_t> > &
+reservation_group::cget() const
+{
+  return RA2_short;
+}
+template<>
+const reservation_array<bucket_array_t<3, shorthint_t> > &
+reservation_group::cget() const
+{
+  return RA3_short;
+}
+
+template<>
+const reservation_array<bucket_array_t<1, longhint_t> > &
+reservation_group::cget() const
+{
+  return RA1_long;
+}
+template<>
+const reservation_array<bucket_array_t<2, longhint_t> > &
+reservation_group::cget() const
+{
+  return RA2_long;
+}
+
+
+
+thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
+  const unsigned int _nr_sides, las_info_ptr las)
+  : nr_workspaces(_nr_workspaces), nr_sides(_nr_sides)
+{
+    thrs = new thread_data[_nr_workspaces];
     ASSERT_ALWAYS(thrs != NULL);
-    used = new bool[n];
-    ASSERT_ALWAYS(used != NULL);
+    groups = new reservation_group_ptr[_nr_sides];
+    ASSERT_ALWAYS(groups != NULL);
 
     for(size_t i = 0 ; i < nr_workspaces; i++) {
-        thrs[i].init(i, las);
-        used[i] = false;
+        thrs[i].init(*this, i, las);
     }
+    for (unsigned int i = 0; i < nr_sides; i++)
+      groups[i] = new reservation_group(_nr_workspaces);
 }
 
 thread_workspaces::~thread_workspaces()
 {
     delete[] thrs;
-    delete[] used;
-    pthread_mutex_destroy(&mutex);
+    for (unsigned int i = 0; i < nr_sides; i++)
+      delete groups[i];
+    delete[] groups;
 }
 
 /* Prepare to work on sieving a special-q as described by _si.
@@ -98,6 +262,11 @@ thread_workspaces::pickup_si(sieve_info_ptr _si)
     for (size_t i = 0; i < nr_workspaces; ++i) {
         thrs[i].pickup_si(_si);
     }
+    /* Always allocate the max number of buckets (i.e., as if we were using the
+       max value for J), even if we use a smaller J due to a poor q-lattice
+       basis */
+    for (unsigned int i_side = 0; i_side < nr_sides; i_side++)
+      groups[i_side]->allocate_buckets(si->nb_buckets_max, si->sides[i_side]->max_bucket_fill_ratio);
 }
 
 void
@@ -136,55 +305,29 @@ thread_workspaces::thread_do(void * (*f) (thread_data *))
     free(th);
 }
 
+template <int LEVEL, typename HINT>
 double
 thread_workspaces::buckets_max_full()
 {
     double mf0 = 0;
-    for (size_t i = 0; i < nr_workspaces; ++i) {
-      for(unsigned int side = 0 ; side < 2 ; side++) {
-        double mf = thrs[i].sides[side].BA.max_full();
+    
+    for(unsigned int side = 0 ; side < nr_sides ; side++) {
+      for (const bucket_array_t<LEVEL, HINT> *it_BA = cbegin_BA<LEVEL, HINT>(side);
+           it_BA != cend_BA<LEVEL, HINT>(side); it_BA++) {
+        const double mf = it_BA->max_full();
         if (mf > mf0) mf0 = mf;
       }
     }
     return mf0;
 }
+template double thread_workspaces::buckets_max_full<1, shorthint_t>();
 
 void
 thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
 {
     for (size_t i = 0; i < nr_workspaces; ++i) {
         las_report_accumulate(rep, thrs[i].rep);
-        for (int side = 0; side < 2; side++)
+        for (unsigned int side = 0; side < nr_sides; side++)
             checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }
-}
-
-thread_data &
-thread_workspaces::reserve_workspace()
-{
-  pthread_mutex_lock(&mutex);
-  size_t i;
-  for (i = 0; i < nr_workspaces; ++i) {
-    if (!used[i])
-      break;
-  }
-  /* Currently no logic to make threads wait until workspace becomes available */
-  ASSERT_ALWAYS(i < nr_workspaces);
-  used[i] = true;
-  pthread_mutex_unlock(&mutex);
-  return thrs[i];
-}
-
-void 
-thread_workspaces::release_workspace(thread_data &ws)
-{
-  pthread_mutex_lock(&mutex);
-  size_t i;
-  for (i = 0; i < nr_workspaces; ++i) {
-    if (&ws == &thrs[i])
-      break;
-  }
-  ASSERT_ALWAYS(i < nr_workspaces);
-  used[i] = false;
-  pthread_mutex_unlock(&mutex);
 }

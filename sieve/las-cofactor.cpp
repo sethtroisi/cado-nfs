@@ -103,7 +103,8 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
   return 1;
 }
 
-
+/* This is the header-comment for the old factor_leftover_norm()
+ * function, that is now deleted */
 /* This function was contributed by Jerome Milan (and bugs were introduced
    by Paul Zimmermann :-).
    Input: n - the number to be factored (leftover norm). Must be composite!
@@ -118,101 +119,14 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
           the prime factors of n are factors->data[0..factors->length-1],
           with corresponding multiplicities multis[0..factors->length-1].
 */
-static int
-factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
-                      uint32_array_t* const multis,
-                      sieve_info_srcptr si, int side)
-{
-  unsigned int lpb = si->conf->sides[side]->lpb;
-  facul_strategy_t *strategy = si->sides[side]->strategy;
-  uint32_t i, nr_factors;
-  mpz_t mpz_factors[16];
-  int facul_code;
-
-  for (int i = 0; i < 16; ++i)
-      mpz_init(mpz_factors[i]);
-  
-  /* For the moment this code can't cope with too large factors */
-  ASSERT(lpb <= ULONG_BITS);
-
-  factors->length = 0;
-  multis->length = 0;
-
-  /* If n < B^2, then n is prime, since all primes < B have been removed */
-  if (mpz_cmp (n, si->BB[side]) < 0)
-    {
-      /* if n > L, return -1 */
-      if (mpz_sizeinbase (n, 2) > lpb) {
-          for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
-          return -1;
-      }
-
-      if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
-        {
-          append_mpz_to_array (factors, n);
-          append_uint32_to_array (multis, 1);
-        }
-      for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
-      return 1;
-    }
-
-  /* use the facul library */
-  //gmp_printf ("facul: %Zd\n", n);
-  facul_code = facul (mpz_factors, n, strategy);
-
-  if (facul_code == FACUL_NOT_SMOOTH)
-    return -1;
-
-  ASSERT (facul_code == 0 || mpz_cmp (n, mpz_factors[0]) != 0);
-
-  if (facul_code > 0)
-    {
-      nr_factors = facul_code;
-      for (i = 0; i < nr_factors; i++)
-	{
-          if (mpz_sizeinbase(mpz_factors[i], 2) > lpb) {
-              for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
-              return -1;
-          }
-	  mpz_divexact (n, n, mpz_factors[i]);
-	  append_mpz_to_array (factors, mpz_factors[i]);
-	  append_uint32_to_array (multis, 1); /* FIXME, deal with repeated
-						 factors correctly */
-	}
-
-      if (mpz_cmp (n, si->BB[side]) < 0)
-        {
-          if (mpz_sizeinbase (n, 2) > lpb) {
-              for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
-              return -1;
-          }
-
-          if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
-            {
-              append_mpz_to_array (factors, n);
-              append_uint32_to_array (multis, 1);
-            }
-          for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
-          return 1;
-        }
-
-      if (check_leftover_norm (n, si, side) == 0) {
-          for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
-          return -1;
-      }
-    }
-  for (int i = 0; i < 16; ++i) mpz_clear(mpz_factors[i]);
-  return 0; /* unable to completely factor n */
-}
-
 
 /* This is the same function as factor_leftover_norm() but it works
    with both norms! It is used when we want to factor these norms
    simultaneously and not one after the other.
 */
 
-static int
-factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
+int
+factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
 			       uint32_array_t** multis,
 			       sieve_info_srcptr si)
 {
@@ -330,93 +244,6 @@ factor_both_leftover_norms_src (mpz_t* n, mpz_array_t** factors,
 }
 
 
-
-
 /*}}}*/
 
-/* {{{ factor_both_leftover_norms */
-/*
-    This function factors the leftover norms on both sides. Two
-    possibilities: first, it simply calls factor_leftover_norm()
-    twice, first on the side more likely to fail the smoothness test
-    so that the second call can be omitted. Second, it calls
-    factor_leftover_norms_src() to factor our norms on both sides in
-    the same time.  
-    The long-term plan is to use a more elaborate factoring strategy, 
-    passing both composites to facul_*() so it can try individual 
-    factoring methods on each side until smoothness or
-    (likely) non-smoothness is decided.
-*/
 
-double cof_calls[2][256] = {{0},{0}};
-double cof_fails[2][256] = {{0},{0}};
-
-int
-factor_both_leftover_norms(mpz_t *norm, const mpz_t BLPrat, mpz_array_t **f,
-			   uint32_array_t **m, sieve_info_srcptr si)
-{
-    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    unsigned int nbits[2];
-    int first, pass = 1;
-
-    for (int z = 0; z < 2; z++)
-      nbits[z] = mpz_sizeinbase (norm[z], 2);
-
-    /* Thread-local copy of cof_calls/cof_fails */
-    double cc[2], cf[2];
-
-    pthread_mutex_lock(&mutex);
-    cc[0] = cof_calls[0][nbits[0]];
-    cc[1] = cof_calls[1][nbits[1]];
-    cf[0] = cof_fails[0][nbits[0]];
-    cf[1] = cof_fails[1][nbits[1]];
-    pthread_mutex_unlock(&mutex);
-
-    if (cc[0] > 0. && cc[1] > 0.)
-      {
-	if (cf[0]* cc[1] > cf[1] * cc[0])
-	  first = 0;
-	else
-	  first = 1;
-      }
-    else
-      {
-	/* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
-	 * be smooth. We factor it first. Otherwise we factor it last. */
-	first = mpz_cmp (norm[RATIONAL_SIDE], BLPrat) > 0
-	  ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
-      }
-
-    cc[0] = cc[1] = cf[0] = cf[1] = 0.;
-
-
-    /*
-      The variable 'have_file' is to know if we have or not a file to
-      cofactor our norms, i.e. use si->strategies or
-      si->sides[*]->strategy.
-    */
-
-    int have_file = (si->strategies != NULL);
-    if (have_file)
-       pass = factor_both_leftover_norms_src (norm, f, m, si);
-    else {
-        for (int z = 0 ; pass > 0 && z < 2 ; z++){
-	    int side = first ^ z;
-	    cc[side] ++;
-	    pass = factor_leftover_norm (norm[side], f[side], m[side],
-					 si, side);
-	    if (pass <= 0)
-	      cf[side] ++;
-	}
-    }
-    /* Add thread-local statistics to the global arrays */
-    pthread_mutex_lock(&mutex);
-    cof_calls[0][nbits[0]] += cc[0];
-    cof_calls[1][nbits[1]] += cc[1];
-    cof_fails[0][nbits[0]] += cf[0];
-    cof_fails[1][nbits[1]] += cf[1];
-    pthread_mutex_unlock(&mutex);
-
-    return pass;
-}
-/*}}}*/
