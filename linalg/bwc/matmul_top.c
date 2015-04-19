@@ -1284,22 +1284,24 @@ void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
          * communicator xr.
          */
         matmul_top_comm_bench_helper(&k, &dt, funcs[s], mmt, d^s);
-        for(unsigned int z = 0 ; z < xr->njobs ; z++) {
-            if (xr->jrank == z && wr->jrank == 0) {
-                for(unsigned int w = 0 ; w < xr->ncores ; w++) {
-                    if (xr->trank == w && wr->trank == 0) {
-                        char buf[16];
-                        printf("%s %2d/%d, %s: %2d in %.1fs ; one: %.2fs (xput: %s/s)\n",
-                                wr->th->desc,
-                                xr->jrank * xr->ncores + xr->trank,
-                                xr->totalsize,
-                                text[s],
-                                k, dt, dt/k,
-                                size_disp(datasize[d^s] * k/dt, buf));
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_TIMING_GRIDS)) {
+            for(unsigned int z = 0 ; z < xr->njobs ; z++) {
+                if (xr->jrank == z && wr->jrank == 0) {
+                    for(unsigned int w = 0 ; w < xr->ncores ; w++) {
+                        if (xr->trank == w && wr->trank == 0) {
+                            char buf[16];
+                            printf("%s %2d/%d, %s: %2d in %.1fs ; one: %.2fs (xput: %s/s)\n",
+                                    wr->th->desc,
+                                    xr->jrank * xr->ncores + xr->trank,
+                                    xr->totalsize,
+                                    text[s],
+                                    k, dt, dt/k,
+                                    size_disp(datasize[d^s] * k/dt, buf));
+                        }
                     }
                 }
+                serialize(mmt->pi->m);
             }
-            serialize(mmt->pi->m);
         }
         serialize(mmt->pi->m);
     }
