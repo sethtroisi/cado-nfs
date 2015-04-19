@@ -1474,9 +1474,9 @@ sub subtask_solution_blocks {
     for (@main_args) {
         $nsolvecs=$1 if /^nsolvecs=(\d+)/;
     }
-    print "## $current_task knows about the following solution blocks: @sols\n";
-    print "## (note: nsolvecs=$nsolvecs and n=$n)\n";
-    print "## (since nsolvecs<n, some solutions are knowingly not output)\n" if $nsolvecs < $n;
+    # print "## $current_task knows about the following solution blocks: @sols\n";
+    # print "## (note: nsolvecs=$nsolvecs and n=$n)\n";
+    # print "## (since nsolvecs<n, some solutions are knowingly not output)\n" if $nsolvecs < $n;
     return @sols;
 }
 
