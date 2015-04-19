@@ -164,10 +164,29 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
+    int nsolvecs = bw->nsolvecs;
+    unsigned int multi = 1;
+    unsigned int nsolvecs_pervec = nsolvecs;
+
+    if (mpz_cmp_ui(bw->p,2) != 0 && nsolvecs > 1) {
+        if (tcan_print) {
+            fprintf(stderr,
+"Note: the present code is a quick hack.\n"
+"Some SIMD operations like\n"
+"    w_i += c_i * v (with v a constant vector, c_i scalar)\n"
+"are performed with a simple-minded loop on i, while there is an acknowledged\n"
+"potential for improvement by using more SIMD-aware code.\n");
+        }
+        multi = nsolvecs;
+        nsolvecs_pervec = 1;
+    }
+
+    ASSERT_ALWAYS(multi * nsolvecs_pervec == (unsigned int) nsolvecs);
+
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, bw->nsolvecs,
+            MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
 
 
