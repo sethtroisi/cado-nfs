@@ -1,6 +1,6 @@
 /* table of polynomials f preselected with good properties. */
 
-row_fPyphi_poly_t table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01[8] = { \
+fPyphi_t table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01[8] = { \
   { /* f= x^4 - x^3 + x^2 - x + 1, Py= x^2 + x - 1, varphi= -y*X + X^2 - X + 1 */
     {/*f     */ 1, -1, 1, -1, 1, }, \
     {/*Py    */ -1, 1, 1, }, \
@@ -44,7 +44,7 @@ row_fPyphi_poly_t table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01[8] = { \
 }; 
 
 
-const fPyphi_poly_t list_f4 = {
+const fPyphi_poly_t fPyphi_4 = {
   4, 
   2,
   2,
