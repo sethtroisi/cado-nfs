@@ -184,7 +184,9 @@ int main(int argc, char **argv) {
   free (real_malloc);
   double tt[2];
   seconds_user_sys(tt);
+  /*
   fprintf(stderr, "antebuffer exits after having spent %.2fs+%.2fs on cpu\n",
           tt[0], tt[1]);
+          */
   exit (0);
 }

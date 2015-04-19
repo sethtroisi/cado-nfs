@@ -52,6 +52,8 @@
 
 
 
+
+
 #define abimpl_name()	abcommon_name_(impl_name) ()
 #define abimpl_max_characteristic_bits()	abcommon_name_(impl_max_characteristic_bits) ()
 #define abimpl_max_degree()	abcommon_name_(impl_max_degree) ()
@@ -99,6 +101,7 @@
 #define abadd_ui(a0,a1,a2,a3)	abcommon_name_(add_ui) (a0,a1,a2,a3)
 #define absub_ui(a0,a1,a2,a3)	abcommon_name_(sub_ui) (a0,a1,a2,a3)
 #define abmul_ui(a0,a1,a2,a3)	abcommon_name_(mul_ui) (a0,a1,a2,a3)
+#define abnormalize(a0,a1)	abcommon_name_(normalize) (a0,a1)
 #define abadd_uipoly(a0,a1,a2,a3)	abcommon_name_(add_uipoly) (a0,a1,a2,a3)
 #define absub_uipoly(a0,a1,a2,a3)	abcommon_name_(sub_uipoly) (a0,a1,a2,a3)
 #define abmul_uipoly(a0,a1,a2,a3)	abcommon_name_(mul_uipoly) (a0,a1,a2,a3)
@@ -106,6 +109,7 @@
 #define abas_solve(a0,a1,a2)	abcommon_name_(as_solve) (a0,a1,a2)
 #define abtrace(a0,a1)	abcommon_name_(trace) (a0,a1)
 #define abhadamard(a0,a1,a2,a3,a4)	abcommon_name_(hadamard) (a0,a1,a2,a3,a4)
+
 
 #define abelt_ur_init(a0,a1)	abcommon_name_(elt_ur_init) (a0,a1)
 #define abelt_ur_clear(a0,a1)	abcommon_name_(elt_ur_clear) (a0,a1)
@@ -119,8 +123,8 @@
 #define abmul_ur(a0,a1,a2,a3)	abcommon_name_(mul_ur) (a0,a1,a2,a3)
 #define absqr_ur(a0,a1,a2)	abcommon_name_(sqr_ur) (a0,a1,a2)
 #define abreduce(a0,a1,a2)	abcommon_name_(reduce) (a0,a1,a2)
-#define abnormalize(a0,a1)	abcommon_name_(normalize) (a0,a1)
 #define abaddmul_si_ur(a0,a1,a2,a3)	abcommon_name_(addmul_si_ur) (a0,a1,a2,a3)
+
 
 #define abcmp(a0,a1,a2)	abcommon_name_(cmp) (a0,a1,a2)
 #define abcmp_ui(a0,a1,a2)	abcommon_name_(cmp_ui) (a0,a1,a2)
@@ -141,6 +145,8 @@
 #define abimportdata(a0,a1,a2,a3,a4)	abcommon_name_(importdata) (a0,a1,a2,a3,a4)
 #define abwrite(a0,a1,a2)	abcommon_name_(write) (a0,a1,a2)
 #define abexportdata(a0,a1,a2,a3,a4)	abcommon_name_(exportdata) (a0,a1,a2,a3,a4)
+
+
 
 
 
@@ -176,6 +182,7 @@
 #define abvec_write(a0,a1,a2,a3)	abcommon_name_(vec_write) (a0,a1,a2,a3)
 #define abvec_import(a0,a1,a2,a3,a4)	abcommon_name_(vec_import) (a0,a1,a2,a3,a4)
 #define abvec_export(a0,a1,a2,a3,a4)	abcommon_name_(vec_export) (a0,a1,a2,a3,a4)
+
 #define abvec_ur_init(a0,a1,a2)	abcommon_name_(vec_ur_init) (a0,a1,a2)
 #define abvec_ur_set_zero(a0,a1,a2)	abcommon_name_(vec_ur_set_zero) (a0,a1,a2)
 #define abvec_ur_set_vec(a0,a1,a2,a3)	abcommon_name_(vec_ur_set_vec) (a0,a1,a2,a3)
@@ -195,8 +202,11 @@
 #define abvec_ur_subvec_const(a0,a1,a2)	abcommon_name_(vec_ur_subvec_const) (a0,a1,a2)
 #define abvec_ur_coeff_ptr(a0,a1,a2)	abcommon_name_(vec_ur_coeff_ptr) (a0,a1,a2)
 #define abvec_ur_coeff_ptr_const(a0,a1,a2)	abcommon_name_(vec_ur_coeff_ptr_const) (a0,a1,a2)
+
 #define abvec_elt_stride(a0,a1)	abcommon_name_(vec_elt_stride) (a0,a1)
+
 #define abvec_ur_elt_stride(a0,a1)	abcommon_name_(vec_ur_elt_stride) (a0,a1)
+
 
 
 
@@ -238,8 +248,10 @@
 #define abstride(a0)	abcommon_name_(stride) (a0)
 #define abset_ui_at(a0,a1,a2,a3)	abcommon_name_(set_ui_at) (a0,a1,a2,a3)
 #define abset_ui_all(a0,a1,a2)	abcommon_name_(set_ui_all) (a0,a1,a2)
+
 #define abelt_ur_set_ui_at(a0,a1,a2,a3)	abcommon_name_(elt_ur_set_ui_at) (a0,a1,a2,a3)
 #define abelt_ur_set_ui_all(a0,a1,a2)	abcommon_name_(elt_ur_set_ui_all) (a0,a1,a2)
+
 #define abdotprod(a0,a1,a2,a3,a4)	abcommon_name_(dotprod) (a0,a1,a2,a3,a4)
 #define abmul_constant_ui(a0,a1,a2,a3)	abcommon_name_(mul_constant_ui) (a0,a1,a2,a3)
 

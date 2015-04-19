@@ -89,7 +89,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 "Some SIMD operations like\n"
 "    w_i += c_i * v (with v a constant vector, c_i scalar)\n"
 "are performed with a simple-minded loop on i, while there is an acknowledged\n"
-"potential for improvement by using mode SIMD-aware code.\n");
+"potential for improvement by using more SIMD-aware code.\n");
         }
         multi = nsolvecs;
         nsolvecs_pervec = 1;

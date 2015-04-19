@@ -127,6 +127,9 @@ class GeneralClass(object):
         parser.add_argument("--log",
                 help="File with known logs",
                 type=str)
+        parser.add_argument("--magmadata",
+                help="File with magma data",
+                type=str)
         # This one is a bit special, we'll create it if it is missing.
         parser.add_argument("--debug-renumber",
                 help="File given by debug_renumber",
@@ -161,6 +164,7 @@ class GeneralClass(object):
             # do mkdir ???
         else:
             self._tmpdir = tempfile.mkdtemp(dir="/tmp")
+        self.magmadata=None
         self.hello()
 
     
@@ -185,7 +189,7 @@ class GeneralClass(object):
                 return v
         except KeyError:
             pass
-        if args.db:
+        if args.db and table:
             v=self.__getdb("select value from %s where key='%s'" % (table, key))
             if v is not None and len(v) > 0:
                 return os.path.join(os.path.dirname(args.db), v[0])
@@ -234,16 +238,31 @@ class GeneralClass(object):
         return self.__getfile("badidealinfo", "magmanmbrthry.badidealinfo", "magmanmbrthry", "badinfofile")
     def fb1(self):
         return self.__getfile("fb1", "factorbase.roots.gz", "factorbase", "outputfile")
+    def __read_magmadata_file(self):
+        f = self.__getfile("magmadata", "magmanmbrthry.magma-nmbrthry-wrapper.sh.stdout", None, None)
+        self.magmadata=dict()
+        with open(f, 'r') as file:
+            for line in file:
+                key,value=line.strip().split(" ")
+                self.magmadata[key]=int(value)
+    def __get_magma_data(self, key):
+        try:
+            return int(self.__getarg(key, "magmanmbrthry", key))
+        except ValueError as e:
+            pass
+        if self.magmadata is None:
+            self.__read_magmadata_file()
+        return self.magmadata[key]
     def ell(self):
-        return int(self.__getarg("ell", "magmanmbrthry", "ell"))
+        return self.__get_magma_data("ell")
     def nmaps0(self):
-        return int(self.__getarg("nmaps0", "magmanmbrthry", "nmaps0"))
+        return self.__get_magma_data("nmaps0")
     def nmaps1(self):
-        return int(self.__getarg("nmaps1", "magmanmbrthry", "nmaps1"))
+        return self.__get_magma_data("nmaps1")
     def smexp0(self):
-        return int(self.__getarg("smexp0", "magmanmbrthry", "smexp0"))
+        return self.__get_magma_data("smexp0")
     def smexp1(self):
-        return int(self.__getarg("smexp1", "magmanmbrthry", "smexp1"))
+        return self.__get_magma_data("smexp1")
     def lpb0(self):
         return args.lpb0
     def lpb1(self):
@@ -445,7 +464,7 @@ class DescentUpperClass(object):
                 default=14)
         # Slave las processes in the initial step.
         parser.add_argument("--slaves",
-                help="Number of slavess to use",
+                help="Number of slaves to use",
                 type=int, default=1)
 
     def __init__(self, general, args):

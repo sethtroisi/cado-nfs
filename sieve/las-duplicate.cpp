@@ -372,7 +372,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
       m[side] = alloc_uint32_array (1);
   }
 
-  pass = factor_both_leftover_norms(cof, BLPrat, f, m, si);
+  pass = factor_both_leftover_norms(cof, f, m, si);
 
   if (pass <= 0) {
     if (verbose) {

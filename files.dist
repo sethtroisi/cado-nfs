@@ -84,6 +84,7 @@ filter/report.h
 filter/sparse.c
 filter/sparse.h
 filter/sm.c
+filter/sm_simple.cpp
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING

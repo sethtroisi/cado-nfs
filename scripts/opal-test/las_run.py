@@ -46,7 +46,7 @@ def run(param_file, problem):
     las_params = {
         "I": 11,
         "poly": "c59.polyselect2.poly",
-        "fb": "/tmp/c59.factorbase.roots.gz",
+        "fb": "c59.factorbase.roots.gz",
         "rlim": 50000,
         "alim": 100000,
         "lpbr": 22,
@@ -72,14 +72,13 @@ def run(param_file, problem):
     las_params["mfbr"] = max(las_params["mfbr"], las_params["lpbr"])
     las_params["mfba"] = max(las_params["mfba"], las_params["lpba"])
     
-    las_params["alambda"] = 1.0 * las_params["mfba"] / las_params["lpba"] + 0.1
-    las_params["rlambda"] = 1.0 * las_params["mfbr"] / las_params["lpbr"] + 0.1
-
-    to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
+    to_print = ["I", "alim", "lpba", "mfba", "alambda", "rlim", "lpbr", "mfbr", "rlambda", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     # Update parameters for makefb (which may depend on las parameters)
     update_existing(makefb_params, params)
+    # also update "maxbits" which depends on "I"
+    makefb_params["maxbits"] = params["I"] - 1
     makefb_params["out"] = las_params["fb"]
 
     makefb_cmd_line = [makefb]

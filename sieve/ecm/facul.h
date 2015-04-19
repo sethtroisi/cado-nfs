@@ -32,7 +32,7 @@
  * strategies. For the descent, we do have an interest in raising this
  * number somewhat.
  */
-#define NB_MAX_METHODS 500
+#define NB_MAX_METHODS 200
 
 typedef struct {
   long method; /* Which method to use (P-1, P+1 or ECM) */
@@ -140,6 +140,11 @@ modset_clear (struct modset_t *modset);
 int*
 facul_both (mpz_t**, mpz_t* ,
 	    const facul_strategies_t *, int*);
+
+// In ecm/makeplan.c
+// Should be called at the very end, to clear global variables.
+void free_saved_chains();
+
 #ifdef __cplusplus
 }
 #endif

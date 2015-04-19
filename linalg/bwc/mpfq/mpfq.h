@@ -24,7 +24,11 @@ extern "C" {
 #define MPFQ_IO_TYPE 4          /* for setopt */
 #define MPFQ_GROUPSIZE 5        /* int (SIMD group size) */
 #define MPFQ_PRIME_MPZ 6        /* mpz_t */
-
+#define MPFQ_MANDATORY_TAG 7    /* force the tag to be this one ; this is
+                                 * of course pointless for the low-level
+                                 * implementation, but
+                                 * mpfq_vbase_oo_field_init_byfeatures
+                                 * uses it. */
 
 #define BUILD_BITMASK(x) ((x) == GMP_LIMB_BITS ? ((mp_limb_t) - 1) : (~ - ((mp_limb_t) 1 << (x))))
 

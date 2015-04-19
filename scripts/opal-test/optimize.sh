@@ -6,6 +6,12 @@
 # The CADO_BUILD environment variable must contain the CADO-NFS build
 # directory (makefb and las are taken from $CADO_BUILD/sieve)
 
+# Important:
+# (a) if the input parameter file params.cxx does not contain values for
+#     ncurves0/ncurves1, you need to add them manually in params.cxx.opt
+# (b) if lpbr and/or lpba change, you need to recompute rels_wanted, which
+#     should be near from prime_pi(2^lpbr) + prime_pi(2^lpba)
+
 cwd=`pwd`
 params=$1
 poly=`basename $2`
@@ -19,6 +25,8 @@ lpbr=`grep lpbr $params | cut -d= -f2`
 lpba=`grep lpba $params | cut -d= -f2`
 mfbr=`grep mfbr $params | cut -d= -f2`
 mfba=`grep mfba $params | cut -d= -f2`
+rlambda=`grep rlambda $params | cut -d= -f2`
+alambda=`grep alambda $params | cut -d= -f2`
 grep ncurves0 $params > /dev/null
 if [ $? -eq 0 ]; then
    ncurves0=`grep ncurves0 $params | cut -d= -f2`
@@ -42,8 +50,18 @@ lpba_min=`expr $lpba - 1`
 lpba_max=`expr $lpba + 1`
 mfbr_min=$lpbr_min
 mfbr_max=`expr $lpbr_max \* 3`
+if [ $mfbr -gt $mfbr_max ]; then
+   mfbr_max=$mfbr
+fi
 mfba_min=$lpba_min
 mfba_max=`expr $lpba_max \* 3`
+if [ $mfba -gt $mfba_max ]; then
+   mfba_max=$mfba
+fi
+rlambda_min=`echo $rlambda - 1.0 | bc`
+rlambda_max=`echo $rlambda + 1.0 | bc`
+alambda_min=`echo $alambda - 1.0 | bc`
+alambda_max=`echo $alambda + 1.0 | bc`
 if [ $ncurves0 -gt 3 ]; then
 ncurves0_min=`expr $ncurves0 - 3`
 else
@@ -70,6 +88,10 @@ sed "s/mfbr_def/$mfbr/g" | sed "s/mfbr_min/$mfbr_min/g" | \
 sed "s/mfbr_max/$mfbr_max/g" | \
 sed "s/mfba_def/$mfba/g" | sed "s/mfba_min/$mfba_min/g" | \
 sed "s/mfba_max/$mfba_max/g" | \
+sed "s/rlambda_def/$rlambda/g" | sed "s/rlambda_min/$rlambda_min/g" | \
+sed "s/rlambda_max/$rlambda_max/g" | \
+sed "s/alambda_def/$alambda/g" | sed "s/alambda_min/$alambda_min/g" | \
+sed "s/alambda_max/$alambda_max/g" | \
 sed "s/ncurves0_def/$ncurves0/g" | sed "s/ncurves0_min/$ncurves0_min/g" | \
 sed "s/ncurves0_max/$ncurves0_max/g" | \
 sed "s/ncurves1_def/$ncurves1/g" | sed "s/ncurves1_min/$ncurves1_min/g" | \
@@ -86,19 +108,23 @@ lpbr_opt=`head -3 $f | tail -1`
 lpba_opt=`head -4 $f | tail -1`
 mfbr_opt=`head -5 $f | tail -1`
 mfba_opt=`head -6 $f | tail -1`
-ncurves0_opt=`head -7 $f | tail -1`
-ncurves1_opt=`head -8 $f | tail -1`
-I_opt=`head -9 $f | tail -1`
+rlambda_opt=`head -7 $f | tail -1`
+alambda_opt=`head -8 $f | tail -1`
+ncurves0_opt=`head -9 $f | tail -1`
+ncurves1_opt=`head -10 $f | tail -1`
+I_opt=`head -11 $f | tail -1`
 echo "Optimal parameters:"
-echo "rlim=" $rlim_opt
-echo "alim=" $alim_opt
-echo "lpbr=" $lpbr_opt
-echo "lpba=" $lpba_opt
-echo "mfbr=" $mfbr_opt
-echo "mfba=" $mfba_opt
-echo "ncurves0=" $ncurves0_opt
-echo "ncurves1=" $ncurves1_opt
-echo "I=" $I_opt
+echo "rlim=" $rlim_opt " min=" $rlim_min " max=" $rlim_max
+echo "alim=" $alim_opt " min=" $alim_min " max=" $alim_max
+echo "lpbr=" $lpbr_opt " min=" $lpbr_min " max=" $lpbr_max
+echo "lpba=" $lpba_opt " min=" $lpba_min " max=" $lpba_max
+echo "mfbr=" $mfbr_opt " min=" $mfbr_min " max=" $mfbr_max
+echo "mfba=" $mfba_opt " min=" $mfba_min " max=" $mfba_max
+echo "rlambda=" $rlambda_opt " min=" $rlambda_min " max=" $rlambda_max
+echo "alambda=" $alambda_opt " min=" $alambda_min " max=" $alambda_max
+echo "ncurves0=" $ncurves0_opt " min=" $ncurves0_min " max=" $ncurves0_max
+echo "ncurves1=" $ncurves1_opt " min=" $ncurves1_min " max=" $ncurves1_max
+echo "I=" $I_opt " min=" $I_min " max=" $I_max
 cd $cwd
 sed "s/rlim.*=.*$/rlim = $rlim_opt/g" $params | \
 sed "s/alim.*=.*$/alim = $alim_opt/g" | \
@@ -106,6 +132,8 @@ sed "s/lpbr.*=.*$/lpbr = $lpbr_opt/g" | \
 sed "s/lpba.*=.*$/lpba = $lpba_opt/g" | \
 sed "s/mfbr.*=.*$/mfbr = $mfbr_opt/g" | \
 sed "s/mfba.*=.*$/mfba = $mfba_opt/g" | \
+sed "s/rlambda.*=.*$/rlambda = $rlambda_opt/g" | \
+sed "s/alambda.*=.*$/alambda = $alambda_opt/g" | \
 sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
 sed "s/I.*=.*$/I = $I_opt/g" > $params.opt
