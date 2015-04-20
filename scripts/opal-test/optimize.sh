@@ -50,8 +50,14 @@ lpba_min=`expr $lpba - 1`
 lpba_max=`expr $lpba + 1`
 mfbr_min=$lpbr_min
 mfbr_max=`expr $lpbr_max \* 3`
+if [ $mfbr -gt $mfbr_max ]; then
+   mfbr_max=$mfbr
+fi
 mfba_min=$lpba_min
 mfba_max=`expr $lpba_max \* 3`
+if [ $mfba -gt $mfba_max ]; then
+   mfba_max=$mfba
+fi
 rlambda_min=`echo $rlambda - 1.0 | bc`
 rlambda_max=`echo $rlambda + 1.0 | bc`
 alambda_min=`echo $alambda - 1.0 | bc`
