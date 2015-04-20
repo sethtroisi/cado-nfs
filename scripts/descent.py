@@ -383,11 +383,12 @@ class GeneralClass(object):
             raise RuntimeError(msg)
 
     # self.list_badideals will contain a list of (p,r,side)
+    # self.list_bad_ncols will contain a list of the corresponding nb of cols
     # self.badidealdata will contain a list of
     #     (p, k, rk, side, [exp1, exp2, ..., expi])
     def __load_badidealdata(self):
         self.list_badideals = []
-        list_ncols = []
+        self.list_ncols = []
         with open(self.badideals(), 'r') as bad:
             for line in bad:
                 if line[0] == '#':
@@ -396,7 +397,7 @@ class GeneralClass(object):
                 if foo:
                     self.list_badideals.append((int(foo.groups()[0], 16),
                         int(foo.groups()[1], 16), int(foo.groups()[2])))
-                    list_ncols.append(int(foo.groups()[3]))
+                    self.list_ncols.append(int(foo.groups()[3]))
                 else:
                     raise ValueError("Error while reading %s" % self.badideal())
 
@@ -554,7 +555,7 @@ class ideals_above_p(object):
             self.r = a_over_b_mod_p(a, b, p)
         self.isbad = self.__is_badideal(p, self.r, side, general)
         if self.isbad:
-            self.bads = self.__handle_badideal(p, k, a, b, self.r, general)
+            self.bads = self.__handle_badideal(p, k, a, b, self.r, side, general)
 
     # return an unreduced virtual log or None if unknown.
     def get_log(self):
@@ -565,11 +566,17 @@ class ideals_above_p(object):
             else:
                 return self.k * l
         else:
-            logs = self.logDB.getlog_bad(self.bads["badid"])
-            assert len(logs) == len(self.bads["expo"])
+            ind_b = 0
+            ind_l = 0
+            while general.list_badideals[ind_b] != (self.p, self.r, self.side):
+                ind_l += general.list_ncols[ind_b]
+                ind_b += 1
+            logs = [self.logDB.bad_ideal(x) for x in range(ind_l,
+                ind_l+general.list_ncols[ind_b]) ]
+            assert len(logs) == len(self.bads["exp"])
             log = 0
             for i in range(len(logs)):
-                log = log + logs[i]*self.bads["expo"][i]
+                log = log + logs[i]*self.bads["exp"][i]
             return log
 
 class important_file(object):
@@ -1025,6 +1032,11 @@ class DescentLowerClass(object):
                 sm = [ int(x) for x in r ]
                 SM.append(sm)
         assert len(SM) == nrels
+
+        # Reverse the order of relations to get only one unknown log
+        # per relation while processing them
+        descrels.reverse()
+        SM.reverse()
 
         # Fill-in the log database
         logDB = general.logDB
