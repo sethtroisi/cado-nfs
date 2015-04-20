@@ -260,7 +260,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
   size_t n = 0;
 
 #if TRIALDIV_MAXLEN > 8
-#error trialdiv not implemented for input sizes of more than 6 words
+#error trialdiv not implemented for input sizes of more than 8 words
 #endif
 
   while (mpz_cmp_ui (N, 1UL) > 0)

@@ -194,14 +194,21 @@ thread_pool::add_result(const size_t queue, task_result *const result) {
   leave();
 }
 
+/* Get a result from the specified results queue. If no result is available,
+   waits with blocking=true, and returns NULL with blocking=false. */
 task_result *
-thread_pool::get_result(const size_t queue) {
+thread_pool::get_result(const size_t queue, const bool blocking) {
+  task_result *result;
   ASSERT_ALWAYS(queue < nr_queues);
   enter();
-  while (results[queue].empty())
-    wait(results[queue].not_empty);
-  task_result *result = results[queue].front();
-  results[queue].pop();
+  if (!blocking and results[queue].empty()) {
+    result = NULL;
+  } else {
+    while (results[queue].empty())
+      wait(results[queue].not_empty);
+    result = results[queue].front();
+    results[queue].pop();
+  }
   leave();
   return result;
 }

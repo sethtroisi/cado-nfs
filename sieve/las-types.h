@@ -102,7 +102,7 @@ struct sieve_side_info_s {
     fb_factorbase * fb;
     /* When threads pick up this sieve_info structure, they should check
      * their bucket allocation */
-    double max_bucket_fill_ratio;
+    double max_bucket_fill_ratio[FB_MAX_PARTS];
 
 
     /* These fields are used for the norm initialization essentially.

@@ -22,10 +22,6 @@ typedef struct sm_side_info_s sm_side_info[1];
 typedef struct sm_side_info_s * sm_side_info_ptr;
 typedef const struct sm_side_info_s * sm_side_info_srcptr;
 
-void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell);
-void sm_side_info_clear(sm_side_info_ptr sm);
-void sm_side_info_print(FILE * out, sm_side_info_srcptr sm);
-
 typedef struct {
   mpz_poly_t num[2];
   mpz_poly_t denom[2];
@@ -34,6 +30,14 @@ typedef struct {
 typedef sm_relset_struct_t sm_relset_t[1];
 typedef sm_relset_struct_t * sm_relset_ptr;
 typedef const sm_relset_struct_t * sm_relset_srcptr;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell);
+void sm_side_info_clear(sm_side_info_ptr sm);
+void sm_side_info_print(FILE * out, sm_side_info_srcptr sm);
 
 void sm_relset_init (sm_relset_t r, int *d);
 void sm_relset_clear (sm_relset_t r);
@@ -61,6 +65,10 @@ void print_sm (FILE *, mpz_poly_t, int, int);
  * sm_side_info structure.
  */
 void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm);
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif /* SM_UTILS_H_ */

@@ -97,9 +97,15 @@ bucket_array_t<LEVEL, HINT>::move(bucket_array_t<LEVEL, HINT> &other)
 template <int LEVEL, typename HINT>
 void
 bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
-                                const size_t min_bucket_size,
+                                const double fill_ratio,
                                 const slice_index_t prealloc_slices)
 {
+  /* Don't try to allocate anything, nor print a message, for sieving levels
+     where the corresponding factor base part is empty. */
+  if (fill_ratio == 0.)
+    return;
+
+  const size_t min_bucket_size = fill_ratio * bucket_region;
   const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(update_t));
   const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(update_t);
   const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
@@ -167,6 +173,10 @@ bucket_array_t<LEVEL, HINT>::max_full () const
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */
 template class bucket_array_t<1, shorthint_t>;
+template class bucket_array_t<2, shorthint_t>;
+template class bucket_array_t<3, shorthint_t>;
+template class bucket_array_t<1, longhint_t>;
+template class bucket_array_t<2, longhint_t>;
 
 
 /* A compare function suitable for sorting updates in order of ascending x
@@ -232,6 +242,60 @@ bucket_array_complete::purge (const bucket_array_t<1, shorthint_t> &BA,
 template class bucket_single<1, primehint_t>;
 template class bucket_single<1, longhint_t>;
 
+template<int INPUT_LEVEL>
+void
+downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
+         const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
+         uint32_t bucket_number)
+{
+  /* Rather similar to purging, except it doesn't purge */
+  for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
+    const slice_index_t slice_index = BA_in.get_slice_index(i_slice);
+    const bucket_update_t<INPUT_LEVEL, shorthint_t> *it = BA_in.begin(bucket_number, i_slice);
+    const bucket_update_t<INPUT_LEVEL, shorthint_t> * const end_it = BA_in.end(bucket_number, i_slice);
+
+    for ( ; it != end_it ; it++)
+      BA_out.push_update(it->x, 0, it->hint, slice_index);
+  }
+}
+
+template<int INPUT_LEVEL>
+void
+downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
+         const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
+         uint32_t bucket_number)
+{
+  /* longhint updates don't write slice end pointers, so there must be
+     exactly 1 slice per bucket */
+  ASSERT_ALWAYS(BA_in.get_nr_slices() == 1);
+  const bucket_update_t<INPUT_LEVEL, longhint_t> *it = BA_in.begin(bucket_number, 0);
+  const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
+
+  for ( ; it != end_it ; it++) {
+    BA_out.push_update(it->x, 0, it->hint, it->index);
+  }
+}
+
+/* Explicitly instantiate the versions of downsort() that we'll need:
+   downsorting shorthint from level 3 and level 2, and downsorting
+   longhint from level 2. */
+template<>
+void
+downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
+            const bucket_array_t<2, shorthint_t> &BA_in,
+            uint32_t bucket_number);
+
+template<>
+void
+downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
+            const bucket_array_t<3, shorthint_t> &BA_in,
+            uint32_t bucket_number);
+
+template<>
+void
+downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
+            const bucket_array_t<2, longhint_t> &BA_in,
+            uint32_t bucket_number);
 
 void
 sieve_checksum::update(const unsigned int other)
