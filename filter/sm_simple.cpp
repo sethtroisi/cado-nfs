@@ -14,7 +14,6 @@
 #include "macros.h"
 #include "utils.h"
 #include "relation.h"
-#include "sm_utils.h"
 
 static void my_sm(const char *outfile, const char *infile, 
     sm_side_info *sm_info)
@@ -48,8 +47,10 @@ static void my_sm(const char *outfile, const char *infile,
     for (int side = 0; side < 2; ++side) {
       compute_sm_piecewise(smpol, pol, sm_info[side]);
       print_sm(out, smpol, sm_info[side]->nsm, sm_info[side]->f->deg);
-      fprintf(out, "\n");
+      if (side == 0 && sm_info[0]->nsm > 0 && sm_info[1]->nsm > 0)
+          fprintf(out, " ");
     }
+    fprintf(out, "\n");
   }
 
   if (out != NULL)
