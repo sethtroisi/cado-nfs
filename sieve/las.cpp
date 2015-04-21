@@ -734,7 +734,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
 
     fclose(f);
 }/*}}}*/
-#endif
+#endif /* DLP_DESCENT */
 
 static void las_info_clear_hint_table(las_info_ptr las)/*{{{*/
 {
@@ -1786,7 +1786,7 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
 
     return las->tree->new_candidate_relation(contender);
 }
-#endif
+#endif /* DLP_DESCENT */
 
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
@@ -1909,8 +1909,10 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #endif
 
     for ( ; (unsigned char *) SS_lw < SS + BUCKET_REGION; SS_lw++) {
-        if (las->tree->must_take_decision())
-            break;
+#ifdef DLP_DESCENT
+      if (las->tree->must_take_decision())
+	break;
+#endif
 #ifdef TRACE_K
         size_t trace_offset = (const unsigned char *) SS_lw - SS;
         if ((unsigned int) N == trace_Nx.N && (unsigned int) trace_offset <= trace_Nx.x && 
@@ -2458,7 +2460,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
   param_list_decl_usage(pl, "grace-time-ratio", "Fraction of the estimated further descent time which should be spent processing the current special-q, to find a possibly better relation");
   las_dlog_base::declare_parameter_usage(pl);
-#endif
+#endif /* DLP_DESCENT */
   verbose_decl_usage(pl);
 }
 
