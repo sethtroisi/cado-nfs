@@ -1035,8 +1035,8 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
 
   //Reduce q-lattice is not possible.
   if (boolean == 0) {
-    printf("# Plane sieve does not support this type of Mqr.\n");
-    mat_int64_fprintf_comment(stdout, Mqr);
+    fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
+    mat_int64_fprintf_comment(stderr, Mqr);
  
     //plane_sieve_whithout_FK(SV, vec);
 
@@ -1419,16 +1419,16 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // NUMBER_HIT
 
       } else {
-        printf("# Line sieve does not support this type of Tqr.\n");  
-        printf("# Tqr = [");
+        fprintf(stderr, "# Line sieve does not support this type of Tqr.\n");  
+        fprintf(stderr, "# Tqr = [");
         for (unsigned int i = 0; i < H->t - 1; i++) {
-          printf("%" PRIu64 ", ", Tqr[i]);
+          fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
         }
-        printf("%" PRIu64 "]\n# pseudo_Tqr = [", Tqr[H->t - 1]);
+        fprintf(stderr, "%" PRIu64 "]\n# pseudo_Tqr = [", Tqr[H->t - 1]);
         for (unsigned int i = 0; i < H->t - 1; i++) {
-          printf("%" PRIu64 ", ", pseudo_Tqr[i]);
+          fprintf(stderr, "%" PRIu64 ", ", pseudo_Tqr[i]);
         }
-        printf("%" PRIu64 "]\n", pseudo_Tqr[H->t - 1]);
+        fprintf(stderr, "%" PRIu64 "]\n", pseudo_Tqr[H->t - 1]);
       }
 
       free(pseudo_Tqr);
