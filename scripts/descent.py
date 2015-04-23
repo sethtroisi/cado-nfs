@@ -410,10 +410,10 @@ class GeneralClass(object):
                 foo = re.match(pattern, line)
                 if foo:
                     self.badidealdata.append((
-                        int(foo.groups()[0], 16), # p
-                        int(foo.groups()[1]),     # k
-                        int(foo.groups()[2], 16), # rk
-                        int(foo.groups()[3]),     # side
+                        int(foo.groups()[0]), # p
+                        int(foo.groups()[1]), # k
+                        int(foo.groups()[2]), # rk
+                        int(foo.groups()[3]), # side
                         [ int(x) for x in foo.groups()[4].split() ] # exp
                         ))
                 else:
@@ -421,6 +421,7 @@ class GeneralClass(object):
                         self.badidealinfo())
         print ("Bad ideal information loaded: %s bad ideals, and %s lines in badidealinfo"
                 % (str(len(self.list_badideals)), str(len(self.badidealdata))))
+        print ("badideal data: %s" % str(self.badidealdata))
 
 
 def check_result(two, log2, z, logz, p, ell):
@@ -525,6 +526,7 @@ class ideals_above_p(object):
     def __handle_badideal(self, p, k, a, b, r, side, general):
         baddata = general.badidealdata
         expo = []
+        badid = None
         for X in baddata:
             if side != X[3] or p != X[0]:
                 continue;
@@ -542,6 +544,8 @@ class ideals_above_p(object):
                     exp = k+v
                 expo.append(exp)
             break
+        if badid == None:
+            raise ValueError("Error while handling badideal p=%d side=%d a=%d b=%d" % (p, side, a, b))
         return {"badid":badid, "exp":expo}
 
     def __init__(self, p, k, a, b, side, general):
