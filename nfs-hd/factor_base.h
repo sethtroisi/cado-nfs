@@ -61,6 +61,14 @@ static inline void factor_base_set_ideal_1_part(factor_base_ptr factor_base,
   ideal_1_init(factor_base->factor_base_1[index]);
   ideal_1_set_part(factor_base->factor_base_1[index], r, h, t);
 }
+
+static inline void factor_base_set_ideal_1(factor_base_ptr factor_base,
+    unsigned int index, ideal_1_srcptr ideal, unsigned int t)
+{
+  ideal_1_init(factor_base->factor_base_1[index]);
+  ideal_1_set(factor_base->factor_base_1[index], ideal, t);
+}
+
 /*
  * Set an ideal in part at an index. Do not forget to define LINESIEVE if you
  *  want to set an ideal mod r.
@@ -79,6 +87,14 @@ static inline void factor_base_set_ideal_u_part(factor_base_ptr factor_base,
   ideal_u_init(factor_base->factor_base_u[index]);
   ideal_u_set_part(factor_base->factor_base_u[index], r, h, t);
 }
+
+static inline void factor_base_set_ideal_u(factor_base_ptr factor_base,
+    unsigned int index, ideal_u_srcptr ideal, unsigned int t) 
+{
+  ideal_u_init(factor_base->factor_base_u[index]);
+  ideal_u_set(factor_base->factor_base_u[index], ideal, t);
+}
+
 /*
  * Set an ideal in part at an index. Do not forget to define LINESIEVE if you
  *  want to set an ideal mod r.
