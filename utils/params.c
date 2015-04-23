@@ -893,7 +893,7 @@ void param_list_parse_int_list_size(param_list pl, const char * key , int ** r ,
 }
 
 void param_list_parse_mpz_poly(param_list pl, const char * key,
-                               mpz_poly_ptr f, const char *sep)
+    mpz_poly_ptr f, const char *sep)
 {
   char *value;
   if (!get_assoc(pl, key, &value, NULL))
@@ -907,7 +907,6 @@ void param_list_parse_mpz_poly(param_list pl, const char * key,
     i++;
   }
   deg++;
-  mpz_poly_init(f, deg);
   char *token;
   mpz_t coeff;
   mpz_init(coeff);

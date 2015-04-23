@@ -604,7 +604,7 @@ void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
   mpz_clear(lpb_tmp);
 
   int n;
-  fscanf(file, "n:%d\n", &n);
+  fscanf(file, "deg:%d\n", &n);
   
   mpz_poly_t f_tmp;
   mpz_poly_init(f_tmp, n);
@@ -732,7 +732,7 @@ void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
   fprintf(file, "%" PRIu64 "\n", fbb);
   fprintf(file, "lpb:");
   gmp_fprintf(file, "%Zd\n", lpb);
-  fprintf(file, "n:%d\n", f->deg); 
+  fprintf(file, "deg:%d\n", f->deg); 
   fprintf(file, "f:");
   for (int i = 0; i < f->deg; i++) {
     gmp_fprintf(file, "%Zd,", f->coeff[i]);
@@ -841,6 +841,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   for (unsigned int i = 0; i < * V; i++) {
     char str [2];
     sprintf(str, "f%u", i);
+    mpz_poly_init((*f)[i], -1);
     param_list_parse_mpz_poly(pl, str, (**f) + i, ".,");
   }
 

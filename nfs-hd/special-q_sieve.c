@@ -2190,6 +2190,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   for (unsigned int i = 0; i < * V; i++) {
     char str [2];
     sprintf(str, "f%u", i);
+    mpz_poly_init((*f)[i], -1);
     param_list_parse_mpz_poly(pl, str, (**f) + i, ".,");
   }
 
