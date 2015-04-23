@@ -81,6 +81,8 @@ void ideal_init(ideal_ptr ideal);
  */
 void ideal_set_part(ideal_ptr ideal, uint64_t r, mpz_poly_srcptr h);
 
+void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+    mpz_t * Tr, unsigned char log, unsigned int t);
 /*
  * Delete an ideal.
  *
@@ -160,6 +162,12 @@ void ideal_u_init(ideal_u_ptr ideal);
 void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
                       unsigned int t);
 
+void ideal_u_set_element(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+    mpz_t * Tr, unsigned char log, unsigned int t);
+
+void ideal_u_set(ideal_u_ptr ideal_new, ideal_u_srcptr ideal_old,
+    unsigned int t);
+
 /*
  * Delete an ideal_u.
  *
@@ -190,6 +198,8 @@ void ideal_pr_init(ideal_pr_ptr ideal);
  */
 void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t);
 
+void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, unsigned char log,
+    unsigned int t);
 /*
  * Delete an ideal_pr.
  *
