@@ -15,8 +15,7 @@ REGEXES = {"cap_fp" : CAP_FP}
 PATTERN_SIEVE_SQ = re.compile(r"# Sieving algebraic q=(\d+);")
 PATTERN_SQ = re.compile(r"# Average J=(\d+) for (\d+) special-q's, max bucket fill {cap_fp}".format(**REGEXES))
 PATTERN_CPUTIME = re.compile(r"# Total cpu time {cap_fp}s .norm {cap_fp}\+{cap_fp}, sieving {cap_fp} .{cap_fp} \+ {cap_fp} \+ {cap_fp}., factor {cap_fp}.".format(**REGEXES))
-PATTERN_ELAPSEDTIME = re.compile("# Total elapsed time {cap_fp}s, per special-q {cap_fp}s, per relation {cap_fp}s".format(**REGEXES))
-PATTERN_REPORTS = re.compile(r"# Total (\d+) reports .{cap_fp}s/r, {cap_fp}r/sq.".format(**REGEXES))
+PATTERN_REPORTS = re.compile(r"# Total (\d+) reports".format(**REGEXES))
 PATTERN_DUPE = re.compile("# DUPE ")
 
 class NumInt(object):
@@ -137,7 +136,6 @@ class LasStats(object):
         self.nr_sq = 0
         self.max_fill = 0.
         self.cputimes = ListArith([0.] * 8)
-        self.eltimes = ListArith([0.] * 3)
         self.reports = 0
         self.relations_int = NumInt()
         self.dupes_int = NumInt()
@@ -146,7 +144,6 @@ class LasStats(object):
     def parse_one_input(self, lines, verbose=False):
         nr_sq = None
         cputimes = None
-        eltimes = None
         reports = None
         new_dupes = 0
         first_sq = None
@@ -168,23 +165,21 @@ class LasStats(object):
             match = PATTERN_CPUTIME.match(line)
             if match:
                 cputimes = list(map(float, match.groups()))
-            match = PATTERN_ELAPSEDTIME.match(line)
-            if match:
-                eltimes = list(map(float, match.groups()))
             match = PATTERN_REPORTS.match(line)
             if match:
                 reports = int(match.group(1))
-        if nr_sq is None:
-            sys.stderr.write("Did not receive value for nr_sq\n")
-            return False
         if cputimes is None:
             sys.stderr.write("Did not receive value for cputimes\n")
             return False
-        if eltimes is None:
-            sys.stderr.write("Did not receive value for eltimes\n")
-            return False
         if reports is None:
             sys.stderr.write("Did not receive value for reports\n")
+            return False
+        # check number of relations before number of special-q's
+        if reports == 0:
+            sys.stderr.write("No relation found in sample run, please increase q_range in las_run.py\n")
+            return False
+        if nr_sq is None:
+            sys.stderr.write("Did not receive value for nr_sq\n")
             return False
         self.nr_sq += nr_sq
         self.dupes += new_dupes
@@ -192,9 +187,7 @@ class LasStats(object):
         self.reports += reports
         self.max_fill = max(self.max_fill, new_max_fill)
         self.cputimes += cputimes
-        self.eltimes += eltimes
         cputimes_str = self.cputimes.to_str()
-        eltimes_str = self.eltimes.to_str()
         sq = (last_sq + first_sq) / 2
         sq_correction = 1./nr_sq/log(sq)
         self.relations_int.add(sq, reports * sq_correction)
@@ -202,7 +195,7 @@ class LasStats(object):
         self.elapsed_int.add(sq, cputimes[0] * sq_correction)
         if verbose:
             names = ("sq", "avgJ", "nr_sq", "sq_sum", "max_fill", "cputimes_str", "elapsed", "elapsed/sq", "elapsed/rel", "reports", "reports/nr_sq", "reports/sqrange", "dupes")
-            values = (sq, self.J_sum / self.nr_sq, nr_sq, self.nr_sq, self.max_fill, cputimes_str, eltimes_str, reports, reports/nr_sq, reports * sq_correction, self.dupes)
+            values = (sq, self.J_sum / self.nr_sq, nr_sq, self.nr_sq, self.max_fill, cputimes_str, reports, reports/nr_sq, reports * sq_correction, self.dupes)
             print(", ".join( (":".join(map(str, x)) for x in zip(names, values)) ))
         return True
 

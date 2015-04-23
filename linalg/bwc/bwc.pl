@@ -1049,6 +1049,18 @@ sub get_cached_leadernode_filelist {
     }
 }
 
+sub rename_file_on_leader {
+    my ($old, $new) = @_;
+    if (!$hostfile) {
+        # We're running locally, thus there's no need to go to a remote
+        # place just to run find -printf.
+        rename $old, $new;
+    } else {
+        system(join(' ', @mpi_precmd_single, "mv $old $new"));
+    }
+}
+
+
 # {{{ get_cached_bfile -> check for balancing file.
 sub get_cached_bfile {
     my $key = 'balancing';
@@ -1421,22 +1433,6 @@ sub subtask_krylov_mksol_todo {
 # }}}
 
 # {{{ solution blocks relevant to lingen mksol gather cleanup
-#
-# Those are _all_ solutions one can consider computing. However, we have
-# no obligation to do so.
-sub subtask_solution_blocks {
-    my @sols;
-    if ($prime eq '2') {
-        # This should be fixed. For now, mksol creates big files with
-        # nsolvecs solutions. Those should be split in chunks of width
-        # 64.
-        @sols = ("0..$n");
-    } else {
-        @sols = map {"$_..".($_+1);} (0..$n-1);
-    }
-    print "## $current_task considering the following solution blocks: @sols\n";
-    return @sols;
-}
 
 sub subtask_default_nsolvecs {
     # those are the solutions we compute by default, split in chunks
@@ -1461,6 +1457,29 @@ sub subtask_default_nsolvecs {
     }
     return $nsolvecs;
 }
+#
+# Those are _all_ solutions one can consider computing. However, we have
+# no obligation to do so.
+sub subtask_solution_blocks {
+    my @sols;
+    if ($prime eq '2') {
+        # This should be fixed. For now, mksol creates big files with
+        # nsolvecs solutions. Those should be split in chunks of width
+        # 64.
+        @sols = ("0..$n");
+    } else {
+        @sols = map {"$_..".($_+1);} (0..$n-1);
+    }
+    my $nsolvecs = subtask_default_nsolvecs;
+    for (@main_args) {
+        $nsolvecs=$1 if /^nsolvecs=(\d+)/;
+    }
+    # print "## $current_task knows about the following solution blocks: @sols\n";
+    # print "## (note: nsolvecs=$nsolvecs and n=$n)\n";
+    # print "## (since nsolvecs<n, some solutions are knowingly not output)\n" if $nsolvecs < $n;
+    return @sols;
+}
+
 # }}}
 
 # }}}
@@ -1870,24 +1889,46 @@ sub task_mksol {
 
     print "## mksol max iteration is $length\n";
 
-    my $nsolvecs;
-    if (grep { /^nsolvecs=(\d+)/} @main_args) {
-        $nsolvecs = $1;
-    } else {
-        $nsolvecs = subtask_default_nsolvecs;
+    my $nsolvecs = subtask_default_nsolvecs;
+    for (@main_args) {
+        $nsolvecs=$1 if /^nsolvecs=(\d+)/;
     }
     
-    my @todo = subtask_krylov_mksol_todo $length, sub {
-        my ($range, $cp) = @_;
-        ## return if $cp > $length;
-        for my $s (@sols) {
-            $s =~ /^(\d+)\.\.(\d+)$/ or die;
-            my $optional = $1 >= $nsolvecs;
-            last if $optional;
-            return unless $sfiles->{$s . ".." . $range}->{$cp};
-        }
-        return 1;
+    my @todo;
+    eval {
+        @todo = subtask_krylov_mksol_todo $length, sub {
+            my ($range, $cp) = @_;
+            ## return if $cp > $length;
+            my @musthave_found;
+            my @musthave_notfound;
+            for my $s (@sols) {
+                $s =~ /^(\d+)\.\.(\d+)$/ or die;
+                my $optional = $1 >= $nsolvecs;
+                last if $optional;
+                if ($sfiles->{$s . ".." . $range}->{$cp}) {
+                    push @musthave_found, $s;
+                } else {
+                    push @musthave_notfound, $s;
+                }
+            }
+            return 1 unless @musthave_notfound;
+            return 0 unless @musthave_found;
+            print "\n";
+            print STDERR "\n";
+            my $msg = <<EOF;
+## A previous run of mksol has been done with a different value of nsolvecs.
+## The code presently wants to compute all solutions together, so we cannot
+## work around this easily
+##   found: @musthave_found
+##   notfound: @musthave_notfound
+EOF
+            die $msg;
+        };
     };
+    if ($@) {
+        task_check_message 'error', "Failure message while checking $current_task files";
+        die;
+    }
 
     if (!@todo) {
         # Note that we haven't checked for the A files yet !
@@ -1926,13 +1967,10 @@ sub task_gather {
  
     # we need to decide which solution blocks are optional, and which are
     # mandatory. This all depends on what we asked in the first place...
-    my $nsolvecs;
-    if (grep { /^nsolvecs=(\d+)/} @main_args) {
-        $nsolvecs = $1;
-    } else {
-        $nsolvecs = subtask_default_nsolvecs;
+    my $nsolvecs = subtask_default_nsolvecs;
+    for (@main_args) {
+        $nsolvecs=$1 if /^nsolvecs=(\d+)/;
     }
-    
 
     my @missing;
     my $leader_files = get_cached_leadernode_filelist 'HASH';
@@ -1940,8 +1978,8 @@ sub task_gather {
     for my $s (@sols) { 
         $s =~ /^(\d+)-(\d+)$/ or die;
         my $optional = $1 >= $nsolvecs;
-        push @mandatory_sols, $s unless $optional;
         my $kfile = "K.sols$s.0";
+        push @mandatory_sols, $kfile unless $optional;
         # Do we have that solution file ?
         next if exists $leader_files->{$kfile};
         push @missing, $kfile unless $optional;
@@ -1950,8 +1988,12 @@ sub task_gather {
         task_check_message 'ok', "All solution files produced by gather seem to be present, good.";
         return;
     } elsif (@missing < @mandatory_sols) {
-        task_check_message 'error', "Only some of the solution files for gather are present. Please investigate. Missing: @missing\n";
-        die;
+        task_check_message 'missing', "Only some of the solution files for gather are present. Renaming old files and re-doing gather.\n";
+        for (@mandatory_sols) {
+            task_check_message 'missing', "renaming $_ to $_.old";
+            rename_file_on_leader($_, $_ . '.old');
+        }
+        @missing = @mandatory_sols;
     }
     task_check_message 'missing', "Need to run gather to create the files: @missing\n";
     @missing=();
@@ -2021,9 +2063,9 @@ sub task_gather {
 
     my @args = grep { !/^ys/ } @main_args;
     if (!grep { /^nsolvecs/} @args) {
-        my $nsolvecs = ($prime ne '2' ? $splitwidth : $n);
         push @args, "nsolvecs=$nsolvecs";
     }
+    @args = grep { !/^nsolvecs/ } @args;
     if ($param->{'rhs'}) {
         push @args, "rhscoeffs=$rhs_companion";
     }
