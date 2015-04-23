@@ -1,5 +1,7 @@
 #include "cado.h"
 #include <stdio.h>
+#include <errno.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
@@ -167,7 +169,7 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
  * h: the h of the ideal (r, h).
  * fbb: factor base bound for this side.
  */
-static void add_ideal_1(factor_base_ptr fb, uint64_t * index, uint64_t r,
+static void add_ideal_1_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
     mpz_poly_srcptr h, uint64_t fbb, unsigned int t)
 {
   ASSERT(h->deg == 1);
@@ -190,13 +192,13 @@ static void add_ideal_1(factor_base_ptr fb, uint64_t * index, uint64_t r,
  * fbb: factor base bound for this side.
  * lpb: large prime bound.
  */
-static void add_ideal_u(factor_base_ptr fb, uint64_t * index, uint64_t r,
+static void add_ideal_u_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
     mpz_poly_srcptr h, uint64_t fbb, mpz_t lpb, unsigned int t)
 {
   ASSERT(h->deg > 1);
 
   //Verify if the ideal can be added.
-  if (mpz_cmp_ui(lpb, pow_uint64_t(r, h->deg)) >= 0 && r <= fbb) {
+  if (mpz_cmp_ui(lpb, pow_uint64_t(r, (uint64_t)h->deg)) >= 0 && r <= fbb) {
     factor_base_set_ideal_u_part(fb, * index, r, h, t);
     * index = * index + 1;
   }
@@ -211,7 +213,7 @@ static void add_ideal_u(factor_base_ptr fb, uint64_t * index, uint64_t r,
  * r: the r of the ideal (r, h).
  * fbb: factor base bound for this side.
  */
-static void add_ideal_pr(factor_base_ptr fb, uint64_t * index, uint64_t r,
+static void add_ideal_pr_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
     uint64_t fbb, unsigned int t)
 {
   //Verify if the ideal can be added.
@@ -270,15 +272,15 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
     mpz_set(lc, mpz_poly_lc_const(f[k]));
     //Verify if there exists a projective root.
     if (mpz_congruent_p(lc, zero, a) != 0) {
-      add_ideal_pr(fb[k], indexpr + k, q, fbb[k], t);
+      add_ideal_pr_part(fb[k], indexpr + k, q, fbb[k], t);
     }
     //Find the factorisation of f[k] mod 2.
     mpz_poly_factor2(l, f[k]);
     for (int i = 0; i < l->size ; i++) {
       if (l->factors[i]->f->deg == 1) {
-        add_ideal_1(fb[k], index1 + k, q, l->factors[i]->f, fbb[k], t);
+        add_ideal_1_part(fb[k], index1 + k, q, l->factors[i]->f, fbb[k], t);
       } else if (l->factors[i]->f->deg < (int)t) {
-        add_ideal_u(fb[k], indexu + k, q, l->factors[i]->f, fbb[k], lpb[k], t);
+        add_ideal_u_part(fb[k], indexu + k, q, l->factors[i]->f, fbb[k], lpb[k], t);
       }
     }
   }
@@ -298,17 +300,17 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
       //Projective root?
       mpz_set(lc, mpz_poly_lc_const(f[k]));
       if (mpz_congruent_p(lc, zero, a) != 0) {
-        add_ideal_pr(fb[k], indexpr + k, q, fbb[k], t);
+        add_ideal_pr_part(fb[k], indexpr + k, q, fbb[k], t);
       }
       if (q <= fbb[k]) {
         //Factorization of f[k] mod q.
         mpz_poly_factor(l, f[k], a, state);
         for (int i = 0; i < l->size ; i++) {
           if (l->factors[i]->f->deg == 1) {
-            add_ideal_1(fb[k], index1 + k, q, l->factors[i]->f, fbb[k], t);
+            add_ideal_1_part(fb[k], index1 + k, q, l->factors[i]->f, fbb[k], t);
           } else if (l->factors[i]->f->deg < (int)t) {
-            add_ideal_u(fb[k], indexu + k, q, l->factors[i]->f, fbb[k], lpb[k],
-                t);
+            add_ideal_u_part(fb[k], indexu + k, q, l->factors[i]->f, fbb[k],
+                lpb[k], t);
           }
         }
       }
@@ -333,11 +335,356 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
 }
 
 #ifdef MAIN
+int parse_ulong(unsigned long * x, char ** endptr, char * ptr)
+{
+  unsigned long xx;
+  errno = 0;
+  xx = strtoul(ptr, endptr, 10);
+  if (errno) {
+    // failure
+    return 0;
+  }
+  *x = xx;
+  return 1;
+}
+
+int parse_uint64(uint64_t * x, char ** endptr, char * ptr)
+{
+  return parse_ulong((unsigned long *) x, endptr, ptr);
+}
+
+// Read z from ptr and advance pointer.
+// Assume z has been initialized.
+// return 0 or 1 for failure / success
+int parse_mpz(mpz_t z, char ** endptr, char * ptr)
+{
+  int r = gmp_sscanf(ptr, "%Zd", z);
+  if (r != 1) {
+    *endptr = ptr;
+    return 0; // failure
+  }
+  *endptr = ptr;
+  while (isdigit(*endptr[0]) || *endptr[0] == '-') {
+    (*endptr)++;
+  }
+  return 1;
+}
+
+// Read z from ptr and advance pointer.
+// Assume z has been initialized.
+// return 0 or 1 for failure / success
+int parse_int(int * i, char ** endptr, char * ptr)
+{
+  int r = sscanf(ptr, "%d", i);
+  if (r != 1) {
+    *endptr = ptr;
+    return 0; // failure
+  }
+  *endptr = ptr;
+  while (isdigit(*endptr[0]) || *endptr[0] == '-') {
+    (*endptr)++;
+  }
+  return 1;
+}
+
+// Read z0,z1,...,zk from ptr and advance pointer.
+// Assume all the zi have been initialized and that the array is large
+// enough to hold everyone.
+// Return the number of zi that are parsed (0 means error or empty list)
+int parse_cs_mpzs(mpz_t *z, char ** endptr, char * ptr)
+{
+  char *myptr = ptr;
+  int cpt = 0;
+  for(;;) {
+    int ret = parse_mpz(z[cpt], endptr, myptr);
+    if (!ret) {
+      return 0; // failure or empty list
+    }
+    // got an mpz
+    cpt++;
+    myptr = *endptr;
+    if (myptr[0] != ',') {
+      // finished!
+      *endptr = myptr;
+      return cpt;
+    }
+    // prepare for next mpz
+    myptr++;
+  }
+}
+
+int parse_mpz_poly(mpz_poly_ptr f, char ** endptr, char * str, int n)
+{
+  int ret;
+  
+  mpz_t * coeffs = (mpz_t *) malloc(sizeof(mpz_t) * (n + 1));
+  for (int i = 0; i <= n; i++) {
+    mpz_init(coeffs[i]);
+  }
+  ret = parse_cs_mpzs(coeffs, endptr, str);
+  mpz_poly_setcoeffs(f, coeffs, n);
+  for (int i = 0; i <= n; i++) {
+    mpz_clear(coeffs[i]);
+  }
+  free(coeffs);
+  
+  return ret;
+}
+
+int parse_line_mpz_poly(mpz_poly_ptr f, char * str, int n)
+{
+  char * tmp;
+  if (str[0] != 'f' || str[1] != ':')
+    return 0;
+  str += 2;
+  
+  return parse_mpz_poly(f, &tmp, str, n);
+}
+
+int parse_ideal_1(ideal_1_ptr ideal, char *str, unsigned int t)
+{
+  char *tmp;
+  int ret;
+ 
+  if (str[0] != '1' || str[1] != ':')
+    return 0;
+  str += 2;
+  uint64_t r;
+  ret = parse_uint64(&r, &tmp, str);
+  
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+  mpz_poly_t h;
+  mpz_poly_init(h, 1);
+  ret = parse_mpz_poly(h, &tmp, str, 1);
+  ASSERT(ret == 2);
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+  mpz_t * Tr = (mpz_t *) malloc(sizeof(mpz_t) * (t - 1));
+  for (unsigned int i = 0; i < t - 1; i++) {
+    mpz_init(Tr[i]);
+  }
+  ret = parse_cs_mpzs(Tr, &tmp, str);
+  ASSERT(ret == (int)(t - 1));
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+
+  unsigned char log = (unsigned char)atoi(str);
+
+  ideal_1_set_element(ideal, r, h, Tr, log, t);
+
+  mpz_poly_clear(h);
+  for (unsigned int i = 0; i < t - 1; i++) {
+    mpz_clear(Tr[i]);
+  }
+  free(Tr);
+  return ret;
+}
+
+int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
+{
+  char *tmp;
+  int ret;
+
+  int deg; 
+  ret = parse_int(&deg, &tmp, str);
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+
+  uint64_t r;
+  ret = parse_uint64(&r, &tmp, str);
+  
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+  mpz_poly_t h;
+  mpz_poly_init(h, deg);
+  ret = parse_mpz_poly(h, &tmp, str, deg);
+  ASSERT(ret == deg + 1);
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+  int size_Tr = ((int)t - deg) * deg;
+  mpz_t * Tr = (mpz_t *) malloc(sizeof(mpz_t) * size_Tr);
+  for (int i = 0; i < size_Tr; i++) {
+    mpz_init(Tr[i]);
+  }
+  ret = parse_cs_mpzs(Tr, &tmp, str);
+  ASSERT(ret == size_Tr);
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+
+  unsigned char log = (unsigned char)atoi(str);
+
+  ideal_u_set_element(ideal, r, h, Tr, log, t);
+
+  mpz_poly_clear(h);
+  for (int i = 0; i < size_Tr; i++) {
+    mpz_clear(Tr[i]);
+  }
+  free(Tr);
+  return ret;
+}
+
+int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
+{
+  char *tmp;
+  int ret;
+ 
+  if (str[0] != '1' || str[1] != ':')
+    return 0;
+  str += 2;
+  uint64_t r;
+  ret = parse_uint64(&r, &tmp, str);
+  
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+  mpz_poly_t h;
+  mpz_poly_init(h, 1);
+  ret = parse_mpz_poly(h, &tmp, str, 1);
+  ASSERT(ret == 2);
+  ASSERT(mpz_cmp_ui(h->coeff[0], 0) == 0);
+  ASSERT(mpz_cmp_ui(h->coeff[1], 1) == 0);
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+  mpz_t * Tr = (mpz_t *) malloc(sizeof(mpz_t) * (t - 1));
+  for (unsigned int i = 0; i < t - 1; i++) {
+    mpz_init(Tr[i]);
+  }
+  ret = parse_cs_mpzs(Tr, &tmp, str);
+  ASSERT(ret == (int)(t - 1));
+#ifndef NDEBUG
+  for (unsigned int i = 0; i < t - 1; i++) {
+    ASSERT(mpz_cmp_ui(Tr[i], 0) == 0);
+  }
+#endif
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+
+  unsigned char log = (unsigned char)atoi(str);
+
+  ideal_pr_set_element(ideal, r, log, t);
+
+  mpz_poly_clear(h);
+  for (unsigned int i = 0; i < t - 1; i++) {
+    mpz_clear(Tr[i]);
+  }
+  free(Tr);
+  return ret;
+}
+
+void read_makefb(FILE * file, factor_base_ptr fb, uint64_t fbb, mpz_srcptr lpb,
+    mpz_poly_srcptr f)
+{
+  int size_line = 1024;
+  char line [size_line];
+
+  uint64_t fbb_tmp;
+  fscanf(file, "fbb:%" PRIu64 "\n", &fbb_tmp);
+  ASSERT(fbb <= fbb_tmp);
+
+  mpz_t lpb_tmp;
+  mpz_init(lpb_tmp);
+  gmp_fscanf(file, "lpb:%Zd\n", lpb_tmp);
+  ASSERT(mpz_cmp(lpb, lpb_tmp) <= 0);
+  mpz_clear(lpb_tmp);
+
+  int n;
+  fscanf(file, "n:%d\n", &n);
+  
+  mpz_poly_t f_tmp;
+  mpz_poly_init(f_tmp, n);
+  if (fgets(line, size_line, file) == NULL) {
+    return;
+  }
+  ASSERT_ALWAYS(parse_line_mpz_poly(f_tmp, line, n) == n + 1);
+  ASSERT(mpz_poly_cmp(f, f_tmp) == 0);
+  mpz_poly_clear(f_tmp);
+
+  unsigned int t;
+  fscanf(file, "t:%u\n", &t);
+
+  uint64_t max_number_element_1, max_number_element_u, max_number_element_pr;
+  fscanf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", &max_number_element_1,
+      &max_number_element_u, &max_number_element_pr);
+ 
+  factor_base_init(fb, max_number_element_1, max_number_element_u,
+      max_number_element_pr);
+
+  uint64_t number_element_1, number_element_u, number_element_pr;
+ 
+  number_element_1 = 0; 
+  ideal_1_t ideal_1;
+  ideal_1_init(ideal_1);
+  for (uint64_t i = 0; i < max_number_element_1; i++) {
+    if (fgets(line, size_line, file) == NULL) {
+      return;
+    }
+    parse_ideal_1(ideal_1, line, t);
+    if (ideal_1->ideal->r <= fbb) {
+      factor_base_set_ideal_1(fb, number_element_1, ideal_1, t);
+      number_element_1++;
+    }
+  }
+  ideal_1_clear(ideal_1, t);
+
+  number_element_u = 0;
+  ideal_u_t ideal_u;
+  ideal_u_init(ideal_u);
+  for (uint64_t i = 0; i < max_number_element_u; i++) {
+    if (fgets(line, size_line, file) == NULL) {
+      return;
+    }
+    parse_ideal_u(ideal_u, line, t);
+    if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
+            (uint64_t)ideal_u->ideal->h->deg)) >= 0
+            && ideal_u->ideal->r <= fbb) {
+      factor_base_set_ideal_u(fb, number_element_u, ideal_u, t);
+      number_element_u++;
+    }
+  }
+  ideal_u_clear(ideal_u, t);
+ 
+  number_element_pr = 0; 
+  ideal_pr_t ideal_pr;
+  ideal_pr_init(ideal_pr);
+  for (uint64_t i = 0; i < max_number_element_pr; i++) {
+    if (fgets(line, size_line, file) == NULL) {
+      return;
+    }
+    parse_ideal_pr(ideal_pr, line, t);
+    if (ideal_pr->ideal->r <= fbb) {
+      factor_base_set_ideal_pr(fb, number_element_pr, ideal_pr->ideal->r, t);
+      number_element_pr++;
+    }
+  }
+  ideal_pr_clear(ideal_pr, t);
+
+  factor_base_realloc(fb, number_element_1, number_element_u,
+      number_element_pr);
+}
+
 void write_ideal(FILE * file, ideal_srcptr ideal)
 {
+  fprintf(file, "%d:", ideal->h->deg);
   fprintf(file, "%" PRIu64 ":", ideal->r);
-  fprintf(file, "%d", ideal->h->deg);
-  for (int i = 0; i <= ideal->h->deg; i++) {
+  gmp_fprintf(file, "%Zd", ideal->h->coeff[0]);
+  for (int i = 1; i <= ideal->h->deg; i++) {
     gmp_fprintf(file, ",%Zd", ideal->h->coeff[i]);
   }
   fprintf(file, ":");
@@ -381,30 +728,26 @@ void write_ideal_pr(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
 void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
     int64_t fbb, mpz_srcptr lpb, unsigned int t)
 {
-  fprintf(file, "# f: ");
-  mpz_poly_fprintf(file, f);
-  fprintf(file, "# fbb: ");
+  fprintf(file, "fbb:");
   fprintf(file, "%" PRIu64 "\n", fbb);
-  fprintf(file, "# lpb: ");
+  fprintf(file, "lpb:");
   gmp_fprintf(file, "%Zd\n", lpb);
-
-  fprintf(file, "f: ");
+  fprintf(file, "n:%d\n", f->deg); 
+  fprintf(file, "f:");
   for (int i = 0; i < f->deg; i++) {
     gmp_fprintf(file, "%Zd,", f->coeff[i]);
   }
   gmp_fprintf(file, "%Zd\n", f->coeff[f->deg]);
-  fprintf(file, "t: %u\n", t);
-  fprintf(file, "1:%" PRIu64 "\n", fb->number_element_1);
-
+  fprintf(file, "t:%u\n", t);
+  fprintf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", fb->number_element_1, fb->number_element_u, fb->number_element_pr);
+  
   for (uint64_t i = 0; i < fb->number_element_1; i++) {
     write_ideal_1(file, fb->factor_base_1[i], t);
   }
-  fprintf(file, "u:%" PRIu64 "\n", fb->number_element_u);
   
   for (uint64_t i = 0; i < fb->number_element_u; i++) {
     write_ideal_u(file, fb->factor_base_u[i], t);
   }
-  fprintf(file, "p:%" PRIu64 "\n", fb->number_element_pr);
   
   for (uint64_t i = 0; i < fb->number_element_pr; i++) {
     write_ideal_pr(file, fb->factor_base_pr[i], t);
