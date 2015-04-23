@@ -140,8 +140,7 @@ extern int param_list_parse_int_list(param_list pl, const char * key, int * r, s
   sep: separators of the string.
 */
 extern void param_list_parse_int_list_size(param_list pl, const char * key,
-                                           int ** r, unsigned int * t,
-                                           const char *sep);
+    int ** r, unsigned int * t, const char *sep);
 /*
   Return a mpz_poly f. The polynomial is initialised with the string separate by
   sep.

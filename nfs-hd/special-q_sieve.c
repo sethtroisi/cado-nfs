@@ -2065,6 +2065,10 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "q_min", "minimum of the special-q");
   param_list_decl_usage(pl, "q_max", "maximum of the special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
+  param_list_decl_usage(pl, "fb0",
+      "path to the file that describe the factor base 0");
+  param_list_decl_usage(pl, "fb1",
+      "path to the file that describe the factor base 1");
 
   /* MNFS */
 
@@ -2100,6 +2104,22 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "f7", "polynomial that defines the number field 7");
   param_list_decl_usage(pl, "f8", "polynomial that defines the number field 8");
   param_list_decl_usage(pl, "f9", "polynomial that defines the number field 9");
+  param_list_decl_usage(pl, "fb2",
+      "path to the file that describe the factor base 2");
+  param_list_decl_usage(pl, "fb3",
+      "path to the file that describe the factor base 3");
+  param_list_decl_usage(pl, "fb4",
+      "path to the file that describe the factor base 4");
+  param_list_decl_usage(pl, "fb5",
+      "path to the file that describe the factor base 5");
+  param_list_decl_usage(pl, "fb6",
+      "path to the file that describe the factor base 6");
+  param_list_decl_usage(pl, "fb7",
+      "path to the file that describe the factor base 7");
+  param_list_decl_usage(pl, "fb8",
+      "path to the file that describe the factor base 8");
+  param_list_decl_usage(pl, "fb8",
+      "path to the file that describe the factor base 9");
 }
 
 /*
@@ -2168,22 +2188,15 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   * lpb = malloc(sizeof(mpz_t) * (* V));
 
   for (unsigned int i = 0; i < * V; i++) {
-    char str [4];
-    sprintf(str, "fbb%u", i);
-    param_list_parse_uint64(pl, str, &fbb[0][i]);
-    factor_base_init((*fb)[i], fbb[0][i], fbb[0][i], fbb[0][i]);
-  }
-
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [7];
-    sprintf(str, "thresh%u", i);
-    param_list_parse_uchar(pl, str, (* thresh) + i);
-  }
-
-  for (unsigned int i = 0; i < * V; i++) {
     char str [2];
     sprintf(str, "f%u", i);
-    param_list_parse_mpz_poly(pl, str, (*f)[i], ".,");
+    param_list_parse_mpz_poly(pl, str, (**f) + i, ".,");
+  }
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [4];
+    sprintf(str, "fbb%u", i);
+    param_list_parse_uint64(pl, str, (* fbb) + i);
   }
 
   for (unsigned int i = 0; i < * V; i++) {
@@ -2191,7 +2204,37 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     sprintf(str, "lpb%u", i);
     mpz_init((*lpb)[i]);
     param_list_parse_mpz(pl, str,(*lpb)[i]);
-    ASSERT(mpz_cmp_ui((*lpb)[i], fbb[0][i]) >= 0);
+    ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);
+  }
+
+#ifdef MAKE_FB_DURING_SIEVE
+  for (unsigned int i = 0; i < * V; i++) {
+    factor_base_init((*fb)[i], (*fbb)[i], (*fbb)[i], (*fbb)[i]);
+  }
+  double sec = seconds();
+  makefb(*fb, *f, *fbb, H->t, *lpb, * V);
+  printf("# Time for makefb: %f.\n", seconds() - sec);
+#else
+  double sec = seconds();
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [3];
+    sprintf(str, "fb%u", i);
+    unsigned int size_path = 1024;
+    char path [size_path];
+    param_list_parse_string(pl, str, path, size_path);
+    FILE * file;
+    file = fopen(path, "r");
+    read_factor_base(file, (*fb)[i], (*fbb)[i], (*lpb)[i], (*f)[i]);
+    fclose(file);
+  }
+  printf("# Time to read factor bases: %f.\n", seconds() - sec);
+#endif
+
+
+  for (unsigned int i = 0; i < * V; i++) {
+    char str [7];
+    sprintf(str, "thresh%u", i);
+    param_list_parse_uchar(pl, str, (* thresh) + i);
   }
 
   uint64_t number_element = sieving_bound_number_element(H);
@@ -2271,6 +2314,7 @@ int main(int argc, char * argv[])
   }
   double sec_tot;
   double sec_cofact;
+  double sec;
 
 #ifdef NUMBER_SURVIVALS
   uint64_t * numbers_survivals = (uint64_t * ) malloc(sizeof(uint64_t) * V);
@@ -2280,11 +2324,6 @@ int main(int argc, char * argv[])
   file = fopen("TRACE_POS.txt", "w+");
   fprintf(file, "TRACE_POS: %d\n", TRACE_POS);
 #endif // TRACE_POS
-
-  double sec = seconds();
-  makefb(fb, f, fbb, H->t, lpb, V);
-
-  printf("# Time for makefb: %f.\n", seconds() - sec);
 
   ASSERT(q_min >= fbb[q_side]);
   gmp_randstate_t state;

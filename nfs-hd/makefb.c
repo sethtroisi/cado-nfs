@@ -334,8 +334,7 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   getprime(0);
 }
 
-#ifdef MAIN
-int parse_ulong(unsigned long * x, char ** endptr, char * ptr)
+static int parse_ulong(unsigned long * x, char ** endptr, char * ptr)
 {
   unsigned long xx;
   errno = 0;
@@ -348,7 +347,7 @@ int parse_ulong(unsigned long * x, char ** endptr, char * ptr)
   return 1;
 }
 
-int parse_uint64(uint64_t * x, char ** endptr, char * ptr)
+static int parse_uint64(uint64_t * x, char ** endptr, char * ptr)
 {
   return parse_ulong((unsigned long *) x, endptr, ptr);
 }
@@ -356,7 +355,7 @@ int parse_uint64(uint64_t * x, char ** endptr, char * ptr)
 // Read z from ptr and advance pointer.
 // Assume z has been initialized.
 // return 0 or 1 for failure / success
-int parse_mpz(mpz_t z, char ** endptr, char * ptr)
+static int parse_mpz(mpz_t z, char ** endptr, char * ptr)
 {
   int r = gmp_sscanf(ptr, "%Zd", z);
   if (r != 1) {
@@ -373,7 +372,7 @@ int parse_mpz(mpz_t z, char ** endptr, char * ptr)
 // Read z from ptr and advance pointer.
 // Assume z has been initialized.
 // return 0 or 1 for failure / success
-int parse_int(int * i, char ** endptr, char * ptr)
+static int parse_int(int * i, char ** endptr, char * ptr)
 {
   int r = sscanf(ptr, "%d", i);
   if (r != 1) {
@@ -391,7 +390,7 @@ int parse_int(int * i, char ** endptr, char * ptr)
 // Assume all the zi have been initialized and that the array is large
 // enough to hold everyone.
 // Return the number of zi that are parsed (0 means error or empty list)
-int parse_cs_mpzs(mpz_t *z, char ** endptr, char * ptr)
+static int parse_cs_mpzs(mpz_t *z, char ** endptr, char * ptr)
 {
   char *myptr = ptr;
   int cpt = 0;
@@ -413,7 +412,7 @@ int parse_cs_mpzs(mpz_t *z, char ** endptr, char * ptr)
   }
 }
 
-int parse_mpz_poly(mpz_poly_ptr f, char ** endptr, char * str, int n)
+static int parse_mpz_poly(mpz_poly_ptr f, char ** endptr, char * str, int n)
 {
   int ret;
   
@@ -431,7 +430,7 @@ int parse_mpz_poly(mpz_poly_ptr f, char ** endptr, char * str, int n)
   return ret;
 }
 
-int parse_line_mpz_poly(mpz_poly_ptr f, char * str, int n)
+static int parse_line_mpz_poly(mpz_poly_ptr f, char * str, int n)
 {
   char * tmp;
   if (str[0] != 'f' || str[1] != ':')
@@ -441,7 +440,7 @@ int parse_line_mpz_poly(mpz_poly_ptr f, char * str, int n)
   return parse_mpz_poly(f, &tmp, str, n);
 }
 
-int parse_ideal_1(ideal_1_ptr ideal, char *str, unsigned int t)
+static int parse_ideal_1(ideal_1_ptr ideal, char *str, unsigned int t)
 {
   char *tmp;
   int ret;
@@ -486,7 +485,7 @@ int parse_ideal_1(ideal_1_ptr ideal, char *str, unsigned int t)
   return ret;
 }
 
-int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
+static int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
 {
   char *tmp;
   int ret;
@@ -536,7 +535,7 @@ int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
   return ret;
 }
 
-int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
+static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
 {
   char *tmp;
   int ret;
@@ -588,8 +587,8 @@ int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
   return ret;
 }
 
-void read_makefb(FILE * file, factor_base_ptr fb, uint64_t fbb, mpz_srcptr lpb,
-    mpz_poly_srcptr f)
+void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
+    mpz_srcptr lpb, mpz_poly_srcptr f)
 {
   int size_line = 1024;
   char line [size_line];
@@ -679,6 +678,7 @@ void read_makefb(FILE * file, factor_base_ptr fb, uint64_t fbb, mpz_srcptr lpb,
       number_element_pr);
 }
 
+#ifdef MAIN
 void write_ideal(FILE * file, ideal_srcptr ideal)
 {
   fprintf(file, "%d:", ideal->h->deg);
