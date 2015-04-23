@@ -27,14 +27,14 @@ tasks.polyselect.nrkeep = 50
 # Sieve
 ###########################################################################
 
-rlim = 2000000
-alim = 4000000
-lpbr = 26
-lpba = 26
-tasks.sieve.mfbr = 52
-tasks.sieve.mfba = 52
-tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.2
+rlim = 2962917
+alim = 2149707
+lpbr = 25
+lpba = 25
+tasks.sieve.mfbr = 81
+tasks.sieve.mfba = 81
+tasks.sieve.rlambda = 2.149661254882812
+tasks.sieve.alambda = 2.025253295898438
 
 tasks.I = 12
 tasks.sieve.qrange = 5000

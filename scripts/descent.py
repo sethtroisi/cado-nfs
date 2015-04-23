@@ -166,7 +166,8 @@ class GeneralClass(object):
             self._tmpdir = tempfile.mkdtemp(dir="/tmp")
         self.magmadata=None
         self.hello()
-
+        self.__load_badidealdata()
+        self.logDB = LogBase(self)
     
     def __connect(self):
         if args.db and not self._conn:
@@ -234,6 +235,8 @@ class GeneralClass(object):
 
     def log(self):
         return self.__getfile("log", "reconstructlog.dlog", "reconstructlog", "dlog")
+    def badideals(self):
+        return self.__getfile("badideals", "magmanmbrthry.badideals", "magmanmbrthry", "badfile")
     def badidealinfo(self):
         return self.__getfile("badidealinfo", "magmanmbrthry.badidealinfo", "magmanmbrthry", "badinfofile")
     def fb1(self):
@@ -318,6 +321,8 @@ class GeneralClass(object):
         return os.path.join(args.cadobindir, "misc", "debug_renumber")
     def dup2_bin(self):
         return os.path.join(args.cadobindir, "filter", "dup2")
+    def sm_simple_bin(self):
+        return os.path.join(args.cadobindir, "filter", "sm_simple")
     def reconstructlog_bin(self):
         return os.path.join(args.cadobindir, "filter", "reconstructlog-dl")
 
@@ -367,6 +372,8 @@ class GeneralClass(object):
             errors.append("reconstructlog-dl not found (make reconstructlog-dl ?)")
         if not os.path.exists(self.debug_renumber_bin()):
             errors.append("debug_renumber not found (make debug_renumber ?)")
+        if not os.path.exists(self.sm_simple_bin()):
+            errors.append("sm_simple not found (make sm_simple ?)")
         for f in [ self.log(), self.badidealinfo(), self.poly(), self.renumber(), self.log(), self.fb1() ]:
             if not os.path.exists(f):
                 errors.append("%s missing" % f)
@@ -374,6 +381,53 @@ class GeneralClass(object):
             msg = "Some data files and/or binaries missing:\n"
             msg += "\n".join(["\t"+x for x in errors])
             raise RuntimeError(msg)
+
+    # self.list_badideals will contain a list of (p,r,side)
+    # self.list_bad_ncols will contain a list of the corresponding nb of cols
+    # self.badidealdata will contain a list of
+    #     (p, k, rk, side, [exp1, exp2, ..., expi])
+    def __load_badidealdata(self):
+        self.list_badideals = []
+        self.list_ncols = []
+        with open(self.badideals(), 'r') as bad:
+            for line in bad:
+                if line[0] == '#':
+                    continue
+                foo = re.match("^(\w+),(\w+):(\d+): (\d+)$", line)
+                if foo:
+                    self.list_badideals.append((int(foo.groups()[0], 16),
+                        int(foo.groups()[1], 16), int(foo.groups()[2])))
+                    self.list_ncols.append(int(foo.groups()[3]))
+                else:
+                    raise ValueError("Error while reading %s" % self.badideal())
+
+        self.badidealdata = []
+        with open(self.badidealinfo(), 'r') as bad:
+            for line in bad:
+                if line[0] == '#':
+                    continue
+                pattern = "^(\w+) (\d+) (\w+) (\d+) (.+)$"
+                foo = re.match(pattern, line)
+                if foo:
+                    self.badidealdata.append((
+                        int(foo.groups()[0]), # p
+                        int(foo.groups()[1]), # k
+                        int(foo.groups()[2]), # rk
+                        int(foo.groups()[3]), # side
+                        [ int(x) for x in foo.groups()[4].split() ] # exp
+                        ))
+                else:
+                    raise ValueError("Error while reading %s" %
+                        self.badidealinfo())
+        print ("Bad ideal information loaded: %s bad ideals, and %s lines in badidealinfo"
+                % (str(len(self.list_badideals)), str(len(self.badidealdata))))
+        print ("badideal data: %s" % str(self.badidealdata))
+
+
+def check_result(two, log2, z, logz, p, ell):
+    assert (p-1) % ell == 0
+    assert pow(z, log2*((p-1) // ell), p) == pow(2, logz*((p-1) // ell), p)
+    print ("Final consistency check ok!")
 
 
 # We need this in order to see which are the rational primes we need to
@@ -394,6 +448,140 @@ class RatLogBase(object):
 
     def has(self, p):
         return p in self.known
+
+# A memory image of the reconstructlog.dlog file.
+class LogBase(object):
+    def __init__(self, general):
+        self.known={}
+        self.badideals=[]
+        self.SMs = []
+        self.fullcolumn = None
+        try:
+            print ("--- Reading %s to find which are the known logs ---" % general.log())
+            def process(line):
+                index,p,side,r,*value = line.split()
+                if p == "bad" and side == "ideals":
+                    self.badideals.append(int(r))
+                elif p == "SM" and side == "col":
+                    self.SMs.append(int(value[0]))
+                else:
+                    # for rational side, we actually don't have the root.
+                    if int(side) == 0:
+                        assert r == "rat"
+                        r = -1
+                    else:
+                        r = int(r, 16)
+                    self.known[(int(p, 16),r,int(side))] = int(value[0])
+
+            with open(general.log(),'r') as file:
+                line = file.readline()
+                m = re.match("^(\w+) added column (\d+)$",line)
+                if m:
+                    self.fullcolumn = int(m.groups()[1])
+                else:
+                    self.fullcolumn = None
+                    process(line)
+                for i,line in enumerate(file):
+                    if i % 1000000 == 0:
+                        print("Reading line %d" % i)
+                    process(line)
+            print("Found %d bad ideals, %d known logs, and %d SMs in %s" %(len(self.badideals), len(self.known),len(self.SMs), general.log()))
+        except:
+            raise ValueError("Error while reading %s" % general.log())
+
+    def get_log(self, p,r,side):
+        if side == 0:
+            r = -1;
+        if (p,r,side) in self.known:
+            return self.known[(p,r,side)]
+        else:
+            return None
+    def add_log(self,p,r,side,log):
+        if side == 0:
+            r = -1;
+        self.known[(p,r,side)] = log
+    def bad_ideal(self,i):
+        return self.badideals[i]
+    def SM(self,i):
+        return self.SMs[i]
+    def full_column(self):
+        return self.fullcolumn
+
+def a_over_b_mod_p(a, b, p):
+    if b%p == 0:
+        return p
+    ib = pow(b, p-2, p)
+    return (a*ib) % p
+
+def is_a_over_b_equal_r_mod_pk(a, b, rk, p, pk):
+    if b%p != 0:
+        return (a-b*rk) % pk == 0
+    else:
+        return (b-a*rk) % pk == 0
+
+class ideals_above_p(object):
+    def __is_badideal(self, p, r, side, general):
+        return (p,r,side) in general.list_badideals
+
+    def __handle_badideal(self, p, k, a, b, r, side, general):
+        baddata = general.badidealdata
+        expo = []
+        badid = None
+        for X in baddata:
+            if side != X[3] or p != X[0]:
+                continue;
+            pk = pow(p, X[1])
+            rk = X[2]
+            if not is_a_over_b_equal_r_mod_pk(a,b,rk,p,pk):
+                continue;
+            vals = X[4]
+            badid = (p, r, side)
+            for v in vals:
+                if v > 0:
+                    exp = v
+                else:
+                    assert k >= -v
+                    exp = k+v
+                expo.append(exp)
+            break
+        if badid == None:
+            raise ValueError("Error while handling badideal p=%d side=%d a=%d b=%d" % (p, side, a, b))
+        return {"badid":badid, "exp":expo}
+
+    def __init__(self, p, k, a, b, side, general):
+        self.logDB = general.logDB
+        self.p = p
+        self.k = k
+        self.side = side
+        if side == 0:
+            self.r = -1
+        else:
+            self.r = a_over_b_mod_p(a, b, p)
+        self.isbad = self.__is_badideal(p, self.r, side, general)
+        if self.isbad:
+            self.bads = self.__handle_badideal(p, k, a, b, self.r, side, general)
+
+    # return an unreduced virtual log or None if unknown.
+    def get_log(self):
+        if not self.isbad:
+            l = self.logDB.get_log(self.p, self.r, self.side)
+            if l == None:
+                return None
+            else:
+                return self.k * l
+        else:
+            ind_b = 0
+            ind_l = 0
+            while general.list_badideals[ind_b] != (self.p, self.r, self.side):
+                ind_l += general.list_ncols[ind_b]
+                ind_b += 1
+            logs = [self.logDB.bad_ideal(x) for x in range(ind_l,
+                ind_l+general.list_ncols[ind_b]) ]
+            assert len(logs) == len(self.bads["exp"])
+            log = 0
+            for i in range(len(logs)):
+                log = log + logs[i]*self.bads["exp"][i]
+            return log
 
 class important_file(object):
     def __init__(self, outfile, call_that):
@@ -630,12 +818,6 @@ class DescentUpperClass(object):
 
         return todofilename, [Num, Den, factNum, factDen]
 
-def a_over_b_mod_p(a, b, p):
-    if b%p == 0:
-        return p
-    ib = pow(b, p-2, p)
-    return (a*ib) % p
-
 
 class DescentMiddleClass(object):
     def declare_args(parser):
@@ -755,6 +937,7 @@ def prime_ideal_mixedprint(pr):
         human = "%d,%d,%d" % (side,p,r)
     return machine,human
 
+
 class DescentLowerClass(object):
     def declare_args(parser):
         pass
@@ -789,6 +972,142 @@ class DescentLowerClass(object):
             return int(last_renumber_line.split()[0].split('=')[1], 16)
         except:
             raise ValueError("Error while reading %s" % general.debug_renumber())
+
+    def __count_multiplicites(self, L):
+        LL = []
+        prev_p = L[0]
+        m = 1
+        for i in range(1,len(L)):
+            p = L[i]
+            if p == prev_p:
+                m += 1
+            else:
+                LL.append([prev_p, m])
+                prev_p = p
+                m = 1
+        LL.append([prev_p, m])
+        return LL
+
+    def do_descent_alt(self, relsfile, initial_split):
+        args = parser.parse_args()
+        tmpdir = general.tmpdir()
+        prefix = general.prefix() + ".descent.%s.lower." % args.target
+        relsforSM = os.path.join(tmpdir, prefix + "relsforSM")
+        SMfile = os.path.join(tmpdir, prefix + "SM")
+
+        # Read descent relations
+        descrels = []
+        with open(relsfile, 'r') as file:
+            with open(relsforSM, 'w') as fileSM:
+                for line in file:
+                    foo = re.match("^Taken: (-?\d+),(\d+):", line)
+                    if foo:
+                        r = line.split(':')[1:]
+                        r[0] = r[0].lstrip()
+                        fileSM.write(r[0] + ":" + r[1] + ":" + r[2])
+                        a,b = r[0].split(',')
+                        a=int(a)
+                        b=int(b)
+                        list_p = [ [], [] ]
+                        for side in range(2):
+                            for p in r[side+1].strip().split(','):
+                                list_p[side].append(int(p, 16))
+                        list_p = [ self.__count_multiplicites(list_p[0]),
+                                self.__count_multiplicites(list_p[1])]
+                        descrels.append(([a,b], list_p))
+        nrels = len(descrels)
+        print ("--- Final reconstruction (from %d relations) ---" % nrels)
+
+        # Compute SM
+        call_that = [ general.sm_simple_bin(),
+                        "-poly", general.poly(),
+                        "-inp", relsforSM,
+                        "-out", SMfile,
+                        "-gorder", general.ell()
+                    ]
+        call_that = [str(x) for x in call_that]
+        print("command line:\n" + " ".join(call_that))
+        subprocess.check_call(call_that, stderr=subprocess.DEVNULL)
+
+        SM = []
+        with open(SMfile, 'r') as file:
+            for line in file:
+                r = line.split()
+                sm = [ int(x) for x in r ]
+                SM.append(sm)
+        assert len(SM) == nrels
+
+        # Reverse the order of relations to get only one unknown log
+        # per relation while processing them
+        descrels.reverse()
+        SM.reverse()
+
+        # Fill-in the log database
+        logDB = general.logDB
+        irel = 0
+        for rel in descrels:
+            unk = None
+            a, b = rel[0]
+            list_p = rel[1]
+            acc_log = 0
+            if logDB.fullcolumn != None:
+                acc_log += logDB.fullcolumn
+            sm = SM[irel]
+            for i in range(len(sm)):
+                acc_log += logDB.SM(i)*sm[i]
+            for side in range(2):
+                for p, k in list_p[side]:
+                    ideal = ideals_above_p(p, k, a, b, side, general)
+                    log = ideal.get_log()
+                    if log == None:
+                        if unk != None:
+                            raise ValueError(
+                        "Two unknown ideals in relation a,b=%d,%d: %d and %d"
+                        % (a, b, unk[0], p))
+                        else:
+                            unk = [p, a_over_b_mod_p(a, b, p), side]
+                    else:
+                        acc_log += ideal.get_log()
+            acc_log = acc_log % general.ell()
+            if unk == None:
+                assert acc_log == 0
+            else:
+                log = general.ell() - acc_log
+                print ("Deduced log of (%d, %d, %d) from rel: %d"
+                        % (unk[0], unk[1], unk[2], log))
+                logDB.add_log(unk[0], unk[1], unk[2], log)
+            irel += 1
+
+        ## Deduce the log of the target
+        Num, Den, factNum, factDen = initial_split
+        log_target = 0
+        errors=[]
+        for p in factNum:
+            lp = logDB.get_log(p, -1, 0)
+            if lp is None:
+                errors.append(p)
+            else:
+                log_target = log_target + lp
+        for p in factDen:
+            lp = logDB.get_log(p, -1, 0)
+            if lp is None:
+                errors.append(p)
+            else:
+                log_target = log_target - lp
+        if len(errors):
+            msg = "Some logarithms missing:\n"
+            msg += "\n".join(["\t"+str(x) for x in errors])
+            raise RuntimeError(msg)
+        p=general.p()
+        ell=general.ell()
+        log_target = log_target % ell
+        print("# p=%d" % p)
+        print("# ell=%d" % ell)
+        print("log(2)=%d" % logDB.get_log(2, -1, 0))
+        print("log(3)=%d" % logDB.get_log(3, -1, 0))
+        print("# target=%s" % args.target)
+        print("log(target)=%d" % log_target)
+        check_result(2, logDB.get_log(2, -1, 0), args.target, log_target, p, ell)
 
     def do_descent(self, relsfile, initial_split):
         args = parser.parse_args()
@@ -1019,16 +1338,14 @@ class DescentLowerClass(object):
             raise RuntimeError(msg)
         p=general.p()
         ell=general.ell()
+        log_target = log_target % ell
         print("# p=%d" % p)
         print("# ell=%d" % ell)
         print("log(2)=%d" % wanted["2"])
         print("log(3)=%d" % wanted["3"])
         print("# target=%s" % args.target)
         print("log(target)=%d" % log_target)
-        print("# check line: " +
-                "((GF(p)!2)^%d/(GF(p)!%s)^%d)^((p-1)div %d) where p is %d;"
-                % (log_target, args.target, wanted["2"], ell, p))
-
+        check_result(2, wanted["2"], args.target, log_target, p, ell)
 
 # http://stackoverflow.com/questions/107705/disable-output-buffering
 # shebang takes only one arg...
@@ -1095,6 +1412,7 @@ if __name__ == '__main__':
 
     todofile, initial_split = init.do_descent(int(args.target))
     relsfile = middle.do_descent(todofile)
+    #lower.do_descent_alt(relsfile, initial_split)
     lower.do_descent(relsfile, initial_split)
 
     general.cleanup()
