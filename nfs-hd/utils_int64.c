@@ -1,6 +1,6 @@
 #include "utils_int64.h"
 
-uint64_t pow_uint64_t(uint64_t d, int64_t e)
+uint64_t pow_uint64_t(uint64_t d, uint64_t e)
 {
   ASSERT_ALWAYS(log2((double)d) * (double)e < 64.0);
 

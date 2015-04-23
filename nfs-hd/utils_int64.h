@@ -13,7 +13,7 @@
  * d: a number.
  * e: a number.
  */
-uint64_t pow_uint64_t(uint64_t d, int64_t e);
+uint64_t pow_uint64_t(uint64_t d, uint64_t e);
 
 /*
  * Compute the modular inverse of xx mod mm.
