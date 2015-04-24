@@ -434,7 +434,8 @@ template class std::vector<fb_general_entry>;
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, slice_index_t &next_index)
+fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
+                                      slice_index_t &next_index)
 {
   /* Entries in vec must be sorted */
 
@@ -442,6 +443,8 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, slice_index_t &next_in
   slices.clear();
 
   size_t cur_slice_start = 0;
+
+  if (max_weight > 0.){}
 
   while (cur_slice_start < vec.size()) {
     const unsigned char cur_logp = fb_log (vec[cur_slice_start].p, scale, 0.);
@@ -576,11 +579,12 @@ fb_part::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t
 
 
 void
-fb_part::make_slices(const double scale, slice_index_t &next_index)
+fb_part::make_slices(const double scale, const double max_weight,
+                     slice_index_t &next_index)
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
-      get_slices(i_roots)->make_slices(scale, next_index);
+      get_slices(i_roots)->make_slices(scale, max_weight, next_index);
     /* If we store all entries as general entries, we don't slice them,
        as those are the small primes in part 0 which get line sieved */
   }
@@ -1133,11 +1137,11 @@ fb_factorbase::extract_bycost(std::vector<unsigned long> &extracted, fbprime_t p
 }
 
 void
-fb_factorbase::make_slices(const double scale)
+fb_factorbase::make_slices(const double scale, const double max_weight)
 {
   slice_index_t next_index = 0;
   for (size_t part = 0; part < FB_MAX_PARTS; part++) {
-    parts[part]->make_slices(scale, next_index);
+    parts[part]->make_slices(scale, max_weight, next_index);
   }
 }
 

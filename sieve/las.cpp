@@ -540,7 +540,7 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
   /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
       sieve_side_info_ptr sis = si->sides[side];
-      sis->fb->make_slices(sis->scale * LOG_SCALE);
+      sis->fb->make_slices(sis->scale * LOG_SCALE, 0.);
   }
 
 }/*}}}*/

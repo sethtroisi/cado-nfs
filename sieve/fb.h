@@ -247,7 +247,8 @@ class fb_slices_interface: public fb_interface {
   virtual void finalize() = 0;
   /* Create slices so that one slice contains at most max_slice_len entries,
      and all entries in a slice have the same round(fb_log(p, scale)) */
-  virtual void make_slices(double scale, slice_index_t &next_index) = 0;
+  virtual void make_slices(double scale, double max_weight,
+                           slice_index_t &next_index) = 0;
   virtual const fb_slice_interface *get_first_slice() const = 0;
 };
 
@@ -303,7 +304,7 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   fb_slices(){};
   ~fb_slices(){};
 
-  void make_slices(double scale, slice_index_t &next_index);
+  void make_slices(double scale, double max_weight, slice_index_t &next_index);
   fb_vector<FB_ENTRY_TYPE> *get_vector() {return &vec;}
   /* Implement slices interface */
 
@@ -419,7 +420,7 @@ class fb_part: public fb_interface, private NonCopyable {
       default: abort();
     }
   }
-  void make_slices(double scale, slice_index_t &next_index);
+  void make_slices(double scale, double max_weight, slice_index_t &next_index);
 public:
   fb_part(const fbprime_t _powlim, const bool only_general=false)
     : powlim(_powlim), only_general(only_general){}
@@ -494,7 +495,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
-  void make_slices(double scale);
+  void make_slices(double scale, double max_weight);
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
     for (unsigned int i_part = 0; i_part <= FB_MAX_PARTS; i_part++) {
       const fb_slice_interface *slice;
