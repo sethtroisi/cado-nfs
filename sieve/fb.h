@@ -32,7 +32,7 @@ class fb_entry_x_roots;
 struct fb_general_root {
   /* exp and oldexp are maximal such that:
      If not projective and a == br (mod p^k), then p^exp | F(a,b)
-     -"-               a == br (mod p^(k-1)), then p^oldexp | F(a,b)
+     -"-                   a == br (mod p^(k-1)), then p^oldexp | F(a,b)
      If projective and ar == b  -"- */
   fbroot_t r;
   bool proj;
@@ -245,7 +245,9 @@ class fb_slices_interface: public fb_interface {
   virtual bool is_general() const = 0;
   virtual void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const = 0;
   virtual void finalize() = 0;
-  virtual void make_slices(double, slice_index_t &) = 0;
+  /* Create slices so that one slice contains at most max_slice_len entries,
+     and all entries in a slice have the same round(fb_log(p, scale)) */
+  virtual void make_slices(double scale, slice_index_t &next_index) = 0;
   virtual const fb_slice_interface *get_first_slice() const = 0;
 };
 
@@ -301,7 +303,7 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   fb_slices(){};
   ~fb_slices(){};
 
-  void make_slices(double, slice_index_t &);
+  void make_slices(double scale, slice_index_t &next_index);
   fb_vector<FB_ENTRY_TYPE> *get_vector() {return &vec;}
   /* Implement slices interface */
 
@@ -417,7 +419,7 @@ class fb_part: public fb_interface, private NonCopyable {
       default: abort();
     }
   }
-  void make_slices(double, slice_index_t &);
+  void make_slices(double scale, slice_index_t &next_index);
 public:
   fb_part(const fbprime_t _powlim, const bool only_general=false)
     : powlim(_powlim), only_general(only_general){}
@@ -492,7 +494,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
-  void make_slices(double);
+  void make_slices(double scale);
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
     for (unsigned int i_part = 0; i_part <= FB_MAX_PARTS; i_part++) {
       const fb_slice_interface *slice;
