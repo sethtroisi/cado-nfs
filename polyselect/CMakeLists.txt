@@ -14,7 +14,7 @@ add_executable (polyselect_ropt polyselect_ropt.c ${ropt_sources})
 add_executable (polyselect_gfpn EXCLUDE_FROM_ALL polyselect_gfpn.c gfpkdlpolyselect.c)
 
 # the utils library already includes -lgmp and -lm
-target_link_libraries (polyselect_gfpn utils)
+target_link_libraries (polyselect_gfpn  polyselect_common utils)
 target_link_libraries (polyselect_common utils)
 target_link_libraries (polyselect2l polyselect_common utils ${pthread_libs})
 target_link_libraries (polyselect_ropt polyselect_common utils ${pthread_libs})

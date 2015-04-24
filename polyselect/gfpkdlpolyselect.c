@@ -661,7 +661,7 @@ mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly_t f, const int j, const ch
 {
   if (label_poly != NULL){
     fprintf (fp, "# ");
-    fprintf (fp, label_poly);
+    fputs (label_poly, fp);
     fprintf (fp, "\n");
   }
   fprintf (fp, "poly%c:", j);
@@ -679,13 +679,13 @@ fprintf_gfpn_poly_info ( FILE* fp, mpz_poly_t f, const char *label_poly)
 {
   //unsigned int i;
     double skew, logmu, alpha;
-
+    const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0}; // ??? copy paste from dlpolyselect.c:26
     skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC); // macro defined in polyselect/auxiliary.h
     logmu = L2_lognorm (f, skew);
     alpha = get_alpha (f, ALPHA_BOUND);
     fprintf (fp, "# ");
     if (label_poly != NULL){
-      fprintf (fp, label_poly);
+      fputs (label_poly, fp);
     }
     fprintf (fp, " lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, " \
 	     "exp_E %1.2f\n",
