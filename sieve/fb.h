@@ -109,6 +109,7 @@ public:
   void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
   fbroot_t get_r(const size_t i) const {return roots[i].r;};
   fbroot_t get_proj(const size_t i) const {return roots[i].proj;};
+  double weight() const {return 1./p * nr_roots;}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
     if (k == 1 && p <= pmax && p <= nr_roots * td_thresh) {
       // printf("Extracting p = %" FBPRIME_FORMAT "\n", p);
@@ -159,6 +160,7 @@ public:
       roots[i] = e.roots[i].r;
   }
   fbprime_t get_q() const {return p;}
+  double weight() const {return 1./p * Nr_roots;}
   /* Allow sorting by p */
   bool operator<(const fb_entry_x_roots<Nr_roots> &other) const {return this->p < other.p;}
   bool operator>(const fb_entry_x_roots<Nr_roots> &other) const {return this->p > other.p;}
@@ -298,6 +300,7 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   fb_vector<FB_ENTRY_TYPE> vec;
   std::vector<fb_slice<FB_ENTRY_TYPE> > slices;
   void sort();
+  double est_weight(size_t, size_t) const;
  public:
   static const size_t max_slice_len = 65536;
 
@@ -495,7 +498,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
-  void make_slices(double scale, double max_weight);
+  void make_slices(double scale, const double max_weight[FB_MAX_PARTS]);
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
     for (unsigned int i_part = 0; i_part <= FB_MAX_PARTS; i_part++) {
       const fb_slice_interface *slice;

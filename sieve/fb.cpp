@@ -431,6 +431,27 @@ fb_slice<FB_ENTRY_TYPE>::fprint(FILE *out) const
 /* http://stackoverflow.com/questions/24130093/gdb-could-not-find-operator */
 template class std::vector<fb_general_entry>;
 
+/* Compute an upper bound on this slice's weight by assuming all primes in the
+   slice are equal on the first (and thus smallest) one. This relies on the
+   vector being sorted. */
+template <class FB_ENTRY_TYPE>
+double
+fb_slices<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
+{
+  return vec[start].weight() * (end - start);
+}
+
+/* For general vectors, we compute the weight the hard way, via a sum over
+   all entries. General vectors are quite small so this should not take long */
+template <>
+double
+fb_slices<fb_general_entry>::est_weight(const size_t start, const size_t end) const
+{
+  double sum = 0.;
+  for (size_t i = start; i < end; i++)
+    sum += vec[i].weight();
+  return sum;
+}
 
 template <class FB_ENTRY_TYPE>
 void
@@ -443,8 +464,6 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
   slices.clear();
 
   size_t cur_slice_start = 0;
-
-  if (max_weight > 0.){}
 
   while (cur_slice_start < vec.size()) {
     const unsigned char cur_logp = fb_log (vec[cur_slice_start].p, scale, 0.);
@@ -465,13 +484,27 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
       ASSERT_ALWAYS(next_slice_start <= cur_slice_start + max_slice_len);
     }
 
+    /* Maybe the slice's weight is greater than max_weight and we have to make
+       the slice smaller */
+    double weight;
+    while ((weight = est_weight(cur_slice_start, next_slice_start)) > max_weight) {
+      const size_t old = next_slice_start;
+      next_slice_start = cur_slice_start + (next_slice_start - cur_slice_start) / 2;
+      verbose_output_print (0, 3, "# Slice %u starting at offset %zu has too "
+        "great weight %.3f > %.3f, shortening end from %zu to %zu\n",
+        (unsigned int) next_index, cur_slice_start, weight, max_weight, old,
+        next_slice_start);
+      ASSERT_ALWAYS(next_slice_start > cur_slice_start);
+    }
+
     verbose_output_print (0, 4, "# Slice %u starts at offset %zu (p = %"
         FBPRIME_FORMAT ", log(p) = %u) and ends at offset %zu (p = %"
-        FBPRIME_FORMAT ", log(p) = %u)\n",
+        FBPRIME_FORMAT ", log(p) = %u), weight <= %.3f\n",
            (unsigned int) next_index, cur_slice_start, vec[cur_slice_start].p,
            (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
            next_slice_start - 1, vec[next_slice_start - 1].p,
-           (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.));
+           (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.),
+           weight);
     fb_slice<FB_ENTRY_TYPE> s(&vec, vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
     slices.push_back(s);
 
@@ -1137,11 +1170,11 @@ fb_factorbase::extract_bycost(std::vector<unsigned long> &extracted, fbprime_t p
 }
 
 void
-fb_factorbase::make_slices(const double scale, const double max_weight)
+fb_factorbase::make_slices(const double scale, const double max_weight[FB_MAX_PARTS])
 {
   slice_index_t next_index = 0;
   for (size_t part = 0; part < FB_MAX_PARTS; part++) {
-    parts[part]->make_slices(scale, max_weight, next_index);
+    parts[part]->make_slices(scale, max_weight[part], next_index);
   }
 }
 

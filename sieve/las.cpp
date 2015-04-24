@@ -494,7 +494,8 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_stack * todo)
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
 
-static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
+static void sieve_info_update (sieve_info_ptr si, int nb_threads,
+    const size_t nr_workspaces)/*{{{*/
 {
   /* essentially update the fij polynomials and J value */
   sieve_info_update_norm_data(si, nb_threads);
@@ -504,8 +505,17 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
 
   /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
+      /* The safety factor controls by how much a single slice should fill a
+         bucket array at most, i.e., with .5, a single slice should never fill
+         a bucket array more than half-way. */
+      const double safety_factor = .5;
       sieve_side_info_ptr sis = si->sides[side];
-      sis->fb->make_slices(sis->scale * LOG_SCALE, 0.);
+      double max_weight[FB_MAX_PARTS];
+      for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++) {
+        max_weight[i_part] = sis->max_bucket_fill_ratio[i_part] / nr_workspaces
+            * safety_factor;
+      }
+      sis->fb->make_slices(sis->scale * LOG_SCALE, max_weight);
   }
 
 }/*}}}*/
@@ -2538,7 +2548,7 @@ int main (int argc0, char *argv0[])/*{{{*/
        threads, so that threads have some freedom in avoiding the fullest
        bucket array. With only one thread, no balancing needs to be done,
        so we use only one bucket array. */
-    size_t nr_workspaces = las->nb_threads + (las->nb_threads > 1);
+    const size_t nr_workspaces = las->nb_threads + (las->nb_threads > 1);
     thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
 
     las_report report;
@@ -2696,7 +2706,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (si, las->nb_threads);
+        sieve_info_update (si, las->nb_threads, nr_workspaces);
         totJ += (double) si->J;
         verbose_output_print(0, 2, "# I=%u; J=%u\n", si->I, si->J);
         if (las->verbose >= 2) {
