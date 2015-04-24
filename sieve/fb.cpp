@@ -1163,8 +1163,8 @@ int main(int argc, char **argv)
 {
   fbprime_t thresholds[4] = {200, 1000, 1000, 1000};
   fbprime_t powbound = 100;
-  fb_factorbase *fb1 = new fb_factorbase(thresholds),
-    *fb2 = new fb_factorbase(thresholds);
+  fb_factorbase *fb1 = new fb_factorbase(thresholds, powbound),
+    *fb2 = new fb_factorbase(thresholds, powbound);
 
   mpz_t poly[2];
 
@@ -1174,8 +1174,8 @@ int main(int argc, char **argv)
   mpz_set_ui(poly[0], 727);
   mpz_set_ui(poly[1], 210); /* Bunch of projective primes */
 
-  fb1->make_linear(poly, powbound);
-  fb1->make_slices(2.0);
+  fb1->make_linear(poly);
+  fb1->make_slices(2.0, 0.5);
   output(fb1, "from linear polynomial");
 
   // This line does (and should) fail to compile, as fb_factorbase is
@@ -1184,16 +1184,16 @@ int main(int argc, char **argv)
 
   if (argc > 1) {
     fb2->read(argv[1]);
-    fb2->make_slices(2.0);
+    fb2->make_slices(2.0, 0.5);
     output(fb2, "from file");
   }
 
   delete fb1;
   delete fb2;
   bool only_general[4] = {false, false, false, false};
-  fb1 = new fb_factorbase(thresholds, only_general);
-  fb1->make_linear(poly, powbound);
-  fb1->make_slices(2.0);
+  fb1 = new fb_factorbase(thresholds, powbound, only_general);
+  fb1->make_linear(poly);
+  fb1->make_slices(2.0, 0.5);
   output(fb1, "from linear polynomial, only_general = false");
 
   printf("Trialdiv primes:\n");
