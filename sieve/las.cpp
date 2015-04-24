@@ -323,41 +323,6 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
         }
         s->max_bucket_fill_ratio[i_part] = weight * 1.07;
     }
-
-    // How do we write updates to buckets? How much space should we allocate? With a thread-pool, how do we determine how much memory each bucket array needs?
-#if 0
-
-    const int n = las->nb_threads;
-    double bucket_fill_ratio[n];
-    size_t nr_primes[n], nr_roots[n];
-    /* Counting the bucket-sieved primes per thread. */
-    for (int i = 0; i < n; ++i) {
-        s->fb->get_part(1)->count_entries(&nr_primes[i], &nr_roots[i], &bucket_fill_ratio[i]);
-    }
-    verbose_output_print(0, 1, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
-    for(int i = 0 ; i < n ; i++)
-        verbose_output_print(0, 1, " %lu", nr_primes[i]);
-    verbose_output_print(0, 1, "\n");
-    verbose_output_print(0, 1, "# Number of bucket-sieved prime ideals in %s factor base per thread =", sidenames[side]);
-    for(int i = 0 ; i < n ; i++)
-        verbose_output_print(0, 1, " %lu", nr_roots[i]);
-    verbose_output_print(0, 1, "\n");
-    verbose_output_print(0, 1, "# Inverse sum of bucket-sieved prime ideals in %s factor base per thread =", sidenames[side]);
-    for(int i = 0 ; i < n ; i++)
-        verbose_output_print(0, 1, " %.5f", bucket_fill_ratio[i]);
-
-    double min_bucket_fill_ratio = bucket_fill_ratio[n-1]; /* Why not [0]? */
-    double max_bucket_fill_ratio = bucket_fill_ratio[0];
-    for(int i = 0 ; i < n ; i++) {
-        double r = bucket_fill_ratio[i];
-        if (r < min_bucket_fill_ratio) min_bucket_fill_ratio = r;
-        if (r > max_bucket_fill_ratio) max_bucket_fill_ratio = r;
-    }
-    verbose_output_print(0, 1, " [hit jitter %g]\n",
-            (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
-    /* enable some margin in the bucket size */
-    s->max_bucket_fill_ratio = max_bucket_fill_ratio * 1.07;
-#endif
 }
 /*}}}*/
 
