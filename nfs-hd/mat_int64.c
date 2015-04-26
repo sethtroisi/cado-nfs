@@ -258,13 +258,14 @@ void mat_int64_extract_vector(int64_vector_ptr v, mat_int64_srcptr matrix,
   }
 }
 
-void mat_int64_set_diag(mat_int64_ptr matrix, int64_t * x)
+void mat_int64_set_diag(mat_int64_ptr matrix, int64_vector_srcptr x)
 {
   ASSERT(matrix->NumRows == matrix->NumCols);
+  ASSERT(x->dim == matrix->NumRows);
 
   mat_int64_set_zero(matrix);
   for (unsigned int i = 0; i < matrix->NumCols; i++) {
-    matrix->coeff[i + 1][i + 1] = x[i];
+    matrix->coeff[i + 1][i + 1] = x->c[i];
   }
 }
 

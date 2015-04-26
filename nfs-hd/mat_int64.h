@@ -185,7 +185,7 @@ void mat_int64_extract(mat_int64_ptr matrix_out, mat_int64_srcptr matrix_in,
 void mat_int64_extract_vector(int64_vector_ptr v, mat_int64_srcptr matrix,
     unsigned int col);
 
-void mat_int64_set_diag(mat_int64_ptr matrix, int64_t * x);
+void mat_int64_set_diag(mat_int64_ptr matrix, int64_vector_srcptr x);
 
 void mat_int64_LLL(mat_int64_ptr C, mat_int64_srcptr A);
 
