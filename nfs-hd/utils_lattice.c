@@ -22,11 +22,12 @@ void list_int64_vector_init(list_int64_vector_ptr list)
       DEFAULT_LENGTH_LIST_VECTOR);
 }
 
-void list_int64_vector_add_int64_vector(list_int64_vector_ptr list, int64_vector_srcptr v)
+void list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
+    int64_vector_srcptr v)
 {
   if ((list->length % DEFAULT_LENGTH_LIST_VECTOR) == 0 && list->length != 0) {
-  list->v = realloc(list->v, sizeof(int64_vector_t) * (list->length +
-        DEFAULT_LENGTH_LIST_VECTOR));
+    list->v = realloc(list->v, sizeof(int64_vector_t) * (list->length +
+          DEFAULT_LENGTH_LIST_VECTOR));
   }
   int64_vector_init(list->v[list->length], v->dim);
   int64_vector_set(list->v[list->length], v);
@@ -86,6 +87,20 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
   int64_vector_clear(v_tmp);
 }
 
+void mat_int64_from_list_int64_vector(mat_int64_ptr matrix,
+    list_int64_vector_srcptr list)
+{
+  ASSERT(list->length == matrix->NumCols);
+  ASSERT(list->v[0]->dim == matrix->NumRows);
+
+  for (unsigned int col = 0; col < list->length; col++) {
+    for (unsigned int row = 0; row < list->v[0]->dim; row++) {
+      matrix->coeff[row + 1][col + 1] = list->v[col]->c[row];
+    }
+  }
+
+}
+
 /*
  * From PNpoly
  */
@@ -115,8 +130,8 @@ static int int64_vector_in_list_int64_vector(int64_vector_srcptr vec, list_int64
       i++) {
     if ( ((list->v[i]->c[1] > vec->c[1]) != (list->v[j]->c[1] > vec->c[1])) &&
         (vec->c[0] < (list->v[j]->c[0] - list->v[i]->c[0]) *
-         (vec->c[1] - list->v[i]->c[1]) / (list->v[j]->c[1] - list->v[i]->c[1]) +
-         list->v[i]->c[0]) ) {
+         (vec->c[1] - list->v[i]->c[1]) /
+         (list->v[j]->c[1] - list->v[i]->c[1]) + list->v[i]->c[0]) ) {
       c = !c;
     }
   }
@@ -343,6 +358,27 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
 }
 
 #ifdef SKEW_LLL
+void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr Mqr,
+    int64_vector_srcptr skewness)
+{
+  mat_int64_t I_s;
+  mat_int64_init(I_s, Mqr->NumRows, Mqr->NumCols);
+  mat_int64_set_diag(I_s, skewness);
+
+  mat_int64_t M;
+  mat_int64_init(M, Mqr->NumRows, Mqr->NumCols);
+  mat_int64_mul_mat_int64(M, I_s, Mqr);
+  
+  mat_int64_t U;
+  mat_int64_init(U, 2, 2);
+  mat_int64_LLL_unimodular_transpose(U, M);
+  mat_int64_mul_mat_int64(MSLLL, Mqr, U);
+
+  mat_int64_clear(U);
+  mat_int64_clear(I_s);
+  mat_int64_clear(M);
+}
+
 static void skew_LLL_2(list_int64_vector_ptr list, int64_vector_srcptr v0_root,
     int64_vector_srcptr v1_root, int64_t I)
 {
@@ -358,32 +394,34 @@ static void skew_LLL_2(list_int64_vector_ptr list, int64_vector_srcptr v0_root,
 
   mat_int64_t Mqr;
   mat_int64_init(Mqr, 2, 2);
-  for (unsigned row = 0; row < 2; row++) {
-    Mqr->coeff[row + 1][1] = v0_root->c[row];
-    Mqr->coeff[row + 1][2] = v1_root->c[row];
+  list_int64_vector_t list_tmp;
+  list_int64_vector_init(list_tmp);
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, 2);
+  for (unsigned int i = 0; i < 2; i++) {
+    v_tmp->c[i] = v0_root->c[i];
   }
+  list_int64_vector_add_int64_vector(list_tmp, v_tmp);
+  for (unsigned int i = 0; i < 2; i++) {
+    v_tmp->c[i] = v1_root->c[i];
+  }
+  list_int64_vector_add_int64_vector(list_tmp, v_tmp);
+  int64_vector_clear(v_tmp);
+  mat_int64_from_list_int64_vector(Mqr, list_tmp);
+  list_int64_vector_clear(list_tmp);
 
-  int64_t diag[2] = {1,
-    (int64_t)round(((double)(2 * (I / 2) * (I / 2))) / (double)v0_root->c[0])};
-  mat_int64_t Il;
-  mat_int64_init(Il, 2, 2);
-  mat_int64_set_diag(Il, diag);
-
-  mat_int64_t M;
-  mat_int64_init(M, 2, 2);
-  mat_int64_mul_mat_int64(M, Il, Mqr);
-
-  mat_int64_t U;
-  mat_int64_init(U, 2, 2);
-  mat_int64_LLL_unimodular_transpose(U, M);
-  mat_int64_mul_mat_int64(M, Mqr, U);
-
-  list_int64_vector_extract_mat_int64(list, M);
-
-  mat_int64_clear(M);
-  mat_int64_clear(U);
+  int64_vector_t diag;
+  int64_vector_init(diag, 2);
+  diag->c[0] = 1;
+  diag->c[1] =  (int64_t)round(((double)(2 * (I / 2) * (I / 2))) /
+      (double)v0_root->c[0]);
+  
+  mat_int64_t MSLLL;
+  mat_int64_init(MSLLL, 2, 2);
+  skew_LLL(MSLLL, Mqr, diag);
+  list_int64_vector_extract_mat_int64(list, MSLLL);
+  mat_int64_clear(MSLLL);
   mat_int64_clear(Mqr);
-  mat_int64_clear(Il);
 }
 #endif // SKEW_LLL
 
@@ -462,6 +500,8 @@ int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
   list_int64_vector_init(list);
   skew_LLL_2(list, v0_root, v1_root, I);
   list_int64_vector_fprintf_comment(stdout, list);
+  printf("# "); int64_vector_fprintf(stdout, v0);
+  printf("# "); int64_vector_fprintf(stdout, v1);
 #endif // SKEW_LLL  
 
   return 1;

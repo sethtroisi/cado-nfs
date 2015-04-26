@@ -66,6 +66,12 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
     mat_int64_srcptr matrix);
 
 /*
+ * Fill a matrix with the vectors of list in columns.
+ */
+void mat_int64_vector_from_list_int64(mat_int64_ptr matrix,
+    list_int64_vector_srcptr list);
+
+/*
  * List of double vector.
  */
 typedef struct
@@ -143,6 +149,9 @@ int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1, mat_int64_ptr U,
  */
 int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
     mat_int64_ptr U, int64_vector_srcptr v0_root, int64_vector_srcptr v1_root);
+
+void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr Mqr,
+    int64_vector_srcptr skewness);
 
 /*
  * Use the Franke-Kleinjung to modify the two first coordinates of v0_root and
