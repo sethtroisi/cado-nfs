@@ -772,6 +772,9 @@ class DescentUpperClass(object):
                 sys.stdout.write('\n')
                 print(line.rstrip())
                 if int(foo.groups()[0]) > 0:
+                    for j,process in enumerate(processes):
+                        if j != i:
+                            process.child.kill()
                     if not os.path.exists(relsfilename):
                         shutil.copyfile(relsfilename+"."+str(i),relsfilename)
                     break
