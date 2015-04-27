@@ -6,11 +6,8 @@
 # The CADO_BUILD environment variable must contain the CADO-NFS build
 # directory (makefb and las are taken from $CADO_BUILD/sieve)
 
-# Important:
-# (a) if the input parameter file params.cxx does not contain values for
-#     ncurves0/ncurves1, you need to add them manually in params.cxx.opt
-# (b) if lpbr and/or lpba change, you need to recompute rels_wanted, which
-#     should be near from prime_pi(2^lpbr) + prime_pi(2^lpba)
+# Important: if lpbr and/or lpba change, you need to recompute rels_wanted,
+# which should be near from prime_pi(2^lpbr) + prime_pi(2^lpba)
 
 cwd=`pwd`
 params=$1
@@ -30,14 +27,18 @@ alambda=`grep alambda $params | cut -d= -f2`
 grep ncurves0 $params > /dev/null
 if [ $? -eq 0 ]; then
    ncurves0=`grep ncurves0 $params | cut -d= -f2`
+   has_ncurves0=1
 else
    ncurves0=10
+   has_ncurves0=0
 fi
 grep ncurves1 $params > /dev/null
 if [ $? -eq 0 ]; then
    ncurves1=`grep ncurves1 $params | cut -d= -f2`
+   has_ncurves1=1
 else
    ncurves1=10
+   has_ncurves1=0
 fi
 I=`grep I $params | cut -d= -f2`
 rlim_min=`expr $rlim / 2`
@@ -137,4 +138,10 @@ sed "s/alambda.*=.*$/alambda = $alambda_opt/g" | \
 sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
 sed "s/I.*=.*$/I = $I_opt/g" > $params.opt
+if [ $has_ncurves0 -eq 0]; then
+   echo "tasks.sieve.ncurves0 = $ncurves0_opt" >> $params.opt
+fi
+if [ $has_ncurves1 -eq 0]; then
+   echo "tasks.sieve.ncurves1 = $ncurves1_opt" >> $params.opt
+fi
 /bin/rm -fr $d
