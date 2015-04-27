@@ -488,7 +488,8 @@ class LogBase(object):
             print("Found %d bad ideals, %d known logs, and %d SMs in %s" %(len(self.badideals), len(self.known),len(self.SMs), general.log()))
         except:
             raise ValueError("Error while reading %s" % general.log())
-
+    def has(self,p,r,side):
+        return (p,r,side) in self.known
     def get_log(self, p,r,side):
         if side == 0:
             r = -1;
@@ -803,7 +804,7 @@ class DescentUpperClass(object):
             known = RatLogBase(general)
             with open(todofilename, "w") as f:
                 for q in factNum + factDen:
-                    if known.has(q):
+                    if self.logDB.has(q,-1,0):
                         continue
                     logq = math.ceil(math.log(q, 2))
                     print("Will do further descent for %d-bit rational prime %d"
