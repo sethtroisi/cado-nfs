@@ -1410,6 +1410,12 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             client_cmd_file.write("# Command for work unit: %s\n%s\n" %
                                   (wuid, cmdline))
     
+    def get_eta(self):
+        remaining_time = self.get_total_cpu_or_real_time(True) * (1.0 / self.get_achievement() - 1)
+        now = datetime.datetime.now()
+        arrival = now + datetime.timedelta(seconds=remaining_time)
+        return arrival.ctime()
+
     def verification(self, wuid, ok, *, commit):
         """ Mark a workunit as verified ok or verified with error and update
         wu_received counter """
@@ -1417,7 +1423,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         assert self.get_number_outstanding_wus() >= 1
         key = "wu_received"
         self.state.update({key: self.state[key] + 1}, commit=False)
-        self.logger.info("Marking workunit %s as %s (achievement: %.1f%%)", wuid, ok_str, 100.0 * self.get_achievement())
+        self.logger.info("Marking workunit %s as %s (%.1f%% => ETA %s)", wuid, ok_str, 100.0 * self.get_achievement(), self.get_eta())
         self.wuar.verification(wuid, ok, commit=commit)
     
     def cancel_available_wus(self):
@@ -1767,6 +1773,10 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     
     def get_achievement(self):
         return self.state["wu_received"] * self.params["adrange"] / (self.params["admax"] - self.params["admin"])
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by polyselect_ropt """
+        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
@@ -2716,7 +2726,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return True
     
     def get_achievement(self):
-        return self.state["rels_found"] / self.params["rels_wanted"]
+        return self.state["rels_found"] / self.state["rels_wanted"]
 
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
