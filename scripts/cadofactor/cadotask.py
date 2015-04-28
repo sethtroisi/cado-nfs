@@ -1367,10 +1367,18 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.state.setdefault("wu_timedout", 0)
         self.state.setdefault("wu_failed", 0)
         assert self.get_number_outstanding_wus() >= 0
+        # start_real_time will be a float giving the number of seconds since
+        # Jan 1 1900 at thebeginning of the task
+        self.state.update({"start_real_time": 0})
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_wu(self, wu, commit=True):
         """ Submit a WU and update wu_submitted counter """
+        # at beginning of the task, set "start_real_time" to the number of
+        # seconds since Jan 1 1900
+        if self.state["start_real_time"] == 0:
+           delta = datetime.datetime.now() - datetime.datetime(1900,1,1)
+           self.state.update({"start_real_time": delta.total_seconds()})
         key = "wu_submitted"
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.create(str(wu), commit=commit)
@@ -1411,7 +1419,9 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
                                   (wuid, cmdline))
     
     def get_eta(self):
-        remaining_time = self.get_total_cpu_or_real_time(True) * (1.0 / self.get_achievement() - 1)
+        delta = datetime.datetime.now() - datetime.datetime(1900,1,1)
+        seconds = delta.total_seconds() - self.state["start_real_time"]
+        remaining_time = seconds * (1.0 / self.get_achievement() - 1)
         now = datetime.datetime.now()
         arrival = now + datetime.timedelta(seconds=remaining_time)
         return arrival.ctime()
