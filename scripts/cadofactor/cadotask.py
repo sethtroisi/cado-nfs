@@ -1414,10 +1414,10 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         """ Mark a workunit as verified ok or verified with error and update
         wu_received counter """
         ok_str = "ok" if ok else "not ok"
-        self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
         key = "wu_received"
         self.state.update({key: self.state[key] + 1}, commit=False)
+        self.logger.info("Marking workunit %s as %s (achievement: %.1f%%)", wuid, ok_str, 100.0 * self.get_achievement())
         self.wuar.verification(wuid, ok, commit=commit)
     
     def cancel_available_wus(self):
@@ -1765,6 +1765,9 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         return not self.need_more_wus() and \
             self.get_number_outstanding_wus() == 0
     
+    def get_achievement(self):
+        return self.state["wu_received"] * self.params["adrange"] / (self.params["admax"] - self.params["admin"])
+
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
         if not identifier:
@@ -2121,6 +2124,9 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     def need_more_wus(self):
         return self.state["nr_poly_submitted"] < len(self.poly_to_submit)
     
+    def get_achievement(self):
+        return (self.state["nr_poly_submitted"] - self.params["batch"] * self.get_number_outstanding_wus()) / len(self.poly_to_submit)
+
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
         if not identifier:
@@ -2709,6 +2715,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return True
     
+    def get_achievement(self):
+        return self.state["rels_found"] / self.params["rels_wanted"]
+
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
         if not identifier:
