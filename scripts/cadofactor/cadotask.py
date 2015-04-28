@@ -3244,7 +3244,7 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": False, "gzip": True})
+            {"dlp": False, "galois": False, "gzip": True, "add_ratio": 0.1})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3377,7 +3377,7 @@ class PurgeTask(Task):
         \end{eqnarray*}
         """
         
-        additional = nunique * 0.1
+        additional = nunique * self.params["add_ratio"]
         if "delta_r" in self.state:
             excess = self.state["last_input_nrels"] - \
                 self.state["last_input_nprimes"]
