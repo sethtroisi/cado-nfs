@@ -87,6 +87,35 @@ static void factorize(factor_ptr factor, mpz_t z, unsigned int * number)
   mpz_clear(res);
 }
 
+static void brute_force_factorize(factor_ptr factor, mpz_srcptr z_root,
+    unsigned int * number)
+{
+  mpz_t z;
+  mpz_init(z);
+  mpz_set(z, z_root);
+  mpz_t prime;
+  mpz_init(prime);
+  mpz_set_ui(prime, 1);
+  while(mpz_cmp_ui(z, 1) != 0) {
+    mpz_nextprime(prime, prime);
+    mpz_t q;
+    mpz_init(q);
+    mpz_t r;
+    mpz_init(r);
+    mpz_fdiv_qr(q, r, z, prime);
+    while (mpz_cmp_ui(r, 0) == 0) {
+      mpz_set(z, q);
+      mpz_set(factor->factorization[* number], prime);
+      * number = * number + 1;
+      mpz_fdiv_qr(q, r, z, prime);
+    }
+    mpz_clear(q);
+    mpz_clear(r);
+  }
+  mpz_clear(prime);
+  mpz_clear(z);
+}
+
 static int compare(const void * p1, const void * p2)
 {
   return(mpz_cmp((mpz_srcptr) p1, (mpz_srcptr) p2));
@@ -96,6 +125,35 @@ void sort_factor(factor_ptr factor)
 {
   qsort(factor->factorization, factor->number, sizeof(factor->factorization[0]),
         compare);
+}
+
+unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
+{
+  unsigned int number = mpz_sizeinbase(z, 2);
+  factor_init(factor, number);
+  unsigned int nb = 0;
+  if (mpz_probab_prime_p (z, 25)) {
+    mpz_set(factor->factorization[nb], z);
+    nb = 1;
+  } else {
+    brute_force_factorize(factor, z, &nb);
+  }
+  factor_realloc(factor, nb);
+  sort_factor(factor);
+
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_set_ui(tmp, 1);
+  for (unsigned int i = 0; i < factor->number - 1; i++) {
+    mpz_mul(tmp, tmp, factor->factorization[i]);
+  }
+  unsigned int assert_facto = 1;
+  if (mpz_cmp(tmp, z)) {
+    assert_facto = 0;
+  }
+  mpz_clear(tmp);
+
+  return assert_facto;
 }
 
 unsigned int gmp_factorize(factor_ptr factor, mpz_t z)

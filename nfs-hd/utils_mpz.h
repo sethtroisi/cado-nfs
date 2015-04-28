@@ -47,13 +47,22 @@ void factor_realloc(factor_ptr factor, unsigned int number);
 void sort_factor(factor_ptr factor);
 
 /*
- * Factorize a mpz and set the factors in factor. Return 0 if the factorization
- *  is correct, 1 else.
+ * Factorize (with ECM) a mpz and set the factors in factor.
+ *  Return 0 if the factorization is correct, 1 else.
  *
  * factor: an array of factors.
  * z: the number we want to factorize.
  */
 unsigned int gmp_factorize(factor_ptr factor, mpz_t z);
+
+/*
+ * Factorise (brute force) a mpz and set the factors in factor.
+ *  Return 0 if the factorisation is correct, 1 else.
+ *
+ * factor: an array of factors.
+ * z: the number we want to factorize.
+ */
+unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z);
 
 /*
  * Print an array of factors.
