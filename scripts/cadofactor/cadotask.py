@@ -4473,7 +4473,7 @@ class ReconstructLogTask(Task):
             abunitsdirname = self.send_request(Request.GET_UNITS_DIRNAME)
                  
             (stdoutpath, stderrpath) = \
-                    self.make_std_paths(cadoprograms.SM.name)
+                    self.make_std_paths(cadoprograms.ReconstructLog.name)
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
@@ -4521,6 +4521,58 @@ class ReconstructLogTask(Task):
         else:
             return [ 0, 0 ]
 
+class DescentTask(Task):
+    """ Individual logarithm Task """
+    @property
+    def name(self):
+        return "descent"
+    @property
+    def title(self):
+        return "Individual logarithm"
+    @property
+    def programs(self):
+        input = {"db": Request.GET_DB_FILENAME,}
+        override = ()
+        return ((cadoprograms.Descent, override, input),)
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames,
+                {"target": int, "descent_hint": str, "init_I": int,
+                    "init_ncurves": int, "init_lpb": int,
+                    "init_lim": int, "init_mfb": int, "init_tkewness": int,
+                    "I": int, "lpb0": int, "lpb1": int, "mfb0": int,
+                    "mfb1": int, "lim0": int, "lim1": int,
+                    "execpath": str
+                    })
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        super().run()
+
+        (stdoutpath, stderrpath) = \
+                self.make_std_paths(cadoprograms.Descent.name)
+        p = cadoprograms.Descent(
+                stdout=str(stdoutpath),
+                stderr=str(stderrpath),
+                **self.merged_args[0])
+        message = self.submit_command(p, "", log_errors=True)
+        if message.get_exitcode(0) != 0:
+            raise Exception("Program failed")
+
+        stdout = message.read_stdout(0).decode("utf-8")
+        for line in stdout.splitlines():
+            match = re.match(r'log\(target\)=(\d+)', line)
+            if match:
+                self.state["logtarget"] = match.group(1)
+                break
+        return True
+
+    def get_logtarget(self):
+        return self.state["logtarget"]
+    
 class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     """ Starts HTTP server """
     @property
@@ -4921,6 +4973,7 @@ class Request(Message):
     GET_ELL = object()
     GET_NMAPS = object()
     GET_WU_RESULT = object()
+    GET_DB_FILENAME = object()
 
 class CompleteFactorization(HasState, wudb.DbAccess, 
         DoesLogging, cadoparams.UseParameters, patterns.Mediator):
@@ -4936,7 +4989,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # This isn't a Task subclass so we don't really need to define
         # paramnames, but we do it out of habit
         return {"name": str, "workdir": str, "N": int, "dlp": False,
-                "gfpext": 1, "trybadwu": False}
+                "gfpext": 1, "trybadwu": False, "target": 0}
     @property
     def title(self):
         return "Complete Factorization"
@@ -4948,7 +5001,9 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
         self.params = self.parameters.myparams(self.paramnames)
         self.db_listener = self.make_db_listener()
-        
+
+        self.state["dbfilename"] = db
+
         # Init WU BD
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
@@ -4983,6 +5038,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
+        descentpath = parampath + ['descent']
         
         ## tasks that are common to factorization and dlp
         self.fb = FactorBaseTask(mediator=self,
@@ -5052,6 +5108,11 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                                      db=db,
                                      parameters=self.parameters,
                                      path_prefix=parampath)
+            if self.params["target"]:
+                self.descent = DescentTask(mediator=self,
+                                         db=db,
+                                         parameters=self.parameters,
+                                         path_prefix=descentpath)
         else:
             ## Tasks specific to factorization
             self.merge = MergeTask(mediator=self,
@@ -5083,6 +5144,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                           self.dup1, self.dup2,
                           self.filtergalois, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
+            if self.params["target"]:
+                self.tasks = self.tasks + (self.descent,)
         else:
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
                           self.sieving, self.dup1, self.dup2, self.purge,
@@ -5140,6 +5203,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
             self.request_map[Request.GET_VIRTUAL_LOGS_FILENAME] = self.linalg.get_virtual_logs_filename
+            self.request_map[Request.GET_DB_FILENAME] = self.get_db_filename
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
             self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename
@@ -5193,10 +5257,16 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             return None
 
         if self.params["dlp"]:
-            return [ self.params["N"], self.nmbrthry.get_ell() ] + self.reconstructlog.get_log2log3()
+            ret = [ self.params["N"], self.nmbrthry.get_ell() ] + self.reconstructlog.get_log2log3()
+            if self.params["target"]:
+                ret = ret + [self.descent.get_logtarget()]
+            return ret
         else:
             return self.sqrt.get_factors()
     
+    def get_db_filename(self):
+        return self.state["dbfilename"]
+
     def start_all_clients(self):
         url = self.servertask.get_url()
         certsha1 = self.servertask.get_cert_sha1()
