@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 
+########################################################################
 # This script is responsible of handing over the build process, in a
 # proper out of source build directory. It takes care of calling cmake
 # first if needed, and then cd's into the proper sub-directory of the
 # build tree, and runs make there. The intent is that this script is
 # called from a Makefile within the source tree.
+# In particuar, the following tasks are done,
+#  - check if the calling path is correct?
+#  - if exists, parse the file ${up_path}local.sh
+#  - check if cmake is installed, if not install it.
+#  - "cmake" to generate Makefile
+#  - "make"
+#
+# Type "make ?" for more options.
+########################################################################
 
+
+########################################################################
 # The location of the build tree is, by default,
 # $cado_source_tree/build/`hostname`, but customizing it is easy.
 
@@ -99,12 +111,53 @@ export NO_SSE
 export NO_INLINE_ASSEMBLY
 export CHECKS_EXPENSIVE
 
-if [ "$1" = "tidy" ] ; then
-    echo "Wiping out $build_tree"
-    rm -rf "$build_tree"
+
+########################################################################
+# "make ?" or "make help" (when the Makefile does not exist)
+info=""
+function make_usage {
+    echo "-------------------------------------------------------------- "
+    echo "[Options] (see $0 for details)"
+    echo "-------------------------------------------------------------- "
+    echo " $info \"make ?\"       -- this help"
+    echo " $info \"make show\"    -- only show env variables"
+    echo " $info \"make cmake\"   -- only run cmake to generate Makefile"
+    echo " $info \"make\"         -- run cmake first and then make"
+    echo " $info \"make tidy\"    -- delete folder $build_tree (dangerous)"
+    echo " $info  Any other options will be passed to the actual make followed."
+    echo "-------------------------------------------------------------- "
+    exit 0
+}
+if [ "$1" == "?" ] ; then
+    make_usage
+fi
+if [ "$1" == "help" ] && [ ! -f "$build_tree/Makefile" ] ; then
+    make_usage
+fi
+
+########################################################################
+# make tidy (warn, this delete the whole build folder)
+wn="[warning]"
+if [ "$1" == "tidy" ] ; then
+    echo "$wn this deletes the whole folder $build_tree. Do you want to continue? (n/Y)"
+    if [ -e "`tty`" ] ; then
+        read TIDY_BUILD
+    else
+        echo "$wn no input terminal, assuming no"
+        TIDY_BUILD=n
+    fi
+    if [ "$TIDY_BUILD" == "Y" ]; then
+        echo "$wn wiping out $build_tree"
+        rm -rf "$build_tree"
+    else
+        echo "$wn no action and quit now"
+    fi
     exit 0
 fi
 
+
+########################################################################
+# make show
 if [ "$1" = "show" ] ; then
     echo "build_tree=\"$build_tree\""
     echo "up_path=\"$up_path\""
@@ -128,6 +181,7 @@ if [ "$1" = "show" ] ; then
     exit 0
 fi
 
+########################################################################
 # Make sure we have cmake, by the way !
 :  ${cmake_path:="`which cmake 2>/dev/null`"}
 cmake_companion_install_location="$absolute_path_of_source/cmake-installed"
@@ -166,6 +220,16 @@ if ! [ "$cmake_path" ] ; then
     fi
 fi
 
+
+########################################################################
+# handle "make clean"
+if [ "$1" == "clean" ] && [ ! -f "$build_tree/Makefile" ] ; then
+    echo "There is no $build_tree/Makefile. Nothing to clean."
+    exit 0
+fi
+
+########################################################################
+# call cmake (if Makefile does not exist)
 if [ "$1" = "cmake" ] || [ ! -f "$build_tree/Makefile" ] ; then
     mkdir -p "$build_tree"
     absolute_path_of_build_tree="`cd "$build_tree" ; $pwdP`"
@@ -180,6 +244,8 @@ fi
 if [ "$1" = "cmake" ] ; then
     exit 0
 fi
+
+########################################################################
 # Now cd into the target directory, and build everything required.
 # Note that it's useful to kill MAKELEVEL, or otherwise we'll get scores
 # and scores of ``Entering directory'' messages (sure, there's the
