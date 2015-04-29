@@ -150,3 +150,4 @@ sieve/strategies/F9.sh
 sieve/freerel_multipoly.c
 linalg/bwc/lingen.txt
 sieve/CMakeLists-nodist.txt
+sieve/bernstein.c
