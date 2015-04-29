@@ -48,7 +48,7 @@ typedef struct {
   unsigned int deg_f;
   unsigned int deg_Py;
   unsigned int deg_phi;
-  int size;
+  int size; // nb of elements f in table
   const tPyf_t* tab; // la table de {f, Py, phi}
   long int phi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
   //(a root of PY) modulo PY so of degree at most DEG_PY-1 --> of DEG_PY coeffs.
@@ -91,8 +91,8 @@ typedef polyselect_parameter_poly_t ppf_t[1];
 
 typedef struct {
   unsigned int n; // also written k in earlier versions
-  mpz_t p;
-  mpz_t ell;
+  mpz_srcptr p;
+  mpz_srcptr ell;
   unsigned int mnfs;
 }polyselect_parameters_t;
 
@@ -109,6 +109,7 @@ void eval_si_phi_mpz_y(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG
 void eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
 
 bool is_irreducible_ZZ(mpz_poly_srcptr phi);
+bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, int* sign_Discr, mpz_t Discr);
 bool is_irreducible_mod_p(mpz_poly_srcptr phi, mpz_srcptr p);
 bool is_irreducible_mod_p_si(const long int* Py, int deg_Py, mpz_srcptr p);
 
@@ -120,7 +121,7 @@ bool is_good_phi(mpz_poly_t phi, unsigned int n, mpz_t p);
 bool is_good_f_PY(fPyphi_t* fPyphi, mpz_poly_t** phi);
 
 // set f_id l'indice de la bonne ligne du tableau de {f, Py, phi}
-bool get_f_CONJ(int* f_id, mpz_poly_t * tab_phi, mpz_t * tab_roots_Py, int* nb_phi, const fPyphi_poly_t * ff, mpz_t p);
+bool get_f_CONJ(int* f_id, mpz_poly_t * tab_phi, mpz_t * tab_roots_Py, int* nb_phi, const fPyphi_poly_t * ff, mpz_srcptr p);
 // ff->tab_f[i] is the line with a right f.
 
 // case MNFS: tab of g_i, 1 <= i <= mnfs.
@@ -133,13 +134,15 @@ bool get_g_CONJ(mpz_poly_t g[], ppf_t params_g, int f_id, mpz_t * tab_roots_Py, 
 
 void mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly_t f, 
 					const int j, const char* label_poly);
-void
-fprintf_gfpn_poly_info (FILE* fp, mpz_poly_t f, const char *label_poly);
-
+void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, unsigned int deg_Py, int j, const char *label_poly);
+void fprintf_gfpn_poly_info (FILE* fp, mpz_poly_t f, const char *label_poly);
+void gfpk_print_params(unsigned int n, mpz_srcptr p, mpz_srcptr ell);
 
 // the function to call for generating a .poly file.
 // works only for n=2 at the moment.
 // , mpz_t ell, unsigned int mnfs
-int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs, const char* label);
+int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int mnfs, const char* label);
+
+
 #endif // DEG_PY > 2 is not supported
 #endif // GFPKDLPOLYSELECT_H

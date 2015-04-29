@@ -62,6 +62,7 @@ void eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, 
     mpz_mul(g->coeff[i], v, phi_coeff[i][0]);    // gi <- phi_i0 * v
     mpz_addmul(g->coeff[i], u, phi_coeff[i][1]); // gi <- gi + phi_i1 * u
   }
+  mpz_poly_cleandeg(g, deg_phi); // set deg to deg_phi at most (check that coeff is not 0)
 }
     // t[0] + t[1]*X + ... + t[deg_phi]*X^deg_phi
     // with t[i] = t[i][0] + t[i][1]*Y + ... t[i][deg_Py - 1]*Y^(deg_Py-1)
@@ -75,20 +76,22 @@ void eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DE
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
-    // if phi has coefficients of type (signed) long int
+    // phi has coefficients of type (signed) long int
     mpz_mul_si(g->coeff[i], v, phi_coeff[i][0]);    // gi <- phi_i0 * v
     mpz_addmul_si(g->coeff[i], u, phi_coeff[i][1]); // gi <- gi + phi_i1 * u
   }
+  mpz_poly_cleandeg(g, deg_phi); // set deg to deg_phi at most (check that coeff is not 0)
 }
 
 void eval_si_phi_mpz_y(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
-    // if phi has coefficients of type (signed) long int
+    // phi has coefficients of type (signed) long int
     mpz_init_set_si(g->coeff[i], phi_coeff[i][0]);    // gi <- phi_i0
     mpz_addmul_si(g->coeff[i], y, phi_coeff[i][1]); // gi <- phi_i0 + phi_i1 * y
   }
+  mpz_poly_cleandeg(g, deg_phi); // set deg to deg_phi at most (check that coeff is not 0)
 }
 
 /**
@@ -172,6 +175,66 @@ bool is_irreducible_ZZ(mpz_poly_srcptr phi)
 	  }
 	}// sign_D < 0
       }// sign_D == 0
+      mpz_clear(D);
+      mpz_clear(tmp);
+    }// degree == 2
+  }// degree <= 1
+  return is_irreducible;
+}
+
+/**
+ * \brief test irreducibility modulo a prime p of polynomial phi
+ * 
+ * \param[in] phi: polynomial with large coefficients
+ * \param[in] p: (large) prime number
+ * \return true if the polynomial is irreducible
+ * \return false if the polynomial is not irreducible
+ * 
+ * 1st version : for Degree(phi) <= 2.
+ */
+bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, int* sign_Discr, mpz_t Discr)
+{
+  /* if deg <= 1, return true
+     if deg == 2, test discriminant 
+        --> if D is a square mod p, (compute Legendre symbol)
+            then phi has two degree 2 factors
+	    otherwise phi is irreducible
+     if deg >= 3: use MPFQ library ?
+  */
+  int degree, Legendre_D_p;
+  bool is_irreducible = false;
+  mpz_t tmp;
+  degree = phi->deg;
+  if (degree <= 1){
+    is_irreducible = true;
+  }
+  else{
+    if (degree == 2){
+      //compute discriminant, phi = a*x^2 + b*x + c
+      //mpz_init(Discr); assume already done in calling function
+      mpz_init(tmp);
+      mpz_mul(Discr, phi->coeff[1], phi->coeff[1]); //   D <- b^2
+      mpz_mul(tmp, phi->coeff[0], phi->coeff[2]); // tmp <- a*c
+      mpz_mul_ui(tmp, tmp, 4);      // tmp <- 4*a*c
+      *sign_Discr = mpz_cmp(Discr, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
+      mpz_sub(Discr, Discr, tmp); //   D <- b^2 - 4*a*c and is != 0
+      if (*sign_Discr == 0){
+	// very easy, D = 0 and phi is reducible
+	is_irreducible = false;
+      }else{
+	// is_square mod p ?
+	// compute Legendre symbol
+	Legendre_D_p = mpz_legendre(Discr, p);
+	  if (Legendre_D_p >= 0){ // indeed, (D/p) can be 0 if D is a multiple of p.
+	    is_irreducible = false;
+	  }else{ // (D/p) = -1
+	    is_irreducible = true;
+	  }
+      }// sign_Discr == 0
+      mpz_clear(tmp);
+    }else{
+      // degree > 2, use a function that tests irreducibility. But the function does not exists yet.
+      is_irreducible = false;
     }// degree == 2
   }// degree <= 1
   return is_irreducible;
@@ -196,36 +259,19 @@ bool is_irreducible_mod_p(mpz_poly_srcptr phi, mpz_srcptr p)
 	    otherwise phi is irreducible
      if deg >= 3: use MPFQ library ?
   */
-  int degree, sign_D, Legendre_D_p;
+  int degree, sign_D;
   bool is_irreducible = false;
-  mpz_t D, tmp;
+  mpz_t D;
+  
   degree = phi->deg;
   if (degree <= 1){
     is_irreducible = true;
   }
   else{
     if (degree == 2){
-      //compute discriminant, phi = a*x^2 + b*x + c
-      mpz_init(D);
-      mpz_init(tmp);
-      mpz_mul(D, phi->coeff[1], phi->coeff[1]); //   D <- b^2
-      mpz_mul(tmp, phi->coeff[0], phi->coeff[2]); // tmp <- a*c
-      mpz_mul_ui(tmp, tmp, 4);      // tmp <- 4*a*c
-      sign_D = mpz_cmp(D, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
-      if (sign_D == 0){
-	// very easy, D = 0 and phi is reducible
-	is_irreducible = false;
-      }else{
-	mpz_sub(D, D, tmp); //   D <- b^2 - 4*a*c and is != 0
-	// is_square mod p ?
-	// compute Legendre symbol
-	Legendre_D_p = mpz_legendre(D, p);
-	  if (Legendre_D_p >= 0){ // indeed, (D/p) can be 0 if D is a multiple of p.
-	    is_irreducible = false;
-	  }else{ // (D/p) = -1
-	    is_irreducible = true;
-	  }
-      }// sign_D == 0
+      is_irreducible = is_irreducible_mod_p_deg2(phi, p, &sign_D, D);
+      // has to clear D after use here.
+      mpz_clear(D);
     }else{
       // degree > 2, use a function that tests irreducibility. But the function does not exists yet.
       is_irreducible = false;
@@ -233,6 +279,7 @@ bool is_irreducible_mod_p(mpz_poly_srcptr phi, mpz_srcptr p)
   }// degree <= 1
   return is_irreducible;
 }
+
 
 // same as above but with a poly with "small" coeffs given in a tab, with size <-> deg.
 bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
@@ -297,8 +344,7 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
 
 // same as is_good_poly_check_all in gfpk/magma/polyselect_utils.mag
 // return: error_code, see above
-//int is_good_poly(pp_t params, ppf_t poly_params, mpz_poly_t f){}
-
+ int is_good_poly_deg2(pp_t params, ppf_t poly_params, mpz_poly_srcptr g){
   /* check: 
      - deg f
      - f irreducible over Q
@@ -311,6 +357,28 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
      - badideals: call the magma function...
      - smexp: does this already exists in C ? call magma maybe.
   */
+
+   int sign_D;
+   bool sgtr_ok = false;
+   mpz_t D;
+   mpz_init(D);
+   bool is_irreducible = is_irreducible_mod_p_deg2(g, params->p, &sign_D, D);
+   if(is_irreducible){
+     // check signature of g --> D < 0 or D > 0 ?
+     // get signature:
+     unsigned int* sgtr_g = poly_params->sgtr;
+     if ((sgtr_g[0] == 2) && (sgtr_g[1] == 0)){
+       sgtr_ok = (sign_D >= 0);
+     }else{
+       if ((sgtr_g[0] == 0) && (sgtr_g[1] == 1)){
+	 sgtr_ok = (sign_D < 0);
+       }
+     }
+   }
+   mpz_clear(D);
+   return (is_irreducible && sgtr_ok);
+}
+
 
 /**
  * \brief test wether phi is a suitable candidate for computing g from phi
@@ -366,26 +434,32 @@ void mpz_poly_set_sli(mpz_poly_t f, const long int * h, int deg_h)
  * \return bool 
  */
 
-bool get_f_CONJ(int* f_id, mpz_poly_t * tab_phi, mpz_t * tab_roots_Py, int* nb_phi, const fPyphi_poly_t * ff, mpz_t p){
+bool get_f_CONJ(int* f_id, mpz_poly_t * tab_phi, mpz_t * tab_roots_Py, int* nb_phi, const fPyphi_poly_t * ff, mpz_srcptr p){
   unsigned int j=0;
   int i=0, k=0;// index of first good f in table
+  int nb_reducible_Py = 0;
+  int nb_irreducible_Py = 0;
   bool found_good_f = false;
   //const long int * Pyi = NULL;
   //const long int * phii[];
-  mpz_t y[DEG_PY]; // to store the roots y of Py mod p
-  mpz_poly_t phiy;// phi evaluated at a given y
+  mpz_t y[DEG_PY]; // to store all the Degree(Py) roots y of Py mod p
+  mpz_poly_t phiy; // phi evaluated at a given y
   mpz_poly_t Pyi_mpz_poly;// Py with mpz_t coeffs
 
   if(ff != NULL){
     // Now, find an appropriate poly f in that table.
     // start with the first one, etc because the polynomials are sorted in 
     // decreasing order of interest (decreasing order of Murphy E value)
-    i = 0;
+    i = *f_id;
+    mpz_poly_init(Pyi_mpz_poly, ff->deg_Py);
+    mpz_poly_init(phiy, ff->deg_Py);
+    for (j=0; j<ff->deg_Py; j++){
+      mpz_init(y[j]);
+    }
     while ((found_good_f != true) && (i < ff->size)){// nothing found
-      //Pyi = ((ff->tab[i]).Py); //  il faudrait plutot ecrire #define Pyi (ff->tab[i]).Py
-      //phii = (ff->tab[i]).phi; //il faudrait plutot ecrire #define phii (ff->tab[i]).phi
 
       if (! is_irreducible_mod_p_si( (ff->tab[i]).Py, ff->deg_Py, p)){ //
+	nb_reducible_Py++;
 	// Py is not irreducible i.e. if deg=2, means has roots mod p.
 	// careful:: if one day, Py will be of degree > 2, then will need here find_root(Py) instead.
 	mpz_poly_set_sli(Pyi_mpz_poly, (ff->tab[i]).Py, ff->deg_Py); // long int -> int bof
@@ -400,11 +474,12 @@ bool get_f_CONJ(int* f_id, mpz_poly_t * tab_phi, mpz_t * tab_roots_Py, int* nb_p
 	// compute the possible phi(s) foreach y and store them (good phi, good corresponding y)
 	k = 0;
 	for (j=0; j<ff->deg_Py; j++){
-	  // eval also init what is needed (?)
 	  eval_si_phi_mpz_y(phiy, (ff->tab[i]).phi, ff->deg_phi, y[j]);
-	  printf("phi[0][0] = %ld", (ff->tab[i]).phi[0][0]);
-	  printf("phi = %p", (ff->tab[i]).phi );
-
+	  // print phi
+	  printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+	  printf("phi_y = ");
+	  mpz_poly_fprintf_cado_format_line (stdout, phiy, 0, NULL);
+	  printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 	  // phiy is now a poly in one variable with large coeffs.
 	  // test if at least one phiy is irreducible
 	  // is_irreducible_mod_p(phii_j, p)
@@ -416,16 +491,27 @@ bool get_f_CONJ(int* f_id, mpz_poly_t * tab_phi, mpz_t * tab_roots_Py, int* nb_p
 	    mpz_poly_set(tab_phi[k], phiy);
 	    mpz_init_set(tab_roots_Py[k], y[j]);
 	    k++;
-	  }
-	  mpz_clear(y[j]);
-	}// loop over the roots y of Py mod p
-	mpz_poly_clear(phiy);
-	mpz_poly_clear(Pyi_mpz_poly);
+	  }// end if
+	}// end for loop over the roots y of Py mod p
       }// Py had roots mod p 
+      else{
+	nb_irreducible_Py++;
+      }
       i++;// loop over tab ff->tab of polys {f, Py, phi}
     }// either poly f found or end of ff->tab reached.
+    printf("\nend of function get_f_CONJ, nb_irreducible_Py = %d, nb_reducible_Py = %d\n", \
+	   nb_irreducible_Py, nb_reducible_Py);
+    mpz_poly_clear(Pyi_mpz_poly);
+    mpz_poly_clear(phiy);
+    for (j=0; j<ff->deg_Py; j++){
+      mpz_clear(y[j]);
+    }
   }
-  *f_id = i;
+  if (found_good_f){
+    *f_id = i-1;
+  }else{
+    *f_id = i;
+  }
   *nb_phi = k;
   return found_good_f;
 }
@@ -460,13 +546,15 @@ static bool get_g_phi_y(mpz_poly_t g[], int* nb_found,
     mat_Z M;
     mpz_t detM; // well, not needed. This will be p.
     LLL_init(&M, 2, 2);
-    mpz_set(M.coeff[0][0], p);
-    mpz_set_si(M.coeff[0][1], 0);
+    mpz_init(detM);
+    /// INDICES START AT 1, NOT AT 0.
+    mpz_set(M.coeff[1][1], p);
+    mpz_set_si(M.coeff[1][2], 0);
     
     mpz_init(sy);
     mpz_mul_ui(sy, y, skewness);
-    mpz_set(M.coeff[1][0], sy);
-    mpz_set_si(M.coeff[1][1], 1);
+    mpz_set(M.coeff[2][1], sy);
+    mpz_set_si(M.coeff[2][2], 1);
     /* [ p 0
          y 1 ] */
     mpz_t a,b;// a/b = 3/4 for LLL
@@ -477,34 +565,53 @@ static bool get_g_phi_y(mpz_poly_t g[], int* nb_found,
 
     mpz_init(u);
     mpz_init(v);
-    for (i=0; i<2;i++){
-    /* [ u0 v0
-         u1 v1 ] */
-    // g0 <- v0 * phi(y <- u0/v0)
-    // u <-> M.coeff[0][0], v <-> M.coeff[0][1]
+    printf ("\n\n");
+    printf("init u,v.");
+    gmp_fprintf (stdout, " u = %Zd, ", u);
+    gmp_fprintf (stdout, " v = %Zd, ", v);
+    for (i=1; i<=2;i++){
+      /* [ u0 v0
+           u1 v1 ] */
+      // g0 <- v0 * phi(y <- u0/v0)
+      // u <-> M.coeff[i][1], v <-> M.coeff[i][2]*sy
+      mpz_set(u, M.coeff[i][1]);
+      mpz_mul_ui(v, M.coeff[i][2], skewness); // now gcd ?
       // sy <- v
-      mpz_mul_ui(sy, M.coeff[i][1], skewness); // now gcd ?
-      gcd_uv = mpz_gcd_ui(a, M.coeff[i][0], skewness); // a <- gcd(v*s, u) = gcd(s, u) since gcd(v,u) = 1;
-      assert(gcd_uv != 0);
-      if (gcd_uv > 1){
-	mpz_tdiv_q_ui(u, M.coeff[i][0], gcd_uv);
-	mpz_tdiv_q_ui(v, sy, gcd_uv);
-      }else{
-	mpz_set(u, M.coeff[i][0]);
-	mpz_set(v, sy);
+      //mpz_mul_ui(sy, M.coeff[i][2], skewness); // now gcd ?
+      // we need v > 0
+      if (mpz_sgn(v) < 0){
+	mpz_neg(v, v);
+	mpz_neg(u, u);
       }
-      mpz_poly_init(g[i], ff->deg_phi);
-      eval_si_phi_mpz_uv(g[i], ((ff->tab)[f_id]).phi, ff->deg_phi, u, v);
+      // mpz_gcd(a, u, v); // a <- gcd(v*s, u) = gcd(s, u) since gcd(v,u) = 1;
+      // gmp_fprintf (stdout, " mpz_t gcd(u%d,v%d) = %Zd, ", i-1, i-1, a);
+      // assert(mpz_sgn(a) != 0);
+      // mpz_divexact(u, u, a);
+      // mpz_divexact(v, v, a);
+      gcd_uv = mpz_gcd_ui(a, u, skewness); // a <- gcd(v*s, u) = gcd(s, u) since gcd(v,u) = 1;
+      if (gcd_uv > 1){
+	mpz_tdiv_q_ui(u, u, gcd_uv);
+	mpz_tdiv_q_ui(v, v, gcd_uv);
+      }
+      gmp_fprintf (stdout, " u%d = %Zd, ", i-1, u);
+      gmp_fprintf (stdout, " v%d = %Zd, ", i-1, v);
+
+      mpz_poly_init(g[i-1], ff->deg_phi);
+      eval_si_phi_mpz_uv(g[i-1], ((ff->tab)[f_id]).phi, ff->deg_phi, u, v);
+      printf("g[%d] is of degree %d and  =\n", i-1, (g[i-1])->deg);
+      mpz_poly_fprintf_cado_format_line (stdout, g[i-1], i-1, NULL);
+
       // TODO: add skewness until g0 has right signature params_g->sgtr
       // will skewness change anything if g is not irreducible ?
-      gi_ok = is_irreducible_mod_p(g[i], p);
-      gi_ok = gi_ok && is_good_poly(params, params_g, g[i]);
+      //gi_ok = is_irreducible_mod_p_deg2(g[i], p);
+      gi_ok = is_good_poly_deg2(params, params_g, g[i-1]);
       if(gi_ok){
+	printf("found g.\n");
 	nb_g_found++;
       }
     }
     *nb_found = nb_g_found;
-    found = nb_g_found >0;
+    found = nb_g_found > 0;
     LLL_clear(&M);
     mpz_clear(a);
     mpz_clear(b);
@@ -535,6 +642,7 @@ bool get_g_CONJ(mpz_poly_t g[],
      
    */
   if (ff->deg_Py == 2){
+    printf("entered inside loop of get_g_CONJ.\n");
     // case where we can simply run LLL(y) -> (u,v) then evaluate phi at (u,v).
     // one pair of possible g per phi. (u0,v0), (u1,v1).
     // for each phi_y:
@@ -542,24 +650,29 @@ bool get_g_CONJ(mpz_poly_t g[],
     // v1: keep the 1st couple (g0,g1) found.
     i=0;
     nb_gi=0;
-    while ((i < nb_phi)){
+    printf("nb_phi = %d\n", nb_phi);
+    while ((i < nb_phi) && (!found_g)){
       gi_ok = get_g_phi_y(gi, &nb_found, params_g, f_id, tab_roots_Py[i], ff, params);
       if(gi_ok){
 	nb_gi=nb_gi+nb_found;
 	found_g = true;
+	printf("found a g.\n");
       }
       i++;
     }
     // now, we have a couple (g0, g1) for a given root y of Py, of index i--
     i--;
     if (nb_gi > 0){
-      mpz_poly_init(g[0], ff->deg_Py);
-      mpz_poly_set(g[0], gi[0]);
-      mpz_poly_clear(gi[0]);
+      for (i=0; (i<nb_gi) && (i< (int)params->mnfs); i++){
+	mpz_poly_init(g[i], params_g->deg);
+	mpz_poly_set(g[i], gi[i]);
+	mpz_poly_clear(gi[i]);
+      }
     }
     // search for good gi, 1 <= i <= mnfs. --> NEED A SEPARATE FUNCTION.
   }else{
     // use LLL over phi directly to get g.
+    printf("ff->deg_Py = %d but only ff->deg_Py = 2 is implmented fr the moment.\n", ff->deg_Py);
     found_g = false;// not yet implemented
   }
   return found_g;
@@ -575,22 +688,27 @@ bool get_g_CONJ(mpz_poly_t g[],
  */
 
 // , mpz_t ell, unsigned int mnfs
-int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs,
+int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int mnfs,
 		      const char* label){
   bool found_f=false, found_g=false;
   int dd_p; // log_10 (p) i.e.size of p in dd (decimal digits)
   int f_id, nb_phi;
-  unsigned int deg_f = 2*n, deg_g = 2*n;
+  int return_code=0;
+  unsigned int deg_f = 2*n, deg_g = 2*n, i=0;
   // take the largest possibility as default init for deg_f and deg_g.
   mpz_poly_t f;
-  mpz_poly_t g[2]; // oups ?  2 ???
+  //mpz_poly_t g[2]; // oups ?  2 ???
+  mpz_poly_t *g = (mpz_poly_t *) malloc(mnfs * sizeof(mpz_poly_t));
+  FATAL_ERROR_CHECK (g == NULL, "not enough memory to allocate for table of g.");
+
   const fPyphi_poly_t* ff;
   mpz_poly_t tab_phi[DEG_PY]; // the possible polys phi (i.e. phi(y, X) evaluated a differents values for y)
   mpz_t tab_roots_Py[DEG_PY]; // a tab for the roots of Py
   pp_t params;
+  ppf_t params_g = {{2, {0,1}, 0, {0,0}, 2, -1, 0}}; 
   params->n = n;
-  mpz_init_set(params->p, p);
-  mpz_init_set(params->ell, ell);
+  params->p = p;
+  params->ell = ell;
   params->mnfs = mnfs;
 
   if (n==2){
@@ -603,50 +721,64 @@ int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs,
       // look at Miscellanous Functions on Integers in GMP doc
       dd_p = mpz_sizeinbase(p, 10);
       mpz_poly_init(f, deg_f);
-      // 1. find a good f in table. If no f is found, return failed and exit 0.
-      found_f = get_f_CONJ(&f_id, tab_phi, tab_roots_Py, &nb_phi, ff, p);
-      
-
-      if (found_f){
-	ASSERT((f_id >= 0) && (f_id < (ff->size))); // ~
-	// 2. find a good g with LLL.
-	ppf_t params_g = {{2, {0,1}, 0, {0,0}, 2, -1, 0}}; 
-	//mpz_poly_init(g[0], deg_g); done into function :
-	found_g = get_g_CONJ(g, params_g, f_id, tab_roots_Py, nb_phi, ff, params);
-
-	if(found_g){
-	  char* filename = (char*)malloc(strlen(label) + 16);
-	  
-	  sprintf(filename, "p%ddd%d%s.poly", n, dd_p, label);
-	  FILE* outputpoly = fopen(filename, "w");
-	  ASSERT(outputpoly != NULL);
-	  // is there a printing function for f and g ?
-	  // dlpolyselect.c: NO, there is 
-	  // print_nonlinear_poly_info(f, g, deg_f, deg_g, 1);
-	  // but that does NOT do what I want.
-	  mpz_poly_fprintf_cado_format_line (outputpoly, f, 0, "f");
-	  fprintf_gfpn_poly_info (outputpoly, f, "f");
-
-	  mpz_poly_fprintf_cado_format_line (outputpoly, g[0], 1, "g");
-	  mpz_poly_fprintf_cado_format_line (outputpoly, g[1], 2, "g2");
-	  fclose(outputpoly);
-	}else{
-	  return 0; // g not found
-	}
-	mpz_poly_clear(g[0]);
-	mpz_poly_clear(g[1]);
-      }else{
-	return 0; // f not found.
+      for (i=0; i<mnfs;i++){
+	mpz_poly_init(g[i], ff->deg_phi);
       }
+      // 1. find a good f in table. If no f is found, return failed and exit 0.
+      // tab_roots_Py will be mpz_init() inside the get_f_CONJ function.
+      f_id = 0;
+
+      while ((f_id < ff->size) && (!(found_f && found_g))){
+	found_f = get_f_CONJ(&f_id, tab_phi, tab_roots_Py, &nb_phi, ff, p);
+	if (found_f){
+	  ASSERT((f_id >= 0) && (f_id < (ff->size))); // ~
+	  // 2. find a good g with LLL.
+	  //mpz_poly_init(g[0], deg_g); done into function :
+	  printf("f found, now find g.\n");
+	  found_g = get_g_CONJ(g, params_g, f_id, tab_roots_Py, nb_phi, ff, params);
+
+	  if(found_g){
+	    printf("\nfound g = ");
+	    for (i=0; i<mnfs;i++){
+	      mpz_poly_fprintf_cado_format_line (stdout, g[i], 0, NULL);
+	    }
+	    // set f !!!
+	    mpz_poly_set_sli(f, ff->tab[f_id].f, ff->deg_f);
+	    char* filename = (char*)malloc(strlen(label) + 16);
+	  
+	    sprintf(filename, "p%ddd%d%s.poly", n, dd_p, label);
+	    FILE* outputpoly = fopen(filename, "w");
+	    ASSERT(outputpoly != NULL);
+	    // is there a printing function for f and g ?
+	    // dlpolyselect.c: NO, there is 
+	    // print_nonlinear_poly_info(f, g, deg_f, deg_g, 1);
+	    // but that does NOT do what I want.
+	    mpz_poly_fprintf_cado_format_line (outputpoly, f, 0, "f");
+	    fprintf_gfpn_poly_info (outputpoly, f, "f");
+
+	    for(i=0;i<mnfs;i++){
+	      mpz_poly_fprintf_cado_format_line (outputpoly, g[i], i+1, "g");
+	      fprintf_gfpn_poly_info (outputpoly, g[i], "g");
+	    }
+	    fclose(outputpoly);
+	    return_code = 1;
+	  }else{ // f fonud but g not found
+	    f_id++;
+	  }	  
+	}else{ // f not found
+	  f_id++;
+	}// end if--then--else f_found
+      }// end while not (found_f && found_g)
       mpz_poly_clear(f);
+      for(i=0;i<mnfs;i++){
+	mpz_poly_clear(g[i]);
+      }
     }else{
-      return 0; // NO ff available for this n.
+      printf("\npb ff == NULL.\n"); 
+      // NO ff available for this n.
     }
-    
-  }else{
-    return 0; // n not supported (n=2 only at the moment)
-  }
-  return 0;
+  }// else n not supported (n=2 only at the moment)
+  return return_code;
 }
 
 
@@ -656,21 +788,59 @@ int gfpkdlpolyselect( unsigned int n, mpz_t p, mpz_t ell, unsigned int mnfs,
     poly<i>: f0,f1,f2,...,fd\n
     (new format decided in 2015 for DL in GF(p^n))
 */
-void
-mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly_t f, const int j, const char* label_poly)
+void mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly_t f, const int j, const char* label_poly)
 {
   if (label_poly != NULL){
     fprintf (fp, "# ");
     fputs (label_poly, fp);
     fprintf (fp, "\n");
   }
-  fprintf (fp, "poly%c:", j);
+  fprintf (fp, "poly%d:", j);
   for (int i = 0; i < f->deg; i++)
   {
-    gmp_fprintf (fp, "%d,", f->coeff[i]);
+    gmp_fprintf (fp, "%Zd,", f->coeff[i]);
   }
   //i = f->deg;
-  gmp_fprintf (fp, "%d\n", f->coeff[f->deg]);
+  if (f->deg >= 0){
+    gmp_fprintf (fp, "%Zd\n", f->coeff[f->deg]);
+  }
+}
+
+static void print_coeff_Y_phi(FILE *fp, const long int phi_coeff_y[DEG_PY], unsigned int deg_Py){
+  fprintf (fp, "(");
+  fprintf (fp, "%ld", phi_coeff_y[0]);
+  if (deg_Py >= 1){
+    fprintf (fp, " + %ld*Y", phi_coeff_y[1]);
+  }
+  for (unsigned int k=2; k < deg_Py; k++){
+    fprintf (fp, " + %ld*Y^%d", phi_coeff_y[k], k);
+  }
+  fprintf (fp, ")");
+}
+
+
+void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, unsigned int deg_Py, int j, const char *label_poly)
+{
+  if (label_poly != NULL){
+    fprintf (fp, "# ");
+    fputs (label_poly, fp);
+    fprintf (fp, "\n");
+  }
+  fprintf (fp, "poly-phi-%d:", j);
+
+  print_coeff_Y_phi(fp, phi_coeff[0], deg_Py);
+  if (deg_phi >= 1){
+    fprintf (fp, " + ");    
+    print_coeff_Y_phi(fp, phi_coeff[1], deg_Py);
+    fprintf (fp, "*X");
+  }
+  for (unsigned int i = 2; i <= deg_phi; i++)
+  {
+    fprintf (fp, " + ");    
+    print_coeff_Y_phi(fp, phi_coeff[i], deg_Py);
+    fprintf (fp, "*X^%d", i);
+  }
+  printf("\n");
 }
 
 
@@ -691,4 +861,12 @@ fprintf_gfpn_poly_info ( FILE* fp, mpz_poly_t f, const char *label_poly)
 	     "exp_E %1.2f\n",
 	     logmu, skew, alpha, logmu + alpha,
 	     logmu - 0.824 * sqrt (2.0 * exp_rot[f->deg] * log (skew)));
+}
+
+void gfpk_print_params(unsigned int n, mpz_srcptr p, mpz_srcptr ell){
+  printf("p = ");
+  gmp_printf ("%Zd\n", p);
+  printf("ell = ");
+  gmp_printf ("%Zd\n", ell);
+  printf("n = %d\n", n);
 }
