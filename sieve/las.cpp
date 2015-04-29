@@ -238,6 +238,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
  * be done once and for all.
  */
 
+static size_t
+count_roots(const std::vector<fb_general_entry> &v)
+{
+    size_t count = 0;
+    for(std::vector<fb_general_entry>::const_iterator it = v.begin();
+        it != v.end(); it++) {
+        count += it->nr_roots;
+    }
+    return count;
+}
+
 void reorder_fb(sieve_info_ptr si, int side)
 {
     /* We go through all the primes in FB part 0 and sort them into one of
@@ -245,17 +256,17 @@ void reorder_fb(sieve_info_ptr si, int side)
 
     /* alloc the 5 vectors */
     enum {POW2, POW3, TD, RS, REST};
-    fb_vector<fb_general_entry> *pieces = new fb_vector<fb_general_entry>[5];
+    std::vector<fb_general_entry> *pieces = new std::vector<fb_general_entry>[5];
 
     fb_part *small_part = si->sides[side]->fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
-    const fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
+    const std::vector<fb_general_entry> *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si->conf->bucket_thresh;
     fbprime_t costlim = si->conf->td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
-    for(fb_vector<fb_general_entry>::const_iterator it = small_entries->begin();
+    for(std::vector<fb_general_entry>::const_iterator it = small_entries->begin();
         it != small_entries->end();
         it++)
     {
@@ -263,35 +274,32 @@ void reorder_fb(sieve_info_ptr si, int side)
          * pattern-sieving is done.
          */
         if (it->p == 2 && it->q <= pattern2_size) {
-            pieces[POW2].append(*it);
+            pieces[POW2].push_back(*it);
         } else if (it->q == 3) { /* Currently only q=3 is pattern sieved */
-            pieces[POW3].append(*it);
+            pieces[POW3].push_back(*it);
         } else if (it->k != 1) {
             /* prime powers always go into "rest" */
-            pieces[REST].append(*it);
+            pieces[REST].push_back(*it);
         } else if (it->q <= plim && it->q <= costlim * it->nr_roots) {
-            pieces[TD].append(*it);
+            pieces[TD].push_back(*it);
         } else if (it->q <= plim) {
-            pieces[RS].append(*it);
+            pieces[RS].push_back(*it);
         } else {
             abort();
         }
     }
     /* Concatenate the 5 vectors into one, and store the beginning and ending
        index of each part in fb_parts_x */
-    fb_vector<fb_general_entry> *s = new fb_vector<fb_general_entry>;
+    std::vector<fb_general_entry> *s = new std::vector<fb_general_entry>;
     /* FIXME: hack to be able to access the struct fb_parts_x entries via
        an index */
     typedef int interval_t[2];
     interval_t *parts_as_array = &si->sides[side]->fb_parts_x->pow2;
     for (int i = 0; i < 5; i++) {
-        size_t nr_roots;
-        s->count_entries(NULL, &nr_roots, NULL);
-        parts_as_array[i][0] = nr_roots;
+        parts_as_array[i][0] = count_roots(*s);
         std::sort(pieces[i].begin(), pieces[i].end());
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
-        s->count_entries(NULL, &nr_roots, NULL);
-        parts_as_array[i][1] = nr_roots;
+        parts_as_array[i][1] = count_roots(*s);
     }
     delete[] pieces;
     si->sides[side]->fb_smallsieved = s;
@@ -323,41 +331,6 @@ void sieve_info_print_fb_statistics(las_info_ptr las MAYBE_UNUSED, sieve_info_pt
         }
         s->max_bucket_fill_ratio[i_part] = weight * 1.07;
     }
-
-    // How do we write updates to buckets? How much space should we allocate? With a thread-pool, how do we determine how much memory each bucket array needs?
-#if 0
-
-    const int n = las->nb_threads;
-    double bucket_fill_ratio[n];
-    size_t nr_primes[n], nr_roots[n];
-    /* Counting the bucket-sieved primes per thread. */
-    for (int i = 0; i < n; ++i) {
-        s->fb->get_part(1)->count_entries(&nr_primes[i], &nr_roots[i], &bucket_fill_ratio[i]);
-    }
-    verbose_output_print(0, 1, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
-    for(int i = 0 ; i < n ; i++)
-        verbose_output_print(0, 1, " %lu", nr_primes[i]);
-    verbose_output_print(0, 1, "\n");
-    verbose_output_print(0, 1, "# Number of bucket-sieved prime ideals in %s factor base per thread =", sidenames[side]);
-    for(int i = 0 ; i < n ; i++)
-        verbose_output_print(0, 1, " %lu", nr_roots[i]);
-    verbose_output_print(0, 1, "\n");
-    verbose_output_print(0, 1, "# Inverse sum of bucket-sieved prime ideals in %s factor base per thread =", sidenames[side]);
-    for(int i = 0 ; i < n ; i++)
-        verbose_output_print(0, 1, " %.5f", bucket_fill_ratio[i]);
-
-    double min_bucket_fill_ratio = bucket_fill_ratio[n-1]; /* Why not [0]? */
-    double max_bucket_fill_ratio = bucket_fill_ratio[0];
-    for(int i = 0 ; i < n ; i++) {
-        double r = bucket_fill_ratio[i];
-        if (r < min_bucket_fill_ratio) min_bucket_fill_ratio = r;
-        if (r > max_bucket_fill_ratio) max_bucket_fill_ratio = r;
-    }
-    verbose_output_print(0, 1, " [hit jitter %g]\n",
-            (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
-    /* enable some margin in the bucket size */
-    s->max_bucket_fill_ratio = max_bucket_fill_ratio * 1.07;
-#endif
 }
 /*}}}*/
 
@@ -529,7 +502,8 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_stack * todo)
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
 
-static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
+static void sieve_info_update (sieve_info_ptr si, int nb_threads,
+    const size_t nr_workspaces)/*{{{*/
 {
   /* essentially update the fij polynomials and J value */
   sieve_info_update_norm_data(si, nb_threads);
@@ -539,8 +513,17 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
 
   /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
+      /* The safety factor controls by how much a single slice should fill a
+         bucket array at most, i.e., with .5, a single slice should never fill
+         a bucket array more than half-way. */
+      const double safety_factor = .5;
       sieve_side_info_ptr sis = si->sides[side];
-      sis->fb->make_slices(sis->scale * LOG_SCALE);
+      double max_weight[FB_MAX_PARTS];
+      for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++) {
+        max_weight[i_part] = sis->max_bucket_fill_ratio[i_part] / nr_workspaces
+            * safety_factor;
+      }
+      sis->fb->make_slices(sis->scale * LOG_SCALE, max_weight);
   }
 
 }/*}}}*/
@@ -2573,7 +2556,7 @@ int main (int argc0, char *argv0[])/*{{{*/
        threads, so that threads have some freedom in avoiding the fullest
        bucket array. With only one thread, no balancing needs to be done,
        so we use only one bucket array. */
-    size_t nr_workspaces = las->nb_threads + (las->nb_threads > 1);
+    const size_t nr_workspaces = las->nb_threads + (las->nb_threads > 1);
     thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
 
     las_report report;
@@ -2731,7 +2714,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (si, las->nb_threads);
+        sieve_info_update (si, las->nb_threads, nr_workspaces);
         totJ += (double) si->J;
         verbose_output_print(0, 2, "# I=%u; J=%u\n", si->I, si->J);
         if (las->verbose >= 2) {
@@ -2914,6 +2897,8 @@ int main (int argc0, char *argv0[])/*{{{*/
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) nr_sq_processed);
 
+
+    print_worst_weight_errors();
 
     /*}}}*/
 

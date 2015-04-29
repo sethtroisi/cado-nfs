@@ -1,0 +1,28 @@
+#!/bin/csh
+set d=$1
+
+/bin/rm -f $d/cpu $d/rep $d/mem
+
+foreach f (/localdisk/cado-nfs/rsa704/2015*)
+   grep "Total cpu time" $f | cut -d" " -f5 | sed 's/s//g' >> $d/cpu
+   grep Total $f | grep reports | cut -d" " -f3 | sed 's/s//g' >> $d/rep
+   grep PeakMemusage $f | cut -d" " -f5 | sed 's/s//g' >> $d/mem
+end
+
+gnuplot << EOF > $d/cpu.gnuplot
+set terminal gif
+set output '$d/cpu.gif'
+plot "$d/cpu" using 1 title "cpu time (seconds)" with lp
+EOF
+
+gnuplot << EOF > $d/rep.gnuplot
+set terminal gif
+set output '$d/rep.gif'
+plot "$d/rep" using 1 title "relations found" with lp
+EOF
+
+gnuplot << EOF > $d/mem.gnuplot
+set terminal gif
+set output '$d/mem.gif'
+plot "$d/mem" using 1 title "memory used (MB)" with lp
+EOF

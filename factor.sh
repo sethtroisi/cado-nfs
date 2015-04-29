@@ -13,10 +13,9 @@
 usage() {
     cat >&2 <<EOF
 Usage: $0 <integer> [options] [arguments passed to cadofactor.py]
-    <integer>     - integer to be factored. must be at least 57 digits,
-                    and free of small prime factors [parameters are
-                    optimized only for 85 digits and above]
-options:
+    <integer>     - integer to be factored (must be at least 58 digits)
+
+Options:
     -dlp          - don't factor, solve dlp in GF(integer)
     -gfpext <integer>
                   - (with DLP) solve dlp in GF(integer^gfpext)
@@ -246,26 +245,23 @@ fi
 
 size=${#n}
 
-# Try n, n+1, n-1, n+2...
-for ((i=1; i<=4; i=i+1)) ; do
-  if $dlp ; then
+# we round to the nearest multiple of 5
+size=`expr \( \( $size + 2 \) \/ 5 \) \* 5`
+echo $size
+
+if $dlp ; then
     if [ $gfpext = "1" ]; then
       file="$paramdir/params.p$size"
     else
       file="$paramdir/params.p${gfpext}dd$size"
     fi
-  else 
+else
     file="$paramdir/params.c$size"
-  fi
-  if [ -f $file ] ; then
-    break
-  fi
-  size=`expr $size + \( 2 \* \( $i % 2 \) - 1 \) \* $i`
-done
+fi
+echo $file
 
 if [ ! -f $file ] ; then
-    echo "no parameter file found for c${#n} (last tried was $file)" >&2
-    usage
+    echo "no parameter file found for c${#n} (tried $file)" >&2
     exit 1
 fi
 

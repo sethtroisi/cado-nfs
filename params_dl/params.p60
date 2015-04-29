@@ -6,7 +6,7 @@
 # General parameters
 ###########################################################################
 
-name = p59
+name = p60
 
 ## The "dlp" flag tells the main script that we want to do dlog
 dlp = true
@@ -59,7 +59,7 @@ tasks.sieve.alambda = 1.2
 
 tasks.sieve.qmin = 200000
 tasks.sieve.qrange = 1000
-tasks.sieve.rels_wanted = 250000
+tasks.sieve.rels_wanted = 800000
 slaves.niceness = 10
 
 ###########################################################################
@@ -73,3 +73,6 @@ tasks.filter.coverNmax = 100
 
 ## uncomment to replace sm by explicit units (experimental)
 # tasks.explicit_units = true
+#
+
+tasks.reconstructlog.partial=false

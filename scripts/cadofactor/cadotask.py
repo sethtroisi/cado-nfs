@@ -1367,10 +1367,18 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.state.setdefault("wu_timedout", 0)
         self.state.setdefault("wu_failed", 0)
         assert self.get_number_outstanding_wus() >= 0
+        # start_real_time will be a float giving the number of seconds since
+        # Jan 1 1900 at the beginning of the task
+        self.state.update({"start_real_time": 0})
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_wu(self, wu, commit=True):
         """ Submit a WU and update wu_submitted counter """
+        # at beginning of the task, set "start_real_time" to the number of
+        # seconds since Jan 1 1900
+        if self.state["start_real_time"] == 0:
+           delta = datetime.datetime.now() - datetime.datetime(1900,1,1)
+           self.state.update({"start_real_time": delta.total_seconds()})
         key = "wu_submitted"
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.create(str(wu), commit=commit)
@@ -1410,14 +1418,22 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             client_cmd_file.write("# Command for work unit: %s\n%s\n" %
                                   (wuid, cmdline))
     
+    def get_eta(self):
+        delta = datetime.datetime.now() - datetime.datetime(1900,1,1)
+        seconds = delta.total_seconds() - self.state["start_real_time"]
+        remaining_time = seconds * (1.0 / self.get_achievement() - 1)
+        now = datetime.datetime.now()
+        arrival = now + datetime.timedelta(seconds=remaining_time)
+        return arrival.ctime()
+
     def verification(self, wuid, ok, *, commit):
         """ Mark a workunit as verified ok or verified with error and update
         wu_received counter """
         ok_str = "ok" if ok else "not ok"
-        self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
         key = "wu_received"
         self.state.update({key: self.state[key] + 1}, commit=False)
+        self.logger.info("Marking workunit %s as %s (%.1f%% => ETA %s)", wuid, ok_str, 100.0 * self.get_achievement(), self.get_eta())
         self.wuar.verification(wuid, ok, commit=commit)
     
     def cancel_available_wus(self):
@@ -1489,7 +1505,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         # self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
         #                   cutoff, now)
         results = self.wuar.query(eq={"status": wudb.WuStatus.ASSIGNED},
-                                      lt={"timeassigned": cutoff})
+                                  lt={"timeassigned": cutoff})
+        results += self.wuar.query(eq={"status": wudb.WuStatus.NEED_RESUBMIT})
         if not results:
             # self.logger.debug("Found no timed-out workunits")
             pass
@@ -1765,6 +1782,13 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         return not self.need_more_wus() and \
             self.get_number_outstanding_wus() == 0
     
+    def get_achievement(self):
+        return self.state["wu_received"] * self.params["adrange"] / (self.params["admax"] - self.params["admin"])
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by polyselect_ropt """
+        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
+
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
         if not identifier:
@@ -2121,6 +2145,9 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     def need_more_wus(self):
         return self.state["nr_poly_submitted"] < len(self.poly_to_submit)
     
+    def get_achievement(self):
+        return (self.state["nr_poly_submitted"] - self.params["batch"] * self.get_number_outstanding_wus()) / len(self.poly_to_submit)
+
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
         if not identifier:
@@ -2607,7 +2634,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "qmin": 0, "qrange": int, "rels_wanted": 1, "alim": int, 
+            "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int,
             "gzip": True})
 
     @property
@@ -2670,8 +2697,12 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         self.state.setdefault("rels_found", 0)
         self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
-            # TODO: Choose sensible default value
-            pass
+            # taking into account duplicates, the initial value
+            # pi(2^lpbr) + pi(2^lpba) should be good
+            nr = 2 ** self.progparams[0]["lpbr"]
+            na =  2 ** self.progparams[0]["lpba"]
+            nra = int(nr / log (nr) + na / log (na))
+            self.state["rels_wanted"] = nra
     
     def run(self):
         super().run()
@@ -2682,6 +2713,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         else:
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
 
+        self.logger.info("We want %d relations", self.state["rels_wanted"])
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
@@ -2709,6 +2741,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return True
     
+    def get_achievement(self):
+        return self.state["rels_found"] / self.state["rels_wanted"]
+
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
         if not identifier:
@@ -3244,7 +3279,8 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": False, "gzip": True})
+            {"dlp": False, "galois": False, "gzip": True, "add_ratio": 0.1,
+             "required_excess": 0.1})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3351,50 +3387,28 @@ class PurgeTask(Task):
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
+            stats = self.parse_stdout(stdout)
+            self.logger.info("After purge, %d relations with %d primes remain "
+                             "with excess %d", stats[0], stats[1], stats[3])
+            excess = stats[3]
             self.logger.info("Not enough relations")
             if not self.params["galois"]:
-                self.request_more_relations(nunique)
+                self.request_more_relations(nunique, excess)
             else:
-                self.request_more_relations(input_nrels)
+                self.request_more_relations(input_nrels, excess)
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
         return True
     
-    def request_more_relations(self, nunique):
+    def request_more_relations(self, nunique, excess):
         r"""
-        We want an excess of $e = 0.1 n_p$,
-        with $n_p$ primes among $n_r$ relations in the output file.
-        
-        We have $\Delta_r$ additional relations in the output file per
-        additional input relation, and $\Delta_p$ additional primes in
-        the output file per additional input relation.
-        
-        We need $a$ additional relations so that
-        \begin{eqnarray*}
-            n_r + a  \Delta_r - (n_p + a  \Delta_p) & = & 0.1  (n_p + a  \Delta_p) \\
-            n_r + a  \Delta_r & = & 1.1  (n_p + a  \Delta_p) \\
-            n_r - 1.1 n_p & = & 1.1 a \Delta_p - a \Delta_r \\
-            \frac{n_r - 1.1 n_p}{1.1 \Delta_p - \Delta_r} & = & a \\
-        \end{eqnarray*}
+        Given 'nunique' relations and an excess of 'excess',
+        estimate how many new (unique) relations we need.
         """
         
-        additional = nunique * 0.1
-        if "delta_r" in self.state:
-            excess = self.state["last_input_nrels"] - \
-                self.state["last_input_nprimes"]
-            n_r = self.state["last_output_nrels"]
-            n_p = self.state["last_output_nprimes"]
-            delta_r = self.state["delta_r"]
-            delta_p = self.state["delta_p"]
-            if abs(1.1 * delta_p - delta_r) > 0.01:
-                a = (n_r - 1.1 * n_p) / (1.1 * delta_p - delta_r)
-                self.logger.info("a = %f, excess = %d", a, excess)
-                # Use the negative excess among the input relations as an
-                # upper limit on the additional relations needed, to keep
-                # a small donominator from causing a huge value
-                if excess < 0 and a > -excess:
-                    a = -excess
-                if a > 10000. and a < nunique * 0.5:
-                    additional = int(a)
+        additional = nunique * self.params["add_ratio"]
+        # if the excess is negative, we need at least -excess new relations
+        if excess < 0:
+           additional = max(additional, -excess)
         # Always request at least 10k more
         additional = max(additional, 10000)
         
@@ -3471,13 +3485,8 @@ class PurgeTask(Task):
                          "relations and ended with %d relations and %d primes",
                          last_input_nrels, last_nrels, last_nprimes,
                          input_nrels, nrels, nprimes)
-        delta_r = (nrels - last_nrels) / (input_nrels - last_input_nrels)
-        delta_p = (nprimes - last_nprimes) / (input_nrels - last_input_nrels)
-        self.logger.info("Gained %f output relations and %f primes per input "
-                         "relation", delta_r, delta_p)
         update = {"last_output_nrels": nrels, "last_output_nprimes": nprimes,
-                  "last_input_nrels": input_nrels, "delta_r": delta_r,
-                  "delta_p": delta_p}
+                  "last_input_nrels": input_nrels}
         self.state.update(update)
     
     def parse_stdout(self, stdout):
@@ -3500,7 +3509,7 @@ class PurgeTask(Task):
             for key in keys:
                 # Match the key at the start of a line, or after a whitespace
                 # Note: (?:) is non-capturing group
-                match = re.search(r"(?:^|\s)%s\s*=\s*(\d+)" % key, line)
+                match = re.search(r"(?:^|\s)%s\s*=\s*([-]?\d+)" % key, line)
                 if match:
                     if key in r:
                         raise Exception("Found multiple values for %s" % key)
@@ -4464,7 +4473,7 @@ class ReconstructLogTask(Task):
             abunitsdirname = self.send_request(Request.GET_UNITS_DIRNAME)
                  
             (stdoutpath, stderrpath) = \
-                    self.make_std_paths(cadoprograms.SM.name)
+                    self.make_std_paths(cadoprograms.ReconstructLog.name)
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
@@ -4512,6 +4521,58 @@ class ReconstructLogTask(Task):
         else:
             return [ 0, 0 ]
 
+class DescentTask(Task):
+    """ Individual logarithm Task """
+    @property
+    def name(self):
+        return "descent"
+    @property
+    def title(self):
+        return "Individual logarithm"
+    @property
+    def programs(self):
+        input = {"db": Request.GET_DB_FILENAME,}
+        override = ()
+        return ((cadoprograms.Descent, override, input),)
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames,
+                {"target": int, "descent_hint": str, "init_I": int,
+                    "init_ncurves": int, "init_lpb": int,
+                    "init_lim": int, "init_mfb": int, "init_tkewness": int,
+                    "I": int, "lpb0": int, "lpb1": int, "mfb0": int,
+                    "mfb1": int, "lim0": int, "lim1": int,
+                    "execpath": str
+                    })
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        super().run()
+
+        (stdoutpath, stderrpath) = \
+                self.make_std_paths(cadoprograms.Descent.name)
+        p = cadoprograms.Descent(
+                stdout=str(stdoutpath),
+                stderr=str(stderrpath),
+                **self.merged_args[0])
+        message = self.submit_command(p, "", log_errors=True)
+        if message.get_exitcode(0) != 0:
+            raise Exception("Program failed")
+
+        stdout = message.read_stdout(0).decode("utf-8")
+        for line in stdout.splitlines():
+            match = re.match(r'log\(target\)=(\d+)', line)
+            if match:
+                self.state["logtarget"] = match.group(1)
+                break
+        return True
+
+    def get_logtarget(self):
+        return self.state["logtarget"]
+    
 class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     """ Starts HTTP server """
     @property
@@ -4912,6 +4973,7 @@ class Request(Message):
     GET_ELL = object()
     GET_NMAPS = object()
     GET_WU_RESULT = object()
+    GET_DB_FILENAME = object()
 
 class CompleteFactorization(HasState, wudb.DbAccess, 
         DoesLogging, cadoparams.UseParameters, patterns.Mediator):
@@ -4927,7 +4989,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # This isn't a Task subclass so we don't really need to define
         # paramnames, but we do it out of habit
         return {"name": str, "workdir": str, "N": int, "dlp": False,
-                "gfpext": 1, "trybadwu": False}
+                "gfpext": 1, "trybadwu": False, "target": 0}
     @property
     def title(self):
         return "Complete Factorization"
@@ -4939,7 +5001,9 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
         self.params = self.parameters.myparams(self.paramnames)
         self.db_listener = self.make_db_listener()
-        
+
+        self.state["dbfilename"] = db
+
         # Init WU BD
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
@@ -4974,6 +5038,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
+        descentpath = parampath + ['descent']
         
         ## tasks that are common to factorization and dlp
         self.fb = FactorBaseTask(mediator=self,
@@ -5043,6 +5108,11 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                                      db=db,
                                      parameters=self.parameters,
                                      path_prefix=parampath)
+            if self.params["target"]:
+                self.descent = DescentTask(mediator=self,
+                                         db=db,
+                                         parameters=self.parameters,
+                                         path_prefix=descentpath)
         else:
             ## Tasks specific to factorization
             self.merge = MergeTask(mediator=self,
@@ -5074,6 +5144,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                           self.dup1, self.dup2,
                           self.filtergalois, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
+            if self.params["target"]:
+                self.tasks = self.tasks + (self.descent,)
         else:
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
                           self.sieving, self.dup1, self.dup2, self.purge,
@@ -5131,6 +5203,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
             self.request_map[Request.GET_VIRTUAL_LOGS_FILENAME] = self.linalg.get_virtual_logs_filename
+            self.request_map[Request.GET_DB_FILENAME] = self.get_db_filename
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
             self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename
@@ -5184,10 +5257,16 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             return None
 
         if self.params["dlp"]:
-            return [ self.params["N"], self.nmbrthry.get_ell() ] + self.reconstructlog.get_log2log3()
+            ret = [ self.params["N"], self.nmbrthry.get_ell() ] + self.reconstructlog.get_log2log3()
+            if self.params["target"]:
+                ret = ret + [self.descent.get_logtarget()]
+            return ret
         else:
             return self.sqrt.get_factors()
     
+    def get_db_filename(self):
+        return self.state["dbfilename"]
+
     def start_all_clients(self):
         url = self.servertask.get_url()
         certsha1 = self.servertask.get_cert_sha1()
