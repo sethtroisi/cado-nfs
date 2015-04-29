@@ -505,7 +505,7 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
            next_slice_start - 1, vec[next_slice_start - 1].p,
            (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.),
            weight);
-    fb_slice<FB_ENTRY_TYPE> s(&vec, vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
+    fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
     slices.push_back(s);
 
     cur_slice_start = next_slice_start;
