@@ -1368,7 +1368,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.state.setdefault("wu_failed", 0)
         assert self.get_number_outstanding_wus() >= 0
         # start_real_time will be a float giving the number of seconds since
-        # Jan 1 1900 at thebeginning of the task
+        # Jan 1 1900 at the beginning of the task
         self.state.update({"start_real_time": 0})
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -3273,7 +3273,8 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": False, "gzip": True, "add_ratio": 0.1})
+            {"dlp": False, "galois": False, "gzip": True, "add_ratio": 0.1,
+             "required_excess": 0.1})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3380,50 +3381,28 @@ class PurgeTask(Task):
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
+            stats = self.parse_stdout(stdout)
+            self.logger.info("After purge, %d relations with %d primes remain "
+                             "with excess %d", stats[0], stats[1], stats[3])
+            excess = stats[3]
             self.logger.info("Not enough relations")
             if not self.params["galois"]:
-                self.request_more_relations(nunique)
+                self.request_more_relations(nunique, excess)
             else:
-                self.request_more_relations(input_nrels)
+                self.request_more_relations(input_nrels, excess)
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
         return True
     
-    def request_more_relations(self, nunique):
+    def request_more_relations(self, nunique, excess):
         r"""
-        We want an excess of $e = 0.1 n_p$,
-        with $n_p$ primes among $n_r$ relations in the output file.
-        
-        We have $\Delta_r$ additional relations in the output file per
-        additional input relation, and $\Delta_p$ additional primes in
-        the output file per additional input relation.
-        
-        We need $a$ additional relations so that
-        \begin{eqnarray*}
-            n_r + a  \Delta_r - (n_p + a  \Delta_p) & = & 0.1  (n_p + a  \Delta_p) \\
-            n_r + a  \Delta_r & = & 1.1  (n_p + a  \Delta_p) \\
-            n_r - 1.1 n_p & = & 1.1 a \Delta_p - a \Delta_r \\
-            \frac{n_r - 1.1 n_p}{1.1 \Delta_p - \Delta_r} & = & a \\
-        \end{eqnarray*}
+        Given 'nunique' relations and an excess of 'excess',
+        estimate how many new (unique) relations we need.
         """
         
         additional = nunique * self.params["add_ratio"]
-        if "delta_r" in self.state:
-            excess = self.state["last_input_nrels"] - \
-                self.state["last_input_nprimes"]
-            n_r = self.state["last_output_nrels"]
-            n_p = self.state["last_output_nprimes"]
-            delta_r = self.state["delta_r"]
-            delta_p = self.state["delta_p"]
-            if abs(1.1 * delta_p - delta_r) > 0.01:
-                a = (n_r - 1.1 * n_p) / (1.1 * delta_p - delta_r)
-                self.logger.info("a = %f, excess = %d", a, excess)
-                # Use the negative excess among the input relations as an
-                # upper limit on the additional relations needed, to keep
-                # a small donominator from causing a huge value
-                if excess < 0 and a > -excess:
-                    a = -excess
-                if a > 10000. and a < nunique * 0.5:
-                    additional = int(a)
+        # if the excess is negative, we need at least -excess new relations
+        if excess < 0:
+           additional = max(additional, -excess)
         # Always request at least 10k more
         additional = max(additional, 10000)
         
@@ -3500,13 +3479,8 @@ class PurgeTask(Task):
                          "relations and ended with %d relations and %d primes",
                          last_input_nrels, last_nrels, last_nprimes,
                          input_nrels, nrels, nprimes)
-        delta_r = (nrels - last_nrels) / (input_nrels - last_input_nrels)
-        delta_p = (nprimes - last_nprimes) / (input_nrels - last_input_nrels)
-        self.logger.info("Gained %f output relations and %f primes per input "
-                         "relation", delta_r, delta_p)
         update = {"last_output_nrels": nrels, "last_output_nprimes": nprimes,
-                  "last_input_nrels": input_nrels, "delta_r": delta_r,
-                  "delta_p": delta_p}
+                  "last_input_nrels": input_nrels}
         self.state.update(update)
     
     def parse_stdout(self, stdout):
@@ -3529,7 +3503,7 @@ class PurgeTask(Task):
             for key in keys:
                 # Match the key at the start of a line, or after a whitespace
                 # Note: (?:) is non-capturing group
-                match = re.search(r"(?:^|\s)%s\s*=\s*(\d+)" % key, line)
+                match = re.search(r"(?:^|\s)%s\s*=\s*([-]?\d+)" % key, line)
                 if match:
                     if key in r:
                         raise Exception("Found multiple values for %s" % key)
