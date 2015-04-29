@@ -348,43 +348,11 @@ struct get_nroots<fb_entry_x_roots<n> > {
 
 template <class FB_ENTRY_TYPE>
 void
-fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_slices<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
+    fbprime_t pmax, fbprime_t td_thresh) const
 {
-  if (nprimes != NULL)
-    *nprimes += this->size();
-  double w = 0.;
-  size_t nr = 0;
-  for (size_t i = 0; i < this->size(); i++) {
-#if 0
-      /* see compiler bug section above... */
-      unsigned char nr_i = (*this)[i].nr_roots;
-#else
-      /* use workaround */
-      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>((*this)[i])();
-#endif
-      nr += nr_i;
-      w += (double) nr_i / (double) (*this)[i].get_q();
-  }
-  if (nroots != NULL)
-    *nroots += nr;
-  if (weight != NULL)
-    *weight += w;
-}
-
-template <class FB_ENTRY_TYPE>
-void
-fb_vector<FB_ENTRY_TYPE>::fprint(FILE *out) const
-{
-  for (size_t i = 0; i < this->size(); i++)
-    (*this)[i].fprint(out);
-}
-
-template <class FB_ENTRY_TYPE>
-void
-fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
-{
-  for (size_t i = 0; i < this->size(); i++)
-    (*this)[i].extract_bycost(p, pmax, td_thresh);
+  for (size_t i = 0; i < vec.size(); i++)
+    vec[i].extract_bycost(p, pmax, td_thresh);
 }
 
 
@@ -428,8 +396,30 @@ fb_slice<FB_ENTRY_TYPE>::fprint(FILE *out) const
 }
 
 
-/* http://stackoverflow.com/questions/24130093/gdb-could-not-find-operator */
-template class std::vector<fb_general_entry>;
+template <class FB_ENTRY_TYPE>
+void
+fb_slices<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+{
+  if (nprimes != NULL)
+    *nprimes += vec.size();
+  double w = 0.;
+  size_t nr = 0;
+  for (size_t i = 0; i < vec.size(); i++) {
+#if 0
+      /* see compiler bug section above... */
+      unsigned char nr_i = vec[i].nr_roots;
+#else
+      /* use workaround */
+      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>(vec[i])();
+#endif
+      nr += nr_i;
+      w += (double) nr_i / (double) vec[i].get_q();
+  }
+  if (nroots != NULL)
+    *nroots += nr;
+  if (weight != NULL)
+    *weight += w;
+}
 
 /* Compute an upper bound on this slice's weight by assuming all primes in the
    slice are equal on the first (and thus smallest) one. This relies on the
@@ -531,9 +521,10 @@ fb_slices<FB_ENTRY_TYPE>::fprint(FILE *out) const
       it->fprint(out);
     }
   } else {
-    /* Otherwise we delegate to the vector */
+    /* Otherwise we print the whole vector */
     fprintf(out, "#    Not sliced\n");
-    vec.fprint(out);
+    for (size_t i = 0; i < vec.size(); i++)
+      vec[i].fprint(out);
   }
 }
 

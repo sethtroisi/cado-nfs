@@ -195,23 +195,6 @@ public:
   virtual void fprint(FILE *) const = 0;
 };
 
-template <typename FB_ENTRY_TYPE>
-class fb_vector:
-  public std::vector<FB_ENTRY_TYPE>,
-  public fb_countable_entries {
-  public:
-  fb_vector(){}
-  ~fb_vector(){}
-  /* FIXME: using size_type here does not work, why? */
-  fb_vector(size_t n) : std::vector<FB_ENTRY_TYPE>(n){}
-  void append(const FB_ENTRY_TYPE &e){this->push_back(e);};
-  void fprint(FILE *) const;
-  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  int get_nr_roots() const {return FB_ENTRY_TYPE::fixed_nr_roots;};
-  bool is_general() const {return FB_ENTRY_TYPE::is_general_type;};
-  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
-};
-
 
 class fb_transformed_vector: 
       public std::vector<plattice_sieve_entry>, private NonCopyable {
@@ -298,7 +281,7 @@ class fb_slice : public fb_slice_interface {
 
 template <class FB_ENTRY_TYPE>
 class fb_slices : public fb_slices_interface, private NonCopyable {
-  fb_vector<FB_ENTRY_TYPE> vec;
+  std::vector<FB_ENTRY_TYPE> vec;
   std::vector<fb_slice<FB_ENTRY_TYPE> > slices;
   void sort();
   double est_weight(size_t, size_t) const;
@@ -309,22 +292,19 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   ~fb_slices(){};
 
   void make_slices(double scale, double max_weight, slice_index_t &next_index);
-  fb_vector<FB_ENTRY_TYPE> *get_vector() {return &vec;}
+  std::vector<FB_ENTRY_TYPE> *get_vector() {return &vec;}
   /* Implement slices interface */
 
   /* These are just deletates to vec */
-  int get_nr_roots() const {return vec.get_nr_roots();};
-  bool is_general() const {return vec.is_general();};
-  void append(const fb_general_entry &new_entry) {vec.append(new_entry);};
-  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const
-  {
-    vec._count_entries(nprimes, nroots, weight);
-  }
+  int get_nr_roots() const {return FB_ENTRY_TYPE::fixed_nr_roots;}
+  bool is_general() const {return FB_ENTRY_TYPE::is_general_type;}
+  void append(const fb_general_entry &new_entry) {vec.push_back(new_entry);}
+  
+  
+  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   void fprint(FILE *out) const;
-  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const
-  {
-    vec.extract_bycost(extracted, pmax, td_thresh);
-  }
+  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax,
+                      fbprime_t td_thresh) const;
 
   /* Finalizing requires only sorting the vector */
   void finalize() {sort();}
@@ -434,7 +414,7 @@ public:
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   void finalize();
   bool is_only_general() const {return only_general;}
-  fb_vector<fb_general_entry> *get_general_vector(){return general_vector.get_vector();}
+  std::vector<fb_general_entry> *get_general_vector(){return general_vector.get_vector();}
   const fb_slice_interface *get_first_slice() const {
     /* Find the first non-empty slices entry and return a pointer to it,
        or return NULL if all are empty */
