@@ -1090,8 +1090,8 @@ linalg/bwc/flint-fft/ulong_extras.h
 linalg/bwc/flint-fft/transform_interface.c
 linalg/bwc/test-flint.c
 filter/filter_badideals.c
-params_dl/params.p59
-params_dl/p59.hint
+params_dl/params.p60
+params_dl/p60.hint
 params_dl/params.p2dd20
 params_dl/params.p30
 params_dl/p30.hint
