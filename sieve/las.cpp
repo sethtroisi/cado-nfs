@@ -2898,6 +2898,8 @@ int main (int argc0, char *argv0[])/*{{{*/
             (double) report->reports / (double) nr_sq_processed);
 
 
+    print_worst_weight_errors();
+
     /*}}}*/
 
     //{{{ print the stats of the cofactorization.

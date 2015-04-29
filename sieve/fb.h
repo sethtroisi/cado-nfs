@@ -284,6 +284,12 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
   std::vector<FB_ENTRY_TYPE> vec;
   std::vector<fb_slice<FB_ENTRY_TYPE> > slices;
   void sort();
+  double est_weight_max(size_t, size_t) const;
+  double est_weight_avg(size_t, size_t) const;
+  double est_weight_simpson(size_t, size_t) const;
+  double est_weight_mertens(size_t, size_t) const;
+  double est_weight_sum(size_t, size_t) const;
+  double est_weight_compare(size_t, size_t) const;
   double est_weight(size_t, size_t) const;
  public:
   static const size_t max_slice_len = 65536;
@@ -494,5 +500,6 @@ class fb_factorbase: public fb_interface, private NonCopyable {
 unsigned char	fb_log (double, double, double);
 fbprime_t       fb_pow (fbprime_t, unsigned long);
 fbprime_t       fb_is_power (fbprime_t, unsigned long *);
+void print_worst_weight_errors();
 
 #endif
