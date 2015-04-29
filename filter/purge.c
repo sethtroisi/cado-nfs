@@ -718,6 +718,16 @@ remove_all_singletons(uint64_t * nrels, uint64_t * nprimes, int64_t * excess)
     } while (oldnrels != *nrels);
 }
 
+static void
+print_final_values (uint64_t nrels, uint64_t nprimes, double weight)
+{
+  fprintf (stdout, "Final values:\nnrels=%" PRIu64 " nprimes=%" PRIu64 " "
+           "excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
+           nrels, nprimes, ((int64_t) nrels) - nprimes, weight,
+           weight * (double) nrels);
+  fflush (stdout);
+}
+
 static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 {
     uint64_t oldnrels = 0;
@@ -728,15 +738,17 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
     remove_all_singletons(nrels, nprimes, &excess);
 
     if (excess <= 0) {		/* covers case nrel = nprimes = 0 */
-	fprintf(stdout, "number of relations <= number of ideals\n");
+	fprintf (stdout, "number of relations <= number of ideals\n");
+        print_final_values (nrels[0], nprimes[0], 0);
 	exit(2);
     }
 
     if ((double) excess < required_excess * ((double) *nprimes)) {
-	fprintf(stdout,
-		"(excess / nprimes) = %.2f < %.2f. See -required_excess "
-		"argument.\n", ((double) excess / (double) *nprimes),
-		required_excess);
+	fprintf (stdout,
+                 "(excess / nprimes) = %.2f < %.2f. See -required_excess "
+                 "argument.\n", ((double) excess / (double) *nprimes),
+                 required_excess);
+        print_final_values (nrels[0], nprimes[0], 0);
 	exit(2);
     }
 
@@ -1189,11 +1201,7 @@ int main(int argc, char **argv)
 
     /* write final values to stdout */
     /* This output, incl. "Final values:", is required by the script */
-    fprintf(stdout, "Final values:\nnrels=%" PRIu64 " nprimes=%" PRIu64 " "
-            "excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
-            nrels, nprimes, ((int64_t) nrels) - nprimes, pd->info.W,
-            pd->info.W * (double) nrels);
-    fflush(stdout);
+    print_final_values (nrels, nprimes, pd->info.W);
 
     /* Free allocated stuff */
     if (ideals_weight != NULL)

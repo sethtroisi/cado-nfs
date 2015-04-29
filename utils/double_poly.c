@@ -59,6 +59,60 @@ double_poly_eval (double_poly_srcptr p, const double x)
   }
 }
 
+/* return e and set r such that r*2^e = x */
+static long
+mpz_set_d_exp (mpz_t r, double x)
+{
+  long e = 0;
+
+  if (x != 0.0)
+    {
+      e = ilogb (x) - 52;
+      mpz_set_d (r, ldexp (x, -e));
+    }
+  return e;
+}
+
+/* Same as double_poly_eval, but uses arbitrary precision to avoid
+   cancellations */
+double
+double_poly_eval_safe (double_poly_srcptr p, const double x)
+{
+  mpz_t xm, vm, fm;
+  long xe, ve, fe;
+  const double *f = p->coeff;
+  const unsigned int d = p->deg;
+  unsigned int k;
+  double r;
+
+  mpz_init (xm);
+  mpz_init (vm);
+  mpz_init (fm);
+  xe = mpz_set_d_exp (xm, x);
+  ve = mpz_set_d_exp (vm, f[d]);
+  for (k = d - 1; k != UINT_MAX; k--)
+    {
+      /* multiply by x = xm*2^xe */
+      mpz_mul (vm, vm, xm);
+      ve += xe;
+      /* add f[k] = fm*2^fe */
+      fe = mpz_set_d_exp (fm, f[k]);
+      if (fe < ve)
+        {
+          mpz_mul_2exp (vm, vm, ve - fe);
+          ve = fe;
+        }
+      else
+        mpz_mul_2exp (fm, fm, fe - ve);
+      mpz_add (vm, vm, fm);
+    }
+  r = mpz_get_d (vm);
+  mpz_clear (xm);
+  mpz_clear (vm);
+  mpz_clear (fm);
+  return ldexp (r, ve);
+}
+
 /* assuming g(a)*g(b) < 0, and g has a single root in [a, b],
    refines that root by dichotomy with n iterations.
    Assumes sa is of same sign as g(a).

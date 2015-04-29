@@ -214,6 +214,7 @@ tasks.I = 11		# Sieving range in lattice siever
     # of Murphy's E value) thus we define it at the "tasks" level, not at the
     # "tasks.sieve" level.
 
+
 tasks.sieve.ratq = 0
     # The ratq parameter specifies whether or not the special-q is to be
     # taken on the rational side (ratq=1) or on the algebraic side
@@ -231,13 +232,6 @@ tasks.sieve.qrange = 10000		# The size of an elementary sieving task
     # assigned as a workunit to a client. This parameter controls the size of
     # individual tasks.
 
-tasks.sieve.rels_wanted = 1660000		# Start of filtering tries
-    # We only try to do filtering (and thus check if we have enough relations)
-    # once we have accumulated <rels_wanted> relations (including duplicates).
-    # A rule of thumb is to use 1.6*N/log(N) if N=2^n when lpba=lpbr=n, or
-    # 0.8*2^lpba/log(2^lpba) + 0.8*2^lpbrlog(2^lpbr) when lpba <> lpbr.
-    # Make sure to update <rels_wanted> whenever you update lpba or lpbr.
-
 tasks.sieve.threads = 2
     # The lattice siever program las may run in a multithreaded manner.
     # This keeps the amount of memory used constant, and just runs
@@ -249,6 +243,10 @@ tasks.sieve.threads = 2
 
 tasks.filter.purge.keep = 160		# maximal excess wanted after purge
 					# (purge shrinks if needed)
+tasks.filter.purge.add_ratio = 0.1
+    # Number of additional required relations before next filtering step
+    # expressed as a ratio of the number of unique relations already collected
+    # Default value is 0.1 (i.e. number of additional relation is equal to 10% of number of unique relations)
 tasks.filter.maxlevel = 15		# perform up to <maxlevel>-way merges
 tasks.filter.ratio = 1.1		# used only when forbw=0 (see below)
 tasks.filter.merge.forbw = 3 # forbw=0: stops the merge when the weight of the

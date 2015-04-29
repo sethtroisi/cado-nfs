@@ -156,8 +156,8 @@ If you encounter "Database corrupted" or similar errors, try if storing the
 working directory on a local (not network-mounted) file system resolves the
 problem.
 
-Controlling the excess
-======================
+Controlling the filtering stage
+===============================
 
 By default CADO-NFS requires an excess (after the first singleton removal)
 of 10% more relations than ideals. This is controlled by:
@@ -177,6 +177,14 @@ Note: if your factorization already started the linear algebra step, and you
 want to do more sieving, you can restart it with a larger "rels_wanted" than
 the current number of relations. For example if you have say 1000000 relations
 (grep "is now" in the log file), just add in the cadofactor.py line:
+
+If not enough relations are collected after the filtering step, the sieve is executed again with an additional number of wanted relations.
+The parameter tasks.filter.purge.add_ratio controls the number of additional required relations as a ratio of the number of unique relations already collected:
+
+tasks.filter.purge.add_ratio=0.05
+
+specifies that you want 5% more relations before next filtering step.
+The default value is 0.1 (i.e. 10%).
 
 tasks.sieve.rels_wanted=1000001
 
