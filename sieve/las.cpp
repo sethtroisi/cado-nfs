@@ -238,6 +238,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
  * be done once and for all.
  */
 
+static size_t
+count_roots(const std::vector<fb_general_entry> &v)
+{
+    size_t count = 0;
+    for(std::vector<fb_general_entry>::const_iterator it = v.begin();
+        it != v.end(); it++) {
+        count += it->nr_roots;
+    }
+    return count;
+}
+
 void reorder_fb(sieve_info_ptr si, int side)
 {
     /* We go through all the primes in FB part 0 and sort them into one of
@@ -245,17 +256,17 @@ void reorder_fb(sieve_info_ptr si, int side)
 
     /* alloc the 5 vectors */
     enum {POW2, POW3, TD, RS, REST};
-    fb_vector<fb_general_entry> *pieces = new fb_vector<fb_general_entry>[5];
+    std::vector<fb_general_entry> *pieces = new std::vector<fb_general_entry>[5];
 
     fb_part *small_part = si->sides[side]->fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
-    const fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
+    const std::vector<fb_general_entry> *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si->conf->bucket_thresh;
     fbprime_t costlim = si->conf->td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
-    for(fb_vector<fb_general_entry>::const_iterator it = small_entries->begin();
+    for(std::vector<fb_general_entry>::const_iterator it = small_entries->begin();
         it != small_entries->end();
         it++)
     {
@@ -263,35 +274,32 @@ void reorder_fb(sieve_info_ptr si, int side)
          * pattern-sieving is done.
          */
         if (it->p == 2 && it->q <= pattern2_size) {
-            pieces[POW2].append(*it);
+            pieces[POW2].push_back(*it);
         } else if (it->q == 3) { /* Currently only q=3 is pattern sieved */
-            pieces[POW3].append(*it);
+            pieces[POW3].push_back(*it);
         } else if (it->k != 1) {
             /* prime powers always go into "rest" */
-            pieces[REST].append(*it);
+            pieces[REST].push_back(*it);
         } else if (it->q <= plim && it->q <= costlim * it->nr_roots) {
-            pieces[TD].append(*it);
+            pieces[TD].push_back(*it);
         } else if (it->q <= plim) {
-            pieces[RS].append(*it);
+            pieces[RS].push_back(*it);
         } else {
             abort();
         }
     }
     /* Concatenate the 5 vectors into one, and store the beginning and ending
        index of each part in fb_parts_x */
-    fb_vector<fb_general_entry> *s = new fb_vector<fb_general_entry>;
+    std::vector<fb_general_entry> *s = new std::vector<fb_general_entry>;
     /* FIXME: hack to be able to access the struct fb_parts_x entries via
        an index */
     typedef int interval_t[2];
     interval_t *parts_as_array = &si->sides[side]->fb_parts_x->pow2;
     for (int i = 0; i < 5; i++) {
-        size_t nr_roots;
-        s->count_entries(NULL, &nr_roots, NULL);
-        parts_as_array[i][0] = nr_roots;
+        parts_as_array[i][0] = count_roots(*s);
         std::sort(pieces[i].begin(), pieces[i].end());
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
-        s->count_entries(NULL, &nr_roots, NULL);
-        parts_as_array[i][1] = nr_roots;
+        parts_as_array[i][1] = count_roots(*s);
     }
     delete[] pieces;
     si->sides[side]->fb_smallsieved = s;
