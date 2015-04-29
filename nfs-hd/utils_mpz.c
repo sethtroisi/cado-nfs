@@ -87,8 +87,8 @@ static void factorize(factor_ptr factor, mpz_t z, unsigned int * number)
   mpz_clear(res);
 }
 
-static void brute_force_factorize(factor_ptr factor, mpz_srcptr z_root,
-    unsigned int * number)
+static unsigned char brute_force_factorize(factor_ptr factor,
+    unsigned int * number, mpz_srcptr z_root, mpz_srcptr bound)
 {
   mpz_t z;
   mpz_init(z);
@@ -96,7 +96,7 @@ static void brute_force_factorize(factor_ptr factor, mpz_srcptr z_root,
   mpz_t prime;
   mpz_init(prime);
   mpz_set_ui(prime, 1);
-  while(mpz_cmp_ui(z, 1) != 0) {
+  while(mpz_cmp_ui(z, 1) != 0 && mpz_cmp(prime, bound) <= 0) {
     mpz_nextprime(prime, prime);
     mpz_t q;
     mpz_init(q);
@@ -112,8 +112,14 @@ static void brute_force_factorize(factor_ptr factor, mpz_srcptr z_root,
     mpz_clear(q);
     mpz_clear(r);
   }
+
+  unsigned char factorise = 0;
+  if (mpz_cmp_ui(z, 1) == 0) {
+    factorise = 1;
+  }
   mpz_clear(prime);
   mpz_clear(z);
+  return factorise;
 }
 
 static int compare(const void * p1, const void * p2)
@@ -136,7 +142,7 @@ unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
     mpz_set(factor->factorization[nb], z);
     nb = 1;
   } else {
-    brute_force_factorize(factor, z, &nb);
+    brute_force_factorize(factor, &nb, z, z);
   }
   factor_realloc(factor, nb);
   sort_factor(factor);
@@ -165,7 +171,16 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_t z)
     mpz_set(factor->factorization[nb], z);
     nb = 1;
   } else {
-    factorize(factor, z, &nb);
+    mpz_t bound;
+    mpz_init(bound);
+    mpz_set_ui(bound, 1048576);
+    unsigned char run = brute_force_factorize(factor, &nb, z, bound);
+    if (!run) {
+      ASSERT(run == 0);
+
+      factorize(factor, z, &nb);
+    }
+    mpz_clear(bound);
   }
   factor_realloc(factor, nb);
   sort_factor(factor);
