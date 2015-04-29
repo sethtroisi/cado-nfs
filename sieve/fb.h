@@ -50,10 +50,8 @@ struct fb_general_root {
      added to the root if the root is projective */
   fb_general_root (const unsigned long long old_r, const fbprime_t q,
                    const unsigned char nexp=1, const unsigned char oldexp=0) :
-                   exp(nexp), oldexp(oldexp) {
-    proj = (old_r >= q);
-    r = proj ? (old_r - q) : old_r;
-  }
+                   r((old_r >= q) ? (old_r - q) : old_r),
+                   proj(old_r >= q), exp(nexp), oldexp(oldexp) {}
 
   /* A root is simple if it is not projective and the exp goes from 0 to 1 */
   bool is_simple() const {return exp == 1 && oldexp == 0 && !proj;}
@@ -102,13 +100,13 @@ public:
   template <int Nr_roots>
   fb_general_entry (const fb_entry_x_roots<Nr_roots> &e);
   fbprime_t get_q() const {return q;}
+  fbroot_t get_r(const size_t i) const {return roots[i].r;};
+  fbroot_t get_proj(const size_t i) const {return roots[i].proj;};
   void parse_line (const char *line, unsigned long linenr);
   void merge (const fb_general_entry &);
   void fprint(FILE *out) const;
   bool is_simple() const;
   void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
-  fbroot_t get_r(const size_t i) const {return roots[i].r;};
-  fbroot_t get_proj(const size_t i) const {return roots[i].proj;};
   double weight() const {return 1./p * nr_roots;}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
     if (k == 1 && p <= pmax && p <= nr_roots * td_thresh) {
@@ -127,12 +125,12 @@ public:
   fbprime_t p;
   fbroot_t roots[Nr_roots];
   bool proj[Nr_roots];
-  fbprime_t get_q() const {return p;}
   static const unsigned char k = 1, nr_roots = Nr_roots;
   /* Static class members to allow fb_vector<> to distinguish between and
      operate on both kind of entries */
   static const bool is_general_type = false;
   static const unsigned char fixed_nr_roots = Nr_roots;
+  fbprime_t get_q() const {return p;}
   fbroot_t get_r(const size_t i) const {return roots[i];};
   fbroot_t get_proj(const size_t i) const {return proj[i];};
 };
@@ -156,10 +154,13 @@ public:
   /* Allow assignment-construction from general entries */
   fb_entry_x_roots(const fb_general_entry &e) : p(e.p), invq(e.invq) {
     ASSERT_ALWAYS(Nr_roots == e.nr_roots);
+    ASSERT(e.is_simple());
     for (int i = 0; i < Nr_roots; i++)
       roots[i] = e.roots[i].r;
   }
   fbprime_t get_q() const {return p;}
+  fbroot_t get_r(const size_t i) const {return roots[i];};
+  fbroot_t get_proj(const size_t i) const {return false;};
   double weight() const {return 1./p * Nr_roots;}
   /* Allow sorting by p */
   bool operator<(const fb_entry_x_roots<Nr_roots> &other) const {return this->p < other.p;}
@@ -203,7 +204,6 @@ class fb_vector:
   ~fb_vector(){}
   /* FIXME: using size_type here does not work, why? */
   fb_vector(size_t n) : std::vector<FB_ENTRY_TYPE>(n){}
-  // void append(const fb_general_entry &e){this->push_back(e);};
   void append(const FB_ENTRY_TYPE &e){this->push_back(e);};
   void fprint(FILE *) const;
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
