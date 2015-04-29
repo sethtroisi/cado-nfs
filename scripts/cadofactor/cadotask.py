@@ -2634,7 +2634,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "qmin": 0, "qrange": int, "rels_wanted": 1, "alim": int, 
+            "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int,
             "gzip": True})
 
     @property
@@ -2697,8 +2697,12 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         self.state.setdefault("rels_found", 0)
         self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
-            # TODO: Choose sensible default value
-            pass
+            # taking into account duplicates, the initial value
+            # pi(2^lpbr) + pi(2^lpba) should be good
+            nr = 2 ** self.progparams[0]["lpbr"]
+            na =  2 ** self.progparams[0]["lpba"]
+            nra = int(nr / log (nr) + na / log (na))
+            self.state["rels_wanted"] = nra
     
     def run(self):
         super().run()
@@ -2709,6 +2713,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         else:
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
 
+        self.logger.info("We want %d relations", self.state["rels_wanted"])
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
