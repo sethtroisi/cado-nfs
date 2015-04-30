@@ -348,43 +348,11 @@ struct get_nroots<fb_entry_x_roots<n> > {
 
 template <class FB_ENTRY_TYPE>
 void
-fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_slices<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
+    fbprime_t pmax, fbprime_t td_thresh) const
 {
-  if (nprimes != NULL)
-    *nprimes += this->size();
-  double w = 0.;
-  size_t nr = 0;
-  for (size_t i = 0; i < this->size(); i++) {
-#if 0
-      /* see compiler bug section above... */
-      unsigned char nr_i = (*this)[i].nr_roots;
-#else
-      /* use workaround */
-      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>((*this)[i])();
-#endif
-      nr += nr_i;
-      w += (double) nr_i / (double) (*this)[i].get_q();
-  }
-  if (nroots != NULL)
-    *nroots += nr;
-  if (weight != NULL)
-    *weight += w;
-}
-
-template <class FB_ENTRY_TYPE>
-void
-fb_vector<FB_ENTRY_TYPE>::fprint(FILE *out) const
-{
-  for (size_t i = 0; i < this->size(); i++)
-    (*this)[i].fprint(out);
-}
-
-template <class FB_ENTRY_TYPE>
-void
-fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
-{
-  for (size_t i = 0; i < this->size(); i++)
-    (*this)[i].extract_bycost(p, pmax, td_thresh);
+  for (size_t i = 0; i < vec.size(); i++)
+    vec[i].extract_bycost(p, pmax, td_thresh);
 }
 
 
@@ -428,17 +396,149 @@ fb_slice<FB_ENTRY_TYPE>::fprint(FILE *out) const
 }
 
 
-/* http://stackoverflow.com/questions/24130093/gdb-could-not-find-operator */
-template class std::vector<fb_general_entry>;
+template <class FB_ENTRY_TYPE>
+void
+fb_slices<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+{
+  if (nprimes != NULL)
+    *nprimes += vec.size();
+  double w = 0.;
+  size_t nr = 0;
+  for (size_t i = 0; i < vec.size(); i++) {
+#if 0
+      /* see compiler bug section above... */
+      unsigned char nr_i = vec[i].nr_roots;
+#else
+      /* use workaround */
+      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>(vec[i])();
+#endif
+      nr += nr_i;
+      w += (double) nr_i / (double) vec[i].get_q();
+  }
+  if (nroots != NULL)
+    *nroots += nr;
+  if (weight != NULL)
+    *weight += w;
+}
 
 /* Compute an upper bound on this slice's weight by assuming all primes in the
    slice are equal on the first (and thus smallest) one. This relies on the
    vector being sorted. */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
+fb_slices<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) const
 {
   return vec[start].weight() * (end - start);
+}
+
+/* Estimate weight by the average of the weight of the two endpoints, i.e.,
+   by trapezoidal rule. */
+template <class FB_ENTRY_TYPE>
+double
+fb_slices<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) const
+{
+  return (vec[start].weight() + vec[end-1].weight()) / 2. * (end - start);
+}
+
+/* Estimate weight by Simpson's rule on the weight of the two endpoints and
+   of the midpoint */
+template <class FB_ENTRY_TYPE>
+double
+fb_slices<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t end) const
+{
+  const size_t midpoint = start + (end - start) / 2;
+  return (vec[start].weight() + 4.*vec[midpoint].weight() + vec[end-1].weight()) / 6. * (end - start);
+}
+
+/* Estimate weight by using Merten's rule on the primes at the two endpoints */
+template <class FB_ENTRY_TYPE>
+double
+fb_slices<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t end) const
+{
+  return log(log(vec[end-1].get_q())) - log(log(vec[start].get_q()));
+}
+
+/* Compute weight exactly with a sum over all entries */
+template <class FB_ENTRY_TYPE>
+double
+fb_slices<FB_ENTRY_TYPE>::est_weight_sum(const size_t start, const size_t end) const
+{
+  double sum = 0.;
+  for (size_t i = start; i < end; i++)
+    sum += vec[i].weight();
+  return sum;
+}
+
+class wurst {
+  double worst_err, worst_est, worst_val, mse;
+  unsigned long nr;
+public:
+  wurst() : worst_err(0.), worst_est(0.), worst_val(0.), mse(0.), nr(0){}
+  void update(const double est, const double val) {
+    const double err = est / val - 1.;
+    mse += err * err;
+    nr++;
+    if (fabs(err) > fabs(worst_err)) {
+      worst_err = err;
+      worst_est = est;
+      worst_val = val;
+    }
+    verbose_output_print(0, 4, "%0.3g (%.3g)", val, err);
+  }
+  void print() {
+    if (nr > 0)
+      verbose_output_print(0, 4, "%0.3g vs. %0.3g (rel err. %.3g, MSE: %.3g)",
+                           worst_est, worst_val, worst_err, mse / nr);
+  }
+};
+
+static wurst worst_max, worst_avg, worst_simpson, worst_mertens;
+
+void print_worst_weight_errors()
+{
+    verbose_output_start_batch();
+    verbose_output_print(0, 4, "# Worst weight errors: max = ");
+    worst_max.print();
+    verbose_output_print(0, 4, ", avg = ");
+    worst_avg.print();
+    verbose_output_print(0, 4, ", simpson = ");
+    worst_simpson.print();
+    verbose_output_print(0, 4, ", mertens = ");
+    worst_mertens.print();
+    verbose_output_print(0, 4, "\n");
+    verbose_output_end_batch();
+}
+
+template <class FB_ENTRY_TYPE>
+double
+fb_slices<FB_ENTRY_TYPE>::est_weight_compare(const size_t start, const size_t end) const
+{
+  const double _max = est_weight_max(start, end),
+               avg = est_weight_avg(start, end),
+               simpson = est_weight_simpson(start, end),
+               mertens = est_weight_mertens(start, end),
+               _sum = est_weight_sum(start, end);
+  verbose_output_start_batch();
+  verbose_output_print(0, 4, "# Slice [%zu, %zu] weight: max = ", start, end);
+  worst_max.update(_max, _sum);
+  verbose_output_print(0, 4, ", avg = ");
+  worst_avg.update(avg, _sum);
+  verbose_output_print(0, 4, ", simpson = ");
+  worst_simpson.update(simpson, _sum);
+  verbose_output_print(0, 4, ", mertens = ");
+  worst_mertens.update(mertens, _sum);
+  verbose_output_print(0, 4, ", sum = %0.3g\n", _sum);
+  verbose_output_end_batch();
+  return _sum;
+}
+
+template <class FB_ENTRY_TYPE>
+double
+fb_slices<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
+{
+  if (verbose_output_get(0, 4, 0) != NULL)
+    return est_weight_compare(start, end);
+  return est_weight_max(start, end);
 }
 
 /* For general vectors, we compute the weight the hard way, via a sum over
@@ -447,10 +547,7 @@ template <>
 double
 fb_slices<fb_general_entry>::est_weight(const size_t start, const size_t end) const
 {
-  double sum = 0.;
-  for (size_t i = start; i < end; i++)
-    sum += vec[i].weight();
-  return sum;
+  return est_weight_sum(start, end);
 }
 
 template <class FB_ENTRY_TYPE>
@@ -505,7 +602,7 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
            next_slice_start - 1, vec[next_slice_start - 1].p,
            (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.),
            weight);
-    fb_slice<FB_ENTRY_TYPE> s(&vec, vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
+    fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
     slices.push_back(s);
 
     cur_slice_start = next_slice_start;
@@ -531,9 +628,10 @@ fb_slices<FB_ENTRY_TYPE>::fprint(FILE *out) const
       it->fprint(out);
     }
   } else {
-    /* Otherwise we delegate to the vector */
+    /* Otherwise we print the whole vector */
     fprintf(out, "#    Not sliced\n");
-    vec.fprint(out);
+    for (size_t i = 0; i < vec.size(); i++)
+      vec[i].fprint(out);
   }
 }
 

@@ -40,7 +40,6 @@ tasks.sieve.ncurves1 = 23
 tasks.I = 14
 
 tasks.sieve.qrange = 10000
-tasks.sieve.rels_wanted = 53000000
 
 ###########################################################################
 # Filtering

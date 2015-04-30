@@ -232,13 +232,6 @@ tasks.sieve.qrange = 10000		# The size of an elementary sieving task
     # assigned as a workunit to a client. This parameter controls the size of
     # individual tasks.
 
-tasks.sieve.rels_wanted = 1660000		# Start of filtering tries
-    # We only try to do filtering (and thus check if we have enough relations)
-    # once we have accumulated <rels_wanted> relations (including duplicates).
-    # A rule of thumb is to use 1.6*N/log(N) if N=2^n when lpba=lpbr=n, or
-    # 0.8*2^lpba/log(2^lpba) + 0.8*2^lpbrlog(2^lpbr) when lpba <> lpbr.
-    # Make sure to update <rels_wanted> whenever you update lpba or lpbr.
-
 tasks.sieve.threads = 2
     # The lattice siever program las may run in a multithreaded manner.
     # This keeps the amount of memory used constant, and just runs

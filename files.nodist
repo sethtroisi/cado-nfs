@@ -134,6 +134,8 @@ ffs/archives/test.mag
 ffs/test.mag
 scripts/cadofactor/README.OAR
 scripts/plot_params.sh
+scripts/make_graphs
+scripts/rsa704.test
 linalg/bwc/update-flint.sh
 linalg/bwc/parse-flint-fft-doc.pl
 linalg/bwc/creating-sm-example.m

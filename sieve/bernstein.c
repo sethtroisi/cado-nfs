@@ -218,7 +218,7 @@ main ()
 {
   FILE *cofac_r, *cofac_a;
   mpz_t *R, *A, P;
-  unsigned long n = 479233; /* number of cofactors */
+  unsigned long n = 479233; /* number of cofactors, UPDATE */
   unsigned long i;
   size_t ret;
   double s;

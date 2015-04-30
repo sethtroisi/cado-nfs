@@ -61,7 +61,6 @@ tasks.I = 15
 # Sam Wagstaff did sieve special-q's < 1660M
 tasks.sieve.qrange = 20000
 # of that many relations found.
-tasks.sieve.rels_wanted = 1
 
 ###########################################################################
 ###########################################################################
