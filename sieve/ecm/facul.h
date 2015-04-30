@@ -32,7 +32,11 @@
  * strategies. For the descent, we do have an interest in raising this
  * number somewhat.
  */
+#ifdef DLP_DESCENT
 #define NB_MAX_METHODS 600
+#else
+#define NB_MAX_METHODS 200
+#endif
 
 typedef struct {
   long method; /* Which method to use (P-1, P+1 or ECM) */
