@@ -40,6 +40,6 @@ set (POL_SRC polyselect-hd.c functions.c parameters.c sieving_bound.c
 
 add_executable(polyselect-hd ${POL_SRC})
 
-target_link_libraries(polyselect-hd utils polyselect_common)
+target_link_libraries(polyselect-hd utils polyselect_common ${ECM_LIB})
 
 #set_property(TARGET polyselect-hd PROPERTY COMPILE_DEFINITIONS EEA_BOUND)

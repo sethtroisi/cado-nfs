@@ -3,9 +3,12 @@
 #include <inttypes.h>
 #include <math.h>
 #include <time.h>
+#include <float.h>
 #include "cado.h"
 #include "utils.h"
 #include "functions.h"
+#include "utils_mpz.h"
+#include "polyselect/auxiliary.h"
 
 MAYBE_UNUSED static void extended_euclidean_algorithm(mpz_ptr r0, mpz_ptr t0,
     mpz_srcptr f, mpz_srcptr g)
@@ -186,23 +189,26 @@ static void extended_euclidean_algorithm_stop_2(mpz_ptr r2, mpz_ptr t2,
 }
 #endif
 
-static double find_epsilon(mpz_srcptr q, mpz_srcptr p, unsigned int t)
+static double find_epsilon(unsigned int q, mpz_srcptr p, unsigned int t)
 {
-  double q_d = mpz_get_d(q);
+  double q_d = pow(2.0, (double)q);
   double p_d = mpz_get_d(p);
   return log(q_d) / (2 * (double)(t - 1) * log(p_d));
 }
 
-static void random_mpz_poly(mpz_poly_ptr g, int coeff0, int coeff1, int degree)
+static void random_mpz_poly(mpz_poly_ptr g, int coeff0, int coeff1, int degree,
+    int lc)
 {
-  for (int i = 0; i <= degree; i++) {
+  for (int i = 0; i < degree; i++) {
     mpz_poly_setcoeff_si(g, i, rand() % (coeff1 - coeff0) + coeff0);
   }
+  mpz_poly_setcoeff_si(g, degree, lc);
 }
 
-void gen_poly_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
+static void gen_poly_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
     mpz_ptr a, mpz_ptr b, mpz_ptr c, mpz_srcptr p, mpz_poly_srcptr h,
-    int coeff0, int coeff1, mpz_srcptr q, unsigned int t)
+    int coeff0, int coeff1, unsigned int q, unsigned int t,
+    unsigned int nb_times, double weight_0, double weight_1)
 {
   ASSERT(g->alloc > 0);
   srand(time(NULL));
@@ -210,48 +216,80 @@ void gen_poly_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
   double epsilon = find_epsilon(q, p, t);
   mpz_set_d(c, pow(mpz_get_d(p), 0.5 - epsilon) + 1);
 
+  int lc = coeff0;
+  mpz_t smooth;
+  mpz_init(smooth);
   mpz_t coeff;
   mpz_init(coeff);
-  factor_t factor;
   for (int i = coeff0; i < coeff1; i++) {
+    factor_t factor;
     mpz_mul(coeff, c, h->coeff[h->deg]);
     if (i < 0) {
-      mpz_add_ui(coeff, coeff, (unsigned int)(-i));
+      mpz_sub_ui(coeff, coeff, (unsigned int)(-i));
     } else if (i > 0) {
       mpz_add_ui(coeff, coeff, (unsigned int)(i));
     }
+    mpz_abs(coeff, coeff);
     gmp_brute_force_factorize(factor, coeff);
-    factor_fprintf(stdout, factor);
+    if (mpz_cmp_ui(smooth, 0) == 0) {
+      mpz_set(smooth, factor->factorization[factor->number - 1]);
+      lc = i;
+    } else if (mpz_cmp(smooth, factor->factorization[factor->number - 1]) > 0) {
+      mpz_set(smooth, factor->factorization[factor->number - 1]);
+      lc = i;
+    } 
+    factor_clear(factor);
   }
+  mpz_clear(smooth);
   mpz_clear(coeff);
 
-  while (1) {
-    random_mpz_poly(g, coeff0, coeff1, h->deg);
-    mpz_poly_set(f0, h);
-    mpz_poly_mul_mpz(f0, f0, c);
-    mpz_poly_add(f0, f0, g);
-    if (mpz_poly_is_irreducible(f0, p)) {
+  double alpha0 = 0.0;
+  double alpha1 = 0.0;
+  double sum_alpha = DBL_MAX;
+  mpz_poly_t f0_tmp;
+  mpz_poly_init(f0_tmp, -1);
+  mpz_poly_t f1_tmp;
+  mpz_poly_init(f1_tmp, -1);
+  
+  unsigned int k = 0;
+  while (k < nb_times) {
+    random_mpz_poly(g, coeff0, coeff1, h->deg, lc);
+    mpz_poly_set(f0_tmp, h);
+    mpz_poly_mul_mpz(f0_tmp, f0_tmp, c);
+    mpz_poly_add(f0_tmp, f0_tmp, g);
+    alpha0 = get_alpha(f0_tmp, ALPHA_BOUND);
+    if (mpz_poly_is_irreducible(f0_tmp, p)) {
+      k++;
 #ifdef EEA_BOUND 
       extended_euclidean_algorithm_bound(a, b, p, c, c);
 #else
       extended_euclidean_algorithm_stop_2(a, b, p, c);
 #endif
-      mpz_poly_mul_mpz(f1, g, b);
+      mpz_poly_mul_mpz(f1_tmp, g, b);
       mpz_poly_t tmp;
       mpz_poly_init(tmp, -1);
       mpz_poly_mul_mpz(tmp, h, a);
-      mpz_poly_add(f1, f1, tmp);
+      mpz_poly_add(f1_tmp, f1_tmp, tmp);
+      alpha1 = get_alpha(f1_tmp, ALPHA_BOUND);
+      if (alpha0 + alpha1 < sum_alpha) {
+        mpz_poly_set(f0, f0_tmp);
+        mpz_poly_set(f1, f1_tmp);
+        sum_alpha = weight_0 * alpha0 + weight_1 * alpha1;
+      }
       mpz_poly_clear(tmp);
-      break;
     }
   }
+  mpz_poly_clear(f0_tmp);
+  mpz_poly_clear(f1_tmp);
 }
 
 void function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
     mpz_ptr a, mpz_ptr b, mpz_ptr c, mpz_srcptr p, mpz_poly_srcptr h,
-    int coeff0, int coeff1, mpz_srcptr q, unsigned int t)
+    int coeff0, int coeff1, unsigned int q, unsigned int t,
+    unsigned int nb_times, double weight_0, double weight_1)
 {
-  gen_poly_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, q, t);
+  gen_poly_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, q, t, nb_times,
+      weight_0, weight_1);
   mpz_t p2;
   mpz_init(p2);
   mpz_fdiv_q_ui(p2, p, 2);
