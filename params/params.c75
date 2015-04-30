@@ -1,7 +1,7 @@
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
-# See params/params.c91 for an example which contains some documentation.
+# See params/params.c90 for an example which contains some documentation.
 
 ###########################################################################
 # General parameters
