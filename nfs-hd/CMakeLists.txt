@@ -32,3 +32,14 @@ add_executable(makefb-hd ${MAKEFB_SRC})
 set_property(TARGET makefb-hd PROPERTY COMPILE_DEFINITIONS MAIN)
 
 target_link_libraries(makefb-hd ${ECM_LIB} utils)
+
+# Polynomial selection
+
+set (POL_SRC polyselect-hd.c functions.c parameters.c sieving_bound.c
+	utils_mpz.c)
+
+add_executable(polyselect-hd ${POL_SRC})
+
+target_link_libraries(polyselect-hd utils polyselect_common)
+
+#set_property(TARGET polyselect-hd PROPERTY COMPILE_DEFINITIONS EEA_BOUND)
