@@ -15,7 +15,8 @@
 
 #define STATUS_SMOOTH  0
 #define STATUS_UNKNOWN 1
-#define STATUS_USELESS 2
+//#define STATUS_USELESS 2
+#define STATUS_NON_SMOOTH 2
 
 unsigned long
 tree_height (unsigned long n)
@@ -150,8 +151,9 @@ prime_product (mpz_t P, unsigned long lim, unsigned long pmax)
 }
 
 void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char *b_status_a, unsigned long int n, unsigned int b_side_R,
-                   unsigned long int rlim_high, unsigned long int lpbr, unsigned long int alim_high, unsigned long int lpba,
-                   unsigned long int *nb_smooth_r, unsigned long int *nb_useless_r, unsigned long int *nb_smooth_a, unsigned long int *nb_useless_a)
+                   unsigned long int rlim_high, unsigned long int lpbr, unsigned long int alim_high, unsigned long int lpba)
+//                   unsigned long int rlim_high, unsigned long int lpbr, unsigned long int alim_high, unsigned long int lpba,
+//                   unsigned long int *nb_smooth_r, unsigned long int *nb_useless_r, unsigned long int *nb_smooth_a, unsigned long int *nb_useless_a)
 {
   unsigned long int i;
   
@@ -233,10 +235,10 @@ main ()
   unsigned long int alim_step = 250000000;
   unsigned char *b_status_r;
   unsigned char *b_status_a;
-  unsigned long int nb_smooth_r;
-  unsigned long int nb_useless_r;
-  unsigned long int nb_smooth_a;
-  unsigned long int nb_useless_a;
+//  unsigned long int nb_smooth_r;
+//  unsigned long int nb_useless_r;
+//  unsigned long int nb_smooth_a;
+//  unsigned long int nb_useless_a;
 
 
   b_status_r = (unsigned char *) malloc(n * sizeof(unsigned char));
@@ -271,7 +273,6 @@ main ()
   rlim_high = 250000000;
   alim_high = 500000000;
 
-  nb_  
   update_status(R, A, b_status_r, b_status_a, n, 1, rlim_high, lpbr, alim_high, lpba);
   update_status(R, A, b_status_r, b_status_a, n, 0, rlim_high, lpbr, alim_high, lpba);
 
