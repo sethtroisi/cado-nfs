@@ -12,6 +12,7 @@
 void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "p", "prime number");
+  param_list_decl_usage(pl, "n", "degree of the extension");
   param_list_decl_usage(pl, "h", "polynomial to build f0 and f1");
   param_list_decl_usage(pl, "coeff0", "lowest coefficient of g");
   param_list_decl_usage(pl, "coeff1", "greatest coefficient of g");
@@ -22,11 +23,13 @@ void declare_usage(param_list pl)
       "weight for alpha of f0 when sum alphas");
   param_list_decl_usage(pl, "weight_1",
       "weight for alpha of f1 when sum alphas");
+  param_list_decl_usage(pl, "type", "0 if classical, 1 if special-q");
 }
 
 void initialise_parameters(int argc, char * argv[], mpz_ptr p, mpz_poly_ptr h,
     int * coeff0, int * coeff1, unsigned int * q, unsigned int * t,
-    unsigned int * nb_times, double * weight_0, double * weight_1)
+    unsigned int * nb_times, double * weight_0, double * weight_1,
+    unsigned int * n, unsigned int * type)
 {
   param_list pl;
   param_list_init(pl);
@@ -51,19 +54,9 @@ void initialise_parameters(int argc, char * argv[], mpz_ptr p, mpz_poly_ptr h,
     exit (EXIT_FAILURE);
   }
 
+  param_list_parse_uint(pl, "type", type);
   param_list_parse_mpz(pl, "p", p);
-
-  param_list_parse_mpz_poly(pl, "h", h, ","); 
-
-  param_list_parse_int(pl, "coeff0", coeff0);
-  param_list_parse_int(pl, "coeff1", coeff1);
-  ASSERT(coeff0 < coeff1);
-
-  param_list_parse_uint(pl, "q", q);
-
-  param_list_parse_uint(pl, "t", t);
-  ASSERT(* t > 2);
-  
+  param_list_parse_uint(pl, "n", n);
   param_list_parse_uint(pl, "nb_times", nb_times);
   ASSERT(* nb_times > 0);
 
@@ -73,6 +66,20 @@ void initialise_parameters(int argc, char * argv[], mpz_ptr p, mpz_poly_ptr h,
   ASSERT(* weight_1 >= 0.0);
   ASSERT(* weight_0 + * weight_1 == 1.0);
 
+  param_list_parse_int(pl, "coeff0", coeff0);
+  param_list_parse_int(pl, "coeff1", coeff1);
+  ASSERT(coeff0 < coeff1);
+
+  if (* type == 1) { 
+    param_list_parse_mpz_poly(pl, "h", h, ","); 
+    ASSERT(* n == (unsigned int )h->deg);
+
+    param_list_parse_uint(pl, "q", q);
+
+    param_list_parse_uint(pl, "t", t);
+    ASSERT(* t > 2);
+  }
+  
   param_list_clear(pl);
 }
 
@@ -80,6 +87,7 @@ int main(int argc, char * argv[])
 {
   mpz_t p;
   mpz_init(p);
+  unsigned int n;
   mpz_poly_t h;
   mpz_poly_init(h, -1);
   unsigned int q;
@@ -89,9 +97,10 @@ int main(int argc, char * argv[])
   unsigned int nb_times;
   double weight_0;
   double weight_1;
+  unsigned int type;
 
   initialise_parameters(argc, argv, p, h, &coeff0, &coeff1, &q, &t, &nb_times,
-      &weight_0, &weight_1);
+      &weight_0, &weight_1, &n, &type);
 
   mpz_poly_t f0;
   mpz_poly_init(f0, h->deg);
@@ -106,23 +115,36 @@ int main(int argc, char * argv[])
   mpz_init(b);
   mpz_t c;
   mpz_init(c);
-
-  function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, q, t, nb_times,
-      weight_0, weight_1);
-  printf("f0: ");
-  mpz_poly_fprintf(stdout, f0);
-  printf("alpha0: %f\n", get_alpha(f0, ALPHA_BOUND));
-  printf("f1: ");
-  mpz_poly_fprintf(stdout, f1);
-  printf("alpha1: %f\n", get_alpha(f1, ALPHA_BOUND));
-  gmp_printf("a: %Zd, b: %Zd, c: %Zd\n", a, b, c);
-  printf("g: ");
-  mpz_poly_fprintf(stdout, g);
-  printf("h: ");
-  mpz_poly_fprintf(stdout, h);
+  
+  if (type == 0) {
+    function_classical(f0, f1, p, n, coeff0, coeff1, nb_times, weight_0,
+        weight_1);
+    printf("f0: ");
+    mpz_poly_fprintf(stdout, f0);
+    printf("alpha0: %f\n", get_alpha(f0, ALPHA_BOUND));
+    printf("f1: ");
+    mpz_poly_fprintf(stdout, f1);
+    printf("alpha1: %f\n", get_alpha(f1, ALPHA_BOUND));
+  } else if (type == 1) {
+    function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, q, t, nb_times,
+        weight_0, weight_1);
+    printf("f0: ");
+    mpz_poly_fprintf(stdout, f0);
+    printf("alpha0: %f\n", get_alpha(f0, ALPHA_BOUND));
+    printf("f1: ");
+    mpz_poly_fprintf(stdout, f1);
+    printf("alpha1: %f\n", get_alpha(f1, ALPHA_BOUND));
+    gmp_printf("a: %Zd, b: %Zd, c: %Zd\n", a, b, c);
+    printf("g: ");
+    mpz_poly_fprintf(stdout, g);
+    printf("h: ");
+    mpz_poly_fprintf(stdout, h);
+  }
 
   mpz_poly_clear(g);
   mpz_poly_clear(h);
+  mpz_poly_clear(f0);
+  mpz_poly_clear(f1);
 
   mpz_clear(a);
   mpz_clear(b);

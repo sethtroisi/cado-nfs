@@ -24,4 +24,8 @@ void function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
     int coeff0, int coeff1, unsigned int q, unsigned int t,
     unsigned int nb_times, double weight_0, double weight_1);
 
+void function_classical(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_srcptr p,
+    unsigned int n, int coeff0, int coeff1, unsigned int nb_times,
+    double weight_0, double weight_1);
+
 #endif // FUNCTIONS_H

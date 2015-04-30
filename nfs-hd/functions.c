@@ -305,3 +305,41 @@ void function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
   mpz_clear(p2);
   mpz_clear(tmp);
 }
+
+void function_classical(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_srcptr p,
+    unsigned int n, int coeff0, int coeff1, unsigned int nb_times,
+    double weight_0, double weight_1)
+{
+  mpz_poly_t f0_tmp;
+  mpz_poly_init(f0_tmp, -1);
+  mpz_poly_t f1_tmp;
+  mpz_poly_init(f1_tmp, -1);
+
+  double sum_alpha = DBL_MAX;
+  double alpha0 = 0.0;
+  double alpha1 = 0.0;
+  unsigned int k = 0;
+  while (k < nb_times) {
+    random_mpz_poly(f0_tmp, coeff0, coeff1, n, 1);
+    if (mpz_poly_is_irreducible(f0_tmp, p)) {
+      k++;
+      mpz_poly_set(f1_tmp, f0_tmp);
+      if (mpz_cmp_ui(f1_tmp->coeff[0], 0) < 0) {
+        mpz_add(f1_tmp->coeff[0], f1_tmp->coeff[0], p);
+      } else {
+        mpz_sub(f1_tmp->coeff[0], f1_tmp->coeff[0], p);
+      }
+      alpha0 = get_alpha(f0_tmp, ALPHA_BOUND);
+      alpha1 = get_alpha(f1_tmp, ALPHA_BOUND);
+      if (weight_0 * alpha0 + weight_1 * alpha1 < sum_alpha) {
+        mpz_poly_set(f0, f0_tmp);
+        mpz_poly_set(f1, f1_tmp);
+        sum_alpha = weight_0 * alpha0 + weight_1 * alpha1;
+      }
+    }
+  }
+
+  mpz_poly_clear(f0_tmp);
+  mpz_poly_clear(f1_tmp);
+ 
+}
