@@ -56,7 +56,9 @@ initPrimes ( unsigned long P,
     exit (1);
   }
 
-  for (p = 2; p < P; p = getprime (p));
+  prime_info i;
+  prime_info_init (i);
+  for (p = 2; p < P; p = getprime (i));
 
 #ifdef LESS_P
   while (p <= (P + P/5)) {
@@ -72,10 +74,10 @@ initPrimes ( unsigned long P,
       }
     }
     (*primes)[nprimes++] = p;
-    p = getprime (p);
+    p = getprime (i);
   }
 
-  getprime (0); /* free the memory used by getprime */
+  prime_info_clear (i); /* free the memory used */
 
   *primes = (uint32_t*) realloc (*primes, (nprimes) * sizeof (uint32_t));
   if ( (*primes) == NULL) {

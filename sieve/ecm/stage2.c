@@ -171,13 +171,16 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
   memset (primes, 0, max_i * d + d/2);
   nr_primes = 0;
 
-  for (p = 2; p <= B2min; p = (unsigned int) getprime (p));
+  prime_info pi;
+  prime_info_init (pi);
+  for (p = 2; p <= B2min; p = (unsigned int) getprime (pi));
   /* Now p is smallest prime > B2min */
-  for ( ; p <= B2; p = getprime (p))
+  for ( ; p <= B2; p = getprime (pi))
     {
       nr_primes++;
       primes[p] = 1;
     }
+  prime_info_clear (pi);
   
   /* We need at most one pair per prime, plus the number of NEXT_D and 
      NEXT_PASS codes */
@@ -411,7 +414,6 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
     }
 
   free (primes);
-  getprime (0);
 }
 
 void stage2_clear_plan (stage2_plan_t *plan)
