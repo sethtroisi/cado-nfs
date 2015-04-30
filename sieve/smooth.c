@@ -13,10 +13,11 @@
 #include "gmp.h"
 #include "utils.h"
 
+#define NB_MILLER_RABIN  2
+
 #define STATUS_SMOOTH  0
 #define STATUS_UNKNOWN 1
-//#define STATUS_USELESS 2
-#define STATUS_NON_SMOOTH 2
+#define STATUS_USELESS 2
 
 unsigned long
 tree_height (unsigned long n)
@@ -138,81 +139,156 @@ prime_product (mpz_t P, unsigned long lim, unsigned long pmax)
       for (i = 0; i+1 < n; i+=2)
         mpz_mul (L[i/2], L[i], L[i+1]);
       if (n & 1)
-        mpz_set(L[n/2], L[n-1]); 
+        mpz_set(L[n/2], L[n-1]);
 //        mpz_swap (L[n/2], L[n-1]);
       n = (n + 1) / 2;
     }
 //  mpz_swap (P, L[0]);
   mpz_set (P, L[0]);
-  
+
   for (i = 0; i < alloc; i++)
     mpz_clear (L[i]);
   free (L);
 }
 
 void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char *b_status_a, unsigned long int n, unsigned int b_side_R,
-                   unsigned long int rlim_high, unsigned long int lpbr, unsigned long int alim_high, unsigned long int lpba)
-//                   unsigned long int rlim_high, unsigned long int lpbr, unsigned long int alim_high, unsigned long int lpba,
-//                   unsigned long int *nb_smooth_r, unsigned long int *nb_useless_r, unsigned long int *nb_smooth_a, unsigned long int *nb_useless_a)
+                   unsigned long int rlim, unsigned long int lpbr, unsigned long int alim, unsigned long int lpba,
+                   unsigned long int *nb_smooth_r, unsigned long int *nb_smooth_a, unsigned long int *nb_useless)
 {
+  mpz_t z_B3;
+  mpz_t z_L2;
+
   unsigned long int i;
-  
+
+
+  mpz_init(z_B3);
+  mpz_init(z_L2);
+
   if (b_side_R)
   {
+    mpz_set_ui(z_B3, rlim * rlim);
+    mpz_mul_ui(z_B3, z_B3, rlim);
+    mpz_set_ui(z_L2, 0);
+    mpz_setbit(z_L2, 2 * lpbr);
+
     for (i = 0; i < n; i++)
     {
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
         if (mpz_cmp_ui (R[i], 1) == 0)
-          b_status_r[i] = STATUS_SMOOTH;
-        else if ( (mpz_cmp_ui(R[i], (1UL << lpbr)) <= 0) && (mpz_probab_prime_p(R[i], 6) != 0) )
         {
           b_status_r[i] = STATUS_SMOOTH;
-          mpz_set_ui(R[i], 1);
+          (*nb_smooth_r)++;
         }
-        else if ( (mpz_cmp_ui(R[i], rlim_high * (1UL << lpbr)) <= 0) && (mpz_probab_prime_p(R[i], 6) == 0) )
+        else if (mpz_cmp_ui(R[i], (1UL << lpbr)) <= 0)  // works only if rlim*rlim > 2^lpbr (which is assumed)
         {
           b_status_r[i] = STATUS_SMOOTH;
           mpz_set_ui(R[i], 1);
+          (*nb_smooth_r)++;
         }
-        else if ( (mpz_cmp_ui(R[i], (1UL << lpbr)) > 0) && (mpz_probab_prime_p(R[i], 6) != 0) )
+        else if ( (mpz_cmp_ui(R[i], (1UL << lpbr)) > 0) && (mpz_cmp_ui(R[i], rlim * rlim) < 0) )
         {
-          b_status_r[i] = STATUS_NON_SMOOTH;
+          if (b_status_a[i] == STATUS_SMOOTH)
+            (*nb_smooth_a)--;
+          b_status_r[i] = STATUS_USELESS;
           mpz_set_ui(R[i], 1);
-          b_status_a[i] = STATUS_NON_SMOOTH;
+          b_status_a[i] = STATUS_USELESS;
           mpz_set_ui(A[i], 1);
+          (*nb_useless)++;
+        }
+        else if ( (mpz_cmp(R[i], z_L2) > 0) && (mpz_cmp(R[i], z_B3) < 0) )
+        {
+          if (b_status_a[i] == STATUS_SMOOTH)
+            (*nb_smooth_a)--;
+          b_status_r[i] = STATUS_USELESS;
+          mpz_set_ui(R[i], 1);
+          b_status_a[i] = STATUS_USELESS;
+          mpz_set_ui(A[i], 1);
+          (*nb_useless)++;
+        }
+        else if ( (mpz_cmp_ui(R[i], rlim * (1UL << lpbr)) <= 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) == 0) )
+        {
+          b_status_r[i] = STATUS_SMOOTH;
+          mpz_set_ui(R[i], 1);
+          (*nb_smooth_r)++;
+        }
+        else if ( (mpz_cmp_ui(R[i], (1UL << lpbr)) > 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) != 0) )
+        {
+          if (b_status_a[i] == STATUS_SMOOTH)
+            (*nb_smooth_a)--;
+          b_status_r[i] = STATUS_USELESS;
+          mpz_set_ui(R[i], 1);
+          b_status_a[i] = STATUS_USELESS;
+          mpz_set_ui(A[i], 1);
+          (*nb_useless)++;
         }
       }
     }
   }
   else
   {
+    mpz_set_ui(z_B3, alim * alim);
+    mpz_mul_ui(z_B3, z_B3, alim);
+    mpz_set_ui(z_L2, 0);
+    mpz_setbit(z_L2, 2 * lpba);
+
     for (i = 0; i < n; i++)
     {
       if (b_status_a[i] == STATUS_UNKNOWN)
       {
         if (mpz_cmp_ui (A[i], 1) == 0)
-          b_status_a[i] = STATUS_SMOOTH;
-        else if ( (mpz_cmp_ui(A[i], (1UL << lpba)) <= 0) && (mpz_probab_prime_p(A[i], 6) != 0) )
         {
           b_status_a[i] = STATUS_SMOOTH;
-          mpz_set_ui(A[i], 1);
+          (*nb_smooth_a)++;
         }
-        else if ( (mpz_cmp_ui(A[i], alim_high * (1UL << lpba)) <= 0) && (mpz_probab_prime_p(A[i], 6) == 0) )
+        else if (mpz_cmp_ui(A[i], (1UL << lpba)) <= 0)  // works only if alim*alim > 2^lpba (which is assumed)
         {
           b_status_a[i] = STATUS_SMOOTH;
           mpz_set_ui(A[i], 1);
+          (*nb_smooth_a)++;
         }
-        else if ( (mpz_cmp_ui(A[i], (1UL << lpba)) > 0) && (mpz_probab_prime_p(A[i], 6) != 0) )
+        else if ( (mpz_cmp_ui(A[i], (1UL << lpba)) > 0) && (mpz_cmp_ui(A[i], alim * alim) < 0) )
         {
-          b_status_a[i] = STATUS_NON_SMOOTH;
+          if (b_status_r[i] == STATUS_SMOOTH)
+            (*nb_smooth_r)--;
+          b_status_a[i] = STATUS_USELESS;
           mpz_set_ui(A[i], 1);
-          b_status_r[i] = STATUS_NON_SMOOTH;
+          b_status_r[i] = STATUS_USELESS;
           mpz_set_ui(R[i], 1);
+          (*nb_useless)++;
+        }
+        else if ( (mpz_cmp(A[i], z_L2) > 0) && (mpz_cmp(A[i], z_B3) < 0) )
+        {
+          if (b_status_r[i] == STATUS_SMOOTH)
+            (*nb_smooth_r)--;
+          b_status_a[i] = STATUS_USELESS;
+          mpz_set_ui(A[i], 1);
+          b_status_r[i] = STATUS_USELESS;
+          mpz_set_ui(R[i], 1);
+          (*nb_useless)++;
+        }
+        else if ( (mpz_cmp_ui(A[i], alim * (1UL << lpba)) <= 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) == 0) )
+        {
+          b_status_a[i] = STATUS_SMOOTH;
+          mpz_set_ui(A[i], 1);
+          (*nb_smooth_a)++;
+        }
+        else if ( (mpz_cmp_ui(A[i], (1UL << lpba)) > 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) != 0) )
+        {
+          if (b_status_r[i] == STATUS_SMOOTH)
+            (*nb_smooth_r)--;
+          b_status_a[i] = STATUS_USELESS;
+          mpz_set_ui(A[i], 1);
+          b_status_r[i] = STATUS_USELESS;
+          mpz_set_ui(R[i], 1);
+          (*nb_useless)++;
         }
       }
     }
   }
+
+  mpz_clear(z_B3);
+  mpz_clear(z_L2);
 }
 
 int
@@ -221,6 +297,7 @@ main ()
   FILE *cofac_r, *cofac_a;
   mpz_t *R, *A, P;
   unsigned long n = 479233; /* number of cofactors, UPDATE */
+  unsigned long n_init;
   unsigned long i;
   size_t ret;
   double s;
@@ -231,15 +308,16 @@ main ()
   unsigned long int alim_low;
   unsigned long int rlim_high;
   unsigned long int alim_high;
-  unsigned long int rlim_step = 250000000;
-  unsigned long int alim_step = 250000000;
+  unsigned long int rlim_step = 50000000;
+  unsigned long int alim_step = 50000000;
   unsigned char *b_status_r;
   unsigned char *b_status_a;
-//  unsigned long int nb_smooth_r;
-//  unsigned long int nb_useless_r;
-//  unsigned long int nb_smooth_a;
-//  unsigned long int nb_useless_a;
+  unsigned long int nb_smooth_r;
+  unsigned long int nb_smooth_a;
+  unsigned long int nb_useless;
 
+
+  n_init = n;
 
   b_status_r = (unsigned char *) malloc(n * sizeof(unsigned char));
   b_status_a = (unsigned char *) malloc(n * sizeof(unsigned char));
@@ -266,30 +344,36 @@ main ()
 
 
   /**** Initial pass ***/
-  
+
   printf("\n");
   printf("Initial pass\n");
 
   rlim_high = 250000000;
   alim_high = 500000000;
 
-  update_status(R, A, b_status_r, b_status_a, n, 1, rlim_high, lpbr, alim_high, lpba);
-  update_status(R, A, b_status_r, b_status_a, n, 0, rlim_high, lpbr, alim_high, lpba);
+  nb_smooth_r = 0;
+  nb_smooth_a = 0;
+  nb_useless = 0;
+
+  update_status(R, A, b_status_r, b_status_a, n, 1, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
+  update_status(R, A, b_status_r, b_status_a, n, 0, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
 
   n0_pass = 0;
   while (n0_pass < 20)
   {
     n0_pass++;
- 
+
     printf("\n");
     printf("Pass %u\n", n0_pass);
-    
+
     /* rational side */
 
     rlim_low = rlim_high;
     rlim_high += rlim_step;
 
-    printf("rlim : %lu:%lu\n", rlim_low, rlim_high);  
+    printf("\n");
+    printf("rlim : %lu:%lu\n", rlim_low, rlim_high);
+    printf("nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_r, nb_useless, n_init - nb_smooth_r - nb_useless);
 
     s = seconds ();
     prime_product (P, rlim_low, rlim_high); /* UPDATE */
@@ -299,14 +383,17 @@ main ()
     smoothness_test (R, n, P);
     printf ("smoothness_test took %.0f seconds\n", seconds () - s);
 
-    update_status(R, A, b_status_r, b_status_a, n, 1, rlim_high, lpbr, alim_high, lpba);
+    update_status(R, A, b_status_r, b_status_a, n, 1, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
+    printf("nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_r, nb_useless, n_init - nb_smooth_r - nb_useless);
 
     /* algebraic side */
 
     alim_low = alim_high;
     alim_high += alim_step;
 
-    printf("alim : %lu:%lu\n", alim_low, alim_high);  
+    printf("\n");
+    printf("alim : %lu:%lu\n", alim_low, alim_high);
+    printf("nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_a, nb_useless, n_init - nb_smooth_a - nb_useless);
 
     s = seconds ();
     prime_product (P, alim_low, alim_high); /* UPDATE */
@@ -316,7 +403,8 @@ main ()
     smoothness_test (A, n, P);
     printf ("smoothness_test took %.0f seconds\n", seconds () - s);
 
-    update_status(R, A, b_status_r, b_status_a, n, 0, rlim_high, lpbr, alim_high, lpba);
+    update_status(R, A, b_status_r, b_status_a, n, 0, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
+    printf("nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_a, nb_useless, n_init - nb_smooth_a - nb_useless);
   }
 
   mpz_clear (P);
@@ -327,7 +415,7 @@ main ()
       mpz_clear (R[i]);
       mpz_clear (A[i]);
     }
-    
+
   free (b_status_r);
   free (b_status_a);
   free (R);
