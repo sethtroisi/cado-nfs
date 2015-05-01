@@ -116,8 +116,10 @@ prime_product (mpz_t P, unsigned long lim, unsigned long pmax)
 {
   unsigned long p, n = 0, alloc = 0, newalloc, i;
   mpz_t *L = NULL;
+  prime_info pi;
 
-  for (p = 2; p <= pmax; p = getprime (p))
+  prime_info_init (pi);
+  for (p = 2; p <= pmax; p = getprime_mt (pi))
     {
       if (p > lim)
         {
@@ -131,7 +133,7 @@ prime_product (mpz_t P, unsigned long lim, unsigned long pmax)
           mpz_set_ui (L[n++], p);
         }
     }
-  getprime(0);
+  prime_info_clear (pi);
 
     /* FIXME: equilibrate the product */
   while (n > 1)
