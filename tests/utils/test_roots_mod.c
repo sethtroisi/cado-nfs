@@ -83,8 +83,10 @@ int main(int argc, char **argv) {
 
   r1 = malloc (sizeof(uint64_t) * maxd);
   r2 = malloc (sizeof(uint64_t) * maxd);
-  
-  for (p = 2; p < minp; p = getprime(p));
+
+  prime_info pi;
+  prime_info_init (pi);
+  for (p = 2; p < minp; p = getprime_mt (pi));
 
   while (p <= maxp) {
     for (a = mina; a <= maxa && a < p; a++) {
@@ -113,9 +115,9 @@ int main(int argc, char **argv) {
         }
       }
     }
-    p = getprime(p);
+    p = getprime_mt (pi);
   }
-  getprime(0);
+  prime_info_clear (pi);
   free (r1);
   free (r2);
   exit (EXIT_SUCCESS);
