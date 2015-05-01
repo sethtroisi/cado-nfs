@@ -82,16 +82,16 @@ T &reservation_array<T>::reserve()
     double best_full = 1.;
     if (verbose)
       verbose_output_print(0, 3, "# Looking for least full bucket\n");
-    for (size_t i = 0; i < n; i++) {
-      if (in_use[i])
+    for (size_t j = 0; j < n; j++) {
+      if (in_use[j])
         continue;
-      double full = BAs[i].max_full();
+      double full = BAs[j].max_full();
       if (verbose)
         verbose_output_print(0, 3, "# Bucket %zu is %.0f%% full\n",
-                             i, full * 100.);
+                             j, full * 100.);
       if (full < best_full) {
         best_full = full;
-        best_i = i;
+        best_i = j;
       }
     }
     ASSERT_ALWAYS(best_i != n && best_full < 1.);
