@@ -954,7 +954,7 @@ trialdivide_print(unsigned long N, unsigned long B)
             N /= p;
             printf("%ld\n", p);
             if (N == 1) {
-                getprime(0);  // free table
+                prime_info_clear (pi);
                 return N;
             }
         }
