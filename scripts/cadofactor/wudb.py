@@ -101,8 +101,8 @@ def conn_close(conn):
     conn.close()
 
 # Dummy class for defining "constants" with reverse lookup
-STATUS_NAMES = ["AVAILABLE", "ASSIGNED", "RECEIVED_OK", "RECEIVED_ERROR",
-        "VERIFIED_OK", "VERIFIED_ERROR", "CANCELLED"]
+STATUS_NAMES = ["AVAILABLE", "ASSIGNED", "NEED_RESUBMIT", "RECEIVED_OK",
+         "RECEIVED_ERROR", "VERIFIED_OK", "VERIFIED_ERROR", "CANCELLED"]
 STATUS_VALUES = range(len(STATUS_NAMES))
 WuStatusBase = collections.namedtuple("WuStatusBase", STATUS_NAMES)
 class WuStatusClass(WuStatusBase):
@@ -870,6 +870,9 @@ class WuAccess(object): # {
             if status is WuStatus.ASSIGNED and wu_status is WuStatus.CANCELLED:
                 logger.warning ("WuAccess._checkstatus(): %s, presumably timed out", msg)
                 raise StatusUpdateError(msg)
+            elif status is WuStatus.ASSIGNED and wu_status is WuStatus.NEED_RESUBMIT:
+                logger.warning ("WuAccess._checkstatus(): %s, manually expired", msg)
+                raise StatusUpdateError(msg)
             else:
                 logger.error ("WuAccess._checkstatus(): %s", msg)
                 raise StatusUpdateError(msg)
@@ -1462,6 +1465,8 @@ if __name__ == '__main__': # {
                         help = 'Assign an available WU to clientid')
     parser.add_argument('-cancel', action="store_true",
                         help = 'Cancel selected WUs')
+    parser.add_argument('-expire', action="store_true",
+                        help = 'Expire selected WUs')
     # parser.add_argument('-setstatus', metavar = 'STATUS', 
     #                    help = 'Forcibly set selected workunits to status (integer)')
     parser.add_argument('-prio', metavar = 'N', 
@@ -1562,6 +1567,9 @@ if __name__ == '__main__': # {
         if args["cancel"]:
             print("Cancelling selected workunits")
             db_pool.cancel_by_condition(**condition)
+        if args["expire"]:
+            print("Expiring selected workunits")
+            db_pool.set_status(WuStatus.NEED_RESUBMIT, commit=True, **condition)
         # if args["setstatus"]:
         #    db_pool.set_status(int(args["setstatus"]), **condition)
 

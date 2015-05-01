@@ -130,10 +130,6 @@ class GeneralClass(object):
         parser.add_argument("--magmadata",
                 help="File with magma data",
                 type=str)
-        # This one is a bit special, we'll create it if it is missing.
-        parser.add_argument("--debug-renumber",
-                help="File given by debug_renumber",
-                type=str)
         # This one applies to both las in the initial step, and
         # reconstructlog in the final step
         parser.add_argument("--threads",
@@ -227,11 +223,6 @@ class GeneralClass(object):
         return self.__getfile("poly", "polyselect2.poly", "polyselect2", "polyfilename")
     def renumber(self):
         return self.__getfile("renumber", "freerel.renumber.gz", "freerel", "renumberfilename")
-    def debug_renumber(self):
-        if args.debug_renumber:
-            return args.debug_renumber
-        else:
-            return os.path.join(self.datadir(), self.prefix() + ".debug_renumber.txt")
 
     def log(self):
         return self.__getfile("log", "reconstructlog.dlog", "reconstructlog", "dlog")
@@ -317,10 +308,6 @@ class GeneralClass(object):
 
     def las_bin(self):
         return os.path.join(args.cadobindir, "sieve", "las")
-    def debug_renumber_bin(self):
-        return os.path.join(args.cadobindir, "misc", "debug_renumber")
-    def dup2_bin(self):
-        return os.path.join(args.cadobindir, "filter", "dup2")
     def sm_simple_bin(self):
         return os.path.join(args.cadobindir, "filter", "sm_simple")
     def reconstructlog_bin(self):
@@ -366,12 +353,8 @@ class GeneralClass(object):
             errors.append("las not found (make las ?)")
         if not os.path.exists(self.las_bin() + "_descent"):
             errors.append("las_descent not found (make las_descent ?)")
-        if not os.path.exists(self.dup2_bin()):
-            errors.append("dup2 not found (make dup2 ?)")
         if not os.path.exists(self.reconstructlog_bin()):
             errors.append("reconstructlog-dl not found (make reconstructlog-dl ?)")
-        if not os.path.exists(self.debug_renumber_bin()):
-            errors.append("debug_renumber not found (make debug_renumber ?)")
         if not os.path.exists(self.sm_simple_bin()):
             errors.append("sm_simple not found (make sm_simple ?)")
         for f in [ self.log(), self.badidealinfo(), self.poly(), self.renumber(), self.log(), self.fb1() ]:
@@ -429,25 +412,6 @@ def check_result(two, log2, z, logz, p, ell):
     assert pow(z, log2*((p-1) // ell), p) == pow(2, logz*((p-1) // ell), p)
     print ("Final consistency check ok!")
 
-
-# We need this in order to see which are the rational primes we need to
-# descend. We do not care about the algebraic primes, here/
-class RatLogBase(object):
-    def __init__(self, general):
-        self.known=set()
-        try:
-            print ("--- Reading %s to find which are the known logs ---" % general.log())
-            with open(general.log(),'r') as file:
-                for line in file:
-                    foo = re.match("^(\w+) (\w+) (\w+) rat (\d+)$", line)
-                    if foo:
-                        self.known.add(int(foo.groups()[1], 16))
-            print("Found %d known rational logs in %s" %(len(self.known), general.log()))
-        except:
-            raise ValueError("Error while reading %s" % general.log())
-
-    def has(self, p):
-        return p in self.known
 
 # A memory image of the reconstructlog.dlog file.
 class LogBase(object):
@@ -658,6 +622,7 @@ class DescentUpperClass(object):
 
     def __init__(self, general, args):
         self.general = general
+        self.logDB = general.logDB
 
         self.tkewness = int(args.init_tkewness)
         self.lim      = int(args.init_lim)
@@ -801,7 +766,6 @@ class DescentUpperClass(object):
         todofilename = os.path.join(general.datadir(), prefix + "todo")
 
         if not os.path.exists(todofilename):
-            known = RatLogBase(general)
             with open(todofilename, "w") as f:
                 for q in factNum + factDen:
                     if self.logDB.has(q,-1,0):
@@ -948,34 +912,6 @@ class DescentLowerClass(object):
     def __init__(self, general, args):
         self.general = general
         self.args = args
-    def _last_renumber_index(self):
-        # In the renumber file, the line number is not exactly the index.
-        # Let us rely on debug_renumber's output to find the last used index
-        # in the renumber table.
-        if not os.path.exists(general.debug_renumber()):
-            print("--- generating %s ---"% general.debug_renumber())
-            call_that = [ general.debug_renumber_bin(),
-                            "-poly", general.poly(),
-                            "-renumber", general.renumber(),
-                        ]
-            call_that = [str(x) for x in call_that]
-            outfile = open(general.debug_renumber(), 'w')
-            subprocess.check_call(call_that, stdout=outfile)
-            outfile.close()
-
-        last_renumber_line = None
-        call_that = ["tail", "-10", general.debug_renumber()]
-        call_that = [str(x) for x in call_that]
-        print("command line:\n" + " ".join(call_that))
-        try:
-            with subprocess.Popen(call_that, stdout=subprocess.PIPE) as p:
-                for line in p.stdout:
-                    ll = line.decode("utf-8")
-                    if ll[0] == 'i':
-                        last_renumber_line = ll.rstrip()
-            return int(last_renumber_line.split()[0].split('=')[1], 16)
-        except:
-            raise ValueError("Error while reading %s" % general.debug_renumber())
 
     def __count_multiplicites(self, L):
         LL = []
@@ -992,7 +928,7 @@ class DescentLowerClass(object):
         LL.append([prev_p, m])
         return LL
 
-    def do_descent_alt(self, relsfile, initial_split):
+    def do_descent(self, relsfile, initial_split):
         args = parser.parse_args()
         tmpdir = general.tmpdir()
         prefix = general.prefix() + ".descent.%s.lower." % args.target
@@ -1113,243 +1049,6 @@ class DescentLowerClass(object):
         print("log(target)=%d" % log_target)
         check_result(2, logDB.get_log(2, -1, 0), args.target, log_target, p, ell)
 
-    def do_descent(self, relsfile, initial_split):
-        args = parser.parse_args()
-        tmpdir = general.tmpdir()
-        prefix = general.prefix() + ".descent.%s.lower." % args.target
-
-        # Read descent relations
-        useful=lambda x: re.match("^Taken:",x)
-        with open(relsfile, 'r') as file:
-            descrels = list(filter(useful, file))
-        nrels = len(descrels)
-        print ("--- Final reconstruction (from %d relations) ---" % nrels)
-
-        lpb = [ general.lpb0(), general.lpb1() ]
-
-        # Create fake relations: remove large primes, because those are
-        # not in the renumber table.
-        #
-        # FIXME -- we must create proper renumber table entries for extra
-        # primes, otherwise the birthday paradox will kill us.
-        fakerels = []
-        extraprimes = set()
-        more_extraprimes = set()
-        extraprimes_per_rel = {}
-        for rel in descrels:
-            r = rel.split(':')[1:]
-            r[0] = r[0].lstrip()
-            a,b = r[0].split(',')
-            a=int(a)
-            b=int(b)
-            ss = [ [], [] ]
-            extra = [ [], [] ]
-            for side in range(2):
-                for p in r[side+1].strip().split(','):
-                    ip=int(p, 16)
-                    if ip >> lpb[side]:
-                        if side == 0:
-                            extra[side].append("%s 0 rat" % p) 
-                            extraprimes.add((ip, side))
-                        else:
-                            rho = a_over_b_mod_p(a,b,ip)
-                            extra[side].append("%s %d %x" % (p,side,rho)) 
-                            extraprimes.add((ip,side,rho))
-                            # We forcibly add this one too, because it
-                            # makes it easier to have a correct table in
-                            # the end.
-                            more_extraprimes.add((ip,0))
-                    else:
-                        ss[side].append(p)
-            fake = ":".join([r[0]] + [",".join(x) for x in ss])
-            fakerels.append(fake)
-            extraprimes_per_rel["%x,%x"%(a,b)]=extra
-        for pr in more_extraprimes:
-            if pr in extraprimes:
-                machine,human = prime_ideal_mixedprint(pr)
-                print("Note: prime %s is here both for itself, and because an algebraic prime with same p exists" % human)
-        listextraprimes = list(set.union(extraprimes, more_extraprimes))
-        listextraprimes.sort()
-        print ("They include %s primes above lpb:" % len(extraprimes))
-        for pr in listextraprimes:
-            desc = "%s\t# %s" % prime_ideal_mixedprint(pr)
-            if pr in more_extraprimes and pr not in extraprimes:
-                desc += "\t\t(for technical reasons only)"
-            print(desc)
-
-        fakefilename = os.path.join(tmpdir, prefix + "fakerels")
-        with open(fakefilename, 'w') as f:
-            for rel in fakerels:
-                f.write(rel + '\n')
-
-        # Call dup2 to renumber those relations to get them renumbered
-        # It works in place, so we do a copy first.
-        fakefilename2 = os.path.join(tmpdir, prefix + "fakerels-renumbered.txt")
-
-        shutil.copyfile(fakefilename, fakefilename2)
-
-        print("--- renumbering descent relations ---")
-        call_that = [ general.dup2_bin(),
-                        "-dl",
-                        "-nrels", nrels,
-                        "-renumber", general.renumber(),
-                        "-badidealinfo", general.badidealinfo(),
-                        fakefilename2
-                    ]
-        call_that = [str(x) for x in call_that]
-        print("command line:\n" + " ".join(call_that))
-        subprocess.check_call(call_that, stderr=subprocess.DEVNULL)
-
-        last_index = self._last_renumber_index()
-        print("--- last renumber index is %d ---" % last_index)
-
-
-
-        # Now, we can assign fresh indices to new primes
-        # We fix the relations and the create a new renumber table
-        # accordingly.
-        dictextraprimes = {}
-        for i in range(len(listextraprimes)):
-            machine,human = prime_ideal_mixedprint(listextraprimes[i])
-            dictextraprimes[machine] = last_index+1+i
-            print("%x %s" % (last_index+1+i, machine))
-
-        descentrelsfilename = os.path.join(tmpdir, prefix + "rels-renumbered.txt")
-        # relations
-        with open(descentrelsfilename, 'w') as outfile:
-            # add first line like in purged.gz, just to give the number
-            # of relations to reconstructlog.
-            outfile.write("# %d 0 0\n" % nrels)
-            with open(fakefilename2, 'r') as infile:
-                for rel in infile:
-                    rel = rel.rstrip()
-                    ab = rel.split(':')[0]
-                    if ab not in extraprimes_per_rel:
-                        raise RuntimeError("weird, can't find relation for" + ab)
-                    extra = sum(extraprimes_per_rel[ab],[])
-                    for p in extra:
-                        rel += "," + hex(dictextraprimes[p])[2:]
-                    outfile.write(rel + "\n")
-                    # print(rel)
-
-        newrenumberfilename = os.path.join(tmpdir, prefix + "new-renumber.txt")
-        print("--- generating temporary %s ---" % newrenumberfilename)
-        # we now have to create a new temp file which contains the
-        # renumber table + our extra crap appended.
-        newlpb = math.ceil(math.log(listextraprimes[-1][0], 2))
-        with open(newrenumberfilename, 'w') as file:
-            # decompress the old one.
-            call_that = [ "gzip", "-dc", general.renumber() ]
-            call_that = [str(x) for x in call_that]
-            print("command line:\n" + " ".join(call_that))
-            with subprocess.Popen(call_that, stdout=subprocess.PIPE) as old:
-                # tweak the header
-                header = old.stdout.readline().decode("utf-8").strip().split()
-                header[-1] = str(newlpb)
-                header[-2] = str(newlpb)
-                file.write(" ".join(header) + "\n")
-                # leave the bulk of the file unchanged
-                for x in old.stdout:
-                    file.write(x.decode("utf-8"))
-                # add our crap
-                # we don't want to find all roots mod p. It suffices to
-                # pretend that there's just one.
-                lastp=None
-                for pr in listextraprimes:
-                    if not lastp or lastp != pr[0]:
-                        line="%x"%(pr[0]+1)
-                        file.write(line+"\n")
-                        print(line)
-                    lastp=pr[0]
-                    if pr[1] > 0:
-                        line = "%x"%pr[2]
-                        file.write(line+"\n")
-                        print(line)
-
-        newdlogfilename = os.path.join(tmpdir, prefix + "new-dlog.txt")
-        print("--- generating temporary %s ---" % newdlogfilename)
-        # Prepare the call to reconstructlog
-        # Need to modifiy the last lines of known logs that contain the
-        # virtual logs of the SMs
-        nsm = general.nmaps0() + general.nmaps1()
-        with open(newdlogfilename, 'w') as outfile:
-            count_sm=0
-            with open(general.log(), 'r') as infile:
-                for line in infile:
-                    if "SM" in line:
-                        count_sm += 1
-                        ll = line.split()
-                        assert len(ll) == 5
-                        ll[0] = hex(int(ll[0], 16) + len(listextraprimes))[2:]
-                        line = " ".join(ll) + "\n"
-                    outfile.write(line)
-            assert nsm == count_sm
-
-        # create an empty relsdel file
-        fakerelsdelfilename = os.path.join(tmpdir, prefix + "fake-relsdel.txt")
-        open(fakerelsdelfilename,'w').close()
-
-        resultfilename = os.path.join(tmpdir, prefix + "result-dlog.txt")
-        s = general.reconstructlog_final_base_args()
-        s+= [
-            "-nrels", nrels,
-            "-renumber", newrenumberfilename,
-            "-log", newdlogfilename,
-            "-purged", descentrelsfilename,
-            "-relsdel", fakerelsdelfilename,
-            "-out", resultfilename,
-            ]
-        call_that=[str(x) for x in s]
-        print("command line:\n" + " ".join(call_that))
-        subprocess.check_call(call_that)
-
-        ## Deduce the log of the target, at last...
-        Num, Den, factNum, factDen = initial_split
-        # need to grep these rational primes in our log table. We do not
-        # care about the index, really, but match with the rest.
-        wanted={ hex(int(p))[2:]:None for p in factNum+factDen }
-        # oh, and by the way, let's forcibly add 2 and 3 to the list of
-        # wanted logs. This way, the user will be able to check the
-        # consistency easily
-        wanted["2"]=None
-        wanted["3"]=None
-        with open(resultfilename, 'r') as file:
-            for line in file:
-                foo=re.match("^\w+ (\w+) 0 rat (\d+)$", line)
-                if foo:
-                    pp = foo.groups()[0]
-                    if pp in wanted:
-                        wanted[pp]=int(foo.groups()[1])
-        for u,v in wanted.items():
-            print(u,v)
-        log_target = 0
-        errors=[]
-        for p in factNum:
-            pp = hex(int(p))[2:]
-            if wanted[pp] is None:
-                errors.append(pp)
-            else:
-                log_target = log_target + wanted[pp]
-        for p in factDen:
-            pp = hex(int(p))[2:]
-            if wanted[pp] is None:
-                errors.append(pp)
-            else:
-                log_target = log_target - wanted[pp]
-        if len(errors):
-            msg = "Some logarithms missing:\n"
-            msg += "\n".join(["\t"+x for x in errors])
-            raise RuntimeError(msg)
-        p=general.p()
-        ell=general.ell()
-        log_target = log_target % ell
-        print("# p=%d" % p)
-        print("# ell=%d" % ell)
-        print("log(2)=%d" % wanted["2"])
-        print("log(3)=%d" % wanted["3"])
-        print("# target=%s" % args.target)
-        print("log(target)=%d" % log_target)
-        check_result(2, wanted["2"], args.target, log_target, p, ell)
 
 # http://stackoverflow.com/questions/107705/disable-output-buffering
 # shebang takes only one arg...
@@ -1416,7 +1115,6 @@ if __name__ == '__main__':
 
     todofile, initial_split = init.do_descent(int(args.target))
     relsfile = middle.do_descent(todofile)
-    #lower.do_descent_alt(relsfile, initial_split)
     lower.do_descent(relsfile, initial_split)
 
     general.cleanup()

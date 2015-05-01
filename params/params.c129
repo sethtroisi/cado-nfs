@@ -1,7 +1,7 @@
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
-# See params/params.c91 for an example which contains some documentation.
+# See params/params.c90 for an example which contains some documentation.
 
 ###########################################################################
 # General parameters
@@ -38,7 +38,6 @@ tasks.sieve.alambda = 2.8
 
 tasks.I = 12
 tasks.sieve.qrange = 20000
-tasks.sieve.rels_wanted = 1
 
 ###########################################################################
 # Filtering
