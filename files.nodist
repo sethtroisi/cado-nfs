@@ -54,7 +54,6 @@ polyselect/integral.sage
 polyselect/kleinjung.sage
 polyselect/kleinjung-list-of-lattices.sage
 polyselect/linear_interpolation.sage
-polyselect/ropt_main.c
 polyselect/rotate.c
 polyselect/rotate_all.c
 polyselect/sopt.c
