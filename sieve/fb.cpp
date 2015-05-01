@@ -981,10 +981,8 @@ fb_powers::fb_powers (const fbprime_t lim)
 {
   fbprime_t p;
   powers = new std::vector<fb_power_t>;
-
-  prime_info i;
-  prime_info_init (i);
-  for (p = 2; p <= lim / p; p = getprime(i)) {
+  
+  for (p = 2; p <= lim / p; p = getprime(1)) {
     fbprime_t q = p;
     unsigned char k = 1;
     do {
@@ -994,7 +992,7 @@ fb_powers::fb_powers (const fbprime_t lim)
       powers->push_back(new_entry);
     } while (q <= lim / p);
   }
-  prime_info_clear (i);
+  getprime(0);
   
   std::sort (powers->begin(), powers->end(), cmp_powers);
 }
@@ -1027,8 +1025,6 @@ fb_factorbase::make_linear (const mpz_t *poly)
                poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
                poly[0], thresholds[FB_MAX_PARTS-1], powlim);
 
-  prime_info pi;
-  prime_info_init (pi);
   for (next_prime = 2; next_prime <= thresholds[FB_MAX_PARTS-1]; ) {
     /* Handle any prime powers that are smaller than next_prime */
     if (next_pow < powers->size() && (*powers)[next_pow].q <= next_prime) {
@@ -1041,7 +1037,7 @@ fb_factorbase::make_linear (const mpz_t *poly)
     } else {
       fb_cur.q = fb_cur.p = next_prime;
       fb_cur.k = 1;
-      next_prime = getprime (pi);
+      next_prime = getprime(1);
     }
     fb_cur.nr_roots = 1;
     fb_cur.roots[0].exp = fb_cur.k;
@@ -1051,7 +1047,7 @@ fb_factorbase::make_linear (const mpz_t *poly)
     append(fb_cur);
   }
 
-  prime_info_clear (pi); /* free prime iterator */
+  getprime (0); /* free prime iterator */
 
   delete (powers);
   finalize();
@@ -1118,7 +1114,7 @@ process_one_task(const task_parameters *_param)
 // Otherwise, return the number of ideals put in the task.
 static int
 get_new_task(task_info_t &T, fbprime_t &next_prime, const fbprime_t maxp,
-	     size_t &next_pow, const fb_powers &powers, prime_info pi)
+    size_t &next_pow, const fb_powers &powers)
 {
   unsigned int i;
   for (i = 0; i < GROUP && next_prime <= maxp; ++i) {
@@ -1131,7 +1127,7 @@ get_new_task(task_info_t &T, fbprime_t &next_prime, const fbprime_t maxp,
     } else {
       T.q[i] = T.p[i] = next_prime;
       T.k[i] = 1;
-      next_prime = getprime (pi);
+      next_prime = getprime(next_prime);
     }
   }
   T.n = i;
@@ -1188,8 +1184,6 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
   
   fbprime_t maxp = thresholds[FB_MAX_PARTS-1];
   fbprime_t next_prime = 2;
-  prime_info pi;
-  prime_info_init (pi);
 
   thread_pool pool(nb_threads);
 
@@ -1197,7 +1191,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
   unsigned int active_task = 0;
   for (unsigned int i = 0; i < nb_tab; ++i) {
     int ret;
-    ret = get_new_task(T[i], next_prime, maxp, next_pow, powers, pi);
+    ret = get_new_task(T[i], next_prime, maxp, next_pow, powers);
     if (!ret)
       break;
     pool.add_task(process_one_task, &params[i], 0);
@@ -1215,7 +1209,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
     active_task--;
     task_info_t * curr_T = res->T;
     store_task_result(this, curr_T);
-    cont = get_new_task(*curr_T, next_prime, maxp, next_pow, powers, pi);
+    cont = get_new_task(*curr_T, next_prime, maxp, next_pow, powers);
     if (cont) {
       active_task++;
       pool.add_task(process_one_task, res->orig_param, 0);
@@ -1235,7 +1229,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
 
   delete [] T;
   delete [] params;
-  prime_info_clear (pi); /* free prime iterator */
+  getprime (0); /* free prime iterator */
   finalize();
 }
 

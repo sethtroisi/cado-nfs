@@ -43,14 +43,12 @@
    To perform a loop over all primes <= B1, do the following
    (compile this file with -DMAIN to count primes):
 
-      prime_info i;
-      prime_info_init (i);
-      for (p = 2; p <= B1; p = getprime (i))
+      for (p = 2; p <= B1; p = getprime (p))
          {
             ...
          }
 
-      prime_info_clear (i);
+      getprime (0);  { free the memory used by getprime() }
 
    It is slightly less efficient (1.5 to 2 times) than Dan Bernstein's
    primegen library (http://cr.yp.to/primegen.html), however it is
@@ -59,139 +57,137 @@
    FIXME: An MT-safe version would be nice (and easy).
 */
 
-void
-prime_info_init (prime_info i)
-{
-  i->offset = 0;
-  i->current = -1;
-  i->primes = NULL;
-  i->nprimes = 0;
-  i->sieve = NULL;
-  i->len = 0;
-  i->moduli = NULL;
-}
-
-void
-prime_info_clear (prime_info i)
-{
-  free (i->primes);
-  free (i->sieve);
-  free (i->moduli);
-}
-
 unsigned long
-getprime (prime_info i)
+getprime (unsigned long pp)
 {
-  if (i->len)
-    {
-      unsigned char *ptr = i->sieve + i->current;
-      while (!*++ptr);
-      i->current = ptr - i->sieve;
-    }
-  else
-    i->current = 0;
+  static unsigned long offset = 0;     /* offset for current primes */
+  static long current = -1;            /* index of previous prime */
+  static unsigned int *primes = NULL;  /* small primes up to sqrt(p) */
+  static unsigned long nprimes = 0;    /* length of primes[] */
+  static unsigned char *sieve = NULL;  /* sieving table */
+  static long len = 0;                 /* length of sieving table */
+  static unsigned int *moduli = NULL;  /* offset for small primes */
 
-  if (i->current < i->len) /* most calls will end here */
-    return i->offset + 2 * i->current;
+  if (pp == 0) /* free the tables, and reinitialize */
+    {
+      offset = 0;
+      current = -1;
+      free (primes);
+      primes = NULL;
+      nprimes = 0;
+      free (sieve);
+      sieve = NULL;
+      len = 0;
+      free (moduli);
+      moduli = NULL;
+      return pp;
+    }
+
+  if (len) {
+    unsigned char *ptr = sieve + current;
+    while (!*++ptr);
+    current = ptr - sieve;
+  }
+  else
+    current = 0;
+
+  if (current < len) /* most calls will end here */
+    return offset + 2 * current;
 
   /* otherwise we have to sieve */
-  i->offset += 2 * i->len;
+  offset += 2 * len;
 
   /* first enlarge sieving table if too small */
-  if ((unsigned long) i->len * i->len < i->offset)
+  if ((unsigned long) len * len < offset)
     {
-      free (i->sieve);
-      i->len *= 2;
-      i->sieve = (unsigned char *) malloc ((i->len + 1 )
-                                           * sizeof (unsigned char));
+      free (sieve);
+      len *= 2;
+      sieve = (unsigned char *) malloc ((len + 1 ) * sizeof (unsigned char));
       /* assume this "small" malloc will not fail in normal usage */
-      ASSERT(i->sieve != NULL);
-      i->sieve[i->len] = 1; /* End mark */
+      ASSERT(sieve != NULL);
+      sieve[len] = 1; /* End mark */
     }
 
   /* now enlarge small prime table if too small */
-  if ((i->nprimes == 0) ||
-      ((unsigned long) i->primes[i->nprimes - 1] * (unsigned long)
-       i->primes[i->nprimes - 1] < i->offset + i->len))
+  if ((nprimes == 0) ||
+      ((unsigned long) primes[nprimes - 1] * (unsigned long)
+       primes[nprimes - 1] < offset + len))
       {
-	if (i->nprimes == 0) /* initialization */
+	if (nprimes == 0) /* initialization */
 	  {
-	    i->nprimes = 1;
-	    i->primes = (unsigned int*) malloc (i->nprimes
-                                                * sizeof(unsigned int));
+	    nprimes = 1;
+	    primes = (unsigned int*) malloc (nprimes * sizeof(unsigned int));
 	    /* assume this "small" malloc will not fail in normal usage */
-	    ASSERT(i->primes != NULL);
-	    i->moduli = (unsigned int*) malloc (i->nprimes
-                                                * sizeof(unsigned int));
+	    ASSERT(primes != NULL);
+	    moduli = (unsigned int*) malloc (nprimes * sizeof(unsigned int));
 	    /* assume this "small" malloc will not fail in normal usage */
-	    ASSERT(i->moduli != NULL);
-	    i->len = 1;
-	    i->sieve = (unsigned char *) malloc((i->len + 1) *
+	    ASSERT(moduli != NULL);
+	    len = 1;
+	    sieve = (unsigned char *) malloc((len + 1) *
                                        sizeof(unsigned char)); /* len=1 here */
 	    /* assume this "small" malloc will not fail in normal usage */
-	    ASSERT(i->sieve != NULL);
-	    i->sieve[i->len] = 1; /* End mark */
-	    i->offset = 5;
-	    i->sieve[0] = 1; /* corresponding to 5 */
-	    i->primes[0] = 3;
-	    i->moduli[0] = 1; /* next odd multiple of 3 is 7, i.e. next to 5 */
-	    i->current = -1;
+	    ASSERT(sieve != NULL);
+	    sieve[len] = 1; /* End mark */
+	    offset = 5;
+	    sieve[0] = 1; /* corresponding to 5 */
+	    primes[0] = 3;
+	    moduli[0] = 1; /* next odd multiple of 3 is 7, i.e. next to 5 */
+	    current = -1;
 	    return 3;
 	  }
 	else
 	  {
-	    unsigned int k, p, j, ok;
+	    unsigned int i, p, j, ok;
 
-	    k = i->nprimes;
-	    i->nprimes *= 2;
-	    i->primes = (unsigned int*) realloc (i->primes, i->nprimes *
-                                                 sizeof(unsigned int));
-	    i->moduli = (unsigned int*) realloc (i->moduli, i->nprimes *
-                                                 sizeof(unsigned int));
+	    i = nprimes;
+	    nprimes *= 2;
+	    primes = (unsigned int*) realloc (primes, nprimes *
+                                           sizeof(unsigned int));
+	    moduli = (unsigned int*) realloc (moduli, nprimes *
+                                              sizeof(unsigned int));
 	    /* assume those "small" realloc's will not fail in normal usage */
-	    ASSERT(i->primes != NULL && i->moduli != NULL);
-	    for (p = i->primes[k-1]; k < i->nprimes; k++)
+	    ASSERT(primes != NULL && moduli != NULL);
+	    for (p = primes[i-1]; i < nprimes; i++)
 	      {
 		/* find next (odd) prime > p */
 		do
 		  {
-		    for (p += 2, ok = 1, j = 0; (ok != 0) && (j < k); j++)
-		      ok = p % i->primes[j];
+		    for (p += 2, ok = 1, j = 0; (ok != 0) && (j < i); j++)
+		      ok = p % primes[j];
 		  }
 		while (ok == 0);
-		i->primes[k] = p;
-		/* moduli[k] is the smallest m such that offset + 2*m = k*p */
-		j = i->offset % p;
+		primes[i] = p;
+		/* moduli[i] is the smallest m such that offset + 2*m = k*p */
+		j = offset % p;
 		j = (j == 0) ? j : p - j; /* -offset mod p */
 		if ((j % 2) != 0)
 		  j += p; /* ensure j is even */
-		i->moduli[k] = j / 2;
+		moduli[i] = j / 2;
 	      }
 	  }
       }
 
   /* now sieve for new primes */
   {
-    long k;
+    long i;
     unsigned long j, p;
     
-    memset (i->sieve, 1, sizeof(unsigned char) * (i->len + 1));
-    for (j = 0; j < i->nprimes; j++)
+    memset (sieve, 1, sizeof(unsigned char) * (len + 1));
+    for (j = 0; j < nprimes; j++)
       {
-	p = i->primes[j];
-	for (k = i->moduli[j]; k < i->len; k += p)
-	  i->sieve[k] = 0;
-	i->moduli[j] = k - i->len; /* for next sieving array */
+	p = primes[j];
+	for (i = moduli[j]; i < len; i += p)
+	  sieve[i] = 0;
+	moduli[j] = i - len; /* for next sieving array */
       }
   }
 
-  unsigned char *ptr = i->sieve - 1;
+  unsigned char *ptr = sieve - 1;
   while (!*++ptr);
-  i->current = ptr - i->sieve;
+  current = ptr - sieve;
 
-  ASSERT(i->current < i->len); /* otherwise we found a prime gap >= sqrt(x)
-                                  around x */
-  return i->offset + 2 * i->current;
+  ASSERT(current < len); /* otherwise we found a prime gap >= sqrt(x) around x */
+  return offset + 2 * current;
 }
 
 #ifdef MAIN
@@ -200,7 +196,6 @@ main (int argc, char *argv[])
 {
   unsigned long p, B;
   unsigned long pi = 0;
-  prime_info i;
 
   if (argc != 2)
     {
@@ -210,12 +205,10 @@ main (int argc, char *argv[])
 
   B = strtoul (argv[1], NULL, 0);
   
-  prime_info_init (i);
-
-  for (pi = 0, p = 2; p <= B; p = getprime (i), pi++);
+  for (pi = 0, p = 2; p <= B; p = getprime (p), pi++);
   printf ("pi(%lu)=%lu\n", B, pi);
 
-  prime_info_clear (i); /* free the tables */
+  getprime (0); /* free the tables */
 
   return 0;
 }

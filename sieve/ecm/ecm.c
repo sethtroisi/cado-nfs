@@ -2093,14 +2093,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       mod_set1 (a, m);
       mod_neg (a, a, m);
 
-      prime_info i;
-      prime_info_init (i);
-      for (p = 2; p <= plan->B1; p = getprime (i))
+      for (p = 2; p <= plan->B1; p = getprime (p))
 	{
 	  for (q = p; q <= plan->B1 / p; q *= p);
 	  ellE_mul_ul (Q, Q, q, m, a);
 	}
-      prime_info_clear (i);
 
       mod_gcd (f, Q->z, m);
 

@@ -278,9 +278,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
     {
       unsigned long p = 2, e;
       mpz_t pp;
-      prime_info pi;
 
-      prime_info_init (pi);
       mpz_init (pp);
       fprintf (stderr, "Error, rational square root remainder is not zero\n");
       /* reconstruct the initial value of prd[0] to debug */
@@ -302,10 +300,10 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
               if (verbose)
                 break;
             }
-          p = getprime (pi);
+          p = getprime (p);
         }
       mpz_clear (pp);
-      prime_info_clear (pi);
+      p = getprime (0);
       exit (1);
     }
 
@@ -702,13 +700,11 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
   modul_poly_t fp;
 
   modul_poly_init (fp, dF);
-  prime_info pi;
-  prime_info_init (pi);
   while (1)
     {
     int d;
 
-    p = getprime (pi);
+    p = getprime (p);
     ntries ++;
     if (mpz_gcd_ui(NULL, N, p) != 1)
       continue;
@@ -730,7 +726,7 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
       break;
     }
   modul_poly_clear (fp);
-  prime_info_clear (pi);
+  getprime (0);
 
   return p;
 }
@@ -957,9 +953,7 @@ trialdivide_print(unsigned long N, unsigned long B)
     ASSERT(N != 0);
     if (N == 1) return 1;
     unsigned long p;
-    prime_info pi;
-    prime_info_init (pi);
-    for (p = 2; p <= B; p = getprime (pi)) {
+    for (p = 2; p <= B; p = getprime (p)) {
         while ((N%p) == 0) {
             N /= p;
             printf("%ld\n", p);
@@ -969,7 +963,7 @@ trialdivide_print(unsigned long N, unsigned long B)
             }
         }
     }
-    prime_info_clear (pi);
+    getprime(0);
     return N;
 }
 
@@ -1389,15 +1383,13 @@ int main(int argc, char *argv[])
         /* Trial divide Np, to avoid bug if a stupid input is given */
         {
             unsigned long p;
-            prime_info pi;
-            prime_info_init (pi);
-            for (p = 2; p <= 1000000; p = getprime (pi)) {
+            for (p = 2; p <= 1000000; p = getprime (p)) {
                 while (mpz_tdiv_ui(Np, p) == 0) {
                     printf("%lu\n", p);
                     mpz_divexact_ui(Np, Np, p);
                 }
             }
-            prime_info_clear (pi);
+            getprime(0);
         }
         if (mpz_cmp(pol->n, Np) != 0) 
             gmp_fprintf(stderr, "Now factoring N' = %Zd\n", Np);
