@@ -284,6 +284,8 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
       /* reconstruct the initial value of prd[0] to debug */
       mpz_mul (prd[0], prd[0], prd[0]);
       mpz_add (prd[0], prd[0], v);
+      prime_info pi;
+      prime_info_init (pi);
       while (mpz_cmp_ui (prd[0], 1) > 0)
         {
           e = 0;
@@ -300,10 +302,10 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
               if (verbose)
                 break;
             }
-          p = getprime (p);
+          p = getprime_mt (pi);
         }
       mpz_clear (pp);
-      p = getprime (0);
+      prime_info_clear (pi);
       exit (1);
     }
 
@@ -700,24 +702,16 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
   modul_poly_t fp;
 
   modul_poly_init (fp, dF);
+  prime_info pi;
+  prime_info_init (pi);
   while (1)
     {
     int d;
 
-    p = getprime (p);
+    p = getprime_mt (pi);
     ntries ++;
     if (mpz_gcd_ui(NULL, N, p) != 1)
       continue;
-
-    /* Not needed anymore with modul_poly */
-
-    /* if (! plain_poly_fits (dF, p) || ntries > 100) */
-    /*   { */
-    /*     fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n"); */
-    /*     plain_poly_clear (fp); */
-    /*     getprime (0); */
-    /*     exit (1); */
-    /*   } */
 
     d = modul_poly_set_mod (fp, F, &p);
     if (d != dF)
@@ -726,7 +720,7 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
       break;
     }
   modul_poly_clear (fp);
-  getprime (0);
+  prime_info_clear (pi);
 
   return p;
 }
@@ -953,7 +947,9 @@ trialdivide_print(unsigned long N, unsigned long B)
     ASSERT(N != 0);
     if (N == 1) return 1;
     unsigned long p;
-    for (p = 2; p <= B; p = getprime (p)) {
+    prime_info pi;
+    prime_info_init (pi);
+    for (p = 2; p <= B; p = getprime_mt (pi)) {
         while ((N%p) == 0) {
             N /= p;
             printf("%ld\n", p);
@@ -963,7 +959,7 @@ trialdivide_print(unsigned long N, unsigned long B)
             }
         }
     }
-    getprime(0);
+    prime_info_clear (pi);
     return N;
 }
 
@@ -1383,13 +1379,15 @@ int main(int argc, char *argv[])
         /* Trial divide Np, to avoid bug if a stupid input is given */
         {
             unsigned long p;
-            for (p = 2; p <= 1000000; p = getprime (p)) {
+            prime_info pi;
+            prime_info_init (pi);
+            for (p = 2; p <= 1000000; p = getprime_mt (pi)) {
                 while (mpz_tdiv_ui(Np, p) == 0) {
                     printf("%lu\n", p);
                     mpz_divexact_ui(Np, Np, p);
                 }
             }
-            getprime(0);
+            prime_info_clear (pi);
         }
         if (mpz_cmp(pol->n, Np) != 0) 
             gmp_fprintf(stderr, "Now factoring N' = %Zd\n", Np);
