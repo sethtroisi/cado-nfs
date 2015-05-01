@@ -299,14 +299,18 @@ int main(int argc, char **argv)
      or build_LUT() crashes */
   uint64_t prime_table_max = max_u64(z, LUT_Y) + 1;
   size_t nr_primes = 1; /* 1 extra at the end */
-  for (uint64_t p = 2; p <= prime_table_max; p = getprime(1))
+  prime_info pi;
+  prime_info_init (pi);
+  for (uint64_t p = 2; p <= prime_table_max; p = getprime_mt (pi))
     nr_primes++;
   
   primes = malloc(nr_primes * sizeof(uint64_t));
-  getprime(0); /* Re-init */
+  prime_info_clear (pi);
   primes[0] = 2;
+  prime_info_init (pi);
   for (size_t i = 1; i < nr_primes; i++)
-    primes[i] = getprime(1);
+    primes[i] = getprime_mt (pi);
+  prime_info_clear (pi);
 
   build_LUT();
   check_LUT();
