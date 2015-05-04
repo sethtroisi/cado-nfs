@@ -18,6 +18,7 @@
 #define STATUS_SMOOTH  0
 #define STATUS_UNKNOWN 1
 #define STATUS_USELESS 2
+#define STATUS_NEW 3
 
 unsigned long
 tree_height (unsigned long n)
@@ -39,7 +40,7 @@ tree_height (unsigned long n)
    Each R[j] has been divided by its P-smooth part
 */
 void
-smoothness_test (mpz_t *R, unsigned long n, mpz_t P)
+smoothness_test (mpz_t *R, unsigned long n, mpz_t P, unsigned char *status)
 {
   unsigned long h = tree_height (n), i, j, w[64];
   mpz_t **T;
@@ -69,7 +70,7 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P)
       if (w[i-1] & 1)
         mpz_set (T[i][w[i]-1], T[i-1][w[i-1]-1]);
     }
-  printf ("T[h][0] has %lu bits\n", mpz_sizeinbase (T[h][0], 2));
+  fprintf (stderr, "T[h][0] has %lu bits\n", mpz_sizeinbase (T[h][0], 2));
 
   /* compute remainder tree */
   mpz_mod (T[h][0], P, T[h][0]);
@@ -90,14 +91,20 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P)
       mpz_mod (w1, T[1][j], T[0][2*j]);
       mpz_gcd(w2, w1, T[0][2*j]);
       mpz_divexact(T[0][2*j], T[0][2*j], w2);
+      if (mpz_cmp_ui (w2, 1) > 0)
+        status[2*j] = STATUS_NEW;
       mpz_mod (w1, T[1][j], T[0][2*j+1]);
       mpz_gcd(w2, w1, T[0][2*j+1]);
       mpz_divexact(T[0][2*j+1], T[0][2*j+1], w2);
+      if (mpz_cmp_ui (w2, 1) > 0)
+        status[2*j+1] = STATUS_NEW;
     }
   if (n & 1)
     {
       mpz_gcd(w2, T[1][w[1]-1], T[0][n-1]);
       mpz_divexact(T[0][n-1], T[0][n-1], w2);
+      if (mpz_cmp_ui (w2, 1) > 0)
+        status[n-1] = STATUS_NEW;
     }
 
   mpz_clear(w1);
@@ -160,7 +167,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
   mpz_t z_B3;
   mpz_t z_L2;
 
-  unsigned long int i;
+  unsigned long int i, L;
 
 
   mpz_init(z_B3);
@@ -172,23 +179,24 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
     mpz_mul_ui(z_B3, z_B3, rlim);
     mpz_set_ui(z_L2, 0);
     mpz_setbit(z_L2, 2 * lpbr);
+    L = 1UL << lpbr;
 
     for (i = 0; i < n; i++)
     {
-      if (b_status_r[i] == STATUS_UNKNOWN)
+      if (b_status_r[i] == STATUS_NEW)
       {
         if (mpz_cmp_ui (R[i], 1) == 0)
         {
           b_status_r[i] = STATUS_SMOOTH;
           (*nb_smooth_r)++;
         }
-        else if (mpz_cmp_ui(R[i], (1UL << lpbr)) <= 0)  // works only if rlim*rlim > 2^lpbr (which is assumed)
+        else if (mpz_cmp_ui(R[i], L) <= 0)  // works only if rlim*rlim > 2^lpbr (which is assumed)
         {
           b_status_r[i] = STATUS_SMOOTH;
           mpz_set_ui(R[i], 1);
           (*nb_smooth_r)++;
         }
-        else if ( (mpz_cmp_ui(R[i], (1UL << lpbr)) > 0) && (mpz_cmp_ui(R[i], rlim * rlim) < 0) )
+        else if ( (mpz_cmp_ui(R[i], L) > 0) && (mpz_cmp_ui(R[i], rlim * rlim) < 0) )
         {
           if (b_status_a[i] == STATUS_SMOOTH)
             (*nb_smooth_a)--;
@@ -208,13 +216,13 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(A[i], 1);
           (*nb_useless)++;
         }
-        else if ( (mpz_cmp_ui(R[i], rlim * (1UL << lpbr)) <= 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) == 0) )
+        else if ((mpz_cmp_ui(R[i], rlim * L) <= 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) == 0) )
         {
           b_status_r[i] = STATUS_SMOOTH;
           mpz_set_ui(R[i], 1);
           (*nb_smooth_r)++;
         }
-        else if ( (mpz_cmp_ui(R[i], (1UL << lpbr)) > 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) != 0) )
+        else if ((mpz_cmp_ui(R[i], L) > 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) != 0))
         {
           if (b_status_a[i] == STATUS_SMOOTH)
             (*nb_smooth_a)--;
@@ -224,6 +232,8 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(A[i], 1);
           (*nb_useless)++;
         }
+        else
+          b_status_r[i] = STATUS_UNKNOWN;
       }
     }
   }
@@ -233,23 +243,24 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
     mpz_mul_ui(z_B3, z_B3, alim);
     mpz_set_ui(z_L2, 0);
     mpz_setbit(z_L2, 2 * lpba);
+    L = 1UL << lpba;
 
     for (i = 0; i < n; i++)
     {
-      if (b_status_a[i] == STATUS_UNKNOWN)
+      if (b_status_a[i] == STATUS_NEW)
       {
         if (mpz_cmp_ui (A[i], 1) == 0)
         {
           b_status_a[i] = STATUS_SMOOTH;
           (*nb_smooth_a)++;
         }
-        else if (mpz_cmp_ui(A[i], (1UL << lpba)) <= 0)  // works only if alim*alim > 2^lpba (which is assumed)
+        else if (mpz_cmp_ui(A[i], L) <= 0)  // works only if alim*alim > 2^lpba (which is assumed)
         {
           b_status_a[i] = STATUS_SMOOTH;
           mpz_set_ui(A[i], 1);
           (*nb_smooth_a)++;
         }
-        else if ( (mpz_cmp_ui(A[i], (1UL << lpba)) > 0) && (mpz_cmp_ui(A[i], alim * alim) < 0) )
+        else if ( (mpz_cmp_ui(A[i], L) > 0) && (mpz_cmp_ui(A[i], alim * alim) < 0) )
         {
           if (b_status_r[i] == STATUS_SMOOTH)
             (*nb_smooth_r)--;
@@ -269,13 +280,13 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(R[i], 1);
           (*nb_useless)++;
         }
-        else if ( (mpz_cmp_ui(A[i], alim * (1UL << lpba)) <= 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) == 0) )
+        else if ((mpz_cmp_ui(A[i], alim * L) <= 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) == 0) )
         {
           b_status_a[i] = STATUS_SMOOTH;
           mpz_set_ui(A[i], 1);
           (*nb_smooth_a)++;
         }
-        else if ( (mpz_cmp_ui(A[i], (1UL << lpba)) > 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) != 0) )
+        else if ((mpz_cmp_ui(A[i], L) > 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) != 0))
         {
           if (b_status_r[i] == STATUS_SMOOTH)
             (*nb_smooth_r)--;
@@ -285,6 +296,8 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(R[i], 1);
           (*nb_useless)++;
         }
+        else
+          b_status_a[i] = STATUS_UNKNOWN;
       }
     }
   }
@@ -294,15 +307,15 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
 }
 
 int
-main ()
+main (int argc, char *argv[])
 {
-  FILE *cofac_r, *cofac_a;
+  FILE *cofac;
   mpz_t *R, *A, P;
-  unsigned long n = 479233; /* number of cofactors, UPDATE */
+  unsigned long n = 5567917; /* number of cofactors, UPDATE */
   unsigned long n_init;
   unsigned long i;
   size_t ret;
-  double s;
+  double s, t_smooth = 0, t_update = 0;
   unsigned int n0_pass;
   unsigned long int lpbr = 33;
   unsigned long int lpba = 33;
@@ -310,14 +323,15 @@ main ()
   unsigned long int alim_low;
   unsigned long int rlim_high;
   unsigned long int alim_high;
-  unsigned long int rlim_step = 50000000;
-  unsigned long int alim_step = 50000000;
+  unsigned long int rlim_step = 500000000;
+  unsigned long int alim_step = 500000000;
   unsigned char *b_status_r;
   unsigned char *b_status_a;
   unsigned long int nb_smooth_r;
   unsigned long int nb_smooth_a;
   unsigned long int nb_useless;
-
+  long *a;
+  unsigned long *b;
 
   n_init = n;
 
@@ -325,21 +339,21 @@ main ()
   b_status_a = (unsigned char *) malloc(n * sizeof(unsigned char));
   for (i = 0; i < n; i++)
   {
-    b_status_r[i] = STATUS_UNKNOWN;
-    b_status_a[i] = STATUS_UNKNOWN;
+    b_status_r[i] = STATUS_NEW;
+    b_status_a[i] = STATUS_NEW;
   }
-  cofac_r = fopen ("/tmp/cofac_r", "r");
-  cofac_a = fopen ("/tmp/cofac_a", "r");
+  ASSERT_ALWAYS (argc == 2);
+  cofac = fopen (argv[1], "r");
+  a = malloc (n * sizeof (long));
+  b = malloc (n * sizeof (unsigned long));
   R = malloc (n * sizeof (mpz_t));
   A = malloc (n * sizeof (mpz_t));
   for (i = 0; i < n; i++)
     {
       mpz_init (R[i]);
       mpz_init (A[i]);
-      ret = mpz_inp_str (R[i], cofac_r, 10);
-      ASSERT_ALWAYS (ret > 0);
-      ret = mpz_inp_str (A[i], cofac_a, 10);
-      ASSERT_ALWAYS (ret > 0);
+      ret = gmp_fscanf (cofac, "%ld %lu %Zd %Zd\n", a+i, b+i, R[i], A[i]);
+      ASSERT_ALWAYS (ret == 4);
     }
   fprintf (stderr, "Read %lu cofactors\n", n);
   mpz_init (P);
@@ -347,8 +361,8 @@ main ()
 
   /**** Initial pass ***/
 
-  printf("\n");
-  printf("Initial pass\n");
+  fprintf (stderr, "\n");
+  fprintf (stderr, "Initial pass\n");
 
   rlim_high = 250000000;
   alim_high = 500000000;
@@ -357,57 +371,92 @@ main ()
   nb_smooth_a = 0;
   nb_useless = 0;
 
+  t_update -= seconds ();
   update_status(R, A, b_status_r, b_status_a, n, 1, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
   update_status(R, A, b_status_r, b_status_a, n, 0, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
+  t_update += seconds ();
+  fprintf (stderr, "Update time %.0fs\n", t_update);
+
+#define NPASS 20
+
+  rlim_step = 1 + ((1UL << lpbr) - rlim_high - 1) / NPASS;
+  alim_step = 1 + ((1UL << lpba) - alim_high - 1) / NPASS;
 
   n0_pass = 0;
-  while (n0_pass < 20)
+  while (n0_pass < NPASS)
   {
     n0_pass++;
 
-    printf("\n");
-    printf("Pass %u\n", n0_pass);
+    fprintf (stderr, "\n");
+    fprintf (stderr, "Pass %u\n", n0_pass);
 
     /* rational side */
 
     rlim_low = rlim_high;
     rlim_high += rlim_step;
 
-    printf("\n");
-    printf("rlim : %lu:%lu\n", rlim_low, rlim_high);
-    printf("nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_r, nb_useless, n_init - nb_smooth_r - nb_useless);
+    fprintf (stderr, "\n");
+    fprintf (stderr, "rlim : %lu:%lu\n", rlim_low, rlim_high);
+    fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_r, nb_useless, n_init - nb_smooth_r - nb_useless);
 
     s = seconds ();
     prime_product (P, rlim_low, rlim_high); /* UPDATE */
     fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
              mpz_sizeinbase (P, 2), seconds () - s);
     s = seconds ();
-    smoothness_test (R, n, P);
-    printf ("smoothness_test took %.0f seconds\n", seconds () - s);
+    t_smooth -= seconds ();
+    smoothness_test (R, n, P, b_status_r);
+    t_smooth += seconds ();
+    fprintf (stderr, "smoothness_test took %.0fs (total %.0fs so far)\n",
+             seconds () - s, t_smooth);
 
+    t_update -= seconds ();
     update_status(R, A, b_status_r, b_status_a, n, 1, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
-    printf("nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_r, nb_useless, n_init - nb_smooth_r - nb_useless);
+    t_update += seconds ();
+    fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_r, nb_useless, n_init - nb_smooth_r - nb_useless);
+    fprintf (stderr, "Update time %.0fs so far\n", t_update);
 
     /* algebraic side */
 
     alim_low = alim_high;
     alim_high += alim_step;
 
-    printf("\n");
-    printf("alim : %lu:%lu\n", alim_low, alim_high);
-    printf("nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_a, nb_useless, n_init - nb_smooth_a - nb_useless);
+    fprintf (stderr, "\n");
+    fprintf (stderr, "alim : %lu:%lu\n", alim_low, alim_high);
+    fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_a, nb_useless, n_init - nb_smooth_a - nb_useless);
 
     s = seconds ();
     prime_product (P, alim_low, alim_high); /* UPDATE */
     fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
              mpz_sizeinbase (P, 2), seconds () - s);
     s = seconds ();
-    smoothness_test (A, n, P);
-    printf ("smoothness_test took %.0f seconds\n", seconds () - s);
+    t_smooth -= seconds ();
+    smoothness_test (A, n, P, b_status_a);
+    t_smooth += seconds ();
+    fprintf (stderr, "smoothness_test took %.0fs (total %.0fs so far)\n",
+             seconds () - s, t_smooth);
 
+    t_update -= seconds ();
     update_status(R, A, b_status_r, b_status_a, n, 0, rlim_high, lpbr, alim_high, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless);
-    printf("nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_a, nb_useless, n_init - nb_smooth_a - nb_useless);
+    t_update += seconds ();
+    fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu\n", nb_smooth_a, nb_useless, n_init - nb_smooth_a - nb_useless);
+    fprintf (stderr, "Update time %.0fs so far\n", t_update);
   }
+
+  /* those relations that remain unknown are those for which we were not able
+     to determine the status on each side, in any case they are non smooth */
+
+  /* print smooth cofactors */
+  unsigned long nb_smooth = 0;
+  for (i = 0; i < n; i++)
+    {
+      if (b_status_r[i] == STATUS_SMOOTH && b_status_a[i] == STATUS_SMOOTH)
+        {
+          printf ("Smooth: a=%ld b=%lu\n", a[i], b[i]);
+          nb_smooth ++;
+        }
+    }
+  fprintf (stderr, "Found %lu relations\n", nb_smooth);
 
   mpz_clear (P);
 
@@ -422,7 +471,8 @@ main ()
   free (b_status_a);
   free (R);
   free (A);
-  fclose (cofac_r);
-  fclose (cofac_a);
+  free (a);
+  free (b);
+  fclose (cofac);
 }
 
