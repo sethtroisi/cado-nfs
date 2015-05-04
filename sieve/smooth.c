@@ -18,7 +18,6 @@
 #define STATUS_SMOOTH  0
 #define STATUS_UNKNOWN 1
 #define STATUS_USELESS 2
-#define STATUS_NEW 3
 
 unsigned long
 tree_height (unsigned long n)
@@ -40,7 +39,7 @@ tree_height (unsigned long n)
    Each R[j] has been divided by its P-smooth part
 */
 void
-smoothness_test (mpz_t *R, unsigned long n, mpz_t P, unsigned char *status)
+smoothness_test (mpz_t *R, unsigned long n, mpz_t P)
 {
   unsigned long h = tree_height (n), i, j, w[64];
   mpz_t **T;
@@ -91,20 +90,14 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P, unsigned char *status)
       mpz_mod (w1, T[1][j], T[0][2*j]);
       mpz_gcd(w2, w1, T[0][2*j]);
       mpz_divexact(T[0][2*j], T[0][2*j], w2);
-      if (mpz_cmp_ui (w2, 1) > 0)
-        status[2*j] = STATUS_NEW;
       mpz_mod (w1, T[1][j], T[0][2*j+1]);
       mpz_gcd(w2, w1, T[0][2*j+1]);
       mpz_divexact(T[0][2*j+1], T[0][2*j+1], w2);
-      if (mpz_cmp_ui (w2, 1) > 0)
-        status[2*j+1] = STATUS_NEW;
     }
   if (n & 1)
     {
       mpz_gcd(w2, T[1][w[1]-1], T[0][n-1]);
       mpz_divexact(T[0][n-1], T[0][n-1], w2);
-      if (mpz_cmp_ui (w2, 1) > 0)
-        status[n-1] = STATUS_NEW;
     }
 
   mpz_clear(w1);
@@ -167,7 +160,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
   mpz_t z_B3;
   mpz_t z_L2;
 
-  unsigned long int i, L;
+  unsigned long int i, L, B;
 
 
   mpz_init(z_B3);
@@ -179,24 +172,21 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
     mpz_mul_ui(z_B3, z_B3, rlim);
     mpz_set_ui(z_L2, 0);
     mpz_setbit(z_L2, 2 * lpbr);
+    B = rlim;
     L = 1UL << lpbr;
 
     for (i = 0; i < n; i++)
     {
-      if (b_status_r[i] == STATUS_NEW)
+      if (b_status_r[i] == STATUS_UNKNOWN)
       {
-        if (mpz_cmp_ui (R[i], 1) == 0)
-        {
-          b_status_r[i] = STATUS_SMOOTH;
-          (*nb_smooth_r)++;
-        }
-        else if (mpz_cmp_ui(R[i], L) <= 0)  // works only if rlim*rlim > 2^lpbr (which is assumed)
+        if (mpz_cmp_ui(R[i], L) <= 0)  // assume L < B^2
         {
           b_status_r[i] = STATUS_SMOOTH;
           mpz_set_ui(R[i], 1);
           (*nb_smooth_r)++;
         }
-        else if ( (mpz_cmp_ui(R[i], L) > 0) && (mpz_cmp_ui(R[i], rlim * rlim) < 0) )
+        /* now L < R[i] */
+        else if (mpz_cmp_ui(R[i], B * B) < 0)
         {
           if (b_status_a[i] == STATUS_SMOOTH)
             (*nb_smooth_a)--;
@@ -206,6 +196,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(A[i], 1);
           (*nb_useless)++;
         }
+        /* now L < B^2 <= R[i] */
         else if ( (mpz_cmp(R[i], z_L2) > 0) && (mpz_cmp(R[i], z_B3) < 0) )
         {
           if (b_status_a[i] == STATUS_SMOOTH)
@@ -216,13 +207,8 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(A[i], 1);
           (*nb_useless)++;
         }
-        else if ((mpz_cmp_ui(R[i], rlim * L) <= 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) == 0) )
-        {
-          b_status_r[i] = STATUS_SMOOTH;
-          mpz_set_ui(R[i], 1);
-          (*nb_smooth_r)++;
-        }
-        else if ((mpz_cmp_ui(R[i], L) > 0) && (mpz_probab_prime_p(R[i], NB_MILLER_RABIN) != 0))
+        /* now L < B^2 <= R[i] <= L^2 or B^3 <= R[i] */
+        else if (mpz_probab_prime_p(R[i], NB_MILLER_RABIN))
         {
           if (b_status_a[i] == STATUS_SMOOTH)
             (*nb_smooth_a)--;
@@ -232,8 +218,13 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(A[i], 1);
           (*nb_useless)++;
         }
-        else
-          b_status_r[i] = STATUS_UNKNOWN;
+        /* now L < B^2 <= R[i] <= L^2 or B^3 <= R[i] and R[i] is composite */
+        else if (mpz_cmp_ui(R[i], B * L) <= 0)
+        {
+          b_status_r[i] = STATUS_SMOOTH;
+          mpz_set_ui(R[i], 1);
+          (*nb_smooth_r)++;
+        }
       }
     }
   }
@@ -243,24 +234,21 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
     mpz_mul_ui(z_B3, z_B3, alim);
     mpz_set_ui(z_L2, 0);
     mpz_setbit(z_L2, 2 * lpba);
+    B = alim;
     L = 1UL << lpba;
 
     for (i = 0; i < n; i++)
     {
-      if (b_status_a[i] == STATUS_NEW)
+      if (b_status_a[i] == STATUS_UNKNOWN)
       {
-        if (mpz_cmp_ui (A[i], 1) == 0)
-        {
-          b_status_a[i] = STATUS_SMOOTH;
-          (*nb_smooth_a)++;
-        }
-        else if (mpz_cmp_ui(A[i], L) <= 0)  // works only if alim*alim > 2^lpba (which is assumed)
+        if (mpz_cmp_ui(A[i], L) <= 0)  // assume L < B^2
         {
           b_status_a[i] = STATUS_SMOOTH;
           mpz_set_ui(A[i], 1);
           (*nb_smooth_a)++;
         }
-        else if ( (mpz_cmp_ui(A[i], L) > 0) && (mpz_cmp_ui(A[i], alim * alim) < 0) )
+        /* now L < A[i] */
+        else if (mpz_cmp_ui(A[i], B * B) < 0)
         {
           if (b_status_r[i] == STATUS_SMOOTH)
             (*nb_smooth_r)--;
@@ -270,6 +258,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(R[i], 1);
           (*nb_useless)++;
         }
+        /* now L < B^2 <= A[i] */
         else if ( (mpz_cmp(A[i], z_L2) > 0) && (mpz_cmp(A[i], z_B3) < 0) )
         {
           if (b_status_r[i] == STATUS_SMOOTH)
@@ -280,13 +269,8 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(R[i], 1);
           (*nb_useless)++;
         }
-        else if ((mpz_cmp_ui(A[i], alim * L) <= 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) == 0) )
-        {
-          b_status_a[i] = STATUS_SMOOTH;
-          mpz_set_ui(A[i], 1);
-          (*nb_smooth_a)++;
-        }
-        else if ((mpz_cmp_ui(A[i], L) > 0) && (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) != 0))
+        /* now L < B^2 <= A[i] <= L^2 or B^3 <= A[i] */
+        else if (mpz_probab_prime_p(A[i], NB_MILLER_RABIN))
         {
           if (b_status_r[i] == STATUS_SMOOTH)
             (*nb_smooth_r)--;
@@ -296,8 +280,13 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
           mpz_set_ui(R[i], 1);
           (*nb_useless)++;
         }
-        else
-          b_status_a[i] = STATUS_UNKNOWN;
+        /* now L < B^2 <= A[i] <= L^2 or B^3 <= A[i] and A[i] is composite */
+        else if (mpz_cmp_ui(A[i], B * L) <= 0)
+        {
+          b_status_a[i] = STATUS_SMOOTH;
+          mpz_set_ui(A[i], 1);
+          (*nb_smooth_a)++;
+        }
       }
     }
   }
@@ -313,7 +302,7 @@ main (int argc, char *argv[])
   mpz_t *R, *A, P;
   unsigned long n = 5567917; /* number of cofactors, UPDATE */
   unsigned long n_init;
-  unsigned long i;
+  unsigned long i, j;
   size_t ret;
   double s, t_smooth = 0, t_update = 0;
   unsigned int n0_pass;
@@ -333,14 +322,12 @@ main (int argc, char *argv[])
   long *a;
   unsigned long *b;
 
-  n_init = n;
-
   b_status_r = (unsigned char *) malloc(n * sizeof(unsigned char));
   b_status_a = (unsigned char *) malloc(n * sizeof(unsigned char));
   for (i = 0; i < n; i++)
   {
-    b_status_r[i] = STATUS_NEW;
-    b_status_a[i] = STATUS_NEW;
+    b_status_r[i] = STATUS_UNKNOWN;
+    b_status_a[i] = STATUS_UNKNOWN;
   }
   ASSERT_ALWAYS (argc == 2);
   cofac = fopen (argv[1], "r");
@@ -348,13 +335,22 @@ main (int argc, char *argv[])
   b = malloc (n * sizeof (unsigned long));
   R = malloc (n * sizeof (mpz_t));
   A = malloc (n * sizeof (mpz_t));
-  for (i = 0; i < n; i++)
+  for (i = j = 0; i < n; i++)
     {
       mpz_init (R[i]);
       mpz_init (A[i]);
-      ret = gmp_fscanf (cofac, "%ld %lu %Zd %Zd\n", a+i, b+i, R[i], A[i]);
+      ret = gmp_fscanf (cofac, "%ld %lu %Zd %Zd\n", a+j, b+j, R[j], A[j]);
       ASSERT_ALWAYS (ret == 4);
+#if 1 /* define to 1 to enable only two large primes on the rational side */
+      if (mpz_sizeinbase (R[j], 2) > 66)
+        {
+        }
+      else
+#endif
+      j++;
     }
+  n = j;
+  n_init = n;
   fprintf (stderr, "Read %lu cofactors\n", n);
   mpz_init (P);
 
@@ -405,7 +401,7 @@ main (int argc, char *argv[])
              mpz_sizeinbase (P, 2), seconds () - s);
     s = seconds ();
     t_smooth -= seconds ();
-    smoothness_test (R, n, P, b_status_r);
+    smoothness_test (R, n, P);
     t_smooth += seconds ();
     fprintf (stderr, "smoothness_test took %.0fs (total %.0fs so far)\n",
              seconds () - s, t_smooth);
@@ -431,7 +427,7 @@ main (int argc, char *argv[])
              mpz_sizeinbase (P, 2), seconds () - s);
     s = seconds ();
     t_smooth -= seconds ();
-    smoothness_test (A, n, P, b_status_a);
+    smoothness_test (A, n, P);
     t_smooth += seconds ();
     fprintf (stderr, "smoothness_test took %.0fs (total %.0fs so far)\n",
              seconds () - s, t_smooth);
