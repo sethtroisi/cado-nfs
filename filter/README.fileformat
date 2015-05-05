@@ -182,6 +182,9 @@ column weights (one weight per row), and have no header (so that the
 number of lines of XXX.sparse.rw.txt is exactly the number of rows of the
 matrix.
 
+$ wc -l < /tmp/xxx.sparse.rw.txt # number of rows
+$ wc -l < /tmp/xxx.sparse.cw.txt # number of columns
+
 The "bin" format is more compact. Recent versions of CADO-NFS only
 generate the bin format. It is only made of 32-bit little-endian
 integers. The main file has no header, and is just a sequence of rows.
@@ -201,14 +204,33 @@ in order to obtain a xxx.sparse.txt from a xxx.sparse.bin file:
 mf_scan --binary-in --mfile xxx.sparse.bin --ascii-out --ofile xxx.sparse.txt --freq
 
 Note that the program will say "Warning: output matrix is headerless",
-which is normal. One must then prepend the number of rows and columns at
-the beginning of the file and the txt file is then well-formed. For
-example:
+which is normal.  The txt matrix with header can be obtained by adding a
+first row to xxx.sparse.txt which contains the number of rows and the
+number of columns, for example:
+
+$ wc -l < /tmp/xxx.sparse.rw.txt # number of rows
+$ wc -l < /tmp/xxx.sparse.cw.txt # number of columns
+
+7638 7446
+11 36 38 89 373 425 689 876 1410 5745 5274 901
+11 14 70 107 192 505 1097 4438 6904 4094 1997 2849
+10 88 112 170 227 248 399 1365 1329 4749 3056
+15 1 8 9 20 24 75 159 169 251 873 2018 1013 4064 2984 2370
+12 25 29 36 118 346 387 1026 2930 6995 5591 1719 1605
+11 57 65 121 141 390 612 1308 1114 2388 1645 1605
+11 28 124 257 348 607 780 815 1097 947 5617 6337
+12 33 150 213 217 527 480 576 1323 1261 4570 6374 1723
+12 19 60 108 124 789 760 4261 4892 1856 4489 1194 1723
+13 11 50 86 148 262 333 528 3382 5961 3234 3412 3534 1723
+...
+
+Equivalent shell line:
 
 (echo `wc -l < /tmp/xxx.sparse.rw.txt` `wc -l < /tmp/xxx.sparse.cw.txt` ; cat xxx.sparse.txt) > xxx.sparse.txt.final
 
-The mf_scan binary can also handle DL matrices, but the --withcoeffs
-option must be added.
+
+Note: The mf_scan binary can also handle DL matrices, but the
+--withcoeffs option must be added.
 
 Files XXX.sparse.* versus XXX.dense.*
 =====================================
