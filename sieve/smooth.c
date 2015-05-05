@@ -156,8 +156,9 @@ void prime_product(mpz_t P, prime_info pi, unsigned long p_max, unsigned long *p
   free (L);
 }
 
-void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char *b_status_a, unsigned long int *n, unsigned int b_side_R,
-                   unsigned long int rlim, unsigned long int lpbr, unsigned long int alim, unsigned long int lpba,
+void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
+                   unsigned char *b_status_a, unsigned long int *n,
+                   unsigned long int rlim, unsigned long int lpbr,
                    unsigned long int *nb_smooth_r, unsigned long int *nb_smooth_a, unsigned long int *nb_useless,
                    unsigned int nb_type[5], unsigned long int *rel_index)
 {
@@ -176,16 +177,14 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
     
   memset(nb_type, 0, 5 * sizeof(unsigned int));
   
-  if (b_side_R)
-  {
-    mpz_set_ui(z_B3, rlim * rlim);
-    mpz_mul_ui(z_B3, z_B3, rlim);
-    mpz_set_ui(z_L2, 0);
-    mpz_setbit(z_L2, 2 * lpbr);
-    B = rlim;
-    L = 1UL << lpbr;
+  mpz_set_ui(z_B3, rlim * rlim);
+  mpz_mul_ui(z_B3, z_B3, rlim);
+  mpz_set_ui(z_L2, 0);
+  mpz_setbit(z_L2, 2 * lpbr);
+  B = rlim;
+  L = 1UL << lpbr;
 
-    for (i = 0; i < *n; i++)
+  for (i = 0; i < *n; i++)
     {
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
@@ -258,90 +257,6 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r, unsigned char 
         }
       }
     }
-  }
-  else
-  {
-    mpz_set_ui(z_B3, alim * alim);
-    mpz_mul_ui(z_B3, z_B3, alim);
-    mpz_set_ui(z_L2, 0);
-    mpz_setbit(z_L2, 2 * lpba);
-    B = alim;
-    L = 1UL << lpba;
-
-    for (i = 0; i < *n; i++)
-    {
-      if (b_status_a[i] == STATUS_UNKNOWN)
-      {
-        if ( (mpz_cmp(A[i], z_L2) > 0) && (mpz_cmp(A[i], z_B3) < 0) )
-        {
-          if (b_status_r[i] == STATUS_SMOOTH)
-            (*nb_smooth_r)--;
-          b_status_a[i] = STATUS_USELESS;
-          mpz_set_ui(A[i], 1);
-          b_status_r[i] = STATUS_USELESS;
-          mpz_set_ui(R[i], 1);
-          (*nb_useless)++;
-          mpz_swap(R[i], R[(*n)-1]);
-          mpz_swap(A[i], A[(*n)-1]);
-          tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
-          tmp = b_status_a[i]; b_status_a[i] = b_status_a[(*n)-1] ; b_status_a[(*n)-1] = tmp;
-          tmp = rel_index[i]; rel_index[i] = rel_index[(*n)-1] ; rel_index[(*n)-1] = tmp;
-          (*n)--; i--;
-          nb_type[0]++;
-        }
-        else if ( (mpz_cmp_ui(A[i], L) > 0) && (mpz_cmp_ui(A[i], B * B) < 0) )
-        {
-          if (b_status_r[i] == STATUS_SMOOTH)
-            (*nb_smooth_r)--;
-          b_status_a[i] = STATUS_USELESS;
-          mpz_set_ui(A[i], 1);
-          b_status_r[i] = STATUS_USELESS;
-          mpz_set_ui(R[i], 1);
-          (*nb_useless)++;
-          mpz_swap(R[i], R[(*n)-1]);
-          mpz_swap(A[i], A[(*n)-1]);
-          tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
-          tmp = b_status_a[i]; b_status_a[i] = b_status_a[(*n)-1] ; b_status_a[(*n)-1] = tmp;
-          tmp = rel_index[i]; rel_index[i] = rel_index[(*n)-1] ; rel_index[(*n)-1] = tmp;
-          (*n)--; i--;
-          nb_type[1]++;
-        }
-        else if (mpz_cmp_ui(A[i], L) <= 0)  // assume L < B^2
-        {
-          b_status_a[i] = STATUS_SMOOTH;
-          mpz_set_ui(A[i], 1);
-          (*nb_smooth_a)++;
-          nb_type[2]++;
-        }
-        /* now L < B^2 <= A[i] <= L^2 or B^3 <= A[i] */
-        else if (mpz_probab_prime_p(A[i], NB_MILLER_RABIN) != 0)
-        {
-          if (b_status_r[i] == STATUS_SMOOTH)
-            (*nb_smooth_r)--;
-          b_status_a[i] = STATUS_USELESS;
-          mpz_set_ui(A[i], 1);
-          b_status_r[i] = STATUS_USELESS;
-          mpz_set_ui(R[i], 1);
-          (*nb_useless)++;
-          mpz_swap(R[i], R[(*n)-1]);
-          mpz_swap(A[i], A[(*n)-1]);
-          tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
-          tmp = b_status_a[i]; b_status_a[i] = b_status_a[(*n)-1] ; b_status_a[(*n)-1] = tmp;
-          tmp = rel_index[i]; rel_index[i] = rel_index[(*n)-1] ; rel_index[(*n)-1] = tmp;
-          (*n)--; i--;
-          nb_type[3]++;
-        }
-        /* now L < B^2 <= A[i] <= L^2 or B^3 <= A[i] and A[i] is composite */
-        else if (mpz_cmp_ui(A[i], alim * (1UL << lpba)) <= 0)
-        {
-          b_status_a[i] = STATUS_SMOOTH;
-          mpz_set_ui(A[i], 1);
-          (*nb_smooth_a)++;
-          nb_type[4]++;
-        }
-      }
-    }
-  }
 
   mpz_clear(z_B3);
   mpz_clear(z_L2);
@@ -478,7 +393,7 @@ int main(int argc, char* argv[])
       
       rlim = rlim_new;
       t_update -= seconds();
-      update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 1, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+      update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
       t_update += seconds();
       fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
                " %u : %u : %u : %u : %u\n",
@@ -517,7 +432,7 @@ int main(int argc, char* argv[])
       
       alim = alim_new;
       t_update -= seconds();
-      update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 0, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+      update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
       t_update += seconds();
       fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
                " %u : %u : %u : %u : %u\n",
@@ -563,7 +478,7 @@ int main(int argc, char* argv[])
 
     rlim = rlim_new;
     t_update -= seconds();
-    update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 1, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+    update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
     t_update += seconds();
     fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
              " %u : %u : %u : %u : %u\n",
@@ -592,7 +507,7 @@ int main(int argc, char* argv[])
 
     alim = alim_new;
     t_update -= seconds();
-    update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 0, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+    update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
     t_update += seconds();
     fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
              " %u : %u : %u : %u : %u\n",
