@@ -69,7 +69,7 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P)
       if (w[i-1] & 1)
         mpz_set (T[i][w[i]-1], T[i-1][w[i-1]-1]);
     }
-  printf ("T[h][0] has %lu bits\n", mpz_sizeinbase (T[h][0], 2));
+  fprintf (stderr, "T[h][0] has %lu bits\n", mpz_sizeinbase (T[h][0], 2));
 
   /* compute remainder tree */
   mpz_mod (T[h][0], P, T[h][0]);
