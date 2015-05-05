@@ -713,6 +713,8 @@ int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int
 	    mpz_poly_set_sli(f, ff->tab[f_id].f, ff->deg_f);
 	    FILE* outputpoly = fopen(out_filename, "w");
 	    ASSERT(outputpoly != NULL);
+            gmp_fprintf(outputpoly, "n: %Zd\n", p);
+            fprintf(outputpoly, "skew: 1.0\n");
 	    mpz_poly_fprintf_cado_format_line (outputpoly, f, 0, "f");
 	    fprintf_gfpn_poly_info (outputpoly, f, "f");
 

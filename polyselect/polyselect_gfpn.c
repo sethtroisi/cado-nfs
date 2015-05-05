@@ -54,14 +54,20 @@ int main (int argc, char *argv[])
 
     if (!param_list_parse_mpz(pl, "p", p)) // fill mpz_t p with p if a right value is given
         usage(argv0[0], "p", pl);
-    if (!param_list_parse_mpz(pl, "ell", ell)) // fill mpz_t ell with ell if a right value is given
-        usage(argv0[0], "ell", pl);
+    if (!param_list_parse_mpz(pl, "ell", ell)){
+        // fill mpz_t ell with ell if a right value is given
+        // usage(argv0[0], "ell", pl);
+        mpz_set_ui(ell, 42); // not used anyway...
+    }
 
     if (!param_list_parse_uint(pl, "n", &n) || (n != 2))
         usage(argv0[0], "n", pl);
 
     if (!param_list_parse_uint(pl, "mnfs", &mnfs) || (mnfs < 1) || (mnfs > 2))
-        usage(argv0[0], "mnfs", pl);
+    {
+        mnfs = 1; // let's default to 1.
+    }
+
 
     char *out = param_list_lookup_string (pl, "out");
     if (out == NULL){
