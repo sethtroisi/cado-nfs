@@ -392,9 +392,7 @@ int main(int argc, char* argv[])
   
   start = seconds();
 
-  printf("\n");
-  printf("Init : %.0f s\n", seconds() - start);
-  printf("\n");
+  fprintf (stderr, "\nInit : %.0f s\n\n", seconds() - start);
 
   ASSERT_ALWAYS (argc == 2);
   cofac = fopen (argv[1], "r");
@@ -424,7 +422,7 @@ int main(int argc, char* argv[])
     j++;
   }
   nb_rel_read = j;
-  printf("Read %lu cofactors\n", nb_rel_read);
+  fprintf (stderr, "Read %lu cofactors\n", nb_rel_read);
 
   mpz_init (P);
 
@@ -456,16 +454,14 @@ int main(int argc, char* argv[])
     {
       rlim_new = (rlim + rlim_step < alim ? rlim + rlim_step : alim);
 
-      printf("\n");
-      printf("Initial one-side pass : %0.f s\n", seconds() - start);
-      printf("\n");
+      fprintf (stderr, "\nInitial one-side pass : %0.f s\n\n", seconds() - start);
 
-      printf("rlim : %lu:%lu\n", rlim, rlim_new);
-      printf("\n");
+      fprintf (stderr, "rlim : %lu:%lu\n\n", rlim, rlim_new);
 
       s = seconds ();
       prime_product (P, pi, rlim_new, &prime);
-      printf("Computed P of %lu bits took %.0f seconds\n", mpz_sizeinbase (P, 2), seconds () - s);
+      fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
+               mpz_sizeinbase (P, 2), seconds () - s);
 
       nb_rel = 0;
       while (nb_rel < nb_rel_unknown)
@@ -475,7 +471,8 @@ int main(int argc, char* argv[])
         t_smooth -= seconds();
         smoothness_test (&(R[nb_rel]), nb_rel_new - nb_rel, P);
         t_smooth += seconds();
-        printf("smoothness_test (%lu cofactors) took %.0f seconds  (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+        fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
+                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
         nb_rel = nb_rel_new;
       }
       
@@ -483,9 +480,11 @@ int main(int argc, char* argv[])
       t_update -= seconds();
       update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 1, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
       t_update += seconds();
-      printf("nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;  %u : %u : %u : %u : %u\n", nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
+      fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+               " %u : %u : %u : %u : %u\n",
+               nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
-      printf("t_update: %.0f seconds\n", t_update);
+      fprintf (stderr, "t_update: %.0f seconds\n", t_update);
     }
   }
   else if (alim < rlim)
@@ -494,16 +493,14 @@ int main(int argc, char* argv[])
     {
       alim_new = (alim + alim_step < rlim ? alim + alim_step : rlim);
 
-      printf("\n");
-      printf("Initial one-side pass : %0.f s\n", seconds() - start);
-      printf("\n");
+      fprintf (stderr, "\nInitial one-side pass : %0.f s\n\n", seconds() - start);
 
-      printf("\n");
-      printf("alim : %lu:%lu\n", alim, alim_new);
+      fprintf (stderr, "\nalim : %lu:%lu\n", alim, alim_new);
 
       s = seconds ();
       prime_product (P, pi, alim_new, &prime);
-      printf("Computed P of %lu bits took %.0f seconds\n", mpz_sizeinbase (P, 2), seconds () - s);
+      fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
+               mpz_sizeinbase (P, 2), seconds () - s);
 
       nb_rel = 0;
       while (nb_rel < nb_rel_unknown)
@@ -513,7 +510,8 @@ int main(int argc, char* argv[])
         t_smooth -= seconds();
         smoothness_test (&(A[nb_rel]), nb_rel_new - nb_rel, P);
         t_smooth += seconds();
-        printf("smoothness_test (%lu cofactors) took %.0f seconds  (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+        fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
+                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
         nb_rel = nb_rel_new;
       }
       
@@ -521,9 +519,11 @@ int main(int argc, char* argv[])
       t_update -= seconds();
       update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 0, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
       t_update += seconds();
-      printf("nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;  %u : %u : %u : %u : %u\n", nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
+      fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+               " %u : %u : %u : %u : %u\n",
+               nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
-      printf("t_update: %.0f seconds\n", t_update);
+      fprintf (stderr, "t_update: %.0f seconds\n", t_update);
     }
   }
 
@@ -535,19 +535,18 @@ int main(int argc, char* argv[])
   {
     n0_pass++;
  
-    printf("\n");
-    printf("Pass %u : %.0f s\n", n0_pass, seconds() - start);
+    fprintf (stderr, "\nPass %u : %.0f s\n", n0_pass, seconds() - start);
     
     /* rational side */
 
     rlim_new = (rlim + rlim_step < (1UL << lpbr) ? rlim + rlim_step : (1UL << lpbr));
     
-    printf("\n");
-    printf("rlim : %lu:%lu\n", rlim, rlim_new);
+    fprintf (stderr, "\nrlim : %lu:%lu\n", rlim, rlim_new);
 
     s = seconds ();
     prime_product (P, pi, rlim_new, &prime);
-    printf("Computed P of %lu bits took %.0f seconds\n", mpz_sizeinbase (P, 2), seconds () - s);
+    fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
+             mpz_sizeinbase (P, 2), seconds () - s);
 
     nb_rel = 0;
     while (nb_rel < nb_rel_unknown)
@@ -557,7 +556,8 @@ int main(int argc, char* argv[])
       t_smooth -= seconds();
       smoothness_test (&(R[nb_rel]), nb_rel_new - nb_rel, P);
       t_smooth += seconds();
-      printf("smoothness_test (%lu cofactors) took %.0f seconds  (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+      fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
+               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
       nb_rel = nb_rel_new;
     }
 
@@ -565,16 +565,17 @@ int main(int argc, char* argv[])
     t_update -= seconds();
     update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 1, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
     t_update += seconds();
-    printf("nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;  %u : %u : %u : %u : %u\n", nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
+    fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+             " %u : %u : %u : %u : %u\n",
+             nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
            nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
-    printf("t_update: %.0f seconds\n", t_update);
+    fprintf (stderr, "t_update: %.0f seconds\n", t_update);
 
     /* algebraic side */
 
     alim_new = (alim + alim_step < (1UL << lpba) ? alim + alim_step : (1UL << lpba));
 
-    printf("\n");
-    printf("alim : %lu:%lu\n", alim, alim_new);
+    fprintf (stderr, "\nalim : %lu:%lu\n", alim, alim_new);
 
     nb_rel = 0;
     while (nb_rel < nb_rel_unknown)
@@ -584,7 +585,8 @@ int main(int argc, char* argv[])
       t_smooth -= seconds();
       smoothness_test (&(A[nb_rel]), nb_rel_new - nb_rel, P);
       t_smooth += seconds();
-      printf("smoothness_test (%lu cofactors) took %.0f seconds  (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+      fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
+               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
       nb_rel = nb_rel_new;
     }
 
@@ -592,26 +594,25 @@ int main(int argc, char* argv[])
     t_update -= seconds();
     update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, 0, rlim, lpbr, alim, lpba, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
     t_update += seconds();
-    printf("nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ;  %u : %u : %u : %u : %u\n", nb_smooth_a, nb_useless, nb_rel_all - nb_smooth_a - nb_useless,
-           nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
-    printf("t_update: %.0f seconds\n", t_update);
+    fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+             " %u : %u : %u : %u : %u\n",
+             nb_smooth_a, nb_useless, nb_rel_all - nb_smooth_a - nb_useless,
+             nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
+    fprintf (stderr, "t_update: %.0f seconds\n", t_update);
   }
 
-  printf("\n");
-  printf("Collect smooth relations: %.0f s\n", seconds() - start);
+  fprintf (stderr, "\nCollect smooth relations: %.0f s\n\n", seconds() - start);
 
-  printf("\n");
   nb_smooth = 0;
   for (i = 0; i < nb_rel_unknown; i++)
   {
     if ( (b_status_r[i] == STATUS_SMOOTH) && (b_status_a[i] == STATUS_SMOOTH) )
     {
-      printf("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i], a[rel_index[i]], b[rel_index[i]]);
+      printf ("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i], a[rel_index[i]], b[rel_index[i]]);
       nb_smooth++;
     }
   }
-  printf("\n");
-  printf("Found %u smooth relations\n", nb_smooth);
+  fprintf (stderr, "\nFound %u smooth relations\n", nb_smooth);
 
   mpz_clear (P);
 
@@ -627,7 +628,6 @@ int main(int argc, char* argv[])
   free (A);
   fclose (cofac);
 
-  printf("\n");
-  printf("The end : %.0f s\n", seconds() - start);
+  fprintf (stderr, "\nThe end : %.0f s\n", seconds() - start);
 }
 
