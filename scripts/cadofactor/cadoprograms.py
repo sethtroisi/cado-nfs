@@ -1067,6 +1067,32 @@ class ReconstructLog(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class Descent(Program):
+    binary = "descent.py"
+    name = binary
+    subdir = "scripts"
+    def __init__(self, *,
+                 target: Parameter(prefix="--"),
+                 db: Parameter(prefix="--", is_input_file=True),
+                 execpath: Parameter("cadobindir", prefix="--"),
+                 descent_hint: Parameter("descent-hint", prefix="--",
+                     is_input_file=True),
+                 init_I: Parameter("init-I", prefix="--"),
+                 init_ncurves: Parameter("init-ncurves", prefix="--"),
+                 init_lpb: Parameter("init-lpb", prefix="--"),
+                 init_lim: Parameter("init-lim", prefix="--"),
+                 init_mfb: Parameter("init-mfb", prefix="--"),
+                 init_tkewness: Parameter("init-tkewness", prefix="--"),
+                 I: Parameter(prefix="--"),
+                 lpb0: Parameter(prefix="--"),
+                 lpb1: Parameter(prefix="--"),
+                 mfb0: Parameter(prefix="--"),
+                 mfb1: Parameter(prefix="--"),
+                 lim0: Parameter(prefix="--"),
+                 lim1: Parameter(prefix="--"),
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
 
 class Characters(Program):
     binary = "characters"

@@ -25,19 +25,12 @@ WARNING: We assume that these not-too-large integers are a few bits below
 to initialize the descent up to 55 bits smooth elements.
 TODO: still true?
 
-Recompiling las
----------------
+Compiling las_descent
+---------------------
 
 A special las binary must used for the "descent" mode. It is called
 "las_descent", and has to be built explicitly (just type "make
 las_descent").
-Furthermore, in local.sh, uncomment the line:
-  FLAGS_SIZE="-D__SIZEOF_P_R_VALUES__=8"
-[FIXME: does this still hold ?]
-
-Then recompile cado-nfs, maybe in a separate build-directory.  If you are
-on a 32-bit machine, then this might actually fail at compile or
-execution time. It is highly recommended to choose a 64-bit platform.
 
 Writing a hint table
 -------------------

@@ -585,7 +585,7 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   double_poly_t q;
   mpz_poly_t P;
   unsigned int count = MAX_LOOPS + 1;
-  
+
   a = ldexp (mpz_get_d (r[0].a), -r[0].ka); /* a/2^ka */
   b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
   if (a == b) /* might be the case for an exact root a/2^k */
@@ -597,7 +597,14 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   double_poly_set_mpz_poly (q, P);
   sa = double_poly_eval (q, a);
   sb = double_poly_eval (q, b);
-  ASSERT_ALWAYS (sa * sb < 0.0);
+  /* due to truncation of the initial coefficients, and rounding error in
+     evaluation of q, it might be that sa and sb do not have opposite signs */
+  if (sa * sb >= 0)
+    {
+      sa = double_poly_eval_safe (q, a);
+      sb = double_poly_eval_safe (q, b);
+    }
+  ASSERT_ALWAYS(sa * sb < 0);
   sc = 0.;
   if (precision > 0.)
     if (sa >= 0.)

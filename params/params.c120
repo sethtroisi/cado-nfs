@@ -1,7 +1,7 @@
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
-# See params/params.c91 for an example which contains some documentation.
+# See params/params.c90 for an example which contains some documentation.
 
 ###########################################################################
 # General parameters
@@ -27,20 +27,19 @@ tasks.polyselect.nrkeep = 100
 # Sieve
 ###########################################################################
 
-rlim = 2371302
-alim = 3837507
+rlim = 1570963
+alim = 3405773
 lpbr = 26
 lpba = 26
-tasks.sieve.mfbr = 54
-tasks.sieve.mfba = 53
-tasks.sieve.rlambda = 2.18
-tasks.sieve.alambda = 2.14
-tasks.sieve.ncurves0 = 6
-tasks.sieve.ncurves1 = 9
+tasks.sieve.mfbr = 69
+tasks.sieve.mfba = 81
+tasks.sieve.rlambda = 2.079997563791312
+tasks.sieve.alambda = 2.490014596033066
+tasks.sieve.ncurves0 = 4
+tasks.sieve.ncurves1 = 13
 tasks.I = 12
 
 tasks.sieve.qrange = 10000
-tasks.sieve.rels_wanted = 7400000
 
 ###########################################################################
 # Filtering

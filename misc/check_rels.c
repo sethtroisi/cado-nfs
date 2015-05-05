@@ -69,6 +69,8 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
   p_r_values_t p = rel->primes[i].p;
   unsigned int side = rel->primes[i].h, pr = 2;
   modulusul_t m;
+  prime_info pi;
+  prime_info_init (pi);
   do
   {
     exponent_t e_pr_in_p = 0;
@@ -86,10 +88,10 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
     else if (e_pr_in_p != 0)
       rel_add_prime (rel, side, pr, e * e_pr_in_p);
 
-    pr = getprime(pr);
+    pr = getprime_mt (pi);
     modul_initmod_ul (m, p);
   } while (!modul_isprime(m));
-  getprime(0);
+  prime_info_clear (pi);
   modul_clearmod (m);
   if (p != 1) //means remaining p is prime
     rel->primes[i] = (prime_t) {.h = side, .p = p, .e = e};
@@ -185,8 +187,11 @@ process_one_relation (earlyparsed_relation_ptr rel)
   /* complete relation if it is asked and necessary */
   if (complete_rels)
   {
+    prime_info pi;
+    prime_info_init (pi);
     for (unsigned long p = 2; mpz_cmp_ui (norm[0], 1) != 0 ||
-                              mpz_cmp_ui (norm[1], 1) != 0 ; p = getprime(p))
+                              mpz_cmp_ui (norm[1], 1) != 0 ;
+         p = getprime_mt (pi))
     {
       for(unsigned int side = 0 ; side < 2 ; side++)
       {
@@ -211,8 +216,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
         }
       }
     }
-
-    getprime(0);
+    prime_info_clear (pi);
   }
   else
   {

@@ -86,7 +86,7 @@ struct sieve_side_info_s {
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
                             at most "bound" on each side */
     trialdiv_divisor_t *trialdiv_data;
-    fb_vector<fb_general_entry> *fb_smallsieved;
+    std::vector<fb_general_entry> *fb_smallsieved;
     struct {
         int pow2[2];
         int pow3[2];

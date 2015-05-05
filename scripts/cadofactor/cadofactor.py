@@ -84,6 +84,8 @@ if __name__ == '__main__':
     dlp = dlp_param["dlp"]
     checkdlp_param = parameters.myparams({"checkdlp": True ,}, "")
     checkdlp = checkdlp_param["checkdlp"]
+    target_param = parameters.myparams({"target": 0,}, "")
+    target = int(target_param["target"])
 
     if not dlp:
         if factors is None:
@@ -107,5 +109,10 @@ if __name__ == '__main__':
             print("The other logarithms of the factor base elements are in %s" %
                     tasksparams["workdir"] + os.sep + tasksparams["name"] +
                     ".reconstructlog.dlog")
+            if target != 0:
+                logtarget = int(factors[4])
+                assert pow(target, log2*((p-1) // ell), p) == pow(2, logtarget*((p-1) // ell), p)
+                print("target = " + str(target))
+                print("log(target) = " + str(logtarget))
         else:
             print("No check was performed. Logarithms of the factor base elements are in %s" % tasksparams["workdir"] + os.sep + tasksparams["name"] + ".reconstructlog.dlog")
