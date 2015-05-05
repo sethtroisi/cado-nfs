@@ -175,6 +175,29 @@ obtained using the "mf_scan" binary as follows:
 
 mf_scan --binary-in --mfile xxx.small.bin --ascii-out --ofile xxx.small.txt --freq
 
+The mf_scan binary also produces files xxx.small.rw.txt and xxx.small.cw.txt,
+from which the numbers of rows and columns can be deduced:
+
+$ wc -l < /tmp/xxx.small.rw.txt # number of rows
+$ wc -l < /tmp/xxx.small.cw.txt # number of columns
+
+Then the txt matrix with header can be obtained by adding a first row to
+xxx.small.txt which contains the number of rows and the number of columns,
+for example:
+
+7638 7446
+11 36 38 89 373 425 689 876 1410 5745 5274 901
+11 14 70 107 192 505 1097 4438 6904 4094 1997 2849
+10 88 112 170 227 248 399 1365 1329 4749 3056
+15 1 8 9 20 24 75 159 169 251 873 2018 1013 4064 2984 2370
+12 25 29 36 118 346 387 1026 2930 6995 5591 1719 1605
+11 57 65 121 141 390 612 1308 1114 2388 1645 1605
+11 28 124 257 348 607 780 815 1097 947 5617 6337
+12 33 150 213 217 527 480 576 1323 1261 4570 6374 1723
+12 19 60 108 124 789 760 4261 4892 1856 4489 1194 1723
+13 11 50 86 148 262 333 528 3382 5961 3234 3412 3534 1723
+...
+
 The matrix main file is XXX.sparse.txt. Its first line contains the number
 of rows and columns. Then each line gives a row in the following format.
 The first integer is the number of non-zero entries for this row. Then
