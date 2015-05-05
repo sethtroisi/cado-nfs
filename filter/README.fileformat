@@ -95,7 +95,7 @@ where
   - a and b give the (a,b) pair of the original relation
   - h_i is an index of an ideal appearing in the relation. For factorization, an
     ideal appears at most one per relation. For DL, if an ideal more than
-    once in the relation, all these occurences are guaranteed to be one after
+    once in the relation, all these occurrences are guaranteed to be one after
     the other.
 a,b and the h_i's are in hexadecimal.
 
@@ -162,29 +162,57 @@ For DL, each entry is of the form id:e, where id is the index in the
 purged.gz file, and e is the exponent of the corresponding relation in
 the relation-set.
 
-File XXX.sparse.*.{txt|bin}|bin}
-==========================
+Files XXX.sparse.{txt|bin} and XXX.sparse.{rw|cw}.{txt|bin}
+===========================================================
 
 This is the set of files that describe the "sparse" matrix that is passed
 to the linalg machinery. They are created by replay.
 
-They exist in 2 different formats: txt or bin, the later is more compact.
-We describe only the "txt" format, which is human-readable. Note: recent
-versions of CADO-NFS only generate the bin format. The txt format can be
-obtained using the "mf_scan" binary as follows:
+They exist in 2 different formats: txt or bin, the latter is more compact.
 
-mf_scan --binary-in --mfile xxx.small.bin --ascii-out --ofile xxx.small.txt --freq
-
-The matrix main file is XXX.sparse.txt. Its first line contains the number
-of rows and columns. Then each line gives a row in the following format.
-The first integer is the number of non-zero entries for this row. Then
-the list of entries is given. In the case of factorization, an entry is
-just a column index, and for DL, it is accompanied with its positive or
-negative value.
+The "txt" format is human-readable.  The main file is XXX.sparse.txt. Its
+first line contains the number of rows and columns. Then each line gives
+a row in the following format.  The first integer is the number of
+non-zero entries for this row. Then the list of entries is given. In the
+case of factorization, an entry is just a column index, and for DL, it is
+accompanied with its positive or negative value.
 
 The files XXX.sparse.rw.txt and XXX.sparse.cw.txt contains the row and
-column weights.
+column weights (one weight per row), and have no header (so that the
+number of lines of XXX.sparse.rw.txt is exactly the number of rows of the
+matrix.
+
+The "bin" format is more compact. Recent versions of CADO-NFS only
+generate the bin format. It is only made of 32-bit little-endian
+integers. The main file has no header, and is just a sequence of rows.
+Each row is given as in the txt format: number of non-zero entries, and
+column indices for these entries. All are stored as 32-bit little-endian
+integers. In the case of DL matrices, the coefficient values are stored
+right after the column index, as *signed* 32-bit little-endian integers.
+The files XXX.sparse.rw.bin and XXX.sparse.cw.bin, like in the txt case,
+have the row and column weights (one weight per row), as 32-bit
+little-endian integers.
+
+
+Conversions between the txt and bin format, as well as generation of the
+rw.txt and cw.txt files can be done with the mf_scan binary. For eaxmple,
+in order to obtain a xxx.sparse.txt from a xxx.sparse.bin file:
+
+mf_scan --binary-in --mfile xxx.sparse.bin --ascii-out --ofile xxx.sparse.txt --freq
+
+Note that the program will say "Warning: output matrix is headerless",
+which is normal. One must then prepend the number of rows and columns at
+the beginning of the file and the txt file is then well-formed. For
+example:
+
+(echo `wc -l < /tmp/xxx.sparse.rw.txt` `wc -l < /tmp/xxx.sparse.cw.txt` ; cat xxx.sparse.txt) > xxx.sparse.txt.final
+
+The mf_scan binary can also handle DL matrices, but the --withcoeffs
+option must be added.
+
+Files XXX.sparse.* versus XXX.dense.*
+=====================================
 
 If the parameter "skip" is non-zero, then the matrix is separated in a
 dense and a sparse parts, so that additionnally to the previously
-mentionned files, there are also "dense" versions.
+mentioned files, there are also "dense" versions.
