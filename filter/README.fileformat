@@ -169,7 +169,11 @@ This is the set of files that describe the "sparse" matrix that is passed
 to the linalg machinery. They are created by replay.
 
 They exist in 2 different formats: txt or bin, the later is more compact.
-We describe only the "txt" format, which is human-readable.
+We describe only the "txt" format, which is human-readable. Note: recent
+versions of CADO-NFS only generate the bin format. The txt format can be
+obtained using the "mf_scan" binary as follows:
+
+mf_scan --binary-in --mfile xxx.small.bin --ascii-out --ofile xxx.small.txt --freq
 
 The matrix main file is XXX.sparse.txt. Its first line contains the number
 of rows and columns. Then each line gives a row in the following format.
