@@ -175,11 +175,6 @@ nfs-hd/mat_int64.h
 nfs-hd/matrix.h
 nfs-hd/mat_Z.c
 nfs-hd/mat_Z.h
-nfs-hd/polyselect-hd/functions.c
-nfs-hd/polyselect-hd/functions.h
-nfs-hd/polyselect-hd/main.c
-nfs-hd/polyselect-hd/parameters.c
-nfs-hd/polyselect-hd/parameters.h
 nfs-hd/sieving_bound.c
 nfs-hd/sieving_bound.h
 nfs-hd/special-q_sieve.c
