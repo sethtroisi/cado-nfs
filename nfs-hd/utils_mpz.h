@@ -31,6 +31,8 @@ void factor_init(factor_ptr factor, unsigned int number);
  */
 void factor_clear(factor_ptr factor);
 
+unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z);
+
 /*
  * Realloc an array of factors. Number must be less than factor->number.
  *
@@ -53,7 +55,7 @@ void sort_factor(factor_ptr factor);
  * factor: an array of factors.
  * z: the number we want to factorize.
  */
-unsigned int gmp_factorize(factor_ptr factor, mpz_t z);
+unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z);
 
 /*
  * Factorise (brute force) a mpz and set the factors in factor.
