@@ -204,6 +204,8 @@ pthread_primes_producer (void *ptvoid) {
   unsigned long lpbmax = pth->lpbmax, p = 2;
   size_t number_of_pthreads = pth->number_of_pthreads, current_buf = 0, i = 0, j;
 
+  prime_info pi;
+  prime_info_init (pi);
   while (p <= lpbmax){
     // here, we are sure we can produce at least one prime
     sema_wait (&(pth[i].primes_empty)); // Need an empty primes buffer
@@ -212,7 +214,7 @@ pthread_primes_producer (void *ptvoid) {
 
     do { // Main loop to produce primes
       *my_primes.current++ = (p_r_values_t) p;
-      p = getprime (p);
+      p = getprime_mt (pi);
     } while (my_primes.current < my_primes.end && p <= lpbmax);
 
     pth[i].primes[current_buf] = my_primes;
@@ -224,7 +226,7 @@ pthread_primes_producer (void *ptvoid) {
     }
 
   }
-  getprime (0); // Free structures in getprime
+  prime_info_clear (pi);
 
   // We have to produce a special end buffer in each pth[].primes
   j = i;

@@ -1433,7 +1433,11 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         assert self.get_number_outstanding_wus() >= 1
         key = "wu_received"
         self.state.update({key: self.state[key] + 1}, commit=False)
-        self.logger.info("Marking workunit %s as %s (%.1f%% => ETA %s)", wuid, ok_str, 100.0 * self.get_achievement(), self.get_eta())
+        # only print ETA when achievement > 0 to avoid division by zero
+        a = self.get_achievement()
+        if a > 0:
+            self.logger.info("Marking workunit %s as %s (%.1f%% => ETA %s)",
+                              wuid, ok_str, 100.0 * a, self.get_eta())
         self.wuar.verification(wuid, ok, commit=commit)
     
     def cancel_available_wus(self):
@@ -1985,7 +1989,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         for (index, (lognorm, (key, poly))) in enumerate(self.poly_heap):
             if search_poly.polyg.same_lc(poly.polyg):
                if not found is None:
-                   self.logger.warning("Found more than one match for %s", search_poly)
+                   self.logger.warning("Found more than one match for:\n%s", search_poly)
                else:
                    found = index
         if found is None:

@@ -56,6 +56,9 @@ tasks.sieve.rels_wanted = 1
 # "rational")
 tasks.sieve.ratq = true
 
+tasks.allow_zero_on_rhs=1
+
+
 #############
 # Final step
 #############

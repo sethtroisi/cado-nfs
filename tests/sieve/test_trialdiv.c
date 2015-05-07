@@ -18,15 +18,19 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
   unsigned long p;
   const size_t max_div = 32;
   mpz_t N;
+  prime_info pi;
 
-  for (p = getprime(1UL); p <= pmax; p = getprime(1UL))
+  prime_info_init (pi);
+  for (p = getprime_mt (pi); p <= pmax; p = getprime_mt (pi))
     nr_primes++;
   primes = malloc (nr_primes * sizeof (unsigned long));
+  prime_info_clear (pi);
 
-  getprime(0UL);
+  prime_info_init (pi);
   nr_primes = 0;
-  for (p = getprime(1UL); p <= pmax; p = getprime(1UL))
+  for (p = getprime_mt (pi); p <= pmax; p = getprime_mt (pi))
     primes[nr_primes++] = p;
+  prime_info_clear (pi);
 
   d = trialdiv_init (primes, nr_primes);
   free (primes);
@@ -188,15 +192,17 @@ int main (int argc, const char **argv)
   mpz_tdiv_q_ui (N, N, 3UL);
   mpz_nextprime (N, N);
 
+  prime_info pi;
+  prime_info_init (pi);
   for (i = 0; i < 0; i++) /* To skip some primes */
-    getprime(1UL);
+    getprime_mt (pi);
   primes = malloc (nr_primes * sizeof (unsigned long));
 
   mpz_add_ui (M, N, nr_N - 1); /* We'll divide integers in [N, M] */
   mpz_sub_ui (N, N, 1UL);
   for (i = 0; i < nr_primes; i++)
     {
-      primes[i] = getprime(1UL);
+      primes[i] = getprime_mt (pi);
       /* Estimate the number of divisors we'll find when trial dividing by
          this p and its powers. 
          The number of times d divides in [0, n] is floor(n/d)+1,
@@ -220,7 +226,7 @@ int main (int argc, const char **argv)
                 "by the %d primes in [%lu, %lu]\n", 
                 N, M, nr_primes, (unsigned long) primes[0], 
                 (unsigned long) primes[nr_primes - 1]);
-  getprime (0);
+  prime_info_clear (pi);
 
   d = trialdiv_init (primes, nr_primes);
   free (primes);

@@ -10,29 +10,6 @@
 #include "stage2.h"
 #include "portability.h"
 
-#if 0
-/* Looks for x in the sorted array a which has length l. Requires that
-   x actually appears in a[]. */
-static unsigned int 
-binsearch (const int *a, const unsigned int l, const int x)
-{
-  unsigned int low = 0, high = l - 1, mid;
-  
-  while (low <= high)
-  {
-    mid = low + (high - low) / 2;
-    if (a[mid] > x)
-      high = mid - 1;
-    else if (a[mid] < x)
-      low = mid + 1;
-    else
-      return mid; /* a[mid] == x */
-  }
-  abort(); /* Not found! */
-}
-#endif
-
-
 static inline unsigned long 
 eulerphi_ul (unsigned long n)
 {
@@ -171,13 +148,16 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
   memset (primes, 0, max_i * d + d/2);
   nr_primes = 0;
 
-  for (p = 2; p <= B2min; p = (unsigned int) getprime (p));
+  prime_info pi;
+  prime_info_init (pi);
+  for (p = 2; p <= B2min; p = (unsigned int) getprime_mt (pi));
   /* Now p is smallest prime > B2min */
-  for ( ; p <= B2; p = getprime (p))
+  for ( ; p <= B2; p = getprime_mt (pi))
     {
       nr_primes++;
       primes[p] = 1;
     }
+  prime_info_clear (pi);
   
   /* We need at most one pair per prime, plus the number of NEXT_D and 
      NEXT_PASS codes */
@@ -411,7 +391,6 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
     }
 
   free (primes);
-  getprime (0);
 }
 
 void stage2_clear_plan (stage2_plan_t *plan)

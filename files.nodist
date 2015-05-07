@@ -38,6 +38,12 @@ scripts/opal-test/report.py
 scripts/opal-test/README
 scripts/opal-test/optimize.sh
 scripts/opal-test/las_decl_template.py
+polyselect/gfp2dlpolyselect_notes.txt
+polyselect/gfpkdlpolyselect_test.c
+polyselect/makefile_gfpkdl.make
+polyselect/table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01.c
+polyselect/table_t_Py_f_deg4_type0_h1_t-200--200.c
+polyselect/template-header.c
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/debug_rootsieve.sage
@@ -48,7 +54,6 @@ polyselect/integral.sage
 polyselect/kleinjung.sage
 polyselect/kleinjung-list-of-lattices.sage
 polyselect/linear_interpolation.sage
-polyselect/ropt_main.c
 polyselect/rotate.c
 polyselect/rotate_all.c
 polyselect/sopt.c
@@ -64,8 +69,6 @@ scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/ecm/CMakeLists-nodist.txt
 sieve/ecm/ecm_avg_exp.gp
-sieve/ecm/find_primes_hit.c
-sieve/ecm/getprime.c
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
 sieve/hist.rsa155.3lp.png
@@ -122,6 +125,8 @@ misc/phi.c
 misc/psi.c
 misc/cacheline.c
 misc/get_valid_lines.c
+misc/CMakeLists-nodist.txt
+misc/descent-init.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
@@ -140,7 +145,6 @@ linalg/bwc/update-flint.sh
 linalg/bwc/parse-flint-fft-doc.pl
 linalg/bwc/creating-sm-example.m
 linalg/bwc/sm-outside-matrix.m
-misc/CMakeLists-nodist.txt
 sieve/strategies/script_bench.sh
 sieve/strategies/script_fm.sh
 sieve/strategies/script_mg.sh
@@ -188,3 +192,4 @@ nfs-hd/utils_mpz.c
 nfs-hd/utils_mpz.h
 nfs-hd/vector.h
 tests/nfs-hd/
+sieve/smooth.c
