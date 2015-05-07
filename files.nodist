@@ -125,6 +125,8 @@ misc/phi.c
 misc/psi.c
 misc/cacheline.c
 misc/get_valid_lines.c
+misc/CMakeLists-nodist.txt
+misc/descent-init.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
@@ -143,7 +145,6 @@ linalg/bwc/update-flint.sh
 linalg/bwc/parse-flint-fft-doc.pl
 linalg/bwc/creating-sm-example.m
 linalg/bwc/sm-outside-matrix.m
-misc/CMakeLists-nodist.txt
 sieve/strategies/script_bench.sh
 sieve/strategies/script_fm.sh
 sieve/strategies/script_mg.sh
