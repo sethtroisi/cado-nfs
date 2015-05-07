@@ -16,8 +16,6 @@
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
-#include "getprime.h"
-
 #include "generate_factoring_method.h"
 #include "convex_hull.h"
 

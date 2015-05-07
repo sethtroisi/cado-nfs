@@ -107,6 +107,12 @@ void mpz_poly_set_sli(mpz_poly_t f, const long int * h, int deg_h);
 void eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
 void eval_si_phi_mpz_y(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
 void eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
+// works only if PY is of degree 2
+
+void init_eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
+void init_eval_si_phi_mpz_y(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
+void init_eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
+
 
 bool is_irreducible_ZZ(mpz_poly_srcptr phi);
 bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, int* sign_Discr, mpz_t Discr);
@@ -121,12 +127,11 @@ bool is_good_phi(mpz_poly_t phi, unsigned int n, mpz_t p);
 bool is_good_f_PY(fPyphi_t* fPyphi, mpz_poly_t** phi);
 
 // set f_id l'indice de la bonne ligne du tableau de {f, Py, phi}
-bool get_f_CONJ(int* f_id, mpz_poly_t * tab_phi, mpz_t * tab_roots_Py, int* nb_phi, const fPyphi_poly_t * ff, mpz_srcptr p);
+bool get_f_CONJ(int* f_id, mpz_t * tab_roots_Py, int* nb_roots_Py, const fPyphi_poly_t * ff, mpz_srcptr p);
 // ff->tab_f[i] is the line with a right f.
 
 // case MNFS: tab of g_i, 1 <= i <= mnfs.
-// , mpz_poly_t * tab_phi, mpz_t p,
-bool get_g_CONJ(mpz_poly_t g[], ppf_t params_g, int f_id, mpz_t * tab_roots_Py, int nb_phi, const fPyphi_poly_t * ff, pp_t params);
+bool get_g_CONJ(mpz_poly_t g[], mpz_poly_t phi, ppf_t params_g, int f_id, mpz_t * tab_roots_Py, int nb_roots_Py, const fPyphi_poly_t * ff, pp_t params);
 // ff->tab[i] is the line with a right f.
 // ff->tab[i].f
 
@@ -141,7 +146,7 @@ void gfpk_print_params(unsigned int n, mpz_srcptr p, mpz_srcptr ell);
 // the function to call for generating a .poly file.
 // works only for n=2 at the moment.
 // , mpz_t ell, unsigned int mnfs
-int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int mnfs, const char* label);
+int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int mnfs, const char* out_filename);
 
 
 #endif // DEG_PY > 2 is not supported

@@ -1,7 +1,7 @@
 
 ###########################################################################
 ###########################################################################
-# See params/params.c91 for an example which contains some documentation.
+# See params/params.c90 for an example which contains some documentation.
 
 # Anything after a # is a comment, until end of line.
 # Any empty line is ignored

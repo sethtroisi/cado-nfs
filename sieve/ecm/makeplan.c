@@ -100,9 +100,11 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   plan->B1 = B1;
   mpz_init (E);
   mpz_set_ui (E, 1UL);
-  p = (unsigned int) getprime (p);
+  prime_info pi;
+  prime_info_init (pi);
+  p = (unsigned int) getprime_mt (pi);
   ASSERT (p == 3);
-  for ( ; p <= B1; p = (unsigned int) getprime (p))
+  for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
     {
       unsigned long q;
       /* Uses p^k s.t. (p-1)p^(k-1) <= B1, except for p=2 because our 
@@ -110,6 +112,7 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
       for (q = 1; q <= B1 / (p - 1); q *= p)
         mpz_mul_ui (E, E, p);
     }
+  prime_info_clear (pi);
   
   if (verbose)
     gmp_printf ("pm1_make_plan: E = %Zd;\n", E);
@@ -123,7 +126,6 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   plan->E_mask = ~0UL - (~0UL >> 1); /* Only MSB set */
   while ((plan->E[plan->E_nrwords - 1] & plan->E_mask) == 0UL)
     plan->E_mask >>= 1;
-  getprime (0);
   
   stage2_make_plan (&(plan->stage2), B1, B2, verbose);
 }
@@ -163,14 +165,17 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
 
   plan->B1 = B1;
   bc_state = bytecoder_init (compress ? &pp1_dict : NULL);
-  p = (unsigned int) getprime (p);
+  prime_info pi;
+  prime_info_init (pi);
+  p = (unsigned int) getprime_mt (pi);
   ASSERT (p == 3);
-  for ( ; p <= B1; p = (unsigned int) getprime (p))
+  for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
     {
       unsigned long q;
       for (q = 1; q <= B1 / p; q *= p)
 	prac_bytecode (p, addcost, doublecost, bytecost, changecost, bc_state);
     }
+  prime_info_clear (pi);
   bytecoder ((literal_t) 12, bc_state);
   bytecoder_flush (bc_state);
   plan->bc_len = bytecoder_size (bc_state);
@@ -178,7 +183,6 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   ASSERT (plan->bc != NULL);
   bytecoder_read (plan->bc, bc_state);
   bytecoder_clear (bc_state);
-  getprime (0);
 
   if (!compress)
     {
@@ -268,19 +272,22 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
       plan->bc_len = lookup_saved_chain(&plan->bc, B1);
       if (plan->bc_len == 0) {
         bc_state = bytecoder_init (compress ? &ecm_dict : NULL);
-        p = (unsigned int) getprime (2UL);
-        ASSERT (p == 3);
         /* If group order is divisible by 12, add another 3 to stage 1 primes */
         if (extra_primes && 
             (parameterization == BRENT12 || parameterization == MONTY12))
           totalcost += prac_bytecode (3, addcost, doublecost, bytecost, 
           			    changecost, bc_state);
-        for ( ; p <= B1; p = (unsigned int) getprime (p))
+        prime_info pi;
+        prime_info_init (pi);
+        p = (unsigned int) getprime_mt (pi);
+        ASSERT (p == 3);
+        for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
           {
             for (q = 1; q <= B1 / p; q *= p)
               totalcost += prac_bytecode (p, addcost, doublecost, bytecost, 
           				changecost, bc_state);
           }
+        prime_info_clear (pi);
         bytecoder ((literal_t) 12, bc_state);
         bytecoder_flush (bc_state);
         plan->bc_len = bytecoder_size (bc_state);
@@ -288,7 +295,6 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
         ASSERT (plan->bc);
         bytecoder_read (plan->bc, bc_state);
         bytecoder_clear (bc_state);
-        getprime (0);
         // save chain for future use (global variable).
         // If this get multithreaded someday, we should have a mutex
         // here.
