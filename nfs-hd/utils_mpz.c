@@ -75,7 +75,7 @@ unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z)
 
 void factor_realloc(factor_ptr factor, unsigned int number)
 {
-  ASSERT(factor->number > number);
+  ASSERT(factor->number >= number);
 
   for (unsigned int i = number; i < factor->number; i++) {
     mpz_clear(factor->factorization[i]);
@@ -195,11 +195,17 @@ void sort_factor(factor_ptr factor)
 
 unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
 {
+  if (mpz_cmp_ui(z, 0) == 0) {
+    factor_init(factor, 1);
+    mpz_set(factor->factorization[0], z);
+    return 0;
+  }
+
   unsigned int number = mpz_sizeinbase(z, 2);
   factor_init(factor, number);
   unsigned int nb = 0;
   unsigned int assert_facto = 1;
-  if (mpz_probab_prime_p (z, 25)) {
+  if (mpz_probab_prime_p (z, 25) || mpz_cmp_ui(z, 1) == 0) {
     mpz_set(factor->factorization[nb], z);
     nb = 1;
     assert_facto = 0;
@@ -223,11 +229,17 @@ unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
 
 unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z)
 {
+  if (mpz_cmp_ui(z, 0) == 0) {
+    factor_init(factor, 1);
+    mpz_set(factor->factorization[0], z);
+    return 0;
+  }
+
   unsigned int number = mpz_sizeinbase(z, 2);
   factor_init(factor, number);
   unsigned int nb = 0;
   unsigned int assert_facto = 1; 
-  if (mpz_probab_prime_p (z, 25)) {
+  if (mpz_probab_prime_p (z, 25) || mpz_cmp_ui(z, 1) == 0) {
     mpz_set(factor->factorization[nb], z);
     nb = 1;
   } else {
