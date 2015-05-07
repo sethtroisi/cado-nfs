@@ -159,6 +159,39 @@ static unsigned int test(mpz_t * mean, unsigned int i, mpz_poly_t * f,
   return 0;
 } 
 
+static void decrease_sieving_region_adapted(sieving_bound_ptr H, mpz_t * mean,
+    mpz_poly_t * f, uint64_t size_current, unsigned int lpb, uint64_t number_a)
+{
+  size_current = size_current * 2;
+  sieving_region_adapted(H, size_current);
+  unsigned int res = test(mean, size_current, f, 2, number_a, H, lpb);
+  while (!res) {
+    ASSERT(res == 0);
+
+    size_current = size_current * 2;
+    if (log2((double)size_current) > 63.0) {
+      break;
+    }
+    sieving_region_adapted(H, size_current);
+    res = test(mean, size_current, f, 2, number_a, H, lpb);
+  }
+}
+
+static void increase_sieving_region_adapted(sieving_bound_ptr H, mpz_t * mean,
+    mpz_poly_t * f, uint64_t size_current, unsigned int lpb, uint64_t number_a)
+{
+  size_current = size_current / 2;
+  sieving_region_adapted(H, size_current);
+  unsigned int res = test(mean, size_current, f, 2, number_a, H, lpb);
+  while (res) {
+    ASSERT(res == 1);
+
+    size_current = size_current / 2;
+    sieving_region_adapted(H, size_current);
+    res = test(mean, size_current, f, 2, number_a, H, lpb);
+  }
+}
+
 void find_parameters_adapted(mpz_srcptr p, unsigned int n, uint64_t number_a,
     unsigned int lpb_min, unsigned int lpb_max, unsigned int t_min,
     unsigned int t_max, uint64_t size_start, mpz_poly_srcptr h, int coeff0,
@@ -187,15 +220,24 @@ void find_parameters_adapted(mpz_srcptr p, unsigned int n, uint64_t number_a,
   for (unsigned int lpb = lpb_min; lpb < lpb_max; lpb++) {
     for (unsigned int t = t_min; t < t_max; t++) {
       sieving_bound_init(H, t);
-      uint64_t size_current = size_start;
 
-      sieving_region_adapted(H, size_current);
+      sieving_region_adapted(H, size_start);
       function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, lpb - 1, t,
-          number_a, weight_0, weight_1);
+          nb_times, weight_0, weight_1);
       mpz_poly_set(f[0], f0);
       mpz_poly_set(f[1], f1);
       
-      test(mean, size_current, f, 2, nb_times, H, lpb);
+      unsigned int res = test(mean, size_start, f, 2, number_a, H, lpb);
+      if (res) {
+        ASSERT(res == 1);
+
+        increase_sieving_region_adapted(H, mean, f, size_start, lpb, number_a);
+      } else {
+        ASSERT(res == 0);
+
+        decrease_sieving_region_adapted(H, mean, f, size_start, lpb, number_a);
+      }
+
       sieving_bound_clear(H);
     }
   }
