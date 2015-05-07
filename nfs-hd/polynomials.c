@@ -6,7 +6,7 @@
 #include <float.h>
 #include "cado.h"
 #include "utils.h"
-#include "functions.h"
+#include "polynomials.h"
 #include "utils_mpz.h"
 #include "polyselect/auxiliary.h"
 

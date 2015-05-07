@@ -3,9 +3,8 @@
 #include <inttypes.h>
 #include "cado.h"
 #include "utils.h"
-#include "functions.h"
+#include "polynomials.h"
 #include "sieving_bound.h"
-#include "parameters.h"
 #include "polyselect/auxiliary.h"
 
   /*function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, q, t);*/
