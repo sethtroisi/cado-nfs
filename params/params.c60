@@ -1,7 +1,7 @@
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
-# See params/params.c91 for an example which contains some documentation.
+# See params/params.c90 for an example which contains some documentation.
 
 ###########################################################################
 # General parameters
@@ -16,11 +16,11 @@ tasks.threads = 2
 
 tasks.polyselect.degree = 4
 
-tasks.polyselect.admax = 12000
-tasks.polyselect.adrange = 6000
+tasks.polyselect.admax = 10000
+tasks.polyselect.adrange = 5000
 tasks.polyselect.incr = 60
-tasks.polyselect.P = 480
-tasks.polyselect.nq = 16
+tasks.polyselect.P = 420
+tasks.polyselect.nq = 1000
 tasks.polyselect.nrkeep = 20
 
 ###########################################################################
@@ -38,7 +38,7 @@ tasks.sieve.alambda = 2.02
 tasks.sieve.ncurves0 = 16
 tasks.sieve.ncurves1 = 14
 tasks.I = 10
-tasks.sieve.qrange = 1000
+tasks.sieve.qrange = 2000
 
 ###########################################################################
 # Filtering

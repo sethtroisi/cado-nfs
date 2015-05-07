@@ -434,11 +434,13 @@ int main (int argc, char **argv)
       if (start % 2UL == 0UL)
 	start++;
       stop = strtoul (argv[2], NULL, 10);
-      
+
+      prime_info pi;
+      prime_info_init (pi);
       if (only_primes)
 	{
 	  do {
-            i = getprime (1);
+            i = getprime_mt (pi);
           } while (i < start);
 	}
       else
@@ -467,10 +469,11 @@ int main (int argc, char **argv)
             }
 
 	  if (only_primes)
-	    i = getprime (1);
+	    i = getprime_mt (pi);
 	  else
 	    i += 2;
 	}
+      prime_info_clear (pi);
   } else {
     inp = fopen (inp_fn, "r");
     if (inp == NULL)

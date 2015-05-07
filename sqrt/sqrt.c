@@ -31,7 +31,7 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define THRESHOLD 2 /* must be >= 2 */
 
 /* accumulate up to THRESHOLD products in prd[0], 2^i*THRESHOLD in prd[i].
-   nprd is the number of already accumulated values: if nprd = n0 + 
+   nprd is the number of already accumulated values: if nprd = n0 +
    n1 * THRESHOLD + n2 * THRESHOLD^2 + ..., then prd[0] has n0 entries,
    prd[1] has n1*THRESHOLD entries, and so on.
 */
@@ -151,7 +151,7 @@ check_dep (const char *prefix, int numdep)
   return 1;
 }
 
-int 
+int
 calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
                   mpz_t Np)
 {
@@ -229,7 +229,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
         mpz_addmul_si (v, pol->rat->coeff[0], b);
 
         prd = accumulate_fast (prd, v, &lprd, nprd++);
-          
+
         if (feof (depfile))
           break;
       }
@@ -268,7 +268,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
 
   /* since we know we have a square, take the square root */
   mpz_sqrtrem (prd[0], v, prd[0]);
-  
+
   pthread_mutex_lock (&lock);
   fprintf (stderr, "Computed rational square root for dep %d at %lums\n",
            numdep, milliseconds ());
@@ -284,6 +284,8 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
       /* reconstruct the initial value of prd[0] to debug */
       mpz_mul (prd[0], prd[0], prd[0]);
       mpz_add (prd[0], prd[0], v);
+      prime_info pi;
+      prime_info_init (pi);
       while (mpz_cmp_ui (prd[0], 1) > 0)
         {
           e = 0;
@@ -300,10 +302,10 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
               if (verbose)
                 break;
             }
-          p = getprime (p);
+          p = getprime_mt (pi);
         }
       mpz_clear (pp);
-      p = getprime (0);
+      prime_info_clear (pi);
       exit (1);
     }
 
@@ -316,7 +318,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
 
   /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
      if ab_pairs is odd */
-  
+
   mpz_powm_ui (v, pol->rat->coeff[1], (ab_pairs + 1) / 2, Np);
   pthread_mutex_lock (&lock);
   fprintf (stderr, "SqrtRat(%d): computed g1^(nab/2) mod n at %lums\n",
@@ -327,7 +329,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   mpz_invert (v, v, Np);
   mpz_mul (prd[0], prd[0], v);
   mpz_mod (prd[0], prd[0], Np);
-  
+
   gmp_fprintf (ratfile, "%Zd\n", prd[0]);
   fclose_maybe_compressed_lock (ratfile, ratname);
   free (ratname);
@@ -700,24 +702,16 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
   modul_poly_t fp;
 
   modul_poly_init (fp, dF);
+  prime_info pi;
+  prime_info_init (pi);
   while (1)
     {
     int d;
 
-    p = getprime (p);
+    p = getprime_mt (pi);
     ntries ++;
     if (mpz_gcd_ui(NULL, N, p) != 1)
       continue;
-
-    /* Not needed anymore with modul_poly */
-
-    /* if (! plain_poly_fits (dF, p) || ntries > 100) */
-    /*   { */
-    /*     fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n"); */
-    /*     plain_poly_clear (fp); */
-    /*     getprime (0); */
-    /*     exit (1); */
-    /*   } */
 
     d = modul_poly_set_mod (fp, F, &p);
     if (d != dF)
@@ -726,7 +720,7 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
       break;
     }
   modul_poly_clear (fp);
-  getprime (0);
+  prime_info_clear (pi);
 
   return p;
 }
@@ -808,21 +802,21 @@ calculateSqrtAlg (const char *prefix, int numdep,
   f = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->coeff;
 
   ASSERT_ALWAYS(deg > 1);
-  
+
   // Init F to be the corresponding polynomial
   mpz_poly_init (F, deg);
   for (i = deg; i >= 0; --i)
     mpz_poly_setcoeff (F, i, f[i]);
-  
+
   // Init prd to 1.
   mpz_poly_init (prd->p, deg);
   mpz_set_ui (prd->p->coeff[0], 1);
   prd->p->deg = 0;
   prd->v = 0;
-  
+
   // Allocate tmp
   mpz_poly_init (tmp->p, 1);
-  
+
   // Accumulate product with a subproduct tree
   {
       polymodF_t *prd_tab;
@@ -865,7 +859,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
        * be even. Another possibility is when f_d contains a big prime
        * number that does not occur anywhere else, so that the power of
        * this prime is controlled by the usual characters, and since f_d
-       * is always present... 
+       * is always present...
        *
        * But: I wouldn't be surprised if the assert(even(nab)) fails.
        * Then, a patch would be:
@@ -878,14 +872,14 @@ calculateSqrtAlg (const char *prefix, int numdep,
       accumulate_fast_F_end (prd_tab, F, lprd);
       fclose_maybe_compressed_lock (depfile, depname);
       free (depname);
-  
+
       mpz_poly_set(prd->p, prd_tab[0]->p);
       prd->v = prd_tab[0]->v;
       for (i = 0; i < (long)lprd; ++i)
         mpz_poly_clear(prd_tab[i]->p);
       free(prd_tab);
     }
-  
+
     pthread_mutex_lock (&lock);
     fprintf (stderr, "AlgSqrt(%d): finished accumulating product at %2.2lf\n",
              numdep, seconds());
@@ -895,14 +889,14 @@ calculateSqrtAlg (const char *prefix, int numdep,
     p = FindSuitableModP(F, Np);
     fprintf (stderr, "Using p=%lu for lifting\n", p);
     pthread_mutex_unlock (&lock);
-  
+
     double tm = seconds();
     polymodF_sqrt (prd, prd, F, p);
     pthread_mutex_lock (&lock);
     fprintf (stderr, "AlgSqrt(%d): square root lifted in %2.2lf\n",
              numdep, seconds() - tm);
     pthread_mutex_unlock (&lock);
-  
+
     mpz_init(algsqrt);
     mpz_init(aux);
     mpz_t m;
@@ -921,7 +915,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
     mpz_powm_ui(aux, aux, prd->v, Np);      // 1/fd^v mod n
     mpz_mul(algsqrt, algsqrt, aux);
     mpz_mod(algsqrt, algsqrt, Np);
-  
+
     algfile = fopen_maybe_compressed_lock (algname, "wb");
     gmp_fprintf (algfile, "%Zd\n", algsqrt);
     fclose_maybe_compressed_lock (algfile, algname);
@@ -947,23 +941,25 @@ calculateSqrtAlg (const char *prefix, int numdep,
  * Returns 1 if input is completely factored, otherwise, returns
  * remaining factor.
  */
-unsigned long 
+unsigned long
 trialdivide_print(unsigned long N, unsigned long B)
 {
     ASSERT(N != 0);
     if (N == 1) return 1;
     unsigned long p;
-    for (p = 2; p <= B; p = getprime (p)) {
+    prime_info pi;
+    prime_info_init (pi);
+    for (p = 2; p <= B; p = getprime_mt (pi)) {
         while ((N%p) == 0) {
             N /= p;
             printf("%ld\n", p);
             if (N == 1) {
-                getprime(0);  // free table
+                prime_info_clear (pi);
                 return N;
             }
         }
     }
-    getprime(0);
+    prime_info_clear (pi);
     return N;
 }
 
@@ -988,7 +984,7 @@ void print_nonsmall(mpz_t zx)
     }
 }
 
-void print_factor(mpz_t N) 
+void print_factor(mpz_t N)
 {
     unsigned long xx = mpz_get_ui(N);
     pthread_mutex_lock (&lock);
@@ -1001,7 +997,7 @@ void print_factor(mpz_t N)
             print_nonsmall(zx);
             mpz_clear(zx);
         }
-    } else 
+    } else
         print_nonsmall(N);
     pthread_mutex_unlock (&lock);
 }
@@ -1023,7 +1019,7 @@ calculateGcd (const char *prefix, int numdep, mpz_t Np)
     mpz_init(algsqrt);
     mpz_init(g1);
     mpz_init(g2);
-  
+
     ratfile = fopen_maybe_compressed_lock (ratname, "rb");
     algfile = fopen_maybe_compressed_lock (algname, "rb");
     if (ratfile == NULL)
@@ -1087,10 +1083,10 @@ calculateGcd (const char *prefix, int numdep, mpz_t Np)
         printf ("Failed\n");
         pthread_mutex_unlock (&lock);
       }
-  
+
     mpz_clear(ratsqrt);
     mpz_clear(algsqrt);
-  
+
     return 0;
 }
 
@@ -1100,7 +1096,7 @@ typedef struct
   uint64_t *dep_masks;
   unsigned int *dep_counts;
   unsigned int nonzero_deps;
-  FILE **dep_files;  
+  FILE **dep_files;
 } sqrt_data_t;
 
 void *
@@ -1149,7 +1145,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     /* Read the number of (a,b) pairs */
     uint64_t nrows, ncols;
     purgedfile_read_firstline (purgedname, &nrows, &ncols);
-    
+
     uint64_t * abs = malloc(nrows * sizeof(uint64_t));
     memset(abs, 0, nrows * sizeof(uint64_t));
 
@@ -1383,15 +1379,17 @@ int main(int argc, char *argv[])
         /* Trial divide Np, to avoid bug if a stupid input is given */
         {
             unsigned long p;
-            for (p = 2; p <= 1000000; p = getprime (p)) {
+            prime_info pi;
+            prime_info_init (pi);
+            for (p = 2; p <= 1000000; p = getprime_mt (pi)) {
                 while (mpz_tdiv_ui(Np, p) == 0) {
                     printf("%lu\n", p);
                     mpz_divexact_ui(Np, Np, p);
                 }
             }
-            getprime(0);
+            prime_info_clear (pi);
         }
-        if (mpz_cmp(pol->n, Np) != 0) 
+        if (mpz_cmp(pol->n, Np) != 0)
             gmp_fprintf(stderr, "Now factoring N' = %Zd\n", Np);
         if (mpz_cmp_ui(Np, 1) == 0) {
             gmp_fprintf(stderr, "Hey N' is 1! Stopping\n");
@@ -1470,7 +1468,7 @@ int main(int argc, char *argv[])
         ASSERT_ALWAYS(numdep != -1);
         calculateTaskN (2, prefix, numdep, nthreads, pol, 0, Np);
     }
-    
+
     cado_poly_clear (pol);
     param_list_clear (pl);
     mpz_clear (Np);

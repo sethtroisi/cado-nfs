@@ -17,15 +17,17 @@ main (int argc, const char *argv[])
 
   unsigned long p[P_LEN], r[P_LEN];
   unsigned long t;
+  prime_info pi;
 
-  t = getprime(2);
+  prime_info_init (pi);
+  t = getprime_mt (pi);
   while(t < 8192)
-    t = getprime(2);
+    t = getprime_mt (pi);
   for (size_t i = 0; i < P_LEN; i++) {
     p[i] = t;
-    t = getprime(2);
+    t = getprime_mt (pi);
   }
-  getprime(0);
+  prime_info_clear (pi);
 
   const unsigned long k = 0;
   const int neg = 0;

@@ -1,124 +1,23 @@
 /**
    Root optimization for polynomials in the number field sieve.
 
-   [1. Run]
+   ./polyselect_ropt [options]
 
-   Input polynomials are in "CADO" or "Msieve" format. They are read 
-   from STDIN/FILE. Output polynomials are in "CADO" format. Examples:
+    -inputpolys    "input polynomial file"
+    -ropteffort    "effort scales"
+    -t             "number of threads"
+    -area          "sieving area"
+    -Bf            "algebraic smoothness bound"
+    -Bg            "rational smoothness bound"
+    -v             "toggle verbose"
+    -boundmaxlognorm  "maximum lognorm to bound the rotation"
 
-   ropt < POLY -w 0 -l 8 > OUTPUT 2> ERRINFO
-   ropt -f POLY -w 0 -l 8 > OUTPUT 2> ERRINFO
+   Only the -inputpolys option (follwed by the FILENAME) is compulsory.
+   Input polynomials are in "CADO". They are read from FILENAME.
+   Output polynomials are in "CADO" format.
 
-   If deg=5, quadratic rotations "-w" and "-l" will be ignored.
-   If deg=6, "-w" is the leftmost of a quadratic rotation and 
-   "-l" is the step from the "-w".
-
-   [2. Algorithm]
-
-   There are two steps in the root sieve.
-
-   Given a polynomial, the code first tries to find good
-   (u, v) (mod (p1^e1 * p2^e2* \cdots *pn^en)) for small prime powers.
-   This step is done by hensel-lift-like procedure in a p^2-ary tree data
-   structure (for each such p) and discard any bad/impossible (u, v)
-   during the tree-building. The multiple roots are updated in a way
-   following Emmanuel Thome's idea. Finally, Finally we use CRT to
-   find some good (u, v) pairs, those with small u. Note if there are
-   too many pi^ei, the CRTs will domimated the running time.
-
-   In the second step, we do the actually root sieve for all primes
-   up to some bound. We only consider the (u, v) points lying on the
-   sublattice within the sieving range (U, V).
-
-   The method is described in "Root optimization of polynomials in 
-   the number field sieve." on http://wwwmaths.anu.edu.au/~bai.
-
-   [3. Degree 6]
-
-   For degree 6 polynomial, the following processes are called in order,
-
-   (a) - For each quadratic rotation w;
-   (b) -- Tune parameters; ("WANT_TUNE" in "ropt_param.h".)
-   (c) -- Find good sublattices (w, u, v)
-   (d) - Compare (priority queue) all good sublattices and pick up top ones.
-   (e) - For each such sublattice (w, u, v)
-   (f) -- Do the root sieve.
-
-   Details:
-   (a) In the following command,
-
-   ropt < POLY -w 0 -l 8
-
-   "-w" defines the leftmost point of quadratic rotation.
-   f'(x) = f(x) + w*x^2*g(x)
-
-   "-l" defines the steps for quadratic rotation, (w+l-1)
-
-   (b, c)
-   The code starts by looking each quadratic rotation, say
-   [w, \cdots, w+l-1]. For each rotated polynomial, we will
-   have to find a suitable set of parameters (p1^e1 * p2^e2*
-   \cdots *pn^en) to produce the sublattice. Note that, if it 
-   is larger, then we could find polynomials with better alpha,
-   but probably worse size; reversly, a small parameter gives 
-   worse alpha, but probably better size. It is hard to prebuilt
-   a universel parameter. Hence we may tune the parameters (p1^e1 
-   * p2^e2* \cdots *pn^en) using a trial sieving. The tune function
-   is disabled by default. Toggle "WANT_TUNE" in "ropt_param.h".
-
-   (d)
-   After good sublattices (w, u, v) are found for all w in the
-   permitted range (as you set by "-w" and "-l"), we will compare
-   the alpha values between all these sublattices. At the moment,
-   we only pick up the top "rsparam->nbest_sl = 128" sublattices
-   for sieving. You may change this in "ropt_param.h".
-
-   (e, f)
-   For each survived sublattice (w, u, v), we do the root sieve.
-   The permitted bound for "v" could be huge which runs forever.
-   Therefore, function "ropt_s2param_setup_range()" limits the sieving
-   range for "v". You may change this in "ropt_param.h".
-
-   Even the range "v" is limited, it may take much memory.
-   Therefore, we divide it into "SIEVEARRAY_SIZE " in "ropt_param.h".
-   Setting it larger take more memory and may reduce (setup) time.
-
-   For each such "SIEVEARRAY_SIZE", we actually sieving in blocks
-   of "L1_SIZE 12288". You may change this in "ropt_param.h".
-
-   Another important parameter:  "NUM_TOPALPHA_SIEVEARRAY 16".
-   For each sieve array of "SIEVEARRAY_SIZE", compute the MurphyE of
-   16 polynomials whose alpha values are the best among this array.
-
-   These poynomials will be then filtered into another global priority
-   queue which records "NUM_TOPE_SUBLATTICE=8" polynomials with top
-   MurphyE.
-
-   Note that, for polynomials of small skewness. Size can be more
-   important, hence you may want to set "NUM_TOPALPHA_SIEVEARRAY 8"
-   larger. However, this may reduce the performance since MurphyE
-   computation is slow.
-
-   [4. Tuning]
-
-   The "ropt_param.c" contains functions: "ropt_s2param_setup_range()"
-   and  "ropt_param_setup ()". They can be tuned. Please also see its
-   header file for other parameters.
-  
-   [5. Log]
-
-   -- (Dec, 2010) block sieving.
-   -- (Dec, 2010) reduced memory usage in return_combined_sublattice().
-   -- (Jan, 2011) addded priority queue, changed precision in return_combined_sublattice().
-   -- (Feb, 2011) some tunnings, correct bugs in rootsieve_v().
-   -- (Mar, 2011) readme.
-   -- (Apr, 2011) changed 1d sieving to 2d.
-   -- (Apr, 2012) spitting into separate c files.
-   -- (May, 2012) rewrite.
-
-   [6. Bugs]
-
-   Please report bugs to Shi Bai (shih.bai AT gmail.com).
+   Please report bugs to the public mailing list 
+       cado-nfs-discuss@lists.gforge.inria.fr
 */
 
 
@@ -131,24 +30,46 @@
 #include "rho.h"
 #include "auxiliary.h"
 #include "murphyE.h"
-#include "ropt.h"
+#include <pthread.h>
 #include "portability.h"
 #include "area.h"
+#include "ropt.h"
+
+/* thread structure for ropt */
+typedef struct
+{
+  cado_poly_ptr poly;
+  unsigned int id;
+  unsigned int poly_id;
+  double ropt_time;
+} __ropt_thread_struct;
+typedef __ropt_thread_struct ropt_thread_t[1];
+typedef __ropt_thread_struct * ropt_thread_ptr;
+typedef const __ropt_thread_struct * ropt_thread_srcptr;
+pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
+                                                   lock for those variables */
+unsigned int nthreads = 1;
+int tot_found = 0; /* total number of polynomials */
+cado_poly best_poly;
+double best_MurphyE = 0.0; /* Murphy's E (the larger the better) */
+ropt_param_t ropt_param; /* params for ropt algorithms */
+
 
 /**
  * Usage
  */
 void
-usage (char **argv)
+usage_adv (char **argv)
 {
   fprintf (stderr, "Error: Unhandled parameter: %s\n", argv[1]);
   fprintf (stderr, "\n");
-  fprintf (stderr, "Usage: %s -f fname [options]\n", argv[0]);
-  fprintf (stderr, "       %s -f fname --s2 [options]\n", argv[0]);
-  fprintf (stderr, "       %s -fm fname -n N -d D [options]\n", argv[0]);
-  fprintf (stderr, "       %s -fm fname --s2 -n N -d D [options]\n", argv[0]);
-  fprintf (stderr, "       %s [options]\n", argv[0]);
-  fprintf (stderr, "       %s --s2 [options]\n", argv[0]);
+  fprintf (stderr, "Options followed by %s\n", argv[1]);
+  fprintf (stderr, "Usage: %s %s -f fname [options]\n", argv[0], argv[1]);
+  fprintf (stderr, "       %s %s -f fname --s2 [options]\n", argv[0], argv[1]);
+  fprintf (stderr, "       %s %s -fm fname -n N -d D [options]\n", argv[0], argv[1]);
+  fprintf (stderr, "       %s %s -fm fname --s2 -n N -d D [options]\n", argv[0], argv[1]);
+  fprintf (stderr, "       %s %s [options]\n", argv[0], argv[1]);
+  fprintf (stderr, "       %s %s --s2 [options]\n", argv[0], argv[1]);
   fprintf (stderr, "\n");
   fprintf (stderr, "Options:\n");
   fprintf (stderr, " -f fname      read polynomials in CADO format.\n");
@@ -179,23 +100,23 @@ usage (char **argv)
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
   fprintf (stderr, " -ropteffort M   sieving effort ranging from 1 to 10 (default %d).\n", DEFAULT_ROPTEFFORT);
 
-  fprintf (stderr, "\nExample 1: %s -f fname\n", argv[0]);
+  fprintf (stderr, "\nExample 1: %s %s -f fname\n", argv[0], argv[1]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
 
-  fprintf (stderr, "\nExample 2: %s -f fname -amin -512 -amax 512  -norm 70\n", argv[0]);
+  fprintf (stderr, "\nExample 2: %s %s -f fname -amin -512 -amax 512  -norm 70\n", argv[0], argv[1]);
   fprintf (stderr, "As above, but restricts the quadratic rotation between -512\n"
            "and 512 and the sieving region by norm 70.\n");
 
-  fprintf (stderr, "\nExample 3: %s -f fname -amin -512 -amax 512 -e 5 7 4 3 2 2 -bmax 16 -cmax 10000000\n", argv[0]);
+  fprintf (stderr, "\nExample 3: %s %s -f fname -amin -512 -amax 512 -e 5 7 4 3 2 2 -bmax 16 -cmax 10000000\n", argv[0], argv[1]);
   fprintf (stderr, "As above, but uses five prime factors (2, 3, 5, 7, 11) in the\n"
            "sublattice with powers (7, 4, 3, 2, 2). It also tells ropt to\n"
            "root sieve a region of 16 by 10000000.\n");
 
-  fprintf (stderr, "\nExample 4: %s -fm rsa768.poly -amin -512 -amax 512 -e 5 7 4 3 2 2 -bmax 16 -cmax 10000000 -n $N -d 6\n", argv[0]);
+  fprintf (stderr, "\nExample 4: %s %s -fm rsa768.poly -amin -512 -amax 512 -e 5 7 4 3 2 2 -bmax 16 -cmax 10000000 -n $N -d 6\n", argv[0], argv[1]);
   fprintf (stderr, "As above, but reads msieve format where each line contains\n"
            "'c_d Y1 Y0'. The parameters -n and -d are compulsory.\n");
 
-  fprintf (stderr, "\nExample 5: %s -f fname --s2 -a 12 -b 345 -c 6789 -mod 1814400 -bmax 16 -cmax 10000000\n", argv[0]);
+  fprintf (stderr, "\nExample 5: %s %s -f fname --s2 -a 12 -b 345 -c 6789 -mod 1814400 -bmax 16 -cmax 10000000\n", argv[0], argv[1]);
   fprintf (stderr, "Sieve-only mode. Assume that we know the polynomial has good\n"
            "root property at rotation (12*x^2 + 345*x + 6789), we want to\n"
            "search 12*x^2 + (345 + 1814400*i)*x + (6789 + 1814400*j) where\n"
@@ -326,7 +247,7 @@ ropt_parse_param ( int argc,
           exit(1);
         }
         else {
-          usage (argv);
+          usage_adv (argv);
         }
       }
     }
@@ -445,7 +366,7 @@ ropt_parse_param ( int argc,
           }
         }
         else {
-          usage (argv);
+          usage_adv (argv);
         }
       }
     }
@@ -453,13 +374,80 @@ ropt_parse_param ( int argc,
 }
 
 
-/**
- * Main function: call ropt_on_cadopoly() or ropt_on_cadopoly()
- * or ropt_on_stdin().
- */
-int
-main (int argc, char **argv)
+static void
+ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
 {
+  double curr_MurphyE, st;
+  mpz_t t;
+  cado_poly ropt_poly;
+  cado_poly_init (ropt_poly);
+
+  if (nthreads > 1)
+    pthread_mutex_lock (&lock);
+  printf ("\n### input polynomial %u ###\n", poly_id);
+  cado_poly_fprintf_with_info (stdout, input_poly, "# ");
+  if (nthreads > 1)
+    pthread_mutex_unlock (&lock);
+
+  /* If the content of the algebraic polynomial has content <> 1, then print a
+     warning (this should not be frequent) and divides all coefficients of the
+     polynomial by the content. */
+  mpz_init (t);
+  mpz_poly_content (t, input_poly->alg);
+  if (mpz_cmp_ui (t, 1) != 0 && !mpz_divisible_p (input_poly->n, t))
+  {
+    gmp_printf ("# WARNING: the content of the algebraic side of polynomial %u "
+                "is not 1 (%Zd). The input polynomial will be divided by its "
+                "content.\n", poly_id, t);
+    mpz_poly_divexact_mpz (input_poly->alg, input_poly->alg, t);
+  }
+  mpz_clear (t);
+
+  st = seconds_thread ();
+  ropt_polyselect (ropt_poly, input_poly, ropt_param);
+  *ropt_time += seconds_thread () - st;
+
+  /* MurphyE */
+  ropt_poly->skew = L2_skewness (ropt_poly->alg, SKEWNESS_DEFAULT_PREC);
+  curr_MurphyE = MurphyE (ropt_poly, bound_f, bound_g, area, MURPHY_K);
+  if (nthreads > 1)
+    pthread_mutex_lock (&lock);
+  if (curr_MurphyE > best_MurphyE)
+  {
+    best_MurphyE = curr_MurphyE;
+    cado_poly_set (best_poly, ropt_poly);
+  }
+  printf ("\n### root-optimized polynomial %u ###\n", poly_id);
+    cado_poly_fprintf_with_info_and_MurphyE (stdout, ropt_poly, curr_MurphyE,
+                                             bound_f, bound_g, area, "# ");
+  printf ("### Best MurphyE so far is %.2e\n", best_MurphyE);
+  fflush (stdout);
+  if (nthreads > 1)
+    pthread_mutex_unlock (&lock);
+
+  cado_poly_clear (ropt_poly);
+}
+
+
+static void *
+thread_ropt (void *args)
+{
+  ropt_thread_ptr data = (ropt_thread_ptr) args;
+  ropt_wrapper (data->poly, data->poly_id, &(data->ropt_time));
+  return NULL;
+}
+
+
+/**
+ * Interface main_adv(). This will call ropt_on_cadopoly().
+ */
+static int
+main_adv (int argc, char **argv)
+{
+
+  char **argv0 = argv;
+  argv += 1;
+  argc -= 1;
   int i;
 
   /* L1 cache size */
@@ -498,7 +486,7 @@ main (int argc, char **argv)
     fclose (file);
     ropt_param_free (param);
 
-    return 0;
+    return EXIT_SUCCESS;
   }
   /* read polynomials in msieve format */
   else if (argc >= 3 && strcmp(argv[1], "-fm") == 0) {
@@ -533,7 +521,7 @@ main (int argc, char **argv)
     fclose (file);
     ropt_param_free (param);
 
-    return 0;
+    return EXIT_SUCCESS;
   }
   /* read polynomials from stdin */
   else if (argc >= 3)
@@ -547,8 +535,278 @@ main (int argc, char **argv)
 
     ropt_param_free (param);
 
-    return 0;
+    return EXIT_SUCCESS;
   }
   else
-    usage (argv);
+    usage_adv (argv0);
+
+  return EXIT_SUCCESS;
+}
+
+
+static void
+declare_usage_basic (param_list pl)
+{
+  char str[200];
+  param_list_decl_usage(pl, "inputpolys", "root-sieve the size-optimized "
+                                          "polynomials given in this file");
+  snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
+            DEFAULT_ROPTEFFORT);
+  param_list_decl_usage(pl, "ropteffort", str);
+  param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
+  snprintf (str, 200, "sieving area (default %.2e)", AREA);
+  param_list_decl_usage(pl, "area", str);
+  snprintf (str, 200, "algebraic smoothness bound (default %.2e)", BOUND_F);
+  param_list_decl_usage(pl, "Bf", str);
+  snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
+  param_list_decl_usage(pl, "Bg", str);
+  param_list_decl_usage(pl, "v", "(switch) verbose mode");
+  param_list_decl_usage(pl, "boundmaxlognorm", "Maximum lognorm. Used to compute"
+                                               " bounds for rotations for the "
+                                               "sieve stage of ropt");
+  verbose_decl_usage(pl);
+}
+
+
+static void
+usage_basic (const char *argv, const char * missing, param_list pl)
+{
+  if (missing) {
+    fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
+            missing);
+  }
+  param_list_print_usage (pl, argv, stderr);
+  param_list_clear (pl);
+  exit (EXIT_FAILURE);
+}
+
+
+/**
+ * Interface main_basic()
+ */
+static int
+main_basic (int argc, char **argv)
+{
+  char **argv0 = argv;
+  const char *polys_filename = NULL;
+  double st0 = seconds ();
+  FILE *polys_file = NULL;
+  cado_poly *input_polys = NULL;
+  unsigned int nb_input_polys = 0; /* number of input polynomials */
+  unsigned int size_input_polys = 16; /* Size of input_polys tab. */
+  double rootsieve_time = 0.0;
+
+  cado_poly_init (best_poly);
+  input_polys = (cado_poly *) malloc (size_input_polys * sizeof (cado_poly));
+  ASSERT_ALWAYS (input_polys != NULL);
+  for (unsigned int i = 0; i < size_input_polys; i++)
+    cado_poly_init (input_polys[i]);
+  ropt_param_init (ropt_param);
+  ropt_param->effort = DEFAULT_ROPTEFFORT; /* ropt effort, among 1-10 */
+
+  /* read params */
+  param_list pl;
+  param_list_init (pl);
+  declare_usage_basic(pl);
+  param_list_configure_switch (pl, "-v", &(ropt_param->verbose));
+
+  if (argc == 1)
+    usage_basic (argv0[0], NULL, pl);
+
+  argv++, argc--;
+  for ( ; argc; ) {
+    if (param_list_update_cmdline (pl, &argc, &argv)) continue;
+    fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
+    usage_basic (argv0[0], NULL, pl);
+  }
+
+  param_list_parse_uint (pl, "t", &nthreads);
+  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
+    area = AREA;
+  if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
+    bound_f = BOUND_F;
+  if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
+    bound_g = BOUND_G;
+  /* sieving effort that passed to ropt */
+  param_list_parse_int (pl, "ropteffort", &(ropt_param->effort));
+  /* param for ropt */
+  param_list_parse_double (pl, "boundmaxlognorm", &(ropt_param->bound_lognorm));
+  /* filename of the file with the list of polynomials to root-sieve */
+  polys_filename = param_list_lookup_string (pl, "inputpolys");
+
+  if (param_list_warn_unused(pl))
+    usage_basic (argv0[0], NULL, pl);
+
+  /* print command line */
+  verbose_interpret_parameters(pl);
+  param_list_print_command_line (stdout, pl);
+
+  /* Check that ropteffort is in [1,10] */
+  if (ropt_param->effort < 1 || ropt_param->effort > 10)
+  {
+    fprintf (stderr, "Error, -ropteffort should be in [1,10]\n");
+    usage_basic (argv0[0], NULL, pl);
+  }
+
+  /* Check that nthreads is >= 1 */
+  if (nthreads == 0)
+  {
+    fprintf (stderr, "Error, -t must be non-zero.\n");
+    usage_basic (argv0[0], NULL, pl);
+  }
+
+  if (polys_filename == NULL)
+    usage_basic (argv0[0], "inputpolys", pl);
+
+  printf ("# Info: Will use %u thread%s\n# Info: ropteffort = %d\n", nthreads,
+          (nthreads > 1) ? "s": "", ropt_param->effort);
+
+  /* detect L1 cache size */
+  ropt_L1_cachesize ();
+
+  printf ("# Info: L1_cachesize/2 = %u, size_tune_sievearray = %u\n",
+          L1_cachesize, size_tune_sievearray);
+
+  /* Open file containing polynomials. */
+  printf ("# Reading polynomials from %s\n", polys_filename);
+  polys_file = fopen(polys_filename, "r");
+  if (polys_file == NULL)
+  {
+    perror("Could not open file");
+    exit(EXIT_FAILURE);
+  }
+
+  /* Read all polynomials from file. Store then in input_polys. */
+  while (cado_poly_read_next_poly_from_stream (input_polys[nb_input_polys],
+                                               polys_file))
+  {
+    nb_input_polys++;
+    if (nb_input_polys == size_input_polys) /* Realloc if needed */
+    {
+      if (ropt_param->verbose > 0)
+        fprintf (stderr, "# Reallocating input_polys\n");
+      unsigned int new_size = 2 * size_input_polys;
+      input_polys = (cado_poly *) realloc (input_polys, new_size * sizeof (cado_poly));
+      ASSERT_ALWAYS (input_polys != NULL);
+      for (unsigned int i = size_input_polys; i < new_size; i++)
+        cado_poly_init (input_polys[i]);
+      size_input_polys = new_size;
+    }
+  }
+  /* Did we stop at the end of the file or was there an error. */
+  if (!feof (polys_file))
+  {
+    fprintf (stderr, "Error while reading file %s.\n", polys_filename);
+    abort ();
+  }
+  fclose (polys_file);
+  printf ("# %u polynomials read.\n", nb_input_polys);
+
+  /* Main loop: do root-optimization on input_polys. */
+  if (nthreads > 1) /* multi thread version */
+  {
+    /* Allocated memory for threads and threads_data */
+    pthread_t *threads = NULL;
+    ropt_thread_t *threads_data = NULL;
+    threads = (pthread_t *) malloc (nthreads * sizeof (pthread_t));
+    ASSERT_ALWAYS (threads != NULL);
+    threads_data = (ropt_thread_t *) malloc (nthreads * sizeof (ropt_thread_t));
+    ASSERT_ALWAYS (threads_data != NULL);
+    for (unsigned int i = 0; i < nthreads; i++)
+    {
+      threads_data[i]->ropt_time = 0.0;
+      threads_data[i]->id = i;
+    }
+
+    for (unsigned int i = 0; i < nb_input_polys; )
+    {
+      unsigned int j;
+      for (j = 0; j < nthreads && i < nb_input_polys; j++, i++)
+      {
+        threads_data[j]->poly = input_polys[i];
+        threads_data[j]->poly_id = i;
+        pthread_create (&threads[j], NULL, thread_ropt,
+                        (void *) (threads_data[j]));
+      }
+
+      /* we have created j threads, with j = nthreads usually, except at the
+         end of we might have j < nthreads */
+      while (j > 0)
+        pthread_join (threads[--j], NULL);
+    }
+
+    for (unsigned int i = 0; i < nthreads; i++)
+    {
+      rootsieve_time += threads_data[i]->ropt_time;
+      if (ropt_param->verbose > 0)
+        printf ("# Stat: rootsieve on thread %u took %.2fs\n", i,
+                threads_data[i]->ropt_time);
+    }
+
+    free (threads);
+    free (threads_data);
+  }
+  else /* mono thread version */
+  {
+    for (unsigned int i = 0; i < nb_input_polys; i++)
+      ropt_wrapper (input_polys[i], i, &rootsieve_time);
+  }
+
+  /* print total time and rootsieve time.
+     These two lines gets parsed by the script. */
+  printf ("\n\n# Stat: total phase took %.2fs\n", seconds () - st0);
+
+#ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
+                              works or in mono-thread mode */
+  if (nthreads == 1)
+#endif
+    printf ("# Stat: rootsieve took %.2fs\n", rootsieve_time);
+
+  if (best_MurphyE == 0.0)
+  {
+    if (nb_input_polys > 0)
+    {
+      /* At least one poly was parsed and the best MurphyE is still 0 => Error */
+      fprintf (stderr, "Error, the best MurphyE value is still 0 at the end.\n");
+      abort ();
+    }
+    else
+    {
+      /* No polynomials were parsed in the input files but the whole file was
+         parsed without errors (see !feof above) => Warning */
+      printf ("# WARNING: No polynomials were found in the input file %s\n",
+              polys_filename);
+    }
+  }
+  else
+  {
+    printf ("# Best polynomial found:\n");
+    cado_poly_fprintf_with_info_and_MurphyE (stdout, best_poly, best_MurphyE,
+                                             bound_f, bound_g, area, NULL);
+  }
+
+  ropt_param_free (ropt_param);
+  cado_poly_clear (best_poly);
+  for (unsigned int i = 0; i < size_input_polys; i++)
+    cado_poly_clear (input_polys[i]);
+  free (input_polys);
+  param_list_clear (pl);
+
+  return EXIT_SUCCESS;
+}
+
+
+/**
+ * There are two interfaces: either call "main_adv" or "main_basic"
+ * depending whether we have the option --adv. 
+ * Note the cadoprograms.py uses the main_basic() interface.
+ */
+int
+main (int argc, char **argv)
+{
+  /* usage */
+  if (argc > 1 && strcmp(argv[1], "--adv") == 0)
+    return main_adv (argc, argv);
+  else
+    return main_basic (argc, argv);
 }

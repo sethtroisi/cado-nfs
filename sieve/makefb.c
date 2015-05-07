@@ -394,10 +394,12 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
         T[j]->d = d;
         T[j]->maxbits = maxbits;
       }
+    prime_info pi;
+    prime_info_init (pi);
     for (p = 2; p <= alim;) {
       for (j = 0; j < nb_threads && p <= alim; j++)
         {
-          for (k = 0; k < GROUP && p <= alim; p = getprime (p), k++)
+          for (k = 0; k < GROUP && p <= alim; p = getprime_mt (pi), k++)
             T[j]->p[k] = p;
           T[j]->n = k;
         }
@@ -434,8 +436,7 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
         }
       }
     }
-    /* Free getprime() memory */
-    getprime(0);
+    prime_info_clear (pi);
 }
 
 static void declare_usage(param_list pl)
