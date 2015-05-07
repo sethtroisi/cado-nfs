@@ -32,6 +32,25 @@ void factor_init(factor_ptr factor, unsigned int number);
 void factor_clear(factor_ptr factor);
 
 /*
+ * Print an array of factors.
+ *
+ * factor: an array of factors.
+ */
+void factor_fprintf(FILE * file, factor_srcptr factor);
+
+/*
+ * Test if the maximum factor of the array factor is less or equal to B. Return
+ *  1 if true, 0 otherwise. If factor is sorted, set sort to 1, 0 otherwise.
+ *
+ * factor: an array of factors.
+ * B: the smoothness bound.
+ * sort: 1 if factor is sorted, 0 otherwise.
+ */
+unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort);
+
+unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z);
+
+/*
  * Realloc an array of factors. Number must be less than factor->number.
  *
  * factor: the array of factors.
@@ -53,7 +72,7 @@ void sort_factor(factor_ptr factor);
  * factor: an array of factors.
  * z: the number we want to factorize.
  */
-unsigned int gmp_factorize(factor_ptr factor, mpz_t z);
+unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z);
 
 /*
  * Factorise (brute force) a mpz and set the factors in factor.
@@ -63,23 +82,6 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_t z);
  * z: the number we want to factorize.
  */
 unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z);
-
-/*
- * Print an array of factors.
- *
- * factor: an array of factors.
- */
-void factor_fprintf(FILE * file, factor_srcptr factor);
-
-/*
- * Test if the maximum factor of the array factor is less or equal to B. Return
- *  1 if true, 0 otherwise. If factor is sorted, set sort to 1, 0 otherwise.
- *
- * factor: an array of factors.
- * B: the smoothness bound.
- * sort: 1 if factor is sorted, 0 otherwise.
- */
-unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort);
 
 /*
  * Compute the inversion of op1 mod op2 and set the result to rop.

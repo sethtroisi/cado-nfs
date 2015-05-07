@@ -33,17 +33,17 @@ int main()
   uint64_t index;
   uint64_t index1;
 
-  array_int64_vector_index(&index, vector, H, nb);
+  index = array_int64_vector_index(vector, H, nb);
   ASSERT_ALWAYS(index == 0);
   for (unsigned int i = 1; i < nb; i++) {
     int64_vector_add_one(vector, H);
-    array_int64_vector_index(&index, vector, H, nb);
+    index = array_int64_vector_index(vector, H, nb);
     ASSERT_ALWAYS(index == i);
     array_index_mpz_vector(v, index, H, nb);
     for (unsigned int j = 0; j < t; j++) {
       ASSERT_ALWAYS(mpz_cmp_si(v->c[j], vector->c[j] == 0));
     }
-    array_mpz_vector_index(&index1, v, H, nb);
+    index1 = array_mpz_vector_index(v, H, nb);
     ASSERT_ALWAYS(index == index1);
   }
 

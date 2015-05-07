@@ -15,6 +15,11 @@ typedef s_array_t array_t[1];
 typedef s_array_t * array_ptr;
 typedef const s_array_t * array_srcptr;
 
+/* 
+ * Array is used to store the value of norm. An index correnspond to an element
+ * (a_0, a_1, …, a_{t-1}) with t the dimension of the lattice we consider.
+ */
+
 /*
  * Initialise an array.
  *
@@ -39,6 +44,7 @@ void array_clear(array_ptr array);
 static inline unsigned char array_get(array_srcptr array, uint64_t i)
 {
   ASSERT(i < array->number_element);
+
   return array->array[i];
 }
 
@@ -52,6 +58,7 @@ static inline unsigned char array_get(array_srcptr array, uint64_t i)
 static inline void array_set(array_srcptr array, uint64_t i, unsigned char val)
 {
   ASSERT(i < array->number_element);
+
   array->array[i] = val;
 }
 
