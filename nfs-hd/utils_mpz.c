@@ -24,6 +24,36 @@ void factor_clear(factor_ptr factor)
   factor->number = 0;
 }
 
+void factor_fprintf(FILE * file, factor_srcptr factor)
+{
+  fprintf(file, "[");
+  for (unsigned int i = 0; i < factor->number - 1; i++) {
+    gmp_fprintf(file, "%Zd, ", factor->factorization[i]);
+  }
+  gmp_fprintf(file, "%Zd]\n", factor->factorization[factor->number - 1]);
+}
+
+unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort)
+{
+  if (sort) {
+    ASSERT(sort == 1);
+
+    if (mpz_cmp(factor->factorization[factor->number - 1], B) > 0) {
+      return 0;
+    }
+  } else {
+    ASSERT(sort == 0);
+
+    for (unsigned int i = 0; i < factor->number; i++) {
+      if (mpz_cmp(factor->factorization[i], B) > 0) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+
 unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z)
 {
   mpz_t tmp;
@@ -118,11 +148,9 @@ static unsigned int factorize(factor_ptr factor, mpz_srcptr z_root,
   return factorise;
 }
 
-static unsigned int brute_force_factorize(factor_ptr factor,
+static unsigned int brute_force_factorize(factor_ptr factor, mpz_ptr z,
     unsigned int * number, mpz_srcptr z_root, mpz_srcptr bound)
 {
-  mpz_t z;
-  mpz_init(z);
   mpz_set(z, z_root);
   mpz_t prime;
   mpz_init(prime);
@@ -150,7 +178,6 @@ static unsigned int brute_force_factorize(factor_ptr factor,
   }
 
   mpz_clear(prime);
-  mpz_clear(z);
 
   return factorise;
 }
@@ -177,7 +204,11 @@ unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
     nb = 1;
     assert_facto = 0;
   } else {
-    assert_facto = brute_force_factorize(factor, &nb, z, z);
+    mpz_t tmp;
+    mpz_init(tmp);
+    assert_facto = brute_force_factorize(factor, tmp, &nb, z, z);
+    ASSERT(mpz_cmp_ui(tmp, 1) == 0);
+    mpz_clear(tmp);
   }
   factor_realloc(factor, nb);
   sort_factor(factor);
@@ -200,16 +231,28 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z)
     mpz_set(factor->factorization[nb], z);
     nb = 1;
   } else {
+    mpz_t z_res;
+    mpz_init(z_res);
+
+#ifdef FACTO_BRUTE_FORCE
     mpz_t bound;
     mpz_init(bound);
     mpz_set_ui(bound, 1048576);
-    assert_facto = brute_force_factorize(factor, &nb, z, bound);
+    assert_facto = brute_force_factorize(factor, z_res, &nb, z, bound);
+#else
+    mpz_set(z_res, z);
+#endif
+
     if (assert_facto) {
       ASSERT(assert_facto == 1);
 
-      assert_facto = factorize(factor, z, &nb);
+      assert_facto = factorize(factor, z_res, &nb);
     }
+#ifdef FACTO_BRUTE_FORCE
     mpz_clear(bound);
+#endif
+
+    mpz_clear(z_res);
   }
   factor_realloc(factor, nb);
   sort_factor(factor);
@@ -219,36 +262,6 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z)
 #endif
 
   return assert_facto;
-}
-
-void factor_fprintf(FILE * file, factor_srcptr factor)
-{
-  fprintf(file, "[");
-  for (unsigned int i = 0; i < factor->number - 1; i++) {
-    gmp_fprintf(file, "%Zd, ", factor->factorization[i]);
-  }
-  gmp_fprintf(file, "%Zd]\n", factor->factorization[factor->number - 1]);
-}
-
-unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort)
-{
-  if (sort) {
-    ASSERT(sort == 1);
-
-    if (mpz_cmp(factor->factorization[factor->number - 1], B) > 0) {
-      return 0;
-    }
-  } else {
-    ASSERT(sort == 0);
-
-    for (unsigned int i = 0; i < factor->number; i++) {
-      if (mpz_cmp(factor->factorization[i], B) > 0) {
-        return 0;
-      }
-    }
-  }
-
-  return 1;
 }
 
 int mpz_invert_ui(mpz_ptr rop, mpz_srcptr op1, const uint64_t op2)
