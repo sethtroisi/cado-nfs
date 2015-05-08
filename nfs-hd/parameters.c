@@ -71,6 +71,7 @@ void sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
   double power = ( (double)H->t - (double)(H->t * H->t) ) / (2.0 * (double) n);
   power = pow(mpz_get_d(p), power);
   nb_elem = nb_elem / power;
+  nb_elem = nb_elem / pow(2.0, (double) H->t - 1.0);
   unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem, 1/(double)H->t));
 
   sieving_bound_set_hi(H, 0, H0);
