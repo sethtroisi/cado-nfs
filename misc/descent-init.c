@@ -86,6 +86,7 @@ main (int argc, char *argv[])
   unsigned long e, L, l, lu, lv, i, seed = 0;
   double B1, S, Smax = 1000.0;
   int uprime, vprime;
+  ecm_params params;
 
   if (argc > 2 && strcmp (argv[1], "-seed") == 0)
     {
@@ -167,7 +168,11 @@ main (int argc, char *argv[])
           gain_v[i] = gain_v[i-1];
           if (uprime == 0)
             {
-              ecm_factor (f, u, B1, NULL);
+              ecm_init (params);
+              mpz_set_d (params->sigma, B1);
+              mpz_set_ui (f, 1);
+              ecm_factor (f, u, B1, params);
+              ecm_clear (params);
 	      gain_u[i] += log2 (mpz_get_d (f));
 	      aver_gain[i] = aver_gain[i] * nb_test[i] + gain_u[i];
 	      nb_test[i] += 1;
@@ -183,7 +188,11 @@ main (int argc, char *argv[])
 
           if (vprime == 0)
             {
-              ecm_factor (f, v, B1, NULL);
+              ecm_init (params);
+              mpz_set_d (params->sigma, B1);
+              mpz_set_ui (f, 1);
+              ecm_factor (f, v, B1, params);
+              ecm_clear (params);
 	      gain_v[i] += log2 (mpz_get_d (f));
 	      aver_gain[i] = aver_gain[i] * nb_test[i] + gain_v[i];
 	      nb_test[i] += 1;
@@ -215,10 +224,15 @@ main (int argc, char *argv[])
             {
               if (uprime == 0)
                 {
-                  ecm_factor (f, u, B1, NULL);
+                  ecm_init (params);
+                  mpz_set_d (params->sigma, B1);
+                  mpz_set_ui (f, 1);
+                  ecm_factor (f, u, B1, params);
+                  ecm_clear (params);
                   if (mpz_cmp_ui (f, 1) > 0)
                     {
-                      gmp_printf ("found factor of u: %Zd\n", f);
+                      gmp_printf ("found factor of u with B1=%.0f: %Zd\n",
+                                  B1, f);
                       mpz_divexact (u, u, f);
                       uprime = mpz_probab_prime_p (u, 1);
                       if (uprime && mpz_sizeinbase (u, 2) > L)
@@ -227,10 +241,15 @@ main (int argc, char *argv[])
                 }
               if (vprime == 0)
                 {
-                  ecm_factor (f, v, B1, NULL);
+                  ecm_init (params);
+                  mpz_set_d (params->sigma, B1);
+                  mpz_set_ui (f, 1);
+                  ecm_factor (f, v, B1, params);
+                  ecm_clear (params);
                   if (mpz_cmp_ui (f, 1) > 0)
                     {
-                      gmp_printf ("found factor of v: %Zd\n", f);
+                      gmp_printf ("found factor of v with B1=%.0f: %Zd\n",
+                                  B1, f);
                       mpz_divexact (v, v, f);
                       vprime = mpz_probab_prime_p (v, 1);
                       if (vprime && mpz_sizeinbase (v, 2) > L)
