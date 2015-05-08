@@ -41,22 +41,23 @@ static double prime_pi (unsigned long i)
 
 /* ---------- */
 
-uint64_t size_sieving_region(sieving_bound_srcptr H)
+double size_sieving_region(sieving_bound_srcptr H)
 {
-  uint64_t res = 1;
+  double res = 1;
   for (unsigned int i = 0; i < H->t - 1; i++) {
-    res = res * 2 * (uint64_t) H->h[i];
+    res = res * 2 * (double) H->h[i];
   }
-  res = res * (uint64_t) H->h[H->t - 1];
+  res = res * (double) H->h[H->t - 1];
 
-  ASSERT(res > 0);
+  ASSERT(res > 0.0);
 
   return res;
 }
 
-void sieving_region_adapted(sieving_bound_ptr H, uint64_t number_element)
+void sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element)
 {
-  double tmp = (double)number_element / pow(2, (double)(H->t - 1));
+  double nb_elem = pow(2.0, (double)number_element);
+  double tmp = nb_elem / pow(2, (double)(H->t - 1));
   unsigned int H0 = (unsigned int) nearbyint(pow(tmp, 1/(double)H->t));
   for (unsigned int i = 0; i < H->t; i++) {
     sieving_bound_set_hi(H, i, H0);
@@ -64,20 +65,20 @@ void sieving_region_adapted(sieving_bound_ptr H, uint64_t number_element)
 }
 
 void sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
-    uint64_t number_element)
+    unsigned int number_element)
 {
-  double tmp = (double)number_element / pow(2, (double)(H->t - 1));
-  double p_d = mpz_get_d(p);
-  double power = ( (double) (H->t - H->t * H->t) ) / (2.0 * (double) n);
-  tmp = tmp / pow(p_d, power);
-  unsigned int H0 = (unsigned int) nearbyint(pow(tmp, 1/(double)H->t));
- 
+  double nb_elem = pow(2.0, (double) number_element);
+  double power = ( (double)H->t - (double)(H->t * H->t) ) / (2.0 * (double) n);
+  power = pow(mpz_get_d(p), power);
+  nb_elem = nb_elem / power;
+  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem, 1/(double)H->t));
+
   sieving_bound_set_hi(H, 0, H0);
   for (unsigned int i = 1; i < H->t - 1; i++) {
-    tmp = H0 * pow(p_d, - (double) i / (double) n);
+    double tmp = (double)H0 * pow(mpz_get_d(p), - (double) i / (double) n);
     sieving_bound_set_hi(H, i, (unsigned int) nearbyint(tmp));
   }
-  tmp = H0 * pow(p_d, - (double) (H->t - 1) / (double) n);
+  double tmp = (double)H0 * pow(mpz_get_d(p), - (double) (H->t - 1) / (double) n);
   if ((unsigned int) nearbyint(tmp) == 0) {
     sieving_bound_set_hi(H, H->t - 1, 1);
   } else {
@@ -159,40 +160,42 @@ static unsigned int test(mpz_t * mean, unsigned int i, mpz_poly_t * f,
   return 0;
 } 
 
-static void decrease_sieving_region_adapted(sieving_bound_ptr H, mpz_t * mean,
-    mpz_poly_t * f, uint64_t size_current, unsigned int lpb, uint64_t number_a)
+static void increase_sieving_region_special_q(sieving_bound_ptr H, mpz_t * mean,
+    mpz_poly_t * f, unsigned int size_current, unsigned int lpb,
+    uint64_t number_a)
 {
-  size_current = size_current * 2;
-  sieving_region_adapted(H, size_current);
+  size_current = size_current + 1;
+  sieving_region_special_q(H, size_current);
   unsigned int res = test(mean, size_current, f, 2, number_a, H, lpb);
   while (!res) {
     ASSERT(res == 0);
 
-    size_current = size_current * 2;
+    size_current = size_current + 1;
     if (log2((double)size_current) > 63.0) {
       break;
     }
-    sieving_region_adapted(H, size_current);
+    sieving_region_special_q(H, size_current);
     res = test(mean, size_current, f, 2, number_a, H, lpb);
   }
 }
 
-static void increase_sieving_region_adapted(sieving_bound_ptr H, mpz_t * mean,
-    mpz_poly_t * f, uint64_t size_current, unsigned int lpb, uint64_t number_a)
+static void decrease_sieving_region_special_q(sieving_bound_ptr H, mpz_t * mean,
+    mpz_poly_t * f, unsigned int size_current, unsigned int lpb,
+    uint64_t number_a)
 {
-  size_current = size_current / 2;
-  sieving_region_adapted(H, size_current);
+  size_current = size_current - 1;
+  sieving_region_special_q(H, size_current);
   unsigned int res = test(mean, size_current, f, 2, number_a, H, lpb);
   while (res) {
     ASSERT(res == 1);
 
-    size_current = size_current / 2;
-    sieving_region_adapted(H, size_current);
+    size_current = size_current - 1;
+    sieving_region_special_q(H, size_current);
     res = test(mean, size_current, f, 2, number_a, H, lpb);
   }
 }
 
-void find_parameters_adapted(mpz_srcptr p, unsigned int n, uint64_t number_a,
+void find_parameters_special_q(mpz_srcptr p, unsigned int n, uint64_t number_a,
     unsigned int lpb_min, unsigned int lpb_max, unsigned int t_min,
     unsigned int t_max, uint64_t size_start, mpz_poly_srcptr h, int coeff0,
     int coeff1, unsigned int nb_times, double weight_0, double weight_1)
@@ -221,7 +224,7 @@ void find_parameters_adapted(mpz_srcptr p, unsigned int n, uint64_t number_a,
     for (unsigned int t = t_min; t < t_max; t++) {
       sieving_bound_init(H, t);
 
-      sieving_region_adapted(H, size_start);
+      sieving_region_special_q(H, size_start);
       function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, lpb - 1, t,
           nb_times, weight_0, weight_1);
       mpz_poly_set(f[0], f0);
@@ -231,11 +234,13 @@ void find_parameters_adapted(mpz_srcptr p, unsigned int n, uint64_t number_a,
       if (res) {
         ASSERT(res == 1);
 
-        increase_sieving_region_adapted(H, mean, f, size_start, lpb, number_a);
+        increase_sieving_region_special_q(H, mean, f, size_start, lpb,
+            number_a);
       } else {
         ASSERT(res == 0);
 
-        decrease_sieving_region_adapted(H, mean, f, size_start, lpb, number_a);
+        decrease_sieving_region_special_q(H, mean, f, size_start, lpb,
+            number_a);
       }
 
       sieving_bound_clear(H);
