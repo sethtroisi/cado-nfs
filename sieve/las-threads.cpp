@@ -59,11 +59,14 @@ template <typename T>
 void
 reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fill_ratio)
 {
-  // FIXME: we lose a factor of 2 in memory, here.
-  // Once the multi-threading issue is solved, we can probably put back a
-  // more reasonable value. But in the meantime, this avoid to hit the
-  // maxfull bug.
-  double ratio = 2.0*fill_ratio;
+  double ratio = fill_ratio;
+  if (n > 1) {
+      // FIXME: we lose a factor of 2 in memory, here.
+      // Once the multi-threading issue is solved, we can probably put back a
+      // more reasonable value. But in the meantime, this avoid to hit the
+      // maxfull bug.
+      ratio = 2.0*fill_ratio;
+  }
   /* We estimate that the updates will be evenly distrubuted among the n
      different bucket arrays, so each gets fill_ratio / n. */
   for (size_t i = 0; i < n; i++)
