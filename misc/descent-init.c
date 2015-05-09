@@ -160,6 +160,7 @@ main (int argc, char *argv[])
       vprime = mpz_probab_prime_p (v, 1);
       if (vprime && mpz_sizeinbase (v, 2) > L)
         continue;
+      ecm_init (params);
       while (S < Smax && (uprime == 0 || vprime == 0))
         {
           i = i + 1;
@@ -168,11 +169,10 @@ main (int argc, char *argv[])
           gain_v[i] = gain_v[i-1];
           if (uprime == 0)
             {
-              ecm_init (params);
               mpz_set_d (params->sigma, B1);
               mpz_set_ui (f, 1);
               ecm_factor (f, u, B1, params);
-              ecm_clear (params);
+              params->B1done = ECM_DEFAULT_B1_DONE; /* fix issue in 6.4.x */
 	      gain_u[i] += log2 (mpz_get_d (f));
 	      aver_gain[i] = aver_gain[i] * nb_test[i] + gain_u[i];
 	      nb_test[i] += 1;
@@ -188,11 +188,10 @@ main (int argc, char *argv[])
 
           if (vprime == 0)
             {
-              ecm_init (params);
               mpz_set_d (params->sigma, B1);
               mpz_set_ui (f, 1);
               ecm_factor (f, v, B1, params);
-              ecm_clear (params);
+              params->B1done = ECM_DEFAULT_B1_DONE; /* fix issue in 6.4.x */
 	      gain_v[i] += log2 (mpz_get_d (f));
 	      aver_gain[i] = aver_gain[i] * nb_test[i] + gain_v[i];
 	      nb_test[i] += 1;
@@ -224,11 +223,10 @@ main (int argc, char *argv[])
             {
               if (uprime == 0)
                 {
-                  ecm_init (params);
                   mpz_set_d (params->sigma, B1);
                   mpz_set_ui (f, 1);
                   ecm_factor (f, u, B1, params);
-                  ecm_clear (params);
+                  params->B1done = ECM_DEFAULT_B1_DONE; /* issue in 6.4.x */
                   if (mpz_cmp_ui (f, 1) > 0)
                     {
                       gmp_printf ("found factor of u with B1=%.0f: %Zd\n",
@@ -241,11 +239,10 @@ main (int argc, char *argv[])
                 }
               if (vprime == 0)
                 {
-                  ecm_init (params);
                   mpz_set_d (params->sigma, B1);
                   mpz_set_ui (f, 1);
                   ecm_factor (f, v, B1, params);
-                  ecm_clear (params);
+                  params->B1done = ECM_DEFAULT_B1_DONE; /* issue in 6.4.x */
                   if (mpz_cmp_ui (f, 1) > 0)
                     {
                       gmp_printf ("found factor of v with B1=%.0f: %Zd\n",
@@ -291,4 +288,5 @@ main (int argc, char *argv[])
   mpz_clear (u0);
   mpz_clear (v0);
   mpz_clear (f);
+  ecm_clear (params);
 }
