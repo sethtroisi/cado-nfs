@@ -17,6 +17,7 @@
 #endif
 #include <gmp.h>
 #include <vector>
+#include <map>
 #include "las-config.h"
 #include "cado_poly.h" // for MAXDEGREE
 #include "fb-types.h"
@@ -282,7 +283,12 @@ class fb_slice : public fb_slice_interface {
 template <class FB_ENTRY_TYPE>
 class fb_vector : public fb_vector_interface, private NonCopyable {
   std::vector<FB_ENTRY_TYPE> vec;
-  std::vector<fb_slice<FB_ENTRY_TYPE> > slices;
+  typedef std::vector<fb_slice<FB_ENTRY_TYPE> > slices_t;
+  const slices_t *slices; /* If no slicing exists, e.g., because the fb_part
+                             is only_general (and thus meant for line-sieving)
+                             or because the vector is empty, then
+                             slices == NULL */
+  std::map<const double, const slices_t *> cached_slices;
   void sort();
   double est_weight_max(size_t, size_t) const;
   double est_weight_avg(size_t, size_t) const;
@@ -294,7 +300,7 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
  public:
   static const size_t max_slice_len = 65536;
 
-  fb_vector(){};
+  fb_vector() : slices(NULL){};
   ~fb_vector(){};
 
   void make_slices(double scale, double max_weight, slice_index_t &next_index);
@@ -315,19 +321,19 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
   void finalize() {sort();}
 
   const fb_slice<FB_ENTRY_TYPE> *get_first_slice() const {
-    if (slices.empty()) {
+    if (slices == NULL || slices->empty()) {
       return NULL;
     }
-    return &slices[0];
+    return &(*slices)[0];
   }
   const fb_slice<FB_ENTRY_TYPE> *get_slice(const size_t n) const {
-    if (slices.empty())
+    if (slices == NULL || slices->empty())
       return NULL;
-    const slice_index_t first = slices.front().get_index();
-    const slice_index_t last = slices.back().get_index();
+    const slice_index_t first = slices->front().get_index();
+    const slice_index_t last = slices->back().get_index();
     const fb_slice<FB_ENTRY_TYPE> *slice = NULL;
     if (first <= n && n <= last) {
-      slice = &slices[n - first];
+      slice = &(*slices)[n - first];
       ASSERT_ALWAYS(n == slice->get_index());
     }
     return slice;
@@ -347,8 +353,8 @@ class fb_part: public fb_interface, private NonCopyable {
      here, or let each array end with a "magic value", such as a slice with
      0 entries, or a NULL pointer? */
 
-  /* If true, all entries go in the general vector */
   const fbprime_t powlim;
+  /* If true, all entries go in the general vector */
   const bool only_general;
 
   /* These vectors are filled when we read or generate the factor base.

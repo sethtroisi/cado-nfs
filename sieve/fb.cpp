@@ -557,8 +557,31 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
 {
   /* Entries in vec must be sorted */
 
-  /* Remove old entries in slices */
-  slices.clear();
+  if (vec.empty()) {
+    /* Nothing to do. Leave slices == NULL */
+    ASSERT_ALWAYS(slices == NULL);
+    return;
+  }
+
+  /* If we already have a slicing for this scale in the cache, use that one */
+  if (!cached_slices.empty() &&
+      cached_slices.find(scale) != cached_slices.end()) {
+    slices = cached_slices[scale];
+    return;
+  }
+
+  /* Otherwise create a new slicing */
+  verbose_output_print (0, 3, "# Creating new slicing of ");
+  if (FB_ENTRY_TYPE::is_general_type) {
+    verbose_output_print (0, 3, "general vector");
+  } else {
+    verbose_output_print (0, 3, "vector with %d root%s",
+                          FB_ENTRY_TYPE::fixed_nr_roots,
+                          FB_ENTRY_TYPE::fixed_nr_roots != 1 ? "s" : "");
+  }
+  verbose_output_print (0, 3, " for scale=%1.2f\n", scale);
+
+  slices_t *new_slices = new slices_t;
 
   size_t cur_slice_start = 0;
 
@@ -603,10 +626,15 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
            (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.),
            weight);
     fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
-    slices.push_back(s);
+    new_slices->push_back(s);
 
     cur_slice_start = next_slice_start;
   }
+
+  /* Add new slicing to the cache */
+  cached_slices[scale] = new_slices;
+  /* Make the new slicing the currently used one */
+  slices = new_slices;
 }
 
 template <class FB_ENTRY_TYPE>
@@ -622,8 +650,8 @@ void
 fb_vector<FB_ENTRY_TYPE>::fprint(FILE *out) const
 {
   /* If we have sliced the entries, we print them one slice at a time */
-  if (!slices.empty()) {
-    for (typename std::vector<fb_slice<FB_ENTRY_TYPE> >::const_iterator it = slices.begin(); it != slices.end(); it++) {
+  if (!slices->empty()) {
+    for (typename std::vector<fb_slice<FB_ENTRY_TYPE> >::const_iterator it = slices->begin(); it != slices->end(); it++) {
       fprintf(out, "#    Slice index = %u, logp = %hhu:\n", (unsigned int) it->get_index(), it->get_logp());
       it->fprint(out);
     }
@@ -718,6 +746,7 @@ fb_part::make_slices(const double scale, const double max_weight,
       get_slices(i_roots)->make_slices(scale, max_weight, next_index);
     /* If we store all entries as general entries, we don't slice them,
        as those are the small primes in part 0 which get line sieved */
+    general_vector.make_slices(scale, max_weight, next_index);
   }
 }
 
