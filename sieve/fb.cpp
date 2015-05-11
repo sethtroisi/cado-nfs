@@ -765,6 +765,14 @@ fb_part::make_slices(const double scale, const double max_weight,
       get_slices(i_roots)->make_slices(scale, max_weight, next_index);
     /* If we store all entries as general entries, we don't slice them,
        as those are the small primes in part 0 which get line sieved */
+    /* FIXME: slicing the general vector is somewhat silly even if it gets
+       bucket-sieved, as there are only few entries, scattered over the
+       interval [2, powlim] (and perhaps a bigger prime or two with
+       projective/ramified roots). Thus most slices contain only a few
+       primes or prime powers. It would be better to let fill_in_buckets()
+       write prime-hint updates instead when sieving the general vector,
+       so that we don't have to write a pointer array for nearly-empty
+       slices. */
     general_vector.make_slices(scale, max_weight, next_index);
   }
 }
