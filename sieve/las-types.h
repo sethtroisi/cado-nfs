@@ -108,7 +108,8 @@ struct sieve_side_info_s {
     /* These fields are used for the norm initialization essentially.
      * Only the scale is also relevant to part of the rest, since it
      * determines the logp contributions for factor base primes */
-    double scale;      /* scale used for logarithms for fb and norm */
+    double scale;      /* scale used for logarithms for fb and norm.
+                          must be of form (int)x * 0.1 */
     double cexp2[257]; /* for 2^X * scale + GUARD */
     double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
 
