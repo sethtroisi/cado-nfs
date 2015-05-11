@@ -115,9 +115,9 @@ public:
       extracted.push_back(static_cast<unsigned long>(p));
     }
   }
-  /* Allow sorting by q */
-  bool operator<(const fb_general_entry &other) const {return this->q < other.q;}
-  bool operator>(const fb_general_entry &other) const {return this->q > other.q;}
+  /* Allow sorting by p */
+  bool operator<(const fb_general_entry &other) const {return this->p < other.p;}
+  bool operator>(const fb_general_entry &other) const {return this->p > other.p;}
 };
 
 template <int Nr_roots>

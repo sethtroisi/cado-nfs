@@ -569,7 +569,9 @@ void
 fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
                                       slice_index_t &next_index)
 {
-  /* Entries in vec must be sorted */
+  /* Entries in vec must be sorted in order of non-decreasing round(log(p));
+     since the logarithm base varies, this implies order of non-decreasing p.
+  */
 
   if (vec.empty()) {
     /* Nothing to do. Leave slices == NULL */
@@ -603,7 +605,8 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
     const unsigned char cur_logp = fb_log (vec[cur_slice_start].p, scale, 0.);
 
     size_t next_slice_start = std::min(cur_slice_start + max_slice_len, vec.size());
-    ASSERT_ALWAYS(cur_slice_start != next_slice_start);
+    ASSERT_ALWAYS(cur_slice_start < next_slice_start);
+    ASSERT_ALWAYS(vec[cur_slice_start].p <= vec[next_slice_start - 1].p);
 
     /* See if last element of the current slice has a greater log(p) than
        the first element */
