@@ -221,6 +221,7 @@ class fb_slice_interface {
   virtual unsigned char get_logp() const = 0;
   virtual slice_index_t get_index() const = 0;
   virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
+  virtual unsigned char get_k(slice_offset_t offset) const = 0;
 };
 
 class fb_vector_interface: public fb_interface {
@@ -275,6 +276,10 @@ class fb_slice : public fb_slice_interface {
   fbprime_t get_prime(const slice_offset_t offset) const {
     ASSERT_ALWAYS(_begin + offset < _end);
     return _begin[offset].p;
+  }
+  unsigned char get_k(const slice_offset_t offset) const {
+    ASSERT_ALWAYS(_begin + offset < _end);
+    return _begin[offset].k;
   }
   fb_transformed_vector * make_lattice_bases(const qlattice_basis &, int) const;
 };

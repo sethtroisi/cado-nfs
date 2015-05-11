@@ -366,7 +366,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const i
   const unsigned long special_q = mpz_fits_ulong_p(basis.q) ? mpz_get_ui(basis.q) : 0;
 
   fb_transformed_vector *result = new fb_transformed_vector(get_index());
-  size_t i_entry = 0;
+  slice_offset_t i_entry = 0;
   for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
     if (it->p == special_q) /* Assumes it->p != 0 */
       continue;
@@ -377,8 +377,10 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const i
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_sieve_entry pli = plattice_sieve_entry(transformed.get_q(), r, proj, logI, (slice_offset_t)i_entry);
-        result->push_back(pli);
+        plattice_sieve_entry pli = plattice_sieve_entry(transformed.get_q(), r, proj, logI, i_entry);
+        if (LIKELY(pli.a0 != 0)) {
+          result->push_back(pli);
+        }
       }
     }
   }
