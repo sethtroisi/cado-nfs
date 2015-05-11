@@ -306,7 +306,7 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
   static const size_t max_slice_len = 65536;
 
   fb_vector() : slices(NULL){};
-  ~fb_vector(){};
+  ~fb_vector();
 
   void make_slices(double scale, double max_weight, slice_index_t &next_index);
   std::vector<FB_ENTRY_TYPE> *get_vector() {return &vec;}

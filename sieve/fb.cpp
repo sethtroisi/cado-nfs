@@ -346,6 +346,18 @@ struct get_nroots<fb_entry_x_roots<n> > {
     inline unsigned char operator()() const { return fb_entry_x_roots<n>::nr_roots; }
 };
 
+
+template <class FB_ENTRY_TYPE>
+fb_vector<FB_ENTRY_TYPE>::~fb_vector()
+{
+  /* Free all the slices */
+  typename std::map<const double, const slices_t *>::const_iterator it;
+  for (it = cached_slices.begin(); it != cached_slices.end(); it++) {
+    delete it->second;
+  }
+}
+
+
 template <class FB_ENTRY_TYPE>
 void
 fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
