@@ -108,7 +108,7 @@ public:
   void fprint(FILE *out) const;
   bool is_simple() const;
   void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
-  double weight() const {return 1./p * nr_roots;}
+  double weight() const {return 1./q * nr_roots;}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
     if (k == 1 && p <= pmax && p <= nr_roots * td_thresh) {
       // printf("Extracting p = %" FBPRIME_FORMAT "\n", p);
