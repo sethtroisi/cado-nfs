@@ -222,6 +222,7 @@ class fb_slice_interface {
   virtual slice_index_t get_index() const = 0;
   virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
   virtual unsigned char get_k(slice_offset_t offset) const = 0;
+  virtual double get_weight() const = 0;
 };
 
 class fb_vector_interface: public fb_interface {
@@ -257,13 +258,16 @@ class fb_slice : public fb_slice_interface {
   const FB_ENTRY_TYPE *_begin, *_end;
   unsigned char logp;
   slice_index_t index;
+  double weight;
   public:
   typedef typename FB_ENTRY_TYPE::transformed_entry_t transformed_entry_t;
   fb_slice(const FB_ENTRY_TYPE *begin,
            const FB_ENTRY_TYPE *end,
            const unsigned char logp,
-           const slice_index_t index)
-           : _begin(begin), _end(end), logp(logp), index(index) {}
+           const slice_index_t index,
+           const double weight)
+           : _begin(begin), _end(end), logp(logp), index(index),
+             weight(weight) {}
   /* Iterators */
   const FB_ENTRY_TYPE *begin() const {return _begin;}
   const FB_ENTRY_TYPE *end() const {return _end;}
@@ -272,6 +276,7 @@ class fb_slice : public fb_slice_interface {
   bool is_general() const {return FB_ENTRY_TYPE::is_general_type;}
   unsigned char get_logp() const {return logp;};
   slice_index_t get_index() const {return index;}
+  double get_weight() const {return weight;}
   void fprint(FILE *out) const;
   fbprime_t get_prime(const slice_offset_t offset) const {
     ASSERT_ALWAYS(_begin + offset < _end);

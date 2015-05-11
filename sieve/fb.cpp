@@ -621,7 +621,7 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
     /* Maybe the slice's weight is greater than max_weight and we have to make
        the slice smaller */
     double weight;
-    while ((weight = est_weight(cur_slice_start, next_slice_start)) > max_weight) {
+    while ((weight = est_weight_sum(cur_slice_start, next_slice_start)) > max_weight) {
       const size_t old = next_slice_start;
       next_slice_start = cur_slice_start + (next_slice_start - cur_slice_start) / 2;
       verbose_output_print (0, 3, "# Slice %u starting at offset %zu has too "
@@ -633,13 +633,15 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
 
     verbose_output_print (0, 4, "# Slice %u starts at offset %zu (p = %"
         FBPRIME_FORMAT ", log(p) = %u) and ends at offset %zu (p = %"
-        FBPRIME_FORMAT ", log(p) = %u), weight <= %.3f\n",
+        FBPRIME_FORMAT ", log(p) = %u), weight = %.3f\n",
            (unsigned int) next_index, cur_slice_start, vec[cur_slice_start].p,
            (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
            next_slice_start - 1, vec[next_slice_start - 1].p,
            (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.),
            weight);
-    fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
+    fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start,
+                              vec.data() + next_slice_start, cur_logp,
+                              next_index++, weight);
     new_slices->push_back(s);
 
     cur_slice_start = next_slice_start;
