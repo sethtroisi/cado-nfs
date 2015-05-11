@@ -377,7 +377,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const i
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_sieve_entry pli = plattice_sieve_entry(transformed.p, r, proj, logI, (slice_offset_t)i_entry);
+        plattice_sieve_entry pli = plattice_sieve_entry(transformed.get_q(), r, proj, logI, (slice_offset_t)i_entry);
         result->push_back(pli);
       }
     }
@@ -413,7 +413,7 @@ fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double
       unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>(vec[i])();
 #endif
       nr += nr_i;
-      w += (double) nr_i / (double) vec[i].get_q();
+      w += vec[i].weight();
   }
   if (nroots != NULL)
     *nroots += nr;
