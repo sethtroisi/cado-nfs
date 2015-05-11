@@ -28,12 +28,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <values.h>
 #include <math.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/resource.h>
 #include "gmp.h"
 #include "ecm.h"
+
+double default_B1done;
 
 typedef struct {
   unsigned long e; /* exponent of z */
@@ -80,7 +83,66 @@ cand_clear (cand c)
 }
 
 void
-cand_scan (cand c, ecm_params params)
+cand_print_raw (unsigned long e, mpz_t u0, mpz_t v0, mpz_t u, mpz_t v)
+{
+  printf ("e=%lu\n", e);
+  gmp_printf ("u0=%Zd\n", u0);
+  gmp_printf ("v0=%Zd\n", v0);
+  gmp_printf ("u=%Zd (%lu bits)\n", u, mpz_sizeinbase (u, 2));
+  gmp_printf ("v=%Zd (%lu bits)\n", v, mpz_sizeinbase (v, 2));
+  fflush (stdout);
+}
+
+void
+cand_print (cand c)
+{
+  cand_print_raw (c->e, c->u0, c->v0, c->u, c->v);
+}
+
+void
+cand_info (cand c)
+{
+  printf ("u:%c%lu v:%c%lu (B1=%.0f)\n",
+          (c->uprime) ? 'p' : 'c', mpz_sizeinbase (c->u, 2),
+          (c->vprime) ? 'p' : 'c', mpz_sizeinbase (c->v, 2), c->B1);
+}
+
+int
+cand_factored (cand c)
+{
+  return c->uprime && c->vprime;
+}
+
+void
+params_init (ecm_params params, double B1)
+{
+  mpz_set_d (params->sigma, B1);
+  params->B1done = default_B1done; /* issue with ECM 6.4.x */
+}
+
+void
+print_params (ecm_params params)
+{
+  printf ("method=%d\n", params->method);
+  gmp_printf ("x=%Zd\n", params->x);
+  gmp_printf ("sigma=%Zd\n", params->sigma);
+  printf ("sigma_is_A=%d\n", params->sigma_is_A);
+  gmp_printf ("go=%Zd\n", params->go);
+  printf ("B1done=%.16e\n", params->B1done);
+  gmp_printf ("B2min=%Zd\n", params->B2min);
+  gmp_printf ("B2=%Zd\n", params->B2);
+  gmp_printf ("k=%lu\n", params->k);
+  printf ("S=%d\n", params->S);
+  printf ("repr=%d\n", params->repr);
+  printf ("nobase2step2=%d\n", params->nobase2step2);
+  printf ("verbose=%d\n", params->verbose);
+  printf ("maxmem=%.16e\n", params->maxmem);
+  printf ("use_ntt=%d\n", params->use_ntt);
+  printf ("batch=%d\n", params->batch);
+}
+
+void
+cand_scan (cand c, ecm_params params, double *S2)
 {
   mpz_t f;
   unsigned long lu, lv;
@@ -88,10 +150,9 @@ cand_scan (cand c, ecm_params params)
   mpz_init (f);
   if (c->uprime == 0)
     {
-      mpz_set_d (params->sigma, c->B1);
-      mpz_set_ui (f, 1);
+      params_init (params, c->B1);
+      *S2 += c->B1;
       ecm_factor (f, c->u, c->B1, params);
-      params->B1done = ECM_DEFAULT_B1_DONE; /* issue in 6.4.x */
       if (mpz_cmp_ui (f, 1) > 0)
         {
           mpz_divexact (c->u, c->u, f);
@@ -103,10 +164,9 @@ cand_scan (cand c, ecm_params params)
     }
   if (c->vprime == 0)
     {
-      mpz_set_d (params->sigma, c->B1);
-      mpz_set_ui (f, 1);
+      params_init (params, c->B1);
+      *S2 += c->B1;
       ecm_factor (f, c->v, c->B1, params);
-      params->B1done = ECM_DEFAULT_B1_DONE; /* issue in 6.4.x */
       if (mpz_cmp_ui (f, 1) > 0)
         {
           mpz_divexact (c->v, c->v, f);
@@ -121,17 +181,6 @@ cand_scan (cand c, ecm_params params)
 }
 
 void
-cand_print (cand c)
-{
-  printf ("e=%lu\n", c->e);
-  gmp_printf ("u0=%Zd\n", c->u0);
-  gmp_printf ("v0=%Zd\n", c->v0);
-  gmp_printf ("u=%Zd (%lu bits)\n", c->u, mpz_sizeinbase (c->u, 2));
-  gmp_printf ("v=%Zd (%lu bits)\n", c->v, mpz_sizeinbase (c->v, 2));
-  fflush (stdout);
-}
-
-void
 cand_set (cand c, cand d)
 {
   c->e = d->e;
@@ -143,6 +192,47 @@ cand_set (cand c, cand d)
   c->vprime = d->vprime;
   c->B1 = d->B1;
   c->l = d->l;
+}
+
+void
+cand_swap (cand c, cand d)
+{
+  unsigned long t;
+  int i;
+  double s;
+  t = c->e; c->e = d->e; d->e = t;
+  mpz_swap (c->u0, d->u0);
+  mpz_swap (c->v0, d->v0);
+  mpz_swap (c->u, d->u);
+  mpz_swap (c->v, d->v);
+  i = c->uprime; c->uprime = d->uprime; d->uprime = i;
+  i = c->vprime; c->vprime = d->vprime; d->vprime = i;
+  s = c->B1; c->B1 = d->B1; d->B1 = s;
+  t = c->l; c->l = d->l; d->l = t;
+}
+
+/* return the bit-size of the smallest composite between u and v,
+   and INT_MAX if both are prime */
+int
+cost (cand c)
+{
+  if (c->uprime == 0)
+    {
+      if (c->vprime == 0)
+        {
+          return (mpz_cmpabs (c->u, c->v) < 0) ? mpz_sizeinbase (c->u, 2)
+            : mpz_sizeinbase (c->v, 2);
+        }
+      else
+        return mpz_sizeinbase (c->u, 2);
+    }
+  else /* u is prime */
+    {
+      if (c->vprime)
+        return INT_MAX;
+      else
+        return mpz_sizeinbase (c->v, 2);
+    }
 }
 
 /*****************************************************************************/
@@ -174,21 +264,43 @@ void
 pool_add (pool p, unsigned long e, mpz_t u0, mpz_t v0, mpz_t u, mpz_t v,
           int uprime, int vprime, double B1, unsigned long l)
 {
+  unsigned int i;
+
   p->list = realloc (p->list, (p->n + 1) * sizeof (cand));
   cand_init_set (p->list[p->n], e, u0, v0, u, v, uprime, vprime, B1, l);
+  for (i = p->n; i > 0 && cost (p->list[i-1]) > cost (p->list[i]); i--)
+    cand_swap (p->list[i-1], p->list[i]);
   p->n += 1;
 }
 
 /* perform an ECM curve for each candidate in the pool */
 unsigned long
-pool_scan (pool p, ecm_params params, unsigned long L)
+pool_scan (pool p, ecm_params params, unsigned long L, double S1, double *S2)
 {
-  unsigned long i, j;
+  unsigned long i, j, lu, lv, l, minl = 0, oldn = p->n;
 
+  /* compute minl */
   for (i = 0; i < p->n; i++)
-    cand_scan (p->list[i], params);
+    {
+      lu = mpz_sizeinbase (p->list[i]->u, 2);
+      lv = mpz_sizeinbase (p->list[i]->v, 2);
+      l = (lu > lv) ? lu : lv;
+      if (i == 0 || l < minl)
+        minl = l;
+    }
+
+  for (i = 0; i < p->n && *S2 < S1; i++)
+    {
+      /* we focus on the best candidate first */
+      do {
+        cand_scan (p->list[i], params, S2);
+      } while (cand_factored (p->list[i]) == 0 && *S2 < S1);
+    }
+
+
+  /* search for better solutions */
   for (i = 0; i < p->n; i++)
-    if (p->list[i]->uprime && p->list[i]->vprime)
+    if (cand_factored (p->list[i]))
       {
         if (p->list[i]->l < L) /* found better solution */
           {
@@ -196,17 +308,39 @@ pool_scan (pool p, ecm_params params, unsigned long L)
             L = p->list[i]->l;
           }
       }
+
+  /* purge candidates */
   for (i = j = 0; i < p->n; i++)
-    if ((p->list[i]->uprime && p->list[i]->vprime) || p->list[i]->l >= L)
+    if (cand_factored (p->list[i]) || p->list[i]->l >= L)
       {
+      }
+    else if (p->list[i]->uprime && mpz_sizeinbase (p->list[i]->u, 2) >= minl)
+      { /* if there is a prime of >= minl bits, it cannot win */
+      }
+    else if (p->list[i]->vprime && mpz_sizeinbase (p->list[i]->v, 2) >= minl)
+      { /* if there is a prime of >= minl bits, it cannot win */
       }
     else
       cand_set (p->list[j++], p->list[i]);
-  if (j < p->n)
+
+  /* sort remaining candidates */
+  p->n = j;
+  for (i = 1; i < p->n; i++)
+    for (j = i; j > 0 && cost (p->list[j-1]) > cost (p->list[j]); j--)
+      cand_swap (p->list[j-1], p->list[j]);
+
+  if (j < oldn)
     {
-      p->n = j;
+      unsigned long imin, imax;
       p->list = realloc (p->list, p->n * sizeof (cand));
-      printf ("Remains %lu candidates in pool\n", p->n);
+      printf ("Remains %lu candidate(s) in pool", p->n);
+      if (p->n == 0)
+        printf ("\n");
+      else
+        {
+          printf (", first ");
+          cand_info (p->list[0]);
+        }
       fflush (stdout);
     }
   return L;
@@ -267,6 +401,8 @@ main (int argc, char *argv[])
   int uprime, vprime;
   ecm_params params;
   pool P;
+  double S1 = 0.0; /* total ECM effort spent in first stage */
+  double S2 = 0.0; /* total ECM effort spent in second stage */
 
   while (argc > 2 && argv[1][0] == '-')
     {
@@ -296,6 +432,11 @@ main (int argc, char *argv[])
       aver_gain[i] = 0.0;
       nb_test[i] = 0;
     }
+
+  /* fix issue with ECM 6.4.x */
+  ecm_init (params);
+  default_B1done = params->B1done;
+  ecm_clear (params);
 
   pool_init (P);
   mpz_init_set_str (p, argv[1], 10);
@@ -364,10 +505,9 @@ main (int argc, char *argv[])
           gain_v[i] = gain_v[i-1];
           if (uprime == 0)
             {
-              mpz_set_d (params->sigma, B1);
-              mpz_set_ui (f, 1);
+              params_init (params, B1);
+              S1 += B1;
               ecm_factor (f, u, B1, params);
-              params->B1done = ECM_DEFAULT_B1_DONE; /* fix issue in 6.4.x */
 	      gain_u[i] += log2 (mpz_get_d (f));
 	      aver_gain[i] = aver_gain[i] * nb_test[i] + gain_u[i];
 	      nb_test[i] += 1;
@@ -383,10 +523,9 @@ main (int argc, char *argv[])
 
           if (vprime == 0)
             {
-              mpz_set_d (params->sigma, B1);
-              mpz_set_ui (f, 1);
+              params_init (params, B1);
+              S1 += B1;
               ecm_factor (f, v, B1, params);
-              params->B1done = ECM_DEFAULT_B1_DONE; /* fix issue in 6.4.x */
 	      gain_v[i] += log2 (mpz_get_d (f));
 	      aver_gain[i] = aver_gain[i] * nb_test[i] + gain_v[i];
 	      nb_test[i] += 1;
@@ -410,8 +549,16 @@ main (int argc, char *argv[])
       l = (lu > lv) ? lu : lv;
       if (l < L) /* potential better relation */
         {
-          pool_add (P, e, u0, v0, u, v, uprime, vprime, B1, l);
-          L = pool_scan (P, params, L);
+          if (uprime && vprime)
+            {
+              cand_print_raw (e, u0, v0, u, v);
+              L = l;
+            }
+          else
+            {
+              pool_add (P, e, u0, v0, u, v, uprime, vprime, B1, l);
+              L = pool_scan (P, params, L, S1, &S2);
+            }
         }
       Smax += sqrt (Smax);
     }
