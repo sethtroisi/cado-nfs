@@ -348,7 +348,7 @@ struct get_nroots<fb_entry_x_roots<n> > {
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
+fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
     fbprime_t pmax, fbprime_t td_thresh) const
 {
   for (size_t i = 0; i < vec.size(); i++)
@@ -398,7 +398,7 @@ fb_slice<FB_ENTRY_TYPE>::fprint(FILE *out) const
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
     *nprimes += vec.size();
@@ -426,7 +426,7 @@ fb_slices<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double
    vector being sorted. */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) const
 {
   return vec[start].weight() * (end - start);
 }
@@ -435,7 +435,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) c
    by trapezoidal rule. */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) const
 {
   return (vec[start].weight() + vec[end-1].weight()) / 2. * (end - start);
 }
@@ -444,7 +444,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) c
    of the midpoint */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t end) const
 {
   const size_t midpoint = start + (end - start) / 2;
   return (vec[start].weight() + 4.*vec[midpoint].weight() + vec[end-1].weight()) / 6. * (end - start);
@@ -453,7 +453,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t en
 /* Estimate weight by using Merten's rule on the primes at the two endpoints */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t end) const
 {
   return log(log(vec[end-1].get_q())) - log(log(vec[start].get_q()));
 }
@@ -461,7 +461,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t en
 /* Compute weight exactly with a sum over all entries */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_sum(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_sum(const size_t start, const size_t end) const
 {
   double sum = 0.;
   for (size_t i = start; i < end; i++)
@@ -511,7 +511,7 @@ void print_worst_weight_errors()
 
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_compare(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_compare(const size_t start, const size_t end) const
 {
   const double _max = est_weight_max(start, end),
                avg = est_weight_avg(start, end),
@@ -534,7 +534,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_compare(const size_t start, const size_t en
 
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
 {
   if (verbose_output_get(0, 4, 0) != NULL)
     return est_weight_compare(start, end);
@@ -545,14 +545,14 @@ fb_slices<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
    all entries. General vectors are quite small so this should not take long */
 template <>
 double
-fb_slices<fb_general_entry>::est_weight(const size_t start, const size_t end) const
+fb_vector<fb_general_entry>::est_weight(const size_t start, const size_t end) const
 {
   return est_weight_sum(start, end);
 }
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
+fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
                                       slice_index_t &next_index)
 {
   /* Entries in vec must be sorted */
@@ -611,7 +611,7 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::sort()
+fb_vector<FB_ENTRY_TYPE>::sort()
 {
   std::sort(vec.begin(), vec.end());
 }
@@ -619,7 +619,7 @@ fb_slices<FB_ENTRY_TYPE>::sort()
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::fprint(FILE *out) const
+fb_vector<FB_ENTRY_TYPE>::fprint(FILE *out) const
 {
   /* If we have sliced the entries, we print them one slice at a time */
   if (!slices.empty()) {

@@ -222,9 +222,9 @@ class fb_slice_interface {
   virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
 };
 
-class fb_slices_interface: public fb_interface {
+class fb_vector_interface: public fb_interface {
   public:
-  virtual ~fb_slices_interface(){}
+  virtual ~fb_vector_interface(){}
   virtual const fb_slice_interface *get_slice(size_t) const = 0;
   virtual int get_nr_roots() const = 0;
   virtual bool is_general() const = 0;
@@ -280,7 +280,7 @@ class fb_slice : public fb_slice_interface {
 
 
 template <class FB_ENTRY_TYPE>
-class fb_slices : public fb_slices_interface, private NonCopyable {
+class fb_vector : public fb_vector_interface, private NonCopyable {
   std::vector<FB_ENTRY_TYPE> vec;
   std::vector<fb_slice<FB_ENTRY_TYPE> > slices;
   void sort();
@@ -294,14 +294,13 @@ class fb_slices : public fb_slices_interface, private NonCopyable {
  public:
   static const size_t max_slice_len = 65536;
 
-  fb_slices(){};
-  ~fb_slices(){};
+  fb_vector(){};
+  ~fb_vector(){};
 
   void make_slices(double scale, double max_weight, slice_index_t &next_index);
   std::vector<FB_ENTRY_TYPE> *get_vector() {return &vec;}
-  /* Implement slices interface */
 
-  /* These are just deletates to vec */
+  /* Implement fb_vector interface */
   int get_nr_roots() const {return FB_ENTRY_TYPE::fixed_nr_roots;}
   bool is_general() const {return FB_ENTRY_TYPE::is_general_type;}
   void append(const fb_general_entry &new_entry) {vec.push_back(new_entry);}
@@ -354,20 +353,20 @@ class fb_part: public fb_interface, private NonCopyable {
 
   /* These vectors are filled when we read or generate the factor base.
      The slices point into the vectors' storage. */
-  fb_slices<fb_entry_x_roots<0> > fb0_slices; /* From 0 to MAXDEGREE */
-  fb_slices<fb_entry_x_roots<1> > fb1_slices;
-  fb_slices<fb_entry_x_roots<2> > fb2_slices;
-  fb_slices<fb_entry_x_roots<3> > fb3_slices;
-  fb_slices<fb_entry_x_roots<4> > fb4_slices;
-  fb_slices<fb_entry_x_roots<5> > fb5_slices;
-  fb_slices<fb_entry_x_roots<6> > fb6_slices;
-  fb_slices<fb_entry_x_roots<7> > fb7_slices;
-  fb_slices<fb_entry_x_roots<8> > fb8_slices;
-  fb_slices<fb_entry_x_roots<9> > fb9_slices;
-  fb_slices<fb_entry_x_roots<10> > fb10_slices;
-  fb_slices<fb_general_entry> general_vector;
+  fb_vector<fb_entry_x_roots<0> > fb0_slices; /* From 0 to MAXDEGREE */
+  fb_vector<fb_entry_x_roots<1> > fb1_slices;
+  fb_vector<fb_entry_x_roots<2> > fb2_slices;
+  fb_vector<fb_entry_x_roots<3> > fb3_slices;
+  fb_vector<fb_entry_x_roots<4> > fb4_slices;
+  fb_vector<fb_entry_x_roots<5> > fb5_slices;
+  fb_vector<fb_entry_x_roots<6> > fb6_slices;
+  fb_vector<fb_entry_x_roots<7> > fb7_slices;
+  fb_vector<fb_entry_x_roots<8> > fb8_slices;
+  fb_vector<fb_entry_x_roots<9> > fb9_slices;
+  fb_vector<fb_entry_x_roots<10> > fb10_slices;
+  fb_vector<fb_general_entry> general_vector;
 
-  fb_slices_interface *get_slices(const unsigned int n) {
+  fb_vector_interface *get_slices(const unsigned int n) {
     ASSERT_ALWAYS(n <= MAXDEGREE);
     
     if (only_general)
@@ -389,7 +388,7 @@ class fb_part: public fb_interface, private NonCopyable {
     }
   }
   /* (^$#&$@! C++ */
-  const fb_slices_interface *cget_slices(const unsigned int n) const {
+  const fb_vector_interface *cget_slices(const unsigned int n) const {
     ASSERT_ALWAYS(n <= MAXDEGREE);
     
     if (only_general)
@@ -427,7 +426,7 @@ public:
     const fb_slice_interface *slice = NULL;
     if (!only_general) {
       for (unsigned int nr_roots = 0; slice == NULL && nr_roots <= MAXDEGREE; nr_roots++) {
-        const fb_slices_interface *slices = cget_slices(nr_roots);
+        const fb_vector_interface *slices = cget_slices(nr_roots);
         if (slices != NULL)
           slice = slices->get_first_slice();
       }
@@ -445,7 +444,7 @@ public:
   }
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
     for (unsigned int nr_roots = 0; nr_roots <= MAXDEGREE; nr_roots++) {
-      const fb_slices_interface *slices = cget_slices(nr_roots);
+      const fb_vector_interface *slices = cget_slices(nr_roots);
       if (slices != NULL) {
         const fb_slice_interface *slice;
         if ((slice = slices->get_slice(slice_idx)) != NULL) return slice;
