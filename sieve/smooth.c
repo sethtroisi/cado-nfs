@@ -358,13 +358,13 @@ int main(int argc, char* argv[])
   nb_useless = 0;
 
   prime_info_init(pi);
-  for (prime = 2; prime <= rlim; prime = getprime_mt(pi));
-
 
   /* Initial one-side pass (to make rlim and alim be equal) */
   
   if (rlim < alim)
   {
+    for (prime = 2; prime <= rlim; prime = getprime_mt(pi));
+
     while (rlim < alim)
     {
       rlim_new = (rlim + rlim_step < alim ? rlim + rlim_step : alim);
@@ -397,13 +397,15 @@ int main(int argc, char* argv[])
       t_update += seconds();
       fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
                " %u : %u : %u : %u : %u\n",
-               nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
+               nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
       fprintf (stderr, "t_update: %.0f seconds\n", t_update);
     }
   }
   else if (alim < rlim)
   {
+    for (prime = 2; prime <= alim; prime = getprime_mt(pi));
+
     while (alim < rlim)
     {
       alim_new = (alim + alim_step < rlim ? alim + alim_step : rlim);
@@ -434,12 +436,16 @@ int main(int argc, char* argv[])
       t_update -= seconds();
       update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
       t_update += seconds();
-      fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+      fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
                " %u : %u : %u : %u : %u\n",
-               nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
+               nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
       fprintf (stderr, "t_update: %.0f seconds\n", t_update);
     }
+  }
+  else  // rlim = alim
+  {
+    for (prime = 2; prime <= rlim; prime = getprime_mt(pi));
   }
 
   
@@ -482,7 +488,7 @@ int main(int argc, char* argv[])
     t_update += seconds();
     fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
              " %u : %u : %u : %u : %u\n",
-             nb_smooth_r, nb_useless, nb_rel_all - nb_smooth_r - nb_useless,
+             nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless,
            nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
     fprintf (stderr, "t_update: %.0f seconds\n", t_update);
 
@@ -511,7 +517,7 @@ int main(int argc, char* argv[])
     t_update += seconds();
     fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
              " %u : %u : %u : %u : %u\n",
-             nb_smooth_a, nb_useless, nb_rel_all - nb_smooth_a - nb_useless,
+             nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
     fprintf (stderr, "t_update: %.0f seconds\n", t_update);
   }
