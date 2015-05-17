@@ -346,9 +346,21 @@ struct get_nroots<fb_entry_x_roots<n> > {
     inline unsigned char operator()() const { return fb_entry_x_roots<n>::nr_roots; }
 };
 
+
+template <class FB_ENTRY_TYPE>
+fb_vector<FB_ENTRY_TYPE>::~fb_vector()
+{
+  /* Free all the slices */
+  typename std::map<const double, const slices_t *>::const_iterator it;
+  for (it = cached_slices.begin(); it != cached_slices.end(); it++) {
+    delete it->second;
+  }
+}
+
+
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
+fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
     fbprime_t pmax, fbprime_t td_thresh) const
 {
   for (size_t i = 0; i < vec.size(); i++)
@@ -366,7 +378,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const i
   const unsigned long special_q = mpz_fits_ulong_p(basis.q) ? mpz_get_ui(basis.q) : 0;
 
   fb_transformed_vector *result = new fb_transformed_vector(get_index());
-  size_t i_entry = 0;
+  slice_offset_t i_entry = 0;
   for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
     if (it->p == special_q) /* Assumes it->p != 0 */
       continue;
@@ -377,8 +389,10 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const i
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_sieve_entry pli = plattice_sieve_entry(transformed.p, r, proj, logI, (slice_offset_t)i_entry);
-        result->push_back(pli);
+        plattice_sieve_entry pli = plattice_sieve_entry(transformed.get_q(), r, proj, logI, i_entry);
+        if (LIKELY(pli.a0 != 0)) {
+          result->push_back(pli);
+        }
       }
     }
   }
@@ -398,7 +412,7 @@ fb_slice<FB_ENTRY_TYPE>::fprint(FILE *out) const
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
+fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
     *nprimes += vec.size();
@@ -413,7 +427,7 @@ fb_slices<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double
       unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>(vec[i])();
 #endif
       nr += nr_i;
-      w += (double) nr_i / (double) vec[i].get_q();
+      w += vec[i].weight();
   }
   if (nroots != NULL)
     *nroots += nr;
@@ -426,7 +440,7 @@ fb_slices<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double
    vector being sorted. */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) const
 {
   return vec[start].weight() * (end - start);
 }
@@ -435,7 +449,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) c
    by trapezoidal rule. */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) const
 {
   return (vec[start].weight() + vec[end-1].weight()) / 2. * (end - start);
 }
@@ -444,7 +458,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) c
    of the midpoint */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t end) const
 {
   const size_t midpoint = start + (end - start) / 2;
   return (vec[start].weight() + 4.*vec[midpoint].weight() + vec[end-1].weight()) / 6. * (end - start);
@@ -453,7 +467,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t en
 /* Estimate weight by using Merten's rule on the primes at the two endpoints */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t end) const
 {
   return log(log(vec[end-1].get_q())) - log(log(vec[start].get_q()));
 }
@@ -461,7 +475,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t en
 /* Compute weight exactly with a sum over all entries */
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_sum(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_sum(const size_t start, const size_t end) const
 {
   double sum = 0.;
   for (size_t i = start; i < end; i++)
@@ -511,7 +525,7 @@ void print_worst_weight_errors()
 
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight_compare(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight_compare(const size_t start, const size_t end) const
 {
   const double _max = est_weight_max(start, end),
                avg = est_weight_avg(start, end),
@@ -534,7 +548,7 @@ fb_slices<FB_ENTRY_TYPE>::est_weight_compare(const size_t start, const size_t en
 
 template <class FB_ENTRY_TYPE>
 double
-fb_slices<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
+fb_vector<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
 {
   if (verbose_output_get(0, 4, 0) != NULL)
     return est_weight_compare(start, end);
@@ -545,20 +559,45 @@ fb_slices<FB_ENTRY_TYPE>::est_weight(const size_t start, const size_t end) const
    all entries. General vectors are quite small so this should not take long */
 template <>
 double
-fb_slices<fb_general_entry>::est_weight(const size_t start, const size_t end) const
+fb_vector<fb_general_entry>::est_weight(const size_t start, const size_t end) const
 {
   return est_weight_sum(start, end);
 }
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
+fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
                                       slice_index_t &next_index)
 {
-  /* Entries in vec must be sorted */
+  /* Entries in vec must be sorted in order of non-decreasing round(log(p));
+     since the logarithm base varies, this implies order of non-decreasing p.
+  */
 
-  /* Remove old entries in slices */
-  slices.clear();
+  if (vec.empty()) {
+    /* Nothing to do. Leave slices == NULL */
+    ASSERT_ALWAYS(slices == NULL);
+    return;
+  }
+
+  /* If we already have a slicing for this scale in the cache, use that one */
+  if (!cached_slices.empty() &&
+      cached_slices.find(scale) != cached_slices.end()) {
+    slices = cached_slices[scale];
+    return;
+  }
+
+  /* Otherwise create a new slicing */
+  verbose_output_print (0, 3, "# Creating new slicing of ");
+  if (FB_ENTRY_TYPE::is_general_type) {
+    verbose_output_print (0, 3, "general vector");
+  } else {
+    verbose_output_print (0, 3, "vector with %d root%s",
+                          FB_ENTRY_TYPE::fixed_nr_roots,
+                          FB_ENTRY_TYPE::fixed_nr_roots != 1 ? "s" : "");
+  }
+  verbose_output_print (0, 3, " for scale=%1.2f\n", scale);
+
+  slices_t *new_slices = new slices_t;
 
   size_t cur_slice_start = 0;
 
@@ -566,7 +605,8 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
     const unsigned char cur_logp = fb_log (vec[cur_slice_start].p, scale, 0.);
 
     size_t next_slice_start = std::min(cur_slice_start + max_slice_len, vec.size());
-    ASSERT_ALWAYS(cur_slice_start != next_slice_start);
+    ASSERT_ALWAYS(cur_slice_start < next_slice_start);
+    ASSERT_ALWAYS(vec[cur_slice_start].p <= vec[next_slice_start - 1].p);
 
     /* See if last element of the current slice has a greater log(p) than
        the first element */
@@ -584,7 +624,7 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
     /* Maybe the slice's weight is greater than max_weight and we have to make
        the slice smaller */
     double weight;
-    while ((weight = est_weight(cur_slice_start, next_slice_start)) > max_weight) {
+    while ((weight = est_weight_sum(cur_slice_start, next_slice_start)) > max_weight) {
       const size_t old = next_slice_start;
       next_slice_start = cur_slice_start + (next_slice_start - cur_slice_start) / 2;
       verbose_output_print (0, 3, "# Slice %u starting at offset %zu has too "
@@ -596,22 +636,29 @@ fb_slices<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
 
     verbose_output_print (0, 4, "# Slice %u starts at offset %zu (p = %"
         FBPRIME_FORMAT ", log(p) = %u) and ends at offset %zu (p = %"
-        FBPRIME_FORMAT ", log(p) = %u), weight <= %.3f\n",
+        FBPRIME_FORMAT ", log(p) = %u), weight = %.3f\n",
            (unsigned int) next_index, cur_slice_start, vec[cur_slice_start].p,
            (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
            next_slice_start - 1, vec[next_slice_start - 1].p,
            (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.),
            weight);
-    fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start, vec.data() + next_slice_start, cur_logp, next_index++);
-    slices.push_back(s);
+    fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start,
+                              vec.data() + next_slice_start, cur_logp,
+                              next_index++, weight);
+    new_slices->push_back(s);
 
     cur_slice_start = next_slice_start;
   }
+
+  /* Add new slicing to the cache */
+  cached_slices[scale] = new_slices;
+  /* Make the new slicing the currently used one */
+  slices = new_slices;
 }
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::sort()
+fb_vector<FB_ENTRY_TYPE>::sort()
 {
   std::sort(vec.begin(), vec.end());
 }
@@ -619,11 +666,11 @@ fb_slices<FB_ENTRY_TYPE>::sort()
 
 template <class FB_ENTRY_TYPE>
 void
-fb_slices<FB_ENTRY_TYPE>::fprint(FILE *out) const
+fb_vector<FB_ENTRY_TYPE>::fprint(FILE *out) const
 {
   /* If we have sliced the entries, we print them one slice at a time */
-  if (!slices.empty()) {
-    for (typename std::vector<fb_slice<FB_ENTRY_TYPE> >::const_iterator it = slices.begin(); it != slices.end(); it++) {
+  if (!slices->empty()) {
+    for (typename std::vector<fb_slice<FB_ENTRY_TYPE> >::const_iterator it = slices->begin(); it != slices->end(); it++) {
       fprintf(out, "#    Slice index = %u, logp = %hhu:\n", (unsigned int) it->get_index(), it->get_logp());
       it->fprint(out);
     }
@@ -718,6 +765,15 @@ fb_part::make_slices(const double scale, const double max_weight,
       get_slices(i_roots)->make_slices(scale, max_weight, next_index);
     /* If we store all entries as general entries, we don't slice them,
        as those are the small primes in part 0 which get line sieved */
+    /* FIXME: slicing the general vector is somewhat silly even if it gets
+       bucket-sieved, as there are only few entries, scattered over the
+       interval [2, powlim] (and perhaps a bigger prime or two with
+       projective/ramified roots). Thus most slices contain only a few
+       primes or prime powers. It would be better to let fill_in_buckets()
+       write prime-hint updates instead when sieving the general vector,
+       so that we don't have to write a pointer array for nearly-empty
+       slices. */
+    general_vector.make_slices(scale, max_weight, next_index);
   }
 }
 

@@ -175,7 +175,12 @@ struct plattice_info_t {
     } else {
       ASSERT_ALWAYS(!proj);
       int rc = reduce_plattice (this, p, r, 1U << logI);
-      ASSERT_ALWAYS(rc != 0);
+      if (UNLIKELY(rc == 0)) {
+        /* gcd(r, p) > I. We currently can't handle this case. Set everything
+           to zero to signal to calling code that this is not a valid basis.
+           Is there a better way? Exception, maybe? */
+        a0 = a1 = b0 = b1 = 0;
+      }
     }
   }
 
