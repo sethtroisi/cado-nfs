@@ -1552,6 +1552,16 @@ factor_list_add(factor_list_t *fl, const uint64_t p)
   fl->fac[fl->n++] = p;
 }
 
+bool
+factor_list_contains(const factor_list_t *fl, const uint64_t p)
+{
+  for (int i = 0; i < fl->n; i++) {
+    if (fl->fac[i] == p)
+      return true;
+  }
+  return false;
+}
+
 // print a comma-separated list of factors.
 // returns the number of factor printed (in particular, a comma is needed
 // after this output only if the return value is non zero)
@@ -1591,13 +1601,25 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
                                      "# N = %u, x = %d, dividing out prime hint p = %lu, norm = %Zd\n",
                                      N, x, p, norm);
           }
+          /* If powers of a prime p get bucket-sieved and more than one such
+              power hits, then the second (and later) hints will find a
+              cofactor that already had all powers of p divided out by the
+              loop below that removes multiplicities. Thus, if a prime does
+              not divide, we check whether it was divided out before (and thus
+              is in the factors list) */
           if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
-              verbose_output_print(1, 0,
-                       "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
-                       p, N, x);
-              abort();
-          }
-          do {
+              if(!factor_list_contains(fl, p)) {
+                  verbose_output_print(1, 0,
+                           "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
+                           p, N, x);
+                  abort();
+              } else {
+                  verbose_output_print(0, 2,
+                           "# Note: p = %lu does not divide at (N,x) = (%u,%d), was divided out before\n",
+                           p, N, x);
+              }
+          } else do {
+              /* Remove powers of prime divisors */
               factor_list_add(fl, p);
               mpz_divexact_ui (norm, norm, p);
           } while (mpz_divisible_ui_p (norm, p));
@@ -1624,17 +1646,33 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
           ASSERT_ALWAYS(slice != NULL);
           const unsigned long p = slice->get_prime(complete_hint.hint);
           if (very_verbose) {
+              const unsigned char k = slice->get_k(complete_hint.hint);
+              verbose_output_print(0, 1,
+                                   "# N = %u, x = %d, dividing out slice hint, "
+                                   "index = %lu offset = %lu ",
+                                   N, x, (unsigned long) complete_hint.index,
+                                   (unsigned long) complete_hint.hint);
+              if (slice->is_general()) {
+                  verbose_output_print(0, 1, "(general)");
+              } else {
+                  verbose_output_print(0, 1, "(%d roots)", slice->get_nr_roots());
+              }
               verbose_output_vfprint(0, 1, gmp_vfprintf,
-                                     "# N = %u, x = %d, dividing out slice hint, slice index = %lu, slice offset = %lu, p = %lu, norm = %Zd\n",
-                                     N, x, (unsigned long) complete_hint.index, (unsigned long) complete_hint.hint, p, norm);
+                                     ", q = %lu^%hhu, norm = %Zd\n",
+                                     p, k, norm);
           }
           if (UNLIKELY(!mpz_divisible_ui_p (norm, p))) {
-              verbose_output_print(1, 0,
-                       "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
-                       p, N, x);
-              abort();
-          }
-          do {
+              if (!factor_list_contains(fl, p)) {
+                  verbose_output_print(1, 0,
+                           "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
+                           p, N, x);
+                  abort();
+              } else {
+                  verbose_output_print(0, 2,
+                           "# Note: p = %lu does not divide at (N,x) = (%u,%d), was divided out before\n",
+                           p, N, x);
+              }
+          } else do {
               factor_list_add(fl, p);
               mpz_divexact_ui (norm, norm, p);
           } while (mpz_divisible_ui_p (norm, p));

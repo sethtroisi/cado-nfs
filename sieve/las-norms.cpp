@@ -1550,11 +1550,13 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
 
   maxlog2 = rat->logmax;
-  verbose_output_print (0, 1, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
-     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2.
+     We require that scale is of the form (int) * 0.1, so that only a small
+     number of different factor base slicings can occur. */
+  rat->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 10.) * 0.1;
+  verbose_output_print (0, 1, "# Rat. side: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
+           maxlog2, rat->scale, exp2 (1. / rat->scale));
   step = 1. / rat->scale;
   begin = -step * GUARD;
   for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
@@ -1597,11 +1599,11 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   alg->logmax += 2.0;
   maxlog2 = alg->logmax;
 
-  verbose_output_print (0, 1, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-      alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  alg->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 10.) * 0.1;
+  verbose_output_print (0, 1, "# Alg. side: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
+      alg->logmax, alg->scale, exp2 (1. / alg->scale));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
   step = 1. / alg->scale;
   begin = -step * GUARD;
   for (unsigned int inc = 0; inc < 257; begin += step) alg->cexp2[inc++] = exp2(begin);
