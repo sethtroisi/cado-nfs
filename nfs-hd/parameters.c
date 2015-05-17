@@ -54,7 +54,7 @@ double size_sieving_region(sieving_bound_srcptr H)
   return res;
 }
 
-void sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element)
+int sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element)
 {
   double nb_elem = pow(2.0, (double)number_element);
   double tmp = nb_elem / pow(2, (double)(H->t - 1));
@@ -62,9 +62,12 @@ void sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element)
   for (unsigned int i = 0; i < H->t; i++) {
     sieving_bound_set_hi(H, i, H0);
   }
+
+  int size = (int)ceil(log2(size_sieving_region(H)));
+  return size - (int)number_element;
 }
 
-void sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
+int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
     unsigned int number_element)
 {
   double nb_elem = pow(2.0, (double) number_element);
@@ -79,12 +82,16 @@ void sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
     double tmp = (double)H0 * pow(mpz_get_d(p), - (double) i / (double) n);
     sieving_bound_set_hi(H, i, (unsigned int) nearbyint(tmp));
   }
-  double tmp = (double)H0 * pow(mpz_get_d(p), - (double) (H->t - 1) / (double) n);
+  double tmp = (double)H0 *
+    pow(mpz_get_d(p), - (double) (H->t - 1) / (double) n);
   if ((unsigned int) nearbyint(tmp) == 0) {
     sieving_bound_set_hi(H, H->t - 1, 1);
   } else {
     sieving_bound_set_hi(H, H->t - 1, (unsigned int) nearbyint(tmp));
   }
+
+  int size = (int)ceil(log2(size_sieving_region(H)));
+  return size - (int)number_element;
 }
 
 void rand_mpz_poly(mpz_poly_ptr a, sieving_bound_srcptr H)

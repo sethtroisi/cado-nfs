@@ -6,9 +6,9 @@
 
 double size_sieving_region(sieving_bound_srcptr H);
 
-void sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element);
+int sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element);
 
-void sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
+int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
     unsigned int number_element);
 
 void rand_mpz_poly(mpz_poly_ptr a, sieving_bound_srcptr H);
