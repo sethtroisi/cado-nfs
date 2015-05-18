@@ -63,8 +63,8 @@ int sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element)
     sieving_bound_set_hi(H, i, H0);
   }
 
-  int size = (int)ceil(log2(size_sieving_region(H)));
-  return size - (int)number_element;
+  double size = log2(size_sieving_region(H));
+  return (int)nearbyint(size - (double)number_element);
 }
 
 static void recompute_sieving_region(sieving_bound_ptr H, mpz_srcptr p,
@@ -95,8 +95,7 @@ int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
   power = pow(mpz_get_d(p), power);
   nb_elem = nb_elem / power;
   nb_elem = nb_elem / pow(2.0, (double) H->t - 1.0);
-  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem,
-        1/((double)H->t)));
+  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem, 1/((double)H->t)));
 
   sieving_bound_set_hi(H, 0, H0);
   for (unsigned int i = 1; i < H->t - 1; i++) {
@@ -112,8 +111,8 @@ int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
     sieving_bound_set_hi(H, H->t - 1, (unsigned int) nearbyint(tmp));
   }
 
-  int size = (int)ceil(log2(size_sieving_region(H)));
-  return size - (int)number_element;
+  double size = log2(size_sieving_region(H));
+  return (int)nearbyint(size - (double)number_element);
 }
 
 void rand_mpz_poly(mpz_poly_ptr a, sieving_bound_srcptr H)
