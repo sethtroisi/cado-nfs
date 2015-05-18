@@ -55,10 +55,18 @@ void sieving_bound_clear(sieving_bound_ptr H);
 void sieving_bound_fprintf(FILE * file, sieving_bound_srcptr H);
 
 /*
- * To write with # before a sieving bound in a file.
+ * To write a sieving bound with bounds in a file.
  * file: the file.
  * H: the sieving bound.
  */
-void sieving_bound_fprintf_comment(FILE * file, sieving_bound_srcptr H);
+void sieving_bound_fprintf_detailed(FILE * filew, sieving_bound_srcptr H);
+
+/*
+ * To write with # before a sieving bound with bounds in a file.
+ * file: the file.
+ * H: the sieving bound.
+ */
+void sieving_bound_fprintf_detailed_comment(FILE * filew,
+    sieving_bound_srcptr H);
 
 #endif /* SIEVING_INTERVAL_H */
