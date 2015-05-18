@@ -11,11 +11,16 @@ void sieving_bound_init(sieving_bound_ptr H, unsigned int t)
   H->h = (unsigned int * ) malloc(sizeof(unsigned int) * t);
 }
 
-void sieving_bound_set_hi(sieving_bound_ptr H, unsigned int i, unsigned
-    int value)
+void sieving_bound_set_hi(sieving_bound_ptr H, unsigned int i,
+    unsigned int value)
 
 {
   ASSERT(i < H->t);
+#ifndef NDEBUG
+  if (i == H->t - 1) {
+    ASSERT(value > 1);
+  }
+#endif // NDEBUG
 
   H->h[i] = value;
 }
