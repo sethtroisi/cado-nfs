@@ -547,7 +547,7 @@ int main(int argc, char* argv[])
     ASSERT_ALWAYS ( (b_status_r[i] == STATUS_SMOOTH) && (b_status_a[i] == STATUS_SMOOTH) );
     printf ("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i], a[rel_index[i]], b[rel_index[i]]);
   }
-  fprintf (stderr, "\nFound %u smooth relations\n", nb_rel_smooth);
+  fprintf (stderr, "\nFound %lu smooth relations\n", nb_rel_smooth);
 
   mpz_clear (P);
 
