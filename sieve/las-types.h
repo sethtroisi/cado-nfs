@@ -285,4 +285,18 @@ enum {
 #endif
 /* }}} */
 
+/* for batch cofactorization */
+struct {
+  int64_t a;
+  uint64_t b;
+  mpz_t cofactor[2]; /* cofactors on both sides */
+} cofac_elem_struct TYPE_MAYBE_UNUSED;
+typedef struct cofac_elem_struct cofac_elem[1];
+
+struct {
+  cofac_elem *list;
+  size_t alloc;
+  size_t size;
+} cofac_list TYPE_MAYBE_UNUSED;
+
 #endif	/* LAS_TYPES_H_ */
