@@ -286,12 +286,12 @@ enum {
 /* }}} */
 
 /* for batch cofactorization */
-struct {
+typedef struct {
   int64_t a;
   uint64_t b;
   mpz_t cofactor[2]; /* cofactors on both sides */
 } cofac_elem_struct TYPE_MAYBE_UNUSED;
-typedef struct cofac_elem_struct cofac_elem[1];
+typedef cofac_elem_struct cofac_elem[1];
 
 struct {
   cofac_elem *list;
