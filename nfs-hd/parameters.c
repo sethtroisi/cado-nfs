@@ -67,15 +67,36 @@ int sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element)
   return size - (int)number_element;
 }
 
+static void recompute_sieving_region(sieving_bound_ptr H, mpz_srcptr p,
+    unsigned int n, unsigned int number_element)
+{
+  double nb_elem = pow(2.0, (double) number_element);
+  // sum(-k/n, k, 0, t-2)
+  double power = -( 2.0 - 3.0*(double)H->t + (double)(H->t * H->t) ) /
+    (2.0 * (double) n);
+  power = pow(mpz_get_d(p), power);
+  nb_elem = nb_elem / power;
+  nb_elem = nb_elem / pow(2.0, (double) H->t - 1.0);
+  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem,
+        1/((double)H->t - 1.0)));
+  sieving_bound_set_hi(H, 0, H0);
+  for (unsigned int i = 1; i < H->t - 1; i++) {
+    double tmp = (double)H0 * pow(mpz_get_d(p), - (double) i / (double) n);
+    sieving_bound_set_hi(H, i, (unsigned int) nearbyint(tmp));
+  }
+}
+
 int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
     unsigned int number_element)
 {
   double nb_elem = pow(2.0, (double) number_element);
+  // sum(-k/n, k, 0, t-1)
   double power = ( (double)H->t - (double)(H->t * H->t) ) / (2.0 * (double) n);
   power = pow(mpz_get_d(p), power);
   nb_elem = nb_elem / power;
   nb_elem = nb_elem / pow(2.0, (double) H->t - 1.0);
-  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem, 1/(double)H->t));
+  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem,
+        1/((double)H->t)));
 
   sieving_bound_set_hi(H, 0, H0);
   for (unsigned int i = 1; i < H->t - 1; i++) {
@@ -84,8 +105,9 @@ int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
   }
   double tmp = (double)H0 *
     pow(mpz_get_d(p), - (double) (H->t - 1) / (double) n);
-  if ((unsigned int) nearbyint(tmp) == 0) {
-    sieving_bound_set_hi(H, H->t - 1, 1);
+  if ((unsigned int) nearbyint(tmp) < 2) {
+    sieving_bound_set_hi(H, H->t - 1, 2);
+    recompute_sieving_region(H, p, n, number_element - 1);
   } else {
     sieving_bound_set_hi(H, H->t - 1, (unsigned int) nearbyint(tmp));
   }
