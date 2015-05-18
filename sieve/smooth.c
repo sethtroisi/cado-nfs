@@ -157,7 +157,7 @@ void prime_product(mpz_t P, prime_info pi, unsigned long p_max, unsigned long *p
 }
 
 void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
-                   unsigned char *b_status_a, unsigned long int *n,
+                   unsigned char *b_status_a, unsigned long int *n, unsigned long int *nb_rel_smooth,
                    unsigned long int rlim, unsigned long int lpbr,
                    unsigned long int *nb_smooth_r, unsigned long int *nb_smooth_a, unsigned long int *nb_useless,
                    unsigned int nb_type[5], unsigned long int *rel_index)
@@ -165,9 +165,8 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
   mpz_t z_B3;
   mpz_t z_L2;
   
-  unsigned char tmp;
-  
-  unsigned long int i;  
+  unsigned long int tmp;
+  unsigned long int i;
   unsigned long int B;  
   unsigned long int L;  
 
@@ -184,7 +183,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
   B = rlim;
   L = 1UL << lpbr;
 
-  for (i = 0; i < *n; i++)
+  for (i = *nb_rel_smooth; i < *n; i++)
     {
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
@@ -227,6 +226,15 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
           b_status_r[i] = STATUS_SMOOTH;
           mpz_set_ui(R[i], 1);
           (*nb_smooth_r)++;
+          if (b_status_a[i] == STATUS_SMOOTH)
+          {
+            mpz_swap(R[i], R[*nb_rel_smooth]);
+            mpz_swap(A[i], A[*nb_rel_smooth]);
+            tmp = b_status_r[i]; b_status_r[i] = b_status_r[*nb_rel_smooth] ; b_status_r[*nb_rel_smooth] = tmp;
+            tmp = b_status_a[i]; b_status_a[i] = b_status_a[*nb_rel_smooth] ; b_status_a[*nb_rel_smooth] = tmp;
+            tmp = rel_index[i]; rel_index[i] = rel_index[*nb_rel_smooth] ; rel_index[*nb_rel_smooth] = tmp;
+            (*nb_rel_smooth)++;
+          }
           nb_type[2]++;
         }
         /* now L < B^2 <= R[i] <= L^2 or B^3 <= R[i] */
@@ -253,6 +261,15 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
           b_status_r[i] = STATUS_SMOOTH;
           mpz_set_ui(R[i], 1);
           (*nb_smooth_r)++;
+          if (b_status_a[i] == STATUS_SMOOTH)
+          {
+            mpz_swap(R[i], R[*nb_rel_smooth]);
+            mpz_swap(A[i], A[*nb_rel_smooth]);
+            tmp = b_status_r[i]; b_status_r[i] = b_status_r[*nb_rel_smooth] ; b_status_r[*nb_rel_smooth] = tmp;
+            tmp = b_status_a[i]; b_status_a[i] = b_status_a[*nb_rel_smooth] ; b_status_a[*nb_rel_smooth] = tmp;
+            tmp = rel_index[i]; rel_index[i] = rel_index[*nb_rel_smooth] ; rel_index[*nb_rel_smooth] = tmp;
+            (*nb_rel_smooth)++;
+          }
           nb_type[4]++;
         }
       }
@@ -291,6 +308,7 @@ int main(int argc, char* argv[])
   unsigned long int alim_new;
   unsigned char *b_status_r;
   unsigned char *b_status_a;
+  unsigned long int nb_rel_smooth;
   unsigned long int nb_smooth_r;
   unsigned long int nb_smooth_a;
   unsigned long int nb_useless;
@@ -298,7 +316,6 @@ int main(int argc, char* argv[])
   prime_info pi;
   unsigned long int prime;
   unsigned int nb_type[5];
-  unsigned int nb_smooth;
   long int *a;
   unsigned long int *b;
 
@@ -351,6 +368,7 @@ int main(int argc, char* argv[])
     rel_index[i] = i;
   }
 
+  nb_rel_smooth = 0;
   nb_rel_unknown = nb_rel_read;
 
   nb_smooth_r = 0;
@@ -378,7 +396,7 @@ int main(int argc, char* argv[])
       fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
                mpz_sizeinbase (P, 2), seconds () - s);
 
-      nb_rel = 0;
+      nb_rel = nb_rel_smooth;
       while (nb_rel < nb_rel_unknown)
       {
         nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
@@ -393,11 +411,11 @@ int main(int argc, char* argv[])
       
       rlim = rlim_new;
       t_update -= seconds();
-      update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+      update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
       t_update += seconds();
-      fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+      fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
                " %u : %u : %u : %u : %u\n",
-               nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless,
+               nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
       fprintf (stderr, "t_update: %.0f seconds\n", t_update);
     }
@@ -419,7 +437,7 @@ int main(int argc, char* argv[])
       fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
                mpz_sizeinbase (P, 2), seconds () - s);
 
-      nb_rel = 0;
+      nb_rel = nb_rel_smooth;
       while (nb_rel < nb_rel_unknown)
       {
         nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
@@ -434,11 +452,11 @@ int main(int argc, char* argv[])
       
       alim = alim_new;
       t_update -= seconds();
-      update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
+      update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
       t_update += seconds();
-      fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+      fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
                " %u : %u : %u : %u : %u\n",
-               nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless,
+               nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
       fprintf (stderr, "t_update: %.0f seconds\n", t_update);
     }
@@ -469,7 +487,7 @@ int main(int argc, char* argv[])
     fprintf (stderr, "Computed P of %lu bits took %.0f seconds\n",
              mpz_sizeinbase (P, 2), seconds () - s);
 
-    nb_rel = 0;
+    nb_rel = nb_rel_smooth;
     while (nb_rel < nb_rel_unknown)
     {
       nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
@@ -484,11 +502,11 @@ int main(int argc, char* argv[])
 
     rlim = rlim_new;
     t_update -= seconds();
-    update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+    update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
     t_update += seconds();
-    fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+    fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
              " %u : %u : %u : %u : %u\n",
-             nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless,
+             nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth,
            nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
     fprintf (stderr, "t_update: %.0f seconds\n", t_update);
 
@@ -498,7 +516,7 @@ int main(int argc, char* argv[])
 
     fprintf (stderr, "\nalim : %lu:%lu\n", alim, alim_new);
 
-    nb_rel = 0;
+    nb_rel = nb_rel_smooth;
     while (nb_rel < nb_rel_unknown)
     {
       nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
@@ -513,27 +531,23 @@ int main(int argc, char* argv[])
 
     alim = alim_new;
     t_update -= seconds();
-    update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
+    update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
     t_update += seconds();
-    fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ;"
+    fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
              " %u : %u : %u : %u : %u\n",
-             nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless,
+             nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
     fprintf (stderr, "t_update: %.0f seconds\n", t_update);
   }
 
   fprintf (stderr, "\nCollect smooth relations: %.0f s\n\n", seconds() - start);
 
-  nb_smooth = 0;
-  for (i = 0; i < nb_rel_unknown; i++)
+  for (i = 0; i < nb_rel_smooth; i++)
   {
-    if ( (b_status_r[i] == STATUS_SMOOTH) && (b_status_a[i] == STATUS_SMOOTH) )
-    {
-      printf ("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i], a[rel_index[i]], b[rel_index[i]]);
-      nb_smooth++;
-    }
+    ASSERT_ALWAYS ( (b_status_r[i] == STATUS_SMOOTH) && (b_status_a[i] == STATUS_SMOOTH) );
+    printf ("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i], a[rel_index[i]], b[rel_index[i]]);
   }
-  fprintf (stderr, "\nFound %u smooth relations\n", nb_smooth);
+  fprintf (stderr, "\nFound %u smooth relations\n", nb_rel_smooth);
 
   mpz_clear (P);
 
