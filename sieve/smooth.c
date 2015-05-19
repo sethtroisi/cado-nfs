@@ -11,6 +11,7 @@
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <gmp.h>
 #include "smooth.h"
 #include "utils.h"
@@ -567,7 +568,7 @@ cofactor (cofac_list l)
   for (i = 0; i < nb_rel_smooth; i++)
   {
     ASSERT_ALWAYS ( (b_status_r[i] == STATUS_SMOOTH) && (b_status_a[i] == STATUS_SMOOTH) );
-    printf ("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i],
+    printf ("Smooth: index=%lu a=%" PRId64 " b=%" PRIu64 "\n", rel_index[i],
             l->a[rel_index[i]], l->b[rel_index[i]]);
   }
   fprintf (stderr, "\nFound %lu smooth relations\n", nb_rel_smooth);
