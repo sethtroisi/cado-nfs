@@ -350,8 +350,8 @@ cofactor (cofac_list l)
   unsigned long int lpba = 33;
   unsigned long int rlim = 250000000; /* UPDATE */
   unsigned long int alim = 500000000; /* UPDATE */
-  unsigned long int rlim_step = 250000000; /* UPDATE */
-  unsigned long int alim_step = 250000000; /* UPDATE */
+  unsigned long int rlim_step = 750000000; /* UPDATE */
+  unsigned long int alim_step = 750000000; /* UPDATE */
   unsigned long int rlim_new;
   unsigned long int alim_new;
   unsigned char *b_status_r;
