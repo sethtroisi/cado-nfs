@@ -158,6 +158,12 @@ void prime_product(mpz_t P, prime_info pi, unsigned long p_max, unsigned long *p
   free (L);
 }
 
+/* invariant:
+   relations 0 to *nb_rel_smooth-1 are smooth
+   relations *nb_rel_smooth to *n-1 are unknown
+   relations >= *n are non-smooth (useless)
+   rel_index[i] stores the original location (to get the a,b values)
+*/
 void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
                    unsigned char *b_status_a, unsigned long int *n, unsigned long int *nb_rel_smooth,
                    unsigned long int rlim, unsigned long int lpbr,
@@ -198,6 +204,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
           b_status_a[i] = STATUS_USELESS;
           mpz_set_ui(A[i], 1);
           (*nb_useless)++;
+          /* relation i is useless, swap it with relation *n - 1 */
           mpz_swap(R[i], R[(*n)-1]);
           mpz_swap(A[i], A[(*n)-1]);
           tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
@@ -215,6 +222,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
           b_status_a[i] = STATUS_USELESS;
           mpz_set_ui(A[i], 1);
           (*nb_useless)++;
+          /* relation i is useless, swap it with relation *n - 1 */
           mpz_swap(R[i], R[(*n)-1]);
           mpz_swap(A[i], A[(*n)-1]);
           tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
@@ -230,6 +238,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
           (*nb_smooth_r)++;
           if (b_status_a[i] == STATUS_SMOOTH)
           {
+            /* relation i is smooth, swap it with relation *nb_rel_smooth-1 */
             mpz_swap(R[i], R[*nb_rel_smooth]);
             mpz_swap(A[i], A[*nb_rel_smooth]);
             tmp = b_status_r[i]; b_status_r[i] = b_status_r[*nb_rel_smooth] ; b_status_r[*nb_rel_smooth] = tmp;
@@ -251,6 +260,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
           (*nb_useless)++;
           mpz_swap(R[i], R[(*n)-1]);
           mpz_swap(A[i], A[(*n)-1]);
+          /* relation i is useless, swap it with relation *n - 1 */
           tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
           tmp = b_status_a[i]; b_status_a[i] = b_status_a[(*n)-1] ; b_status_a[(*n)-1] = tmp;
           tmp = rel_index[i]; rel_index[i] = rel_index[(*n)-1] ; rel_index[(*n)-1] = tmp;
@@ -267,6 +277,7 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
           {
             mpz_swap(R[i], R[*nb_rel_smooth]);
             mpz_swap(A[i], A[*nb_rel_smooth]);
+            /* relation i is smooth, swap it with relation *nb_rel_smooth-1 */
             tmp = b_status_r[i]; b_status_r[i] = b_status_r[*nb_rel_smooth] ; b_status_r[*nb_rel_smooth] = tmp;
             tmp = b_status_a[i]; b_status_a[i] = b_status_a[*nb_rel_smooth] ; b_status_a[*nb_rel_smooth] = tmp;
             tmp = rel_index[i]; rel_index[i] = rel_index[*nb_rel_smooth] ; rel_index[*nb_rel_smooth] = tmp;
@@ -350,8 +361,8 @@ cofactor (cofac_list l)
   unsigned long int lpba = 33;
   unsigned long int rlim = 250000000; /* UPDATE */
   unsigned long int alim = 500000000; /* UPDATE */
-  unsigned long int rlim_step = 250000000; /* UPDATE */
-  unsigned long int alim_step = 250000000; /* UPDATE */
+  unsigned long int rlim_step = 750000000; /* UPDATE */
+  unsigned long int alim_step = 750000000; /* UPDATE */
   unsigned long int rlim_new;
   unsigned long int alim_new;
   unsigned char *b_status_r;
