@@ -1,16 +1,18 @@
 /* Bernstein's smoothness test */
 
 /* This is a first very naive implementation. To use it:
-   1) create two files /tmp/cofac_r and /tmp/cofac_a of cofactors on the
-      rational and algebraic sides respectively (should be of the same size)
-   2) replace n = 479233 by the common number of lines of those files
-   3) update the ranges for rational and algebraic primes on lines UPDATE
+   1) create a file (say cofac) containing lines of the following form:
+      a b cofac_r cofac_a
+      where cofac_r and cofac_a and cofactors on the rational and algebraic
+      sides respectively
+   2) run ./smooth cofac after updating the lines with "UPDATE".
 */
 
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "gmp.h"
+#include <gmp.h>
+#include "smooth.h"
 #include "utils.h"
 
 #define NB_MILLER_RABIN  2
@@ -279,20 +281,66 @@ void update_status(mpz_t *R, mpz_t *A, unsigned char *b_status_r,
   mpz_clear(z_L2);
 }
 
-int main(int argc, char* argv[])
+void
+cofac_list_init (cofac_list l)
 {
-  char line[200];
+  l->a = NULL;
+  l->b = NULL;
+  l->R = NULL;
+  l->A = NULL;
+  l->alloc = 0;
+  l->size = 0;
+}
+
+void
+cofac_list_realloc (cofac_list l, size_t newsize)
+{
+  l->a = realloc (l->a, newsize * sizeof (int64_t));
+  l->b = realloc (l->b, newsize * sizeof (uint64_t));
+  l->R = realloc (l->R, newsize * sizeof (mpz_t));
+  l->A = realloc (l->A, newsize * sizeof (mpz_t));
+  l->alloc = newsize;
+}
+
+void
+cofac_list_add (cofac_list l, long a, unsigned long b, mpz_t R, mpz_t A)
+{
+  if (l->size == l->alloc)
+    cofac_list_realloc (l, 2 * l->alloc + 1);
+  l->a[l->size] = a;
+  l->b[l->size] = b;
+  mpz_init (l->R[l->size]);
+  mpz_init (l->A[l->size]);
+  mpz_swap (l->R[l->size], R);
+  mpz_swap (l->A[l->size], A);
+  (l->size)++;
+}
+
+void
+cofac_list_clear (cofac_list l)
+{
+  unsigned long i;
+  for (i = 0; i < l->size; i++)
+    {
+      mpz_clear (l->R[i]);
+      mpz_clear (l->A[i]);
+    }
+  free (l->a);
+  free (l->b);
+  free (l->R);
+  free (l->A);
+}
+
+void
+cofactor (cofac_list l)
+{
   unsigned long int nb_rel;
-  unsigned long int nb_rel_all;
   unsigned long int nb_rel_new;
-  unsigned long int nb_rel_read;
+  unsigned long int nb_rel_read = l->size;
   unsigned long int nb_rel_step = 10000000;
   unsigned long int nb_rel_unknown;
   unsigned long int i;
-  unsigned long int j;
-  FILE *cofac;
-  mpz_t *R, *A, P;
-  size_t ret;
+  mpz_t P;
   double s;
   double t_smooth = 0;
   double t_update = 0;
@@ -302,8 +350,8 @@ int main(int argc, char* argv[])
   unsigned long int lpba = 33;
   unsigned long int rlim = 250000000; /* UPDATE */
   unsigned long int alim = 500000000; /* UPDATE */
-  unsigned long int rlim_step = 750000000; /* UPDATE */
-  unsigned long int alim_step = 750000000; /* UPDATE */
+  unsigned long int rlim_step = 250000000; /* UPDATE */
+  unsigned long int alim_step = 250000000; /* UPDATE */
   unsigned long int rlim_new;
   unsigned long int alim_new;
   unsigned char *b_status_r;
@@ -316,52 +364,15 @@ int main(int argc, char* argv[])
   prime_info pi;
   unsigned long int prime;
   unsigned int nb_type[5];
-  long int *a;
-  unsigned long int *b;
 
-  
-  /* Init */
-  
-  start = seconds();
-
-  fprintf (stderr, "\nInit : %.0f s\n\n", seconds() - start);
-
-  ASSERT_ALWAYS (argc == 2);
-  cofac = fopen (argv[1], "r");
-  nb_rel_all = 0;
-  while (fgets(line, 200, cofac) != NULL)
-  {
-    nb_rel_all++;
-  }
-  fseek(cofac, 0, SEEK_SET);
-
-  a = malloc (nb_rel_all * sizeof (long));
-  b = malloc (nb_rel_all * sizeof (unsigned long));
-  R = malloc (nb_rel_all * sizeof (mpz_t));
-  A = malloc (nb_rel_all * sizeof (mpz_t));
-  for (i = j = 0; i < nb_rel_all; i++)
-  {
-    mpz_init (R[i]);
-    mpz_init (A[i]);
-    ret = gmp_fscanf (cofac, "%ld %lu %Zd %Zd\n", a+j, b+j, R[j], A[j]);
-    ASSERT_ALWAYS (ret == 4);
-#if 1 /* define to 1 to enable only two large primes on the rational side */
-    if (mpz_sizeinbase (R[j], 2) > 66)
-    {
-    }
-    else
-#endif
-    j++;
-  }
-  nb_rel_read = j;
-  fprintf (stderr, "Read %lu cofactors\n", nb_rel_read);
+  start = seconds ();
 
   mpz_init (P);
 
-  b_status_r = (unsigned char *) malloc(nb_rel_all * sizeof(unsigned char));
-  b_status_a = (unsigned char *) malloc(nb_rel_all * sizeof(unsigned char));
-  rel_index = (unsigned long int *) malloc(nb_rel_all * sizeof(unsigned long int));
-  for (i = 0; i < nb_rel_all; i++)
+  b_status_r = (unsigned char *) malloc(nb_rel_read * sizeof(unsigned char));
+  b_status_a = (unsigned char *) malloc(nb_rel_read * sizeof(unsigned char));
+  rel_index = (unsigned long int *) malloc(nb_rel_read * sizeof(unsigned long int));
+  for (i = 0; i < nb_rel_read; i++)
   {
     b_status_r[i] = STATUS_UNKNOWN;
     b_status_a[i] = STATUS_UNKNOWN;
@@ -387,9 +398,9 @@ int main(int argc, char* argv[])
     {
       rlim_new = (rlim + rlim_step < alim ? rlim + rlim_step : alim);
 
-      fprintf (stderr, "\nInitial one-side pass : %0.f s\n\n", seconds() - start);
+      fprintf (stderr, "\nInitial one-side pass: %0.fs\n\n", seconds() - start);
 
-      fprintf (stderr, "rlim : %lu:%lu\n\n", rlim, rlim_new);
+      fprintf (stderr, "rlim: %lu:%lu\n\n", rlim, rlim_new);
 
       s = seconds ();
       prime_product (P, pi, rlim_new, &prime);
@@ -402,7 +413,7 @@ int main(int argc, char* argv[])
         nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
         s = seconds ();
         t_smooth -= seconds();
-        smoothness_test (&(R[nb_rel]), nb_rel_new - nb_rel, P);
+        smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P);
         t_smooth += seconds();
         fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
                  " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
@@ -411,10 +422,10 @@ int main(int argc, char* argv[])
       
       rlim = rlim_new;
       t_update -= seconds();
-      update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+      update_status(l->R, l->A, b_status_r, b_status_a, &nb_rel_unknown, &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
       t_update += seconds();
       fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
-               " %u : %u : %u : %u : %u\n",
+               " %u: %u : %u : %u : %u\n",
                nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth,
              nb_type[0], nb_type[1], nb_type[2], nb_type[3], nb_type[4]);
       fprintf (stderr, "t_update: %.0f seconds\n", t_update);
@@ -428,9 +439,9 @@ int main(int argc, char* argv[])
     {
       alim_new = (alim + alim_step < rlim ? alim + alim_step : rlim);
 
-      fprintf (stderr, "\nInitial one-side pass : %0.f s\n\n", seconds() - start);
+      fprintf (stderr, "\nInitial one-side pass: %0.fs\n\n", seconds() - start);
 
-      fprintf (stderr, "\nalim : %lu:%lu\n", alim, alim_new);
+      fprintf (stderr, "\nalim: %lu:%lu\n", alim, alim_new);
 
       s = seconds ();
       prime_product (P, pi, alim_new, &prime);
@@ -443,7 +454,7 @@ int main(int argc, char* argv[])
         nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
         s = seconds ();
         t_smooth -= seconds();
-        smoothness_test (&(A[nb_rel]), nb_rel_new - nb_rel, P);
+        smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P);
         t_smooth += seconds();
         fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
                  " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
@@ -452,7 +463,7 @@ int main(int argc, char* argv[])
       
       alim = alim_new;
       t_update -= seconds();
-      update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
+      update_status(l->A, l->R, b_status_a, b_status_r, &nb_rel_unknown, &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
       t_update += seconds();
       fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
                " %u : %u : %u : %u : %u\n",
@@ -474,13 +485,13 @@ int main(int argc, char* argv[])
   {
     n0_pass++;
  
-    fprintf (stderr, "\nPass %u : %.0f s\n", n0_pass, seconds() - start);
+    fprintf (stderr, "\nPass %u: %.0f s\n", n0_pass, seconds() - start);
     
     /* rational side */
 
     rlim_new = (rlim + rlim_step < (1UL << lpbr) ? rlim + rlim_step : (1UL << lpbr));
     
-    fprintf (stderr, "\nrlim : %lu:%lu\n", rlim, rlim_new);
+    fprintf (stderr, "\nrlim: %lu:%lu\n", rlim, rlim_new);
 
     s = seconds ();
     prime_product (P, pi, rlim_new, &prime);
@@ -493,7 +504,7 @@ int main(int argc, char* argv[])
       nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
       s = seconds ();
       t_smooth -= seconds();
-      smoothness_test (&(R[nb_rel]), nb_rel_new - nb_rel, P);
+      smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P);
       t_smooth += seconds();
       fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
                " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
@@ -502,7 +513,7 @@ int main(int argc, char* argv[])
 
     rlim = rlim_new;
     t_update -= seconds();
-    update_status(R, A, b_status_r, b_status_a, &nb_rel_unknown, &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
+    update_status(l->R, l->A, b_status_r, b_status_a, &nb_rel_unknown, &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a, &nb_useless, nb_type, rel_index);
     t_update += seconds();
     fprintf (stderr, "nb_smooth_r = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
              " %u : %u : %u : %u : %u\n",
@@ -514,7 +525,7 @@ int main(int argc, char* argv[])
 
     alim_new = (alim + alim_step < (1UL << lpba) ? alim + alim_step : (1UL << lpba));
 
-    fprintf (stderr, "\nalim : %lu:%lu\n", alim, alim_new);
+    fprintf (stderr, "\nalim: %lu:%lu\n", alim, alim_new);
 
     nb_rel = nb_rel_smooth;
     while (nb_rel < nb_rel_unknown)
@@ -522,7 +533,7 @@ int main(int argc, char* argv[])
       nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
       s = seconds ();
       t_smooth -= seconds();
-      smoothness_test (&(A[nb_rel]), nb_rel_new - nb_rel, P);
+      smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P);
       t_smooth += seconds();
       fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
                " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
@@ -531,7 +542,7 @@ int main(int argc, char* argv[])
 
     alim = alim_new;
     t_update -= seconds();
-    update_status(A, R, b_status_a, b_status_r, &nb_rel_unknown, &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
+    update_status(l->A, l->R, b_status_a, b_status_r, &nb_rel_unknown, &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r, &nb_useless, nb_type, rel_index);
     t_update += seconds();
     fprintf (stderr, "nb_smooth_a = %lu ; nb_useless = %lu ; nb_unknown = %lu ; nb_rel_smooth = %lu ;"
              " %u : %u : %u : %u : %u\n",
@@ -545,24 +556,56 @@ int main(int argc, char* argv[])
   for (i = 0; i < nb_rel_smooth; i++)
   {
     ASSERT_ALWAYS ( (b_status_r[i] == STATUS_SMOOTH) && (b_status_a[i] == STATUS_SMOOTH) );
-    printf ("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i], a[rel_index[i]], b[rel_index[i]]);
+    printf ("Smooth: index=%lu a=%ld b=%lu\n", rel_index[i],
+            l->a[rel_index[i]], l->b[rel_index[i]]);
   }
   fprintf (stderr, "\nFound %lu smooth relations\n", nb_rel_smooth);
 
   mpz_clear (P);
-
-  for (i = 0; i < nb_rel_all; i++)
-    {
-      mpz_clear (R[i]);
-      mpz_clear (A[i]);
-    }
-    
   free (b_status_r);
   free (b_status_a);
-  free (R);
-  free (A);
-  fclose (cofac);
-
-  fprintf (stderr, "\nThe end : %.0f s\n", seconds() - start);
 }
 
+int
+main (int argc, char* argv[])
+{
+  cofac_list L;
+  double start;
+  FILE *cofac;
+  int64_t a;
+  uint64_t b;
+  mpz_t R, A;
+  
+  start = seconds ();
+
+  /* Initialization */
+  cofac_list_init (L);
+
+  ASSERT_ALWAYS (argc == 2);
+  cofac = fopen (argv[1], "r");
+
+  mpz_init (R);
+  mpz_init (A);
+  while (1)
+  {
+    int ret;
+    ret = gmp_fscanf (cofac, "%ld %lu %Zd %Zd\n", &a, &b, R, A);
+    if (ret != 4)
+      break;
+    cofac_list_add (L, a, b, R, A);
+  }
+  fclose (cofac);
+  cofac_list_realloc (L, L->size);
+  fprintf (stderr, "Read %lu cofactors in %.0fs\n", L->size,
+           seconds () - start);
+  fflush (stderr);
+
+  start = seconds ();
+  cofactor (L);
+  fprintf (stderr, "Cofactorization took %.0f s\n", seconds() - start);
+
+  mpz_clear (R);
+  mpz_clear (A);
+  cofac_list_clear (L);
+
+}
