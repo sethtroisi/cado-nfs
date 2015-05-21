@@ -2,28 +2,28 @@
    in DLP.
 
    Input:
-   ./descent-init [-seed s] p z
+   ./descent-init [-seed s] [-target t] p z
    s is the random seed used (if not given, getpid() is used)
+   t is the bit-size of wanted large primes (if not given, assume t=0)
    p is the prime defining the DLP group
    z is the target element
 
    Output:
    integers e, u0, v0 such that z^e = u0/v0 mod p and u0, v0 are smooth.
 
-   Requires libecm.{a,so} in addition to -lgmp and -lm.
+   Requires libecm.{a,so} in addition to -lgmp and -lm
+   (tested with GMP-ECM 6.4.4).
 
-   Example: with the 180-digit prime and the target z=rsa1024 from
-   http://caramel.loria.fr/p180.txt we get in a few minutes:
-
-   e=1125822966 L=91 aver_gain[189]=131.337396 gain_u=131.337396 gain_v=207.443672 S=5223565.252471 Smax=751333.655143
-   u0=272156503062481694016191511460637222570435895062537206732822181869087792349037223514408066
-   v0=327142099764205173410624844875387710737486249289718351091450638348510670002468548292102115
-   u=1989808957508784679468391539 (p91)
-   v=1169415656325906683767999889 (p90)
-
-   Note: even with the same random seed, the results might differ between two
-   different runs since the random seed does not control the ECM runs, but only
-   the choice of the exponents e.
+   Example:
+   $ p=53236943330228380237618624445646085674945074907141464418703
+   $ z=13236943330228380237618624445646085674945074907141464418703
+   $ ./descent-init -seed 1 -target 17 $p $z
+   ...
+   e=733057497
+   u0=65757339031131586688817728662
+   v0=364193180709513237520172194279
+   u=35983 (16 bits)
+   v=125707 (17 bits)
  */
 
 #include <stdio.h>
