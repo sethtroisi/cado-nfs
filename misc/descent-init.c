@@ -36,6 +36,8 @@
 #include "gmp.h"
 #include "ecm.h"
 
+#define KEEP 10 /* minimal number of elements in pool */
+
 double default_B1done;
 
 typedef struct {
@@ -56,6 +58,17 @@ bsize (mpz_t u, int uprime)
   else /* if u has n bits, we have 2^(n-1) <= u < 2^n: if u = p*q with p <= q,
           then q >= 2^((n-1)/2) and q has at least floor(((n-1)/2)+1 bits */
     return (mpz_sizeinbase (u, 2) + 1) / 2;
+}
+
+
+unsigned long
+csize (mpz_t u, int uprime)
+{
+  if (uprime)
+    return mpz_sizeinbase (u, 2);
+  else /* if u has n bits, we have 2^(n-1) <= u < 2^n: if u = p*q with p <= q,
+          then q >= 2^((n-1)/2) and q has at least floor(((n-1)/2)+1 bits */
+    return 0;
 }
 
 void
@@ -211,28 +224,34 @@ cand_swap (cand c, cand d)
   t = c->l; c->l = d->l; d->l = t;
 }
 
+int
+cost_uv (mpz_t u, mpz_t v, int uprime, int vprime)
+{
+  if (uprime == 0)
+    {
+      if (vprime == 0)
+        {
+          return (mpz_cmpabs (u, v) < 0) ? mpz_sizeinbase (u, 2)
+            : mpz_sizeinbase (v, 2);
+        }
+      else
+        return mpz_sizeinbase (u, 2);
+    }
+  else /* u is prime */
+    {
+      if (vprime)
+        return INT_MAX;
+      else
+        return mpz_sizeinbase (v, 2);
+    }
+}
+
 /* return the bit-size of the smallest composite between u and v,
    and INT_MAX if both are prime */
 int
 cost (cand c)
 {
-  if (c->uprime == 0)
-    {
-      if (c->vprime == 0)
-        {
-          return (mpz_cmpabs (c->u, c->v) < 0) ? mpz_sizeinbase (c->u, 2)
-            : mpz_sizeinbase (c->v, 2);
-        }
-      else
-        return mpz_sizeinbase (c->u, 2);
-    }
-  else /* u is prime */
-    {
-      if (c->vprime)
-        return INT_MAX;
-      else
-        return mpz_sizeinbase (c->v, 2);
-    }
+  return cost_uv (c->u, c->v, c->uprime, c->vprime);
 }
 
 /*****************************************************************************/
@@ -329,6 +348,7 @@ pool_scan (pool p, ecm_params params, unsigned long L, double S1, double *S2)
     for (j = i; j > 0 && cost (p->list[j-1]) > cost (p->list[j]); j--)
       cand_swap (p->list[j-1], p->list[j]);
 
+#if 0
   if (j < oldn)
     {
       unsigned long imin, imax;
@@ -343,6 +363,7 @@ pool_scan (pool p, ecm_params params, unsigned long L, double S1, double *S2)
         }
       fflush (stdout);
     }
+#endif
   return L;
 }
 
@@ -547,18 +568,20 @@ main (int argc, char *argv[])
       lu = bsize (u, uprime);
       lv = bsize (v, vprime);
       l = (lu > lv) ? lu : lv;
-      if (l < L) /* potential better relation */
+      if (uprime && vprime)
         {
-          if (uprime && vprime)
+          if (l < L) /* found better relation */
             {
               cand_print_raw (e, u0, v0, u, v);
               L = l;
             }
-          else
-            {
-              pool_add (P, e, u0, v0, u, v, uprime, vprime, B1, l);
-              L = pool_scan (P, params, L, S1, &S2);
-            }
+        }
+      else if (csize (u, uprime) < L && csize (v, vprime) < L &&
+               (P->n < KEEP || cost_uv (u, v, uprime, vprime) < 
+                cost (P->list[P->n - 1])))
+        {
+          pool_add (P, e, u0, v0, u, v, uprime, vprime, B1, l);
+          L = pool_scan (P, params, L, S1, &S2);
         }
       Smax += sqrt (Smax);
     }
