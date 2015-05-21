@@ -16,6 +16,7 @@
 #include "misc.h"
 #include "fb-types.h"
 #include "fb.h"
+#include "las-debug.h"
 
 /*
  * This bucket module provides a way to store elements (that are called
@@ -61,8 +62,8 @@ public:
   shorthint_t(const slice_offset_t slice_offset)
     : hint(slice_offset) {}
   shorthint_t(const fbprime_t p MAYBE_UNUSED,
-                     const slice_offset_t slice_offset,
-                     const slice_index_t slice_index MAYBE_UNUSED)
+              const slice_offset_t slice_offset,
+              const slice_index_t slice_index MAYBE_UNUSED)
     : hint(slice_offset) {}
 };
 
@@ -75,10 +76,12 @@ public:
   slice_index_t index;
   slice_offset_t hint;
   longhint_t(){}
-  longhint_t(const slice_offset_t slice_offset, const slice_index_t slice_index)
+  longhint_t(const slice_offset_t slice_offset,
+             const slice_index_t slice_index)
     : index(slice_index), hint(slice_offset) {}
-  longhint_t(const fbprime_t p MAYBE_UNUSED, const slice_offset_t slice_offset,
-                    const slice_index_t slice_index)
+  longhint_t(const fbprime_t p MAYBE_UNUSED,
+             const slice_offset_t slice_offset,
+             const slice_index_t slice_index)
     : index(slice_index), hint(slice_offset) {}
 };
 
@@ -89,8 +92,9 @@ public:
   primehint_t(){}
   primehint_t(const fbprime_t p)
     : p(p) {}
-  primehint_t(const fbprime_t p, const slice_offset_t slice_offset MAYBE_UNUSED,
-                        const slice_index_t slice_index MAYBE_UNUSED)
+  primehint_t(const fbprime_t p,
+              const slice_offset_t slice_offset MAYBE_UNUSED,
+              const slice_index_t slice_index MAYBE_UNUSED)
     : p(p) {}
 };
 
@@ -188,6 +192,8 @@ class bucket_array_t : private NonCopyable {
       return (bucket_write[i] - bucket_start[i]);
   }
   void realloc_slice_start(size_t);
+  void log_this_update (const update_t update, uint64_t bucket_number,
+                        where_am_I_ptr w) const;
 public:
   /* Constructor sets everything to zero, and does not allocate memory.
      allocate_memory() does all the allocation. */
@@ -258,28 +264,14 @@ public:
   /* Create an update for a hit at location offset and push it to the
      coresponding bucket */
   void push_update(const uint64_t offset, const fbprime_t p,
-      const slice_offset_t slice_offset, const slice_index_t slice_index)
+      const slice_offset_t slice_offset, const slice_index_t slice_index,
+      where_am_I_ptr w MAYBE_UNUSED)
   {
     const uint64_t bucket_number = offset / bucket_region;
     ASSERT_EXPENSIVE(bucket_number < n_bucket);
     update_t update(offset % bucket_region, p, slice_offset, slice_index);
-#if 0 && defined(TRACE_K)
-    /* TODO: don't define where_am_I_ptr in las-types.h, to avoid cyclic header
-       file dependencies */
-    /* TODO: need to be able to set the current region size in WHERE_AM_I,
-       so we can compute N * regionsize + offset correctly for different
-       sieving levels */
-    WHERE_AM_I_UPDATE(w, N, bucket_number);
-    WHERE_AM_I_UPDATE(w, x, update.x);
-    
-    if (trace_on_spot_x(offset)) {
-        verbose_output_print (TRACE_CHANNEL, 0, "# Pushed factor base entry (slice_index=%u, slice_offset=%u, p=%"
-                              FBPRIME_FORMAT "), hit at location (x=%u, %s) to BA[%u]\n",
-                 (unsigned int) slice_index, (unsigned int) slice_offset, p,
-                 (unsigned int) update.x, sidenames[side],
-                 (unsigned int) bucket_number);
-        ASSERT(test_divisible(w));
-      }
+#if defined(TRACE_K)
+    log_this_update(update, bucket_number, w);
 #endif
     push_update(bucket_number, update);
   }
