@@ -192,8 +192,8 @@ class bucket_array_t : private NonCopyable {
       return (bucket_write[i] - bucket_start[i]);
   }
   void realloc_slice_start(size_t);
-  void log_this_update (const update_t update, uint64_t bucket_number,
-                        where_am_I_ptr w) const;
+  void log_this_update (const update_t update, uint64_t offset,
+                        uint64_t bucket_number, where_am_I_ptr w) const;
 public:
   /* Constructor sets everything to zero, and does not allocate memory.
      allocate_memory() does all the allocation. */
@@ -271,7 +271,7 @@ public:
     ASSERT_EXPENSIVE(bucket_number < n_bucket);
     update_t update(offset % bucket_region, p, slice_offset, slice_index);
 #if defined(TRACE_K)
-    log_this_update(update, bucket_number, w);
+    log_this_update(update, offset, bucket_number, w);
 #endif
     push_update(bucket_number, update);
   }

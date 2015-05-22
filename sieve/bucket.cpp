@@ -174,7 +174,8 @@ bucket_array_t<LEVEL, HINT>::max_full () const
 template <int LEVEL, typename HINT>
 void
 bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED,
-    const uint64_t bucket_number MAYBE_UNUSED, where_am_I_ptr w MAYBE_UNUSED) const
+    const uint64_t offset MAYBE_UNUSED, const uint64_t bucket_number MAYBE_UNUSED,
+    where_am_I_ptr w MAYBE_UNUSED) const
 {
 #if defined(TRACE_K)
     /* TODO: need to be able to set the current region size in WHERE_AM_I,
@@ -184,7 +185,7 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
     WHERE_AM_I_UPDATE(w, x, update.x);
     WHERE_AM_I_UPDATE(w, N, bucket_number);
 
-    if (trace_on_spot_x(w->x)) {
+    if (trace_on_spot_x(offset)) {
         verbose_output_print (TRACE_CHANNEL, 0,
             "# Pushed hit at location (x=%u, %s), from factor base entry "
             "(slice_index=%u, slice_offset=%u, p=%" FBPRIME_FORMAT "), "
