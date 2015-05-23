@@ -225,13 +225,12 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 /* {{{ */
 template <int LEVEL>
 void
-fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA, sieve_info_srcptr const si,
+fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
+                sieve_info_srcptr const si,
                 const fb_transformed_vector *transformed_vector,
-                const int side MAYBE_UNUSED,
                 const fb_slice_interface *slice MAYBE_UNUSED,
-                where_am_I_ptr w MAYBE_UNUSED)
+                where_am_I_ptr w)
 {
-  WHERE_AM_I_UPDATE(w, side, side);
   const slice_index_t slice_index = transformed_vector->get_index();
   const uint32_t I = si->I;
   const uint32_t J = si->J;
@@ -245,14 +244,17 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA, sieve_info_srcptr c
   for (fb_transformed_vector::const_iterator pl_it = transformed_vector->begin();
        pl_it != transformed_vector->end(); pl_it++) {
 
-#if 0
-    printf("%s(): sieving side=%d, p=%u, logp = %u, a = (%d, %u), b = (%u, %u)\n", 
-           __func__, side, pl_it->det(), (unsigned int) slice->get_logp(), pl_it->get_a0(), pl_it->get_a1(), pl_it->get_b0(), pl_it->get_b1());
+#if defined(TRACK_CODE_PATH) && 0
+    printf("%s(): sieving side=%d, p=%u, logp = %u, a = (%d, %u), b = (%u, %u)\n",
+           __func__, w->side, pl_it->det(), (unsigned int) slice->get_logp(),
+           pl_it->get_a0(), pl_it->get_a1(), pl_it->get_b0(), pl_it->get_b1());
 #endif
     
     const slice_offset_t hint = pl_it->hint;
+    WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
     const fbprime_t p = pl_it->det();
+    WHERE_AM_I_UPDATE(w, p, p);
 #else
     const fbprime_t p = 0;
 #endif
@@ -269,7 +271,7 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA, sieve_info_srcptr c
          (if any) do we sieve? */
       uint64_t x = (pl_it->b1 == 0 ? 1 : I) + (I >> 1);
      /*****************************************************************/
-      BA.push_update(x, p, hint, slice_index);
+      BA.push_update(x, p, hint, slice_index, w);
       continue;
     }
 
@@ -279,7 +281,7 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA, sieve_info_srcptr c
     /* Now, do the real work: the filling of the buckets */
     while (!points.finished()) {
       if (LIKELY(points.probably_coprime()))
-        BA.push_update(points.get_x(), p, hint, slice_index);
+        BA.push_update(points.get_x(), p, hint, slice_index, w);
       points.next();
     }
   }
@@ -303,13 +305,15 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
+    WHERE_AM_I_UPDATE(w, side, param->side);
+    WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
 
     /* Do the root transform and lattice basis reduction for this factor base slice */
     const fb_transformed_vector *transformed_vector = param->slice->make_lattice_bases(param->si->qbasis, param->si->conf->logI);
     /* Get an unused bucket array that we can write to */
     bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
     /* Fill the buckets */
-    fill_in_buckets<LEVEL>(BA, param->si, transformed_vector, param->side, param->slice, w);
+    fill_in_buckets<LEVEL>(BA, param->si, transformed_vector, param->slice, w);
     /* Release bucket array again */
     param->ws.release_BA(param->side, BA);
     delete transformed_vector;

@@ -193,3 +193,4 @@ nfs-hd/utils_mpz.h
 nfs-hd/vector.h
 tests/nfs-hd/
 sieve/smooth.c
+sieve/smooth.h

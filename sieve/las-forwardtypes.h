@@ -3,6 +3,7 @@
 
 /* These must be forward-declared, because various header files use them */
 
+class bucket_primes_t;
 struct sieve_info_s;
 typedef struct sieve_info_s * sieve_info_ptr;
 typedef const struct sieve_info_s * sieve_info_srcptr;
