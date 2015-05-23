@@ -243,32 +243,6 @@ struct las_info_s {
 typedef struct las_info_s las_info[1];
 /* }}} */
 
-/* FIXME: This does not seem to work well */
-#ifdef  __GNUC__
-#define TYPE_MAYBE_UNUSED     __attribute__((unused));
-#else
-#define TYPE_MAYBE_UNUSED       /**/
-#endif
-
-/* {{{ where_am_I (debug) */
-struct where_am_I_s {
-#ifdef TRACK_CODE_PATH
-    fbprime_t p;        /* current prime or prime power, when applicable */
-    fbroot_t r;         /* current root */
-    slice_offset_t h;   /* Prime hint, if not decoded yet */
-    int fb_idx;         /* index into the factor base si->sides[side]->fb
-                           or into th->sides[side]->fb_bucket */
-    unsigned int j;     /* row number in bucket */
-    unsigned int x;     /* value in bucket */
-    unsigned int N;     /* bucket number */
-    int side;
-    las_info_srcptr las;
-    sieve_info_srcptr si;
-#endif  /* TRACK_CODE_PATH */
-} TYPE_MAYBE_UNUSED;
-
-typedef struct where_am_I_s where_am_I[1];
-
 enum {
   OUTPUT_CHANNEL,
   ERROR_CHANNEL,
@@ -276,13 +250,5 @@ enum {
   TRACE_CHANNEL,
   NR_CHANNELS /* This must be the last element of the enum */
 };
-
-
-#ifdef TRACK_CODE_PATH
-#define WHERE_AM_I_UPDATE(w, field, value) (w)->field = (value)
-#else
-#define WHERE_AM_I_UPDATE(w, field, value) /**/
-#endif
-/* }}} */
 
 #endif	/* LAS_TYPES_H_ */

@@ -2,28 +2,28 @@
    in DLP.
 
    Input:
-   ./descent-init [-seed s] p z
+   ./descent-init [-seed s] [-target t] p z
    s is the random seed used (if not given, getpid() is used)
+   t is the bit-size of wanted large primes (if not given, assume t=0)
    p is the prime defining the DLP group
    z is the target element
 
    Output:
    integers e, u0, v0 such that z^e = u0/v0 mod p and u0, v0 are smooth.
 
-   Requires libecm.{a,so} in addition to -lgmp and -lm.
+   Requires libecm.{a,so} in addition to -lgmp and -lm
+   (tested with GMP-ECM 6.4.4).
 
-   Example: with the 180-digit prime and the target z=rsa1024 from
-   http://caramel.loria.fr/p180.txt we get in a few minutes:
-
-   e=1125822966 L=91 aver_gain[189]=131.337396 gain_u=131.337396 gain_v=207.443672 S=5223565.252471 Smax=751333.655143
-   u0=272156503062481694016191511460637222570435895062537206732822181869087792349037223514408066
-   v0=327142099764205173410624844875387710737486249289718351091450638348510670002468548292102115
-   u=1989808957508784679468391539 (p91)
-   v=1169415656325906683767999889 (p90)
-
-   Note: even with the same random seed, the results might differ between two
-   different runs since the random seed does not control the ECM runs, but only
-   the choice of the exponents e.
+   Example:
+   $ p=53236943330228380237618624445646085674945074907141464418703
+   $ z=13236943330228380237618624445646085674945074907141464418703
+   $ ./descent-init -seed 1 -target 17 $p $z
+   ...
+   e=733057497
+   u0=65757339031131586688817728662
+   v0=364193180709513237520172194279
+   u=35983 (16 bits)
+   v=125707 (17 bits)
  */
 
 #include <stdio.h>
@@ -35,6 +35,8 @@
 #include <sys/resource.h>
 #include "gmp.h"
 #include "ecm.h"
+
+#define KEEP 10 /* minimal number of elements in pool */
 
 double default_B1done;
 
@@ -56,6 +58,17 @@ bsize (mpz_t u, int uprime)
   else /* if u has n bits, we have 2^(n-1) <= u < 2^n: if u = p*q with p <= q,
           then q >= 2^((n-1)/2) and q has at least floor(((n-1)/2)+1 bits */
     return (mpz_sizeinbase (u, 2) + 1) / 2;
+}
+
+
+unsigned long
+csize (mpz_t u, int uprime)
+{
+  if (uprime)
+    return mpz_sizeinbase (u, 2);
+  else /* if u has n bits, we have 2^(n-1) <= u < 2^n: if u = p*q with p <= q,
+          then q >= 2^((n-1)/2) and q has at least floor(((n-1)/2)+1 bits */
+    return 0;
 }
 
 void
@@ -211,28 +224,34 @@ cand_swap (cand c, cand d)
   t = c->l; c->l = d->l; d->l = t;
 }
 
+int
+cost_uv (mpz_t u, mpz_t v, int uprime, int vprime)
+{
+  if (uprime == 0)
+    {
+      if (vprime == 0)
+        {
+          return (mpz_cmpabs (u, v) < 0) ? mpz_sizeinbase (u, 2)
+            : mpz_sizeinbase (v, 2);
+        }
+      else
+        return mpz_sizeinbase (u, 2);
+    }
+  else /* u is prime */
+    {
+      if (vprime)
+        return INT_MAX;
+      else
+        return mpz_sizeinbase (v, 2);
+    }
+}
+
 /* return the bit-size of the smallest composite between u and v,
    and INT_MAX if both are prime */
 int
 cost (cand c)
 {
-  if (c->uprime == 0)
-    {
-      if (c->vprime == 0)
-        {
-          return (mpz_cmpabs (c->u, c->v) < 0) ? mpz_sizeinbase (c->u, 2)
-            : mpz_sizeinbase (c->v, 2);
-        }
-      else
-        return mpz_sizeinbase (c->u, 2);
-    }
-  else /* u is prime */
-    {
-      if (c->vprime)
-        return INT_MAX;
-      else
-        return mpz_sizeinbase (c->v, 2);
-    }
+  return cost_uv (c->u, c->v, c->uprime, c->vprime);
 }
 
 /*****************************************************************************/
@@ -329,6 +348,7 @@ pool_scan (pool p, ecm_params params, unsigned long L, double S1, double *S2)
     for (j = i; j > 0 && cost (p->list[j-1]) > cost (p->list[j]); j--)
       cand_swap (p->list[j-1], p->list[j]);
 
+#if 0
   if (j < oldn)
     {
       unsigned long imin, imax;
@@ -343,6 +363,7 @@ pool_scan (pool p, ecm_params params, unsigned long L, double S1, double *S2)
         }
       fflush (stdout);
     }
+#endif
   return L;
 }
 
@@ -547,18 +568,20 @@ main (int argc, char *argv[])
       lu = bsize (u, uprime);
       lv = bsize (v, vprime);
       l = (lu > lv) ? lu : lv;
-      if (l < L) /* potential better relation */
+      if (uprime && vprime)
         {
-          if (uprime && vprime)
+          if (l < L) /* found better relation */
             {
               cand_print_raw (e, u0, v0, u, v);
               L = l;
             }
-          else
-            {
-              pool_add (P, e, u0, v0, u, v, uprime, vprime, B1, l);
-              L = pool_scan (P, params, L, S1, &S2);
-            }
+        }
+      else if (csize (u, uprime) < L && csize (v, vprime) < L &&
+               (P->n < KEEP || cost_uv (u, v, uprime, vprime) < 
+                cost (P->list[P->n - 1])))
+        {
+          pool_add (P, e, u0, v0, u, v, uprime, vprime, B1, l);
+          L = pool_scan (P, params, L, S1, &S2);
         }
       Smax += sqrt (Smax);
     }

@@ -10,6 +10,7 @@
 #include "portability.h"
 #include "memory.h"
 #include "las-config.h"
+#include "las-debug.h"
 #include "iqsort.h"
 #include "verbose.h"
 #include "ularith.h"
@@ -169,6 +170,34 @@ bucket_array_t<LEVEL, HINT>::max_full () const
     }
   return (double) max / (double) bucket_size;
 }
+
+template <int LEVEL, typename HINT>
+void
+bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED,
+    const uint64_t offset MAYBE_UNUSED, const uint64_t bucket_number MAYBE_UNUSED,
+    where_am_I_ptr w MAYBE_UNUSED) const
+{
+#if defined(TRACE_K)
+    /* TODO: need to be able to set the current region size in WHERE_AM_I,
+       so we can compute N * regionsize + offset correctly for different
+       sieving levels */
+
+    WHERE_AM_I_UPDATE(w, x, update.x);
+    WHERE_AM_I_UPDATE(w, N, bucket_number);
+
+    if (trace_on_spot_x(offset)) {
+        verbose_output_print (TRACE_CHANNEL, 0,
+            "# Pushed hit at location (x=%u, %s), from factor base entry "
+            "(slice_index=%u, slice_offset=%u, p=%" FBPRIME_FORMAT "), "
+            "to BA<%d>[%u]\n",
+            (unsigned int) w->x, sidenames[w->side], (unsigned int) w->i,
+            (unsigned int) w->h, w->p, LEVEL, (unsigned int) w->N);
+        ASSERT(test_divisible(w));
+      }
+#endif
+}
+
+
 
 /* Instantiate concrete classes that we need or some methods do not get
    compiled and cause "undefined reference" errors during linking. */

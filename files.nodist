@@ -187,3 +187,4 @@ nfs-hd/utils_mpz.c
 nfs-hd/utils_mpz.h
 tests/nfs-hd/
 sieve/smooth.c
+sieve/smooth.h
