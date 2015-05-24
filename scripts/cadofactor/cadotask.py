@@ -4512,10 +4512,10 @@ class ReconstructLogTask(Task):
             myfile = open(fullfile, "rb")
             data = myfile.read()
             for line in data.splitlines():
-                match = re.match(br'(\d+) 2 0 rat (\d+)', line)
+                match = re.match(br'(\w+) 2 0 rat (\d+)', line)
                 if match:
                     log2 = match.group(2)
-                match = re.match(br'(\d+) 3 0 rat (\d+)', line)
+                match = re.match(br'(\w+) 3 0 rat (\d+)', line)
                 if match:
                     log3 = match.group(2)
                 if log2 != None and log3 != None:
