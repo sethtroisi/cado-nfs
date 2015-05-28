@@ -1936,7 +1936,7 @@ unsigned int find_indexes_min(unsigned int ** L,
   * L = (unsigned int * ) malloc(sizeof(unsigned int) * (V));
   unsigned int i = 0;
   unsigned int size = 0;
-  while(indexes[i]->length == 0)
+  while(indexes[i]->length == 0 || index[i] == indexes[i]->length)
   {
     i++;
   }
@@ -1948,11 +1948,10 @@ unsigned int find_indexes_min(unsigned int ** L,
     }
   }
   for (i = 0; i < V; i++) {
-    if (indexes[i]->length != 0) {
-      if (min == indexes[i]->array[index[i]]) {
-        (*L)[size] = i;
-        size++;
-      }
+    if ((indexes[i]->length != 0) && (min == indexes[i]->array[index[i]]) &&
+        (index[i] < indexes[i]->length)) {
+      (*L)[size] = i;
+      size++;
     }
   }
   * L = realloc(* L, size * sizeof(unsigned int));
@@ -2033,7 +2032,7 @@ void find_relations(uint64_array_t * indexes, uint64_t number_element,
   for (unsigned int i = 0; i < V; i++) {
     index[i] = 0;
     if (indexes[i]->length != 0) {
-      length_tot += (indexes[i]->length - 1);
+      length_tot += indexes[i]->length;
     }
   }
 
@@ -2041,7 +2040,6 @@ void find_relations(uint64_array_t * indexes, uint64_t number_element,
     while(sum_index(index, V) < length_tot) {
       find_relation(indexes, index, number_element, lpb, matrix, f, H, V);
     }
-    find_relation(indexes, index, number_element, lpb, matrix, f, H, V);
   } else {
     printf("# No relations\n");
   }
@@ -2120,6 +2118,8 @@ void declare_usage(param_list pl)
       "path to the file that describe the factor base 8");
   param_list_decl_usage(pl, "fb8",
       "path to the file that describe the factor base 9");
+  param_list_decl_usage(pl, "main",
+      "main side to cofactorise");
 }
 
 /*
@@ -2141,7 +2141,8 @@ void declare_usage(param_list pl)
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
     uint64_t * q_min, uint64_t * q_max, unsigned char ** thresh, mpz_t ** lpb,
-    array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V)
+    array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
+    int * main_side)
 {
   param_list pl;
   param_list_init(pl);
@@ -2231,7 +2232,6 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   printf("# Time to read factor bases: %f.\n", seconds() - sec);
 #endif
 
-
   for (unsigned int i = 0; i < * V; i++) {
     char str [7];
     sprintf(str, "thresh%u", i);
@@ -2254,6 +2254,8 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   array_init(array, number_element);
 
   mat_Z_init(matrix, t, t);
+
+  param_list_parse_int(pl, "main", main_side);
 }
 
 /*
@@ -2274,9 +2276,10 @@ int main(int argc, char * argv[])
   mat_Z_t matrix;
   factor_base_t * fb;
   uint64_t q;
+  int main_side;
 
   initialise_parameters(argc, argv, &f, &fbb, &fb, H, &q_min, &q_max,
-                        &thresh, &lpb, array, matrix, &q_side, &V);
+                        &thresh, &lpb, array, matrix, &q_side, &V, &main_side);
 
 #ifdef PRINT_PARAMETERS
   printf("# H =\n");
@@ -2300,6 +2303,7 @@ int main(int argc, char * argv[])
   printf("# q_side = %u\n", q_side);
 #endif // PRINT_PARAMETERS
 
+  //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
     (uint64_array_t * ) malloc(sizeof(uint64_array_t) * V);
 
