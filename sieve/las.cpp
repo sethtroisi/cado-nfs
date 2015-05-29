@@ -184,6 +184,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             char fbparamname[4];
             snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
+            if (!fbfilename) {
+                fprintf(stderr, "Error: factor base file for algebraic side %d is not given\n", side);
+                exit(EXIT_FAILURE);
+            }
             verbose_output_print(0, 1, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             tfb = seconds () - tfb;
             if (!sis->fb->read(fbfilename))
