@@ -51,6 +51,9 @@ add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\"
 set_test_build_depends(F9_tracektest las_tracek)
 set_test_dependencies(F9_tracektest F9_makefbtest)
 
+# Try sieving I (see bug 18814)
+add_test(sievetest_I "${las_path}" -poly "${CMAKE_CURRENT_SOURCE_DIR}/c120.poly" -I 12 -fb1 "${CMAKE_CURRENT_SOURCE_DIR}/c120.roots1.gz" -lim0 10000 -lim1 10000 -lpb0 26 -lpb1 26 -mfb0 28 -mfb1 28 -q0 15350028 -q1 15350029 -t 2)
+
 # Try a too-large lambda value
 add_test(F9_rlambdatest bash -c "rlambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"rlambda>.* does not make sense\"")
 set_test_build_depends(F9_rlambdatest las)
