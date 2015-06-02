@@ -1134,20 +1134,22 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
     mpz_clear(t);
 }
 
-// #define GALOIS_CASE 0 /* case x -> 1/x of order 2 */
-#define GALOIS_CASE 1 /* case x -> 1-1/x of order 3 */
-
 static int
-skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots)
+skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
+		  const char *galois_autom)
 {
-#if GALOIS_CASE == 0 // sigma: x -> y = 1/x <=> x = 1/y
-    int ord = 2;
-#elif GALOIS_CASE == 1 // sigma: x -> y = 1-1/x <=>, x = -1/(y-1)
-    int ord = 3;
-#endif
     int nroots = orig_nroots;
     if(nroots == 0)
 	return 0;
+    int ord = 0;
+    if(strcmp(galois_autom, "1/x") == 0)
+	ord = 2;
+    else if(strcmp(galois_autom, "1_1/x") == 0)
+	ord = 3;
+    else{
+	fprintf(stderr, "Unknown automorphism: %s\n", galois_autom);
+	ASSERT_ALWAYS(0);
+    }
     if (nroots % ord) {
         fprintf(stderr, "Number of roots modulo q is not divisible by %d. Don't know how to interpret -galois.\n", ord);
         ASSERT_ALWAYS(0);
@@ -1159,81 +1161,84 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots)
     residueul_t r1, r2;
     modul_init(r1, mm);
     modul_init(r2, mm);
-#if GALOIS_CASE == 0 // be conservative
-    for (int k = 0; k < nroots; k++) {
-        unsigned long rr = mpz_get_ui(roots[k]);
-        modul_set_ul(r1, rr, mm);
-        int kk = 0;
-        for (int l = k+1; l < nroots; ++l) {
-            unsigned long ss = mpz_get_ui(roots[l]);
-            modul_set_ul(r2, ss, mm);
-            modul_mul(r2, r2, r1, mm);
-            if (modul_is1(r2, mm)) {
-                kk = l;
-                break;
-            }
-        }
-        ASSERT_ALWAYS(kk != 0); // Should always find an inverse.
-        // Remove it from the list
-        for (int l = kk; l < nroots-1; ++l) {
-            mpz_set(roots[l], roots[l+1]);
-        }
-        nroots--;
-    }
-#else
-    residueul_t conj[ord]; // where to put conjugates
-    for(int k = 0; k < ord; k++)
-	modul_init(conj[k], mm);
-    char used[nroots];     // used roots: non-principal conjugates
-    memset(used, 0, nroots);
-    for(int k = 0; k < nroots; k++){
-	if(used[k]) continue;
-	unsigned long rr = mpz_get_ui(roots[k]);
-	modul_set_ul(r1, rr, mm);
-	// build ord-1 conjugates for roots[k]
-	for(int l = 0; l < ord-1; l++){
-#if GALOIS_CASE == 1
-	    // sigma(r1) = 1-1/r1
-	    if(modul_intequal_ul(r1, qq))
-		modul_set_ul(r1, 1, mm);
-	    else{
-		modul_inv(r2, r1, mm);
-		modul_set_ul(r1, 1, mm);
-		modul_sub(r1, r1, r2, mm);
-	    }
-	    modul_set(conj[l], r1, mm);
-#endif
-	}
-	printf("new orbit: %lu", rr);
-	for(int l = 0; l < ord-1; l++)
-	    printf(" -> %lu", conj[l][0]);
-	printf("\n");
-	// look at roots
-	for(int l = k+1; l < nroots; l++){
-	    unsigned long ss = mpz_get_ui(roots[l]);
-	    modul_set_ul(r2, ss, mm);
-	    for(int i = 0; i < ord-1; i++)
-		if(modul_equal(r2, conj[i], mm)){
-		    ASSERT_ALWAYS(used[l] == 0);
-		    // l is some conjugate, we erase it
-		    used[l] = (char)1;
+    if(ord == 2){ // be conservative
+	for (int k = 0; k < nroots; k++) {
+	    unsigned long rr = mpz_get_ui(roots[k]);
+	    modul_set_ul(r1, rr, mm);
+	    int kk = 0;
+	    for (int l = k+1; l < nroots; ++l) {
+		unsigned long ss = mpz_get_ui(roots[l]);
+		modul_set_ul(r2, ss, mm);
+		modul_mul(r2, r2, r1, mm);
+		if (modul_is1(r2, mm)) {
+		    kk = l;
 		    break;
 		}
+	    }
+	    ASSERT_ALWAYS(kk != 0); // Should always find an inverse.
+	    // Remove it from the list
+	    for (int l = kk; l < nroots-1; ++l) {
+		mpz_set(roots[l], roots[l+1]);
+	    }
+	    nroots--;
 	}
     }
-    // now, compact roots
-    int kk = 0;
-    for(int k = 0; k < nroots; k++)
-	if(used[k] == 0){
-	    if(k > kk)
-		mpz_set(roots[kk], roots[k]);
-	    kk++;
+    else{
+	residueul_t conj[ord]; // where to put conjugates
+	for(int k = 0; k < ord; k++)
+	    modul_init(conj[k], mm);
+	char used[nroots];     // used roots: non-principal conjugates
+	memset(used, 0, nroots);
+	for(int k = 0; k < nroots; k++){
+	    if(used[k]) continue;
+	    unsigned long rr = mpz_get_ui(roots[k]);
+	    modul_set_ul(r1, rr, mm);
+	    // build ord-1 conjugates for roots[k]
+	    for(int l = 0; l < ord-1; l++){
+		if(ord == 3){ // TODO: do better!
+		    // sigma(r1) = 1-1/r1
+		    if(modul_intequal_ul(r1, qq))
+			modul_set_ul(r1, 1, mm);
+		    else{
+			modul_inv(r2, r1, mm);
+			modul_set_ul(r1, 1, mm);
+			modul_sub(r1, r1, r2, mm);
+		    }
+		    modul_set(conj[l], r1, mm);
+		}
+	    }
+#if 0 // to be sure!
+	    printf("new orbit: %lu", rr);
+	    for(int l = 0; l < ord-1; l++)
+		printf(" -> %lu", conj[l][0]);
+	    printf("\n");
+#endif
+	    // look at roots
+	    for(int l = k+1; l < nroots; l++){
+		unsigned long ss = mpz_get_ui(roots[l]);
+		modul_set_ul(r2, ss, mm);
+		for(int i = 0; i < ord-1; i++)
+		    if(modul_equal(r2, conj[i], mm)){
+			ASSERT_ALWAYS(used[l] == 0);
+			// l is some conjugate, we erase it
+			used[l] = (char)1;
+			break;
+		    }
+	    }
 	}
-    ASSERT_ALWAYS(kk == (nroots/ord));
-    nroots = kk;
-    for(int k = 0; k < ord; k++)
-	modul_clear(conj[k], mm);
-#endif // GALOIS_CASE == 0
+	// now, compact roots
+	int kk = 0;
+	for(int k = 0; k < nroots; k++)
+	    if(used[k] == 0){
+		if(k > kk)
+		    mpz_set(roots[kk], roots[k]);
+		kk++;
+	    }
+	ASSERT_ALWAYS(kk == (nroots/ord));
+	nroots = kk;
+	for(int k = 0; k < ord; k++)
+	    modul_clear(conj[k], mm);
+    }
     modul_clear(r1, mm);
     modul_clear(r2, mm);
     modul_clearmod(mm);
@@ -1323,8 +1328,9 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# polynomial has no roots for q = %Zu\n", q);
             }
 
-            if (param_list_parse_switch(pl, "-galois"))
-                nroots = skip_galois_roots(nroots, q, roots);
+	    const char * tmp_galois = param_list_lookup_string(pl, "galois");
+            if (tmp_galois != NULL)
+                nroots = skip_galois_roots(nroots, q, roots, tmp_galois);
 
             for(int i = 0 ; i < nroots && las->nq_pushed < las->nq_max; i++) {
                 las->nq_pushed++;
@@ -1345,8 +1351,9 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
             next_legitimate_specialq(q, q, 0);
             int nroots = mpz_poly_roots (roots, f, q);
             if (!nroots) continue;
-            if (param_list_parse_switch(pl, "-galois"))
-                nroots = skip_galois_roots(nroots, q, roots);
+	    const char * tmp_galois = param_list_lookup_string(pl, "galois");
+            if (tmp_galois != NULL)
+                nroots = skip_galois_roots(nroots, q, roots, tmp_galois);
             unsigned long i = gmp_urandomm_ui(las->rstate, nroots);
             las->nq_pushed++;
             las_todo_push(las->todo, q, roots[i], qside);
@@ -2587,7 +2594,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
     param_list_configure_switch(pl, "-dup", NULL);
-    param_list_configure_switch(pl, "-galois", NULL);
+    //    param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "skew", "S");
     param_list_configure_alias(pl, "fb1", "fb");
     param_list_configure_alias(pl, "lim0", "rlim");
