@@ -3941,7 +3941,9 @@ class LinAlgDLPTask(Task):
         return "Linear Algebra"
     @property
     def programs(self):
-        return ((cadoprograms.BWC, ("complete", "rhs", "prime", "matrix",  "wdir", "nullspace"),
+        override = ("complete", "rhs", "prime", "matrix",  "wdir",
+                "nullspace", "n", "m")
+        return ((cadoprograms.BWC, override,
                  {"merged": Request.GET_MERGED_FILENAME,
                   "sm": Request.GET_SM_FILENAME}),)
     @property
