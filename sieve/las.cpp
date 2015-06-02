@@ -1134,21 +1134,32 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
     mpz_clear(t);
 }
 
+// #define GALOIS_CASE 0 /* case x -> 1/x of order 2 */
+#define GALOIS_CASE 1 /* case x -> 1-1/x of order 3 */
+
 static int
 skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots)
 {
+#if GALOIS_CASE == 0 // sigma: x -> y = 1/x <=> x = 1/y
+    int ord = 2;
+#elif GALOIS_CASE == 1 // sigma: x -> y = 1-1/x <=>, x = -1/(y-1)
+    int ord = 3;
+#endif
     int nroots = orig_nroots;
-    if (nroots % 2) {
-        fprintf(stderr, "Number of roots modulo q is odd. Don't know how to interpret -galois.\n");
+    if(nroots == 0)
+	return 0;
+    if (nroots % ord) {
+        fprintf(stderr, "Number of roots modulo q is not divisible by %d. Don't know how to interpret -galois.\n", ord);
         ASSERT_ALWAYS(0);
     }
-    // Keep only one root among {r, 1/r} orbits.
+    // Keep only one root among sigma-orbits.
     modulusul_t mm;
     unsigned long qq = mpz_get_ui(q);
     modul_initmod_ul(mm, qq);
     residueul_t r1, r2;
     modul_init(r1, mm);
     modul_init(r2, mm);
+#if GALOIS_CASE == 0 // be conservative
     for (int k = 0; k < nroots; k++) {
         unsigned long rr = mpz_get_ui(roots[k]);
         modul_set_ul(r1, rr, mm);
@@ -1169,6 +1180,60 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots)
         }
         nroots--;
     }
+#else
+    residueul_t conj[ord]; // where to put conjugates
+    for(int k = 0; k < ord; k++)
+	modul_init(conj[k], mm);
+    char used[nroots];     // used roots: non-principal conjugates
+    memset(used, 0, nroots);
+    for(int k = 0; k < nroots; k++){
+	if(used[k]) continue;
+	unsigned long rr = mpz_get_ui(roots[k]);
+	modul_set_ul(r1, rr, mm);
+	// build ord-1 conjugates for roots[k]
+	for(int l = 0; l < ord-1; l++){
+#if GALOIS_CASE == 1
+	    // sigma(r1) = 1-1/r1
+	    if(modul_intequal_ul(r1, qq))
+		modul_set_ul(r1, 1, mm);
+	    else{
+		modul_inv(r2, r1, mm);
+		modul_set_ul(r1, 1, mm);
+		modul_sub(r1, r1, r2, mm);
+	    }
+	    modul_set(conj[l], r1, mm);
+#endif
+	}
+	printf("new orbit: %lu", rr);
+	for(int l = 0; l < ord-1; l++)
+	    printf(" -> %lu", conj[l][0]);
+	printf("\n");
+	// look at roots
+	for(int l = k+1; l < nroots; l++){
+	    unsigned long ss = mpz_get_ui(roots[l]);
+	    modul_set_ul(r2, ss, mm);
+	    for(int i = 0; i < ord-1; i++)
+		if(modul_equal(r2, conj[i], mm)){
+		    ASSERT_ALWAYS(used[l] == 0);
+		    // l is some conjugate, we erase it
+		    used[l] = (char)1;
+		    break;
+		}
+	}
+    }
+    // now, compact roots
+    int kk = 0;
+    for(int k = 0; k < nroots; k++)
+	if(used[k] == 0){
+	    if(k > kk)
+		mpz_set(roots[kk], roots[k]);
+	    kk++;
+	}
+    ASSERT_ALWAYS(kk == (nroots/ord));
+    nroots = kk;
+    for(int k = 0; k < ord; k++)
+	modul_clear(conj[k], mm);
+#endif // GALOIS_CASE == 0
     modul_clear(r1, mm);
     modul_clear(r2, mm);
     modul_clearmod(mm);
