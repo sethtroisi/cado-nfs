@@ -1006,7 +1006,7 @@ class BWC(Program):
                  precmd: ParameterEq()=None,
                  # put None below for a random seed,
                  # or any value (for example 1) for a fixed seed
-                 seed: ParameterEq()=1433260058,
+                 seed: ParameterEq()=None,
                  **kwargs):
         if os.name == "nt":
             kwargs.setdefault("runprefix", "perl.exe")
