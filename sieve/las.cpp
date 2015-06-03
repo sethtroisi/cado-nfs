@@ -750,6 +750,8 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     setvbuf(las->output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
 
+    las->galois = param_list_lookup_string(pl, "galois");
+
     las->verbose = param_list_parse_switch(pl, "-v");
 
     verbose_output_init(NR_CHANNELS);
@@ -1328,9 +1330,8 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# polynomial has no roots for q = %Zu\n", q);
             }
 
-	    const char * tmp_galois = param_list_lookup_string(pl, "galois");
-            if (tmp_galois != NULL)
-                nroots = skip_galois_roots(nroots, q, roots, tmp_galois);
+            if (las->galois != NULL)
+                nroots = skip_galois_roots(nroots, q, roots, las->galois);
 
             for(int i = 0 ; i < nroots && las->nq_pushed < las->nq_max; i++) {
                 las->nq_pushed++;
@@ -1351,9 +1352,8 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
             next_legitimate_specialq(q, q, 0);
             int nroots = mpz_poly_roots (roots, f, q);
             if (!nroots) continue;
-	    const char * tmp_galois = param_list_lookup_string(pl, "galois");
-            if (tmp_galois != NULL)
-                nroots = skip_galois_roots(nroots, q, roots, tmp_galois);
+            if (las->galois != NULL)
+                nroots = skip_galois_roots(nroots, q, roots, las->galois);
             unsigned long i = gmp_urandomm_ui(las->rstate, nroots);
             las->nq_pushed++;
             las_todo_push(las->todo, q, roots[i], qside);
@@ -2192,6 +2192,28 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                      (output = verbose_output_get(0, 0, i_output)) != NULL;
                      i_output++) {
                     rel.print(output, comment);
+		    // adding relations on the fly in Galois cases
+		    if(strcmp(las->galois, "1/x") == 0){
+			int64_t a2, b1 = (int64_t)b, b2;
+			// (a-b/x) = 1/x*(-b+a*x)
+			a2 = -b1; b2 = -a;
+			if(b2 < 0) { a2 = -a2; b2 = -b2; }
+			rel.a = a2; rel.b = (uint64_t)b2;
+			rel.print(output, comment);
+			cpt += 1;
+		    }
+		    else if(strcmp(las->galois, "1_1/x") == 0){
+			int64_t a2, a3, b1 = (int64_t)b, b2, b3;
+			a2 = -b1; b2 = a-b1;
+			a3 = -b2; b3 = a2-b2;
+			if(b2 < 0){ a2 = -a2; b2 = -b2; }
+			if(b3 < 0){ a3 = -a3; b3 = -b3; }
+			rel.a = a2; rel.b = (uint64_t)b2;
+			rel.print(output, comment);
+			rel.a = a3; rel.b = (uint64_t)b3;
+			rel.print(output, comment);
+			cpt += 2;
+		    }
                 }
                 verbose_output_end_batch();     /* unlock I/O */
             }
