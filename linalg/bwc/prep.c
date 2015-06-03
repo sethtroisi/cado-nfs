@@ -76,20 +76,14 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
          * test and update it here.
          * at pi->m->jrank > 0, we don't care about the seed anyway
          */
-#if 0
         bw->seed = time(NULL);
-#else /* temporary patch to try to resolve a centos bug: build #1897 on
-         centos-63-i386-small-c90 used seed 1433260058 and failed
-         (/tmp/cado.yMQ2doottV) */
-        bw->seed = 1433260058;
-#endif
         MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
     }
     serialize_threads(pi->m);
 
     gmp_randseed_ui(rstate, bw->seed);
     if (tcan_print) {
-        printf("// Prep1: Random generator seeded with %d\n", bw->seed);
+        printf("// Random generator seeded with %d\n", bw->seed);
     }
 
 
@@ -258,16 +252,12 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
          * test and update it here.
          * at pi->m->jrank > 0, we don't care about the seed anyway
          */
-#if 0
         bw->seed = time(NULL);
-#else /* temporary patch */
-        bw->seed = 1433260058;
-#endif
         MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
     }
 
     gmp_randseed_ui(rstate, bw->seed);
-    printf("// Prep2: Random generator seeded with %d\n", bw->seed);
+    printf("// Random generator seeded with %d\n", bw->seed);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     FILE * rhs = NULL;

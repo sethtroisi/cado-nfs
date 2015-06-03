@@ -1004,6 +1004,9 @@ class BWC(Program):
                  cantor_threshold: ParameterEq()=None,
                  lingen_threshold: ParameterEq()=None,
                  precmd: ParameterEq()=None,
+                 # put None below for a random seed,
+                 # or any value (for example 1) for a fixed seed
+                 seed: ParameterEq()=1433260058,
                  **kwargs):
         if os.name == "nt":
             kwargs.setdefault("runprefix", "perl.exe")
