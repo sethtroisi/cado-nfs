@@ -203,6 +203,10 @@ The wudb.py script can be used to print info on the workunits. For example,
 
 prints all currently assigned work units.
 
+To cancel a workunit:
+
+./wudb.py -dbfile /tmp/work/testrun.db -cancel wuname
+
 This script can also be used to manipulate the database, for example:
 
 ./wudb.py -dbfile /tmp/work/testrun.db -setdict sqrt next_dep int 0
