@@ -812,7 +812,7 @@ print_relations (cofac_list L, mpz_t *P, unsigned long n, int lpbr, int lpba)
 
   for (i = 0; i < L->size; i++)
     {
-      len = sprintf (line, "%ld:%lu:", L->a[i], L->b[i]);
+      len = sprintf (line, "%" PRId64 ":%" PRIu64 ":", L->a[i], L->b[i]);
       ret = print_norm (line + len, L->R[i], P, n, lpbr);
       if (ret >= 0)
         {
@@ -826,7 +826,8 @@ print_relations (cofac_list L, mpz_t *P, unsigned long n, int lpbr, int lpba)
           printed ++;
         }
       else
-        fprintf (stderr, "Error for %ld:%lu\n", L->a[i], L->b[i]);
+        fprintf (stderr, "Error for %" PRId64 ":%" PRIu64 "\n",
+                 L->a[i], L->b[i]);
     }
   fprintf (stderr, "Printed %lu relations in %.0f s\n",
            printed, seconds () - s);
