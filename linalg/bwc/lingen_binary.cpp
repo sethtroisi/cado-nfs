@@ -1003,7 +1003,15 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     for(unsigned int j = 0 ; j < E.ncols ; j++) {
         E.deg(j) = deg;
     }
-    polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
+    /* There's a nasty bug. Revealed by 32-bits, but can occur on larger
+     * sizes too. Le W be the word size. When E has length W + epsilon,
+     * pi_deg_bound(W+epsilon) may be < W. So that we may have tmp_pi and
+     * E have stride 1 and 2 respectively. However, in
+     * lingen_qcode_do_tmpl, we fill the pointers in tmp_pi (optrs[]
+     * there) using the stride of E. This is not proper. A kludge is to
+     * make them compatible.
+     */
+    polmat tmp_pi(m + n, m + n, deg + 1); // pi_deg_bound(deg) + 1);
 
     bool finished = false;
 
@@ -1158,6 +1166,8 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 
 #if 1
     /* Arrange so that we recurse on sizes which are multiples of ULONG_BITS. */
+    /* (note that for reproducibility across different machines, forcing
+     * 64 is better) */
     if (E_length > ULONG_BITS && llen % ULONG_BITS != 0) {
         llen += ULONG_BITS - (llen % ULONG_BITS);
         rlen = E_length - llen;
