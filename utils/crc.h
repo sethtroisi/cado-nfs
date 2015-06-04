@@ -23,8 +23,11 @@ extern uint32_t crc32(const void * c, size_t n);
 extern uint32_t cado_crc_lfsr_turn1(cado_crc_lfsr_ptr, uint32_t);
 extern void cado_crc_lfsr_init(cado_crc_lfsr_ptr);
 extern void cado_crc_lfsr_clear(cado_crc_lfsr_ptr);
-extern uint32_t cado_crc_lfsr_turn(cado_crc_lfsr_ptr, const void *, unsigned int);
-extern uint32_t cado_crc_lfsr_turn32_little(cado_crc_lfsr_ptr, const uint32_t *, unsigned int);
+extern uint32_t cado_crc_lfsr_turn(cado_crc_lfsr_ptr, const void *, size_t);
+/* This one is endianness-safe, but wants an integer number of 32-bit
+ * words. The size_t argument still refers to a byte count, though.
+ */
+extern uint32_t cado_crc_lfsr_turn32_little(cado_crc_lfsr_ptr, const uint32_t *, size_t);
 
 #ifdef __cplusplus
 }

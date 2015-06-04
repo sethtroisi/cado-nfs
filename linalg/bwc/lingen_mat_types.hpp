@@ -683,7 +683,26 @@ struct polmat { /* {{{ */
             where += stride();
         }
     }/*}}}*/
-    uint32_t crc() const { return crc32(x, ncols * colstride() * sizeof(uint32_t)); }
+    uint32_t crc() const {
+        if (stride() * sizeof(unsigned long) == BITS_TO_WORDS(ncoef, 64) * sizeof(uint64_t)) {
+            return crc32(x, ncols * nrows * stride() * sizeof(unsigned long));
+        } else {
+            /* otherwise it's gonna be painful...  */
+            ASSERT_ALWAYS(sizeof(unsigned long) == sizeof(uint32_t));
+            ASSERT_ALWAYS(stride() & 1);
+            cado_crc_lfsr l;
+            cado_crc_lfsr_init(l);
+            const uint32_t * xx = (const uint32_t *)(x);
+            uint32_t z = 0;
+            uint32_t w;
+            for(unsigned int count = nrows * ncols ; count-- ; xx += stride()) {
+                w = cado_crc_lfsr_turn32_little(l, xx, stride() * sizeof(unsigned long));
+                w = cado_crc_lfsr_turn32_little(l, &z, sizeof(unsigned long));
+            }
+            cado_crc_lfsr_clear(l);
+            return w;
+        }
+    }
 };
 
 
@@ -773,7 +792,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
         po->zero(col(j), 1);
         deg(j) = -1;
     }
-    uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * po->size() * sizeof(typename fft_type::t)/sizeof(unsigned long)); }
+    uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * po->size() * sizeof(typename fft_type::t)); }
 };
 /*}}}*/
 

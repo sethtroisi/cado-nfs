@@ -45,7 +45,7 @@ void cado_crc_lfsr_init(cado_crc_lfsr l)
 
 void cado_crc_lfsr_clear(cado_crc_lfsr l MAYBE_UNUSED) { }
 
-uint32_t cado_crc_lfsr_turn(cado_crc_lfsr l, const void * data, unsigned int count)
+uint32_t cado_crc_lfsr_turn(cado_crc_lfsr l, const void * data, size_t count)
 {
     const uint8_t * ptr = (const uint8_t *) data;
     uint32_t w = 0;
@@ -57,19 +57,20 @@ uint32_t cado_crc_lfsr_turn(cado_crc_lfsr l, const void * data, unsigned int cou
 }
 
 /* This version yields the same checksum regardless of the endianness */
-uint32_t cado_crc_lfsr_turn32_little(cado_crc_lfsr l, const uint32_t * data, unsigned int count)
+uint32_t cado_crc_lfsr_turn32_little(cado_crc_lfsr l, const uint32_t * data, size_t count)
 {
     ASSERT_ALWAYS(sizeof(uint32_t) == 4);
+    ASSERT_ALWAYS(count % 4 == 0);
     int twist[sizeof(uint32_t)];
-    for(unsigned int j = 0 ; j < sizeof(uint32_t) ; j++) {
+    for(size_t j = 0 ; j < sizeof(uint32_t) ; j++) {
         const uint32_t c = 0x03020100;
         twist[((uint8_t *)&c)[j]]=j;
     }
     uint32_t w = 0;
 
-    for( ; count-- ; data++) {
-        const uint8_t * ptr = (const uint8_t *) data;
-        for(unsigned int j = 0 ; j < sizeof(uint32_t) ; j++) {
+    for(unsigned int i = 0 ; i * sizeof(uint32_t) < count ; i++) {
+        const uint8_t * ptr = (const uint8_t *) (data + i);
+        for(size_t j = 0 ; j < sizeof(uint32_t) ; j++) {
             w = cado_crc_lfsr_turn1(l, ptr[twist[j]]);
         }
     }

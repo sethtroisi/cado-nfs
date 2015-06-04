@@ -33,12 +33,10 @@ void balancing_finalize(balancing_ptr bal)
     uint32_t w = 0;
     balancing_set_row_col_count(bal);
     if (bal->h->flags & FLAG_ROWPERM) {
-        // w = cado_crc_lfsr_turn(l, bal->rowperm, bal->trows * sizeof(uint32_t));
-        w = cado_crc_lfsr_turn32_little(l, bal->rowperm, bal->trows);
+        w = cado_crc_lfsr_turn32_little(l, bal->rowperm, bal->trows * sizeof(uint32_t));
     }
     if (bal->h->flags & FLAG_COLPERM) {
-        // w = cado_crc_lfsr_turn(l, bal->colperm, bal->tcols * sizeof(uint32_t));
-        w = cado_crc_lfsr_turn32_little(l, bal->colperm, bal->tcols);
+        w = cado_crc_lfsr_turn32_little(l, bal->colperm, bal->tcols * sizeof(uint32_t));
     }
     cado_crc_lfsr_clear(l);
     bal->h->checksum = w;
