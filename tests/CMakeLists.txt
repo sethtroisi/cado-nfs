@@ -31,7 +31,9 @@ macro(update_test_build_depends test_name)
     add_dependencies(${test_name}_dependencies ${ARGN})
 endmacro(update_test_build_depends test_name)
 
-cmake_policy(SET CMP0054 OLD)
+if(CMAKE_VERSION VERSION_GREATER 3.1)
+    cmake_policy(SET CMP0054 OLD)
+endif(CMAKE_VERSION VERSION_GREATER 3.1)
 
 macro(set_test_dependencies test_name)
     set(deps ${ARGN})
