@@ -2193,26 +2193,35 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                      i_output++) {
                     rel.print(output, comment);
 		    // adding relations on the fly in Galois cases
-		    if(strcmp(las->galois, "1/x") == 0){
-			int64_t a2, b1 = (int64_t)b, b2;
-			// (a-b/x) = 1/x*(-b+a*x)
-			a2 = -b1; b2 = -a;
-			if(b2 < 0) { a2 = -a2; b2 = -b2; }
-			rel.a = a2; rel.b = (uint64_t)b2;
-			rel.print(output, comment);
-			cpt += 1;
-		    }
-		    else if(strcmp(las->galois, "1_1/x") == 0){
-			int64_t a2, a3, b1 = (int64_t)b, b2, b3;
-			a2 = -b1; b2 = a-b1;
-			a3 = -b2; b3 = a2-b2;
-			if(b2 < 0){ a2 = -a2; b2 = -b2; }
-			if(b3 < 0){ a3 = -a3; b3 = -b3; }
-			rel.a = a2; rel.b = (uint64_t)b2;
-			rel.print(output, comment);
-			rel.a = a3; rel.b = (uint64_t)b3;
-			rel.print(output, comment);
-			cpt += 2;
+		    if(las->galois != NULL){
+			// once filtering is ok for all Galois cases, 
+			// this entire block would have to disappear
+			if(strcmp(las->galois, "1/x") == 0){
+			    // this is false, since Galois filtering is
+			    // working in that case; I let it in case
+			    // some order 2 automorphism would require it
+#if 0
+			    int64_t a2, b1 = (int64_t)b, b2;
+			    // (a-b/x) = 1/x*(-b+a*x)
+			    a2 = -b1; b2 = -a;
+			    if(b2 < 0) { a2 = -a2; b2 = -b2; }
+			    rel.a = a2; rel.b = (uint64_t)b2;
+			    rel.print(output, comment);
+			    cpt += 1;
+#endif
+			}
+			else if(strcmp(las->galois, "1_1/x") == 0){
+			    int64_t a2, a3, b1 = (int64_t)b, b2, b3;
+			    a2 = -b1; b2 = a-b1;
+			    a3 = -b2; b3 = a2-b2;
+			    if(b2 < 0){ a2 = -a2; b2 = -b2; }
+			    if(b3 < 0){ a3 = -a3; b3 = -b3; }
+			    rel.a = a2; rel.b = (uint64_t)b2;
+			    rel.print(output, comment);
+			    rel.a = a3; rel.b = (uint64_t)b3;
+			    rel.print(output, comment);
+			    cpt += 2;
+			}
 		    }
                 }
                 verbose_output_end_batch();     /* unlock I/O */
