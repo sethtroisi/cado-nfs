@@ -31,6 +31,8 @@ macro(update_test_build_depends test_name)
     add_dependencies(${test_name}_dependencies ${ARGN})
 endmacro(update_test_build_depends test_name)
 
+cmake_policy(SET CMP0054 OLD)
+
 macro(set_test_dependencies test_name)
     set(deps ${ARGN})
     if("${test_name}_has_build_depends")
