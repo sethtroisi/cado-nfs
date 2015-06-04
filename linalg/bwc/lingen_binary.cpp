@@ -1,22 +1,21 @@
 #include "cado.h"
-
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <inttypes.h> /* for PRIx64 macro and strtoumax */
 #include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <sys/time.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
 #include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <list>
-#include <string.h>
 #include <cstdio>
 #include <gmp.h>
 #include <errno.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <utility>
 #include <vector>
