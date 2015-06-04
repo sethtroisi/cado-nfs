@@ -3259,6 +3259,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             return
         additional_out = target - nrels
         ratio = self.state.get("unique_ratio", 1.)
+        ratio = max(0.5, ratio) # avoid stupidly large values of rels_wanted
         additional_in = int(additional_out / ratio)
         newtarget = self.state["last_input_nrel"] + additional_in
         self.logger.info("Got request for %d (%d additional) output relations, "
