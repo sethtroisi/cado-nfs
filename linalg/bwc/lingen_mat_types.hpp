@@ -694,7 +694,7 @@ struct polmat { /* {{{ */
             cado_crc_lfsr_init(l);
             const uint32_t * xx = (const uint32_t *)(x);
             uint32_t z = 0;
-            uint32_t w;
+            uint32_t w = 0;
             for(unsigned int count = nrows * ncols ; count-- ; xx += stride()) {
                 w = cado_crc_lfsr_turn32_little(l, xx, stride() * sizeof(unsigned long));
                 w = cado_crc_lfsr_turn32_little(l, &z, sizeof(unsigned long));
