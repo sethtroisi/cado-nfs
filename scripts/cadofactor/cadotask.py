@@ -3297,7 +3297,6 @@ class PurgeTask(Task):
     def run(self):
         super().run()
 
-        print("GATO", self.params["galois"])
         if self.params["galois"] != "1/x":
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
