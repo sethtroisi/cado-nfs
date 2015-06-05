@@ -346,7 +346,7 @@ std::string intlist_to_string(iterator t0, iterator t1)
 // polynomials.
 void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
 {
-    printf("Computing final F from PI (crc(pi)=%"PRIx32")\n", pi.crc());
+    printf("Computing final F from PI (crc(pi)=%" PRIx32 ")\n", pi.crc());
     using namespace globals;
     // We take t0 rows, so that we can do as few shifts as possible
     // tmpmat is used only within the inner loop.
@@ -479,7 +479,7 @@ void bw_commit_f(polmat& F)
     using namespace std;
 
     /* Say n' columns are said interesting. We'll pad these to n */
-    printf("Writing F files (crc: %"PRIx32")\n", F.crc());
+    printf("Writing F files (crc: %" PRIx32 ")\n", F.crc());
 
     unsigned int * pick = (unsigned int *) malloc(n * sizeof(unsigned int));
     memset(pick, 0, n * sizeof(unsigned int));
@@ -1400,7 +1400,7 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
     tim.push();
 
     /*
-    logline_begin(stdout, UINT_MAX, "t=%u E_checksum() = (%lu, %"PRIx32")",
+    logline_begin(stdout, UINT_MAX, "t=%u E_checksum() = (%lu, %" PRIx32 ")",
             t, E.ncoef, E.crc());
     logline_end(NULL, "");
     */
@@ -1418,7 +1418,7 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
     }
 
     /*
-    logline_begin(stdout, UINT_MAX, "t=%u pi_checksum(%u,%u,%u) = (%lu, %"PRIx32")",
+    logline_begin(stdout, UINT_MAX, "t=%u pi_checksum(%u,%u,%u) = (%lu, %" PRIx32 ")",
             t, t0, t, deg_E+1, pi.maxlength(), pi.crc());
     logline_end(NULL, "");
     */
