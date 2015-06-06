@@ -1144,7 +1144,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     if(nroots == 0)
 	return 0;
     int ord = 0;
-    if(strcmp(galois_autom, "1/x") == 0)
+    if(strcmp(galois_autom, "1/x") == 0 || strcmp(galois_autom, "1/y") == 0)
 	ord = 2;
     else if(strcmp(galois_autom, "1_1/x") == 0)
 	ord = 3;
@@ -2197,10 +2197,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 			// once filtering is ok for all Galois cases, 
 			// this entire block would have to disappear
 			if(strcmp(las->galois, "1/x") == 0){
-			    // this is false, since Galois filtering is
-			    // working in that case; I let it in case
-			    // some order 2 automorphism would require it
-#if 0
+			    // remember, 1/x is for plain autom
+			    // 1/y is for special Galois, e.g., x^4+1
 			    int64_t a2, b1 = (int64_t)b, b2;
 			    // (a-b/x) = 1/x*(-b+a*x)
 			    a2 = -b1; b2 = -a;
@@ -2208,7 +2206,6 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 			    rel.a = a2; rel.b = (uint64_t)b2;
 			    rel.print(output, comment);
 			    cpt += 1;
-#endif
 			}
 			else if(strcmp(las->galois, "1_1/x") == 0){
 			    int64_t a2, a3, b1 = (int64_t)b, b2, b3;
