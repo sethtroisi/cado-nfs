@@ -1860,9 +1860,11 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
  * V: number of number fields.
  */
 void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
-    unsigned int * L, unsigned int size, unsigned int t, unsigned int V)
+    unsigned int * L, unsigned int size, unsigned int t, unsigned int V,
+    int main)
 {
-  mpz_t * res = (mpz_t * ) malloc(sizeof(mpz_t) * size);
+  mpz_t res;
+  mpz_init(res);
   factor_t * factor = (factor_t * ) malloc(sizeof(factor_t) * size);
   unsigned int * I = (unsigned int * ) malloc(sizeof(unsigned int) * size);
 
@@ -1871,39 +1873,74 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
 #endif
 
   unsigned int find = 0;
-  /* Not optimal */
-  for (unsigned int i = 0; i < size; i++) {
-    mpz_init(res[i]);
-    norm_poly(res[i], f[L[i]], a);
+  if (main == -1) {
+    for (unsigned int i = 0; i < size; i++) {
+      norm_poly(res, f[L[i]], a);
 
 #ifdef ASSERT_FACTO
-    assert_facto[i] = gmp_factorize(factor[i], res[i]);
+      assert_facto[i] = gmp_factorize(factor[i], res);
 #else
-    gmp_factorize(factor[i], res[i]);
+      gmp_factorize(factor[i], res);
 #endif
 
-    if (factor_is_smooth(factor[i], lpb[L[i]], 0)) {
-      find++;
-      I[i] = 1;
-    } else {
-      I[i] = 0;
+      if (factor_is_smooth(factor[i], lpb[L[i]], 1)) {
+        find++;
+        I[i] = 1;
+      } else {
+        I[i] = 0;
+      }
+    }
+  } else {
+    ASSERT(main >= 0);
+
+    norm_poly(res, f[L[main]], a);
+#ifdef ASSERT_FACTO
+    assert_facto[main] = gmp_factorize(factor[main], res);
+#else
+    gmp_factorize(factor[main], res);
+#endif
+
+    if (factor_is_smooth(factor[main], lpb[L[main]], 1)) {
+      find = 1;
+
+      for (unsigned int i = 0; i < size; i++) {
+        if (i != (unsigned int) main) {
+          norm_poly(res, f[L[i]], a);
+
+#ifdef ASSERT_FACTO
+          assert_facto[i] = gmp_factorize(factor[i], res);
+#else
+          gmp_factorize(factor[i], res);
+#endif
+
+          if (factor_is_smooth(factor[i], lpb[L[i]], 1)) {
+            find++;
+            I[i] = 1;
+          } else {
+            I[i] = 0;
+          }
+        }
+      }
     }
   }
+
   if (find >= 2) {
+
 #ifdef ASSERT_FACTO
     printf_relation(factor, I, L, a, t, V, size, assert_facto);
 #else
     printf_relation(factor, I, L, a, t, V, size);
 #endif
+
   }
 
+  mpz_clear(res);
   for (unsigned int i = 0; i < size; i++) {
     factor_clear(factor[i]);
-    mpz_clear(res[i]);
   }
-  free(res);
   free(factor);
   free(I);
+
 #ifdef ASSERT_FACTO
   free(assert_facto);
 #endif
@@ -1918,7 +1955,7 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
 uint64_t sum_index(uint64_t * index, unsigned int V, int main)
 {
   ASSERT(main >= -1);
-  ASSERT(V > 2);
+  ASSERT(V >= 2);
 
   if (main != -1) {
     return index[main];
@@ -2000,9 +2037,6 @@ void find_relation(uint64_array_t * indexes, uint64_t * index,
     uint64_t number_element, mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indexes)
 {
-  //TODO: remove that as soon as possible.
-  ASSERT(main == -1);
-
   unsigned int * L;
   unsigned int size = 0;
   if (main == -1) {
@@ -2038,7 +2072,7 @@ void find_relation(uint64_array_t * indexes, uint64_t * index,
       number_survivals_facto++;
 #endif // NUMBER_SURVIVALS
 
-      good_polynomial(a, f, lpb, L, size, H->t, V);
+      good_polynomial(a, f, lpb, L, size, H->t, V, main);
     }
 
     mpz_poly_clear(a);
@@ -2079,6 +2113,8 @@ void find_relations(uint64_array_t * indexes, uint64_t number_element,
   for (unsigned int i = 0; i < V; i++) {
     index[i] = 0;
     if (i == (unsigned int)main) {
+      ASSERT(main >= 0);
+
       length_tot = indexes[main]->length;
     } else if (indexes[i]->length != 0 && main == -1) {
       length_tot += indexes[i]->length;
@@ -2308,6 +2344,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
 
   mat_Z_init(matrix, t, t);
 
+  * main_side = -1;
   param_list_parse_int(pl, "main", main_side);
 }
 
@@ -2504,7 +2541,7 @@ int main(int argc, char * argv[])
 
         sec = seconds();
         find_relations(indexes, array->number_element, lpb, matrix, f, H, V,
-            main); 
+            main_side); 
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
