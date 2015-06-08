@@ -343,3 +343,17 @@ void mat_int64_LLL_unimodular_transpose(mat_int64_ptr C, mat_int64_srcptr A)
   mat_Z_clear(C_Z);
   mat_Z_clear(A_Z);
 }
+
+
+void mat_int64_from_list_int64_vector(mat_int64_ptr matrix,
+    list_int64_vector_srcptr list)
+{
+  ASSERT(list->length == matrix->NumCols);
+  ASSERT(list->v[0]->dim == matrix->NumRows);
+
+  for (unsigned int col = 0; col < list->length; col++) {
+    for (unsigned int row = 0; row < list->v[0]->dim; row++) {
+      matrix->coeff[row + 1][col + 1] = list->v[col]->c[row];
+    }
+  }
+}

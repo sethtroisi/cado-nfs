@@ -7,6 +7,7 @@
 #include "int64_poly.h"
 #include "macros.h"
 #include "matrix.h"
+#include "list.h"
 
 /*
  * WARNING: to correspond to the definition of mat_Z, the first column and line
@@ -194,4 +195,12 @@ void mat_int64_LLL_transpose(mat_int64_ptr C, mat_int64_srcptr A);
 void mat_int64_LLL_unimodular(mat_int64_ptr C, mat_int64_srcptr A);
 
 void mat_int64_LLL_unimodular_transpose(mat_int64_ptr C, mat_int64_srcptr A);
+
+
+/*
+ * Fill a matrix with the vectors of list in columns.
+ */
+void mat_int64_vector_from_list_int64(mat_int64_ptr matrix,
+    list_int64_vector_srcptr list);
+
 #endif // MAT_INT64_H
