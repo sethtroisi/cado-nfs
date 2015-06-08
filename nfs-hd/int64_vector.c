@@ -5,6 +5,7 @@
 #include "sieving_bound.h"
 #include "int64_vector.h"
 #include <inttypes.h>
+#include "gcd.h"
 
 void int64_vector_init(int64_vector_ptr v, unsigned int d)  
 {
@@ -86,6 +87,16 @@ void int64_vector_mul(int64_vector_ptr a, int64_vector_srcptr b,
 
   for (unsigned int i = 0; i < a->dim; i++) {
     a->c[i] = c * b->c[i];
+  }
+}
+
+void int64_vector_div(int64_vector_ptr a, int64_vector_srcptr b,
+    int64_t c)
+{
+  ASSERT(a->dim == b->dim);
+
+  for (unsigned int i = 0; i < a->dim; i++) {
+    a->c[i] = b->c[i] / c;
   }
 }
 
@@ -223,6 +234,28 @@ void double_vector_in_int64_vector(int64_vector_ptr v_i,
 
   for (unsigned int i = 0; i < v_i->dim; i++) {
     v_d->c[i] = (int64_t) v_i->c[i];
+  }
+}
+
+int64_t int64_vector_gcd(int64_vector_srcptr v)
+{
+  ASSERT(v->dim >= 2);
+
+  int64_t gcd = gcd_int64(v->c[0], v->c[1]);
+  for (unsigned int i = 2; i < v->dim; i++) {
+    gcd = gcd_int64(gcd, v->c[i]);
+  }
+  return gcd;
+}
+
+void int64_vector_reduce(int64_vector_ptr u, int64_vector_srcptr v)
+{
+  ASSERT(v->dim >= 2);
+  ASSERT(u->dim == v->dim);
+  
+  int64_t gcd = int64_vector_gcd(v);
+  if (gcd != 0) {
+    int64_vector_div(u, v, gcd);
   }
 }
 

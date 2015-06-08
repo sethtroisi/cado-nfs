@@ -112,6 +112,12 @@ void int64_vector_mul(int64_vector_ptr a, int64_vector_srcptr b,
                       int64_t c);
 
 /*
+ * a = b / c
+ */
+void int64_vector_div(int64_vector_ptr a, int64_vector_srcptr b,
+    int64_t c);
+
+/*
  * a = b + d * c
  */
 void int64_vector_addmul(int64_vector_ptr a, int64_vector_srcptr b,
@@ -189,5 +195,12 @@ int int64_vector_in_sieving_region(int64_vector_srcptr v,
  */
 void double_vector_in_int64_vector(int64_vector_ptr v_i,
     double_vector_srcptr v_d);
+
+int64_t int64_vector_gcd(int64_vector_srcptr v);
+
+/*
+ * u = v / gcd(v)
+ */
+void int64_vector_reduce(int64_vector_ptr u, int64_vector_srcptr v);
 
 #endif // INT64_VECTOR_H
