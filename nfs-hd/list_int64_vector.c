@@ -37,12 +37,12 @@ void list_int64_vector_clear(list_int64_vector_ptr list)
 
 void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list)
 {
-  fprintf(file, "[\n");
-  for (unsigned int i = 0; i < list->length - 1; i++) {
-    int64_vector_fprintf(file, list->v[i]);
-  }
+  fprintf(file, "[");
   if (list->length != 0) {
-    int64_vector_fprintf(file, list->v[list->length - 1]);
+    fprintf(file, "\n");
+    for (unsigned int i = 0; i < list->length; i++) {
+      int64_vector_fprintf(file, list->v[i]);
+    }
   }
   fprintf(file, "]\n");
 }
@@ -50,16 +50,16 @@ void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list)
 void list_int64_vector_fprintf_comment(FILE * file,
     list_int64_vector_srcptr list)
 {
-  fprintf(file, "# [\n");
-  for (unsigned int i = 0; i < list->length - 1; i++) {
-    fprintf(file, "# ");
-    int64_vector_fprintf(file, list->v[i]);
-  }
+  fprintf(file, "# [");
   if (list->length != 0) {
+    fprintf(file, "\n");
+    for (unsigned int i = 0; i < list->length; i++) {
+      fprintf(file, "# ");
+      int64_vector_fprintf(file, list->v[i]);
+    }
     fprintf(file, "# ");
-    int64_vector_fprintf(file, list->v[list->length - 1]);
   }
-  fprintf(file, "# ]\n");
+  fprintf(file, "]\n");
 }
 
 void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,

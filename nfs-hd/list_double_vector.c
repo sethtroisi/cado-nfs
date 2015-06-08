@@ -32,12 +32,12 @@ void list_double_vector_clear(list_double_vector_ptr list)
 
 void list_double_vector_fprintf(FILE * file, list_double_vector_srcptr list)
 {
-  fprintf(file, "[\n");
-  for (unsigned int i = 0; i < list->length - 1; i++) {
-    double_vector_fprintf(file, list->v[i]);
-  }
+  fprintf(file, "[");
   if (list->length != 0) {
-    double_vector_fprintf(file, list->v[list->length - 1]);
+    fprintf(file, "\n");
+    for (unsigned int i = 0; i < list->length; i++) {
+      double_vector_fprintf(file, list->v[i]);
+    }
   }
   fprintf(file, "]\n");
 }
