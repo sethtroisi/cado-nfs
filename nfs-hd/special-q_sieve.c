@@ -1915,8 +1915,14 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
  * index: array of index.
  * V: number of element, number of number fields.
  */
-uint64_t sum_index(uint64_t * index, unsigned int V)
+uint64_t sum_index(uint64_t * index, unsigned int V, int main)
 {
+  ASSERT(main >= -1);
+  ASSERT(V > 2);
+
+  if (main != -1) {
+    return index[main];
+  }
   uint64_t sum = 0;
   for (unsigned int i = 0; i < V; i++) {
     sum += index[i];
@@ -1930,30 +1936,59 @@ uint64_t sum_index(uint64_t * index, unsigned int V)
  *
  *
  */
-unsigned int find_indexes_min(unsigned int ** L,
-    uint64_array_t * indexes, uint64_t * index, unsigned int V)
+unsigned int find_indexes(unsigned int ** L,
+    uint64_array_t * indexes, uint64_t * index, unsigned int V,
+    uint64_t max_indexes)
 {
   * L = (unsigned int * ) malloc(sizeof(unsigned int) * (V));
-  unsigned int i = 0;
   unsigned int size = 0;
-  while(indexes[i]->length == 0 || index[i] == indexes[i]->length)
-  {
-    i++;
+  uint64_t min = max_indexes;
+  for (unsigned int i = 0; i < V; i++) {
+    if (indexes[i]->length != 0 && index[i] < indexes[i]->length) {
+      if (indexes[i]->array[index[i]] < min) {
+        min = indexes[i]->array[index[i]];
+        (*L)[0] = i;
+        size = 1;
+      } else if (min == indexes[i]->array[index[i]]) {
+        (*L)[size] = i;
+        size++;
+      }
+    }
   }
-  uint64_t min = indexes[i]->array[index[i]];
+  * L = realloc(* L, size * sizeof(unsigned int));
+  return size;
+}
 
-  for (; i < V; i++) {
-    if (index[i] < indexes[i]->length) {
-      min = MIN(min, indexes[i]->array[index[i]]);
+unsigned int find_indexes_main(unsigned int ** L, uint64_array_t * indexes,
+    uint64_t * index, unsigned int V, int main)
+{
+  ASSERT(main >= 0);
+
+  unsigned int size = 1;
+  uint64_t target = indexes[main]->array[index[main]];
+  (*L)[0] = main;
+  for (unsigned int i = 0; i < V; i++) {
+    if (i != (unsigned int) main && indexes[i]->length != 0 && index[i] <
+        indexes[i]->length) {
+      int test = 0;
+      while (target > indexes[i]->array[index[i]]) {
+        index[i] = index[i] + 1;
+        if (index[i] == indexes[i]->length) {
+          test = 1;
+          break;
+        }
+      }
+      if (test) {
+        ASSERT(test == 1);
+
+        if (target == indexes[i]->array[index[i]]) {
+          (*L)[size] = main;
+          size++;
+        }
+      }
     }
   }
-  for (i = 0; i < V; i++) {
-    if ((indexes[i]->length != 0) && (min == indexes[i]->array[index[i]]) &&
-        (index[i] < indexes[i]->length)) {
-      (*L)[size] = i;
-      size++;
-    }
-  }
+  
   * L = realloc(* L, size * sizeof(unsigned int));
   return size;
 }
@@ -1963,10 +1998,21 @@ unsigned int find_indexes_min(unsigned int ** L,
  */
 void find_relation(uint64_array_t * indexes, uint64_t * index,
     uint64_t number_element, mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
-    sieving_bound_srcptr H, unsigned int V)
+    sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indexes)
 {
+  //TODO: remove that as soon as possible.
+  ASSERT(main == -1);
+
   unsigned int * L;
-  unsigned int size = find_indexes_min(&L, indexes, index, V);
+  unsigned int size = 0;
+  if (main == -1) {
+    size = find_indexes(&L, indexes, index, V, max_indexes);
+  } else {
+    size = find_indexes_main(&L, indexes, index, V, main);
+  }
+
+  ASSERT(size >= 1);
+
   if (size >= 2) {
     mpz_vector_t c;
     mpz_t gcd;
@@ -2023,22 +2069,29 @@ void find_relation(uint64_array_t * indexes, uint64_t * index,
  */
 void find_relations(uint64_array_t * indexes, uint64_t number_element,
     mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
-    unsigned int V)
+    unsigned int V, int main)
 {
-  //Index is the current index to move in the indexes array.
+  //index[i] is the current index of indexes[i].
   uint64_t * index = (uint64_t * ) malloc(sizeof(uint64_t) * V);
-  /* Compute sum of the length of all the uint64_array. */
   uint64_t length_tot = 0;
+  //Maximum of all the indexes.
+  uint64_t max_indexes = 0;
   for (unsigned int i = 0; i < V; i++) {
     index[i] = 0;
-    if (indexes[i]->length != 0) {
+    if (i == (unsigned int)main) {
+      length_tot = indexes[main]->length;
+    } else if (indexes[i]->length != 0 && main == -1) {
       length_tot += indexes[i]->length;
+      if (max_indexes < indexes[i]->array[indexes[i]->length - 1]) {
+        max_indexes = indexes[i]->array[indexes[i]->length - 1];
+      }
     }
   }
 
   if (0 != length_tot) {
-    while(sum_index(index, V) < length_tot) {
-      find_relation(indexes, index, number_element, lpb, matrix, f, H, V);
+    while(sum_index(index, V, main) < length_tot) {
+      find_relation(indexes, index, number_element, lpb, matrix, f, H, V, main,
+          max_indexes);
     }
   } else {
     printf("# No relations\n");
@@ -2450,7 +2503,8 @@ int main(int argc, char * argv[])
         }
 
         sec = seconds();
-        find_relations(indexes, array->number_element, lpb, matrix, f, H, V);
+        find_relations(indexes, array->number_element, lpb, matrix, f, H, V,
+            main); 
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
