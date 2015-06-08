@@ -182,15 +182,15 @@ static unsigned int brute_force_factorize(factor_ptr factor, mpz_ptr z,
   return factorise;
 }
 
-static int compare(const void * p1, const void * p2)
+static int compare_factor(const void * p0, const void * p1)
 {
-  return(mpz_cmp((mpz_srcptr) p1, (mpz_srcptr) p2));
+  return(mpz_cmp((mpz_srcptr) p0, (mpz_srcptr) p1));
 }
 
 void sort_factor(factor_ptr factor)
 {
-  qsort(factor->factorization, factor->number, sizeof(factor->factorization[0]),
-        compare);
+  qsort(factor->factorization, factor->number,
+      sizeof(factor->factorization[0]), compare_factor);
 }
 
 unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)

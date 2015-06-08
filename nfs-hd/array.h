@@ -6,6 +6,11 @@
 #include "utils.h"
 #include "int64_vector.h"
 
+/* 
+ * Array is used to store the value of norm. An index correnspond to an element
+ * (a_0, a_1, …, a_{t-1}) with t the dimension of the lattice we consider.
+ */
+
 typedef struct {
   uint64_t number_element;
   unsigned char * array;
@@ -14,11 +19,6 @@ typedef struct {
 typedef s_array_t array_t[1];
 typedef s_array_t * array_ptr;
 typedef const s_array_t * array_srcptr;
-
-/* 
- * Array is used to store the value of norm. An index correnspond to an element
- * (a_0, a_1, …, a_{t-1}) with t the dimension of the lattice we consider.
- */
 
 /*
  * Initialise an array.
