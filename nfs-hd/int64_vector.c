@@ -58,7 +58,7 @@ int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b)
 }
 
 void int64_vector_add(int64_vector_ptr a, int64_vector_srcptr b,
-                     int64_vector_srcptr c)
+    int64_vector_srcptr c)
 {
   ASSERT(a->dim == b->dim);
   ASSERT(c->dim == b->dim);
@@ -69,7 +69,7 @@ void int64_vector_add(int64_vector_ptr a, int64_vector_srcptr b,
 }
 
 void int64_vector_sub(int64_vector_ptr a, int64_vector_srcptr b,
-                      int64_vector_srcptr c)
+    int64_vector_srcptr c)
 {
   ASSERT(a->dim == b->dim);
   ASSERT(c->dim == b->dim);
@@ -79,6 +79,26 @@ void int64_vector_sub(int64_vector_ptr a, int64_vector_srcptr b,
   }
 }
 
+void int64_vector_mul(int64_vector_ptr a, int64_vector_srcptr b,
+    int64_t c)
+{
+  ASSERT(a->dim == b->dim);
+
+  for (unsigned int i = 0; i < a->dim; i++) {
+    a->c[i] = c * b->c[i];
+  }
+}
+
+void int64_vector_addmul(int64_vector_ptr a, int64_vector_srcptr b,
+    int64_vector_srcptr c, int64_t d)
+{
+  ASSERT(a->dim == b->dim);
+  ASSERT(c->dim == b->dim);
+
+  for (unsigned int i = 0; i < a->dim; i++) {
+    a->c[i] = b->c[i] + d * c->c[i];
+  }
+}
 
 void int64_vector_fprintf(FILE * file, int64_vector_srcptr v)
 {

@@ -102,6 +102,21 @@ void int64_vector_sub(int64_vector_ptr a, int64_vector_srcptr b,
                       int64_vector_srcptr c);
 
 /*
+ * a = c * b
+ *
+ * a: the result.
+ * b: the first vector.
+ * c: the factor.
+ */
+void int64_vector_mul(int64_vector_ptr a, int64_vector_srcptr b,
+                      int64_t c);
+
+/*
+ * a = b + d * c
+ */
+void int64_vector_addmul(int64_vector_ptr a, int64_vector_srcptr b,
+    int64_vector_srcptr c, int64_t d);
+/*
  * Write a vector in a file.
  *
  * file: the file.
