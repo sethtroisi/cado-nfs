@@ -513,6 +513,10 @@ main (int argc, char *argv[])
   outfilename = param_list_lookup_string(pl, "out");
   if (outfilename != NULL) {
     outputfile = fopen_maybe_compressed(outfilename, "w");
+    if (!outputfile) {
+        fprintf(stderr, "Error: could not open output file: %s\n", outfilename);
+        exit(EXIT_FAILURE);
+    }
   } else {
     outputfile = stdout;
   }

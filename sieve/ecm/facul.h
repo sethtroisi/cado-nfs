@@ -32,11 +32,7 @@
  * strategies. For the descent, we do have an interest in raising this
  * number somewhat.
  */
-#ifdef DLP_DESCENT
-#define NB_MAX_METHODS 600
-#else
 #define NB_MAX_METHODS 200
-#endif
 
 typedef struct {
   long method; /* Which method to use (P-1, P+1 or ECM) */
@@ -67,7 +63,7 @@ extern "C" {
 
 typedef struct {
   facul_method_t* method;
-  int side; /* To know on which side this method will be apply! */
+  int side; /* To know on which side this method will be applied */
   int is_the_last; /* To know if this method is the last on its side
 		      (used when you chain methods).  */
 }facul_method_side_t;

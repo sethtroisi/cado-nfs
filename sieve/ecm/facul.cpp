@@ -692,7 +692,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
  * cofactorization.
  */
 facul_method_t*
-facul_make_aux_methods (int n, const int verbose)
+facul_make_aux_methods (int n, unsigned int already_used, const int verbose)
 {
     n = MAX(2,n);
   facul_method_t *methods = (facul_method_t*) malloc ((n+1) * sizeof (facul_method_t));
@@ -721,7 +721,7 @@ facul_make_aux_methods (int n, const int verbose)
       methods[i].method = EC_METHOD;
       methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
       ecm_make_plan ((ecm_plan_t*) methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
-		     MONTY12, i + 1 + NB_MAX_METHODS, 1, 0);
+		     MONTY12, i + 1 + already_used, 1, 0);
     }
 
   methods[n].method = 0;
@@ -837,9 +837,10 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      const unsigned int alpb, const unsigned int amfb,
 		      int n0, int n1, FILE* file, const int verbose)
 {
+  unsigned int max_curves_used_before_aux = 0;
   // printf ("create strategies\n");
   facul_strategies_t* strategies = (facul_strategies_t*) malloc (sizeof(facul_strategies_t));
-  ASSERT (strategies != NULL);
+  ASSERT_ALWAYS (strategies != NULL);
   strategies->mfb[0] = rmfb;
   strategies->mfb[1] = amfb;
 
@@ -854,11 +855,14 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 
   // alloc methods
   facul_method_side_t*** methods = (facul_method_side_t***) malloc (sizeof (*methods) * (rmfb+1));
+  ASSERT_ALWAYS (methods != NULL);
 
   if (file == NULL) {
       /* we have just one strategy, really. So we just allocate once. */
       strategies->uniform_strategy[0] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
+      ASSERT_ALWAYS (strategies->uniform_strategy[0] != NULL);
       strategies->uniform_strategy[1] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
+      ASSERT_ALWAYS (strategies->uniform_strategy[1] != NULL);
   } else {
       strategies->uniform_strategy[0] = NULL;
       strategies->uniform_strategy[1] = NULL;
@@ -867,13 +871,13 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   // init methods
   for (unsigned int r = 0; r <= rmfb; r++) {
     methods[r] = (facul_method_side_t**) malloc (sizeof (*methods[r]) * (amfb+1));
-    ASSERT (methods[r] != NULL);
+    ASSERT_ALWAYS (methods[r] != NULL);
     if (file != NULL) {
         for (unsigned int a = 0; a <= amfb; a++)
         {
             methods[r][a] = (facul_method_side_t*)  malloc (NB_MAX_METHODS * sizeof (facul_method_side_t));
+            ASSERT_ALWAYS (methods[r][a] != NULL);
             methods[r][a][0].method = NULL;
-            ASSERT (methods[r][a] != NULL);
         }
     }
   }
@@ -886,6 +890,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       ncurves[0] = (n0 > -1) ? n0 : nb_curves90 (rlpb);
       ncurves[1] = (n1 > -1) ? n1 : nb_curves90 (alpb);
       int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
+      max_curves_used_before_aux = max_ncurves + 4; // account for fixed methods.
       // There is an hardcoded bound on the number of methods.
       // If ncurves0 or ncurves1 passed by the user is too large,
       // we can not handle that.
@@ -957,6 +962,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 	methods[i].is_the_last = 0;
 	index_last_method[methods[i].side] = i;
       }
+      if (i > max_curves_used_before_aux)
+          max_curves_used_before_aux = i;
       // == -1 if it exists zero method for this side
       if (index_last_method[0] != -1)
 	  methods[index_last_method[0]].is_the_last = 1;
@@ -978,7 +985,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   int ncurves_aux[2];
   ncurves_aux[0] = (n0 > -1) ? n0 : nb_curves95 (rlpb);
   ncurves_aux[1] = (n1 > -1) ? n1 : nb_curves95 (alpb);
-  strategies->methods_aux = facul_make_aux_methods (MAX(ncurves_aux[0], ncurves_aux[1]), verbose);
+  strategies->methods_aux = facul_make_aux_methods (MAX(ncurves_aux[0], ncurves_aux[1]), max_curves_used_before_aux, verbose);
   // old way was:
   // strategies->methods_aux = facul_make_aux_methods (30, verbose);
 

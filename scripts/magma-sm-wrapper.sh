@@ -92,22 +92,25 @@ done
 # where am I ?
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-## set parameters depending on units or not
+## set parameters depending on units or not: nsm0 (resp. nsm1) will be the
+## number of true SM's to be computed (not the number of units)
 side=-1
 if [ $EXPLICIT0 = "yes" ]; then
-    smopts="-smexp0 $SMEXP0 -nsm0 0"
+    nsm0=0
     side=0
     usef=false
 else
-    smopts="-smexp0 $SMEXP0 -nsm0 $NMAPS0"
+    nsm0=$NMAPS0
 fi
+smopts="-smexp0 $SMEXP0 -nsm0 $nsm0"
 if [ $EXPLICIT1 = "yes" ]; then
-    smopts="$smopts -smexp1 $SMEXP1 -nsm1 0"
+    nsm1=0
     side=1
     usef=true
 else
-    smopts="$smopts -smexp1 $SMEXP1 -nsm1 $NMAPS1"
+    nsm1=$NMAPS1
 fi
+smopts="$smopts -smexp1 $SMEXP1 -nsm1 $nsm1"
 
 ## build required SM's
 if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
@@ -118,10 +121,14 @@ if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
 	# out contains SM's for side=0..1 in that order, or 0 or 1 depending
 	# on the unit side if any
 	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts $mtopts"
-	echo $CMD; $CMD
+	if [ $nsm0 -ne 0 -o $nsm1 -ne 0 ]; then
+	    echo $CMD; $CMD
+	else
+	    echo "WARNING: no SM to compute at all"
+	fi
     fi
 else
-    echo "No SM's to be computed"
+    echo "No map to be computed"
 fi
 
 ## now, use units if needed: we suppose that we use either 0 or 1, not both
@@ -185,18 +192,39 @@ if [ $side -ne -1 ]; then
 	    $DIR/split.py /tmp/foo$$ $abunitsdir/ 100
 	    /bin/rm -f /tmp/foo$$
 	fi
-
-        # paste files if needed: we require sides 0..1 in that order
-	if [ $side -eq 0 ]; then
+    fi
+    # paste files if needed: we require sides 0..1 in that order
+    if [ $side -eq 0 ]; then
+	f0=$OUT.$side; f1=$OUT
+	if [ $nsm1 -ne 0 ]; then
 	    # paste $OUT.0 and $OUT to get a new $OUT
-	    f1=$OUT.$side; f2=$OUT
+	    dopaste=true
 	else
-	    # paste $OUT and $OUT.1 to get a new $OUT
-	    f1=$OUT; f2=$OUT.$side
+            # nsm1 = 0 means no SM on side 1
+	    head -1 $f0
+	    cat $f0 | (read sr0 nsm0 p0; echo "$sr0 $nsm0 $ELL"; cat) > $OUT.$$
+	    mv $OUT.$$ $OUT
+	    dopaste=false
 	fi
+    else
+	f0=$OUT; f1=$OUT.$side
+	if [ $nsm0 -ne 0 ]; then
+	    # paste $OUT and $OUT.1 to get a new $OUT
+	    dopaste=true
+	else
+	    # nsm0 = 0 means no SM on side 0
+	    head -1 $f1
+	    cat $f1 | (read sr1 nsm1 p1; echo "$sr1 $nsm1 $ELL"; cat) > $OUT.$$
+	    mv $OUT.$$ $OUT
+	    dopaste=false
+	fi
+    fi
+    if $dopaste; then
+	# first line is "number_of_lines_of_sms nmaps0 1"
+	# we need to output: "number_of_lines_of_sms (nmaps0+nmaps1) ell"
+        head -1 $f0
         head -1 $f1
-        head -1 $f2
-	paste -d" " $f1 $f2 | (read sr0 nsm0 p0 sr1 nsm1 p1 ; echo "$sr0 $((nsm0+nsm1)) $ELL" ; cat) > $OUT.$$
+	paste -d" " $f0 $f1 | (read sr0 nsm0 p0 sr1 nsm1 p1 ; echo "$sr0 $((nsm0+nsm1)) $ELL" ; cat) > $OUT.$$
 	mv $OUT.$$ $OUT
     fi
 fi

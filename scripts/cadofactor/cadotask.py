@@ -3259,6 +3259,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             return
         additional_out = target - nrels
         ratio = self.state.get("unique_ratio", 1.)
+        ratio = max(0.5, ratio) # avoid stupidly large values of rels_wanted
         additional_in = int(additional_out / ratio)
         newtarget = self.state["last_input_nrel"] + additional_in
         self.logger.info("Got request for %d (%d additional) output relations, "
@@ -3283,7 +3284,7 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": False, "gzip": True, "add_ratio": 0.1,
+            {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.1,
              "required_excess": 0.1})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -3296,7 +3297,7 @@ class PurgeTask(Task):
     def run(self):
         super().run()
 
-        if not self.params["galois"]:
+        if self.params["galois"] != "1/y":
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             if not nunique:
@@ -3331,7 +3332,7 @@ class PurgeTask(Task):
         self.state.pop("purgedfile", None)
         self.state.pop("input_nrels", None)
         
-        if not self.params["galois"]:
+        if self.params["galois"] == "none":
             self.logger.info("Reading %d unique and %d free relations, total %d"
                              % (nunique, nfree, input_nrels))
         else:
@@ -3350,7 +3351,7 @@ class PurgeTask(Task):
         # Remark: "Galois unique" and "unique" are in the same files
         # because filter_galois works in place. Same request.
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
-        if not self.params["galois"] and freerel_filename is not None:
+        if self.params["galois"] == "none" and freerel_filename is not None:
             files = unique_filenames + [str(freerel_filename)]
         else:
             files = unique_filenames
@@ -3396,7 +3397,7 @@ class PurgeTask(Task):
                              "with excess %d", stats[0], stats[1], stats[3])
             excess = stats[3]
             self.logger.info("Not enough relations")
-            if not self.params["galois"]:
+            if self.params["galois"] == "none":
                 self.request_more_relations(nunique, excess)
             else:
                 self.request_more_relations(input_nrels, excess)
@@ -3542,15 +3543,15 @@ class FilterGaloisTask(Task):
         return ((cadoprograms.GaloisFilter, ("nrels",), input),)
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"galois": False})
+        return self.join_params(super().paramnames, {"galois": "none"})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
 
     def run(self):
-        # This task must be run only if galois=true.
-        if not self.params["galois"]:
+        # This task must be run only if galois is recognized by filter_galois
+        if self.params["galois"] != "1/y":
             return True
 
         super().run()
@@ -3941,7 +3942,9 @@ class LinAlgDLPTask(Task):
         return "Linear Algebra"
     @property
     def programs(self):
-        return ((cadoprograms.BWC, ("complete", "rhs", "prime", "matrix",  "wdir", "nullspace"),
+        override = ("complete", "rhs", "prime", "matrix",  "wdir",
+                "nullspace", "n", "m")
+        return ((cadoprograms.BWC, override,
                  {"merged": Request.GET_MERGED_FILENAME,
                   "sm": Request.GET_SM_FILENAME}),)
     @property
@@ -4512,10 +4515,10 @@ class ReconstructLogTask(Task):
             myfile = open(fullfile, "rb")
             data = myfile.read()
             for line in data.splitlines():
-                match = re.match(br'(\d+) 2 0 rat (\d+)', line)
+                match = re.match(br'(\w+) 2 0 rat (\d+)', line)
                 if match:
                     log2 = match.group(2)
-                match = re.match(br'(\d+) 3 0 rat (\d+)', line)
+                match = re.match(br'(\w+) 3 0 rat (\d+)', line)
                 if match:
                     log3 = match.group(2)
                 if log2 != None and log3 != None:
