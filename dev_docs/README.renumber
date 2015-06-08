@@ -24,13 +24,13 @@ The format of the file is described in filter/REAME.fileformat
 
 * Compute vp
     vp = p + 1 if there is a rational side
-    vp = 2*p + 1 if there are two algebraic sides 
-  
+    vp = 2*p + 1 if there are two algebraic sides
+
 * Compute vr
     vr = r if there is a rational side and s corresponds to the algrebraic side
     vr = p + 1 if there is a rational side and s corresponds to the rational side
     vr = s*(p+1) + r if there are two algebraic sides
-  
+
 * Find the index j such that table[j] = vp and it is the beginning of a sequence
   of decreasing values
     In the renumbering table, all ideals above the same prime p belong to the
@@ -42,7 +42,7 @@ The format of the file is described in filter/REAME.fileformat
   done
 
 * The index of the ideal of (p,r) on side s in the renumbering table is i
-      
+
 
 This can be done with misc/renumber_convert with the following command line:
 
@@ -59,7 +59,7 @@ Warning: p and r should be in hexa.
   While table[j-1] > table[j] do
     j--
   done
-    
+
 * Compute p
     p = index[j] - 1 if there is a rational side
     p = (index[j] - 1)/2 if there are two algebraic sides

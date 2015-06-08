@@ -748,6 +748,8 @@ tests/sieve/F9.todotest.sh
 tests/sieve/F9.descenttest.sh
 tests/sieve/F9.todo
 tests/sieve/F9.hint
+tests/sieve/c120.poly
+tests/sieve/c120.roots1.gz
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
 tests/sieve/test_fb_make_step.c

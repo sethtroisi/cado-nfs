@@ -780,10 +780,10 @@ class Las(Program):
                  threads: Parameter("t", checktype=int)=None,
                  ratq: Toggle()=None,
                  dup: Toggle()=None,
-                 galois: Toggle()=None,
+                 galois: Parameter() = None,
                  allow_largesq: Toggle("allow-largesq")=None,
                  stats_stderr: Toggle("stats-stderr")=None,
-                 # We have no checktype for parametes of the form <int>,<int>,
+                 # We have no checktype for parameters of the form <int>,<int>,
                  # so these are passed just as strings
                  traceab: Parameter() = None,
                  traceij: Parameter() = None,
@@ -1004,6 +1004,9 @@ class BWC(Program):
                  cantor_threshold: ParameterEq()=None,
                  lingen_threshold: ParameterEq()=None,
                  precmd: ParameterEq()=None,
+                 # put None below for a random seed,
+                 # or any value (for example 1) for a fixed seed
+                 seed: ParameterEq()=None,
                  **kwargs):
         if os.name == "nt":
             kwargs.setdefault("runprefix", "perl.exe")

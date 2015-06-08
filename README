@@ -31,7 +31,7 @@ Anything else than the primary platform perhaps works, perhaps does not work.
    least once, provided some additional tools and libraries (see below) have
    been installed, notably for Leopard. ABI selection is sometimes tricky. (see
    local.sh.macosx.x86_32)
- 
+
 
  - 32-bit linux with gcc-4.4 or later is supposed to work.
 

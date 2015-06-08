@@ -10,7 +10,7 @@ knowledge on the algorithm.
 
 Notation:
   p, n:   we want to compute dlog in GF(p^n), with p=2 or p=3.
-  
+
 You should first compile the FFS-related binaries. Visit the ffs/
 subdirectory, copy Makefile.local.example to Makefile.local and edit it
 to configure according to what you want; then type 'make'.
@@ -47,7 +47,7 @@ to configure according to what you want; then type 'make'.
 
 - Reconstruct dlogs of fb elements
   The same as for NFS-DL, again.
-  
+
 - Individual logarithms
   Nothing automatic. Use ffs/descent_init and ffs/sieve to do the
   descent.

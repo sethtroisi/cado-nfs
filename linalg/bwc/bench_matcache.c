@@ -148,18 +148,18 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
      * number of coordinates of source/destination vectors */
 
     printf("T%d colvec(%u): %08" PRIx32 "\n", tnum,
-            nc, crc32((unsigned long*) p->colvec, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
+            nc, crc32((unsigned long*) p->colvec, A->vec_elt_stride(A, nc0)));
     matmul_mul(p->mm, p->rowvec, p->colvec, 1);
     printf("T%d rowvec(%u): %08" PRIx32 "\n", tnum,
-            nr, crc32((unsigned long*) p->rowvec, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
+            nr, crc32((unsigned long*) p->rowvec, A->vec_elt_stride(A, nr0)));
 
     A->dotprod(A, check0, p->rowvec, rowvec_bis, nr0);
 
     printf("T%d rowvec_bis(%u): %08" PRIx32 "\n", tnum,
-            nr, crc32((unsigned long*) rowvec_bis, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
+            nr, crc32((unsigned long*) rowvec_bis, A->vec_elt_stride(A, nr0)));
     matmul_mul(p->mm, colvec_bis, rowvec_bis, 0);
     printf("T%d colvec_bis(%u): %08" PRIx32 "\n", tnum,
-            nc, crc32((unsigned long*) colvec_bis, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
+            nc, crc32((unsigned long*) colvec_bis, A->vec_elt_stride(A, nc0)));
 
     A->dotprod(A, check1, p->colvec, colvec_bis, nc0);
 

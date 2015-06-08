@@ -59,7 +59,7 @@ tasks.sieve.alambda = 2.8
 tasks.I = 15
 # Wagstaff did use I=14, I=15 should be better
 # Sam Wagstaff did sieve special-q's < 1660M
-tasks.sieve.qrange = 20000
+tasks.sieve.qrange = 10000
 # of that many relations found.
 
 ###########################################################################

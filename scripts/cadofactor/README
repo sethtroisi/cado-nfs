@@ -142,6 +142,12 @@ name per line.
 Adjust the tasks.sieve.sieving.qmin parameter accordingly to prevent
 already-sieved special-q ranges from being sieved again.
 
+Be aware that importing relation files that were not produced by
+CADO-NFS's siever (for instance, handcrafted relations) is not supported:
+the script will assume various things, like the presence of certain
+commented lines. The list of these particularities may vary over time,
+so we don't even try to list them here.
+
 File locking
 ============
 
@@ -196,6 +202,10 @@ The wudb.py script can be used to print info on the workunits. For example,
 ./wudb.py -dbfile /tmp/work/testrun.db -dump -assigned
 
 prints all currently assigned work units.
+
+To cancel a workunit:
+
+./wudb.py -dbfile /tmp/work/testrun.db -cancel wuname
 
 This script can also be used to manipulate the database, for example:
 

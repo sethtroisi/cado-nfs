@@ -8,7 +8,7 @@ Release \texttt{2.1.1}, available from \url{http://cado-nfs.gforge.inria.fr/}
 Additional contributors who have worked on the Function Field Sieve
 implementation are to be cited as well if you use the FFS part of the
 code:
- 
+
 Razvan Barbulescu
 Jérémie Detrey
 Marion Videau
