@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <inttypes.h>
 #include "list_int64_vector.h"
 
@@ -110,4 +111,17 @@ int int64_vector_in_list_int64_vector(int64_vector_srcptr vec, list_int64_vector
   }
 
   return c;
+}
+
+static int compare_last(const void * p0, const void * p1)
+{
+  const int64_vector_t * v0 = (const int64_vector_t * ) p0;
+  const int64_vector_t * v1 = (const int64_vector_t * ) p1;
+  
+  return (int)((*v0)->c[(*v0)->dim - 1] - (*v1)->c[(*v1)->dim - 1]);
+}
+
+void list_int64_vector_sort_last(list_int64_vector_ptr list)
+{
+  qsort(list->v, list->length, sizeof(list->v[0]), compare_last);
 }

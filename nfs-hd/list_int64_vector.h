@@ -57,4 +57,6 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
  */
 int int64_vector_in_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list);
 
+void list_int64_vector_sort_last(list_int64_vector_ptr list);
+
 #endif /* LIST_INT64_VECTOR_H */
