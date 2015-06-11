@@ -13,7 +13,7 @@ void list_int64_vector_init(list_int64_vector_ptr list)
       DEFAULT_LENGTH_LIST_INT64_VECTOR);
 }
 
-void list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
+unsigned int list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
     int64_vector_srcptr v)
 {
   if ((list->length % DEFAULT_LENGTH_LIST_INT64_VECTOR) == 0 && list->length != 0) {
@@ -23,6 +23,7 @@ void list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
   int64_vector_init(list->v[list->length], v->dim);
   int64_vector_set(list->v[list->length], v);
   list->length++;
+  return list->length - 1;
 }
 
 void list_int64_vector_clear(list_int64_vector_ptr list)
@@ -78,7 +79,7 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
   int64_vector_clear(v_tmp);
 }
 
-int int64_vector_in_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list)
+int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list)
 {
   ASSERT(list->length > 2);
   ASSERT(vec->dim > 1);

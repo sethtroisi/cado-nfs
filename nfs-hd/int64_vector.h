@@ -74,7 +74,7 @@ static inline void int64_vector_setcoordinate(int64_vector_ptr v,
 }
 
 /*
- * Return 1 if the vector are equal, 0 otherwise.
+ * Return 0 if the vector are equal, 1 otherwise.
  *
  * a: first vector.
  * b: second vector.

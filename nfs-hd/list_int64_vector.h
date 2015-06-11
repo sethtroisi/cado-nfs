@@ -24,7 +24,8 @@ void list_int64_vector_init(list_int64_vector_ptr list);
  * list: the list of vector.
  * v: the vector we add.
  */
-void list_int64_vector_add_int64_vector(list_int64_vector_ptr list, int64_vector_srcptr v);
+unsigned int list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
+    int64_vector_srcptr v);
 
 /*
  * Delete the list.
@@ -55,7 +56,7 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
 /*
  * From PNpoly
  */
-int int64_vector_in_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list);
+int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list);
 
 void list_int64_vector_sort_last(list_int64_vector_ptr list);
 
