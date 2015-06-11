@@ -12,3 +12,10 @@ typedef struct {
   size_t size;
 } cofac_list_t;
 typedef cofac_list_t cofac_list[1];
+
+typedef struct {
+  mpz_t *l;
+  size_t alloc;
+  size_t size;
+} mpz_list_t;
+typedef mpz_list_t mpz_list[1];
