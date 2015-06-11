@@ -487,8 +487,8 @@ find_smooth (cofac_list l, int lpba, int lpbr,
   {
     b_status_r[i] = STATUS_UNKNOWN;
     b_status_a[i] = STATUS_UNKNOWN;
-    ASSERT_ALWAYS(mpz_cmp_ui (l->R[i], 0) > 0);
-    ASSERT_ALWAYS(mpz_cmp_ui (l->A[i], 0) > 0);
+    ASSERT(mpz_cmp_ui (l->R[i], 0) > 0);
+    ASSERT(mpz_cmp_ui (l->A[i], 0) > 0);
   }
 
   nb_rel_smooth = 0;
