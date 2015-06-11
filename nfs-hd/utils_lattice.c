@@ -11,6 +11,7 @@
 #include "double_vector.h"
 #include "list_int64_vector.h"
 #include "list_double_vector.h"
+#include "list_int64_vector_index.h"
 
 /*
  * Compute angle between two vectors.
@@ -167,73 +168,31 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
   return det; 
 }
 
-#ifdef SKEW_LLL
-void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr Mqr,
+void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
     int64_vector_srcptr skewness)
 {
+  ASSERT(skewness->dim == M_root->NumCols);
+  ASSERT(M_root->NumRows == M_root->NumCols);
+  ASSERT(MSLLL->NumRows == M_root->NumCols);
+  ASSERT(MSLLL->NumRows == M_root->NumCols);
+
   mat_int64_t I_s;
-  mat_int64_init(I_s, Mqr->NumRows, Mqr->NumCols);
+  mat_int64_init(I_s, M_root->NumRows, M_root->NumCols);
   mat_int64_set_diag(I_s, skewness);
 
   mat_int64_t M;
-  mat_int64_init(M, Mqr->NumRows, Mqr->NumCols);
-  mat_int64_mul_mat_int64(M, I_s, Mqr);
+  mat_int64_init(M, M_root->NumRows, M_root->NumCols);
+  mat_int64_mul_mat_int64(M, I_s, M_root);
   
   mat_int64_t U;
-  mat_int64_init(U, 2, 2);
+  mat_int64_init(U, M_root->NumRows, M_root->NumCols);
   mat_int64_LLL_unimodular_transpose(U, M);
-  mat_int64_mul_mat_int64(MSLLL, Mqr, U);
+  mat_int64_mul_mat_int64(MSLLL, M_root, U);
 
   mat_int64_clear(U);
   mat_int64_clear(I_s);
   mat_int64_clear(M);
 }
-
-static void skew_LLL_2(list_int64_vector_ptr list, int64_vector_srcptr v0_root,
-    int64_vector_srcptr v1_root, int64_t I)
-{
-  ASSERT(v0_root->c[1] == 0);
-  ASSERT(v1_root->c[1] == 1);
-  ASSERT(v0_root->dim == v1_root->dim);
-  ASSERT(I > 0);
-#ifndef NDEBUG
-  for (unsigned int i = 3; i < v1_root->dim; i++) {
-    ASSERT(v0_root->c[i] == v1_root->c[i]);
-  }
-#endif // NDEBUG
-
-  mat_int64_t Mqr;
-  mat_int64_init(Mqr, 2, 2);
-  list_int64_vector_t list_tmp;
-  list_int64_vector_init(list_tmp);
-  int64_vector_t v_tmp;
-  int64_vector_init(v_tmp, 2);
-  for (unsigned int i = 0; i < 2; i++) {
-    v_tmp->c[i] = v0_root->c[i];
-  }
-  list_int64_vector_add_int64_vector(list_tmp, v_tmp);
-  for (unsigned int i = 0; i < 2; i++) {
-    v_tmp->c[i] = v1_root->c[i];
-  }
-  list_int64_vector_add_int64_vector(list_tmp, v_tmp);
-  int64_vector_clear(v_tmp);
-  mat_int64_from_list_int64_vector(Mqr, list_tmp);
-  list_int64_vector_clear(list_tmp);
-
-  int64_vector_t diag;
-  int64_vector_init(diag, 2);
-  diag->c[0] = 1;
-  diag->c[1] =  (int64_t)round(((double)(2 * (I / 2) * (I / 2))) /
-      (double)v0_root->c[0]);
-  
-  mat_int64_t MSLLL;
-  mat_int64_init(MSLLL, 2, 2);
-  skew_LLL(MSLLL, Mqr, diag);
-  list_int64_vector_extract_mat_int64(list, MSLLL);
-  mat_int64_clear(MSLLL);
-  mat_int64_clear(Mqr);
-}
-#endif // SKEW_LLL
 
 //TODO: why not merge with gauss reduction?
 int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
@@ -304,15 +263,6 @@ int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
   v0->c[1] = a1;
   v1->c[0] = b0;
   v1->c[1] = b1;
-
-#ifdef SKEW_LLL  
-  list_int64_vector_t list;
-  list_int64_vector_init(list);
-  skew_LLL_2(list, v0_root, v1_root, I);
-  list_int64_vector_fprintf_comment(stdout, list);
-  printf("# "); int64_vector_fprintf(stdout, v0);
-  printf("# "); int64_vector_fprintf(stdout, v1);
-#endif // SKEW_LLL  
 
   return 1;
 }
@@ -411,7 +361,7 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
   for (unsigned int i = 2; i < v_tmp->dim; i++) {
     v_tmp->c[i] = 0;
   }
-  ASSERT(int64_vector_in_list_int64_vector(v_tmp, SV) == 1);
+  ASSERT(int64_vector_in_polytop_list_int64_vector(v_tmp, SV) == 1);
   int64_vector_clear(v_tmp);
 #endif // NDEBUG
 
@@ -593,6 +543,46 @@ unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
   }
 }
 
+//TODO: is it a good idea to retun 0 if fail?
+uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
+    uint64_t number_element)
+{
+  uint64_t index = 0;
+
+  int64_vector_t v_start;
+  int64_vector_init(v_start, v->dim);
+  int64_vector_set_zero(v_start);
+  int64_vector_t v_end;
+  int64_vector_init(v_end, v->dim);
+  int64_vector_set(v_end, v);
+  for (unsigned int i = 0; i < v->dim - 1; i++) {
+    if (v->c[i] >= 0) {
+      v_start->c[i] = -(int64_t)H->h[i];
+    } else {
+      v_start->c[i] = (int64_t)(H->h[i] - 1);
+    }
+    v_end->c[i] = v_start->c[i] + v->c[i];
+  }
+  if (int64_vector_in_sieving_region(v_end, H)) {
+    uint64_t index_end = array_int64_vector_index(v_end, H, number_element);
+    uint64_t index_start =
+      array_int64_vector_index(v_start, H, number_element);
+    if (index_end > index_start) {
+      index = index_end - index_start;
+    } else {
+      index = index_start - index_end;
+    }
+  } else {
+    index = 0;
+  }
+
+  ASSERT(index < number_element);
+  int64_vector_clear(v_start);
+  int64_vector_clear(v_end);
+
+  return index;
+}
+
 void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
     uint64_t number_element)
@@ -636,6 +626,9 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     * coord_v1 = 0;
   }
 
+  ASSERT(* coord_v0 == index_vector(v0, H, number_element));
+  ASSERT(* coord_v1 == index_vector(v1, H, number_element));
+
   int64_vector_clear(e0);
   int64_vector_clear(e1);
 }
@@ -660,6 +653,7 @@ unsigned int find_min_y(list_int64_vector_srcptr SV, unsigned char * stamp,
   for (unsigned int i = 0; i < SV->length; i++) {
     if (stamp[i] == val_stamp) {
       //Find the closest y to 0.
+      //TODO: warning, with this, we forget the problem in H1 - 1.
       int64_t tmp = ABS(SV->v[i]->c[1]);
       if (y == -1) {
         y = tmp;
@@ -747,4 +741,390 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
   }
 
   double_vector_clear(v_tmp);
+}
+
+static int space_sieve_good_vector(int64_vector_srcptr v,
+    sieving_bound_srcptr H)
+{
+  ASSERT(v->dim == H->t);
+
+  for (unsigned int i = 0; i < v->dim - 1; i++) {
+    if ((-2 * (int64_t)H->h[i]) > v->c[i] ||
+        (2 * (int64_t)H->h[i]) < v->c[i]) {
+      return 0;
+    }
+  }
+  if (0 > v->c[v->dim - 1] || (int64_t)H->h[v->dim - 1] <= v->c[v->dim - 1]) {
+    return 0;
+  }
+  return 1; 
+}
+
+static int int64_vector_in_list_zero(int64_vector_srcptr v_tmp,
+    list_int64_vector_index_srcptr list_zero)
+{
+  for (unsigned int i = 0; i < list_zero->length; i++) {
+    for (unsigned int j = 0; j < v_tmp->dim - 1; j++) {
+      if (ABS(v_tmp->c[j]) == ABS(list_zero->v[i]->vec->c[j])) {
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+//TODO: change that.
+static void space_sieve_linear_combination(list_int64_vector_index_ptr list,
+    list_int64_vector_index_ptr list_zero, mat_int64_srcptr MSLLL,
+    sieving_bound_srcptr H, uint64_t number_element)
+{
+  list_int64_vector_t list_tmp;
+  list_int64_vector_init(list_tmp);
+  list_int64_vector_extract_mat_int64(list_tmp, MSLLL);
+
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, MSLLL->NumRows);
+  for (int64_t l = -1; l < 2; l++) {
+    for (int64_t m = -1; m < 2; m++) {
+      for (int64_t n = -1; n < 2; n++) {
+        //v_tmp = l * v[0] + n * v[1] + m * v[2]
+        int64_vector_mul(v_tmp, list_tmp->v[0], (int64_t)l);
+        int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[1], (int64_t)m);
+        int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[2], (int64_t)n);
+        if (space_sieve_good_vector(v_tmp, H)) {
+          if (v_tmp->c[2] == 0) {
+            if (v_tmp->c[1] != 0 && v_tmp->c[0] != 0) {
+              int64_vector_reduce(v_tmp, v_tmp);
+              if (!int64_vector_in_list_zero(v_tmp, list_zero)) {
+                list_int64_vector_index_add_int64_vector_index(list_zero,
+                    v_tmp, index_vector(v_tmp, H, number_element));
+              }
+            }
+          } else {
+            list_int64_vector_index_add_int64_vector_index(list, v_tmp,
+                index_vector(v_tmp, H, number_element));
+          }
+        }
+      }
+    }
+  }
+
+  for (unsigned int i = 0; i < list_zero->length; i++) {
+    ASSERT(int64_vector_gcd(list_zero->v[i]->vec) == 1);
+  }
+
+  int64_vector_clear(v_tmp);
+  list_int64_vector_clear(list_tmp);
+}
+int int64_vector_in_sieving_region_dim(int64_vector_srcptr v,
+    sieving_bound_srcptr H) {
+  ASSERT(v->dim == H->t);
+
+  for (unsigned int i = 0; i < v->dim - 1; i++) {
+    if (-(int64_t)H->h[i] > v->c[i] || ((int64_t)H->h[i]) <= v->c[i]) {
+      return 0;
+    }
+  }
+  return 1; 
+}
+
+void plane_sieve_1_enum_plane_incomplete(int64_vector_ptr v_in,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
+{
+  int64_vector_t v;
+  int64_vector_init(v, v_in->dim);
+  int64_vector_set(v, v_in);
+  //Perform Franke-Kleinjung enumeration.
+  //x increases.
+  while (v->c[1] < (int64_t)H->h[1]) {
+    if (v->c[1] >= -(int64_t)H->h[1]) {
+      int64_vector_set(v_in, v);
+      int64_vector_clear(v);
+      return;
+    }
+    enum_pos_with_FK(v, v, e0, e1, -(int64_t)H->h[0], 2 * (int64_t)
+        H->h[0]);
+  }
+
+  //x decreases.
+  int64_vector_set(v, v_in);
+  enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 * (int64_t)H->h[0]);
+  while (v->c[1] >= -(int64_t)H->h[1]) {
+    if (v->c[1] < (int64_t)H->h[1]) {
+      int64_vector_set(v_in, v);
+      int64_vector_clear(v);
+      return;
+    }
+    enum_neg_with_FK(v, v, e0, e1, -(int64_t)H->h[0] + 1, 2 *
+        (int64_t) H->h[0]);
+  }
+  int64_vector_clear(v);
+}
+
+//SPACE_SIEVE_CONTRIBUTION is broken.
+void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+    list_int64_vector_srcptr list_FK, list_int64_vector_srcptr list_SV)
+{
+  ASSERT(Mqr->NumRows == Mqr->NumCols);
+  ASSERT(Mqr->NumRows == 3);
+
+  int64_vector_set(s_out, s);
+
+  plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
+  //Enumerate the element of the sieving region.
+  for (unsigned int d = (unsigned int) s->c[2] + 1; d < H->h[2]; d++) {
+    plane_sieve_1_enum_plane_incomplete
+      (s_out, list_FK->v[0], list_FK->v[1], H);
+    if (int64_vector_in_sieving_region(s_out, H)) {
+      return;
+    }
+
+    //Jump in the next plane.
+    plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
+  }
+}
+
+void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
+    sieving_bound_srcptr H)
+{
+  int64_vector_t skewness;
+  int64_vector_init(skewness, 3);
+  skewness->c[0] = 1;
+  skewness->c[1] = 1;
+  skewness->c[2] = (int64_t)(4 * H->h[0] * H->h[0] * H->h[0]) / (int64_t)r->ideal->r;
+
+  mat_int64_t MSLLL;
+  mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
+  skew_LLL(MSLLL, Mqr, skewness);
+  int64_vector_clear(skewness);
+
+  for (unsigned int col = 1; col <= MSLLL->NumCols; col++) {
+    if (MSLLL->coeff[3][col] < 0) {
+      for (unsigned int row = 1; row <= MSLLL->NumRows; row++) {
+        MSLLL->coeff[row][col] = - MSLLL->coeff[row][col];
+      }
+    }
+  }
+  
+  //TODO: we must generate all the zero vectors!
+  list_int64_vector_index_t list_vec;
+  list_int64_vector_index_init(list_vec);
+  list_int64_vector_index_t list_vec_zero;
+  list_int64_vector_index_init(list_vec_zero);
+  space_sieve_linear_combination(list_vec, list_vec_zero, MSLLL, H,
+      array->number_element);
+  list_int64_vector_index_fprintf_comment(stdout, list_vec_zero);
+  /*mat_int64_fprintf_comment(stdout, MSLLL);*/
+  mat_int64_clear(MSLLL);
+
+  list_int64_vector_index_sort_last(list_vec);
+  int plane_sieve = 0;
+
+  list_int64_vector_t list_FK;
+  list_int64_vector_init(list_FK);
+  list_int64_vector_t list_SV;
+  list_int64_vector_init(list_SV);
+
+  list_int64_vector_t list_out;
+  list_int64_vector_init(list_out);
+  int64_vector_t s;
+  int64_vector_init(s, Mqr->NumRows);
+  int64_vector_set_zero(s);
+
+#ifdef SPACE_SIEVE_CONTRIBUTION
+  uint64_t index_s = array_int64_vector_index(s, H, array->number_element);
+  array->array[index_s] = array->array[index_s] - r->log;
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+  unsigned int first_s = list_int64_vector_add_int64_vector(list_out, s);
+
+  ASSERT(first_s == 0);
+
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, s->dim);
+  while (s->c[2] < (int64_t)H->h[2]) {
+    for (unsigned int i = 0; i < list_vec_zero->length; i++) {
+      int64_vector_add(v_tmp, s, list_vec_zero->v[i]->vec);
+
+#ifdef SPACE_SIEVE_CONTRIBUTION
+      uint64_t index_tmp = index_s;
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+      while (int64_vector_in_sieving_region(v_tmp, H)) {
+        list_int64_vector_add_int64_vector(list_out, v_tmp);
+        
+#ifdef SPACE_SIEVE_CONTRIBUTION
+        if (list_vec_zero->v[i]->vec->c[1] < 0) {
+          index_tmp = index_tmp - list_vec_zero->v[i]->index;
+        } else {
+          index_tmp = index_tmp + list_vec_zero->v[i]->index;
+        }
+        array->array[index_tmp] = array->array[index_tmp] - r->log;
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+        int64_vector_add(v_tmp, v_tmp, list_vec_zero->v[i]->vec);
+      }
+      int64_vector_sub(v_tmp, s, list_vec_zero->v[i]->vec);
+ 
+#ifdef SPACE_SIEVE_CONTRIBUTION
+      index_tmp = index_s;
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+      while (int64_vector_in_sieving_region(v_tmp, H)) {
+        list_int64_vector_add_int64_vector(list_out, v_tmp);
+
+#ifdef SPACE_SIEVE_CONTRIBUTION
+        if (list_vec_zero->v[i]->vec->c[1] < 0) {
+          index_tmp = index_tmp + list_vec_zero->v[i]->index;
+        } else {
+          index_tmp = index_tmp - list_vec_zero->v[i]->index;
+        }
+        array->array[index_tmp] = array->array[index_tmp] - r->log;
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+        int64_vector_sub(v_tmp, v_tmp, list_vec_zero->v[i]->vec);
+      }
+    }
+ 
+#ifdef SPACE_SIEVE_CONTRIBUTION
+    unsigned int index_vec = 0;
+    unsigned int s_change = 0;
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+    unsigned int hit = 0;
+    int64_vector_t s_tmp;
+    int64_vector_init(s_tmp, s->dim);
+    for (unsigned int i = 0; i < s->dim; i++) {
+      s_tmp->c[i] = (int64_t)H->h[i];
+    }
+    for (unsigned int i = first_s; i < list_out->length; i++) {
+      if (list_out->v[i]->c[2] == s->c[2]) {
+        for (unsigned int j = 0; j < list_vec->length; j++) {
+          int64_vector_add(v_tmp, list_out->v[i], list_vec->v[j]->vec);
+          if (int64_vector_in_sieving_region_dim(v_tmp, H)) {
+            if (v_tmp->c[2] < s_tmp->c[2]) {
+              int64_vector_set(s_tmp, v_tmp);
+
+#ifdef SPACE_SIEVE_CONTRIBUTION
+              index_vec = j;
+              if (int64_vector_equal(s, list_out->v[i])) {
+                s_change = 1;
+              }
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+            }
+            hit = 1;
+          }
+        }
+      }
+    }
+    if (hit) {
+      int64_vector_set(s, s_tmp);
+
+      if (s->c[2] < (int64_t)H->h[2]) {
+        first_s = list_int64_vector_add_int64_vector(list_out, s);
+
+#ifdef SPACE_SIEVE_CONTRIBUTION
+        if (!s_change) {
+          index_s = index_s + list_vec->v[index_vec]->index;
+        } else {
+          ASSERT(s_change == 1);
+
+          index_s = array_int64_vector_index(s, H, array->number_element);
+        }
+        array->array[index_s] = array->array[index_s] - r->log;
+#endif // SPACE_SIEVE_CONTRIBUTION
+      }
+    }
+    if (!hit) {
+      ASSERT(hit == 0);
+
+      /*fprintf(stderr, "# Need to plane sieve.\n");*/
+      if (!plane_sieve) {
+        ASSERT(plane_sieve == 0);
+
+        int64_vector_t * vec = malloc(sizeof(int64_vector_t) * Mqr->NumRows);
+        for (unsigned int i = 0; i < Mqr->NumCols; i++) {
+          int64_vector_init(vec[i], Mqr->NumRows);
+          mat_int64_extract_vector(vec[i], Mqr, i);
+        }
+        SV4(list_SV, vec[0], vec[1], vec[2]);        
+        //TODO: Warning, reduce q lattice can ouput nothing.
+        int boolean = reduce_qlattice(vec[0], vec[1], vec[0], vec[1],
+            (uint64_t)(2 * H->h[0]));
+        if (boolean == 0) {
+          fprintf(stderr,
+              "# Plane sieve (called by space sieve does not support this type of Mqr.\n");
+          mat_int64_fprintf_comment(stderr, Mqr);
+
+          for (unsigned int i = 0; i < Mqr->NumCols; i++) {
+            int64_vector_clear(vec[i]);
+          }
+          free(vec);
+          int64_vector_clear(v_tmp);
+          /*printf("# Number of vector space sieve: %u\n", list_out->length);*/
+          int64_vector_clear(s);
+          list_int64_vector_clear(list_out);
+          list_int64_vector_index_clear(list_vec);
+          list_int64_vector_index_clear(list_vec_zero);
+          list_int64_vector_clear(list_FK);
+          list_int64_vector_clear(list_SV);
+
+          return;
+        }
+        list_int64_vector_add_int64_vector(list_FK, vec[0]);
+        list_int64_vector_add_int64_vector(list_FK, vec[1]);
+        if (space_sieve_good_vector(vec[0], H)) {
+          if (!int64_vector_in_list_zero(vec[0], list_vec_zero)) {
+            list_int64_vector_index_add_int64_vector_index(list_vec_zero,
+                vec[0], index_vector(vec[0], H, array->number_element));
+          }
+        }
+        if (space_sieve_good_vector(vec[1], H)) {
+          if (!int64_vector_in_list_zero(vec[1], list_vec_zero)) {
+            list_int64_vector_index_add_int64_vector_index(list_vec_zero,
+                vec[1], index_vector(vec[1], H, array->number_element));
+          }
+        }
+        for (unsigned int i = 0; i < Mqr->NumCols; i++) {
+          int64_vector_clear(vec[i]);
+        }
+        free(vec);
+        plane_sieve = 1;
+      }
+      int64_vector_t s_out;
+      int64_vector_init(s_out, s->dim);
+      int64_vector_t v_new;
+      int64_vector_init(v_new, s->dim);
+      plane_sieve_1_incomplete(s_out, s, Mqr, H, list_FK, list_SV);
+      if (int64_vector_in_sieving_region(s_out, H)) {
+        first_s = list_int64_vector_add_int64_vector(list_out, s_out);
+        int64_vector_sub(v_new, s_out, s);
+        uint64_t index_new = index_vector(v_new, H, array->number_element);
+        list_int64_vector_index_add_int64_vector_index(list_vec, v_new,
+            index_new);
+
+#ifdef SPACE_SIEVE_CONTRIBUTION
+        index_s = index_s + index_new;
+        array->array[index_s] = array->array[index_s] - r->log;
+#endif // SPACE_SIEVE_CONTRIBUTION
+
+        list_int64_vector_index_sort_last(list_vec);
+      }
+      int64_vector_set(s, s_out);
+      int64_vector_clear(s_out);
+      int64_vector_clear(v_new);
+    }
+    int64_vector_clear(s_tmp);
+  }
+
+  int64_vector_clear(v_tmp);
+  /*printf("# Number of vector space sieve: %u\n", list_out->length);*/
+  int64_vector_clear(s);
+  list_int64_vector_clear(list_out);
+  list_int64_vector_index_clear(list_vec);
+  list_int64_vector_index_clear(list_vec_zero);
+  list_int64_vector_clear(list_FK);
+  list_int64_vector_clear(list_SV);
 }

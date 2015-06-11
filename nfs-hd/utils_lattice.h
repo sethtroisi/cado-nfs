@@ -36,7 +36,15 @@ int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1, mat_int64_ptr U,
 int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
     mat_int64_ptr U, int64_vector_srcptr v0_root, int64_vector_srcptr v1_root);
 
-void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr Mqr,
+/*
+ * Skew LLL (vector in columns).
+ * Work for square matrix.
+ *
+ * MSLLL: the ouput matrix.
+ * M_root: the initial matrix.
+ * skewness: skewness (for the rows).
+ */
+void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
     int64_vector_srcptr skewness);
 
 /*
@@ -162,4 +170,8 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
  */
 void double_vector_gram_schmidt(list_double_vector_ptr list_new,
     mat_double_ptr m, list_double_vector_srcptr list_old);
+
+
+void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
+    sieving_bound_srcptr H);
 #endif // UTILS_SIEVE_H

@@ -1026,9 +1026,10 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
   int64_vector_t e1;
   int64_vector_init(e0, vec[0]->dim);
   int64_vector_init(e1, vec[1]->dim);
-  int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], 2*H->h[0]);
+  int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], (int64_t)(2*H->h[0]));
   
   //Find some short vectors to go from z = d to z = d + 1.
+  //TODO: go after boolean, no?
   list_int64_vector_t SV;
   list_int64_vector_init(SV);
   SV4(SV, vec[0], vec[1], vec[2]);
@@ -1534,7 +1535,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       }
 #endif // TIMER_SIEVE
 
+#ifdef SPACE_SIEVE
+      space_sieve_1_3D(array, r, Mqr, H);
+#else
       plane_sieve_1(array, r, Mqr, H, matrix, f);
+#endif // SPACE_SIEVE
 
 #ifdef TIMER_SIEVE
       if (r->ideal->r > TIMER_SIEVE) {
