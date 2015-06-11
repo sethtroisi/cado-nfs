@@ -267,12 +267,12 @@ update_status (mpz_t *R, mpz_t *A,
   mpz_init(z_B2);
   mpz_init(z_BL);
   mpz_init(z_B3);
-  mpz_init(z_L2);
+  mpz_init(z_L2); /* set to 0 */
 
-  mpz_set_ui(z_B2, rlim * rlim);
-  mpz_mul_ui(z_B3, z_B2, rlim);
-  mpz_set_ui(z_L2, 0);
-  mpz_setbit(z_L2, 2 * lpbr);
+  mpz_set_ui (z_B2, rlim);
+  mpz_mul_ui (z_B2, z_B2, rlim);
+  mpz_mul_ui (z_B3, z_B2, rlim);
+  mpz_setbit (z_L2, 2 * lpbr);
   B = rlim;
   L = 1UL << lpbr;
   mpz_set_ui (z_BL, B);
