@@ -108,8 +108,8 @@ exist in the XXX.rels.deleted.gz file.
 Useful only for DL.
 
 
-File XXX.merge.his
-==================
+File XXX.merge.history
+======================
 
 It is created by merge, and contains the sequence of operations that must
 be done on the lines to replay the merge and create the matrix given to
