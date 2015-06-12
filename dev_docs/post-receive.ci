@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# exec wget -O- http://ci.inria.fr/cado/git/notifyCommit?url=git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git
+exec curl -k https://ci.inria.fr/cado/git/notifyCommit?url=git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git
