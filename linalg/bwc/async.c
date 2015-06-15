@@ -258,6 +258,48 @@ void pi_thread_allreduce_add_double(parallelizing_info pi, double * x, int n)
     serialize_threads(pi->m);
 }
 
+void pi_thread_allreduce_min_double(parallelizing_info pi, double * x, int n)
+{
+    /* Broadcast master's x */
+    double * master_x = (pi->m->trank == 0) ? x : NULL;
+    thread_broadcast(pi->m, (void **) &master_x, sizeof(void*), 0);
+    /* Threads other than master add their x to master's x */
+    if (pi->m->trank != 0) {
+        my_pthread_mutex_lock(pi->m->th->m);
+        for(int i = 0 ; i < n ; i++)
+            master_x[i] = MIN(master_x[i], x[i]);
+        my_pthread_mutex_unlock(pi->m->th->m);
+    }
+    serialize_threads(pi->m);
+    /* Master has totals in x, everyone else needs to update their x */
+    if (pi->m->trank != 0)
+        memcpy(x, master_x, n * sizeof(int));
+    /* as long as we have a read intention on master_x, we should not get
+     * past this barrier */
+    serialize_threads(pi->m);
+}
+
+void pi_thread_allreduce_max_double(parallelizing_info pi, double * x, int n)
+{
+    /* Broadcast master's x */
+    double * master_x = (pi->m->trank == 0) ? x : NULL;
+    thread_broadcast(pi->m, (void **) &master_x, sizeof(void*), 0);
+    /* Threads other than master add their x to master's x */
+    if (pi->m->trank != 0) {
+        my_pthread_mutex_lock(pi->m->th->m);
+        for(int i = 0 ; i < n ; i++)
+            master_x[i] = MAX(master_x[i], x[i]);
+        my_pthread_mutex_unlock(pi->m->th->m);
+    }
+    serialize_threads(pi->m);
+    /* Master has totals in x, everyone else needs to update their x */
+    if (pi->m->trank != 0)
+        memcpy(x, master_x, n * sizeof(int));
+    /* as long as we have a read intention on master_x, we should not get
+     * past this barrier */
+    serialize_threads(pi->m);
+}
+
 static const char * timer_names[] = TIMER_NAMES;
 
 /* stage=0 for krylov, 1 for mksol */
@@ -270,32 +312,36 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
     timing_interval_data since_beginning[NTIMERS_EACH_ITERATION];
     extract_interval(since_last_reset, since_beginning, timing);
 
-    timing_interval_data * since = done ? since_beginning : since_last_reset;
+    timing_interval_data * T = done ? since_beginning : since_last_reset;
 
     double di = iter - timing->go_mark;
+    double ncoeffs_d = ncoeffs;
 
-    double dwct[NTIMERS_EACH_ITERATION];
-    double sum_dwct = 0;
-    for(int i = 0 ; i < NTIMERS_EACH_ITERATION ; i++) {
-        dwct[i] = since[i]->wct;
-        sum_dwct += dwct[i];
-    }
+    /* for each timer, we want to print:
+     *
+     *  - the total accumulated number of seconds spent. This really is
+     *    the addition of all the per-thread WCTs.
+     *  - average [min..max] for these
+     *  - the CPU % for each. This is \sum job[0] / total wct.
+     */
 
-    /* this may be used to compute the aggregated delta-wct (for each
-     * timer) on this node
-    double aggr_dwct[NTIMERS_EACH_ITERATION];
-    memcpy(aggr_dwct, dwct, sizeof(dwct));
-    pi_thread_allreduce_add_double(pi, aggr_dwct, NTIMERS_EACH_ITERATION);
-    */
+    timing_interval_data Tmin[NTIMERS_EACH_ITERATION];
+    timing_interval_data Tmax[NTIMERS_EACH_ITERATION];
+    timing_interval_data Tsum[NTIMERS_EACH_ITERATION];
 
     int ndoubles = NTIMERS_EACH_ITERATION * sizeof(timing_interval_data) / sizeof(double);
 
-    double ncoeffs_d = ncoeffs;
-    pi_thread_allreduce_add_double(pi, &ncoeffs_d, 1);
+    memcpy(Tmin, T, sizeof(Tmin));
+    memcpy(Tmax, T, sizeof(Tmax));
+    memcpy(Tsum, T, sizeof(Tsum));
 
     SEVERAL_THREADS_PLAY_MPI_BEGIN(pi->m) {
         int err;
-        err = MPI_Allreduce(MPI_IN_PLACE, since, ndoubles, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        err = MPI_Allreduce(MPI_IN_PLACE, Tsum, ndoubles, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+        err = MPI_Allreduce(MPI_IN_PLACE, Tmin, ndoubles, MPI_DOUBLE, MPI_MIN, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+        err = MPI_Allreduce(MPI_IN_PLACE, Tmax, ndoubles, MPI_DOUBLE, MPI_MAX, pi->m->pals);
         ASSERT_ALWAYS(!err);
 
         err = MPI_Allreduce(MPI_IN_PLACE, &ncoeffs_d, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
@@ -303,16 +349,20 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
-    /* we have the following data, aggregated over all nodes:
-     *    ncoeffs_d
-     *    since[i]: timings for sub-timer i
-     */
+    pi_thread_allreduce_add_double(pi, (double*) Tsum, ndoubles);
+    pi_thread_allreduce_min_double(pi, (double*) Tmin, ndoubles);
+    pi_thread_allreduce_max_double(pi, (double*) Tmax, ndoubles);
+    pi_thread_allreduce_add_double(pi, &ncoeffs_d, 1);
+
+    double sum_dwct = 0;
+    for(int i = 0 ; i < NTIMERS_EACH_ITERATION ; i++) {
+        sum_dwct += Tsum[i]->wct;
+    }
+    double avdwct = sum_dwct / pi->m->totalsize / di;
 
     if (print) {
         for(int timer = 0 ; timer < NTIMERS_EACH_ITERATION ; timer++) {
-            double puser = since[timer]->job[0] / dwct[timer];
-            double psys = since[timer]->job[1] / dwct[timer];
-            double avwct = dwct[timer] / di;
+            double avwct = Tsum[timer]->wct / pi->m->totalsize / di;
 
             char extra[32]={'\0'};
             if (timer == 0) {
@@ -320,24 +370,19 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
                 // total (aggregated) wall-clock time per iteration within
                 // the cpu-bound part, and divided by the total number of
                 // coefficients.
-                double nsc = since[timer]->wct / di / ncoeffs_d * 1.0e9;
+                double nsc = Tsum[timer]->wct / di / ncoeffs_d * 1.0e9;
                 snprintf(extra, sizeof(extra), ", %.2f ns/%.1fGcoeff", nsc, ncoeffs_d*1.0e-9);
             }
 
-            char * what_wct = "s";
-            if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
 
-            printf("%sN=%d ; %s: %.2f [%.0f%%cpu, %.0f%%sys]"
-                    ", %.2f %s/iter"
-                    "%s"
-                    "\n",
+            printf("%sN=%d ; %s: %.2f s/iter [%.3f..%.3f]%s\n",
                     done ? "done " : "",
                     iter,
                     timer_names[timer],
-                    since[timer]->job[0] + since[timer]->job[1],
-                    100.0 * puser,
-                    100.0 * psys,
-                    avwct, what_wct, extra);
+                    avwct,
+                    Tmin[timer]->wct/di,
+                    Tmax[timer]->wct/di,
+                    extra);
         }
 
         if (!done) {
@@ -346,7 +391,7 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
             time_t eta[1];
             char eta_string[32] = "not available yet\n";
             time(now);
-            *eta = *now + (timing->end_mark - iter) * sum_dwct / di;
+            *eta = *now + (timing->end_mark - iter) * avdwct;
             if (di) {
 #ifdef HAVE_CTIME_R
                 ctime_r(eta, eta_string);
@@ -361,7 +406,7 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
 
             printf("%s: N=%d ; ETA (N=%d): %s [%.3f s/iter]\n",
                    (stage == 0) ? "krylov" : "mksol",
-                   iter, timing->end_mark, eta_string, sum_dwct / di);
+                   iter, timing->end_mark, eta_string, avdwct);
         }
     }
     /* We're sharing via thread_broadcast data which sits on the stack of

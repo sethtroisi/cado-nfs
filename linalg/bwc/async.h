@@ -7,6 +7,8 @@
  * signals) to be checked ? */
 #define PREFERRED_ASYNC_LAG     15.0
 
+/* This structure **MUST** be made only of doubles, or disaster will
+ * occur */
 struct timing_interval_data_s {
     double job[2];  // user, system
     double thread[2];       // user, system
