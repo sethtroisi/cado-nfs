@@ -739,13 +739,19 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     }
 #endif
     if (m == 1) /* singleton ideal */
-      removeColDefinitely(rep, mat, j);
-    else if (m > 0)
-      mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel, j);
+        removeColDefinitely(rep, mat, j);
+    else if (m > 0) {
+        if (nb_merges[m] == 0 && m > 1) {
+            fprintf(rep->outfile, "## First %d-merge\n", m);
+        }
+        fprintf(rep->outfile, "#\n");
+        mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel, j);
+    }
 
-    if (nb_merges[m]++ == 0 && m > 1)
+    if (nb_merges[m]++ == 0 && m > 1) {
       printf ("First %d-merge, cost %d (#Q=%d)\n", m, mkz,
           MkzQueueCardinality(mat->MKZQ));
+    }
 
     /* Update values and report if necessary */
     nbmerge++;
