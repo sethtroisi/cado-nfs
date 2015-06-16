@@ -588,7 +588,7 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
 }
 
 void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
-    mpz_srcptr lpb, mpz_poly_srcptr f)
+    mpz_srcptr lpb, MAYBE_UNUSED mpz_poly_srcptr f)
 {
   int size_line = 1024;
   char line [size_line];

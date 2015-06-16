@@ -42,7 +42,7 @@ static double angle_2_coordinate(int64_vector_srcptr v0, int64_vector_srcptr v1)
 /*
  * Compute the determinant of a 2 * 2 matrix.
  */
-static int determinant2(mat_int64_srcptr matrix)
+MAYBE_UNUSED static int determinant2(mat_int64_srcptr matrix)
 {
   return (int) matrix->coeff[1][1] * matrix->coeff[2][2] - matrix->coeff[2][1] *
     matrix->coeff[1][2];
@@ -863,7 +863,7 @@ void plane_sieve_1_enum_plane_incomplete(int64_vector_ptr v_in,
 
 //SPACE_SIEVE_CONTRIBUTION is broken.
 void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+    MAYBE_UNUSED mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     list_int64_vector_srcptr list_FK, list_int64_vector_srcptr list_SV)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);

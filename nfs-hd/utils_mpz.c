@@ -214,7 +214,7 @@ unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
   sort_factor(factor);
 
   ASSERT(assert_facto == 0);
-#ifdef NDEBUG
+#ifndef NDEBUG
   ASSERT(factor_assert(factor, z) == 0);
 #endif
 
@@ -257,7 +257,7 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z)
   factor_realloc(factor, nb);
   sort_factor(factor);
 
-#ifdef NDEBUG
+#ifndef NDEBUG
   ASSERT(factor_assert(factor, z) == assert_facto);
 #endif
 
