@@ -542,7 +542,8 @@ void compute_Tqr_1(uint64_t * Tqr, mat_Z_srcptr matrix,
  * t: dimension of the lattice.
  * ideal: the ideal r.
  */
-void generate_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, ideal_1_srcptr ideal)
+void generate_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, ideal_1_srcptr ideal,
+    MAYBE_UNUSED unsigned int t)
 {
   ASSERT(Tqr[0] != 0);
   ASSERT(t == Mqr->NumCols);

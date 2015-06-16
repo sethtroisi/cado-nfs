@@ -162,7 +162,7 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 
 #ifndef NDEBUG
   else {
-    ASSERT(h->deg == ideal->h->deg);
+    ASSERT(h->deg == ideal->ideal->h->deg);
   }
 #endif // NDEBUG
 
@@ -380,9 +380,9 @@ void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     mpz_t tmp;
     mpz_init(tmp);
     mpz_poly_getcoeff(tmp, 0, h);
-    ASSERT(gmp_cmp_ui(tmp, 0) == 1);
+    ASSERT(mpz_cmp_ui(tmp, 0) == 1);
     mpz_poly_getcoeff(tmp, 1, h);
-    ASSERT(gmp_cmp_ui(tmp, 1) == 1);
+    ASSERT(mpz_cmp_ui(tmp, 1) == 1);
     mpz_clear(tmp);
 #endif // NDEBUG
 
