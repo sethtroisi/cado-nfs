@@ -34,6 +34,7 @@ unsigned int list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
  */
 void list_int64_vector_clear(list_int64_vector_ptr list);
 
+void list_int64_vector_delete_elements(list_int64_vector_ptr list);
 /*
  * Write a list in a file.
  *

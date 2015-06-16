@@ -36,6 +36,19 @@ void list_int64_vector_clear(list_int64_vector_ptr list)
   list->length = 0;
 }
 
+void list_int64_vector_delete_elements(list_int64_vector_ptr list)
+{
+  for (unsigned int i = 0; i < list->length; i++) {
+    ASSERT(list->v[i]->dim != 0);
+    int64_vector_clear(list->v[i]);
+  }
+  if(list->length > 3) {
+    list->v = realloc(list->v, sizeof(int64_vector_t) *
+        (DEFAULT_LENGTH_LIST_INT64_VECTOR));
+  }
+  list->length = 0;
+}
+
 void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list)
 {
   fprintf(file, "[");
