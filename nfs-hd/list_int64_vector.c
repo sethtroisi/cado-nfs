@@ -6,46 +6,50 @@
  * List of int64_vector.
  */
 
-void list_int64_vector_init(list_int64_vector_ptr list)
+void list_int64_vector_init(list_int64_vector_ptr list,
+    unsigned int vector_dim)
 {
-  list->length = 0;
-  list->v = (int64_vector_t * ) malloc(sizeof(int64_vector_t) *
-      DEFAULT_LENGTH_LIST_INT64_VECTOR);
+  memset(list, 0, sizeof(*list));
+  list->vector_dim = vector_dim;
+}
+
+static void list_int64_vector_prepare_write(list_int64_vector_ptr list,
+    unsigned int index) {
+  if (index >= list->alloc) {
+    list->alloc = index + 4 + list->alloc / 4;
+    list->v = (int64_vector_t *) realloc(list->v, list->alloc *
+        sizeof(int64_vector_t));
+    for (unsigned int i = list->length; i < list->alloc; i++) {
+      int64_vector_init(list->v[i], list->vector_dim);
+    }
+  }
+  if (list->length <= index) {
+    list->length = index + 1;
+  }
 }
 
 unsigned int list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
     int64_vector_srcptr v)
 {
-  if ((list->length % DEFAULT_LENGTH_LIST_INT64_VECTOR) == 0 && list->length != 0) {
-    list->v = realloc(list->v, sizeof(int64_vector_t) * (list->length +
-          DEFAULT_LENGTH_LIST_INT64_VECTOR));
-  }
-  int64_vector_init(list->v[list->length], v->dim);
-  int64_vector_set(list->v[list->length], v);
-  list->length++;
+  ASSERT(v->dim == list->vector_dim);
+
+  list_int64_vector_prepare_write(list, list->length);
+  int64_vector_set(list->v[list->length - 1], v);
   return list->length - 1;
 }
 
 void list_int64_vector_clear(list_int64_vector_ptr list)
 {
-  for (unsigned int i = 0; i < list->length; i++) {
+  for (unsigned int i = 0; i < list->alloc; i++) {
     ASSERT(list->v[i]->dim != 0);
     int64_vector_clear(list->v[i]);
   }
   free(list->v);
-  list->length = 0;
+  memset(list, 0, sizeof(*list));
 }
 
 void list_int64_vector_delete_elements(list_int64_vector_ptr list)
 {
-  for (unsigned int i = 0; i < list->length; i++) {
-    ASSERT(list->v[i]->dim != 0);
-    int64_vector_clear(list->v[i]);
-  }
-  if(list->length > 3) {
-    list->v = realloc(list->v, sizeof(int64_vector_t) *
-        (DEFAULT_LENGTH_LIST_INT64_VECTOR));
-  }
   list->length = 0;
 }
 

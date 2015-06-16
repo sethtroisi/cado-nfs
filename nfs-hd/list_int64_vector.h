@@ -9,14 +9,13 @@
 #include "mat_int64.h"
 #include "list.h"
 
-#define DEFAULT_LENGTH_LIST_INT64_VECTOR 3
-
 /*
  * Initialise a list of int64_vector.
  * 
  * list: the list.
  */
-void list_int64_vector_init(list_int64_vector_ptr list);
+void list_int64_vector_init(list_int64_vector_ptr list,
+    unsigned int vector_dim);
 
 /*
  * Add a vector in the list.

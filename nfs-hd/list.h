@@ -9,8 +9,10 @@
  */
 typedef struct
 {
-  int64_vector_t * v;
+  unsigned int alloc;
   unsigned int length;
+  unsigned int vector_dim;
+  int64_vector_t * v;
 }  s_list_int64_vector_t;
 
 typedef s_list_int64_vector_t list_int64_vector_t[1];
