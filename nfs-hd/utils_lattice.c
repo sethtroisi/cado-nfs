@@ -672,7 +672,7 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
 {
   // Contain all the possible vectors to go from z=d to z=d+1.
   list_int64_vector_t list;
-  list_int64_vector_init(list);
+  list_int64_vector_init(list, 3);
   int64_vector_t v_tmp;
   int64_vector_init(v_tmp, SV->v[0]->dim);
   /*
@@ -779,7 +779,7 @@ static void space_sieve_linear_combination(list_int64_vector_index_ptr list,
     sieving_bound_srcptr H, uint64_t number_element)
 {
   list_int64_vector_t list_tmp;
-  list_int64_vector_init(list_tmp);
+  list_int64_vector_init(list_tmp, 3);
   list_int64_vector_extract_mat_int64(list_tmp, MSLLL);
 
   int64_vector_t v_tmp;
@@ -921,16 +921,16 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   int plane_sieve = 0;
 
   list_int64_vector_t list_FK;
-  list_int64_vector_init(list_FK);
+  list_int64_vector_init(list_FK, 3);
   list_int64_vector_t list_SV;
-  list_int64_vector_init(list_SV);
+  list_int64_vector_init(list_SV, 3);
 
 #ifdef SPACE_SIEVE_OUT
   list_int64_vector_t list_out;
-  list_int64_vector_init(list_out);
+  list_int64_vector_init(list_out, 3);
 #else
   list_int64_vector_t list_s;
-  list_int64_vector_init(list_s);
+  list_int64_vector_init(list_s, 3);
 #endif // SPACE_SIEVE_OUT
 
   int64_vector_t s;

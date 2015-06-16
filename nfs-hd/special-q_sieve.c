@@ -1031,7 +1031,7 @@ void plane_sieve_1(array_ptr array, ideal_1_srcptr r,
   //Find some short vectors to go from z = d to z = d + 1.
   //TODO: go after boolean, no?
   list_int64_vector_t SV;
-  list_int64_vector_init(SV);
+  list_int64_vector_init(SV, 3);
   SV4(SV, vec[0], vec[1], vec[2]);
 
   //Reduce q-lattice is not possible.
@@ -1157,7 +1157,7 @@ void enum_lattice(array_ptr array, ideal_1_srcptr ideal,
 
   //Original basis of the lattice.
   list_int64_vector_t b_root;
-  list_int64_vector_init(b_root);
+  list_int64_vector_init(b_root, 3);
   list_int64_vector_extract_mat_int64(b_root, Mqr);
 
   /* To compute and store the result of Gram-Schmidt. */
