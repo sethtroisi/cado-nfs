@@ -51,7 +51,7 @@ int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b)
 {
   int r = (a->dim > b->dim) - (b->dim > a->dim);
   if (r) return 1;
-  for(int d = a->dim; d >= 0 ; d--) {
+  for(int d = (int)(a->dim - 1); d >= 0 ; d--) {
     r = a->c[d] - b->c[d];
     if (r) return 1;
   }
