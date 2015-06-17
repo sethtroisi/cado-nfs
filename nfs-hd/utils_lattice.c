@@ -909,9 +909,9 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   
   //TODO: we must generate all the zero vectors!
   list_int64_vector_index_t list_vec;
-  list_int64_vector_index_init(list_vec);
+  list_int64_vector_index_init(list_vec, 3);
   list_int64_vector_index_t list_vec_zero;
-  list_int64_vector_index_init(list_vec_zero);
+  list_int64_vector_index_init(list_vec_zero, 3);
   space_sieve_linear_combination(list_vec, list_vec_zero, MSLLL, H,
       array->number_element);
   /*mat_int64_fprintf_comment(stdout, MSLLL);*/
