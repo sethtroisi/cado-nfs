@@ -2,24 +2,38 @@
 #include "utils.h"
 #include "list_int64_vector_index.h"
 
-void list_int64_vector_index_init(list_int64_vector_index_ptr list)
+void list_int64_vector_index_init(list_int64_vector_index_ptr list,
+    unsigned int vector_dim)
 {
-  list->length = 0;
-  list->v = (int64_vector_index_t * ) malloc(sizeof(int64_vector_index_t) *
-      DEFAULT_LENGTH_LIST_INT64_VECTOR_INDEX);
+  memset(list, 0, sizeof(*list));
+  list->vector_dim = vector_dim;
 }
 
-void list_int64_vector_index_add_int64_vector_index(list_int64_vector_index_ptr list,
-    int64_vector_srcptr v, uint64_t index)
+static void list_int64_vector_index_prepare_write(list_int64_vector_index_ptr list,
+    unsigned int index)
 {
-  if ((list->length % DEFAULT_LENGTH_LIST_INT64_VECTOR_INDEX) == 0 && list->length != 0) {
-    list->v = realloc(list->v, sizeof(int64_vector_index_t) * (list->length +
-          DEFAULT_LENGTH_LIST_INT64_VECTOR_INDEX));
+  if (index >= list->alloc) {
+    list->alloc = index + 4 + list->alloc / 4;
+    list->v = (int64_vector_index_t * ) realloc(list->v, list->alloc *
+        sizeof(int64_vector_index_t));
+    for (unsigned int i = list->length; i < list->alloc; i++) {
+      int64_vector_init(list->v[i]->vec, list->vector_dim);
+      list->v[i]->index = 0;
+    }
   }
-  int64_vector_init(list->v[list->length]->vec, v->dim);
-  int64_vector_set(list->v[list->length]->vec, v);
-  list->v[list->length]->index = index;
-  list->length++;
+  if (list->length <= index) {
+    list->length = index + 1;
+  }
+}
+
+void list_int64_vector_index_add_int64_vector_index(
+    list_int64_vector_index_ptr list, int64_vector_srcptr v, uint64_t index)
+{
+  ASSERT(v->dim == list->vector_dim);
+
+  list_int64_vector_index_prepare_write(list, list->length);
+  int64_vector_set(list->v[list->length - 1]->vec, v);
+  list->v[list->length - 1]->index = index;
 }
 
 void list_int64_vector_index_clear(list_int64_vector_index_ptr list)
@@ -29,7 +43,7 @@ void list_int64_vector_index_clear(list_int64_vector_index_ptr list)
     int64_vector_clear(list->v[i]->vec);
   }
   free(list->v);
-  list->length = 0;
+  memset(list, 0, sizeof(*list));
 }
 
 void list_int64_vector_index_fprintf(FILE * file,

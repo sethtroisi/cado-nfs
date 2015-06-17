@@ -14,7 +14,8 @@ void list_int64_vector_init(list_int64_vector_ptr list,
 }
 
 static void list_int64_vector_prepare_write(list_int64_vector_ptr list,
-    unsigned int index) {
+    unsigned int index)
+{
   if (index >= list->alloc) {
     list->alloc = index + 4 + list->alloc / 4;
     list->v = (int64_vector_t *) realloc(list->v, list->alloc *

@@ -8,8 +8,6 @@
 #include "int64_vector.h"
 #include "mat_int64.h"
 
-#define DEFAULT_LENGTH_LIST_INT64_VECTOR_INDEX 3
-
 /*
  * int64_vector with its index.
  */
@@ -30,6 +28,8 @@ typedef struct
 {
   int64_vector_index_t * v;
   unsigned int length;
+  unsigned int alloc;
+  unsigned int vector_dim;
 }  s_list_int64_vector_index_t;
 
 typedef s_list_int64_vector_index_t list_int64_vector_index_t[1];
@@ -41,7 +41,8 @@ typedef const s_list_int64_vector_index_t * list_int64_vector_index_srcptr;
  * 
  * list: the list.
  */
-void list_int64_vector_index_init(list_int64_vector_index_ptr list);
+void list_int64_vector_index_init(list_int64_vector_index_ptr list,
+    unsigned int vector_dim);
 
 /*
  * Add a vector_index in the list.
