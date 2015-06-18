@@ -1409,12 +1409,12 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
         b = go_quadratic(pi);
     } else if (deg_E < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<fake_fft>(pi, tim);
+        b = go_recursive<gf2x_fake_fft>(pi, tim);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<c128_fft>(pi, tim);
+        b = go_recursive<gf2x_cantor_fft>(pi, tim);
     }
 
     /*
