@@ -21,7 +21,7 @@ checkout_that() {
 
 checkout_that ${gf2x_url} ${gf2x_rev} gf2x
 
-rm -f gf2x/toom-gpl.c
+cp -f gf2x/toom-gpl-placeholder.c gf2x/toom-gpl.c
 
 (cd gf2x/ ; autoreconf -i)
 (cd gf2x/ ; xargs -r rm -f < no-distribute.txt)

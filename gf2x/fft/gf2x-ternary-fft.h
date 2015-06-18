@@ -69,6 +69,8 @@ extern int gf2x_ternary_fft_compatible(gf2x_ternary_fft_info_srcptr o1, gf2x_ter
 extern void gf2x_ternary_fft_clear(gf2x_ternary_fft_info_ptr o);
 
 
+static inline int gf2x_ternary_fft_recoverorder(gf2x_ternary_fft_info_srcptr o) { return ((o)->K * ((o)->split ? -1 : 1)); }
+
 #ifdef __cplusplus
 }
 #endif

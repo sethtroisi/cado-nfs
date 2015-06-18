@@ -54,7 +54,7 @@ extern int time_ift;
 #define ENGINE_get gf2x_cantor_fft_get
 #define ENGINE_get_const gf2x_cantor_fft_get_const
 #define ENGINE_clear gf2x_cantor_fft_clear
-#define ENGINE_recoverorder(o)  ((o)->k)
+#define ENGINE_recoverorder gf2x_cantor_fft_recoverorder 
 #define ENGINE_mul      test_gf2x_cantor_fft_mul
 #elif defined(ENGINE_TERNARY)
 #include "gf2x-ternary-fft.h"
@@ -77,7 +77,7 @@ extern int time_ift;
 #define ENGINE_get gf2x_ternary_fft_get
 #define ENGINE_get_const gf2x_ternary_fft_get_const
 #define ENGINE_clear gf2x_ternary_fft_clear
-#define ENGINE_recoverorder(o)  ((o)->K * ((o)->split ? -1 : 1))
+#define ENGINE_recoverorder gf2x_ternary_fft_recoverorder
 #define ENGINE_mul      test_gf2x_ternary_fft_mul
 #else
 #error "Please define either ENGINE_CANTOR or ENGINE_TERNARY"

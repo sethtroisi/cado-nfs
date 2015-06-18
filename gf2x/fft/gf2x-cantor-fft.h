@@ -127,6 +127,7 @@ extern void gf2x_cantor_fft_ift(const gf2x_cantor_fft_info_t p,
 extern size_t gf2x_cantor_fft_size(gf2x_cantor_fft_info_srcptr p);
 extern void gf2x_cantor_fft_init_similar(gf2x_cantor_fft_info_ptr o, size_t bits_a, size_t bits_b, gf2x_cantor_fft_info_srcptr other);
 extern int gf2x_cantor_fft_compatible(gf2x_cantor_fft_info_srcptr o1, gf2x_cantor_fft_info_srcptr o2);
+static inline int gf2x_cantor_fft_recoverorder(gf2x_cantor_fft_info_srcptr o) { return o->k; }
 
 #ifdef __cplusplus
 }

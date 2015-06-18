@@ -1261,6 +1261,7 @@ gf2x/tests/generate-fft-tests.pl
 gf2x/tests/test-tools.c
 gf2x/tests/test-tools.h
 gf2x/toom-gpl-placeholder.c
+gf2x/toom-gpl.c
 gf2x/toom.c
 gf2x/version.sh.in
 scripts/refresh-gf2x.sh
