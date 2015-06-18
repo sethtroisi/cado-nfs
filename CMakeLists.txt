@@ -132,20 +132,21 @@ endif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
 #####################################################################
 # Set dependencies for external software.
+include(${CADO_NFS_SOURCE_DIR}/config/string_join.cmake)
 
 set(some_mpir_variable "$ENV{MPIR}$ENV{MPIR_INCDIR}$ENV{MPIR_LIBDIR}")
 if(some_mpir_variable)
 # locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
 include(${CADO_NFS_SOURCE_DIR}/config/mpir.cmake)
-string(CONCAT GF2X_C_FLAGS ${CMAKE_C_FLAGS} "-I${MPIR_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
-string(CONCAT GF2X_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-I${MPIR_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
-string(CONCAT GF2X_LDFLAGS ${CMAKE_SHARED_LINKER_FLAGS} "-L${MPIR_LIBDIR}")
+string_join(GF2X_C_FLAGS " " ${CMAKE_C_FLAGS} "-I${MPIR_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string_join(GF2X_CXX_FLAGS " " ${CMAKE_CXX_FLAGS} "-I${MPIR_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string_join(GF2X_LDFLAGS " " ${CMAKE_SHARED_LINKER_FLAGS} "-L${MPIR_LIBDIR}")
 else(some_mpir_variable)
 # locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
 include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
-string(CONCAT GF2X_C_FLAGS ${CMAKE_C_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
-string(CONCAT GF2X_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
-string(CONCAT GF2X_LDFLAGS ${CMAKE_SHARED_LINKER_FLAGS} "-L${GMP_LIBDIR}")
+string_join(GF2X_C_FLAGS " " ${CMAKE_C_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string_join(GF2X_CXX_FLAGS " " ${CMAKE_CXX_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string_join(GF2X_LDFLAGS " " ${CMAKE_SHARED_LINKER_FLAGS} "-L${GMP_LIBDIR}")
 endif(some_mpir_variable)
 
 #####
