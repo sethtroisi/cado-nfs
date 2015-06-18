@@ -137,18 +137,20 @@ set(some_mpir_variable "$ENV{MPIR}$ENV{MPIR_INCDIR}$ENV{MPIR_LIBDIR}")
 if(some_mpir_variable)
 # locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
 include(${CADO_NFS_SOURCE_DIR}/config/mpir.cmake)
-set(GF2X_C_FLAGS "${CMAKE_C_FLAGS} -I${MPIR_INCDIR} -I${CADO_NFS_SOURCE_DIR}")
-set(GF2X_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${MPIR_INCDIR} -I${CADO_NFS_SOURCE_DIR}")
+string(CONCAT GF2X_C_FLAGS ${CMAKE_C_FLAGS} "-I${MPIR_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string(CONCAT GF2X_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-I${MPIR_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string(CONCAT GF2X_LDFLAGS ${CMAKE_SHARED_LINKER_FLAGS} "-L${MPIR_LIBDIR}")
 else(some_mpir_variable)
 # locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
 include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
-set(GF2X_C_FLAGS "${CMAKE_C_FLAGS} -I${GMP_INCDIR} -I${CADO_NFS_SOURCE_DIR}")
-set(GF2X_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${GMP_INCDIR} -I${CADO_NFS_SOURCE_DIR}")
+string(CONCAT GF2X_C_FLAGS ${CMAKE_C_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string(CONCAT GF2X_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
+string(CONCAT GF2X_LDFLAGS ${CMAKE_SHARED_LINKER_FLAGS} "-L${GMP_LIBDIR}")
 endif(some_mpir_variable)
 
 #####
 
-set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --enable-fft-interface CC="${CMAKE_C_COMPILER}" CXX="${CMAKE_CXX_COMPILER}" CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
+set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --enable-fft-interface CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} LDFLAGS=${GF2X_LDFLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
