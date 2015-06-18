@@ -148,7 +148,7 @@ endif(some_mpir_variable)
 
 #####
 
-set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking CC="${CMAKE_C_COMPILER}" CXX="${CMAKE_CXX_COMPILER}" CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
+set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --enable-fft-interface CC="${CMAKE_C_COMPILER}" CXX="${CMAKE_CXX_COMPILER}" CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
@@ -258,7 +258,6 @@ include_directories (${CADO_NFS_BINARY_DIR})
 
 # link_directories (${CADO_NFS_BINARY_DIR}/utils)
 # link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
-# link_directories (${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs)
 
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
 include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
