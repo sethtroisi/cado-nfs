@@ -793,7 +793,7 @@ static void space_sieve_linear_combination(list_int64_vector_index_ptr list,
         int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[2], (int64_t)n);
         if (space_sieve_good_vector(v_tmp, H)) {
           if (v_tmp->c[2] == 0) {
-            if (v_tmp->c[1] != 0 && v_tmp->c[0] != 0) {
+            if (v_tmp->c[1] != 0 || v_tmp->c[0] != 0) {
               int64_vector_reduce(v_tmp, v_tmp);
               if (!int64_vector_in_list_zero(v_tmp, list_zero)) {
                 list_int64_vector_index_add_int64_vector_index(list_zero,
