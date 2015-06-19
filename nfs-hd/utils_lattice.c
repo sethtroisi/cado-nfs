@@ -774,10 +774,12 @@ static int int64_vector_in_list_zero(int64_vector_srcptr v_tmp,
 }
 
 //TODO: change that.
-static void space_sieve_linear_combination(list_int64_vector_index_ptr list,
-    list_int64_vector_index_ptr list_zero, mat_int64_srcptr MSLLL,
-    sieving_bound_srcptr H, uint64_t number_element)
+static unsigned int space_sieve_linear_combination(
+    list_int64_vector_index_ptr list, list_int64_vector_index_ptr list_zero,
+    mat_int64_srcptr MSLLL, sieving_bound_srcptr H, uint64_t number_element)
 {
+  unsigned int vector_1 = 0;
+
   list_int64_vector_t list_tmp;
   list_int64_vector_init(list_tmp, 3);
   list_int64_vector_extract_mat_int64(list_tmp, MSLLL);
@@ -798,11 +800,17 @@ static void space_sieve_linear_combination(list_int64_vector_index_ptr list,
               if (!int64_vector_in_list_zero(v_tmp, list_zero)) {
                 list_int64_vector_index_add_int64_vector_index(list_zero,
                     v_tmp, index_vector(v_tmp, H, number_element));
+                if (v_tmp->c[2] == 1) {
+                  vector_1 = 1;
+                }
               }
             }
           } else {
             list_int64_vector_index_add_int64_vector_index(list, v_tmp,
                 index_vector(v_tmp, H, number_element));
+            if (v_tmp->c[2] == 1) {
+              vector_1 = 1;
+            }
           }
         }
       }
@@ -815,6 +823,8 @@ static void space_sieve_linear_combination(list_int64_vector_index_ptr list,
 
   int64_vector_clear(v_tmp);
   list_int64_vector_clear(list_tmp);
+
+  return vector_1;
 }
 int int64_vector_in_sieving_region_dim(int64_vector_srcptr v,
     sieving_bound_srcptr H) {
@@ -917,9 +927,8 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   list_int64_vector_index_init(list_vec, 3);
   list_int64_vector_index_t list_vec_zero;
   list_int64_vector_index_init(list_vec_zero, 3);
-  space_sieve_linear_combination(list_vec, list_vec_zero, MSLLL, H,
-      array->number_element);
-  /*mat_int64_fprintf_comment(stdout, MSLLL);*/
+  unsigned int vector_1 = space_sieve_linear_combination(
+      list_vec, list_vec_zero, MSLLL, H, array->number_element);
   mat_int64_clear(MSLLL);
 
   list_int64_vector_index_sort_last(list_vec);
@@ -1100,7 +1109,19 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
           int64_vector_init(vec[i], Mqr->NumRows);
           mat_int64_extract_vector(vec[i], Mqr, i);
         }
-        SV4(list_SV, vec[0], vec[1], vec[2]);        
+        if (vector_1 && list_vec->length != 0) {
+          unsigned int cpt = 0;
+          while (cpt < list_vec->length && list_vec->v[cpt]->vec->c[2] < 2) {
+            if (list_vec->v[cpt]->vec->c[2] == 1) {
+              list_int64_vector_add_int64_vector(list_SV,
+                  list_vec->v[cpt]->vec);
+            }
+            cpt++;
+          }
+        } else {
+          ASSERT(vector_1 == 0);
+          SV4(list_SV, vec[0], vec[1], vec[2]);
+        }
         //TODO: Warning, reduce q lattice can ouput nothing.
         int boolean = reduce_qlattice(vec[0], vec[1], vec[0], vec[1],
             (uint64_t)(2 * H->h[0]));
