@@ -1266,3 +1266,5 @@ gf2x/toom.c
 gf2x/version.sh.in
 scripts/refresh-gf2x.sh
 config/string_join.cmake
+config/pclmul.c
+config/pclmul.cmake
