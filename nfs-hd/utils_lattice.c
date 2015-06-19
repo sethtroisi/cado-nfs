@@ -544,6 +544,7 @@ unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
 }
 
 //TODO: is it a good idea to retun 0 if fail?
+//TODO: index is not signed, why?
 uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
     uint64_t number_element)
 {
@@ -800,14 +801,10 @@ static unsigned int space_sieve_linear_combination(
               if (!int64_vector_in_list_zero(v_tmp, list_zero)) {
                 list_int64_vector_index_add_int64_vector_index(list_zero,
                     v_tmp, index_vector(v_tmp, H, number_element));
-                if (v_tmp->c[2] == 1) {
-                  vector_1 = 1;
-                }
               }
             }
           } else {
-            list_int64_vector_index_add_int64_vector_index(list, v_tmp,
-                index_vector(v_tmp, H, number_element));
+            list_int64_vector_index_add_int64_vector_index(list, v_tmp, 0);
             if (v_tmp->c[2] == 1) {
               vector_1 = 1;
             }
@@ -1087,6 +1084,11 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 
 #ifdef SPACE_SIEVE_CONTRIBUTION
         if (!s_change) {
+          if (list_vec->v[index_vec]->index == 0) {
+            list_vec->v[index_vec]->index =
+              index_vector(list_vec->v[index_vec]->vec, H,
+                  array->number_element);
+          }
           index_s = index_s + list_vec->v[index_vec]->index;
         } else {
           ASSERT(s_change == 1);
