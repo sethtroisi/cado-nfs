@@ -35,7 +35,6 @@
 #ifdef  HAVE_SYS_RESOURCE_H_
 #include <sys/resource.h>
 #endif  /*  HAVE_SYS_RESOURCE_H_ */
-#include <gmp.h>		// for random
 
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-thresholds.h"
