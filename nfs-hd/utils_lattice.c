@@ -886,18 +886,23 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 }
 
 void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
-    sieving_bound_srcptr H)
+    sieving_bound_srcptr H, uint64_t threshold_hit)
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
   skewness->c[0] = 1;
   skewness->c[1] = 1;
+  //TODO: bound?
   skewness->c[2] = (int64_t)(4 * H->h[0] * H->h[0] * H->h[0]) / (int64_t)r->ideal->r;
 
   mat_int64_t MSLLL;
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
   skew_LLL(MSLLL, Mqr, skewness);
   int64_vector_clear(skewness);
+
+  uint64_t nb_hit = 0;
+  uint64_t expected_hit = (uint64_t)(4 * H->h[0] * H->h[1] * H->h[2]) /
+    r->ideal->r;
 
   for (unsigned int col = 1; col <= MSLLL->NumCols; col++) {
     if (MSLLL->coeff[3][col] < 0) {
@@ -936,6 +941,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   int64_vector_t s;
   int64_vector_init(s, Mqr->NumRows);
   int64_vector_set_zero(s);
+  nb_hit++;
 
 #ifdef SPACE_SIEVE_CONTRIBUTION
   uint64_t index_s = array_int64_vector_index(s, H, array->number_element);
@@ -967,6 +973,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #endif // SPACE_SIEVE_CONTRIBUTION
 
       while (int64_vector_in_sieving_region(v_tmp, H)) {
+        nb_hit++;
 #ifdef SPACE_SIEVE_OUT
         list_int64_vector_add_int64_vector(list_out, v_tmp);
 #else
@@ -991,6 +998,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #endif // SPACE_SIEVE_CONTRIBUTION
 
       while (int64_vector_in_sieving_region(v_tmp, H)) {
+        nb_hit++;
 #ifdef SPACE_SIEVE_OUT
         list_int64_vector_add_int64_vector(list_out, v_tmp);
 #else
@@ -1060,6 +1068,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
       int64_vector_set(s, s_tmp);
 
       if (s->c[2] < (int64_t)H->h[2]) {
+        nb_hit++;
 #ifdef SPACE_SIEVE_OUT
         first_s = list_int64_vector_add_int64_vector(list_out, s);
 #else
@@ -1079,7 +1088,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #endif // SPACE_SIEVE_CONTRIBUTION
       }
     }
-    if (!hit) {
+    if (!hit && expected_hit - nb_hit >= threshold_hit) {
       ASSERT(hit == 0);
 
       /*fprintf(stderr, "# Need to plane sieve.\n");*/
@@ -1144,6 +1153,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
       int64_vector_init(v_new, s->dim);
       plane_sieve_1_incomplete(s_out, s, Mqr, H, list_FK, list_SV);
       if (int64_vector_in_sieving_region(s_out, H)) {
+        nb_hit++;
 #ifdef SPACE_SIEVE_OUT
         first_s = list_int64_vector_add_int64_vector(list_out, s_out);
 #else
