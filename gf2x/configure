@@ -795,6 +795,7 @@ enable_pclmul
 enable_fft_interface
 with_compile_warnings
 with_gmp
+with_mpir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1463,6 +1464,7 @@ Optional Packages:
   --without-compile-warnings
                           Disable warning verbosity
   --with-gmp=DIR          GMP installation directory
+  --with-mpir=DIR         MPIR installation directory
 
 Some influential environment variables:
   CC          C compiler command
@@ -16501,13 +16503,27 @@ if test "${with_gmp+set}" = set; then :
   withval=$with_gmp;
 		    CPPFLAGS="$CPPFLAGS -I$withval/include"
 		    LDFLAGS="$LDFLAGS -L$withval/lib"
+                    check_specifically_for=gmp
 
 fi
 
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for GMP" >&5
-$as_echo_n "checking for GMP... " >&6; }
-	LIBS="-lgmp $LIBS"
-	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+
+# Check whether --with-mpir was given.
+if test "${with_mpir+set}" = set; then :
+  withval=$with_mpir;
+		    CPPFLAGS="$CPPFLAGS -I$withval/include"
+		    LDFLAGS="$LDFLAGS -L$withval/lib"
+                    check_specifically_for=mpir
+
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for GMP or MPIR" >&5
+$as_echo_n "checking for GMP or MPIR... " >&6; }
+        save_LIBS="$LIBS"
+        found_gmp=
+        if ! [ "$check_specifically_for" ] || [ "$check_specifically_for" = "gmp" ] ; then
+            LIBS="-lgmp $save_LIBS"
+            cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include "gmp.h"
 int
@@ -16520,23 +16536,70 @@ mpz_t x;  mpz_init(x) ; mpz_clear(x);
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
+
+$as_echo "#define GF2X_HAVE_GMP_H 1" >>confdefs.h
+
+                    found_gmp=gmp
+
 else
 
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-		as_fn_error $? "libgmp not found or uses a different API. Please see the README file for issues with missing dependencies." "$LINENO" 5
+                    if [ "$check_specifically_for" ] ; then
+                    as_fn_error $? "libgmp not found or uses a different API. Please see the README file for issues with missing dependencies." "$LINENO" 5
+                    fi
 
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for recent GMP" >&5
-$as_echo_n "checking for recent GMP... " >&6; }
+        fi
+        if ! [ "$found_gmp" ] && [ "$check_specifically_for" != "gmp" ] ; then
+            LIBS="-lmpir $save_LIBS"
+            cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include "mpir.h"
+int
+main ()
+{
+mpz_t x;  mpz_init(x) ; mpz_clear(x);
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define GF2X_HAVE_MPIR_H 1" >>confdefs.h
+
+                    found_gmp=mpir
+
+else
+
+                    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+                    if [ "$check_specifically_for" ] ; then
+                    as_fn_error $? "libmpir not found or uses a different API. Please see the README file for issues with missing dependencies." "$LINENO" 5
+                    fi
+
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+        fi
+        if ! [ "$found_gmp" ] ; then
+                as_fn_error $? "neither GMP nor MPIR could be found, or perhaps there is one but which uses a different API. Please see the README file for issues with missing dependencies." "$LINENO" 5
+        fi
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for recent GMP or MPIR" >&5
+$as_echo_n "checking for recent GMP or MPIR... " >&6; }
 	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-	#include "gmp.h"
+	#include <$found_gmp.h>
 	#if (__GNU_MP_VERSION*100 + __GNU_MP_VERSION_MINOR*10 + __GNU_MP_VERSION_PATCHLEVEL < 432)
 	# error "Minimal GMP version is 4.3.2"
 	error

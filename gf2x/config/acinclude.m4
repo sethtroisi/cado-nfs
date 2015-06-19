@@ -287,24 +287,64 @@ AC_DEFUN([GF2X_CHECK_FOR_GMP],[
 		    [
 		    CPPFLAGS="$CPPFLAGS -I$withval/include"
 		    LDFLAGS="$LDFLAGS -L$withval/lib"
+                    check_specifically_for=gmp
 		    ])
-	AC_MSG_CHECKING(for GMP)
-	LIBS="-lgmp $LIBS"
-	AC_LINK_IFELSE(
-		[AC_LANG_PROGRAM(
-			[[#include "gmp.h"]],
-			[[mpz_t x;  mpz_init(x) ; mpz_clear(x);]]
-		)],
-		[AC_MSG_RESULT(yes)],
-		[
-		AC_MSG_RESULT(no)
-		AC_MSG_ERROR([libgmp not found or uses a different API. Please see the README file for issues with missing dependencies.])
-		])
-	AC_MSG_CHECKING(for recent GMP)
+	AC_ARG_WITH([mpir],
+		    [AS_HELP_STRING([--with-mpir=DIR],[MPIR installation directory])],
+		    [
+		    CPPFLAGS="$CPPFLAGS -I$withval/include"
+		    LDFLAGS="$LDFLAGS -L$withval/lib"
+                    check_specifically_for=mpir
+		    ])
+	AC_MSG_CHECKING(for GMP or MPIR)
+        save_LIBS="$LIBS"
+        found_gmp=
+        if ! [[ "$check_specifically_for" ]] || [[ "$check_specifically_for" = "gmp" ]] ; then
+            LIBS="-lgmp $save_LIBS"
+            AC_LINK_IFELSE(
+                    [AC_LANG_PROGRAM(
+                            [[#include "gmp.h"]],
+                            [[mpz_t x;  mpz_init(x) ; mpz_clear(x);]]
+                    )],
+                    [
+                    AC_MSG_RESULT(yes)
+                    AC_DEFINE([GF2X_HAVE_GMP_H], [1], [Define to 1 if the gmp.h header exists])
+                    found_gmp=gmp
+                    ],
+                    [
+                    AC_MSG_RESULT(no)
+                    if [[ "$check_specifically_for" ]] ; then
+                    AC_MSG_ERROR([libgmp not found or uses a different API. Please see the README file for issues with missing dependencies.])
+                    fi
+                    ])
+        fi
+        if ! [[ "$found_gmp" ]] && [[ "$check_specifically_for" != "gmp" ]] ; then
+            LIBS="-lmpir $save_LIBS"
+            AC_LINK_IFELSE(
+                    [AC_LANG_PROGRAM(
+                            [[#include "mpir.h"]],
+                            [[mpz_t x;  mpz_init(x) ; mpz_clear(x);]]
+                    )],
+                    [
+                    AC_MSG_RESULT(yes)
+                    AC_DEFINE([GF2X_HAVE_MPIR_H], [1], [Define to 1 if the mpir.h header exists])
+                    found_gmp=mpir
+                    ],
+                    [
+                    AC_MSG_RESULT(no)
+                    if [[ "$check_specifically_for" ]] ; then
+                    AC_MSG_ERROR([libmpir not found or uses a different API. Please see the README file for issues with missing dependencies.])
+                    fi
+                    ])
+        fi
+        if ! [[ "$found_gmp" ]] ; then
+                AC_MSG_ERROR([neither GMP nor MPIR could be found, or perhaps there is one but which uses a different API. Please see the README file for issues with missing dependencies.])
+        fi
+	AC_MSG_CHECKING(for recent GMP or MPIR)
 	AC_COMPILE_IFELSE(
 		[AC_LANG_SOURCE(
 		[[
-	#include "gmp.h"
+	#include <$found_gmp.h>
 	#if (__GNU_MP_VERSION*100 + __GNU_MP_VERSION_MINOR*10 + __GNU_MP_VERSION_PATCHLEVEL < 432)
 	# error "Minimal GMP version is 4.3.2"
 	error
