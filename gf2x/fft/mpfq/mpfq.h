@@ -252,36 +252,6 @@ static inline void malloc_failed() {
 }
 
 
-#if !GMP_VERSION_ATLEAST(5, 0, 0)
-static inline void mpn_copyi (mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
-    memmove(dst, src, n * sizeof(mp_limb_t));
-}
-static inline void mpn_copyd (mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
-    memmove(dst, src, n * sizeof(mp_limb_t));
-}
-static inline void mpn_zero (mp_limb_t * dst, mp_size_t n) {
-    memset(dst, 0, n * sizeof(mp_limb_t));
-}
-static inline mp_limb_t
-mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n)
-{
-  mp_size_t i;
-
-  for (i = 0; i < n; i++)
-    rp[i] = ~sp[i];
-  return mpn_add_1 (rp, rp, n, 1);
-}
-static inline void
-mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
-	   mp_size_t n)
-{
-  mp_size_t i;
-
-  for (i = 0; i < n; i++)
-    rp[i] = s1p[i] ^ s2p[i];
-}
-#endif /* GMP < 5.0.0 */
-
 /* Given the fact that copies are always very small, we're probably
  * better off giving the compiler the opportunity to optimize all this
  * away.

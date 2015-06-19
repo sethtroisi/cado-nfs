@@ -1438,37 +1438,6 @@ void gf2x_cantor_fft_ift(
 }
 
 
-// Main function:
-// Takes two arrays of 64 bit limbs and compute their
-// product as polynomials over GF(2). 
-// H must have room for the result (Fl+Gl limbs)
-void mulCantor(unsigned long * H, unsigned long * F, size_t Fl,
-        unsigned long * G, size_t Gl)
-{
-    gf2x_cantor_fft_info_t order;
-    gf2x_cantor_fft_ptr f, g;
-
-    size_t nF = Fl * GF2X_WORDSIZE;
-    size_t nG = Gl * GF2X_WORDSIZE;
-
-    gf2x_cantor_fft_init(order, nF, nG);
-
-    f = gf2x_cantor_fft_alloc(order, 1);
-    gf2x_cantor_fft_dft(order, f, F, nF);
-
-    g = gf2x_cantor_fft_alloc(order, 1);
-    gf2x_cantor_fft_dft(order, g, G, nG);
-
-    gf2x_cantor_fft_compose(order, f, (gf2x_cantor_fft_srcptr) f, (gf2x_cantor_fft_srcptr) g);
-
-    gf2x_cantor_fft_free(order, g, 1);
-    gf2x_cantor_fft_ift(order, H, nF + nG -1, f);
-
-    gf2x_cantor_fft_free(order, f, 1);
-
-    gf2x_cantor_fft_clear(order);
-}
-
 gf2x_cantor_fft_ptr gf2x_cantor_fft_alloc(const gf2x_cantor_fft_info_t p, size_t n)
 {
     return (Kelt *) malloc((n << p->k) * sizeof(Kelt));

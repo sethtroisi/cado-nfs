@@ -9,16 +9,6 @@ multiplying two binary polynomials using "additive FFT".
 
 The exported function are:
 
-void mulCantor(unsigned long *H, unsigned long *F, int Fl, unsigned long *G, int Gl);
-
-	multiplies two polynomials F(x) and G(x) and put the results in
-	H(x).  F(x) is represented in a dense way by an array F of Fl
-	blocks of w bits (where w is the bit width of unsigned long), the
-	same for G, with Gl blocks, and the result is put in the table H,
-	that must have room for Fl+Gl blocks of w bits.
-
-as well as other functions allowing FFT caching.
-
 extern void cantor_setup(cantor_info_t p, int nF, int nG);
 
 	sets up the appropriate data for multiplying polynomials having

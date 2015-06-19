@@ -58,16 +58,9 @@
 extern "C" {
 #endif
 
-    /* ??? */
-extern void mulCantor(unsigned long *H, unsigned long *F, size_t Fl, unsigned long *G, size_t Gl);
-
-
-
-// now for the gf2x-fft interface.
-//
-// note that we must implement some sort of fallback on the fake_fft
-// thing when the polynomials are too small, or something like this. The
-// gf2x-fft interface requires that any size can be used.
+// we must implement some sort of fallback on the fake_fft thing when the
+// polynomials are too small, or something like this. The gf2x-fft
+// interface requires that any size can be used.
 
 struct gf2x_cantor_fft_info_struct {
     unsigned int k;

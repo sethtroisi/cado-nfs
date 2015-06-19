@@ -37,7 +37,7 @@ binary-fields: mpfq-buildtree
 	$(MPFQ)/gf2n/gen_gf2n.pl helper=$(MPFQ_TEMP)/gf2n/helper/helper table=$(MPFQ_TEMP)/gf2x/wizard.table output_path=x86_64 n=64 w=64
 	$(MPFQ)/gf2n/gen_gf2n.pl helper=$(MPFQ_TEMP)/gf2n/helper/helper table=$(MPFQ_TEMP)/gf2x/wizard.table output_path=i386 n=128 w=32
 	$(MPFQ)/gf2n/gen_gf2n.pl helper=$(MPFQ_TEMP)/gf2n/helper/helper table=$(MPFQ_TEMP)/gf2x/wizard.table output_path=i386 n=64 w=32
-	patch -p2 -d. < better-integrate-gf2x.patch
+	patch -p3 -d. < better-integrate-gf2x.patch
 	-rm -f *.orig
 
 clean:

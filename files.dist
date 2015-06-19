@@ -1255,7 +1255,6 @@ gf2x/tests/check-mul.c
 gf2x/tests/check.c
 gf2x/tests/do-check-fft.sh
 gf2x/tests/do-check-mul.sh
-gf2x/tests/fft/Makefile.am
 gf2x/tests/generate-check-code.sh
 gf2x/tests/generate-fft-tests.pl
 gf2x/tests/test-tools.c
