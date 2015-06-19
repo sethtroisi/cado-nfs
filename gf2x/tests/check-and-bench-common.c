@@ -25,15 +25,18 @@
    02110-1301, USA.
 */
 
+#include "gf2x/gf2x-config.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
+#ifdef  HAVE_SYS_RESOURCE_H_
 #include <sys/resource.h>
+#endif  /*  HAVE_SYS_RESOURCE_H_ */
 #include <gmp.h>		// for random
 
-#include "gf2x/gf2x-config.h"
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-thresholds.h"
 
@@ -45,9 +48,13 @@ static long init_extra_arg = ENGINE_EXTRA_ARG_DEFAULT;
 // cputime in millisec.
 static int cputime()
 {
+#ifdef  HAVE_SYS_RESOURCE_H_
     struct rusage rus;
     getrusage(0, &rus);
     return rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
+#else
+    return 0;
+#endif
 }
 
 int time_total;

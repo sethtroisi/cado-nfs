@@ -30,7 +30,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <math.h>		// for random
 
 #include "gf2x.h"

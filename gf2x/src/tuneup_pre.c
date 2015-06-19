@@ -36,7 +36,6 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <string.h>
 
 /* gf2x is used for checking correctness -- not otherwise */

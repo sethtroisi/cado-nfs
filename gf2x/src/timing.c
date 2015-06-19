@@ -26,12 +26,15 @@
 */
 
 #include <sys/types.h>    /* for cputime */
+#ifdef HAVE_SYS_RESOURCE_H_
 #include <sys/resource.h> /* for cputime */
+#endif  /* HAVE_SYS_RESOURCE_H_ */
 #include <stdint.h>
 #include "timing.h"
 
 uint64_t microseconds()
 {
+#ifdef HAVE_SYS_RESOURCE_H_
         struct rusage res[1];
         getrusage(RUSAGE_SELF,res);
         uint64_t r;
@@ -39,4 +42,7 @@ uint64_t microseconds()
         r *= (uint64_t) 1000000UL;
         r += (uint64_t) res->ru_utime.tv_usec;
         return r;
+#else
+        return 0;
+#endif
 }
