@@ -375,6 +375,26 @@ index 7394af5..22c51e0 100644
  }
  
  /* *Mpfq::gf2n::squaring::code_for_sqr_ur */
+diff --git a/fft/mpfq/mpfq.h b/fft/mpfq/mpfq.h
+index 9240e1b..30d9cc7 100644
+--- a/fft/mpfq/mpfq.h
++++ b/fft/mpfq/mpfq.h
+@@ -8,7 +8,15 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++
++#ifdef  GF2X_HAVE_GMP_H
+ #include <gmp.h>
++#elif defined(GF2X_HAVE_MPIR_H)
++#include <mpir.h>
++#else
++#error "make sure gf2x-config-export.h is included before gf2x-cantor-fft.h"
++#endif
++
+ 
+ #ifdef __cplusplus
+ extern "C" {
 diff --git a/fft/mpfq/x86_64/mpfq_2_128.h b/fft/mpfq/x86_64/mpfq_2_128.h
 index bbb1866..f701c33 100644
 --- a/fft/mpfq/x86_64/mpfq_2_128.h

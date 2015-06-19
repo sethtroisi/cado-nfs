@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
     printf("#define GF2X_MUL1_H_\n");
     printf("\n");
     printf("/* This file was generated automatically with\n");
-    printf("   %s %u %u. Don't edit it! */\n",
+    printf("   %s %lu %lu. Don't edit it! */\n",
 	   argv[0], w, K);
     printf("\n");
     printf(
@@ -107,16 +107,16 @@ int main(int argc, char *argv[])
 	    printf("   long i;\n");
 	    printf("   unsigned long carry = 0, b;\n");
 	}
-	printf("   unsigned long hi, lo, tmp, A[%u];\n", 1 << K);
+	printf("   unsigned long hi, lo, tmp, A[%lu];\n", 1UL << K);
 	printf("\n");
 	printf("   A[0] = 0;\t\t");
 	/* do not truncate: fix non-considered bit products afterwards */
 	printf("A[1] = a;\n");
 	for (i = 2u; i < (1u << K); i++) {
 	    if (i % 2 == 0)
-		printf("   A[%u] = A[%u] << 1;\t", i, i / 2);
+		printf("   A[%lu] = A[%lu] << 1;\t", i, i / 2);
 	    else
-		printf("A[%u] = A[%u] ^ a;\n", i, i - 1);
+		printf("A[%lu] = A[%lu] ^ a;\n", i, i - 1);
 	}
 	printf("\n");
 
@@ -131,21 +131,21 @@ int main(int argc, char *argv[])
 	CHOP = w - CHOP;
 	/* now 1 <= CHOP <= 2 * K, with w - CHOP multiple of 2K */
 	if (CHOP <= K)		/* one slice is enough for the upper part */
-	    printf("   lo = A[b >> %u];\n", w - CHOP);
+	    printf("   lo = A[b >> %lu];\n", w - CHOP);
 	else			/* two slices for the upper part */
-	    printf("   lo = (A[b >> %u] << %u) ^ A[(b >> %u) & %lu];\n",
+	    printf("   lo = (A[b >> %lu] << %lu) ^ A[(b >> %lu) & %lu];\n",
 		   w - (CHOP - K), K,
 		   w - CHOP, MASK);
-	printf("   hi = lo >> %u;\n", w - 2 * K);
+	printf("   hi = lo >> %lu;\n", w - 2 * K);
 	for (i = w - CHOP - 2 * K; i >= 2 * K; i -= 2 * K) {
 	    printf
-		("   lo = (lo << %u) ^ (A[(b >> %u) & %lu] << %u) ^ A[(b >> %u) & %lu];\n",
+		("   lo = (lo << %lu) ^ (A[(b >> %lu) & %lu] << %lu) ^ A[(b >> %lu) & %lu];\n",
 		 2 * K, i + K, MASK, K, i, MASK);
-	    printf("   hi = (hi << %u) | (lo >> %u);\n", 2 * K, REM);
+	    printf("   hi = (hi << %lu) | (lo >> %lu);\n", 2 * K, REM);
 	}
 	/* special case for i=0 since a shift of 0 is undefined */
 	printf
-	    ("   lo = (lo << %u) ^ (A[(b >> %u) & %lu] << %u) ^ A[b & %lu];\n",
+	    ("   lo = (lo << %lu) ^ (A[(b >> %lu) & %lu] << %lu) ^ A[b & %lu];\n",
 	     2 * K, K, MASK, K, MASK);
 
 	/* now perform the repair step for 2*K */
@@ -159,11 +159,11 @@ int main(int argc, char *argv[])
 	    /* bit w-i from a was not considered in blocks of
 	       K bits from b for index j >= i */
 	    /* Gaudry's no-branching optimization */
-	    printf("   tmp = -((a >> %u) & 1);\n", w - i);
+	    printf("   tmp = -((a >> %lu) & 1);\n", w - i);
             if (w == 32) {
                 mask2 = (unsigned long) (uint32_t) mask2;
             }
-	    printf("   tmp &= ((b & 0x%lx) >> %u);\n", mask2, i);
+	    printf("   tmp &= ((b & 0x%lx) >> %lu);\n", mask2, i);
 	    printf("   hi = hi ^ tmp;\n");
 	    mask2 = (mask2 << 1) & MASK;
 	}

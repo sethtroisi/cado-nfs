@@ -8,7 +8,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef  GF2X_HAVE_GMP_H
 #include <gmp.h>
+#elif defined(GF2X_HAVE_MPIR_H)
+#include <mpir.h>
+#else
+#error "make sure gf2x-config-export.h is included before gf2x-cantor-fft.h"
+#endif
+
 
 #ifdef __cplusplus
 extern "C" {
