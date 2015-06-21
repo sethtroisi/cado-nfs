@@ -256,19 +256,37 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         A->vec_set_zero(A, xymats->v, bw->m*bw->interval);
         serialize(pi->m);
         for(int i = 0 ; i < bw->interval ; i++) {
+            /* The first part of this loop must be guaranteed to be free
+             * of any mpi calls */
             pi_interleaving_flip(pi);
-            timing_flip_timer(timing);
-            /* This segment must be guaranteed to be free of any mpi
-             * calls */
+
             /* Compute the product by x */
             x_dotprod(mmt, gxvecs, nx, xymats, i * bw->m, bw->m, 1);
-
-            
             matmul_top_mul_cpu(mmt, bw->dir);
+
+#ifdef MEASURE_LINALG_JITTER_TIMINGS
+            timing_next_timer(timing); /* now timer is [1] (cpu-wait) */
+#endif
             pi_interleaving_flip(pi);
-            timing_flip_timer(timing);
+            /* from this point on in the loop, mpi calls are allowed */
+#ifdef MEASURE_LINALG_JITTER_TIMINGS
+            /* This is *only* in order to be able to measure the wait
+             * times */
+            serialize(pi->m);
+#endif
+
+            timing_next_timer(timing); /* now timer is [2] (COMM) */ 
             /* Now we can resume MPI communications. */
             matmul_top_mul_comm(mmt, bw->dir);
+
+#ifdef MEASURE_LINALG_JITTER_TIMINGS
+            timing_next_timer(timing); /* now timer is [3] (comm-wait) */
+            /* This is *only* in order to be able to measure the wait
+             * times */
+            serialize(pi->m);
+#endif
+
+            timing_next_timer(timing);
             timing_check(pi, timing, s+i+1, tcan_print);
         }
         serialize(pi->m);
@@ -320,7 +338,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, 0);
     }
 
-    timing_final_tally("krylov", pi, timing, mmt->mm->ncoeffs, tcan_print);
+    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, 0);
 
 #if 0
     pi_log_clear(pi->m);
