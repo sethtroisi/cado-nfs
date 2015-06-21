@@ -774,6 +774,31 @@ static int int64_vector_in_list_zero(int64_vector_srcptr v_tmp,
   return 0;
 }
 
+static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
+    list_int64_vector_index_ptr list_zero, int64_vector_ptr v,
+    sieving_bound_srcptr H, int64_t number_element)
+{
+  unsigned int vector_1 = 0;
+  if (space_sieve_good_vector(v, H)) {
+    if (v->c[2] == 0) {
+      if (v->c[1] != 0 || v->c[0] != 0) {
+        int64_vector_reduce(v, v);
+        if (!int64_vector_in_list_zero(v, list_zero)) {
+          list_int64_vector_index_add_int64_vector_index(list_zero,
+              v, index_vector(v, H, number_element));
+        }
+      }
+    } else {
+      list_int64_vector_index_add_int64_vector_index(list, v, 0);
+      if (v->c[2] == 1) {
+        vector_1 = 1;
+      }
+    }
+  }
+  return vector_1;
+}
+
+
 //TODO: change that.
 static unsigned int space_sieve_linear_combination(
     list_int64_vector_index_ptr list, list_int64_vector_index_ptr list_zero,
@@ -794,22 +819,8 @@ static unsigned int space_sieve_linear_combination(
         int64_vector_mul(v_tmp, list_tmp->v[0], (int64_t)l);
         int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[1], (int64_t)m);
         int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[2], (int64_t)n);
-        if (space_sieve_good_vector(v_tmp, H)) {
-          if (v_tmp->c[2] == 0) {
-            if (v_tmp->c[1] != 0 || v_tmp->c[0] != 0) {
-              int64_vector_reduce(v_tmp, v_tmp);
-              if (!int64_vector_in_list_zero(v_tmp, list_zero)) {
-                list_int64_vector_index_add_int64_vector_index(list_zero,
-                    v_tmp, index_vector(v_tmp, H, number_element));
-              }
-            }
-          } else {
-            list_int64_vector_index_add_int64_vector_index(list, v_tmp, 0);
-            if (v_tmp->c[2] == 1) {
-              vector_1 = 1;
-            }
-          }
-        }
+        vector_1 = good_vector_in_list(list, list_zero, v_tmp, H,
+            number_element);
       }
     }
   }
@@ -823,6 +834,31 @@ static unsigned int space_sieve_linear_combination(
 
   return vector_1;
 }
+
+static void space_sieve_generate_new_vectors(
+    list_int64_vector_index_ptr list, list_int64_vector_index_ptr list_zero,
+    sieving_bound_srcptr H, uint64_t number_element)
+{
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, list->vector_dim);
+  unsigned int ind = list->length - 1;
+  for (unsigned int i = 0; i < ind; i++) {
+    //v_tmp = l * v[0] + n * v[1] + m * v[2]
+    int64_vector_set(v_tmp, list->v[ind]->vec);
+    int64_vector_add(v_tmp, v_tmp, list->v[i]->vec);
+    good_vector_in_list(list, list_zero, v_tmp, H, number_element);
+    int64_vector_set(v_tmp, list->v[ind]->vec);
+    int64_vector_sub(v_tmp, v_tmp, list->v[i]->vec);
+    good_vector_in_list(list, list_zero, v_tmp, H, number_element);
+  }
+
+  for (unsigned int i = 0; i < list_zero->length; i++) {
+    ASSERT(int64_vector_gcd(list_zero->v[i]->vec) == 1);
+  }
+
+  int64_vector_clear(v_tmp);
+}
+
 int int64_vector_in_sieving_region_dim(int64_vector_srcptr v,
     sieving_bound_srcptr H) {
   ASSERT(v->dim == H->t);
@@ -868,7 +904,6 @@ void plane_sieve_1_enum_plane_incomplete(int64_vector_ptr v_in,
   int64_vector_clear(v);
 }
 
-//SPACE_SIEVE_CONTRIBUTION is broken.
 void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
     MAYBE_UNUSED mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     list_int64_vector_srcptr list_FK, list_int64_vector_srcptr list_SV)
@@ -1187,7 +1222,8 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         uint64_t index_new = index_vector(v_new, H, array->number_element);
         list_int64_vector_index_add_int64_vector_index(list_vec, v_new,
             index_new);
-
+        space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
+            array->number_element);
 #ifdef SPACE_SIEVE_CONTRIBUTION
         index_s = index_s + index_new;
         array->array[index_s] = array->array[index_s] - r->log;
