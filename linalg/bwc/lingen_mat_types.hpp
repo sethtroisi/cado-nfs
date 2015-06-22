@@ -683,7 +683,26 @@ struct polmat { /* {{{ */
             where += stride();
         }
     }/*}}}*/
-    uint32_t crc() const { return crc32(x, ncols * colstride() * sizeof(uint32_t)); }
+    uint32_t crc() const {
+        if (stride() * sizeof(unsigned long) == BITS_TO_WORDS(ncoef, 64) * sizeof(uint64_t)) {
+            return crc32(x, ncols * nrows * stride() * sizeof(unsigned long));
+        } else {
+            /* otherwise it's gonna be painful...  */
+            ASSERT_ALWAYS(sizeof(unsigned long) == sizeof(uint32_t));
+            ASSERT_ALWAYS(stride() & 1);
+            cado_crc_lfsr l;
+            cado_crc_lfsr_init(l);
+            const uint32_t * xx = (const uint32_t *)(x);
+            uint32_t z = 0;
+            uint32_t w = 0;
+            for(unsigned int count = nrows * ncols ; count-- ; xx += stride()) {
+                w = cado_crc_lfsr_turn32_little(l, xx, stride() * sizeof(unsigned long));
+                w = cado_crc_lfsr_turn32_little(l, &z, sizeof(unsigned long));
+            }
+            cado_crc_lfsr_clear(l);
+            return w;
+        }
+    }
 };
 
 
@@ -698,7 +717,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
     unsigned int ncols;
     fft_type * po;
     private:
-    typename fft_type::t * x;
+    typename fft_type::ptr x;
     int   * _deg;
     // inline unsigned int stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }
     // inline unsigned int colstride() const { return nrows * stride(); }
@@ -773,7 +792,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
         po->zero(col(j), 1);
         deg(j) = -1;
     }
-    uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * po->size() * sizeof(typename fft_type::t)/sizeof(unsigned long)); }
+    uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * po->size() * sizeof(*x)); }
 };
 /*}}}*/
 
@@ -1001,6 +1020,8 @@ int operator()(unsigned int m, unsigned int n, unsigned int p, unsigned int nbit
 
 };
 
+template<typename T> struct remove_pointer {};
+template<typename T> struct remove_pointer<T*> {typedef T t;};
 
 template<typename fft_type, typename selector_type>
 void compose_inner(
@@ -1012,7 +1033,7 @@ void compose_inner(
     tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
     ASSERT(s1.ncols == s2.nrows);
     unsigned int nbits;
-    nbits = o.size() * sizeof(typename fft_type::t) * CHAR_BIT;
+    nbits = o.size() * sizeof(typename remove_pointer<typename fft_type::ptr>::t) * CHAR_BIT;
     if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
         compose_strassen(tmp, s1, s2, o, s);
     } else {
@@ -1021,7 +1042,7 @@ void compose_inner(
 #pragma omp parallel
 #endif  /* HAVE_OPENMP */
         {
-            typename fft_type::t * x = o.alloc(1);
+            typename fft_type::ptr x = o.alloc(1);
 	    /* This way of doing matrix multiplication is better for locality:
 	       in the inner loop, the first element s1[i,k] is constant,
 	       and in the second one s2[k,j], only the second index changes.

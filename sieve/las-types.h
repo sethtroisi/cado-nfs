@@ -188,6 +188,7 @@ struct las_info_s {
     int nb_threads;
     FILE *output;
     const char * outputname; /* keep track of whether it's gzipped or not */
+    const char * galois; /* a string to indicate which galois to use in las */
     int verbose;
     int suppress_duplicates;
 

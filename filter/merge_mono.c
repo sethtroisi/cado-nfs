@@ -175,7 +175,7 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 static void
 removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 {
-  unsigned int k;
+    unsigned int k;
 
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW)
@@ -198,9 +198,9 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
   unsigned int k;
 
-    mat->weight += matLengthRow(mat, i);
-    for(k = 1; k <= matLengthRow(mat, i); k++)
-	addCellAndUpdate(mat, i, matCell(mat, i, k));
+  mat->weight += matLengthRow(mat, i);
+  for(k = 1; k <= matLengthRow(mat, i); k++)
+    addCellAndUpdate(mat, i, matCell(mat, i, k));
 }
 
 // realize mat[i1] += mat[i2] and update the data structure.
@@ -219,7 +219,7 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
 static int
 removeSingletons(report_t *rep, filter_matrix_t *mat)
 {
-  index_t j;
+    index_t j;
     int njrem = 0;
 
     for(j = 0; j < mat->ncols; j++)
@@ -644,15 +644,15 @@ number_of_superfluous_rows(filter_matrix_t *mat)
     if(kappa <= (1<<4))
       ni2rem = mat->keep / 2;
     else if(kappa <= (1<<5))
-	ni2rem = mat->keep * (kappa/4);
+      ni2rem = mat->keep * (kappa/4);
     else if(kappa <= (1<<10))
-	ni2rem = mat->keep * (kappa/8);
+      ni2rem = mat->keep * (kappa/8);
     else if(kappa <= (1<<15))
-	ni2rem = mat->keep * (kappa/16);
+      ni2rem = mat->keep * (kappa/16);
     else if(kappa <= (1<<20))
-	ni2rem = mat->keep * (kappa/32);
+      ni2rem = mat->keep * (kappa/32);
     else
-	ni2rem = mat->keep * (kappa/64);
+      ni2rem = mat->keep * (kappa/64);
     return ni2rem;
 }
 
@@ -670,10 +670,10 @@ void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                int forbw, double ratio, double coverNmax, int64_t nbmergemax)
 {
-    double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
-    int njrem = 0;
-    int ni2rem;
-    int32_t j, mkz;
+  double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
+  int njrem = 0;
+  int ni2rem;
+  int32_t j, mkz;
   double REPORT = 20.0; /* threshold of w/N from which reports are done */
                         /* on stdout                                    */
   double FREQ_REPORT = 5.0; /* Once the threshold is exceeded, this is added */
@@ -686,8 +686,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
   printf ("# Using %s to compute the merges\n", __func__);
 
-    // clean things
-    njrem = removeSingletons(rep, mat);
+  // clean things
+  njrem = removeSingletons(rep, mat);
 
   nb_merges = (uint64_t *) malloc ((maxlevel + 1) * sizeof (uint64_t));
   ASSERT_ALWAYS (nb_merges != NULL);
@@ -705,19 +705,19 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
       printf ("nbmergemax=%" PRId64 " reached, stopping.\n", nbmergemax);
       break;
     }
-	  if (forbw == 0 && ((double) WN_cur > ratio * (double) WN_min))
+    if (forbw == 0 && ((double) WN_cur > ratio * (double) WN_min))
     {
       printf ("WN=%.2f*WN_min, stopping.\n", (double) WN_cur / (double) WN_min);
       break;
     }
-	  else if (forbw == 3 && WoverN >= coverNmax)
+    else if (forbw == 3 && WoverN >= coverNmax)
     {
       printf ("W/N=%.2f too high, stopping.\n", WoverN);
       break;
     }
-	  else if(forbw == 1 && ncost >= ncostmax)
+    else if(forbw == 1 && ncost >= ncostmax)
     {
-		  printf ("WN value increased %u times in a row, stopping.\n", ncost);
+      printf ("WN value increased %u times in a row, stopping.\n", ncost);
       break;
     }
 
@@ -739,18 +739,24 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     }
 #endif
     if (m == 1) /* singleton ideal */
-      removeColDefinitely(rep, mat, j);
-    else if (m > 0)
-      mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel, j);
+        removeColDefinitely(rep, mat, j);
+    else if (m > 0) {
+        if (nb_merges[m] == 0 && m > 1) {
+            fprintf(rep->outfile, "## First %d-merge\n", m);
+        }
+        fprintf(rep->outfile, "#\n");
+        mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel, j);
+    }
 
-    if (nb_merges[m]++ == 0 && m > 1)
+    if (nb_merges[m]++ == 0 && m > 1) {
       printf ("First %d-merge, cost %d (#Q=%d)\n", m, mkz,
-                                           MkzQueueCardinality(mat->MKZQ));
+          MkzQueueCardinality(mat->MKZQ));
+    }
 
     /* Update values and report if necessary */
     nbmerge++;
     WoverN = compute_WoverN(mat);
-	  WN_prev = WN_cur;
+    WN_prev = WN_cur;
     WN_cur = compute_WN(mat);
     if (WN_cur > WN_prev)
       ncost++;
@@ -766,7 +772,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
       ni2rem = number_of_superfluous_rows (mat);
       deleteSuperfluousRows (rep, mat, ni2rem, m);
       print_report (mat);
-	  }
+    }
   }
 
   if (nbmergemax < 0)

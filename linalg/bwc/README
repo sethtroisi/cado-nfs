@@ -595,7 +595,7 @@ Using bwc.pl
     More extensive documentation in bwc.pl is included in the file
     header.
 
-Using bwc.pl with MPI (updated 20120704)
+Using bwc.pl with MPI (updated 20150611)
 =====================
 
     1) first you have to compile CADO-NFS with MPI support:
@@ -621,6 +621,17 @@ Using bwc.pl with MPI (updated 20120704)
        mpi_extra_args= this is needed for openmpi
 
     $ bwc.pl :complete seed=1 thr=2x2 mpi=2x2 hosts=andouille,chipolata,chorizo,merguez matrix=/localdisk/tmp/nfs/c156.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+
+Note: Some additional scheduler-specific bits and pieces (consider them as
+example documentation status only -- none are part of regular tests):
+    OAR : scripts/cluster/bwc-cluster-oar.sh
+    openpbs/torque : linalg/bwc/README.TORQUE
+    Oracle SGE : scripts/cluster/sge-linalg.pl
+
+If you intend to only use one sequence, it's not very difficult. If you
+want to do several sequences, you have to split the :complete meta-step
+into several, and run them at the appropriate moments. This also works,
+but requires you to know a bit what you're doing.
 
 Cpu binding (updated 20141002)
 ===========

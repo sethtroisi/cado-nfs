@@ -1,22 +1,21 @@
 #include "cado.h"
-
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <inttypes.h> /* for PRIx64 macro and strtoumax */
 #include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <sys/time.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
 #include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <list>
-#include <string.h>
 #include <cstdio>
 #include <gmp.h>
 #include <errno.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <utility>
 #include <vector>
@@ -347,7 +346,7 @@ std::string intlist_to_string(iterator t0, iterator t1)
 // polynomials.
 void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
 {
-    printf("Computing final F from PI\n");
+    printf("Computing final F from PI (crc(pi)=%" PRIx32 ")\n", pi.crc());
     using namespace globals;
     // We take t0 rows, so that we can do as few shifts as possible
     // tmpmat is used only within the inner loop.
@@ -480,7 +479,7 @@ void bw_commit_f(polmat& F)
     using namespace std;
 
     /* Say n' columns are said interesting. We'll pad these to n */
-    printf("Writing F files\n");
+    printf("Writing F files (crc: %" PRIx32 ")\n", F.crc());
 
     unsigned int * pick = (unsigned int *) malloc(n * sizeof(unsigned int));
     memset(pick, 0, n * sizeof(unsigned int));
@@ -1003,7 +1002,15 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     for(unsigned int j = 0 ; j < E.ncols ; j++) {
         E.deg(j) = deg;
     }
-    polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
+    /* There's a nasty bug. Revealed by 32-bits, but can occur on larger
+     * sizes too. Le W be the word size. When E has length W + epsilon,
+     * pi_deg_bound(W+epsilon) may be < W. So that we may have tmp_pi and
+     * E have stride 1 and 2 respectively. However, in
+     * lingen_qcode_do_tmpl, we fill the pointers in tmp_pi (optrs[]
+     * there) using the stride of E. This is not proper. A kludge is to
+     * make them compatible.
+     */
+    polmat tmp_pi(m + n, m + n, deg + 1); // pi_deg_bound(deg) + 1);
 
     bool finished = false;
 
@@ -1158,6 +1165,8 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 
 #if 1
     /* Arrange so that we recurse on sizes which are multiples of ULONG_BITS. */
+    /* (note that for reproducibility across different machines, forcing
+     * 64 is better) */
     if (E_length > ULONG_BITS && llen % ULONG_BITS != 0) {
         llen += ULONG_BITS - (llen % ULONG_BITS);
         rlen = E_length - llen;
@@ -1194,7 +1203,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     /* The transform() calls expect a number of coefficients, not a
      * degree. */
     transform(E_hat, E, o, E_length);
-    logline_end(&t_dft_E, "");
+    logline_end(NULL, "");
 
 
     /* ditto for this one */
@@ -1390,17 +1399,29 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
     
     tim.push();
 
+    /*
+    logline_begin(stdout, UINT_MAX, "t=%u E_checksum() = (%lu, %" PRIx32 ")",
+            t, E.ncoef, E.crc());
+    logline_end(NULL, "");
+    */
+
     if (deg_E <= lingen_threshold) {
         b = go_quadratic(pi);
     } else if (deg_E < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<fake_fft>(pi, tim);
+        b = go_recursive<gf2x_fake_fft>(pi, tim);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<c128_fft>(pi, tim);
+        b = go_recursive<gf2x_cantor_fft>(pi, tim);
     }
+
+    /*
+    logline_begin(stdout, UINT_MAX, "t=%u pi_checksum(%u,%u,%u) = (%lu, %" PRIx32 ")",
+            t, t0, t, deg_E+1, pi.maxlength(), pi.crc());
+    logline_end(NULL, "");
+    */
 
     tim.pop(t);
 

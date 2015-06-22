@@ -598,7 +598,7 @@ dep_do_one_part_of_iter (dep_read_data_t *data, bit_vector not_used,
   {
     if (bit_vector_getbit(not_used, (size_t) i))
     {
-      index_t h;
+      index_t h = 0; // Placate gcc
       weight_t nb = dep_nb_unknown_log(data, i, &h);
       if (nb <= 1)
       {
