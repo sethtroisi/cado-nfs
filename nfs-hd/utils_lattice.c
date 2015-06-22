@@ -835,7 +835,7 @@ static unsigned int space_sieve_linear_combination(
   return vector_1;
 }
 
-static void space_sieve_generate_new_vectors(
+MAYBE_UNUSED static void space_sieve_generate_new_vectors(
     list_int64_vector_index_ptr list, list_int64_vector_index_ptr list_zero,
     sieving_bound_srcptr H, uint64_t number_element)
 {
@@ -928,7 +928,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 }
 
 void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
-    sieving_bound_srcptr H, uint64_t threshold_hit)
+    sieving_bound_srcptr H, MAYBE_UNUSED double threshold_hit)
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
@@ -942,9 +942,14 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   skew_LLL(MSLLL, Mqr, skewness);
   int64_vector_clear(skewness);
 
+#ifdef SPACE_SIEVE_CUT_EARLY
   uint64_t nb_hit = 0;
-  uint64_t expected_hit = (uint64_t)(4 * H->h[0] * H->h[1] * H->h[2]) /
-    r->ideal->r;
+#endif // SPACE_SIEVE_CUT_EARLY
+
+#ifdef SPACE_SIEVE_CUT_EARLY
+  double expected_hit = (double)(4 * H->h[0] * H->h[1] * H->h[2]) /
+    (double)r->ideal->r;
+#endif // SPACE_SIEVE_CUT_EARLY
 
   for (unsigned int col = 1; col <= MSLLL->NumCols; col++) {
     if (MSLLL->coeff[3][col] < 0) {
@@ -982,7 +987,10 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   int64_vector_t s;
   int64_vector_init(s, Mqr->NumRows);
   int64_vector_set_zero(s);
+
+#ifdef SPACE_SIEVE_CUT_EARLY
   nb_hit++;
+#endif // SPACE_SIEVE_CUT_EARLY
 
 #ifdef SPACE_SIEVE_CONTRIBUTION
   uint64_t index_s = array_int64_vector_index(s, H, array->number_element);
@@ -1014,7 +1022,10 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #endif // SPACE_SIEVE_CONTRIBUTION
 
       while (int64_vector_in_sieving_region(v_tmp, H)) {
+#ifdef SPACE_SIEVE_CUT_EARLY
         nb_hit++;
+#endif // SPACE_SIEVE_CUT_EARLY
+
 #ifdef SPACE_SIEVE_OUT
         list_int64_vector_add_int64_vector(list_out, v_tmp);
 #else
@@ -1039,7 +1050,10 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #endif // SPACE_SIEVE_CONTRIBUTION
 
       while (int64_vector_in_sieving_region(v_tmp, H)) {
+#ifdef SPACE_SIEVE_CUT_EARLY
         nb_hit++;
+#endif // SPACE_SIEVE_CUT_EARLY
+
 #ifdef SPACE_SIEVE_OUT
         list_int64_vector_add_int64_vector(list_out, v_tmp);
 #else
@@ -1109,7 +1123,10 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
       int64_vector_set(s, s_tmp);
 
       if (s->c[2] < (int64_t)H->h[2]) {
+#ifdef SPACE_SIEVE_CUT_EARLY
         nb_hit++;
+#endif // SPACE_SIEVE_CUT_EARLY
+
 #ifdef SPACE_SIEVE_OUT
         first_s = list_int64_vector_add_int64_vector(list_out, s);
 #else
@@ -1134,10 +1151,15 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #endif // SPACE_SIEVE_CONTRIBUTION
       }
     }
-    if (!hit && expected_hit - nb_hit >= threshold_hit) {
+#ifdef SPACE_SIEVE_CUT_EARLY
+    if (!hit && (double)expected_hit - (double)nb_hit >=
+        (double)threshold_hit) {
+#else
+    if (!hit) {
+
+#endif // SPACE_SIEVE_CUT_EARLY
       ASSERT(hit == 0);
 
-      /*fprintf(stderr, "# Need to plane sieve.\n");*/
       if (!plane_sieve) {
         ASSERT(plane_sieve == 0);
 
@@ -1211,7 +1233,10 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
       int64_vector_init(v_new, s->dim);
       plane_sieve_1_incomplete(s_out, s, Mqr, H, list_FK, list_SV);
       if (int64_vector_in_sieving_region(s_out, H)) {
+#ifdef SPACE_SIEVE_CUT_EARLY
         nb_hit++;
+#endif // SPACE_SIEVE_CUT_EARLY
+
 #ifdef SPACE_SIEVE_OUT
         first_s = list_int64_vector_add_int64_vector(list_out, s_out);
 #else
@@ -1222,8 +1247,13 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         uint64_t index_new = index_vector(v_new, H, array->number_element);
         list_int64_vector_index_add_int64_vector_index(list_vec, v_new,
             index_new);
+        //TODO: do that rarely.
+        //
+#ifdef SPACE_SIEVE_ENTROPY
         space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
             array->number_element);
+#endif // SPACE_SIEVE_ENTROPY
+
 #ifdef SPACE_SIEVE_CONTRIBUTION
         index_s = index_s + index_new;
         array->array[index_s] = array->array[index_s] - r->log;
@@ -1235,6 +1265,12 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
       int64_vector_clear(s_out);
       int64_vector_clear(v_new);
     }
+#ifdef SPACE_SIEVE_CUT_EARLY
+    else if (!hit) {
+      int64_vector_clear(s_tmp);
+      break;
+    }
+#endif // SPACE_SIEVE_CUT_EARLY
     int64_vector_clear(s_tmp);
   }
 
