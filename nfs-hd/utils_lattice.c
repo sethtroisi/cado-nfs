@@ -744,14 +744,50 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
   double_vector_clear(v_tmp);
 }
 
+static void reduce_qlattice_output(int64_vector_ptr v0, 
+    int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I)
+{
+  ASSERT(v0_root->c[1] == 0);
+  ASSERT(v1_root->c[1] > 0);
+  ASSERT(v0_root->dim == v1_root->dim);
+  ASSERT(v0->dim == v0_root->dim);
+  ASSERT(I > 0);
+#ifndef NDEBUG
+  for (unsigned int i = 3; i < v1_root->dim; i++) {
+    ASSERT(v0_root->c[i] == v1_root->c[i]);
+    ASSERT(v0_root->c[i] == 0);
+  }
+#endif // NDEBUG
+
+  int64_vector_set(v0, v0_root);
+  int64_t k = 0;
+  if (v1_root->c[0] > 0) {
+    //k = ceil((I + r - a) / a)
+    k = (int64_t) ceil((double)(I + v0->c[0] - v1_root->c[0]) / (double)v1_root->c[0]);
+    v0->c[0] = v0->c[0] - k * v1_root->c[0];
+    ASSERT(v0->c[0] <= 0);
+  } else {
+    //k = floor((I - r + a) / a)
+    k = (int64_t) floor((double)(I - v0->c[0] + v1_root->c[0]) / (double)v1_root->c[0]);
+    v0->c[0] = v0->c[0] + k * v1_root->c[0];
+    ASSERT(v0->c[0] >= 0);
+  }
+
+  ASSERT(k >= 0);
+
+  v0->c[1] = k * v1_root->c[1];
+
+  //TODO: add assert here.
+}
+
 static int space_sieve_good_vector(int64_vector_srcptr v,
     sieving_bound_srcptr H)
 {
   ASSERT(v->dim == H->t);
 
   for (unsigned int i = 0; i < v->dim - 1; i++) {
-    if ((-2 * (int64_t)H->h[i]) > v->c[i] ||
-        (2 * (int64_t)H->h[i]) < v->c[i]) {
+    if ((-2 * (int64_t)H->h[i]) >= v->c[i] ||
+        (2 * (int64_t)H->h[i]) <= v->c[i]) {
       return 0;
     }
   }
@@ -766,6 +802,7 @@ static int int64_vector_in_list_zero(int64_vector_srcptr v_tmp,
 {
   for (unsigned int i = 0; i < list_zero->length; i++) {
     for (unsigned int j = 0; j < v_tmp->dim - 1; j++) {
+      //TODO: ABS is no longer required.
       if (ABS(v_tmp->c[j]) == ABS(list_zero->v[i]->vec->c[j])) {
         return 1;
       }
@@ -782,13 +819,19 @@ static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
   if (space_sieve_good_vector(v, H)) {
     if (v->c[2] == 0) {
       if (v->c[1] != 0 || v->c[0] != 0) {
+        //TODO: Reduce early (top of the fuction)
         int64_vector_reduce(v, v);
+        if (v->c[1] < 0) {
+          v->c[0] = -v->c[0];
+          v->c[1] = -v->c[1];
+        }
         if (!int64_vector_in_list_zero(v, list_zero)) {
           list_int64_vector_index_add_int64_vector_index(list_zero,
               v, index_vector(v, H, number_element));
         }
       }
     } else {
+      //TODO: why not reduce the vector v.
       list_int64_vector_index_add_int64_vector_index(list, v, 0);
       if (v->c[2] == 1) {
         vector_1 = 1;
@@ -797,7 +840,6 @@ static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
   }
   return vector_1;
 }
-
 
 //TODO: change that.
 static unsigned int space_sieve_linear_combination(
@@ -819,6 +861,8 @@ static unsigned int space_sieve_linear_combination(
         int64_vector_mul(v_tmp, list_tmp->v[0], (int64_t)l);
         int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[1], (int64_t)m);
         int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[2], (int64_t)n);
+        //TODO: reduce number of vector with l in [-1, 2], m in [0, 2[ and n in
+        //[1, 2[ and multiply by -1 if z is negative.
         vector_1 = good_vector_in_list(list, list_zero, v_tmp, H,
             number_element);
       }
@@ -835,7 +879,8 @@ static unsigned int space_sieve_linear_combination(
   return vector_1;
 }
 
-MAYBE_UNUSED static void space_sieve_generate_new_vectors(
+#ifdef SPACE_SIEVE_ENTROPY
+static void space_sieve_generate_new_vectors(
     list_int64_vector_index_ptr list, list_int64_vector_index_ptr list_zero,
     sieving_bound_srcptr H, uint64_t number_element)
 {
@@ -858,6 +903,7 @@ MAYBE_UNUSED static void space_sieve_generate_new_vectors(
 
   int64_vector_clear(v_tmp);
 }
+#endif // SPACE_SIEVE_ENTROPY
 
 int int64_vector_in_sieving_region_dim(int64_vector_srcptr v,
     sieving_bound_srcptr H) {
@@ -928,7 +974,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 }
 
 void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
-    sieving_bound_srcptr H, MAYBE_UNUSED double threshold_hit)
+    sieving_bound_srcptr H)
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
@@ -941,6 +987,9 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
   skew_LLL(MSLLL, Mqr, skewness);
   int64_vector_clear(skewness);
+#ifdef SPACE_SIEVE_ENTROPY
+  unsigned int entropy = 0;
+#endif // SPACE_SIEVE_ENTROPY
 
 #ifdef SPACE_SIEVE_CUT_EARLY
   uint64_t nb_hit = 0;
@@ -1153,7 +1202,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
     if (!hit && ((double)expected_hit - (double)nb_hit) / (double)nb_hit >=
-        (double)threshold_hit) {
+        SPACE_SIEVE_CUT_EARLY) {
 #else
     if (!hit) {
 #endif // SPACE_SIEVE_CUT_EARLY
@@ -1181,8 +1230,39 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
           SV4(list_SV, vec[0], vec[1], vec[2]);
         }
         //TODO: Warning, reduce q lattice can ouput nothing.
-        int boolean = reduce_qlattice(vec[0], vec[1], vec[0], vec[1],
+        //TODO: Warning, reduce_qlatticeoutput can ouput nothing (and the
+        //function say nothing at this tim (and the function say nothing at
+        //this time.
+        int boolean = 0;
+        if (list_vec_zero->length == 0) {
+          boolean = reduce_qlattice(vec[0], vec[1], vec[0], vec[1],
             (uint64_t)(2 * H->h[0]));
+        } else if (list_vec_zero->length == 1) {
+          reduce_qlattice_output(vec[0], vec[0], list_vec_zero->v[0]->vec,
+            (uint64_t)(2 * H->h[0]));
+          if (0 >= vec[0]->c[0]) {
+            int64_vector_set(vec[1], list_vec_zero->v[0]->vec);
+          } else {
+            int64_vector_set(vec[1], vec[0]);
+            int64_vector_set(vec[0], list_vec_zero->v[0]->vec);
+          }
+          //TODO: remove that because reduce_qlattice_output can output
+          //nothing.
+          boolean = 1;
+        } else {
+          ASSERT(list_vec_zero->length == 2);
+          if (0 >= list_vec_zero->v[0]->vec->c[0]) {
+            int64_vector_set(vec[0], list_vec_zero->v[0]->vec);
+            int64_vector_set(vec[1], list_vec_zero->v[1]->vec);
+          } else {
+            int64_vector_set(vec[1], list_vec_zero->v[0]->vec);
+            int64_vector_set(vec[0], list_vec_zero->v[1]->vec);
+          }
+          //TODO: remove that because reduce_qlattice_output can output
+          //nothing.
+          boolean = 1;
+        }
+
         if (boolean == 0) {
           fprintf(stderr,
               "# Plane sieve (called by space sieve does not support this type of Mqr.\n");
@@ -1206,6 +1286,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 
           return;
         }
+        //TODO: Go up, and just when we need.
         list_int64_vector_add_int64_vector(list_FK, vec[0]);
         list_int64_vector_add_int64_vector(list_FK, vec[1]);
         if (space_sieve_good_vector(vec[0], H)) {
@@ -1249,8 +1330,11 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         //TODO: do that rarely.
         //
 #ifdef SPACE_SIEVE_ENTROPY
-        space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
-            array->number_element);
+        if (entropy < SPACE_SIEVE_ENTROPY) {
+          space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
+              array->number_element);
+          entropy++;
+        }
 #endif // SPACE_SIEVE_ENTROPY
 
 #ifdef SPACE_SIEVE_CONTRIBUTION
