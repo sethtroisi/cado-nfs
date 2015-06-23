@@ -821,11 +821,10 @@ static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
     sieving_bound_srcptr H, int64_t number_element)
 {
   unsigned int vector_1 = 0;
+  int64_vector_reduce(v, v);
   if (space_sieve_good_vector(v, H)) {
     if (v->c[2] == 0) {
       if (v->c[1] != 0 || v->c[0] != 0) {
-        //TODO: Reduce early (top of the fuction)
-        int64_vector_reduce(v, v);
         if (v->c[1] < 0) {
           v->c[0] = -v->c[0];
           v->c[1] = -v->c[1];
@@ -836,7 +835,6 @@ static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
         }
       }
     } else {
-      //TODO: why not reduce the vector v.
       list_int64_vector_index_add_int64_vector_index(list, v, 0);
       if (v->c[2] == 1) {
         vector_1 = 1;
@@ -860,17 +858,18 @@ static unsigned int space_sieve_linear_combination(
   int64_vector_t v_tmp;
   int64_vector_init(v_tmp, MSLLL->NumRows);
   for (int64_t l = -1; l < 2; l++) {
-    for (int64_t m = -1; m < 2; m++) {
-      for (int64_t n = -1; n < 2; n++) {
-        //v_tmp = l * v[0] + n * v[1] + m * v[2]
-        int64_vector_mul(v_tmp, list_tmp->v[0], (int64_t)l);
-        int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[1], (int64_t)m);
-        int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[2], (int64_t)n);
-        //TODO: reduce number of vector with l in [-1, 2], m in [0, 2[ and n in
-        //[1, 2[ and multiply by -1 if z is negative.
-        vector_1 = good_vector_in_list(list, list_zero, v_tmp, H,
-            number_element);
+    for (int64_t m = 0; m < 2; m++) {
+      //v_tmp = l * v[0] + n * v[1] + 1 * v[2]
+      int64_vector_mul(v_tmp, list_tmp->v[0], (int64_t)l);
+      int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[1], (int64_t)m);
+      int64_vector_add(v_tmp, v_tmp, list_tmp->v[2]);
+      if (v_tmp->c[2] < 0) {
+        for (unsigned int i = 0; i < v_tmp->dim; i++) {
+          v_tmp->c[i] = -v_tmp->c[i];
+        }
       }
+      vector_1 = good_vector_in_list(list, list_zero, v_tmp, H,
+          number_element);
     }
   }
 
