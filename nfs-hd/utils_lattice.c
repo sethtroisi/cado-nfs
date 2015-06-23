@@ -744,11 +744,11 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
   double_vector_clear(v_tmp);
 }
 
-static void reduce_qlattice_output(int64_vector_ptr v0, 
+static int reduce_qlattice_output(int64_vector_ptr v0, 
     int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I)
 {
   ASSERT(v0_root->c[1] == 0);
-  ASSERT(v1_root->c[1] > 0);
+  ASSERT(v1_root->c[1] >= 0);
   ASSERT(v0_root->dim == v1_root->dim);
   ASSERT(v0->dim == v0_root->dim);
   ASSERT(I > 0);
@@ -758,6 +758,11 @@ static void reduce_qlattice_output(int64_vector_ptr v0,
     ASSERT(v0_root->c[i] == 0);
   }
 #endif // NDEBUG
+
+  //TODO: not sure that only this case can fail.
+  if (v1_root->c[0] == 0 || v1_root->c[1] == 0) {
+    return 0;
+  }
 
   int64_vector_set(v0, v0_root);
   int64_t k = 0;
@@ -776,8 +781,8 @@ static void reduce_qlattice_output(int64_vector_ptr v0,
   ASSERT(k >= 0);
 
   v0->c[1] = k * v1_root->c[1];
-
-  //TODO: add assert here.
+ 
+  return 1;
 }
 
 static int space_sieve_good_vector(int64_vector_srcptr v,
@@ -1229,26 +1234,19 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
           ASSERT(vector_1 == 0);
           SV4(list_SV, vec[0], vec[1], vec[2]);
         }
-        //TODO: Warning, reduce q lattice can ouput nothing.
-        //TODO: Warning, reduce_qlatticeoutput can ouput nothing (and the
-        //function say nothing at this tim (and the function say nothing at
-        //this time.
         int boolean = 0;
         if (list_vec_zero->length == 0) {
           boolean = reduce_qlattice(vec[0], vec[1], vec[0], vec[1],
             (uint64_t)(2 * H->h[0]));
         } else if (list_vec_zero->length == 1) {
-          reduce_qlattice_output(vec[0], vec[0], list_vec_zero->v[0]->vec,
-            (uint64_t)(2 * H->h[0]));
+          boolean = reduce_qlattice_output(vec[0], vec[0],
+              list_vec_zero->v[0]->vec, (uint64_t)(2 * H->h[0]));
           if (0 >= vec[0]->c[0]) {
             int64_vector_set(vec[1], list_vec_zero->v[0]->vec);
           } else {
             int64_vector_set(vec[1], vec[0]);
             int64_vector_set(vec[0], list_vec_zero->v[0]->vec);
           }
-          //TODO: remove that because reduce_qlattice_output can output
-          //nothing.
-          boolean = 1;
         } else {
           ASSERT(list_vec_zero->length == 2);
           if (0 >= list_vec_zero->v[0]->vec->c[0]) {
@@ -1258,14 +1256,19 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
             int64_vector_set(vec[1], list_vec_zero->v[0]->vec);
             int64_vector_set(vec[0], list_vec_zero->v[1]->vec);
           }
-          //TODO: remove that because reduce_qlattice_output can output
-          //nothing.
           boolean = 1;
         }
 
+        ASSERT(vec[0]->c[0] > -(int64_t)(2 * H->h[0]));
+        ASSERT(0 >= vec[0]->c[0]);
+        ASSERT(0 <= vec[1]->c[0]);
+        ASSERT(vec[1]->c[0] < (int64_t)(2 * H->h[0]));
+        ASSERT(vec[0]->c[1] > 0);
+        ASSERT(vec[1]->c[1] > 0);
+
         if (boolean == 0) {
           fprintf(stderr,
-              "# Plane sieve (called by space sieve does not support this type of Mqr.\n");
+              "# Plane sieve (called by space sieve) does not support this type of Mqr.\n");
           mat_int64_fprintf_comment(stderr, Mqr);
 
           for (unsigned int i = 0; i < Mqr->NumCols; i++) {
