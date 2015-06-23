@@ -1152,11 +1152,10 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
       }
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
-    if (!hit && (double)expected_hit - (double)nb_hit >=
+    if (!hit && ((double)expected_hit - (double)nb_hit) / (double)nb_hit >=
         (double)threshold_hit) {
 #else
     if (!hit) {
-
 #endif // SPACE_SIEVE_CUT_EARLY
       ASSERT(hit == 0);
 
