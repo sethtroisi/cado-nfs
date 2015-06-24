@@ -817,30 +817,34 @@ static int int64_vector_in_list_zero(int64_vector_srcptr v_tmp,
 }
 
 static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
-    list_int64_vector_index_ptr list_zero, int64_vector_ptr v,
+    list_int64_vector_index_ptr list_zero, int64_vector_srcptr v,
     sieving_bound_srcptr H, int64_t number_element)
 {
   unsigned int vector_1 = 0;
-  int64_vector_reduce(v, v);
-  if (space_sieve_good_vector(v, H)) {
-    if (v->c[2] == 0) {
-      if (v->c[1] != 0 || v->c[0] != 0) {
-        if (v->c[1] < 0) {
-          v->c[0] = -v->c[0];
-          v->c[1] = -v->c[1];
+  int64_vector_t v_tmp;
+  int64_vector_init(v_tmp, v->dim);
+  int64_vector_set(v_tmp, v);
+  int64_vector_reduce(v_tmp, v_tmp);
+  if (space_sieve_good_vector(v_tmp, H)) {
+    if (v_tmp->c[2] == 0) {
+      if (v_tmp->c[1] != 0 || v_tmp->c[0] != 0) {
+        if (v_tmp->c[1] < 0) {
+          v_tmp->c[0] = -v_tmp->c[0];
+          v_tmp->c[1] = -v_tmp->c[1];
         }
-        if (!int64_vector_in_list_zero(v, list_zero)) {
+        if (!int64_vector_in_list_zero(v_tmp, list_zero)) {
           list_int64_vector_index_add_int64_vector_index(list_zero,
-              v, index_vector(v, H, number_element));
+              v_tmp, index_vector(v_tmp, H, number_element));
         }
       }
     } else {
-      list_int64_vector_index_add_int64_vector_index(list, v, 0);
-      if (v->c[2] == 1) {
+      list_int64_vector_index_add_int64_vector_index(list, v_tmp, 0);
+      if (v_tmp->c[2] == 1) {
         vector_1 = 1;
       }
     }
   }
+  int64_vector_clear(v_tmp);
   return vector_1;
 }
 
@@ -857,17 +861,55 @@ static unsigned int space_sieve_linear_combination(
 
   int64_vector_t v_tmp;
   int64_vector_init(v_tmp, MSLLL->NumRows);
-  for (int64_t l = -1; l < 2; l++) {
-    for (int64_t m = 0; m < 2; m++) {
-      //v_tmp = l * v[0] + n * v[1] + 1 * v[2]
-      int64_vector_mul(v_tmp, list_tmp->v[0], (int64_t)l);
-      int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[1], (int64_t)m);
+  int64_vector_t v_tmp_n;
+  int64_vector_init(v_tmp_n, MSLLL->NumRows);
+  int64_vector_set_zero(v_tmp);
+  int64_t l = -1;
+  int64_t m = -1;
+  int64_t n = -2;
+  //v_tmp = l * v[0] + n * v[1] + 1 * v[2], l in [-1, 2[, m in [-1, 2[, n in
+  //[-1, 2[.
+  int64_vector_sub(v_tmp, v_tmp, list_tmp->v[0]);
+  int64_vector_sub(v_tmp, v_tmp, list_tmp->v[1]);
+  int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[2], -2);
+
+  //14 = 3^3 / 2 + 1;
+  for (unsigned int i = 0; i < 14; i++) {
+    if (n < 1) {
+      n++;
       int64_vector_add(v_tmp, v_tmp, list_tmp->v[2]);
-      if (v_tmp->c[2] < 0) {
-        for (unsigned int i = 0; i < v_tmp->dim; i++) {
-          v_tmp->c[i] = -v_tmp->c[i];
-        }
+    } else {
+      n = -1;
+      int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[2], -2);
+      if (m < 1) {
+        m++;
+        int64_vector_add(v_tmp, v_tmp, list_tmp->v[1]);
+      } else {
+        m = -1;
+        int64_vector_addmul(v_tmp, v_tmp, list_tmp->v[1], -2);
+        l = l + 1;
+        int64_vector_add(v_tmp, v_tmp, list_tmp->v[0]);
       }
+    }
+
+#ifndef NDEBUG
+  int64_vector_t v_tmp1;
+  int64_vector_init(v_tmp1, MSLLL->NumRows);
+  int64_vector_set_zero(v_tmp1);
+  int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[0], l); 
+  int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[1], m); 
+  int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[2], n);
+  ASSERT(!int64_vector_equal(v_tmp, v_tmp1));
+  int64_vector_clear(v_tmp1);
+#endif // NDEBUG
+
+    if (v_tmp->c[2] < 0) {
+      for (unsigned int i = 0; i < v_tmp->dim; i++) {
+        v_tmp_n->c[i] = -v_tmp->c[i];
+      }
+      vector_1 = good_vector_in_list(list, list_zero, v_tmp_n, H,
+          number_element);
+    } else {
       vector_1 = good_vector_in_list(list, list_zero, v_tmp, H,
           number_element);
     }
@@ -878,6 +920,7 @@ static unsigned int space_sieve_linear_combination(
   }
 
   int64_vector_clear(v_tmp);
+  int64_vector_clear(v_tmp_n);
   list_int64_vector_clear(list_tmp);
 
   return vector_1;
