@@ -205,7 +205,9 @@ prints all currently assigned work units.
 
 To cancel a workunit:
 
-./wudb.py -dbfile /tmp/work/testrun.db -cancel wuname
+./wudb.py -dbfile /tmp/work/testrun.db -cancel -wuid wuname
+
+where "wuname" appears after "Workunit" in the "-dump -assigned" call.
 
 This script can also be used to manipulate the database, for example:
 
