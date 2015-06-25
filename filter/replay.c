@@ -459,6 +459,8 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile,
     stats_init (stats, stdout, &addread, 23, "Read", "row additions", "", "line");
     while(fgets(str, STRLENMAX, hisfile) && nrows >= Nmax)
     {
+        if (str[0] == '#') continue;
+
       addread++;
 
       if (stats_test_progress(stats))
