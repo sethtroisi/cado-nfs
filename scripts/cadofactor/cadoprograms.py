@@ -1050,6 +1050,7 @@ class ReconstructLog(Program):
     subdir = "filter"
     def __init__(self, *,
                  ell: Parameter("gorder"),
+                 threads: Parameter("mt")=None,
                  ker: Parameter("log"),
                  dlog: Parameter("out"),
                  renumber: Parameter(),
