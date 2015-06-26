@@ -2033,8 +2033,8 @@ static void mpz_poly_pseudo_remainder(mpz_poly_ptr R, mpz_poly_srcptr A,
 
 void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
 {
-  assert(p->coeff[p->deg] != 0);
-  assert(q->coeff[q->deg] != 0);
+  ASSERT(p->coeff[p->deg] != 0);
+  ASSERT(q->coeff[q->deg] != 0);
 
   //Assume that the polynomial is normalized.
   if (p->deg == -1 && q->deg == -1) {
@@ -2044,12 +2044,12 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
 
   mpz_t a;
   mpz_t b;
-  int64_t s = 1;
+  long int s = 1;
   mpz_t g;
   mpz_t h;
   mpz_t t;
   mpz_t tmp;
-  int64_t d;
+  unsigned long int d;
   mpz_poly_t R;
   mpz_poly_t A;
   mpz_poly_t B;
@@ -2061,8 +2061,8 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
   mpz_init(t);
   mpz_init(tmp);
   mpz_poly_init(R, 0);
-  mpz_poly_init(A, 0);
-  mpz_poly_init(B, 0);
+  mpz_poly_init(A, p->deg);
+  mpz_poly_init(B, q->deg);
 
   mpz_poly_set(A, p);
   mpz_poly_set(B, q);
@@ -2083,12 +2083,14 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
     mpz_poly_swap (A, B);
 
     if ((A->deg % 2) == 1 && (B->deg % 2) == 1) {
-      s = (int64_t) -1;
+      s = -1;
     }
   }
 
   while (B->deg > 0) {
-    d = A->deg - B->deg;
+    ASSERT(A->deg - B->deg >= 0);
+
+    d = (unsigned long int)(A->deg - B->deg);
 
     if ((A->deg % 2) == 1 && (B->deg % 2) == 1) {
       s = -s;
@@ -2104,6 +2106,9 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
     mpz_poly_divexact_mpz(B, R, tmp);
 
     mpz_set(g, mpz_poly_lc(A));
+
+    ASSERT(d > 0);
+
     mpz_pow_ui(h, h, d - 1);
     mpz_pow_ui(tmp, g, d);
     mpz_divexact(h, tmp, h);
