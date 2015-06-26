@@ -80,7 +80,8 @@ class NumInt(object):
         """ Return the sum that would result if the last trapezoidal had been
         cut or extended to abscissa "coord".
         """
-        # assert self.lastcoord[1] <= coord <= self.lastcoord[0]
+        # due to str <-> float conversions, we might have discrepancies
+        assert self.lastcoord[1] <= coord <= self.lastcoord[0] * 1.000001
         x = coord - self.lastcoord[1]
         prev_sum = self.sum - self.trapez_area()
         t = (self.lastvalue[0] - self.lastvalue[1]) / (self.lastcoord[0] - self.lastcoord[1])
