@@ -901,6 +901,18 @@ factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
   mpz_t QR, QA, t;
   double s, s_product = 0, s_remainder = 0;
 
+#if 0
+  facul_method_t *methods;
+  methods = facul_make_default_strategy (NB_MAX_METHODS - 4, 1);
+  res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
+                                  methods[i], &fm, &cfm,
+                                  strategies->lpb[side],
+                                  strategies->assume_prime_thresh[side],
+                                  strategies->BBB[side]);
+  ...
+  facul_clear_aux_methods (methods);
+#endif
+
   cado_poly_init (pol);
   if (cado_poly_read (pol, poly_file) == 0)
     {
