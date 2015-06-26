@@ -3943,14 +3943,15 @@ class LinAlgDLPTask(Task):
     @property
     def programs(self):
         override = ("complete", "rhs", "prime", "matrix",  "wdir",
-                "nullspace", "n", "m")
+                "nullspace")
         return ((cadoprograms.BWC, override,
                  {"merged": Request.GET_MERGED_FILENAME,
                   "sm": Request.GET_SM_FILENAME}),)
     @property
     def paramnames(self):
-        return super().paramnames
-
+        # the default value for m and n is to use the number of SMs for
+        # n, and then m=2*n
+        return self.join_params(super().paramnames, {"m": 0, "n": 0})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3971,17 +3972,35 @@ class LinAlgDLPTask(Task):
             matrix = mergedfile.realpath()
             wdir = workdir.realpath()
             nmaps = self.send_request(Request.GET_NMAPS)
+            nsm = nmaps[0] + nmaps[1]
+            if self.params["n"] == 0:
+                self.logger.info("Using %d as default value for n to account for Schirokauer maps"
+                        % nsm)
+                n = nsm
+            else:
+                n = self.params["n"]
+                if n < nsm:
+                    self.logger.critical("n must be greater than or equal to the number of Schirokauer maps, which is %d (got n=%d)" % (nsm,n))
+                    raise Exception("Program failed")
+            if self.params["m"] == 0:
+                m = 2*n
+                self.logger.info("Using 2*n=%d as default value for m" % m)
+            else:
+                m = self.params["m"]
+
+            passed_dict=self.progparams[0].copy()
+            passed_dict["m"]=m
+            passed_dict["n"]=n
+
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir,
-                                 m = nmaps[0] + nmaps[1],
-                                 n = nmaps[0] + nmaps[1],
                                  prime=self.send_request(Request.GET_ELL),
                                  rhs=smfile,
                                  mm_impl="basicp",
                                  nullspace="right",
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),
-                                 **self.progparams[0])
+                                 **passed_dict)
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
