@@ -30,16 +30,21 @@ mpz_list_init (mpz_list L)
   L->alloc = L->size = 0;
 }
 
+/* at any point, all values up to L->alloc should be mpz_init()'ed,
+   even beyond L->size */
 void
 mpz_list_add (mpz_list L, unsigned long n)
 {
   if (L->size == L->alloc)
     {
+      unsigned long old = L->alloc, i;
       L->alloc = 3 * (L->alloc / 2) + 2;
       L->l = realloc (L->l, L->alloc * sizeof (mpz_t));
+      for (i = old; i < L->alloc; i++)
+        mpz_init (L->l[i]);
     }
   ASSERT_ALWAYS(L->size < L->alloc);
-  mpz_init_set_ui (L->l[L->size], n);
+  mpz_set_ui (L->l[L->size], n);
   L->size ++;
 }
 
@@ -48,7 +53,7 @@ mpz_list_clear (mpz_list L)
 {
   size_t i;
 
-  for (i = 0; i < L->size; i++)
+  for (i = 0; i < L->alloc; i++)
     mpz_clear (L->l[i]);
   free (L->l);
   L->alloc = L->size = 0;
