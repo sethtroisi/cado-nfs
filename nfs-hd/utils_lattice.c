@@ -1248,8 +1248,8 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
       }
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
-    if (!hit && ((double)expected_hit - (double)nb_hit) / (double)nb_hit >=
-        SPACE_SIEVE_CUT_EARLY) {
+    double err_rel = ((double)expected_hit - (double)nb_hit) / (double)nb_hit;
+    if (!hit && err_rel >= SPACE_SIEVE_CUT_EARLY && 0 <= err_rel) {
 #else
     if (!hit) {
 #endif // SPACE_SIEVE_CUT_EARLY
@@ -1395,6 +1395,8 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
     else if (!hit) {
+      ASSERT(err_rel <= SPACE_SIEVE_CUT_EARLY);
+
       int64_vector_clear(s_tmp);
       break;
     }
