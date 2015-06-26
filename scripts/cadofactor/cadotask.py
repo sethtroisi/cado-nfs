@@ -3943,7 +3943,7 @@ class LinAlgDLPTask(Task):
     @property
     def programs(self):
         override = ("complete", "rhs", "prime", "matrix",  "wdir",
-                "nullspace")
+                "nullspace", "m", "n")
         return ((cadoprograms.BWC, override,
                  {"merged": Request.GET_MERGED_FILENAME,
                   "sm": Request.GET_SM_FILENAME}),)
@@ -3988,10 +3988,6 @@ class LinAlgDLPTask(Task):
             else:
                 m = self.params["m"]
 
-            passed_dict=self.progparams[0].copy()
-            passed_dict["m"]=m
-            passed_dict["n"]=n
-
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir,
                                  prime=self.send_request(Request.GET_ELL),
@@ -4000,7 +3996,9 @@ class LinAlgDLPTask(Task):
                                  nullspace="right",
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),
-                                 **passed_dict)
+                                 m=m,
+                                 n=n,
+                                 **self.progparams[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
