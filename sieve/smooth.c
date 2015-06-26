@@ -882,6 +882,16 @@ scan_primes (mpz_t *LP, mpz_t *T, unsigned long nprimes)
    (4) store in a list T the primes p for which Q mod p = 0, these are the only
        primes that can appear in any F(a,b) or G(a,b)
    (5) use trial division (with primes in T) to factor the norms
+
+Note: we should use instead the following algorithm from
+"How to find smooth parts of integers", Dan Bernstein, draft, 2004,
+http://cr.yp.to/factorization/smoothparts-20040510.pdf.
+Given cofactors r_1, ..., r_n and primes p_1, ..., p_k:
+(1) compute R = r_1 * ... * r_n
+(2) compute R mod p_1, ..., R mod p_k and keep only those p_j for which
+    R mod p_j = 0
+(3) if n >= 2, cut r_1, ..., r_n in two parts, and do the same recursively for
+    the first and second parts
 */
 void
 factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
