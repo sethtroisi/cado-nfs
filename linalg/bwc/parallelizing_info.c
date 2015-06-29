@@ -476,6 +476,18 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         }
         free(big_pool);
     }
+#else
+    if (param_list_lookup_string(pl, "cpubinding")) {
+        if (pi->m->jrank == 0) {
+#ifdef HAVE_HWLOC
+                    printf("cpubinding: parameter ignored (no C++11)\n");
+#elif defined(HAVE_CXX11)
+                    printf("cpubinding: parameter ignored (no hwloc)\n");
+#else
+                    printf("cpubinding: parameter ignored (no hwloc, no C++11)\n");
+#endif
+        }
+    }
 #endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
 }
 
@@ -844,6 +856,8 @@ void parallelizing_info_decl_usage(param_list pl)/*{{{*/
 
 #if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
     cpubinding_decl_usage(pl);
+#else
+    param_list_decl_usage(pl, "cpubinding", "(ignored, no sufficient sotftware support)");
 #endif
 }
 /*}}}*/
@@ -859,6 +873,8 @@ void parallelizing_info_lookup_parameters(param_list_ptr pl)/*{{{*/
 
 #if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
     cpubinding_lookup_parameters(pl);
+#else
+    param_list_lookup_string(pl, "cpubinding");
 #endif
 }
 /*}}}*/

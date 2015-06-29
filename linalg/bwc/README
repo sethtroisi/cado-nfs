@@ -600,7 +600,9 @@ Using bwc.pl with MPI (updated 20150611)
 
     1) first you have to compile CADO-NFS with MPI support:
 
+    $ rm -rf build/           # make sure to remove any previous non-MPI binary
     $ MPI=1 make
+    (or MPI=$HOME/packages/openmpi-1.8.6/ make)
 
     Check the following lines are present in the make output:
 
