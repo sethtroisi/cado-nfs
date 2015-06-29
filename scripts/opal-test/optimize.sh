@@ -138,10 +138,10 @@ sed "s/alambda.*=.*$/alambda = $alambda_opt/g" | \
 sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
 sed "s/I.*=.*$/I = $I_opt/g" > $params.opt
-if [ $has_ncurves0 -eq 0]; then
+if [ $has_ncurves0 -eq 0 ]; then
    echo "tasks.sieve.ncurves0 = $ncurves0_opt" >> $params.opt
 fi
-if [ $has_ncurves1 -eq 0]; then
+if [ $has_ncurves1 -eq 0 ]; then
    echo "tasks.sieve.ncurves1 = $ncurves1_opt" >> $params.opt
 fi
 /bin/rm -fr $d

@@ -1,23 +1,32 @@
 /* This file is part of the gf2x library.
 
-   Copyright 2007, 2008, 2009
+   Copyright 2007, 2008, 2009, 2010, 2013, 2014, 2015
    Richard Brent, Pierrick Gaudry, Emmanuel Thome', Paul Zimmermann
 
    This program is free software; you can redistribute it and/or modify it
-   under the terms of the GNU Lesser General Public License as published by
-   the Free Software Foundation; either version 2.1 of the License, or (at
-   your option) any later version.
+   under the terms of either:
+    - If the archive contains a file named toom-gpl.c (not a trivial
+    placeholder), the GNU General Public License as published by the Free
+    Software Foundation; either version 3 of the License, or (at your
+    option) any later version.
+    - If the archive contains a file named toom-gpl.c which is a trivial
+    placeholder, the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
+    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful, but WITHOUT
    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
-   License for more details.
+   FITNESS FOR A PARTICULAR PURPOSE.  See the license text for more details.
    
-   You should have received a copy of the GNU Lesser General Public
-   License along with CADO-NFS; see the file COPYING.  If not, write to
-   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
-   Boston, MA 02110-1301, USA.
+   You should have received a copy of the GNU General Public License as
+   well as the GNU Lesser General Public License along with this program;
+   see the files COPYING and COPYING.LIB.  If not, write to the Free
+   Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+   02110-1301, USA.
 */
+
+#include "gf2x/gf2x-config.h"
+
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -50,7 +59,7 @@ void gf2x_mul_basecase(unsigned long * c, const unsigned long * a,
 	default:
 	    fprintf(stderr, "basecase.c: ran off end of switch\n"
 		    "na=nb=%ld ; decrease GF2X_MUL_KARA_THRESHOLD\n", na);
-	    exit(1);
+            abort();
 	}
     } else if (na < nb) {
         /* FIXME -- this does not seem efficient */
@@ -73,9 +82,6 @@ int64_t T_FFT_TAB[][2] = GF2X_MUL_FFT_TABLE;
  * storage if necessary.
  */
 
-/* Having this static ensures initialization to zero */
-static gf2x_mul_pool_t global_pool;
-
 void gf2x_mul_pool_init(gf2x_mul_pool_t p)
 {
     memset(p, 0, sizeof(gf2x_mul_pool_t));
@@ -88,17 +94,17 @@ void gf2x_mul_pool_clear(gf2x_mul_pool_t p)
 }
 
 void gf2x_mul(unsigned long * c,
-        const unsigned long * a, unsigned int sa,
-        const unsigned long * b, unsigned int sb)
+        const unsigned long * a, unsigned long sa,
+        const unsigned long * b, unsigned long sb)
 {
-    gf2x_mul_r(c, a, sa, b, sb, global_pool);
+    gf2x_mul_r(c, a, sa, b, sb, NULL);
 }
 
 void gf2x_mul_r(unsigned long * c,
-        const unsigned long * a, unsigned int sa,
-        const unsigned long * b, unsigned int sb, gf2x_mul_pool_t pool)
+        const unsigned long * a, unsigned long sa,
+        const unsigned long * b, unsigned long sb, gf2x_mul_pool_t pool)
 {
-    unsigned int sc = sa + sb;
+    unsigned long sc = sa + sb;
     /* As a starting guess, assume that c may alias a or b */
     unsigned long * dst = c;
 
@@ -137,7 +143,7 @@ void gf2x_mul_r(unsigned long * c,
     }
 #endif
 
-    unsigned int sp1, sp2, sp3, sp;
+    unsigned long sp1, sp2, sp3, sp;
     sp1 = gf2x_toomspace(sa);	// Space for balanced TC routines
     sp2 = gf2x_toomuspace(2 * sa);	// Space for unbalanced TC routines
     sp3 = 2 * sa + gf2x_toomspace(sa);	// Space for unbalanced TC routines w/ lazy cut
@@ -169,14 +175,16 @@ void gf2x_mul_r(unsigned long * c,
     if (sa == sb) {
         // Avoid copy in common case
         gf2x_mul_toom(dst, a, b, sa, xpool->stk);
-//    } else if ((sa == (sb + 1) / 2) && gf2x_best_utoom(sb)) {
-//        // Another common case
-//        // due to GCD algorithm
-//        gf2x_mul_tc3u(dst, b, sb, a, xpool->stk);
+#if GPL_CODE_PRESENT
+    } else if ((sa == (sb + 1) / 2) && gf2x_best_utoom(sb)) {
+        // Another common case
+        // due to GCD algorithm
+        gf2x_mul_tc3u(dst, b, sb, a, xpool->stk);
+#endif  /* GPL_CODE_PRESENT */
     } else {
         unsigned long *v = xpool->stk + gf2x_toomspace(sa);
 
-        unsigned int i, j;
+        unsigned long i, j;
 
         memset(dst, 0, sc * sizeof(unsigned long));
 
@@ -201,7 +209,7 @@ void gf2x_mul_r(unsigned long * c,
 
             {
                 const unsigned long *t;
-                unsigned int st;
+                unsigned long st;
 
                 /* Swap a and b, and go for the next spin */
                 t = a;

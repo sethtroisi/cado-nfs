@@ -139,8 +139,12 @@ tasks.sieve.import=@foo
 where "foo" is a file containing several names of relation files, one file
 name per line.
 
-Adjust the tasks.sieve.sieving.qmin parameter accordingly to prevent
-already-sieved special-q ranges from being sieved again.
+Adjust the tasks.sieve.qmin parameter accordingly to prevent
+already-sieved special-q ranges from being sieved again. To do that:
+
+* go into the cxx.upload directory
+* list the cxx.sieving.xxx-yyy.*.gz files
+* find the largest yyy value, and use it as new qmin
 
 Be aware that importing relation files that were not produced by
 CADO-NFS's siever (for instance, handcrafted relations) is not supported:
@@ -205,7 +209,9 @@ prints all currently assigned work units.
 
 To cancel a workunit:
 
-./wudb.py -dbfile /tmp/work/testrun.db -cancel wuname
+./wudb.py -dbfile /tmp/work/testrun.db -cancel -wuid wuname
+
+where "wuname" appears after "Workunit" in the "-dump -assigned" call.
 
 This script can also be used to manipulate the database, for example:
 

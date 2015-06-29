@@ -1148,6 +1148,8 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	ord = 2;
     else if(strcmp(galois_autom, "1_1/x") == 0)
 	ord = 3;
+    else if(strcmp(galois_autom, "_1_1/x") == 0)
+	ord = 3;
     else{
 	fprintf(stderr, "Unknown automorphism: %s\n", galois_autom);
 	ASSERT_ALWAYS(0);
@@ -1197,10 +1199,15 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	    modul_set_ul(r1, rr, mm);
 	    // build ord-1 conjugates for roots[k]
 	    for(int l = 0; l < ord-1; l++){
-		if(ord == 3){ // TODO: do better!
-		    // sigma(r1) = 1-1/r1
+		if(strcmp(galois_autom, "1_1/x") == 0){
+		    // r1 <- sigma(r1) = 1-1/r1
 		    if(modul_intequal_ul(r1, qq))
+			// r1 = oo => 1/r1 = 0
 			modul_set_ul(r1, 1, mm);
+		    else if(modul_is0(r1, mm)){
+			// 1/0 = oo
+			modul_set_ul(r1, qq, mm);
+		    }
 		    else{
 			modul_inv(r2, r1, mm);
 			modul_set_ul(r1, 1, mm);
@@ -1208,9 +1215,28 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		    }
 		    modul_set(conj[l], r1, mm);
 		}
+		else if(strcmp(galois_autom, "_1_1/x") == 0){
+		    // r1 <- sigma(r1) = -1-1/r1 = -(1+1/r1)
+		    if(modul_intequal_ul(r1, qq)){
+			// r1 = oo => 1/r1 = 0
+                        modul_set_ul(r1, 1, mm);
+			modul_neg(r1, r1, mm);
+		    }
+		    else if(modul_is0(r1, mm)){
+			// 1/0 = oo
+			modul_set_ul(r1, qq, mm);
+		    }
+                    else{
+			modul_inv(r2, r1, mm);
+			modul_set_ul(r1, 1, mm);
+			modul_add(r1, r1, r2, mm);
+			modul_neg(r1, r1, mm);
+		    }
+		    modul_set(conj[l], r1, mm);
+		}
 	    }
-#if 0 // to be sure!
-	    printf("new orbit: %lu", rr);
+#if 1 // to be sure!
+	    printf("orbit for %lu: %lu", qq, rr);
 	    for(int l = 0; l < ord-1; l++)
 		printf(" -> %lu", conj[l][0]);
 	    printf("\n");
@@ -2211,6 +2237,18 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 			    int64_t a2, a3, b1 = (int64_t)b, b2, b3;
 			    a2 = -b1; b2 = a-b1;
 			    a3 = -b2; b3 = a2-b2;
+			    if(b2 < 0){ a2 = -a2; b2 = -b2; }
+			    if(b3 < 0){ a3 = -a3; b3 = -b3; }
+			    rel.a = a2; rel.b = (uint64_t)b2;
+			    rel.print(output, comment);
+			    rel.a = a3; rel.b = (uint64_t)b3;
+			    rel.print(output, comment);
+			    cpt += 2;
+			}
+			else if(strcmp(las->galois, "_1_1/x") == 0){
+			    int64_t a2, a3, b1 = (int64_t)b, b2, b3;
+			    a2 = b1; b2 = -a-b1;
+			    a3 = b2; b3 = -a2-b2;
 			    if(b2 < 0){ a2 = -a2; b2 = -b2; }
 			    if(b3 < 0){ a3 = -a3; b3 = -b3; }
 			    rel.a = a2; rel.b = (uint64_t)b2;

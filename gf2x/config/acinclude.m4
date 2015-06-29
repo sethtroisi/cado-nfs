@@ -1,22 +1,28 @@
 #  This file is part of the gf2x library.
-# 
-#  Copyright 2007, 2008, 2009, 2010
+#
+#  Copyright 2007, 2008, 2009, 2010, 2012, 2013
 #  Richard Brent, Pierrick Gaudry, Emmanuel Thome', Paul Zimmermann
-# 
+#
 #  This program is free software; you can redistribute it and/or modify it
-#  under the terms of the GNU Lesser General Public License as published by
-#  the Free Software Foundation; either version 2.1 of the License, or (at
-#  your option) any later version.
+#  under the terms of either:
+#   - If the archive contains a file named toom-gpl.c (not a trivial
+#     placeholder), the GNU General Public License as published by the
+#     Free Software Foundation; either version 3 of the License, or (at
+#     your option) any later version.
+#   - If the archive contains a file named toom-gpl.c which is a trivial
+#     placeholder, the GNU Lesser General Public License as published by
+#     the Free Software Foundation; either version 2.1 of the License, or
+#     (at your option) any later version.
 #  
 #  This program is distributed in the hope that it will be useful, but WITHOUT
 #  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
-#  License for more details.
+#  FITNESS FOR A PARTICULAR PURPOSE.  See the license text for more details.
 #  
-#  You should have received a copy of the GNU Lesser General Public
-#  License along with CADO-NFS; see the file COPYING.  If not, write to
-#  the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
-#  Boston, MA 02110-1301, USA.
+#  You should have received a copy of the GNU General Public License as
+#  well as the GNU Lesser General Public License along with this program;
+#  see the files COPYING and COPYING.LIB.  If not, write to the Free
+#  Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+#  02110-1301, USA.
 
 AC_DEFUN([WORDSIZE_CODE],[AC_LANG_SOURCE([
 /* We check wraparound rather than zero, because that's the only thing
@@ -46,7 +52,9 @@ AC_DEFUN([RUNTIME_ULONG_BITS],[
     AC_CACHE_CHECK([the number of bits in an unsigned long],
         [gf2x_cv_ulongbits],[
         AC_RUN_IFELSE([WORDSIZE_CODE()],[
-            detected=`cat conftest.out | tr -d -c 0-9`
+            # see bug #15631 and autoconf manual about tr.
+            # detected=`cat conftest.out | tr -d -c 0-9`
+            detected=`cat conftest.out`
             if test x$detected = x ; then
                 AC_MSG_ERROR([test program failed])
             else
@@ -72,27 +80,43 @@ AC_DEFUN([VERIFY_WORDSIZE],[
     esac
 ])
 
+# pepper this check with more sse-2 only statements, or we might be
+# fooled by some early athlon64 cpus supporting extended 3dnow, which
+# includes a subset of sse-2, but do not support the full sse-2 insn set.
 AC_DEFUN([SSE2_EXAMPLE],[AC_LANG_SOURCE([
 #include <emmintrin.h>
-__v2di x;
-int main() {}
+int main(int argc, char * argv[[]]) {
+     __m128i foo = _mm_setr_epi32(argc, argc + 1, argc + 2, argc + 3);
+     __m128i bar = _mm_setr_epi32(argc + 3, argc + 2, argc + 1, argc);
+    foo = _mm_mullo_epi16(foo, bar);
+    foo = _mm_slli_epi64(foo, 1);
+    foo = _mm_xor_si128(bar, _mm_unpacklo_epi32 (foo, bar));
+    foo = _mm_srli_epi64(foo, 1);
+    foo = _mm_mullo_epi16(foo, bar);
+    foo = _mm_shuffle_epi32(foo, 78);
+    foo = _mm_xor_si128(bar, _mm_unpacklo_epi32 (foo, bar));
+    foo = _mm_srli_si128(foo, 1);
+
+    return _mm_extract_epi16(foo, 0) & (argc - 1);
+}
 ])])
 
 # Check whether we need some flag such as -msse2 in order to enable sse-2
 # support
 AC_DEFUN([CHECK_SSE2_SUPPORT],[
  ac_save_CFLAGS=$CFLAGS
- AC_CACHE_CHECK([whether $CC can compile sse-2 code], [gf2x_cv_cc_supports_sse2],[
+ AC_CACHE_CHECK([whether $CC can compile and run sse-2 code], [gf2x_cv_cc_supports_sse2],[
   gf2x_cv_cc_supports_sse2=no
   if test "x${enable_sse2}" = xno ; then
    echo $ECHO_N "explicitly disabled, "
   else
-   AC_COMPILE_IFELSE([SSE2_EXAMPLE()],[
+   CFLAGS="$ac_save_CFLAGS -msse2"
+   AC_RUN_IFELSE([SSE2_EXAMPLE()],[
     gf2x_cv_cc_supports_sse2=yes
    ],[
-    CFLAGS="$ac_save_CFLAGS -msse2"
-    AC_COMPILE_IFELSE([SSE2_EXAMPLE()],[
-     gf2x_cv_cc_supports_sse2="requires -msse2"
+    CFLAGS="$ac_save_CFLAGS"
+    AC_RUN_IFELSE([SSE2_EXAMPLE()],[
+     gf2x_cv_cc_supports_sse2="yes, but without -msse2"
     ],[
      gf2x_cv_cc_supports_sse2=no
     ])
@@ -100,32 +124,33 @@ AC_DEFUN([CHECK_SSE2_SUPPORT],[
   fi
  ])
  ac_save_CPPFLAGS=$CPPFLAGS
- if test "$gf2x_cv_cc_supports_sse2" = "requires -msse2" ;then
+ if test "$gf2x_cv_cc_supports_sse2" = "yes" ;then
   # Tweaking CFLAGS is often not enough.
-  AC_CACHE_CHECK([whether -msse2 is also needed by the preprocessor],
-   [gf2x_cv_cpp_requires_msse2_flag],[
+  AC_CACHE_CHECK([whether -msse2 is also understood by the preprocessor],
+   [gf2x_cv_cpp_understands_msse2_flag],[
+   CPPFLAGS="$ac_save_CPPFLAGS -msse2"
    AC_PREPROC_IFELSE([SSE2_EXAMPLE()],[
-    gf2x_cv_cpp_requires_msse2_flag=no
+    gf2x_cv_cpp_understands_msse2_flag=yes
    ],[
-    CPPFLAGS="$ac_save_CPPFLAGS -msse2"
+    CPPFLAGS="$ac_save_CPPFLAGS"
     AC_PREPROC_IFELSE([SSE2_EXAMPLE()],[
-    gf2x_cv_cpp_requires_msse2_flag=yes
+    gf2x_cv_cpp_understands_msse2_flag=no
     ],[
-     AC_MSG_ERROR([Sorry, the preprocessor can't parse sse-2 !])
+     AC_MSG_ERROR([Sorry, the preprocessor can't parse sse-2!])
     ])
    ])
   ])
  fi
  CFLAGS=$ac_save_CFLAGS
  CPPFLAGS=$ac_save_CPPFLAGS
- if test "$gf2x_cv_cc_supports_sse2" = "requires -msse2" ;then
+ if test "$gf2x_cv_cc_supports_sse2" = "yes" ;then
   CFLAGS="$CFLAGS -msse2"
  fi
- if test "$gf2x_cv_cpp_requires_msse2_flag" = "yes" ; then
+ if test "$gf2x_cv_cpp_understands_msse2_flag" = "yes" ; then
   CPPFLAGS="$CPPFLAGS -msse2"
  fi
  if test "$gf2x_cv_cc_supports_sse2" != "no" ;then
-  AC_DEFINE([HAVE_SSE2_SUPPORT],[1],[Define if sse-2 code as present in the source tree is supported by the compiler])
+  AC_DEFINE([GF2X_HAVE_SSE2_SUPPORT],[1],[Define if sse-2 code as present in the source tree is supported by the compiler])
  fi
 ])# CHECK_SSE2_SUPPORT
 
@@ -136,13 +161,24 @@ AC_DEFUN([PCLMUL_EXAMPLE],[AC_LANG_SOURCE([
 #include <assert.h>
 int main() {
 assert(sizeof(unsigned long) == 8); /* assume 64-bit */
-typedef union { __v2di s; unsigned long x[[2]]; } __v2di_proxy;
-__v2di xx, yy;
-__v2di_proxy zz;
-xx = (__v2di) { 23, 0 };
-yy = (__v2di) { 47, 0 };
-zz.s = _mm_clmulepi64_si128(xx, yy, 0);
-return zz.x[[0]] - 61;
+#if defined(__GNUC__) && __GNUC__ == 4 &&__GNUC_MINOR__ == 1
+#define _gf2x_mm_cvtsi64_m64(u) _mm_cvtsi64x_m64((u))
+#else
+#define _gf2x_mm_cvtsi64_m64(u) _mm_cvtsi64_m64((u))
+#endif
+/* _m128i from 2 int64_t's */
+#define _gf2x_mm_setr_epi64(lo, hi)                      		\
+    _mm_setr_epi64(                                      		\
+            _gf2x_mm_cvtsi64_m64((int64_t) (lo)),       		\
+            _gf2x_mm_cvtsi64_m64((int64_t) (hi))        		\
+        )
+/* _m128i from 1 int64_t's */
+#define _gf2x_mm_set1_epi64(u) _mm_set1_epi64( _gf2x_mm_cvtsi64_m64((int64_t) (u)))
+__m128i a = _gf2x_mm_set1_epi64(17);
+__m128i b = _gf2x_mm_set1_epi64(42);
+union { __m128i s; unsigned long x[[2]]; } proxy;
+proxy.s = _mm_clmulepi64_si128(a, b, 0);
+return proxy.x[[0]] - 650;
 }
 ])])
 
@@ -196,7 +232,7 @@ AC_DEFUN([CHECK_PCLMUL_SUPPORT],[
   CPPFLAGS="$CPPFLAGS -mpclmul"
  fi
  if test "$gf2x_cv_cc_supports_pclmul" != "no" ;then
-  AC_DEFINE([HAVE_PCLMUL_SUPPORT],[1],[Define if pclmul as present in the source tree is supported by the compiler and hardware])
+  AC_DEFINE([GF2X_HAVE_PCLMUL_SUPPORT],[1],[Define if pclmul as present in the source tree is supported by the compiler and hardware])
  fi
 ])# CHECK_PCLMUL_SUPPORT
 
@@ -224,7 +260,7 @@ AC_MSG_CHECKING([warning verbosity option])
       then
         ac_compile_warnings_opt='-Wall -W'
       fi
-      CXXFLAGS="$ac_compile_warnings_opt $CXXFLAGS"
+      CXXFLAGS="$CXXFLAGS $ac_compile_warnings_opt"
       ac_compile_warnings_msg="$ac_compile_warnings_opt for C++"
     fi
 
@@ -234,7 +270,7 @@ AC_MSG_CHECKING([warning verbosity option])
     then
       ac_compile_warnings_opt='-Wall -W'
     fi
-    CFLAGS="$ac_compile_warnings_opt $CFLAGS"
+    CFLAGS="$CFLAGS $ac_compile_warnings_opt"
     ac_compile_warnings_msg="$ac_compile_warnings_msg $ac_compile_warnings_opt for C"
   fi
   fi
@@ -243,6 +279,83 @@ AC_MSG_CHECKING([warning verbosity option])
   unset ac_compile_warnings_opt
 ])
 
+
+dnl check gmp
+AC_DEFUN([GF2X_CHECK_FOR_GMP],[
+	AC_ARG_WITH([gmp],
+		    [AS_HELP_STRING([--with-gmp=DIR],[GMP installation directory])],
+		    [
+		    CPPFLAGS="$CPPFLAGS -I$withval/include"
+		    LDFLAGS="$LDFLAGS -L$withval/lib"
+                    check_specifically_for=gmp
+		    ])
+	AC_ARG_WITH([mpir],
+		    [AS_HELP_STRING([--with-mpir=DIR],[MPIR installation directory])],
+		    [
+		    CPPFLAGS="$CPPFLAGS -I$withval/include"
+		    LDFLAGS="$LDFLAGS -L$withval/lib"
+                    check_specifically_for=mpir
+		    ])
+	AC_MSG_CHECKING(for GMP or MPIR)
+        save_LIBS="$LIBS"
+        found_gmp=
+        if ! [[ "$check_specifically_for" ]] || [[ "$check_specifically_for" = "gmp" ]] ; then
+            LIBS="-lgmp $save_LIBS"
+            AC_LINK_IFELSE(
+                    [AC_LANG_PROGRAM(
+                            [[#include "gmp.h"]],
+                            [[mpz_t x;  mpz_init(x) ; mpz_clear(x);]]
+                    )],
+                    [
+                    AC_MSG_RESULT(yes)
+                    AC_DEFINE([GF2X_HAVE_GMP_H], [1], [Define to 1 if the gmp.h header exists])
+                    found_gmp=gmp
+                    ],
+                    [
+                    AC_MSG_RESULT(no)
+                    if [[ "$check_specifically_for" ]] ; then
+                    AC_MSG_ERROR([libgmp not found or uses a different API. Please see the README file for issues with missing dependencies.])
+                    fi
+                    ])
+        fi
+        if ! [[ "$found_gmp" ]] && [[ "$check_specifically_for" != "gmp" ]] ; then
+            LIBS="-lmpir $save_LIBS"
+            AC_LINK_IFELSE(
+                    [AC_LANG_PROGRAM(
+                            [[#include "mpir.h"]],
+                            [[mpz_t x;  mpz_init(x) ; mpz_clear(x);]]
+                    )],
+                    [
+                    AC_MSG_RESULT(yes)
+                    AC_DEFINE([GF2X_HAVE_MPIR_H], [1], [Define to 1 if the mpir.h header exists])
+                    found_gmp=mpir
+                    ],
+                    [
+                    AC_MSG_RESULT(no)
+                    if [[ "$check_specifically_for" ]] ; then
+                    AC_MSG_ERROR([libmpir not found or uses a different API. Please see the README file for issues with missing dependencies.])
+                    fi
+                    ])
+        fi
+        if ! [[ "$found_gmp" ]] ; then
+                AC_MSG_ERROR([neither GMP nor MPIR could be found, or perhaps there is one but which uses a different API. Please see the README file for issues with missing dependencies.])
+        fi
+	AC_MSG_CHECKING(for recent GMP or MPIR)
+	AC_COMPILE_IFELSE(
+		[AC_LANG_SOURCE(
+		[[
+	#include <$found_gmp.h>
+	#if (__GNU_MP_VERSION*100 + __GNU_MP_VERSION_MINOR*10 + __GNU_MP_VERSION_PATCHLEVEL < 432)
+	# error "Minimal GMP version is 4.3.2"
+	error
+	#endif
+		]])],
+		[AC_MSG_RESULT(yes)],
+		[
+		AC_MSG_RESULT(no)
+		AC_MSG_ERROR([GMP version >= 4.3.2 required])
+		])
+])
 
 
 dnl -- taken from gmp-4.2.1, LGPL v2.1+ --

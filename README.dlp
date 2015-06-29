@@ -28,11 +28,12 @@ the presence of the "dlp=true" line, and the lines related to characters
 and sqrt disappear. The other example params_dl/param.p30, shows how to
 give parameters for the descent.
 
-By default, the Magma script will factor p-1 and compute discrete logs modulo
-the largest prime factor ell of p-1. This can be overridden by giving
-explicitly ell=... in the parameter file. This feature might disappear in
-the future: you'd better consider already that the parameter ell is
-mandatory.
+By default, the Magma script will factor p-1 and compute discrete logs
+modulo the largest prime factor ell of p-1. This can be overridden by
+giving explicitly gorder=... in the parameter file.  Note that this
+automatic factoring feature might disappear in the future: you'd better
+consider already that the parameter gorder is mandatory (furthermore, its
+name is likely to change to ell).
 
 Note: the logarithms are given in an arbitrary base. If you want to
 define them with respect to a specific generator g, then you'll have to
