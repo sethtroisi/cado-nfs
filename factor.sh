@@ -194,11 +194,6 @@ elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     # Make the path absolute.
     bindir="$cado_build_dir"
     cpubinding_file="$cado_source_dir/linalg/bwc/cpubinding.conf"
-    for flag in HAVE_CXX11 HAVE_HWLOC ; do
-        if ! grep -q "define.*$flag" "$bindir/cado_config.h" ; then
-            cpubinding_file=
-        fi
-    done
 elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
     # Otherwise we're called from the source tree (or we hope so)
     srcdir=$(cd "`dirname $0`" ; pwd)
@@ -215,11 +210,6 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
       # Make the path absolute.
       bindir=`cd "$build_tree" ; pwd`
       cpubinding_file="$srcdir/linalg/bwc/cpubinding.conf"
-      for flag in HAVE_CXX11 HAVE_HWLOC ; do
-          if ! grep -q "define.*$flag" "$bindir/cado_config.h" ; then
-              cpubinding_file=
-          fi
-      done
     fi
 fi
 if [ -z "$cadofactor" ] ; then

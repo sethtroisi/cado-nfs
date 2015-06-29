@@ -6,6 +6,16 @@
       where cofac_r and cofac_a and cofactors on the rational and algebraic
       sides respectively
    2) run ./smooth cofac after updating the lines with "UPDATE".
+
+   The algorithm is the following:
+   (a) compute the product P of all primes in [B, L]
+   (b) compute the product tree T of all cofactors
+   (c) compute the remainder tree of P mod T: at the leaves we have 0 for
+       smooth cofactors (assuming all primes in [B,L] have multiplicity 1)
+   In practice we split P into smaller chunks P_j of bit-size near that of all
+   cofactors, and compute a gcd at leaves to reveal primes in P_j.
+   If the number of cofactors doubles, the cost goes from M(n)*log(n) to
+   M(2n)*log(2n), thus essentially doubles.
 */
 
 #include "cado.h"
@@ -30,16 +40,21 @@ mpz_list_init (mpz_list L)
   L->alloc = L->size = 0;
 }
 
+/* at any point, all values up to L->alloc should be mpz_init()'ed,
+   even beyond L->size */
 void
 mpz_list_add (mpz_list L, unsigned long n)
 {
   if (L->size == L->alloc)
     {
+      unsigned long old = L->alloc, i;
       L->alloc = 3 * (L->alloc / 2) + 2;
       L->l = realloc (L->l, L->alloc * sizeof (mpz_t));
+      for (i = old; i < L->alloc; i++)
+        mpz_init (L->l[i]);
     }
   ASSERT_ALWAYS(L->size < L->alloc);
-  mpz_init_set_ui (L->l[L->size], n);
+  mpz_set_ui (L->l[L->size], n);
   L->size ++;
 }
 
@@ -48,7 +63,7 @@ mpz_list_clear (mpz_list L)
 {
   size_t i;
 
-  for (i = 0; i < L->size; i++)
+  for (i = 0; i < L->alloc; i++)
     mpz_clear (L->l[i]);
   free (L->l);
   L->alloc = L->size = 0;
@@ -707,7 +722,7 @@ void declare_usage (param_list pl)
 }
 
 void
-compute_biproduct (mpz_t Q, cofac_list L)
+compute_biproduct (mpz_t Q, cofac_list L, int alg)
 {
   unsigned long n = L->size, i, j;
   mpz_t T[MAX_DEPTH];
@@ -722,8 +737,15 @@ compute_biproduct (mpz_t Q, cofac_list L)
      When acc[i] reaches 2^(i+1) values, we move them to T[i+1] */
   for (i = 0; i < n; i++)
     {
+#if 0
       mpz_mul (Q, L->R[i], L->A[i]);
       mpz_mul (T[0], T[0], Q);
+#else
+      if (alg)
+        mpz_mul (T[0], T[0], L->A[i]);
+      else
+        mpz_mul (T[0], T[0], L->R[i]);
+#endif
       acc[0] ++;
       j = 0;
       for (j = 0; acc[j] == (2UL << j); j++)
@@ -786,7 +808,9 @@ print_norm (char *s, mpz_t N, mpz_t *P, unsigned long n, unsigned int lpb)
 }
 
 void
-print_relations (cofac_list L, mpz_t *P, unsigned long n, int lpbr, int lpba)
+print_relations (cofac_list L, mpz_t *PR, unsigned long nr,
+                 mpz_t *PA, unsigned long na,
+                 int lpbr, int lpba)
 {
   unsigned long i;
   int ret, len;
@@ -797,12 +821,12 @@ print_relations (cofac_list L, mpz_t *P, unsigned long n, int lpbr, int lpba)
   for (i = 0; i < L->size; i++)
     {
       len = sprintf (line, "%" PRId64 ":%" PRIu64 ":", L->a[i], L->b[i]);
-      ret = print_norm (line + len, L->R[i], P, n, lpbr);
+      ret = print_norm (line + len, L->R[i], PR, nr, lpbr);
       if (ret >= 0)
         {
           len += ret;
           len += sprintf (line + len, ":");
-          ret = print_norm (line + len, L->A[i], P, n, lpba);
+          ret = print_norm (line + len, L->A[i], PA, na, lpba);
         }
       if (ret >= 0)
         {
@@ -821,6 +845,33 @@ print_relations (cofac_list L, mpz_t *P, unsigned long n, int lpbr, int lpba)
            printed, seconds () - s);
 }
 
+/* put in LP[0..i-1] the good primes, and return i */
+unsigned long
+scan_primes (mpz_t *LP, mpz_t *T, unsigned long nprimes)
+{
+  mpz_t t;
+  unsigned long i, j;
+
+  mpz_init (t);
+  for (i = j = 0; j < nprimes / 2; j++)
+    {
+      mpz_mod (t, T[j], LP[2*j]);
+      if (mpz_cmp_ui (t, 0) == 0)
+        mpz_swap (LP[i++], LP[2*j]);
+      mpz_mod (t, T[j], LP[2*j+1]);
+      if (mpz_cmp_ui (t, 0) == 0)
+        mpz_swap (LP[i++], LP[2*j+1]);
+    }
+  if (nprimes & 1)
+    {
+      mpz_mod (t, T[j], LP[2*j]);
+      if (mpz_cmp_ui (t, 0) == 0)
+        mpz_swap (LP[i++], LP[2*j]);
+    }
+  mpz_clear (t);
+  return i;
+}
+
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
    on stdout. The algorithm is as follows:
    (1) compute the product Q of all norms F(a,b) and G(a,b) corresponding
@@ -831,14 +882,36 @@ print_relations (cofac_list L, mpz_t *P, unsigned long n, int lpbr, int lpba)
    (4) store in a list T the primes p for which Q mod p = 0, these are the only
        primes that can appear in any F(a,b) or G(a,b)
    (5) use trial division (with primes in T) to factor the norms
+
+Note: we should use instead the following algorithm from
+"How to find smooth parts of integers", Dan Bernstein, draft, 2004,
+http://cr.yp.to/factorization/smoothparts-20040510.pdf.
+Given cofactors r_1, ..., r_n and primes p_1, ..., p_k:
+(1) compute R = r_1 * ... * r_n
+(2) compute R mod p_1, ..., R mod p_k and keep only those p_j for which
+    R mod p_j = 0
+(3) if n >= 2, cut r_1, ..., r_n in two parts, and do the same recursively for
+    the first and second parts
 */
 void
 factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
 {
   cado_poly pol;
-  unsigned long n = L->size, i, j, nprimes, w[MAX_DEPTH];
-  mpz_t Q, t;
+  unsigned long n = L->size, i, nprimes, w[MAX_DEPTH];
+  mpz_t QR, QA, t;
   double s, s_product = 0, s_remainder = 0;
+
+#if 0
+  facul_method_t *methods;
+  methods = facul_make_default_strategy (NB_MAX_METHODS - 4, 1);
+  res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
+                                  methods[i], &fm, &cfm,
+                                  strategies->lpb[side],
+                                  strategies->assume_prime_thresh[side],
+                                  strategies->BBB[side]);
+  ...
+  facul_clear_aux_methods (methods);
+#endif
 
   cado_poly_init (pol);
   if (cado_poly_read (pol, poly_file) == 0)
@@ -860,23 +933,29 @@ factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
   fflush (stderr);
 
   /* compute the product of all norms */
-  mpz_init (Q);
+  mpz_init (QR);
+  mpz_init (QA);
   fprintf (stderr, "factor: computing product of all norms...");
   fflush (stderr);
   s = seconds ();
-  compute_biproduct (Q, L);
+  compute_biproduct (QR, L, 0);
+  compute_biproduct (QA, L, 1);
   fprintf (stderr, "done in %.0f s\n", seconds () - s);
   fflush (stderr);
 
   /* compute all primes up to max(2^lpba, 2^lpbr) */
   lpba = (lpba > lpbr) ? lpba : lpbr;
-  unsigned long Qbits = mpz_sizeinbase (Q, 2);
+  unsigned long Qbits;
   prime_info pi;
   unsigned long pmin = 2, pmax = 1UL << lpba;
-  mpz_list P;
-  mpz_t *LP;
+  mpz_list PR, PA;
+  mpz_t *LPR, *LPA;
 
-  mpz_list_init (P);
+  Qbits = mpz_cmp (QA, QR) > 0 ? mpz_sizeinbase (QA, 2)
+    : mpz_sizeinbase (QR, 2);
+
+  mpz_list_init (PR);
+  mpz_list_init (PA);
   prime_info_init (pi);
   mpz_init (t);
   while (pmin < pmax)
@@ -886,51 +965,47 @@ factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
       unsigned long phigh = pmin + (unsigned long) ((double) Qbits * log (2.0));
       if (phigh > pmax)
         phigh = pmax;
-      nprimes = P->size;
-      pmin = prime_list (P, pi, pmin, phigh);
-      nprimes = P->size - nprimes; /* number of new primes */
-      LP = P->l + (P->size - nprimes); /* start location of new primes */
+      nprimes = PR->size;
+      pmin = prime_list (PR, pi, pmin, phigh);
+      nprimes = PR->size - nprimes; /* number of new primes */
+      LPR = PR->l + (PR->size - nprimes); /* start location of new primes */
 
-      /* form a product tree from LP */
+      /* copy new primes in PA */
+      for (i = 0; i < nprimes; i++)
+        mpz_list_add (PA, mpz_get_ui (PR->l[PR->size - nprimes + i]));
+      LPA = PA->l + (PA->size - nprimes);
+
+      /* form a product tree from LPR */
       mpz_t **T;
       s_product -= seconds ();
-      T = product_tree (LP, nprimes, w);
+      T = product_tree (LPR, nprimes, w);
       s_product += seconds ();
 
       /* compute the remainder tree Q mod T */
       s_remainder -= seconds ();
-      remainder_tree (T, nprimes, w, Q);
+      remainder_tree (T, nprimes, w, QR);
+      /* now scan all primes appearing in norms */
+      i = scan_primes (LPR, T[1], nprimes);
       s_remainder += seconds ();
 
-      /* now scan all primes appearing in norms */
-      for (i = j = 0; j < nprimes / 2; j++)
-        {
-          mpz_mod (t, T[1][j], LP[2*j]);
-          if (mpz_cmp_ui (t, 0) == 0)
-            {
-              mpz_swap (LP[i], LP[2*j]);
-              i++;
-            }
-          mpz_mod (t, T[1][j], LP[2*j+1]);
-          if (mpz_cmp_ui (t, 0) == 0)
-            {
-              mpz_swap (LP[i], LP[2*j+1]);
-              i++;
-            }
-        }
-      if (nprimes & 1)
-        {
-          mpz_mod (t, T[1][j], LP[2*j]);
-          if (mpz_cmp_ui (t, 0) == 0)
-            {
-              mpz_swap (LP[i], LP[2*j]);
-              i++;
-            }
-        }
       clear_product_tree (T, nprimes, w);
       /* the primes appearing in relations are LP[0..i-1] */
+      PR->size = (LPR + i) - PR->l; /* reajust the 'appearing' primes */
 
-      P->size = (LP + i) - P->l; /* reajust the 'appearing' primes */
+      /* same thing for algebraic side */
+      s_product -= seconds ();
+      T = product_tree (LPA, nprimes, w);
+      s_product += seconds ();
+
+      /* compute the remainder tree Q mod T */
+      s_remainder -= seconds ();
+      remainder_tree (T, nprimes, w, QA);
+      /* now scan all primes appearing in norms */
+      i = scan_primes (LPA, T[1], nprimes);
+      s_remainder += seconds ();
+
+      clear_product_tree (T, nprimes, w);
+      PA->size = (LPA + i) - PA->l;
     }
   fprintf (stderr, "factor: computing product tree of primes took %1.0f s\n",
            s_product);
@@ -939,12 +1014,14 @@ factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
   fflush (stderr);
   mpz_clear (t);
   prime_info_clear (pi);
-  mpz_clear (Q);
+  mpz_clear (QR);
+  mpz_clear (QA);
   cado_poly_clear (pol);
 
-  print_relations (L, P->l, P->size, lpbr, lpba);
+  print_relations (L, PR->l, PR->size, PA->l, PA->size, lpbr, lpba);
 
-  mpz_list_clear (P);
+  mpz_list_clear (PR);
+  mpz_list_clear (PA);
 }
 
 int
