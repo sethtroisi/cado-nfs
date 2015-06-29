@@ -1150,6 +1150,8 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	ord = 3;
     else if(strcmp(galois_autom, "_1_1/x") == 0)
 	ord = 3;
+    else if(strcmp(galois_autom, "_x_1/x_1") == 0)
+	ord = 4;
     else{
 	fprintf(stderr, "Unknown automorphism: %s\n", galois_autom);
 	ASSERT_ALWAYS(0);
@@ -1198,7 +1200,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	    unsigned long rr = mpz_get_ui(roots[k]);
 	    modul_set_ul(r1, rr, mm);
 	    // build ord-1 conjugates for roots[k]
-	    for(int l = 0; l < ord-1; l++){
+	    for(int l = 0; l < ord; l++){
 		if(strcmp(galois_autom, "1_1/x") == 0){
 		    // r1 <- sigma(r1) = 1-1/r1
 		    if(modul_intequal_ul(r1, qq))
@@ -1234,7 +1236,31 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		    }
 		    modul_set(conj[l], r1, mm);
 		}
+		else if(strcmp(galois_autom, "_x_1/x_1") == 0){
+		    // r1 <- sigma(r1) = -(r1+1)/(r1-1)
+		    if(modul_intequal_ul(r1, 1))
+                        // r1 = 1 => 1/(r1-1) = oo
+                        modul_set_ul(r1, qq, mm);
+		    else if(modul_intequal_ul(r1, qq)){
+			// sigma(oo) = -1
+			modul_set_ul(r1, 1, mm);
+			modul_neg(r1, r1, mm);
+		    }
+		    else{
+			// r1 <- r1_orig-1
+			modul_sub_ul(r1, r1, 1, mm);
+			modul_inv(r2, r1, mm);
+			// r1 <- r1_orig+1
+			modul_add_ul(r1, r1, 2, mm);
+			// r1 <- (r1_orig+1)/(r1_orig-1)
+			modul_mul(r1, r1, r2, mm);
+			modul_neg(r1, r1, mm);
+		    }
+		    modul_set(conj[l], r1, mm);
+		}
 	    }
+	    // check: sigma^ord(r1) should be rr
+	    ASSERT_ALWAYS(modul_intequal_ul(r1, rr));
 #if 1 // to be sure!
 	    printf("orbit for %lu: %lu", qq, rr);
 	    for(int l = 0; l < ord-1; l++)
@@ -2256,6 +2282,25 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 			    rel.a = a3; rel.b = (uint64_t)b3;
 			    rel.print(output, comment);
 			    cpt += 2;
+			}
+			else if(strcmp(las->galois, "_x_1/x_1") == 0){
+			    int64_t a1 = a, b1 = (int64_t)b, aa, bb;
+			    // sig((a, b)) = (-a-b, a-b)
+			    aa = -a1-b1; bb = a1-b1;
+			    if(bb < 0){ aa = -aa; bb = -bb; }
+			    rel.a = aa; rel.b = (uint64_t)bb;
+			    rel.print(output, comment);
+			    // tricky: sig^2((a, b)) = (2b, -2a) ~ (b, -a)
+			    aa = b1; bb = -a1;
+			    if(bb < 0){ aa = -aa; bb = -bb; }
+			    rel.a = aa; rel.b = (uint64_t)bb;
+			    rel.print(output, comment);
+			    // sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
+			    aa = a1-b1; bb = a1+b1;
+			    if(bb < 0){ aa = -aa; bb = -bb; }
+			    rel.a = aa; rel.b = (uint64_t)bb;
+			    rel.print(output, comment);
+			    cpt += 3;
 			}
 		    }
                 }
