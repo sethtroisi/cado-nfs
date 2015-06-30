@@ -204,7 +204,8 @@ tasks.sieve.ncurves1 = 3
     # or lpba, see function nb_curves() in file sieve/ecm/facul.c.
 
 
-tasks.I = 11		# Sieving range in lattice siever
+tasks.I = 11
+    # Sieving range in lattice siever
     # The lattice siever sieves over a range in the (i,j) plane which is
     # 2^I times 2^(I-1), to put things simply (some rescaling may change
     # this, but the size of the sieve area remains constant). Increasing
