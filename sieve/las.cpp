@@ -1261,7 +1261,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	    }
 	    // check: sigma^ord(r1) should be rr
 	    ASSERT_ALWAYS(modul_intequal_ul(r1, rr));
-#if 1 // to be sure!
+#if 0 // debug. 
 	    printf("orbit for %lu: %lu", qq, rr);
 	    for(int l = 0; l < ord-1; l++)
 		printf(" -> %lu", conj[l][0]);
