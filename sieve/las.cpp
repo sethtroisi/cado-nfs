@@ -2284,23 +2284,46 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 			    cpt += 2;
 			}
 			else if(strcmp(las->galois, "_x_1/x_1") == 0){
-			    int64_t a1 = a, b1 = (int64_t)b, aa, bb;
-			    // sig((a, b)) = (-a-b, a-b)
-			    aa = -a1-b1; bb = a1-b1;
-			    if(bb < 0){ aa = -aa; bb = -bb; }
-			    rel.a = aa; rel.b = (uint64_t)bb;
-			    rel.print(output, comment);
+			    int64_t a1 = a, b1 = (int64_t)b, aa, bb, a3, b3;
 			    // tricky: sig^2((a, b)) = (2b, -2a) ~ (b, -a)
 			    aa = b1; bb = -a1;
 			    if(bb < 0){ aa = -aa; bb = -bb; }
 			    rel.a = aa; rel.b = (uint64_t)bb;
+			    // same factorization as for (a, b)
 			    rel.print(output, comment);
+			    cpt += 1;
+#if 1
+			    // sig((a, b)) = (-(a+b), a-b)
+			    aa = -(a1+b1);
+			    bb = a1-b1;
+			    a3 = aa;
+			    b3 = bb;
+			    if(b3 < 0){ a3 = -a3; b3 = -b3; }
+			    int am2 = a1 & 1, bm2 = b1 & 1;
+			    if(am2+bm2 == 1){
+				// (a, b) = (1, 0) or (0, 1) mod 2
+				// aa and bb are odd, aa/bb = 1 mod 2
+				// we must add "2,2" in front of f and g
+				for(int side = 0; side < 2; side++){
+				    rel.add(side, 2, 1);
+				    rel.add(side, 2, 1);
+				}
+			    }
+			    else{
+				// (a, b) = (1, 1), aa and bb are even
+				// we must remove "2,2" in front of f and g
+				continue; // TMP!
+			    }
+			    rel.a = a3; rel.b = (uint64_t)b3;
+			    rel.print(output, comment);
+			    cpt += 1;
 			    // sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
-			    aa = a1-b1; bb = a1+b1;
-			    if(bb < 0){ aa = -aa; bb = -bb; }
-			    rel.a = aa; rel.b = (uint64_t)bb;
+			    aa = -aa;
+			    if(aa < 0){ aa = -aa; bb = -bb; }
+			    rel.a = bb; rel.b = (uint64_t)aa;
 			    rel.print(output, comment);
-			    cpt += 3;
+			    cpt += 1;
+#endif
 			}
 		    }
                 }
