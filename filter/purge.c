@@ -364,6 +364,14 @@ static index_t delete_connected_component_nopth (pth_t *pth, index_t current_row
   return (pth->explored.current - pth->explored.begin);
 }
 
+int
+cmp_comp_t (const void *p, const void *q)
+{
+  float x = ((comp_t *)p)->w;
+  float y = ((comp_t *)q)->w;
+  return (x <= y ? 1 : -1);
+}
+
 /* This MT function search the heaviest pth->chunk cliques in
    interlaced parts of rel_used cliques.
 */
@@ -419,6 +427,7 @@ static void *search_chunk_max_cliques (void *pt) {
       pbv = rel_used->p + (pth->clique.i >> LN2_BV_BITS);
     }
   }
+  qsort (pth->clique_graph, pth->size_clique_graph, sizeof(comp_t), cmp_comp_t);
   pthread_exit (NULL);
   return NULL;
 }
@@ -470,6 +479,7 @@ static void
 cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
 {
   int64_t excess = (((int64_t) *nrels) - *nprimes);
+  uint64_t nb_clique_deleted = 0;
   size_t i, chunk;
   index_t N = 0;		/* number of rows */
 
@@ -529,57 +539,56 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
 
   
   /* At this point, in each pth[i].graph_cliques we have
-     chunk cliques at most.
-     Boring problem: we need if possible chunk cliques in pth->clique_graph
-     (in pth[0].clique_graph). If not enough, we try to add the
-     others pth[i].clique_graph, until chunk.
-  */
-  if (UNLIKELY (pth->size_clique_graph < chunk)) {
-    for (i = 1; i < npt; ++i) {
-      if (UNLIKELY(pth[i].size_clique_graph + pth->size_clique_graph >= chunk)) {
-	while (pth->size_clique_graph < chunk) {
-	  pth->clique = pth[i].clique_graph[--pth[i].size_clique_graph];
-	  insert_clique_pth (pth);
-	}
-	// Right, we have chunk cliques in pth[0].clique_graph now
-	break;
-      }
-      // We could insert all pth[i].clique_graph in pth[0].clique_graph
-      while (pth[i].size_clique_graph) {
-	pth->clique = pth[i].clique_graph[--pth[i].size_clique_graph];
-	insert_clique_pth (pth);
+     size_clique_graph cliques order by decreasing weight */
+  size_t *next_clique = NULL;
+  next_clique = (size_t *) malloc (npt * sizeof (next_clique));
+  ASSERT_ALWAYS (next_clique != NULL);
+  memset (next_clique, 0, npt * sizeof (next_clique));
+
+  while (*nrels > target_excess + *nprimes)
+  {
+    comp_t *max_clique = NULL;
+    size_t max_thread = 0;
+
+    for (i = 0; i < npt; ++i)
+    {
+      if (next_clique[i] < pth[i].size_clique_graph)
+      {
+        comp_t *cur_clique = &(pth[i].clique_graph[next_clique[i]]);
+        if (max_clique == NULL || cur_clique->w > max_clique->w)
+        {
+          max_clique = cur_clique;
+          max_thread = i;
+        }
       }
     }
+
+    if (max_clique == NULL)
+    {
+      fprintf (stderr, "# All heaps of cliques are empty.");
+      break;
+    }
+
+    *nrels -= delete_connected_component_nopth (pth, max_clique->i, nprimes);
+    next_clique[max_thread]++;
+    nb_clique_deleted++;
   }
-  // we do a fusion with pth->clique_graph and all pth[i != 0].clique_graph
-  if (LIKELY(pth->size_clique_graph == chunk)) // if NOT, pth[1...npt[.clique_graph are empty
-    for (i = 1; i < npt; ++i)
-      while (pth[i].size_clique_graph)
-	if (UNLIKELY(pth[i].clique_graph[--pth[i].size_clique_graph].w > pth->clique_graph->w)) {
-	  pth->clique = pth[i].clique_graph[pth[i].size_clique_graph];
-	  replace_clique_pth (pth);
-	}
-  // We could suppress pth[1...npt[
-  for (i = 1; i < npt; ++i) {
-    free (pth[i].clique_graph);
-    free (pth[i].to_explore.begin);
-    free (pth[i].explored.begin);
-  }
-  // pth->size_clique_graph has at most the chunk heaviest cliques -> suppress them!
-  comp_t *pt = pth->clique_graph + pth->size_clique_graph;
-  while (pt > pth->clique_graph)
-    *nrels -= delete_connected_component_nopth (pth, (--pt)->i, nprimes);
+
+  free (next_clique);
   
-  fprintf(stdout, "    deleted %zu heavier connected components at %2.2lf\n",
-	  pth->size_clique_graph, seconds());
+  fprintf(stdout, "    deleted %" PRIu64 " heavier connected components at "
+                  "%2.2lf\n", nb_clique_deleted, seconds());
 #if DEBUG >= 1
   fprintf(stdout, "    DEBUG: nb heaviest cliques=%zu chunk=%u target=%u\n",
 	  pth->size_clique_graph, chunk, target_excess);
 #endif
-  // We could suppress pth[0] and pth itself
-  free (pth->clique_graph);
-  free (pth->to_explore.begin);
-  free (pth->explored.begin);
+  /* We can suppress pth[i] and pth itself */
+  for (i = 0; i < npt; ++i)
+  {
+    free (pth[i].clique_graph);
+    free (pth[i].to_explore.begin);
+    free (pth[i].explored.begin);
+  }
   free (pth);
 }
 
@@ -715,6 +724,7 @@ remove_all_singletons(uint64_t * nrels, uint64_t * nprimes, int64_t * excess)
 	fprintf(stdout,
 		"  new_nrels=%" PRIu64 " new_nprimes=%" PRIu64 " excess=%" PRId64
 		"" " at %2.2lf\n", *nrels, *nprimes, *excess, seconds());
+  fflush(stdout);
     } while (oldnrels != *nrels);
 }
 
