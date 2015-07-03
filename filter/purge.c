@@ -112,7 +112,7 @@ static index_t *sum2_index = NULL;	/*sum of rows index for primes of weight 2 */
 
 static uint64_t nrelmax = 0, nprimemax = 0;
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
-static unsigned int npass = DEFAULT_PURGE_NPASS;
+static int npass = -1; /* negative value means chosen by purge */
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
 static unsigned int npt = DEFAULT_PURGE_NPT;
 
@@ -732,7 +732,7 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 {
     uint64_t oldnrels = 0;
     int64_t oldexcess, excess, target_excess;
-    unsigned int count;
+    int count;
 
     //First step of singletons removal
     remove_all_singletons(nrels, nprimes, &excess);
@@ -752,48 +752,54 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 	exit(2);
     }
 
-    /* adjust npass so that each pass removes at least about 1% wrt the number
-       of ideals */
-    if ((uint64_t) excess / npass < *nprimes / 100)
+  /* If npass was not given in the command line, adjust npass in
+     [1..DEFAULT_PURGE_NPASS] so that each pass removes at least about 1% wrt
+     the number of ideals */
+  if (npass < 0)
+    if ((uint64_t) excess / DEFAULT_PURGE_NPASS < *nprimes / 100)
       npass = 1 + (100 * excess) / *nprimes;
 
-    int64_t chunk = excess / npass;
+  int64_t chunk = excess / npass;
 
-    //npass pass of clique removal + singletons removal
-    for (count = 0; count < npass && excess > 0; count++) {
-	oldnrels = *nrels;
-	oldexcess = excess;
-	target_excess = excess - chunk;
-	if (target_excess < keep)
-	    target_excess = keep;
-	fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
-		count + 1, npass, target_excess);
-	cliques_removal(target_excess, nrels, nprimes);
+  /* npass pass of clique removal + singletons removal */
+  for (count = 0; count < npass && excess > 0; count++)
+  {
+    oldnrels = *nrels;
+    oldexcess = excess;
+    target_excess = excess - chunk;
+    if (target_excess < keep)
+      target_excess = keep;
+    fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
+                    count + 1, npass, target_excess);
 
-	remove_all_singletons(nrels, nprimes, &excess);
-	fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
-		(double) (oldnrels - *nrels) / (double) (oldexcess - excess));
-    }
+    cliques_removal(target_excess, nrels, nprimes);
+    remove_all_singletons(nrels, nprimes, &excess);
+
+    fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
+                    (double) (oldnrels-*nrels) / (double) (oldexcess-excess));
+  }
 
 
-    /* May need an extra pass of clique removal + singletons removal if excess is
-       still larger than keep. It may happen due to the fact that each clique does
-       not make the excess go down by one but can (rarely) left the excess
-       unchanged. */
-    if (excess > keep) {
-	oldnrels = *nrels;
-	oldexcess = excess;
-	target_excess = excess - chunk;
-	target_excess = keep;
+  /* May need an extra pass of clique removal + singletons removal if excess is
+     still larger than keep. It may happen due to the fact that each clique does
+     not make the excess go down by one but can (rarely) left the excess
+     unchanged. */
+  if (excess > keep && npass > 0)
+  {
+	  oldnrels = *nrels;
+	  oldexcess = excess;
+	  target_excess = excess - chunk;
+	  target_excess = keep;
 
-	fprintf(stdout, "Step extra: target excess is %" PRId64 "\n",
-		target_excess);
-	cliques_removal(target_excess, nrels, nprimes);
+	  fprintf(stdout, "Step extra: target excess is %" PRId64 "\n",
+		  target_excess);
 
-	remove_all_singletons(nrels, nprimes, &excess);
-	fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
-		(double) (oldnrels - *nrels) / (double) (oldexcess - excess));
-    }
+    cliques_removal(target_excess, nrels, nprimes);
+
+	  remove_all_singletons(nrels, nprimes, &excess);
+	  fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
+		                (double) (oldnrels-*nrels) / (double) (oldexcess-excess));
+  }
 }
 
 /*****************************************************************************/
@@ -882,8 +888,9 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "minindex", "index of the first considered prime");
   param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
                                     "(default " STR(DEFAULT_FILTER_EXCESS) ")");
-  param_list_decl_usage(pl, "npass", "maximal number of steps of clique removal "
-                                     "(default " STR(DEFAULT_PURGE_NPASS) ")");
+  param_list_decl_usage(pl, "npass", "maximal number of steps of clique "
+                                     "removal (default: chosen in [1.."
+                                      STR(DEFAULT_PURGE_NPASS) "])");
   param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
                             "end of the 1st singleton removal step (default "
                             STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
@@ -951,7 +958,7 @@ int main(int argc, char **argv)
 
 
     param_list_parse_uint(pl, "npthr", &npt);
-    param_list_parse_uint(pl, "npass", &npass);
+    param_list_parse_int(pl, "npass", &npass);
     param_list_parse_double(pl, "required_excess", &required_excess);
 
     /* These three parameters specify the set of input files, of the form
