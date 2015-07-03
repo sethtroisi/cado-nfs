@@ -115,6 +115,7 @@ static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
 static int npass = -1; /* negative value means chosen by purge */
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
 static unsigned int npt = DEFAULT_PURGE_NPT;
+static int verbose = 0;
 
 #ifdef STAT
 uint64_t __stat_weight;
@@ -781,6 +782,7 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
       target_excess = keep;
     fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
                     count + 1, npass, target_excess);
+    fflush(stdout);
 
     cliques_removal(target_excess, nrels, nprimes);
     remove_all_singletons(nrels, nprimes, &excess);
@@ -846,7 +848,103 @@ void *thread_print(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 
 /*********** utility functions for purge binary ****************/
 
+void
+print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
+                       int verbose)
+{
+  uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
+  for (uint64_t i = 0; i < len; i++)
+  {
+    if (w[i] > 0)
+    {
+      nb_nzero++;
+      if (w[i] < min)
+        min = w[i];
+      if (w[i] > max)
+        max = w[i];
+      av += w[i];
+      std += w[i]*w[i];
+    }
+  }
 
+  double av_f = ((double) av) / ((double) nb_nzero);
+  double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
+
+  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, len);
+  fprintf (out, "# STATS on %s: #active %s = %" PRIu64 "\n", name, name,
+                                                                    nb_nzero);
+  fprintf (out, "# STATS on %s: min = %" PRIu64 "\n", name, min);
+  fprintf (out, "# STATS on %s: max = %" PRIu64 "\n", name, max);
+  fprintf (out, "# STATS on %s: av = %.2f\n", name, av_f);
+  fprintf (out, "# STATS on %s: std = %.2f\n", name, std_f);
+
+  if (verbose > 1)
+  {
+    uint64_t *nb_w = NULL;
+    nb_w = (uint64_t *) malloc ((max-min+1) * sizeof (uint64_t));
+    ASSERT_ALWAYS (nb_w != NULL);
+    memset (nb_w, 0, (max-min+1) * sizeof (uint64_t));
+    for (uint64_t i = 0; i < len; i++)
+      if (w[i] > 0)
+        nb_w[w[i]-min]++;
+
+    for (uint64_t i = 0; i < max-min+1; i++)
+    {
+      if (nb_w[i] > 0)
+        fprintf (out, "# STATS on %s: #%s of weight %" PRIu64 " : %" PRIu64
+                      "\n", name, name, min+i, nb_w[i]);
+    }
+    free (nb_w);
+  }
+}
+
+void
+print_stats_columns_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nprimemax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nprimemax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+  {
+    if (bit_vector_getbit(rel_used, (size_t) i))
+    {
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+      {
+        w[*h]++;
+      }
+    }
+  }
+
+  print_stats_on_weight (out, w, nprimemax, "cols", verbose);
+  free (w);
+}
+
+void
+print_stats_rows_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nrelmax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+  {
+    if (bit_vector_getbit(rel_used, (size_t) i))
+    {
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+      {
+        w[i]++;
+      }
+    }
+  }
+
+  print_stats_on_weight (out, w, nrelmax, "rows", verbose);
+  free (w);
+}
 
   /* Build the file list (ugly). It is the concatenation of all
    *  b s p
@@ -906,6 +1004,7 @@ static void declare_usage(param_list pl)
                             STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
   param_list_decl_usage(pl, "outdel", "outfile for deleted relations (for DL)");
   param_list_decl_usage(pl, "npthr", "number of threads (default " STR(DEFAULT_PURGE_NPT) ")");
+  param_list_decl_usage(pl, "v", "(switch) verbose mode");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   verbose_decl_usage(pl);
@@ -941,6 +1040,7 @@ int main(int argc, char **argv)
     declare_usage(pl);
     argv++,argc--;
 
+    param_list_configure_switch (pl, "-v", &verbose);
     param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
     if (argc == 0)
@@ -1154,7 +1254,21 @@ int main(int argc, char **argv)
     ALLOC_VERBOSE_BIT_VECTOR(rel_used, nrels);
     bit_vector_set(rel_used, 1);
 
+    if (verbose > 0)
+    {
+      print_stats_columns_weight (stdout, verbose);
+      print_stats_rows_weight (stdout, verbose);
+    }
+
+    /* MAIN FUNCTIONS: do singletons and cliques removal. */
     singletons_and_cliques_removal(&nrels, &nprimes);
+
+    if (verbose > 0)
+    {
+      print_stats_columns_weight (stdout, verbose);
+      print_stats_rows_weight (stdout, verbose);
+    }
+
     if (nrels < nprimes) {
       fprintf(stdout, "number of relations < number of ideals\n");
       exit(2);
