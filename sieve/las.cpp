@@ -1299,6 +1299,102 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     return nroots;
 }
 
+// adding relations on the fly in Galois cases
+static void add_relations_with_galois(const char *galois, FILE *output, 
+				      const char *comment, int *cpt,
+				      relation &rel){
+    int64_t a1, b1, a2, b2, a3, b3, aa, bb, a;
+    uint64_t b;
+
+    a = rel.a; b = rel.b;
+    if(strcmp(galois, "1/x") == 0){
+	// remember, 1/x is for plain autom
+	// 1/y is for special Galois, e.g., x^4+1
+	b1 = (int64_t)b;
+	// (a-b/x) = 1/x*(-b+a*x)
+	a2 = -b1; b2 = -a;
+	if(b2 < 0) { a2 = -a2; b2 = -b2; }
+	rel.a = a2; rel.b = (uint64_t)b2;
+	rel.print(output, comment);
+	*cpt += 1;
+    }
+    else if(strcmp(galois, "1_1/x") == 0){
+	b1 = (int64_t)b;
+	a2 = -b1; b2 = a-b1;
+	a3 = -b2; b3 = a2-b2;
+	if(b2 < 0){ a2 = -a2; b2 = -b2; }
+	if(b3 < 0){ a3 = -a3; b3 = -b3; }
+	rel.a = a2; rel.b = (uint64_t)b2;
+	rel.print(output, comment);
+	rel.a = a3; rel.b = (uint64_t)b3;
+	rel.print(output, comment);
+	*cpt += 2;
+    }
+    else if(strcmp(galois, "_1_1/x") == 0){
+	b1 = (int64_t)b;
+	a2 = b1; b2 = -a-b1;
+	a3 = b2; b3 = -a2-b2;
+	if(b2 < 0){ a2 = -a2; b2 = -b2; }
+	if(b3 < 0){ a3 = -a3; b3 = -b3; }
+	rel.a = a2; rel.b = (uint64_t)b2;
+	rel.print(output, comment);
+	rel.a = a3; rel.b = (uint64_t)b3;
+	rel.print(output, comment);
+	*cpt += 2;
+    }
+    else if(strcmp(galois, "_x_1/x_1") == 0){
+	a1 = a;
+	b1 = (int64_t)b;
+	// tricky: sig^2((a, b)) = (2b, -2a) ~ (b, -a)
+	aa = b1; bb = -a1;
+	if(bb < 0){ aa = -aa; bb = -bb; }
+	rel.a = aa; rel.b = (uint64_t)bb;
+	// same factorization as for (a, b)
+	rel.print(output, comment);
+	*cpt += 1;
+	// sig((a, b)) = (-(a+b), a-b)
+	aa = -(a1+b1);
+	bb = a1-b1;
+	int am2 = a1 & 1, bm2 = b1 & 1;
+	if(am2+bm2 == 1){
+	    // (a, b) = (1, 0) or (0, 1) mod 2
+	    // aa and bb are odd, aa/bb = 1 mod 2
+	    // we must add "2,2" in front of f and g
+	    for(int side = 0; side < 2; side++){
+		rel.add(side, 2, 1);
+		rel.add(side, 2, 1);
+	    }
+	}
+	else{
+	    // (a, b) = (1, 1), aa and bb are even
+	    // we must remove "2,2" in front of f and g
+	    // taken from relation.cpp
+	    for(int side = 0 ; side < 2 ; side++){
+		for(unsigned int i = 0 ; i < rel.sides[side].size(); i++)
+		    if(mpz_cmp_ui(rel.sides[side][i].p, 2) == 0){
+			ASSERT_ALWAYS(rel.sides[side][i].e >= 2);
+			rel.sides[side][i].e -= 2;
+		    }
+	    }
+	    // remove common powers of 2
+	    do {
+		aa >>= 1;
+		bb >>= 1;
+	    } while((aa & 1) == 0 && (bb & 1) == 0);
+	}
+	if(bb < 0){ aa = -aa; bb = -bb; }
+	rel.a = aa; rel.b = (uint64_t)bb;
+	rel.print(output, comment);
+	*cpt += 1;
+	// sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
+	aa = -aa;
+	if(aa < 0){ aa = -aa; bb = -bb; }
+	rel.a = bb; rel.b = (uint64_t)aa;
+	rel.print(output, comment);
+	*cpt += 1;
+    }
+}
+
 /* {{{ Populating the todo list */
 /* See below in main() for documentation about the q-range and q-list
  * modes */
@@ -2244,89 +2340,13 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                      (output = verbose_output_get(0, 0, i_output)) != NULL;
                      i_output++) {
                     rel.print(output, comment);
-		    // adding relations on the fly in Galois cases
-		    if(las->galois != NULL){
-			// once filtering is ok for all Galois cases, 
-			// this entire block would have to disappear
-			if(strcmp(las->galois, "1/x") == 0){
-			    // remember, 1/x is for plain autom
-			    // 1/y is for special Galois, e.g., x^4+1
-			    int64_t a2, b1 = (int64_t)b, b2;
-			    // (a-b/x) = 1/x*(-b+a*x)
-			    a2 = -b1; b2 = -a;
-			    if(b2 < 0) { a2 = -a2; b2 = -b2; }
-			    rel.a = a2; rel.b = (uint64_t)b2;
-			    rel.print(output, comment);
-			    cpt += 1;
-			}
-			else if(strcmp(las->galois, "1_1/x") == 0){
-			    int64_t a2, a3, b1 = (int64_t)b, b2, b3;
-			    a2 = -b1; b2 = a-b1;
-			    a3 = -b2; b3 = a2-b2;
-			    if(b2 < 0){ a2 = -a2; b2 = -b2; }
-			    if(b3 < 0){ a3 = -a3; b3 = -b3; }
-			    rel.a = a2; rel.b = (uint64_t)b2;
-			    rel.print(output, comment);
-			    rel.a = a3; rel.b = (uint64_t)b3;
-			    rel.print(output, comment);
-			    cpt += 2;
-			}
-			else if(strcmp(las->galois, "_1_1/x") == 0){
-			    int64_t a2, a3, b1 = (int64_t)b, b2, b3;
-			    a2 = b1; b2 = -a-b1;
-			    a3 = b2; b3 = -a2-b2;
-			    if(b2 < 0){ a2 = -a2; b2 = -b2; }
-			    if(b3 < 0){ a3 = -a3; b3 = -b3; }
-			    rel.a = a2; rel.b = (uint64_t)b2;
-			    rel.print(output, comment);
-			    rel.a = a3; rel.b = (uint64_t)b3;
-			    rel.print(output, comment);
-			    cpt += 2;
-			}
-			else if(strcmp(las->galois, "_x_1/x_1") == 0){
-			    int64_t a1 = a, b1 = (int64_t)b, aa, bb, a3, b3;
-			    // tricky: sig^2((a, b)) = (2b, -2a) ~ (b, -a)
-			    aa = b1; bb = -a1;
-			    if(bb < 0){ aa = -aa; bb = -bb; }
-			    rel.a = aa; rel.b = (uint64_t)bb;
-			    // same factorization as for (a, b)
-			    rel.print(output, comment);
-			    cpt += 1;
-#if 1
-			    // sig((a, b)) = (-(a+b), a-b)
-			    aa = -(a1+b1);
-			    bb = a1-b1;
-			    a3 = aa;
-			    b3 = bb;
-			    if(b3 < 0){ a3 = -a3; b3 = -b3; }
-			    int am2 = a1 & 1, bm2 = b1 & 1;
-			    if(am2+bm2 == 1){
-				// (a, b) = (1, 0) or (0, 1) mod 2
-				// aa and bb are odd, aa/bb = 1 mod 2
-				// we must add "2,2" in front of f and g
-				for(int side = 0; side < 2; side++){
-				    rel.add(side, 2, 1);
-				    rel.add(side, 2, 1);
-				}
-			    }
-			    else{
-				// (a, b) = (1, 1), aa and bb are even
-				// we must remove "2,2" in front of f and g
-				continue; // TMP!
-			    }
-			    rel.a = a3; rel.b = (uint64_t)b3;
-			    rel.print(output, comment);
-			    cpt += 1;
-			    // sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
-			    aa = -aa;
-			    if(aa < 0){ aa = -aa; bb = -bb; }
-			    rel.a = bb; rel.b = (uint64_t)aa;
-			    rel.print(output, comment);
-			    cpt += 1;
-#endif
-			}
-		    }
-                }
+		    // once filtering is ok for all Galois cases, 
+		    // this entire block would have to disappear
+		    if(las->galois != NULL)
+			// adding relations on the fly in Galois cases
+			add_relations_with_galois(las->galois, output, comment,
+						  &cpt, rel);
+		}
                 verbose_output_end_batch();     /* unlock I/O */
             }
 
