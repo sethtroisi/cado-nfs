@@ -767,8 +767,12 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
      [1..DEFAULT_PURGE_NPASS] so that each pass removes at least about 1% wrt
      the number of ideals */
   if (npass < 0)
+  {
     if ((uint64_t) excess / DEFAULT_PURGE_NPASS < *nprimes / 100)
       npass = 1 + (100 * excess) / *nprimes;
+    else
+      npass = DEFAULT_PURGE_NPASS;
+  }
 
   int64_t chunk = excess / npass;
 
