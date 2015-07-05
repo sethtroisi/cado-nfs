@@ -1136,6 +1136,12 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
     mpz_clear(t);
 }
 
+/* Galois automorphisms
+   autom3.1: 1-1/x
+   autom3.2: -1-1/x
+   autom4.1: -(x+1)/(x-1)
+   autom6.1: -(2x+1)/(x-1)
+*/
 static int
 skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		  const char *galois_autom)
@@ -1146,12 +1152,14 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     int ord = 0;
     if(strcmp(galois_autom, "1/x") == 0 || strcmp(galois_autom, "1/y") == 0)
 	ord = 2;
-    else if(strcmp(galois_autom, "1_1/x") == 0)
+    else if(strcmp(galois_autom, "autom3.1") == 0)
 	ord = 3;
-    else if(strcmp(galois_autom, "_1_1/x") == 0)
+    else if(strcmp(galois_autom, "autom3.2") == 0)
 	ord = 3;
-    else if(strcmp(galois_autom, "_x_1/x_1") == 0)
+    else if(strcmp(galois_autom, "autom4.1") == 0)
 	ord = 4;
+    else if(strcmp(galois_autom, "autom6.1") == 0)
+	ord = 6;
     else{
 	fprintf(stderr, "Unknown automorphism: %s\n", galois_autom);
 	ASSERT_ALWAYS(0);
@@ -1201,7 +1209,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	    modul_set_ul(r1, rr, mm);
 	    // build ord-1 conjugates for roots[k]
 	    for(int l = 0; l < ord; l++){
-		if(strcmp(galois_autom, "1_1/x") == 0){
+		if(strcmp(galois_autom, "autom3.1") == 0){
 		    // r1 <- sigma(r1) = 1-1/r1
 		    if(modul_intequal_ul(r1, qq))
 			// r1 = oo => 1/r1 = 0
@@ -1217,7 +1225,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		    }
 		    modul_set(conj[l], r1, mm);
 		}
-		else if(strcmp(galois_autom, "_1_1/x") == 0){
+		else if(strcmp(galois_autom, "autom3.2") == 0){
 		    // r1 <- sigma(r1) = -1-1/r1 = -(1+1/r1)
 		    if(modul_intequal_ul(r1, qq)){
 			// r1 = oo => 1/r1 = 0
@@ -1236,7 +1244,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		    }
 		    modul_set(conj[l], r1, mm);
 		}
-		else if(strcmp(galois_autom, "_x_1/x_1") == 0){
+		else if(strcmp(galois_autom, "autom4.1") == 0){
 		    // r1 <- sigma(r1) = -(r1+1)/(r1-1)
 		    if(modul_intequal_ul(r1, 1))
                         // r1 = 1 => 1/(r1-1) = oo
@@ -1258,15 +1266,38 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		    }
 		    modul_set(conj[l], r1, mm);
 		}
+		else if(strcmp(galois_autom, "autom6.1") == 0){
+		    // r1 <- sigma(r1) = -(2*r1+1)/(r1-1)
+		    if(modul_intequal_ul(r1, 1))
+                        // r1 = 1 => 1/(r1-1) = oo
+                        modul_set_ul(r1, qq, mm);
+		    else if(modul_intequal_ul(r1, qq)){
+			// sigma(oo) = -2
+			modul_set_ul(r1, 2, mm);
+			modul_neg(r1, r1, mm);
+		    }
+		    else{
+			// r1 <- r1_orig-1
+			modul_sub_ul(r1, r1, 1, mm);
+			modul_inv(r2, r1, mm);
+			// r1 <- 2*r1_orig+1 = 2*(r1_orig-1)+3
+			modul_add(r1, r1, r1, mm);
+			modul_add_ul(r1, r1, 3, mm);
+			// r1 <- (2*r1_orig+1)/(r1_orig-1)
+			modul_mul(r1, r1, r2, mm);
+			modul_neg(r1, r1, mm);
+		    }
+		    modul_set(conj[l], r1, mm);
+		}
 	    }
-	    // check: sigma^ord(r1) should be rr
-	    ASSERT_ALWAYS(modul_intequal_ul(r1, rr));
 #if 0 // debug. 
 	    printf("orbit for %lu: %lu", qq, rr);
 	    for(int l = 0; l < ord-1; l++)
 		printf(" -> %lu", conj[l][0]);
 	    printf("\n");
 #endif
+	    // check: sigma^ord(r1) should be rr
+	    ASSERT_ALWAYS(modul_intequal_ul(r1, rr));
 	    // look at roots
 	    for(int l = k+1; l < nroots; l++){
 		unsigned long ss = mpz_get_ui(roots[l]);
@@ -1299,11 +1330,19 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     return nroots;
 }
 
+static void adwg(FILE *output, const char *comment, int *cpt,
+		 relation &rel, int64_t a, int64_t b){
+    if(b < 0) { a = -a; b = -b; }
+    rel.a = a; rel.b = (uint64_t)b;
+    rel.print(output, comment);
+    *cpt += 1;
+}
+
 // adding relations on the fly in Galois cases
 static void add_relations_with_galois(const char *galois, FILE *output, 
 				      const char *comment, int *cpt,
 				      relation &rel){
-    int64_t a1, b1, a2, b2, a3, b3, aa, bb, a;
+    int64_t a0, b0, a1, b1, a2, b2, a3, b3, a4, b4, aa, bb, a;
     uint64_t b;
 
     a = rel.a; b = rel.b;
@@ -1313,38 +1352,24 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	b1 = (int64_t)b;
 	// (a-b/x) = 1/x*(-b+a*x)
 	a2 = -b1; b2 = -a;
-	if(b2 < 0) { a2 = -a2; b2 = -b2; }
-	rel.a = a2; rel.b = (uint64_t)b2;
-	rel.print(output, comment);
-	*cpt += 1;
+	adwg(output, comment, cpt, rel, a2, b2);
     }
-    else if(strcmp(galois, "1_1/x") == 0){
+    else if(strcmp(galois, "autom3.1") == 0){
 	b1 = (int64_t)b;
 	a2 = -b1; b2 = a-b1;
+	adwg(output, comment, cpt, rel, a2, b2);
 	a3 = -b2; b3 = a2-b2;
-	if(b2 < 0){ a2 = -a2; b2 = -b2; }
-	if(b3 < 0){ a3 = -a3; b3 = -b3; }
-	rel.a = a2; rel.b = (uint64_t)b2;
-	rel.print(output, comment);
-	rel.a = a3; rel.b = (uint64_t)b3;
-	rel.print(output, comment);
-	*cpt += 2;
+	adwg(output, comment, cpt, rel, a3, b3);
     }
-    else if(strcmp(galois, "_1_1/x") == 0){
+    else if(strcmp(galois, "autom3.2") == 0){
 	b1 = (int64_t)b;
 	a2 = b1; b2 = -a-b1;
+	adwg(output, comment, cpt, rel, a2, b2);
 	a3 = b2; b3 = -a2-b2;
-	if(b2 < 0){ a2 = -a2; b2 = -b2; }
-	if(b3 < 0){ a3 = -a3; b3 = -b3; }
-	rel.a = a2; rel.b = (uint64_t)b2;
-	rel.print(output, comment);
-	rel.a = a3; rel.b = (uint64_t)b3;
-	rel.print(output, comment);
-	*cpt += 2;
+	adwg(output, comment, cpt, rel, a3, b3);
     }
-    else if(strcmp(galois, "_x_1/x_1") == 0){
-	a1 = a;
-	b1 = (int64_t)b;
+    else if(strcmp(galois, "autom4.1") == 0){
+	a1 = a; b1 = (int64_t)b;
 	// tricky: sig^2((a, b)) = (2b, -2a) ~ (b, -a)
 	aa = b1; bb = -a1;
 	if(bb < 0){ aa = -aa; bb = -bb; }
@@ -1387,11 +1412,56 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	rel.print(output, comment);
 	*cpt += 1;
 	// sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
-	aa = -aa;
+	aa = -aa; // FIXME: check!
 	if(aa < 0){ aa = -aa; bb = -bb; }
 	rel.a = bb; rel.b = (uint64_t)aa;
 	rel.print(output, comment);
 	*cpt += 1;
+    }
+    else if(strcmp(galois, "autom6.1") == 0){
+	a0 = a; b0 = (int64_t)b;
+#if 0
+        a1=-(2*a+b)
+	   b1=(a-b)
+	    d=gcd(a1,b1)
+	    a1,b1=ZZ(a1 / d),ZZ(b1 / d)
+	    if b1 < 0:
+	a1,b1=-a1,-b1
+	    if d == 1:
+                factg1="3,3,3,"+factg
+                factf1="3,3,3,"+factf
+		else:
+		    factg1=factg[6:]
+			factf1=factf[6:]
+#endif
+			a2 = a0 + b0; b2 = -a0;
+	adwg(output, comment, cpt, rel, a2, b2);
+#if 0
+	    a3,b3=-(2*b+a),2*a+b
+	    a3,b3=ZZ(a3 / d),ZZ(b3 / d)   # d == gcd(a3,b3)
+	    if b3 < 0:
+	a3,b3=-a3,-b3
+	    if d == 1:
+                factg3="3,3,3,"+factg
+                factf3="3,3,3,"+factf
+		else:
+		    factg3=factg[6:]
+			factf3=factf[6:]
+#endif
+			a4 = b0; b4 = -(a0+b0);
+	    adwg(output, comment, cpt, rel, a4, b4);
+#if 0
+	    a5,b5=a-b,2*b+a
+	    a5,b5=ZZ(a5 / d),ZZ(b5 / d)   # d == gcd(a5,b5)
+	    if b5 < 0:
+	a5,b5=-a5,-b5
+	    if d == 1:
+                factg5="3,3,3,"+factg
+                factf5="3,3,3,"+factf
+		else:
+		    factg5=factg[6:]
+			factf5=factf[6:]
+#endif
     }
 }
 
