@@ -12,6 +12,8 @@
 #include "list_int64_vector.h"
 #include "list_double_vector.h"
 #include "list_int64_vector_index.h"
+#include "gcd.h"
+#include "utils_int64.h"
 
 /*
  * Compute angle between two vectors.
@@ -744,44 +746,112 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
   double_vector_clear(v_tmp);
 }
 
-static int reduce_qlattice_output(int64_vector_ptr v0, 
-    int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I)
+static void xgcd(int64_t * g, int64_t * u, int64_t * v, int64_t a, int64_t b)
 {
-  ASSERT(v0_root->c[1] == 0);
-  ASSERT(v1_root->c[1] >= 0);
-  ASSERT(v0_root->dim == v1_root->dim);
-  ASSERT(v0->dim == v0_root->dim);
+  if (!a) {
+    ASSERT(a == 0);
+
+    * g = b;
+    * u = 0;
+    * v = 1;
+  } else {
+    int64_t x = 0;
+    int64_t y = 0;
+    xgcd(g, &y, &x, b % a, a);
+    * u = x - (b / a) * y;
+    * v = y;
+  }
+
+  ASSERT(* g == * u * a + * v * b);
+  ASSERT(ABS(* g) == ABS(gcd_int64(a, b)));
+}
+
+static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
+    int64_t I)
+{
+  //list->v[0]->c[0] <= 0, list->v[1]->c[0] >= 0
+  //index: where is the vector of Franke-Kleinjung.
+  unsigned int index = 0;
+  unsigned int index_new = 1;
+  if (list->v[0]->c[0] > 0) {
+    index = 1;
+    index_new = 0;
+  }
+
+  ASSERT(list->v[index]->c[1] >= 0);
   ASSERT(I > 0);
 #ifndef NDEBUG
-  for (unsigned int i = 3; i < v1_root->dim; i++) {
-    ASSERT(v0_root->c[i] == v1_root->c[i]);
-    ASSERT(v0_root->c[i] == 0);
+  for (unsigned int i = 3; i < list->v[index]->dim; i++) {
+    ASSERT(0 == list->v[index]->c[i]);
   }
 #endif // NDEBUG
 
   //TODO: not sure that only this case can fail.
-  if (v1_root->c[0] == 0 || v1_root->c[1] == 0) {
+  if (list->v[index]->c[0] == 0 || list->v[index]->c[1] == 0) {
     return 0;
   }
 
-  int64_vector_set(v0, v0_root);
-  int64_t k = 0;
-  if (v1_root->c[0] > 0) {
-    //k = ceil((I + r - a) / a)
-    k = (int64_t) ceil((double)(I + v0->c[0] - v1_root->c[0]) / (double)v1_root->c[0]);
-    v0->c[0] = v0->c[0] - k * v1_root->c[0];
-    ASSERT(v0->c[0] <= 0);
+  int64_t x = 0;
+  int64_t y = 0;
+
+  if (index == 0) {
+    ASSERT(list->v[0]->c[0] < 0);
+
+    int64_t g = 0;
+    xgcd(&g, &x, &y, list->v[0]->c[1], -list->v[0]->c[0]);
+
+    if (g == -1) {
+      g = 1;
+      x = -x;
+      y = -y;
+    }
+
+    ASSERT(g == 1);
   } else {
-    //k = floor((I - r + a) / a)
-    k = (int64_t) floor((double)(I - v0->c[0] + v1_root->c[0]) / (double)v1_root->c[0]);
-    v0->c[0] = v0->c[0] + k * v1_root->c[0];
-    ASSERT(v0->c[0] >= 0);
+    ASSERT(list->v[0]->c[0] > 0);
+
+    int64_t g = 0;
+    xgcd(&g, &x, &y, -list->v[0]->c[1], list->v[0]->c[0]);
+
+    if (g != 1) {
+      g = -g;
+      x = -x;
+      y = -y;
+    }
+
+    ASSERT(g == 1);
   }
 
-  ASSERT(k >= 0);
+  //Beware of overflow
+  x = x * r;
+  y = y * r;
 
-  v0->c[1] = k * v1_root->c[1];
- 
+  int64_t k = 0;
+  if (index == 0) {
+    //k = ceil((I - x) / v[0])
+    k = siceildiv(I - x, list->v[0]->c[0]);
+    /*k = (int64_t) ceil(((double)I - (double)x) / (double)list->v[0]->c[0]);*/
+    if (I - x == k * list->v[0]->c[0]) {
+      k++;
+    }
+  } else {
+    //k = ceil((-I - x) / v[0])
+    k = siceildiv(-I - x, list->v[1]->c[0]);
+    /*k = (int64_t) ceil((-(double)I - (double)x) / (double)list->v[1]->c[0]);*/
+    if (-I - x == k * list->v[0]->c[0]) {
+      k++;
+    }
+  }
+  printf("%" PRId64 ", %" PRId64 "\n", k, x);
+  list->v[index_new]->c[0] = x + k * list->v[index]->c[0];
+  list->v[index_new]->c[1] = y + k * list->v[index]->c[1];
+
+  list_int64_vector_fprintf(stdout, list);
+#ifndef NDEBUG
+  ASSERT(list->v[0]->c[0] * list->v[1]->c[1] - list->v[0]->c[1]
+    * list->v[1]->c[0] == -r);
+#endif // NDEBUG
+
   return 1;
 }
 
@@ -952,6 +1022,9 @@ static void space_sieve_generate_new_vectors(
 }
 #endif // SPACE_SIEVE_ENTROPY
 
+/*
+ * Compute g = a * u + b * v
+ */
 int int64_vector_in_sieving_region_dim(int64_vector_srcptr v,
     sieving_bound_srcptr H) {
   ASSERT(v->dim == H->t);
@@ -1278,45 +1351,52 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         }
         int boolean = 0;
         if (list_vec_zero->length == 0) {
-          boolean = reduce_qlattice(vec[0], vec[1], vec[0], vec[1],
-            (uint64_t)(2 * H->h[0]));
+          //Stupid add, just to declare this two vector.
+          list_int64_vector_add_int64_vector(list_FK, vec[0]);
+          list_int64_vector_add_int64_vector(list_FK, vec[1]);
+          boolean = reduce_qlattice(list_FK->v[0], list_FK->v[1], vec[0],
+              vec[1], (int64_t)(2 * H->h[0]));
         } else if (list_vec_zero->length == 1) {
-          boolean = reduce_qlattice_output(vec[0], vec[0],
-              list_vec_zero->v[0]->vec, (uint64_t)(2 * H->h[0]));
-          if (0 >= vec[0]->c[0]) {
-            int64_vector_set(vec[1], list_vec_zero->v[0]->vec);
-          } else {
-            int64_vector_set(vec[1], vec[0]);
-            int64_vector_set(vec[0], list_vec_zero->v[0]->vec);
-          }
+          list_int64_vector_add_int64_vector(list_FK,
+              list_vec_zero->v[0]->vec);
+          list_int64_vector_add_int64_vector(list_FK,
+              list_vec_zero->v[0]->vec);
+          mat_int64_fprintf_comment(stdout, Mqr);
+          boolean = reduce_qlattice_output(list_FK, (int64_t)r->ideal->r,
+              (int64_t)(2 * H->h[0]));
         } else {
           ASSERT(list_vec_zero->length == 2);
           if (0 >= list_vec_zero->v[0]->vec->c[0]) {
-            int64_vector_set(vec[0], list_vec_zero->v[0]->vec);
-            int64_vector_set(vec[1], list_vec_zero->v[1]->vec);
+            list_int64_vector_add_int64_vector(list_FK,
+                list_vec_zero->v[0]->vec);
+            list_int64_vector_add_int64_vector(list_FK,
+                list_vec_zero->v[1]->vec);
           } else {
-            int64_vector_set(vec[1], list_vec_zero->v[0]->vec);
-            int64_vector_set(vec[0], list_vec_zero->v[1]->vec);
+            list_int64_vector_add_int64_vector(list_FK,
+                list_vec_zero->v[1]->vec);
+            list_int64_vector_add_int64_vector(list_FK,
+                list_vec_zero->v[0]->vec);
           }
           boolean = 1;
         }
 
-        ASSERT(vec[0]->c[0] > -(int64_t)(2 * H->h[0]));
-        ASSERT(0 >= vec[0]->c[0]);
-        ASSERT(0 <= vec[1]->c[0]);
-        ASSERT(vec[1]->c[0] < (int64_t)(2 * H->h[0]));
-        ASSERT(vec[0]->c[1] > 0);
-        ASSERT(vec[1]->c[1] > 0);
+        for (unsigned int i = 0; i < Mqr->NumCols; i++) {
+          int64_vector_clear(vec[i]);
+        }
+        free(vec);
+
+        ASSERT(list_FK->v[0]->c[0] > -(int64_t)(2 * H->h[0]));
+        ASSERT(0 >= list_FK->v[0]->c[0]);
+        ASSERT(0 <= list_FK->v[1]->c[0]);
+        ASSERT(list_FK->v[1]->c[0] < (int64_t)(2 * H->h[0]));
+        ASSERT(list_FK->v[0]->c[1] > 0);
+        ASSERT(list_FK->v[1]->c[1] > 0);
 
         if (boolean == 0) {
           fprintf(stderr,
               "# Plane sieve (called by space sieve) does not support this type of Mqr.\n");
           mat_int64_fprintf_comment(stderr, Mqr);
 
-          for (unsigned int i = 0; i < Mqr->NumCols; i++) {
-            int64_vector_clear(vec[i]);
-          }
-          free(vec);
           int64_vector_clear(v_tmp);
           int64_vector_clear(s);
 #ifdef SPACE_SIEVE_OUT
@@ -1332,24 +1412,20 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
           return;
         }
         //TODO: Go up, and just when we need.
-        list_int64_vector_add_int64_vector(list_FK, vec[0]);
-        list_int64_vector_add_int64_vector(list_FK, vec[1]);
-        if (space_sieve_good_vector(vec[0], H)) {
-          if (!int64_vector_in_list_zero(vec[0], list_vec_zero)) {
+        if (space_sieve_good_vector(list_FK->v[0], H)) {
+          if (!int64_vector_in_list_zero(list_FK->v[0], list_vec_zero)) {
             list_int64_vector_index_add_int64_vector_index(list_vec_zero,
-                vec[0], index_vector(vec[0], H, array->number_element));
+                list_FK->v[0],
+                index_vector(list_FK->v[0], H, array->number_element));
           }
         }
-        if (space_sieve_good_vector(vec[1], H)) {
-          if (!int64_vector_in_list_zero(vec[1], list_vec_zero)) {
+        if (space_sieve_good_vector(list_FK->v[1], H)) {
+          if (!int64_vector_in_list_zero(list_FK->v[1], list_vec_zero)) {
             list_int64_vector_index_add_int64_vector_index(list_vec_zero,
-                vec[1], index_vector(vec[1], H, array->number_element));
+                list_FK->v[1],
+                index_vector(list_FK->v[1], H, array->number_element));
           }
         }
-        for (unsigned int i = 0; i < Mqr->NumCols; i++) {
-          int64_vector_clear(vec[i]);
-        }
-        free(vec);
         plane_sieve = 1;
       }
       int64_vector_t s_out;
@@ -1375,6 +1451,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         //TODO: do that rarely.
         //
 #ifdef SPACE_SIEVE_ENTROPY
+        //TODO: avoid duplicate.
         if (entropy < SPACE_SIEVE_ENTROPY) {
           space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
               array->number_element);
