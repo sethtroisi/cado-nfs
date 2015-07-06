@@ -144,7 +144,106 @@ typedef struct pth_s {
 } pth_t;
 
 /*****************************************************************************/
+void
+print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
+                       int verbose)
+{
+  uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
+  for (uint64_t i = 0; i < len; i++)
+  {
+    if (w[i] > 0)
+    {
+      nb_nzero++;
+      if (w[i] < min)
+        min = w[i];
+      if (w[i] > max)
+        max = w[i];
+      av += w[i];
+      std += w[i]*w[i];
+    }
+  }
 
+  double av_f = ((double) av) / ((double) nb_nzero);
+  double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
+
+  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, len);
+  fprintf (out, "# STATS on %s: #active %s = %" PRIu64 "\n", name, name,
+                                                                    nb_nzero);
+  fprintf (out, "# STATS on %s: min = %" PRIu64 "\n", name, min);
+  fprintf (out, "# STATS on %s: max = %" PRIu64 "\n", name, max);
+  fprintf (out, "# STATS on %s: av = %.2f\n", name, av_f);
+  fprintf (out, "# STATS on %s: std = %.2f\n", name, std_f);
+
+  if (verbose > 1)
+  {
+    uint64_t *nb_w = NULL;
+    nb_w = (uint64_t *) malloc ((max-min+1) * sizeof (uint64_t));
+    ASSERT_ALWAYS (nb_w != NULL);
+    memset (nb_w, 0, (max-min+1) * sizeof (uint64_t));
+    for (uint64_t i = 0; i < len; i++)
+      if (w[i] > 0)
+        nb_w[w[i]-min]++;
+
+    for (uint64_t i = 0; i < max-min+1; i++)
+    {
+      if (nb_w[i] > 0)
+        fprintf (out, "# STATS on %s: #%s of weight %" PRIu64 " : %" PRIu64
+                      "\n", name, name, min+i, nb_w[i]);
+    }
+    free (nb_w);
+  }
+  fflush (out);
+}
+
+void
+print_stats_columns_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nprimemax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nprimemax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+    if (bit_vector_getbit(rel_used, (size_t) i))
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+        w[*h]++;
+
+  print_stats_on_weight (out, w, nprimemax, "cols", verbose);
+  free (w);
+}
+
+void
+print_stats_rows_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nrelmax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+    if (bit_vector_getbit(rel_used, (size_t) i))
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+        w[i]++;
+
+  print_stats_on_weight (out, w, nrelmax, "rows", verbose);
+  free (w);
+}
+
+#if 0
+void print_stats_on_cliques (FILE *out, int verbose)
+{
+  uint64_t *len = NULL;
+  len = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
+  ASSERT_ALWAYS (len != NULL);
+  memset (len, 0, nrelmax * sizeof (uint64_t));
+
+  free (len);
+}
+#endif
+
+/*****************************************************************************/
 
 /* Delete a relation: set rel_used[i] to 0, update the count of primes
  * in that relation.
@@ -538,7 +637,6 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   }
   for (i = npt; i--; ) pthread_join (pth[i].pthread, NULL);
 
-  
   /* At this point, in each pth[i].graph_cliques we have
      size_clique_graph cliques order by decreasing weight */
   size_t *next_clique = NULL;
@@ -788,6 +886,13 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
                     count + 1, npass, target_excess);
     fflush(stdout);
 
+    /* prints some stats on columns and rows weight if verbose > 0. */
+    if (verbose > 0)
+    {
+      print_stats_columns_weight (stdout, verbose);
+      print_stats_rows_weight (stdout, verbose);
+    }
+
     cliques_removal(target_excess, nrels, nprimes);
     remove_all_singletons(nrels, nprimes, &excess);
 
@@ -804,15 +909,22 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
   {
 	  oldnrels = *nrels;
 	  oldexcess = excess;
-	  target_excess = excess - chunk;
 	  target_excess = keep;
 
 	  fprintf(stdout, "Step extra: target excess is %" PRId64 "\n",
 		  target_excess);
+    fflush(stdout);
+
+    /* prints some stats on columns and rows weight if verbose > 0. */
+    if (verbose > 0)
+    {
+      print_stats_columns_weight (stdout, verbose);
+      print_stats_rows_weight (stdout, verbose);
+    }
 
     cliques_removal(target_excess, nrels, nprimes);
-
 	  remove_all_singletons(nrels, nprimes, &excess);
+
 	  fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
 		                (double) (oldnrels-*nrels) / (double) (oldexcess-excess));
   }
@@ -851,104 +963,6 @@ void *thread_print(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 
 
 /*********** utility functions for purge binary ****************/
-
-void
-print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
-                       int verbose)
-{
-  uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
-  for (uint64_t i = 0; i < len; i++)
-  {
-    if (w[i] > 0)
-    {
-      nb_nzero++;
-      if (w[i] < min)
-        min = w[i];
-      if (w[i] > max)
-        max = w[i];
-      av += w[i];
-      std += w[i]*w[i];
-    }
-  }
-
-  double av_f = ((double) av) / ((double) nb_nzero);
-  double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
-
-  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, len);
-  fprintf (out, "# STATS on %s: #active %s = %" PRIu64 "\n", name, name,
-                                                                    nb_nzero);
-  fprintf (out, "# STATS on %s: min = %" PRIu64 "\n", name, min);
-  fprintf (out, "# STATS on %s: max = %" PRIu64 "\n", name, max);
-  fprintf (out, "# STATS on %s: av = %.2f\n", name, av_f);
-  fprintf (out, "# STATS on %s: std = %.2f\n", name, std_f);
-
-  if (verbose > 1)
-  {
-    uint64_t *nb_w = NULL;
-    nb_w = (uint64_t *) malloc ((max-min+1) * sizeof (uint64_t));
-    ASSERT_ALWAYS (nb_w != NULL);
-    memset (nb_w, 0, (max-min+1) * sizeof (uint64_t));
-    for (uint64_t i = 0; i < len; i++)
-      if (w[i] > 0)
-        nb_w[w[i]-min]++;
-
-    for (uint64_t i = 0; i < max-min+1; i++)
-    {
-      if (nb_w[i] > 0)
-        fprintf (out, "# STATS on %s: #%s of weight %" PRIu64 " : %" PRIu64
-                      "\n", name, name, min+i, nb_w[i]);
-    }
-    free (nb_w);
-  }
-}
-
-void
-print_stats_columns_weight (FILE *out, int verbose)
-{
-  uint64_t *w = NULL;
-  index_t *h = 0;
-  w = (uint64_t *) malloc (nprimemax * sizeof (uint64_t));
-  ASSERT_ALWAYS (w != NULL);
-  memset (w, 0, nprimemax * sizeof (uint64_t));
-
-  for (uint64_t i = 0; i < nrelmax; i++)
-  {
-    if (bit_vector_getbit(rel_used, (size_t) i))
-    {
-      for (h = rel_compact[i]; *h != UMAX(*h); h++)
-      {
-        w[*h]++;
-      }
-    }
-  }
-
-  print_stats_on_weight (out, w, nprimemax, "cols", verbose);
-  free (w);
-}
-
-void
-print_stats_rows_weight (FILE *out, int verbose)
-{
-  uint64_t *w = NULL;
-  index_t *h = 0;
-  w = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
-  ASSERT_ALWAYS (w != NULL);
-  memset (w, 0, nrelmax * sizeof (uint64_t));
-
-  for (uint64_t i = 0; i < nrelmax; i++)
-  {
-    if (bit_vector_getbit(rel_used, (size_t) i))
-    {
-      for (h = rel_compact[i]; *h != UMAX(*h); h++)
-      {
-        w[i]++;
-      }
-    }
-  }
-
-  print_stats_on_weight (out, w, nrelmax, "rows", verbose);
-  free (w);
-}
 
   /* Build the file list (ugly). It is the concatenation of all
    *  b s p
@@ -1258,6 +1272,7 @@ int main(int argc, char **argv)
     ALLOC_VERBOSE_BIT_VECTOR(rel_used, nrels);
     bit_vector_set(rel_used, 1);
 
+    /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
     {
       print_stats_columns_weight (stdout, verbose);
@@ -1267,6 +1282,7 @@ int main(int argc, char **argv)
     /* MAIN FUNCTIONS: do singletons and cliques removal. */
     singletons_and_cliques_removal(&nrels, &nprimes);
 
+    /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
     {
       print_stats_columns_weight (stdout, verbose);
