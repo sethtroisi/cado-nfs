@@ -53,7 +53,7 @@
 #include <gmp.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>		/* for _O_BINARY */
+#include <fcntl.h>  /* for _O_BINARY */
 #include <math.h>
 #include <unistd.h>
 #include <string.h>
@@ -79,36 +79,14 @@
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
-/* Main variables */
-
-/* This one is passed to all functions, so it's morally a global */
-struct purge_data_s {
-    /* for minimal changes, don't put these here _yet_ */
-    // uint64_t min_index;
-    // index_t **rel_compact;	/* see main documentation */
-    // weight_t *ideals_weight;
-    info_mat_t info;
-    /* fd[0]: printed relations */
-    /* fd[1]: deleted relations */
-    FILE * fd[2];
-};
-typedef struct purge_data_s purge_data[1];
-typedef struct purge_data_s * purge_data_ptr;
-typedef const struct purge_data_s * purge_data_srcptr;
-
-/* A clique is a connected components of the relation R, where R(i1,i2) iff
- * i1 and i2 share a prime of weight 2. */
-typedef struct {
-  float w;   /* Weight of the clique */
-  index_t i; /* smallest relation of the clique (index in rel_compact) */
-} comp_t;
+/********************** Main global variables ********************************/
 
 uint64_t min_index;
-index_t **rel_compact;	/* see main documentation */
+index_t **rel_compact; /* see main documentation */
 weight_t *ideals_weight;
 
 static bit_vector rel_used;
-static index_t *sum2_index = NULL;	/*sum of rows index for primes of weight 2 */
+static index_t *sum2_index = NULL; /*sum of rows index for primes of weight 2 */
 
 static uint64_t nrelmax = 0, nprimemax = 0;
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
@@ -125,9 +103,86 @@ uint64_t __stat_nbcoeffofvalue[STAT_VALUES_COEFF_LEN + 1];
 #endif
 #endif
 
+/********************* purge_data struct *************************************/
+
+/* This one is passed to all functions, so it's morally a global */
+struct purge_data_s {
+    /* for minimal changes, don't put these here _yet_ */
+    // uint64_t min_index;
+    // index_t **rel_compact; /* see main documentation */
+    // weight_t *ideals_weight;
+    info_mat_t info;
+    /* fd[0]: printed relations */
+    /* fd[1]: deleted relations */
+    FILE * fd[2];
+};
+typedef struct purge_data_s purge_data[1];
+typedef struct purge_data_s * purge_data_ptr;
+typedef const struct purge_data_s * purge_data_srcptr;
+
+/********************* comp_t struct (clique) ********************************/
+
+/* A clique is a connected components of the relation R, where R(i1,i2) iff
+ * i1 and i2 share a prime of weight 2. */
+typedef struct {
+  float w;   /* Weight of the clique */
+  index_t i; /* smallest relation of the clique (index in rel_compact) */
+} comp_t;
+
+int
+cmp_comp_t (const void *p, const void *q)
+{
+  float x = ((comp_t *)p)->w;
+  float y = ((comp_t *)q)->w;
+  return (x <= y ? 1 : -1);
+}
+
+/******************** index_buffer struct ************************************/
+
 typedef struct index_buffer_s { // Classical buffer (here, a stack in fact)
   index_t *begin, *current, *end;
 } index_buffer_t;
+
+/* Init function for index_buffer_t */
+static inline void
+index_buffer_init (index_buffer_t *buf, size_t size)
+{
+  buf->begin = (index_t *) malloc_check (sizeof(index_t) * size);
+  buf->current = buf->begin;
+  buf->end = buf->begin + size;
+}
+
+/* Reset function for index_buffer_t */
+static inline void
+index_buffer_reset (index_buffer_t *buf)
+{
+  buf->current = buf->begin;
+}
+
+/* Clear function for index_buffer_t */
+static inline void
+index_buffer_clear (index_buffer_t *buf)
+{
+  free(buf->begin);
+}
+
+/* This function grows a possible too small index_buffer_t. */
+static inline void
+index_buffer_resize (index_buffer_t *buf)
+{
+  size_t min_buf = 0;
+  if (UNLIKELY(buf->current + min_buf >= buf->end))
+  {
+    size_t ind_current = buf->current - buf->begin;
+    size_t new_size = (buf->end - buf->begin) << 1;
+    buf->begin = (index_t *) realloc (buf->begin, new_size * sizeof (index_t));
+    ASSERT_ALWAYS (buf->begin != NULL);
+    buf->current = buf->begin + ind_current;
+    buf->end = buf->begin + new_size;
+  }
+}
+
+/*****************************************************************************/
 
 /* The main structure for the working pthreads pool which
    compute the heaviest cliques */
@@ -143,7 +198,8 @@ typedef struct pth_s {
   index_buffer_t to_explore, explored; // stacks to explore and already explored
 } pth_t;
 
-/*****************************************************************************/
+/******************* Functions to print stats ********************************/
+
 void
 print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
                        int verbose)
@@ -298,22 +354,6 @@ float weight_function_clique(weight_t w)
 #endif
 }
 
-// This function grows a possible too small index_t buffer.
-static inline
-void resize_buf_index (index_buffer_t *buf, size_t min_buf) {
-  if (UNLIKELY(buf->current + min_buf >= buf->end)) {
-    size_t ind_current = buf->current - buf->begin,
-      new_lg = (buf->end - buf->begin) << 1;
-    buf->begin = realloc (buf->begin, new_lg * sizeof (index_t));
-    if (!buf->begin) {
-      perror ("Realloc error\n");
-      exit (1);
-    }
-    buf->current = buf->begin + ind_current;
-    buf->end = buf->begin + new_lg;
-  }
-}
-
 /* This function insert a clique in a binary tree on the classical array form:
    2 sons at the index 2n+1 and 2n+2 for a father at the index n.
    The property is: the weight of the clique father is less than its 2 sons.
@@ -378,8 +418,8 @@ static int compute_connected_component_pth (pth_t *pth) {
   index_t *primes_of_current_row, current_prime, current_row, the_other_row, nb_rels = 1;
   weight_t current_ideal_weight;
 
-  pth->to_explore.current = pth->to_explore.begin; // Empty buffer
-  pth->explored.current   = pth->explored.begin;   // Empty buffer
+  index_buffer_reset (&(pth->to_explore)); /* Empty buffer */
+  index_buffer_reset (&(pth->explored)); /* Empty buffer */
   current_row = pth->clique.i;
   pth->clique.w = 0.;
   for (;;) { // Loop on all connected rows
@@ -402,12 +442,12 @@ static int compute_connected_component_pth (pth_t *pth) {
 	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
 	// No: store the new clique row in order to explore it later
 	++nb_rels;
-	resize_buf_index (&(pth->to_explore), 0);
+	index_buffer_resize (&(pth->to_explore));
 	*(pth->to_explore.current)++ = the_other_row;
       }
     }
     // current row is now explored
-    resize_buf_index (&(pth->explored), 0);
+    index_buffer_resize (&(pth->explored));
     *(pth->explored.current)++ = current_row;
     // We need another row to explore, or it's the end
     if (UNLIKELY(pth->to_explore.current == pth->to_explore.begin)) break;
@@ -429,8 +469,8 @@ static index_t delete_connected_component_nopth (pth_t *pth, index_t current_row
   index_t *primes_of_current_row, current_prime, the_other_row;
   weight_t current_ideal_weight;
 
-  pth->to_explore.current = pth->to_explore.begin;   // Empty buffer
-  pth->explored.current   = pth->explored.begin;     // Empty buffer
+  index_buffer_reset (&(pth->to_explore)); /* Empty buffer */
+  index_buffer_reset (&(pth->explored)); /* Empty buffer */
   for (;;) { // Loop on all connected rows
     primes_of_current_row = rel_compact[current_row];
     for (;;) { // Loop on all primes of the current row
@@ -447,12 +487,12 @@ static index_t delete_connected_component_nopth (pth_t *pth, index_t current_row
 	for (index_t *pt = pth->to_explore.begin; pt < pth->to_explore.current; pt++)
 	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
 	// No: store the new clique row in order to explore it later
-	resize_buf_index (&(pth->to_explore), 0);
+	index_buffer_resize (&(pth->to_explore));
 	*(pth->to_explore.current)++ = the_other_row;
       }
     }
     // current row is now explored
-    resize_buf_index (&(pth->explored), 0);
+    index_buffer_resize (&(pth->explored));
     *(pth->explored.current)++ = current_row;
     // We need another row to explore, or it's the end
     if (pth->to_explore.current == pth->to_explore.begin) break;
@@ -462,14 +502,6 @@ static index_t delete_connected_component_nopth (pth_t *pth, index_t current_row
   for (index_t *pt = pth->explored.begin; pt < pth->explored.current; pt++)
     *nprimes -= delete_relation (*pt);
   return (pth->explored.current - pth->explored.begin);
-}
-
-int
-cmp_comp_t (const void *p, const void *q)
-{
-  float x = ((comp_t *)p)->w;
-  float y = ((comp_t *)q)->w;
-  return (x <= y ? 1 : -1);
 }
 
 /* This MT function search the heaviest pth->chunk cliques in
@@ -491,12 +523,8 @@ static void *search_chunk_max_cliques (void *pt) {
   else
     pth->clique_graph = (comp_t *) malloc_check (sizeof(comp_t) * pth->chunk);
   pth->size_clique_graph = 0;
-  pth->to_explore.begin = pth->to_explore.current
-    = (index_t *) malloc_check (sizeof(index_t) * TO_EXPLORE_MIN_BUFFER);
-  pth->to_explore.end = pth->to_explore.begin + TO_EXPLORE_MIN_BUFFER;
-  pth->explored.begin = pth->explored.current
-    = (index_t *) malloc_check (sizeof(index_t) * EXPLORED_MIN_BUFFER);
-  pth->explored.end = pth->explored.begin + EXPLORED_MIN_BUFFER;
+  index_buffer_init (&(pth->to_explore), TO_EXPLORE_MIN_BUFFER);
+  index_buffer_init (&(pth->explored), EXPLORED_MIN_BUFFER);
 
   // Now the first begin of the search
   pth->clique.i = pth->pthread_number * RELS_BLOCK;
@@ -685,8 +713,8 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   for (i = 0; i < npt; ++i)
   {
     free (pth[i].clique_graph);
-    free (pth[i].to_explore.begin);
-    free (pth[i].explored.begin);
+    index_buffer_clear (&(pth[i].to_explore));
+    index_buffer_clear (&(pth[i].explored));
   }
   free (pth);
 }
