@@ -1338,12 +1338,47 @@ static void adwg(FILE *output, const char *comment, int *cpt,
     *cpt += 1;
 }
 
-// adding relations on the fly in Galois cases
+/* removing p^vp from the list of factors in rel. */
+static void remove_galois_factors(relation &rel, int p, int vp){
+    int ok = 0;
+
+    for(int side = 0 ; side < 2 ; side++){
+	for(unsigned int i = 0 ; i < rel.sides[side].size(); i++)
+	    if(mpz_cmp_ui(rel.sides[side][i].p, p) == 0){
+		ok = 1;
+		ASSERT_ALWAYS(rel.sides[side][i].e >= vp);
+		rel.sides[side][i].e -= vp;
+	    }
+    }
+    /* indeed, p was present */
+    ASSERT_ALWAYS(ok == 1);
+}
+
+/* adding p^vp to the list of factors in rel. */
+static void add_galois_factors(relation &rel, int p, int vp){
+    int ok = 0;
+
+    for(int side = 0 ; side < 2 ; side++){
+	for(unsigned int i = 0 ; i < rel.sides[side].size(); i++)
+	    if(mpz_cmp_ui(rel.sides[side][i].p, p) == 0){
+		ok = 1;
+		rel.sides[side][i].e += vp;
+	    }
+    }
+    if(ok == 0){
+	/* we must add p^vp */
+	for(int side = 0; side < 2; side++)
+	    rel.add(side, p, vp);
+    }
+}
+
+/* adding relations on the fly in Galois cases */
 static void add_relations_with_galois(const char *galois, FILE *output, 
 				      const char *comment, int *cpt,
 				      relation &rel){
-    int64_t a0, b0, a1, b1, a2, b2, a3, b3, a4, b4, aa, bb, a;
+    int64_t a0, b0, a1, b1, a2, b2, a3, b3, a5, b5, aa, bb, a;
     uint64_t b;
+    int d;
 
     a = rel.a; b = rel.b;
     if(strcmp(galois, "1/x") == 0){
@@ -1385,22 +1420,13 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	    // (a, b) = (1, 0) or (0, 1) mod 2
 	    // aa and bb are odd, aa/bb = 1 mod 2
 	    // we must add "2,2" in front of f and g
-	    for(int side = 0; side < 2; side++){
-		rel.add(side, 2, 1);
-		rel.add(side, 2, 1);
-	    }
+	    add_galois_factors(rel, 2, 2);
 	}
 	else{
 	    // (a, b) = (1, 1), aa and bb are even
 	    // we must remove "2,2" in front of f and g
 	    // taken from relation.cpp
-	    for(int side = 0 ; side < 2 ; side++){
-		for(unsigned int i = 0 ; i < rel.sides[side].size(); i++)
-		    if(mpz_cmp_ui(rel.sides[side][i].p, 2) == 0){
-			ASSERT_ALWAYS(rel.sides[side][i].e >= 2);
-			rel.sides[side][i].e -= 2;
-		    }
-	    }
+	    remove_galois_factors(rel, 2, 2);
 	    // remove common powers of 2
 	    do {
 		aa >>= 1;
@@ -1420,48 +1446,37 @@ static void add_relations_with_galois(const char *galois, FILE *output,
     }
     else if(strcmp(galois, "autom6.1") == 0){
 	a0 = a; b0 = (int64_t)b;
-#if 0
-        a1=-(2*a+b)
-	   b1=(a-b)
-	    d=gcd(a1,b1)
-	    a1,b1=ZZ(a1 / d),ZZ(b1 / d)
-	    if b1 < 0:
-	a1,b1=-a1,-b1
-	    if d == 1:
-                factg1="3,3,3,"+factg
-                factf1="3,3,3,"+factf
-		else:
-		    factg1=factg[6:]
-			factf1=factf[6:]
-#endif
-			a2 = a0 + b0; b2 = -a0;
-	adwg(output, comment, cpt, rel, a2, b2);
-#if 0
-	    a3,b3=-(2*b+a),2*a+b
-	    a3,b3=ZZ(a3 / d),ZZ(b3 / d)   # d == gcd(a3,b3)
-	    if b3 < 0:
-	a3,b3=-a3,-b3
-	    if d == 1:
-                factg3="3,3,3,"+factg
-                factf3="3,3,3,"+factf
-		else:
-		    factg3=factg[6:]
-			factf3=factf[6:]
-#endif
-			a4 = b0; b4 = -(a0+b0);
-	    adwg(output, comment, cpt, rel, a4, b4);
-#if 0
-	    a5,b5=a-b,2*b+a
-	    a5,b5=ZZ(a5 / d),ZZ(b5 / d)   # d == gcd(a5,b5)
-	    if b5 < 0:
-	a5,b5=-a5,-b5
-	    if d == 1:
-                factg5="3,3,3,"+factg
-                factf5="3,3,3,"+factf
-		else:
-		    factg5=factg[6:]
-			factf5=factf[6:]
-#endif
+
+	// fact do not change
+	adwg(output, comment, cpt, rel, a0 + b0, -a0); // (a2, b2)
+	adwg(output, comment, cpt, rel, b0, -(a0+b0)); // (a4, b4)
+
+	// fact do change
+        a1 = -(2*a0+b0); b1= a0-b0;
+	d = 0;
+	while(((a1 % 3) == 0) && ((b1 % 3) == 0)){
+	    a1 /= 3;
+	    b1 /= 3;
+	    d++;
+	}
+	fprintf(output, "# d1=%d\n", d);
+	a3 =-(2*b0+a0); b3 = 2*a0+b0;
+	a5 = a0-b0;     b5 = 2*b0+a0;
+	if(d == 0)
+	    // we need to add 3^3
+	    add_galois_factors(rel, 3, 3);
+	else
+	    // we need to remove 3^3
+	    remove_galois_factors(rel, 3, 3);
+	adwg(output, comment, cpt, rel, a1, b1); // (a1/3^d, b1/3^d)
+	for(int i = 0; i < d; i++){
+	    a3 /= 3;
+	    b3 /= 3;
+	    a5 /= 3;
+	    b5 /= 3;
+	}
+	adwg(output, comment, cpt, rel, a3, b3); // (a3/3^d, b3/3^d)
+	adwg(output, comment, cpt, rel, a5, b5); // (a5/3^d, b5/3^d)
     }
 }
 
