@@ -3433,8 +3433,8 @@ class PurgeTask(Task):
         # not_enough1 = re.compile(r"excess < (\d+.\d+) \* #primes")
         not_enough1 = re.compile(r"\(excess / ncols\) = \d+.?\d* < \d+.?\d*. "
                                  r"See -required_excess argument.")
-        not_enough2 = re.compile(r"number of relations <= number of ideals")
-        nrels_nprimes = re.compile(r"\s*nrels=(\d+), ncols=(\d+); "
+        not_enough2 = re.compile(r"number of rows <= number of columns")
+        nrels_nprimes = re.compile(r"\s*nrows=(\d+), ncols=(\d+); "
                                    r"excess=(-?\d+)")
         for line in stderr.splitlines():
             match = not_enough1.match(line)
@@ -3493,11 +3493,11 @@ class PurgeTask(Task):
     def parse_stdout(self, stdout):
         # Program stdout is expected in the form:
         #   Final values:
-        #   nrels=23105 ncols=22945 excess=160
-        #   weight=382433 weight*nrels=8.84e+09
+        #   nrows=23105 ncols=22945 excess=160
+        #   weight=382433 weight*nows=8.84e+09
         # but we allow some extra whitespace
         r = {}
-        keys = ("nrels", "ncols", "weight", "excess")
+        keys = ("nrows", "ncols", "weight", "excess")
         final_values_line = "Final values:"
         had_final_values = False
         for line in stdout.splitlines():

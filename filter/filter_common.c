@@ -15,15 +15,15 @@ static inline unsigned int earlyparsed_relation_nb_above_min_index(earlyparsed_r
     return nb_above_min_index;
 }
 
-/* Write relation j from buffer to rel_compact
- * We put in rel_compact only primes such that their index h is greater or
+/* Write relation j from buffer to row_compact
+ * We put in row_compact only primes such that their index h is greater or
  * equal to min_index
  * Return the number of new primes
  */
 
 inline unsigned int
 insert_rel_in_table_no_e(earlyparsed_relation_ptr my_br, index_t min_index,
-			 index_t ** rel_compact,
+			 index_t ** row_compact,
 			 weight_t * ideals_weight)
 {
     unsigned int nprimes = 0;
@@ -50,14 +50,14 @@ insert_rel_in_table_no_e(earlyparsed_relation_ptr my_br, index_t min_index,
     }
 
     my_tmp[itmp] = UMAX(*my_tmp);	/* sentinel */
-    rel_compact[my_br->num] = my_tmp;
+    row_compact[my_br->num] = my_tmp;
 
     return nprimes;
 }
 
 inline unsigned int
 insert_rel_in_table_with_e(earlyparsed_relation_ptr my_br, index_t min_index,
-                           ideal_merge_t **rel_compact, int32_t *ideals_weight)
+                           ideal_merge_t **row_compact, int32_t *ideals_weight)
 {
     unsigned int nprimes = 0;
     unsigned int i, itmp, nb_above_min;
@@ -85,7 +85,7 @@ insert_rel_in_table_with_e(earlyparsed_relation_ptr my_br, index_t min_index,
 
     if (my_tmp) {
 	my_tmp[itmp].id = UMAX(my_tmp[itmp].id);	/* sentinel */
-	rel_compact[my_br->num] = my_tmp;
+	row_compact[my_br->num] = my_tmp;
     }
 
     return nprimes;
