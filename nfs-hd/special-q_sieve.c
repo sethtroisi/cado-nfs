@@ -264,7 +264,8 @@ void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
  * f: the polynomial that defines the number field.
  * a: the polynomial.
  * q: the q of the special-q.
- * bound_resulant: an approximation of the resultant between a and f.
+ * log_bound_resulant: log2 of an approximation of the resultant between a
+ *  and f.
  * i: position in the array we want to follow.
  * vector: the vector corresponding to the ith position.
  * array: the array in which we store the norm.
@@ -272,7 +273,7 @@ void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
  */
 void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
     MAYBE_UNUSED int64_poly_srcptr a, MAYBE_UNUSED ideal_spq_srcptr spq,
-    MAYBE_UNUSED double bound_resultant, MAYBE_UNUSED uint64_t i,
+    MAYBE_UNUSED double log_bound_resultant, MAYBE_UNUSED uint64_t i,
     MAYBE_UNUSED int64_vector_srcptr vector, MAYBE_UNUSED array_srcptr array)
 {
 #ifdef MEAN_NORM
@@ -286,10 +287,10 @@ void mode_init_norm(MAYBE_UNUSED int special_q, MAYBE_UNUSED mpz_poly_srcptr f,
 
 #ifdef MEAN_NORM_BOUND
   if (special_q == 1) {
-    norm_bound = norm_bound + bound_resultant /
+    norm_bound = norm_bound + pow(2, log_bound_resultant) /
     pow(((double) ideal_spq_get_q(spq), (double) ideal_spq_get_deg_h(spq)));
   } else {
-    norm_bound = norm_bound + bound_resultant;
+    norm_bound = norm_bound + pow(2, log_bound_resultant);
   }
 #endif // MEAN_NORM_BOUND
 
@@ -319,7 +320,7 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
     unsigned int beg, mpz_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
     MAYBE_UNUSED int64_vector_srcptr vector)
 {
-  double bound_resultant;
+  double log_bound_resultant = 0;
   //a = a + sum(matrix[j][beg + 1], j, 1, H->t + 1) * x^beg.
   for (unsigned int j = 0; j < H->t; j++) {
     int64_poly_setcoeff(a, j, a->coeff[j] + matrix->coeff[j + 1][beg + 1]);
@@ -346,9 +347,11 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
   //Compute an approximation of the norm.
   if (a->deg > 0) {
     uint64_t tmp = int64_poly_infinite_norm(a);
-    bound_resultant = pow((double)tmp, (double)f->deg) * pre_compute[a->deg];
+    log_bound_resultant =
+      log2((double)pre_compute[a->deg]) + log2((double)tmp) * (double)f->deg;
+    
   } else {
-    bound_resultant = 1;
+    log_bound_resultant = 0;
   }
   /*
    * Store in array the value of the norm, without the contribution of the
@@ -357,13 +360,13 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
   if (special_q) {
     ASSERT(special_q == 1);
 
-    array->array[i] = (unsigned char)log2(bound_resultant) -
+    array->array[i] = (unsigned char)log_bound_resultant -
       ideal_spq_get_log(spq);
-    mode_init_norm(special_q, f, a, spq, bound_resultant, i,
+    mode_init_norm(special_q, f, a, spq, log_bound_resultant, i,
         vector, array);
   } else {
-    array->array[i] = (unsigned char) log2(bound_resultant);
-    mode_init_norm(special_q, f, a, spq, bound_resultant, i, vector, array);
+    array->array[i] = (unsigned char) log_bound_resultant;
+    mode_init_norm(special_q, f, a, spq, log_bound_resultant, i, vector, array);
   }
 }
 
