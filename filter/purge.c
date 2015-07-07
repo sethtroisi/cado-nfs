@@ -31,18 +31,23 @@
  */
 
 /*
+ * Important remark:
+ *   A relation corresponds to a row of the matrix and a ideal corresponds to
+ *   a column of the matrix.
+ *
  * This program works in two passes over the relation files:
- * - the first pass loads in memory only indexes of columns >= min_index and
- *   keeps a count of the weight of each column o, cols_weight.
- *   Then simultaneously singleton removal is performed, and heavy relations
- *   are discarded, until the final excess is 'keep'.
+ * - the first pass loads in memory only indexes of columns >= col_min_index
+ *   and keeps a count of the weight of each column in cols_weight.
+ *   Then, a first pass of singleton removal is performed followed by 'npass'
+ *   pass of singleton removal and clique removal, in order to obtained the
+ *   final excess 'keep'.
  * - the second pass goes through the relations again, and dumps the remaining
  *   ones in the format needed by 'merge'.
 
  * This program uses the following data structures:
  * rel_used[i]    - non-zero iff relation i is kept (so far)
  * rel_compact[i] - list of indexes of columns (greater than or equal to
- *                  min_index) of the row i (terminated by a -1 sentinel)
+ *                  col_min_index) of the row i (terminated by a -1 sentinel)
  * cols_weight [h] - weight of the column h in current relations (saturates
                        at 256)
  */
@@ -81,14 +86,14 @@
 
 /********************** Main global variables ********************************/
 
-uint64_t min_index;
+uint64_t col_min_index;
 index_t **rel_compact; /* see main documentation */
 weight_t *cols_weight;
 
 static bit_vector rel_used;
 static uint64_t *sum2_row = NULL; /* sum of 2 row indexes for columns of
                                      weight 2 */
-static uint64_t nrelmax = 0, nprimemax = 0;
+static uint64_t nrelmax = 0, col_max_index = 0;
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
 static int npass = -1; /* negative value means chosen by purge */
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
@@ -104,7 +109,7 @@ uint64_t __stat_weight;
 /* This one is passed to all functions, so it's morally a global */
 struct purge_data_s {
     /* for minimal changes, don't put these here _yet_ */
-    // uint64_t min_index;
+    // uint64_t col_min_index;
     // index_t **rel_compact; /* see main documentation */
     // weight_t *cols_weight;
     info_mat_t info;
@@ -119,7 +124,7 @@ typedef const struct purge_data_s * purge_data_srcptr;
 /********************* comp_t struct (clique) ********************************/
 
 /* A clique is a connected components of the relation R, where R(i1,i2) iff
- * i1 and i2 share a prime of weight 2. */
+ * i1 and i2 share a column of weight 2. */
 typedef struct {
   float w;   /* Weight of the clique */
   uint64_t i; /* smallest relation of the clique (index in rel_compact) */
@@ -341,28 +346,28 @@ comp_sorted_bin_tree_replace (comp_sorted_bin_tree_ptr T, comp_t new_node)
 
 /*****************************************************************************/
 
-/* Delete a relation: set rel_used[i] to 0, update the count of primes
- * in that relation.
- * Warning: we only update the count of primes that we consider, i.e.,
- * primes with index >= min_index.
+/* Delete a relation: set rel_used[i] to 0, update the count of the columns
+ * appearing in that relation.
+ * Warning: we only update the count of columns that we consider, i.e.,
+ * columns with index >= col_min_index.
  * CAREFUL: no multithread compatible with " !(--(*o))) " and
  * bit_vector_clearbit.
  */
 static unsigned int delete_relation (uint64_t i)
 {
     index_t *tab;
-    unsigned int nremoveprimes = 0;
+    unsigned int nrem_cols = 0;
     weight_t *o;
 
     for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
 	o = &(cols_weight[*tab]);
 	ASSERT(*o);
 	if (*o < UMAX(*o) && !(--(*o)))
-	    nremoveprimes++;
+	    nrem_cols++;
     }
     /* We do not free rel_compact[i] as it is freed with my_malloc_free_all */
     bit_vector_clearbit(rel_used, (size_t) i);
-    return nremoveprimes;
+    return nrem_cols;
 }
 
 /************* Code for clique (= connected component) removal ***************/
@@ -391,7 +396,7 @@ compute_connected_component_mt (comp_t *clique,
   clique->w = 0.; /* Set initial weight of the connected component to 0. */
   do /* Loop on all connected rows */
   {
-    /* Loop on all primes of the current row */
+    /* Loop on all columns of the current row */
     for (h = rel_compact[current_row]; *h != UMAX(*h); h++)
     {
       index_t cur_h = *h;
@@ -430,7 +435,7 @@ compute_connected_component_mt (comp_t *clique,
  * it calls delete_relation, which is NOT compatible!
  */
 static uint64_t
-delete_connected_component (uint64_t current_row, uint64_t *nprimes,
+delete_connected_component (uint64_t current_row, uint64_t *ncols,
                             uint64_buffer_ptr buf_to_explore,
                             uint64_buffer_ptr buf_explored)
 {
@@ -440,7 +445,7 @@ delete_connected_component (uint64_t current_row, uint64_t *nprimes,
   uint64_buffer_reset (buf_explored); /* Empty buffer */
   do /* Loop on all connected rows */
   {
-    /* Loop on all primes of the current row */
+    /* Loop on all columns of the current row */
     for (h = rel_compact[current_row]; *h != UMAX(*h); h++)
     {
       index_t cur_h = *h;
@@ -470,7 +475,7 @@ delete_connected_component (uint64_t current_row, uint64_t *nprimes,
 
   /* Now, we deleted all rows explored */
   for (uint64_t *pt = buf_explored->begin; pt < buf_explored->current; pt++)
-    *nprimes -= delete_relation (*pt);
+    *ncols -= delete_relation (*pt);
   return (buf_explored->current - buf_explored->begin);
 }
 
@@ -523,7 +528,7 @@ compute_sum2_row_mt (void *pt)
 static inline void
 compute_sum2_row ()
 {
-  memset(sum2_row, 0, nprimemax * sizeof(uint64_t));
+  memset(sum2_row, 0, col_max_index * sizeof(uint64_t));
 #ifndef HAVE_SYNC_FETCH /* monothread */
   for (uint64_t i = 0; i < nrelmax; i++)
   {
@@ -684,16 +689,16 @@ print_stats_columns_weight (FILE *out, int verbose)
 {
   uint64_t *w = NULL;
   index_t *h = 0;
-  w = (uint64_t *) malloc (nprimemax * sizeof (uint64_t));
+  w = (uint64_t *) malloc (col_max_index * sizeof (uint64_t));
   ASSERT_ALWAYS (w != NULL);
-  memset (w, 0, nprimemax * sizeof (uint64_t));
+  memset (w, 0, col_max_index * sizeof (uint64_t));
 
   for (uint64_t i = 0; i < nrelmax; i++)
     if (bit_vector_getbit(rel_used, (size_t) i))
       for (h = rel_compact[i]; *h != UMAX(*h); h++)
         w[*h]++;
 
-  print_stats_uint64 (out, w, nprimemax, "cols", "weight", verbose);
+  print_stats_uint64 (out, w, col_max_index, "cols", "weight", verbose);
   free (w);
 }
 
@@ -746,9 +751,9 @@ void print_stats_on_cliques (FILE *out, int verbose)
 /***************************** Clique removal stage *************************/
 
 static void
-cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
+cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * ncols)
 {
-  int64_t excess = (((int64_t) *nrels) - *nprimes);
+  int64_t excess = (((int64_t) *nrels) - *ncols);
   uint64_t nb_clique_deleted = 0;
   size_t i, chunk;
 
@@ -757,7 +762,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   if (excess <= keep || excess <= target_excess) return;
   chunk = (size_t) (excess - target_excess);
 
-  /* First collect sums for primes with weight 2.
+  /* First collect sums for columns with weight 2.
    * If HAVE_SYNC_FETCH is defined, this part is done with the previous
    * multithread function; if not, it's done in sequential, immediatly.
   */
@@ -801,7 +806,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   uint64_buffer_init (buf1, UINT64_BUFFER_MIN_SIZE);
   uint64_buffer_init (buf2, UINT64_BUFFER_MIN_SIZE);
 
-  while (*nrels > target_excess + *nprimes)
+  while (*nrels > target_excess + *ncols)
   {
     comp_t max_comp = {.i = 0, .w = -1.0};
     size_t max_thread = 0;
@@ -824,7 +829,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
       break;
     }
 
-    *nrels -= delete_connected_component (max_comp.i, nprimes, buf1, buf2);
+    *nrels -= delete_connected_component (max_comp.i, ncols, buf1, buf2);
     next_clique[max_thread]++;
     nb_clique_deleted++;
   }
@@ -852,16 +857,16 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
  */
 
 #ifndef HAVE_SYNC_FETCH
-static void onepass_singleton_removal(uint64_t * nrels, uint64_t * nprimes)
+static void onepass_singleton_removal(uint64_t * nrels, uint64_t * ncols)
 {
     index_t *tab;
-    uint64_t i, nremoverels = 0, nremoveprimes = 0;
+    uint64_t i, nremoverels = 0, nremovecols = 0;
 
     for (i = 0; i < nrelmax; i++) {
 	if (bit_vector_getbit(rel_used, (size_t) i)) {
 	    for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
 		if (cols_weight[*tab] == 1) {
-		    nremoveprimes += delete_relation(i);
+		    nremovecols += delete_relation(i);
 		    nremoverels++;
 		    break;
 		}
@@ -869,7 +874,7 @@ static void onepass_singleton_removal(uint64_t * nrels, uint64_t * nprimes)
 	}
     }
     *nrels -= nremoverels;
-    *nprimes -= nremoveprimes;
+    *ncols -= nremovecols;
 }
 
 #else				/* ifndef HAVE_SYNC_FETCH */
@@ -877,7 +882,7 @@ static void onepass_singleton_removal(uint64_t * nrels, uint64_t * nprimes)
 typedef struct {
     unsigned int nb;
     pthread_t mt;
-    uint64_t begin, end, sup_nrel, sup_npri;
+    uint64_t begin, end, sup_nrel, sup_ncol;
 } ti_t;
 static ti_t *ti;
 
@@ -889,7 +894,7 @@ static void onepass_thread_singleton_removal(ti_t * mti)
   weight_t *o;
   bv_t j;
   
-  mti->sup_nrel = mti->sup_npri = 0;
+  mti->sup_nrel = mti->sup_ncol = 0;
   for (i = mti->begin; i < mti->end; i++) {
     j = (((bv_t) 1) << (i & (BV_BITS - 1)));
     
@@ -900,7 +905,7 @@ static void onepass_thread_singleton_removal(ti_t * mti)
 	    o = &(cols_weight[*tab]);
 	    ASSERT(*o);
 	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
-	      (mti->sup_npri)++;
+	      (mti->sup_ncol)++;
 	  }
 	  /* rel_compact[i] is not freed , it is freed with my_malloc_free_all */
 	  rel_used->p[i >> LN2_BV_BITS] &= ~j;
@@ -913,7 +918,7 @@ static void onepass_thread_singleton_removal(ti_t * mti)
 
 static void
 onepass_singleton_parallel_removal(unsigned int nb_thread, uint64_t * nrels,
-				   uint64_t * nprimes)
+				   uint64_t * ncols)
 {
     pthread_attr_t attr;
     uint64_t pas, incr;
@@ -949,7 +954,7 @@ onepass_singleton_parallel_removal(unsigned int nb_thread, uint64_t * nrels,
     for (i = 0; i < nb_thread; i++) {
 	pthread_join(ti[i].mt, NULL);
 	*nrels -= ti[i].sup_nrel;
-	*nprimes -= ti[i].sup_npri;
+	*ncols -= ti[i].sup_ncol;
     }
     pthread_attr_destroy(&attr);
     if (ti != NULL)
@@ -959,70 +964,70 @@ onepass_singleton_parallel_removal(unsigned int nb_thread, uint64_t * nrels,
 #endif				/* ifdef HAVE_SYNC_FETCH */
 
 static void
-remove_all_singletons(uint64_t * nrels, uint64_t * nprimes, int64_t * excess)
+remove_all_singletons(uint64_t * nrels, uint64_t * ncols, int64_t * excess)
 {
     uint64_t oldnrels;
-    *excess = (((int64_t) * nrels) - *nprimes);
+    *excess = (((int64_t) * nrels) - *ncols);
     fprintf(stdout,
-	    "  nrels=%" PRIu64 " nprimes=%" PRIu64 " excess=%" PRId64 "\n",
-	    *nrels, *nprimes, *excess);
+	    "  nrels=%" PRIu64 " ncols=%" PRIu64 " excess=%" PRId64 "\n",
+	    *nrels, *ncols, *excess);
     do {
 	oldnrels = *nrels;
 #ifdef HAVE_SYNC_FETCH
 	ASSERT(npt);
-	onepass_singleton_parallel_removal(npt, nrels, nprimes);
+	onepass_singleton_parallel_removal(npt, nrels, ncols);
 #else
-	onepass_singleton_removal(nrels, nprimes);
+	onepass_singleton_removal(nrels, ncols);
 #endif
-	*excess = (((int64_t) * nrels) - *nprimes);
+	*excess = (((int64_t) * nrels) - *ncols);
 	fprintf(stdout,
-		"  new_nrels=%" PRIu64 " new_nprimes=%" PRIu64 " excess=%" PRId64
-		"" " at %2.2lf\n", *nrels, *nprimes, *excess, seconds());
+		"  new_nrels=%" PRIu64 " new_ncols=%" PRIu64 " excess=%" PRId64
+		"" " at %2.2lf\n", *nrels, *ncols, *excess, seconds());
   fflush(stdout);
     } while (oldnrels != *nrels);
 }
 
 static void
-print_final_values (uint64_t nrels, uint64_t nprimes, double weight)
+print_final_values (uint64_t nrels, uint64_t ncols, double weight)
 {
-  fprintf (stdout, "Final values:\nnrels=%" PRIu64 " nprimes=%" PRIu64 " "
+  fprintf (stdout, "Final values:\nnrels=%" PRIu64 " ncols=%" PRIu64 " "
            "excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
-           nrels, nprimes, ((int64_t) nrels) - nprimes, weight,
+           nrels, ncols, ((int64_t) nrels) - ncols, weight,
            weight * (double) nrels);
   fflush (stdout);
 }
 
-static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
+static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * ncols)
 {
     uint64_t oldnrels = 0;
     int64_t oldexcess, excess, target_excess;
     int count;
 
     //First step of singletons removal
-    remove_all_singletons(nrels, nprimes, &excess);
+    remove_all_singletons(nrels, ncols, &excess);
 
-    if (excess <= 0) {		/* covers case nrel = nprimes = 0 */
+    if (excess <= 0) {		/* covers case nrel = ncols = 0 */
 	fprintf (stdout, "number of relations <= number of ideals\n");
-        print_final_values (nrels[0], nprimes[0], 0);
+        print_final_values (*nrels, *ncols, 0);
 	exit(2);
     }
 
-    if ((double) excess < required_excess * ((double) *nprimes)) {
+    if ((double) excess < required_excess * ((double) *ncols)) {
 	fprintf (stdout,
-                 "(excess / nprimes) = %.2f < %.2f. See -required_excess "
-                 "argument.\n", ((double) excess / (double) *nprimes),
+                 "(excess / ncols) = %.2f < %.2f. See -required_excess "
+                 "argument.\n", ((double) excess / (double) *ncols),
                  required_excess);
-        print_final_values (nrels[0], nprimes[0], 0);
+        print_final_values (*nrels, *ncols, 0);
 	exit(2);
     }
 
   /* If npass was not given in the command line, adjust npass in
      [1..DEFAULT_PURGE_NPASS] so that each pass removes at least about 1% wrt
-     the number of ideals */
+     the number of columns */
   if (npass < 0)
   {
-    if ((uint64_t) excess / DEFAULT_PURGE_NPASS < *nprimes / 100)
-      npass = 1 + (100 * excess) / *nprimes;
+    if ((uint64_t) excess / DEFAULT_PURGE_NPASS < *ncols / 100)
+      npass = 1 + (100 * excess) / *ncols;
     else
       npass = DEFAULT_PURGE_NPASS;
   }
@@ -1048,8 +1053,8 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
       print_stats_rows_weight (stdout, verbose);
     }
 
-    cliques_removal(target_excess, nrels, nprimes);
-    remove_all_singletons(nrels, nprimes, &excess);
+    cliques_removal(target_excess, nrels, ncols);
+    remove_all_singletons(nrels, ncols, &excess);
 
     fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
                     (double) (oldnrels-*nrels) / (double) (oldexcess-excess));
@@ -1077,8 +1082,8 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
       print_stats_rows_weight (stdout, verbose);
     }
 
-    cliques_removal(target_excess, nrels, nprimes);
-	  remove_all_singletons(nrels, nprimes, &excess);
+    cliques_removal(target_excess, nrels, ncols);
+	  remove_all_singletons(nrels, ncols, &excess);
 
 	  fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
 		                (double) (oldnrels-*nrels) / (double) (oldexcess-excess));
@@ -1093,13 +1098,12 @@ void *insert_rel_into_table(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 {
     ASSERT_ALWAYS(rel->num < nrelmax);
 
-    arg->info.nprimes +=
-        insert_rel_in_table_no_e(rel, min_index, 
-                rel_compact, cols_weight);
+    arg->info.ncols +=
+        insert_rel_in_table_no_e(rel, col_min_index, rel_compact, cols_weight);
 #ifdef STAT
-    /* here we also used to accumulate the number of primes above
-     * min_index in arg->info.W */
-    arg->info.W += earlyparsed_relation_nb_above_min_index(rel, min_index);
+    /* here we also used to accumulate the number of columns above
+     * col_min_index in arg->info.W */
+    arg->info.W += earlyparsed_relation_nb_above_min_index(rel, col_min_index);
 #endif
 
     return NULL;
@@ -1164,9 +1168,11 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "basepath", "path added to all file in filelist");
   param_list_decl_usage(pl, "out", "outfile for remaining relations");
   param_list_decl_usage(pl, "nrels", "number of initial relations");
-  param_list_decl_usage(pl, "nprimes",
-                                  "number of prime ideals in renumber table");
-  param_list_decl_usage(pl, "minindex", "index of the first considered prime");
+  param_list_decl_usage(pl, "col-max-index", "upper bound on the number of "
+                                  "columns (must be at least the number "
+                  "                   of prime ideals in renumber table)");
+  param_list_decl_usage(pl, "col-min-index", "do not take into account columns"
+                                             " with indexes <= col-min-index");
   param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
                                     "(default " STR(DEFAULT_FILTER_EXCESS) ")");
   param_list_decl_usage(pl, "npass", "maximal number of steps of clique "
@@ -1197,8 +1203,8 @@ int main(int argc, char **argv)
 {
     char * argv0 = argv[0];
     param_list pl;
-    min_index = UMAX(uint64_t);
-    uint64_t nrels, nprimes;
+    col_min_index = UMAX(uint64_t);
+    uint64_t nrels, ncols;
     size_t tot_alloc_bytes = 0;
     char ** input_files;
 
@@ -1232,11 +1238,11 @@ int main(int argc, char **argv)
 
     /* read command-line parameters */
     param_list_parse_uint64(pl, "nrels", &nrelmax);
-    param_list_parse_uint64(pl, "nprimes", &nprimemax);
+    param_list_parse_uint64(pl, "col-max-index", &col_max_index);
     param_list_parse_int64(pl, "keep", &keep);
 
-    /* Only look at relations of index above minindex */
-    param_list_parse_uint64(pl, "minindex", &min_index);
+    /* Only look at columns of index >= col-min-index */
+    param_list_parse_uint64(pl, "col-min-index", &col_min_index);
 
 
     param_list_parse_uint(pl, "npthr", &npt);
@@ -1291,23 +1297,24 @@ int main(int argc, char **argv)
                       "(or nrels = 0)\n");
       usage(pl, argv0);
     }
-    if (nprimemax == 0)
+    if (col_max_index == 0)
     {
-      fprintf(stderr, "Error, missing -nprimes command line argument "
-                      "(or nprimes = 0)\n");
+      fprintf(stderr, "Error, missing -col-max-index command line argument "
+                      "(or col-max-index = 0)\n");
       usage(pl, argv0);
     }
-    if (min_index > nprimemax)
+    if (col_min_index > col_max_index)
     {
-      fprintf(stderr, "Error, missing -minindex command line argument "
-                      "or (minindex > nprimes)\n");
+      fprintf(stderr, "Error, missing -col-min-index command line argument "
+                      "or (col-min-index > col-max-index)\n");
       usage(pl, argv0);
     }
-    /* If nrels or nprimes > 2^32, then we need index_t to be 64-bit */
-    if (((nprimemax >> 32) != 0 || (nrelmax >> 32) != 0) && sizeof(index_t) < 8)
+    /* If nrels or col_max_index > 2^32, then we need index_t to be 64-bit */
+    if (((col_max_index >> 32) != 0 || (nrelmax >> 32) != 0) && sizeof(index_t) < 8)
     {
-      fprintf(stderr, "Error, -nrels or -nprimes is too large for a 32-bit "
-                      "program\nSee #define __SIZEOF_INDEX__ in typedefs.h\n");
+      fprintf(stderr, "Error, -nrels or -col-max-index is too large for a "
+                      "32-bit program\nSee #define __SIZEOF_INDEX__ in "
+                      "typedefs.h\n");
       exit(EXIT_FAILURE);
     }
 
@@ -1315,8 +1322,8 @@ int main(int argc, char **argv)
     comp_print_info_weight_function ();
 
     fprintf(stdout, "Number of relations is %" PRIu64 "\n", nrelmax);
-    fprintf(stdout, "Number of prime ideals below the two large prime bounds: "
-                    "%" PRIu64 "\n", nprimemax);
+    fprintf(stdout, "Maximum possible index of a column is: %" PRIu64 "\n",
+                    col_max_index);
     /*}}}*/
 
     /* {{{ Allocating memory. We are keeping track of the total
@@ -1350,7 +1357,7 @@ int main(int argc, char **argv)
 } while (0)
     /* }}} */
 
-    ALLOC_VERBOSE_MALLOC(uint64_t, sum2_row, nprimemax);
+    ALLOC_VERBOSE_MALLOC(uint64_t, sum2_row, col_max_index);
 
 
     set_antebuffer_path(argv0, param_list_lookup_string(pl, "path_antebuffer"));
@@ -1377,10 +1384,10 @@ int main(int argc, char **argv)
     memset(pd, 0, sizeof(purge_data));
 
     ALLOC_VERBOSE_MALLOC(index_t*, rel_compact, nrelmax);
-    ALLOC_VERBOSE_CALLOC(weight_t, cols_weight, nprimemax);
+    ALLOC_VERBOSE_CALLOC(weight_t, cols_weight, col_max_index);
 
-    fprintf(stdout, "Pass 1, reading and storing ideals with index h >= "
-            "%" PRIu64 "\n", min_index);
+    fprintf(stdout, "Pass 1, reading and storing columns with index h >= "
+            "%" PRIu64 "\n", col_min_index);
 
     nrels = nrelmax;
 
@@ -1402,7 +1409,7 @@ int main(int argc, char **argv)
         abort();
     }
 
-    nprimes = pd->info.nprimes;
+    ncols = pd->info.ncols;
 
     tot_alloc_bytes += get_my_malloc_bytes();
     fprintf(stdout, "Allocated rel_compact[i] %zuMB (total %zuMB so far)\n",
@@ -1430,7 +1437,7 @@ int main(int argc, char **argv)
     }
 
     /* MAIN FUNCTIONS: do singletons and cliques removal. */
-    singletons_and_cliques_removal(&nrels, &nprimes);
+    singletons_and_cliques_removal(&nrels, &ncols);
 
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
@@ -1439,12 +1446,12 @@ int main(int argc, char **argv)
       print_stats_rows_weight (stdout, verbose);
     }
 
-    if (nrels < nprimes) {
-      fprintf(stdout, "number of relations < number of ideals\n");
+    if (nrels < ncols) {
+      fprintf(stdout, "number of relations < number of columns\n");
       exit(2);
     }
-    if (nrels == 0 || nprimes == 0) {
-      fprintf(stdout, "number of relations or number of ideals is 0\n");
+    if (nrels == 0 || ncols == 0) {
+      fprintf(stdout, "number of relations or number of columns is 0\n");
       exit(2);
     }
 
@@ -1485,12 +1492,12 @@ int main(int argc, char **argv)
      * compute last index i such that cols_weight[i] != 0
      */
     {
-	uint64_t last_used = nprimemax - 1;
+	uint64_t last_used = col_max_index - 1;
 	while (cols_weight[last_used] == 0)
 	    last_used--;
 
 	fprintf(pd->fd[0], "# %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", nrels,
-		last_used + 1, nprimes);
+		last_used + 1, ncols);
     }
 
     /* second pass over relations in files */
@@ -1502,7 +1509,7 @@ int main(int argc, char **argv)
 
     /* write final values to stdout */
     /* This output, incl. "Final values:", is required by the script */
-    print_final_values (nrels, nprimes, pd->info.W);
+    print_final_values (nrels, ncols, pd->info.W);
 
     /* Free allocated stuff */
     if (cols_weight != NULL)

@@ -3308,15 +3308,15 @@ class PurgeTask(Task):
                 return False
 
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
-        # If the user didn't give minindex, let's compute it.
-        minindex = int(self.progparams[0].get("minindex", -1))
-        if minindex == -1:
-            minindex = int(nprimes / 20.0)
+        # If the user didn't give col_minindex, let's compute it.
+        col_minindex = int(self.progparams[0].get("col_minindex", -1))
+        if col_minindex == -1:
+            col_minindex = int(nprimes / 20.0)
             # For small cases, we want to avoid degenerated cases, so let's
             # keep most of the ideals: memory is not an issue in that case.
-            if (minindex < 10000):
-                minindex = 500
-            self.progparams[0].setdefault("minindex", minindex)
+            if (col_minindex < 10000):
+                col_minindex = 500
+            self.progparams[0].setdefault("col_minindex", col_minindex)
         
         if "purgedfile" in self.state and not self.have_new_input_files() and \
                 input_nrels == self.state["input_nrels"]:
@@ -3431,10 +3431,10 @@ class PurgeTask(Task):
         input_nprimes = None
         have_enough = True
         # not_enough1 = re.compile(r"excess < (\d+.\d+) \* #primes")
-        not_enough1 = re.compile(r"\(excess / nprimes\) = \d+.?\d* < \d+.?\d*. "
+        not_enough1 = re.compile(r"\(excess / ncols\) = \d+.?\d* < \d+.?\d*. "
                                  r"See -required_excess argument.")
         not_enough2 = re.compile(r"number of relations <= number of ideals")
-        nrels_nprimes = re.compile(r"\s*nrels=(\d+), nprimes=(\d+); "
+        nrels_nprimes = re.compile(r"\s*nrels=(\d+), ncols=(\d+); "
                                    r"excess=(-?\d+)")
         for line in stderr.splitlines():
             match = not_enough1.match(line)
@@ -3493,11 +3493,11 @@ class PurgeTask(Task):
     def parse_stdout(self, stdout):
         # Program stdout is expected in the form:
         #   Final values:
-        #   nrels=23105 nprimes=22945 excess=160
+        #   nrels=23105 ncols=22945 excess=160
         #   weight=382433 weight*nrels=8.84e+09
         # but we allow some extra whitespace
         r = {}
-        keys = ("nrels", "nprimes", "weight", "excess")
+        keys = ("nrels", "ncols", "weight", "excess")
         final_values_line = "Final values:"
         had_final_values = False
         for line in stdout.splitlines():
