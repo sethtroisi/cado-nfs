@@ -1,7 +1,7 @@
-/* purge --- remove singletons
+/* purge --- perform singleton removal and clique removal
  * 
- * Copyright 2008, 2009, 2010, 2011, 2012 Alain Filbois, Francois Morain,
- *                                        Paul Zimmermann
+ * Copyright 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015
+ * Cyril Bouvier, Alain Filbois, Francois Morain, Paul Zimmermann
  * 
  * This file is part of CADO-NFS.
  * 
@@ -24,14 +24,16 @@
 /* References:
  * On the Number Field Sieve Integer Factorisation Algorithm,
  * Stefania Cavallar, PhD Thesis, University of Leiden, 2002.
+ *
+ * The filtering step of discrete logarithm and integer factorization
+ * algorithms.
+ * Cyril Bouvier, preprint, 22 pages. 2013.
  */
 
 /*
  * This program works in two passes over the relation files:
- * - the first pass loads in memory only rational primes >= minpr and algebraic
- *   ideals >= minpa, but stores all ideals in the hash table, and keeps a count
- *   of the number of non-stored ideals for each relation.
- *   By default minpr and minpa are taken as rlim and alim respectively.
+ * - the first pass loads in memory only indexes of columns >= min_index and
+ *   keeps a count of the weight of each column o, cols_weight.
  *   Then simultaneously singleton removal is performed, and heavy relations
  *   are discarded, until the final excess is 'keep'.
  * - the second pass goes through the relations again, and dumps the remaining
@@ -39,10 +41,13 @@
 
  * This program uses the following data structures:
  * rel_used[i]    - non-zero iff relation i is kept (so far)
- * rel_compact[i] - list of 'h' indices in H table of considered (p,r) for row i
- *                  (terminated by a -1 sentinel)
- * ideals_weight [h] - number of occurrences of h in current relations
+ * rel_compact[i] - list of indexes of columns (greater than or equal to
+ *                  min_index) of the row i (terminated by a -1 sentinel)
+ * cols_weight [h] - weight of the column h in current relations (saturates
+                       at 256)
+ */
 
+/*
  * Exit value:
  * - 0 if enough relations
  * - 1 if an error occurred (then we should abort the factorization)
@@ -83,7 +88,7 @@
 
 uint64_t min_index;
 index_t **rel_compact; /* see main documentation */
-weight_t *ideals_weight;
+weight_t *cols_weight;
 
 static bit_vector rel_used;
 static index_t *sum2_index = NULL; /*sum of rows index for primes of weight 2 */
@@ -110,7 +115,7 @@ struct purge_data_s {
     /* for minimal changes, don't put these here _yet_ */
     // uint64_t min_index;
     // index_t **rel_compact; /* see main documentation */
-    // weight_t *ideals_weight;
+    // weight_t *cols_weight;
     info_mat_t info;
     /* fd[0]: printed relations */
     /* fd[1]: deleted relations */
@@ -263,8 +268,6 @@ typedef struct pth_s {
   pthread_t pthread;
   comp_t *clique_graph;     // Array/binary tree sorted of the heaviest cliques
   size_t size_clique_graph; // max & optimal size of the tree = chunk
-  comp_t clique;            // current clique
-  index_buffer_t to_explore, explored;// stacks to explore and already explored
 } pth_t;
 
 static inline void
@@ -281,6 +284,68 @@ comp_graph_init (pth_t *pth)
   else
     pth->clique_graph = (comp_t *) malloc_check (sizeof(comp_t) * pth->chunk);
   pth->size_clique_graph = 0;
+}
+
+/* This function insert a connected component comp_t in a binary tree on the
+   classical array form: 2 sons at the index 2n+1 and 2n+2 for a father at
+   the index n.
+   The property is: the weight of the comp_t father is less than its 2 sons.
+*/
+static void
+comp_graph_insert (pth_t *pth, comp_t clique)
+{
+  size_t son, father, place;
+  son = pth->size_clique_graph;
+  while (son)
+  {
+    father = (son - 1) >> 1;
+    if (UNLIKELY (clique.w >= pth->clique_graph[father].w))
+      break;
+    son = father;
+  }
+  place = son;
+  son = (pth->size_clique_graph)++;
+  while (place != son)
+  {
+    father = (son - 1) >> 1;
+    pth->clique_graph[son] = pth->clique_graph[father];
+    son = father;
+  }
+  pth->clique_graph[son] = clique;
+}
+
+/* This function takes a clique where the clique weight is greater than the
+ * weight of the clique root of a binary tree build by insert_clique_pth.
+ * The function searchs the right place in this tree for the clique in respect
+ * with the property described in insert_clique_pth.
+*/
+static void
+comp_graph_replace (pth_t *pth, comp_t clique)
+{
+  ASSERT_EXPENSIVE (pth->clique_graph->w < clique.w);
+  size_t father = 0;
+  for (;;) /* In this loop, always, clique_graph[father].w < weight_clique */
+  {
+    float weight1, weight2;
+    size_t son = father * 2 + 1; /* son is son1 */
+    if (UNLIKELY (son >= pth->chunk)) /* No son: father is a leaf. Found! */
+      break;
+    weight1 = pth->clique_graph[son].w;
+    weight2 = pth->clique_graph[son + 1].w;
+    if (UNLIKELY(weight1 > weight2))
+    {
+      ++son; /* son is here the son 2 */
+      weight1 = weight2;
+    }
+    /* here, weight1 is the lightest weight and son is its clique index */
+    if (UNLIKELY (weight1 >= clique.w)) /* Found! */
+      break;
+    /* The lightest son has a weight lighter than clique, so we have to go
+     * down the tree, but before the son replaces its father. */
+    pth->clique_graph[father] = pth->clique_graph[son];
+    father = son;
+  }
+  pth->clique_graph[father] = clique;
 }
 
 /******************* Functions to print stats ********************************/
@@ -400,7 +465,7 @@ static unsigned int delete_relation (uint64_t i)
     weight_t *o;
 
     for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
-	o = &(ideals_weight[*tab]);
+	o = &(cols_weight[*tab]);
 	ASSERT(*o);
 	if (*o < UMAX(*o) && !(--(*o)))
 	    nremoveprimes++;
@@ -410,123 +475,69 @@ static unsigned int delete_relation (uint64_t i)
     return nremoveprimes;
 }
 
-/*****************************************************************************/
-/* Code for clique removal.
- * We remove the heaviest cliques.
- * Each ideal h contributes to the weight of the cliques depending on its
- * weight (see weight_function_clique).
- */
+/************* Code for clique (= connected component) removal ***************/
 
-/* This function insert a clique in a binary tree on the classical array form:
-   2 sons at the index 2n+1 and 2n+2 for a father at the index n.
-   The property is: the weight of the clique father is less than its 2 sons.
-*/
-static void insert_clique_pth (pth_t *pth) {
-  size_t son, father, place;
-  son = pth->size_clique_graph;
-  while (son) {
-    father = (son - 1) >> 1;
-    if (UNLIKELY (pth->clique.w >= pth->clique_graph[father].w)) break;
-    son = father;
-  }
-  place = son;
-  son = (pth->size_clique_graph)++;
-  while (place != son) {
-    father = (son - 1) >> 1;
-    pth->clique_graph[son] = pth->clique_graph[father];
-    son = father;
-  }
-  pth->clique_graph[son] = pth->clique;
-}
-  
-/* This function takes a clique where the clique weight is greater than the weight
-   of the clique root of a binary tree build by insert_clique_pth.
-   The function searchs the right place in this tree for the clique in respect with
-   the property described in insert_clique_pth.
-*/
-static void replace_clique_pth (pth_t *pth) {
-  ASSERT_EXPENSIVE (pth->clique_graph->w < pth->clique.w);
-  size_t father = 0;
-  for (;;) { // In this loop, always, clique_graph[father].w < weight_clique
-    float weight1, weight2;
-    size_t son = father * 2 + 1; // son is son1
-    if (UNLIKELY (son >= pth->chunk)) break; // No son: father is a leaf. Found!
-    weight1 = pth->clique_graph[son].w;
-    weight2 = pth->clique_graph[son + 1].w;
-    if (UNLIKELY(weight1 > weight2)) {
-      ++son; // son is here the son 2
-      weight1 = weight2;
-    }
-    // here, weight1 is the lightest weight and son is its clique index
-    if (UNLIKELY (weight1 >= pth->clique.w)) break; // Found!
-    // The lightest son has a weight lighter than clique, so
-    // we have to go down the tree, but before the son replaces its father.
-    pth->clique_graph[father] = pth->clique_graph[son];
-    father = son;
-  }
-  pth->clique_graph[father] = pth->clique;
-}
-
-/* Compute connected component of row clique->i for the relation R(i1,i2)
- * if rows i1 and i2 share a prime of weight 2.
- * The total weight of the clique is written in pth->clique.w
+/* Compute connected component beginning at row clique->i
+ * The weight of the connected component is written in clique->w
  *
- * NB: Multithread version! if it exists a row i1 with i1 < clique_pth->clique.i in
- * the connected component, this component has been already found when we
- * have treated the row i1.
- * In this case, the function returns 0.
- * If no, the function returns the number of connected relations.
+ * Multithread version.
+ *
+ * Return the number of rows in the connected component or 0 if it exists a
+ * row i1 with i1 < clique->i in the connected component (it implies that this
+ * component has already been found, by this thread or another, when we have
+ * treated the row i1.
  */
-static int compute_connected_component_pth (pth_t *pth) {
-  index_t *primes_of_current_row, current_prime, current_row, the_other_row, nb_rels = 1;
-  weight_t current_ideal_weight;
+static int
+compute_connected_component_mt (comp_t *clique,
+                                index_buffer_ptr buf_to_explore,
+                                index_buffer_ptr buf_explored)
+{
+  index_t current_row;
+  index_t *h;
 
-  index_buffer_reset (pth->to_explore); /* Empty buffer */
-  index_buffer_reset (pth->explored); /* Empty buffer */
-  current_row = pth->clique.i;
-  pth->clique.w = 0.;
-  for (;;) { // Loop on all connected rows
-    primes_of_current_row = rel_compact[current_row];
-    for (;;) { // Loop on all primes of the current row
-      next_row:
-      current_prime = *primes_of_current_row++;
-      if (UNLIKELY (current_prime == UMAX(current_prime))) break; // exit of the current loop
-      current_ideal_weight = ideals_weight[current_prime];
-      pth->clique.w += comp_weight_function (current_ideal_weight);
-      if (UNLIKELY(current_ideal_weight == 2)) {
-  the_other_row = sum2_index[current_prime] - current_row;
-  /* First, if the_other_row < clique.i, it's an already found clique. Bye.*/
-  if (UNLIKELY (the_other_row < pth->clique.i)) return 0;
-  /* Second, is the_other_row already explored ? */
-  if (index_buffer_is_in (pth->explored, the_other_row))
-    goto next_row;
-  /* Third, is the_other_row is already in the to_explore buffer ? */
-  if (index_buffer_is_in (pth->to_explore, the_other_row))
-    goto next_row;
-  /* No: store the new clique row in order to explore it later */
-  nb_rels++;
-  index_buffer_resize (pth->to_explore);
-  *(pth->to_explore->current)++ = the_other_row;
+  index_buffer_reset (buf_to_explore); /* Empty buffer */
+  index_buffer_reset (buf_explored); /* Empty buffer */
+  current_row = clique->i;
+  clique->w = 0.; /* Set initial weight of the connected component to 0. */
+  do /* Loop on all connected rows */
+  {
+    /* Loop on all primes of the current row */
+    for (h = rel_compact[current_row]; *h != UMAX(*h); h++)
+    {
+      index_t cur_h = *h;
+      weight_t cur_h_weight = cols_weight[cur_h];
+      clique->w += comp_weight_function (cur_h_weight);
+      if (UNLIKELY(cur_h_weight == 2))
+      {
+        index_t the_other_row = sum2_index[cur_h] - current_row;
+        /* First, if the_other_row < clique.i, the connected component was
+         * already found (by this thread or another). return 0 */
+        if (the_other_row < clique->i)
+          return 0;
+        /* If the_other_row is not already in a buffer, add it to to_explore */
+        if (!index_buffer_is_in (buf_explored, the_other_row) &&
+            !index_buffer_is_in (buf_to_explore, the_other_row))
+        {
+          /* No: store the new row in order to explore it later */
+          index_buffer_push (buf_to_explore, the_other_row);
+        }
       }
     }
-    // current row is now explored
-    index_buffer_resize (pth->explored);
-    *(pth->explored->current)++ = current_row;
-    // We need another row to explore, or it's the end
-    if (UNLIKELY(pth->to_explore->current == pth->to_explore->begin)) break;
-    current_row = *(--(pth->to_explore->current));
-  }
-  return nb_rels;
+    /* current row is now explored */
+    index_buffer_push (buf_explored, current_row);
+    /* We need another row to explore */
+    current_row = index_buffer_pop (buf_to_explore);
+  } while (current_row != UMAX(current_row));
+
+  /* Return the nb of rows in the connected component */
+  return (buf_explored->current - buf_explored->begin);
 }
 
 /* Delete connected component of row current_row
  * Return number of deleted rows.
- * CAREFUL: this code itself is multithread compatible, but
+ *
+ * WARNING: this code itself is multithread compatible, but
  * it calls delete_relation, which is NOT compatible!
- * Warning: we might have some H->hashcount[h] = 3, which is decreased
- * to 2, but we don't want to treat that case. Thus we check in addition
- * that sum2_index[h] <> 0, which only occurs when H->hashcount[h] = 2
- * initially.
  */
 static index_t
 delete_connected_component (index_t current_row, uint64_t *nprimes,
@@ -543,7 +554,11 @@ delete_connected_component (index_t current_row, uint64_t *nprimes,
     for (h = rel_compact[current_row]; *h != UMAX(*h); h++)
     {
       index_t cur_h = *h;
-      weight_t cur_h_weight = ideals_weight[cur_h];
+      weight_t cur_h_weight = cols_weight[cur_h];
+      /* We might have some H->hashcount[h] = 3, which is decreased to 2, but
+       * we don't want to treat that case. Thus we check in addition that
+       * sum2_index[h] <> 0, which only occurs when H->hashcount[h] = 2
+       * initially.*/
       if (UNLIKELY(cur_h_weight == 2 && sum2_index[cur_h]))
       {
         index_t the_other_row = sum2_index[cur_h] - current_row;
@@ -572,45 +587,55 @@ delete_connected_component (index_t current_row, uint64_t *nprimes,
 /* This MT function search the heaviest pth->chunk cliques in
    interlaced parts of rel_used cliques.
 */
-static void *search_chunk_max_cliques (void *pt) {
+static void *search_chunk_max_cliques (void *pt)
+{
   pth_t *pth = (pth_t *) pt;
   index_t end_step_rels;
   bv_t bv, *pbv;
+  index_buffer_t buf1, buf2;
+  comp_t clique;
 
   // Init of the structure & malloc.
   comp_graph_init (pth);
-  index_buffer_init (pth->to_explore, TO_EXPLORE_MIN_BUFFER);
-  index_buffer_init (pth->explored, EXPLORED_MIN_BUFFER);
+  index_buffer_init (buf1, TO_EXPLORE_MIN_BUFFER);
+  index_buffer_init (buf2, EXPLORED_MIN_BUFFER);
 
   // Now the first begin of the search
-  pth->clique.i = pth->pthread_number * RELS_BLOCK;
-  if (UNLIKELY (pth->clique.i >= nrelmax)) pthread_exit (NULL);
+  clique.i = pth->pthread_number * RELS_BLOCK;
+  if (UNLIKELY (clique.i >= nrelmax)) pthread_exit (NULL);
   // And the first end
-  end_step_rels = pth->clique.i + RELS_BLOCK;
+  end_step_rels = clique.i + RELS_BLOCK;
 
-  pbv = rel_used->p + (pth->clique.i >> LN2_BV_BITS);
-  while (pth->clique.i < nrelmax) {
-    index_t save_i = pth->clique.i;
-    for (bv = *pbv++; bv; ++(pth->clique.i), bv >>= 1) {
-      if (LIKELY(bv & 1)) {
-	unsigned int nb_rels_connected = compute_connected_component_pth (pth);
-	if (UNLIKELY (!nb_rels_connected)) continue;
-	if (UNLIKELY (pth->size_clique_graph < pth->chunk))
-	  insert_clique_pth (pth);
-	else 
-	  if (UNLIKELY(pth->clique.w > pth->clique_graph->w))
-	    replace_clique_pth (pth);
+  pbv = rel_used->p + (clique.i >> LN2_BV_BITS);
+  while (clique.i < nrelmax)
+  {
+    index_t save_i = clique.i;
+    for (bv = *pbv++; bv; ++(clique.i), bv >>= 1)
+    {
+      if (LIKELY(bv & 1))
+      {
+        unsigned int nb_rows = compute_connected_component_mt (&(clique),
+                                              buf1, buf2);
+        if (UNLIKELY (!nb_rows))
+          continue;
+        if (UNLIKELY (pth->size_clique_graph < pth->chunk))
+          comp_graph_insert (pth, clique);
+        else if (UNLIKELY(clique.w > pth->clique_graph->w))
+          comp_graph_replace (pth, clique);
       }
     }
-    pth->clique.i = save_i + BV_BITS;
+    clique.i = save_i + BV_BITS;
     // Have we reach the actuel end ?
-    if (UNLIKELY (pth->clique.i == end_step_rels)) {
+    if (UNLIKELY (clique.i == end_step_rels))
+    {
       // The new begin & end.
       end_step_rels += npt * RELS_BLOCK;
-      pth->clique.i = end_step_rels - RELS_BLOCK;
-      pbv = rel_used->p + (pth->clique.i >> LN2_BV_BITS);
+      clique.i = end_step_rels - RELS_BLOCK;
+      pbv = rel_used->p + (clique.i >> LN2_BV_BITS);
     }
   }
+  index_buffer_clear (buf1);
+  index_buffer_clear (buf2);
   qsort (pth->clique_graph, pth->size_clique_graph, sizeof(comp_t), comp_cmp_weight);
   pthread_exit (NULL);
   return NULL;
@@ -647,7 +672,7 @@ static void *compute_sum2_index (void *pt) {
 	for (;;) {
 	  h = *myrelcompact++;
 	  if (UNLIKELY (h == UMAX(h))) break;
-	  if (LIKELY (ideals_weight[h] == 2))
+	  if (LIKELY (cols_weight[h] == 2))
 	    __sync_add_and_fetch (sum2_index + h, j);
 	}
       }
@@ -684,7 +709,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
       ++N;
       for (myrelcompact = rel_compact[i];
 	   (h = *myrelcompact++) != UMAX(h);)
-	if (ideals_weight[h] == 2)
+	if (cols_weight[h] == 2)
 	  sum2_index[h] += i;
     }
 #else
@@ -772,11 +797,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
 #endif
   /* We can suppress pth[i] and pth itself */
   for (i = 0; i < npt; ++i)
-  {
     free (pth[i].clique_graph);
-    index_buffer_clear (pth[i].to_explore);
-    index_buffer_clear (pth[i].explored);
-  }
   free (pth);
 }
 
@@ -794,7 +815,7 @@ static void onepass_singleton_removal(uint64_t * nrels, uint64_t * nprimes)
     for (i = 0; i < nrelmax; i++) {
 	if (bit_vector_getbit(rel_used, (size_t) i)) {
 	    for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
-		if (ideals_weight[*tab] == 1) {
+		if (cols_weight[*tab] == 1) {
 		    nremoveprimes += delete_relation(i);
 		    nremoverels++;
 		    break;
@@ -829,9 +850,9 @@ static void onepass_thread_singleton_removal(ti_t * mti)
     
     if (rel_used->p[i >> LN2_BV_BITS] & j)
       for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++)
-	if (UNLIKELY(ideals_weight[*tab] == 1)) {
+	if (UNLIKELY(cols_weight[*tab] == 1)) {
 	  for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
-	    o = &(ideals_weight[*tab]);
+	    o = &(cols_weight[*tab]);
 	    ASSERT(*o);
 	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
 	      (mti->sup_npri)++;
@@ -1029,7 +1050,7 @@ void *insert_rel_into_table(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 
     arg->info.nprimes +=
         insert_rel_in_table_no_e(rel, min_index, 
-                rel_compact, ideals_weight);
+                rel_compact, cols_weight);
 #ifdef STAT
     /* here we also used to accumulate the number of primes above
      * min_index in arg->info.W */
@@ -1311,7 +1332,7 @@ int main(int argc, char **argv)
     memset(pd, 0, sizeof(purge_data));
 
     ALLOC_VERBOSE_MALLOC(index_t*, rel_compact, nrelmax);
-    ALLOC_VERBOSE_CALLOC(weight_t, ideals_weight, nprimemax);
+    ALLOC_VERBOSE_CALLOC(weight_t, cols_weight, nprimemax);
 
     fprintf(stdout, "Pass 1, reading and storing ideals with index h >= "
             "%" PRIu64 "\n", min_index);
@@ -1416,11 +1437,11 @@ int main(int argc, char **argv)
     }
 
     /* Write the header line for the file of remaining relations:
-     * compute last index i such that ideals_weight[i] != 0
+     * compute last index i such that cols_weight[i] != 0
      */
     {
 	uint64_t last_used = nprimemax - 1;
-	while (ideals_weight[last_used] == 0)
+	while (cols_weight[last_used] == 0)
 	    last_used--;
 
 	fprintf(pd->fd[0], "# %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", nrels,
@@ -1439,9 +1460,9 @@ int main(int argc, char **argv)
     print_final_values (nrels, nprimes, pd->info.W);
 
     /* Free allocated stuff */
-    if (ideals_weight != NULL)
-	free(ideals_weight);
-    ideals_weight = NULL;
+    if (cols_weight != NULL)
+	free(cols_weight);
+    cols_weight = NULL;
     if (sum2_index != NULL)
 	free(sum2_index);
     sum2_index = NULL;
