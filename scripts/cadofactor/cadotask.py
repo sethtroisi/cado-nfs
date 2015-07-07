@@ -2684,9 +2684,6 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             ["Total CPU time: {stats_total_cpu_time[0]:g}s"],
             ["Total time: {stats_total_time[0]:g}s"],
         )
-    # We seek to this many bytes before the EOF to look for the
-    # "Total xxx reports" message
-    file_end_offset = 1000
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -2811,7 +2808,6 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             else:
                 size = os.path.getsize(filename)
                 f = open(filename, "rb")
-                f.seek(max(size - self.file_end_offset, 0))
         except (OSError, IOError) as e:
             if e.errno == 2: # No such file or directory
                 self.logger.error("File '%s' does not exist", filename)

@@ -2908,7 +2908,11 @@ int main (int argc0, char *argv0[])/*{{{*/
        threads, so that threads have some freedom in avoiding the fullest
        bucket array. With only one thread, no balancing needs to be done,
        so we use only one bucket array. */
-    const size_t nr_workspaces = las->nb_threads + (las->nb_threads > 1);
+    // FIXME: We can't do this. Some part of the code rely on the fact
+    // that nr_workspaces == las->nb_threads. For instance,
+    // process_bucket_region uses las->nb_threads while it should
+    // sometimes use nr_workspaces.
+    const size_t nr_workspaces = las->nb_threads;
     thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
 
     las_report report;

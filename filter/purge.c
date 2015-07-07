@@ -112,9 +112,10 @@ static index_t *sum2_index = NULL;	/*sum of rows index for primes of weight 2 */
 
 static uint64_t nrelmax = 0, nprimemax = 0;
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
-static unsigned int npass = DEFAULT_PURGE_NPASS;
+static int npass = -1; /* negative value means chosen by purge */
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
 static unsigned int npt = DEFAULT_PURGE_NPT;
+static int verbose = 0;
 
 #ifdef STAT
 uint64_t __stat_weight;
@@ -364,6 +365,14 @@ static index_t delete_connected_component_nopth (pth_t *pth, index_t current_row
   return (pth->explored.current - pth->explored.begin);
 }
 
+int
+cmp_comp_t (const void *p, const void *q)
+{
+  float x = ((comp_t *)p)->w;
+  float y = ((comp_t *)q)->w;
+  return (x <= y ? 1 : -1);
+}
+
 /* This MT function search the heaviest pth->chunk cliques in
    interlaced parts of rel_used cliques.
 */
@@ -419,6 +428,7 @@ static void *search_chunk_max_cliques (void *pt) {
       pbv = rel_used->p + (pth->clique.i >> LN2_BV_BITS);
     }
   }
+  qsort (pth->clique_graph, pth->size_clique_graph, sizeof(comp_t), cmp_comp_t);
   pthread_exit (NULL);
   return NULL;
 }
@@ -470,6 +480,7 @@ static void
 cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
 {
   int64_t excess = (((int64_t) *nrels) - *nprimes);
+  uint64_t nb_clique_deleted = 0;
   size_t i, chunk;
   index_t N = 0;		/* number of rows */
 
@@ -529,57 +540,56 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
 
   
   /* At this point, in each pth[i].graph_cliques we have
-     chunk cliques at most.
-     Boring problem: we need if possible chunk cliques in pth->clique_graph
-     (in pth[0].clique_graph). If not enough, we try to add the
-     others pth[i].clique_graph, until chunk.
-  */
-  if (UNLIKELY (pth->size_clique_graph < chunk)) {
-    for (i = 1; i < npt; ++i) {
-      if (UNLIKELY(pth[i].size_clique_graph + pth->size_clique_graph >= chunk)) {
-	while (pth->size_clique_graph < chunk) {
-	  pth->clique = pth[i].clique_graph[--pth[i].size_clique_graph];
-	  insert_clique_pth (pth);
-	}
-	// Right, we have chunk cliques in pth[0].clique_graph now
-	break;
-      }
-      // We could insert all pth[i].clique_graph in pth[0].clique_graph
-      while (pth[i].size_clique_graph) {
-	pth->clique = pth[i].clique_graph[--pth[i].size_clique_graph];
-	insert_clique_pth (pth);
+     size_clique_graph cliques order by decreasing weight */
+  size_t *next_clique = NULL;
+  next_clique = (size_t *) malloc (npt * sizeof (next_clique));
+  ASSERT_ALWAYS (next_clique != NULL);
+  memset (next_clique, 0, npt * sizeof (next_clique));
+
+  while (*nrels > target_excess + *nprimes)
+  {
+    comp_t *max_clique = NULL;
+    size_t max_thread = 0;
+
+    for (i = 0; i < npt; ++i)
+    {
+      if (next_clique[i] < pth[i].size_clique_graph)
+      {
+        comp_t *cur_clique = &(pth[i].clique_graph[next_clique[i]]);
+        if (max_clique == NULL || cur_clique->w > max_clique->w)
+        {
+          max_clique = cur_clique;
+          max_thread = i;
+        }
       }
     }
+
+    if (max_clique == NULL)
+    {
+      fprintf (stderr, "# All heaps of cliques are empty.");
+      break;
+    }
+
+    *nrels -= delete_connected_component_nopth (pth, max_clique->i, nprimes);
+    next_clique[max_thread]++;
+    nb_clique_deleted++;
   }
-  // we do a fusion with pth->clique_graph and all pth[i != 0].clique_graph
-  if (LIKELY(pth->size_clique_graph == chunk)) // if NOT, pth[1...npt[.clique_graph are empty
-    for (i = 1; i < npt; ++i)
-      while (pth[i].size_clique_graph)
-	if (UNLIKELY(pth[i].clique_graph[--pth[i].size_clique_graph].w > pth->clique_graph->w)) {
-	  pth->clique = pth[i].clique_graph[pth[i].size_clique_graph];
-	  replace_clique_pth (pth);
-	}
-  // We could suppress pth[1...npt[
-  for (i = 1; i < npt; ++i) {
-    free (pth[i].clique_graph);
-    free (pth[i].to_explore.begin);
-    free (pth[i].explored.begin);
-  }
-  // pth->size_clique_graph has at most the chunk heaviest cliques -> suppress them!
-  comp_t *pt = pth->clique_graph + pth->size_clique_graph;
-  while (pt > pth->clique_graph)
-    *nrels -= delete_connected_component_nopth (pth, (--pt)->i, nprimes);
+
+  free (next_clique);
   
-  fprintf(stdout, "    deleted %zu heavier connected components at %2.2lf\n",
-	  pth->size_clique_graph, seconds());
+  fprintf(stdout, "    deleted %" PRIu64 " heavier connected components at "
+                  "%2.2lf\n", nb_clique_deleted, seconds());
 #if DEBUG >= 1
   fprintf(stdout, "    DEBUG: nb heaviest cliques=%zu chunk=%u target=%u\n",
 	  pth->size_clique_graph, chunk, target_excess);
 #endif
-  // We could suppress pth[0] and pth itself
-  free (pth->clique_graph);
-  free (pth->to_explore.begin);
-  free (pth->explored.begin);
+  /* We can suppress pth[i] and pth itself */
+  for (i = 0; i < npt; ++i)
+  {
+    free (pth[i].clique_graph);
+    free (pth[i].to_explore.begin);
+    free (pth[i].explored.begin);
+  }
   free (pth);
 }
 
@@ -715,6 +725,7 @@ remove_all_singletons(uint64_t * nrels, uint64_t * nprimes, int64_t * excess)
 	fprintf(stdout,
 		"  new_nrels=%" PRIu64 " new_nprimes=%" PRIu64 " excess=%" PRId64
 		"" " at %2.2lf\n", *nrels, *nprimes, *excess, seconds());
+  fflush(stdout);
     } while (oldnrels != *nrels);
 }
 
@@ -732,7 +743,7 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 {
     uint64_t oldnrels = 0;
     int64_t oldexcess, excess, target_excess;
-    unsigned int count;
+    int count;
 
     //First step of singletons removal
     remove_all_singletons(nrels, nprimes, &excess);
@@ -752,48 +763,59 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 	exit(2);
     }
 
-    /* adjust npass so that each pass removes at least about 1% wrt the number
-       of ideals */
-    if ((uint64_t) excess / npass < *nprimes / 100)
+  /* If npass was not given in the command line, adjust npass in
+     [1..DEFAULT_PURGE_NPASS] so that each pass removes at least about 1% wrt
+     the number of ideals */
+  if (npass < 0)
+  {
+    if ((uint64_t) excess / DEFAULT_PURGE_NPASS < *nprimes / 100)
       npass = 1 + (100 * excess) / *nprimes;
+    else
+      npass = DEFAULT_PURGE_NPASS;
+  }
 
-    int64_t chunk = excess / npass;
+  int64_t chunk = excess / npass;
 
-    //npass pass of clique removal + singletons removal
-    for (count = 0; count < npass && excess > 0; count++) {
-	oldnrels = *nrels;
-	oldexcess = excess;
-	target_excess = excess - chunk;
-	if (target_excess < keep)
-	    target_excess = keep;
-	fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
-		count + 1, npass, target_excess);
-	cliques_removal(target_excess, nrels, nprimes);
+  /* npass pass of clique removal + singletons removal */
+  for (count = 0; count < npass && excess > 0; count++)
+  {
+    oldnrels = *nrels;
+    oldexcess = excess;
+    target_excess = excess - chunk;
+    if (target_excess < keep)
+      target_excess = keep;
+    fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
+                    count + 1, npass, target_excess);
+    fflush(stdout);
 
-	remove_all_singletons(nrels, nprimes, &excess);
-	fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
-		(double) (oldnrels - *nrels) / (double) (oldexcess - excess));
-    }
+    cliques_removal(target_excess, nrels, nprimes);
+    remove_all_singletons(nrels, nprimes, &excess);
+
+    fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
+                    (double) (oldnrels-*nrels) / (double) (oldexcess-excess));
+  }
 
 
-    /* May need an extra pass of clique removal + singletons removal if excess is
-       still larger than keep. It may happen due to the fact that each clique does
-       not make the excess go down by one but can (rarely) left the excess
-       unchanged. */
-    if (excess > keep) {
-	oldnrels = *nrels;
-	oldexcess = excess;
-	target_excess = excess - chunk;
-	target_excess = keep;
+  /* May need an extra pass of clique removal + singletons removal if excess is
+     still larger than keep. It may happen due to the fact that each clique does
+     not make the excess go down by one but can (rarely) left the excess
+     unchanged. */
+  if (excess > keep && npass > 0)
+  {
+	  oldnrels = *nrels;
+	  oldexcess = excess;
+	  target_excess = excess - chunk;
+	  target_excess = keep;
 
-	fprintf(stdout, "Step extra: target excess is %" PRId64 "\n",
-		target_excess);
-	cliques_removal(target_excess, nrels, nprimes);
+	  fprintf(stdout, "Step extra: target excess is %" PRId64 "\n",
+		  target_excess);
 
-	remove_all_singletons(nrels, nprimes, &excess);
-	fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
-		(double) (oldnrels - *nrels) / (double) (oldexcess - excess));
-    }
+    cliques_removal(target_excess, nrels, nprimes);
+
+	  remove_all_singletons(nrels, nprimes, &excess);
+	  fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
+		                (double) (oldnrels-*nrels) / (double) (oldexcess-excess));
+  }
 }
 
 /*****************************************************************************/
@@ -830,7 +852,103 @@ void *thread_print(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 
 /*********** utility functions for purge binary ****************/
 
+void
+print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
+                       int verbose)
+{
+  uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
+  for (uint64_t i = 0; i < len; i++)
+  {
+    if (w[i] > 0)
+    {
+      nb_nzero++;
+      if (w[i] < min)
+        min = w[i];
+      if (w[i] > max)
+        max = w[i];
+      av += w[i];
+      std += w[i]*w[i];
+    }
+  }
 
+  double av_f = ((double) av) / ((double) nb_nzero);
+  double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
+
+  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, len);
+  fprintf (out, "# STATS on %s: #active %s = %" PRIu64 "\n", name, name,
+                                                                    nb_nzero);
+  fprintf (out, "# STATS on %s: min = %" PRIu64 "\n", name, min);
+  fprintf (out, "# STATS on %s: max = %" PRIu64 "\n", name, max);
+  fprintf (out, "# STATS on %s: av = %.2f\n", name, av_f);
+  fprintf (out, "# STATS on %s: std = %.2f\n", name, std_f);
+
+  if (verbose > 1)
+  {
+    uint64_t *nb_w = NULL;
+    nb_w = (uint64_t *) malloc ((max-min+1) * sizeof (uint64_t));
+    ASSERT_ALWAYS (nb_w != NULL);
+    memset (nb_w, 0, (max-min+1) * sizeof (uint64_t));
+    for (uint64_t i = 0; i < len; i++)
+      if (w[i] > 0)
+        nb_w[w[i]-min]++;
+
+    for (uint64_t i = 0; i < max-min+1; i++)
+    {
+      if (nb_w[i] > 0)
+        fprintf (out, "# STATS on %s: #%s of weight %" PRIu64 " : %" PRIu64
+                      "\n", name, name, min+i, nb_w[i]);
+    }
+    free (nb_w);
+  }
+}
+
+void
+print_stats_columns_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nprimemax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nprimemax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+  {
+    if (bit_vector_getbit(rel_used, (size_t) i))
+    {
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+      {
+        w[*h]++;
+      }
+    }
+  }
+
+  print_stats_on_weight (out, w, nprimemax, "cols", verbose);
+  free (w);
+}
+
+void
+print_stats_rows_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nrelmax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+  {
+    if (bit_vector_getbit(rel_used, (size_t) i))
+    {
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+      {
+        w[i]++;
+      }
+    }
+  }
+
+  print_stats_on_weight (out, w, nrelmax, "rows", verbose);
+  free (w);
+}
 
   /* Build the file list (ugly). It is the concatenation of all
    *  b s p
@@ -882,13 +1000,15 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "minindex", "index of the first considered prime");
   param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
                                     "(default " STR(DEFAULT_FILTER_EXCESS) ")");
-  param_list_decl_usage(pl, "npass", "maximal number of steps of clique removal "
-                                     "(default " STR(DEFAULT_PURGE_NPASS) ")");
+  param_list_decl_usage(pl, "npass", "maximal number of steps of clique "
+                                     "removal (default: chosen in [1.."
+                                      STR(DEFAULT_PURGE_NPASS) "])");
   param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
                             "end of the 1st singleton removal step (default "
                             STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
   param_list_decl_usage(pl, "outdel", "outfile for deleted relations (for DL)");
   param_list_decl_usage(pl, "npthr", "number of threads (default " STR(DEFAULT_PURGE_NPT) ")");
+  param_list_decl_usage(pl, "v", "(switch) verbose mode");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   verbose_decl_usage(pl);
@@ -924,6 +1044,7 @@ int main(int argc, char **argv)
     declare_usage(pl);
     argv++,argc--;
 
+    param_list_configure_switch (pl, "-v", &verbose);
     param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
     if (argc == 0)
@@ -951,7 +1072,7 @@ int main(int argc, char **argv)
 
 
     param_list_parse_uint(pl, "npthr", &npt);
-    param_list_parse_uint(pl, "npass", &npass);
+    param_list_parse_int(pl, "npass", &npass);
     param_list_parse_double(pl, "required_excess", &required_excess);
 
     /* These three parameters specify the set of input files, of the form
@@ -1137,7 +1258,21 @@ int main(int argc, char **argv)
     ALLOC_VERBOSE_BIT_VECTOR(rel_used, nrels);
     bit_vector_set(rel_used, 1);
 
+    if (verbose > 0)
+    {
+      print_stats_columns_weight (stdout, verbose);
+      print_stats_rows_weight (stdout, verbose);
+    }
+
+    /* MAIN FUNCTIONS: do singletons and cliques removal. */
     singletons_and_cliques_removal(&nrels, &nprimes);
+
+    if (verbose > 0)
+    {
+      print_stats_columns_weight (stdout, verbose);
+      print_stats_rows_weight (stdout, verbose);
+    }
+
     if (nrels < nprimes) {
       fprintf(stdout, "number of relations < number of ideals\n");
       exit(2);
