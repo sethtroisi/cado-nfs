@@ -74,13 +74,7 @@
 
 #include "filter_common.h"
 
-/* Some define, no so interesting. */
-#define TO_EXPLORE_MIN_BUFFER 16 // Minimal size of the "stack" to explore cliques
-#define EXPLORED_MIN_BUFFER 16   // Id, for the relations already explored */
-#define RELS_BLOCK (BV_BITS<<4)    // The size of the relations minimal block : BV_BITS << x
-
 //#define STAT
-//#define STAT_VALUES_COEFF //STAT must be defined. Interesting only DL
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
@@ -102,10 +96,6 @@ static int verbose = 0;
 
 #ifdef STAT
 uint64_t __stat_weight;
-#ifdef STAT_VALUES_COEFF
-#define STAT_VALUES_COEFF_LEN 10
-uint64_t __stat_nbcoeffofvalue[STAT_VALUES_COEFF_LEN + 1];
-#endif
 #endif
 
 /********************* purge_data struct *************************************/
@@ -185,6 +175,8 @@ typedef struct index_buffer_s index_buffer_t[1];
 typedef struct index_buffer_s * index_buffer_ptr;
 typedef const struct index_buffer_s * index_buffer_srcptr;
 
+#define INDEX_BUFFER_MIN_SIZE 16
+
 /* Init function for index_buffer_t */
 static inline void
 index_buffer_init (index_buffer_ptr buf, size_t size)
@@ -256,198 +248,95 @@ index_buffer_pop (index_buffer_ptr buf)
   return pop_element;
 }
 
-/*****************************************************************************/
+/***************** Sorted binary tree of comp_t struct ***********************/
 
-/* The main structure for the working pthreads pool which
-   compute the heaviest cliques */
-typedef struct pth_s {
-// Read only part
-  unsigned int pthread_number;
-  size_t chunk;
-// Read-write part
-  pthread_t pthread;
-  comp_t *clique_graph;     // Array/binary tree sorted of the heaviest cliques
-  size_t size_clique_graph; // max & optimal size of the tree = chunk
-} pth_t;
+/* Binary tree of comp_t sorted by weight of the connected component.
+ * The two sons of a node of index n are the nodes of indexes 2n+1 and 2n+1.
+ * The property is: the weight of the comp_t father is less than its 2 sons.
+ * so root of the tree is the connected component with the smallest weight. */
+struct comp_sorted_bin_tree_s {
+  size_t alloc;
+  size_t size;
+  comp_t * tree;
+};
+typedef struct comp_sorted_bin_tree_s comp_sorted_bin_tree_t[1];
+typedef struct comp_sorted_bin_tree_s * comp_sorted_bin_tree_ptr;
+typedef const struct comp_sorted_bin_tree_s * comp_sorted_bin_tree_srcptr;
 
 static inline void
-comp_graph_init (pth_t *pth)
+comp_sorted_bin_tree_init (comp_sorted_bin_tree_ptr T, size_t max_size)
 {
-  /* If chunk is even, an artificial clique must exists at [chunk] in order to
-     avoid a node-father with only one node-son */
-  if (!(pth->chunk & 1))
-  {
-    pth->clique_graph = (comp_t *) malloc_check (sizeof(comp_t) * (pth->chunk + 1));
-    pth->clique_graph[pth->chunk].i = UMAX(pth->clique_graph[pth->chunk].i);
-    pth->clique_graph[pth->chunk].w = 1E18; // Avoid MAXFLOAT for overflow
-  }
+  /* If max_size is even, T->alloc = max_size + 1, in order to avoid a
+   * node-father with only one node-son.a We will have one more connected
+   * component than needed but we do not care (the computing cost in
+   * negligible) */
+  if (max_size & 1)
+    T->alloc = max_size;
   else
-    pth->clique_graph = (comp_t *) malloc_check (sizeof(comp_t) * pth->chunk);
-  pth->size_clique_graph = 0;
+    T->alloc = max_size + 1;
+
+  T->tree = (comp_t *) malloc_check (sizeof(comp_t) * T->alloc);
+  T->size = 0;
 }
 
-/* This function insert a connected component comp_t in a binary tree on the
-   classical array form: 2 sons at the index 2n+1 and 2n+2 for a father at
-   the index n.
-   The property is: the weight of the comp_t father is less than its 2 sons.
-*/
+static inline void
+comp_sorted_bin_tree_clear (comp_sorted_bin_tree_ptr T)
+{
+  free(T->tree);
+  T->size = T->alloc = 0;
+}
+
 static void
-comp_graph_insert (pth_t *pth, comp_t clique)
+comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
 {
   size_t son, father, place;
-  son = pth->size_clique_graph;
+  son = T->size;
   while (son)
   {
     father = (son - 1) >> 1;
-    if (UNLIKELY (clique.w >= pth->clique_graph[father].w))
+    if (UNLIKELY (new_node.w >= T->tree[father].w))
       break;
     son = father;
   }
   place = son;
-  son = (pth->size_clique_graph)++;
+  son = (T->size)++;
   while (place != son)
   {
     father = (son - 1) >> 1;
-    pth->clique_graph[son] = pth->clique_graph[father];
+    T->tree[son] = T->tree[father];
     son = father;
   }
-  pth->clique_graph[son] = clique;
+  T->tree[son] = new_node;
 }
 
-/* This function takes a clique where the clique weight is greater than the
- * weight of the clique root of a binary tree build by insert_clique_pth.
- * The function searchs the right place in this tree for the clique in respect
- * with the property described in insert_clique_pth.
-*/
 static void
-comp_graph_replace (pth_t *pth, comp_t clique)
+comp_sorted_bin_tree_replace (comp_sorted_bin_tree_ptr T, comp_t new_node)
 {
-  ASSERT_EXPENSIVE (pth->clique_graph->w < clique.w);
+  ASSERT_EXPENSIVE (T->tree[0].w < new_node.w);
   size_t father = 0;
   for (;;) /* In this loop, always, clique_graph[father].w < weight_clique */
   {
     float weight1, weight2;
     size_t son = father * 2 + 1; /* son is son1 */
-    if (UNLIKELY (son >= pth->chunk)) /* No son: father is a leaf. Found! */
+    if (UNLIKELY (son >= T->alloc)) /* No son: father is a leaf. Found! */
       break;
-    weight1 = pth->clique_graph[son].w;
-    weight2 = pth->clique_graph[son + 1].w;
+    weight1 = T->tree[son].w;
+    weight2 = T->tree[son + 1].w;
     if (UNLIKELY(weight1 > weight2))
     {
-      ++son; /* son is here the son 2 */
+      son++; /* son is here the son 2 */
       weight1 = weight2;
     }
     /* here, weight1 is the lightest weight and son is its clique index */
-    if (UNLIKELY (weight1 >= clique.w)) /* Found! */
+    if (UNLIKELY (weight1 >= new_node.w)) /* Found! */
       break;
     /* The lightest son has a weight lighter than clique, so we have to go
      * down the tree, but before the son replaces its father. */
-    pth->clique_graph[father] = pth->clique_graph[son];
+    T->tree[father] = T->tree[son];
     father = son;
   }
-  pth->clique_graph[father] = clique;
+  T->tree[father] = new_node;
 }
-
-/******************* Functions to print stats ********************************/
-
-void
-print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
-                       int verbose)
-{
-  uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
-  for (uint64_t i = 0; i < len; i++)
-  {
-    if (w[i] > 0)
-    {
-      nb_nzero++;
-      if (w[i] < min)
-        min = w[i];
-      if (w[i] > max)
-        max = w[i];
-      av += w[i];
-      std += w[i]*w[i];
-    }
-  }
-
-  double av_f = ((double) av) / ((double) nb_nzero);
-  double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
-
-  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, len);
-  fprintf (out, "# STATS on %s: #active %s = %" PRIu64 "\n", name, name,
-                                                                    nb_nzero);
-  fprintf (out, "# STATS on %s: min = %" PRIu64 "\n", name, min);
-  fprintf (out, "# STATS on %s: max = %" PRIu64 "\n", name, max);
-  fprintf (out, "# STATS on %s: av = %.2f\n", name, av_f);
-  fprintf (out, "# STATS on %s: std = %.2f\n", name, std_f);
-
-  if (verbose > 1)
-  {
-    uint64_t *nb_w = NULL;
-    nb_w = (uint64_t *) malloc ((max-min+1) * sizeof (uint64_t));
-    ASSERT_ALWAYS (nb_w != NULL);
-    memset (nb_w, 0, (max-min+1) * sizeof (uint64_t));
-    for (uint64_t i = 0; i < len; i++)
-      if (w[i] > 0)
-        nb_w[w[i]-min]++;
-
-    for (uint64_t i = 0; i < max-min+1; i++)
-    {
-      if (nb_w[i] > 0)
-        fprintf (out, "# STATS on %s: #%s of weight %" PRIu64 " : %" PRIu64
-                      "\n", name, name, min+i, nb_w[i]);
-    }
-    free (nb_w);
-  }
-  fflush (out);
-}
-
-void
-print_stats_columns_weight (FILE *out, int verbose)
-{
-  uint64_t *w = NULL;
-  index_t *h = 0;
-  w = (uint64_t *) malloc (nprimemax * sizeof (uint64_t));
-  ASSERT_ALWAYS (w != NULL);
-  memset (w, 0, nprimemax * sizeof (uint64_t));
-
-  for (uint64_t i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i))
-      for (h = rel_compact[i]; *h != UMAX(*h); h++)
-        w[*h]++;
-
-  print_stats_on_weight (out, w, nprimemax, "cols", verbose);
-  free (w);
-}
-
-void
-print_stats_rows_weight (FILE *out, int verbose)
-{
-  uint64_t *w = NULL;
-  index_t *h = 0;
-  w = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
-  ASSERT_ALWAYS (w != NULL);
-  memset (w, 0, nrelmax * sizeof (uint64_t));
-
-  for (uint64_t i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i))
-      for (h = rel_compact[i]; *h != UMAX(*h); h++)
-        w[i]++;
-
-  print_stats_on_weight (out, w, nrelmax, "rows", verbose);
-  free (w);
-}
-
-#if 0
-void print_stats_on_cliques (FILE *out, int verbose)
-{
-  uint64_t *len = NULL;
-  len = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
-  ASSERT_ALWAYS (len != NULL);
-  memset (len, 0, nrelmax * sizeof (uint64_t));
-
-  free (len);
-}
-#endif
 
 /*****************************************************************************/
 
@@ -584,27 +473,122 @@ delete_connected_component (index_t current_row, uint64_t *nprimes,
   return (buf_explored->current - buf_explored->begin);
 }
 
-/* This MT function search the heaviest pth->chunk cliques in
-   interlaced parts of rel_used cliques.
-*/
-static void *search_chunk_max_cliques (void *pt)
+/******* Functions to compute sum2_index array (mono and multi thread) *******/
+
+#ifdef HAVE_SYNC_FETCH /* Multithread code */
+/* The main structure for the working pthreads pool which compute sum2_index */
+typedef struct sum2_mt_data_s {
+  // Read only part
+  unsigned int pthread_number;
+  // Read-write part
+  pthread_t pthread;
+} sum2_mt_data_t;
+
+static void *
+compute_sum2_index_mt (void *pt)
 {
-  pth_t *pth = (pth_t *) pt;
+  sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
+  index_t j = nrelmax / npt;
+  index_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
+  index_t end = (data->pthread_number == npt - 1) ? nrelmax :
+    (j * (data->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
+  bv_t bv, *pbv;
+  index_t h, *myrelcompact;
+
+  pbv = rel_used->p + (i >> LN2_BV_BITS);
+  for (; i < end; i += BV_BITS)
+  {
+    for (j = i, bv = *pbv++; bv; ++j, bv >>= 1)
+    {
+      if (LIKELY(bv & 1))
+      {
+        myrelcompact = rel_compact[j];
+        for (;;)
+        {
+          h = *myrelcompact++;
+          if (UNLIKELY (h == UMAX(h)))
+            break;
+          if (LIKELY (cols_weight[h] == 2))
+            __sync_add_and_fetch (sum2_index + h, j);
+        }
+      }
+    }
+  }
+  pthread_exit (NULL);
+  return NULL;
+}
+#endif
+
+static inline void
+compute_sum2_index ()
+{
+  memset(sum2_index, 0, nprimemax * sizeof(index_t));
+#ifndef HAVE_SYNC_FETCH /* monothread */
+  for (uint64_t i = 0; i < nrelmax; i++)
+  {
+    if (bit_vector_getbit(rel_used, (size_t) i))
+    {
+      index_t h, *myrelcompact;
+      for (myrelcompact = rel_compact[i]; (h = *myrelcompact++) != UMAX(h);)
+        if (cols_weight[h] == 2)
+          sum2_index[h] += i;
+    }
+  }
+#else
+  sum2_mt_data_t *th_data = malloc_check (npt * sizeof (sum2_mt_data_t));
+  for (size_t i = npt; i--; )
+  {
+    th_data[i].pthread_number = i;
+    if (pthread_create (&(th_data[i].pthread), NULL, compute_sum2_index_mt,
+                                                     (void *) (th_data + i)))
+    {
+      perror ("compute_sum2_index pthread creation failed\n");
+      exit (1);
+    }
+  }
+  for (size_t i = npt; i--; )
+    pthread_join (th_data[i].pthread, NULL);
+  free (th_data);
+#endif
+}
+
+/*************** Multithread code for clique removal *************************/
+
+/* The main structure for the working pthreads pool which compute the
+   heaviest cliques */
+typedef struct comp_mt_thread_data_s {
+  unsigned int th_id; /* read only */
+  pthread_t pthread;
+  comp_sorted_bin_tree_t comp_tree; /* sorted tree computed by the thread */
+} comp_mt_thread_data_t;
+/* Size of the block of rows treated by a thread during the computation of the
+ * connected component (has to be of the form: BV_BITS << x)*/
+#define COMP_MT_ROWS_BLOCK (BV_BITS<<4)
+
+/* This MT function fill the tree pth->comp_tree with the pth->comp_tree->alloc
+ * heaviest connected components whose smallest row belongs in
+ *   [ (data->th_id + j*npt) * COMP_MT_ROWS_BLOCK,
+                              (data->th_id + j*npt + 1) * COMP_MT_ROWS_BLOCK],
+ * with j = 0,1,2... until the interval does not intersect [0..nrelmax-1].
+ */
+static void *
+search_chunk_max_cliques (void *pt)
+{
+  comp_mt_thread_data_t *data = (comp_mt_thread_data_t *) pt;
   index_t end_step_rels;
   bv_t bv, *pbv;
   index_buffer_t buf1, buf2;
   comp_t clique;
 
-  // Init of the structure & malloc.
-  comp_graph_init (pth);
-  index_buffer_init (buf1, TO_EXPLORE_MIN_BUFFER);
-  index_buffer_init (buf2, EXPLORED_MIN_BUFFER);
+  /* Init of the structure & malloc. */
+  index_buffer_init (buf1, INDEX_BUFFER_MIN_SIZE);
+  index_buffer_init (buf2, INDEX_BUFFER_MIN_SIZE);
 
   // Now the first begin of the search
-  clique.i = pth->pthread_number * RELS_BLOCK;
+  clique.i = data->th_id * COMP_MT_ROWS_BLOCK;
   if (UNLIKELY (clique.i >= nrelmax)) pthread_exit (NULL);
   // And the first end
-  end_step_rels = clique.i + RELS_BLOCK;
+  end_step_rels = clique.i + COMP_MT_ROWS_BLOCK;
 
   pbv = rel_used->p + (clique.i >> LN2_BV_BITS);
   while (clique.i < nrelmax)
@@ -618,10 +602,10 @@ static void *search_chunk_max_cliques (void *pt)
                                               buf1, buf2);
         if (UNLIKELY (!nb_rows))
           continue;
-        if (UNLIKELY (pth->size_clique_graph < pth->chunk))
-          comp_graph_insert (pth, clique);
-        else if (UNLIKELY(clique.w > pth->clique_graph->w))
-          comp_graph_replace (pth, clique);
+        if (UNLIKELY (data->comp_tree->size < data->comp_tree->alloc))
+          comp_sorted_bin_tree_insert (data->comp_tree, clique);
+        else if (UNLIKELY(clique.w > data->comp_tree->tree[0].w))
+          comp_sorted_bin_tree_replace (data->comp_tree, clique);
       }
     }
     clique.i = save_i + BV_BITS;
@@ -629,60 +613,122 @@ static void *search_chunk_max_cliques (void *pt)
     if (UNLIKELY (clique.i == end_step_rels))
     {
       // The new begin & end.
-      end_step_rels += npt * RELS_BLOCK;
-      clique.i = end_step_rels - RELS_BLOCK;
+      end_step_rels += npt * COMP_MT_ROWS_BLOCK;
+      clique.i = end_step_rels - COMP_MT_ROWS_BLOCK;
       pbv = rel_used->p + (clique.i >> LN2_BV_BITS);
     }
   }
   index_buffer_clear (buf1);
   index_buffer_clear (buf2);
-  qsort (pth->clique_graph, pth->size_clique_graph, sizeof(comp_t), comp_cmp_weight);
+  /* Re-order the connected component by decreasing weight. */
+  qsort (data->comp_tree->tree, data->comp_tree->size, sizeof(comp_t),
+                                                     comp_cmp_weight);
   pthread_exit (NULL);
   return NULL;
 }
 
-#ifdef HAVE_SYNC_FETCH
-/* The main structure for the working pthreads pool which
-   compute sum2_index, only if HAVE_SYNC_FETCH is defined.
-*/
-typedef struct sum2_pth_s {
-  // Read only part
-  unsigned int pthread_number;
-  // Read-write part
-  pthread_t pthread;
-  index_t rels_found;
-} sum2_pth_t;
+/******************* Functions to print stats ********************************/
 
-MAYBE_UNUSED  
-static void *compute_sum2_index (void *pt) {
-  sum2_pth_t *sum2_pth = (sum2_pth_t *) pt;
-  index_t j = nrelmax / npt;
-  index_t i = (j * sum2_pth->pthread_number) & ~((size_t) (BV_BITS - 1));
-  index_t end = (sum2_pth->pthread_number == npt - 1) ? nrelmax :
-    (j * (sum2_pth->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
-  bv_t bv, *pbv;
-  index_t rels_found = 0, h, *myrelcompact;
-
-  pbv = rel_used->p + (i >> LN2_BV_BITS);
-  for (; i < end; i += BV_BITS) {
-    for (j = i, bv = *pbv++; bv; ++j, bv >>= 1) {
-      if (LIKELY(bv & 1)) {
-	++rels_found;
-	myrelcompact = rel_compact[j];
-	for (;;) {
-	  h = *myrelcompact++;
-	  if (UNLIKELY (h == UMAX(h))) break;
-	  if (LIKELY (cols_weight[h] == 2))
-	    __sync_add_and_fetch (sum2_index + h, j);
-	}
-      }
+void
+print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
+                       int verbose)
+{
+  uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
+  for (uint64_t i = 0; i < len; i++)
+  {
+    if (w[i] > 0)
+    {
+      nb_nzero++;
+      if (w[i] < min)
+        min = w[i];
+      if (w[i] > max)
+        max = w[i];
+      av += w[i];
+      std += w[i]*w[i];
     }
   }
-  sum2_pth->rels_found = rels_found;
-  pthread_exit (NULL);
-  return NULL;
+
+  double av_f = ((double) av) / ((double) nb_nzero);
+  double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
+
+  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, len);
+  fprintf (out, "# STATS on %s: #active %s = %" PRIu64 "\n", name, name,
+                                                                    nb_nzero);
+  fprintf (out, "# STATS on %s: min = %" PRIu64 "\n", name, min);
+  fprintf (out, "# STATS on %s: max = %" PRIu64 "\n", name, max);
+  fprintf (out, "# STATS on %s: av = %.2f\n", name, av_f);
+  fprintf (out, "# STATS on %s: std = %.2f\n", name, std_f);
+
+  if (verbose > 1)
+  {
+    uint64_t *nb_w = NULL;
+    nb_w = (uint64_t *) malloc ((max-min+1) * sizeof (uint64_t));
+    ASSERT_ALWAYS (nb_w != NULL);
+    memset (nb_w, 0, (max-min+1) * sizeof (uint64_t));
+    for (uint64_t i = 0; i < len; i++)
+      if (w[i] > 0)
+        nb_w[w[i]-min]++;
+
+    for (uint64_t i = 0; i < max-min+1; i++)
+    {
+      if (nb_w[i] > 0)
+        fprintf (out, "# STATS on %s: #%s of weight %" PRIu64 " : %" PRIu64
+                      "\n", name, name, min+i, nb_w[i]);
+    }
+    free (nb_w);
+  }
+  fflush (out);
+}
+
+void
+print_stats_columns_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nprimemax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nprimemax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+    if (bit_vector_getbit(rel_used, (size_t) i))
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+        w[*h]++;
+
+  print_stats_on_weight (out, w, nprimemax, "cols", verbose);
+  free (w);
+}
+
+void
+print_stats_rows_weight (FILE *out, int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, nrelmax * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < nrelmax; i++)
+    if (bit_vector_getbit(rel_used, (size_t) i))
+      for (h = rel_compact[i]; *h != UMAX(*h); h++)
+        w[i]++;
+
+  print_stats_on_weight (out, w, nrelmax, "rows", verbose);
+  free (w);
+}
+
+#if 0
+void print_stats_on_cliques (FILE *out, int verbose)
+{
+  uint64_t *len = NULL;
+  len = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
+  ASSERT_ALWAYS (len != NULL);
+  memset (len, 0, nrelmax * sizeof (uint64_t));
+
+  free (len);
 }
 #endif
+
+/***************************** Clique removal stage *************************/
 
 static void
 cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
@@ -690,97 +736,77 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   int64_t excess = (((int64_t) *nrels) - *nprimes);
   uint64_t nb_clique_deleted = 0;
   size_t i, chunk;
-  index_t N = 0;		/* number of rows */
 
   ASSERT(npt);
 
   if (excess <= keep || excess <= target_excess) return;
   chunk = (size_t) (excess - target_excess);
 
-  /* first collect sums for primes with weight 2, and compute total weight.
-     If HAVE_SYNC_FETCH is defined, this part is done with the previous
-     multithread function; if not, it's done in sequential, immediatly.
+  /* First collect sums for primes with weight 2.
+   * If HAVE_SYNC_FETCH is defined, this part is done with the previous
+   * multithread function; if not, it's done in sequential, immediatly.
   */
-  memset(sum2_index, 0, nprimemax * sizeof(index_t));
-#ifndef HAVE_SYNC_FETCH
-  for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i)) {
-      index_t h, *myrelcompact;
-      ++N;
-      for (myrelcompact = rel_compact[i];
-	   (h = *myrelcompact++) != UMAX(h);)
-	if (cols_weight[h] == 2)
-	  sum2_index[h] += i;
-    }
-#else
-  sum2_pth_t *sum2_pth = malloc_check (npt * sizeof (*sum2_pth));
-  for (i = npt; i--; ) {
-    sum2_pth[i].pthread_number = i;
-    if (pthread_create (&(sum2_pth[i].pthread), NULL,
-			compute_sum2_index, (void *) (sum2_pth + i))) {
-      perror ("compute_sum2_index pthread creation failed\n");
-      exit (1);
-    }
-  }
-  for (i = npt; i--; ) {
-    pthread_join (sum2_pth[i].pthread, NULL);
-    N += sum2_pth[i].rels_found;
-  }
-  free (sum2_pth);
-#endif
+  compute_sum2_index ();
+  fprintf(stdout, "    computed sum2_index at %2.2lf\n", seconds());
+  fflush (stdout);
 
-  ASSERT_ALWAYS(N == *nrels);
-  
-  // Second we search in parallel the chunk heaviest cliques.
-  // For this, each thread search its chunk heaviest cliques.
-  pth_t *pth = malloc_check (npt * sizeof (*pth));
-  memset (pth, 0, npt * sizeof (*pth));
-  for (i = npt; i--; ) {
-    pth[i].pthread_number = i;
-    pth[i].chunk = chunk;
-    if (pthread_create (&(pth[i].pthread), NULL,
-			search_chunk_max_cliques, (void *) (pth + i))) {
+  /* Second we search in parallel the "chunk" heaviest cliques.
+   * For this, each thread search its "chunk" heaviest cliques.
+   */
+  comp_mt_thread_data_t *th_data = (comp_mt_thread_data_t *)
+                            malloc_check (npt * sizeof(comp_mt_thread_data_t));
+  memset (th_data, 0, npt * sizeof (comp_mt_thread_data_t));
+  for (i = npt; i--; )
+  {
+    th_data[i].th_id = i;
+    comp_sorted_bin_tree_init (th_data[i].comp_tree, chunk);
+    if (pthread_create (&(th_data[i].pthread), NULL, search_chunk_max_cliques,
+                                                    (void *) &(th_data[i])))
+    {
       perror ("search_chunk_max_cliques pthread creation failed\n");
       exit (1);
     }
   }
-  for (i = npt; i--; ) pthread_join (pth[i].pthread, NULL);
+  for (i = npt; i--; )
+    pthread_join (th_data[i].pthread, NULL);
+  fprintf(stdout, "    computed heaviest connected components at %2.2lf\n",
+                  seconds());
+  fflush (stdout);
 
-  /* At this point, in each pth[i].graph_cliques we have
-     size_clique_graph cliques order by increasing weight */
+  /* At this point, in each pth[i].comp_tree we have pth[i].comp_tree->size
+     connected components order by decreasing weight. */
   size_t *next_clique = NULL;
   index_buffer_t buf1, buf2;
   next_clique = (size_t *) malloc (npt * sizeof (next_clique));
   ASSERT_ALWAYS (next_clique != NULL);
   memset (next_clique, 0, npt * sizeof (next_clique));
-  index_buffer_init (buf1, TO_EXPLORE_MIN_BUFFER);
-  index_buffer_init (buf2, EXPLORED_MIN_BUFFER);
+  index_buffer_init (buf1, INDEX_BUFFER_MIN_SIZE);
+  index_buffer_init (buf2, INDEX_BUFFER_MIN_SIZE);
 
   while (*nrels > target_excess + *nprimes)
   {
-    comp_t *max_clique = NULL;
+    comp_t max_comp = {.i = 0, .w = -1.0};
     size_t max_thread = 0;
 
     for (i = 0; i < npt; ++i)
     {
-      if (next_clique[i] < pth[i].size_clique_graph)
+      if (next_clique[i] < th_data[i].comp_tree->size)
       {
-        comp_t *cur_clique = &(pth[i].clique_graph[next_clique[i]]);
-        if (max_clique == NULL || cur_clique->w > max_clique->w)
+        comp_t cur_comp = th_data[i].comp_tree->tree[next_clique[i]];
+        if (cur_comp.w > max_comp.w)
         {
-          max_clique = cur_clique;
+          max_comp = cur_comp;
           max_thread = i;
         }
       }
     }
-
-    if (max_clique == NULL)
+    if (max_comp.w < 0.0)
     {
-      fprintf (stderr, "# All heaps of cliques are empty.");
+      fprintf (stderr, "  # All heaps of cliques are empty.\n");
       break;
     }
 
-    *nrels -= delete_connected_component (max_clique->i, nprimes, buf1, buf2);
+    *nrels -= delete_connected_component (max_comp.i, nprimes, buf1, buf2);
     next_clique[max_thread]++;
     nb_clique_deleted++;
   }
@@ -789,16 +815,17 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   index_buffer_clear (buf1);
   index_buffer_clear (buf2);
   
-  fprintf(stdout, "    deleted %" PRIu64 " heavier connected components at "
+  fprintf(stdout, "    deleted %" PRIu64 " heaviest connected components at "
                   "%2.2lf\n", nb_clique_deleted, seconds());
-#if DEBUG >= 1
-  fprintf(stdout, "    DEBUG: nb heaviest cliques=%zu chunk=%u target=%u\n",
-	  pth->size_clique_graph, chunk, target_excess);
-#endif
+  if (verbose > 0)
+    fprintf(stdout, "    # INFO: chunk=%zu target_excess=%" PRId64 "\n",
+                    chunk, target_excess);
+  fflush (stdout);
+
   /* We can suppress pth[i] and pth itself */
   for (i = 0; i < npt; ++i)
-    free (pth[i].clique_graph);
-  free (pth);
+    comp_sorted_bin_tree_clear (th_data[i].comp_tree);
+  free (th_data);
 }
 
 /*****************************************************************************/
