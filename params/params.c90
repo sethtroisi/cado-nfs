@@ -119,12 +119,12 @@ tasks.maxtimedout = 100
 # the parameter tree, all tasks can find them.
 
 # (r,a) means rational or algebraic side
-rlim = 200000
-alim = 400000
+rlim = 270782
+alim = 320938
 # The number of rational (resp. # algebraic) primes is roughly rlim/log(rlim)
 # (resp. alim/log(rlim))
-lpbr = 24
-lpba = 24
+lpbr = 23
+lpba = 23
 # lpbr/lpba is the (base 2 log of the) large prime bound
 
 ###########################################################################
@@ -176,13 +176,13 @@ tasks.polyselect.nq = 1000
 # Sieve task
 ###########################################################################
 
-tasks.sieve.mfbr = 48
-tasks.sieve.mfba = 48
+tasks.sieve.mfbr = 75
+tasks.sieve.mfba = 70
     # mfbr/mfba is the (base 2 log of the) limit for the cofactor we try
     # to split into large primes.
 
-tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.1
+tasks.sieve.rlambda = 2.131250000000000
+tasks.sieve.alambda = 2.103125000000000
     # rlambda/alambda is the early-abort ratio: if after sieving, and
     # subtracting from the log of the norm the contribution of the
     # sieved primes, the approximation of the log of the remaining
@@ -193,8 +193,8 @@ tasks.sieve.alambda = 2.1
     # allowed, to set rlambda to e.g. k + 0.1, in order to compensate for
     # inaccuracies due to sieving.
 
-tasks.sieve.ncurves0 = 3
-tasks.sieve.ncurves1 = 3
+tasks.sieve.ncurves0 = 4
+tasks.sieve.ncurves1 = 2
     # ncurves0 controls the number of P-1/P+1/ECM curves used in the
     # cofactorization on side 0 (i.e., rational side), more precisely we
     # use 3+ncurves0 curves. If one increases ncurves0, one will find more
