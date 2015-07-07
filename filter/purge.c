@@ -86,8 +86,8 @@ index_t **rel_compact; /* see main documentation */
 weight_t *cols_weight;
 
 static bit_vector rel_used;
-static index_t *sum2_index = NULL; /*sum of rows index for primes of weight 2 */
-
+static uint64_t *sum2_row = NULL; /* sum of 2 row indexes for columns of
+                                     weight 2 */
 static uint64_t nrelmax = 0, nprimemax = 0;
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
 static int npass = -1; /* negative value means chosen by purge */
@@ -122,7 +122,7 @@ typedef const struct purge_data_s * purge_data_srcptr;
  * i1 and i2 share a prime of weight 2. */
 typedef struct {
   float w;   /* Weight of the clique */
-  index_t i; /* smallest relation of the clique (index in rel_compact) */
+  uint64_t i; /* smallest relation of the clique (index in rel_compact) */
 } comp_t;
 
 int
@@ -166,37 +166,37 @@ comp_print_info_weight_function ()
   fprintf(stdout, "\n");
 }
 
-/******************** index_buffer struct ************************************/
+/******************** uint64_buffer struct ***********************************/
 
 /* Classical buffer (here, a stack in fact) */
-struct index_buffer_s {
-  index_t *begin, *current, *end;
+struct uint64_buffer_s {
+  uint64_t *begin, *current, *end;
 };
-typedef struct index_buffer_s index_buffer_t[1];
-typedef struct index_buffer_s * index_buffer_ptr;
-typedef const struct index_buffer_s * index_buffer_srcptr;
+typedef struct uint64_buffer_s uint64_buffer_t[1];
+typedef struct uint64_buffer_s * uint64_buffer_ptr;
+typedef const struct uint64_buffer_s * uint64_buffer_srcptr;
 
-#define INDEX_BUFFER_MIN_SIZE 16
+#define UINT64_BUFFER_MIN_SIZE 16
 
-/* Init function for index_buffer_t */
+/* Init function for uint64_buffer_t */
 static inline void
-index_buffer_init (index_buffer_ptr buf, size_t size)
+uint64_buffer_init (uint64_buffer_ptr buf, size_t size)
 {
-  buf->begin = (index_t *) malloc_check (sizeof(index_t) * size);
+  buf->begin = (uint64_t *) malloc_check (sizeof(uint64_t) * size);
   buf->current = buf->begin;
   buf->end = buf->begin + size;
 }
 
-/* Reset function for index_buffer_t */
+/* Reset function for uint64_buffer_t */
 static inline void
-index_buffer_reset (index_buffer_ptr buf)
+uint64_buffer_reset (uint64_buffer_ptr buf)
 {
   buf->current = buf->begin;
 }
 
-/* Clear function for index_buffer_t */
+/* Clear function for uint64_buffer_t */
 static inline void
-index_buffer_clear (index_buffer_ptr buf)
+uint64_buffer_clear (uint64_buffer_ptr buf)
 {
   free(buf->begin);
 }
@@ -204,44 +204,44 @@ index_buffer_clear (index_buffer_ptr buf)
 /* return non-zero if target is in buf
    return 0 otherwise */
 static inline int
-index_buffer_is_in (index_buffer_srcptr buf, index_t target)
+uint64_buffer_is_in (uint64_buffer_srcptr buf, uint64_t target)
 {
-  for (index_t *p = buf->begin; p < buf->current; p++)
+  for (uint64_t *p = buf->begin; p < buf->current; p++)
     if (UNLIKELY(*p == target))
       return 1;
   return 0;
 }
 
-/* This function grows a possible too small index_buffer_t. */
+/* This function grows a possible too small uint64_buffer_t. */
 static inline void
-index_buffer_resize (index_buffer_ptr buf)
+uint64_buffer_resize (uint64_buffer_ptr buf)
 {
   if (UNLIKELY(buf->current >= buf->end))
   {
     size_t ind_current = buf->current - buf->begin;
     size_t new_size = (buf->end - buf->begin) << 1;
-    buf->begin = (index_t *) realloc (buf->begin, new_size * sizeof (index_t));
+    buf->begin = (uint64_t*) realloc (buf->begin, new_size * sizeof(uint64_t));
     ASSERT_ALWAYS (buf->begin != NULL);
     buf->current = buf->begin + ind_current;
     buf->end = buf->begin + new_size;
   }
 }
 
-/* push fonction for index_buffer_t */
+/* push fonction for uint64_buffer_t */
 static inline void
-index_buffer_push (index_buffer_ptr buf, index_t new_element)
+uint64_buffer_push (uint64_buffer_ptr buf, uint64_t new_element)
 {
-  index_buffer_resize (buf); /* check that space is enough */
+  uint64_buffer_resize (buf); /* check that space is enough */
   *(buf->current)++ = new_element;
 }
 
-/* push fonction for index_buffer_t
-   return UMAX(index_t) if buffer is empty */
-static inline index_t
-index_buffer_pop (index_buffer_ptr buf)
+/* push fonction for uint64_buffer_t
+   return UMAX(uint64_t) if buffer is empty */
+static inline uint64_t
+uint64_buffer_pop (uint64_buffer_ptr buf)
 {
-  index_t pop_element;
-  index_buffer_resize (buf); /* check that space is enough */
+  uint64_t pop_element;
+  uint64_buffer_resize (buf); /* check that space is enough */
   if (buf->current == buf->begin)
     pop_element = UMAX(pop_element);
   else
@@ -377,16 +377,16 @@ static unsigned int delete_relation (uint64_t i)
  * component has already been found, by this thread or another, when we have
  * treated the row i1.
  */
-static int
+static uint64_t
 compute_connected_component_mt (comp_t *clique,
-                                index_buffer_ptr buf_to_explore,
-                                index_buffer_ptr buf_explored)
+                                uint64_buffer_ptr buf_to_explore,
+                                uint64_buffer_ptr buf_explored)
 {
-  index_t current_row;
+  uint64_t current_row;
   index_t *h;
 
-  index_buffer_reset (buf_to_explore); /* Empty buffer */
-  index_buffer_reset (buf_explored); /* Empty buffer */
+  uint64_buffer_reset (buf_to_explore); /* Empty buffer */
+  uint64_buffer_reset (buf_explored); /* Empty buffer */
   current_row = clique->i;
   clique->w = 0.; /* Set initial weight of the connected component to 0. */
   do /* Loop on all connected rows */
@@ -399,24 +399,24 @@ compute_connected_component_mt (comp_t *clique,
       clique->w += comp_weight_function (cur_h_weight);
       if (UNLIKELY(cur_h_weight == 2))
       {
-        index_t the_other_row = sum2_index[cur_h] - current_row;
+        uint64_t the_other_row = sum2_row[cur_h] - current_row;
         /* First, if the_other_row < clique.i, the connected component was
          * already found (by this thread or another). return 0 */
         if (the_other_row < clique->i)
           return 0;
         /* If the_other_row is not already in a buffer, add it to to_explore */
-        if (!index_buffer_is_in (buf_explored, the_other_row) &&
-            !index_buffer_is_in (buf_to_explore, the_other_row))
+        if (!uint64_buffer_is_in (buf_explored, the_other_row) &&
+            !uint64_buffer_is_in (buf_to_explore, the_other_row))
         {
           /* No: store the new row in order to explore it later */
-          index_buffer_push (buf_to_explore, the_other_row);
+          uint64_buffer_push (buf_to_explore, the_other_row);
         }
       }
     }
     /* current row is now explored */
-    index_buffer_push (buf_explored, current_row);
+    uint64_buffer_push (buf_explored, current_row);
     /* We need another row to explore */
-    current_row = index_buffer_pop (buf_to_explore);
+    current_row = uint64_buffer_pop (buf_to_explore);
   } while (current_row != UMAX(current_row));
 
   /* Return the nb of rows in the connected component */
@@ -429,15 +429,15 @@ compute_connected_component_mt (comp_t *clique,
  * WARNING: this code itself is multithread compatible, but
  * it calls delete_relation, which is NOT compatible!
  */
-static index_t
-delete_connected_component (index_t current_row, uint64_t *nprimes,
-                            index_buffer_ptr buf_to_explore,
-                            index_buffer_ptr buf_explored)
+static uint64_t
+delete_connected_component (uint64_t current_row, uint64_t *nprimes,
+                            uint64_buffer_ptr buf_to_explore,
+                            uint64_buffer_ptr buf_explored)
 {
   index_t *h;
 
-  index_buffer_reset (buf_to_explore); /* Empty buffer */
-  index_buffer_reset (buf_explored); /* Empty buffer */
+  uint64_buffer_reset (buf_to_explore); /* Empty buffer */
+  uint64_buffer_reset (buf_explored); /* Empty buffer */
   do /* Loop on all connected rows */
   {
     /* Loop on all primes of the current row */
@@ -447,37 +447,37 @@ delete_connected_component (index_t current_row, uint64_t *nprimes,
       weight_t cur_h_weight = cols_weight[cur_h];
       /* We might have some H->hashcount[h] = 3, which is decreased to 2, but
        * we don't want to treat that case. Thus we check in addition that
-       * sum2_index[h] <> 0, which only occurs when H->hashcount[h] = 2
+       * sum2_row[h] <> 0, which only occurs when H->hashcount[h] = 2
        * initially.*/
-      if (UNLIKELY(cur_h_weight == 2 && sum2_index[cur_h]))
+      if (UNLIKELY(cur_h_weight == 2 && sum2_row[cur_h]))
       {
-        index_t the_other_row = sum2_index[cur_h] - current_row;
+        uint64_t the_other_row = sum2_row[cur_h] - current_row;
         /* If the_other_row is not already in a buffer, add it to to_explore */
-        if (!index_buffer_is_in (buf_explored, the_other_row) &&
-            !index_buffer_is_in (buf_to_explore, the_other_row))
+        if (!uint64_buffer_is_in (buf_explored, the_other_row) &&
+            !uint64_buffer_is_in (buf_to_explore, the_other_row))
         {
           /* No: store the new row in order to explore it later */
-          index_buffer_push (buf_to_explore, the_other_row);
+          uint64_buffer_push (buf_to_explore, the_other_row);
         }
       }
     }
     /* current row is now explored */
-    index_buffer_push (buf_explored, current_row);
+    uint64_buffer_push (buf_explored, current_row);
 
     /* We need another row to explore */
-    current_row = index_buffer_pop (buf_to_explore);
+    current_row = uint64_buffer_pop (buf_to_explore);
   } while (current_row != UMAX(current_row));
 
   /* Now, we deleted all rows explored */
-  for (index_t *pt = buf_explored->begin; pt < buf_explored->current; pt++)
+  for (uint64_t *pt = buf_explored->begin; pt < buf_explored->current; pt++)
     *nprimes -= delete_relation (*pt);
   return (buf_explored->current - buf_explored->begin);
 }
 
-/******* Functions to compute sum2_index array (mono and multi thread) *******/
+/******* Functions to compute sum2_row array (mono and multi thread) *********/
 
 #ifdef HAVE_SYNC_FETCH /* Multithread code */
-/* The main structure for the working pthreads pool which compute sum2_index */
+/* The main structure for the working pthreads pool which compute sum2_row */
 typedef struct sum2_mt_data_s {
   // Read only part
   unsigned int pthread_number;
@@ -486,12 +486,12 @@ typedef struct sum2_mt_data_s {
 } sum2_mt_data_t;
 
 static void *
-compute_sum2_index_mt (void *pt)
+compute_sum2_row_mt (void *pt)
 {
   sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
-  index_t j = nrelmax / npt;
-  index_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
-  index_t end = (data->pthread_number == npt - 1) ? nrelmax :
+  uint64_t j = nrelmax / npt;
+  uint64_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
+  uint64_t end = (data->pthread_number == npt - 1) ? nrelmax :
     (j * (data->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
   bv_t bv, *pbv;
   index_t h, *myrelcompact;
@@ -510,7 +510,7 @@ compute_sum2_index_mt (void *pt)
           if (UNLIKELY (h == UMAX(h)))
             break;
           if (LIKELY (cols_weight[h] == 2))
-            __sync_add_and_fetch (sum2_index + h, j);
+            __sync_add_and_fetch (sum2_row + h, j);
         }
       }
     }
@@ -521,9 +521,9 @@ compute_sum2_index_mt (void *pt)
 #endif
 
 static inline void
-compute_sum2_index ()
+compute_sum2_row ()
 {
-  memset(sum2_index, 0, nprimemax * sizeof(index_t));
+  memset(sum2_row, 0, nprimemax * sizeof(uint64_t));
 #ifndef HAVE_SYNC_FETCH /* monothread */
   for (uint64_t i = 0; i < nrelmax; i++)
   {
@@ -532,7 +532,7 @@ compute_sum2_index ()
       index_t h, *myrelcompact;
       for (myrelcompact = rel_compact[i]; (h = *myrelcompact++) != UMAX(h);)
         if (cols_weight[h] == 2)
-          sum2_index[h] += i;
+          sum2_row[h] += i;
     }
   }
 #else
@@ -540,10 +540,10 @@ compute_sum2_index ()
   for (size_t i = npt; i--; )
   {
     th_data[i].pthread_number = i;
-    if (pthread_create (&(th_data[i].pthread), NULL, compute_sum2_index_mt,
+    if (pthread_create (&(th_data[i].pthread), NULL, compute_sum2_row_mt,
                                                      (void *) (th_data + i)))
     {
-      perror ("compute_sum2_index pthread creation failed\n");
+      perror ("compute_sum2_row pthread creation failed\n");
       exit (1);
     }
   }
@@ -576,14 +576,14 @@ static void *
 search_chunk_max_cliques (void *pt)
 {
   comp_mt_thread_data_t *data = (comp_mt_thread_data_t *) pt;
-  index_t end_step_rels;
+  uint64_t end_step_rels;
   bv_t bv, *pbv;
-  index_buffer_t buf1, buf2;
+  uint64_buffer_t buf1, buf2;
   comp_t clique;
 
   /* Init of the structure & malloc. */
-  index_buffer_init (buf1, INDEX_BUFFER_MIN_SIZE);
-  index_buffer_init (buf2, INDEX_BUFFER_MIN_SIZE);
+  uint64_buffer_init (buf1, UINT64_BUFFER_MIN_SIZE);
+  uint64_buffer_init (buf2, UINT64_BUFFER_MIN_SIZE);
 
   // Now the first begin of the search
   clique.i = data->th_id * COMP_MT_ROWS_BLOCK;
@@ -594,7 +594,7 @@ search_chunk_max_cliques (void *pt)
   pbv = rel_used->p + (clique.i >> LN2_BV_BITS);
   while (clique.i < nrelmax)
   {
-    index_t save_i = clique.i;
+    uint64_t save_i = clique.i;
     for (bv = *pbv++; bv; ++(clique.i), bv >>= 1)
     {
       if (LIKELY(bv & 1))
@@ -619,8 +619,8 @@ search_chunk_max_cliques (void *pt)
       pbv = rel_used->p + (clique.i >> LN2_BV_BITS);
     }
   }
-  index_buffer_clear (buf1);
-  index_buffer_clear (buf2);
+  uint64_buffer_clear (buf1);
+  uint64_buffer_clear (buf2);
   /* Re-order the connected component by decreasing weight. */
   qsort (data->comp_tree->tree, data->comp_tree->size, sizeof(comp_t),
                                                      comp_cmp_weight);
@@ -723,23 +723,23 @@ void print_stats_on_cliques (FILE *out, int verbose)
   ASSERT_ALWAYS (len != NULL);
   memset (len, 0, nrelmax * sizeof (uint64_t));
 
-  index_buffer_t buf1, buf2;
-  index_buffer_init (buf1, INDEX_BUFFER_MIN_SIZE);
-  index_buffer_init (buf2, INDEX_BUFFER_MIN_SIZE);
+  uint64_buffer_t buf1, buf2;
+  uint64_buffer_init (buf1, UINT64_BUFFER_MIN_SIZE);
+  uint64_buffer_init (buf2, UINT64_BUFFER_MIN_SIZE);
   for (uint64_t i = 0; i < nrelmax; i++)
   {
     if (bit_vector_getbit(rel_used, (size_t) i))
     {
       comp_t c = {.i = i, .w = 0.0};
-      index_t nrows = compute_connected_component_mt (&c, buf1, buf2);
+      uint64_t nrows = compute_connected_component_mt (&c, buf1, buf2);
       len[i] = nrows;
     }
   }
 
   print_stats_uint64 (out, len, nrelmax, "cliques", "length", verbose);
 
-  index_buffer_clear (buf1);
-  index_buffer_clear (buf2);
+  uint64_buffer_clear (buf1);
+  uint64_buffer_clear (buf2);
   free (len);
 }
 
@@ -761,8 +761,8 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
    * If HAVE_SYNC_FETCH is defined, this part is done with the previous
    * multithread function; if not, it's done in sequential, immediatly.
   */
-  compute_sum2_index ();
-  fprintf(stdout, "    computed sum2_index at %2.2lf\n", seconds());
+  compute_sum2_row ();
+  fprintf(stdout, "    computed sum2_row at %2.2lf\n", seconds());
   fflush (stdout);
 
   /* Second we search in parallel the "chunk" heaviest cliques.
@@ -794,12 +794,12 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   /* At this point, in each pth[i].comp_tree we have pth[i].comp_tree->size
      connected components order by decreasing weight. */
   size_t *next_clique = NULL;
-  index_buffer_t buf1, buf2;
+  uint64_buffer_t buf1, buf2;
   next_clique = (size_t *) malloc (npt * sizeof (next_clique));
   ASSERT_ALWAYS (next_clique != NULL);
   memset (next_clique, 0, npt * sizeof (next_clique));
-  index_buffer_init (buf1, INDEX_BUFFER_MIN_SIZE);
-  index_buffer_init (buf2, INDEX_BUFFER_MIN_SIZE);
+  uint64_buffer_init (buf1, UINT64_BUFFER_MIN_SIZE);
+  uint64_buffer_init (buf2, UINT64_BUFFER_MIN_SIZE);
 
   while (*nrels > target_excess + *nprimes)
   {
@@ -830,8 +830,8 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   }
 
   free (next_clique);
-  index_buffer_clear (buf1);
-  index_buffer_clear (buf2);
+  uint64_buffer_clear (buf1);
+  uint64_buffer_clear (buf2);
   
   fprintf(stdout, "    deleted %" PRIu64 " heaviest connected components at "
                   "%2.2lf\n", nb_clique_deleted, seconds());
@@ -1350,7 +1350,7 @@ int main(int argc, char **argv)
 } while (0)
     /* }}} */
 
-    ALLOC_VERBOSE_MALLOC(index_t, sum2_index, nprimemax);
+    ALLOC_VERBOSE_MALLOC(uint64_t, sum2_row, nprimemax);
 
 
     set_antebuffer_path(argv0, param_list_lookup_string(pl, "path_antebuffer"));
@@ -1508,9 +1508,9 @@ int main(int argc, char **argv)
     if (cols_weight != NULL)
 	free(cols_weight);
     cols_weight = NULL;
-    if (sum2_index != NULL)
-	free(sum2_index);
-    sum2_index = NULL;
+    if (sum2_row != NULL)
+      free(sum2_row);
+    sum2_row = NULL;
 
     bit_vector_clear(rel_used);
 
