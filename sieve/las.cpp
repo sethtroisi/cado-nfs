@@ -1356,20 +1356,19 @@ static void remove_galois_factors(relation &rel, int p, int vp){
 
 /* adding p^vp to the list of factors in rel. */
 static void add_galois_factors(relation &rel, int p, int vp){
-    int ok = 0;
+    int ok[2] = {0, 0};
 
     for(int side = 0 ; side < 2 ; side++){
 	for(unsigned int i = 0 ; i < rel.sides[side].size(); i++)
 	    if(mpz_cmp_ui(rel.sides[side][i].p, p) == 0){
-		ok = 1;
+		ok[side] = 1;
 		rel.sides[side][i].e += vp;
 	    }
     }
-    if(ok == 0){
-	/* we must add p^vp */
-	for(int side = 0; side < 2; side++)
+    for(int side = 0 ; side < 2 ; side++)
+	if(ok[side] == 0)
+	    /* we must add p^vp */
 	    rel.add(side, p, vp);
-    }
 }
 
 /* adding relations on the fly in Galois cases */
