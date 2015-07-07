@@ -1195,175 +1195,151 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     modul_init(r1, mm);
     modul_init(r2, mm);
     modul_init(r3, mm);
-    if(ord == 2){ // be conservative
-	for (int k = 0; k < nroots; k++) {
-	    unsigned long rr = mpz_get_ui(roots[k]);
-	    modul_set_ul(r1, rr, mm);
-	    int kk = 0;
-	    for (int l = k+1; l < nroots; ++l) {
-		unsigned long ss = mpz_get_ui(roots[l]);
-		modul_set_ul(r2, ss, mm);
-		modul_mul(r2, r2, r1, mm);
-		if (modul_is1(r2, mm)) {
-		    kk = l;
+    residueul_t conj[ord]; // where to put conjugates
+    for(int k = 0; k < ord; k++)
+	modul_init(conj[k], mm);
+    char used[nroots];     // used roots: non-principal conjugates
+    memset(used, 0, nroots);
+    for(int k = 0; k < nroots; k++){
+	if(used[k]) continue;
+	unsigned long rr = mpz_get_ui(roots[k]);
+	modul_set_ul(r1, rr, mm);
+	// build ord-1 conjugates for roots[k]
+	for(int l = 0; l < ord; l++){
+#if 0
+	    if(strcmp(galois_autom, "autom3.1") == 0){
+		// r1 <- sigma(r1) = 1-1/r1
+		if(modul_intequal_ul(r1, qq))
+		    // r1 = oo => 1/r1 = 0
+		    modul_set_ul(r1, 1, mm);
+		else if(modul_is0(r1, mm)){
+		    // 1/0 = oo
+		    modul_set_ul(r1, qq, mm);
+		}
+		else{
+		    modul_inv(r2, r1, mm);
+		    modul_set_ul(r1, 1, mm);
+		    modul_sub(r1, r1, r2, mm);
+		}
+		modul_set(conj[l], r1, mm);
+	    }
+	    else if(strcmp(galois_autom, "autom3.2") == 0){
+		// r1 <- sigma(r1) = -1-1/r1 = -(1+1/r1)
+		if(modul_intequal_ul(r1, qq)){
+		    // r1 = oo => 1/r1 = 0
+		    modul_set_ul(r1, 1, mm);
+		    modul_neg(r1, r1, mm);
+		}
+		else if(modul_is0(r1, mm)){
+		    // 1/0 = oo
+		    modul_set_ul(r1, qq, mm);
+		}
+		else{
+		    modul_inv(r2, r1, mm);
+		    modul_set_ul(r1, 1, mm);
+		    modul_add(r1, r1, r2, mm);
+		    modul_neg(r1, r1, mm);
+		}
+		modul_set(conj[l], r1, mm);
+	    }
+	    else if(strcmp(galois_autom, "autom4.1") == 0){
+		// r1 <- sigma(r1) = -(r1+1)/(r1-1)
+		if(modul_intequal_ul(r1, 1))
+		    // r1 = 1 => 1/(r1-1) = oo
+		    modul_set_ul(r1, qq, mm);
+		else if(modul_intequal_ul(r1, qq)){
+		    // sigma(oo) = -1
+		    modul_set_ul(r1, 1, mm);
+		    modul_neg(r1, r1, mm);
+		}
+		else{
+		    // r1 <- r1_orig-1
+		    modul_sub_ul(r1, r1, 1, mm);
+		    modul_inv(r2, r1, mm);
+		    // r1 <- r1_orig+1
+		    modul_add_ul(r1, r1, 2, mm);
+		    // r1 <- (r1_orig+1)/(r1_orig-1)
+		    modul_mul(r1, r1, r2, mm);
+		    modul_neg(r1, r1, mm);
+		}
+		modul_set(conj[l], r1, mm);
+	    }
+	    else if(strcmp(galois_autom, "autom6.1") == 0){
+		// r1 <- sigma(r1) = -(2*r1+1)/(r1-1)
+		if(modul_intequal_ul(r1, 1))
+		    // r1 = 1 => 1/(r1-1) = oo
+		    modul_set_ul(r1, qq, mm);
+		else if(modul_intequal_ul(r1, qq)){
+		    // sigma(oo) = -2
+		    modul_set_ul(r1, 2, mm);
+		    modul_neg(r1, r1, mm);
+		}
+		else{
+		    // r1 <- r1_orig-1
+		    modul_sub_ul(r1, r1, 1, mm);
+		    modul_inv(r2, r1, mm);
+		    // r1 <- 2*r1_orig+1 = 2*(r1_orig-1)+3
+		    modul_add(r1, r1, r1, mm);
+		    modul_add_ul(r1, r1, 3, mm);
+		    // r1 <- (2*r1_orig+1)/(r1_orig-1)
+		    modul_mul(r1, r1, r2, mm);
+		    modul_neg(r1, r1, mm);
+		}
+		modul_set(conj[l], r1, mm);
+	    }
+#else
+	    if(modul_intequal_ul(r1, qq)){
+		// FIXME: sigma(oo) = A/C
+		ASSERT_ALWAYS(0);
+	    }
+	    // denominator: C*r1+D
+	    modul_mul(r2, mat[2], r1, mm);
+	    modul_add(r2, r2, mat[3], mm);
+	    if(modul_is0(r2, mm)){
+		// FIXME: sigma(r1) = oo
+		ASSERT_ALWAYS(0);
+	    }
+	    modul_inv(r3, r2, mm);
+	    // numerator: A*r1+B
+	    modul_mul(r1, mat[0], r1, mm);
+	    modul_add(r1, r1, mat[1], mm);
+	    modul_mul(r1, r3, r1, mm);
+	    modul_set(conj[l], r1, mm);
+#endif
+	}
+#if 0 // debug. 
+	printf("orbit for %lu: %lu", qq, rr);
+	for(int l = 0; l < ord-1; l++)
+	    printf(" -> %lu", conj[l][0]);
+	printf("\n");
+#endif
+	// check: sigma^ord(r1) should be rr
+	ASSERT_ALWAYS(modul_intequal_ul(r1, rr));
+	// look at roots
+	for(int l = k+1; l < nroots; l++){
+	    unsigned long ss = mpz_get_ui(roots[l]);
+	    modul_set_ul(r2, ss, mm);
+	    for(int i = 0; i < ord-1; i++)
+		if(modul_equal(r2, conj[i], mm)){
+		    ASSERT_ALWAYS(used[l] == 0);
+		    // l is some conjugate, we erase it
+		    used[l] = (char)1;
 		    break;
 		}
-	    }
-	    ASSERT_ALWAYS(kk != 0); // Should always find an inverse.
-	    // Remove it from the list
-	    for (int l = kk; l < nroots-1; ++l) {
-		mpz_set(roots[l], roots[l+1]);
-	    }
-	    nroots--;
 	}
     }
-    else{
-	residueul_t conj[ord]; // where to put conjugates
-	for(int k = 0; k < ord; k++)
-	    modul_init(conj[k], mm);
-	char used[nroots];     // used roots: non-principal conjugates
-	memset(used, 0, nroots);
-	for(int k = 0; k < nroots; k++){
-	    if(used[k]) continue;
-	    unsigned long rr = mpz_get_ui(roots[k]);
-	    modul_set_ul(r1, rr, mm);
-	    // build ord-1 conjugates for roots[k]
-	    for(int l = 0; l < ord; l++){
-#if 0
-		if(strcmp(galois_autom, "autom3.1") == 0){
-		    // r1 <- sigma(r1) = 1-1/r1
-		    if(modul_intequal_ul(r1, qq))
-			// r1 = oo => 1/r1 = 0
-			modul_set_ul(r1, 1, mm);
-		    else if(modul_is0(r1, mm)){
-			// 1/0 = oo
-			modul_set_ul(r1, qq, mm);
-		    }
-		    else{
-			modul_inv(r2, r1, mm);
-			modul_set_ul(r1, 1, mm);
-			modul_sub(r1, r1, r2, mm);
-		    }
-		    modul_set(conj[l], r1, mm);
-		}
-		else if(strcmp(galois_autom, "autom3.2") == 0){
-		    // r1 <- sigma(r1) = -1-1/r1 = -(1+1/r1)
-		    if(modul_intequal_ul(r1, qq)){
-			// r1 = oo => 1/r1 = 0
-                        modul_set_ul(r1, 1, mm);
-			modul_neg(r1, r1, mm);
-		    }
-		    else if(modul_is0(r1, mm)){
-			// 1/0 = oo
-			modul_set_ul(r1, qq, mm);
-		    }
-                    else{
-			modul_inv(r2, r1, mm);
-			modul_set_ul(r1, 1, mm);
-			modul_add(r1, r1, r2, mm);
-			modul_neg(r1, r1, mm);
-		    }
-		    modul_set(conj[l], r1, mm);
-		}
-		else if(strcmp(galois_autom, "autom4.1") == 0){
-		    // r1 <- sigma(r1) = -(r1+1)/(r1-1)
-		    if(modul_intequal_ul(r1, 1))
-                        // r1 = 1 => 1/(r1-1) = oo
-                        modul_set_ul(r1, qq, mm);
-		    else if(modul_intequal_ul(r1, qq)){
-			// sigma(oo) = -1
-			modul_set_ul(r1, 1, mm);
-			modul_neg(r1, r1, mm);
-		    }
-		    else{
-			// r1 <- r1_orig-1
-			modul_sub_ul(r1, r1, 1, mm);
-			modul_inv(r2, r1, mm);
-			// r1 <- r1_orig+1
-			modul_add_ul(r1, r1, 2, mm);
-			// r1 <- (r1_orig+1)/(r1_orig-1)
-			modul_mul(r1, r1, r2, mm);
-			modul_neg(r1, r1, mm);
-		    }
-		    modul_set(conj[l], r1, mm);
-		}
-		else if(strcmp(galois_autom, "autom6.1") == 0){
-		    // r1 <- sigma(r1) = -(2*r1+1)/(r1-1)
-		    if(modul_intequal_ul(r1, 1))
-                        // r1 = 1 => 1/(r1-1) = oo
-                        modul_set_ul(r1, qq, mm);
-		    else if(modul_intequal_ul(r1, qq)){
-			// sigma(oo) = -2
-			modul_set_ul(r1, 2, mm);
-			modul_neg(r1, r1, mm);
-		    }
-		    else{
-			// r1 <- r1_orig-1
-			modul_sub_ul(r1, r1, 1, mm);
-			modul_inv(r2, r1, mm);
-			// r1 <- 2*r1_orig+1 = 2*(r1_orig-1)+3
-			modul_add(r1, r1, r1, mm);
-			modul_add_ul(r1, r1, 3, mm);
-			// r1 <- (2*r1_orig+1)/(r1_orig-1)
-			modul_mul(r1, r1, r2, mm);
-			modul_neg(r1, r1, mm);
-		    }
-		    modul_set(conj[l], r1, mm);
-		}
-#else
-		if(modul_intequal_ul(r1, qq)){
-		    // FIXME: sigma(oo) = A/C
-		    ASSERT_ALWAYS(0);
-		}
-		// denominator: C*r1+D
-		modul_mul(r2, mat[2], r1, mm);
-		modul_add(r2, r2, mat[3], mm);
-		if(modul_is0(r2, mm)){
-		    // FIXME: sigma(r1) = oo
-		    ASSERT_ALWAYS(0);
-		}
-		modul_inv(r3, r2, mm);
-		// numerator: A*r1+B
-		modul_mul(r1, mat[0], r1, mm);
-		modul_add(r1, r1, mat[1], mm);
-		modul_mul(r1, r3, r1, mm);
-		modul_set(conj[l], r1, mm);
-#endif
-	    }
-#if 0 // debug. 
-	    printf("orbit for %lu: %lu", qq, rr);
-	    for(int l = 0; l < ord-1; l++)
-		printf(" -> %lu", conj[l][0]);
-	    printf("\n");
-#endif
-	    // check: sigma^ord(r1) should be rr
-	    ASSERT_ALWAYS(modul_intequal_ul(r1, rr));
-	    // look at roots
-	    for(int l = k+1; l < nroots; l++){
-		unsigned long ss = mpz_get_ui(roots[l]);
-		modul_set_ul(r2, ss, mm);
-		for(int i = 0; i < ord-1; i++)
-		    if(modul_equal(r2, conj[i], mm)){
-			ASSERT_ALWAYS(used[l] == 0);
-			// l is some conjugate, we erase it
-			used[l] = (char)1;
-			break;
-		    }
-	    }
+    // now, compact roots
+    int kk = 0;
+    for(int k = 0; k < nroots; k++)
+	if(used[k] == 0){
+	    if(k > kk)
+		mpz_set(roots[kk], roots[k]);
+	    kk++;
 	}
-	// now, compact roots
-	int kk = 0;
-	for(int k = 0; k < nroots; k++)
-	    if(used[k] == 0){
-		if(k > kk)
-		    mpz_set(roots[kk], roots[k]);
-		kk++;
-	    }
-	ASSERT_ALWAYS(kk == (nroots/ord));
-	nroots = kk;
-	for(int k = 0; k < ord; k++)
-	    modul_clear(conj[k], mm);
-    }
+    ASSERT_ALWAYS(kk == (nroots/ord));
+    nroots = kk;
+    for(int k = 0; k < ord; k++)
+	modul_clear(conj[k], mm);
     for(int i = 0; i < 4; i++)
 	modul_clear(mat[i], mm);
     modul_clear(r1, mm);
@@ -1424,21 +1400,20 @@ static void add_relations_with_galois(const char *galois, FILE *output,
     uint64_t b;
     int d;
 
-    a = rel.a; b = rel.b;
-    if(strcmp(galois, "1/x") == 0){
+    a = rel.a; b = rel.b; // should be obsolete one day
+    // (a0, b0) = sigma^0((a, b)) = (a, b)
+    a0 = rel.a; b0 = (int64_t)rel.b;
+    if(strcmp(galois, "1/x") == 0 || strcmp(galois, "1/y") == 0)
 	// remember, 1/x is for plain autom
-	// 1/y is for special Galois, e.g., x^4+1
-	b1 = (int64_t)b;
+	// 1/y is for special Galois: x^4+1
 	// (a-b/x) = 1/x*(-b+a*x)
-	a2 = -b1; b2 = -a;
-	adwg(output, comment, cpt, rel, a2, b2);
-    }
+	adwg(output, comment, cpt, rel, -b0, -a0);
     else if(strcmp(galois, "autom3.1") == 0){
-	b1 = (int64_t)b;
-	a2 = -b1; b2 = a-b1;
+	// modified, not checked
+	a1 = -b0; b1 = a0-b0;
+	adwg(output, comment, cpt, rel, a1, b1);
+	a2 = -b1; b2 = a1-b1;
 	adwg(output, comment, cpt, rel, a2, b2);
-	a3 = -b2; b3 = a2-b2;
-	adwg(output, comment, cpt, rel, a3, b3);
     }
     else if(strcmp(galois, "autom3.2") == 0){
 	b1 = (int64_t)b;
@@ -1448,6 +1423,7 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	adwg(output, comment, cpt, rel, a3, b3);
     }
     else if(strcmp(galois, "autom4.1") == 0){
+	// FIXME: rewrite and check
 	a1 = a; b1 = (int64_t)b;
 	// tricky: sig^2((a, b)) = (2b, -2a) ~ (b, -a)
 	aa = b1; bb = -a1;
@@ -1489,8 +1465,6 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	*cpt += 1;
     }
     else if(strcmp(galois, "autom6.1") == 0){
-	a0 = a; b0 = (int64_t)b;
-
 	// fact do not change
 	adwg(output, comment, cpt, rel, a0 + b0, -a0); // (a2, b2)
 	adwg(output, comment, cpt, rel, b0, -(a0+b0)); // (a4, b4)
