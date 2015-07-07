@@ -842,11 +842,9 @@ static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
       k++;
     }
   }
-  printf("%" PRId64 ", %" PRId64 "\n", k, x);
   list->v[index_new]->c[0] = x + k * list->v[index]->c[0];
   list->v[index_new]->c[1] = y + k * list->v[index]->c[1];
 
-  list_int64_vector_fprintf(stdout, list);
 #ifndef NDEBUG
   ASSERT(list->v[0]->c[0] * list->v[1]->c[1] - list->v[0]->c[1]
     * list->v[1]->c[0] == -r);
@@ -1361,7 +1359,6 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
               list_vec_zero->v[0]->vec);
           list_int64_vector_add_int64_vector(list_FK,
               list_vec_zero->v[0]->vec);
-          mat_int64_fprintf_comment(stdout, Mqr);
           boolean = reduce_qlattice_output(list_FK, (int64_t)r->ideal->r,
               (int64_t)(2 * H->h[0]));
         } else {
