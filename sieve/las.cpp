@@ -1169,6 +1169,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     else if(strcmp(galois_autom, "autom6.1") == 0){
 	// -(2*x+1)/(x-1)
 	ord = 6; A = -2; B = -1; C = 1; D = -1;
+    }
     else{
 	fprintf(stderr, "Unknown automorphism: %s\n", galois_autom);
 	ASSERT_ALWAYS(0);
