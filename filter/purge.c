@@ -63,6 +63,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <float.h>
 #include <pthread.h>
 #include <errno.h>
 #include <pthread.h>
@@ -630,8 +631,8 @@ search_chunk_max_cliques (void *pt)
 /******************* Functions to print stats ********************************/
 
 void
-print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
-                       int verbose)
+print_stats_uint64 (FILE *out, uint64_t *w, uint64_t len, char name[],
+                    char unit[], int verbose)
 {
   uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
   for (uint64_t i = 0; i < len; i++)
@@ -651,13 +652,11 @@ print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
   double av_f = ((double) av) / ((double) nb_nzero);
   double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
 
-  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, len);
-  fprintf (out, "# STATS on %s: #active %s = %" PRIu64 "\n", name, name,
-                                                                    nb_nzero);
-  fprintf (out, "# STATS on %s: min = %" PRIu64 "\n", name, min);
-  fprintf (out, "# STATS on %s: max = %" PRIu64 "\n", name, max);
-  fprintf (out, "# STATS on %s: av = %.2f\n", name, av_f);
-  fprintf (out, "# STATS on %s: std = %.2f\n", name, std_f);
+  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, nb_nzero);
+  fprintf (out, "# STATS on %s: min %s = %" PRIu64 "\n", name, unit, min);
+  fprintf (out, "# STATS on %s: max %s = %" PRIu64 "\n", name, unit, max);
+  fprintf (out, "# STATS on %s: av %s = %.2f\n", name, unit, av_f);
+  fprintf (out, "# STATS on %s: std %s = %.2f\n", name, unit, std_f);
 
   if (verbose > 1)
   {
@@ -672,8 +671,8 @@ print_stats_on_weight (FILE *out, uint64_t *w, uint64_t len, char name[],
     for (uint64_t i = 0; i < max-min+1; i++)
     {
       if (nb_w[i] > 0)
-        fprintf (out, "# STATS on %s: #%s of weight %" PRIu64 " : %" PRIu64
-                      "\n", name, name, min+i, nb_w[i]);
+        fprintf (out, "# STATS on %s: #%s of %s %" PRIu64 " : %" PRIu64
+                      "\n", name, name, unit, min+i, nb_w[i]);
     }
     free (nb_w);
   }
@@ -694,7 +693,7 @@ print_stats_columns_weight (FILE *out, int verbose)
       for (h = rel_compact[i]; *h != UMAX(*h); h++)
         w[*h]++;
 
-  print_stats_on_weight (out, w, nprimemax, "cols", verbose);
+  print_stats_uint64 (out, w, nprimemax, "cols", "weight", verbose);
   free (w);
 }
 
@@ -712,21 +711,37 @@ print_stats_rows_weight (FILE *out, int verbose)
       for (h = rel_compact[i]; *h != UMAX(*h); h++)
         w[i]++;
 
-  print_stats_on_weight (out, w, nrelmax, "rows", verbose);
+  print_stats_uint64 (out, w, nrelmax, "rows", "weight", verbose);
   free (w);
 }
 
-#if 0
 void print_stats_on_cliques (FILE *out, int verbose)
 {
   uint64_t *len = NULL;
+
   len = (uint64_t *) malloc (nrelmax * sizeof (uint64_t));
   ASSERT_ALWAYS (len != NULL);
   memset (len, 0, nrelmax * sizeof (uint64_t));
 
+  index_buffer_t buf1, buf2;
+  index_buffer_init (buf1, INDEX_BUFFER_MIN_SIZE);
+  index_buffer_init (buf2, INDEX_BUFFER_MIN_SIZE);
+  for (uint64_t i = 0; i < nrelmax; i++)
+  {
+    if (bit_vector_getbit(rel_used, (size_t) i))
+    {
+      comp_t c = {.i = i, .w = 0.0};
+      index_t nrows = compute_connected_component_mt (&c, buf1, buf2);
+      len[i] = nrows;
+    }
+  }
+
+  print_stats_uint64 (out, len, nrelmax, "cliques", "length", verbose);
+
+  index_buffer_clear (buf1);
+  index_buffer_clear (buf2);
   free (len);
 }
-#endif
 
 /***************************** Clique removal stage *************************/
 
@@ -772,6 +787,9 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
   fprintf(stdout, "    computed heaviest connected components at %2.2lf\n",
                   seconds());
   fflush (stdout);
+
+  if (verbose > 0)
+    print_stats_on_cliques (stdout, verbose);
 
   /* At this point, in each pth[i].comp_tree we have pth[i].comp_tree->size
      connected components order by decreasing weight. */
