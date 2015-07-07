@@ -79,8 +79,6 @@
 
 #include "filter_common.h"
 
-//#define STAT
-
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
 /********************** Main global variables ********************************/
@@ -98,12 +96,8 @@ static uint64_t col_max_index = 0; /* Maximum possible value for indexes of
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
 static int npass = -1; /* negative value means chosen by purge */
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
-static unsigned int npt = DEFAULT_PURGE_NPT;
+static unsigned int nthreads = DEFAULT_PURGE_NTHREADS;
 static int verbose = 0;
-
-#ifdef STAT
-uint64_t __stat_weight;
-#endif
 
 /********************* purge_data struct *************************************/
 
@@ -495,9 +489,9 @@ static void *
 compute_sum2_row_mt (void *pt)
 {
   sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
-  uint64_t j = nrows_init / npt;
+  uint64_t j = nrows_init / nthreads;
   uint64_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
-  uint64_t end = (data->pthread_number == npt - 1) ? nrows_init :
+  uint64_t end = (data->pthread_number == nthreads - 1) ? nrows_init :
     (j * (data->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
   bv_t bv, *pbv;
   index_t h, *myrowcompact;
@@ -542,8 +536,8 @@ compute_sum2_row ()
     }
   }
 #else
-  sum2_mt_data_t *th_data = malloc_check (npt * sizeof (sum2_mt_data_t));
-  for (size_t i = npt; i--; )
+  sum2_mt_data_t *th_data = malloc_check (nthreads * sizeof (sum2_mt_data_t));
+  for (size_t i = nthreads; i--; )
   {
     th_data[i].pthread_number = i;
     if (pthread_create (&(th_data[i].pthread), NULL, compute_sum2_row_mt,
@@ -553,7 +547,7 @@ compute_sum2_row ()
       exit (1);
     }
   }
-  for (size_t i = npt; i--; )
+  for (size_t i = nthreads; i--; )
     pthread_join (th_data[i].pthread, NULL);
   free (th_data);
 #endif
@@ -574,8 +568,8 @@ typedef struct comp_mt_thread_data_s {
 
 /* This MT function fill the tree pth->comp_tree with the pth->comp_tree->alloc
  * heaviest connected components whose smallest row belongs in
- *   [ (data->th_id + j*npt) * COMP_MT_ROWS_BLOCK,
-                              (data->th_id + j*npt + 1) * COMP_MT_ROWS_BLOCK],
+ *   [ (data->th_id + j*nthreads) * COMP_MT_ROWS_BLOCK,
+                        (data->th_id + j*nthreads + 1) * COMP_MT_ROWS_BLOCK],
  * with j = 0,1,2... until the interval does not intersect [0..nrows_init-1].
  */
 static void *
@@ -620,7 +614,7 @@ search_chunk_max_cliques (void *pt)
     if (UNLIKELY (clique.i == end_step_rows))
     {
       // The new begin & end.
-      end_step_rows += npt * COMP_MT_ROWS_BLOCK;
+      end_step_rows += nthreads * COMP_MT_ROWS_BLOCK;
       clique.i = end_step_rows - COMP_MT_ROWS_BLOCK;
       pbv = row_used->p + (clique.i >> LN2_BV_BITS);
     }
@@ -758,8 +752,6 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
   uint64_t nb_clique_deleted = 0;
   size_t i, chunk;
 
-  ASSERT(npt);
-
   if (excess <= keep || excess <= target_excess) return;
   chunk = (size_t) (excess - target_excess);
 
@@ -775,9 +767,9 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
    * For this, each thread search its "chunk" heaviest cliques.
    */
   comp_mt_thread_data_t *th_data = (comp_mt_thread_data_t *)
-                            malloc_check (npt * sizeof(comp_mt_thread_data_t));
-  memset (th_data, 0, npt * sizeof (comp_mt_thread_data_t));
-  for (i = npt; i--; )
+                      malloc_check (nthreads * sizeof(comp_mt_thread_data_t));
+  memset (th_data, 0, nthreads * sizeof (comp_mt_thread_data_t));
+  for (i = nthreads; i--; )
   {
     th_data[i].th_id = i;
     comp_sorted_bin_tree_init (th_data[i].comp_tree, chunk);
@@ -788,7 +780,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
       exit (1);
     }
   }
-  for (i = npt; i--; )
+  for (i = nthreads; i--; )
     pthread_join (th_data[i].pthread, NULL);
   fprintf(stdout, "    computed heaviest connected components at %2.2lf\n",
                   seconds());
@@ -801,9 +793,9 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
      connected components order by decreasing weight. */
   size_t *next_clique = NULL;
   uint64_buffer_t buf1, buf2;
-  next_clique = (size_t *) malloc (npt * sizeof (next_clique));
+  next_clique = (size_t *) malloc (nthreads * sizeof (next_clique));
   ASSERT_ALWAYS (next_clique != NULL);
-  memset (next_clique, 0, npt * sizeof (next_clique));
+  memset (next_clique, 0, nthreads * sizeof (next_clique));
   uint64_buffer_init (buf1, UINT64_BUFFER_MIN_SIZE);
   uint64_buffer_init (buf2, UINT64_BUFFER_MIN_SIZE);
 
@@ -812,7 +804,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
     comp_t max_comp = {.i = 0, .w = -1.0};
     size_t max_thread = 0;
 
-    for (i = 0; i < npt; ++i)
+    for (i = 0; i < nthreads; ++i)
     {
       if (next_clique[i] < th_data[i].comp_tree->size)
       {
@@ -847,7 +839,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
   fflush (stdout);
 
   /* We can suppress pth[i] and pth itself */
-  for (i = 0; i < npt; ++i)
+  for (i = 0; i < nthreads; ++i)
     comp_sorted_bin_tree_clear (th_data[i].comp_tree);
   free (th_data);
 }
@@ -975,8 +967,7 @@ remove_all_singletons(uint64_t * nrows, uint64_t * ncols, int64_t * excess)
   {
     oldnrows = *nrows;
 #ifdef HAVE_SYNC_FETCH
-    ASSERT(npt);
-    onepass_singleton_parallel_removal(npt, nrows, ncols);
+    onepass_singleton_parallel_removal(nthreads, nrows, ncols);
 #else
     onepass_singleton_removal(nrows, ncols);
 #endif
@@ -1101,11 +1092,6 @@ void *insert_rel_into_table(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 
     arg->info.ncols +=
         insert_rel_in_table_no_e(rel, col_min_index, row_compact, cols_weight);
-#ifdef STAT
-    /* here we also used to accumulate the number of columns above
-     * col_min_index in arg->info.W */
-    arg->info.W += earlyparsed_relation_nb_above_min_index(rel, col_min_index);
-#endif
 
     return NULL;
 }
@@ -1170,7 +1156,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "outfile for remaining relations");
   param_list_decl_usage(pl, "nrels", "number of initial relations");
   param_list_decl_usage(pl, "col-max-index", "upper bound on the number of "
-                                  "columns (must be at least the number "
+                                  "columns (must be at least the number\n"
                   "                   of prime ideals in renumber table)");
   param_list_decl_usage(pl, "col-min-index", "do not take into account columns"
                                              " with indexes <= col-min-index");
@@ -1183,7 +1169,8 @@ static void declare_usage(param_list pl)
                             "end of the 1st singleton removal step (default "
                             STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
   param_list_decl_usage(pl, "outdel", "outfile for deleted relations (for DL)");
-  param_list_decl_usage(pl, "npthr", "number of threads (default " STR(DEFAULT_PURGE_NPT) ")");
+  param_list_decl_usage(pl, "t", "number of threads (default "
+                                             STR(DEFAULT_PURGE_NTHREADS) ")");
   param_list_decl_usage(pl, "v", "(switch) verbose mode");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
@@ -1246,7 +1233,7 @@ int main(int argc, char **argv)
     param_list_parse_uint64(pl, "col-min-index", &col_min_index);
 
 
-    param_list_parse_uint(pl, "npthr", &npt);
+    param_list_parse_uint(pl, "t", &nthreads);
     param_list_parse_int(pl, "npass", &npass);
     param_list_parse_double(pl, "required_excess", &required_excess);
 
@@ -1310,21 +1297,33 @@ int main(int argc, char **argv)
                       "or (col-min-index > col-max-index)\n");
       usage(pl, argv0);
     }
-    /* If nrels or col_max_index > 2^32, then we need index_t to be 64-bit */
-    if (((col_max_index >> 32) != 0 || (nrows_init >> 32) != 0) && sizeof(index_t) < 8)
+    /* If col_max_index > 2^32, then we need index_t to be 64-bit */
+    if (((col_max_index >> 32) != 0) && sizeof(index_t) < 8)
     {
-      fprintf(stderr, "Error, -nrels or -col-max-index is too large for a "
-                      "32-bit program\nSee #define __SIZEOF_INDEX__ in "
-                      "typedefs.h\n");
+      fprintf(stderr, "Error, -col-max-index is too large for a 32-bit "
+                      "program\nSee #define __SIZEOF_INDEX__ in typedefs.h\n");
+      exit(EXIT_FAILURE);
+    }
+    if (nthreads == 0)
+    {
+      fprintf(stderr, "Error, -t should be non-zero\n");
       exit(EXIT_FAILURE);
     }
 
     /* Printing relevant information */
     comp_print_info_weight_function ();
 
-    fprintf(stdout, "Number of rows is %" PRIu64 "\n", nrows_init);
-    fprintf(stdout, "Maximum possible index of a column is: %" PRIu64 "\n",
-                    col_max_index);
+    fprintf(stdout, "# INFO: number of rows: %" PRIu64 "\n", nrows_init);
+    fprintf(stdout, "# INFO: maximum possible index of a column: %" PRIu64
+                    "\n", col_max_index);
+    fprintf(stdout, "# INFO: number of threads: %u\n", nthreads);
+    fprintf(stdout, "# INFO: number of clique removal pass: ");
+    if (npass < 0)
+      fprintf(stdout, "will be chosen by the program\n");
+    else
+      fprintf(stdout, "%d\n", npass);
+    fprintf(stdout, "# INFO: target excess: %" PRId64 "\n", keep);
+    fflush (stdout);
     /*}}}*/
 
     /* {{{ Allocating memory. We are keeping track of the total
@@ -1387,7 +1386,7 @@ int main(int argc, char **argv)
     ALLOC_VERBOSE_MALLOC(index_t*, row_compact, nrows_init);
     ALLOC_VERBOSE_CALLOC(weight_t, cols_weight, col_max_index);
 
-    fprintf(stdout, "Pass 1, reading and storing columns with index h >= "
+    fprintf(stdout, "\nPass 1, reading and storing columns with index h >= "
             "%" PRIu64 "\n", col_min_index);
 
     nrows = nrows_init;
@@ -1415,17 +1414,6 @@ int main(int argc, char **argv)
     tot_alloc_bytes += get_my_malloc_bytes();
     fprintf(stdout, "Allocated row_compact[i] %zuMB (total %zuMB so far)\n",
 	    get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
-#ifdef STAT
-    {
-	size_t tmp = ((uint64_t) buf_arg.W + nrows_init) * sizeof(index_t);
-	double ratio = 100.0 * (double) (((double) tmp) /
-					 ((double) get_my_malloc_bytes()));
-	fprintf(stdout,
-		"STAT: W_active=%1.0f\nSTAT: Should take %zuMB in memory, "
-		"take %zuMB (%.2f %%)\n", buf_arg.W, tmp >> 20,
-		get_my_malloc_bytes() >> 20, ratio);
-    }
-#endif
 
     ALLOC_VERBOSE_BIT_VECTOR(row_used, nrows_init);
     bit_vector_set(row_used, 1);
@@ -1447,12 +1435,18 @@ int main(int argc, char **argv)
       print_stats_rows_weight (stdout, verbose);
     }
 
-    if (nrows < ncols) {
-      fprintf(stdout, "number of relations < number of columns\n");
+    /* XXX: Are these tests useful ? Already checked after first pass of
+     * singleton removal. */
+    if (nrows < ncols)
+    {
+      fprintf (stdout, "number of rows <= number of columns\n");
+      print_final_values (nrows, ncols, 0);
       exit(2);
     }
-    if (nrows == 0 || ncols == 0) {
-      fprintf(stdout, "number of relations or number of columns is 0\n");
+    if (nrows == 0 || ncols == 0)
+    {
+      fprintf(stdout, "number of rows or number of columns is 0\n");
+      print_final_values (nrows, ncols, 0);
       exit(2);
     }
 

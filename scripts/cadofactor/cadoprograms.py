@@ -863,7 +863,7 @@ class Purge(Program):
                  keep: Parameter(checktype=int)=None,
                  col_minindex: Parameter("col-min-index", checktype=int)=None,
                  nprimes: Parameter("col-max-index", checktype=int)=None,
-                 threads: Parameter("npthr", checktype=int)=None,
+                 threads: Parameter("t", checktype=int)=None,
                  npass: Parameter(checktype=int)=None,
                  force_posix_threads: Toggle("force-posix-threads")=None,
                  required_excess: Parameter(checktype=float)=None,
