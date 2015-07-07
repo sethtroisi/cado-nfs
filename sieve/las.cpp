@@ -1229,7 +1229,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	    modul_set_ul(r1, rr, mm);
 	    // build ord-1 conjugates for roots[k]
 	    for(int l = 0; l < ord; l++){
-#if 1
+#if 0
 		if(strcmp(galois_autom, "autom3.1") == 0){
 		    // r1 <- sigma(r1) = 1-1/r1
 		    if(modul_intequal_ul(r1, qq))
@@ -1315,7 +1315,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		    // FIXME: sigma(oo) = A/C
 		    ASSERT_ALWAYS(0);
 		}
-		// denominator
+		// denominator: C*r1+D
 		modul_mul(r2, mat[2], r1, mm);
 		modul_add(r2, r2, mat[3], mm);
 		if(modul_is0(r2, mm)){
@@ -1323,10 +1323,11 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		    ASSERT_ALWAYS(0);
 		}
 		modul_inv(r3, r2, mm);
-		// numerator
+		// numerator: A*r1+B
 		modul_mul(r1, mat[0], r1, mm);
 		modul_add(r1, r1, mat[1], mm);
 		modul_mul(r1, r3, r1, mm);
+		modul_set(conj[l], r1, mm);
 #endif
 	    }
 #if 0 // debug. 
