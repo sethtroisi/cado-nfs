@@ -746,6 +746,7 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
   double_vector_clear(v_tmp);
 }
 
+#ifdef SPACE_SIEVE_REDUCE_QLATTICE
 static void xgcd(int64_t * g, int64_t * u, int64_t * v, int64_t a, int64_t b)
 {
   if (!a) {
@@ -852,6 +853,7 @@ static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
 
   return 1;
 }
+#endif // SPACE_SIEVE_REDUCE_QLATTICE
 
 static int space_sieve_good_vector(int64_vector_srcptr v,
     sieving_bound_srcptr H)
@@ -1348,6 +1350,7 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
           SV4(list_SV, vec[0], vec[1], vec[2]);
         }
         int boolean = 0;
+#ifdef SPACE_SIEVE_REDUCE_QLATTICE
         if (list_vec_zero->length == 0) {
           //Stupid add, just to declare this two vector.
           list_int64_vector_add_int64_vector(list_FK, vec[0]);
@@ -1376,6 +1379,12 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
           }
           boolean = 1;
         }
+#else
+        list_int64_vector_add_int64_vector(list_FK, vec[0]);
+        list_int64_vector_add_int64_vector(list_FK, vec[1]);
+        boolean = reduce_qlattice(list_FK->v[0], list_FK->v[1], vec[0],
+            vec[1], (int64_t)(2 * H->h[0]));
+#endif
 
         for (unsigned int i = 0; i < Mqr->NumCols; i++) {
           int64_vector_clear(vec[i]);
