@@ -1359,6 +1359,13 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   double sec = 0;
 #endif // TIMER_SIEVE
 
+#ifdef TIME_SIEVES
+  double time_line_sieve = 0;
+  double time_plane_sieve = 0;
+  double time_space_sieve = 0;
+  double sec_sieves = 0;
+#endif // TIME_SIEVES
+
 
   //For all the ideal_1 of the factor base.
   for (uint64_t i = 0; i < fb->number_element_1; i++) {
@@ -1368,6 +1375,10 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       sec = seconds();
     }
 #endif // TIMER_SIEVE
+
+#ifdef TIME_SIEVES
+    sec_sieves = seconds();
+#endif // TIME_SIEVES
 
     ideal_1_t r;
     ideal_1_init(r);
@@ -1398,6 +1409,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         int64_t c0 = 0;
         int64_vector_setcoordinate(c, 1, c->c[1] - 1);
         //Compute c0 = (-Tqr[0])^(-1) * (Tqr[1]*c[1] + …) mod r.
+        //TODO: delete the modulo.
         for (unsigned int j = 1; j < H->t; j++) {
           c0 = c0 + (int64_t)pseudo_Tqr[j] * c->c[j];
           if (c0 >= (int64_t)r->ideal->r || c0 < 0) {
@@ -1411,23 +1423,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         //Number of c with the same c[1], …, c[t-1].
         uint64_t number_c = array->number_element / (2 * H->h[0]);
 
-#ifdef TIMER_SIEVE
-        if (r->ideal->r > TIMER_SIEVE) {
-          sec = seconds();
-        }
-#endif // TIMER_SIEVE
-
         for (uint64_t j = 0; j < number_c; j++) {
           pos = int64_vector_add_one_i(c, 1, H);
           line_sieve_1(array, c, pseudo_Tqr, r, H, 0, 1, &c0, pos,
               matrix, f);
         }
-
-#ifdef TIMER_SIEVE
-        if (r->ideal->r > TIMER_SIEVE) {
-          time_sieve = time_sieve + seconds() - sec;
-        }
-#endif // TIMER_SIEVE
 
 #ifdef NUMBER_HIT
         printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ", number_of_hit,
@@ -1455,6 +1455,10 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       free(pseudo_Tqr);
       int64_vector_clear(c);
 
+#ifdef TIME_SIEVES
+    time_line_sieve = time_line_sieve + seconds() - sec_sieves;
+#endif // TIME_SIEVES
+
     } else if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
 
 #ifdef TEST_MQR
@@ -1476,19 +1480,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
       compute_Mqr_1(Mqr, Tqr, H->t, r);
 
-#ifdef TIMER_SIEVE
-      if (r->ideal->r > TIMER_SIEVE) {
-        sec = seconds();
-      }
-#endif // TIMER_SIEVE
-
       plane_sieve_1(array, r, Mqr, H, matrix, f);
-
-#ifdef TIMER_SIEVE
-      if (r->ideal->r > TIMER_SIEVE) {
-        time_sieve = time_sieve + seconds() - sec;
-      }
-#endif // TIMER_SIEVE
 
 #ifdef NUMBER_HIT
       printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
@@ -1502,6 +1494,9 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
       mat_int64_clear(Mqr);
 
+#ifdef TIME_SIEVES
+    time_plane_sieve = time_plane_sieve + seconds() - sec_sieves;
+#endif // TIME_SIEVES
     } else {
 
 #ifdef ENUM_LATTICE
@@ -1549,23 +1544,12 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
       compute_Mqr_1(Mqr, Tqr, H->t, r);
 
-#ifdef TIMER_SIEVE
-      if (r->ideal->r > TIMER_SIEVE) {
-        sec = seconds();
-      }
-#endif // TIMER_SIEVE
-
 #ifdef SPACE_SIEVE
       space_sieve_1_3D(array, r, Mqr, H);
 #else
       plane_sieve_1(array, r, Mqr, H, matrix, f);
 #endif // SPACE_SIEVE
 
-#ifdef TIMER_SIEVE
-      if (r->ideal->r > TIMER_SIEVE) {
-        time_sieve = time_sieve + seconds() - sec;
-      }
-#endif // TIMER_SIEVE
 
 #ifdef NUMBER_HIT
       printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
@@ -1579,9 +1563,20 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
       mat_int64_clear(Mqr);
 #endif // ENUM_LATTICE
+
+#ifdef TIME_SIEVES
+    time_space_sieve = time_space_sieve + seconds() - sec_sieves;
+#endif // TIME_SIEVES
     }
+
     ideal_1_clear(r, H->t);
     free(Tqr);
+
+#ifdef TIMER_SIEVE
+      if (r->ideal->r > TIMER_SIEVE) {
+        time_sieve = time_sieve + seconds() - sec;
+      }
+#endif // TIMER_SIEVE
   }
 
 #ifdef TIMER_SIEVE
@@ -1589,6 +1584,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   printf("# Perform sieve: %f\n", time_sieve);
 #endif // TIMER_SIEVE
 
+#ifdef TIME_SIEVES
+  printf("# Perform line sieve: %f\n", time_line_sieve);
+  printf("# Perform plane sieve: %f\n", time_plane_sieve);
+  printf("# Perform space sieve: %f\n", time_space_sieve);
+#endif // TIME_SIEVES
 }
 
 #if 0
