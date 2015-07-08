@@ -1723,7 +1723,7 @@ static void mpz_max(mpz_ptr max, mpz_srcptr a, mpz_srcptr b)
     }
 }
 
-void mpz_poly_infinite_norm(mpz_ptr in, mpz_poly_srcptr f)
+void mpz_poly_infinity_norm(mpz_ptr in, mpz_poly_srcptr f)
 {
   int i = 1;
   mpz_t tmp;

@@ -148,7 +148,7 @@ int64_t int64_poly_max(int64_poly_srcptr f)
   return max;
 }
 
-uint64_t int64_poly_infinite_norm(int64_poly_srcptr f)
+uint64_t int64_poly_infinity_norm(int64_poly_srcptr f)
 {
   int i = 1;
   uint64_t in = (uint64_t)ABS(f->coeff[0]);

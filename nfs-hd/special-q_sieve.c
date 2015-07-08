@@ -134,6 +134,15 @@ void build_Mq_ideal_u(mat_Z_ptr matrix, ideal_u_srcptr ideal)
   }
 }
 
+/*
+ * Build the matrix Mq for an ideal (q, g). The matrix need Tq
+ *  with the good coefficients, i.e. t the coeffecients not reduced modulo q.
+ *  Suppose that the matrix is good initialized. Can not verify if ideal->Tq
+ *  and matrix has the good size.
+ *
+ * matrix: Mq.
+ * ideal: an ideal (q, g) with deg(g) > 1.
+ */
 void build_Mq_ideal_spq(mat_Z_ptr matrix, ideal_spq_srcptr ideal)
 {
   ASSERT(matrix->NumRows == matrix->NumCols);
@@ -146,9 +155,9 @@ void build_Mq_ideal_spq(mat_Z_ptr matrix, ideal_spq_srcptr ideal)
 }
 
 /*
- * Precompute some part of the computation of the bound on the resultant between
- *  f and ha. We precompute (deg(f) + 1) ^ (i/2) * (i + 1) ^ (deg(f) / 2) *
- *  infinite_norm(f), with i the degree of ha.
+ * Precompute some part of the computation of the bound on the resultant
+ *  of f and ha. We precompute (deg(f) + 1) ^ (i/2) * (i + 1) ^ (deg(f) / 2) *
+ *  infinity_norm(f), with i the degree of ha.
  *
  * pre_compute: an array in which we store the precompute elements. Need to be
  *  alloc for #(dimension of the lattice) coefficients.
@@ -157,18 +166,17 @@ void build_Mq_ideal_spq(mat_Z_ptr matrix, ideal_spq_srcptr ideal)
  */
 void pre_computation(double * pre_compute, mpz_poly_srcptr f, unsigned int d)
 {
-  pre_compute[0] = 1;
-  mpz_t infinite_norm_f_tmp;
-  mpz_init(infinite_norm_f_tmp);
+  pre_compute[0] = 0;
+  mpz_t infinity_norm_f_tmp;
+  mpz_init(infinity_norm_f_tmp);
   //Infinite norm of f.
-  mpz_poly_infinite_norm(infinite_norm_f_tmp, f);
-  double infinite_norm_f = mpz_get_d(infinite_norm_f_tmp);
-  mpz_clear(infinite_norm_f_tmp);
+  mpz_poly_infinity_norm(infinity_norm_f_tmp, f);
+  double infinity_norm_f = mpz_get_d(infinity_norm_f_tmp);
+  mpz_clear(infinity_norm_f_tmp);
   //Do the computation for each i.
   for (unsigned int i = 1; i < d; i++) {
-    pre_compute[i] = pow(infinite_norm_f, (double)i) *
-      pow((double)(i + 1), ((double)f->deg / 2)) * pow((double)(f->deg + 1),
-                                                       ((double)i / 2));
+    pre_compute[i] = (double)i * log2(infinity_norm_f) + ((double)f->deg / 2) *
+      log2((double)(i + 1)) + ((double)i / 2) * log2((double)(f->deg + 1));
   }
 }
 
@@ -346,9 +354,9 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 
   //Compute an approximation of the norm.
   if (a->deg > 0) {
-    uint64_t tmp = int64_poly_infinite_norm(a);
+    uint64_t tmp = int64_poly_infinity_norm(a);
     log_bound_resultant =
-      log2((double)pre_compute[a->deg]) + log2((double)tmp) * (double)f->deg;
+      (double)pre_compute[a->deg] + log2((double)tmp) * (double)f->deg;
     
   } else {
     log_bound_resultant = 0;
@@ -365,8 +373,9 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
     mode_init_norm(special_q, f, a, spq, log_bound_resultant, i,
         vector, array);
   } else {
-    array->array[i] = (unsigned char) log_bound_resultant;
-    mode_init_norm(special_q, f, a, spq, log_bound_resultant, i, vector, array);
+    array->array[i] = (unsigned char)log_bound_resultant;
+    mode_init_norm(special_q, f, a, spq, log_bound_resultant, i, vector,
+        array);
   }
 }
 
@@ -1343,18 +1352,19 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   double sec = 0;
 #endif // TIMER_SIEVE
 
+
   //For all the ideal_1 of the factor base.
   for (uint64_t i = 0; i < fb->number_element_1; i++) {
-
-    ideal_1_t r;
-    ideal_1_init(r);
-    ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef TIMER_SIEVE
     if (r->ideal->r > TIMER_SIEVE) {
       sec = seconds();
     }
 #endif // TIMER_SIEVE
+
+    ideal_1_t r;
+    ideal_1_init(r);
+    ideal_1_set(r, fb->factor_base_1[i], H->t);
 
     uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
 

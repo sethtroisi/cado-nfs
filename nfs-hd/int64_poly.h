@@ -153,7 +153,7 @@ int64_t int64_poly_max(int64_poly_srcptr f);
  *
  * f: the polynomial.
  */
-uint64_t int64_poly_infinite_norm(int64_poly_srcptr f);
+uint64_t int64_poly_infinity_norm(int64_poly_srcptr f);
 
 /*
  * Make a mpz_poly from the int64_poly.
