@@ -38,8 +38,8 @@
  * This program works in two passes over the relation files:
  * - the first pass loads in memory only indexes of columns >= col_min_index
  *   and keeps a count of the weight of each column in cols_weight.
- *   Then, a first pass of singleton removal is performed followed by 'npass'
- *   pass of singleton removal and clique removal, in order to obtained the
+ *   Then, a first step of singleton removal is performed followed by 'nsteps'
+ *   steps of singleton removal and clique removal, in order to obtained the
  *   final excess 'keep'.
  * - the second pass goes through the relations again, and dumps the remaining
  *   ones in the format needed by 'merge'.
@@ -94,7 +94,7 @@ static uint64_t nrows_init = 0; /* Initial number of rows. */
 static uint64_t col_max_index = 0; /* Maximum possible value for indexes of
                                       columns*/
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
-static int npass = -1; /* negative value means chosen by purge */
+static int nsteps = -1; /* negative value means chosen by purge */
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
 static unsigned int nthreads = DEFAULT_PURGE_NTHREADS;
 static int verbose = 0;
@@ -767,7 +767,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
    * multithread function; if not, it's done in sequential, immediatly.
    */
   compute_sum2_row ();
-  fprintf(stdout, "    computed sum2_row at %2.2lf\n", seconds());
+  fprintf(stdout, "Cliq. rem.: computed sum2_row at %2.2lf\n", seconds());
   fflush (stdout);
 
   /* Then, each thread searches for its "max_nb_comp_per_thread" heaviest
@@ -790,8 +790,8 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
   }
   for (i = nthreads; i--; )
     pthread_join (th_data[i].pthread, NULL);
-  fprintf(stdout, "    computed heaviest connected components at %2.2lf\n",
-                  seconds());
+  fprintf(stdout, "Cliq. rem.: computed heaviest connected components at "
+                  "%2.2lf\n", seconds());
   fflush (stdout);
 
   if (verbose > 0)
@@ -825,7 +825,8 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
     }
     if (max_comp.w < 0.0)
     {
-      fprintf (stderr, "  # All heaps of cliques are empty.\n");
+      fprintf (stderr, "Cliq. rem.: Warning, all lists of connected components"
+                       " are empty\n");
       break;
     }
 
@@ -837,11 +838,11 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
   free (next_clique);
   uint64_buffer_clear (buf);
   
-  fprintf(stdout, "    deleted %" PRIu64 " heaviest connected components at "
-                  "%2.2lf\n", nb_clique_deleted, seconds());
+  fprintf(stdout, "Cliq. rem.: deleted %" PRIu64 " heaviest connected "
+                  "components at %2.2lf\n", nb_clique_deleted, seconds());
   if (verbose > 0)
-    fprintf(stdout, "    # INFO: max_nb_comp_per_thread=%zu target_excess"
-                    "=%" PRId64 "\n", max_nb_comp_per_thread, target_excess);
+    fprintf(stdout, "# INFO: max_nb_comp_per_thread=%zu target_excess="
+                    "%" PRId64 "\n", max_nb_comp_per_thread, target_excess);
   fflush (stdout);
 
   /* We can suppress pth[i] and pth itself */
@@ -966,23 +967,29 @@ static void
 remove_all_singletons(uint64_t * nrows, uint64_t * ncols, int64_t * excess)
 {
   uint64_t oldnrows;
-  *excess = (((int64_t) * nrows) - *ncols);
-  fprintf(stdout, "  nrows=%" PRIu64 " ncols=%" PRIu64 " excess=%" PRId64 "\n",
-                  *nrows, *ncols, *excess);
+  unsigned int iter = 0;
   do
   {
     oldnrows = *nrows;
+    *excess = (((int64_t) * nrows) - *ncols);
+    if (iter == 0)
+      fprintf(stdout, "Sing. rem.: begin with: ");
+    else
+      fprintf(stdout, "Sing. rem.:   iter %03u: ", iter);
+    fprintf(stdout, "nrows=%" PRIu64 " ncols=%" PRIu64 " excess=%" PRId64 " at "
+                    "%2.2lf\n", *nrows, *ncols, *excess, seconds());
+    fflush(stdout);
+
 #ifdef HAVE_SYNC_FETCH
     onepass_singleton_parallel_removal(nthreads, nrows, ncols);
 #else
     onepass_singleton_removal(nrows, ncols);
 #endif
-    *excess = (((int64_t) * nrows) - *ncols);
-    fprintf(stdout, "  new_nrows=%" PRIu64 " new_ncols=%" PRIu64
-                    " excess=%" PRId64 "" " at %2.2lf\n", *nrows, *ncols,
-                    *excess, seconds());
-    fflush(stdout);
+
+    iter++;
   } while (oldnrows != *nrows);
+  fprintf(stdout, "Sing. rem.:   iter %03u: No more singletons, finished at "
+                   "%2.2lf\n", iter, seconds());
 }
 
 static void
@@ -997,51 +1004,58 @@ print_final_values (uint64_t nrows, uint64_t ncols, double weight)
 
 static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
 {
-    uint64_t oldnrows = 0;
-    int64_t oldexcess, excess, target_excess;
-    int count;
+  uint64_t oldnrows = 0;
+  int64_t oldexcess, excess, target_excess;
+  int count;
 
-    //First step of singletons removal
-    remove_all_singletons(nrows, ncols, &excess);
+  /* First step of singletons removal */
+  fprintf(stdout, "\nStep 0: only singleton removal\n");
+  remove_all_singletons(nrows, ncols, &excess);
 
-    if (excess <= 0) {		/* covers case nrows = ncols = 0 */
-	fprintf (stdout, "number of rows <= number of columns\n");
-        print_final_values (*nrows, *ncols, 0);
-	exit(2);
-    }
-
-    if ((double) excess < required_excess * ((double) *ncols)) {
-	fprintf (stdout,
-                 "(excess / ncols) = %.2f < %.2f. See -required_excess "
-                 "argument.\n", ((double) excess / (double) *ncols),
-                 required_excess);
-        print_final_values (*nrows, *ncols, 0);
-	exit(2);
-    }
-
-  /* If npass was not given in the command line, adjust npass in
-     [1..DEFAULT_PURGE_NPASS] so that each pass removes at least about 1% wrt
-     the number of columns */
-  if (npass < 0)
+  if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
-    if ((uint64_t) excess / DEFAULT_PURGE_NPASS < *ncols / 100)
-      npass = 1 + (100 * excess) / *ncols;
-    else
-      npass = DEFAULT_PURGE_NPASS;
+    fprintf (stdout, "number of rows <= number of columns\n");
+    print_final_values (*nrows, *ncols, 0);
+    exit(2);
   }
 
-  int64_t chunk = excess / npass;
+  if ((double) excess < required_excess * ((double) *ncols))
+  {
+    fprintf (stdout, "(excess / ncols) = %.2f < %.2f. See -required_excess "
+                     "argument.\n", ((double) excess / (double) *ncols),
+                     required_excess);
+    print_final_values (*nrows, *ncols, 0);
+    exit(2);
+  }
 
-  /* npass pass of clique removal + singletons removal */
-  for (count = 0; count < npass && excess > 0; count++)
+  /* If nsteps was not given in the command line, adjust nsteps in
+     [1..DEFAULT_PURGE_NSTEPS] so that each step removes at least about 1% wrt
+     the number of columns */
+  if (nsteps < 0)
+  {
+    if ((uint64_t) excess / DEFAULT_PURGE_NSTEPS < *ncols / 100)
+      nsteps = 1 + (100 * excess) / *ncols;
+    else
+      nsteps = DEFAULT_PURGE_NSTEPS;
+  }
+
+  int64_t chunk = excess / nsteps;
+
+  fprintf(stdout, "# INFO: number of clique removal steps: %d\n", nsteps);
+  fprintf(stdout, "# INFO: At each step, excess will be decreased by "
+                  "%" PRId64 "\n", chunk);
+  fflush (stdout);
+
+  /* nsteps steps of clique removal + singletons removal */
+  for (count = 0; count < nsteps && excess > 0; count++)
   {
     oldnrows = *nrows;
     oldexcess = excess;
     target_excess = excess - chunk;
     if (target_excess < keep)
       target_excess = keep;
-    fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
-                    count + 1, npass, target_excess);
+    fprintf(stdout, "\nStep %u on %u: target excess is %" PRId64 "\n",
+                    count + 1, nsteps, target_excess);
     fflush(stdout);
 
     /* prints some stats on columns and rows weight if verbose > 0. */
@@ -1054,23 +1068,25 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
     cliques_removal(target_excess, nrows, ncols);
     remove_all_singletons(nrows, ncols, &excess);
 
-    fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
+    fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
+                    "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
+                    (int64_t) (oldnrows-*nrows), (oldexcess-excess),
                     (double) (oldnrows-*nrows) / (double) (oldexcess-excess));
   }
 
 
-  /* May need an extra pass of clique removal + singletons removal if excess is
+  /* May need an extra step of clique removal + singletons removal if excess is
      still larger than keep. It may happen due to the fact that each clique does
      not make the excess go down by one but can (rarely) left the excess
      unchanged. */
-  if (excess > keep && npass > 0)
+  if (excess > keep && nsteps > 0)
   {
-	  oldnrows = *nrows;
-	  oldexcess = excess;
-	  target_excess = keep;
+    oldnrows = *nrows;
+    oldexcess = excess;
+    target_excess = keep;
 
-	  fprintf(stdout, "Step extra: target excess is %" PRId64 "\n",
-		  target_excess);
+    fprintf(stdout, "\nStep extra: target excess is %" PRId64 "\n",
+                    target_excess);
     fflush(stdout);
 
     /* prints some stats on columns and rows weight if verbose > 0. */
@@ -1081,10 +1097,12 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
     }
 
     cliques_removal(target_excess, nrows, ncols);
-	  remove_all_singletons(nrows, ncols, &excess);
+    remove_all_singletons(nrows, ncols, &excess);
 
-	  fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
-		                (double) (oldnrows-*nrows) / (double) (oldexcess-excess));
+    fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
+                    "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
+                    (int64_t) (oldnrows-*nrows), (oldexcess-excess),
+                    (double) (oldnrows-*nrows) / (double) (oldexcess-excess));
   }
 }
 
@@ -1168,9 +1186,9 @@ static void declare_usage(param_list pl)
                                              " with indexes <= col-min-index");
   param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
                                     "(default " STR(DEFAULT_FILTER_EXCESS) ")");
-  param_list_decl_usage(pl, "npass", "maximal number of steps of clique "
-                                     "removal (default: chosen in [1.."
-                                      STR(DEFAULT_PURGE_NPASS) "])");
+  param_list_decl_usage(pl, "nsteps", "maximal number of steps of clique "
+                                      "removal (default: chosen in [1.."
+                                             STR(DEFAULT_PURGE_NSTEPS) "])");
   param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
                             "end of the 1st singleton removal step (default "
                             STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
@@ -1240,7 +1258,7 @@ int main(int argc, char **argv)
 
 
     param_list_parse_uint(pl, "t", &nthreads);
-    param_list_parse_int(pl, "npass", &npass);
+    param_list_parse_int(pl, "nsteps", &nsteps);
     param_list_parse_double(pl, "required_excess", &required_excess);
 
     /* These three parameters specify the set of input files, of the form
@@ -1323,11 +1341,11 @@ int main(int argc, char **argv)
     fprintf(stdout, "# INFO: maximum possible index of a column: %" PRIu64
                     "\n", col_max_index);
     fprintf(stdout, "# INFO: number of threads: %u\n", nthreads);
-    fprintf(stdout, "# INFO: number of clique removal pass: ");
-    if (npass < 0)
+    fprintf(stdout, "# INFO: number of clique removal steps: ");
+    if (nsteps < 0)
       fprintf(stdout, "will be chosen by the program\n");
     else
-      fprintf(stdout, "%d\n", npass);
+      fprintf(stdout, "%d\n", nsteps);
     fprintf(stdout, "# INFO: target excess: %" PRId64 "\n", keep);
     fflush (stdout);
     /*}}}*/
@@ -1336,30 +1354,30 @@ int main(int argc, char **argv)
      * malloc()'ed amount only for informational purposes */
 
     /* {{{ Some macros for tracking memory-consuming variables */
-#define ALLOC_VERBOSE_MALLOC(type_, variable_, amount_) do {		\
-    variable_ = (type_ *) malloc(amount_ * sizeof(type_));		\
-    ASSERT_ALWAYS(variable_ != NULL);					\
+#define ALLOC_VERBOSE_MALLOC(type_, variable_, amount_) do {            \
+    variable_ = (type_ *) malloc(amount_ * sizeof(type_));              \
+    ASSERT_ALWAYS(variable_ != NULL);                                   \
     size_t cur_alloc = amount_ * sizeof(type_);                         \
     tot_alloc_bytes += cur_alloc;                                       \
-    fprintf(stdout,							\
-            "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",	\
-	    cur_alloc >> 20, tot_alloc_bytes >> 20);                  	\
+    fprintf(stdout, "# MEMORY: Allocated " #variable_ " of %zuMB "      \
+                    "(total %zuMB so far)\n", cur_alloc >> 20,          \
+                    tot_alloc_bytes >> 20);                             \
 } while (0)
 
-#define ALLOC_VERBOSE_CALLOC(type_, variable_, amount_) do {		\
+#define ALLOC_VERBOSE_CALLOC(type_, variable_, amount_) do {            \
     ALLOC_VERBOSE_MALLOC(type_, variable_, amount_);                    \
     /* Do this now so that we crash early if kernel overcommitted memory\
-     */									\
-    memset(variable_, 0, amount_);					\
+     */                                                                 \
+    memset(variable_, 0, amount_);                                      \
 } while (0)
 
-#define ALLOC_VERBOSE_BIT_VECTOR(variable_, amount_) do {		\
-    bit_vector_init(variable_, amount_);				\
-    size_t cur_alloc = bit_vector_memory_footprint(variable_);		\
-    tot_alloc_bytes += cur_alloc;					\
-    fprintf(stdout,                                                     \
-            "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",	\
-	    cur_alloc >> 20, tot_alloc_bytes >> 20);			\
+#define ALLOC_VERBOSE_BIT_VECTOR(variable_, amount_) do {               \
+    bit_vector_init(variable_, amount_);                                \
+    size_t cur_alloc = bit_vector_memory_footprint(variable_);          \
+    tot_alloc_bytes += cur_alloc;                                       \
+    fprintf(stdout, "# MEMORY: Allocated " #variable_ " of %zuMB "      \
+                    "(total %zuMB so far)\n", cur_alloc >> 20,          \
+                    tot_alloc_bytes >> 20);                             \
 } while (0)
     /* }}} */
 
@@ -1418,8 +1436,9 @@ int main(int argc, char **argv)
     ncols = pd->info.ncols;
 
     tot_alloc_bytes += get_my_malloc_bytes();
-    fprintf(stdout, "Allocated row_compact[i] %zuMB (total %zuMB so far)\n",
-	    get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
+    fprintf(stdout, "# MEMORY: Allocated row_compact[i] %zuMB "
+                    "(total %zuMB so far)\n", get_my_malloc_bytes() >> 20,
+                    tot_alloc_bytes >> 20);
 
     ALLOC_VERBOSE_BIT_VECTOR(row_used, nrows_init);
     bit_vector_set(row_used, 1);
@@ -1441,8 +1460,8 @@ int main(int argc, char **argv)
       print_stats_rows_weight (stdout, verbose);
     }
 
-    /* XXX: Are these tests useful ? Already checked after first pass of
-     * singleton removal. */
+    /* XXX: Are these tests useful ? Already checked after first call to
+     * removal_all_singletons in singletons_and_cliques_removal. */
     if (nrows < ncols)
     {
       fprintf (stdout, "number of rows <= number of columns\n");
@@ -1458,18 +1477,20 @@ int main(int argc, char **argv)
 
     /* free row_compact[i] and row_compact. We no longer need them */
     tot_alloc_bytes -= get_my_malloc_bytes();
-    fprintf(stdout, "Freed row_compact[i] %zuMB (total %zuMB so far)\n",
-            get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
+    fprintf(stdout, "# MEMORY: Freed row_compact[i] %zuMB "
+                    "(total %zuMB so far)\n", get_my_malloc_bytes() >> 20,
+                    tot_alloc_bytes >> 20);
     my_malloc_free_all();
 
     free(row_compact);
     size_t tmp = (nrows_init * sizeof(index_t *));
     tot_alloc_bytes -= tmp;
-    fprintf(stdout, "Freed row_compact %zuMB (total %zuMB so far)\n",
-            tmp >> 20, tot_alloc_bytes >> 20);
+    fprintf(stdout, "# MEMORY: Freed row_compact %zuMB (total %zuMB so far)\n",
+                    tmp >> 20, tot_alloc_bytes >> 20);
 
-    /* reread the relation files and convert them to the new coding */
-    fprintf(stdout, "Storing remaining relations...\n");
+    /* reread the relation files and write output file(s) */
+    fprintf(stdout, "\nPass 2, reading and writing output file%s...\n",
+                    deletedname == NULL ? "" : "s");
 
     if (!(pd->fd[0] = fopen_maybe_compressed(purgedname, "w"))) {
 	fprintf(stderr, "Error, cannot open file %s for writing.\n",
