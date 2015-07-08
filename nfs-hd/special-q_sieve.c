@@ -818,8 +818,15 @@ void compute_ci_1(int64_t * ci, unsigned int i, unsigned int pos,
 {
   for (unsigned int j = i + 1; j < pos; j++) {
     * ci = * ci - ((int64_t)pseudo_Tqr[j] * (2 * (int64_t)H->h[j] - 1));
-    if (* ci >= (int64_t)ideal_r || * ci < 0) {
-      * ci = * ci % (int64_t)ideal_r;
+    if (* ci >= (int64_t) ideal_r) {
+      while(* ci >= (int64_t)ideal_r) {
+        * ci = * ci - (int64_t)ideal_r;
+      }
+    } else if (* ci < 0) {
+      while(* ci < (int64_t)ideal_r) {
+        * ci = * ci + (int64_t)ideal_r;
+      }
+      * ci = * ci - (int64_t)ideal_r;
     }
   }
   * ci = * ci + pseudo_Tqr[pos];
