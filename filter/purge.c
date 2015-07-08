@@ -83,16 +83,6 @@
 
 /********************** Main global variables ********************************/
 
-uint64_t col_min_index;
-index_t **row_compact; /* see main documentation */
-weight_t *cols_weight;
-
-static bit_vector row_used;
-static uint64_t *sum2_row = NULL; /* sum of 2 row indexes for columns of
-                                     weight 2 */
-static uint64_t nrows_init = 0; /* Initial number of rows. */
-static uint64_t col_max_index = 0; /* Maximum possible value for indexes of
-                                      columns*/
 static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
 static int nsteps = -1; /* negative value means chosen by purge */
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
@@ -102,19 +92,113 @@ static int verbose = 0;
 /********************* purge_data struct *************************************/
 
 /* This one is passed to all functions, so it's morally a global */
-struct purge_data_s {
-    /* for minimal changes, don't put these here _yet_ */
-    // uint64_t col_min_index;
-    // index_t **row_compact; /* see main documentation */
-    // weight_t *cols_weight;
-    info_mat_t info;
-    /* fd[0]: for printing kept relations */
-    /* fd[1]: for printing deleted relations */
-    FILE * fd[2];
+struct purge_matrix_s
+{
+  uint64_t nrows_init;  /* number of initial rows */
+  uint64_t nrows; /* number of active rows */
+  uint64_t ncols; /* number of active columns */
+  uint64_t col_max_index; /* Maximum possible value for indexes of columns*/
+  uint64_t col_min_index; /* Only columns with indexes >= col_min_index are
+                             considered */
+  index_t **row_compact; /* rows as lists of indexes of columns */
+  weight_t *cols_weight; /* weights of columns */
+  bit_vector row_used; /* row_used[i] = 0 iff row i was deleted */
+  uint64_t *sum2_row; /* sum of 2 row indexes for columns of weight 2 */
+  size_t tot_alloc_bytes; /* To keep track of allocated memory */
 };
-typedef struct purge_data_s purge_data[1];
-typedef struct purge_data_s * purge_data_ptr;
-typedef const struct purge_data_s * purge_data_srcptr;
+typedef struct purge_matrix_s purge_matrix_t[1];
+typedef struct purge_matrix_s * purge_matrix_ptr;
+typedef const struct purge_matrix_s * purge_matrix_srcptr;
+
+static purge_matrix_t mat; /* XXX Temporarily a global variable */
+
+static void
+purge_matrix_init (purge_matrix_ptr mat, uint64_t nrows_init,
+                   uint64_t col_min_index, uint64_t col_max_index)
+{
+  size_t cur_alloc;
+  mat->nrows = mat->nrows_init = nrows_init;
+  mat->ncols = mat->col_max_index = col_max_index;
+  mat->col_min_index = col_min_index;
+  mat->tot_alloc_bytes = 0;
+
+  /* Malloc cols_weight ans set to 0 */
+  cur_alloc = mat->col_max_index * sizeof (weight_t);
+  mat->cols_weight = (weight_t *) malloc(cur_alloc);
+  ASSERT_ALWAYS(mat->cols_weight != NULL);
+  mat->tot_alloc_bytes += cur_alloc;
+  fprintf(stdout, "# MEMORY: Allocated cols_weight of %zuMB (total %zuMB "
+                  "so far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
+  memset(mat->cols_weight, 0, cur_alloc);
+
+  /* Malloc row_used and set to 1 */
+  bit_vector_init(mat->row_used, mat->nrows_init);
+  cur_alloc = bit_vector_memory_footprint(mat->row_used);
+  mat->tot_alloc_bytes += cur_alloc;
+  fprintf(stdout, "# MEMORY: Allocated row_used of %zuMB (total %zuMB "
+                  "so far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
+  bit_vector_set(mat->row_used, 1);
+
+  /* Malloc sum2_row */
+  cur_alloc = mat->col_max_index * sizeof (uint64_t);
+  mat->sum2_row = (uint64_t *) malloc(cur_alloc);
+  ASSERT_ALWAYS(mat->sum2_row != NULL);
+  mat->tot_alloc_bytes += cur_alloc;
+  fprintf(stdout, "# MEMORY: Allocated sum2_row of %zuMB (total %zuMB "
+                  "so far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
+
+  /* Malloc row_compact */
+  cur_alloc = mat->nrows_init * sizeof (index_t *);
+  mat->row_compact = (index_t **) malloc (cur_alloc);
+  ASSERT_ALWAYS(mat->row_compact != NULL);
+  mat->tot_alloc_bytes += cur_alloc;
+  fprintf(stdout, "# MEMORY: Allocated row_compact of %zuMB (total %zuMB "
+                  "so far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
+}
+
+/* Field row_compact has its own clear function so we can free the memory as
+ * soon as we do not need it anymore */
+static void
+purge_matrix_clear_row_compact (purge_matrix_ptr mat)
+{
+  if (mat->row_compact != NULL)
+  {
+    size_t cur_free_size = get_my_malloc_bytes();
+    mat->tot_alloc_bytes -= cur_free_size;
+    my_malloc_free_all();
+    fprintf(stdout, "# MEMORY: Freed row_compact[i] %zuMB (total %zuMB so "
+                    "far)\n", cur_free_size >> 20, mat->tot_alloc_bytes >> 20);
+
+    cur_free_size = (mat->nrows_init * sizeof(index_t *));
+    mat->tot_alloc_bytes -= cur_free_size;
+    free(mat->row_compact);
+    mat->row_compact = NULL;
+    fprintf(stdout, "# MEMORY: Freed row_compact %zuMB (total %zuMB so far)\n",
+                    cur_free_size >> 20, mat->tot_alloc_bytes >> 20);
+  }
+}
+
+/* Free everything and set everythin to 0. */
+static void
+purge_matrix_clear (purge_matrix_ptr mat)
+{
+  free (mat->cols_weight);
+  bit_vector_clear(mat->row_used);
+  free (mat->sum2_row);
+  purge_matrix_clear_row_compact (mat);
+
+  memset (mat, 0, sizeof (purge_matrix_t));
+}
+
+static void
+purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr mat)
+{
+  size_t cur_alloc = get_my_malloc_bytes();
+  mat->tot_alloc_bytes += cur_alloc;
+  fprintf(stdout, "# MEMORY: Allocated row_compact[i] %zuMB (total %zuMB so "
+                  "far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
+}
+
 
 /********************* comp_t struct (clique) ********************************/
 
@@ -366,10 +450,10 @@ comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
 
 /*****************************************************************************/
 
-/* Delete a row: set row_used[i] to 0, update the count of the columns
+/* Delete a row: set mat->row_used[i] to 0, update the count of the columns
  * appearing in that row.
  * Warning: we only update the count of columns that we consider, i.e.,
- * columns with index >= col_min_index.
+ * columns with index >= mat->col_min_index.
  * CAREFUL: no multithread compatible with " !(--(*o))) " and
  * bit_vector_clearbit.
  */
@@ -379,14 +463,14 @@ static unsigned int delete_row (uint64_t i)
     unsigned int nrem_cols = 0;
     weight_t *o;
 
-    for (tab = row_compact[i]; *tab != UMAX(*tab); tab++) {
-	o = &(cols_weight[*tab]);
+    for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++) {
+	o = &(mat->cols_weight[*tab]);
 	ASSERT(*o);
 	if (*o < UMAX(*o) && !(--(*o)))
 	    nrem_cols++;
     }
-    /* We do not free row_compact[i] as it is freed with my_malloc_free_all */
-    bit_vector_clearbit(row_used, (size_t) i);
+    /* We do not free mat->row_compact[i] as it is freed with my_malloc_free_all */
+    bit_vector_clearbit(mat->row_used, (size_t) i);
     return nrem_cols;
 }
 
@@ -417,14 +501,14 @@ compute_connected_component_mt (comp_t *clique,
   while ((cur_row = uint64_buffer_pop_todo (row_buffer)) != UMAX(cur_row))
   {
     /* Loop on all columns of the current row */
-    for (h = row_compact[cur_row]; *h != UMAX(*h); h++)
+    for (h = mat->row_compact[cur_row]; *h != UMAX(*h); h++)
     {
       index_t cur_h = *h;
-      weight_t cur_h_weight = cols_weight[cur_h];
+      weight_t cur_h_weight = mat->cols_weight[cur_h];
       clique->w += comp_weight_function (cur_h_weight);
       if (UNLIKELY(cur_h_weight == 2))
       {
-        uint64_t the_other_row = sum2_row[cur_h] - cur_row;
+        uint64_t the_other_row = mat->sum2_row[cur_h] - cur_row;
         /* First, if the_other_row < clique.i, the connected component was
          * already found (by this thread or another). return 0 */
         if (the_other_row < clique->i)
@@ -459,17 +543,17 @@ delete_connected_component (uint64_t cur_row, uint64_t *ncols,
   while ((cur_row = uint64_buffer_pop_todo (row_buffer)) != UMAX(cur_row))
   {
     /* Loop on all columns of the current row */
-    for (h = row_compact[cur_row]; *h != UMAX(*h); h++)
+    for (h = mat->row_compact[cur_row]; *h != UMAX(*h); h++)
     {
       index_t cur_h = *h;
-      weight_t cur_h_weight = cols_weight[cur_h];
+      weight_t cur_h_weight = mat->cols_weight[cur_h];
       /* We might have some H->hashcount[h] = 3, which is decreased to 2, but
        * we don't want to treat that case. Thus we check in addition that
-       * sum2_row[h] <> 0, which only occurs when H->hashcount[h] = 2
+       * mat->sum2_row[h] <> 0, which only occurs when H->hashcount[h] = 2
        * initially.*/
-      if (UNLIKELY(cur_h_weight == 2 && sum2_row[cur_h]))
+      if (UNLIKELY(cur_h_weight == 2 && mat->sum2_row[cur_h]))
       {
-        uint64_t the_other_row = sum2_row[cur_h] - cur_row;
+        uint64_t the_other_row = mat->sum2_row[cur_h] - cur_row;
         /* If the_other_row is not already in the buffer, add it as a todo. */
         if (!uint64_buffer_is_in (row_buffer, the_other_row))
           uint64_buffer_push_todo (row_buffer, the_other_row);
@@ -484,10 +568,11 @@ delete_connected_component (uint64_t cur_row, uint64_t *ncols,
   return (row_buffer->next_todo - row_buffer->begin);
 }
 
-/******* Functions to compute sum2_row array (mono and multi thread) *********/
+/***** Functions to compute mat->sum2_row array (mono and multi thread) *******/
 
 #ifdef HAVE_SYNC_FETCH /* Multithread code */
-/* The main structure for the working pthreads pool which compute sum2_row */
+/* The main structure for the working pthreads pool which compute mat->sum2_row
+ */
 typedef struct sum2_mt_data_s {
   // Read only part
   unsigned int pthread_number;
@@ -499,28 +584,28 @@ static void *
 compute_sum2_row_mt (void *pt)
 {
   sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
-  uint64_t j = nrows_init / nthreads;
+  uint64_t j = mat->nrows_init / nthreads;
   uint64_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
-  uint64_t end = (data->pthread_number == nthreads - 1) ? nrows_init :
+  uint64_t end = (data->pthread_number == nthreads - 1) ? mat->nrows_init :
     (j * (data->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
   bv_t bv, *pbv;
   index_t h, *myrowcompact;
 
-  pbv = row_used->p + (i >> LN2_BV_BITS);
+  pbv = mat->row_used->p + (i >> LN2_BV_BITS);
   for (; i < end; i += BV_BITS)
   {
     for (j = i, bv = *pbv++; bv; ++j, bv >>= 1)
     {
       if (LIKELY(bv & 1))
       {
-        myrowcompact = row_compact[j];
+        myrowcompact = mat->row_compact[j];
         for (;;)
         {
           h = *myrowcompact++;
           if (UNLIKELY (h == UMAX(h)))
             break;
-          if (LIKELY (cols_weight[h] == 2))
-            __sync_add_and_fetch (sum2_row + h, j);
+          if (LIKELY (mat->cols_weight[h] == 2))
+            __sync_add_and_fetch (mat->sum2_row + h, j);
         }
       }
     }
@@ -533,16 +618,16 @@ compute_sum2_row_mt (void *pt)
 static inline void
 compute_sum2_row ()
 {
-  memset(sum2_row, 0, col_max_index * sizeof(uint64_t));
+  memset(mat->sum2_row, 0, mat->col_max_index * sizeof(uint64_t));
 #ifndef HAVE_SYNC_FETCH /* monothread */
-  for (uint64_t i = 0; i < nrows_init; i++)
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
   {
-    if (bit_vector_getbit(row_used, (size_t) i))
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
     {
       index_t h, *myrowcompact;
-      for (myrowcompact = row_compact[i]; (h = *myrowcompact++) != UMAX(h);)
-        if (cols_weight[h] == 2)
-          sum2_row[h] += i;
+      for (myrowcompact = mat->row_compact[i]; (h = *myrowcompact++) != UMAX(h);)
+        if (mat->cols_weight[h] == 2)
+          mat->sum2_row[h] += i;
     }
   }
 #else
@@ -580,7 +665,7 @@ typedef struct comp_mt_thread_data_s {
  * heaviest connected components whose smallest row belongs in
  *   [ (data->th_id + j*nthreads) * COMP_MT_ROWS_BLOCK,
                         (data->th_id + j*nthreads + 1) * COMP_MT_ROWS_BLOCK],
- * with j = 0,1,2... until the interval does not intersect [0..nrows_init-1].
+ * with j=0,1,2.. until the interval does not intersect [0..mat->nrows_init-1].
  */
 static void *
 compute_sorted_list_of_connected_components_mt (void *pt)
@@ -596,12 +681,12 @@ compute_sorted_list_of_connected_components_mt (void *pt)
 
   // Now the first begin of the search
   clique.i = data->th_id * COMP_MT_ROWS_BLOCK;
-  if (UNLIKELY (clique.i >= nrows_init)) pthread_exit (NULL);
+  if (UNLIKELY (clique.i >= mat->nrows_init)) pthread_exit (NULL);
   // And the first end
   end_step_rows = clique.i + COMP_MT_ROWS_BLOCK;
 
-  pbv = row_used->p + (clique.i >> LN2_BV_BITS);
-  while (clique.i < nrows_init)
+  pbv = mat->row_used->p + (clique.i >> LN2_BV_BITS);
+  while (clique.i < mat->nrows_init)
   {
     uint64_t save_i = clique.i;
     for (bv = *pbv++; bv; ++(clique.i), bv >>= 1)
@@ -622,7 +707,7 @@ compute_sorted_list_of_connected_components_mt (void *pt)
       // The new begin & end.
       end_step_rows += nthreads * COMP_MT_ROWS_BLOCK;
       clique.i = end_step_rows - COMP_MT_ROWS_BLOCK;
-      pbv = row_used->p + (clique.i >> LN2_BV_BITS);
+      pbv = mat->row_used->p + (clique.i >> LN2_BV_BITS);
     }
   }
   uint64_buffer_clear (buf);
@@ -688,16 +773,16 @@ print_stats_columns_weight (FILE *out, int verbose)
 {
   uint64_t *w = NULL;
   index_t *h = 0;
-  w = (uint64_t *) malloc (col_max_index * sizeof (uint64_t));
+  w = (uint64_t *) malloc (mat->col_max_index * sizeof (uint64_t));
   ASSERT_ALWAYS (w != NULL);
-  memset (w, 0, col_max_index * sizeof (uint64_t));
+  memset (w, 0, mat->col_max_index * sizeof (uint64_t));
 
-  for (uint64_t i = 0; i < nrows_init; i++)
-    if (bit_vector_getbit(row_used, (size_t) i))
-      for (h = row_compact[i]; *h != UMAX(*h); h++)
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
+      for (h = mat->row_compact[i]; *h != UMAX(*h); h++)
         w[*h]++;
 
-  print_stats_uint64 (out, w, col_max_index, "cols", "weight", verbose);
+  print_stats_uint64 (out, w, mat->col_max_index, "cols", "weight", verbose);
   free (w);
 }
 
@@ -706,16 +791,16 @@ print_stats_rows_weight (FILE *out, int verbose)
 {
   uint64_t *w = NULL;
   index_t *h = 0;
-  w = (uint64_t *) malloc (nrows_init * sizeof (uint64_t));
+  w = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
   ASSERT_ALWAYS (w != NULL);
-  memset (w, 0, nrows_init * sizeof (uint64_t));
+  memset (w, 0, mat->nrows_init * sizeof (uint64_t));
 
-  for (uint64_t i = 0; i < nrows_init; i++)
-    if (bit_vector_getbit(row_used, (size_t) i))
-      for (h = row_compact[i]; *h != UMAX(*h); h++)
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
+      for (h = mat->row_compact[i]; *h != UMAX(*h); h++)
         w[i]++;
 
-  print_stats_uint64 (out, w, nrows_init, "rows", "weight", verbose);
+  print_stats_uint64 (out, w, mat->nrows_init, "rows", "weight", verbose);
   free (w);
 }
 
@@ -723,15 +808,15 @@ void print_stats_on_cliques (FILE *out, int verbose)
 {
   uint64_t *len = NULL;
 
-  len = (uint64_t *) malloc (nrows_init * sizeof (uint64_t));
+  len = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
   ASSERT_ALWAYS (len != NULL);
-  memset (len, 0, nrows_init * sizeof (uint64_t));
+  memset (len, 0, mat->nrows_init * sizeof (uint64_t));
 
   uint64_buffer_t buf;
   uint64_buffer_init (buf, UINT64_BUFFER_MIN_SIZE);
-  for (uint64_t i = 0; i < nrows_init; i++)
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
   {
-    if (bit_vector_getbit(row_used, (size_t) i))
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
     {
       comp_t c = {.i = i, .w = 0.0};
       uint64_t nrows = compute_connected_component_mt (&c, buf);
@@ -739,7 +824,7 @@ void print_stats_on_cliques (FILE *out, int verbose)
     }
   }
 
-  print_stats_uint64 (out, len, nrows_init, "cliques", "length", verbose);
+  print_stats_uint64 (out, len, mat->nrows_init, "cliques", "length", verbose);
 
   uint64_buffer_clear (buf);
   free (len);
@@ -773,7 +858,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
    * multithread function; if not, it's done in sequential, immediatly.
    */
   compute_sum2_row ();
-  fprintf(stdout, "Cliq. rem.: computed sum2_row at %2.2lf\n", seconds());
+  fprintf(stdout, "Cliq. rem.: computed mat->sum2_row at %2.2lf\n", seconds());
   fflush (stdout);
 
   /* Then, each thread searches for its "max_nb_comp_per_thread" heaviest
@@ -869,9 +954,9 @@ static void onepass_singleton_removal(uint64_t * nrows, uint64_t * ncols)
     uint64_t i, nrem_rows = 0, nrem_cols = 0;
 
     for (i = 0; i < nrows_init; i++) {
-	if (bit_vector_getbit(row_used, (size_t) i)) {
-	    for (tab = row_compact[i]; *tab != UMAX(*tab); tab++) {
-		if (cols_weight[*tab] == 1) {
+	if (bit_vector_getbit(mat->row_used, (size_t) i)) {
+	    for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++) {
+		if (mat->cols_weight[*tab] == 1) {
 		    nrem_cols += delete_row (i);
 		    nrem_rows++;
 		    break;
@@ -904,17 +989,17 @@ static void onepass_thread_singleton_removal(ti_t * mti)
   for (i = mti->begin; i < mti->end; i++) {
     j = (((bv_t) 1) << (i & (BV_BITS - 1)));
     
-    if (row_used->p[i >> LN2_BV_BITS] & j)
-      for (tab = row_compact[i]; *tab != UMAX(*tab); tab++)
-	if (UNLIKELY(cols_weight[*tab] == 1)) {
-	  for (tab = row_compact[i]; *tab != UMAX(*tab); tab++) {
-	    o = &(cols_weight[*tab]);
+    if (mat->row_used->p[i >> LN2_BV_BITS] & j)
+      for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++)
+	if (UNLIKELY(mat->cols_weight[*tab] == 1)) {
+	  for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++) {
+	    o = &(mat->cols_weight[*tab]);
 	    ASSERT(*o);
 	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
 	      (mti->sup_ncol)++;
 	  }
-	  /* row_compact[i] is not freed , it is freed with my_malloc_free_all */
-	  row_used->p[i >> LN2_BV_BITS] &= ~j;
+	  /* mat->row_compact[i] is not freed , it is freed with my_malloc_free_all */
+	  mat->row_used->p[i >> LN2_BV_BITS] &= ~j;
 	  (mti->sup_nrow)++;
 	  break;
 	}
@@ -934,7 +1019,7 @@ onepass_singleton_parallel_removal(unsigned int nb_thread, uint64_t * nrows,
     ti = (ti_t *) malloc(nb_thread * sizeof(ti_t));
     ASSERT_ALWAYS(ti != NULL);
     ti[0].begin = 0;
-    pas = (nrows_init / nb_thread) & ((uint64_t) ~ (BV_BITS - 1));
+    pas = (mat->nrows_init / nb_thread) & ((uint64_t) ~ (BV_BITS - 1));
     incr = 0;
     for (i = 0, incr = 0; i < nb_thread - 1;) {
 	incr += pas;
@@ -943,7 +1028,7 @@ onepass_singleton_parallel_removal(unsigned int nb_thread, uint64_t * nrows,
 	ti[i].begin = incr;
     }
     ti[i].nb = i;
-    ti[i].end = nrows_init;
+    ti[i].end = mat->nrows_init;
     pthread_attr_init(&attr);
     pthread_attr_setstacksize(&attr, 1 << 16);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -1112,29 +1197,50 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
   }
 }
 
-/*****************************************************************************/
-/* I/O functions */
+/*************** Callback functions called by filter_rels ********************/
 
-/* Callback functions called by filter_rels */
-void *insert_rel_into_table(purge_data_ptr arg, earlyparsed_relation_ptr rel)
+/* Data struct for insert_rel_into_table (called by filter_rels on pass 1) */
+struct data_first_pass_s
 {
-    ASSERT_ALWAYS(rel->num < nrows_init);
+  uint64_t ncols;
+};
+typedef struct data_first_pass_s data_first_pass_t[1];
+typedef struct data_first_pass_s * data_first_pass_ptr;
 
-    arg->info.ncols +=
-        insert_rel_in_table_no_e(rel, col_min_index, row_compact, cols_weight);
+/* Callback function called by filter_rels on pass 1 */
+void *
+insert_rel_into_table (data_first_pass_ptr arg, earlyparsed_relation_ptr rel)
+{
+  ASSERT_ALWAYS(rel->num < mat->nrows_init);
+  arg->ncols += insert_rel_in_table_no_e(rel, mat->col_min_index, mat->row_compact,
+                                         mat->cols_weight);
 
-    return NULL;
+  return NULL;
 }
 
-void *thread_print(purge_data_ptr arg, earlyparsed_relation_ptr rel)
+/* Data struct for thread_print (called by filter_rels on pass 2) */
+struct data_second_pass_s
 {
-    if (bit_vector_getbit(row_used, rel->num)) {
-        arg->info.W += rel->nb;
-        fputs(rel->line, arg->fd[0]);
-    } else if (arg->fd[1] != NULL) {
-        fputs(rel->line, arg->fd[1]);
-    }
-    return NULL;
+  double W; /* Total weight of the matrix (counting only remaining rows) */
+  /* fd[0]: for printing kept relations */
+  /* fd[1]: for printing deleted relations */
+  FILE * fd[2];
+};
+typedef struct data_second_pass_s data_second_pass_t[1];
+typedef struct data_second_pass_s * data_second_pass_ptr;
+
+/* Callback function called by filter_rels on pass 2 */
+void *
+thread_print(data_second_pass_ptr arg, earlyparsed_relation_ptr rel)
+{
+  if (bit_vector_getbit(mat->row_used, rel->num))
+  {
+    arg->W += rel->nb;
+    fputs(rel->line, arg->fd[0]);
+  }
+  else if (arg->fd[1] != NULL)
+    fputs(rel->line, arg->fd[1]);
+  return NULL;
 }
 
 
@@ -1221,10 +1327,11 @@ int main(int argc, char **argv)
 {
     char * argv0 = argv[0];
     param_list pl;
-    col_min_index = UMAX(uint64_t);
-    uint64_t nrows, ncols;
-    size_t tot_alloc_bytes = 0;
+    uint64_t col_min_index_arg = UMAX(uint64_t);
     char ** input_files;
+    uint64_t col_max_index_arg = 0;
+    uint64_t nrows_init_arg = 0;
+    // purge_matrix_t mat; /* XXX Temporarily a global variable (see above) */
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;		/* Binary open for all files */
@@ -1255,12 +1362,12 @@ int main(int argc, char **argv)
     fflush(stdout);
 
     /* read command-line parameters */
-    param_list_parse_uint64(pl, "nrels", &nrows_init);
-    param_list_parse_uint64(pl, "col-max-index", &col_max_index);
+    param_list_parse_uint64(pl, "nrels", &nrows_init_arg);
+    param_list_parse_uint64(pl, "col-max-index", &col_max_index_arg);
     param_list_parse_int64(pl, "keep", &keep);
 
     /* Only look at columns of index >= col-min-index */
-    param_list_parse_uint64(pl, "col-min-index", &col_min_index);
+    param_list_parse_uint64(pl, "col-min-index", &col_min_index_arg);
 
 
     param_list_parse_uint(pl, "t", &nthreads);
@@ -1309,26 +1416,30 @@ int main(int argc, char **argv)
       fprintf(stderr, "Error, provide either -filelist or freeform file names\n");
       usage(pl, argv0);
     }
-    if (nrows_init == 0)
+    if (nrows_init_arg == 0)
     {
       fprintf(stderr, "Error, missing -nrels command line argument "
                       "(or nrels = 0)\n");
       usage(pl, argv0);
     }
-    if (col_max_index == 0)
+    if (col_max_index_arg == 0)
     {
       fprintf(stderr, "Error, missing -col-max-index command line argument "
                       "(or col-max-index = 0)\n");
       usage(pl, argv0);
     }
-    if (col_min_index > col_max_index)
+    if (col_min_index_arg == UMAX(uint64_t))
     {
-      fprintf(stderr, "Error, missing -col-min-index command line argument "
-                      "or (col-min-index > col-max-index)\n");
+      fprintf(stderr, "Error, missing -col-min-index command line argument\n");
       usage(pl, argv0);
     }
-    /* If col_max_index > 2^32, then we need index_t to be 64-bit */
-    if (((col_max_index >> 32) != 0) && sizeof(index_t) < 8)
+    if (col_min_index_arg >= col_max_index_arg)
+    {
+      fprintf(stderr, "Error, col-min-index >= col-max-index\n");
+      usage(pl, argv0);
+    }
+    /* If col_max_index_arg > 2^32, then we need index_t to be 64-bit */
+    if (((col_max_index_arg >> 32) != 0) && sizeof(index_t) < 8)
     {
       fprintf(stderr, "Error, -col-max-index is too large for a 32-bit "
                       "program\nSee #define __SIZEOF_INDEX__ in typedefs.h\n");
@@ -1343,9 +1454,9 @@ int main(int argc, char **argv)
     /* Printing relevant information */
     comp_print_info_weight_function ();
 
-    fprintf(stdout, "# INFO: number of rows: %" PRIu64 "\n", nrows_init);
+    fprintf(stdout, "# INFO: number of rows: %" PRIu64 "\n", nrows_init_arg);
     fprintf(stdout, "# INFO: maximum possible index of a column: %" PRIu64
-                    "\n", col_max_index);
+                    "\n", col_max_index_arg);
     fprintf(stdout, "# INFO: number of threads: %u\n", nthreads);
     fprintf(stdout, "# INFO: number of clique removal steps: ");
     if (nsteps < 0)
@@ -1356,38 +1467,10 @@ int main(int argc, char **argv)
     fflush (stdout);
     /*}}}*/
 
-    /* {{{ Allocating memory. We are keeping track of the total
-     * malloc()'ed amount only for informational purposes */
-
-    /* {{{ Some macros for tracking memory-consuming variables */
-#define ALLOC_VERBOSE_MALLOC(type_, variable_, amount_) do {            \
-    variable_ = (type_ *) malloc(amount_ * sizeof(type_));              \
-    ASSERT_ALWAYS(variable_ != NULL);                                   \
-    size_t cur_alloc = amount_ * sizeof(type_);                         \
-    tot_alloc_bytes += cur_alloc;                                       \
-    fprintf(stdout, "# MEMORY: Allocated " #variable_ " of %zuMB "      \
-                    "(total %zuMB so far)\n", cur_alloc >> 20,          \
-                    tot_alloc_bytes >> 20);                             \
-} while (0)
-
-#define ALLOC_VERBOSE_CALLOC(type_, variable_, amount_) do {            \
-    ALLOC_VERBOSE_MALLOC(type_, variable_, amount_);                    \
-    /* Do this now so that we crash early if kernel overcommitted memory\
-     */                                                                 \
-    memset(variable_, 0, amount_);                                      \
-} while (0)
-
-#define ALLOC_VERBOSE_BIT_VECTOR(variable_, amount_) do {               \
-    bit_vector_init(variable_, amount_);                                \
-    size_t cur_alloc = bit_vector_memory_footprint(variable_);          \
-    tot_alloc_bytes += cur_alloc;                                       \
-    fprintf(stdout, "# MEMORY: Allocated " #variable_ " of %zuMB "      \
-                    "(total %zuMB so far)\n", cur_alloc >> 20,          \
-                    tot_alloc_bytes >> 20);                             \
-} while (0)
     /* }}} */
 
-    ALLOC_VERBOSE_MALLOC(uint64_t, sum2_row, col_max_index);
+    purge_matrix_init (mat, nrows_init_arg, col_min_index_arg,
+                       col_max_index_arg);
 
 
     set_antebuffer_path(argv0, param_list_lookup_string(pl, "path_antebuffer"));
@@ -1409,45 +1492,30 @@ int main(int argc, char **argv)
     /*}}}*/
 
     /****************** Begin interesting stuff *************************/
-    purge_data pd;
-
-    memset(pd, 0, sizeof(purge_data));
-
-    ALLOC_VERBOSE_MALLOC(index_t*, row_compact, nrows_init);
-    ALLOC_VERBOSE_CALLOC(weight_t, cols_weight, col_max_index);
-
     fprintf(stdout, "\nPass 1, reading and storing columns with index h >= "
-            "%" PRIu64 "\n", col_min_index);
-
-    nrows = nrows_init;
+                    "%" PRIu64 "\n", mat->col_min_index);
+    data_first_pass_t data1;
+    memset(data1, 0, sizeof(data_first_pass_t));
 
     /* first pass over relations in files */
     /* Note: Now that we no longer take a bitmap on input, all
      * relations are considered active at this point, so that we
      * do not need to pass a bitmap to filter_rels */
-    pd->info.nrows = filter_rels(
-            input_files,
-            (filter_rels_callback_t) &insert_rel_into_table, pd,
-            EARLYPARSE_NEED_INDEX,
-            NULL, NULL);
+    mat->nrows = filter_rels(input_files,
+                        (filter_rels_callback_t) &insert_rel_into_table, data1,
+                        EARLYPARSE_NEED_INDEX, NULL, NULL);
+    mat->ncols = data1->ncols;
 
-    if (pd->info.nrows != nrows) {
-	fprintf(stderr,
-		"Error, -nrels value should match the number of scanned "
-		"relations\nexpected %" PRIu64 " relations, found %" PRIu64
-		"\n", nrows_init, pd->info.nrows);
-        abort();
+    if (mat->nrows != mat->nrows_init)
+    {
+      fprintf(stderr, "Error, -nrels value should match the number of scanned "
+                      "relations\nexpected %" PRIu64 " relations, found "
+                      "%" PRIu64 "\n", mat->nrows_init, mat->nrows);
+      abort();
     }
 
-    ncols = pd->info.ncols;
-
-    tot_alloc_bytes += get_my_malloc_bytes();
-    fprintf(stdout, "# MEMORY: Allocated row_compact[i] %zuMB "
-                    "(total %zuMB so far)\n", get_my_malloc_bytes() >> 20,
-                    tot_alloc_bytes >> 20);
-
-    ALLOC_VERBOSE_BIT_VECTOR(row_used, nrows_init);
-    bit_vector_set(row_used, 1);
+    /* Take into account the memory allocated for all mat->row_compact[i] */
+    purge_matrix_clear_row_compact_update_mem_usage (mat);
 
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
@@ -1457,7 +1525,7 @@ int main(int argc, char **argv)
     }
 
     /* MAIN FUNCTIONS: do singletons and cliques removal. */
-    singletons_and_cliques_removal(&nrows, &ncols);
+    singletons_and_cliques_removal(&(mat->nrows), &(mat->ncols));
 
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
@@ -1468,93 +1536,75 @@ int main(int argc, char **argv)
 
     /* XXX: Are these tests useful ? Already checked after first call to
      * removal_all_singletons in singletons_and_cliques_removal. */
-    if (nrows < ncols)
+    if (mat->nrows < mat->ncols)
     {
       fprintf (stdout, "number of rows <= number of columns\n");
-      print_final_values (nrows, ncols, 0);
+      print_final_values (mat->nrows, mat->ncols, 0);
       exit(2);
     }
-    if (nrows == 0 || ncols == 0)
+    if (mat->nrows == 0 || mat->ncols == 0)
     {
       fprintf(stdout, "number of rows or number of columns is 0\n");
-      print_final_values (nrows, ncols, 0);
+      print_final_values (mat->nrows, mat->ncols, 0);
       exit(2);
     }
 
-    /* free row_compact[i] and row_compact. We no longer need them */
-    tot_alloc_bytes -= get_my_malloc_bytes();
-    fprintf(stdout, "# MEMORY: Freed row_compact[i] %zuMB "
-                    "(total %zuMB so far)\n", get_my_malloc_bytes() >> 20,
-                    tot_alloc_bytes >> 20);
-    my_malloc_free_all();
+    /* free mat->row_compact[i] and mat->row_compact. We no longer need them */
+    purge_matrix_clear_row_compact (mat);
 
-    free(row_compact);
-    size_t tmp = (nrows_init * sizeof(index_t *));
-    tot_alloc_bytes -= tmp;
-    fprintf(stdout, "# MEMORY: Freed row_compact %zuMB (total %zuMB so far)\n",
-                    tmp >> 20, tot_alloc_bytes >> 20);
-
-    /* reread the relation files and write output file(s) */
+    /****** Pass 2: reread the relation files and write output file(s) ******/
     fprintf(stdout, "\nPass 2, reading and writing output file%s...\n",
                     deletedname == NULL ? "" : "s");
+    data_second_pass_t data2;
+    memset(data2, 0, sizeof(data_second_pass_t));
 
-    if (!(pd->fd[0] = fopen_maybe_compressed(purgedname, "w"))) {
-	fprintf(stderr, "Error, cannot open file %s for writing.\n",
-		purgedname);
-	exit(1);
+    if (!(data2->fd[0] = fopen_maybe_compressed(purgedname, "w")))
+    {
+      fprintf(stderr, "Error, cannot open file %s for writing.\n", purgedname);
+      exit(1);
     }
 
-    if (deletedname != NULL) {
-	if (!(pd->fd[1] = fopen_maybe_compressed(deletedname, "w"))) {
-	    fprintf(stderr, "Error, cannot open file %s for writing.\n",
-		    deletedname);
-	    exit(1);
-	}
-      else
+    if (deletedname != NULL)
+    {
+      if (!(data2->fd[1] = fopen_maybe_compressed(deletedname, "w")))
       {
-          fprintf(pd->fd[1], "# %" PRIu64 "\n", nrows_init - nrows);
+        fprintf(stderr, "Error, cannot open file %s for writing.\n",
+                        deletedname);
+        exit(1);
       }
+      /* Write the header line for the file of deleted relations. */
+      fprintf(data2->fd[1], "# %" PRIu64 "\n", mat->nrows_init - mat->nrows);
     }
 
     /* Write the header line for the file of remaining relations:
      * compute last index i such that cols_weight[i] != 0
      */
     {
-	uint64_t last_used = col_max_index - 1;
-	while (cols_weight[last_used] == 0)
-	    last_used--;
+      uint64_t last_used = mat->col_max_index - 1;
+      while (mat->cols_weight[last_used] == 0)
+        last_used--;
 
-	fprintf(pd->fd[0], "# %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", nrows,
-		last_used + 1, ncols);
+      fprintf(data2->fd[0], "# %" PRIu64 " %" PRIu64 " %" PRIu64 "\n",
+                            mat->nrows, last_used + 1, mat->ncols);
     }
 
     /* second pass over relations in files */
-    filter_rels(
-            input_files,
-            (filter_rels_callback_t) &thread_print, pd,
-            EARLYPARSE_NEED_LINE,
-            NULL, NULL);
+    filter_rels(input_files, (filter_rels_callback_t) &thread_print, data2,
+                EARLYPARSE_NEED_LINE, NULL, NULL);
 
     /* write final values to stdout */
     /* This output, incl. "Final values:", is required by the script */
-    print_final_values (nrows, ncols, pd->info.W);
+    print_final_values (mat->nrows, mat->ncols, data2->W);
 
     /* Free allocated stuff */
-    if (cols_weight != NULL)
-	free(cols_weight);
-    cols_weight = NULL;
-    if (sum2_row != NULL)
-      free(sum2_row);
-    sum2_row = NULL;
-
-    bit_vector_clear(row_used);
-
     if (filelist)
-        filelist_clear(input_files);
+      filelist_clear(input_files);
 
-    fclose_maybe_compressed(pd->fd[0], purgedname);
-    if (pd->fd[1]) fclose_maybe_compressed(pd->fd[1], deletedname);
+    fclose_maybe_compressed(data2->fd[0], purgedname);
+    if (data2->fd[1])
+      fclose_maybe_compressed(data2->fd[1], deletedname);
 
+    purge_matrix_clear (mat);
     /* print usage of time and memory */
     print_timing_and_memory(wct0);
 
