@@ -269,7 +269,11 @@ uint64_buffer_pop_todo (uint64_buffer_ptr buf)
 /* Binary tree of comp_t sorted by weight of the connected component.
  * The two sons of a node of index n are the nodes of indexes 2n+1 and 2n+1.
  * The property is: the weight of the comp_t father is less than its 2 sons.
- * so root of the tree is the connected component with the smallest weight. */
+ * so root of the tree is the connected component with the smallest weight.
+ * When the tree is full, a new node is inserted in the tree iff its weight is
+ * greater than the weight of the root (and the root is removed from the tree).
+ * At the end the tree contained the 'size' (= 'alloc') heaviest comp_t.
+ */
 struct comp_sorted_bin_tree_s {
   size_t alloc;
   size_t size;
@@ -302,56 +306,62 @@ comp_sorted_bin_tree_clear (comp_sorted_bin_tree_ptr T)
   T->size = T->alloc = 0;
 }
 
-static void
-comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
+static inline void
+comp_sorted_bin_tree_qsort (comp_sorted_bin_tree_ptr T,
+                            int (*cmp_fct)(const void *, const void *))
 {
-  size_t son, father, place;
-  son = T->size;
-  while (son)
-  {
-    father = (son - 1) >> 1;
-    if (UNLIKELY (new_node.w >= T->tree[father].w))
-      break;
-    son = father;
-  }
-  place = son;
-  son = (T->size)++;
-  while (place != son)
-  {
-    father = (son - 1) >> 1;
-    T->tree[son] = T->tree[father];
-    son = father;
-  }
-  T->tree[son] = new_node;
+  qsort (T->tree, T->size, sizeof(comp_t), cmp_fct);
 }
 
 static void
-comp_sorted_bin_tree_replace (comp_sorted_bin_tree_ptr T, comp_t new_node)
+comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
 {
-  ASSERT_EXPENSIVE (T->tree[0].w < new_node.w);
-  size_t father = 0;
-  for (;;) /* In this loop, always, clique_graph[father].w < weight_clique */
+  /* If the tree is not full, add new_node at the end and go up. */
+  if (UNLIKELY (T->size < T->alloc))
   {
-    float weight1, weight2;
-    size_t son = father * 2 + 1; /* son is son1 */
-    if (UNLIKELY (son >= T->alloc)) /* No son: father is a leaf. Found! */
-      break;
-    weight1 = T->tree[son].w;
-    weight2 = T->tree[son + 1].w;
-    if (UNLIKELY(weight1 > weight2))
+    size_t cur = T->size;
+    while (cur)
     {
-      son++; /* son is here the son 2 */
-      weight1 = weight2;
+      size_t father = (cur - 1) >> 1;
+      if (UNLIKELY (new_node.w >= T->tree[father].w))
+        break;
+      T->tree[cur] = T->tree[father];
+      cur = father;
     }
-    /* here, weight1 is the lightest weight and son is its clique index */
-    if (UNLIKELY (weight1 >= new_node.w)) /* Found! */
-      break;
-    /* The lightest son has a weight lighter than clique, so we have to go
-     * down the tree, but before the son replaces its father. */
-    T->tree[father] = T->tree[son];
-    father = son;
+    T->size++;
+    T->tree[cur] = new_node;
   }
-  T->tree[father] = new_node;
+  /* If the tree is full, insert new_node iff the weight of new_node if greater
+   * than the weight of the root. In this case, replace the root by new node
+   * and go down */
+  else if (UNLIKELY(new_node.w > T->tree[0].w))
+  {
+    size_t cur = 0;
+    for (;;) /* In this loop, always, T->tree[cur].w < new_node.w */
+    {
+      float lightest_weight, other_weight;
+      size_t lightest_son = cur * 2 + 1; /* son is son1 */
+      /* If there is no son: cur is a leaf. Found! */
+      if (UNLIKELY (lightest_son >= T->alloc))
+        break;
+      lightest_weight = T->tree[lightest_son].w; /* weight of son 1 */
+      other_weight = T->tree[lightest_son + 1].w; /* weight of son 2 */
+      if (UNLIKELY(other_weight < lightest_weight))
+      {
+        lightest_son++; /* lightest_son is now son 2 */
+        lightest_weight = other_weight;
+      }
+      /* Now lightest_son and lightest_weight are correct */
+      if (UNLIKELY (new_node.w <= lightest_weight)) /* Found! */
+        break;
+      /* The lightest_son has a weight lighter than new_node, so we have to go
+       * down the tree, but before the son replaces its father. */
+      T->tree[cur] = T->tree[lightest_son];
+      cur = lightest_son;
+    }
+    T->tree[cur] = new_node;
+  }
+  /* else do nothing */
 }
 
 /*****************************************************************************/
@@ -602,10 +612,7 @@ compute_sorted_list_of_connected_components_mt (void *pt)
                                               buf);
         if (UNLIKELY (!nb_rows))
           continue;
-        if (UNLIKELY (data->comp_tree->size < data->comp_tree->alloc))
-          comp_sorted_bin_tree_insert (data->comp_tree, clique);
-        else if (UNLIKELY(clique.w > data->comp_tree->tree[0].w))
-          comp_sorted_bin_tree_replace (data->comp_tree, clique);
+        comp_sorted_bin_tree_insert (data->comp_tree, clique);
       }
     }
     clique.i = save_i + BV_BITS;
@@ -620,8 +627,7 @@ compute_sorted_list_of_connected_components_mt (void *pt)
   }
   uint64_buffer_clear (buf);
   /* Re-order the connected component by decreasing weight. */
-  qsort (data->comp_tree->tree, data->comp_tree->size, sizeof(comp_t),
-                                                     comp_cmp_weight);
+  comp_sorted_bin_tree_qsort (data->comp_tree, comp_cmp_weight);
   pthread_exit (NULL);
   return NULL;
 }
