@@ -1137,6 +1137,7 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
 }
 
 /* Galois automorphisms
+   autom2.1: 1/x
    autom3.1: 1-1/x
    autom3.2: -1-1/x
    autom4.1: -(x+1)/(x-1)
@@ -1151,7 +1152,8 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	return 0;
     int ord = 0;
     int A, B, C, D; // x -> (A*x+B)/(C*x+D)
-    if(strcmp(galois_autom, "1/x") == 0 || strcmp(galois_autom, "1/y") == 0){
+    if(strcmp(galois_autom, "autom2.1") == 0 
+       || strcmp(galois_autom, "1/y") == 0){
 	ord = 2; A = 0; B = 1; C = 1; D = 0;
     }
     else if(strcmp(galois_autom, "autom3.1") == 0){
@@ -1206,88 +1208,6 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	modul_set_ul(r1, rr, mm);
 	// build ord-1 conjugates for roots[k]
 	for(int l = 0; l < ord; l++){
-#if 0
-	    if(strcmp(galois_autom, "autom3.1") == 0){
-		// r1 <- sigma(r1) = 1-1/r1
-		if(modul_intequal_ul(r1, qq))
-		    // r1 = oo => 1/r1 = 0
-		    modul_set_ul(r1, 1, mm);
-		else if(modul_is0(r1, mm)){
-		    // 1/0 = oo
-		    modul_set_ul(r1, qq, mm);
-		}
-		else{
-		    modul_inv(r2, r1, mm);
-		    modul_set_ul(r1, 1, mm);
-		    modul_sub(r1, r1, r2, mm);
-		}
-		modul_set(conj[l], r1, mm);
-	    }
-	    else if(strcmp(galois_autom, "autom3.2") == 0){
-		// r1 <- sigma(r1) = -1-1/r1 = -(1+1/r1)
-		if(modul_intequal_ul(r1, qq)){
-		    // r1 = oo => 1/r1 = 0
-		    modul_set_ul(r1, 1, mm);
-		    modul_neg(r1, r1, mm);
-		}
-		else if(modul_is0(r1, mm)){
-		    // 1/0 = oo
-		    modul_set_ul(r1, qq, mm);
-		}
-		else{
-		    modul_inv(r2, r1, mm);
-		    modul_set_ul(r1, 1, mm);
-		    modul_add(r1, r1, r2, mm);
-		    modul_neg(r1, r1, mm);
-		}
-		modul_set(conj[l], r1, mm);
-	    }
-	    else if(strcmp(galois_autom, "autom4.1") == 0){
-		// r1 <- sigma(r1) = -(r1+1)/(r1-1)
-		if(modul_intequal_ul(r1, 1))
-		    // r1 = 1 => 1/(r1-1) = oo
-		    modul_set_ul(r1, qq, mm);
-		else if(modul_intequal_ul(r1, qq)){
-		    // sigma(oo) = -1
-		    modul_set_ul(r1, 1, mm);
-		    modul_neg(r1, r1, mm);
-		}
-		else{
-		    // r1 <- r1_orig-1
-		    modul_sub_ul(r1, r1, 1, mm);
-		    modul_inv(r2, r1, mm);
-		    // r1 <- r1_orig+1
-		    modul_add_ul(r1, r1, 2, mm);
-		    // r1 <- (r1_orig+1)/(r1_orig-1)
-		    modul_mul(r1, r1, r2, mm);
-		    modul_neg(r1, r1, mm);
-		}
-		modul_set(conj[l], r1, mm);
-	    }
-	    else if(strcmp(galois_autom, "autom6.1") == 0){
-		// r1 <- sigma(r1) = -(2*r1+1)/(r1-1)
-		if(modul_intequal_ul(r1, 1))
-		    // r1 = 1 => 1/(r1-1) = oo
-		    modul_set_ul(r1, qq, mm);
-		else if(modul_intequal_ul(r1, qq)){
-		    // sigma(oo) = -2
-		    modul_set_ul(r1, 2, mm);
-		    modul_neg(r1, r1, mm);
-		}
-		else{
-		    // r1 <- r1_orig-1
-		    modul_sub_ul(r1, r1, 1, mm);
-		    modul_inv(r2, r1, mm);
-		    // r1 <- 2*r1_orig+1 = 2*(r1_orig-1)+3
-		    modul_add(r1, r1, r1, mm);
-		    modul_add_ul(r1, r1, 3, mm);
-		    // r1 <- (2*r1_orig+1)/(r1_orig-1)
-		    modul_mul(r1, r1, r2, mm);
-		    modul_neg(r1, r1, mm);
-		}
-		modul_set(conj[l], r1, mm);
-	    }
-#else
 	    if(modul_intequal_ul(r1, qq)){
 		// FIXME: sigma(oo) = A/C
 		ASSERT_ALWAYS(0);
@@ -1305,7 +1225,6 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	    modul_add(r1, r1, mat[1], mm);
 	    modul_mul(r1, r3, r1, mm);
 	    modul_set(conj[l], r1, mm);
-#endif
 	}
 #if 0 // debug. 
 	printf("orbit for %lu: %lu", qq, rr);
@@ -1403,9 +1322,9 @@ static void add_relations_with_galois(const char *galois, FILE *output,
     a = rel.a; b = rel.b; // should be obsolete one day
     // (a0, b0) = sigma^0((a, b)) = (a, b)
     a0 = rel.a; b0 = (int64_t)rel.b;
-    if(strcmp(galois, "1/x") == 0 || strcmp(galois, "1/y") == 0)
+    if(strcmp(galois, "autom2.1") == 0)
 	// remember, 1/x is for plain autom
-	// 1/y is for special Galois: x^4+1
+	// 1/y is for special Galois: x^4+1 -> DO NOT DUPLICATE RELATIONS!
 	// (a-b/x) = 1/x*(-b+a*x)
 	adwg(output, comment, cpt, rel, -b0, -a0);
     else if(strcmp(galois, "autom3.1") == 0){
