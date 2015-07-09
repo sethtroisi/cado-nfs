@@ -88,3 +88,41 @@ void list_int64_vector_index_sort_last(list_int64_vector_index_ptr list)
 {
   qsort(list->v, list->length, sizeof(list->v[0]), compare_vector_last);
 }
+
+void list_int64_vector_index_delete_int64_vector_index(
+    list_int64_vector_index_ptr list, unsigned int pos)
+{
+  for (unsigned int i = pos + 1; i < list->length; i++) {
+    int64_vector_set(list->v[i - 1]->vec, list->v[i]->vec);
+    list->v[i - 1]->index = list->v[i]->index;
+  }
+  list->length--;
+}
+
+void list_int64_vector_index_remove_duplicate(list_int64_vector_index_ptr list)
+{
+  for (unsigned int i = 0; i < list->length - 1; i++) {
+    for (unsigned int j = i + 1; j < list->length; j++) {
+      if (int64_vector_equal(list->v[i]->vec, list->v[j]->vec) == 0) {
+        list_int64_vector_index_delete_int64_vector_index(list, j);
+      }
+    }
+  }
+}
+
+void list_int64_vector_index_remove_duplicate_sort(
+    list_int64_vector_index_ptr list)
+{
+  list_int64_vector_index_sort_last(list);
+
+  for (unsigned int i = 0; i < list->length - 1; i++) {
+    unsigned int current = i + 1;
+    while (current < list->length && list->v[i]->vec->c[list->vector_dim - 1]
+        == list->v[current]->vec->c[list->vector_dim - 1]) {
+      if (int64_vector_equal(list->v[i]->vec, list->v[current]->vec) == 0) {
+        list_int64_vector_index_delete_int64_vector_index(list, current);
+      }
+      current++;
+    }
+  }
+}

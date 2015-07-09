@@ -72,4 +72,12 @@ void list_int64_vector_index_fprintf_comment(FILE * file,
 
 void list_int64_vector_index_sort_last(list_int64_vector_index_ptr list);
 
+void list_int64_vector_index_delete_int64_vector_index(
+    list_int64_vector_index_ptr list, unsigned int pos);
+
+void list_int64_vector_index_remove_duplicate(
+    list_int64_vector_index_ptr list);
+
+void list_int64_vector_index_remove_duplicate_sort(
+    list_int64_vector_index_ptr list);
 #endif /* LIST_INT64_VECTOR_INDEX_H */
