@@ -96,5 +96,34 @@ purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr mat)
                   "far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
 }
 
+/* Delete a row: set mat->row_used[i] to 0, update the count of the columns
+ * appearing in that row, mat->nrows and mat->ncols.
+ * Warning: we only update the count of columns that we consider, i.e.,
+ * columns with index >= mat->col_min_index.
+ * CAREFUL: no multithread compatible with " !(--(*o))) " and
+ * bit_vector_clearbit.
+ */
+void
+purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i)
+{
+  index_t *row;
+  weight_t *w;
+
+  for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+  {
+    w = &(mat->cols_weight[*row]);
+    ASSERT(*w);
+    /* Decrease only if not equal to the maximum value */
+    /* If weight becomes 0, we just remove a column */
+    if (*w < UMAX(*w) && !(--(*w)))
+      mat->ncols--;
+  }
+  /* We do not free mat->row_compact[i] as it is freed later with
+     my_malloc_free_all */
+  bit_vector_clearbit (mat->row_used, (size_t) i);
+  mat->nrows--;
+}
 
 
+
+#endif /* PURGE_MATRICE_H_ */

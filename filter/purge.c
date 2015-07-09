@@ -330,36 +330,6 @@ comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
   /* else do nothing */
 }
 
-/*****************************************************************************/
-
-/* Delete a row: set mat->row_used[i] to 0, update the count of the columns
- * appearing in that row.
- * Warning: we only update the count of columns that we consider, i.e.,
- * columns with index >= mat->col_min_index.
- * CAREFUL: no multithread compatible with " !(--(*o))) " and
- * bit_vector_clearbit.
- */
-static void
-delete_row (purge_matrix_ptr mat, uint64_t i)
-{
-  index_t *row;
-  weight_t *w;
-
-  for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
-  {
-    w = &(mat->cols_weight[*row]);
-    ASSERT(*w);
-    /* Decrease only if not equal to the maximum value */
-    /* If weight becomes 0, we just remove a column */
-    if (*w < UMAX(*w) && !(--(*w)))
-      mat->ncols--;
-  }
-  /* We do not free mat->row_compact[i] as it is freed later with
-     my_malloc_free_all */
-  bit_vector_clearbit (mat->row_used, (size_t) i);
-  mat->nrows--;
-}
-
 /************* Code for clique (= connected component) removal ***************/
 
 /* Compute connected component beginning at row clique->i
@@ -449,8 +419,8 @@ delete_connected_component (purge_matrix_ptr mat, uint64_t cur_row,
 
   /* Now, we deleted all rows explored */
   for (uint64_t *pt = row_buffer->begin; pt < row_buffer->next_todo; pt++)
-    delete_row (mat, *pt);
-    /* mat->nrows and mat->ncols are updated by delete_row. */
+    purge_matrix_delete_row (mat, *pt);
+    /* mat->nrows and mat->ncols are updated by purge_matrix_delete_row. */
 }
 
 /***** Functions to compute mat->sum2_row array (mono and multi thread) *******/
@@ -855,8 +825,8 @@ static void onepass_singleton_removal (purge_matrix_ptr mat)
       {
         if (mat->cols_weight[*row] == 1)
         {
-          /* mat->nrows and mat->ncols are updated by delete_row. */
-          delete_row (mat, i);
+          /* mat->nrows and mat->ncols are updated by purge_matrix_delete_row.*/
+          purge_matrix_delete_row (mat, i);
           break;
         }
       }
