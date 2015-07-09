@@ -96,6 +96,55 @@ purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr mat)
                   "far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
 }
 
+
+/* Set a row of a purge_matrix_t from a read relation.
+ * The row that is set is decided by the relation number rel->num
+ * We put in mat->row_compact only primes such that their index h is greater or
+ * equal to mat->col_min_index.
+ * A row in mat->row_compact is ended by a -1 (= UMAX(index_t))
+ * The number of columns mat->ncols is updated is necessary.
+ * The number of rows mat->ncols is increased by 1.
+ *
+ * The return type of this function is void * instead of void so we can use it
+ * as a callback function for filter_rels.
+ *
+ * Not thread-safe.
+ */
+
+void *
+purge_matrix_set_row_from_rel (purge_matrix_t mat, earlyparsed_relation_ptr rel)
+{
+  ASSERT_ALWAYS(rel->num < mat->nrows_init);
+
+  unsigned int nb_above_min_index = 0;
+  for (weight_t i = 0; i < rel->nb; i++)
+    nb_above_min_index += (rel->primes[i].h >= mat->col_min_index);
+
+  index_t *tmp_row = index_my_malloc (1 + nb_above_min_index);
+  unsigned int next = 0;
+  for (weight_t i = 0; i < rel->nb; i++)
+  {
+    index_t h = rel->primes[i].h;
+    if (mat->cols_weight[h] == 0)
+    {
+      mat->cols_weight[h] = 1;
+      (mat->ncols)++;
+    }
+    else if (mat->cols_weight[h] != UMAX(weight_t))
+      mat->cols_weight[h]++;
+
+    if (h >= mat->col_min_index)
+      tmp_row[next++] = h;
+  }
+
+  tmp_row[next] = UMAX(index_t); /* sentinel */
+  mat->row_compact[rel->num] = tmp_row;
+  (mat->nrows)++;
+
+  return NULL;
+}
+
+
 /* Delete a row: set mat->row_used[i] to 0, update the count of the columns
  * appearing in that row, mat->nrows and mat->ncols.
  * Warning: we only update the count of columns that we consider, i.e.,

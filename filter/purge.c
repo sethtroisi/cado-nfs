@@ -932,19 +932,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
   }
 }
 
-/*************** Callback functions called by filter_rels ********************/
-
-/* Callback function called by filter_rels on pass 1 */
-void *
-insert_rel_into_table (purge_matrix_ptr mat, earlyparsed_relation_ptr rel)
-{
-  ASSERT_ALWAYS(rel->num < mat->nrows_init);
-  // TODO: following fct should have only 2 args: mat and rel
-  mat->ncols += insert_rel_in_table_no_e(rel, mat->col_min_index, mat->row_compact,
-                                         mat->cols_weight);
-
-  return NULL;
-}
+/*************** Callback function called by filter_rels ********************/
 
 /* Data struct for thread_print (called by filter_rels on pass 2) */
 struct data_second_pass_s
@@ -1234,8 +1222,8 @@ int main(int argc, char **argv)
      * relations are considered active at this point, so that we
      * do not need to pass a bitmap to filter_rels */
     mat->nrows = filter_rels(input_files,
-                        (filter_rels_callback_t) &insert_rel_into_table, mat,
-                        EARLYPARSE_NEED_INDEX, NULL, NULL);
+                        (filter_rels_callback_t) &purge_matrix_set_row_from_rel,
+                        mat, EARLYPARSE_NEED_INDEX, NULL, NULL);
 
     if (mat->nrows != mat->nrows_init)
     {
