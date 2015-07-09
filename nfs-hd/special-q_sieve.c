@@ -737,8 +737,6 @@ void mode_sieve(MAYBE_UNUSED sieving_bound_srcptr H,
 #ifdef NUMBER_HIT
   if (nbint) {
     number_of_hit = number_of_hit + number_c_l;
-    /*printf("Hit: %" PRIu64 "\n", number_of_hit);*/
-    /*getchar();*/
   }
 #endif // NUMBER_HIT
 
@@ -1361,8 +1359,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
+  uint64_t ideal_line_sieve = 0;
   double time_plane_sieve = 0;
+  uint64_t ideal_plane_sieve = 0;
   double time_space_sieve = 0;
+  uint64_t ideal_space_sieve = 0;
   double sec_sieves = 0;
 #endif // TIME_SIEVES
 
@@ -1457,6 +1458,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
 #ifdef TIME_SIEVES
     time_line_sieve = time_line_sieve + seconds() - sec_sieves;
+    ideal_line_sieve++;
 #endif // TIME_SIEVES
 
     } else if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
@@ -1496,6 +1498,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
 #ifdef TIME_SIEVES
     time_plane_sieve = time_plane_sieve + seconds() - sec_sieves;
+    ideal_plane_sieve++;
 #endif // TIME_SIEVES
     } else {
 
@@ -1566,6 +1569,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
 #ifdef TIME_SIEVES
     time_space_sieve = time_space_sieve + seconds() - sec_sieves;
+    ideal_space_sieve++;
 #endif // TIME_SIEVES
     }
 
@@ -1585,9 +1589,15 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // TIMER_SIEVE
 
 #ifdef TIME_SIEVES
-  printf("# Perform line sieve: %f\n", time_line_sieve);
-  printf("# Perform plane sieve: %f\n", time_plane_sieve);
-  printf("# Perform space sieve: %f\n", time_space_sieve);
+  printf("# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+      time_line_sieve, ideal_line_sieve,
+      time_line_sieve / (double)ideal_line_sieve);
+  printf("# Perform plane sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+      time_plane_sieve, ideal_plane_sieve,
+      time_plane_sieve / (double)ideal_plane_sieve);
+  printf("# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+      time_space_sieve, ideal_space_sieve,
+      time_space_sieve / (double)ideal_space_sieve);
 #endif // TIME_SIEVES
 }
 
