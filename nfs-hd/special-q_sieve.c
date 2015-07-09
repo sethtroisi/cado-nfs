@@ -1413,14 +1413,18 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
         //TODO: delete the modulo.
         for (unsigned int j = 1; j < H->t; j++) {
           c0 = c0 + (int64_t)pseudo_Tqr[j] * c->c[j];
-          if (c0 >= (int64_t)r->ideal->r || c0 < 0) {
-            c0 = c0 % (int64_t)r->ideal->r;
+          if (c0 >= (int64_t) r->ideal->r) {
+            while(c0 >= (int64_t)r->ideal->r) {
+              c0 = c0 - (int64_t)r->ideal->r;
+            }
+          } else if (c0 < 0) {
+            while(c0 < (int64_t)r->ideal->r) {
+              c0 = c0 + (int64_t)r->ideal->r;
+            }
+            c0 = c0 - (int64_t)r->ideal->r;
           }
         }
-        if (c0 < 0) {
-          c0 = c0 + (int64_t)r->ideal->r;
-        }
-        ASSERT(c0 >= 0);
+        ASSERT(c0 >= 0 && c0 < (int64_t)r->ideal->r);
         //Number of c with the same c[1], …, c[t-1].
         uint64_t number_c = array->number_element / (2 * H->h[0]);
 
