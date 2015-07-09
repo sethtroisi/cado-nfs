@@ -129,7 +129,7 @@ compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
 		      ASSERT_ALWAYS(sigma_r < old_p);
 		  }
 	      }
-	      else if(strcmp(action, "-y") == 0){
+	      else if(strcmp(action, "_y") == 0){
 		  if (r[k] == 0)
 		      sigma_r = 0;
 		  else if (r[k] == old_p)
@@ -279,7 +279,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "nrels", "(approximate) number of input relations");
-  param_list_decl_usage(pl, "galois", "Galois action among 1/y or -y");
+  param_list_decl_usage(pl, "galois", "Galois action among 1/y or _y");
   verbose_decl_usage(pl);
 }
 
@@ -369,7 +369,7 @@ main (int argc, char *argv[])
   }
   K = 100 + 1.2 * nrels_expected;
 
-  if( action == NULL || (strcmp(action, "1/y") && strcmp(action, "-y")) )
+  if( action == NULL || (strcmp(action, "1/y") && strcmp(action, "_y")) )
   {
     fprintf(stderr, "Error, missing -action command line argument\n");
     usage(pl, argv0);
