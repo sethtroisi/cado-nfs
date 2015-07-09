@@ -702,7 +702,7 @@ static void
 cliques_removal (purge_matrix_ptr mat, int64_t target_excess,
                  unsigned int nthreads, int verbose)
 {
-  int64_t excess = (((int64_t) mat->nrows) - mat->ncols);
+  int64_t excess = purge_matrix_compute_excess (mat);
   uint64_t nb_clique_deleted = 0;
   size_t i, max_nb_comp_per_thread;
 
@@ -810,13 +810,17 @@ cliques_removal (purge_matrix_ptr mat, int64_t target_excess,
 }
 
 /*****************************************************************************/
+
+/* write final values to stdout */
+/* This output, incl. "Final values:", is required by the script */
 static void
-print_final_values (uint64_t nrows, uint64_t ncols, double weight)
+print_final_values (purge_matrix_ptr mat, double weight)
 {
+  int64_t excess = purge_matrix_compute_excess (mat);
   fprintf (stdout, "Final values:\nnrows=%" PRIu64 " ncols=%" PRIu64 " "
                    "excess=%" PRId64 "\nweight=%1.0f weight*nrows=%1.2e\n",
-                   nrows, ncols, ((int64_t) nrows) - ncols, weight,
-                   weight * (double) nrows);
+                   mat->nrows, mat->ncols, excess, weight,
+                   weight * (double) mat->nrows);
   fflush (stdout);
 }
 
@@ -837,7 +841,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
   if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
     fprintf (stdout, "number of rows <= number of columns\n");
-    print_final_values (mat->nrows, mat->ncols, 0);
+    print_final_values (mat, 0);
     exit(2);
   }
 
@@ -846,7 +850,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
     fprintf (stdout, "(excess / ncols) = %.2f < %.2f. See -required_excess "
                      "argument.\n", ((double) excess / (double) mat->ncols),
                      required_excess);
-    print_final_values (mat->nrows, mat->ncols, 0);
+    print_final_values (mat, 0);
     exit(2);
   }
 
@@ -1267,13 +1271,13 @@ int main(int argc, char **argv)
     if (mat->nrows < mat->ncols)
     {
       fprintf (stdout, "number of rows <= number of columns\n");
-      print_final_values (mat->nrows, mat->ncols, 0);
+      print_final_values (mat, 0);
       exit(2);
     }
     if (mat->nrows == 0 || mat->ncols == 0)
     {
       fprintf(stdout, "number of rows or number of columns is 0\n");
-      print_final_values (mat->nrows, mat->ncols, 0);
+      print_final_values (mat, 0);
       exit(2);
     }
 
@@ -1323,7 +1327,7 @@ int main(int argc, char **argv)
 
     /* write final values to stdout */
     /* This output, incl. "Final values:", is required by the script */
-    print_final_values (mat->nrows, mat->ncols, data2->W);
+    print_final_values (mat, data2->W);
 
     /* Free allocated stuff */
     if (filelist)

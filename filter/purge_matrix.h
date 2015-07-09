@@ -26,5 +26,6 @@ void purge_matrix_clear (purge_matrix_ptr);
 void purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr);
 void purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i);
 
+#define purge_matrix_compute_excess(m) (((int64_t)m->nrows)-((int64_t)m->ncols))
 
 #endif /* PURGE_MATRICE_H_ */

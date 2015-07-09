@@ -164,7 +164,7 @@ singleton_removal (purge_matrix_ptr mat, unsigned int nthreads, int verbose)
   do
   {
     oldnrows = mat->nrows;
-    excess = (((int64_t) mat->nrows) - mat->ncols);
+    excess = purge_matrix_compute_excess (mat);
     if (verbose >= 0) /* if no quiet */
     {
       if (iter == 0)
