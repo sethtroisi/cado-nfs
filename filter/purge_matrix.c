@@ -123,7 +123,3 @@ purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i)
   bit_vector_clearbit (mat->row_used, (size_t) i);
   mat->nrows--;
 }
-
-
-
-#endif /* PURGE_MATRICE_H_ */
