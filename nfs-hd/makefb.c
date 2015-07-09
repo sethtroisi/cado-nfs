@@ -876,6 +876,10 @@ int main(int argc, char ** argv)
 
   initialise_parameters(argc, argv, &f, &fbb, &fb, &t, &lpb, &V, &p, &n);
 
+#ifdef TIME_MAKEFB
+  double sec = seconds();
+#endif // TIME_MAKEFB
+
   makefb(fb, f, fbb, t, lpb, V);
 
   //5 because name of the file is p,n,V.
@@ -889,6 +893,10 @@ int main(int argc, char ** argv)
     export_factor_base(file, fb[i], f[i], fbb[i], lpb[i], t);
     fclose(file);
   }
+
+#ifdef TIME_MAKEFB
+  printf("# Time to build makefb: %fs.\n", seconds() - sec);
+#endif // TIME_MAKEFB
 
   free(f);
   free(fbb);
