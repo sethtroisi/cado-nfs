@@ -70,6 +70,8 @@ filter/merge_replay_matrix.c
 filter/merge_replay_matrix.h
 filter/purge_matrix.c
 filter/purge_matrix.h
+filter/singleton_removal.c
+filter/singleton_removal.h
 filter/markowitz.c
 filter/markowitz.h
 filter/merge.c

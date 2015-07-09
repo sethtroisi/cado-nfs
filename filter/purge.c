@@ -79,6 +79,7 @@
 
 #include "filter_common.h"
 #include "purge_matrix.h"
+#include "singleton_removal.h"
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
@@ -809,169 +810,6 @@ cliques_removal (purge_matrix_ptr mat, int64_t target_excess,
 }
 
 /*****************************************************************************/
-/* Code for singletons removal.
- * Exist in multithread if __sync_sub_and_fetch exists.
- */
-
-#ifndef HAVE_SYNC_FETCH
-static void onepass_singleton_removal (purge_matrix_ptr mat)
-{
-  for (uint64_t i = 0; i < mat->nrows_init; i++)
-  {
-    if (bit_vector_getbit(mat->row_used, (size_t) i))
-    {
-      index_t *row;
-      for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
-      {
-        if (mat->cols_weight[*row] == 1)
-        {
-          /* mat->nrows and mat->ncols are updated by purge_matrix_delete_row.*/
-          purge_matrix_delete_row (mat, i);
-          break;
-        }
-      }
-    }
-  }
-}
-
-#else       /* ifndef HAVE_SYNC_FETCH */
-
-typedef struct
-{
-  /* Read only */
-  pthread_t mt;
-  uint64_t begin, end;
-  /* Read / Write */
-  uint64_t sup_nrow, sup_ncol;
-  purge_matrix_ptr mat;
-} ti_t;
-
-/* Hightest criticality for performance. I inline all myself. */
-static void onepass_thread_singleton_removal(ti_t * mti)
-{
-  index_t *row;
-  weight_t *w;
-  bv_t j;
-  purge_matrix_ptr mat = mti->mat;
-  
-  mti->sup_nrow = mti->sup_ncol = 0;
-  for (uint64_t i = mti->begin; i < mti->end; i++)
-  {
-    j = (((bv_t) 1) << (i & (BV_BITS - 1)));
-    
-    if (mat->row_used->p[i >> LN2_BV_BITS] & j) /* Still active ? */
-    {
-      for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
-      {
-        if (UNLIKELY(mat->cols_weight[*row] == 1)) /* We found a singleton */
-        {
-          for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
-          {
-            w = &(mat->cols_weight[*row]);
-            ASSERT(*w);
-            /* Decrease only if not equal to the maximum value */
-            /* If weight becomes 0, we just remove a column */
-            if (*w < UMAX(*w) && !__sync_sub_and_fetch(w, 1))
-              (mti->sup_ncol)++;
-          }
-          /* We do not free mat->row_compact[i] as it is freed later with
-             my_malloc_free_all */
-          /* This is thread-safe because we know that all rows in
-             mti->row_used->p[i >> LN2_BV_BITS] are handled by the same thread*/
-          mat->row_used->p[i >> LN2_BV_BITS] &= ~j;
-          (mti->sup_nrow)++;
-          break;
-        }
-      }
-    }
-  }
-  pthread_exit(NULL);
-}
-
-static void
-onepass_singleton_parallel_removal (purge_matrix_ptr mat, unsigned int nthreads)
-{
-  pthread_attr_t attr;
-  uint64_t pas, incr;
-  unsigned int i;
-  int err;
-  ti_t *ti;
-
-  ti = (ti_t *) malloc (nthreads * sizeof(ti_t));
-  ASSERT_ALWAYS(ti != NULL);
-  ti[0].begin = 0;
-  pas = (mat->nrows_init / nthreads) & ((uint64_t) ~ (BV_BITS - 1));
-  incr = 0;
-  for (i = 0, incr = 0; i < nthreads - 1;)
-  {
-    ti[i].mat = mat;
-    incr += pas;
-    ti[i++].end = incr;
-    ti[i].begin = incr;
-  }
-  ti[i].end = mat->nrows_init;
-  ti[i].mat = mat;
-
-  pthread_attr_init (&attr);
-  pthread_attr_setstacksize (&attr, 1 << 16);
-  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
-  for (i = 0; i < nthreads; i++)
-  {
-    if ((err = pthread_create(&ti[i].mt, &attr,
-                        (void *) onepass_thread_singleton_removal, &(ti[i]))))
-    {
-      fprintf(stderr, "onepass_singleton_parallel_removal : pthread_create "
-                      "error 1: %d. %s\n", err, strerror(errno));
-      exit(1);
-    }
-  }
-  for (i = 0; i < nthreads; i++)
-  {
-    pthread_join(ti[i].mt, NULL);
-    mat->nrows -= ti[i].sup_nrow;
-    mat->ncols -= ti[i].sup_ncol;
-  }
-  pthread_attr_destroy(&attr);
-  free(ti);
-}
-#endif      /* ifdef HAVE_SYNC_FETCH */
-
-/* Return the excess at the end */
-static int64_t
-remove_all_singletons (purge_matrix_ptr mat, unsigned int nthreads)
-{
-  int64_t excess;
-  uint64_t oldnrows;
-  unsigned int iter = 0;
-  do
-  {
-    oldnrows = mat->nrows;
-    excess = (((int64_t) mat->nrows) - mat->ncols);
-    if (iter == 0)
-      fprintf(stdout, "Sing. rem.: begin with: ");
-    else
-      fprintf(stdout, "Sing. rem.:   iter %03u: ", iter);
-    fprintf(stdout, "nrows=%" PRIu64 " ncols=%" PRIu64 " excess=%" PRId64 " at "
-                    "%2.2lf\n", mat->nrows, mat->ncols, excess, seconds());
-    fflush(stdout);
-
-#ifdef HAVE_SYNC_FETCH
-    onepass_singleton_parallel_removal (mat, nthreads);
-#else
-    if (nthreads > 1)
-      fprintf (stdout, "# INFO: Cannot use multithread code for remove_all_"
-                       "singletons: HAVE_SYNC_FETCH is not defined\n");
-    onepass_singleton_removal (mat);
-#endif
-
-    iter++;
-  } while (oldnrows != mat->nrows);
-  fprintf(stdout, "Sing. rem.:   iter %03u: No more singletons, finished at "
-                   "%2.2lf\n", iter, seconds());
-
-  return excess;
-}
-
 static void
 print_final_values (uint64_t nrows, uint64_t ncols, double weight)
 {
@@ -994,7 +832,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
 
   /* First step of singletons removal */
   fprintf(stdout, "\nStep 0: only singleton removal\n");
-  excess = remove_all_singletons (mat, nthreads);
+  excess = singleton_removal (mat, nthreads, verbose);
 
   if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
@@ -1050,7 +888,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
     }
 
     cliques_removal (mat, target_excess, nthreads, verbose);
-    excess = remove_all_singletons (mat, nthreads);
+    excess = singleton_removal (mat, nthreads, verbose);
 
     fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
                     "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
@@ -1081,7 +919,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
     }
 
     cliques_removal (mat, target_excess, nthreads, verbose);
-    excess = remove_all_singletons (mat, nthreads);
+    excess = singleton_removal (mat, nthreads, verbose);
 
     fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
                     "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",

@@ -9,7 +9,7 @@ target_link_libraries(dup1 utils_with_io)
 add_executable(dup2 dup2.c filter_badideals.c)
 target_link_libraries(dup2 utils_with_io)
 
-add_executable(purge filter_common.c purge_matrix.c purge.c)
+add_executable(purge filter_common.c purge_matrix.c singleton_removal.c purge.c)
 target_link_libraries(purge utils_with_io)
 
 add_executable(merge merge.c filter_common.c markowitz.c mst.c report.c merge_mono.c merge_replay_matrix.c sparse.c)
