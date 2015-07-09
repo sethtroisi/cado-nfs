@@ -1014,9 +1014,11 @@ static void space_sieve_generate_new_vectors(
     good_vector_in_list(list, list_zero, v_tmp, H, number_element);
   }
 
+#ifndef NDEBUG
   for (unsigned int i = 0; i < list_zero->length; i++) {
     ASSERT(int64_vector_gcd(list_zero->v[i]->vec) == 1);
   }
+#endif // NDEBUG
 
   int64_vector_clear(v_tmp);
 }
@@ -1454,15 +1456,22 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         uint64_t index_new = index_vector(v_new, H, array->number_element);
         list_int64_vector_index_add_int64_vector_index(list_vec, v_new,
             index_new);
-        //TODO: do that rarely.
-        //
 #ifdef SPACE_SIEVE_ENTROPY
         //TODO: avoid duplicate.
         if (entropy < SPACE_SIEVE_ENTROPY) {
           space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
               array->number_element);
           entropy++;
+
+#ifdef SPACE_SIEVE_REMOVE_DUPLICATE
+          list_int64_vector_index_remove_duplicate_sort(list_vec);
+#endif // SPACE_SIEVE_REMOVE_DUPLICATE
+
+        } else {
+          list_int64_vector_index_sort_last(list_vec);
         }
+#else
+        list_int64_vector_index_sort_last(list_vec);
 #endif // SPACE_SIEVE_ENTROPY
 
 #ifdef SPACE_SIEVE_CONTRIBUTION
@@ -1470,7 +1479,6 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         array->array[index_s] = array->array[index_s] - r->log;
 #endif // SPACE_SIEVE_CONTRIBUTION
 
-        list_int64_vector_index_sort_last(list_vec);
       }
       int64_vector_set(s, s_out);
       int64_vector_clear(s_out);
