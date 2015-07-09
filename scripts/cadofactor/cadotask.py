@@ -3547,7 +3547,7 @@ class FilterGaloisTask(Task):
 
     def run(self):
         # This task must be run only if galois is recognized by filter_galois
-        if self.params["galois"] != "1/y":
+        if self.params["galois"] != "1/y" and self.params["galois"] != "-y":
             return True
 
         super().run()
