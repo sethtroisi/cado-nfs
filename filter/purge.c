@@ -110,15 +110,14 @@ typedef struct purge_matrix_s purge_matrix_t[1];
 typedef struct purge_matrix_s * purge_matrix_ptr;
 typedef const struct purge_matrix_s * purge_matrix_srcptr;
 
-static purge_matrix_t mat; /* XXX Temporarily a global variable */
-
 static void
 purge_matrix_init (purge_matrix_ptr mat, uint64_t nrows_init,
                    uint64_t col_min_index, uint64_t col_max_index)
 {
   size_t cur_alloc;
-  mat->nrows = mat->nrows_init = nrows_init;
-  mat->ncols = mat->col_max_index = col_max_index;
+  mat->nrows_init = nrows_init;
+  mat->col_max_index = col_max_index;
+  mat->nrows = mat->ncols = 0;
   mat->col_min_index = col_min_index;
   mat->tot_alloc_bytes = 0;
 
@@ -457,21 +456,25 @@ comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
  * CAREFUL: no multithread compatible with " !(--(*o))) " and
  * bit_vector_clearbit.
  */
-static unsigned int delete_row (uint64_t i)
+static void
+delete_row (purge_matrix_ptr mat, uint64_t i)
 {
-    index_t *tab;
-    unsigned int nrem_cols = 0;
-    weight_t *o;
+  index_t *row;
+  weight_t *w;
 
-    for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++) {
-	o = &(mat->cols_weight[*tab]);
-	ASSERT(*o);
-	if (*o < UMAX(*o) && !(--(*o)))
-	    nrem_cols++;
-    }
-    /* We do not free mat->row_compact[i] as it is freed with my_malloc_free_all */
-    bit_vector_clearbit(mat->row_used, (size_t) i);
-    return nrem_cols;
+  for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+  {
+    w = &(mat->cols_weight[*row]);
+    ASSERT(*w);
+    /* Decrease only if not equal to the maximum value */
+    /* If weight becomes 0, we just remove a column */
+    if (*w < UMAX(*w) && !(--(*w)))
+      mat->ncols--;
+  }
+  /* We do not free mat->row_compact[i] as it is freed later with
+     my_malloc_free_all */
+  bit_vector_clearbit (mat->row_used, (size_t) i);
+  mat->nrows--;
 }
 
 /************* Code for clique (= connected component) removal ***************/
@@ -487,7 +490,7 @@ static unsigned int delete_row (uint64_t i)
  * treated the row i1.
  */
 static uint64_t
-compute_connected_component_mt (comp_t *clique,
+compute_connected_component_mt (comp_t *clique, purge_matrix_srcptr mat,
                                 uint64_buffer_ptr row_buffer)
 {
   uint64_t cur_row;
@@ -525,14 +528,14 @@ compute_connected_component_mt (comp_t *clique,
 }
 
 /* Delete connected component of row current_row
- * Return number of deleted rows.
  *
  * WARNING: this code itself is multithread compatible, but
  * it calls delete_row, which is NOT compatible!
  */
-static uint64_t
-delete_connected_component (uint64_t cur_row, uint64_t *ncols,
+static void
+delete_connected_component (purge_matrix_ptr mat, uint64_t cur_row,
                             uint64_buffer_ptr row_buffer)
+//, uint64_t *ncols,
 {
   index_t *h;
 
@@ -563,9 +566,8 @@ delete_connected_component (uint64_t cur_row, uint64_t *ncols,
 
   /* Now, we deleted all rows explored */
   for (uint64_t *pt = row_buffer->begin; pt < row_buffer->next_todo; pt++)
-    *ncols -= delete_row (*pt);
-  /* Return the nb of deleted rows */
-  return (row_buffer->next_todo - row_buffer->begin);
+    delete_row (mat, *pt);
+    /* mat->nrows and mat->ncols are updated by delete_row. */
 }
 
 /***** Functions to compute mat->sum2_row array (mono and multi thread) *******/
@@ -577,6 +579,7 @@ typedef struct sum2_mt_data_s {
   // Read only part
   unsigned int pthread_number;
   // Read-write part
+  purge_matrix_ptr mat;
   pthread_t pthread;
 } sum2_mt_data_t;
 
@@ -584,6 +587,7 @@ static void *
 compute_sum2_row_mt (void *pt)
 {
   sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
+  purge_matrix_ptr mat = data->mat;
   uint64_t j = mat->nrows_init / nthreads;
   uint64_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
   uint64_t end = (data->pthread_number == nthreads - 1) ? mat->nrows_init :
@@ -616,7 +620,7 @@ compute_sum2_row_mt (void *pt)
 #endif
 
 static inline void
-compute_sum2_row ()
+compute_sum2_row (purge_matrix_ptr mat)
 {
   memset(mat->sum2_row, 0, mat->col_max_index * sizeof(uint64_t));
 #ifndef HAVE_SYNC_FETCH /* monothread */
@@ -635,6 +639,7 @@ compute_sum2_row ()
   for (size_t i = nthreads; i--; )
   {
     th_data[i].pthread_number = i;
+    th_data[i].mat = mat;
     if (pthread_create (&(th_data[i].pthread), NULL, compute_sum2_row_mt,
                                                      (void *) (th_data + i)))
     {
@@ -655,6 +660,7 @@ compute_sum2_row ()
 typedef struct comp_mt_thread_data_s {
   unsigned int th_id; /* read only */
   pthread_t pthread;
+  purge_matrix_srcptr mat; /* Read only */
   comp_sorted_bin_tree_t comp_tree; /* sorted tree computed by the thread */
 } comp_mt_thread_data_t;
 /* Size of the block of rows treated by a thread during the computation of the
@@ -681,12 +687,12 @@ compute_sorted_list_of_connected_components_mt (void *pt)
 
   // Now the first begin of the search
   clique.i = data->th_id * COMP_MT_ROWS_BLOCK;
-  if (UNLIKELY (clique.i >= mat->nrows_init)) pthread_exit (NULL);
+  if (UNLIKELY (clique.i >= data->mat->nrows_init)) pthread_exit (NULL);
   // And the first end
   end_step_rows = clique.i + COMP_MT_ROWS_BLOCK;
 
-  pbv = mat->row_used->p + (clique.i >> LN2_BV_BITS);
-  while (clique.i < mat->nrows_init)
+  pbv = data->mat->row_used->p + (clique.i >> LN2_BV_BITS);
+  while (clique.i < data->mat->nrows_init)
   {
     uint64_t save_i = clique.i;
     for (bv = *pbv++; bv; ++(clique.i), bv >>= 1)
@@ -694,7 +700,7 @@ compute_sorted_list_of_connected_components_mt (void *pt)
       if (LIKELY(bv & 1))
       {
         unsigned int nb_rows = compute_connected_component_mt (&(clique),
-                                              buf);
+                                              data->mat, buf);
         if (UNLIKELY (!nb_rows))
           continue;
         comp_sorted_bin_tree_insert (data->comp_tree, clique);
@@ -707,7 +713,7 @@ compute_sorted_list_of_connected_components_mt (void *pt)
       // The new begin & end.
       end_step_rows += nthreads * COMP_MT_ROWS_BLOCK;
       clique.i = end_step_rows - COMP_MT_ROWS_BLOCK;
-      pbv = mat->row_used->p + (clique.i >> LN2_BV_BITS);
+      pbv = data->mat->row_used->p + (clique.i >> LN2_BV_BITS);
     }
   }
   uint64_buffer_clear (buf);
@@ -769,7 +775,7 @@ print_stats_uint64 (FILE *out, uint64_t *w, uint64_t len, char name[],
 }
 
 void
-print_stats_columns_weight (FILE *out, int verbose)
+print_stats_columns_weight (FILE *out, purge_matrix_srcptr mat, int verbose)
 {
   uint64_t *w = NULL;
   index_t *h = 0;
@@ -787,7 +793,7 @@ print_stats_columns_weight (FILE *out, int verbose)
 }
 
 void
-print_stats_rows_weight (FILE *out, int verbose)
+print_stats_rows_weight (FILE *out, purge_matrix_srcptr mat, int verbose)
 {
   uint64_t *w = NULL;
   index_t *h = 0;
@@ -804,7 +810,7 @@ print_stats_rows_weight (FILE *out, int verbose)
   free (w);
 }
 
-void print_stats_on_cliques (FILE *out, int verbose)
+void print_stats_on_cliques (FILE *out, purge_matrix_srcptr mat, int verbose)
 {
   uint64_t *len = NULL;
 
@@ -819,7 +825,7 @@ void print_stats_on_cliques (FILE *out, int verbose)
     if (bit_vector_getbit(mat->row_used, (size_t) i))
     {
       comp_t c = {.i = i, .w = 0.0};
-      uint64_t nrows = compute_connected_component_mt (&c, buf);
+      uint64_t nrows = compute_connected_component_mt (&c, mat, buf);
       len[i] = nrows;
     }
   }
@@ -833,9 +839,9 @@ void print_stats_on_cliques (FILE *out, int verbose)
 /***************************** Clique removal stage *************************/
 
 static void
-cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
+cliques_removal (purge_matrix_ptr mat, int64_t target_excess)
 {
-  int64_t excess = (((int64_t) *nrows) - *ncols);
+  int64_t excess = (((int64_t) mat->nrows) - mat->ncols);
   uint64_t nb_clique_deleted = 0;
   size_t i, max_nb_comp_per_thread;
 
@@ -857,7 +863,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
    * If HAVE_SYNC_FETCH is defined, this part is done with the previous
    * multithread function; if not, it's done in sequential, immediatly.
    */
-  compute_sum2_row ();
+  compute_sum2_row (mat);
   fprintf(stdout, "Cliq. rem.: computed mat->sum2_row at %2.2lf\n", seconds());
   fflush (stdout);
 
@@ -870,6 +876,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
   for (i = nthreads; i--; )
   {
     th_data[i].th_id = i;
+    th_data[i].mat = mat;
     comp_sorted_bin_tree_init (th_data[i].comp_tree, max_nb_comp_per_thread);
     if (pthread_create (&(th_data[i].pthread), NULL,
                         compute_sorted_list_of_connected_components_mt,
@@ -886,7 +893,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
   fflush (stdout);
 
   if (verbose > 0)
-    print_stats_on_cliques (stdout, verbose);
+    print_stats_on_cliques (stdout, mat, verbose);
 
   /* At this point, in each pth[i].comp_tree we have pth[i].comp_tree->size
      connected components order by decreasing weight. */
@@ -897,7 +904,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
   memset (next_clique, 0, nthreads * sizeof (next_clique));
   uint64_buffer_init (buf, UINT64_BUFFER_MIN_SIZE);
 
-  while (*nrows > target_excess + *ncols)
+  while (mat->nrows > target_excess + mat->ncols)
   {
     comp_t max_comp = {.i = 0, .w = -1.0};
     size_t max_thread = 0;
@@ -921,7 +928,7 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
       break;
     }
 
-    *nrows -= delete_connected_component (max_comp.i, ncols, buf);
+    delete_connected_component (mat, max_comp.i, buf);
     next_clique[max_thread]++;
     nb_clique_deleted++;
   }
@@ -948,139 +955,159 @@ cliques_removal(int64_t target_excess, uint64_t * nrows, uint64_t * ncols)
  */
 
 #ifndef HAVE_SYNC_FETCH
-static void onepass_singleton_removal(uint64_t * nrows, uint64_t * ncols)
+static void onepass_singleton_removal (purge_matrix_ptr mat)
 {
-    index_t *tab;
-    uint64_t i, nrem_rows = 0, nrem_cols = 0;
-
-    for (i = 0; i < nrows_init; i++) {
-	if (bit_vector_getbit(mat->row_used, (size_t) i)) {
-	    for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++) {
-		if (mat->cols_weight[*tab] == 1) {
-		    nrem_cols += delete_row (i);
-		    nrem_rows++;
-		    break;
-		}
-	    }
-	}
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+  {
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
+    {
+      index_t *row;
+      for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+      {
+        if (mat->cols_weight[*row] == 1)
+        {
+          /* mat->nrows and mat->ncols are updated by delete_row. */
+          delete_row (mat, i);
+          break;
+        }
+      }
     }
-    *nrows -= nrem_rows;
-    *ncols -= nrem_cols;
+  }
 }
 
-#else				/* ifndef HAVE_SYNC_FETCH */
+#else       /* ifndef HAVE_SYNC_FETCH */
 
-typedef struct {
-    unsigned int nb;
-    pthread_t mt;
-    uint64_t begin, end, sup_nrow, sup_ncol;
+typedef struct
+{
+  /* Read only */
+  pthread_t mt;
+  uint64_t begin, end;
+  /* Read / Write */
+  uint64_t sup_nrow, sup_ncol;
+  purge_matrix_ptr mat;
 } ti_t;
-static ti_t *ti;
 
 /* Hightest criticality for performance. I inline all myself. */
 static void onepass_thread_singleton_removal(ti_t * mti)
 {
-  index_t *tab;
-  uint64_t i;
-  weight_t *o;
+  index_t *row;
+  weight_t *w;
   bv_t j;
+  purge_matrix_ptr mat = mti->mat;
   
   mti->sup_nrow = mti->sup_ncol = 0;
-  for (i = mti->begin; i < mti->end; i++) {
+  for (uint64_t i = mti->begin; i < mti->end; i++)
+  {
     j = (((bv_t) 1) << (i & (BV_BITS - 1)));
     
-    if (mat->row_used->p[i >> LN2_BV_BITS] & j)
-      for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++)
-	if (UNLIKELY(mat->cols_weight[*tab] == 1)) {
-	  for (tab = mat->row_compact[i]; *tab != UMAX(*tab); tab++) {
-	    o = &(mat->cols_weight[*tab]);
-	    ASSERT(*o);
-	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
-	      (mti->sup_ncol)++;
-	  }
-	  /* mat->row_compact[i] is not freed , it is freed with my_malloc_free_all */
-	  mat->row_used->p[i >> LN2_BV_BITS] &= ~j;
-	  (mti->sup_nrow)++;
-	  break;
-	}
+    if (mat->row_used->p[i >> LN2_BV_BITS] & j) /* Still active ? */
+    {
+      for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+      {
+        if (UNLIKELY(mat->cols_weight[*row] == 1)) /* We found a singleton */
+        {
+          for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+          {
+            w = &(mat->cols_weight[*row]);
+            ASSERT(*w);
+            /* Decrease only if not equal to the maximum value */
+            /* If weight becomes 0, we just remove a column */
+            if (*w < UMAX(*w) && !__sync_sub_and_fetch(w, 1))
+              (mti->sup_ncol)++;
+          }
+          /* We do not free mat->row_compact[i] as it is freed later with
+             my_malloc_free_all */
+          /* This is thread-safe because we know that all rows in
+             mti->row_used->p[i >> LN2_BV_BITS] are handled by the same thread*/
+          mat->row_used->p[i >> LN2_BV_BITS] &= ~j;
+          (mti->sup_nrow)++;
+          break;
+        }
+      }
+    }
   }
   pthread_exit(NULL);
 }
 
 static void
-onepass_singleton_parallel_removal(unsigned int nb_thread, uint64_t * nrows,
-				   uint64_t * ncols)
+onepass_singleton_parallel_removal (purge_matrix_ptr mat, unsigned int nthreads)
 {
-    pthread_attr_t attr;
-    uint64_t pas, incr;
-    unsigned int i;
-    int err;
+  pthread_attr_t attr;
+  uint64_t pas, incr;
+  unsigned int i;
+  int err;
+  ti_t *ti;
 
-    ti = (ti_t *) malloc(nb_thread * sizeof(ti_t));
-    ASSERT_ALWAYS(ti != NULL);
-    ti[0].begin = 0;
-    pas = (mat->nrows_init / nb_thread) & ((uint64_t) ~ (BV_BITS - 1));
-    incr = 0;
-    for (i = 0, incr = 0; i < nb_thread - 1;) {
-	incr += pas;
-	ti[i].nb = i;
-	ti[i++].end = incr;
-	ti[i].begin = incr;
+  ti = (ti_t *) malloc (nthreads * sizeof(ti_t));
+  ASSERT_ALWAYS(ti != NULL);
+  ti[0].begin = 0;
+  pas = (mat->nrows_init / nthreads) & ((uint64_t) ~ (BV_BITS - 1));
+  incr = 0;
+  for (i = 0, incr = 0; i < nthreads - 1;)
+  {
+    ti[i].mat = mat;
+    incr += pas;
+    ti[i++].end = incr;
+    ti[i].begin = incr;
+  }
+  ti[i].end = mat->nrows_init;
+  ti[i].mat = mat;
+
+  pthread_attr_init (&attr);
+  pthread_attr_setstacksize (&attr, 1 << 16);
+  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
+  for (i = 0; i < nthreads; i++)
+  {
+    if ((err = pthread_create(&ti[i].mt, &attr,
+                        (void *) onepass_thread_singleton_removal, &(ti[i]))))
+    {
+      fprintf(stderr, "onepass_singleton_parallel_removal : pthread_create "
+                      "error 1: %d. %s\n", err, strerror(errno));
+      exit(1);
     }
-    ti[i].nb = i;
-    ti[i].end = mat->nrows_init;
-    pthread_attr_init(&attr);
-    pthread_attr_setstacksize(&attr, 1 << 16);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    for (i = 0; i < nb_thread; i++)
-	if ((err =
-	     pthread_create(&ti[i].mt, &attr,
-			    (void *) onepass_thread_singleton_removal,
-			    &ti[i]))) {
-	    fprintf(stderr,
-		    "onepass_singleton_parallel_removal : pthread_create error 1: %d. %s\n",
-		    err, strerror(errno));
-	    exit(1);
-	}
-    for (i = 0; i < nb_thread; i++) {
-	pthread_join(ti[i].mt, NULL);
-	*nrows -= ti[i].sup_nrow;
-	*ncols -= ti[i].sup_ncol;
-    }
-    pthread_attr_destroy(&attr);
-    if (ti != NULL)
-	free(ti);
-    ti = NULL;
+  }
+  for (i = 0; i < nthreads; i++)
+  {
+    pthread_join(ti[i].mt, NULL);
+    mat->nrows -= ti[i].sup_nrow;
+    mat->ncols -= ti[i].sup_ncol;
+  }
+  pthread_attr_destroy(&attr);
+  free(ti);
 }
-#endif				/* ifdef HAVE_SYNC_FETCH */
+#endif      /* ifdef HAVE_SYNC_FETCH */
 
-static void
-remove_all_singletons(uint64_t * nrows, uint64_t * ncols, int64_t * excess)
+/* Return the excess at the end */
+static int64_t
+remove_all_singletons (purge_matrix_ptr mat)
 {
+  int64_t excess;
   uint64_t oldnrows;
   unsigned int iter = 0;
   do
   {
-    oldnrows = *nrows;
-    *excess = (((int64_t) * nrows) - *ncols);
+    oldnrows = mat->nrows;
+    excess = (((int64_t) mat->nrows) - mat->ncols);
     if (iter == 0)
       fprintf(stdout, "Sing. rem.: begin with: ");
     else
       fprintf(stdout, "Sing. rem.:   iter %03u: ", iter);
     fprintf(stdout, "nrows=%" PRIu64 " ncols=%" PRIu64 " excess=%" PRId64 " at "
-                    "%2.2lf\n", *nrows, *ncols, *excess, seconds());
+                    "%2.2lf\n", mat->nrows, mat->ncols, excess, seconds());
     fflush(stdout);
 
 #ifdef HAVE_SYNC_FETCH
-    onepass_singleton_parallel_removal(nthreads, nrows, ncols);
+    onepass_singleton_parallel_removal (mat, nthreads);
 #else
-    onepass_singleton_removal(nrows, ncols);
+    onepass_singleton_removal (mat);
 #endif
 
     iter++;
-  } while (oldnrows != *nrows);
+  } while (oldnrows != mat->nrows);
   fprintf(stdout, "Sing. rem.:   iter %03u: No more singletons, finished at "
                    "%2.2lf\n", iter, seconds());
+
+  return excess;
 }
 
 static void
@@ -1093,7 +1120,7 @@ print_final_values (uint64_t nrows, uint64_t ncols, double weight)
   fflush (stdout);
 }
 
-static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
+static void singletons_and_cliques_removal(purge_matrix_ptr mat)
 {
   uint64_t oldnrows = 0;
   int64_t oldexcess, excess, target_excess;
@@ -1101,21 +1128,21 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
 
   /* First step of singletons removal */
   fprintf(stdout, "\nStep 0: only singleton removal\n");
-  remove_all_singletons(nrows, ncols, &excess);
+  excess = remove_all_singletons (mat);
 
   if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
     fprintf (stdout, "number of rows <= number of columns\n");
-    print_final_values (*nrows, *ncols, 0);
+    print_final_values (mat->nrows, mat->ncols, 0);
     exit(2);
   }
 
-  if ((double) excess < required_excess * ((double) *ncols))
+  if ((double) excess < required_excess * ((double) mat->ncols))
   {
     fprintf (stdout, "(excess / ncols) = %.2f < %.2f. See -required_excess "
-                     "argument.\n", ((double) excess / (double) *ncols),
+                     "argument.\n", ((double) excess / (double) mat->ncols),
                      required_excess);
-    print_final_values (*nrows, *ncols, 0);
+    print_final_values (mat->nrows, mat->ncols, 0);
     exit(2);
   }
 
@@ -1124,8 +1151,8 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
      the number of columns */
   if (nsteps < 0)
   {
-    if ((uint64_t) excess / DEFAULT_PURGE_NSTEPS < *ncols / 100)
-      nsteps = 1 + (100 * excess) / *ncols;
+    if ((uint64_t) excess / DEFAULT_PURGE_NSTEPS < mat->ncols / 100)
+      nsteps = 1 + (100 * excess) / mat->ncols;
     else
       nsteps = DEFAULT_PURGE_NSTEPS;
   }
@@ -1140,7 +1167,7 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
   /* nsteps steps of clique removal + singletons removal */
   for (count = 0; count < nsteps && excess > 0; count++)
   {
-    oldnrows = *nrows;
+    oldnrows = mat->nrows;
     oldexcess = excess;
     target_excess = excess - chunk;
     if (target_excess < keep)
@@ -1152,17 +1179,17 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
     {
-      print_stats_columns_weight (stdout, verbose);
-      print_stats_rows_weight (stdout, verbose);
+      print_stats_columns_weight (stdout, mat, verbose);
+      print_stats_rows_weight (stdout, mat, verbose);
     }
 
-    cliques_removal(target_excess, nrows, ncols);
-    remove_all_singletons(nrows, ncols, &excess);
+    cliques_removal (mat, target_excess);
+    excess = remove_all_singletons (mat);
 
     fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
                     "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
-                    (int64_t) (oldnrows-*nrows), (oldexcess-excess),
-                    (double) (oldnrows-*nrows) / (double) (oldexcess-excess));
+                    (int64_t) (oldnrows-mat->nrows), (oldexcess-excess),
+                    (double) (oldnrows-mat->nrows) / (double) (oldexcess-excess));
   }
 
 
@@ -1172,7 +1199,7 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
      unchanged. */
   if (excess > keep && nsteps > 0)
   {
-    oldnrows = *nrows;
+    oldnrows = mat->nrows;
     oldexcess = excess;
     target_excess = keep;
 
@@ -1183,36 +1210,29 @@ static void singletons_and_cliques_removal(uint64_t * nrows, uint64_t * ncols)
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
     {
-      print_stats_columns_weight (stdout, verbose);
-      print_stats_rows_weight (stdout, verbose);
+      print_stats_columns_weight (stdout, mat, verbose);
+      print_stats_rows_weight (stdout, mat, verbose);
     }
 
-    cliques_removal(target_excess, nrows, ncols);
-    remove_all_singletons(nrows, ncols, &excess);
+    cliques_removal (mat, target_excess);
+    excess = remove_all_singletons (mat);
 
     fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
                     "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
-                    (int64_t) (oldnrows-*nrows), (oldexcess-excess),
-                    (double) (oldnrows-*nrows) / (double) (oldexcess-excess));
+                    (int64_t) (oldnrows-mat->nrows), (oldexcess-excess),
+                    (double) (oldnrows-mat->nrows) / (double) (oldexcess-excess));
   }
 }
 
 /*************** Callback functions called by filter_rels ********************/
 
-/* Data struct for insert_rel_into_table (called by filter_rels on pass 1) */
-struct data_first_pass_s
-{
-  uint64_t ncols;
-};
-typedef struct data_first_pass_s data_first_pass_t[1];
-typedef struct data_first_pass_s * data_first_pass_ptr;
-
 /* Callback function called by filter_rels on pass 1 */
 void *
-insert_rel_into_table (data_first_pass_ptr arg, earlyparsed_relation_ptr rel)
+insert_rel_into_table (purge_matrix_ptr mat, earlyparsed_relation_ptr rel)
 {
   ASSERT_ALWAYS(rel->num < mat->nrows_init);
-  arg->ncols += insert_rel_in_table_no_e(rel, mat->col_min_index, mat->row_compact,
+  // TODO: following fct should have only 2 args: mat and rel
+  mat->ncols += insert_rel_in_table_no_e(rel, mat->col_min_index, mat->row_compact,
                                          mat->cols_weight);
 
   return NULL;
@@ -1222,6 +1242,7 @@ insert_rel_into_table (data_first_pass_ptr arg, earlyparsed_relation_ptr rel)
 struct data_second_pass_s
 {
   double W; /* Total weight of the matrix (counting only remaining rows) */
+  bit_vector_ptr remaining_rows;
   /* fd[0]: for printing kept relations */
   /* fd[1]: for printing deleted relations */
   FILE * fd[2];
@@ -1233,7 +1254,7 @@ typedef struct data_second_pass_s * data_second_pass_ptr;
 void *
 thread_print(data_second_pass_ptr arg, earlyparsed_relation_ptr rel)
 {
-  if (bit_vector_getbit(mat->row_used, rel->num))
+  if (bit_vector_getbit(arg->remaining_rows, rel->num))
   {
     arg->W += rel->nb;
     fputs(rel->line, arg->fd[0]);
@@ -1331,7 +1352,7 @@ int main(int argc, char **argv)
     char ** input_files;
     uint64_t col_max_index_arg = 0;
     uint64_t nrows_init_arg = 0;
-    // purge_matrix_t mat; /* XXX Temporarily a global variable (see above) */
+    purge_matrix_t mat; /* All info regarding the matrix is in this struct */
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;		/* Binary open for all files */
@@ -1494,17 +1515,14 @@ int main(int argc, char **argv)
     /****************** Begin interesting stuff *************************/
     fprintf(stdout, "\nPass 1, reading and storing columns with index h >= "
                     "%" PRIu64 "\n", mat->col_min_index);
-    data_first_pass_t data1;
-    memset(data1, 0, sizeof(data_first_pass_t));
 
     /* first pass over relations in files */
     /* Note: Now that we no longer take a bitmap on input, all
      * relations are considered active at this point, so that we
      * do not need to pass a bitmap to filter_rels */
     mat->nrows = filter_rels(input_files,
-                        (filter_rels_callback_t) &insert_rel_into_table, data1,
+                        (filter_rels_callback_t) &insert_rel_into_table, mat,
                         EARLYPARSE_NEED_INDEX, NULL, NULL);
-    mat->ncols = data1->ncols;
 
     if (mat->nrows != mat->nrows_init)
     {
@@ -1520,18 +1538,18 @@ int main(int argc, char **argv)
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
     {
-      print_stats_columns_weight (stdout, verbose);
-      print_stats_rows_weight (stdout, verbose);
+      print_stats_columns_weight (stdout, mat, verbose);
+      print_stats_rows_weight (stdout, mat, verbose);
     }
 
     /* MAIN FUNCTIONS: do singletons and cliques removal. */
-    singletons_and_cliques_removal(&(mat->nrows), &(mat->ncols));
+    singletons_and_cliques_removal (mat);
 
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
     {
-      print_stats_columns_weight (stdout, verbose);
-      print_stats_rows_weight (stdout, verbose);
+      print_stats_columns_weight (stdout, mat, verbose);
+      print_stats_rows_weight (stdout, mat, verbose);
     }
 
     /* XXX: Are these tests useful ? Already checked after first call to
@@ -1557,6 +1575,7 @@ int main(int argc, char **argv)
                     deletedname == NULL ? "" : "s");
     data_second_pass_t data2;
     memset(data2, 0, sizeof(data_second_pass_t));
+    data2->remaining_rows = mat->row_used;
 
     if (!(data2->fd[0] = fopen_maybe_compressed(purgedname, "w")))
     {
