@@ -81,14 +81,6 @@
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
-/********************** Main global variables ********************************/
-
-static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
-static int nsteps = -1; /* negative value means chosen by purge */
-static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
-static unsigned int nthreads = DEFAULT_PURGE_NTHREADS;
-static int verbose = 0;
-
 /********************* purge_data struct *************************************/
 
 /* This one is passed to all functions, so it's morally a global */
@@ -578,6 +570,7 @@ delete_connected_component (purge_matrix_ptr mat, uint64_t cur_row,
 typedef struct sum2_mt_data_s {
   // Read only part
   unsigned int pthread_number;
+  unsigned int nthreads;
   // Read-write part
   purge_matrix_ptr mat;
   pthread_t pthread;
@@ -588,10 +581,10 @@ compute_sum2_row_mt (void *pt)
 {
   sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
   purge_matrix_ptr mat = data->mat;
-  uint64_t j = mat->nrows_init / nthreads;
+  uint64_t j = mat->nrows_init / data->nthreads;
   uint64_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
-  uint64_t end = (data->pthread_number == nthreads - 1) ? mat->nrows_init :
-    (j * (data->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
+  uint64_t end = (data->pthread_number == data->nthreads - 1) ? mat->nrows_init
+                : (j * (data->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
   bv_t bv, *pbv;
   index_t h, *myrowcompact;
 
@@ -620,10 +613,13 @@ compute_sum2_row_mt (void *pt)
 #endif
 
 static inline void
-compute_sum2_row (purge_matrix_ptr mat)
+compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
 {
   memset(mat->sum2_row, 0, mat->col_max_index * sizeof(uint64_t));
 #ifndef HAVE_SYNC_FETCH /* monothread */
+  if (nthreads > 1)
+    fprintf (stdout, "# INFO: Cannot use multithread code for compute_sum2_row:"
+                     " HAVE_SYNC_FETCH is not defined\n");
   for (uint64_t i = 0; i < mat->nrows_init; i++)
   {
     if (bit_vector_getbit(mat->row_used, (size_t) i))
@@ -639,6 +635,7 @@ compute_sum2_row (purge_matrix_ptr mat)
   for (size_t i = nthreads; i--; )
   {
     th_data[i].pthread_number = i;
+    th_data[i].nthreads = nthreads;
     th_data[i].mat = mat;
     if (pthread_create (&(th_data[i].pthread), NULL, compute_sum2_row_mt,
                                                      (void *) (th_data + i)))
@@ -659,6 +656,7 @@ compute_sum2_row (purge_matrix_ptr mat)
    heaviest cliques */
 typedef struct comp_mt_thread_data_s {
   unsigned int th_id; /* read only */
+  unsigned int nthreads; /* read only */
   pthread_t pthread;
   purge_matrix_srcptr mat; /* Read only */
   comp_sorted_bin_tree_t comp_tree; /* sorted tree computed by the thread */
@@ -711,7 +709,7 @@ compute_sorted_list_of_connected_components_mt (void *pt)
     if (UNLIKELY (clique.i == end_step_rows))
     {
       // The new begin & end.
-      end_step_rows += nthreads * COMP_MT_ROWS_BLOCK;
+      end_step_rows += data->nthreads * COMP_MT_ROWS_BLOCK;
       clique.i = end_step_rows - COMP_MT_ROWS_BLOCK;
       pbv = data->mat->row_used->p + (clique.i >> LN2_BV_BITS);
     }
@@ -839,16 +837,15 @@ void print_stats_on_cliques (FILE *out, purge_matrix_srcptr mat, int verbose)
 /***************************** Clique removal stage *************************/
 
 static void
-cliques_removal (purge_matrix_ptr mat, int64_t target_excess)
+cliques_removal (purge_matrix_ptr mat, int64_t target_excess,
+                 unsigned int nthreads, int verbose)
 {
   int64_t excess = (((int64_t) mat->nrows) - mat->ncols);
   uint64_t nb_clique_deleted = 0;
   size_t i, max_nb_comp_per_thread;
 
-  /* If the excess is smaller than keep (= final excess) or target_excess, then
-   * we have nothing to do.
-   */
-  if (excess <= keep || excess <= target_excess)
+  /* If the excess is smaller than target_excess, then we have nothing to do. */
+  if (excess <= target_excess)
     return;
 
   /* if we are in monothread, we increase max_nb_comp_per_thread by 25% to take
@@ -863,7 +860,7 @@ cliques_removal (purge_matrix_ptr mat, int64_t target_excess)
    * If HAVE_SYNC_FETCH is defined, this part is done with the previous
    * multithread function; if not, it's done in sequential, immediatly.
    */
-  compute_sum2_row (mat);
+  compute_sum2_row (mat, nthreads);
   fprintf(stdout, "Cliq. rem.: computed mat->sum2_row at %2.2lf\n", seconds());
   fflush (stdout);
 
@@ -876,6 +873,7 @@ cliques_removal (purge_matrix_ptr mat, int64_t target_excess)
   for (i = nthreads; i--; )
   {
     th_data[i].th_id = i;
+    th_data[i].nthreads = nthreads;
     th_data[i].mat = mat;
     comp_sorted_bin_tree_init (th_data[i].comp_tree, max_nb_comp_per_thread);
     if (pthread_create (&(th_data[i].pthread), NULL,
@@ -1079,7 +1077,7 @@ onepass_singleton_parallel_removal (purge_matrix_ptr mat, unsigned int nthreads)
 
 /* Return the excess at the end */
 static int64_t
-remove_all_singletons (purge_matrix_ptr mat)
+remove_all_singletons (purge_matrix_ptr mat, unsigned int nthreads)
 {
   int64_t excess;
   uint64_t oldnrows;
@@ -1099,6 +1097,9 @@ remove_all_singletons (purge_matrix_ptr mat)
 #ifdef HAVE_SYNC_FETCH
     onepass_singleton_parallel_removal (mat, nthreads);
 #else
+    if (nthreads > 1)
+      fprintf (stdout, "# INFO: Cannot use multithread code for remove_all_"
+                       "singletons: HAVE_SYNC_FETCH is not defined\n");
     onepass_singleton_removal (mat);
 #endif
 
@@ -1120,7 +1121,11 @@ print_final_values (uint64_t nrows, uint64_t ncols, double weight)
   fflush (stdout);
 }
 
-static void singletons_and_cliques_removal(purge_matrix_ptr mat)
+/* If nsteps is negative, then the value is chosen by the function. */
+static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
+                                           int64_t final_excess,
+                                           double required_excess,
+                                           unsigned int nthreads, int verbose)
 {
   uint64_t oldnrows = 0;
   int64_t oldexcess, excess, target_excess;
@@ -1128,7 +1133,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat)
 
   /* First step of singletons removal */
   fprintf(stdout, "\nStep 0: only singleton removal\n");
-  excess = remove_all_singletons (mat);
+  excess = remove_all_singletons (mat, nthreads);
 
   if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
@@ -1170,8 +1175,8 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat)
     oldnrows = mat->nrows;
     oldexcess = excess;
     target_excess = excess - chunk;
-    if (target_excess < keep)
-      target_excess = keep;
+    if (target_excess < final_excess)
+      target_excess = final_excess;
     fprintf(stdout, "\nStep %u on %u: target excess is %" PRId64 "\n",
                     count + 1, nsteps, target_excess);
     fflush(stdout);
@@ -1183,8 +1188,8 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat)
       print_stats_rows_weight (stdout, mat, verbose);
     }
 
-    cliques_removal (mat, target_excess);
-    excess = remove_all_singletons (mat);
+    cliques_removal (mat, target_excess, nthreads, verbose);
+    excess = remove_all_singletons (mat, nthreads);
 
     fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
                     "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
@@ -1197,11 +1202,11 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat)
      still larger than keep. It may happen due to the fact that each clique does
      not make the excess go down by one but can (rarely) left the excess
      unchanged. */
-  if (excess > keep && nsteps > 0)
+  if (excess > final_excess && nsteps > 0)
   {
     oldnrows = mat->nrows;
     oldexcess = excess;
-    target_excess = keep;
+    target_excess = final_excess;
 
     fprintf(stdout, "\nStep extra: target excess is %" PRId64 "\n",
                     target_excess);
@@ -1214,8 +1219,8 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat)
       print_stats_rows_weight (stdout, mat, verbose);
     }
 
-    cliques_removal (mat, target_excess);
-    excess = remove_all_singletons (mat);
+    cliques_removal (mat, target_excess, nthreads, verbose);
+    excess = remove_all_singletons (mat, nthreads);
 
     fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
                     "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
@@ -1353,6 +1358,11 @@ int main(int argc, char **argv)
     uint64_t col_max_index_arg = 0;
     uint64_t nrows_init_arg = 0;
     purge_matrix_t mat; /* All info regarding the matrix is in this struct */
+    int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
+    int nsteps = -1; /* negative value means chosen by purge */
+    double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
+    unsigned int nthreads = DEFAULT_PURGE_NTHREADS;
+    int verbose = 0;
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;		/* Binary open for all files */
@@ -1543,7 +1553,8 @@ int main(int argc, char **argv)
     }
 
     /* MAIN FUNCTIONS: do singletons and cliques removal. */
-    singletons_and_cliques_removal (mat);
+    singletons_and_cliques_removal (mat, nsteps, keep, required_excess,
+                                    nthreads, verbose);
 
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
