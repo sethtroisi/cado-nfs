@@ -152,6 +152,7 @@ void mpz_poly_xgcd_mpz(mpz_poly_ptr gcd, mpz_poly_srcptr f, mpz_poly_srcptr g, m
 void mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4]);
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
+void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q);
 
 int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
 

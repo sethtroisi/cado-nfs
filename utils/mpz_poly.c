@@ -1975,6 +1975,243 @@ mpz_poly_content (mpz_t c, mpz_poly_srcptr F)
   mpz_abs (c, c);
 }
 
+/*
+ * Compute the pseudo division of a and b such that
+ *  lc(b)^(deg(a) - deg(b) + 1) * a = b * q + r with deg(r) < deg(q).
+ *  See Henri Cohen, "A Course in Computational Algebraic Number Theory",
+ *  for more information.
+ *
+ * Assume that deg(a) >= deg(b) and B is not the zero polynomial.
+ */
+static void mpz_poly_pseudo_division(mpz_poly_ptr q, mpz_poly_ptr r,
+    mpz_poly_srcptr a, mpz_poly_srcptr b)
+{
+  ASSERT(a->deg >= b->deg);
+  ASSERT(b->deg != -1);
+
+  int m = a->deg;
+  int n = b->deg;
+  mpz_t d;
+  int e;
+  mpz_poly_t s;
+
+#ifndef NDEBUG
+  MAYBE_UNUSED mpz_poly_t q_tmp;
+#endif // NDEBUG
+
+  mpz_init(d);
+  mpz_set(d, mpz_poly_lc_const(b));
+
+  if (q != NULL) {
+    mpz_poly_set_zero(q);
+  }
+
+#ifndef NDEBUG
+  else {
+    mpz_poly_init(q_tmp, 0);
+  }
+#endif // NDEBUG
+
+  mpz_poly_set(r, a);
+
+  e = m - n + 1;
+
+  while (r->deg >= n) {
+    mpz_poly_init(s, r->deg - n);
+    mpz_poly_setcoeff(s, r->deg - n, mpz_poly_lc(r));
+    if (q != NULL) {
+      mpz_poly_mul_mpz(q, q, d);
+      mpz_poly_add(q, s, q);
+    }
+
+#ifndef NDEBUG
+    else {
+      mpz_poly_mul_mpz(q_tmp, q_tmp, d);
+      mpz_poly_add(q_tmp, s, q_tmp);
+    }
+#endif // NDEBUG
+
+    mpz_poly_mul_mpz(r, r, d);
+    mpz_poly_mul(s, b, s);
+    mpz_poly_sub(r, r, s);
+    mpz_poly_clear(s);
+    e--;
+  }
+
+  ASSERT(e >= 0);
+
+  mpz_pow_ui(d, d, (unsigned long int) e);
+  if (q != NULL) {
+    mpz_poly_mul_mpz(q, q, d);
+  }
+
+#ifndef NDEBUG
+  else {
+    mpz_poly_mul_mpz(q_tmp, q_tmp, d);
+  }
+#endif // NDEBUG
+
+  mpz_poly_mul_mpz(r, r, d);
+
+#ifndef NDEBUG
+  mpz_poly_t f, g;
+  mpz_poly_init(f, a->deg);
+  mpz_poly_init(g, b->deg);
+  mpz_poly_set(f, a);
+  mpz_poly_set(g, b);
+
+  mpz_set(d, mpz_poly_lc_const(g));
+
+  ASSERT(m - n + 1 >= 0);
+
+  mpz_pow_ui(d, d, (unsigned long int) (m - n + 1));
+  mpz_poly_mul_mpz(f, f, d);
+
+  if (q != NULL) {
+    mpz_poly_mul(g, g, q);
+  } else {
+    mpz_poly_mul(g, g, q_tmp);
+  }
+  mpz_poly_add(g, g, r);
+
+  ASSERT(mpz_poly_cmp(f, g) == 0);
+
+  mpz_poly_clear(f);
+  mpz_poly_clear(g);
+  if (q == NULL) {
+    mpz_poly_clear(q_tmp);
+  }
+#endif // NDEBUG
+
+  mpz_clear(d);
+}
+
+/*
+ * Like mpz_poly_pseudo_division, but give only the remainder.
+ */
+static void mpz_poly_pseudo_remainder(mpz_poly_ptr r, mpz_poly_srcptr a,
+    mpz_poly_srcptr b)
+{
+  mpz_poly_pseudo_division(NULL, r, a, b);
+}
+
+/*
+ * Compute the resultant of p and q and set the resultat in res.
+ *  See Henri Cohen, "A Course in Computational Algebraic Number Theory",
+ *  for more information.
+ *
+ * Assume that the polynomials are normalized.
+ */
+void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
+{
+  if (p->deg == -1 || q->deg == -1) {
+    mpz_set_ui(res, 0);
+    return;
+  }
+
+  ASSERT(mpz_cmp_ui(p->coeff[p->deg], 0) != 0);
+  ASSERT(mpz_cmp_ui(q->coeff[q->deg], 0) != 0);
+
+  long int s = 1;
+  mpz_t g;
+  mpz_t h;
+  mpz_t t;
+  mpz_t tmp;
+  int d;
+  mpz_poly_t r;
+  mpz_poly_t a;
+  mpz_poly_t b;
+
+  mpz_init(g);
+  mpz_init(h);
+  mpz_init(t);
+  mpz_init(tmp);
+  mpz_poly_init(r, -1);
+  mpz_poly_init(a, p->deg);
+  mpz_poly_init(b, q->deg);
+
+  mpz_poly_set(a, p);
+  mpz_poly_set(b, q);
+
+  mpz_poly_content(g, a);
+  mpz_poly_content(h, b);
+
+  mpz_poly_divexact_mpz(a, a, g);
+  mpz_poly_divexact_mpz(b, b, h);
+
+  mpz_pow_ui(t, g, (unsigned long int) b->deg);
+  mpz_pow_ui(tmp, h, (unsigned long int) a->deg);
+  mpz_mul(t, t, tmp);
+
+  mpz_set_ui(g, 1);
+  mpz_set_ui(h, 1);
+
+  if (a->deg < b->deg) {
+    mpz_poly_swap(a, b);
+
+    if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
+      s = -1;
+    }
+  }
+
+  while (b->deg > 0) {
+    d = a->deg - b->deg;
+
+    if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
+      s = -s;
+    }
+
+    mpz_poly_pseudo_remainder(r, a, b);
+
+    mpz_poly_set(a, b);
+
+    ASSERT(d >= 0);
+
+    mpz_pow_ui(tmp, h, (unsigned long int) d);
+    mpz_mul(tmp, g, tmp);
+
+    mpz_poly_divexact_mpz(b, r, tmp);
+
+    mpz_set(g, mpz_poly_lc(a));
+
+#ifdef NDEBUG
+    if (d == 0) {
+      ASSERT(mpz_cmp_ui(h, 1) == 0);
+    }
+#endif // NDEBUG
+    mpz_pow_ui(h, h, (unsigned long int) (d - 1));
+    mpz_pow_ui(tmp, g, (unsigned long int) d);
+    mpz_divexact(h, tmp, h);
+  }
+
+  ASSERT(a->deg > 0);
+
+  mpz_pow_ui(h, h, (unsigned long int) (a->deg - 1));
+  //Prevent an error if b = 0.
+  if (b->deg == -1) {
+    mpz_set_ui(res, 0);
+  } else {
+    mpz_set(tmp, mpz_poly_lc(b));
+
+    ASSERT(a->deg >= 0);
+
+    mpz_pow_ui(tmp, tmp, (unsigned long int) a->deg);
+    mpz_divexact(h, tmp, h);
+
+    mpz_mul_si(t, t, s);
+    mpz_mul(h, h, t);
+    mpz_set(res, h);
+  }
+
+  mpz_clear(g);
+  mpz_clear(h);
+  mpz_clear(t);
+  mpz_clear(tmp);
+  mpz_poly_clear(a);
+  mpz_poly_clear(b);
+  mpz_poly_clear(r);
+}
+
 /* factoring polynomials */
 
 void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l)
