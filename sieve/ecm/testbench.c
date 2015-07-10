@@ -27,7 +27,7 @@
 #include "facul.h"
 #include "pm1.h"
 #include "pp1.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "modredc_ul.h"
 #include "modredc_ul_default.h"
 #include "getprime.h"

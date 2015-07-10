@@ -889,7 +889,7 @@ void test_mpz_poly_trivialities()
 
 void test_mpz_poly_resultant()
 {
-  mpz_poly_t f,g;
+  mpz_poly_t f, g;
   mpz_poly_init(f, 10);
   mpz_poly_init(g, 10);
   mpz_t res;
@@ -897,49 +897,84 @@ void test_mpz_poly_resultant()
   mpz_t val;
   mpz_init(val);
 
+  /*f=6+7*x^1+0*x^2+9*x^3+13*x^4+13*x^5+1*x^6+4*x^7+8*x^8+4*x^9+6*x^10*/
+  /*g=1+10*x^1+7*x^2+2*x^3+9*x^4+5*x^5+0*x^6+10*x^7+7*x^8+5*x^9+4*x^10*/
   mpz_poly_setcoeffs_ui_var(f, 10, 6, 7, 0, 9, 13, 13, 1, 4, 8, 4, 6);
   mpz_poly_setcoeffs_ui_var(g, 10, 1, 10, 7, 2, 9, 5, 0, 10, 7, 5, 4);
   mpz_poly_resultant(res, f, g);
   mpz_set_str(val, "3787840596130306882", 10);
   ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
+  /*f=12+11*x^1+6*x^2+9*x^3+11*x^4+13*x^5+2*x^6+14*x^7+14*x^8+1*x^9+1*x^10*/
+  /*g=0+10*x^1+13*x^2+5*x^3+4*x^4+1*x^5+1*x^6+9*x^7+6*x^8+5*x^9+13*x^10*/
   mpz_poly_setcoeffs_ui_var(f, 10, 12, 11, 6, 9, 11, 13, 2, 14, 14, 1, 1);
   mpz_poly_setcoeffs_ui_var(g, 10, 0, 10, 13, 5, 4, 1, 1, 9, 6, 5, 13);
   mpz_poly_resultant(res, f, g);
   mpz_set_str(val, "52543088043796652195928", 10);
   ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
+  /*f=0+6*x^1+6*x^2+7*x^3+9*x^4+1*x^5+7*x^6+6*x^7+1*x^8+9*x^9+5*x^10*/
+  /*g=5+7*x^1+11*x^2+0*x^3+13*x^4+9*x^5+5*x^6+0*x^7+4*x^8+1*x^9+5*x^10*/
   mpz_poly_setcoeffs_ui_var(f, 10, 0, 6, 6, 7, 9, 1, 7, 6, 1, 9, 5);
   mpz_poly_setcoeffs_ui_var(g, 10, 5, 7, 11, 0, 13, 9, 5, 0, 4, 1, 5);
   mpz_poly_resultant(res, f, g);
   mpz_set_str(val, "137271514893118787175", 10);
   ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
+  /*f=-10-11*x^1+13*x^2+6*x^3-13*x^4+3*x^5+5*x^6-13*x^7+11*x^8-6*x^9-11*x^10*/
+  /*g=-8-14*x^1-9*x^2+2*x^3-4*x^4+0*x^5-7*x^6-10*x^7-3*x^8-3*x^9-11*x^10*/
   mpz_poly_setcoeffs_si_var(f, 10, -10, -11, 13, 6, -13, 3, 5, -13, 11, -6,
-                            -11);
-  mpz_poly_setcoeffs_si_var(g, 10, -8, -14, -9, 2, -4, 0, -7, -10, -3, -3, -11);
+      -11);
+  mpz_poly_setcoeffs_si_var
+    (g, 10, -8, -14, -9, 2, -4, 0, -7, -10, -3, -3, -11);
   mpz_poly_resultant(res, f, g);
   mpz_set_str(val, "408310242047874808370080", 10);
   ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
+  /*f=-3-10*x^1-12*x^2+1*x^3-3*x^4+5*x^5+0*x^6+0*x^7+10*x^8-12*x^9+14*x^10*/
+  /*g=13-11*x^1-8*x^2-13*x^3-14*x^4-9*x^5+10*x^6-5*x^7-3*x^8-11*x^9+12*x^10*/
   mpz_poly_setcoeffs_si_var(f, 10, -3, -10, -12, 1, -3, 5, 0, 0, 10, -12, 14);
   mpz_poly_setcoeffs_si_var(g, 10, 13, -11, -8, -13, -14, -9, 10, -5, -3, -11,
-                            12);
+      12);
   mpz_poly_resultant(res, f, g);
   mpz_set_str(val, "-36491329842163368368577782", 10);
   ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
+  /*f=-3-15*x^1-9*x^2+3*x^3-13*x^4-12*x^5-1*x^6-1*x^7-12*x^8-14*x^9+4*x^10*/
+  /*g=-6-13*x^1+9*x^2+7*x^3-5*x^4-5*x^5+11*x^6+2*x^7-5*x^8-4*x^9*/
   mpz_poly_setcoeffs_si_var(f, 10, -3, -15, -9, 3, -13, -12, -1, -1, -12, -14,
-                            4);
+      4);
   mpz_poly_cleandeg(g, 9);
   mpz_poly_setcoeffs_si_var(g, 9, -6, -13, 9, 7, -5, -5, 11, 2, -5, -4);
   mpz_poly_resultant(res, f, g);
   mpz_set_str(val, "3719519175576976543932", 10);
   ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
+  /*f=0*/
+  /*g=-6-13*x^1+9*x^2+7*x^3-5*x^4-5*x^5+11*x^6+2*x^7-5*x^8-4*x^9*/
   mpz_poly_cleandeg(f, -1);
   mpz_poly_resultant(res, f, g);
   ASSERT_ALWAYS(mpz_cmp_ui(res, 0) == 0);
+
+  /*f=-3-15*x^1-9*x^2+3*x^3-13*x^4-12*x^5-1*x^6-1*x^7-12*x^8-14*x^9+4*x^10*/
+  /*g=-6-13*x^1+9*x^2+7*x^3-5*x^4-5*x^5+11*x^6+2*x^7*/
+  mpz_poly_setcoeffs_si_var(f, 10, -3, -15, -9, 3, -13, -12, -1, -1, -12, -14,
+      4);
+  mpz_poly_cleandeg(g, 7);
+  mpz_poly_setcoeffs_si_var(g, 7, -6, -13, 9, 7, -5, -5, 11, 2);
+  mpz_poly_resultant(res, f, g);
+  mpz_set_str(val, "-26778351555137831424", 10);
+  ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
+
+  /*f=-3-15*x^1-9*x^2+3*x^3-12*x^4-12*x^5-3*x^6-3*x^7-12*x^8-15*x^9+6*x^10*/
+  /*g=-6-13*x^1+9*x^2+7*x^3-5*x^4-5*x^5+11*x^6+2*x^7*/
+  mpz_poly_setcoeffs_si_var(f, 10, -3, -15, -9, 3, -12, -12, -3, -3, -12, -15,
+      6);
+  mpz_poly_cleandeg(g, 7);
+  mpz_poly_setcoeffs_si_var(g, 7, -6, -13, 9, 7, -5, -5, 11, 2);
+  mpz_poly_resultant(res, f, g);
+  mpz_set_str(val, "-61519394185549843500", 10);
+  ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
   mpz_clear(res);
   mpz_clear(val);

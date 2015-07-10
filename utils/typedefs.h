@@ -65,8 +65,8 @@ typedef struct {
 } ideal_merge_t;
 
 typedef struct {
-  uint64_t nrels;
-  uint64_t nprimes;
+  uint64_t nrows;
+  uint64_t ncols;
   double W; /* weight of the active part of the matrix */
 } info_mat_t;
 

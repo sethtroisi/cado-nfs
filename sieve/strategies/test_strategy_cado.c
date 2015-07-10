@@ -10,7 +10,7 @@
 #include "utils.h"
 #include "pm1.h"
 #include "pp1.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "facul.h"
 #include "finding_good_strategy.h"
 #include "generate_factoring_method.h"

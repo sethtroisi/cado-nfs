@@ -17,7 +17,7 @@
 
 #include "merge_opts.h"
 #include "sparse.h"
-#include "filter_matrix.h"
+#include "merge_replay_matrix.h"
 #include "report.h"
 
 # include "swar.h"
