@@ -431,7 +431,7 @@ sieve/iqsort.h
 sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
 sieve/ecm/ecm.c
-sieve/ecm/ecm.h
+sieve/ecm/facul_ecm.h
 sieve/ecm/ecm_15ul.c
 sieve/ecm/ecm_2ul2.c
 sieve/ecm/ecm_mpz.c

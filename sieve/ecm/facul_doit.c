@@ -2,7 +2,7 @@
 #include "facul_doit.h"
 #include "pm1.h"
 #include "pp1.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "mpqs.h"
 
 extern unsigned long stats_called[];

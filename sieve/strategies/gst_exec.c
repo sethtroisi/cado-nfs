@@ -10,7 +10,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "facul.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "tab_strategy.h"
 #include "generate_strategies.h"
 #include "gen_decomp.h"

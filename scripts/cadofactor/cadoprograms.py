@@ -844,6 +844,7 @@ class GaloisFilter(Program):
                  renumber: Parameter(is_input_file=True),
                  filelist: Parameter(is_input_file=True)=None,
                  basepath: Parameter()=None,
+                 galois: Parameter("galois")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

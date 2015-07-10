@@ -1138,6 +1138,7 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
 
 /* Galois automorphisms
    autom2.1: 1/x
+   autom2.2: -x
    autom3.1: 1-1/x
    autom3.2: -1-1/x
    autom4.1: -(x+1)/(x-1)
@@ -1155,6 +1156,10 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     if(strcmp(galois_autom, "autom2.1") == 0 
        || strcmp(galois_autom, "1/y") == 0){
 	ord = 2; A = 0; B = 1; C = 1; D = 0;
+    }
+    else if(strcmp(galois_autom, "autom2.2") == 0
+	    || strcmp(galois_autom, "_y") == 0){
+	ord = 2; A = -1; B = 0; C = 0; D = 1;
     }
     else if(strcmp(galois_autom, "autom3.1") == 0){
 	// 1-1/x = (x-1)/x

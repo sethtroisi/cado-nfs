@@ -63,9 +63,6 @@
 # the power of the cadofactor python programs. I need to understand that
 # stuff better.
 
-# TODO: this currently fails when the target is ridiculously small, as
-# target=1009 for instance -- see why.
-
 # TODO: keep las awake, if needed.
 
 # TODO: make output less verbose.
@@ -83,6 +80,7 @@ import tempfile
 import shutil
 import functools
 import itertools
+import random
 from queue import Queue, Empty
 from threading import Thread
 
@@ -164,6 +162,7 @@ class GeneralClass(object):
         self.hello()
         self.__load_badidealdata()
         self.logDB = LogBase(self)
+        self.initrandomizer = 1
     
     def __connect(self):
         if args.db and not self._conn:
@@ -658,7 +657,21 @@ class DescentUpperClass(object):
 
     def do_descent(self, z):
         p = general.p()
-        gg = self.__myxgcd(z, p, self.tkewness)
+        bound = p.bit_length() // 2 + 10
+        # make the randomness deterministic to be able to replay
+        # interrupted computations.
+        random.seed(42)
+        while True:
+            zz = pow(z, general.initrandomizer, p)
+            gg = self.__myxgcd(zz, p, self.tkewness)
+            if (gg[0][0].bit_length() < bound and
+                    gg[1][0].bit_length() < bound and
+                    gg[0][1].bit_length() < bound and
+                    gg[1][1].bit_length() < bound):
+                break
+            print ("Skewed reconstruction. Let's randomize the input.")
+            general.initrandomizer = random.randrange(p)
+
         tmpdir = general.tmpdir()
         prefix = general.prefix() + ".descent.%s.init." % args.target
 
@@ -754,7 +767,7 @@ class DescentUpperClass(object):
 
         Num = a*gg[0][0] + b*gg[1][0]
         Den = a*gg[0][1] + b*gg[1][1]
-        assert (z*Den-Num) % p == 0
+        assert (zz*Den-Num) % p == 0
 
         factNum = [ int(x, 16) for x in rel[2].split(',') ]
         factDen = [ int(x, 16) for x in rel[1].split(',') ]
@@ -1041,6 +1054,10 @@ class DescentLowerClass(object):
         p=general.p()
         ell=general.ell()
         log_target = log_target % ell
+        if general.initrandomizer != 1:
+            # divide result by randomizer modulo ell
+            multiplier = pow(general.initrandomizer, ell-2, ell)
+            log_target = (log_target * multiplier) % ell
         print("# p=%d" % p)
         print("# ell=%d" % ell)
         print("log(2)=%d" % logDB.get_log(2, -1, 0))

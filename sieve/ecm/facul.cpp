@@ -14,7 +14,7 @@
 #include "portability.h"
 #include "pm1.h"
 #include "pp1.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "facul.h"
 #include "facul_doit.h"
 
