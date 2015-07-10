@@ -97,7 +97,7 @@ singleton_removal_mt_thread (void *arg)
       }
     }
   }
-  pthread_exit(NULL);
+  return NULL;
 }
 
 void
@@ -132,8 +132,8 @@ singleton_removal_oneiter_mt (purge_matrix_ptr mat, unsigned int nthreads)
   pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
   for (unsigned int i = 0; i < nthreads; i++)
   {
-    if ((err = pthread_create(&threads[i], &attr, singleton_removal_mt_thread,
-                              &(th_data[i]))))
+    if ((err = pthread_create(&threads[i], &attr, &singleton_removal_mt_thread,
+                              (void *) &(th_data[i]))))
     {
       fprintf(stderr, "Error, pthread_create failed in singleton_removal_"
                       "oneiter_mt: %d. %s\n", err, strerror(errno));
