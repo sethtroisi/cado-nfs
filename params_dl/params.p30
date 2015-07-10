@@ -56,5 +56,5 @@ tasks.descent.lpb0 = 17
 tasks.descent.lpb1 = 17
 tasks.descent.mfb0 = 35
 tasks.descent.mfb1 = 35
-tasks.descent.descent_hint = /home/gaudry/Recherche/cado-nfs/params_dl/p30.hint
+tasks.descent.descent_hint = /users/caramel/gaudry/Recherche/cado-nfs/params_dl/p30.hint
 

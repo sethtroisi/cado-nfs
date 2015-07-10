@@ -657,7 +657,7 @@ class DescentUpperClass(object):
 
     def do_descent(self, z):
         p = general.p()
-        bound = p.bit_length() // 2 + 10
+        bound = p.bit_length() // 2 + 20
         # make the randomness deterministic to be able to replay
         # interrupted computations.
         random.seed(42)
