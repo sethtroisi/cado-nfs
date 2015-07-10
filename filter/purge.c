@@ -424,94 +424,6 @@ delete_connected_component (purge_matrix_ptr mat, uint64_t cur_row,
     /* mat->nrows and mat->ncols are updated by purge_matrix_delete_row. */
 }
 
-/***** Functions to compute mat->sum2_row array (mono and multi thread) *******/
-
-#ifdef HAVE_SYNC_FETCH /* Multithread code */
-/* The main structure for the working pthreads pool which compute mat->sum2_row
- */
-typedef struct sum2_mt_data_s {
-  // Read only part
-  unsigned int pthread_number;
-  unsigned int nthreads;
-  // Read-write part
-  purge_matrix_ptr mat;
-  pthread_t pthread;
-} sum2_mt_data_t;
-
-static void *
-compute_sum2_row_mt (void *pt)
-{
-  sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
-  purge_matrix_ptr mat = data->mat;
-  uint64_t j = mat->nrows_init / data->nthreads;
-  uint64_t i = (j * data->pthread_number) & ~((size_t) (BV_BITS - 1));
-  uint64_t end = (data->pthread_number == data->nthreads - 1) ? mat->nrows_init
-                : (j * (data->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
-  bv_t bv, *pbv;
-  index_t h, *myrowcompact;
-
-  pbv = mat->row_used->p + (i >> LN2_BV_BITS);
-  for (; i < end; i += BV_BITS)
-  {
-    for (j = i, bv = *pbv++; bv; ++j, bv >>= 1)
-    {
-      if (LIKELY(bv & 1))
-      {
-        myrowcompact = mat->row_compact[j];
-        for (;;)
-        {
-          h = *myrowcompact++;
-          if (UNLIKELY (h == UMAX(h)))
-            break;
-          if (LIKELY (mat->cols_weight[h] == 2))
-            __sync_add_and_fetch (mat->sum2_row + h, j);
-        }
-      }
-    }
-  }
-  pthread_exit (NULL);
-  return NULL;
-}
-#endif
-
-static inline void
-compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
-{
-  memset(mat->sum2_row, 0, mat->col_max_index * sizeof(uint64_t));
-#ifndef HAVE_SYNC_FETCH /* monothread */
-  if (nthreads > 1)
-    fprintf (stdout, "# INFO: Cannot use multithread code for compute_sum2_row:"
-                     " HAVE_SYNC_FETCH is not defined\n");
-  for (uint64_t i = 0; i < mat->nrows_init; i++)
-  {
-    if (bit_vector_getbit(mat->row_used, (size_t) i))
-    {
-      index_t h, *myrowcompact;
-      for (myrowcompact = mat->row_compact[i]; (h = *myrowcompact++) != UMAX(h);)
-        if (mat->cols_weight[h] == 2)
-          mat->sum2_row[h] += i;
-    }
-  }
-#else
-  sum2_mt_data_t *th_data = malloc_check (nthreads * sizeof (sum2_mt_data_t));
-  for (size_t i = nthreads; i--; )
-  {
-    th_data[i].pthread_number = i;
-    th_data[i].nthreads = nthreads;
-    th_data[i].mat = mat;
-    if (pthread_create (&(th_data[i].pthread), NULL, compute_sum2_row_mt,
-                                                     (void *) (th_data + i)))
-    {
-      perror ("compute_sum2_row pthread creation failed\n");
-      exit (1);
-    }
-  }
-  for (size_t i = nthreads; i--; )
-    pthread_join (th_data[i].pthread, NULL);
-  free (th_data);
-#endif
-}
-
 /*************** Multithread code for clique removal *************************/
 
 /* The main structure for the working pthreads pool which compute the
@@ -722,7 +634,7 @@ cliques_removal (purge_matrix_ptr mat, int64_t target_excess,
    * If HAVE_SYNC_FETCH is defined, this part is done with the previous
    * multithread function; if not, it's done in sequential, immediatly.
    */
-  compute_sum2_row (mat, nthreads);
+  purge_matrix_compute_sum2_row (mat, nthreads);
   fprintf(stdout, "Cliq. rem.: computed mat->sum2_row at %2.2lf\n", seconds());
   fflush (stdout);
 
@@ -1221,9 +1133,9 @@ int main(int argc, char **argv)
     /* Note: Now that we no longer take a bitmap on input, all
      * relations are considered active at this point, so that we
      * do not need to pass a bitmap to filter_rels */
-    mat->nrows = filter_rels(input_files,
-                        (filter_rels_callback_t) &purge_matrix_set_row_from_rel,
-                        mat, EARLYPARSE_NEED_INDEX, NULL, NULL);
+    filter_rels(input_files,
+                (filter_rels_callback_t) &purge_matrix_set_row_from_rel,
+                (void *) mat, EARLYPARSE_NEED_INDEX, NULL, NULL);
 
     if (mat->nrows != mat->nrows_init)
     {
@@ -1310,8 +1222,8 @@ int main(int argc, char **argv)
     }
 
     /* second pass over relations in files */
-    filter_rels(input_files, (filter_rels_callback_t) &thread_print, data2,
-                EARLYPARSE_NEED_LINE, NULL, NULL);
+    filter_rels(input_files, (filter_rels_callback_t) &thread_print,
+                (void *) data2, EARLYPARSE_NEED_LINE, NULL, NULL);
 
     /* write final values to stdout */
     /* This output, incl. "Final values:", is required by the script */

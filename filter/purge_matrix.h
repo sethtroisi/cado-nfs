@@ -26,6 +26,7 @@ void purge_matrix_clear (purge_matrix_ptr);
 void purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr);
 void* purge_matrix_set_row_from_rel (purge_matrix_t, earlyparsed_relation_ptr);
 void purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i);
+void purge_matrix_compute_sum2_row (purge_matrix_ptr, unsigned int);
 
 #define purge_matrix_compute_excess(m) (((int64_t)m->nrows)-((int64_t)m->ncols))
 

@@ -7,6 +7,11 @@
 #include "filter_common.h"
 #include "purge_matrix.h"
 
+/* If HAVE_SYNC_FETCH is not defined, we will use mutex for multithreaded
+ * version of the code. May be too slow. */
+#ifndef HAVE_SYNC_FETCH
+pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 void
 purge_matrix_init (purge_matrix_ptr mat, uint64_t nrows_init,
@@ -172,3 +177,131 @@ purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i)
   bit_vector_clearbit (mat->row_used, (size_t) i);
   mat->nrows--;
 }
+
+/***** Functions to compute mat->sum2_row array (mono and multi thread) *******/
+
+/* sum2_row[h] = 0 if cols_weight[h] <> 2
+               = i1 + i2 if cols_weight[h] = 2 and h appears in rows i1 and i2
+ */
+
+/* Code for computing mat->sum2_row --- monothread version */
+
+static inline void
+purge_matrix_compute_sum2_row_mono (purge_matrix_ptr mat)
+{
+  /* Reset mat->sum2_row to 0 */
+  memset(mat->sum2_row, 0, mat->col_max_index * sizeof(uint64_t));
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+  {
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
+    {
+      index_t h, *cur_row;
+      for (cur_row = mat->row_compact[i]; (h = *cur_row++) != UMAX(h);)
+        if (mat->cols_weight[h] == 2)
+          mat->sum2_row[h] += i;
+    }
+  }
+}
+
+/* Code for computing mat->sum2_row --- multithread version */
+
+typedef struct sum2_mt_data_s {
+  // Read only part
+  uint64_t begin, end;
+  // Read-write part
+  purge_matrix_ptr mat;
+} sum2_mt_data_t;
+
+void *
+purge_matrix_compute_sum2_row_mt_thread (void *pt)
+{
+  sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
+  purge_matrix_ptr mat = data->mat;
+  bv_t bv, *pbv;
+  uint64_t i,j;
+
+  /* Here, data->start and data->end must be multiple of BV_BITS. */
+  pbv = mat->row_used->p + (data->begin >> LN2_BV_BITS);
+  for (i = data->begin; i < data->end; i += BV_BITS)
+  {
+    for (j = i, bv = *pbv++; bv; ++j, bv >>= 1)
+    {
+      if (LIKELY(bv & 1))
+      {
+        index_t h, *cur_row;
+        for (cur_row = mat->row_compact[j]; (h = *cur_row++) != UMAX(h);)
+        {
+          if (LIKELY (mat->cols_weight[h] == 2))
+          {
+#ifdef HAVE_SYNC_FETCH
+            __sync_add_and_fetch (mat->sum2_row + h, j);
+#else /* else we use mutex to protect the addition on mat->sum2_row[h] */
+            pthread_mutex_lock (&lock);
+            mat->sum2_row[h] += j;
+            pthread_mutex_unlock (&lock);
+#endif
+          }
+        }
+      }
+    }
+  }
+  return NULL;
+}
+
+static inline void
+purge_matrix_compute_sum2_row_mt (purge_matrix_ptr mat, unsigned int nthreads)
+{
+  pthread_t *threads = NULL;
+  sum2_mt_data_t *th_data = NULL;
+  uint64_t nrows_per_thread, k;
+  int err;
+
+  /* Reset mat->sum2_row to 0 */
+  memset(mat->sum2_row, 0, mat->col_max_index * sizeof(uint64_t));
+
+  th_data = (sum2_mt_data_t *) malloc (nthreads * sizeof(sum2_mt_data_t));
+  ASSERT_ALWAYS(th_data != NULL);
+  threads = (pthread_t *) malloc (nthreads * sizeof(pthread_t));
+  ASSERT_ALWAYS(threads != NULL);
+
+  /* nrows_per_thread MUST be a multiple of BV_BITS (see how we loop on the rows
+   * in purge_matrix_compute_sum2_row_mt_thread
+   */
+  nrows_per_thread = (mat->nrows_init / nthreads) & ((uint64_t) ~(BV_BITS - 1));
+  k = 0;
+  for (unsigned int i = 0; i < nthreads; i++)
+  {
+    th_data[i].mat = mat;
+    th_data[i].begin = k;
+    k += nrows_per_thread;
+    th_data[i].end = k;
+  }
+  th_data[nthreads-1].end = mat->nrows_init;
+
+  for (unsigned int i = 0; i < nthreads; i++)
+  {
+    if ((err = pthread_create(&threads[i], NULL,
+                              &purge_matrix_compute_sum2_row_mt_thread,
+                              (void *) &(th_data[i]))))
+    {
+      fprintf(stderr, "Error, pthread_create failed in purge_matrix_compute_"
+                      "sum2_row_mt: %d. %s\n", err, strerror(errno));
+      abort();
+    }
+  }
+  for (unsigned int i = 0; i < nthreads; i++)
+    pthread_join (threads[i], NULL);
+
+  free(threads);
+  free(th_data);
+}
+
+void
+purge_matrix_compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
+{
+  if (nthreads > 1)
+    purge_matrix_compute_sum2_row_mt (mat, nthreads);
+  else
+    purge_matrix_compute_sum2_row_mono (mat);
+}
+

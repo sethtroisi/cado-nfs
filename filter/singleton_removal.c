@@ -104,8 +104,8 @@ void
 singleton_removal_oneiter_mt (purge_matrix_ptr mat, unsigned int nthreads)
 {
   pthread_attr_t attr;
-  pthread_t *threads;
-  sing_rem_mt_data_t *th_data;
+  pthread_t *threads = NULL;
+  sing_rem_mt_data_t *th_data = NULL;
   uint64_t nrows_per_thread, k;
   int err;
 
@@ -140,7 +140,7 @@ singleton_removal_oneiter_mt (purge_matrix_ptr mat, unsigned int nthreads)
       abort();
     }
   }
-  for (unsigned i = 0; i < nthreads; i++)
+  for (unsigned int i = 0; i < nthreads; i++)
   {
     pthread_join (threads[i], NULL);
     mat->nrows -= th_data[i].sup_nrow;
