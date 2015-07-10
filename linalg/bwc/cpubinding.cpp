@@ -168,7 +168,9 @@ public:
     string object;
     int n;
     topology_level() {}
-    topology_level(string const& s, int n) : object(s), n(n) {}
+    topology_level(string const& s, int n) : object(s), n(n) {
+        if (s == "Socket") object="Package";
+    }
     friend istream& operator>>(istream& is, topology_level& t);
     bool operator<(topology_level const& o) const {
         if (object < o.object) return true;
@@ -184,6 +186,7 @@ istream& operator>>(istream& is, topology_level& t)
     string::size_type colon = s.find(':');
     if (colon != string::npos) {
         t.object = s.substr(0, colon);
+        if (t.object == "Socket") t.object="Package";
         if (!(istringstream(s.substr(colon+1)) >> t.n)) {
             is.setstate(ios_base::failbit);
         }
@@ -241,9 +244,15 @@ struct mapping_string {
     int group;
     thread_split t;
     mapping_string() : group(0) {}
-    mapping_string(string const& type, int g, thread_split const& t) : object(type), group(g), t(t) { }
-    mapping_string(string const& type, int g, int t[2]) : object(type), group(g), t(t) { }
-    mapping_string(string const& type, int g): object(type), group(g) {}
+    mapping_string(string const& type, int g, thread_split const& t) : object(type), group(g), t(t) {
+        if (type == "Socket") { object = "Package"; }
+    }
+    mapping_string(string const& type, int g, int t[2]) : object(type), group(g), t(t) {
+        if (type == "Socket") { object = "Package"; }
+    }
+    mapping_string(string const& type, int g): object(type), group(g) {
+        if (type == "Socket") { object = "Package"; }
+    }
     bool operator<(const mapping_string& o) const {
         if (object != o.object) return object < o.object;
         if (group != o.group)   return group < o.group;
@@ -270,8 +279,10 @@ istream& operator>>(istream& is, mapping_string& ms)
         string::size_type star = s.find('*');
         if (star == string::npos) {
             ms.object = s.substr(0, rel);
+            if (ms.object == "Socket") ms.object="Package";
         } else if (star < rel) {
             ms.object = s.substr(0, star);
+            if (ms.object == "Socket") ms.object="Package";
             if (!(istringstream(s.substr(star+1, rel-(star+1))) >> ms.group)) {
                 is.setstate(ios_base::failbit);
             }
