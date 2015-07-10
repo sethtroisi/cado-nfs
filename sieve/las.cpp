@@ -1157,7 +1157,8 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
        || strcmp(galois_autom, "1/y") == 0){
 	ord = 2; A = 0; B = 1; C = 1; D = 0;
     }
-    else if(strcmp(galois_autom, "autom2.2") == 0 ){
+    else if(strcmp(galois_autom, "autom2.2") == 0
+	    || strcmp(galois_autom, "_y") == 0){
 	ord = 2; A = -1; B = 0; C = 0; D = 1;
     }
     else if(strcmp(galois_autom, "autom3.1") == 0){
