@@ -427,7 +427,7 @@ if [ "${DO_PURGE}" -eq "1" ] ; then
   argp0="-out ${RELSFILE} -basepath ${NODUPDIR} -subdirlist ${SUBDIRLIST} "
   argp1="-filelist ${FILELIST_DUP2} -keep ${EXCESS} "
   argp2="-outdel ${DELRELSFILE} "
-  argp3="-nrels ${NBREL} -nprimes ${NBPR} -minindex ${MIN} "
+  argp3="-nrels ${NBREL} -nprimes ${NBPR} -col-min-index ${MIN} "
   if [ "x${REQ_EXCESS}" = "x-1" ] ; then
     argp4=""
   else

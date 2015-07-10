@@ -1,4 +1,4 @@
-/* routines for TeX output, extracted from filter_matrix.c */
+/* routines for TeX output, extracted from merge_replay_matrix.c */
 
 void
 dclistTex(FILE *file, dclist dcl)

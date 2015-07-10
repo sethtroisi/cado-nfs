@@ -432,10 +432,17 @@ int check_whether_file_is_renumbered(const char * filename, unsigned int npoly)
     unsigned int count = 0;
     char s[1024];
     FILE *f_tmp = fopen_maybe_compressed (filename, "rb");
+
     if (!f_tmp) {
         fprintf(stderr, "%s: %s\n", filename, strerror(errno));
         abort();
     }
+
+    if (feof (f_tmp)) /* file is empty */
+      {
+        fclose_maybe_compressed (f_tmp, filename);
+        return 1; /* an empty file might be considered as renumbered */
+      }
 
     /* Look for first non-comment line */
     while (1) {

@@ -16,9 +16,10 @@
 
 #define DEFAULT_FILTER_EXCESS 160
 
-#define DEFAULT_PURGE_NPASS 50
+/* Default number of step of clique removal in purge. */
+#define DEFAULT_PURGE_NSTEPS 50
 #define DEFAULT_PURGE_REQUIRED_EXCESS 0.1
-#define DEFAULT_PURGE_NPT 4
+#define DEFAULT_PURGE_NTHREADS 4
 
 #define DEFAULT_MERGE_MAXLEVEL 10
 #define DEFAULT_MERGE_FORBW 0

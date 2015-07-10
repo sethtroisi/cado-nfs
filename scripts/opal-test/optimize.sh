@@ -16,31 +16,31 @@ d=`mktemp -d`
 echo "Working directory:" $d
 cp $2 las_optimize.py report.py $d
 sed "s/c59.polyselect2.poly/$poly/g" las_run.py > $d/las_run.py
-rlim=`grep rlim $params | cut -d= -f2`
-alim=`grep alim $params | cut -d= -f2`
-lpbr=`grep lpbr $params | cut -d= -f2`
-lpba=`grep lpba $params | cut -d= -f2`
-mfbr=`grep mfbr $params | cut -d= -f2`
-mfba=`grep mfba $params | cut -d= -f2`
-rlambda=`grep rlambda $params | cut -d= -f2`
-alambda=`grep alambda $params | cut -d= -f2`
-grep ncurves0 $params > /dev/null
+rlim=`grep "^rlim.*=" $params | cut -d= -f2`
+alim=`grep "^alim.*=" $params | cut -d= -f2`
+lpbr=`grep "^lpbr.*=" $params | cut -d= -f2`
+lpba=`grep "^lpba.*=" $params | cut -d= -f2`
+mfbr=`grep "mfbr.*=" $params | cut -d= -f2`
+mfba=`grep "mfba.*=" $params | cut -d= -f2`
+rlambda=`grep "rlambda.*=" $params | cut -d= -f2`
+alambda=`grep "alambda.*=" $params | cut -d= -f2`
+grep "ncurves0.*=" $params > /dev/null
 if [ $? -eq 0 ]; then
-   ncurves0=`grep ncurves0 $params | cut -d= -f2`
+   ncurves0=`grep "ncurves0.*=" $params | cut -d= -f2`
    has_ncurves0=1
 else
    ncurves0=10
    has_ncurves0=0
 fi
-grep ncurves1 $params > /dev/null
+grep "ncurves1.*=" $params > /dev/null
 if [ $? -eq 0 ]; then
-   ncurves1=`grep ncurves1 $params | cut -d= -f2`
+   ncurves1=`grep "ncurves1.*=" $params | cut -d= -f2`
    has_ncurves1=1
 else
    ncurves1=10
    has_ncurves1=0
 fi
-I=`grep I $params | cut -d= -f2`
+I=`grep "I.*=" $params | cut -d= -f2`
 rlim_min=`expr $rlim / 2`
 rlim_max=`expr $rlim \* 2`
 alim_min=`expr $alim / 2`
