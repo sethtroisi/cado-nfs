@@ -6,6 +6,7 @@
 
 #include "filter_common.h"
 #include "purge_matrix.h"
+#include "clique_removal.h" /* for computing stats on cliques */
 
 /* If HAVE_SYNC_FETCH is not defined, we will use mutex for multithreaded
  * version of the code. May be too slow. */
@@ -206,9 +207,9 @@ purge_matrix_compute_sum2_row_mono (purge_matrix_ptr mat)
 /* Code for computing mat->sum2_row --- multithread version */
 
 typedef struct sum2_mt_data_s {
-  // Read only part
+  /* Read only part */
   uint64_t begin, end;
-  // Read-write part
+  /* Read-write part */
   purge_matrix_ptr mat;
 } sum2_mt_data_t;
 
@@ -305,3 +306,125 @@ purge_matrix_compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
     purge_matrix_compute_sum2_row_mono (mat);
 }
 
+/******************* Functions to print stats ********************************/
+
+/* These 3 functions compute and print stats on rows weight, columns weight and
+ * cliques (connected components) length. The stats can be expensive to
+ * compute, so these functions should not be called by default. */
+
+/* Internal function */
+static void
+print_stats_uint64 (FILE *out, uint64_t *w, uint64_t len, char name[],
+                    char unit[], int verbose)
+{
+  uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
+  for (uint64_t i = 0; i < len; i++)
+  {
+    if (w[i] > 0)
+    {
+      nb_nzero++;
+      if (w[i] < min)
+        min = w[i];
+      if (w[i] > max)
+        max = w[i];
+      av += w[i];
+      std += w[i]*w[i];
+    }
+  }
+
+  double av_f = ((double) av) / ((double) nb_nzero);
+  double std_f = sqrt(((double) std) / ((double) nb_nzero) - av_f*av_f);
+
+  fprintf (out, "# STATS on %s: #%s = %" PRIu64 "\n", name, name, nb_nzero);
+  fprintf (out, "# STATS on %s: min %s = %" PRIu64 "\n", name, unit, min);
+  fprintf (out, "# STATS on %s: max %s = %" PRIu64 "\n", name, unit, max);
+  fprintf (out, "# STATS on %s: av %s = %.2f\n", name, unit, av_f);
+  fprintf (out, "# STATS on %s: std %s = %.2f\n", name, unit, std_f);
+
+  if (verbose > 1)
+  {
+    uint64_t *nb_w = NULL;
+    nb_w = (uint64_t *) malloc ((max-min+1) * sizeof (uint64_t));
+    ASSERT_ALWAYS (nb_w != NULL);
+    memset (nb_w, 0, (max-min+1) * sizeof (uint64_t));
+    for (uint64_t i = 0; i < len; i++)
+      if (w[i] > 0)
+        nb_w[w[i]-min]++;
+
+    for (uint64_t i = 0; i < max-min+1; i++)
+    {
+      if (nb_w[i] > 0)
+        fprintf (out, "# STATS on %s: #%s of %s %" PRIu64 " : %" PRIu64
+                      "\n", name, name, unit, min+i, nb_w[i]);
+    }
+    free (nb_w);
+  }
+  fflush (out);
+}
+
+void
+purge_matrix_print_stats_columns_weight (FILE *out, purge_matrix_srcptr mat,
+                                         int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (mat->col_max_index * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, mat->col_max_index * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
+      for (h = mat->row_compact[i]; *h != UMAX(*h); h++)
+        w[*h]++;
+
+  print_stats_uint64 (out, w, mat->col_max_index, "cols", "weight", verbose);
+  free (w);
+}
+
+void
+purge_matrix_print_stats_rows_weight (FILE *out, purge_matrix_srcptr mat,
+                                      int verbose)
+{
+  uint64_t *w = NULL;
+  index_t *h = 0;
+  w = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
+  ASSERT_ALWAYS (w != NULL);
+  memset (w, 0, mat->nrows_init * sizeof (uint64_t));
+
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
+      for (h = mat->row_compact[i]; *h != UMAX(*h); h++)
+        w[i]++;
+
+  print_stats_uint64 (out, w, mat->nrows_init, "rows", "weight", verbose);
+  free (w);
+}
+
+/* Assume mat->sum2_row is already computed */
+void
+purge_matrix_print_stats_on_cliques (FILE *out, purge_matrix_srcptr mat,
+                                     int verbose)
+{
+  uint64_t *len = NULL;
+
+  len = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
+  ASSERT_ALWAYS (len != NULL);
+  memset (len, 0, mat->nrows_init * sizeof (uint64_t));
+
+  uint64_buffer_t buf;
+  uint64_buffer_init (buf, UINT64_BUFFER_MIN_SIZE);
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+  {
+    if (bit_vector_getbit(mat->row_used, (size_t) i))
+    {
+      comp_t c = {.i = i, .w = 0.0};
+      uint64_t nrows = compute_one_connected_component (&c, mat, buf);
+      len[i] = nrows;
+    }
+  }
+
+  print_stats_uint64 (out, len, mat->nrows_init, "cliques", "length", verbose);
+
+  uint64_buffer_clear (buf);
+  free (len);
+}
