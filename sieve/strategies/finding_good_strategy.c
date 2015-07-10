@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "facul.h"
 #include "portability.h"
 #include "utils.h"

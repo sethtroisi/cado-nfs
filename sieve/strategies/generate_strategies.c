@@ -1,6 +1,6 @@
 #include "generate_strategies.h"
 #include "facul.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 
 #include <math.h>
 #include <stdlib.h>

@@ -15,7 +15,7 @@
 #include "facul.h"
 #include "pm1.h"
 #include "pp1.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "generate_factoring_method.h"
 #include "convex_hull.h"
 
