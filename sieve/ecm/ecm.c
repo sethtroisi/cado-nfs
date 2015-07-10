@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "ularith.h"
 #include "portability.h"
 #include "getprime.h"
