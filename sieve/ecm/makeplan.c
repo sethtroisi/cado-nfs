@@ -6,7 +6,7 @@
 #include "utils.h" /* for getprime() */
 #include "pm1.h"
 #include "pp1.h"
-#include "ecm.h"
+#include "facul_ecm.h"
 #include "prac_bc.h"
 #include "portability.h"
 

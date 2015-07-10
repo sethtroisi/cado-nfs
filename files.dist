@@ -66,8 +66,12 @@ filter/filter_common.h
 filter/dup1.c
 filter/dup2.c
 filter/explain.c
-filter/filter_matrix.c
-filter/filter_matrix.h
+filter/merge_replay_matrix.c
+filter/merge_replay_matrix.h
+filter/purge_matrix.c
+filter/purge_matrix.h
+filter/singleton_removal.c
+filter/singleton_removal.h
 filter/markowitz.c
 filter/markowitz.h
 filter/merge.c
@@ -425,7 +429,7 @@ sieve/iqsort.h
 sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
 sieve/ecm/ecm.c
-sieve/ecm/ecm.h
+sieve/ecm/facul_ecm.h
 sieve/ecm/ecm_15ul.c
 sieve/ecm/ecm_2ul2.c
 sieve/ecm/ecm_mpz.c

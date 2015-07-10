@@ -15,7 +15,7 @@
 #include "portability.h"
 #include "macros.h"
 #include "filter_common.h"
-#include "filter_matrix.h"
+#include "merge_replay_matrix.h"
 #include "sparse.h"
 
 #define DEBUG 0

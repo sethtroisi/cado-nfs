@@ -84,8 +84,10 @@ II) Using msieve filtering and linear algebra with relations in CADO format
 
 III) Using msieve linear algebra after CADO-NFS filtering
 
-up from SVN 891, msieve can read a cycle file produced by CADO-NFS. To use it,
-you will have to:
+[should work with CADO-NFS revision aca5658]
+
+up from msieve (svn) revision 891, msieve can read a cycle file produced by
+CADO-NFS. To use it, you will have to:
 
 - use CADO-NFS for the filtering. In what follows, let 'prefix' be
   the prefix used for all the CADO filenames
