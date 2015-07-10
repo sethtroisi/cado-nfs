@@ -16,11 +16,13 @@ dlp = true
 
 tasks.polyselect.degree = 3
 
-tasks.polyselect.admax = 200
-tasks.polyselect.incr = 60
+tasks.polyselect.admax = 1000
+tasks.polyselect.incr = 20
 tasks.polyselect.adrange = 100
 tasks.polyselect.P = 260
 tasks.polyselect.nq = 50
+tasks.polyselect.nrkeep = 2
+tasks.polyselect.ropteffort = 1
 
 ###########################################################################
 # Sieve
