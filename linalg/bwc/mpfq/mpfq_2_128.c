@@ -485,7 +485,7 @@ void mpfq_2_128_poly_setmonic(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_ds
         q->size = 1;
         return;
     }
-    mpfq_2_128_elt lc;
+    mpfq_2_128_elt lc;	/* spurious uninit warning sometimes */
     mpfq_2_128_init(K, &lc);
     mpfq_2_128_poly_getcoeff(K, lc, p, degp);
     mpfq_2_128_inv(K, lc, lc);
@@ -587,7 +587,7 @@ static void mpfq_2_128_poly_preinv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_1
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
     // Requires p(0) = 1
     // Assume p != q (no alias)
-    mpfq_2_128_elt temp;
+    mpfq_2_128_elt temp;	/* spurious uninit warning sometimes */
     mpfq_2_128_init(K, &temp);
     mpfq_2_128_poly_getcoeff(K, temp, p, 0);//Should be in the assert
     assert( mpfq_2_128_cmp_ui(K, temp, 1) == 0);
