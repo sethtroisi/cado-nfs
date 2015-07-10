@@ -381,7 +381,7 @@ clique_removal_core_mt_thread (void *pt)
 
     bv_t * pbv = data->mat->row_used->p + (begin_cur_block >> LN2_BV_BITS);
     /* The size of a block must be a multiple of BV_BITS */
-    for (uint64_t j = begin_cur_block; j < end_cur_block; j += BV_BITS, *pbv++)
+    for (uint64_t j = begin_cur_block; j < end_cur_block; j += BV_BITS, pbv++)
     {
       uint64_t i = j;
       bv_t bv;
