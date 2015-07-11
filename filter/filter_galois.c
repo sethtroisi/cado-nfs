@@ -130,10 +130,14 @@ compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
 		  }
 	      }
 	      else if(strcmp(action, "_y") == 0){
-		  if (r[k] == 0)
+		  if (r[k] == 0){
+		      fprintf(stderr, "WARNING: r=0\n");
 		      sigma_r = 0;
-		  else if (r[k] == old_p)
+		  }
+		  else if (r[k] == old_p){
+		      fprintf(stderr, "WARNING: r=oo\n");
 		      sigma_r = old_p;
+		  }
 		  else {
 		      sigma_r = old_p - r[k];
 		      ASSERT_ALWAYS(sigma_r < old_p);
@@ -173,9 +177,10 @@ compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
   }
 }
 
+// Case x -> 1/x: (a-b/x) = 1/x*(-b-(-a)*x) = (-b, -a) ~ (b, a)
 // Hash value that is the same for (a,b) and (b,a)
 // (with sign normalization).
-static inline uint64_t myhash(int64_t a, uint64_t b)
+static inline uint64_t myhash_1(int64_t a, uint64_t b)
 {
   uint64_t h0, h1;
   h0 = CA_DUP2 * (uint64_t) a + CB_DUP2 * b;
@@ -188,14 +193,33 @@ static inline uint64_t myhash(int64_t a, uint64_t b)
   return h0 ^ h1;
 }
 
+// Case x -> -x: (a-b*(-x)) = (a-(-b)*x) = (a, -b) ~ (-a, b).
+// Hash value that is the same for (a,b) and (-a,b).
+// (with sign normalization).
+static inline uint64_t myhash_2(int64_t a, uint64_t b)
+{
+    int64_t absa = (a >= 0 ? a : -a);
+    return (CA_DUP2 * (uint64_t) absa + CB_DUP2 * b);
+}
+
+static inline uint64_t myhash(int64_t a, uint64_t b, char *action)
+{
+    if(strcmp(action, "1/y") == 0)
+	return myhash_1(a, b);
+    else if(strcmp(action, "_y") == 0)
+	return myhash_2(a, b);
+    else
+	return 0;
+}
+
 static inline uint32_t
 insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel,
-    unsigned int *is_dup)
+				  unsigned int *is_dup, char *action)
 {
   uint64_t h;
   uint32_t i, j;
 
-  h = myhash(rel->a, rel->b);
+  h = myhash(rel->a, rel->b, action);
   i = h % K;
   j = (uint32_t) (h >> 32);
   while (H[i] != 0 && H[i] != j) {
@@ -214,11 +238,11 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel,
 }
 
 static void *
-thread_galois (void * context_data, earlyparsed_relation_ptr rel)
+thread_galois (void * context_data, earlyparsed_relation_ptr rel, char *action)
 {
   unsigned int is_dup;
   FILE * output = (FILE*) context_data;
-  insert_relation_in_dup_hashtable (rel, &is_dup);
+  insert_relation_in_dup_hashtable (rel, &is_dup, action);
   if (is_dup)
     return NULL;
 
@@ -265,6 +289,18 @@ thread_galois (void * context_data, earlyparsed_relation_ptr rel)
     abort();
   }
   return NULL;
+}
+
+static void *
+thread_galois_1 (void * context_data, earlyparsed_relation_ptr rel)
+{
+    return thread_galois(context_data, rel, "1/y");
+}
+
+static void *
+thread_galois_2 (void * context_data, earlyparsed_relation_ptr rel)
+{
+    return thread_galois(context_data, rel, "_y");
 }
 
 static void declare_usage(param_list pl)
@@ -401,9 +437,12 @@ main (int argc, char *argv[])
     nb_files++;
 
   struct filter_rels_description desc[2] = {
-    { .f = thread_galois, .arg=0, .n=1, },
+    { .f = thread_galois_1, .arg=0, .n=1, },
     { .f = NULL, },
   };
+
+  if(strcmp(action, "_y") == 0)
+      desc[0].f = thread_galois_2;
 
   fprintf (stderr, "Reading files (using %d auxiliary threads):\n", desc[0].n);
   for (char **p = files; *p ; p++) {
