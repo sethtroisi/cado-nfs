@@ -161,6 +161,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
         const fbprime_t fbb = si->conf->sides[side]->lim;
         const fbprime_t powlim = si->conf->sides[side]->powlim;
+        if (bk_thresh > fbb) {
+            fprintf(stderr, "Error: lim is too small compared to bk_thresh\n");
+            ASSERT_ALWAYS(0);
+        }
         const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
         sis->fb = new fb_factorbase(thresholds, powlim, only_general);

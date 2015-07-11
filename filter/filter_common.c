@@ -15,46 +15,6 @@ static inline unsigned int earlyparsed_relation_nb_above_min_index(earlyparsed_r
     return nb_above_min_index;
 }
 
-/* Write relation j from buffer to row_compact
- * We put in row_compact only primes such that their index h is greater or
- * equal to min_index
- * Return the number of new primes
- */
-
-inline unsigned int
-insert_rel_in_table_no_e(earlyparsed_relation_ptr my_br, index_t min_index,
-			 index_t ** row_compact,
-			 weight_t * ideals_weight)
-{
-    unsigned int nprimes = 0;
-    unsigned int itmp;
-    index_t *my_tmp;
-    index_t h;
-
-    itmp = 0;
-
-    unsigned int nb_above_min_index = earlyparsed_relation_nb_above_min_index(my_br, min_index);
-
-    my_tmp = index_my_malloc(1 + nb_above_min_index);
-
-    for (unsigned int i = 0; i < my_br->nb; i++) {
-	h = my_br->primes[i].h;
-	if (ideals_weight[h] == 0) {
-	    ideals_weight[h] = 1;
-	    nprimes++;
-	} else if (ideals_weight[h] != UMAX(weight_t))
-	    ideals_weight[h]++;
-
-	if (h >= min_index)
-	    my_tmp[itmp++] = h;
-    }
-
-    my_tmp[itmp] = UMAX(*my_tmp);	/* sentinel */
-    row_compact[my_br->num] = my_tmp;
-
-    return nprimes;
-}
-
 inline unsigned int
 insert_rel_in_table_with_e(earlyparsed_relation_ptr my_br, index_t min_index,
                            ideal_merge_t **row_compact, int32_t *ideals_weight)
