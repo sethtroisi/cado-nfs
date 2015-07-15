@@ -622,10 +622,10 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
                        exit(1);
         }
         for( ; *x && isspace(*x) ; x++) ;
-        t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+        t = strtod(x, &x); ASSERT_ALWAYS(t >= 0);
         h->expected_time = t;
         for( ; *x && isspace(*x) ; x++) ;
-        t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+        t = strtod(x, &x); ASSERT_ALWAYS(t >= 0);
         h->expected_success = t;
         for( ; *x && isspace(*x) ; x++) ;
         for( ; *x && !isdigit(*x) ; x++) ;
