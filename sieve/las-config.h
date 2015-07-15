@@ -176,11 +176,6 @@
 
 #define BUCKET_REGION (1 << LOG_BUCKET_REGION)
 
-/* This flag is necessary to support I=16. Otherwise it's a useless
- * burden
- */
-#define SUPPORT_I16
-
 /* This is currently used to enable some code paths specific to the
  * descent. The mid-term plan is to remove this compile-time flag.
  */
