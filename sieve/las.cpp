@@ -370,14 +370,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      */
     ASSERT_ALWAYS(LOG_BUCKET_REGION >= (sc->logI - 1));
 
-#ifndef SUPPORT_I17
-    if (sc->logI >= 17) {
-        fprintf(stderr,
-                "Error: -I 17 requires setting the SUPPORT_I17 flag at compile time\n");
-        abort();
-    }
-#endif
-
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
     si->nb_buckets_max = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
