@@ -19,12 +19,15 @@ gfpext = 2
 
 ## Flags to (des-)activate the appropriate funcionalities
 #
-# Galois is when *both* polynomials are reciprocal. This is the case for
-# polynomials selected by default. But if you use imported polynomials,
-# you might need to set to false.
-tasks.galois = true
+# Galois is when *both* polynomials have an automorphism of order 2. This
+# is the case for polynomials selected by default. But if you use
+# imported polynomials, you might need to set to false. 
+# The available automorphisms are "1/y" (for reciprocal polynomials) and
+# "_y" (for polynomials with only even powers).
+tasks.galois = 1/y
+
 # If you don't want the "full column of 1", uncomment the following line.
-# In particular when both polynomials are monic, this could help.
+# In particular when both polynomials are not monic, this could help.
 # tasks.addfullcol = false
 
 tasks.I = 9
@@ -52,9 +55,8 @@ tasks.sieve.qmin = 20000
 tasks.sieve.qrange = 1000
 tasks.sieve.rels_wanted = 1
 # The polynomials selected by default put the "small polynomial" on side 0,
-# so we need to put the special-q on that side (which is still called
-# "rational")
-tasks.sieve.ratq = true
+# so we need to put the special-q on that side 
+tasks.sieve.sqside = 0
 
 tasks.allow_zero_on_rhs=1
 
@@ -70,4 +72,3 @@ tasks.reconstructlog.partial = false
 # We do not have any easy way to check the result since there is no
 # rational side
 checkdlp = false
-
