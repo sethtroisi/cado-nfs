@@ -21,10 +21,12 @@
  *
  * There are some change of coordinate functions at the end of this file.
  * The coordinate system (N, x) is almost always referred to as just x,
- * where x is a 32-bit value equal to N*bucket_region+x. Thus from this
- * wide x, it is possible to recover both N and (the short) x.
+ * where x is a 64-bit value equal to N*bucket_region+x. Thus from this
+ * wide x, it is possible to recover both N and (the short, fitting in 32
+ * bits) x.
+ * Note: the "wide" x might be larger than 32 bits only for I> 16.
  */
-void xToIJ(int *i, unsigned int *j, const unsigned int X, sieve_info_srcptr si)
+void xToIJ(int *i, unsigned int *j, const uint64_t X, sieve_info_srcptr si)
 {
     *i = (X % (si->I)) - (si->I >> 1);
     *j = X / si->I;
@@ -32,20 +34,21 @@ void xToIJ(int *i, unsigned int *j, const unsigned int X, sieve_info_srcptr si)
 
 void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, sieve_info_srcptr si)
 {
-    unsigned int X = x + (N << LOG_BUCKET_REGION);
+    uint64_t X = (uint64_t)x + (((uint64_t)N) << LOG_BUCKET_REGION);
     return xToIJ(i, j, X, si);
 }
 
-void IJTox(unsigned int * x, int i, unsigned int j, sieve_info_srcptr si)
+void IJTox(uint64_t * x, int i, unsigned int j, sieve_info_srcptr si)
 {
-    *x = i + (si->I)*j + (si->I>>1);
+    *x = (int64_t)i + ((uint64_t)si->I)*(uint64_t)j + (uint64_t)(si->I>>1);
 }
 
 void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, sieve_info_srcptr si)
 {
-    IJTox(x, i, j, si);
-    *N = *x >> LOG_BUCKET_REGION;
-    *x &= ((1 << LOG_BUCKET_REGION) - 1);
+    uint64_t xx;
+    IJTox(&xx, i, j, si);
+    *N = xx >> LOG_BUCKET_REGION;
+    *x = xx & (uint64_t)((1 << LOG_BUCKET_REGION) - 1);
 }
 
 void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, 

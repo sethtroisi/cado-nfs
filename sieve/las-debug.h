@@ -79,7 +79,8 @@ static inline int trace_on_range_Nx(unsigned int N, unsigned int x0, unsigned in
 }
 
 static inline int trace_on_spot_x(uint64_t x) {
-    return x == (trace_Nx.N << LOG_BUCKET_REGION) + trace_Nx.x;
+    return x == (((uint64_t)trace_Nx.N) << LOG_BUCKET_REGION)
+        + (uint64_t)trace_Nx.x;
 }
 
 static inline int trace_on_spot_ab(int64_t a, uint64_t b) {
