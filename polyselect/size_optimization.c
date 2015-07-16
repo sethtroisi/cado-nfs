@@ -1038,10 +1038,13 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   mpz_init (tmp2);
   for (unsigned int i = 0; i < SOPT_NB_OF_SKEWNESS_VALUES; i++)
     mpz_init (list_skew[i]);
-  /* 1/4 < a/b < 1: the closer a/b is from 1, the better the reduction is.
-     We take the classical value of delta = a/b = 3/4. */
-  mpz_init_set_ui (a, 3);
-  mpz_init_set_ui (b, 4);
+
+  /* 1/4 < delta = a/b <= 1: the closer delta is from 1, the better the
+     reduction is. We take delta=1, since in fixed dimension the algorithm is
+     still polynomial (see "The optimal LLL algorithm is still polynomial in
+     fixed dimension" by Ali Akhavi, Theoretical Computer Science, 2003). */
+  mpz_init_set_ui (a, 1);
+  mpz_init_set_ui (b, 1);
 
   mpz_poly_init (ft, d);
   mpz_poly_init (gt, 1);
