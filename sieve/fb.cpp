@@ -813,7 +813,7 @@ fb_factorbase::append(const fb_general_entry &fb_cur)
   /* No prime > largest threshold should ever be added */
   if (i == FB_MAX_PARTS) {
     if (!printed_too_large_prime_warning) {
-      verbose_output_print(1, 0, "Factor base entry %" FBPRIME_FORMAT 
+      verbose_output_print(1, 0, "# Factor base entry %" FBPRIME_FORMAT 
                            " is above factor base bound, skipping it "
                            "(and all other too large entries)\n", fb_cur.q);
       printed_too_large_prime_warning = true;
