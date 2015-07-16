@@ -1830,7 +1830,7 @@ static long nr_composite_tests = 0;
 static long nr_wrap_was_composite = 0;
 /* The entries in BP must be sorted in order of increasing x */
 static void
-divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
+divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const unsigned int x,
                            bucket_primes_t *BP, const int very_verbose)
 {
   while (!BP->is_end()) {
@@ -1877,7 +1877,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
 
 /* The entries in BP must be sorted in order of increasing x */
 static void
-divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
+divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const unsigned int x,
                           bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
 {
   while (!purged->is_end()) {
@@ -1929,7 +1929,7 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
 
 
 NOPROFILE_STATIC void
-trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
+trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, unsigned int x,
            const bool handle_2, bucket_primes_t *primes,
            bucket_array_complete *purged,
 	   trialdiv_divisor_t *trialdiv_data,
