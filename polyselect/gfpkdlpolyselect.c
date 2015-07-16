@@ -564,7 +564,7 @@ static bool get_g_phi_y(mpz_poly_t g[], int* nb_found,
       // g0 <- v0 * phi(y <- u0/v0)
       // g1 <- v1 * phi(y <- u1/v1)
 
-    for (i=1; i<=2;i++){ // carefull, M coeffs start at i=1, not i=0.
+    for (i=1; i<=2;i++){ // careful, M coeffs start at i=1, not i=0.
       // u <-> M.coeff[i][1], v <-> M.coeff[i][2]*sy
       gcd_uv = mpz_gcd_ui(tmp, M.coeff[i][1], skewness); 
       // (unsigned long int) gcd_uv <- gcd(v*s, u) = gcd(s, u) since gcd(v,u) = 1
