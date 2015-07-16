@@ -373,7 +373,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
     si->nb_buckets_max = 1 +
-        ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1) / BUCKET_REGION;
+        ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BUCKET_REGION;
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
     si->doing = NULL;
