@@ -90,8 +90,8 @@ IncrementalGS (mat_Z B, long *P, mpz_t *D, mpz_t **lam, long *s, long k)
    mpz_t u, t1;
    long i, j, posj;
 
-   mpz_init(u);
-   mpz_init(t1);
+   mpz_init (u);
+   mpz_init (t1);
 
    for (j = 1; j <= k-1; j++) {
       posj = P[j];
@@ -105,7 +105,7 @@ IncrementalGS (mat_Z B, long *P, mpz_t *D, mpz_t **lam, long *s, long k)
          mpz_set (u, t1);
       }
 
-      mpz_set(lam[k][posj], u);
+      mpz_set (lam[k][posj], u);
    }
 
    InnerProduct (u, B.coeff[k], B.coeff[k], n);
@@ -117,7 +117,7 @@ IncrementalGS (mat_Z B, long *P, mpz_t *D, mpz_t **lam, long *s, long k)
       mpz_set (u, t1);
    }
 
-   if (mpz_cmp_ui(u, 0) == 0)
+   if (mpz_cmp_ui (u, 0) == 0)
      {
        P[k] = 0;
      }
@@ -128,8 +128,8 @@ IncrementalGS (mat_Z B, long *P, mpz_t *D, mpz_t **lam, long *s, long k)
        mpz_set (D[*s], u);
      }
 
-   mpz_clear(u);
-   mpz_clear(t1);
+   mpz_clear (u);
+   mpz_clear (t1);
 }
 
 
@@ -145,13 +145,13 @@ BalDiv (mpz_t q, mpz_t a, mpz_t d, mpz_t r)
    mpz_mul_2exp (r, r, 1);
 
    cmp = mpz_cmp (r, d);
-   if (cmp > 0 || (cmp == 0 && mpz_cmp_ui(q, 0) < 0))
+   if (cmp > 0 || (cmp == 0 && mpz_cmp_ui (q, 0) < 0))
      mpz_add_ui (q, q, 1);
 }
 
 
 static void
-MulSubN ( mpz_t *c, mpz_t *c2, mpz_t x, long n, mpz_t tmp )
+MulSubN (mpz_t *c, mpz_t *c2, mpz_t x, long n, mpz_t tmp)
 /* c = c - x*c2 */
 {
    long i;
@@ -168,7 +168,7 @@ MulSubN ( mpz_t *c, mpz_t *c2, mpz_t x, long n, mpz_t tmp )
      else if (x0 < 0) {
        x0 = -x0;
        for (i = 1; i <= n; i++)
-	 mpz_addmul_ui(c[i], c2[i], x0);
+	 mpz_addmul_ui (c[i], c2[i], x0);
      }
    }
    else
@@ -193,7 +193,7 @@ reduce ( long k, long l, mat_Z B, long *P, mpz_t *D,
 
    mpz_mul_2exp (t1, lam[k][P[l]], 1);
    mpz_abs (t1, t1);
-   if (mpz_cmp(t1, D[P[l]]) <= 0)
+   if (mpz_cmp (t1, D[P[l]]) <= 0)
      return;
 
    BalDiv (r, lam[k][P[l]], D[P[l]], t1);
@@ -216,15 +216,15 @@ SwapTest ( mpz_t d0, mpz_t d1, mpz_t d2, mpz_t lam,
 /* test if a*d1^2 > b*(d0*d2 + lam^2)
    t1 and t2 are temporary variables */
 {
-    mpz_mul(t1, d0, d2);
-    mpz_mul(t2, lam, lam);
-    mpz_add(t1, t1, t2);
-    mpz_mul(t1, t1, b);
+    mpz_mul (t1, d0, d2);
+    mpz_mul (t2, lam, lam);
+    mpz_add (t1, t1, t2);
+    mpz_mul (t1, t1, b);
 
-    mpz_mul(t2, d1, d1);
-    mpz_mul(t2, t2, a);
+    mpz_mul (t2, d1, d1);
+    mpz_mul (t2, t2, a);
 
-    return (mpz_cmp(t2, t1) > 0);
+    return (mpz_cmp (t2, t1) > 0);
 }
 
 
@@ -318,8 +318,8 @@ RowTransformN ( mpz_t *c1,
 
 
 static void
-swapLLL ( long k, mat_Z B, long *P, mpz_t *D, 
-          mpz_t **lam, mat_Z* U, long m )
+swapLLL (long k, mat_Z B, long *P, mpz_t *D,
+         mpz_t **lam, mat_Z* U, long m)
 /* swaps vectors k-1 and k;  assumes P(k-1) != 0 */
 {
    long i, j;
@@ -352,7 +352,7 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
       MulAddDiv(D[P[k]-1], D[P[k]], lam[k][P[k]-1],
                 D[P[k]-2], lam[k][P[k]-1], D[P[k]-1], t2, t3);
    }
-   else if (mpz_cmp_ui(lam[k][P[k-1]], 0) != 0) {
+   else if (mpz_cmp_ui (lam[k][P[k-1]], 0) != 0) {
       mpz_gcdext(e, x, y, lam[k][P[k-1]], D[P[k-1]]);
 
       mpz_divexact(t1, lam[k][P[k-1]], e);
@@ -408,7 +408,8 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
    starting at 1):
  * det (output) is the determinant
  * U (output) is the transformation matrix (NULL if not needed)
- * a, b are parameters (a/b=3/4 classically, we should have 1/4 < a/b < 1)
+ * a, b are parameters (delta = a/b = 3/4 classically, we must have
+   1/4 < delta < 1, the closer delta is from 1, the better is the reduction)
  m is the number of vectors (i.e., number of rows)
  n is the number of columns (i.e., length of each vector)
  */
@@ -460,13 +461,13 @@ long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_t a, mpz_t b )
 
       if (P[k-1] != 0 && 
           (P[k] == 0 || 
-           SwapTest(D[P[k]], D[P[k]-1], D[P[k]-2], lam[k][P[k]-1], a, b, tmp1, tmp2))) {
+           SwapTest (D[P[k]], D[P[k]-1], D[P[k]-2], lam[k][P[k]-1], a, b, tmp1, tmp2))) {
          swapLLL (k, B, P, D, lam, U, max_k);
          k--;
       }
       else {	
          for (j = k-2; j >= 1; j--) 
-            reduce(k, j, B, P, D, lam, U, tmp1, tmp2);
+            reduce (k, j, B, P, D, lam, U, tmp1, tmp2);
          k++;
       }
    }
