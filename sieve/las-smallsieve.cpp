@@ -1114,7 +1114,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             }
             ssdpos[i] = i0 - bucket_region;
             if (resieve_very_verbose_bad) {
-                verbose_output_print(0, 1, "# resieving: new i0 = %"PRIu64
+                verbose_output_print(0, 1, "# resieving: new i0 = %" PRIu64
                         ", bucket_region = %d, "
                         "new ssdpos = %" PRIu64 "\n",
                         i0, bucket_region, ssdpos[i]);
