@@ -1423,8 +1423,11 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         seconds = delta.total_seconds() - self.state["start_real_time"]
         remaining_time = seconds * (1.0 / self.get_achievement() - 1)
         now = datetime.datetime.now()
-        arrival = now + datetime.timedelta(seconds=remaining_time)
-        return arrival.ctime()
+        try:
+           arrival = now + datetime.timedelta(seconds=remaining_time)
+           return arrival.ctime()
+        except OverflowError:
+           return "Unknown"
 
     def verification(self, wuid, ok, *, commit):
         """ Mark a workunit as verified ok or verified with error and update
