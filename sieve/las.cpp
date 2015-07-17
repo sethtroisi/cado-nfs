@@ -2598,7 +2598,7 @@ void * process_bucket_region(thread_data *th)
             thread_side_data &ts = th->sides[side];
             small_sieve_skip_stride(s->ssd, ts.ssdpos, skiprows, si);
             int * b = s->fb_parts_x->rs;
-            memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
+            memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
       }
 

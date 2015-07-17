@@ -173,6 +173,7 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
 // ssdpos points at the next position that will be hit by sieving,
 // relative to the start of the next bucket region to sieve. It may exceed I 
 // and even BUCKET_REGION
+// It could actually be larger than 32 bits when I > 16.
 
 /* Initialization procedures for the ssp data */
 
@@ -305,18 +306,19 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
 /* }}} */
 
 /* {{{ Creation of the ssdpos tables */
-int * small_sieve_copy_start(int * base, int bounds[2])
+int64_t * small_sieve_copy_start(int64_t * base, int bounds[2])
 {
-    int * res = (int *)malloc((bounds[1] - bounds[0]) * sizeof(int));
-    memcpy(res, base + bounds[0], (bounds[1] - bounds[0]) * sizeof(int));
+    int64_t *res = (int64_t *)malloc((bounds[1] - bounds[0]) * sizeof(int64_t));
+    memcpy(res, base + bounds[0], (bounds[1] - bounds[0]) * sizeof(int64_t));
     return res;
 }
 
 /* Only compute the initial ssdpos fields. */
-int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_srcptr si)
+int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int j0,
+        sieve_info_srcptr si)
 {
     ssp_marker_t * next_marker = ssd->markers;
-    int * ssdpos = (int *) malloc(ssd->nb_ssp * sizeof(int));
+    int64_t * ssdpos = (int64_t *) malloc(ssd->nb_ssp * sizeof(int64_t));
 
     for(int i = 0 ; i < ssd->nb_ssp ; i++) {
         int fence;
@@ -326,9 +328,9 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
         next_marker++;
         for( ; i < fence ; i++) {
             ssp_t * ssp = &(ssd->ssp[i]);
-            unsigned int compensate = si->I / 2;
-            compensate += j0 * ssp->r;
-            ssdpos[i] = compensate % ssp->p;
+            uint64_t compensate = si->I / 2;
+            compensate += (uint64_t)j0 * (uint64_t)ssp->r;
+            ssdpos[i] = compensate % (uint64_t)ssp->p;
         }
         if (event & SSP_END) break;
         // Remark: even in the case of discard, we want to precompute the
@@ -338,7 +340,7 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
             /* Compute the next multiple of g above j0 */
             unsigned int j1 = j0 - (j0 % ssp->g);
-            unsigned int compensate = si->I / 2;
+            uint64_t compensate = si->I / 2;
             // FIXME: is it (j1<j0) the right condition ?
             if (j1<j0) { /* most often j1 is < j0 -- in this case,
                          the j1 we're looking for needs +g */
@@ -352,8 +354,9 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             if (j1 == 0) {
                 j1 += ssp->g;
             }
-            compensate += (j1 / ssp->g) * ssp->U;
-            ssdpos[i] = (j1 - j0) * si->I + compensate % ssp->q;
+            compensate += (uint64_t)(j1 / ssp->g) * (uint64_t)ssp->U;
+            ssdpos[i] = (((uint64_t)(j1 - j0))<<si->conf->logI)
+                + compensate % (uint64_t)ssp->q;
         } else if (event & SSP_POW2) {
             /* For powers of 2, we sieve only odd lines (*) and 
              * ssdpos needs to point at line j=1. We assume
@@ -377,7 +380,8 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
 
 
 /* {{{ Skip stride -- used in multithreaded context only */
-void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int skip, sieve_info_srcptr si)
+void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos,
+        unsigned int skip, sieve_info_srcptr si)
 {
     if (skip == 0) return;
 
@@ -402,7 +406,7 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
             /* Don't bother. Pay attention to the fact that we have offsets to
              * the (current) bucket base. */
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
-            unsigned int x = ssdpos[i];
+            uint64_t x = ssdpos[i];
             const unsigned int I = 1U << si->conf->logI;
             unsigned int imask = I-1;
             unsigned int j = x >> si->conf->logI;
@@ -417,11 +421,12 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
                  * advance: add g to j enough times so that j>=skip.
                  * Which means j+g*ceil((skip-j)/g)
                  */
-                unsigned int i = x & imask;
-                unsigned int jI = x - i;
-                unsigned int nskip = iceildiv(skip-j, ssp->g);
-                jI = jI + ((nskip * ssp->g - skip) << si->conf->logI);
-                i = (i + nskip * ssp->U) % ssp->q;
+                uint64_t i = x & imask;
+                uint64_t jI = x - i;
+                uint64_t nskip = iceildiv(skip-j, ssp->g);
+                jI = jI
+                    + (((uint64_t)(nskip * ssp->g - skip)) << si->conf->logI);
+                i = (i + nskip * (uint64_t)ssp->U) % ssp->q;
                 x = jI + i;
             }
             ssdpos[i] = x;
@@ -462,8 +467,8 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
 // next sieve region S.
 // Information about where we are is in ssd.
 void sieve_small_bucket_region(unsigned char *S, int N,
-			       small_sieve_data_t * ssd, int * ssdpos, sieve_info_ptr si,
-                               int side,
+			       small_sieve_data_t * ssd, int64_t * ssdpos,
+                               sieve_info_ptr si, int side,
 			       where_am_I_ptr w MAYBE_UNUSED)
 {
     const uint32_t I = si->I;
@@ -505,7 +510,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             }
             if (n < fence) {
                 const fbprime_t p = ssd->ssp[n].p;
-                unsigned int i0 = ssdpos[n];
+                uint64_t i0 = ssdpos[n];
                 if (i0 < I) {
                     // At the start of the bucket region, we are not sure
                     // that i0 is reduced mod p when we enter here.
@@ -793,7 +798,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         if (event & SSP_PROJ) {
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[k]);
             const fbprime_t g = ssp->g;
-            const fbprime_t gI = ssp->g << si->conf->logI;
+            const uint64_t gI = (uint64_t)ssp->g << si->conf->logI;
             const fbprime_t q = ssp->q;
             const fbprime_t U = ssp->U;
             const fbprime_t p MAYBE_UNUSED = g * q;
@@ -815,7 +820,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 /* q = 1, therefore U = 0, and we sieve all entries in lines
                    with g|j, beginning with the line starting at S[ssdpos] */
                 unsigned long logps;
-                unsigned int i0 = ssdpos[k];
+                uint64_t i0 = ssdpos[k];
                 // The following is for the case where p divides the norm
                 // at the position (i,j) = (1,0).
                 if (UNLIKELY(N == 0 && i0 == gI)) {
@@ -874,7 +879,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ssdpos[k] = i0 - (1U << LOG_BUCKET_REGION);
             } else {
                 /* q > 1, more general sieving code. */
-                const unsigned int i0 = ssdpos[k];
+                const uint64_t i0 = ssdpos[k];
                 const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
                 size_t lineoffset = i0 & (I - 1U),
                        linestart = i0 - lineoffset;
@@ -965,7 +970,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
    Information about where we are is in ssd. */
 void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
-        small_sieve_data_t *ssd, int * ssdpos,
+        small_sieve_data_t *ssd, int64_t * ssdpos,
         sieve_info_srcptr si, where_am_I_ptr w MAYBE_UNUSED)
 {
     const uint32_t I = si->I;
@@ -1043,12 +1048,12 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         if (event & SSP_PROJ) {
             ssp_bad_t * ssp = (ssp_bad_t * ) &(ssd->ssp[i]);
             const fbprime_t g = ssp->g;
-            const fbprime_t gI = g << si->conf->logI;
+            const uint64_t gI = (uint64_t)g << si->conf->logI;
 
             WHERE_AM_I_UPDATE(w, p, g * ssp->q);
 
             /* Test every p-th line, starting at S[ssdpos] */
-            unsigned int i0 = ssdpos[i];
+            uint64_t i0 = ssdpos[i];
             // This block is for the case where p divides at (1,0).
             if (UNLIKELY(N == 0 && i0 == gI)) {
                 bucket_update_t<1, primehint_t> prime;
@@ -1066,7 +1071,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                                      of line */
             if (resieve_very_verbose_bad) {
                 verbose_output_print(0, 1, "# resieving bad prime %" FBPRIME_FORMAT
-                        ", i0 = %u\n", g, i0);
+                        ", i0 = %" PRIu64 "\n", g, i0);
             }
             while (i0 < (unsigned int) bucket_region) {
                 unsigned char *S_ptr = S + i0;
@@ -1109,8 +1114,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             }
             ssdpos[i] = i0 - bucket_region;
             if (resieve_very_verbose_bad) {
-                verbose_output_print(0, 1, "# resieving: new i0 = %u, bucket_region = %d, "
-                        "new ssdpos = %d\n",
+                verbose_output_print(0, 1, "# resieving: new i0 = %"PRIu64
+                        ", bucket_region = %d, "
+                        "new ssdpos = %" PRIu64 "\n",
                         i0, bucket_region, ssdpos[i]);
             }
         }
