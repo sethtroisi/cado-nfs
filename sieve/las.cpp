@@ -363,12 +363,12 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* Initialize the number of buckets */
 
-    /* If LOG_BUCKET_REGION == (sc->logI-1), then one bucket (whose size is the
+    /* If LOG_BUCKET_REGION == sc->logI, then one bucket (whose size is the
      * L1 cache size) is actually one line. This changes some assumptions
      * in sieve_small_bucket_region and resieve_small_bucket_region, where
      * we want to differentiate on the parity on j.
      */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= (sc->logI - 1));
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= sc->logI);
 
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
