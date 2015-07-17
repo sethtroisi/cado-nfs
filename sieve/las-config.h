@@ -164,22 +164,15 @@
 #define xxxUNSIEVE_NOT_COPRIME  /* see las-unsieve.c */
 
 /* Optimal bucket region: 2^16 = 64K == close to L1 size.
-   MANDATORY. Don't change this value.
+ * It is possible to put a higher value, in order to set I > 16.
+ * However, this will have a bad impact on the memory usage, and on
+ * efficiency, due to worse memory access. See bucket.h .
 */
 #ifndef LOG_BUCKET_REGION
 #define LOG_BUCKET_REGION 16
 #endif
 
-#if LOG_BUCKET_REGION != 16
-#error "LOG_BUCKET_REGION must (mandatory!) be equal to 16."
-#endif
-
 #define BUCKET_REGION (1 << LOG_BUCKET_REGION)
-
-/* This flag is necessary to support I=16. Otherwise it's a useless
- * burden
- */
-#define SUPPORT_I16
 
 /* This is currently used to enable some code paths specific to the
  * descent. The mid-term plan is to remove this compile-time flag.

@@ -564,7 +564,7 @@ static bool get_g_phi_y(mpz_poly_t g[], int* nb_found,
       // g0 <- v0 * phi(y <- u0/v0)
       // g1 <- v1 * phi(y <- u1/v1)
 
-    for (i=1; i<=2;i++){ // carefull, M coeffs start at i=1, not i=0.
+    for (i=1; i<=2;i++){ // careful, M coeffs start at i=1, not i=0.
       // u <-> M.coeff[i][1], v <-> M.coeff[i][2]*sy
       gcd_uv = mpz_gcd_ui(tmp, M.coeff[i][1], skewness); 
       // (unsigned long int) gcd_uv <- gcd(v*s, u) = gcd(s, u) since gcd(v,u) = 1
@@ -648,7 +648,7 @@ bool get_g_CONJ(mpz_poly_t g[], mpz_poly_t phi,
     free(gi);
   }else{
     // use LLL over phi directly to get g.
-    printf("ff->deg_Py = %d but only ff->deg_Py = 2 is implemented for the moment.\n", ff->deg_Py);
+    printf("# ff->deg_Py = %d but only ff->deg_Py = 2 is implemented for the moment.\n", ff->deg_Py);
     found_g = false;// not yet implemented
   }
   return found_g;
@@ -711,8 +711,13 @@ int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int
 
 	  if(found_g){
 	    mpz_poly_set_sli(f, ff->tab[f_id].f, ff->deg_f);
-	    FILE* outputpoly = fopen(out_filename, "w");
-	    ASSERT(outputpoly != NULL);
+	    FILE* outputpoly;
+            if (out_filename != NULL) {
+                outputpoly = fopen(out_filename, "w");
+                ASSERT_ALWAYS(outputpoly != NULL);
+            } else {
+                outputpoly = stdout;
+            }
             gmp_fprintf(outputpoly, "n: %Zd\n", p);
             fprintf(outputpoly, "skew: 1.0\n");
 	    mpz_poly_fprintf_cado_format_line (outputpoly, f, 0, "f");
@@ -740,7 +745,7 @@ int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int
       }
       free(g);
     }else{
-      printf("\npb ff == NULL.\n"); 
+      printf("\n# pb ff == NULL.\n"); 
       // NO ff available for this n.
     }
   }// else n not supported (n=2 only at the moment)
@@ -806,7 +811,7 @@ void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[M
     print_coeff_Y_phi(fp, phi_coeff[i], deg_Py);
     fprintf (fp, "*X^%d", i);
   }
-  printf("\n");
+  fprintf(fp, "\n");
 }
 
 

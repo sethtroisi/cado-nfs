@@ -7,6 +7,7 @@
  * prevent gmp's I/O functions to ever be exposed... */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <gmp.h>
 
 #ifdef __cplusplus
@@ -37,23 +38,19 @@ extern "C" {
 #define LEXLE2(X,Y,A,B) LEXGE2(A,B,X,Y)
 #define LEXLE3(X,Y,Z,A,B,C) LEXGE3(A,B,C,X,Y,Z)
 
-#ifndef GNU_MP_VERSION
-#define GNU_MP_VERSION(X,Y,Z)     \
-    defined(__GNU_MP_VERSION) &&        \
-(__GNU_MP_VERSION == X && __GNU_MP_VERSION_MINOR == Y && __GNU_MP_VERSION_PATCHLEVEL == Z)
+#ifndef GMP_VERSION_ATLEAST
+#define GMP_VERSION_ATLEAST(X,Y,Z)     \
+    (defined(__GNU_MP__) &&        \
+LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
 #endif
 
-#ifndef GNU_MP_VERSION_ATLEAST
-#define GNU_MP_VERSION_ATLEAST(X,Y,Z)     \
-    defined(__GNU_MP_VERSION) &&        \
-LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+#ifndef GMP_VERSION_ATMOST
+#define GMP_VERSION_ATMOST(X,Y,Z)     \
+    (defined(__GNU_MP__) &&        \
+LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
 #endif
 
-#ifndef GNU_MP_VERSION_ATMOST
-#define GNU_MP_VERSION_ATMOST(X,Y,Z)     \
-    defined(__GNU_MP__) &&        \
-LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
-#endif
+
 
 #ifndef GNUC_VERSION
 #define GNUC_VERSION(X,Y,Z)     \
@@ -254,18 +251,6 @@ static inline void malloc_failed() {
     abort();
 }
 
-
-#if !GNU_MP_VERSION_ATLEAST(5, 0, 0)
-static inline void mpn_copyi (mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
-    memmove(dst, src, n * sizeof(mp_limb_t));
-}
-static inline void mpn_copyd (mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
-    memmove(dst, src, n * sizeof(mp_limb_t));
-}
-static inline void mpn_zero (mp_limb_t * dst, mp_size_t n) {
-    memset(dst, 0, n * sizeof(mp_limb_t));
-}
-#endif /* GMP < 5.0.0 */
 
 /* Given the fact that copies are always very small, we're probably
  * better off giving the compiler the opportunity to optimize all this

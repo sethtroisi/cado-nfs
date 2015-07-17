@@ -161,6 +161,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
         const fbprime_t fbb = si->conf->sides[side]->lim;
         const fbprime_t powlim = si->conf->sides[side]->powlim;
+        if (bk_thresh > fbb) {
+            fprintf(stderr, "Error: lim is too small compared to bk_thresh\n");
+            ASSERT_ALWAYS(0);
+        }
         const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
         sis->fb = new fb_factorbase(thresholds, powlim, only_general);
@@ -359,24 +363,17 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* Initialize the number of buckets */
 
-    /* If LOG_BUCKET_REGION == (sc->logI-1), then one bucket (whose size is the
+    /* If LOG_BUCKET_REGION == sc->logI, then one bucket (whose size is the
      * L1 cache size) is actually one line. This changes some assumptions
      * in sieve_small_bucket_region and resieve_small_bucket_region, where
      * we want to differentiate on the parity on j.
      */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= (sc->logI - 1));
-
-#ifndef SUPPORT_I17
-    if (sc->logI >= 17) {
-        fprintf(stderr,
-                "Error: -I 17 requires setting the SUPPORT_I17 flag at compile time\n");
-        abort();
-    }
-#endif
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= sc->logI);
 
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
-    si->nb_buckets_max = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
+    si->nb_buckets_max = 1 +
+        ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BUCKET_REGION;
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
     si->doing = NULL;
@@ -513,7 +510,8 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads,
   sieve_info_update_norm_data(si, nb_threads);
 
   /* update number of buckets */
-  si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
+  si->nb_buckets = 1 +
+      ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BUCKET_REGION;
 
   /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
@@ -618,10 +616,10 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
                        exit(1);
         }
         for( ; *x && isspace(*x) ; x++) ;
-        t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+        t = strtod(x, &x); ASSERT_ALWAYS(t >= 0);
         h->expected_time = t;
         for( ; *x && isspace(*x) ; x++) ;
-        t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+        t = strtod(x, &x); ASSERT_ALWAYS(t >= 0);
         h->expected_success = t;
         for( ; *x && isspace(*x) ; x++) ;
         for( ; *x && !isdigit(*x) ; x++) ;
@@ -1138,6 +1136,7 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
 
 /* Galois automorphisms
    autom2.1: 1/x
+   autom2.2: -x
    autom3.1: 1-1/x
    autom3.2: -1-1/x
    autom4.1: -(x+1)/(x-1)
@@ -1155,6 +1154,10 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     if(strcmp(galois_autom, "autom2.1") == 0 
        || strcmp(galois_autom, "1/y") == 0){
 	ord = 2; A = 0; B = 1; C = 1; D = 0;
+    }
+    else if(strcmp(galois_autom, "autom2.2") == 0
+	    || strcmp(galois_autom, "_y") == 0){
+	ord = 2; A = -1; B = 0; C = 0; D = 1;
     }
     else if(strcmp(galois_autom, "autom3.1") == 0){
 	// 1-1/x = (x-1)/x
@@ -1829,7 +1832,7 @@ static long nr_composite_tests = 0;
 static long nr_wrap_was_composite = 0;
 /* The entries in BP must be sorted in order of increasing x */
 static void
-divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
+divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const unsigned int x,
                            bucket_primes_t *BP, const int very_verbose)
 {
   while (!BP->is_end()) {
@@ -1876,7 +1879,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
 
 /* The entries in BP must be sorted in order of increasing x */
 static void
-divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const int x,
+divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const unsigned int x,
                           bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
 {
   while (!purged->is_end()) {
@@ -1928,7 +1931,7 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
 
 
 NOPROFILE_STATIC void
-trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
+trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, unsigned int x,
            const bool handle_2, bucket_primes_t *primes,
            bucket_array_complete *purged,
 	   trialdiv_divisor_t *trialdiv_data,
@@ -2595,7 +2598,7 @@ void * process_bucket_region(thread_data *th)
             thread_side_data &ts = th->sides[side];
             small_sieve_skip_stride(s->ssd, ts.ssdpos, skiprows, si);
             int * b = s->fb_parts_x->rs;
-            memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
+            memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
       }
 

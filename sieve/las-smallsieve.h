@@ -52,17 +52,17 @@ extern void small_sieve_clear(small_sieve_data_t * ssd);
 extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
 extern void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const std::vector<fb_general_entry> *fb,
                       sieve_info_srcptr si, int side);
-extern int * small_sieve_copy_start(int * base, int bounds[2]);
-extern int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_srcptr si);
-extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int skip, sieve_info_srcptr si);
+extern int64_t * small_sieve_copy_start(int64_t * base, int bounds[2]);
+extern int64_t * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_srcptr si);
+extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos, unsigned int skip, sieve_info_srcptr si);
 extern void sieve_small_bucket_region(unsigned char *S, int N,
-			       small_sieve_data_t * ssd, int * ssdpos, sieve_info_ptr si,
+			       small_sieve_data_t * ssd, int64_t * ssdpos, sieve_info_ptr si,
                                int side,
 			       where_am_I_ptr w MAYBE_UNUSED);
 
 extern void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
-        small_sieve_data_t *ssd, int * ssdpos,
+        small_sieve_data_t *ssd, int64_t * ssdpos,
         sieve_info_srcptr si, where_am_I_ptr w MAYBE_UNUSED);
 
 
