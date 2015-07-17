@@ -66,9 +66,9 @@ mpfq-generated file into something valid for 32- and 64-bit.)
  #define SHR(x, r) _mm_srli_epi64((x), (r))
  #define SHLD(x, r) _mm_slli_si128((x), (r) >> 3)
 @@ -1059,6 +1095,7 @@
- #undef SHR
- #undef SHLD
- #undef SHRD
+ #undef XOREQ
+ #undef PXOR
+ #undef PAND
 +#endif
  }
  

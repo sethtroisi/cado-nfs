@@ -69,3 +69,8 @@ for this case is not yet included, so you must build them by yourself,
 based on constructions available in the literature. Also the individual
 logarithm has to be implemented for that case.
 
+For DLP in GF(p^2), things are sligthly more integrated:
+  ./factor.sh <p> -dlp -ell <ell> -gfpext 2
+should work for p mod 8 = 7, provided that a parameter file is available
+for the size of p (at the time of writing this doc, only p of 20 decimal
+digits is supported).

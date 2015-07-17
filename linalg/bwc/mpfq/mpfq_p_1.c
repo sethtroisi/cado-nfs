@@ -31,18 +31,28 @@ static int mpfq_p_1_impl_mpi_use_count;   /* several stacked init()/clear() pair
     families=[
      [ u64k1, u64k2, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_5, tag=p_5, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_6, tag=p_6, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_7, tag=p_7, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
+     p_5=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_5, tag=p_5, }, ],
+     p_6=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_6, tag=p_6, }, ],
+     p_7=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_7, tag=p_7, }, ],
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
+     p_9=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
      u64k1=[ u64k1, u64k2, u64k4, ],
      u64k2=[ u64k1, u64k2, u64k4, ],
@@ -138,11 +148,12 @@ static void mpfq_p_1_init_ts(mpfq_p_1_dst_field);
 /* Triggered by: sqrt */
 static void mpfq_p_1_init_ts(mpfq_p_1_dst_field k)
 {
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    
     mp_limb_t pp[1];
     mp_limb_t *ptr = pp;
     mp_limb_t s[1];
-    gmp_randstate_t rstate;
-    gmp_randinit_default(rstate);
     mpfq_fixmp_1_sub_ui_nc(pp, k->p->_mp_d, 1);
     int e = 0;
     while (*ptr == 0) {
@@ -164,7 +175,7 @@ static void mpfq_p_1_init_ts(mpfq_p_1_dst_field k)
     if (e-1 < 64) {
         mpfq_fixmp_1_lshift(s, e-1);
     } else {
-        mpfq_fixmp_1_long_rshift(s, (e-1)/64, (e-1)%64);
+        mpfq_fixmp_1_long_lshift(s, (e-1)/64, (e-1)%64);
     }
     k->ts_info.e = e;
     
@@ -623,7 +634,7 @@ void mpfq_p_1_vec_conv_ur_ks(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_vec
     memset(U->_mp_d, 0, n*nwords*sizeof(unsigned long));
     memset(V->_mp_d, 0, m*nwords*sizeof(unsigned long));
     unsigned int i;
-    assert (U->_mp_alloc == n*nwords);
+    assert (U->_mp_alloc == (int) (n*nwords));
     for (i = 0; i < n; ++i)
         mpfq_p_1_get_mpn(K, U->_mp_d + i*nwords, u[i]);
     U->_mp_size = U->_mp_alloc;
@@ -631,7 +642,7 @@ void mpfq_p_1_vec_conv_ur_ks(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_vec
     // but then one should take care of W->_mp_size as well...
     //while (U->_mp_size > 0 && U->_mp_d[U->_mp_size-1] == 0)
     //    U->_mp_size--;
-    assert (V->_mp_alloc == m*nwords);
+    assert (V->_mp_alloc == (int) (m*nwords));
     for (i = 0; i < m; ++i)
         mpfq_p_1_get_mpn(K, V->_mp_d + i*nwords, v[i]);
     V->_mp_size = V->_mp_alloc;
@@ -646,7 +657,7 @@ void mpfq_p_1_vec_conv_ur_ks(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_vec
     mpz_clear(V);
     
     // Put coefficients in w
-    assert (W->_mp_size >= (m+n-1)*nwords);
+    assert (W->_mp_size >= (int) ((m+n-1)*nwords));
     if (sizeof(mpfq_p_1_elt_ur) == nwords*sizeof(unsigned long)) {
         for (i = 0; i < m+n-1; ++i) 
             mpfq_p_1_elt_ur_set(K, w[i], (mpfq_p_1_src_elt_ur)(W->_mp_d + i*nwords));
@@ -679,7 +690,7 @@ void mpfq_p_1_poly_setmonic(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_poly
         q->size = 1;
         return;
     }
-    mpfq_p_1_elt lc;
+    mpfq_p_1_elt lc;	/* spurious uninit warning sometimes */
     mpfq_p_1_init(K, &lc);
     mpfq_p_1_poly_getcoeff(K, lc, p, degp);
     mpfq_p_1_inv(K, lc, lc);
@@ -781,7 +792,7 @@ static void mpfq_p_1_poly_preinv(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
     // Requires p(0) = 1
     // Assume p != q (no alias)
-    mpfq_p_1_elt temp;
+    mpfq_p_1_elt temp;	/* spurious uninit warning sometimes */
     mpfq_p_1_init(K, &temp);
     mpfq_p_1_poly_getcoeff(K, temp, p, 0);//Should be in the assert
     assert( mpfq_p_1_cmp_ui(K, temp, 1) == 0);

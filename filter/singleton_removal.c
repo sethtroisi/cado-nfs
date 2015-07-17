@@ -97,15 +97,15 @@ singleton_removal_mt_thread (void *arg)
       }
     }
   }
-  pthread_exit(NULL);
+  return NULL;
 }
 
 void
 singleton_removal_oneiter_mt (purge_matrix_ptr mat, unsigned int nthreads)
 {
   pthread_attr_t attr;
-  pthread_t *threads;
-  sing_rem_mt_data_t *th_data;
+  pthread_t *threads = NULL;
+  sing_rem_mt_data_t *th_data = NULL;
   uint64_t nrows_per_thread, k;
   int err;
 
@@ -132,15 +132,15 @@ singleton_removal_oneiter_mt (purge_matrix_ptr mat, unsigned int nthreads)
   pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
   for (unsigned int i = 0; i < nthreads; i++)
   {
-    if ((err = pthread_create(&threads[i], &attr, singleton_removal_mt_thread,
-                              &(th_data[i]))))
+    if ((err = pthread_create(&threads[i], &attr, &singleton_removal_mt_thread,
+                              (void *) &(th_data[i]))))
     {
       fprintf(stderr, "Error, pthread_create failed in singleton_removal_"
                       "oneiter_mt: %d. %s\n", err, strerror(errno));
       abort();
     }
   }
-  for (unsigned i = 0; i < nthreads; i++)
+  for (unsigned int i = 0; i < nthreads; i++)
   {
     pthread_join (threads[i], NULL);
     mat->nrows -= th_data[i].sup_nrow;
@@ -164,7 +164,7 @@ singleton_removal (purge_matrix_ptr mat, unsigned int nthreads, int verbose)
   do
   {
     oldnrows = mat->nrows;
-    excess = (((int64_t) mat->nrows) - mat->ncols);
+    excess = purge_matrix_compute_excess (mat);
     if (verbose >= 0) /* if no quiet */
     {
       if (iter == 0)

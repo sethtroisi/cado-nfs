@@ -68,7 +68,7 @@ get_outfilename_from_infilename (char *infilename, const char *outfmt,
 index_t *Gal;
 
 static void
-compute_galois_action (renumber_t tab, cado_poly cpoly)
+compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
 {
   index_t i;
   p_r_values_t old_p, p, r[20], rr;
@@ -99,7 +99,7 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
       if ((old_p != p || old_side != side) || i == tab->size-1)
       {
         if (old_p != 0) {
-          // Sort the roots, to put 1/r near r.
+          // Sort the roots, to put sigma(r) near r.
           if (nr & 1) {
             fprintf(stderr,
                 "Warning: odd number of roots, skipping p=%" PRpr
@@ -109,34 +109,50 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
           } else {
             int k = 0;
             while (k < nr) {
-              // Get the inverse mod p of r[k]
-              p_r_values_t invr;
-              if (r[k] == 0)
-                invr = old_p;
-              else if (r[k] == old_p)
-                invr = 0;
-              else {
-                modulusul_t mm;
-                residueul_t xx;
-                modul_initmod_ul(mm, old_p);
-                modul_init(xx, mm);
-                modul_set_ul(xx, r[k], mm);
-                modul_inv(xx, xx, mm);
-                invr = modul_get_ul(xx, mm);
-                modul_clear(xx, mm);
-                modul_clearmod(mm);
-                ASSERT_ALWAYS(invr < old_p);
-              }
+              // Get sigma(r[k]) mod p
+	      p_r_values_t sigma_r;
+	      if(strcmp(action, "1/y") == 0){
+		  if (r[k] == 0)
+		      sigma_r = old_p;
+		  else if (r[k] == old_p)
+		      sigma_r = 0;
+		  else {
+		      modulusul_t mm;
+		      residueul_t xx;
+		      modul_initmod_ul(mm, old_p);
+		      modul_init(xx, mm);
+		      modul_set_ul(xx, r[k], mm);
+		      modul_inv(xx, xx, mm);
+		      sigma_r = modul_get_ul(xx, mm);
+		      modul_clear(xx, mm);
+		      modul_clearmod(mm);
+		      ASSERT_ALWAYS(sigma_r < old_p);
+		  }
+	      }
+	      else if(strcmp(action, "_y") == 0){
+		  if (r[k] == 0){
+		      fprintf(stderr, "WARNING: r=0\n");
+		      sigma_r = 0;
+		  }
+		  else if (r[k] == old_p){
+		      fprintf(stderr, "WARNING: r=oo\n");
+		      sigma_r = old_p;
+		  }
+		  else {
+		      sigma_r = old_p - r[k];
+		      ASSERT_ALWAYS(sigma_r < old_p);
+		  }
+	      }
               // Find the index of the conjugate
               int l;
               for (l = k+1; l <= nr; ++l) {
-                if (r[l] == invr)
+                if (r[l] == sigma_r)
                   break;
               }
               ASSERT_ALWAYS(l < nr);
               // Swap position k+1 and l
               r[l] = r[k+1];
-              r[k+1] = invr;
+              r[k+1] = sigma_r;
               int tmp = ind[l];
               ind[l] = ind[k+1];
               ind[k+1] = tmp;
@@ -161,9 +177,10 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
   }
 }
 
+// Case x -> 1/x: (a-b/x) = 1/x*(-b-(-a)*x) = (-b, -a) ~ (b, a)
 // Hash value that is the same for (a,b) and (b,a)
 // (with sign normalization).
-static inline uint64_t myhash(int64_t a, uint64_t b)
+static inline uint64_t myhash_1(int64_t a, uint64_t b)
 {
   uint64_t h0, h1;
   h0 = CA_DUP2 * (uint64_t) a + CB_DUP2 * b;
@@ -176,14 +193,33 @@ static inline uint64_t myhash(int64_t a, uint64_t b)
   return h0 ^ h1;
 }
 
+// Case x -> -x: (a-b*(-x)) = (a-(-b)*x) = (a, -b) ~ (-a, b).
+// Hash value that is the same for (a,b) and (-a,b).
+// (with sign normalization).
+static inline uint64_t myhash_2(int64_t a, uint64_t b)
+{
+    int64_t absa = (a >= 0 ? a : -a);
+    return (CA_DUP2 * (uint64_t) absa + CB_DUP2 * b);
+}
+
+static inline uint64_t myhash(int64_t a, uint64_t b, char *action)
+{
+    if(strcmp(action, "1/y") == 0)
+	return myhash_1(a, b);
+    else if(strcmp(action, "_y") == 0)
+	return myhash_2(a, b);
+    else
+	return 0;
+}
+
 static inline uint32_t
 insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel,
-    unsigned int *is_dup)
+				  unsigned int *is_dup, char *action)
 {
   uint64_t h;
   uint32_t i, j;
 
-  h = myhash(rel->a, rel->b);
+  h = myhash(rel->a, rel->b, action);
   i = h % K;
   j = (uint32_t) (h >> 32);
   while (H[i] != 0 && H[i] != j) {
@@ -202,11 +238,11 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel,
 }
 
 static void *
-thread_galois (void * context_data, earlyparsed_relation_ptr rel)
+thread_galois (void * context_data, earlyparsed_relation_ptr rel, char *action)
 {
   unsigned int is_dup;
   FILE * output = (FILE*) context_data;
-  insert_relation_in_dup_hashtable (rel, &is_dup);
+  insert_relation_in_dup_hashtable (rel, &is_dup, action);
   if (is_dup)
     return NULL;
 
@@ -255,6 +291,18 @@ thread_galois (void * context_data, earlyparsed_relation_ptr rel)
   return NULL;
 }
 
+static void *
+thread_galois_1 (void * context_data, earlyparsed_relation_ptr rel)
+{
+    return thread_galois(context_data, rel, "1/y");
+}
+
+static void *
+thread_galois_2 (void * context_data, earlyparsed_relation_ptr rel)
+{
+    return thread_galois(context_data, rel, "_y");
+}
+
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "filelist", "file containing a list of input files");
@@ -267,6 +315,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "nrels", "(approximate) number of input relations");
+  param_list_decl_usage(pl, "galois", "Galois action among 1/y or _y");
   verbose_decl_usage(pl);
 }
 
@@ -317,6 +366,7 @@ main (int argc, char *argv[])
   const char * outdir = param_list_lookup_string(pl, "outdir");
   const char * renumberfilename = param_list_lookup_string(pl, "renumber");
   const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+  const char * action = param_list_lookup_string(pl, "galois");
   param_list_parse_ulong(pl, "nrels", &nrels_expected);
 
   if (param_list_warn_unused(pl))
@@ -355,6 +405,12 @@ main (int argc, char *argv[])
   }
   K = 100 + 1.2 * nrels_expected;
 
+  if( action == NULL || (strcmp(action, "1/y") && strcmp(action, "_y")) )
+  {
+    fprintf(stderr, "Error, missing -action command line argument\n");
+    usage(pl, argv0);
+  }
+
   H = (uint32_t*) malloc (K * sizeof (uint32_t));
   ASSERT_ALWAYS(H);
   memset (H, 0, K * sizeof (uint32_t));
@@ -370,8 +426,8 @@ main (int argc, char *argv[])
   renumber_init_for_reading (renumber_tab);
   renumber_read_table (renumber_tab, renumberfilename);
 
-  fprintf(stderr, "Computing Galois action on ideals\n");
-  compute_galois_action(renumber_tab, cpoly);
+  fprintf(stderr, "Computing Galois action %s on ideals\n", action);
+  compute_galois_action(renumber_tab, cpoly, action);
 
   fprintf(stderr, "Rewriting relations files\n");
   char ** files;
@@ -381,9 +437,12 @@ main (int argc, char *argv[])
     nb_files++;
 
   struct filter_rels_description desc[2] = {
-    { .f = thread_galois, .arg=0, .n=1, },
+    { .f = thread_galois_1, .arg=0, .n=1, },
     { .f = NULL, },
   };
+
+  if(strcmp(action, "_y") == 0)
+      desc[0].f = thread_galois_2;
 
   fprintf (stderr, "Reading files (using %d auxiliary threads):\n", desc[0].n);
   for (char **p = files; *p ; p++) {

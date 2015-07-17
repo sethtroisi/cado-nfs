@@ -68,17 +68,7 @@ int main (int argc, char *argv[])
         mnfs = 1; // let's default to 1.
     }
 
-
-    char *out = param_list_lookup_string (pl, "out");
-    if (out == NULL){
-      // usage(argv0[0], "out", pl);
-      // use a default .poly name: p<n>dd<log_10p>-f<deg f>g<deg g>-<polyselect method>.poly
-      //e.g. p2dd31f4g2-conj.poly
-      // log_10 (p) i.e. size of p in dd (decimal digits)
-      int dd_p = mpz_sizeinbase(p, 10);
-      out = (char*)malloc(48);
-      sprintf(out, "p%ddd%d-f4g2-conj.poly", n, dd_p);
-    }
+    const char *out = param_list_lookup_string (pl, "out");
     verbose_interpret_parameters(pl);
 
     /* check unused and print command line */
@@ -86,28 +76,13 @@ int main (int argc, char *argv[])
         usage (argv0[0], NULL, pl);
     param_list_print_command_line (stdout, pl);
 
-    gfpk_print_params(n,p,ell);
+    // gfpk_print_params(n,p,ell);
 
     int return_code = gfpkdlpolyselect( n, p, ell, mnfs, out);
 
     if (!return_code){
-      printf("no polynomial found.\n");
-      /* test 1 */
-      // build/cormoran/polyselect/polyselect_gfpn -n 2 -p 1000000000000000000000000000099 -ell 127522001020150503761 -mnfs 1 -out superpoly.poly
-      // gdb --args build/cormoran/polyselect/polyselect_gfpn -n 2 -p 1000000000000000000000000000099 -ell 127522001020150503761 -mnfs 1 -out superpoly.poly
-
-      /* Start to do something */
-      printf("WARNING: we just write a hardcoded polynomial to %s\n", out);
-      FILE * outfile = fopen(out, "w");
-      if (outfile == NULL) {
-        perror("Error while trying to open output file for writing");
-        return EXIT_FAILURE;
-      }
-      fprintf(outfile, "n: 100000000000000000039\n");
-      fprintf(outfile, "skew: 1\n");
-      fprintf(outfile, "poly0: 1,-35,-48,-35,1\n");
-      fprintf(outfile, "poly1: 8385962152,-2002641011,8385962152\n");
-      fclose(outfile);
+      fprintf(stderr, "no polynomial found.\n");
+      return EXIT_FAILURE;
     }
 
     mpz_clear(p);

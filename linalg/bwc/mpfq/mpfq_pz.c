@@ -30,18 +30,28 @@ static int mpfq_pz_impl_mpi_use_count;   /* several stacked init()/clear() pairs
     families=[
      [ u64k1, u64k2, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_5, tag=p_5, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_6, tag=p_6, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_7, tag=p_7, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
+     p_5=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_5, tag=p_5, }, ],
+     p_6=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_6, tag=p_6, }, ],
+     p_7=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_7, tag=p_7, }, ],
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
+     p_9=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
      u64k1=[ u64k1, u64k2, u64k4, ],
      u64k2=[ u64k1, u64k2, u64k4, ],
@@ -377,7 +387,16 @@ void mpfq_pz_elt_ur_add(mpfq_pz_dst_field k, mpfq_pz_dst_elt_ur z, mpfq_pz_src_e
 /* *pz::code_for_elt_ur_neg */
 void mpfq_pz_elt_ur_neg(mpfq_pz_dst_field k, mpfq_pz_dst_elt_ur z, mpfq_pz_src_elt_ur x)
 {
+#if GMP_VERSION_ATLEAST(5, 0, 0)
         mpn_neg(z, x, mpz_size(k->bigmul_p));
+#else
+      mp_size_t i;
+      mp_size_t n = mpz_size(k->bigmul_p);
+    
+      for (i = 0; i < n; i++)
+        z[i] = ~x[i];
+      mpn_add_1 (z, z, n, 1);
+#endif
 }
 
 /* *pz::code_for_elt_ur_sub */
@@ -968,7 +987,7 @@ void mpfq_pz_poly_setmonic(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_poly q,
         q->size = 1;
         return;
     }
-    mpfq_pz_elt lc;
+    mpfq_pz_elt lc;	/* spurious uninit warning sometimes */
     mpfq_pz_init(K, &lc);
     mpfq_pz_poly_getcoeff(K, lc, p, degp);
     mpfq_pz_inv(K, lc, lc);
@@ -1070,7 +1089,7 @@ static void mpfq_pz_poly_preinv(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_po
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
     // Requires p(0) = 1
     // Assume p != q (no alias)
-    mpfq_pz_elt temp;
+    mpfq_pz_elt temp;	/* spurious uninit warning sometimes */
     mpfq_pz_init(K, &temp);
     mpfq_pz_poly_getcoeff(K, temp, p, 0);//Should be in the assert
     assert( mpfq_pz_cmp_ui(K, temp, 1) == 0);
