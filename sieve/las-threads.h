@@ -17,8 +17,8 @@ class thread_workspaces;
 struct thread_side_data : private NonCopyable {
   const fb_part *fb;
   /* For small sieve */
-  int * ssdpos;
-  int * rsdpos;
+  int64_t * ssdpos;
+  int64_t * rsdpos;
 
   unsigned char *bucket_region;
   sieve_checksum checksum_post_sieve;

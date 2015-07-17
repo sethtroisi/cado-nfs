@@ -2,6 +2,9 @@ set (bin_list
         dup1 dup2 purge merge merge-dl replay replay-dl sm reconstructlog-dl
 )
 
+set (purge_sources filter_common.c purge_matrix.c singleton_removal.c
+                   clique_removal.c purge.c)
+
 # the utils library is already linked with -lgmp and -lm
 add_executable(dup1 dup1.c)
 target_link_libraries(dup1 utils_with_io)
@@ -9,7 +12,7 @@ target_link_libraries(dup1 utils_with_io)
 add_executable(dup2 dup2.c filter_badideals.c)
 target_link_libraries(dup2 utils_with_io)
 
-add_executable(purge filter_common.c purge_matrix.c singleton_removal.c purge.c)
+add_executable(purge ${purge_sources})
 target_link_libraries(purge utils_with_io)
 
 add_executable(merge merge.c filter_common.c markowitz.c mst.c report.c merge_mono.c merge_replay_matrix.c sparse.c)

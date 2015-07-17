@@ -1423,8 +1423,11 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         seconds = delta.total_seconds() - self.state["start_real_time"]
         remaining_time = seconds * (1.0 / self.get_achievement() - 1)
         now = datetime.datetime.now()
-        arrival = now + datetime.timedelta(seconds=remaining_time)
-        return arrival.ctime()
+        try:
+           arrival = now + datetime.timedelta(seconds=remaining_time)
+           return arrival.ctime()
+        except OverflowError:
+           return "Unknown"
 
     def verification(self, wuid, ok, *, commit):
         """ Mark a workunit as verified ok or verified with error and update
@@ -3293,7 +3296,7 @@ class PurgeTask(Task):
     def run(self):
         super().run()
 
-        if self.params["galois"] != "1/y":
+        if not (self.params["galois"] in ["1/y", "_y"]):
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             if not nunique:
@@ -3547,7 +3550,7 @@ class FilterGaloisTask(Task):
 
     def run(self):
         # This task must be run only if galois is recognized by filter_galois
-        if self.params["galois"] != "1/y":
+        if not (self.params["galois"] in ["1/y", "_y"]):
             return True
 
         super().run()

@@ -104,7 +104,22 @@ public:
    hint it stores, used to speed up factoring of survivors.
 
    The level is 1, 2, or 3. The data type for the position where the update
-   hits within a bucket is 16, 24, and 32 bits wide, resp. */
+   hits within a bucket is 16, 24, and 32 bits wide, resp.
+
+   When LOG_BUCKET_REGION > 16, however, the position will have a few bits
+   more, so the types for levels 1 and 3 must be changed accordingly.
+   This creates, of course, a large memory overhead. */
+
+#if LOG_BUCKET_REGION <= 16
+#  define XSIZE1 uint16_t
+#  define XSIZE2 uint32_t
+#  define XSIZE3 uint32_t
+#else
+#  define XSIZE1 uint32_t
+#  define XSIZE2 uint32_t
+#  define XSIZE3 uint64_t
+#endif
+
 template <int LEVEL, typename HINT>
 class bucket_update_t;
 
@@ -112,12 +127,12 @@ template <typename HINT>
 class bucket_update_t<1, HINT> : public HINT {
 public:
   static const size_t bucket_region = BUCKET_REGION;
-  uint16_t x;
+  XSIZE1 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
     const slice_offset_t slice_offset, const slice_index_t slice_index)
     : HINT(p, slice_offset, slice_index),
-      x(limit_cast<uint16_t>(_x))
+      x(limit_cast<XSIZE1>(_x))
     {}
 };
 
@@ -126,12 +141,12 @@ class bucket_update_t<2, HINT> : public HINT {
 public:
   static const size_t bucket_region = BUCKET_REGION; /* FIXME */
   /* TODO: create a fake 24-bit type as uint8_t[3]. */
-  uint32_t x;
+  XSIZE2 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
     const slice_offset_t slice_offset, const slice_index_t slice_index)
     : HINT(p, slice_offset, slice_index),
-      x(limit_cast<uint32_t>(_x))
+      x(limit_cast<XSIZE2>(_x))
     {}
 };
 
@@ -139,15 +154,18 @@ template <typename HINT>
 class bucket_update_t<3, HINT> : public HINT {
 public:
   static const size_t bucket_region = BUCKET_REGION; /* FIXME */
-  uint32_t x;
+  XSIZE3 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
     const slice_offset_t slice_offset, const slice_index_t slice_index)
     : HINT(p, slice_offset, slice_index),
-      x(limit_cast<uint32_t>(_x))
+      x(limit_cast<XSIZE3>(_x))
     {}
 };
 
+#undef XSIZE1
+#undef XSIZE2
+#undef XSIZE3
 
 /******** Bucket array typedef **************/
 /******** Bucket array implementation **************/

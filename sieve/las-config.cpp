@@ -28,9 +28,6 @@ void las_display_config_flags()
 #ifdef TRACK_CODE_PATH
     verbose_output_print(0, 1, " TRACK_CODE_PATH");
 #endif
-#ifdef SUPPORT_I17
-    verbose_output_print(0, 1, " SUPPORT_I17");
-#endif
 #ifdef ALG_LAZY
     verbose_output_print(0, 1, " ALG_LAZY");
     verbose_output_print(0, 1, " NORM_STRIDE=8 (locked)");

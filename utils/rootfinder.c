@@ -15,7 +15,7 @@
 
 
 int
-mpz_poly_roots (mpz_t * r, mpz_poly_t F, mpz_t p)
+mpz_poly_roots (mpz_t * r, mpz_poly_t F, const mpz_t p)
 {
     int d = F->deg;
 
