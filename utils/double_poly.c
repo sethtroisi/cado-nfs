@@ -723,6 +723,7 @@ static int double_poly_pseudo_division(double_poly_ptr q, double_poly_ptr r,
   while (r->deg >= n) {
     double_poly_degree(r);
     double_poly_init(s, r->deg - n);
+    memset(s->coeff, 0, sizeof(double) * (s->deg + 1));
     s->coeff[r->deg - n] = double_poly_lc(r);
 
     if (q != NULL) {
@@ -742,6 +743,7 @@ static int double_poly_pseudo_division(double_poly_ptr q, double_poly_ptr r,
     double_poly_subtraction(r, r, s);
     double_poly_clear(s);
     e--;
+    //TODO: is it necessary?
     if (double_poly_isnan_or_isinf(r)) {
       return 0;
     }
@@ -813,6 +815,7 @@ static void mpz_poly_set_double_poly(mpz_poly_ptr f, double_poly_srcptr g)
   f->deg = g->deg;
 }
 
+//TODO: follow the modification of mpz_poly_resultant.
 double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
 {
   if (p->deg == -1 || q->deg == -1) {
@@ -820,6 +823,7 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
   }
 
   ASSERT(p->coeff[p->deg] != 0);
+
   ASSERT(q->coeff[q->deg] != 0);
 
   double_poly_t a;
@@ -831,11 +835,10 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
   double_poly_set(a, p);
   double_poly_set(b, q);
 
-  double s = 1;
+  int s = 1;
   double g = double_poly_content(a);
   double h = double_poly_content(b);
   int d;
-  double tmp;
 
   double_poly_mul_double(a, a, 1 / g);
   double_poly_mul_double(b, b, 1 / h);
@@ -856,8 +859,9 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
   }
 
   while (b->deg > 0) {
-    double_poly_degree(a);
-    double_poly_degree(b);
+    //TODO: verify if it is necessary.
+    /*double_poly_degree(a);*/
+    /*double_poly_degree(b);*/
     d = a->deg - b->deg;;
 
     if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
@@ -868,13 +872,13 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
     if (!pseudo_div) {
       break;
     }
-    double_poly_degree(r);
+    /*double_poly_degree(r);*/
     double_poly_set(a, b);
 
     ASSERT(d >= 0);
 
-    tmp = g * pow(h, (double) d);
-    double_poly_mul_double(b, r, tmp);
+    double_poly_mul_double(b, r, 1 / (g * pow(h, (double) d)));
+    //TODO: a is normalized, so g = a->coeff[a->deg].
     g = double_poly_lc(a);
 
 #ifdef NDEBUG
@@ -884,8 +888,7 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
 #endif // NDEBUG
 
     h = pow(h, (double) (d - 1));
-    tmp = pow(g, (double) d);
-    h = tmp / h;
+    h = pow(g, (double) d) / h;
   }
 
   if (pseudo_div) {
@@ -899,23 +902,19 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
       double_poly_clear(r);
       return 0;
     } else {
-      tmp = double_poly_lc(b);
 
       ASSERT(a->deg >= 0);
 
-      tmp = pow(tmp, (double) a->deg);
-      h = tmp / h;
-
-      t = t * s;
-      h = h * t;
+      h = pow(b->coeff[0], (double) a->deg) / h;
 
       double_poly_clear(a);
       double_poly_clear(b);
       double_poly_clear(r);
 
-      return h;
+      return (double)s * t * h;
     }
   } else {
+    //TODO: use last version of a and b in pseudo_division.
     printf("Need mpz.\n");
     mpz_t res;
     mpz_init(res);
