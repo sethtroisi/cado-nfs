@@ -1367,7 +1367,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
 
 #ifdef TIME_SIEVES
-  double time_line_sieve = seconds();
+  time_line_sieve = seconds();
 #endif // TIME_SIEVES
 
   /* --- Line sieve --- */
@@ -1454,7 +1454,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   }
 
 #ifdef TIME_SIEVES
-  time_line_sieve = time_line_sieve - seconds();
+  time_line_sieve = seconds() - time_line_sieve;
   ideal_line_sieve = i;
 #endif // TIME_SIEVES
 
@@ -1509,7 +1509,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   }
 
 #ifdef TIME_SIEVES
-  time_plane_sieve = time_plane_sieve - seconds();
+  time_plane_sieve = seconds() - time_plane_sieve;
   ideal_plane_sieve = i - ideal_line_sieve;
 #endif // TIME_SIEVES
 
@@ -1594,7 +1594,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   }
 
 #ifdef TIME_SIEVES
-  time_space_sieve = time_space_sieve - seconds();
+  time_space_sieve = seconds() - time_space_sieve;
   ideal_space_sieve = i - ideal_line_sieve - ideal_space_sieve;
 #endif // TIME_SIEVES
 
