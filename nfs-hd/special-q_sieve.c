@@ -1352,11 +1352,6 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     factor_base_srcptr fb, sieving_bound_srcptr H,
     MAYBE_UNUSED mpz_poly_srcptr f)
 {
-#ifdef TIMER_SIEVE
-  double time_sieve = 0;
-  double sec = 0;
-#endif // TIMER_SIEVE
-
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
   uint64_t ideal_line_sieve = 0;
@@ -1364,133 +1359,74 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   uint64_t ideal_plane_sieve = 0;
   double time_space_sieve = 0;
   uint64_t ideal_space_sieve = 0;
-  double sec_sieves = 0;
 #endif // TIME_SIEVES
 
+  ideal_1_t r;
+  ideal_1_init(r);
 
-  //For all the ideal_1 of the factor base.
-  for (uint64_t i = 0; i < fb->number_element_1; i++) {
-
-#ifdef TIMER_SIEVE
-    if (r->ideal->r > TIMER_SIEVE) {
-      sec = seconds();
-    }
-#endif // TIMER_SIEVE
+  uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
 
 #ifdef TIME_SIEVES
-    sec_sieves = seconds();
+  double time_line_sieve = seconds();
 #endif // TIME_SIEVES
 
-    ideal_1_t r;
-    ideal_1_init(r);
-    ideal_1_set(r, fb->factor_base_1[i], H->t);
+  /* --- Line sieve --- */
 
-    uint64_t * Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
+  uint64_t i = 0;
+  uint64_t line_sieve_stop = 2 * (uint64_t) H->h[0];
+  while (i < fb->number_element_1 &&
+      fb->factor_base_1[i]->ideal->r < line_sieve_stop) {
+    ideal_1_set(r, fb->factor_base_1[i], H->t);
 
     //Compute the true Tqr
     compute_Tqr_1(Tqr, matrix, H->t, r);
 
-    if (r->ideal->r < 2 * (uint64_t) H->h[0]) {
-      uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
-      //Compute a usefull pseudo_Tqr for line_sieve.
-      compute_pseudo_Tqr_1(pseudo_Tqr, Tqr, H->t, r);
+    uint64_t * pseudo_Tqr = (uint64_t *) malloc(sizeof(uint64_t) * (H->t));
+    //Compute a usefull pseudo_Tqr for line_sieve.
+    compute_pseudo_Tqr_1(pseudo_Tqr, Tqr, H->t, r);
 
-      //Initialise c = (-H[0], -H[1], …, 0).
-      int64_vector_t c;
-      int64_vector_init(c, H->t);
-      for (unsigned int j = 0; j < H->t - 1; j++) {
-        int64_vector_setcoordinate(c, j, -(int64_t)H->h[j]);
-      }
-      int64_vector_setcoordinate(c, H->t - 1, 0);
+    //Initialise c = (-H[0], -H[1], …, 0).
+    int64_vector_t c;
+    int64_vector_init(c, H->t);
+    for (unsigned int j = 0; j < H->t - 1; j++) {
+      int64_vector_setcoordinate(c, j, -(int64_t)H->h[j]);
+    }
+    int64_vector_setcoordinate(c, H->t - 1, 0);
 
-      if (pseudo_Tqr[0] != 0) {
-        unsigned int pos = 0;
+    if (pseudo_Tqr[0] != 0) {
+      unsigned int pos = 0;
 
-        //Set c = (-H[0] - 1, -H[1], …, 0).
-        int64_t c0 = 0;
-        int64_vector_setcoordinate(c, 1, c->c[1] - 1);
-        //Compute c0 = (-Tqr[0])^(-1) * (Tqr[1]*c[1] + …) mod r.
-        //TODO: delete the modulo.
-        for (unsigned int j = 1; j < H->t; j++) {
-          c0 = c0 + (int64_t)pseudo_Tqr[j] * c->c[j];
-          if (c0 >= (int64_t) r->ideal->r) {
-            while(c0 >= (int64_t)r->ideal->r) {
-              c0 = c0 - (int64_t)r->ideal->r;
-            }
-          } else if (c0 < 0) {
-            while(c0 < (int64_t)r->ideal->r) {
-              c0 = c0 + (int64_t)r->ideal->r;
-            }
+      //Set c = (-H[0] - 1, -H[1], …, 0).
+      int64_t c0 = 0;
+      int64_vector_setcoordinate(c, 1, c->c[1] - 1);
+      //Compute c0 = (-Tqr[0])^(-1) * (Tqr[1]*c[1] + …) mod r.
+      //TODO: delete the modulo.
+      for (unsigned int j = 1; j < H->t; j++) {
+        c0 = c0 + (int64_t)pseudo_Tqr[j] * c->c[j];
+        if (c0 >= (int64_t) r->ideal->r) {
+          while(c0 >= (int64_t)r->ideal->r) {
             c0 = c0 - (int64_t)r->ideal->r;
           }
+        } else if (c0 < 0) {
+          while(c0 < (int64_t)r->ideal->r) {
+            c0 = c0 + (int64_t)r->ideal->r;
+          }
+          c0 = c0 - (int64_t)r->ideal->r;
         }
-        ASSERT(c0 >= 0 && c0 < (int64_t)r->ideal->r);
-        //Number of c with the same c[1], …, c[t-1].
-        uint64_t number_c = array->number_element / (2 * H->h[0]);
+      }
+      ASSERT(c0 >= 0 && c0 < (int64_t)r->ideal->r);
+      //Number of c with the same c[1], …, c[t-1].
+      uint64_t number_c = array->number_element / (2 * H->h[0]);
 
-        for (uint64_t j = 0; j < number_c; j++) {
-          pos = int64_vector_add_one_i(c, 1, H);
-          line_sieve_1(array, c, pseudo_Tqr, r, H, 0, 1, &c0, pos,
-              matrix, f);
-        }
-
-#ifdef NUMBER_HIT
-        printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ", number_of_hit,
-            r->ideal->r);
-        mpz_poly_fprintf(stdout, r->ideal->h);
-        printf("# Estimated number of hits: %u.\n",
-            (unsigned int) nearbyint((double) array->number_element /
-              (double) r->ideal->r));
-        number_of_hit = 0;
-#endif // NUMBER_HIT
-
-      } else {
-        fprintf(stderr, "# Line sieve does not support this type of Tqr.\n");  
-        fprintf(stderr, "# Tqr = [");
-        for (unsigned int i = 0; i < H->t - 1; i++) {
-          fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
-        }
-        fprintf(stderr, "%" PRIu64 "]\n# pseudo_Tqr = [", Tqr[H->t - 1]);
-        for (unsigned int i = 0; i < H->t - 1; i++) {
-          fprintf(stderr, "%" PRIu64 ", ", pseudo_Tqr[i]);
-        }
-        fprintf(stderr, "%" PRIu64 "]\n", pseudo_Tqr[H->t - 1]);
+      for (uint64_t j = 0; j < number_c; j++) {
+        pos = int64_vector_add_one_i(c, 1, H);
+        line_sieve_1(array, c, pseudo_Tqr, r, H, 0, 1, &c0, pos,
+            matrix, f);
       }
 
-      free(pseudo_Tqr);
-      int64_vector_clear(c);
-
-#ifdef TIME_SIEVES
-    time_line_sieve = time_line_sieve + seconds() - sec_sieves;
-    ideal_line_sieve++;
-#endif // TIME_SIEVES
-
-    } else if (r->ideal->r < 4 * (int64_t)(H->h[0] * H->h[1])) {
-
-#ifdef TEST_MQR
-      printf("# Tqr = [");
-      for (unsigned int i = 0; i < H->t - 1; i++) {
-        printf("%" PRIu64 ", ", Tqr[i]);
-      }
-      printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
-      mat_int64_t Mqr_test;
-      compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-      mat_int64_fprintf_comment(stdout, Mqr_test);
-      mat_int64_clear(Mqr_test);
-#endif // TEST_MQR
-
-      ASSERT(H->t == 3);
-
-      mat_int64_t Mqr;
-      mat_int64_init(Mqr, H->t, H->t);
-
-      compute_Mqr_1(Mqr, Tqr, H->t, r);
-
-      plane_sieve_1(array, r, Mqr, H, matrix, f);
-
 #ifdef NUMBER_HIT
-      printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
-          number_of_hit, r->ideal->r);
+      printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ", number_of_hit,
+          r->ideal->r);
       mpz_poly_fprintf(stdout, r->ideal->h);
       printf("# Estimated number of hits: %u.\n",
           (unsigned int) nearbyint((double) array->number_element /
@@ -1498,99 +1434,172 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       number_of_hit = 0;
 #endif // NUMBER_HIT
 
-      mat_int64_clear(Mqr);
+    } else {
+      fprintf(stderr, "# Line sieve does not support this type of Tqr.\n");  
+      fprintf(stderr, "# Tqr = [");
+      for (unsigned int i = 0; i < H->t - 1; i++) {
+        fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
+      }
+      fprintf(stderr, "%" PRIu64 "]\n# pseudo_Tqr = [", Tqr[H->t - 1]);
+      for (unsigned int i = 0; i < H->t - 1; i++) {
+        fprintf(stderr, "%" PRIu64 ", ", pseudo_Tqr[i]);
+      }
+      fprintf(stderr, "%" PRIu64 "]\n", pseudo_Tqr[H->t - 1]);
+    }
+
+    free(pseudo_Tqr);
+    int64_vector_clear(c);
+
+    i++;
+  }
 
 #ifdef TIME_SIEVES
-    time_plane_sieve = time_plane_sieve + seconds() - sec_sieves;
-    ideal_plane_sieve++;
+  time_line_sieve = time_line_sieve - seconds();
+  ideal_line_sieve = i;
 #endif // TIME_SIEVES
-    } else {
+
+#ifdef TIME_SIEVES
+  time_plane_sieve = seconds();
+#endif // TIME_SIEVES
+
+  /* --- Plane sieve --- */
+
+  uint64_t plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
+  while (i < fb->number_element_1 &&
+      fb->factor_base_1[i]->ideal->r < plane_sieve_stop) {
+    ideal_1_set(r, fb->factor_base_1[i], H->t);
+
+    //Compute the true Tqr
+    compute_Tqr_1(Tqr, matrix, H->t, r);
+
+#ifdef TEST_MQR
+    printf("# Tqr = [");
+    for (unsigned int i = 0; i < H->t - 1; i++) {
+      printf("%" PRIu64 ", ", Tqr[i]);
+    }
+    printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+    mat_int64_t Mqr_test;
+    compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+    mat_int64_fprintf_comment(stdout, Mqr_test);
+    mat_int64_clear(Mqr_test);
+#endif // TEST_MQR
+
+    ASSERT(H->t == 3);
+
+    mat_int64_t Mqr;
+    mat_int64_init(Mqr, H->t, H->t);
+
+    compute_Mqr_1(Mqr, Tqr, H->t, r);
+
+    plane_sieve_1(array, r, Mqr, H, matrix, f);
+
+#ifdef NUMBER_HIT
+    printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
+        number_of_hit, r->ideal->r);
+    mpz_poly_fprintf(stdout, r->ideal->h);
+    printf("# Estimated number of hits: %u.\n",
+        (unsigned int) nearbyint((double) array->number_element /
+          (double) r->ideal->r));
+    number_of_hit = 0;
+#endif // NUMBER_HIT
+
+    mat_int64_clear(Mqr);
+
+    i++;
+  }
+
+#ifdef TIME_SIEVES
+  time_plane_sieve = time_plane_sieve - seconds();
+  ideal_plane_sieve = i - ideal_line_sieve;
+#endif // TIME_SIEVES
+
+  /* --- Space sieve --- */
+
+#ifdef TIME_SIEVES
+  time_space_sieve = seconds();
+#endif // TIME_SIEVES
+
+  while (i < fb->number_element_1) {
+    ideal_1_set(r, fb->factor_base_1[i], H->t);
+
+    //Compute the true Tqr
+    compute_Tqr_1(Tqr, matrix, H->t, r);
 
 #ifdef ENUM_LATTICE
 #ifdef TEST_MQR
-      printf("# Tqr = [");
-      for (unsigned int i = 0; i < H->t - 1; i++) {
-        printf("%" PRIu64 ", ", Tqr[i]);
-      }
-      printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
-      mat_int64_t Mqr_test;
-      compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-      mat_int64_fprintf_comment(stdout, Mqr_test);
-      mat_int64_clear(Mqr_test);
+    printf("# Tqr = [");
+    for (unsigned int i = 0; i < H->t - 1; i++) {
+      printf("%" PRIu64 ", ", Tqr[i]);
+    }
+    printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+    mat_int64_t Mqr_test;
+    compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+    mat_int64_fprintf_comment(stdout, Mqr_test);
+    mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
-      ASSERT(H->t == 3);
+    ASSERT(H->t == 3);
 
-      mat_int64_t Mqr;
-      mat_int64_init(Mqr, H->t, H->t);
+    mat_int64_t Mqr;
+    mat_int64_init(Mqr, H->t, H->t);
 
-      compute_Mqr_1(Mqr, Tqr, H->t, r);
+    compute_Mqr_1(Mqr, Tqr, H->t, r);
 
-      enum_lattice(array, r, Mqr, H, f, matrix);
+    enum_lattice(array, r, Mqr, H, f, matrix);
 
-      mat_int64_clear(Mqr);
+    mat_int64_clear(Mqr);
 
 #else // ENUM_LATTICE
 
 #ifdef TEST_MQR
-      printf("# Tqr = [");
-      for (unsigned int i = 0; i < H->t - 1; i++) {
-        printf("%" PRIu64 ", ", Tqr[i]);
-      }
-      printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
-      mat_int64_t Mqr_test;
-      compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-      mat_int64_fprintf_comment(stdout, Mqr_test);
-      mat_int64_clear(Mqr_test);
+    printf("# Tqr = [");
+    for (unsigned int i = 0; i < H->t - 1; i++) {
+      printf("%" PRIu64 ", ", Tqr[i]);
+    }
+    printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+    mat_int64_t Mqr_test;
+    compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+    mat_int64_fprintf_comment(stdout, Mqr_test);
+    mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
-      ASSERT(H->t == 3);
+    ASSERT(H->t == 3);
 
-      mat_int64_t Mqr;
-      mat_int64_init(Mqr, H->t, H->t);
+    mat_int64_t Mqr;
+    mat_int64_init(Mqr, H->t, H->t);
 
-      compute_Mqr_1(Mqr, Tqr, H->t, r);
+    compute_Mqr_1(Mqr, Tqr, H->t, r);
 
 #ifdef SPACE_SIEVE
-      space_sieve_1_3D(array, r, Mqr, H);
+    space_sieve_1_3D(array, r, Mqr, H);
 #else
-      plane_sieve_1(array, r, Mqr, H, matrix, f);
+    plane_sieve_1(array, r, Mqr, H, matrix, f);
 #endif // SPACE_SIEVE
 
 
 #ifdef NUMBER_HIT
-      printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
-          number_of_hit, r->ideal->r);
-      mpz_poly_fprintf(stdout, r->ideal->h);
-      printf("# Estimated number of hits: %u.\n",
-          (unsigned int) nearbyint((double) array->number_element /
-            (double) r->ideal->r));
-      number_of_hit = 0;
+    printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
+        number_of_hit, r->ideal->r);
+    mpz_poly_fprintf(stdout, r->ideal->h);
+    printf("# Estimated number of hits: %u.\n",
+        (unsigned int) nearbyint((double) array->number_element /
+          (double) r->ideal->r));
+    number_of_hit = 0;
 #endif // NUMBER_HIT
 
-      mat_int64_clear(Mqr);
+    mat_int64_clear(Mqr);
 #endif // ENUM_LATTICE
 
-#ifdef TIME_SIEVES
-    time_space_sieve = time_space_sieve + seconds() - sec_sieves;
-    ideal_space_sieve++;
-#endif // TIME_SIEVES
-    }
-
-    ideal_1_clear(r, H->t);
-    free(Tqr);
-
-#ifdef TIMER_SIEVE
-      if (r->ideal->r > TIMER_SIEVE) {
-        time_sieve = time_sieve + seconds() - sec;
-      }
-#endif // TIMER_SIEVE
+    i++;
   }
 
-#ifdef TIMER_SIEVE
-  printf("# Bound: %d\n", TIMER_SIEVE);
-  printf("# Perform sieve: %f\n", time_sieve);
-#endif // TIMER_SIEVE
+#ifdef TIME_SIEVES
+  time_space_sieve = time_space_sieve - seconds();
+  ideal_space_sieve = i - ideal_line_sieve - ideal_space_sieve;
+#endif // TIME_SIEVES
+
+  ideal_1_clear(r, H->t);
+  free(Tqr);
 
 #ifdef TIME_SIEVES
   printf("# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
