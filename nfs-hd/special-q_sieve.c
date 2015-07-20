@@ -47,10 +47,6 @@ FILE * file;
 double norm_bound = 0;
 #endif // MEAN_NORM_BOUND
 
-#ifdef MEAN_NORM_BOUND_SIEVE
-double norm_bound_sieve = 0;
-#endif // MEAN_NORM_BOUND_SIEVE
-
 #ifdef MEAN_NORM
 double norm = 0;
 #endif // MEAN_NORM
@@ -1718,18 +1714,19 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 #endif // SIEVE_U
 #endif // Draft for special-q_sieve
 
+#ifdef MEAN_NORM_BOUND_SIEVE
+void find_index(uint64_array_ptr indexes, array_srcptr array,
+    unsigned char thresh, double * norm_bound_sieve)
+#else
 void find_index(uint64_array_ptr indexes, array_srcptr array,
     unsigned char thresh)
-{
-#ifdef MEAN_NORM_BOUND_SIEVE
-  norm_bound_sieve = 0;
 #endif // MEAN_NORM_BOUND_SIEVE
-
+{
   uint64_t ind = 0;
   for (uint64_t i = 0; i < array->number_element; i++) {
 
 #ifdef MEAN_NORM_BOUND_SIEVE
-    norm_bound_sieve = norm_bound_sieve + (double)array->array[i];
+    * norm_bound_sieve = * norm_bound_sieve + (double)array->array[i];
 #endif // MEAN_NORM_BOUND_SIEVE
 
     if (array->array[i] <= thresh) {
@@ -2560,6 +2557,7 @@ int main(int argc, char * argv[])
 
 #ifdef MEAN_NORM_BOUND_SIEVE
         double * norms_bound_sieve = (double * ) malloc(sizeof(double) * V);
+        memset(norms_bound_sieve, 0, sizeof(double) * V);
 #endif // MEAN_NORM_BOUND_SIEVE
 
         for (unsigned int j = 0; j < V; j++) {
@@ -2581,12 +2579,12 @@ int main(int argc, char * argv[])
           special_q_sieve(array, matrix, fb[j], H, f[j]);
           time[j][1] = seconds() - sec;
           sec = seconds();
-          find_index(indexes[j], array, thresh[j]);
-          time[j][2] = seconds() - sec;
-
 #ifdef MEAN_NORM_BOUND_SIEVE
-        norms_bound_sieve[j] = norm_bound_sieve;
+          find_index(indexes[j], array, thresh[j], norms_bound_sieve + j);
+#else
+          find_index(indexes[j], array, thresh[j]);
 #endif // MEAN_NORM_BOUND_SIEVE
+          time[j][2] = seconds() - sec;
 
 #ifdef TRACE_POS
         fprintf(file, "********************\n");
