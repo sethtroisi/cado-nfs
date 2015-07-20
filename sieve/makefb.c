@@ -541,13 +541,7 @@ main (int argc, char *argv[])
 
   param_list_warn_unused(pl);
 
-  // TODO: clean this; we keep the first lines for compatibility reasons
-  if (side == ALGEBRAIC_SIDE)
-    makefb_with_powers (outputfile, cpoly->alg, alim, maxbits, nb_threads);
-  else if (side == RATIONAL_SIDE)
-    makefb_with_powers (outputfile, cpoly->rat, alim, maxbits, nb_threads);
-  else
-    makefb_with_powers (outputfile, cpoly->pols[side], alim, maxbits, nb_threads);
+  makefb_with_powers (outputfile, cpoly->pols[side], alim, maxbits, nb_threads);
 
   cado_poly_clear (cpoly);
   if (outfilename != NULL) {
