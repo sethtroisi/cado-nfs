@@ -1095,8 +1095,9 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
   }
 }
 
-void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
-    sieving_bound_srcptr H)
+unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
+    list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element)
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
@@ -1109,18 +1110,6 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
   skew_LLL(MSLLL, Mqr, skewness);
   int64_vector_clear(skewness);
-#ifdef SPACE_SIEVE_ENTROPY
-  unsigned int entropy = 0;
-#endif // SPACE_SIEVE_ENTROPY
-
-#ifdef SPACE_SIEVE_CUT_EARLY
-  uint64_t nb_hit = 0;
-#endif // SPACE_SIEVE_CUT_EARLY
-
-#ifdef SPACE_SIEVE_CUT_EARLY
-  double expected_hit = (double)(4 * H->h[0] * H->h[1] * H->h[2]) /
-    (double)r->ideal->r;
-#endif // SPACE_SIEVE_CUT_EARLY
 
   for (unsigned int col = 1; col <= MSLLL->NumCols; col++) {
     if (MSLLL->coeff[3][col] < 0) {
@@ -1131,15 +1120,36 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   }
   
   //TODO: we must generate all the zero vectors!
+  unsigned int vector_1 = space_sieve_linear_combination(
+      list_vec, list_vec_zero, MSLLL, H, number_element);
+  mat_int64_clear(MSLLL);
+
+  list_int64_vector_index_sort_last(list_vec);
+
+  return vector_1;
+}
+
+void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
+    sieving_bound_srcptr H)
+{
+#ifdef SPACE_SIEVE_ENTROPY
+  unsigned int entropy = 0;
+#endif // SPACE_SIEVE_ENTROPY
+
+#ifdef SPACE_SIEVE_CUT_EARLY
+  uint64_t nb_hit = 0;
+  double expected_hit = (double)(4 * H->h[0] * H->h[1] * H->h[2]) /
+    (double)r->ideal->r;
+#endif // SPACE_SIEVE_CUT_EARLY
+
   list_int64_vector_index_t list_vec;
   list_int64_vector_index_init(list_vec, 3);
   list_int64_vector_index_t list_vec_zero;
   list_int64_vector_index_init(list_vec_zero, 3);
-  unsigned int vector_1 = space_sieve_linear_combination(
-      list_vec, list_vec_zero, MSLLL, H, array->number_element);
-  mat_int64_clear(MSLLL);
 
-  list_int64_vector_index_sort_last(list_vec);
+  unsigned int vector_1 = space_sieve_1_init(list_vec, list_vec_zero, r, Mqr,
+      H, array->number_element);
+
   int plane_sieve = 0;
 
   list_int64_vector_t list_FK;
