@@ -6,7 +6,7 @@
 #include "cado_poly.h"
 #include "portability.h"
 
-const char * sidenames[2] = {
+const char * sidenames[NB_POLYS_MAX] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
 
@@ -15,6 +15,7 @@ void cado_poly_init(cado_poly poly)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly[0]));
+    // TODO: noalgrat remove those two lines.
     poly->rat = poly->pols[RATIONAL_SIDE];
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
@@ -88,6 +89,8 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     }
   }
   if (poly->nb_polys == 0) /* No polynomials so far. Try other format. */
+  /* Convention: c or X means side 1 (often algebraic)
+   *             Y means side 0 (often rational) */
   {
     poly->nb_polys = 2;
     /* reading polynomials coefficient by coefficient */
@@ -95,14 +98,14 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     {
       char tag[4];
       snprintf(tag, sizeof(tag), "c%d", i);
-      int b = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-      if (!b) /* coeffs of alg poly can be given by c%d or X%d */
+      int b = param_list_parse_mpz(pl, tag, poly->pols[1]->coeff[i]);
+      if (!b) 
       {
         snprintf(tag, sizeof(tag), "X%d", i);
-        param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+        param_list_parse_mpz(pl, tag, poly->pols[1]->coeff[i]);
       }
       snprintf(tag, sizeof(tag), "Y%d", i);
-      param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
+      param_list_parse_mpz(pl, tag, poly->pols[0]->coeff[i]);
     }
   }
   /* setting degrees */
@@ -237,6 +240,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 int
 cado_poly_get_ratside (cado_poly_ptr pol)
 {
+  ASSERT_ALWAYS(pol->nb_polys == 2);
   if (pol->pols[0]->deg != 1 && pol->pols[1]->deg != 1)
     return -1; /* two algrebraic sides */
   else if (pol->pols[0]->deg == 1)
@@ -254,8 +258,8 @@ cado_poly_fprintf (FILE *fp, cado_poly_srcptr poly, const char *prefix)
 
   if (poly->nb_polys == 2)
   {
-    mpz_poly_fprintf_cado_format (fp, poly->rat, 'Y', prefix);
-    mpz_poly_fprintf_cado_format (fp, poly->alg, 'c', prefix);
+    mpz_poly_fprintf_cado_format (fp, poly->pols[0], 'Y', prefix);
+    mpz_poly_fprintf_cado_format (fp, poly->pols[1], 'c', prefix);
   }
   else
   {
