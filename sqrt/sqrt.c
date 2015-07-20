@@ -16,9 +16,6 @@
 #include "utils_with_io.h"
 #include "portability.h"
 
-#define DEBUG 0
-#define MAPLE 0
-
 static int verbose = 0;
 
 #define MAX_THREADS 32
