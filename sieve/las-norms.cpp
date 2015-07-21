@@ -1486,15 +1486,11 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
    rational and algebraic sides */
 /*
    Updates:
-     si->sides[RATIONAL_SIDE]->logmax
-     si->sides[RATIONAL_SIDE]->scale
-     si->sides[RATIONAL_SIDE]->cexp2[]
-     si->sides[RATIONAL_SIDE]->bound
+     si->sides[side]->logmax
+     si->sides[side]->scale
+     si->sides[side]->cexp2[]
+     si->sides[side]->bound
 
-     si->sides[ALGEBRAIC_SIDE]->logmax
-     si->sides[ALGEBRAIC_SIDE]->scale
-     si->sides[ALGEBRAIC_SIDE]->cexp2[]
-     si->sides[ALGEBRAIC_SIDE]->bound
 */
 
 void
@@ -1505,8 +1501,6 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   double step, begin;
   double r, maxlog2;
   double_poly_t poly;
-  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
   /* Update floating point version of both polynomials. They will be used in
    * get_maxnorm_alg(). */
@@ -1526,103 +1520,62 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
           s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
   }
 
-  /************************** rational side **********************************/
 
-  /* Compute the roots of the polynome F(i,1) and the roots of its inflexion points
-     d^2(F(i,1))/d(i)^2.
-     These roots and 0.0 are need to be corrected the norms initialization on their
-     neighboroods in init_smart_degree_X_norms_bucket_region_internal.  */
+  for (int side = 0; side < 2; ++side) {
+    sieve_side_info_ptr sideptr = si->sides[side];
+
+    /* Compute the roots of the polynomial F(i,1) and the roots of its
+       inflexion points d^2(F(i,1))/d(i)^2.  These roots and 0.0 are need to
+       be corrected the norms initialization on their neighboroods in
+       init_smart_degree_X_norms_bucket_region_internal.  */
+
 #ifdef SMART_NORM
-  if (si->cpoly->pols[RATIONAL_SIDE]->deg >= 2) init_norms_roots (si, RATIONAL_SIDE);
+    if (si->cpoly->pols[side]->deg >= 2)
+      init_norms_roots (si, side);
 #endif
 
-  /* Compute the maximum norm of the rational polynomial over the sieve
-     region. The polynomial coefficient in fijd are already divided by q
-     on the special-q side. */
-  poly->deg = si->cpoly->pols[RATIONAL_SIDE]->deg;
-  poly->coeff = si->sides[RATIONAL_SIDE]->fijd;
-  rat->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
+    /* Compute the maximum norm of the polynomial over the sieve region.
+       The polynomial coefficient in fijd are already divided by q
+       on the special-q side. */
+    poly->deg = si->cpoly->pols[side]->deg;
+    poly->coeff = si->sides[side]->fijd;
+    sideptr->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
 
-  /* we increase artificially 'logmax', to allow larger values of J */
-  rat->logmax += 2.0;
+    /* we know that |F(a,b)| < 2^(logmax) or |F(a,b)/q| < 2^(logmax)
+       depending on sqside. 0 */
+    /* we increase artificially 'logmax', to allow larger values of J */
+    sideptr->logmax += 2.0;
+    maxlog2 = sideptr->logmax;
 
-  /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
-     and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
-
-  maxlog2 = rat->logmax;
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
-     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2.
-     We require that scale is of the form (int) * 0.1, so that only a small
-     number of different factor base slicings can occur. */
-  rat->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 10.) * 0.1;
-  verbose_output_print (0, 1, "# Rat. side: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
-           maxlog2, rat->scale, exp2 (1. / rat->scale));
-  step = 1. / rat->scale;
-  begin = -step * GUARD;
-  for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
-  /* we want to select relations with a cofactor of less than r bits on the
-     rational side */
-  {
-      double max_rlambda = (maxlog2 - GUARD / rat->scale) /
-          si->conf->sides[RATIONAL_SIDE]->lpb;
-      double lambda = si->conf->sides[RATIONAL_SIDE]->lambda;
+    /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+       thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2.
+       We require that scale is of the form (int) * 0.1, so that only a small
+       number of different factor base slicings can occur. */
+    sideptr->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 10.)*0.1;
+    verbose_output_print (0, 1,
+        "# Side %d: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
+        side, maxlog2, sideptr->scale, exp2 (1. / sideptr->scale));
+    step = 1. / sideptr->scale;
+    begin = -step * GUARD;
+    for (unsigned int inc = 0; inc < 257; begin += step)
+      sideptr->cexp2[inc++] = exp2(begin);
+    /* we want to select relations with a cofactor of less than r bits */
+    {
+      double max_lambda = (maxlog2 - GUARD / sideptr->scale) /
+        si->conf->sides[side]->lpb;
+      double lambda = si->conf->sides[side]->lambda;
       if (lambda == 0) {
-          r = MIN(si->conf->sides[RATIONAL_SIDE]->mfb, maxlog2 - GUARD / rat->scale);
+        r = MIN(si->conf->sides[side]->mfb, maxlog2 - GUARD / sideptr->scale);
       } else {
-          r = MIN(lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
+        r = MIN(lambda * (double) si->conf->sides[side]->lpb,
+            maxlog2 - GUARD / sideptr->scale);
       }
-      rat->bound = (unsigned char) (r * rat->scale + GUARD);
-      verbose_output_print (0, 1, " bound=%u\n", rat->bound);
-      if (lambda > max_rlambda)
-          verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
-  }
-
-  /************************** algebraic side *********************************/
-
-  /* Compute the roots of the polynome F(i,1) and the roots of its inflexion points
-     d^2(F(i,1))/d(i)^2.
-     These roots and 0.0 are need to be corrected the norms initialization on their
-     neighboroods in init_smart_degree_X_norms_bucket_region_internal.  */
-#ifdef SMART_NORM
-  if (si->cpoly->pols[ALGEBRAIC_SIDE]->deg >= 2) init_norms_roots (si, ALGEBRAIC_SIDE);
-#endif
-  /* Compute the maximum norm of the algebraic polynomial over the sieve
-     region. The polynomial coefficient in fijd are already divided by q
-     on the special-q side. */
-  poly->deg = si->cpoly->pols[ALGEBRAIC_SIDE]->deg;
-  poly->coeff = si->sides[ALGEBRAIC_SIDE]->fijd;
-  alg->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
-  /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
-     and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
-
-  /* we increase artificially 'logmax', to allow larger values of J */
-  alg->logmax += 2.0;
-  maxlog2 = alg->logmax;
-
-  alg->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 10.) * 0.1;
-  verbose_output_print (0, 1, "# Alg. side: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
-      alg->logmax, alg->scale, exp2 (1. / alg->scale));
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
-     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  step = 1. / alg->scale;
-  begin = -step * GUARD;
-  for (unsigned int inc = 0; inc < 257; begin += step) alg->cexp2[inc++] = exp2(begin);
-  /* we want to report relations with a remaining log2-norm after sieving of
-     at most lambda * lpb, which corresponds in the y-range to
-     y >= GUARD + lambda * lpb * scale */
-  {
-      double max_alambda = (maxlog2 - GUARD / alg->scale) /
-          si->conf->sides[ALGEBRAIC_SIDE]->lpb;
-      double lambda = si->conf->sides[ALGEBRAIC_SIDE]->lambda;
-      if (lambda == 0) {
-          r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->mfb, maxlog2 - GUARD / alg->scale);
-      } else {
-          r = MIN(lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
-      }
-      alg->bound = (unsigned char) (r * alg->scale + GUARD);
-      verbose_output_print (0, 1, " bound=%u\n", alg->bound);
-      if (lambda > max_alambda)
-          verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+      sideptr->bound = (unsigned char) (r * sideptr->scale + GUARD);
+      verbose_output_print (0, 1, " bound=%u\n", sideptr->bound);
+      if (lambda > max_lambda)
+        verbose_output_print (0, 1, "# Warning, lambda>%.1f on side %d does "
+            "not make sense (capped to limit)\n", max_lambda, side);
+    }
   }
 
   /* improve bound on J if possible */

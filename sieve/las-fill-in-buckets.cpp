@@ -342,7 +342,7 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
 
 void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, const int part, sieve_info_srcptr si)
 {
-    fill_in_buckets_one_side(pool, ws, si->sides[ALGEBRAIC_SIDE]->fb->get_part(part), si, ALGEBRAIC_SIDE);
-    fill_in_buckets_one_side(pool, ws, si->sides[RATIONAL_SIDE]->fb->get_part(part), si, RATIONAL_SIDE);
+    for (int side = 0; side < 2; ++side)
+        fill_in_buckets_one_side(pool, ws, si->sides[side]->fb->get_part(part), si, side);
 }
 /* }}} */

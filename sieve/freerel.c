@@ -396,7 +396,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 {
   size_t i, j;
   FILE *fpout = fopen_maybe_compressed (outfilename, "w");
-  unsigned int sum_degs_add_one = pol->rat->deg + pol->alg->deg + 1;
+  unsigned int sum_degs_add_one = pol->pols[0]->deg + pol->pols[1]->deg + 1;
   unsigned long lpbmax;            // MAX(lpb[0],lpb[1])
   uint64_t total_primes = 0;       // Total of the primes
   p_r_values_t total_free_rels = 0;// Total of the free relations
@@ -450,8 +450,8 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     pth[i].pmax               = pmax;
     pth[i].lpb[0]             = lpb[0];            pth[i].lpb[1]   = lpb[1];
     pth[i].lpbmax             = lpbmax;
-    pth[i].deg[0]             = pol->rat->deg;     pth[i].deg[1]   = pol->alg->deg;
-    pth[i].coeff[0]           = pol->rat->coeff;   pth[i].coeff[1] = pol->alg->coeff;
+    pth[i].deg[0]             = pol->pols[0]->deg;     pth[i].deg[1]   = pol->pols[1]->deg;
+    pth[i].coeff[0]           = pol->pols[0]->coeff;   pth[i].coeff[1] = pol->pols[1]->coeff;
     pth[i].pols[0]            = pol->pols[0];      pth[i].pols[1]  = pol->pols[1];
     for (j = NB_BUFS; j--;) {
       pth[i].free_rels[j].begin = pth[i].free_rels[j].current =
@@ -563,8 +563,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "output file for renumbering table");
   param_list_decl_usage(pl, "out", "output file for free relations");
-  param_list_decl_usage(pl, "lpbr", "rational large prime bound");
-  param_list_decl_usage(pl, "lpba", "algebraic large prime bound");
+  param_list_decl_usage(pl, "lpb0", "large prime bound on side 0");
+  param_list_decl_usage(pl, "lpb1", "large prime bound on side 1");
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
@@ -654,8 +654,8 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-    param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]);
-    param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]);
+    param_list_parse_ulong(pl, "lpb0", &lpb[0]);
+    param_list_parse_ulong(pl, "lpb1", &lpb[1]);
     param_list_parse_ulong(pl, "pmin", &pmin);
     param_list_parse_ulong(pl, "pmax", &pmax);
     param_list_parse_ulong(pl, "t"   , &nb_pthreads);
