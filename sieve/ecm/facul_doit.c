@@ -521,7 +521,7 @@ facul_doit_onefm (mpz_t *factors, const modulus_t m,
 	  goto clean_up;
 	}
     }
-      
+
   /* So we found a non-trivial factor. See if it is prime, if the 
      cofactor is prime, and if one of them is, whether they are too
      large for our smoothness bounds */
@@ -554,8 +554,7 @@ facul_doit_onefm (mpz_t *factors, const modulus_t m,
       goto clean_up;
     }
   
-  if (2 * lpb < mod_intbits (n) &&
-      n_dbl < BBB)
+  if (2 * lpb < mod_intbits (n) && n_dbl < BBB)
     {
       found = FACUL_NOT_SMOOTH;
       goto clean_up;
