@@ -1227,17 +1227,10 @@ int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
   return 1;
 }
 
-#ifdef SPACE_SIEVE_CUT_EARLY
-void space_sieve_1_plane(array_ptr array,
-    uint64_t * nb_hit, list_int64_vector_ptr list_s, int64_vector_srcptr s,
-    ideal_1_srcptr, list_int64_vector_index_srcptr list_vec_zero,
+void space_sieve_1_plane(array_ptr array, MAYBE_UNUSED uint64_t * nb_hit,
+    list_int64_vector_ptr list_s, int64_vector_srcptr s,
+    ideal_1_srcptr r, list_int64_vector_index_srcptr list_vec_zero,
     uint64_t index_s, sieving_bound_srcptr H)
-#else // SPACE_SIEVE_CUT_EARLY
-void space_sieve_1_plane(array_ptr array,
-    list_int64_vector_ptr list_s, int64_vector_srcptr s, ideal_1_srcptr r,
-    list_int64_vector_index_srcptr list_vec_zero, uint64_t index_s,
-    sieving_bound_srcptr H)
-#endif // SPACE_SIEVE_CUT_EARLY
 {
   ASSERT(int64_vector_equal(s, list_s->v[0]) == 0);
 
@@ -1329,16 +1322,68 @@ unsigned int space_sieve_1_next_plane(int64_vector_ptr s_tmp,
   return hit;
 }
 
+void space_sieve_1_plane_sieve(array_ptr array,
+    list_int64_vector_ptr list_s,MAYBE_UNUSED uint64_t * nb_hit,
+    MAYBE_UNUSED unsigned int * entropy, int64_vector_ptr s,
+    uint64_t * index_s, list_int64_vector_index_ptr list_vec,
+    MAYBE_UNUSED list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
+    mat_int64_srcptr Mqr, list_int64_vector_srcptr list_SV,
+    list_int64_vector_srcptr list_FK, sieving_bound_srcptr H)
+{
+  int64_vector_t s_out;
+  int64_vector_init(s_out, s->dim);
+  int64_vector_t v_new;
+  int64_vector_init(v_new, s->dim);
+  plane_sieve_1_incomplete(s_out, s, Mqr, H, list_FK, list_SV);
+  if (int64_vector_in_sieving_region(s_out, H)) {
+
+#ifdef SPACE_SIEVE_CUT_EARLY
+    * nb_hit = * nb_hit + 1;
+#endif // SPACE_SIEVE_CUT_EARLY
+
+    list_int64_vector_delete_elements(list_s);
+    list_int64_vector_add_int64_vector(list_s, s_out);
+    int64_vector_sub(v_new, s_out, s);
+    uint64_t index_new = index_vector(v_new, H, array->number_element);
+    list_int64_vector_index_add_int64_vector_index(list_vec, v_new,
+        index_new);
+
+#ifdef SPACE_SIEVE_ENTROPY
+    //TODO: avoid duplicate.
+    if (* entropy < SPACE_SIEVE_ENTROPY) {
+      space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
+          array->number_element);
+      * entropy = * entropy + 1;
+
+#ifdef SPACE_SIEVE_REMOVE_DUPLICATE
+      list_int64_vector_index_remove_duplicate_sort(list_vec);
+#endif // SPACE_SIEVE_REMOVE_DUPLICATE
+
+    } else {
+      list_int64_vector_index_sort_last(list_vec);
+    }
+#else
+    list_int64_vector_index_sort_last(list_vec);
+#endif // SPACE_SIEVE_ENTROPY
+
+    * index_s = * index_s + index_new;
+    array->array[* index_s] = array->array[* index_s] - r->log;
+
+  }
+  int64_vector_set(s, s_out);
+  int64_vector_clear(s_out);
+  int64_vector_clear(v_new);
+}
+
 //TODO: in many function, a v_tmp is used, try to have only one.
 void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
     sieving_bound_srcptr H)
 {
-#ifdef SPACE_SIEVE_ENTROPY
-  unsigned int entropy = 0;
-#endif // SPACE_SIEVE_ENTROPY
+  MAYBE_UNUSED unsigned int entropy = 0;
+
+  MAYBE_UNUSED uint64_t nb_hit = 0;
 
 #ifdef SPACE_SIEVE_CUT_EARLY
-  uint64_t nb_hit = 0;
   double expected_hit = (double)(4 * H->h[0] * H->h[1] * H->h[2]) /
     (double)r->ideal->r;
 #endif // SPACE_SIEVE_CUT_EARLY
@@ -1376,12 +1421,8 @@ void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 
   while (s->c[2] < (int64_t)H->h[2]) {
 
-#ifdef SPACE_SIEVE_CUT_EARLY
     space_sieve_1_plane(array, &nb_hit, list_s, s, r, list_vec_zero,
         index_s, H);
-#else // SPACE_SIEVE_CUT_EARLY
-    space_sieve_1_plane(array, list_s, s, r, list_vec_zero, index_s, H);
-#endif // SPACE_SIEVE_CUT_EARLY
  
     unsigned int index_vec = 0;
     unsigned int s_change = 0;
@@ -1427,6 +1468,7 @@ void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #endif // SPACE_SIEVE_CUT_EARLY
       ASSERT(hit == 0);
 
+      //Need to do plane sieve to 
       if (!plane_sieve) {
         ASSERT(plane_sieve == 0);
         int boolean = space_sieve_1_plane_sieve_init(list_SV, list_FK,
@@ -1451,48 +1493,9 @@ void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         }
         plane_sieve = 1;
       }
-      int64_vector_t s_out;
-      int64_vector_init(s_out, s->dim);
-      int64_vector_t v_new;
-      int64_vector_init(v_new, s->dim);
-      plane_sieve_1_incomplete(s_out, s, Mqr, H, list_FK, list_SV);
-      if (int64_vector_in_sieving_region(s_out, H)) {
 
-#ifdef SPACE_SIEVE_CUT_EARLY
-        nb_hit++;
-#endif // SPACE_SIEVE_CUT_EARLY
-
-        list_int64_vector_delete_elements(list_s);
-        list_int64_vector_add_int64_vector(list_s, s_out);
-        int64_vector_sub(v_new, s_out, s);
-        uint64_t index_new = index_vector(v_new, H, array->number_element);
-        list_int64_vector_index_add_int64_vector_index(list_vec, v_new,
-            index_new);
-#ifdef SPACE_SIEVE_ENTROPY
-        //TODO: avoid duplicate.
-        if (entropy < SPACE_SIEVE_ENTROPY) {
-          space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
-              array->number_element);
-          entropy++;
-
-#ifdef SPACE_SIEVE_REMOVE_DUPLICATE
-          list_int64_vector_index_remove_duplicate_sort(list_vec);
-#endif // SPACE_SIEVE_REMOVE_DUPLICATE
-
-        } else {
-          list_int64_vector_index_sort_last(list_vec);
-        }
-#else
-        list_int64_vector_index_sort_last(list_vec);
-#endif // SPACE_SIEVE_ENTROPY
-
-        index_s = index_s + index_new;
-        array->array[index_s] = array->array[index_s] - r->log;
-
-      }
-      int64_vector_set(s, s_out);
-      int64_vector_clear(s_out);
-      int64_vector_clear(v_new);
+      space_sieve_1_plane_sieve(array, list_s, &nb_hit, &entropy, s, &index_s,
+          list_vec, list_vec_zero, r, Mqr, list_SV, list_FK, H);
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
     else if (!hit) {
