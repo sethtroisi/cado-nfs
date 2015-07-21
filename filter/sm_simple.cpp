@@ -138,8 +138,8 @@ int main (int argc, char **argv)
   /* Init polynomial */
   cado_poly_init (pol);
   cado_poly_read(pol, polyfile);
-  F[0] = pol->pols[RATIONAL_SIDE];
-  F[1] = pol->pols[ALGEBRAIC_SIDE];
+  F[0] = pol->pols[0];
+  F[1] = pol->pols[1];
 
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
