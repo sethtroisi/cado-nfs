@@ -104,11 +104,11 @@ int main (int argc, char **argv)
     double lognorm, alpha, alpha_proj;
 
     printf ("\n### Input raw polynomial (%u) ###\n", nb_input_polys);
-    poly->skew = L2_skewness (poly->pols[1], SKEWNESS_DEFAULT_PREC);
-    nrroots = numberOfRealRoots (poly->pols[1]->coeff, poly->pols[1]->deg, 0, 0, NULL);
-    lognorm = L2_lognorm (poly->pols[1], poly->skew);
-    alpha = get_alpha (poly->pols[1], ALPHA_BOUND);
-    alpha_proj = get_biased_alpha_projective (poly->pols[1], ALPHA_BOUND);
+    poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+    nrroots = numberOfRealRoots (poly->pols[ALG_SIDE]->coeff, poly->pols[ALG_SIDE]->deg, 0, 0, NULL);
+    lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+    alpha = get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND);
+    alpha_proj = get_biased_alpha_projective (poly->pols[ALG_SIDE], ALPHA_BOUND);
     cado_poly_fprintf (stdout, poly, "# ");
     cado_poly_fprintf_info (stdout, lognorm, alpha, alpha_proj, nrroots, "# ");
 
@@ -119,18 +119,18 @@ int main (int argc, char **argv)
 
     /* Size-optimize */
     if (use_only_translation)
-      sopt_local_descent (poly->pols[1], poly->pols[0], poly->pols[1], poly->pols[0], 
+      sopt_local_descent (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 
                                       1, -1, SOPT_DEFAULT_MAX_STEPS, verbose);
     else
-      size_optimization (poly->pols[1], poly->pols[0], poly->pols[1], poly->pols[0],
+      size_optimization (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], poly->pols[ALG_SIDE], poly->pols[RAT_SIDE],
                                                         sopt_effort, verbose);
 
     printf ("### Size-optimized polynomial (%u) ###\n", nb_input_polys);
-    poly->skew = L2_skewness (poly->pols[1], SKEWNESS_DEFAULT_PREC);
-    nrroots = numberOfRealRoots (poly->pols[1]->coeff, poly->pols[1]->deg, 0, 0, NULL);
-    lognorm = L2_lognorm (poly->pols[1], poly->skew);
-    alpha = get_alpha (poly->pols[1], ALPHA_BOUND);
-    alpha_proj = get_biased_alpha_projective (poly->pols[1], ALPHA_BOUND);
+    poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+    nrroots = numberOfRealRoots (poly->pols[ALG_SIDE]->coeff, poly->pols[ALG_SIDE]->deg, 0, 0, NULL);
+    lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+    alpha = get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND);
+    alpha_proj = get_biased_alpha_projective (poly->pols[ALG_SIDE], ALPHA_BOUND);
     cado_poly_fprintf (stdout, poly, NULL);
     cado_poly_fprintf_info (stdout, lognorm, alpha, alpha_proj, nrroots, NULL);
 

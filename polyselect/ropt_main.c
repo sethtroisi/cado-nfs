@@ -393,13 +393,13 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
      warning (this should not be frequent) and divides all coefficients of the
      polynomial by the content. */
   mpz_init (t);
-  mpz_poly_content (t, input_poly->pols[1]);
+  mpz_poly_content (t, input_poly->pols[ALG_SIDE]);
   if (mpz_cmp_ui (t, 1) != 0 && !mpz_divisible_p (input_poly->n, t))
   {
     gmp_printf ("# WARNING: the content of the algebraic side of polynomial %u "
                 "is not 1 (%Zd). The input polynomial will be divided by its "
                 "content.\n", poly_id, t);
-    mpz_poly_divexact_mpz (input_poly->pols[1], input_poly->pols[1], t);
+    mpz_poly_divexact_mpz (input_poly->pols[ALG_SIDE], input_poly->pols[ALG_SIDE], t);
   }
   mpz_clear (t);
 
@@ -408,7 +408,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   *ropt_time += seconds_thread () - st;
 
   /* MurphyE */
-  ropt_poly->skew = L2_skewness (ropt_poly->pols[1], SKEWNESS_DEFAULT_PREC);
+  ropt_poly->skew = L2_skewness (ropt_poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
   curr_MurphyE = MurphyE (ropt_poly, bound_f, bound_g, area, MURPHY_K);
   if (nthreads > 1)
     pthread_mutex_lock (&lock);

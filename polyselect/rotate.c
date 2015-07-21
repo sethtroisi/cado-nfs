@@ -55,10 +55,10 @@ int main(int argc, char **argv) {
     j = strtol(argv[2], NULL, 10);
     k = strtol(argv[3], NULL, 10);
 
-    mpz_set (b, poly->pols[0]->coeff[1]);
-    mpz_neg (m, poly->pols[0]->coeff[0]);
-    rotate_aux (poly->pols[1]->coeff, b, m, 0, k, 0);
-    rotate_aux (poly->pols[1]->coeff, b, m, 0, j, 1);
+    mpz_set (b, poly->pols[RAT_SIDE]->coeff[1]);
+    mpz_neg (m, poly->pols[RAT_SIDE]->coeff[0]);
+    rotate_aux (poly->pols[ALG_SIDE]->coeff, b, m, 0, k, 0);
+    rotate_aux (poly->pols[ALG_SIDE]->coeff, b, m, 0, j, 1);
     mpz_clear(b);
     mpz_clear(m);
 

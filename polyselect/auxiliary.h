@@ -25,6 +25,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <float.h>  /* for DBL_MAX */
 #include <string.h>
 
+/* The polynomial selection algorithms that use a linear polynomial will
+ * put it on the side given by the following. */
+#define RAT_SIDE 0
+#define ALG_SIDE 1
+
 #define DEFAULT_INCR 60 /* we want a positive integer with many divisors,
                            other values are 210, 2310, 30030, 510510, 9699690,
                            223092870 */

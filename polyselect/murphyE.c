@@ -57,12 +57,12 @@ MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
 
   x = sqrt (area * cpoly->skew);
   y = sqrt (area / cpoly->skew);
-  double_poly_init (f, cpoly->pols[1]->deg);
-  double_poly_init (g, cpoly->pols[0]->deg);
-  double_poly_set_mpz_poly (f, cpoly->pols[1]);
-  double_poly_set_mpz_poly (g, cpoly->pols[0]);
-  alpha_f = get_alpha (cpoly->pols[1], ALPHA_BOUND);
-  alpha_g = get_alpha (cpoly->pols[0], ALPHA_BOUND);
+  double_poly_init (f, cpoly->pols[ALG_SIDE]->deg);
+  double_poly_init (g, cpoly->pols[RAT_SIDE]->deg);
+  double_poly_set_mpz_poly (f, cpoly->pols[ALG_SIDE]);
+  double_poly_set_mpz_poly (g, cpoly->pols[RAT_SIDE]);
+  alpha_f = get_alpha (cpoly->pols[ALG_SIDE], ALPHA_BOUND);
+  alpha_g = get_alpha (cpoly->pols[RAT_SIDE], ALPHA_BOUND);
   one_over_logBf = 1.0 / log (Bf);
   one_over_logBg = 1.0 / log (Bg);
   for (int i = 0; i < K; i++)

@@ -1926,10 +1926,10 @@ main (int argc, char *argv[])
   /* set cpoly */
   mpz_set (best_poly->n, N);
   mpz_set (curr_poly->n, N);
-  best_poly->pols[1]->deg = d;
-  best_poly->pols[0]->deg = 1;
-  curr_poly->pols[1]->deg = d;
-  curr_poly->pols[0]->deg = 1;
+  best_poly->pols[ALG_SIDE]->deg = d;
+  best_poly->pols[RAT_SIDE]->deg = 1;
+  curr_poly->pols[ALG_SIDE]->deg = d;
+  curr_poly->pols[RAT_SIDE]->deg = 1;
 
   /* initialize primes in [P,2*P] */
   double Pd;

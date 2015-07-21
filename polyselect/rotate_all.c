@@ -593,35 +593,35 @@ main (int argc, char **argv)
     kmax = strtol(argv[2], NULL, 10);
     MAX_k = kmax;
 
-    poly->skew = L2_skewness (poly->pols[1], SKEWNESS_DEFAULT_PREC);
+    poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
 
     printf ("Initial polynomial:\n");
     if (verbose)
       print_cadopoly_extra (stdout, poly, argc0, argv0, 0);
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n", poly->skew,
-              get_alpha (poly->pols[1], ALPHA_BOUND));
-    size_optimization (poly->pols[1], poly->pols[0], poly->pols[1], poly->pols[0],
+              get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND));
+    size_optimization (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], poly->pols[ALG_SIDE], poly->pols[RAT_SIDE],
                        SOPT_DEFAULT_EFFORT, verbose - 1);
-    poly->skew = L2_skewness (poly->pols[1], SKEWNESS_DEFAULT_PREC);
+    poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
     
     printf ("After norm optimization:\n");
     if (verbose)
       print_cadopoly_extra (stdout, poly, argc0, argv0, 0);
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n",
-              poly->skew, get_alpha (poly->pols[1], ALPHA_BOUND));
+              poly->skew, get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND));
 
-    mpz_set (b, poly->pols[0]->coeff[1]);
-    mpz_neg (m, poly->pols[0]->coeff[0]);
-    rotate (poly->pols[1], alim, m, b, &jmin, &kmin, 0, verbose - 1);
-    mpz_set (poly->pols[0]->coeff[1], b);
-    mpz_neg (poly->pols[0]->coeff[0], m);
+    mpz_set (b, poly->pols[RAT_SIDE]->coeff[1]);
+    mpz_neg (m, poly->pols[RAT_SIDE]->coeff[0]);
+    rotate (poly->pols[ALG_SIDE], alim, m, b, &jmin, &kmin, 0, verbose - 1);
+    mpz_set (poly->pols[RAT_SIDE]->coeff[1], b);
+    mpz_neg (poly->pols[RAT_SIDE]->coeff[0], m);
     /* optimize again, but only translation */
-    mpz_poly_fprintf (stdout, poly->pols[0]);
-    sopt_local_descent (poly->pols[1], poly->pols[0], poly->pols[1], poly->pols[0], 1, -1,
+    mpz_poly_fprintf (stdout, poly->pols[RAT_SIDE]);
+    sopt_local_descent (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 1, -1,
                                           SOPT_DEFAULT_MAX_STEPS, verbose - 1);
-    poly->skew = L2_skewness (poly->pols[1], SKEWNESS_DEFAULT_PREC);
+    poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
     mpz_clear(b);
     mpz_clear(m);
 

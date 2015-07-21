@@ -491,14 +491,14 @@ print_poly_info_short ( mpz_t *f,
   cado_poly cpoly;
   cado_poly_init(cpoly);
   for (i = 0; i < (d + 1); i++) {
-    mpz_set(cpoly->pols[1]->coeff[i], f[i]);
+    mpz_set(cpoly->pols[ALG_SIDE]->coeff[i], f[i]);
   }
   for (i = 0; i < 2; i++) {
-    mpz_set(cpoly->pols[0]->coeff[i], g[i]);
+    mpz_set(cpoly->pols[RAT_SIDE]->coeff[i], g[i]);
   }
   mpz_set (cpoly->n, N);
-  cpoly->pols[1]->deg = d;
-  cpoly->pols[0]->deg = 1;
+  cpoly->pols[ALG_SIDE]->deg = d;
+  cpoly->pols[RAT_SIDE]->deg = 1;
 
   /* output original poly */
   gmp_printf ("%Zd ", f[d]);
@@ -510,7 +510,7 @@ print_poly_info_short ( mpz_t *f,
   mpz_neg (g[0], g[0]);
   
   /* compute skew, logmu, nroots */
-  nroots = numberOfRealRoots (cpoly->pols[1]->coeff, d, 0, 0, NULL);
+  nroots = numberOfRealRoots (cpoly->pols[ALG_SIDE]->coeff, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   cpoly->skew = skew;
   logmu = L2_lognorm (F, skew);
