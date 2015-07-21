@@ -712,7 +712,7 @@ class MakeFB(Program):
 
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
-                 lim: Parameter("alim", checktype=int),
+                 lim: Parameter(checktype=int),
                  maxbits: Parameter(checktype=int)=None,
                  out: Parameter(is_output_file=True)=None,
                  side: Parameter(checktype=int)=None,
