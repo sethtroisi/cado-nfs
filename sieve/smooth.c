@@ -1025,7 +1025,7 @@ factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
   /* compute all norms F(a,b) and G(a,b) */
   for (i = 0; i < n; i++)
     {
-      printf ("%ld,%lu:", L->a[i], L->b[i]);
+      printf ("%" PRId64 ",%" PRIu64 ":", L->a[i], L->b[i]);
 
       /* at this point L->R[i] and L->A[i] contain the product of all prime
          factors > rlim and alim respectively (apart from the special-q) */
