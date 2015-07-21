@@ -40,8 +40,6 @@ scripts/opal-test/las_decl_template.py
 polyselect/gfp2dlpolyselect_notes.txt
 polyselect/gfpkdlpolyselect_test.c
 polyselect/makefile_gfpkdl.make
-polyselect/table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01.c
-polyselect/table_t_Py_f_deg4_type0_h1_t-200--200.c
 polyselect/template-header.c
 polyselect/alpha.mpl
 polyselect/alpha.sage
