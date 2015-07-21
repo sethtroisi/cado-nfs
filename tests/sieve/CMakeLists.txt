@@ -19,7 +19,7 @@ set(las_tracek_path     ${CADO_NFS_BINARY_DIR}/sieve/las_tracek)
 set(las_descent_path    ${CADO_NFS_BINARY_DIR}/sieve/las_descent)
 
 set(F9_roots "${CMAKE_CURRENT_BINARY_DIR}/F9.roots")
-add_test(F9_makefbtest "${makefb_path}" -poly "${CADO_NFS_SOURCE_DIR}/params/F9.poly" -alim 1200000 -maxbits 10 -out "${F9_roots}")
+add_test(F9_makefbtest "${makefb_path}" -poly "${CADO_NFS_SOURCE_DIR}/params/F9.poly" -lim 1200000 -maxbits 10 -out "${F9_roots}")
 set_test_build_depends(F9_makefbtest makefb)
 
 add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")

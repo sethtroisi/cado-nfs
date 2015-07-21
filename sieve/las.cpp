@@ -830,6 +830,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             sc->bitsize = mpz_sizeinbase(q0, 2);
         }
         mpz_clear(q0);
+        sc->side = 1; // Legacy.
         if (!param_list_parse_int(pl, "sqside", &sc->side)) {
             verbose_output_print(0, 1, "# Warning: sqside not given, "
                     "assuming side 1 for backward compatibility.\n");
