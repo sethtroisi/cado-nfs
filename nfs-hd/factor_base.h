@@ -41,8 +41,9 @@ void factor_base_init(factor_base_ptr factor_base, uint64_t number_element_1,
  *  factor_base: the factor base.
  *  new_number_element: the number of element in the factor base.
  */
-void factor_base_realloc(factor_base_ptr factor_base, uint64_t number_element_1,
-    uint64_t number_element_u, uint64_t number_element_pr);
+void factor_base_realloc(factor_base_ptr factor_base,
+    uint64_t number_element_1, uint64_t number_element_u,
+    uint64_t number_element_pr);
 
 /*
  * Set an ideal in part at an index. Do not forget to define LINESIEVE if you
@@ -54,7 +55,7 @@ void factor_base_realloc(factor_base_ptr factor_base, uint64_t number_element_1,
  * h: the h of the ideal (r, h).
  */
 static inline void factor_base_set_ideal_1_part(factor_base_ptr factor_base,
-    unsigned int index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
+    uint64_t index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
 {
   ASSERT(index < factor_base->number_element_1);
 
@@ -63,8 +64,10 @@ static inline void factor_base_set_ideal_1_part(factor_base_ptr factor_base,
 }
 
 static inline void factor_base_set_ideal_1(factor_base_ptr factor_base,
-    unsigned int index, ideal_1_srcptr ideal, unsigned int t)
+    uint64_t index, ideal_1_srcptr ideal, unsigned int t)
 {
+  ASSERT(index < factor_base->number_element_1);
+
   ideal_1_init(factor_base->factor_base_1[index]);
   ideal_1_set(factor_base->factor_base_1[index], ideal, t);
 }
@@ -80,7 +83,7 @@ static inline void factor_base_set_ideal_1(factor_base_ptr factor_base,
  * h: the h of the ideal (r, h).
  */
 static inline void factor_base_set_ideal_u_part(factor_base_ptr factor_base,
-    unsigned int index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
+    uint64_t index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
 {
   ASSERT(index < factor_base->number_element_u);
 
@@ -89,8 +92,10 @@ static inline void factor_base_set_ideal_u_part(factor_base_ptr factor_base,
 }
 
 static inline void factor_base_set_ideal_u(factor_base_ptr factor_base,
-    unsigned int index, ideal_u_srcptr ideal, unsigned int t) 
+    uint64_t index, ideal_u_srcptr ideal, unsigned int t) 
 {
+  ASSERT(index < factor_base->number_element_u);
+
   ideal_u_init(factor_base->factor_base_u[index]);
   ideal_u_set(factor_base->factor_base_u[index], ideal, t);
 }
@@ -103,7 +108,7 @@ static inline void factor_base_set_ideal_u(factor_base_ptr factor_base,
  * r: the r of the ideal (r, h).
  */
 static inline void factor_base_set_ideal_pr(factor_base_ptr factor_base,
-    unsigned int index, uint64_t r, unsigned int t)
+    uint64_t index, uint64_t r, unsigned int t)
 {
   ASSERT(index < factor_base->number_element_pr);
 

@@ -22,8 +22,9 @@ void factor_base_init(factor_base_ptr factor_base, uint64_t number_element_1,
     malloc ((number_element_pr) * sizeof(ideal_pr_t));
 }
 
-void factor_base_realloc(factor_base_ptr factor_base, uint64_t number_element_1,
-    uint64_t number_element_u, uint64_t number_element_pr)
+void factor_base_realloc(factor_base_ptr factor_base,
+    uint64_t number_element_1, uint64_t number_element_u,
+    uint64_t number_element_pr)
 {
   ASSERT(number_element_1 <= factor_base->number_element_1);
   ASSERT(number_element_u <= factor_base->number_element_u);

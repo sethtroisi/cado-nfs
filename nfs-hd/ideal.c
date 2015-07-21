@@ -52,7 +52,7 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 
   mpz_poly_set(ideal->ideal->h, h);
   //if r == 0, Tr is not created.
-  if ((ideal->ideal->r) == 0) {
+  if (ideal->ideal->r == 0) {
     ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
     for (unsigned int i = 0; i < t - 1; i++) {
       mpz_init(ideal->Tr[i]);
@@ -92,26 +92,34 @@ void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old,
     unsigned int t)
 {
   mpz_poly_set(ideal_new->ideal->h, ideal_old->ideal->h);
-  ideal_new->ideal->r = ideal_old->ideal->r;
-  ideal_new->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+  if (ideal_new->ideal->r == 0) {
+    ideal_new->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+    for (unsigned int i = 0; i < t - 1; i++) {
+      mpz_init(ideal_new->Tr[i]);
+    }
+  }
   for (unsigned int i = 0; i < t - 1; i++) {
-    mpz_init(ideal_new->Tr[i]);
     mpz_set(ideal_new->Tr[i], ideal_old->Tr[i]);
   }
   ideal_new->log = ideal_old->log;
+  ideal_new->ideal->r = ideal_old->ideal->r;
 }
 
 void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     mpz_t * Tr, unsigned char log, unsigned int t)
 {
-  ideal->ideal->r = r;
   mpz_poly_set(ideal->ideal->h, h);
-  ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+  if ((ideal->ideal->r) == 0) {
+    ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+    for (unsigned int i = 0; i < t - 1; i++) {
+      mpz_init(ideal->Tr[i]);
+    }
+  }
   for (unsigned int i = 0; i < t - 1; i++) {
-    mpz_init(ideal->Tr[i]);
     mpz_set(ideal->Tr[i], Tr[i]);
   }
   ideal->log = log;
+  ideal->ideal->r = r;
 }
 
 void ideal_1_fprintf(FILE * file, ideal_1_srcptr ideal, unsigned int t)
@@ -202,35 +210,47 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 void ideal_u_set_element(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     mpz_t * Tr, unsigned char log, unsigned int t)
 {
-  ideal->ideal->r = r;
   mpz_poly_set(ideal->ideal->h, h);
-  ideal->Tr = (mpz_t ** ) malloc(sizeof(mpz_t * ) * h->deg);
+  if ((ideal->ideal->r) == 0) {
+    ideal->Tr = (mpz_t ** ) malloc(sizeof(mpz_t * ) * h->deg);
+    for (int row = 0; row < h->deg; row++) {
+      ideal->Tr[row] = (mpz_t * ) malloc(sizeof(mpz_t) * ((int)t - h->deg));
+      for (int col = 0; col < ((int)t - h->deg); col++) {
+        mpz_init(ideal->Tr[row][col]);
+      }
+    }
+  }
   for (int row = 0; row < h->deg; row++) {
-    ideal->Tr[row] = (mpz_t * ) malloc(sizeof(mpz_t) * ((int)t - h->deg));
     for (int col = 0; col < ((int)t - h->deg); col++) {
-      mpz_init(ideal->Tr[row][col]);
       mpz_set(ideal->Tr[row][col], Tr[((int)t-h->deg) * row + col]);
     }
   }
   ideal->log = log;
+  ideal->ideal->r = r;
 }
 
 void ideal_u_set(ideal_u_ptr ideal_new, ideal_u_srcptr ideal_old,
     unsigned int t)
 {
-  ideal_new->ideal->r = ideal_old->ideal->r;
-  mpz_poly_set(ideal_new->ideal->h, ideal_old->ideal->h);
-  ideal_new->Tr =
-    (mpz_t ** ) malloc(sizeof(mpz_t * ) * ideal_new->ideal->h->deg);
-  for (int row = 0; row < ideal_new->ideal->h->deg; row++) {
-    ideal_new->Tr[row] =
-      (mpz_t * ) malloc(sizeof(mpz_t) * ((int)t - ideal_new->ideal->h->deg));
-    for (int col = 0; col < ((int)t - ideal_new->ideal->h->deg); col++) {
-      mpz_init(ideal_new->Tr[row][col]);
+  if (ideal_new->ideal->r == 0) {
+    ideal_new->Tr =
+      (mpz_t ** ) malloc(sizeof(mpz_t * ) * ideal_old->ideal->h->deg);
+    for (int row = 0; row < ideal_old->ideal->h->deg; row++) {
+      ideal_new->Tr[row] =
+        (mpz_t * ) malloc(sizeof(mpz_t) * ((int)t - ideal_old->ideal->h->deg));
+      for (int col = 0; col < ((int)t - ideal_old->ideal->h->deg); col++) {
+        mpz_init(ideal_new->Tr[row][col]);
+      }
+    }
+  }
+  for (int row = 0; row < ideal_old->ideal->h->deg; row++) {
+    for (int col = 0; col < ((int)t - ideal_old->ideal->h->deg); col++) {
       mpz_set(ideal_new->Tr[row][col], ideal_old->Tr[row][col]);
     }
   }
+  ideal_new->ideal->r = ideal_old->ideal->r;
   ideal_new->log = ideal_old->log;
+  mpz_poly_set(ideal_new->ideal->h, ideal_old->ideal->h);
 }
 
 void ideal_u_clear(ideal_u_ptr ideal, unsigned int t)
@@ -314,9 +334,13 @@ void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, unsigned char log,
   mpz_poly_set(ideal->ideal->h, h);
   mpz_poly_clear(h);
 
-  ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+  if ((ideal->ideal->r) == 0) {
+    ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+    for (unsigned int i = 0; i < t - 1; i++) {
+      mpz_init(ideal->Tr[i]);
+    }
+  }
   for (unsigned int i = 0; i < t - 1; i++) {
-    mpz_init(ideal->Tr[i]);
     mpz_set_ui(ideal->Tr[i], 0);
   }
   ideal->ideal->r = r;

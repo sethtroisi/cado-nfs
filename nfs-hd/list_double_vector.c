@@ -27,7 +27,7 @@ void list_double_vector_clear(list_double_vector_ptr list)
     double_vector_clear(list->v[i]);
   }
   free(list->v);
-  list->length = 0;
+  memset(list, 0, sizeof(*list));
 }
 
 void list_double_vector_fprintf(FILE * file, list_double_vector_srcptr list)

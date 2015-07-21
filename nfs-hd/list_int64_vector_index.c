@@ -38,7 +38,7 @@ void list_int64_vector_index_add_int64_vector_index(
 
 void list_int64_vector_index_clear(list_int64_vector_index_ptr list)
 {
-  for (unsigned int i = 0; i < list->length; i++) {
+  for (unsigned int i = 0; i < list->alloc; i++) {
     ASSERT(list->v[i]->vec->dim != 0);
     int64_vector_clear(list->v[i]->vec);
   }

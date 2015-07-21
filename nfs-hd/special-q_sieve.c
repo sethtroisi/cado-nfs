@@ -478,7 +478,9 @@ void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, uint64_t * Tqr,
 void compute_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, unsigned int t,
     ideal_1_srcptr ideal)
 {
-  mat_int64_init(Mqr, t, t);
+  ASSERT(Mqr->NumRows == t);
+  ASSERT(Mqr->NumCols == t);
+
   mat_int64_set_zero(Mqr);
   Mqr->coeff[1][1] = ideal->ideal->r;
   for (unsigned int i = 2; i <= t; i++) {
@@ -1466,6 +1468,9 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
   /* --- Plane sieve --- */
 
+  mat_int64_t Mqr;
+  mat_int64_init(Mqr, H->t, H->t);
+
   uint64_t plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
   while (i < fb->number_element_1 &&
       fb->factor_base_1[i]->ideal->r < plane_sieve_stop) {
@@ -1481,15 +1486,13 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     }
     printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
     mat_int64_t Mqr_test;
+    mat_int64_init(Mqr_test, H->t, H->t);
     compute_Mqr_1(Mqr_test, Tqr, H->t, r);
     mat_int64_fprintf_comment(stdout, Mqr_test);
     mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
     ASSERT(H->t == 3);
-
-    mat_int64_t Mqr;
-    mat_int64_init(Mqr, H->t, H->t);
 
     compute_Mqr_1(Mqr, Tqr, H->t, r);
 
@@ -1504,8 +1507,6 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
           (double) r->ideal->r));
     number_hit = 0;
 #endif // NUMBER_HIT
-
-    mat_int64_clear(Mqr);
 
     i++;
   }
@@ -1527,57 +1528,32 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     //Compute the true Tqr
     compute_Tqr_1(Tqr, matrix, H->t, r);
 
+#ifdef TEST_MQR
+    printf("# Tqr = [");
+    for (unsigned int i = 0; i < H->t - 1; i++) {
+      printf("%" PRIu64 ", ", Tqr[i]);
+    }
+    printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
+    mat_int64_t Mqr_test;
+    mat_int64_init(Mqr_test, H->t, H->t);
+    compute_Mqr_1(Mqr_test, Tqr, H->t, r);
+    mat_int64_fprintf_comment(stdout, Mqr_test);
+    mat_int64_clear(Mqr_test);
+#endif // TEST_MQR
+
+    ASSERT(H->t == 3);
+
+    compute_Mqr_1(Mqr, Tqr, H->t, r);
+
 #ifdef ENUM_LATTICE
-#ifdef TEST_MQR
-    printf("# Tqr = [");
-    for (unsigned int i = 0; i < H->t - 1; i++) {
-      printf("%" PRIu64 ", ", Tqr[i]);
-    }
-    printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
-    mat_int64_t Mqr_test;
-    compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-    mat_int64_fprintf_comment(stdout, Mqr_test);
-    mat_int64_clear(Mqr_test);
-#endif // TEST_MQR
-
-    ASSERT(H->t == 3);
-
-    mat_int64_t Mqr;
-    mat_int64_init(Mqr, H->t, H->t);
-
-    compute_Mqr_1(Mqr, Tqr, H->t, r);
-
     enum_lattice(array, r, Mqr, H, f, matrix);
-
-    mat_int64_clear(Mqr);
-
 #else // ENUM_LATTICE
-
-#ifdef TEST_MQR
-    printf("# Tqr = [");
-    for (unsigned int i = 0; i < H->t - 1; i++) {
-      printf("%" PRIu64 ", ", Tqr[i]);
-    }
-    printf("%" PRIu64 "]\n# Mqr =\n", Tqr[H->t - 1]);
-    mat_int64_t Mqr_test;
-    compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-    mat_int64_fprintf_comment(stdout, Mqr_test);
-    mat_int64_clear(Mqr_test);
-#endif // TEST_MQR
-
-    ASSERT(H->t == 3);
-
-    mat_int64_t Mqr;
-    mat_int64_init(Mqr, H->t, H->t);
-
-    compute_Mqr_1(Mqr, Tqr, H->t, r);
-
 #ifdef SPACE_SIEVE
     space_sieve_1_3D(array, r, Mqr, H);
 #else
     plane_sieve_1(array, r, Mqr, H, matrix, f);
 #endif // SPACE_SIEVE
-
+#endif // ENUM_LATTICE
 
 #ifdef NUMBER_HIT
     printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
@@ -1589,9 +1565,6 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     number_hit = 0;
 #endif // NUMBER_HIT
 
-    mat_int64_clear(Mqr);
-#endif // ENUM_LATTICE
-
     i++;
   }
 
@@ -1600,6 +1573,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   ideal_space_sieve = i - ideal_line_sieve - ideal_space_sieve;
 #endif // TIME_SIEVES
 
+  mat_int64_clear(Mqr);
   ideal_1_clear(r, H->t);
   free(Tqr);
 
@@ -2396,7 +2370,9 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   mat_Z_init(matrix, t, t);
 
   * main_side = -1;
+  //TODO: error in valgrind, because of no main.
   param_list_parse_int(pl, "main", main_side);
+  param_list_clear(pl);
 }
 
 /*

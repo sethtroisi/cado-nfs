@@ -653,6 +653,7 @@ void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
     if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
             (uint64_t)ideal_u->ideal->h->deg)) >= 0
             && ideal_u->ideal->r <= fbb) {
+      //TODO: Problem here.
       factor_base_set_ideal_u(fb, number_element_u, ideal_u, t);
       number_element_u++;
     }
@@ -739,7 +740,8 @@ void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
   }
   gmp_fprintf(file, "%Zd\n", f->coeff[f->deg]);
   fprintf(file, "t:%u\n", t);
-  fprintf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", fb->number_element_1, fb->number_element_u, fb->number_element_pr);
+  fprintf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", fb->number_element_1,
+      fb->number_element_u, fb->number_element_pr);
   
   for (uint64_t i = 0; i < fb->number_element_1; i++) {
     write_ideal_1(file, fb->factor_base_1[i], t);
@@ -752,7 +754,6 @@ void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
   for (uint64_t i = 0; i < fb->number_element_pr; i++) {
     write_ideal_pr(file, fb->factor_base_pr[i], t);
   }
-
 }
 
 void declare_usage(param_list pl)
