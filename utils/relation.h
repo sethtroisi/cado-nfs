@@ -75,7 +75,7 @@ struct relation : public relation_ab {
 
     relation() {}
     operator bool() const { return (bool) (relation_ab) *this; }
-    relation(int64_t a, uint64_t b, int rational_side = RATIONAL_SIDE)
+    relation(int64_t a, uint64_t b, int rational_side = -1)
         : relation_ab(a,b), rational_side(rational_side)
     {}
 
