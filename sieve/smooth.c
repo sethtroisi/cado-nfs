@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <gmp.h>
+#include "facul.h"
+#include "facul_doit.h"
 #include "smooth.h"
 #include "utils.h"
 #include "portability.h"
@@ -161,7 +163,7 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P)
    Each R[j] has been divided by its P-smooth part.
 */
 void
-smoothness_test (mpz_t *R, unsigned long n, mpz_t P)
+smoothness_test (mpz_t *R, unsigned long n, mpz_t P, int verbose)
 {
   unsigned long h = tree_height (n), j, w[MAX_DEPTH];
   mpz_t **T;
@@ -172,8 +174,9 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P)
 
   T = product_tree (R, n, w);
 
-  fprintf (stderr, "cofactor product has %lu bits\n",
-           mpz_sizeinbase (T[h][0], 2));
+  if (verbose)
+    fprintf (stderr, "cofactor product has %lu bits\n",
+             mpz_sizeinbase (T[h][0], 2));
 
   /* compute remainder tree */
   remainder_tree (T, n, w, P);
@@ -465,7 +468,7 @@ estimate_bit_size (mpz_t *l, unsigned long n)
    which should be at the end in locations 0, 1, ..., n-1 */
 void
 find_smooth (cofac_list l, int lpba, int lpbr,
-             unsigned long alim, unsigned long rlim)
+             unsigned long alim, unsigned long rlim, int split, int verbose)
 {
   unsigned long nb_rel;
   unsigned long nb_rel_new;
@@ -477,6 +480,7 @@ find_smooth (cofac_list l, int lpba, int lpbr,
   double s;
   double t_smooth = 0;
   double t_update = 0;
+  double t_prime = 0;
   double start;
   unsigned int n0_pass;
   unsigned long rlim_step;
@@ -521,10 +525,18 @@ find_smooth (cofac_list l, int lpba, int lpbr,
   /* the product of primes in [rlim, rlim + step] has a number of bits about:
      sum(log(p)/log(2)/log(p), p = rlim..rlim + step) ~ step/log(2)
      thus we need step ~ rsize*log(2) */
-  rsize = estimate_bit_size (l->R, l->size);
-  rlim_step = (unsigned long) ((double) rsize * log (2.0));
-  asize = estimate_bit_size (l->A, l->size);
-  alim_step = (unsigned long) ((double) asize * log (2.0));
+  if (split == 0)
+    {
+      rsize = estimate_bit_size (l->R, l->size);
+      rlim_step = (unsigned long) ((double) rsize * log (2.0));
+      asize = estimate_bit_size (l->A, l->size);
+      alim_step = (unsigned long) ((double) asize * log (2.0));
+    }
+  else
+    {
+       rlim_step = 1 + ((uint64_t) 1UL << lpbr) / split;
+       alim_step = 1 + ((uint64_t) 1UL << lpba) / split;
+    }
 
   /* the code below assumes max(rlim,alim) <= min(2^lpbr,2^lpba) */
   ASSERT_ALWAYS(rlim <= (1UL << lpbr));
@@ -540,14 +552,19 @@ find_smooth (cofac_list l, int lpba, int lpbr,
     {
       rlim_new = (rlim + rlim_step < alim ? rlim + rlim_step : alim);
 
-      fprintf (stderr, "\nInitial one-side pass: %0.fs\n\n", seconds() - start);
-
-      fprintf (stderr, "rlim: %lu:%lu\n\n", rlim, rlim_new);
+      if (verbose)
+        {
+          fprintf (stderr, "\nInitial one-side pass: %0.fs\n\n", seconds() - start);
+          fprintf (stderr, "rlim: %lu:%lu\n\n", rlim, rlim_new);
+        }
 
       s = seconds ();
       prime = prime_product (P, pi, rlim_new, prime);
-      fprintf (stderr, "Computing prime product of %lu bits took %.0f seconds\n",
-               mpz_sizeinbase (P, 2), seconds () - s);
+      s = seconds () - s;
+      t_prime += s;
+      if (verbose)
+        fprintf (stderr, "Computing prime product of %lu bits took %.0fs (total %.0fs so far)\n",
+                 mpz_sizeinbase (P, 2), s, t_prime);
 
       nb_rel = nb_rel_smooth;
       while (nb_rel < nb_rel_unknown)
@@ -555,10 +572,11 @@ find_smooth (cofac_list l, int lpba, int lpbr,
         nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
         s = seconds ();
         t_smooth -= seconds();
-        smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P);
+        smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P, verbose);
         t_smooth += seconds();
-        fprintf (stderr, "smoothness test (%lu cofactors) took %.0f seconds"
-                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+        if (verbose)
+          fprintf (stderr, "smoothness test (%lu cofactors) took %.0f seconds"
+                   " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
         nb_rel = nb_rel_new;
       }
 
@@ -568,9 +586,12 @@ find_smooth (cofac_list l, int lpba, int lpbr,
                      &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a,
                      &nb_useless, l->a, l->b);
       t_update += seconds();
-      fprintf (stderr, "smooth_r:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-               nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth);
-      fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+      if (verbose)
+        {
+          fprintf (stderr, "smooth_r:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
+                   nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth);
+          fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+        }
     }
   }
   else if (alim < rlim)
@@ -581,14 +602,19 @@ find_smooth (cofac_list l, int lpba, int lpbr,
     {
       alim_new = (alim + alim_step < rlim ? alim + alim_step : rlim);
 
-      fprintf (stderr, "\nInitial one-side pass: %0.fs\n\n", seconds() - start);
-
-      fprintf (stderr, "\nalim: %lu:%lu\n", alim, alim_new);
+      if (verbose)
+        {
+          fprintf (stderr, "\nInitial one-side pass: %0.fs\n\n", seconds() - start);
+          fprintf (stderr, "\nalim: %lu:%lu\n", alim, alim_new);
+        }
 
       s = seconds ();
       prime = prime_product (P, pi, alim_new, prime);
-      fprintf (stderr, "Computing prime product of %lu bits took %.0f seconds\n",
-               mpz_sizeinbase (P, 2), seconds () - s);
+      s = seconds () - s;
+      t_prime += s;
+      if (verbose)
+        fprintf (stderr, "Computing prime product of %lu bits took %.0fs (total %.0fs so far)\n",
+                 mpz_sizeinbase (P, 2), s, t_prime);
 
       nb_rel = nb_rel_smooth;
       while (nb_rel < nb_rel_unknown)
@@ -596,10 +622,11 @@ find_smooth (cofac_list l, int lpba, int lpbr,
         nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
         s = seconds ();
         t_smooth -= seconds();
-        smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P);
+        smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P, verbose);
         t_smooth += seconds();
-        fprintf (stderr, "smoothness test (%lu cofactors) took %.0f seconds"
-                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+        if (verbose)
+          fprintf (stderr, "smoothness test (%lu cofactors) took %.0f seconds"
+                   " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
         nb_rel = nb_rel_new;
       }
 
@@ -609,9 +636,12 @@ find_smooth (cofac_list l, int lpba, int lpbr,
                      &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r,
                      &nb_useless, l->a, l->b);
       t_update += seconds();
-      fprintf (stderr, "smooth_a:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-               nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth);
-      fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+      if (verbose)
+        {
+          fprintf (stderr, "smooth_a:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
+                   nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth);
+          fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+        }
     }
   }
   else  // rlim = alim
@@ -634,18 +664,23 @@ find_smooth (cofac_list l, int lpba, int lpbr,
   {
     n0_pass++;
 
-    fprintf (stderr, "\nPass %u: %.0f s\n", n0_pass, seconds() - start);
+    if (verbose)
+      fprintf (stderr, "\nPass %u: %.0f s\n", n0_pass, seconds() - start);
 
     /* rational side */
 
     rlim_new = (rlim + rlim_step < (1UL << lpbr) ? rlim + rlim_step : (1UL << lpbr));
 
-    fprintf (stderr, "\nrlim: %lu:%lu\n", rlim, rlim_new);
+    if (verbose)
+      fprintf (stderr, "\nrlim: %lu:%lu\n", rlim, rlim_new);
 
     s = seconds ();
     prime = prime_product (P, pi, rlim_new, prime);
-    fprintf (stderr, "Computing prime product of %lu bits took %.0f seconds\n",
-             mpz_sizeinbase (P, 2), seconds () - s);
+    s = seconds () - s;
+    t_prime += s;
+    if (verbose)
+      fprintf (stderr, "Computing prime product of %lu bits took %.0fs (total %.0fs so far)\n",
+               mpz_sizeinbase (P, 2), s, t_prime);
 
     nb_rel = nb_rel_smooth;
     while (nb_rel < nb_rel_unknown)
@@ -653,10 +688,11 @@ find_smooth (cofac_list l, int lpba, int lpbr,
       nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
       s = seconds ();
       t_smooth -= seconds();
-      smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P);
+      smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P, verbose);
       t_smooth += seconds();
-      fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
-               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+      if (verbose)
+        fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
+                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
       nb_rel = nb_rel_new;
     }
 
@@ -666,15 +702,19 @@ find_smooth (cofac_list l, int lpba, int lpbr,
                    &nb_rel_smooth, rlim, lpbr, &nb_smooth_r, &nb_smooth_a,
                    &nb_useless, l->a, l->b);
     t_update += seconds();
-    fprintf (stderr, "smooth_r:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-             nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth);
-    fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+    if (verbose)
+      {
+        fprintf (stderr, "smooth_r:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
+                 nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth);
+        fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+      }
 
     /* algebraic side */
 
     alim_new = (alim + alim_step < (1UL << lpba) ? alim + alim_step : (1UL << lpba));
 
-    fprintf (stderr, "\nalim: %lu:%lu\n", alim, alim_new);
+    if (verbose)
+      fprintf (stderr, "\nalim: %lu:%lu\n", alim, alim_new);
 
     nb_rel = nb_rel_smooth;
     while (nb_rel < nb_rel_unknown)
@@ -682,10 +722,11 @@ find_smooth (cofac_list l, int lpba, int lpbr,
       nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
       s = seconds ();
       t_smooth -= seconds();
-      smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P);
+      smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P, verbose);
       t_smooth += seconds();
-      fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
-               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+      if (verbose)
+        fprintf (stderr, "smoothness_test (%lu cofactors) took %.0f seconds"
+                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
       nb_rel = nb_rel_new;
     }
 
@@ -695,30 +736,35 @@ find_smooth (cofac_list l, int lpba, int lpbr,
                    &nb_rel_smooth, alim, lpba, &nb_smooth_a, &nb_smooth_r,
                    &nb_useless, l->a, l->b);
     t_update += seconds();
-    fprintf (stderr, "smooth_a:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-             nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth);
-    fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+    if (verbose)
+      {
+        fprintf (stderr, "smooth_a:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
+                 nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth);
+        fprintf (stderr, "t_update: %.0f seconds\n", t_update);
+      }
   }
   prime_info_clear (pi);
-
-  fprintf (stderr, "\nCollect smooth relations: %.0f s\n\n", seconds() - start);
-
-  fprintf (stderr, "\nFound %lu smooth relations\n", nb_rel_smooth);
 
   cofac_list_realloc (l, nb_rel_smooth);
 
   mpz_clear (P);
   free (b_status_r);
   free (b_status_a);
+
+  fprintf (stderr, "t_prime %.0fs, t_smooth %.0fs, t_update %.0fs\n",
+           t_prime, t_smooth, t_update);
 }
 
 void declare_usage (param_list pl)
 {
   param_list_decl_usage (pl, "poly", "Polynomial file");
+  param_list_decl_usage (pl, "cofac", "Cofactor file");
   param_list_decl_usage (pl, "lpbr", "rational large prime bound is 2^lpbr");
   param_list_decl_usage (pl, "lpba", "algebraic large prime bound is 2^lpba");
   param_list_decl_usage (pl, "rlim", "rational factor base bound");
   param_list_decl_usage (pl, "alim", "algebraic factor base bound");
+  param_list_decl_usage (pl, "v",    "(switch) verbose mode");
+  param_list_decl_usage (pl, "split", "number of splits");
 }
 
 void
@@ -872,47 +918,98 @@ scan_primes (mpz_t *LP, mpz_t *T, unsigned long nprimes)
   return i;
 }
 
-/* Given a list L of bi-smooth cofactors, print the corresponding relations
-   on stdout. The algorithm is as follows:
-   (1) compute the product Q of all norms F(a,b) and G(a,b) corresponding
-       to pairs (a,b) in L
-   (2) construct a product tree of all primes p up to max(2^lpba, 2^lpbr)
-   (3) going down that product tree, compute the remainder of Q modulo all
-       primes p
-   (4) store in a list T the primes p for which Q mod p = 0, these are the only
-       primes that can appear in any F(a,b) or G(a,b)
-   (5) use trial division (with primes in T) to factor the norms
+/* the list SP (small primes) contains all primes < B */
+void
+print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
+              unsigned long nb_methods,
+              struct modset_t *fm, struct modset_t *cfm,
+              int lpb, double BB, double BBB, mpz_list SP)
+{
+  int res_fac, j;
+  unsigned long i;
+  int m = 0; /* number of printed factors */
 
-Note: we should use instead the following algorithm from
-"How to find smooth parts of integers", Dan Bernstein, draft, 2004,
-http://cr.yp.to/factorization/smoothparts-20040510.pdf.
-Given cofactors r_1, ..., r_n and primes p_1, ..., p_k:
-(1) compute R = r_1 * ... * r_n
-(2) compute R mod p_1, ..., R mod p_k and keep only those p_j for which
-    R mod p_j = 0
-(3) if n >= 2, cut r_1, ..., r_n in two parts, and do the same recursively for
-    the first and second parts
-*/
+  /* remove small primes < B */
+  for (i = 0; i < SP->size; i++)
+    {
+      while (mpz_divisible_p (n, SP->l[i]))
+        {
+          mpz_divexact (n, n, SP->l[i]);
+          if (m++ > 0)
+            printf (",");
+          gmp_printf ("%Zx", SP->l[i]);
+        }
+    }
+
+  /* any factor < B^2 is necessarily prime */
+
+  for (i = 0; i < nb_methods && mpz_cmp_d (n, BB) >= 0; i++)
+    {
+      res_fac = facul_doit_onefm_mpz (factors, n, methods[i], fm, cfm,
+                                      lpb, BB, BBB);
+
+      if (fm->arith != CHOOSE_NONE)
+        modset_clear (fm);
+      if (cfm->arith != CHOOSE_NONE)
+        modset_clear (cfm);
+
+      if (res_fac == FACUL_NOT_SMOOTH) /* should not happen */
+        {
+          gmp_fprintf (stderr, "Error, non-smooth cofactor %Zd\n", n);
+          exit (1);
+        }
+
+      for (j = 0; j < res_fac; j++)
+        {
+          if (m++ > 0)
+            printf (",");
+          gmp_printf ("%Zx", factors[j]);
+          mpz_divexact (n, n, factors[j]);
+        }
+    }
+
+  if (mpz_cmp_ui (n, 1) > 0)
+    {
+      if (mpz_cmp_d (n, BB) >= 0) /* by construction BB >= L */
+        {
+          gmp_fprintf (stderr, "Error, unfactored %Zd, please increase NB_MAX_METHODS\n", n);
+          exit (1);
+        }
+      if (m++ > 0)
+        printf (",");
+      gmp_printf ("%Zx", n);
+    }
+
+}
+
+/* Given a list L of bi-smooth cofactors, print the corresponding relations
+   on stdout. */
 void
 factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
 {
   cado_poly pol;
-  unsigned long n = L->size, i, nprimes, w[MAX_DEPTH];
-  mpz_t QR, QA, t;
-  double s, s_product = 0, s_remainder = 0;
-
-#if 0
+  unsigned long n = L->size, i, pmax;
+  int nb_methods;
   facul_method_t *methods;
-  methods = facul_make_default_strategy (NB_MAX_METHODS - 4, 1);
-  res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
-                                  methods[i], &fm, &cfm,
-                                  strategies->lpb[side],
-                                  strategies->assume_prime_thresh[side],
-                                  strategies->BBB[side]);
-  ...
-  facul_clear_aux_methods (methods);
-#endif
+#define MAX_FACTORS 16
+  mpz_t factors[MAX_FACTORS];
+  struct modset_t fm, cfm;
+  double BB, BBB;
+  mpz_list SP;
+  prime_info pi;
 
+  /* we trial divide by all primes < L^(1/2), so that any factor < L
+     is necessarily prime */
+  pmax = (lpba > lpbr) ? lpba : lpbr;
+  pmax = (unsigned long) ceil (pow (2.0, (double) pmax / 2.0));
+  mpz_list_init (SP);
+  prime_info_init (pi);
+  prime_list (SP, pi, 2, pmax);
+
+  nb_methods = 50;
+  if (nb_methods >= NB_MAX_METHODS)
+    nb_methods = NB_MAX_METHODS - 1;
+  methods = facul_make_default_strategy (nb_methods - 3, 0);
   cado_poly_init (pol);
   if (cado_poly_read (pol, poly_file) == 0)
     {
@@ -920,108 +1017,38 @@ factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
       exit (1);
     }
 
-  fprintf (stderr, "factor: computing full norms...");
-  fflush (stderr);
-  s = seconds ();
+  for (i = 0; i < MAX_FACTORS; i++)
+    mpz_init (factors[i]);
+  BB = (double) pmax * (double) pmax;
+  BBB = BB * (double) pmax;
+
   /* compute all norms F(a,b) and G(a,b) */
   for (i = 0; i < n; i++)
     {
-      mpz_poly_homogeneous_eval_siui (L->A[i], pol->alg, L->a[i], L->b[i]);
+      printf ("%ld,%lu:", L->a[i], L->b[i]);
+
+      /* at this point L->R[i] and L->A[i] contain the product of all prime
+         factors > rlim and alim respectively (apart from the special-q) */
+
       mpz_poly_homogeneous_eval_siui (L->R[i], pol->rat, L->a[i], L->b[i]);
+      print_smooth (factors, L->R[i], methods, nb_methods,
+                    &fm, &cfm, lpbr, BB, BBB, SP);
+      printf (":");
+
+      mpz_poly_homogeneous_eval_siui (L->A[i], pol->alg, L->a[i], L->b[i]);
+      print_smooth (factors, L->A[i], methods, nb_methods,
+                    &fm, &cfm, lpba, BB, BBB, SP);
+      printf ("\n");
+      fflush (stdout);
     }
-  fprintf (stderr, "done in %.0f s\n", seconds () - s);
-  fflush (stderr);
 
-  /* compute the product of all norms */
-  mpz_init (QR);
-  mpz_init (QA);
-  fprintf (stderr, "factor: computing product of all norms...");
-  fflush (stderr);
-  s = seconds ();
-  compute_biproduct (QR, L, 0);
-  compute_biproduct (QA, L, 1);
-  fprintf (stderr, "done in %.0f s\n", seconds () - s);
-  fflush (stderr);
+  for (i = 0; i < MAX_FACTORS; i++)
+    mpz_clear (factors[i]);
 
-  /* compute all primes up to max(2^lpba, 2^lpbr) */
-  lpba = (lpba > lpbr) ? lpba : lpbr;
-  unsigned long Qbits;
-  prime_info pi;
-  unsigned long pmin = 2, pmax = 1UL << lpba;
-  mpz_list PR, PA;
-  mpz_t *LPR, *LPA;
-
-  Qbits = mpz_cmp (QA, QR) > 0 ? mpz_sizeinbase (QA, 2)
-    : mpz_sizeinbase (QR, 2);
-
-  mpz_list_init (PR);
-  mpz_list_init (PA);
-  prime_info_init (pi);
-  mpz_init (t);
-  while (pmin < pmax)
-    {
-      /* we consider primes in [pmin, pmin + step], whose product has about
-         step/log(2) bits, thus we want step ~ Qbits * log(2) */
-      unsigned long phigh = pmin + (unsigned long) ((double) Qbits * log (2.0));
-      if (phigh > pmax)
-        phigh = pmax;
-      nprimes = PR->size;
-      pmin = prime_list (PR, pi, pmin, phigh);
-      nprimes = PR->size - nprimes; /* number of new primes */
-      LPR = PR->l + (PR->size - nprimes); /* start location of new primes */
-
-      /* copy new primes in PA */
-      for (i = 0; i < nprimes; i++)
-        mpz_list_add (PA, mpz_get_ui (PR->l[PR->size - nprimes + i]));
-      LPA = PA->l + (PA->size - nprimes);
-
-      /* form a product tree from LPR */
-      mpz_t **T;
-      s_product -= seconds ();
-      T = product_tree (LPR, nprimes, w);
-      s_product += seconds ();
-
-      /* compute the remainder tree Q mod T */
-      s_remainder -= seconds ();
-      remainder_tree (T, nprimes, w, QR);
-      /* now scan all primes appearing in norms */
-      i = scan_primes (LPR, T[1], nprimes);
-      s_remainder += seconds ();
-
-      clear_product_tree (T, nprimes, w);
-      /* the primes appearing in relations are LP[0..i-1] */
-      PR->size = (LPR + i) - PR->l; /* reajust the 'appearing' primes */
-
-      /* same thing for algebraic side */
-      s_product -= seconds ();
-      T = product_tree (LPA, nprimes, w);
-      s_product += seconds ();
-
-      /* compute the remainder tree Q mod T */
-      s_remainder -= seconds ();
-      remainder_tree (T, nprimes, w, QA);
-      /* now scan all primes appearing in norms */
-      i = scan_primes (LPA, T[1], nprimes);
-      s_remainder += seconds ();
-
-      clear_product_tree (T, nprimes, w);
-      PA->size = (LPA + i) - PA->l;
-    }
-  fprintf (stderr, "factor: computing product tree of primes took %1.0f s\n",
-           s_product);
-  fprintf (stderr, "factor: computing remainder tree took %1.0f s\n",
-           s_remainder);
-  fflush (stderr);
-  mpz_clear (t);
   prime_info_clear (pi);
-  mpz_clear (QR);
-  mpz_clear (QA);
+  mpz_list_clear (SP);
   cado_poly_clear (pol);
-
-  print_relations (L, PR->l, PR->size, PA->l, PA->size, lpbr, lpba);
-
-  mpz_list_clear (PR);
-  mpz_list_clear (PA);
+  facul_clear_aux_methods (methods);
 }
 
 int
@@ -1034,14 +1061,16 @@ main (int argc, char* argv[])
   uint64_t b;
   mpz_t R, A;
   param_list pl;
-  const char *poly_file;
-  int lpba, lpbr;
+  const char *poly_file, *cofac_file;
+  int lpba, lpbr, verbose, split = 0;
   unsigned long alim, rlim;
 
   start = seconds ();
 
   param_list_init (pl);
   declare_usage (pl);
+
+  param_list_configure_switch (pl, "-v", NULL);
 
   argc--, argv++;
   for( ; argc ; )
@@ -1053,10 +1082,13 @@ main (int argc, char* argv[])
     }
 
   poly_file = param_list_lookup_string (pl, "poly");
+  cofac_file = param_list_lookup_string (pl, "cofac");
   ASSERT_ALWAYS(param_list_parse_int (pl, "lpba", &lpba));
   ASSERT_ALWAYS(param_list_parse_int (pl, "lpbr", &lpbr));
   ASSERT_ALWAYS(param_list_parse_ulong (pl, "alim", &alim));
   ASSERT_ALWAYS(param_list_parse_ulong (pl, "rlim", &rlim));
+  param_list_parse_int (pl, "split", &split);
+  verbose = param_list_parse_switch (pl, "-v");
 
   if (poly_file == NULL)
     {
@@ -1064,11 +1096,16 @@ main (int argc, char* argv[])
       exit (1);
     }
 
+  if (cofac_file == NULL)
+    {
+      fprintf (stderr, "Error, missing -cofac <file>\n");
+      exit (1);
+    }
+
   /* Initialization */
   cofac_list_init (L);
 
-  ASSERT_ALWAYS (argc == 1);
-  cofac = fopen (argv[0], "r");
+  cofac = fopen (cofac_file, "r");
 
   mpz_init (R);
   mpz_init (A);
@@ -1087,13 +1124,13 @@ main (int argc, char* argv[])
   fflush (stderr);
 
   start = seconds ();
-  find_smooth (L, lpba, lpbr, alim, rlim);
-  fprintf (stderr, "Detecting smooth cofactors took %.0f s\n",
+  find_smooth (L, lpba, lpbr, alim, rlim, split, verbose);
+  fprintf (stderr, "Detecting %lu smooth cofactors took %.0f s\n", L->size,
            seconds() - start);
 
   start = seconds ();
   factor (L, poly_file, lpba, lpbr);
-  fprintf (stderr, "Factoring smooth cofactors took %.0f s\n",
+  fprintf (stderr, "Factoring %lu smooth cofactors took %.0f s\n", L->size,
            seconds() - start);
 
   mpz_clear (R);

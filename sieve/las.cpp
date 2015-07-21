@@ -2289,6 +2289,12 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             }
             if (!pass) continue;
 
+#if 0 /* enable this to produce input for the batch factorization (smooth.c) */
+	    gmp_printf ("LOG %ld %lu %Zd %Zd\n", a, b, norm[RATIONAL_SIDE],
+			norm[ALGEBRAIC_SIDE]);
+	    fflush (stdout);
+#endif
+
             if (cof_stats == 1)
             {
                 cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
