@@ -15,7 +15,7 @@ void usage(const char *argv0)
 {
     fprintf(stderr, "Usage: %s -poly xxx.poly -q <q> [-side <side>]\n", argv0);
     fprintf(stderr, "prints the roots of polynomial[side] mod q");
-    fprintf(stderr, " (default side is ALGEBRAIC)\n");
+    fprintf(stderr, " (default side is 1)\n");
     exit(1);
 }
 
@@ -29,7 +29,7 @@ int main(int argc0, char *argv0[])
     uint64_t q1 = 0;
     int argc = argc0;
     char **argv = argv0;
-    int side = ALGEBRAIC_SIDE;
+    int side = 1;
 
     param_list_init(pl);
     argv++, argc--;

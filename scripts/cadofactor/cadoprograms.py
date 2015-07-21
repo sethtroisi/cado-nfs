@@ -725,10 +725,10 @@ class FreeRel(Program):
     """
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel")
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel'
+    'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel'
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
+    'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
     """
     binary = "freerel"
     name = binary
@@ -736,8 +736,8 @@ class FreeRel(Program):
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
                  renumber: Parameter(is_output_file=True),
-                 lpbr: Parameter(checktype=int),
-                 lpba: Parameter(checktype=int),
+                 lpbr: Parameter("lpb0", checktype=int),
+                 lpba: Parameter("lpb1", checktype=int),
                  out: Parameter(is_output_file=True),
                  badideals: Parameter(is_output_file=True)=None,
                  pmin: Parameter(checktype=int)=None,

@@ -563,8 +563,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "output file for renumbering table");
   param_list_decl_usage(pl, "out", "output file for free relations");
-  param_list_decl_usage(pl, "lpbr", "rational large prime bound");
-  param_list_decl_usage(pl, "lpba", "algebraic large prime bound");
+  param_list_decl_usage(pl, "lpb0", "large prime bound on side 0");
+  param_list_decl_usage(pl, "lpb1", "large prime bound on side 1");
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
@@ -654,8 +654,8 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-    param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]);
-    param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]);
+    param_list_parse_ulong(pl, "lpb0", &lpb[0]);
+    param_list_parse_ulong(pl, "lpb1", &lpb[1]);
     param_list_parse_ulong(pl, "pmin", &pmin);
     param_list_parse_ulong(pl, "pmax", &pmax);
     param_list_parse_ulong(pl, "t"   , &nb_pthreads);
