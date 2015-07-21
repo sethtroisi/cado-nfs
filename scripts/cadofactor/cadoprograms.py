@@ -701,10 +701,10 @@ class MakeFB(Program):
     """
     >>> p = MakeFB(poly="foo.poly", lim=1)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'makefb -poly foo.poly -alim 1'
+    'makefb -poly foo.poly -lim 1'
     >>> p = MakeFB(poly="foo.poly", lim=1, maxbits=5, stdout="foo.roots")
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'makefb -poly foo.poly -alim 1 -maxbits 5 > foo.roots'
+    'makefb -poly foo.poly -lim 1 -maxbits 5 > foo.roots'
     """
     binary = "makefb"
     name = binary
