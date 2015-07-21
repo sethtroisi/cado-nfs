@@ -1129,8 +1129,8 @@ class Sqrt(Program):
                  dep: Parameter()=None,
                  threads : Parameter("t", checktype=int)=None,
                  ab: Toggle()=None,
-                 rat: Toggle()=None,
-                 alg: Toggle()=None,
+                 side0: Toggle()=None,
+                 side1: Toggle()=None,
                  gcd: Toggle()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
