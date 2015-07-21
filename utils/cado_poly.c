@@ -15,9 +15,6 @@ void cado_poly_init(cado_poly poly)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly[0]));
-    // TODO: noalgrat remove those two lines.
-    poly->rat = poly->pols[RATIONAL_SIDE];
-    poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
     /* By default allocate 2 polynomials */
     poly->nb_polys = 2;
