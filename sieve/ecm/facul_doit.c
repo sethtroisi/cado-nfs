@@ -405,8 +405,8 @@ facul_doit (mpz_t *factors, const modulus_t m,
        n if we found n factors and store them in 'factors'.
 
   Remark: if m has more than two factors, it's possible that 
-  we need to try a other factorization on f (or/and  m/f). So
-  the values of our composite factor is stored in fm (or/and cfm).
+  we need to try another factorization on f (or/and  m/f). So
+  the values of our composite factor are stored in fm (or/and cfm).
 */
 int
 facul_doit_onefm (mpz_t *factors, const modulus_t m,
