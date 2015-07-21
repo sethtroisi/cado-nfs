@@ -442,15 +442,12 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
 static void declare_usage(param_list pl)
 {
     param_list_decl_usage(pl, "poly", "polynomial file");
-    param_list_decl_usage(pl, "alim", "factor base bound");
+    param_list_decl_usage(pl, "lim", "factor base bound");
     param_list_decl_usage(pl, "maxbits", "(optional) maximal number of "
             "bits of powers");
     param_list_decl_usage(pl, "out", "(optional) name of the output file");
-    char str[1024];
-    snprintf(str, sizeof(str), "(optional) create factor base for given side. "
-            "Side must be %d or %d (default is %d, i.e. algebraic).",
-            RATIONAL_SIDE, ALGEBRAIC_SIDE, ALGEBRAIC_SIDE);
-    param_list_decl_usage(pl, "side", str);
+    param_list_decl_usage(pl, "side", "(optional) create factor base for given side. "
+                        "By default, use the unique algebraic side.");
     param_list_decl_usage(pl, "t", "number of threads");
     verbose_decl_usage(pl);
 }
@@ -463,8 +460,8 @@ main (int argc, char *argv[])
   FILE * f, *outputfile;
   const char *outfilename = NULL;
   int maxbits = 1;  // disable powers by default
-  unsigned int side = ALGEBRAIC_SIDE;
-  unsigned long alim = 0;
+  int side = -1;
+  unsigned long lim = 0;
   char *argv0 = argv[0];
   unsigned long nb_threads = 1;
 
@@ -501,9 +498,9 @@ main (int argc, char *argv[])
   param_list_parse_ulong(pl, "t"   , &nb_threads);
   ASSERT_ALWAYS(1 <= nb_threads && nb_threads <= MAX_THREADS);
 
-  param_list_parse_ulong(pl, "alim", &alim);
-  if (alim == 0) {
-      fprintf(stderr, "Error: parameter -alim is mandatory\n");
+  param_list_parse_ulong(pl, "lim", &lim);
+  if (lim == 0) {
+      fprintf(stderr, "Error: parameter -lim is mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
@@ -528,26 +525,38 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-  param_list_parse_uint(pl, "side", &side);
-  if (side >= cpoly->nb_polys){
-      if(cpoly->nb_polys == 2)
-	  fprintf(stderr, "Error: side must be %d (for rational) or %d "
-		  "(for algebraic)\n", RATIONAL_SIDE, ALGEBRAIC_SIDE);
-      else
-	  fprintf(stderr, "Error: side must be in [0..%d[\n", cpoly->nb_polys);
+  param_list_parse_int(pl, "side", &side);
+  if (side >= (int)cpoly->nb_polys){
+      fprintf(stderr, "Error: side must be in [0..%d[\n", cpoly->nb_polys);
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
 
+  // No side is given: choose the unique algebraic side.
+  if (side == -1) {
+      for (unsigned int i = 0; i < cpoly->nb_polys; ++i) {
+          if (cpoly->pols[i]->deg > 1) {
+              if (side == -1) {
+                  side = i;
+              } else {
+                  fprintf(stderr, "Error: there are more than one algebraic side;"
+                          " parameter -side is therefore mandatory\n");
+                  param_list_print_usage(pl, argv0, stderr);
+                  exit(EXIT_FAILURE);
+              }
+          }
+      }
+      if (side == -1) {
+          fprintf(stderr, "Error: there are no algebraic side;"
+                  " parameter -side is therefore mandatory\n");
+          param_list_print_usage(pl, argv0, stderr);
+          exit(EXIT_FAILURE);
+      }
+  }
+
   param_list_warn_unused(pl);
 
-  // TODO: clean this; we keep the first lines for compatibility reasons
-  if (side == ALGEBRAIC_SIDE)
-    makefb_with_powers (outputfile, cpoly->alg, alim, maxbits, nb_threads);
-  else if (side == RATIONAL_SIDE)
-    makefb_with_powers (outputfile, cpoly->rat, alim, maxbits, nb_threads);
-  else
-    makefb_with_powers (outputfile, cpoly->pols[side], alim, maxbits, nb_threads);
+  makefb_with_powers (outputfile, cpoly->pols[side], lim, maxbits, nb_threads);
 
   cado_poly_clear (cpoly);
   if (outfilename != NULL) {

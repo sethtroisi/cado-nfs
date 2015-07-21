@@ -37,12 +37,8 @@ dupsup (FILE *output, relation & rel, const mpz_t sq, const mpz_t rho, const int
 static int
 read_sq_comment(mpz_t sq, mpz_t rho, int *side, const char *line)
 {
-  if (gmp_sscanf(line, "# Sieving algebraic q=%Zd; rho=%Zd;", sq, rho) == 2) {
-    *side = ALGEBRAIC_SIDE;
-    return 1;
-  }
-  if (gmp_sscanf(line, "# Sieving rational q=%Zd; rho=%Zd;", sq, rho) == 2) {
-    *side = RATIONAL_SIDE;
+  if (gmp_sscanf(line, "# Sieving side-%d q=%Zd; rho=%Zd;",
+              side, sq, rho) == 3) {
     return 1;
   }
   return 0;
@@ -72,17 +68,18 @@ read_poly(cado_poly_ptr cpoly, param_list pl)
 static int
 parse_config(siever_config_ptr sc, param_list pl)
 {
-    sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
-    param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
-    param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
+    sc->side = 1; // Legacy default.
+    param_list_parse_int(pl, "-sqside", &sc->side);
+    param_list_parse_double(pl, "lambda0", &(sc->sides[0]->lambda));
+    param_list_parse_double(pl, "lambda1", &(sc->sides[1]->lambda));
     int seen = 1;
-    seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
-    seen &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
-    seen &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
+    seen  = param_list_parse_int   (pl, "I",     &(sc->logI));
+    seen &= param_list_parse_ulong (pl, "lim0",  &(sc->sides[0]->lim));
+    seen &= param_list_parse_int   (pl, "lpb0",  &(sc->sides[0]->lpb));
+    seen &= param_list_parse_int   (pl, "mfb0",  &(sc->sides[0]->mfb));
+    seen &= param_list_parse_ulong (pl, "lim1",  &(sc->sides[1]->lim));
+    seen &= param_list_parse_int   (pl, "lpb1",  &(sc->sides[1]->lpb));
+    seen &= param_list_parse_int   (pl, "mfb1",  &(sc->sides[1]->mfb));
     return seen;
 }
 
@@ -103,7 +100,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
   param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
   param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
-  param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
+  param_list_decl_usage(pl, "sqside", "side of special-q (default=1)");
   param_list_decl_usage(pl, "mt",   "number of threads to use");
   verbose_decl_usage(pl);
 }

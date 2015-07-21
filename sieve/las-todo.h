@@ -7,7 +7,7 @@
 
 struct las_todo_entry {
     mpz_t p;
-    /* even when side == RATIONAL_SIDE, the field below is used, since
+    /* even for a rational side, the field below is used, since
      * it is needed for the initialization of the q-lattice. All callers
      * of las_todo_push must therefore make sure that a proper argument
      * is provided.

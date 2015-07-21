@@ -1030,12 +1030,12 @@ factor (cofac_list L, const char *poly_file, int lpba, int lpbr)
       /* at this point L->R[i] and L->A[i] contain the product of all prime
          factors > rlim and alim respectively (apart from the special-q) */
 
-      mpz_poly_homogeneous_eval_siui (L->R[i], pol->rat, L->a[i], L->b[i]);
+      mpz_poly_homogeneous_eval_siui (L->R[i], pol->pols[0], L->a[i], L->b[i]);
       print_smooth (factors, L->R[i], methods, nb_methods,
                     &fm, &cfm, lpbr, BB, BBB, SP);
       printf (":");
 
-      mpz_poly_homogeneous_eval_siui (L->A[i], pol->alg, L->a[i], L->b[i]);
+      mpz_poly_homogeneous_eval_siui (L->A[i], pol->pols[1], L->a[i], L->b[i]);
       print_smooth (factors, L->A[i], methods, nb_methods,
                     &fm, &cfm, lpba, BB, BBB, SP);
       printf ("\n");
