@@ -70,8 +70,6 @@ uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
                         successes, i.e., of call that lead to a relation */
 /* }}} */
 
-/* }}} */
-
 /*****************************/
 
 /* siever_config stuff */
@@ -82,25 +80,17 @@ void siever_config_display(siever_config_srcptr sc)/*{{{*/
             sc->bitsize, sidenames[sc->side]);
     /* Strive to keep these output lines untouched */
     verbose_output_print(0, 1,
-	    "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
-	    sc->sides[RATIONAL_SIDE]->lim,
-            sc->sides[ALGEBRAIC_SIDE]->lim,
-            sc->sides[RATIONAL_SIDE]->lpb,
-	    sc->sides[ALGEBRAIC_SIDE]->lpb);
+	    "# Sieving parameters: lim0=%lu lim1=%lu lpb0=%d lpb1=%d\n",
+	    sc->sides[0]->lim, sc->sides[1]->lim,
+            sc->sides[0]->lpb, sc->sides[1]->lpb);
     verbose_output_print(0, 1,
-	    "#                     mfbr=%d mfba=%d\n",
-	    sc->sides[RATIONAL_SIDE]->mfb,
-            sc->sides[ALGEBRAIC_SIDE]->mfb);
-    if (sc->sides[RATIONAL_SIDE]->lambda != 0 || sc->sides[ALGEBRAIC_SIDE]->lambda != 0) {
+	    "#                     mfb0=%d mfb1=%d\n",
+	    sc->sides[0]->mfb, sc->sides[1]->mfb);
+    if (sc->sides[0]->lambda != 0 || sc->sides[1]->lambda != 0) {
         verbose_output_print(0, 1,
-                "#                     rlambda=%1.1f alambda=%1.1f\n",
-            sc->sides[RATIONAL_SIDE]->lambda,
-	    sc->sides[ALGEBRAIC_SIDE]->lambda);
+                "#                     lambda0=%1.1f lambda1=%1.1f\n",
+            sc->sides[0]->lambda, sc->sides[1]->lambda);
     }
-    /*
-    verbose_output_print(0, 1, "#                     skewness=%1.1f\n",
-	    sc->skewness);
-            */
 }/*}}}*/
 
 int siever_config_cmp(siever_config_srcptr a, siever_config_srcptr b)/*{{{*/
@@ -385,7 +375,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * In the descent, where we initialize a sieve_info for each pair
      * (bitsize_of_q, side), we would call it dozens of time.
      * For the moment, we will assume that all along the hint file, the
-     * values of I, alim, rlim are the constant, so that the factor bases
+     * values of I, lim0, lim1 are constant, so that the factor bases
      * are exactly the same and can be shared.
      */
     if (las->sievers == si) {
@@ -605,8 +595,6 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         ASSERT_ALWAYS(z > 0);
         sc->bitsize = z;
         switch(*x++) {
-            case 'a' : sc->side = ALGEBRAIC_SIDE; break;
-            case 'r' : sc->side = RATIONAL_SIDE; break;
             case '@' :
                        sc->side = strtoul(x, &x, 0);
                        ASSERT_ALWAYS(sc->side < 2);
@@ -707,7 +695,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
          */
         /* But now, the .poly file does not contain lim data anymore.
          * This is up to the user to do this check, anyway, because
-         * it is not sure that makefb was run with the alim given in the
+         * it is not sure that makefb was run with the lim given in the
          * poly file.
          */
         /*
@@ -842,16 +830,16 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             sc->bitsize = mpz_sizeinbase(q0, 2);
         }
         mpz_clear(q0);
-        /* sqside is now the preferred parameter */
         if (!param_list_parse_int(pl, "sqside", &sc->side)) {
-            sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+            verbose_output_print(0, 1, "# Warning: sqside not given, "
+                    "assuming side 1 for backward compatibility.\n");
         }
-        param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
-        param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
+        param_list_parse_double(pl, "lambda0", &(sc->sides[0]->lambda));
+        param_list_parse_double(pl, "lambda1", &(sc->sides[1]->lambda));
         int complete = 1;
-        complete &= param_list_parse_int   (pl, "I",       &(sc->logI));
-        complete &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
-        complete &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
+        complete &= param_list_parse_int  (pl, "I",    &(sc->logI));
+        complete &= param_list_parse_ulong(pl, "lim0", &(sc->sides[0]->lim));
+        complete &= param_list_parse_ulong(pl, "lim1", &(sc->sides[1]->lim));
         if (!complete) {
             /* ok. Now in fact, for the moment we really need these to be
              * specified, because the call to "new fb_interface" of
@@ -866,10 +854,10 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             exit(EXIT_FAILURE);
         }
 
-        complete &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
-        complete &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
-        complete &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
-        complete &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
+        complete &= param_list_parse_int(pl, "lpb0",  &(sc->sides[0]->lpb));
+        complete &= param_list_parse_int(pl, "mfb0",  &(sc->sides[0]->mfb));
+        complete &= param_list_parse_int(pl, "lpb1",  &(sc->sides[1]->lpb));
+        complete &= param_list_parse_int(pl, "mfb1",  &(sc->sides[1]->mfb));
         if (!complete) {
             verbose_output_print(0, 1, "# default siever configuration is incomplete ; required parameters are I, lim[01], lpb[01], mfb[01]\n");
 
@@ -892,9 +880,11 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
         const char *powlim_params[2] = {"powlim0", "powlim1"};
         for (int side = 0; side < 2; side++) {
-            if (!param_list_parse_ulong(pl, powlim_params[side], &sc->sides[side]->powlim)) {
+            if (!param_list_parse_ulong(pl, powlim_params[side],
+                        &sc->sides[side]->powlim)) {
                 sc->sides[side]->powlim = sc->bucket_thresh - 1;
-                verbose_output_print(0, 1, "# Using default value of %lu for -%s\n",
+                verbose_output_print(0, 1,
+                        "# Using default value of %lu for -%s\n",
                         sc->sides[side]->powlim, powlim_params[side]);
             }
         }
@@ -910,44 +900,46 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     /* }}} */
 
-    if (!las->default_config && !param_list_lookup_string(pl, "descent-hint-table")) {
-        fprintf(stderr, "Error: no default config set, and no hint table either\n");
+    if (!las->default_config &&
+            !param_list_lookup_string(pl, "descent-hint-table")) {
+        fprintf(stderr,
+                "Error: no default config set, and no hint table either\n");
         exit(EXIT_FAILURE);
     }
 
     //{{{ parse option stats_cofact
     const char *statsfilename = param_list_lookup_string (pl, "stats-cofact");
-    if (statsfilename != NULL) /* a file was given */
-      {
-          siever_config_srcptr sc = las->default_config;
-          if (sc == NULL) {
-              fprintf(stderr, "Error: option stats-cofact works only with a default config\n");
-              exit(EXIT_FAILURE);
-          } else if (param_list_lookup_string(pl, "descent-hint-table")) {
-              verbose_output_print(0, 1, "# Warning: option stats-cofact only applies to the default siever config\n");
-          }
+    if (statsfilename != NULL) { /* a file was given */
+        siever_config_srcptr sc = las->default_config;
+        if (sc == NULL) {
+            fprintf(stderr, "Error: option stats-cofact works only "
+                    "with a default config\n");
+            exit(EXIT_FAILURE);
+        } else if (param_list_lookup_string(pl, "descent-hint-table")) {
+            verbose_output_print(0, 1, "# Warning: option stats-cofact "
+                    "only applies to the default siever config\n");
+        }
 
-	  cof_stats_file = fopen (statsfilename, "w");
-	  if (cof_stats_file == NULL)
-              {
-		  fprintf (stderr, "Error, cannot create file %s\n",
-			   statsfilename);
-		  exit (EXIT_FAILURE);
-              }
-	  cof_stats = 1;
-	  //allocate cof_call and cof_succ
-	  int mfbr = sc->sides[RATIONAL_SIDE]->mfb;
-	  int mfba = sc->sides[ALGEBRAIC_SIDE]->mfb;
-	  cof_call = (uint32_t**) malloc ((mfbr+1) * sizeof(uint32_t*));
-	  cof_succ = (uint32_t**) malloc ((mfbr+1) * sizeof(uint32_t*));
-	  for (int i = 0; i <= mfbr; i++)
-	      {
-		  cof_call[i] = (uint32_t*) malloc ((mfba+1) * sizeof(uint32_t));
-		  cof_succ[i] = (uint32_t*) malloc ((mfba+1) * sizeof(uint32_t));
-		  for (int j = 0; j <= mfba; j++)
-		      cof_call[i][j] = cof_succ[i][j] = 0;
-	      }
-      }
+        cof_stats_file = fopen (statsfilename, "w");
+        if (cof_stats_file == NULL)
+        {
+            fprintf (stderr, "Error, cannot create file %s\n",
+                    statsfilename);
+            exit (EXIT_FAILURE);
+        }
+        cof_stats = 1;
+        //allocate cof_call and cof_succ
+        int mfb0 = sc->sides[0]->mfb;
+        int mfb1 = sc->sides[1]->mfb;
+        cof_call = (uint32_t**) malloc ((mfb0+1) * sizeof(uint32_t*));
+        cof_succ = (uint32_t**) malloc ((mfb0+1) * sizeof(uint32_t*));
+        for (int i = 0; i <= mfb0; i++) {
+            cof_call[i] = (uint32_t*) malloc ((mfb1+1) * sizeof(uint32_t));
+            cof_succ[i] = (uint32_t*) malloc ((mfb1+1) * sizeof(uint32_t));
+            for (int j = 0; j <= mfb1; j++)
+                cof_call[i][j] = cof_succ[i][j] = 0;
+        }
+    }
     //}}}
     
     /* {{{ Init and parse info regarding work to be done by the siever */
@@ -1546,8 +1538,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
  *   - Blank lines are ignored
  *   - Each valid line must have the form
  *       s q r
- *     where s is "a" or "r", giving the "algebraic" or "rational" side
- *     of the special q, and q and r are as usual.
+ *     where s is the side (0 or 1) of the special q, and q and r are as usual.
  */
 int las_todo_feed_qlist(las_info_ptr las, param_list pl)
 {
@@ -1577,10 +1568,6 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
     mpz_init(r);
     int rc;
     switch(*x++) {
-        case 'a' : side = ALGEBRAIC_SIDE;
-                   break;
-        case 'r' : side = RATIONAL_SIDE; 
-                   break;
         case '0':
         case '1':
         case '2':
@@ -2074,9 +2061,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     uint32_array_t *lps_m[2] = { NULL, }; /* corresponding multiplicities */
     bucket_primes_t primes[2] = {bucket_primes_t(BUCKET_REGION), bucket_primes_t(BUCKET_REGION)};
     bucket_array_complete purged[2] = {bucket_array_complete(BUCKET_REGION), bucket_array_complete(BUCKET_REGION)};
-    mpz_t BLPrat;       /* alone ? */
-    uint32_t cof_rat_bitsize = 0; /* placate gcc */
-    uint32_t cof_alg_bitsize = 0; /* placate gcc */
+    uint32_t cof_bitsize[2] = {0, 0}; /* placate gcc */
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
     const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
     unsigned char * S[2] = {th->sides[0].bucket_region, th->sides[1].bucket_region};
@@ -2089,17 +2074,15 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         mpz_init (norm[side]);
     }
 
-    mpz_init (BLPrat);
-    mpz_set_ui (BLPrat, si->conf->sides[RATIONAL_SIDE]->lim);
-    mpz_mul_2exp (BLPrat, BLPrat, si->conf->sides[RATIONAL_SIDE]->lpb); /* fb bound * lp bound */
-
-    unsigned char * alg_S = S[ALGEBRAIC_SIDE];
-    unsigned char * rat_S = S[RATIONAL_SIDE];
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
-        verbose_output_print(TRACE_CHANNEL, 0, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
-                trace_Nx.N, trace_Nx.x, alg_S[trace_Nx.x], trace_Nx.x, rat_S[trace_Nx.x]);
-        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
+        verbose_output_print(TRACE_CHANNEL, 0,
+                "# When entering factor_survivors for bucket %u, "
+                "S[0][%u]=%u, S[1][%u]=%u\n",
+                trace_Nx.N, trace_Nx.x, S[0][trace_Nx.x], trace_Nx.x, S[1][trace_Nx.x]);
+        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
+                traced_norms[0], traced_norms[1]);
     }
 #endif  /* }}} */
 
@@ -2110,13 +2093,14 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     unsigned char * SS = S[0];
 
 #ifdef TRACE_K /* {{{ */
-    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-    sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
+    sieve_side_info_ptr side0 = si->sides[0];
+    sieve_side_info_ptr side1 = si->sides[1];
     for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
         if (trace_on_spot_Nx(N, x)) {
-            verbose_output_print(TRACE_CHANNEL, 0, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
-                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
+            verbose_output_print(TRACE_CHANNEL, 0,
+                    "# side0->Bound[%u]=%u, side1t->Bound[%u]=%u\n",
+                    S[0][trace_Nx.x], S[0][x] <= side0->bound ? 0 : side0->bound,
+                    S[1][trace_Nx.x], S[1][x] <= side0->bound ? 0 : side1->bound);
         }
     }
 #endif /* }}} */
@@ -2157,7 +2141,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
         /* Resieve small primes for this bucket region and store them 
            together with the primes recovered from the bucket updates */
-        resieve_small_bucket_region (&primes[side], N, SS, th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
+        resieve_small_bucket_region (&primes[side], N, SS,
+                th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
 
         /* Sort the entries to avoid O(n^2) complexity when looking for
            primes during trial division */
@@ -2202,7 +2187,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         for (size_t x = offset; x < offset + together; ++x) {
             if (SS[x] == 255) continue;
 
-            th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
+            th->rep->survivor_sizes[S[0][x]][S[1][x]]++;
             
             /* For factor_leftover_norm, we need to pass the information of the
              * sieve bound. If a cofactor is less than the square of the sieve
@@ -2254,9 +2239,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
             int i;
             unsigned int j;
-            for(int z = 0 ; pass && z < 2 ; z++) {
-                int side = RATIONAL_SIDE ^ z;   /* start with rational */
-
+            for(int side = 0 ; pass && side < 2 ; side++) {
                 // Trial divide rational norm
                 /* Compute the norms using the polynomials transformed to 
                    i,j-coordinates. The transformed polynomial on the 
@@ -2266,8 +2249,10 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
-                    verbose_output_print(TRACE_CHANNEL, 0, "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
+                    verbose_output_vfprint(TRACE_CHANNEL, 0,
+                            gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0,
+                            "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
                 }
 #endif
                 verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
@@ -2282,8 +2267,11 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# checked leftover norm=%Zd", norm[side]);
-                    verbose_output_print(TRACE_CHANNEL, 0, " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n", sidenames[side], a, b, pass);
+                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                            "# checked leftover norm=%Zd", norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0,
+                            " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",
+                            sidenames[side], a, b, pass);
                 }
 #endif
             }
@@ -2291,8 +2279,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
             if (cof_stats == 1)
             {
-                cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
-                cof_alg_bitsize = mpz_sizeinbase (norm[ALGEBRAIC_SIDE], 2);
+                cof_bitsize[0] = mpz_sizeinbase (norm[0], 2);
+                cof_bitsize[1] = mpz_sizeinbase (norm[1], 2);
                 /* learning phase */
 		/* no need to use a mutex here: either we use one thread only
 		   to compute the cofactorization data and if several threads
@@ -2300,15 +2288,17 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 		   is when two threads increase the value at the same time,
 		   and it is increased by 1 instead of 2, but this should
 		   happen rarely. */
-		cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
+		cof_call[cof_bitsize[0]][cof_bitsize[1]] ++;
             }
 	    rep->ttcof -= microseconds_thread ();
             pass = factor_both_leftover_norms(norm, lps, lps_m, si);
 	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b) && pass == 0) {
-              verbose_output_print(TRACE_CHANNEL, 0, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
-              verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
+              verbose_output_print(TRACE_CHANNEL, 0,
+                      "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
+              verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                      "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
             }
 #endif
             if (pass <= 0) continue; /* a factor was > 2^lpb, or some
@@ -2317,12 +2307,11 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             /* yippee: we found a relation! */
 
             if (cof_stats == 1) /* learning phase */
-                cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
+                cof_succ[cof_bitsize[0]][cof_bitsize[1]] ++;
 	    
             // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
-            /* say that there is a rational side */
-            relation rel(a, b, RATIONAL_SIDE);
+            relation rel(a, b);
 
             /* Note that we explicitly do not bother about storing r in
              * the relations below */
@@ -2340,7 +2329,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                verbose_output_print(TRACE_CHANNEL, 0, "# Relation for (%" PRId64 ",%" PRIu64 ") printed\n", a, b);
+                verbose_output_print(TRACE_CHANNEL, 0, "# Relation for (%"
+                        PRId64 ",%" PRIu64 ") printed\n", a, b);
             }
 #endif
             {
@@ -2376,7 +2366,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             }
 
             /* Build histogram of lucky S[x] values */
-            th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
+            th->rep->report_sizes[S[0][x]][S[1][x]]++;
 
 #ifdef  DLP_DESCENT
             if (register_contending_relation(las, si, rel))
@@ -2388,8 +2378,6 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", surv, N);
     th->rep->survivors1 += surv;
     th->rep->survivors2 += copr;
-
-    mpz_clear (BLPrat);
 
     for(int side = 0 ; side < 2 ; side++) {
         mpz_clear(norm[side]);
@@ -2618,7 +2606,9 @@ void * process_bucket_region(thread_data *th)
  *    timing argument (in seconds).
  *  - merge the per-sq report into a global report
  */
-void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr si, las_report_ptr report, thread_workspaces *ws, double qt0)
+void las_report_accumulate_threads_and_display(las_info_ptr las,
+        sieve_info_ptr si, las_report_ptr report,
+        thread_workspaces *ws, double qt0)
 {
     /* Display results for this special q */
     las_report rep;
@@ -2650,8 +2640,8 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
 	    " (%1.4f + %1.4f + %1.4f),"
             " factor %1.4f (%1.4f + %1.4f)]\n", qt0,
-            rep->tn[RATIONAL_SIDE],
-            rep->tn[ALGEBRAIC_SIDE],
+            rep->tn[0],
+            rep->tn[1],
             qtts,
             rep->ttbuckets_fill,
             rep->ttbuckets_apply,
@@ -2692,16 +2682,16 @@ static void declare_usage(param_list pl)
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
   param_list_decl_usage(pl, "skew", "(alias S) skewness");
-  param_list_decl_usage(pl, "lim0", "(alias rlim) rational factor base bound");
-  param_list_decl_usage(pl, "lim1", "(alias alim) algebraic factor base bound");
-  param_list_decl_usage(pl, "lpb0", "(alias lpbr) set rational large prime bound to 2^lpb0");
-  param_list_decl_usage(pl, "lpb1", "(alias lpba) set algebraic large prime bound to 2^lpb1");
-  param_list_decl_usage(pl, "mfb0", "(alias mfbr) set rational cofactor bound 2^mfb0");
-  param_list_decl_usage(pl, "mfb1", "(alias mfba) set algebraic cofactor bound 2^mfb1");
-  param_list_decl_usage(pl, "lambda0", "(alias rlambda) rational lambda value");
-  param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
-  param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
-  param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
+  param_list_decl_usage(pl, "lim0", "factor base bound on side 0");
+  param_list_decl_usage(pl, "lim1", "factor base bound on side 1");
+  param_list_decl_usage(pl, "lpb0", "set large prime bound on side 0 to 2^lpb0");
+  param_list_decl_usage(pl, "lpb1", "set large prime bound on side 1 to 2^lpb1");
+  param_list_decl_usage(pl, "mfb0", "set rational cofactor bound on side 0 2^mfb0");
+  param_list_decl_usage(pl, "mfb1", "set rational cofactor bound on side 1 2^mfb1");
+  param_list_decl_usage(pl, "lambda0", "lambda value on side 0");
+  param_list_decl_usage(pl, "lambda1", "lambda value on side 1");
+  param_list_decl_usage(pl, "powlim0", "limit on powers on side 0");
+  param_list_decl_usage(pl, "powlim1", "limit on powers on side 1");
   param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0");
   param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
@@ -2775,6 +2765,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-dup", NULL);
     //    param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "skew", "S");
+    // TODO: All these aliases should disappear, one day.
+    // This is just legacy.
     param_list_configure_alias(pl, "fb1", "fb");
     param_list_configure_alias(pl, "lim0", "rlim");
     param_list_configure_alias(pl, "lim1", "alim");
@@ -3176,8 +3168,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f (%1.1f + %1.1f)]\n", t0,
-                report->tn[RATIONAL_SIDE],
-                report->tn[ALGEBRAIC_SIDE],
+                report->tn[0],
+                report->tn[1],
                 tts,
                 report->ttbuckets_fill,
                 report->ttbuckets_apply,
@@ -3201,10 +3193,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     //{{{ print the stats of the cofactorization.
     if (cof_stats == 1) {
-	int mfbr = las->default_config->sides[RATIONAL_SIDE]->mfb;
-	int mfba = las->default_config->sides[ALGEBRAIC_SIDE]->mfb;
-	for (int i = 0; i <= mfbr; i++) {
-	    for (int j = 0; j <= mfba; j++)
+	int mfb0 = las->default_config->sides[0]->mfb;
+	int mfb1 = las->default_config->sides[1]->mfb;
+	for (int i = 0; i <= mfb0; i++) {
+	    for (int j = 0; j <= mfb1; j++)
 		fprintf (cof_stats_file, "%u %u %u %u\n", i, j, cof_call[i][j],
 			 cof_succ[i][j]);
 	    free (cof_call[i]);
