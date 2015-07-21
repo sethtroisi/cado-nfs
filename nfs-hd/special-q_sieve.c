@@ -1549,7 +1549,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     enum_lattice(array, r, Mqr, H, f, matrix);
 #else // ENUM_LATTICE
 #ifdef SPACE_SIEVE
-    space_sieve_1_3D(array, r, Mqr, H);
+    space_sieve_1(array, r, Mqr, H);
 #else
     plane_sieve_1(array, r, Mqr, H, matrix, f);
 #endif // SPACE_SIEVE

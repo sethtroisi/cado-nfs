@@ -172,6 +172,6 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
     mat_double_ptr m, list_double_vector_srcptr list_old);
 
 
-void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
+void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
     sieving_bound_srcptr H);
 #endif // UTILS_SIEVE_H
