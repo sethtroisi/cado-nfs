@@ -13,7 +13,8 @@
 
 void usage(const char *argv0)
 {
-    fprintf(stderr, "Usage: %s -poly xxx.poly -q0 nnn -q1 nnn\n", argv0);
+    fprintf(stderr, "Usage: %s -poly xxx.poly -q0 nnn -q1 nnn [-side n]\n",
+            argv0);
     fprintf(stderr, "  prints all (q,r) in an interval [q0, q1[.\n");
     exit(1);
 }
@@ -28,11 +29,9 @@ main (int argc0, char *argv0[])
   mpz_t P;
   int argc = argc0;
   char **argv = argv0;
-  int ratq = 0;
-  int side = ALGEBRAIC_SIDE;
+  int side = 1;
 
   param_list_init(pl);
-  param_list_configure_switch(pl, "-ratq", &ratq);
   argv++, argc--;
   for( ; argc ; ) {
     if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -47,7 +46,7 @@ main (int argc0, char *argv0[])
     fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
     usage(argv0[0]);
   }
-  if (ratq) side = RATIONAL_SIDE;
+  param_list_parse_int(pl, "side", &side);
 
   mpz_init_set_ui(q0,0);
   mpz_init_set_ui(q1,0);
@@ -76,7 +75,7 @@ main (int argc0, char *argv0[])
   mpz_sub_ui(q0,q0,1);
   mpz_init_set (P, q0);
   mpz_nextprime (P, P);
-  mpz_poly_ptr ps = pol->pols[ALGEBRAIC_SIDE];
+  mpz_poly_ptr ps = pol->pols[side];
   mpz_t * roots;
   roots = malloc(ps->deg * sizeof(mpz_t));
   for(int i = 0 ; i < ps->deg ; i++) {
@@ -85,6 +84,8 @@ main (int argc0, char *argv0[])
   while (mpz_cmp (P, q1) < 0) {
     int nr = mpz_poly_roots (roots, ps, P);
     for(int i = 0 ; i < nr ; i++) {
+        // TODO: Make this compatible with las-todo format, once it is
+        // definitely decided.
         gmp_printf("%s %Zd %Zd\n", sidenames[side], P, roots[i]);
     }
     mpz_nextprime(P,P);
