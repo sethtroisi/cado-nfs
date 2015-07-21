@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 /* The polynomial selection algorithms that use a linear polynomial will
  * put it on the side given by the following. */
+// FIXME: atm, changing these does not work. It should...
 #define RAT_SIDE 0
 #define ALG_SIDE 1
 
