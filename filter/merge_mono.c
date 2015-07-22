@@ -795,6 +795,11 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   for (m = 1; m <= maxlevel; m++)
     printf ("Number of %d-merges: %" PRIu64 "\n", m, nb_merges[m]);
   free (nb_merges);
+
+  printf ("Time spent finding optimal combination: %.2fs (among which %.2fs "
+          "for filling the weight matrices and %.2fs for computing minimal "
+          "spanning tree)\nTime spent deleting heavy cols: %.2fs\n", totopt,
+          totfill, totMST, totdel);
 }
 
 //////////////////////////////////////////////////////////////////////
