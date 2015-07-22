@@ -1285,7 +1285,7 @@ void space_sieve_1_plane(array_ptr array, MAYBE_UNUSED uint64_t * nb_hit,
   int64_vector_clear(v_tmp);
 }
 
-unsigned int space_sieve_1_next_plane(int64_vector_ptr s_tmp,
+unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
     unsigned int * index_vec, unsigned int * s_change,
     list_int64_vector_srcptr list_s, list_int64_vector_index_srcptr list_vec,
     sieving_bound_srcptr H, int64_vector_srcptr s)
@@ -1320,6 +1320,35 @@ unsigned int space_sieve_1_next_plane(int64_vector_ptr s_tmp,
   int64_vector_clear(v_tmp);
 
   return hit;
+}
+
+void space_sieve_1_next_plane(array_ptr array, uint64_t * index_s,
+    list_int64_vector_ptr list_s, unsigned int s_change, int64_vector_srcptr s,
+    list_int64_vector_index_srcptr list_vec, unsigned int index_vec,
+    ideal_1_srcptr r, sieving_bound_srcptr H)
+{
+  if (s->c[2] < (int64_t)H->h[2]) {
+#ifdef SPACE_SIEVE_CUT_EARLY
+    nb_hit++;
+#endif // SPACE_SIEVE_CUT_EARLY
+
+    list_int64_vector_delete_elements(list_s);
+    list_int64_vector_add_int64_vector(list_s, s);
+
+    if (!s_change) {
+      if (list_vec->v[index_vec]->index == 0) {
+        list_vec->v[index_vec]->index =
+          index_vector(list_vec->v[index_vec]->vec, H,
+              array->number_element);
+      }
+      * index_s = * index_s + list_vec->v[index_vec]->index;
+    } else {
+      ASSERT(s_change == 1);
+
+      * index_s = array_int64_vector_index(s, H, array->number_element);
+    }
+    array->array[* index_s] = array->array[* index_s] - r->log;
+  }
 }
 
 void space_sieve_1_plane_sieve(array_ptr array,
@@ -1379,8 +1408,9 @@ void space_sieve_1_plane_sieve(array_ptr array,
 void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
     sieving_bound_srcptr H)
 {
+  //For SPACE_SIEVE_ENTROPY
   MAYBE_UNUSED unsigned int entropy = 0;
-
+  //For SPACE_SIEVE_CUT_EARLY
   MAYBE_UNUSED uint64_t nb_hit = 0;
 
 #ifdef SPACE_SIEVE_CUT_EARLY
@@ -1388,24 +1418,33 @@ void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
     (double)r->ideal->r;
 #endif // SPACE_SIEVE_CUT_EARLY
 
+  /*
+   * The two list contain vector in ]-2*H0, 2*H0[x]-2*H1, 2*H1[x[0, H2[.
+   * list_vec contains vector with a last non-zero coordinate.
+   * list_vec_zero contains vector with a last coordinate equals to zero.
+   */
   list_int64_vector_index_t list_vec;
   list_int64_vector_index_init(list_vec, 3);
   list_int64_vector_index_t list_vec_zero;
   list_int64_vector_index_init(list_vec_zero, 3);
 
+  //List that contain the vector for the plane sieve.
   list_int64_vector_t list_FK;
   list_int64_vector_init(list_FK, 3);
   list_int64_vector_t list_SV;
   list_int64_vector_init(list_SV, 3);
 
+  //List that contain the current set of point with the same z coordinate.
   list_int64_vector_t list_s;
   list_int64_vector_init(list_s, 3);
 
   unsigned int vector_1 = space_sieve_1_init(list_vec, list_vec_zero, r, Mqr,
       H, array->number_element);
 
+  //0 if plane sieve is already done, 1 otherwise.
   int plane_sieve = 0;
 
+  //s = 0, starting point.
   int64_vector_t s;
   int64_vector_init(s, Mqr->NumRows);
   int64_vector_set_zero(s);
@@ -1414,50 +1453,41 @@ void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   nb_hit++;
 #endif // SPACE_SIEVE_CUT_EARLY
 
+  //Compute the index of s in array.
   uint64_t index_s = array_int64_vector_index(s, H, array->number_element);
+  //TODO: not necessary to do that.
   array->array[index_s] = array->array[index_s] - r->log;
 
+  //s is in the list of current point.
   list_int64_vector_add_int64_vector(list_s, s);
 
   while (s->c[2] < (int64_t)H->h[2]) {
 
+    /*
+     * if there are vectors in list_vec_zero, use it to find other point with
+     * the same z coordinate as s.
+     */
     space_sieve_1_plane(array, &nb_hit, list_s, s, r, list_vec_zero,
         index_s, H);
- 
+
+    //index_vec: index of the vector we used to go to the other plane in list_s
     unsigned int index_vec = 0;
+    //s has changed, compare the s in space_sieve_1_plane.
     unsigned int s_change = 0;
 
+    //s_tmp: TODO
     int64_vector_t s_tmp;
     int64_vector_init(s_tmp, s->dim);
 
-    unsigned int hit = space_sieve_1_next_plane(s_tmp, &index_vec,
+    //Find the next element, with the smallest reachable z.
+    //hit is set to 1 if an element is reached.
+    unsigned int hit = space_sieve_1_next_plane_seek(s_tmp, &index_vec,
         &s_change, list_s, list_vec, H, s);
 
     if (hit) {
       int64_vector_set(s, s_tmp);
-
-      if (s->c[2] < (int64_t)H->h[2]) {
-#ifdef SPACE_SIEVE_CUT_EARLY
-        nb_hit++;
-#endif // SPACE_SIEVE_CUT_EARLY
-
-        list_int64_vector_delete_elements(list_s);
-        list_int64_vector_add_int64_vector(list_s, s);
-
-        if (!s_change) {
-          if (list_vec->v[index_vec]->index == 0) {
-            list_vec->v[index_vec]->index =
-              index_vector(list_vec->v[index_vec]->vec, H,
-                  array->number_element);
-          }
-          index_s = index_s + list_vec->v[index_vec]->index;
-        } else {
-          ASSERT(s_change == 1);
-
-          index_s = array_int64_vector_index(s, H, array->number_element);
-        }
-        array->array[index_s] = array->array[index_s] - r->log;
-      }
+      space_sieve_1_next_plane(array, &index_s, list_s, s_change, s, list_vec,
+          index_vec, r, H);
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
     double err_rel = ((double)expected_hit - (double)nb_hit) / (double)nb_hit;
