@@ -10,13 +10,48 @@
 
 /********************* comp_t struct (clique) ********************************/
 
-/* Compare weights of two connected components (to use with qsort) */
-int
-comp_cmp_weight (const void *p, const void *q)
+/* Compare weights of two connected components.
+   Return 1 if the weight of c1 is less than the weight of c2.
+   Return -1 if the weight of c1 is larger than the weight of c2.
+   If the weights are the same
+      return 1 if the first row of c1 is less than the first row of c2;
+      return -1 if the first row of c1 is not less than the first row of c2.
+   We do that in order to be deterministic (even with different number of
+   threads).
+ */
+static inline int
+comp_cmp_weight (comp_t c1, comp_t c2)
 {
-  float x = ((comp_t *)p)->w;
-  float y = ((comp_t *)q)->w;
-  return (x <= y ? 1 : -1);
+  if (c1.w < c2.w)
+    return 1;
+  else if (c1.w > c2.w)
+    return -1;
+  else /* same weight, use first row to be deterministic */
+  {
+    if (c1.i < c2.i)
+      return 1;
+    else
+      return -1;
+  }
+}
+
+static inline int
+comp_weight_is_smaller (comp_t c1, comp_t c2)
+{
+  return (comp_cmp_weight (c1, c2) > 0);
+}
+
+static inline int
+comp_weight_is_larger (comp_t c1, comp_t c2)
+{
+  return (comp_cmp_weight (c1, c2) < 0);
+}
+
+/* Compare weights of two connected components (to use with qsort) */
+static int
+comp_cmp_weight_for_qsort (const void *p, const void *q)
+{
+  return comp_cmp_weight (*((comp_t *)p), *((comp_t *)q));
 }
 
 /* Contribution of each column of weight w to the weight of the connected
@@ -198,7 +233,7 @@ comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
     while (cur)
     {
       size_t father = (cur - 1) >> 1;
-      if (UNLIKELY (new_node.w >= T->tree[father].w))
+      if (UNLIKELY (comp_weight_is_larger (new_node, T->tree[father])))
         break;
       T->tree[cur] = T->tree[father];
       cur = father;
@@ -209,26 +244,22 @@ comp_sorted_bin_tree_insert (comp_sorted_bin_tree_ptr T, comp_t new_node)
   /* If the tree is full, insert new_node iff the weight of new_node if greater
    * than the weight of the root. In this case, replace the root by new node
    * and go down */
-  else if (UNLIKELY(new_node.w > T->tree[0].w))
+  else if (UNLIKELY(comp_weight_is_larger (new_node, T->tree[0])))
   {
     size_t cur = 0;
     for (;;) /* In this loop, always, T->tree[cur].w < new_node.w */
     {
-      float lightest_weight, other_weight;
       size_t lightest_son = cur * 2 + 1; /* son is son1 */
       /* If there is no son: cur is a leaf. Found! */
       if (UNLIKELY (lightest_son >= T->alloc))
         break;
-      lightest_weight = T->tree[lightest_son].w; /* weight of son 1 */
-      other_weight = T->tree[lightest_son + 1].w; /* weight of son 2 */
-      if (UNLIKELY(other_weight < lightest_weight))
+      if (comp_weight_is_smaller(T->tree[lightest_son+1],T->tree[lightest_son]))
       {
         lightest_son++; /* lightest_son is now son 2 */
-        lightest_weight = other_weight;
       }
       /* Now lightest_son and lightest_weight are correct */
-      if (UNLIKELY (new_node.w <= lightest_weight)) /* Found! */
-        break;
+      if (UNLIKELY (comp_weight_is_smaller (new_node, T->tree[lightest_son])))
+        break; /* Found! */
       /* The lightest_son has a weight lighter than new_node, so we have to go
        * down the tree, but before the son replaces its father. */
       T->tree[cur] = T->tree[lightest_son];
@@ -405,7 +436,7 @@ clique_removal_core_mt_thread (void *pt)
 
   uint64_buffer_clear (buf);
   /* Re-order the connected component by decreasing weight. */
-  comp_sorted_bin_tree_qsort (data->comp_tree, comp_cmp_weight);
+  comp_sorted_bin_tree_qsort (data->comp_tree, comp_cmp_weight_for_qsort);
 
   return NULL;
 }
@@ -476,7 +507,7 @@ clique_removal_core_mt (purge_matrix_ptr mat, int64_t target_excess,
       if (next_clique[i] < th_data[i].comp_tree->size)
       {
         comp_t * cur_comp = &(th_data[i].comp_tree->tree[next_clique[i]]);
-        if (max_comp == NULL || cur_comp->w > max_comp->w)
+        if (max_comp == NULL || comp_weight_is_larger (*cur_comp, *max_comp))
         {
           max_comp = cur_comp;
           max_thread = i;
@@ -541,7 +572,7 @@ clique_removal_core_mono (purge_matrix_ptr mat, int64_t target_excess,
   }
 
   /* Re-order the connected component by decreasing weight. */
-  comp_sorted_bin_tree_qsort (comp_tree, comp_cmp_weight);
+  comp_sorted_bin_tree_qsort (comp_tree, comp_cmp_weight_for_qsort);
 
   fprintf(stdout, "Cliq. rem.: computed heaviest connected components at "
                   "%2.2lf\n", seconds());
