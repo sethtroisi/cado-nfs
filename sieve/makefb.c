@@ -469,6 +469,9 @@ main (int argc, char *argv[])
   declare_usage(pl);
   cado_poly_init(cpoly);
 
+  // Legacy
+  param_list_configure_alias(pl, "lim", "alim"); 
+
   argv++, argc--;
   for( ; argc ; ) {
       if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
