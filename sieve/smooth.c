@@ -1137,6 +1137,10 @@ main (int argc, char* argv[])
   mpz_clear (A);
   cofac_list_clear (L);
 
+  /* Clear the ecm addition chains that are stored as global variables
+     to avoid re-computations. */
+  free_saved_chains ();
+
   param_list_clear (pl);
 
   return 0;
