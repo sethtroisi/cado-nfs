@@ -12,6 +12,7 @@
 #include "mat_double.h"
 #include "list_int64_vector.h"
 #include "list_double_vector.h"
+#include "list_int64_vector_index.h"
 
 /*
  * Compute the acute Gauss reduction of two vector (v0_root and v1_root) if they
@@ -171,7 +172,27 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
 void double_vector_gram_schmidt(list_double_vector_ptr list_new,
     mat_double_ptr m, list_double_vector_srcptr list_old);
 
+void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
+    MAYBE_UNUSED mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+    list_int64_vector_srcptr list_FK, list_int64_vector_srcptr list_SV);
 
-void space_sieve_1(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
-    sieving_bound_srcptr H);
+uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
+    uint64_t number_element);
+
+unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
+    list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element);
+
+int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
+    list_int64_vector_ptr list_FK, list_int64_vector_index_ptr list_vec,
+    list_int64_vector_index_ptr list_vec_zero, MAYBE_UNUSED ideal_1_srcptr r,
+    sieving_bound_srcptr H, mat_int64_srcptr Mqr,
+    unsigned int vector_1, uint64_t number_element);
+
+unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
+    unsigned int * index_vec, unsigned int * s_change,
+    list_int64_vector_srcptr list_s, list_int64_vector_index_srcptr list_vec,
+    sieving_bound_srcptr H, int64_vector_srcptr s);
+
+
 #endif // UTILS_SIEVE_H
