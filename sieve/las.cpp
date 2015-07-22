@@ -2279,9 +2279,10 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             if (!pass) continue;
 
 #if 0 /* enable this to produce input for the batch factorization (smooth.c) */
-	    gmp_printf ("LOG %ld %lu %Zd %Zd\n", a, b, norm[RATIONAL_SIDE],
-			norm[ALGEBRAIC_SIDE]);
+	    verbose_output_start_batch ();
+	    gmp_printf ("LOG %ld %lu %Zd %Zd\n", a, b, norm[0], norm[1]);
 	    fflush (stdout);
+	    verbose_output_end_batch ();
 #endif
 
             if (cof_stats == 1)
