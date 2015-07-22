@@ -19,7 +19,7 @@
 #include "ecm/batch.h"
 
 /* define BATCH to use batch cofactorization */
-#define BATCH 1
+// #define BATCH 1
 
 /* {{{ siever_config */
 /* The following structure lists the fields with an impact on the siever.
