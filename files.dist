@@ -472,6 +472,8 @@ sieve/ecm/mpqs_ul.c
 sieve/ecm/mpqs_15ul.c
 sieve/ecm/mpqs_2ul2.c
 sieve/ecm/mpqs_mpz.c
+sieve/ecm/batch.h
+sieve/ecm/batch.c
 sieve/fb.cpp
 sieve/fb.h
 sieve/fb-types.h

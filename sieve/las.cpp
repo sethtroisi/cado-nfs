@@ -994,6 +994,9 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     las->dlog_base->read();
 #endif
 
+#ifdef BATCH
+    cofac_list_init (las->L);
+#endif
 
 }/*}}}*/
 
@@ -1038,6 +1041,10 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     delete las->todo;
 #ifdef DLP_DESCENT
     delete las->dlog_base;
+#endif
+
+#ifdef BATCH
+    cofac_list_clear (las->L);
 #endif
 }/*}}}*/
 
@@ -2278,18 +2285,17 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             }
             if (!pass) continue;
 
-#if 0 /* enable this to produce input for the batch factorization (smooth.c) */
+#ifdef BATCH
 	    verbose_output_start_batch ();
-	    gmp_printf ("LOG %ld %lu %Zd %Zd\n", a, b, norm[0], norm[1]);
-	    fflush (stdout);
+	    cofac_list_add ((cofac_list_t*) las->L, a, b, norm[0], norm[1]);
 	    verbose_output_end_batch ();
+	    continue; /* we will deal with all cofactors at the end of las */
 #endif
 
             if (cof_stats == 1)
             {
                 cof_bitsize[0] = mpz_sizeinbase (norm[0], 2);
                 cof_bitsize[1] = mpz_sizeinbase (norm[1], 2);
-                /* learning phase */
 		/* no need to use a mutex here: either we use one thread only
 		   to compute the cofactorization data and if several threads
 		   the order is irrelevant. The only problem that can happen
@@ -3144,6 +3150,23 @@ int main (int argc0, char *argv0[])/*{{{*/
         las->tree->display_all_trees(las->output);
     }
     delete las->tree;
+
+#ifdef BATCH
+    int split = 10;
+    cofac_list_realloc (las->L, las->L->size);
+    verbose_output_print (2, 1, "# Total %lu pairs of cofactors\n",
+			  las->L->size);
+    find_smooth (las->L, las->default_config->sides[0]->lpb,
+		 las->default_config->sides[1]->lpb,
+		 las->default_config->sides[0]->lim,
+		 las->default_config->sides[1]->lim,
+		 split, las->verbose);
+    verbose_output_print (2, 1, "# Detected %lu smooth cofactors\n",
+			  las->L->size);
+    factor (las->L, las->cpoly, las->default_config->sides[0]->lpb,
+	    las->default_config->sides[1]->lpb);
+    report->reports = las->L->size;
+#endif
 
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
