@@ -129,7 +129,7 @@ main (int argc, char* argv[])
       exit (1);
     }
   start = seconds ();
-  factor (L, pol, lpb0, lpb1);
+  factor (L, pol, lpb0, lpb1, verbose);
   fprintf (stderr, "Factoring %lu smooth cofactors took %.0f s\n", L->size,
            seconds() - start);
 
