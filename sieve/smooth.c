@@ -42,40 +42,6 @@ declare_usage (param_list pl)
   param_list_decl_usage (pl, "batch1", "side-1 batch file");
 }
 
-void
-create_batch_file (const char *f, unsigned long B, unsigned long L,
-                   cado_poly pol MAYBE_UNUSED, int split)
-{
-  FILE *fp;
-  prime_info pi;
-  unsigned long p, h;
-  mpz_t P;
-  double s = seconds ();
-
-  ASSERT_ALWAYS (L > B);
-
-  prime_info_init (pi);
-  fp = fopen (f, "w");
-  ASSERT_ALWAYS(fp != NULL);
-  mpz_init (P);
-
-  h = (L - B + split - 1) / split;
-
-  for (p = 2; p < B; p = getprime_mt (pi));
-
-  while (B < L)
-    {
-      p = prime_product (P, pi, (B + h < L) ? B + h : L, p);
-      gmp_fprintf (fp, "%lu %Zx\n", B + h, P);
-      B += h;
-    }
-
-  fclose (fp);
-  prime_info_clear (pi);
-  mpz_clear (P);
-  fprintf (stderr, "# creating batch file %s took %.0fs\n", f, seconds () - s);
-}
-
 int
 main (int argc, char* argv[])
 {
@@ -136,27 +102,31 @@ main (int argc, char* argv[])
       exit (1);
     }
 
-  if (batch0_file != NULL)
+  if (batch0_file == NULL)
     {
+      fprintf (stderr, "Error, missing -batch0 <file>\n");
+      exit (1);
+    }
+  batch0 = fopen (batch0_file, "r");
+  if (batch0 == NULL)
+    {
+      create_batch_file (batch0_file, lim0, 1UL << lpb0, pol, split);
       batch0 = fopen (batch0_file, "r");
-      if (batch0 == NULL)
-        {
-          create_batch_file (batch0_file, lim0, 1UL << lpb0, pol, split);
-          batch0 = fopen (batch0_file, "r");
-        }
-      ASSERT_ALWAYS(batch0 != NULL);
     }
+  ASSERT_ALWAYS(batch0 != NULL);
 
-  if (batch1_file != NULL)
+  if (batch1_file == NULL)
     {
-      batch1 = fopen (batch1_file, "r");
-      if (batch1 == NULL)
-        {
-          create_batch_file (batch1_file, lim1, 1UL << lpb1, pol, split);
-          batch0 = fopen (batch1_file, "r");
-        }
-      ASSERT_ALWAYS(batch1 != NULL);
+      fprintf (stderr, "Error, missing -batch1 <file>\n");
+      exit (1);
     }
+  batch1 = fopen (batch1_file, "r");
+  if (batch1 == NULL)
+    {
+      create_batch_file (batch1_file, lim1, 1UL << lpb1, pol, split);
+      batch1 = fopen (batch1_file, "r");
+    }
+  ASSERT_ALWAYS(batch1 != NULL);
 
   /* Initialization */
   cofac_list_init (L);
@@ -184,7 +154,7 @@ main (int argc, char* argv[])
   fflush (stderr);
 
   start = seconds ();
-  find_smooth (L, lpb0, lpb1, lim0, lim1, batch0, batch1, split, verbose);
+  find_smooth (L, lpb0, lpb1, lim0, lim1, batch0, batch1, verbose);
   fprintf (stderr, "Detecting %lu smooth cofactors took %.0f s\n", L->size,
            seconds() - start);
 

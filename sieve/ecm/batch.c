@@ -115,25 +115,6 @@ cofac_list_clear (cofac_list l)
   free (l->A);
 }
 
-/* estimate the bit-size of l[0]*...*l[n-1] */
-static unsigned long
-estimate_bit_size (mpz_t *l, unsigned long n)
-{
-  double x = 1.0;
-  unsigned long i, e = 0;
-
-  for (i = 0; i < n; i++)
-    {
-      x *= mpz_get_d (l[i]);
-      if (x > 1.34e154)
-        {
-          e += 512;
-          x = ldexp (x, -512);
-        }
-    }
-  return e + (unsigned long) ilogb (x) + 1;
-}
-
 /* FIXME: since we don't need to keep the indidivual primes here,
    instead of allocating spaces for n mpz_t data structures, we need
    only to allocate O(log n) [see function compute_biproduct below] */
@@ -439,12 +420,11 @@ void
 find_smooth (cofac_list l, int lpb0, int lpb1,
              unsigned long lim0, unsigned long lim1,
              FILE *batch0 MAYBE_UNUSED, FILE *batch1 MAYBE_UNUSED,
-             int split, int verbose)
+             int verbose)
 {
   unsigned long nb_rel;
   unsigned long nb_rel_new;
   unsigned long nb_rel_read = l->size;
-  unsigned long nb_rel_step = 10000000;
   unsigned long nb_rel_unknown;
   unsigned long i;
   mpz_t P;
@@ -454,8 +434,6 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
   double t_prime = 0;
   double start;
   unsigned int n0_pass;
-  unsigned long lim0_step;
-  unsigned long lim1_step;
   unsigned long lim0_new;
   unsigned long lim1_new;
   unsigned char *b_status_r;
@@ -464,8 +442,10 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
   unsigned long nb_smooth_r;
   unsigned long nb_smooth_a;
   unsigned long nb_useless;
-  prime_info pi;
-  unsigned long prime;
+  int ret;
+
+  ASSERT_ALWAYS(batch0 != NULL);
+  ASSERT_ALWAYS(batch1 != NULL);
 
   start = seconds ();
 
@@ -488,145 +468,11 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
   nb_smooth_a = 0;
   nb_useless = 0;
 
-  prime_info_init (pi);
-
-  /* Initial one-side pass (to make lim0 and lim1 be equal) */
-
-  unsigned long rsize, asize;
-  /* the product of primes in [lim0, lim0 + step] has a number of bits about:
-     sum(log(p)/log(2)/log(p), p = lim0..lim0 + step) ~ step/log(2)
-     thus we need step ~ rsize*log(2) */
-  if (split == 0)
-    {
-      rsize = estimate_bit_size (l->R, l->size);
-      lim0_step = (unsigned long) ((double) rsize * log (2.0));
-      asize = estimate_bit_size (l->A, l->size);
-      lim1_step = (unsigned long) ((double) asize * log (2.0));
-    }
-  else
-    {
-       lim0_step = 1 + ((uint64_t) 1UL << lpb0) / split;
-       lim1_step = 1 + ((uint64_t) 1UL << lpb1) / split;
-    }
-
   /* the code below assumes max(lim0,lim1) <= min(2^lpb0,2^lpb1) */
   ASSERT_ALWAYS(lim0 <= (1UL << lpb0));
   ASSERT_ALWAYS(lim0 <= (1UL << lpb1));
   ASSERT_ALWAYS(lim1 <= (1UL << lpb0));
   ASSERT_ALWAYS(lim1 <= (1UL << lpb1));
-
-  if (lim0 < lim1)
-  {
-    for (prime = 2; prime <= lim0; prime = getprime_mt (pi));
-
-    while (lim0 < lim1)
-    {
-      lim0_new = (lim0 + lim0_step < lim1 ? lim0 + lim0_step : lim1);
-
-      if (verbose > 1)
-        {
-          fprintf (stderr, "#\n# Initial one-side pass: %0.fs\n#\n", seconds() - start);
-          fprintf (stderr, "# lim0: %lu:%lu\n\n", lim0, lim0_new);
-        }
-
-      s = seconds ();
-      prime = prime_product (P, pi, lim0_new, prime);
-      s = seconds () - s;
-      t_prime += s;
-      if (verbose > 1)
-        fprintf (stderr, "# Computing prime product of %lu bits took %.0fs (total %.0fs so far)\n",
-                 mpz_sizeinbase (P, 2), s, t_prime);
-
-      nb_rel = nb_rel_smooth;
-      while (nb_rel < nb_rel_unknown)
-      {
-        nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
-        s = seconds ();
-        t_smooth -= seconds();
-        smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P, verbose);
-        t_smooth += seconds();
-        if (verbose > 1)
-          fprintf (stderr, "# smoothness test (%lu cofactors) took %.0f seconds"
-                   " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
-        nb_rel = nb_rel_new;
-      }
-
-      lim0 = lim0_new;
-      t_update -= seconds();
-      update_status (l->R, l->A, b_status_r, b_status_a, &nb_rel_unknown,
-                     &nb_rel_smooth, lim0, lpb0, &nb_smooth_r, &nb_smooth_a,
-                     &nb_useless, l->a, l->b);
-      t_update += seconds();
-      if (verbose > 1)
-        {
-          fprintf (stderr, "# smooth_r:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-                   nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth);
-          fprintf (stderr, "# t_update: %.0f seconds\n", t_update);
-        }
-    }
-  }
-  else if (lim1 < lim0)
-  {
-    for (prime = 2; prime <= lim1; prime = getprime_mt (pi));
-
-    while (lim1 < lim0)
-    {
-      lim1_new = (lim1 + lim1_step < lim0 ? lim1 + lim1_step : lim0);
-
-      if (verbose > 1)
-        {
-          fprintf (stderr, "#\n# Initial one-side pass: %0.fs\n#\n", seconds() - start);
-          fprintf (stderr, "# lim1: %lu:%lu\n", lim1, lim1_new);
-        }
-
-      s = seconds ();
-      prime = prime_product (P, pi, lim1_new, prime);
-      s = seconds () - s;
-      t_prime += s;
-      if (verbose > 1)
-        fprintf (stderr, "# Computing prime product of %lu bits took %.0fs (total %.0fs so far)\n",
-                 mpz_sizeinbase (P, 2), s, t_prime);
-
-      nb_rel = nb_rel_smooth;
-      while (nb_rel < nb_rel_unknown)
-      {
-        nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
-        s = seconds ();
-        t_smooth -= seconds();
-        smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P, verbose);
-        t_smooth += seconds();
-        if (verbose > 1)
-          fprintf (stderr, "# smoothness test (%lu cofactors) took %.0f seconds"
-                   " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
-        nb_rel = nb_rel_new;
-      }
-
-      lim1 = lim1_new;
-      t_update -= seconds();
-      update_status (l->A, l->R, b_status_a, b_status_r, &nb_rel_unknown,
-                     &nb_rel_smooth, lim1, lpb1, &nb_smooth_a, &nb_smooth_r,
-                     &nb_useless, l->a, l->b);
-      t_update += seconds();
-      if (verbose > 1)
-        {
-          fprintf (stderr, "# smooth_a:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-                   nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth);
-          fprintf (stderr, "# t_update: %.0f seconds\n", t_update);
-        }
-    }
-  }
-  else  // lim0 = lim1
-  {
-    for (prime = 2; prime <= lim0; prime = getprime_mt (pi));
-  }
-
-  ASSERT_ALWAYS (lim0 == lim1);
-
-  /* the loop below assumes lim0_step = lim1_step */
-  if (lim0_step < lim1_step)
-    lim0_step = lim1_step;
-  else
-    lim1_step = lim0_step;
 
   /* Loop */
 
@@ -640,32 +486,25 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
 
     /* side 0 */
 
-    lim0_new = (lim0 + lim0_step < (1UL << lpb0) ? lim0 + lim0_step : (1UL << lpb0));
-
-    if (verbose > 1)
-      fprintf (stderr, "# lim0: %lu:%lu\n", lim0, lim0_new);
-
     s = seconds ();
-    prime = prime_product (P, pi, lim0_new, prime);
+    ret = gmp_fscanf (batch0, "%lu %Zx\n", &lim0_new, P);
+    ASSERT_ALWAYS(ret == 2);
     s = seconds () - s;
     t_prime += s;
     if (verbose > 1)
-      fprintf (stderr, "# Computing prime product of %lu bits took %.0fs (total %.0fs so far)\n",
+      fprintf (stderr, "# Reading prime product of %lu bits took %.0fs (total %.0fs so far)\n",
                mpz_sizeinbase (P, 2), s, t_prime);
 
     nb_rel = nb_rel_smooth;
-    while (nb_rel < nb_rel_unknown)
-    {
-      nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
-      s = seconds ();
-      t_smooth -= seconds();
-      smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P, verbose);
-      t_smooth += seconds();
-      if (verbose > 1)
-        fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
-                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
-      nb_rel = nb_rel_new;
-    }
+    nb_rel_new = nb_rel_unknown;
+    s = seconds ();
+    t_smooth -= seconds();
+    smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P, verbose);
+    t_smooth += seconds();
+    if (verbose > 1)
+      fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
+               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+    nb_rel = nb_rel_new;
 
     lim0 = lim0_new;
     t_update -= seconds();
@@ -682,24 +521,25 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
 
     /* side 1 */
 
-    lim1_new = (lim1 + lim1_step < (1UL << lpb1) ? lim1 + lim1_step : (1UL << lpb1));
-
+    s = seconds ();
+    ret = gmp_fscanf (batch1, "%lu %Zx\n", &lim1_new, P);
+    ASSERT_ALWAYS(ret == 2);
+    s = seconds () - s;
+    t_prime += s;
     if (verbose > 1)
-      fprintf (stderr, "# lim1: %lu:%lu\n", lim1, lim1_new);
+      fprintf (stderr, "# Reading prime product of %lu bits took %.0fs (total %.0fs so far)\n",
+               mpz_sizeinbase (P, 2), s, t_prime);
 
     nb_rel = nb_rel_smooth;
-    while (nb_rel < nb_rel_unknown)
-    {
-      nb_rel_new = (nb_rel + nb_rel_step < nb_rel_unknown ? nb_rel + nb_rel_step : nb_rel_unknown);
-      s = seconds ();
-      t_smooth -= seconds();
-      smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P, verbose);
-      t_smooth += seconds();
-      if (verbose > 1)
-        fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
-                 " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
-      nb_rel = nb_rel_new;
-    }
+    nb_rel_new = nb_rel_unknown;
+    s = seconds ();
+    t_smooth -= seconds();
+    smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P, verbose);
+    t_smooth += seconds();
+    if (verbose > 1)
+      fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
+               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+    nb_rel = nb_rel_new;
 
     lim1 = lim1_new;
     t_update -= seconds();
@@ -714,8 +554,6 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
         fprintf (stderr, "# t_update: %.0f seconds\n", t_update);
       }
   }
-  prime_info_clear (pi);
-
   cofac_list_realloc (l, nb_rel_smooth);
 
   mpz_clear (P);
@@ -959,3 +797,38 @@ factor (cofac_list L, cado_poly pol, int lpb0, int lpb1, int verbose)
     fprintf (stderr, "# factor: %.1fs to print %lu rels\n",
              seconds () - start, n);
 }
+
+void
+create_batch_file (const char *f, unsigned long B, unsigned long L,
+                   cado_poly pol MAYBE_UNUSED, int split)
+{
+  FILE *fp;
+  prime_info pi;
+  unsigned long p, h;
+  mpz_t P;
+  double s = seconds ();
+
+  ASSERT_ALWAYS (L > B);
+
+  prime_info_init (pi);
+  fp = fopen (f, "w");
+  ASSERT_ALWAYS(fp != NULL);
+  mpz_init (P);
+
+  h = (L - B + split - 1) / split;
+
+  for (p = 2; p < B; p = getprime_mt (pi));
+
+  while (B < L)
+    {
+      p = prime_product (P, pi, (B + h < L) ? B + h : L, p);
+      gmp_fprintf (fp, "%lu %Zx\n", B + h, P);
+      B += h;
+    }
+
+  fclose (fp);
+  prime_info_clear (pi);
+  mpz_clear (P);
+  fprintf (stderr, "# creating batch file %s took %.0fs\n", f, seconds () - s);
+}
+
