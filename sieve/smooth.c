@@ -100,8 +100,12 @@ main (int argc, char* argv[])
   mpz_init (A);
   while (1)
   {
+    char str[1024];
     int ret;
-    ret = gmp_fscanf (cofac, "%ld %lu %Zd %Zd\n", &a, &b, R, A);
+
+    if (fgets (str, 1024, cofac) == NULL)
+      break;
+    ret = gmp_sscanf (str, "%ld %lu %Zd %Zd\n", &a, &b, R, A);
     if (ret != 4)
       break;
     cofac_list_add (L, a, b, R, A);

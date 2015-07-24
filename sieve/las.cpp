@@ -3152,6 +3152,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     delete las->tree;
 
 #ifdef BATCH
+    double tcof_batch = seconds ();
     int split = 10;
     cofac_list_realloc (las->L, las->L->size);
     verbose_output_print (2, 1, "# Total %lu pairs of cofactors\n",
@@ -3164,8 +3165,12 @@ int main (int argc0, char *argv0[])/*{{{*/
     verbose_output_print (2, 1, "# Detected %lu smooth cofactors\n",
 			  las->L->size);
     factor (las->L, las->cpoly, las->default_config->sides[0]->lpb,
-	    las->default_config->sides[1]->lpb);
+	    las->default_config->sides[1]->lpb, las->verbose);
     report->reports = las->L->size;
+    tcof_batch = seconds () - tcof_batch;
+    report->ttcof += tcof_batch;
+    /* add to ttf since the remaining time will be computed as ttf - ttcof */
+    report->ttf += tcof_batch;
 #endif
 
     t0 = seconds () - t0;

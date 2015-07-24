@@ -1111,6 +1111,32 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
   return 1;
 }
 
+void
+modset_get_z (mpz_t z, struct modset_t *modset)
+{
+  ASSERT_ALWAYS(modset->arith != modset_t::CHOOSE_NONE);
+  switch (modset->arith)
+    {
+    case modset_t::CHOOSE_UL:
+      mpz_set_ui (z, modset->m_ul->m);
+      break;
+    case modset_t::CHOOSE_15UL:
+      mpz_set_ui (z, modset->m_15ul->m[1]);
+      mpz_mul_2exp (z, z, LONG_BIT);
+      mpz_add_ui (z, z, modset->m_15ul->m[0]);
+      break;
+    case modset_t::CHOOSE_2UL2:
+      mpz_set_ui (z, modset->m_2ul2->m[1]);
+      mpz_mul_2exp (z, z, LONG_BIT);
+      mpz_add_ui (z, z, modset->m_2ul2->m[0]);
+      break;
+    case modset_t::CHOOSE_MPZ:
+      mpz_set (z, modset->m_mpz);
+      break;
+    default:
+      abort ();
+    }
+}
 
 /*
  * This is our auxiliary factorization.
