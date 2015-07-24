@@ -80,4 +80,8 @@ void list_int64_vector_index_remove_duplicate(
 
 void list_int64_vector_index_remove_duplicate_sort(
     list_int64_vector_index_ptr list);
+
+void list_int64_vector_index_set(
+    list_int64_vector_index_ptr list_new,
+    list_int64_vector_index_srcptr list_old);
 #endif /* LIST_INT64_VECTOR_INDEX_H */

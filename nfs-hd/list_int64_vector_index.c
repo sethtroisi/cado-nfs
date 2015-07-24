@@ -126,3 +126,23 @@ void list_int64_vector_index_remove_duplicate_sort(
     }
   }
 }
+
+void list_int64_vector_index_set(
+    list_int64_vector_index_ptr list_new,
+    list_int64_vector_index_srcptr list_old)
+{
+  ASSERT(list_new->vector_dim == list_old->vector_dim);
+
+  list_new->length = list_old->length;
+  list_new->alloc = list_old->alloc;
+  list_new->v = (int64_vector_index_t * ) realloc(list_new->v,
+      list_new->alloc * sizeof(int64_vector_index_t));
+  for (unsigned int i = 0; i < list_new->length; i++) {
+    int64_vector_init(list_new->v[i]->vec, list_new->vector_dim);
+    int64_vector_set(list_new->v[i]->vec, list_old->v[i]->vec);
+    list_new->v[i]->index = list_old->v[i]->index;
+  }
+  for (unsigned int i = list_new->length; i < list_new->alloc; i++) {
+    int64_vector_init(list_new->v[i]->vec, list_new->vector_dim);
+  }
+}
