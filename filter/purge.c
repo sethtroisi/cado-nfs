@@ -507,7 +507,7 @@ int main(int argc, char **argv)
     }
 
     /* Take into account the memory allocated for all mat->row_compact[i] */
-    purge_matrix_clear_row_compact_update_mem_usage (mat);
+    purge_matrix_row_compact_update_mem_usage (mat);
 
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)

@@ -94,7 +94,7 @@ purge_matrix_clear (purge_matrix_ptr mat)
 }
 
 void
-purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr mat)
+purge_matrix_row_compact_update_mem_usage (purge_matrix_ptr mat)
 {
   size_t cur_alloc = get_my_malloc_bytes();
   mat->tot_alloc_bytes += cur_alloc;

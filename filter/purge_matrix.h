@@ -23,7 +23,7 @@ typedef const struct purge_matrix_s * purge_matrix_srcptr;
 void purge_matrix_init (purge_matrix_ptr, uint64_t, uint64_t, uint64_t);
 void purge_matrix_clear_row_compact (purge_matrix_ptr);
 void purge_matrix_clear (purge_matrix_ptr);
-void purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr);
+void purge_matrix_row_compact_update_mem_usage (purge_matrix_ptr);
 void* purge_matrix_set_row_from_rel (purge_matrix_t, earlyparsed_relation_ptr);
 void purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i);
 void purge_matrix_compute_sum2_row (purge_matrix_ptr, unsigned int);
