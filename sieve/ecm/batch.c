@@ -438,7 +438,7 @@ update_status (mpz_t *R, mpz_t *A,
 void
 find_smooth (cofac_list l, int lpb0, int lpb1,
              unsigned long lim0, unsigned long lim1,
-             FILE *batch0, FILE *batch1,
+             FILE *batch0 MAYBE_UNUSED, FILE *batch1 MAYBE_UNUSED,
              int split, int verbose)
 {
   unsigned long nb_rel;
