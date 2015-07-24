@@ -505,7 +505,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     // We write the roots in one ASCII block
     fwrite (roots->begin, (void *) roots->current - (void *) roots->begin, 1, renumber_table->file);
 
-    // We have to recomputed the real index of the renumber table for the free rels
+    // We have to recompute the real index of the renumber table for the free rels
     free_rels_t free_rels = pth[i].free_rels [current_buf]; // Careful: local copy!
     ASSERT (!((free_rels.current - free_rels.begin) % sum_degs_add_one));
     for (free_rels_buf_t *pt = free_rels.begin; pt < free_rels.current; pt += sum_degs_add_one) {
