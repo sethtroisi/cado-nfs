@@ -3161,7 +3161,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 		 las->default_config->sides[1]->lpb,
 		 las->default_config->sides[0]->lim,
 		 las->default_config->sides[1]->lim,
-		 split, las->verbose);
+		 NULL, NULL, split, las->verbose);
     verbose_output_print (2, 1, "# Detected %lu smooth cofactors\n",
 			  las->L->size);
     factor (las->L, las->cpoly, las->default_config->sides[0]->lpb,

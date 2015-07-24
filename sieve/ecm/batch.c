@@ -137,7 +137,7 @@ estimate_bit_size (mpz_t *l, unsigned long n)
 /* FIXME: since we don't need to keep the indidivual primes here,
    instead of allocating spaces for n mpz_t data structures, we need
    only to allocate O(log n) [see function compute_biproduct below] */
-static unsigned long
+unsigned long
 prime_product (mpz_t P, prime_info pi, unsigned long p_max,
                unsigned long p_last)
 {
@@ -437,7 +437,9 @@ update_status (mpz_t *R, mpz_t *A,
    which should be at the end in locations 0, 1, ..., n-1 */
 void
 find_smooth (cofac_list l, int lpb0, int lpb1,
-             unsigned long lim0, unsigned long lim1, int split, int verbose)
+             unsigned long lim0, unsigned long lim1,
+             FILE *batch0, FILE *batch1,
+             int split, int verbose)
 {
   unsigned long nb_rel;
   unsigned long nb_rel_new;
