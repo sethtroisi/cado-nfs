@@ -38,6 +38,8 @@ declare_usage (param_list pl)
   param_list_decl_usage (pl, "lim1", "side-1 factor base bound");
   param_list_decl_usage (pl, "v",    "(switch) verbose mode");
   param_list_decl_usage (pl, "split", "number of splits");
+  param_list_decl_usage (pl, "batch0", "side-0 batch file");
+  param_list_decl_usage (pl, "batch1", "side-1 batch file");
 }
 
 int
@@ -45,13 +47,13 @@ main (int argc, char* argv[])
 {
   cofac_list L;
   double start;
-  FILE *cofac;
+  FILE *cofac, *batch0 = NULL, *batch1 = NULL;
   int64_t a;
   uint64_t b;
   mpz_t R, A;
   param_list pl;
-  const char *poly_file, *cofac_file;
-  int lpb1, lpb0, verbose, split = 0;
+  const char *poly_file, *cofac_file, *batch0_file, *batch1_file;
+  int lpb1, lpb0, verbose, split = 10;
   unsigned long lim1, lim0;
 
   start = seconds ();
@@ -72,6 +74,8 @@ main (int argc, char* argv[])
 
   poly_file = param_list_lookup_string (pl, "poly");
   cofac_file = param_list_lookup_string (pl, "cofac");
+  batch0_file = param_list_lookup_string (pl, "batch0");
+  batch1_file = param_list_lookup_string (pl, "batch1");
   ASSERT_ALWAYS(param_list_parse_int (pl, "lpb1", &lpb1));
   ASSERT_ALWAYS(param_list_parse_int (pl, "lpb0", &lpb0));
   ASSERT_ALWAYS(param_list_parse_ulong (pl, "lim1", &lim1));
@@ -84,12 +88,45 @@ main (int argc, char* argv[])
       fprintf (stderr, "Error, missing -poly <file>\n");
       exit (1);
     }
+  cado_poly pol;
+  cado_poly_init (pol);
+  if (cado_poly_read (pol, poly_file) == 0)
+    {
+      fprintf (stderr, "Could not read polynomial file\n");
+      exit (1);
+    }
 
   if (cofac_file == NULL)
     {
       fprintf (stderr, "Error, missing -cofac <file>\n");
       exit (1);
     }
+
+  if (batch0_file == NULL)
+    {
+      fprintf (stderr, "Error, missing -batch0 <file>\n");
+      exit (1);
+    }
+  batch0 = fopen (batch0_file, "r");
+  if (batch0 == NULL)
+    {
+      create_batch_file (batch0_file, lim0, 1UL << lpb0, pol, split);
+      batch0 = fopen (batch0_file, "r");
+    }
+  ASSERT_ALWAYS(batch0 != NULL);
+
+  if (batch1_file == NULL)
+    {
+      fprintf (stderr, "Error, missing -batch1 <file>\n");
+      exit (1);
+    }
+  batch1 = fopen (batch1_file, "r");
+  if (batch1 == NULL)
+    {
+      create_batch_file (batch1_file, lim1, 1UL << lpb1, pol, split);
+      batch1 = fopen (batch1_file, "r");
+    }
+  ASSERT_ALWAYS(batch1 != NULL);
 
   /* Initialization */
   cofac_list_init (L);
@@ -100,8 +137,12 @@ main (int argc, char* argv[])
   mpz_init (A);
   while (1)
   {
+    char str[1024];
     int ret;
-    ret = gmp_fscanf (cofac, "%ld %lu %Zd %Zd\n", &a, &b, R, A);
+
+    if (fgets (str, 1024, cofac) == NULL)
+      break;
+    ret = gmp_sscanf (str, "%ld %lu %Zd %Zd\n", &a, &b, R, A);
     if (ret != 4)
       break;
     cofac_list_add (L, a, b, R, A);
@@ -113,19 +154,12 @@ main (int argc, char* argv[])
   fflush (stderr);
 
   start = seconds ();
-  find_smooth (L, lpb0, lpb1, lim0, lim1, split, verbose);
+  find_smooth (L, lpb0, lpb1, lim0, lim1, batch0, batch1, verbose);
   fprintf (stderr, "Detecting %lu smooth cofactors took %.0f s\n", L->size,
            seconds() - start);
 
-  cado_poly pol;
-  cado_poly_init (pol);
-  if (cado_poly_read (pol, poly_file) == 0)
-    {
-      fprintf (stderr, "Could not read polynomial file\n");
-      exit (1);
-    }
   start = seconds ();
-  factor (L, pol, lpb0, lpb1);
+  factor (L, pol, lpb0, lpb1, verbose);
   fprintf (stderr, "Factoring %lu smooth cofactors took %.0f s\n", L->size,
            seconds() - start);
 
@@ -133,6 +167,12 @@ main (int argc, char* argv[])
   mpz_clear (R);
   mpz_clear (A);
   cofac_list_clear (L);
+
+  if (batch0_file != NULL)
+    fclose (batch0);
+
+  if (batch1_file != NULL)
+    fclose (batch1);
 
   /* Clear the ecm addition chains that are stored as global variables
      to avoid re-computations. */

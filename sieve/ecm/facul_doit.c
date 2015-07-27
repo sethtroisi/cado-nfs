@@ -337,7 +337,7 @@ facul_doit (mpz_t *factors, const modulus_t m,
 	    }
 	}
       
-      /* So each of factor and cofactor is either a prime < 2^lpb, 
+      /* So each of factor and cofactor is either a prime < 2^lpb,
 	 or is composite */
 
       if (fprime) {
@@ -565,49 +565,48 @@ facul_doit_onefm (mpz_t *factors, const modulus_t m,
     {
       modset_init (fm, f);
       fprime = modset_primetest (fm);
-      if (fprime) 
-	modset_clear (fm);
+      if (fprime)
+        modset_clear (fm);
       if (fprime && mod_intbits (f) > lpb)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	  goto clean_up;
 	}
-      }
+    }
       
-    /* Determine for certain if the cofactor is prime */
-    if (!cfprime)
-      {
-	modset_init (cfm, n);
-	cfprime = modset_primetest (cfm);
-
-	if (cfprime)
-	  modset_clear (cfm);
-	if (cfprime && mod_intbits (n) > lpb)
-	  {
-	    if (!fprime)
-	      modset_clear (fm);
-	    found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
-	    goto clean_up;
-	  }
-      }
+  /* Determine for certain if the cofactor is prime */
+  if (!cfprime)
+    {
+      modset_init (cfm, n);
+      cfprime = modset_primetest (cfm);
+      if (cfprime)
+        modset_clear (cfm);
+      if (cfprime && mod_intbits (n) > lpb)
+        {
+          if (!fprime)
+            modset_clear (fm);
+          found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
+          goto clean_up;
+        }
+    }
       
-    /* So each of factor and cofactor is either a prime < 2^lpb, 
-       or is composite */
+  /* So each of factor and cofactor is either a prime < 2^lpb, 
+     or is composite */
 
-    if (fprime)
-	mod_intget_mpz(factors[found++], f);
+  if (fprime)
+    mod_intget_mpz(factors[found++], f);
       
-    if (cfprime) 
-	mod_intget_mpz(factors[found++], n);
+  if (cfprime)
+    mod_intget_mpz(factors[found++], n);
 
-    /* if either f of cf is composite, it is returned in fm or cfm */
+  /* if either f of cf is composite, it is returned in fm or cfm */
 
-    //Free
+  //Free
  clean_up:
-    mod_clear (r, m);
-    mod_intclear (n);
-    mod_intclear (f);
-    return found;
+  mod_clear (r, m);
+  mod_intclear (n);
+  mod_intclear (f);
+  return found;
 }
 
 

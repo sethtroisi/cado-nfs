@@ -140,6 +140,8 @@ facul_fprint_strategies (FILE*, facul_strategies_t* );
 void
 modset_clear (struct modset_t *modset);
 
+void modset_get_z (mpz_t, struct modset_t*);
+
 int*
 facul_both (mpz_t**, mpz_t* ,
 	    const facul_strategies_t *, int*);

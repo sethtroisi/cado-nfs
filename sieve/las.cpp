@@ -793,6 +793,15 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	exit(EXIT_FAILURE);
     }
 
+#ifdef BATCH
+    if ((tmp = param_list_lookup_string (pl, "batch0")) == NULL)
+      {
+        fprintf (stderr, "Error: -batch0 is missing\n");
+        param_list_print_usage (pl, NULL, stderr);
+        exit (EXIT_FAILURE);
+      }
+#endif
+
     // sc->skewness = las->cpoly->skew;
     /* -skew (or -S) may override (or set) the skewness given in the
      * polynomial file */
@@ -2741,6 +2750,10 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "grace-time-ratio", "Fraction of the estimated further descent time which should be spent processing the current special-q, to find a possibly better relation");
   las_dlog_base::declare_parameter_usage(pl);
 #endif /* DLP_DESCENT */
+#ifdef BATCH
+  param_list_decl_usage (pl, "batch0", "side-0 batch file");
+  param_list_decl_usage (pl, "batch1", "side-1 batch file");
+#endif
   verbose_decl_usage(pl);
 }
 
@@ -2756,6 +2769,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
+    FILE *batch0 = NULL, *batch1 = NULL;
+    const char *batch0_file, *batch1_file;
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -2816,6 +2831,20 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
 #if DLP_DESCENT
     param_list_parse_double(pl, "grace-time-ratio", &general_grace_time_ratio);
+#endif
+#ifdef BATCH
+    if ((batch0_file = param_list_lookup_string (pl, "batch0")) == NULL)
+      {
+        fprintf (stderr, "Error: -batch0 is missing\n");
+        param_list_print_usage (pl, NULL, stderr);
+        exit (EXIT_FAILURE);
+      }
+    if ((batch1_file = param_list_lookup_string (pl, "batch1")) == NULL)
+      {
+        fprintf (stderr, "Error: -batch1 is missing\n");
+        param_list_print_usage (pl, NULL, stderr);
+        exit (EXIT_FAILURE);
+      }
 #endif
 
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
@@ -3152,20 +3181,40 @@ int main (int argc0, char *argv0[])/*{{{*/
     delete las->tree;
 
 #ifdef BATCH
+    unsigned long lim0 = las->default_config->sides[0]->lim;
+    unsigned long lim1 = las->default_config->sides[1]->lim;
+    int lpb0 = las->default_config->sides[0]->lpb;
+    int lpb1 = las->default_config->sides[1]->lpb;
     int split = 10;
+    batch0 = fopen (batch0_file, "r");
+    if (batch0 == NULL)
+      {
+	create_batch_file (batch0_file, lim0, 1UL << lpb0, las->cpoly, split);
+	batch0 = fopen (batch0_file, "r");
+      }
+    ASSERT_ALWAYS(batch0 != NULL);
+    batch1 = fopen (batch1_file, "r");
+    if (batch1 == NULL)
+      {
+	create_batch_file (batch1_file, lim1, 1UL << lpb1, las->cpoly, split);
+	batch1 = fopen (batch1_file, "r");
+      }
+    ASSERT_ALWAYS(batch1 != NULL);
+    double tcof_batch = seconds ();
     cofac_list_realloc (las->L, las->L->size);
     verbose_output_print (2, 1, "# Total %lu pairs of cofactors\n",
 			  las->L->size);
-    find_smooth (las->L, las->default_config->sides[0]->lpb,
-		 las->default_config->sides[1]->lpb,
-		 las->default_config->sides[0]->lim,
-		 las->default_config->sides[1]->lim,
-		 split, las->verbose);
+    find_smooth (las->L, lpb0, lpb1, lim0, lim1,
+		 batch0, batch1, las->verbose);
     verbose_output_print (2, 1, "# Detected %lu smooth cofactors\n",
 			  las->L->size);
     factor (las->L, las->cpoly, las->default_config->sides[0]->lpb,
-	    las->default_config->sides[1]->lpb);
+	    las->default_config->sides[1]->lpb, las->verbose);
     report->reports = las->L->size;
+    tcof_batch = seconds () - tcof_batch;
+    report->ttcof += tcof_batch;
+    /* add to ttf since the remaining time will be computed as ttf - ttcof */
+    report->ttf += tcof_batch;
 #endif
 
     t0 = seconds () - t0;

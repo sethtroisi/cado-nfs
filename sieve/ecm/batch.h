@@ -38,8 +38,12 @@ void cofac_list_init (cofac_list);
 void cofac_list_realloc (cofac_list, size_t);
 void cofac_list_clear (cofac_list);
 void cofac_list_add (cofac_list, long, unsigned long, mpz_t, mpz_t);
-void find_smooth (cofac_list, int, int, unsigned long, unsigned long, int, int);
-void factor (cofac_list, cado_poly, int, int);
+unsigned long prime_product (mpz_t, prime_info, unsigned long, unsigned long);
+void find_smooth (cofac_list, int, int, unsigned long, unsigned long,
+                  FILE*, FILE*, int);
+void factor (cofac_list, cado_poly, int, int, int);
+void create_batch_file (const char*, unsigned long, unsigned long,
+                        cado_poly, int);
 
 #ifdef __cplusplus
 }
