@@ -278,12 +278,12 @@ purge_matrix_compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
 
 /******************* Functions to print stats ********************************/
 
-/* These 3 functions compute and print stats on rows weight, columns weight and
- * cliques (connected components) length. The stats can be expensive to
- * compute, so these functions should not be called by default. */
+/* These 2 functions compute and print stats on rows weight and columns weight.
+ * The stats can be expensive to compute, so these functions should not be
+ * called by default. */
 
 /* Internal function */
-static void
+void
 print_stats_uint64 (FILE *out, uint64_t *w, uint64_t len, char name[],
                     char unit[], int verbose)
 {
@@ -368,33 +368,4 @@ purge_matrix_print_stats_rows_weight (FILE *out, purge_matrix_srcptr mat,
 
   print_stats_uint64 (out, w, mat->nrows_init, "rows", "weight", verbose);
   free (w);
-}
-
-/* Assume mat->sum2_row is already computed */
-void
-purge_matrix_print_stats_on_cliques (FILE *out, purge_matrix_srcptr mat,
-                                     int verbose)
-{
-  uint64_t *len = NULL;
-
-  len = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
-  ASSERT_ALWAYS (len != NULL);
-  memset (len, 0, mat->nrows_init * sizeof (uint64_t));
-
-  uint64_buffer_t buf;
-  uint64_buffer_init (buf, UINT64_BUFFER_MIN_SIZE);
-  for (uint64_t i = 0; i < mat->nrows_init; i++)
-  {
-    if (purge_matrix_is_row_active (mat, i))
-    {
-      comp_t c = {.i = i, .w = 0.0};
-      uint64_t nrows = compute_one_connected_component (&c, mat, buf);
-      len[i] = nrows;
-    }
-  }
-
-  print_stats_uint64 (out, len, mat->nrows_init, "cliques", "length", verbose);
-
-  uint64_buffer_clear (buf);
-  free (len);
 }

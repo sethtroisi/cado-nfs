@@ -31,11 +31,11 @@ void purge_matrix_compute_sum2_row (purge_matrix_ptr, unsigned int);
 
 #define purge_matrix_compute_excess(m) (((int64_t)m->nrows)-((int64_t)m->ncols))
 
-/* These 3 functions compute and print stats on rows weight, columns weight and
- * cliques (connected components) length. The stats can be expensive to
- * compute, so these functions should not be called by default. */
+/* These 2 functions compute and print stats on rows weight and columns weight.
+ * The stats can be expensive to compute, so these functions should not be
+ * called by default. */
+void print_stats_uint64 (FILE *, uint64_t *, uint64_t, char [], char[], int);
 void purge_matrix_print_stats_columns_weight (FILE *, purge_matrix_srcptr, int);
 void purge_matrix_print_stats_rows_weight (FILE *, purge_matrix_srcptr, int);
-void purge_matrix_print_stats_on_cliques (FILE *, purge_matrix_srcptr, int);
 
 #endif /* PURGE_MATRICE_H_ */

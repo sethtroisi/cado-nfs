@@ -367,6 +367,39 @@ delete_one_connected_component (purge_matrix_ptr mat, uint64_t cur_row,
 
 /************* Code for clique (= connected component) removal ***************/
 
+/* Print stats on the length of the cliques (connected components). The stats
+ * are expensive to compute, so these functions should not be called by default.
+ * Assume mat->sum2_row is already computed.
+ */
+void
+purge_matrix_print_stats_on_cliques (FILE *out, purge_matrix_srcptr mat,
+                                     int verbose)
+{
+  uint64_t *len = NULL;
+
+  len = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
+  ASSERT_ALWAYS (len != NULL);
+  memset (len, 0, mat->nrows_init * sizeof (uint64_t));
+
+  uint64_buffer_t buf;
+  uint64_buffer_init (buf, UINT64_BUFFER_MIN_SIZE);
+  for (uint64_t i = 0; i < mat->nrows_init; i++)
+  {
+    if (purge_matrix_is_row_active (mat, i))
+    {
+      comp_t c = {.i = i, .w = 0.0};
+      uint64_t nrows = compute_one_connected_component (&c, mat, buf);
+      len[i] = nrows;
+    }
+  }
+
+  print_stats_uint64 (out, len, mat->nrows_init, "cliques", "length", verbose);
+
+  uint64_buffer_clear (buf);
+  free (len);
+}
+
+
 /* Code for clique_removal --- multithread version */
 
 /* The main structure for the working pthreads pool which compute the
