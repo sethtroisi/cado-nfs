@@ -410,23 +410,16 @@ clique_removal_core_mt_thread (void *pt)
     if (UNLIKELY (end_cur_block > data->mat->nrows_init))
       end_cur_block = data->mat->nrows_init;
 
-    bv_t * pbv = data->mat->row_used->p + (begin_cur_block >> LN2_BV_BITS);
-    /* The size of a block must be a multiple of BV_BITS */
-    for (uint64_t j = begin_cur_block; j < end_cur_block; j += BV_BITS, pbv++)
+    for (uint64_t i = begin_cur_block; i < end_cur_block; i++)
     {
-      uint64_t i = j;
-      bv_t bv;
-      for (bv = *pbv; bv; bv >>= 1, i++)
+      if (purge_matrix_is_row_active (data->mat, i))
       {
-        if (LIKELY(bv & 1))
-        {
-          clique.i = i;
-          unsigned int nb_rows = compute_one_connected_component (&(clique),
-                                                data->mat, buf);
-          if (UNLIKELY (!nb_rows))
-            continue;
-          comp_sorted_bin_tree_insert (data->comp_tree, clique);
-        }
+        clique.i = i;
+        unsigned int nb_rows = compute_one_connected_component (&(clique),
+                                              data->mat, buf);
+        if (UNLIKELY (!nb_rows))
+          continue;
+        comp_sorted_bin_tree_insert (data->comp_tree, clique);
       }
     }
 
@@ -545,7 +538,6 @@ clique_removal_core_mono (purge_matrix_ptr mat, int64_t target_excess,
                           size_t max_nb_comp, int verbose)
 {
   comp_sorted_bin_tree_t comp_tree;
-  bv_t bv, *pbv;
   uint64_buffer_t buf;
   comp_t clique;
 
@@ -553,22 +545,16 @@ clique_removal_core_mono (purge_matrix_ptr mat, int64_t target_excess,
   uint64_buffer_init (buf, UINT64_BUFFER_MIN_SIZE);
   comp_sorted_bin_tree_init (comp_tree, max_nb_comp);
 
-  pbv = mat->row_used->p;
-  for (clique.i = 0; clique.i < mat->nrows_init; )
+  for (clique.i = 0; clique.i < mat->nrows_init; clique.i++)
   {
-    uint64_t save_i = clique.i;
-    for (bv = *pbv++; bv; ++(clique.i), bv >>= 1)
+    if (purge_matrix_is_row_active (mat, clique.i))
     {
-      if (LIKELY(bv & 1))
-      {
-        unsigned int nb_rows = compute_one_connected_component (&(clique),
-                                              mat, buf);
-        if (UNLIKELY (!nb_rows))
-          continue;
-        comp_sorted_bin_tree_insert (comp_tree, clique);
-      }
+      unsigned int nb_rows = compute_one_connected_component (&(clique),
+                                            mat, buf);
+      if (UNLIKELY (!nb_rows))
+        continue;
+      comp_sorted_bin_tree_insert (comp_tree, clique);
     }
-    clique.i = save_i + BV_BITS;
   }
 
   /* Re-order the connected component by decreasing weight. */

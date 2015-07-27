@@ -211,7 +211,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
 struct data_second_pass_s
 {
   double W; /* Total weight of the matrix (counting only remaining rows) */
-  bit_vector_ptr remaining_rows;
+  purge_matrix_ptr mat;
   /* fd[0]: for printing kept relations */
   /* fd[1]: for printing deleted relations */
   FILE * fd[2];
@@ -223,7 +223,7 @@ typedef struct data_second_pass_s * data_second_pass_ptr;
 void *
 thread_print(data_second_pass_ptr arg, earlyparsed_relation_ptr rel)
 {
-  if (bit_vector_getbit(arg->remaining_rows, rel->num))
+  if (purge_matrix_is_row_active (arg->mat, rel->num))
   {
     arg->W += rel->nb;
     fputs(rel->line, arg->fd[0]);
@@ -542,15 +542,12 @@ int main(int argc, char **argv)
       exit(2);
     }
 
-    /* free mat->row_compact[i] and mat->row_compact. We no longer need them */
-    purge_matrix_clear_row_compact (mat);
-
     /****** Pass 2: reread the relation files and write output file(s) ******/
     fprintf(stdout, "\nPass 2, reading and writing output file%s...\n",
                     deletedname == NULL ? "" : "s");
     data_second_pass_t data2;
     memset(data2, 0, sizeof(data_second_pass_t));
-    data2->remaining_rows = mat->row_used;
+    data2->mat = mat;
 
     if (!(data2->fd[0] = fopen_maybe_compressed(purgedname, "w")))
     {

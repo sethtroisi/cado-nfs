@@ -11,7 +11,6 @@ struct purge_matrix_s
                              considered */
   index_t **row_compact; /* rows as lists of indexes of columns */
   weight_t *cols_weight; /* weights of columns */
-  bit_vector row_used; /* row_used[i] = 0 iff row i was deleted */
   uint64_t *sum2_row; /* sum of 2 row indexes for columns of weight 2 */
   size_t tot_alloc_bytes; /* To keep track of allocated memory */
 };
@@ -27,6 +26,8 @@ void purge_matrix_row_compact_update_mem_usage (purge_matrix_ptr);
 void* purge_matrix_set_row_from_rel (purge_matrix_t, earlyparsed_relation_ptr);
 void purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i);
 void purge_matrix_compute_sum2_row (purge_matrix_ptr, unsigned int);
+#define purge_matrix_is_row_active(m, i) (m->row_compact[i] != NULL)
+#define purge_matrix_set_row_inactive(m, i) m->row_compact[i] = NULL
 
 #define purge_matrix_compute_excess(m) (((int64_t)m->nrows)-((int64_t)m->ncols))
 
