@@ -408,6 +408,23 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P, int verbose)
   mpz_clear (w2);
 }
 
+static void
+swap_rel (unsigned long i, unsigned long j, mpz_t *R, mpz_t *A,
+          unsigned char *b_status_r, unsigned char *b_status_a,
+          int64_t *a, uint64_t *b)
+{
+  unsigned char tmp;
+  int64_t atmp;
+  uint64_t btmp;
+
+  mpz_swap (R[i], R[j]);
+  mpz_swap (A[i], A[j]);
+  tmp = b_status_r[i]; b_status_r[i] = b_status_r[j] ; b_status_r[j] = tmp;
+  tmp = b_status_a[i]; b_status_a[i] = b_status_a[j] ; b_status_a[j] = tmp;
+  atmp = a[i]; a[i] = a[j]; a[j] = atmp;
+  btmp = b[i]; b[i] = b[j]; b[j] = btmp;
+}
+
 #define NB_MILLER_RABIN 1
 
 /* invariant:
@@ -425,13 +442,9 @@ update_status (mpz_t *R, mpz_t *A,
 {
   mpz_t z_B2, z_BL, z_B3, z_L2;
 
-  unsigned long tmp;
   unsigned long i;
   unsigned long B;
   unsigned long L;
-
-  int64_t atmp;
-  uint64_t btmp;
 
   mpz_init(z_B2);
   mpz_init(z_BL);
@@ -452,78 +465,31 @@ update_status (mpz_t *R, mpz_t *A,
     {
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
-        /* if L^2 < R[i] < B^3 or L < R[i] < B^2, then R[i] cannot be smooth */
-        if ((mpz_cmp (R[i], z_L2) > 0 && mpz_cmp (R[i], z_B3) < 0) ||
-            (mpz_cmp_ui (R[i], L) > 0 && mpz_cmp (R[i], z_B2) < 0))
-        {
-          if (b_status_a[i] == STATUS_SMOOTH)
-            (*nb_smooth_a)--;
-          b_status_r[i] = STATUS_USELESS;
-          mpz_set_ui(R[i], 1);
-          b_status_a[i] = STATUS_USELESS;
-          mpz_set_ui(A[i], 1);
-          (*nb_useless)++;
-          /* relation i is useless, swap it with relation *n - 1 */
-          mpz_swap(R[i], R[(*n)-1]);
-          mpz_swap(A[i], A[(*n)-1]);
-          tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
-          tmp = b_status_a[i]; b_status_a[i] = b_status_a[(*n)-1] ; b_status_a[(*n)-1] = tmp;
-          atmp = a[i]; a[i] = a[(*n)-1]; a[(*n)-1] = atmp;
-          btmp = b[i]; b[i] = b[(*n)-1]; b[(*n)-1] = btmp;
-          (*n)--; i--;
-        }
         /* if R[i] < L, then R[i] is smooth (we assume L <= B^2) */
-        else if (mpz_cmp_ui (R[i], L) <= 0)
-        {
-          b_status_r[i] = STATUS_SMOOTH;
-          mpz_set_ui(R[i], 1);
-          (*nb_smooth_r)++;
-          if (b_status_a[i] == STATUS_SMOOTH)
-          {
-            /* relation i is smooth, swap it with relation *nb_rel_smooth-1 */
-            mpz_swap(R[i], R[*nb_rel_smooth]);
-            mpz_swap(A[i], A[*nb_rel_smooth]);
-            tmp = b_status_r[i]; b_status_r[i] = b_status_r[*nb_rel_smooth] ; b_status_r[*nb_rel_smooth] = tmp;
-            tmp = b_status_a[i]; b_status_a[i] = b_status_a[*nb_rel_smooth] ; b_status_a[*nb_rel_smooth] = tmp;
-            atmp = a[i]; a[i] = a[*nb_rel_smooth]; a[*nb_rel_smooth] = atmp;
-            btmp = b[i]; b[i] = b[*nb_rel_smooth]; b[*nb_rel_smooth] = btmp;
-            (*nb_rel_smooth)++;
-          }
-        }
-        /* now L <= B^2 <= R[i] <= L^2 or B^3 <= R[i] */
-        else if (mpz_probab_prime_p (R[i], NB_MILLER_RABIN) != 0)
+        if (mpz_cmp_ui (R[i], L) <= 0)
+          goto smooth;
+        /* if L^2 < R[i] < B^3 or L < R[i] < B^2, then R[i] cannot be smooth */
+        else if ((0 < mpz_cmp (R[i], z_L2) && mpz_cmp (R[i], z_B3) < 0) ||
+                 (0 < mpz_cmp_ui (R[i], L) && mpz_cmp (R[i], z_B2) < 0) ||
+                 mpz_probab_prime_p (R[i], NB_MILLER_RABIN))
         {
           if (b_status_a[i] == STATUS_SMOOTH)
             (*nb_smooth_a)--;
-          b_status_r[i] = STATUS_USELESS;
-          mpz_set_ui(R[i], 1);
-          b_status_a[i] = STATUS_USELESS;
-          mpz_set_ui(A[i], 1);
           (*nb_useless)++;
-          mpz_swap(R[i], R[(*n)-1]);
-          mpz_swap(A[i], A[(*n)-1]);
           /* relation i is useless, swap it with relation *n - 1 */
-          tmp = b_status_r[i]; b_status_r[i] = b_status_r[(*n)-1] ; b_status_r[(*n)-1] = tmp;
-          tmp = b_status_a[i]; b_status_a[i] = b_status_a[(*n)-1] ; b_status_a[(*n)-1] = tmp;
-          atmp = a[i]; a[i] = a[(*n)-1]; a[(*n)-1] = atmp;
-          btmp = b[i]; b[i] = b[(*n)-1]; b[(*n)-1] = btmp;
+          swap_rel (i, (*n) - 1, R, A, b_status_r, b_status_a, a, b);
           (*n)--; i--;
         }
-        /* now L <= B^2 <= R[i] <= L^2 or B^3 <= R[i] and R[i] is composite */
+        /* now B^2 <= R[i] <= L^2 or B^3 <= R[i] and R[i] is composite */
         else if (mpz_cmp (R[i], z_BL) <= 0)
         {
+        smooth:
           b_status_r[i] = STATUS_SMOOTH;
-          mpz_set_ui(R[i], 1);
           (*nb_smooth_r)++;
           if (b_status_a[i] == STATUS_SMOOTH)
           {
-            mpz_swap(R[i], R[*nb_rel_smooth]);
-            mpz_swap(A[i], A[*nb_rel_smooth]);
             /* relation i is smooth, swap it with relation *nb_rel_smooth-1 */
-            tmp = b_status_r[i]; b_status_r[i] = b_status_r[*nb_rel_smooth] ; b_status_r[*nb_rel_smooth] = tmp;
-            tmp = b_status_a[i]; b_status_a[i] = b_status_a[*nb_rel_smooth] ; b_status_a[*nb_rel_smooth] = tmp;
-            atmp = a[i]; a[i] = a[*nb_rel_smooth]; a[*nb_rel_smooth] = atmp;
-            btmp = b[i]; b[i] = b[*nb_rel_smooth]; b[*nb_rel_smooth] = btmp;
+            swap_rel (i, *nb_rel_smooth, R, A, b_status_r, b_status_a, a, b);
             (*nb_rel_smooth)++;
           }
         }
@@ -596,6 +562,10 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
   ASSERT_ALWAYS(lim1 <= (1UL << lpb1));
 
   /* Loop */
+
+  /* invariant: the smooth relations are in 0..nb_relsmooth-1,
+     the unknown ones in nb_relsmooth..nb_rel_new-1,
+     the remaining ones are not smooth */
 
   n0_pass = 0;
   while ( (lim0 < (1UL << lpb0)) || (lim1 < (1UL << lpb1)) )
@@ -879,9 +849,6 @@ factor (cofac_list L, cado_poly pol, int lpb0, int lpb1, int verbose)
   for (i = 0; i < n; i++)
     {
       printf ("%" PRId64 ",%" PRIu64 ":", L->a[i], L->b[i]);
-
-      /* at this point L->R[i] and L->A[i] contain the product of all prime
-         factors > lim0 and lim1 respectively (apart from the special-q) */
 
       mpz_poly_homogeneous_eval_siui (L->R[i], pol->pols[0], L->a[i], L->b[i]);
       if (print_smooth (factors, L->R[i], methods,
