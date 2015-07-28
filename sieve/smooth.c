@@ -153,15 +153,17 @@ main (int argc, char* argv[])
            seconds () - start);
   fflush (stderr);
 
+  double start0 = seconds ();
   start = seconds ();
   find_smooth (L, lpb0, lpb1, lim0, lim1, batch0, batch1, verbose);
-  fprintf (stderr, "Detecting %lu smooth cofactors took %.0f s\n", L->size,
+  fprintf (stderr, "Detecting %lu smooth cofactors took %.1f s\n", L->size,
            seconds() - start);
 
   start = seconds ();
   factor (L, pol, lpb0, lpb1, verbose);
-  fprintf (stderr, "Factoring %lu smooth cofactors took %.0f s\n", L->size,
+  fprintf (stderr, "Factoring %lu smooth cofactors took %.1f s\n", L->size,
            seconds() - start);
+  fprintf (stderr, "Detecting + factoring: %.1f s\n", seconds () - start0);
 
   cado_poly_clear (pol);
   mpz_clear (R);
