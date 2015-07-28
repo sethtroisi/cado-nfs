@@ -1977,11 +1977,11 @@ mpz_poly_content (mpz_t c, mpz_poly_srcptr F)
 
 /*
  * Compute the pseudo division of a and b such that
- *  lc(b)^(deg(a) - deg(b) + 1) * a = b * q + r with deg(r) < deg(q).
+ *  lc(b)^(deg(a) - deg(b) + 1) * a = b * q + r with deg(r) < deg(b).
  *  See Henri Cohen, "A Course in Computational Algebraic Number Theory",
  *  for more information.
  *
- * Assume that deg(a) >= deg(b) and B is not the zero polynomial.
+ * Assume that deg(a) >= deg(b) and b is not the zero polynomial.
  */
 static void mpz_poly_pseudo_division(mpz_poly_ptr q, mpz_poly_ptr r,
     mpz_poly_srcptr a, mpz_poly_srcptr b)
@@ -2139,6 +2139,13 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
   mpz_poly_divexact_mpz(a, a, g);
   mpz_poly_divexact_mpz(b, b, h);
 
+#ifndef NDEBUG
+  mpz_poly_content(tmp, a);
+  ASSERT(mpz_cmp_ui(tmp, 1) == 0);
+  mpz_poly_content(tmp, b);
+  ASSERT(mpz_cmp_ui(tmp, 1) == 0);
+#endif // NDEBUG
+
   mpz_pow_ui(t, g, (unsigned long int) b->deg);
   mpz_pow_ui(tmp, h, (unsigned long int) a->deg);
   mpz_mul(t, t, tmp);
@@ -2162,7 +2169,6 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
     }
 
     mpz_poly_pseudo_remainder(r, a, b);
-
     mpz_poly_set(a, b);
 
     ASSERT(d >= 0);
@@ -2184,18 +2190,18 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
     mpz_divexact(h, tmp, h);
   }
 
-  ASSERT(a->deg > 0);
-
-  mpz_pow_ui(h, h, (unsigned long int) (a->deg - 1));
   //Prevent an error if b = 0.
   if (b->deg == -1) {
     mpz_set_ui(res, 0);
   } else {
-    mpz_set(tmp, mpz_poly_lc(b));
+    ASSERT(a->deg > 0);
+    ASSERT(b->deg == 0);
+
+    mpz_pow_ui(h, h, (unsigned long int) (a->deg - 1));
 
     ASSERT(a->deg >= 0);
 
-    mpz_pow_ui(tmp, tmp, (unsigned long int) a->deg);
+    mpz_pow_ui(tmp, b->coeff[0], (unsigned long int) a->deg);
     mpz_divexact(h, tmp, h);
 
     mpz_mul_si(t, t, s);

@@ -149,19 +149,19 @@ main (int argc, char* argv[])
   }
   fclose (cofac);
   cofac_list_realloc (L, L->size);
-  fprintf (stderr, "Read %lu cofactor pairs in %.0fs\n", L->size,
+  fprintf (stderr, "Read %zu cofactor pairs in %.0fs\n", L->size,
            seconds () - start);
   fflush (stderr);
 
   double start0 = seconds ();
   start = seconds ();
   find_smooth (L, lpb0, lpb1, lim0, lim1, batch0, batch1, verbose);
-  fprintf (stderr, "Detecting %lu smooth cofactors took %.1f s\n", L->size,
+  fprintf (stderr, "Detecting %zu smooth cofactors took %.1f s\n", L->size,
            seconds() - start);
 
   start = seconds ();
   factor (L, pol, lpb0, lpb1, verbose);
-  fprintf (stderr, "Factoring %lu smooth cofactors took %.1f s\n", L->size,
+  fprintf (stderr, "Factoring %zu smooth cofactors took %.1f s\n", L->size,
            seconds() - start);
   fprintf (stderr, "Detecting + factoring: %.1f s\n", seconds () - start0);
 

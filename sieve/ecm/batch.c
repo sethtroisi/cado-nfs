@@ -375,7 +375,7 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P, int verbose)
   T = product_tree (R, n, w);
 
   if (verbose > 1)
-    fprintf (stderr, "# cofactor product has %lu bits\n",
+    fprintf (stderr, "# cofactor product has %zu bits\n",
              mpz_sizeinbase (T[h][0], 2));
 
   /* compute remainder tree */
@@ -613,7 +613,7 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
     s = seconds () - s;
     t_prime += s;
     if (verbose > 1)
-      fprintf (stderr, "# Reading prime product of %lu bits took %.0fs (total %.0fs so far)\n",
+      fprintf (stderr, "# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
                mpz_sizeinbase (P, 2), s, t_prime);
 
     nb_rel = nb_rel_smooth;
@@ -648,7 +648,7 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
     s = seconds () - s;
     t_prime += s;
     if (verbose > 1)
-      fprintf (stderr, "# Reading prime product of %lu bits took %.0fs (total %.0fs so far)\n",
+      fprintf (stderr, "# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
                mpz_sizeinbase (P, 2), s, t_prime);
 
     nb_rel = nb_rel_smooth;
