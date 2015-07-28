@@ -66,6 +66,23 @@ prime_list (mpz_list L, prime_info pi, unsigned long pmin,
   return p;
 }
 
+/* same as prime_list, but only adds primes p for which f has at least one
+   root modulo p */
+static unsigned long
+prime_list_poly (mpz_list L, prime_info pi, unsigned long pmin,
+                 unsigned long pmax, mpz_poly_t f)
+{
+  unsigned long p;
+
+  if (f->deg == 1)
+    return prime_list (L, pi, pmin, pmax);
+
+  for (p = pmin; p < pmax; p = getprime_mt (pi))
+    if (mpz_poly_roots_ulong (NULL, f, p) > 0)
+      mpz_list_add (L, p);
+  return p;
+}
+
 void
 cofac_list_realloc (cofac_list l, size_t newsize)
 {
@@ -127,6 +144,35 @@ prime_product (mpz_t P, prime_info pi, unsigned long p_max,
 
   mpz_list_init (L);
   p_last = prime_list (L, pi, p_last, p_max);
+
+  /* FIXME: equilibrate the product */
+  mpz_t *l = L->l;
+  unsigned long n = L->size;
+  while (n > 1)
+  {
+    for (i = 0; i+1 < n; i+=2)
+      mpz_mul (l[i/2], l[i], l[i+1]);
+    if (n & 1)
+      mpz_swap (l[n/2], l[n-1]);
+    n = (n + 1) / 2;
+  }
+  mpz_set (P, l[0]);
+
+  mpz_list_clear (L);
+  return p_last;
+}
+
+/* same as prime_product, but keeps only primes for which the given polynomial
+   has factors modulo p */
+unsigned long
+prime_product_poly (mpz_t P, prime_info pi, unsigned long p_max,
+                    unsigned long p_last, mpz_poly_t f)
+{
+  unsigned long i;
+  mpz_list L;
+
+  mpz_list_init (L);
+  p_last = prime_list_poly (L, pi, p_last, p_max, f);
 
   /* FIXME: equilibrate the product */
   mpz_t *l = L->l;
@@ -419,8 +465,7 @@ update_status (mpz_t *R, mpz_t *A,
 void
 find_smooth (cofac_list l, int lpb0, int lpb1,
              unsigned long lim0, unsigned long lim1,
-             FILE *batch0 MAYBE_UNUSED, FILE *batch1 MAYBE_UNUSED,
-             int verbose)
+             FILE *batch0, FILE *batch1, int verbose)
 {
   unsigned long nb_rel;
   unsigned long nb_rel_new;
@@ -800,7 +845,7 @@ factor (cofac_list L, cado_poly pol, int lpb0, int lpb1, int verbose)
 
 void
 create_batch_file (const char *f, unsigned long B, unsigned long L,
-                   cado_poly pol MAYBE_UNUSED, int split)
+                   mpz_poly_t pol, int split)
 {
   FILE *fp;
   prime_info pi;
@@ -809,6 +854,9 @@ create_batch_file (const char *f, unsigned long B, unsigned long L,
   double s = seconds ();
 
   ASSERT_ALWAYS (L > B);
+
+  fprintf (stderr, "# creating batch file %s", f);
+  fflush (stderr);
 
   prime_info_init (pi);
   fp = fopen (f, "w");
@@ -821,7 +869,7 @@ create_batch_file (const char *f, unsigned long B, unsigned long L,
 
   while (B < L)
     {
-      p = prime_product (P, pi, (B + h < L) ? B + h : L, p);
+      p = prime_product_poly (P, pi, (B + h < L) ? B + h : L, p, pol);
       gmp_fprintf (fp, "%lu %Zx\n", B + h, P);
       B += h;
     }
@@ -829,6 +877,7 @@ create_batch_file (const char *f, unsigned long B, unsigned long L,
   fclose (fp);
   prime_info_clear (pi);
   mpz_clear (P);
-  fprintf (stderr, "# creating batch file %s took %.0fs\n", f, seconds () - s);
+  fprintf (stderr, " took %.0fs\n", seconds () - s);
+  fflush (stderr);
 }
 

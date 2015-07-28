@@ -110,7 +110,7 @@ main (int argc, char* argv[])
   batch0 = fopen (batch0_file, "r");
   if (batch0 == NULL)
     {
-      create_batch_file (batch0_file, lim0, 1UL << lpb0, pol, split);
+      create_batch_file (batch0_file, lim0, 1UL << lpb0, pol->pols[0], split);
       batch0 = fopen (batch0_file, "r");
     }
   ASSERT_ALWAYS(batch0 != NULL);
@@ -123,7 +123,7 @@ main (int argc, char* argv[])
   batch1 = fopen (batch1_file, "r");
   if (batch1 == NULL)
     {
-      create_batch_file (batch1_file, lim1, 1UL << lpb1, pol, split);
+      create_batch_file (batch1_file, lim1, 1UL << lpb1, pol->pols[1], split);
       batch1 = fopen (batch1_file, "r");
     }
   ASSERT_ALWAYS(batch1 != NULL);

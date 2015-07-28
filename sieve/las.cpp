@@ -3189,14 +3189,16 @@ int main (int argc0, char *argv0[])/*{{{*/
     batch0 = fopen (batch0_file, "r");
     if (batch0 == NULL)
       {
-	create_batch_file (batch0_file, lim0, 1UL << lpb0, las->cpoly, split);
+	create_batch_file (batch0_file, lim0, 1UL << lpb0, las->cpoly->pols[0],
+			   split);
 	batch0 = fopen (batch0_file, "r");
       }
     ASSERT_ALWAYS(batch0 != NULL);
     batch1 = fopen (batch1_file, "r");
     if (batch1 == NULL)
       {
-	create_batch_file (batch1_file, lim1, 1UL << lpb1, las->cpoly, split);
+	create_batch_file (batch1_file, lim1, 1UL << lpb1, las->cpoly->pols[1],
+			   split);
 	batch1 = fopen (batch1_file, "r");
       }
     ASSERT_ALWAYS(batch1 != NULL);
