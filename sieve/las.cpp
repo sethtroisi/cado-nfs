@@ -2769,8 +2769,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
-    FILE *batch0 = NULL, *batch1 = NULL;
-    const char *batch0_file, *batch1_file;
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -2833,6 +2831,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_parse_double(pl, "grace-time-ratio", &general_grace_time_ratio);
 #endif
 #ifdef BATCH
+    FILE *batch0 = NULL, *batch1 = NULL;
+    const char *batch0_file, *batch1_file;
     if ((batch0_file = param_list_lookup_string (pl, "batch0")) == NULL)
       {
         fprintf (stderr, "Error: -batch0 is missing\n");
