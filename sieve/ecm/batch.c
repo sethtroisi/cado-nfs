@@ -372,7 +372,7 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P,
 /* invariant:
    relations 0 to *nb_smooth-1 are smooth
    relations *nb_smooth to *nb_unknown-1 are unknown
-   relations >= *nb_unknown are non-smooth (useless)
+   relations >= *nb_unknown are non-smooth (useless).
 */
 static void
 update_status (mpz_t *R, uint32_t *perm,
@@ -451,7 +451,6 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
   unsigned long nb_rel_read = l->size;
   unsigned long nb_smooth;
   unsigned long nb_unknown;
-  unsigned long i;
   mpz_t P;
   double s;
   double t_smooth = 0;
@@ -473,13 +472,8 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
 
   b_status_r = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
   b_status_a = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
-  for (i = 0; i < nb_rel_read; i++)
-    {
-      b_status_r[i] = STATUS_UNKNOWN;
-      b_status_a[i] = STATUS_UNKNOWN;
-      ASSERT(mpz_cmp_ui (l->R[i], 0) > 0);
-      ASSERT(mpz_cmp_ui (l->A[i], 0) > 0);
-    }
+  memset (b_status_r, STATUS_UNKNOWN, nb_rel_read);
+  memset (b_status_a, STATUS_UNKNOWN, nb_rel_read);
 
   nb_smooth = 0;
   nb_unknown = nb_rel_read;
@@ -628,8 +622,6 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
   return m;
 }
 
-double td_time = 0;
-
 static int
 trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize)
 {
@@ -666,10 +658,8 @@ print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
   ASSERT_ALWAYS(mpz_divisible_p (n, hint));
   mpz_divexact (n, n, hint);
 
-  td_time -= seconds ();
   /* remove small primes */
   m = trial_divide (n, sp, spsize);
-  td_time += seconds ();
 
   /* use hint */
   m = print_smooth_aux (factors, hint, methods, fm, cfm, lpb, BB, BBB, m);
@@ -776,7 +766,6 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
     }
   free (norm0);
   free (norm1);
-  fprintf (stderr, "td_time=%.1fs sp0:%lu(%lu) sp1:%lu(%lu)\n", td_time, spsize[0], sp0[spsize[0]-1], spsize[1], sp1[spsize[1]-1]);
 
   mpz_clear (Q[0]);
   mpz_clear (Q[1]);
