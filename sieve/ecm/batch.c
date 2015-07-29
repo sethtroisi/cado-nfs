@@ -214,17 +214,20 @@ product_tree (mpz_t *R, unsigned long n, unsigned long *w)
   mpz_t **T;
 
   T = (mpz_t**) malloc ((h + 1) * sizeof (mpz_t*));
-  T[0] = R;
 
   /* initialize tree */
   w[0] = n;
-  for (i = 1; i <= h; i++)
+  for (i = 0; i <= h; i++)
     {
       w[i] = 1 + ((n - 1) >> i);
       T[i] = (mpz_t*) malloc (w[i] * sizeof (mpz_t));
       for (j = 0; j < w[i]; j++)
         mpz_init (T[i][j]);
     }
+
+  /* initialize T[0] to R */
+  for (j = 0; j < n; j++)
+    mpz_set (T[0][j], R[j]);
 
   /* compute product tree */
   for (i = 1; i <= h; i++)
@@ -239,15 +242,15 @@ product_tree (mpz_t *R, unsigned long n, unsigned long *w)
 }
 
 #if 0
-/* compute the remainder of P modulo the product tree T, up to T[1]
-   (last step from T[1] to T[0] is special) */
+/* compute the remainder of P modulo the product tree T */
 static void
-remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P)
+remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P,
+                mpz_t *R MAYBE_UNUSED)
 {
   unsigned long h = tree_height (n), i, j;
 
   mpz_mod (T[h][0], P, T[h][0]);
-  for (i = h; i > 1; i--)
+  for (i = h; i > 0; i--)
     {
       for (j = 0; j < w[i-1] / 2; j++)
         {
@@ -259,12 +262,13 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P)
     }
 }
 #else
-/* Compute the remainder_tree using the "scaled" variant
+/* Compute the remainder tree using the "scaled" variant
    (http://cr.yp.to/arith/scaledmod-20040820.pdf).
    At the root, we compute a floating-point
    approximation of P/T[h][0] with m+guard bits, where m = nbits(T[h][0]). */
 static void
-remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P)
+remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P,
+                mpz_t *R)
 {
   unsigned long h = tree_height (n), i, j, guard;
   unsigned long **nbits;
@@ -284,7 +288,7 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P)
   mpz_mul_2exp (Q, Q, nbits[h][0] + guard);
   mpz_tdiv_q (T[h][0], Q, T[h][0]);
   /* P/T[h][0] ~ Q/2^(m+guard) */
-  for (i = h; i > 1; i--)
+  for (i = h; i > 0; i--)
     {
       for (j = 0; j < w[i-1] / 2; j++)
         {
@@ -308,18 +312,16 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P)
         mpz_swap (T[i-1][w[i-1]-1], T[i][w[i]-1]);
     }
 
-  /* from X[1][j] ~ P/T[1][j]*2^(nbits[1][j] + guard) mod 2^(nbits[1][j] + guard),
-     get X[1][j]*T[1][j]/2^(nbits[1][j] + guard) ~ P mod T[1][j] */
-  for (j = 0; j < w[1]; j++)
+  /* from T[0][j] ~ P/R[j]*2^(nbits[0][j] + guard) mod 2^(nbits[0][j] + guard),
+     get T[0][j]*R[j]/2^(nbits[0][j] + guard) ~ P mod R[j] */
+  for (j = 0; j < n; j++)
     {
-      mpz_mul (T[1][j], T[1][j], T[0][2*j]);
-      if (2*j+1 < w[0])
-        mpz_mul (T[1][j], T[1][j], T[0][2*j+1]);
-      /* now X[1][j] ~ P*2^(nbits[1][j] + guard) */
-      mpz_div_2exp (T[1][j], T[1][j], nbits[1][j]);
-      /* now X[1][j] ~ P*2^guard */
-      mpz_add_ui (T[1][j], T[1][j], (1UL << guard) - 1UL);
-      mpz_div_2exp (T[1][j], T[1][j], guard);
+      mpz_mul (T[0][j], T[0][j], R[j]);
+      /* T[0][j] ~ P*2^(nbits[0][j] + guard) mod R[j]*2^(nbits[0][j]+guard) */
+      mpz_div_2exp (T[0][j], T[0][j], nbits[0][j]);
+      /* T[0][j] ~ P*2^guard mod R[j]*2^guard */
+      mpz_add_ui (T[0][j], T[0][j], (1UL << guard) - 1UL);
+      mpz_div_2exp (T[0][j], T[0][j], guard);
     }
 
   mpz_clear (Q);
@@ -329,14 +331,13 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P)
 }
 #endif
 
-/* Clear the product tree (except T[0] which is assumed to have been
-   allocated differently). */
+/* Clear the product tree. */
 static void
 clear_product_tree (mpz_t **T, unsigned long n, unsigned long *w)
 {
   unsigned long i, j, h = tree_height (n);
 
-  for (i = 1; i <= h; i++)
+  for (i = 0; i <= h; i++)
     {
       for (j = 0; j < w[i]; j++)
         mpz_clear (T[i][j]);
@@ -358,19 +359,7 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P, int verbose)
 {
   unsigned long h = tree_height (n), j, w[MAX_DEPTH];
   mpz_t **T;
-  mpz_t w1, w2;
   static double t_rem = 0;
-
-  mpz_init (w1);
-  mpz_init (w2);
-
-  /* special case for n=1 */
-  if (n == 1)
-    {
-      mpz_gcd (w1, R[0], P);
-      mpz_divexact (R[0], R[0], w1);
-      goto clear_and_exit;
-    }
 
   T = product_tree (R, n, w);
 
@@ -380,32 +369,19 @@ smoothness_test (mpz_t *R, unsigned long n, mpz_t P, int verbose)
 
   /* compute remainder tree */
   t_rem -= seconds ();
-  remainder_tree (T, n, w, P);
+  remainder_tree (T, n, w, P, R);
   t_rem += seconds ();
   if (verbose > 1)
     fprintf (stderr, "# remainder_tree: %.1fs\n", t_rem);
 
-  /* special last loop for i=1, with T[0] = R */
-  for (j = 0; j < n / 2; j++)
+  /* now T[0][j] = P mod R[j] for 0 <= j < n */
+  for (j = 0; j < n; j++)
     {
-      mpz_mod (w1, T[1][j], R[2*j]);
-      mpz_gcd (w2, w1, R[2*j]);
-      mpz_divexact (R[2*j], R[2*j], w2);
-      mpz_mod (w1, T[1][j], R[2*j+1]);
-      mpz_gcd (w2, w1, R[2*j+1]);
-      mpz_divexact (R[2*j+1], R[2*j+1], w2);
-    }
-  /* special case if n is odd */
-  if (n & 1)
-    {
-      mpz_gcd (w2, T[1][w[1]-1], R[n-1]);
-      mpz_divexact (R[n-1], R[n-1], w2);
+      mpz_gcd (T[0][j], T[0][j], R[j]);
+      mpz_divexact (R[j], R[j], T[0][j]);
     }
 
   clear_product_tree (T, n, w);
- clear_and_exit:
-  mpz_clear (w1);
-  mpz_clear (w2);
 }
 
 static void
@@ -446,10 +422,10 @@ update_status (mpz_t *R, mpz_t *A,
   unsigned long B;
   unsigned long L;
 
-  mpz_init(z_B2);
-  mpz_init(z_BL);
-  mpz_init(z_B3);
-  mpz_init(z_L2); /* set to 0 */
+  mpz_init (z_B2);
+  mpz_init (z_BL);
+  mpz_init (z_B3);
+  mpz_init (z_L2); /* set to 0 */
 
   mpz_set_ui (z_B2, lim0);
   mpz_mul_ui (z_B2, z_B2, lim0);
@@ -496,10 +472,10 @@ update_status (mpz_t *R, mpz_t *A,
       }
     }
 
-  mpz_clear(z_B2);
-  mpz_clear(z_BL);
-  mpz_clear(z_B3);
-  mpz_clear(z_L2);
+  mpz_clear (z_B2);
+  mpz_clear (z_BL);
+  mpz_clear (z_B3);
+  mpz_clear (z_L2);
 }
 
 /* return the number n of smooth relations in l,
