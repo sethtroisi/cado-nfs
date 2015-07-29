@@ -1277,9 +1277,11 @@ mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
   }
   /* i is the degree of the leading monomial */
   Q->deg = i;
-  if (i < 0) 
+  if (i < 0) {
       /* if i == -1, then Q is the zero polynomial, there's nothing to do */
+      mpz_clear(aux);
       return;
+  }
 
   mpz_t aux2;
   mpz_init(aux2);
