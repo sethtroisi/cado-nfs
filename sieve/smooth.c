@@ -47,14 +47,15 @@ main (int argc, char* argv[])
 {
   cofac_list L;
   double start;
-  FILE *cofac, *batch0 = NULL, *batch1 = NULL;
+  FILE *cofac;
+  FILE *batch[2] = {NULL, NULL};
   int64_t a;
   uint64_t b;
   mpz_t R, A;
   param_list pl;
   const char *poly_file, *cofac_file, *batch0_file, *batch1_file;
-  int lpb1, lpb0, verbose, split = 10;
-  unsigned long lim1, lim0;
+  int lpb[2], verbose, split = 10;
+  unsigned long lim[2];
 
   start = seconds ();
 
@@ -76,10 +77,10 @@ main (int argc, char* argv[])
   cofac_file = param_list_lookup_string (pl, "cofac");
   batch0_file = param_list_lookup_string (pl, "batch0");
   batch1_file = param_list_lookup_string (pl, "batch1");
-  ASSERT_ALWAYS(param_list_parse_int (pl, "lpb1", &lpb1));
-  ASSERT_ALWAYS(param_list_parse_int (pl, "lpb0", &lpb0));
-  ASSERT_ALWAYS(param_list_parse_ulong (pl, "lim1", &lim1));
-  ASSERT_ALWAYS(param_list_parse_ulong (pl, "lim0", &lim0));
+  ASSERT_ALWAYS(param_list_parse_int (pl, "lpb1", &(lpb[1])));
+  ASSERT_ALWAYS(param_list_parse_int (pl, "lpb0", &(lpb[0])));
+  ASSERT_ALWAYS(param_list_parse_ulong (pl, "lim1", &(lim[1])));
+  ASSERT_ALWAYS(param_list_parse_ulong (pl, "lim0", &(lim[0])));
   param_list_parse_int (pl, "split", &split);
   verbose = param_list_parse_switch (pl, "-v");
 
@@ -107,26 +108,28 @@ main (int argc, char* argv[])
       fprintf (stderr, "Error, missing -batch0 <file>\n");
       exit (1);
     }
-  batch0 = fopen (batch0_file, "r");
-  if (batch0 == NULL)
+  batch[0] = fopen (batch0_file, "r");
+  if (batch[0] == NULL)
     {
-      create_batch_file (batch0_file, lim0, 1UL << lpb0, pol->pols[0], split);
-      batch0 = fopen (batch0_file, "r");
+      create_batch_file (batch0_file, lim[0], 1UL << lpb[0], pol->pols[0],
+                         split);
+      batch[0] = fopen (batch0_file, "r");
     }
-  ASSERT_ALWAYS(batch0 != NULL);
+  ASSERT_ALWAYS(batch[0] != NULL);
 
   if (batch1_file == NULL)
     {
       fprintf (stderr, "Error, missing -batch1 <file>\n");
       exit (1);
     }
-  batch1 = fopen (batch1_file, "r");
-  if (batch1 == NULL)
+  batch[1] = fopen (batch1_file, "r");
+  if (batch[1] == NULL)
     {
-      create_batch_file (batch1_file, lim1, 1UL << lpb1, pol->pols[1], split);
-      batch1 = fopen (batch1_file, "r");
+      create_batch_file (batch1_file, lim[1], 1UL << lpb[1], pol->pols[1],
+                         split);
+      batch[1] = fopen (batch1_file, "r");
     }
-  ASSERT_ALWAYS(batch1 != NULL);
+  ASSERT_ALWAYS(batch[1] != NULL);
 
   /* Initialization */
   cofac_list_init (L);
@@ -155,12 +158,12 @@ main (int argc, char* argv[])
 
   double start0 = seconds ();
   start = seconds ();
-  find_smooth (L, lpb0, lpb1, lim0, lim1, batch0, batch1, verbose);
+  find_smooth (L, lpb, lim, batch, verbose);
   fprintf (stderr, "Detecting %zu smooth cofactors took %.1f s\n", L->size,
            seconds() - start);
 
   start = seconds ();
-  factor (L, pol, lpb0, lpb1, verbose);
+  factor (L, pol, lpb[0], lpb[1], verbose);
   fprintf (stderr, "Factoring %zu smooth cofactors took %.1f s\n", L->size,
            seconds() - start);
   fprintf (stderr, "Detecting + factoring: %.1f s\n", seconds () - start0);
@@ -171,10 +174,10 @@ main (int argc, char* argv[])
   cofac_list_clear (L);
 
   if (batch0_file != NULL)
-    fclose (batch0);
+    fclose (batch[0]);
 
   if (batch1_file != NULL)
-    fclose (batch1);
+    fclose (batch[1]);
 
   /* Clear the ecm addition chains that are stored as global variables
      to avoid re-computations. */

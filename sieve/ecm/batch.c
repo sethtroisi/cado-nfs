@@ -413,8 +413,7 @@ update_status (mpz_t *R, mpz_t *A,
                unsigned char *b_status_r, unsigned char *b_status_a,
                unsigned long *n, unsigned long *nb_rel_smooth,
                unsigned long lim0, unsigned long lpb0,
-               unsigned long *nb_smooth_r, unsigned long *nb_smooth_a,
-               unsigned long *nb_useless, int64_t *a, uint64_t *b)
+               int64_t *a, uint64_t *b)
 {
   mpz_t z_B2, z_BL, z_B3, z_L2;
 
@@ -449,9 +448,6 @@ update_status (mpz_t *R, mpz_t *A,
                  (0 < mpz_cmp_ui (R[i], L) && mpz_cmp (R[i], z_B2) < 0) ||
                  mpz_probab_prime_p (R[i], NB_MILLER_RABIN))
         {
-          if (b_status_a[i] == STATUS_SMOOTH)
-            (*nb_smooth_a)--;
-          (*nb_useless)++;
           /* relation i is useless, swap it with relation *n - 1 */
           swap_rel (i, (*n) - 1, R, A, b_status_r, b_status_a, a, b);
           (*n)--; i--;
@@ -461,7 +457,6 @@ update_status (mpz_t *R, mpz_t *A,
         {
         smooth:
           b_status_r[i] = STATUS_SMOOTH;
-          (*nb_smooth_r)++;
           if (b_status_a[i] == STATUS_SMOOTH)
           {
             /* relation i is smooth, swap it with relation *nb_rel_smooth-1 */
@@ -481,9 +476,8 @@ update_status (mpz_t *R, mpz_t *A,
 /* return the number n of smooth relations in l,
    which should be at the end in locations 0, 1, ..., n-1 */
 void
-find_smooth (cofac_list l, int lpb0, int lpb1,
-             unsigned long lim0, unsigned long lim1,
-             FILE *batch0, FILE *batch1, int verbose)
+find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
+             FILE *batch[2], int verbose)
 {
   unsigned long nb_rel;
   unsigned long nb_rel_new;
@@ -497,18 +491,14 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
   double t_prime = 0;
   double start;
   unsigned int n0_pass;
-  unsigned long lim0_new;
-  unsigned long lim1_new;
+  unsigned long lim_new[2];
   unsigned char *b_status_r;
   unsigned char *b_status_a;
   unsigned long nb_rel_smooth;
-  unsigned long nb_smooth_r;
-  unsigned long nb_smooth_a;
-  unsigned long nb_useless;
   int ret;
 
-  ASSERT_ALWAYS(batch0 != NULL);
-  ASSERT_ALWAYS(batch1 != NULL);
+  ASSERT_ALWAYS(batch[0] != NULL);
+  ASSERT_ALWAYS(batch[1] != NULL);
 
   start = seconds ();
 
@@ -527,15 +517,9 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
   nb_rel_smooth = 0;
   nb_rel_unknown = nb_rel_read;
 
-  nb_smooth_r = 0;
-  nb_smooth_a = 0;
-  nb_useless = 0;
-
-  /* the code below assumes max(lim0,lim1) <= min(2^lpb0,2^lpb1) */
-  ASSERT_ALWAYS(lim0 <= (1UL << lpb0));
-  ASSERT_ALWAYS(lim0 <= (1UL << lpb1));
-  ASSERT_ALWAYS(lim1 <= (1UL << lpb0));
-  ASSERT_ALWAYS(lim1 <= (1UL << lpb1));
+  /* the code below assumes lim0 <= 2^lpb0 and lim1 <= 2^lpb1 */
+  ASSERT_ALWAYS(lim[0] <= (1UL << lpb[0]));
+  ASSERT_ALWAYS(lim[1] <= (1UL << lpb[1]));
 
   /* Loop */
 
@@ -544,81 +528,52 @@ find_smooth (cofac_list l, int lpb0, int lpb1,
      the remaining ones are not smooth */
 
   n0_pass = 0;
-  while ( (lim0 < (1UL << lpb0)) || (lim1 < (1UL << lpb1)) )
+  while ( (lim[0] < (1UL << lpb[0])) || (lim[1] < (1UL << lpb[1])) )
   {
     n0_pass++;
 
-    if (verbose > 1)
-      fprintf (stderr, "#\n# Pass %u: %.0f s\n", n0_pass, seconds() - start);
+    if (verbose)
+      fprintf (stderr, "# Starting pass %u at %.1fs\n",
+               n0_pass, seconds() - start);
 
-    /* side 0 */
-
-    s = seconds ();
-    ret = gmp_fscanf (batch0, "%lu %Zx\n", &lim0_new, P);
-    ASSERT_ALWAYS(ret == 2);
-    s = seconds () - s;
-    t_prime += s;
-    if (verbose > 1)
-      fprintf (stderr, "# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
-               mpz_sizeinbase (P, 2), s, t_prime);
-
-    nb_rel = nb_rel_smooth;
-    nb_rel_new = nb_rel_unknown;
-    s = seconds ();
-    t_smooth -= seconds();
-    smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P, verbose);
-    t_smooth += seconds();
-    if (verbose > 1)
-      fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
-               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
-    nb_rel = nb_rel_new;
-
-    lim0 = lim0_new;
-    t_update -= seconds();
-    update_status (l->R, l->A, b_status_r, b_status_a, &nb_rel_unknown,
-                   &nb_rel_smooth, lim0, lpb0, &nb_smooth_r, &nb_smooth_a,
-                   &nb_useless, l->a, l->b);
-    t_update += seconds();
-    if (verbose > 1)
+    /* it seems faster to start from the algebraic side */
+    for (int z = 1; z >= 0; z--)
       {
-        fprintf (stderr, "# smooth_r:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-                 nb_smooth_r, nb_useless, nb_rel_read - nb_smooth_r - nb_useless, nb_rel_smooth);
-        fprintf (stderr, "# t_update: %.0f seconds\n", t_update);
-      }
+        s = seconds ();
+        ret = gmp_fscanf (batch[z], "%lu %Zx\n", &(lim_new[z]), P);
+        ASSERT_ALWAYS(ret == 2);
+        s = seconds () - s;
+        t_prime += s;
+        if (verbose > 1)
+          fprintf (stderr, "# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
+                   mpz_sizeinbase (P, 2), s, t_prime);
 
-    /* side 1 */
+        nb_rel = nb_rel_smooth;
+        nb_rel_new = nb_rel_unknown;
+        s = seconds ();
+        t_smooth -= seconds();
+        if (z == 0)
+          smoothness_test (&(l->R[nb_rel]), nb_rel_new - nb_rel, P, verbose);
+        else
+          smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P, verbose);
+        t_smooth += seconds();
+        if (verbose > 1)
+          fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
+                   " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
+        nb_rel = nb_rel_new;
 
-    s = seconds ();
-    ret = gmp_fscanf (batch1, "%lu %Zx\n", &lim1_new, P);
-    ASSERT_ALWAYS(ret == 2);
-    s = seconds () - s;
-    t_prime += s;
-    if (verbose > 1)
-      fprintf (stderr, "# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
-               mpz_sizeinbase (P, 2), s, t_prime);
-
-    nb_rel = nb_rel_smooth;
-    nb_rel_new = nb_rel_unknown;
-    s = seconds ();
-    t_smooth -= seconds();
-    smoothness_test (&(l->A[nb_rel]), nb_rel_new - nb_rel, P, verbose);
-    t_smooth += seconds();
-    if (verbose > 1)
-      fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
-               " (total %.0f so far)\n", nb_rel_new - nb_rel, seconds () - s, t_smooth);
-    nb_rel = nb_rel_new;
-
-    lim1 = lim1_new;
-    t_update -= seconds();
-    update_status (l->A, l->R, b_status_a, b_status_r, &nb_rel_unknown,
-                   &nb_rel_smooth, lim1, lpb1, &nb_smooth_a, &nb_smooth_r,
-                   &nb_useless, l->a, l->b);
-    t_update += seconds();
-    if (verbose > 1)
-      {
-        fprintf (stderr, "# smooth_a:%lu useless:%lu unknown:%lu rel_smooth:%lu\n",
-                 nb_smooth_a, nb_useless, nb_rel_read - nb_smooth_a - nb_useless, nb_rel_smooth);
-        fprintf (stderr, "# t_update: %.0f seconds\n", t_update);
+        lim[z] = lim_new[z];
+        t_update -= seconds();
+        if (z == 0)
+          update_status (l->R, l->A, b_status_r, b_status_a, &nb_rel_unknown,
+                         &nb_rel_smooth, lim[0], lpb[0], l->a, l->b);
+        else
+          update_status (l->A, l->R, b_status_a, b_status_r, &nb_rel_unknown,
+                         &nb_rel_smooth, lim[1], lpb[1], l->a, l->b);
+        t_update += seconds();
+        if (verbose)
+          fprintf (stderr, "# rel_smooth: %lu t_update: %.1f seconds\n",
+                   nb_rel_smooth, t_update);
       }
   }
   cofac_list_realloc (l, nb_rel_smooth);

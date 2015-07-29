@@ -2831,7 +2831,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_parse_double(pl, "grace-time-ratio", &general_grace_time_ratio);
 #endif
 #ifdef BATCH
-    FILE *batch0 = NULL, *batch1 = NULL;
+    FILE *batch[2] = {NULL, NULL};
     const char *batch0_file, *batch1_file;
     if ((batch0_file = param_list_lookup_string (pl, "batch0")) == NULL)
       {
@@ -3181,37 +3181,35 @@ int main (int argc0, char *argv0[])/*{{{*/
     delete las->tree;
 
 #ifdef BATCH
-    unsigned long lim0 = las->default_config->sides[0]->lim;
-    unsigned long lim1 = las->default_config->sides[1]->lim;
-    int lpb0 = las->default_config->sides[0]->lpb;
-    int lpb1 = las->default_config->sides[1]->lpb;
+    unsigned long lim[2] = {las->default_config->sides[0]->lim,
+			    las->default_config->sides[1]->lim};
+    int lpb[2] = {las->default_config->sides[0]->lpb,
+		  las->default_config->sides[1]->lpb};
     int split = 10;
-    batch0 = fopen (batch0_file, "r");
-    if (batch0 == NULL)
+    batch[0] = fopen (batch0_file, "r");
+    if (batch[0] == NULL)
       {
-	create_batch_file (batch0_file, lim0, 1UL << lpb0, las->cpoly->pols[0],
-			   split);
-	batch0 = fopen (batch0_file, "r");
+	create_batch_file (batch0_file, lim[0], 1UL << lpb[0],
+			   las->cpoly->pols[0], split);
+	batch[0] = fopen (batch0_file, "r");
       }
-    ASSERT_ALWAYS(batch0 != NULL);
-    batch1 = fopen (batch1_file, "r");
-    if (batch1 == NULL)
+    ASSERT_ALWAYS(batch[0] != NULL);
+    batch[1] = fopen (batch1_file, "r");
+    if (batch[1] == NULL)
       {
-	create_batch_file (batch1_file, lim1, 1UL << lpb1, las->cpoly->pols[1],
-			   split);
-	batch1 = fopen (batch1_file, "r");
+	create_batch_file (batch1_file, lim[1], 1UL << lpb[1],
+			   las->cpoly->pols[1], split);
+	batch[1] = fopen (batch1_file, "r");
       }
-    ASSERT_ALWAYS(batch1 != NULL);
+    ASSERT_ALWAYS(batch[1] != NULL);
     double tcof_batch = seconds ();
     cofac_list_realloc (las->L, las->L->size);
     verbose_output_print (2, 1, "# Total %lu pairs of cofactors\n",
 			  las->L->size);
-    find_smooth (las->L, lpb0, lpb1, lim0, lim1,
-		 batch0, batch1, las->verbose);
+    find_smooth (las->L, lpb, lim, batch, las->verbose);
     verbose_output_print (2, 1, "# Detected %lu smooth cofactors\n",
 			  las->L->size);
-    factor (las->L, las->cpoly, las->default_config->sides[0]->lpb,
-	    las->default_config->sides[1]->lpb, las->verbose);
+    factor (las->L, las->cpoly, lpb[0], lpb[1], las->verbose);
     report->reports = las->L->size;
     tcof_batch = seconds () - tcof_batch;
     report->ttcof += tcof_batch;
