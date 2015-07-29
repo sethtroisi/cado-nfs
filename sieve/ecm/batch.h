@@ -26,6 +26,7 @@ typedef struct {
   mpz_t *A;    /* cofactors on side 1 */
   size_t alloc;
   size_t size;
+  uint32_t *perm; /* permutation to access elements */
 } cofac_list_t;
 typedef cofac_list_t cofac_list[1];
 
@@ -38,8 +39,8 @@ void cofac_list_realloc (cofac_list, size_t);
 void cofac_list_clear (cofac_list);
 void cofac_list_add (cofac_list, long, unsigned long, mpz_t, mpz_t);
 unsigned long prime_product (mpz_t, prime_info, unsigned long, unsigned long);
-void find_smooth (cofac_list, int[2], unsigned long[2], FILE*[2], int);
-void factor (cofac_list, cado_poly, int, int, int);
+unsigned long find_smooth (cofac_list, int[2], unsigned long[2], FILE*[2], int);
+void factor (cofac_list, unsigned long, cado_poly, int, int, int);
 void create_batch_file (const char*, unsigned long, unsigned long,
                         mpz_poly_t, int);
 

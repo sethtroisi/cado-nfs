@@ -3206,11 +3206,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     cofac_list_realloc (las->L, las->L->size);
     verbose_output_print (2, 1, "# Total %lu pairs of cofactors\n",
 			  las->L->size);
-    find_smooth (las->L, lpb, lim, batch, las->verbose);
+    report->reports = find_smooth (las->L, lpb, lim, batch, las->verbose);
     verbose_output_print (2, 1, "# Detected %lu smooth cofactors\n",
-			  las->L->size);
-    factor (las->L, las->cpoly, lpb[0], lpb[1], las->verbose);
-    report->reports = las->L->size;
+			  report->reports);
+    factor (las->L, report->reports, las->cpoly, lpb[0], lpb[1], las->verbose);
     tcof_batch = seconds () - tcof_batch;
     report->ttcof += tcof_batch;
     /* add to ttf since the remaining time will be computed as ttf - ttcof */

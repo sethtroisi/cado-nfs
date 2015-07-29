@@ -55,7 +55,7 @@ main (int argc, char* argv[])
   param_list pl;
   const char *poly_file, *cofac_file, *batch0_file, *batch1_file;
   int lpb[2], verbose, split = 10;
-  unsigned long lim[2];
+  unsigned long lim[2], nb_smooth;
 
   start = seconds ();
 
@@ -158,13 +158,13 @@ main (int argc, char* argv[])
 
   double start0 = seconds ();
   start = seconds ();
-  find_smooth (L, lpb, lim, batch, verbose);
-  fprintf (stderr, "Detecting %zu smooth cofactors took %.1f s\n", L->size,
+  nb_smooth = find_smooth (L, lpb, lim, batch, verbose);
+  fprintf (stderr, "Detecting %zu smooth cofactors took %.1f s\n", nb_smooth,
            seconds() - start);
 
   start = seconds ();
-  factor (L, pol, lpb[0], lpb[1], verbose);
-  fprintf (stderr, "Factoring %zu smooth cofactors took %.1f s\n", L->size,
+  factor (L, nb_smooth, pol, lpb[0], lpb[1], verbose);
+  fprintf (stderr, "Factoring %zu smooth cofactors took %.1f s\n", nb_smooth,
            seconds() - start);
   fprintf (stderr, "Detecting + factoring: %.1f s\n", seconds () - start0);
 

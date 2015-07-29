@@ -768,7 +768,7 @@ facul_make_default_strategy (int n, const int verbose)
       ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
     }
 
-  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
+  /* heuristic strategy where B1 is increased by c*sqrt(B1) at each curve */
   double B1 = 105.0;
   for (int i = 4; i < n + 3; i++)
     {
@@ -899,7 +899,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 
       verbose_output_print(0, 1, "# Using default strategy for the cofactorization\n");
       strategies->precomputed_methods =
-	facul_make_default_strategy (max_ncurves,verbose);
+	facul_make_default_strategy (max_ncurves, verbose);
       /* make two well-behaved facul_method_side_t* lists, based on which
        * side is first */
       for (int first = 0 ; first < 2 ; first++) {
