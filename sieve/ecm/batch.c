@@ -46,6 +46,9 @@ cofac_list_init (cofac_list l)
   l->b = NULL;
   l->R = NULL;
   l->A = NULL;
+  l->R0 = NULL;
+  l->A0 = NULL;
+  l->sq = NULL;
   l->perm = NULL;
   l->alloc = 0;
   l->size = 0;
@@ -94,11 +97,17 @@ cofac_list_realloc (cofac_list l, size_t newsize)
     {
       mpz_clear (l->R[i]);
       mpz_clear (l->A[i]);
+      mpz_clear (l->R0[i]);
+      mpz_clear (l->A0[i]);
+      mpz_clear (l->sq[i]);
     }
   l->a = realloc (l->a, newsize * sizeof (int64_t));
   l->b = realloc (l->b, newsize * sizeof (uint64_t));
   l->R = realloc (l->R, newsize * sizeof (mpz_t));
   l->A = realloc (l->A, newsize * sizeof (mpz_t));
+  l->R0 = realloc (l->R0, newsize * sizeof (mpz_t));
+  l->A0 = realloc (l->A0, newsize * sizeof (mpz_t));
+  l->sq = realloc (l->sq, newsize * sizeof (mpz_t));
   l->perm = realloc (l->perm, newsize * sizeof (uint32_t));
   l->alloc = newsize;
   if (newsize < l->size)
@@ -106,16 +115,18 @@ cofac_list_realloc (cofac_list l, size_t newsize)
 }
 
 void
-cofac_list_add (cofac_list l, long a, unsigned long b, mpz_t R, mpz_t A)
+cofac_list_add (cofac_list l, long a, unsigned long b, mpz_t R, mpz_t A,
+                mpz_t sq)
 {
   if (l->size == l->alloc)
     cofac_list_realloc (l, 2 * l->alloc + 1);
   l->a[l->size] = a;
   l->b[l->size] = b;
-  mpz_init (l->R[l->size]);
-  mpz_init (l->A[l->size]);
-  mpz_set (l->R[l->size], R);
-  mpz_set (l->A[l->size], A);
+  mpz_init_set (l->R[l->size], R);
+  mpz_init_set (l->A[l->size], A);
+  mpz_init_set (l->R0[l->size], R);
+  mpz_init_set (l->A0[l->size], A);
+  mpz_init_set (l->sq[l->size], sq);
   l->perm[l->size] = l->size;
   (l->size)++;
 }
@@ -128,11 +139,17 @@ cofac_list_clear (cofac_list l)
     {
       mpz_clear (l->R[i]);
       mpz_clear (l->A[i]);
+      mpz_clear (l->R0[i]);
+      mpz_clear (l->A0[i]);
+      mpz_clear (l->sq[i]);
     }
   free (l->a);
   free (l->b);
   free (l->R);
   free (l->A);
+  free (l->R0);
+  free (l->A0);
+  free (l->sq);
   free (l->perm);
 }
 
@@ -646,25 +663,46 @@ trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize)
    The list SP (small primes) contains all primes < B.
    BB is the prime bound: any factor < BB is necessarily prime.
    'hint' is either 1 or a product of large primes.
+   'cofac' is the initial cofactor (without special-q).
 */
 static void
 print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
               struct modset_t *fm, struct modset_t *cfm,
               unsigned int lpb, double BB, double BBB, unsigned long *sp,
-              unsigned long spsize, mpz_t hint)
+              unsigned long spsize, mpz_t hint, mpz_t cofac, mpz_ptr sq)
 {
   int m; /* number of already printed factors */
 
-  ASSERT_ALWAYS(mpz_divisible_p (n, hint));
-  mpz_divexact (n, n, hint);
+  ASSERT_ALWAYS(mpz_divisible_p (n, cofac));
+  mpz_divexact (n, n, cofac);
+
+  ASSERT_ALWAYS(mpz_divisible_p (cofac, hint));
+  mpz_divexact (cofac, cofac, hint);
+
+  if (sq != NULL)
+    {
+      ASSERT_ALWAYS(mpz_divisible_p (n, sq));
+      mpz_divexact (n, n, sq);
+    }
 
   /* remove small primes */
   m = trial_divide (n, sp, spsize);
 
-  /* use hint */
+  /* factor hint */
   m = print_smooth_aux (factors, hint, methods, fm, cfm, lpb, BB, BBB, m);
 
+  /* factor rest of cofactor */
+  m = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, BB, BBB, m);
+
+  /* factor rest of factor base primes */
   print_smooth_aux (factors, n, methods, fm, cfm, lpb, BB, BBB, m);
+
+  if (sq != NULL)
+    {
+      if (m)
+        printf (",");
+      gmp_printf ("%lx", sq);
+    }
 }
 
 /* strip integers in l[0..n-1] which do not divide P */
@@ -753,12 +791,12 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
     {
       printf ("%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
 
-      print_smooth (Q, norm0[i], methods, &fm, &cfm, lpb0, BB, BBB,
-                    sp0, spsize[0], L->R[perm[i]]);
+      print_smooth (Q, norm0[i], methods, &fm, &cfm, lpb0, BB, BBB, sp0,
+                    spsize[0], L->R[perm[i]], L->R0[perm[i]], NULL);
       printf (":");
 
-      print_smooth (Q, norm1[i], methods, &fm, &cfm, lpb1, BB, BBB,
-                    sp1, spsize[1], L->A[perm[i]]);
+      print_smooth (Q, norm1[i], methods, &fm, &cfm, lpb1, BB, BBB, sp1,
+                    spsize[1], L->A[perm[i]], L->A0[perm[i]], L->sq[perm[i]]);
       printf ("\n");
       fflush (stdout);
       mpz_clear (norm0[i]);

@@ -2296,9 +2296,14 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
 #ifdef BATCH
 	    verbose_output_start_batch ();
-	    cofac_list_add ((cofac_list_t*) las->L, a, b, norm[0], norm[1]);
+	    cofac_list_add ((cofac_list_t*) las->L, a, b, norm[0], norm[1],
+			    si->qbasis.q);
 	    verbose_output_end_batch ();
 	    continue; /* we will deal with all cofactors at the end of las */
+#endif
+#if 0 /* activate here to create a cofac file for the 'smooth' binary */
+	    gmp_printf ("LOG %ld %lu %Zd %Zd %Zd\n", a, b, norm[0], norm[1],
+			si->qbasis.q);
 #endif
 
             if (cof_stats == 1)

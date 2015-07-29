@@ -51,7 +51,7 @@ main (int argc, char* argv[])
   FILE *batch[2] = {NULL, NULL};
   int64_t a;
   uint64_t b;
-  mpz_t R, A;
+  mpz_t R, A, q;
   param_list pl;
   const char *poly_file, *cofac_file, *batch0_file, *batch1_file;
   int lpb[2], verbose, split = 10;
@@ -135,9 +135,11 @@ main (int argc, char* argv[])
   cofac_list_init (L);
 
   cofac = fopen (cofac_file, "r");
+  ASSERT_ALWAYS(cofac != NULL);
 
   mpz_init (R);
   mpz_init (A);
+  mpz_init (q);
   while (1)
   {
     char str[1024];
@@ -145,10 +147,10 @@ main (int argc, char* argv[])
 
     if (fgets (str, 1024, cofac) == NULL)
       break;
-    ret = gmp_sscanf (str, "%ld %lu %Zd %Zd\n", &a, &b, R, A);
-    if (ret != 4)
+    ret = gmp_sscanf (str, "%ld %lu %Zd %Zd %Zd\n", &a, &b, R, A, q);
+    if (ret != 5)
       break;
-    cofac_list_add (L, a, b, R, A);
+    cofac_list_add (L, a, b, R, A, q);
   }
   fclose (cofac);
   cofac_list_realloc (L, L->size);
@@ -171,6 +173,7 @@ main (int argc, char* argv[])
   cado_poly_clear (pol);
   mpz_clear (R);
   mpz_clear (A);
+  mpz_clear (q);
   cofac_list_clear (L);
 
   if (batch0_file != NULL)
