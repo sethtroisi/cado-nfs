@@ -1948,17 +1948,30 @@ mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4])
 /* v <- |f(i,j)|, where f is homogeneous of degree d */
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j)
 {
-  unsigned int k;
+  unsigned int k = f->deg;
   mpz_t jpow;
 
-  mpz_init_set_ui (jpow, 1);
+  ASSERT(k > 0);
   mpz_set (v, f->coeff[f->deg]);
-  for (k = f->deg; k-- > 0;)
-    {
-      mpz_mul_int64 (v, v, i);
-      mpz_mul_uint64 (jpow, jpow, j);
-      mpz_addmul (v, f->coeff[k], jpow);
-    }
+  mpz_mul_si (v, f->coeff[k], i);
+  mpz_init (jpow);
+  mpz_set_uint64 (jpow, j);
+  mpz_addmul (v, f->coeff[--k], jpow); /* v = i*f[d] + j*f[d-1] */
+  for (; k-- > 0;)
+      {
+        /* this test will be resolved at compile time by most compilers */
+        if ((uint64_t) ULONG_MAX >= UINT64_MAX)
+          { /* hardcode since this function is critical in las */
+            mpz_mul_si (v, v, i);
+            mpz_mul_ui (jpow, jpow, j);
+          }
+        else
+          {
+            mpz_mul_int64 (v, v, i);
+            mpz_mul_uint64 (jpow, jpow, j);
+          }
+        mpz_addmul (v, f->coeff[k], jpow);
+      }
   mpz_abs (v, v); /* avoids problems with negative norms */
   mpz_clear (jpow);
 }
