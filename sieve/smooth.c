@@ -57,8 +57,6 @@ main (int argc, char* argv[])
   int lpb[2], verbose, split = 10;
   unsigned long lim[2], nb_smooth;
 
-  start = seconds ();
-
   param_list_init (pl);
   declare_usage (pl);
 
@@ -132,6 +130,7 @@ main (int argc, char* argv[])
   ASSERT_ALWAYS(batch[1] != NULL);
 
   /* Initialization */
+  start = seconds ();
   cofac_list_init (L);
 
   cofac = fopen (cofac_file, "r");
@@ -148,8 +147,7 @@ main (int argc, char* argv[])
     if (fgets (str, 1024, cofac) == NULL)
       break;
     ret = gmp_sscanf (str, "%ld %lu %Zd %Zd %Zd\n", &a, &b, R, A, q);
-    if (ret != 5)
-      break;
+    ASSERT_ALWAYS(ret == 5);
     cofac_list_add (L, a, b, R, A, q);
   }
   fclose (cofac);
