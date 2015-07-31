@@ -269,11 +269,10 @@ trialdiv2_divexact (mpz_t N, mp_limb_t p, mp_limb_t pinv)
 
   x0 = n[0] * pinv; /* N/p mod W = x0 */
   ularith_mul_ul_ul_2ul (&r0, &r1, x0, p); /* x0 * p = r1*W+r0 */
-  /* x0 * p = N + k*W */
-  ularith_sub_2ul_2ul (&r0, &r1, n[0], n[1]);
-  ASSERT(r0 == 0);
+  ASSERT(r0 == n[0]);
+  r1 = n[1] - r1;
   n[0] = x0;
-  n[1] = -(r1 * pinv);
+  n[1] = r1 * pinv;
   N->_mp_size -= (r1 == 0);
 }
 
