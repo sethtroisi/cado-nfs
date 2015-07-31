@@ -467,7 +467,7 @@ mod_sprp2 (const modulus_t m)
   /* Let m-1 = 2^l * k, k odd. Set mm1 = k, po2 = l */
   mm1[0]--; /* No borrow since m is odd */
 
-  if (mm1[0] == 0UL)
+  if (UNLIKELY(mm1[0] == 0UL))
     {
       mm1[0] = mm1[1];
       mm1[1] = 0UL;
