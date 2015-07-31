@@ -3190,7 +3190,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 			    las->default_config->sides[1]->lim};
     int lpb[2] = {las->default_config->sides[0]->lpb,
 		  las->default_config->sides[1]->lpb};
-    int split = 10;
+    int split = 1;
     batch[0] = fopen (batch0_file, "r");
     if (batch[0] == NULL)
       {

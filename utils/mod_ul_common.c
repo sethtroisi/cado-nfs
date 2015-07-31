@@ -400,7 +400,8 @@ mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords,
 }
 
 
-/* Returns 1 if m is a strong probable prime wrt base b, 0 otherwise. */
+/* Returns 1 if m is a strong probable prime wrt base b, 0 otherwise.
+   We assume m is odd. */
 int
 mod_sprp (const residue_t b, const modulus_t m)
 {
@@ -409,12 +410,6 @@ mod_sprp (const residue_t b, const modulus_t m)
   unsigned long mm1;
 
   mm1 = mod_getmod_ul (m);
-
-  if (mm1 <= 3UL)
-    return (mm1 >= 2UL);
-
-  if (mm1 % 2UL == 0UL)
-    return 0;
 
   /* Set mm1 to the odd part of m-1 */
   mm1 = (mm1 - 1) >> 1;
@@ -448,7 +443,7 @@ mod_sprp (const residue_t b, const modulus_t m)
 
 
 /* Returns 1 if m is a strong probable prime wrt base 2, 0 otherwise.
-   Assume m is odd. */
+   We assume m is odd. */
 int
 mod_sprp2 (const modulus_t m)
 {
@@ -461,7 +456,7 @@ mod_sprp2 (const modulus_t m)
   /* If m == 1,7 (mod 8), then 2 is a quadratic residue, and we must find
      -1 with one less squaring. This does not reduce the number of
      pseudo-primes because strong pseudo-primes are also Euler pseudo-primes,
-     but makes identifying composites a little faster on avarage. */
+     but makes identifying composites a little faster on average. */
   if (mm1 % 8 == 1 || mm1 % 8 == 7)
     po2--;
 

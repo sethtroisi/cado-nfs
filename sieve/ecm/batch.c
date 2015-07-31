@@ -364,15 +364,15 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P,
   T = product_tree (R, perm, n, w);
 
   if (verbose > 1)
-    fprintf (stderr, "# cofactor product has %zu bits\n",
-             mpz_sizeinbase (T[h][0], 2));
+    printf ("# cofactor product has %zu bits\n",
+            mpz_sizeinbase (T[h][0], 2));
 
   /* compute remainder tree */
   t_rem -= seconds ();
   remainder_tree (T, n, w, P, R, perm);
   t_rem += seconds ();
   if (verbose > 1)
-    fprintf (stderr, "# remainder_tree: %.1fs\n", t_rem);
+    printf ("# remainder_tree: %.1fs\n", t_rem);
 
   /* now T[0][j] = P mod R[j] for 0 <= j < n */
   for (j = 0; j < n; j++)
@@ -511,8 +511,8 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
     n0_pass++;
 
     if (verbose)
-      fprintf (stderr, "# Starting pass %u at %.1fs\n",
-               n0_pass, seconds() - start);
+      printf ("# Starting pass %u at %.1fs\n",
+              n0_pass, seconds() - start);
 
     /* it seems faster to start from the algebraic side */
     for (int z = 1; z >= 0; z--)
@@ -523,8 +523,8 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
         s = seconds () - s;
         t_prime += s;
         if (verbose > 1)
-          fprintf (stderr, "# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
-                   mpz_sizeinbase (P, 2), s, t_prime);
+          printf ("# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
+                  mpz_sizeinbase (P, 2), s, t_prime);
 
         s = seconds ();
         t_smooth -= seconds();
@@ -534,8 +534,8 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
           smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth, P, verbose);
         t_smooth += seconds();
         if (verbose > 1)
-          fprintf (stderr, "# smoothness_test (%lu cofactors) took %.0f seconds"
-                   " (total %.0f so far)\n", nb_unknown - nb_smooth, seconds () - s, t_smooth);
+          printf ("# smoothness_test (%lu cofactors) took %.0f seconds"
+                  " (total %.0f so far)\n", nb_unknown - nb_smooth, seconds () - s, t_smooth);
 
         lim[z] = lim_new[z];
         t_update -= seconds();
@@ -548,8 +548,8 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
                          &nb_smooth, &nb_unknown, lim[z], lpb[z]);
         t_update += seconds();
         if (verbose)
-          fprintf (stderr, "# rel_smooth: %lu t_update: %.1f seconds\n",
-                   nb_smooth, t_update);
+          printf ("# rel_smooth: %lu t_update: %.1f seconds\n",
+                  nb_smooth, t_update);
       }
   }
 
@@ -559,10 +559,10 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
 
   if (verbose)
     {
-      fprintf (stderr, "# find_smooth %.1fs (t_prime %.1fs, t_smooth %.1fs, t_update %.1fs)\n",
-               seconds () - start, t_prime, t_smooth, t_update);
-      fprintf (stderr, "# out of %lu rels, found %lu smooth\n",
-               nb_rel_read, nb_smooth);
+      printf ("# find_smooth %.1fs (t_prime %.1fs, t_smooth %.1fs, t_update %.1fs)\n",
+              seconds () - start, t_prime, t_smooth, t_update);
+      printf ("# out of %lu rels, found %lu smooth\n",
+              nb_rel_read, nb_smooth);
     }
 
   return nb_smooth;
@@ -813,8 +813,8 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
   facul_clear_aux_methods (methods);
 
   if (verbose)
-    fprintf (stderr, "# factor: %.1fs to print %lu rels\n",
-             seconds () - start, n);
+    printf ("# factor: %.1fs to print %lu rels\n",
+            seconds () - start, n);
 }
 
 void
@@ -829,8 +829,8 @@ create_batch_file (const char *f, unsigned long B, unsigned long L,
 
   ASSERT_ALWAYS (L > B);
 
-  fprintf (stderr, "# creating batch file %s", f);
-  fflush (stderr);
+  printf ("# creating batch file %s", f);
+  fflush (stdout);
 
   prime_info_init (pi);
   fp = fopen (f, "w");
@@ -851,7 +851,7 @@ create_batch_file (const char *f, unsigned long B, unsigned long L,
   fclose (fp);
   prime_info_clear (pi);
   mpz_clear (P);
-  fprintf (stderr, " took %.0fs\n", seconds () - s);
-  fflush (stderr);
+  printf (" took %.0fs\n", seconds () - s);
+  fflush (stdout);
 }
 
