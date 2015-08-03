@@ -1,9 +1,10 @@
 #!/bin/csh
-set d=$1
+set in=$1
+set d=$2
 
 /bin/rm -f $d/cpu $d/rep $d/mem
 
-foreach f (/localdisk/cado-nfs/rsa704/2015*)
+foreach f ($in/2015*)
    set t1=`grep "Total cpu time" $f | cut -d" " -f5 | sed 's/s//g'`
    set t2=`grep "Total cpu time" $f | cut -d" " -f9`
    set t3=`grep "Total cpu time" $f | cut -d" " -f16`
@@ -15,6 +16,7 @@ end
 gnuplot << EOF
 set terminal gif
 set output '$d/cpu.gif'
+set yrange [0:]
 plot "$d/cpu" using 1 title "total time (seconds)" with lp, \
      "$d/cpu" using 2 title "sieving time (seconds)" with lp, \
      "$d/cpu" using 3 title "cofactorization time (seconds)" with lp

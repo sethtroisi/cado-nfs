@@ -58,7 +58,9 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
 
 #ifndef MOD_NO_SHARED_MOD_POW_MP
 /* Compute r = b^e. Here e is a multiple precision integer 
-   sum_{i=0}^{e_nrwords-1} e[i] * (machine word base)^i */
+   sum_{i=0}^{e_nrwords-1} e[i] * (machine word base)^i.
+   Assume e[e_nrwords-1}] is not zero if e_nrwords > 0.
+*/
 void
 mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e, 
 	    const int e_nrwords, const modulus_t m)
@@ -67,7 +69,7 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
   residue_t t;
   int i = e_nrwords - 1;
 
-  if (e_nrwords == 0 || e[i] == 0UL)
+  if (e_nrwords == 0)
     {
       mod_set1 (r, m);
       return;

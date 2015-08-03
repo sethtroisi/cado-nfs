@@ -16,7 +16,10 @@
 #include "las-todo.h"
 #include "las-smallsieve.h"
 #include "las-dlog-base.h"
+#include "ecm/batch.h"
 
+/* define BATCH to use batch cofactorization */
+// #define BATCH 1
 
 /* {{{ siever_config */
 /* The following structure lists the fields with an impact on the siever.
@@ -239,6 +242,10 @@ struct las_info_s {
     las_dlog_base * dlog_base;
 #endif
     descent_tree * tree;
+
+#ifdef BATCH
+    cofac_list L; /* to store (a,b) and corresponding cofactors */
+#endif
 };
 
 typedef struct las_info_s las_info[1];

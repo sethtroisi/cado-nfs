@@ -331,6 +331,7 @@ params/params.c186
 params/params.c190
 params/params.c204
 params/params.c220
+params/params.c30
 params/params.c60
 params/params.c65
 params/params.c70
@@ -353,6 +354,8 @@ polyselect/murphyE.h
 polyselect/polyselect_gfpn.c
 polyselect/gfpkdlpolyselect.h
 polyselect/gfpkdlpolyselect.c
+polyselect/table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01.c
+polyselect/table_t_Py_f_deg4_type0_h1_t-200--200.c
 polyselect/polyselect2l.c
 polyselect/polyselect2l.h
 polyselect/polyselect2l_arith.c
@@ -469,6 +472,8 @@ sieve/ecm/mpqs_ul.c
 sieve/ecm/mpqs_15ul.c
 sieve/ecm/mpqs_2ul2.c
 sieve/ecm/mpqs_mpz.c
+sieve/ecm/batch.h
+sieve/ecm/batch.c
 sieve/fb.cpp
 sieve/fb.h
 sieve/fb-types.h
