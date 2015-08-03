@@ -44,6 +44,18 @@ void mat_int64_init_with_array(mat_int64_ptr matrix, unsigned int NumRows,
 void mat_int64_set_zero(mat_int64_ptr matrix);
 
 /*
+ * Set the matrix to the identity matrix.
+ *
+ * matrix: the matrix.
+ */
+void mat_int64_set_identity(mat_int64_ptr matrix);
+
+/*
+ * Compare to matrices. Return 1 if these are equal, 0 otherwise.
+ */
+unsigned int mat_int64_equal(mat_int64_srcptr A, mat_int64_srcptr B);
+
+/*
  * Copy A in B. Assume that B and A have the same size.
  *
  * B: the new matrix.

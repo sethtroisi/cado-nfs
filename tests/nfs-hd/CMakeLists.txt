@@ -32,6 +32,7 @@ run_test(test_makefb test_makefb)
 add_executable(test_utils_int64 test_utils_int64.c ../../nfs-hd/utils_int64.c)
 target_link_libraries(test_utils_int64 utils)
 include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
+run_test(test_utils_int64 test_utils_int64)
 
 # -----
 run_test(test_utils_mpz test_utils_mpz)
@@ -39,3 +40,9 @@ add_executable(test_utils_mpz test_utils_mpz.c ../../nfs-hd/utils_mpz.c)
 target_link_libraries(test_utils_mpz utils ${ECM_LIB})
 include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
 run_test(test_utils_mpz test_utils_mpz)
+
+# -----
+add_executable(test_mat_int64 test_mat_int64.c ../../nfs-hd/mat_int64.c ../../nfs-hd/utils_int64.c ../../nfs-hd/mat_Z.c ../../nfs-hd/int64_poly.c ../../nfs-hd/int64_vector.c)
+target_link_libraries(test_mat_int64 utils)
+include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
+run_test(test_mat_int64 test_mat_int64)

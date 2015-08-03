@@ -747,25 +747,6 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
 }
 
 #ifdef SPACE_SIEVE_REDUCE_QLATTICE
-static void xgcd(int64_t * g, int64_t * u, int64_t * v, int64_t a, int64_t b)
-{
-  if (!a) {
-    ASSERT(a == 0);
-
-    * g = b;
-    * u = 0;
-    * v = 1;
-  } else {
-    int64_t x = 0;
-    int64_t y = 0;
-    xgcd(g, &y, &x, b % a, a);
-    * u = x - (b / a) * y;
-    * v = y;
-  }
-
-  ASSERT(* g == * u * a + * v * b);
-  ASSERT(ABS(* g) == ABS(gcd_int64(a, b)));
-}
 
 static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
     int64_t I)
@@ -799,7 +780,7 @@ static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
     ASSERT(list->v[0]->c[0] < 0);
 
     int64_t g = 0;
-    xgcd(&g, &x, &y, list->v[0]->c[1], -list->v[0]->c[0]);
+    int64_xgcd(&g, &x, &y, list->v[0]->c[1], -list->v[0]->c[0]);
 
     if (g == -1) {
       g = 1;
@@ -812,7 +793,7 @@ static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
     ASSERT(list->v[0]->c[0] > 0);
 
     int64_t g = 0;
-    xgcd(&g, &x, &y, -list->v[0]->c[1], list->v[0]->c[0]);
+    int64_xgcd(&g, &x, &y, -list->v[0]->c[1], list->v[0]->c[0]);
 
     if (g != 1) {
       g = -g;
