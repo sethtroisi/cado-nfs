@@ -230,12 +230,6 @@ removeSingletons(report_t *rep, filter_matrix_t *mat)
     return njrem;
 }
 
-int
-deleteHeavyColumns(report_t *rep, filter_matrix_t *mat)
-{
-    return MkzDeleteHeavyColumns(rep, mat);
-}
-
 void
 removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 {
@@ -617,9 +611,8 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
 }
 
 static void
-mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
-		double *totopt, double *totfill, double *totMST,
-		double *totdel, int32_t j)
+mergeForColumn2 (report_t *rep, filter_matrix_t *mat, int *njrem,
+                 double *totopt, double *totfill, double *totMST, int32_t j)
 {
     double tt, tfill, tMST;
     
@@ -627,9 +620,6 @@ mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
     *totopt += tt;
     *totfill += tfill;
     *totMST += tMST;
-    tt = seconds();
-    *njrem += deleteHeavyColumns(rep, mat);
-    *totdel += (seconds()-tt);
 }
 
 int
@@ -670,7 +660,7 @@ void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                int forbw, double ratio, double coverNmax, int64_t nbmergemax)
 {
-  double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
+  double totopt = 0.0, totfill = 0.0, totMST = 0.0;
   int njrem = 0;
   int ni2rem;
   int32_t j, mkz;
@@ -745,7 +735,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
             fprintf(rep->outfile, "## First %d-merge\n", m);
         }
         fprintf(rep->outfile, "#\n");
-        mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel, j);
+        mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, j);
     }
 
     if (nb_merges[m]++ == 0 && m > 1) {
@@ -795,6 +785,10 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   for (m = 1; m <= maxlevel; m++)
     printf ("Number of %d-merges: %" PRIu64 "\n", m, nb_merges[m]);
   free (nb_merges);
+
+  printf ("Time spent finding optimal combination: %.2fs (among which %.2fs "
+          "for filling the weight matrices and %.2fs for computing minimal "
+          "spanning tree)\n", totopt, totfill, totMST);
 }
 
 //////////////////////////////////////////////////////////////////////

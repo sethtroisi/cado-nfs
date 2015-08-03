@@ -701,10 +701,10 @@ class MakeFB(Program):
     """
     >>> p = MakeFB(poly="foo.poly", lim=1)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'makefb -poly foo.poly -alim 1'
+    'makefb -poly foo.poly -lim 1'
     >>> p = MakeFB(poly="foo.poly", lim=1, maxbits=5, stdout="foo.roots")
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'makefb -poly foo.poly -alim 1 -maxbits 5 > foo.roots'
+    'makefb -poly foo.poly -lim 1 -maxbits 5 > foo.roots'
     """
     binary = "makefb"
     name = binary
@@ -712,7 +712,7 @@ class MakeFB(Program):
 
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
-                 lim: Parameter("alim", checktype=int),
+                 lim: Parameter(checktype=int),
                  maxbits: Parameter(checktype=int)=None,
                  out: Parameter(is_output_file=True)=None,
                  side: Parameter(checktype=int)=None,
@@ -725,10 +725,10 @@ class FreeRel(Program):
     """
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel")
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel'
+    'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel'
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
+    'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
     """
     binary = "freerel"
     name = binary
@@ -736,8 +736,8 @@ class FreeRel(Program):
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
                  renumber: Parameter(is_output_file=True),
-                 lpbr: Parameter(checktype=int),
-                 lpba: Parameter(checktype=int),
+                 lpbr: Parameter("lpb0", checktype=int),
+                 lpba: Parameter("lpb1", checktype=int),
                  out: Parameter(is_output_file=True),
                  badideals: Parameter(is_output_file=True)=None,
                  pmin: Parameter(checktype=int)=None,
@@ -1108,8 +1108,8 @@ class Characters(Program):
                  heavyblock: Parameter(),
                  out: Parameter(),
                  wfile: Parameter("ker"),
-                 lpbr: Parameter(),
-                 lpba: Parameter(),
+                 lpbr: Parameter("lpb0"),
+                 lpba: Parameter("lpb1"),
                  nchar: Parameter()=None,
                  nratchars: Parameter()=None,
                  threads: Parameter("t")=None,
@@ -1129,8 +1129,8 @@ class Sqrt(Program):
                  dep: Parameter()=None,
                  threads : Parameter("t", checktype=int)=None,
                  ab: Toggle()=None,
-                 rat: Toggle()=None,
-                 alg: Toggle()=None,
+                 side0: Toggle()=None,
+                 side1: Toggle()=None,
                  gcd: Toggle()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)

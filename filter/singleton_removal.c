@@ -20,12 +20,12 @@ void singleton_removal_oneiter_mono (purge_matrix_ptr mat)
 {
   for (uint64_t i = 0; i < mat->nrows_init; i++)
   {
-    if (bit_vector_getbit(mat->row_used, (size_t) i))
+    index_t h, *row_ptr;
+    if (purge_matrix_is_row_active(mat, i))
     {
-      index_t *row;
-      for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+      for (row_ptr = mat->row_compact[i]; (h = *row_ptr++) != UMAX(h);)
       {
-        if (mat->cols_weight[*row] == 1)
+        if (mat->cols_weight[h] == 1)
         {
           /* mat->nrows and mat->ncols are updated by purge_matrix_delete_row.*/
           purge_matrix_delete_row (mat, i);
@@ -54,24 +54,20 @@ singleton_removal_mt_thread (void *arg)
 {
   sing_rem_mt_data_t *data = (sing_rem_mt_data_t *) arg;
   purge_matrix_ptr mat = data->mat;
-  index_t *row;
-  weight_t *w;
-  bv_t j;
 
   data->sup_nrow = data->sup_ncol = 0;
   for (uint64_t i = data->begin; i < data->end; i++)
   {
-    j = (((bv_t) 1) << (i & (BV_BITS - 1)));
-
-    if (mat->row_used->p[i >> LN2_BV_BITS] & j) /* Still active ? */
+    if (purge_matrix_is_row_active(mat, i))
     {
-      for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+      index_t h, *row_ptr;
+      for (row_ptr = mat->row_compact[i]; (h = *row_ptr++) != UMAX(h);)
       {
-        if (UNLIKELY(mat->cols_weight[*row] == 1)) /* We found a singleton */
+        if (UNLIKELY(mat->cols_weight[h] == 1)) /* We found a singleton */
         {
-          for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+          for (row_ptr = mat->row_compact[i]; (h = *row_ptr++) != UMAX(h);)
           {
-            w = &(mat->cols_weight[*row]);
+            weight_t *w = &(mat->cols_weight[h]);
             ASSERT(*w);
             /* Decrease only if not equal to the maximum value */
             /* If weight becomes 0, we just remove a column */
@@ -87,10 +83,7 @@ singleton_removal_mt_thread (void *arg)
           }
           /* We do not free mat->row_compact[i] as it is freed later with
              my_malloc_free_all */
-          /* This is thread-safe because we know that all rows in
-             data->row_used->p[i >> LN2_BV_BITS] are handled by the same thread
-           */
-          mat->row_used->p[i >> LN2_BV_BITS] &= ~j;
+          purge_matrix_set_row_inactive (mat, i); /* mark as deleted */
           (data->sup_nrow)++;
           break;
         }

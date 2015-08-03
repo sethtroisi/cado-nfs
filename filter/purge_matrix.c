@@ -34,14 +34,6 @@ purge_matrix_init (purge_matrix_ptr mat, uint64_t nrows_init,
                   "so far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
   memset(mat->cols_weight, 0, cur_alloc);
 
-  /* Malloc row_used and set to 1 */
-  bit_vector_init(mat->row_used, mat->nrows_init);
-  cur_alloc = bit_vector_memory_footprint(mat->row_used);
-  mat->tot_alloc_bytes += cur_alloc;
-  fprintf(stdout, "# MEMORY: Allocated row_used of %zuMB (total %zuMB "
-                  "so far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
-  bit_vector_set(mat->row_used, 1);
-
   /* Malloc sum2_row */
   cur_alloc = mat->col_max_index * sizeof (uint64_t);
   mat->sum2_row = (uint64_t *) malloc(cur_alloc);
@@ -59,42 +51,20 @@ purge_matrix_init (purge_matrix_ptr mat, uint64_t nrows_init,
                   "so far)\n", cur_alloc >> 20, mat->tot_alloc_bytes >> 20);
 }
 
-/* Field row_compact has its own clear function so we can free the memory as
- * soon as we do not need it anymore */
-void
-purge_matrix_clear_row_compact (purge_matrix_ptr mat)
-{
-  if (mat->row_compact != NULL)
-  {
-    size_t cur_free_size = get_my_malloc_bytes();
-    mat->tot_alloc_bytes -= cur_free_size;
-    my_malloc_free_all();
-    fprintf(stdout, "# MEMORY: Freed row_compact[i] %zuMB (total %zuMB so "
-                    "far)\n", cur_free_size >> 20, mat->tot_alloc_bytes >> 20);
-
-    cur_free_size = (mat->nrows_init * sizeof(index_t *));
-    mat->tot_alloc_bytes -= cur_free_size;
-    free(mat->row_compact);
-    mat->row_compact = NULL;
-    fprintf(stdout, "# MEMORY: Freed row_compact %zuMB (total %zuMB so far)\n",
-                    cur_free_size >> 20, mat->tot_alloc_bytes >> 20);
-  }
-}
-
 /* Free everything and set everythin to 0. */
 void
 purge_matrix_clear (purge_matrix_ptr mat)
 {
   free (mat->cols_weight);
-  bit_vector_clear(mat->row_used);
   free (mat->sum2_row);
-  purge_matrix_clear_row_compact (mat);
+  my_malloc_free_all();
+  free(mat->row_compact);
 
   memset (mat, 0, sizeof (purge_matrix_t));
 }
 
 void
-purge_matrix_clear_row_compact_update_mem_usage (purge_matrix_ptr mat)
+purge_matrix_row_compact_update_mem_usage (purge_matrix_ptr mat)
 {
   size_t cur_alloc = get_my_malloc_bytes();
   mat->tot_alloc_bytes += cur_alloc;
@@ -164,19 +134,27 @@ purge_matrix_delete_row (purge_matrix_ptr mat, uint64_t i)
   index_t *row;
   weight_t *w;
 
-  for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+  if (purge_matrix_is_row_active(mat, i))
   {
-    w = &(mat->cols_weight[*row]);
-    ASSERT(*w);
-    /* Decrease only if not equal to the maximum value */
-    /* If weight becomes 0, we just remove a column */
-    if (*w < UMAX(*w) && !(--(*w)))
-      mat->ncols--;
+    for (row = mat->row_compact[i]; *row != UMAX(*row); row++)
+    {
+      w = &(mat->cols_weight[*row]);
+      ASSERT(*w);
+      /* Decrease only if not equal to the maximum value */
+      /* If weight becomes 0, we just remove a column */
+      if (*w < UMAX(*w) && !(--(*w)))
+        mat->ncols--;
+    }
+    /* We do not free mat->row_compact[i] as it is freed later with
+      my_malloc_free_all */
+    purge_matrix_set_row_inactive (mat, i); /* mark as deleted */
+    mat->nrows--;
   }
-  /* We do not free mat->row_compact[i] as it is freed later with
-     my_malloc_free_all */
-  bit_vector_clearbit (mat->row_used, (size_t) i);
-  mat->nrows--;
+  else /* Row already deleted => Abort (It means there is a bug somewhere) */
+  {
+    fprintf (stderr, "Error, row %" PRIu64" is already deleted\n", i);
+    abort();
+  }
 }
 
 /***** Functions to compute mat->sum2_row array (mono and multi thread) *******/
@@ -194,13 +172,11 @@ purge_matrix_compute_sum2_row_mono (purge_matrix_ptr mat)
   memset(mat->sum2_row, 0, mat->col_max_index * sizeof(uint64_t));
   for (uint64_t i = 0; i < mat->nrows_init; i++)
   {
-    if (bit_vector_getbit(mat->row_used, (size_t) i))
-    {
-      index_t h, *cur_row;
-      for (cur_row = mat->row_compact[i]; (h = *cur_row++) != UMAX(h);)
+    index_t h, *row_ptr;
+    if (purge_matrix_is_row_active(mat, i))
+      for (row_ptr = mat->row_compact[i]; (h = *row_ptr++) != UMAX(h);)
         if (mat->cols_weight[h] == 2)
           mat->sum2_row[h] += i;
-    }
   }
 }
 
@@ -218,30 +194,24 @@ purge_matrix_compute_sum2_row_mt_thread (void *pt)
 {
   sum2_mt_data_t *data = (sum2_mt_data_t *) pt;
   purge_matrix_ptr mat = data->mat;
-  bv_t bv, *pbv;
-  uint64_t i,j;
+  uint64_t i;
 
-  /* Here, data->start and data->end must be multiple of BV_BITS. */
-  pbv = mat->row_used->p + (data->begin >> LN2_BV_BITS);
-  for (i = data->begin; i < data->end; i += BV_BITS)
+  for (i = data->begin; i < data->end; i++)
   {
-    for (j = i, bv = *pbv++; bv; ++j, bv >>= 1)
+    if (purge_matrix_is_row_active(mat, i))
     {
-      if (LIKELY(bv & 1))
+      index_t h, *row_ptr;
+      for (row_ptr = mat->row_compact[i]; (h = *row_ptr++) != UMAX(h);)
       {
-        index_t h, *cur_row;
-        for (cur_row = mat->row_compact[j]; (h = *cur_row++) != UMAX(h);)
+        if (LIKELY (mat->cols_weight[h] == 2))
         {
-          if (LIKELY (mat->cols_weight[h] == 2))
-          {
 #ifdef HAVE_SYNC_FETCH
-            __sync_add_and_fetch (mat->sum2_row + h, j);
+          __sync_add_and_fetch (mat->sum2_row + h, i);
 #else /* else we use mutex to protect the addition on mat->sum2_row[h] */
-            pthread_mutex_lock (&lock);
-            mat->sum2_row[h] += j;
-            pthread_mutex_unlock (&lock);
+          pthread_mutex_lock (&lock);
+          mat->sum2_row[h] += i;
+          pthread_mutex_unlock (&lock);
 #endif
-          }
         }
       }
     }
@@ -308,12 +278,12 @@ purge_matrix_compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
 
 /******************* Functions to print stats ********************************/
 
-/* These 3 functions compute and print stats on rows weight, columns weight and
- * cliques (connected components) length. The stats can be expensive to
- * compute, so these functions should not be called by default. */
+/* These 2 functions compute and print stats on rows weight and columns weight.
+ * The stats can be expensive to compute, so these functions should not be
+ * called by default. */
 
 /* Internal function */
-static void
+void
 print_stats_uint64 (FILE *out, uint64_t *w, uint64_t len, char name[],
                     char unit[], int verbose)
 {
@@ -367,15 +337,15 @@ purge_matrix_print_stats_columns_weight (FILE *out, purge_matrix_srcptr mat,
                                          int verbose)
 {
   uint64_t *w = NULL;
-  index_t *h = 0;
+  index_t h, *row_ptr;
   w = (uint64_t *) malloc (mat->col_max_index * sizeof (uint64_t));
   ASSERT_ALWAYS (w != NULL);
   memset (w, 0, mat->col_max_index * sizeof (uint64_t));
 
   for (uint64_t i = 0; i < mat->nrows_init; i++)
-    if (bit_vector_getbit(mat->row_used, (size_t) i))
-      for (h = mat->row_compact[i]; *h != UMAX(*h); h++)
-        w[*h]++;
+    if (purge_matrix_is_row_active(mat, i))
+      for (row_ptr = mat->row_compact[i]; (h = *row_ptr++) != UMAX(h);)
+        w[h]++;
 
   print_stats_uint64 (out, w, mat->col_max_index, "cols", "weight", verbose);
   free (w);
@@ -386,45 +356,16 @@ purge_matrix_print_stats_rows_weight (FILE *out, purge_matrix_srcptr mat,
                                       int verbose)
 {
   uint64_t *w = NULL;
-  index_t *h = 0;
+  index_t h, *row_ptr;
   w = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
   ASSERT_ALWAYS (w != NULL);
   memset (w, 0, mat->nrows_init * sizeof (uint64_t));
 
   for (uint64_t i = 0; i < mat->nrows_init; i++)
-    if (bit_vector_getbit(mat->row_used, (size_t) i))
-      for (h = mat->row_compact[i]; *h != UMAX(*h); h++)
+    if (purge_matrix_is_row_active(mat, i))
+      for (row_ptr = mat->row_compact[i]; (h = *row_ptr++) != UMAX(h);)
         w[i]++;
 
   print_stats_uint64 (out, w, mat->nrows_init, "rows", "weight", verbose);
   free (w);
-}
-
-/* Assume mat->sum2_row is already computed */
-void
-purge_matrix_print_stats_on_cliques (FILE *out, purge_matrix_srcptr mat,
-                                     int verbose)
-{
-  uint64_t *len = NULL;
-
-  len = (uint64_t *) malloc (mat->nrows_init * sizeof (uint64_t));
-  ASSERT_ALWAYS (len != NULL);
-  memset (len, 0, mat->nrows_init * sizeof (uint64_t));
-
-  uint64_buffer_t buf;
-  uint64_buffer_init (buf, UINT64_BUFFER_MIN_SIZE);
-  for (uint64_t i = 0; i < mat->nrows_init; i++)
-  {
-    if (bit_vector_getbit(mat->row_used, (size_t) i))
-    {
-      comp_t c = {.i = i, .w = 0.0};
-      uint64_t nrows = compute_one_connected_component (&c, mat, buf);
-      len[i] = nrows;
-    }
-  }
-
-  print_stats_uint64 (out, len, mat->nrows_init, "cliques", "length", verbose);
-
-  uint64_buffer_clear (buf);
-  free (len);
 }

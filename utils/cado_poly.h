@@ -11,9 +11,6 @@
    allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
 #define MAXDEGREE 10
 
-#define RATIONAL_SIDE   0
-#define ALGEBRAIC_SIDE   1
-
 #define NB_POLYS_MAX 8 /* maximal number of polynomials in multiple fields */
 
 struct cado_poly_s {
@@ -21,14 +18,13 @@ struct cado_poly_s {
   double skew;    /* skewness from poly file, if given, otherwise 0. */
 
   unsigned int nb_polys;   /* number of polynomials used, 2 in most cases */
-  mpz_poly_ptr rat, alg;
   mpz_poly_t pols[NB_POLYS_MAX];
 };
 typedef struct cado_poly_s cado_poly[1];
 typedef struct cado_poly_s * cado_poly_ptr;
 typedef const struct cado_poly_s * cado_poly_srcptr;
 
-extern const char * sidenames[2]; // FIXME: 2 or NB_POLYS_MAX?
+extern const char * sidenames[NB_POLYS_MAX];
 
 #ifdef __cplusplus
 extern "C" {

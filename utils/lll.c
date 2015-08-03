@@ -211,8 +211,8 @@ reduce ( long k, long l, mat_Z B, long *P, mpz_t *D,
 
 
 static long
-SwapTest ( mpz_t d0, mpz_t d1, mpz_t d2, mpz_t lam,
-           mpz_t a, mpz_t b, mpz_t t1, mpz_t t2)
+SwapTest (mpz_t d0, mpz_t d1, mpz_t d2, mpz_t lam,
+          mpz_t a, mpz_t b, mpz_t t1, mpz_t t2)
 /* test if a*d1^2 > b*(d0*d2 + lam^2)
    t1 and t2 are temporary variables */
 {

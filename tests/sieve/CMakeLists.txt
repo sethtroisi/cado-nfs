@@ -19,7 +19,7 @@ set(las_tracek_path     ${CADO_NFS_BINARY_DIR}/sieve/las_tracek)
 set(las_descent_path    ${CADO_NFS_BINARY_DIR}/sieve/las_descent)
 
 set(F9_roots "${CMAKE_CURRENT_BINARY_DIR}/F9.roots")
-add_test(F9_makefbtest "${makefb_path}" -poly "${CADO_NFS_SOURCE_DIR}/params/F9.poly" -alim 1200000 -maxbits 10 -out "${F9_roots}")
+add_test(F9_makefbtest "${makefb_path}" -poly "${CADO_NFS_SOURCE_DIR}/params/F9.poly" -lim 1200000 -maxbits 10 -out "${F9_roots}")
 set_test_build_depends(F9_makefbtest makefb)
 
 add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
@@ -55,11 +55,11 @@ set_test_dependencies(F9_tracektest F9_makefbtest)
 add_test(sievetest_I "${las_path}" -poly "${CMAKE_CURRENT_SOURCE_DIR}/c120.poly" -I 12 -fb1 "${CMAKE_CURRENT_SOURCE_DIR}/c120.roots1.gz" -lim0 10000 -lim1 10000 -lpb0 26 -lpb1 26 -mfb0 28 -mfb1 28 -q0 15350028 -q1 15350029 -t 2 -powlim0 8000 -powlim1 8000)
 
 # Try a too-large lambda value
-add_test(F9_rlambdatest bash -c "rlambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"rlambda>.* does not make sense\"")
+add_test(F9_rlambdatest bash -c "rlambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"lambda>.* does not make sense\"")
 set_test_build_depends(F9_rlambdatest las)
 set_test_dependencies(F9_rlambdatest F9_makefbtest)
 
-add_test(F9_alambdatest bash -c "alambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"alambda>.* does not make sense\"")
+add_test(F9_alambdatest bash -c "alambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"lambda>.* does not make sense\"")
 set_test_build_depends(F9_alambdatest las)
 set_test_dependencies(F9_alambdatest F9_makefbtest)
 
