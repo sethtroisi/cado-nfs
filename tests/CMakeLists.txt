@@ -121,7 +121,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         run_test(test_gfp3 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
         set_test_build_depends(test_gfp3 full_c59_dependencies debug_renumber)
         run_test(test_gfp2 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
-        set_test_build_depends(test_gfp2 full_c59_dependencies polyselect_gfpn)
+        set_test_build_depends(test_gfp2 full_c59_dependencies filter_galois polyselect_gfpn)
     endif(MAGMA)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 

@@ -91,6 +91,7 @@ filter/sparse.c
 filter/sparse.h
 filter/sm.c
 filter/sm_simple.cpp
+filter/filter_galois.c
 linalg/CMakeLists.txt
 linalg/Makefile
 linalg/bit_matrices.c
