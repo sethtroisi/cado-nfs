@@ -347,24 +347,38 @@ struct plattice_sieve_entry : public plattice_info_t {
      : plattice_info_t(p, r, proj, logI), hint(hint) {};
 };
 
-
 /* Class for enumerating lattice points with the Franke-Kleinjung algorithm */
+template <int LEVEL>
 class plattice_enumerate_t {
 protected:
-    const plattice_x_t inc_a, inc_c;
-    const uint32_t bound0, bound1;
-    const plattice_x_t IJ;
-    const uint32_t maskI;
-    const plattice_x_t even_mask;
+    // Maybe at some point, the plattice_x_t type could be templated in
+    // order to have it 32 bits for non-top levels.
+    plattice_x_t inc_a, inc_c;
+    uint32_t bound0, bound1;
     plattice_x_t x;
+    slice_offset_t hint;
+
+    static uint32_t maskI;
+    static plattice_x_t even_mask;
+    static plattice_x_t area; // this one depends on the level
 public:
-    plattice_enumerate_t(const plattice_info_t &basis, const int logI, uint32_t J)
-        : inc_a(basis.get_inc_a(logI)), inc_c(basis.get_inc_c(logI)), 
-          bound0(basis.get_bound0(logI)), bound1(basis.get_bound1(logI)),
-          IJ(plattice_x_t(J) << logI), maskI((1U << logI) - 1U),
-          even_mask((plattice_x_t(1) << logI) | plattice_x_t(1)),
-          x(plattice_x_t(1) << (logI-1))
-    {}
+    static void set_area(const int _logI, const uint32_t lines) {
+        ASSERT_ALWAYS(lines % 2 == 0);
+        maskI = (1U << _logI) - 1U;
+        even_mask = (plattice_x_t(1) << _logI) | plattice_x_t(1);
+        area = plattice_x_t(lines) << _logI;
+    }
+
+    plattice_enumerate_t(const plattice_info_t &basis,
+            const slice_offset_t hint, const int logI)
+        : hint(hint)
+    {
+        inc_a = basis.get_inc_a(logI);
+        inc_c = basis.get_inc_c(logI);
+        bound0 = basis.get_bound0(logI);
+        bound1 = basis.get_bound1(logI);
+        x = plattice_x_t(1) << (logI-1);
+    }
 
     void next() {
       uint32_t i = x & maskI;
@@ -376,17 +390,22 @@ public:
 
     /* Currently merely checks that not both are even */
     bool probably_coprime() const {return (x & even_mask) != 0;}
-    bool finished() const {return x >= IJ;}
+    bool finished() const {return x >= area;}
+    // The position of the point is relative to the current area start.
+    void advance_to_next_area() {x -= area;}
     plattice_x_t get_x() const {return x;}
+    slice_offset_t get_hint() const {return hint;}
 };
 
 /* Also enumerates lattice points, but probably_coprime() does a full gcd()
-   to ensure that points are really coprime. Very slow. */
+   to ensure that points are really coprime. Very slow. Not used, just there
+   for experimenting.*/
 class plattice_enumerate_coprime_t : public plattice_enumerate_t {
   unsigned long u, v;
 public:
-  plattice_enumerate_coprime_t(const plattice_info_t &basis, const int logI, uint32_t J)
-    : plattice_enumerate_t(basis, logI, J), u(0), v(0) {}
+  plattice_enumerate_coprime_t(const plattice_info_t &basis,
+          const slice_offset_t hint, const int logI)
+    : plattice_enumerate_t(basis, hint, logI), u(0), v(0) {}
   void next() {
     uint32_t i = x & maskI;
     if (i >= bound1) {
@@ -401,6 +420,15 @@ public:
     return (x & even_mask) != 0 && gcd_ul(u, v) == 1;
   }
 };
+
+class plattices_vector_t:
+        public std::vector<plattice_enumerate_t>, private NonCopyable {
+    slice_index_t index;
+public:
+    plattices_vector_t(const slice_index_t index) : index(index) {}
+    slice_index_t get_index() const {return index;};
+};
+
 
 /* This is for working with congruence classes only */
 /* NOPROFILE_INLINE */

@@ -217,7 +217,7 @@ class fb_slice_interface {
   virtual ~fb_slice_interface(){}
   virtual int get_nr_roots() const = 0;
   virtual bool is_general() const = 0;
-  virtual fb_transformed_vector * make_lattice_bases(const qlattice_basis &, int) const = 0;
+  virtual plattices_vector_t * make_lattice_bases(const qlattice_basis &, int) const = 0;
   virtual unsigned char get_logp() const = 0;
   virtual slice_index_t get_index() const = 0;
   virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
@@ -286,7 +286,7 @@ class fb_slice : public fb_slice_interface {
     ASSERT_ALWAYS(_begin + offset < _end);
     return _begin[offset].k;
   }
-  fb_transformed_vector * make_lattice_bases(const qlattice_basis &, int) const;
+  plattices_vector_t * make_lattice_bases(const qlattice_basis &, int) const;
 };
 
 
