@@ -3081,7 +3081,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         workspaces->pickup_si(si);
 
         thread_pool *pool = new thread_pool(las->nb_threads);
-        /* Fill in rat and alg buckets */
+        /* Fill in buckets on both sides */
         fill_in_buckets_both(*pool, *workspaces, 1, si);
         delete pool;
 
@@ -3091,7 +3091,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         report->ttbuckets_fill += seconds();
 
-        /* This can now be factored out ! */
+        /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
 
