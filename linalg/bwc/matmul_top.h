@@ -235,7 +235,8 @@ extern void vec_init_generic(pi_wiring_ptr, mpfq_vbase_ptr, mmt_vec_ptr, int, un
 extern void vec_clear_generic(pi_wiring_ptr, mmt_vec_ptr, unsigned int);
 
 /* we should refrain from exposing these. At least for mksol,
- * allreduce_across is really useful, though.
+ * allreduce_across is really useful, though. We use it for the block
+ * Lanczos iterations, too.
  */
 // extern void broadcast_down(matmul_top_data_ptr mmt, int d);
 // extern void reduce_across(matmul_top_data_ptr mmt, int d);
