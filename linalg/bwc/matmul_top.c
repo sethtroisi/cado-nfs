@@ -419,7 +419,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
 
 /* {{{ backends for load/save */
 /* {{{ save, backend */
-/* It really something relevant to the pirow communicator. Turn it so */
+/* It is really something relevant to the pirow communicator. */
 static void save_vector_toprow_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk)
 {
     if (v == NULL) v = mmt->wr[d]->v;
@@ -1795,7 +1795,7 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 }
 #endif
 
-/* Takes data in mmt->wd[d]->v, and compute the corresponding partial result in
+/* Takes data in mmt->wr[d]->v, and compute the corresponding partial result in
  * mmt->wr[!d]->v.
  */
 void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d)

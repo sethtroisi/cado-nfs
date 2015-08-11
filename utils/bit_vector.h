@@ -43,6 +43,10 @@ extern void bit_vector_read_from_file(bit_vector_ptr b, const char * fname);
 
 extern size_t bit_vector_popcount(bit_vector_ptr b);
 extern size_t bit_vector_memory_footprint(bit_vector_srcptr b);
+
+extern void bit_vector_read_from_stream(bit_vector_ptr b, FILE * f);
+extern void bit_vector_write_to_stream(bit_vector_srcptr b, FILE * f);
+
 #ifdef __cplusplus
 }
 #endif
