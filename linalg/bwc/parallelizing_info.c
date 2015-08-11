@@ -1450,10 +1450,10 @@ int area_is_zero(const void * src, ptrdiff_t offset0, ptrdiff_t offset1)
  */
 int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * buf, size_t mysize, size_t sizeondisk)
 {
+
     int * displs = (int *) malloc(w->njobs * sizeof(int));
     int * recvcounts = (int *) malloc(w->njobs * sizeof(int));
-    size_t siz;
-    siz = get_counts_and_displacements(w, mysize, displs, recvcounts);
+    size_t siz = get_counts_and_displacements(w, mysize, displs, recvcounts);
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
@@ -1461,11 +1461,11 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
+    int rc;
     int err;
 
     char * filename;
     char * filename_pre;
-    int rc;
 
     if (leader) {
         rc = asprintf(&filename, "%s.%u", name, iter);
@@ -1543,8 +1543,8 @@ pi_save_file_leader_init_done:
     free(displs);
 
     if (leader) {
-#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
         rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
@@ -1582,8 +1582,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
 
     int * displs = (int *) malloc(w->njobs * sizeof(int));
     int * recvcounts = (int *) malloc(w->njobs * sizeof(int));
-    size_t siz;
-    siz = get_counts_and_displacements_2d(pi, d, mysize, displs, recvcounts);
+    size_t siz = get_counts_and_displacements_2d(pi, d, mysize, displs, recvcounts);
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
