@@ -353,21 +353,28 @@ void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, const int pa
 /* }}} */
 
 
+// first_region0_index is a way to remember where we are in the tree.
+// The depth-first is a way to precess all the the region of level 0 in
+// increasing order of j-value.
+// first_region0_index * nb_lines_per_region0 therefore gives the j-line
+// where we are. This is what is called N by WHERE_AM_I and friends.
 template <int LEVEL>
 void
-downsort_tree(uint32_t bucket_index, thread_workspaces &ws,
+downsort_tree(uint32_t bucket_index,
+        uint32_t first_region0_index,
+        thread_workspaces &ws,
         sieve_info_srcptr si,
         typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS])
 {
-    if (LEVEL == 0) {
-        // post-processing
-        return;
-    }
+    ASSERT_ALWAYS(LEVEL > 0);
+
+    double max_full;
 
     for (int side = 0; side < 2; ++side) {
         /* FIRST: Downsort what is coming from the level above, for this
          * bucket index */
         // All these BA are global stuff; see reservation_group.
+        // FIXME: QUESTION: do we need to reserve???
         bucket_array_t<LEVEL,longhint_t> BAout = 
             ws.reserve_BA<LEVEL,longhint_t>(side);
         // The data that comes from fill-in bucket at level above:
@@ -378,8 +385,9 @@ downsort_tree(uint32_t bucket_index, thread_workspaces &ws,
             ws.release_BA<LEVEL+1,shorthint_t>(side);
         }
 
-    //    if (LEVEL < toplevel - 1) {
-        if (1) {
+        const int toplevel = MAX(si->sides[0]->fb->get_toplevel(),
+                si->sides[1]->fb->get_toplevel());                              
+        if (LEVEL < toplevel - 1) {
             // What comes from already downsorted data above:
             bucket_array_t<LEVEL+1,longhint_t> BAin =
                 ws.reserve_BA<LEVEL+1,longhint_t>(side);
@@ -387,6 +395,8 @@ downsort_tree(uint32_t bucket_index, thread_workspaces &ws,
             ws.release_BA<LEVEL+1,longhint_t>(side);
         }
         ws.release_BA<LEVEL,longhint_t>(side);
+        max_full = std::max(ws.buckets_max_full<LEVEL, longhint_t>());
+        ASSERT_ALWAYS(max_full <= 1.0);
 
         /* SECOND: fill in buckets at this level, for this region. */
         bucket_array_t<LEVEL,shorthint_t> BAin = 
@@ -402,12 +412,22 @@ downsort_tree(uint32_t bucket_index, thread_workspaces &ws,
             fill_in_buckets<LEVEL>(BAin, si, pl_it, w);
         }
         ws.release_BA<LEVEL,shorthint_t>(side);
+        max_full = std::max(ws.buckets_max_full<LEVEL, shorthint_t>());
+        ASSERT_ALWAYS(max_full <= 1.0);
     }
 
     /* RECURSE */
-    for (int i = 0; i < bucket_array_t<LEVEL,shorthint_t>::n_bucket; ++i) {
-        downsort_tree<LEVEL-1>(i, ws, si, precomp_plattice);
+    if (LEVEL > 1) {
+        for (int i = 0; i < bucket_array_t<LEVEL,shorthint_t>::n_bucket; ++i) {
+            uint32_t N = first_region0_index; // FIXME + i*APPROPRIATE_REGION_SIZE.
+            downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice);
+        }
+    } else {
+        /* PROCESS THE REGIONS AT LEVEL 0 */
+
+        // Should be more or less exactly process_bucket_region(),
+        // except that we should also apply the updates of
+        //   bucket_array_t<1, longhint_t>
+        // coming from downsorting.
     }
 }
-
-

@@ -3079,6 +3079,13 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Fill in buckets on both sides at top level */
         fill_in_buckets_both(*pool, *workspaces, toplevel, si);
 
+        /* FIXME: how to deal with toplevel that is not constant?
+        max_full = std::max(max_full,
+                workspaces->buckets_max_full<toplevel, shorthint_t>());
+        ASSERT_ALWAYS(max_full <= 1.0 || // see commented code below
+                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
+                 */
+
         // Prepare plattices at internal levels
         typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS];
         for (int side = 0; side < 2; ++side) {
@@ -3094,18 +3101,15 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
+        // FIXME: again...
         // Visit the downsorting tree depth-first.
         // If toplevel = 1, then this is just processing all bucket
         // regions.
 //        for (int i = 0; i < bucket_array_t<toplevel,shorthint_t>::n_bucket; i++) {
-//            downsort_tree(toplevel-1, *workspaces, si, i);
+//            downsort_tree(toplevel-1, 0, *workspaces, si, i);
 //        }
 
         delete pool;
-
-        max_full = std::max(max_full, workspaces->buckets_max_full<1, shorthint_t>());
-        ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
-                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
 
         report->ttbuckets_fill += seconds();
 
