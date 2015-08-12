@@ -238,7 +238,6 @@ void
 fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 sieve_info_srcptr const si MAYBE_UNUSED,
                 plattices_vector_t *plattices_vector,
-                const fb_slice_interface *slice MAYBE_UNUSED,
                 where_am_I_ptr w)
 {
   const slice_index_t slice_index = plattices_vector->get_index();
@@ -247,7 +246,6 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
-  ASSERT_ALWAYS(slice_index == slice->get_index());
 
   for (plattices_vector_t::iterator pl_it = plattices_vector->begin();
        pl_it != plattices_vector->end(); pl_it++) {
@@ -255,6 +253,8 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
     const slice_offset_t hint = pl_it->get_hint();
     WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
+    const fb_slice_interface * slice =
+        si->sides[w->side]->fb->get_slice(slice_index);
     const fbprime_t p = slice->get_prime(hint); 
     WHERE_AM_I_UPDATE(w, p, p);
 #else
@@ -317,7 +317,7 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
     /* Get an unused bucket array that we can write to */
     bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
     /* Fill the buckets */
-    fill_in_buckets<LEVEL>(BA, param->si, plattices_vector, param->slice, w);
+    fill_in_buckets<LEVEL>(BA, param->si, plattices_vector, w);
     /* Release bucket array again */
     param->ws.release_BA(param->side, BA);
     delete plattices_vector;
