@@ -247,6 +247,7 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
+  ASSERT_ALWAYS(slice_index == slice->get_index());
 
   for (plattices_vector_t::iterator pl_it = plattices_vector->begin();
        pl_it != plattices_vector->end(); pl_it++) {
@@ -254,8 +255,7 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
     const slice_offset_t hint = pl_it->get_hint();
     WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
-    XXXX BORKEN
-    const fbprime_t p = pl_it->det();
+    const fbprime_t p = slice->get_prime(hint); 
     WHERE_AM_I_UPDATE(w, p, p);
 #else
     const fbprime_t p = 0;
@@ -346,6 +346,7 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
 
 void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, const int part, sieve_info_srcptr si)
 {
+    plattice_enumerate_t::set_area(si->conf->logI, si->J);
     for (int side = 0; side < 2; ++side)
         fill_in_buckets_one_side(pool, ws, si->sides[side]->fb->get_part(part), si, side);
 }
