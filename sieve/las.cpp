@@ -3074,10 +3074,33 @@ int main (int argc0, char *argv0[])/*{{{*/
         workspaces->pickup_si(si);
 
         thread_pool *pool = new thread_pool(las->nb_threads);
-        int toplevel = MAX(si->sides[0]->fb->get_toplevel(),
+        const int toplevel = MAX(si->sides[0]->fb->get_toplevel(),
                 si->sides[1]->fb->get_toplevel());
-        /* Fill in buckets on both sides */
+        /* Fill in buckets on both sides at top level */
         fill_in_buckets_both(*pool, *workspaces, toplevel, si);
+
+        // Prepare plattices at internal levels
+        typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS];
+        for (int side = 0; side < 2; ++side) {
+            for (int level = 1; level < toplevel; ++level) {
+                const fb_part * fb = si->sides[side]->fb->get_part(level);
+                const fb_slice_interface *slice;
+                for (slice_index_t slice_index = fb->get_first_slice_index();
+                        (slice = fb->get_slice(slice_index)) != NULL; 
+                        slice_index++) {  
+                    precomp_plattice[side][level].push_back(
+                        slice->make_lattice_bases(si->qbasis, si->conf->logI));
+                }
+            }
+        }
+
+        // Visit the downsorting tree depth-first.
+        // If toplevel = 1, then this is just processing all bucket
+        // regions.
+//        for (int i = 0; i < bucket_array_t<toplevel,shorthint_t>::n_bucket; i++) {
+//            downsort_tree(toplevel-1, i);
+//        }
+
         delete pool;
 
         max_full = std::max(max_full, workspaces->buckets_max_full<1, shorthint_t>());
