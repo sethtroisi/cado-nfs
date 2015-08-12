@@ -3098,7 +3098,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         // If toplevel = 1, then this is just processing all bucket
         // regions.
 //        for (int i = 0; i < bucket_array_t<toplevel,shorthint_t>::n_bucket; i++) {
-//            downsort_tree(toplevel-1, i);
+//            downsort_tree(toplevel-1, *workspaces, si, i);
 //        }
 
         delete pool;

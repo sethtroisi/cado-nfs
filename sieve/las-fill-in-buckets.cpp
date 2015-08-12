@@ -351,3 +351,63 @@ void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, const int pa
         fill_in_buckets_one_side(pool, ws, si->sides[side]->fb->get_part(part), si, side);
 }
 /* }}} */
+
+
+template <int LEVEL>
+void
+downsort_tree(uint32_t bucket_index, thread_workspaces &ws,
+        sieve_info_srcptr si,
+        typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS])
+{
+    if (LEVEL == 0) {
+        // post-processing
+        return;
+    }
+
+    for (int side = 0; side < 2; ++side) {
+        /* FIRST: Downsort what is coming from the level above, for this
+         * bucket index */
+        // All these BA are global stuff; see reservation_group.
+        bucket_array_t<LEVEL,longhint_t> BAout = 
+            ws.reserve_BA<LEVEL,longhint_t>(side);
+        // The data that comes from fill-in bucket at level above:
+        {
+            bucket_array_t<LEVEL+1,shorthint_t> BAin =
+                ws.reserve_BA<LEVEL+1,shorthint_t>(side);
+            downsort<LEVEL+1>(BAout, BAin, bucket_index);
+            ws.release_BA<LEVEL+1,shorthint_t>(side);
+        }
+
+    //    if (LEVEL < toplevel - 1) {
+        if (1) {
+            // What comes from already downsorted data above:
+            bucket_array_t<LEVEL+1,longhint_t> BAin =
+                ws.reserve_BA<LEVEL+1,longhint_t>(side);
+            downsort<LEVEL+1>(BAout, BAin, bucket_index);
+            ws.release_BA<LEVEL+1,longhint_t>(side);
+        }
+        ws.release_BA<LEVEL,longhint_t>(side);
+
+        /* SECOND: fill in buckets at this level, for this region. */
+        bucket_array_t<LEVEL,shorthint_t> BAin = 
+            ws.reserve_BA<LEVEL,shorthint_t>(side);
+        for (typename std::vector<plattices_vector_t *>::iterator pl_it =
+                precomp_plattice[side][LEVEL].begin();
+              pl_it != precomp_plattice[side][LEVEL].end();
+              pl_it++) {
+            where_am_I_ptr w;
+            WHERE_AM_I_UPDATE(w, si, si);
+            WHERE_AM_I_UPDATE(w, side, side);
+            WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
+            fill_in_buckets<LEVEL>(BAin, si, pl_it, w);
+        }
+        ws.release_BA<LEVEL,shorthint_t>(side);
+    }
+
+    /* RECURSE */
+    for (int i = 0; i < bucket_array_t<LEVEL,shorthint_t>::n_bucket; ++i) {
+        downsort_tree<LEVEL-1>(i, ws, si, precomp_plattice);
+    }
+}
+
+
