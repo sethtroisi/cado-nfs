@@ -335,6 +335,7 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
          (slice = fb->get_slice(slice_index)) != NULL;
          slice_index++) {
         fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice);
+        // FIXME: here, this should be toplevel, not 1.
         pool.add_task(fill_in_buckets_one_slice<1>, param, 0);
         slices_pushed++;
     }

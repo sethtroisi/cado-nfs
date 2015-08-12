@@ -144,6 +144,10 @@
 
 #define BUCKET_REGION (1 << LOG_BUCKET_REGION)
 
+#define BUCKET_REGION_1 BUCKET_REGION
+#define BUCKET_REGION_2 256*BUCKET_REGION_1
+#define BUCKET_REGION_3 256*BUCKET_REGION_2
+
 /* This is currently used to enable some code paths specific to the
  * descent. The mid-term plan is to remove this compile-time flag.
  */
