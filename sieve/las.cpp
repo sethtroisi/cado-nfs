@@ -3074,8 +3074,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         workspaces->pickup_si(si);
 
         thread_pool *pool = new thread_pool(las->nb_threads);
+        int toplevel = MAX(si->sides[0]->fb->get_toplevel(),
+                si->sides[1]->fb->get_toplevel());
         /* Fill in buckets on both sides */
-        fill_in_buckets_both(*pool, *workspaces, 1, si);
+        fill_in_buckets_both(*pool, *workspaces, toplevel, si);
         delete pool;
 
         max_full = std::max(max_full, workspaces->buckets_max_full<1, shorthint_t>());

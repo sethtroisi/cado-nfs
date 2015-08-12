@@ -483,6 +483,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   fb_part *parts[FB_MAX_PARTS];
   fbprime_t thresholds[FB_MAX_PARTS];
   void finalize();
+  int toplevel;
  public:
   fb_factorbase(const fbprime_t *thresholds,
                 fbprime_t powlim,
@@ -509,6 +510,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
     }
     return NULL;
   }
+  int get_toplevel() const { return toplevel; }
 };
 
 

@@ -791,6 +791,7 @@ fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
     const bool og = (only_general == NULL) ? (i == 0) : only_general[i];
     parts[i] = new fb_part(powlim, og);
   }
+  toplevel = 0;
 }
 
 fb_factorbase::~fb_factorbase()
@@ -821,6 +822,9 @@ fb_factorbase::append(const fb_general_entry &fb_cur)
       printed_too_large_prime_warning = true;
     }
     return; /* silently skip this entry */
+  }
+  if (i > toplevel) {
+      toplevel = i;
   }
   parts[i]->append(fb_cur);
 }
