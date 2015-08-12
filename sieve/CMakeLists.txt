@@ -26,16 +26,6 @@ add_executable (las_tracek EXCLUDE_FROM_ALL ${las_sources})
 set_property(TARGET las_tracek PROPERTY COMPILE_DEFINITIONS TRACE_K=1)
 target_link_libraries (las_tracek ${las_libraries})
 
-# Targets with the minimum acceptable thresholds for K-buckets and
-# M-buckets, so that this code can be tested without requiring an
-# exorbitant amount of memory
-add_executable (las_kbucket EXCLUDE_FROM_ALL ${las_sources})
-set_property(TARGET las_kbucket PROPERTY COMPILE_DEFINITIONS THRESHOLD_K_BUCKETS=16)
-target_link_libraries (las_kbucket ${las_libraries})
-add_executable (las_mbucket EXCLUDE_FROM_ALL ${las_sources})
-set_property(TARGET las_mbucket PROPERTY COMPILE_DEFINITIONS THRESHOLD_K_BUCKETS=16 THRESHOLD_M_BUCKETS=64)
-target_link_libraries (las_mbucket ${las_libraries})
-
 add_executable (fb_test EXCLUDE_FROM_ALL fb.cpp)
 set_property(TARGET fb_test PROPERTY COMPILE_DEFINITIONS TESTDRIVE=1)
 target_link_libraries (fb_test utils)

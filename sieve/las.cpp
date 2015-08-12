@@ -380,13 +380,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      */
     if (las->sievers == si) {
         verbose_output_print(0, 1, "# bucket_region = %u\n", BUCKET_REGION);
-        if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
-            verbose_output_print(0, 1, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
-        else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
-            verbose_output_print(0, 1, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
-        else
-            verbose_output_print(0, 1, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
-
         sieve_info_init_factor_bases(las, si, pl);
         for (int side = 0; side < 2; side++) {
             sieve_info_print_fb_statistics(las, si, side);
