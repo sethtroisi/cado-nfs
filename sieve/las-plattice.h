@@ -348,7 +348,7 @@ struct plattice_sieve_entry : public plattice_info_t {
 };
 
 /* Class for enumerating lattice points with the Franke-Kleinjung algorithm */
-template <int LEVEL>
+//template <int LEVEL>
 class plattice_enumerate_t {
 protected:
     // Maybe at some point, the plattice_x_t type could be templated in
