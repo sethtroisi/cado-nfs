@@ -28,7 +28,7 @@ static int mpfq_pz_impl_mpi_use_count;   /* several stacked init()/clear() pairs
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
-     [ u64k1, u64k2, u64k4, ],
+     [ u64k1, u64k2, u64k3, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
@@ -53,9 +53,10 @@ static int mpfq_pz_impl_mpi_use_count;   /* several stacked init()/clear() pairs
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
      p_9=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
-     u64k1=[ u64k1, u64k2, u64k4, ],
-     u64k2=[ u64k1, u64k2, u64k4, ],
-     u64k4=[ u64k1, u64k2, u64k4, ],
+     u64k1=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k2=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k3=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k4=[ u64k1, u64k2, u64k3, u64k4, ],
      },
     vc:includes=[ <stdarg.h>, ],
     },

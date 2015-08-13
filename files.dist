@@ -1300,3 +1300,7 @@ linalg/bwc/mpfq/mpfq_p_9.c
 linalg/bwc/mpfq/mpfq_p_9.h
 linalg/bwc/mpfq/mpfq_p_9_t.c
 linalg/bwc/mpfq/mpfq_p_9_t.h
+linalg/bwc/mpfq/mpfq_u64k3.c
+linalg/bwc/mpfq/mpfq_u64k3.h
+linalg/bwc/mpfq/mpfq_u64k3_t.c
+linalg/bwc/mpfq/mpfq_u64k3_t.h

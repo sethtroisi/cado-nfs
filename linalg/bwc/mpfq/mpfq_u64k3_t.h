@@ -1,5 +1,5 @@
-#ifndef MPFQ_U64K2_T_H_
-#define MPFQ_U64K2_T_H_
+#ifndef MPFQ_U64K3_T_H_
+#define MPFQ_U64K3_T_H_
 
 /* MPFQ generated file -- do not edit */
 
@@ -18,8 +18,8 @@
 /* Active handler: simd_char2 */
 /* Options used:{
    family=[ u64k1, u64k2, u64k3, u64k4, ],
-   k=2,
-   tag=u64k2,
+   k=3,
+   tag=u64k3,
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
@@ -60,26 +60,26 @@
     global_prefix=mpfq_,
     name=mpfq_vbase,
     substitutions=[
-     [ (?^:mpfq_u64k2_elt \*), void *, ],
-     [ (?^:mpfq_u64k2_src_elt\b), const void *, ],
-     [ (?^:mpfq_u64k2_elt\b), void *, ],
-     [ (?^:mpfq_u64k2_dst_elt\b), void *, ],
-     [ (?^:mpfq_u64k2_elt_ur \*), void *, ],
-     [ (?^:mpfq_u64k2_src_elt_ur\b), const void *, ],
-     [ (?^:mpfq_u64k2_elt_ur\b), void *, ],
-     [ (?^:mpfq_u64k2_dst_elt_ur\b), void *, ],
-     [ (?^:mpfq_u64k2_vec \*), void *, ],
-     [ (?^:mpfq_u64k2_src_vec\b), const void *, ],
-     [ (?^:mpfq_u64k2_vec\b), void *, ],
-     [ (?^:mpfq_u64k2_dst_vec\b), void *, ],
-     [ (?^:mpfq_u64k2_vec_ur \*), void *, ],
-     [ (?^:mpfq_u64k2_src_vec_ur\b), const void *, ],
-     [ (?^:mpfq_u64k2_vec_ur\b), void *, ],
-     [ (?^:mpfq_u64k2_dst_vec_ur\b), void *, ],
-     [ (?^:mpfq_u64k2_poly \*), void *, ],
-     [ (?^:mpfq_u64k2_src_poly\b), const void *, ],
-     [ (?^:mpfq_u64k2_poly\b), void *, ],
-     [ (?^:mpfq_u64k2_dst_poly\b), void *, ],
+     [ (?^:mpfq_u64k3_elt \*), void *, ],
+     [ (?^:mpfq_u64k3_src_elt\b), const void *, ],
+     [ (?^:mpfq_u64k3_elt\b), void *, ],
+     [ (?^:mpfq_u64k3_dst_elt\b), void *, ],
+     [ (?^:mpfq_u64k3_elt_ur \*), void *, ],
+     [ (?^:mpfq_u64k3_src_elt_ur\b), const void *, ],
+     [ (?^:mpfq_u64k3_elt_ur\b), void *, ],
+     [ (?^:mpfq_u64k3_dst_elt_ur\b), void *, ],
+     [ (?^:mpfq_u64k3_vec \*), void *, ],
+     [ (?^:mpfq_u64k3_src_vec\b), const void *, ],
+     [ (?^:mpfq_u64k3_vec\b), void *, ],
+     [ (?^:mpfq_u64k3_dst_vec\b), void *, ],
+     [ (?^:mpfq_u64k3_vec_ur \*), void *, ],
+     [ (?^:mpfq_u64k3_src_vec_ur\b), const void *, ],
+     [ (?^:mpfq_u64k3_vec_ur\b), void *, ],
+     [ (?^:mpfq_u64k3_dst_vec_ur\b), void *, ],
+     [ (?^:mpfq_u64k3_poly \*), void *, ],
+     [ (?^:mpfq_u64k3_src_poly\b), const void *, ],
+     [ (?^:mpfq_u64k3_poly\b), void *, ],
+     [ (?^:mpfq_u64k3_dst_poly\b), void *, ],
      ],
     },
    w=64,
@@ -113,19 +113,19 @@
 /* MPI interface */
 
 /* Object-oriented interface */
-void mpfq_u64k2_u64k1_dotprod(mpfq_u64k2_dst_field, mpfq_u64k1_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k2_src_vec, unsigned int);
-void mpfq_u64k2_u64k2_dotprod(mpfq_u64k2_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
-void mpfq_u64k2_u64k3_dotprod(mpfq_u64k2_dst_field, mpfq_u64k3_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k2_src_vec, unsigned int);
-void mpfq_u64k2_u64k4_dotprod(mpfq_u64k2_dst_field, mpfq_u64k4_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k2_src_vec, unsigned int);
-void mpfq_u64k2_u64k1_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k1_dst_vec, unsigned int);
-void mpfq_u64k2_u64k2_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_dst_vec, unsigned int);
-void mpfq_u64k2_u64k3_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k3_dst_vec, unsigned int);
-void mpfq_u64k2_u64k4_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k4_dst_vec, unsigned int);
-void mpfq_u64k2_u64k1_transpose(mpfq_u64k2_dst_field, mpfq_u64k1_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k1_src_vec);
-void mpfq_u64k2_u64k2_transpose(mpfq_u64k2_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec);
-void mpfq_u64k2_u64k3_transpose(mpfq_u64k2_dst_field, mpfq_u64k3_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k3_src_vec);
-void mpfq_u64k2_u64k4_transpose(mpfq_u64k2_dst_field, mpfq_u64k4_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k4_src_vec);
+void mpfq_u64k3_u64k1_dotprod(mpfq_u64k3_dst_field, mpfq_u64k1_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k3_src_vec, unsigned int);
+void mpfq_u64k3_u64k2_dotprod(mpfq_u64k3_dst_field, mpfq_u64k2_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k3_src_vec, unsigned int);
+void mpfq_u64k3_u64k3_dotprod(mpfq_u64k3_dst_field, mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k3_src_vec, unsigned int);
+void mpfq_u64k3_u64k4_dotprod(mpfq_u64k3_dst_field, mpfq_u64k4_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k3_src_vec, unsigned int);
+void mpfq_u64k3_u64k1_addmul_tiny(mpfq_u64k3_dst_field, mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k1_dst_vec, unsigned int);
+void mpfq_u64k3_u64k2_addmul_tiny(mpfq_u64k3_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k2_dst_vec, unsigned int);
+void mpfq_u64k3_u64k3_addmul_tiny(mpfq_u64k3_dst_field, mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k3_dst_vec, unsigned int);
+void mpfq_u64k3_u64k4_addmul_tiny(mpfq_u64k3_dst_field, mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k4_dst_vec, unsigned int);
+void mpfq_u64k3_u64k1_transpose(mpfq_u64k3_dst_field, mpfq_u64k1_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k1_src_vec);
+void mpfq_u64k3_u64k2_transpose(mpfq_u64k3_dst_field, mpfq_u64k2_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k2_src_vec);
+void mpfq_u64k3_u64k3_transpose(mpfq_u64k3_dst_field, mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k3_src_vec);
+void mpfq_u64k3_u64k4_transpose(mpfq_u64k3_dst_field, mpfq_u64k4_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k4_src_vec);
 
-#endif  /* MPFQ_U64K2_T_H_ */
+#endif  /* MPFQ_U64K3_T_H_ */
 
 /* vim:set ft=cpp: */
