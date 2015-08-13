@@ -289,6 +289,15 @@ class fb_slice : public fb_slice_interface {
   plattices_vector_t * make_lattice_bases(const qlattice_basis &, int) const;
 };
 
+/* A predicate to test whether an fb_slice has weight at most x, for use with
+   STL search functions etc. */
+class fb_slice_pred_weight_le {
+  const double max_weight;
+public:
+  fb_slice_pred_weight_le (const double x) : max_weight(x) {}
+  bool operator() (const fb_slice_interface *slice) const {return slice->get_weight() <= max_weight;}
+};
+
 
 template <class FB_ENTRY_TYPE>
 class fb_vector : public fb_vector_interface, private NonCopyable {
