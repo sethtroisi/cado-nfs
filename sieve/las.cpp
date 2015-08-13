@@ -351,23 +351,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     si->I = 1 << sc->logI;
     si->J = 1 << (sc->logI - 1);
 
-    /* Initialize the number of buckets */
-
-    /* If LOG_BUCKET_REGION == sc->logI, then one bucket (whose size is the
-     * L1 cache size) is actually one line. This changes some assumptions
-     * in sieve_small_bucket_region and resieve_small_bucket_region, where
-     * we want to differentiate on the parity on j.
-     */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= sc->logI);
-
-    /* this is the maximal value of the number of buckets (might be less
-       for a given special-q if J is smaller) */
-    si->nb_buckets_max = 1 +
-        ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BUCKET_REGION;
-    si->j_div = init_j_div(si->J);
-    si->us = init_unsieve_data(si->I);
-    si->doing = NULL;
-
     /* Allocate memory for transformed polynomials */
     sieve_info_init_norm_data(si);
 
@@ -404,6 +387,34 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
                 sis->max_bucket_fill_ratio[i] = sis0->max_bucket_fill_ratio[i];
         }
     }
+
+    // Now that fb have been initialized, we can set the toplevel.
+    si->toplevel = MAX(si->sides[0]->fb->get_toplevel(),
+            si->sides[1]->fb->get_toplevel());
+
+    /* Initialize the number of buckets */
+
+    /* If LOG_BUCKET_REGION == sc->logI, then one bucket (whose size is the
+     * L1 cache size) is actually one line. This changes some assumptions
+     * in sieve_small_bucket_region and resieve_small_bucket_region, where
+     * we want to differentiate on the parity on j.
+     */
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= sc->logI);
+
+    /* this is the maximal value of the number of buckets (might be less
+       for a given special-q if J is smaller) */
+    uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
+    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+    XX[si->toplevel] = 1 +
+      ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BRS[si->toplevel];
+    for (int i = si->toplevel+1; i < FB_MAX_PARTS; ++i)
+        XX[i] = 0;
+    for (int i = 0; i < FB_MAX_PARTS; ++i) 
+        si->nb_buckets_max[i] = XX[i];
+
+    si->j_div = init_j_div(si->J);
+    si->us = init_unsieve_data(si->I);
+    si->doing = NULL;
 
 
     /* TODO: We may also build a strategy book, given that several
@@ -2582,7 +2593,7 @@ void * process_bucket_region(thread_data *th)
             const bucket_array_t<1, shorthint_t> * const BA_end =
                 th->ws->cend_BA<1, shorthint_t>(side);
             for (; BA != BA_end; BA++)  {
-                apply_one_bucket(SS, *BA, i, ts.fb, w);
+                apply_one_bucket(SS, *BA, i, ts.fb->get_part(1), w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
@@ -2882,7 +2893,7 @@ int main (int argc0, char *argv0[])/*{{{*/
        threads, so that threads have some freedom in avoiding the fullest
        bucket array. With only one thread, no balancing needs to be done,
        so we use only one bucket array. */
-    // FIXME: We can't do this. Some part of the code rely on the fact
+    // FIXME: We can't do this. Some parts of the code rely on the fact
     // that nr_workspaces == las->nb_threads. For instance,
     // process_bucket_region uses las->nb_threads while it should
     // sometimes use nr_workspaces.
@@ -3074,10 +3085,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         workspaces->pickup_si(si);
 
         thread_pool *pool = new thread_pool(las->nb_threads);
-        const int toplevel = MAX(si->sides[0]->fb->get_toplevel(),
-                si->sides[1]->fb->get_toplevel());
+
         /* Fill in buckets on both sides at top level */
-        fill_in_buckets_both(*pool, *workspaces, toplevel, si);
+        fill_in_buckets_both(*pool, *workspaces, si);
 
         /* FIXME: how to deal with toplevel that is not constant?
         max_full = std::max(max_full,
@@ -3089,7 +3099,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         // Prepare plattices at internal levels
         typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS];
         for (int side = 0; side < 2; ++side) {
-            for (int level = 1; level < toplevel; ++level) {
+            for (int level = 1; level < si->toplevel; ++level) {
                 const fb_part * fb = si->sides[side]->fb->get_part(level);
                 const fb_slice_interface *slice;
                 for (slice_index_t slice_index = fb->get_first_slice_index();

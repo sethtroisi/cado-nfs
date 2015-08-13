@@ -345,8 +345,9 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
     }
 }
 
-void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, const int part, sieve_info_srcptr si)
+void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, sieve_info_srcptr si)
 {
+    int part = si->toplevel;
     plattice_enumerate_t::set_area(si->conf->logI, si->J);
     for (int side = 0; side < 2; ++side)
         fill_in_buckets_one_side(pool, ws, si->sides[side]->fb->get_part(part), si, side);

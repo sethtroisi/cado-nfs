@@ -142,12 +142,17 @@
 #define LOG_BUCKET_REGION 16
 #endif
 
+#define NB_BUCKETS_2 256
+#define NB_BUCKETS_3 256
+
 // Portability of ULL suffix?
 #define BUCKET_REGION (1ULL << LOG_BUCKET_REGION)
 
 #define BUCKET_REGION_1 BUCKET_REGION
-#define BUCKET_REGION_2 256*BUCKET_REGION_1
-#define BUCKET_REGION_3 256*BUCKET_REGION_2
+#define BUCKET_REGION_2 NB_BUCKETS_2*BUCKET_REGION_1
+#define BUCKET_REGION_3 NB_BUCKETS_3*BUCKET_REGION_2
+
+#define BUCKET_REGIONS { 0, BUCKET_REGION_1, BUCKET_REGION_2, BUCKET_REGION_3 }
 
 /* This is currently used to enable some code paths specific to the
  * descent. The mid-term plan is to remove this compile-time flag.

@@ -499,7 +499,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void fprint(FILE *) const;
   void append(const fb_general_entry &);
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
+  fb_part *get_part(const size_t n) const {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
   void make_slices(double scale, const double max_weight[FB_MAX_PARTS]);
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {

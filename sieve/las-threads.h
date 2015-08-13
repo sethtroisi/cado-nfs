@@ -15,19 +15,20 @@ class thread_workspaces;
 /* {{{ thread-related defines */
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
-  const fb_part *fb;
+  const fb_factorbase *fb;
   /* For small sieve */
   int64_t * ssdpos;
   int64_t * rsdpos;
 
+  /* The real array where we apply the sieve.
+     This has size BUCKET_REGION_0 and should be close to L1 cache size. */
   unsigned char *bucket_region;
   sieve_checksum checksum_post_sieve;
 
   thread_side_data();
   ~thread_side_data();
-  /* Allocate enough memory to be able to store at least n_bucket buckets,
-     each of size at least fill_ratio * bucket region size. */
-  void set_fb(const fb_part *_fb) {fb = _fb;}
+  
+  void set_fb(const fb_factorbase *_fb) {fb = _fb;}
   void update_checksum(){checksum_post_sieve.update(bucket_region, BUCKET_REGION);}
 };
 
@@ -73,6 +74,8 @@ public:
     delete[] in_use;
   }
 
+  /* Allocate enough memory to be able to store at least n_bucket buckets,
+     each of size at least fill_ratio * bucket region size. */
   void allocate_buckets(const uint32_t n_bucket, double fill_ratio);
   const T* cbegin() const {return &BAs[0];}
   const T* cend() const {return &BAs[n];}
@@ -102,7 +105,7 @@ protected:
   cget() const;
 public:
   reservation_group(size_t nr_bucket_arrays);
-  void allocate_buckets(const uint32_t n_bucket, const double *fill_ratio);
+  void allocate_buckets(const uint32_t *n_bucket, const double *fill_ratio);
 };
 
 class thread_workspaces : private NonCopyable {
