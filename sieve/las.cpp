@@ -3141,8 +3141,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                         downsort_tree<1>(i, 0, *workspaces, si, precomp_plattice);
                         break;
                     case 3:
-                        // FIXME!!!
-                        downsort_tree<1>(i, 0, *workspaces, si, precomp_plattice);
+                        downsort_tree<2>(i, 0, *workspaces, si, precomp_plattice);
                         break;
                     default:
                         ASSERT_ALWAYS(0);

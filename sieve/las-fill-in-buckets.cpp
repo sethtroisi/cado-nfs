@@ -325,6 +325,7 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
     return new task_result;
 }
 
+template <int LEVEL>
 static void
 fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
 {
@@ -335,8 +336,7 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
          (slice = fb->get_slice(slice_index)) != NULL;
          slice_index++) {
         fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice);
-        // FIXME: here, this should be toplevel, not 1.
-        pool.add_task(fill_in_buckets_one_slice<1>, param, 0);
+        pool.add_task(fill_in_buckets_one_slice<LEVEL>, param, 0);
         slices_pushed++;
     }
     for (slice_index_t slices_completed = 0; slices_completed < slices_pushed; slices_completed++) {
@@ -347,10 +347,25 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
 
 void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, sieve_info_srcptr si)
 {
-    int part = si->toplevel;
     plattice_enumerate_t::set_area(si->conf->logI, si->J);
-    for (int side = 0; side < 2; ++side)
-        fill_in_buckets_one_side(pool, ws, si->sides[side]->fb->get_part(part), si, side);
+    for (int side = 0; side < 2; ++side) {
+        switch (si->toplevel) {
+            case 1:
+                fill_in_buckets_one_side<1>(pool, ws,
+                        si->sides[side]->fb->get_part(si->toplevel), si, side);
+                break;
+            case 2:
+                fill_in_buckets_one_side<2>(pool, ws,
+                        si->sides[side]->fb->get_part(si->toplevel), si, side);
+                break;
+            case 3:
+                fill_in_buckets_one_side<3>(pool, ws,
+                        si->sides[side]->fb->get_part(si->toplevel), si, side);
+                break;
+            default:
+                ASSERT_ALWAYS(0);
+        }
+    }
 }
 /* }}} */
 
@@ -439,17 +454,37 @@ void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
   sieve_info_srcptr si MAYBE_UNUSED,
   typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS] MAYBE_UNUSED)
 {
+    ASSERT_ALWAYS(0);
 }
 
+// other fake instances to please level-2 instanciation.
+template <>
+bucket_array_t<3, longhint_t>::bucket_array_t()
+{
+    ASSERT_ALWAYS(0);
+}
+
+template <>
+bucket_array_t<3, longhint_t>::~bucket_array_t()
+{
+    ASSERT_ALWAYS(0);
+}
+
+template <>
+void downsort<3>(bucket_array_t<2, longhint_t>&,
+        bucket_array_t<3, longhint_t> const&, unsigned int)
+{
+    ASSERT_ALWAYS(0);
+}
+
+// Now the two exported instances
 
 template 
 void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_srcptr si,
   typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
 
-#if 0
 template
 void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_srcptr si,
   typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
-#endif
