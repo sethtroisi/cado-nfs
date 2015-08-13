@@ -161,7 +161,7 @@ struct sieve_info_s {
 
     // parameters for bucket sieving
     /* Actual number of buckets at toplevel used by current special-q */
-    uint32_t nb_buckets;
+    uint32_t nb_buckets[FB_MAX_PARTS];
     /* Max number of buckets if J=I/2, at each level */
     uint32_t nb_buckets_max[FB_MAX_PARTS];
     /* Largest level for which the corresponding fb_part is not empty */

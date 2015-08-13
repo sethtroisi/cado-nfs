@@ -401,7 +401,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      */
     ASSERT_ALWAYS(LOG_BUCKET_REGION >= sc->logI);
 
-    /* this is the maximal value of the number of buckets (might be less
+    /* set the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
     uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
     uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
@@ -409,8 +409,10 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
       ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BRS[si->toplevel];
     for (int i = si->toplevel+1; i < FB_MAX_PARTS; ++i)
         XX[i] = 0;
-    for (int i = 0; i < FB_MAX_PARTS; ++i) 
+    for (int i = 0; i < FB_MAX_PARTS; ++i) {
         si->nb_buckets_max[i] = XX[i];
+        si->nb_buckets[i] = XX[i];
+    }
 
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
@@ -503,9 +505,11 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads,
   /* essentially update the fij polynomials and J value */
   sieve_info_update_norm_data(si, nb_threads);
 
-  /* update number of buckets */
-  si->nb_buckets = 1 +
-      ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BUCKET_REGION;
+  /* update number of buckets at toplevel */
+  uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+  si->nb_buckets[si->toplevel] = 1 +
+      ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / 
+      BRS[si->toplevel];
 
   /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
@@ -2542,7 +2546,7 @@ void * process_bucket_region(thread_data *th)
     memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
-    for (unsigned int i = th->id; i < si->nb_buckets; i += las->nb_threads) 
+    for (unsigned int i = th->id; i < si->nb_buckets[1]; i += las->nb_threads) 
       {
         WHERE_AM_I_UPDATE(w, N, i);
 
@@ -3088,6 +3092,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* Fill in buckets on both sides at top level */
         fill_in_buckets_both(*pool, *workspaces, si);
+        delete pool;
 
         /* FIXME: how to deal with toplevel that is not constant?
         max_full = std::max(max_full,
@@ -3095,33 +3100,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         ASSERT_ALWAYS(max_full <= 1.0 || // see commented code below
                  fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
                  */
-
-        // Prepare plattices at internal levels
-        typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS];
-        for (int side = 0; side < 2; ++side) {
-            for (int level = 1; level < si->toplevel; ++level) {
-                const fb_part * fb = si->sides[side]->fb->get_part(level);
-                const fb_slice_interface *slice;
-                for (slice_index_t slice_index = fb->get_first_slice_index();
-                        (slice = fb->get_slice(slice_index)) != NULL; 
-                        slice_index++) {  
-                    precomp_plattice[side][level].push_back(
-                        slice->make_lattice_bases(si->qbasis, si->conf->logI));
-                }
-            }
-        }
-
-        // FIXME: again...
-        // Visit the downsorting tree depth-first.
-        // If toplevel = 1, then this is just processing all bucket
-        // regions.
-//        for (int i = 0; i < bucket_array_t<toplevel,shorthint_t>::n_bucket; i++) {
-//            downsort_tree(toplevel-1, 0, *workspaces, si, i);
-//        }
-
-        delete pool;
-
-        report->ttbuckets_fill += seconds();
 
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
@@ -3134,8 +3112,43 @@ int main (int argc0, char *argv0[])/*{{{*/
             small_sieve_info("resieve", side, s->rsd);
         }
 
-        /* Process bucket regions in parallel */
-        workspaces->thread_do(&process_bucket_region);
+        report->ttbuckets_fill += seconds();
+        if (si->toplevel == 1) {
+            /* Process bucket regions in parallel */
+            workspaces->thread_do(&process_bucket_region);
+        } else {
+            // Prepare plattices at internal levels
+            typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS];
+            for (int side = 0; side < 2; ++side) {
+                for (int level = 1; level < si->toplevel; ++level) {
+                    const fb_part * fb = si->sides[side]->fb->get_part(level);
+                    const fb_slice_interface *slice;
+                    for (slice_index_t slice_index = fb->get_first_slice_index();
+                            (slice = fb->get_slice(slice_index)) != NULL; 
+                            slice_index++) {  
+                        precomp_plattice[side][level].push_back(
+                                slice->make_lattice_bases(si->qbasis, si->conf->logI));
+                    }
+                }
+            }
+
+            // Visit the downsorting tree depth-first.
+            // If toplevel = 1, then this is just processing all bucket
+            // regions.
+            for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
+                switch (si->toplevel) {
+                    case 2:
+                        downsort_tree<1>(i, 0, *workspaces, si, precomp_plattice);
+                        break;
+                    case 3:
+                        // FIXME!!!
+                        downsort_tree<1>(i, 0, *workspaces, si, precomp_plattice);
+                        break;
+                    default:
+                        ASSERT_ALWAYS(0);
+                }
+            }
+        }
 
 #ifdef  DLP_DESCENT
         descent_tree::candidate_relation const& winner(las->tree->current_best_candidate());

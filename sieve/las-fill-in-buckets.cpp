@@ -370,57 +370,52 @@ downsort_tree(uint32_t bucket_index,
 {
     ASSERT_ALWAYS(LEVEL > 0);
 
-    double max_full;
+    double max_full MAYBE_UNUSED = 0.0;
 
     for (int side = 0; side < 2; ++side) {
         /* FIRST: Downsort what is coming from the level above, for this
          * bucket index */
         // All these BA are global stuff; see reservation_group.
         // FIXME: QUESTION: do we need to reserve???
-        bucket_array_t<LEVEL,longhint_t> BAout = 
-            ws.reserve_BA<LEVEL,longhint_t>(side);
+        bucket_array_t<LEVEL,longhint_t> BAout; // = ws.get<LEVEL,longhint_t>(side);
         // The data that comes from fill-in bucket at level above:
         {
-            bucket_array_t<LEVEL+1,shorthint_t> BAin =
-                ws.reserve_BA<LEVEL+1,shorthint_t>(side);
+            bucket_array_t<LEVEL+1,shorthint_t> BAin; // = ws.get<LEVEL+1,shorthint_t>(side);
             downsort<LEVEL+1>(BAout, BAin, bucket_index);
-            ws.release_BA<LEVEL+1,shorthint_t>(side);
+//            ws.release_BA<LEVEL+1,shorthint_t>(side);
         }
 
-        const int toplevel = MAX(si->sides[0]->fb->get_toplevel(),
-                si->sides[1]->fb->get_toplevel());                              
+        const int toplevel = si->toplevel;
         if (LEVEL < toplevel - 1) {
             // What comes from already downsorted data above:
-            bucket_array_t<LEVEL+1,longhint_t> BAin =
-                ws.reserve_BA<LEVEL+1,longhint_t>(side);
+            bucket_array_t<LEVEL+1,longhint_t> BAin; //= ws.get<LEVEL+1,longhint_t>(side);
             downsort<LEVEL+1>(BAout, BAin, bucket_index);
-            ws.release_BA<LEVEL+1,longhint_t>(side);
+//            ws.release_BA<LEVEL+1,longhint_t>(side);
         }
-        ws.release_BA<LEVEL,longhint_t>(side);
-        max_full = std::max(ws.buckets_max_full<LEVEL, longhint_t>());
+//        ws.release_BA<LEVEL,longhint_t>(side);
+        max_full = std::max(max_full, ws.buckets_max_full<LEVEL, longhint_t>());
         ASSERT_ALWAYS(max_full <= 1.0);
 
         /* SECOND: fill in buckets at this level, for this region. */
-        bucket_array_t<LEVEL,shorthint_t> BAin = 
-            ws.reserve_BA<LEVEL,shorthint_t>(side);
+        bucket_array_t<LEVEL,shorthint_t> BAin; // = ws.get<LEVEL,shorthint_t>(side);
         for (typename std::vector<plattices_vector_t *>::iterator pl_it =
                 precomp_plattice[side][LEVEL].begin();
               pl_it != precomp_plattice[side][LEVEL].end();
               pl_it++) {
-            where_am_I_ptr w;
+            where_am_I_ptr w = NULL;
             WHERE_AM_I_UPDATE(w, si, si);
             WHERE_AM_I_UPDATE(w, side, side);
             WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
-            fill_in_buckets<LEVEL>(BAin, si, pl_it, w);
+            fill_in_buckets<LEVEL>(BAin, si, *pl_it, w);
         }
-        ws.release_BA<LEVEL,shorthint_t>(side);
-        max_full = std::max(ws.buckets_max_full<LEVEL, shorthint_t>());
+//        ws.release_BA<LEVEL,shorthint_t>(side);
+        max_full = std::max(max_full, ws.buckets_max_full<LEVEL, shorthint_t>());
         ASSERT_ALWAYS(max_full <= 1.0);
     }
 
     /* RECURSE */
     if (LEVEL > 1) {
-        for (int i = 0; i < bucket_array_t<LEVEL,shorthint_t>::n_bucket; ++i) {
+        for (unsigned int i = 0; i < si->nb_buckets[LEVEL]; ++i) {
             uint32_t N = first_region0_index; // FIXME + i*APPROPRIATE_REGION_SIZE.
             downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice);
         }
@@ -433,3 +428,28 @@ downsort_tree(uint32_t bucket_index,
         // coming from downsorting.
     }
 }
+
+/* Instances to be compiled */
+
+// A fake level 0, to avoid infinite loop during compilation.
+template <>
+void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
+  uint32_t first_region0_index MAYBE_UNUSED,
+  thread_workspaces &ws MAYBE_UNUSED,
+  sieve_info_srcptr si MAYBE_UNUSED,
+  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS] MAYBE_UNUSED)
+{
+}
+
+
+template 
+void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
+  thread_workspaces &ws, sieve_info_srcptr si,
+  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
+
+#if 0
+template
+void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
+  thread_workspaces &ws, sieve_info_srcptr si,
+  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
+#endif

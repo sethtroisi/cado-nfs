@@ -283,8 +283,9 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
     const bucket_update_t<INPUT_LEVEL, shorthint_t> *it = BA_in.begin(bucket_number, i_slice);
     const bucket_update_t<INPUT_LEVEL, shorthint_t> * const end_it = BA_in.end(bucket_number, i_slice);
 
+    // FIXME: need a where_am_I_ptr w instead of NULL.
     for ( ; it != end_it ; it++)
-      BA_out.push_update(it->x, 0, it->hint, slice_index);
+      BA_out.push_update(it->x, 0, it->hint, slice_index, NULL);
   }
 }
 
@@ -300,27 +301,28 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
   const bucket_update_t<INPUT_LEVEL, longhint_t> *it = BA_in.begin(bucket_number, 0);
   const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
 
+  // FIXME: need a where_am_I_ptr w instead of NULL.
   for ( ; it != end_it ; it++) {
-    BA_out.push_update(it->x, 0, it->hint, it->index);
+    BA_out.push_update(it->x, 0, it->hint, it->index, NULL);
   }
 }
 
 /* Explicitly instantiate the versions of downsort() that we'll need:
    downsorting shorthint from level 3 and level 2, and downsorting
    longhint from level 2. */
-template<>
+template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, shorthint_t> &BA_in,
             uint32_t bucket_number);
 
-template<>
+template
 void
 downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
             const bucket_array_t<3, shorthint_t> &BA_in,
             uint32_t bucket_number);
 
-template<>
+template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, longhint_t> &BA_in,

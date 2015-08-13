@@ -329,6 +329,10 @@ thread_workspaces::buckets_max_full()
     return mf0;
 }
 template double thread_workspaces::buckets_max_full<1, shorthint_t>();
+template double thread_workspaces::buckets_max_full<2, shorthint_t>();
+template double thread_workspaces::buckets_max_full<3, shorthint_t>();
+template double thread_workspaces::buckets_max_full<1, longhint_t>();
+template double thread_workspaces::buckets_max_full<2, longhint_t>();
 
 void
 thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
