@@ -133,10 +133,6 @@ public:
   reserve_BA(const int side) {return groups[side]->get<LEVEL, HINT>().reserve();}
 
   template <int LEVEL, typename HINT>
-  bucket_array_t<LEVEL, HINT> &
-  get(const int side) {return groups[side]->get<LEVEL, HINT>().BAs[0];}
-
-  template <int LEVEL, typename HINT>
   void
   release_BA(const int side, bucket_array_t<LEVEL, HINT> &BA) {
     return groups[side]->get<LEVEL, HINT>().release(BA);

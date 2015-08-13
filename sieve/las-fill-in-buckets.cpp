@@ -381,7 +381,7 @@ downsort_tree(uint32_t bucket_index,
         uint32_t first_region0_index,
         thread_workspaces &ws,
         sieve_info_srcptr si,
-        typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS])
+        precomp_plattice_t precomp_plattice)
 {
     ASSERT_ALWAYS(LEVEL > 0);
 
@@ -392,27 +392,34 @@ downsort_tree(uint32_t bucket_index,
          * bucket index */
         // All these BA are global stuff; see reservation_group.
         // FIXME: QUESTION: do we need to reserve???
-        bucket_array_t<LEVEL,longhint_t> BAout; // = ws.get<LEVEL,longhint_t>(side);
+        bucket_array_t<LEVEL, longhint_t> & BAout =
+            ws.reserve_BA<LEVEL, longhint_t>(side);
         // The data that comes from fill-in bucket at level above:
         {
-            bucket_array_t<LEVEL+1,shorthint_t> BAin; // = ws.get<LEVEL+1,shorthint_t>(side);
-            downsort<LEVEL+1>(BAout, BAin, bucket_index);
-//            ws.release_BA<LEVEL+1,shorthint_t>(side);
+            const bucket_array_t<LEVEL+1,shorthint_t> * BAin
+                = ws.cbegin_BA<LEVEL+1,shorthint_t>(side);
+            while (BAin != ws.cend_BA<LEVEL+1,shorthint_t>(side)) {
+                downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+            }
         }
 
         const int toplevel = si->toplevel;
         if (LEVEL < toplevel - 1) {
             // What comes from already downsorted data above:
-            bucket_array_t<LEVEL+1,longhint_t> BAin; //= ws.get<LEVEL+1,longhint_t>(side);
-            downsort<LEVEL+1>(BAout, BAin, bucket_index);
-//            ws.release_BA<LEVEL+1,longhint_t>(side);
+            const bucket_array_t<LEVEL+1,longhint_t> * BAin
+                = ws.cbegin_BA<LEVEL+1,longhint_t>(side);
+            while (BAin != ws.cend_BA<LEVEL+1,longhint_t>(side)) {             
+                downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+            }
         }
-//        ws.release_BA<LEVEL,longhint_t>(side);
+        ws.release_BA<LEVEL,longhint_t>(side, BAout);
+
         max_full = std::max(max_full, ws.buckets_max_full<LEVEL, longhint_t>());
         ASSERT_ALWAYS(max_full <= 1.0);
 
         /* SECOND: fill in buckets at this level, for this region. */
-        bucket_array_t<LEVEL,shorthint_t> BAin; // = ws.get<LEVEL,shorthint_t>(side);
+        bucket_array_t<LEVEL,shorthint_t> & BAfill =
+            ws.reserve_BA<LEVEL, shorthint_t>(side);
         for (typename std::vector<plattices_vector_t *>::iterator pl_it =
                 precomp_plattice[side][LEVEL].begin();
               pl_it != precomp_plattice[side][LEVEL].end();
@@ -421,10 +428,11 @@ downsort_tree(uint32_t bucket_index,
             WHERE_AM_I_UPDATE(w, si, si);
             WHERE_AM_I_UPDATE(w, side, side);
             WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
-            fill_in_buckets<LEVEL>(BAin, si, *pl_it, w);
+            fill_in_buckets<LEVEL>(BAfill, si, *pl_it, w);
         }
-//        ws.release_BA<LEVEL,shorthint_t>(side);
-        max_full = std::max(max_full, ws.buckets_max_full<LEVEL, shorthint_t>());
+        ws.release_BA<LEVEL,shorthint_t>(side, BAfill);
+
+        max_full = std::max(max_full, ws.buckets_max_full<LEVEL,shorthint_t>());
         ASSERT_ALWAYS(max_full <= 1.0);
     }
 
@@ -473,6 +481,13 @@ bucket_array_t<3, longhint_t>::~bucket_array_t()
 template <>
 void downsort<3>(bucket_array_t<2, longhint_t>&,
         bucket_array_t<3, longhint_t> const&, unsigned int)
+{
+    ASSERT_ALWAYS(0);
+}
+
+template <>
+reservation_array<bucket_array_t<3, longhint_t> > const&
+reservation_group::cget<3, longhint_t>() const
 {
     ASSERT_ALWAYS(0);
 }

@@ -3094,12 +3094,25 @@ int main (int argc0, char *argv0[])/*{{{*/
         fill_in_buckets_both(*pool, *workspaces, si);
         delete pool;
 
-        /* FIXME: how to deal with toplevel that is not constant?
-        max_full = std::max(max_full,
-                workspaces->buckets_max_full<toplevel, shorthint_t>());
-        ASSERT_ALWAYS(max_full <= 1.0 || // see commented code below
-                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
-                 */
+        /* Check that buckets are not more than full.
+         * Due to templates and si->toplevel being not constant, need a
+         * switch. (really?)
+         */
+        switch(si->toplevel) {
+            case 1:
+                max_full = std::max(max_full,
+                        workspaces->buckets_max_full<1, shorthint_t>());
+            case 2:
+                max_full = std::max(max_full,
+                        workspaces->buckets_max_full<2, shorthint_t>());
+            case 3:
+                max_full = std::max(max_full,
+                        workspaces->buckets_max_full<3, shorthint_t>());
+            default:
+                ASSERT_ALWAYS(0);
+        }
+        ASSERT_ALWAYS(max_full <= 1.0 ||
+                fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
 
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
@@ -3118,7 +3131,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             workspaces->thread_do(&process_bucket_region);
         } else {
             // Prepare plattices at internal levels
-            typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS];
+            precomp_plattice_t precomp_plattice;
             for (int side = 0; side < 2; ++side) {
                 for (int level = 1; level < si->toplevel; ++level) {
                     const fb_part * fb = si->sides[side]->fb->get_part(level);
