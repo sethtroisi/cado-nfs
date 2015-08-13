@@ -1723,7 +1723,7 @@ apply_one_update (unsigned char * const S, const bucket_update_t<1, shorthint_t>
 
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
-NOPROFILE_STATIC
+// FIXME NOPROFILE_STATIC
 #endif
 void
 apply_one_bucket (unsigned char *S, const bucket_array_t<1, shorthint_t> &BA, const int i,
@@ -2072,7 +2072,8 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
 
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
-NOPROFILE_STATIC int
+// FIXME NOPROFILE_STATIC
+int
 factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 {
     las_info_srcptr las = th->las;
@@ -3102,12 +3103,15 @@ int main (int argc0, char *argv0[])/*{{{*/
             case 1:
                 max_full = std::max(max_full,
                         workspaces->buckets_max_full<1, shorthint_t>());
+                break;
             case 2:
                 max_full = std::max(max_full,
                         workspaces->buckets_max_full<2, shorthint_t>());
+                break;
             case 3:
                 max_full = std::max(max_full,
                         workspaces->buckets_max_full<3, shorthint_t>());
+                break;
             default:
                 ASSERT_ALWAYS(0);
         }

@@ -13,6 +13,18 @@
 #include "las-arith.h"
 #include "las-qlattice.h"
 #include "las-fill-in-buckets.h"
+#include "las-norms.h"
+#include "las-smallsieve.h"
+
+
+// FIXME: this function of las.cpp should be somewhere
+void apply_one_bucket (unsigned char *S,
+    const bucket_array_t<1, shorthint_t> &BA, const int i,
+    const fb_part *fb, where_am_I_ptr w);
+void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2);
+int factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED);
+
+
 
 #ifdef USE_CACHEBUFFER
 #include "cachebuf.h"
@@ -378,78 +390,144 @@ void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, sieve_info_s
 template <int LEVEL>
 void
 downsort_tree(uint32_t bucket_index,
-        uint32_t first_region0_index,
-        thread_workspaces &ws,
-        sieve_info_srcptr si,
-        precomp_plattice_t precomp_plattice)
+    uint32_t first_region0_index,
+    thread_workspaces &ws,
+    sieve_info_ptr si,
+    precomp_plattice_t precomp_plattice)
 {
-    ASSERT_ALWAYS(LEVEL > 0);
+  ASSERT_ALWAYS(LEVEL > 0);
 
-    double max_full MAYBE_UNUSED = 0.0;
+  double max_full MAYBE_UNUSED = 0.0;
 
-    for (int side = 0; side < 2; ++side) {
-        /* FIRST: Downsort what is coming from the level above, for this
-         * bucket index */
-        // All these BA are global stuff; see reservation_group.
-        // FIXME: QUESTION: do we need to reserve???
-        bucket_array_t<LEVEL, longhint_t> & BAout =
-            ws.reserve_BA<LEVEL, longhint_t>(side);
-        // The data that comes from fill-in bucket at level above:
-        {
-            const bucket_array_t<LEVEL+1,shorthint_t> * BAin
-                = ws.cbegin_BA<LEVEL+1,shorthint_t>(side);
-            while (BAin != ws.cend_BA<LEVEL+1,shorthint_t>(side)) {
-                downsort<LEVEL+1>(BAout, *BAin, bucket_index);
-            }
-        }
-
-        const int toplevel = si->toplevel;
-        if (LEVEL < toplevel - 1) {
-            // What comes from already downsorted data above:
-            const bucket_array_t<LEVEL+1,longhint_t> * BAin
-                = ws.cbegin_BA<LEVEL+1,longhint_t>(side);
-            while (BAin != ws.cend_BA<LEVEL+1,longhint_t>(side)) {             
-                downsort<LEVEL+1>(BAout, *BAin, bucket_index);
-            }
-        }
-        ws.release_BA<LEVEL,longhint_t>(side, BAout);
-
-        max_full = std::max(max_full, ws.buckets_max_full<LEVEL, longhint_t>());
-        ASSERT_ALWAYS(max_full <= 1.0);
-
-        /* SECOND: fill in buckets at this level, for this region. */
-        bucket_array_t<LEVEL,shorthint_t> & BAfill =
-            ws.reserve_BA<LEVEL, shorthint_t>(side);
-        for (typename std::vector<plattices_vector_t *>::iterator pl_it =
-                precomp_plattice[side][LEVEL].begin();
-              pl_it != precomp_plattice[side][LEVEL].end();
-              pl_it++) {
-            where_am_I_ptr w = NULL;
-            WHERE_AM_I_UPDATE(w, si, si);
-            WHERE_AM_I_UPDATE(w, side, side);
-            WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
-            fill_in_buckets<LEVEL>(BAfill, si, *pl_it, w);
-        }
-        ws.release_BA<LEVEL,shorthint_t>(side, BAfill);
-
-        max_full = std::max(max_full, ws.buckets_max_full<LEVEL,shorthint_t>());
-        ASSERT_ALWAYS(max_full <= 1.0);
+  for (int side = 0; side < 2; ++side) {
+    /* FIRST: Downsort what is coming from the level above, for this
+     * bucket index */
+    // All these BA are global stuff; see reservation_group.
+    // We reserve those where we write, and access the ones for
+    // reading without reserving. We require that things at level
+    // above is finished before entering here.
+    bucket_array_t<LEVEL, longhint_t> & BAout =
+      ws.reserve_BA<LEVEL, longhint_t>(side);
+    BAout.reset_pointers();
+    // The data that comes from fill-in bucket at level above:
+    {
+      const bucket_array_t<LEVEL+1,shorthint_t> * BAin
+        = ws.cbegin_BA<LEVEL+1,shorthint_t>(side);
+      while (BAin != ws.cend_BA<LEVEL+1,shorthint_t>(side)) {
+        downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+      }
     }
 
-    /* RECURSE */
-    if (LEVEL > 1) {
-        for (unsigned int i = 0; i < si->nb_buckets[LEVEL]; ++i) {
-            uint32_t N = first_region0_index; // FIXME + i*APPROPRIATE_REGION_SIZE.
-            downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice);
-        }
-    } else {
-        /* PROCESS THE REGIONS AT LEVEL 0 */
-
-        // Should be more or less exactly process_bucket_region(),
-        // except that we should also apply the updates of
-        //   bucket_array_t<1, longhint_t>
-        // coming from downsorting.
+    const int toplevel = si->toplevel;
+    if (LEVEL < toplevel - 1) {
+      // What comes from already downsorted data above:
+      const bucket_array_t<LEVEL+1,longhint_t> * BAin
+        = ws.cbegin_BA<LEVEL+1,longhint_t>(side);
+      while (BAin != ws.cend_BA<LEVEL+1,longhint_t>(side)) { 
+        downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+      }
     }
+    ws.release_BA<LEVEL,longhint_t>(side, BAout);
+
+    max_full = std::max(max_full, ws.buckets_max_full<LEVEL, longhint_t>());
+    ASSERT_ALWAYS(max_full <= 1.0);
+
+    /* SECOND: fill in buckets at this level, for this region. */
+    bucket_array_t<LEVEL,shorthint_t> & BAfill =
+      ws.reserve_BA<LEVEL, shorthint_t>(side);
+    BAfill.reset_pointers();
+    for (typename std::vector<plattices_vector_t *>::iterator pl_it =
+            precomp_plattice[side][LEVEL].begin();
+        pl_it != precomp_plattice[side][LEVEL].end();
+        pl_it++) {
+      where_am_I_ptr w = NULL;
+      WHERE_AM_I_UPDATE(w, si, si);
+      WHERE_AM_I_UPDATE(w, side, side);
+      WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
+      fill_in_buckets<LEVEL>(BAfill, si, *pl_it, w);
+    }
+    ws.release_BA<LEVEL,shorthint_t>(side, BAfill);
+
+    max_full = std::max(max_full, ws.buckets_max_full<LEVEL,shorthint_t>());
+    ASSERT_ALWAYS(max_full <= 1.0);
+  }
+
+  /* RECURSE */
+  if (LEVEL > 1) {
+    for (unsigned int i = 0; i < si->nb_buckets[LEVEL]; ++i) {
+      uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+      uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
+      downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice);
+    }
+  } else {
+    /* PROCESS THE REGIONS AT LEVEL 0 */
+    where_am_I w MAYBE_UNUSED;
+    // FIXME: get thread_data from somewhere!
+    thread_data *th = NULL;
+
+    unsigned char * S[2];
+    unsigned int my_row0 =(BUCKET_REGION_1 >> si->conf->logI)
+      * first_region0_index;
+    for(int side = 0 ; side < 2 ; side++) {
+      sieve_side_info_ptr s = si->sides[side];
+      thread_side_data &ts = th->sides[side];
+      S[side] = ts.bucket_region;
+      // FIXME: should do that only when first_region0_index = 0 ??
+      ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
+      ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s->fb_parts_x->rs);
+    }
+
+    unsigned char *SS = th->SS;
+    memset(SS, 0, BUCKET_REGION_1);
+    for (uint32_t ii = 0; ii < si->nb_buckets[LEVEL]; ++ii) {
+      uint32_t i = first_region0_index + ii;
+      // WHERE_AM_I_UPDATE(w, N, i);
+      // FIXME: for the descent, could early abort here.
+
+      for (int side = 0; side < 2; side++) {
+        // WHERE_AM_I_UPDATE(w, side, side);
+        sieve_side_info_ptr s = si->sides[side];
+        thread_side_data &ts = th->sides[side];
+
+        // Init norms
+#ifdef SMART_NORM
+        init_norms_bucket_region(S[side], i, si, side, 1);
+#else
+        init_norms_bucket_region(S[side], i, si, side, 0);
+#endif
+        // FIXME Invalidate the first row except (1,0)
+
+        // Apply buckets
+        const bucket_array_t<1, shorthint_t> *BA =
+          th->ws->cbegin_BA<1, shorthint_t>(side);
+        const bucket_array_t<1, shorthint_t> * const BA_end =
+          th->ws->cend_BA<1, shorthint_t>(side);
+        for (; BA != BA_end; BA++)  {
+          apply_one_bucket(SS, *BA, i, ts.fb->get_part(1), w);
+        }
+        SminusS(S[side], S[side] + BUCKET_REGION_1, SS);
+
+        // Sieve small primes
+        sieve_small_bucket_region(SS, i, s->ssd, ts.ssdpos, si, side, w);
+        SminusS(S[side], S[side] + BUCKET_REGION_1, SS);
+      }
+
+      // Factor survivors
+      factor_survivors (th, i, w);
+
+      // Reset resiving data
+      for(int side = 0 ; side < 2 ; side++) {
+        sieve_side_info_ptr s = si->sides[side];
+        thread_side_data &ts = th->sides[side];
+        int * b = s->fb_parts_x->rs;
+        memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
+      }
+    }
+
+    // Freeing? FIXME: only at the very end?
+    // free(ts.ssdpos);
+    // free(ts.rsdpos);
+  }
 }
 
 /* Instances to be compiled */
@@ -459,7 +537,7 @@ template <>
 void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
   uint32_t first_region0_index MAYBE_UNUSED,
   thread_workspaces &ws MAYBE_UNUSED,
-  sieve_info_srcptr si MAYBE_UNUSED,
+  sieve_info_ptr si MAYBE_UNUSED,
   typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS] MAYBE_UNUSED)
 {
     ASSERT_ALWAYS(0);
@@ -496,10 +574,10 @@ reservation_group::cget<3, longhint_t>() const
 
 template 
 void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
-  thread_workspaces &ws, sieve_info_srcptr si,
+  thread_workspaces &ws, sieve_info_ptr si,
   typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
 
 template
 void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
-  thread_workspaces &ws, sieve_info_srcptr si,
+  thread_workspaces &ws, sieve_info_ptr si,
   typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
