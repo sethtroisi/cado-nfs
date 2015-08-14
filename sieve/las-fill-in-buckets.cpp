@@ -395,9 +395,14 @@ downsort_tree(uint32_t bucket_index,
 {
   ASSERT_ALWAYS(LEVEL > 0);
 
+  where_am_I w;
+  WHERE_AM_I_UPDATE(w, si, si);
+  WHERE_AM_I_UPDATE(w, N, first_region0_index);
+
   double max_full MAYBE_UNUSED = 0.0;
 
   for (int side = 0; side < 2; ++side) {
+    WHERE_AM_I_UPDATE(w, side, side);
     /* FIRST: Downsort what is coming from the level above, for this
      * bucket index */
     // All these BA are global stuff; see reservation_group.
@@ -412,7 +417,7 @@ downsort_tree(uint32_t bucket_index,
       const bucket_array_t<LEVEL+1,shorthint_t> * BAin
         = ws.cbegin_BA<LEVEL+1,shorthint_t>(side);
       while (BAin != ws.cend_BA<LEVEL+1,shorthint_t>(side)) {
-        downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+        downsort<LEVEL+1>(BAout, *BAin, bucket_index, w);
         BAin++;
       }
     }
@@ -423,7 +428,7 @@ downsort_tree(uint32_t bucket_index,
       const bucket_array_t<LEVEL+1,longhint_t> * BAin
         = ws.cbegin_BA<LEVEL+1,longhint_t>(side);
       while (BAin != ws.cend_BA<LEVEL+1,longhint_t>(side)) { 
-        downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+        downsort<LEVEL+1>(BAout, *BAin, bucket_index, w);
         BAin++;
       }
     }
@@ -440,9 +445,6 @@ downsort_tree(uint32_t bucket_index,
             precomp_plattice[side][LEVEL].begin();
         pl_it != precomp_plattice[side][LEVEL].end();
         pl_it++) {
-      where_am_I_ptr w = NULL;
-      WHERE_AM_I_UPDATE(w, si, si);
-      WHERE_AM_I_UPDATE(w, side, side);
       WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
       fill_in_buckets<LEVEL>(BAfill, si, *pl_it, w);
     }
@@ -461,7 +463,11 @@ downsort_tree(uint32_t bucket_index,
     }
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
+    // FIXME: This block duplicates a lot of code with
+    // process_bucket_region in las.cpp.
     where_am_I w MAYBE_UNUSED;
+    printf("################ Entering with first_region0_index = %d\n",
+            first_region0_index);
 
     unsigned char * S[2];
     for(int side = 0 ; side < 2 ; side++) {
@@ -473,11 +479,12 @@ downsort_tree(uint32_t bucket_index,
     memset(SS, 0, BUCKET_REGION_1);
     for (uint32_t ii = 0; ii < si->nb_buckets[LEVEL]; ++ii) {
       uint32_t i = first_region0_index + ii;
-      // WHERE_AM_I_UPDATE(w, N, i);
+      printf("####### Entering with sub-region = %d\n", i);
+      WHERE_AM_I_UPDATE(w, N, i);
       // FIXME: for the descent, could early abort here.
 
       for (int side = 0; side < 2; side++) {
-        // WHERE_AM_I_UPDATE(w, side, side);
+        WHERE_AM_I_UPDATE(w, side, side);
         sieve_side_info_ptr s = si->sides[side];
         thread_side_data &ts = th->sides[side];
 
@@ -560,7 +567,7 @@ bucket_array_t<3, longhint_t>::~bucket_array_t()
 
 template <>
 void downsort<3>(bucket_array_t<2, longhint_t>&,
-        bucket_array_t<3, longhint_t> const&, unsigned int)
+        bucket_array_t<3, longhint_t> const&, unsigned int, where_am_I_ptr)
 {
     ASSERT_ALWAYS(0);
 }

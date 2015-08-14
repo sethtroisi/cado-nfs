@@ -192,7 +192,11 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
             "to BA<%d>[%u]\n",
             (unsigned int) w->x, sidenames[w->side], (unsigned int) w->i,
             (unsigned int) w->h, w->p, LEVEL, (unsigned int) w->N);
-        ASSERT(test_divisible(w));
+        if (std::is_same<HINT,longhint_t>::value) {
+          verbose_output_print (TRACE_CHANNEL, 0, "# Warning: did not check divisibility during downsorting p=%" FBPRIME_FORMAT "\n", w->p);
+        } else {
+          ASSERT(test_divisible(w));
+        }
       }
 #endif
 }
@@ -295,17 +299,20 @@ template<int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_number)
+         uint32_t bucket_number, where_am_I_ptr w)
 {
   /* Rather similar to purging, except it doesn't purge */
   for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA_in.get_slice_index(i_slice);
+    WHERE_AM_I_UPDATE(w, i, slice_index);
     const bucket_update_t<INPUT_LEVEL, shorthint_t> *it = BA_in.begin(bucket_number, i_slice);
     const bucket_update_t<INPUT_LEVEL, shorthint_t> * const end_it = BA_in.end(bucket_number, i_slice);
 
-    // FIXME: need a where_am_I_ptr w instead of NULL.
-    for ( ; it != end_it ; it++)
-      BA_out.push_update(it->x, 0, it->hint, slice_index, NULL);
+    for ( ; it != end_it ; it++) {
+      WHERE_AM_I_UPDATE(w, p,
+          w->si->sides[w->side]->fb->get_slice(slice_index)->get_prime(it->hint));
+      BA_out.push_update(it->x, 0, it->hint, slice_index, w);
+    }
   }
 }
 
@@ -313,7 +320,7 @@ template<int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_number)
+         uint32_t bucket_number, where_am_I_ptr w) 
 {
   /* longhint updates don't write slice end pointers, so there must be
      exactly 1 slice per bucket */
@@ -321,9 +328,8 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
   const bucket_update_t<INPUT_LEVEL, longhint_t> *it = BA_in.begin(bucket_number, 0);
   const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
 
-  // FIXME: need a where_am_I_ptr w instead of NULL.
   for ( ; it != end_it ; it++) {
-    BA_out.push_update(it->x, 0, it->hint, it->index, NULL);
+    BA_out.push_update(it->x, 0, it->hint, it->index, w);
   }
 }
 
@@ -334,19 +340,19 @@ template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, shorthint_t> &BA_in,
-            uint32_t bucket_number);
+            uint32_t bucket_number, where_am_I_ptr w);
 
 template
 void
 downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
             const bucket_array_t<3, shorthint_t> &BA_in,
-            uint32_t bucket_number);
+            uint32_t bucket_numbe, where_am_I_ptr wr);
 
 template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, longhint_t> &BA_in,
-            uint32_t bucket_number);
+            uint32_t bucket_number, where_am_I_ptr w);
 
 void
 sieve_checksum::update(const unsigned int other)

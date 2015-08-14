@@ -303,13 +303,13 @@ template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_index);
+         uint32_t bucket_index, where_am_I_ptr w);
 
 template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_index);
+         uint32_t bucket_index, where_am_I_ptr w);
 
 /* A class that stores updates in a single "bucket".
    It's really just a container class with pre-allocated array for storage,
