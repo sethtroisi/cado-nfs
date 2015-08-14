@@ -508,12 +508,19 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads,
   sieve_info_update_norm_data(si, nb_threads);
 
   /* update number of buckets at toplevel */
-  // FIXME: this does not work: maybe there is only 1 bucket at toplevel
-  // and less than 256 at toplevel-1, due to a tiny J.
   uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
   si->nb_buckets[si->toplevel] = 1 +
       ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / 
       BRS[si->toplevel];
+  // maybe there is only 1 bucket at toplevel and less than 256 at
+  // toplevel-1, due to a tiny J.
+  if (si->nb_buckets[si->toplevel] == 1) {
+        si->nb_buckets[si->toplevel-1] = 1 +
+            ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) /
+            BRS[si->toplevel-1]; 
+        // we forbid skipping two levels.
+        ASSERT_ALWAYS(si->nb_buckets[si->toplevel-1] != 1);
+  }
 
   /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
