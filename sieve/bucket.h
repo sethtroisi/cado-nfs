@@ -383,7 +383,8 @@ class bucket_array_complete : public bucket_single<1, longhint_t> {
 public:  
   bucket_array_complete (const size_t size) : super(size){}
   ~bucket_array_complete(){}
-  void purge (const bucket_array_t<1, shorthint_t> &BA, int i, const unsigned char *S);
+  template <typename HINT>
+  void purge (const bucket_array_t<1, HINT> &BA, int i, const unsigned char *S);
 };
 
 

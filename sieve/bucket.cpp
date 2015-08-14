@@ -251,9 +251,11 @@ bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
   }
 }
 
+template <>
 void
-bucket_array_complete::purge (const bucket_array_t<1, shorthint_t> &BA,
-              const int i, const unsigned char *S)
+bucket_array_complete::purge<shorthint_t>(
+    const bucket_array_t<1, shorthint_t> &BA,
+    const int i, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
@@ -263,6 +265,24 @@ bucket_array_complete::purge (const bucket_array_t<1, shorthint_t> &BA,
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
         push_update(bucket_update_t<1, longhint_t> (it->x, 0, it->hint, slice_index));
+      }
+    }
+  }
+}
+
+template <>
+void
+bucket_array_complete::purge<longhint_t>(
+    const bucket_array_t<1, longhint_t> &BA,
+    const int i, const unsigned char *S)
+{
+  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+    const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, longhint_t> * const end_it = BA.end(i, i_slice);
+
+    for ( ; it != end_it ; it++) {
+      if (UNLIKELY(S[it->x] != 255)) {
+        push_update(*it);
       }
     }
   }

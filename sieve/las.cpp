@@ -404,13 +404,20 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* set the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
-    // FIXME: This does not work when I is small !!!!!
     uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
     uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
     XX[si->toplevel] = 1 +
       ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BRS[si->toplevel];
     for (int i = si->toplevel+1; i < FB_MAX_PARTS; ++i)
         XX[i] = 0;
+    // For small Jmax, the number of buckets at toplevel-1 could also
+    // be less than the maximum allowed.
+    if (XX[si->toplevel] == 1) {
+        XX[si->toplevel-1] = 1 +
+            ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1))
+            / BRS[si->toplevel-1];
+        ASSERT_ALWAYS(XX[si->toplevel-1] != 1);
+    }
     for (int i = 0; i < FB_MAX_PARTS; ++i) {
         si->nb_buckets_max[i] = XX[i];
         si->nb_buckets[i] = XX[i];
@@ -1719,45 +1726,49 @@ void init_trace_k(sieve_info_srcptr si, param_list pl)
 }
 
 /* {{{ apply_buckets */
+template <typename HINT>
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
 NOPROFILE_STATIC
 #endif
 void
-apply_one_update (unsigned char * const S, const bucket_update_t<1, shorthint_t> * const u,
-                  const unsigned char logp, where_am_I_ptr w)
+apply_one_update (unsigned char * const S,
+        const bucket_update_t<1, HINT> * const u,
+        const unsigned char logp, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, h, u->hint);
   WHERE_AM_I_UPDATE(w, x, u->x);
   sieve_increase(S + (u->x), logp, w);
 }
 
+template <typename HINT>
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
 // FIXME NOPROFILE_STATIC
 #endif
 void
-apply_one_bucket (unsigned char *S, const bucket_array_t<1, shorthint_t> &BA, const int i,
+apply_one_bucket (unsigned char *S,
+        const bucket_array_t<1, HINT> &BA, const int i,
         const fb_part *fb, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, shorthint_t> * const it_end = BA.end(i, i_slice);
+    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, HINT> * const it_end = BA.end(i, i_slice);
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fb->get_slice(slice_index)->get_logp();
 
-    const bucket_update_t<1, shorthint_t> *next_align;
-    if (sizeof(bucket_update_t<1, shorthint_t>) == 4) {
-      next_align = (bucket_update_t<1, shorthint_t> *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
+    const bucket_update_t<1, HINT> *next_align;
+    if (sizeof(bucket_update_t<1, HINT>) == 4) {
+      next_align = (bucket_update_t<1, HINT> *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
       if (UNLIKELY(next_align > it_end)) next_align = it_end;
     } else {
       next_align = it_end;
     }
 
     while (it != next_align)
-      apply_one_update (S, it++, logp, w);
+      apply_one_update<HINT> (S, it++, logp, w);
 
     while (it + 16 <= it_end) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
@@ -1795,9 +1806,21 @@ apply_one_bucket (unsigned char *S, const bucket_array_t<1, shorthint_t> &BA, co
       INSERT_2_VALUES(x4); INSERT_2_VALUES(x5); INSERT_2_VALUES(x6); INSERT_2_VALUES(x7);
     }
     while (it != it_end)
-      apply_one_update (S, it++, logp, w);
+      apply_one_update<HINT> (S, it++, logp, w);
   }
 }
+
+// Create the two instances 
+template 
+void apply_one_bucket<shorthint_t> (unsigned char *S,
+        const bucket_array_t<1, shorthint_t> &BA, const int i,
+        const fb_part *fb, where_am_I_ptr w);
+
+template
+void apply_one_bucket<longhint_t> (unsigned char *S,
+        const bucket_array_t<1, longhint_t> &BA, const int i,
+        const fb_part *fb, where_am_I_ptr w);
+
 
 /* {{{ Trial division */
 typedef struct {
@@ -2174,6 +2197,15 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             th->ws->cend_BA<1, shorthint_t>(side);
         for (; BA != BA_end; BA++)  {
             purged[side].purge(*BA, N, SS);
+        }
+
+        /* Add entries coming from downsorting, if any */
+        const bucket_array_t<1, longhint_t> *BAd =
+            th->ws->cbegin_BA<1, longhint_t>(side);
+        const bucket_array_t<1, longhint_t> * const BAd_end =
+            th->ws->cend_BA<1, longhint_t>(side);
+        for (; BAd != BAd_end; BAd++)  {
+            purged[side].purge(*BAd, N, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 

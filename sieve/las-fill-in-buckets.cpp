@@ -22,8 +22,9 @@
 #endif
 
 // FIXME: this function of las.cpp should be somewhere
+template <typename HINT>
 void apply_one_bucket (unsigned char *S,
-    const bucket_array_t<1, shorthint_t> &BA, const int i,
+    const bucket_array_t<1, HINT> &BA, const int i,
     const fb_part *fb, where_am_I_ptr w);
 void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2);
 int factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED);
@@ -488,7 +489,7 @@ downsort_tree(uint32_t bucket_index,
 #endif
         // FIXME Invalidate the first row except (1,0)
 
-        // Apply buckets
+        // Apply buckets that have just been filled-in
         const bucket_array_t<1, shorthint_t> *BA =
           th->ws->cbegin_BA<1, shorthint_t>(side);
         const bucket_array_t<1, shorthint_t> * const BA_end =
@@ -496,6 +497,19 @@ downsort_tree(uint32_t bucket_index,
         for (; BA != BA_end; BA++)  {
           apply_one_bucket(SS, *BA, i, ts.fb->get_part(1), w);
         }
+
+        // Apply downsorted buckets.
+        // TODO: there is only one, no ? Why do we iterate here?
+        const bucket_array_t<1, longhint_t> *BAd =
+          th->ws->cbegin_BA<1, longhint_t>(side);
+        const bucket_array_t<1, longhint_t> * const BAd_end =
+          th->ws->cend_BA<1, longhint_t>(side);
+        for (; BAd != BAd_end; BAd++)  {
+          // FIXME: the updates could come from part 3 as well, not only
+          // part 2.
+          apply_one_bucket(SS, *BAd, i, ts.fb->get_part(2), w);
+        }
+
         SminusS(S[side], S[side] + BUCKET_REGION_1, SS);
 
         // Sieve small primes
