@@ -172,7 +172,7 @@ if [ -f "$JOBDIR/00build" ] ; then
     fi
 fi
 
-jobfiles=$(ls $JOBDIR | grep -v '~$' | grep -v 00build)
+jobfiles=($(ls $JOBDIR | grep -v '~$' | grep -v 00build))
 
 progress "jobs to run: ${jobfiles[@]}"
 
