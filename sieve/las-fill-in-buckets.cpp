@@ -412,6 +412,7 @@ downsort_tree(uint32_t bucket_index,
         = ws.cbegin_BA<LEVEL+1,shorthint_t>(side);
       while (BAin != ws.cend_BA<LEVEL+1,shorthint_t>(side)) {
         downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+        BAin++;
       }
     }
 
@@ -422,6 +423,7 @@ downsort_tree(uint32_t bucket_index,
         = ws.cbegin_BA<LEVEL+1,longhint_t>(side);
       while (BAin != ws.cend_BA<LEVEL+1,longhint_t>(side)) { 
         downsort<LEVEL+1>(BAout, *BAin, bucket_index);
+        BAin++;
       }
     }
     ws.release_BA<LEVEL,longhint_t>(side, BAout);
@@ -459,8 +461,6 @@ downsort_tree(uint32_t bucket_index,
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
     where_am_I w MAYBE_UNUSED;
-    // FIXME: get thread_data from somewhere!
-    thread_data *th = NULL;
 
     unsigned char * S[2];
     for(int side = 0 ; side < 2 ; side++) {

@@ -404,6 +404,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* set the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
+    // FIXME: This does not work when I is small !!!!!
     uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
     uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
     XX[si->toplevel] = 1 +
@@ -507,6 +508,8 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads,
   sieve_info_update_norm_data(si, nb_threads);
 
   /* update number of buckets at toplevel */
+  // FIXME: this does not work: maybe there is only 1 bucket at toplevel
+  // and less than 256 at toplevel-1, due to a tiny J.
   uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
   si->nb_buckets[si->toplevel] = 1 +
       ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / 
