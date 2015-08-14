@@ -18,8 +18,11 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # add_library calls, and then I'm not sure whether
 # target_link_libraries picks the static or shared ones...
 
-# This is a default setting
-set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k4
+# This is a default setting, but in reality we don't have much latitude
+# with it. We *have* to compile all the u64k* which are in the set of
+# sources, because of cross dependencies which are presently not
+# correctly guarded.
+set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced threaded
@@ -150,7 +153,9 @@ target_link_libraries(random_matrix utils m)
 
 ### bwc_mpfq
 
-set(bwc_abases u64k1 u64k2 u64k4)
+# FIXME: does this have to be the same as BWC_GF2_ARITHMETIC_BACKENDS ?
+# Is there any reason for having two variables ??
+set(bwc_abases u64k1 u64k2 u64k3 u64k4)
 
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
 foreach(v ${bwc_abases})
