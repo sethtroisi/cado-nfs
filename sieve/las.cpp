@@ -155,7 +155,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             fprintf(stderr, "Error: lim is too small compared to bk_thresh\n");
             ASSERT_ALWAYS(0);
         }
-        const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
+        // const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
+        const fbprime_t thresholds[4] = {bk_thresh, bk_thresh<<5, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
         sis->fb = new fb_factorbase(thresholds, powlim, only_general);
 
@@ -3134,6 +3135,12 @@ int main (int argc0, char *argv0[])/*{{{*/
             /* Process bucket regions in parallel */
             workspaces->thread_do(&process_bucket_region);
         } else {
+            // FIXME: multithread with multi-level buckets is WANTED,
+            // but currently borken.
+            // Pick the first (and unique) thread data.
+            ASSERT_ALWAYS (las->nb_threads == 1);
+            thread_data *th = &workspaces->thrs[0];
+
             // Prepare plattices at internal levels
             precomp_plattice_t precomp_plattice;
             for (int side = 0; side < 2; ++side) {
@@ -3149,20 +3156,38 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
 
+            // Initialiaze small sieve data at the first region of level 0
+            // This has to be adapted for multithread, like in
+            // processregion().
+            for(int side = 0 ; side < 2 ; side++) {
+                sieve_side_info_ptr s = si->sides[side];
+                thread_side_data &ts = th->sides[side];
+                ts.ssdpos = small_sieve_start(s->ssd, 0, si);
+                ts.rsdpos = small_sieve_copy_start(ts.ssdpos,
+                        s->fb_parts_x->rs);
+            }
+
             // Visit the downsorting tree depth-first.
             // If toplevel = 1, then this is just processing all bucket
             // regions.
             for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
                 switch (si->toplevel) {
                     case 2:
-                        downsort_tree<1>(i, 0, *workspaces, si, precomp_plattice);
+                        downsort_tree<1>(i, 0, *workspaces, si, precomp_plattice, th);
                         break;
                     case 3:
-                        downsort_tree<2>(i, 0, *workspaces, si, precomp_plattice);
+                        downsort_tree<2>(i, 0, *workspaces, si, precomp_plattice, th);
                         break;
                     default:
                         ASSERT_ALWAYS(0);
                 }
+            }
+
+            // Cleanup (Again, should be modified for multi-thread?)
+            for(int side = 0 ; side < 2 ; side++) {
+                thread_side_data &ts = th->sides[side];
+                free(ts.ssdpos);
+                free(ts.rsdpos);
             }
         }
 

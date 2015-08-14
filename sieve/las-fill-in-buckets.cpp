@@ -15,7 +15,11 @@
 #include "las-fill-in-buckets.h"
 #include "las-norms.h"
 #include "las-smallsieve.h"
+#include "las-plattice.h"
 
+#ifdef USE_CACHEBUFFER
+#include "cachebuf.h"
+#endif
 
 // FIXME: this function of las.cpp should be somewhere
 void apply_one_bucket (unsigned char *S,
@@ -23,14 +27,6 @@ void apply_one_bucket (unsigned char *S,
     const fb_part *fb, where_am_I_ptr w);
 void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2);
 int factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED);
-
-
-
-#ifdef USE_CACHEBUFFER
-#include "cachebuf.h"
-#endif
-
-#include "las-plattice.h"
 
 // FIXME
 // Those three lines should go to las-plattice.c, but there is none for
@@ -393,7 +389,8 @@ downsort_tree(uint32_t bucket_index,
     uint32_t first_region0_index,
     thread_workspaces &ws,
     sieve_info_ptr si,
-    precomp_plattice_t precomp_plattice)
+    precomp_plattice_t precomp_plattice,
+    thread_data *th)
 {
   ASSERT_ALWAYS(LEVEL > 0);
 
@@ -457,7 +454,7 @@ downsort_tree(uint32_t bucket_index,
     for (unsigned int i = 0; i < si->nb_buckets[LEVEL]; ++i) {
       uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
       uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
-      downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice);
+      downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice, th);
     }
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
@@ -466,15 +463,9 @@ downsort_tree(uint32_t bucket_index,
     thread_data *th = NULL;
 
     unsigned char * S[2];
-    unsigned int my_row0 =(BUCKET_REGION_1 >> si->conf->logI)
-      * first_region0_index;
     for(int side = 0 ; side < 2 ; side++) {
-      sieve_side_info_ptr s = si->sides[side];
       thread_side_data &ts = th->sides[side];
       S[side] = ts.bucket_region;
-      // FIXME: should do that only when first_region0_index = 0 ??
-      ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
-      ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s->fb_parts_x->rs);
     }
 
     unsigned char *SS = th->SS;
@@ -523,10 +514,6 @@ downsort_tree(uint32_t bucket_index,
         memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
       }
     }
-
-    // Freeing? FIXME: only at the very end?
-    // free(ts.ssdpos);
-    // free(ts.rsdpos);
   }
 }
 
@@ -538,7 +525,8 @@ void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
   uint32_t first_region0_index MAYBE_UNUSED,
   thread_workspaces &ws MAYBE_UNUSED,
   sieve_info_ptr si MAYBE_UNUSED,
-  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS] MAYBE_UNUSED)
+  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS] MAYBE_UNUSED,
+  thread_data *th MAYBE_UNUSED)
 {
     ASSERT_ALWAYS(0);
 }
@@ -575,9 +563,11 @@ reservation_group::cget<3, longhint_t>() const
 template 
 void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_ptr si,
-  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
+  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS],
+  thread_data *th);
 
 template
 void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_ptr si,
-  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS]);
+  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS],
+  thread_data *th);

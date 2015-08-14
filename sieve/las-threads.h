@@ -110,7 +110,6 @@ public:
 
 class thread_workspaces : private NonCopyable {
   typedef reservation_group * reservation_group_ptr;
-  thread_data *thrs;
   const size_t nr_workspaces;
   sieve_info_ptr si;
   const unsigned int nr_sides; /* Usually 2 */
@@ -118,6 +117,9 @@ class thread_workspaces : private NonCopyable {
     lacking new[] without default constructor prior to C++11 :( */
 
 public:
+  // FIXME: thrs should be private!
+  thread_data *thrs;
+
   thread_workspaces(size_t nr_workspaces, unsigned int nr_sides, las_info_ptr _las);
   ~thread_workspaces();
   void pickup_si(sieve_info_ptr si);
