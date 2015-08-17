@@ -1492,20 +1492,20 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
             mpz_init(q);
             mpz_init_set(q1_orig, q1);
             /* we need to know the limit of the q range */
-            for(unsigned long i = 0 ; ; i++) {
+            for(unsigned long i = 1 ; ; i++) {
                 mpz_sub_ui(q, q1, i);
                 next_legitimate_specialq(q, q, 0);
-                if (mpz_cmp(q, q1) > 0) 
+                if (mpz_cmp(q, q1) >= 0)
                     continue;
                 if (mpz_poly_roots (roots, f, q) > 0)
                     break;
                 /* small optimization: avoid redoing root finding
                  * several times */
-                mpz_sub_ui(q1, q, 1);
-                i = 0;
+                mpz_set (q1, q);
+                i = 1;
             }
-            /* now q is prevprime(q1) */
-            mpz_set(q1, q);
+            /* now q is the largest prime < q1 with f having roots mod q */
+            mpz_add_ui (q1, q, 1);
             /* so now if we pick an integer in [q0, q1[, then its nextprime()
              * will be in [q0, q1_orig[, which is what we look for,
              * really.
@@ -1531,7 +1531,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
         /* If nq_max is specified, then q1 has no effect, even though it
          * has been set equal to q */
         for ( ; las->todo->size() < push_at_least_this_many &&
-                (las->nq_max < UINT_MAX || mpz_cmp(q, q1) <= 0) &&
+                (las->nq_max < UINT_MAX || mpz_cmp(q, q1) < 0) &&
                 las->nq_pushed < las->nq_max ; )
         {
             int nroots = mpz_poly_roots (roots, f, q);
@@ -1555,7 +1555,6 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
         mpz_init(q);
         for ( ; las->todo->size() < push_at_least_this_many && las->nq_pushed < las->nq_max ; ) {
             mpz_sub(q, q1, q0);
-            mpz_add_ui(q, q, 1);
             mpz_urandomm(q, las->rstate, q);
             mpz_add(q, q, q0);
             next_legitimate_specialq(q, q, 0);
