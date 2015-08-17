@@ -203,10 +203,10 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
             "to BA<%d>[%u]\n",
             (unsigned int) w->x, sidenames[w->side], (unsigned int) w->i,
             (unsigned int) w->h, w->p, LEVEL, (unsigned int) w->N);
-        if (is_same<HINT,longhint_t>) {
+        if (is_same<HINT,longhint_t>::value) {
           verbose_output_print (TRACE_CHANNEL, 0, "# Warning: did not check divisibility during downsorting p=%" FBPRIME_FORMAT "\n", w->p);
         } else {
-          ASSERT(test_divisible(w));
+          ASSERT_ALWAYS(test_divisible(w));
         }
       }
 #endif
