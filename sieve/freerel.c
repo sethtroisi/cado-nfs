@@ -621,9 +621,9 @@ main (int argc, char *argv[])
         usage (pl, argv0);
     }
     /* print command-line arguments */
+    verbose_interpret_parameters (pl);
     param_list_print_command_line (stdout, pl);
-    printf ("\n");
-    fflush(stdout);
+    fflush (stdout);
 
     polyfilename = param_list_lookup_string(pl, "poly");
     outfilename = param_list_lookup_string(pl, "out");
