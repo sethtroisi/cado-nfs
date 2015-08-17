@@ -28,7 +28,7 @@ if ! [ "$JOB_NAME" ] ; then
 fi
 
 if ! [ "$BUILD_TAG" ] ; then
-    BUILD_TAG="$JOB_NAME-test-`date +%Y%m%d%H%M%S`"
+    BUILD_TAG="test-$JOB_NAME-`date +%Y%m%d%H%M%S`"
 fi
 
 while [ $# -gt 0 ] ; do
@@ -47,6 +47,24 @@ JOBDIR="$CONTROL/jobs.d"
 
 lockfile="$CONTROL/pending"
 deadlockfile="$LOGFILEDIR/$BUILD_TAG.log"
+
+cleanup_and_exit() {
+    if [ "$#" -gt 0 ] ; then
+        rc=$1
+    else
+        rc=1
+    fi
+    mv $lockfile $deadlockfile
+    myfiles=($(find "$LOGFILEDIR" -name "${BUILD_TAG}.*"))
+    tar czf "$LOGFILEDIR/$BUILD_TAG.tar.gz" "${myfiles[@]}"
+    rm -f "${myfiles[@]}"
+    echo "All log files stored in $LOGFILEDIR/$BUILD_TAG.tar.gz"
+    trap - EXIT
+    exit $rc
+}
+
+trap cleanup_and_exit 1 2
+trap cleanup_and_exit EXIT
 
 mkdir -p "$LOGFILEDIR" "$JOBDIR" "$CONTROL" || :
 if ! [ -f "$SRC/local.sh" ] && [ -f "$CONTROL"/local.sh ] ; then
@@ -121,16 +139,15 @@ EOF
         jobid=$OAR_JOB_ID
         if [ "$jobid" ] ; then
             progress "submitted job $jobid ($jobfile)"
-            progress "stdout in $LOGFILEDIR/$BUILD_TAG.OAR.$jobid.out"
-            progress "stderr in $LOGFILEDIR/$BUILD_TAG.OAR.$jobid.err"
+            progress "stdout in $LOGFILEDIR/$BUILD_TAG.${jobfile}.OAR.$jobid.out"
+            progress "stderr in $LOGFILEDIR/$BUILD_TAG.${jobfile}.OAR.$jobid.err"
         else
             progress "oarsub failed !"
             progress "command line was: oarsub ${y[@]}"
             if [ "${#subjobs[@]}" -gt 0 ] ; then
                 oardel "${subjobs[@]}"
             fi
-            mv $lockfile $deadlockfile
-            exit 1
+            cleanup_and_exit 1
         fi
         subjobs=("${subjobs[@]}" $jobid)
         echo "$jobfile" > "$d/$jobid-NAME"
@@ -144,9 +161,14 @@ EOF
         for jobid in "${subjobs[@]}" ; do
             if ! [ -f $d/$jobid-ACK ] ; then
                 if [ -f $d/$jobid-END ] ; then
-                    progress "successful job $jobid (`cat $d/$jobid-NAME`): [`cat $d/$jobid-END`]"
+                    progress "finished job $jobid (`cat $d/$jobid-NAME`): [`cat $d/$jobid-END`]"
                     donejobs=("${donejobs[@]}" $jobid)
                     touch "$d/$jobid-ACK"
+                    exit_code="$(oarstat -fj $jobid | grep exit_code)"
+                    if ! [[ "$exit_code" =~ "exit_code = 0" ]] ; then
+                        progress "bad exit code for job $jobid: $exit_code"
+                        status=1
+                    fi
                     seen=1
                 elif [ -f $d/$jobid-ERROR ] ; then
                     progress "FAILED job $jobid (`cat $d/$jobid-NAME`): [`cat $d/$jobid-ERROR`]"
@@ -177,10 +199,8 @@ for s in "${sequence_steps[@]}" ; do
     progress "Set $s: ${#jobfiles[@]} job(s) to run: ${jobfiles[@]}"
 
     if ! submit_jobs_and_wait_for_completion "${jobfiles[@]}" ; then
-        mv $lockfile $deadlockfile
-        exit 1
+        cleanup_and_exit 1
     fi
 done
 
-mv $lockfile $deadlockfile
-exit 0
+cleanup_and_exit 0
