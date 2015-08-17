@@ -11,7 +11,7 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 add_executable (makefb makefb.c)
 target_link_libraries (makefb utils)
 
-set (las_sources las.cpp fb.cpp
+set (las_sources las.cpp fb.cpp las-plattice.cpp
   las-coordinates.cpp las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.cpp bucket.cpp las-smallsieve.cpp las-unsieve.cpp las-arith.cpp
   las-qlattice.cpp las-descent-trees.cpp las-cofactor.cpp
@@ -40,13 +40,14 @@ target_link_libraries (las_descent ${las_libraries})
 add_library (trialdiv trialdiv.c)
 add_library (las-norms las-norms.cpp)
 
-add_executable(freerel freerel.c fb.cpp)
+add_executable(freerel freerel.c fb.cpp las-plattice.cpp)
 target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
 add_subdirectory(strategies)
 
-add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
+add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
+    las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
 target_link_libraries(dupsup utils_with_io facul las-norms)
 
 install(TARGETS makefb las freerel RUNTIME DESTINATION ${BINSUFFIX}/sieve)

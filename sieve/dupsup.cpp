@@ -23,6 +23,7 @@
 #include "las-norms.h"
 #include "verbose.h"
 
+
 static void *
 dupsup (FILE *output, relation & rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
 {

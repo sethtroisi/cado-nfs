@@ -29,16 +29,6 @@ void apply_one_bucket (unsigned char *S,
 void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2);
 int factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED);
 
-// FIXME
-// Those three lines should go to las-plattice.c, but there is none for
-// the moment. And since the present file is the only one that uses
-// those, then we put the definition of static variables there.
-uint32_t plattice_enumerate_t::maskI;
-plattice_x_t plattice_enumerate_t::even_mask;
-plattice_x_t plattice_enumerate_t::area;
-
-
-
 /***************************************************************************/
 /********        Main bucket sieving functions                    **********/
 
