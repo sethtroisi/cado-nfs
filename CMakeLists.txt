@@ -284,7 +284,7 @@ add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
 add_custom_target(gf2x-build ALL
     DEPENDS ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     WORKING_DIRECTORY gf2x
-    COMMAND ${CMAKE_BUILD_TOOL}
+    COMMAND "${CMAKE_MAKE_PROGRAM}"
     COMMENT "Building gf2x"
 )
 
