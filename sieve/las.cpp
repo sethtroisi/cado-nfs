@@ -155,8 +155,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             fprintf(stderr, "Error: lim is too small compared to bk_thresh\n");
             ASSERT_ALWAYS(0);
         }
-        // const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
-        const fbprime_t thresholds[4] = {bk_thresh, bk_thresh<<5, fbb, fbb};
+        const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
+        // const fbprime_t thresholds[4] = {bk_thresh, bk_thresh<<5, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
         sis->fb = new fb_factorbase(thresholds, powlim, only_general);
 
