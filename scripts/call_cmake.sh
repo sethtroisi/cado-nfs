@@ -16,12 +16,10 @@
 # Type "make ?" for more options.
 ########################################################################
 
-env | grep -i MAKE
-
 : ${MAKE=make}
 export MAKE
 
-if echo "${MAKEFLAGS}" | grep -q "jobserver-fds=0,.*-j" ; then
+if echo "${MAKEFLAGS}" | grep -q "jobserver-fds=0," ; then
     echo "# You are calling the top-level cado makefile with file descriptor 0 closed.">&2
     echo "# This is unsupported (at least for a parallel build), because in that">&2
     echo "# case GNU Make opens and uses a pipe on file descriptor 0, and we">&2
