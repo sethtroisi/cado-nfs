@@ -4,7 +4,7 @@ use strict;
 
 use POSIX qw/getcwd/;
 use File::Basename;
-use File::Temp qw/tempdir/;
+use File::Temp qw/tempdir tempfile mktemp/;
 use List::Util qw[max];
 use Data::Dumper;
 use Fcntl;
@@ -813,8 +813,8 @@ if ($mpi_needed) {
     # Need hosts.
     if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
 	    print STDERR "OAR environment detected, setting hostfile.\n";
-	    system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
-	    $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
+	    $hostfile = mktemp("/tmp/HOSTS.$ENV{'OAR_JOBID'}.XXXXXXX");
+	    system "uniq $ENV{'OAR_NODEFILE'} > $hostfile";
     } elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
 	    print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
 	    get_mpi_hosts_torque;
