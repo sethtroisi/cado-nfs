@@ -94,20 +94,6 @@ progress() {
     echo "`date` $@" >> $lockfile
 }
 
-submit_job() {
-    eval $(oarsub -S -n $BUILD_TAG -O "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.out' -E "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.err' "$@" | tee /dev/stderr | grep OAR_JOB_ID)
-    if ! [ "$OAR_JOB_ID" ] ; then
-        progress "oarsub failed !"
-        progress "command line was: oarsub -S -n $BUILD_TAG -O "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.out' -E "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.err' $@"
-        mv $lockfile $deadlockfile
-        exit 1
-    fi
-    progress "submitted job $OAR_JOB_ID: $@"
-    progress "stdout in $LOGFILEDIR/$BUILD_TAG.OAR.$OAR_JOB_ID.out"
-    progress "stderr in $LOGFILEDIR/$BUILD_TAG.OAR.$OAR_JOB_ID.err"
-    echo $OAR_JOB_ID
-}
-
 submit_jobs_and_wait_for_completion()
 {
     # It's difficult because we need to make the thing synchronous.
@@ -126,9 +112,20 @@ EOF
     subjobs=()
     for jobfile in "$@" ; do
         x="$JOBDIR/$jobfile"
-        jobid=$(submit_job --notify "exec:$d/notify.sh" "$x")
-        if ! [ "$jobid" ] ; then
+        # build command line arguments in y
+        y=("-S" "-n" "$BUILD_TAG")
+        y=("${y[@]}" "-O" "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.out')
+        y=("${y[@]}" "-E" "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.err')
+        y=("${y[@]}" "--notify" "exec:$d/notify.sh" "$x")
+        eval $(oarsub "${y[@]}" | tee /dev/stderr | grep OAR_JOB_ID)
+        jobid=$OAR_JOB_ID
+        if [ "$jobid" ] ; then
+            progress "submitted job $jobid ($jobfile)"
+            progress "stdout in $LOGFILEDIR/$BUILD_TAG.OAR.$jobid.out"
+            progress "stderr in $LOGFILEDIR/$BUILD_TAG.OAR.$jobid.err"
+        else
             progress "oarsub failed !"
+            progress "command line was: oarsub ${y[@]}"
             if [ "${#subjobs[@]}" -gt 0 ] ; then
                 oardel "${subjobs[@]}"
             fi
@@ -136,6 +133,7 @@ EOF
             exit 1
         fi
         subjobs=("${subjobs[@]}" $jobid)
+        echo "$jobfile" > "$d/$jobid-NAME"
     done
 
     donejobs=()
@@ -144,42 +142,45 @@ EOF
     while [ "${#donejobs[@]}" -lt "${#subjobs[@]}" ] ; do
         seen=
         for jobid in "${subjobs[@]}" ; do
-            if [ -f $d/$jobid-END ] ; then
-                progress "successful job $jobid: $@ [`cat $d/$jobid-END`]"
-                donejobs=("${donejobs[@]}" $jobid)
-                seen=1
-            elif [ -f $d/$jobid-ERROR ] ; then
-                progress "FAILED job $jobid: $@ [`cat $d/$jobid-ERROR`]"
-                donejobs=("${donejobs[@]}" $jobid)
-                status=1
-                seen=1
+            if ! [ -f $d/$jobid-ACK ] ; then
+                if [ -f $d/$jobid-END ] ; then
+                    progress "successful job $jobid (`cat $d/$jobid-NAME`): [`cat $d/$jobid-END`]"
+                    donejobs=("${donejobs[@]}" $jobid)
+                    touch "$d/$jobid-ACK"
+                    seen=1
+                elif [ -f $d/$jobid-ERROR ] ; then
+                    progress "FAILED job $jobid (`cat $d/$jobid-NAME`): [`cat $d/$jobid-ERROR`]"
+                    donejobs=("${donejobs[@]}" $jobid)
+                    status=1
+                    touch "$d/$jobid-ACK"
+                    seen=1
+                fi
             fi
         done
         if ! [ "$seen" ] ; then
             sleep 10
+        else
+            progress "now ${#donejobs[@]} completed jobs, want ${#subjobs[@]}"
         fi
     done
     rm -rf $d
     return $status
 }
 
-# 00build is special, we want to synchronize after it completes.
+sequence_steps=($(ls $JOBDIR | grep -v '~$' | perl -ne '/^(\d+)\D/ && print "$1\n";' | sort -n -u))
 
-if [ -f "$JOBDIR/00build" ] ; then
-    if ! submit_jobs_and_wait_for_completion 00build ; then
+echo "${#sequence_steps[@]} sets of jobs to run: ${sequence_steps[@]}"
+
+for s in "${sequence_steps[@]}" ; do
+    jobfiles=($(ls $JOBDIR | grep -v '~$' | grep "^$s[^0-9]"))
+
+    progress "Set $s: ${#jobfiles[@]} job(s) to run: ${jobfiles[@]}"
+
+    if ! submit_jobs_and_wait_for_completion "${jobfiles[@]}" ; then
         mv $lockfile $deadlockfile
         exit 1
     fi
-fi
-
-jobfiles=($(ls $JOBDIR | grep -v '~$' | grep -v 00build))
-
-progress "jobs to run: ${jobfiles[@]}"
-
-if ! submit_jobs_and_wait_for_completion "${jobfiles[@]}" ; then
-    mv $lockfile $deadlockfile
-    exit 1
-fi
+done
 
 mv $lockfile $deadlockfile
 exit 0
