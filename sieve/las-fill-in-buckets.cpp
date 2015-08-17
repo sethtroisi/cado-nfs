@@ -545,7 +545,7 @@ void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
   uint32_t first_region0_index MAYBE_UNUSED,
   thread_workspaces &ws MAYBE_UNUSED,
   sieve_info_ptr si MAYBE_UNUSED,
-  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS] MAYBE_UNUSED,
+  precomp_plattice_t precomp_plattice MAYBE_UNUSED,
   thread_data *th MAYBE_UNUSED)
 {
     ASSERT_ALWAYS(0);
@@ -583,11 +583,11 @@ reservation_group::cget<3, longhint_t>() const
 template 
 void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_ptr si,
-  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS],
+  precomp_plattice_t precomp_plattice,
   thread_data *th);
 
 template
 void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_ptr si,
-  typename std::vector<plattices_vector_t *> precomp_plattice[2][FB_MAX_PARTS],
+  precomp_plattice_t precomp_plattice,
   thread_data *th);
