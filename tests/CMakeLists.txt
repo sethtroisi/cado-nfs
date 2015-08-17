@@ -1,6 +1,9 @@
+add_custom_target(all_test_dependencies)
+
 macro(set_test_build_depends test_name)
     add_custom_target(${test_name}_dependencies)
     add_dependencies(${test_name}_dependencies ${ARGN})
+    add_dependencies(all_test_dependencies ${test_name}_dependencies)
     add_test("builddep_${test_name}" "${CMAKE_COMMAND}" --build
         ${CMAKE_BINARY_DIR} --target ${test_name}_dependencies)
     set("${test_name}_has_build_depends" 1)
