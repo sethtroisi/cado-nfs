@@ -55,7 +55,8 @@ cleanup_and_exit() {
         rc=1
     fi
     mv $lockfile $deadlockfile
-    myfiles=($(find "$LOGFILEDIR" -name "${BUILD_TAG}.*"))
+    cd $CONTROL
+    myfiles=($(find logfiles -name "${BUILD_TAG}.*"))
     tar czf "$LOGFILEDIR/$BUILD_TAG.tar.gz" "${myfiles[@]}"
     rm -f "${myfiles[@]}"
     echo "All log files stored in $LOGFILEDIR/$BUILD_TAG.tar.gz"
