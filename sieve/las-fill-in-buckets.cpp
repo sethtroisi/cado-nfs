@@ -412,6 +412,7 @@ downsort_tree(uint32_t bucket_index,
     bucket_array_t<LEVEL, longhint_t> & BAout =
       ws.reserve_BA<LEVEL, longhint_t>(side);
     BAout.reset_pointers();
+    BAout.add_slice_index(0); // FIXME: This is a fake slice_index!
     // The data that comes from fill-in bucket at level above:
     {
       const bucket_array_t<LEVEL+1,shorthint_t> * BAin
@@ -502,7 +503,7 @@ downsort_tree(uint32_t bucket_index,
         const bucket_array_t<1, shorthint_t> * const BA_end =
           th->ws->cend_BA<1, shorthint_t>(side);
         for (; BA != BA_end; BA++)  {
-          apply_one_bucket(SS, *BA, i, ts.fb->get_part(1), w);
+          apply_one_bucket(SS, *BA, ii, ts.fb->get_part(1), w);
         }
 
         // Apply downsorted buckets.
@@ -514,7 +515,7 @@ downsort_tree(uint32_t bucket_index,
         for (; BAd != BAd_end; BAd++)  {
           // FIXME: the updates could come from part 3 as well, not only
           // part 2.
-          apply_one_bucket(SS, *BAd, i, ts.fb->get_part(2), w);
+          apply_one_bucket(SS, *BAd, ii, ts.fb->get_part(2), w);
         }
 
         SminusS(S[side], S[side] + BUCKET_REGION_1, SS);

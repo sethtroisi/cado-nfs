@@ -1810,16 +1810,29 @@ apply_one_bucket (unsigned char *S,
   }
 }
 
-// Create the two instances 
+// Create the two instances, the longhint_t being specialized.
 template 
 void apply_one_bucket<shorthint_t> (unsigned char *S,
         const bucket_array_t<1, shorthint_t> &BA, const int i,
         const fb_part *fb, where_am_I_ptr w);
 
-template
+template <>
 void apply_one_bucket<longhint_t> (unsigned char *S,
         const bucket_array_t<1, longhint_t> &BA, const int i,
-        const fb_part *fb, where_am_I_ptr w);
+        const fb_part *fb, where_am_I_ptr w) {
+  WHERE_AM_I_UPDATE(w, p, 0);
+
+  // There is only one slice.
+  slice_index_t i_slice = 0;
+  const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
+  const bucket_update_t<1, longhint_t> * const it_end = BA.end(i, i_slice);
+
+  while (it != it_end) {
+    slice_index_t index = it->index;
+    const unsigned char logp = fb->get_slice(index)->get_logp();
+    apply_one_update<longhint_t> (S, it++, logp, w);
+  }
+}
 
 
 /* {{{ Trial division */
