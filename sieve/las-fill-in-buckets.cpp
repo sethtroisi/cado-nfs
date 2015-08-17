@@ -467,8 +467,6 @@ downsort_tree(uint32_t bucket_index,
     // FIXME: This block duplicates a lot of code with
     // process_bucket_region in las.cpp.
     where_am_I w MAYBE_UNUSED;
-    printf("################ Entering with first_region0_index = %d\n",
-            first_region0_index);
 
     unsigned char * S[2];
     for(int side = 0 ; side < 2 ; side++) {
@@ -480,7 +478,6 @@ downsort_tree(uint32_t bucket_index,
     memset(SS, 0, BUCKET_REGION_1);
     for (uint32_t ii = 0; ii < si->nb_buckets[LEVEL]; ++ii) {
       uint32_t i = first_region0_index + ii;
-      printf("####### Entering with sub-region = %d\n", i);
       WHERE_AM_I_UPDATE(w, N, i);
       // FIXME: for the descent, could early abort here.
 
@@ -526,7 +523,8 @@ downsort_tree(uint32_t bucket_index,
       }
 
       // Factor survivors
-      factor_survivors (th, i, w);
+      las_report_ptr rep = th->rep;
+      rep->reports += factor_survivors (th, i, w);
 
       // Reset resiving data
       for(int side = 0 ; side < 2 ; side++) {
