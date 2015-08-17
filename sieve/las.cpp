@@ -363,7 +363,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * are exactly the same and can be shared.
      */
     if (las->sievers == si) {
-        verbose_output_print(0, 1, "# bucket_region = %llu\n", BUCKET_REGION);
+        verbose_output_print(0, 1, "# bucket_region = %lu\n", BUCKET_REGION);
         sieve_info_init_factor_bases(las, si, pl);
         for (int side = 0; side < 2; side++) {
             sieve_info_print_fb_statistics(las, si, side);
