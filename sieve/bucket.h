@@ -126,7 +126,7 @@ class bucket_update_t;
 template <typename HINT>
 class bucket_update_t<1, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION_1;
+  static const uint64_t bucket_region = BUCKET_REGION_1;
   XSIZE1 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
@@ -139,7 +139,7 @@ public:
 template <typename HINT>
 class bucket_update_t<2, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION_2;
+  static const uint64_t bucket_region = BUCKET_REGION_2;
   /* TODO: create a fake 24-bit type as uint8_t[3]. */
   XSIZE2 x;
   bucket_update_t(){};
@@ -153,7 +153,7 @@ public:
 template <typename HINT>
 class bucket_update_t<3, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION_3;
+  static const uint64_t bucket_region = BUCKET_REGION_3;
   XSIZE3 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
@@ -172,7 +172,7 @@ public:
 template <int LEVEL, typename HINT>
 class bucket_array_t : private NonCopyable {
   typedef bucket_update_t<LEVEL, HINT> update_t;
-  static const size_t bucket_region = update_t::bucket_region;
+  static const uint64_t bucket_region = update_t::bucket_region;
   update_t *big_data;
   size_t big_size;                    // size of bucket update memory
 
