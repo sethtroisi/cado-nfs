@@ -171,6 +171,17 @@ bucket_array_t<LEVEL, HINT>::max_full () const
   return (double) max / (double) bucket_size;
 }
 
+// Replace std::is_same()::value that is not yet available.
+template <typename T, typename U>
+struct is_same
+{
+    static const bool value = false;
+};
+
+template <typename T>
+struct is_same<T, T> { static const bool value = true; };
+
+
 template <int LEVEL, typename HINT>
 void
 bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED,
@@ -192,7 +203,7 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
             "to BA<%d>[%u]\n",
             (unsigned int) w->x, sidenames[w->side], (unsigned int) w->i,
             (unsigned int) w->h, w->p, LEVEL, (unsigned int) w->N);
-        if (std::is_same<HINT,longhint_t>::value) {
+        if (is_same<HINT,longhint_t>) {
           verbose_output_print (TRACE_CHANNEL, 0, "# Warning: did not check divisibility during downsorting p=%" FBPRIME_FORMAT "\n", w->p);
         } else {
           ASSERT(test_divisible(w));
