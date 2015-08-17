@@ -1828,6 +1828,9 @@ void apply_one_bucket<longhint_t> (unsigned char *S,
   const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
   const bucket_update_t<1, longhint_t> * const it_end = BA.end(i, i_slice);
 
+  // FIXME: Computing logp for each and every entry seems really, really
+  // inefficient. Could we add it to a bucket_update_t of "longhint"
+  // type?
   while (it != it_end) {
     slice_index_t index = it->index;
     const unsigned char logp = fb->get_slice(index)->get_logp();
