@@ -126,7 +126,7 @@ class bucket_update_t;
 template <typename HINT>
 class bucket_update_t<1, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION;
+  static const size_t bucket_region = BUCKET_REGION_1;
   XSIZE1 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
@@ -139,7 +139,7 @@ public:
 template <typename HINT>
 class bucket_update_t<2, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION; /* FIXME */
+  static const size_t bucket_region = BUCKET_REGION_2;
   /* TODO: create a fake 24-bit type as uint8_t[3]. */
   XSIZE2 x;
   bucket_update_t(){};
@@ -153,7 +153,7 @@ public:
 template <typename HINT>
 class bucket_update_t<3, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION; /* FIXME */
+  static const size_t bucket_region = BUCKET_REGION_3;
   XSIZE3 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
@@ -303,13 +303,13 @@ template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_index);
+         uint32_t bucket_index, where_am_I_ptr w);
 
 template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_index);
+         uint32_t bucket_index, where_am_I_ptr w);
 
 /* A class that stores updates in a single "bucket".
    It's really just a container class with pre-allocated array for storage,
@@ -383,7 +383,8 @@ class bucket_array_complete : public bucket_single<1, longhint_t> {
 public:  
   bucket_array_complete (const size_t size) : super(size){}
   ~bucket_array_complete(){}
-  void purge (const bucket_array_t<1, shorthint_t> &BA, int i, const unsigned char *S);
+  template <typename HINT>
+  void purge (const bucket_array_t<1, HINT> &BA, int i, const unsigned char *S);
 };
 
 

@@ -192,7 +192,11 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
             "to BA<%d>[%u]\n",
             (unsigned int) w->x, sidenames[w->side], (unsigned int) w->i,
             (unsigned int) w->h, w->p, LEVEL, (unsigned int) w->N);
-        ASSERT(test_divisible(w));
+        if (std::is_same<HINT,longhint_t>::value) {
+          verbose_output_print (TRACE_CHANNEL, 0, "# Warning: did not check divisibility during downsorting p=%" FBPRIME_FORMAT "\n", w->p);
+        } else {
+          ASSERT(test_divisible(w));
+        }
       }
 #endif
 }
@@ -251,9 +255,11 @@ bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
   }
 }
 
+template <>
 void
-bucket_array_complete::purge (const bucket_array_t<1, shorthint_t> &BA,
-              const int i, const unsigned char *S)
+bucket_array_complete::purge<shorthint_t>(
+    const bucket_array_t<1, shorthint_t> &BA,
+    const int i, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
@@ -268,6 +274,24 @@ bucket_array_complete::purge (const bucket_array_t<1, shorthint_t> &BA,
   }
 }
 
+template <>
+void
+bucket_array_complete::purge<longhint_t>(
+    const bucket_array_t<1, longhint_t> &BA,
+    const int i, const unsigned char *S)
+{
+  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+    const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, longhint_t> * const end_it = BA.end(i, i_slice);
+
+    for ( ; it != end_it ; it++) {
+      if (UNLIKELY(S[it->x] != 255)) {
+        push_update(*it);
+      }
+    }
+  }
+}
+
 template class bucket_single<1, primehint_t>;
 template class bucket_single<1, longhint_t>;
 
@@ -275,16 +299,20 @@ template<int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_number)
+         uint32_t bucket_number, where_am_I_ptr w)
 {
   /* Rather similar to purging, except it doesn't purge */
   for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA_in.get_slice_index(i_slice);
+    WHERE_AM_I_UPDATE(w, i, slice_index);
     const bucket_update_t<INPUT_LEVEL, shorthint_t> *it = BA_in.begin(bucket_number, i_slice);
     const bucket_update_t<INPUT_LEVEL, shorthint_t> * const end_it = BA_in.end(bucket_number, i_slice);
 
-    for ( ; it != end_it ; it++)
-      BA_out.push_update(it->x, 0, it->hint, slice_index);
+    for ( ; it != end_it ; it++) {
+      WHERE_AM_I_UPDATE(w, p,
+          w->si->sides[w->side]->fb->get_slice(slice_index)->get_prime(it->hint));
+      BA_out.push_update(it->x, 0, it->hint, slice_index, w);
+    }
   }
 }
 
@@ -292,7 +320,7 @@ template<int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_number)
+         uint32_t bucket_number, where_am_I_ptr w) 
 {
   /* longhint updates don't write slice end pointers, so there must be
      exactly 1 slice per bucket */
@@ -301,30 +329,30 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
   const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
 
   for ( ; it != end_it ; it++) {
-    BA_out.push_update(it->x, 0, it->hint, it->index);
+    BA_out.push_update(it->x, 0, it->hint, it->index, w);
   }
 }
 
 /* Explicitly instantiate the versions of downsort() that we'll need:
    downsorting shorthint from level 3 and level 2, and downsorting
    longhint from level 2. */
-template<>
+template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, shorthint_t> &BA_in,
-            uint32_t bucket_number);
+            uint32_t bucket_number, where_am_I_ptr w);
 
-template<>
+template
 void
 downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
             const bucket_array_t<3, shorthint_t> &BA_in,
-            uint32_t bucket_number);
+            uint32_t bucket_numbe, where_am_I_ptr wr);
 
-template<>
+template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, longhint_t> &BA_in,
-            uint32_t bucket_number);
+            uint32_t bucket_number, where_am_I_ptr w);
 
 void
 sieve_checksum::update(const unsigned int other)
