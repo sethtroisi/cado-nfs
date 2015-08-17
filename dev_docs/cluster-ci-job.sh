@@ -114,8 +114,8 @@ EOF
         x="$JOBDIR/$jobfile"
         # build command line arguments in y
         y=("-S" "-n" "$BUILD_TAG")
-        y=("${y[@]}" "-O" "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.out')
-        y=("${y[@]}" "-E" "$LOGFILEDIR"/'%jobname%.OAR.%jobid%.err')
+        y=("${y[@]}" "-O" "$LOGFILEDIR/%jobname%.${jobfile}.OAR.%jobid%.out")
+        y=("${y[@]}" "-E" "$LOGFILEDIR/%jobname%.${jobfile}.OAR.%jobid%.err")
         y=("${y[@]}" "--notify" "exec:$d/notify.sh" "$x")
         eval $(oarsub "${y[@]}" | tee /dev/stderr | grep OAR_JOB_ID)
         jobid=$OAR_JOB_ID
