@@ -1281,10 +1281,6 @@ scripts/refresh-gf2x.sh
 config/utilities.cmake
 config/pclmul.c
 config/pclmul.cmake
-linalg/bwc/mpfq/mpfq_p_10.c
-linalg/bwc/mpfq/mpfq_p_10.h
-linalg/bwc/mpfq/mpfq_p_10_t.c
-linalg/bwc/mpfq/mpfq_p_10_t.h
 linalg/bwc/mpfq/mpfq_p_5.c
 linalg/bwc/mpfq/mpfq_p_5.h
 linalg/bwc/mpfq/mpfq_p_5_t.c

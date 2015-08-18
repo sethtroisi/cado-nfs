@@ -15,10 +15,6 @@
 #include "mpfq_p_1.h"
 #include "mpfq_p_1_t.h"
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_1 */
-#ifdef COMPILE_MPFQ_PRIME_FIELD_p_10
-#include "mpfq_p_10.h"
-#include "mpfq_p_10_t.h"
-#endif /* COMPILE_MPFQ_PRIME_FIELD_p_10 */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_2
 #include "mpfq_p_2.h"
 #include "mpfq_p_2_t.h"
@@ -94,10 +90,6 @@ void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr v, ...)
             } else if (strcmp(mandatory_tag, "p_1") == 0 && groupsize == 1 && mpz_size(p) == 1) {
                 mpfq_p_1_oo_field_init(v);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_1 */
-#ifdef COMPILE_MPFQ_PRIME_FIELD_p_10
-            } else if (strcmp(mandatory_tag, "p_10") == 0 && groupsize == 1 && mpz_size(p) == 10) {
-                mpfq_p_10_oo_field_init(v);
-#endif /* COMPILE_MPFQ_PRIME_FIELD_p_10 */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_2
             } else if (strcmp(mandatory_tag, "p_2") == 0 && groupsize == 1 && mpz_size(p) == 2) {
                 mpfq_p_2_oo_field_init(v);
@@ -151,10 +143,6 @@ void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr v, ...)
         } else if (groupsize == 1 && mpz_size(p) == 1) {
             mpfq_p_1_oo_field_init(v);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_1 */
-#ifdef COMPILE_MPFQ_PRIME_FIELD_p_10
-        } else if (groupsize == 1 && mpz_size(p) == 10) {
-            mpfq_p_10_oo_field_init(v);
-#endif /* COMPILE_MPFQ_PRIME_FIELD_p_10 */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_2
         } else if (groupsize == 1 && mpz_size(p) == 2) {
             mpfq_p_2_oo_field_init(v);
@@ -275,12 +263,6 @@ void mpfq_vbase_oo_init_templates(mpfq_vbase_tmpl_ptr w, mpfq_vbase_ptr v0, mpfq
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_1_p_1_addmul_tiny;
         w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_1_p_1_transpose;
 #endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_1) */
-#if defined(COMPILE_MPFQ_PRIME_FIELD_p_10)
-    } else if (strcmp(s0, "p_10") == 0 && strcmp(s1, "p_10") == 0) {
-        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_10_p_10_dotprod;
-        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_10_p_10_addmul_tiny;
-        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_10_p_10_transpose;
-#endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_10) */
 #if defined(COMPILE_MPFQ_PRIME_FIELD_p_2)
     } else if (strcmp(s0, "p_2") == 0 && strcmp(s1, "p_2") == 0) {
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_2_p_2_dotprod;
