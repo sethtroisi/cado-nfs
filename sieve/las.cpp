@@ -2329,7 +2329,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             int i;
             unsigned int j;
             for(int side = 0 ; pass && side < 2 ; side++) {
-                // Trial divide rational norm
+                // Trial divide norm on side 'side'
                 /* Compute the norms using the polynomials transformed to 
                    i,j-coordinates. The transformed polynomial on the 
                    special-q side is already divided by q */

@@ -1,11 +1,12 @@
-#include "cado.h"
 #define _DEFAULT_SOURCE /* glibc >= 2.20 */
 #define _GNU_SOURCE     /* asprintf */
 #define _BSD_SOURCE     /* asprintf sometimes (I think) */
 #define _POSIX_C_SOURCE 200809L
-/* test_p_2.c is sed- generated from test.c.meta */
+#line 4 "PATH_TO_SRC_TEST_DIRECTORYmpfq_test.c.meta"
+/* test_TAG.c is sed- generated from test.c.meta */
 
 #ifdef  NDEBUG
+#warning "Forcibly disabling -DNDEBUG for the tests"
 #undef NDEBUG
 #endif
 
@@ -17,7 +18,7 @@
 #include <gmp.h>
 #include <time.h>
 
-#include "mpfq_p_2.h"
+#include "mpfq_TAG.h"
 #include "mpfq_name_K.h"
 
 Kfield K;
@@ -129,7 +130,7 @@ int main(int argc, char * argv[])
     if (!mkdtemp(tmpdir))
         abort();
 
-    if (!quiet) fprintf(stderr, "--- testing for p_2\n");
+    if (!quiet) fprintf(stderr, "--- testing for TAG\n");
 
     for(int loop_i = 0; (nloops == 0) || (loop_i < nloops) ; loop_i++) {
         gmp_randstate_t  rstate;
@@ -829,13 +830,13 @@ int main(int argc, char * argv[])
                 });
 #endif
 
-#ifdef  HAVE_mpfq_p_2_hadamard
+#ifdef  HAVE_mpfq_TAG_hadamard
          /* This does no checking of course. However it is useful to
           * trigger linking of the function, since when it is done in
           * assembly, it is likely to trigger register allocation
           * problems in some instances */
          Khadamard(a0,a1,a2,a3);
-#endif  /* HAVE_mpfq_p_2_hadamard */
+#endif  /* HAVE_mpfq_TAG_hadamard */
         /*-----------------------------------------------------------*/
         /*          Tests related to vectors                         */
         /*-----------------------------------------------------------*/

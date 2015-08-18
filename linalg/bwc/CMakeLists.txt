@@ -35,12 +35,18 @@ set(BWC_GFP_MATMUL_BACKENDS basicp
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
 
+# In the fflas branch, this is used to plug in fflas.
+set(BWC_EXTRA_BACKENDS "" CACHE STRING "list of pairs (arithmetic,matmul) backends for linear algebra")
+
 # In case there's a user override, just make mention of the situation.
 if(NOT BWC_GFP_ARITHMETIC_BACKENDS)
     message(STATUS "DL mode disabled for linear algebra")
 else(NOT BWC_GFP_ARITHMETIC_BACKENDS)
     if(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-        message(STATUS "GF(p) implementations enabled for DL linear algebra: ${BWC_GFP_ARITHMETIC_BACKENDS}")
+        string_join(FOO ", " ${BWC_GFP_ARITHMETIC_BACKENDS})
+        message(STATUS "GF(p) implementations enabled for DL linear algebra: ${FOO}")
+        string_join(FOO ", " ${BWC_GFP_MATMUL_BACKENDS})
+        message(STATUS "GF(p) SpMV backends for DL linear algebra: ${FOO}")
     else(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
         # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU
         # CC idioms. As it is not used in production yet, we don't want
@@ -50,20 +56,6 @@ else(NOT BWC_GFP_ARITHMETIC_BACKENDS)
         message(STATUS "Warning: DL mode forcibly disabled for linear algebra (amd64-only)")
     endif(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 endif(NOT BWC_GFP_ARITHMETIC_BACKENDS)
-
-set(COOKED_BWC_BACKENDS)
-foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
-    foreach(w ${BWC_GF2_MATMUL_BACKENDS})
-        set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${w})")
-    endforeach(w)
-endforeach(v)
-foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
-    foreach(w ${BWC_GFP_MATMUL_BACKENDS})
-        set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${w})")
-    endforeach(w)
-endforeach(v)
-
-configure_file(bwc_config_h.in bwc_config.h ESCAPE_QUOTES @ONLY)
 
 ### end bwc-specific configuration.
 
@@ -224,6 +216,7 @@ set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
 
 macro(CONFIGURE_MATMUL_LIB v i)
+    set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${i})")
     string(COMPARE EQUAL "${v}" "u64k1" doing_u64)
     string(COMPARE EQUAL "${i}" "bucket" doing_bucket)
     set(sources matmul_facade.c ${matmul_${i}_sources})
@@ -257,6 +250,13 @@ macro(CONFIGURE_MATMUL_LIB v i)
     endif(ENABLE_SHARED)
 endmacro(CONFIGURE_MATMUL_LIB)
 
+string_join(FOO ", " ${BWC_GF2_ARITHMETIC_BACKENDS})
+message(STATUS "GF(2) implementations enabled for linear algebra: ${FOO}")
+string_join(FOO ", " ${BWC_GF2_MATMUL_BACKENDS})
+message(STATUS "GF(2) SpMV backends for linear algebra: ${FOO}")
+
+
+
 foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
     foreach(w ${BWC_GF2_MATMUL_BACKENDS})
         CONFIGURE_MATMUL_LIB(${v} ${w})
@@ -267,6 +267,17 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         CONFIGURE_MATMUL_LIB(${v} ${w})
     endforeach(w)
 endforeach(v)
+
+foreach(vw ${BWC_EXTRA_BACKENDS})
+    string_split("${vw}" "+" FOO)
+    message(STATUS "output variable: ${FOO}")
+    list(GET FOO 0 v)
+    list(GET FOO 1 w)
+    message(STATUS "Extra bwc backend: arithmetic=${v}, matmul=${w}")
+    CONFIGURE_MATMUL_LIB(${v} ${w})
+endforeach(vw ${BWC_EXTRA_BACKENDS})
+
+configure_file(bwc_config_h.in bwc_config.h ESCAPE_QUOTES @ONLY)
 
 
 if(BUILD_DYNAMICALLY_LINKABLE_BWC)
