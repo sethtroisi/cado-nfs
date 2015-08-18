@@ -1,8 +1,9 @@
+/* toplevel include for features maybe */
 #define _DEFAULT_SOURCE /* glibc >= 2.20 */
 #define _GNU_SOURCE     /* asprintf */
 #define _BSD_SOURCE     /* asprintf sometimes (I think) */
 #define _POSIX_C_SOURCE 200809L
-#line 4 "PATH_TO_SRC_TEST_DIRECTORYmpfq_test.c.meta"
+#line 7 "PATH_TO_SRC_TEST_DIRECTORYmpfq_test.c.meta"
 /* test_TAG.c is sed- generated from test.c.meta */
 
 #ifdef  NDEBUG
