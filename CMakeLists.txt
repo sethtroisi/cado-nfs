@@ -45,7 +45,7 @@ add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -V $(ARGS))
 macro(get_override extname intname)
 string(COMPARE NOTEQUAL "$ENV{${extname}}" "" HAS_${intname}_OVERRIDE)
 if(HAS_${intname}_OVERRIDE)
-    set(${intname} "$ENV{${extname}}")
+    set(${intname} "$ENV{${extname}}" CACHE STRING "" FORCE)
     message(STATUS "${extname}=${${intname}}")
 endif(HAS_${intname}_OVERRIDE)
 endmacro(get_override varname)
@@ -62,6 +62,12 @@ get_override(MPI                  MPI)
 get_override(LDFLAGS              CMAKE_EXE_LINKER_FLAGS)
 get_override(LDFLAGS              CMAKE_SHARED_LINKER_FLAGS)
 get_override(FLAGS_SIZE           CMAKE_FLAGS_SIZE)
+get_override(BWC_GF2_ARITHMETIC_BACKENDS BWC_GF2_ARITHMETIC_BACKENDS)
+get_override(BWC_GF2_MATMUL_BACKENDS    BWC_GF2_MATMUL_BACKENDS)
+get_override(BWC_GFP_ARITHMETIC_BACKENDS BWC_GFP_ARITHMETIC_BACKENDS)
+get_override(BWC_GFP_MATMUL_BACKENDS    BWC_GFP_MATMUL_BACKENDS)
+get_override(BWC_EXTRA_BACKENDS    BWC_EXTRA_BACKENDS)
+
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
     set(EXCLUDE_FROM_RELEASE_BUILD )
@@ -132,7 +138,7 @@ endif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
 #####################################################################
 # Set dependencies for external software.
-include(${CADO_NFS_SOURCE_DIR}/config/string_join.cmake)
+include(${CADO_NFS_SOURCE_DIR}/config/utilities.cmake)
 
 set(some_mpir_variable "$ENV{MPIR}$ENV{MPIR_INCDIR}$ENV{MPIR_LIBDIR}")
 if(some_mpir_variable)

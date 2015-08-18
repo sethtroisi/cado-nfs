@@ -124,7 +124,11 @@ export NO_PYTHON_CHECK
 export NO_SSE
 export NO_INLINE_ASSEMBLY
 export CHECKS_EXPENSIVE
-
+export BWC_GF2_MATMUL_BACKENDS
+export BWC_GFP_MATMUL_BACKENDS
+export BWC_GF2_ARITHMETIC_BACKENDS
+export BWC_GFP_ARITHMETIC_BACKENDS
+export BWC_EXTRA_BACKENDS
 
 ########################################################################
 # "make ?" or "make help" (when the Makefile does not exist)
@@ -192,6 +196,11 @@ if [ "$1" = "show" ] ; then
     echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
     echo "ENABLE_SHARED=\"$ENABLE_SHARED\""
     echo "CHECKS_EXPENSIVE=\"$CHECKS_EXPENSIVE\""
+    echo "BWC_GF2_MATMUL_BACKENDS=\"$BWC_GF2_MATMUL_BACKENDS\""
+    echo "BWC_GFP_MATMUL_BACKENDS=\"$BWC_GFP_MATMUL_BACKENDS\""
+    echo "BWC_GF2_ARITHMETIC_BACKENDS=\"$BWC_GF2_ARITHMETIC_BACKENDS\""
+    echo "BWC_GFP_ARITHMETIC_BACKENDS=\"$BWC_GFP_ARITHMETIC_BACKENDS\""
+    echo "BWC_EXTRA_BACKENDS=\"$BWC_EXTRA_BACKENDS\""
     exit 0
 fi
 
