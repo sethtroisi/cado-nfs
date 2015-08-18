@@ -191,15 +191,15 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
 #if defined(TRACE_K)
     // FIXME: this does not work with multiple level
     // Computing N is tricky.
-#if 0
     /* TODO: need to be able to set the current region size in WHERE_AM_I,
        so we can compute N * regionsize + offset correctly for different
        sieving levels */
 
     WHERE_AM_I_UPDATE(w, x, update.x);
-    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
     // WRONG
-    WHERE_AM_I_UPDATE(w, N, bucket_number*BRS[LEVEL]/BRS[1]);
+    // uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+    // WHERE_AM_I_UPDATE(w, N, bucket_number*BRS[LEVEL]/BRS[1]);
+    WHERE_AM_I_UPDATE(w, N, bucket_number);
 
     if (trace_on_spot_x(offset)) {
         verbose_output_print (TRACE_CHANNEL, 0,
@@ -214,7 +214,6 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
           ASSERT_ALWAYS(test_divisible(w));
         }
       }
-#endif
 #endif
 }
 
