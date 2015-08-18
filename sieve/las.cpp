@@ -27,6 +27,7 @@
 #include "las-norms.h"
 #include "las-unsieve.h"
 #include "las-arith.h"
+#include "las-plattice.h"
 #include "las-qlattice.h"
 #include "las-smallsieve.h"
 #include "las-descent-trees.h"
@@ -2206,13 +2207,16 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
     for(int side = 0 ; side < 2 ; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
+        // From N we can deduce the bucket_index. They are not the same
+        // when there are multiple-level buckets.
+        uint32_t bucket_index = N % si->nb_buckets[1];
 
         const bucket_array_t<1, shorthint_t> *BA =
             th->ws->cbegin_BA<1, shorthint_t>(side);
         const bucket_array_t<1, shorthint_t> * const BA_end =
             th->ws->cend_BA<1, shorthint_t>(side);
         for (; BA != BA_end; BA++)  {
-            purged[side].purge(*BA, N, SS);
+            purged[side].purge(*BA, bucket_index, SS);
         }
 
         /* Add entries coming from downsorting, if any */
@@ -2221,7 +2225,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         const bucket_array_t<1, longhint_t> * const BAd_end =
             th->ws->cend_BA<1, longhint_t>(side);
         for (; BAd != BAd_end; BAd++)  {
-            purged[side].purge(*BAd, N, SS);
+            purged[side].purge(*BAd, bucket_index, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
@@ -3200,6 +3204,12 @@ int main (int argc0, char *argv0[])/*{{{*/
             thread_data *th = &workspaces->thrs[0];
 
             // Prepare plattices at internal levels
+            plattice_x_t max_area = plattice_x_t(si->J)<<si->conf->logI;
+            plattice_enumerate_area<1>::value =
+                MIN(max_area, plattice_x_t(BUCKET_REGION_2));
+            plattice_enumerate_area<2>::value =
+                MIN(max_area, plattice_x_t(BUCKET_REGION_3));
+            plattice_enumerate_area<3>::value = max_area;
             precomp_plattice_t precomp_plattice;
             for (int side = 0; side < 2; ++side) {
                 for (int level = 1; level < si->toplevel; ++level) {
@@ -3228,13 +3238,16 @@ int main (int argc0, char *argv0[])/*{{{*/
             // Visit the downsorting tree depth-first.
             // If toplevel = 1, then this is just processing all bucket
             // regions.
+            uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
             for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
                 switch (si->toplevel) {
                     case 2:
-                        downsort_tree<1>(i, 0, *workspaces, si, precomp_plattice, th);
+                        downsort_tree<1>(i, i*BRS[2]/BRS[1],
+                                *workspaces, si, precomp_plattice, th);
                         break;
                     case 3:
-                        downsort_tree<2>(i, 0, *workspaces, si, precomp_plattice, th);
+                        downsort_tree<2>(i, i*BRS[3]/BRS[1],
+                                *workspaces, si, precomp_plattice, th);
                         break;
                     default:
                         ASSERT_ALWAYS(0);

@@ -280,13 +280,14 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 #endif
 
     /* Now, do the real work: the filling of the buckets */
-    while (!pl_it->finished()) {
+    while (!plattice_enumerate_finished<LEVEL>(pl_it->get_x())) {
       if (LIKELY(pl_it->probably_coprime()))
         BA.push_update(pl_it->get_x(), p, hint, slice_index, w);
       pl_it->next();
     }
-    pl_it->advance_to_next_area();
-  }
+
+    pl_it->advance_to_next_area(LEVEL);
+  } 
   orig_BA.move(BA);
 }
 
@@ -346,25 +347,28 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
 
 void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, sieve_info_srcptr si)
 {
-    plattice_enumerate_t::set_area(si->conf->logI, si->J);
-    for (int side = 0; side < 2; ++side) {
-        switch (si->toplevel) {
-            case 1:
-                fill_in_buckets_one_side<1>(pool, ws,
-                        si->sides[side]->fb->get_part(si->toplevel), si, side);
-                break;
-            case 2:
-                fill_in_buckets_one_side<2>(pool, ws,
-                        si->sides[side]->fb->get_part(si->toplevel), si, side);
-                break;
-            case 3:
-                fill_in_buckets_one_side<3>(pool, ws,
-                        si->sides[side]->fb->get_part(si->toplevel), si, side);
-                break;
-            default:
-                ASSERT_ALWAYS(0);
-        }
+  plattice_enumerate_t::set_area(si->conf->logI, si->J);
+  for (int side = 0; side < 2; ++side) {
+    switch (si->toplevel) {
+      case 1:
+        plattice_enumerate_area<1>::value = plattice_x_t(si->J) << si->conf->logI;
+        fill_in_buckets_one_side<1>(pool, ws,
+            si->sides[side]->fb->get_part(si->toplevel), si, side);
+        break;
+      case 2:
+        plattice_enumerate_area<2>::value = plattice_x_t(si->J) << si->conf->logI;
+        fill_in_buckets_one_side<2>(pool, ws,
+            si->sides[side]->fb->get_part(si->toplevel), si, side);
+        break;
+      case 3:
+        plattice_enumerate_area<3>::value = plattice_x_t(si->J) << si->conf->logI;
+        fill_in_buckets_one_side<3>(pool, ws,
+            si->sides[side]->fb->get_part(si->toplevel), si, side);
+        break;
+      default:
+        ASSERT_ALWAYS(0);
     }
+  }
 }
 /* }}} */
 
@@ -457,6 +461,7 @@ downsort_tree(uint32_t bucket_index,
     // FIXME: This block duplicates a lot of code with
     // process_bucket_region in las.cpp.
     where_am_I w MAYBE_UNUSED;
+    WHERE_AM_I_UPDATE(w, si, si);
 
     unsigned char * S[2];
     for(int side = 0 ; side < 2 ; side++) {
@@ -484,6 +489,13 @@ downsort_tree(uint32_t bucket_index,
 #endif
         // FIXME Invalidate the first row except (1,0)
 
+#if defined(TRACE_K)
+        if (trace_on_spot_N(w->N))
+          verbose_output_print(TRACE_CHANNEL, 0,
+              "# After %s init_norms_bucket_region, N=%u S[%u]=%u\n",
+              sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif                                                                          
+
         // Apply buckets that have just been filled-in
         const bucket_array_t<1, shorthint_t> *BA =
           th->ws->cbegin_BA<1, shorthint_t>(side);
@@ -510,6 +522,12 @@ downsort_tree(uint32_t bucket_index,
         // Sieve small primes
         sieve_small_bucket_region(SS, i, s->ssd, ts.ssdpos, si, side, w);
         SminusS(S[side], S[side] + BUCKET_REGION_1, SS);
+#if defined(TRACE_K)
+        if (trace_on_spot_N(w->N)) 
+          verbose_output_print(TRACE_CHANNEL, 0,
+              "# Final value on %s side, N=%u rat_S[%u]=%u\n",
+              sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif          
       }
 
       // Factor survivors

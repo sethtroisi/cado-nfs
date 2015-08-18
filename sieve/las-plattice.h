@@ -347,6 +347,18 @@ struct plattice_sieve_entry : public plattice_info_t {
      : plattice_info_t(p, r, proj, logI), hint(hint) {};
 };
 
+template <int LEVEL>
+class plattice_enumerate_area {
+public:
+    static plattice_x_t value;
+};
+
+template <int LEVEL>
+bool
+plattice_enumerate_finished(plattice_x_t x)
+{ return x >= plattice_enumerate_area<LEVEL>::value; }
+
+
 /* Class for enumerating lattice points with the Franke-Kleinjung algorithm */
 //template <int LEVEL>
 class plattice_enumerate_t {
@@ -360,13 +372,13 @@ protected:
 
     static uint32_t maskI;
     static plattice_x_t even_mask;
-    static plattice_x_t area; // this one depends on the level
+//    static plattice_x_t area; // this one depends on the level
 public:
     static void set_area(const int _logI, const uint32_t lines) {
         ASSERT_ALWAYS(lines % 2 == 0);
         maskI = (1U << _logI) - 1U;
         even_mask = (plattice_x_t(1) << _logI) | plattice_x_t(1);
-        area = plattice_x_t(lines) << _logI;
+        //area = plattice_x_t(lines) << _logI;
     }
 
     plattice_enumerate_t(const plattice_info_t &basis,
@@ -390,9 +402,21 @@ public:
 
     /* Currently merely checks that not both are even */
     bool probably_coprime() const {return (x & even_mask) != 0;}
-    bool finished() const {return x >= area;}
+//    bool finished() const {return x >= area;}
     // The position of the point is relative to the current area start.
-    void advance_to_next_area() {x -= area;}
+//    void advance_to_next_area() {x -= area;}
+    void advance_to_next_area(int level) {
+        switch (level) {
+            case 1:
+                x -= plattice_enumerate_area<1>::value; break;
+            case 2:
+                x -= plattice_enumerate_area<2>::value; break;
+            case 3:
+                x -= plattice_enumerate_area<3>::value; break;
+            default:
+                ASSERT_ALWAYS(0);
+        }
+    }
     plattice_x_t get_x() const {return x;}
     slice_offset_t get_hint() const {return hint;}
 };
