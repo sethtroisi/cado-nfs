@@ -1,9 +1,21 @@
 
 include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc/mpfq)
 
+# because the source files we compile here are generated, we need to tell
+# cmake that the current source dir does still serve a purpose...
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
 foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
-    add_executable(mpfq_test_${gfp_layer} mpfq_test_${gfp_layer}.c
+    add_custom_command(OUTPUT
+        ${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
+            COMMAND sed -e '1 i \#include \"cado.h\"' -e 's/TAG/${gfp_layer}/g' -e 's,PATH_TO_SRC_TEST_DIRECTORY,${CMAKE_CURRENT_SOURCE_DIR}/,' -e '/^\#warning/ d' < mpfq_test.c.meta > ${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            DEPENDS mpfq_test.c.meta
+            )
+
+    add_executable(mpfq_test_${gfp_layer}
+        ${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
         ${PROJECT_SOURCE_DIR}/linalg/bwc/mpfq/mpfq_${gfp_layer}.c)
 
     set(extra)
