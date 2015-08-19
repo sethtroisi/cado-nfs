@@ -360,7 +360,11 @@ plattice_enumerate_finished(plattice_x_t x)
 
 
 /* Class for enumerating lattice points with the Franke-Kleinjung algorithm */
-//template <int LEVEL>
+// Note: we would have liked to template this class by LEVEL.
+// However, since it is used by fb.h in a place that convert slices, and
+// slices does not know its level, we do the ugly workaround that puts
+// area outside this class.
+// TODO: can we do better in terms of structure of the code?
 class plattice_enumerate_t {
 protected:
     // Maybe at some point, the plattice_x_t type could be templated in
@@ -372,13 +376,11 @@ protected:
 
     static uint32_t maskI;
     static plattice_x_t even_mask;
-//    static plattice_x_t area; // this one depends on the level
 public:
-    static void set_area(const int _logI, const uint32_t lines) {
+    static void set_masks(const int _logI, const uint32_t lines) {
         ASSERT_ALWAYS(lines % 2 == 0);
         maskI = (1U << _logI) - 1U;
         even_mask = (plattice_x_t(1) << _logI) | plattice_x_t(1);
-        //area = plattice_x_t(lines) << _logI;
     }
 
     plattice_enumerate_t(const plattice_info_t &basis,
@@ -402,21 +404,8 @@ public:
 
     /* Currently merely checks that not both are even */
     bool probably_coprime() const {return (x & even_mask) != 0;}
-//    bool finished() const {return x >= area;}
-    // The position of the point is relative to the current area start.
-//    void advance_to_next_area() {x -= area;}
-    void advance_to_next_area(int level) {
-        switch (level) {
-            case 1:
-                x -= plattice_enumerate_area<1>::value; break;
-            case 2:
-                x -= plattice_enumerate_area<2>::value; break;
-            case 3:
-                x -= plattice_enumerate_area<3>::value; break;
-            default:
-                ASSERT_ALWAYS(0);
-        }
-    }
+
+    void advance_to_next_area(int level);
     plattice_x_t get_x() const {return x;}
     slice_offset_t get_hint() const {return hint;}
 };
