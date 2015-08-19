@@ -461,7 +461,7 @@ int main(int argc, char * argv[])
     if (param_list_lookup_string(pl, "skip_decorrelating_permutation")) {
         /* internal, for debugging. This removes the de-correlating
          * permutation. Nothing to do with what is called
-         * "shuffled-product" elsewhere, except that both hare taken care
+         * "shuffled-product" elsewhere, except that both are taken care
          * of within mf_bal. */
         bal->h->pshuf[0] = 1;
         bal->h->pshuf[1] = 0;
