@@ -150,14 +150,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         sieve_side_info_ptr sis = si->sides[side];
 
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
+        fbprime_t bk_thresh1 = si->conf->bucket_thresh1;
         const fbprime_t fbb = si->conf->sides[side]->lim;
         const fbprime_t powlim = si->conf->sides[side]->powlim;
         if (bk_thresh > fbb) {
             fprintf(stderr, "Error: lim is too small compared to bk_thresh\n");
             ASSERT_ALWAYS(0);
         }
-        const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
-        // const fbprime_t thresholds[4] = {bk_thresh, bk_thresh<<5, fbb, fbb};
+        if (bk_thresh1 == 0 || bk_thresh1 > fbb) {
+            bk_thresh1 = fbb;
+        }
+        const fbprime_t thresholds[4] = {bk_thresh, bk_thresh1, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
         sis->fb = new fb_factorbase(thresholds, powlim, only_general);
 
@@ -376,6 +379,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         // A few sanity checks, first.
         ASSERT_ALWAYS(las->sievers->conf->logI == si->conf->logI);
         ASSERT_ALWAYS(las->sievers->conf->bucket_thresh == si->conf->bucket_thresh);
+        ASSERT_ALWAYS(las->sievers->conf->bucket_thresh1 == si->conf->bucket_thresh1);
         // Then, copy relevant data from the first sieve_info
         verbose_output_print(0, 1, "# Do not regenerate factor base data: copy it from first siever\n");
         for (int side = 0; side < 2; side++) {
@@ -679,6 +683,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         // Copy default value for non-given parameters
         // sc->skewness = las->default_config->skewness;
         sc->bucket_thresh = las->config_base->bucket_thresh;
+        sc->bucket_thresh1 = las->config_base->bucket_thresh1;
         sc->td_thresh = las->config_base->td_thresh;
         sc->unsieve_thresh = las->config_base->unsieve_thresh;
         for(int side = 0 ; side < 2 ; side++) {
@@ -913,8 +918,10 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         }
 
         sc->bucket_thresh = 1 << sc->logI;	/* default value */
+        sc->bucket_thresh1 = 0;	/* default value */
         /* overrides default only if parameter is given */
         param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
+        param_list_parse_ulong(pl, "bkthresh1", &(sc->bucket_thresh1));
 
         const char *powlim_params[2] = {"powlim0", "powlim1"};
         for (int side = 0; side < 2; side++) {
@@ -2796,6 +2803,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+  param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");

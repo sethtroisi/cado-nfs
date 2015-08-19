@@ -33,6 +33,7 @@ struct siever_config_s {
     int side;
     int logI;
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
+    unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
     unsigned int unsieve_thresh;
     struct {
