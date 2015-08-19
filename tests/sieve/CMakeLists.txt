@@ -68,9 +68,9 @@ set_test_build_depends(F9_descenttest las_descent)
 set_test_dependencies(F9_descenttest F9_makefbtest)
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
-add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")
+add_executable(test_trialdiv test_trialdiv.c ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c)
 target_link_libraries(test_trialdiv utils tests)
-run_test(test_trialdiv test_trialdiv)
+run_target_as_a_test(test_trialdiv)
 
 build_and_run_test(test_memset_things "las-norms;utils")
 
@@ -78,14 +78,14 @@ macro (add_trialdiv_test MAXLEN)
   add_executable(test_trialdiv${MAXLEN} test_trialdiv.c)
   set_property(TARGET test_trialdiv${MAXLEN} PROPERTY COMPILE_DEFINITIONS TRIALDIV_MAXLEN=${MAXLEN})
   target_link_libraries(test_trialdiv${MAXLEN} trialdiv utils tests)
-  run_test(test_trialdiv${MAXLEN} test_trialdiv${MAXLEN})
+  run_target_as_a_test(test_trialdiv${MAXLEN})
 endmacro(add_trialdiv_test)
 
 macro (add_init_norms_bucket_region)
   add_executable(test_init_norms_bucket_region test_init_norms_bucket_region.cpp )
   set_property(TARGET test_init_norms_bucket_region PROPERTY COMPILE_DEFINITIONS)
   target_link_libraries(test_init_norms_bucket_region las-norms utils tests)
-  run_test(test_init_norms_bucket_region test_init_norms_bucket_region)
+  run_target_as_a_test(test_init_norms_bucket_region)
 endmacro(add_init_norms_bucket_region)
 
 # Try specific TRIALDIV_MAXLEN from 1 to 6

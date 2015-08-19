@@ -19,8 +19,7 @@ add_executable(test_generate_composite_numbers
   ${SUF_SRC}/generate_factoring_method.c
   ${SRC_UTILS})
 target_link_libraries(test_generate_composite_numbers ${LIB_EXEC})
-run_test (test_generate_composite_numbers test_generate_composite_numbers)
-set_test_build_depends (test_generate_composite_numbers test_generate_composite_numbers)
+run_target_as_a_test (test_generate_composite_numbers)
 
 
 add_executable(test_generate_strategies
@@ -29,8 +28,7 @@ add_executable(test_generate_strategies
   ${SUF_SRC}/generate_strategies.c
   ${SRC_UTILS})
 target_link_libraries(test_generate_strategies ${LIB_EXEC})
-run_test (test_generate_strategies test_generate_strategies)
-set_test_build_depends (test_generate_strategies test_generate_strategies)
+run_target_as_a_test(test_generate_strategies)
 
 add_executable(test_filtering
   test_filtering.c
@@ -38,16 +36,14 @@ add_executable(test_filtering
   ${SRC_UTILS})
 
 target_link_libraries(test_filtering ${LIB_EXEC})
-run_test (test_filtering test_filtering)
-set_test_build_depends(test_filtering test_filtering)
+run_target_as_a_test(test_filtering)
 
 add_executable(test_benchfm
   test_benchfm.c
   ${SUF_SRC}/generate_factoring_method.c
   ${SRC_UTILS})
 target_link_libraries(test_benchfm ${LIB_EXEC})
-run_test (test_benchfm test_benchfm)
-set_test_build_depends(test_benchfm test_benchfm)
+run_target_as_a_test (test_benchfm)
 
 
 if(DEFINED ENV{CHECKS_EXPENSIVE})
