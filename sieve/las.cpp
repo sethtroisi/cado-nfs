@@ -3264,6 +3264,16 @@ int main (int argc0, char *argv0[])/*{{{*/
 
             // Cleanup (Again, should be modified for multi-thread?)
             for(int side = 0 ; side < 2 ; side++) {
+                for (int level = 1; level < si->toplevel; ++level) {
+                    std::vector<plattices_vector_t*> V =
+                        precomp_plattice[side][level];
+                    for (std::vector<plattices_vector_t *>::iterator it =
+                            V.begin();
+                            it != V.end();
+                            it++) {
+                        delete *it;
+                    }
+                }
                 thread_side_data &ts = th->sides[side];
                 free(ts.ssdpos);
                 free(ts.rsdpos);
