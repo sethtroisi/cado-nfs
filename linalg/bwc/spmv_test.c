@@ -175,10 +175,14 @@ int main(int argc, char * argv[])
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
+    matmul_top_decl_usage(pl);
+    /* declare local parameters and switches: none here (so far). */
+
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
 
     bw_common_interpret_parameters(bw, pl);
     parallelizing_info_lookup_parameters(pl);
+    matmul_top_lookup_parameters(pl);
 
     if (param_list_warn_unused(pl)) {
         param_list_print_usage(pl, bw->original_argv[0], stderr);

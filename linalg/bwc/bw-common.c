@@ -181,7 +181,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         }
         if (strcmp(tmp_l, dirtext[0]) == 0) {
             bw->dir = 0;
-        } else if (strcmp(tmp, dirtext[1]) == 0) {
+        } else if (strcmp(tmp_l, dirtext[1]) == 0) {
             bw->dir = 1;
         } else {
             fprintf(stderr, "Parameter nullspace may only be %s|%s\n",
