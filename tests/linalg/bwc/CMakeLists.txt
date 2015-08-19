@@ -7,7 +7,7 @@ macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
     # Don't split this line !
     add_test(test-bwc-${nm} bash -c
-        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections")
+        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections")
     set_test_build_depends(test-bwc-${nm} bwc_full)
 endmacro(add_bwc_test)
 
@@ -140,8 +140,11 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
-add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
-update_test_build_depends(test-bwc-mod2 mf_scan)
+add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
+update_test_build_depends(test-bwc-mod2-plain mf_scan)
+
+add_bwc_test(mod2-noshuffle bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 shuffle=0)
+update_test_build_depends(test-bwc-mod2-noshuffle mf_scan)
 
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 mn=128 seed=1 thr=3)
 update_test_build_depends(test-bwc-mod2-oddthr mf_scan)

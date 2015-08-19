@@ -317,6 +317,10 @@ if [ "$tolerate_failure" ] ; then
     common="$common tolerate_failure=$tolerate_failure"
 fi
 
+if [ "$shuffle" = 0 ] || ! [ "$shuffle" ] ; then
+    common="$common shuffled_product=0"
+fi
+
 set $common
 
 if [ "$magma" ] ; then
