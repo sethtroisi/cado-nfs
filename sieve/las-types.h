@@ -251,8 +251,6 @@ struct las_info_s {
 #ifdef BATCH
     cofac_list L; /* to store (a,b) and corresponding cofactors */
 #endif
-
-    int toplevel; // How many levels of buckets do we use.
 };
 
 typedef struct las_info_s las_info[1];

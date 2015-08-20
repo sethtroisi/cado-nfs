@@ -136,10 +136,9 @@ template class reservation_array<bucket_array_t<2, longhint_t> >;
    For longhint, we need only one each, as those are filled only by
    downsorting, and all the downsorting of one level n bucket into a level
    n-1 bucket array is done as a single task, by a single thread. */
-// FIXME: the fill-in-bucket is not yet multi-thread for inner levels.
-reservation_group::reservation_group(const size_t nr_bucket_arrays, int toplevel)
-  : RA1_short((toplevel > 1) ? 1 : nr_bucket_arrays),
-    RA2_short((toplevel > 2) ? 1 : nr_bucket_arrays),
+reservation_group::reservation_group(const size_t nr_bucket_arrays)
+  : RA1_short(nr_bucket_arrays),
+    RA2_short(nr_bucket_arrays),
     RA3_short(nr_bucket_arrays),
     RA1_long(1),
     RA2_long(1)
@@ -162,6 +161,7 @@ reservation_group::allocate_buckets(const uint32_t *n_bucket, const double *fill
   RA1_long.allocate_buckets(n_bucket[1], fill_ratio[2] + fill_ratio[3]);
   RA2_long.allocate_buckets(n_bucket[2], fill_ratio[3]);
 }
+
 
 /* 
    We want to map the desired bucket_array type to the appropriate
@@ -250,7 +250,7 @@ thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
         thrs[i].init(*this, i, las);
     }
     for (unsigned int i = 0; i < nr_sides; i++)
-      groups[i] = new reservation_group(_nr_workspaces, las->toplevel);
+      groups[i] = new reservation_group(_nr_workspaces);
 }
 
 thread_workspaces::~thread_workspaces()
@@ -344,3 +344,13 @@ thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
             checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }
 }
+
+template <int LEVEL, typename HINT>
+void
+thread_workspaces::reset_all_pointers(int side) {
+    groups[side]->get<LEVEL, HINT>().reset_all_pointers();
+}
+
+template void thread_workspaces::reset_all_pointers<1, shorthint_t>(int);
+template void thread_workspaces::reset_all_pointers<2, shorthint_t>(int);
+template void thread_workspaces::reset_all_pointers<3, shorthint_t>(int);

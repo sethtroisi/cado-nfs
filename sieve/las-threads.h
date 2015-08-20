@@ -81,6 +81,12 @@ public:
   const T* cbegin() const {return &BAs[0];}
   const T* cend() const {return &BAs[n];}
 
+  void reset_all_pointers() {
+      for (T * it = &BAs[0]; it != &BAs[n]; it++) {
+          it->reset_pointers();
+      }
+  }
+
   T &reserve();
   void release(T &BA);
 };
@@ -105,7 +111,7 @@ protected:
   const reservation_array<bucket_array_t<LEVEL, HINT> > &
   cget() const;
 public:
-  reservation_group(size_t nr_bucket_arrays, int toplevel);
+  reservation_group(size_t nr_bucket_arrays);
   void allocate_buckets(const uint32_t *n_bucket, const double *fill_ratio);
 };
 
@@ -130,6 +136,9 @@ public:
   template <int LEVEL, typename HINT>
   double buckets_max_full();
   void accumulate(las_report_ptr, sieve_checksum *);
+
+  template <int LEVEL, typename HINT>
+  void reset_all_pointers(int side);
 
   template <int LEVEL, typename HINT>
   bucket_array_t<LEVEL, HINT> &

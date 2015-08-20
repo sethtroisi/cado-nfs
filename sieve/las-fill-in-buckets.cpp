@@ -22,12 +22,6 @@
 #endif
 
 // FIXME: this function of las.cpp should be somewhere
-template <typename HINT>
-void apply_one_bucket (unsigned char *S,
-    const bucket_array_t<1, HINT> &BA, const int i,
-    const fb_part *fb, where_am_I_ptr w);
-void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2);
-int factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED);
 void * process_bucket_region(thread_data *th);
 
 
@@ -300,9 +294,40 @@ public:
   const int side;
   sieve_info_srcptr const si;
   const fb_slice_interface * const slice;
-  fill_in_buckets_parameters(thread_workspaces &_ws, const int _side, sieve_info_srcptr const _si, const fb_slice_interface *_slice)
-  : ws(_ws), side(_side), si(_si), slice(_slice) {}
+  plattices_vector_t * const plattices_vector; // content changed during fill-in
+  const uint32_t first_region0_index;
+  fill_in_buckets_parameters(thread_workspaces &_ws, const int _side,
+          sieve_info_srcptr const _si, const fb_slice_interface *_slice,
+          plattices_vector_t *_platt, const uint32_t _reg0)
+  : ws(_ws), side(_side), si(_si), slice(_slice),
+    plattices_vector(_platt), first_region0_index(_reg0)
+  {}
 };
+
+// For internal levels, the fill-in is not exactly the same as for
+// top-level, since the plattices have already been precomputed.
+template<int LEVEL>
+task_result *
+fill_in_buckets_one_slice_internal(const task_parameters *const _param)
+{
+    const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
+    where_am_I w;
+    WHERE_AM_I_UPDATE(w, si, param->si);
+    WHERE_AM_I_UPDATE(w, side, param->side);
+    WHERE_AM_I_UPDATE(w, i, param->plattices_vector->get_index());
+
+    /* Get an unused bucket array that we can write to */
+    bucket_array_t<LEVEL, shorthint_t> &BA =
+        param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
+    /* Fill the buckets */
+    fill_in_buckets<LEVEL>(BA, param->si, param->plattices_vector,
+            (param->first_region0_index == 0), w);
+    /* Release bucket array again */
+    param->ws.release_BA(param->side, BA);
+    delete param;
+    return new task_result;
+}
+
 
 template<int LEVEL>
 task_result *
@@ -339,7 +364,7 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
     for (slice_index_t slice_index = fb->get_first_slice_index();
          (slice = fb->get_slice(slice_index)) != NULL;
          slice_index++) {
-        fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice);
+        fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice, NULL, 0);
         pool.add_task(fill_in_buckets_one_slice<LEVEL>, param, 0);
         slices_pushed++;
     }
@@ -387,6 +412,7 @@ void
 downsort_tree(uint32_t bucket_index,
     uint32_t first_region0_index,
     thread_workspaces &ws,
+    thread_pool &pool,
     sieve_info_ptr si,
     precomp_plattice_t precomp_plattice)
 {
@@ -439,19 +465,24 @@ downsort_tree(uint32_t bucket_index,
     ASSERT_ALWAYS(max_full <= 1.0);
 
     /* SECOND: fill in buckets at this level, for this region. */
-    // FIXME: Multi-thread, here!
-    // Don't forget to fix also the reservation_group constructor!
-    bucket_array_t<LEVEL,shorthint_t> & BAfill =
-      ws.reserve_BA<LEVEL, shorthint_t>(side);
-    BAfill.reset_pointers();
+    ws.reset_all_pointers<LEVEL,shorthint_t>(side);
+    slice_index_t slices_pushed = 0;
     for (typename std::vector<plattices_vector_t *>::iterator pl_it =
             precomp_plattice[side][LEVEL].begin();
         pl_it != precomp_plattice[side][LEVEL].end();
         pl_it++) {
-      WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
-      fill_in_buckets<LEVEL>(BAfill, si, *pl_it, (first_region0_index == 0), w);
+      fill_in_buckets_parameters *param =
+        new fill_in_buckets_parameters(ws, side, si,
+            (fb_slice_interface *)NULL, *pl_it, first_region0_index);
+      pool.add_task(fill_in_buckets_one_slice_internal<LEVEL>, param, 0);
+      slices_pushed++;
     }
-    ws.release_BA<LEVEL,shorthint_t>(side, BAfill);
+    for (slice_index_t slices_completed = 0;
+        slices_completed < slices_pushed;
+        slices_completed++) {
+      task_result *result = pool.get_result();
+      delete result;
+    }
 
     max_full = std::max(max_full, ws.buckets_max_full<LEVEL,shorthint_t>());
     ASSERT_ALWAYS(max_full <= 1.0);
@@ -462,7 +493,7 @@ downsort_tree(uint32_t bucket_index,
     for (unsigned int i = 0; i < si->nb_buckets[LEVEL]; ++i) {
       uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
       uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
-      downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice);
+      downsort_tree<LEVEL-1>(i, N, ws, pool, si, precomp_plattice);
     }
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
@@ -480,6 +511,7 @@ template <>
 void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
   uint32_t first_region0_index MAYBE_UNUSED,
   thread_workspaces &ws MAYBE_UNUSED,
+  thread_pool &pool MAYBE_UNUSED,
   sieve_info_ptr si MAYBE_UNUSED,
   precomp_plattice_t precomp_plattice MAYBE_UNUSED)
 {
@@ -517,10 +549,10 @@ reservation_group::cget<3, longhint_t>() const
 
 template 
 void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
-  thread_workspaces &ws, sieve_info_ptr si,
+  thread_workspaces &ws, thread_pool &pool, sieve_info_ptr si,
   precomp_plattice_t precomp_plattice);
 
 template
 void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
-  thread_workspaces &ws, sieve_info_ptr si,
+  thread_workspaces &ws, thread_pool &pool, sieve_info_ptr si,
   precomp_plattice_t precomp_plattice);

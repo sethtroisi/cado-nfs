@@ -398,7 +398,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     // Now that fb have been initialized, we can set the toplevel.
     si->toplevel = MAX(si->sides[0]->fb->get_toplevel(),
             si->sides[1]->fb->get_toplevel());
-    las->toplevel = si->toplevel;
 
     /* Initialize the number of buckets */
 
@@ -1753,7 +1752,7 @@ apply_one_update (unsigned char * const S,
 template <typename HINT>
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
-// FIXME NOPROFILE_STATIC
+NOPROFILE_STATIC
 #endif
 void
 apply_one_bucket (unsigned char *S,
@@ -2675,6 +2674,7 @@ void * process_bucket_region(thread_data *th)
                 for (; BAd != BAd_end; BAd++)  {
                     // FIXME: the updates could come from part 3 as well,
                     // not only part 2.
+                    ASSERT_ALWAYS(si->toplevel <= 2);
                     apply_one_bucket(SS, *BAd, ii, ts.fb->get_part(2), w);
                 }
             }
@@ -3169,7 +3169,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* Fill in buckets on both sides at top level */
         fill_in_buckets_both(*pool, *workspaces, si);
-        delete pool;
 
         /* Check that buckets are not more than full.
          * Due to templates and si->toplevel being not constant, need a
@@ -3255,11 +3254,11 @@ int main (int argc0, char *argv0[])/*{{{*/
                 switch (si->toplevel) {
                     case 2:
                         downsort_tree<1>(i, i*BRS[2]/BRS[1],
-                                *workspaces, si, precomp_plattice);
+                                *workspaces, *pool, si, precomp_plattice);
                         break;
                     case 3:
                         downsort_tree<2>(i, i*BRS[3]/BRS[1],
-                                *workspaces, si, precomp_plattice);
+                                *workspaces, *pool, si, precomp_plattice);
                         break;
                     default:
                         ASSERT_ALWAYS(0);
@@ -3280,6 +3279,8 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
         }
+
+        delete pool;
 
         // Cleanup smallsieve data
         for (int i = 0; i < las->nb_threads; ++i) {
