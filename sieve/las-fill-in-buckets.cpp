@@ -310,6 +310,7 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
+    WHERE_AM_I_UPDATE(w, N, 0);
 
     /* Do the root transform and lattice basis reduction for this factor base slice */
     plattices_vector_t *plattices_vector =

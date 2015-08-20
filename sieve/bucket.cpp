@@ -184,24 +184,23 @@ struct is_same<T, T> { static const bool value = true; };
 
 template <int LEVEL, typename HINT>
 void
-bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED,
-    const uint64_t offset MAYBE_UNUSED, const uint64_t bucket_number MAYBE_UNUSED,
+bucket_array_t<LEVEL, HINT>::log_this_update (
+    const update_t update MAYBE_UNUSED,
+    const uint64_t offset MAYBE_UNUSED,
+    const uint64_t bucket_number MAYBE_UNUSED,
     where_am_I_ptr w MAYBE_UNUSED) const
 {
 #if defined(TRACE_K)
-    // FIXME: this does not work with multiple level
-    // Computing N is tricky.
-    /* TODO: need to be able to set the current region size in WHERE_AM_I,
-       so we can compute N * regionsize + offset correctly for different
-       sieving levels */
+    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+    unsigned int saveN = w->N;
+    unsigned int x = update.x % BUCKET_REGION_1;
+    unsigned int N = w->N +
+        bucket_number*BRS[LEVEL]/BRS[1] + (update.x / BUCKET_REGION_1);
 
-    WHERE_AM_I_UPDATE(w, x, update.x);
-    // WRONG
-    // uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-    // WHERE_AM_I_UPDATE(w, N, bucket_number*BRS[LEVEL]/BRS[1]);
-    WHERE_AM_I_UPDATE(w, N, bucket_number);
+    WHERE_AM_I_UPDATE(w, x, x);
+    WHERE_AM_I_UPDATE(w, N, N);
 
-    if (trace_on_spot_x(offset)) {
+    if (trace_on_spot_Nx(w->N, w->x)) {
         verbose_output_print (TRACE_CHANNEL, 0,
             "# Pushed hit at location (x=%u, %s), from factor base entry "
             "(slice_index=%u, slice_offset=%u, p=%" FBPRIME_FORMAT "), "
@@ -209,11 +208,14 @@ bucket_array_t<LEVEL, HINT>::log_this_update (const update_t update MAYBE_UNUSED
             (unsigned int) w->x, sidenames[w->side], (unsigned int) w->i,
             (unsigned int) w->h, w->p, LEVEL, (unsigned int) w->N);
         if (is_same<HINT,longhint_t>::value) {
-          verbose_output_print (TRACE_CHANNEL, 0, "# Warning: did not check divisibility during downsorting p=%" FBPRIME_FORMAT "\n", w->p);
+          verbose_output_print (TRACE_CHANNEL, 0,
+             "# Warning: did not check divisibility during downsorting p=%"
+             FBPRIME_FORMAT "\n", w->p);
         } else {
           ASSERT_ALWAYS(test_divisible(w));
         }
-      }
+    }
+    WHERE_AM_I_UPDATE(w, N, saveN);
 #endif
 }
 
