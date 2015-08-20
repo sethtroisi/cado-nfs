@@ -27,212 +27,393 @@ add_custom_target(all_test_dependencies)
 
 # WHICH CMAKE COMMANDS SHOULD BE USED ?
 #
-# only one of the following:
+# only the following:
 #
-#       build_and_run_test
-#       run_target_as_a_test
-#       run_target_as_a_parametric_test
-#       run_test
+#       cado_define_test()
+#       cado_divert_test()
 #
-# the naming is admittedly wholly inconsistent, and would deserve some
-# cleaning.
-# 
-# 1 Typical case: you have one binary foo, which makes one test
-# 
-#  1a  foo is compiled only from foo.c, and perhaps links with library
-#      baz and qux. It may need arguments 17 and 42
+# those are documented below within their source definitions.
 #
-#      build_and_run_test(foo.c "baz;qux" 17 42)
-#
-#      note that if no libraries dependencies exist, those should be
-#      specified as "".
-#
-#      [NOTE: this is equivalent to:
-#          add_executable(foo foo.c)
-#          target_link_libraries(foo baz qux)
-#          run_test(foo foo 17 42)               # test foo versus target foo
-#          set_test_build_depends(foo foo)
-#      ]
-#
-#  1b  foo is compiled from foo.c and bar.c, and/or the binary foo needs
-#      to be invoked with arguments 17 and 42
-#      
-#          add_executable(foo foo.c bar.c)
-#          target_link_libraries(foo baz qux)
-#          run_target_as_a_test(foo 17 42)
-# 
-# 2 you have one binary, which makes several tests depending on
-#   arguments.
-#
-#          add_executable(foo foo.c bar.c)
-#          target_link_libraries(foo baz qux)
-#          run_target_as_a_parametric_test(1 foo 17)
-#          run_target_as_a_parametric_test(2 foo 42)
-# 
-#   this creates tests foo_1 and foo_2
-#
-# 3 you have one script, which needs several binaries. In this case, you
-#   need to use run_test and set the dependencies by yourself.
-#
-#          run_test(testname ${CMAKE_CURRENT_SOURCE_DIR}/test_main_script.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
-#          set_test_build_depends(testname binary1 binary2)
-#
-#         (arguments passed to the script may vary of course, but needing
-#         the bindir and/or srcdir can be considered typical)
-
-macro(set_test_build_depends test_name)
-    add_custom_target(${test_name}_dependencies)
-    add_dependencies(${test_name}_dependencies ${ARGN})
-    add_dependencies(all_test_dependencies ${test_name}_dependencies)
-    add_test("builddep_${test_name}" "${CMAKE_COMMAND}" --build
-        ${CMAKE_BINARY_DIR} --target ${test_name}_dependencies)
-    set("${test_name}_has_build_depends" 1)
-    # message(STATUS "Creating dependencies for ${test_name} -- ${ARGN}")
-    set_tests_properties (${test_name} PROPERTIES DEPENDS "builddep_${test_name}")
-endmacro(set_test_build_depends test_name ${ARGN})
-
-macro(update_test_build_depends test_name)
-    add_dependencies(${test_name}_dependencies ${ARGN})
-endmacro(update_test_build_depends test_name)
-
+# Note that for test X, there are some use cases where it is nice to know
+# about X_dependencies (for adding extra dependencies late), or the
+# targets X (for setting compile time definitions).
 if(CMAKE_VERSION VERSION_GREATER 3.1)
     cmake_policy(SET CMP0054 OLD)
 endif(CMAKE_VERSION VERSION_GREATER 3.1)
 
-macro(set_test_dependencies test_name)
-    set(deps ${ARGN})
-    if("${test_name}_has_build_depends")
-        list(APPEND deps "builddep_${test_name}")
-    endif("${test_name}_has_build_depends")
-    # cmake has very quirky syntax...
-    string_join(alldeps ";" ${deps})
-    # message(STATUS "Updating dependencies for ${test_name} -- ${alldeps}")
-    set_tests_properties (${test_name} PROPERTIES DEPENDS "${alldeps}")
-endmacro(set_test_dependencies test_name ${ARGN})
+macro(cado_define_test)
+    # This macro is appropriate for a test which consists in running a
+    # binary. The different ways to call this macro are:
+    # 
+    # cado_define_test(SOURCES foo.c bar.c
+    #                        [TEST_NAME x]
+    #                        [LIBRARIES x y z]
+    #                        [TARGET_DEPENDENCIES x y z]
+    #                        [TEST_DEPENDENCIES x y z]
+    #                        [ARGUMENTS x y z]
+    #                        [NO_DEFAULT_RUN])
+    # cado_define_test(foo.c bar.c
+    #                        [TEST_NAME x]
+    #                        [LIBRARIES x y z]
+    #                        [TARGET_DEPENDENCIES x y z]
+    #                        [TEST_DEPENDENCIES x y z]
+    #                        [ARGUMENTS x y z]
+    #                        [NO_DEFAULT_RUN])
+    # cado_define_test(foo
+    #                        SOURCES foo.c bar.c
+    #                        [LIBRARIES x y z]
+    #                        [TARGET_DEPENDENCIES x y z]
+    #                        [TEST_DEPENDENCIES x y z]
+    #                        [ARGUMENTS x y z]
+    #                        [NO_DEFAULT_RUN])
+    # 
+    # cado_define_test(foo
+    #                        SCRIPT test.sh
+    #                        [TARGET_DEPENDENCIES x y z]
+    #                        [TEST_DEPENDENCIES x y z]
+    #                        [ARGUMENTS x y z]
+    #                        [NO_DEFAULT_RUN])
+    # 
+    # we define the "implicit" parameters as those occuring before any
+    # tag of the form [SOURCES|LIBRARIES|...|...] (e.g foo.c bar.c in the
+    # second example above).
+    #
+    # The test is named in either of the following ways:
+    #   - after the TEST_NAME parameter if one is given,
+    #   - as the implicit parameter if there is an explicit SOURCES or
+    #     SCRIPT parameter and implicit parameters (there must not be
+    #     more than one, then).
+    #   - after the basename (with extension stripped) of the first source
+    #     file or the SCRIPT parameter otherwise.
+    #
+    # The source files to be compiled are those defined by the SOURCES
+    # parameter, or the implicit parameters otherwise.
+    #
+    # If the test consists in running a script (or any arbitrary external
+    # command, really), then an explicit SCRIPT parameter must be
+    # present, and explicit or implicit SOURCES parameters are forbidden.
+    # If the SCRIPT parameter consists of more than one parameter and no
+    # explicit ARGUMENTS parameter list is given, then the tail of the
+    # SCRIPT parameter list is taken as an argument list.
+    #
+    # the PROGRAM tag has the exact same meaning as SCRIPT (handling is
+    # identical)
+    #
+    # LIBRARIES, TARGET_DEPENDENCIES, TEST_DEPENDENCIES should be self
+    # explanatory. LIBRARIES is incompatible with SCRIPT.
+    #
+    # ARGUMENTS defines which arguments are to be passed to the binary.
+    # Optional.
+    #
+    # NO_DEFAULT_RUN (incompatible with ARGUMENTS) indicates that no test
+    # is really defined, only a baseline for further calls to
+    # cado_divert_test. (note that despite the fact that no test is
+    # created in cmake's mind, we do need a test name for further
+    # reference in cado_divert_test).
+    set(IMPLICIT)
+    set(TEST_DEPENDENCIES)
+    set(TARGET_DEPENDENCIES)
+    set(LIBRARIES)
+    set(SOURCES)
+    set(SCRIPT)
+    set(ARGUMENTS)
+    set(TEST_NAME)
+    set(NO_DEFAULT_RUN)
+    set(current IMPLICIT)
+    foreach(x ${ARGN})
+        if (17 EQUAL 42)        # cmake syntax sucks
+            # dead branch, I know. But since the 1st test has privileged
+            # status in cmake syntax, let's make it a straw man.
+        elseif (x STREQUAL "TEST_DEPENDENCIES")
+            SET(current TEST_DEPENDENCIES)
+        elseif (x STREQUAL "TARGET_DEPENDENCIES")
+            SET(current TARGET_DEPENDENCIES)
+        elseif (x STREQUAL "LIBRARIES")
+            SET(current LIBRARIES)
+        elseif (x STREQUAL "SOURCES")
+            SET(current SOURCES)
+        elseif ((x STREQUAL "SCRIPT") OR (x STREQUAL "PROGRAM"))
+            SET(current SCRIPT)
+        elseif (x STREQUAL "ARGUMENTS")
+            SET(current ARGUMENTS)
+        elseif (x STREQUAL "TEST_NAME")
+            SET(current TEST_NAME)
+        elseif (x STREQUAL "NO_DEFAULT_RUN")
+            SET(current NO_DEFAULT_RUN)
+            # special, because it's a flag, really
+            set(NO_DEFAULT_RUN 1)
+        else(17 EQUAL 42)       # cmake syntax sucks
+            list(APPEND ${current} ${x})
+        endif(17 EQUAL 42)      # cmake syntax sucks
+    endforeach(x)
+    # do some checking.
+	#message(STATUS "IMPLICIT is ${IMPLICIT}")
+	#message(STATUS "TEST_DEPENDENCIES is ${TEST_DEPENDENCIES}")
+	#message(STATUS "TARGET_DEPENDENCIES is ${TARGET_DEPENDENCIES}")
+	#message(STATUS "LIBRARIES is ${LIBRARIES}")
+	#message(STATUS "SOURCES is ${SOURCES}")
+	#message(STATUS "SCRIPT is ${SCRIPT}")
+	#message(STATUS "ARGUMENTS is ${ARGUMENTS}")
+	#message(STATUS "TEST_NAME is ${TEST_NAME}")
+	#message(STATUS "NO_DEFAULT_RUN is ${NO_DEFAULT_RUN}")
+    list(LENGTH TEST_NAME nTEST_NAME)
+    list(LENGTH SOURCES nSOURCES)
+    list(LENGTH SCRIPT nSCRIPT)
+    list(LENGTH LIBRARIES nLIBRARIES)
+    list(LENGTH IMPLICIT nIMPLICIT)
+    list(LENGTH NO_DEFAULT_RUN nNO_DEFAULT_RUN)
+    list(LENGTH TARGET_DEPENDENCIES nTARGET_DEPENDENCIES)
+    list(LENGTH ARGUMENTS nARGUMENTS)
+    # direct the implicit parameters somewhere
+    if(nIMPLICIT GREATER 0) 
+        if (17 EQUAL 42)        # cmake syntax sucks
+        elseif (((nSOURCES GREATER 0) OR (nSCRIPT GREATER 0)) AND (nTEST_NAME GREATER 0))
+            message(FATAL_ERROR "bad syntax with implicit parameter list and both (SOURCES or SCRIPT) and TEST_NAME defined")
+        elseif (((nSOURCES GREATER 0) OR (nSCRIPT GREATER 0)) AND (nTEST_NAME EQUAL 0))
+            set(TEST_NAME ${IMPLICIT})
+            list(LENGTH TEST_NAME nTEST_NAME)
+        # from then on we know that SOURCES and SCRIPT are empty
+        else(17 EQUAL 42)       # cmake syntax sucks
+            set(SOURCES ${IMPLICIT})
+            list(LENGTH SOURCES nSOURCES)
+        endif (17 EQUAL 42)        # cmake syntax sucks
+    endif(nIMPLICIT GREATER 0) 
+    if(nSCRIPT GREATER 1)
+        if (nARGUMENTS EQUAL 0)
+            # Then use the tail as an argument list
+            LIST(GET SCRIPT 0 x)
+            LIST(REMOVE_AT SCRIPT 0)
+            SET(ARGUMENTS ${SCRIPT})
+            SET(SCRIPT ${x})
+            list(LENGTH SCRIPT nSCRIPT)
+        else (nARGUMENTS EQUAL 0)
+            message(WARNING "too many script names, retaining only first")
+            LIST(GET SCRIPT 0 x)
+            SET(SCRIPT ${x})
+            list(LENGTH SCRIPT nSCRIPT)
+        endif (nARGUMENTS EQUAL 0)
+    endif(nSCRIPT GREATER 1)
+    if(nSCRIPT GREATER 0)
+        if (nSOURCES GREATER 0)
+            message(FATAL "SCRIPT and SOURCES incompatible")
+        endif (nSOURCES GREATER 0)
+        if (nLIBRARIES GREATER 0)
+            message(FATAL "SCRIPT and LIBRARIES incompatible")
+        endif (nLIBRARIES GREATER 0)
+    endif(nSCRIPT GREATER 0)
+    if(nTEST_NAME GREATER 1)
+        message(WARNING "too many test names ${TEST_NAME}, retaining only first")
+        LIST(GET TEST_NAME 0 x)
+        SET(TEST_NAME ${x})
+    elseif(nTEST_NAME EQUAL 0)
+        # # message(STATUS "trying to find a test name")
+        # # message(STATUS "SOURCES = ${SOURCES}")
+        # # message(STATUS "SCRIPT = ${SCRIPT}")
+        if (17 EQUAL 42)        # cmake syntax sucks
+        elseif(nSOURCES GREATER 0)
+            # define the test name as the base name without extension of the
+            # first source file.
+            LIST(GET SOURCES 0 x)
+            get_filename_component (TEST_NAME ${x} NAME_WE)
+        elseif(nSCRIPT GREATER 0)
+            # define the test name as the base name without extension of the
+            # first source file.
+            LIST(GET SCRIPT 0 x)
+            get_filename_component (TEST_NAME ${x} NAME_WE)
+        else (17 EQUAL 42)        # cmake syntax sucks
+            message(FATAL_ERROR "cannot find a name for test")
+        endif (17 EQUAL 42)        # cmake syntax sucks
+    endif(nTEST_NAME GREATER 1)
+    if(nNO_DEFAULT_RUN GREATER 1)
+        message(FATAL_ERROR "discarded arguments after NO_DEFAULT_RUN for test ${TEST_NAME}")
+        set(NO_DEFAULT_RUN 1)
+    elseif(nNO_DEFAULT_RUN GREATER 0)
+        list(LENGTH ARGUMENTS nARGUMENTS)
+        if (nARGUMENTS GREATER 0)
+            message(FATAL_ERROR "NO_DEFAULT_RUN and ARGUMENTS are incomaptible for test ${TEST_NAME}")
+        endif (nARGUMENTS GREATER 0)
+    endif(nNO_DEFAULT_RUN GREATER 1)
 
-macro(run_test NAME DSTFILE)
-    # this is like add_test, but copes with scripts better.
-    set(binary ${DSTFILE})
-    if (${DSTFILE} MATCHES ".sh$")
-        set(binary env bash ${DSTFILE})
-    endif (${DSTFILE} MATCHES ".sh$")
-    add_test (${NAME} ${binary} ${ARGN})
-# old version.
-#  # This add_test() call causes the ctest program to be called on the
-#  # current source and binary directories. The ctest program then builds
-#  # the DSTFILE binary by calling cmake (which we suppress here) and make,
-#  # and then runs DSTFILE
-#     add_test ("${NAME}" "${CMAKE_CTEST_COMMAND}"
-#               # Specify the source and build directories for the Cmake/make
-#               # steps that gets executed by CTest (except we suppress the
-#               # CMake step in this CTest run, but we still have to specify the
-#               # directories)
-#               --build-and-test "${CMAKE_CURRENT_SOURCE_DIR}"
-#                                "${CMAKE_CURRENT_BINARY_DIR}"
-# 
-#               # If CTest were to run Cmake, it should use same CMake generator
-#               # as we use in the parent Cmake. We suppress the CMake call, but
-#               # the "--build-generator" parameter is mandatory so we have to
-#               # specify it anyway. Without it, we get this error:
-#               # "--build-and-test requires that both the generator and 
-#               #  makeprogram be provided using the --build-generator and 
-#               #  --build-makeprogram command line options."
-#               --build-generator "${CMAKE_GENERATOR}"
-# 
-#               # Use same make program as the parent CMake.
-#               --build-makeprogram "${CMAKE_MAKE_PROGRAM}"
-# 
-#               # Do NOT run CMake. The CMakeCache.txt file generated by having
-#               # add_subdirectory() in the parent directories is fine, and
-#               # if we were to let CTest re-run CMake, we'd have to figure out
-#               # directory locations all over again - this way, we inherit
-#               # everything from the CMakeCache.txt generated by the parent
-#               # CMake.
-#               --build-nocmake
-# 
-#               # Normally, CTest runs "make clean" before building any target,
-#               # so that only the most recently built target would remain in
-#               # the build directory. I assume we don't want that, but want to
-#               # be able to run them manually as well. Do tell CTest not to do
-#               # "make clean."
-#               --build-noclean
-# 
-#               # When we build and run this test, build only the binary
-#               # required for this test
-#               --build-target "${DSTFILE}"
-# 
-#               # If any test fails, print its output to stdout.
-#               # ... except that does not actually work. When running the
-#               # test suite with
-#               # /usr/bin/ctest --force-new-ctest-process -V
-#               # then the debugging output shows --output-on-failure being
-#               # passed to the spawned ctest processes, but without -V, they
-#               # still don't print anything in case of failure. Maybe a bug.
-#               # To get output, we have to pass it via ARGS to "make test".
-#               --output-on-failure
-# 
-#               # And finally the binary that should be run as the actual test
-#               --test-command ${binary} ${ARGN})
-endmacro(run_test NAME DSTFILE)
+    if (nSCRIPT EQUAL 0)
+        add_executable(${TEST_NAME} ${SOURCES})
+        target_link_libraries(${TEST_NAME} ${LIBRARIES})
+        list(INSERT TARGET_DEPENDENCIES 0 ${TEST_NAME})
+        list(LENGTH TARGET_DEPENDENCIES nTARGET_DEPENDENCIES)
+    endif (nSCRIPT EQUAL 0)
 
-# The SRCFILE parameter to this macro is the file name of the source file to
-# build. The LIBRARIES parameter is any libraries that should be linked in.
-# Any additional parameters are added to the command line of the test
-# executable that gets run.
-macro(build_and_run_test SRCFILE LIBRARIES)
-    # The name of the binary executable is equal to the name of the source
-    # file, minus the extension
-    get_filename_component (DSTFILE ${SRCFILE} NAME_WE)
+    if(NOT TEST_NAME)
+        message(FATAL_ERROR "could not find a test name")
+        endif(NOT TEST_NAME)
+    # even script tests may define target dependencies, even though it's
+    # probably of little use.
+    add_custom_target(${TEST_NAME}_dependencies)
+    add_dependencies(all_test_dependencies ${TEST_NAME}_dependencies)
 
-    add_executable (${DSTFILE} ${SRCFILE})
-    target_link_libraries (${DSTFILE} ${LIBRARIES})
-    # The name of the test here is the same as the name of the test
-    # executable file
-    add_test (${DSTFILE} ${DSTFILE} ${ARGN})
-    set_test_build_depends(${DSTFILE} ${DSTFILE})
-endmacro(build_and_run_test)
+    if(nTARGET_DEPENDENCIES GREATER 0)
+        add_dependencies(${TEST_NAME}_dependencies ${TARGET_DEPENDENCIES})
+        add_test(builddep_${TEST_NAME} ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target ${TEST_NAME}_dependencies)
+        # set(${TEST_NAME}_has_build_depends 1)
+    endif(nTARGET_DEPENDENCIES GREATER 0)
 
-macro(run_target_as_a_test x)
-    add_test(${x} ${x} ${ARGN})
-    set_test_build_depends(${x} ${x})
-endmacro(run_target_as_a_test x)
+    if (nSCRIPT EQUAL 0)
+        set(${TEST_NAME}_EXECUTABLE ${TEST_NAME})
+    else (nSCRIPT EQUAL 0)
+        set(binary ${SCRIPT})
+        if (${SCRIPT} MATCHES ".sh$")
+            set(binary env bash ${SCRIPT})
+        endif (${SCRIPT} MATCHES ".sh$")
+        set(${TEST_NAME}_EXECUTABLE ${binary})
+    endif(nSCRIPT EQUAL 0)
 
-macro(run_target_as_a_parametric_test n x)
-    add_test(${x}_${n} ${x} ${ARGN})
-    set_test_build_depends(${x}_${n} ${x})
-endmacro(run_target_as_a_parametric_test n x)
+    if(NOT NO_DEFAULT_RUN)
+        add_test (${TEST_NAME} ${${TEST_NAME}_EXECUTABLE} ${ARGUMENTS})
+        set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
+        set(${TEST_NAME}_TEST_EXISTS 1)
+        if(nTARGET_DEPENDENCIES GREATER 0)
+            # seems that we need set_tests_properties to take only a
+            # ;-separated list here.
+            set(deps builddep_${TEST_NAME} ${TEST_DEPENDENCIES})
+            string_join(all_deps ";" ${deps})
+            set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
+        endif(nTARGET_DEPENDENCIES GREATER 0)
+    endif(NOT NO_DEFAULT_RUN)
+endmacro(cado_define_test)
+
+macro(cado_divert_test TEST_BASE DIVERSION)
+    # This macro is appropriate when a test defined by
+    # cado_define_test (possibly with NO_DEFAULT_RUN) needs to be
+    # called several times with various parameter sets.
+    # binary. The different ways to call this macro are:
+    # 
+    # optional arguments:
+    #           TEST_DEPENDENCIES
+    #           TARGET_DEPENDENCIES
+    #           ARGUMENTS
+    #           APPEND_ARGUMENTS
+    #
+    # example use:
+    #
+    #     cado_define_test(TEST_NAME foo .....)
+    #
+    #     cado_divert_test(foo 1 --fast)
+    #     cado_divert_test(foo 2 --thorough)
+    #     cado_divert_test(foo extra --fallback TEST_DEPENDENCIES test3)
+    #     cado_divert_test(foo extra TEST_DEPENDENCIES test3
+    #                                ARGUMENTS --fallback)
+    #
+    # this defines tests foo_1, foo_2, and foo_extra, with the specific
+    # arguments given. The two last syntaxes are equivalent.
+    #
+    # NOTE that if the base test name does indeed correspond to a test
+    # (that is, it was not defined with NO_DEFAULT_RUN), then the
+    # diverted test is made to depend on this base test.
+    set(ARGUMENTS)
+    set(APPEND_ARGUMENTS)
+    set(TEST_DEPENDENCIES)
+    set(TARGET_DEPENDENCIES)
+    set(current ARGUMENTS)
+    foreach(x ${ARGN})
+        if (17 EQUAL 42)        # cmake syntax sucks
+            # dead branch, I know. But since the 1st test has privileged
+            # status in cmake syntax, let's make it a straw man.
+        elseif (x STREQUAL "APPEND_ARGUMENTS")
+            SET(current APPEND_ARGUMENTS)
+        elseif (x STREQUAL "TEST_DEPENDENCIES")
+            SET(current TEST_DEPENDENCIES)
+        elseif (x STREQUAL "TARGET_DEPENDENCIES")
+            SET(current TARGET_DEPENDENCIES)
+        else(17 EQUAL 42)       # cmake syntax sucks
+            list(APPEND ${current} ${x})
+        endif(17 EQUAL 42)      # cmake syntax sucks
+    endforeach(x)
+    # do some checking.
+    list(LENGTH TARGET_DEPENDENCIES nTARGET_DEPENDENCIES)
+    list(LENGTH ARGUMENTS nARGUMENTS)
+    list(LENGTH APPEND_ARGUMENTS nAPPEND_ARGUMENTS)
+    if ((nAPPEND_ARGUMENTS GREATER 0) AND (nARGUMENTS GREATER 0))
+        message(FATAL_ERROR "ARGUMENTS and APPEND_ARGUMENTS are incompatible")
+    endif ((nAPPEND_ARGUMENTS GREATER 0) AND (nARGUMENTS GREATER 0))
+
+    set(TEST_NAME "${TEST_BASE}_${DIVERSION}")
+    if (nAPPEND_ARGUMENTS GREATER 0)
+        set(ARGUMENTS ${${TEST_BASE}_ARGUMENTS} ${APPEND_ARGUMENTS})
+        list(LENGTH ARGUMENTS nARGUMENTS)
+    endif (nAPPEND_ARGUMENTS GREATER 0)
+    add_test(${TEST_NAME} ${${TEST_BASE}_EXECUTABLE} ${ARGUMENTS})
+
+    # we want to define builddep_X unconditionally, depending at least on
+    # the dependencies of the base test.
+    add_custom_target(${TEST_NAME}_dependencies)
+    add_test(builddep_${TEST_NAME} ${CMAKE_COMMAND} --build
+        ${CMAKE_BINARY_DIR} --target ${TEST_NAME}_dependencies)
+
+    add_dependencies(${TEST_NAME}_dependencies ${TEST_BASE}_dependencies ${TARGET_DEPENDENCIES})
+    # set("${TEST_NAME}_has_build_depends" 1)
+
+    # prepare a ;-separated list for set_tests_properties
+    # note that we do not need to make the test depend on
+    # builddep_${TEST_BASE}, since we have made ${TEST_NAME}_dependencies
+    # depend on ${TEST_BASE}_dependencies. It's in fact relieving, given
+    # that builddep_${TEST_BASE} does not necessarily exist.
+    set(deps builddep_${TEST_NAME} ${TEST_DEPENDENCIES})
+    if(${TEST_BASE}_TEST_EXISTS)
+        list(APPEND deps ${TEST_BASE})
+    endif(${TEST_BASE}_TEST_EXISTS)
+    string_join(all_deps ";" ${deps})
+    set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
+endmacro(cado_divert_test TEST_BASE DIVERSION ARGUMENTS)
+
+
 
 if(DEFINED ENV{CHECKS_EXPENSIVE})
-    run_test(full_c59 ${CADO_NFS_SOURCE_DIR}/factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2)
-    set_test_build_depends(full_c59 polyselect2l polyselect_ropt freerel makefb las dup1 dup2 purge merge merge-dl replay replay-dl sm reconstructlog-dl characters bwc_full plingen_pz sqrt)
+    cado_define_test(full_c59
+        SCRIPT
+            ${CADO_NFS_SOURCE_DIR}/factor.sh
+        ARGUMENTS
+            90377629292003121684002147101760858109247336549001090677693 -t 2
+        TARGET_DEPENDENCIES
+            polyselect2l polyselect_ropt
+            freerel makefb
+            las
+            dup1 dup2 purge merge merge-dl replay replay-dl
+            sm reconstructlog-dl characters
+            bwc_full plingen_pz
+            sqrt)
     find_program(MAGMA magma)
     if (MAGMA)
-        run_test(full_p59 ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh ${CADO_NFS_SOURCE_DIR})
-        set_test_build_depends(full_p59 full_c59_dependencies debug_renumber)
-        run_test(test_gfp3 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
-        set_test_build_depends(test_gfp3 full_c59_dependencies debug_renumber)
-        run_test(test_gfp2 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
-        set_test_build_depends(test_gfp2 full_c59_dependencies filter_galois polyselect_gfpn)
+        cado_define_test(full_p59
+            SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
+            ARGUMENTS ${CADO_NFS_SOURCE_DIR}
+            TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
+        )
+        cado_define_test(test_gfp3
+            SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
+            ARGUMENTS ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
+            TARGET_DEPENDENCIES full_p59_dependencies)
+        cado_define_test(test_gfp2
+            SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2.sh
+            ARGUMENTS ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
+            TARGET_DEPENDENCIES full_p59_dependencies filter_galois polyselect_gfpn)
     endif(MAGMA)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
 add_library (tests STATIC test_iter.c tests_common.c)
 target_link_libraries (tests ${gmp_libname})
 
-add_executable(test_tests_common test_tests_common.c)
-target_link_libraries(test_tests_common tests)
-run_target_as_a_parametric_test(1 test_tests_common)
-run_target_as_a_parametric_test(2 test_tests_common -seed)
-run_target_as_a_parametric_test(3 test_tests_common -seed 1)
+cado_define_test(test_tests_common.c NO_DEFAULT_RUN LIBRARIES tests)
+cado_divert_test(test_tests_common 1)
+cado_divert_test(test_tests_common 2 -seed)
+cado_divert_test(test_tests_common 3 -seed 1)
 set_tests_properties(test_tests_common_3 PROPERTIES PASS_REGULAR_EXPRESSION "Using random seed=1")
-run_target_as_a_parametric_test(4 test_tests_common -seed a)
-run_target_as_a_parametric_test(5 test_tests_common -seed "")
+cado_divert_test(test_tests_common 4 -seed a)
+cado_divert_test(test_tests_common 5 -seed "")
 set_tests_properties(test_tests_common_2 test_tests_common_4 test_tests_common_5 PROPERTIES WILL_FAIL 1)
-run_target_as_a_parametric_test(6 test_tests_common -iter 10)
+cado_divert_test(test_tests_common 6 -iter 10)
 set_tests_properties(test_tests_common_6 PROPERTIES PASS_REGULAR_EXPRESSION "Using 10 iterations")
 
-build_and_run_test(test_iceildiv.c "")
+cado_define_test(test_iceildiv.c)
 
 add_subdirectory (utils)
 add_subdirectory (sieve)

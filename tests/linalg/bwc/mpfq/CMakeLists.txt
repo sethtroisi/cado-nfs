@@ -14,11 +14,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             DEPENDS mpfq_test.c.meta
             )
 
-    add_executable(mpfq_test_${gfp_layer}
-        ${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
-        ${PROJECT_SOURCE_DIR}/linalg/bwc/mpfq/mpfq_${gfp_layer}.c)
-
-    set(extra)
+    set(toggle_variable_size_flag 0)
     string(REGEX MATCH "p_([0-9]+)" t "${gfp_layer}")
     if(t)
         set(width ${CMAKE_MATCH_1})
@@ -26,16 +22,21 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         if(gfp_layer STREQUAL "pz")
             set(t TRUE)
             set(width "z")
-            set_target_properties(mpfq_test_${gfp_layer} PROPERTIES COMPILE_FLAGS "-DVARIABLE_SIZE_PRIME")
+            set(toggle_variable_size_flag 1)
         endif(gfp_layer STREQUAL "pz")
     endif(t)
     set(p "${prime_${width}}")
 
+    cado_define_test(${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
+                ${PROJECT_SOURCE_DIR}/linalg/bwc/mpfq/mpfq_${gfp_layer}.c
+                LIBRARIES ${gmp_libname}
+                ARGUMENTS -s 1 -p ${p})
+    if(toggle_variable_size_flag)
+        set_target_properties(mpfq_test_${gfp_layer} PROPERTIES COMPILE_FLAGS "-DVARIABLE_SIZE_PRIME")
+    endif(toggle_variable_size_flag)
 
-    target_link_libraries(mpfq_test_${gfp_layer} ${gmp_libname})
-    run_target_as_a_test(mpfq_test_${gfp_layer} -s 1 -p ${p})
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 # mpfq_test_fixmp is not seeded as of now, because it uses random2, and
 # there is no mpn_rrandomb as of gmp-6.0.0
-build_and_run_test(mpfq_test_fixmp.c "${gmp_libname}" 40)
+cado_define_test(mpfq_test_fixmp.c LIBRARIES ${gmp_libname} ARGUMENTS 40)

@@ -603,7 +603,6 @@ tests/sieve/c120.poly
 tests/sieve/c120.roots1.gz
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
-tests/sieve/test_fb_make_step.c
 tests/sieve/ecm/CMakeLists.txt
 tests/sieve/ecm/test_factor_ecm_10_100_1000.inp
 tests/sieve/ecm/test_factor_ecm_11_100_1000.inp

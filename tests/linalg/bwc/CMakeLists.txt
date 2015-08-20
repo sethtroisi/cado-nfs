@@ -4,11 +4,11 @@
 # anything else than plingen_pz
 
 macro(add_bwc_test nm script)
-    string_join(tail " " ${ARGN})
-    # Don't split this line !
-    add_test(test-bwc-${nm} bash -c
-        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections")
-    set_test_build_depends(test-bwc-${nm} bwc_full)
+    cado_define_test(test-bwc-${nm} SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh
+        ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script}
+        bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${ARGN} -- verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections
+        TARGET_DEPENDENCIES bwc_full)
 endmacro(add_bwc_test)
 
 
@@ -27,19 +27,17 @@ set(prime_z 69617318994479297159441705409245167921344429126717528237597542082203
 
 
 macro(add_plingen_test testname)
-    string_join(tail " " ${ARGN})
-    # Don't split this line !
-    add_test(test-bwc-plingen-${gfp_layer}-${testname} bash -c
-        "${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
-    set_test_build_depends(test-bwc-plingen-${gfp_layer}-${testname}
-        plingen_${gfp_layer})
+    cado_define_test(test-bwc-plingen-${gfp_layer}-${testname} SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh
+        ${CADO_NFS_BINARY_DIR} ${ARGN}
+        TARGET_DEPENDENCIES plingen_${gfp_layer})
 endmacro(add_plingen_test testname)
 
 macro(add_lingen_binary_test testname)
-    string_join(tail " " ${ARGN})
-    # Don't split this line !
-    add_test(test-bwc-lingen-binary-${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/test-lingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
-    set_test_build_depends(test-bwc-lingen-binary-${testname} lingen)
+    cado_define_test(test-bwc-lingen-binary-${testname} SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/test-lingen.sh
+        ${CADO_NFS_BINARY_DIR} ${ARGN}
+        TARGET_DEPENDENCIES lingen)
 endmacro(add_lingen_binary_test)
 
 add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75,d0e758e619c8e81b3e28bbd4fe69c32826e9a4bd 64 64 160 1 lingen_threshold=10)
@@ -61,7 +59,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     endif(t)
     set(p "${prime_${width}}")
     add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
-    update_test_build_depends(test-bwc-modp-inhomogeneous-${gfp_layer}
+    add_dependencies(test-bwc-modp-inhomogeneous-${gfp_layer}_dependencies
         plingen_pz plingen_${gfp_layer})
     if(gfp_layer STREQUAL "p_1")
         set(mextra)
@@ -71,32 +69,32 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         endif(DEFINED ENV{CHECKS_EXPENSIVE} AND DEFINED ENV{MAGMA})
         add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
             random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
-        update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6
+        add_dependencies(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6_dependencies
             plingen_pz plingen_${gfp_layer})
 
         add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
             prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
-        update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4
+        add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
             plingen_pz plingen_${gfp_layer})
 
         if(DEFINED ENV{CHECKS_EXPENSIVE})
             add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
                 prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
-            update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive
+            add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive_dependencies
                 plingen_pz plingen_${gfp_layer})
         endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
         add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
             prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
-        update_test_build_depends(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1
+        add_dependencies(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1_dependencies
             plingen_pz plingen_${gfp_layer})
 #        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
 #            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
-#        update_test_build_depends(modp-homogeneous-minimal-mn4
+#        add_dependencies(modp-homogeneous-minimal-mn4_dependencies
 #        plingen_pz plingen_${gfp_layer})
 #        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
 #            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
-#        update_test_build_depends(modp-inhomogeneous-minimal-2rhs-mn2
+#        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies
 #        plingen_pz plingen_${gfp_layer})
     endif(gfp_layer STREQUAL "p_1")
 
@@ -141,34 +139,38 @@ endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
 add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
-update_test_build_depends(test-bwc-mod2-plain mf_scan)
+add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
 
 add_bwc_test(mod2-noshuffle bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 shuffle=0)
-update_test_build_depends(test-bwc-mod2-noshuffle mf_scan)
+add_dependencies(test-bwc-mod2-noshuffle_dependencies mf_scan)
 
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 mn=128 seed=1 thr=3)
-update_test_build_depends(test-bwc-mod2-oddthr mf_scan)
+add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
 add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 mn=128
     interleaving=1 seed=1 thr=2)
-update_test_build_depends(test-bwc-mod2-oddthr mf_scan)
+add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
 add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
     seed=1 thr=5)
-update_test_build_depends(test-bwc-mod2-m-neq-n mf_scan)
+add_dependencies(test-bwc-mod2-m-neq-n_dependencies mf_scan)
 
 add_subdirectory(mpfq)
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
     include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
-    build_and_run_test(test_cpubinding.c "utils;bwc_base" --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf)
+    cado_define_test(test_cpubinding.c
+        ARGUMENTS
+        --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf
+        LIBRARIES utils bwc_base)
 endif(HAVE_CXX11 AND HAVE_HWLOC)
 
 macro(test_dispatch_matmul testname)
-    string_join(tail " " ${ARGN})
-    # Don't split this line !
-    add_test(${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-dispatch-matmul.sh bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc ${tail}")
-    set_test_build_depends(${testname} bwc_matmul dispatch mf_scan mf_bal random_matrix)
+    cado_define_test(${testname} SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/bwc-dispatch-matmul.sh
+        bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc ${ARGN}
+        TARGET_DEPENDENCIES bwc_matmul dispatch mf_scan mf_bal
+        random_matrix)
 endmacro(test_dispatch_matmul testname)
 
 # mingw has antique bash (3.1) with different regexp syntax, and having
