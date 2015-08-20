@@ -136,9 +136,10 @@ template class reservation_array<bucket_array_t<2, longhint_t> >;
    For longhint, we need only one each, as those are filled only by
    downsorting, and all the downsorting of one level n bucket into a level
    n-1 bucket array is done as a single task, by a single thread. */
-reservation_group::reservation_group(const size_t nr_bucket_arrays)
-  : RA1_short(nr_bucket_arrays),
-    RA2_short(nr_bucket_arrays),
+// FIXME: the fill-in-bucket is not yet multi-thread for inner levels.
+reservation_group::reservation_group(const size_t nr_bucket_arrays, int toplevel)
+  : RA1_short((toplevel > 1) ? 1 : nr_bucket_arrays),
+    RA2_short((toplevel > 2) ? 1 : nr_bucket_arrays),
     RA3_short(nr_bucket_arrays),
     RA1_long(1),
     RA2_long(1)
@@ -249,7 +250,7 @@ thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
         thrs[i].init(*this, i, las);
     }
     for (unsigned int i = 0; i < nr_sides; i++)
-      groups[i] = new reservation_group(_nr_workspaces);
+      groups[i] = new reservation_group(_nr_workspaces, las->toplevel);
 }
 
 thread_workspaces::~thread_workspaces()

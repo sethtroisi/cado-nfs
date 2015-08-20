@@ -105,7 +105,7 @@ protected:
   const reservation_array<bucket_array_t<LEVEL, HINT> > &
   cget() const;
 public:
-  reservation_group(size_t nr_bucket_arrays);
+  reservation_group(size_t nr_bucket_arrays, int toplevel);
   void allocate_buckets(const uint32_t *n_bucket, const double *fill_ratio);
 };
 

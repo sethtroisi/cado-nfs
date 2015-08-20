@@ -391,7 +391,6 @@ downsort_tree(uint32_t bucket_index,
     precomp_plattice_t precomp_plattice)
 {
   ASSERT_ALWAYS(LEVEL > 0);
-  thread_data *th = &ws.thrs[0];
 
   where_am_I w;
   WHERE_AM_I_UPDATE(w, si, si);
@@ -440,6 +439,8 @@ downsort_tree(uint32_t bucket_index,
     ASSERT_ALWAYS(max_full <= 1.0);
 
     /* SECOND: fill in buckets at this level, for this region. */
+    // FIXME: Multi-thread, here!
+    // Don't forget to fix also the reservation_group constructor!
     bucket_array_t<LEVEL,shorthint_t> & BAfill =
       ws.reserve_BA<LEVEL, shorthint_t>(side);
     BAfill.reset_pointers();
@@ -465,8 +466,10 @@ downsort_tree(uint32_t bucket_index,
     }
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
-    th->first_region0_index = first_region0_index;
-    process_bucket_region(th);
+    for (int i = 0; i < ws.thrs[0].las->nb_threads; ++i) {
+      ws.thrs[i].first_region0_index = first_region0_index;
+    }
+    ws.thread_do(&process_bucket_region);
   }
 }
 

@@ -398,6 +398,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     // Now that fb have been initialized, we can set the toplevel.
     si->toplevel = MAX(si->sides[0]->fb->get_toplevel(),
             si->sides[1]->fb->get_toplevel());
+    las->toplevel = si->toplevel;
 
     /* Initialize the number of buckets */
 
@@ -3223,10 +3224,6 @@ int main (int argc0, char *argv0[])/*{{{*/
             /* Process bucket regions in parallel */
             workspaces->thread_do(&process_bucket_region);
         } else {
-            // FIXME: multithread with multi-level buckets is WANTED,
-            // but currently borken.
-            ASSERT_ALWAYS (las->nb_threads == 1);
-
             // Prepare plattices at internal levels
             // TODO: this could be multi-threaded
             plattice_x_t max_area = plattice_x_t(si->J)<<si->conf->logI;
