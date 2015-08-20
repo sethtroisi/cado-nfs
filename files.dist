@@ -1295,3 +1295,4 @@ linalg/bwc/mpfq/mpfq_u64k3.c
 linalg/bwc/mpfq/mpfq_u64k3.h
 linalg/bwc/mpfq/mpfq_u64k3_t.c
 linalg/bwc/mpfq/mpfq_u64k3_t.h
+tests/linalg/bwc/test-spmv.sh

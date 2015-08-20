@@ -182,3 +182,9 @@ test_dispatch_matmul(dispatch-matmul-65536-mpi nrows=65536 density=2 mpi=2x2)
 endif (HAVE_MPI)
 endif (NOT MINGW)
 
+
+cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
+    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    TARGET_DEPENDENCIES
+    random_matrix spmv_test short_matmul mf_scan)
+
