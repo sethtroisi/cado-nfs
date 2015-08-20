@@ -114,6 +114,10 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         TARGET_DEPENDENCIES plingen_${gfp_layer})
     set_tests_properties(test-bwc-plingen-${gfp_layer} PROPERTIES WILL_FAIL 1)
 
+    # Note that the thr argument here is used only in MPI
+    # context, and ignored otherwise. In MPI context, this triggers the
+    # mpi portions of the code (actually the test gets run twice, once
+    # with the threads, once without. Both have to succeed, of course).
     if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
         cado_divert_test(test-bwc-plingen-${gfp_layer} test0
             ${CADO_NFS_BINARY_DIR}
