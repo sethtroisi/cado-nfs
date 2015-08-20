@@ -369,31 +369,35 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
     cado_define_test(full_c59
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/factor.sh
-        ARGUMENTS
             90377629292003121684002147101760858109247336549001090677693 -t 2
         TARGET_DEPENDENCIES
             polyselect2l polyselect_ropt
             freerel makefb
             las
-            dup1 dup2 purge merge merge-dl replay replay-dl
-            sm reconstructlog-dl characters
-            bwc_full plingen_pz
+            dup1 dup2 purge merge replay
+            characters
+            bwc_full
             sqrt)
     find_program(MAGMA magma)
     if (MAGMA)
         cado_define_test(full_p59
-            SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
-            ARGUMENTS ${CADO_NFS_SOURCE_DIR}
+            SCRIPT
+                ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
+                ${CADO_NFS_SOURCE_DIR}
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
+            plingen_pz sm reconstructlog-dl merge-dl replay-dl)
         )
         cado_define_test(test_gfp3
-            SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
-            ARGUMENTS ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
+            SCRIPT
+                ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
+                ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
             TARGET_DEPENDENCIES full_p59_dependencies)
         cado_define_test(test_gfp2
-            SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2.sh
-            ARGUMENTS ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
-            TARGET_DEPENDENCIES full_p59_dependencies filter_galois polyselect_gfpn)
+            SCRIPT
+                ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2.sh
+                ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
+            TARGET_DEPENDENCIES full_p59_dependencies filter_galois
+            polyselect_gfpn)
     endif(MAGMA)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
