@@ -28,6 +28,8 @@ void apply_one_bucket (unsigned char *S,
     const fb_part *fb, where_am_I_ptr w);
 void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2);
 int factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED);
+void * process_bucket_region(thread_data *th);
+
 
 /***************************************************************************/
 /********        Main bucket sieving functions                    **********/
@@ -463,96 +465,8 @@ downsort_tree(uint32_t bucket_index,
     }
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
-    // FIXME: This block duplicates a lot of code with
-    // process_bucket_region in las.cpp.
-    where_am_I w MAYBE_UNUSED;
-    WHERE_AM_I_UPDATE(w, si, si);
-
-    unsigned char * S[2];
-    for(int side = 0 ; side < 2 ; side++) {
-      thread_side_data &ts = th->sides[side];
-      S[side] = ts.bucket_region;
-    }
-
-    unsigned char *SS = th->SS;
-    memset(SS, 0, BUCKET_REGION_1);
-    for (uint32_t ii = 0; ii < si->nb_buckets[LEVEL]; ++ii) {
-      uint32_t i = first_region0_index + ii;
-      WHERE_AM_I_UPDATE(w, N, i);
-      // FIXME: for the descent, could early abort here.
-
-      for (int side = 0; side < 2; side++) {
-        WHERE_AM_I_UPDATE(w, side, side);
-        sieve_side_info_ptr s = si->sides[side];
-        thread_side_data &ts = th->sides[side];
-
-        // Init norms
-#ifdef SMART_NORM
-        init_norms_bucket_region(S[side], i, si, side, 1);
-#else
-        init_norms_bucket_region(S[side], i, si, side, 0);
-#endif
-        // Invalidate the first row except (1,0)
-        if (side == 0 && i == 0) {
-          int pos10 = 1+((si->I)>>1);
-          unsigned char n10 = S[side][pos10];
-          memset(S[side], 255, si->I);
-          S[side][pos10] = n10;
-        }
-
-#if defined(TRACE_K)
-        if (trace_on_spot_N(w->N))
-          verbose_output_print(TRACE_CHANNEL, 0,
-              "# After %s init_norms_bucket_region, N=%u S[%u]=%u\n",
-              sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
-#endif                                                                          
-
-        // Apply buckets that have just been filled-in
-        const bucket_array_t<1, shorthint_t> *BA =
-          th->ws->cbegin_BA<1, shorthint_t>(side);
-        const bucket_array_t<1, shorthint_t> * const BA_end =
-          th->ws->cend_BA<1, shorthint_t>(side);
-        for (; BA != BA_end; BA++)  {
-          apply_one_bucket(SS, *BA, ii, ts.fb->get_part(1), w);
-        }
-
-        // Apply downsorted buckets.
-        // TODO: there is only one, no ? Why do we iterate here?
-        const bucket_array_t<1, longhint_t> *BAd =
-          th->ws->cbegin_BA<1, longhint_t>(side);
-        const bucket_array_t<1, longhint_t> * const BAd_end =
-          th->ws->cend_BA<1, longhint_t>(side);
-        for (; BAd != BAd_end; BAd++)  {
-          // FIXME: the updates could come from part 3 as well, not only
-          // part 2.
-          apply_one_bucket(SS, *BAd, ii, ts.fb->get_part(2), w);
-        }
-
-        SminusS(S[side], S[side] + BUCKET_REGION_1, SS);
-
-        // Sieve small primes
-        sieve_small_bucket_region(SS, i, s->ssd, ts.ssdpos, si, side, w);
-        SminusS(S[side], S[side] + BUCKET_REGION_1, SS);
-#if defined(TRACE_K)
-        if (trace_on_spot_N(w->N)) 
-          verbose_output_print(TRACE_CHANNEL, 0,
-              "# Final value on %s side, N=%u rat_S[%u]=%u\n",
-              sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
-#endif          
-      }
-
-      // Factor survivors
-      las_report_ptr rep = th->rep;
-      rep->reports += factor_survivors (th, i, w);
-
-      // Reset resiving data
-      for(int side = 0 ; side < 2 ; side++) {
-        sieve_side_info_ptr s = si->sides[side];
-        thread_side_data &ts = th->sides[side];
-        int * b = s->fb_parts_x->rs;
-        memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
-      }
-    }
+    th->first_region0_index = first_region0_index;
+    process_bucket_region(th);
   }
 }
 

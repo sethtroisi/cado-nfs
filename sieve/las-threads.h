@@ -41,6 +41,7 @@ struct thread_data : private NonCopyable {
   las_report rep;
   unsigned char *SS;
   bool is_initialized;
+  uint32_t first_region0_index;
   thread_data();
   ~thread_data();
   void init(const thread_workspaces &_ws, int id, las_info_srcptr las);

@@ -2587,38 +2587,32 @@ void * process_bucket_region(thread_data *th)
     where_am_I w MAYBE_UNUSED;
     las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
+    uint32_t first_region0_index = th->first_region0_index;
+    if (si->toplevel == 1) {
+        first_region0_index = 0;
+    }
 
     WHERE_AM_I_UPDATE(w, si, si);
 
     las_report_ptr rep = th->rep;
 
-    WHERE_AM_I_UPDATE(w, N, th->id);
-
     unsigned char * S[2];
 
-    unsigned int my_row0 = (BUCKET_REGION >> si->conf->logI) * th->id;
     unsigned int skiprows = (BUCKET_REGION >> si->conf->logI)*(las->nb_threads-1);
-
 
     /* This is local to this thread */
     for(int side = 0 ; side < 2 ; side++) {
-        sieve_side_info_ptr s = si->sides[side];
         thread_side_data &ts = th->sides[side];
-
-        /* Compute first sieve locations hit by small primes */
-        ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
-        /* Copy those locations that correspond to re-sieved primes */
-        ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s->fb_parts_x->rs);
-
-        /* local sieve region */
         S[side] = ts.bucket_region;
     }
+
     unsigned char *SS = th->SS;
     memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
-    for (unsigned int i = th->id; i < si->nb_buckets[1]; i += las->nb_threads) 
+    for (uint32_t ii = th->id; ii < si->nb_buckets[1]; ii += las->nb_threads)
       {
+        uint32_t i = first_region0_index + ii;
         WHERE_AM_I_UPDATE(w, N, i);
 
         if (recursive_descent) {
@@ -2668,8 +2662,22 @@ void * process_bucket_region(thread_data *th)
             const bucket_array_t<1, shorthint_t> * const BA_end =
                 th->ws->cend_BA<1, shorthint_t>(side);
             for (; BA != BA_end; BA++)  {
-                apply_one_bucket(SS, *BA, i, ts.fb->get_part(1), w);
+                apply_one_bucket(SS, *BA, ii, ts.fb->get_part(1), w);
             }
+
+            /* Apply downsorted buckets, if necessary. */
+            if (si->toplevel > 1) {
+                const bucket_array_t<1, longhint_t> *BAd =
+                    th->ws->cbegin_BA<1, longhint_t>(side);
+                const bucket_array_t<1, longhint_t> * const BAd_end =
+                    th->ws->cend_BA<1, longhint_t>(side);
+                for (; BAd != BAd_end; BAd++)  {
+                    // FIXME: the updates could come from part 3 as well,
+                    // not only part 2.
+                    apply_one_bucket(SS, *BAd, ii, ts.fb->get_part(2), w);
+                }
+            }
+
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
 
@@ -2678,8 +2686,9 @@ void * process_bucket_region(thread_data *th)
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              verbose_output_print(TRACE_CHANNEL, 0, "# Final value on %s side, N=%u rat_S[%u]=%u\n",
-                       sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              verbose_output_print(TRACE_CHANNEL, 0,
+                      "# Final value on %s side, N=%u rat_S[%u]=%u\n",
+                      sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
         }
 
@@ -2688,6 +2697,7 @@ void * process_bucket_region(thread_data *th)
         rep->reports += factor_survivors (th, i, w);
         rep->ttf += seconds_thread ();
 
+        /* Reset resieving data */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
             thread_side_data &ts = th->sides[side];
@@ -2695,12 +2705,6 @@ void * process_bucket_region(thread_data *th)
             int * b = s->fb_parts_x->rs;
             memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
-      }
-
-    for(int side = 0 ; side < 2 ; side++) {
-        thread_side_data &ts = th->sides[side];
-        free(ts.ssdpos);
-        free(ts.rsdpos);
     }
 
     return NULL;
@@ -3198,6 +3202,18 @@ int main (int argc0, char *argv0[])/*{{{*/
 
             small_sieve_extract_interval(s->rsd, s->ssd, s->fb_parts_x->rs);
             small_sieve_info("resieve", side, s->rsd);
+
+            // Initialiaze small sieve data at the first region of level 0
+            for (int i = 0; i < las->nb_threads; ++i) {
+                thread_data * th = &workspaces->thrs[i];
+                sieve_side_info_ptr s = si->sides[side];
+                thread_side_data &ts = th->sides[side];
+
+                uint32_t my_row0 = (BUCKET_REGION >> si->conf->logI) * th->id;
+                ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
+                ts.rsdpos = small_sieve_copy_start(ts.ssdpos,
+                        s->fb_parts_x->rs);
+            }
         }
 
         report->ttbuckets_fill += seconds();
@@ -3232,16 +3248,6 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
 
-            // Initialiaze small sieve data at the first region of level 0
-            // This has to be adapted for multithread, like in
-            // processregion().
-            for(int side = 0 ; side < 2 ; side++) {
-                sieve_side_info_ptr s = si->sides[side];
-                thread_side_data &ts = th->sides[side];
-                ts.ssdpos = small_sieve_start(s->ssd, 0, si);
-                ts.rsdpos = small_sieve_copy_start(ts.ssdpos,
-                        s->fb_parts_x->rs);
-            }
 
             // Visit the downsorting tree depth-first.
             // If toplevel = 1, then this is just processing all bucket
@@ -3262,7 +3268,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
 
-            // Cleanup (Again, should be modified for multi-thread?)
+            // Cleanup precomputed lattice bases.
             for(int side = 0 ; side < 2 ; side++) {
                 for (int level = 1; level < si->toplevel; ++level) {
                     std::vector<plattices_vector_t*> &V =
@@ -3274,11 +3280,19 @@ int main (int argc0, char *argv0[])/*{{{*/
                         delete *it;
                     }
                 }
+            }
+        }
+
+        // Cleanup smallsieve data
+        for (int i = 0; i < las->nb_threads; ++i) {
+            for(int side = 0 ; side < 2 ; side++) {
+                thread_data * th = &workspaces->thrs[i];
                 thread_side_data &ts = th->sides[side];
                 free(ts.ssdpos);
                 free(ts.rsdpos);
             }
         }
+
 
 #ifdef  DLP_DESCENT
         descent_tree::candidate_relation const& winner(las->tree->current_best_candidate());
