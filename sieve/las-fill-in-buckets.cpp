@@ -262,7 +262,7 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 #endif
 
     // Handle the rare special cases
-    const uint32_t I = 1<<si->conf->logI;
+    const uint32_t I = si->I;
     if (UNLIKELY(pl_it->get_inc_c() == 1 && pl_it->get_bound1() == I - 1)) {
         // Projective root: only update is at (1,0).
         if (first_reg) {
@@ -408,7 +408,10 @@ downsort_tree(uint32_t bucket_index,
     bucket_array_t<LEVEL, longhint_t> & BAout =
       ws.reserve_BA<LEVEL, longhint_t>(side);
     BAout.reset_pointers();
-    BAout.add_slice_index(0); // FIXME: This is a fake slice_index!
+    // This is a fake slice_index. For a longhint_t bucket, each update
+    // contains its own slice_index, directly used by apply_one_bucket
+    // and purge.
+    BAout.add_slice_index(0);
     // The data that comes from fill-in bucket at level above:
     {
       const bucket_array_t<LEVEL+1,shorthint_t> * BAin
@@ -489,7 +492,13 @@ downsort_tree(uint32_t bucket_index,
 #else
         init_norms_bucket_region(S[side], i, si, side, 0);
 #endif
-        // FIXME Invalidate the first row except (1,0)
+        // Invalidate the first row except (1,0)
+        if (side == 0 && i == 0) {
+          int pos10 = 1+((si->I)>>1);
+          unsigned char n10 = S[side][pos10];
+          memset(S[side], 255, si->I);
+          S[side][pos10] = n10;
+        }
 
 #if defined(TRACE_K)
         if (trace_on_spot_N(w->N))
