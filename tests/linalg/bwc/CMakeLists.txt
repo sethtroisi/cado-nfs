@@ -26,13 +26,6 @@ set(prime_9 37739624248215413522415545809882688909169212204164404283762063002456
 set(prime_z 69617318994479297159441705409245167921344429126717528237597542082203295398081625160307507496908132931192662194421301381083506846944815643283884602656894137393981852330936660004926669193667)
 
 
-macro(add_plingen_test testname)
-    cado_define_test(test-bwc-plingen-${gfp_layer}-${testname} SCRIPT
-        ${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh
-        ${CADO_NFS_BINARY_DIR} ${ARGN}
-        TARGET_DEPENDENCIES plingen_${gfp_layer})
-endmacro(add_plingen_test testname)
-
 macro(add_lingen_binary_test testname)
     cado_define_test(test-bwc-lingen-binary-${testname} SCRIPT
         ${CMAKE_CURRENT_SOURCE_DIR}/test-lingen.sh
@@ -100,7 +93,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
     # Also add some plingen tests if it so occurs that the current
     # backend can process them
-    # Each of the add_plingen_test lines has the following arguments
+    # Each test has the following arguments
     # plingen test name
     # reference sha1 sum for generator
     # m
@@ -109,27 +102,43 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     # p
     # seed for random generation (entries are (2^k*(seed/1000) mod q) + (3^k*(seed%1000) mod q) mod p, with q=2^20-3).
     # arguments to be passed to plingen (including mpi arguments)
+    
+    # we create a phony first test, so as to limit the risk of having
+    # several tests trigger the same build dependency on
+    # plingen_${gfp_layer} at the same time. Of course, the bare test
+    # here does not have the require arguments, so it will fail (we avoid
+    # NO_DEFAULT_RUN in this case, precisely because we want a phony
+    # test).
+    cado_define_test(test-bwc-plingen-${gfp_layer} SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh
+        TARGET_DEPENDENCIES plingen_${gfp_layer})
+    set_tests_properties(test-bwc-plingen-${gfp_layer} PROPERTIES WILL_FAIL 1)
 
     if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
-        add_plingen_test(test0
+        cado_divert_test(test-bwc-plingen-${gfp_layer} test0
+            ${CADO_NFS_BINARY_DIR}
             2b6428178054fc0d3931dcdc9257ccf3bdea62f9 4 2 36 1009 17042
             lingen_threshold=10 lingen_mpi_threshold=10 thr=2x2 --ascii
             ${extra})
-        add_plingen_test(test1
+        cado_divert_test(test-bwc-plingen-${gfp_layer} test1
+            ${CADO_NFS_BINARY_DIR}
             f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9 4 2 200 1009 88888
             lingen_threshold=10 lingen_mpi_threshold=10 thr=2x2 --ascii
             ${extra})
-        add_plingen_test(test2
+        cado_divert_test(test-bwc-plingen-${gfp_layer} test2
+            ${CADO_NFS_BINARY_DIR}
             f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9 4 2 200 1009 88888
             lingen_threshold=10 lingen_mpi_threshold=40 thr=2x2 --ascii
             ${extra})
-        add_plingen_test(test3
+        cado_divert_test(test-bwc-plingen-${gfp_layer} test3
+            ${CADO_NFS_BINARY_DIR}
             b448493e04299d8d54be6cc1273c43293520ac9e 3 3 1000 1009 1111
             lingen_threshold=10 lingen_mpi_threshold=40 thr=3x3 --ascii
             ${extra})
     endif(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
     if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_3")
-        add_plingen_test(test4
+        cado_divert_test(test-bwc-plingen-${gfp_layer} test4
+            ${CADO_NFS_BINARY_DIR}
             00a481d0e0e2ee7403fa234b7f8b818dc2ec8db4 3 3 1000
             1532495540865888858358347027150309183618739122183602191 1111
             lingen_threshold=10 lingen_mpi_threshold=40 thr=3x3
