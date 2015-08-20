@@ -141,6 +141,13 @@ endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
 
+# Note: because of stop_at_step here, we're not verifying what we're
+# doing, which is a bit stupid.
+add_bwc_test(mod2-rolling bwc-trace.sh random_matrix_size=2000
+    interval=10 keep_rolling_checkpoints=2 checkpoint_precious=40 m=64 n=64
+    seed=1 thr=2x2 stop_at_step=lingen)
+add_dependencies(test-bwc-mod2-rolling_dependencies mf_scan)
+
 add_bwc_test(mod2-noshuffle bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 shuffle=0)
 add_dependencies(test-bwc-mod2-noshuffle_dependencies mf_scan)
 

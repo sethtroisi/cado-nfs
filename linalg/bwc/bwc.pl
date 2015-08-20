@@ -199,7 +199,8 @@ my $prime;
 my $splitwidth;
 my @splits=();
 
-my $force_complete;
+# my $force_complete;
+my $stop_at_step;
 
 my $hostfile;
 my @hosts=();
@@ -212,7 +213,8 @@ my $needs_mpd;
 # out the arguments which are only of interest to us.
 # Here we read (from $param) the
 # following things.
-#  - $hostfile $mpi_extra_args $force_complete
+#  - $hostfile $mpi_extra_args
+#  - ## broken ## $force_complete
 #  - @hosts $m $n @splits
 #  - @mpi_split @thr_split
 #  - $nh $nv
@@ -257,7 +259,12 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'matrix') { $matrix=$v; next; }
     if ($k eq 'hostfile') { $hostfile=$v; next; }
     if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
-    if ($k eq 'force_complete') { $force_complete=$v; next; }
+    ## if ($k eq 'force_complete') { $force_complete=$v; next; }
+    if ($k eq 'stop_at_step') {
+        die "stop_at_step requires :complete" unless $main eq ':complete';
+        $stop_at_step=$v;
+        next;
+    }
     if ($k eq 'hosts') {
         $v=[$v] if (ref $v eq '');
         for (@$v) { push @hosts, split(',',$_); }
@@ -2136,6 +2143,10 @@ my @tasks = (
 
 for my $tc (@tasks) {
     if ($main eq $tc->[0] || $main eq ':complete') {
+        if ($stop_at_step && $tc->[0] eq $stop_at_step) {
+            print "Exiting early, because of stop_at_step=$stop_at_step\n";
+            last;
+        }
         $current_task = $tc->[0];
         &{$tc->[1]}(@main_args);
     }
