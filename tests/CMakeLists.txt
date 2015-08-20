@@ -385,7 +385,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
                 ${CADO_NFS_SOURCE_DIR}
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
-            plingen_pz sm reconstructlog-dl merge-dl replay-dl)
+            plingen_pz sm reconstructlog-dl merge-dl replay-dl
         )
         cado_define_test(test_gfp3
             SCRIPT
