@@ -2610,9 +2610,11 @@ void * process_bucket_region(thread_data *th)
     memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
-    for (uint32_t ii = th->id; ii < si->nb_buckets[1]; ii += las->nb_threads)
+    for (uint32_t ii = 0; ii < si->nb_buckets[1]; ii ++)
       {
         uint32_t i = first_region0_index + ii;
+        if ((i % las->nb_threads) != (uint32_t)th->id)
+            continue;
         WHERE_AM_I_UPDATE(w, N, i);
 
         if (recursive_descent) {
