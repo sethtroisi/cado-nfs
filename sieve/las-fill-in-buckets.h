@@ -12,8 +12,7 @@ downsort_tree(uint32_t bucket_index,
         uint32_t first_region0_index,
         thread_workspaces &ws,
         sieve_info_ptr si,
-        precomp_plattice_t precomp_plattice,
-        thread_data *th);
+        precomp_plattice_t precomp_plattice);
 void fill_in_buckets_both(thread_pool &, thread_workspaces &, sieve_info_srcptr);
 
 #endif

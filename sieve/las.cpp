@@ -3192,6 +3192,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         ASSERT_ALWAYS(max_full <= 1.0 ||
                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
+        
+        report->ttbuckets_fill += seconds();
 
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
@@ -3204,6 +3206,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             small_sieve_info("resieve", side, s->rsd);
 
             // Initialiaze small sieve data at the first region of level 0
+            // TODO: multithread this? Probably useless...
             for (int i = 0; i < las->nb_threads; ++i) {
                 thread_data * th = &workspaces->thrs[i];
                 sieve_side_info_ptr s = si->sides[side];
@@ -3216,18 +3219,16 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
-        report->ttbuckets_fill += seconds();
         if (si->toplevel == 1) {
             /* Process bucket regions in parallel */
             workspaces->thread_do(&process_bucket_region);
         } else {
             // FIXME: multithread with multi-level buckets is WANTED,
             // but currently borken.
-            // Pick the first (and unique) thread data.
             ASSERT_ALWAYS (las->nb_threads == 1);
-            thread_data *th = &workspaces->thrs[0];
 
             // Prepare plattices at internal levels
+            // TODO: this could be multi-threaded
             plattice_x_t max_area = plattice_x_t(si->J)<<si->conf->logI;
             plattice_enumerate_area<1>::value =
                 MIN(max_area, plattice_x_t(BUCKET_REGION_2));
@@ -3257,11 +3258,11 @@ int main (int argc0, char *argv0[])/*{{{*/
                 switch (si->toplevel) {
                     case 2:
                         downsort_tree<1>(i, i*BRS[2]/BRS[1],
-                                *workspaces, si, precomp_plattice, th);
+                                *workspaces, si, precomp_plattice);
                         break;
                     case 3:
                         downsort_tree<2>(i, i*BRS[3]/BRS[1],
-                                *workspaces, si, precomp_plattice, th);
+                                *workspaces, si, precomp_plattice);
                         break;
                     default:
                         ASSERT_ALWAYS(0);

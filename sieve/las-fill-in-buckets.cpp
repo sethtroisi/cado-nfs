@@ -378,7 +378,7 @@ void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, sieve_info_s
 
 
 // first_region0_index is a way to remember where we are in the tree.
-// The depth-first is a way to precess all the the region of level 0 in
+// The depth-first is a way to process all the the regions of level 0 in
 // increasing order of j-value.
 // first_region0_index * nb_lines_per_region0 therefore gives the j-line
 // where we are. This is what is called N by WHERE_AM_I and friends.
@@ -388,10 +388,10 @@ downsort_tree(uint32_t bucket_index,
     uint32_t first_region0_index,
     thread_workspaces &ws,
     sieve_info_ptr si,
-    precomp_plattice_t precomp_plattice,
-    thread_data *th)
+    precomp_plattice_t precomp_plattice)
 {
   ASSERT_ALWAYS(LEVEL > 0);
+  thread_data *th = &ws.thrs[0];
 
   where_am_I w;
   WHERE_AM_I_UPDATE(w, si, si);
@@ -461,7 +461,7 @@ downsort_tree(uint32_t bucket_index,
     for (unsigned int i = 0; i < si->nb_buckets[LEVEL]; ++i) {
       uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
       uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
-      downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice, th);
+      downsort_tree<LEVEL-1>(i, N, ws, si, precomp_plattice);
     }
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
@@ -478,8 +478,7 @@ void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
   uint32_t first_region0_index MAYBE_UNUSED,
   thread_workspaces &ws MAYBE_UNUSED,
   sieve_info_ptr si MAYBE_UNUSED,
-  precomp_plattice_t precomp_plattice MAYBE_UNUSED,
-  thread_data *th MAYBE_UNUSED)
+  precomp_plattice_t precomp_plattice MAYBE_UNUSED)
 {
     ASSERT_ALWAYS(0);
 }
@@ -516,11 +515,9 @@ reservation_group::cget<3, longhint_t>() const
 template 
 void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_ptr si,
-  precomp_plattice_t precomp_plattice,
-  thread_data *th);
+  precomp_plattice_t precomp_plattice);
 
 template
 void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, sieve_info_ptr si,
-  precomp_plattice_t precomp_plattice,
-  thread_data *th);
+  precomp_plattice_t precomp_plattice);
