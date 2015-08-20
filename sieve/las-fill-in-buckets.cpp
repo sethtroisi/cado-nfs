@@ -237,6 +237,7 @@ void
 fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 sieve_info_srcptr const si MAYBE_UNUSED,
                 plattices_vector_t *plattices_vector,
+                bool first_reg,
                 where_am_I_ptr w)
 {
   const slice_index_t slice_index = plattices_vector->get_index();
@@ -260,24 +261,24 @@ fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
     const fbprime_t p = 0;
 #endif
 
-    // FIXME
-#if 0 // SHOULD be done by one of the callers!
-    if (pl_it->get_b0() == 0 || pl_it->get_b1() == 0) {
-      /* r == 0 or r == 1/0.
-         1. If r == 0 (mod p), this prime hits for i == 0 (mod p), but since p > I,
-         this implies i = 0 or i > I. We don't sieve i > I. Since gcd(i,j) |
-         gcd(a,b), for i = 0 we only need to sieve j = 1. 
-         So, x = j*I + (i + I/2) = I + I/2.
-         2. r == p means root at infinity, which hits for j == 0 (mod p). Since q > I > J,
-         this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
-         FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
-         (if any) do we sieve? */
-      uint64_t x = (pl_it->b1 == 0 ? 1 : I) + (I >> 1);
-     /*****************************************************************/
-      BA.push_update(x, p, hint, slice_index, w);
-      continue;
+    // Handle the rare special cases
+    const uint32_t I = 1<<si->conf->logI;
+    if (UNLIKELY(pl_it->get_inc_c() == 1 && pl_it->get_bound1() == I - 1)) {
+        // Projective root: only update is at (1,0).
+        if (first_reg) {
+            uint64_t x = 1 + (I >> 1);
+            BA.push_update(x, p, hint, slice_index, w);
+        }
+        continue;
     }
-#endif
+    if (UNLIKELY(pl_it->get_inc_c() == I && pl_it->get_bound1() == I)) {
+        // Root=0: only update is at (0,1).
+        if (first_reg) {
+            uint64_t x = I + (I >> 1);
+            BA.push_update(x, p, hint, slice_index, w);
+        }
+        continue;
+    }
 
     /* Now, do the real work: the filling of the buckets */
     while (!plattice_enumerate_finished<LEVEL>(pl_it->get_x())) {
@@ -318,7 +319,7 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
     /* Get an unused bucket array that we can write to */
     bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
     /* Fill the buckets */
-    fill_in_buckets<LEVEL>(BA, param->si, plattices_vector, w);
+    fill_in_buckets<LEVEL>(BA, param->si, plattices_vector, true, w);
     /* Release bucket array again */
     param->ws.release_BA(param->side, BA);
     delete plattices_vector;
@@ -442,7 +443,7 @@ downsort_tree(uint32_t bucket_index,
         pl_it != precomp_plattice[side][LEVEL].end();
         pl_it++) {
       WHERE_AM_I_UPDATE(w, i, (*pl_it)->get_index());
-      fill_in_buckets<LEVEL>(BAfill, si, *pl_it, w);
+      fill_in_buckets<LEVEL>(BAfill, si, *pl_it, (first_region0_index == 0), w);
     }
     ws.release_BA<LEVEL,shorthint_t>(side, BAfill);
 

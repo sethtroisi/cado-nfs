@@ -162,7 +162,7 @@ struct plattice_info_t {
     if (UNLIKELY(proj && r == 0)) {
       /* This lattice basis might work in principle, but it generates hits in
          all locations i=1, ..., I/2-1, j = 0, all of which are useless except
-         I=1, j=0.  */
+         i=1, j=0.  */
       a1 = p;
       a0 = -((int32_t)1 << logI) + 1;
       b1 = 0;
@@ -407,6 +407,8 @@ public:
 
     void advance_to_next_area(int level);
     plattice_x_t get_x() const {return x;}
+    plattice_x_t get_bound1() const {return bound1;}
+    plattice_x_t get_inc_c() const {return inc_c;}
     slice_offset_t get_hint() const {return hint;}
 };
 

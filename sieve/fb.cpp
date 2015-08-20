@@ -391,10 +391,6 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
         plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
-        if (pli.get_b0() == 0 || pli.get_b1() == 0) {
-          // FIXME: we should still sieve (1,0) in that case!
-          continue;
-        }
         plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI);
         // Skip (0,0).
         ple.next();
