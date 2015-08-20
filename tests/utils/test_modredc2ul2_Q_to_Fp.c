@@ -36,11 +36,11 @@ main (int argc, const char *argv[])
   unsigned long p1[2] = {451UL, 72057594037927936UL}, /* 1329227995784915872903807060280345027 */
                 p2[2] = {41UL, 144115188075855872UL}; /* 2658455991569831745807614120560689193 */
 
-  if (sizeof (unsigned long)) == 4)
-   {
-     p1[1] = 452984832UL;
-     p2[1] = 184549376UL;
-   }
+  if (sizeof (unsigned long) == 4)
+    {
+      p1[1] = 452984832UL;
+      p2[1] = 184549376UL;
+    }
 
   modintredc2ul2_t num, den;
   modredc2ul2_intinit(num);
