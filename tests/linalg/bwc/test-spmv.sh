@@ -5,7 +5,7 @@ dens=10
 seed=1
 bindir=
 
-set -e
+set -ex
 
 usage() {
     echo "Usage: $0 <N>" >&2
