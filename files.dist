@@ -404,7 +404,6 @@ scripts/cluster/sge-linalg.pl
 scripts/gdb.py
 scripts/install-cmake.sh
 scripts/version.sh
-scripts/winlinks.sh
 scripts/oar_start_clients.sh
 scripts/list_modified_files.sh
 scripts/cadofactor/cadocommand.py
@@ -1040,7 +1039,6 @@ utils/threadpool.cpp
 utils/threadpool.h
 misc/extra_renumber.c
 cado-nfs.supp
-scripts/valgrind-slave.sh
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING
