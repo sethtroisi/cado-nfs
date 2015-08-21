@@ -113,15 +113,15 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
 int
 process_one_relation (earlyparsed_relation_ptr rel)
 {
-  mpz_t norm[2];
-  mpz_init (norm[0]);
-  mpz_init (norm[1]);
+  mpz_t norm[NB_POLYS_MAX];
+  for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
+      mpz_init (norm[side]);
   unsigned int fac_error = 0, need_completion = 0, nonprime = 0, toolarge = 0;
   /* If we complete relations, do not print error msg but warning. */
   int err = (complete_rels) ? 0 : 1;
 
   /* compute the norm on alg and rat sides */
-  for(unsigned int side = 0 ; side < 2 ; side++)
+  for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
   {
     mpz_poly_ptr ps = cpoly->pols[side];
     mpz_poly_homogeneous_eval_siui (norm[side], ps, rel->a, rel->b);
@@ -154,8 +154,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
   /* With an error in the factorization of the norm, no need to continue */
   if (fac_error)
   {
-    mpz_clear(norm[0]);
-    mpz_clear(norm[1]);
+      for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
+	  mpz_clear(norm[side]);
     return -1;
   }
 
@@ -193,7 +193,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
                               mpz_cmp_ui (norm[1], 1) != 0 ;
          p = getprime_mt (pi))
     {
-      for(unsigned int side = 0 ; side < 2 ; side++)
+	for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
       {
         exponent_t e = 0;
         while (mpz_divisible_ui_p (norm[side], p))
@@ -220,7 +220,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
   }
   else
   {
-    for(unsigned int side = 0 ; side < 2 ; side++)
+    for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
     {
       if (mpz_cmp_ui (norm[side], 1) != 0)
       {
@@ -257,9 +257,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
     }
   }
 
-
-  mpz_clear(norm[0]);
-  mpz_clear(norm[1]);
+  for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
+      mpz_clear(norm[side]);
   return nonprime + 2*need_completion + 4*toolarge;
 }
 
