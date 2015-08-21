@@ -71,7 +71,7 @@ struct relation : public relation_ab {
         }
     };
     int rational_side;    /* index of the rational side, if any */
-    std::vector<pr> sides[2];
+    std::vector<pr> sides[NB_POLYS_MAX];
 
     relation() {}
     operator bool() const { return (bool) (relation_ab) *this; }

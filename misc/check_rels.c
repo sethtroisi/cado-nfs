@@ -23,7 +23,7 @@
 uint64_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
 uint64_t nrels_toolarge;
 cado_poly cpoly;
-unsigned long lpb[2] = {0, 0};
+unsigned long lpb[NB_POLYS_MAX] = {0, 0, 0, 0, 0, 0, 0, 0};
 int verbose = 0;
 int abhexa = 0;
 int check_primality = 0; /* By default no primality check */
@@ -95,6 +95,14 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
   modul_clearmod (m);
   if (p != 1) //means remaining p is prime
     rel->primes[i] = (prime_t) {.h = side, .p = p, .e = e};
+}
+
+static int
+more_job(mpz_t norm[], unsigned int nb_poly){
+    for(unsigned int side = 0; side < nb_poly; side++)
+	if(mpz_cmp_ui (norm[side], 1) != 0)
+	    return 1;
+    return 0;
 }
 
 /* return 0 if everything is ok (factorization, primality, and complete)
@@ -189,8 +197,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
   {
     prime_info pi;
     prime_info_init (pi);
-    for (unsigned long p = 2; mpz_cmp_ui (norm[0], 1) != 0 ||
-                              mpz_cmp_ui (norm[1], 1) != 0 ;
+    for (unsigned long p = 2; more_job(norm, cpoly->nb_polys) ;
          p = getprime_mt (pi))
     {
 	for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
@@ -237,7 +244,13 @@ process_one_relation (earlyparsed_relation_ptr rel)
   }
 
   /* check that ideals appearing in the relations are below the lpb */
-  if (lpb[0] != 0 || lpb[1] != 0)
+  int any_lpb = 0;
+  for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
+      if(lpb[side] != 0){
+	  any_lpb = 1;
+	  break;
+      }
+  if (any_lpb)
   {
     for(weight_t i = 0; i < rel->nb ; i++)
     {
@@ -419,9 +432,12 @@ main (int argc, char * argv[])
 
     param_list_parse_ulong(pl, "lpb0", &lpb[0]);
     param_list_parse_ulong(pl, "lpb1", &lpb[1]);
-    lpb[0] = (lpb[0] == 0) ? 0 : 1UL << lpb[0];
-    lpb[1] = (lpb[1] == 0) ? 0 : 1UL << lpb[1];
-
+    // FIXME: more lpb's on command line?
+    for(unsigned int side = 0 ; side < cpoly->nb_polys ; side++)
+	lpb[side] = (lpb[side] == 0) ? 0 : 1UL << lpb[side];
+    // TODO: remove this
+    for(unsigned int side = 2 ; side < cpoly->nb_polys ; side++)
+	lpb[side] = lpb[1];
     const char * polyfilename = param_list_lookup_string(pl, "poly");
     const char *outfilename = param_list_lookup_string(pl, "complete");
     const char * filelist = param_list_lookup_string(pl, "filelist");
