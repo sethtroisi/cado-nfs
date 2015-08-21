@@ -181,7 +181,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
     // have to work with copies, because pseudo_gcd destroys its input
     mpz_poly_t f[2];
 
-    ASSERT_ALWAYS(cpoly->nb_polys == 2);
+    //    ASSERT_ALWAYS(cpoly->nb_polys == 2); // FIXME!!!
 
     for (int i = 0; i < 2; ++i) {
         mpz_poly_init(f[i], cpoly->pols[i]->alloc);
@@ -235,6 +235,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 int
 cado_poly_get_ratside (cado_poly_ptr pol)
 {
+#if 0
   ASSERT_ALWAYS(pol->nb_polys == 2);
   if (pol->pols[0]->deg != 1 && pol->pols[1]->deg != 1)
     return -1; /* two algrebraic sides */
@@ -242,6 +243,13 @@ cado_poly_get_ratside (cado_poly_ptr pol)
     return 0;
   else
     return 1;
+#else
+  // assuming there is at most *one* rational side (?)
+  for(unsigned int side = 0; side < pol->nb_polys; side++)
+      if(pol->pols[side]->deg == 1)
+	  return side;
+  return -1;
+#endif
 }
 
 void
