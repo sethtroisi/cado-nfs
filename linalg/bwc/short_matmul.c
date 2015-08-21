@@ -173,7 +173,7 @@ int main(int argc, char * argv[])
     }
     FILE * v = fopen(argv[2], "rb");
     if (v == NULL) {
-        perror(argv[1]);
+        perror(argv[2]);
         exit(1);
     }
     
@@ -184,8 +184,8 @@ int main(int argc, char * argv[])
         exit(1);
     }
 
+    /* fclose(v) is implicit */
     short_matmul(w, v, argv[1], mul_left);
-    fclose(v);
     fclose(w);
 }
 
