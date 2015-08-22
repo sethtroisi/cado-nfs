@@ -16,7 +16,7 @@ void cado_poly_init(cado_poly poly)
 
     /* By default allocate 2 polynomials */
     poly->nb_polys = 2;
-    for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_init (poly->pols[side], MAXDEGREE);
 
     mpz_init_set_ui(poly->n, 0);
@@ -24,7 +24,7 @@ void cado_poly_init(cado_poly poly)
 
 void cado_poly_clear(cado_poly poly)
 {
-    for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_clear (poly->pols[side]);
 
     mpz_clear(poly->n);
@@ -38,7 +38,7 @@ cado_poly_set (cado_poly p, cado_poly q)
     mpz_set (p->n, q->n);
     p->skew = q->skew;
     p->nb_polys = q->nb_polys;
-    for(unsigned int side = 0 ; side < q->nb_polys ; side++)
+    for(int side = 0 ; side < q->nb_polys ; side++)
       mpz_poly_set (p->pols[side], q->pols[side]);
 }
 
@@ -58,7 +58,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 
   /* Parse polynomials. Either in line format (poly%d=%Zd,%Zd,...) either given
    * by coefficients. */
-  for(unsigned int i = 0; i < NB_POLYS_MAX; i++)
+  for(int i = 0; i < NB_POLYS_MAX; i++)
   {
     char tag[6], buf[BUF_MAX];
     snprintf(tag, sizeof(tag), "poly%d", i);
@@ -104,7 +104,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     }
   }
   /* setting degrees */
-  for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
+  for(int side = 0 ; side < poly->nb_polys ; side++)
     mpz_poly_cleandeg(poly->pols[side], MAXDEGREE);
 
   /* Parse value of N. Two keys possible: n or None. Return 0 if not found. */
@@ -115,7 +115,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     ret = 0;
   }
 
-  for (unsigned int side = 0; side < poly->nb_polys; side++)
+  for (int side = 0; side < poly->nb_polys; side++)
     if (poly->pols[side]->deg < 0)
     {
       fprintf (stderr, "Error, polynomial on side %u has degree < 0 in "
@@ -245,7 +245,7 @@ cado_poly_get_ratside (cado_poly_ptr pol)
     return 1;
 #else
   // assuming there is at most *one* rational side (?)
-  for(unsigned int side = 0; side < pol->nb_polys; side++)
+  for(int side = 0; side < pol->nb_polys; side++)
       if(pol->pols[side]->deg == 1)
 	  return side;
   return -1;
@@ -266,7 +266,7 @@ cado_poly_fprintf (FILE *fp, cado_poly_srcptr poly, const char *prefix)
   }
   else
   {
-    for (unsigned int side = 0; side < poly->nb_polys; side++)
+    for (int side = 0; side < poly->nb_polys; side++)
     {
       if (prefix)
         fputs (prefix, fp);

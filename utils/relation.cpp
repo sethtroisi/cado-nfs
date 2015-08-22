@@ -32,8 +32,8 @@ relation::parse(const char *line)
     if (sscanf(line, "%" SCNd64 ",%" SCNu64 ":%n", &a, &b, &consumed) < 2)
         return 0;
 
-    sides[0].clear();
-    sides[1].clear();
+    for(int i = 0; i < nb_polys; i++)
+	sides[i].clear();
 
     if (line[consumed] == ':') {
         side++;
@@ -51,7 +51,7 @@ relation::parse(const char *line)
             consumed++;
         else if (line[consumed] == ':') {
             side++;
-            ASSERT_ALWAYS(side < 2);
+            ASSERT_ALWAYS(side < nb_polys);
             consumed++;
         }
     }
@@ -73,7 +73,7 @@ relation::print (FILE *file, const char *prefix) const
     c = snprintf(p, fence - p, "%" PRId64 ",%" PRIu64, a, b);
     p += c;
 
-    for(int side = 0 ; side < 2 ; side++) {
+    for(int side = 0 ; side < nb_polys ; side++) {
         if (p + 1 < fence) *p++ = ':';
         char * op = p;
         for(unsigned int i = 0 ; i < sides[side].size() ; i++) {
@@ -131,7 +131,7 @@ void relation::add(int side, unsigned long p)
 
 void relation::fixup_r(bool also_rational)
 {
-    for(int side = 0 ; side < 2 ; side++) {
+    for(int side = 0 ; side < nb_polys ; side++) {
         if (!also_rational && side == rational_side)
             continue;
         for(unsigned int i = 0 ; i < sides[side].size() ; i++) {
@@ -157,7 +157,7 @@ inline bool operator==(relation::pr const& a, relation::pr const& b) {
 
 void relation::compress()
 {
-    for(int side = 0 ; side < 2 ; side++) {
+    for(int side = 0 ; side < nb_polys ; side++) {
         vector<pr> & v(sides[side]);
         sort(v.begin(), v.end(), pr_cmp());
         unsigned int j = 0;
