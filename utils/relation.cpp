@@ -45,6 +45,8 @@ relation::parse(const char *line)
         int consumed_p;
         if (sscanf(line + consumed, "%lx%n", &p, &consumed_p) < 1)
             return 0;
+	// take care to the "::" problem in MNFS
+	printf("CONSUMED: %ul %d\n", p, consumed_p);
         add(side, p);
         consumed += consumed_p;
         if (line[consumed] == ',')

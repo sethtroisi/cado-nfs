@@ -122,6 +122,8 @@ int
 process_one_relation (earlyparsed_relation_ptr rel)
 {
   mpz_t norm[NB_POLYS_MAX];
+  char used[NB_POLYS_MAX];
+  memset(used, 0, NB_POLYS_MAX); /* which sides are in use */
   for(int side = 0 ; side < cpoly->nb_polys ; side++)
       mpz_init (norm[side]);
   unsigned int fac_error = 0, need_completion = 0, nonprime = 0, toolarge = 0;
@@ -141,6 +143,13 @@ process_one_relation (earlyparsed_relation_ptr rel)
     unsigned int side = rel->primes[i].h;
     p_r_values_t p = rel->primes[i].p;
     exponent_t e = rel->primes[i].e;
+    if(p == 0){ // FIXME!!!!
+	if(verbose != 0){
+	    //	    fprintf(stderr, "Warning: p_%d=0 => skipping\n", side);
+	    continue;
+	}
+    }
+    used[side] = 1;
     for (int j = 0; j < e; ++j)
     {
       //if (mpz_fdiv_q_ui (norm[side], norm[side], p) != 0)
@@ -167,6 +176,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
     return -1;
   }
 
+  // HERE!
   /* check primality of all ideals appearing in the relations */
   if (check_primality != 0)
   {
@@ -229,6 +239,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
   {
     for(int side = 0 ; side < cpoly->nb_polys ; side++)
     {
+      if(used[side] == 0)
+	continue;
       if (mpz_cmp_ui (norm[side], 1) != 0)
       {
         if (verbose != 0)
@@ -256,6 +268,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
     {
       p_r_values_t p = rel->primes[i].p;
       unsigned int side = rel->primes[i].h;
+      if(p == 0)
+	  continue;
       if (lpb[side] != 0 && p > lpb[side])
       {
         if (verbose != 0)
