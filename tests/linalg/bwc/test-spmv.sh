@@ -5,7 +5,7 @@ dens=10
 seed=1
 bindir=
 
-set -e
+set -ex
 
 usage() {
     echo "Usage: $0 <N>" >&2
@@ -51,9 +51,9 @@ eval $($bindir/mf_bal  1 1 $wdir/mat.bin skip_decorrelating_permutation=true 2>&
 $bindir/spmv_test wdir=$wdir mn=64 prime=2 balancing=$B matrix=$wdir/mat.bin nullspace=left
 mv $wdir/MY.0 $wdir/YM.0
 
-$bindir/short_matmul  $wdir/mat.bin  $wdir/Y.0  > $wdir/sMY.0
+$bindir/short_matmul  $wdir/mat.bin  $wdir/Y.0  $wdir/sMY.0
 
-$bindir/short_matmul -t $wdir/mat.bin  $wdir/Y.0  > $wdir/sYM.0
+$bindir/short_matmul -t $wdir/mat.bin  $wdir/Y.0  $wdir/sYM.0
 
 $bindir/spmv_test wdir=$wdir mn=64 prime=2 balancing=$B matrix=$wdir/mat.bin nullspace=RIGHT
 
