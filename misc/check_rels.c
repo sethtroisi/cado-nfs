@@ -143,12 +143,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
     unsigned int side = rel->primes[i].h;
     p_r_values_t p = rel->primes[i].p;
     exponent_t e = rel->primes[i].e;
-    if(p == 0){ // FIXME!!!!
-	if(verbose != 0){
-	    //	    fprintf(stderr, "Warning: p_%d=0 => skipping\n", side);
-	    continue;
-	}
-    }
+    ASSERT_ALWAYS(p != 0); // could reveal a problem in parsing
     used[side] = 1;
     for (int j = 0; j < e; ++j)
     {
@@ -176,7 +171,6 @@ process_one_relation (earlyparsed_relation_ptr rel)
     return -1;
   }
 
-  // HERE!
   /* check primality of all ideals appearing in the relations */
   if (check_primality != 0)
   {
