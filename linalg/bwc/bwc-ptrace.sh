@@ -318,7 +318,7 @@ if [ "$shuffle" = 0 ] || ! [ "$shuffle" ] ; then
     common="$common shuffled_product=0"
 fi
 
-for v in tolerate_failure stop_at_step keep_rolling_checkpoints checkpoint_precious skip_online_checks ; do
+for v in tolerate_failure stop_at_step keep_rolling_checkpoints checkpoint_precious skip_online_checks interleaving ; do
     c="$(eval echo \$$v)"
     if [ "$c" ] ; then
         common="$common $v=$c"
