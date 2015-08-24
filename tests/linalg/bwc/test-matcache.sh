@@ -72,7 +72,7 @@ for impl in basic sliced bucket ; do
         cachefile=$wdir/mat-${impl}${cachefiledirection}.bin
 
         $bindir/build_matcache --matrix-file $wdir/mat.bin -impl $impl -direction $direction -tmpdir $wdir > $wdir/build.$impl.$direction.out 2>&1
-        SHA1=$(sha1sum ${cachefile})
+        SHA1=$($SHA1BIN ${cachefile})
         SHA1="${SHA1%% *}"
         REFSHA1=$SHA1
         unset SHA1
@@ -83,7 +83,7 @@ for impl in basic sliced bucket ; do
         eval argtail=\(\$bench_arg_${direction}\)
         $bindir/bench_matcache -r $wdir/mat.bin  --nmax 100 -impl $impl "${argtail[@]}" > $wdir/bench$impl.$direction.out 2>&1
 
-        SHA1=$(sha1sum ${cachefile2})
+        SHA1=$($SHA1BIN ${cachefile2})
         SHA1="${SHA1%% *}"
 
         if [ "$SHA1" != "$REFSHA1" ] ; then
