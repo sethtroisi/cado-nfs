@@ -10,6 +10,9 @@ use Data::Dumper;
 use Fcntl;
 
 # This companion program serves as a helper for running bwc programs.
+#
+# It should be rewritten someday, perhaps in python. At least this has to
+# be more modular (to be honest, it used to be much worse).
 
 # MPI_BINDIR=/opt/mpich2-1.1a2-1.fc10.x86_64/usr/bin ./bwc.pl :complete matrix=c72 interval=256 splits=64 mn=64 ys=0..64 mpi=4x4
 
@@ -322,12 +325,20 @@ $splitwidth = ($prime == 2) ? 64 : 1;
 
 print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
 
+if ($main eq ':mpirun') {
+    # ok, this is really an ugly ugly hack. We have some mpi detection
+    # magic in this script, which we would like to use. So the :mpirun
+    # meta-command is just for that. Of course the argument requirements
+    # are mostly waived in this case.
+    $matrix=$param->{'matrix'}=$0;
+    $param->{'prime'}=2;
+    $m=$n=64;
+    $wdir=$param->{'wdir'}="/";
+}
+
 # {{{ Some important argument checks
 {
     my @miss = grep { !defined $param->{$_}; } (qw/prime matrix interval/);
-    if (!defined($param->{'mn'})) {
-        push @miss, grep { !defined $param->{$_}; } (qw/prime matrix interval/);
-    }
     die "Missing argument(s): @miss" if @miss;
     if (!defined($m) || !defined($n)) {
         die "Missing parameters: m and/or n";
@@ -930,6 +941,13 @@ if ($mpi_needed) {
     # without having ever tried to join in an mpi collective like
     # mpi_init(), there's potential for the mpirun command to complain.
     dosystem('-nofatal', @mpi_precmd, split(' ', "mkdir -p $wdir"));
+}
+
+if ($main eq ':mpirun') {
+    # we don't even put @main_args in, because we're tinkering with it
+    # somewhat.
+    dosystem(@mpi_precmd, @extra_args);
+    exit 0;
 }
 
 ##################################################

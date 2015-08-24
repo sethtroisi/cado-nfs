@@ -230,7 +230,11 @@ set_target_properties(test_hello PROPERTIES
     LINK_FLAGS "--mpi")
 
 if (HAVE_MPI)
-    cado_define_test(TEST_NAME test_hello_mpi PROGRAM ${MPIEXEC} -n 6
-        ${CADO_NFS_BINARY_DIR}/linalg/bwc/test_hello mpi=3x2 thr=2x2
+    # yes, the mpi= and thr= arguments are given twice here. This is
+    # intentional, because our only logic for discovering the scheduling
+    # environment is within bwc.pl, so we have to use it.
+    cado_define_test(TEST_NAME test_hello_mpi PROGRAM
+        ${PROJECT_BINARY_DIR}/linalg/bwc/bwc.pl :mpirun mpi=3x2 thr=2x2
+        -- ${CMAKE_CURRENT_BINARY_DIR}/test_hello mpi=3x2 thr=2x2
         TEST_DEPENDENCIES test_hello)
 endif (HAVE_MPI)
