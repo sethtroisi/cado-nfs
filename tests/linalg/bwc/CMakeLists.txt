@@ -208,3 +208,10 @@ cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
     TARGET_DEPENDENCIES
     random_matrix spmv_test short_matmul mf_scan)
 
+
+cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-matcache.sh
+    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    TARGET_DEPENDENCIES
+    random_matrix build_matcache bench_matcache)
+
+
