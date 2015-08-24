@@ -177,8 +177,10 @@ add_dependencies(test-bwc-mod2-m-neq-n_dependencies mf_scan)
 
 add_subdirectory(mpfq)
 
+# some tests below use the bwc include files.
+include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
+
 if(HAVE_CXX11 AND HAVE_HWLOC)
-    include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
     cado_define_test(test_cpubinding.c
         ARGUMENTS
         --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf
