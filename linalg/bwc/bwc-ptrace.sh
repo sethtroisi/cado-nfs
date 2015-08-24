@@ -291,6 +291,7 @@ prepare_common_arguments() {
         prime=$prime
         mm_impl=$mm_impl
         nullspace=$nullspace
+        interval=$interval
 
 EOF
 }
@@ -313,13 +314,16 @@ if [ "$rhsfile" ] ; then
     common="$common rhs=$rhsfile"
 fi
 
-if [ "$tolerate_failure" ] ; then
-    common="$common tolerate_failure=$tolerate_failure"
-fi
-
 if [ "$shuffle" = 0 ] || ! [ "$shuffle" ] ; then
     common="$common shuffled_product=0"
 fi
+
+for v in tolerate_failure stop_at_step keep_rolling_checkpoints checkpoint_precious skip_online_checks ; do
+    c="$(eval echo \$$v)"
+    if [ "$c" ] ; then
+        common="$common $v=$c"
+    fi
+done
 
 set $common
 

@@ -498,10 +498,10 @@ renumber_write_open (renumber_ptr tab, const char *tablefile, const char *badfil
   /* Write the two polynomials on a line beginning by #, if given */
   if (poly != NULL)
   {
-    ASSERT_ALWAYS (poly->nb_polys == tab->nb_polys);
-    for (unsigned int i = 0; i < poly->nb_polys; i++)
+    ASSERT_ALWAYS (poly->nb_polys == (int)tab->nb_polys);
+    for (int i = 0; i < poly->nb_polys; i++)
     {
-      fprintf (tab->file, "# pol%u: ", i);
+      fprintf (tab->file, "# pol%d: ", i);
       mpz_poly_fprintf_coeffs (tab->file, poly->pols[i], ',');
     }
   }

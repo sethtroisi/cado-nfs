@@ -317,4 +317,10 @@ static inline long pagesize ()
 #endif
 }
 
+#ifdef HAVE_MINGW
+/* oh dear... */
+#include <windows.h>
+#define sleep(seconds) Sleep((seconds)*1000) 
+#endif /* HAVE_MINGW */
+
 #endif /* ifndef CADO_PORTABILITY_H_ */

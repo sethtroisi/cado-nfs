@@ -1752,7 +1752,7 @@ apply_one_update (unsigned char * const S,
 template <typename HINT>
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
-// FIXME NOPROFILE_STATIC
+NOPROFILE_STATIC
 #endif
 void
 apply_one_bucket (unsigned char *S,
@@ -2610,9 +2610,11 @@ void * process_bucket_region(thread_data *th)
     memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
-    for (uint32_t ii = th->id; ii < si->nb_buckets[1]; ii += las->nb_threads)
+    for (uint32_t ii = 0; ii < si->nb_buckets[1]; ii ++)
       {
         uint32_t i = first_region0_index + ii;
+        if ((i % las->nb_threads) != (uint32_t)th->id)
+            continue;
         WHERE_AM_I_UPDATE(w, N, i);
 
         if (recursive_descent) {
@@ -2674,6 +2676,7 @@ void * process_bucket_region(thread_data *th)
                 for (; BAd != BAd_end; BAd++)  {
                     // FIXME: the updates could come from part 3 as well,
                     // not only part 2.
+                    ASSERT_ALWAYS(si->toplevel <= 2);
                     apply_one_bucket(SS, *BAd, ii, ts.fb->get_part(2), w);
                 }
             }
@@ -3168,7 +3171,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* Fill in buckets on both sides at top level */
         fill_in_buckets_both(*pool, *workspaces, si);
-        delete pool;
 
         /* Check that buckets are not more than full.
          * Due to templates and si->toplevel being not constant, need a
@@ -3192,6 +3194,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         ASSERT_ALWAYS(max_full <= 1.0 ||
                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
+        
+        report->ttbuckets_fill += seconds();
 
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
@@ -3204,6 +3208,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             small_sieve_info("resieve", side, s->rsd);
 
             // Initialiaze small sieve data at the first region of level 0
+            // TODO: multithread this? Probably useless...
             for (int i = 0; i < las->nb_threads; ++i) {
                 thread_data * th = &workspaces->thrs[i];
                 sieve_side_info_ptr s = si->sides[side];
@@ -3216,18 +3221,12 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
-        report->ttbuckets_fill += seconds();
         if (si->toplevel == 1) {
             /* Process bucket regions in parallel */
             workspaces->thread_do(&process_bucket_region);
         } else {
-            // FIXME: multithread with multi-level buckets is WANTED,
-            // but currently borken.
-            // Pick the first (and unique) thread data.
-            ASSERT_ALWAYS (las->nb_threads == 1);
-            thread_data *th = &workspaces->thrs[0];
-
             // Prepare plattices at internal levels
+            // TODO: this could be multi-threaded
             plattice_x_t max_area = plattice_x_t(si->J)<<si->conf->logI;
             plattice_enumerate_area<1>::value =
                 MIN(max_area, plattice_x_t(BUCKET_REGION_2));
@@ -3257,11 +3256,11 @@ int main (int argc0, char *argv0[])/*{{{*/
                 switch (si->toplevel) {
                     case 2:
                         downsort_tree<1>(i, i*BRS[2]/BRS[1],
-                                *workspaces, si, precomp_plattice, th);
+                                *workspaces, *pool, si, precomp_plattice);
                         break;
                     case 3:
                         downsort_tree<2>(i, i*BRS[3]/BRS[1],
-                                *workspaces, si, precomp_plattice, th);
+                                *workspaces, *pool, si, precomp_plattice);
                         break;
                     default:
                         ASSERT_ALWAYS(0);
@@ -3282,6 +3281,8 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
         }
+
+        delete pool;
 
         // Cleanup smallsieve data
         for (int i = 0; i < las->nb_threads; ++i) {

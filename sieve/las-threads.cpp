@@ -162,6 +162,7 @@ reservation_group::allocate_buckets(const uint32_t *n_bucket, const double *fill
   RA2_long.allocate_buckets(n_bucket[2], fill_ratio[3]);
 }
 
+
 /* 
    We want to map the desired bucket_array type to the appropriate
    reservation_array in reservation_group, which we do by explicit
@@ -343,3 +344,13 @@ thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
             checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }
 }
+
+template <int LEVEL, typename HINT>
+void
+thread_workspaces::reset_all_pointers(int side) {
+    groups[side]->get<LEVEL, HINT>().reset_all_pointers();
+}
+
+template void thread_workspaces::reset_all_pointers<1, shorthint_t>(int);
+template void thread_workspaces::reset_all_pointers<2, shorthint_t>(int);
+template void thread_workspaces::reset_all_pointers<3, shorthint_t>(int);
