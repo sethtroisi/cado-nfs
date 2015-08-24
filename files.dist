@@ -951,6 +951,7 @@ linalg/bwc/cpubinding.cpp
 linalg/bwc/cpubinding.h
 tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
+tests/test_full_p30.sh
 tests/test_full_p59.sh
 tests/test_gfp2.sh
 tests/test_gfp3.sh
