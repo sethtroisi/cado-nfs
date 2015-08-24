@@ -1295,3 +1295,8 @@ linalg/bwc/mpfq/mpfq_u64k3_t.c
 linalg/bwc/mpfq/mpfq_u64k3_t.h
 tests/linalg/bwc/test-spmv.sh
 tests/linalg/bwc/test-matcache.sh
+linalg/bwc/short_matmul.c
+linalg/bwc/spmv_test.c
+linalg/bwc/bench_matcache.c
+linalg/bwc/build_matcache.c
+tests/linalg/bwc/test_hello.c

@@ -905,8 +905,9 @@ void pi_log_init(pi_wiring_ptr wr)
     char commname[MPI_MAX_OBJECT_NAME];
     int namelen = sizeof(commname);
     MPI_Comm_get_name(wr->pals, commname, &namelen);
+
     if (wr->jrank == 0 && wr->trank == 0) {
-        printf("Enabled logging for %s\n", commname);
+        printf("Enabled logging for %s:%s\n", commname, wr->th->desc);
     }
 }
 

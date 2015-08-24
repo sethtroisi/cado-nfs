@@ -111,7 +111,7 @@ void bw_common_parse_cmdline(struct bw_params * bw, param_list pl, int * p_argc,
         }
         fprintf(stderr, "Unhandled parameter %s\n", (*p_argv)[0]);
         param_list_print_usage(pl, bw->original_argv[0], stderr);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     if (bw->can_print) {

@@ -215,3 +215,20 @@ cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-matcache.sh
     random_matrix build_matcache bench_matcache)
 
 
+# Tests which use bwc_base will need nwc_config.h
+include_directories(${PROJECT_BINARY_DIR}/linalg/bwc)
+
+if (WITH_MPI)
+add_definitions(-DWITH_MPI)
+endif (WITH_MPI)
+
+cado_define_test(test_hello.c ARGUMENTS thr=2x2 LIBRARIES bwc_base)
+set_target_properties(test_hello PROPERTIES
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
+
+if (HAVE_MPI)
+    cado_define_test(TEST_NAME test_hello_mpi PROGRAM ${MPIEXEC} -n 6
+        ${CADO_NFS_BINARY_DIR}/linalg/bwc/test_hello mpi=3x2 thr=2x2
+        TEST_DEPENDENCIES test_hello)
+endif (HAVE_MPI)
