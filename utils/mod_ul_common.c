@@ -442,7 +442,9 @@ mod_sprp (const residue_t b, const modulus_t m)
 }
 
 
-/* Returns 1 if m is a strong probable prime wrt base 2, 0 otherwise. */
+/* Returns 1 if m is a strong probable prime wrt base 2, 0 otherwise.
+   Assumes m > 1 and is odd.
+ */
 int
 mod_sprp2 (const modulus_t m)
 {
@@ -451,12 +453,6 @@ mod_sprp2 (const modulus_t m)
   unsigned long mm1;
 
   mm1 = mod_getmod_ul (m);
-
-  if (mm1 <= 3UL)
-    return (mm1 >= 2UL);
-
-  if (mm1 % 2UL == 0UL)
-    return 0;
 
   /* If m == 1,7 (mod 8), then 2 is a quadratic residue, and we must find
      -1 with one less squaring. This does not reduce the number of
