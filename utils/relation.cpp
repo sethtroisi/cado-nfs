@@ -32,7 +32,7 @@ relation::parse(const char *line)
     if (sscanf(line, "%" SCNd64 ",%" SCNu64 ":%n", &a, &b, &consumed) < 2)
         return 0;
 
-    for(int i = 0; i < nb_polys; i++)
+    for(int i = 0; i < NB_POLYS_MAX; i++)
 	sides[i].clear();
 
     if (line[consumed] == ':') {
@@ -46,17 +46,18 @@ relation::parse(const char *line)
         if (sscanf(line + consumed, "%lx%n", &p, &consumed_p) < 1)
             return 0;
 	// take care to the "::" problem in MNFS
-	printf("CONSUMED: %lu %d\n", p, consumed_p);
+	// printf("CONSUMED: %lu %d\n", p, consumed_p);
         add(side, p);
         consumed += consumed_p;
         if (line[consumed] == ',')
             consumed++;
         else if (line[consumed] == ':') {
             side++;
-            ASSERT_ALWAYS(side < nb_polys);
+            ASSERT_ALWAYS(side < NB_POLYS_MAX);
             consumed++;
         }
     }
+    nb_polys = side+1;
     compress();
     fixup_r();
     return 1;
