@@ -4555,7 +4555,7 @@ class DescentTask(Task):
     @property
     def programs(self):
         input = {"db": Request.GET_DB_FILENAME,}
-        override = ()
+        override = ("cadobindir",)
         return ((cadoprograms.Descent, override, input),)
     @property
     def paramnames(self):
@@ -4577,7 +4577,9 @@ class DescentTask(Task):
 
         (stdoutpath, stderrpath) = \
                 self.make_std_paths(cadoprograms.Descent.name)
+        cadobindir = self.params["execpath"]
         p = cadoprograms.Descent(
+                cadobindir=cadobindir,
                 stdout=str(stdoutpath),
                 stderr=str(stderrpath),
                 **self.merged_args[0])
