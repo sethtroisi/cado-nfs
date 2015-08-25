@@ -242,6 +242,7 @@ echo $size
 if $dlp ; then
     if [ $gfpext = "1" ]; then
       file="$paramdir/params.p$size"
+      export CADO_HINTFILE_DIR=$paramdir
     else
       file="$paramdir/params.p${gfpext}dd$size"
     fi
