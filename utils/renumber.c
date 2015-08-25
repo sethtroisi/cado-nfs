@@ -468,8 +468,8 @@ renumber_clear (renumber_ptr renumber_info)
 /* The renumber_t struct _must_ have been initialized before
  * poly = NULL is accepted. It will not print the polynomials on the file */
 void
-renumber_write_open (renumber_ptr tab, const char *tablefile, const char *badfile,
-                     cado_poly poly)
+renumber_write_open (renumber_ptr tab, const char *tablefile, 
+		     const char *badfile, cado_poly poly)
 {
   printf ("# Opening %s to write the renumbering table\n", tablefile);
   fflush (stdout);

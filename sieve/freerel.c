@@ -591,9 +591,11 @@ main (int argc, char *argv[])
     unsigned long pmin = 2, pmax = 0, nfree;
     renumber_t renumber_table;
     int add_full_col = 0;
-    unsigned long lpb[2] = {0, 0};
+    unsigned long lpb[NB_POLYS_MAX];
     unsigned long nb_pthreads = 1;
 
+    for(int i = 0; i < NB_POLYS_MAX; i++)
+	lpb[i] = 0;
     param_list pl;
     param_list_init(pl);
     declare_usage(pl);
@@ -660,6 +662,9 @@ main (int argc, char *argv[])
     param_list_parse_ulong(pl, "pmax", &pmax);
     param_list_parse_ulong(pl, "t"   , &nb_pthreads);
 
+    // FIXME: be damn stupid for the time being
+    for(int i = 2; i < cpoly->nb_polys; i++)
+	lpb[i] = lpb[1];
     if (lpb[0] == 0 || lpb[1] == 0)
     {
       fprintf (stderr, "Error, missing -lpbr or -lpba command line argument\n");
@@ -678,7 +683,7 @@ main (int argc, char *argv[])
 
     int ratside = cado_poly_get_ratside (cpoly);
     renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside,
-                                                              add_full_col, lpb);
+			       add_full_col, lpb);
     renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
                          cpoly);
 
