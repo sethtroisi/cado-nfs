@@ -53,7 +53,7 @@ dlp = true
 N = 100000000010189
 gorder = 10000000002037900000103825911
 
-slaves.nrclients = $((NCPUS/2))
+slaves.nrclients = $(((1+NCPUS)/2))
 tasks.threads = 2
 tasks.linalg.bwc.threads = $NCPUS
 tasks.execpath = $CADO_NFS_BINARY_DIR
