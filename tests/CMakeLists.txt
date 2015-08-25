@@ -380,13 +380,15 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             sqrt)
     find_program(MAGMA magma)
     if (MAGMA)
-        cado_define_test(full_p59
-            SCRIPT
-                ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
-                ${CADO_NFS_SOURCE_DIR}
-            TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
-            plingen_pz sm reconstructlog-dl merge-dl replay-dl
-        )
+#        this test is probably not very useful, given that the other
+#        (quicker) tests cover everything covered by this test.
+#        cado_define_test(full_p59
+#            SCRIPT
+#                ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
+#                ${CADO_NFS_SOURCE_DIR}
+#            TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
+#            plingen_pz sm reconstructlog-dl merge-dl replay-dl
+#        )
         cado_define_test(full_p30
             SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p30.sh
             ARGUMENTS ${CADO_NFS_SOURCE_DIR}
@@ -396,13 +398,15 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             SCRIPT
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
                 ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
-            TARGET_DEPENDENCIES full_p59_dependencies)
+            TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
+            plingen_pz sm reconstructlog-dl merge-dl replay-dl)
         cado_define_test(test_gfp2
             SCRIPT
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2.sh
                 ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
-            TARGET_DEPENDENCIES full_p59_dependencies filter_galois
-            polyselect_gfpn)
+            TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
+            plingen_pz sm reconstructlog-dl merge-dl replay-dl
+            filter_galois polyselect_gfpn)
     endif(MAGMA)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 

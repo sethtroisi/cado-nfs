@@ -194,7 +194,7 @@ bool is_irreducible_ZZ(mpz_poly_srcptr phi)
  * 
  * 1st version : for Degree(phi) <= 2.
  */
-bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, int* sign_Discr, mpz_t Discr)
+bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, mpz_t Discr)
 {
   /* if deg <= 1, return true
      if deg == 2, test discriminant 
@@ -218,9 +218,8 @@ bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, int* sign_Disc
       mpz_mul(Discr, phi->coeff[1], phi->coeff[1]); //   D <- b^2
       mpz_mul(tmp, phi->coeff[0], phi->coeff[2]); // tmp <- a*c
       mpz_mul_ui(tmp, tmp, 4);      // tmp <- 4*a*c
-      *sign_Discr = mpz_cmp(Discr, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
       mpz_sub(Discr, Discr, tmp); //   D <- b^2 - 4*a*c and is != 0
-      if (*sign_Discr == 0){
+      if (mpz_sgn(Discr) == 0) {
 	// very easy, D = 0 and phi is reducible
 	is_irreducible = false;
       }else{
@@ -232,13 +231,14 @@ bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, int* sign_Disc
 	  }else{ // (D/p) = -1
 	    is_irreducible = true;
 	  }
-      }// sign_Discr == 0
+      }
       mpz_clear(tmp);
     }else{
-      // degree > 2, use a function that tests irreducibility. But the function does not exists yet.
-      is_irreducible = false;
-    }// degree == 2
-  }// degree <= 1
+        // degree > 2, use a function that tests irreducibility. But the function does not exist yet.
+        fprintf(stderr, "Implement me !\n");
+        abort();
+    }
+  }
   return is_irreducible;
 }
 
@@ -261,7 +261,7 @@ bool is_irreducible_mod_p(mpz_poly_srcptr phi, mpz_srcptr p)
 	    otherwise phi is irreducible
      if deg >= 3: use MPFQ library ?
   */
-  int degree, sign_D;
+  int degree;
   bool is_irreducible = false;
   mpz_t D;
   
@@ -272,11 +272,12 @@ bool is_irreducible_mod_p(mpz_poly_srcptr phi, mpz_srcptr p)
   else{
     if (degree == 2){
       mpz_init(D);
-      is_irreducible = is_irreducible_mod_p_deg2(phi, p, &sign_D, D);
+      is_irreducible = is_irreducible_mod_p_deg2(phi, p, D);
       mpz_clear(D);
     }else{
-      // degree > 2, use a function that tests irreducibility. But the function does not exists yet.
-      is_irreducible = false;
+      // degree > 2, use a function that tests irreducibility. But the function does not exist yet.
+        fprintf(stderr, "Implement me !\n");
+        abort();
     }// degree == 2
   }// degree <= 1
   return is_irreducible;
@@ -285,7 +286,7 @@ bool is_irreducible_mod_p(mpz_poly_srcptr phi, mpz_srcptr p)
 
 // same as above but with a poly with "small" coeffs given in a tab, with size <-> deg.
 bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
-  int sign_D, Legendre_D_p;
+  int Legendre_D_p;
   bool is_irreducible = false;
   mpz_t D, tmp;
   mpz_t a, b, c;
@@ -303,12 +304,11 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
       mpz_mul(D, b, b); //   D <- b^2
       mpz_mul(tmp, a, c); // tmp <- a*c
       mpz_mul_ui(tmp, tmp, 4);      // tmp <- 4*a*c
-      sign_D = mpz_cmp(D, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
-      if (sign_D == 0){
+      mpz_sub(D, D, tmp); //   D <- b^2 - 4*a*c and is != 0
+      if (mpz_sgn(D) == 0) {
 	// very easy, D = 0 and phi is reducible
 	is_irreducible = false;
       }else{
-	mpz_sub(D, D, tmp); //   D <- b^2 - 4*a*c and is != 0
 	// is_square mod p ?
 	// compute Legendre symbol
 	Legendre_D_p = mpz_legendre(D, p);
@@ -317,15 +317,16 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
 	  }else{ // (D/p) = -1
 	    is_irreducible = true;
 	  }
-      }// sign_D == 0
+      }
       mpz_clear(D);
       mpz_clear(tmp);
       mpz_clear(a);
       mpz_clear(b);
       mpz_clear(c);
     }else{
-      // degree > 2, use a function that tests irreducibility. But the function does not exists yet.
-      is_irreducible = false;
+      // degree > 2, use a function that tests irreducibility. But the function does not exist yet.
+        fprintf(stderr, "Implement me !\n");
+        abort();
     }// degree == 2
   }// degree <= 1
   return is_irreducible;
@@ -345,7 +346,8 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
      + signature(f) : how to do that in C ??? [look at the Cohen, then ask Pierrick and Paul.]
      o signature subfield: how to find the subfield ? [id]
      o badideals: call the magma function...
-     o smexp: does this already exists in C ? call magma maybe.
+     o smexp: does this already exist in C ? call magma maybe.
+        [ yes, look up sm_side_info_init in sm_utils ]
   */
 
 
@@ -363,24 +365,27 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
      - signature subfield: how to find the subfield ? [id]
      - badideals: call the magma function...
      - smexp: does this already exists in C ? call magma maybe.
+        [ yes, look up sm_side_info_init in sm_utils ]
   */
 
-   int sign_D;
    bool sgtr_ok = false;
    mpz_t D;
    mpz_init(D);
-   bool is_irreducible = is_irreducible_mod_p_deg2(g, params->p, &sign_D, D);
-   if(is_irreducible){
-     // check signature of g --> D < 0 or D > 0 ?
-     // get signature:
-     unsigned int* sgtr_g = poly_params->sgtr;
-     if ((sgtr_g[0] == 2) && (sgtr_g[1] == 0)){
-       sgtr_ok = (sign_D >= 0);
-     }else{
+   bool is_irreducible = is_irreducible_mod_p_deg2(g, params->p, D);
+   if (!is_irreducible) {
+       mpz_clear(D);
+       return false;
+   }
+
+   // check signature of g --> D < 0 or D > 0 ?
+   // get signature:
+   unsigned int* sgtr_g = poly_params->sgtr;
+   if ((sgtr_g[0] == 2) && (sgtr_g[1] == 0)){
+       sgtr_ok = mpz_sgn(D) >= 0;
+   }else{
        if ((sgtr_g[0] == 0) && (sgtr_g[1] == 1)){
-	 sgtr_ok = (sign_D < 0);
+           sgtr_ok = mpz_sgn(D) < 0;
        }
-     }
    }
    mpz_clear(D);
    return (is_irreducible && sgtr_ok);
