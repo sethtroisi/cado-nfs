@@ -57,10 +57,12 @@ should exercise myfunction(). If everything is ok, the main should return
 EXIT_SUCCESS (and anything else otherwise, from segfault to
 EXIT_FAILURE). 
 Finally, edit CMakeLists.txt in the same directory, and add a line like
-  build_and_run_test(test_myfunction.c utils)
-(in case only libutils.a is required).
-A few utilitary functions for testing are available in tests/tests_common.
-
-It is also possible to run a shell script or more generally, any
+    cado_define_test(test_init_norms_bucket_region.cpp
+        LIBRARIES las-norms utils tests)
+The two cmake macros to be used for defining new tests are
+        cado_define_test
+    and cado_divert_test.
+Their documentation is in tests/CMakeLists.txt ; In greater generality,
+these functions also allow to run a shell script or more generally any
 executable. Browse the subdirectories and the CMakeLists.txt to get
 examples.
