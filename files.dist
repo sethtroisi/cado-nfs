@@ -1301,3 +1301,4 @@ linalg/bwc/spmv_test.c
 linalg/bwc/bench_matcache.c
 linalg/bwc/build_matcache.c
 tests/linalg/bwc/test_hello.c
+tests/ncpus.sh
