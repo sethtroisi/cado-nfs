@@ -1000,9 +1000,10 @@ test_mpz_poly_discriminant (unsigned long iter)
 
     while (iter--)
     {
-        d = 1 + (lrand48 () % (N-1));
+        int N = 10;
+        int d = 1 + (lrand48 () % (N-1));
         mpz_poly_set_zero(f);
-        for (i = 0; i <= d; i++) {
+        for (int i = 0; i <= d; i++) {
             long c;
             do {
                 c = (lrand48 () % 5) - 2;
@@ -1010,7 +1011,7 @@ test_mpz_poly_discriminant (unsigned long iter)
             mpz_poly_setcoeff_si(f, i, c);
         }
         mpz_poly_cleandeg(f, d);
-        mpz_poly_discriminant (D, f, d);
+        mpz_poly_discriminant (D, f);
     }
 
     mpz_poly_clear(f);
