@@ -990,11 +990,11 @@ test_mpz_poly_discriminant (unsigned long iter)
     mpz_poly_init(f, -1);
     mpz_init(D);
 
-    mpz_poly_setcoeffs_si_var(3, 4, 3, 0, 1);
+    mpz_poly_setcoeffs_si_var(f, 3, 4, 3, 0, 1);
     mpz_poly_discriminant(D, f);
     ASSERT_ALWAYS(mpz_cmp_ui (D, 540) == 0);
 
-    mpz_poly_setcoeffs_si_var(3, 0, 0, 0, 2);
+    mpz_poly_setcoeffs_si_var(f, 3, 0, 0, 0, 2);
     mpz_poly_discriminant(D, f);
     ASSERT_ALWAYS(mpz_cmp_ui (D, 0) == 0);
 
@@ -1037,7 +1037,7 @@ main (int argc, const char *argv[])
   test_mpz_poly_factor(iter / 5);
   test_mpz_poly_trivialities ();
   test_mpz_poly_resultant();
-  test_mpz_poly_discriminant();
+  test_mpz_poly_discriminant(20000);
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
