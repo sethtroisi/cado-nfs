@@ -66,7 +66,7 @@ void mpz_poly_set_xi(mpz_poly_ptr f, int i);
 void mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b);
 
 void mpz_poly_setcoeff(mpz_poly_ptr f, int i, mpz_srcptr z);
-void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, int z);
+void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, long z);
 void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 
@@ -153,6 +153,7 @@ void mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4]);
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
 void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q);
+void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f);
 
 int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
 

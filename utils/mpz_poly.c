@@ -410,7 +410,7 @@ void mpz_poly_setcoeff (mpz_poly_ptr f, int i, mpz_srcptr z)
 }
 
 /* Set signed int coefficient for the i-th term. */
-void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, int z)
+void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, long z)
 {
   mpz_poly_realloc (f, i + 1);
   mpz_set_si (f->coeff[i], z);
@@ -2232,6 +2232,18 @@ void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q)
   mpz_poly_clear(b);
   mpz_poly_clear(r);
 }
+
+void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f)
+{
+    mpz_poly_t df;
+    mpz_poly_init(df, f->deg);
+    mpz_poly_derivative(df, f);
+    mpz_poly_resultant(res, f, df);
+    ASSERT(mpz_divisible_p(res, mpz_poly_lc_const(f)));
+    mpz_divexact(res, res, mpz_poly_lc_const(f));
+    mpz_poly_clear(df);
+}
+
 
 /* factoring polynomials */
 

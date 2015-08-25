@@ -543,8 +543,6 @@ utils/cado_popen.h
 utils/crc.c
 utils/crc.h
 utils/cut_n_roots.c
-utils/discriminant.c
-utils/discriminant.h
 utils/electric_alloc.h
 utils/fakempi.h
 utils/fakepthread.h
@@ -575,7 +573,6 @@ tests/utils/test_modul_poly.c
 tests/utils/test_cache.c
 tests/utils/test_usp.c
 tests/utils/test_bit_vector.c
-tests/utils/test_discriminant.c
 tests/utils/test_intinv.c
 tests/utils/test_modredcul_batchinv.c
 tests/utils/test_modredcul_batchinv_ul.c

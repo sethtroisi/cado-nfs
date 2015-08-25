@@ -177,13 +177,13 @@ discriminant_k (mpz_t *D, mpz_poly_ptr f, mpz_t m, mpz_t b)
           ...
           D[d] = a[0] + a[1]*d + ... + a[d]*d^d */
 
-  discriminant (D[0], f->coeff, d); /* a[0] */
+  mpz_poly_discriminant (D[0], f);
   for (i = 1; i <= d; i++)
     {
       /* add b*x - m */
       mpz_add (f->coeff[1], f->coeff[1], b);
       mpz_sub (f->coeff[0], f->coeff[0], m);
-      discriminant (D[i], f->coeff, d);
+      mpz_poly_discriminant (D[i], f);
     }
 
   /* initialize matrix coefficients */

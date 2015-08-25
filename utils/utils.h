@@ -26,7 +26,6 @@
 #include "rootfinder.h"
 #include "params.h"
 #include "gcd.h"
-#include "discriminant.h"
 #include "mpz_array.h"
 #include "gzip.h"
 #include "misc.h"
