@@ -3,6 +3,8 @@
 CADO_NFS_SOURCE_DIR=$1
 CADO_NFS_BINARY_DIR=$2
 
+NCPUS=$("`dirname $0`/ncpus.sh)
+
 t=`mktemp -d /tmp/cado-check.XXXXXXX`
 
 POLYFILE=$t/p3dd15-f4g3-GJL-1.poly
@@ -51,8 +53,8 @@ dlp = true
 N = 100000000010189
 gorder = 10000000002037900000103825911
 
-slaves.nrclients = 2
-tasks.threads = 2
+slaves.nrclients = $NCPUS
+tasks.threads = $NCPUS
 tasks.execpath = $CADO_NFS_BINARY_DIR
 slaves.scriptpath = $CADO_NFS_SOURCE_DIR/scripts/cadofactor
 tasks.workdir = $WDIR
