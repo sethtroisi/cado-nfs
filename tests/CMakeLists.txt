@@ -425,6 +425,7 @@ set_tests_properties(test_tests_common_6 PROPERTIES PASS_REGULAR_EXPRESSION "Usi
 
 cado_define_test(test_iceildiv.c)
 
+add_subdirectory (scripts)
 add_subdirectory (utils)
 add_subdirectory (sieve)
 add_subdirectory (polyselect)
