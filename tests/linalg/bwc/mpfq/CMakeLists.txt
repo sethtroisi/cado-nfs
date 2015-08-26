@@ -9,10 +9,17 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
     add_custom_command(OUTPUT
         ${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
-            COMMAND sed -e '1 s/^.*toplevel include.*/\#include \"cado.h\"/' -e 's/TAG/${gfp_layer}/g' -e 's,PATH_TO_SRC_TEST_DIRECTORY,${CMAKE_CURRENT_SOURCE_DIR}/,' -e 's/^\#warning.*//' < mpfq_test.c.meta > ${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            DEPENDS mpfq_test.c.meta
-            )
+        COMMAND sed
+            -e '1 s/^.*toplevel include.*/\#include \"cado.h\"/'
+            -e 's/TAG/${gfp_layer}/g'
+            -e 's,PATH_TO_SRC_TEST_DIRECTORY,${CMAKE_CURRENT_SOURCE_DIR}/,'
+            -e 's/^\#warning.*//'
+            -e 's/^\#define _POSIX_C_SOURCE.*//'
+            < mpfq_test.c.meta
+            > ${CMAKE_CURRENT_BINARY_DIR}/mpfq_test_${gfp_layer}.c
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        DEPENDS mpfq_test.c.meta
+        )
 
     set(toggle_variable_size_flag 0)
     string(REGEX MATCH "p_([0-9]+)" t "${gfp_layer}")
