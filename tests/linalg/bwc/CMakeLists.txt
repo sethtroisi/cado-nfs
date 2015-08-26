@@ -224,7 +224,7 @@ if (WITH_MPI)
 add_definitions(-DWITH_MPI)
 endif (WITH_MPI)
 
-cado_define_test(test_hello.c ARGUMENTS thr=2x2 LIBRARIES bwc_base)
+cado_define_test(test_hello.c ARGUMENTS -v thr=2x2 LIBRARIES bwc_base)
 set_target_properties(test_hello PROPERTIES
     COMPILE_FLAGS "--mpi"
     LINK_FLAGS "--mpi")
@@ -235,6 +235,6 @@ if (HAVE_MPI)
     # environment is within bwc.pl, so we have to use it.
     cado_define_test(TEST_NAME test_hello_mpi PROGRAM
         ${PROJECT_BINARY_DIR}/linalg/bwc/bwc.pl :mpirun mpi=3x2 thr=2x2
-        -- ${CMAKE_CURRENT_BINARY_DIR}/test_hello mpi=3x2 thr=2x2
+        -- ${CMAKE_CURRENT_BINARY_DIR}/test_hello -v mpi=3x2 thr=2x2
         TEST_DEPENDENCIES test_hello)
 endif (HAVE_MPI)

@@ -50,13 +50,13 @@ int main(int argc, char * argv[])
     param_list_init (pl);
 
     parallelizing_info_decl_usage(pl);
-
     param_list_decl_usage(pl, "v", "(switch) turn on some demo logging");
 
     const char * programname = argv[0];
 
     argv++, argc--;
-    param_list_configure_switch(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "v", &verbose);
+
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
