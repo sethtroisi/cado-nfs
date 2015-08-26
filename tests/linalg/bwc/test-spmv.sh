@@ -55,12 +55,12 @@ $bindir/short_matmul  $wdir/mat.bin  $wdir/Y.0  $wdir/sMY.0 >/dev/null 2>&1
 $bindir/short_matmul -t $wdir/mat.bin  $wdir/Y.0  $wdir/sYM.0 > /dev/null 2>&1
 
 for impl in basic sliced bucket threaded ; do
-    $bindir/spmv_test wdir=$wdir mn=64 prime=2 balancing=$B matrix=$wdir/mat.bin nullspace=left mm_impl=$impl > $wdir.spmv-$impl-left.out 2>&1
+    $bindir/spmv_test wdir=$wdir mn=64 prime=2 balancing=$B matrix=$wdir/mat.bin nullspace=left mm_impl=$impl > $wdir/spmv-$impl-left.out 2>&1
     mv $wdir/MY.0 $wdir/YM.0
     diff -q $wdir/YM.0 $wdir/sYM.0
     echo "spmv $impl left ok"
 
-    $bindir/spmv_test wdir=$wdir mn=64 prime=2 balancing=$B matrix=$wdir/mat.bin nullspace=RIGHT mm_impl=$impl > $wdir.spmv-$impl-right 2>&1
+    $bindir/spmv_test wdir=$wdir mn=64 prime=2 balancing=$B matrix=$wdir/mat.bin nullspace=RIGHT mm_impl=$impl > $wdir/spmv-$impl-right 2>&1
 
 
     diff -q $wdir/MY.0 $wdir/sMY.0
