@@ -445,6 +445,30 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mpz_mul_ui (mtilde, mtilde, q);
   mpz_add (mtilde, mtilde, rq);
   mpz_add (mtilde, mtilde, m0);
+
+  /* Small improvement: we have Ntilde = mtilde^d + l^2*R with R small.
+     If p^2 divides R, with p prime to d*ad, then we can accumulate p into l,
+     which will give an even smaller R' = R/p^2. */
+  unsigned long *p, Primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 0};
+  mpz_mul_ui (m, ad, d);
+  mpz_pow_ui (m, m, d);
+  mpz_divexact (m, m, ad);
+  mpz_mul (m, m, N); /* t := Ntilde = d^d*ad^(d-1)*N */
+  mpz_pow_ui (t, mtilde, d);
+  mpz_sub (t, m, t);
+  mpz_divexact (t, t, l);
+  mpz_divexact (t, t, l);
+  for (p = Primes; p[0]; p++)
+    {
+      if (d % p[0] == 0 || mpz_divisible_ui_p (ad, p[0]))
+        continue;
+      while (mpz_divisible_ui_p (t, p[0] * p[0]))
+        {
+          mpz_mul_ui (l, l, p[0]);
+          mpz_divexact_ui (t, t, p[0] * p[0]);
+        }
+    }
+
   /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
      We have a_{d-1} = mtilde/l mod (d*ad). */
   mpz_mul_ui (m, ad, d);
