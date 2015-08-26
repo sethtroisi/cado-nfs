@@ -32,6 +32,10 @@ void * program(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * arg
         serialize(pi->wr[1]);
 
         pi_log_print_all(pi);
+
+        pi_log_clear(pi->m);
+        pi_log_clear(pi->wr[0]);
+        pi_log_clear(pi->wr[1]);
     }
 
     return NULL;
@@ -75,9 +79,9 @@ int main(int argc, char * argv[])
 
     pi_go(program, pl, 0);
 
-    MPI_Finalize();
-
     param_list_clear(pl);
+
+    MPI_Finalize();
 
     return 0;
 }
