@@ -29,6 +29,8 @@ Options:
                     Default: localhost
     -timeout <integer>
                   - abort computation after this many seconds
+    -dlpnokeep    - disable the feature that CADO_DEBUG is set by default
+                    in dlp mode
 
     If the shell environment variable CADO_DEBUG is set to any non-empty
     string, the working directory is not deleted even if the factorization
@@ -87,6 +89,7 @@ cores=1
 slaves=1
 verbose=false
 dlp=false
+dlpkeep=true
 gfpext=1
 ell=1
 while [ -n "$1" ] ; do
@@ -123,7 +126,6 @@ while [ -n "$1" ] ; do
     shift 2
   elif [ "$1" = "-dlp" ]; then
     dlp=true
-    CADO_DEBUG="Yes, please"
     shift
   elif [ "$1" = "-gfpext" ]; then
     gfpext="$2"
@@ -136,6 +138,9 @@ while [ -n "$1" ] ; do
   elif [ "$1" = "-ell" ]; then
     ell=$2
     shift 2
+  elif [ "$1" = "-dlpnokeep" ]; then
+    dlpkeep=false
+    shift
   elif [ "$1" = "-v" ]; then
     verbose=true
     shift
@@ -143,6 +148,13 @@ while [ -n "$1" ] ; do
     break
   fi
 done
+
+# In DLP mode, keep data, unless -dlpnokeep has been passed.
+if $dlp; then
+  if $dlpkeep; then
+    CADO_DEBUG="Yes, please"
+  fi
+fi
 
 # If gfpext is 2, then ell must be given
 if [ $gfpext = "2" ]; then
