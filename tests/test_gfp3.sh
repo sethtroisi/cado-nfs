@@ -64,6 +64,8 @@ tasks.sieve.mfbr = 32
 tasks.sieve.mfba = 32
 tasks.sieve.qrange = 1000
 tasks.sieve.rels_wanted = 10000
+
+tasks.linalg.allow_zero_on_rhs = 1
 tasks.reconstructlog.partial = true
 checkdlp = false
 EOF
