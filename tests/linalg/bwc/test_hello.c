@@ -26,10 +26,22 @@ void * program(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * arg
     if (verbose) {
         pi_log_op(pi->m, "serialize");
         serialize(pi->m);
-        pi_log_op(pi->wr[0], "serialize(2nd)");
-        serialize(pi->wr[0]);
-        pi_log_op(pi->wr[1], "serialize(3rd)");
-        serialize(pi->wr[1]);
+
+        /* note that in order to do serialize(pi->wr[0]), we need to make
+         * sure that only one threads in the intersecting communicator
+         * executes.
+         */
+        if (pi->wr[1]->trank == 0) {
+            pi_log_op(pi->wr[0], "serialize(2nd)");
+            serialize(pi->wr[0]);
+        }
+        serialize_threads(pi->wr[1]);
+
+        if (pi->wr[0]->trank == 0) {
+            pi_log_op(pi->wr[1], "serialize(3rd)");
+            serialize(pi->wr[1]);
+        }
+        serialize_threads(pi->wr[0]);
 
         pi_log_print_all(pi);
 
