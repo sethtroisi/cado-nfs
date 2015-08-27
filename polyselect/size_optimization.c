@@ -84,7 +84,7 @@ list_mpz_sort_and_remove_dup (list_mpz_ptr l, const int verbose)
   for (unsigned int i = 1; i < len; i++)
     if (mpz_cmp (l->tab[i], l->tab[l->len-1]) != 0)
       list_mpz_append (l, l->tab[i]);
-    else if (verbose)
+    else if (verbose > 1)
       gmp_fprintf (stderr, "# sopt: Remove duplicate %Zd\n", l->tab[i]);
 }
 
@@ -229,14 +229,15 @@ sopt_list_skewness_values (mpz_t *skew, mpz_poly_srcptr f, mpz_poly_srcptr g,
 {
   const int d = f->deg;
   unsigned int i = 0;
-  /* skew0 = (|g0/ad|)^(1/d) */
+  /* skew0 = (|g0/ad|)^(1/(d+1)): we take the (d+1)-th root instead of the
+     d-th root since with the LLL-multiplier, ad will increase */
   double skew0 = pow (fabs (mpz_get_d (g->coeff[0]) / mpz_get_d (f->coeff[d])),
-              1.0 / (double) d);
+                      1.0 / (double) (d + 1));
   if (verbose)
     fprintf (stderr, "# sopt: skew0 = %f\n", skew0);
   for (int e = SOPT_NSKEW; e <= 3 * SOPT_NSKEW; e++, i++)
   {
-    double s = pow (skew0, (double) e / (double) (2*SOPT_NSKEW));
+    double s = pow (skew0, (double) e / (double) (2 * SOPT_NSKEW));
     mpz_set_d (skew[i], s + 0.5); /* round to nearest */
     if (verbose)
       gmp_fprintf (stderr, "# sopt: skew[%u] = %Zd\n", i, skew[i]);
@@ -393,7 +394,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       double double_roots_k[5];
       unsigned int nb_k_roots;
 
-      if (verbose)
+      if (verbose > 1)
         fprintf (stderr, "# sopt: process rational approximation %f of %f\n",
                          q3_rat, roots_q3[i]);
 
@@ -407,7 +408,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
-        if (verbose)
+        if (verbose > 1)
           gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of c4)\n",
                        list_k->tab[list_k->len-1]);
       }
@@ -423,7 +424,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
-        if (verbose)
+        if (verbose > 1)
           gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of c3)\n",
                        list_k->tab[list_k->len-1]);
       }
@@ -452,7 +453,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
-        if (verbose)
+        if (verbose > 1)
           gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of "
                                "Res(c3,c2))\n", list_k->tab[list_k->len-1]);
       }
@@ -462,7 +463,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
-        if (verbose)
+        if (verbose > 1)
           gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of derivative "
                                "of Res(c3,c2)\n", list_k->tab[list_k->len-1]);
       }
@@ -615,7 +616,7 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
       double double_roots_k[5];
       unsigned int nb_k_roots;
 
-      if (verbose)
+      if (verbose > 1)
         fprintf (stderr, "# sopt: process rational approximation %f of %f\n",
                          q2_rat, roots_q2[i]);
 
@@ -629,7 +630,7 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
-        if (verbose)
+        if (verbose > 1)
           gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of c3)\n",
                        list_k->tab[list_k->len-1]);
       }
@@ -645,7 +646,7 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
-        if (verbose)
+        if (verbose > 1)
           gmp_fprintf (stderr, "# sopt:   Adding k = %Zd (roots of c2)\n",
                        list_k->tab[list_k->len-1]);
       }
@@ -835,7 +836,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   mpz_init (tmp);
   mpz_poly_init (ftmp, f_raw->deg);
 
-  if (verbose)
+  if (verbose > 1)
   {
     fprintf (stderr, "# sopt:       starting local descent with polynomials:\n"
                      "# sopt:       f_raw = ");
@@ -970,7 +971,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     }
   }
 
-  if (verbose)
+  if (verbose > 1)
   {
     fprintf (stderr, "# sopt:       end of local descent after %u iterations "
                      "with polynomials:\n" "# sopt:       f_opt = ", iter);
@@ -1124,7 +1125,7 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     mpz_poly_translation (ft, f_raw, list_k->tab[i]);
     mpz_poly_translation (gt, g_raw, list_k->tab[i]);
     hash_uint64_reset (H);
-    if (verbose)
+    if (verbose > 1)
     {
       gmp_fprintf (stderr, "# sopt: process k = %Zd\n# sopt:   translated "
                            "polynomials are:\n# sopt:   ft = ", list_k->tab[i]);
@@ -1136,7 +1137,7 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     for (unsigned int j = 0; j < SOPT_NB_OF_SKEWNESS_VALUES; j++)
     {
       LLL_set_matrix_from_polys (&m, ft, gt, list_skew[j], tmp);
-      if (verbose)
+      if (verbose > 1)
         gmp_fprintf (stderr, "# sopt:   calling LLL with skew = %Zd\n",
                              list_skew[j]);
 
@@ -1155,7 +1156,7 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
         {
           npoly++;
           LLL_set_poly_from_vector (flll, U, k, ft, gt);
-          if (verbose)
+          if (verbose > 1)
           {
             fprintf (stderr, "# sopt:     LLL return the following polynomial "
                              "of degree %d:\n# sopt:       flll = ", d);
@@ -1170,20 +1171,21 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
             {
               if (verbose)
               {
-                fprintf (stderr, "# sopt:       better lognorm = %f (previous "
-                                 "was %f)\n", lognorm, best_lognorm);
+                gmp_fprintf (stderr, "# sopt:       better lognorm (previous "
+                                 "was %f) for skew[%d] = %Zd\n",
+                             lognorm, best_lognorm, j, list_skew[j]);
               }
               best_lognorm = lognorm;
               mpz_poly_swap (fbest, fld);
               mpz_poly_swap (gbest, gld);
             }
-            else if (verbose)
+            else if (verbose > 1)
             {
               fprintf (stderr, "# sopt:       lognorm = %f (better is %f)\n",
                                lognorm, best_lognorm);
             }
           }
-          else if (verbose)
+          else if (verbose > 1)
             fprintf (stderr, "# sopt:       local descent already run on a "
                              "similar polynomial\n");
         }
