@@ -390,7 +390,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
 #            plingen_pz sm reconstructlog-dl merge-dl replay-dl
 #        )
         cado_define_test(full_p30
-            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 427545955933445497303117859123 -dlp -ell 24982234190338056404295773 -t 2 -dlpnokeep target=62720951885220719832970790782
+            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 191907783019725260605646959711 -dlp -ell 101538509534246169632617439 -t 2 -dlpnokeep target=92800609832959449330691138186
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             sm_simple las_descent)
         cado_define_test(test_gfp3
