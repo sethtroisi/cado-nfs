@@ -36,6 +36,8 @@ $CADO_NFS_SOURCE_DIR/sieve/strategies/create_strat_file.sh $lim0 $lpb0 $mfb0 $li
 
 nl=`wc -l final_st | cut -d " " -f 1`
 if [ $nl == "382" ]; then
+    cd /tmp
+    rm -rf $t
     exit 0
 else
     exit 1
