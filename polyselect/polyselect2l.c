@@ -264,9 +264,9 @@ check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mp
   mpz_divexact (r, d, q);
 }
 
-void
-output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
-    const mpz_t N, mpz_t *f, mpz_t *g, const double E)
+static void
+output_polynomials (mpz_t *fold, const unsigned long d, mpz_t *gold,
+                    const mpz_t N, mpz_t *f, mpz_t *g)
 {
   mutex_lock (&lock);
   if (fold != NULL && gold != NULL) {
@@ -275,8 +275,6 @@ output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
   }
     gmp_printf ("# Size-optimized polynomial:\n");
   print_poly_info (f, d, g, N, 0, "");
-  printf ("# Murphy's E(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e (best so far %.2e)\n",
-          bound_f, bound_g, area, E, best_E);
   printf ("\n");
   fflush (stdout);
   mutex_unlock (&lock);
@@ -344,7 +342,7 @@ sorted_insert_double(double *array, const size_t len, const double value)
 /* return 1 if the polynomial is ok and among the best ones,
    otherwise return 0 */
 static int
-optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g, double *E)
+optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g)
 {
   double skew;
   mpz_t t;
@@ -389,7 +387,6 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g, double *E)
   if (*logmu > max_opt_lognorm)
     max_opt_lognorm = *logmu;
 
-  *E = 0.0;
   mutex_unlock (&lock);
 
   return 1;
@@ -402,7 +399,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2];
   int cmp, did_optimize;
-  double skew, logmu, E;
+  double skew, logmu;
   mpz_poly_t F;
 
   /* the expected rotation space is S^5 for degree 6 */
@@ -554,14 +551,14 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  did_optimize = optimize_raw_poly (&logmu, F, g, &E);
+  did_optimize = optimize_raw_poly (&logmu, F, g);
 
   if (did_optimize && out != NULL)
     output_msieve (out, d, F->coeff, g);
   
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
-    output_polynomials (fold, d, gold, N, F->coeff, g, E);
+    output_polynomials (fold, d, gold, N, F->coeff, g);
   
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (logmu, ad, l, g[0]);
@@ -590,7 +587,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, tmp;
   int cmp, did_optimize;
-  double skew, logmu, E;
+  double skew, logmu;
   mpz_poly_t F;
 
 #ifdef DEBUG_POLYSELECT2L
@@ -722,14 +719,14 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  did_optimize = optimize_raw_poly (&logmu, F, g, &E);
+  did_optimize = optimize_raw_poly (&logmu, F, g);
 
   if (did_optimize && out != NULL)
     output_msieve(out, d, F->coeff, g);
   
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
-    output_polynomials(fold, d, gold, N, F->coeff, g, E);
+    output_polynomials (fold, d, gold, N, F->coeff, g);
   
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (logmu, ad, l, g[0]);
