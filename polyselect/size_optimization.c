@@ -1171,8 +1171,8 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
             {
               if (verbose)
               {
-                gmp_fprintf (stderr, "# sopt:       better lognorm (previous "
-                                 "was %f) for skew[%d] = %Zd\n",
+                gmp_fprintf (stderr, "# sopt:       better lognorm %.2f (previ"
+                                 "ous was %.2f) for skew[%u] = %Zd\n",
                              lognorm, best_lognorm, j, list_skew[j]);
               }
               best_lognorm = lognorm;
