@@ -134,7 +134,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
 
     /* instead of doing memcpy, we align the stuff. */
     char * fmt;
-    int rc = asprintf(&fmt, "%%-%zus", maxsize-1);
+    int rc = asprintf(&fmt, "%%-%lus", maxsize-1);
     ASSERT_ALWAYS(rc >= 0);
     snprintf(strings + me * maxsize, maxsize, fmt, buf);
     free(fmt);
