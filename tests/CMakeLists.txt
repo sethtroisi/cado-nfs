@@ -100,7 +100,11 @@ macro(cado_define_test)
     # identical)
     #
     # LIBRARIES, TARGET_DEPENDENCIES, TEST_DEPENDENCIES should be self
-    # explanatory. LIBRARIES is incompatible with SCRIPT.
+    # explanatory. LIBRARIES is incompatible with SCRIPT. Note that
+    # TARGET_DEPENDENCIES is mostly useful for scripts (it ensures that
+    # the targets have been built before running the script), but if
+    # instead source files are given, the built executable is made to
+    # depend on TARGET_DEPENDENCIES.
     #
     # ARGUMENTS defines which arguments are to be passed to the binary.
     # Optional.
@@ -234,10 +238,17 @@ macro(cado_define_test)
         endif (nARGUMENTS GREATER 0)
     endif(nNO_DEFAULT_RUN GREATER 1)
 
+    # If we have a binary to build, then the meaning of
+    # TARGET_DEPENDENCIES is most probably that we want the binary target
+    # itself to depend on them. But bear in mind that the main use for
+    # TARGET_DEPENDENCIES is probably for scripts anyway.
     if (nSCRIPT EQUAL 0)
         add_executable(${TEST_NAME} ${SOURCES})
         target_link_libraries(${TEST_NAME} ${LIBRARIES})
-        list(INSERT TARGET_DEPENDENCIES 0 ${TEST_NAME})
+        if(nTARGET_DEPENDENCIES GREATER 0)
+            add_dependencies(${TEST_NAME} ${TARGET_DEPENDENCIES})
+        endif(nTARGET_DEPENDENCIES GREATER 0)
+        set(TARGET_DEPENDENCIES ${TEST_NAME})
         list(LENGTH TARGET_DEPENDENCIES nTARGET_DEPENDENCIES)
     endif (nSCRIPT EQUAL 0)
 
