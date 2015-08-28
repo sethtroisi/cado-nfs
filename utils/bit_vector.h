@@ -38,9 +38,6 @@ extern int bit_vector_clearbit(bit_vector_ptr b, size_t pos);
 /* In contrast, this returns the new value */
 extern int bit_vector_flipbit(bit_vector_ptr b, size_t pos);
 
-extern void bit_vector_write_to_file(bit_vector_srcptr b, const char * fname);
-extern void bit_vector_read_from_file(bit_vector_ptr b, const char * fname);
-
 extern size_t bit_vector_popcount(bit_vector_ptr b);
 extern size_t bit_vector_memory_footprint(bit_vector_srcptr b);
 

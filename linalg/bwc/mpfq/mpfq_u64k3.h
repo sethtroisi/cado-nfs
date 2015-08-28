@@ -13,7 +13,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "assert.h"
-#include "select_mpi.h"
 #include "mpfq_vbase.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
 #undef	MPFQ_LAST_GENERATED_TAG
@@ -24,7 +23,6 @@
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::vec */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
@@ -305,14 +303,6 @@ void mpfq_u64k3_elt_ur_set_ui_all(mpfq_u64k3_dst_field, mpfq_u64k3_dst_elt, unsi
 void mpfq_u64k3_dotprod(mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k3_src_vec, unsigned int);
 
 /* Member templates related to SIMD operation */
-
-/* MPI interface */
-void mpfq_u64k3_mpi_ops_init(mpfq_u64k3_dst_field);
-MPI_Datatype mpfq_u64k3_mpi_datatype(mpfq_u64k3_dst_field);
-MPI_Datatype mpfq_u64k3_mpi_datatype_ur(mpfq_u64k3_dst_field);
-MPI_Op mpfq_u64k3_mpi_addition_op(mpfq_u64k3_dst_field);
-MPI_Op mpfq_u64k3_mpi_addition_op_ur(mpfq_u64k3_dst_field);
-void mpfq_u64k3_mpi_ops_clear(mpfq_u64k3_dst_field);
 
 /* Object-oriented interface */
 void mpfq_u64k3_oo_field_init(mpfq_vbase_ptr);

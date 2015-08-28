@@ -1,6 +1,5 @@
 /* MPFQ generated file -- do not edit */
 
-#define _POSIX_C_SOURCE 200112L
 #include <stdarg.h>
 #include "mpfq_vbase.h"
 #include "mpfq_u64k1.h"

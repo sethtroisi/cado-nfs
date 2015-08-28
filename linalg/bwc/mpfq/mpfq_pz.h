@@ -17,7 +17,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "assert.h"
-#include "select_mpi.h"
 #include "mpfq_vbase.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
 #undef	MPFQ_LAST_GENERATED_TAG
@@ -30,7 +29,6 @@
 /* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::poly */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
    fieldtype=prime,
@@ -372,18 +370,10 @@ void mpfq_pz_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_p
 
 /* Member templates related to SIMD operation */
 
-/* MPI interface */
-void mpfq_pz_mpi_ops_init(mpfq_pz_dst_field);
-MPI_Datatype mpfq_pz_mpi_datatype(mpfq_pz_dst_field);
-MPI_Datatype mpfq_pz_mpi_datatype_ur(mpfq_pz_dst_field);
-MPI_Op mpfq_pz_mpi_addition_op(mpfq_pz_dst_field);
-MPI_Op mpfq_pz_mpi_addition_op_ur(mpfq_pz_dst_field);
-void mpfq_pz_mpi_ops_clear(mpfq_pz_dst_field);
-
 /* Object-oriented interface */
-void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_pz_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

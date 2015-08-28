@@ -8,7 +8,6 @@
 #include "select_mpi.h"
 #include "params.h"
 #include "xvectors.h"
-#include "xymats.h"
 #include "portability.h"
 #include "misc.h"
 #include "bw-common.h"
@@ -44,6 +43,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
+
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+
     /* Hmmm. This would deserve better thought. Surely we don't need 64
      * in the prime case. Anything which makes checks relevant will do.
      * For the binary case, we used to work with 64 as a constant, but
@@ -54,6 +56,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
+
+    pi_datatype_ptr Ac_pi = pi_alloc_mpfq_datatype(pi, Ac);
 
     int nsolvecs = bw->nsolvecs;
     /* In order to use only a subset of the number of solutions which can
@@ -103,16 +107,16 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
 
-    if (pi->m->trank == 0) Ar->mpi_ops_init(Ar);
+    pi_datatype_ptr Ar_pi = pi_alloc_mpfq_datatype(pi, Ar);
 
     block_control_signals();
 
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
-    mmt_wiring_ptr mcol = mmt->wr[bw->dir];
-    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
-    pi_wiring_ptr picol = mmt->pi->wr[bw->dir];
+    mmt_comm_ptr mcol = mmt->wr[bw->dir];
+    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
+    pi_comm_ptr picol = mmt->pi->wr[bw->dir];
 
     serialize(pi->m);
     
@@ -164,7 +168,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     /* Our ``ahead zone'' will also be used for storing the data prior to
      * transposing */
     mmt_vec ahead;
-    vec_init_generic(pi->m, A, ahead, 0, bw->n);
+    vec_init_generic(pi->m, A, A_pi, ahead, 0, bw->n);
 
     mpfq_vbase_tmpl AxAc;
     mpfq_vbase_oo_init_templates(AxAc, A, Ac);
@@ -176,7 +180,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     mpfq_vbase_oo_init_templates(AxAr, A, Ar);
 
     if (!bw->skip_online_checks) {
-        matmul_top_vec_init_generic(mmt, Ac,
+        matmul_top_vec_init_generic(mmt, Ac, Ac_pi,
                 check_vector, !bw->dir, THREAD_SHARED_VECTOR);
         if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
         matmul_top_load_vector_generic(mmt,
@@ -224,7 +228,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 (multi * Ar->vec_elt_stride(Ar, A->groupsize(A)*bw->interval)) >> 10);
     }
     for(unsigned int k = 0 ; k < multi ; k++) {
-        vec_init_generic(pi->m, Ar, fcoeffs[k], 0, A->groupsize(A)*bw->interval);
+        vec_init_generic(pi->m, Ar, Ar_pi, fcoeffs[k], 0, A->groupsize(A)*bw->interval);
     }
     
     /* Our sum vector is only part of the story of course. All jobs, all
@@ -245,7 +249,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     mmt_vec * sum;
     sum = malloc(multi * sizeof(mmt_vec));
     for(unsigned int k = 0 ; k < multi ; k++) {
-        vec_init_generic(mmt->pi->m, Ar, sum[k], 0, eblock);
+        vec_init_generic(mmt->pi->m, Ar, Ar_pi, sum[k], 0, eblock);
     }
 
     if (bw->end == 0) {
@@ -331,7 +335,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
         /* broadcast f */
         for(unsigned int k = 0 ; k < multi ; k++) {
-            broadcast_generic(fcoeffs[k], pi->m, A->groupsize(A) * bw->interval, 0, 0);
+            pi_bcast(fcoeffs[k]->v, A->groupsize(A) * bw->interval, A_pi, 0, 0, pi->m);
         }
 
         for(unsigned int k = 0 ; k < multi ; k++) {
@@ -432,7 +436,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
              * adds to the result. */
             x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks, -1);
 
-            allreduce_generic(ahead, pi->m, nchecks);
+            pi_allreduce(NULL, ahead->v, nchecks, A_pi, BWC_PI_SUM, pi->m);
             if (!A->vec_is_zero(A, ahead->v, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
@@ -502,8 +506,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                     src = pointer_arith_const(src, stride);
                 }
             }
-            char * s_name;
-            rc = asprintf(&s_name, S_FILE_BASE_PATTERN, k, k + nsolvecs_pervec, ys[0], ys[1]);
             // TODO: There is not much preventing us from using simply
             // something like:
             // matmul_top_save_vector(mmt, s_name, bw->dir, s +
@@ -517,7 +519,19 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             // preferred-io-width modification (see TODO), this whole
             // code branch should be simplified, and at least the
             // pi_save_file_2d call here should go away.
-            pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum[k]->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
+            char * s_name;
+            rc = asprintf(&s_name, S_FILE_BASE_PATTERN ".%u", k, k + nsolvecs_pervec, ys[0], ys[1], s+bw->interval);
+            pi_file_handle f;
+            pi_file_open(f, pi, bw->dir, s_name, "wb", Ar->vec_elt_stride(Ar, unpadded));
+            ssize_t s = pi_file_write(f, sum[k]->v, Ar->vec_elt_stride(Ar, ii1 - ii0));
+            
+            if(s < 0 || s < A->vec_elt_stride(A, unpadded)) {
+                if (tcan_print) {
+                    fprintf(stderr, "ERROR: could not save %s\n", s_name);
+                    unlink(s_name);
+                }
+            }
+            pi_file_close(f);
             free(s_name);
         }
         serialize(pi->m);
@@ -556,8 +570,10 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     free(sum);
 
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
+    pi_free_mpfq_datatype(pi, Ar_pi);
+    pi_free_mpfq_datatype(pi, Ac_pi);
 
-    if (pi->m->trank == 0) Ar->mpi_ops_clear(Ar);
     Ar->oo_field_clear(Ar);
     Ac->oo_field_clear(Ac);
     A->oo_field_clear(A);
@@ -573,6 +589,7 @@ int main(int argc, char * argv[])
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+    parallelizing_info_init();
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
@@ -595,6 +612,7 @@ int main(int argc, char * argv[])
 
     pi_go(mksol_prog, pl, 0);
 
+    parallelizing_info_finish();
     param_list_clear(pl);
     bw_common_clear_new(bw);
 

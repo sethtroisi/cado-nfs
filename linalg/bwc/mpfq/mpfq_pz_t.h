@@ -10,7 +10,6 @@
 /* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::poly */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
    fieldtype=prime,
@@ -106,8 +105,6 @@
 /* Functions related to SIMD operation */
 
 /* Member templates related to SIMD operation */
-
-/* MPI interface */
 
 /* Object-oriented interface */
 void mpfq_pz_pz_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);

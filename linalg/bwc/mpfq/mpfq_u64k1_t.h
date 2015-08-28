@@ -11,7 +11,6 @@
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::vec */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
@@ -107,8 +106,6 @@
 /* Functions related to SIMD operation */
 
 /* Member templates related to SIMD operation */
-
-/* MPI interface */
 
 /* Object-oriented interface */
 void mpfq_u64k1_u64k1_dotprod(mpfq_u64k1_dst_field, mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k1_src_vec, unsigned int);

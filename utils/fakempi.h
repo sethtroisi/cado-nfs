@@ -17,18 +17,21 @@ typedef void MPI_User_function(void *invec, void *inoutvec,
 typedef int MPI_Errhandler;
 typedef int MPI_Request;
 
-// type keys are sizeof() values.
-#define MPI_DATATYPE_NULL       0
-#define MPI_BYTE        1
-#define MPI_INT         sizeof(int)
-#define MPI_DOUBLE      sizeof(double)
-#define MPI_UNSIGNED_LONG sizeof(unsigned long)
-#define MPI_LONG        sizeof(long)
+// type keys are made as follows:
+// lowest 8 bits: sizeof()
+// high 8 bits: a uniqueifying tag
+#define MPI_DATATYPE_NULL       0x0000
+#define MPI_BYTE                0x0101
+#define MPI_INT                 (0x0200 | sizeof(int))
+#define MPI_DOUBLE              (0x0300 | sizeof(double))
+#define MPI_UNSIGNED_LONG       (0x0400 | sizeof(unsigned long))
+#define MPI_LONG                (0x0500 | sizeof(long))
 /* It seems that MPI_UNSIGNED_INT is in fact unspecified */
-// #define MPI_UNSIGNED_INT  sizeof(unsigned int)
-#define MPI_UNSIGNED      sizeof(unsigned int)
+#define MPI_UNSIGNED            (0x0600 | sizeof(unsigned int))
 
-#define MPI_Type_size(x, s)     *(s)=(x)
+#define fakempi_sizeof_type(x) ((x) & 0xff)
+
+#define MPI_Type_size(x, s)     *(s)=fakempi_sizeof_type(x)
 
 #define MPI_COMM_WORLD	0
 
@@ -88,18 +91,18 @@ static inline int MPI_Irecv( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI
 static inline int MPI_Bcast( void *buffer MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED){return 0;}
 static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED)
 {
-    if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
+    if (sendbuf) memcpy(recvbuf, sendbuf, count * fakempi_sizeof_type(datatype));
     return 0;
 }
 static inline int MPI_Reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                     MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)
 {
-    if (sendbuf) memcpy(recvbuf, sendbuf, recvcounts[0] * datatype);
+    if (sendbuf) memcpy(recvbuf, sendbuf, recvcounts[0] * fakempi_sizeof_type(datatype));
     return 0;
 }
 static inline int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED)
 {
-    if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
+    if (sendbuf) memcpy(recvbuf, sendbuf, count * fakempi_sizeof_type(datatype));
     return 0;
 }
 static inline int MPI_Comm_split (MPI_Comm x MAYBE_UNUSED, int color MAYBE_UNUSED, int key MAYBE_UNUSED, MPI_Comm * y)
@@ -116,15 +119,15 @@ static inline int MPI_Comm_dup (MPI_Comm y, MPI_Comm * x) { *x = y; return 0; }
 static inline int MPI_Comm_set_name(MPI_Comm comm MAYBE_UNUSED, char *comm_name MAYBE_UNUSED) { return 0;}
 static inline int MPI_Comm_get_name(MPI_Comm comm MAYBE_UNUSED, char *comm_name MAYBE_UNUSED, int * rlen) { *comm_name='\0'; *rlen=0; return 0;}
 static inline int MPI_Scatterv(void * sendbuf, int * sendcounts, int * displs,  MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
-    ASSERT_ALWAYS(sendcounts[0] * st == recvcount * rt);
-    memcpy(recvbuf, ((char *)sendbuf) + displs[0] * st, recvcount * rt);
+    ASSERT_ALWAYS(sendcounts[0] * fakempi_sizeof_type(st) == recvcount * fakempi_sizeof_type(rt));
+    memcpy(recvbuf, ((char *)sendbuf) + displs[0] * fakempi_sizeof_type(st), recvcount * fakempi_sizeof_type(rt));
     return 0;
 }
 
 static inline int MPI_Scatter(void * sendbuf, int sendcount, MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
-    ASSERT_ALWAYS(sendcount * st == recvcount * rt);
+    ASSERT_ALWAYS(sendcount * fakempi_sizeof_type(st) == recvcount * fakempi_sizeof_type(rt));
     if (recvbuf && sendbuf)
-        memcpy(recvbuf, sendbuf, recvcount * rt);
+        memcpy(recvbuf, sendbuf, recvcount * fakempi_sizeof_type(rt));
     return 0;
 }
 
@@ -132,17 +135,17 @@ static inline int MPI_Barrier (MPI_Comm x MAYBE_UNUSED) { return 0; }
 
 static inline int MPI_Gather(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int recvcount MAYBE_UNUSED, MPI_Datatype rt MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     if (sendbuf == MPI_IN_PLACE) return 0;
-    memcpy(((char *)recvbuf), (char*) sendbuf, sendcount * st);
+    memcpy(((char *)recvbuf), (char*) sendbuf, sendcount * fakempi_sizeof_type(st));
     return 0;
 }
 static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int * recvcounts, int * displs, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
-    ASSERT_ALWAYS(sendcount * st == recvcounts[0] * rt);
-    memcpy(((char *)recvbuf) + displs[0] * rt, sendbuf, sendcount * st);
+    ASSERT_ALWAYS(sendcount * fakempi_sizeof_type(st) == recvcounts[0] * fakempi_sizeof_type(rt));
+    memcpy(((char *)recvbuf) + displs[0] * fakempi_sizeof_type(rt), sendbuf, sendcount * fakempi_sizeof_type(st));
     return 0;
 }
 static inline int MPI_Allgather(void * sendbuf MAYBE_UNUSED, int sendcount MAYBE_UNUSED,  MPI_Datatype st MAYBE_UNUSED, void * recvbuf MAYBE_UNUSED, int recvcount MAYBE_UNUSED, MPI_Datatype rt MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
-    ASSERT_ALWAYS(sendbuf == MPI_IN_PLACE || sendcount * st == recvcount * rt);
-    if (sendbuf) memcpy(recvbuf, sendbuf, sendcount * st);
+    ASSERT_ALWAYS(sendbuf == MPI_IN_PLACE || sendcount * fakempi_sizeof_type(st) == recvcount * fakempi_sizeof_type(rt));
+    if (sendbuf) memcpy(recvbuf, sendbuf, sendcount * fakempi_sizeof_type(st));
     return 0;
 }
 

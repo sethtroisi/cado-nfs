@@ -21,14 +21,14 @@ void * program(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * arg
     }
 
     // it is here as a cheap sanity check.
-    hello(pi);
+    pi_hello(pi);
 
     if (verbose) {
         pi_log_op(pi->m, "serialize");
         serialize(pi->m);
 
         /* note that in order to do serialize(pi->wr[0]), we need to make
-         * sure that only one threads in the intersecting communicator
+         * sure that only one thread in the intersecting communicator
          * executes.
          */
         if (pi->wr[1]->trank == 0) {
@@ -64,6 +64,7 @@ int main(int argc, char * argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     param_list_init (pl);
+    parallelizing_info_init();
 
     parallelizing_info_decl_usage(pl);
     param_list_decl_usage(pl, "v", "(switch) turn on some demo logging");
@@ -91,6 +92,7 @@ int main(int argc, char * argv[])
 
     pi_go(program, pl, 0);
 
+    parallelizing_info_finish();
     param_list_clear(pl);
 
     MPI_Finalize();

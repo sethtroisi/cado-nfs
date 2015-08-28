@@ -16,7 +16,6 @@
 #include <limits.h>
 #include "mpfq_fixmp.h"
 #include "mpfq_gfp_common.h"
-#include "select_mpi.h"
 #include "mpfq_vbase.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
 #undef	MPFQ_LAST_GENERATED_TAG
@@ -30,7 +29,6 @@
 /* Active handler: Mpfq::defaults::poly */
 /* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::gfp::elt */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_6, tag=p_6, }, ],
    fieldtype=prime,
@@ -435,18 +433,10 @@ void mpfq_p_6_dotprod(mpfq_p_6_dst_field, mpfq_p_6_dst_vec, mpfq_p_6_src_vec, mp
 
 /* Member templates related to SIMD operation */
 
-/* MPI interface */
-void mpfq_p_6_mpi_ops_init(mpfq_p_6_dst_field);
-MPI_Datatype mpfq_p_6_mpi_datatype(mpfq_p_6_dst_field);
-MPI_Datatype mpfq_p_6_mpi_datatype_ur(mpfq_p_6_dst_field);
-MPI_Op mpfq_p_6_mpi_addition_op(mpfq_p_6_dst_field);
-MPI_Op mpfq_p_6_mpi_addition_op_ur(mpfq_p_6_dst_field);
-void mpfq_p_6_mpi_ops_clear(mpfq_p_6_dst_field);
-
 /* Object-oriented interface */
+void mpfq_p_6_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_6_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_6_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

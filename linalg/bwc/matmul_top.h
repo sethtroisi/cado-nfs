@@ -16,14 +16,19 @@
 /* Don't touch this. */
 #define CONJUGATED_PERMUTATIONS
 
-/* A wiring is the information concerning our matrix in one of its two
- * dimensions. Everything is made so that inverting the direction flag
- * should make it possible to compute with the transposed matrix easily.
+/* A communicator is the information concerning our matrix in one of its
+ * two dimensions. Everything is made so that inverting the direction
+ * flag should make it possible to compute with the transposed matrix
+ * easily.
  * 
- * Wiring number 0 is ``horizontal''. In detail, what this means is:
+ * [note: communicators, both for this layer and the parallelizing_info
+ * layer, used to be called "wirings", hence the variable name "wr"]
+ *
+ * Communicator number 0 is ``horizontal''. In detail, what this means
+ * is:
  *
  * n is the total number of rows ; the total number of instances of this
- * ``wiring'', so to say.
+ * communicator, so to say.
  * v is the LEFT vector (result of matrix-times-vector, or input of
  *   vector-times-matrix).
  * fences denote the row indices within the matrix where the different
@@ -46,7 +51,7 @@
  *
  *
  *
- * Note also that we have the pi_wiring to consider as well. Those
+ * Note also that we have the pi_comm to consider as well. Those
  * have nothing to do with the matrix, and are relevant with regard to
  * the parallelization of the work.
  */
@@ -58,6 +63,7 @@
 
 struct mmt_vec_s {
     mpfq_vbase_ptr abase;
+    pi_datatype_ptr pitype;
     size_t stride;      // shorcut to this->abase->vec_elt_stride(this->abase,1)
     void * v;
     void * * all_v;
@@ -82,7 +88,7 @@ typedef struct mmt_generic_vec_s mmt_generic_vec[1];
 typedef struct mmt_generic_vec_s * mmt_generic_vec_ptr;
 */
 
-struct mmt_wiring_s {
+struct mmt_comm_s {
     unsigned int i0;
     unsigned int i1;
     /* Note that while i0 and i1 are obviously abase-dependent, clearly
@@ -91,9 +97,9 @@ struct mmt_wiring_s {
     size_t rsbuf_size;          // auto-expanded on demand.
     void * rsbuf[2];            // only for USE_ALTERNATIVE_REDUCE_SCATTER
 };
-typedef struct mmt_wiring_s mmt_wiring[1];
-typedef struct mmt_wiring_s * mmt_wiring_ptr;
-typedef struct mmt_wiring_s const * mmt_wiring_srcptr;
+typedef struct mmt_comm_s mmt_comm[1];
+typedef struct mmt_comm_s * mmt_comm_ptr;
+typedef struct mmt_comm_s const * mmt_comm_srcptr;
 
 /* TODO: It's unhandy to have abase here, since it forces some files to
  * be abase-dependent, without any real reason.
@@ -118,7 +124,7 @@ struct matmul_top_data_s {
     // this really ends up within the mm field.
     char * locfile;
 
-    mmt_wiring wr[2];
+    mmt_comm wr[2];
 
 #ifdef  CONJUGATED_PERMUTATIONS
     // fences[0]: horizontal fences == row indices (horizontal separating line)
@@ -136,6 +142,7 @@ struct matmul_top_data_s {
     matmul_ptr mm;
 
     mpfq_vbase_ptr abase;
+    pi_datatype_ptr pitype;
 
     int io_truncate;
 };
@@ -158,6 +165,7 @@ extern "C" {
 
 extern void matmul_top_init(matmul_top_data_ptr mmt,
         mpfq_vbase_ptr abase,
+        pi_datatype_ptr pitype,
         parallelizing_info_ptr pi,
         int const * flags,
         param_list pl,
@@ -222,7 +230,7 @@ extern void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d);
  * vector defined in the mmt data for the given direction flag. */
 
 
-extern void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, mmt_vec_ptr v, int d, int flags);
+extern void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr, mmt_vec_ptr v, int d, int flags);
 extern void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
 #if 0
 extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_vec_ptr v, int d);
@@ -231,8 +239,8 @@ extern void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr 
 extern void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 
 /* These two do not really belong here, but come as a useful complement */
-extern void vec_init_generic(pi_wiring_ptr, mpfq_vbase_ptr, mmt_vec_ptr, int, unsigned int);
-extern void vec_clear_generic(pi_wiring_ptr, mmt_vec_ptr, unsigned int);
+extern void vec_init_generic(pi_comm_ptr, mpfq_vbase_ptr, pi_datatype_ptr, mmt_vec_ptr, int, unsigned int);
+extern void vec_clear_generic(pi_comm_ptr, mmt_vec_ptr, unsigned int);
 
 /* we should refrain from exposing these. At least for mksol,
  * allreduce_across is really useful, though. We use it for the block

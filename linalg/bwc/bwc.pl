@@ -384,7 +384,7 @@ if ($prime == 2 && ($lingen_mpi_split[0] != 1 || $lingen_mpi_split[1] != 1)) {
 }
 
 if ($lingen_mpi_split[0] != $lingen_mpi_split[1]) {
-    die "lingen_mpi must be a square split";
+    die "lingen_mpi ($lingen_mpi_split[0]x$lingen_mpi_split[1]) must be a square split";
 }
 
 if ($m % $lingen_mpi_split[0] != 0 || $n % $lingen_mpi_split[0] != 0) {
