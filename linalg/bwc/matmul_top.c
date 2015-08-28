@@ -457,6 +457,7 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, cons
 
     /* not clear it's useful, but well. */
     broadcast_down_generic(mmt, v, d);
+    serialize_threads(mmt->pi->m);
 }
 /* }}} */
 /* {{{ save (generic) */
@@ -468,6 +469,7 @@ void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, cons
      * mode, it's not completely clear. */
     // we want row 0 to have everything.
     broadcast_down_generic(mmt, v, d);
+    serialize_threads(mmt->pi->m);
 
     mmt_comm_ptr mcol = mmt->wr[d];
     pi_comm_ptr picol = mmt->pi->wr[d];
