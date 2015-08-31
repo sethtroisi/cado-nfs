@@ -81,15 +81,6 @@ struct bw_params {
      */
     int dir;
 
-    /* How many mpi jobs are defined. First array member indicates the number
-     * of horizontal stripes in the mpi job grid, second is vertical
-     */
-    int mpi_split[2];
-
-    /* Similar, but for threads. Not exclusive of the above.
-    */
-    int thr_split[2];
-
     /* Only prep and lingen are not deterministic. */
     int seed;
 
