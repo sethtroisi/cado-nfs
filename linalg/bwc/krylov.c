@@ -7,7 +7,6 @@
 #include "select_mpi.h"
 #include "params.h"
 #include "xvectors.h"
-#include "xymats.h"
 #include "portability.h"
 #include "misc.h"
 #include "bw-common.h"
@@ -22,8 +21,8 @@
  * Relatively common manipulation in fact. Move to matmul_top ?
 static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsigned int nx, int d)
 {
-    mmt_wiring_ptr mcol = mmt->wr[d];
-    pi_wiring_ptr picol = mmt->pi->wr[d];
+    mmt_comm_ptr mcol = mmt->wr[d];
+    pi_comm_ptr picol = mmt->pi->wr[d];
     int shared = mcol->v->flags & THREAD_SHARED_VECTOR;
     if (!shared || picol->trank == 0) {
         abzero(mmt->abase, mcol->v->v, mcol->i1 - mcol->i0);
@@ -69,6 +68,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
+
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+
     /* Hmmm. This would deserve better thought. Surely we don't need 64
      * in the prime case. Anything which makes checks relevant will do.
      * For the binary case, we used to work with 64 as a constant, but
@@ -80,13 +82,15 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
+    pi_datatype_ptr Ac_pi = pi_alloc_mpfq_datatype(pi, Ac);
+
     block_control_signals();
 
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
-    mmt_wiring_ptr mcol = mmt->wr[bw->dir];
-    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
+    mmt_comm_ptr mcol = mmt->wr[bw->dir];
+    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
 
     serialize(pi->m);
     
@@ -163,7 +167,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     mpfq_vbase_oo_init_templates(AxAc, A, Ac);
 
     if (!bw->skip_online_checks) {
-        matmul_top_vec_init_generic(mmt, Ac,
+        matmul_top_vec_init_generic(mmt, Ac, Ac_pi,
                 check_vector, !bw->dir, THREAD_SHARED_VECTOR);
         if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
         matmul_top_load_vector_generic(mmt,
@@ -172,7 +176,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     if (!bw->skip_online_checks) {
-        vec_init_generic(pi->m, A, ahead, 0, nchecks);
+        vec_init_generic(pi->m, A, A_pi, ahead, 0, nchecks);
     }
 
     /* We'll store all xy matrices locally before doing reductions. Given
@@ -184,7 +188,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         printf("Each thread allocates %zd kb for the A matrices\n",
                 A->vec_elt_stride(A, bw->m*bw->interval) >> 10);
     }
-    vec_init_generic(pi->m, A, xymats, 0, bw->m*bw->interval);
+    vec_init_generic(pi->m, A, A_pi, xymats, 0, bw->m*bw->interval);
     
     if (bw->end == 0) {
         /* Decide on an automatic ending value */
@@ -299,7 +303,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             /* Last dot product. This must cancel ! */
             x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks, -1);
 
-            allreduce_generic(ahead, pi->m, nchecks);
+            pi_allreduce(NULL, ahead->v, nchecks, A_pi, BWC_PI_SUM, pi->m);
             if (!A->vec_is_zero(A, ahead->v, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
@@ -309,7 +313,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         matmul_top_untwist_vector(mmt, bw->dir);
 
         /* Now (and only now) collect the xy matrices */
-        allreduce_generic(xymats, pi->m, bw->m * bw->interval);
+        pi_allreduce(NULL, xymats->v,
+                bw->m * bw->interval,
+                A_pi, BWC_PI_SUM, pi->m);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * tmp;
@@ -362,6 +368,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     free(v_name);
 
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
+    pi_free_mpfq_datatype(pi, Ac_pi);
     A->oo_field_clear(A);
     Ac->oo_field_clear(Ac);
 
@@ -377,6 +385,7 @@ int main(int argc, char * argv[])
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+    parallelizing_info_init();
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
@@ -399,6 +408,7 @@ int main(int argc, char * argv[])
 
     pi_go(krylov_prog, pl, 0);
 
+    parallelizing_info_finish();
     param_list_clear(pl);
     bw_common_clear_new(bw);
 

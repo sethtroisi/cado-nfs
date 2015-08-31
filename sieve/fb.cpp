@@ -369,15 +369,16 @@ fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
 
 
 template <class FB_ENTRY_TYPE>
-fb_transformed_vector *
-fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const int logI) const
+plattices_vector_t *
+fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
+    const int logI) const
 {
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
   /* Create a transformed vector and store the index of the slice we currently
      transform */
   const unsigned long special_q = mpz_fits_ulong_p(basis.q) ? mpz_get_ui(basis.q) : 0;
 
-  fb_transformed_vector *result = new fb_transformed_vector(get_index());
+  plattices_vector_t *result = new plattices_vector_t(get_index());
   slice_offset_t i_entry = 0;
   for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
     if (it->p == special_q) /* Assumes it->p != 0 */
@@ -389,9 +390,12 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis, const i
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_sieve_entry pli = plattice_sieve_entry(transformed.get_q(), r, proj, logI, i_entry);
+        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI);
+        // Skip (0,0).
+        ple.next();
         if (LIKELY(pli.a0 != 0)) {
-          result->push_back(pli);
+          result->push_back(ple);
         }
       }
     }
@@ -789,6 +793,7 @@ fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
     const bool og = (only_general == NULL) ? (i == 0) : only_general[i];
     parts[i] = new fb_part(powlim, og);
   }
+  toplevel = 0;
 }
 
 fb_factorbase::~fb_factorbase()
@@ -819,6 +824,9 @@ fb_factorbase::append(const fb_general_entry &fb_cur)
       printed_too_large_prime_warning = true;
     }
     return; /* silently skip this entry */
+  }
+  if (i > toplevel) {
+      toplevel = i;
   }
   parts[i]->append(fb_cur);
 }

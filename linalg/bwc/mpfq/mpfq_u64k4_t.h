@@ -5,26 +5,25 @@
 
 #include "mpfq_u64k1.h"
 #include "mpfq_u64k2.h"
+#include "mpfq_u64k3.h"
 #include "mpfq_u64k4.h"
 /* Active handler: simd_u64k */
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::vec */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_char2 */
 /* Options used:{
-   family=[ u64k1, u64k2, u64k4, ],
+   family=[ u64k1, u64k2, u64k3, u64k4, ],
    k=4,
    tag=u64k4,
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
-     [ u64k1, u64k2, u64k4, ],
+     [ u64k1, u64k2, u64k3, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -37,7 +36,6 @@
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
-     p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -47,9 +45,10 @@
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
      p_9=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
-     u64k1=[ u64k1, u64k2, u64k4, ],
-     u64k2=[ u64k1, u64k2, u64k4, ],
-     u64k4=[ u64k1, u64k2, u64k4, ],
+     u64k1=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k2=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k3=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k4=[ u64k1, u64k2, u64k3, u64k4, ],
      },
     vc:includes=[ <stdarg.h>, ],
     },
@@ -108,17 +107,18 @@
 
 /* Member templates related to SIMD operation */
 
-/* MPI interface */
-
 /* Object-oriented interface */
 void mpfq_u64k4_u64k1_dotprod(mpfq_u64k4_dst_field, mpfq_u64k1_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k4_src_vec, unsigned int);
 void mpfq_u64k4_u64k2_dotprod(mpfq_u64k4_dst_field, mpfq_u64k2_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k4_src_vec, unsigned int);
+void mpfq_u64k4_u64k3_dotprod(mpfq_u64k4_dst_field, mpfq_u64k3_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k4_src_vec, unsigned int);
 void mpfq_u64k4_u64k4_dotprod(mpfq_u64k4_dst_field, mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k4_src_vec, unsigned int);
 void mpfq_u64k4_u64k1_addmul_tiny(mpfq_u64k4_dst_field, mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k1_dst_vec, unsigned int);
 void mpfq_u64k4_u64k2_addmul_tiny(mpfq_u64k4_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k2_dst_vec, unsigned int);
+void mpfq_u64k4_u64k3_addmul_tiny(mpfq_u64k4_dst_field, mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k3_dst_vec, unsigned int);
 void mpfq_u64k4_u64k4_addmul_tiny(mpfq_u64k4_dst_field, mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k4_dst_vec, unsigned int);
 void mpfq_u64k4_u64k1_transpose(mpfq_u64k4_dst_field, mpfq_u64k1_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k1_src_vec);
 void mpfq_u64k4_u64k2_transpose(mpfq_u64k4_dst_field, mpfq_u64k2_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k2_src_vec);
+void mpfq_u64k4_u64k3_transpose(mpfq_u64k4_dst_field, mpfq_u64k3_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k3_src_vec);
 void mpfq_u64k4_u64k4_transpose(mpfq_u64k4_dst_field, mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec);
 
 #endif  /* MPFQ_U64K4_T_H_ */

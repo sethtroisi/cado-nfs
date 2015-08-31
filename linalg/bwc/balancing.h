@@ -23,8 +23,8 @@
   p2i:=func<p|Seqint(ChangeUniverse(Eltseq(p),Integers()),2)>;
   ixor:=func<a,b|p2i(i2p(a)+i2p(b))>;
   vs:=func<v|vv(Seqint(ChangeUniverse(Eltseq(v),Integers()),2)*2^32)>;
-  arbitrary1:=Matrix([vv(p div j + q * j) : j in [1..65536]]);                 
-  arbitrary2:=[arbitrary1[1+ixor(j, 0xbeef)] + vs(arbitrary1[1+ixor(j, 0xcafe)]):j in [0..nrows-1]];
+  arbitrary1:=func<j|vv(p div j + q * j)>;
+  arbitrary2:=[arbitrary1(1+ixor(j, 0xbeef)) + vs(arbitrary1(1+ixor(j, 0xcafe))):j in [0..nrows-1]];
  */
 
 /* balancing structure */

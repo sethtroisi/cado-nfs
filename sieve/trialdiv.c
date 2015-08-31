@@ -244,7 +244,37 @@ trialdiv_div8 (const unsigned long *n, const trialdiv_divisor_t *d)
   return x0 <= d->plim;
 }
 
+/* Divide exactly N = {n, 2} in place by p, where pinv = 1/p mod W,
+   using Hensel division. The algorithm is the following for N of k limbs:
 
+   r = 0 # borrow
+   for (i = 0; i < k; i++)
+      t = n[i] - r           # computed mod W
+      q[i] = n[i] * pinv     # i-th digit of Hensel's quotient (computed mod W)
+      y = q[i] * p + r - n[i]
+      r = y / W              # exact division
+
+   If at the end, r is zero, then the division is exact.
+
+   The values r and y satisfy 0 <= r < W and 0 <= y < W^2 by induction:
+   (i) q[i] <= W-1 thus q[i]*p + r <= (W-1)*p+W-1 = (W-1)*(p+1) < W since p < W
+   (ii) we have q[i]*p = n[i] mod W, thus q[i]*p = n[i] + k*W with k >= 0,
+        this ensures that q[i]*p - n[i] >= 0.
+*/
+static inline void
+trialdiv2_divexact (mpz_t N, mp_limb_t p, mp_limb_t pinv)
+{
+  mp_limb_t x0, r0, r1;
+  mp_ptr n = N->_mp_d;
+
+  x0 = n[0] * pinv; /* N/p mod W = x0 */
+  ularith_mul_ul_ul_2ul (&r0, &r1, x0, p); /* x0 * p = r1*W+r0 */
+  ASSERT(r0 == n[0]);
+  r1 = n[1] - r1;
+  n[0] = x0;
+  n[1] = r1 * pinv;
+  N->_mp_size -= (r1 == 0);
+}
 
 /* Divides primes in d out of N and stores them (with multiplicity) in f.
    Never stores more than max_div primes in f. Returns the number of
@@ -266,6 +296,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
   while (mpz_cmp_ui (N, 1UL) > 0)
     {
       size_t s = mpz_size(N);
+      mp_limb_t u = 0;
 #if VERBOSE
       gmp_printf ("s = %d, N = %Zd, ", s, N);
 #endif
@@ -273,7 +304,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
       if (s == 1)
         {
 	  mp_limb_t t = mpz_getlimbn (N, 0);
-	  while (t * d->pinv > d->plim)
+	  while ((u = t * d->pinv) > d->plim)
 	    d++;
         }
 #if TRIALDIV_MAXLEN >= 2
@@ -339,7 +370,12 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 	return max_div + 1;
 
       f[n++] = d->p;
-      mpz_divexact_ui (N, N, d->p); /* TODO, we can use pinv here */
+      if (s == 1)
+        N->_mp_d[0] = u;
+      else if (s == 2)
+        trialdiv2_divexact (N, d->p, d->pinv);
+      else
+        mpz_divexact_ui (N, N, d->p);
     }
   
   return n;
@@ -347,7 +383,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 
 
 /* Initialise a trialdiv_divisor_t array with the nr primes stored in *f.
-   This function allcates memory for the array, inits each entry, and puts
+   This function allocates memory for the array, inits each entry, and puts
    a sentinel at the end. */
 trialdiv_divisor_t *
 trialdiv_init (const unsigned long *f, const unsigned int nr)

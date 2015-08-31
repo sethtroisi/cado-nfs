@@ -92,13 +92,13 @@ int test_compute_all_r (unsigned int nb)
     {
       mpz_set_ui (tp, lrand48());
       mpz_nextprime(tp, tp);
-      t1.add(RATIONAL_SIDE, tp, NULL);
+      t1.add(0, tp, NULL);
     }
     for (uint8_t k = 0; k <= lrand48() % 5; k++)
     {
       mpz_set_ui (tp, lrand48());
       mpz_nextprime(tp, tp);
-      t1.add(ALGEBRAIC_SIDE, tp, NULL);
+      t1.add(1, tp, NULL);
     }
 
     relation t2 = t1;

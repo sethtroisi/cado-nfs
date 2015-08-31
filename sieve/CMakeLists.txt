@@ -11,7 +11,7 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 add_executable (makefb makefb.c)
 target_link_libraries (makefb utils)
 
-set (las_sources las.cpp fb.cpp
+set (las_sources las.cpp fb.cpp las-plattice.cpp
   las-coordinates.cpp las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.cpp bucket.cpp las-smallsieve.cpp las-unsieve.cpp las-arith.cpp
   las-qlattice.cpp las-descent-trees.cpp las-cofactor.cpp
@@ -25,16 +25,6 @@ target_link_libraries (las ${las_libraries})
 add_executable (las_tracek EXCLUDE_FROM_ALL ${las_sources})
 set_property(TARGET las_tracek PROPERTY COMPILE_DEFINITIONS TRACE_K=1)
 target_link_libraries (las_tracek ${las_libraries})
-
-# Targets with the minimum acceptable thresholds for K-buckets and
-# M-buckets, so that this code can be tested without requiring an
-# exorbitant amount of memory
-add_executable (las_kbucket EXCLUDE_FROM_ALL ${las_sources})
-set_property(TARGET las_kbucket PROPERTY COMPILE_DEFINITIONS THRESHOLD_K_BUCKETS=16)
-target_link_libraries (las_kbucket ${las_libraries})
-add_executable (las_mbucket EXCLUDE_FROM_ALL ${las_sources})
-set_property(TARGET las_mbucket PROPERTY COMPILE_DEFINITIONS THRESHOLD_K_BUCKETS=16 THRESHOLD_M_BUCKETS=64)
-target_link_libraries (las_mbucket ${las_libraries})
 
 add_executable (fb_test EXCLUDE_FROM_ALL fb.cpp)
 set_property(TARGET fb_test PROPERTY COMPILE_DEFINITIONS TESTDRIVE=1)
@@ -50,13 +40,14 @@ target_link_libraries (las_descent ${las_libraries})
 add_library (trialdiv trialdiv.c)
 add_library (las-norms las-norms.cpp)
 
-add_executable(freerel freerel.c fb.cpp)
+add_executable(freerel freerel.c fb.cpp las-plattice.cpp)
 target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
 add_subdirectory(strategies)
 
-add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
+add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
+    las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
 target_link_libraries(dupsup utils_with_io facul las-norms)
 
 install(TARGETS makefb las freerel RUNTIME DESTINATION ${BINSUFFIX}/sieve)

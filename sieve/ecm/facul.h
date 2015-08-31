@@ -117,6 +117,9 @@ void
 modset_clear (struct modset_t *);
 
 
+facul_method_t* facul_make_default_strategy (int, const int);
+void facul_clear_aux_methods (facul_method_t*);
+
 int nb_curves (unsigned int);
 facul_strategy_t * facul_make_strategy (unsigned long, unsigned int, int, int);
 void facul_clear_strategy (facul_strategy_t *);
@@ -136,6 +139,8 @@ facul_fprint_strategies (FILE*, facul_strategies_t* );
 
 void
 modset_clear (struct modset_t *modset);
+
+void modset_get_z (mpz_t, struct modset_t*);
 
 int*
 facul_both (mpz_t**, mpz_t* ,

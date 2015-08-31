@@ -120,10 +120,11 @@ typedef struct producer_s {
     roots_full, roots_empty; // are also free_rels pseudo semaphores
 // Now the read only part
   unsigned int pthread_number, number_of_pthreads;
-  unsigned long pmin, pmax, lpb[2], lpbmax;
-  size_t deg[2];
-  mpz_t *coeff[2];
-  mpz_poly_ptr pols[2];
+  unsigned long pmin, pmax, lpb[NB_POLYS_MAX], lpbmax;
+  size_t deg[NB_POLYS_MAX];
+  mpz_t *coeff[NB_POLYS_MAX];
+  mpz_poly_ptr pols[NB_POLYS_MAX];
+  int nb_polys;
 // Now the read-write part
   pthread_t pthread;
   size_t current_buf; // [0, NB_NBUFS[
@@ -263,10 +264,12 @@ static void *
 pthread_roots_and_free_rels_producer (void *ptvoid) {
   producer_t *my_pth = ptvoid;
   unsigned long p;
-  size_t i, nb_roots[2];
-  unsigned long computed_roots[2][32]; // With malloc, the computed_roots of 2 pthreads
-  ASSERT_ALWAYS (my_pth->deg[0] < 32); // may be in the same cacheline. 
-  ASSERT_ALWAYS (my_pth->deg[1] < 32); // A computed_root with a fixed size is faster.
+  size_t i, nb_roots[NB_POLYS_MAX];
+  unsigned long computed_roots[NB_POLYS_MAX][32]; // With malloc, the computed_roots of 2 pthreads
+  // may be in the same cacheline. 
+  // A computed_root with a fixed size is faster.
+  for(int k = 0; k < my_pth->nb_polys; k++)
+      ASSERT_ALWAYS (my_pth->deg[k] < 32); 
 
   for (;;) {
 
@@ -298,6 +301,7 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
     // I prefer to separate the 2 cases (rat & alg) and (alg & alg).
     // The goal is to suppress the first case in few months
     if (my_pth->deg[0] == 1)
+	// TODO: make this MNFS-compliant!
 
       while (my_p < my_primes->current) { // rational & algebraic polynomials, special case
 	p = (unsigned long) *my_p++;      // p is the current prime
@@ -340,11 +344,12 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 
     else       
 
-      while (my_p < my_primes->current) { // 2 algebraics polynomials, normal case
+      // algebraic polynomials poly, "normal" case
+      while (my_p < my_primes->current) {
 	p = *my_p++;                      // p is the current prime
 
-	// First, we compute the roots of alg1 and alg2 - same treatment for both
-	for (size_t my_alg = 0; my_alg < 2; ++my_alg) {
+	// First, we compute the roots of all polys
+	for (size_t my_alg = 0; my_alg < (size_t)my_pth->nb_polys; ++my_alg) {
 	  if (LIKELY (p < my_pth->lpb[my_alg])) {
 	    nb_roots[my_alg] = mpz_poly_roots_ulong (computed_roots[my_alg], my_pth->pols[my_alg], p);
 	    if (UNLIKELY(nb_roots[my_alg] != my_pth->deg[my_alg] &&
@@ -358,8 +363,10 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 	}
 	
 	// Second, we fill my_roots->current buffer by the computed roots
-	my_roots->current += renumber_write_p_buffer_2algs (my_roots->current, p,
-                computed_roots[0], nb_roots[0], computed_roots[1], nb_roots[1]);
+	my_roots->current += 
+	    renumber_write_p_buffer_2algs (my_roots->current, p,
+					   computed_roots[0], nb_roots[0],
+					   computed_roots[1], nb_roots[1]);
 	resize_buf ((buf_t *) &(my_roots->begin), MIN_BUF_ROOTS);
 
 	// Third, we fill my_free_rels->current buffer by the possible free rels, on the form
@@ -391,33 +398,40 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 /* generate the renumbering table */
 static unsigned long MAYBE_UNUSED
 allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
-                  unsigned long lpb[2], renumber_t renumber_table, size_t nb_pthreads,
+                  unsigned long lpb[NB_POLYS_MAX], renumber_t renumber_table,
+		  size_t nb_pthreads,
                   const char *outfilename)
 {
   size_t i, j;
   FILE *fpout = fopen_maybe_compressed (outfilename, "w");
-  unsigned int sum_degs_add_one = pol->rat->deg + pol->alg->deg + 1;
-  unsigned long lpbmax;            // MAX(lpb[0],lpb[1])
+  unsigned int sum_degs_add_one = pol->pols[0]->deg + 1;
+  for(int k = 1; k < pol->nb_polys; k++)
+      sum_degs_add_one += pol->pols[k]->deg;
+  unsigned long lpbmax, lpbmin;     // MAX(lpb[0],lpb[1],...), MIN()
   uint64_t total_primes = 0;       // Total of the primes
   p_r_values_t total_free_rels = 0;// Total of the free relations
   size_t current_buf = 0;          // current index buffer(s) for all the pthreads = [0, NB_NBUFS[
   producer_t *pth;                 // primes consumers/root+free_rels producers main array
   pthread_t primes_producer_pth;   // pthread for primes producer
 
-  ASSERT_ALWAYS(lpb[0] < sizeof(unsigned long) * CHAR_BIT);
-  lpb[0] = 1UL << lpb[0];
-  ASSERT_ALWAYS(lpb[1] < sizeof(unsigned long) * CHAR_BIT);
-  lpb[1] = 1UL << lpb[1];
-  lpbmax = MAX(lpb[0], lpb[1]);
+  ASSERT_ALWAYS(pol->nb_polys == 2); // TMP!!!!!
+
+  lpbmin = 1UL << lpb[0]; lpbmax = 0;
+  for(int k = 0; k < pol->nb_polys; k++){
+      ASSERT_ALWAYS(lpb[k] < sizeof(unsigned long) * CHAR_BIT);
+      lpb[k] = 1UL << lpb[k];
+      lpbmax = MAX(lpbmax, lpb[k]);
+      lpbmin = MIN(lpbmin, lpb[k]);
+  }
 
   if (pmax) {
-    if (UNLIKELY (pmax > MIN(lpb[0], lpb[1]))) {
-      fprintf (stderr, "Error: pmax is greater than MIN(lpb[])\n");
-      exit (1);
-    }
+      if (UNLIKELY (pmax > lpbmin)) {
+	  fprintf (stderr, "Error: pmax is greater than MIN(lpb[])\n");
+	  exit (1);
+      }
   }
   else
-    pmax = MIN(lpb[0], lpb[1]);
+      pmax = lpbmin;
 
   printf ("Generating freerels for %lu <= p <= %lu\n", pmin, pmax);
   printf ("Generating renumber table for 2 <= p <= %lu\n", lpbmax);
@@ -448,11 +462,14 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     pth[i].number_of_pthreads = nb_pthreads;
     pth[i].pmin               = pmin;
     pth[i].pmax               = pmax;
-    pth[i].lpb[0]             = lpb[0];            pth[i].lpb[1]   = lpb[1];
     pth[i].lpbmax             = lpbmax;
-    pth[i].deg[0]             = pol->rat->deg;     pth[i].deg[1]   = pol->alg->deg;
-    pth[i].coeff[0]           = pol->rat->coeff;   pth[i].coeff[1] = pol->alg->coeff;
-    pth[i].pols[0]            = pol->pols[0];      pth[i].pols[1]  = pol->pols[1];
+    pth[i].nb_polys           = pol->nb_polys;
+    for(int k = 0; k < pol->nb_polys; k++){
+	pth[i].lpb[k]   = lpb[k];
+	pth[i].deg[k]   = pol->pols[k]->deg;
+	pth[i].coeff[k] = pol->pols[k]->coeff;
+	pth[i].pols[k]  = pol->pols[k];
+    }
     for (j = NB_BUFS; j--;) {
       pth[i].free_rels[j].begin = pth[i].free_rels[j].current =
 	malloc_aligned (SIZE_BUF_FREE_RELS * sum_degs_add_one * sizeof (*(pth[i].free_rels[j].begin)), CACHELINESIZE);
@@ -505,7 +522,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     // We write the roots in one ASCII block
     fwrite (roots->begin, (void *) roots->current - (void *) roots->begin, 1, renumber_table->file);
 
-    // We have to recomputed the real index of the renumber table for the free rels
+    // We have to recompute the real index of the renumber table for the free rels
     free_rels_t free_rels = pth[i].free_rels [current_buf]; // Careful: local copy!
     ASSERT (!((free_rels.current - free_rels.begin) % sum_degs_add_one));
     for (free_rels_buf_t *pt = free_rels.begin; pt < free_rels.current; pt += sum_degs_add_one) {
@@ -563,8 +580,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "output file for renumbering table");
   param_list_decl_usage(pl, "out", "output file for free relations");
-  param_list_decl_usage(pl, "lpbr", "rational large prime bound");
-  param_list_decl_usage(pl, "lpba", "algebraic large prime bound");
+  param_list_decl_usage(pl, "lpb0", "large prime bound on side 0");
+  param_list_decl_usage(pl, "lpb1", "large prime bound on side 1");
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
@@ -591,9 +608,11 @@ main (int argc, char *argv[])
     unsigned long pmin = 2, pmax = 0, nfree;
     renumber_t renumber_table;
     int add_full_col = 0;
-    unsigned long lpb[2] = {0, 0};
+    unsigned long lpb[NB_POLYS_MAX];
     unsigned long nb_pthreads = 1;
 
+    for(int i = 0; i < NB_POLYS_MAX; i++)
+	lpb[i] = 0;
     param_list pl;
     param_list_init(pl);
     declare_usage(pl);
@@ -621,9 +640,9 @@ main (int argc, char *argv[])
         usage (pl, argv0);
     }
     /* print command-line arguments */
+    verbose_interpret_parameters (pl);
     param_list_print_command_line (stdout, pl);
-    printf ("\n");
-    fflush(stdout);
+    fflush (stdout);
 
     polyfilename = param_list_lookup_string(pl, "poly");
     outfilename = param_list_lookup_string(pl, "out");
@@ -654,15 +673,18 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-    param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]);
-    param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]);
+    param_list_parse_ulong(pl, "lpb0", &lpb[0]);
+    param_list_parse_ulong(pl, "lpb1", &lpb[1]);
     param_list_parse_ulong(pl, "pmin", &pmin);
     param_list_parse_ulong(pl, "pmax", &pmax);
     param_list_parse_ulong(pl, "t"   , &nb_pthreads);
 
+    // FIXME: be damn stupid for the time being
+    for(int i = 2; i < cpoly->nb_polys; i++)
+	lpb[i] = lpb[1];
     if (lpb[0] == 0 || lpb[1] == 0)
     {
-      fprintf (stderr, "Error, missing -lpbr or -lpba command line argument\n");
+      fprintf (stderr, "Error, missing -lpb0 or -lpb1 command line argument\n");
       usage (pl, argv0);
     }
 
@@ -678,12 +700,12 @@ main (int argc, char *argv[])
 
     int ratside = cado_poly_get_ratside (cpoly);
     renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside,
-                                                              add_full_col, lpb);
+			       add_full_col, lpb);
     renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
                          cpoly);
 
-    nfree = allFreeRelations (cpoly, pmin, pmax, lpb, renumber_table, (size_t) nb_pthreads,
-                              outfilename);
+    nfree = allFreeRelations (cpoly, pmin, pmax, lpb, renumber_table, 
+			      (size_t) nb_pthreads, outfilename);
 
     /* /!\ Needed by the Python script. /!\ */
     fprintf (stderr, "# Free relations: %lu\n", nfree);

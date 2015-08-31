@@ -91,6 +91,7 @@ filter/sparse.c
 filter/sparse.h
 filter/sm.c
 filter/sm_simple.cpp
+filter/filter_galois.c
 linalg/CMakeLists.txt
 linalg/Makefile
 linalg/bit_matrices.c
@@ -233,8 +234,6 @@ linalg/bwc/xdotprod.c
 linalg/bwc/xdotprod.h
 linalg/bwc/xvectors.c
 linalg/bwc/xvectors.h
-linalg/bwc/xymats.c
-linalg/bwc/xymats.h
 linalg/characters.c
 linalg/gauss.c
 linalg/gauss.h
@@ -331,6 +330,7 @@ params/params.c186
 params/params.c190
 params/params.c204
 params/params.c220
+params/params.c30
 params/params.c60
 params/params.c65
 params/params.c70
@@ -353,6 +353,8 @@ polyselect/murphyE.h
 polyselect/polyselect_gfpn.c
 polyselect/gfpkdlpolyselect.h
 polyselect/gfpkdlpolyselect.c
+polyselect/table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01.c
+polyselect/table_t_Py_f_deg4_type0_h1_t-200--200.c
 polyselect/polyselect2l.c
 polyselect/polyselect2l.h
 polyselect/polyselect2l_arith.c
@@ -400,7 +402,6 @@ scripts/cluster/sge-linalg.pl
 scripts/gdb.py
 scripts/install-cmake.sh
 scripts/version.sh
-scripts/winlinks.sh
 scripts/oar_start_clients.sh
 scripts/list_modified_files.sh
 scripts/cadofactor/cadocommand.py
@@ -469,6 +470,8 @@ sieve/ecm/mpqs_ul.c
 sieve/ecm/mpqs_15ul.c
 sieve/ecm/mpqs_2ul2.c
 sieve/ecm/mpqs_mpz.c
+sieve/ecm/batch.h
+sieve/ecm/batch.c
 sieve/fb.cpp
 sieve/fb.h
 sieve/fb-types.h
@@ -485,6 +488,7 @@ sieve/las-duplicate.cpp
 sieve/las-duplicate.h
 sieve/las-norms.cpp
 sieve/las-norms.h
+sieve/las-plattice.cpp
 sieve/las-plattice.h
 sieve/las-qlattice.cpp
 sieve/las-qlattice.h
@@ -537,8 +541,6 @@ utils/cado_popen.h
 utils/crc.c
 utils/crc.h
 utils/cut_n_roots.c
-utils/discriminant.c
-utils/discriminant.h
 utils/electric_alloc.h
 utils/fakempi.h
 utils/fakepthread.h
@@ -569,7 +571,6 @@ tests/utils/test_modul_poly.c
 tests/utils/test_cache.c
 tests/utils/test_usp.c
 tests/utils/test_bit_vector.c
-tests/utils/test_discriminant.c
 tests/utils/test_intinv.c
 tests/utils/test_modredcul_batchinv.c
 tests/utils/test_modredcul_batchinv_ul.c
@@ -596,7 +597,6 @@ tests/sieve/c120.poly
 tests/sieve/c120.roots1.gz
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
-tests/sieve/test_fb_make_step.c
 tests/sieve/ecm/CMakeLists.txt
 tests/sieve/ecm/test_factor_ecm_10_100_1000.inp
 tests/sieve/ecm/test_factor_ecm_11_100_1000.inp
@@ -737,8 +737,6 @@ linalg/bwc/lingen-matpoly.c
 linalg/bwc/lingen-matpoly.h
 linalg/bwc/lingen-polymat.c
 linalg/bwc/lingen-polymat.h
-linalg/bwc/lingen-bigpolymat.c
-linalg/bwc/lingen-bigpolymat.h
 linalg/bwc/lingen-bigmatpoly.c
 linalg/bwc/lingen-bigmatpoly.h
 config/asprintf.c
@@ -933,12 +931,7 @@ tests/linalg/bwc/CMakeLists.txt
 tests/linalg/CMakeLists.txt
 tests/linalg/bwc/mpfq/CMakeLists.txt
 tests/linalg/bwc/mpfq/mpfq_name_K.h
-tests/linalg/bwc/mpfq/mpfq_test_p_1.c
-tests/linalg/bwc/mpfq/mpfq_test_p_2.c
-tests/linalg/bwc/mpfq/mpfq_test_p_3.c
-tests/linalg/bwc/mpfq/mpfq_test_p_4.c
-tests/linalg/bwc/mpfq/mpfq_test_p_8.c
-tests/linalg/bwc/mpfq/mpfq_test_pz.c
+tests/linalg/bwc/mpfq/mpfq_test.c.meta
 tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
 tests/gf2x/CMakeLists.txt
@@ -952,7 +945,6 @@ linalg/bwc/cpubinding.h
 tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
 tests/test_full_p59.sh
-tests/test_gfp2.sh
 tests/test_gfp3.sh
 utils/verbose.c
 utils/verbose.h
@@ -1039,7 +1031,6 @@ utils/threadpool.cpp
 utils/threadpool.h
 misc/extra_renumber.c
 cado-nfs.supp
-scripts/valgrind-slave.sh
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING
@@ -1271,13 +1262,9 @@ gf2x/toom-gpl.c
 gf2x/toom.c
 gf2x/version.sh.in
 scripts/refresh-gf2x.sh
-config/string_join.cmake
+config/utilities.cmake
 config/pclmul.c
 config/pclmul.cmake
-linalg/bwc/mpfq/mpfq_p_10.c
-linalg/bwc/mpfq/mpfq_p_10.h
-linalg/bwc/mpfq/mpfq_p_10_t.c
-linalg/bwc/mpfq/mpfq_p_10_t.h
 linalg/bwc/mpfq/mpfq_p_5.c
 linalg/bwc/mpfq/mpfq_p_5.h
 linalg/bwc/mpfq/mpfq_p_5_t.c
@@ -1294,3 +1281,17 @@ linalg/bwc/mpfq/mpfq_p_9.c
 linalg/bwc/mpfq/mpfq_p_9.h
 linalg/bwc/mpfq/mpfq_p_9_t.c
 linalg/bwc/mpfq/mpfq_p_9_t.h
+linalg/bwc/mpfq/mpfq_u64k3.c
+linalg/bwc/mpfq/mpfq_u64k3.h
+linalg/bwc/mpfq/mpfq_u64k3_t.c
+linalg/bwc/mpfq/mpfq_u64k3_t.h
+tests/linalg/bwc/test-spmv.sh
+tests/linalg/bwc/test-matcache.sh
+linalg/bwc/short_matmul.c
+linalg/bwc/spmv_test.c
+linalg/bwc/bench_matcache.c
+linalg/bwc/build_matcache.c
+tests/linalg/bwc/test_hello.c
+tests/ncpus.sh
+tests/scripts/CMakeLists.txt
+tests/scripts/cadofactor/CMakeLists.txt

@@ -263,15 +263,6 @@
 
 
 
-#define abmpi_ops_init(a0)	abcommon_name_(mpi_ops_init) (a0)
-#define abmpi_datatype(a0)	abcommon_name_(mpi_datatype) (a0)
-#define abmpi_datatype_ur(a0)	abcommon_name_(mpi_datatype_ur) (a0)
-#define abmpi_addition_op(a0)	abcommon_name_(mpi_addition_op) (a0)
-#define abmpi_addition_op_ur(a0)	abcommon_name_(mpi_addition_op_ur) (a0)
-#define abmpi_ops_clear(a0)	abcommon_name_(mpi_ops_clear) (a0)
-
-
-
 
 #define aboo_field_init(a0)	abcommon_name_(oo_field_init) (a0)
 #define aboo_field_clear(a0)	abcommon_name_(oo_field_clear) (a0)

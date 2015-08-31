@@ -154,34 +154,38 @@ void short_matmul(FILE * out, FILE * v,  const char * uri, int mul_left)
 
 void usage()
 {
-    fprintf(stderr, "Usage: short-matmul <matrix file> <vector file>\n");
+    fprintf(stderr, "Usage: short-matmul [-t] <matrix file> <vector file> <vector output file>\n");
     exit(1);
 }
 int main(int argc, char * argv[])
 {
     int mul_left = 0;
-    for( ; argc > 3 ; ) {
+    for( ; argc > 4 ; ) {
         if (strcmp(argv[1], "-t") == 0) {
             mul_left = 1;
             argv++, argc--;
+        } else {
+            usage();
         }
     }
-    if (argc != 3) {
+    if (argc != 4) {
         usage();
     }
-    /*
-    FILE * m = fopen(argv[1], "rb");
-    if (m == NULL) {
-        perror(argv[1]);
-        exit(1);
-    }
-    */
     FILE * v = fopen(argv[2], "rb");
     if (v == NULL) {
-        perror(argv[1]);
+        perror(argv[2]);
         exit(1);
     }
     
-    short_matmul(stdout, v, argv[1], mul_left);
+
+    FILE * w = fopen(argv[3], "wb");
+    if (w == NULL) {
+        perror(argv[2]);
+        exit(1);
+    }
+
+    /* fclose(v) is implicit */
+    short_matmul(w, v, argv[1], mul_left);
+    fclose(w);
 }
 

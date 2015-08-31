@@ -122,15 +122,18 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
             } else if (ch->r == 2) {
                 /* Special: rational sign (sign of m1*a+m2*b) */
                 mpz_t tmp1, tmp2;
-		ASSERT_ALWAYS(pol->rat->deg == 1);
+                int ratside = cado_poly_get_ratside(pol);
+		ASSERT_ALWAYS(ratside != -1);
+
+                mpz_poly_ptr po = pol->pols[ratside];
 
                 /* first perform a quick check */
-                res = (a > 0) ? mpz_sgn(pol->rat->coeff[1]) : -mpz_sgn(pol->rat->coeff[1]);
-                if (mpz_sgn(pol->rat->coeff[0]) != res) {
+                res = (a > 0) ? mpz_sgn(po->coeff[1]) : -mpz_sgn(po->coeff[1]);
+                if (mpz_sgn(po->coeff[0]) != res) {
                     mpz_init(tmp1);
-                    mpz_mul_si(tmp1, pol->rat->coeff[1], a);
+                    mpz_mul_si(tmp1, po->coeff[1], a);
                     mpz_init(tmp2);
-                    mpz_mul_ui(tmp2, pol->rat->coeff[0], b);
+                    mpz_mul_ui(tmp2, po->coeff[0], b);
                     mpz_add(tmp1, tmp1, tmp2);
                     res = mpz_sgn(tmp1) < 0;
                     mpz_clear(tmp1);
@@ -210,7 +213,7 @@ void eval_64chars_batch_thread(struct worker_threads_group * g, int tnum, void *
     return;
 }
 
-static alg_prime_t * create_characters(int nchars, int nratchars,
+static alg_prime_t * create_characters(int nchars[2],
         cado_poly pol, unsigned long *lpb)
 {
     unsigned long p;
@@ -218,12 +221,13 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
     mpz_t pp;
     unsigned long *roots;
 
-    ASSERT_ALWAYS(nchars);
+    ASSERT_ALWAYS(nchars[0] + nchars[1] > 0);
 
-    int nchars2 = iceildiv(nchars, 64) * 64;
+    int nchars2 = iceildiv(nchars[0] + nchars[1], 64) * 64;
 
     mpz_init (pp);
-    roots = malloc(MAX(pol->alg->deg, pol->rat->deg) * sizeof(unsigned long));
+    roots = malloc(MAX(pol->pols[0]->deg, pol->pols[1]->deg)
+            * sizeof(unsigned long));
 
     alg_prime_t * chars = malloc(nchars2 * sizeof(alg_prime_t));
 
@@ -234,7 +238,8 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
      * we're lazy -- it's been asserted that it eases stuff at some
      * point, but nobody remembers the why and how. */
     chars[1] = (alg_prime_t) { .p = 0, .r = 3 };
-    if (pol->rat->deg == 1) {
+    if (nchars[0] == 0 || nchars[1] == 0) {
+        ASSERT_ALWAYS(MIN(pol->pols[0]->deg, pol->pols[1]->deg) == 1);
         /* force rational sign */
         chars[2] = (alg_prime_t) { .p = 0, .r = 2 };
         nspecchar++;
@@ -247,34 +252,39 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
     /* Rational characters. Normally we have none. But the -nratchars
      * option inserts some */
     /* we want some prime beyond the (rational) large prime bound */
-    mpz_set_ui (pp, 1UL << lpb[RATIONAL_SIDE]);
-    for(int i = nspecchar ; i < nspecchar + nratchars && i < nchars ; ) {
-        mpz_nextprime(pp, pp);
-        p = mpz_get_ui(pp);
-        ret = mpz_poly_roots_ulong (roots, pol->rat, p);
-        for(int j = 0 ; j < ret && i < nspecchar + nratchars && i < nchars ;
-                j++, i++) {
-            chars[i].p = p;
-            chars[i].r = roots[j];
-        }
+
+    int i = nspecchar;
+    for (int side = 0; side < 2; ++side) {
+        if (nchars[side] == 0)
+            continue;
+        mpz_set_ui (pp, 1UL << lpb[side]);
+
+        int j = 0;
+        do {
+            mpz_nextprime(pp, pp);
+            p = mpz_get_ui(pp);
+            ret = mpz_poly_roots_ulong (roots, pol->pols[side], p);
+            for (int k = 0; k < ret; ++k) {
+                if (i == nchars[0] + nchars[1])
+                    break;
+                if (j == nchars[side])
+                    break;
+                chars[i].p = p;
+                chars[i].r = roots[k];
+                ++i;
+                ++j;
+            }
+        } while(j < nchars[side] && (i < nchars[0] + nchars[1]));
     }
-    /* we want some prime beyond the (algebraic) large prime bound */
-    mpz_set_ui (pp, 1UL << lpb[ALGEBRAIC_SIDE]);
-    for(int i = nspecchar + nratchars ; i < nchars ; ) {
-        mpz_nextprime(pp, pp);
-        p = mpz_get_ui(pp);
-        ret = mpz_poly_roots_ulong (roots, pol->alg, p);
-        for(int j = 0 ; j < ret && i < nchars ; j++, i++) {
-            chars[i].p = p;
-            chars[i].r = roots[j];
-        }
-    }
+
     /* pad with trivial characters */
-    for(int i = nchars ; i < nchars2 ; i++) {
+    for(int i = nchars[0] + nchars[1] ; i < nchars2 ; i++) {
         chars[i] = (alg_prime_t) { .p = 0, .r = 0 };
     }
-    if (nchars < nchars2) {
-        fprintf(stderr, "Note: total %d characters, including %d trivial padding characters\n", nchars2, nchars2-nchars);
+    if (nchars[0] + nchars[1] < nchars2) {
+        fprintf(stderr, "Note: total %d characters, "
+                "including %d trivial padding characters\n",
+                nchars2, nchars2-(nchars[0] + nchars[1]));
     }
 
     free(roots);
@@ -591,10 +601,9 @@ declare_usage (param_list pl)
   param_list_decl_usage (pl, "out",    "output file");
   param_list_decl_usage (pl, "heavyblock", "heavyblock output file");
   param_list_decl_usage (pl, "poly",   "polynomial file");
-  param_list_decl_usage (pl, "nchar",  "number of (algebraic) characters");
-  param_list_decl_usage (pl, "lpbr",   "large prime bound on rational side");
-  param_list_decl_usage (pl, "lpba",   "large prime bound on algebraic side");
-  param_list_decl_usage (pl, "nratchars", "number of rational characters");
+  param_list_decl_usage (pl, "nchar",  "number of characters");
+  param_list_decl_usage (pl, "lpb0",   "large prime bound on side 0");
+  param_list_decl_usage (pl, "lpb1",   "large prime bound on side 1");
   param_list_decl_usage (pl, "t",      "number of threads");
   param_list_decl_usage (pl, "ker",      "input kernel file");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
@@ -604,7 +613,6 @@ int main(int argc, char **argv)
 {
     const char * heavyblockname = NULL;
     int nchars;
-    int nratchars = 0;
     alg_prime_t *chars;
     cado_poly pol;
     const char *purgedname = NULL;
@@ -660,44 +668,38 @@ int main(int argc, char **argv)
         param_list_print_usage (pl, argv0, stderr);
         exit (EXIT_FAILURE);
       }
-    if (param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]) == 0)
+    if (param_list_parse_ulong(pl, "lpb0", &lpb[0]) == 0)
       {
-        fprintf (stderr, "Error: parameter -lpbr is mandatory\n");
+        fprintf (stderr, "Error: parameter -lpb0 is mandatory\n");
         param_list_print_usage (pl, argv0, stderr);
         exit (EXIT_FAILURE);
       }
-    if (param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]) == 0)
+    if (param_list_parse_ulong(pl, "lpb1", &lpb[1]) == 0)
       {
-        fprintf (stderr, "Error: parameter -lpba is mandatory\n");
+        fprintf (stderr, "Error: parameter -lpb1 is mandatory\n");
         param_list_print_usage (pl, argv0, stderr);
         exit (EXIT_FAILURE);
       }
 
-    param_list_parse_int(pl, "nratchars", &nratchars);
     param_list_parse_int(pl, "t", &nthreads);
 
-    if (purgedname == NULL)
-      {
-        fprintf (stderr, "Error: parameter -purged is mandatory\n");
+    if (purgedname == NULL || indexname == NULL || outname == NULL) {
+        fprintf (stderr,
+                "Error: parameters -purged, -index and -out are mandatory\n");
         param_list_print_usage (pl, argv0, stderr);
         exit (EXIT_FAILURE);
-      }
-     if (indexname == NULL)
-       {
-         fprintf (stderr, "Error: parameter -index is mandatory\n");
-         param_list_print_usage (pl, argv0, stderr);
-         exit (EXIT_FAILURE);
-       }
-     if (outname == NULL)
-       {
-         fprintf (stderr, "Error: parameter -out is mandatory\n");
-         param_list_print_usage (pl, argv0, stderr);
-         exit (EXIT_FAILURE);
-       }
+    }
+
+    /* Put characters on all algebraic sides */
+    int nch[2] = {0, 0};
+    for (int side = 0; side < 2; ++side) {
+        if (pol->pols[side]->deg > 1)
+            nch[side] = nchars;
+    }
 
     struct worker_threads_group * g = worker_threads_init (nthreads);
-    chars = create_characters (nchars, nratchars, pol, lpb);
-    int nchars2 = iceildiv(nchars, 64) * 64;
+    chars = create_characters (nch, pol, lpb);
+    int nchars2 = iceildiv(nch[0] + nch[1], 64) * 64;
     double tt=wct_seconds();
     blockmatrix bcmat = big_character_matrix(chars, nchars2, purgedname, pol, g);
     free(chars);

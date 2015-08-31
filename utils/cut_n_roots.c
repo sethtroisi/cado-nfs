@@ -81,7 +81,7 @@ main (int argc0, char *argv0[])
     assert(mpz_cmp_ui(P, fence) < 0);
     assert(base < fence);
     unsigned long p = mpz_get_ui (P);
-    mpz_poly_ptr ps = pol->pols[ALGEBRAIC_SIDE];
+    mpz_poly_ptr ps = pol->pols[1];
     unsigned long nr = modul_poly_roots (NULL, ps, &p);
     totnr+=nr;
     if (totnr > N) {

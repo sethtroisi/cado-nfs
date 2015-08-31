@@ -25,6 +25,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <float.h>  /* for DBL_MAX */
 #include <string.h>
 
+/* The polynomial selection algorithms that use a linear polynomial will
+ * put it on the side given by the following. */
+// FIXME: atm, changing these does not work. It should...
+#define RAT_SIDE 0
+#define ALG_SIDE 1
+
 #define DEFAULT_INCR 60 /* we want a positive integer with many divisors,
                            other values are 210, 2310, 30030, 510510, 9699690,
                            223092870 */
@@ -70,7 +76,6 @@ void print_cadopoly_fg (FILE*, mpz_t*, int, mpz_t*, int, mpz_t);
 double print_cadopoly (FILE*, cado_poly);
 void print_cadopoly_extra (FILE*, cado_poly, int, char**, double);
 double print_poly_fg (mpz_poly_ptr, mpz_t*, mpz_t, int);
-void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 void rotate_auxg_z (mpz_t*, const mpz_t, const mpz_t, const mpz_t, unsigned int);
 void do_translate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k);

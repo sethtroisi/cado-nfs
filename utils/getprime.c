@@ -230,7 +230,7 @@ main (int argc, char *argv[])
   
   prime_info_init (i);
 
-  for (pi = 0, p = 2; p <= B; p = getprime (i), pi++);
+  for (pi = 0, p = 2; p <= B; p = getprime_mt (i), pi++);
   printf ("pi(%lu)=%lu\n", B, pi);
 
   prime_info_clear (i); /* free the tables */

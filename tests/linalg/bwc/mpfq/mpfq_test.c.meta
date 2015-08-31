@@ -1,9 +1,13 @@
-#include "cado.h"
+/* toplevel include for features maybe */
+#define _DEFAULT_SOURCE /* glibc >= 2.20 */
 #define _GNU_SOURCE     /* asprintf */
 #define _BSD_SOURCE     /* asprintf sometimes (I think) */
-/* test_pz.c is sed- generated from test.c.meta */
+#define _POSIX_C_SOURCE 200809L
+#line 7 "PATH_TO_SRC_TEST_DIRECTORYmpfq_test.c.meta"
+/* test_TAG.c is sed- generated from test.c.meta */
 
 #ifdef  NDEBUG
+#warning "Forcibly disabling -DNDEBUG for the tests"
 #undef NDEBUG
 #endif
 
@@ -15,7 +19,7 @@
 #include <gmp.h>
 #include <time.h>
 
-#include "mpfq_pz.h"
+#include "mpfq_TAG.h"
 #include "mpfq_name_K.h"
 
 Kfield K;
@@ -70,9 +74,8 @@ void get_random_prime(mpz_t z, mp_bitcnt_t n, int quiet, gmp_randstate_t rnd) {
 }
 #endif
 
-
-
-
+/* must really be a character array, not a pointer. See mkdtemp(3) */
+char tmpdir[] = "/tmp/mpfq.XXXXXX";
 
 int main(int argc, char * argv[])
 {
@@ -125,8 +128,10 @@ int main(int argc, char * argv[])
     if (argc > 1)
         usage();
 
+    if (!mkdtemp(tmpdir))
+        abort();
 
-    if (!quiet) fprintf(stderr, "--- testing for pz\n");
+    if (!quiet) fprintf(stderr, "--- testing for TAG\n");
 
     for(int loop_i = 0; (nloops == 0) || (loop_i < nloops) ; loop_i++) {
         gmp_randstate_t  rstate;
@@ -447,7 +452,7 @@ int main(int argc, char * argv[])
         {
             /* Now do some I/O tests */
             char * filename;
-            int rc = asprintf(&filename, "/tmp/mpfq-test.%lu", gmp_urandomb_ui(rstate, 32));
+            int rc = asprintf(&filename, "%s/mpfq-test.%lu", tmpdir, gmp_urandomb_ui(rstate, 32));
             if (rc < 0) abort();
             FILE * f = fopen(filename, "w");
             if (f == NULL) abort();
@@ -620,7 +625,7 @@ int main(int argc, char * argv[])
                     Kset_ui(r2, Ksscan(a0, "garbage"));
                     });
             char * filename;
-            int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            int rc = asprintf(&filename, "%s/mpfq-dummy-test.%lu", tmpdir, gmp_urandomb_ui(rstate, 32));
             if (rc < 0) abort();
             FILE * f = fopen(filename, "w");
             if (f == NULL) abort();
@@ -638,7 +643,7 @@ int main(int argc, char * argv[])
         /* This is meant to exert the realloc() feature in fscan */
         DO_ONE_TEST("fscan(long file)", {
             char * filename;
-            int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            int rc = asprintf(&filename, "%s/mpfq-dummy-test.%lu", tmpdir, gmp_urandomb_ui(rstate, 32));
             TEST_ASSERT(rc >= 0);
             FILE * f = fopen(filename, "w");
             TEST_ASSERT(f);
@@ -826,13 +831,13 @@ int main(int argc, char * argv[])
                 });
 #endif
 
-#ifdef  HAVE_mpfq_pz_hadamard
+#ifdef  HAVE_mpfq_TAG_hadamard
          /* This does no checking of course. However it is useful to
           * trigger linking of the function, since when it is done in
           * assembly, it is likely to trigger register allocation
           * problems in some instances */
          Khadamard(a0,a1,a2,a3);
-#endif  /* HAVE_mpfq_pz_hadamard */
+#endif  /* HAVE_mpfq_TAG_hadamard */
         /*-----------------------------------------------------------*/
         /*          Tests related to vectors                         */
         /*-----------------------------------------------------------*/
@@ -905,7 +910,7 @@ int main(int argc, char * argv[])
         {
             /* Now do some I/O tests */
             char * filename;
-            int rc = asprintf(&filename, "/tmp/mpfq-vec-test.%lu", gmp_urandomb_ui(rstate, 32));
+            int rc = asprintf(&filename, "%s/mpfq-vec-test.%lu", tmpdir, gmp_urandomb_ui(rstate, 32));
             if (rc < 0) abort();
             FILE * f = fopen(filename, "w");
             if (f == NULL) abort();
@@ -980,7 +985,7 @@ int main(int argc, char * argv[])
                     Kvec_clear(&tvec, tlength);
                     });
             char * filename;
-            int rc = asprintf(&filename, "/tmp/mpfq-vec_dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            int rc = asprintf(&filename, "%s/mpfq-vec_dummy-test.%lu", tmpdir, gmp_urandomb_ui(rstate, 32));
             if (rc < 0) abort();
             FILE * f = fopen(filename, "w");
             if (f == NULL) abort();
@@ -1006,7 +1011,7 @@ int main(int argc, char * argv[])
         /* This is meant to exert the realloc() feature in vec_fscan */
         DO_ONE_TEST("vec_fscan(long file)", {
             char * filename;
-            int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            int rc = asprintf(&filename, "%s/mpfq-dummy-test.%lu", tmpdir, gmp_urandomb_ui(rstate, 32));
             TEST_ASSERT(rc >= 0);
             FILE * f = fopen(filename, "w");
             TEST_ASSERT(f);
@@ -1391,6 +1396,9 @@ int main(int argc, char * argv[])
         seed = gmp_urandomb_ui(rstate, 64);
 
         gmp_randclear(rstate);
+    }
+    if (rmdir(tmpdir) != 0) {
+        perror(tmpdir);
     }
 }
 

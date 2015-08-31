@@ -670,7 +670,6 @@ def optimize(f,g):
        kr2 *= 2
     while best_l2norm_tk_circular(R(f(x=x+kt))) <= logmu0 + 0.001:
        kt *= 2
-    print "kr0=", kr0, "kr1=", kr1, "kr2=", kr2, "kt=", kt
     while count < 200:
         count += 1
         changedt = changedr2 = changedr1 = changedr0 = False

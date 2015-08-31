@@ -717,6 +717,8 @@ void cpubinder::read_param_list(param_list_ptr pl, int want_conf_file)
          */
 #if HWLOC_API_VERSION >= 0x010900
         int rc = hwloc_topology_set_synthetic(topology, topology_string);
+        if (rc < 0)
+            cerr << "hwloc_topology_set_synthetic("<< topology_string <<") failed\n";
 #else
         int rc;
         {
@@ -725,17 +727,22 @@ void cpubinder::read_param_list(param_list_ptr pl, int want_conf_file)
             if (is >> stopo) {
                 for(auto& x: stopo) {
                     if (x.object == "NUMANode") { x.object="node"; }
+                    /* Obviously, pre-1.9 is also pre-1.11, so we don't
+                     * want "Package" in that case */
+                    if (x.object == "Package") { x.object="Socket"; }
                 }
                 ostringstream os;
                 os << stopo;
                 const char * v = os.str().c_str();
                 rc = hwloc_topology_set_synthetic(topology, v);
+                if (rc < 0)
+                    cerr << "hwloc_topology_set_synthetic("<< v <<") [mangled for hwloc<1.9] failed\n";
             } else {
+                cerr << "pre-hwloc-1.9 mangling for hwloc_topology_set_synthetic("<< topology_string <<") failed\n";
                 rc = -1;
             }
         }
 #endif
-
         ASSERT_ALWAYS(rc >= 0);
         fake = true;
     } else {

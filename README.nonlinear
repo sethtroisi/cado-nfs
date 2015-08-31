@@ -27,7 +27,7 @@ Y1: -71651332635517
 Y2: -205964131819700
 
 2) then create a parameter file:
-  - start with a copy of params/params.c59
+  - start with a copy of params/params.c60
   - add the required parameters to run the python script outside
     factor.sh: slaves.nrclients, tasks.execpath, tasks.workdir,
     slaves.hostnames, slaves.scriptpath, slaves.basepath.
@@ -39,10 +39,8 @@ Y2: -205964131819700
   - Tell the script to use your polynomial file:
     tasks.polyselect.admax = 0
     tasks.polyselect.import = /my/wonderful/path/c59.poly
-  - Add the following to have characters also on the "rational" side:
-    tasks.linalg.characters.nratchars = 25
 
-Here is an example of lines added at the end of params.c59:
+Here is an example of lines added at the end of params.c60:
 
 slaves.nrclients = 2
 tasks.execpath = ${HOME}/svn/cado-nfs/build/coing
@@ -53,7 +51,6 @@ slaves.basepath = /tmp/c59
 N = 71641520761751435455133616475667090434063332228247871795429
 tasks.polyselect.admax = 0
 tasks.polyselect.import = /tmp/c59.poly
-tasks.linalg.characters.nratchars = 25
 
 3) Run the script:
    scripts/cadofactor/cadofactor.py params.c59

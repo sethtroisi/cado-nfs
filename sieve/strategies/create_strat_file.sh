@@ -179,7 +179,7 @@ for r0 in `seq 0 $mfb0`; do
     done
 done
 
-echo "######## Running las for getting a sample of caofactors"
+echo "######## Running las for getting a sample of cofactors"
 #collect a sample of the distribution of the pairs of cofactors.
 $MAKEFB -poly $poly -alim $lim0 -maxbits $I -out XXXX.roots0 -side 0
 $MAKEFB -poly $poly -alim $lim1 -maxbits $I -out XXXX.roots1 -side 1

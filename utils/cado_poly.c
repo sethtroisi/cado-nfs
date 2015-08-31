@@ -6,21 +6,17 @@
 #include "cado_poly.h"
 #include "portability.h"
 
-const char * sidenames[2] = {
-    [RATIONAL_SIDE] = "rational",
-    [ALGEBRAIC_SIDE] = "algebraic", };
+const char * sidenames[NB_POLYS_MAX] = { "side-0", "side-1", };
 
 /* Be conservative and allocate two polynomials by default. */
 void cado_poly_init(cado_poly poly)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly[0]));
-    poly->rat = poly->pols[RATIONAL_SIDE];
-    poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
     /* By default allocate 2 polynomials */
     poly->nb_polys = 2;
-    for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_init (poly->pols[side], MAXDEGREE);
 
     mpz_init_set_ui(poly->n, 0);
@@ -28,7 +24,7 @@ void cado_poly_init(cado_poly poly)
 
 void cado_poly_clear(cado_poly poly)
 {
-    for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
+    for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_clear (poly->pols[side]);
 
     mpz_clear(poly->n);
@@ -42,7 +38,7 @@ cado_poly_set (cado_poly p, cado_poly q)
     mpz_set (p->n, q->n);
     p->skew = q->skew;
     p->nb_polys = q->nb_polys;
-    for(unsigned int side = 0 ; side < q->nb_polys ; side++)
+    for(int side = 0 ; side < q->nb_polys ; side++)
       mpz_poly_set (p->pols[side], q->pols[side]);
 }
 
@@ -62,7 +58,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 
   /* Parse polynomials. Either in line format (poly%d=%Zd,%Zd,...) either given
    * by coefficients. */
-  for(unsigned int i = 0; i < NB_POLYS_MAX; i++)
+  for(int i = 0; i < NB_POLYS_MAX; i++)
   {
     char tag[6], buf[BUF_MAX];
     snprintf(tag, sizeof(tag), "poly%d", i);
@@ -88,6 +84,8 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     }
   }
   if (poly->nb_polys == 0) /* No polynomials so far. Try other format. */
+  /* Convention: c or X means side 1 (often algebraic)
+   *             Y means side 0 (often rational) */
   {
     poly->nb_polys = 2;
     /* reading polynomials coefficient by coefficient */
@@ -95,18 +93,18 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     {
       char tag[4];
       snprintf(tag, sizeof(tag), "c%d", i);
-      int b = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
-      if (!b) /* coeffs of alg poly can be given by c%d or X%d */
+      int b = param_list_parse_mpz(pl, tag, poly->pols[1]->coeff[i]);
+      if (!b) 
       {
         snprintf(tag, sizeof(tag), "X%d", i);
-        param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
+        param_list_parse_mpz(pl, tag, poly->pols[1]->coeff[i]);
       }
       snprintf(tag, sizeof(tag), "Y%d", i);
-      param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
+      param_list_parse_mpz(pl, tag, poly->pols[0]->coeff[i]);
     }
   }
   /* setting degrees */
-  for(unsigned int side = 0 ; side < poly->nb_polys ; side++)
+  for(int side = 0 ; side < poly->nb_polys ; side++)
     mpz_poly_cleandeg(poly->pols[side], MAXDEGREE);
 
   /* Parse value of N. Two keys possible: n or None. Return 0 if not found. */
@@ -117,7 +115,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     ret = 0;
   }
 
-  for (unsigned int side = 0; side < poly->nb_polys; side++)
+  for (int side = 0; side < poly->nb_polys; side++)
     if (poly->pols[side]->deg < 0)
     {
       fprintf (stderr, "Error, polynomial on side %u has degree < 0 in "
@@ -183,7 +181,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
     // have to work with copies, because pseudo_gcd destroys its input
     mpz_poly_t f[2];
 
-    ASSERT_ALWAYS(cpoly->nb_polys == 2);
+    //    ASSERT_ALWAYS(cpoly->nb_polys == 2); // FIXME!!!
 
     for (int i = 0; i < 2; ++i) {
         mpz_poly_init(f[i], cpoly->pols[i]->alloc);
@@ -237,12 +235,21 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 int
 cado_poly_get_ratside (cado_poly_ptr pol)
 {
+#if 0
+  ASSERT_ALWAYS(pol->nb_polys == 2);
   if (pol->pols[0]->deg != 1 && pol->pols[1]->deg != 1)
     return -1; /* two algrebraic sides */
   else if (pol->pols[0]->deg == 1)
     return 0;
   else
     return 1;
+#else
+  // assuming there is at most *one* rational side (?)
+  for(int side = 0; side < pol->nb_polys; side++)
+      if(pol->pols[side]->deg == 1)
+	  return side;
+  return -1;
+#endif
 }
 
 void
@@ -254,12 +261,12 @@ cado_poly_fprintf (FILE *fp, cado_poly_srcptr poly, const char *prefix)
 
   if (poly->nb_polys == 2)
   {
-    mpz_poly_fprintf_cado_format (fp, poly->rat, 'Y', prefix);
-    mpz_poly_fprintf_cado_format (fp, poly->alg, 'c', prefix);
+    mpz_poly_fprintf_cado_format (fp, poly->pols[0], 'Y', prefix);
+    mpz_poly_fprintf_cado_format (fp, poly->pols[1], 'c', prefix);
   }
   else
   {
-    for (unsigned int side = 0; side < poly->nb_polys; side++)
+    for (int side = 0; side < poly->nb_polys; side++)
     {
       if (prefix)
         fputs (prefix, fp);

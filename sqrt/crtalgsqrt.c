@@ -1055,7 +1055,7 @@ mpz_poly_from_ab_monic(mpz_poly_t tmp, long a, unsigned long b) {
     mpz_set_ui (tmp->coeff[1], b);
     mpz_neg (tmp->coeff[1], tmp->coeff[1]);
     mpz_set_si (tmp->coeff[0], a);
-    mpz_mul(tmp->coeff[0], tmp->coeff[0], glob.pol->alg->coeff[glob.n]);
+    mpz_mul(tmp->coeff[0], tmp->coeff[0], glob.pol->pols[1]->coeff[glob.n]);
 }
 
     static void
@@ -1141,7 +1141,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
      }
      */
 
-    int n = glob.pol->alg->deg;
+    int n = glob.pol->pols[1]->deg;
 
     long double complex * eval_points = malloc(n * sizeof(long double complex));
     double * double_coeffs = malloc((n+1) * sizeof(double));
@@ -1150,7 +1150,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
     // take the roots of f, and multiply later on to obtain the roots of
     // f_hat. Otherwise we encounter precision issues.
     for(int i = 0 ; i <= n ; i++) {
-        double_coeffs[i] = mpz_get_d(glob.pol->alg->coeff[i]);
+        double_coeffs[i] = mpz_get_d(glob.pol->pols[1]->coeff[i]);
     }
 
     int rc = poly_roots_longdouble(double_coeffs, n, eval_points);
@@ -1179,7 +1179,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
 
     // {{{ post-scale to roots of f_hat, and store f_hat instead of f
     for(int i = 0 ; i < rs ; i++) {
-        eval_points[i] *= mpz_get_d(glob.pol->alg->coeff[n]);
+        eval_points[i] *= mpz_get_d(glob.pol->pols[1]->coeff[n]);
     }
     for(int i = 0 ; i <= n ; i++) {
         double_coeffs[i] = mpz_get_d(glob.f_hat->coeff[i]);
@@ -1234,7 +1234,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
     ab_source_rewind(ab);
     for( ; ab_source_next(ab, &a, &b) ; ) {
         for(int i = 0 ; i < rs ; i++) {
-            long double complex y = a * mpz_get_d(glob.pol->alg->coeff[n]);
+            long double complex y = a * mpz_get_d(glob.pol->pols[1]->coeff[n]);
             long double complex w = eval_points[i] * b;
             y = y - w;
             evaluations[i] += log(cabsl(y));
@@ -1257,7 +1257,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
     if (ab->nab & 1) {
         fprintf(stderr, "# [%2.2lf] odd number of pairs !\n", WCT);
         for(int i = 0 ; i < rs ; i++) {
-            evaluations[i] += log(fabs(mpz_get_d(glob.pol->alg->coeff[n])));
+            evaluations[i] += log(fabs(mpz_get_d(glob.pol->pols[1]->coeff[n])));
         }
     }
 
@@ -1480,7 +1480,7 @@ struct prime_data * suitable_crt_primes()
         modulusul_t q;
         modul_initmod_ul(q, p);
         memset(roots, 0, glob.n * sizeof(unsigned long));
-        int nr = modul_poly_roots_ulong(roots, glob.pol->alg, q);
+        int nr = modul_poly_roots_ulong(roots, glob.pol->pols[1], q);
         if (nr != glob.n) continue;
         memset(&(res[i]), 0, sizeof(struct prime_data));
         res[i].r = malloc(glob.n * sizeof(unsigned long));
@@ -1491,7 +1491,7 @@ struct prime_data * suitable_crt_primes()
         // if (glob.rank == 0) fprintf(stderr, "#[%2.2lf] %lu\n", WCT, p);
         residueul_t fd;
         modul_init(fd, q);
-        modul_set_ul_reduced(fd, mpz_fdiv_ui(glob.pol->alg->coeff[glob.n], modul_getmod_ul (q)), q);
+        modul_set_ul_reduced(fd, mpz_fdiv_ui(glob.pol->pols[1]->coeff[glob.n], modul_getmod_ul (q)), q);
         for(int j = 0 ; j < glob.n ; j++) {
             residueul_t r;
             modul_init(r, q);
@@ -1887,7 +1887,7 @@ int crtalgsqrt_knapsack_callback(struct crtalgsqrt_knapsack * cks,
         // gmp_printf("[X^%d] %Zd\n", k, zN);
         // good. we have the coefficient !
         mpz_mul(e, e, glob.root_m);
-        mpz_mul(e, e, glob.pol->alg->coeff[glob.n]);
+        mpz_mul(e, e, glob.pol->pols[1]->coeff[glob.n]);
         mpz_add(e, e, zN);
         mpz_mod(e, e, glob.pol->n);
         mpz_clear(z);
@@ -1957,15 +1957,15 @@ void crtalgsqrt_knapsack_prepare(struct crtalgsqrt_knapsack * cks, size_t lc_exp
 
     mpz_powm_ui(cks->Px, glob.P, glob.prec, glob.pol->n);
 
-    mpz_set(cks->lcx, glob.pol->alg->coeff[glob.n]);
-    mpz_powm_ui(cks->lcx, glob.pol->alg->coeff[glob.n], lc_exp, glob.pol->n);
+    mpz_set(cks->lcx, glob.pol->pols[1]->coeff[glob.n]);
+    mpz_powm_ui(cks->lcx, glob.pol->pols[1]->coeff[glob.n], lc_exp, glob.pol->n);
     mpz_invert(cks->lcx, cks->lcx, glob.pol->n);
 
     // evaluate the derivative of f_hat in alpha_hat mod N, that is lc*m.
     {
         mpz_t alpha_hat;
         mpz_init(alpha_hat);
-        mpz_mul(alpha_hat, glob.root_m, glob.pol->alg->coeff[glob.n]);
+        mpz_mul(alpha_hat, glob.root_m, glob.pol->pols[1]->coeff[glob.n]);
         mpz_poly_eval_mod_mpz(cks->fhdiff_modN,
                 glob.f_hat_diff, alpha_hat, glob.pol->n);
         mpz_clear(alpha_hat);
@@ -3528,7 +3528,9 @@ int main(int argc, char **argv)
 
     cado_poly_init(glob.pol);
     ret = cado_poly_read(glob.pol, param_list_lookup_string(pl, "polyfile"));
-    glob.n = glob.pol->alg->deg;
+    /* This assumes that we have a rational side 0 and an algebraic side 1*/
+    ASSERT_ALWAYS(cado_poly_get_ratside(glob.pol) == 0);
+    glob.n = glob.pol->pols[1]->deg;
     ASSERT_ALWAYS(ret == 1);
     mpz_init(glob.root_m);
     cado_poly_getm(glob.root_m, glob.pol, glob.pol->n);
@@ -3544,8 +3546,8 @@ int main(int argc, char **argv)
         mpz_init_set_ui(tmp, 1);
         mpz_set_ui(glob.f_hat->coeff[glob.n], 1);
         for(int i = glob.n - 1 ; i >= 0 ; i--) {
-            mpz_mul(glob.f_hat->coeff[i], tmp, glob.pol->alg->coeff[i]);
-            mpz_mul(tmp, tmp, glob.pol->alg->coeff[glob.n]);
+            mpz_mul(glob.f_hat->coeff[i], tmp, glob.pol->pols[1]->coeff[i]);
+            mpz_mul(tmp, tmp, glob.pol->pols[1]->coeff[glob.n]);
         }
         mpz_poly_cleandeg(glob.f_hat, glob.n);
         mpz_clear(tmp);
@@ -3718,7 +3720,7 @@ int main(int argc, char **argv)
             for(int i = i0 ; i < i1 ; i++) {
                 for(int j =  0 ; j < glob.n ; j++) {
                     mpz_ptr x = primes[i].evals->coeff[j];
-                    mpz_mul(x, x, glob.pol->alg->coeff[glob.n]);
+                    mpz_mul(x, x, glob.pol->pols[1]->coeff[glob.n]);
                 }
             }
         }
