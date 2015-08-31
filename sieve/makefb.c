@@ -537,7 +537,7 @@ main (int argc, char *argv[])
 
   // No side is given: choose the unique algebraic side.
   if (side == -1) {
-      for (unsigned int i = 0; i < cpoly->nb_polys; ++i) {
+      for (int i = 0; i < cpoly->nb_polys; ++i) {
           if (cpoly->pols[i]->deg > 1) {
               if (side == -1) {
                   side = i;

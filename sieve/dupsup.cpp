@@ -23,6 +23,7 @@
 #include "las-norms.h"
 #include "verbose.h"
 
+
 static void *
 dupsup (FILE *output, relation & rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
 {
@@ -117,7 +118,7 @@ int
 main (int argc, char * argv[])
 {
     char * argv0 = argv[0];
-    facul_strategy_t *strategy[2];
+    facul_strategy_t *strategy[NB_POLYS_MAX];
     siever_config conf;
     int nb_threads = 1;
 
@@ -170,7 +171,7 @@ main (int argc, char * argv[])
 
     tune_las_memset();
 
-    for (int side = 0; side < 2; side++)
+    for (int side = 0; side < cpoly->nb_polys; side++)
       strategy[side] = facul_make_strategy(conf->sides[side]->lim,
                                            conf->sides[side]->lpb, 0, 0);
 
@@ -205,7 +206,7 @@ main (int argc, char * argv[])
       clear_sieve_info(si);
     }
     
-    for (int side = 0; side < 2; side++)
+    for (int side = 0; side < cpoly->nb_polys; side++)
       facul_clear_strategy(strategy[side]);
     cado_poly_clear(cpoly);
     mpz_clear(sq);

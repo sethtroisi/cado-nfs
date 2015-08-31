@@ -55,8 +55,7 @@ void setup_x_random(uint32_t * xs,
             }
         }
     }
-    global_broadcast(pi->m, xs, nx * m * sizeof(unsigned int), 0, 0);
-    serialize(pi->m);
+    pi_bcast(xs, nx * m * sizeof(uint32_t), BWC_PI_BYTE, 0, 0, pi->m);
 }
 
 void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
@@ -72,7 +71,7 @@ void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
         rc = fscanf(f, "%u", pnx);
         FATAL_ERROR_CHECK(rc != 1, "short read in file X");
     }
-    global_broadcast(pi->m, pnx, sizeof(unsigned int), 0, 0);
+    pi_bcast(pnx, 1, BWC_PI_UNSIGNED, 0, 0, pi->m);
     *xs = malloc(*pnx * m * sizeof(unsigned int));
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
         for (unsigned int i = 0 ; i < *pnx * m; i++) {
@@ -81,8 +80,7 @@ void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
         }
         fclose(f);
     }
-    global_broadcast(pi->m, (*xs), *pnx * m * sizeof(unsigned int), 0, 0);
-    serialize(pi->m);
+    pi_bcast(*xs, *pnx * m * sizeof(uint32_t), BWC_PI_BYTE, 0, 0, pi->m);
 }
 
 void set_x_fake(uint32_t ** xs, unsigned int m, unsigned int *pnx,

@@ -12,9 +12,6 @@ typedef unsigned int fbprime_t; /* 32 bits should be enough for everyone */
 #define FBPRIME_BITS 32
 typedef fbprime_t fbroot_t;
 #define FBROOT_FORMAT "u"
-typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
-                                       large primes */
-#define LARGEPRIME_FORMAT "lu"
 
 #define FB_MAX_PARTS 4
 

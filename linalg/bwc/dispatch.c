@@ -18,7 +18,6 @@
 #include "bw-common.h"
 #include "async.h"
 #include "filenames.h"
-#include "xymats.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 
@@ -50,6 +49,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
 
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+
     block_control_signals();
 
     /*****************************************
@@ -69,7 +70,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
      * random_matrix_size : for creating test matrices, essentially for
      * krylov/mksol speed testing.
      */
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
 
 
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
@@ -92,8 +93,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
          * check 2: for some vector L, compute (L, H=M*K) and (L*M, K).
          * This means matmul_top_mul(mmt, 0).
          */
-        mmt_wiring_ptr mcol = mmt->wr[1];
-        mmt_wiring_ptr mrow = mmt->wr[0];
+        mmt_comm_ptr mcol = mmt->wr[1];
+        mmt_comm_ptr mrow = mmt->wr[0];
 
         const char * checkname;
 
@@ -123,7 +124,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 #else
                 fprintf(stderr, "%s returned %d\n", cmd, rc);
 #endif
-                exit(1);
+                exit(EXIT_FAILURE);
             } else {
                 printf("%s : ok\n", checkname);
             }
@@ -141,8 +142,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         }
         /* This is L. Now compute the dot product. */
         mmt_vec dp0, dp1;
-        vec_init_generic(pi->m, A, dp0, 0, A->groupsize(A));
-        vec_init_generic(pi->m, A, dp1, 0, A->groupsize(A));
+        vec_init_generic(pi->m, A, A_pi, dp0, 0, A->groupsize(A));
+        vec_init_generic(pi->m, A, A_pi, dp1, 0, A->groupsize(A));
         unsigned int how_many;
         unsigned int offset_c;
         unsigned int offset_v;
@@ -153,7 +154,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
                 SUBVEC(mrow->v, v, offset_c),
                 SUBVEC(mcol->v, v, offset_v),
                 how_many);
-        allreduce_generic(dp0, pi->m, A->groupsize(A));
+        pi_allreduce(NULL, dp0->v, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
         /* now we can throw away Hx */
         matmul_top_twist_vector(mmt, 0);
         matmul_top_mul(mmt, 0);
@@ -170,7 +171,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
                 SUBVEC(mrow->v, v, offset_c),
                 SUBVEC(mcol->v, v, offset_v),
                 how_many);
-        allreduce_generic(dp1, pi->m, A->groupsize(A));
+        pi_allreduce(NULL, dp1->v, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
         int diff = memcmp(dp0->v, dp1->v, A->vec_elt_stride(A, A->groupsize(A)));
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             if (diff) {
@@ -185,6 +186,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     }
 
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
+
     A->oo_field_clear(A);
 
     timing_clear(timing);
@@ -199,6 +202,7 @@ int main(int argc, char * argv[])
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+    parallelizing_info_init();
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
@@ -228,8 +232,8 @@ int main(int argc, char * argv[])
     catch_control_signals();
     pi_go(dispatch_prog, pl, 0);
 
+    parallelizing_info_finish();
     param_list_clear(pl);
-
     bw_common_clear_new(bw);
 
     return 0;

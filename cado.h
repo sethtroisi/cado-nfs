@@ -1,7 +1,6 @@
 /* Common header file for the CADO project
 
-Copyright 2007, 2008, 2009, 2010, 2011 Pierrick Gaudry, Alexander Kruppa,
-                                       Emmanuel Thome, Paul Zimmermann
+Copyright 2007-2015 Pierrick Gaudry, Alexander Kruppa, Emmanuel Thome, Paul Zimmermann
 
 This file is part of the CADO project.
 
@@ -62,6 +61,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define _XOPEN_SOURCE   700     /* posix_memalign lrand48 strndup */
 #define _BSD_SOURCE     /* M_LN2 gethostname strdup random */
 #define _ISOC99_SOURCE  /* Sometimes there's link trickery which causes fscanf to be linked in *only* when this is defined */
+#define _DEFAULT_SOURCE /* for glibc 2.20 and later. As per the man page
+                           (feature_test_macros(7) ), the compilation
+                           warning triggered by _BSD_SOURCE is silenced
+                           if _DEFAULT_SOURCE is there too, so maybe we
+                           can have both and not need a cmake-time check
+                           for the libc version. */
 #ifndef __cplusplus
 #define _GNU_SOURCE         /* asprintf vasprintf */
 #endif

@@ -16,6 +16,20 @@
 # Type "make ?" for more options.
 ########################################################################
 
+: ${MAKE=make}
+export MAKE
+
+if echo "${MAKEFLAGS}" | grep -q "jobserver-fds=0," ; then
+    echo "# You are calling the top-level cado makefile with file descriptor 0 closed.">&2
+    echo "# This is unsupported (at least for a parallel build), because in that">&2
+    echo "# case GNU Make opens and uses a pipe on file descriptor 0, and we">&2
+    echo "# suspect that cmake closes it right away, causing the compilation to">&2
+    echo "# fail.">&2
+    echo "#">&2
+    echo "# Simple fix: make -j \$number_of_cpus < /dev/null">&2
+    echo "#">&2
+    exit 42
+fi
 
 ########################################################################
 # The location of the build tree is, by default,
@@ -110,7 +124,11 @@ export NO_PYTHON_CHECK
 export NO_SSE
 export NO_INLINE_ASSEMBLY
 export CHECKS_EXPENSIVE
-
+export BWC_GF2_MATMUL_BACKENDS
+export BWC_GFP_MATMUL_BACKENDS
+export BWC_GF2_ARITHMETIC_BACKENDS
+export BWC_GFP_ARITHMETIC_BACKENDS
+export BWC_EXTRA_BACKENDS
 
 ########################################################################
 # "make ?" or "make help" (when the Makefile does not exist)
@@ -178,6 +196,11 @@ if [ "$1" = "show" ] ; then
     echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
     echo "ENABLE_SHARED=\"$ENABLE_SHARED\""
     echo "CHECKS_EXPENSIVE=\"$CHECKS_EXPENSIVE\""
+    echo "BWC_GF2_MATMUL_BACKENDS=\"$BWC_GF2_MATMUL_BACKENDS\""
+    echo "BWC_GFP_MATMUL_BACKENDS=\"$BWC_GFP_MATMUL_BACKENDS\""
+    echo "BWC_GF2_ARITHMETIC_BACKENDS=\"$BWC_GF2_ARITHMETIC_BACKENDS\""
+    echo "BWC_GFP_ARITHMETIC_BACKENDS=\"$BWC_GFP_ARITHMETIC_BACKENDS\""
+    echo "BWC_EXTRA_BACKENDS=\"$BWC_EXTRA_BACKENDS\""
     exit 0
 fi
 
@@ -253,4 +276,4 @@ fi
 # env | grep -i make
 unset MAKELEVEL
 absolute_path_of_build_tree="`cd "$build_tree" ; $pwdP`"
-(cd "$absolute_path_of_build_tree$relative_path_of_cwd" ; make "$@")
+(cd "$absolute_path_of_build_tree$relative_path_of_cwd" ; ${MAKE} "$@")

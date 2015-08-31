@@ -33,6 +33,7 @@ struct siever_config_s {
     int side;
     int logI;
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
+    unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
     unsigned int unsieve_thresh;
     struct {
@@ -160,8 +161,12 @@ struct sieve_info_s {
     qlattice_basis qbasis;
 
     // parameters for bucket sieving
-    uint32_t nb_buckets; /* Actual number of buckets used by current special-q */
-    uint32_t nb_buckets_max; /* Max number of buckets, if J=I/2 */
+    /* Actual number of buckets at toplevel used by current special-q */
+    uint32_t nb_buckets[FB_MAX_PARTS];
+    /* Max number of buckets if J=I/2, at each level */
+    uint32_t nb_buckets_max[FB_MAX_PARTS];
+    /* Largest level for which the corresponding fb_part is not empty */
+    int toplevel;
 
     sieve_side_info sides[2];
 

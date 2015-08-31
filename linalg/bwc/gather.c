@@ -106,47 +106,22 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
      * actual I/O.
      */
     serialize(pi->m);
-    global_broadcast(pi->m, sl, sizeof(struct sols_list), 0, 0);
+    pi_bcast(sl, sizeof(struct sols_list), BWC_PI_BYTE, 0, 0, pi->m);
     if (pi->m->jrank || pi->m->trank) {
         sl->sols = malloc(sl->sols_alloc * sizeof(struct sfiles_list));
     }
     for(int i = 0 ; i < sl->nsols ; i++) {
         struct sfiles_list * s = sl->sols[i];
-        global_broadcast(pi->m, s, sizeof(struct sfiles_list), 0, 0);
+        pi_bcast(s, sizeof(struct sfiles_list), BWC_PI_BYTE, 0, 0, pi->m);
         if (pi->m->jrank || pi->m->trank) {
             s->sfiles = malloc(s->sfiles_alloc * sizeof(struct sfile_info));
         }
-        global_broadcast(pi->m, s->sfiles, s->nsfiles * sizeof(struct sfile_info), 0, 0);
+        pi_bcast(s->sfiles,
+                s->nsfiles * sizeof(struct sfile_info), BWC_PI_BYTE,
+                0, 0,
+                pi->m);
     }
     serialize(pi->m);
-}
-
-int agree_on_flag(pi_wiring_ptr w, int v)
-{
-    static pthread_mutex_t mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
-    int * ptr = &v;
-    thread_broadcast(w, (void**) &ptr, sizeof(void*), 0);
-    for(unsigned int i = 0 ; i < w->ncores ; i++) {
-        int ptrc = pthread_mutex_lock(mutex);
-        ASSERT_ALWAYS(ptrc == 0);
-        * ptr &= v;
-        ptrc = pthread_mutex_unlock(mutex);
-        ASSERT_ALWAYS(ptrc == 0);
-    }
-    serialize_threads(w);
-
-    if (w->trank == 0) {
-        int err = MPI_Allreduce(MPI_IN_PLACE, &v, 1, MPI_INT, MPI_LAND, w->pals);
-        ASSERT_ALWAYS(!err);
-    }
-    serialize_threads(w);
-    if (w->trank != 0) {
-        v = *ptr;
-    }
-    /* serialize again because the leader must not release its stack
-     * before all pals have read it ! */
-    serialize_threads(w);
-    return v;
 }
 
 void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
@@ -189,8 +164,9 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
 
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
 
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
 
     /* this is really a misnomer, because in the typical case, M is
      * rectangular, and then the square matrix does induce some padding.
@@ -201,8 +177,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
     unsigned int nrhs = 0;
 
-    mmt_wiring_ptr mcol = mmt->wr[bw->dir];
-    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
+    mmt_comm_ptr mcol = mmt->wr[bw->dir];
+    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
 
     struct sols_list sl[1];
     prelude(pi, sl);
@@ -217,7 +193,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         return NULL;
     }
 
-    pi_wiring_ptr picol = pi->wr[bw->dir];
+    pi_comm_ptr picol = pi->wr[bw->dir];
 
     unsigned int ii0, ii1;
     unsigned int di = mcol->i1 - mcol->i0;
@@ -229,14 +205,14 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     mmt_vec svec;
     mmt_vec tvec;
-    vec_init_generic(pi->m, A, svec, 0, ii1-ii0);
-    vec_init_generic(pi->m, A, tvec, 0, ii1-ii0);
+    vec_init_generic(pi->m, A, A_pi, svec, 0, ii1-ii0);
+    vec_init_generic(pi->m, A, A_pi, tvec, 0, ii1-ii0);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     if (rhs_name != NULL) {
         if (pi->m->jrank == 0 && pi->m->trank == 0)
             get_rhs_file_header(rhs_name, NULL, &nrhs, NULL);
-        global_broadcast(pi->m, &nrhs, sizeof(unsigned int), 0, 0);
+        pi_bcast(&nrhs, 1, BWC_PI_UNSIGNED, 0, 0, pi->m);
     }
 
     if (tcan_print && nrhs) {
@@ -261,7 +237,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (rhscoeffs_name) {
         if (!pi->m->trank && !pi->m->jrank)
             rhscoeffs_file = fopen(rhscoeffs_name, "rb");
-        matmul_top_vec_init_generic(mmt, A, rhscoeffs_vec, bw->dir, 0);
+        matmul_top_vec_init_generic(mmt, A, A_pi, rhscoeffs_vec, bw->dir, 0);
     }
 
     for(int s = 0 ; s < sl->nsols ; s++) {
@@ -304,33 +280,42 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     ASSERT_ALWAYS(rc == 1);
                 }
             }
-            global_broadcast(pi->m, rhscoeffs, A->vec_elt_stride(A,nrhs), 0, 0);
+            pi_bcast(rhscoeffs, nrhs, A_pi, 0, 0, pi->m);
 
             A->vec_set_zero(A, tvec->v, ii1 - ii0);
             for(unsigned int j = 0 ; j < nrhs ; j++) {
                 /* Add c_j times v_j to tvec */
                 ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
                 char * tmp;
-                int rc = asprintf(&tmp, V_FILE_BASE_PATTERN, j, j + 1);
+                int rc = asprintf(&tmp, V_FILE_BASE_PATTERN ".0", j, j + 1);
                 ASSERT_ALWAYS(rc >= 0);
-                /* equivalently, we may load the data in mmt->wr[1]->v
-                 * with
-                 * matmul_top_load_vector(mmt, v_name, bw->dir, 0, unpadded);
-                 */
 
-                pi_load_file_2d(pi, bw->dir, tmp, 0, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+                pi_file_handle f;
+                rc = pi_file_open(f, pi, bw->dir, tmp, "rb", A->vec_elt_stride(A, unpadded));
+                if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
+                ASSERT_ALWAYS(rc);
+                ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0));
+                ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
+                pi_file_close(f);
+                free(tmp);
+
                 A->vec_scal_mul(A, svec->v, svec->v, A->vec_coeff_ptr(A, rhscoeffs, j), ii1 - ii0);
                 A->vec_add(A, tvec->v, tvec->v, svec->v, ii1 - ii0);
-                free(tmp);
             }
 
             /* Now save the sum to a temp file, which we'll read later on
              */
             {
                 char * tmp;
-                int rc = asprintf(&tmp, R_FILE_BASE_PATTERN, sf->s0, sf->s1);
+                int rc = asprintf(&tmp, R_FILE_BASE_PATTERN ".0", sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
-                pi_save_file_2d(pi, bw->dir, tmp, 0, tvec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+                pi_file_handle f;
+                rc = pi_file_open(f, pi, bw->dir, tmp, "wb", A->vec_elt_stride(A, unpadded));
+                if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
+                ASSERT_ALWAYS(rc);
+                ssize_t s = pi_file_write(f, tvec->v, A->vec_elt_stride(A, ii1 - ii0));
+                ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
+                pi_file_close(f);
                 free(tmp);
             }
         }
@@ -341,16 +326,24 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         for(int i = 0 ; i < sf->nsfiles ; i++) {
             char * tmp;
-            int rc = asprintf(&tmp, S_FILE_BASE_PATTERN,
+            int rc = asprintf(&tmp, S_FILE_BASE_PATTERN ".%u",
                     sf->s0, sf->s1,
-                    sf->sfiles[i]->n0, sf->sfiles[i]->n1);
+                    sf->sfiles[i]->n0, sf->sfiles[i]->n1,
+                    sf->sfiles[i]->iter);
             ASSERT_ALWAYS(rc >= 0);
 
             if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
-                printf("loading %s.%u\n", tmp, sf->sfiles[i]->iter);
+                printf("loading %s\n", tmp);
             }
-            pi_load_file_2d(pi, bw->dir, tmp, sf->sfiles[i]->iter, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+            pi_file_handle f;
+            rc = pi_file_open(f, pi, bw->dir, tmp, "rb", A->vec_elt_stride(A, unpadded));
+            if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
+            ASSERT_ALWAYS(rc);
+            ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0));
+            ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
+            pi_file_close(f);
             free(tmp);
+
             A->vec_add(A, sv, sv, svec->v, ii1 - ii0);
         }
 
@@ -376,11 +369,12 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         void * check_area = SUBVEC(mcol->v, v, offset_v);
         is_zero = A->vec_is_zero(A, check_area, how_many);
-        is_zero = agree_on_flag(pi->m, is_zero);
+        pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
         if (is_zero) {
             fprintf(stderr, "Found zero vector. Most certainly a bug. "
                     "No solution found.\n");
+            exitcode=1;
             continue;
         }
         serialize(pi->m);
@@ -414,9 +408,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
 
             is_zero = A->vec_is_zero(A, check_area, how_many);
-            is_zero = agree_on_flag(pi->m, is_zero);
+            is_zero = pi_data_eq(&is_zero, 1, BWC_PI_INT, pi->m);
+
             serialize(pi->m);
-            if (agree_on_flag(pi->m, is_zero)) {
+            if (pi_data_eq(&is_zero, 1, BWC_PI_INT, pi->m)) {
                 if (tcan_print) {
                     if (rhscoeffs_name) {
                         printf("M^%u * V + R is zero\n", i);
@@ -497,6 +492,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     vec_clear_generic(pi->m, tvec, ii1-ii0);
 
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
+
     A->oo_field_clear(A);
 
     for(int i = 0 ; i < sl->nsols ; i++) {
@@ -514,6 +511,7 @@ int main(int argc, char * argv[])
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+    parallelizing_info_init();
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
@@ -540,6 +538,7 @@ int main(int argc, char * argv[])
 
     pi_go(gather_prog, pl, 0);
 
+    parallelizing_info_finish();
     param_list_clear(pl);
     bw_common_clear_new(bw);
 

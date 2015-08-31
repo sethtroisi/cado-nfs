@@ -4,12 +4,15 @@ use strict;
 
 use POSIX qw/getcwd/;
 use File::Basename;
-use File::Temp qw/tempdir/;
+use File::Temp qw/tempdir tempfile mktemp/;
 use List::Util qw[max];
 use Data::Dumper;
 use Fcntl;
 
 # This companion program serves as a helper for running bwc programs.
+#
+# It should be rewritten someday, perhaps in python. At least this has to
+# be more modular (to be honest, it used to be much worse).
 
 # MPI_BINDIR=/opt/mpich2-1.1a2-1.fc10.x86_64/usr/bin ./bwc.pl :complete matrix=c72 interval=256 splits=64 mn=64 ys=0..64 mpi=4x4
 
@@ -199,7 +202,8 @@ my $prime;
 my $splitwidth;
 my @splits=();
 
-my $force_complete;
+# my $force_complete;
+my $stop_at_step;
 
 my $hostfile;
 my @hosts=();
@@ -212,7 +216,8 @@ my $needs_mpd;
 # out the arguments which are only of interest to us.
 # Here we read (from $param) the
 # following things.
-#  - $hostfile $mpi_extra_args $force_complete
+#  - $hostfile $mpi_extra_args
+#  - ## broken ## $force_complete
 #  - @hosts $m $n @splits
 #  - @mpi_split @thr_split
 #  - $nh $nv
@@ -257,7 +262,12 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'matrix') { $matrix=$v; next; }
     if ($k eq 'hostfile') { $hostfile=$v; next; }
     if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
-    if ($k eq 'force_complete') { $force_complete=$v; next; }
+    ## if ($k eq 'force_complete') { $force_complete=$v; next; }
+    if ($k eq 'stop_at_step') {
+        die "stop_at_step requires :complete" unless $main eq ':complete';
+        $stop_at_step=$v;
+        next;
+    }
     if ($k eq 'hosts') {
         $v=[$v] if (ref $v eq '');
         for (@$v) { push @hosts, split(',',$_); }
@@ -315,12 +325,20 @@ $splitwidth = ($prime == 2) ? 64 : 1;
 
 print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
 
+if ($main eq ':mpirun') {
+    # ok, this is really an ugly ugly hack. We have some mpi detection
+    # magic in this script, which we would like to use. So the :mpirun
+    # meta-command is just for that. Of course the argument requirements
+    # are mostly waived in this case.
+    $matrix=$param->{'matrix'}=$0;
+    $param->{'prime'}=2;
+    $m=$n=64;
+    $wdir=$param->{'wdir'}="/";
+}
+
 # {{{ Some important argument checks
 {
     my @miss = grep { !defined $param->{$_}; } (qw/prime matrix interval/);
-    if (!defined($param->{'mn'})) {
-        push @miss, grep { !defined $param->{$_}; } (qw/prime matrix interval/);
-    }
     die "Missing argument(s): @miss" if @miss;
     if (!defined($m) || !defined($n)) {
         die "Missing parameters: m and/or n";
@@ -366,7 +384,7 @@ if ($prime == 2 && ($lingen_mpi_split[0] != 1 || $lingen_mpi_split[1] != 1)) {
 }
 
 if ($lingen_mpi_split[0] != $lingen_mpi_split[1]) {
-    die "lingen_mpi must be a square split";
+    die "lingen_mpi ($lingen_mpi_split[0]x$lingen_mpi_split[1]) must be a square split";
 }
 
 if ($m % $lingen_mpi_split[0] != 0 || $n % $lingen_mpi_split[0] != 0) {
@@ -813,8 +831,8 @@ if ($mpi_needed) {
     # Need hosts.
     if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
 	    print STDERR "OAR environment detected, setting hostfile.\n";
-	    system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
-	    $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
+	    $hostfile = mktemp("/tmp/HOSTS.$ENV{'OAR_JOBID'}.XXXXXXX");
+	    system "uniq $ENV{'OAR_NODEFILE'} > $hostfile";
     } elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
 	    print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
 	    get_mpi_hosts_torque;
@@ -925,6 +943,13 @@ if ($mpi_needed) {
     dosystem('-nofatal', @mpi_precmd, split(' ', "mkdir -p $wdir"));
 }
 
+if ($main eq ':mpirun') {
+    # we don't even put @main_args in, because we're tinkering with it
+    # somewhat.
+    dosystem(@mpi_precmd, @extra_args);
+    exit 0;
+}
+
 ##################################################
 ### ok -- now @main_args is something relatively useful.
 # print "main_args:\n", join("\n", @main_args), "\n";
@@ -1031,7 +1056,7 @@ sub get_cached_leadernode_filelist {
         }
         closedir $dh;
     } else {
-        my $foo = join(' ', @mpi_precmd_single, "find $wdir -follow -type f -a -printf '%s %p\\n'");
+        my $foo = join(' ', @mpi_precmd_single, "find $wdir -maxdepth 1 -follow -type f -a -printf '%s %p\\n'");
         for my $line (`$foo`) {
             $line =~ s/^\s*//;
             chomp($line);
@@ -2136,6 +2161,10 @@ my @tasks = (
 
 for my $tc (@tasks) {
     if ($main eq $tc->[0] || $main eq ':complete') {
+        if ($stop_at_step && $tc->[0] eq $stop_at_step) {
+            print "Exiting early, because of stop_at_step=$stop_at_step\n";
+            last;
+        }
         $current_task = $tc->[0];
         &{$tc->[1]}(@main_args);
     }

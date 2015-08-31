@@ -12,11 +12,11 @@ The parameters given to pi_go() are:
 Its implementation is in parallelizing_info.[ch] .  The main data
 structure that conveys information on the parallel setting is 
   struct parallelizing_info_s
-The details are not so simple... but in a nutshell, we get 3 "wirings",
-the meaning of which is more or less a generalization of "MPI_Comm" to
-encompass also the pthread level. The first wiring allows full
-communication, the second is for row-wise communications, the third is
-for column-wise communications.
+The details are not so simple... but in a nutshell, we get 3
+communicators, the meaning of which is more or less a generalization of
+"MPI_Comm" to encompass also the pthread level. The first communicator
+allows full communication, the second is for row-wise communications, the
+third is for column-wise communications.
 
 The prototype of the function passed to pi_go() is
   void *(*fcn)(parallelizing_info_ptr pi, void * arg)
@@ -25,17 +25,21 @@ function. The last argument allows any additional thing to be passed
 through.
 
 Below are a few things you can do with the pi variable. In these protos,
-wr should be one of the wiring inside pi.
-  hello(pi)             // a small hello-world that tests the pi
-  thread_broadcast(wr, void* ptr, size_t size, uint root)
+wr should be one of the communicator inside pi.
+  pi_hello(pi)           // a small hello-world that tests the pi
+  pi_thread_bcast(void* ptr, size_t size, BWC_PI_BYTE, uint root, wr)
                         // Broadcasting function at thread level
-  global_broadcast(wr, ...)
+  pi_bcast(...)
                         // Broadcasting function at MPI+thread level
   serialize(wr)         // Serializing stuff
   serialize_threads(wr)
 The most interesting example of using these is matmul_top.[ch] . Be
-careful: in these files, the pi's wirings are completed by others
-wirings that links pieces of the matrix.
+careful: in these files, the pi's communicators are completed by others
+communicators that links pieces of the matrix. In particular, there are
+two intersecting communicators which are sub-communicators of the larger
+one. This implies that serializing on one of these sub-communicators with
+all threads of the other communicator concurrently is illegal, because
+serialize() entails MPI calls which do not handle concurrency well.
 
 The "abase" mechanism
 ---------------------

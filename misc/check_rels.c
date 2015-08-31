@@ -23,7 +23,7 @@
 uint64_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
 uint64_t nrels_toolarge;
 cado_poly cpoly;
-unsigned long lpb[2] = {0, 0};
+unsigned long lpb[NB_POLYS_MAX] = {0, 0, 0, 0, 0, 0, 0, 0};
 int verbose = 0;
 int abhexa = 0;
 int check_primality = 0; /* By default no primality check */
@@ -97,6 +97,14 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
     rel->primes[i] = (prime_t) {.h = side, .p = p, .e = e};
 }
 
+static int
+more_job(mpz_t norm[], unsigned int nb_poly){
+    for(unsigned int side = 0; side < nb_poly; side++)
+	if(mpz_cmp_ui (norm[side], 1) != 0)
+	    return 1;
+    return 0;
+}
+
 /* return 0 if everything is ok (factorization, primality, and complete)
  * return -1 if a ideal does not divide the norm (primality and completeness
  * are not checked)
@@ -113,15 +121,17 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
 int
 process_one_relation (earlyparsed_relation_ptr rel)
 {
-  mpz_t norm[2];
-  mpz_init (norm[0]);
-  mpz_init (norm[1]);
+  mpz_t norm[NB_POLYS_MAX];
+  char used[NB_POLYS_MAX];
+  memset(used, 0, NB_POLYS_MAX); /* which sides are in use */
+  for(int side = 0 ; side < cpoly->nb_polys ; side++)
+      mpz_init (norm[side]);
   unsigned int fac_error = 0, need_completion = 0, nonprime = 0, toolarge = 0;
   /* If we complete relations, do not print error msg but warning. */
   int err = (complete_rels) ? 0 : 1;
 
   /* compute the norm on alg and rat sides */
-  for(unsigned int side = 0 ; side < 2 ; side++)
+  for(int side = 0 ; side < cpoly->nb_polys ; side++)
   {
     mpz_poly_ptr ps = cpoly->pols[side];
     mpz_poly_homogeneous_eval_siui (norm[side], ps, rel->a, rel->b);
@@ -133,6 +143,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
     unsigned int side = rel->primes[i].h;
     p_r_values_t p = rel->primes[i].p;
     exponent_t e = rel->primes[i].e;
+    ASSERT_ALWAYS(p != 0); // could reveal a problem in parsing
+    used[side] = 1;
     for (int j = 0; j < e; ++j)
     {
       //if (mpz_fdiv_q_ui (norm[side], norm[side], p) != 0)
@@ -154,8 +166,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
   /* With an error in the factorization of the norm, no need to continue */
   if (fac_error)
   {
-    mpz_clear(norm[0]);
-    mpz_clear(norm[1]);
+      for(int side = 0 ; side < cpoly->nb_polys ; side++)
+	  mpz_clear(norm[side]);
     return -1;
   }
 
@@ -189,11 +201,10 @@ process_one_relation (earlyparsed_relation_ptr rel)
   {
     prime_info pi;
     prime_info_init (pi);
-    for (unsigned long p = 2; mpz_cmp_ui (norm[0], 1) != 0 ||
-                              mpz_cmp_ui (norm[1], 1) != 0 ;
+    for (unsigned long p = 2; more_job(norm, cpoly->nb_polys) ;
          p = getprime_mt (pi))
     {
-      for(unsigned int side = 0 ; side < 2 ; side++)
+	for(int side = 0 ; side < cpoly->nb_polys ; side++)
       {
         exponent_t e = 0;
         while (mpz_divisible_ui_p (norm[side], p))
@@ -220,8 +231,10 @@ process_one_relation (earlyparsed_relation_ptr rel)
   }
   else
   {
-    for(unsigned int side = 0 ; side < 2 ; side++)
+    for(int side = 0 ; side < cpoly->nb_polys ; side++)
     {
+      if(used[side] == 0)
+	continue;
       if (mpz_cmp_ui (norm[side], 1) != 0)
       {
         if (verbose != 0)
@@ -237,12 +250,20 @@ process_one_relation (earlyparsed_relation_ptr rel)
   }
 
   /* check that ideals appearing in the relations are below the lpb */
-  if (lpb[0] != 0 || lpb[1] != 0)
+  int any_lpb = 0;
+  for(int side = 0 ; side < cpoly->nb_polys ; side++)
+      if(lpb[side] != 0){
+	  any_lpb = 1;
+	  break;
+      }
+  if (any_lpb)
   {
     for(weight_t i = 0; i < rel->nb ; i++)
     {
       p_r_values_t p = rel->primes[i].p;
       unsigned int side = rel->primes[i].h;
+      if(p == 0)
+	  continue;
       if (lpb[side] != 0 && p > lpb[side])
       {
         if (verbose != 0)
@@ -257,9 +278,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
     }
   }
 
-
-  mpz_clear(norm[0]);
-  mpz_clear(norm[1]);
+  for(int side = 0 ; side < cpoly->nb_polys ; side++)
+      mpz_clear(norm[side]);
   return nonprime + 2*need_completion + 4*toolarge;
 }
 
@@ -420,9 +440,12 @@ main (int argc, char * argv[])
 
     param_list_parse_ulong(pl, "lpb0", &lpb[0]);
     param_list_parse_ulong(pl, "lpb1", &lpb[1]);
-    lpb[0] = (lpb[0] == 0) ? 0 : 1UL << lpb[0];
-    lpb[1] = (lpb[1] == 0) ? 0 : 1UL << lpb[1];
-
+    // FIXME: more lpb's on command line?
+    for(int side = 0 ; side < cpoly->nb_polys ; side++)
+	lpb[side] = (lpb[side] == 0) ? 0 : 1UL << lpb[side];
+    // TODO: remove this
+    for(int side = 2 ; side < cpoly->nb_polys ; side++)
+	lpb[side] = lpb[1];
     const char * polyfilename = param_list_lookup_string(pl, "poly");
     const char *outfilename = param_list_lookup_string(pl, "complete");
     const char * filelist = param_list_lookup_string(pl, "filelist");

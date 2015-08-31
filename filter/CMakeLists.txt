@@ -12,6 +12,9 @@ target_link_libraries(dup1 utils_with_io)
 add_executable(dup2 dup2.c filter_badideals.c)
 target_link_libraries(dup2 utils_with_io)
 
+add_executable(filter_galois filter_galois.c)
+target_link_libraries(filter_galois utils_with_io)
+
 add_executable(purge ${purge_sources})
 target_link_libraries(purge utils_with_io)
 

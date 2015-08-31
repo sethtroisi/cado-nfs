@@ -7,36 +7,6 @@
 #define SSE_NORM_INIT
 #endif
 
-/* Thresholds of the kilo-buckets & mega-buckets.
- * When the number of buckets I*J/BUCKET_REGION = I*(I/2)/65536
- * is less to THRESHOLD_K_BUCKETS, an one pass sort algorithm is
- * used to computed the buckets : function fill_in_buckets.
- * When the number is >= THRESHOLD_K_BUCKETS and < THRESHOLD_M_BUCKETS,
- * a two passes sort algorithm is used : function fill_in_k_buckets.
- * When the number is >= THRESHOLD_M_BUCKETS, a three pass sort
- * algorithm is used : function fill_in_m_buckets.
- * These threshold are very critical for the performance.
- * The "good" values for THRESHOLD_K_BUCKETS are between 4 096 & 32 768;
- * the "good" values for THRESHOLD_M_BUCKETS are between 32 768 &
- * 1 048 576 (it's possible the 3 passes sort is always slower than
- * the 2 passes).
- * Mandatory: THRESHOLD_K_BUCKETS >= 16;
- * THRESHOLD_M_BUCKETS >= (THRESHOLD_K_BUCKETS) * 4.
-*/
-#ifndef THRESHOLD_K_BUCKETS
-#define THRESHOLD_K_BUCKETS 32768   /* 512 */
-#endif
-#ifndef THRESHOLD_M_BUCKETS
-#define THRESHOLD_M_BUCKETS 1048576 /* 131072 */
-#endif
-
-#if THRESHOLD_K_BUCKETS < 16
-#error THRESHOLD_K_BUCKETS must be >= 16
-#endif
-#if THRESHOLD_M_BUCKETS < (THRESHOLD_K_BUCKETS * 4)
-#error THRESHOLD_M_BUCKETS must be >= (THRESHOLD_K_BUCKETS * 4)
-#endif
-
 /* Number of bits used to estimate the norms
  * This should be large enough: it must be such that all norms are
  * smaller than 2^NORM_BITS.
@@ -172,7 +142,17 @@
 #define LOG_BUCKET_REGION 16
 #endif
 
-#define BUCKET_REGION (1 << LOG_BUCKET_REGION)
+#define NB_BUCKETS_2 256
+#define NB_BUCKETS_3 256
+
+// Portability of ULL suffix?
+#define BUCKET_REGION (UINT64_C(1) << LOG_BUCKET_REGION)
+
+#define BUCKET_REGION_1 BUCKET_REGION
+#define BUCKET_REGION_2 NB_BUCKETS_2*BUCKET_REGION_1
+#define BUCKET_REGION_3 NB_BUCKETS_3*BUCKET_REGION_2
+
+#define BUCKET_REGIONS { 0, BUCKET_REGION_1, BUCKET_REGION_2, BUCKET_REGION_3 }
 
 /* This is currently used to enable some code paths specific to the
  * descent. The mid-term plan is to remove this compile-time flag.

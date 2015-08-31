@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <gmp.h>
-#include "select_mpi.h"
 struct mpfq_vbase_s;
 typedef struct mpfq_vbase_s * mpfq_vbase_ptr;
 typedef struct mpfq_vbase_s const * mpfq_vbase_srcptr;
@@ -173,12 +172,6 @@ struct mpfq_vbase_s {
     void (*elt_ur_set_ui_all)(mpfq_vbase_ptr, void *, unsigned long);
     void (*dotprod)(mpfq_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*mul_constant_ui)(mpfq_vbase_ptr, void *, const void *, unsigned long);
-    void (*mpi_ops_init)(mpfq_vbase_ptr);
-    MPI_Datatype (*mpi_datatype)(mpfq_vbase_ptr);
-    MPI_Datatype (*mpi_datatype_ur)(mpfq_vbase_ptr);
-    MPI_Op (*mpi_addition_op)(mpfq_vbase_ptr);
-    MPI_Op (*mpi_addition_op_ur)(mpfq_vbase_ptr);
-    void (*mpi_ops_clear)(mpfq_vbase_ptr);
     void (*oo_field_init)(mpfq_vbase_ptr);
     void (*oo_field_clear)(mpfq_vbase_ptr);
 };

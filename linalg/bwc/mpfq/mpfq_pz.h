@@ -17,7 +17,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "assert.h"
-#include "select_mpi.h"
 #include "mpfq_vbase.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
 #undef	MPFQ_LAST_GENERATED_TAG
@@ -30,7 +29,6 @@
 /* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::poly */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
    fieldtype=prime,
@@ -41,9 +39,8 @@
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
-     [ u64k1, u64k2, u64k4, ],
+     [ u64k1, u64k2, u64k3, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -56,7 +53,6 @@
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
-     p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -66,9 +62,10 @@
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
      p_9=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
-     u64k1=[ u64k1, u64k2, u64k4, ],
-     u64k2=[ u64k1, u64k2, u64k4, ],
-     u64k4=[ u64k1, u64k2, u64k4, ],
+     u64k1=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k2=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k3=[ u64k1, u64k2, u64k3, u64k4, ],
+     u64k4=[ u64k1, u64k2, u64k3, u64k4, ],
      },
     vc:includes=[ <stdarg.h>, ],
     },
@@ -373,18 +370,10 @@ void mpfq_pz_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_p
 
 /* Member templates related to SIMD operation */
 
-/* MPI interface */
-void mpfq_pz_mpi_ops_init(mpfq_pz_dst_field);
-MPI_Datatype mpfq_pz_mpi_datatype(mpfq_pz_dst_field);
-MPI_Datatype mpfq_pz_mpi_datatype_ur(mpfq_pz_dst_field);
-MPI_Op mpfq_pz_mpi_addition_op(mpfq_pz_dst_field);
-MPI_Op mpfq_pz_mpi_addition_op_ur(mpfq_pz_dst_field);
-void mpfq_pz_mpi_ops_clear(mpfq_pz_dst_field);
-
 /* Object-oriented interface */
-void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_pz_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

@@ -443,7 +443,8 @@ mod_sprp (const residue_t b, const modulus_t m)
 
 
 /* Returns 1 if m is a strong probable prime wrt base 2, 0 otherwise.
-   We assume m is odd. */
+   Assumes m > 1 and is odd.
+ */
 int
 mod_sprp2 (const modulus_t m)
 {

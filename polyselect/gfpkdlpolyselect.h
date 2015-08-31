@@ -115,7 +115,7 @@ void init_eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 
 
 
 bool is_irreducible_ZZ(mpz_poly_srcptr phi);
-bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, int* sign_Discr, mpz_t Discr);
+bool is_irreducible_mod_p_deg2(mpz_poly_srcptr phi, mpz_srcptr p, mpz_t Discr);
 bool is_irreducible_mod_p(mpz_poly_srcptr phi, mpz_srcptr p);
 bool is_irreducible_mod_p_si(const long int* Py, int deg_Py, mpz_srcptr p);
 

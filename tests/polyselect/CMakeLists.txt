@@ -1,16 +1,16 @@
 # Build polyselect2l before running check
 
-add_test(test_polsel2 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh\" \"${CADO_NFS_BINARY_DIR}\" 2 1000 100 8")
-set_test_build_depends(test_polsel2 polyselect2l)
-add_test(test_polsel3 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh\" \"${CADO_NFS_BINARY_DIR}\" 3 1000 500 10")
-set_test_build_depends(test_polsel3 polyselect2l)
-add_test(test_polsel4 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh\" \"${CADO_NFS_BINARY_DIR}\" 4 1000 1000 10")
-set_test_build_depends(test_polsel4 polyselect2l)
-add_test(test_polsel5 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh\" \"${CADO_NFS_BINARY_DIR}\" 5 1000 1000 10")
-set_test_build_depends(test_polsel5 polyselect2l)
-add_test(test_polsel6 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh\" \"${CADO_NFS_BINARY_DIR}\" 6 1000 1000 10")
-set_test_build_depends(test_polsel6 polyselect2l)
-add_test(test_polsel7 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh\" \"${CADO_NFS_BINARY_DIR}\" 7 1000 1000 10")
-set_test_build_depends(test_polsel7 polyselect2l)
-build_and_run_test(test_auxiliary "utils;tests;polyselect_common")
-build_and_run_test(test_rho.c "polyselect_common;tests")
+cado_define_test(test_polsel SCRIPT
+    ${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh
+    NO_DEFAULT_RUN
+    TARGET_DEPENDENCIES polyselect2l)
+
+cado_divert_test(test_polsel 2 ${CADO_NFS_BINARY_DIR} 2 1000 100 8)
+cado_divert_test(test_polsel 3 ${CADO_NFS_BINARY_DIR} 3 1000 500 10)
+cado_divert_test(test_polsel 4 ${CADO_NFS_BINARY_DIR} 4 1000 1000 10)
+cado_divert_test(test_polsel 5 ${CADO_NFS_BINARY_DIR} 5 1000 1000 10)
+cado_divert_test(test_polsel 6 ${CADO_NFS_BINARY_DIR} 6 1000 1000 10)
+cado_divert_test(test_polsel 7 ${CADO_NFS_BINARY_DIR} 7 1000 1000 10)
+
+cado_define_test(test_auxiliary.c LIBRARIES utils tests polyselect_common)
+cado_define_test(test_rho.c LIBRARIES polyselect_common tests)
