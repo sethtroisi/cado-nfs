@@ -12,6 +12,7 @@ void array_init(array_ptr array, uint64_t number_element)
 
   array->number_element = number_element;
   array->array = malloc(sizeof(unsigned char) * number_element);
+  memset(array->array, 0, sizeof(unsigned char) * number_element);
 }
 
 void array_clear(array_ptr array)
@@ -138,4 +139,38 @@ uint64_t array_int64_vector_index(int64_vector_srcptr v,
   ASSERT(index < number_element);
 
   return index;
+}
+
+void array_set_at(array_ptr array, int * vec, unsigned char val,
+    sieving_bound_srcptr H)
+{
+  uint64_t prod = 1;
+  unsigned int k = 0;
+  uint64_t index = (uint64_t) vec[k] + (uint64_t) H->h[k];
+
+  for (k = 1; k < H->t - 1; k++) {
+    prod = prod * (uint64_t)(2 * H->h[k - 1]);
+    index = index + ((uint64_t)vec[k] + (uint64_t)H->h[k]) * prod;
+  }
+  prod = prod * (2 * H->h[k - 1]);
+  index = index + (uint64_t)(vec[k]) * prod;
+
+  array_set(array, index, val);
+}
+
+unsigned char array_get_at(array_ptr array, int * vec,
+    sieving_bound_srcptr H)
+{
+  uint64_t prod = 1;
+  unsigned int k = 0;
+  uint64_t index = (uint64_t) vec[k] + (uint64_t) H->h[k];
+
+  for (k = 1; k < H->t - 1; k++) {
+    prod = prod * (uint64_t)(2 * H->h[k - 1]);
+    index = index + ((uint64_t)vec[k] + (uint64_t)H->h[k]) * prod;
+  }
+  prod = prod * (2 * H->h[k - 1]);
+  index = index + (uint64_t)(vec[k]) * prod;
+
+  return array_get(array, index);
 }
