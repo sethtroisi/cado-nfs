@@ -14,45 +14,32 @@ include_directories(${CADO_NFS_SOURCE_DIR}/sieve/ecm)
 include_directories(${CADO_NFS_SOURCE_DIR}/sieve/strategies)
 include_directories(${CADO_NFS_SOURCE_DIR}/sieve/strategies/utils_st)
 
-add_executable(test_generate_composite_numbers
-  test_generate_composite_numbers.c
-  ${SUF_SRC}/generate_factoring_method.c
-  ${SRC_UTILS})
-target_link_libraries(test_generate_composite_numbers ${LIB_EXEC})
-run_test (test_generate_composite_numbers test_generate_composite_numbers)
-set_test_build_depends (test_generate_composite_numbers test_generate_composite_numbers)
+cado_define_test(test_generate_composite_numbers.c
+  ${SUF_SRC}/generate_factoring_method.c ${SRC_UTILS}
+  LIBRARIES ${LIB_EXEC})
 
 
-add_executable(test_generate_strategies
-  test_generate_strategies.c
+cado_define_test(test_generate_strategies.c
   ${SUF_SRC}/generate_factoring_method.c
   ${SUF_SRC}/generate_strategies.c
-  ${SRC_UTILS})
-target_link_libraries(test_generate_strategies ${LIB_EXEC})
-run_test (test_generate_strategies test_generate_strategies)
-set_test_build_depends (test_generate_strategies test_generate_strategies)
+  ${SRC_UTILS}
+  LIBRARIES ${LIB_EXEC})
 
-add_executable(test_filtering
-  test_filtering.c
+cado_define_test(test_filtering.c
   ${SUF_SRC}/generate_factoring_method.c
-  ${SRC_UTILS})
+  ${SRC_UTILS}
+  LIBRARIES ${LIB_EXEC})
 
-target_link_libraries(test_filtering ${LIB_EXEC})
-run_test (test_filtering test_filtering)
-set_test_build_depends(test_filtering test_filtering)
-
-add_executable(test_benchfm
-  test_benchfm.c
+cado_define_test(test_benchfm.c
   ${SUF_SRC}/generate_factoring_method.c
-  ${SRC_UTILS})
-target_link_libraries(test_benchfm ${LIB_EXEC})
-run_test (test_benchfm test_benchfm)
-set_test_build_depends(test_benchfm test_benchfm)
-
+  ${SRC_UTILS}
+  LIBRARIES ${LIB_EXEC})
 
 if(DEFINED ENV{CHECKS_EXPENSIVE})
-    run_test(strategies_main_script ${CMAKE_CURRENT_SOURCE_DIR}/test_main_script.sh ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR})
-    set_test_build_depends(strategies_main_script gfm benchfm gst finalst)
+    cado_define_test(SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_main_script.sh
+        ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
+        TARGET_DEPENDENCIES gfm benchfm gst finalst)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
 add_subdirectory (utils_st)

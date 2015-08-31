@@ -59,7 +59,7 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
 #ifndef MOD_NO_SHARED_MOD_POW_MP
 /* Compute r = b^e. Here e is a multiple precision integer 
    sum_{i=0}^{e_nrwords-1} e[i] * (machine word base)^i.
-   Assume e[e_nrwords-1}] is not zero if e_nrwords > 0.
+   Assume e[e_nrwords-1] is not zero when e_nrwords > 0.
 */
 void
 mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e, 
@@ -67,13 +67,16 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
 {
   unsigned long mask;
   residue_t t;
-  int i = e_nrwords - 1;
+  int i;
 
   if (e_nrwords == 0)
     {
       mod_set1 (r, m);
       return;
     }
+
+  i = e_nrwords - 1;
+  ASSERT (e[i] != 0UL);
 
   /* Find highest set bit in e[i]. */
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);

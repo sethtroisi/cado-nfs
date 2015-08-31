@@ -27,6 +27,7 @@
 #include "las-norms.h"
 #include "las-unsieve.h"
 #include "las-arith.h"
+#include "las-plattice.h"
 #include "las-qlattice.h"
 #include "las-smallsieve.h"
 #include "las-descent-trees.h"
@@ -149,13 +150,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         sieve_side_info_ptr sis = si->sides[side];
 
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
+        fbprime_t bk_thresh1 = si->conf->bucket_thresh1;
         const fbprime_t fbb = si->conf->sides[side]->lim;
         const fbprime_t powlim = si->conf->sides[side]->powlim;
         if (bk_thresh > fbb) {
             fprintf(stderr, "Error: lim is too small compared to bk_thresh\n");
             ASSERT_ALWAYS(0);
         }
-        const fbprime_t thresholds[4] = {bk_thresh, fbb, fbb, fbb};
+        if (bk_thresh1 == 0 || bk_thresh1 > fbb) {
+            bk_thresh1 = fbb;
+        }
+        const fbprime_t thresholds[4] = {bk_thresh, bk_thresh1, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
         sis->fb = new fb_factorbase(thresholds, powlim, only_general);
 
@@ -351,23 +356,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     si->I = 1 << sc->logI;
     si->J = 1 << (sc->logI - 1);
 
-    /* Initialize the number of buckets */
-
-    /* If LOG_BUCKET_REGION == sc->logI, then one bucket (whose size is the
-     * L1 cache size) is actually one line. This changes some assumptions
-     * in sieve_small_bucket_region and resieve_small_bucket_region, where
-     * we want to differentiate on the parity on j.
-     */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= sc->logI);
-
-    /* this is the maximal value of the number of buckets (might be less
-       for a given special-q if J is smaller) */
-    si->nb_buckets_max = 1 +
-        ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BUCKET_REGION;
-    si->j_div = init_j_div(si->J);
-    si->us = init_unsieve_data(si->I);
-    si->doing = NULL;
-
     /* Allocate memory for transformed polynomials */
     sieve_info_init_norm_data(si);
 
@@ -379,14 +367,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      * are exactly the same and can be shared.
      */
     if (las->sievers == si) {
-        verbose_output_print(0, 1, "# bucket_region = %u\n", BUCKET_REGION);
-        if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
-            verbose_output_print(0, 1, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
-        else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
-            verbose_output_print(0, 1, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
-        else
-            verbose_output_print(0, 1, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
-
+        verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
+                BUCKET_REGION);
         sieve_info_init_factor_bases(las, si, pl);
         for (int side = 0; side < 2; side++) {
             sieve_info_print_fb_statistics(las, si, side);
@@ -397,6 +379,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         // A few sanity checks, first.
         ASSERT_ALWAYS(las->sievers->conf->logI == si->conf->logI);
         ASSERT_ALWAYS(las->sievers->conf->bucket_thresh == si->conf->bucket_thresh);
+        ASSERT_ALWAYS(las->sievers->conf->bucket_thresh1 == si->conf->bucket_thresh1);
         // Then, copy relevant data from the first sieve_info
         verbose_output_print(0, 1, "# Do not regenerate factor base data: copy it from first siever\n");
         for (int side = 0; side < 2; side++) {
@@ -411,6 +394,44 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
                 sis->max_bucket_fill_ratio[i] = sis0->max_bucket_fill_ratio[i];
         }
     }
+
+    // Now that fb have been initialized, we can set the toplevel.
+    si->toplevel = MAX(si->sides[0]->fb->get_toplevel(),
+            si->sides[1]->fb->get_toplevel());
+
+    /* Initialize the number of buckets */
+
+    /* If LOG_BUCKET_REGION == sc->logI, then one bucket (whose size is the
+     * L1 cache size) is actually one line. This changes some assumptions
+     * in sieve_small_bucket_region and resieve_small_bucket_region, where
+     * we want to differentiate on the parity on j.
+     */
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= sc->logI);
+
+    /* set the maximal value of the number of buckets (might be less
+       for a given special-q if J is smaller) */
+    uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
+    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+    XX[si->toplevel] = 1 +
+      ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BRS[si->toplevel];
+    for (int i = si->toplevel+1; i < FB_MAX_PARTS; ++i)
+        XX[i] = 0;
+    // For small Jmax, the number of buckets at toplevel-1 could also
+    // be less than the maximum allowed.
+    if (XX[si->toplevel] == 1) {
+        XX[si->toplevel-1] = 1 +
+            ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1))
+            / BRS[si->toplevel-1];
+        ASSERT_ALWAYS(XX[si->toplevel-1] != 1);
+    }
+    for (int i = 0; i < FB_MAX_PARTS; ++i) {
+        si->nb_buckets_max[i] = XX[i];
+        si->nb_buckets[i] = XX[i];
+    }
+
+    si->j_div = init_j_div(si->J);
+    si->us = init_unsieve_data(si->I);
+    si->doing = NULL;
 
 
     /* TODO: We may also build a strategy book, given that several
@@ -499,9 +520,20 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads,
   /* essentially update the fij polynomials and J value */
   sieve_info_update_norm_data(si, nb_threads);
 
-  /* update number of buckets */
-  si->nb_buckets = 1 +
-      ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / BUCKET_REGION;
+  /* update number of buckets at toplevel */
+  uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+  si->nb_buckets[si->toplevel] = 1 +
+      ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) / 
+      BRS[si->toplevel];
+  // maybe there is only 1 bucket at toplevel and less than 256 at
+  // toplevel-1, due to a tiny J.
+  if (si->nb_buckets[si->toplevel] == 1) {
+        si->nb_buckets[si->toplevel-1] = 1 +
+            ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) /
+            BRS[si->toplevel-1]; 
+        // we forbid skipping two levels.
+        ASSERT_ALWAYS(si->nb_buckets[si->toplevel-1] != 1);
+  }
 
   /* Update the slices of the factor base according to new log base */
   for(int side = 0 ; side < 2 ; side++) {
@@ -651,6 +683,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         // Copy default value for non-given parameters
         // sc->skewness = las->default_config->skewness;
         sc->bucket_thresh = las->config_base->bucket_thresh;
+        sc->bucket_thresh1 = las->config_base->bucket_thresh1;
         sc->td_thresh = las->config_base->td_thresh;
         sc->unsieve_thresh = las->config_base->unsieve_thresh;
         for(int side = 0 ; side < 2 ; side++) {
@@ -885,8 +918,10 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         }
 
         sc->bucket_thresh = 1 << sc->logI;	/* default value */
+        sc->bucket_thresh1 = 0;	/* default value */
         /* overrides default only if parameter is given */
         param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
+        param_list_parse_ulong(pl, "bkthresh1", &(sc->bucket_thresh1));
 
         const char *powlim_params[2] = {"powlim0", "powlim1"};
         for (int side = 0; side < 2; side++) {
@@ -1465,20 +1500,20 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
             mpz_init(q);
             mpz_init_set(q1_orig, q1);
             /* we need to know the limit of the q range */
-            for(unsigned long i = 0 ; ; i++) {
+            for(unsigned long i = 1 ; ; i++) {
                 mpz_sub_ui(q, q1, i);
                 next_legitimate_specialq(q, q, 0);
-                if (mpz_cmp(q, q1) > 0) 
+                if (mpz_cmp(q, q1) >= 0)
                     continue;
                 if (mpz_poly_roots (roots, f, q) > 0)
                     break;
                 /* small optimization: avoid redoing root finding
                  * several times */
-                mpz_sub_ui(q1, q, 1);
-                i = 0;
+                mpz_set (q1, q);
+                i = 1;
             }
-            /* now q is prevprime(q1) */
-            mpz_set(q1, q);
+            /* now q is the largest prime < q1 with f having roots mod q */
+            mpz_add_ui (q1, q, 1);
             /* so now if we pick an integer in [q0, q1[, then its nextprime()
              * will be in [q0, q1_orig[, which is what we look for,
              * really.
@@ -1504,7 +1539,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
         /* If nq_max is specified, then q1 has no effect, even though it
          * has been set equal to q */
         for ( ; las->todo->size() < push_at_least_this_many &&
-                (las->nq_max < UINT_MAX || mpz_cmp(q, q1) <= 0) &&
+                (las->nq_max < UINT_MAX || mpz_cmp(q, q1) < 0) &&
                 las->nq_pushed < las->nq_max ; )
         {
             int nroots = mpz_poly_roots (roots, f, q);
@@ -1528,7 +1563,6 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
         mpz_init(q);
         for ( ; las->todo->size() < push_at_least_this_many && las->nq_pushed < las->nq_max ; ) {
             mpz_sub(q, q1, q0);
-            mpz_add_ui(q, q, 1);
             mpz_urandomm(q, las->rstate, q);
             mpz_add(q, q, q0);
             next_legitimate_specialq(q, q, 0);
@@ -1700,45 +1734,49 @@ void init_trace_k(sieve_info_srcptr si, param_list pl)
 }
 
 /* {{{ apply_buckets */
+template <typename HINT>
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
 NOPROFILE_STATIC
 #endif
 void
-apply_one_update (unsigned char * const S, const bucket_update_t<1, shorthint_t> * const u,
-                  const unsigned char logp, where_am_I_ptr w)
+apply_one_update (unsigned char * const S,
+        const bucket_update_t<1, HINT> * const u,
+        const unsigned char logp, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, h, u->hint);
   WHERE_AM_I_UPDATE(w, x, u->x);
   sieve_increase(S + (u->x), logp, w);
 }
 
+template <typename HINT>
 #ifndef TRACE_K
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
 NOPROFILE_STATIC
 #endif
 void
-apply_one_bucket (unsigned char *S, const bucket_array_t<1, shorthint_t> &BA, const int i,
+apply_one_bucket (unsigned char *S,
+        const bucket_array_t<1, HINT> &BA, const int i,
         const fb_part *fb, where_am_I_ptr w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, shorthint_t> * const it_end = BA.end(i, i_slice);
+    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, HINT> * const it_end = BA.end(i, i_slice);
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fb->get_slice(slice_index)->get_logp();
 
-    const bucket_update_t<1, shorthint_t> *next_align;
-    if (sizeof(bucket_update_t<1, shorthint_t>) == 4) {
-      next_align = (bucket_update_t<1, shorthint_t> *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
+    const bucket_update_t<1, HINT> *next_align;
+    if (sizeof(bucket_update_t<1, HINT>) == 4) {
+      next_align = (bucket_update_t<1, HINT> *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
       if (UNLIKELY(next_align > it_end)) next_align = it_end;
     } else {
       next_align = it_end;
     }
 
     while (it != next_align)
-      apply_one_update (S, it++, logp, w);
+      apply_one_update<HINT> (S, it++, logp, w);
 
     while (it + 16 <= it_end) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
@@ -1776,9 +1814,37 @@ apply_one_bucket (unsigned char *S, const bucket_array_t<1, shorthint_t> &BA, co
       INSERT_2_VALUES(x4); INSERT_2_VALUES(x5); INSERT_2_VALUES(x6); INSERT_2_VALUES(x7);
     }
     while (it != it_end)
-      apply_one_update (S, it++, logp, w);
+      apply_one_update<HINT> (S, it++, logp, w);
   }
 }
+
+// Create the two instances, the longhint_t being specialized.
+template 
+void apply_one_bucket<shorthint_t> (unsigned char *S,
+        const bucket_array_t<1, shorthint_t> &BA, const int i,
+        const fb_part *fb, where_am_I_ptr w);
+
+template <>
+void apply_one_bucket<longhint_t> (unsigned char *S,
+        const bucket_array_t<1, longhint_t> &BA, const int i,
+        const fb_part *fb, where_am_I_ptr w) {
+  WHERE_AM_I_UPDATE(w, p, 0);
+
+  // There is only one slice.
+  slice_index_t i_slice = 0;
+  const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
+  const bucket_update_t<1, longhint_t> * const it_end = BA.end(i, i_slice);
+
+  // FIXME: Computing logp for each and every entry seems really, really
+  // inefficient. Could we add it to a bucket_update_t of "longhint"
+  // type?
+  while (it != it_end) {
+    slice_index_t index = it->index;
+    const unsigned char logp = fb->get_slice(index)->get_logp();
+    apply_one_update<longhint_t> (S, it++, logp, w);
+  }
+}
+
 
 /* {{{ Trial division */
 typedef struct {
@@ -2064,7 +2130,8 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
 
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
-NOPROFILE_STATIC int
+// FIXME NOPROFILE_STATIC
+int
 factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 {
     las_info_srcptr las = th->las;
@@ -2147,13 +2214,25 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
     for(int side = 0 ; side < 2 ; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
+        // From N we can deduce the bucket_index. They are not the same
+        // when there are multiple-level buckets.
+        uint32_t bucket_index = N % si->nb_buckets[1];
 
         const bucket_array_t<1, shorthint_t> *BA =
             th->ws->cbegin_BA<1, shorthint_t>(side);
         const bucket_array_t<1, shorthint_t> * const BA_end =
             th->ws->cend_BA<1, shorthint_t>(side);
         for (; BA != BA_end; BA++)  {
-            purged[side].purge(*BA, N, SS);
+            purged[side].purge(*BA, bucket_index, SS);
+        }
+
+        /* Add entries coming from downsorting, if any */
+        const bucket_array_t<1, longhint_t> *BAd =
+            th->ws->cbegin_BA<1, longhint_t>(side);
+        const bucket_array_t<1, longhint_t> * const BAd_end =
+            th->ws->cend_BA<1, longhint_t>(side);
+        for (; BAd != BAd_end; BAd++)  {
+            purged[side].purge(*BAd, bucket_index, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
@@ -2508,38 +2587,34 @@ void * process_bucket_region(thread_data *th)
     where_am_I w MAYBE_UNUSED;
     las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
+    uint32_t first_region0_index = th->first_region0_index;
+    if (si->toplevel == 1) {
+        first_region0_index = 0;
+    }
 
     WHERE_AM_I_UPDATE(w, si, si);
 
     las_report_ptr rep = th->rep;
 
-    WHERE_AM_I_UPDATE(w, N, th->id);
-
     unsigned char * S[2];
 
-    unsigned int my_row0 = (BUCKET_REGION >> si->conf->logI) * th->id;
     unsigned int skiprows = (BUCKET_REGION >> si->conf->logI)*(las->nb_threads-1);
-
 
     /* This is local to this thread */
     for(int side = 0 ; side < 2 ; side++) {
-        sieve_side_info_ptr s = si->sides[side];
         thread_side_data &ts = th->sides[side];
-
-        /* Compute first sieve locations hit by small primes */
-        ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
-        /* Copy those locations that correspond to re-sieved primes */
-        ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s->fb_parts_x->rs);
-
-        /* local sieve region */
         S[side] = ts.bucket_region;
     }
+
     unsigned char *SS = th->SS;
     memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
-    for (unsigned int i = th->id; i < si->nb_buckets; i += las->nb_threads) 
+    for (uint32_t ii = 0; ii < si->nb_buckets[1]; ii ++)
       {
+        uint32_t i = first_region0_index + ii;
+        if ((i % las->nb_threads) != (uint32_t)th->id)
+            continue;
         WHERE_AM_I_UPDATE(w, N, i);
 
         if (recursive_descent) {
@@ -2589,8 +2664,23 @@ void * process_bucket_region(thread_data *th)
             const bucket_array_t<1, shorthint_t> * const BA_end =
                 th->ws->cend_BA<1, shorthint_t>(side);
             for (; BA != BA_end; BA++)  {
-                apply_one_bucket(SS, *BA, i, ts.fb, w);
+                apply_one_bucket(SS, *BA, ii, ts.fb->get_part(1), w);
             }
+
+            /* Apply downsorted buckets, if necessary. */
+            if (si->toplevel > 1) {
+                const bucket_array_t<1, longhint_t> *BAd =
+                    th->ws->cbegin_BA<1, longhint_t>(side);
+                const bucket_array_t<1, longhint_t> * const BAd_end =
+                    th->ws->cend_BA<1, longhint_t>(side);
+                for (; BAd != BAd_end; BAd++)  {
+                    // FIXME: the updates could come from part 3 as well,
+                    // not only part 2.
+                    ASSERT_ALWAYS(si->toplevel <= 2);
+                    apply_one_bucket(SS, *BAd, ii, ts.fb->get_part(2), w);
+                }
+            }
+
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
 
@@ -2599,8 +2689,9 @@ void * process_bucket_region(thread_data *th)
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              verbose_output_print(TRACE_CHANNEL, 0, "# Final value on %s side, N=%u rat_S[%u]=%u\n",
-                       sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              verbose_output_print(TRACE_CHANNEL, 0,
+                      "# Final value on %s side, N=%u rat_S[%u]=%u\n",
+                      sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
         }
 
@@ -2609,6 +2700,7 @@ void * process_bucket_region(thread_data *th)
         rep->reports += factor_survivors (th, i, w);
         rep->ttf += seconds_thread ();
 
+        /* Reset resieving data */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
             thread_side_data &ts = th->sides[side];
@@ -2616,12 +2708,6 @@ void * process_bucket_region(thread_data *th)
             int * b = s->fb_parts_x->rs;
             memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
-      }
-
-    for(int side = 0 ; side < 2 ; side++) {
-        thread_side_data &ts = th->sides[side];
-        free(ts.ssdpos);
-        free(ts.rsdpos);
     }
 
     return NULL;
@@ -2724,6 +2810,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+  param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
@@ -2889,7 +2976,7 @@ int main (int argc0, char *argv0[])/*{{{*/
        threads, so that threads have some freedom in avoiding the fullest
        bucket array. With only one thread, no balancing needs to be done,
        so we use only one bucket array. */
-    // FIXME: We can't do this. Some part of the code rely on the fact
+    // FIXME: We can't do this. Some parts of the code rely on the fact
     // that nr_workspaces == las->nb_threads. For instance,
     // process_bucket_region uses las->nb_threads while it should
     // sometimes use nr_workspaces.
@@ -3081,17 +3168,36 @@ int main (int argc0, char *argv0[])/*{{{*/
         workspaces->pickup_si(si);
 
         thread_pool *pool = new thread_pool(las->nb_threads);
-        /* Fill in rat and alg buckets */
-        fill_in_buckets_both(*pool, *workspaces, 1, si);
-        delete pool;
 
-        max_full = std::max(max_full, workspaces->buckets_max_full<1, shorthint_t>());
-        ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
-                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
+        /* Fill in buckets on both sides at top level */
+        fill_in_buckets_both(*pool, *workspaces, si);
 
+        /* Check that buckets are not more than full.
+         * Due to templates and si->toplevel being not constant, need a
+         * switch. (really?)
+         */
+        switch(si->toplevel) {
+            case 1:
+                max_full = std::max(max_full,
+                        workspaces->buckets_max_full<1, shorthint_t>());
+                break;
+            case 2:
+                max_full = std::max(max_full,
+                        workspaces->buckets_max_full<2, shorthint_t>());
+                break;
+            case 3:
+                max_full = std::max(max_full,
+                        workspaces->buckets_max_full<3, shorthint_t>());
+                break;
+            default:
+                ASSERT_ALWAYS(0);
+        }
+        ASSERT_ALWAYS(max_full <= 1.0 ||
+                fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
+        
         report->ttbuckets_fill += seconds();
 
-        /* This can now be factored out ! */
+        /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
 
@@ -3100,10 +3206,94 @@ int main (int argc0, char *argv0[])/*{{{*/
 
             small_sieve_extract_interval(s->rsd, s->ssd, s->fb_parts_x->rs);
             small_sieve_info("resieve", side, s->rsd);
+
+            // Initialiaze small sieve data at the first region of level 0
+            // TODO: multithread this? Probably useless...
+            for (int i = 0; i < las->nb_threads; ++i) {
+                thread_data * th = &workspaces->thrs[i];
+                sieve_side_info_ptr s = si->sides[side];
+                thread_side_data &ts = th->sides[side];
+
+                uint32_t my_row0 = (BUCKET_REGION >> si->conf->logI) * th->id;
+                ts.ssdpos = small_sieve_start(s->ssd, my_row0, si);
+                ts.rsdpos = small_sieve_copy_start(ts.ssdpos,
+                        s->fb_parts_x->rs);
+            }
         }
 
-        /* Process bucket regions in parallel */
-        workspaces->thread_do(&process_bucket_region);
+        if (si->toplevel == 1) {
+            /* Process bucket regions in parallel */
+            workspaces->thread_do(&process_bucket_region);
+        } else {
+            // Prepare plattices at internal levels
+            // TODO: this could be multi-threaded
+            plattice_x_t max_area = plattice_x_t(si->J)<<si->conf->logI;
+            plattice_enumerate_area<1>::value =
+                MIN(max_area, plattice_x_t(BUCKET_REGION_2));
+            plattice_enumerate_area<2>::value =
+                MIN(max_area, plattice_x_t(BUCKET_REGION_3));
+            plattice_enumerate_area<3>::value = max_area;
+            precomp_plattice_t precomp_plattice;
+            for (int side = 0; side < 2; ++side) {
+                for (int level = 1; level < si->toplevel; ++level) {
+                    const fb_part * fb = si->sides[side]->fb->get_part(level);
+                    const fb_slice_interface *slice;
+                    for (slice_index_t slice_index = fb->get_first_slice_index();
+                            (slice = fb->get_slice(slice_index)) != NULL; 
+                            slice_index++) {  
+                        precomp_plattice[side][level].push_back(
+                                slice->make_lattice_bases(si->qbasis, si->conf->logI));
+                    }
+                }
+            }
+
+
+            // Visit the downsorting tree depth-first.
+            // If toplevel = 1, then this is just processing all bucket
+            // regions.
+            uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+            for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
+                switch (si->toplevel) {
+                    case 2:
+                        downsort_tree<1>(i, i*BRS[2]/BRS[1],
+                                *workspaces, *pool, si, precomp_plattice);
+                        break;
+                    case 3:
+                        downsort_tree<2>(i, i*BRS[3]/BRS[1],
+                                *workspaces, *pool, si, precomp_plattice);
+                        break;
+                    default:
+                        ASSERT_ALWAYS(0);
+                }
+            }
+
+            // Cleanup precomputed lattice bases.
+            for(int side = 0 ; side < 2 ; side++) {
+                for (int level = 1; level < si->toplevel; ++level) {
+                    std::vector<plattices_vector_t*> &V =
+                        precomp_plattice[side][level];
+                    for (std::vector<plattices_vector_t *>::iterator it =
+                            V.begin();
+                            it != V.end();
+                            it++) {
+                        delete *it;
+                    }
+                }
+            }
+        }
+
+        delete pool;
+
+        // Cleanup smallsieve data
+        for (int i = 0; i < las->nb_threads; ++i) {
+            for(int side = 0 ; side < 2 ; side++) {
+                thread_data * th = &workspaces->thrs[i];
+                thread_side_data &ts = th->sides[side];
+                free(ts.ssdpos);
+                free(ts.rsdpos);
+            }
+        }
+
 
 #ifdef  DLP_DESCENT
         descent_tree::candidate_relation const& winner(las->tree->current_best_candidate());

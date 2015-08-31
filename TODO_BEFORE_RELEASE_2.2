@@ -1,0 +1,27 @@
+
+[ ] Get rid of factor.sh
+
+  - cadofactor.py (maybe move it at the top-level of the source tree)
+    should take care of finding parameter files, creating a working
+    directory, and so on.
+  - abandon the idea of copying cadofactor.py to the build-tree.
+  - allow a bindir=.... option to tell which build-tree to use.
+  - by default, use the last one known to cmake (or local.sh?);
+    for that, run eval `call_cmake.sh show`.
+  - don't forget to have all of this functional after make install.
+  - try to avoid to copy many scripts in the build-tree.
+
+[ ] Have correctly tuned parameter files
+
+[ ] Officially support DLP in GF(p)
+
+  - ship parameter file for p155 + hintfile
+  - review documentation
+  - what about bad ideals in magma ???
+
+[ ] Fix memory issue in las
+
+  - evaluation of weight of the buckets is still wrong
+
+[ ] Delete dead code
+

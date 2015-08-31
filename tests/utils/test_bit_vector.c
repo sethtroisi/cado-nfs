@@ -66,7 +66,6 @@ test_bit_vector (unsigned long iter)
 void
 test_bit_vector_read_from_file (void)
 {
-  char *s;
   bit_vector b, c;
   size_t n, i;
 
@@ -77,12 +76,13 @@ test_bit_vector_read_from_file (void)
     if (lrand48 () & 1)
       bit_vector_flipbit (b, i);
 
-  s = tmpnam (NULL);
-  bit_vector_write_to_file (b, s);
 
+  FILE * f = tmpfile();
+  bit_vector_write_to_stream (b, f);
+  fseek(f, 0L, SEEK_SET);
   bit_vector_init (c, n);
-  bit_vector_read_from_file (c, s);
-  unlink(s);
+  bit_vector_read_from_stream (c, f);
+  fclose(f);
 
   /* check both vectors are equal */
   for (i = 0; i < n; i++)

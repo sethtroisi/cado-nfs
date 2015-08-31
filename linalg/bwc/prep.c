@@ -9,7 +9,6 @@
 #include "gauss.h"
 #include "params.h"
 #include "xvectors.h"
-#include "xymats.h"
 #include "bw-common.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
@@ -26,7 +25,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     // Doing the ``hello world'' test is a very good way of testing the
     // global mpi/pthreads setup. So despite its apparent irrelevance, I
     // suggest leaving it here as a cheap sanity check.
-    hello(pi);
+    pi_hello(pi);
 
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
@@ -41,7 +40,9 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
             MPFQ_GROUPSIZE, bw->n,
             MPFQ_DONE);
 
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     /* Number of copies of m by n matrices to use for trying to obtain a
@@ -54,18 +55,15 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     unsigned int my_nx = 1;
 
-    mmt_wiring_ptr mcol = mmt->wr[bw->dir];
-    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
+    mmt_comm_ptr mcol = mmt->wr[bw->dir];
+    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
 
     uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
 
     mmt_vec xymats;
 
     /* We're cheating on the generic init routines */
-    vec_init_generic(pi->m,
-            A,
-            xymats,
-            0,
+    vec_init_generic(pi->m, A, A_pi, xymats, 0,
             bw->m * prep_lookahead_iterations);
 
     gmp_randstate_t rstate;
@@ -166,8 +164,9 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         /* Now all threads and jobs must collectively reduce the zone
          * pointed to by xymats */
-        allreduce_generic(xymats, pi->m,
-                bw->m * prep_lookahead_iterations);
+        pi_allreduce(NULL, xymats->v,
+                bw->m * prep_lookahead_iterations,
+                A_pi, BWC_PI_SUM, pi->m);
 
         /* OK -- now everybody has the same data */
 
@@ -180,7 +179,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                     A->vec_elt_stride(A, prep_lookahead_iterations)/sizeof(mp_limb_t),
                     0);
         }
-        thread_broadcast(pi->m, (void *) &dimk, sizeof(int), 0);
+        pi_thread_bcast((void *) &dimk, 1, BWC_PI_INT, 0, pi->m);
 
         if (tcan_print)
             printf("// Dimension of kernel: %d\n", dimk);
@@ -198,6 +197,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     save_x(xvecs, bw->m, my_nx, pi);
 
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
 
     /* clean up xy mats stuff */
     vec_clear_generic(pi->m, xymats, bw->m * prep_lookahead_iterations);
@@ -237,7 +237,9 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             MPFQ_GROUPSIZE, 1,
             MPFQ_DONE);
 
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
 
     if (pi->m->trank || pi->m->jrank) {
         /* as said above, this is *NOT* a parallel program.  */
@@ -354,6 +356,8 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 
 leave_prep_prog_gfp:
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
+
     A->oo_field_clear(A);
     return NULL;
 }
@@ -364,6 +368,7 @@ int main(int argc, char * argv[])
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+    parallelizing_info_init();
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
@@ -392,6 +397,7 @@ int main(int argc, char * argv[])
         pi_go(prep_prog_gfp, pl, 0);
     }
 
+    parallelizing_info_finish();
     param_list_clear(pl);
     bw_common_clear_new(bw);
 

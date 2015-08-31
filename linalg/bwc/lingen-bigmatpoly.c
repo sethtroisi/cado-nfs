@@ -288,6 +288,25 @@ void bigmatpoly_rshift(abdst_field ab, bigmatpoly_ptr dst, bigmatpoly_ptr src, u
 }
 /*}}}*/
 
+#define CHECK_MPI_DATASIZE_FITS(_size0, _size1, _type0, _code) do {	\
+    ASSERT_ALWAYS((size_t) _size0 <= (size_t) INT_MAX);			\
+    ASSERT_ALWAYS((size_t) _size1 <= (size_t) INT_MAX);			\
+    size_t _datasize = (size_t) _size0 * (size_t) _size1;		\
+    if (_datasize > (size_t) INT_MAX) {					\
+        MPI_Datatype _datatype;						\
+        MPI_Type_contiguous(_size1, _type0, &_datatype);		\
+        MPI_Type_commit(&_datatype);					\
+        int _datasize = _size1;						\
+        _code;								\
+        MPI_Type_free(&_datatype);					\
+    } else {								\
+        MPI_Datatype _datatype = _type0;				\
+        _code;								\
+    }									\
+} while (0)
+
+
+
 
 /* {{{ allgather operations */
 void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
@@ -305,7 +324,11 @@ void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
         ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[1]);
+        CHECK_MPI_DATASIZE_FITS(
+                data->m * data->n, data->alloc * abvec_elt_stride(ab, 1),
+                MPI_BYTE,
+                MPI_Bcast(data->x, _datasize, _datatype, k, a->com[1])
+        );
     }
 }
 void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
@@ -323,45 +346,11 @@ void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
         ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[2]);
-    }
-}
-/* scatter from node 0. This is not a very interesting function, in fact
- * it's used only within bigmatpoly_scatter_mat. We assume that data for
- * all rows is currently present at node 0 in each row, and we we
- * dispatch this data to the rows which actually do need it. */
-/* TODO: post asynchronous sends ? */
-static void bigmatpoly_scatter_row(abdst_field ab, bigmatpoly a)
-{
-    int irank;
-    int jrank;
-    MPI_Comm_rank(a->com[2], &irank);
-    MPI_Comm_rank(a->com[1], &jrank);
-    bigmatpoly_provision_row(ab, a);
-
-    for(unsigned int k = 0 ; k < a->n1 ; k++) {
-        /* We are currently dispatching the data we have which belongs to
-         * row k, to job k in this row */
-        if (k == 0) continue;
-        /* Send first data size, then payload from node jrank==0 to node jrank == k */
-        /* XXX: Should we ensure earlier that we agree on the size ? */
-        if (jrank == 0) {
-            matpoly_ptr data = bigmatpoly_cell(a, irank, k);
-            unsigned long size = data->size;
-            MPI_Send(&size, 1, MPI_UNSIGNED_LONG, k, 0, a->com[1]);
-            ASSERT_ALWAYS((data->m * data->n * data->size) <= (size_t) INT_MAX);
-            MPI_Send(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, 1, a->com[1]);
-        } else if (jrank == (int) k) {
-            matpoly_ptr data = bigmatpoly_my_cell(a);
-            unsigned long size = 0;
-            MPI_Recv(&size, 1, MPI_UNSIGNED_LONG, 0, 0, a->com[1], MPI_STATUS_IGNORE);
-            data->size = size;
-            unsigned long s = data->m * data->n * data->size;
-            ASSERT_ALWAYS(s <= (unsigned long) INT_MAX);
-            ASSERT_ALWAYS((data->m * data->n * data->size) <= (size_t) INT_MAX);
-            ASSERT_ALWAYS(data->size <= data->alloc);
-            MPI_Recv(data->x, data->m * data->n * data->size, abmpi_datatype(ab), 0, 1, a->com[1], MPI_STATUS_IGNORE);
-        }
+        CHECK_MPI_DATASIZE_FITS(
+                data->m * data->n, data->alloc * abvec_elt_stride(ab, 1),
+                MPI_BYTE,
+                MPI_Bcast(data->x, _datasize, _datatype, k, a->com[2])
+        );
     }
 }
 /* }}} */
@@ -430,367 +419,11 @@ void bigmatpoly_mp(abdst_field ab,/*{{{*/
     }
 }/*}}}*/
 
-/* Collect everything into node 0 */
-void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src)
-{
-    if (matpoly_check_pre_init(dst)) {
-        matpoly_init(ab, dst, src->m, src->n, src->size);
-    }
-    matpoly_zero(ab, dst);  /* See comment below about the gather operation */
-    ASSERT_ALWAYS(dst->m == src->m);
-    ASSERT_ALWAYS(dst->n == src->n);
-    int irank;
-    int jrank;
-    MPI_Comm_rank(src->com[2], &irank);
-    MPI_Comm_rank(src->com[1], &jrank);
-    /* Node 0 must receive data from everyone. Whether we seek
-     * collaboration from some of the peer nodes to delegate some of the
-     * receiving does not matter much, since _we_ will receive the whole
-     * thing in the end. However, this does have an impact on the
-     * communication pattern.
-     */
-    bigmatpoly_allgather_row(ab, src);
-    dst->size = src->size;
-    /* Do this on all nodes. This will aid the coding of the next gather */
-    unsigned int ibase = irank * src->m0;
-    for(unsigned int i = 0 ; i < src->m0 ; i++) {
-        for(unsigned int j1 = 0 ; j1 < src->n1 ; j1++) {
-            /* Collect local row i from node j1 in this row */
-            matpoly_ptr them = bigmatpoly_cell(src, irank, j1);
-            matpoly_extract_row_fragment(ab,
-                    dst, ibase+i, j1 * src->n0,
-                    them, i, 0, src->n0);
-        }
-    }
-    /* Now across rows, each row has a copy of the complete row block it
-     * belongs to (in the proper place in dst). Do gather() on node 0 in
-     * the column, now (we could as well do allgather).
-     *
-     * Unfortunately, data is strided, as we have all coefficients
-     * corresponding to our row block, but obviously these are spaced
-     * apart.
-     *
-     * There are several possibilities:
-     *  - post large number of nonblocking transfers. Imagine submatrices
-     *    of size maybe 2*2, with 64-byte data, that means very tiny
-     *    transfers (256 bytes). It is hard to imagine that reasonable
-     *    performance may be obtained like this.
-     *  - allocate some transitory buffer to do larger transfers, still
-     *    asynchronous ones. It is perhaps possible to achieve fairly
-     *    good performance like this.
-     *  - handle striding by just ensuring that data is zero where we
-     *    expect no coefficients (see matpoly_zero above). We may thus do
-     *    a simple MPI_BXOR. It's a bit cheating, but it works. We
-     *    do at least a fraction 1/r of useless transfers.
-     * Note that it is not clear at this point whether gather_mat is a
-     * bottleneck or not.
-     */
-    /* size-wise, which MPI_Reduce is rather big. It's not unexpected,
-     * since in the end, we do _gather_ everything here.
-     */
-    /* MPI_IN_PLACE semantics for Reduce() and Gather() are stupid. */
-    MPI_Reduce(
-            irank ? matpoly_part(ab, dst, 0, 0, 0) : MPI_IN_PLACE,
-            irank ? NULL : matpoly_part(ab, dst, 0, 0, 0),
-            src->m * src->n * src->size,
-            abmpi_datatype(ab),
-            abmpi_addition_op(ab), 0, src->com[2]);
-}
-
-/* Exactly the converse of the previous function. */
-void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
-{
-    int irank;
-    int jrank;
-    MPI_Comm_rank(dst->com[2], &irank);
-    MPI_Comm_rank(dst->com[1], &jrank);
-    /* src at root must be initialized. src may be pre-init at other
-     * nodes */
-    int pre_init_status[2];     /* local, max-global */
-    pre_init_status[0] = matpoly_check_pre_init(src);
-    pre_init_status[1] = pre_init_status[0];
-    MPI_Allreduce(MPI_IN_PLACE, &(pre_init_status[1]), 1, MPI_INT, MPI_MAX, dst->com[2]);
-    MPI_Allreduce(MPI_IN_PLACE, &(pre_init_status[1]), 1, MPI_INT, MPI_MAX, dst->com[1]);
-
-    if (irank == 0 && jrank == 0) {
-        ASSERT_ALWAYS(pre_init_status[0] == 0);
-    }
-
-    /* source argument src at nodes other than root are uninitialized */
-    if (pre_init_status[1]) {
-        /* So, initialize them... */
-        /* XXX. This is quite inelegant */
-        if (irank || jrank) {
-            ASSERT_ALWAYS(pre_init_status[0] == 1);
-        }
-        /* share allocation size. Don't share data, as it's not very
-         * relevant. */
-        matpoly shell;
-        shell->m = src->m;
-        shell->n = src->n;
-        shell->size = src->size;
-        shell->alloc = src->alloc;
-        /* 2-step broadcast */
-        MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->com[2]);
-        MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->com[1]);
-        if (irank || jrank) {
-            /* make sure we have exactly the same amount of allocated
-             * memory everywhere */
-            /* XXX In effect, this allocates the root amount
-             * *everywhere*, which is completely insane !
-             */
-            matpoly_init(ab, src, shell->m, shell->n, shell->alloc);
-            src->size = shell->size;
-        }
-    }
-
-    /* dst must be either initialized, or in pre-init mode */
-    if (bigmatpoly_check_pre_init(dst)) {
-        bigmatpoly_finish_init(ab, dst, src->m, src->n, src->size);
-    }
-    ASSERT_ALWAYS(dst->m == src->m);
-    ASSERT_ALWAYS(dst->n == src->n);
-    bigmatpoly_set_size(dst, src->size);
-    /* See similar comment in gather_mat. We can't do scatter() here.
-     * We're better off with a simple bcast.
-     * 
-     * Copy the full range of allocated bytes, not only up to size.
-     */
-    ASSERT_ALWAYS((src->m * src->n * src->alloc) <= (size_t) INT_MAX);
-    MPI_Bcast(
-            matpoly_part(ab, src, 0, 0, 0),
-            src->m * src->n * src->alloc,
-            abmpi_datatype(ab),
-            0,
-            dst->com[2]);
-    /* Now scatter across rows */
-    bigmatpoly_provision_row(ab, dst);
-    /* propagate the size info */
-    bigmatpoly_set_size(dst, dst->size);
-    /* Copy our matpoly parts to our local bigmatpoly cells. Then we'll
-     * do scatter() (admittedly, this is one extra copy which we could
-     * seek to avoid) */
-    unsigned int ibase = irank * dst->m0;
-    for(unsigned int i = 0 ; i < dst->m0 ; i++) {
-        for(unsigned int j1 = 0 ; j1 < dst->n1 ; j1++) {
-            matpoly_ptr them = bigmatpoly_cell(dst, irank, j1);
-            matpoly_extract_row_fragment(ab,
-                    them, i, 0,
-                    src, ibase+i, j1*dst->n0,
-                    dst->n0);
-        }
-    }
-    bigmatpoly_scatter_row(ab, dst);
-    bigmatpoly_unprovision_row(ab, dst);
-}
-
-/* Collect everything into node 0 */
-void bigmatpoly_gather_mat_alt(abdst_field ab, matpoly dst, bigmatpoly src)
-{
-    // All vectors should be the same allocated space. Let's pick the one
-    // that's inside our part of src.
-    size_t alloc;
-    {
-        matpoly_ptr me = bigmatpoly_my_cell(src);
-        alloc = me->alloc;
-        ASSERT_ALWAYS(alloc >= src->size);
-    }
-
-    if (matpoly_check_pre_init(dst)) {
-        matpoly_init(ab, dst, src->m, src->n, alloc);
-    }
-
-    int rank;
-    int irank;
-    int jrank;
-    MPI_Comm_rank(src->com[0], &rank);
-    MPI_Comm_rank(src->com[2], &irank);
-    MPI_Comm_rank(src->com[1], &jrank);
-    /* dst at root must be initialized.
-     * dst at other nodes is untouched. */
-
-    /* sanity checks, because the code below assumes this. */
-    ASSERT_ALWAYS(irank * (int) src->n1 + jrank == rank);
-    ASSERT_ALWAYS(dst->m == src->m);
-    ASSERT_ALWAYS(dst->n == src->n);
-    ASSERT_ALWAYS(dst->size = src->size);
-    ASSERT_ALWAYS((src->n0 * alloc) <= (size_t) INT_MAX);
-
-    // Node 0 receives
-    if (!rank) {
-        MPI_Request * reqs = malloc(src->m1 * src->n1 * src->m0 * sizeof(MPI_Request));
-        MPI_Request * req = reqs;
-        /* the master receives data from everyone */
-        for(unsigned int i1 = 0 ; i1 < src->m1 ; i1++) {
-            for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
-                for(unsigned int j1 = 0 ; j1 < src->n1 ; j1++) {
-                    unsigned int ii = i1 * src->m0 + i0;
-                    unsigned int jj = j1 * src->n0;
-                    unsigned int count = src->n0 * alloc;
-                    unsigned int peer = i1 * src->n1 + j1;
-                    unsigned int tag = ii * src->n + jj;
-                    abdst_vec to = matpoly_part(ab, dst, ii, jj, 0);
-
-                    if (peer == 0) {
-                        /* talk to ourself */
-                        matpoly_ptr me = bigmatpoly_my_cell(src);
-                        abdst_vec from = matpoly_part(ab, me, i0, 0, 0);
-                        abvec_set(ab, to, from, count);
-                    } else {
-                        MPI_Irecv(to, count, abmpi_datatype(ab),
-                                peer, tag, src->com[0], req);
-                    }
-
-                    req++;
-                }
-            }
-        }
-
-        req = reqs;
-        for(unsigned int i1 = 0 ; i1 < src->m1 ; i1++) {
-            for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
-                for(unsigned int j1 = 0 ; j1 < src->n1 ; j1++) {
-                    unsigned int peer = i1 * src->n1 + j1;
-                    if (peer)
-                        MPI_Wait(req, MPI_STATUS_IGNORE);
-                    req++;
-                }
-            }
-        }
-        free(reqs);
-    } else {
-        // All the other nodes send their data.
-        MPI_Request * reqs = malloc(src->m0 * sizeof(MPI_Request));
-        MPI_Request * req = reqs;
-        /* receive. Each job will receive exactly dst->m0 transfers */
-        matpoly_ptr me = bigmatpoly_my_cell(src);
-        for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
-            unsigned int i1 = irank;
-            unsigned int j1 = jrank;
-            unsigned int ii = i1 * src->m0 + i0;
-            unsigned int jj = j1 * src->n0;
-            unsigned int count = src->n0 * alloc;
-            unsigned int tag = ii * src->n + jj;
-            abdst_vec from = matpoly_part(ab, me, i0, 0, 0);
-            MPI_Isend(from, count, abmpi_datatype(ab),
-                    0, tag, src->com[0], req);
-            req++;
-        }
-        req = reqs;
-        for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
-            MPI_Wait(req, MPI_STATUS_IGNORE);
-            req++;
-        }
-        free(reqs);
-    }
-}
-
-
-/* Exactly the converse of the previous function. */
-void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
-{
-    int rank;
-    int irank;
-    int jrank;
-    MPI_Comm_rank(dst->com[0], &rank);
-    MPI_Comm_rank(dst->com[2], &irank);
-    MPI_Comm_rank(dst->com[1], &jrank);
-    /* src at root must be initialized.
-     * src at other nodes is untouched. */
-
-    /* share allocation size. Don't share data, as it's not very
-     * relevant. */
-    matpoly shell;
-    shell->m = src->m;
-    shell->n = src->n;
-    shell->size = src->size;
-    shell->alloc = src->alloc;
-
-    MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->com[0]);
-
-    /* dst must be in pre-init mode */
-    ASSERT_ALWAYS(bigmatpoly_check_pre_init(dst));
-
-    /* Important: allocate the same area */
-    bigmatpoly_finish_init(ab, dst, shell->m, shell->n, shell->alloc);
-
-    bigmatpoly_set_size(dst, shell->size);
-
-    /* sanity check, because the code below assumes this. */
-    ASSERT_ALWAYS(irank * (int) dst->n1 + jrank == rank);
-    ASSERT_ALWAYS((dst->n0 * shell->alloc) <= (size_t) INT_MAX);
-
-    if (!rank) {
-        MPI_Request * reqs = malloc(dst->m1 * dst->n1 * dst->m0 * sizeof(MPI_Request));
-        MPI_Request * req = reqs;
-        /* the master sends data to everyone ! */
-        for(unsigned int i1 = 0 ; i1 < dst->m1 ; i1++) {
-            for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
-                for(unsigned int j1 = 0 ; j1 < dst->n1 ; j1++) {
-                    unsigned int ii = i1 * dst->m0 + i0;
-                    unsigned int jj = j1 * dst->n0;
-                    unsigned int count = dst->n0 * shell->alloc;
-                    unsigned int peer = i1 * dst->n1 + j1;
-                    unsigned int tag = ii * dst->n + jj;
-                    abdst_vec from = matpoly_part(ab, src, ii, jj, 0);
-
-                    if (peer == 0) {
-                        /* talk to ourself */
-                        matpoly_ptr me = bigmatpoly_my_cell(dst);
-                        abdst_vec to = matpoly_part(ab, me, i0, 0, 0);
-                        abvec_set(ab, to, from, count);
-                    } else {
-                        MPI_Isend(from, count, abmpi_datatype(ab),
-                                peer, tag, dst->com[0], req);
-                    }
-                    req++;
-                }
-            }
-        }
-
-        req = reqs;
-        for(unsigned int i1 = 0 ; i1 < dst->m1 ; i1++) {
-            for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
-                for(unsigned int j1 = 0 ; j1 < dst->n1 ; j1++) {
-                    unsigned int peer = i1 * dst->n1 + j1;
-                    if (peer)
-                        MPI_Wait(req, MPI_STATUS_IGNORE);
-                    req++;
-                }
-            }
-        }
-        free(reqs);
-    } else {
-        MPI_Request * reqs = malloc(dst->m0 * sizeof(MPI_Request));
-        MPI_Request * req = reqs;
-        /* receive. Each job will receive exactly dst->m0 transfers */
-        matpoly_ptr me = bigmatpoly_my_cell(dst);
-        for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
-            unsigned int i1 = irank;
-            unsigned int j1 = jrank;
-            unsigned int ii = i1 * dst->m0 + i0;
-            unsigned int jj = j1 * dst->n0;
-            unsigned int count = dst->n0 * shell->alloc;
-            unsigned int tag = ii * dst->n + jj;
-            abdst_vec to = matpoly_part(ab, me, i0, 0, 0);
-            MPI_Irecv(to, count, abmpi_datatype(ab),
-                    0, tag, dst->com[0], req);
-            req++;
-        }
-        req = reqs;
-        for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
-            MPI_Wait(req, MPI_STATUS_IGNORE);
-            req++;
-        }
-        free(reqs);
-    }
-}
-
 /*
- * Same functionality as above, but with "partial" transfer in order to
- * allow some kind of streaming between reading a matrix on node 0 and
- * scaterring it on all the nodes. (and the same for gather / writing to
- * file on node 0).
+ * gather to node 0, or scatter from node 0, but use "partial" transfer
+ * in order to allow some kind of streaming between reading a matrix on
+ * node 0 and scaterring it on all the nodes. (and the same for gather /
+ * writing to file on node 0).
  */
 
 /* The piece [offset, offset+length[ of the bigmatpoly source is gathered
@@ -812,6 +445,10 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
     /* sanity checks, because the code below assumes this. */
     ASSERT_ALWAYS(irank * (int) src->n1 + jrank == rank);
     ASSERT_ALWAYS(length <= (size_t) INT_MAX);
+
+    MPI_Datatype mt;
+    MPI_Type_contiguous(length * abvec_elt_stride(ab, 1), MPI_BYTE, &mt);
+    MPI_Type_commit(&mt);
 
     // Node 0 receives data
     if (!rank) {
@@ -840,8 +477,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
                             absrc_vec from = matpoly_part_const(ab, me, i0, j0, offset);
                             abvec_set(ab, to, from, length);
                         } else {
-                            MPI_Irecv(to, length, abmpi_datatype(ab),
-                                    peer, tag, src->com[0], req);
+                            MPI_Irecv(to, 1, mt, peer, tag, src->com[0], req);
                         }
                         req++;
                     }
@@ -878,8 +514,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
                 unsigned int tag = ii * src->n + jj;
                 absrc_vec from = matpoly_part_const(ab, me, i0, j0, offset);
                 /* battle with const-deprived MPI prototypes... */
-                MPI_Isend((void*)from, length, abmpi_datatype(ab),
-                        0, tag, src->com[0], req);
+                MPI_Isend((void*)from, 1, mt, 0, tag, src->com[0], req);
                 req++;
             }
         }
@@ -892,6 +527,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
         }
         free(reqs);
     }
+    MPI_Type_free(&mt);
 }
 
 /* Exactly the converse of the previous function.
@@ -914,6 +550,11 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
     MPI_Comm_rank(dst->com[1], &jrank);
 
     bigmatpoly_set_size(dst, offset+length);
+
+    MPI_Datatype mt;
+    MPI_Type_contiguous(length * abvec_elt_stride(ab, 1), MPI_BYTE, &mt);
+    MPI_Type_commit(&mt);
+
 
     /* sanity check, because the code below assumes this. */
     ASSERT_ALWAYS(irank * (int) dst->n1 + jrank == rank);
@@ -939,8 +580,7 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
                             abdst_vec to = matpoly_part(ab, me, i0, j0, offset);
                             abvec_set(ab, to, from, length);
                         } else {
-                            MPI_Isend(from, length, abmpi_datatype(ab),
-                                    peer, tag, dst->com[0], req);
+                            MPI_Isend(from, 1, mt, peer, tag, dst->com[0], req);
                         }
                         req++;
                     }
@@ -974,8 +614,7 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
                 unsigned int jj = j1 * dst->n0 + j0;
                 unsigned int tag = ii * dst->n + jj;
                 abdst_vec to = matpoly_part(ab, me, i0, j0, offset);
-                MPI_Irecv(to, length, abmpi_datatype(ab),
-                        0, tag, dst->com[0], req);
+                MPI_Irecv(to, 1, mt, 0, tag, dst->com[0], req);
                 req++;
             }
         }
@@ -988,12 +627,13 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
         }
         free(reqs);
     }
+    MPI_Type_free(&mt);
 }
 
 
 
 /* Collect everything into node 0 */
-void bigmatpoly_gather_mat_alt2(abdst_field ab, matpoly dst, bigmatpoly src)
+void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src)
 {
     matpoly dst_partial;
     size_t length = 100;
@@ -1038,7 +678,7 @@ void bigmatpoly_gather_mat_alt2(abdst_field ab, matpoly dst, bigmatpoly src)
 
 
 /* Exactly the converse of the previous function. */
-void bigmatpoly_scatter_mat_alt2(abdst_field ab,
+void bigmatpoly_scatter_mat(abdst_field ab,
         bigmatpoly_ptr dst, matpoly_ptr src)
 {
     matpoly src_partial;

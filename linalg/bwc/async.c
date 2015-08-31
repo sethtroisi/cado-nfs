@@ -99,7 +99,7 @@ void timing_clear(struct timing_data * t MAYBE_UNUSED)
 {
 }
 
-static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int print)
+static void timing_rare_checks(pi_comm_ptr wr, struct timing_data * t, int iter, int print)
 {
     /* We've decided that it was time to check for asynchronous data.
      * Since it's an expensive operation, the whole point is to avoid
@@ -123,7 +123,7 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
 
     double good_period = PREFERRED_ASYNC_LAG / av;
     int guess = 1 + (int) good_period;
-    global_broadcast(wr, &guess, sizeof(int), 0, 0);
+    pi_bcast(&guess, 1, BWC_PI_INT, 0, 0, wr);
     /* negative stuff is most probably caused by overflows in a fast
      * context */
     if (guess <= 0) guess = 10;
@@ -136,17 +136,9 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
     /* Now do some possibly expensive checks */
 
     /* This read is unsafe. We need to protect it. */
-    unsigned int caught_something = hup_caught; // || int_caught;
+    int caught_something = hup_caught; // || int_caught;
 
-    /* propagate the unsafe read. */
-    if (wr->trank == 0) {
-        int err = MPI_Allreduce(MPI_IN_PLACE, &caught_something, 1,
-                MPI_UNSIGNED, MPI_MAX, wr->pals);
-        ASSERT_ALWAYS(!err);
-    }
-
-    /* reconcile threads */
-    thread_broadcast(wr, &caught_something, sizeof(unsigned int), 0);
+    pi_allreduce(NULL, &caught_something, 1, BWC_PI_INT, BWC_PI_MAX, wr);
 
     /* ok, got it. Before we possibly leave, make sure everybody has read
      * the data from the pointer. */
@@ -170,7 +162,7 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
 
 void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, int print)
 {
-    pi_wiring_ptr wr = pi->m;
+    pi_comm_ptr wr = pi->m;
 
     // printf("timing_check %d timing%d\n", iter, wr->trank);
 
@@ -234,72 +226,6 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     grid_print(pi, buf, sizeof(buf), print);
 }
 
-/* This adds the contents of x[0..n[ on all threads, and communicates the
- * result to everyone. This is a thread-level only function !
- */
-void pi_thread_allreduce_add_double(parallelizing_info pi, double * x, int n)
-{
-    /* Broadcast master's x */
-    double * master_x = (pi->m->trank == 0) ? x : NULL;
-    thread_broadcast(pi->m, (void **) &master_x, sizeof(void*), 0);
-    /* Threads other than master add their x to master's x */
-    if (pi->m->trank != 0) {
-        my_pthread_mutex_lock(pi->m->th->m);
-        for(int i = 0 ; i < n ; i++)
-            master_x[i] += x[i];
-        my_pthread_mutex_unlock(pi->m->th->m);
-    }
-    serialize_threads(pi->m);
-    /* Master has totals in x, everyone else needs to update their x */
-    if (pi->m->trank != 0)
-        memcpy(x, master_x, n * sizeof(int));
-    /* as long as we have a read intention on master_x, we should not get
-     * past this barrier */
-    serialize_threads(pi->m);
-}
-
-void pi_thread_allreduce_min_double(parallelizing_info pi, double * x, int n)
-{
-    /* Broadcast master's x */
-    double * master_x = (pi->m->trank == 0) ? x : NULL;
-    thread_broadcast(pi->m, (void **) &master_x, sizeof(void*), 0);
-    /* Threads other than master add their x to master's x */
-    if (pi->m->trank != 0) {
-        my_pthread_mutex_lock(pi->m->th->m);
-        for(int i = 0 ; i < n ; i++)
-            master_x[i] = MIN(master_x[i], x[i]);
-        my_pthread_mutex_unlock(pi->m->th->m);
-    }
-    serialize_threads(pi->m);
-    /* Master has totals in x, everyone else needs to update their x */
-    if (pi->m->trank != 0)
-        memcpy(x, master_x, n * sizeof(int));
-    /* as long as we have a read intention on master_x, we should not get
-     * past this barrier */
-    serialize_threads(pi->m);
-}
-
-void pi_thread_allreduce_max_double(parallelizing_info pi, double * x, int n)
-{
-    /* Broadcast master's x */
-    double * master_x = (pi->m->trank == 0) ? x : NULL;
-    thread_broadcast(pi->m, (void **) &master_x, sizeof(void*), 0);
-    /* Threads other than master add their x to master's x */
-    if (pi->m->trank != 0) {
-        my_pthread_mutex_lock(pi->m->th->m);
-        for(int i = 0 ; i < n ; i++)
-            master_x[i] = MAX(master_x[i], x[i]);
-        my_pthread_mutex_unlock(pi->m->th->m);
-    }
-    serialize_threads(pi->m);
-    /* Master has totals in x, everyone else needs to update their x */
-    if (pi->m->trank != 0)
-        memcpy(x, master_x, n * sizeof(int));
-    /* as long as we have a read intention on master_x, we should not get
-     * past this barrier */
-    serialize_threads(pi->m);
-}
-
 static const char * timer_names[] = TIMER_NAMES;
 
 /* stage=0 for krylov, 1 for mksol */
@@ -331,28 +257,18 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
 
     int ndoubles = NTIMERS_EACH_ITERATION * sizeof(timing_interval_data) / sizeof(double);
 
-    memcpy(Tmin, T, sizeof(Tmin));
-    memcpy(Tmax, T, sizeof(Tmax));
-    memcpy(Tsum, T, sizeof(Tsum));
-
-    SEVERAL_THREADS_PLAY_MPI_BEGIN(pi->m) {
-        int err;
-        err = MPI_Allreduce(MPI_IN_PLACE, Tsum, ndoubles, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-        ASSERT_ALWAYS(!err);
-        err = MPI_Allreduce(MPI_IN_PLACE, Tmin, ndoubles, MPI_DOUBLE, MPI_MIN, pi->m->pals);
-        ASSERT_ALWAYS(!err);
-        err = MPI_Allreduce(MPI_IN_PLACE, Tmax, ndoubles, MPI_DOUBLE, MPI_MAX, pi->m->pals);
-        ASSERT_ALWAYS(!err);
-
-        err = MPI_Allreduce(MPI_IN_PLACE, &ncoeffs_d, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-        ASSERT_ALWAYS(!err);
-    }
-    SEVERAL_THREADS_PLAY_MPI_END;
-
-    pi_thread_allreduce_add_double(pi, (double*) Tsum, ndoubles);
-    pi_thread_allreduce_min_double(pi, (double*) Tmin, ndoubles);
-    pi_thread_allreduce_max_double(pi, (double*) Tmax, ndoubles);
-    pi_thread_allreduce_add_double(pi, &ncoeffs_d, 1);
+    pi_allreduce((double*) T, (double*) Tsum,
+            ndoubles, BWC_PI_DOUBLE, BWC_PI_SUM,
+            pi->m);
+    pi_allreduce((double*) T, (double*) Tmin,
+            ndoubles, BWC_PI_DOUBLE, BWC_PI_MIN,
+            pi->m);
+    pi_allreduce((double*) T, (double*) Tmax,
+            ndoubles, BWC_PI_DOUBLE, BWC_PI_MAX,
+            pi->m);
+    pi_allreduce(NULL, &ncoeffs_d,
+            1, BWC_PI_DOUBLE, BWC_PI_SUM,
+            pi->m);
 
     double sum_dwct = 0;
     for(int i = 0 ; i < NTIMERS_EACH_ITERATION ; i++) {

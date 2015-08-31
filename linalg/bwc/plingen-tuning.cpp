@@ -22,7 +22,7 @@
 #include "mpfq_layer.h"
 #include "lingen-polymat.h"
 #include "lingen-matpoly.h"
-#include "lingen-bigpolymat.h"
+// #include "lingen-bigpolymat.h" // 20150826: deleted.
 #ifdef  HAVE_MPIR
 #include "lingen-matpoly-ft.h"
 #endif
@@ -1256,6 +1256,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
 }/*}}}*/
 
 #if 0
+/* 20150826: bigpolymat deleted */
 void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigned int m1, unsigned int n1, MPI_Comm comm)/*{{{*/
 {
     int rank;

@@ -1072,12 +1072,12 @@ class ReconstructLog(Program):
 
 class Descent(Program):
     binary = "descent.py"
-    name = binary
+    name = "descent"
     subdir = "scripts"
     def __init__(self, *,
                  target: Parameter(prefix="--"),
                  db: Parameter(prefix="--", is_input_file=True),
-                 execpath: Parameter("cadobindir", prefix="--"),
+                 cadobindir: Parameter(prefix="--"),
                  descent_hint: Parameter("descent-hint", prefix="--",
                      is_input_file=True),
                  init_I: Parameter("init-I", prefix="--"),

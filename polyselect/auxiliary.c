@@ -1278,15 +1278,14 @@ get_alpha (mpz_poly_ptr f, unsigned long B)
   double alpha, e;
   unsigned long p;
   mpz_t disc;
-  unsigned int d = f->deg;
 
   /* for F linear, we have q_p = 1 for all p, thus
      alpha(F) = sum(prime p <= B, log(p)/(p^2-1)) ~ 0.569959993064325 */
-  if (d == 1)
+  if (f->deg == 1)
     return 0.569959993064325;
 
   mpz_init (disc);
-  discriminant (disc, f->coeff, d);
+  mpz_poly_discriminant (disc, f);
 
   /* special_valuation returns the expected average exponent of p in F(a,b)
      for coprime a, b, i.e., e = q_p*p/(p^2-1), thus the contribution for p
@@ -1365,10 +1364,9 @@ get_biased_alpha_projective (mpz_poly_ptr f, unsigned long B)
    double alpha, e;
    unsigned long p;
    mpz_t disc;
-   int d = f->deg;
 
    mpz_init (disc);
-   discriminant (disc, f->coeff, d);
+   mpz_poly_discriminant (disc, f);
 
    /* prime p=2 */
    e = special_valuation (f, 2, disc) - special_valuation_affine (f, 2, disc);

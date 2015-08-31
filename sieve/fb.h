@@ -217,7 +217,7 @@ class fb_slice_interface {
   virtual ~fb_slice_interface(){}
   virtual int get_nr_roots() const = 0;
   virtual bool is_general() const = 0;
-  virtual fb_transformed_vector * make_lattice_bases(const qlattice_basis &, int) const = 0;
+  virtual plattices_vector_t * make_lattice_bases(const qlattice_basis &, int) const = 0;
   virtual unsigned char get_logp() const = 0;
   virtual slice_index_t get_index() const = 0;
   virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
@@ -286,7 +286,16 @@ class fb_slice : public fb_slice_interface {
     ASSERT_ALWAYS(_begin + offset < _end);
     return _begin[offset].k;
   }
-  fb_transformed_vector * make_lattice_bases(const qlattice_basis &, int) const;
+  plattices_vector_t * make_lattice_bases(const qlattice_basis &, int) const;
+};
+
+/* A predicate to test whether an fb_slice has weight at most x, for use with
+   STL search functions etc. */
+class fb_slice_pred_weight_le {
+  const double max_weight;
+public:
+  fb_slice_pred_weight_le (const double x) : max_weight(x) {}
+  bool operator() (const fb_slice_interface *slice) const {return slice->get_weight() <= max_weight;}
 };
 
 
@@ -483,6 +492,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   fb_part *parts[FB_MAX_PARTS];
   fbprime_t thresholds[FB_MAX_PARTS];
   void finalize();
+  int toplevel;
  public:
   fb_factorbase(const fbprime_t *thresholds,
                 fbprime_t powlim,
@@ -498,7 +508,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void fprint(FILE *) const;
   void append(const fb_general_entry &);
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  fb_part *get_part(const size_t n) {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
+  fb_part *get_part(const size_t n) const {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
   void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
   void make_slices(double scale, const double max_weight[FB_MAX_PARTS]);
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
@@ -509,6 +519,7 @@ class fb_factorbase: public fb_interface, private NonCopyable {
     }
     return NULL;
   }
+  int get_toplevel() const { return toplevel; }
 };
 
 
