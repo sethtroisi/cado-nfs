@@ -1393,14 +1393,11 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
         }
         free(vec);
 
-        ASSERT(list_FK->v[0]->c[0] > -(int64_t)(2 * H->h[0]));
-        ASSERT(0 >= list_FK->v[0]->c[0]);
-        ASSERT(0 <= list_FK->v[1]->c[0]);
-        ASSERT(list_FK->v[1]->c[0] < (int64_t)(2 * H->h[0]));
-        ASSERT(list_FK->v[0]->c[1] > 0);
-        ASSERT(list_FK->v[1]->c[1] > 0);
 
         if (boolean == 0) {
+          ASSERT(list_FK->v[0]->c[1] == 0);
+          ASSERT(list_FK->v[1]->c[0] == 0);
+
           fprintf(stderr,
               "# Plane sieve (called by space sieve) does not support this type of Mqr.\n");
           mat_int64_fprintf_comment(stderr, Mqr);
@@ -1419,6 +1416,14 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 
           return;
         }
+
+        ASSERT(list_FK->v[0]->c[0] > -(int64_t)(2 * H->h[0]));
+        ASSERT(0 >= list_FK->v[0]->c[0]);
+        ASSERT(0 <= list_FK->v[1]->c[0]);
+        ASSERT(list_FK->v[1]->c[0] < (int64_t)(2 * H->h[0]));
+        ASSERT(list_FK->v[0]->c[1] > 0);
+        ASSERT(list_FK->v[1]->c[1] > 0);
+
         //TODO: Go up, and just when we need.
         if (space_sieve_good_vector(list_FK->v[0], H)) {
           if (!int64_vector_in_list_zero(list_FK->v[0], list_vec_zero)) {
