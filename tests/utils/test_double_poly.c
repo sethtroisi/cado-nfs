@@ -272,9 +272,16 @@ test_double_poly_set_mpz_poly (void)
   mpz_poly_clear (q);
 }
 
-MAYBE_UNUSED int resultant_error(double true_val, double exp_val, int error)
+unsigned int resultant_error(double true_val, double exp_val,
+    unsigned int error)
 {
-  if ((int)abs(log2(abs(true_val)) - log2(abs(exp_val))) < error) {
+  if (true_val == 0.0) {
+    true_val = 1.0;
+  }
+  if (exp_val == 0.0) {
+    exp_val = 1.0;
+  }
+  if ((unsigned int)fabs(log2(fabs(true_val)) - log2(fabs(exp_val))) <= error) {
     return 1;
   }
   return 0;
@@ -311,6 +318,29 @@ MAYBE_UNUSED void test_double_poly_resultant() {
   double_poly_clear(f);
   double_poly_clear(g);
   val = 1102790158070603587092742144.000000;
+  ASSERT_ALWAYS(resultant_error(val, res, 0));
+
+  /*f=1365*x^6 + 1366*x^5+1368*x^4+1368*x^3+1368*x^2+1366*x+1366*/
+  /*g=0*x^3+8320*x^2-50560*x-896*/
+  parse_poly(f, "1366 1366 1368 1368 1368 1366 1365");
+  parse_poly(g, "-896 -50560 8320 0");
+  double_poly_degree(g);
+  res = double_poly_resultant(f, g);
+  double_poly_clear(f);
+  double_poly_clear(g);
+  val = 37263864605996575174727132124282880.000000;
+  ASSERT_ALWAYS(resultant_error(val, res, 0));
+
+  /*f=1365*x^6 + 1366*x^5+1368*x^4+1368*x^3+1368*x^2+1366*x+1366*/
+  /*g=15*x^2-43368*x-4753*/
+
+  parse_poly(f, "1366 1366 1368 1368 1368 1366 1365");
+  parse_poly(g, "-4753 -43368 15");
+  double_poly_degree(g);
+  res = double_poly_resultant(f, g);
+  double_poly_clear(f);
+  double_poly_clear(g);
+  val = 11186466747618860118741892404376785.000000;
   ASSERT_ALWAYS(resultant_error(val, res, 0));
 }
 
