@@ -481,6 +481,27 @@ double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q)
   p->deg = d;
 }
 
+void
+double_poly_set_const_mpz_poly (double_poly_ptr p, mpz_poly_srcptr q)
+{
+  unsigned int d = q->deg, i;
+
+  for (i = 0; i <= d; i++)
+    p->coeff[i] = mpz_get_d (q->coeff[i]);
+  p->deg = d;
+}
+
+void mpz_poly_set_double_poly(mpz_poly_ptr f, double_poly_srcptr g)
+{
+  ASSERT(f->alloc - 1 == g->deg);
+
+  for (int i = 0; i <= g->deg; i++) {
+    mpz_set_d(f->coeff[i], g->coeff[i]);
+  }
+  f->deg = g->deg;
+}
+
+
 /*
  * Other printf function.
  */
@@ -511,13 +532,9 @@ MAYBE_UNUSED static void double_poly_fprintf(FILE *fp, double_poly_srcptr f)
 /*
  * Compute the real degree of the polynomial and realloc coeff.
  */
-static void double_poly_degree(double_poly_ptr f)
+void double_poly_degree(double_poly_ptr f)
 {
-  /*double_poly_print(stdout, f, "f: ");*/
-  /*printf("Look at %d\n", f->deg);*/
   while (f->deg >= 0 && f->coeff[f->deg] == 0) {
-    /*printf("Look at %d\n", f->deg - 1);*/
-    /*getchar();*/
     f->deg = f->deg - 1;
   }
   f->coeff = (double *) realloc(f->coeff, sizeof(double) * (f->deg + 1));
@@ -549,13 +566,18 @@ MAYBE_UNUSED static int double_poly_cmp(double_poly_ptr a, double_poly_ptr b)
 }
 
 /*
- * g = mul * f.
+ * f = mul * g.
  */
 static void double_poly_mul_double(double_poly_ptr f, double_poly_srcptr g,
     double mul)
 {
+  if (g->deg < 0) {
+    f->deg = -1;
+    return;
+  }
+
   ASSERT(mul != 0.0);
-  ASSERT(f->deg >= 0);
+  ASSERT(g->deg >= 0);
   ASSERT(f->deg >= g->deg);
 
   double_poly_set(f, g);
@@ -563,6 +585,7 @@ static void double_poly_mul_double(double_poly_ptr f, double_poly_srcptr g,
   for (int i = 0; i <= f->deg; i++) {
     f->coeff[i] = f->coeff[i] * mul;
   }
+  double_poly_degree( f);
 }
 
 /*
@@ -686,11 +709,13 @@ static int double_poly_pseudo_division(double_poly_ptr q, double_poly_ptr r,
 {
   ASSERT(a->deg >= b->deg);
   ASSERT(b->deg != -1);
+
 #ifndef NDEBUG
   if (q != NULL) {
     ASSERT(q->deg >= a->deg - b->deg);
   }
 #endif // NDEBUG
+
   ASSERT(r->deg == a->deg);
 
   int m = a->deg;
@@ -744,7 +769,7 @@ static int double_poly_pseudo_division(double_poly_ptr q, double_poly_ptr r,
     double_poly_clear(s);
     e--;
     //TODO: is it necessary?
-    if (double_poly_isnan_or_isinf(r)) {
+    if (double_poly_isnan_or_isinf(r) || r->deg == -1) {
       return 0;
     }
   }
@@ -805,16 +830,6 @@ static int double_poly_pseudo_remainder(double_poly_ptr r,
   return double_poly_pseudo_division(NULL, r, a, b);
 }
 
-static void mpz_poly_set_double_poly(mpz_poly_ptr f, double_poly_srcptr g)
-{
-  ASSERT(f->alloc - 1 == g->deg);
-
-  for (int i = 0; i <= g->deg; i++) {
-    mpz_set_d(f->coeff[i], g->coeff[i]);
-  }
-  f->deg = g->deg;
-}
-
 //TODO: follow the modification of mpz_poly_resultant.
 double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
 {
@@ -860,8 +875,6 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
 
   while (b->deg > 0) {
     //TODO: verify if it is necessary.
-    /*double_poly_degree(a);*/
-    /*double_poly_degree(b);*/
     d = a->deg - b->deg;;
 
     if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
@@ -894,18 +907,14 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
   if (pseudo_div) {
     ASSERT(a->deg > 0);
 
-    h = pow(h, (double) (a->deg - 1));
-    //Prevent an error if b = 0.
+    //For now, if b->deg == -1, pseudo_div == 0.
     if (b->deg == -1) {
-      double_poly_clear(a);
-      double_poly_clear(b);
-      double_poly_clear(r);
-      return 0;
+      ASSERT(0);
     } else {
 
       ASSERT(a->deg >= 0);
 
-      h = pow(b->coeff[0], (double) a->deg) / h;
+      h = pow(b->coeff[0], (double) a->deg) / pow(h, (double) (a->deg - 1));
 
       double_poly_clear(a);
       double_poly_clear(b);
@@ -915,7 +924,6 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
     }
   } else {
     //TODO: use last version of a and b in pseudo_division.
-    printf("Need mpz.\n");
     mpz_t res;
     mpz_init(res);
     mpz_poly_t f, g;
