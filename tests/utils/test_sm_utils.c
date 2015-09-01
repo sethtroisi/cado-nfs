@@ -139,7 +139,7 @@ test_sm (FILE * datafile)
     } else {
         mpz_poly_ptr FF[2] = {F, F};
         int dd[2] = {degF, degF};
-      sm_relset_init (relset, dd);
+      sm_relset_init (relset, dd, 2);
       sm_build_one_relset (relset, r, e, len_relset, ab_polys, FF, sm_info->ell2);
       mpz_poly_set (Nc, relset->num[0]);
       mpz_poly_set (Dc, relset->denom[0]);

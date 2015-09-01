@@ -346,9 +346,11 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "output file");
   param_list_decl_usage(pl, "gorder", "(required) group order");
   param_list_decl_usage(pl, "smexp0", "(required) sm-exponent");
-  param_list_decl_usage(pl, "nsm0", "number of SM on the 0-side, default deg(polynomial))");
+  param_list_decl_usage(pl, "nsm0", "number of SM on the side 0, default deg(polynomial))");
   param_list_decl_usage(pl, "smexp1", "(required) sm-exponent");
-  param_list_decl_usage(pl, "nsm1", "number of SM on the 1-side, default deg(polynomial))");
+  param_list_decl_usage(pl, "nsm1", "number of SM on the side 1, default deg(polynomial))");
+  param_list_decl_usage(pl, "smexp2", "(MNFS) sm-exponent");
+  param_list_decl_usage(pl, "nsm2", "(MNFS) number of SM on side 2, default deg(polynomial))");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
   verbose_decl_usage(pl);
 }
@@ -443,7 +445,8 @@ int main (int argc, char **argv)
 
   mpz_ptr eps[NB_POLYS_MAX];
   /* Read sm exponent from command line (assuming radix 10) */
-  for (int side = 0; side < 2; side++) {
+  for (int side = 0; side < pol->nb_polys; side++) {
+      eps[side] = &epsilon[side][0];
       mpz_init (eps[side]);
       char str[10];
       sprintf(str, "smexp%c", '0'+side);
@@ -456,7 +459,6 @@ int main (int argc, char **argv)
   int nsm[NB_POLYS_MAX];
   for(int side = 0; side < pol->nb_polys; side++){
       F[side] = pol->pols[side];
-      eps[side] = &epsilon[side][0];
       nsm[side] = F[side]->deg;
   }
 
