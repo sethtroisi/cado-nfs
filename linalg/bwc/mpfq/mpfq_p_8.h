@@ -434,9 +434,9 @@ void mpfq_p_8_dotprod(mpfq_p_8_dst_field, mpfq_p_8_dst_vec, mpfq_p_8_src_vec, mp
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_p_8_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_8_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_8_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -1433,6 +1433,16 @@ void mpfq_p_8_poly_getcoeff(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt 
 static inline
 int mpfq_p_8_poly_deg(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_src_poly w)
 {
+#if GNUC_VERSION_ATLEAST(4,8,0)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+    /* the spurious uninit warning we get below is due to gcc's inability to
+     * decide that the test in mpfq_p_8_set() actually does something. See
+     *      https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67418
+     * The exact extent of gcc versions affected is not known. At least 4.8.4
+     * to 5.2.0
+     */
+#endif
     if (w->size == 0)
         return -1;
     int deg = w->size-1;
@@ -1449,6 +1459,9 @@ int mpfq_p_8_poly_deg(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_src_poly w)
     }
     mpfq_p_8_clear(K, &temp);
     return deg;
+#if GNUC_VERSION_ATLEAST(4,8,0)
+#pragma GCC diagnostic pop
+#endif
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add, Mpfq::gfp */
