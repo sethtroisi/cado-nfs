@@ -111,7 +111,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 	    dF[s] = F[s]->deg;
     }
     sm_relset_init (&rels[i], dF, nb_polys);
-    sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
+    sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, nb_polys, ell2);
 
     if (stats_test_progress(stats))
       stats_print_progress (stats, i, 0, 0, 0);
@@ -128,7 +128,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
 struct thread_info {
   int offset;
-  int nb;
+  int nb, nb_polys;
   sm_relset_ptr rels;
   sm_side_info * sm_info;
   /* where we are supposed to write our result */
@@ -141,7 +141,7 @@ void * thread_start(void *arg) {
     int offset = ti->offset;
 
     for (int i = 0; i < ti->nb; i++) {
-        for(int side = 0 ; side < 2 ; side++) {
+        for(int side = 0 ; side < ti->nb_polys ; side++) {
             if (ti->sm_info[side]->nsm == 0)
                 continue;
 
@@ -165,7 +165,7 @@ uint64_t print_thread_result(FILE * out, struct thread_info * ti)
 {
     uint64_t out_cpt = 0;
     for (int k = 0; k < ti->nb; ++k, ++out_cpt) {
-        for(int side = 0, c = 0 ; side < 2 ; side++) {
+        for(int side = 0, c = 0 ; side < ti->nb_polys ; side++) {
             if (ti->sm_info[side]->nsm == 0)
                 continue;
             if (c++) fprintf(out, " ");
@@ -181,8 +181,9 @@ uint64_t print_thread_result(FILE * out, struct thread_info * ti)
 
 #define SM_BATCH_SIZE 512
 
-void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t nb_relsets,
-        mpz_srcptr ell, sm_side_info * sm_info)
+void mt_sm (int nt, const char * outname, sm_relset_ptr rels, 
+	    uint64_t nb_relsets, mpz_srcptr ell, sm_side_info * sm_info,
+	    int nb_polys)
 {
   // We'll use a rotating buffer of thread id.
   pthread_t *threads;
@@ -196,7 +197,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t nb_relset
   FILE * out = outname ? fopen(outname, "w") : stdout;
   DIE_ERRNO_DIAG(out==NULL, "fopen", outname);
   int nsm_total=0;
-  for (int side = 0; side < 2; side++) {
+  for (int side = 0; side < nb_polys; side++) {
       nsm_total += sm_info[side]->nsm;
   }
   /*
@@ -215,10 +216,11 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t nb_relset
   for (int i = 0; i < nt; ++i) {
     tis[i].rels = rels;
     tis[i].dst = (mpz_poly_t **) malloc(SM_BATCH_SIZE*sizeof(mpz_poly_t*));
+    tis[i].nb_polys = nb_polys;
     for (int j = 0; j < SM_BATCH_SIZE; ++j) {
-        tis[i].dst[j] = (mpz_poly_t *) malloc(2*sizeof(mpz_poly_t));
-        memset(tis[i].dst[j], 0, 2*sizeof(mpz_poly_t));
-        for(int side = 0 ; side < 2 ; side++) {
+        tis[i].dst[j] = (mpz_poly_t *) malloc(nb_polys*sizeof(mpz_poly_t));
+        memset(tis[i].dst[j], 0, nb_polys*sizeof(mpz_poly_t));
+        for(int side = 0 ; side < nb_polys ; side++) {
             if (sm_info[side]->nsm != 0)
                 mpz_poly_init(tis[i].dst[j][side],
                         sm_info[side]->f->deg);
@@ -267,7 +269,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t nb_relset
   if (outname) fclose(out);
   for (int i = 0; i < nt; ++i) {
       for (int j = 0; j < SM_BATCH_SIZE; ++j) {
-          for(int side = 0 ; side < 2 ; side++) {
+          for(int side = 0 ; side < nb_polys ; side++) {
               if (sm_info[side]->nsm != 0)
                   mpz_poly_clear(tis[i].dst[j][side]);
           }
@@ -541,14 +543,14 @@ int main (int argc, char **argv)
                   "using %d thread(s)\n", nb_relsets, mt);
   fflush(stdout);
 
-  mt_sm(mt, outfile, rels, nb_relsets, ell, sm_info);
+  mt_sm(mt, outfile, rels, nb_relsets, ell, sm_info, pol->nb_polys);
   // sm(outfile, rels, nb_relsets, ell, sm_info);
 
   fprintf(stdout, "\n# sm completed in %2.2lf seconds\n", seconds() - t0);
   fflush(stdout);
 
   for (uint64_t i = 0; i < nb_relsets; i++)
-    sm_relset_clear (&rels[i]);
+      sm_relset_clear (&rels[i], pol->nb_polys);
   free(rels);
 
   for(int side = 0 ; side < pol->nb_polys ; side++) {

@@ -41,7 +41,7 @@ void sm_side_info_clear(sm_side_info_ptr sm);
 void sm_side_info_print(FILE * out, sm_side_info_srcptr sm);
 
 void sm_relset_init (sm_relset_t r, int *d, int nb_polys);
-void sm_relset_clear (sm_relset_t r);
+void sm_relset_clear (sm_relset_t r, int nb_polys);
 
 // (a,b) -> a - b*x
 void mpz_poly_init_set_ab (mpz_poly_ptr, int64_t, uint64_t);
@@ -51,7 +51,8 @@ void mpz_poly_init_set_ab (mpz_poly_ptr, int64_t, uint64_t);
 // If F[0] or F[1] is NULL, then no computation is done on the
 // corresponding side.
 void sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
-			  mpz_poly_t * abpolys, mpz_poly_ptr *F, const mpz_t ell2);
+			  mpz_poly_t * abpolys, mpz_poly_ptr *F, int nb_polys, 
+			  const mpz_t ell2);
 
 // Taking a polynomial modulo F as input, compute the corresponding SM
 // as a polynomial.
