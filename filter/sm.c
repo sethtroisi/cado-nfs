@@ -451,7 +451,7 @@ int main (int argc, char **argv)
       eps[side] = &epsilon[side][0];
       mpz_init (eps[side]);
       char str[10];
-      sprintf(str, "smexp%c", '0'+side);
+      snprintf(str, sizeof(str), "smexp%d", side);
       if (!param_list_parse_mpz(pl, str, eps[side])) {
           fprintf(stderr, "Error: parameter -%s is mandatory\n", str);
           param_list_print_usage(pl, argv0, stderr);
@@ -466,7 +466,7 @@ int main (int argc, char **argv)
   /* Read number of sm to be printed from command line */
   for(int side = 0; side < pol->nb_polys; side++){
       char tmp_nsm[5];
-      sprintf(tmp_nsm, "nsm%c", '0'+side);
+      snprintf(tmp_nsm, sizeof(tmp_nsm), "nsm%d", side);
       param_list_parse_int(pl, tmp_nsm, &nsm[side]);
       nsm_tot += nsm[side];
   }
