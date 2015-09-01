@@ -103,7 +103,7 @@ void list_int64_vector_index_remove_duplicate(list_int64_vector_index_ptr list)
 {
   for (unsigned int i = 0; i < list->length - 1; i++) {
     for (unsigned int j = i + 1; j < list->length; j++) {
-      if (int64_vector_equal(list->v[i]->vec, list->v[j]->vec) == 0) {
+      if (int64_vector_equal(list->v[i]->vec, list->v[j]->vec)) {
         list_int64_vector_index_delete_int64_vector_index(list, j);
       }
     }
@@ -119,7 +119,7 @@ void list_int64_vector_index_remove_duplicate_sort(
     unsigned int current = i + 1;
     while (current < list->length && list->v[i]->vec->c[list->vector_dim - 1]
         == list->v[current]->vec->c[list->vector_dim - 1]) {
-      if (int64_vector_equal(list->v[i]->vec, list->v[current]->vec) == 0) {
+      if (int64_vector_equal(list->v[i]->vec, list->v[current]->vec)) {
         list_int64_vector_index_delete_int64_vector_index(list, current);
       }
       current++;

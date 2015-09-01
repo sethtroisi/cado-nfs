@@ -71,6 +71,13 @@ static inline void mat_int64_set_coeff(mat_int64_ptr matrix, int64_t i,
   matrix->coeff[row + 1][col + 1] = i;
 }
 
+/*
+ * Get the coefficient at the row (row) and the column (col).
+ *
+ * matrix: the matrix.
+ * row: number for row.
+ * col: number for column.
+ */
 static inline int64_t mat_int64_get_coeff(mat_int64_srcptr matrix,
       unsigned int row, unsigned int col)
 {
@@ -186,21 +193,35 @@ void mat_int64_extract(mat_int64_ptr matrix_out, mat_int64_srcptr matrix_in,
 void mat_int64_extract_vector(int64_vector_ptr v, mat_int64_srcptr matrix,
     unsigned int col);
 
+/*
+ * Matrix is a diagonal matrix, with the coefficients of x.
+ */
 void mat_int64_set_diag(mat_int64_ptr matrix, int64_vector_srcptr x);
 
+/*
+ * Perform LLL on A and store it in C.
+ */
 void mat_int64_LLL(mat_int64_ptr C, mat_int64_srcptr A);
 
+/*
+ * Perform LLL on the transposition of A and store the transposition in C.
+ */
 void mat_int64_LLL_transpose(mat_int64_ptr C, mat_int64_srcptr A);
 
+/*
+ * Perform LLL on A and store the unimodular matrix in C.
+ */
 void mat_int64_LLL_unimodular(mat_int64_ptr C, mat_int64_srcptr A);
 
+/*
+ * Perform LLL on the transposition of A and store the transposition of the
+ *  unimodular matrix in C.
+ */
 void mat_int64_LLL_unimodular_transpose(mat_int64_ptr C, mat_int64_srcptr A);
-
 
 /*
  * Fill a matrix with the vectors of list in columns.
  */
 void mat_int64_vector_from_list_int64(mat_int64_ptr matrix,
     list_int64_vector_srcptr list);
-
 #endif // MAT_INT64_H

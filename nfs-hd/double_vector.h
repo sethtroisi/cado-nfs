@@ -44,7 +44,6 @@ void double_vector_set(double_vector_ptr v, double_vector_srcptr s);
  *
  * v: the vector.
  */
-
 void double_vector_set_zero(double_vector_ptr v);
 /*
  * Get the ith coefficient of v.
@@ -89,7 +88,7 @@ int double_vector_equal(double_vector_srcptr a, double_vector_srcptr b);
  * c: the second vector.
  */
 void double_vector_add(double_vector_ptr a, double_vector_srcptr b,
-                      double_vector_srcptr c);
+    double_vector_srcptr c);
 
 /*
  * a = b - c
@@ -99,7 +98,7 @@ void double_vector_add(double_vector_ptr a, double_vector_srcptr b,
  * c: the second vector.
  */
 void double_vector_sub(double_vector_ptr a, double_vector_srcptr b,
-                      double_vector_srcptr c);
+    double_vector_srcptr c);
 
 /*
  * Write a vector in a file.
@@ -130,7 +129,7 @@ double double_vector_norml2(double_vector_srcptr a);
  * v1: second vector.
  */
 double double_vector_dot_product(double_vector_srcptr v0,
-                                 double_vector_srcptr v1);
+    double_vector_srcptr v1);
 
 /*
  * Return 1 if a vector is in the sieving region, 0 otherwise.

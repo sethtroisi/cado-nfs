@@ -4,8 +4,7 @@
 #include "mat_Z.h"
 #include "lll.h"
 
-void mat_Z_init(mat_Z_ptr matrix, unsigned int NumRows, unsigned int
-                NumCols)
+void mat_Z_init(mat_Z_ptr matrix, unsigned int NumRows, unsigned int NumCols)
 {
   ASSERT(1 <= NumRows);
   ASSERT(1 <= NumCols);
@@ -25,8 +24,8 @@ void mat_Z_init(mat_Z_ptr matrix, unsigned int NumRows, unsigned int
   }
 }
 
-void mat_Z_init_with_array(mat_Z_ptr matrix, unsigned int NumRows, unsigned int
-                           NumCols, mpz_t * coeff)
+void mat_Z_init_with_array(mat_Z_ptr matrix, unsigned int NumRows,
+    unsigned int NumCols, mpz_t * coeff)
 {
   ASSERT(1 <= NumRows);
   ASSERT(1 <= NumCols);
@@ -47,7 +46,6 @@ void mat_Z_init_with_array(mat_Z_ptr matrix, unsigned int NumRows, unsigned int
 
   for (unsigned int row = 1; row < NumRows + 1; row++) {
     for (unsigned int col = 1; col < NumCols + 1; col++) {
-      //Test how the matrix is set.
       mpz_set(matrix->coeff[row][col], coeff[(col - 1) + NumCols * (row - 1)]);
     }
   }
@@ -65,8 +63,8 @@ void mat_Z_copy(mat_Z_ptr B, mat_Z_srcptr A)
   }
 }
 
-void mat_Z_set_coeff(mat_Z_ptr matrix, mpz_t i, unsigned int row, unsigned int
-                     col)
+void mat_Z_set_coeff(mat_Z_ptr matrix, mpz_t i, unsigned int row,
+    unsigned int col)
 {
   ASSERT(row <= matrix->NumRows);
   ASSERT(col <= matrix->NumCols);

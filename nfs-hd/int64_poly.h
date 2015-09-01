@@ -119,7 +119,7 @@ void int64_poly_set_xi(int64_poly_ptr f, int i);
 void int64_poly_set_bxi(int64_poly_ptr f, int i, int64_t b);
 
 /*
- * Return 0 if f and g are equal, 1 otherwise. Assumes f and g are normalized.
+ * Return 1 if f and g are equal, 0 otherwise. Assumes f and g are normalized.
  *
  * a: a polynomial.
  * b: a polynowial.
@@ -131,7 +131,7 @@ int int64_poly_equal(int64_poly_srcptr a, int64_poly_srcptr b);
  *
  * f: the tested polynomial.
  */
-int int64_poly_normalized_p(int64_poly_srcptr f);
+int int64_poly_normalized(int64_poly_srcptr f);
 
 /*
  * To write a polynomial in a file.
@@ -162,6 +162,4 @@ uint64_t int64_poly_infinity_norm(int64_poly_srcptr f);
  * b: the old int64_poly.
  */
 void int64_poly_to_mpz_poly(mpz_poly_ptr a, int64_poly_srcptr b);
-
-
 #endif /* INT64_POLY_H */

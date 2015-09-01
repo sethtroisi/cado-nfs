@@ -17,7 +17,7 @@ void uint64_array_init(uint64_array_ptr array, uint64_t length)
 }
 
 void uint64_array_set_coeff(uint64_array_ptr array, uint64_t index,
-                            uint64_t coeff)
+    uint64_t coeff)
 {
   ASSERT(index < array->length);
   array->array[index] = coeff;

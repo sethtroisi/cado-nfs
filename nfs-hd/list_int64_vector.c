@@ -2,10 +2,6 @@
 #include <inttypes.h>
 #include "list_int64_vector.h"
 
-/*
- * List of int64_vector.
- */
-
 void list_int64_vector_init(list_int64_vector_ptr list,
     unsigned int vector_dim)
 {
@@ -13,6 +9,13 @@ void list_int64_vector_init(list_int64_vector_ptr list,
   list->vector_dim = vector_dim;
 }
 
+/*
+ * Increase the length of the list, and if needed, the number of possible
+ * allocated cells of the list.
+ *
+ * list: the list.
+ * index: index in which we hope to write an element.
+ */
 static void list_int64_vector_prepare_write(list_int64_vector_ptr list,
     unsigned int index)
 {
@@ -97,7 +100,8 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
   int64_vector_clear(v_tmp);
 }
 
-int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list)
+int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec,
+    list_int64_vector_srcptr list)
 {
   ASSERT(list->length > 2);
   ASSERT(vec->dim > 1);
@@ -111,7 +115,9 @@ int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec, list_int6
 #endif // NDEBUG
 
   for (unsigned int i = 0; i < list->length; i++) {
-    if (int64_vector_equal(vec, list->v[i]) == 1) {
+    if (!int64_vector_equal(vec, list->v[i])) {
+      ASSERT(int64_vector_equal(vec, list->v[i]) == 0);
+
       return 1;
     }  
   }
@@ -119,8 +125,7 @@ int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec, list_int6
   int c = 0;
   unsigned i = 0;
   unsigned j = 0;
-  for (i = 0, j = list->length - 1; i < list->length; j =
-      i++) {
+  for (i = 0, j = list->length - 1; i < list->length; j = i++) {
     if ( ((list->v[i]->c[1] > vec->c[1]) != (list->v[j]->c[1] > vec->c[1])) &&
         (vec->c[0] < (list->v[j]->c[0] - list->v[i]->c[0]) *
          (vec->c[1] - list->v[i]->c[1]) /

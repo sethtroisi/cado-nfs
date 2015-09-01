@@ -75,5 +75,6 @@ void sieving_bound_fprintf_detailed_comment(FILE * filew,
   for (unsigned int i = 1 ; i < H->t - 1; i++) {
     fprintf(filew, "# -H%u: -%u -- H%u: %u\n", i, H->h[i], i, H->h[i] - 1);
   }
-  fprintf(filew, "# H%u: 0 -- H%u: %u]\n", H->t - 1, H->t - 1, H->h[H->t - 1] - 1);
+  fprintf(filew, "# H%u: 0 -- H%u: %u]\n", H->t - 1, H->t - 1,
+      H->h[H->t - 1] - 1);
 }

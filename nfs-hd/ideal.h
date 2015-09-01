@@ -73,16 +73,14 @@ typedef const s_ideal_spq_t * ideal_spq_srcptr;
 void ideal_init(ideal_ptr ideal);
 
 /*
- * Set an ideal.
+ * Set an ideal. Compute Tr and log.
  *
- * ideal: ideal_ptr, the ideal we want to set.
+ * ideal: the ideal we want to set.
  * r: r is equal to the r of the ideal.
  * h: h is equal to the h of the ideal.
  */
 void ideal_set_part(ideal_ptr ideal, uint64_t r, mpz_poly_srcptr h);
 
-void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-    mpz_t * Tr, unsigned char log, unsigned int t);
 /*
  * Delete an ideal.
  *
@@ -116,7 +114,28 @@ void ideal_1_init(ideal_1_ptr ideal);
  * t: t is the dimension of the lattice we explore.
  */
 void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-                 unsigned int t);
+    unsigned int t);
+
+/*
+ * Set an ideal.
+ *
+ * ideal: the ideal we want to set.
+ * r: r of the ideal.
+ * h: h of the ideal.
+ * Tr: Tr matrix.
+ * log: frequently equal to log2(r).
+ */
+void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+    mpz_t * Tr, unsigned char log, unsigned int t);
+
+/*
+ * Copy an ideal_1 in an other.
+ *
+ * ideal_new: the new ideal.
+ * ideal_old: the old ideal.
+ */
+void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old,
+    unsigned int t);
 
 /*
  * Delete an ideal_1.
@@ -125,14 +144,6 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
  * t: t is the dimension of the lattice we explore.
  */
 void ideal_1_clear(ideal_1_ptr ideal, unsigned int t);
-
-/*
- * Copy an ideal_1 in an other.
- *
- * ideal_new: the new ideal.
- * ideal_old: the old ideal.
- */
-void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old, unsigned int t);
 
 /*
  * Write an ideal_1.
@@ -162,9 +173,25 @@ void ideal_u_init(ideal_u_ptr ideal);
 void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
                       unsigned int t);
 
+/*
+ * Set an ideal.
+ *
+ * ideal: the ideal we want to set.
+ * r: r of the ideal.
+ * h: h of the ideal.
+ * Tr: Tr matrix.
+ * log: frequently equal to log2(r^deg(h)).
+ */
 void ideal_u_set_element(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     mpz_t * Tr, unsigned char log, unsigned int t);
 
+/*
+ * Copy ideal_old in ideal_new.
+ *
+ * ideal_new: the new ideal.
+ * ideal_old: the old ideal.
+ * t: dimension of the lattice.
+ */
 void ideal_u_set(ideal_u_ptr ideal_new, ideal_u_srcptr ideal_old,
     unsigned int t);
 
@@ -187,6 +214,11 @@ void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t);
 
 /* Ideal projective root and Tr */
 
+/*
+ * Init an ideal_pr.
+ *
+ * ideal: the ideal we initialize.
+ */
 void ideal_pr_init(ideal_pr_ptr ideal);
 
 /*
@@ -198,6 +230,14 @@ void ideal_pr_init(ideal_pr_ptr ideal);
  */
 void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t);
 
+/*
+ * Set an ideal_pr.
+ *
+ * ideal: the ideal we want to set.
+ * r: r of the ideal.
+ * Tr: Tr matrix.
+ * log: frequently equal to log2(r).
+ */
 void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, unsigned char log,
     unsigned int t);
 /*
@@ -217,21 +257,62 @@ void ideal_pr_clear(ideal_pr_ptr ideal, unsigned int t);
  */
 void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t);
 
-/* Special-q ideal */
+/* Special-q ideal: (q, g) */
+/* type: 0 if ideal_1, 1 if ideal_u, 2 if ideal_pr. */
 
+/*
+ * Init an ideal_spq.
+ *
+ * ideal: the ideal.
+ */
 void ideal_spq_init(ideal_spq_ptr ideal);
 
-void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+/*
+ * Set an ideal spq.
+ *
+ * r: r of the ideal.
+ * h: h of the ideal.
+ * t: dimension of the lattice.
+ * type: type of the ideal_spq.
+ */
+void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t q, mpz_poly_srcptr g,
     unsigned int t, char type);
 
+/*
+ * Clear an ideal_spq.
+ *
+ * ideal: the ideal.
+ * t: dimension of the lattice.
+ */
 void ideal_spq_clear(ideal_spq_ptr ideal, unsigned int t);
 
+/*
+ * Write an ideal_spq.
+ *
+ * file: file in which we print.
+ * ideal: the ideal.
+ * t: dimension of the lattice.
+ */
 void ideal_spq_fprintf(FILE * file, ideal_spq_srcptr ideal, unsigned int t);
 
+/*
+ * Return the log of the ideal_spq.
+ *
+ * ideal: the ideal.
+ */
 unsigned char ideal_spq_get_log(ideal_spq_srcptr ideal);
 
+/*
+ * Return q of an ideal_spq.
+ *
+ * ideal: the ideal.
+ */
 uint64_t ideal_spq_get_q(ideal_spq_srcptr ideal);
 
+/*
+ * Return g of an ideal_spq.
+ *
+ * ideal: the ideal.
+ */
 int ideal_spq_get_deg_g(ideal_spq_srcptr ideal);
-
 #endif /* IDEAL_H */

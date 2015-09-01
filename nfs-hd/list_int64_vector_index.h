@@ -67,17 +67,35 @@ void list_int64_vector_index_clear(list_int64_vector_index_ptr list);
  */
 void list_int64_vector_index_fprintf(FILE * file, list_int64_vector_index_srcptr list);
 
+/*
+ * Write a list in a file, with # before each lines.
+ *
+ * file: the file in which we write.
+ * lest: the list.
+ */
 void list_int64_vector_index_fprintf_comment(FILE * file,
     list_int64_vector_index_srcptr list);
 
+/*
+ * Sort the list by the last coordinate of each vectors.
+ */
 void list_int64_vector_index_sort_last(list_int64_vector_index_ptr list);
 
+/*
+ * Delete the element at pos.
+ */
 void list_int64_vector_index_delete_int64_vector_index(
     list_int64_vector_index_ptr list, unsigned int pos);
 
+/*
+ * Remove duplicate vectors.
+ */
 void list_int64_vector_index_remove_duplicate(
     list_int64_vector_index_ptr list);
 
+/*
+ * Remove duplicate vectors and sort the list.
+ */
 void list_int64_vector_index_remove_duplicate_sort(
     list_int64_vector_index_ptr list);
 #endif /* LIST_INT64_VECTOR_INDEX_H */

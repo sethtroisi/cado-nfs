@@ -33,6 +33,9 @@ unsigned int list_int64_vector_add_int64_vector(list_int64_vector_ptr list,
  */
 void list_int64_vector_clear(list_int64_vector_ptr list);
 
+/*
+ * Set length of the list to zero, do not delete the elements.
+ */
 void list_int64_vector_delete_elements(list_int64_vector_ptr list);
 /*
  * Write a list in a file.
@@ -42,6 +45,9 @@ void list_int64_vector_delete_elements(list_int64_vector_ptr list);
  */
 void list_int64_vector_fprintf(FILE * file, list_int64_vector_srcptr list);
 
+/*
+ * Write a list in a file with # before each lines.
+ */
 void list_int64_vector_fprintf_comment(FILE * file,
     list_int64_vector_srcptr list);
 /*
@@ -54,10 +60,17 @@ void list_int64_vector_extract_mat_int64(list_int64_vector_ptr list,
     mat_int64_srcptr matrix);
 
 /*
- * From PNpoly
+ * TODO: continue here.
+ * Return 1 a vector is inside the polytop formed by all the vector in the
+ * list. Works only with vector of dimension 2.
+ * This code is inspired from PNPOLY
+ * (http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html).
  */
-int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec, list_int64_vector_srcptr list);
+int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec,
+    list_int64_vector_srcptr list);
 
+/*
+ * Sort vectors of the list by last coordinate.
+ */
 void list_int64_vector_sort_last(list_int64_vector_ptr list);
-
 #endif /* LIST_INT64_VECTOR_H */
