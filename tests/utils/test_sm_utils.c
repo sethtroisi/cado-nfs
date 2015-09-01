@@ -140,13 +140,13 @@ test_sm (FILE * datafile)
         mpz_poly_ptr FF[2] = {F, F};
         int dd[2] = {degF, degF};
       sm_relset_init (relset, dd, 2);
-      sm_build_one_relset (relset, r, e, len_relset, ab_polys, FF, sm_info->ell2);
+      sm_build_one_relset (relset, r, e, len_relset, ab_polys, FF, 2, sm_info->ell2);
       mpz_poly_set (Nc, relset->num[0]);
       mpz_poly_set (Dc, relset->denom[0]);
       mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num[0], relset->denom[0],
               F, sm_info->ell2, sm_info->invl2);
       compute_sm_straightforward (SMc, relset->num[0], sm_info);
-      sm_relset_clear (relset);
+      sm_relset_clear (relset, 2);
     }
     // mpz_poly_clear(SMc2);
 

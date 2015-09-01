@@ -458,25 +458,29 @@ int main (int argc, char **argv)
           exit(EXIT_FAILURE);
       }
   }
-  int nsm[NB_POLYS_MAX];
+  int nsm[NB_POLYS_MAX], nsm_tot = 0;
   for(int side = 0; side < pol->nb_polys; side++){
       F[side] = pol->pols[side];
       nsm[side] = F[side]->deg;
   }
-
   /* Read number of sm to be printed from command line */
-  param_list_parse_int(pl, "nsm0", &nsm[0]);
-  param_list_parse_int(pl, "nsm1", &nsm[1]);
-  param_list_parse_int(pl, "nsm2", &nsm[2]);
-  if (nsm[0] + nsm[1] + nsm[2] == 0) {
+  for(int side = 0; side < pol->nb_polys; side++){
+      char tmp_nsm[5];
+      sprintf(tmp_nsm, "nsm%c", '0'+side);
+      param_list_parse_int(pl, tmp_nsm, &nsm[side]);
+      nsm_tot += nsm[side];
+  }
+  if (nsm_tot == 0){
       fprintf(stderr, "Error: no SM to compute!\n");
       exit(EXIT_FAILURE);
   }
-  if (nsm[0] > F[0]->deg || nsm[1] > F[1]->deg || nsm[2] > F[2]->deg)
-  {
-    fprintf(stderr, "Error: nsm can not exceed the degree\n");
-    param_list_print_usage(pl, argv0, stderr);
-    exit(EXIT_FAILURE);
+  for(int side = 0; side < pol->nb_polys; side++){
+      if (nsm[side] > F[side]->deg){
+	  fprintf(stderr, "Error: nsm%d=%d can not exceed the degree=%d\n",
+		  side, nsm[side], F[side]->deg);
+	  param_list_print_usage(pl, argv0, stderr);
+	  exit(EXIT_FAILURE);
+      }
   }
 
   if (param_list_warn_unused(pl))
