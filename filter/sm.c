@@ -53,6 +53,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 
 sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
                              uint64_t * small_nrows, mpz_poly_ptr *F,
+			     int nb_polys,
                              const mpz_t ell2)
 {
   uint64_t nrows, ncols, small_ncols, len_relset;
@@ -102,12 +103,14 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
       ASSERT_ALWAYS(ret == 2);
     }
     
-    int dF[2] = {0, 0};
-    for (int s = 0; s < 2; ++s) {
-        if (F[s] == NULL) continue;
-        dF[s] = F[s]->deg;
+    int dF[NB_POLYS_MAX];
+    for (int s = 0; s < nb_polys; ++s) {
+        if (F[s] == NULL)
+	    dF[s] = 0;
+	else
+	    dF[s] = F[s]->deg;
     }
-    sm_relset_init (&rels[i], dF);
+    sm_relset_init (&rels[i], dF, nb_polys);
     sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
 
     if (stats_test_progress(stats))
@@ -373,14 +376,11 @@ int main (int argc, char **argv)
 
   param_list pl;
   cado_poly pol;
-  mpz_poly_ptr F[2];
+  mpz_poly_ptr F[NB_POLYS_MAX];
 
   sm_relset_ptr rels = NULL;
   uint64_t nb_relsets;
-  mpz_t ell, ell2, epsilon[2];
-  mpz_ptr eps[2];
-  eps[0] = &epsilon[0][0];
-  eps[1] = &epsilon[1][0];
+  mpz_t ell, ell2, epsilon[NB_POLYS_MAX];
   int mt = 1;
   double t0;
 
@@ -430,6 +430,18 @@ int main (int argc, char **argv)
       exit(EXIT_FAILURE);
   }
 
+  param_list_parse_int(pl, "t", &mt);
+  if (mt < 1) {
+    fprintf(stderr, "Error: parameter mt must be at least 1\n");
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
+  }
+
+  /* Init polynomial */
+  cado_poly_init (pol);
+  cado_poly_read(pol, polyfile);
+
+  mpz_ptr eps[NB_POLYS_MAX];
   /* Read sm exponent from command line (assuming radix 10) */
   for (int side = 0; side < 2; side++) {
       mpz_init (eps[side]);
@@ -441,30 +453,22 @@ int main (int argc, char **argv)
           exit(EXIT_FAILURE);
       }
   }
-  param_list_parse_int(pl, "t", &mt);
-  if (mt < 1) {
-    fprintf(stderr, "Error: parameter mt must be at least 1\n");
-    param_list_print_usage(pl, argv0, stderr);
-    exit(EXIT_FAILURE);
+  int nsm[NB_POLYS_MAX];
+  for(int side = 0; side < pol->nb_polys; side++){
+      F[side] = pol->pols[side];
+      eps[side] = &epsilon[side][0];
+      nsm[side] = F[side]->deg;
   }
 
-  /* Init polynomial */
-  cado_poly_init (pol);
-  cado_poly_read(pol, polyfile);
-  F[0] = pol->pols[0];
-  F[1] = pol->pols[1];
-
   /* Read number of sm to be printed from command line */
-  int nsm[2];
-  nsm[0] = F[0]->deg;
-  nsm[1] = F[1]->deg;
   param_list_parse_int(pl, "nsm0", &nsm[0]);
   param_list_parse_int(pl, "nsm1", &nsm[1]);
-  if (nsm[0] + nsm[1] == 0) {
+  param_list_parse_int(pl, "nsm2", &nsm[2]);
+  if (nsm[0] + nsm[1] + nsm[2] == 0) {
       fprintf(stderr, "Error: no SM to compute!\n");
       exit(EXIT_FAILURE);
   }
-  if (nsm[0] > F[0]->deg || nsm[1] > F[1]->deg)
+  if (nsm[0] > F[0]->deg || nsm[1] > F[1]->deg || nsm[2] > F[2]->deg)
   {
     fprintf(stderr, "Error: nsm can not exceed the degree\n");
     param_list_print_usage(pl, argv0, stderr);
@@ -480,13 +484,13 @@ int main (int argc, char **argv)
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
 
-  sm_side_info sm_info[2];
+  sm_side_info sm_info[NB_POLYS_MAX];
 
-  for(int side = 0 ; side < 2 ; side++) {
+  for(int side = 0 ; side < pol->nb_polys ; side++) {
       sm_side_info_init(sm_info[side], F[side], ell);
   }
 
-  for (int side = 0; side < 2; side++) {
+  for (int side = 0; side < pol->nb_polys; side++) {
       fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
       mpz_poly_fprintf(stdout, F[side]);
       gmp_fprintf(stdout,
@@ -520,11 +524,11 @@ int main (int argc, char **argv)
   // If nsm is 0 on one side, then set F[side] to NULL to desactivate the
   // corresponding computations.
   // TODO: this will go.
-  for (int side = 0; side < 2; ++side) {
+  for (int side = 0; side < pol->nb_polys; ++side) {
       if (nsm[side] == 0)
           F[side] = NULL;
   }
-  rels = build_rel_sets(purgedfile, indexfile, &nb_relsets, F, ell2);
+  rels = build_rel_sets(purgedfile, indexfile, &nb_relsets, F, pol->nb_polys, ell2);
 
   /* adjust the number of threads based on the number of relations */
   double ntm = ceil((nb_relsets + 0.0)/SM_BATCH_SIZE);
@@ -545,7 +549,7 @@ int main (int argc, char **argv)
     sm_relset_clear (&rels[i]);
   free(rels);
 
-  for(int side = 0 ; side < 2 ; side++) {
+  for(int side = 0 ; side < pol->nb_polys ; side++) {
       mpz_clear(eps[side]);
       sm_side_info_clear(sm_info[side]);
   }

@@ -67,7 +67,7 @@ size_t renumber_write_p_buffer_2algs (char *, unsigned long, unsigned long *,
                                       size_t, unsigned long *, size_t);
 size_t renumber_write_p_buffer_generic (char *, unsigned long, renumber_t,
                                         unsigned long **, int *);
-void renumber_write_p (renumber_ptr, unsigned long, unsigned long **, int *);
+void renumber_write_p (renumber_ptr, unsigned long, unsigned long *r[], int *);
 void renumber_write_close (renumber_ptr, const char*);
 
 void renumber_init_for_reading (renumber_ptr);

@@ -441,7 +441,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   /* will print report at 2^10, 2^11, ... 2^23 computed primes and every
    * 2^23 primes after that */
   stats_init (stats, stdout, &total_primes, 23, "Looked into", "primes", "", "p");
-
+ 
   /* We generate all free relations from pmin and up to the *minimum*
      of the two large prime bounds, since larger primes will never
      occur on both sides.

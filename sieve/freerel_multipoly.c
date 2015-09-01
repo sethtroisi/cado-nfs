@@ -252,7 +252,7 @@ main (int argc, char *argv[])
     exit (EXIT_FAILURE);
   }
 
-  for (unsigned int i = 0; i < cpoly->nb_polys; i++)
+  for (int i = 0; i < cpoly->nb_polys; i++)
   {
     if (lpb[i] == 0)
     {

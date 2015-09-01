@@ -694,26 +694,26 @@ int renumber_is_bad (int *nb, index_t *first, renumber_srcptr rn, p_r_values_t p
 /* roots_alg0 and roots_alg1 are sorted and are modified by the function. */
 inline size_t
 renumber_write_p_buffer_2algs (char *buffer, unsigned long p,
-                               unsigned long *roots_alg0, size_t nb_roots_alg0,
-		                           unsigned long *roots_alg1, size_t nb_roots_alg1)
+                               unsigned long *roots_alg0, size_t nb_roots0,
+                               unsigned long *roots_alg1, size_t nb_roots1)
 {
   size_t size_buffer = 0;
   size_t i;
 
-  renumber_sort_ul(roots_alg0, nb_roots_alg0);
-  renumber_sort_ul(roots_alg1, nb_roots_alg1);
+  renumber_sort_ul(roots_alg0, nb_roots0);
+  renumber_sort_ul(roots_alg1, nb_roots1);
 
-  if (LIKELY (nb_roots_alg1))
+  if (LIKELY (nb_roots1))
   {
     /* The largest root becomes 2p+1 */
     size_buffer += sprintf (buffer, "%lx\n", (p << 1) + 1);
-    for (i = 1; i < nb_roots_alg1; ++i) /* Do not forget to add p+1 on side 1 */
+    for (i = 1; i < nb_roots1; ++i) /* Do not forget to add p+1 on side 1 */
       size_buffer += sprintf (buffer + size_buffer, "%lx\n", roots_alg1[i]+p+1);
   }
   else
     *roots_alg0 = (p << 1) + 1; /* The largest root becomes 2p+1 */
 
-  for (i = 0; i < nb_roots_alg0; ++i)
+  for (i = 0; i < nb_roots0; ++i)
     size_buffer += sprintf (buffer + size_buffer, "%lx\n", roots_alg0[i]);
 
   return size_buffer;
@@ -791,9 +791,11 @@ renumber_write_p (renumber_ptr tab, unsigned long p, unsigned long **r, int *k)
 
   if (tab->nb_polys == 2)
   {
-    if (tab->rat == -1)
-      size_buffer = renumber_write_p_buffer_2algs (buffer, p, r[0],
-                                         (size_t) k[0], r[1], (size_t) k[1]);
+      if (tab->rat == -1){
+	  size_buffer = 
+	      renumber_write_p_buffer_2algs (buffer, p, r[0], (size_t)k[0], 
+					                r[1], (size_t)k[1]);
+      }
     else
       size_buffer = renumber_write_p_buffer_rat_alg (buffer, p,
                                          (size_t) k[tab->rat], r[tab->rat ^ 1],

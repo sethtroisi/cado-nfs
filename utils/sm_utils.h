@@ -23,8 +23,9 @@ typedef struct sm_side_info_s * sm_side_info_ptr;
 typedef const struct sm_side_info_s * sm_side_info_srcptr;
 
 typedef struct {
-  mpz_poly_t num[2];
-  mpz_poly_t denom[2];
+  mpz_poly_t num[NB_POLYS_MAX];
+  mpz_poly_t denom[NB_POLYS_MAX];
+  int nb_polys;
 } sm_relset_struct_t;
 
 typedef sm_relset_struct_t sm_relset_t[1];
@@ -39,7 +40,7 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell);
 void sm_side_info_clear(sm_side_info_ptr sm);
 void sm_side_info_print(FILE * out, sm_side_info_srcptr sm);
 
-void sm_relset_init (sm_relset_t r, int *d);
+void sm_relset_init (sm_relset_t r, int *d, int nb_polys);
 void sm_relset_clear (sm_relset_t r);
 
 // (a,b) -> a - b*x
@@ -50,7 +51,7 @@ void mpz_poly_init_set_ab (mpz_poly_ptr, int64_t, uint64_t);
 // If F[0] or F[1] is NULL, then no computation is done on the
 // corresponding side.
 void sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
-        mpz_poly_t * abpolys, mpz_poly_ptr *F, const mpz_t ell2);
+			  mpz_poly_t * abpolys, mpz_poly_ptr *F, const mpz_t ell2);
 
 // Taking a polynomial modulo F as input, compute the corresponding SM
 // as a polynomial.
