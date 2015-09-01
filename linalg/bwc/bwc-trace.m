@@ -128,7 +128,7 @@ function vblock(nr,var, nc)
 end function;
 
 
-load "/tmp/bwc/Y.0.m";      Y0:= vblock(nc, var, n);
+load "/tmp/bwc/Y0.m";      Y0:= vblock(nc, var, n);
 load "/tmp/bwc/V0-64.0.m";  V0:= vblock(nc, var, 64);
 // load "/tmp/bwc/V0-64.1.m";  V1:= vblock(nc, var, 64);
 // load "/tmp/bwc/V0-64.2.m";  V2:= vblock(nc, var, 64);

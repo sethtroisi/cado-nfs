@@ -771,9 +771,9 @@ void read_bfile(master_data m, const char * bfile)
 
 void share_bfile_header_data(parallelizing_info_ptr pi, balancing_ptr bal)
 {
-    global_broadcast(pi->m, bal->h, sizeof(balancing_header), 0, 0);
-    global_broadcast(pi->m, &bal->trows, sizeof(uint32_t), 0, 0);
-    global_broadcast(pi->m, &bal->tcols, sizeof(uint32_t), 0, 0);
+    pi_bcast(bal->h, sizeof(balancing_header), BWC_PI_BYTE, 0, 0, pi->m);
+    pi_bcast(&bal->trows, sizeof(uint32_t), BWC_PI_BYTE, 0, 0, pi->m);
+    pi_bcast(&bal->tcols, sizeof(uint32_t), BWC_PI_BYTE, 0, 0, pi->m);
 }
 
 /* {{{ slave loops 1 and 2 */

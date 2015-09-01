@@ -327,10 +327,10 @@ endmacro(bwc_program)
 bwc_program(acollect acollect.c)
 bwc_program(split split.c)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
-bwc_program(prep prep.c xymats.c ../gauss.c)
-bwc_program(krylov krylov.c xymats.c xdotprod.c)
-bwc_program(dispatch dispatch.c xymats.c xdotprod.c)
-bwc_program(mksol mksol.c xymats.c xdotprod.c)
+bwc_program(prep prep.c ../gauss.c)
+bwc_program(krylov krylov.c xdotprod.c)
+bwc_program(dispatch dispatch.c xdotprod.c)
+bwc_program(mksol mksol.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
 
@@ -382,7 +382,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         lingen-matpoly.c
         lingen-bigmatpoly.c
         lingen-polymat.c
-        lingen-bigpolymat.c
+        # lingen-bigpolymat.c # deleted 20150826
         mpfq/mpfq_${v}.c
         )
     if(WITH_MPIR)

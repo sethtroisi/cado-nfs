@@ -1,15 +1,8 @@
 /* MPFQ generated file -- do not edit */
 
-#define _POSIX_C_SOURCE 200112L
 #include "mpfq_p_1.h"
 
 #include <inttypes.h>
-static int mpfq_p_1_impl_mpi_attr;     /* for MPI functions */
-static MPI_Datatype mpfq_p_1_impl_mpi_datatype;
-static MPI_Datatype mpfq_p_1_impl_mpi_datatype_ur;
-static MPI_Op mpfq_p_1_impl_mpi_addition_op;
-static MPI_Op mpfq_p_1_impl_mpi_addition_op_ur;
-static int mpfq_p_1_impl_mpi_use_count;   /* several stacked init()/clear() pairs are supported */
 /* Active handler: simd_gfp */
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
@@ -17,7 +10,6 @@ static int mpfq_p_1_impl_mpi_use_count;   /* several stacked init()/clear() pair
 /* Active handler: Mpfq::defaults::poly */
 /* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::gfp::elt */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
    fieldtype=prime,
@@ -890,86 +882,6 @@ void mpfq_p_1_dotprod(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_vec xw, mp
 
 /* Member templates related to SIMD operation */
 
-/* MPI interface */
-static void mpfq_p_1_mpi_op_inner_ur(void *, void *, int *, MPI_Datatype *);
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
-/* Triggered by: mpi_ops_init */
-static void mpfq_p_1_mpi_op_inner_ur(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
-{
-    int got_it;
-    mpfq_p_1_dst_field K;
-    MPI_Type_get_attr(*datatype, mpfq_p_1_impl_mpi_attr, (void*) &K, &got_it);
-    assert(got_it);
-    mpfq_p_1_vec_ur_add(K, inoutvec, inoutvec, invec, *len);
-}
-
-static void mpfq_p_1_mpi_op_inner(void *, void *, int *, MPI_Datatype *);
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
-/* Triggered by: mpi_ops_init */
-static void mpfq_p_1_mpi_op_inner(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
-{
-    int got_it;
-    mpfq_p_1_dst_field K;
-    MPI_Type_get_attr(*datatype, mpfq_p_1_impl_mpi_attr, (void*) &K, &got_it);
-    assert(got_it);
-    mpfq_p_1_vec_add(K, inoutvec, inoutvec, invec, *len);
-}
-
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
-void mpfq_p_1_mpi_ops_init(mpfq_p_1_dst_field K MAYBE_UNUSED)
-{
-        if (mpfq_p_1_impl_mpi_use_count++) return;
-    MPI_Type_create_keyval(MPI_TYPE_DUP_FN, MPI_TYPE_NULL_DELETE_FN, &mpfq_p_1_impl_mpi_attr, NULL);
-    MPI_Type_contiguous(mpfq_p_1_vec_elt_stride(K, 1), MPI_BYTE, &mpfq_p_1_impl_mpi_datatype);
-    MPI_Type_commit(&mpfq_p_1_impl_mpi_datatype);
-    MPI_Type_contiguous(mpfq_p_1_vec_ur_elt_stride(K, 1), MPI_BYTE, &mpfq_p_1_impl_mpi_datatype_ur);
-    MPI_Type_commit(&mpfq_p_1_impl_mpi_datatype_ur);
-    MPI_Type_set_attr(mpfq_p_1_impl_mpi_datatype, mpfq_p_1_impl_mpi_attr, K);
-    MPI_Type_set_attr(mpfq_p_1_impl_mpi_datatype_ur, mpfq_p_1_impl_mpi_attr, K);
-    /* 1 here indicates that our operation is always taken to be
-     * commutative */
-    MPI_Op_create(&mpfq_p_1_mpi_op_inner, 1, &mpfq_p_1_impl_mpi_addition_op);
-    MPI_Op_create(&mpfq_p_1_mpi_op_inner_ur, 1, &mpfq_p_1_impl_mpi_addition_op_ur);
-}
-
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype */
-MPI_Datatype mpfq_p_1_mpi_datatype(mpfq_p_1_dst_field K MAYBE_UNUSED)
-{
-    return mpfq_p_1_impl_mpi_datatype;
-}
-
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype_ur */
-MPI_Datatype mpfq_p_1_mpi_datatype_ur(mpfq_p_1_dst_field K MAYBE_UNUSED)
-{
-    return mpfq_p_1_impl_mpi_datatype_ur;
-}
-
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op */
-MPI_Op mpfq_p_1_mpi_addition_op(mpfq_p_1_dst_field K MAYBE_UNUSED)
-{
-    return mpfq_p_1_impl_mpi_addition_op;
-}
-
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op_ur */
-MPI_Op mpfq_p_1_mpi_addition_op_ur(mpfq_p_1_dst_field K MAYBE_UNUSED)
-{
-    return mpfq_p_1_impl_mpi_addition_op_ur;
-}
-
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_clear */
-void mpfq_p_1_mpi_ops_clear(mpfq_p_1_dst_field K MAYBE_UNUSED)
-{
-        if (--mpfq_p_1_impl_mpi_use_count) return;
-    MPI_Op_free(&mpfq_p_1_impl_mpi_addition_op);
-    MPI_Op_free(&mpfq_p_1_impl_mpi_addition_op_ur);
-    MPI_Type_delete_attr(mpfq_p_1_impl_mpi_datatype, mpfq_p_1_impl_mpi_attr);
-    MPI_Type_delete_attr(mpfq_p_1_impl_mpi_datatype_ur, mpfq_p_1_impl_mpi_attr);
-    MPI_Type_free(&mpfq_p_1_impl_mpi_datatype);
-    MPI_Type_free(&mpfq_p_1_impl_mpi_datatype_ur);
-    MPI_Type_free_keyval(&mpfq_p_1_impl_mpi_attr);
-}
-
-
 /* Object-oriented interface */
 static void mpfq_p_1_wrapper_oo_field_clear(mpfq_vbase_ptr);
 static void mpfq_p_1_wrapper_oo_field_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
@@ -981,42 +893,6 @@ static void mpfq_p_1_wrapper_oo_field_init(mpfq_vbase_ptr);
 static void mpfq_p_1_wrapper_oo_field_init(mpfq_vbase_ptr vbase MAYBE_UNUSED)
 {
     mpfq_p_1_oo_field_init(vbase);
-}
-
-static void mpfq_p_1_wrapper_mpi_ops_clear(mpfq_vbase_ptr);
-static void mpfq_p_1_wrapper_mpi_ops_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    mpfq_p_1_mpi_ops_clear(vbase->obj);
-}
-
-static MPI_Op mpfq_p_1_wrapper_mpi_addition_op_ur(mpfq_vbase_ptr);
-static MPI_Op mpfq_p_1_wrapper_mpi_addition_op_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_p_1_mpi_addition_op_ur(vbase->obj);
-}
-
-static MPI_Op mpfq_p_1_wrapper_mpi_addition_op(mpfq_vbase_ptr);
-static MPI_Op mpfq_p_1_wrapper_mpi_addition_op(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_p_1_mpi_addition_op(vbase->obj);
-}
-
-static MPI_Datatype mpfq_p_1_wrapper_mpi_datatype_ur(mpfq_vbase_ptr);
-static MPI_Datatype mpfq_p_1_wrapper_mpi_datatype_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_p_1_mpi_datatype_ur(vbase->obj);
-}
-
-static MPI_Datatype mpfq_p_1_wrapper_mpi_datatype(mpfq_vbase_ptr);
-static MPI_Datatype mpfq_p_1_wrapper_mpi_datatype(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_p_1_mpi_datatype(vbase->obj);
-}
-
-static void mpfq_p_1_wrapper_mpi_ops_init(mpfq_vbase_ptr);
-static void mpfq_p_1_wrapper_mpi_ops_init(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    mpfq_p_1_mpi_ops_init(vbase->obj);
 }
 
 static void mpfq_p_1_wrapper_dotprod(mpfq_vbase_ptr, mpfq_p_1_dst_vec, mpfq_p_1_src_vec, mpfq_p_1_src_vec, unsigned int);
@@ -2063,12 +1939,6 @@ void mpfq_p_1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->elt_ur_set_ui_at = (void (*) (mpfq_vbase_ptr, void *, int, unsigned long)) mpfq_p_1_wrapper_elt_ur_set_ui_at;
     vbase->elt_ur_set_ui_all = (void (*) (mpfq_vbase_ptr, void *, unsigned long)) mpfq_p_1_wrapper_elt_ur_set_ui_all;
     vbase->dotprod = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_1_wrapper_dotprod;
-    vbase->mpi_ops_init = (void (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_mpi_ops_init;
-    vbase->mpi_datatype = (MPI_Datatype (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_mpi_datatype;
-    vbase->mpi_datatype_ur = (MPI_Datatype (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_mpi_datatype_ur;
-    vbase->mpi_addition_op = (MPI_Op (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_mpi_addition_op;
-    vbase->mpi_addition_op_ur = (MPI_Op (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_mpi_addition_op_ur;
-    vbase->mpi_ops_clear = (void (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_mpi_ops_clear;
     vbase->oo_field_init = (void (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_oo_field_init;
     vbase->oo_field_clear = (void (*) (mpfq_vbase_ptr)) mpfq_p_1_wrapper_oo_field_clear;
 }

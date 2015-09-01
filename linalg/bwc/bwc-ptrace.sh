@@ -284,7 +284,6 @@ prepare_common_arguments() {
         matrix=$matrix
         mpi=$mpi
         thr=$thr
-        lingen_mpi=$mpi
         m=$m
         n=$n
         wdir=$wdir
@@ -294,6 +293,7 @@ prepare_common_arguments() {
         interval=$interval
 
 EOF
+    if [ "$prime" != 2 ] ; then common="$common lingen_mpi=$lingen_mpi" ; fi
 }
 
 argument_checking
@@ -306,6 +306,10 @@ if ! [ "$matrix" ] ; then
 else
     # This also sets rwfile cwfile nrows ncols
     create_auxiliary_weight_files
+fi
+
+if [ "$magma" ] ; then
+    interval=1
 fi
 
 prepare_common_arguments
@@ -329,8 +333,7 @@ set $common
 
 if [ "$magma" ] ; then
     echo "### Enabling magma checking ###"
-    interval=1
-    set "$@" save_submatrices=1 interval=1
+    set "$@" save_submatrices=1
 fi
 
 if ! [ "$magma" ] ; then
@@ -379,7 +382,11 @@ echo "m:=$m;n:=$n;interval:=$interval;nrhs:=$nrhs;" > $mdir/mn.m
 echo "Saving matrix to magma format"
 $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
-$cmd bpmatrix_${nrows}_${ncols} < $matrix > $mdir/t.m
+if [ "$prime" = 2 ] ; then
+    $cmd bmatrix < $matrix > $mdir/t.m
+else
+    $cmd bpmatrix_${nrows}_${ncols} < $matrix > $mdir/t.m
+fi
 $cmd balancing < "$bfile" > $mdir/b.m
 
 placemats() {
@@ -410,7 +417,11 @@ EOF
             snr$i:=$i*nrp; /* $i*(nr div nh) + Min($i, nr mod nh); */
 EOF
         for j in `seq 0 $((Nv-1))` ; do
-            $cmd bpmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
+            if [ "$prime" = 2 ] ; then
+                $cmd bmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
+            else
+                $cmd bpmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
+            fi
             cat <<-EOF
                 nc$j:=ncp; /*  div nv + ($j lt nc mod nv select 1 else 0); */
                 snc$j:=$j*ncp; /* (nc div nv) + Min($j, nc mod nv); */

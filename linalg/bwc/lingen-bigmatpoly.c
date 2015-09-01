@@ -288,6 +288,25 @@ void bigmatpoly_rshift(abdst_field ab, bigmatpoly_ptr dst, bigmatpoly_ptr src, u
 }
 /*}}}*/
 
+#define CHECK_MPI_DATASIZE_FITS(_size0, _size1, _type0, _code) do {	\
+    ASSERT_ALWAYS((size_t) _size0 <= (size_t) INT_MAX);			\
+    ASSERT_ALWAYS((size_t) _size1 <= (size_t) INT_MAX);			\
+    size_t _datasize = (size_t) _size0 * (size_t) _size1;		\
+    if (_datasize > (size_t) INT_MAX) {					\
+        MPI_Datatype _datatype;						\
+        MPI_Type_contiguous(_size1, _type0, &_datatype);		\
+        MPI_Type_commit(&_datatype);					\
+        int _datasize = _size1;						\
+        _code;								\
+        MPI_Type_free(&_datatype);					\
+    } else {								\
+        MPI_Datatype _datatype = _type0;				\
+        _code;								\
+    }									\
+} while (0)
+
+
+
 
 /* {{{ allgather operations */
 void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
@@ -305,7 +324,11 @@ void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
         ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[1]);
+        CHECK_MPI_DATASIZE_FITS(
+                data->m * data->n, data->alloc * abvec_elt_stride(ab, 1),
+                MPI_BYTE,
+                MPI_Bcast(data->x, _datasize, _datatype, k, a->com[1])
+        );
     }
 }
 void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
@@ -323,7 +346,11 @@ void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
         ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[2]);
+        CHECK_MPI_DATASIZE_FITS(
+                data->m * data->n, data->alloc * abvec_elt_stride(ab, 1),
+                MPI_BYTE,
+                MPI_Bcast(data->x, _datasize, _datatype, k, a->com[2])
+        );
     }
 }
 /* }}} */
@@ -419,6 +446,10 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
     ASSERT_ALWAYS(irank * (int) src->n1 + jrank == rank);
     ASSERT_ALWAYS(length <= (size_t) INT_MAX);
 
+    MPI_Datatype mt;
+    MPI_Type_contiguous(length * abvec_elt_stride(ab, 1), MPI_BYTE, &mt);
+    MPI_Type_commit(&mt);
+
     // Node 0 receives data
     if (!rank) {
         ASSERT_ALWAYS(dst->m == src->m);
@@ -446,8 +477,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
                             absrc_vec from = matpoly_part_const(ab, me, i0, j0, offset);
                             abvec_set(ab, to, from, length);
                         } else {
-                            MPI_Irecv(to, length, abmpi_datatype(ab),
-                                    peer, tag, src->com[0], req);
+                            MPI_Irecv(to, 1, mt, peer, tag, src->com[0], req);
                         }
                         req++;
                     }
@@ -484,8 +514,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
                 unsigned int tag = ii * src->n + jj;
                 absrc_vec from = matpoly_part_const(ab, me, i0, j0, offset);
                 /* battle with const-deprived MPI prototypes... */
-                MPI_Isend((void*)from, length, abmpi_datatype(ab),
-                        0, tag, src->com[0], req);
+                MPI_Isend((void*)from, 1, mt, 0, tag, src->com[0], req);
                 req++;
             }
         }
@@ -498,6 +527,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly_ptr dst, bigmatpoly_s
         }
         free(reqs);
     }
+    MPI_Type_free(&mt);
 }
 
 /* Exactly the converse of the previous function.
@@ -520,6 +550,11 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
     MPI_Comm_rank(dst->com[1], &jrank);
 
     bigmatpoly_set_size(dst, offset+length);
+
+    MPI_Datatype mt;
+    MPI_Type_contiguous(length * abvec_elt_stride(ab, 1), MPI_BYTE, &mt);
+    MPI_Type_commit(&mt);
+
 
     /* sanity check, because the code below assumes this. */
     ASSERT_ALWAYS(irank * (int) dst->n1 + jrank == rank);
@@ -545,8 +580,7 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
                             abdst_vec to = matpoly_part(ab, me, i0, j0, offset);
                             abvec_set(ab, to, from, length);
                         } else {
-                            MPI_Isend(from, length, abmpi_datatype(ab),
-                                    peer, tag, dst->com[0], req);
+                            MPI_Isend(from, 1, mt, peer, tag, dst->com[0], req);
                         }
                         req++;
                     }
@@ -580,8 +614,7 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
                 unsigned int jj = j1 * dst->n0 + j0;
                 unsigned int tag = ii * dst->n + jj;
                 abdst_vec to = matpoly_part(ab, me, i0, j0, offset);
-                MPI_Irecv(to, length, abmpi_datatype(ab),
-                        0, tag, dst->com[0], req);
+                MPI_Irecv(to, 1, mt, 0, tag, dst->com[0], req);
                 req++;
             }
         }
@@ -594,6 +627,7 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
         }
         free(reqs);
     }
+    MPI_Type_free(&mt);
 }
 
 

@@ -2775,7 +2775,6 @@ int main(int argc, char *argv[])
 
     abfield_init(ab);
     abfield_specify(ab, MPFQ_PRIME_MPZ, bw->p);
-    abmpi_ops_init(ab);
 
     bm->lingen_threshold = 10;
     bm->lingen_mpi_threshold = 1000;
@@ -2838,7 +2837,7 @@ int main(int argc, char *argv[])
          * own address space (hence mpirun will need a bigger -n
          * argument).  In a sense, here we strive to follow the semantics
          * used in bwc otherwise.  In fact, we should probably use the
-         * pi_wiring structures as well, so that we can say that we
+         * pi_comm structures as well, so that we can say that we
          * consistently use the same infrastructure.  For simplicity of
          * the code, we don't.
          */
@@ -3022,7 +3021,6 @@ int main(int argc, char *argv[])
 
     bm_io_clear(aa);
     free(delta);
-    abmpi_ops_clear(ab);
     abfield_clear(ab);
     bmstatus_clear(bm);
     if (ffile) free(ffile);

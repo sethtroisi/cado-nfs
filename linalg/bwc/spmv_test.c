@@ -44,14 +44,15 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
 
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
-    mmt_wiring_ptr mcol = mmt->wr[bw->dir];
-    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
-    // pi_wiring_ptr picol = mmt->pi->wr[bw->dir];
-    // pi_wiring_ptr pirow = mmt->pi->wr[!bw->dir];
+    mmt_comm_ptr mcol = mmt->wr[bw->dir];
+    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
+    // pi_comm_ptr picol = mmt->pi->wr[bw->dir];
+    // pi_comm_ptr pirow = mmt->pi->wr[!bw->dir];
 
     A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
     A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
@@ -156,6 +157,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     memset(oldv[1], 0, sizeof(mmt_vec));
 #endif
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
 
     return NULL;
 }
@@ -172,6 +174,7 @@ int main(int argc, char * argv[])
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+    parallelizing_info_init();
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
@@ -191,6 +194,7 @@ int main(int argc, char * argv[])
 
     pi_go(tst_prog, pl, 0);
 
+    parallelizing_info_finish();
     param_list_clear(pl);
     bw_common_clear_new(bw);
 

@@ -68,7 +68,20 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
             prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
         add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
-            plingen_pz plingen_${gfp_layer})
+                plingen_pz plingen_${gfp_layer})
+
+        if (HAVE_MPI)
+            add_bwc_test(mpi1-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
+                mpi=2x3 lingen_mpi=2x2 ${mextra})
+            add_dependencies(test-bwc-mpi1-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                plingen_pz plingen_${gfp_layer})
+            add_bwc_test(mpi2-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
+                mpi=3x2 lingen_mpi=2x2 ${mextra})
+            add_dependencies(test-bwc-mpi2-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                plingen_pz plingen_${gfp_layer})
+        endif (HAVE_MPI)
 
         if(DEFINED ENV{CHECKS_EXPENSIVE})
             add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
@@ -164,16 +177,24 @@ add_dependencies(test-bwc-mod2-rolling_dependencies mf_scan)
 add_bwc_test(mod2-noshuffle bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 shuffle=0)
 add_dependencies(test-bwc-mod2-noshuffle_dependencies mf_scan)
 
-add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 mn=128 seed=1 thr=3)
+add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 m=128 n=128 seed=1 thr=3)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
-add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 mn=128
+add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 m=128 n=128
     interleaving=1 seed=1 thr=2)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
 add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
     seed=1 thr=5)
 add_dependencies(test-bwc-mod2-m-neq-n_dependencies mf_scan)
+if (HAVE_MPI)
+add_bwc_test(mpi1-mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
+    seed=1 thr=5 mpi=2x3 lingen_mpi=2x2)
+add_dependencies(test-bwc-mpi1-mod2-m-neq-n_dependencies mf_scan)
+add_bwc_test(mpi2-mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
+    seed=1 thr=5 mpi=3x2 lingen_mpi=2x2)
+add_dependencies(test-bwc-mpi2-mod2-m-neq-n_dependencies mf_scan)
+endif (HAVE_MPI)
 
 add_subdirectory(mpfq)
 

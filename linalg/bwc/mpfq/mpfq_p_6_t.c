@@ -1,6 +1,5 @@
 /* MPFQ generated file -- do not edit */
 
-#define _POSIX_C_SOURCE 200112L
 #include "mpfq_p_6_t.h"
 
 /* Active handler: simd_gfp */
@@ -10,7 +9,6 @@
 /* Active handler: Mpfq::defaults::poly */
 /* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::gfp::elt */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_6, tag=p_6, }, ],
    fieldtype=prime,
@@ -107,8 +105,6 @@
 /* Functions related to SIMD operation */
 
 /* Member templates related to SIMD operation */
-
-/* MPI interface */
 
 /* Object-oriented interface */
 /* *simd_gfp::code_for_member_template_dotprod */

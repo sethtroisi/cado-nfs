@@ -684,7 +684,7 @@ main (int argc, char *argv[])
 	lpb[i] = lpb[1];
     if (lpb[0] == 0 || lpb[1] == 0)
     {
-      fprintf (stderr, "Error, missing -lpbr or -lpba command line argument\n");
+      fprintf (stderr, "Error, missing -lpb0 or -lpb1 command line argument\n");
       usage (pl, argv0);
     }
 

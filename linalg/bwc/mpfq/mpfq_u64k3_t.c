@@ -1,6 +1,5 @@
 /* MPFQ generated file -- do not edit */
 
-#define _POSIX_C_SOURCE 200112L
 #include "mpfq_u64k3_t.h"
 
 #include "binary-dotprods-backends.h"
@@ -8,7 +7,6 @@
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::vec */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
@@ -104,8 +102,6 @@
 /* Functions related to SIMD operation */
 
 /* Member templates related to SIMD operation */
-
-/* MPI interface */
 
 /* Object-oriented interface */
 /* *simd_dotprod::code_for_member_template_dotprod */

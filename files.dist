@@ -234,8 +234,6 @@ linalg/bwc/xdotprod.c
 linalg/bwc/xdotprod.h
 linalg/bwc/xvectors.c
 linalg/bwc/xvectors.h
-linalg/bwc/xymats.c
-linalg/bwc/xymats.h
 linalg/characters.c
 linalg/gauss.c
 linalg/gauss.h
@@ -637,6 +635,11 @@ tests/filter/testsm.sh
 tests/filter/testsm.p59.poly
 tests/filter/testsm.p59.purged.gz
 tests/filter/testsm.p59.index.gz
+tests/misc/c60.poly
+tests/misc/c60.rels1
+tests/misc/c60.rels2
+tests/misc/CMakeLists.txt
+tests/misc/testcheck_rels.sh
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c
@@ -739,8 +742,6 @@ linalg/bwc/lingen-matpoly.c
 linalg/bwc/lingen-matpoly.h
 linalg/bwc/lingen-polymat.c
 linalg/bwc/lingen-polymat.h
-linalg/bwc/lingen-bigpolymat.c
-linalg/bwc/lingen-bigpolymat.h
 linalg/bwc/lingen-bigmatpoly.c
 linalg/bwc/lingen-bigmatpoly.h
 config/asprintf.c

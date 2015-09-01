@@ -18,8 +18,8 @@
  */
 static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsigned int nx, int d)
 {
-    mmt_wiring_ptr mcol = mmt->wr[d];
-    pi_wiring_ptr picol = mmt->pi->wr[d];
+    mmt_comm_ptr mcol = mmt->wr[d];
+    pi_comm_ptr picol = mmt->pi->wr[d];
     int shared = mcol->v->flags & THREAD_SHARED_VECTOR;
     mpfq_vbase_ptr A = mcol->v->abase;
     if (!shared || picol->trank == 0) {
@@ -46,10 +46,10 @@ static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsig
 #if 0
 void save_untwisted_transposed_vector(matmul_top_data_ptr mmt, const char * name, int d, int iter)
 {
-    mmt_wiring_ptr mcol = mmt->wr[!d];
-    mmt_wiring_ptr mrow = mmt->wr[d];
-    pi_wiring_ptr picol = mmt->pi->wr[!d];
-    pi_wiring_ptr pirow = mmt->pi->wr[d];
+    mmt_comm_ptr mcol = mmt->wr[!d];
+    mmt_comm_ptr mrow = mmt->wr[d];
+    pi_comm_ptr picol = mmt->pi->wr[!d];
+    pi_comm_ptr pirow = mmt->pi->wr[d];
 
     // v ---> Pr^-1*Sr^-1*v
     matmul_top_twist_vector(mmt, d);
@@ -113,7 +113,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
-    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+
+    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     /* Because we're a special case, we _expect_ to work opposite to
@@ -121,8 +123,8 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
      * to call mmt_mul with !bw->dir.
      */
 
-    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
-    // mmt_wiring_ptr mcol = mmt->wr[bw->dir];
+    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
+    // mmt_comm_ptr mcol = mmt->wr[bw->dir];
     
     serialize(pi->m);
 
@@ -206,6 +208,8 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     }
 
     matmul_top_clear(mmt);
+    pi_free_mpfq_datatype(pi, A_pi);
+
     A->oo_field_clear(A);
 
     free(gxvecs);
@@ -226,6 +230,7 @@ int main(int argc, char * argv[])
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
+    parallelizing_info_init();
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
@@ -247,6 +252,7 @@ int main(int argc, char * argv[])
 
     pi_go(sec_prog, pl, 0);
 
+    parallelizing_info_finish();
     param_list_clear(pl);
     bw_common_clear_new(bw);
     return 0;

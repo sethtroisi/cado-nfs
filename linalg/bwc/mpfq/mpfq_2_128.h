@@ -1797,6 +1797,16 @@ void mpfq_2_128_poly_getcoeff(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_ds
 static inline
 int mpfq_2_128_poly_deg(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_poly w)
 {
+#if GNUC_VERSION_ATLEAST(4,8,0)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+    /* the spurious uninit warning we get below is due to gcc's inability to
+     * decide that the test in mpfq_2_128_set() actually does something. See
+     *      https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67418
+     * The exact extent of gcc versions affected is not known. At least 4.8.4
+     * to 5.2.0
+     */
+#endif
     if (w->size == 0)
         return -1;
     int deg = w->size-1;
@@ -1813,6 +1823,9 @@ int mpfq_2_128_poly_deg(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_poly
     }
     mpfq_2_128_clear(K, &temp);
     return deg;
+#if GNUC_VERSION_ATLEAST(4,8,0)
+#pragma GCC diagnostic pop
+#endif
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add */

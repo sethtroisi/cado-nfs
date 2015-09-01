@@ -11,7 +11,6 @@
 /* Active handler: Mpfq::defaults::poly */
 /* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::gfp::elt */
-/* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
    fieldtype=prime,
@@ -108,8 +107,6 @@
 /* Functions related to SIMD operation */
 
 /* Member templates related to SIMD operation */
-
-/* MPI interface */
 
 /* Object-oriented interface */
 void mpfq_p_1_p_1_dotprod(mpfq_p_1_dst_field, mpfq_p_1_dst_field, mpfq_p_1_dst_vec, mpfq_p_1_src_vec, mpfq_p_1_src_vec, unsigned int);
