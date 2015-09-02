@@ -969,7 +969,7 @@ static unsigned int space_sieve_linear_combination(
   int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[0], l); 
   int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[1], m); 
   int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[2], n);
-  ASSERT(!int64_vector_equal(v_tmp, v_tmp1));
+  ASSERT(int64_vector_equal(v_tmp, v_tmp1));
   int64_vector_clear(v_tmp1);
 #endif // NDEBUG
 
@@ -1180,9 +1180,9 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
   while (s->c[2] < (int64_t)H->h[2]) {
 
 #ifdef SPACE_SIEVE_OUT
-    ASSERT(int64_vector_equal(s, list_out->v[first_s]) == 0);
+    ASSERT(int64_vector_equal(s, list_out->v[first_s]));
 #else
-    ASSERT(int64_vector_equal(s, list_s->v[0]) == 0);
+    ASSERT(int64_vector_equal(s, list_s->v[0]));
 #endif // SPACE_SIEVE_OUT
 
     for (unsigned int i = 0; i < list_vec_zero->length; i++) {
@@ -1277,9 +1277,9 @@ void space_sieve_1_3D(array_ptr array, ideal_1_srcptr r, mat_int64_srcptr Mqr,
 #ifdef SPACE_SIEVE_CONTRIBUTION
             index_vec = j;
 #ifdef SPACE_SIEVE_OUT
-            if (int64_vector_equal(s, list_out->v[i])) {
+            if (!int64_vector_equal(s, list_out->v[i])) {
 #else
-            if (int64_vector_equal(s, list_s->v[i])) {
+            if (!int64_vector_equal(s, list_s->v[i])) {
 #endif // SPACE_SIEVE_OUT
               s_change = 1;
             }
