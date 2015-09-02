@@ -389,6 +389,14 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             characters
             bwc_full
             sqrt)
+    cado_define_test(nonlinear_c59
+        SCRIPT
+            ${CADO_NFS_SOURCE_DIR}/factor.sh
+            71641520761751435455133616475667090434063332228247871795429
+            tasks.polyselect.import=${CADO_NFS_SOURCE_DIR}/tests/misc/c59_nonlinear.poly
+        TARGET_DEPENDENCIES
+            full_c59_dependencies
+        )
     find_program(MAGMA magma)
     if (MAGMA)
 #        this test is probably not very useful, given that the other
