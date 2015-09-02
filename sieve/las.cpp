@@ -418,7 +418,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         XX[i] = 0;
     // For small Jmax, the number of buckets at toplevel-1 could also
     // be less than the maximum allowed.
-    if (XX[si->toplevel] == 1) {
+    if (si->toplevel > 1 && XX[si->toplevel] == 1) {
         XX[si->toplevel-1] = 1 +
             ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1))
             / BRS[si->toplevel-1];
@@ -527,7 +527,7 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads,
       BRS[si->toplevel];
   // maybe there is only 1 bucket at toplevel and less than 256 at
   // toplevel-1, due to a tiny J.
-  if (si->nb_buckets[si->toplevel] == 1) {
+  if (si->toplevel > 1 && si->nb_buckets[si->toplevel] == 1) {
         si->nb_buckets[si->toplevel-1] = 1 +
             ((((uint64_t)si->J) << si->conf->logI) - UINT64_C(1)) /
             BRS[si->toplevel-1]; 
