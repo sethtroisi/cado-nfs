@@ -133,14 +133,16 @@ else
 fi
 smopts="$smopts -smexp1 $SMEXP1 -nsm1 $nsm1"
 ## FIXME: copy-paste without thinking!
-if [ $EXPLICIT2 = "yes" ]; then
-    nsm2=0
-    side=2
-    usef=true
-else
-    nsm2=$NMAPS2
+if [ $NSIDES -gt 2 ]; then
+    if [ $EXPLICIT2 = "yes" ]; then
+	nsm2=0
+	side=2
+	usef=true
+    else
+	nsm2=$NMAPS2
+    fi
+    smopts="$smopts -smexp2 $SMEXP2 -nsm2 $nsm2"
 fi
-smopts="$smopts -smexp2 $SMEXP2 -nsm2 $nsm2"
 
 ## build required SM's
 if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then

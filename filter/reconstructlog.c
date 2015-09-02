@@ -1142,6 +1142,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "smexp0", "sm exponent on side 0");
   param_list_decl_usage(pl, "sm1", "number of SM to add on side 1");
   param_list_decl_usage(pl, "smexp1", "sm exponent on side 1");
+  param_list_decl_usage(pl, "sm2", "number of SM to add on side 2");
+  param_list_decl_usage(pl, "smexp2", "sm exponent on side 2");
   param_list_decl_usage(pl, "abunits0", "units for all (a, b) pairs from purged and relsdels on side 0");
   param_list_decl_usage(pl, "abunits1", "units for all (a, b) pairs from purged and relsdels on side 1");
   param_list_decl_usage(pl, "explicit_units0", "use units for all (a, b) pairs from purged and relsdels on side 0");
@@ -1172,7 +1174,8 @@ main(int argc, char *argv[])
   uint64_t nprimes;
   int mt = 1;
   int partial = 0;
-  unsigned int nbsm0 = 0, nbsm1 = 0;
+  unsigned int nbsm[NB_POLYS_MAX];
+  memset(nbsm, 0, NB_POLYS_MAX*sizeof(int));
 
   mpz_t q;
   logtab_t log;
@@ -1226,56 +1229,16 @@ main(int argc, char *argv[])
   const char * wantedfilename = param_list_lookup_string(pl, "wanted");
   param_list_parse_uint64(pl, "nrels", &nrels_tot);
   param_list_parse_mpz(pl, "gorder", q);
-#ifndef FOR_FFS
-  /* eek. */
-  mpz_t smexp0;
-  param_list_parse_uint(pl, "sm0", &nbsm0);
-  mpz_init (smexp0);
-  param_list_parse_mpz(pl, "smexp0", smexp0);
-  const char * abunits0dirname = NULL;
-  abunits0dirname = param_list_lookup_string(pl, "abunits0");
-  if(units0 == 0)
-      abunits0dirname = NULL;
-
-  mpz_t smexp1;
-  param_list_parse_uint(pl, "sm1", &nbsm1);
-  mpz_init (smexp1);
-  param_list_parse_mpz(pl, "smexp1", smexp1);
-  const char * abunits1dirname = NULL;
-  abunits1dirname = param_list_lookup_string(pl, "abunits1");
-  if(units1 == 0)
-      abunits1dirname = NULL;
-#endif
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
   /* Some checks on command line arguments */
-  if (param_list_warn_unused(pl))
-  {
-    fprintf(stderr, "Error, unused parameters are given\n");
-    usage(pl, argv0);
-  }
-
   if (mpz_cmp_ui (q, 0) <= 0)
   {
     fprintf(stderr, "Error, missing -gorder command line argument "
                     "(or gorder <= 0)\n");
     usage (pl, argv0);
   }
-#ifndef FOR_FFS
-  if (nbsm0 != 0 && mpz_cmp_ui (smexp0, 0) <= 0)
-  {
-    fprintf(stderr, "Error, missing -smexp0 command line argument "
-                    "(or smexp0 <= 0)\n");
-    usage (pl, argv0);
-  }
-  if (nbsm1 != 0 && mpz_cmp_ui (smexp1, 0) <= 0)
-  {
-    fprintf(stderr, "Error, missing -smexp1 command line argument "
-                    "(or smexp1 <= 0)\n");
-    usage (pl, argv0);
-  }
-#endif
   if (nrels_tot == 0)
   {
     fprintf(stderr, "Error, missing -nrels command line argument "
@@ -1352,23 +1315,61 @@ main(int argc, char *argv[])
   }
 
 #ifndef FOR_FFS
-  if (nbsm0) {
+  /* eek. */
+  mpz_t smexp[NB_POLYS_MAX];
+  for(int side = 0; side < poly->nb_polys; side++){
+      char str[10];
+      snprintf(str, sizeof(str), "sm%c", '0'+side);
+      param_list_parse_uint(pl, str, &nbsm[side]);
+      mpz_init (smexp[side]);
+      snprintf(str, sizeof(str), "smexp%c", '0'+side);
+      param_list_parse_mpz(pl, str, smexp[side]);
+  }
+
+  const char * abunits0dirname = NULL;
+  abunits0dirname = param_list_lookup_string(pl, "abunits0");
+  if(units0 == 0)
+      abunits0dirname = NULL;
+
+  const char * abunits1dirname = NULL;
+  abunits1dirname = param_list_lookup_string(pl, "abunits1");
+  if(units1 == 0)
+      abunits1dirname = NULL;
+  if (nbsm[0] != 0 && mpz_cmp_ui (smexp[0], 0) <= 0)
+  {
+    fprintf(stderr, "Error, missing -smexp[0] command line argument "
+                    "(or smexp[0] <= 0)\n");
+    usage (pl, argv0);
+  }
+  if (nbsm[1] != 0 && mpz_cmp_ui (smexp[1], 0) <= 0)
+  {
+    fprintf(stderr, "Error, missing -smexp[1] command line argument "
+                    "(or smexp[1] <= 0)\n");
+    usage (pl, argv0);
+  }
+  if (nbsm[0]) {
       F0 = poly->pols[0];
-      FATAL_ERROR_CHECK(nbsm0 > (unsigned int) poly->pols[0]->deg,
+      FATAL_ERROR_CHECK(nbsm[0] > (unsigned int) poly->pols[0]->deg,
               "Too many SM");
   } else {
       F0 = NULL;
   }
-  if (nbsm1) {
+  if (nbsm[1]) {
       F1 = poly->pols[1];
-      FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->pols[1]->deg,
+      FATAL_ERROR_CHECK(nbsm[1] > (unsigned int) poly->pols[1]->deg,
               "Too many SM");
   } else {
       F1 = NULL;
   }
 #else
-  FATAL_ERROR_CHECK((nbsm0 != 0) || (nbsm1 != 0), "sm should be 0 for FFS");
+  FATAL_ERROR_CHECK((nbsm[0] != 0) || (nbsm[1] != 0), "sm should be 0 for FFS");
 #endif
+
+  if (param_list_warn_unused(pl))
+  {
+    fprintf(stderr, "Error, unused parameters are given\n");
+    usage(pl, argv0);
+  }
 
   set_antebuffer_path (argv0, path_antebuffer);
 
@@ -1386,9 +1387,9 @@ main(int argc, char *argv[])
   /* Malloc'ing log tab and reading values of log */
   printf ("\n###### Reading known logarithms ######\n");
   fflush(stdout);
-  logtab_init (log, nprimes, nbsm1+nbsm0, q);
+  logtab_init (log, nprimes, nbsm[1]+nbsm[0], q);
   if (logformat == NULL || strcmp(logformat, "LA") == 0)
-    read_log_format_LA (log, logfilename, idealsfilename, nbsm0, nbsm1);
+    read_log_format_LA (log, logfilename, idealsfilename, nbsm[0], nbsm[1]);
   else
     read_log_format_reconstruct (log, renumber_table, logfilename);
 
@@ -1452,8 +1453,8 @@ main(int argc, char *argv[])
 
   /* freeing and closing */
 #ifndef FOR_FFS
-  mpz_clear(smexp1);
-  mpz_clear(smexp0);
+  mpz_clear(smexp[1]);
+  mpz_clear(smexp[0]);
 #endif
   logtab_clear (log);
   mpz_clear(q);
