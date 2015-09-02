@@ -408,10 +408,9 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
 
             is_zero = A->vec_is_zero(A, check_area, how_many);
-            is_zero = pi_data_eq(&is_zero, 1, BWC_PI_INT, pi->m);
+            pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
-            serialize(pi->m);
-            if (pi_data_eq(&is_zero, 1, BWC_PI_INT, pi->m)) {
+            if (is_zero) {
                 if (tcan_print) {
                     if (rhscoeffs_name) {
                         printf("M^%u * V + R is zero\n", i);
