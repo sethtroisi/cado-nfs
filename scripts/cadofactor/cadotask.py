@@ -4468,7 +4468,7 @@ class ReconstructLogTask(Task):
                  "ker": Request.GET_KERNEL_FILENAME,
                  "ideals": Request.GET_IDEAL_FILENAME,
                  "relsdel": Request.GET_RELSDEL_FILENAME}
-        override = ("dlog",  "ell", "smexp0", "nmaps0", "smexp1", "nmaps1", "nrels", "abunits0", "abunits1")
+        override = ("dlog",  "ell", "nmaps0", "nmaps1", "nrels", "abunits0", "abunits1")
         return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):
@@ -4486,7 +4486,6 @@ class ReconstructLogTask(Task):
         if not "dlog" in self.state or self.have_new_input_files():
             dlogfilename = self.workdir.make_filename("dlog")
             gorder = self.send_request(Request.GET_ELL)
-            smexp = self.send_request(Request.GET_SMEXP)
             nmaps = self.send_request(Request.GET_NMAPS)
 
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
@@ -4500,8 +4499,6 @@ class ReconstructLogTask(Task):
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
-                    smexp0=smexp[0],
-                    smexp1=smexp[1],
                     nmaps0=nmaps[0],
                     nmaps1=nmaps[1],
                     nrels=nrels,
