@@ -636,6 +636,7 @@ tests/filter/testsm.p59.index.gz
 tests/misc/c60.poly
 tests/misc/c60.rels1
 tests/misc/c60.rels2
+tests/misc/c59_nonlinear.poly
 tests/misc/CMakeLists.txt
 tests/misc/testcheck_rels.sh
 utils/gcd.c
