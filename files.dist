@@ -244,8 +244,6 @@ local.sh.macosx.x86_32
 local.sh.macosx.x86_64
 macros.h
 misc/CMakeLists.txt
-misc/convert_poly.c
-misc/convert_rels.c
 misc/check_rels.c
 misc/debug_renumber.c
 misc/renumber_convert.c

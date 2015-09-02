@@ -12,4 +12,10 @@ set_target_properties(debug_renumber-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS 
 add_executable(psi EXCLUDE_FROM_ALL psi.c)
 target_link_libraries (psi utils)
 
+add_executable(convert_poly EXCLUDE_FROM_ALL convert_poly.c)
+target_link_libraries(convert_poly utils)
+
+add_executable(convert_rels EXCLUDE_FROM_ALL convert_rels.c)
+target_link_libraries(convert_rels utils)
+
 # vim: set ft=cmake:
