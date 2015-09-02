@@ -1,41 +1,34 @@
-add_executable(test_array test_array.c ../../nfs-hd/sieving_bound.c
-  ../../nfs-hd/int64_vector.c ../../nfs-hd/array.c)
 FIND_LIBRARY(ECM_LIB ecm ${CADO_NFS_SOURCE_DIR}/nfs-hd)
-target_link_libraries(test_array ${ECM_LIB} utils)
-include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
-run_test(test_array test_array)
-
-# -----
-add_executable(test_int64_poly test_int64_poly.c ../../nfs-hd/int64_poly.c
-	../../nfs-hd/sieving_bound.c ../../nfs-hd/utils_int64.c
-	../../utils/mpz_poly.c)
-target_link_libraries(test_int64_poly ${ECM_LIBS} utils)
-include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
-run_test(test_int64_poly test_int64_poly)
-
-# -----
-add_executable(test_ideal test_ideal.c ../../nfs-hd/ideal.c
-	../../utils/mpz_poly.c)
-target_link_libraries(test_ideal ${ECM_LIBS} utils)
-include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
-run_test(test_ideal test_ideal)
-
-# -----
-add_executable(test_makefb test_makefb.c ../../nfs-hd/makefb.c
-	../../utils/mpz_poly.c ../../nfs-hd/ideal.c ../../nfs-hd/utils_int64.c
-  ../../nfs-hd/factor_base.c)
-target_link_libraries(test_makefb ${ECM_LIBS} utils)
-include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
-run_test(test_makefb test_makefb)
-
-# -----
-add_executable(test_utils_int64 test_utils_int64.c ../../nfs-hd/utils_int64.c)
-target_link_libraries(test_utils_int64 utils)
+include_directories(${CADO_NFS_SOURCE_DIR})
 include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
 
 # -----
-run_test(test_utils_mpz test_utils_mpz)
-add_executable(test_utils_mpz test_utils_mpz.c ../../nfs-hd/utils_mpz.c)
-target_link_libraries(test_utils_mpz utils ${ECM_LIB})
-include_directories(${CADO_NFS_SOURCE_DIR}/nfs-hd)
-run_test(test_utils_mpz test_utils_mpz)
+
+cado_define_test(test_array.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/sieving_bound.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/int64_vector.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/array.c LIBRARIES utils)
+
+# -----
+cado_define_test(test_int64_poly.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/int64_poly.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/sieving_bound.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/utils_int64.c
+	${CADO_NFS_SOURCE_DIR}/utils/mpz_poly.c LIBRARIES utils ${ECM_LIB})
+
+# -----
+cado_define_test(test_ideal.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/ideal.c
+	${CADO_NFS_SOURCE_DIR}/utils/mpz_poly.c LIBRARIES utils ${ECM_LIBS})
+
+## -----
+cado_define_test(test_makefb.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/makefb.c
+	${CADO_NFS_SOURCE_DIR}/utils/mpz_poly.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/ideal.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/utils_int64.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/factor_base.c LIBRARIES utils ${ECM_LIBS})
+
+# -----
+cado_define_test(test_utils_int64.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/utils_int64.c
+	LIBRARIES utils)
+
+# -----
+cado_define_test(test_utils_mpz.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/utils_mpz.c
+	LIBRARIES utils ${ECM_LIB})

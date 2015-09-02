@@ -26,7 +26,7 @@ int main()
   for (int i = 0; i < pol0->deg; i++) {
     ASSERT_ALWAYS(int64_poly_getcoeff(i, pol0) == int64_poly_getcoeff(i, pol1));
   }
-  ASSERT_ALWAYS(int64_poly_equal(pol0, pol1) == 0);
+  ASSERT_ALWAYS(int64_poly_equal(pol0, pol1));
 
   int64_poly_set_xi(pol0, 4);
   for (int i = 0; i < pol0->deg; i++) {
@@ -39,10 +39,10 @@ int main()
     ASSERT_ALWAYS(int64_poly_getcoeff(i, pol0) == 0);
   }
   ASSERT_ALWAYS(int64_poly_getcoeff(pol0->deg, pol0) == 4);
-  ASSERT_ALWAYS(int64_poly_equal(pol0, pol1) == 1);
+  ASSERT_ALWAYS(!int64_poly_equal(pol0, pol1));
 
   ASSERT_ALWAYS((uint64_t) int64_poly_max(pol1) ==
-      int64_poly_infinite_norm(pol1));
+      int64_poly_infinity_norm(pol1));
 
   mpz_poly_t pol2;
   mpz_poly_init(pol2, 0);
