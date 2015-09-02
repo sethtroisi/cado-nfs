@@ -926,22 +926,27 @@ void compute_pseudo_Tqr_1(uint64_t * pseudo_Tqr, uint64_t * Tqr,
 void compute_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, unsigned int t,
     ideal_1_srcptr ideal)
 {
+  unsigned int index = 0;
+  while (Tqr[index] == 0) {
+    index++;
+  }
+
   mat_int64_init(Mqr, t, t);
   mat_int64_set_zero(Mqr);
-  if (Tqr[0] != 0) {
-    Mqr->coeff[1][1] = ideal->ideal->r;
-    for (unsigned int i = 2; i <= t; i++) {
-      Mqr->coeff[i][i] = 1;
+  for (unsigned int i = 1; i <= t; i++) {
+    Mqr->coeff[i][i] = 1;
+  }
+  Mqr->coeff[index + 1][index + 1] = ideal->ideal->r;
+  for (unsigned int col = index + 2; col <= t; col++) {
+    if (Tqr[col-1] != 0) {
+      Mqr->coeff[index + 1][col] =
+        (-(int64_t)Tqr[col-1]) + (int64_t)ideal->ideal->r;
     }
-    for (unsigned int col = 2; col <= t; col++) {
-      if (Tqr[col-1] != 0) {
-        Mqr->coeff[1][col] = (-(int64_t)Tqr[col-1]) + (int64_t)ideal->ideal->r;
-      } else {
-        Mqr->coeff[1][col] = 0;
-      }
+#ifndef NDEBUG
+    else {
+      Mqr->coeff[index + 1][col] = 0;
     }
-  } else {
-    //TODO: continue here.
+#endif // NDEBUG
   }
 }
 
@@ -1965,16 +1970,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       mat_int64_init(Mqr, H->t, H->t);
 
       compute_Mqr_1(Mqr, Tqr, H->t, r);
-      if (Mqr->coeff[1][1] != 0) {
+      if (Mqr->coeff[1][1] != 1) {
         plane_sieve_1(array, r, Mqr, H, matrix, f);
       } else {
-        fprintf(stderr, "# Plane sieve: error in the construction of Mqr.\n# ");
-        ideal_fprintf(stderr, r->ideal);
-        printf("# Tqr = [");
-        for (unsigned int i = 0; i < H->t - 1; i++) {
-          printf("%" PRIu64 ", ", Tqr[i]);
-        }
-        printf("%" PRIu64 "]\n", Tqr[H->t - 1]);
+        fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
+        mat_int64_fprintf_comment(stderr, Mqr);
       }
 
 #ifdef NUMBER_HIT
