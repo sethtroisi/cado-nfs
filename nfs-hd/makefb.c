@@ -13,8 +13,12 @@
 #include "utils_int64.h"
 
 /*
-  mpz_poly_factor does not work in characteristic 2, so we do it the naive way.
-*/
+ * Mode:
+ *   MAIN: export factor bases. Default file name is: <p>,<n>,<#numberfield>.
+ *   TIME_MAKEFB: get the time to build factor bases.
+ */
+
+//mpz_poly_factor does not work in characteristic 2, so we do it the naive way.
 
 /*
  * Add 1 to f. If the constant term is equal to 1, set this term to 0 and
@@ -38,6 +42,9 @@ static void mpz_poly_add_one_in_F2(mpz_poly_ptr f)
   mpz_poly_setcoeff_si(f, i, 1);
 }
 
+/*
+ * Factorise naively a mpz_poly mod 2.
+ */
 void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
 {
   //set p to 2, because we work in F2.
@@ -160,8 +167,7 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
 }
 
 /*
- * Set an ideal_1 at an index. Do not forget to define LINESIEVE if you
- *  want to set an ideal mod r.
+ * Set an ideal_1 at an index.
  *
  * fb: the factor base.
  * index: index in the factor base.
@@ -182,8 +188,7 @@ static void add_ideal_1_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
 }
 
 /*
- * Set an ideal_u at an index. Do not forget to define LINESIEVE if you
- *  want to set an ideal mod r.
+ * Set an ideal_u at an index.
  *
  * fb: the factor base.
  * index: index in the factor base.
@@ -205,8 +210,7 @@ static void add_ideal_u_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
 }
 
 /*
- * Set an ideal_pr at an index. Do not forget to define LINESIEVE if you
- *  want to set an ideal mod r.
+ * Set an ideal_pr at an index.
  *
  * fb: the factor base.
  * index: index in the factor base.
@@ -334,6 +338,8 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   getprime(0);
 }
 
+/* Parse different types. */
+
 static int parse_ulong(unsigned long * x, char ** endptr, char * ptr)
 {
   unsigned long xx;
@@ -352,9 +358,11 @@ static int parse_uint64(uint64_t * x, char ** endptr, char * ptr)
   return parse_ulong((unsigned long *) x, endptr, ptr);
 }
 
-// Read z from ptr and advance pointer.
-// Assume z has been initialized.
-// return 0 or 1 for failure / success
+/*
+ * Read z from ptr and advance pointer.
+ * Assume z has been initialized.
+ * Return 0 or 1 for failure / success
+ */
 static int parse_mpz(mpz_t z, char ** endptr, char * ptr)
 {
   int r = gmp_sscanf(ptr, "%Zd", z);
@@ -369,9 +377,11 @@ static int parse_mpz(mpz_t z, char ** endptr, char * ptr)
   return 1;
 }
 
-// Read z from ptr and advance pointer.
-// Assume z has been initialized.
-// return 0 or 1 for failure / success
+/*
+ * Read z from ptr and advance pointer.
+ * Assume z has been initialized.
+ * Return 0 or 1 for failure / success
+ */
 static int parse_int(int * i, char ** endptr, char * ptr)
 {
   int r = sscanf(ptr, "%d", i);
@@ -386,10 +396,12 @@ static int parse_int(int * i, char ** endptr, char * ptr)
   return 1;
 }
 
-// Read z0,z1,...,zk from ptr and advance pointer.
-// Assume all the zi have been initialized and that the array is large
-// enough to hold everyone.
-// Return the number of zi that are parsed (0 means error or empty list)
+/*
+ * Read z0,z1,...,zk from ptr and advance pointer.
+ * Assume all the zi have been initialized and that the array is large
+ * enough to hold everyone.
+ * Return the number of zi that are parsed (0 means error or empty list)
+ */
 static int parse_cs_mpzs(mpz_t *z, char ** endptr, char * ptr)
 {
   char *myptr = ptr;
@@ -680,6 +692,9 @@ void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
 }
 
 #ifdef MAIN
+/*
+ * Write ideal in a file.
+ */
 void write_ideal(FILE * file, ideal_srcptr ideal)
 {
   fprintf(file, "%d:", ideal->h->deg);
@@ -691,6 +706,9 @@ void write_ideal(FILE * file, ideal_srcptr ideal)
   fprintf(file, ":");
 }
 
+/*
+ * Write ideal_1 in a file.
+ */
 void write_ideal_1(FILE * file, ideal_1_srcptr ideal, unsigned int t) {
   write_ideal(file, ideal->ideal);
   for (unsigned int i = 0; i < t - 2; i++) {
@@ -700,6 +718,9 @@ void write_ideal_1(FILE * file, ideal_1_srcptr ideal, unsigned int t) {
   fprintf(file, "%u\n", ideal->log);
 }
 
+/*
+ * Write ideal_u in a file.
+ */
 void write_ideal_u(FILE * file, ideal_u_srcptr ideal, unsigned int t) {
   write_ideal(file, ideal->ideal);
   for (int row = 0; row < ideal->ideal->h->deg - 1; row++) {
@@ -716,6 +737,10 @@ void write_ideal_u(FILE * file, ideal_u_srcptr ideal, unsigned int t) {
               [t - (unsigned int)ideal->ideal->h->deg - 1]);
   fprintf(file, "%u\n", ideal->log);
 }
+
+/*
+ * Write ideal_pr in a file.
+ */
 void write_ideal_pr(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
 {
   write_ideal(file, ideal->ideal);
@@ -726,6 +751,16 @@ void write_ideal_pr(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
   fprintf(file, "%u\n", ideal->log);
 }
 
+/*
+ * Write factor base in a file.
+ *
+ * file: the file.
+ * fb: the factor base.
+ * f: polynomial that defines the number field.
+ * fbb: factor base bound.
+ * lpb: large prime bound.
+ * t: dimension of the lattice.
+ */
 void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
     int64_t fbb, mpz_srcptr lpb, unsigned int t)
 {
@@ -797,6 +832,18 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "f9", "polynomial that defines the number field 9");
 }
 
+/*
+ * Initialise all the parameters. Frequently read from command line.
+ *
+ * f: array of mpz_poly that define the number fields.
+ * fbb: factor base bounds.
+ * fb: factor bases.
+ * t: dimension of the lattice.
+ * lpb: large prime bounds.
+ * V: number of number fields.
+ * p: characteristic of the finite field.
+ * n: extension of the finite field.
+ */
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     uint64_t ** fbb, factor_base_t ** fb, unsigned int * t, mpz_t ** lpb,
     unsigned int * V, uint64_t * p, unsigned int * n)

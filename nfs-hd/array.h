@@ -100,7 +100,30 @@ uint64_t array_mpz_vector_index(mpz_vector_srcptr v, sieving_bound_srcptr H,
  * number_element: number of element in the sieving region, only used in the
  *  NDEBUG mode.
  */
-uint64_t array_int64_vector_index(int64_vector_srcptr v, sieving_bound_srcptr H,
-    uint64_t number_element);
+uint64_t array_int64_vector_index(int64_vector_srcptr v,
+    sieving_bound_srcptr H, uint64_t number_element);
+
+/*
+ * Return the value at the index define by vec.
+ * Assume dimension of vec is equal to H->t.
+ *
+ * array: the array in which we store the norm.
+ * vec: coordinates of the vector.
+ * H: the sieving bound.
+ */
+unsigned char array_get_at(array_ptr array, int * vec,
+    sieving_bound_srcptr H);
+
+/*
+ * Set the value at the index define by vec.
+ * Assume dimension of vec is equal to H->t.
+ *
+ * array: the array in which we store the norm.
+ * vec: coordinates of the vector.
+ * val: value.
+ * H: the sieving bound.
+ */
+void array_set_at(array_ptr array, int * vec, unsigned char val,
+    sieving_bound_srcptr H);
 
 #endif /* ARRAY_H */

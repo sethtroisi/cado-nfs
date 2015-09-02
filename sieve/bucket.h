@@ -126,7 +126,7 @@ class bucket_update_t;
 template <typename HINT>
 class bucket_update_t<1, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION;
+  static const uint64_t bucket_region = BUCKET_REGION_1;
   XSIZE1 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
@@ -139,7 +139,7 @@ public:
 template <typename HINT>
 class bucket_update_t<2, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION; /* FIXME */
+  static const uint64_t bucket_region = BUCKET_REGION_2;
   /* TODO: create a fake 24-bit type as uint8_t[3]. */
   XSIZE2 x;
   bucket_update_t(){};
@@ -153,7 +153,7 @@ public:
 template <typename HINT>
 class bucket_update_t<3, HINT> : public HINT {
 public:
-  static const size_t bucket_region = BUCKET_REGION; /* FIXME */
+  static const uint64_t bucket_region = BUCKET_REGION_3;
   XSIZE3 x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
@@ -172,7 +172,7 @@ public:
 template <int LEVEL, typename HINT>
 class bucket_array_t : private NonCopyable {
   typedef bucket_update_t<LEVEL, HINT> update_t;
-  static const size_t bucket_region = update_t::bucket_region;
+  static const uint64_t bucket_region = update_t::bucket_region;
   update_t *big_data;
   size_t big_size;                    // size of bucket update memory
 
@@ -289,6 +289,7 @@ public:
     ASSERT_EXPENSIVE(bucket_number < n_bucket);
     update_t update(offset % bucket_region, p, slice_offset, slice_index);
 #if defined(TRACE_K)
+    WHERE_AM_I_UPDATE(w, i, slice_index);
     log_this_update(update, offset, bucket_number, w);
 #endif
     push_update(bucket_number, update);
@@ -303,13 +304,13 @@ template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_index);
+         uint32_t bucket_index, where_am_I_ptr w);
 
 template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_index);
+         uint32_t bucket_index, where_am_I_ptr w);
 
 /* A class that stores updates in a single "bucket".
    It's really just a container class with pre-allocated array for storage,
@@ -383,7 +384,8 @@ class bucket_array_complete : public bucket_single<1, longhint_t> {
 public:  
   bucket_array_complete (const size_t size) : super(size){}
   ~bucket_array_complete(){}
-  void purge (const bucket_array_t<1, shorthint_t> &BA, int i, const unsigned char *S);
+  template <typename HINT>
+  void purge (const bucket_array_t<1, HINT> &BA, int i, const unsigned char *S);
 };
 
 

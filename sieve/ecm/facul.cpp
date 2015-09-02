@@ -768,7 +768,7 @@ facul_make_default_strategy (int n, const int verbose)
       ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
     }
 
-  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
+  /* heuristic strategy where B1 is increased by c*sqrt(B1) at each curve */
   double B1 = 105.0;
   for (int i = 4; i < n + 3; i++)
     {
@@ -899,7 +899,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 
       verbose_output_print(0, 1, "# Using default strategy for the cofactorization\n");
       strategies->precomputed_methods =
-	facul_make_default_strategy (max_ncurves,verbose);
+	facul_make_default_strategy (max_ncurves, verbose);
       /* make two well-behaved facul_method_side_t* lists, based on which
        * side is first */
       for (int first = 0 ; first < 2 ; first++) {
@@ -1111,6 +1111,32 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
   return 1;
 }
 
+void
+modset_get_z (mpz_t z, struct modset_t *modset)
+{
+  ASSERT_ALWAYS(modset->arith != modset_t::CHOOSE_NONE);
+  switch (modset->arith)
+    {
+    case modset_t::CHOOSE_UL:
+      mpz_set_ui (z, modset->m_ul->m);
+      break;
+    case modset_t::CHOOSE_15UL:
+      mpz_set_ui (z, modset->m_15ul->m[1]);
+      mpz_mul_2exp (z, z, LONG_BIT);
+      mpz_add_ui (z, z, modset->m_15ul->m[0]);
+      break;
+    case modset_t::CHOOSE_2UL2:
+      mpz_set_ui (z, modset->m_2ul2->m[1]);
+      mpz_mul_2exp (z, z, LONG_BIT);
+      mpz_add_ui (z, z, modset->m_2ul2->m[0]);
+      break;
+    case modset_t::CHOOSE_MPZ:
+      mpz_set (z, modset->m_mpz);
+      break;
+    default:
+      abort ();
+    }
+}
 
 /*
  * This is our auxiliary factorization.

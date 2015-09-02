@@ -45,7 +45,7 @@ void thread_data::pickup_si(sieve_info_ptr _si)
 {
   si = _si;
   for (int side = 0 ; side < 2 ; side++) {
-    sides[side].set_fb(si->sides[side]->fb->get_part(1));
+    sides[side].set_fb(si->sides[side]->fb);
   }
 }
 
@@ -146,21 +146,22 @@ reservation_group::reservation_group(const size_t nr_bucket_arrays)
 }
 
 void
-reservation_group::allocate_buckets(const uint32_t n_bucket, const double *fill_ratio)
+reservation_group::allocate_buckets(const uint32_t *n_bucket, const double *fill_ratio)
 {
   /* Short hint updates are generated only by fill_in_buckets(), so each BA
      gets filled only by its respective FB part */
-  RA1_short.allocate_buckets(n_bucket, fill_ratio[1]);
-  RA2_short.allocate_buckets(n_bucket, fill_ratio[2]);
-  RA3_short.allocate_buckets(n_bucket, fill_ratio[3]);
+  RA1_short.allocate_buckets(n_bucket[1], fill_ratio[1]);
+  RA2_short.allocate_buckets(n_bucket[2], fill_ratio[2]);
+  RA3_short.allocate_buckets(n_bucket[3], fill_ratio[3]);
 
   /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
      array gets the shorthint updates from level 3 sieving, and the level-1
      longhint array gets the shorthint updates from level 2 sieving as well
      as the previously downsorted longhint updates from level 3 sieving. */
-  RA1_long.allocate_buckets(n_bucket, fill_ratio[2] + fill_ratio[3]);
-  RA2_long.allocate_buckets(n_bucket, fill_ratio[3]);
+  RA1_long.allocate_buckets(n_bucket[1], fill_ratio[2] + fill_ratio[3]);
+  RA2_long.allocate_buckets(n_bucket[2], fill_ratio[3]);
 }
+
 
 /* 
    We want to map the desired bucket_array type to the appropriate
@@ -329,6 +330,10 @@ thread_workspaces::buckets_max_full()
     return mf0;
 }
 template double thread_workspaces::buckets_max_full<1, shorthint_t>();
+template double thread_workspaces::buckets_max_full<2, shorthint_t>();
+template double thread_workspaces::buckets_max_full<3, shorthint_t>();
+template double thread_workspaces::buckets_max_full<1, longhint_t>();
+template double thread_workspaces::buckets_max_full<2, longhint_t>();
 
 void
 thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
@@ -339,3 +344,13 @@ thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
             checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }
 }
+
+template <int LEVEL, typename HINT>
+void
+thread_workspaces::reset_all_pointers(int side) {
+    groups[side]->get<LEVEL, HINT>().reset_all_pointers();
+}
+
+template void thread_workspaces::reset_all_pointers<1, shorthint_t>(int);
+template void thread_workspaces::reset_all_pointers<2, shorthint_t>(int);
+template void thread_workspaces::reset_all_pointers<3, shorthint_t>(int);

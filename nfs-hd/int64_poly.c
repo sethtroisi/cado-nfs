@@ -17,11 +17,9 @@ void int64_poly_init(int64_poly_ptr f, int d)
     f->coeff = (int64_t *) NULL;
   } else {
     f->alloc = d + 1;
-    f->coeff = calloc(d + 1, sizeof(int64_t));
+    f->coeff = (int64_t *) malloc((d + 1) * sizeof(int64_t));
+    memset(f->coeff, 0, (d + 1) * sizeof(int64_t));
     FATAL_ERROR_CHECK (f->coeff == NULL, "not enough memory");
-    /*for (int i = 0; i <= d; ++i) {*/
-      /*f->coeff[i] = 0;*/
-    /*}*/
   }
 }
 
@@ -32,9 +30,6 @@ void int64_poly_realloc(int64_poly_ptr f, int nc)
     f->coeff = (int64_t*) realloc (f->coeff, nc * sizeof(int64_t));
     FATAL_ERROR_CHECK (f->coeff == NULL, "not enough memory");
     memset(f->coeff + f->alloc, 0, (nc - f->alloc) * sizeof(int64_t));
-    /*for (int i = f->alloc; i < nc; i++) {*/
-      /*f->coeff[i] = 0;*/
-    /*}*/
     f->alloc = nc;
   }
 }
@@ -70,6 +65,7 @@ void int64_poly_clear(int64_poly_ptr f)
 void int64_poly_cleandeg(int64_poly_ptr f, int deg)
 {
   ASSERT(deg >= -1);
+
   while ((deg >= 0) && (f->coeff[deg] == 0))
     deg--;
   f->deg = deg;
@@ -103,15 +99,15 @@ void int64_poly_set_bxi(int64_poly_ptr f, int i, int64_t b)
 int int64_poly_equal(int64_poly_srcptr a, int64_poly_srcptr b)
 {
   int r = (a->deg > b->deg) - (b->deg > a->deg);
-  if (r) return 1;
+  if (r) return 0;
   for(int d = a->deg; d >= 0 ; d--) {
     r = a->coeff[d] - b->coeff[d];
-    if (r) return 1;
+    if (r) return 0;
   }
-  return 0;
+  return 1;
 }
 
-int int64_poly_normalized_p(int64_poly_srcptr f)
+int int64_poly_normalized(int64_poly_srcptr f)
 {
   return (f->deg == -1) || f->coeff[f->deg] !=  0;
 }

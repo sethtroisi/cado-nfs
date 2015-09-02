@@ -42,20 +42,18 @@ void int64_vector_set(int64_vector_ptr v, int64_vector_srcptr s)
 
 void int64_vector_set_zero(int64_vector_ptr v)
 {
-  for (unsigned int i = 0; i < v->dim; i++) {
-    v->c[i] = 0;
-  }
+  memset(v->c, 0, v->dim * sizeof(int64_t));
 }
 
 int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b)
 {
   int r = (a->dim > b->dim) - (b->dim > a->dim);
-  if (r) return 1;
+  if (r) return 0;
   for(int d = (int)(a->dim - 1); d >= 0 ; d--) {
     r = a->c[d] - b->c[d];
-    if (r) return 1;
+    if (r) return 0;
   }
-  return 0;
+  return 1;
 }
 
 void int64_vector_add(int64_vector_ptr a, int64_vector_srcptr b,

@@ -2,7 +2,7 @@
 include_directories(. ..)
 # include_directories(mpfq)
 
-# Use with care. Normally, binaries not needed MPI for real should not
+# Use with care. Normally, binaries not needing MPI for real should not
 # emit MPI symbols since they don't do anything depending on this config
 # variable. However this mechanism is somewhat fragile.
 if (${WITH_MPI})
@@ -18,8 +18,11 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # add_library calls, and then I'm not sure whether
 # target_link_libraries picks the static or shared ones...
 
-# This is a default setting
-set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k4
+# This is a default setting, but in reality we don't have much latitude
+# with it. We *have* to compile all the u64k* which are in the set of
+# sources, because of cross dependencies which are presently not
+# correctly guarded.
+set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced threaded
@@ -32,12 +35,18 @@ set(BWC_GFP_MATMUL_BACKENDS basicp
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
 
+# In the fflas branch, this is used to plug in fflas.
+set(BWC_EXTRA_BACKENDS "" CACHE STRING "list of pairs (arithmetic,matmul) backends for linear algebra")
+
 # In case there's a user override, just make mention of the situation.
 if(NOT BWC_GFP_ARITHMETIC_BACKENDS)
     message(STATUS "DL mode disabled for linear algebra")
 else(NOT BWC_GFP_ARITHMETIC_BACKENDS)
     if(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-        message(STATUS "GF(p) implementations enabled for DL linear algebra: ${BWC_GFP_ARITHMETIC_BACKENDS}")
+        string_join(FOO ", " ${BWC_GFP_ARITHMETIC_BACKENDS})
+        message(STATUS "GF(p) implementations enabled for DL linear algebra: ${FOO}")
+        string_join(FOO ", " ${BWC_GFP_MATMUL_BACKENDS})
+        message(STATUS "GF(p) SpMV backends for DL linear algebra: ${FOO}")
     else(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
         # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU
         # CC idioms. As it is not used in production yet, we don't want
@@ -47,20 +56,6 @@ else(NOT BWC_GFP_ARITHMETIC_BACKENDS)
         message(STATUS "Warning: DL mode forcibly disabled for linear algebra (amd64-only)")
     endif(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 endif(NOT BWC_GFP_ARITHMETIC_BACKENDS)
-
-set(COOKED_BWC_BACKENDS)
-foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
-    foreach(w ${BWC_GF2_MATMUL_BACKENDS})
-        set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${w})")
-    endforeach(w)
-endforeach(v)
-foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
-    foreach(w ${BWC_GFP_MATMUL_BACKENDS})
-        set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${w})")
-    endforeach(w)
-endforeach(v)
-
-configure_file(bwc_config_h.in bwc_config.h ESCAPE_QUOTES @ONLY)
 
 ### end bwc-specific configuration.
 
@@ -150,7 +145,9 @@ target_link_libraries(random_matrix utils m)
 
 ### bwc_mpfq
 
-set(bwc_abases u64k1 u64k2 u64k4)
+# FIXME: does this have to be the same as BWC_GF2_ARITHMETIC_BACKENDS ?
+# Is there any reason for having two variables ??
+set(bwc_abases u64k1 u64k2 u64k3 u64k4)
 
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
 foreach(v ${bwc_abases})
@@ -219,6 +216,7 @@ set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
 
 macro(CONFIGURE_MATMUL_LIB v i)
+    set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${i})")
     string(COMPARE EQUAL "${v}" "u64k1" doing_u64)
     string(COMPARE EQUAL "${i}" "bucket" doing_bucket)
     set(sources matmul_facade.c ${matmul_${i}_sources})
@@ -252,6 +250,13 @@ macro(CONFIGURE_MATMUL_LIB v i)
     endif(ENABLE_SHARED)
 endmacro(CONFIGURE_MATMUL_LIB)
 
+string_join(FOO ", " ${BWC_GF2_ARITHMETIC_BACKENDS})
+message(STATUS "GF(2) implementations enabled for linear algebra: ${FOO}")
+string_join(FOO ", " ${BWC_GF2_MATMUL_BACKENDS})
+message(STATUS "GF(2) SpMV backends for linear algebra: ${FOO}")
+
+
+
 foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
     foreach(w ${BWC_GF2_MATMUL_BACKENDS})
         CONFIGURE_MATMUL_LIB(${v} ${w})
@@ -262,6 +267,17 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         CONFIGURE_MATMUL_LIB(${v} ${w})
     endforeach(w)
 endforeach(v)
+
+foreach(vw ${BWC_EXTRA_BACKENDS})
+    string_split("${vw}" "+" FOO)
+    message(STATUS "output variable: ${FOO}")
+    list(GET FOO 0 v)
+    list(GET FOO 1 w)
+    message(STATUS "Extra bwc backend: arithmetic=${v}, matmul=${w}")
+    CONFIGURE_MATMUL_LIB(${v} ${w})
+endforeach(vw ${BWC_EXTRA_BACKENDS})
+
+configure_file(bwc_config_h.in bwc_config.h ESCAPE_QUOTES @ONLY)
 
 
 if(BUILD_DYNAMICALLY_LINKABLE_BWC)
@@ -311,10 +327,10 @@ endmacro(bwc_program)
 bwc_program(acollect acollect.c)
 bwc_program(split split.c)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
-bwc_program(prep prep.c xymats.c ../gauss.c)
-bwc_program(krylov krylov.c xymats.c xdotprod.c)
-bwc_program(dispatch dispatch.c xymats.c xdotprod.c)
-bwc_program(mksol mksol.c xymats.c xdotprod.c)
+bwc_program(prep prep.c ../gauss.c)
+bwc_program(krylov krylov.c xdotprod.c)
+bwc_program(dispatch dispatch.c xdotprod.c)
+bwc_program(mksol mksol.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
 
@@ -366,7 +382,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         lingen-matpoly.c
         lingen-bigmatpoly.c
         lingen-polymat.c
-        lingen-bigpolymat.c
+        # lingen-bigpolymat.c # deleted 20150826
         mpfq/mpfq_${v}.c
         )
     if(WITH_MPIR)
@@ -402,5 +418,14 @@ add_custom_target(bwc_full)
 add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
     bwc_matmul)
+
+# Those are used only for tests.
+add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
+target_link_libraries(short_matmul bwc_base)
+bwc_program_extra(spmv_test spmv_test.c)
+bwc_program_extra(build_matcache build_matcache.c)
+target_link_libraries(build_matcache matmul_mf)
+bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)
+target_link_libraries(bench_matcache matmul_mf)
 
 include(CMakeLists-nodist.txt OPTIONAL)

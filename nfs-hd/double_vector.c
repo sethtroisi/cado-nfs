@@ -47,16 +47,16 @@ void double_vector_set_zero(double_vector_ptr v)
 int double_vector_equal(double_vector_srcptr a, double_vector_srcptr b)
 {
   int r = (a->dim > b->dim) - (b->dim > a->dim);
-  if (r) return 1;
+  if (r) return 0;
   for(int d = a->dim; d >= 0 ; d--) {
     r = a->c[d] - b->c[d];
-    if (r) return 1;
+    if (r) return 0;
   }
-  return 0;
+  return 1;
 }
 
 void double_vector_add(double_vector_ptr a, double_vector_srcptr b,
-                     double_vector_srcptr c)
+    double_vector_srcptr c)
 {
   ASSERT(a->dim == b->dim);
   ASSERT(c->dim == b->dim);
@@ -67,7 +67,7 @@ void double_vector_add(double_vector_ptr a, double_vector_srcptr b,
 }
 
 void double_vector_sub(double_vector_ptr a, double_vector_srcptr b,
-                      double_vector_srcptr c)
+    double_vector_srcptr c)
 {
   ASSERT(a->dim == b->dim);
   ASSERT(c->dim == b->dim);
@@ -147,7 +147,7 @@ double double_vector_orthogonal_projection(double_vector_ptr res,
 {
   ASSERT(res->dim == u->dim);
   ASSERT(u->dim == v->dim);
-  
+
   double coeff =
     double_vector_dot_product(u, v) / double_vector_norml2sqr(u);
   for (unsigned int i = 0; i < res->dim; i++) {
@@ -155,4 +155,3 @@ double double_vector_orthogonal_projection(double_vector_ptr res,
   }
   return coeff;
 }
-

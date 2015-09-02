@@ -46,76 +46,6 @@ void factor_base_realloc(factor_base_ptr factor_base,
     uint64_t number_element_pr);
 
 /*
- * Set an ideal in part at an index. Do not forget to define LINESIEVE if you
- *  want to set an ideal mod r.
- *
- * factor_base: the factor base.
- * index: index in the factor base.
- * r: the r of the ideal (r, h).
- * h: the h of the ideal (r, h).
- */
-static inline void factor_base_set_ideal_1_part(factor_base_ptr factor_base,
-    uint64_t index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
-{
-  ASSERT(index < factor_base->number_element_1);
-
-  ideal_1_init(factor_base->factor_base_1[index]);
-  ideal_1_set_part(factor_base->factor_base_1[index], r, h, t);
-}
-
-static inline void factor_base_set_ideal_1(factor_base_ptr factor_base,
-    uint64_t index, ideal_1_srcptr ideal, unsigned int t)
-{
-  ASSERT(index < factor_base->number_element_1);
-
-  ideal_1_init(factor_base->factor_base_1[index]);
-  ideal_1_set(factor_base->factor_base_1[index], ideal, t);
-}
-
-/*
- * Set an ideal in part at an index. Do not forget to define LINESIEVE if you
- *  want to set an ideal mod r.
- *
- * factor_base: the factor base.
- *
- * index: index in the factor base.
- * r: the r of the ideal (r, h).
- * h: the h of the ideal (r, h).
- */
-static inline void factor_base_set_ideal_u_part(factor_base_ptr factor_base,
-    uint64_t index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
-{
-  ASSERT(index < factor_base->number_element_u);
-
-  ideal_u_init(factor_base->factor_base_u[index]);
-  ideal_u_set_part(factor_base->factor_base_u[index], r, h, t);
-}
-
-static inline void factor_base_set_ideal_u(factor_base_ptr factor_base,
-    uint64_t index, ideal_u_srcptr ideal, unsigned int t) 
-{
-  ASSERT(index < factor_base->number_element_u);
-
-  ideal_u_init(factor_base->factor_base_u[index]);
-  ideal_u_set(factor_base->factor_base_u[index], ideal, t);
-}
-
-/*
- * Set an ideal in part at an index. Do not forget to define LINESIEVE if you
- *  want to set an ideal mod r.
- * factor_base: the factor base.
- * index: index in the factor base.
- * r: the r of the ideal (r, h).
- */
-static inline void factor_base_set_ideal_pr(factor_base_ptr factor_base,
-    uint64_t index, uint64_t r, unsigned int t)
-{
-  ASSERT(index < factor_base->number_element_pr);
-
-  ideal_pr_init(factor_base->factor_base_pr[index]);
-  ideal_pr_set_part(factor_base->factor_base_pr[index], r, t);
-}
-/*
  * Delete the factor base bound.
  *
  * factor_base: the factor base.
@@ -131,4 +61,87 @@ void factor_base_clear(factor_base_ptr factor_base, unsigned int t);
 void factor_base_fprintf(FILE * file, factor_base_srcptr factor_base,
     unsigned int t);
 
+/*
+ * Set an ideal in part at an index.
+ *
+ * factor_base: the factor base.
+ * index: index in the factor base.
+ * r: the r of the ideal (r, h).
+ * h: the h of the ideal (r, h).
+ */
+static inline void factor_base_set_ideal_1_part(factor_base_ptr factor_base,
+    uint64_t index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
+{
+  ASSERT(index < factor_base->number_element_1);
+
+  ideal_1_init(factor_base->factor_base_1[index]);
+  ideal_1_set_part(factor_base->factor_base_1[index], r, h, t);
+}
+
+/*
+ * Set an ideal at an index.
+ *
+ * factor_base: the factor base.
+ * index: index in the factor base.
+ * ideal: the ideal.
+ * t: dimension of the lattice.
+ */
+static inline void factor_base_set_ideal_1(factor_base_ptr factor_base,
+    uint64_t index, ideal_1_srcptr ideal, unsigned int t)
+{
+  ASSERT(index < factor_base->number_element_1);
+
+  ideal_1_init(factor_base->factor_base_1[index]);
+  ideal_1_set(factor_base->factor_base_1[index], ideal, t);
+}
+
+/*
+ * Set an ideal in part at an index.
+ *
+ * factor_base: the factor base.
+ * index: index in the factor base.
+ * r: the r of the ideal (r, h).
+ * h: the h of the ideal (r, h).
+ */
+static inline void factor_base_set_ideal_u_part(factor_base_ptr factor_base,
+    uint64_t index, uint64_t r, mpz_poly_srcptr h, unsigned int t)
+{
+  ASSERT(index < factor_base->number_element_u);
+
+  ideal_u_init(factor_base->factor_base_u[index]);
+  ideal_u_set_part(factor_base->factor_base_u[index], r, h, t);
+}
+
+/*
+ * Set an ideal at an index.
+ *
+ * factor_base: the factor base.
+ * index: index in the factor base.
+ * ideal: the ideal.
+ * t: dimension of the lattice.
+ */
+static inline void factor_base_set_ideal_u(factor_base_ptr factor_base,
+    uint64_t index, ideal_u_srcptr ideal, unsigned int t) 
+{
+  ASSERT(index < factor_base->number_element_u);
+
+  ideal_u_init(factor_base->factor_base_u[index]);
+  ideal_u_set(factor_base->factor_base_u[index], ideal, t);
+}
+
+/*
+ * Set an ideal in part at an index.
+ *
+ * factor_base: the factor base.
+ * index: index in the factor base.
+ * r: the r of the ideal (r, h).
+ */
+static inline void factor_base_set_ideal_pr(factor_base_ptr factor_base,
+    uint64_t index, uint64_t r, unsigned int t)
+{
+  ASSERT(index < factor_base->number_element_pr);
+
+  ideal_pr_init(factor_base->factor_base_pr[index]);
+  ideal_pr_set_part(factor_base->factor_base_pr[index], r, t);
+}
 #endif  /* FACTOR_BASE_H */

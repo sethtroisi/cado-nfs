@@ -30,8 +30,8 @@ void mat_Z_init(mat_Z_ptr matrix, unsigned int NumRows, unsigned int NumCols);
  * coeff: an array with the coefficient of the matrix, given in the order to
  *  fill the row.
  */
-void mat_Z_init_with_array(mat_Z_ptr matrix, unsigned int NumRows, unsigned int
-                           NumCols, mpz_t * coeff);
+void mat_Z_init_with_array(mat_Z_ptr matrix, unsigned int NumRows,
+    unsigned int NumCols, mpz_t * coeff);
 
 /*
  * Copy A in B. Assume that B and A have the same size.
@@ -50,8 +50,8 @@ void mat_Z_copy(mat_Z_ptr B, mat_Z_srcptr A);
  * row: number for row.
  * col: number for column.
  */
-void mat_Z_set_coeff(mat_Z_ptr matrix, mpz_t i, unsigned int row, unsigned int
-                     col);
+void mat_Z_set_coeff(mat_Z_ptr matrix, mpz_t i, unsigned int row,
+    unsigned int col);
 
 /*
  * Set a coefficient to i, this coefficient is in the row (row) and the column
@@ -63,7 +63,7 @@ void mat_Z_set_coeff(mat_Z_ptr matrix, mpz_t i, unsigned int row, unsigned int
  * col: number for column.
  */
 void mat_Z_set_coeff_int64(mat_Z_ptr matrix, int64_t i, unsigned int row,
-                            unsigned int col);
+    unsigned int col);
 
 /*
  * Set a coefficient to i, this coefficient is in the row (row) and the column
@@ -75,7 +75,7 @@ void mat_Z_set_coeff_int64(mat_Z_ptr matrix, int64_t i, unsigned int row,
  * col: number for column.
  */
 void mat_Z_set_coeff_uint64(mat_Z_ptr matrix, uint64_t i, unsigned int row,
-                             unsigned int col);
+    unsigned int col);
 
 /*
  * Delete a matrix.
@@ -118,7 +118,6 @@ void mat_Z_transpose(mat_Z_ptr matrix, mat_Z_srcptr matrix_src);
  */
 void mat_Z_mul_mat_Z(mat_Z_ptr C, mat_Z_srcptr A, mat_Z_srcptr B);
 
-
 /*
  * Compute the product A * c and set the coefficient in a polynomial a.
  *
@@ -148,16 +147,24 @@ void mat_Z_mul_mpz_poly(mpz_poly_ptr a, mat_Z_srcptr A, mpz_poly_srcptr c);
 void mat_Z_LLL(mat_Z_ptr C, mat_Z_srcptr A);
 
 /*
- * LLL on a matrix whose columns represent vectors.
- *
- * matrix: perform LLL on the matrix and set the result in this matrix.
+ * LLL on a matrix whose columns represent vectors,
+ * matrix_new: result of LLL on matrix_old.
 .*/
 void mat_Z_LLL_transpose(mat_Z_ptr matrix_new, mat_Z_srcptr matrix_old);
 
+/*
+ * Perform LLL on A and store the unimodular matrix in C.
+ */
 void mat_Z_LLL_unimodular(mat_Z_ptr C, mat_Z_srcptr A);
 
+/*
+ * Perform LLL on the transposition of  A and store the transposition of the
+ *  unimodular matrix in C.
+ */
 void mat_Z_LLL_unimodular_transpose(mat_Z_ptr mat_new, mat_Z_srcptr mat_old);
 
+/*
+ * Copy a mat_int64 in a mat_Z.
+ */
 void mat_int64_to_mat_Z(mat_Z_ptr mat_Z, mat_int64_srcptr mat_int);
-
 #endif  /* MAT_Z_H */

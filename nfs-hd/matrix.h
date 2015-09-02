@@ -33,6 +33,4 @@ typedef struct {
 typedef s_mat_double_t mat_double_t[1];
 typedef s_mat_double_t * mat_double_ptr;
 typedef const s_mat_double_t * mat_double_srcptr;
-
-
 #endif /* MATRIX_H */

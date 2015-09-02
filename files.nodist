@@ -4,6 +4,7 @@
 # with the list of files known to the SCM.  A further word of caution:
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 README.nonlinear
+TODO_BEFORE_RELEASE_2.2
 Toolchain-MinGW64.cmake
 dev_docs/
 files.dist
@@ -16,7 +17,6 @@ linalg/bwc/sketch.tex
 linalg/tex.c
 filter/merge_mpi.c
 filter/merge_mpi.h
-filter/filter_galois.c
 scripts/nightly-test
 scripts/coverage-nightly.sh
 scripts/polsel_effort
@@ -40,8 +40,6 @@ scripts/opal-test/las_decl_template.py
 polyselect/gfp2dlpolyselect_notes.txt
 polyselect/gfpkdlpolyselect_test.c
 polyselect/makefile_gfpkdl.make
-polyselect/table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01.c
-polyselect/table_t_Py_f_deg4_type0_h1_t-200--200.c
 polyselect/template-header.c
 polyselect/alpha.mpl
 polyselect/alpha.sage
@@ -111,11 +109,6 @@ scripts/cluster/bwc-fetchfiles.pl
 scripts/cluster/oarsh_wrap.sh
 scripts/cluster/trampoline-git.sh
 linalg/bwc/bcast-file.c
-linalg/bwc/short_matmul.c
-linalg/bwc/spmv_test.c
-linalg/bwc/bench_matcache.c
-linalg/bwc/build_matcache.c
-linalg/bwc/test_hello.c
 linalg/bwc/tool.sh
 misc/README
 misc/cachesim.c
@@ -199,3 +192,4 @@ nfs-hd/list_int64_vector.h
 nfs-hd/list_int64_vector_index.c
 nfs-hd/list_int64_vector_index.h
 tests/nfs-hd/
+sieve/smooth.c

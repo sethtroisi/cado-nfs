@@ -4211,7 +4211,7 @@ class SqrtTask(Task):
                  "purged": Request.GET_PURGED_FILENAME,
                  "index": Request.GET_INDEX_FILENAME,
                  "kernel": Request.GET_KERNEL_FILENAME}
-        return ((cadoprograms.Sqrt, ("ab", "prefix", "rat", "alg", "gcd", "dep"),
+        return ((cadoprograms.Sqrt, ("ab", "prefix", "side0", "side1", "gcd", "dep"),
                  input), )
     @property
     def paramnames(self):
@@ -4252,8 +4252,8 @@ class SqrtTask(Task):
                                     dep, dep+t-1)
                 (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Sqrt.name)
-                p = cadoprograms.Sqrt(ab=False, rat=True,
-                        alg=True, gcd=True, dep=dep, prefix=prefix,
+                p = cadoprograms.Sqrt(ab=False, side1=True,
+                        side0=True, gcd=True, dep=dep, prefix=prefix,
                         stdout=str(stdoutpath), stderr=str(stderrpath), 
                         **self.merged_args[0])
                 message = self.submit_command(p, "dep%d" % dep, log_errors=True)
@@ -4555,7 +4555,7 @@ class DescentTask(Task):
     @property
     def programs(self):
         input = {"db": Request.GET_DB_FILENAME,}
-        override = ()
+        override = ("cadobindir",)
         return ((cadoprograms.Descent, override, input),)
     @property
     def paramnames(self):
@@ -4577,7 +4577,9 @@ class DescentTask(Task):
 
         (stdoutpath, stderrpath) = \
                 self.make_std_paths(cadoprograms.Descent.name)
+        cadobindir = self.params["execpath"]
         p = cadoprograms.Descent(
+                cadobindir=cadobindir,
                 stdout=str(stdoutpath),
                 stderr=str(stderrpath),
                 **self.merged_args[0])

@@ -48,6 +48,9 @@ void factor_fprintf(FILE * file, factor_srcptr factor);
  */
 unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort);
 
+/*
+ * Return 1 if the factorisation is good, 0 otherwise.
+ */
 unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z);
 
 /*

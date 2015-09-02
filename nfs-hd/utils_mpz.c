@@ -254,6 +254,10 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z)
 
     mpz_clear(z_res);
   }
+  if (nb == 0) {
+    mpz_set(factor->factorization[nb], z);
+    nb = 1;
+  }
   factor_realloc(factor, nb);
   sort_factor(factor);
 

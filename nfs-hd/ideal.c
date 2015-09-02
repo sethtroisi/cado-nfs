@@ -40,10 +40,6 @@ void ideal_1_init(ideal_1_ptr ideal)
   ideal->log = 0;
 }
 
-/*
-  If you want to line sieve, you can need to have Tr only with the coefficient
-   modulo r. Enable this with LINESIEVE.
-*/
 void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     unsigned int t)
 {
@@ -64,28 +60,24 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     mpz_set_si(ideal->Tr[i], -1);
     mpz_mul(ideal->Tr[i], ideal->Tr[i], ideal->Tr[i - 1]);
     mpz_mul(ideal->Tr[i], ideal->Tr[i], ideal->Tr[0]);
-
-#ifdef LINESIEVE
-    mpz_mod_ui(ideal->Tr[i], ideal->Tr[i], r);
-    ASSERT(mpz_cmp(ideal->Tr[i], r) < 0);
-#endif // LINESIEVE
   }
 
   ideal->ideal->r = r;
   ideal->log = (unsigned char)(log2((double) r));
 }
 
-void ideal_1_clear(ideal_1_ptr ideal, unsigned int t)
+void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+    mpz_t * Tr, unsigned char log, unsigned int t)
 {
-  ASSERT(ideal->ideal->h->deg == 1 && ideal->ideal->r != 0);
-
+  ideal->ideal->r = r;
+  mpz_poly_set(ideal->ideal->h, h);
+  ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
   for (unsigned int i = 0; i < t - 1; i++) {
-    mpz_clear(ideal->Tr[i]);
+    mpz_init(ideal->Tr[i]);
+    mpz_set(ideal->Tr[i], Tr[i]);
   }
-  free(ideal->Tr);
 
-  ideal_clear(ideal->ideal);
-  ideal->log = 0;
+  ideal->log = log;
 }
 
 void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old,
@@ -105,21 +97,17 @@ void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old,
   ideal_new->ideal->r = ideal_old->ideal->r;
 }
 
-void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-    mpz_t * Tr, unsigned char log, unsigned int t)
+void ideal_1_clear(ideal_1_ptr ideal, unsigned int t)
 {
-  mpz_poly_set(ideal->ideal->h, h);
-  if ((ideal->ideal->r) == 0) {
-    ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
-    for (unsigned int i = 0; i < t - 1; i++) {
-      mpz_init(ideal->Tr[i]);
-    }
-  }
+  ASSERT(ideal->ideal->h->deg == 1 && ideal->ideal->r != 0);
+
   for (unsigned int i = 0; i < t - 1; i++) {
-    mpz_set(ideal->Tr[i], Tr[i]);
+    mpz_clear(ideal->Tr[i]);
   }
-  ideal->log = log;
-  ideal->ideal->r = r;
+  free(ideal->Tr);
+
+  ideal_clear(ideal->ideal);
+  ideal->log = 0;
 }
 
 void ideal_1_fprintf(FILE * file, ideal_1_srcptr ideal, unsigned int t)
@@ -144,11 +132,11 @@ void ideal_u_init(ideal_u_ptr ideal)
 }
 
 /*
-  If you want to line sieve, you can need to have Tr only with the coefficient
-  modulo r.
-*/
+   If you want to line sieve, you can need to have Tr only with the coefficient
+   modulo r.
+   */
 void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-                      unsigned int t)
+    unsigned int t)
 {
   ASSERT(h->deg > 1);
   ASSERT(mpz_cmp_ui(mpz_poly_lc_const(h), 1) == 0);
@@ -178,11 +166,6 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   for (int col = 0; col < (int) t - h->deg; col++) {
     for (int row = col; row < h->deg; row++) {
       mpz_set(ideal->Tr[row][col], h->coeff[row-col]);
-
-#ifdef LINESIEVE
-      mpz_mod_ui(ideal->Tr[row][col], ideal->Tr[row][col], r);
-      ASSERT(mpz_cmp(ideal->Tr[row][col], r) < 0);
-#endif // LINESIEVE
     }
   }
 
@@ -192,12 +175,7 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
       for (int k = 0; k < h->deg; k++) {
         if (col - h->deg + k >= 0) {
           mpz_submul(ideal->Tr[row][col], h->coeff[k],
-                     ideal->Tr[row][col - h->deg + k]);
-
-#ifdef LINESIEVE
-      mpz_mod_ui(ideal->Tr[row][col], ideal->Tr[row][col], r);
-      ASSERT(mpz_cmp(ideal->Tr[row][col], r) < 0);
-#endif // LINESIEVE
+              ideal->Tr[row][col - h->deg + k]);
         }
       }
     }
@@ -285,14 +263,14 @@ void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t)
       gmp_fprintf(file, "%Zd, ", ideal->Tr[row][col]);
     }
     gmp_fprintf(file, "%Zd],\n", ideal->Tr[row]
-                [t - (unsigned int)ideal->ideal->h->deg - 1]);
+        [t - (unsigned int)ideal->ideal->h->deg - 1]);
   }
   fprintf(file, "[");
   for (int col = 0; col < (int)t - ideal->ideal->h->deg - 1; col++) {
     gmp_fprintf(file, "%Zd, ", ideal->Tr[ideal->ideal->h->deg - 1][col]);
   }
   gmp_fprintf(file, "%Zd]]\n", ideal->Tr[ideal->ideal->h->deg - 1]
-              [t - (unsigned int)ideal->ideal->h->deg - 1]);
+      [t - (unsigned int)ideal->ideal->h->deg - 1]);
 }
 
 /* Ideal projective root and Tr */
@@ -373,17 +351,18 @@ void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
 }
 
 /* Ideal special-q. */
+
 void ideal_spq_init(ideal_spq_ptr ideal)
 {
   ideal->type = -1; 
 }
 
-void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t r, mpz_poly_srcptr h,
+void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t q, mpz_poly_srcptr g,
     unsigned int t, char type)
 {
   ASSERT(type >= 0 && type < 3);
 #ifndef NDEBUG
-  if (h->deg == 1) {
+  if (g->deg == 1) {
     ASSERT(type == 0 || type == 2);
   } else {
     ASSERT(type == 1);
@@ -393,25 +372,25 @@ void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   ideal->type = type;
   if (type == 0) {
     ideal_1_init(ideal->ideal_1);
-    ideal_1_set_part(ideal->ideal_1, r, h, t);
+    ideal_1_set_part(ideal->ideal_1, q, g, t);
   } else if (type == 1) {
     ideal_u_init(ideal->ideal_u);
-    ideal_u_set_part(ideal->ideal_u, r, h, t);
+    ideal_u_set_part(ideal->ideal_u, q, g, t);
   } else {
     ASSERT(type == 2);
-    ASSERT(h->deg == 1);
+    ASSERT(g->deg == 1);
 #ifndef NDEBUG
     mpz_t tmp;
     mpz_init(tmp);
-    mpz_poly_getcoeff(tmp, 0, h);
+    mpz_poly_getcoeff(tmp, 0, g);
     ASSERT(mpz_cmp_ui(tmp, 0) == 1);
-    mpz_poly_getcoeff(tmp, 1, h);
+    mpz_poly_getcoeff(tmp, 1, g);
     ASSERT(mpz_cmp_ui(tmp, 1) == 1);
     mpz_clear(tmp);
 #endif // NDEBUG
 
     ideal_pr_init(ideal->ideal_pr);
-    ideal_pr_set_part(ideal->ideal_pr, r, t);
+    ideal_pr_set_part(ideal->ideal_pr, q, t);
   }
 }
 

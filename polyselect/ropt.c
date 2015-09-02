@@ -238,10 +238,10 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
   ropt_poly_init (poly);
 
   /* setup poly */
-  for (i = 0; i <= input_poly->rat->deg; i++)
-    mpz_set (poly->g[i], input_poly->rat->coeff[i]);
-  for (i = 0; i <= input_poly->alg->deg; i++)
-    mpz_set (poly->f[i], input_poly->alg->coeff[i]);
+  for (i = 0; i <= input_poly->pols[RAT_SIDE]->deg; i++)
+    mpz_set (poly->g[i], input_poly->pols[RAT_SIDE]->coeff[i]);
+  for (i = 0; i <= input_poly->pols[ALG_SIDE]->deg; i++)
+    mpz_set (poly->f[i], input_poly->pols[ALG_SIDE]->coeff[i]);
   mpz_set (poly->n, input_poly->n);
   ropt_poly_setup (poly);
 
@@ -257,12 +257,12 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
   ropt_do_both_stages (poly, bestpoly, param, info);
   
   /* bring bestpoly back to polyselect_ropt */
-  for (i = 0; i <= input_poly->rat->deg; i++)
-    mpz_set (output_poly->rat->coeff[i], bestpoly->g[i]);
-  mpz_poly_cleandeg (output_poly->rat, input_poly->rat->deg);
-  for (i = 0; i <= input_poly->alg->deg; i++)
-    mpz_set (output_poly->alg->coeff[i], bestpoly->f[i]);
-  mpz_poly_cleandeg (output_poly->alg, input_poly->alg->deg);
+  for (i = 0; i <= input_poly->pols[RAT_SIDE]->deg; i++)
+    mpz_set (output_poly->pols[RAT_SIDE]->coeff[i], bestpoly->g[i]);
+  mpz_poly_cleandeg (output_poly->pols[RAT_SIDE], input_poly->pols[RAT_SIDE]->deg);
+  for (i = 0; i <= input_poly->pols[ALG_SIDE]->deg; i++)
+    mpz_set (output_poly->pols[ALG_SIDE]->coeff[i], bestpoly->f[i]);
+  mpz_poly_cleandeg (output_poly->pols[ALG_SIDE], input_poly->pols[ALG_SIDE]->deg);
   mpz_set (output_poly->n, input_poly->n);
 
   /* free */

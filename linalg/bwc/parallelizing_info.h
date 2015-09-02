@@ -5,6 +5,8 @@
 
 #include "params.h"
 #include "select_mpi.h"
+#include "mpfq/mpfq.h"
+#include "mpfq/mpfq_vbase.h"
 
 /*
  * The main guy here is the parallelizing_info data type. It is commonly
@@ -14,12 +16,16 @@
  * communication groups are defined. One for the global grid, as well as
  * one for each column / row.
  *
- * pi->m denotes the global group. There is only one such group. All
- * jobs, all threads contribute to it. At the mpi level, the communicator
- * which is relevant is of course MPI_COMM_WORLD.
+ * pi->m denotes the global communicator. There is only one such
+ * communicator. All jobs, all threads contribute to it. At the mpi
+ * level, the related communicator is MPI_COMM_WORLD (well, unless we're
+ * working in interleaving mode).
  *
- * pi->wr[0] denotes horizontal, a.k.a. ROW groups.
- * pi->wr[1] denotes vertical, a.k.a. COLUMN groups.
+ * Two other communicators are defined:
+ *      pi->wr[0] denotes horizontal, a.k.a. ROW groups.
+ *      pi->wr[1] denotes vertical, a.k.a. COLUMN groups.
+ * [Note: communicators used to be called "wirings", hence the variable
+ * name]
  *
  * When a matrix is mapped to a grid process of this kind, say a matrix
  * having been split in nhs * nvs slices, then there are exactly nhs ROW
@@ -38,17 +44,18 @@
  * supports MPI_THREAD_MULTIPLE, chances are that this gets close to
  * working ok, and even maybe improve performance quite a bit.
  *
- * At the moment, with openmpi 1.2.8 compiled with
- * --enable-mpi-threads, it does not work (crash observed at
- * MPI_Init_thread -- fairly weird).
- *
- * Mpich2 1.1a2 works, apparently. And it even seems to end up being
- * noticeably faster for my toy examples (= latency-wise).
+ * As of openmpi-1.8, this is not reliable enough when the basic
+ * transport layer is openib (on infiniband). Status may of course vary
+ * for other mpi implementations.
  *
  * As for the ``fake mpi'' implementation we have, well, it's up to the
  * reader to decide. All collectives are nops, so it's trivially capable.
  * OTOH, not setting the flags ensures that the rest of the code compiles
  * ok.
+ *
+ * --> we never allow this flag currently. Corresponding pieces of code
+ *  have been deleted as the program evolved, given that it had zero
+ *  testing.
  */
 
 #if defined(MPICH2) && MPICH2_NUMVERSION >= 10100002
@@ -66,8 +73,17 @@
 /* Assume it does not work */
 #endif
 
+/* {{{ definition of the parallelizing_info communicator type */
 
-/* utility structure. It is stored in thread-shared memory */
+/* {{{ forward-define */
+struct pi_comm_s;
+typedef struct pi_comm_s * pi_comm_ptr;
+typedef const struct pi_comm_s * pi_comm_srcptr;
+/* }}} */
+
+/* {{{ utility structures for communicators. */
+
+/* {{{ This one is stored in thread-shared memory ; shared locks and so on */
 struct pthread_things {
     barrier_t bh[1];
     my_pthread_barrier_t b[1];
@@ -77,12 +93,9 @@ struct pthread_things {
     void * utility_ptr;
     // int count;
 };
+/* }}} */
 
-/* need to forward-define this for log entries */
-struct pi_wiring_s;
-typedef struct pi_wiring_s * pi_wiring_ptr;
-typedef const struct pi_wiring_s * pi_wiring_srcptr;
-
+/* {{{ logging. To be activated in debug mode only */
 struct pi_log_entry {
     struct timeval tv[1];
     char what[80];
@@ -94,8 +107,10 @@ struct pi_log_book {
     int hsize;  // history size -- only a count, once the things wraps.
     int next;   // next free pointer.
 };
+/* }}} */
+/* }}} */
 
-struct pi_wiring_s {
+struct pi_comm_s { /* {{{ */
     /* njobs : number of mpi jobs concerned by this logical group */
     /* ncores : number of threads concerned by this logical group */
     unsigned int njobs;
@@ -114,8 +129,11 @@ struct pi_wiring_s {
     struct pi_log_book * log_book;
 };
 
-typedef struct pi_wiring_s pi_wiring[1];
+typedef struct pi_comm_s pi_comm[1];
+/* }}} */
+/* }}} */
 
+/* {{{ interleaving two pi structures. */
 struct pi_interleaving_s {
     int idx;                    /* 0 or 1 */
     my_pthread_barrier_t * b;   /* not a 1-sized array on purpose --
@@ -123,7 +141,11 @@ struct pi_interleaving_s {
 };
 typedef struct pi_interleaving_s pi_interleaving[1];
 typedef struct pi_interleaving_s * pi_interleaving_ptr;
+/* }}} */
 
+/* {{{ This arbitrary associative array is meant to be very global, even
+ * common to two interleaved pi structures. Used to pass lightweight info
+ * only */
 struct pi_dictionary_entry_s;
 typedef struct pi_dictionary_entry_s * pi_dictionary_entry_ptr;
 struct pi_dictionary_entry_s {
@@ -140,13 +162,15 @@ struct pi_dictionary_s {
 };
 typedef struct pi_dictionary_s pi_dictionary[1];
 typedef struct pi_dictionary_s * pi_dictionary_ptr;
+/* }}} */
 
+/* {{{ global parallelizing_info handle */
 #define PI_NAMELEN      32
 struct parallelizing_info_s {
     // row-wise, column-wise.
-    pi_wiring wr[2];
+    pi_comm wr[2];
     // main.
-    pi_wiring m;
+    pi_comm m;
     pi_interleaving_ptr interleaved;
     pi_dictionary_ptr dict;
     char nodename[PI_NAMELEN];
@@ -164,96 +188,154 @@ struct parallelizing_info_s {
 typedef struct parallelizing_info_s parallelizing_info[1];
 typedef struct parallelizing_info_s * parallelizing_info_ptr;
 typedef const struct parallelizing_info_s * parallelizing_info_srcptr;
+/* }}} */
+
+/* {{{ collective operations and user-defined types */
+
+struct pi_datatype_s {
+    MPI_Datatype datatype;
+    /* two attributes we're really happy to use */
+    mpfq_vbase_ptr abase;
+    size_t item_size;
+};
+typedef struct pi_datatype_s * pi_datatype_ptr;
+extern pi_datatype_ptr BWC_PI_INT;
+extern pi_datatype_ptr BWC_PI_DOUBLE;
+extern pi_datatype_ptr BWC_PI_BYTE;
+extern pi_datatype_ptr BWC_PI_UNSIGNED;
+extern pi_datatype_ptr BWC_PI_UNSIGNED_LONG;
+extern pi_datatype_ptr BWC_PI_LONG;
+
+
+struct pi_op_s {
+    MPI_Op stock;  /* typically MPI_SUM */
+    MPI_Op custom;  /* for mpfq types, the mpi-level user-defined op */
+    void (*f_stock)(void *, void *, int *, MPI_Datatype *);
+    void (*f_custom)(void *, void *, size_t, pi_datatype_ptr);
+};
+typedef struct pi_op_s * pi_op_ptr;
+extern struct pi_op_s BWC_PI_MIN[1];
+extern struct pi_op_s BWC_PI_MAX[1];
+extern struct pi_op_s BWC_PI_SUM[1];
+extern struct pi_op_s BWC_PI_BXOR[1];
+extern struct pi_op_s BWC_PI_BAND[1];
+extern struct pi_op_s BWC_PI_BOR[1];
+
+/* we define new datatypes in a way which diverts from the mpi calling
+ * interface, because that interface is slightly awkward for our needs */
+
+extern pi_datatype_ptr pi_alloc_mpfq_datatype(parallelizing_info_ptr pi, mpfq_vbase_ptr abase);
+extern void pi_free_mpfq_datatype(parallelizing_info_ptr pi, pi_datatype_ptr ptr);
+
+
+
+
+/* }}} */
+
+/* {{{ I/O layer */
+struct pi_file_handle_s {
+    char * name;        /* just for reference. I doubt we'll need them */
+    char * mode;
+    FILE * f;   /* meaningful only at root */
+    parallelizing_info_ptr pi;
+    int inner;
+    int outer;
+    size_t totalsize;
+};
+typedef struct pi_file_handle_s pi_file_handle[1];
+typedef struct pi_file_handle_s * pi_file_handle_ptr;
+/* }}} */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+extern void parallelizing_info_init();
+extern void parallelizing_info_finish();
+extern void parallelizing_info_decl_usage(param_list pl);
+extern void parallelizing_info_lookup_parameters(param_list_ptr pl);
+
 /* pi_go is the main function. It is responsible of creating all the
- * parallelizing_info data structures, set up the different
- * inter-job and inter-thread conciliation toys (communicators, pthread
- * barriers, and so on), and eventually run the provided function.
+ * parallelizing_info data structures, set up the different inter-job and
+ * inter-thread conciliation toys (communicators, pthread barriers, and
+ * so on), and eventually run the provided function.
  *
  * the param_list is checked for parameters mpi and thr, so as to define
  * the mpi and thr splttings.
  *
  * nhc, nvc are the same for threads (cores).
  */
-
-extern void parallelizing_info_decl_usage(param_list pl);
-extern void parallelizing_info_lookup_parameters(param_list_ptr pl);
-
 extern void pi_go(
         void *(*fcn)(parallelizing_info_ptr, param_list pl, void * arg),
         param_list pl,
         void * arg);
 
-extern void hello(parallelizing_info_ptr pi);
+extern void pi_hello(parallelizing_info_ptr pi);
 
-/* This must be viewed as a companion to MPI_Bcast. Threads must agree on
- * a shared area. The area is the *ptr value as presented on input by
- * the thread having index i ; i == 0 is a reasonable start in general. In
- * any case, it must be an integer between 0 and ncores-1.
+/* I/O functions */
+extern int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode, size_t totalsize);
+extern void pi_file_close(pi_file_handle_ptr f);
+extern ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size);
+extern ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size);
+
+/* the parallelizing_info layer has some collective operations which
+ * deliberately have prototypes simlar or identical to their mpi
+ * counterparts (we use size_t for the count arguments, though).
  *
- * This function uses the wr->utility_ptr field.
+ * Note: These functions use the wr->utility_ptr field.
  */
-extern void thread_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int root);
 
-typedef void (*thread_reducer_t)(void *, const void *, size_t);
+/* almost similar to the mpi-level reduction functions, except that
+ * we added const, dropped the int *, and dropped the multiplexing
+ * argument with the datatype (perhaps we shouldn't, but so far we have
+ * no use for it) */
+typedef void (*thread_reducer_t)(const void *, void *, size_t);
 
-extern void thread_reducer_int_min(void *, const void *, size_t size);
-extern void thread_reducer_int_max(void *, const void *, size_t size);
-extern void thread_reducer_int_sum(void *, const void *, size_t size);
-/* dptr must be a shared area allocated by shared_malloc */
-/* the area in ptr is clobbered, but its output results are undefined */
-extern void thread_allreduce(pi_wiring_ptr wr, void * dptr, void * ptr, size_t size, thread_reducer_t f);
+/* pointers must be different on all threads */
+extern void pi_thread_bcast(void * sendbuf,
+        size_t count, pi_datatype_ptr datatype,
+        unsigned int root,
+        pi_comm_ptr wr);
+extern void pi_bcast(void * sendbuf,
+        size_t count, pi_datatype_ptr datatype,
+        unsigned int jroot, unsigned int troot,
+        pi_comm_ptr wr);
+extern void pi_thread_allreduce(void * sendbuf, void * recvbuf,
+        size_t count, pi_datatype_ptr datatype, pi_op_ptr op,
+        pi_comm_ptr wr);
+extern void pi_allreduce(void * sendbuf, void *recvbuf,
+        size_t count, pi_datatype_ptr datatype, pi_op_ptr op,
+        pi_comm_ptr wr);
+extern int pi_thread_data_eq(void * buffer,
+        size_t count, pi_datatype_ptr datatype,
+        pi_comm_ptr wr);
+extern int pi_data_eq(void * buffer,
+        size_t count, pi_datatype_ptr datatype,
+        pi_comm_ptr wr);
 
 /* shared_malloc is like malloc, except that the pointer returned will be
  * equal on all threads (proper access will deserve proper locking of
  * course). shared_malloc_set_zero sets to zero too */
 /* As a side-effect, all shared_* functions serialize threads */
-extern void * shared_malloc(pi_wiring_ptr wr, size_t size);
-extern void * shared_malloc_set_zero(pi_wiring_ptr wr, size_t size);
-extern void shared_free(pi_wiring_ptr wr, void * ptr);
+extern void * shared_malloc(pi_comm_ptr wr, size_t size);
+extern void * shared_malloc_set_zero(pi_comm_ptr wr, size_t size);
+extern void shared_free(pi_comm_ptr wr, void * ptr);
 
-
-/* This one is the higher level thingy on top of MPI_Bcast and the
- * previous one. It broadcast data computed by job j, thread t (e.g. 0,0)
- * to all jobs and threads.
- */
-extern void global_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t);
-
-/* companions to the above, the two functions below compare a data area
- * between threads and/or mpi jobs, and collectively return the result.
- * Useful for deciding on a common way to go given a condition.
- * 
- * These assume different pointers on all threads. If equal (created with
- * shared_malloc), then another function may be called -- currently not
- * exposed because I couldn't come up with a satisfying name.
- */
-extern int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
-extern int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 
 /* prints the given string in a ascii-form matrix. */
 extern void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print);
 
 #define serialize(w)   serialize__(w, __FILE__, __LINE__)
-extern int serialize__(pi_wiring_ptr, const char *, unsigned int);
+extern int serialize__(pi_comm_ptr, const char *, unsigned int);
 #define serialize_threads(w)   serialize_threads__(w, __FILE__, __LINE__)
-extern int serialize_threads__(pi_wiring_ptr, const char *, unsigned int);
-
-extern int pi_save_file(pi_wiring_ptr, const char *, unsigned int iter, void *, size_t, size_t);
-extern int pi_load_file(pi_wiring_ptr, const char *, unsigned int iter, void *, size_t, size_t);
-
-extern int pi_load_file_2d(parallelizing_info_ptr, int, const char *, unsigned int iter, void *, size_t, size_t);
-extern int pi_save_file_2d(parallelizing_info_ptr, int, const char *, unsigned int iter, void *, size_t, size_t);
+extern int serialize_threads__(pi_comm_ptr, const char *, unsigned int);
 
 /* stuff related to log entry printing */
-extern void pi_log_init(pi_wiring_ptr);
-extern void pi_log_clear(pi_wiring_ptr);
-extern void pi_log_op(pi_wiring_ptr, const char * fmt, ...);
+extern void pi_log_init(pi_comm_ptr);
+extern void pi_log_clear(pi_comm_ptr);
+extern void pi_log_op(pi_comm_ptr, const char * fmt, ...);
 extern void pi_log_print_all(parallelizing_info_ptr);
-extern void pi_log_print(pi_wiring_ptr);
+extern void pi_log_print(pi_comm_ptr);
 
 /* These are the calls for interleaving. The 2n threads are divided into
  * two grous. It is guaranteed that at a given point, the two groups of n
@@ -279,16 +361,22 @@ extern void pi_dictionary_clear(pi_dictionary_ptr);
 }
 #endif
 
-/* This provides a fairly typical construct */
+/* This provides a fairly typical construct, used like this:
+ * SEVERAL_THREADS_PLAY_MPI_BEGIN(some pi communicator) {
+ *      some code which happens for threads in the pi comm in turn
+ * }
+ * SEVERAL_THREADS_PLAY_MPI_END();
+ */
 #ifndef MPI_LIBRARY_MT_CAPABLE
-#define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm)				\
+#define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm) do {			\
     for(unsigned int t__ = 0 ; t__ < comm->ncores ; t__++) {		\
         serialize_threads(comm);					\
-        if (t__ != comm->trank) continue; // not our turn.
-#define SEVERAL_THREADS_PLAY_MPI_END    }
+        if (t__ != comm->trank) continue; /* not our turn. */           \
+        do
+#define SEVERAL_THREADS_PLAY_MPI_END()    while (0); } } while (0)
 #else
 #define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm)    /**/
-#define SEVERAL_THREADS_PLAY_MPI_END            /**/
+#define SEVERAL_THREADS_PLAY_MPI_END()          /**/
 #endif
 
 #endif	/* PARALLELIZING_INFO_H_ */

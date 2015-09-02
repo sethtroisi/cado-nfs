@@ -556,29 +556,3 @@ MkzRemoveJ(filter_matrix_t *mat, int32_t j)
     MkzIsHeap(mat->MKZQ);
 #endif
 }
-
-// let's say we remove some columns with the highest Mkz count.
-// Not very pertinent right now.
-int
-MkzDeleteHeavyColumns(report_t *rep MAYBE_UNUSED, filter_matrix_t *mat MAYBE_UNUSED)
-{
-#if 1
-    return 0;
-#else
-    int32_t j;
-    int nj, njmax, w;
-
-    if(MkzQueueCardinality(mat->MKZQ) < 5000)
-	return 0;
-    njmax = 10; // humf
-    for(nj = 0; nj < njmax; nj++){
-	j = MkzGet(mat->MKZQ, Q[0], 0);
-	w = mat->wt[j]; // make a copy of the weight
-	MkzRemoveJ(mat, j);
-        // mat->wt[j] was put to 0...
-        mat->wt[j] = -w; // restore and update
-	Q[0]--;
-    }
-    return njmax;
-#endif
-}

@@ -950,7 +950,7 @@ static unsigned int space_sieve_linear_combination(
   int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[0], l); 
   int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[1], m); 
   int64_vector_addmul(v_tmp1, v_tmp1, list_tmp->v[2], n);
-  ASSERT(!int64_vector_equal(v_tmp, v_tmp1));
+  ASSERT(int64_vector_equal(v_tmp, v_tmp1));
   int64_vector_clear(v_tmp1);
 #endif // NDEBUG
 
@@ -1177,19 +1177,23 @@ int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
   }
   free(vec);
 
+
+  if (!boolean) {
+    ASSERT(boolean == 0);
+    ASSERT(list_FK->v[0]->c[1] == 0);
+    ASSERT(list_FK->v[1]->c[0] == 0);
+
+    return 0;
+  }
+
   ASSERT(list_FK->v[0]->c[0] > -(int64_t)(2 * H->h[0]));
   ASSERT(0 >= list_FK->v[0]->c[0]);
   ASSERT(0 <= list_FK->v[1]->c[0]);
   ASSERT(list_FK->v[1]->c[0] < (int64_t)(2 * H->h[0]));
   ASSERT(list_FK->v[0]->c[1] > 0);
   ASSERT(list_FK->v[1]->c[1] > 0);
-
-  if (!boolean) {
-    ASSERT(boolean == 0);
-
-    return 0;
-  }
   //TODO: Go up, and just when we need.
+
   if (space_sieve_good_vector(list_FK->v[0], H)) {
     if (!int64_vector_in_list_zero(list_FK->v[0], list_vec_zero)) {
       list_int64_vector_index_add_int64_vector_index(list_vec_zero,
@@ -1231,7 +1235,7 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
         if (v_tmp->c[2] < s_tmp->c[2]) {
           int64_vector_set(s_tmp, v_tmp);
           * index_vec = j;
-          if (int64_vector_equal(s, list_s->v[i])) {
+          if (!int64_vector_equal(s, list_s->v[i])) {
             * s_change = 1;
           }
         }

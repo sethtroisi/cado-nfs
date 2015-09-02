@@ -153,13 +153,17 @@ EOF
                 echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}. Files remain in ${TMPDIR}" >&2
                 exit 1
             fi
-            rm -f $G.gen
+            if ! [ "$CADO_DEBUG" ] ; then
+                rm -f $G.gen
+            fi
         else
             echo "========= $SHA1 ========"
         fi
     fi
 
-    rm -rf "$TMPDIR"
+    if ! [ "$CADO_DEBUG" ] ; then
+        rm -rf "$TMPDIR"
+    fi
 }
 
 dotest "$@"

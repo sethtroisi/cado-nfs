@@ -547,6 +547,11 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
         else if (c == ':') { last_prime = 0; side++; }
         else PARSER_ASSERT_ALWAYS(c, ',', r->rhead, p);
         c = earlyparser_inner_read_prime(r, &p, &pr);
+	// it can be that c = ':', during the descent or more often in MNFS
+	// and this implies pr = 0 which is used to detect this case
+	// FIXME: do we need a specific ASSERT in the normal case?
+	if(pr == 0)
+	    continue;
         // not enforcing at the moment.
         // ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
         sorted = sorted && pr >= last_prime;

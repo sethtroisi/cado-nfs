@@ -227,7 +227,7 @@ main (int argc, char *argv[])
 
     param_list_clear (pl);
 
-    printf ("Total merge time: %1.0f seconds\n", seconds ());
+    printf ("Total merge time: %.2f seconds\n", seconds ());
 
     print_timing_and_memory (wct0);
 

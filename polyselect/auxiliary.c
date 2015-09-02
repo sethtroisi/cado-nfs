@@ -1278,15 +1278,14 @@ get_alpha (mpz_poly_ptr f, unsigned long B)
   double alpha, e;
   unsigned long p;
   mpz_t disc;
-  unsigned int d = f->deg;
 
   /* for F linear, we have q_p = 1 for all p, thus
      alpha(F) = sum(prime p <= B, log(p)/(p^2-1)) ~ 0.569959993064325 */
-  if (d == 1)
+  if (f->deg == 1)
     return 0.569959993064325;
 
   mpz_init (disc);
-  discriminant (disc, f->coeff, d);
+  mpz_poly_discriminant (disc, f);
 
   /* special_valuation returns the expected average exponent of p in F(a,b)
      for coprime a, b, i.e., e = q_p*p/(p^2-1), thus the contribution for p
@@ -1365,10 +1364,9 @@ get_biased_alpha_projective (mpz_poly_ptr f, unsigned long B)
    double alpha, e;
    unsigned long p;
    mpz_t disc;
-   int d = f->deg;
 
    mpz_init (disc);
-   discriminant (disc, f->coeff, d);
+   mpz_poly_discriminant (disc, f);
 
    /* prime p=2 */
    e = special_valuation (f, 2, disc) - special_valuation_affine (f, 2, disc);
@@ -1543,10 +1541,10 @@ print_cadopoly (FILE *fp, cado_poly p)
    double alpha, alpha_proj, logmu, e;
    mpz_poly_t F, G;
 
-   F->coeff = p->alg->coeff;
-   F->deg = p->alg->deg;
-   G->coeff = p->rat->coeff;
-   G->deg = p->rat->deg;
+   F->coeff = p->pols[ALG_SIDE]->coeff;
+   F->deg = p->pols[ALG_SIDE]->deg;
+   G->coeff = p->pols[RAT_SIDE]->coeff;
+   G->deg = p->pols[RAT_SIDE]->deg;
 
    /* print f, g only*/
    print_cadopoly_fg (fp, F->coeff, F->deg, G->coeff, G->deg, p->n);
@@ -1615,13 +1613,13 @@ print_poly_fg (mpz_poly_ptr f, mpz_t *g, mpz_t N, int mode)
    cado_poly cpoly;
    cado_poly_init(cpoly);
    for (i = 0; i < (d + 1); i++)
-      mpz_set(cpoly->alg->coeff[i], f->coeff[i]);
+      mpz_set(cpoly->pols[ALG_SIDE]->coeff[i], f->coeff[i]);
    for (i = 0; i < 2; i++)
-      mpz_set(cpoly->rat->coeff[i], g[i]);
+      mpz_set(cpoly->pols[RAT_SIDE]->coeff[i], g[i]);
    mpz_set(cpoly->n, N);
    cpoly->skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
-   cpoly->alg->deg = d;
-   cpoly->rat->deg = 1;
+   cpoly->pols[ALG_SIDE]->deg = d;
+   cpoly->pols[RAT_SIDE]->deg = 1;
 
    if (mode == 1)
      {
@@ -1668,12 +1666,12 @@ cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix)
 {
   unsigned int nrroots;
   double lognorm, alpha, alpha_proj;
-  nrroots = numberOfRealRoots (poly->alg->coeff, poly->alg->deg, 0, 0, NULL);
+  nrroots = numberOfRealRoots (poly->pols[ALG_SIDE]->coeff, poly->pols[ALG_SIDE]->deg, 0, 0, NULL);
   if (poly->skew <= 0.0) /* If skew is undefined, compute it. */
-    poly->skew = L2_skewness (poly->alg, SKEWNESS_DEFAULT_PREC);
-  lognorm = L2_lognorm (poly->alg, poly->skew);
-  alpha = get_alpha (poly->alg, ALPHA_BOUND);
-  alpha_proj = get_biased_alpha_projective (poly->alg, ALPHA_BOUND);
+    poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+  lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+  alpha = get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND);
+  alpha_proj = get_biased_alpha_projective (poly->pols[ALG_SIDE], ALPHA_BOUND);
 
   cado_poly_fprintf (stdout, poly, prefix);
   cado_poly_fprintf_info (fp, lognorm, alpha, alpha_proj, nrroots, prefix);

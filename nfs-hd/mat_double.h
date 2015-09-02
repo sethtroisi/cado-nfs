@@ -20,7 +20,8 @@ void mat_double_init(mat_double_ptr matrix, unsigned int NumRows,
     unsigned int NumCols);
 
 /*
- * Initialize a matrix and set the coefficients.
+ * Initialize a matrix and set the coefficients. Assume there are enough
+ *  coefficients.
  *
  * matrix: the matrix.
  * NumRows: number of rows in the matrix.
@@ -48,7 +49,7 @@ void mat_double_copy(mat_double_ptr B, mat_double_srcptr A);
 
 /*
  * Set a coefficient to i, this coefficient is in the row (row) and the column
- *  (col).
+ *  (col). Row and col are defined without the offset on rows and columns.
  *
  * matrix: the matrix.
  * i: the new coefficient.
@@ -66,6 +67,10 @@ static inline void mat_double_set_coeff(mat_double_ptr matrix, double i,
   matrix->coeff[row + 1][col + 1] = i;
 }
 
+/*
+ * Return the coeffecient at postition [row, col]. Row and col are defined
+ *  without the offset on rows and columns.
+ */
 static inline double mat_double_get_coeff(mat_double_srcptr matrix,
       unsigned int row, unsigned int col)
 {
@@ -108,5 +113,4 @@ void mat_double_fprintf_comment(FILE * file, mat_double_srcptr matrix);
  * matrix_src: the root matrix.
  */
 void mat_double_transpose(mat_double_ptr matrix, mat_double_srcptr matrix_src);
-
 #endif /* MAT_DOUBLE_H */

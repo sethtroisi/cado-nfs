@@ -216,7 +216,7 @@ void mat_int64_mul_int64_vector(int64_vector_ptr a, mat_int64_srcptr A,
     int64_vector_srcptr c)
 {
   ASSERT(A->NumCols == c->dim);
-  ASSERT(A->NumRows == a->dim);//TODO: verify the test.
+  ASSERT(A->NumRows == a->dim);
 
   int64_vector_t v;
   int64_vector_init(v, A->NumRows);
@@ -266,7 +266,6 @@ void mat_Z_to_mat_int64(mat_int64_ptr matrix_int, mat_Z_srcptr matrix)
   }
 }
 
-//TODO: Wahoo! No initialisation here and I do not know what it does!
 void mat_int64_extract(mat_int64_ptr matrix_out, mat_int64_srcptr matrix_in,
     unsigned int ulx, unsigned int uly, unsigned int drx, unsigned int dry)
 {
@@ -274,6 +273,11 @@ void mat_int64_extract(mat_int64_ptr matrix_out, mat_int64_srcptr matrix_in,
   ASSERT(dry - uly > 0);
 
   mat_int64_init(matrix_out, drx - ulx, dry - uly);
+
+#ifndef NDEBUG
+  mat_int64_set_zero(matrix_out);
+#endif // NDEBUG
+
   for (unsigned int i = 0; i < drx - ulx; i++) {
     for (unsigned int j = 0; j < dry - uly; j++) {
       matrix_out->coeff[i + 1][j + 1] =

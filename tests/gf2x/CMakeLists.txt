@@ -1,11 +1,21 @@
-run_test(gf2x ${CMAKE_CURRENT_SOURCE_DIR}/test_gf2x.sh ${CADO_NFS_BINARY_DIR})
+
+# note that cmake sees gf2x as an external library, so adding gf2x with
+# target_link_libraries cannot have the effect that the target depends on
+# building gf2x. That dependency (on gf2x-build, in fact) has to be added
+# by hand.
+
+cado_define_test(SCRIPT
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_gf2x.sh ${CADO_NFS_BINARY_DIR}
+    TARGET_DEPENDENCIES gf2x-build)
+
 link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft)
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft/mpfq)
-add_executable(test_cantor test_cantor.c)
+
+cado_define_test(test_cantor.c
+    ARGUMENTS 100000
+    LIBRARIES gf2x tests ${gmp_libname}
+    TARGET_DEPENDENCIES gf2x-build)
 # This **MUST** match the #define in gf2x/Makefile.am
 set_source_files_properties(test_cantor.c COMPILE_FLAGS
         "-DCANTOR_BASE_FIELD_SIZE=128")
-target_link_libraries(test_cantor gf2x tests)
-target_link_libraries(test_cantor ${gmp_libname})
-run_test(test_cantor test_cantor 100000)

@@ -1353,14 +1353,16 @@ main(int argc, char *argv[])
 
 #ifndef FOR_FFS
   if (nbsm0) {
-      F0 = poly->pols[RATIONAL_SIDE];
-      FATAL_ERROR_CHECK(nbsm0 > (unsigned int) poly->rat->deg, "Too many SM");
+      F0 = poly->pols[0];
+      FATAL_ERROR_CHECK(nbsm0 > (unsigned int) poly->pols[0]->deg,
+              "Too many SM");
   } else {
       F0 = NULL;
   }
   if (nbsm1) {
-      F1 = poly->pols[ALGEBRAIC_SIDE];
-      FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
+      F1 = poly->pols[1];
+      FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->pols[1]->deg,
+              "Too many SM");
   } else {
       F1 = NULL;
   }

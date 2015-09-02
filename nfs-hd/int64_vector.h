@@ -74,7 +74,7 @@ static inline void int64_vector_setcoordinate(int64_vector_ptr v,
 }
 
 /*
- * Return 0 if the vector are equal, 1 otherwise.
+ * Return 1 if the vector are equal, 0 otherwise.
  *
  * a: first vector.
  * b: second vector.
@@ -89,7 +89,7 @@ int int64_vector_equal(int64_vector_srcptr a, int64_vector_srcptr b);
  * c: the second vector.
  */
 void int64_vector_add(int64_vector_ptr a, int64_vector_srcptr b,
-                      int64_vector_srcptr c);
+    int64_vector_srcptr c);
 
 /*
  * a = b - c
@@ -99,7 +99,7 @@ void int64_vector_add(int64_vector_ptr a, int64_vector_srcptr b,
  * c: the second vector.
  */
 void int64_vector_sub(int64_vector_ptr a, int64_vector_srcptr b,
-                      int64_vector_srcptr c);
+    int64_vector_srcptr c);
 
 /*
  * a = c * b
@@ -176,7 +176,7 @@ double int64_vector_norml2(int64_vector_srcptr a);
  * v1: second vector.
  */
 int64_t int64_vector_dot_product(int64_vector_srcptr v0,
-                                 int64_vector_srcptr v1);
+    int64_vector_srcptr v1);
 
 /*
  * Return 1 if a vector is in the sieving region, 0 otherwise.
@@ -196,11 +196,13 @@ int int64_vector_in_sieving_region(int64_vector_srcptr v,
 void double_vector_in_int64_vector(int64_vector_ptr v_i,
     double_vector_srcptr v_d);
 
+/*
+ * Compute the gcd between all the coefficients of v.
+ */
 int64_t int64_vector_gcd(int64_vector_srcptr v);
 
 /*
  * u = v / gcd(v)
  */
 void int64_vector_reduce(int64_vector_ptr u, int64_vector_srcptr v);
-
 #endif // INT64_VECTOR_H
