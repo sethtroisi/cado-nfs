@@ -1669,6 +1669,7 @@ void mpfq_p_5_poly_xgcd(mpfq_p_5_dst_field k MAYBE_UNUSED, mpfq_p_5_dst_poly g, 
     mpfq_p_5_poly a,b,u,v,w,x,q,r;
     mpfq_p_5_elt c;
     mpfq_p_5_init(k,&c);
+    mpfq_p_5_set_ui(k,c,0);        /* placate gcc */
     int da0=mpfq_p_5_poly_deg(k,a0), db0=mpfq_p_5_poly_deg(k,b0), dega;
     if (db0==-1) {
      if (da0==-1) {

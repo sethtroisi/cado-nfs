@@ -371,9 +371,9 @@ void mpfq_pz_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_p
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
-void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_pz_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -897,6 +897,7 @@ void mpfq_pz_poly_xgcd(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_dst_poly g, mpf
     mpfq_pz_poly a,b,u,v,w,x,q,r;
     mpfq_pz_elt c;
     mpfq_pz_init(k,&c);
+    mpfq_pz_set_ui(k,c,0);        /* placate gcc */
     int da0=mpfq_pz_poly_deg(k,a0), db0=mpfq_pz_poly_deg(k,b0), dega;
     if (db0==-1) {
      if (da0==-1) {

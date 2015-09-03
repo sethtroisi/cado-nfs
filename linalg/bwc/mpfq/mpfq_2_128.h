@@ -2033,6 +2033,7 @@ void mpfq_2_128_poly_xgcd(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_po
     mpfq_2_128_poly a,b,u,v,w,x,q,r;
     mpfq_2_128_elt c;
     mpfq_2_128_init(k,&c);
+    mpfq_2_128_set_ui(k,c,0);        /* placate gcc */
     int da0=mpfq_2_128_poly_deg(k,a0), db0=mpfq_2_128_poly_deg(k,b0), dega;
     if (db0==-1) {
      if (da0==-1) {
