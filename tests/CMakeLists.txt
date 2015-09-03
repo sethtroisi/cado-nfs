@@ -399,8 +399,9 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         TARGET_DEPENDENCIES
             full_c59_dependencies
         )
-    find_program(MAGMA magma)
+    find_program(MAGMA magma HINTS ENV MAGMA)
     if (MAGMA)
+        message(STATUS "magma found: ${MAGMA}")
 #        this test is probably not very useful, given that the other
 #        (quicker) tests cover everything covered by this test.
 #        cado_define_test(full_p59
@@ -431,6 +432,8 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
             filter_galois polyselect_gfpn)
+    else(MAGMA)
+        message(STATUS "magma found: ${MAGMA}")
     endif(MAGMA)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
