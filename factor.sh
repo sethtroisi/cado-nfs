@@ -154,6 +154,7 @@ while [ "$#" -gt 0 ] ; do
         shift
     else
         cadofactor_args=("${cadofactor_args[@]}" "$1")
+        shift
     fi
 done
 
