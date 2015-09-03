@@ -310,6 +310,8 @@ void mat_int64_set_diag(mat_int64_ptr matrix, int64_vector_srcptr x)
 
 /****************************************/
 
+//TODO: move lll in utils_lattice.
+
 /* This uses Paul Zimmermann implementation.
 
    LLL using exact multiprecision arithmetic.
@@ -326,12 +328,13 @@ void mat_int64_set_diag(mat_int64_ptr matrix, int64_vector_srcptr x)
    This follows the implementation in utils/lll.c, but for mat_int64_t.
  */
 
-static void innerproduct(int64_t * x, int64_t * a, int64_t * b, unsigned int n)
+static int64_t innerproduct(int64_t * a, int64_t * b, unsigned int n)
 {
-  * x = a[1] * b[1];
+  int64_t x = a[1] * b[1];
   for (unsigned int i = 2; i <= n; i++) {
-    * x = * x + a[i] * b[i];
+    x = x + a[i] * b[i];
   }
+  return x;
 }
 
 static void incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
@@ -346,7 +349,7 @@ static void incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
       continue;
     }
 
-    innerproduct(&u, B->coeff[k], B->coeff[j], n);
+    u = innerproduct(B->coeff[k], B->coeff[j], n);
     for (unsigned int i = 1; i <= posj - 1; i++) {
       ASSERT(D[i - 1] != 0);
 
@@ -356,7 +359,7 @@ static void incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
     lam[k][posj] = u;
   }
 
-  innerproduct(&u, B->coeff[k], B->coeff[k], n);
+  u = innerproduct(B->coeff[k], B->coeff[k], n);
 
   for (unsigned int i = 1; i <= * s; i++) {
     ASSERT(D[i - 1] != 0);
@@ -373,17 +376,19 @@ static void incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
   }
 }
 
-static void baldiv(int64_t * q, int64_t a, int64_t d)
+static int64_t baldiv(int64_t a, int64_t d)
   /*  rounds a/d to nearest integer, breaking ties
       by rounding towards zero.  Assumes d > 0. */
 {
+  int64_t q = 0;
   int64_t r = 0;
-  int64_fdiv_qr(q, &r, a, d);
+  int64_fdiv_qr(&q, &r, a, d);
   r = r * 2;
 
-  if (r > d || (r == d && * q < 0)) {
-    * q = * q + 1;
+  if (r > d || (r == d && q < 0)) {
+    q = q + 1;
   }
+  return q;
 }
 
 static void mulsubn (int64_t * c0, int64_t * c1, int64_t x, unsigned int n)
@@ -408,7 +413,7 @@ static void reduce(unsigned int k, unsigned int l, mat_int64_ptr B,
     return;
   }
 
-  baldiv(&r, lam[k][P[l]], D[P[l]]);
+  r = baldiv(lam[k][P[l]], D[P[l]]);
   mulsubn(B->coeff[k], B->coeff[l], r, B->NumCols);
 
   if (U != NULL) {
@@ -429,30 +434,29 @@ static int swaptest(int64_t d0, int64_t d1, int64_t d2, int64_t lam,
   /* test if a*d1^2 > b*(d0*d2 + lam^2)
      t1 and t2 are temporary variables */
 {
-  int64_t t2 = lam * lam;
-  int64_t t1 = (d0 * d2 + t2) * b;
-  t2 = d1 * d1 * a;
+  double t1 = ((double)d0 * (double)d2 + (double)lam * (double)lam) * (double)b;
+  double t2 = (double)d1 * (double)d1 * (double)a;
 
   return (t2 > t1);
 }
 
-static void muladddiv (int64_t * c, int64_t c1, int64_t c2, 
+static int64_t muladddiv (int64_t c1, int64_t c2, 
     int64_t x, int64_t y, int64_t z)
 
   /* c = (x*c1 + y*c2)/z */
 {
   ASSERT(z != 0);
 
-  * c = (x * c1 + y * c2) / z;
+  return (x * c1 + y * c2) / z;
 }
 
-static void mulsubdiv (int64_t * c, int64_t c1, int64_t c2, 
+static int64_t mulsubdiv (int64_t c1, int64_t c2, 
     int64_t x, int64_t y, int64_t z)
   /* c = (x*c1 - y*c2)/z */
 {
   ASSERT(z != 0);
 
-  * c = (x * c1 - y * c2) / z;
+  return (x * c1 - y * c2) / z;
 }
 
 static void rowtransform(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
@@ -500,14 +504,14 @@ static void swaplll (unsigned int k, mat_int64_ptr B, unsigned int * P,
     }
 
     for (unsigned int i = k + 1; i <= m; i++) {
-      muladddiv(&t1, lam[i][P[k] - 1], lam[i][P[k]],
+      t1 = muladddiv(lam[i][P[k] - 1], lam[i][P[k]],
           lam[k][P[k] - 1], D[P[k] - 2], D[P[k] - 1]);
-      mulsubdiv(&(lam[i][P[k]]), lam[i][P[k] - 1], lam[i][P[k]], 
+      lam[i][P[k]] = mulsubdiv(lam[i][P[k] - 1], lam[i][P[k]], 
           D[P[k]], lam[k][P[k] - 1], D[P[k] - 1]);
       lam[i][P[k] - 1] = t1;
     }
 
-    muladddiv(&(D[P[k] - 1]), D[P[k]], lam[k][P[k] - 1],
+    D[P[k] - 1] = muladddiv(D[P[k]], lam[k][P[k] - 1],
         D[P[k] - 2], lam[k][P[k] - 1], D[P[k] - 1]);
   } else if (lam[k][P[k - 1]] != 0) {
     int64_gcdext(&e, &x, &y, lam[k][P[k - 1]], D[P[k - 1]]);
@@ -664,17 +668,12 @@ void mat_int64_LLL(mat_int64_ptr C, mat_int64_srcptr A)
   ASSERT(A->NumRows == C->NumRows);
   ASSERT(A->NumCols == C->NumCols);
 
-  mat_int64_t A_tmp;
-  mat_int64_init(A_tmp, A->NumRows, A->NumCols);
-  mat_int64_copy(A_tmp, A);
+  mat_int64_copy(C, A);
   int64_t a = 3;
   int64_t b = 4;
   int64_t det = 0;
 
-  lll(&det, A_tmp, NULL, a, b);
-  mat_int64_copy(C, A_tmp);
-  
-  mat_int64_clear(A_tmp);
+  lll(&det, C, NULL, a, b);
 }
 #endif
 
@@ -685,24 +684,21 @@ void mat_int64_LLL_transpose(mat_int64_ptr C, mat_int64_srcptr A)
   ASSERT(A->NumRows == C->NumRows);
   ASSERT(A->NumCols == C->NumCols);
 
-  mat_Z_t A_Z;
-  mat_Z_init(A_Z, A->NumRows, A->NumCols);
-  mat_int64_to_mat_Z(A_Z, A);
+  mat_int64_t A_tmp;
+  mat_int64_init(A_tmp, A->NumRows, A->NumCols);
+  mat_int64_transpose(A_tmp, A);
 
-  mat_Z_t C_Z;
-  mat_Z_init(C_Z, C->NumRows, C->NumCols);
+  mat_int64_LLL(C, A_tmp);
 
-  mat_Z_LLL_transpose(C_Z, A_Z);
-
-  mat_Z_to_mat_int64(C, C_Z);
-
-  mat_Z_clear(C_Z);
-  mat_Z_clear(A_Z);
-
+  mat_int64_transpose(C, C);
+  mat_int64_clear(A_tmp);
 }
 
 void mat_int64_LLL_unimodular(mat_int64_ptr C, mat_int64_srcptr A)
 {
+  ASSERT(A->NumRows == C->NumRows);
+  ASSERT(A->NumCols == C->NumCols);
+
   mat_Z_t A_Z;
   mat_Z_init(A_Z, A->NumRows, A->NumCols);
   mat_int64_to_mat_Z(A_Z, A);
@@ -720,19 +716,17 @@ void mat_int64_LLL_unimodular(mat_int64_ptr C, mat_int64_srcptr A)
 
 void mat_int64_LLL_unimodular_transpose(mat_int64_ptr C, mat_int64_srcptr A)
 {
-  mat_Z_t A_Z;
-  mat_Z_init(A_Z, A->NumRows, A->NumCols);
-  mat_int64_to_mat_Z(A_Z, A);
+  ASSERT(A->NumRows == C->NumRows);
+  ASSERT(A->NumCols == C->NumCols);
 
-  mat_Z_t C_Z;
-  mat_Z_init(C_Z, C->NumRows, C->NumCols);
+  mat_int64_t A_tmp;
+  mat_int64_init(A_tmp, A->NumRows, A->NumCols);
+  mat_int64_transpose(A_tmp, A);
 
-  mat_Z_LLL_unimodular_transpose(C_Z, A_Z);
+  mat_int64_LLL_unimodular(C, A_tmp);
 
-  mat_Z_to_mat_int64(C, C_Z);
-
-  mat_Z_clear(C_Z);
-  mat_Z_clear(A_Z);
+  mat_int64_transpose(C, C);
+  mat_int64_clear(A_tmp);
 }
 
 
