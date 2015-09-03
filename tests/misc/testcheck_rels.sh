@@ -28,20 +28,26 @@ fi
 
 
 ############## Check with wrong relations
-if ! ("$CHECK_RELS" -poly $poly -check_primality -complete $fixed $rels2 > $out 2>&1) ; then
+if ("$CHECK_RELS" -poly $poly -v -lpb1 400000 -check_primality -complete $fixed $rels2 > $out 2>&1) ; then
     echo "$0: check_rels binary failed when testing wrong relations"
     exit 1
 fi
 
 nrels=`awk '/read relations/ {print $5}' $out`
+deletedrels=`awk '/deleted relations/ {print $5}' $out`
 correctrels=`awk '/keeped relations/ {print $5}' $out`
 composite=`awk '/one non-primes ideal/ {print $2}' $out`
-if [ $nrels != $correctrels ]; then
+lpb=`awk '/ideal larger than a lpb/ {print $3}' $out`
+if [ $nrels != "5" -o $correctrels != 3  -o $deletedrels != 2 ]; then
     echo "$0: check_rels binary failed to fix wrong relations"
     exit 1
 fi
 if [ $composite != "1" ]; then
     echo "$0: check_rels binary failed to detect composite factor"
+    exit 1
+fi
+if [ $lpb != "1" ]; then
+    echo "$0: check_rels binary failed to detect larger than lpb factor"
     exit 1
 fi
 
