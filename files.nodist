@@ -149,7 +149,6 @@ sieve/freerel_multipoly.c
 linalg/bwc/lingen.txt
 sieve/CMakeLists-nodist.txt
 sieve/smooth.c
-sieve/smooth.h
 nfs-hd/array.c
 nfs-hd/array.h
 nfs-hd/factor_base.c
@@ -192,4 +191,3 @@ nfs-hd/list_int64_vector.h
 nfs-hd/list_int64_vector_index.c
 nfs-hd/list_int64_vector_index.h
 tests/nfs-hd/
-sieve/smooth.c
