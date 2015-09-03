@@ -12,7 +12,7 @@ RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 CAP_FP = "(%s)" % RE_FP
 REGEXES = {"cap_fp" : CAP_FP}
 
-PATTERN_SIEVE_SQ = re.compile(r"# Sieving algebraic q=(\d+);")
+PATTERN_SIEVE_SQ = re.compile(r"# Sieving (algebraic|rational|side-0|side-1) q=(\d+);")
 PATTERN_SQ = re.compile(r"# Average J=(\d+) for (\d+) special-q's, max bucket fill {cap_fp}".format(**REGEXES))
 PATTERN_CPUTIME = re.compile(r"# Total cpu time {cap_fp}s .norm {cap_fp}\+{cap_fp}, sieving {cap_fp} .{cap_fp} \+ {cap_fp} \+ {cap_fp}., factor {cap_fp}.".format(**REGEXES))
 PATTERN_REPORTS = re.compile(r"# Total (\d+) reports".format(**REGEXES))
