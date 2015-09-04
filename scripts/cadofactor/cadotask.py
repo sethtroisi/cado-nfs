@@ -4499,8 +4499,7 @@ class ReconstructLogTask(Task):
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
-                    nmaps0=nmaps[0],
-                    nmaps1=nmaps[1],
+                    nsm=str(nmaps[0])+","+str(nmaps[1]),
                     nrels=nrels,
 		    abunits0=str(abunitsdirname) + ".0",
 		    abunits1=str(abunitsdirname) + ".1",

@@ -72,7 +72,7 @@ struct relation : public relation_ab {
     };
     int rational_side;    /* index of the rational side, if any */
     int nb_polys;         /* number of polynoms, default = 2 */
-    std::vector<pr> sides[NB_POLYS_MAX];
+    std::vector<pr> sides[NB_POLYS_MAX]; /* pr's are stored w.r.t. side */
 
     relation() {}
     operator bool() const { return (bool) (relation_ab) *this; }

@@ -17,6 +17,7 @@ unset SMEXP2
 unset NMAPS0
 unset NMAPS1
 unset NMAPS2
+unset NMAPS
 unset ABUNITS
 unset mtopts
 
@@ -123,7 +124,8 @@ if [ $EXPLICIT0 = "yes" ]; then
 else
     nsm0=$NMAPS0
 fi
-smopts="-smexp0 $SMEXP0 -nsm0 $nsm0"
+nsm="-nsm $nsm0"
+smopts="-smexp0 $SMEXP0"
 if [ $EXPLICIT1 = "yes" ]; then
     nsm1=0
     side=1
@@ -131,7 +133,8 @@ if [ $EXPLICIT1 = "yes" ]; then
 else
     nsm1=$NMAPS1
 fi
-smopts="$smopts -smexp1 $SMEXP1 -nsm1 $nsm1"
+nsm="$nsm,$nsm1"
+smopts="$smopts -smexp1 $SMEXP1"
 ## FIXME: copy-paste without thinking!
 if [ $NSIDES -gt 2 ]; then
     if [ $EXPLICIT2 = "yes" ]; then
@@ -141,6 +144,7 @@ if [ $NSIDES -gt 2 ]; then
     else
 	nsm2=$NMAPS2
     fi
+    nsm="$nsm,$nsm2"
     smopts="$smopts -smexp2 $SMEXP2 -nsm2 $nsm2"
 fi
 
@@ -152,7 +156,7 @@ if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
     else
 	# out contains SM's for side=0..1 in that order, or 0 or 1 depending
 	# on the unit side if any
-	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts $mtopts"
+	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts $nsm $mtopts"
 	if [ $nsm0 -ne 0 -o $nsm1 -ne 0 ]; then
 	    echo $CMD; $CMD
 	else

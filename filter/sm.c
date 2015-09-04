@@ -348,11 +348,9 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "output file");
   param_list_decl_usage(pl, "gorder", "(required) group order");
   param_list_decl_usage(pl, "smexp0", "(required) sm-exponent");
-  param_list_decl_usage(pl, "nsm0", "number of SM on the side 0, default deg(polynomial))");
   param_list_decl_usage(pl, "smexp1", "(required) sm-exponent");
-  param_list_decl_usage(pl, "nsm1", "number of SM on the side 1, default deg(polynomial))");
   param_list_decl_usage(pl, "smexp2", "(MNFS) sm-exponent");
-  param_list_decl_usage(pl, "nsm2", "(MNFS) number of SM on side 2, default deg(polynomial))");
+  param_list_decl_usage(pl, "nsm", "number of SM on side 0,1,... default deg(polynomial))");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
   verbose_decl_usage(pl);
 }
@@ -464,12 +462,14 @@ int main (int argc, char **argv)
       nsm[side] = F[side]->deg;
   }
   /* Read number of sm to be printed from command line */
-  for(int side = 0; side < pol->nb_polys; side++){
-      char tmp_nsm[5];
-      snprintf(tmp_nsm, sizeof(tmp_nsm), "nsm%d", side);
-      param_list_parse_int(pl, tmp_nsm, &nsm[side]);
+  int nsm_read[NB_POLYS_MAX];
+  int nsides = param_list_parse_int_list(pl,"nsm",nsm_read,pol->nb_polys,",");
+  memcpy(nsm, nsm_read, nsides * sizeof(int));
+  // it is possible to have non prescribed nsm's corresponding
+  // to default = deg(F)
+
+  for(int side = 0; side < pol->nb_polys; side++)
       nsm_tot += nsm[side];
-  }
   if (nsm_tot == 0){
       fprintf(stderr, "Error: no SM to compute!\n");
       exit(EXIT_FAILURE);
