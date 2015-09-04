@@ -2702,10 +2702,10 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
             # taking into account duplicates, the initial value
-            # pi(2^lpbr) + pi(2^lpba) should be good
+            # 0.9 * (pi(2^lpbr) + pi(2^lpba)) should be good
             nr = 2 ** self.progparams[0]["lpbr"]
             na =  2 ** self.progparams[0]["lpba"]
-            nra = int(nr / log (nr) + na / log (na))
+            nra = int(0.9 * nr / log (nr) + 0.9 * na / log (na))
             self.state["rels_wanted"] = nra
     
     def run(self):
