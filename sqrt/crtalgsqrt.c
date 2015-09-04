@@ -664,10 +664,10 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
         tsize=sbuf->st_size;
         // we have 2.5 non-digit bytes per file line. However we
         // don't know the line count, so we can't subtract. As a
-        // guess, we read the first 16kb, and count the number of
+        // guess, we read the first 8kb, and count the number of
         // lines in there.
         if (rank == root) {
-            char buf[16384];
+            char buf[8192];
             FILE * f = fopen(fname, "r");
             rc = fread(buf, 1, sizeof(buf), f);
             ASSERT_ALWAYS(rc == sizeof(buf));

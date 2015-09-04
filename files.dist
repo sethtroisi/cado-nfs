@@ -639,6 +639,11 @@ tests/misc/c60.rels2
 tests/misc/c59_nonlinear.poly
 tests/misc/CMakeLists.txt
 tests/misc/testcheck_rels.sh
+tests/sqrt/c30.dep.000
+tests/sqrt/c30.poly
+tests/sqrt/c30.ratdep.000
+tests/sqrt/CMakeLists.txt
+tests/sqrt/test_crtalgsqrt.sh
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c
