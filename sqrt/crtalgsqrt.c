@@ -2059,13 +2059,13 @@ void mpi_custom_types_check()/*{{{*/
 // parallelism-multithreading, but OTOH small r will yield less
 // time).
 
-void get_parameters(int * pr, int * ps, int * pt, int asked_r)
+static void get_parameters(int * pr, int * ps, int * pt, int asked_r)
 {
     int n=0,r=0,s=0,t=0;
-    size_t R = ram_gb * (1UL << 30) * 8UL;
+    double R = ram_gb * 8UL * (double) (1UL << 30);
     n = glob.n;
     size_t T = glob.nbits_sqrt + 80;    // some margin for knapsack.
-    double ramfraction = 2*T*n / (double) R;
+    double ramfraction = 2*T*n / R;
     s = ceil(ramfraction);
     t = ceil((double)n*T / R);
     int dmax = glob.lll_maxdim - n;
@@ -2102,7 +2102,7 @@ void get_parameters(int * pr, int * ps, int * pt, int asked_r)
 
     /* If these asserts fail, it means that the constraints are
      * impossible to satisfy */
-    ASSERT_ALWAYS((double)T/t < (double) R/n);
+    ASSERT_ALWAYS((double)T/t < R/n);
     ASSERT_ALWAYS(B*n <= R);
 
     fprintf(stderr, "# [%2.2lf] number of pairs is %zu\n", WCT,
@@ -3588,6 +3588,9 @@ int main(int argc, char **argv)
     MPI_Bcast(&glob.s, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&glob.t, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&glob.r, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    ASSERT_ALWAYS(glob.r >= 1);
+    ASSERT_ALWAYS(glob.s >= 1);
+    ASSERT_ALWAYS(glob.t >= 1);
 
     int r = glob.r;
     int s = glob.s;
