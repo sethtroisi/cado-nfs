@@ -2279,6 +2279,11 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
     if (Mqr->coeff[1][1] != 1) {
       plane_sieve_1(array, r, Mqr, H, matrix, f, &number_hit);
     } else {
+      fprintf(stderr, "# Tqr = [");
+      for (unsigned int i = 0; i < H->t - 1; i++) {
+        fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
+      }
+      fprintf(stderr, "%" PRIu64 "]\n", Tqr[H->t - 1]);
       fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
       mat_int64_fprintf_comment(stderr, Mqr);
     }
@@ -2351,13 +2356,13 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
       plane_sieve_1(array, r, Mqr, H, matrix, f);
 #endif // SPACE_SIEVE
     } else {
-      fprintf(stderr, "# Space sieve: error in the construction of Mqr.\n# ");
-      ideal_fprintf(stderr, r->ideal);
-      printf("# Tqr = [");
+      fprintf(stderr, "# Tqr = [");
       for (unsigned int i = 0; i < H->t - 1; i++) {
-        printf("%" PRIu64 ", ", Tqr[i]);
+        fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
       }
-      printf("%" PRIu64 "]\n", Tqr[H->t - 1]);
+      fprintf(stderr, "%" PRIu64 "]\n", Tqr[H->t - 1]);
+      fprintf(stderr, "# Space sieve does not support this type of Mqr.\n");
+      mat_int64_fprintf_comment(stderr, Mqr);
     }
 #endif // ENUM_LATTICE
 
