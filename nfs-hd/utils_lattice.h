@@ -194,5 +194,8 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
     list_int64_vector_srcptr list_s, list_int64_vector_index_srcptr list_vec,
     sieving_bound_srcptr H, int64_vector_srcptr s);
 
+void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A);
+
+void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A);
 
 #endif // UTILS_SIEVE_H

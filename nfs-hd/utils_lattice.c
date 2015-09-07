@@ -15,6 +15,9 @@
 #include "gcd.h"
 #include "utils_int64.h"
 
+#define swap(x, y) { unsigned int _tmp = (x); (x) = (y); (y) = _tmp; }
+#define int64_swap_n(x, y) { int64_t *_tmp = (x); (x) = (y); (y) = _tmp; }
+
 /*
  * Compute angle between two vectors.
  *
@@ -185,10 +188,17 @@ void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
   mat_int64_t M;
   mat_int64_init(M, M_root->NumRows, M_root->NumCols);
   mat_int64_mul_mat_int64(M, I_s, M_root);
-  
+
+  /*//TODO: test*/
+  /*mat_int64_t C;*/
+  /*mat_int64_init(C, M_root->NumRows, M_root->NumCols);*/
+  /*lll_Mqr(C, M);*/
+  /*mat_int64_clear(C);*/
+
   mat_int64_t U;
   mat_int64_init(U, M_root->NumRows, M_root->NumCols);
   mat_int64_LLL_unimodular_transpose(U, M);
+
   mat_int64_mul_mat_int64(MSLLL, M_root, U);
 
   mat_int64_clear(U);
@@ -411,13 +421,6 @@ void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr)
 
 static int64_t compute_k(int64_t x, int64_t xfk, int64_t H0)
 {
-  /*printf("%" PRId64 ", %" PRId64 ", %" PRId64 "\n", x, xfk, H0);*/
-  /*printf("%f\n", (double)(-H0 - x) / (double)xfk);*/
-  /*printf("%f\n", (double)(H0 - 1 - x) / (double)xfk);*/
-
-  /*ASSERT(ceil((double)(-H0 - x) / (double)xfk) ==*/
-      /*floor((double)(H0 - 1 - x) / (double)xfk - 1));*/
-
   return (int64_t)ceil((double)(-H0 - x) / (double)xfk);
 }
 
@@ -1006,6 +1009,7 @@ static void space_sieve_generate_new_vectors(
 #endif // SPACE_SIEVE_ENTROPY
 
 /*
+ * TODO: what?
  * Compute g = a * u + b * v
  */
 int int64_vector_in_sieving_region_dim(int64_vector_srcptr v,
@@ -1249,3 +1253,500 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
   return hit;
 }
 
+/* This uses Paul Zimmermann implementation.
+
+   LLL using exact multiprecision arithmetic.
+   Translated from NTL 4.1a <http://www.shoup.net/>
+   into GMP <http://www.swox.se/gmp/> 
+   by Paul Zimmermann, July 2000.
+
+   Revised April 4, 2002 (bug found by Jens Franke <franke (at) math
+   (dot) uni-bonn (dot) de>).
+
+   This program is open-source software distributed under the terms 
+   of the GNU General Public License <http://www.fsf.org/copyleft/gpl.html>.
+
+   This follows the implementation in utils/lll.c, but for mat_int64_t.
+ */
+
+static int64_t innerproduct(int64_t * a, int64_t * b, unsigned int n)
+{
+  int64_t x = a[1] * b[1];
+  for (unsigned int i = 2; i <= n; i++) {
+    x = x + a[i] * b[i];
+  }
+  return x;
+}
+
+/* c = (x*c1 + y*c2)/z */
+static int64_t muladddiv(int64_t c1, int64_t c2, int64_t x, int64_t y,
+    int64_t z)
+{
+  ASSERT(z != 0);
+
+  double d_tmp0 = (double)x * (double)c1;
+  double d_tmp1 = (double)y * (double)c2;
+
+  if (ceil(log2(fabs(d_tmp0))) <= 53.0 && ceil(log2(fabs(d_tmp1))) <= 53.0) {
+    return ((int64_t) d_tmp0 + (int64_t) d_tmp1) / z;
+  } else if (ceil(log2(fabs(d_tmp0))) <= 63.0
+      && ceil(log2(fabs(d_tmp1))) <= 63.0) {
+    return (x * c1 + y * c2) / z;
+  } else {
+    int64_t tmp = 0;
+    mpz_t c1_Z, c2_Z, x_Z, y_Z, z_Z, c, t1;
+    mpz_init(c1_Z);
+    mpz_init(c2_Z);
+    mpz_init(x_Z);
+    mpz_init(y_Z);
+    mpz_init(z_Z);
+    mpz_init(c);
+    mpz_init(t1);
+
+    mpz_set_int64(c1_Z, c1);
+    mpz_set_int64(c2_Z, c2);
+    mpz_set_int64(x_Z, x);
+    mpz_set_int64(y_Z, y);
+    mpz_set_int64(z_Z, z);
+
+    mpz_mul(t1, x_Z, c1_Z);
+    mpz_addmul(t1, y_Z, c2_Z);
+    mpz_divexact(c, t1, z_Z);
+
+    mpz_clear(c1_Z);
+    mpz_clear(c2_Z);
+    mpz_clear(x_Z);
+    mpz_clear(y_Z);
+    mpz_clear(z_Z);
+    mpz_clear(t1);
+
+    tmp = mpz_get_int64(c);
+    mpz_clear(c);
+
+    return tmp;
+  }
+}
+
+/* c = (x*c1 - y*c2)/z */
+static int64_t mulsubdiv(int64_t c1, int64_t c2, int64_t x, int64_t y,
+    int64_t z)
+{
+  ASSERT(z != 0);
+
+  double d_tmp0 = (double)x * (double)c1;
+  double d_tmp1 = (double)y * (double)c2;
+
+  if (ceil(log2(fabs(d_tmp0))) <= 53.0 && ceil(log2(fabs(d_tmp1))) <= 53.0) {
+    return ((int64_t) d_tmp0 - (int64_t) d_tmp1) / z;
+  } else if (ceil(log2(fabs(d_tmp0))) <= 63.0 &&
+      ceil(log2(fabs(d_tmp1))) <= 63.0) {
+    return (x * c1 - y * c2) / z;
+  } else {
+    int64_t tmp = 0;
+    mpz_t c1_Z, c2_Z, x_Z, y_Z, z_Z, c, t1;
+    mpz_init(c1_Z);
+    mpz_init(c2_Z);
+    mpz_init(x_Z);
+    mpz_init(y_Z);
+    mpz_init(z_Z);
+    mpz_init(c);
+    mpz_init(t1);
+
+    mpz_set_int64(c1_Z, c1);
+    mpz_set_int64(c2_Z, c2);
+    mpz_set_int64(x_Z, x);
+    mpz_set_int64(y_Z, y);
+    mpz_set_int64(z_Z, z);
+
+    mpz_mul(t1, x_Z, c1_Z);
+    mpz_submul(t1, y_Z, c2_Z);
+    mpz_divexact(c, t1, z_Z);
+
+    mpz_clear(c1_Z);
+    mpz_clear(c2_Z);
+    mpz_clear(x_Z);
+    mpz_clear(y_Z);
+    mpz_clear(z_Z);
+    mpz_clear(t1);
+
+    tmp = mpz_get_int64(c);
+    mpz_clear(c);
+
+    return tmp;
+  }
+}
+
+static void incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
+    int64_t ** lam, unsigned int * s, unsigned int k)
+{
+  unsigned int n = B->NumCols;
+  int64_t u = 0;
+
+  for (unsigned int j = 1; j <= k - 1; j++) {
+    unsigned int posj = P[j];
+    if (posj == 0) {
+      continue;
+    }
+
+    u = innerproduct(B->coeff[k], B->coeff[j], n);
+    for (unsigned int i = 1; i <= posj - 1; i++) {
+      ASSERT(D[i - 1] != 0);
+
+      /*u = (D[i] * u - lam[k][i] * lam[j][i]) / D[i - 1];*/
+      u = mulsubdiv(u, lam[j][i], D[i], lam[k][i], D[i - 1]);
+    }
+
+    lam[k][posj] = u;
+  }
+
+  u = innerproduct(B->coeff[k], B->coeff[k], n);
+
+  for (unsigned int i = 1; i <= * s; i++) {
+    ASSERT(D[i - 1] != 0);
+
+    /*u = (D[i] * u - lam[k][i] * lam[k][i]) / D[i - 1];*/
+    u = mulsubdiv(u, lam[k][i], D[i], lam[k][i], D[i - 1]);
+  }
+
+  if (u == 0) {
+    P[k] = 0;
+  } else {
+    * s = * s + 1;
+    P[k] = * s;
+    D[* s] = u;
+  }
+}
+
+/*  rounds a/d to nearest integer, breaking ties
+    by rounding towards zero.  Assumes d > 0. */
+static int64_t baldiv(int64_t a, int64_t d)
+{
+  int64_t q = 0;
+  int64_t r = 0;
+  int64_fdiv_qr(&q, &r, a, d);
+  r = r * 2;
+
+  if (r > d || (r == d && q < 0)) {
+    q = q + 1;
+  }
+  return q;
+}
+
+/* c0 = c0 - x*c1 */
+static void mulsubn (int64_t * c0, int64_t * c1, int64_t x, unsigned int n)
+{
+  for (unsigned int i = 1; i <= n; i++) {
+    c0[i] = c0[i] - c1[i] * x;
+  }
+}
+
+static void reduce(unsigned int k, unsigned int l, mat_int64_ptr B,
+    unsigned int * P, int64_t * D, int64_t ** lam, mat_int64_ptr U)
+{
+  if (P[l] == 0) {
+    return;
+  }
+
+  int64_t t1 = lam[k][P[l]] * 2;
+  int64_t r = 0;
+  t1 = ABS(t1);
+  if (t1 <= D[P[l]]) {
+    return;
+  }
+
+  r = baldiv(lam[k][P[l]], D[P[l]]);
+  mulsubn(B->coeff[k], B->coeff[l], r, B->NumCols);
+
+  if (U != NULL) {
+    mulsubn(U->coeff[k], U->coeff[l], r, B->NumRows);
+  }
+
+  for (unsigned int j = 1; j <= l - 1; j++) {
+    if (P[j] != 0) {
+      lam[k][P[j]] = lam[k][P[j]] - lam[l][P[j]] * r;
+    }
+  }
+
+  lam[k][P[l]] = lam[k][P[l]] - D[P[l]] * r;
+}
+
+/* test if a*d1^2 > b*(d0*d2 + lam^2)
+   t1 and t2 are temporary variables */
+static int swaptest(int64_t d0, int64_t d1, int64_t d2, int64_t lam,
+    int64_t a, int64_t b)
+{
+  double t1 = ((double)d0 * (double)d2 + (double)lam * (double)lam) * (double)b;
+  double t2 = (double)d1 * (double)d1 * (double)a;
+
+  return (t2 > t1);
+}
+
+/* (c1, c2) = (x*c1 + y*c2, u*c1 + v*c2) */
+static void rowtransform(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
+    int64_t u, int64_t v)
+{
+  double d_tmp0 = (double)x * (double) (* c1);
+  double d_tmp1 = (double)y * (double) (* c2);
+
+  if (ceil(log2(fabs(d_tmp0))) > 63.0 &&
+      ceil(log2(fabs(d_tmp1))) > 63.0) {
+    printf("Error\n");
+    getchar();
+  }
+
+  d_tmp0 = (double)u * (double) (* c1);
+  d_tmp1 = (double)v * (double) (* c2);
+
+  if (ceil(log2(fabs(d_tmp0))) > 63.0 &&
+      ceil(log2(fabs(d_tmp1))) > 63.0) {
+    printf("Error\n");
+    getchar();
+  }
+
+  int64_t t1 = x * * c1 + y * * c2;
+  int64_t t2 = u * * c1;
+  * c1 = t1;
+  t1 = v * * c2;
+  * c2 = t1 + t2;
+}
+
+/* (c1, c2) = (x*c1 + y*c2, u*c1 + v*c2) */
+static void rowtransformn(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
+    int64_t u, int64_t v, unsigned int n)
+{
+  for (unsigned int i = 1; i <= n; i++)
+  {
+    double d_tmp0 = (double)x * (double) (c1[i]);
+    double d_tmp1 = (double)y * (double) (c2[i]);
+
+    if (ceil(log2(fabs(d_tmp0))) > 63.0 &&
+        ceil(log2(fabs(d_tmp1))) > 63.0) {
+      printf("Error\n");
+      getchar();
+    }
+
+    d_tmp0 = (double)u * (double) (c1[i]);
+    d_tmp1 = (double)v * (double) (c2[i]);
+
+    if (ceil(log2(fabs(d_tmp0))) > 63.0 &&
+        ceil(log2(fabs(d_tmp1))) > 63.0) {
+      printf("Error\n");
+      getchar();
+    }
+    int64_t t1 = x * c1[i] + y * c2[i];
+    int64_t t2 = u * c1[i];
+    c1[i] = t1;
+    t1 = v * c2[i];
+    c2[i] = t1 + t2;
+  }
+}
+
+/* swaps vectors k-1 and k;  assumes P(k-1) != 0 */
+static void swaplll (unsigned int k, mat_int64_ptr B, unsigned int * P,
+    int64_t * D, int64_t ** lam, mat_int64_ptr U, unsigned int m)
+{
+  unsigned int i, j;
+  int64_t t1, t2, t3, e, x, y;
+
+  if (P[k] != 0) {
+    int64_swap_n(B->coeff[k - 1], B->coeff[k]);
+    if (U != NULL) {
+      int64_swap_n(U->coeff[k - 1], U->coeff[k]);
+    }
+
+    for (unsigned int j = 1; j <= k - 2; j++) {
+      if (P[j] != 0) {
+        swap_int64(&(lam[k - 1][P[j]]), &(lam[k][P[j]]));
+      }
+    }
+
+    for (unsigned int i = k + 1; i <= m; i++) {
+      t1 = muladddiv(lam[i][P[k] - 1], lam[i][P[k]],
+          lam[k][P[k] - 1], D[P[k] - 2], D[P[k] - 1]);
+      lam[i][P[k]] = mulsubdiv(lam[i][P[k] - 1], lam[i][P[k]], 
+          D[P[k]], lam[k][P[k] - 1], D[P[k] - 1]);
+      lam[i][P[k] - 1] = t1;
+    }
+
+    D[P[k] - 1] = muladddiv(D[P[k]], lam[k][P[k] - 1],
+        D[P[k] - 2], lam[k][P[k] - 1], D[P[k] - 1]);
+  } else if (lam[k][P[k - 1]] != 0) {
+    int64_gcdext(&e, &x, &y, lam[k][P[k - 1]], D[P[k - 1]]);
+
+    t1 = lam[k][P[k - 1]] / e;
+    t2 = D[P[k - 1]] / e;
+
+    t3 = t2;
+    t2 = -t2;
+    rowtransformn(B->coeff[k - 1], B->coeff[k], t1, t2, y, x, B->NumCols);
+    if (U != NULL) {
+      rowtransformn(U->coeff[k - 1], U->coeff[k], t1, t2, y, x, B->NumCols);
+    }
+    for (unsigned j = 1; j <= k - 2; j++) {
+      if (P[j] != 0) {
+        rowtransform(&(lam[k - 1][P[j]]), &(lam[k][P[j]]), t1, t2, y, x);
+      }
+    }
+
+    t2 = t2 * t2;
+    D[P[k - 1]] = D[P[k - 1]] / t2;
+
+    for (unsigned i = k + 1; i <= m; i++) {
+      if (P[i] != 0) {
+        D[P[i]] = D[P[i]] / t2;
+        for (j = i + 1; j <= m; j++) {
+          lam[j][P[i]] = lam[j][P[i]] / t2;
+        }
+      }
+    }
+    for (i = k + 1; i <= m; i++) {
+      lam[i][P[k - 1]] = lam[i][P[k - 1]] / t3;
+    }
+
+    swap(P[k - 1], P[k]);
+  } else {
+    int64_swap_n(B->coeff[k - 1], B->coeff[k]);
+    if (U != NULL) {
+      int64_swap_n(U->coeff[k - 1], U->coeff[k]);
+    }
+
+    for (j = 1; j <= k - 2; j++) {
+      if (P[j] != 0) {
+        swap_int64(&(lam[k - 1][P[j]]), &(lam[k][P[j]]));
+      }
+    }
+
+    swap(P[k - 1], P[k]);
+  }
+}
+
+/* LLL-reduce the matrix B (whose rows represent vectors, with indices
+   starting at 1):
+ * det (output) is the determinant
+ * U (output) is the transformation matrix (NULL if not needed)
+ * a, b are parameters (delta = a/b = 3/4 classically, we must have
+   1/4 < delta < 1, the closer delta is from 1, the better is the reduction)
+ m is the number of vectors (i.e., number of rows)
+ n is the number of columns (i.e., length of each vector)
+ */
+unsigned int lll(int64_t * det, mat_int64_ptr B, mat_int64_ptr U, int64_t a,
+    int64_t b)
+{
+  unsigned int m = B->NumRows;
+  unsigned int n = B->NumCols;
+  ASSERT_ALWAYS(n >= m);
+
+  unsigned int * P = (unsigned int *) malloc((m + 1) * sizeof(unsigned int));
+
+  int64_t * D = (int64_t *) malloc((m + 1) * sizeof(int64_t));
+  for (unsigned int j = 0; j <= m; j++) {
+    D[j] = (j == 0);
+  }
+
+  int64_t ** lam = (int64_t **) malloc((m + 1) * sizeof(int64_t *));
+  for (unsigned int j = 0; j <= m; j++) {
+    lam[j] = (int64_t *) malloc((m + 1) * sizeof(int64_t));
+    for (unsigned int k = 0; k <= m; k++) {
+      lam[j][k] = 0;
+    }
+  }
+
+  if (U != NULL) {
+    ASSERT(U->NumRows == m);
+    ASSERT(U->NumCols == m);
+
+    mat_int64_set_identity(U);
+  }
+
+  unsigned int s = 0;
+
+  unsigned int k = 1;
+  unsigned int max_k = 0;
+
+  while (k <= m) {
+    if (k > max_k) {
+      incrementalgs(B, P, D, lam, &s, k);
+      max_k = k;
+    }
+
+    if (k == 1) {
+      k++;
+      continue;
+    }
+
+    reduce(k, k - 1, B, P, D, lam, U);
+
+    if (P[k - 1] != 0 && (P[k] == 0 || 
+          swaptest(D[P[k]], D[P[k] - 1], D[P[k] - 2],
+            lam[k][P[k] - 1], a, b))) {
+      swaplll(k, B, P, D, lam, U, max_k);
+      k--;
+    } else {
+      for (unsigned int j = k - 2; j >= 1; j--) {
+        reduce(k, j, B, P, D, lam, U);
+      }
+      k++;
+    }
+  }
+
+  * det = D[s];
+  free(D);
+  for (unsigned int j = 0; j <= m; j++) {
+    free (lam[j]);
+  }
+  free (lam);
+
+  free(P);
+  return s;
+}
+
+void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A)
+{
+  ASSERT(A->NumRows == C->NumRows);
+  ASSERT(A->NumCols == C->NumCols);
+
+  mat_int64_transpose(C, A);
+  int64_t a = 3;
+  int64_t b = 4;
+  int64_t det = 0;
+
+  mat_int64_fprintf(stdout, C);
+  lll(&det, C, NULL, a, b);
+
+  mat_int64_transpose(C, C);
+
+#ifndef NDEBUG
+  mat_int64_t C_tmp;
+  mat_int64_init(C_tmp, C->NumRows, C->NumCols);
+  mat_int64_set_zero(C_tmp);
+  mat_int64_LLL_transpose(C_tmp, A);
+  ASSERT(mat_int64_equal(C_tmp, C));
+  mat_int64_clear(C_tmp);
+#endif // NDEBUG
+}
+
+void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A)
+{
+  ASSERT(A->NumRows == U->NumRows);
+  ASSERT(A->NumCols == U->NumCols);
+
+  mat_int64_t C;
+  mat_int64_init(C, A->NumRows, A->NumCols);
+  mat_int64_transpose(C, A);
+  int64_t a = 3;
+  int64_t b = 4;
+  int64_t det = 0;
+
+  lll(&det, C, U, a, b);
+
+  mat_int64_transpose(U, U);
+
+#ifndef NDEBUG
+  mat_int64_t U_tmp;
+  mat_int64_init(U_tmp, U->NumRows, U->NumCols);
+  mat_int64_set_zero(U_tmp);
+  mat_int64_LLL_unimodular_transpose(U_tmp, A);
+  ASSERT(mat_int64_equal(U_tmp, U));
+  mat_int64_clear(U_tmp);
+#endif // NDEBUG
+}
