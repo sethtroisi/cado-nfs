@@ -326,7 +326,6 @@ endmacro(bwc_program)
 
 bwc_program(acollect acollect.c)
 bwc_program(split split.c)
-set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 bwc_program(prep prep.c ../gauss.c)
 bwc_program(krylov krylov.c xdotprod.c)
 bwc_program(dispatch dispatch.c xdotprod.c)
@@ -427,5 +426,6 @@ bwc_program_extra(build_matcache build_matcache.c)
 target_link_libraries(build_matcache matmul_mf)
 bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)
 target_link_libraries(bench_matcache matmul_mf)
+
 
 include(CMakeLists-nodist.txt OPTIONAL)

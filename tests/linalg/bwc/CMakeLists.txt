@@ -262,3 +262,12 @@ if (HAVE_MPI)
         -- ${CMAKE_CURRENT_BINARY_DIR}/test_hello -v mpi=3x2 thr=2x2
         TEST_DEPENDENCIES test_hello)
 endif (HAVE_MPI)
+
+include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft)
+include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft/mpfq)
+include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
+cado_define_test(test_matops.cpp 
+        ${CADO_NFS_SOURCE_DIR}/linalg/bwc/matops.cpp
+        ${CADO_NFS_SOURCE_DIR}/linalg/gauss.c
+        ARGUMENTS --test-fast 1000 --n 1000 TARGET_DEPENDENCIES
+        gf2x-build)

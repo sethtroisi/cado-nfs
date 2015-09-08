@@ -263,15 +263,6 @@
 
 
 
-#define Kmpi_ops_init()	Kcommon_name_(mpi_ops_init) (K)
-#define Kmpi_datatype()	Kcommon_name_(mpi_datatype) (K)
-#define Kmpi_datatype_ur()	Kcommon_name_(mpi_datatype_ur) (K)
-#define Kmpi_addition_op()	Kcommon_name_(mpi_addition_op) (K)
-#define Kmpi_addition_op_ur()	Kcommon_name_(mpi_addition_op_ur) (K)
-#define Kmpi_ops_clear()	Kcommon_name_(mpi_ops_clear) (K)
-
-
-
 
 #define Koo_field_init()	Kcommon_name_(oo_field_init) (K)
 #define Koo_field_clear()	Kcommon_name_(oo_field_clear) (K)

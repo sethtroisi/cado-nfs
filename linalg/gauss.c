@@ -62,19 +62,9 @@ If just the dimension of kernel is wanted, set ker=NULL.
 #include "utils.h"  /* for seconds() */
 #include "gauss.h"
 
-#ifndef VERBOSE
-#define VERBOSE 0
-#endif
-#ifndef NB_TEST
-#define NB_TEST 100
-#endif
 #ifndef MULTI_ROW
-#define MULTI_ROW 2
+#define MULTI_ROW 3
 #endif
-
-
-/* Look on which computer we are */
-#define MACHINE_WORD_SIZE GMP_LIMB_BITS
 
 /* If the flag below is set, the interface to kernel() changes slightly, as the
  * mp_limb_t ** ker argument is expected to hold space for pointers BUT
@@ -114,109 +104,16 @@ static inline void add3Rows(int row, int row2, int row3, int pivot,
 			    mp_limb_t mask, /* int j_current, */
 			    mp_limb_t **ptr_current);
 static inline int getPivot(mp_limb_t **ptr, mp_limb_t mask);
-#if VERBOSE
-#ifndef NO_MAIN
-static void printVector(mp_limb_t *V, int n);
-static void printMatrix(mp_limb_t *M, int nrows, int ncols, int limbs_per_row);
-#endif
-#endif
-
 
 /*===========================================================================*/
 /*  functions definition                                                     */
 /*===========================================================================*/
 
-#ifndef NO_MAIN
-int main(int argc, char **argv) {
-  mp_limb_t* mat;
-  mp_limb_t** ker;
-  int nrows, ncols, limbs_per_row, limbs_per_col;
-  int i, justrank = 0;
-#if VERBOSE
-  int j;
-#endif
-  
-  nrows = ncols = 0;
-
-  argc--,argv++;
-  for( ; argc ; argc--,argv++) {
-      int u = atoi(*argv);
-      if (u) {
-          if (nrows == 0) {
-              nrows = ncols = u;
-          } else {
-              ncols = u;
-          }
-      } else if (strcmp(argv[2], "justrank") == 0) {
-          justrank = 1;
-      } else {
-	printf("usage: %s n [justrank]\n", argv[0]);
-	printf("   where n is the size of the matrix\n");
-	exit(1);
-      }
-  }
-  if (nrows == 0) nrows = ncols = 163;
-
-  limbs_per_row = iceildiv(ncols, MACHINE_WORD_SIZE);
-  limbs_per_col = iceildiv(nrows, MACHINE_WORD_SIZE);
-
-  mat = (mp_limb_t *)malloc(limbs_per_row*nrows*sizeof(mp_limb_t));
-  ker = (mp_limb_t **)malloc(nrows*sizeof(mp_limb_t *));
-  for (i = 0; i < nrows; ++i)
-    ker[i] = (mp_limb_t *)malloc(limbs_per_col*sizeof(mp_limb_t));
-
-  for (i = 0; i < NB_TEST; ++i) {
-    int dim;
-    mpn_random(mat, limbs_per_row*nrows);
-
-#if VERBOSE
-    printf("M:=\n");
-    printMatrix(mat, nrows, ncols, limbs_per_row);
-    printf(";\n");
-#endif
-
-
-#if VERBOSE
-    mp_limb_t * s = malloc(nrows * limbs_per_col * sizeof(mp_limb_t));
-    dim = spanned_basis(s, mat, nrows, ncols, limbs_per_row, limbs_per_col);
-    printf("rank:=%d\n", dim);
-    printf("S:=\n");
-    printMatrix(s,nrows,nrows,limbs_per_col);
-    printf(";\n");
-    free(s);
-#endif
-
-
-    if (!justrank)
-      dim = kernel(mat, ker, nrows, ncols, limbs_per_row, limbs_per_col);
-    else
-      dim = kernel(mat, NULL, nrows, ncols, limbs_per_row, limbs_per_col);
-
-    printf("dimker:=%d;\n", dim);
-
-#if VERBOSE
-    if ((!justrank) && (dim > 0)) 
-      printf("Bker:=[\n");
-      for (j = 0; j < dim; ++j) {
-	printVector(ker[j], nrows);
-        if (j < dim-1) printf(",");
-        printf("\n");
-      }
-      printf("];\n");
-#endif
-
-  }
-
-  free(mat);
-  free(ker);
-}
-#endif
-
 static void check_soundness(){
 #ifndef NDEBUG
   mp_limb_t x = 2342326;
   int i;
-  ASSERT (LIMBS_PER_ROW*MACHINE_WORD_SIZE >= NCOLS);
+  ASSERT (LIMBS_PER_ROW*ULONG_BITS >= NCOLS);
   /* touch everywhere in the matrix to look for SEGV's */
   for (i = 0; i < NROWS; ++i) 
     x += matrix[LIMBS_PER_ROW*i];
@@ -247,7 +144,7 @@ void simple_addrows(mp_limb_t * p, int d, int s, int stride)
  * Variables description:
  *   ptr_current : table containing for each row the address of
  *                 the limb which we are currently dealing with.
- *                 These are incremented after MACHINE_WORD_SIZE 
+ *                 These are incremented after ULONG_BITS 
  *                 pivot elimination.
  *   col_current : index of the current column
  *   j_current   : the index of the limb containing the current column
@@ -274,7 +171,7 @@ struct gaussian_elimination_data {
 };
 
 #define ADDBIT_SLOW(r, l, i, j)    \
-    r[i * l + j / MACHINE_WORD_SIZE] ^= 1UL << (j % MACHINE_WORD_SIZE)
+    r[i * l + j / ULONG_BITS] ^= 1UL << (j % ULONG_BITS)
 
 void gaussian_elimination(struct gaussian_elimination_data * G)
 {
@@ -293,7 +190,7 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
 
   /* if G->lmat == NULL, then don't bug the user if he just gave 0 for the
    * otherwise unused limbs_per_col value */
-  assert (G->lmat == NULL || limbs_per_col*MACHINE_WORD_SIZE >= NROWS);
+  assert (G->lmat == NULL || limbs_per_col*ULONG_BITS >= NROWS);
 
   G->set_pivot = (int *)malloc(NCOLS*sizeof(int));
   G->set_used  = (int *)malloc(NROWS*sizeof(int));
@@ -306,13 +203,13 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
   mp_limb_t **ptr_current;
   int j_current, col_current;
   mp_limb_t mask1, mask2;
-#if VERBOSE
+#ifdef VERBOSE
   double st0 = seconds();
   double st;
 #endif
 
   // shut up.
-#if VERBOSE
+#ifdef VERBOSE
   fprintf (stderr, "Using MULTI_ROW=%d\n", MULTI_ROW);
 #endif
 
@@ -419,7 +316,7 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
       /* Purge the pivot line */
       addRows(pivot, pivot, mask1, /*j_current,*/ ptr_current);
 #if 0
-#if VERBOSE
+#ifdef VERBOSE
       if (G->lmat) {
           printf("L:=\n");
           printMatrix(G->lmat, NROWS, NROWS, limbs_per_col);
@@ -433,7 +330,7 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
     ++col_current;
     mask1 <<= 1;
     mask2 <<= 1;
-    if (!mask1) { /* we have done MACHINE_WORD_SIZE operations */
+    if (!mask1) { /* we have done ULONG_BITS operations */
       mask1 = 1UL;
       mask2 = (-(1UL)) ^ (1UL);
       j_current++;
@@ -445,7 +342,7 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
     /* some verbosity... */
     if ((col_current % 128) == 0)
       {
-#if VERBOSE
+#ifdef VERBOSE
         st = (seconds () - st0); /* time in seconds */
         fprintf (stderr, "done %d pivots in %1.0fs (est. %1.0fs)\n",
 			col_current,
@@ -471,7 +368,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
         .rank = 0, }};
     gaussian_elimination(G);
 
-#if VERBOSE
+#ifdef VERBOSE
   printf("Pivots:=[");
   for (i = 0; i < NCOLS-1; ++i)
     printf("%d,", G->set_pivot[i]);
@@ -486,7 +383,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
  
   /* if ker == NULL, then don't bug the user if he just gave 0 for the
    * otherwise unused limbs_per_col value */
-  assert (ker == NULL || limbs_per_col*MACHINE_WORD_SIZE >= NROWS);
+  assert (ker == NULL || limbs_per_col*ULONG_BITS >= NROWS);
   /* Explore the set of unused rows, get the G->rank */
   G->rank = NROWS;
   for (i = 0; i < NROWS; ++i)
@@ -503,7 +400,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	
 	for (j = 0; j < limbs_per_col; ++j)
 	  ker[0][j] = 0;
-	ker[0][i / MACHINE_WORD_SIZE] = 1UL << (i % MACHINE_WORD_SIZE);
+	ker[0][i / ULONG_BITS] = 1UL << (i % ULONG_BITS);
 
 	mp_limb_t mask1 = 1UL;
 	j = 0;
@@ -511,13 +408,13 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	  if ((*ptr) & mask1) { /* have to recover the pivoting */
 	    int pivot;
 	    pivot = G->set_pivot[j];
-	    (ker[0])[pivot / MACHINE_WORD_SIZE] |= 
-	      (1UL << (pivot % MACHINE_WORD_SIZE));
+	    (ker[0])[pivot / ULONG_BITS] |= 
+	      (1UL << (pivot % ULONG_BITS));
 	  } /* end if */
 	  /* increment */
 	  ++j;
 	  mask1 <<= 1;
-	  if (!mask1) { /* we have done MACHINE_WORD_SIZE operations */
+	  if (!mask1) { /* we have done ULONG_BITS operations */
 	    mask1 = 1UL;
 	    ptr++;
 	  }
@@ -555,7 +452,7 @@ int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
     int i;
 
 #if 0
-#if VERBOSE
+#ifdef VERBOSE
     printf("M:=\n");
     printMatrix(mat, nrows, ncols, limbs_per_row);
     printf(";\n");
@@ -733,32 +630,3 @@ static inline int getPivot(mp_limb_t **ptr, mp_limb_t mask) {
   return -1;
 }
 
-
-#if	VERBOSE
-#ifndef NO_MAIN
-static void printVector(mp_limb_t *V, int n) {
-  int i;
-  printf("[");
-  for (i = 0; i < n; ++i) {
-    if (V[i / MACHINE_WORD_SIZE] & (1UL << (i % MACHINE_WORD_SIZE)))
-      printf("1");
-    else
-      printf("0");
-    if (i < n - 1) printf(",");
-  }
-  printf("]");
-}
-
-static void printMatrix(mp_limb_t *M, int nrows, int ncols,
-			int limbs_per_row) {
-  int i;
-  printf("[\n");
-  for (i = 0; i < nrows; ++i) {
-    printVector(M + i*limbs_per_row, ncols);
-    if (i < nrows - 1)
-      printf(",\n");
-  }
-  printf("\n]\n");
-}
-#endif
-#endif

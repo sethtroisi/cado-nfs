@@ -86,7 +86,7 @@ next_multiple_of_powerof2(unsigned long n, unsigned long k)
 /* provide slow fallbacks */
 static inline int clzll(unsigned long long x)
 {
-        /* We assume exactly 64 bits in a long long for now */
+#if ULONGLONG_BITS == 64
         static const int t[4] = { 2, 1, 0, 0 };
         int a = 0;
         int res;
@@ -97,6 +97,9 @@ static inline int clzll(unsigned long long x)
         if (x >>  2) { a +=  2; x >>=  2; }
         res = 64 - 2 - a + t[x];
         return res;
+#else
+#error "clzll might be wrong here"
+#endif
 }
 
 static inline int clzl(unsigned long x)
@@ -104,7 +107,7 @@ static inline int clzl(unsigned long x)
         static const int t[4] = { 2, 1, 0, 0 };
         int a = 0;
         int res;
-#if (GMP_LIMB_BITS == 64)
+#if ULONG_BITS == 64
         if (x >> 32) { a += 32; x >>= 32; }
 #endif
         if (x >> 16) { a += 16; x >>= 16; }
@@ -155,7 +158,11 @@ static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
    -x = 1...1(1-a)(1-b)(1-c)10...0, and x & (-x) = 0...000010...0 */
 static inline int ctzll(unsigned long long x)
 {
+#if ULONGLONG_BITS == 64
   return (64 - 1) - clzll(x & - x);
+#else
+#error "ctzll probably wrong here"
+#endif
 }
 static inline int ctzl(unsigned long x)
 {
@@ -171,6 +178,41 @@ static inline int ctz(unsigned int x)
 #define HAVE_ctzl_fallback
 #endif
 #endif  /* HAVE_ctzl */
+
+
+#ifndef HAVE_parityl
+#if GNUC_VERSION_ATLEAST(3,4,0)
+#define parityll(x)        __builtin_parityll(x)
+#define parityl(x)         __builtin_parityl(x)
+#define parity(x)          __builtin_parity(x)
+#define HAVE_ctzl
+#else
+/* slow equivalent */
+static inline int parityll(unsigned long long x)
+{
+#if ULONGLONG_BITS == 64
+    x ^= x >> 32;
+    x ^= x >> 16;
+    x ^= x >> 8;
+    x ^= x >> 4;
+    int t[16] = { 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0 };
+    return t[x&15];
+#else
+#error "fix parityll here"
+#endif
+}
+#define HAVE_parityl
+#define HAVE_parityl_fallback
+#endif
+#endif  /* HAVE_parityl */
+
+#if ULONGLONG_BITS == 64
+static inline int ctz64(uint64_t x) { return ctzll(x); }
+static inline int clz64(uint64_t x) { return clzll(x); }
+static inline int parity64(uint64_t x) { return parityll(x); }
+#else
+#error "need proper equivalents for ctz64 & friends"
+#endif
 
 const char *size_disp(size_t s, char buf[16]);
 

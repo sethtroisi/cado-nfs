@@ -8,7 +8,7 @@ MPFQ:=$$HOME/Mp/mpfq/src
 
 mpfq_tag_list:=u64k1 u64k2 u64k3 u64k4 p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 pz
 
-all: basic binary-fields prime-fields
+all: basic prime-fields
 
 MPFQ_TEMP:=/tmp/mpfq-cado
 
@@ -31,23 +31,7 @@ mpfq-buildtree:
 	if [ -e $(MPFQ_TEMP) ] ; then echo "Purging old $(MPFQ_TEMP)" ; rm -rf $(MPFQ_TEMP) ; fi
 	echo "Creating new $(MPFQ_TEMP)"
 	mkdir $(MPFQ_TEMP)
-	if ! [ -d $(MPFQ_TEMP) ] || ! [ -w $(MPFQ_TEMP) ] || ! [ -x $(MPFQ_TEMP) ] ; then \
-	    echo "$(MPFQ_TEMP) not a writeable directory, binary fields skipped" ; \
-	    exit 0 ; \
-	fi
 	(cd $(MPFQ_TEMP) ; cmake $(MPFQ))
-
-binary-fields: mpfq-buildtree
-	# We need mpfq, a built image with the helper binary, and also
-	# some additional tweaks.
-	if ! [ -x $(MPFQ_TEMP)/gf2n/helper/helper ] ; then \
-	(cd $(MPFQ_TEMP) ; cmake $(MPFQ) ; make helper) ; \
-	fi
-	/bin/cp -f $(MPFQ)/gf2n/mpfq_gf2n_common.h .
-	$(MPFQ)/gf2n/gen_gf2n.pl helper=$(MPFQ_TEMP)/gf2n/helper/helper table=$(MPFQ_TEMP)/gf2x/wizard.table output_path=. n=128 w=64
-	$(MPFQ)/gf2n/gen_gf2n.pl helper=$(MPFQ_TEMP)/gf2n/helper/helper table=$(MPFQ_TEMP)/gf2x/wizard.table output_path=. n=64 w=64
-	patch -p1 -d. < pclmul.patch
-	-rm -f *.orig
 
 prime-fields: mpfq-buildtree
 	# This would almost suffice, except for the mpfq_fixmp.h file.
@@ -72,11 +56,6 @@ clean:	$(patsubst %,clean-mpfq_%,$(mpfq_tag_list))
 	-rm -f mpfq.h
 	-rm -f mpfq_gfp_common.h
 	-rm -f mpfq_fixmp*.h
-	-rm -f mpfq_2_128.[ch]
-	-rm -f mpfq_2_64.[ch]
-	-rm -f mpfq_2_128.h.orig
-	-rm -f mpfq_2_64.h.orig
-	-rm -f mpfq_gf2n_common.h
 	-rm -f mpfq_name_ab.h
 	-rm -f tags
 	-rm -f *~

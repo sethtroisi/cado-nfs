@@ -14,7 +14,7 @@
 #elif defined(GF2X_HAVE_MPIR_H)
 #include <mpir.h>
 #else
-#error "make sure gf2x-config-export.h is included before gf2x-cantor-fft.h"
+#error "make sure gf2x-config-export.h is included before gf2x-cantor-fft.h or mpfq/<anything>.h"
 #endif
 
 

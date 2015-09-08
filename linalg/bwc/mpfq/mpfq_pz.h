@@ -661,20 +661,10 @@ void mpfq_pz_poly_getcoeff(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_dst_elt x, 
 static inline
 int mpfq_pz_poly_deg(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_src_poly w)
 {
-#if GNUC_VERSION_ATLEAST(4,8,0)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-    /* the spurious uninit warning we get below is due to gcc's inability to
-     * decide that the test in mpfq_pz_set() actually does something. See
-     *      https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67418
-     * The exact extent of gcc versions affected is not known. At least 4.8.4
-     * to 5.2.0
-     */
-#endif
     if (w->size == 0)
         return -1;
     int deg = w->size-1;
-    mpfq_pz_elt temp;	/* spurious uninit warning sometimes */
+    mpfq_pz_elt temp;
     mpfq_pz_init(K, &temp);
     mpfq_pz_vec_getcoeff(K, temp, w->c, deg);
     int comp=mpfq_pz_cmp_ui(K, temp, 0);
@@ -687,9 +677,6 @@ int mpfq_pz_poly_deg(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_src_poly w)
     }
     mpfq_pz_clear(K, &temp);
     return deg;
-#if GNUC_VERSION_ATLEAST(4,8,0)
-#pragma GCC diagnostic pop
-#endif
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add, pz */

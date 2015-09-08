@@ -207,14 +207,8 @@ linalg/bwc/mpfq/mpfq_fixmp_longlong.h
 linalg/bwc/mpfq/mpfq_fixmp_i386.h
 linalg/bwc/mpfq/mpfq_fixmp_x86_64.h
 linalg/bwc/mpfq/mpfq.h
-linalg/bwc/mpfq/mpfq_2_128.c
-linalg/bwc/mpfq/mpfq_2_128.h
-linalg/bwc/mpfq/mpfq_2_64.c
-linalg/bwc/mpfq/mpfq_2_64.h
-linalg/bwc/mpfq/mpfq_gf2n_common.h
 linalg/bwc/mpfq/mpfq_gfp_common.h
 linalg/bwc/mpfq/mpfq_name_ab.h
-linalg/bwc/mpfq/pclmul.patch
 linalg/bwc/mpfq/asm-constraints.patch
 linalg/bwc/mpich2.spec
 linalg/bwc/pad.h
@@ -1303,3 +1297,6 @@ tests/linalg/bwc/test_hello.c
 tests/ncpus.sh
 tests/scripts/CMakeLists.txt
 tests/scripts/cadofactor/CMakeLists.txt
+linalg/bwc/matops.h
+tests/linalg/bwc/test_matops.cpp
+tests/linalg/test_gauss.c
