@@ -17,6 +17,17 @@
 #define RENUMBER_SPECIAL_VALUE ((p_r_values_t) -1)
 #define RENUMBER_DEFAULT_SIZE (1 << 22)
 #define RENUMBER_ROOT_ON_RAT_SIDE ((p_r_values_t) -1)
+/* Max number of char necessary to write all the roots in hexa for ONE prime p.
+ * Must be greater than (max_nb_char_per_roots+1)*MAXDEGREE*NB_POLYS_MAX.
+ * max_nb_char_per_roots is 8 (a root is always smaller than a prime and a
+ * prime is smaller than 2^64 (this bound is not tight at all, in practice a
+ * prime is smaller 2^32~2^34 at most)), and the +1 is here to take into account
+ * the '\n' at the end of each entry of the table
+ */
+#define RENUMBER_MAX_SIZE_PER_PRIME (1<<10)
+#if RENUMBER_MAX_SIZE_PER_PRIME < (8+1)*MAXDEGREE*NB_POLYS_MAX
+  #error "RENUMBER_MAX_SIZE_PER_PRIME is too small."
+#endif
 
 struct bad_ideals_s
 {

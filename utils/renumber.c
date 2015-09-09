@@ -325,7 +325,7 @@ compute_vr_from_p_r (renumber_srcptr tab, p_r_values_t p, p_r_values_t r, int si
     if (tab->rat >= 0) /* If there is a rational side */
     {
       if (side == tab->rat)
-        return RENUMBER_ROOT_ON_RAT_SIDE;
+        return (tab->nb_polys - 1) * (p + 1);
       else if (side < tab->rat)
         return side * (p + 1) + r;
       else
@@ -409,8 +409,8 @@ renumber_init_for_writing (renumber_ptr renumber_info, unsigned int nb_polys,
   memcpy (renumber_info->lpb, lpb, size_ul);
 
   /* Set max_lpb */
-  renumber_info->max_lpb = MAX(lpb[0], lpb[1]); /* There are at least 2 sides */
-  for (unsigned int i = 2; i < nb_polys; i++)
+  renumber_info->max_lpb = lpb[0]; /* There are at least 1 sides */
+  for (unsigned int i = 1; i < nb_polys; i++)
     renumber_info->max_lpb = MAX(renumber_info->max_lpb, lpb[i]);
 
   /* Set max_nb_bits */
