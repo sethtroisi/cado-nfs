@@ -753,7 +753,7 @@ main (int argc, char *argv[])
                                           pmin, pmax, nthreads);
 
   /* /!\ Needed by the Python script. /!\ */
-  fprintf (stderr, "# Free relations: %lu\n", nfree);
+  fprintf (stderr, "# Free relations: %" PRIu64 "\n", nfree);
   fprintf (stderr, "Renumbering struct: nprimes=%" PRIu64 "\n",
                    renumber_table->size);
 
