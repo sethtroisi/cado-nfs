@@ -544,7 +544,7 @@ ropt_s1param_init ( ropt_s1param_t s1param )
   s1param->tlen_e_sl = 0;
   s1param->nbest_sl = 0;
 
-  /* set to 1 for using quicker, smaller nbest_sl for tunning
+  /* set to 1 for using quicker, smaller nbest_sl for tuning
      sublattices */
   s1param->nbest_sl_tunemode = 0;
 
