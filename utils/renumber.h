@@ -61,13 +61,10 @@ void renumber_init_for_writing (renumber_ptr, unsigned int, int, int,
 /* Last argument of renumber_write_open can be NULL. It will not print the
    polynomials on the file */
 void renumber_write_open (renumber_ptr, const char *, const char *, cado_poly);
-size_t renumber_write_p_buffer_rat_alg (char *, unsigned long, size_t,
-                                        unsigned long *, size_t);
-size_t renumber_write_p_buffer_2algs (char *, unsigned long, unsigned long *,
-                                      size_t, unsigned long *, size_t);
-size_t renumber_write_p_buffer_generic (char *, unsigned long, renumber_t,
-                                        unsigned long **, int *);
-void renumber_write_p (renumber_ptr, unsigned long, unsigned long *r[], int *);
+void renumber_write_p (renumber_ptr, unsigned long, unsigned long [][MAXDEGREE],
+                       int []);
+size_t renumber_write_buffer_p (char *, renumber_ptr, unsigned long,
+                                unsigned long [][MAXDEGREE], int []);
 void renumber_write_close (renumber_ptr, const char*);
 
 void renumber_init_for_reading (renumber_ptr);
