@@ -56,6 +56,9 @@ MAYBE_UNUSED static int determinant2(mat_int64_srcptr matrix)
 int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1,
     mat_int64_ptr U, int64_vector_srcptr v0_root, int64_vector_srcptr v1_root)
 {
+  int64_vector_set(v0, v0_root);
+  int64_vector_set(v1, v1_root);
+
   //Verify that the vector are in the same plane.
   ASSERT(v0_root->dim == v1_root->dim);
   ASSERT(v0_root->dim >= 2);
@@ -79,9 +82,6 @@ int gauss_reduction(int64_vector_ptr v0, int64_vector_ptr v1,
 #endif // NDEBUG
   ASSERT(v0->dim == v1->dim);
   ASSERT(v0_root->dim >= v1->dim);
-
-  int64_vector_set(v0, v0_root);
-  int64_vector_set(v1, v1_root);
 
   //determinant of U, 0 if U is NULL.
   int det = 0;
@@ -206,7 +206,6 @@ void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
   mat_int64_clear(M);
 }
 
-//TODO: why not merge with gauss reduction?
 int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
     int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I)
 {
@@ -387,6 +386,9 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
   mat_int64_clear(U);
 }
 
+/*
+ * Do SV4 on Mqr. The vectors of Mqr must be written in columns.
+ */
 void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
@@ -419,6 +421,13 @@ void SV4_Mqr(list_int64_vector_ptr SV, mat_int64_srcptr Mqr)
       /*ABS((int64_t)H->h[0] - 1 - v->c[0]));*/
 /*}*/
 
+/*
+ * Sub task, compute how many times we need to add the Franke-Kleinjung vector.
+ *
+ * x: x coordinate of the current starting point.
+ * xfk: x coordinate of the Franke-Kleinjung vector.
+ * H0: bound of the sieving region on x.
+ */
 static int64_t compute_k(int64_t x, int64_t xfk, int64_t H0)
 {
   return (int64_t)ceil((double)(-H0 - x) / (double)xfk);
@@ -548,47 +557,6 @@ unsigned int enum_neg_with_FK(int64_vector_ptr v, int64_vector_srcptr v_old,
   }
 }
 
-//TODO: is it a good idea to retun 0 if fail?
-//TODO: index is not signed, why?
-uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
-    uint64_t number_element)
-{
-  uint64_t index = 0;
-
-  int64_vector_t v_start;
-  int64_vector_init(v_start, v->dim);
-  int64_vector_set_zero(v_start);
-  int64_vector_t v_end;
-  int64_vector_init(v_end, v->dim);
-  int64_vector_set(v_end, v);
-  for (unsigned int i = 0; i < v->dim - 1; i++) {
-    if (v->c[i] >= 0) {
-      v_start->c[i] = -(int64_t)H->h[i];
-    } else {
-      v_start->c[i] = (int64_t)(H->h[i] - 1);
-    }
-    v_end->c[i] = v_start->c[i] + v->c[i];
-  }
-  if (int64_vector_in_sieving_region(v_end, H)) {
-    uint64_t index_end = array_int64_vector_index(v_end, H, number_element);
-    uint64_t index_start =
-      array_int64_vector_index(v_start, H, number_element);
-    if (index_end > index_start) {
-      index = index_end - index_start;
-    } else {
-      index = index_start - index_end;
-    }
-  } else {
-    index = 0;
-  }
-
-  ASSERT(index < number_element);
-  int64_vector_clear(v_start);
-  int64_vector_clear(v_end);
-
-  return index;
-}
-
 void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     int64_vector_srcptr v0, int64_vector_srcptr v1, sieving_bound_srcptr H,
     uint64_t number_element)
@@ -639,10 +607,50 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
   int64_vector_clear(e1);
 }
 
+//TODO: is it a good idea to retun 0 if fail?
+uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
+    uint64_t number_element)
+{
+  uint64_t index = 0;
+
+  int64_vector_t v_start;
+  int64_vector_init(v_start, v->dim);
+  int64_vector_set_zero(v_start);
+  int64_vector_t v_end;
+  int64_vector_init(v_end, v->dim);
+  int64_vector_set(v_end, v);
+  for (unsigned int i = 0; i < v->dim - 1; i++) {
+    if (v->c[i] >= 0) {
+      v_start->c[i] = -(int64_t)H->h[i];
+    } else {
+      v_start->c[i] = (int64_t)(H->h[i] - 1);
+    }
+    v_end->c[i] = v_start->c[i] + v->c[i];
+  }
+  if (int64_vector_in_sieving_region(v_end, H)) {
+    uint64_t index_end = array_int64_vector_index(v_end, H, number_element);
+    uint64_t index_start =
+      array_int64_vector_index(v_start, H, number_element);
+    if (index_end > index_start) {
+      index = index_end - index_start;
+    } else {
+      index = index_start - index_end;
+    }
+  } else {
+    index = 0;
+  }
+
+  ASSERT(index < number_element);
+  int64_vector_clear(v_start);
+  int64_vector_clear(v_end);
+
+  return index;
+}
+
 /*
  * Return the position of the vector with a x coordinate minimal, according to
- * the classification defined by the stamp array and the value of the
- * classification val_stamp.
+ *  the classification defined by the stamp array and the value of the
+ *  classification val_stamp.
  *
  * SV: list of vector.
  * H: sieving bound.
@@ -650,8 +658,8 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
  *  vectors.
  * val_stamp: value we want for the stamp of the vector.
  */
-unsigned int find_min_y(list_int64_vector_srcptr SV, unsigned char * stamp,
-    unsigned char val_stamp)
+static unsigned int find_min_y(list_int64_vector_srcptr SV,
+    unsigned char * stamp, unsigned char val_stamp)
 {
   int64_t y = -1; 
   unsigned int pos = 0;
@@ -750,7 +758,11 @@ void double_vector_gram_schmidt(list_double_vector_ptr list_new,
 }
 
 #ifdef SPACE_SIEVE_REDUCE_QLATTICE
-
+/*
+ * Perform reduce q lattice if a Franke-Kleinjung vector is known. list contains
+ *  two times the same vector. r is the r of the ideal we sieve, and I is equal
+ *  to 2*H0.
+ */
 static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
     int64_t I)
 {
@@ -839,6 +851,10 @@ static int reduce_qlattice_output(list_int64_vector_ptr list, int64_t r,
 }
 #endif // SPACE_SIEVE_REDUCE_QLATTICE
 
+/*
+ * Verify if a vector can be interesting for the space sieve, ie the t-1 first
+ *  coordinate must be in [-2*Hi, 2*Hi].
+ */
 static int space_sieve_good_vector(int64_vector_srcptr v,
     sieving_bound_srcptr H)
 {
@@ -856,6 +872,10 @@ static int space_sieve_good_vector(int64_vector_srcptr v,
   return 1; 
 }
 
+/*
+ * Verify if a vector is in a list in which vector has the last coordinate equal
+ *  to 0.
+ */
 static int int64_vector_in_list_zero(int64_vector_srcptr v_tmp,
     list_int64_vector_index_srcptr list_zero)
 {
@@ -870,6 +890,10 @@ static int int64_vector_in_list_zero(int64_vector_srcptr v_tmp,
   return 0;
 }
 
+/*
+ * Store v in the good list (list_zero has vector with 0 for last coordinate).
+ * Return 1 if a vector in list has a z coordinate equal to 1.
+ */
 static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
     list_int64_vector_index_ptr list_zero, int64_vector_srcptr v,
     sieving_bound_srcptr H, int64_t number_element)
@@ -881,6 +905,7 @@ static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
   int64_vector_reduce(v_tmp, v_tmp);
   if (space_sieve_good_vector(v_tmp, H)) {
     if (v_tmp->c[2] == 0) {
+      //v_tmp != 0.
       if (v_tmp->c[1] != 0 || v_tmp->c[0] != 0) {
         if (v_tmp->c[1] < 0) {
           v_tmp->c[0] = -v_tmp->c[0];
@@ -903,6 +928,10 @@ static unsigned int good_vector_in_list(list_int64_vector_index_ptr list,
 }
 
 //TODO: change that.
+/*
+ * Do some linear combination of the vector of MSLLL to initialize space sieve.
+ * Return 1 if a vector with a z coordinate equal to 1 is in list.
+ */
 static unsigned int space_sieve_linear_combination(
     list_int64_vector_index_ptr list, list_int64_vector_index_ptr list_zero,
     mat_int64_srcptr MSLLL, sieving_bound_srcptr H, uint64_t number_element)
@@ -981,6 +1010,10 @@ static unsigned int space_sieve_linear_combination(
 }
 
 #ifdef SPACE_SIEVE_ENTROPY
+/*
+ * When a new vector is added to list, do some linear combination of the last
+ *  vector and the previous vectors to find news vectors.
+ */
 static void space_sieve_generate_new_vectors(
     list_int64_vector_index_ptr list, list_int64_vector_index_ptr list_zero,
     sieving_bound_srcptr H, uint64_t number_element)
@@ -1009,8 +1042,8 @@ static void space_sieve_generate_new_vectors(
 #endif // SPACE_SIEVE_ENTROPY
 
 /*
- * TODO: what?
- * Compute g = a * u + b * v
+ * Return 1 if a vector is in the sieving region except the last coordinate, 0
+ *  otherwise.
  */
 int int64_vector_in_sieving_region_dim(int64_vector_srcptr v,
     sieving_bound_srcptr H) {

@@ -145,6 +145,12 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
     uint64_t number_element);
 
 /*
+ * Compute the contribution of adding a vector v in array_ptr.
+ */
+uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
+    uint64_t number_element);
+
+/*
  * Go from the plane z=d to the plane z=d+1 and keep the x coordinate of vs in
  *  [-H0, H0[.
  *
@@ -161,9 +167,9 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
 /*
  * Compute the Gram-Schmidt orthogonalisation of the vector in list_old to
  *  produce list_new and the m matrix, the matrix with the result of the
- *  orthogonal projection (see page 164 of "Algorithms for the Shortest and Closest
- *  Lattice Vector Problems" by Guillaume Hanrot, Xavier Pujol, and Damien Stehlé,
- *  IWCC 2011).
+ *  orthogonal projection (see page 164 of "Algorithms for the Shortest and
+ *  Closest Lattice Vector Problems" by Guillaume Hanrot, Xavier Pujol, and
+ *  Damien Stehlé, IWCC 2011).
  *
  * list_new: the Gram-Schmidt basis.
  * m: the matrix with the coefficient \mu_{i, j}.
@@ -172,23 +178,44 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
 void double_vector_gram_schmidt(list_double_vector_ptr list_new,
     mat_double_ptr m, list_double_vector_srcptr list_old);
 
+/*
+ * TODO: is s_out really needed? Can be s?
+ * When the space sieve is not able to go from a plane to the next plane, call
+ *  plane_sieve_1_incomplete to find the next reached plane.
+ *
+ * s_out: new starting point vector.
+ * s: old starting point vector.
+ * Mqr: the Mqr matrix.
+ * H: sieving bound.
+ * list_FK: the 2 Franke-Kleinjung vectors.
+ * list_SV: the list of short vectors with a z coordinate equal to 1.
+ */
 void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
     MAYBE_UNUSED mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     list_int64_vector_srcptr list_FK, list_int64_vector_srcptr list_SV);
 
-uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
-    uint64_t number_element);
-
+/*
+ * Beginning of the space sieve. ie, store in list_vec the 3 vectors given by
+ *  skew LLL on Mqr and return 1 if a vector with a z coordinate equal to 1 is
+ *  in list.
+ */
 unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
     mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element);
-
+/*
+ * During the plane sieve, compute reduce q lattice and SV4 and store vectors in
+ *  the appropriate lists.
+ */
 int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
     list_int64_vector_ptr list_FK, list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, MAYBE_UNUSED ideal_1_srcptr r,
     sieving_bound_srcptr H, mat_int64_srcptr Mqr,
     unsigned int vector_1, uint64_t number_element);
 
+/*
+ * Store in s_tmp the starting point with the smallest z coordinate that are in
+ *  the sieving region.
+ */
 unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
     unsigned int * index_vec, unsigned int * s_change,
     list_int64_vector_srcptr list_s, list_int64_vector_index_srcptr list_vec,
