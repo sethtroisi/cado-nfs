@@ -1,11 +1,7 @@
 
 # SSSE-3
 message(STATUS "Testing whether ssse-3 code can be used")
-# We used to base this test on sse-3, but apparently there are some
-# compiler / binutils versions (gcc-4.7.2 on x86_64-unknown-openbsd5.3,
-# binutils 2.15) for which ssse3 and sse4.1 fail with no apparent
-# explanation.
-if (HAVE_SSE2)
+if (HAVE_SSE3)
     try_run(ssse3_runs ssse3_compiles
         ${PROJECT_BINARY_DIR}/config
         ${PROJECT_SOURCE_DIR}/config/ssse3.c)
@@ -37,6 +33,6 @@ if (HAVE_SSE2)
             set (HAVE_SSSE3 0)
         endif(ssse3_compiles)
     endif(ssse3_compiles)
-else (HAVE_SSE2)
+else (HAVE_SSE3)
     message(STATUS "Testing whether ssse-3 code can be used -- skipped")
-endif (HAVE_SSE2)
+endif (HAVE_SSE3)

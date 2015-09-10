@@ -85,19 +85,103 @@ AC_DEFUN([VERIFY_WORDSIZE],[
 # includes a subset of sse-2, but do not support the full sse-2 insn set.
 AC_DEFUN([SSE2_EXAMPLE],[AC_LANG_SOURCE([
 #include <emmintrin.h>
+#include <stdint.h>
+#include <emmintrin.h>
+
 int main(int argc, char * argv[[]]) {
-     __m128i foo = _mm_setr_epi32(argc, argc + 1, argc + 2, argc + 3);
-     __m128i bar = _mm_setr_epi32(argc + 3, argc + 2, argc + 1, argc);
+    __m128i foo = _mm_setr_epi32(argc, argc + 1, argc + 2, argc + 3);
+    __m128i bar = _mm_setr_epi32(argc + 3, argc + 2, argc + 1, argc);
+    __m128i x = _mm_setr_epi32(42, 0, 17, 0);
+    __m128d g = _mm_set_pd(42.0, 17.0);
+    x = _mm_srl_epi64(x, x);
     foo = _mm_mullo_epi16(foo, bar);
     foo = _mm_slli_epi64(foo, 1);
-    foo = _mm_xor_si128(bar, _mm_unpacklo_epi32 (foo, bar));
+    foo = _mm_xor_si128(bar, _mm_unpacklo_epi32(foo, bar));
     foo = _mm_srli_epi64(foo, 1);
     foo = _mm_mullo_epi16(foo, bar);
     foo = _mm_shuffle_epi32(foo, 78);
-    foo = _mm_xor_si128(bar, _mm_unpacklo_epi32 (foo, bar));
+    foo = _mm_xor_si128(bar, _mm_unpacklo_epi32(foo, bar));
     foo = _mm_srli_si128(foo, 1);
+    foo = _mm_xor_si128(foo, x);
 
     return _mm_extract_epi16(foo, 0) & (argc - 1);
+}
+])])
+
+AC_DEFUN([SSE3_EXAMPLE],[AC_LANG_SOURCE([
+/* This source file is our test case for sse-3 support. */
+#include <stdint.h>
+#include <string.h>
+#include <pmmintrin.h>
+
+int main()
+{
+    __m128d x = _mm_setr_pd(12.34, 34.12);
+    __m128d y = _mm_setr_pd(78.56, 56.78);
+    double a[[2]], b[[2]] = { 78.56 + 56.78, 12.34 + 34.12 };
+
+    y = _mm_hadd_pd(y, x);
+    memcpy(a, &y, 16);
+    return (a[[0]] != b[[0]] || a[[1]] != b[[1]]);
+}
+])])
+
+AC_DEFUN([SSSE3_EXAMPLE],[AC_LANG_SOURCE([
+/* This source file is our test case for ssse3 support. */
+#include <stdint.h>
+#include <string.h>
+#include <tmmintrin.h>
+
+int main()
+{
+    __m128i x = _mm_setr_epi32(0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C);
+    __m128i y = _mm_setr_epi32(0x13121110, 0x17161514, 0x1B1A1918, 0x1F1E1D1C);
+    uint64_t a[[2]], b[[2]] = { 0x0C0B0A0908070605, 0x14131211100F0E0D };
+    y = _mm_alignr_epi8(y, x, 0x5);
+    memcpy (a, &y, 16);
+    return(a[[0]] != b[[0]] || a[[1]] != b[[1]]);
+}
+])])
+
+AC_DEFUN([SSE41_EXAMPLE],[AC_LANG_SOURCE([
+#include <stdint.h>
+#include <smmintrin.h>
+
+int main() {
+    __m128i x = _mm_setr_epi32(42, 0, 17, 0);
+    __m128i y = _mm_setr_epi32(41, 0, 17, 0);
+    x = _mm_cmpeq_epi64(x, y);
+    /* the following test is for emulated 32-bit on physical 64-bit */
+    if (sizeof(unsigned long) != 8)
+      abort ();
+    return 0;
+}
+])])
+AC_DEFUN([PCLMUL_EXAMPLE],[AC_LANG_SOURCE([
+#include <stdint.h>
+#include <wmmintrin.h>
+#include <assert.h>
+
+int main() {
+    assert(sizeof(unsigned long) == 8); /* assume 64-bit */
+#if defined(__GNUC__) && __GNUC__ == 4 &&__GNUC_MINOR__ == 1
+#define _gf2x_mm_cvtsi64_m64(u) _mm_cvtsi64x_m64((u))
+#else
+#define _gf2x_mm_cvtsi64_m64(u) _mm_cvtsi64_m64((u))
+#endif
+    /* _m128i from 2 int64_t's */
+#define _gf2x_mm_setr_epi64(lo, hi)                                     \
+    _mm_setr_epi64(                                                     \
+            _gf2x_mm_cvtsi64_m64((int64_t) (lo)),                       \
+            _gf2x_mm_cvtsi64_m64((int64_t) (hi))                        \
+            )
+    /* _m128i from 1 int64_t's */
+#define _gf2x_mm_set1_epi64(u) _mm_set1_epi64( _gf2x_mm_cvtsi64_m64((int64_t) (u)))
+    __m128i a = _gf2x_mm_set1_epi64(17);
+    __m128i b = _gf2x_mm_set1_epi64(42);
+    union { __m128i s; unsigned long x[[2]]; } proxy;
+    proxy.s = _mm_clmulepi64_si128(a, b, 0);
+    return proxy.x[[0]] - 650;
 }
 ])])
 
@@ -120,6 +204,14 @@ AC_DEFUN([CHECK_SSE2_SUPPORT],[
     ],[
      gf2x_cv_cc_supports_sse2=no
     ])
+   ],[
+   echo $ECHO_N "cross-compiling, "
+   if test "x${enable_sse2}" = xyes ; then
+    echo $ECHO_N "explicitly enabled, "
+    gf2x_cv_cc_supports_sse2=yes
+   else
+    gf2x_cv_cc_supports_sse2=no
+   fi
    ])
   fi
  ])
@@ -154,91 +246,256 @@ AC_DEFUN([CHECK_SSE2_SUPPORT],[
  fi
 ])# CHECK_SSE2_SUPPORT
 
-
-
-AC_DEFUN([PCLMUL_EXAMPLE],[AC_LANG_SOURCE([
-#include <wmmintrin.h>
-#include <assert.h>
-int main() {
-assert(sizeof(unsigned long) == 8); /* assume 64-bit */
-#if defined(__GNUC__) && __GNUC__ == 4 &&__GNUC_MINOR__ == 1
-#define _gf2x_mm_cvtsi64_m64(u) _mm_cvtsi64x_m64((u))
-#else
-#define _gf2x_mm_cvtsi64_m64(u) _mm_cvtsi64_m64((u))
-#endif
-/* _m128i from 2 int64_t's */
-#define _gf2x_mm_setr_epi64(lo, hi)                      		\
-    _mm_setr_epi64(                                      		\
-            _gf2x_mm_cvtsi64_m64((int64_t) (lo)),       		\
-            _gf2x_mm_cvtsi64_m64((int64_t) (hi))        		\
-        )
-/* _m128i from 1 int64_t's */
-#define _gf2x_mm_set1_epi64(u) _mm_set1_epi64( _gf2x_mm_cvtsi64_m64((int64_t) (u)))
-__m128i a = _gf2x_mm_set1_epi64(17);
-__m128i b = _gf2x_mm_set1_epi64(42);
-union { __m128i s; unsigned long x[[2]]; } proxy;
-proxy.s = _mm_clmulepi64_si128(a, b, 0);
-return proxy.x[[0]] - 650;
-}
-])])
-
-# Check whether we need some flag such as -mpclmul in order to enable pclmulqdq
-# support
-AC_DEFUN([CHECK_PCLMUL_SUPPORT],[
- ac_save_CFLAGS="$CFLAGS"
- AC_CACHE_CHECK([whether $CC can compile pclmulqdq and if it is supported by the hardware], [gf2x_cv_cc_supports_pclmul],[
-  gf2x_cv_cc_supports_pclmul=no
-  if test "x${enable_pclmul}" = xno ; then
-   echo $ECHO_N " disabled, "
+AC_DEFUN([CHECK_SSE3_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ AC_CACHE_CHECK([whether $CC can compile and run sse-3 code], [gf2x_cv_cc_supports_sse3],[
+  gf2x_cv_cc_supports_sse3=no
+  if test "x${gf2x_cv_cc_supports_sse2}" = xno ; then
+   echo $ECHO_N "skipped, "
+  elif test "x${enable_sse3}" = xno ; then
+   echo $ECHO_N "explicitly disabled, "
   else
-   AC_RUN_IFELSE([PCLMUL_EXAMPLE()],[
-    gf2x_cv_cc_supports_pclmul=yes
+   CFLAGS="$ac_save_CFLAGS -msse3"
+   AC_RUN_IFELSE([SSE3_EXAMPLE()],[
+    gf2x_cv_cc_supports_sse3=yes
    ],[
-    CFLAGS="$ac_save_CFLAGS -mpclmul"
-    AC_RUN_IFELSE([PCLMUL_EXAMPLE()],[
-     gf2x_cv_cc_supports_pclmul="requires -mpclmul"
+    CFLAGS="$ac_save_CFLAGS"
+    AC_RUN_IFELSE([SSE3_EXAMPLE()],[
+     gf2x_cv_cc_supports_sse3="yes, but without -msse3"
     ],[
-     gf2x_cv_cc_supports_pclmul=no
+     gf2x_cv_cc_supports_sse3=no
     ])
    ],[
-   echo $ECHO_N " cross-compiling, "
-   gf2x_cv_cc_supports_pclmul=no
+   echo $ECHO_N "cross-compiling, "
+   if test "x${enable_sse3}" = xyes ; then
+    echo $ECHO_N "explicitly enabled, "
+    gf2x_cv_cc_supports_sse3=yes
+   else
+    gf2x_cv_cc_supports_sse3=no
+   fi
    ])
   fi
  ])
  ac_save_CPPFLAGS=$CPPFLAGS
- if test "$gf2x_cv_cc_supports_pclmul" = "requires -mpclmul" ;then
+ if test "$gf2x_cv_cc_supports_sse3" = "yes" ;then
   # Tweaking CFLAGS is often not enough.
-  AC_CACHE_CHECK([whether -mpclmul is also needed by the preprocessor],
-   [gf2x_cv_cpp_requires_mpclmul_flag],[
-   AC_PREPROC_IFELSE([PCLMUL_EXAMPLE()],[
-    gf2x_cv_cpp_requires_mpclmul_flag=no
+  AC_CACHE_CHECK([whether -msse3 is also understood by the preprocessor],
+   [gf2x_cv_cpp_understands_msse3_flag],[
+   CPPFLAGS="$ac_save_CPPFLAGS -msse3"
+   AC_PREPROC_IFELSE([SSE3_EXAMPLE()],[
+    gf2x_cv_cpp_understands_msse3_flag=yes
    ],[
-    CPPFLAGS="$ac_save_CPPFLAGS -mpclmul"
-    AC_PREPROC_IFELSE([PCLMUL_EXAMPLE()],[
-    gf2x_cv_cpp_requires_mpclmul_flag=yes
+    CPPFLAGS="$ac_save_CPPFLAGS"
+    AC_PREPROC_IFELSE([SSE3_EXAMPLE()],[
+    gf2x_cv_cpp_understands_msse3_flag=no
     ],[
-     AC_MSG_ERROR([Sorry, the preprocessor can't parse pclmul !])
+     AC_MSG_ERROR([Sorry, the preprocessor can't parse sse-3!])
     ])
    ])
   ])
  fi
- CFLAGS="$ac_save_CFLAGS"
- CPPFLAGS="$ac_save_CPPFLAGS"
- if test "$gf2x_cv_cc_supports_pclmul" = "requires -mpclmul" ;then
+ CFLAGS=$ac_save_CFLAGS
+ CPPFLAGS=$ac_save_CPPFLAGS
+ if test "$gf2x_cv_cc_supports_sse3" = "yes" ;then
+  CFLAGS="$CFLAGS -msse3"
+ fi
+ if test "$gf2x_cv_cpp_understands_msse3_flag" = "yes" ; then
+  CPPFLAGS="$CPPFLAGS -msse3"
+ fi
+ if test "$gf2x_cv_cc_supports_sse3" != "no" ;then
+  AC_DEFINE([GF2X_HAVE_SSE3_SUPPORT],[1],[Define if sse-3 code as present in the source tree is supported by the compiler])
+ fi
+])# CHECK_SSE3_SUPPORT
+
+AC_DEFUN([CHECK_SSSE3_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ AC_CACHE_CHECK([whether $CC can compile and run ssse3 code], [gf2x_cv_cc_supports_ssse3],[
+  gf2x_cv_cc_supports_ssse3=no
+  if test "x${gf2x_cv_cc_supports_sse3}" = xno ; then
+   echo $ECHO_N "skipped, "
+  elif test "x${enable_ssse3}" = xno ; then
+   echo $ECHO_N "explicitly disabled, "
+  else
+   CFLAGS="$ac_save_CFLAGS -mssse3"
+   AC_RUN_IFELSE([SSSE3_EXAMPLE()],[
+    gf2x_cv_cc_supports_ssse3=yes
+   ],[
+    CFLAGS="$ac_save_CFLAGS"
+    AC_RUN_IFELSE([SSSE3_EXAMPLE()],[
+     gf2x_cv_cc_supports_ssse3="yes, but without -mssse3"
+    ],[
+     gf2x_cv_cc_supports_ssse3=no
+    ])
+   ],[
+   echo $ECHO_N "cross-compiling, "
+   if test "x${enable_ssse3}" = xyes ; then
+    echo $ECHO_N "explicitly enabled, "
+    gf2x_cv_cc_supports_ssse3=yes
+   else
+    gf2x_cv_cc_supports_ssse3=no
+   fi
+   ])
+  fi
+ ])
+ ac_save_CPPFLAGS=$CPPFLAGS
+ if test "$gf2x_cv_cc_supports_ssse3" = "yes" ;then
+  # Tweaking CFLAGS is often not enough.
+  AC_CACHE_CHECK([whether -mssse3 is also understood by the preprocessor],
+   [gf2x_cv_cpp_understands_mssse3_flag],[
+   CPPFLAGS="$ac_save_CPPFLAGS -mssse3"
+   AC_PREPROC_IFELSE([SSSE3_EXAMPLE()],[
+    gf2x_cv_cpp_understands_mssse3_flag=yes
+   ],[
+    CPPFLAGS="$ac_save_CPPFLAGS"
+    AC_PREPROC_IFELSE([SSSE3_EXAMPLE()],[
+    gf2x_cv_cpp_understands_mssse3_flag=no
+    ],[
+     AC_MSG_ERROR([Sorry, the preprocessor can't parse ssse3!])
+    ])
+   ])
+  ])
+ fi
+ CFLAGS=$ac_save_CFLAGS
+ CPPFLAGS=$ac_save_CPPFLAGS
+ if test "$gf2x_cv_cc_supports_ssse3" = "yes" ;then
+  CFLAGS="$CFLAGS -mssse3"
+ fi
+ if test "$gf2x_cv_cpp_understands_mssse3_flag" = "yes" ; then
+  CPPFLAGS="$CPPFLAGS -mssse3"
+ fi
+ if test "$gf2x_cv_cc_supports_ssse3" != "no" ;then
+  AC_DEFINE([GF2X_HAVE_SSSE3_SUPPORT],[1],[Define if ssse3 code as present in the source tree is supported by the compiler])
+ fi
+])# CHECK_SSSE3_SUPPORT
+
+
+AC_DEFUN([CHECK_SSE41_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ AC_CACHE_CHECK([whether $CC can compile and run sse-4.1 code], [gf2x_cv_cc_supports_sse41],[
+  gf2x_cv_cc_supports_sse41=no
+  if test "x${gf2x_cv_cc_supports_ssse3}" = xno ; then
+   echo $ECHO_N "skipped, "
+  elif test "x${enable_sse41}" = xno ; then
+   echo $ECHO_N "explicitly disabled, "
+  else
+   CFLAGS="$ac_save_CFLAGS -msse4.1"
+   AC_RUN_IFELSE([SSE41_EXAMPLE()],[
+    gf2x_cv_cc_supports_sse41=yes
+   ],[
+    CFLAGS="$ac_save_CFLAGS"
+    AC_RUN_IFELSE([SSE41_EXAMPLE()],[
+     gf2x_cv_cc_supports_sse41="yes, but without -msse4.1"
+    ],[
+     gf2x_cv_cc_supports_sse41=no
+    ])
+   ],[
+   echo $ECHO_N "cross-compiling, "
+   if test "x${enable_sse41}" = xyes ; then
+    echo $ECHO_N "explicitly enabled, "
+    gf2x_cv_cc_supports_sse41=yes
+   else
+    gf2x_cv_cc_supports_sse41=no
+   fi
+   ])
+  fi
+ ])
+ ac_save_CPPFLAGS=$CPPFLAGS
+ if test "$gf2x_cv_cc_supports_sse41" = "yes" ;then
+  # Tweaking CFLAGS is often not enough.
+  AC_CACHE_CHECK([whether -msse4.1 is also understood by the preprocessor],
+   [gf2x_cv_cpp_understands_msse41_flag],[
+   CPPFLAGS="$ac_save_CPPFLAGS -msse4.1"
+   AC_PREPROC_IFELSE([SSE41_EXAMPLE()],[
+    gf2x_cv_cpp_understands_msse41_flag=yes
+   ],[
+    CPPFLAGS="$ac_save_CPPFLAGS"
+    AC_PREPROC_IFELSE([SSE41_EXAMPLE()],[
+    gf2x_cv_cpp_understands_msse41_flag=no
+    ],[
+     AC_MSG_ERROR([Sorry, the preprocessor can't parse sse-4.1!])
+    ])
+   ])
+  ])
+ fi
+ CFLAGS=$ac_save_CFLAGS
+ CPPFLAGS=$ac_save_CPPFLAGS
+ if test "$gf2x_cv_cc_supports_sse41" = "yes" ;then
+  CFLAGS="$CFLAGS -msse4.1"
+ fi
+ if test "$gf2x_cv_cpp_understands_msse41_flag" = "yes" ; then
+  CPPFLAGS="$CPPFLAGS -msse4.1"
+ fi
+ if test "$gf2x_cv_cc_supports_sse41" != "no" ;then
+  AC_DEFINE([GF2X_HAVE_SSE41_SUPPORT],[1],[Define if sse-4.1 code as present in the source tree is supported by the compiler])
+ fi
+])# CHECK_SSE41_SUPPORT
+
+
+AC_DEFUN([CHECK_PCLMUL_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ AC_CACHE_CHECK([whether $CC can compile pclmulqdq and if it is supported by the hardware], [gf2x_cv_cc_supports_pclmul],[
+  gf2x_cv_cc_supports_pclmul=no
+  if test "x${gf2x_cv_cc_supports_sse41}" = xno ; then
+   echo $ECHO_N "skipped, "
+  elif test "x${enable_pclmul}" = xno ; then
+   echo $ECHO_N "explicitly disabled, "
+  else
+   CFLAGS="$ac_save_CFLAGS -mpclmul"
+   AC_RUN_IFELSE([PCLMUL_EXAMPLE()],[
+    gf2x_cv_cc_supports_pclmul=yes
+   ],[
+    CFLAGS="$ac_save_CFLAGS"
+    AC_RUN_IFELSE([PCLMUL_EXAMPLE()],[
+     gf2x_cv_cc_supports_pclmul="yes, but without -mpclmul"
+    ],[
+     gf2x_cv_cc_supports_pclmul=no
+    ])
+   ],[
+   echo $ECHO_N "cross-compiling, "
+   if test "x${enable_pclmul}" = xyes ; then
+    echo $ECHO_N "explicitly enabled, "
+    gf2x_cv_cc_supports_pclmul=yes
+   else
+    gf2x_cv_cc_supports_pclmul=no
+   fi
+   ])
+  fi
+ ])
+ ac_save_CPPFLAGS=$CPPFLAGS
+ if test "$gf2x_cv_cc_supports_pclmul" = "yes" ;then
+  # Tweaking CFLAGS is often not enough.
+  AC_CACHE_CHECK([whether -mpclmul is also understood by the preprocessor],
+   [gf2x_cv_cpp_understands_mpclmul_flag],[
+   CPPFLAGS="$ac_save_CPPFLAGS -mpclmul"
+   AC_PREPROC_IFELSE([PCLMUL_EXAMPLE()],[
+    gf2x_cv_cpp_understands_mpclmul_flag=yes
+   ],[
+    CPPFLAGS="$ac_save_CPPFLAGS"
+    AC_PREPROC_IFELSE([PCLMUL_EXAMPLE()],[
+    gf2x_cv_cpp_understands_mpclmul_flag=no
+    ],[
+     AC_MSG_ERROR([Sorry, the preprocessor can't parse pclmul!])
+    ])
+   ])
+  ])
+ fi
+ CFLAGS=$ac_save_CFLAGS
+ CPPFLAGS=$ac_save_CPPFLAGS
+ if test "$gf2x_cv_cc_supports_pclmul" = "yes" ;then
   CFLAGS="$CFLAGS -mpclmul"
  fi
- if test "$gf2x_cv_cpp_requires_mpclmul_flag" = "yes" ; then
+ if test "$gf2x_cv_cpp_understands_mpclmul_flag" = "yes" ; then
   CPPFLAGS="$CPPFLAGS -mpclmul"
  fi
  if test "$gf2x_cv_cc_supports_pclmul" != "no" ;then
-  AC_DEFINE([GF2X_HAVE_PCLMUL_SUPPORT],[1],[Define if pclmul as present in the source tree is supported by the compiler and hardware])
+  AC_DEFINE([GF2X_HAVE_PCLMUL_SUPPORT],[1],[Define if pclmul code as present in the source tree is supported by the compiler])
  fi
 ])# CHECK_PCLMUL_SUPPORT
 
 
-
-
+# It is necessary to make all tests. We do encounter in the wild binutils
+# (openbsd binutils 2.15, namely) which are buggy with ssse3, and that
+# isn't extremely quickly spotted by the later checks...
 AC_DEFUN([AC_COMPILE_WARNINGS], [
 AC_MSG_CHECKING([warning verbosity option])
   AC_REQUIRE([AC_PROG_CC])

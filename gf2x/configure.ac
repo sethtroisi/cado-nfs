@@ -94,7 +94,13 @@ AC_SUBST([GF2X_WORDSIZE], [$gf2x_wordsize])
 if test "x${enable_hardware_specific_code}" = xno ; then
  echo "Not using hardware-specific code due to --disable-hardware-specific-code flag"
 else
+ # It is necessary to make all tests. We do encounter in the wild
+ # binutils (openbsd binutils 2.15, namely) which are buggy with ssse3,
+ # and that isn't extremely quickly spotted by the later checks...
  CHECK_SSE2_SUPPORT()
+ CHECK_SSE3_SUPPORT()
+ CHECK_SSSE3_SUPPORT()
+ CHECK_SSE41_SUPPORT()
  CHECK_PCLMUL_SUPPORT()
 fi
 
