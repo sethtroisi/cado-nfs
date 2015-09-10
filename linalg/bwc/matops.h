@@ -63,7 +63,7 @@ extern void mul_N64_6464_vec(uint64_t *C,
 extern void mul_N64_6464_transB(uint64_t *C,
                    const uint64_t *A,
                    const uint64_t *B, size_t m);
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
 extern void mul_N64_6464_sse(uint64_t *C,
 		 const uint64_t *A,
 		 const uint64_t *B, size_t m);
@@ -84,7 +84,7 @@ extern void mul_o64_6464_C_lsb(uint64_t * r, uint64_t a, mat64_srcptr w);
 extern void mul_o64_6464_C_msb(uint64_t *r, uint64_t a, mat64_srcptr w);
 extern void mul_o64_T6464_C_parity(uint64_t * w, uint64_t a, mat64_srcptr b);
 extern void mul_o64_T6464_C_parity3(uint64_t * w, uint64_t a, mat64_srcptr b);
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
 extern void mul_6464_6464_sse(mat64_ptr C, mat64_srcptr A, mat64_srcptr B);
 #endif
 extern void mul_6464_6464_v2(mat64_ptr C, mat64_srcptr A, mat64_srcptr B);

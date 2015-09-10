@@ -265,7 +265,7 @@ void level1_mul_tests_N_list(l1_data_ptr D)
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
     TIME1N(2, mul_N64_6464_transB, (r,a,w,n));
 
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
     mul_N64_6464_sse(r, a, w, n);
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
     TIME1N(2, mul_N64_6464_sse, (r,a,w,n));
@@ -364,7 +364,7 @@ void level1_mul_tests_64_list(l1_data_ptr D)
     SCOPE_L1_DATA_MEMBERS(D);
     assert(n == 64);
 
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
     mul_6464_6464_sse(r, a, w);
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
     TIME1(1, mul_6464_6464_sse, (r, a, w));
@@ -516,6 +516,7 @@ int main(int argc, char * argv[])
 #ifdef VALGRIND
     printf("## VALGRIND\n");
 #endif /* VALGRIND */
+    printf("## ULONG_BITS=%d\n", ULONG_BITS);
 #include "cado.h"       /* HAVE_* macros ! */
 
     if (1) {
@@ -532,7 +533,7 @@ int main(int argc, char * argv[])
         TIME1(1, addmul_To64_o64_lsb, (r, a, w));
         TIME1(1, addmul_To64_o64_msb, (r, a, w));
         TIME1(1, addmul_To64_o64_lsb_packof2, (r, a, w));
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
         TIME1(1, addmul_To64_o64_lsb_sse_v1, (r, a, w));
 #endif
         TIME1(1, addmul_To64_o64, (r, a, w));

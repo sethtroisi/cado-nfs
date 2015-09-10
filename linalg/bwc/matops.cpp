@@ -29,7 +29,7 @@
 #include "matops.h"
 #include "utils/misc.h"
 
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
 #include <emmintrin.h>
 /* {{{ helper macros for sse-2. Copied from gf2x */
 /* {{{ _mm_cvtsi64_m64 is not consistent across compiler versions... */
@@ -163,7 +163,7 @@ static inline uint64_t nibrev(uint64_t a)
 
 
 /* level 1 */
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
 void mul_6464_6464_sse(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
 {
     int i;
@@ -239,7 +239,7 @@ void addmul_To64_o64_lsb_packof2(uint64_t * r, uint64_t a, uint64_t w)
 	a >>= 2;
     }
 }
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
 void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t w)
 {
     /* Using sse-2 */
@@ -786,7 +786,7 @@ void mul_N64_T6464_transB(uint64_t *C,
     free(tb);
 }
 
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
 /* implements mul_N64_6464 */
 void mul_N64_6464_sse(uint64_t *C,
 		 const uint64_t *A,
@@ -866,7 +866,7 @@ void mul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
     }
 }
 
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
 static inline void mul_TN64K_N64_sse2(uint64_t * w, uint64_t * u, uint64_t * v, unsigned int n, unsigned int K)
 {
     memset(w, 0, 64 * K * sizeof(uint64_t));
@@ -1587,7 +1587,7 @@ void mul_N64_6464(uint64_t *C,
 		 const uint64_t *A,
 		 const uint64_t *B, size_t m)
 {
-#ifdef  HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
     mul_N64_6464_sse(C,A,B,m);
 #else
     mul_N64_6464_lookup4(C,A,B,m);
@@ -1601,7 +1601,7 @@ void mul_N64_T6464(uint64_t *C,
 }
 void addmul_To64_o64(uint64_t * r, uint64_t a, uint64_t w)
 {
-#ifdef HAVE_SSE2
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
     addmul_To64_o64_lsb_sse_v1(r,a,w);
 #else
     addmul_To64_o64_lsb_packof2(r,a,w);
