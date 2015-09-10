@@ -56,6 +56,18 @@ AC_ARG_ENABLE([sse2],
               [AS_HELP_STRING([--enable-sse2],
                               [Turn on sse-2 code (default is yes)])])
 
+AC_ARG_ENABLE([sse3],
+              [AS_HELP_STRING([--enable-sse3],
+                              [Turn on sse-3 code (default is yes)])])
+
+AC_ARG_ENABLE([ssse3],
+              [AS_HELP_STRING([--enable-ssse3],
+                              [Turn on ssse3 code (default is yes)])])
+
+AC_ARG_ENABLE([sse41],
+              [AS_HELP_STRING([--enable-sse41],
+                              [Turn on sse-4.1 code (default is yes)])])
+
 AC_ARG_ENABLE([pclmul],
               [AS_HELP_STRING([--enable-pclmul],
                               [Turn on pclmul code (default is yes)])])
@@ -167,6 +179,13 @@ if test x$hwdir = x ; then
 else
  AC_MSG_NOTICE([Using supplied hwdir value $hwdir])
 fi
+case "$hwdir" in
+ x86_64*|coreihwl)
+    if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
+      # this is only if we've been given an explicit --disable-sse2
+      hwdir=x86_64_nosse
+     fi;;
+esac
 
 AC_MSG_NOTICE([using ABI="$ABI"])
 AC_MSG_NOTICE([      CC="$CC"])

@@ -1298,3 +1298,13 @@ tests/scripts/cadofactor/CMakeLists.txt
 linalg/matops.h
 tests/linalg/test_bitlinalg_matops.cpp
 tests/linalg/test_bitlinalg_gauss.c
+gf2x/already_tuned/x86_64_nosse/gf2x-thresholds.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul1.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul2.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul3.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul4.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul5.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul6.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul7.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul8.h
+gf2x/already_tuned/x86_64_nosse/gf2x_mul9.h

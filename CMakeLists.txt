@@ -158,6 +158,9 @@ endif(some_mpir_variable)
 #####
 
 set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --enable-fft-interface CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} LDFLAGS=${GF2X_LDFLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
+IF (DEFINED ENV{NO_SSE})
+    list(APPEND GF2X_CONFIGURE_FLAGS --disable-sse2)
+ENDIF (DEFINED ENV{NO_SSE})
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################

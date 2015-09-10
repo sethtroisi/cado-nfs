@@ -792,6 +792,9 @@ enable_libtool_lock
 enable_ntl_checks
 enable_hardware_specific_code
 enable_sse2
+enable_sse3
+enable_ssse3
+enable_sse41
 enable_pclmul
 enable_fft_interface
 with_compile_warnings
@@ -1461,6 +1464,9 @@ Optional Features:
                           Turn on all cpu-dependent optimized code (default is
                           yes)
   --enable-sse2           Turn on sse-2 code (default is yes)
+  --enable-sse3           Turn on sse-3 code (default is yes)
+  --enable-ssse3          Turn on ssse3 code (default is yes)
+  --enable-sse41          Turn on sse-4.1 code (default is yes)
   --enable-pclmul         Turn on pclmul code (default is yes)
   --enable-fft-interface  compile with the optional fft interface (default is
                           no)
@@ -11931,6 +11937,24 @@ if test "${enable_sse2+set}" = set; then :
 fi
 
 
+# Check whether --enable-sse3 was given.
+if test "${enable_sse3+set}" = set; then :
+  enableval=$enable_sse3;
+fi
+
+
+# Check whether --enable-ssse3 was given.
+if test "${enable_ssse3+set}" = set; then :
+  enableval=$enable_ssse3;
+fi
+
+
+# Check whether --enable-sse41 was given.
+if test "${enable_sse41+set}" = set; then :
+  enableval=$enable_sse41;
+fi
+
+
 # Check whether --enable-pclmul was given.
 if test "${enable_pclmul+set}" = set; then :
   enableval=$enable_pclmul;
@@ -17903,6 +17927,13 @@ else
  { $as_echo "$as_me:${as_lineno-$LINENO}: Using supplied hwdir value $hwdir" >&5
 $as_echo "$as_me: Using supplied hwdir value $hwdir" >&6;}
 fi
+case "$hwdir" in
+ x86_64*|coreihwl)
+    if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
+      # this is only if we've been given an explicit --disable-sse2
+      hwdir=x86_64_nosse
+     fi;;
+esac
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: using ABI=\"$ABI\"" >&5
 $as_echo "$as_me: using ABI=\"$ABI\"" >&6;}
