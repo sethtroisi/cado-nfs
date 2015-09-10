@@ -1,7 +1,11 @@
 
 # pclmul
 message(STATUS "Testing whether pclmul code can be used")
-if (HAVE_SSE41)
+# We used to base this test on sse-4.1, but apparently there are some
+# compiler / binutils versions (gcc-4.7.2 on x86_64-unknown-openbsd5.3,
+# binutils 2.15) for which ssse3 and sse4.1 fail with no apparent
+# explanation.
+if (HAVE_SSE2)
     try_run(pclmul_runs pclmul_compiles
         ${PROJECT_BINARY_DIR}/config
         ${PROJECT_SOURCE_DIR}/config/pclmul.c)
@@ -33,6 +37,6 @@ if (HAVE_SSE41)
             set (HAVE_PCLMUL 0)
         endif(pclmul_compiles)
     endif(pclmul_compiles)
-else (HAVE_SSE41)
+else (HAVE_SSE2)
     message(STATUS "Testing whether pclmul code can be used -- skipped")
-endif (HAVE_SSE41)
+endif (HAVE_SSE2)
