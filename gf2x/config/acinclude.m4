@@ -93,7 +93,7 @@ int main(int argc, char * argv[[]]) {
     __m128i bar = _mm_setr_epi32(argc + 3, argc + 2, argc + 1, argc);
     __m128i x = _mm_setr_epi32(42, 0, 17, 0);
     __m128d g = _mm_set_pd(42.0, 17.0);
-    x = _mm_srl_epi64(x, x);
+    x = _mm_srl_epi64(x, _mm_setr_epi32(2,0,0,0));
     foo = _mm_mullo_epi16(foo, bar);
     foo = _mm_slli_epi64(foo, 1);
     foo = _mm_xor_si128(bar, _mm_unpacklo_epi32(foo, bar));
