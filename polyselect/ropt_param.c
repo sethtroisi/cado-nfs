@@ -29,7 +29,7 @@ unsigned int size_tune_sievearray = 6144;
  * ranked by the digits of integers to be factored and the right
  * column is the number (actually number+1).
  *
- * Usually, there is one or more tunning steps before the final root
+ * Usually, there is one or more tuning steps before the final root
  * sieve. In that case, more sublattices are checked (e.g. double/quad
  * the following valeus).
  * 
@@ -72,7 +72,7 @@ s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
 
 
 /**
- * As above, but it's only used for tunning good w in 'ropt_quadratic.c'.
+ * As above, but it's only used for tuning good w in 'ropt_quadratic.c'.
  * Therefore, the values are much smaller than above.
  */
 const unsigned int

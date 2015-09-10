@@ -380,7 +380,8 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
     cado_define_test(full_c59
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/factor.sh
-            90377629292003121684002147101760858109247336549001090677693 -t 2
+            90377629292003121684002147101760858109247336549001090677693
+            -t 2 -s auto
         TARGET_DEPENDENCIES
             polyselect2l polyselect_ropt
             freerel makefb
@@ -393,24 +394,31 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/factor.sh
             71641520761751435455133616475667090434063332228247871795429
-            -t 2
+            -t 2 -s auto
             tasks.polyselect.import=${CADO_NFS_SOURCE_DIR}/tests/misc/c59_nonlinear.poly
         TARGET_DEPENDENCIES
             full_c59_dependencies
         )
-    find_program(MAGMA magma)
+    find_program(MAGMA magma HINTS ENV MAGMA)
     if (MAGMA)
+        message(STATUS "magma found: ${MAGMA}")
 #        this test is probably not very useful, given that the other
 #        (quicker) tests cover everything covered by this test.
 #        cado_define_test(full_p59
 #            SCRIPT
-#                ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
+#               ${CADO_NFS_SOURCE_DIR}/factor.sh
+#               43341748620473677010074177283795146221310971425909898235183
+#               -dlp -t 2 -s auto -dlpnokeep
 #                ${CADO_NFS_SOURCE_DIR}
 #            TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
 #            plingen_pz sm reconstructlog-dl merge-dl replay-dl
 #        )
         cado_define_test(full_p30
-            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 191907783019725260605646959711 -dlp -ell 101538509534246169632617439 -t 2 -dlpnokeep target=92800609832959449330691138186
+            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh
+            191907783019725260605646959711
+            -dlp -ell 101538509534246169632617439
+            -t 2 -s auto
+            -dlpnokeep target=92800609832959449330691138186
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             sm_simple las_descent)
         cado_define_test(test_gfp3
@@ -420,10 +428,12 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl)
         cado_define_test(test_gfp2
-            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 100000000000000000039 -dlp -gfpext 2 -t 2 -dlpnokeep -ell 164354743277891
+            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 100000000000000000039 -dlp -gfpext 2 -t 2 -s auto -dlpnokeep -ell 164354743277891
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
             filter_galois polyselect_gfpn)
+    else(MAGMA)
+        message(STATUS "magma found: ${MAGMA}")
     endif(MAGMA)
 endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
@@ -453,3 +463,4 @@ add_subdirectory (filter)
 add_subdirectory (linalg)
 add_subdirectory (gf2x)
 add_subdirectory (misc)
+add_subdirectory (sqrt)

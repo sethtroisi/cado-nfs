@@ -483,11 +483,11 @@ void mpfq_p_8_clear(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_elt * x MAYBE_UN
     assert(*x);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_set, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_set, Mpfq::gfp */
 static inline
 void mpfq_p_8_set(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_elt r, mpfq_p_8_src_elt s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_p_8_elt));
+    mpfq_copy(r,s,8);
 }
 
 /* *Mpfq::gfp::elt::code_for_set_ui, Mpfq::gfp */
@@ -499,11 +499,11 @@ void mpfq_p_8_set_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt r, unsi
     mpfq_zero(r + 1, 8 - 1);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_set_zero, Mpfq::gfp */
 static inline
 void mpfq_p_8_set_zero(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_elt r)
 {
-    mpfq_p_8_vec_set_zero(K,(mpfq_p_8_dst_vec)r,1);
+    mpfq_zero(r, 8);
 }
 
 /* *Mpfq::gfp::elt::code_for_get_ui, Mpfq::gfp */
@@ -791,18 +791,18 @@ void mpfq_p_8_elt_ur_set(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur 
     mpfq_copy(z, x, 17);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_elt_ur_set_elt, Mpfq::gfp */
 static inline
 void mpfq_p_8_elt_ur_set_elt(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_elt_ur r, mpfq_p_8_src_elt s)
 {
-    memset(r, 0, sizeof(mpfq_p_8_elt_ur)); memcpy(r,s,sizeof(mpfq_p_8_elt));
+    mpfq_copy(r, s, 8); mpfq_zero(r+8, 17-8);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_elt_ur_set_zero, Mpfq::gfp */
 static inline
 void mpfq_p_8_elt_ur_set_zero(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_elt_ur r)
 {
-    memset(r, 0, sizeof(mpfq_p_8_elt_ur));
+    mpfq_zero(r, 17);
 }
 
 /* *Mpfq::gfp::elt::code_for_elt_ur_set_ui, Mpfq::gfp */
@@ -1433,20 +1433,10 @@ void mpfq_p_8_poly_getcoeff(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt 
 static inline
 int mpfq_p_8_poly_deg(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_src_poly w)
 {
-#if GNUC_VERSION_ATLEAST(4,8,0)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-    /* the spurious uninit warning we get below is due to gcc's inability to
-     * decide that the test in mpfq_p_8_set() actually does something. See
-     *      https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67418
-     * The exact extent of gcc versions affected is not known. At least 4.8.4
-     * to 5.2.0
-     */
-#endif
     if (w->size == 0)
         return -1;
     int deg = w->size-1;
-    mpfq_p_8_elt temp;	/* spurious uninit warning sometimes */
+    mpfq_p_8_elt temp;
     mpfq_p_8_init(K, &temp);
     mpfq_p_8_vec_getcoeff(K, temp, w->c, deg);
     int comp=mpfq_p_8_cmp_ui(K, temp, 0);
@@ -1459,9 +1449,6 @@ int mpfq_p_8_poly_deg(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_src_poly w)
     }
     mpfq_p_8_clear(K, &temp);
     return deg;
-#if GNUC_VERSION_ATLEAST(4,8,0)
-#pragma GCC diagnostic pop
-#endif
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add, Mpfq::gfp */
@@ -1669,6 +1656,7 @@ void mpfq_p_8_poly_xgcd(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_poly g, 
     mpfq_p_8_poly a,b,u,v,w,x,q,r;
     mpfq_p_8_elt c;
     mpfq_p_8_init(k,&c);
+    mpfq_p_8_set_ui(k,c,0);        /* placate gcc */
     int da0=mpfq_p_8_poly_deg(k,a0), db0=mpfq_p_8_poly_deg(k,b0), dega;
     if (db0==-1) {
      if (da0==-1) {

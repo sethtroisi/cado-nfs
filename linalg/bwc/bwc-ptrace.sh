@@ -334,6 +334,14 @@ set $common
 if [ "$magma" ] ; then
     echo "### Enabling magma checking ###"
     set "$@" save_submatrices=1
+    if [ -d "$magma" ] ; then
+        if [ -x "$magma/magma" ] ; then
+            magma="$magma/magma"
+        else
+            echo "If \$magma is a directory, we want to find \$magma/magma !" >&2
+            exit 1
+        fi
+    fi
 fi
 
 if ! [ "$magma" ] ; then

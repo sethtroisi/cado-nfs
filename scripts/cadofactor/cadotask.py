@@ -2702,10 +2702,10 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
             # taking into account duplicates, the initial value
-            # pi(2^lpbr) + pi(2^lpba) should be good
+            # 0.9 * (pi(2^lpbr) + pi(2^lpba)) should be good
             nr = 2 ** self.progparams[0]["lpbr"]
             na =  2 ** self.progparams[0]["lpba"]
-            nra = int(nr / log (nr) + na / log (na))
+            nra = int(0.9 * nr / log (nr) + 0.9 * na / log (na))
             self.state["rels_wanted"] = nra
     
     def run(self):
@@ -4499,8 +4499,7 @@ class ReconstructLogTask(Task):
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
-                    nmaps0=nmaps[0],
-                    nmaps1=nmaps[1],
+                    nsm=str(nmaps[0])+","+str(nmaps[1]),
                     nrels=nrels,
 		    abunits0=str(abunitsdirname) + ".0",
 		    abunits1=str(abunitsdirname) + ".1",

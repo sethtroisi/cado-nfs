@@ -93,10 +93,10 @@ typedef struct logtab_struct logtab_t[1];
 typedef struct logtab_struct * logtab_ptr;
 
 static void
-logtab_init (logtab_t log, uint64_t nprimes, unsigned int nbsm, mpz_t q)
+logtab_init (logtab_t log, uint64_t nprimes, int nbsm, mpz_t q)
 {
   log->tab = NULL;
-  uint64_t size = nprimes + nbsm;
+  uint64_t size = nprimes + (uint64_t)nbsm;
   size_t q_nbits = mpz_size(q) * GMP_LIMB_BITS;
 
   log->nprimes = nprimes;
@@ -729,7 +729,7 @@ dep_do_one_iter_mt (dep_read_data_t *d, bit_vector bv, int nt, uint64_t nrels)
 /* Read the logarithms computed by the linear algebra */
 static void
 read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile,
-		    unsigned int *nbsm, int nb_polys)
+		    int *nbsm, int nb_polys)
 {
   uint64_t i, ncols, col;
   index_t h;
@@ -774,7 +774,7 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile,
 
   unsigned int index = 0;
   for(int side = 0; side < nb_polys; side++){
-      for (unsigned int ism = 0; ism < nbsm[side]; ism++){
+      for (int ism = 0; ism < nbsm[side]; ism++){
 	  int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
 	  FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
 	  logtab_insert (log, log->nprimes+index, tmp_log);
@@ -787,7 +787,7 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile,
 
   for(int side = 0; side < nb_polys; side++){
       if (nbsm[side])
-	  printf ("# Logarithms for %u SM%d columns were also read\n", 
+	  printf ("# Logarithms for %d SM%d columns were also read\n", 
 		  nbsm[side], side);
   }
   mpz_clear (tmp_log);
@@ -1131,9 +1131,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "partial", "(switch) do not reconstruct everything "
                                        "that can be reconstructed");
 #ifndef FOR_FFS
-  param_list_decl_usage(pl, "sm0", "number of SM to add on side 0");
-  param_list_decl_usage(pl, "sm1", "number of SM to add on side 1");
-  param_list_decl_usage(pl, "sm2", "number of SM to add on side 2");
+  param_list_decl_usage(pl, "nsm", "number of SM's to add on side 0,1,...");
   param_list_decl_usage(pl, "abunits0", "units for all (a, b) pairs from purged and relsdels on side 0");
   param_list_decl_usage(pl, "abunits1", "units for all (a, b) pairs from purged and relsdels on side 1");
   param_list_decl_usage(pl, "explicit_units0", "use units for all (a, b) pairs from purged and relsdels on side 0");
@@ -1164,8 +1162,8 @@ main(int argc, char *argv[])
   uint64_t nprimes;
   int mt = 1;
   int partial = 0;
-  unsigned int nbsm[NB_POLYS_MAX], nbsmtot = 0;
-  memset(nbsm, 0, NB_POLYS_MAX*sizeof(unsigned int));
+  int nbsm[NB_POLYS_MAX], nbsmtot = 0;
+  memset(nbsm, 0, NB_POLYS_MAX*sizeof(int));
 
   mpz_t q;
   logtab_t log;
@@ -1306,12 +1304,13 @@ main(int argc, char *argv[])
 
 #ifndef FOR_FFS
   /* eek. */
-  for(int side = 0; side < poly->nb_polys; side++){
-      char str[10];
-      snprintf(str, sizeof(str), "sm%c", '0'+side);
-      param_list_parse_uint(pl, str, &nbsm[side]);
-      nbsmtot += nbsm[side];
+  int nsides = param_list_parse_int_list(pl, "nsm", nbsm, poly->nb_polys, ",");
+  if(nsides != poly->nb_polys){
+      fprintf (stderr, "Error not enough nsm's\n");
+      exit (EXIT_FAILURE);
   }
+  for(int side = 0; side < poly->nb_polys; side++)
+      nbsmtot += nbsm[side];
 
   const char * abunits0dirname = NULL;
   abunits0dirname = param_list_lookup_string(pl, "abunits0");
