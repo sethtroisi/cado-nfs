@@ -1,7 +1,7 @@
 #ifndef BLOCKMATRIX_H_
 #define BLOCKMATRIX_H_
 
-#include "bit_matrices.h"
+#include "matops.h"
 #include "macros.h"
 
 #ifdef __cplusplus

@@ -326,7 +326,8 @@ endmacro(bwc_program)
 
 bwc_program(acollect acollect.c)
 bwc_program(split split.c)
-bwc_program(prep prep.c ../gauss.c)
+bwc_program(prep prep.c)
+target_link_libraries(prep bitlinalg)
 bwc_program(krylov krylov.c xdotprod.c)
 bwc_program(dispatch dispatch.c xdotprod.c)
 bwc_program(mksol mksol.c xdotprod.c)
@@ -356,9 +357,8 @@ set_target_properties(lingen PROPERTIES
     COMPILE_FLAGS "--mpi ${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "--mpi ${OpenMP_CXX_FLAGS}")
 
-add_executable(cleanup cleanup.c ../blockmatrix.c ../bit_matrices.c
-    ../gauss.c)
-target_link_libraries(cleanup utils m)
+add_executable(cleanup cleanup.c)
+target_link_libraries(cleanup bitlinalg utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 

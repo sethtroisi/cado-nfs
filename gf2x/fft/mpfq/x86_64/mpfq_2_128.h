@@ -1072,7 +1072,7 @@ void mpfq_2_128_mul_ur(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_u
         __m128i g[16];
         __m128i w;
         // __m128i m = _mm_set1_epi32(0xeeeeeeee);
-        __m128i m = _gf2x_mm_set1_epi64_c(0xeeeeeeeeeeeeeeee);
+        __m128i m = _mpfq_mm_set1_epi64_c(0xeeeeeeeeeeeeeeee);
         /* sequence update walk */
         __m128i b0 = _mm_loadu_si128((__m128i*) s2);
         g[ 0] = _mm_setzero_si128();

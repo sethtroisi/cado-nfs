@@ -94,8 +94,6 @@ filter/sm_simple.cpp
 filter/filter_galois.c
 linalg/CMakeLists.txt
 linalg/Makefile
-linalg/bit_matrices.c
-linalg/bit_matrices.h
 linalg/blockmatrix.c
 linalg/blockmatrix.h
 linalg/bwc/CMakeLists.txt
@@ -168,7 +166,7 @@ linalg/bwc/matmul_facade.c
 linalg/bwc/matmul_facade.h
 linalg/bwc/matmul_top.c
 linalg/bwc/matmul_top.h
-linalg/bwc/matops.cpp
+linalg/matops.cpp
 linalg/bwc/mf.c
 linalg/bwc/mf.h
 linalg/bwc/mf_bal.c
@@ -1297,6 +1295,6 @@ tests/linalg/bwc/test_hello.c
 tests/ncpus.sh
 tests/scripts/CMakeLists.txt
 tests/scripts/cadofactor/CMakeLists.txt
-linalg/bwc/matops.h
-tests/linalg/bwc/test_matops.cpp
-tests/linalg/test_gauss.c
+linalg/matops.h
+tests/linalg/test_bitlinalg_matops.cpp
+tests/linalg/test_bitlinalg_gauss.c

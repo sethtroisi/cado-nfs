@@ -188,12 +188,12 @@ index eefa0d5..9cb92eb 100644
 -    
 -    /* repair steps */
 -    /* repair section 200711-200803 */
--    __m128i v1 = _gf2x_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
+-    __m128i v1 = _mpfq_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
 -    v1 = SHR(v1, 1);
--    __m128i v2 = _gf2x_mm_setr_epi32(s1[2], s1[3], s1[2], s1[3]);
+-    __m128i v2 = _mpfq_mm_setr_epi32(s1[2], s1[3], s1[2], s1[3]);
 -    v2 = SHR(v2, 1);
 -    __m128i w;
--    __m128i m = _gf2x_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
+-    __m128i m = _mpfq_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
 -    w = -SHR(g[1],63);
 -    v1 = v1 & m;
 -    t1 ^= v1 & w;
@@ -353,10 +353,10 @@ index 7394af5..22c51e0 100644
 -    
 -    /* repair steps */
 -    /* repair section 200711-200803 */
--    __m128i v1 = _gf2x_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
+-    __m128i v1 = _mpfq_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
 -    v1 = SHR(v1, 1);
 -    __m128i w;
--    __m128i m = _gf2x_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
+-    __m128i m = _mpfq_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
 -    w = -SHR(g[1],63);
 -    v1 = v1 & m;
 -    t1 ^= v1 & w;

@@ -6,13 +6,10 @@
 #include <stdint.h>
 #include <emmintrin.h>
 
-volatile __v2di x;
-volatile __v2df g;
-
 int main() {
-    x = (__v2di) { (uint64_t) 42, (uint64_t) 17 };
-    g = (__v2df) { 42.0, 17.0 };
-    __v2di shift = { (uint64_t) 42, (uint64_t) 17 };
+    __m128i x = _mm_setr_epi64((__m64) (uint64_t) 42, (__m64) (uint64_t) 17);
+    __m128d g = _mm_set_pd(42.0, 17.0);
+    __m128i shift = _mm_setr_epi64((__m64) (uint64_t) 42, (__m64) (uint64_t) 17);
     x = _mm_srl_epi64(x, shift);
     return 0;
 }

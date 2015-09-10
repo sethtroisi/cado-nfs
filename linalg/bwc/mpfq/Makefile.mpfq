@@ -8,7 +8,7 @@ MPFQ:=$$HOME/Mp/mpfq/src
 
 mpfq_tag_list:=u64k1 u64k2 u64k3 u64k4 p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 pz
 
-all: basic prime-fields
+all: basic prime-fields prepend-includes
 
 MPFQ_TEMP:=/tmp/mpfq-cado
 
@@ -41,6 +41,10 @@ prime-fields: mpfq-buildtree
 	/bin/cp -f $(MPFQ_TEMP)/include/mpfq_fixmp*h .
 	patch -p1 -d. < asm-constraints.patch
 	-rm -f *.orig
+
+prepend-includes:
+	ls mpfq_*.c | xargs -n 1 sed -e '1 i#include "cado.h"' -i
+
 
 clean-mpfq_%:
 	-rm -f mpfq_$*.c
