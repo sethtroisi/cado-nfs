@@ -152,7 +152,7 @@ class LasStats(object):
                 new_dupes += 1
             match = PATTERN_SIEVE_SQ.match(line)
             if match:
-                last_sq = int(match.group(1))
+                last_sq = int(match.group(2))
                 if first_sq is None:
                     first_sq = last_sq
                 else:

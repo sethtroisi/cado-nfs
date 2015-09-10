@@ -22,6 +22,37 @@ along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/* Model of this code : One producer -> Many consumers/producers -> one consumer.
+
+   1. One thread produces NB_PRIMERS_PER_BUFFER primes per buffer, in
+      NB_BUFFERS_PER_THREAD buffers (named bufs) for each working thread. This
+      thread uses the function pthread_primes_producer.
+
+      When all the primes are produced, this thread produces one buffer with
+      only one "false" prime = FREEREL_END_MARKER for each consumer. It's the
+      end marker.
+
+   2. 'nthreads' threads load a primes buffer by a classical one producer/many
+      consumer models (2 pseudo semaphores BY pair of producer/consumer).
+      Each thread produces 2 buffers: one buffer containing the local
+      renumbering table on the form of a ASCII array and of one buffer
+      containing the information to retrieve the free relations. Those threads
+      use the function pthread_primes_consumer.
+
+      When a thread loads a primes buffer which begins and contains only
+      FREEREL_END_MARKER, it produces a free relations buffer which contains
+      only FREEREL_END_MARKER and exits.
+
+   3. With a many producers/one consumer model, the principal programs (the
+      function generate_renumber_and_freerels) loads the data produced by the
+      'nthreads' pthread_primes_consumer, writes sequentially the renumbering
+      table, and print the free relations.
+
+      When a roots buffer contains exactly one FREEREL_END_MARKER, the job is
+      done.
+*/
+
+
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,543 +67,543 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h"
 #include "typedefs.h"
 
-// All those macros don't need to be powers of two... but it's smarter!
-#define NB_BUFS (1<<1)             // 2 buffers are sufficient; in fact it works with only one!
-#define SIZE_BUF_PRIMES (1<<10)    // Size of a block of generated primes for one pthread
-#define SIZE_BUF_FREE_RELS (1<<8)  // Nb of free rels for the primes block
-#define MIN_BUF_FREE_RELS (1<<8)   // Minimal size in BYTES of free rels buffer before it grows
-#define SIZE_BUF_ROOTS (1<<15)     // Nb of roots for the primes block; NB: in ASCII!
-#define MIN_BUF_ROOTS (1<<10)      // Max size in ASCII of all the roots for ONE p (1024 bytes)
+/* 2 buffers are sufficient; in fact it works with only one! */
+#define NB_BUFFERS_PER_THREAD (1<<1)
+#define NB_PRIMES_PER_BUFFER (1<<10)
 #define CACHELINESIZE 64
-
-/* Model of this code : One producer -> Many consumers/producers -> one consumer.
-   1. First thread produces SIZE_BUF_PRIMES primes by buffer, in NB_BUFS buffers
-      (named primes) for each working thread.
-
-      When all the primes are produced, this thread produces one buffer with
-      only one "false" prime = (p_r_values_t) (-1) for each pthread consumer.
-      It's the end marker.
-
-   2. nb_pthread threads load a primes buffer by a classical one producer/many
-      consumer models (2 pseudo semaphores BY pair of producer/consumer).
-      Each pthread produces 2 buffers: one buffer of free_relations, each on the form of
-      prime + a set of (deg(polynom1)+deg(polynom2)+1 free_rels_buf_t type (unsigned long or
-      unsigned int); and one buffer of roots, on the form of a ASCII array.
-
-      When a thread loads a primes buffer which begins and contains only (p_r_values_t) (-1),
-      the thread produces a roots buffer which contains only (p_r_values_t) (-1) and an empty
-      free relations buffer, and exits.
-
-   3. With a many producers/one consumer model, the principal programs loads the
-      roots & free_buffers, writes sequentially the roots, computes the real renumber
-      index (sum of all previous index) for the free relations, and writes these relations.
-
-      When a roots buffer contains exactly one (p_r_values_t) (-1), the job is done.
-*/
-      
-// Must be EXACTLY the same than begin/current/end in free_rels_t and roots_t,
-// in order to have only one function to grow these buffers (different type). 
-typedef struct buf_s {
-  void *begin, *current, *end;
-} buf_t;
-
-/* Structure for a buffer which keeps the free relations.
-   Problem: we cannot compute directly the true renumber_table->size value:
-   it's the sum of all previous values in the others pthreads.
-   So, the buffer cannot be ASCII, but must store directly
-   a free relation on the form of one type "p" (so, p_r_values_t)
-   and [sum degrees of the 2 poly] type renumber_t.
-   NB: __SIZEOF_INDEX__ defines the renumber_t type: 4 or 8 bytes.
-*/
-#if __SIZEOF_P_R_VALUES__ == 4 && __SIZEOF_INDEX__ == 4
-typedef uint32_t free_rels_buf_t;
-#else
-typedef uint64_t free_rels_buf_t;
+#define INIT_SIZE_BUF_CHAR (1<<15) /* Init size for the char buffer. */
+#if INIT_SIZE_BUF_CHAR < RENUMBER_MAX_SIZE_PER_PRIME
+  #error "INIT_SIZE_BUF_CHAR must be greater than RENUMBER_MAX_SIZE_PER_PRIME."
 #endif
-typedef struct free_rels_s {
-  free_rels_buf_t *begin, *current, *end; // Same than buf_t
-  index_t renumber;
-  unsigned int nb_p, nb_free;             // max SIZE_BUF_PRIMES
-} free_rels_t;
+#define FREEREL_END_MARKER ((unsigned long) (-1))
 
-typedef struct roots_s {
-  char *begin, *current, *end;            // Same than buf_t
-} roots_t;
-
-typedef struct primes_s {
-  p_r_values_t *begin, *current, *end;
-} primes_t;
-
-/* unnamed Posix semaphores don't exist in MacOS,
-   named Posix semaphores are persistent and need a interrupt handler to clean them,
-   so unnamed semaphores are here implemented with pthread_cond_t and pthread_mutex_t,
-   and of course a value (unsigned int).
-*/
-typedef struct sema_s {
+/************************** Unnamed semaphores ********************************/
+/* Unnamed Posix semaphores don't exist in MacOS, named Posix semaphores are
+ * persistent and need a interrupt handler to clean them, so unnamed semaphores
+ * are implemented here with pthread_cond_t and pthread_mutex_t, and of course a
+ * value (unsigned int).
+ */
+struct sema_s
+{
   unsigned int value;
   pthread_mutex_t mutex;
   pthread_cond_t conditional;
-} sema_t;
+};
 
-/* The main structure for the working pthreads pool */
-typedef struct producer_s {
-  sema_t primes_full, primes_empty,
-    roots_full, roots_empty; // are also free_rels pseudo semaphores
-// Now the read only part
-  unsigned int pthread_number, number_of_pthreads;
-  unsigned long pmin, pmax, lpb[NB_POLYS_MAX], lpbmax;
-  size_t deg[NB_POLYS_MAX];
-  mpz_t *coeff[NB_POLYS_MAX];
-  mpz_poly_ptr pols[NB_POLYS_MAX];
-  int nb_polys;
-// Now the read-write part
-  pthread_t pthread;
-  size_t current_buf; // [0, NB_NBUFS[
-  free_rels_t free_rels [NB_BUFS];
-  roots_t roots [NB_BUFS];
-  primes_t primes [NB_BUFS];
-} producer_t;
+typedef struct sema_s sema_t[1];
+typedef struct sema_s * sema_ptr;
 
-/* These functions are sem_init, sem_post, sem_wait and sem_destroy 
-   with mutex & pthread conditional variables.
-   Careful:
-   1. it's not possible to share these pseudo semaphores between
-   processus, but only between threads.
-   2. I use pthread_cond_signal here, not pthread_cond_broadcast!
-   So sema_post wakes only one sleeper!
-*/
-void sema_init (sema_t *sema, unsigned int value_init) {
+/* These functions are sem_init, sem_post, sem_wait and sem_destroy with mutex &
+ * pthread conditional variables.
+ * Careful:
+ *  1. it's not possible to share these pseudo semaphores between processus, but
+ *     only between threads.
+ *  2. I use pthread_cond_signal here, not pthread_cond_broadcast! So sema_post
+ *     wakes only one sleeper!
+ */
+
+void sema_init (sema_ptr sema, unsigned int value_init)
+{
   sema->value = value_init;
-  if (pthread_mutex_init(&(sema->mutex), NULL)) {
+  if (pthread_mutex_init(&(sema->mutex), NULL))
+  {
     perror ("Error in pthread_mutex_init\n");
     exit (1);
   }
-  if (pthread_cond_init(&(sema->conditional), NULL)) {
+  if (pthread_cond_init(&(sema->conditional), NULL))
+  {
     perror ("Error in pthread_cond_init\n");
     exit (1);
   }
 }
 
-void sema_post (sema_t *sema) {
+void sema_post (sema_ptr sema)
+{
   pthread_mutex_lock (&(sema->mutex));
   if (!(sema->value)++)
-    pthread_cond_signal (&(sema->conditional)); // CAREFUL: signal, not broadcast here!
+    pthread_cond_signal (&(sema->conditional)); /* CAREFUL: no broadcast here! */
   pthread_mutex_unlock (&(sema->mutex));
 }
 
-void sema_wait (sema_t *sema) {
-  pthread_mutex_lock (&(sema->mutex));                
-  // The loop is need for the "spurious wakeup",
-  // but these is only at most 1 sleeper by sema... so, not really useful
-  while (!(sema->value)) pthread_cond_wait (&(sema->conditional), &(sema->mutex));
-  sema->value--;                                                           
+void sema_wait (sema_ptr sema)
+{
+  pthread_mutex_lock (&(sema->mutex));
+  /* The loop is need for the "spurious wakeup", but these is only at most 1
+   * sleeper by sema... so, not really useful. */
+  while (!(sema->value))
+    pthread_cond_wait (&(sema->conditional), &(sema->mutex));
+  sema->value--;
   pthread_mutex_unlock (&(sema->mutex));
 }
 
-void sema_destroy (sema_t *sema) {
+void sema_destroy (sema_ptr sema)
+{
   pthread_mutex_destroy (&(sema->mutex));
   pthread_cond_destroy (&(sema->conditional));
 }
 
-// This function grows a possible too small buffer.
-// Careful! min_buf is in BYTES, no in number of the (simple) type of the buffer!
-static void
-resize_buf (buf_t *buf, size_t min_buf) {
-  if (UNLIKELY(buf->current + min_buf > buf->end)) {
-    size_t ind_current = buf->current - buf->begin,
-      new_lg = (buf->end - buf->begin) << 1;
-    buf->begin = realloc (buf->begin, new_lg);
-    if (!buf->begin) {
-      perror ("Realloc error\n");
-      exit (1);
-    }
-    buf->current = buf->begin + ind_current;
-    buf->end = buf->begin + new_lg;
+/*************************** char buffer **************************************/
+struct char_buffer_s
+{
+  char *begin, *cur, *end;
+};
+
+typedef struct char_buffer_s char_buffer_t[1];
+typedef struct char_buffer_s * char_buffer_ptr;
+typedef const struct char_buffer_s * char_buffer_srcptr;
+
+static inline void
+char_buffer_init (char_buffer_ptr buf, size_t size)
+{
+  buf->begin = malloc_aligned (size * sizeof (char), CACHELINESIZE);
+  ASSERT_ALWAYS (buf->begin != NULL);
+  buf->cur = buf->begin;
+  buf->end = buf->begin + size;
+}
+
+static inline void
+char_buffer_reset (char_buffer_ptr buf)
+{
+  buf->cur = buf->begin;
+}
+
+/* Write the char_buffer in one ASCII block */
+static inline void
+char_buffer_write (FILE *out, char_buffer_ptr buf)
+{
+  fwrite ((void *) buf->begin, (buf->cur-buf->begin) * sizeof(char), 1, out);
+}
+
+/* This function grows the char * if the remaining space is lower than
+ * min_needed.
+ */
+static inline void
+char_buffer_resize (char_buffer_ptr buf, size_t min_needed)
+{
+  if (UNLIKELY(buf->cur + min_needed >= buf->end))
+  {
+    size_t save_current = buf->cur - buf->begin,
+    new_size = (buf->end - buf->begin) << 1;
+    buf->begin = (char *) realloc (buf->begin, new_size * sizeof (char));
+    ASSERT_ALWAYS (buf->begin != NULL);
+    buf->cur = buf->begin + save_current;
+    buf->end = buf->begin + new_size;
   }
 }
 
-/* This function produces all the primes from p to pth->lpbmax,
-   for the workers pthreads pool (see next function). The primes are in
-   buffers; each buffer contains SIZE_BUF_PRIMES primes (optimal: 1024),
-   except the last of course.
+static inline void
+char_buffer_clear (char_buffer_ptr buf)
+{
+  free (buf->begin);
+  buf->end = buf->cur = buf->begin;
+}
+
+/************************** Thread buffer *************************************/
+struct th_buf_s
+{
+  /* protected by primes_full/primes_empty */
+  unsigned long primes[NB_PRIMES_PER_BUFFER]; /* array of prime number */
+  uint64_t nprimes_in; /* nb of primes in the array on input */
+  /* protected by roots_full/roots_empty */
+  char_buffer_t roots_char; /* The local renumbering table is kept as a char*. */
+  uint64_t nroots_tot; /* nb of entry in the local renumbering table */
+  uint64_t nprimes_out; /* nb of treated primes */
+  uint64_t nfreerels;
+  unsigned long freerels_p[NB_PRIMES_PER_BUFFER];
+  uint64_t freerels_first_index[NB_PRIMES_PER_BUFFER];
+};
+
+typedef struct th_buf_s th_buf_t[1];
+typedef struct th_buf_s * th_buf_ptr;
+typedef const struct th_buf_s * th_buf_srcptr;
+
+static inline void
+th_buf_init (th_buf_ptr buf, size_t size)
+{
+  char_buffer_init (buf->roots_char, size);
+}
+
+static inline void
+th_buf_reset (th_buf_ptr buf)
+{
+  buf->nprimes_out = 0;
+  buf->nfreerels = 0;
+  buf->nroots_tot = 0;
+  char_buffer_reset (buf->roots_char);
+}
+
+static inline void
+th_buf_clear (th_buf_ptr buf)
+{
+  char_buffer_clear (buf->roots_char);
+}
+
+/******************** Data struct for sharing among threads *******************/
+/* The main structure for the working pthreads pool */
+typedef struct freerel_th_data_s {
+  /* 4 pseudo semaphores. roots_* are also used for free_rel buffer. */
+  sema_t primes_full, primes_empty, roots_full, roots_empty;
+  /* Read only part */
+  unsigned int nthreads;
+  unsigned int th_id;
+  unsigned long *lpb;
+  unsigned long pmin, pmax, lpbmax;
+  renumber_ptr tab;
+  mpz_poly_t *pols;
+  /* Read-write part */
+  th_buf_t bufs[NB_BUFFERS_PER_THREAD];
+} freerel_th_data_t;
+
+/*************************** Main functions ***********************************/
+
+/* This function produces all the primes from 2 to arg->lpbmax,
+   for the workers pthreads pool (see next functions). The primes are in
+   buffers; each buffer contains NB_PRIMES_PER_BUFFER primes (optimal: 1024),
+   except the last one of course.
    After all buffers have been produced, this function creates again
-   nb_pthreads buffers with only the end marker ((p_r_values_t) (-1)),
+   nb_pthreads buffers with only the end marker FREEREL_END_MARKER,
    in order to stop each worker.
 */
 static void *
-pthread_primes_producer (void *ptvoid) {
-  producer_t *pth = (producer_t *) ptvoid;
-  unsigned long lpbmax = pth->lpbmax, p = 2;
-  size_t number_of_pthreads = pth->number_of_pthreads, current_buf = 0, i = 0, j;
+pthread_primes_producer (void *arg)
+{
+  /* This thread get the array of all the thread's data. */
+  freerel_th_data_t *data = (freerel_th_data_t *) arg;
+  unsigned long lpbmax = data->lpbmax, p = 2;
+  unsigned int nthreads = data->nthreads, cur_buf = 0, cur_th = 0;
 
   prime_info pi;
   prime_info_init (pi);
-  while (p <= lpbmax){
-    // here, we are sure we can produce at least one prime
-    sema_wait (&(pth[i].primes_empty)); // Need an empty primes buffer
-    primes_t my_primes = pth[i].primes[current_buf]; // Careful! it's a local copy!
-    my_primes.current = my_primes.begin;
+  while (p <= lpbmax)
+  {
+    /* Here, we are sure that we can write at least one prime. */
+    sema_wait (data[cur_th].primes_empty); /* Need an empty primes buffer */
+    unsigned long *primes = data[cur_th].bufs[cur_buf]->primes;
+    uint64_t nprimes = 0;
 
-    do { // Main loop to produce primes
-      *my_primes.current++ = (p_r_values_t) p;
-      p = getprime_mt (pi);
-    } while (my_primes.current < my_primes.end && p <= lpbmax);
+    do /* Main loop that produces primes */
+    {
+      primes[nprimes++] = p;
+      p = getprime_mt (pi); /* get next prime */
+    } while (nprimes < NB_PRIMES_PER_BUFFER && p <= lpbmax);
 
-    pth[i].primes[current_buf] = my_primes;
-    sema_post (&(pth[i].primes_full)); // Drop the now full primes buffer
+    data[cur_th].bufs[cur_buf]->nprimes_in = nprimes;
+    sema_post (data[cur_th].primes_full); /* Drop the primes buffer */
 
-    if (UNLIKELY (++i == number_of_pthreads)) {
-      i = 0;
-      if (UNLIKELY (++current_buf == NB_BUFS)) current_buf = 0;
+    if (UNLIKELY (++cur_th == nthreads))
+    {
+      cur_th = 0;
+      if (UNLIKELY (++cur_buf == NB_BUFFERS_PER_THREAD))
+        cur_buf = 0;
     }
-
   }
   prime_info_clear (pi);
 
-  // We have to produce a special end buffer in each pth[].primes
-  j = i;
-  do {
+  /* We have to produce a special end buffer in each pth[].primes */
+  unsigned int bak_th = cur_th;
+  do
+  {
+    sema_wait (data[cur_th].primes_empty);
+    data[cur_th].bufs[cur_buf]->primes[0] = FREEREL_END_MARKER;
+    data[cur_th].bufs[cur_buf]->nprimes_in = 1;
+    sema_post (data[cur_th].primes_full);
 
-    sema_wait (&(pth[i].primes_empty));
-    primes_t *my_primes = pth[i].primes + current_buf; // Careful! it's a pointer!
-    *(my_primes->begin) = (p_r_values_t) (-1);
-    my_primes->current = my_primes->begin + 1;
-    sema_post (&(pth[i].primes_full));
-
-    if (UNLIKELY (++i == number_of_pthreads)) {
-      i = 0;
-      if (UNLIKELY (++current_buf == NB_BUFS)) current_buf = 0;
+    if (UNLIKELY (++cur_th == nthreads))
+    {
+      cur_th = 0;
+      if (UNLIKELY (++cur_buf == NB_BUFFERS_PER_THREAD))
+        cur_buf = 0;
     }
-
-  } while (i != j);
-
-  pthread_exit (NULL);
+  } while (cur_th != bak_th);
 
   return NULL;
 }
 
 /* This function takes a primes buffer and generates the corresponding
-   roots and free relations.
-   The roots are directly on the form of a ASCII buffer.
+   local renumbering table and free relations.
+   The local renumbering table is directly on the form of a ASCII buffer.
    The free relations must be recomputed by the main program, so a free relation
-   contains only its prime and ((degree (polynom1) + degree (polynom2)) incremental
-   index.
-   This functions stops when the primes buffer contains only ((p_r_values_t) (-1)),
-   the end marker.
+   contains only its prime and the first index (with respect to the local
+   renumbering table).
+   FIXME: for now it only works with 2 polynomials.
+   This functions stops when the primes buffer contains only one
+   FREEREL_END_MARKER, the end marker.
 */
 static void *
-pthread_roots_and_free_rels_producer (void *ptvoid) {
-  producer_t *my_pth = ptvoid;
-  unsigned long p;
-  size_t i, nb_roots[NB_POLYS_MAX];
-  unsigned long computed_roots[NB_POLYS_MAX][32]; // With malloc, the computed_roots of 2 pthreads
-  // may be in the same cacheline. 
-  // A computed_root with a fixed size is faster.
-  for(int k = 0; k < my_pth->nb_polys; k++)
-      ASSERT_ALWAYS (my_pth->deg[k] < 32); 
+pthread_primes_consumer (void *arg)
+{
+  freerel_th_data_t *my_data = arg;
+  int nroots[NB_POLYS_MAX];
+  unsigned long roots[NB_POLYS_MAX][MAXDEGREE];
 
-  for (;;) {
+  /* Make local copy of some global (read only) variables and set some pointer
+   * to global (read only) data.
+   */
+  int deg[NB_POLYS_MAX]; /* degree of the polynomials */
+  mpz_srcptr lc[NB_POLYS_MAX]; /* pointer to the leading coefficients */
+  unsigned int npolys = my_data->tab->nb_polys;
+  for (unsigned int side = 0; side < npolys; side++)
+  {
+    deg[side] = my_data->pols[side]->deg;
+    lc[side] = my_data->pols[side]->coeff[deg[side]];
+  }
 
-    sema_wait (&(my_pth->roots_empty)); // Need an empty roots & free relations buffer
-    sema_wait (&(my_pth->primes_full)); // Need a produced primes buffer
+  for (unsigned int cur_buf = 0 ; ; )
+  {
+    sema_wait (my_data->roots_empty); /* Need an empty roots buffer */
+    sema_wait (my_data->primes_full); /* Need a produced primes buffer */
 
-    roots_t      *my_roots     = my_pth->roots +     my_pth->current_buf;
-    free_rels_t  *my_free_rels = my_pth->free_rels + my_pth->current_buf;
-    primes_t     *my_primes    = my_pth->primes +    my_pth->current_buf;
-    p_r_values_t *my_p         = my_primes->begin; 
-    
-    // Have we received the special end buffer in primes buffer ?
-    if (UNLIKELY(my_primes->current - my_p == 1 && *my_p == (p_r_values_t) -1)) {
-      // Yes: we create a special end buffer in roots buffer, and exit
-      * (p_r_values_t *) my_roots->begin = (p_r_values_t) -1;
-      my_roots->current = (char *) ((void *) my_roots->begin + sizeof (p_r_values_t));
-      sema_post (&(my_pth->primes_empty)); // Drop my now consumed primes buffer (not useful)
-      sema_post (&(my_pth->roots_full));   // Give my produced roots & free_rels buffer
-      // OK, the job is done. Bye bye!
-      pthread_exit (NULL); // The exit of the endless loop; the exit of the pthread
+    th_buf_ptr local_buf = my_data->bufs[cur_buf];
+    unsigned long *my_p = local_buf->primes;
+
+    /* Have we received the special end buffer in primes buffer ? */
+    if (UNLIKELY(local_buf->nprimes_in == 1 && my_p[0] == FREEREL_END_MARKER))
+    {
+      /* Yes: we create a special end buffer and exit */
+      local_buf->freerels_p[0] = FREEREL_END_MARKER;
+      local_buf->nfreerels = 1;
+      sema_post (my_data->primes_empty); /* Drop my now consumed primes buffer */
+      sema_post (my_data->roots_full); /* Give my produced roots buffer */
+      return NULL; /* The job is done: exit the endless loop and the pthread. */
     }
 
-    my_roots->current = my_roots->begin;
-    my_free_rels->current = my_free_rels->begin;
-    my_free_rels->renumber = 0;
-    my_free_rels->nb_p = 0;
-    my_free_rels->nb_free = 0;
+    th_buf_reset (local_buf);
+    char_buffer_ptr out = my_data->bufs[cur_buf]->roots_char;
 
-    // I prefer to separate the 2 cases (rat & alg) and (alg & alg).
-    // The goal is to suppress the first case in few months
-    if (my_pth->deg[0] == 1)
-	// TODO: make this MNFS-compliant!
-
-      while (my_p < my_primes->current) { // rational & algebraic polynomials, special case
-	p = (unsigned long) *my_p++;      // p is the current prime
-	
-	// First, we compute the roots of alg
-	if (UNLIKELY(p > my_pth->lpb[1])) {
-	  nb_roots[0] = 1;
-	  nb_roots[1] = 0;
-	} else {
-	  nb_roots[0] = (p < my_pth->lpb[0]) ? 1 : 0;
-	  nb_roots[1] = mpz_poly_roots_ulong (computed_roots[1], my_pth->pols[1], p);
-	  if (UNLIKELY(nb_roots[1] != my_pth->deg[1] &&
-		       mpz_divisible_ui_p (my_pth->coeff[1][my_pth->deg[1]], p))) {
-	    computed_roots[1][nb_roots[1]++] = computed_roots[1][0];
-	    computed_roots[1][0] = p; // p is inserted in first place (for the next sort) as a root
-	  }
-	}
-
-	// Second, we fill my_roots->current buffer by the computed roots
-	my_roots->current += renumber_write_p_buffer_rat_alg (my_roots->current, p,
-                                    nb_roots[0], computed_roots[1], nb_roots[1]);
-	resize_buf ((buf_t *) &(my_roots->begin), MIN_BUF_ROOTS);
-	
-	// Third, we fill my_free_rels->current buffer by the possible free rels, on the form
-	// [1] p
-	// [(degree of alg + 1)] ++(my_free_rels->renumber)
-	if (UNLIKELY(nb_roots[0] && nb_roots[1] == my_pth->deg[1] &&
-		     p >= my_pth->pmin && p <= my_pth->pmax)) {
-	  *(my_free_rels->current)++ = p;
-	  for (i = 0; i <= nb_roots[1]; ++i)
-	    my_free_rels->current[i] = my_free_rels->renumber + i;
-	  my_free_rels->current += i;
-	  resize_buf ((buf_t *) &(my_free_rels->begin), MIN_BUF_FREE_RELS);
-	  ++(my_free_rels->nb_free);
-	}
-	my_free_rels->renumber += nb_roots[0] + nb_roots[1];
-
-	++(my_free_rels->nb_p);
-      } // Next p in current primes buffer
-
-    else       
-
-      // algebraic polynomials poly, "normal" case
-      while (my_p < my_primes->current) {
-	p = *my_p++;                      // p is the current prime
-
-	// First, we compute the roots of all polys
-	for (size_t my_alg = 0; my_alg < (size_t)my_pth->nb_polys; ++my_alg) {
-	  if (LIKELY (p < my_pth->lpb[my_alg])) {
-	    nb_roots[my_alg] = mpz_poly_roots_ulong (computed_roots[my_alg], my_pth->pols[my_alg], p);
-	    if (UNLIKELY(nb_roots[my_alg] != my_pth->deg[my_alg] &&
-			 mpz_divisible_ui_p (my_pth->coeff[my_alg][my_pth->deg[my_alg]], p))) {
-	      computed_roots[my_alg][nb_roots[my_alg]++] = computed_roots[my_alg][0];
-	      computed_roots[my_alg][0] = p; // p is inserted in first place (for the next sort) as a root
-	    }
-	  }
-	  else
-	    nb_roots[my_alg] = 0;
-	}
-	
-	// Second, we fill my_roots->current buffer by the computed roots
-	my_roots->current += 
-	    renumber_write_p_buffer_2algs (my_roots->current, p,
-					   computed_roots[0], nb_roots[0],
-					   computed_roots[1], nb_roots[1]);
-	resize_buf ((buf_t *) &(my_roots->begin), MIN_BUF_ROOTS);
-
-	// Third, we fill my_free_rels->current buffer by the possible free rels, on the form
-	// [1] : p
-	// [(degree of alg + 1)] : ++(my_free_rels->renumber)
-	if (UNLIKELY(nb_roots[0] == my_pth->deg[0] && nb_roots[1] == my_pth->deg[1] &&
-		     p >= my_pth->pmin && p <= my_pth->pmax)) {
-	  *(my_free_rels->current)++ = p;
-	  for (i = 0; i < nb_roots[0] + nb_roots[1]; ++i)
-	    my_free_rels->current[i] = my_free_rels->renumber + i;
-	  my_free_rels->current += i;
-	  resize_buf ((buf_t *) &(my_free_rels->begin), MIN_BUF_FREE_RELS);
-	  ++(my_free_rels->nb_free);
-	}
-	my_free_rels->renumber += nb_roots[0] + nb_roots[1];
-
-	++(my_free_rels->nb_p);
-      } // Next p in current primes buffer
-    
-    sema_post(&(my_pth->primes_empty)); // Drop my now consumed primes buffer
-    sema_post(&(my_pth->roots_full));   // Give my produced roots & free_rels buffer
-
-    if (UNLIKELY (++(my_pth->current_buf) == NB_BUFS)) my_pth->current_buf = 0;
-
-  } // Endless loop
-}  
-
-/* generate all free relations up to the large prime bound */
-/* generate the renumbering table */
-static unsigned long MAYBE_UNUSED
-allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
-                  unsigned long lpb[NB_POLYS_MAX], renumber_t renumber_table,
-		  size_t nb_pthreads,
-                  const char *outfilename)
-{
-  size_t i, j;
-  FILE *fpout = fopen_maybe_compressed (outfilename, "w");
-  unsigned int sum_degs_add_one = pol->pols[0]->deg + 1;
-  for(int k = 1; k < pol->nb_polys; k++)
-      sum_degs_add_one += pol->pols[k]->deg;
-  unsigned long lpbmax, lpbmin;     // MAX(lpb[0],lpb[1],...), MIN()
-  uint64_t total_primes = 0;       // Total of the primes
-  p_r_values_t total_free_rels = 0;// Total of the free relations
-  size_t current_buf = 0;          // current index buffer(s) for all the pthreads = [0, NB_NBUFS[
-  producer_t *pth;                 // primes consumers/root+free_rels producers main array
-  pthread_t primes_producer_pth;   // pthread for primes producer
-
-  ASSERT_ALWAYS(pol->nb_polys == 2); // TMP!!!!!
-
-  lpbmin = 1UL << lpb[0]; lpbmax = 0;
-  for(int k = 0; k < pol->nb_polys; k++){
-      ASSERT_ALWAYS(lpb[k] < sizeof(unsigned long) * CHAR_BIT);
-      lpb[k] = 1UL << lpb[k];
-      lpbmax = MAX(lpbmax, lpb[k]);
-      lpbmin = MIN(lpbmin, lpb[k]);
-  }
-
-  if (pmax) {
-      if (UNLIKELY (pmax > lpbmin)) {
-	  fprintf (stderr, "Error: pmax is greater than MIN(lpb[])\n");
-	  exit (1);
+    while (local_buf->nprimes_out < local_buf->nprimes_in)
+    {
+      unsigned long p = *my_p++;  /* p is the current prime */
+      /* Compute the roots on each side */
+      for (unsigned int side = 0; side < npolys; side++)
+      {
+        if (UNLIKELY(p > my_data->lpb[side]))
+          nroots[side] = 0;
+        else if (deg[side] == 1)
+          nroots[side] = 1;
+        else
+        {
+          nroots[side] = mpz_poly_roots_ulong (roots[side],
+                                               my_data->pols[side], p);
+          /* Check for a projective root.
+           * The projective root is assigned the value p and is inserted in
+           * first place in the roots array (for the next sort)
+           */
+          if (nroots[side] != deg[side] && mpz_divisible_ui_p (lc[side], p))
+          {
+            roots[side][nroots[side]++] = roots[side][0];
+            roots[side][0] = p;
+          }
+        }
       }
-  }
-  else
-      pmax = lpbmin;
 
-  printf ("Generating freerels for %lu <= p <= %lu\n", pmin, pmax);
+      /* Write in the temporary local renumbering table */
+      out->cur += renumber_write_buffer_p (out->cur, my_data->tab, p, roots, nroots);
+      char_buffer_resize (out, RENUMBER_MAX_SIZE_PER_PRIME);
+
+      /* Check if p corresponds to a freerel */
+      /* FIXME: What should be done when npolys != 2 ? */
+      if (npolys == 2)
+      {
+        if (UNLIKELY(nroots[0] == deg[0] && nroots[1] == deg[1] &&
+                     p >= my_data->pmin && p <= my_data->pmax))
+        {
+          local_buf->freerels_p[local_buf->nfreerels] = p;
+          local_buf->freerels_first_index[local_buf->nfreerels] =
+                                              local_buf->nroots_tot;
+          local_buf->nfreerels++;
+        }
+      }
+
+      for (unsigned int side = 0; side < npolys; side++)
+        local_buf->nroots_tot += nroots[side];
+      local_buf->nprimes_out++;
+    } /* Next p in current primes buffer */
+
+    sema_post(my_data->primes_empty); /* Drop my now consumed primes buffer */
+    sema_post(my_data->roots_full);   /* Give my produced roots buffer */
+    if (UNLIKELY (++(cur_buf) == NB_BUFFERS_PER_THREAD)) /* Go to next buffer */
+      cur_buf = 0;
+  } /* Endless loop */
+}
+
+/* Generate all the free relations and the renumbering table.
+ * Return the number of free relations */
+static uint64_t
+generate_renumber_and_freerels (const char *outfilename,
+                                renumber_t renumber_table, cado_poly pol,
+                                unsigned long pmin, unsigned long pmax,
+                                unsigned int nthreads)
+{
+  /* open outfile */
+  FILE *outfile = NULL;
+  outfile = fopen_maybe_compressed (outfilename, "w");
+  ASSERT_ALWAYS (outfile != NULL);
+
+  /* precompute sum(pols[k]->deg for k in [1..npolys]) */
+  unsigned int sum_degs = 0; /* sum of the degrees of all polynomials */
+  for(int k = 0; k < pol->nb_polys; k++)
+      sum_degs += pol->pols[k]->deg;
+
+  /* Compute the large primes bounds from their log in base 2. */
+  unsigned long lpb[NB_POLYS_MAX] = { 0 };
+  for(int k = 0; k < pol->nb_polys; k++)
+    lpb[k] = 1UL << renumber_table->lpb[k];
+  unsigned long lpbmax = 1UL << renumber_table->max_lpb;
+
   printf ("Generating renumber table for 2 <= p <= %lu\n", lpbmax);
+  printf ("Considering freerels for %lu <= p <= %lu\n", pmin, pmax);
   fflush (stdout);
 
+  /* Init statistics */
+  uint64_t nprimes_total = 0; /* Total number of the primes */
+  uint64_t nfreerels_total = 0; /* Total number of the free relations */
   stats_data_t stats; /* struct for printing progress */
   /* will print report at 2^10, 2^11, ... 2^23 computed primes and every
    * 2^23 primes after that */
-  stats_init (stats, stdout, &total_primes, 23, "Looked into", "primes", "", "p");
- 
-  /* We generate all free relations from pmin and up to the *minimum*
-     of the two large prime bounds, since larger primes will never
-     occur on both sides.
-     We generate the renumbering table from the first prime (2) and
-     up to the *maximum* of the two large prime bounds.
-  */
+  stats_init (stats, stdout, &nprimes_total, 23, "Treated", "primes", "", "p");
 
-  // First, all the roots & free rels producers, which immediatly wait for primes.
-  // Boring but needed initializations.
-  pth = malloc_check (nb_pthreads * sizeof (*pth));
-  for (i = 0; i < nb_pthreads; ++i) {
-    sema_init (&(pth[i].roots_full), 0);
-    sema_init (&(pth[i].roots_empty), NB_BUFS);
-    sema_init (&(pth[i].primes_full), 0);
-    sema_init (&(pth[i].primes_empty), NB_BUFS);
-    pth[i].current_buf        = 0;
-    pth[i].pthread_number     = i;
-    pth[i].number_of_pthreads = nb_pthreads;
-    pth[i].pmin               = pmin;
-    pth[i].pmax               = pmax;
-    pth[i].lpbmax             = lpbmax;
-    pth[i].nb_polys           = pol->nb_polys;
-    for(int k = 0; k < pol->nb_polys; k++){
-	pth[i].lpb[k]   = lpb[k];
-	pth[i].deg[k]   = pol->pols[k]->deg;
-	pth[i].coeff[k] = pol->pols[k]->coeff;
-	pth[i].pols[k]  = pol->pols[k];
-    }
-    for (j = NB_BUFS; j--;) {
-      pth[i].free_rels[j].begin = pth[i].free_rels[j].current =
-	malloc_aligned (SIZE_BUF_FREE_RELS * sum_degs_add_one * sizeof (*(pth[i].free_rels[j].begin)), CACHELINESIZE);
-      pth[i].roots[j].begin =     pth[i].roots[j].current =
-	malloc_aligned (SIZE_BUF_ROOTS     * sizeof (*(pth[i].roots[j].begin)), CACHELINESIZE);
-      pth[i].primes[j].begin =    pth[i].primes[j].current =
-	malloc_aligned (SIZE_BUF_PRIMES    * sizeof (*(pth[i].primes[j].begin)), CACHELINESIZE);
-      pth[i].free_rels[j].end = pth[i].free_rels[j].begin + SIZE_BUF_FREE_RELS;
-      pth[i].roots[j].end     = pth[i].roots[j].begin     + SIZE_BUF_ROOTS;
-      pth[i].primes[j].end    = pth[i].primes[j].begin    + SIZE_BUF_PRIMES;
-    }
-    if (pthread_create (&(pth[i].pthread), NULL,
-			pthread_roots_and_free_rels_producer, (void *) (pth + i))) {
-      perror ("pthread_roots_and_free_rels_producer pthread creation failed\n");
-      exit (1);
-    }
+  /* Init threads and threads data */
+  freerel_th_data_t *th_data = NULL; /* data of the threads */
+  pthread_t primes_producer_th; /* pthread for primes producer */
+  pthread_t *primes_consumer_th = NULL;
+
+  th_data = (freerel_th_data_t *) malloc (nthreads * sizeof (freerel_th_data_t));
+  ASSERT_ALWAYS (th_data != NULL);
+  primes_consumer_th = (pthread_t *) malloc (nthreads * sizeof (pthread_t));
+  ASSERT_ALWAYS (primes_consumer_th != NULL);
+
+  for (unsigned int i = 0; i < nthreads; i++)
+  {
+    sema_init (th_data[i].roots_full, 0);
+    sema_init (th_data[i].roots_empty, NB_BUFFERS_PER_THREAD);
+    sema_init (th_data[i].primes_full, 0);
+    sema_init (th_data[i].primes_empty, NB_BUFFERS_PER_THREAD);
+    th_data[i].th_id = i;
+    th_data[i].nthreads = nthreads;
+    th_data[i].pmin = pmin;
+    th_data[i].pmax = pmax;
+    th_data[i].lpbmax = lpbmax;
+    th_data[i].tab = renumber_table;
+    th_data[i].lpb = lpb;
+    th_data[i].pols = pol->pols;
+    for (unsigned int j = 0; j < NB_BUFFERS_PER_THREAD; j++)
+      th_buf_init (th_data[i].bufs[j], INIT_SIZE_BUF_CHAR);
   }
-  // Second, run the primes producer
-  if (pthread_create (&(primes_producer_pth), NULL, pthread_primes_producer, (void *) pth)) {
+
+  if (pthread_create (&(primes_producer_th), NULL, &pthread_primes_producer,
+                      (void *) th_data))
+  {
     perror ("pthread_primes_producer creation failed\n");
     exit (1);
   }
-  
-  // Main loop: load the roots & free rels buffers, and print them
-  for (i = 0;;) {
-    sema_wait (&(pth[i].roots_full)); // Need a full root & free rels buffer
-    
-    roots_t *roots = pth[i].roots + current_buf;
-    
-    // Is it the special end buffer (with only the end marker ?)
-    if ((void *) roots->current - (void *) roots->begin == sizeof (p_r_values_t) &&
-	*(p_r_values_t *) roots->begin == (p_r_values_t) (-1)) {
-      /* All is done: when a pthread which produces roots & free rels gives this
-	 special end buffer, all the next pthreads have finished and give also another
-	 special end buffer. So it's not useful to read all; one is sufficient.
-	 But it's dirty, so I prefer "read" (consume the semaphores) them all.
-	 Morever, some ASSERTs after the loop verify the values of the pseudo semaphores;
-	 if all is OK, these values must be equal to their initializations.
-      */
-      sema_post (&(pth[i].roots_empty));
-      for (j = i;;) {
-	if (UNLIKELY(++i == nb_pthreads)) i = 0;
-	if (UNLIKELY (i == j)) break;
-	sema_wait (&(pth[i].roots_full));  // Nothing to do after this,
-	sema_post (&(pth[i].roots_empty)); // we drop directly this special end buffer
-      }
-      break; // End of the main loop
-    }
-    
-    // We write the roots in one ASCII block
-    fwrite (roots->begin, (void *) roots->current - (void *) roots->begin, 1, renumber_table->file);
-
-    // We have to recompute the real index of the renumber table for the free rels
-    free_rels_t free_rels = pth[i].free_rels [current_buf]; // Careful: local copy!
-    ASSERT (!((free_rels.current - free_rels.begin) % sum_degs_add_one));
-    for (free_rels_buf_t *pt = free_rels.begin; pt < free_rels.current; pt += sum_degs_add_one) {
-      fprintf (fpout, "%" PRIx64 ",0:%" PRIx64, (uint64_t) pt[0], (uint64_t) pt[1] + renumber_table->size);
-      for (j = 2; j < sum_degs_add_one; ++j) 
-	fprintf (fpout, ",%" PRIx64, (uint64_t) pt[j] + renumber_table->size);
-      fputc ('\n', fpout);
-    }
-    renumber_table->size += free_rels.renumber;
-    total_free_rels += free_rels.nb_free;
-    total_primes += free_rels.nb_p;
-
-    sema_post (&(pth[i].roots_empty)); // Drop the consumed root & free rels buffer
-    
-    if (stats_test_progress(stats)) stats_print_progress (stats, total_primes, 0, 0, 0);
-
-    if (UNLIKELY (++i == nb_pthreads)) {
-      i = 0;
-      if (UNLIKELY (++current_buf == NB_BUFS)) current_buf = 0;
+  for (unsigned int i = 0; i < nthreads; i++)
+  {
+    if (pthread_create (&(primes_consumer_th[i]), NULL,
+                        &pthread_primes_consumer,
+                        (void *) &(th_data[i])))
+    {
+      perror ("pthread_primes_consumer pthread creation failed\n");
+      exit (1);
     }
   }
-  
-  // All is done!
-  stats_print_progress (stats, total_primes, 0, 0, 1);
-  if (pthread_join (primes_producer_pth, NULL)) {
+
+  unsigned int cur_th = 0;
+  unsigned int cur_buf = 0;
+  /* Main loop: load the roots & free rels buffers, and print them */
+  for (;;)
+  {
+    sema_wait (th_data[cur_th].roots_full); /* Need a full roots buffer */
+    th_buf_ptr local_buf = th_data[cur_th].bufs[cur_buf];
+
+    /* Is it the special end buffer (with only the end marker ) ? */
+    if (local_buf->nfreerels == 1 &&
+        local_buf->freerels_p[0] == FREEREL_END_MARKER)
+    {
+      /* All is done: when a pthread which produces roots & free rels gives this
+       * special end buffer, all the next pthreads have finished and give also
+       * another special end buffer. So it's not useful to read all; one is
+       * sufficient. But it's dirty, so I prefer "read" (consume the semaphores)
+       * them all. Morever, some ASSERTs after the loop verify the values of the
+       * pseudo semaphores; if all is OK, these values must be equal to their
+       * initializations.
+       */
+      sema_post (th_data[cur_th].roots_empty);
+      for (unsigned int th_bak = cur_th;;)
+      {
+        if (UNLIKELY(++cur_th == nthreads))
+          cur_th = 0;
+        if (UNLIKELY (cur_th == th_bak))
+          break;
+        sema_wait (th_data[cur_th].roots_full);
+        /* Nothing to do after this, we drop directly this special end buffer. */
+        sema_post (th_data[cur_th].roots_empty);
+      }
+      break; /* End of the main loop */
+    }
+
+    /* We write the part of the renumbering table computed by the thread */
+    char_buffer_write (renumber_table->file, local_buf->roots_char);
+
+    /* We have to recompute the real index in the renumber table for the free
+       relations */
+    for (uint64_t k = 0; k < local_buf->nfreerels; k++)
+    {
+      uint64_t index = local_buf->freerels_first_index[k] + renumber_table->size;
+      uint64_t last_index = index + sum_degs;
+      fprintf (outfile, "%lx,0:%" PRIx64, local_buf->freerels_p[k], index);
+      index++;
+      for (; index < last_index; index++)
+        fprintf (outfile, ",%" PRIx64, index);
+      fputc ('\n', outfile);
+    }
+    renumber_table->size += local_buf->nroots_tot;
+    nfreerels_total += local_buf->nfreerels;
+    nprimes_total += local_buf->nprimes_out;
+
+    /* Drop the consumed root & free rels buffer */
+    sema_post (th_data[cur_th].roots_empty);
+
+    if (stats_test_progress(stats))
+      stats_print_progress (stats, nprimes_total, 0, 0, 0);
+
+    if (UNLIKELY (++cur_th == nthreads))
+    {
+      cur_th = 0;
+      if (UNLIKELY (++cur_buf == NB_BUFFERS_PER_THREAD))
+        cur_buf = 0;
+    }
+  }
+
+  /* All is done! */
+  stats_print_progress (stats, nprimes_total, 0, 0, 1);
+  if (pthread_join (primes_producer_th, NULL))
+  {
     perror ("Error, pthread primes producer stops abnormally\n");
     exit (1);
   }
-  for (i = nb_pthreads; i--;) {
-    if (pthread_join (pth[i].pthread, NULL)) {
-      perror ("Error, one of the pthreads roots/free relations producers stops abnormally\n");
+  for (unsigned int i = 0; i < nthreads; i++)
+  {
+    if (pthread_join (primes_consumer_th[i], NULL))
+    {
+      perror ("Error, one of the threads pthread_primes_consumer stops "
+              "abnormally\n");
       exit (1);
     }
-    ASSERT(pth[i].roots_full.value == 0);
-    ASSERT(pth[i].roots_empty.value == NB_BUFS);
-    ASSERT(pth[i].primes_full.value == 0);
-    ASSERT(pth[i].primes_empty.value == NB_BUFS);
-    sema_destroy (&(pth[i].roots_full));
-    sema_destroy (&(pth[i].roots_empty));
-    sema_destroy (&(pth[i].primes_full));
-    sema_destroy (&(pth[i].primes_empty));
-    for (j = NB_BUFS; j--;) {
-      free (pth[i].free_rels[j].begin);
-      free (pth[i].roots[j].begin);
-      free (pth[i].primes[j].begin);
-    }
+    ASSERT(th_data[i].roots_full->value == 0);
+    ASSERT(th_data[i].roots_empty->value == NB_BUFFERS_PER_THREAD);
+    ASSERT(th_data[i].primes_full->value == 0);
+    ASSERT(th_data[i].primes_empty->value == NB_BUFFERS_PER_THREAD);
+    sema_destroy (th_data[i].roots_full);
+    sema_destroy (th_data[i].roots_empty);
+    sema_destroy (th_data[i].primes_full);
+    sema_destroy (th_data[i].primes_empty);
+    for (unsigned int j = 0; j < NB_BUFFERS_PER_THREAD; j++)
+      th_buf_clear (th_data[i].bufs[j]);
   }
-  free (pth);
-  fclose_maybe_compressed (fpout, outfilename);
-  return total_free_rels;
+  free (th_data);
+  free (primes_consumer_th);
+  fclose_maybe_compressed (outfile, outfilename);
+  return nfreerels_total;
 }
 
 static void declare_usage(param_list pl)
@@ -580,8 +611,13 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "output file for renumbering table");
   param_list_decl_usage(pl, "out", "output file for free relations");
-  param_list_decl_usage(pl, "lpb0", "large prime bound on side 0");
-  param_list_decl_usage(pl, "lpb1", "large prime bound on side 1");
+  for (unsigned int i = 0; i < NB_POLYS_MAX; i++)
+  {
+    char desc[64], name[8];
+    snprintf (desc, 64, "large prime bound on side %u", i);
+    snprintf (name, 8, "lpb%u", i);
+    param_list_decl_usage(pl, name, desc);
+  }
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
@@ -599,123 +635,132 @@ usage (param_list pl, char *argv0)
 int
 main (int argc, char *argv[])
 {
-    const char *renumberfilename = NULL;
-    const char *badidealsfilename = NULL;
-    const char *polyfilename = NULL;
-    const char *outfilename = NULL;
-    char *argv0 = argv[0];
-    cado_poly cpoly;
-    unsigned long pmin = 2, pmax = 0, nfree;
-    renumber_t renumber_table;
-    int add_full_col = 0;
-    unsigned long lpb[NB_POLYS_MAX];
-    unsigned long nb_pthreads = 1;
+  char *argv0 = argv[0];
+  cado_poly cpoly;
+  unsigned long pmin = 2, pmax = 0;
+  uint64_t nfree;
+  renumber_t renumber_table;
+  int add_full_col = 0;
+  unsigned long lpb[NB_POLYS_MAX] = { 0 };
+  unsigned int nthreads = 1;
 
-    for(int i = 0; i < NB_POLYS_MAX; i++)
-	lpb[i] = 0;
-    param_list pl;
-    param_list_init(pl);
-    declare_usage(pl);
-    param_list_configure_switch(pl, "-addfullcol", &add_full_col);
+  param_list pl;
+  param_list_init(pl);
+  declare_usage(pl);
+  param_list_configure_switch(pl, "-addfullcol", &add_full_col);
 
 #ifdef HAVE_MINGW
-    _fmode = _O_BINARY;     /* Binary open for all files */
+  _fmode = _O_BINARY; /* Binary open for all files */
 #endif
 
-    argv++, argc--;
-    if (argc == 0)
+  argv++, argc--;
+  if (argc == 0)
+    usage (pl, argv0);
+
+  for( ; argc ; )
+  {
+    if (param_list_update_cmdline(pl, &argc, &argv))
+      continue;
+    FILE *f;
+    if ((f = fopen(argv[0], "r")) != NULL)
+    {
+      param_list_read_stream(pl, f, 0);
+      fclose(f);
+      argv++,argc--;
+      continue;
+    }
+    fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+    usage (pl, argv0);
+  }
+  /* print command-line arguments */
+  verbose_interpret_parameters (pl);
+  param_list_print_command_line (stdout, pl);
+  fflush (stdout);
+
+  const char * polyfilename = param_list_lookup_string(pl, "poly");
+  const char * outfilename = param_list_lookup_string(pl, "out");
+  const char * badidealsfilename = param_list_lookup_string(pl, "badideals");
+  const char * renumberfilename = param_list_lookup_string(pl, "renumber");
+  for (unsigned int i = 0; i < NB_POLYS_MAX; i++)
+  {
+    char name[8];
+    snprintf (name, 8, "lpb%u", i);
+    param_list_parse_ulong (pl, name, &lpb[i]);
+  }
+  param_list_parse_ulong (pl, "pmin", &pmin);
+  param_list_parse_ulong (pl, "pmax", &pmax);
+  param_list_parse_uint (pl, "t", &nthreads);
+
+  if (polyfilename == NULL)
+  {
+    fprintf (stderr, "Error, missing -poly command line argument\n");
+    usage (pl, argv0);
+  }
+  if (renumberfilename == NULL)
+  {
+    fprintf (stderr, "Error, missing -renumber command line argument\n");
+    usage (pl, argv0);
+  }
+  if (outfilename == NULL)
+  {
+    fprintf (stderr, "Error, missing -out command line argument\n");
+    usage (pl, argv0);
+  }
+  if (nthreads == 0 || nthreads > 512)
+  {
+    fprintf (stderr, "Error, the number of threads is incorrect, it must be "
+                      "between 1 and 512.\n");
+  }
+
+  cado_poly_init(cpoly);
+  if (!cado_poly_read (cpoly, polyfilename))
+  {
+    fprintf (stderr, "Error reading polynomial file\n");
+    exit (EXIT_FAILURE);
+  }
+  for (int i = 0; i < cpoly->nb_polys; i++)
+  {
+    if (lpb[i] == 0)
+    {
+      fprintf (stderr, "Error, missing -lpb%u command line argument\n", i);
       usage (pl, argv0);
-
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv))
-            continue;
-        FILE *f;
-        if ((f = fopen(argv[0], "r")) != NULL) {
-            param_list_read_stream(pl, f, 0);
-            fclose(f);
-            argv++,argc--;
-            continue;
-        }
-        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
-        usage (pl, argv0);
     }
-    /* print command-line arguments */
-    verbose_interpret_parameters (pl);
-    param_list_print_command_line (stdout, pl);
-    fflush (stdout);
+  }
 
-    polyfilename = param_list_lookup_string(pl, "poly");
-    outfilename = param_list_lookup_string(pl, "out");
-    badidealsfilename = param_list_lookup_string(pl, "badideals");
-    renumberfilename = param_list_lookup_string(pl, "renumber");
+  if (param_list_warn_unused(pl))
+    usage (pl, argv0);
 
+  int ratside = cado_poly_get_ratside (cpoly);
+  renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside,
+                                                            add_full_col, lpb);
 
-    if (polyfilename == NULL)
-    {
-      fprintf (stderr, "Error, missing -poly command line argument\n");
-      usage (pl, argv0);
-    }
-    if (renumberfilename == NULL)
-    {
-      fprintf (stderr, "Error, missing -renumber command line argument\n");
-      usage (pl, argv0);
-    }
-    if (outfilename == NULL)
-    {
-      fprintf (stderr, "Error, missing -out command line argument\n");
-      usage (pl, argv0);
-    }
+  /* if pmax is not equal to 0 (i.e., was not given on the command line), 
+   * set pmax to the *minimum* of the large prime bounds, since larger primes
+   * will never occur on both sides.
+   * We generate the renumbering table from the first prime (2) and
+   * up to the *maximum* of the large prime bounds.
+   */
+  unsigned long lpbmin = lpb[0];
+  for(int k = 1; k < cpoly->nb_polys; k++)
+    lpbmin = MIN(lpbmin, lpb[k]);
+  if (!pmax)
+    pmax = 1UL << lpbmin;
 
-    cado_poly_init(cpoly);
-    if (!cado_poly_read (cpoly, polyfilename))
-    {
-      fprintf (stderr, "Error reading polynomial file\n");
-      exit (EXIT_FAILURE);
-    }
+  renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
+                       cpoly);
 
-    param_list_parse_ulong(pl, "lpb0", &lpb[0]);
-    param_list_parse_ulong(pl, "lpb1", &lpb[1]);
-    param_list_parse_ulong(pl, "pmin", &pmin);
-    param_list_parse_ulong(pl, "pmax", &pmax);
-    param_list_parse_ulong(pl, "t"   , &nb_pthreads);
+  nfree = generate_renumber_and_freerels (outfilename, renumber_table, cpoly,
+                                          pmin, pmax, nthreads);
 
-    // FIXME: be damn stupid for the time being
-    for(int i = 2; i < cpoly->nb_polys; i++)
-	lpb[i] = lpb[1];
-    if (lpb[0] == 0 || lpb[1] == 0)
-    {
-      fprintf (stderr, "Error, missing -lpb0 or -lpb1 command line argument\n");
-      usage (pl, argv0);
-    }
+  /* /!\ Needed by the Python script. /!\ */
+  fprintf (stderr, "# Free relations: %" PRIu64 "\n", nfree);
+  fprintf (stderr, "Renumbering struct: nprimes=%" PRIu64 "\n",
+                   renumber_table->size);
 
-    if (param_list_warn_unused(pl))
-    {
-      usage (pl, argv0);
-    }
+  renumber_write_close (renumber_table, renumberfilename);
+  renumber_clear (renumber_table);
+  cado_poly_clear (cpoly);
+  param_list_clear(pl);
 
-    if (!nb_pthreads || nb_pthreads > 512)
-    {
-      fprintf (stderr, "Error, the number of threads is incorrect, must be between 1 and 512\n");
-    }
-
-    int ratside = cado_poly_get_ratside (cpoly);
-    renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside,
-			       add_full_col, lpb);
-    renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
-                         cpoly);
-
-    nfree = allFreeRelations (cpoly, pmin, pmax, lpb, renumber_table, 
-			      (size_t) nb_pthreads, outfilename);
-
-    /* /!\ Needed by the Python script. /!\ */
-    fprintf (stderr, "# Free relations: %lu\n", nfree);
-    fprintf (stderr, "Renumbering struct: nprimes=%" PRIu64 "\n",
-                     renumber_table->size);
-
-    renumber_write_close (renumber_table, renumberfilename);
-    renumber_clear (renumber_table);
-    cado_poly_clear (cpoly);
-    param_list_clear(pl);
-
-    return 0;
+  return 0;
 }

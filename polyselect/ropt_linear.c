@@ -72,7 +72,7 @@ ropt_linear_tune ( ropt_poly_t poly,
 
       if (j > 32) break;
 
-#ifdef ROPT_LINEAR_TUNE_HARDER /* slow tunning process*/
+#ifdef ROPT_LINEAR_TUNE_HARDER /* slow tuning process */
       k = 0;
       old_MurphyE = 0.0;
       mpz_set (old_mod, mod);
@@ -137,7 +137,7 @@ ropt_linear_tune ( ropt_poly_t poly,
         break;
       mpz_sub (tmpu, tmpu, mod);
 
-#ifdef ROPT_LINEAR_TUNE_HARDER /* slow tunning process*/
+#ifdef ROPT_LINEAR_TUNE_HARDER /* slow tuning process */
 
       k = 0;
       old_MurphyE = 0.0;
