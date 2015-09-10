@@ -634,7 +634,7 @@ int main(int argc, char * argv[])
         int phi[128];
         {
             pmat p,q;
-            mat64 m[4],l[2],u[4];
+            mat64 m[4],l[4],u[4];
             memfill_random(m, 4 * sizeof(mat64));
             pmat_init(p, 128);
             pmat_init(q, 128);
