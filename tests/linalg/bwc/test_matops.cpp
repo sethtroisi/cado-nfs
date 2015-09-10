@@ -24,13 +24,14 @@ static inline uint64_t rand64()
     return r;
 }
 
-static inline void rand64_mem(uint64_t * ptr, size_t z)
+static inline void memfill_random(uint64_t * ptr, size_t z)
 {
     if (urandom_fd == -1)
         urandom_fd = open("/dev/urandom", O_RDONLY);
     if (urandom_fd < 0) abort();
-    size_t s = read(urandom_fd, ptr, z * sizeof(uint64_t));
+    size_t s = read(urandom_fd, ptr, z);
     if (s != z) abort();
+    // close(urandom_fd);
 }
 #else
 static inline uint64_t rand64()
@@ -40,10 +41,16 @@ static inline uint64_t rand64()
     uint64_t r2 = rand(); r2 <<= 44;
     return r0 ^r1 ^ r2;
 }
-static inline void rand64_mem(uint64_t * ptr, size_t z)
+
+static inline void memfill_random(void *p, size_t s)
 {
-    for( ; z-- ; ptr[z] = rand64());
+    size_t w = sizeof(uint64_t);
+    uint64_t * pw = (uint64_t *)p;
+    for( ; s >= w ; pw++, s -= w) *pw = rand64();
+    char * pc = (char*) pw;
+    for( ; s ; pc++, s--) *pc = rand();
 }
+
 #endif/*}}}*/
 
 int test_accel = 1;
@@ -148,8 +155,8 @@ void l1_data_init_set(l1_data_ptr D, unsigned int n)
     D->WT = mzd_init(64, 64);
 #endif  /* HAVE_M4RI */
 
-    rand64_mem(D->a, n);
-    rand64_mem(D->w, 64);
+    memfill_random(D->a, (n) * sizeof(uint64_t));
+    memfill_random(D->w, (64) * sizeof(uint64_t));
     transp_6464(D->wt, D->w);
 #ifdef  HAVE_M4RI
     mzd_set_mem(D->A, D->a, n);
@@ -442,6 +449,7 @@ void check_pluq(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m, int n)
     for(int i = 0 ; i < (n/64) ; i++ ) {
         ASSERT_ALWAYS(mat64_is_uppertriangular(puq[i*(n/64)+i]));
     }
+    pmat_clear(qt);
 }
 /*{{{ more test routines */
 void level3_gauss_tests_N(int n __attribute__((unused)))
@@ -454,7 +462,7 @@ void level3_gauss_tests_N(int n __attribute__((unused)))
 #if 0
     mzd_set_mem(M, m, n);
     uint64_t * m = (uint64_t *) malloc((n*n/64)*sizeof(uint64_t));
-    rand64_mem(m, 64);
+    memfill_random(m, (64) * sizeof(uint64_t));
     free(m);
 #else
     my_mzd_randomize(M);
@@ -535,8 +543,8 @@ int main(int argc, char * argv[])
         uint64_t * r = (uint64_t *) malloc(64 * sizeof(uint64_t));
         uint64_t * a = (uint64_t *) malloc(n * sizeof(uint64_t));
         uint64_t * w = (uint64_t *) malloc(n * sizeof(uint64_t));
-        rand64_mem(a, n);
-        rand64_mem(w, n);
+        memfill_random(a, (n) * sizeof(uint64_t));
+        memfill_random(w, (n) * sizeof(uint64_t));
 
         printf("-- level-2 benches (N=%u) --\n", n);
         level1_mul_tests_N(n);
@@ -555,7 +563,7 @@ int main(int argc, char * argv[])
             pmat p,q;
             pmat_init(p, 64);
             pmat_init(q, 64);
-            rand64_mem((uint64_t*)m, 64);
+            memfill_random(m, sizeof(mat64));
             PLUQ64(p,l,u,q,m);
             check_pluq(p,l,u,q,m,64);
             pmat_clear(p);
@@ -566,7 +574,7 @@ int main(int argc, char * argv[])
             pmat p,q;
             pmat_init(p, 128);
             pmat_init(q, 128);
-            rand64_mem((uint64_t*)m, 4*64);
+            memfill_random(m, 4 * sizeof(mat64));
             PLUQ128(p,l,u,q,m);
             check_pluq(p,l,u,q,m,128);
             pmat_clear(p);
@@ -589,10 +597,10 @@ int main(int argc, char * argv[])
             
 #if 0
             memset(e,0,sizeof(e));
-            rand64_mem(m[0], 64);
-            rand64_mem(m[1], 64);
-            rand64_mem(m[2], 64);
-            rand64_mem(m[3], 64);
+            memfill_random(m[0], (64) * sizeof(uint32_t));
+            memfill_random(m[1], (64) * sizeof(uint32_t));
+            memfill_random(m[2], (64) * sizeof(uint32_t));
+            memfill_random(m[3], (64) * sizeof(uint32_t));
             // pmat_6464(m[0]); printf("\n");
             full_echelon_6464_imm(mm,e[0],m[0]);
 
@@ -610,12 +618,12 @@ int main(int argc, char * argv[])
         mat64 e;
         mat64 mm;
         mat64 l,u,p;
-        rand64_mem(m, 64);
-        rand64_mem(e, 64);
-        rand64_mem(mm, 64);
+        memfill_random(m, sizeof(mat64));
+        memfill_random(e, sizeof(mat64));
+        memfill_random(mm, sizeof(mat64));
         mat64 m4[4];
         mat64 u4[4];
-        rand64_mem((uint64_t*)m4, 256);
+        memfill_random(m4, 4 * sizeof(mat64));
         // printf("-- for reference: best matrix mult, 64x64 --\n");
         // TIME1(2, mul_6464_6464, (mm,e,m));
         // TIME1(2, mul_N64_T6464, (mm,e,m,64));
@@ -627,15 +635,17 @@ int main(int argc, char * argv[])
         {
             pmat p,q;
             mat64 m[4],l[2],u[4];
-            rand64_mem((uint64_t*)m, 4*64);
+            memfill_random(m, 4 * sizeof(mat64));
             pmat_init(p, 128);
             pmat_init(q, 128);
             TIME1(2, PLUQ128, (p,l,u,q,m));
+            pmat_clear(p);
+            pmat_clear(q);
         }
         int n=2;
-        TIME1N(2, rand64_mem((uint64_t*)m4, n*64), );
+        TIME1N(2, memfill_random(m4, n*sizeof(mat64)), );
         TIME1N_spins(, 2, PLUQ64_n, (phi,l,u4,m4,64*n), ret/64,n+1);
-        TIME1N_spins(rand64_mem((uint64_t*)m4, n*64), 2, PLUQ64_n, (phi,l,u4,m4,64*n), ret/64,n+1);
+        TIME1N_spins(memfill_random(m4, n*sizeof(mat64)), 2, PLUQ64_n, (phi,l,u4,m4,64*n), ret/64,n+1);
         TIME1(2, LUP64_imm, (l,u,p,m));
         TIME1(2, full_echelon_6464_imm, (mm,e,m));
         TIME1(2, gauss_128128_C, (m));
@@ -651,6 +661,8 @@ int main(int argc, char * argv[])
         mat64 * A = (mat64 *) malloc(n * sizeof(mat64));
         mat64 * B = (mat64 *) malloc(n * sizeof(mat64));
         mat64 * C = (mat64 *) malloc(2 *n * sizeof(mat64));
+        memfill_random(A, n * sizeof(mat64));
+        memfill_random(B, n * sizeof(mat64));
         printf("-- polynomials (N=%zu) --\n", n);
         TIME1(5, m64pol_mul, (C,A,B,n,n));
         TIME1(5, m64pol_mul_kara, (C,A,B,n,n));
@@ -665,6 +677,8 @@ int main(int argc, char * argv[])
         mat64 * A = (mat64 *) malloc(K * K * n * sizeof(mat64));
         mat64 * B = (mat64 *) malloc(K * K * n * sizeof(mat64));
         mat64 * C = (mat64 *) malloc(K * K * 2 *n * sizeof(mat64));
+        memfill_random(A, K * K * n * sizeof(mat64));
+        memfill_random(B, K * K * n * sizeof(mat64));
         printf("-- polynomials, larger matrices (K=%u, N=%zu) --\n", K, n);
         TIME1(5, m64polblock_mul, (C,A,B,n,n,2));
         TIME1(5, m64polblock_mul_kara, (C,A,B,n,n,K));
@@ -681,6 +695,8 @@ int main(int argc, char * argv[])
         uint64_t * Al = (uint64_t *) A;
         uint64_t * Bl = (uint64_t *) B;
         uint64_t * Cl = (uint64_t *) C;
+        memfill_random(A, n * sizeof(mat64));
+        memfill_random(B, n * sizeof(mat64));
         printf("-- 64x64 matrices over GF(2^64) --\n");
         TIME1(5, m64pol_mul_gf2_64_bitslice, (C,A,B));
         TIME1(5, m64pol_mul_gf2_64_nobitslice, (Cl,Al,Bl));
@@ -724,6 +740,8 @@ m64pol_mul_gf2_128_nobitslice   158 times in 31.8354 ms each
         mat64 * B = (mat64 *) malloc(n * sizeof(mat64));
         uint64_t * Al = (uint64_t *) A;
         uint64_t * Bl = (uint64_t *) B;
+        memfill_random(A, n * sizeof(mat64));
+        memfill_random(B, n * sizeof(mat64));
         printf("-- 64x64 matrix over GF(2^64), multiplication by scalar --\n");
         TIME1(5, m64pol_scalmul_gf2_64_bitslice, (B,A,scalar));
         TIME1(5, m64pol_scalmul_gf2_64_bitslice2, (B,A,scalar));

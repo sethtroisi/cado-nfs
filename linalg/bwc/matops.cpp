@@ -242,7 +242,7 @@ void addmul_To64_o64_lsb_packof2(uint64_t * r, uint64_t a, uint64_t w)
 #ifdef  HAVE_SSE2
 void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t w)
 {
-    /* Avec des sse-2 */
+    /* Using sse-2 */
     __m128i mb[4] = {
 	_cado_mm_setr_epi64(0, 0),
 	_cado_mm_setr_epi64(w, 0),
@@ -798,7 +798,8 @@ void mul_N64_6464_sse(uint64_t *C,
     __m128i *Cw = (__m128i *) C;
     __m128i *Aw = (__m128i *) A;
 
-    for (j = 0; j < m; j += 2) {
+    /* If m is odd, then we can't do sse because of data width */
+    for (j = 0; j < m - 1; j += 2) {
         __m128i c = _mm_setzero_si128();
 	__m128i a = *Aw++;
 
@@ -1040,11 +1041,11 @@ void m64pol_mul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2
     mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
     m64pol_mul_kara(t, a1, a2, n1, n2);
     /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
-    for(unsigned int i = 64 ; i-- > 0 ; ) {
-        add_6464_6464(t[i+4], t[i+4], t[i+64]);
-        add_6464_6464(t[i+3], t[i+3], t[i+64]);
-        add_6464_6464(t[i+1], t[i+1], t[i+64]);
-        add_6464_6464(t[i  ], t[i  ], t[i+64]);
+    for(unsigned int i = n1 + n2 - 2 ; i >= 64 ; i--) {
+        add_6464_6464(t[i-64+4], t[i-64+4], t[i]);
+        add_6464_6464(t[i-64+3], t[i-64+3], t[i]);
+        add_6464_6464(t[i-64+1], t[i-64+1], t[i]);
+        add_6464_6464(t[i-64  ], t[i-64  ], t[i]);
     }
     memcpy(r, t, 64 * sizeof(mat64));
     free(t);
@@ -1062,11 +1063,11 @@ void m64pol_scalmul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a, uint64_t * s)
         // for(unsigned int j = 0 ; j < 64 ; j++) { add_6464_6464(t[i+j], t[i+j], a[j]); }
     }
     /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
-    for(unsigned int i = 64 ; i-- > 0 ; ) {
-        add_6464_6464(t[i+4], t[i+4], t[i+64]);
-        add_6464_6464(t[i+3], t[i+3], t[i+64]);
-        add_6464_6464(t[i+1], t[i+1], t[i+64]);
-        add_6464_6464(t[i  ], t[i  ], t[i+64]);
+    for(unsigned int i = n1 + n2 - 2 ; i >= 64 ; i--) {
+        add_6464_6464(t[i-64+4], t[i-64+4], t[i]);
+        add_6464_6464(t[i-64+3], t[i-64+3], t[i]);
+        add_6464_6464(t[i-64+1], t[i-64+1], t[i]);
+        add_6464_6464(t[i-64  ], t[i-64  ], t[i]);
     }
     memcpy(r, t, 64 * sizeof(mat64));
     free(t);
@@ -1111,11 +1112,11 @@ void m64pol_scalmul_gf2_64_bitslice2(m64pol_ptr r, m64pol_srcptr a, uint64_t * s
     free(am_area);
 
     /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
-    for(unsigned int i = 64 ; i-- > 0 ; ) {
-        add_6464_6464(t[i+4], t[i+4], t[i+64]);
-        add_6464_6464(t[i+3], t[i+3], t[i+64]);
-        add_6464_6464(t[i+1], t[i+1], t[i+64]);
-        add_6464_6464(t[i  ], t[i  ], t[i+64]);
+    for(unsigned int i = n1 + n2 - 2 ; i >= 64 ; i--) {
+        add_6464_6464(t[i-64+4], t[i-64+4], t[i]);
+        add_6464_6464(t[i-64+3], t[i-64+3], t[i]);
+        add_6464_6464(t[i-64+1], t[i-64+1], t[i]);
+        add_6464_6464(t[i-64  ], t[i-64  ], t[i]);
     }
     memcpy(r, t, 64 * sizeof(mat64));
     free(t);
@@ -1162,11 +1163,11 @@ void m64pol_mul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a
     mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
     m64pol_mul_kara(t, a1, a2, n1, n2);
     /* This reduces modulo the polynomial x^128+x^7+x^2+x+1 */
-    for(unsigned int i = 128 ; i-- > 0 ; ) {
-        add_6464_6464(t[i+7], t[i+7], t[i+128]);
-        add_6464_6464(t[i+2], t[i+2], t[i+128]);
-        add_6464_6464(t[i+1], t[i+1], t[i+128]);
-        add_6464_6464(t[i  ], t[i  ], t[i+128]);
+    for(unsigned int i = n1 + n2 - 2 ; i >= 128; i--) {
+        add_6464_6464(t[i-128+7], t[i-128+7], t[i]);
+        add_6464_6464(t[i-128+2], t[i-128+2], t[i]);
+        add_6464_6464(t[i-128+1], t[i-128+1], t[i]);
+        add_6464_6464(t[i-128  ], t[i-128  ], t[i]);
     }
     memcpy(r, t, 128 * sizeof(mat64));
     free(t);
@@ -1185,11 +1186,11 @@ void m64pol_scalmul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a, uint64_t * s
         }
     }
     /* This reduces modulo the polynomial x^128+x^7+x^2+x+1 */
-    for(unsigned int i = 128 ; i-- > 0 ; ) {
-        add_6464_6464(t[i+7], t[i+7], t[i+128]);
-        add_6464_6464(t[i+2], t[i+2], t[i+128]);
-        add_6464_6464(t[i+1], t[i+1], t[i+128]);
-        add_6464_6464(t[i  ], t[i  ], t[i+128]);
+    for(unsigned int i = n1 + n2 - 2 ; i >= 128; i--) {
+        add_6464_6464(t[i-128+7], t[i-128+7], t[i]);
+        add_6464_6464(t[i-128+2], t[i-128+2], t[i]);
+        add_6464_6464(t[i-128+1], t[i-128+1], t[i]);
+        add_6464_6464(t[i-128  ], t[i-128  ], t[i]);
     }
     memcpy(r, t, 128 * sizeof(mat64));
     free(t);
@@ -1388,7 +1389,7 @@ int LUP64_imm(mat64 l, mat64 u, mat64 p, mat64 a)
 {
     memcpy(u,a,sizeof(mat64));
     uint64_t mask=1;
-    uint64_t todo=~((uint64_t)0);
+    uint64_t todo=~UINT64_C(0);
     int r = 0;
     for(int j = 0 ; j < 64 ; j++, mask<<=1) p[j]=l[j]=mask;
     mask=1;
