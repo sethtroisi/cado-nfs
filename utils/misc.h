@@ -74,17 +74,25 @@ next_multiple_of_powerof2(unsigned long n, unsigned long k)
     ASSERT((k & (k-1)) == 0);
     return ((n-1)|(k-1)) + 1;
 }
-
+/* Best X86 medium memcpy with pointers & size length already cache
+   lines aligned on modern X86, so dst/src/lg & 0x3F = 0 */
+static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+  size_t lg_8bytes = lg >> 3;
+  __asm__ __volatile__ ("cld\nrep movsq\n":"+D"(dst),"+S"(src),"+c"(lg_8bytes));
+#else
+  memcpy(dst,src,lg);
+#endif
+}
+/*{{{ cado_clz and variants*/
 /* those builtins seem to have appeared in 3.4 (April 2004) */
-#ifndef HAVE_clzl
 #if GNUC_VERSION_ATLEAST(3,4,0)
-#define clzll(x)        __builtin_clzll(x)
-#define clzl(x)         __builtin_clzl(x)
-#define clz(x)          __builtin_clz(x)
-#define HAVE_clzl
+#define cado_clzll(x)        __builtin_clzll(x)
+#define cado_clzl(x)         __builtin_clzl(x)
+#define cado_clz(x)          __builtin_clz(x)
 #else
 /* provide slow fallbacks */
-static inline int clzll(unsigned long long x)
+static inline int cado_clzll(unsigned long long x)
 {
 #if ULONGLONG_BITS == 64
         static const int t[4] = { 2, 1, 0, 0 };
@@ -98,11 +106,11 @@ static inline int clzll(unsigned long long x)
         res = 64 - 2 - a + t[x];
         return res;
 #else
-#error "clzll might be wrong here"
+#error "cado_clzll might be wrong here"
 #endif
 }
 
-static inline int clzl(unsigned long x)
+static inline int cado_clzl(unsigned long x)
 {
         static const int t[4] = { 2, 1, 0, 0 };
         int a = 0;
@@ -118,7 +126,7 @@ static inline int clzl(unsigned long x)
         return res;
 }
 
-static inline int clz(unsigned int x)
+static inline int cado_clz(unsigned int x)
 {
         static const int t[4] = { 2, 1, 0, 0 };
         int a = 0;
@@ -130,65 +138,39 @@ static inline int clz(unsigned int x)
         res = 30 - a + t[x];
         return res;
 }
-#define HAVE_clzl
-#define HAVE_clzl_fallback
 #endif
-#endif  /* HAVE_clzl */
-
-/* Best X86 medium memcpy with pointers & size length already cache
-   lines aligned on modern X86, so dst/src/lg & 0x3F = 0 */
-static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
-#ifdef __x86_64
-  size_t lg_8bytes = lg >> 3;
-  __asm__ __volatile__ ("cld\nrep movsq\n":"+D"(dst),"+S"(src),"+c"(lg_8bytes));
-#else
-  memcpy(dst,src,lg);
-#endif
-}
-
-#ifndef HAVE_ctzl
+/*}}}*/
+/*{{{ cado_ctz and variants */
 #if GNUC_VERSION_ATLEAST(3,4,0)
-#define ctzll(x)        __builtin_ctzll(x)
-#define ctzl(x)         __builtin_ctzl(x)
-#define ctz(x)          __builtin_ctz(x)
-#define HAVE_ctzl
+#define cado_ctzll(x)        __builtin_ctzll(x)
+#define cado_ctzl(x)         __builtin_ctzl(x)
+#define cado_ctz(x)          __builtin_ctz(x)
 #else
 /* the following code is correct because if x = 0...0abc10...0, then
    -x = ~x + 1, where ~x = 1...1(1-a)(1-b)(1-c)01...1, thus
    -x = 1...1(1-a)(1-b)(1-c)10...0, and x & (-x) = 0...000010...0 */
-static inline int ctzll(unsigned long long x)
+static inline int cado_ctzll(unsigned long long x)
 {
-#if ULONGLONG_BITS == 64
-  return (64 - 1) - clzll(x & - x);
-#else
-#error "ctzll probably wrong here"
+  return (ULONGLONG_BITS - 1) - cado_clzll(x & - x);
+}
+static inline int cado_ctzl(unsigned long x)
+{
+  return (ULONG_BITS - 1) - cado_clzl(x & - x);
+}
+static inline int cado_ctz(unsigned int x)
+{
+  return (ULONG_BITS - 1) - cado_clzl(x & - x);
+}
 #endif
-}
-static inline int ctzl(unsigned long x)
-{
-  ASSERT(GMP_LIMB_BITS == sizeof(unsigned long) * CHAR_BIT);
-  return (GMP_LIMB_BITS - 1) - clzl(x & - x);
-}
-static inline int ctz(unsigned int x)
-{
-  ASSERT(GMP_LIMB_BITS == sizeof(unsigned int) * CHAR_BIT);
-  return (GMP_LIMB_BITS - 1) - clzl(x & - x);
-}
-#define HAVE_ctzl
-#define HAVE_ctzl_fallback
-#endif
-#endif  /* HAVE_ctzl */
-
-
-#ifndef HAVE_parityl
+/*}}}*/
+/*{{{ cado_parity and variants */
 #if GNUC_VERSION_ATLEAST(3,4,0)
-#define parityll(x)        __builtin_parityll(x)
-#define parityl(x)         __builtin_parityl(x)
-#define parity(x)          __builtin_parity(x)
-#define HAVE_ctzl
+#define cado_parityll(x)        __builtin_parityll(x)
+#define cado_parityl(x)         __builtin_parityl(x)
+#define cado_parity(x)          __builtin_parity(x)
 #else
 /* slow equivalent */
-static inline int parityll(unsigned long long x)
+static inline int cado_parityll(unsigned long long x)
 {
 #if ULONGLONG_BITS == 64
     x ^= x >> 32;
@@ -198,22 +180,19 @@ static inline int parityll(unsigned long long x)
     int t[16] = { 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0 };
     return t[x&15];
 #else
-#error "fix parityll here"
+#error "fix cado_parityll here"
 #endif
 }
-#define HAVE_parityl
-#define HAVE_parityl_fallback
 #endif
-#endif  /* HAVE_parityl */
 
 #if ULONGLONG_BITS == 64
-static inline int ctz64(uint64_t x) { return ctzll(x); }
-static inline int clz64(uint64_t x) { return clzll(x); }
-static inline int parity64(uint64_t x) { return parityll(x); }
+static inline int cado_ctz64(uint64_t x) { return cado_ctzll(x); }
+static inline int cado_clz64(uint64_t x) { return cado_clzll(x); }
+static inline int cado_parity64(uint64_t x) { return cado_parityll(x); }
 #else
-#error "need proper equivalents for ctz64 & friends"
+#error "need proper equivalents for cado_ctz64 & friends"
 #endif
-
+/*}}}*/
 const char *size_disp(size_t s, char buf[16]);
 
 #ifdef __cplusplus

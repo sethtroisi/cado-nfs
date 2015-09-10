@@ -158,7 +158,7 @@ struct my_strassen_selector {
      * BITS_IN_DIM_I */
     unsigned int threshold_index(unsigned int m, unsigned int n, unsigned int p) const {
         unsigned int combined = m|n|p;
-        unsigned int b = ctzl(combined);
+        unsigned int b = cado_ctzl(combined);
         if (b >= (1UL << BITS_IN_DIM_I)) {
             // arrange so that we 
             b = (1UL << BITS_IN_DIM_I) - 1;
@@ -403,7 +403,7 @@ void tune_strassen1(fft_type const& base,
 {
     my_strassen_selector& s(foo<fft_type>::s);
 
-    unsigned int bp = ctzl(d1 | d2 | d3);
+    unsigned int bp = cado_ctzl(d1 | d2 | d3);
     unsigned int dd1 = d1 >> bp;
     unsigned int dd2 = d2 >> bp;
     unsigned int dd3 = d3 >> bp;

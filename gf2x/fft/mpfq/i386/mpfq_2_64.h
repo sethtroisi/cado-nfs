@@ -776,7 +776,7 @@ int mpfq_2_64_inv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r, mpfq_
         z = s[1] >>  1;
         b[2] = z;
     }
-    ib = clzlx(b, 3);
+    ib = mpfq_clzlx(b, 3);
     ia = 0;
     
     mpfq_2_64_longshift_left(b,b,3,ib);
@@ -788,7 +788,7 @@ int mpfq_2_64_inv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r, mpfq_
             b[1] ^= a[1]; x |= b[1];
             b[2] ^= a[2]; x |= b[2];
                     if (!x) { memcpy(r,u,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(b,3);
+                    mp_limb_t t = mpfq_clzlx(b,3);
                     ib += t;
                     d += t;
                     mpfq_2_64_longshift_left(b,b,3,t);
@@ -799,7 +799,7 @@ int mpfq_2_64_inv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r, mpfq_
             a[1] ^= b[1]; x |= a[1];
             a[2] ^= b[2]; x |= a[2];
                     if (!x) { memcpy(r,v,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(a,3);
+                    mp_limb_t t = mpfq_clzlx(a,3);
                     ia += t;
                     d -= t;
                     mpfq_2_64_longshift_left(a,a,3,t);
@@ -810,7 +810,7 @@ int mpfq_2_64_inv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r, mpfq_
             a[1] ^= b[1]; x |= a[1];
             a[2] ^= b[2]; x |= a[2];
                     if (!x) { memcpy(r,v,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(a,3);
+                    mp_limb_t t = mpfq_clzlx(a,3);
                     ia += t;
                     d -= t;
                     mpfq_2_64_longshift_left(a,a,3,t);
@@ -821,7 +821,7 @@ int mpfq_2_64_inv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r, mpfq_
             b[1] ^= a[1]; x |= b[1];
             b[2] ^= a[2]; x |= b[2];
                     if (!x) { memcpy(r,u,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(b,3);
+                    mp_limb_t t = mpfq_clzlx(b,3);
                     ib += t;
                     d += t;
                     mpfq_2_64_longshift_left(b,b,3,t);

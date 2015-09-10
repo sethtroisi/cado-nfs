@@ -7,7 +7,7 @@
 #include "fb-types.h"
 #include "utils.h"
 #include "las-config.h"
-#include "utils/misc.h" /* ctzl */
+#include "utils/misc.h" /* cado_ctzl */
 
 // Redc_32 based on 64-bit arithmetic
 // Assume:
@@ -230,7 +230,7 @@ invmod_redc_32(uint32_t a, uint32_t b) {
     return pa;
   }
   const uint32_t p = b;
-  uint32_t u = 1, v = 0, lsh = ctz(a);
+  uint32_t u = 1, v = 0, lsh = cado_ctz(a);
   uint8_t t = lsh;
   // make a odd
   a >>= lsh;
@@ -255,8 +255,8 @@ invmod_redc_32(uint32_t a, uint32_t b) {
 	    "9: \n"							\
 	    : "+r" (a), "+r" (b), "+r" (u), "+r" (v), "+r" (t), "+c" (lsh));
 #else
-#define T1 do { b-=a; lsh=ctz(b); v+=u; b>>=lsh; t+=lsh; u<<=lsh; if (a==b) goto ok; } while (0)
-#define T2 do { a-=b; lsh=ctz(a); u+=v; a>>=lsh; t+=lsh; v<<=lsh; if (b==a) goto ok; } while (0)
+#define T1 do { b-=a; lsh=cado_ctz(b); v+=u; b>>=lsh; t+=lsh; u<<=lsh; if (a==b) goto ok; } while (0)
+#define T2 do { a-=b; lsh=cado_ctz(a); u+=v; a>>=lsh; t+=lsh; v<<=lsh; if (b==a) goto ok; } while (0)
   for (;;) {
     do {
       T1; if (a > b) break; T1; if (a > b) break;
@@ -342,7 +342,7 @@ invmod_redc_64(uint64_t a, uint64_t b)
     return a;
   }
   const uint64_t p = b;
-  uint64_t u = 1, v = 0, lsh = ctz(a);
+  uint64_t u = 1, v = 0, lsh = cado_ctz(a);
   uint8_t t = lsh;
   // make a odd
   a >>= lsh;
@@ -367,8 +367,8 @@ invmod_redc_64(uint64_t a, uint64_t b)
 	    "9: \n"							\
 	    : "+r" (a), "+r" (b), "+r" (u), "+r" (v), "+r" (t), "+c" (lsh));
 #else
-#define T1 do { b-=a; lsh=ctz(b); v+=u; b>>=lsh; t+=lsh; u<<=lsh; if (a==b) goto ok; } while (0)
-#define T2 do { a-=b; lsh=ctz(a); u+=v; a>>=lsh; t+=lsh; v<<=lsh; if (b==a) goto ok; } while (0)
+#define T1 do { b-=a; lsh=cado_ctz(b); v+=u; b>>=lsh; t+=lsh; u<<=lsh; if (a==b) goto ok; } while (0)
+#define T2 do { a-=b; lsh=cado_ctz(a); u+=v; a>>=lsh; t+=lsh; v<<=lsh; if (b==a) goto ok; } while (0)
   for (;;) {
     do {
       T1; if (a > b) break; T1; if (a > b) break;

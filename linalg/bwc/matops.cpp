@@ -285,7 +285,7 @@ void mul_o64_T6464_C_parity(uint64_t * w, uint64_t a, mat64_srcptr b)
     // functions. So if it's available, it should be tested.
     uint64_t c = 0;
     for (unsigned int i = 0; i < WBITS; i++) {
-        uint64_t p = parity64(a & b[i]);
+        uint64_t p = cado_parity64(a & b[i]);
 	c ^= p << i;
     }
     *w = c;
@@ -1730,7 +1730,7 @@ void pmattab_complete(int * phi, uint64_t * bits, int nbits)
     for(int offset=0 ; offset < nbits ; offset+=64) {
         for(uint64_t w = bits[offset/64], z ; w ; w^=z) {
             z = w^(w&(w-1));
-            uint64_t j = ctz64(w);
+            uint64_t j = cado_ctz64(w);
             *phi++ = offset + j;
         }
     }
@@ -1785,7 +1785,7 @@ int PLUQ64_inner(int * phi, mat64 l, mat64 u, mat64 a, int col_offset)
         if (!(r&todo) || phi[i]>=0) continue;
         // this keeps only the least significant bit of r.
         uint64_t v = r^(r&(r-1));
-        uint64_t j = ctz64(r);
+        uint64_t j = cado_ctz64(r);
         phi[i] = col_offset + j;
 #if defined(HAVE_SSE41) && !defined(VALGRIND)
         int k = i+1;

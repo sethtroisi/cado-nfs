@@ -152,7 +152,7 @@ static void mpfq_p_6_init_ts(mpfq_p_6_dst_field k)
         e += 64;
     }
     int ee;
-    ee = ctzl(*ptr);
+    ee = mpfq_ctzl(*ptr);
     e += ee;
     if (e < 64) {
         mpfq_fixmp_6_rshift(pp, e);

@@ -1522,7 +1522,7 @@ struct prime_data * suitable_crt_primes()
 void modul_find_ts_gen(residueul_t z, modulusul_t p)
 {
     unsigned long pp = modul_getmod_ul(p)-1;
-    int e = ctzl(pp);
+    int e = cado_ctzl(pp);
     pp >>= e;
     unsigned long s = 1UL << (e-1);
     residueul_t r;
@@ -1539,7 +1539,7 @@ void modul_find_ts_gen(residueul_t z, modulusul_t p)
 int modul_field_sqrt(residueul_t z, residueul_t a, residueul_t g, modulusul_t p)
 {
     unsigned long pp = modul_getmod_ul(p)-1;
-    int e = ctzl(pp);
+    int e = cado_ctzl(pp);
     pp >>= e+1;
     if (modul_is0(a, p)) {
         modul_set0(z, p);

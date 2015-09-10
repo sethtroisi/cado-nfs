@@ -1085,11 +1085,11 @@ static inline void mulSi(unsigned int k, Kelt * f, size_t L, Kelt beta)
 }
 
 #if GNUC_VERSION_ATLEAST(3,4,0)
-#define clzl(x)         __builtin_clzl(x)
-#define ctzl(x)         __builtin_ctzl(x)
+#define gf2x_clzl(x)         __builtin_clzl(x)
+#define gf2x_ctzl(x)         __builtin_ctzl(x)
 #else
 /* provide slow fallbacks */
-static inline int clzl(unsigned long x)
+static inline int gf2x_clzl(unsigned long x)
 {
         static const int t[4] = { 2, 1, 0, 0 };
         int a = 0;
@@ -1108,10 +1108,10 @@ static inline int clzl(unsigned long x)
 /* the following code is correct because if x = 0...0abc10...0, then
    -x = ~x + 1, where ~x = 1...1(1-a)(1-b)(1-c)01...1, thus
    -x = 1...1(1-a)(1-b)(1-c)10...0, and x & (-x) = 0...000010...0 */
-static inline int ctzl(unsigned long x)
+static inline int gf2x_ctzl(unsigned long x)
 {
   ASSERT(GF2X_WORDSIZE == sizeof(unsigned long) * CHAR_BIT);
-  return (GF2X_WORDSIZE - 1) - clzl(x & - x);
+  return (GF2X_WORDSIZE - 1) - gf2x_clzl(x & - x);
 }
 #endif
 
@@ -1140,7 +1140,7 @@ static inline void reduceModTrunc(Kelt * f, unsigned int k, size_t length)
 
     // go up, reconstructing general rem
     len = length;
-    i = ctzl(len);
+    i = gf2x_ctzl(len);
     len >>= i;
     pf = f + length;
     ii = 1UL << i;
