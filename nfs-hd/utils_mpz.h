@@ -10,6 +10,7 @@ typedef struct
 {
   mpz_t * factorization;
   unsigned int number;
+  unsigned int alloc;
 } s_factor_t;
 
 typedef s_factor_t factor_t[1];
@@ -22,7 +23,7 @@ typedef const s_factor_t * factor_srcptr;
  * factor: the array of factors.
  * number: the maximum number of elements.
  */
-void factor_init(factor_ptr factor, unsigned int number);
+void factor_init(factor_ptr factor, unsigned int alloc);
 
 /*
  * Delete an array of factors.
@@ -30,6 +31,9 @@ void factor_init(factor_ptr factor, unsigned int number);
  * factor: the array of factors.
  */
 void factor_clear(factor_ptr factor);
+
+/* obvious! */
+void factor_append(factor_ptr factor, mpz_srcptr z);
 
 /*
  * Print an array of factors.
@@ -52,14 +56,6 @@ unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort);
  * Return 1 if the factorisation is good, 0 otherwise.
  */
 unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z);
-
-/*
- * Realloc an array of factors. Number must be less than factor->number.
- *
- * factor: the array of factors.
- * number: new number of elements.
- */
-void factor_realloc(factor_ptr factor, unsigned int number);
 
 /*
  * Remove all the small factors under a certain bound, and store z_root /

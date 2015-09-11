@@ -79,6 +79,6 @@ void list_int64_vector_sort_last(list_int64_vector_ptr list);
  *  a last coordinate strictly less than val.
  */
 void list_int64_vector_delete_last_coordinate(list_int64_vector_ptr list,
-    uint64_t val);
+    int64_t val);
 
 #endif /* LIST_INT64_VECTOR_H */

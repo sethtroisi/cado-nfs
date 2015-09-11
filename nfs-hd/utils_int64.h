@@ -25,14 +25,14 @@ uint64_t invmod_uint64(uint64_t xx, uint64_t mm);
 
 void int64_fdiv_qr(int64_t * q, int64_t * r, int64_t n, int64_t d);
 
-inline void swap_int64(int64_t * a, int64_t * b)
+static inline void swap_int64(int64_t * a, int64_t * b)
 {
   int64_t tmp = * a;
   * a = * b;
   * b = tmp;
 }
 
-inline int64_t int64_sgn(int64_t a)
+static inline int64_t int64_sgn(int64_t a)
 {
   if (a == 0) {
     return 0;

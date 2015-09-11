@@ -5,24 +5,41 @@
 #include "macros.h"
 #include "getprime.h"
 
-void factor_init(factor_ptr factor, unsigned int number)
+void factor_init(factor_ptr factor, unsigned int alloc)
 {
-  ASSERT(number > 0);
+  ASSERT(alloc > 0);
 
-  factor->number = number;
-  factor->factorization = (mpz_t * ) malloc(sizeof(mpz_t) * number);
-  for (unsigned int i = 0; i < number; i++) {
+  factor->alloc = alloc;
+  factor->number = 0;
+  factor->factorization = (mpz_t * ) malloc(sizeof(mpz_t) * alloc);
+  for (unsigned int i = 0; i < alloc; i++) {
     mpz_init(factor->factorization[i]);
   }
 }
 
 void factor_clear(factor_ptr factor)
 {
-  for (unsigned int i = 0; i < factor->number; i++) {
+  for (unsigned int i = 0; i < factor->alloc; i++) {
     mpz_clear(factor->factorization[i]);
   }
   free(factor->factorization);
+  factor->alloc = 0;
   factor->number = 0;
+}
+
+void factor_append(factor_ptr factor, mpz_srcptr z)
+{
+  if (factor->alloc == factor->number) {
+    unsigned int newalloc = factor->alloc + 10;
+    factor->factorization = (mpz_t * ) realloc(factor->factorization,
+        sizeof(mpz_t) * newalloc);
+    for (unsigned int i = factor->alloc; i < newalloc; ++i)
+      mpz_init(factor->factorization[i]);
+    factor->alloc = newalloc;
+  }
+
+  mpz_set(factor->factorization[factor->number], z);
+  factor->number++;
 }
 
 void factor_fprintf(FILE * file, factor_srcptr factor)
@@ -74,18 +91,8 @@ unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z)
   return assert_facto;
 }
 
-void factor_realloc(factor_ptr factor, unsigned int number)
-{
-  ASSERT(factor->number > number);
-
-  for (unsigned int i = number; i < factor->number; i++) {
-    mpz_clear(factor->factorization[i]);
-  }
-  factor->factorization = realloc(factor->factorization, sizeof(mpz_t) *
-				  number);
-  factor->number = number;
-}
-
+#if 0
+BROKEN
 static unsigned int factorize(factor_ptr factor, mpz_srcptr z_root,
     unsigned int * number)
 {
@@ -182,12 +189,12 @@ static unsigned int brute_force_factorize(factor_ptr factor, mpz_ptr z,
 
   return factorise;
 }
+#endif
 
 int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
     mpz_srcptr z_root, unsigned long bound)
 {
-  unsigned int number = mpz_sizeinbase(z, 2);
-  factor_init(factor, number);
+  factor_init(factor, 10);
   prime_info pi;
   prime_info_init (pi);
 
@@ -195,7 +202,6 @@ int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
   mpz_t prime_Z;
   mpz_init(prime_Z);
   unsigned long prime = 2;
-  number = 0;
 
   for (prime = 2; prime <= bound; prime = getprime_mt(pi)) {
     if (mpz_cmp_ui(z, 1) != 0) {
@@ -207,8 +213,7 @@ int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
       mpz_fdiv_qr(q, r, z, prime_Z);
       while (mpz_cmp_ui(r, 0) == 0) {
         mpz_set(z, q);
-        mpz_set(factor->factorization[number], prime_Z);
-        number = number + 1;
+        factor_append(factor, prime_Z);
         mpz_fdiv_qr(q, r, z, prime_Z);
       }
       mpz_clear(q);
@@ -218,7 +223,6 @@ int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
 
   mpz_clear(prime_Z);
   prime_info_clear (pi);
-  factor_realloc(factor, number);
 
   if (mpz_cmp_ui(z, 1) == 0) {
     return 1;
@@ -237,15 +241,13 @@ void sort_factor(factor_ptr factor)
       sizeof(factor->factorization[0]), compare_factor);
 }
 
+#if 0
 unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
 {
-  unsigned int number = mpz_sizeinbase(z, 2);
-  factor_init(factor, number);
-  unsigned int nb = 0;
+  factor_init(factor, 10);
   unsigned int assert_facto = 1;
   if (mpz_probab_prime_p (z, 25)) {
-    mpz_set(factor->factorization[nb], z);
-    nb = 1;
+    factor_append(factor, z);
     assert_facto = 0;
   } else {
     mpz_t tmp;
@@ -256,6 +258,7 @@ unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
   }
   factor_realloc(factor, nb);
   sort_factor(factor);
+  XXXXXXXXXXXXXXXXXXXXXXXX BROKEN
 
   ASSERT(assert_facto == 0);
 #ifndef NDEBUG
@@ -264,7 +267,11 @@ unsigned int gmp_brute_force_factorize(factor_ptr factor, mpz_srcptr z)
 
   return assert_facto;
 }
+#endif
 
+#if 0
+
+XXXXXXXXXXXXXXX BROKEN
 unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z)
 {
   unsigned int number = mpz_sizeinbase(z, 2);
@@ -311,6 +318,7 @@ unsigned int gmp_factorize(factor_ptr factor, mpz_srcptr z)
 
   return assert_facto;
 }
+#endif
 
 int mpz_invert_ui(mpz_ptr rop, mpz_srcptr op1, const uint64_t op2)
 {

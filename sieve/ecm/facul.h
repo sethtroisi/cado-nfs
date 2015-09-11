@@ -118,9 +118,13 @@ modset_clear (struct modset_t *);
 
 
 facul_method_t* facul_make_default_strategy (int, const int);
+facul_method_t*
+facul_make_aux_methods (int n, unsigned int already_used, const int verbose);
 void facul_clear_aux_methods (facul_method_t*);
 
 int nb_curves (unsigned int);
+int nb_curves90 (const unsigned int lpb);
+int nb_curves95 (const unsigned int lpb);
 facul_strategy_t * facul_make_strategy (unsigned long, unsigned int, int, int);
 void facul_clear_strategy (facul_strategy_t *);
 void facul_print_stats (FILE *);

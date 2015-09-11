@@ -16,6 +16,11 @@
 #include "mat_double.h"
 #include "double_poly.h"
 #include <time.h>
+
+#include "ecm/facul.h"
+#include "ecm/facul_doit.h"
+
+
 //TODO: do a utils_norm.[ch]
 
 //TODO: change % in test + add or substract.
@@ -1166,7 +1171,8 @@ void trace_pos_sieve(uint64_t index, ideal_1_srcptr ideal, array_srcptr array)
  * nbint: say if we have already count the number_c_l or not.
  * pos: 1 if index must increase, 0 otherwise.
  */
-inline void mode_sieve(MAYBE_UNUSED sieving_bound_srcptr H,
+
+static inline void mode_sieve(MAYBE_UNUSED sieving_bound_srcptr H,
     MAYBE_UNUSED uint64_t index, MAYBE_UNUSED array_srcptr array,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
     MAYBE_UNUSED ideal_1_srcptr ideal, MAYBE_UNUSED int64_vector_srcptr c,
@@ -2693,21 +2699,217 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
   printf("\n");
 }
 
+
+typedef struct {
+  unsigned long lpb;            // large prime bound = 2^lpb
+  unsigned long fbb;            // fbb (the real bound, not its log)
+  double BB;                    // square of fbb
+  double BBB;                   // cube of fbb
+  facul_method_t * methods;     // list of ECMs (null-terminated)
+} facul_aux_data;
+
+
+// FIXME: This has been duplicated from facul.cpp
+// (September 2015).
+// Maybe merge again, at some point.
+// It returns -1 if the factor is not smooth, otherwise the number of
+// factors.
+// Remark: FACUL_NOT_SMOOTH is just -1.
+static int
+facul_aux (mpz_t *factors, const struct modset_t m,
+    const facul_aux_data *data, int method_start)
+{
+  int found = 0;
+  facul_method_t* methods = data->methods;
+  if (methods == NULL)
+    return found;
+
+  int i = 0;
+  for (i = method_start; methods[i].method != 0; i++)
+  {
+    struct modset_t fm, cfm;
+    int res_fac = 0;
+
+    switch (m.arith) {
+      case CHOOSE_UL:
+        res_fac = facul_doit_onefm_ul(factors, m.m_ul, 
+            methods[i], &fm, &cfm,
+            data->lpb, data->BB, data->BBB);
+        break; 
+      case CHOOSE_15UL:
+        res_fac = facul_doit_onefm_15ul(factors, m.m_15ul,
+            methods[i], &fm, &cfm,
+            data->lpb, data->BB, data->BBB);
+        break; 
+      case CHOOSE_2UL2:
+        res_fac = facul_doit_onefm_2ul2 (factors, m.m_2ul2,
+            methods[i], &fm, &cfm,
+            data->lpb, data->BB, data->BBB);
+        break; 
+      case CHOOSE_MPZ:
+        res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
+            methods[i], &fm, &cfm,
+            data->lpb, data->BB, data->BBB);
+        break; 
+      default: abort();
+    }
+    // check our result
+    // res_fac contains the number of factors found
+    if (res_fac == -1)
+    {
+      /*
+         The cofactor m is not smooth. So, one stops the
+         cofactorization.
+         */
+      found = FACUL_NOT_SMOOTH;
+      break;
+    }
+    if (res_fac == 0)
+    {
+      /* Zero factor found. If it was the last method for this
+         side, then one stops the cofactorization. Otherwise, one
+         tries with an other method */
+      continue;
+    }
+
+    found += res_fac;
+    if (res_fac == 2)
+      break;
+
+    /*
+       res_fac == 1  Only one factor has been found. Hence, our
+       factorization is not finished.
+       */
+    if (fm.arith != CHOOSE_NONE)
+    {
+      int found2 = facul_aux(factors+res_fac, fm, data, i+1);
+      if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
+      {
+        found = FACUL_NOT_SMOOTH;
+        modset_clear(&cfm);
+        modset_clear(&fm);
+        break;
+      }
+      else
+        found += found2;
+      modset_clear(&fm);
+    }
+    if (cfm.arith != CHOOSE_NONE)
+    {
+      int found2 = facul_aux(factors+res_fac, cfm, data, i+1);
+      if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
+      {
+        found = FACUL_NOT_SMOOTH;
+      }
+      else
+        found += found2;
+      modset_clear(&cfm);
+      break;
+    }
+    break;
+  }
+  return found;
+}
+
+
+// Returns 1 if norm is smooth, 0 otherwise.
+// Factorization is given in factors.
+int call_facul(factor_ptr factors, mpz_t norm, facul_aux_data * data) {
+  unsigned long B = data->fbb;
+
+  // Trial divide all the small factors.
+  int success = brute_force_factorize_ul(factors, norm, norm, B);
+  if (success) {
+    return 1;
+  }
+
+  // TODO: move this test after the next block
+  // and do the primality test with fast routines.
+  if (mpz_probab_prime_p(norm, 1)) {
+    if (mpz_sizeinbase(norm, 2) <= data->lpb) {
+      factor_append(factors, norm);
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  // Prepare stuff for calling facul() machinery.
+  // Choose appropriate arithmetic according to size of norm
+  // Result is stored in n, which is of type struct modset_t (see facul.h)
+  struct modset_t n;
+  n.arith = CHOOSE_NONE;
+  size_t bits = mpz_sizeinbase(norm, 2);
+  if (bits <= MODREDCUL_MAXBITS) {
+    ASSERT(mpz_fits_ulong_p(norm));
+    modredcul_initmod_ul(n.m_ul, mpz_get_ui(norm));
+    n.arith = CHOOSE_UL;
+  }
+  else if (bits <= MODREDC15UL_MAXBITS)
+  {
+    unsigned long t[2];
+    modintredc15ul_t m;
+    size_t written;
+    mpz_export(t, &written, -1, sizeof(unsigned long), 0, 0, norm);
+    ASSERT_ALWAYS(written <= 2);
+    modredc15ul_intset_uls(m, t, written);
+    modredc15ul_initmod_int(n.m_15ul, m);
+    n.arith = CHOOSE_15UL;
+  }
+  else if (bits <= MODREDC2UL2_MAXBITS)
+  {
+    unsigned long t[2];
+    modintredc2ul2_t m;
+    size_t written;
+    mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, norm);
+    ASSERT_ALWAYS(written <= 2);
+    modredc2ul2_intset_uls (m, t, written);
+    modredc2ul2_initmod_int (n.m_2ul2, m);
+    n.arith = CHOOSE_2UL2;
+  }
+  else
+  {
+    modmpz_initmod_int(n.m_mpz, norm);
+    n.arith = CHOOSE_MPZ;
+  }
+  ASSERT_ALWAYS(n.arith != CHOOSE_NONE);
+
+  
+
+  // Call the facul machinery.
+  // TODO: think about this hard-coded 16...
+  mpz_t * fac = (mpz_t *) malloc(sizeof(mpz_t)*16);
+  for (int i = 0; i < 16; ++i)
+    mpz_init(fac[i]);
+  int found = facul_aux(fac, n, data, 0);
+  if (found > 0) {
+    for (int i = 0; i < found; ++i)
+      factor_append(factors, fac[i]);
+  }
+
+  for (int i = 0; i < 16; ++i)
+    mpz_clear(fac[i]);
+  free(fac);
+  return found > 0;
+}
+
+
+
 /*
  * A potential polynomial is found. Factorise it to verify if it gives a
  *  relation.
  *
  * a: the polynomial in the original lattice.
  * f: the polynomials that define the number fields.
- * lpb: the large prime bands.
+ * lpb: the large prime bounds.
  * L:
  * size:
  * t: dimension of the lattice.
  * V: number of number fields.
  */
-void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
+void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
     unsigned int * L, unsigned int size, unsigned int t, unsigned int V,
-    int main)
+    int main, facul_aux_data *data)
 {
   mpz_t res;
   mpz_init(res);
@@ -2723,13 +2925,9 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
     for (unsigned int i = 0; i < size; i++) {
       norm_poly(res, f[L[i]], a);
 
-#ifdef ASSERT_FACTO
-      assert_facto[i] = gmp_factorize(factor[i], res);
-#else
-      gmp_factorize(factor[i], res);
-#endif
+      int is_smooth = call_facul(factor[i], res, &data[L[i]]);
 
-      if (factor_is_smooth(factor[i], lpb[L[i]], 1)) {
+      if (is_smooth) {
         find++;
         I[i] = 1;
       } else {
@@ -2739,27 +2937,21 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f, mpz_t * lpb,
   } else {
     ASSERT(main >= 0);
 
+    // FIXME: wrong, probably 'main' and not 'L[main]'
     norm_poly(res, f[L[main]], a);
-#ifdef ASSERT_FACTO
-    assert_facto[main] = gmp_factorize(factor[main], res);
-#else
-    gmp_factorize(factor[main], res);
-#endif
 
-    if (factor_is_smooth(factor[main], lpb[L[main]], 1)) {
+    int main_is_smooth = call_facul(factor[main], res, &data[L[main]]);
+
+    if (main_is_smooth) {
       find = 1;
 
       for (unsigned int i = 0; i < size; i++) {
         if (i != (unsigned int) main) {
           norm_poly(res, f[L[i]], a);
 
-#ifdef ASSERT_FACTO
-          assert_facto[i] = gmp_factorize(factor[i], res);
-#else
-          gmp_factorize(factor[i], res);
-#endif
+          int is_smooth = call_facul(factor[i], res, &data[L[i]]);
 
-          if (factor_is_smooth(factor[i], lpb[L[i]], 1)) {
+          if (is_smooth) {
             find++;
             I[i] = 1;
           } else {
@@ -2814,25 +3006,25 @@ uint64_t sum_index(uint64_t * index, unsigned int V, int main)
 }
 
 /*
- * Find in all the indexes which one has the smallest value.
+ * Find in all the indices which one has the smallest value.
  *
  *
  *
  */
-unsigned int find_indexes(unsigned int ** L,
-    uint64_array_t * indexes, uint64_t * index, unsigned int V,
-    uint64_t max_indexes)
+unsigned int find_indices(unsigned int ** L,
+    uint64_array_t * indices, uint64_t * index, unsigned int V,
+    uint64_t max_indices)
 {
   * L = (unsigned int * ) malloc(sizeof(unsigned int) * (V));
   unsigned int size = 0;
-  uint64_t min = max_indexes;
+  uint64_t min = max_indices;
   for (unsigned int i = 0; i < V; i++) {
-    if (indexes[i]->length != 0 && index[i] < indexes[i]->length) {
-      if (indexes[i]->array[index[i]] < min) {
-        min = indexes[i]->array[index[i]];
+    if (indices[i]->length != 0 && index[i] < indices[i]->length) {
+      if (indices[i]->array[index[i]] < min) {
+        min = indices[i]->array[index[i]];
         (*L)[0] = i;
         size = 1;
-      } else if (min == indexes[i]->array[index[i]]) {
+      } else if (min == indices[i]->array[index[i]]) {
         (*L)[size] = i;
         size++;
       }
@@ -2842,21 +3034,21 @@ unsigned int find_indexes(unsigned int ** L,
   return size;
 }
 
-unsigned int find_indexes_main(unsigned int ** L, uint64_array_t * indexes,
+unsigned int find_indices_main(unsigned int ** L, uint64_array_t * indices,
     uint64_t * index, unsigned int V, int main)
 {
   ASSERT(main >= 0);
 
   unsigned int size = 1;
-  uint64_t target = indexes[main]->array[index[main]];
+  uint64_t target = indices[main]->array[index[main]];
   (*L)[0] = main;
   for (unsigned int i = 0; i < V; i++) {
-    if (i != (unsigned int) main && indexes[i]->length != 0 && index[i] <
-        indexes[i]->length) {
+    if (i != (unsigned int) main && indices[i]->length != 0 && index[i] <
+        indices[i]->length) {
       int test = 0;
-      while (target > indexes[i]->array[index[i]]) {
+      while (target > indices[i]->array[index[i]]) {
         index[i] = index[i] + 1;
-        if (index[i] == indexes[i]->length) {
+        if (index[i] == indices[i]->length) {
           test = 1;
           break;
         }
@@ -2864,7 +3056,7 @@ unsigned int find_indexes_main(unsigned int ** L, uint64_array_t * indexes,
       if (test) {
         ASSERT(test == 1);
 
-        if (target == indexes[i]->array[index[i]]) {
+        if (target == indices[i]->array[index[i]]) {
           (*L)[size] = main;
           size++;
         }
@@ -2879,16 +3071,17 @@ unsigned int find_indexes_main(unsigned int ** L, uint64_array_t * indexes,
 /*
  * For 
  */
-void find_relation(uint64_array_t * indexes, uint64_t * index,
-    uint64_t number_element, mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
-    sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indexes)
+void find_relation(uint64_array_t * indices, uint64_t * index,
+    uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_t * f,
+    sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indices,
+    facul_aux_data *data)
 {
   unsigned int * L;
   unsigned int size = 0;
   if (main == -1) {
-    size = find_indexes(&L, indexes, index, V, max_indexes);
+    size = find_indices(&L, indices, index, V, max_indices);
   } else {
-    size = find_indexes_main(&L, indexes, index, V, main);
+    size = find_indices_main(&L, indices, index, V, main);
   }
 
   ASSERT(size >= 1);
@@ -2898,7 +3091,7 @@ void find_relation(uint64_array_t * indexes, uint64_t * index,
     mpz_t gcd;
     mpz_init(gcd);
     mpz_vector_init(c, H->t);
-    array_index_mpz_vector(c, indexes[L[0]]->array[index[L[0]]], H,
+    array_index_mpz_vector(c, indices[L[0]]->array[index[L[0]]], H,
         number_element);
 
     mpz_poly_t a;
@@ -2918,7 +3111,7 @@ void find_relation(uint64_array_t * indexes, uint64_t * index,
       number_survivals_facto++;
 #endif // NUMBER_SURVIVALS
 
-      good_polynomial(a, f, lpb, L, size, H->t, V, main);
+      good_polynomial(a, f, L, size, H->t, V, main, data);
     }
 
     mpz_poly_clear(a);
@@ -2938,46 +3131,63 @@ void find_relation(uint64_array_t * indexes, uint64_t * index,
 /*
  * To find the relations.
  *
- * indexes: for each number field, position where the norm is less as the
+ * indices: for each number field, positions where the norm is less than the
  *  threshold.
- * number_element: number of element in the sieving region.
- * lpb: large prime bands.
+ * number_element: number of elements in the sieving region.
+ * lpb: large prime bounds.
  * matrix: MqLLL.
  * f: polynomials that define the number fields.
- * H: sieving bound.
+ * H: sieving bounds.
  * V: number of number fields.
  */
-void find_relations(uint64_array_t * indexes, uint64_t number_element,
+void find_relations(uint64_array_t * indices, uint64_t number_element,
     mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
     unsigned int V, int main)
 {
-  //index[i] is the current index of indexes[i].
+  //index[i] is the current index of indices[i].
   uint64_t * index = (uint64_t * ) malloc(sizeof(uint64_t) * V);
   uint64_t length_tot = 0;
-  //Maximum of all the indexes.
-  uint64_t max_indexes = 0;
+  //Maximum of all the indices.
+  uint64_t max_indices = 0;
   for (unsigned int i = 0; i < V; i++) {
     index[i] = 0;
     if (i == (unsigned int)main) {
       ASSERT(main >= 0);
 
-      length_tot = indexes[main]->length;
-    } else if (indexes[i]->length != 0 && main == -1) {
-      length_tot += indexes[i]->length;
-      if (max_indexes < indexes[i]->array[indexes[i]->length - 1]) {
-        max_indexes = indexes[i]->array[indexes[i]->length - 1];
+      length_tot = indices[main]->length;
+    } else if (indices[i]->length != 0 && main == -1) {
+      length_tot += indices[i]->length;
+      if (max_indices < indices[i]->array[indices[i]->length - 1]) {
+        max_indices = indices[i]->array[indices[i]->length - 1];
       }
     }
   }
 
+  //  prepare cofactorization strategy
+  facul_aux_data * data;
+  data = (facul_aux_data *)malloc(V*sizeof(facul_aux_data));
+  ASSERT_ALWAYS(data != NULL);
+  for (unsigned int i = 0; i < V; ++i) {
+    size_t lpb_bit = mpz_sizeinbase(lpb[i], 2);
+    unsigned int B = 1000; // FIXME: should be a parameter.
+    data[i].lpb = lpb_bit;
+    data[i].fbb = B;
+    data[i].BB = ((double)B) * ((double)B);
+    data[i].BBB = ((double)B) * data[i].BB;
+    data[i].methods = facul_make_aux_methods(nb_curves95(lpb_bit), 0, 0);
+  }
+
   if (0 != length_tot) {
     while(sum_index(index, V, main) < length_tot) {
-      find_relation(indexes, index, number_element, lpb, matrix, f, H, V, main,
-          max_indexes);
+      find_relation(indices, index, number_element, matrix, f, H, V, main,
+          max_indices, data);
     }
   } else {
     printf("# No relations\n");
   }
+  for (unsigned int i = 0; i < V; ++i)   
+    facul_clear_aux_methods(data[i].methods);
+  free(data);
   free(index);
 }
 
@@ -3398,8 +3608,8 @@ int main(int argc, char * argv[])
         }
 
         sec = seconds();
-        /*find_relations(indexes, array->number_element, lpb, matrix, f, H, V,*/
-            /*main_side); */
+        find_relations(indexes, array->number_element, lpb, matrix, f, H, V,
+            main_side);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {

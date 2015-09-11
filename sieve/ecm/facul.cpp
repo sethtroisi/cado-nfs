@@ -43,15 +43,15 @@ unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 
-static int nb_curves90 (const unsigned int lpb);
-static int nb_curves95 (const unsigned int lpb);
+int nb_curves90 (const unsigned int lpb);
+int nb_curves95 (const unsigned int lpb);
 #if 0
 static int nb_curves99 (const unsigned int lpb);
 #endif
 
 int nb_curves (const unsigned int lpb) { return nb_curves90(lpb); }
 
-static int
+int
 nb_curves90 (const unsigned int lpb)
 {
   /* the following table, computed with the proba_cofactor() function in the
@@ -106,7 +106,7 @@ nb_curves90 (const unsigned int lpb)
 // ncurves = 100 corresponds to looking for 50-bit factors.
 // ncurves = 200 corresponds to looking for 64-bit factors.
 
-static int
+int
 nb_curves95 (const unsigned int lpb)
 {
     /* same, but with target probability 95% */
