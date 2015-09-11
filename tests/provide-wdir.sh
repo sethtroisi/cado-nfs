@@ -12,6 +12,13 @@
 
 t=`mktemp -d /tmp/XXXXXXXXXXXXXX`
 
+cleanup() { rm -rf "$t" ; }
+
+if ! [ "$CADO_DEBUG" ] ; then
+    echo "debug mode, data will be left in $t"
+    trap cleanup EXIT
+fi
+
 extra=()
 
 while [ $# -gt 0 ] ; do
@@ -35,7 +42,19 @@ while [ $# -gt 0 ] ; do
     fi
 done
 
-"$@" "${extra[@]}"
+# add our extra parameters before the first occurrence of the -- separator, if we happen to find any.
+main=()
+
+while [ $# -gt 0 ] ; do
+    if [ "$1" = "--" ] ; then
+        break
+    else
+        main=("${main[@]}" "$1")
+        shift
+    fi
+done
+
+"${main[@]}" "${extra[@]}" "$@"
 
 rc=$?
 
@@ -45,9 +64,8 @@ if [ "$CADO_DEBUG" ] ; then
 fi
 
 if [ $rc != 0 ] ; then
+    trap - EXIT
     # what do we do when the script failed ?
-    rm -rf "$t"
-else
     rm -rf "$t"
 fi
 
