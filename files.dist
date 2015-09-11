@@ -617,7 +617,6 @@ tests/sieve/ecm/test_mpqs.c
 tests/sieve/ecm/test_testbench.sh
 tests/sieve/ecm/make_tests.sh
 tests/polyselect/CMakeLists.txt
-tests/polyselect/polysel.sh
 tests/polyselect/test_auxiliary.c
 tests/polyselect/test_rho.c
 tests/filter/CMakeLists.txt
@@ -936,7 +935,6 @@ tests/linalg/bwc/mpfq/mpfq_test.c.meta
 tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
 tests/gf2x/CMakeLists.txt
-tests/gf2x/test_gf2x.sh
 tests/gf2x/test_cantor.c
 config/hwloc.cmake
 config/numa.cmake
