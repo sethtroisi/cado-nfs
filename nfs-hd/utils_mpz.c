@@ -183,11 +183,13 @@ static unsigned int brute_force_factorize(factor_ptr factor, mpz_ptr z,
   return factorise;
 }
 
-void brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
+int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
     mpz_srcptr z_root, unsigned long bound)
 {
   unsigned int number = mpz_sizeinbase(z, 2);
   factor_init(factor, number);
+  prime_info pi;
+  prime_info_init (pi);
 
   mpz_set(z, z_root);
   mpz_t prime_Z;
@@ -195,7 +197,7 @@ void brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
   unsigned long prime = 2;
   number = 0;
 
-  for (prime = 2; prime <= bound; prime = getprime(prime)) {
+  for (prime = 2; prime <= bound; prime = getprime_mt(pi)) {
     if (mpz_cmp_ui(z, 1) != 0) {
       mpz_set_ui(prime_Z, prime);
       mpz_t q;
@@ -215,8 +217,13 @@ void brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
   }
 
   mpz_clear(prime_Z);
+  prime_info_clear (pi);
   factor_realloc(factor, number);
-  getprime(0);
+
+  if (mpz_cmp_ui(z, 1) == 0) {
+    return 1;
+  }
+  return 0;
 }
 
 static int compare_factor(const void * p0, const void * p1)

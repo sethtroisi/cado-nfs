@@ -78,12 +78,19 @@ int main()
   factor_clear(factor);
 
   mpz_set_str(z, "44190", 10);
-  brute_force_factorize_ul(factor, z, z, 495);
+  ASSERT(brute_force_factorize_ul(factor, z, z, 495));
   ASSERT_ALWAYS(factor->number == 5);
   ASSERT_ALWAYS(mpz_cmp(factor->factorization[1],
         factor->factorization[2]) == 0);
-
   factor_clear(factor);
+
+  mpz_set_str(z, "5927040", 10);
+  ASSERT(brute_force_factorize_ul(factor, z, z, 20));
+  ASSERT_ALWAYS(factor->number == 14);
+  ASSERT_ALWAYS(mpz_cmp(factor->factorization[1],
+        factor->factorization[2]) == 0);
+  factor_clear(factor);
+
   mpz_clear(z);
 
   return 0;

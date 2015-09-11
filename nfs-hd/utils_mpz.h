@@ -63,9 +63,9 @@ void factor_realloc(factor_ptr factor, unsigned int number);
 
 /*
  * Remove all the small factors under a certain bound, and store z_root /
- *  (factors) in z.
+ *  (factors) in z. Return 1 if z_root is entirely factorize.
  */
-void brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
+int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
     mpz_srcptr z_root, unsigned long bound);
 
 /*
