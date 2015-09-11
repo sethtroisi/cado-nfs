@@ -156,16 +156,6 @@ string_join(GF2X_LDFLAGS " " ${CMAKE_SHARED_LINKER_FLAGS} "-Wl,-rpath,${GMP_LIBD
 endif(some_mpir_variable)
 
 #####
-
-set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --enable-fft-interface CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} LDFLAGS=${GF2X_LDFLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
-IF (DEFINED ENV{NO_SSE})
-    list(APPEND GF2X_CONFIGURE_FLAGS --disable-sse2)
-ENDIF (DEFINED ENV{NO_SSE})
-get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
-
-#####################################################################
-# Obtain information from the host.
-
 include(CheckTypeSize)
 CHECK_TYPE_SIZE("unsigned long int" ulong_size)
 CHECK_TYPE_SIZE("unsigned long long int" ulonglong_size)
@@ -173,13 +163,28 @@ math (EXPR ULONG_BITS "8*${ulong_size}")
 math (EXPR ULONGLONG_BITS "8*${ulonglong_size}")
 message(STATUS "bits in unsigned long: ${ULONG_BITS}")
 message(STATUS "bits in unsigned long long: ${ULONGLONG_BITS}")
-IF (NOT DEFINED ENV{NO_SSE})
+
+set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --enable-fft-interface CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} LDFLAGS=${GF2X_LDFLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
+
+#####################################################################
+# Obtain information from the host.
+
+if (DEFINED ENV{NO_SSE})
+    list(APPEND GF2X_CONFIGURE_FLAGS --disable-sse2)
+    message(STATUS "As per $NO_SSE, disabling all simd intrinsics")
+elseif (ULONG_BITS EQUAL 32)
+    list(APPEND GF2X_CONFIGURE_FLAGS --disable-sse2)
+    message(STATUS "32-bit platform, lazily disabling all simd intrinsics")
+else()
     include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/pclmul.cmake")
 endif()
+
+get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
+
 IF (NOT DEFINED ENV{NO_INLINE_ASSEMBLY})
   include("${CADO_NFS_SOURCE_DIR}/config/gcc-inline-assembly.cmake")
 endif()
