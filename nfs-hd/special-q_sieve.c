@@ -3279,8 +3279,11 @@ int main(int argc, char * argv[])
   gmp_randinit_default(state);
   mpz_init(a);
 
+
+  prime_info pi;
+  prime_info_init (pi);
   //Pass all the prime less than q_min.
-  for (q = 2; q < q_min; q = getprime(q)) {}
+  for (q = 2; q < q_min; q = getprime_mt(pi)) {}
 
 #ifdef SPECIAL_Q_IDEAL_U
     int deg_bound_factorise = (int)H->t;
@@ -3288,7 +3291,7 @@ int main(int argc, char * argv[])
     int deg_bound_factorise = 2;
 #endif // SPECIAL_Q_IDEAL_U
 
-  for ( ; q <= q_max; q = getprime(q)) {
+  for ( ; q <= q_max; q = getprime_mt(pi)) {
     ideal_spq_t special_q;
     ideal_spq_init(special_q);
     mpz_set_si(a, q);
@@ -3476,7 +3479,7 @@ int main(int argc, char * argv[])
   mpz_poly_factor_list_clear(l);
   gmp_randclear(state);
   mpz_clear(a);
-  getprime(0);
+  prime_info_clear (pi);
 
 #ifdef TRACE_POS
   fclose(file);
