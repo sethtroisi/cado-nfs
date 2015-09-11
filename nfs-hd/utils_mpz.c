@@ -3,6 +3,7 @@
 #include "gmp-ecm.h"
 #include <stdlib.h>
 #include "macros.h"
+#include "getprime.h"
 
 void factor_init(factor_ptr factor, unsigned int number)
 {
@@ -180,6 +181,42 @@ static unsigned int brute_force_factorize(factor_ptr factor, mpz_ptr z,
   mpz_clear(prime);
 
   return factorise;
+}
+
+void brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
+    mpz_srcptr z_root, unsigned long bound)
+{
+  unsigned int number = mpz_sizeinbase(z, 2);
+  factor_init(factor, number);
+
+  mpz_set(z, z_root);
+  mpz_t prime_Z;
+  mpz_init(prime_Z);
+  unsigned long prime = 2;
+  number = 0;
+
+  for (prime = 2; prime <= bound; prime = getprime(prime)) {
+    if (mpz_cmp_ui(z, 1) != 0) {
+      mpz_set_ui(prime_Z, prime);
+      mpz_t q;
+      mpz_init(q);
+      mpz_t r;
+      mpz_init(r);
+      mpz_fdiv_qr(q, r, z, prime_Z);
+      while (mpz_cmp_ui(r, 0) == 0) {
+        mpz_set(z, q);
+        mpz_set(factor->factorization[number], prime_Z);
+        number = number + 1;
+        mpz_fdiv_qr(q, r, z, prime_Z);
+      }
+      mpz_clear(q);
+      mpz_clear(r);
+    }
+  }
+
+  mpz_clear(prime_Z);
+  factor_realloc(factor, number);
+  getprime(0);
 }
 
 static int compare_factor(const void * p0, const void * p1)

@@ -5,9 +5,9 @@ int main()
 {
   mpz_t z;
   mpz_init(z);
+  factor_t factor;
 
   mpz_set_str(z, "1365", 10);
-  factor_t factor;
   ASSERT_ALWAYS(gmp_brute_force_factorize(factor, z) == 0);
   ASSERT_ALWAYS(factor_assert(factor, z) == 0);
   ASSERT_ALWAYS(mpz_cmp_ui(factor->factorization[3], 13) == 0);
@@ -77,6 +77,14 @@ int main()
         factor->factorization[2]) == 0);
   factor_clear(factor);
 
+  mpz_set_str(z, "44190", 10);
+  brute_force_factorize_ul(factor, z, z, 495);
+  ASSERT_ALWAYS(factor->number == 5);
+  ASSERT_ALWAYS(mpz_cmp(factor->factorization[1],
+        factor->factorization[2]) == 0);
+
+  factor_clear(factor);
   mpz_clear(z);
+
   return 0;
 }

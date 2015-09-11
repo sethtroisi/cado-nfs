@@ -62,6 +62,13 @@ unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z);
 void factor_realloc(factor_ptr factor, unsigned int number);
 
 /*
+ * Remove all the small factors under a certain bound, and store z_root /
+ *  (factors) in z.
+ */
+void brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
+    mpz_srcptr z_root, unsigned long bound);
+
+/*
  * To sort by acending value the element of the factor array.
  *
  * factor: array of factors.
