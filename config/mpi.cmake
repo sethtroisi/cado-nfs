@@ -17,7 +17,7 @@ if("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
     message(STATUS "MPI is not enabled")
     set(MPI_C_COMPILER ${CMAKE_C_COMPILER})
     set(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-else("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
+else()
     set(findprog_flags)
     set(mpicc_names)
     set(mpicxx_names)
@@ -26,7 +26,7 @@ else("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
         list(APPEND mpicc_names "mpicc")
         list(APPEND mpicxx_names "mpic++" "mpicxx" "mpiCC")
         list(APPEND mpiexec_names "mpiexec")
-    else("$ENV{MPI}" MATCHES "^(1|YES|yes|ON|on|)$")
+    else()
         if("$ENV{MPI}" MATCHES "/")
             # If MPI contains a /, then we assume it should be a path
             list(APPEND findprog_flags
@@ -40,7 +40,7 @@ else("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
             list(APPEND mpicc_names "mpicc")
             list(APPEND mpicxx_names "mpic++" "mpicxx" "mpiCC")
             list(APPEND mpiexec_names "mpiexec")
-        else("$ENV{MPI}" MATCHES "/")
+        else()
             # otherwise we make the .<variant> binary names higher
             # priority than others This is for finding things such as
             # mpicc.mpich2 which get installed by the alternatives
@@ -50,8 +50,8 @@ else("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
             list(APPEND mpiexec_names "mpiexec.${MPI}")
             # Well. Presently we're in fact *not* pushing the standard
             # names in the search list. Should we ?
-        endif("$ENV{MPI}" MATCHES "/")
-    endif("$ENV{MPI}" MATCHES "^(1|YES|yes|ON|on|)$")
+        endif()
+    endif()
 
     find_program(MPI_C_COMPILER ${mpicc_names} ${findprog_flags})
     find_program(MPI_CXX_COMPILER ${mpicxx_names} ${findprog_flags})
@@ -98,7 +98,7 @@ else("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
                 SET(${VAR} 1 CACHE INTERNAL "Test ${VAR}")
                 MESSAGE(STATUS "Performing Test ${VAR} -- Success")
             endif (test_return_code)
-        endmacro(my_try_compile_mpicc SOURCE VAR)
+        endmacro()
 
         my_try_compile_mpicc("
         #include <mpi.h>
@@ -124,7 +124,7 @@ else("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
         }
         " HAVE_MPI3_API)
 
-    else(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
+    else()
         message(FATAL_ERROR "Cannot find all of mpicc/mpic++/mpiexec with MPI=$ENV{MPI}")
-    endif(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
-endif("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
+    endif()
+endif()

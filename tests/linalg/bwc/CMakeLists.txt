@@ -9,7 +9,7 @@ macro(add_bwc_test nm script)
         ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script}
         bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${ARGN} -- verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections
         TARGET_DEPENDENCIES bwc_full)
-endmacro(add_bwc_test)
+endmacro()
 
 
 # All this is 64-bit only !
@@ -31,7 +31,7 @@ macro(add_lingen_binary_test testname)
         ${CMAKE_CURRENT_SOURCE_DIR}/test-lingen.sh
         ${CADO_NFS_BINARY_DIR} ${ARGN}
         TARGET_DEPENDENCIES lingen)
-endmacro(add_lingen_binary_test)
+endmacro()
 
 add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75,d0e758e619c8e81b3e28bbd4fe69c32826e9a4bd 64 64 160 1 lingen_threshold=10)
 
@@ -43,13 +43,13 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     string(REGEX MATCH "p_([0-9]+)" t "${gfp_layer}")
     if(t)
         set(width ${CMAKE_MATCH_1})
-    else(t)
+    else()
         if(gfp_layer STREQUAL "pz")
             set(t TRUE)
             set(width "z")
             set(extra "plingen_program=plingen_pz")
-        endif(gfp_layer STREQUAL "pz")
-    endif(t)
+        endif()
+    endif()
     set(p "${prime_${width}}")
     add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
     add_dependencies(test-bwc-modp-inhomogeneous-${gfp_layer}_dependencies
@@ -62,7 +62,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             if (MAGMA)
                 set(mextra magma=${MAGMA})
             endif (MAGMA)
-        endif(DEFINED ENV{CHECKS_EXPENSIVE})
+        endif()
         add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
             random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
         add_dependencies(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6_dependencies
@@ -91,7 +91,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
                 prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
             add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive_dependencies
                 plingen_pz plingen_${gfp_layer})
-        endif(DEFINED ENV{CHECKS_EXPENSIVE})
+        endif()
 
         add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
             prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
@@ -105,7 +105,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 #            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
 #        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies
 #        plingen_pz plingen_${gfp_layer})
-    endif(gfp_layer STREQUAL "p_1")
+    endif()
 
     # Also add some plingen tests if it so occurs that the current
     # backend can process them
@@ -155,7 +155,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             b448493e04299d8d54be6cc1273c43293520ac9e 3 3 1000 1009 1111
             lingen_threshold=10 lingen_mpi_threshold=40 thr=3x3 --ascii
             ${extra})
-    endif(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
+    endif()
     if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_3")
         cado_divert_test(test-bwc-plingen-${gfp_layer} test4
             ${CADO_NFS_BINARY_DIR}
@@ -163,7 +163,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             1532495540865888858358347027150309183618739122183602191 1111
             lingen_threshold=10 lingen_mpi_threshold=40 thr=3x3
             ${extra})
-    endif(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_3")
+    endif()
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
@@ -209,7 +209,7 @@ if(HAVE_CXX11 AND HAVE_HWLOC)
         ARGUMENTS
         --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf
         LIBRARIES utils bwc_base)
-endif(HAVE_CXX11 AND HAVE_HWLOC)
+endif()
 
 macro(test_dispatch_matmul testname)
     cado_define_test(${testname} SCRIPT
@@ -217,7 +217,7 @@ macro(test_dispatch_matmul testname)
         bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc ${ARGN}
         TARGET_DEPENDENCIES bwc_matmul dispatch mf_scan mf_bal
         random_matrix)
-endmacro(test_dispatch_matmul testname)
+endmacro()
 
 # mingw has antique bash (3.1) with different regexp syntax, and having
 # the script below work with both isn't a very funny perspective.
@@ -263,11 +263,3 @@ if (HAVE_MPI)
         TEST_DEPENDENCIES test_hello)
 endif (HAVE_MPI)
 
-include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft)
-include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft/mpfq)
-include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
-cado_define_test(test_matops.cpp 
-        ${CADO_NFS_SOURCE_DIR}/linalg/bwc/matops.cpp
-        ${CADO_NFS_SOURCE_DIR}/linalg/gauss.c
-        ARGUMENTS --test-fast 1000 --n 1000 TARGET_DEPENDENCIES
-        gf2x-build)

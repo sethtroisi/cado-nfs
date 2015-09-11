@@ -244,10 +244,10 @@ void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t w)
 {
     /* Using sse-2 */
     __m128i mb[4] = {
-	_cado_mm_setr_epi64(0, 0),
+	_mm_setzero_si128(),
 	_cado_mm_setr_epi64(w, 0),
 	_cado_mm_setr_epi64(0, w),
-	_cado_mm_setr_epi64(w, w),
+	_cado_mm_set1_epi64(w),
     };
     __m128i *sr = (__m128i *) r;
     for (int i = 0; i < 64; i += 2) {
@@ -355,7 +355,6 @@ void copy_6464(mat64_ptr dst, mat64_srcptr src)
 {
     memcpy(dst, src, sizeof(mat64));
 }
-
 
 /* level 2 */
 
@@ -788,13 +787,11 @@ void mul_N64_T6464_transB(uint64_t *C,
 
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
 /* implements mul_N64_6464 */
-void mul_N64_6464_sse(uint64_t *C,
+void addmul_N64_6464_sse(uint64_t *C,
 		 const uint64_t *A,
 		 const uint64_t *B, size_t m)
 {
     size_t j;
-    memset(C, 0, m * sizeof(uint64_t));
-
     __m128i *Cw = (__m128i *) C;
     __m128i *Aw = (__m128i *) A;
 
@@ -809,7 +806,7 @@ void mul_N64_6464_sse(uint64_t *C,
 	    c ^= (bw & -(a & one));
 	    a = _mm_srli_epi64(a, 1);
 	}
-	*Cw++ = c;
+	*Cw++ ^= c;
     }
     C += j;
     A += j;
@@ -820,8 +817,15 @@ void mul_N64_6464_sse(uint64_t *C,
 	    c ^= (B[i] & -(a & UINT64_C(1)));
 	    a >>= UINT64_C(1);
 	}
-	*C++ = c;
+	*C++ ^= c;
     }
+}
+void mul_N64_6464_sse(uint64_t *C,
+		 const uint64_t *A,
+		 const uint64_t *B, size_t m)
+{
+    memset(C, 0, m * sizeof(uint64_t));
+    addmul_N64_6464_sse(C,A,B,m);
 }
 #endif
 
@@ -850,12 +854,16 @@ void mul_TN32_N64_C(uint64_t * b, uint32_t * A, uint64_t * x, unsigned int ncol)
     }
 }
 
-void mul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
+/* This takes, in row major order, an Nx64 matrix A (transpose of a 64xN
+ * matrix), together with another Nx64 matrix B, and xors the output
+ * matrix with the product transpose(A)*B -- this may as well be seen as
+ * the block dot product of A and B.
+ */
+void addmul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
 {
     uint64_t idx, i, rA;
     uint64_t rx;
 
-    memset(b, 0, 64 * sizeof(uint64_t));
     for(idx = 0; idx < ncol; idx++) {
         rA = A[idx];
         rx = x[idx];
@@ -864,6 +872,12 @@ void mul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
             rA >>= 1;
         }
     }
+}
+
+void mul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
+{
+    memset(b, 0, 64 * sizeof(uint64_t));
+    addmul_TN64_N64_C(b, A, x, ncol);
 }
 
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
@@ -877,10 +891,10 @@ static inline void mul_TN64K_N64_sse2(uint64_t * w, uint64_t * u, uint64_t * v, 
         // (see the u128 version), and is likely to speed things up a
         // wee bit maybe.
         __m128i mb[4] = {
-            _cado_mm_setr_epi64(0,  0 ),
+            _mm_setzero_si128(),
             _cado_mm_setr_epi64(*v, 0 ),
             _cado_mm_setr_epi64(0,  *v),
-            _cado_mm_setr_epi64(*v, *v),
+            _cado_mm_set1_epi64(*v),
         };
         v++;
         __m128i *sw = w0;
@@ -1587,12 +1601,27 @@ void mul_N64_6464(uint64_t *C,
 		 const uint64_t *A,
 		 const uint64_t *B, size_t m)
 {
+/* The chosen function is optimal (among the ones here) for N about
+ * 20000. At N=2000000, a twice faster version can be obtained. However,
+ * it's not critical for cado, so we stick with the slower version.
+ */
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
     mul_N64_6464_sse(C,A,B,m);
 #else
     mul_N64_6464_lookup4(C,A,B,m);
 #endif
 }
+void addmul_N64_6464(uint64_t *C,
+		 const uint64_t *A,
+		 const uint64_t *B, size_t m)
+{
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
+    addmul_N64_6464_sse(C,A,B,m);
+#else
+    addmul_N64_6464_lookup4(C,A,B,m);
+#endif
+}
+
 void mul_N64_T6464(uint64_t *C,
                    const uint64_t *A,
                    const uint64_t *B, size_t m)
@@ -1619,6 +1648,19 @@ void mul_o64_T6464(uint64_t * w, uint64_t a, mat64_srcptr b)
 {
     mul_o64_T6464_C_parity(w,a,b);
 }
+
+void mul_TN64_N64(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
+{
+    mul_TN64_N64_C(b, A, x, ncol);
+}
+
+void addmul_TN64_N64(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
+{
+    addmul_TN64_N64_C(b, A, x, ncol);
+}
+
+
+/*************/
 
 
 int mat64_is_uppertriangular(mat64_srcptr u)

@@ -251,6 +251,7 @@ static inline size_t transform_datasize(gf2x_cantor_fft_info_srcptr p)
 #if 0
 /* These versions would make sense if Kelt were defined to be _v2di *,
  * which it isn't */
+/* TODO: anyway we would need to redefine all this to use __m128i's */
 static inline void allBetai1(Kdst_elt x, size_t i)
 {
     size_t j;

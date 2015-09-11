@@ -6,6 +6,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "portability.h"
 #include "macros.h"
 #include "matops.h"
 

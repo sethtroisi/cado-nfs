@@ -48,11 +48,15 @@ extern void add_6464_6464(mat64_ptr C, mat64_srcptr A, mat64_srcptr B);
 extern void mul_o64_6464(uint64_t *r, uint64_t a, mat64_srcptr w);
 extern void mul_N64_6464(uint64_t *C, const uint64_t *A,
  	 const uint64_t *B, size_t m);
+extern void addmul_N64_6464(uint64_t *C, const uint64_t *A,
+ 	 const uint64_t *B, size_t m);
 extern void mul_N64_T6464(uint64_t *C, const uint64_t *A,
             const uint64_t *B, size_t m);
 extern void addmul_To64_o64(uint64_t * r, uint64_t a, uint64_t w);
 extern void mul_o64_6464(uint64_t * r, uint64_t a, mat64_srcptr w);
 extern void mul_o64_T6464(uint64_t * w, uint64_t a, mat64_srcptr b);
+extern void addmul_TN64_N64(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol);
+extern void mul_TN64_N64(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol);
 
 /* Here come the various implementations of each */
 extern void add_6464_6464_C(mat64_ptr C, mat64_srcptr A, mat64_srcptr B);
@@ -96,6 +100,7 @@ extern void addmul_To64_o64_lsb_packof2(uint64_t * r, uint64_t a, uint64_t w);
 extern void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t w);
 extern void mul_64N_N64_addmul(uint64_t *r, uint64_t *a, uint64_t *w, size_t n);
 extern void mul_TN32_N64_C(uint64_t * b, uint32_t * A, uint64_t * x, unsigned int ncol);
+extern void addmul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol);
 extern void mul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol);
 
 extern int PLUQ64(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m);

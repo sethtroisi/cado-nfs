@@ -56,6 +56,18 @@ AC_ARG_ENABLE([sse2],
               [AS_HELP_STRING([--enable-sse2],
                               [Turn on sse-2 code (default is yes)])])
 
+AC_ARG_ENABLE([sse3],
+              [AS_HELP_STRING([--enable-sse3],
+                              [Turn on sse-3 code (default is yes)])])
+
+AC_ARG_ENABLE([ssse3],
+              [AS_HELP_STRING([--enable-ssse3],
+                              [Turn on ssse3 code (default is yes)])])
+
+AC_ARG_ENABLE([sse41],
+              [AS_HELP_STRING([--enable-sse41],
+                              [Turn on sse-4.1 code (default is yes)])])
+
 AC_ARG_ENABLE([pclmul],
               [AS_HELP_STRING([--enable-pclmul],
                               [Turn on pclmul code (default is yes)])])
@@ -94,7 +106,13 @@ AC_SUBST([GF2X_WORDSIZE], [$gf2x_wordsize])
 if test "x${enable_hardware_specific_code}" = xno ; then
  echo "Not using hardware-specific code due to --disable-hardware-specific-code flag"
 else
+ # It is necessary to make all tests. We do encounter in the wild
+ # binutils (openbsd binutils 2.15, namely) which are buggy with ssse3,
+ # and that isn't extremely quickly spotted by the later checks...
  CHECK_SSE2_SUPPORT()
+ CHECK_SSE3_SUPPORT()
+ CHECK_SSSE3_SUPPORT()
+ CHECK_SSE41_SUPPORT()
  CHECK_PCLMUL_SUPPORT()
 fi
 
@@ -161,6 +179,13 @@ if test x$hwdir = x ; then
 else
  AC_MSG_NOTICE([Using supplied hwdir value $hwdir])
 fi
+case "$hwdir" in
+ x86_64*|coreihwl)
+    if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
+      # this is only if we've been given an explicit --disable-sse2
+      hwdir=x86_64_nosse
+     fi;;
+esac
 
 AC_MSG_NOTICE([using ABI="$ABI"])
 AC_MSG_NOTICE([      CC="$CC"])

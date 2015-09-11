@@ -183,24 +183,24 @@ void fill_cacheline(unsigned int ** restrict buckets, unsigned int start,
     cacheline[bucket * ENTRIES_PER_LINE + (nr[bucket]++)] = (unsigned int) loc;
     
     if (nr[bucket] == ENTRIES_PER_LINE) {
-      __v2di *cl = (__v2di *) &cacheline[bucket * ENTRIES_PER_LINE];
-      __v2di *b = (__v2di *) buckets[bucket];
+      __m128i *cl = (__m128i *) &cacheline[bucket * ENTRIES_PER_LINE];
+      __m128i *b = (__m128i *) buckets[bucket];
       buckets[bucket] += ENTRIES_PER_LINE;
-      __builtin_ia32_movntdq (&(b[0]), cl[0]);
+      _mm_stream_si128 (&(b[0]), cl[0]);
       if (CLSIZE > 16)
-        __builtin_ia32_movntdq (&(b[1]), cl[1]);
+        _mm_stream_si128 (&(b[1]), cl[1]);
       if (CLSIZE > 32)
-        __builtin_ia32_movntdq (&(b[2]), cl[2]);
+        _mm_stream_si128 (&(b[2]), cl[2]);
       if (CLSIZE > 48)
-        __builtin_ia32_movntdq (&(b[3]), cl[3]);
+        _mm_stream_si128 (&(b[3]), cl[3]);
       if (CLSIZE > 64)
-        __builtin_ia32_movntdq (&(b[4]), cl[4]);
+        _mm_stream_si128 (&(b[4]), cl[4]);
       if (CLSIZE > 80)
-        __builtin_ia32_movntdq (&(b[5]), cl[5]);
+        _mm_stream_si128 (&(b[5]), cl[5]);
       if (CLSIZE > 96)
-        __builtin_ia32_movntdq (&(b[6]), cl[6]);
+        _mm_stream_si128 (&(b[6]), cl[6]);
       if (CLSIZE > 112)
-        __builtin_ia32_movntdq (&(b[7]), cl[7]);
+        _mm_stream_si128 (&(b[7]), cl[7]);
       nr[bucket] = 0;
     }
     loc = RAND(loc);
