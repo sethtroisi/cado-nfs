@@ -39,9 +39,9 @@ add_executable(gen_decomp
 
 if(MINGW)
     target_link_libraries(gen_decomp gnurx m)
-else(MINGW)
+else()
     target_link_libraries(gen_decomp m)
-endif(MINGW)
+endif()
 
 
 include(CMakeLists-nodist.txt OPTIONAL)

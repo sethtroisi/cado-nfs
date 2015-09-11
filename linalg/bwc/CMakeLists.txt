@@ -41,21 +41,21 @@ set(BWC_EXTRA_BACKENDS "" CACHE STRING "list of pairs (arithmetic,matmul) backen
 # In case there's a user override, just make mention of the situation.
 if(NOT BWC_GFP_ARITHMETIC_BACKENDS)
     message(STATUS "DL mode disabled for linear algebra")
-else(NOT BWC_GFP_ARITHMETIC_BACKENDS)
+else()
     if(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
         string_join(FOO ", " ${BWC_GFP_ARITHMETIC_BACKENDS})
         message(STATUS "GF(p) implementations enabled for DL linear algebra: ${FOO}")
         string_join(FOO ", " ${BWC_GFP_MATMUL_BACKENDS})
         message(STATUS "GF(p) SpMV backends for DL linear algebra: ${FOO}")
-    else(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+    else()
         # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU
         # CC idioms. As it is not used in production yet, we don't want
         # to expose it on 32-bit platforms.
         set(BWC_GFP_ARITHMETIC_BACKENDS CACHE STRING
                 "which GF(p) backends to compile for DLOG mode" FORCE)
         message(STATUS "Warning: DL mode forcibly disabled for linear algebra (amd64-only)")
-    endif(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-endif(NOT BWC_GFP_ARITHMETIC_BACKENDS)
+    endif()
+endif()
 
 ### end bwc-specific configuration.
 
@@ -94,7 +94,7 @@ set(bwc_base_sources
     cpubinding.cpp
     )
 install(FILES cpubinding.conf DESTINATION ${DATASUFFIX}/misc)
-endif(HAVE_CXX11 AND HAVE_HWLOC)
+endif()
 
 add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
@@ -106,7 +106,7 @@ endif (HAVE_CURL)
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
 target_link_libraries(bwc_base hwloc)
-endif(HAVE_CXX11 AND HAVE_HWLOC)
+endif()
 
 
 set_target_properties(bwc_base PROPERTIES
@@ -115,7 +115,7 @@ set_target_properties(bwc_base PROPERTIES
 
 if(ENABLE_SHARED)
     install(TARGETS bwc_base DESTINATION ${LIBSUFFIX})
-endif(ENABLE_SHARED)
+endif()
 
 ### end bwc_base
 
@@ -124,7 +124,7 @@ add_library(mf ${CADO_SHARED} mf.c)
 target_link_libraries(mf bwc_base utils)
 if(ENABLE_SHARED)
     install(TARGETS mf DESTINATION ${LIBSUFFIX})
-endif(ENABLE_SHARED)
+endif()
 add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
 target_link_libraries(mf_scan mf)
 
@@ -167,7 +167,7 @@ endforeach(v)
 
 if(ENABLE_SHARED)
     install(TARGETS bwc_mpfq DESTINATION ${LIBSUFFIX})
-endif(ENABLE_SHARED)
+endif()
 
 target_link_libraries(bwc_mpfq ${gmp_libname} utils)
 
@@ -180,20 +180,20 @@ set_target_properties(bwc_mpfq PROPERTIES LINK_FLAGS "--mpi")
 ### link dependencies
 
 IF(UNIX)
-FIND_PROGRAM(CMAKE_UNAME uname /bin /usr/bin /usr/local/bin )
-IF(CMAKE_UNAME)
-EXEC_PROGRAM(uname ARGS -s OUTPUT_VARIABLE CMAKE_SYSTEM_NAME)
-ENDIF(CMAKE_UNAME)
-ENDIF(UNIX)
+    FIND_PROGRAM(CMAKE_UNAME uname /bin /usr/bin /usr/local/bin )
+    IF(CMAKE_UNAME)
+        EXEC_PROGRAM(uname ARGS -s OUTPUT_VARIABLE CMAKE_SYSTEM_NAME)
+    ENDIF()
+ENDIF()
 IF(CMAKE_SYSTEM_NAME MATCHES BSD)
-target_link_libraries(bwc_base utils bwc_mpfq ${pthread_libs})
-ELSE(CMAKE_SYSTEM_NAME MATCHES BSD)
-if(BUILD_DYNAMICALLY_LINKABLE_BWC)
-target_link_libraries(bwc_base utils bwc_mpfq ${pthread_libs} dl)
-else(BUILD_DYNAMICALLY_LINKABLE_BWC)
-target_link_libraries(bwc_base utils bwc_mpfq ${pthread_libs})
-endif(BUILD_DYNAMICALLY_LINKABLE_BWC)
-ENDIF(CMAKE_SYSTEM_NAME MATCHES BSD)
+    target_link_libraries(bwc_base utils bwc_mpfq ${pthread_libs})
+ELSE()
+    if(BUILD_DYNAMICALLY_LINKABLE_BWC)
+        target_link_libraries(bwc_base utils bwc_mpfq ${pthread_libs} dl)
+    else()
+        target_link_libraries(bwc_base utils bwc_mpfq ${pthread_libs})
+    endif()
+ENDIF()
 
 # matmul_common is a dependency of all the impl-specific libs. When doing
 # dynamic linking, there's no real need to make matmul_common *also*
@@ -206,7 +206,7 @@ set_target_properties(matmul_common PROPERTIES
     LINK_FLAGS "--mpi")
 if(ENABLE_SHARED)
     install(TARGETS matmul_common DESTINATION ${LIBSUFFIX})
-endif(ENABLE_SHARED)
+endif()
 
 
 set(matmul_basic_sources    matmul-basic.c)
@@ -236,8 +236,8 @@ macro(CONFIGURE_MATMUL_LIB v i)
             set_property(SOURCE matmul-sub-large-fbd.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-vsc-dispatch.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-vsc-combine.S PROPERTY LANGUAGE C)
-        endif(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
-    endif(doing_u64 AND doing_bucket)
+        endif()
+    endif()
 
     add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
     target_link_libraries(matmul_${v}_${i} matmul_common bwc_mpfq)
@@ -247,8 +247,8 @@ macro(CONFIGURE_MATMUL_LIB v i)
     set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
     if(ENABLE_SHARED)
         install(TARGETS matmul_${v}_${i} DESTINATION ${LIBSUFFIX})
-    endif(ENABLE_SHARED)
-endmacro(CONFIGURE_MATMUL_LIB)
+    endif()
+endmacro()
 
 string_join(FOO ", " ${BWC_GF2_ARITHMETIC_BACKENDS})
 message(STATUS "GF(2) implementations enabled for linear algebra: ${FOO}")
@@ -283,14 +283,14 @@ configure_file(bwc_config_h.in bwc_config.h ESCAPE_QUOTES @ONLY)
 if(BUILD_DYNAMICALLY_LINKABLE_BWC)
 set(MATMUL_LIBS_PREFIX ${CMAKE_SHARED_LIBRARY_PREFIX})
 set(MATMUL_LIBS_SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
-endif(BUILD_DYNAMICALLY_LINKABLE_BWC)
+endif()
 
 configure_file(matmul-libnames.h.in matmul-libnames.h ESCAPE_QUOTES @ONLY)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
 if(NOT BUILD_DYNAMICALLY_LINKABLE_BWC)
 target_link_libraries(bwc_base ${all_matmul_libs})
-endif(NOT BUILD_DYNAMICALLY_LINKABLE_BWC)
+endif()
 
 ### matmul_mf
 add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
@@ -300,7 +300,7 @@ add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
 target_link_libraries(matmul_mf mf)
 if(ENABLE_SHARED)
     install(TARGETS matmul_mf DESTINATION ${LIBSUFFIX})
-endif(ENABLE_SHARED)
+endif()
 ### end matmul_mf
 
 macro(bwc_program_base v)
@@ -311,18 +311,18 @@ macro(bwc_program_base v)
             LINK_FLAGS "--mpi")
         # -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${v} bwc_base)
-endmacro(bwc_program_base v)
+endmacro()
 
 # The macro bwc_program_extra is mostly used by the binaries specific to
 # the git tree.
 macro(bwc_program_extra v)
     bwc_program_base(${v} EXCLUDE_FROM_ALL ${ARGN})
-endmacro(bwc_program_extra)
+endmacro()
 
 macro(bwc_program v)
     bwc_program_base(${v} ${ARGN})
     install(TARGETS ${v} RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
-endmacro(bwc_program)
+endmacro()
 
 bwc_program(acollect acollect.c)
 bwc_program(split split.c)
@@ -369,7 +369,7 @@ if(WITH_MPIR)
     add_library(flint-fft ${flint_fft_files})
     add_executable(test-flint test-flint.c)
     target_link_libraries(test-flint flint-fft utils ${gmp_libname})
-endif(WITH_MPIR)
+endif()
 
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(plingen_${v}_sources
@@ -389,20 +389,20 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
             ${plingen_${v}_sources}
             lingen-matpoly-ft.c
             lingen-bigmatpoly-ft.c)
-    endif(WITH_MPIR)
+    endif()
 
     # make plingen_pz a default target, but not the others.
     if(v STREQUAL "pz")
         add_executable(plingen_${v} ${plingen_${v}_sources})
-    else(v STREQUAL "pz")
+    else()
         add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
-    endif(v STREQUAL "pz")
+    endif()
 
     if(WITH_MPIR)
         target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)
-    else(WITH_MPIR)
+    else()
         target_link_libraries(plingen_${v} ${gmp_libname} utils)
-    endif(WITH_MPIR)
+    endif()
     set_target_properties(plingen_${v} PROPERTIES
         COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
         LINK_FLAGS "--mpi"

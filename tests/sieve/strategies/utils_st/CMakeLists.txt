@@ -14,7 +14,7 @@ cado_define_test(test_strategy.c
 set(more)
 if(MINGW)
     set(more LIBRARIES gnurx)
-endif(MINGW)
+endif()
 cado_define_test(test_decomp.c ${SUF_SRC}tab_decomp.c ${SUF_SRC}decomp.c ${more})
 
 cado_define_test(test_convex_hull.c
