@@ -1308,3 +1308,4 @@ gf2x/already_tuned/x86_64_nosse/gf2x_mul6.h
 gf2x/already_tuned/x86_64_nosse/gf2x_mul7.h
 gf2x/already_tuned/x86_64_nosse/gf2x_mul8.h
 gf2x/already_tuned/x86_64_nosse/gf2x_mul9.h
+tests/provide-wdir.sh
