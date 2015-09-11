@@ -73,4 +73,12 @@ int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec,
  * Sort vectors of the list by last coordinate.
  */
 void list_int64_vector_sort_last(list_int64_vector_ptr list);
+
+/*
+ * Assume that list is sorted by last coordinate. Delete all the elements with
+ *  a last coordinate strictly less than val.
+ */
+void list_int64_vector_delete_last_coordinate(list_int64_vector_ptr list,
+    uint64_t val);
+
 #endif /* LIST_INT64_VECTOR_H */

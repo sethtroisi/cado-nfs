@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <limits.h>
 #include <inttypes.h>
 #include "list_int64_vector.h"
 
@@ -148,4 +149,33 @@ static int compare_last(const void * p0, const void * p1)
 void list_int64_vector_sort_last(list_int64_vector_ptr list)
 {
   qsort(list->v, list->length, sizeof(list->v[0]), compare_last);
+}
+
+/*
+ * Assume that list is sorted. Return the index of the first vector with a last
+ *  coordinate less or equal to val.
+ */
+static void find_index(list_int64_vector_ptr list, int64_t val)
+{
+  unsigned int i = 0;
+
+  for (i = list->length - 1; i != UINT_MAX; i--) {
+    if (val >= list->v[i]->c[list->vector_dim - 1]) {
+      return i;
+    }
+  }
+}
+
+void list_int64_vector_delete_last_coordinate(list_int64_vector_ptr list,
+    int64_t val)
+{
+  if (list->length == 0) {
+    return;
+  }
+  unsigned int i = find_index(list, val);
+
+  for (unsigned int j = i + 1; j < list->length; j++) {
+    int64_vector_set(list->v[j - (i + 1)], list->v[j]);
+  }
+  list->length = list->length - (i + 1);
 }
