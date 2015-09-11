@@ -814,10 +814,10 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
   mpz_init (tmp_log);
   stats_init (stats, stdout, &nread, nbits(renumb->size)-5, "Read", "logarithms", "",
               "logs");
-  if (renumb->add_full_col)
+  for (index_t i = 0; i < renumb->naddcols; i++)
   {
     ret = gmp_fscanf (f, "%" SCNid " added column %Zd\n", &h, tmp_log);
-    ASSERT_ALWAYS (ret == 2 && h == 0);
+    ASSERT_ALWAYS (ret == 2 && h == i);
     nread++;
     logtab_insert (log, h, tmp_log);
   }
@@ -887,7 +887,7 @@ write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
       if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
       {
         ASSERT_ALWAYS (mpz_cmp (log->tab[i], log->q) < 0);
-        if (i == 0 && tab->add_full_col)
+        if (i < tab->naddcols)
           gmp_fprintf (f, "%" PRid " added column %Zd\n", i, log->tab[i]);
         else
           gmp_fprintf (f, "%" PRid " bad ideals %Zd\n", i, log->tab[i]);

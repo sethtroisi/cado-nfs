@@ -86,8 +86,8 @@ main (int argc, char *argv[])
   {
     if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
     {
-      if (i == 0 && tab->add_full_col)
-        printf ("i=0 tab[i]=#   added column\n");
+      if (i < tab->naddcols)
+        printf ("i=%" PRid " tab[i]=#   added column\n", i);
       else
         printf ("i=%" PRid " tab[i]=#   above a bad ideals\n", i);
     }

@@ -2511,7 +2511,7 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
-                {"dlp": False, "gzip": True, "addfullcol": None})
+                {"dlp": False, "gzip": True, "lcideals": None})
 
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
@@ -2521,9 +2521,9 @@ class FreeRelTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
-        if self.params["dlp"]:
-            # default for dlp is addfullcol
-            self.progparams[0].setdefault("addfullcol", True)
+        if self.params["dlp"] and self.progparams[0]["lcideals"] is not None:
+            # default for dlp is lcideals (if not already set)
+            self.progparams[0].setdefault("lcideals", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"]) and
         # the lpba/lpbr values used in self.state["lpba"] / ["lpbr"]

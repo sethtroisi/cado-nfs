@@ -46,7 +46,7 @@ tasks.polyselect.import = $POLYFILE
 # this should be uncommented for nominal execution, since the computations
 # involve 1 unit on side 1, 1 SM on side 0
 tasks.explicit_units1 = true 
-tasks.addfullcol = true
+tasks.lcideals = true
 
 tasks.I = 11
 tasks.polyselect.degree = 4

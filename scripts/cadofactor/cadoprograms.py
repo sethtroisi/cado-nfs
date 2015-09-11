@@ -742,7 +742,7 @@ class FreeRel(Program):
                  badideals: Parameter(is_output_file=True)=None,
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
-                 addfullcol: Toggle() = None,
+                 lcideals: Toggle() = None,
                  threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)

@@ -57,7 +57,8 @@ struct renumber_s
   index_t *index_biggest_prime_below_lpb;
   p_r_values_t smallest_prime_not_cached;
   index_t index_smallest_prime_not_cached;
-  int add_full_col;                 // do we add a col of 1 to all relations
+  uint64_t nonmonic; /* bit vector of which polynomials are non monic. */
+  uint8_t naddcols; /* number of additional columns due to non monic poly */
 };
 typedef struct renumber_s renumber_t[1];
 typedef struct renumber_s * renumber_ptr;
@@ -68,7 +69,7 @@ extern "C" {
 #endif
 
 void renumber_init_for_writing (renumber_ptr, unsigned int, int, int,
-                                                              unsigned long *);
+                                uint64_t, unsigned long *);
 /* Last argument of renumber_write_open can be NULL. It will not print the
    polynomials on the file */
 void renumber_write_open (renumber_ptr, const char *, const char *, cado_poly);
