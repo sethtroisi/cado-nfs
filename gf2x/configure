@@ -642,6 +642,8 @@ GF2X_64BIT_SOURCES_FALSE
 GF2X_64BIT_SOURCES_TRUE
 GF2X_32BIT_SOURCES_FALSE
 GF2X_32BIT_SOURCES_TRUE
+WORDSIZE_IS_64_FALSE
+WORDSIZE_IS_64_TRUE
 GF2X_WORDSIZE
 EXEEXT_FOR_BUILD
 CC_FOR_BUILD
@@ -16696,6 +16698,15 @@ gf2x_wordsize=`expr 8 \* $ac_cv_sizeof_unsigned_long`
 GF2X_WORDSIZE=$gf2x_wordsize
 
 
+ if test "x$gf2x_wordsize" = x64; then
+  WORDSIZE_IS_64_TRUE=
+  WORDSIZE_IS_64_FALSE='#'
+else
+  WORDSIZE_IS_64_TRUE='#'
+  WORDSIZE_IS_64_FALSE=
+fi
+
+
 
 if test "x${enable_hardware_specific_code}" = xno ; then
  echo "Not using hardware-specific code due to --disable-hardware-specific-code flag"
@@ -18270,6 +18281,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${am__fastdepCXX_TRUE}" && test -z "${am__fastdepCXX_FALSE}"; then
   as_fn_error $? "conditional \"am__fastdepCXX\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${WORDSIZE_IS_64_TRUE}" && test -z "${WORDSIZE_IS_64_FALSE}"; then
+  as_fn_error $? "conditional \"WORDSIZE_IS_64\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${GF2X_32BIT_SOURCES_TRUE}" && test -z "${GF2X_32BIT_SOURCES_FALSE}"; then

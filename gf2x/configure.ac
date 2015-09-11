@@ -102,6 +102,8 @@ AC_CHECK_SIZEOF([unsigned long])
 gf2x_wordsize=`expr 8 \* $ac_cv_sizeof_unsigned_long`
 AC_SUBST([GF2X_WORDSIZE], [$gf2x_wordsize])
 
+AM_CONDITIONAL([WORDSIZE_IS_64],[test "x$gf2x_wordsize" = x64])
+
 
 if test "x${enable_hardware_specific_code}" = xno ; then
  echo "Not using hardware-specific code due to --disable-hardware-specific-code flag"
