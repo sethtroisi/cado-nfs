@@ -155,7 +155,7 @@ void list_int64_vector_sort_last(list_int64_vector_ptr list)
  * Assume that list is sorted. Return the index of the first vector with a last
  *  coordinate less or equal to val.
  */
-static int find_index(list_int64_vector_ptr list, int64_t val)
+static unsigned int find_index(list_int64_vector_ptr list, int64_t val)
 {
   unsigned int i = 0;
 
@@ -164,7 +164,7 @@ static int find_index(list_int64_vector_ptr list, int64_t val)
       return i;
     }
   }
-  return -1;
+  return 0;
 }
 
 void list_int64_vector_delete_last_coordinate(list_int64_vector_ptr list,

@@ -37,4 +37,4 @@ add_executable(makefb-hd ${MAKEFB_SRC})
 
 set_property(TARGET makefb-hd PROPERTY COMPILE_DEFINITIONS MAIN)
 
-target_link_libraries(makefb-hd ${ECM_LIB} utils)
+target_link_libraries(makefb-hd utils)
