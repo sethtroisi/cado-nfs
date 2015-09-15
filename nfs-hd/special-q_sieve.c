@@ -2207,6 +2207,7 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
       if (is_smooth) {
         find++;
         I[i] = 1;
+        sort_factor(factor[i]);
       } else {
         I[i] = 0;
       }
@@ -2215,15 +2216,15 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
     ASSERT(main >= 0);
 
     // FIXME: wrong, probably 'main' and not 'L[main]'
-    norm_poly(res, f[L[main]], a);
+    norm_poly(res, f[main], a);
 
-    int main_is_smooth = call_facul(factor[main], res, &data[L[main]]);
+    int main_is_smooth = call_facul(factor[main], res, &data[main]);
 
     if (main_is_smooth) {
       find = 1;
 
       for (unsigned int i = 0; i < size; i++) {
-        if (i != (unsigned int) main) {
+        if (L[i] != (unsigned int) main) {
           norm_poly(res, f[L[i]], a);
 
           int is_smooth = call_facul(factor[i], res, &data[L[i]]);
