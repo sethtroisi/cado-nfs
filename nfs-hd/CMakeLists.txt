@@ -3,7 +3,7 @@ set (SQ_SRC special-q_sieve.c mat_int64.c int64_vector.c uint64_array.c
     mat_Z.c ideal.c makefb.c utils_mpz.c int64_poly.c sieving_bound.c
     array.c utils_int64.c factor_base.c utils_lattice.c double_vector.c
     mat_double.c list_int64_vector.c list_double_vector.c
-    list_int64_vector_index.c)
+    list_int64_vector_index.c utils_norm.c)
 
 add_executable(special-q_sieve ${SQ_SRC})
 
@@ -14,7 +14,7 @@ add_executable(special-q_sieve ${SQ_SRC})
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS
 	#ASSERT_FACTO TEST_MQR SKEW_LLL)
 set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS
-	SPACE_SIEVE SPACE_SIEVE_CONTRIBUTION NEW_NORM)
+	SPACE_SIEVE SPACE_SIEVE_CONTRIBUTION)
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS
 	#ASSERT_FACTO TEST_MQR)
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS

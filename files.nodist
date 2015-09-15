@@ -191,3 +191,5 @@ nfs-hd/list_int64_vector.h
 nfs-hd/list_int64_vector_index.c
 nfs-hd/list_int64_vector_index.h
 tests/nfs-hd/
+nfs-hd/utils_norm.c
+nfs-hd/utils_norm.h
