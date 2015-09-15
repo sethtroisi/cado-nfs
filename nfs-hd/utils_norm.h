@@ -37,8 +37,9 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
  * spq: the special-q.
  * special_q: 0 if there is no special-q in this side, else 1.
  */
-void init_norm(array_ptr array, sieving_bound_srcptr H, mat_Z_srcptr matrix,
-    mpz_poly_srcptr f, ideal_spq_srcptr spq, int special_q);
+void init_norm(array_ptr array, MAYBE_UNUSED FILE * file,
+    sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
+    ideal_spq_srcptr spq, int special_q);
 
 #else // OLD_NORM
 

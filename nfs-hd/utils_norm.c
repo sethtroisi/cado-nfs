@@ -12,30 +12,6 @@ void norm_poly(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
   mpz_abs(res, res);
 }
 
-#ifdef MEAN_NORM
-/*
- * Compute the norm of a polynomial a and add an approximation of the norm to
- *  the mean of all the polynomial a. If the special-q is set in this number
- *  field, divide the norm by the value q.
- *
- * f: the polynomial that defines the number field.
- * a: the polynomial for which we compute the norm.
- * q: value of the special-q (ie, q^(deg(g))), 1.0 if no special-q.
- */
-static void mean_norm(mpz_poly_srcptr f, int64_poly_srcptr a, double q)
-{
-  mpz_poly_t b;
-  mpz_poly_init(b, -1);
-  mpz_t res;
-  mpz_init(res);
-  int64_poly_to_mpz_poly(b, a);
-  norm_poly(res, f, b);
-  norm = norm + mpz_get_d(res) / q;
-  mpz_poly_clear(b);
-  mpz_clear(res);
-}
-#endif // MEAN_NORM
-
 #ifdef TRACE_POS
 /*
  * Do the first step for the TRACE_POS mode, i.e. print c, a, f, the resultant
@@ -49,38 +25,40 @@ static void mean_norm(mpz_poly_srcptr f, int64_poly_srcptr a, double q)
  * special_q: 1 if the special-q is set in this number field, 0 otherwise.
  * array: the array in which we store the norms.
  */
-static void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_srcptr a,
-    mpz_poly_srcptr f, double bound_resultant, int special_q,
-    array_srcptr array)
+static void trace_pos_init(FILE * file, int64_vector_srcptr vector,
+    mat_int64_srcptr Mq, mpz_poly_srcptr f, array_srcptr array,
+    sieving_bound_srcptr H)
 {
+  uint64_t i = array_int64_vector_index(vector, H, array->number_element);
+
   if (i == TRACE_POS) {
     fprintf(file, "c = ");
     int64_vector_fprintf(file, vector);
+    mpz_vector_t c;
+    mpz_vector_init(c, vector->dim);
+    int64_vector_to_mpz_vector(c, vector);
+
+    mat_Z_t Mq_Z;
+    mat_Z_init(Mq_Z, Mq->NumRows, Mq->NumCols);
+    mat_int64_to_mat_Z(Mq_Z, Mq);
+    mpz_poly_t a;
+    mpz_poly_init(a, 0);
+    mat_Z_mul_mpz_vector_to_mpz_poly(a, Mq_Z, c);
     fprintf(file, "a = ");
-    int64_poly_fprintf(file, a);
+    mpz_poly_fprintf(file, a);
+    mpz_vector_clear(c);
+    mat_Z_clear(Mq_Z);
+
     fprintf(file, "f = ");
     mpz_poly_fprintf(file, f);
+
     mpz_t res;
     mpz_init(res);
-    mpz_poly_t tmp;
-    mpz_poly_init(tmp, -1);
-    int64_poly_to_mpz_poly(tmp, a);
-    norm_poly(res, f, tmp);
-    factor_t factor;
-    gmp_factorize(factor, res);
+    norm_poly(res, f, a);
     gmp_fprintf(file, "Resultant: %Zd\n", res);
-    fprintf(file, "Factorization: ");
-    factor_fprintf(file, factor);
-    factor_clear(factor);
     mpz_clear(res);
-    if (special_q) {
-      fprintf(file, "Initialization (without special-q): %u\n",
-              (unsigned char) log2(bound_resultant));
-      fprintf(file, "Initialization (with special-q): %u\n", array->array[i]);
-    } else {
-      fprintf(file, "Initialization: %u\n", array->array[i]);
-    }
-    mpz_poly_clear(tmp);
+    fprintf(file, "Initialization: %u\n", array->array[i]);
+    mpz_poly_clear(a);
   }
 }
 #endif // TRACE_POS
@@ -99,30 +77,12 @@ static void trace_pos_init(uint64_t i, int64_vector_srcptr vector, int64_poly_sr
  * array: the array in which we store the norm.
  * deg_g: the degree of the g of the special-q.
  */
-static void mode_init_norm(MAYBE_UNUSED int special_q,
+static inline void mode_init_norm(MAYBE_UNUSED int special_q,
     MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED int64_poly_srcptr a,
     MAYBE_UNUSED ideal_spq_srcptr spq, MAYBE_UNUSED double log_bound_resultant,
     MAYBE_UNUSED uint64_t i, MAYBE_UNUSED int64_vector_srcptr vector,
     MAYBE_UNUSED array_srcptr array)
 {
-#ifdef MEAN_NORM
-  if (special_q == 1) {
-    mean_norm(f, a, pow(((double) ideal_spq_get_q(spq), (double)
-            ideal_spq_get_deg_h(spq)));
-  } else {
-    mean_norm(f, a, 1.0);
-  }
-#endif // MEAN_NORM
-
-#ifdef MEAN_NORM_BOUND
-  if (special_q == 1) {
-    norm_bound = norm_bound + pow(2, log_bound_resultant) /
-    pow(((double) ideal_spq_get_q(spq), (double) ideal_spq_get_deg_h(spq)));
-  } else {
-    norm_bound = norm_bound + pow(2, log_bound_resultant);
-  }
-#endif // MEAN_NORM_BOUND
-
 #ifdef TRACE_POS
   trace_pos_init(i, vector, a, f, bound_resultant, special_q, array);
 #endif // TRACE_POS
@@ -476,9 +436,10 @@ void add_one_values(int * current_indexes, const int * bottom_left_cube,
 #endif
 }
 
-static void init_cells(array_ptr array, const int * bottom_left_cube,
-    const unsigned int * length, sieving_bound_srcptr H, double_poly_srcptr f,
-    mat_int64_srcptr Mq, ideal_spq_srcptr spq, int special_q)
+static void init_cells(array_ptr array, MAYBE_UNUSED FILE * file,
+    const int * bottom_left_cube, const unsigned int * length,
+    sieving_bound_srcptr H, double_poly_srcptr f, mat_int64_srcptr Mq,
+    ideal_spq_srcptr spq, int special_q, MAYBE_UNUSED mpz_poly_srcptr f_Z)
 {
 #ifndef NDEBUG
   for (unsigned int i = 0; i < H->t; i++) {
@@ -512,6 +473,16 @@ static void init_cells(array_ptr array, const int * bottom_left_cube,
       tmp = log_norm_double(current_indexes, Mq, f, spq, special_q, H->t);
 
       array_set_at(array, current_indexes, tmp, H);
+
+#ifdef TRACE_POS
+      int64_vector_t vec;
+      int64_vector_init(vec, H->t);
+      for (unsigned cpt = 0; cpt < H->t; cpt++) {
+        vec->c[cpt] = (int64_t) current_indexes[cpt];
+      }
+      trace_pos_init(file, vec, Mq, f_Z, array, H);
+      int64_vector_clear(vec);
+#endif // TRACE_POS
 
     } 
     update_mini_maxi(&mini, &maxi, tmp);
@@ -552,6 +523,16 @@ static void init_cells(array_ptr array, const int * bottom_left_cube,
 
       array_set_at(array, current_indexes, tmp, H);
 
+#ifdef TRACE_POS
+      int64_vector_t vec;
+      int64_vector_init(vec, H->t);
+      for (unsigned cpt = 0; cpt < H->t; cpt++) {
+        vec->c[cpt] = (int64_t) current_indexes[cpt];
+      }
+      trace_pos_init(file, vec, Mq, f_Z, array, H);
+      int64_vector_clear(vec);
+#endif // TRACE_POS
+
     } 
     update_mini_maxi(&mini, &maxi, tmp);
 
@@ -572,9 +553,9 @@ static void init_cells(array_ptr array, const int * bottom_left_cube,
         //TODO: not H but other think (ie length)
         next_bottom_left_cube_in_hypercube(current_indexes, new_length,
             use_new_length, bottom_left_cube, length, H->t);
-        init_cells(array, current_indexes, new_length, H, f, Mq, spq,
-            special_q);
-      }
+        init_cells(array, file, current_indexes, new_length, H, f, Mq, spq,
+            special_q, f_Z);
+          }
     } else {
       stop = 1;
       for (unsigned int i = 0; i < H->t; i++) {
@@ -589,6 +570,16 @@ static void init_cells(array_ptr array, const int * bottom_left_cube,
         tmp = array_get_at(array, current_indexes, H);
         if (tmp == 255) {
           array_set_at(array, current_indexes, maxi, H);
+
+#ifdef TRACE_POS
+      int64_vector_t vec;
+      int64_vector_init(vec, H->t);
+      for (unsigned cpt = 0; cpt < H->t; cpt++) {
+        vec->c[cpt] = (int64_t) current_indexes[cpt];
+      }
+      trace_pos_init(file, vec, Mq, f_Z, array, H);
+      int64_vector_clear(vec);
+#endif // TRACE_POS
         } 
       }
     }
@@ -600,12 +591,13 @@ static void init_cells(array_ptr array, const int * bottom_left_cube,
 #endif // OLD_NORM
 
 #ifdef OLD_NORM
-void init_norm(array_ptr array, double * pre_compute,
+void init_norm(array_ptr array, MAYBE_UNUSED FILE * file, double * pre_compute,
     sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
     ideal_spq_srcptr spq, int special_q)
 #else // OLD_NORM
-void init_norm(array_ptr array, sieving_bound_srcptr H, mat_Z_srcptr matrix,
-    mpz_poly_srcptr f, ideal_spq_srcptr spq, int special_q)
+void init_norm(array_ptr array, MAYBE_UNUSED FILE * file,
+    sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
+    ideal_spq_srcptr spq, int special_q)
 #endif // OLD_NORM
 {
   ASSERT(special_q == 0 || special_q == 1);
@@ -664,7 +656,8 @@ void init_norm(array_ptr array, sieving_bound_srcptr H, mat_Z_srcptr matrix,
   for (unsigned int i = 0; i < stop; i++) {
     next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
         bottom_left_hypercube, length_hypercube, H->t);
-    init_cells(array, bottom_left_cube, length, H, f_d, Mq, spq, special_q);
+    init_cells(array, file, bottom_left_cube, length, H, f_d, Mq, spq,
+        special_q, f);
   }
 
   mat_int64_clear(Mq);
@@ -698,15 +691,6 @@ void init_norm(array_ptr array, sieving_bound_srcptr H, mat_Z_srcptr matrix,
   int64_poly_t a;
   int64_poly_init(a, H->t - 1);
   mat_int64_mul_int64_vector_to_int64_poly(a, matrix_int, vector);
-
-  //Reinitialise the value that store the mean of the norms.
-#ifdef MEAN_NORM_BOUND
-    norm_bound = 0;
-#endif // MEAN_NORM_BOUND
-
-#ifdef MEAN_NORM
-  norm = 0;
-#endif // MEAN_NORM
 
   int64_vector_setcoordinate(vector, 0, -(int64_t)H->h[0]);
   init_each_cell(array, 0, a, pre_compute, H, matrix_int, beg, f, spq,
