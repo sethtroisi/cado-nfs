@@ -10,7 +10,7 @@
 #include <math.h>
 #include <regex.h>
 
-#include "utils.h"      /* Happens to define ULONG_BITS, which we use */
+#include "utils.h"      /* verbose_ stuff */
 #include "portability.h"
 #include "pm1.h"
 #include "pp1.h"

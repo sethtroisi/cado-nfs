@@ -99,7 +99,7 @@ struct bcol {/*{{{*/
         unsigned int k;
         for(k = stride() ; k && !(w=*src++) ; k--) z += ULONG_BITS;
         if (k == 0) return UINT_MAX;
-        return z + ctzl(w);
+        return z + cado_ctzl(w);
     }
     void add(bcol const& a, unsigned long mask = 1UL) {
         for(unsigned int l = 0 ; l < stride() ; l++) {
@@ -209,7 +209,7 @@ public:
         unsigned int k;
         for(k = stride() ; k && !(w=*src++) ; k--) z += ULONG_BITS;
         if (k == 0) return UINT_MAX;
-        return z + ctzl(w);
+        return z + cado_ctzl(w);
     }
     void extract_col(bcol& a, unsigned int j) const
     {
@@ -531,7 +531,7 @@ struct polmat { /* {{{ */
         if (k < 0) {
             deg(j) = -1;
         } else {
-            deg(j) = (k+1) * ULONG_BITS - clzl(y[k]) - 1;
+            deg(j) = (k+1) * ULONG_BITS - cado_clzl(y[k]) - 1;
         }
     } /* }}} */
     unsigned long * poly(unsigned int i, unsigned int j)/*{{{*/

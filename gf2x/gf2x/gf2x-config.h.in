@@ -6,13 +6,25 @@
 /* Define to 1 if the mpir.h header exists */
 #undef GF2X_HAVE_MPIR_H
 
-/* Define if pclmul as present in the source tree is supported by the compiler
-   and hardware */
+/* Define if pclmul code as present in the source tree is supported by the
+   compiler */
 #undef GF2X_HAVE_PCLMUL_SUPPORT
 
 /* Define if sse-2 code as present in the source tree is supported by the
    compiler */
 #undef GF2X_HAVE_SSE2_SUPPORT
+
+/* Define if sse-3 code as present in the source tree is supported by the
+   compiler */
+#undef GF2X_HAVE_SSE3_SUPPORT
+
+/* Define if sse-4.1 code as present in the source tree is supported by the
+   compiler */
+#undef GF2X_HAVE_SSE41_SUPPORT
+
+/* Define if ssse3 code as present in the source tree is supported by the
+   compiler */
+#undef GF2X_HAVE_SSSE3_SUPPORT
 
 /* Have LGPL code (no GPL taint) */
 #undef GPL_CODE_PRESENT

@@ -1,3 +1,4 @@
+#include "cado.h"
 /* MPFQ generated file -- do not edit */
 
 #include "mpfq_u64k2_t.h"
