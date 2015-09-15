@@ -1831,22 +1831,17 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
  * size:
  * assert_facto: 1 if the factorisation is correct, 0 otherwise.
  */
-#ifdef ASSERT_FACTO
 void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
     mpz_poly_srcptr a, unsigned int t, unsigned int V, unsigned int size,
-    unsigned int * assert_facto)
-#else
-void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
-    mpz_poly_srcptr a, unsigned int t, unsigned int V, unsigned int size)
-#endif
+    MAYBE_UNUSED unsigned int * assert_facto)
 {
   //Print a.
   printf("# ");
   mpz_poly_fprintf(stdout, a);
 
+  unsigned int index = 0;
   //Print if the factorisation is good.
 #ifdef ASSERT_FACTO
-  unsigned int index = 0;
   printf("# ");
   for (unsigned int i = 0; i < V - 1; i++) {
     if (index < size) {
@@ -1875,9 +1870,7 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
   }
 
   printf("\n");
-#else
-  unsigned int index = 0;
-#endif
+#endif // ASSERT_FACTO
 
   //Print the coefficient of a.
   for (int i = 0; i < a->deg; i++) {
@@ -1893,58 +1886,27 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
     printf("0:");
   }
 
+  //Print the factorisation in the different number field.
+  index = 0;
+  for (unsigned int i = 0; i < V - 1; i++) {
+    if (index < size) {
+      if (i == L[index]) {
+        if (I[index]) {
+          for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
 #ifdef PRINT_DECIMAL
-
-  //Print the factorisation in the different number field.
-  index = 0;
-  for (unsigned int i = 0; i < V - 1; i++) {
-    if (index < size) {
-      if (i == L[index]) {
-        if (I[index]) {
-          for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
             gmp_printf("%Zd,", factor[index]->factorization[j]);
-          }
-          gmp_printf("%Zd:", factor[index]->factorization[
-                       factor[index]->number - 1]);
-        } else {
-          printf(":");
-        }
-        index++;
-      } else {
-        printf(":");
-      }
-    } else {
-      printf(":");
-    }
-  }
-
-  if (index < size) {
-    if (V - 1 == L[index]) {
-      if (I[index]) {
-        for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
-          gmp_printf("%Zd,", factor[index]->factorization[j]);
-        }
-        gmp_printf("%Zd", factor[index]->factorization[
-                     factor[index]->number - 1]);
-      }
-      index++;
-    }
-  }
-
 #else // PRINT_DECIMAL
-
-  //Print the factorisation in the different number field.
-  index = 0;
-  for (unsigned int i = 0; i < V - 1; i++) {
-    if (index < size) {
-      if (i == L[index]) {
-        if (I[index]) {
-          for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
             printf("%s,",
                 mpz_get_str(NULL, 16, factor[index]->factorization[j]));
+#endif // PRINT_DECIMAL
           }
+#ifdef PRINT_DECIMAL
+          gmp_printf("%Zd:", factor[index]->factorization[
+                       factor[index]->number - 1]);
+#else // PRINT_DECIMAL
           printf("%s:", mpz_get_str(NULL, 16,
                 factor[index]->factorization[factor[index]->number - 1]));
+#endif // PRINT_DECIMAL
         } else {
           printf(":");
         }
@@ -1961,18 +1923,24 @@ void printf_relation(factor_t * factor, unsigned int * I, unsigned int * L,
     if (V - 1 == L[index]) {
       if (I[index]) {
         for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
+#ifdef PRINT_DECIMAL
+          gmp_printf("%Zd,", factor[index]->factorization[j]);
+#else // PRINT_DECIMAL
           printf("%s,",
                 mpz_get_str(NULL, 16, factor[index]->factorization[j]));
+#endif // PRINT_DECIMAL
         }
+#ifdef PRINT_DECIMAL
         printf("%s", mpz_get_str(NULL, 16,
               factor[index]->factorization[factor[index]->number - 1]));
+#else // PRINT_DECIMAL
+        gmp_printf("%Zd", factor[index]->factorization[
+                     factor[index]->number - 1]);
+#endif // PRINT_DECIMAL
       }
       index++;
     }
   }
-
-#endif // PRINT_DECIMAL
-
   printf("\n");
 }
 
@@ -2091,8 +2059,12 @@ facul_aux (mpz_t *factors, const struct modset_t m,
 
 // Returns 1 if norm is smooth, 0 otherwise.
 // Factorization is given in factors.
-int call_facul(factor_ptr factors, mpz_t norm, facul_aux_data * data) {
+int call_facul(factor_ptr factors, mpz_srcptr norm_r, facul_aux_data * data) {
   unsigned long B = data->fbb;
+
+  mpz_t norm;
+  mpz_init(norm);
+  mpz_set(norm, norm_r);
 
   // Trial divide all the small factors.
   int success = brute_force_factorize_ul(factors, norm, norm, B);
@@ -2167,10 +2139,9 @@ int call_facul(factor_ptr factors, mpz_t norm, facul_aux_data * data) {
   for (int i = 0; i < 16; ++i)
     mpz_clear(fac[i]);
   free(fac);
+  mpz_clear(norm);
   return found > 0;
 }
-
-
 
 /*
  * A potential polynomial is found. Factorise it to verify if it gives a
@@ -2193,9 +2164,12 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
   factor_t * factor = (factor_t * ) malloc(sizeof(factor_t) * size);
   unsigned int * I = (unsigned int * ) malloc(sizeof(unsigned int) * size);
 
+  unsigned int * assert_facto;
 #ifdef ASSERT_FACTO
-  unsigned int * assert_facto = (unsigned int * ) malloc(sizeof(unsigned int) * size);
-#endif
+    assert_facto = (unsigned int * ) malloc(sizeof(unsigned int) * size);
+#else // ASSERT_FACTO
+    assert_facto = NULL;
+#endif // ASSERT_FACTO
 
   unsigned int find = 0;
   if (main == -1) {
@@ -2203,6 +2177,9 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
       norm_poly(res, f[L[i]], a);
 
       int is_smooth = call_facul(factor[i], res, &data[L[i]]);
+#ifdef ASSERT_FACTO
+      assert_facto[i] = factor_assert(factor[i], res);
+#endif
 
       if (is_smooth) {
         find++;
@@ -2213,26 +2190,35 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
       }
     }
   } else {
+    // TODO: this part of code is not tested.
     ASSERT(main >= 0);
+    unsigned int Lmain = 0;
+    while (L[Lmain] != (unsigned int)main) {
+      Lmain++;
+    }
 
-    // FIXME: wrong, probably 'main' and not 'L[main]'
     norm_poly(res, f[main], a);
 
-    int main_is_smooth = call_facul(factor[main], res, &data[main]);
+    int main_is_smooth = call_facul(factor[Lmain], res, &data[main]);
 
     if (main_is_smooth) {
       find = 1;
+#ifdef ASSERT_FACTO
+      assert_facto[Lmain] = factor_assert(factor[Lmain], res);
+#endif
 
       for (unsigned int i = 0; i < size; i++) {
-        if (L[i] != (unsigned int) main) {
+        if (i != Lmain) {
           norm_poly(res, f[L[i]], a);
 
           int is_smooth = call_facul(factor[i], res, &data[L[i]]);
+#ifdef ASSERT_FACTO
+          assert_facto[i] = factor_assert(factor[i], res);
+#endif
 
           if (is_smooth) {
             find++;
             I[i] = 1;
-            //TODO: that do not sort, why?
             sort_factor(factor[i]);
           } else {
             I[i] = 0;
@@ -2244,11 +2230,7 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
 
   if (find >= 2) {
 
-#ifdef ASSERT_FACTO
     printf_relation(factor, I, L, a, t, V, size, assert_facto);
-#else
-    printf_relation(factor, I, L, a, t, V, size);
-#endif
 
   }
 

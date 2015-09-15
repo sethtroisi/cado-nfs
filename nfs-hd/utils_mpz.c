@@ -80,11 +80,11 @@ unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z)
   for (unsigned int i = 0; i < factor->number; i++) {
     mpz_mul(tmp, tmp, factor->factorization[i]);
   }
-  unsigned int assert_facto = 1;
+  unsigned int assert_facto = 0;
   if (!mpz_cmp(tmp, z)) {
     ASSERT(mpz_cmp(tmp, z) == 0);
 
-    assert_facto = 0;
+    assert_facto = 1;
   }
   mpz_clear(tmp);
 
