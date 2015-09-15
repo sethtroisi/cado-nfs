@@ -40,6 +40,6 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         ${CMAKE_CURRENT_SOURCE_DIR}/test_main_script.sh
         ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
         TARGET_DEPENDENCIES gfm benchfm gst finalst)
-endif(DEFINED ENV{CHECKS_EXPENSIVE})
+endif()
 
 add_subdirectory (utils_st)

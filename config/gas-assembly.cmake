@@ -6,8 +6,8 @@ try_compile(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES
     COMPILE_DEFINITIONS "-x assembler")
 if(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
     message(STATUS "Trying to compile gas-syntax assembly sources -- Success")
-else(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
+else()
     message(STATUS "Trying to compile gas-syntax assembly sources -- Failed")
-endif(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
+endif()
 
 

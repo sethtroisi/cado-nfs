@@ -52,7 +52,7 @@ add_dependencies(utils_with_io antebuffer)
 
 if(ENABLE_SHARED)
 install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX})
-endif(ENABLE_SHARED)
+endif()
 
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)

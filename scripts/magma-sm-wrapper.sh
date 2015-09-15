@@ -13,13 +13,19 @@ unset OUT
 unset ELL
 unset SMEXP0
 unset SMEXP1
+unset SMEXP2
 unset NMAPS0
 unset NMAPS1
+unset NMAPS2
+unset NMAPS
 unset ABUNITS
 unset mtopts
 
 EXPLICIT0="no"
 EXPLICIT1="no"
+EXPLICIT2="no"
+
+NSIDES=0
 
 while [ -n "$1" ]
 do
@@ -59,13 +65,24 @@ do
   then
     SMEXP1="$2"
     shift 2
+  elif [ "$1" = "-smexp2" ]
+  then
+    SMEXP2="$2"
+    shift 2
   elif [ "$1" = "-nsm0" ]
   then
     NMAPS0="$2"
+    NSIDES=`expr $NSIDES '+' 1`
     shift 2
   elif [ "$1" = "-nsm1" ]
   then
     NMAPS1="$2"
+    NSIDES=`expr $NSIDES '+' 1`
+    shift 2
+  elif [ "$1" = "-nsm2" ]
+  then
+    NMAPS2="$2"
+    NSIDES=`expr $NSIDES '+' 1`
     shift 2
   elif [ "$1" = "-abunits" ]
   then
@@ -83,6 +100,10 @@ do
   then
     EXPLICIT1="yes"
     shift 1
+  elif [ "$1" = "-explicit_units2" ]
+  then
+    EXPLICIT2="yes"
+    shift 1
   else
     echo "Unknown parameter: $1"
     exit 1
@@ -92,6 +113,7 @@ done
 # where am I ?
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+## FIXME: units and NSIDES > 2
 ## set parameters depending on units or not: nsm0 (resp. nsm1) will be the
 ## number of true SM's to be computed (not the number of units)
 side=-1
@@ -102,7 +124,8 @@ if [ $EXPLICIT0 = "yes" ]; then
 else
     nsm0=$NMAPS0
 fi
-smopts="-smexp0 $SMEXP0 -nsm0 $nsm0"
+nsm="-nsm $nsm0"
+smopts="-smexp0 $SMEXP0"
 if [ $EXPLICIT1 = "yes" ]; then
     nsm1=0
     side=1
@@ -110,7 +133,20 @@ if [ $EXPLICIT1 = "yes" ]; then
 else
     nsm1=$NMAPS1
 fi
-smopts="$smopts -smexp1 $SMEXP1 -nsm1 $nsm1"
+nsm="$nsm,$nsm1"
+smopts="$smopts -smexp1 $SMEXP1"
+## FIXME: copy-paste without thinking!
+if [ $NSIDES -gt 2 ]; then
+    if [ $EXPLICIT2 = "yes" ]; then
+	nsm2=0
+	side=2
+	usef=true
+    else
+	nsm2=$NMAPS2
+    fi
+    nsm="$nsm,$nsm2"
+    smopts="$smopts -smexp2 $SMEXP2 -nsm2 $nsm2"
+fi
 
 ## build required SM's
 if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
@@ -120,7 +156,7 @@ if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
     else
 	# out contains SM's for side=0..1 in that order, or 0 or 1 depending
 	# on the unit side if any
-	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts $mtopts"
+	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts $nsm $mtopts"
 	if [ $nsm0 -ne 0 -o $nsm1 -ne 0 ]; then
 	    echo $CMD; $CMD
 	else

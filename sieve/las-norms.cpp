@@ -457,7 +457,7 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
   const int Idiv2 = (int) I >> 1;
   const double Idiv2_double = (double) Idiv2, Idiv2_double_minus_one = Idiv2_double - 1., invu1 = 1./u1;
 
-  endJ = LOG_BUCKET_REGION - ctz(I);
+  endJ = LOG_BUCKET_REGION - cado_ctz(I);
   J <<= endJ;
   endJ = (1U << endJ) + J;
 
@@ -705,7 +705,7 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
 void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd)
 {
   unsigned char *beginS = S;
-  uint32_t beginJ, endJ = LOG_BUCKET_REGION - ctz (I);
+  uint32_t beginJ, endJ = LOG_BUCKET_REGION - cado_ctz (I);
   scale *= 1./0x100000;
   const double add = 0x3FF00000 - GUARD / scale;
   J <<= endJ;
@@ -989,7 +989,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
   size_t nsg;
 
   unsigned char *beginS;
-  uint32_t beginJ, endJ = LOG_BUCKET_REGION - ctz (I);
+  uint32_t beginJ, endJ = LOG_BUCKET_REGION - cado_ctz (I);
   double scale = original_scale * (1./0x100000);
   const double add = ((double) 0x3FF00000) - GUARD / scale;
   J <<= endJ;

@@ -43,7 +43,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
                   renumber_t renumber_table, const char *outfilename)
 {
   unsigned long lpb[NB_POLYS_MAX], max_lpb;
-  unsigned long p, *roots[NB_POLYS_MAX], nfree = 0;
+  unsigned long p, roots[NB_POLYS_MAX][MAXDEGREE], nfree = 0;
   int d[NB_POLYS_MAX], k[NB_POLYS_MAX];
   index_t old_table_size = renumber_table->size;
   FILE *fpout = NULL;
@@ -62,8 +62,6 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     lpb[i] = 1UL << renumber_table->lpb[i];
     d[i] = pol->pols[i]->deg;
     lc[i] = pol->pols[i]->coeff[d[i]];
-    roots[i] = (unsigned long *) malloc (d[i] * sizeof(unsigned long));
-    ASSERT_ALWAYS (roots[i] != NULL);
   }
   max_lpb = 1UL << renumber_table->max_lpb;
 
@@ -140,8 +138,6 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   stats_print_progress (stats, nb_p, 0, 0, 1);
 
   prime_info_clear (pi);
-  for (unsigned int i = 0; i < renumber_table->nb_polys; i++)
-    free (roots[i]);
 
   fclose_maybe_compressed (fpout, outfilename);
 
@@ -252,7 +248,7 @@ main (int argc, char *argv[])
     exit (EXIT_FAILURE);
   }
 
-  for (unsigned int i = 0; i < cpoly->nb_polys; i++)
+  for (int i = 0; i < cpoly->nb_polys; i++)
   {
     if (lpb[i] == 0)
     {

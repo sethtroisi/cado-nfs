@@ -614,11 +614,17 @@ ularith_shrd (unsigned long *r, const unsigned long hi, const unsigned long lo,
    when it is passed around in a register. It seems that "X" is assumed by
    gcc as possibly referring to an input, and since "X" matches anything,
    that's probably a neccessary assumtion to make. */
+#if GNUC_VERSION_ATLEAST(4,4,0)
+#if GNUC_VERSION_ATLEAST(4,6,0)
 #pragma GCC diagnostic push
+#endif
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
   __asm__ ("# ularith_shrd (*r=%0, hi=%1, lo=%2, i=%3)\n" : : 
            "X" (*r), "X" (hi), "X" (lo), "X" (i));
+#if GNUC_VERSION_ATLEAST(4,6,0)
 #pragma GCC diagnostic pop
+#endif
 #endif
 
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -650,11 +656,17 @@ ularith_shld (unsigned long *r, const unsigned long lo, const unsigned long hi,
 {
   ASSERT_EXPENSIVE (0 <= i && i < LONG_BIT);
 #ifdef ULARITH_VERBOSE_ASM
+#if GNUC_VERSION_ATLEAST(4,4,0)
+#if GNUC_VERSION_ATLEAST(4,6,0)
 #pragma GCC diagnostic push
+#endif
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
   __asm__ ("# ularith_shld (*r=%0, lo=%1, hi=%2, i=%3)\n" : : 
            "X" (*r), "X" (lo), "X" (hi), "X" (i));
+#if GNUC_VERSION_ATLEAST(4,6,0)
 #pragma GCC diagnostic pop
+#endif
 #endif
 
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)

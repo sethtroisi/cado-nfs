@@ -333,10 +333,9 @@ int bw_common_clear_new(struct bw_params * bw)/*{{{*/
          * probably due to MPI_Allreduce, and there's not much we can do,
          * unfortunately.
          */
-        printf("Timings for %s: wct=%.2f cpu=%.2f (aggregated over %d threads and %d MPI jobs)\n",
+        printf("Timings for %s: wct=%.2f cpu=%.2f (aggregated over all threads and %d MPI jobs)\n",
                 ptr,
                 wct, cpu,
-                bw->thr_split[0] * bw->thr_split[1],
                 size);
     }
     mpz_clear(bw->p);

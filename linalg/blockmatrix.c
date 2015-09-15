@@ -7,7 +7,7 @@
 #include <gmp.h>
 
 #include "blockmatrix.h"
-#include "bit_matrices.h"
+#include "matops.h"
 #include "macros.h"
 #include "portability.h"
 #include "cado-endian.h"

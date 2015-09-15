@@ -16,6 +16,9 @@
 #ifdef  HAVE_GF2X
 #include "gf2x.h"
 #endif
+#ifdef HAVE_PCLMUL
+#include <wmmintrin.h>
+#endif
 
 #include "assert.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
@@ -784,7 +787,7 @@ int mpfq_2_128_inv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mp
         z = s[1] >>  1;
         b[2] = z;
     }
-    ib = clzlx(b, 3);
+    ib = mpfq_clzlx(b, 3);
     ia = 0;
     
     mpfq_2_128_longshift_left(b,b,3,ib);
@@ -796,7 +799,7 @@ int mpfq_2_128_inv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mp
             b[1] ^= a[1]; x |= b[1];
             b[2] ^= a[2]; x |= b[2];
                     if (!x) { memcpy(r,u,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(b,3);
+                    mp_limb_t t = mpfq_clzlx(b,3);
                     ib += t;
                     d += t;
                     mpfq_2_128_longshift_left(b,b,3,t);
@@ -807,7 +810,7 @@ int mpfq_2_128_inv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mp
             a[1] ^= b[1]; x |= a[1];
             a[2] ^= b[2]; x |= a[2];
                     if (!x) { memcpy(r,v,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(a,3);
+                    mp_limb_t t = mpfq_clzlx(a,3);
                     ia += t;
                     d -= t;
                     mpfq_2_128_longshift_left(a,a,3,t);
@@ -818,7 +821,7 @@ int mpfq_2_128_inv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mp
             a[1] ^= b[1]; x |= a[1];
             a[2] ^= b[2]; x |= a[2];
                     if (!x) { memcpy(r,v,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(a,3);
+                    mp_limb_t t = mpfq_clzlx(a,3);
                     ia += t;
                     d -= t;
                     mpfq_2_128_longshift_left(a,a,3,t);
@@ -829,7 +832,7 @@ int mpfq_2_128_inv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mp
             b[1] ^= a[1]; x |= b[1];
             b[2] ^= a[2]; x |= b[2];
                     if (!x) { memcpy(r,u,2 * sizeof(mp_limb_t)); return 1; }
-                    mp_limb_t t = clzlx(b,3);
+                    mp_limb_t t = mpfq_clzlx(b,3);
                     ib += t;
                     d += t;
                     mpfq_2_128_longshift_left(b,b,3,t);
@@ -1069,7 +1072,7 @@ void mpfq_2_128_mul_ur(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_u
         __m128i g[16];
         __m128i w;
         // __m128i m = _mm_set1_epi32(0xeeeeeeee);
-        __m128i m = _gf2x_mm_set1_epi64_c(0xeeeeeeeeeeeeeeee);
+        __m128i m = _mpfq_mm_set1_epi64_c(0xeeeeeeeeeeeeeeee);
         /* sequence update walk */
         __m128i b0 = _mm_loadu_si128((__m128i*) s2);
         g[ 0] = _mm_setzero_si128();
@@ -1784,7 +1787,7 @@ int mpfq_2_128_poly_deg(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_poly
     if (w->size == 0)
         return -1;
     int deg = w->size-1;
-    mpfq_2_128_elt temp;	/* spurious uninit warning sometimes */
+    mpfq_2_128_elt temp;
     mpfq_2_128_init(K, &temp);
     mpfq_2_128_vec_getcoeff(K, temp, w->c, deg);
     int comp=mpfq_2_128_cmp_ui(K, temp, 0);
@@ -2004,6 +2007,7 @@ void mpfq_2_128_poly_xgcd(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_po
     mpfq_2_128_poly a,b,u,v,w,x,q,r;
     mpfq_2_128_elt c;
     mpfq_2_128_init(k,&c);
+    mpfq_2_128_set_ui(k,c,0);        /* placate gcc */
     int da0=mpfq_2_128_poly_deg(k,a0), db0=mpfq_2_128_poly_deg(k,b0), dega;
     if (db0==-1) {
      if (da0==-1) {

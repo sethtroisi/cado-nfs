@@ -32,9 +32,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
-#ifdef  HAVE_SYS_RESOURCE_H_
+#ifdef  HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
-#endif  /*  HAVE_SYS_RESOURCE_H_ */
+#endif  /*  HAVE_SYS_RESOURCE_H */
 
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-thresholds.h"
@@ -47,7 +47,7 @@ static long init_extra_arg = ENGINE_EXTRA_ARG_DEFAULT;
 // cputime in millisec.
 static int cputime()
 {
-#ifdef  HAVE_SYS_RESOURCE_H_
+#ifdef  HAVE_SYS_RESOURCE_H
     struct rusage rus;
     getrusage(0, &rus);
     return rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
@@ -129,6 +129,7 @@ void set_extra_arg_from_n32bitwords(size_t n32 GF2X_MAYBE_UNUSED, long supplied)
         init_extra_arg = supplied;
         return;
     }
+#ifdef GF2X_MUL_FFT_TABLE
 #ifdef ENGINE_TERNARY
     int nwords = n32;
 #if GF2X_WORDSIZE == 64
@@ -167,4 +168,5 @@ void set_extra_arg_from_n32bitwords(size_t n32 GF2X_MAYBE_UNUSED, long supplied)
     /* now T_FFT_TAB[i][0] <= nwords < T_FFT_TAB[i+1][0] */
     init_extra_arg = T_FFT_TAB[i][1];
 #endif  /* ENGINE_TERNARY */
+#endif  /* GF2X_MUL_FFT_TABLE */
 }
