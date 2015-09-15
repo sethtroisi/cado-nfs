@@ -55,7 +55,7 @@ static inline unsigned char array_get(array_srcptr array, uint64_t i)
  * i: index of the element.
  * val: value of the element.
  */
-static inline void array_set(array_srcptr array, uint64_t i, unsigned char val)
+static inline void array_set(array_ptr array, uint64_t i, unsigned char val)
 {
   ASSERT(i < array->number_element);
 

@@ -16,6 +16,7 @@
 #include "mat_double.h"
 #include "double_poly.h"
 #include <time.h>
+#include <limits.h>
 
 #include "ecm/facul.h"
 #include "ecm/facul_doit.h"
@@ -383,41 +384,86 @@ void init_each_case(array_ptr array, uint64_t i, int64_poly_ptr a,
 
 #else // NEW_NORM
 
-void add_increment_bottom_left_cube(int * bottom_left_cube,
-    const unsigned int * increment, sieving_bound_srcptr H)
+void add_length_bottom_left_cube(int * bottom_left_cube,
+    const unsigned int * length, const unsigned int * use_length,
+    sieving_bound_srcptr H)
 {
 #ifndef NDEBUG
   int tmp = 0;
   int tmp2 = 0;
   for (unsigned int j = 0; j < H->t; j++) {
     tmp = tmp + bottom_left_cube[j];
-    tmp2 = tmp2 + (int)(H->h[j] - increment[j]);
+    tmp2 = tmp2 + (int)(H->h[j] - length[j]);
   }
   ASSERT(tmp <= tmp2);
 #endif
 
   unsigned int k = 0;
   while(k < H->t) {
-    if (bottom_left_cube[k] == (int)H->h[k] - (int)increment[k]) {
+    if (bottom_left_cube[k] == (int)H->h[k] - (int)length[k]) {
       bottom_left_cube[k] = -(int)H->h[k];
       k++;
     } else {
       break;
     }
   }
-  if (k < H->t) {
-    bottom_left_cube[k] = bottom_left_cube[k] + (int)increment[k];
+  if (k < H->t && use_length[k]) {
+    bottom_left_cube[k] = bottom_left_cube[k] + (int)length[k];
   }
 
 #ifndef NDEBUG
   for (unsigned int j = 0; j < H->t - 1; j++) {
     tmp = bottom_left_cube[j];
     ASSERT(tmp >= -(int)H->h[j]);
-    ASSERT(tmp < (int)(H->h[j] - increment[j]) + 1);
+    ASSERT(tmp < (int)(H->h[j] - length[j]) + 1);
   }
   tmp = bottom_left_cube[H->t - 1];
   ASSERT(tmp >= 0);
-  ASSERT(tmp < (int)(H->h[H->t - 1] - increment[H->t - 1]) + 1);
+  ASSERT(tmp < (int)(H->h[H->t - 1] - length[H->t - 1]) + 1);
+#endif
+}
+
+void next_bottom_left_cube_in_hypercube(int * bottom_left_cube,
+    const unsigned int * length, const unsigned int * use_length,
+    const int * bottom_left_hypercube, const unsigned int * length_hypercube,
+    unsigned int t)
+{
+#ifndef NDEBUG
+  int tmp = 0;
+  int tmp2 = 0;
+  for (unsigned int j = 0; j < t; j++) {
+    tmp = tmp + bottom_left_cube[j];
+    tmp2 = tmp2 + bottom_left_hypercube[j] - (int)length[j] +
+      (int)length_hypercube[j];
+  }
+  ASSERT(tmp <= tmp2);
+#endif
+
+  unsigned int k = 0;
+  while(k < t) {
+    if (bottom_left_cube[k] + (int)length[k] == bottom_left_hypercube[k] +
+        (int)length_hypercube[k]) {
+      bottom_left_cube[k] = bottom_left_hypercube[k];
+      k++;
+    } else {
+      break;
+    }
+  }
+  if (k < t && use_length[k]) {
+    bottom_left_cube[k] = bottom_left_cube[k] + (int)length[k];
+  }
+
+#ifndef NDEBUG
+  for (unsigned int j = 0; j < t - 1; j++) {
+    tmp = bottom_left_cube[j];
+    ASSERT(tmp >= bottom_left_hypercube[j]);
+    ASSERT(tmp + (int)length[j] - 1 < bottom_left_hypercube[j] +
+        (int)length_hypercube[j]);
+  }
+  tmp = bottom_left_cube[t - 1];
+  ASSERT(tmp >= 0);
+  ASSERT(tmp + (int)length[t - 1] - 1 < bottom_left_hypercube[t - 1] +
+      (int)length_hypercube[t - 1]);
 #endif
 }
 
@@ -487,7 +533,7 @@ unsigned char log_norm_double(const int * current_indexes, mat_int64_srcptr M,
   double resultant = fabs(double_poly_resultant(poly, f));
   double_poly_clear(poly);
 
-  ASSERT(resultant >= 0);
+  ASSERT(resultant >= 0.0);
 
   unsigned char res = (unsigned char) round(log2(resultant));
 
@@ -539,6 +585,40 @@ unsigned char log_norm(const int * current_indexes, mat_int64_srcptr M,
   mpz_clear(norm);
   return res;
 }
+
+void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
+    mat_Z_srcptr matrix)
+{
+  mpz_vector_t c;
+  mpz_vector_init(c, H->t);
+  mpz_poly_t a;
+  mpz_poly_init(a, 0);
+
+  mpz_t norm;
+  mpz_init(norm);
+
+  for (uint64_t i = 0; i < array->number_element; i++) {
+    array_index_mpz_vector(c, i, H, array->number_element);
+    mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, c);
+    norm_poly(norm, f, a);
+
+    double log_norm = (double)mpz_sizeinbase(norm, 2);
+
+    if (fabs((double)array->array[i] - log_norm) > 2.0) {
+      fprintf(stderr, "# Error in norm at index %" PRIu64 "\n", i);
+      fprintf(stderr, "# Vector c: ");
+      mpz_vector_fprintf(stderr, c);
+      fprintf(stderr, "# Polynomial a: ");
+      mpz_poly_fprintf(stderr, a);
+      fprintf(stderr, "# Value in the array: %u. Log of the norm: %f\n",
+          array->array[i], log_norm);
+    }
+  }
+  mpz_vector_clear(c);
+  mpz_poly_clear(a);
+  mpz_clear(norm);
+}
+
 #endif // ASSERT_NORM
 
 void update_mini_maxi(unsigned char * mini, unsigned char * maxi,
@@ -600,7 +680,7 @@ void add_one_values(int * current_indexes, const int * bottom_left_cube,
 #endif
 }
 
-void add_boolean_if_needed(int * tab, const unsigned int * new_increment,
+void add_boolean_if_needed(int * tab, const unsigned int * increment,
     unsigned int size)
 {
 #ifndef NDEBUG
@@ -620,7 +700,7 @@ void add_boolean_if_needed(int * tab, const unsigned int * new_increment,
     }
   }
   if (k < size) {
-    while(k < size && new_increment[k] == 2) {
+    while(k < size && increment[k] == 2) {
       k++;
     }
     tab[k]++;
@@ -634,138 +714,127 @@ void add_boolean_if_needed(int * tab, const unsigned int * new_increment,
 #endif
 }
 
+//TODO: Error here.
 void init_cases(array_ptr array, const int * bottom_left_cube,
-    const unsigned int * increment, sieving_bound_srcptr H,
-    double_poly_srcptr f, mat_int64_srcptr Mq, ideal_spq_srcptr spq,
-    int special_q)
+    const unsigned int * length, sieving_bound_srcptr H, double_poly_srcptr f,
+    mat_int64_srcptr Mq, ideal_spq_srcptr spq, int special_q)
 {
-  unsigned char maxi = 0;
-  unsigned char mini = 255;
+#ifndef NDEBUG
+  for (unsigned int i = 0; i < H->t; i++) {
+    ASSERT(length[i] >= 2);
+  }
+#endif // NDEBUG
+
 
   int * true_false = (int *) malloc(sizeof(int) * H->t);
   memset(true_false, 0, sizeof(int) * H->t);
-  int * current_indexes = (int *) malloc(sizeof(int) * H->t);
-  memset(current_indexes, 0, sizeof(int) * H->t);
-  uint64_t stop = 1 << H->t;
   true_false[0] = -1;
 
-  unsigned char tmp = 0;
+  int * current_indexes = (int *) malloc(sizeof(int) * H->t);
+  memset(current_indexes, 0, sizeof(int) * H->t);
 
+  //Compute the number of vertices.
+  uint64_t stop = 1 << H->t;
+
+  unsigned char tmp = 0;
+  unsigned char maxi = 0;
+  unsigned char mini = UCHAR_MAX;
+
+  //Compute each norm of the vertices of the cube.
   for (uint64_t i = 0; i < stop; i++) {
     add_boolean(true_false, H->t);
-    add_arrays(current_indexes, bottom_left_cube, true_false, increment, H->t);
+    add_arrays(current_indexes, bottom_left_cube, true_false, length, H->t);
 
     //Get the possible value of current_indexes.
     tmp = array_get_at(array, current_indexes, H);
-    if (tmp == 0) {
+    if (tmp == 255) {
       tmp = log_norm_double(current_indexes, Mq, f, spq, special_q, H->t);
 
-#ifdef ASSERT_NORM
-          unsigned char res_tmp = log_norm(current_indexes, Mq, f, spq,
-              special_q, H->t);
-          if (maxi - res_tmp > 2) {
-            printf("Error: %u -- %u\n", res_tmp, maxi);
-          } else {
-            printf("Good: %u -- %u\n", res_tmp, maxi);
-          }
-          /*ASSERT(maxi - res_tmp <= 2);*/
-#endif // ASSERT_NORM
-
       array_set_at(array, current_indexes, tmp, H);
+
     } 
     update_mini_maxi(&mini, &maxi, tmp);
   }
+  free(true_false);
 
-  unsigned int * new_increment = (unsigned int * ) malloc(sizeof(unsigned int) *
+  unsigned int * new_length = (unsigned int * ) malloc(sizeof(unsigned int) *
       H->t);
-  memset(new_increment, 0, sizeof(unsigned int) * H->t);
-  unsigned int all_increment_2 = 0;
-  for (unsigned int i = 0; i < H->t; i++) {
-    current_indexes[i] = generate_random_number(bottom_left_cube[i],
-        bottom_left_cube[i] + increment[i]);
-    //TODO: strange thing here. Normaly append if a dimension is equal to 2, but
-    //we do not know how the cube is computed.
-    if (increment[i] > 2) {
-      new_increment[i] = increment[i] / 2;
-    } else {
-      ASSERT(increment[i] == 2);
+  memset(new_length, 0, sizeof(unsigned int) * H->t);
+  unsigned int * use_new_length = (unsigned int * ) malloc(
+      sizeof(unsigned int) * H->t);
+  memset(use_new_length, 0, sizeof(unsigned int) * H->t);
+  unsigned int all_length_2 = 0;
 
-      new_increment[i] = 2;
-      all_increment_2++;
+  for (unsigned int i = 0; i < H->t; i++) {
+    //Generate a random element inside the cube.
+    current_indexes[i] = generate_random_number(bottom_left_cube[i],
+        bottom_left_cube[i] + length[i]);
+    if (length[i] > 2) {
+      new_length[i] = length[i] / 2;
+      use_new_length[i] = 1;
+    } else {
+      ASSERT(length[i] <= 2);
+
+      new_length[i] = 2;
+      all_length_2++;
+      use_new_length[i] = 0;
     }
   }
 
-  tmp = array_get_at(array, current_indexes, H);
-  if (tmp == 0) {
-    tmp = log_norm_double(current_indexes, Mq, f, spq, special_q, H->t);
 
-#ifdef ASSERT_NORM
-          unsigned char res_tmp = log_norm(current_indexes, Mq, f, spq,
-              special_q, H->t);
-          if (maxi - res_tmp > 2) {
-            printf("Error: %u -- %u\n", res_tmp, maxi);
-          } else {
-            printf("Good: %u -- %u\n", res_tmp, maxi);
-          }
-          /*ASSERT(maxi - res_tmp <= 2);*/
-#endif // ASSERT_NORM
+  //If all_length_2 == H->t, all the cells are initialized.
+  if (all_length_2 != H->t) {
 
-    array_set_at(array, current_indexes, tmp, H);
-  } 
-  update_mini_maxi(&mini, &maxi, tmp);
+    tmp = array_get_at(array, current_indexes, H);
+    if (tmp == 255) {
+      tmp = log_norm_double(current_indexes, Mq, f, spq, special_q, H->t);
 
-  if (all_increment_2 != H->t) {
+      array_set_at(array, current_indexes, tmp, H);
 
-    //TODO: arbitrary value.
+    } 
+    update_mini_maxi(&mini, &maxi, tmp);
+
+    //TODO: arbitrary value. If maxi - mini <= 2, all the cells are intialzed to
+    //maxi.
     if (maxi - mini > 2) {
-      memset(true_false, 0, sizeof(int) * H->t);
-
       unsigned int i = 0;
-      while (new_increment[i] == 2) {
+      while (new_length[i] == 2) {
         i++;
       }
-      true_false[i] = -1;
-      uint64_t stop = 1 << all_increment_2;
-      //TODO: continue here.
+      uint64_t stop = 1 << (H->t - all_length_2);
+
+      for (i = 0; i < H->t; i++) {
+        current_indexes[i] = bottom_left_cube[i];
+      }
+      current_indexes[0] = current_indexes[0] - new_length[0];
       for (i = 0; i < stop; i++) {
-        add_boolean_if_needed(true_false, new_increment, H->t);
-        add_arrays(current_indexes, bottom_left_cube, true_false, new_increment,
-            H->t);
-        init_cases(array, current_indexes, new_increment, H, f, Mq, spq,
+        //TODO: not H but other think (ie length)
+        next_bottom_left_cube_in_hypercube(current_indexes, new_length,
+            use_new_length, bottom_left_cube, length, H->t);
+        init_cases(array, current_indexes, new_length, H, f, Mq, spq,
             special_q);
       }
     } else {
       stop = 1;
       for (unsigned int i = 0; i < H->t; i++) {
         current_indexes[i] = bottom_left_cube[i];
-        stop = stop * (uint64_t)increment[i];
+        stop = stop * (uint64_t)length[i];
       }
       current_indexes[0]--;
 
+      //TODO: use memset for the first coordinate.
       for (uint64_t i = 0; i < stop; i++) {
-        add_one_values(current_indexes, bottom_left_cube, increment, H->t);
+        add_one_values(current_indexes, bottom_left_cube, length, H->t);
         tmp = array_get_at(array, current_indexes, H);
-        if (tmp == 0) {
+        if (tmp == 255) {
           array_set_at(array, current_indexes, maxi, H);
-
-#ifdef ASSERT_NORM
-          unsigned char res_tmp = log_norm(current_indexes, Mq, f, spq,
-              special_q, H->t);
-          if (maxi - res_tmp > 2) {
-            printf("Error: %u -- %u\n", res_tmp, maxi);
-          } else {
-            printf("Good: %u -- %u\n", res_tmp, maxi);
-          }
-          /*ASSERT(maxi - res_tmp <= 2);*/
-#endif // ASSERT_NORM
-
         } 
       }
     }
   }
-  free(true_false);
   free(current_indexes);
-  free(new_increment);
+  free(new_length);
+  free(use_new_length);
 }
 #endif // NEW_NORM
 
@@ -839,24 +908,38 @@ void init_norm(array_ptr array, sieving_bound_srcptr H, mat_Z_srcptr matrix,
 
 #else // NEW_NORM
 
+  //TODO: error if H = [1, 1, …]
   srand(time(NULL));
 
-  //Largeur of the first division of the sieving region in hypercubes.
-  unsigned int * increment = (unsigned int * ) malloc(sizeof(unsigned int)
+  //Length of the first division of the sieving region in hypercubes.
+  unsigned int * length = (unsigned int * ) malloc(sizeof(unsigned int)
       * H->t);
-
+  unsigned int * use_length = (unsigned int * ) malloc(sizeof(unsigned int)
+      * H->t);
   int * bottom_left_cube = (int * ) malloc(sizeof(int) * H->t);
+  int * bottom_left_hypercube = (int *) malloc(sizeof(int) * H->t);
+  unsigned int * length_hypercube = (unsigned int *)
+    malloc(sizeof(unsigned int) * H->t);
 
-  uint64_t stop = 1;
+  //TODO: why uint64_t?
+  uint64_t stop = (uint64_t) 1 << H->t;
 
-  for (uint64_t i = 0; i < H->t; i++) {
+  //TODO: eventually, think about H->h[i] == 2.
+  for (uint64_t i = 0; i < H->t - 1; i++) {
     //TODO: arbitrary value.
-    increment[i] = H->h[i] / 2;
+    length[i] = H->h[i];
+    use_length[i] = 1;
     bottom_left_cube[i] = -(int) H->h[i];
-    stop = stop * (uint64_t)(2 * H->h[i] / increment[i]);
+    bottom_left_hypercube[i] = -(int) H->h[i];
+    length_hypercube[i] = 2 * H->h[i];
   }
-  stop = stop / 2;
-  bottom_left_cube[0] = -(int) H->h[0] - (int)increment[0];
+  length[H->t - 1] = H->h[H->t - 1] / 2;
+  use_length[H->t - 1] = 1;
+  bottom_left_cube[H->t - 1] = 0;
+  bottom_left_hypercube[H->t - 1] = 0;
+  length_hypercube[H->t - 1] = H->h[H->t - 1];
+
+  bottom_left_cube[0] = -(int) H->h[0] - (int)length[0];
   bottom_left_cube[H->t - 1] = 0;
 
   double_poly_t f_d;
@@ -867,15 +950,19 @@ void init_norm(array_ptr array, sieving_bound_srcptr H, mat_Z_srcptr matrix,
   mat_int64_init(Mq, matrix->NumRows, matrix->NumCols);
   mat_Z_to_mat_int64(Mq, matrix);  
 
- for (unsigned int i = 0; i < stop; i++) { 
-    add_increment_bottom_left_cube(bottom_left_cube, increment, H);
-    init_cases(array, bottom_left_cube, increment, H, f_d, Mq, spq, special_q);
+  for (unsigned int i = 0; i < stop; i++) {
+    next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
+        bottom_left_hypercube, length_hypercube, H->t);
+    init_cases(array, bottom_left_cube, length, H, f_d, Mq, spq, special_q);
   }
 
   mat_int64_clear(Mq);
   double_poly_clear(f_d);
   free(bottom_left_cube);
-  free(increment);
+  free(length);
+  free(use_length);
+  free(bottom_left_hypercube);
+  free(length_hypercube);
 #endif // NEW_NORM
 }
 
@@ -2517,7 +2604,7 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
 
 #ifdef MEAN_NORM_BOUND_SIEVE
 void find_index(uint64_array_ptr indexes, array_srcptr array,
-    unsigned char thresh, double * norm_bound_sieve)
+    unsigned char thresh, double * norm_bound_sieve, MAYBE_UNUSED f)
 #else
 void find_index(uint64_array_ptr indexes, array_srcptr array,
     unsigned char thresh)
@@ -2954,6 +3041,8 @@ void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
           if (is_smooth) {
             find++;
             I[i] = 1;
+            //TODO: that do not sort, why?
+            sort_factor(factor[i]);
           } else {
             I[i] = 0;
           }
@@ -3575,13 +3664,21 @@ int main(int argc, char * argv[])
         for (unsigned int j = 0; j < V; j++) {
           sec = seconds();
           uint64_array_init(indexes[j], array->number_element);
+          memset(array->array, 255,
+              sizeof(unsigned char) * array->number_element);
 #ifndef NEW_NORM
           init_norm(array, pre_compute[j], H, matrix, f[j], special_q,
               !(j ^ q_side));
 #else // NEW_NORM
           init_norm(array, H, matrix, f[j], special_q, !(j ^ q_side));
 #endif // NEW_NORM
+
           time[j][0] = seconds() - sec;
+
+#ifdef ASSERT_NORM
+          assert_norm(array, H, f[j], matrix);
+          printf("----------------------------------------\n");
+#endif // ASSERT_NORM
 
 #ifdef MEAN_NORM_BOUND
           norms_bound[j] = norm_bound;
