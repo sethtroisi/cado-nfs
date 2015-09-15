@@ -22,7 +22,7 @@ target_link_libraries (polyselect_ropt polyselect_common utils ${pthread_libs})
 
 if(ENABLE_SHARED)
     install(TARGETS polyselect_common DESTINATION ${LIBSUFFIX})
-endif(ENABLE_SHARED)
+endif()
 install(TARGETS polyselect2l RUNTIME DESTINATION ${BINSUFFIX}/polyselect)
 install(TARGETS polyselect_ropt RUNTIME DESTINATION ${BINSUFFIX}/polyselect)
 include(CMakeLists-nodist.txt OPTIONAL)

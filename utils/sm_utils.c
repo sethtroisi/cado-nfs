@@ -134,18 +134,18 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
 }
 
 void
-sm_relset_init (sm_relset_t r, int *d)
+sm_relset_init (sm_relset_t r, int *d, int nb_polys)
 {
-  for (int side = 0; side < 2; side++) {
+  for (int side = 0; side < nb_polys; side++) {
     mpz_poly_init (r->num[side], d[side]);
     mpz_poly_init (r->denom[side], d[side]);
   }
 }
 
 void
-sm_relset_clear (sm_relset_t r)
+sm_relset_clear (sm_relset_t r, int nb_polys)
 {
-  for (int side = 0; side < 2; side++) {
+  for (int side = 0; side < nb_polys; side++) {
     mpz_poly_clear (r->num[side]);
     mpz_poly_clear (r->denom[side]);
   }
@@ -160,18 +160,19 @@ sm_relset_clear (sm_relset_t r)
  */
 void
 sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
-                 mpz_poly_t * abpolys, mpz_poly_ptr *F, const mpz_t ell2)
+		     mpz_poly_t * abpolys, mpz_poly_ptr *F, int nb_polys,
+		     const mpz_t ell2)
 {
   mpz_t ee;
   mpz_init(ee);  
-  mpz_poly_t tmp[2];
-  for (int side = 0; side < 2; side++) {
+  mpz_poly_t tmp[NB_POLYS_MAX];
+  for (int side = 0; side < nb_polys; side++) {
     if (F[side] == NULL) continue;
     mpz_poly_init(tmp[side], F[side]->deg);
   }
 
   /* Set the initial fraction to 1 / 1 */
-  for (int side = 0; side < 2; side++) {
+  for (int side = 0; side < nb_polys; side++) {
     mpz_poly_set_zero (rel->num[side]);
     mpz_poly_setcoeff_si(rel->num[side], 0, 1); 
     mpz_poly_set_zero (rel->denom[side]);
@@ -187,7 +188,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
     {
       mpz_set_si(ee, e[k]);
       /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
-      for (int s = 0; s < 2; ++s) {
+      for (int s = 0; s < nb_polys; ++s) {
         if (F[s] == NULL) continue;
         mpz_poly_power_mod_f_mod_mpz (tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz (rel->num[s], rel->num[s], tmp[s], F[s],
@@ -198,7 +199,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
     {
       mpz_set_si(ee, -e[k]);
       /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
-      for (int s = 0; s < 2; ++s) {
+      for (int s = 0; s < nb_polys; ++s) {
         if (F[s] == NULL) continue;
         mpz_poly_power_mod_f_mod_mpz(tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz(rel->denom[s], rel->denom[s], tmp[s], F[s],
@@ -206,7 +207,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
       }
     }
   }
-  for (int s = 0; s < 2; ++s) {
+  for (int s = 0; s < nb_polys; ++s) {
     if (F[s] == NULL) continue;
     mpz_poly_cleandeg(rel->num[s], F[s]->deg);
     mpz_poly_cleandeg(rel->denom[s], F[s]->deg);

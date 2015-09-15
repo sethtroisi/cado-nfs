@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <wmmintrin.h>
 #include <assert.h>
+
 int main() {
     assert(sizeof(unsigned long) == 8); /* assume 64-bit */
 #if defined(__GNUC__) && __GNUC__ == 4 &&__GNUC_MINOR__ == 1

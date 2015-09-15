@@ -807,6 +807,12 @@ int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r,
         fprintf(stderr, "Bad argument list for parameter random_matrix: %s\n", rmstring);
         exit(1);
     }
+    if (!param_list_lookup_string(pl2, "output")) {
+        /* the default is then that r->out == stdout, but for this very
+         * usage we want no output at all, so r->out should be NULL. */
+        r->out = NULL;
+    }
+
     param_list_clear(pl2);
     free(rmstring);
     free(n_argv0);
@@ -913,37 +919,45 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     const char * rtmp = param_list_lookup_string(pl, "random_matrix");
     ASSERT_ALWAYS(rtmp);
 
-    random_matrix_process_data r;
+    unsigned long nrows;
+    unsigned long ncols;
+    unsigned long seed;
+    int density;
+    int maxcoeff;
+
+    {
+        random_matrix_process_data r;
+        random_matrix_process_data_init(r);
+        random_matrix_process_data_set_from_string(r, rtmp);
+        nrows = r->nrows;
+        ncols = r->ncols;
+        density = r->density;
+        maxcoeff = r->maxcoeff;
+        /* This is not supported here -- mostly because we haven't been
+         * extremely careful. */
+        ASSERT_ALWAYS(!r->rhs->n);
+        seed = r->seed + pi->m->jrank * pi->m->ncores + pi->m->trank;
+        random_matrix_process_data_clear(r);
+    }
+
     gmp_randstate_t rstate;
-    random_matrix_ddata F;
-
-    random_matrix_process_data_init(r);
     gmp_randinit_default(rstate);
+
+    nrows /= pi->wr[1]->totalsize;
+    ncols /= pi->wr[0]->totalsize;
+    density /= pi->wr[0]->totalsize;
+    // F->offset /= pi->wr[0]->totalsize;
+    gmp_randseed_ui(rstate, seed);
+
+
+    random_matrix_ddata F;
     random_matrix_ddata_init(F);
-
-    random_matrix_process_data_set_from_string(r, rtmp);
-
-    ASSERT_ALWAYS(!r->out);
-    ASSERT_ALWAYS(!r->ascii);
-
-    /* This is not supported here -- mostly because we haven't been
-     * extremely careful. */
-    ASSERT_ALWAYS(!r->rhs->n);
-
     random_matrix_ddata_set_default(F);
 
     /* Adapt to the parallelizing_info structure : divide */
     /* note that padding has to still be padding. */
 
-    random_matrix_ddata_adjust(F, r->nrows, r->ncols, r->density, pi->wr[0]->totalsize);
-
-    r->nrows /= pi->wr[1]->totalsize;
-    r->ncols /= pi->wr[0]->totalsize;
-    r->density /= pi->wr[0]->totalsize;
-    r->seed += pi->m->jrank * pi->m->ncores + pi->m->trank;
-    // F->offset /= pi->wr[0]->totalsize;
-
-    gmp_randseed_ui(rstate, r->seed);
+    random_matrix_ddata_adjust(F, nrows, ncols, density, pi->wr[0]->totalsize);
 
 
     /* Now we essentially have a copy of printrows above, except that
@@ -965,7 +979,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
 
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         printf("Each of the %u jobs on %u nodes creates a matrix with %lu rows %lu cols, and %d coefficients per row on average. Seed for rank 0 is %lu.\n",
-                pi->m->totalsize, pi->m->njobs, r->nrows, r->ncols, r->density, r->seed);
+                pi->m->totalsize, pi->m->njobs, nrows, ncols, density, seed);
     }
 
     time_t t0 = time(NULL);
@@ -974,20 +988,20 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     last_printed->z = 0;
 
     if (!arg->transpose) {
-        uint32_t * ptr = malloc(r->ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
         /* we'd like to avoid constant malloc()'s and free()'s */
         punched_interval_ptr pool = NULL;
         punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
-        for(unsigned long i = 0 ; i < r->nrows ; i++) {
-            long v = 0;
+        for(unsigned long i = 0 ; i < nrows ; i++) {
+            // long v = 0;
             uint32_t c = generate_row(rstate, F, ptr, range, & pool);
             PUSH_P(c);
             for(unsigned long j = 0 ; j < c ; j++) {
                 PUSH_P(ptr[j]);
-                if (r->maxcoeff) {
-                    int co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff + 1) - r->maxcoeff;
+                if (maxcoeff) {
+                    int co = gmp_urandomm_ui(rstate, 2 * maxcoeff + 1) - maxcoeff;
                     PUSH_P(co);
-                    if (r->rhs->n) v += co * (1+ptr[j]);
+                    // if (r->rhs->n) v += co * (1+ptr[j]);
                 }
             }
             total_coeffs += c;
@@ -1010,31 +1024,31 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         free(ptr);
     } else {
         size_t size0 = 0;
-        uint32_t * ptr = malloc(r->ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
         random_matrix_ddata G;
         random_matrix_ddata_init(G);
         /* use a special ddata, for our specially simple process (which
          * still needs the pick-and-punch thing */
         G->alpha=0;
-        G->ncols = r->nrows; /* yes */
+        G->ncols = nrows; /* yes */
         /* Then in fact it's easier, as we can avoid inverse transform
          * sampling for the computation of the coefficients */
         // int heavy = 1;
         punched_interval_ptr pool = NULL;
-        for(unsigned long j = 0 ; j < r->ncols ; j++) {
+        for(unsigned long j = 0 ; j < ncols ; j++) {
             double p = dist_p(F, j);
             G->scale = p;
             unsigned long weight;
             if (p > 0.1) {
                 weight = 0;
-                for(unsigned long i = 0 ; i < r->nrows ; i++) {
+                for(unsigned long i = 0 ; i < nrows ; i++) {
                     if (random_uniform(rstate) < p)
                         ptr[weight++]=i;
                 }
             } else {
-                weight = random_binomial(rstate, r->nrows, p);
+                weight = random_binomial(rstate, nrows, p);
                 for(unsigned long i = 0 ; i < weight ; i++) {
-                    ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
+                    ptr[i] = gmp_urandomm_ui(rstate, nrows);
                 }
                 qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                 unsigned long nw = 0;
@@ -1044,10 +1058,10 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 }
                 weight = nw;
 #if 0
-            double wmean = r->nrows * p; 
-            // double wsdev = sqrt(r->nrows * p * (1-p));
-            unsigned long weight = random_binomial(rstate, r->nrows, p);
-            } else if (heavy && weight < sqrt(0.1 * 2 * r->nrows)) {
+            double wmean = nrows * p; 
+            // double wsdev = sqrt(nrows * p * (1-p));
+            unsigned long weight = random_binomial(rstate, nrows, p);
+            } else if (heavy && weight < sqrt(0.1 * 2 * nrows)) {
 
             /* pick uniformly a subset of exactly [weight] row
              * indices, within [0..nrows[.  */
@@ -1074,7 +1088,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
             } else {
                 for(int ok = 0 ; !ok ; ) {
                     for(unsigned long i = 0 ; i < weight ; i++) {
-                        ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
+                        ptr[i] = gmp_urandomm_ui(rstate, nrows);
                     }
                     qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                     ok=1;
@@ -1109,8 +1123,8 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     }
 #undef PUSH_P
     F->total_coeffs = total_coeffs;
-    double e = (double) total_coeffs / r->nrows;
-    double s = (double) tot_sq / r->nrows;
+    double e = (double) total_coeffs / nrows;
+    double s = (double) tot_sq / nrows;
     double sdev = sqrt(s - e*e);
     F->row_avg = e;
     F->row_sdev = sdev;
@@ -1122,7 +1136,6 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
 
     gmp_randclear(rstate);
     random_matrix_ddata_clear(F);
-    random_matrix_process_data_clear(r);
     return arg;
 }
 #endif

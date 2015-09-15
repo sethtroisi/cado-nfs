@@ -1,13 +1,15 @@
 
-include_directories(bwc) # for worker-threads.[ch]
+include_directories(bwc) # for worker-threads.[ch] and matops
 
-add_executable(characters characters.c gauss.c blockmatrix.c
-    bit_matrices.c bwc/worker-threads.c)
+include_directories(${PROJECT_SOURCE_DIR}/gf2x/fft)
+include_directories(${PROJECT_SOURCE_DIR}/gf2x/fft/mpfq)
+add_library(bitlinalg blockmatrix.c matops.cpp gauss.c)
+add_dependencies(bitlinalg gf2x-build)
 
-target_link_libraries(characters utils_with_io pthread)
 
+add_executable(characters characters.c bwc/worker-threads.c)
+target_link_libraries(characters bitlinalg utils_with_io pthread)
 install(TARGETS characters RUNTIME DESTINATION ${BINSUFFIX}/linalg)
 
-set_source_files_properties (gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 
 include(CMakeLists-nodist.txt OPTIONAL)

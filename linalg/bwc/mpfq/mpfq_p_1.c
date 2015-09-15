@@ -1,3 +1,4 @@
+#include "cado.h"
 /* MPFQ generated file -- do not edit */
 
 #include "mpfq_p_1.h"
@@ -152,7 +153,7 @@ static void mpfq_p_1_init_ts(mpfq_p_1_dst_field k)
         e += 64;
     }
     int ee;
-    ee = ctzl(*ptr);
+    ee = mpfq_ctzl(*ptr);
     e += ee;
     if (e < 64) {
         mpfq_fixmp_1_rshift(pp, e);

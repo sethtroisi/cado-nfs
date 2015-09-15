@@ -386,6 +386,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
     pthread_mutex_lock (&lock);
   printf ("\n### input polynomial %u ###\n", poly_id);
   cado_poly_fprintf_with_info (stdout, input_poly, "# ");
+  fflush (stdout);
   if (nthreads > 1)
     pthread_mutex_unlock (&lock);
 

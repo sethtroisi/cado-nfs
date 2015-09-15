@@ -39,7 +39,7 @@ add_custom_target(all_test_dependencies)
 # targets X (for setting compile time definitions).
 if(CMAKE_VERSION VERSION_GREATER 3.1)
     cmake_policy(SET CMP0054 OLD)
-endif(CMAKE_VERSION VERSION_GREATER 3.1)
+endif()
 
 macro(cado_define_test)
     # This macro is appropriate for a test which consists in running a
@@ -69,6 +69,7 @@ macro(cado_define_test)
     # 
     # cado_define_test(foo
     #                        SCRIPT test.sh
+    #                        [WORKING_DIRECTORY x]
     #                        [TARGET_DEPENDENCIES x y z]
     #                        [TEST_DEPENDENCIES x y z]
     #                        [ARGUMENTS x y z]
@@ -122,13 +123,11 @@ macro(cado_define_test)
     set(SCRIPT)
     set(ARGUMENTS)
     set(TEST_NAME)
+    set(WORKING_DIRECTORY)
     set(NO_DEFAULT_RUN)
     set(current IMPLICIT)
     foreach(x ${ARGN})
-        if (17 EQUAL 42)        # cmake syntax sucks
-            # dead branch, I know. But since the 1st test has privileged
-            # status in cmake syntax, let's make it a straw man.
-        elseif (x STREQUAL "TEST_DEPENDENCIES")
+        if (x STREQUAL "TEST_DEPENDENCIES")
             SET(current TEST_DEPENDENCIES)
         elseif (x STREQUAL "TARGET_DEPENDENCIES")
             SET(current TARGET_DEPENDENCIES)
@@ -142,25 +141,29 @@ macro(cado_define_test)
             SET(current ARGUMENTS)
         elseif (x STREQUAL "TEST_NAME")
             SET(current TEST_NAME)
+        elseif (x STREQUAL "WORKING_DIRECTORY")
+            SET(current WORKING_DIRECTORY)
         elseif (x STREQUAL "NO_DEFAULT_RUN")
             SET(current NO_DEFAULT_RUN)
             # special, because it's a flag, really
             set(NO_DEFAULT_RUN 1)
-        else(17 EQUAL 42)       # cmake syntax sucks
+        else()
             list(APPEND ${current} ${x})
-        endif(17 EQUAL 42)      # cmake syntax sucks
+        endif()
     endforeach(x)
     # do some checking.
-	#message(STATUS "IMPLICIT is ${IMPLICIT}")
-	#message(STATUS "TEST_DEPENDENCIES is ${TEST_DEPENDENCIES}")
-	#message(STATUS "TARGET_DEPENDENCIES is ${TARGET_DEPENDENCIES}")
-	#message(STATUS "LIBRARIES is ${LIBRARIES}")
-	#message(STATUS "SOURCES is ${SOURCES}")
-	#message(STATUS "SCRIPT is ${SCRIPT}")
-	#message(STATUS "ARGUMENTS is ${ARGUMENTS}")
-	#message(STATUS "TEST_NAME is ${TEST_NAME}")
-	#message(STATUS "NO_DEFAULT_RUN is ${NO_DEFAULT_RUN}")
+    #message(STATUS "IMPLICIT is ${IMPLICIT}")
+    #message(STATUS "TEST_DEPENDENCIES is ${TEST_DEPENDENCIES}")
+    #message(STATUS "TARGET_DEPENDENCIES is ${TARGET_DEPENDENCIES}")
+    #message(STATUS "LIBRARIES is ${LIBRARIES}")
+    #message(STATUS "SOURCES is ${SOURCES}")
+    #message(STATUS "SCRIPT is ${SCRIPT}")
+    #message(STATUS "ARGUMENTS is ${ARGUMENTS}")
+    #message(STATUS "TEST_NAME is ${TEST_NAME}")
+    #message(STATUS "WORKING_DIRECTORY is ${WORKING_DIRECTORY}")
+    #message(STATUS "NO_DEFAULT_RUN is ${NO_DEFAULT_RUN}")
     list(LENGTH TEST_NAME nTEST_NAME)
+    list(LENGTH WORKING_DIRECTORY nWORKING_DIRECTORY)
     list(LENGTH SOURCES nSOURCES)
     list(LENGTH SCRIPT nSCRIPT)
     list(LENGTH LIBRARIES nLIBRARIES)
@@ -170,18 +173,17 @@ macro(cado_define_test)
     list(LENGTH ARGUMENTS nARGUMENTS)
     # direct the implicit parameters somewhere
     if(nIMPLICIT GREATER 0) 
-        if (17 EQUAL 42)        # cmake syntax sucks
-        elseif (((nSOURCES GREATER 0) OR (nSCRIPT GREATER 0)) AND (nTEST_NAME GREATER 0))
+        if (((nSOURCES GREATER 0) OR (nSCRIPT GREATER 0)) AND (nTEST_NAME GREATER 0))
             message(FATAL_ERROR "bad syntax with implicit parameter list and both (SOURCES or SCRIPT) and TEST_NAME defined")
         elseif (((nSOURCES GREATER 0) OR (nSCRIPT GREATER 0)) AND (nTEST_NAME EQUAL 0))
             set(TEST_NAME ${IMPLICIT})
             list(LENGTH TEST_NAME nTEST_NAME)
         # from then on we know that SOURCES and SCRIPT are empty
-        else(17 EQUAL 42)       # cmake syntax sucks
+        else()
             set(SOURCES ${IMPLICIT})
             list(LENGTH SOURCES nSOURCES)
-        endif (17 EQUAL 42)        # cmake syntax sucks
-    endif(nIMPLICIT GREATER 0) 
+        endif()
+    endif()
     if(nSCRIPT GREATER 1)
         if (nARGUMENTS EQUAL 0)
             # Then use the tail as an argument list
@@ -196,7 +198,7 @@ macro(cado_define_test)
             SET(SCRIPT ${x})
             list(LENGTH SCRIPT nSCRIPT)
         endif (nARGUMENTS EQUAL 0)
-    endif(nSCRIPT GREATER 1)
+    endif()
     if(nSCRIPT GREATER 0)
         if (nSOURCES GREATER 0)
             message(FATAL "SCRIPT and SOURCES incompatible")
@@ -204,7 +206,12 @@ macro(cado_define_test)
         if (nLIBRARIES GREATER 0)
             message(FATAL "SCRIPT and LIBRARIES incompatible")
         endif (nLIBRARIES GREATER 0)
-    endif(nSCRIPT GREATER 0)
+    endif()
+    if(nWORKING_DIRECTORY GREATER 1)
+        message(WARNING "too many test names ${WORKING_DIRECTORY}, retaining only first")
+        LIST(GET WORKING_DIRECTORY 0 x)
+        SET(WORKING_DIRECTORY ${x})
+    endif()
     if(nTEST_NAME GREATER 1)
         message(WARNING "too many test names ${TEST_NAME}, retaining only first")
         LIST(GET TEST_NAME 0 x)
@@ -213,8 +220,7 @@ macro(cado_define_test)
         # # message(STATUS "trying to find a test name")
         # # message(STATUS "SOURCES = ${SOURCES}")
         # # message(STATUS "SCRIPT = ${SCRIPT}")
-        if (17 EQUAL 42)        # cmake syntax sucks
-        elseif(nSOURCES GREATER 0)
+        if(nSOURCES GREATER 0)
             # define the test name as the base name without extension of the
             # first source file.
             LIST(GET SOURCES 0 x)
@@ -224,10 +230,10 @@ macro(cado_define_test)
             # first source file.
             LIST(GET SCRIPT 0 x)
             get_filename_component (TEST_NAME ${x} NAME_WE)
-        else (17 EQUAL 42)        # cmake syntax sucks
+        else()
             message(FATAL_ERROR "cannot find a name for test")
-        endif (17 EQUAL 42)        # cmake syntax sucks
-    endif(nTEST_NAME GREATER 1)
+        endif()
+    endif()
     if(nNO_DEFAULT_RUN GREATER 1)
         message(FATAL_ERROR "discarded arguments after NO_DEFAULT_RUN for test ${TEST_NAME}")
         set(NO_DEFAULT_RUN 1)
@@ -236,7 +242,7 @@ macro(cado_define_test)
         if (nARGUMENTS GREATER 0)
             message(FATAL_ERROR "NO_DEFAULT_RUN and ARGUMENTS are incomaptible for test ${TEST_NAME}")
         endif (nARGUMENTS GREATER 0)
-    endif(nNO_DEFAULT_RUN GREATER 1)
+    endif()
 
     # If we have a binary to build, then the meaning of
     # TARGET_DEPENDENCIES is most probably that we want the binary target
@@ -247,14 +253,14 @@ macro(cado_define_test)
         target_link_libraries(${TEST_NAME} ${LIBRARIES})
         if(nTARGET_DEPENDENCIES GREATER 0)
             add_dependencies(${TEST_NAME} ${TARGET_DEPENDENCIES})
-        endif(nTARGET_DEPENDENCIES GREATER 0)
+        endif()
         set(TARGET_DEPENDENCIES ${TEST_NAME})
         list(LENGTH TARGET_DEPENDENCIES nTARGET_DEPENDENCIES)
     endif (nSCRIPT EQUAL 0)
 
     if(NOT TEST_NAME)
         message(FATAL_ERROR "could not find a test name")
-        endif(NOT TEST_NAME)
+        endif()
     # even script tests may define target dependencies, even though it's
     # probably of little use.
     add_custom_target(${TEST_NAME}_dependencies)
@@ -264,7 +270,7 @@ macro(cado_define_test)
         add_dependencies(${TEST_NAME}_dependencies ${TARGET_DEPENDENCIES})
         add_test(builddep_${TEST_NAME} ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target ${TEST_NAME}_dependencies)
         # set(${TEST_NAME}_has_build_depends 1)
-    endif(nTARGET_DEPENDENCIES GREATER 0)
+    endif()
 
     if (nSCRIPT EQUAL 0)
         set(${TEST_NAME}_EXECUTABLE ${TEST_NAME})
@@ -274,10 +280,14 @@ macro(cado_define_test)
             set(binary env bash ${SCRIPT})
         endif (${SCRIPT} MATCHES ".sh$")
         set(${TEST_NAME}_EXECUTABLE ${binary})
-    endif(nSCRIPT EQUAL 0)
+    endif()
 
     if(NOT NO_DEFAULT_RUN)
-        add_test (${TEST_NAME} ${${TEST_NAME}_EXECUTABLE} ${ARGUMENTS})
+        set(add_test_args NAME ${TEST_NAME} COMMAND ${${TEST_NAME}_EXECUTABLE} ${ARGUMENTS})
+        if(nWORKING_DIRECTORY GREATER 0)
+            list(APPEND add_test_args WORKING_DIRECTORY ${WORKING_DIRECTORY})
+        endif()
+        add_test(${add_test_args})
         set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
         set(${TEST_NAME}_TEST_EXISTS 1)
         if(nTARGET_DEPENDENCIES GREATER 0)
@@ -286,9 +296,9 @@ macro(cado_define_test)
             set(deps builddep_${TEST_NAME} ${TEST_DEPENDENCIES})
             string_join(all_deps ";" ${deps})
             set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
-        endif(nTARGET_DEPENDENCIES GREATER 0)
-    endif(NOT NO_DEFAULT_RUN)
-endmacro(cado_define_test)
+        endif()
+    endif()
+endmacro()
 
 macro(cado_divert_test TEST_BASE DIVERSION)
     # This macro is appropriate when a test defined by
@@ -324,18 +334,15 @@ macro(cado_divert_test TEST_BASE DIVERSION)
     set(TARGET_DEPENDENCIES)
     set(current ARGUMENTS)
     foreach(x ${ARGN})
-        if (17 EQUAL 42)        # cmake syntax sucks
-            # dead branch, I know. But since the 1st test has privileged
-            # status in cmake syntax, let's make it a straw man.
-        elseif (x STREQUAL "APPEND_ARGUMENTS")
+        if (x STREQUAL "APPEND_ARGUMENTS")
             SET(current APPEND_ARGUMENTS)
         elseif (x STREQUAL "TEST_DEPENDENCIES")
             SET(current TEST_DEPENDENCIES)
         elseif (x STREQUAL "TARGET_DEPENDENCIES")
             SET(current TARGET_DEPENDENCIES)
-        else(17 EQUAL 42)       # cmake syntax sucks
+        else()
             list(APPEND ${current} ${x})
-        endif(17 EQUAL 42)      # cmake syntax sucks
+        endif()
     endforeach(x)
     # do some checking.
     list(LENGTH TARGET_DEPENDENCIES nTARGET_DEPENDENCIES)
@@ -369,10 +376,10 @@ macro(cado_divert_test TEST_BASE DIVERSION)
     set(deps builddep_${TEST_NAME} ${TEST_DEPENDENCIES})
     if(${TEST_BASE}_TEST_EXISTS)
         list(APPEND deps ${TEST_BASE})
-    endif(${TEST_BASE}_TEST_EXISTS)
+    endif()
     string_join(all_deps ";" ${deps})
     set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
-endmacro(cado_divert_test TEST_BASE DIVERSION ARGUMENTS)
+endmacro()
 
 
 
@@ -380,7 +387,8 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
     cado_define_test(full_c59
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/factor.sh
-            90377629292003121684002147101760858109247336549001090677693 -t 2
+            90377629292003121684002147101760858109247336549001090677693
+            -t 2 -s auto
         TARGET_DEPENDENCIES
             polyselect2l polyselect_ropt
             freerel makefb
@@ -389,19 +397,35 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             characters
             bwc_full
             sqrt)
-    find_program(MAGMA magma)
+    cado_define_test(nonlinear_c59
+        SCRIPT
+            ${CADO_NFS_SOURCE_DIR}/factor.sh
+            71641520761751435455133616475667090434063332228247871795429
+            -t 2 -s auto
+            tasks.polyselect.import=${CADO_NFS_SOURCE_DIR}/tests/misc/c59_nonlinear.poly
+        TARGET_DEPENDENCIES
+            full_c59_dependencies
+        )
+    find_program(MAGMA magma HINTS ENV MAGMA)
     if (MAGMA)
+        message(STATUS "magma found: ${MAGMA}")
 #        this test is probably not very useful, given that the other
 #        (quicker) tests cover everything covered by this test.
 #        cado_define_test(full_p59
 #            SCRIPT
-#                ${CMAKE_CURRENT_SOURCE_DIR}/test_full_p59.sh
+#               ${CADO_NFS_SOURCE_DIR}/factor.sh
+#               43341748620473677010074177283795146221310971425909898235183
+#               -dlp -t 2 -s auto -dlpnokeep
 #                ${CADO_NFS_SOURCE_DIR}
 #            TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
 #            plingen_pz sm reconstructlog-dl merge-dl replay-dl
 #        )
         cado_define_test(full_p30
-            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 191907783019725260605646959711 -dlp -ell 101538509534246169632617439 -t 2 -dlpnokeep target=92800609832959449330691138186
+            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh
+            191907783019725260605646959711
+            -dlp -ell 101538509534246169632617439
+            -t 2 -s auto
+            -dlpnokeep target=92800609832959449330691138186
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             sm_simple las_descent)
         cado_define_test(test_gfp3
@@ -411,12 +435,14 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl)
         cado_define_test(test_gfp2
-            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 100000000000000000039 -dlp -gfpext 2 -t 2 -dlpnokeep -ell 164354743277891
+            SCRIPT ${CADO_NFS_SOURCE_DIR}/factor.sh 100000000000000000039 -dlp -gfpext 2 -t 2 -s auto -dlpnokeep -ell 164354743277891
             TARGET_DEPENDENCIES full_c59_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
             filter_galois polyselect_gfpn)
-    endif(MAGMA)
-endif(DEFINED ENV{CHECKS_EXPENSIVE})
+    else()
+        message(STATUS "magma found: ${MAGMA}")
+    endif()
+endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -443,4 +469,6 @@ add_subdirectory (polyselect)
 add_subdirectory (filter)
 add_subdirectory (linalg)
 add_subdirectory (gf2x)
+add_subdirectory (misc)
+add_subdirectory (sqrt)
 add_subdirectory (nfs-hd)

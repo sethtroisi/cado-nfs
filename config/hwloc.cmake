@@ -8,7 +8,7 @@ if (DEFINED ENV{HWLOC})
     set(HWLOC_INCDIR_HINTS ${HWLOC_INCDIR_HINTS} "$ENV{HWLOC}"        )
     set(HWLOC_LIBDIR_HINTS ${HWLOC_LIBDIR_HINTS} "$ENV{HWLOC}/lib"    )
     set(HWLOC_LIBDIR_HINTS ${HWLOC_LIBDIR_HINTS} "$ENV{HWLOC}/.libs"  )
-endif(DEFINED ENV{HWLOC})
+endif()
 
 if (DEFINED ENV{HWLOC_INCDIR})
     message(STATUS "Adding $ENV{HWLOC_INCDIR} to the search path for hwloc")
@@ -20,7 +20,7 @@ if (DEFINED ENV{HWLOC_LIBDIR})
     message(STATUS "Adding $ENV{HWLOC_LIBDIR} to the search path for hwloc")
     # prepend !
     set(HWLOC_LIBDIR_HINTS "$ENV{HWLOC_LIBDIR}" ${HWLOC_LIBDIR_HINTS})
-endif(DEFINED ENV{HWLOC_LIBDIR})
+endif()
 
 # Try in three passes, otherwise cmake gets in the way...
 find_path   (HWLOC_INCDIR hwloc.h HINTS ${HWLOC_INCDIR_HINTS} DOC "hwloc headers"
@@ -35,17 +35,17 @@ if(NOT HWLOC_INCDIR)
 find_path   (HWLOC_INCDIR hwloc.h HINTS ${HWLOC_INCDIR_HINTS} DOC "hwloc headers"
         NO_DEFAULT_PATH
         )
-endif(NOT HWLOC_INCDIR)
+endif()
 if(NOT HWLOC_INCDIR)
 find_path   (HWLOC_INCDIR hwloc.h HINTS ${HWLOC_INCDIR_HINTS} DOC "hwloc headers")
-endif(NOT HWLOC_INCDIR)
+endif()
 
 find_library(HWLOC_LIB    hwloc   HINTS ${HWLOC_LIBDIR_HINTS} DOC "hwloc library"
     NO_DEFAULT_PATH
     )
 if(NOT HWLOC_LIB)
 find_library(HWLOC_LIB    hwloc   HINTS ${HWLOC_LIBDIR_HINTS} DOC "hwloc library")
-endif(NOT HWLOC_LIB)
+endif()
 
 
 # Yeah. CMake docs defines the ``PATH'' to a file as being its dirname. Very
@@ -76,4 +76,4 @@ CHECK_C_SOURCE_COMPILES("
       return hwloc_get_api_version();
     }
 " HAVE_HWLOC)
-endif(HWLOC_INCDIR_OK AND HWLOC_LIBDIR_OK)
+endif()

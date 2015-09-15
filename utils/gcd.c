@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "gcd.h"
 #include "macros.h"
-#include "misc.h" /* for ctzl */
+#include "misc.h" /* for cado_ctzl */
 
 int64_t
 gcd_int64 (int64_t a, int64_t b)
@@ -90,8 +90,8 @@ bin_gcd_int64_safe (int64_t a, int64_t b)
   /* C99: long long has at least 64 bits */
   uint64_t ua = (uint64_t) llabs(a), ub = (uint64_t) llabs(b);
 
-  s = ctzll (ua);
-  t = ctzll (ub);
+  s = cado_ctz64 (ua);
+  t = cado_ctz64 (ub);
   ua >>= s;
   ub >>= t;
   if (t < s)
@@ -105,14 +105,14 @@ bin_gcd_int64_safe (int64_t a, int64_t b)
         ua -= ub;
         if (ua == 0)
           return ub << s;
-        ua >>= ctzll (ua);
+        ua >>= cado_ctz64 (ua);
       }
       while (ub >= ua) {
        /* Here, ub >= ua > 0, and ua, ub are both odd */
        ub -= ua;
        if (ub == 0)
          return ua << s;
-       ub >>= ctzll (ub);
+       ub >>= cado_ctz64 (ub);
       }
     }
 }

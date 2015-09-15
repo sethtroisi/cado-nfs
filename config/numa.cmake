@@ -8,7 +8,7 @@ if (DEFINED ENV{NUMA})
     set(NUMA_INCDIR_HINTS ${NUMA_INCDIR_HINTS} "$ENV{NUMA}"        )
     set(NUMA_LIBDIR_HINTS ${NUMA_LIBDIR_HINTS} "$ENV{NUMA}/lib"    )
     set(NUMA_LIBDIR_HINTS ${NUMA_LIBDIR_HINTS} "$ENV{NUMA}/.libs"  )
-endif(DEFINED ENV{NUMA})
+endif()
 
 if (DEFINED ENV{NUMA_INCDIR})
     message(STATUS "Adding $ENV{NUMA_INCDIR} to the search path for numa")
@@ -20,7 +20,7 @@ if (DEFINED ENV{NUMA_LIBDIR})
     message(STATUS "Adding $ENV{NUMA_LIBDIR} to the search path for numa")
     # prepend !
     set(NUMA_LIBDIR_HINTS "$ENV{NUMA_LIBDIR}" ${NUMA_LIBDIR_HINTS})
-endif(DEFINED ENV{NUMA_LIBDIR})
+endif()
 
 # Try in three passes, otherwise cmake gets in the way...
 find_path   (NUMA_INCDIR numa.h HINTS ${NUMA_INCDIR_HINTS} DOC "numa headers"
@@ -35,17 +35,17 @@ if(NOT NUMA_INCDIR)
 find_path   (NUMA_INCDIR numa.h HINTS ${NUMA_INCDIR_HINTS} DOC "numa headers"
         NO_DEFAULT_PATH
         )
-endif(NOT NUMA_INCDIR)
+endif()
 if(NOT NUMA_INCDIR)
 find_path   (NUMA_INCDIR numa.h HINTS ${NUMA_INCDIR_HINTS} DOC "numa headers")
-endif(NOT NUMA_INCDIR)
+endif()
 
 find_library(NUMA_LIB    numa   HINTS ${NUMA_LIBDIR_HINTS} DOC "numa library"
     NO_DEFAULT_PATH
     )
 if(NOT NUMA_LIB)
 find_library(NUMA_LIB    numa   HINTS ${NUMA_LIBDIR_HINTS} DOC "numa library")
-endif(NOT NUMA_LIB)
+endif()
 
 # Yeah. CMake docs defines the ``PATH'' to a file as being its dirname. Very
 # helpful documentation there :-((
@@ -70,4 +70,4 @@ CHECK_C_SOURCE_COMPILES("
     return (numa_num_configured_cpus() << 16) + numa_num_configured_nodes();
     }
 " HAVE_NUMA)
-endif(NUMA_INCDIR_OK AND NUMA_LIBDIR_OK)
+endif()

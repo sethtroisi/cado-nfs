@@ -109,7 +109,7 @@ macro (add_trialdiv_test MAXLEN)
     cado_define_test(test_trialdiv_${MAXLEN} SOURCES test_trialdiv.c ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c LIBRARIES utils tests)
     set_property(TARGET test_trialdiv_${MAXLEN}
                 PROPERTY COMPILE_DEFINITIONS TRIALDIV_MAXLEN=${MAXLEN})
-endmacro(add_trialdiv_test)
+endmacro()
 # Try specific TRIALDIV_MAXLEN from 1 to 6
 add_trialdiv_test(1)
 add_trialdiv_test(2)
