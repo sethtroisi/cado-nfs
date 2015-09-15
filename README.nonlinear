@@ -14,9 +14,10 @@ skew = 1.29196058385
 m = 14849204829709953721577291784724593124898329527333780861554
 (m is the common root of f and g mod n.)
 
-1) you first have to create a polynomial file:
+1) you first have to create a polynomial file, see for example the one in
+   tests/misc/c59_nonlinear.poly:
 
-$ cat c59.poly
+$ cat tests/misc/c59_nonlinear.poly
 n: 71641520761751435455133616475667090434063332228247871795429
 skew: 1.29196058385
 c0: 44337721223995
@@ -26,34 +27,6 @@ Y0: 1199051061668898
 Y1: -71651332635517
 Y2: -205964131819700
 
-2) then create a parameter file:
-  - start with a copy of params/params.c60
-  - add the required parameters to run the python script outside
-    factor.sh: slaves.nrclients, tasks.execpath, tasks.workdir,
-    slaves.hostnames, slaves.scriptpath, slaves.basepath.
-    [ if you don't remember what they mean, this is normal; just start
-    factor.sh, and look at the parameter file it creates in order to
-    imitate ]
-  - add a line with the number you want to factor:
-    N = 71641520761751435455133616475667090434063332228247871795429
-  - Tell the script to use your polynomial file:
-    tasks.polyselect.admax = 0
-    tasks.polyselect.import = /my/wonderful/path/c59.poly
+2) run factor.sh with importing this polynomial:
 
-Here is an example of lines added at the end of params.c60:
-
-slaves.nrclients = 2
-tasks.execpath = ${HOME}/svn/cado-nfs/build/coing
-tasks.workdir = /tmp/c59
-slaves.hostnames = localhost
-slaves.scriptpath = ${HOME}/svn/cado-nfs/scripts/cadofactor
-slaves.basepath = /tmp/c59
-N = 71641520761751435455133616475667090434063332228247871795429
-tasks.polyselect.admax = 0
-tasks.polyselect.import = /tmp/c59.poly
-
-3) Run the script:
-   scripts/cadofactor/cadofactor.py params.c59
-
-And this should end with the factors. Please note that this is still very
-experimental.
+$ ./factor.sh 71641520761751435455133616475667090434063332228247871795429 tasks.polyselect.import=tests/misc/c59_nonlinear.poly

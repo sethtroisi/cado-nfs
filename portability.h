@@ -75,9 +75,20 @@ static inline char * strndup(const char * const a, const size_t n)
 #endif /* HAVE_STRNDUP */
 
 /* MS VS and MinGW use the MS RTL (called MSVCRT for MinGW) which does not
-   know the "%zu" format, they use "%Iu" instead. On MinGW, we use wrapper 
-   functions that rewrite the %zu format accordingly, so the bulk of the
-   code can continue to use C99 syntax.
+ * know the "%zu" format, they use "%Iu" instead. On MinGW, we use wrapper 
+ * functions that rewrite the %zu format accordingly, so the bulk of the
+ * code can continue to use C99 syntax.
+
+ * FIXME: looks like it's a bit of a mess. MinGW, with
+ * __USE_MINGW_ANSI_STDIO, claims to provide C99 things. But from reading
+ * the commit logs, it's not completely clear that this holds for the
+ * full extent of functions we want; maybe it's only *printf, and not
+ * *scanf.
+
+ * Second aspect (below), with C++, it seems that <cstdio> is sometimes
+ * #undef-ining printf, maybe to the point of thrashing the C99-compliant
+ * variants we've selected. Does that say that in the end we *have* to
+ * use substitutes for every call ?
  */
 
 #ifdef HAVE_MINGW

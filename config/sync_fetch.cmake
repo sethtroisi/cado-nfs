@@ -5,7 +5,7 @@ try_compile(HAVE_SYNC_FETCH
     ${PROJECT_SOURCE_DIR}/config/sync_fetch.c)
 if(HAVE_SYNC_FETCH)
     message(STATUS "Testing the existence of __sync_fetch functions -- Success")
-else(HAVE_SYNC_FETCH)
+else()
     message(STATUS "Testing the existence of __sync_fetch functions -- Failed")
-endif(HAVE_SYNC_FETCH)
+endif()
 

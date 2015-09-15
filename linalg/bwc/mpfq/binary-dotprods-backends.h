@@ -3,6 +3,8 @@
 
 /* TODO: there's some duplicated code between here and matops.c */
 
+#include "mpfq_gf2n_common.h"
+
 /* require all versions */
 #define  need_dotprod_64K_64
 #define  need_dotprod_64K_128
@@ -12,7 +14,7 @@
 #define  need_dotprod_64K_64
 
 #ifdef  need_dotprod_64K_64
-#ifdef  HAVE_SSE2
+#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
 #include <emmintrin.h>
 /* u has n rows of 64K bits
  * v has n rows of 64 bits.
@@ -27,23 +29,23 @@ static inline void dotprod_64K_64(
 {
     memset(w, 0, 64 * K * sizeof(uint64_t));
     for(unsigned int i = 0 ; i < n ; i++) {
-        __v2di * w0 = (__v2di*) w;
-        // TODO: It's possible to expand more, and use a __v2di
+        __m128i * w0 = (__m128i*) w;
+        // TODO: It's possible to expand more, and use a __m128i
         // mb[4][2], or even [4]. This wouldn't change the code much
         // (see the u128 version), and is likely to speed things up a
         // wee bit maybe.
-        __v2di mb[4] = {
-            (__v2di) {0, 0},
-            (__v2di) {*v, 0},
-            (__v2di) {0, *v},
-            (__v2di) {*v, *v},
+        __m128i mb[4] = {
+            _mm_setzero_si128(),
+            _mpfq_mm_setr_epi64(*v, 0 ),
+            _mpfq_mm_setr_epi64(0,  *v),
+            _mpfq_mm_set1_epi64(*v),
         };
         v++;
-        __v2di *sw = w0;
+        __m128i *sw = w0;
         for(unsigned int k = 0 ; k < K ; k++) {
             uint64_t a = *u++;
             for (unsigned int j = 0; j < 64; j += 2) {
-                _mm_storeu_si128(sw, _mm_loadu_si128(sw) ^ mb[a & 3]);
+                *sw ^= mb[a & 3];
                 a >>= 2;
                 sw ++;
             }
@@ -75,7 +77,7 @@ static inline void dotprod_64K_64(uint64_t * b, const uint64_t * A, const uint64
 #endif
 
 #ifdef  need_dotprod_64K_128
-#ifdef HAVE_SSE2
+#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
 /* u has n rows of 64K bits
  * v has n rows of 128 bits.
  * Compute (u|v) == tr(u)*v into the area pointed to by v: 64K rows of 128 bits.
@@ -88,22 +90,20 @@ static inline void dotprod_64K_128(
         unsigned int n,
         unsigned int K)
 {
-    memset(w, 0, 64 * K * sizeof(__v2di));
-    /* okay, we've casted the v2di* to u64* for interchange, and now
+    memset(w, 0, 64 * K * sizeof(__m128i));
+    /* okay, we've casted the m128i* to u64* for interchange, and now
      * we're casting it back...  */
-    __v2di * vv = (__v2di*) v;
+    __m128i * vv = (__m128i*) v;
     for(unsigned int i = 0 ; i < n ; i++) {
-        __v2di * w0 = (__v2di*) w;
-#define SSE_0   ((__v2di) {0,0} )
-        __v2di mb[4][2] = {
-            {SSE_0, SSE_0},
-            {*vv, SSE_0},
-            {SSE_0, *vv},
+        __m128i * w0 = (__m128i*) w;
+        __m128i mb[4][2] = {
+            {_mm_setzero_si128(), _mm_setzero_si128()},
+            {*vv, _mm_setzero_si128()},
+            {_mm_setzero_si128(), *vv},
             {*vv, *vv},
         };
-#undef SSE_0
         vv++;
-        __v2di *sw = w0;
+        __m128i *sw = w0;
         for(unsigned int k = 0 ; k < K ; k++) {
             uint64_t a = *u++;
             for (unsigned int j = 0; j < 64; j += 2) {
@@ -185,7 +185,7 @@ static inline void dotprod_64K_64L(
 /* multiply the n times 64K-bit vector u by the 64K by
  * 64L matrix v -- n must be even. Result is put in w.
  */
-#ifdef HAVE_SSE2
+#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
 #include <emmintrin.h>
 static inline void vaddmul_tiny_64K_64L(
             uint64_t * w,
@@ -205,22 +205,21 @@ static inline void vaddmul_tiny_64K_64L(
     for (unsigned int j = 0; j < n; j += 2 ) {
         const uint64_t * v0 = v;
         for(unsigned int l = 0 ; l < L ; l++) {
-            union { __v2di s; uint64_t x[2]; } r;
-            r.s = (__v2di) {0,0};
+            __m128i r = _mm_setzero_si128();
             const uint64_t * vv = v0;
             for(unsigned int k = 0 ; k < K ; k++) {
-                __v2di a = (__v2di) { u0[k], u1[k] };
-                __v2di one = (__v2di) { 1, 1, };
+                __m128i a = _mpfq_mm_setr_epi64(u0[k], u1[k]);
+                __m128i one = _mpfq_mm_set1_epi64_c(1);
                 for (unsigned int i = 0; i < 64; i++) {
-                    __v2di zw = { *vv, *vv, };
-                    r.s ^= (zw & -(a & one));
+                    __m128i zw = _mpfq_mm_set1_epi64(*vv);
+                    r ^= (zw & -(a & one));
                     a = _mm_srli_epi64(a, 1);
                     vv += L;
                 }
             }
             /* Because L > 1, the destination words are not contiguous */
-            w0[l] ^= r.x[0];
-            w1[l] ^= r.x[1];
+            w0[l] ^= _mm_cvtsi128_si64(r);
+            w1[l] ^=  _mm_cvtsi128_si64(_mm_srli_si128(r, 8));
             v0++; /* next column in v */
         }
         u0 += 2 * K; u1 += 2 * K;

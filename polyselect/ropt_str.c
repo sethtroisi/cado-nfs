@@ -299,7 +299,7 @@ ropt_poly_setup ( ropt_poly_t poly )
   ropt_poly_setup_eval (poly->fx, poly->gx, poly->numerator, F, G, primes);
 
   /* projective alpha */
-  poly->alpha_proj = get_biased_alpha_projective (F, 2000);
+  poly->alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
 
   mpz_clear (t);
 }
@@ -544,7 +544,7 @@ ropt_s1param_init ( ropt_s1param_t s1param )
   s1param->tlen_e_sl = 0;
   s1param->nbest_sl = 0;
 
-  /* set to 1 for using quicker, smaller nbest_sl for tunning
+  /* set to 1 for using quicker, smaller nbest_sl for tuning
      sublattices */
   s1param->nbest_sl_tunemode = 0;
 

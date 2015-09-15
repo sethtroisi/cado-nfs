@@ -1390,14 +1390,14 @@ int mpfq_fixmp_1_invmod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
        * An update consists in reducing the largest by the smallest,
        * and then adjusting the valuation.  */
     
-      lsh = ctzl(a);
+      lsh = mpfq_ctzl(a);
       a >>= lsh;
       t += lsh;
       v <<= lsh;
       do {
         do {
           b -= a; v += u;
-          lsh = ctzl(b);
+          lsh = mpfq_ctzl(b);
           b >>= lsh;
           t += lsh;
           u <<= lsh;
@@ -1406,7 +1406,7 @@ int mpfq_fixmp_1_invmod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
           break;
         do {
           a -= b; u += v;
-          lsh = ctzl(a);
+          lsh = mpfq_ctzl(a);
           a >>= lsh;
           t += lsh;
           v <<= lsh;
@@ -2044,7 +2044,7 @@ int mpfq_fixmp_2_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 2);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_2_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_2_long_lshift(v, i, lsh);
@@ -2055,7 +2055,7 @@ int mpfq_fixmp_2_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_2_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 2);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_2_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_2_long_lshift(u, i, lsh);
@@ -2067,7 +2067,7 @@ int mpfq_fixmp_2_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_2_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 2);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_2_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_2_long_lshift(v, i, lsh);
@@ -2758,7 +2758,7 @@ int mpfq_fixmp_3_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 3);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_3_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_3_long_lshift(v, i, lsh);
@@ -2769,7 +2769,7 @@ int mpfq_fixmp_3_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_3_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 3);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_3_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_3_long_lshift(u, i, lsh);
@@ -2781,7 +2781,7 @@ int mpfq_fixmp_3_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_3_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 3);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_3_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_3_long_lshift(v, i, lsh);
@@ -3546,7 +3546,7 @@ int mpfq_fixmp_4_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 4);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_4_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_4_long_lshift(v, i, lsh);
@@ -3557,7 +3557,7 @@ int mpfq_fixmp_4_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_4_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 4);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_4_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_4_long_lshift(u, i, lsh);
@@ -3569,7 +3569,7 @@ int mpfq_fixmp_4_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_4_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 4);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_4_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_4_long_lshift(v, i, lsh);
@@ -4408,7 +4408,7 @@ int mpfq_fixmp_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 5);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_5_long_lshift(v, i, lsh);
@@ -4419,7 +4419,7 @@ int mpfq_fixmp_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 5);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_5_long_lshift(u, i, lsh);
@@ -4431,7 +4431,7 @@ int mpfq_fixmp_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 5);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_5_long_lshift(v, i, lsh);
@@ -5344,7 +5344,7 @@ int mpfq_fixmp_6_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 6);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_6_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_6_long_lshift(v, i, lsh);
@@ -5355,7 +5355,7 @@ int mpfq_fixmp_6_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_6_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 6);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_6_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_6_long_lshift(u, i, lsh);
@@ -5367,7 +5367,7 @@ int mpfq_fixmp_6_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_6_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 6);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_6_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_6_long_lshift(v, i, lsh);
@@ -6354,7 +6354,7 @@ int mpfq_fixmp_7_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 7);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_7_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_7_long_lshift(v, i, lsh);
@@ -6365,7 +6365,7 @@ int mpfq_fixmp_7_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_7_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 7);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_7_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_7_long_lshift(u, i, lsh);
@@ -6377,7 +6377,7 @@ int mpfq_fixmp_7_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_7_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 7);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_7_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_7_long_lshift(v, i, lsh);
@@ -7438,7 +7438,7 @@ int mpfq_fixmp_8_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 8);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_8_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_8_long_lshift(v, i, lsh);
@@ -7449,7 +7449,7 @@ int mpfq_fixmp_8_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_8_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 8);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_8_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_8_long_lshift(u, i, lsh);
@@ -7461,7 +7461,7 @@ int mpfq_fixmp_8_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_8_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 8);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_8_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_8_long_lshift(v, i, lsh);
@@ -8596,7 +8596,7 @@ int mpfq_fixmp_9_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 9);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_9_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_9_long_lshift(v, i, lsh);
@@ -8607,7 +8607,7 @@ int mpfq_fixmp_9_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_9_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 9);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_9_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_9_long_lshift(u, i, lsh);
@@ -8619,7 +8619,7 @@ int mpfq_fixmp_9_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_9_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 9);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_9_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_9_long_lshift(v, i, lsh);
@@ -9144,14 +9144,14 @@ int mpfq_fixmp_0_5_invmod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * 
        * An update consists in reducing the largest by the smallest,
        * and then adjusting the valuation.  */
     
-      lsh = ctzl(a);
+      lsh = mpfq_ctzl(a);
       a >>= lsh;
       t += lsh;
       v <<= lsh;
       do {
         do {
           b -= a; v += u;
-          lsh = ctzl(b);
+          lsh = mpfq_ctzl(b);
           b >>= lsh;
           t += lsh;
           u <<= lsh;
@@ -9160,7 +9160,7 @@ int mpfq_fixmp_0_5_invmod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * 
           break;
         do {
           a -= b; u += v;
-          lsh = ctzl(a);
+          lsh = mpfq_ctzl(a);
           a >>= lsh;
           t += lsh;
           v <<= lsh;
@@ -9863,7 +9863,7 @@ int mpfq_fixmp_1_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 2);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_1_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_1_5_long_lshift(v, i, lsh);
@@ -9874,7 +9874,7 @@ int mpfq_fixmp_1_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_1_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 2);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_1_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_1_5_long_lshift(u, i, lsh);
@@ -9886,7 +9886,7 @@ int mpfq_fixmp_1_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_1_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 2);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_1_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_1_5_long_lshift(v, i, lsh);
@@ -10663,7 +10663,7 @@ int mpfq_fixmp_2_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 3);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_2_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_2_5_long_lshift(v, i, lsh);
@@ -10674,7 +10674,7 @@ int mpfq_fixmp_2_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_2_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 3);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_2_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_2_5_long_lshift(u, i, lsh);
@@ -10686,7 +10686,7 @@ int mpfq_fixmp_2_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_2_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 3);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_2_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_2_5_long_lshift(v, i, lsh);
@@ -11555,7 +11555,7 @@ int mpfq_fixmp_3_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 4);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_3_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_3_5_long_lshift(v, i, lsh);
@@ -11566,7 +11566,7 @@ int mpfq_fixmp_3_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_3_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 4);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_3_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_3_5_long_lshift(u, i, lsh);
@@ -11578,7 +11578,7 @@ int mpfq_fixmp_3_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_3_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 4);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_3_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_3_5_long_lshift(v, i, lsh);
@@ -12539,7 +12539,7 @@ int mpfq_fixmp_4_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 5);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_4_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_4_5_long_lshift(v, i, lsh);
@@ -12550,7 +12550,7 @@ int mpfq_fixmp_4_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_4_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 5);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_4_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_4_5_long_lshift(u, i, lsh);
@@ -12562,7 +12562,7 @@ int mpfq_fixmp_4_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_4_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 5);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_4_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_4_5_long_lshift(v, i, lsh);
@@ -13615,7 +13615,7 @@ int mpfq_fixmp_5_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 6);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_5_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_5_5_long_lshift(v, i, lsh);
@@ -13626,7 +13626,7 @@ int mpfq_fixmp_5_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_5_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 6);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_5_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_5_5_long_lshift(u, i, lsh);
@@ -13638,7 +13638,7 @@ int mpfq_fixmp_5_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_5_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 6);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_5_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_5_5_long_lshift(v, i, lsh);
@@ -14783,7 +14783,7 @@ int mpfq_fixmp_6_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 7);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_6_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_6_5_long_lshift(v, i, lsh);
@@ -14794,7 +14794,7 @@ int mpfq_fixmp_6_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_6_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 7);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_6_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_6_5_long_lshift(u, i, lsh);
@@ -14806,7 +14806,7 @@ int mpfq_fixmp_6_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_6_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 7);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_6_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_6_5_long_lshift(v, i, lsh);
@@ -16043,7 +16043,7 @@ int mpfq_fixmp_7_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 8);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_7_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_7_5_long_lshift(v, i, lsh);
@@ -16054,7 +16054,7 @@ int mpfq_fixmp_7_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_7_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 8);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_7_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_7_5_long_lshift(u, i, lsh);
@@ -16066,7 +16066,7 @@ int mpfq_fixmp_7_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_7_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 8);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_7_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_7_5_long_lshift(v, i, lsh);
@@ -17395,7 +17395,7 @@ int mpfq_fixmp_8_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       
       for(i = 0 ; !a[i] ; i++) ;
       assert (i < 9);
-      lsh = ctzl(a[i]);
+      lsh = mpfq_ctzl(a[i]);
       mpfq_fixmp_8_5_long_rshift(a, i, lsh);
       t += lsh + i*GMP_NUMB_BITS;
       mpfq_fixmp_8_5_long_lshift(v, i, lsh);
@@ -17406,7 +17406,7 @@ int mpfq_fixmp_8_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_8_5_add(v, v, u);
           for(i = 0 ; !b[i] ; i++) ;
           assert (i < 9);
-          lsh = ctzl(b[i]);
+          lsh = mpfq_ctzl(b[i]);
           mpfq_fixmp_8_5_long_rshift(b, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_8_5_long_lshift(u, i, lsh);
@@ -17418,7 +17418,7 @@ int mpfq_fixmp_8_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_8_5_add(u, u, v);
           for(i = 0 ; !a[i] ; i++) ;
           assert (i < 9);
-          lsh = ctzl(a[i]);
+          lsh = mpfq_ctzl(a[i]);
           mpfq_fixmp_8_5_long_rshift(a, i, lsh);
           t += lsh + i*GMP_NUMB_BITS;
           mpfq_fixmp_8_5_long_lshift(v, i, lsh);

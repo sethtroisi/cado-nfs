@@ -5,6 +5,6 @@ try_compile(HAVE_RUSAGE_THREAD
             ${PROJECT_SOURCE_DIR}/config/rusage_thread.c)
 if(HAVE_RUSAGE_THREAD)
    message(STATUS "Trying to compile with RUSAGE_THREAD -- Success")
-else(HAVE_RUSAGE_THREAD)
+else()
    message(STATUS "Trying to compile with RUSAGE_THREAD -- Failed")
-endif(HAVE_RUSAGE_THREAD)
+endif()
