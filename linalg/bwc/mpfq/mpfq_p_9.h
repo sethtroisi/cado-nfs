@@ -434,9 +434,9 @@ void mpfq_p_9_dotprod(mpfq_p_9_dst_field, mpfq_p_9_dst_vec, mpfq_p_9_src_vec, mp
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_p_9_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_9_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_9_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -483,11 +483,11 @@ void mpfq_p_9_clear(mpfq_p_9_dst_field k MAYBE_UNUSED, mpfq_p_9_elt * x MAYBE_UN
     assert(*x);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_set, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_set, Mpfq::gfp */
 static inline
 void mpfq_p_9_set(mpfq_p_9_dst_field K MAYBE_UNUSED, mpfq_p_9_dst_elt r, mpfq_p_9_src_elt s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_p_9_elt));
+    mpfq_copy(r,s,9);
 }
 
 /* *Mpfq::gfp::elt::code_for_set_ui, Mpfq::gfp */
@@ -499,11 +499,11 @@ void mpfq_p_9_set_ui(mpfq_p_9_dst_field k MAYBE_UNUSED, mpfq_p_9_dst_elt r, unsi
     mpfq_zero(r + 1, 9 - 1);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_set_zero, Mpfq::gfp */
 static inline
 void mpfq_p_9_set_zero(mpfq_p_9_dst_field K MAYBE_UNUSED, mpfq_p_9_dst_elt r)
 {
-    mpfq_p_9_vec_set_zero(K,(mpfq_p_9_dst_vec)r,1);
+    mpfq_zero(r, 9);
 }
 
 /* *Mpfq::gfp::elt::code_for_get_ui, Mpfq::gfp */
@@ -791,18 +791,18 @@ void mpfq_p_9_elt_ur_set(mpfq_p_9_dst_field k MAYBE_UNUSED, mpfq_p_9_dst_elt_ur 
     mpfq_copy(z, x, 19);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_elt_ur_set_elt, Mpfq::gfp */
 static inline
 void mpfq_p_9_elt_ur_set_elt(mpfq_p_9_dst_field K MAYBE_UNUSED, mpfq_p_9_dst_elt_ur r, mpfq_p_9_src_elt s)
 {
-    memset(r, 0, sizeof(mpfq_p_9_elt_ur)); memcpy(r,s,sizeof(mpfq_p_9_elt));
+    mpfq_copy(r, s, 9); mpfq_zero(r+9, 19-9);
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::gfp::elt::code_for_elt_ur_set_zero, Mpfq::gfp */
 static inline
 void mpfq_p_9_elt_ur_set_zero(mpfq_p_9_dst_field K MAYBE_UNUSED, mpfq_p_9_dst_elt_ur r)
 {
-    memset(r, 0, sizeof(mpfq_p_9_elt_ur));
+    mpfq_zero(r, 19);
 }
 
 /* *Mpfq::gfp::elt::code_for_elt_ur_set_ui, Mpfq::gfp */
@@ -1436,7 +1436,7 @@ int mpfq_p_9_poly_deg(mpfq_p_9_dst_field K MAYBE_UNUSED, mpfq_p_9_src_poly w)
     if (w->size == 0)
         return -1;
     int deg = w->size-1;
-    mpfq_p_9_elt temp;	/* spurious uninit warning sometimes */
+    mpfq_p_9_elt temp;
     mpfq_p_9_init(K, &temp);
     mpfq_p_9_vec_getcoeff(K, temp, w->c, deg);
     int comp=mpfq_p_9_cmp_ui(K, temp, 0);
@@ -1656,6 +1656,7 @@ void mpfq_p_9_poly_xgcd(mpfq_p_9_dst_field k MAYBE_UNUSED, mpfq_p_9_dst_poly g, 
     mpfq_p_9_poly a,b,u,v,w,x,q,r;
     mpfq_p_9_elt c;
     mpfq_p_9_init(k,&c);
+    mpfq_p_9_set_ui(k,c,0);        /* placate gcc */
     int da0=mpfq_p_9_poly_deg(k,a0), db0=mpfq_p_9_poly_deg(k,b0), dega;
     if (db0==-1) {
      if (da0==-1) {

@@ -21,8 +21,8 @@ Options:
                   - (with DLP) solve dlp in GF(integer^gfpext)
     -ell <integer>
                   - (with DLP) solve dlp modulo ell
-    -t <integer>  - numbers of cores to be used
-    -s <integer>  - numbers of slave scripts to be used
+    -t <integer>  - numbers of cores to be used, or 'auto' (see below)
+    -s <integer>  - numbers of slave scripts to be used, or 'auto' (see below)
     -h <host1>,<host2>,...,<hostn>
                   - comma-separated list of hosts to use for factorization.
                     With -s <n>, run <n> many scripts per host.
@@ -38,6 +38,19 @@ Options:
 
     If CADO_USEHOST is set to any non-empty string, the script will
     listen on "*" even if all clients given with -h are on localhost.
+
+Use of 'auto' for -t and -s:
+    With -t auto, the various multithreaded programs in cado-nfs are run
+    with as many threads as we have available cores on the running
+    machine (the value is guessed by shell commands within this script).
+    This affects the tasks.threads parameter of cadofactor. The meaning
+    of the -t switch may be changed by -s auto (see below).
+
+    With -s auto (which *must* come with -t <some integer>, not -t auto),
+    the las and polyselect programs are capped to the number of threads
+    given by -t, however several slaves are run, up to the number which
+    keeps all the cores busy. For other multithreaded programs, we use as
+    many threads as we have available cores.
 EOF
 }
 
@@ -77,14 +90,7 @@ fi
 # Make temp dir writable by us and readable by everyone
 chmod 755 $t
 
-n=$1
-shift
-if [ ! "$(grep "^[ [:digit:] ]*$" <<< $n)" ]; then
-  echo "Error, first parameter must be the number to factor" >&2
-  usage
-  exit 1
-fi
-
+n=
 cores=1
 slaves=1
 verbose=false
@@ -92,62 +98,71 @@ dlp=false
 dlpkeep=true
 gfpext=1
 ell=1
-while [ -n "$1" ] ; do
-  if [ "$1" = "-t" ]; then
-    cores=$2
-    if [ ! "$(grep "^[ [:digit:] ]*$" <<< $cores)" ]; then
-      echo "Error, number of cores '$cores' is not an integer" >&2
-      usage
-      exit 1
+cadofactor_args=()
+is_number() { [ "$(grep "^[ [:digit:] ]*$" <<< "$1")" ] ; }
+want_number() {
+    if ! is_number "$3" ; then
+        echo "Error, argument to $1 ($2) must be an integer" >&2
+        exit 1
     fi
-    shift 2
-  elif [ "$1" = "-s" ]; then
-    slaves=$2
-    if [ ! "$(grep "^[ [:digit:] ]*$" <<< $slaves)" ]; then
-      echo "Error, number of slaves '$slaves' is not an integer" >&2
-      usage
-      exit 1
+}
+
+
+while [ "$#" -gt 0 ] ; do
+    if ! [ "$n" ] && is_number $1 ; then
+        n=$1
+        shift
+    elif [ "$1" = "-t" ]; then
+        cores=$2
+        [ "$2" = "auto" ] || want_number -t "number or cores" $2
+        shift 2
+    elif [ "$1" = "-s" ]; then
+        slaves=$2
+        [ "$2" = "auto" ] || want_number -s "number or slaves" $2
+        shift 2
+    elif [ "$1" = "-h" ]; then
+        hostnames="$2"
+        shift 2
+    elif [ "$1" = "-timeout" ]; then
+        timeout="$2"
+        want_number -timeout "timeout value" $2
+        if ! find_timeout $2
+        then
+            echo "timeout binary not found. Timeout disabled"
+        fi
+        shift 2
+    elif [ "$1" = "-dlp" ]; then
+        dlp=true
+        shift
+    elif [ "$1" = "-gfpext" ]; then
+        gfpext="$2"
+        if [ $gfpext != "2" ]; then 
+            echo "Error, only extensions of degree 2 are supported for now" >&2
+            usage
+            exit 1
+        fi
+        shift 2
+    elif [ "$1" = "-ell" ]; then
+        ell=$2
+        want_number -ell "DLP subgroup order" $2
+        shift 2
+    elif [ "$1" = "-dlpnokeep" ]; then
+        dlpkeep=false
+        shift
+    elif [ "$1" = "-v" ]; then
+        verbose=true
+        shift
+    else
+        cadofactor_args=("${cadofactor_args[@]}" "$1")
+        shift
     fi
-    shift 2
-  elif [ "$1" = "-h" ]; then
-    hostnames="$2"
-    shift 2
-  elif [ "$1" = "-timeout" ]; then
-    timeout="$2"
-    if [ ! "$(grep "^[ [:digit:] ]*$" <<< $timeout)" ]; then
-      echo "Error, number of seconds '$timeout' is not an integer" >&2
-      usage
-      exit 1
-    fi
-    if ! find_timeout $2
-    then
-      echo "timeout binary not found. Timeout disabled"
-    fi
-    shift 2
-  elif [ "$1" = "-dlp" ]; then
-    dlp=true
-    shift
-  elif [ "$1" = "-gfpext" ]; then
-    gfpext="$2"
-    if [ $gfpext != "2" ]; then 
-      echo "Error, only extensions of degree 2 are supported atm" >&2
-      usage
-      exit 1
-    fi
-    shift 2
-  elif [ "$1" = "-ell" ]; then
-    ell=$2
-    shift 2
-  elif [ "$1" = "-dlpnokeep" ]; then
-    dlpkeep=false
-    shift
-  elif [ "$1" = "-v" ]; then
-    verbose=true
-    shift
-  else
-    break
-  fi
 done
+
+if ! [ "$n" ] ; then
+  echo "Error, must give number to factor (or p modulo which dlp is to be solved)" >&2
+  usage
+  exit 1
+fi
 
 # In DLP mode, keep data, unless -dlpnokeep has been passed.
 if $dlp; then
@@ -268,6 +283,65 @@ if [ ! -f $file ] ; then
     exit 1
 fi
 
+ncpus() {
+    if [ "$NCPUS_FAKE" ] ; then
+        echo $NCPUS_FAKE
+        exit 0
+    fi
+
+    if [ -f /proc/cpuinfo ] ; then
+        # grep -c fails with no match, while |wc -l is happy
+        nphysical=$(sort -u /proc/cpuinfo  | grep '^physical' | wc -l)
+        if [ "$nphysical" -eq 0 ] ; then
+            grep -c ^processor /proc/cpuinfo
+            exit 0
+        fi
+        variants="$(grep '^cpu cores' /proc/cpuinfo | uniq | wc -l)"
+        if [ "$variants" = 0 ] ; then
+            grep -c ^processor /proc/cpuinfo
+            exit 0
+        fi
+        if [ "$variants" != 1 ] ; then
+            echo "inhomogeneous platform ?" >&2
+            exit 1
+        fi
+        cores_per_cpu=$(grep '^cpu cores' /proc/cpuinfo | head -1 | cut -d: -f2)
+        echo $((nphysical*cores_per_cpu))
+    elif [ "$(uname -s)" = Darwin ] ; then
+        # does this count hyperthreading or not ?
+        sysctl -n hw.ncpu
+    elif [ "$(uname -s)" = OpenBSD ] ; then
+        # does this count hyperthreading or not ?
+        sysctl -n hw.ncpu
+    elif [ "$(uname -s)" = MINGW32_NT-6.1 ] ; then
+        # not clear whether it's physical or logical.
+        wmic cpu get Caption | tail -n +2 | grep -c .
+        # we don't believe mingw will support multithreading well.
+    else
+        # this would work as well on linux and darwin, but pretty surely does
+        # not count hyperthreading. Does not work on openbsd5.3
+        getconf _NPROCESSORS_ONLN || (echo "Selecting 1 core only" >&2 ; echo 1)
+    fi
+}
+
+cores_args=()
+if [ "$cores" = auto ] && [ "$slaves" = auto ] ; then
+        echo "Having both -s auto and -t auto is forbidden" >&2
+        exit 1
+elif [ "$cores" = auto ] ; then
+    cores=`ncpus`
+    cores_args=("tasks.threads=$cores" slaves.nrclients=$slaves)
+elif [ "$slaves" = auto ] ; then
+    ncpus=`ncpus`
+    if [ "$cores" -gt "$ncpus" ] ; then
+        cores=$ncpus
+    fi
+    slaves=$((($cores-1+$ncpus)/$cores))
+    cores_args=("tasks.threads=$ncpus" "tasks.polyselect.threads=$cores" "tasks.sieve.threads=$cores" "slaves.nrclients=$slaves")
+else
+    cores_args=("tasks.threads=$cores" "slaves.nrclients=$slaves")
+fi
+
 #########################################################################
 [ "$CADO_DEBUG" ] && echo "(debug mode, temporary files will be kept in $t)"
 
@@ -287,29 +361,33 @@ fi
 
 mkdir $t/tmp
 
+args=(
+    tasks.execpath="$bindir"
+    "${cores_args[@]}"
+    tasks.workdir="$t"
+    slaves.hostnames="$hostnames"
+    slaves.scriptpath="$scriptpath"
+    "$server_address"
+    slaves.basepath="$t/client/"
+    "${cadofactor_args[@]}"
+)
+
+if [ "$cpubinding_file" ] ; then
+    args=("${args[@]}" tasks.linalg.bwc.cpubinding="$cpubinding_file")
+fi
+
+if [ $ell != "1" ]; then
+    args=("${args[@]}" gorder=$ell)
+fi
+
 # $PYTHON is there to expand a shell variable having that name, if
 # provided, in the case there is no python3 script in the path, or if
 # one which is named otherwise, or placed in a non-prority location
 # is the path, is preferred. If $PYTHON is empty, this is a no-op
 
-extra_args=(
-    tasks.execpath="$bindir" \
-    tasks.threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
-    slaves.nrclients=$slaves \
-    slaves.scriptpath="$scriptpath" "$server_address" \
-    slaves.basepath="$t/client/" \
-)
+# Same mechanism for TIMEOUT
 
-if [ "$cpubinding_file" ] ; then
-    extra_args=("${extra_args[@]}" \
-        tasks.linalg.bwc.cpubinding="$cpubinding_file")
-fi
-
-if [ $ell != "1" ]; then
-    extra_args=("${extra_args[@]}" gorder=$ell)
-fi
-
-"${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n "${extra_args[@]}" "$@"
+"${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n "${args[@]}"
 
 rc=$?
 

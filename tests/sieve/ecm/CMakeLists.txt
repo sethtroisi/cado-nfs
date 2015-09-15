@@ -27,7 +27,7 @@ macro(add_order_test METHOD SIGMA PMIN PMAX)
         ${testbench_path}
         ${CMAKE_CURRENT_SOURCE_DIR}/test_${x}.inp
         -q -vf -po${METHOD} ${SIGMA})
-endmacro(add_order_test)
+endmacro()
 
 add_order_test("" 10 1000 2000)
 add_order_test("" 10 1000000 1001000)

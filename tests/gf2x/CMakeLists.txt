@@ -4,8 +4,9 @@
 # building gf2x. That dependency (on gf2x-build, in fact) has to be added
 # by hand.
 
-cado_define_test(SCRIPT
-    ${CMAKE_CURRENT_SOURCE_DIR}/test_gf2x.sh ${CADO_NFS_BINARY_DIR}
+cado_define_test(TEST_NAME test_gf2x
+    PROGRAM ${CMAKE_MAKE_PROGRAM} check
+    WORKING_DIRECTORY ${CADO_NFS_BINARY_DIR}/gf2x
     TARGET_DEPENDENCIES gf2x-build)
 
 link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)

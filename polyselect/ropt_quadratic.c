@@ -35,10 +35,10 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   mpz_neg (m, m);
   w_good = (int *) malloc (size_alpha_pqueue_all_w * sizeof(int));
 
-  /* tmp queue for tunning stage 1 */
+  /* tmp queue for tuning stage 1 */
   new_alpha_pq (&alpha_pqueue_all_w, size_alpha_pqueue_all_w);
 
-  /* parameters for tunning quadratic rotation */
+  /* parameters for tuning quadratic rotation */
   j = param->verbose;
   param->verbose = 0;
   old_nbest_sl = s1param->nbest_sl;
@@ -151,9 +151,9 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
  * Rank found sublattices in alpha_pqueue by test sieving.
  * Note: alpha_pqueue contains more (double/quad) sublattices than 
  * nbest_sl (final sublattices to be root-sieved). In this function,
- * - the first pass of tunning reduces #alpha_pqueue to nbest_sl.
- * - the second pass of tunning identifies good u and v.
- * - the third pass of tunning identifies good mod.
+ * - the first pass of tuning reduces #alpha_pqueue to nbest_sl.
+ * - the second pass of tuning identifies good u and v.
+ * - the third pass of tuning identifies good mod.
  */
 static void
 ropt_quadratic_tune ( ropt_poly_t poly,

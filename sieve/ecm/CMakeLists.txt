@@ -15,7 +15,7 @@
 #     COMMAND ln -s ${src} ${dst}
 #     DEPENDS  ${src})
 # set_source_files_properties(${dst} PROPERTIES COMPILE_FLAGS -DMODREDC${TW})
-# endmacro(variant_facul)
+# endmacro()
 # 
 # variant_facul(pm1 15ul)
 # variant_facul(pp1 15ul)
@@ -60,7 +60,7 @@ add_library(facul
 
 if(MINGW)
 target_link_libraries(facul gnurx)
-endif(MINGW)
+endif()
 
 add_executable(testbench testbench.c)
 

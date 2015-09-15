@@ -23,7 +23,7 @@ target_link_libraries(crtalgsqrt utils ${pthread_libs})
 set_target_properties(crtalgsqrt PROPERTIES
     COMPILE_FLAGS "--mpi"
     LINK_FLAGS "--mpi")
-endif(HAVE_CABSL)
-endif(${WITH_PTHREADS})
+endif()
+endif()
 
 include(CMakeLists-nodist.txt OPTIONAL)

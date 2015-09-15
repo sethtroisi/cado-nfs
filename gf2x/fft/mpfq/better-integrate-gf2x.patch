@@ -16,13 +16,14 @@ index eefa0d5..9cb92eb 100644
  #include "assert.h"
  #ifdef	MPFQ_LAST_GENERATED_TAG
  #undef	MPFQ_LAST_GENERATED_TAG
-@@ -1034,139 +1037,73 @@ void mpfq_2_128_elt_ur_add(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_e
+@@ -1034,139 +1037,74 @@ void mpfq_2_128_elt_ur_add(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_e
  }
  
  /* *Mpfq::gf2n::mul::code_for_mul_ur */
 +#ifndef HAVE_GF2X
++/* include something not too dumb, although we don't really care */
 +static inline void
-+gf2x_mul1 (unsigned long *c, unsigned long a, unsigned long b)
++mpfq_2_128_gf2x_mul1 (unsigned long *c, unsigned long a, unsigned long b)
 +{
 +   unsigned long hi, lo, tmp, A[16];
 +   A[0]  = 0;         A[1]  = a;         A[2]  = A[1] << 1; A[3]  = A[2] ^ a;
@@ -45,33 +46,33 @@ index eefa0d5..9cb92eb 100644
 +   tmp = -((a >> 25) & 1); tmp &= ((b & 0x80808080) >> 7); hi = hi ^ tmp;
 +   c[0] = lo; c[1] = hi;
 +}
-+static inline void gf2x_mul2(unsigned long *c, const unsigned long *a,
++static inline void mpfq_2_128_gf2x_mul2(unsigned long *c, const unsigned long *a,
 +			     const unsigned long *b)
 +{
 +    unsigned long t;
 +    unsigned long u[2];
 +
-+    gf2x_mul1(c, a[0], b[0]);
-+    gf2x_mul1(c + 2, a[1], b[1]);
++    mpfq_2_128_gf2x_mul1(c, a[0], b[0]);
++    mpfq_2_128_gf2x_mul1(c + 2, a[1], b[1]);
 +    t = c[1] ^ c[2];
-+    gf2x_mul1(u, a[0] ^ a[1], b[0] ^ b[1]);
++    mpfq_2_128_gf2x_mul1(u, a[0] ^ a[1], b[0] ^ b[1]);
 +    c[1] = c[0] ^ u[0] ^ t;
 +    c[2] = c[3] ^ u[1] ^ t;
 +}
-+static inline void gf2x_mul4(unsigned long *c, const unsigned long *a,
++static inline void mpfq_2_128_gf2x_mul4(unsigned long *c, const unsigned long *a,
 +		   const unsigned long *b)
 +{
 +    unsigned long aa[2], bb[2], ab[4];
 +    unsigned long lo[4], hi[4];
-+    gf2x_mul2(lo, a, b);
-+    gf2x_mul2(hi, a + 2, b + 2);
++    mpfq_2_128_gf2x_mul2(lo, a, b);
++    mpfq_2_128_gf2x_mul2(hi, a + 2, b + 2);
 +    aa[0] = a[0] ^ a[2];
 +    aa[1] = a[1] ^ a[3];
 +    bb[0] = b[0] ^ b[2];
 +    bb[1] = b[1] ^ b[3];
 +    unsigned long c24 = lo[2] ^ hi[0];
 +    unsigned long c35 = lo[3] ^ hi[1];
-+    gf2x_mul2(ab, aa, bb);
++    mpfq_2_128_gf2x_mul2(ab, aa, bb);
 +    c[0] = lo[0];
 +    c[1] = lo[1];
 +    c[2] = ab[0] ^ lo[0] ^ c24;
@@ -187,12 +188,12 @@ index eefa0d5..9cb92eb 100644
 -    
 -    /* repair steps */
 -    /* repair section 200711-200803 */
--    __m128i v1 = _gf2x_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
+-    __m128i v1 = _mpfq_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
 -    v1 = SHR(v1, 1);
--    __m128i v2 = _gf2x_mm_setr_epi32(s1[2], s1[3], s1[2], s1[3]);
+-    __m128i v2 = _mpfq_mm_setr_epi32(s1[2], s1[3], s1[2], s1[3]);
 -    v2 = SHR(v2, 1);
 -    __m128i w;
--    __m128i m = _gf2x_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
+-    __m128i m = _mpfq_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
 -    w = -SHR(g[1],63);
 -    v1 = v1 & m;
 -    t1 ^= v1 & w;
@@ -216,7 +217,7 @@ index eefa0d5..9cb92eb 100644
 -#undef SHR
 -#undef SHLD
 -#undef SHRD
-+    gf2x_mul4(t, s1, s2);
++    mpfq_2_128_gf2x_mul4(t, s1, s2);
  }
  
  /* *Mpfq::gf2n::squaring::code_for_sqr_ur */
@@ -238,13 +239,14 @@ index 7394af5..22c51e0 100644
  #include "assert.h"
  #ifdef	MPFQ_LAST_GENERATED_TAG
  #undef	MPFQ_LAST_GENERATED_TAG
-@@ -956,95 +959,50 @@ void mpfq_2_64_elt_ur_add(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_
+@@ -956,95 +959,51 @@ void mpfq_2_64_elt_ur_add(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_
  }
  
  /* *Mpfq::gf2n::mul::code_for_mul_ur */
 +#ifndef HAVE_GF2X
++/* include something not too dumb, although we don't really care */
 +static inline void
-+gf2x_mul1 (unsigned long *c, unsigned long a, unsigned long b)
++mpfq_2_64_gf2x_mul1 (unsigned long *c, unsigned long a, unsigned long b)
 +{
 +   unsigned long hi, lo, tmp, A[16];
 +   A[0]  = 0;         A[1]  = a;         A[2]  = A[1] << 1; A[3]  = A[2] ^ a;
@@ -267,16 +269,16 @@ index 7394af5..22c51e0 100644
 +   tmp = -((a >> 25) & 1); tmp &= ((b & 0x80808080) >> 7); hi = hi ^ tmp;
 +   c[0] = lo; c[1] = hi;
 +}
-+static inline void gf2x_mul2(unsigned long *c, const unsigned long *a,
++static inline void mpfq_2_64_gf2x_mul2(unsigned long *c, const unsigned long *a,
 +			     const unsigned long *b)
 +{
 +    unsigned long t;
 +    unsigned long u[2];
 +
-+    gf2x_mul1(c, a[0], b[0]);
-+    gf2x_mul1(c + 2, a[1], b[1]);
++    mpfq_2_64_gf2x_mul1(c, a[0], b[0]);
++    mpfq_2_64_gf2x_mul1(c + 2, a[1], b[1]);
 +    t = c[1] ^ c[2];
-+    gf2x_mul1(u, a[0] ^ a[1], b[0] ^ b[1]);
++    mpfq_2_64_gf2x_mul1(u, a[0] ^ a[1], b[0] ^ b[1]);
 +    c[1] = c[0] ^ u[0] ^ t;
 +    c[2] = c[3] ^ u[1] ^ t;
 +}
@@ -351,10 +353,10 @@ index 7394af5..22c51e0 100644
 -    
 -    /* repair steps */
 -    /* repair section 200711-200803 */
--    __m128i v1 = _gf2x_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
+-    __m128i v1 = _mpfq_mm_setr_epi32(s1[0], s1[1], s1[0], s1[1]);
 -    v1 = SHR(v1, 1);
 -    __m128i w;
--    __m128i m = _gf2x_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
+-    __m128i m = _mpfq_mm_setr_epi32_c(0x77777777, 0x77777777, 0x77777777, 0x77777777);
 -    w = -SHR(g[1],63);
 -    v1 = v1 & m;
 -    t1 ^= v1 & w;
@@ -371,7 +373,7 @@ index 7394af5..22c51e0 100644
 -#undef SHR
 -#undef SHLD
 -#undef SHRD
-+    gf2x_mul2(t, s1, s2);
++    mpfq_2_64_gf2x_mul2(t, s1, s2);
  }
  
  /* *Mpfq::gf2n::squaring::code_for_sqr_ur */
@@ -389,7 +391,7 @@ index 9240e1b..30d9cc7 100644
 +#elif defined(GF2X_HAVE_MPIR_H)
 +#include <mpir.h>
 +#else
-+#error "make sure gf2x-config-export.h is included before gf2x-cantor-fft.h"
++#error "make sure gf2x-config-export.h is included before gf2x-cantor-fft.h or mpfq/<anything>.h"
 +#endif
 +
  
@@ -399,7 +401,7 @@ diff --git a/fft/mpfq/x86_64/mpfq_2_128.h b/fft/mpfq/x86_64/mpfq_2_128.h
 index bbb1866..f701c33 100644
 --- a/fft/mpfq/x86_64/mpfq_2_128.h
 +++ b/fft/mpfq/x86_64/mpfq_2_128.h
-@@ -11,9 +11,12 @@
+@@ -11,9 +11,15 @@
  #include <assert.h>
  #include <stdint.h>
  #include <ctype.h>
@@ -408,6 +410,9 @@ index bbb1866..f701c33 100644
  #include <stdio.h>
 +#ifdef  HAVE_GF2X
 +#include "gf2x.h"
++#endif
++#ifdef HAVE_PCLMUL
++#include <wmmintrin.h>
 +#endif
 +
  #include "assert.h"
@@ -451,7 +456,7 @@ diff --git a/fft/mpfq/x86_64/mpfq_2_64.h b/fft/mpfq/x86_64/mpfq_2_64.h
 index 4cfb9c2..44698b4 100644
 --- a/fft/mpfq/x86_64/mpfq_2_64.h
 +++ b/fft/mpfq/x86_64/mpfq_2_64.h
-@@ -11,9 +11,12 @@
+@@ -11,9 +11,15 @@
  #include <assert.h>
  #include <stdint.h>
  #include <ctype.h>
@@ -461,16 +466,23 @@ index 4cfb9c2..44698b4 100644
 +#ifdef  HAVE_GF2X
 +#include "gf2x.h"
 +#endif
++#ifdef HAVE_PCLMUL
++#include <wmmintrin.h>
++#endif
 +
  #include "assert.h"
  #ifdef	MPFQ_LAST_GENERATED_TAG
  #undef	MPFQ_LAST_GENERATED_TAG
-@@ -935,6 +938,9 @@ void mpfq_2_64_elt_ur_add(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_
+@@ -935,6 +938,13 @@ void mpfq_2_64_elt_ur_add(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_
  static inline
  void mpfq_2_64_mul_ur(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_ur t, mpfq_2_64_src_elt s1, mpfq_2_64_src_elt s2)
  {
 +#ifdef HAVE_GF2X
 +    gf2x_mul1(t, s1, s2);
++#elif defined(HAVE_PCLMUL)      /* !HAVE_GF2X */
++    __m128i ss1 = _mm_setr_epi64((__m64) s1[0], (__m64) 0LL);
++    __m128i ss2 = _mm_setr_epi64((__m64) s2[0], (__m64) 0LL);
++    _mm_storeu_si128((__m128i *)(t),  _mm_clmulepi64_si128(ss1, ss2, 0));
 +#else
         unsigned long hi, lo;
         unsigned long A[16];
