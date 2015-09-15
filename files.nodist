@@ -195,3 +195,5 @@ nfs-hd/list_int64_vector_index.h
 tests/nfs-hd/
 nfs-hd/utils_norm.c
 nfs-hd/utils_norm.h
+nfs-hd/utils_cofactorisation.c
+nfs-hd/utils_cofactorisation.h
