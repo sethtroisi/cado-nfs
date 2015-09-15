@@ -65,6 +65,8 @@ uint64_t number_survivals = 0;
 uint64_t number_survivals_facto = 0;
 #endif // NUMBER_SURVIVALS
 
+/* ----- Compute Mq, Mqr, Tqr ----- */
+
 /*
  * Build the matrix Mq for an ideal (q, g) with deg(g) = 1. The matrix need Tq
  *  with the good coefficients, i.e. t the coeffecients not reduced modulo q.
@@ -330,6 +332,8 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
     }
   }
 }
+
+/* ----- Sieving part ----- */
 
 #ifdef ASSERT_SIEVE
 /*
@@ -1786,6 +1790,8 @@ void special_q_sieve(array_ptr array, mat_Z_srcptr matrix,
   }
 #endif // SIEVE_U
 #endif // Draft for special-q_sieve
+
+/* ----- Collect indices with norm less or equal to lpb ----- */
 
 #ifdef MEAN_NORM_BOUND_SIEVE
 void find_index(uint64_array_ptr indexes, array_srcptr array,
