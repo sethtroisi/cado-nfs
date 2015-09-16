@@ -681,7 +681,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
   if (s1param->nbest_sl < 4)
     s1param->nbest_sl = 4;
   if (param->verbose >= 1)
-    printf ("[Info] s1param->nbest_sl: %u\n", s1param->nbest_sl);
+    printf ("# [Info] s1param->nbest_sl: %u\n", s1param->nbest_sl);
 
   /* Set 3: set "e_sl[]" */
   ropt_s1param_setup_e_sl (poly, s1param, bound, param);
