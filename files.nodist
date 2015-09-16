@@ -103,11 +103,6 @@ params/c110.poly
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh
 scripts/polsel_params.sage
-scripts/cluster/analyze-bwclogfile.pl
-scripts/cluster/bwc-cluster-oar.sh
-scripts/cluster/bwc-fetchfiles.pl
-scripts/cluster/oarsh_wrap.sh
-scripts/cluster/trampoline-git.sh
 linalg/bwc/bcast-file.c
 linalg/bwc/tool.sh
 misc/README
@@ -124,7 +119,6 @@ misc/descent-init.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
-utils/qrange_to_qlist.c
 ffs/archives/checker.mag
 ffs/archives/descent_809.mag
 ffs/archives/modprecomp.mag

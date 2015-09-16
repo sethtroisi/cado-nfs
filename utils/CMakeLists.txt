@@ -54,9 +54,6 @@ if(ENABLE_SHARED)
 install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX})
 endif()
 
-add_executable(cut_n_roots cut_n_roots.c)
-target_link_libraries(cut_n_roots utils)
-
 add_executable(gmp_prob_prime gmp_prob_prime.c)
 add_executable(gmp_nextprime gmp_nextprime.c)
 add_executable(random_integer random_integer.c)

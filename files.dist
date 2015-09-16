@@ -377,18 +377,6 @@ polyselect/ropt_main.c
 polyselect/size_optimization.c
 polyselect/size_optimization.h
 scripts/call_cmake.sh
-scripts/cluster/README_LAS
-scripts/cluster/check_dup_purge.pl
-scripts/cluster/clean.pl
-scripts/cluster/cpu_time.pl
-scripts/cluster/dispatcher
-scripts/cluster/init_cdir
-scripts/cluster/init_ldir
-scripts/cluster/las_1job
-scripts/cluster/las_loop
-scripts/cluster/merge.pl
-scripts/cluster/run_oarjobs
-scripts/cluster/sge-linalg.pl
 scripts/gdb.py
 scripts/install-cmake.sh
 scripts/version.sh
@@ -530,7 +518,6 @@ utils/cado_popen.c
 utils/cado_popen.h
 utils/crc.c
 utils/crc.h
-utils/cut_n_roots.c
 utils/electric_alloc.h
 utils/fakempi.h
 utils/fakepthread.h
