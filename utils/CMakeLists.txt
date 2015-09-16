@@ -54,23 +54,15 @@ if(ENABLE_SHARED)
 install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX})
 endif()
 
-add_executable(gmp_prob_prime gmp_prob_prime.c)
-add_executable(gmp_nextprime gmp_nextprime.c)
-add_executable(random_integer random_integer.c)
-
 # To avoid the warning: implicit declaration of function nanosleep. It's POSIX, non c99.
 set (CMAKE_OLD_C_FLAGS "${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "prout -D _POSIX_C_SOURCE=200809L ${CMAKE_C_FLAGS}")
 add_executable(antebuffer antebuffer.c timing.cpp memusage.c)
 set (CMAKE_C_FLAGS "${CMAKE_OLD_C_FLAGS}")
 
-target_link_libraries(gmp_prob_prime ${gmp_libname})
-target_link_libraries(gmp_nextprime ${gmp_libname})
-target_link_libraries(random_integer ${gmp_libname})
 target_link_libraries(antebuffer pthread)
 
-install(TARGETS gmp_prob_prime random_integer RUNTIME DESTINATION ${BINSUFFIX}/utils)
-install(TARGETS gmp_nextprime antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)
+install(TARGETS antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 

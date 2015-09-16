@@ -624,8 +624,6 @@ utils/getprime.h
 utils/gmp_aux.c
 utils/gmp_aux.h
 utils/gmp_gcd.c
-utils/gmp_nextprime.c
-utils/gmp_prob_prime.c
 utils/gzip.c
 utils/gzip.h
 utils/memusage.c
@@ -661,7 +659,6 @@ utils/mpz_poly.c
 utils/mpz_poly.h
 utils/purgedfile.c
 utils/purgedfile.h
-utils/random_integer.c
 utils/ringbuf.c
 utils/ringbuf.h
 utils/relation.cpp
