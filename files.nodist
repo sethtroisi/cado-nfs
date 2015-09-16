@@ -71,7 +71,6 @@ sieve/ecm/issmooth.c
 sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
-sqrt/magma-manu/
 utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
 utils/cachesize.c
