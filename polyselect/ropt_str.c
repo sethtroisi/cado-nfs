@@ -677,8 +677,11 @@ ropt_s1param_setup ( ropt_poly_t poly,
     if (size_total_sublattices[i][0] > j)
       break;
 
-  s1param->nbest_sl = size_total_sublattices[i][1] * param->effort;
-  //printf ("[Info] s1param->nbest_sl: %u\n", s1param->nbest_sl);
+  s1param->nbest_sl = (unsigned long) ((double) size_total_sublattices[i][1] * param->effort);
+  if (s1param->nbest_sl < 4)
+    s1param->nbest_sl = 4;
+  if (param->verbose >= 1)
+    printf ("[Info] s1param->nbest_sl: %u\n", s1param->nbest_sl);
 
   /* Set 3: set "e_sl[]" */
   ropt_s1param_setup_e_sl (poly, s1param, bound, param);
