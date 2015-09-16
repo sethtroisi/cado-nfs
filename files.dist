@@ -623,7 +623,6 @@ utils/getprime.c
 utils/getprime.h
 utils/gmp_aux.c
 utils/gmp_aux.h
-utils/gmp_factorization_complete.c
 utils/gmp_gcd.c
 utils/gmp_nextprime.c
 utils/gmp_prob_prime.c
