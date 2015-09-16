@@ -73,7 +73,7 @@ sqrt/lift.c
 utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
 utils/cachesize.c
-utils/build-testcases-rootfinder.m
+tests/utils/build-testcases-rootfinder.m
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
@@ -102,7 +102,6 @@ scripts/check_all_gcc.sh
 scripts/gcc-script.sh
 scripts/polsel_params.sage
 linalg/bwc/bcast-file.c
-linalg/bwc/tool.sh
 misc/README
 misc/cachesim.c
 misc/contains_zerochar.c
