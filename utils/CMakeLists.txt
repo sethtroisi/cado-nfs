@@ -57,9 +57,6 @@ endif()
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)
 
-add_executable(roots roots.c)
-target_link_libraries(roots utils)
-
 add_executable(gmp_prob_prime gmp_prob_prime.c)
 add_executable(gmp_nextprime gmp_nextprime.c)
 add_executable(random_integer random_integer.c)
@@ -76,7 +73,7 @@ target_link_libraries(random_integer ${gmp_libname})
 target_link_libraries(antebuffer pthread)
 
 install(TARGETS gmp_prob_prime random_integer RUNTIME DESTINATION ${BINSUFFIX}/utils)
-install(TARGETS cut_n_roots roots gmp_nextprime antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)
+install(TARGETS cut_n_roots gmp_nextprime antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 
