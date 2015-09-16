@@ -70,7 +70,7 @@ target_link_libraries(random_integer ${gmp_libname})
 target_link_libraries(antebuffer pthread)
 
 install(TARGETS gmp_prob_prime random_integer RUNTIME DESTINATION ${BINSUFFIX}/utils)
-install(TARGETS cut_n_roots gmp_nextprime antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)
+install(TARGETS gmp_nextprime antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 
