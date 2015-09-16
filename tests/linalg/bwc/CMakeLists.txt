@@ -273,7 +273,7 @@ if (HAVE_MPI)
         ${PROJECT_BINARY_DIR}/linalg/bwc/bwc.pl
         NO_DEFAULT_RUN TEST_DEPENDENCIES test_hello)
     macro(test_hello_mpi code)
-        cado_divert_test(${test_hello_mpi} ${code} ARGUMENTS
+        cado_divert_test(test_hello_mpi ${code} ARGUMENTS
             :mpirun ${ARGN}
             -- ${CMAKE_CURRENT_BINARY_DIR}/test_hello -v ${ARGN}
             TEST_DEPENDENCIES test_hello)
