@@ -5,8 +5,7 @@ load alpha.sage
 # Bf = 1e7; Bg = 5e6; area = 1e16 are the default values used by pol51opt.c
 # Bf = 1e11; Bg = 1e11; area = 1e18 # values used for RSA-768
 # area is the sieve area, about 2^(2*I-1)*q
-def MurphyE(f,g,s,Bf=1e7,Bg=5e6,area=1e16):
-    K = 1000
+def MurphyE(f,g,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000):
     df = f.degree()
     dg = g.degree()
     alpha_f = alpha(f,2000)
