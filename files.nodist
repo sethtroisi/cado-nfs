@@ -57,7 +57,6 @@ polyselect/sopt.c
 polyselect/twoquadratics.c
 polyselect/twocubics.c
 polyselect/twocubics.h
-polyselect/play.c
 polyselect/rotation_bound.sage
 polyselect/E.sage
 polyselect/MurphyE.sage
