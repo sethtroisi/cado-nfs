@@ -16,7 +16,6 @@ linalg/bwc/convert_magma.pl
 filter/merge_mpi.c
 filter/merge_mpi.h
 scripts/nightly-test
-scripts/coverage-nightly.sh
 scripts/polsel_effort
 scripts/plot_params.sh
 scripts/plot_sieve_region.py
@@ -96,8 +95,6 @@ params/c95.poly
 params/c100.poly
 params/c105.poly
 params/c110.poly
-scripts/check_all_gcc.sh
-scripts/gcc-script.sh
 scripts/polsel_params.sage
 linalg/bwc/bcast-file.c
 misc/README

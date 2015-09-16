@@ -837,7 +837,6 @@ ffs/version.sh
 ffs/Makefile.local.example
 tests/CMakeLists.txt
 tests/utils/CMakeLists.txt
-scripts/coverage-unit-tests.sh
 tests/utils/OpenPegasusNOTICE.txt
 tests/utils/test_rootfinder.c
 tests/utils/test_strlcat.c
