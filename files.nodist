@@ -104,7 +104,6 @@ misc/convert_rels.c
 misc/phi.c
 misc/psi.c
 misc/cacheline.c
-misc/get_valid_lines.c
 misc/CMakeLists-nodist.txt
 misc/descent-init.c
 filter/out-of-core/Makefile
