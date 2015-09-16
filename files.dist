@@ -125,9 +125,6 @@ linalg/bwc/bwc-trace.sh
 linalg/bwc/bwc-trace.m
 linalg/bwc/bwc.pl
 linalg/bwc/bwc_config_h.in
-linalg/bwc/checks.list
-linalg/bwc/checks.list.light
-linalg/bwc/checks.sh
 linalg/bwc/cleanup.c
 linalg/bwc/dispatch.c
 linalg/bwc/do-one-test.sh

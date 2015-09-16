@@ -15,7 +15,7 @@ set (sources
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
-endif (NOT MINGW)
+endif()
 
 set (sources_io
         filter_io.cpp
