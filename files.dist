@@ -127,7 +127,6 @@ linalg/bwc/bwc.pl
 linalg/bwc/bwc_config_h.in
 linalg/bwc/cleanup.c
 linalg/bwc/dispatch.c
-linalg/bwc/do-one-test.sh
 linalg/bwc/filenames.h
 linalg/bwc/gather.c
 linalg/bwc/intersections.c
