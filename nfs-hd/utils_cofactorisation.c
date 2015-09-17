@@ -483,8 +483,8 @@ static unsigned int find_indices(unsigned int ** L,
   return size;
 }
 
-static unsigned int find_indices_main(unsigned int ** L, uint64_array_t * indices,
-    uint64_t * index, unsigned int V, int main)
+static unsigned int find_indices_main(unsigned int ** L,
+    uint64_array_t * indices, uint64_t * index, unsigned int V, int main)
 {
   ASSERT(main >= 0);
 
@@ -525,7 +525,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
     sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indices,
     facul_aux_data *data)
 {
-  unsigned int * L;
+  unsigned int * L = (unsigned int *) malloc(V * sizeof(unsigned int));
   unsigned int size = 0;
   if (main == -1) {
     size = find_indices(&L, indices, index, V, max_indices);
