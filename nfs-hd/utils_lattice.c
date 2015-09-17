@@ -1276,13 +1276,14 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
             * s_change = 1;
           }
         }
+        int64_vector_clear(v_tmp);
         hit = 1;
+        return hit;
       }
     }
   }
 
   int64_vector_clear(v_tmp);
-
   return hit;
 }
 
