@@ -378,7 +378,7 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
     /* The higher, the more margin in computing the sieving bound
        w, u and v, hence the larger the sieving bound, and hence
        larger individual sublattices. */
-    bound->bound_lognorm = bound->init_lognorm * BOUND_LOGNORM_RATIO;
+    bound->bound_lognorm = bound->init_lognorm + BOUND_LOGNORM_INCR_MAX;
   }
 }
 
