@@ -33,14 +33,7 @@
 #define FLAG_ROWPERM    2
 #define FLAG_PADDING    4       /* pad to largest dimension */
 #define FLAG_REPLICATE  8       /* only balancing in one dimension */
-#define FLAG_SHUFFLED_MUL  16   /* corresponds to using shuffled product */
-
-/* Shuffled (a.k.a. reordered) product is when matmul_top code dispatches data
- * with allgather + reduce-scatter instead of bcast + reduce, for a gain in
- * efficiency. This amounts to considering the matrix Sr*M*Sc^-1*P (for left
- * multiplication) instead of Sr*M*Sc^-1. Therefore the same permutation pair
- * cannot be used compatibly in the shuffled and non-shuffled case.
- */
+                                /* NOTE: requires PADDING, too */
 
 struct balancing_header_s {
     // FIXME: add a magic number here ? This header is read directly in
@@ -64,6 +57,9 @@ struct balancing_header_s {
     // matrix M*S, for some permutation S. As long as we are concerned
     // with left nullspace, this does not make any difference, but it
     // does for right nullspace !
+    /* Note: pshuf and pshuf_inv have to do with what is called
+     * "shuffled-product" elsewhere (and has actually become the default)
+     */
     uint32_t pshuf[2];
     uint32_t pshuf_inv[2];
 };

@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <errno.h>
 
 #include "balancing.h"
@@ -10,20 +13,12 @@
 
 void balancing_set_row_col_count(balancing_ptr bal)
 {
-    bal->trows = bal->h->nrows;
-    bal->tcols = bal->h->ncols;
-    if (bal->h->flags & FLAG_PADDING) {
-        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
-    } else {
-        ASSERT_ALWAYS(0);       // read me:
-        // The constraint on equal-sized blocks must be changed in this
-        // case. If we don't insist on having a square matrix, it's
-        // probably because we're in the situation of block lanczos, with
-        // row blocks only ever matching with other row blocks.
-    }
     unsigned int s = bal->h->nh * bal->h->nv;
-    bal->trows = s * iceildiv(bal->trows, s);
-    bal->tcols = s * iceildiv(bal->tcols, s);
+    bal->trows = s * iceildiv(bal->h->nrows, s);
+    bal->tcols = s * iceildiv(bal->h->ncols, s);
+    if (bal->h->flags & FLAG_PADDING) {
+        bal->tcols = bal->trows = MAX(bal->trows, bal->tcols);
+    }
 }
 
 void balancing_finalize(balancing_ptr bal)
@@ -44,11 +39,6 @@ void balancing_finalize(balancing_ptr bal)
         // a trick to identify conjugated perms.
         bal->h->checksum &= ~0xff;
     }
-    /* with FLAG_SHUFFLED_MUL, matmul considers a matrix of the form P*M
-     * instead of M itself, we have to indicate this in the checksum.
-     */
-    bal->h->checksum &= ~0x1;
-    bal->h->checksum |= (bal->h->flags & FLAG_SHUFFLED_MUL) ? 0x1 : 0x0;
 }
 
 void balancing_write_inner(balancing_ptr bal, const char * filename)
@@ -84,7 +74,19 @@ void balancing_write_inner(balancing_ptr bal, const char * filename)
 
 void balancing_write(balancing_ptr bal, const char * mfile, const char * suggest)
 {
-    if (suggest && strlen(suggest) && suggest[strlen(suggest)-1] != '/') {
+    /* the semantics of -out for this program are farily weird. If it's
+     * a file, then we'll use that as an output name (this is the call to
+     * balancing_write_inner() early on below). If it's a
+     * directory, we'll place the balancing file named the standard way
+     * there, as done by the asprintf naming later on.
+     */
+    int suggestion_is_directory = 0;
+    if (suggest && strlen(suggest)) {
+        struct stat sb[1];
+        suggestion_is_directory = (stat(suggest, sb) == 0 && S_ISDIR(sb->st_mode));
+    }
+
+    if (suggest && strlen(suggest) && !suggestion_is_directory) {
         balancing_write_inner(bal, suggest);
     }
 
@@ -97,20 +99,17 @@ void balancing_write(balancing_ptr bal, const char * mfile, const char * suggest
         }
     }
 
-    /* If we've been suggested an output directory, use it ! */
-    const char * q = dup_prefix; 
-    const char * d = "";
-    if (suggest && strlen(suggest)) {
-        d=suggest;
-        char * last_slash = strrchr(q, '/');
-        if (last_slash) {
-            q = last_slash + 1;
-        }
-    }
     char * filename;
-    int rc = asprintf(&filename, "%s%s.%dx%d.%08" PRIx32 ".bin",
-            d,q, bal->h->nh, bal->h->nv, bal->h->checksum);
-
+    int rc;
+    if (suggestion_is_directory) {
+        char * q = strrchr(dup_prefix, '/');
+        if (q) { q++; } else { q = dup_prefix; }
+        rc = asprintf(&filename, "%s/%s.%dx%d.%08" PRIx32 ".bin",
+                suggest, q, bal->h->nh, bal->h->nv, bal->h->checksum);
+    } else {
+        rc = asprintf(&filename, "%s.%dx%d.%08" PRIx32 ".bin",
+                dup_prefix, bal->h->nh, bal->h->nv, bal->h->checksum);
+    }
     ASSERT_ALWAYS(rc >= 0);
     free(dup_prefix);
     balancing_write_inner(bal, filename);

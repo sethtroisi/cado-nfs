@@ -996,7 +996,6 @@ class BWC(Program):
                  hosts: ParameterEq()=None,
                  hostfile: ParameterEq()=None,
                  interleaving: ParameterEq()=None,
-                 shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
                  mm_impl: ParameterEq()=None,
                  cpubinding: ParameterEq()=None,

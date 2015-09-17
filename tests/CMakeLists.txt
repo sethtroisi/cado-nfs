@@ -110,11 +110,14 @@ macro(cado_define_test)
     # ARGUMENTS defines which arguments are to be passed to the binary.
     # Optional.
     #
-    # NO_DEFAULT_RUN (incompatible with ARGUMENTS) indicates that no test
-    # is really defined, only a baseline for further calls to
-    # cado_divert_test. (note that despite the fact that no test is
-    # created in cmake's mind, we do need a test name for further
-    # reference in cado_divert_test).
+    # NO_DEFAULT_RUN indicates that no test is really defined, only a
+    # baseline for further calls to cado_divert_test. (note that despite
+    # the fact that no test is created in cmake's mind, we do need a test
+    # name for further reference in cado_divert_test).
+    #
+    # Giving ARGUMENTS together with NO_DEFAULT_RUN just specifies a
+    # common set of arguments to be passed to all diversions, provided
+    # these are defined with APPEND_ARGUMENTS
     set(IMPLICIT)
     set(TEST_DEPENDENCIES)
     set(TARGET_DEPENDENCIES)
@@ -237,11 +240,6 @@ macro(cado_define_test)
     if(nNO_DEFAULT_RUN GREATER 1)
         message(FATAL_ERROR "discarded arguments after NO_DEFAULT_RUN for test ${TEST_NAME}")
         set(NO_DEFAULT_RUN 1)
-    elseif(nNO_DEFAULT_RUN GREATER 0)
-        list(LENGTH ARGUMENTS nARGUMENTS)
-        if (nARGUMENTS GREATER 0)
-            message(FATAL_ERROR "NO_DEFAULT_RUN and ARGUMENTS are incomaptible for test ${TEST_NAME}")
-        endif()
     endif()
 
     # If we have a binary to build, then the meaning of
@@ -297,6 +295,10 @@ macro(cado_define_test)
             string_join(all_deps ";" ${deps})
             set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
         endif()
+    else()
+        # just in case we defined default arguments.
+        list(LENGTH ARGUMENTS nARGUMENTS)
+        set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
     endif()
 endmacro()
 

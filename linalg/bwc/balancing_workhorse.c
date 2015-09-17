@@ -1245,18 +1245,18 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
     int rem_r = m->bal->trows % m->bal->h->nh;
     ASSERT_ALWAYS(rem_r == 0); // now it's easier
     /*
-    uint32_t quo_c = m->bal->tcols / m->bal->h->nv;
-    int rem_c = m->bal->tcols % m->bal->h->nv;
-    */
+     * uint32_t quo_c = m->bal->tcols / m->bal->h->nv;
+     * int rem_c = m->bal->tcols % m->bal->h->nv;
+     */
 
     m->pi = pi;
 
     /*
-    m->row_cellbase = quo_r;
-    m->col_cellbase = quo_c;
-    m->row_block0 = (quo_r + 1) * rem_r;
-    m->col_block0 = (quo_c + 1) * rem_c;
-    */
+     * m->row_cellbase = quo_r;
+     * m->col_cellbase = quo_c;
+     * m->row_block0 = (quo_r + 1) * rem_r;
+     * m->col_block0 = (quo_c + 1) * rem_c;
+     */
 
     /* these two fields are in fact used only for debugging */
     m->sent_rows = malloc(pi->m->totalsize * sizeof(uint32_t));
@@ -1270,73 +1270,75 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
         }
     }
 
-    uint32_t * xc = m->bal->colperm;
-    uint32_t * xr = m->bal->rowperm;
-    if (!(m->bal->h->flags & FLAG_REPLICATE)) {
-        ASSERT_ALWAYS(m->bal->h->flags & FLAG_COLPERM);
-        ASSERT_ALWAYS(m->bal->h->flags & FLAG_ROWPERM);
-    } else {
+    if (m->bal->h->flags & FLAG_REPLICATE) {
+        uint32_t * xc = m->bal->colperm;
+        uint32_t * xr = m->bal->rowperm;
+        ASSERT_ALWAYS(m->bal->h->flags & FLAG_PADDING);
+        ASSERT_ALWAYS(m->bal->tcols == m->bal->trows);
+        /* currently we seem to be supporting this only in case the
+         * column permutation is authoritative. */
+        ASSERT_ALWAYS(xc);
+        ASSERT_ALWAYS(!xr);
         if (!xc) xc = xr;
         if (!xr) xr = xc;
-    }
-    ASSERT_ALWAYS(xc);
-    ASSERT_ALWAYS(xr);
+        m->fw_colperm = malloc(m->bal->tcols * sizeof(uint32_t));
+        memset(m->fw_colperm, -1, m->bal->tcols * sizeof(uint32_t));
+        for (uint32_t i = 0; i < m->bal->tcols; i++) {
+            ASSERT_ALWAYS(xc[i] < m->bal->tcols);
+            ASSERT_ALWAYS(m->fw_colperm[xc[i]] == UINT32_MAX);
+            m->fw_colperm[xc[i]] = i;
+        }
+        /* In this case we arrange so that the replicated permutation is so
+         * that eventually, we are still computing iterates of a matrix
+         * which is conjugate to the one we're interested in */
 
-    if (m->bal->h->flags & FLAG_REPLICATE) {
-        if (m->bal->h->flags & FLAG_SHUFFLED_MUL) {
-            m->fw_colperm = malloc(m->bal->tcols * sizeof(uint32_t));
-            memset(m->fw_colperm, -1, m->bal->tcols * sizeof(uint32_t));
-            for (uint32_t i = 0; i < m->bal->trows; i++) {
-                ASSERT(m->fw_colperm[xc[i]] == UINT32_MAX);
-                m->fw_colperm[xc[i]] = i;
-            }
-            /* In this case we arrange so that the replicated permutation is so
-             * that eventually, we are still computing iterates of a matrix
-             * which is conjugate to the one we're interested in */
-            m->fw_rowperm = malloc(m->bal->trows * sizeof(uint32_t));
-            memset(m->fw_rowperm, -1, m->bal->trows * sizeof(uint32_t));
-            uint32_t nh = m->bal->h->nh;
-            uint32_t nv = m->bal->h->nv;
-            ASSERT_ALWAYS(m->bal->trows % (nh * nv) == 0);
-            uint32_t elem = m->bal->trows / (nh * nv);
-            uint32_t ix = 0;
-            uint32_t iy = 0;
-            for(uint32_t i = 0 ; i < nh ; i++) {
-                for(uint32_t j = 0 ; j < nv ; j++) {
-                    ix = (i * nv + j) * elem;
-                    iy = (j * nh + i) * elem;
-                    for(uint32_t k = 0 ; k < elem ; k++) {
-                        ASSERT(m->fw_rowperm[xr[iy+k]] == UINT32_MAX);
-                        m->fw_rowperm[xr[iy+k]] = ix+k;
-                    }
+        m->fw_rowperm = malloc(m->bal->trows * sizeof(uint32_t));
+        memset(m->fw_rowperm, -1, m->bal->trows * sizeof(uint32_t));
+        uint32_t nh = m->bal->h->nh;
+        uint32_t nv = m->bal->h->nv;
+        ASSERT_ALWAYS(m->bal->trows % (nh * nv) == 0);
+        uint32_t elem = m->bal->trows / (nh * nv);
+        uint32_t ix = 0;
+        uint32_t iy = 0;
+        for(uint32_t i = 0 ; i < nh ; i++) {
+            for(uint32_t j = 0 ; j < nv ; j++) {
+                ix = (i * nv + j) * elem;
+                iy = (j * nh + i) * elem;
+                for(uint32_t k = 0 ; k < elem ; k++) {
+                    ASSERT(m->fw_rowperm[xr[iy+k]] == UINT32_MAX);
+                    m->fw_rowperm[xr[iy+k]] = ix+k;
                 }
-            }
-        } else {
-            uint32_t maxdim = MAX(m->bal->trows, m->bal->tcols);
-            m->fw_rowperm = m->fw_colperm = malloc(maxdim * sizeof(uint32_t));
-            memset(m->fw_rowperm, -1, maxdim * sizeof(uint32_t));
-            for (uint32_t i = 0; i < maxdim; i++) {
-                uint32_t j = xc[i];
-                ASSERT(m->fw_colperm[j] == UINT32_MAX);
-                m->fw_colperm[j] = i;
             }
         }
     } else {
-	ASSERT_ALWAYS(m->bal->h->flags & FLAG_COLPERM);
-	m->fw_colperm = malloc(m->bal->tcols * sizeof(uint32_t));
-	memset(m->fw_colperm, -1, m->bal->tcols * sizeof(uint32_t));
-	for (uint32_t i = 0; i < m->bal->trows; i++) {
-	    ASSERT(m->fw_colperm[xc[i]] == UINT32_MAX);
-	    m->fw_colperm[xc[i]] = i;
-	}
+        /* In this case, because the row and column permutations depend
+         * on the splitting, if we happen to be in block Wiedemann
+         * context, and compute iterates of the form M^i, then we will
+         * compute something which depends on the splitting. There is no
+         * way we can reconcile what we're doing in a consistent way.
+         * Therefore we don't bother trying to undo the effect of the
+         * shuffled product.
+         */
 
-	ASSERT_ALWAYS(m->bal->h->flags & FLAG_ROWPERM);
-	m->fw_rowperm = malloc(m->bal->trows * sizeof(uint32_t));
-	memset(m->fw_rowperm, -1, m->bal->trows * sizeof(uint32_t));
-	for (uint32_t i = 0; i < m->bal->tcols; i++) {
-	    ASSERT(m->fw_rowperm[xr[i]] == UINT32_MAX);
-	    m->fw_rowperm[xr[i]] = i;
-	}
+        uint32_t * xc = m->bal->colperm;
+        m->fw_colperm = malloc(m->bal->tcols * sizeof(uint32_t));
+        memset(m->fw_colperm, -1, m->bal->tcols * sizeof(uint32_t));
+        for (uint32_t i = 0; i < m->bal->tcols; i++) {
+            uint32_t j = xc ? xc[i] : i;
+            ASSERT_ALWAYS(j < m->bal->tcols);
+            ASSERT_ALWAYS(m->fw_colperm[j] == UINT32_MAX);
+            m->fw_colperm[j] = i;
+        }
+
+        uint32_t * xr = m->bal->rowperm;
+        m->fw_rowperm = malloc(m->bal->trows * sizeof(uint32_t));
+        memset(m->fw_rowperm, -1, m->bal->trows * sizeof(uint32_t));
+        for (uint32_t i = 0; i < m->bal->trows; i++) {
+            uint32_t j = xr ? xr[i] : i;
+            ASSERT_ALWAYS(j < m->bal->trows);
+            ASSERT(m->fw_rowperm[j] == UINT32_MAX);
+            m->fw_rowperm[j] = i;
+        }
     }
 
     /* one more check. The cost is tiny compared to what we do in other
@@ -1374,14 +1376,8 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
 void clear_master_variables(master_data m)/*{{{*/
 {
     free(m->colmap);
-    if (m->bal->h->flags & FLAG_REPLICATE) {
-        if (m->bal->h->flags & FLAG_SHUFFLED_MUL)
-            free(m->fw_colperm);
-	free(m->fw_rowperm);
-    } else {
-	free(m->fw_rowperm);
-	free(m->fw_colperm);
-    }
+    free(m->fw_colperm);
+    free(m->fw_rowperm);
     m->fw_rowperm = m->fw_colperm = NULL;
     free(m->sent_rows); m->sent_rows = NULL;
     free(m->exp_rows); m->exp_rows = NULL;

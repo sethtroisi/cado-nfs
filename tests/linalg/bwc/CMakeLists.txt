@@ -177,9 +177,6 @@ add_bwc_test(mod2-rolling bwc-trace.sh random_matrix_size=2000
     seed=1 thr=2x2 stop_at_step=lingen)
 add_dependencies(test-bwc-mod2-rolling_dependencies mf_scan)
 
-add_bwc_test(mod2-noshuffle bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 shuffle=0)
-add_dependencies(test-bwc-mod2-noshuffle_dependencies mf_scan)
-
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 m=128 n=128 seed=1 thr=3)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
@@ -228,15 +225,46 @@ test_dispatch_matmul(dispatch-matmul-65536-mpi nrows=65536 density=2 mpi=2x2)
 endif()
 endif()
 
+if (WITH_MPI)
+add_definitions(-DWITH_MPI)
+endif()
+
+cado_define_test(test_hello.c NO_DEFAULT_RUN LIBRARIES bwc_base)
+set_target_properties(test_hello PROPERTIES
+            LINKER_LANGUAGE CXX
+            COMPILE_FLAGS "--mpi"
+            LINK_FLAGS "--mpi")
+
+add_executable(spmv_test spmv_test.c)
+set_target_properties(spmv_test PROPERTIES
+            LINKER_LANGUAGE CXX
+            COMPILE_FLAGS "--mpi"
+            LINK_FLAGS "--mpi")
+target_link_libraries(spmv_test bwc_base)
+
+add_executable(short_matmul short_matmul.c)
+target_link_libraries(short_matmul bwc_base)
 
 cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
-    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    ARGUMENTS
+    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}
+    NO_DEFAULT_RUN
     TARGET_DEPENDENCIES
-    random_matrix spmv_test short_matmul mf_scan)
+    random_matrix spmv_test short_matmul mf_scan mf_bal bwc_matmul)
 
+cado_divert_test(test-spmv 11 APPEND_ARGUMENTS thr=1x1)
+cado_divert_test(test-spmv 12 APPEND_ARGUMENTS thr=1x2)
+cado_divert_test(test-spmv 32 APPEND_ARGUMENTS thr=3x2)
+cado_divert_test(test-spmv 23 APPEND_ARGUMENTS thr=2x3)
+if(HAVE_MPI)
+cado_divert_test(test-spmv 2122 APPEND_ARGUMENTS mpi=2x1 thr=2x2)
+cado_divert_test(test-spmv 1322 APPEND_ARGUMENTS mpi=1x3 thr=2x2)
+cado_divert_test(test-spmv 3222 APPEND_ARGUMENTS mpi=3x2 thr=2x2)
+endif()
 
 cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-matcache.sh
-    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    --matrix-size 1000 --density 10 --bindir
+    ${CADO_NFS_BINARY_DIR}/linalg/bwc
     TARGET_DEPENDENCIES
     random_matrix build_matcache bench_matcache)
 
@@ -251,15 +279,6 @@ cado_define_test(TEST_NAME bwc_staged_krylov PROGRAM
 
 # Tests which use bwc_base will need nwc_config.h
 include_directories(${PROJECT_BINARY_DIR}/linalg/bwc)
-
-if (WITH_MPI)
-add_definitions(-DWITH_MPI)
-endif()
-
-cado_define_test(test_hello.c NO_DEFAULT_RUN LIBRARIES bwc_base)
-set_target_properties(test_hello PROPERTIES
-    COMPILE_FLAGS "--mpi"
-    LINK_FLAGS "--mpi")
 
 cado_divert_test(test_hello 11 ARGUMENTS -v thr=1x1)
 cado_divert_test(test_hello 12 ARGUMENTS -v thr=1x2)
@@ -283,4 +302,9 @@ if (HAVE_MPI)
     test_hello_mpi(3222 mpi=3x2 thr=2x2)
 endif()
 
-cado_define_test(test_bl_extraction.c LIBRARIES bwc_base)
+cado_define_test(test_bl_extraction.c LIBRARIES bwc_base bitlinalg)
+set_target_properties(test_bl_extraction PROPERTIES
+                LINKER_LANGUAGE CXX
+                COMPILE_FLAGS "--mpi"
+                LINK_FLAGS "--mpi")
+

@@ -131,11 +131,13 @@ void matrix_read_pass(
             expand(cw_out, exp_nc - cskip);
             drop_cw_p=1;
         }
-        // we don't even set cw_out->size. There's a reason for this.
-        // When reading from binary data, we can't compute cw precisely
-        // anyway. So better not rely on something which is specific to
-        // the ascii case.
-        // cw_out->size = exp_nc;
+        // NOTE: here we have the chance to know the number of columns we
+        // expect. So we'll be able to write the cw file with the proper
+        // number of columns. On the contrary, when reading from binary
+        // data, we can't compute cw precisely. Therefore, and I admit
+        // it's quite odd, we have a behaviour which diverges depending
+        // on whether we're ascii or not.
+        cw_out->size = exp_nc;
     } else {
         if (cw_out && cw_out->p == NULL)  {
             expand(cw_out, 1000 * 1000);

@@ -291,10 +291,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 ASSERT_ALWAYS(rc >= 0);
 
                 pi_file_handle f;
-                rc = pi_file_open(f, pi, bw->dir, tmp, "rb", A->vec_elt_stride(A, unpadded));
+                rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0));
+                ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
@@ -310,10 +310,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 int rc = asprintf(&tmp, R_FILE_BASE_PATTERN ".0", sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
                 pi_file_handle f;
-                rc = pi_file_open(f, pi, bw->dir, tmp, "wb", A->vec_elt_stride(A, unpadded));
+                rc = pi_file_open(f, pi, bw->dir, tmp, "wb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_write(f, tvec->v, A->vec_elt_stride(A, ii1 - ii0));
+                ssize_t s = pi_file_write(f, tvec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
@@ -336,10 +336,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 printf("loading %s\n", tmp);
             }
             pi_file_handle f;
-            rc = pi_file_open(f, pi, bw->dir, tmp, "rb", A->vec_elt_stride(A, unpadded));
+            rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
             if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
             ASSERT_ALWAYS(rc);
-            ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0));
+            ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
             ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
             pi_file_close(f);
             free(tmp);
@@ -348,7 +348,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
 
         /* allgather, really */
-        allreduce_across(mmt, bw->dir);
+        allreduce_across(mmt, NULL, bw->dir);
 
         /* This is a noop if bw->dir == 0 */
         matmul_top_unapply_T(mmt, bw->dir);

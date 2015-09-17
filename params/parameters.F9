@@ -68,7 +68,6 @@ tasks.linalg.verbose = 0
 tasks.linalg.nchar = 64
 tasks.linalg.interval = 1000
 tasks.linalg.interleaving = 0
-tasks.linalg.shuffled_product = 1
 tasks.linalg.bwc.threads = 2x2
 
 tasks.characters.threads = 2

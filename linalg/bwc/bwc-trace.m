@@ -91,6 +91,8 @@ if Mt eq P*S*Mx*Q*S^-1 then
     print "Shuffled product detected";
 elif  Mt eq S*Mx*Q*S^-1 then
     print "non-shuffled product detected";
+    assert false;
+    // this has been deprecated.
     Pr:=Identity(Parent(Pr));
 else
     assert false;

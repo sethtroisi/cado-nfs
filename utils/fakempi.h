@@ -25,9 +25,10 @@ typedef int MPI_Request;
 #define MPI_INT                 (0x0200 | sizeof(int))
 #define MPI_DOUBLE              (0x0300 | sizeof(double))
 #define MPI_UNSIGNED_LONG       (0x0400 | sizeof(unsigned long))
-#define MPI_LONG                (0x0500 | sizeof(long))
+#define MPI_UNSIGNED_LONG_LONG       (0x0500 | sizeof(unsigned long long))
+#define MPI_LONG                (0x0600 | sizeof(long))
 /* It seems that MPI_UNSIGNED_INT is in fact unspecified */
-#define MPI_UNSIGNED            (0x0600 | sizeof(unsigned int))
+#define MPI_UNSIGNED            (0x0700 | sizeof(unsigned int))
 
 #define fakempi_sizeof_type(x) ((x) & 0xff)
 

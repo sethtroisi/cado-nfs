@@ -1034,15 +1034,21 @@ static struct pi_datatype_s pi_predefined_types[] = {
     { MPI_BYTE,	                NULL, 1 },
     { MPI_UNSIGNED,	        NULL, sizeof(unsigned) },
     { MPI_UNSIGNED_LONG,	NULL, sizeof(unsigned long) },
+    { MPI_UNSIGNED_LONG_LONG,	NULL, sizeof(unsigned long long) },
     { MPI_LONG,	                NULL, sizeof(long) },
 };
 
+/* TODO: mpi-3.0 introduced (at last) MPI_UINT64_T and friends. There are
+ * several places where this can come in handy. So once we set our mind
+ * on requiring mpi-3.0, we can do some simplifications here and there.
+ */
 pi_datatype_ptr BWC_PI_INT              = pi_predefined_types + 0;
 pi_datatype_ptr BWC_PI_DOUBLE           = pi_predefined_types + 1;
 pi_datatype_ptr BWC_PI_BYTE             = pi_predefined_types + 2;
 pi_datatype_ptr BWC_PI_UNSIGNED         = pi_predefined_types + 3;
 pi_datatype_ptr BWC_PI_UNSIGNED_LONG    = pi_predefined_types + 4;
-pi_datatype_ptr BWC_PI_LONG             = pi_predefined_types + 5;
+pi_datatype_ptr BWC_PI_UNSIGNED_LONG_LONG    = pi_predefined_types + 5;
+pi_datatype_ptr BWC_PI_LONG             = pi_predefined_types + 6;
 
 
 struct pi_op_s BWC_PI_MIN[1]	= { { .stock = MPI_MIN, } };
@@ -1593,13 +1599,12 @@ void pi_hello(parallelizing_info_ptr pi)
  * In multithreaded context, f must represent a different data area on
  * all threads.
  */
-int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode, size_t totalsize)
+int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode)
 {
     memset(f, 0, sizeof(pi_file_handle));
     f->pi = pi;
     f->inner = inner;
     f->outer = !inner;
-    f->totalsize = totalsize;
     f->f = NULL;
     f->name = strdup(name);
     f->mode = strdup(mode);
@@ -1633,7 +1638,7 @@ int area_is_zero(const void * src, ptrdiff_t offset0, ptrdiff_t offset1)
     return 1;
 }
 
-ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size)
+ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize)
 {
     ASSERT_ALWAYS(size <= ULONG_MAX);
 
@@ -1685,7 +1690,7 @@ ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size)
                                     MPI_STATUS_IGNORE);
                         }
                         if (!failed) {
-                            size_t wanna_write = MIN(size * nci, f->totalsize - res);
+                            size_t wanna_write = MIN(size * nci, totalsize - res);
                             if (wanna_write < size * nci) {
                                 ASSERT_ALWAYS(area_is_zero(sbuf, wanna_write, size * nci));
                             }
@@ -1709,7 +1714,7 @@ ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size)
     return res;
 }
 
-ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size)
+ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize)
 {
     ASSERT_ALWAYS(size <= ULONG_MAX);
 
@@ -1748,7 +1753,7 @@ ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size)
                         /* leader node to read then send data */
                         memset(sbuf, 0, nci * size);
                         if (!failed) {
-                            size_t wanna_read = MIN(size * nci, f->totalsize - res);
+                            size_t wanna_read = MIN(size * nci, totalsize - res);
                             ssize_t x = fread(sbuf, 1, wanna_read, f->f);
                             res += x;
                             if (x < (ssize_t) wanna_read) {

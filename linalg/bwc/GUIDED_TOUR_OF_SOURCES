@@ -3,6 +3,8 @@ The pi_go() function
 
 This is the main workhorse for the parallelizing of the computation. It
 allows multi-thread (with pthread) and multinode (with MPI) processing.
+Some of the calls offered with the parallelizing_info structure are
+reminiscent of the MPI calling interface.
 
 The parameters given to pi_go() are:
    . an outer description of how many mpi jobs and threads should be set up.
@@ -44,29 +46,47 @@ serialize() entails MPI calls which do not handle concurrency well.
 The "abase" mechanism
 ---------------------
 
-## THIS IS PARTLY OBSOLETE. THE GENERAL IDEA STILL HOLDS, BUT THE
-## TOPLEVEL CODE NOW EMPLOYS AN ADDITIONAL INDIRECTION LAYER.
-
 The matrix stuff is kind-of generic w.r.t the type of objects inside the
 matrix. The "abase" mechanism provides this genericity -- don't expect a
 clean ring structure, beautifully following the mathematical notions.
+This layer is built from the mpfq library, together with a table of
+indirect functions serving as wrappers.
 
-The main idea is to use a block of bits as a main type that corresponds
-to the machine word-size, typically uint64_t on a 64 bit computer.
+Thanks to the abase layer, the same code may be used both in
+characteristic two and in characteristic p, only with minor changes.
 
-Two main types:
-  abobj               // the parent structure (may be NULL)
-  abt                   // an element
+The abase layer is accessed in different ways depending on whether we're
+looking at a higher level or lower level part of the code.
 
-Each instance of the abase mechanism is a pair abase-xxx.[ch] . This may
-describe elements whose sizes are known at compile-time (uint64_t), or
-block of them, of width possibly known only at running-time.
+For the higher level code (typically, matmul_top.c, krylov.c, etc), we
+have some object-oriented access. Everything goes through the
+mpfq_vbase_ptr type, which is the type of the parent structure, holding
+all the required function pointers.  The elements are cast to void*
+pointers, will all the accompanying infelicities. The cod compiled in
+this way is independent of the actual implementation of the underlying
+arithmetic.
+
+For lower level code (typically, matmul-bucket.cpp), it's different. We
+have the two main types:
+    abdst_field - a descriptor of the field we're working with
+    abelt       - an element.
+
+Each instance of the abase mechanism is a set of files, as follows:
+    mpfq/mpfq_<something>.c
+    mpfq/mpfq_<something>.h
+    mpfq/mpfq_<something>_t.c
+    mpfq/mpfq_<something>_t.h
+This may describe elements whose sizes are known at compile-time
+(uint64_t), or blocks of them, of width possibly known only at
+running-time (this is the case for the mpfq_pz layer).
 
 The idea is to have genericity and variable width for boring stuff (like
 prep) that does not need maximal efficiency, and fixed sized- code for
 the main operations inside Krylov.
 
-See the header of abase-api.h for details on how to use this.
+See the example uses of the abase layer in either high level or low level
+code for details on how to use this. Functions are all following the mpfq
+api.
 
 Currently the following are implemented:
   abase-u64     // uint64_t
@@ -76,7 +96,7 @@ Currently the following are implemented:
 
 The main use of this type is for vectors to be multiplied by the binary
 matrix. We have for instance in matmul.[ch] a function called:
-  void matmul_mul(matmul_ptr M , abt * B , abt const * A , int d)
+  void matmul_mul(matmul_ptr M , void * B , void const * A , int d)
 that computes B = M . A  (or transpose if d=1), where A and B are vectors
 of "abase".
 
@@ -128,12 +148,34 @@ generated on first use, and saved on disk
 
 (documentation to be continued).
 
-Matrix - vector product -- high-level
--------------------------------------
+Matrix - vector product -- high-level (1)
+-----------------------------------------
 
-The files matmul_top.[ch] do the high-level stuff.
-Things are complicated by the fact that the same code can do right or
-left multiplications. A parameter, usally called "d" means:
+The matmul_top_data type is responsible of tying together the different
+threads and nodes, so as to work collectively on a matrix times vector
+product.
+
+The matmul_top_data object (generally abbreviated mmt) contains in
+particular
+ - on each thread/job, a pointer to the local share of the matrix.
+ - communicator info in all directions
+ - Two vector areas, a "left vector" and a "row vector". Those are quite
+   often, and admittedly disconcertingly, named "row vector" and "column
+   vector". In fact:
+    - the left vector has (both collectively and locally) as many entries
+      as the matrix has rows, and ditto for the right vector and columns.
+    - the left vector has the proper size to be used in a vector times
+      matrix product. The output of such a product goes to the right
+      vector.
+    - conversely, the right vector is fine for being the input to a
+      matrix times vector product, whose output would go to the left
+      vector.
+
+The left vector is mmt->wr[0]->v
+The right vector is mmt->wr[1]->v
+
+In matmul_top.[ch], the same code can do right or left multiplications. A
+parameter, usally called "d" means:
   d=0: vector times matrix, i.e. a vector is a row. Used for left
        nullspace computations (in factorization, for instance)
   d=1: matrix times vector, i.e. a vector is a column. Used for right
@@ -141,45 +183,82 @@ left multiplications. A parameter, usally called "d" means:
 Most of the comments in the source code takes the "d=1" point-of-view,
 even though "d=0" is probably the most extensively tested.
 This convention is visible also in the main bw_param structure. In the
-matmul_top.[ch], it also indicates where the source vector is.
+matmul_top.[ch], it also indicates where the source vector is. Such a
+point of view is also visible in the naming of variables, e.g. when we
+write:
+    mmt_comm_ptr mcol = mmt->wr[d];
+this does actually correspond to a column only when d==1.
+
 
 The main function is matmul_top_mul(), which decomposes in two steps:
   matmul_top_mul_cpu(), which does no communication
   matmul_top_mul_comm(), which does (almost) no computation
 
-Each thread has room for two pieces of vectors (src and dst). The vector
-number 1 is the source when doing nullspace=right (d=1), and the
-destination otherwise. [ in a sense, vector 0 is seen as a row,
-and vector 1 as a column; although this does not really make sense, we
-can see such a convention in the source as well ]
-
 In a Wiedemann setting, bw->dir (nullspace=... at the top-level) should
-be the same as the d-parameter passed to matmul_top_mul(). However, if a
-Lanczos implementation end-up being implemented, this will refer to
-separate notions.
+be the same as the d-parameter passed to matmul_top_mul().
+
+In a Lanczos setting, matmul_top_mul() is called in both directions.
 
 Apart from this d=[0|1] nightmare, the mul_cpu() just calls matmul_mul(),
 and put the result in the destination (partial) vector.  The tricky part
-is (of course) the mul_comm() part.
+is (of course) the mul_comm() part. A brief on vector layout first.
 
-The communication phase is split in two phases:
-  - reduce_accross()
+Vector layout
+-------------
+
+The matmul_top layer distributes vector data across jobs and threads, in
+such a way that prior to doing the local matrix product, each vector has
+all the required input data.
+
+Suppose an N*N matrix is split into a mesh of nh rows and nv columns, and
+suppose we're talking about a vector times matrix product.
+
+Each threads wants its share of size N/nh of the left vector. Note though
+that there are, in total, nv threads which want the same data set for
+input. Among these, we define each thread to be the "owner" of a fraction
+of size N/(nh*nv).
+
+
+We define several states of consistency for a vector:
+ - minimal: each thread has the data it owns correct.
+ - maximal: each thread has all input data it might need correct.
+
+
+Matrix - vector product -- high-level (1)
+-----------------------------------------
+
+The cpu-intensive step requires maximal consistency on the input side.
+Once the local multiplication is completed, we have no consistency on the
+output side, because the data must be reconciled.
+
+Two phases of communication are defined in order to reach maximal
+consistency again.
+  - reduce_across()
   - broadcast_down()
 It takes as input the result of the cpu step, which is in the
 "destination" vector, and does all the communications to reconstruct the
 vector for the next iteration (thus, stored again in the "source"
 vector).
 
-Here, another complication occurs: there is a flag called
-FLAG_SHUFFLED_MUL (that corresponds to the --shuffled-product option of
-mf_bal.c and bwc.pl). If it is set, then matmul_top_mul() will not
-compute exactly the expected w = M*v product but a shuffle of it. In
-other words, what is computed correspond to a matrix M' = P*M, where P is
-a permutation matrix. This reduces / simplifies the mul_comm() part, and
-if the goal is to find a kernel vector, knowing one for M' is
-equivalent to knowing one for M.
-In the following, we assume that we are indeed in the case where
-FLAG_SHUFFLED_MUL is activated.
+reduce_across is actually a slight misnomer. The real operation is a
+"reduce-scatter" operation, in MPI parlance. It adds all data, and sends
+each share of the resulting vector to its owner. Of course, it's really
+"across" only in case we're doing matrix times vector.
+
+likewise, broadcast_down is more accurately an MPI "all-gather"
+operation. Each thread sends the data it owns to all threads which are
+going to need it.
+
+Note that the vector layout which has been presented has the effect that
+if the matrix is in fact the identity, then matmul_top_mul() will not
+compute exactly the expected w = v * Id, but a shuffle of it, which
+involves some transposition of indices. In other words, what is computed
+correspond to a matrix M' = P*M, where P is a permutation matrix. This
+reduces / simplifies / accelerates the mul_comm() part, and if the goal
+is to find a kernel vector, knowing one for M' is equivalent to knowing
+one for M.
+
+
 
 *** Reduce_accross:
 

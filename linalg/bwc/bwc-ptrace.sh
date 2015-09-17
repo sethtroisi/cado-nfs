@@ -50,7 +50,6 @@ pass_bwcpl_args=("$@")
 wordsize=64
 # XXX note that $wdir is wiped out by this script !
 : ${wdir=/tmp/bwcp}
-: ${shuffle=1}
 
 # By default we don't enable magma. Just say magma=magma (or
 # magma=/path/to/magma) to get (very expensive) magma checks.
@@ -316,10 +315,6 @@ prepare_common_arguments
 
 if [ "$rhsfile" ] ; then
     common="$common rhs=$rhsfile"
-fi
-
-if [ "$shuffle" = 0 ] || ! [ "$shuffle" ] ; then
-    common="$common shuffled_product=0"
 fi
 
 for v in tolerate_failure stop_at_step keep_rolling_checkpoints checkpoint_precious skip_online_checks interleaving ; do

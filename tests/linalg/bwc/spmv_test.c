@@ -49,13 +49,8 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
-    mmt_comm_ptr mcol = mmt->wr[bw->dir];
-    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
-    // pi_comm_ptr picol = mmt->pi->wr[bw->dir];
-    // pi_comm_ptr pirow = mmt->pi->wr[!bw->dir];
-
-    A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
-    A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
+    mmt_vec_set_zero(mmt, NULL, 0);
+    mmt_vec_set_zero(mmt, NULL, 1);
 
     serialize(pi->m);
 
@@ -158,6 +153,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 #endif
     matmul_top_clear(mmt);
     pi_free_mpfq_datatype(pi, A_pi);
+    A->oo_field_clear(A);
 
     return NULL;
 }

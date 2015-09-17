@@ -834,7 +834,9 @@ void random_matrix_fill_fake_balancing_header(balancing_ptr bal, parallelizing_i
     bal->h->ncols = r->ncols;
     bal->h->ncoeffs = 0; /* FIXME ; what should I do ? */
     bal->h->checksum = 0;
-    bal->h->flags = FLAG_PADDING|FLAG_COLPERM|FLAG_SHUFFLED_MUL|FLAG_REPLICATE;
+    /* FIXME: put FLAG_PADDING here or not ? */
+    /* FIXME: put FLAG_REPLICATE here or not ? */
+    bal->h->flags = FLAG_COLPERM|FLAG_PADDING|FLAG_REPLICATE;
     bal->h->pshuf[0] = 1;
     bal->h->pshuf[1] = 0;
     bal->h->pshuf_inv[0] = 1;
@@ -1260,7 +1262,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 void usage()
 {
-    fprintf(stderr, "Usage: ./random <nrows> [<ncols>] [<density>] [options]\n"
+    fprintf(stderr, "Usage: ./random_matrix <nrows> [<ncols>] [<density>] [options]\n"
             "Options:\n"
             "\t-d <density> : desired density per row\n"
             "\t-s <seed> : seed\n"

@@ -97,9 +97,12 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
 
-
     /* XXX Here we're working in the opposite direction compared to
-     * prep/krylov/mksol ! */
+     * prep/krylov/mksol !
+     *
+     * Note however that this is slightly problematic for the untwisting
+     * operations.
+     */
     int flags[2];
     flags[!bw->dir] = THREAD_SHARED_VECTOR;
     flags[bw->dir] = 0;

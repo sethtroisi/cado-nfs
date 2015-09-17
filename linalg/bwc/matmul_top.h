@@ -13,9 +13,6 @@
 #include "misc.h"
 #include "mpfq/mpfq_vbase.h"
 
-/* Don't touch this. */
-#define CONJUGATED_PERMUTATIONS
-
 /* A communicator is the information concerning our matrix in one of its
  * two dimensions. Everything is made so that inverting the direction
  * flag should make it possible to compute with the transposed matrix
@@ -64,7 +61,7 @@
 struct mmt_vec_s {
     mpfq_vbase_ptr abase;
     pi_datatype_ptr pitype;
-    size_t stride;      // shorcut to this->abase->vec_elt_stride(this->abase,1)
+    // size_t stride;      // shorcut to this->abase->vec_elt_stride(this->abase,1)
     void * v;
     void * * all_v;
     // internal use
@@ -101,6 +98,16 @@ typedef struct mmt_comm_s mmt_comm[1];
 typedef struct mmt_comm_s * mmt_comm_ptr;
 typedef struct mmt_comm_s const * mmt_comm_srcptr;
 
+/* yikes. yet another list structure. Wish we had the STL. */
+struct permutation_data {
+    uint32_t n;
+    size_t alloc;
+    uint32_t (*x)[2];
+};
+typedef struct permutation_data permutation_data[1];
+typedef struct permutation_data * permutation_data_ptr;
+/* all methods are private */
+
 /* TODO: It's unhandy to have abase here, since it forces some files to
  * be abase-dependent, without any real reason.
  */
@@ -114,45 +121,42 @@ struct matmul_top_data_s {
     // the size of the matrix in the given direction. Meaning that n[0]
     // is the horizontal size -- the size of the rows --. This means the
     // number of columns.
+    //
+    // The number of items in the vector mmt->wr[0]->v is the number of
+    // rows, so it's mmt->n0[1].
+    //
     unsigned int n[2];
     unsigned int n0[2]; // n0: unpadded.
-    // unsigned int ncoeffs_total;
 
-    // local stuff
-    // // unsigned int ncoeffs;
-    
     // this really ends up within the mm field.
     char * locfile;
 
     mmt_comm wr[2];
 
-#ifdef  CONJUGATED_PERMUTATIONS
     // fences[0]: horizontal fences == row indices (horizontal separating line)
     // fences[1]: vertical fences == col indices (vertical separating line)
-    // fences[0] contains 1 + pi->wr[1]->totalsize values
-    // fences[1] contains 1 + pi->wr[0]->totalsize values
-    //
-    // it turns out later on that this numbering is slightly orthogonal
-    // to the one used in most of the rest of the code, so maybe it's a
-    // bad decision. Fortunately, fences[] is rarely used.
+    // fences[0] contains nh = 1 + pi->wr[1]->totalsize values
+    // fences[1] contains nv = 1 + pi->wr[0]->totalsize values
     unsigned int * fences[2];
-#endif
+
     balancing bal;
+
+    /* These are local excerpts of the balancing permutation: arrays of
+     * pairs (row index in the (sub)-matrix) ==> (row index in the
+     * original matrix), but only when both coordinates of this pair are
+     * in the current row and column range. This can be viewed as the set
+     * of non-zero positions in the permutation matrix if it were split
+     * just like the current matrix is. */
+    permutation_data_ptr perm[2];       /* rowperm, colperm */
 
     matmul_ptr mm;
 
     mpfq_vbase_ptr abase;
     pi_datatype_ptr pitype;
-
-    int io_truncate;
 };
 
-/* THREAD_MULTIPLE_VECTOR is when several threads will be writing to the
- * vector simultaneously. This implies having separate areas.
- *
- * TODO: Think about waiving this restriction in the spirit of bucket
- * sieving, maybe */
-#define THREAD_MULTIPLE_VECTOR    0
+/* These are flags for the distributed vectors. For the moment we have
+ * only one flag */
 #define THREAD_SHARED_VECTOR    1
 
 typedef struct matmul_top_data_s matmul_top_data[1];
@@ -178,6 +182,11 @@ extern void matmul_top_clear(matmul_top_data_ptr mmt);
 #if 0
 extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
 #endif
+extern size_t mmt_my_own_size_in_items(matmul_top_data_ptr mmt, int d);
+extern size_t mmt_my_own_size_in_bytes(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
+extern size_t mmt_my_own_offset_in_items(matmul_top_data_ptr mmt, int d);
+extern size_t mmt_my_own_offset_in_bytes(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
+extern void * mmt_my_own_subvec(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
 extern void mmt_vec_set_random_through_file(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate);
 /* do not use this function if you want consistency when the splitting
  * changes ! */
@@ -228,6 +237,7 @@ extern void indices_apply_P(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int
 extern void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr, mmt_vec_ptr v, int d, int flags);
 extern void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
 extern void mmt_vec_set(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v, int d);
+extern void mmt_vec_set_zero(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
 #if 0
 extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_vec_ptr v, int d);
 #endif
@@ -243,9 +253,9 @@ extern void vec_clear_generic(pi_comm_ptr, mmt_vec_ptr, unsigned int);
  * Lanczos iterations, too.
  */
 /* FIXME: well, for BL I fear that I might need broadcast_down */
-extern void broadcast_down(matmul_top_data_ptr mmt, int d);
-// extern void reduce_across(matmul_top_data_ptr mmt, int d);
-extern void allreduce_across(matmul_top_data_ptr mmt, int d);
+extern void broadcast_down(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
+extern void reduce_across(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v, int d);
+extern void allreduce_across(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
 // extern void apply_permutation(matmul_top_data_ptr mmt, int d);
 // extern void apply_identity(matmul_top_data_ptr mmt, int d);
 

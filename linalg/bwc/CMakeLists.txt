@@ -421,9 +421,6 @@ add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     bwc_matmul)
 
 # Those are used only for tests.
-add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
-target_link_libraries(short_matmul bwc_base)
-bwc_program_extra(spmv_test spmv_test.c)
 bwc_program_extra(build_matcache build_matcache.c)
 target_link_libraries(build_matcache matmul_mf)
 bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)

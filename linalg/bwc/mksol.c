@@ -493,7 +493,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                  * location is non-zero only at one location, so unreduced
                  * addition is unnecessary.
                  */
-                allreduce_across(mmt, bw->dir);
+                allreduce_across(mmt, NULL, bw->dir);
                 /* untwist the result */
                 matmul_top_untwist_vector(mmt, bw->dir);
 
@@ -522,8 +522,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             char * s_name;
             rc = asprintf(&s_name, S_FILE_BASE_PATTERN ".%u", k, k + nsolvecs_pervec, ys[0], ys[1], s+bw->interval);
             pi_file_handle f;
-            pi_file_open(f, pi, bw->dir, s_name, "wb", Ar->vec_elt_stride(Ar, unpadded));
-            ssize_t s = pi_file_write(f, sum[k]->v, Ar->vec_elt_stride(Ar, ii1 - ii0));
+            pi_file_open(f, pi, bw->dir, s_name, "wb");
+            ssize_t s = pi_file_write(f, sum[k]->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
             
             if(s < 0 || s < A->vec_elt_stride(A, unpadded)) {
                 if (tcan_print) {
@@ -555,7 +555,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     serialize(pi->m);
 
     for(unsigned int k = 0 ; k < multi ; k++) {
-        mmt_vec_clear(mmt, sum[k], bw->dir);
+        vec_clear_generic(mmt->pi->m, sum[k], eblock);
     }
     if (!bw->skip_online_checks) {
         mmt_vec_clear(mmt, check_vector, !bw->dir);
