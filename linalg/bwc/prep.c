@@ -60,11 +60,10 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
 
-    mmt_vec xymats;
+    void * xymats;
 
     /* We're cheating on the generic init routines */
-    vec_init_generic(pi->m, A, A_pi, xymats, 0,
-            bw->m * prep_lookahead_iterations);
+    A->vec_init(A, &xymats, bw->m * prep_lookahead_iterations);
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -135,11 +134,11 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         matmul_top_untwist_vector(mmt, bw->dir);
         
         // we have indices mmt->wr[1]->i0..i1 available.
-        A->vec_set_zero(A, xymats->v, bw->m * prep_lookahead_iterations);
+        A->vec_set_zero(A, xymats, bw->m * prep_lookahead_iterations);
 
         for(unsigned int k = 0 ; k < prep_lookahead_iterations ; k++) {
             for(int j = 0 ; j < bw->m ; j++) {
-                void * where = SUBVEC(xymats, v, j * prep_lookahead_iterations + k);
+                void * where = A->vec_subvec(A, xymats, j * prep_lookahead_iterations + k);
                 for(unsigned int t = 0 ; t < my_nx ; t++) {
                     uint32_t i = xvecs[j*my_nx+t];
                     if (i < mcol->i0 || i >= mcol->i1)
@@ -164,7 +163,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         /* Now all threads and jobs must collectively reduce the zone
          * pointed to by xymats */
-        pi_allreduce(NULL, xymats->v,
+        pi_allreduce(NULL, xymats,
                 bw->m * prep_lookahead_iterations,
                 A_pi, BWC_PI_SUM, pi->m);
 
@@ -174,7 +173,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
-            dimk = kernel((mp_limb_t *) xymats->v, NULL,
+            dimk = kernel((mp_limb_t *) xymats, NULL,
                     bw->m, prep_lookahead_iterations * A->groupsize(A),
                     A->vec_elt_stride(A, prep_lookahead_iterations)/sizeof(mp_limb_t),
                     0);
@@ -200,7 +199,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     pi_free_mpfq_datatype(pi, A_pi);
 
     /* clean up xy mats stuff */
-    vec_clear_generic(pi->m, xymats, bw->m * prep_lookahead_iterations);
+    A->vec_clear(A, &xymats, bw->m * prep_lookahead_iterations);
 
     A->oo_field_clear(A);
 

@@ -122,12 +122,15 @@ void matmul_top_lookup_parameters(param_list_ptr pl)
     matmul_lookup_parameters(pl);
 }
 
-/* {{{ vector init/clear (generic low-level interface) */
-/* This takes n as the local size of the vector, so that
- * pirow->totalsize*n is the total size of the vector
- */
-void vec_init_generic(pi_comm_ptr picol, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int flags, unsigned int n)
+/* {{{ vector init/clear */
+void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int d, int flags)
 {
+    if (v == NULL) v = mmt->wr[d]->v;
+    if (abase == NULL) abase = mmt->abase;
+    if (pitype == NULL) pitype = mmt->pitype;
+    unsigned int n = mmt->wr[d]->i1 - mmt->wr[d]->i0;
+    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n);
+    pi_comm_ptr picol = mmt->pi->wr[d];
     v->abase = abase;
     v->pitype = pitype;
     v->flags = flags;
@@ -155,8 +158,12 @@ void vec_init_generic(pi_comm_ptr picol, mpfq_vbase_ptr abase, pi_datatype_ptr p
     }
 }
 
-void vec_clear_generic(pi_comm_ptr picol, mmt_vec_ptr v, unsigned int n MAYBE_UNUSED)
+void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
 {
+    if (v == NULL) v = mmt->wr[d]->v;
+    unsigned int n = mmt->wr[d]->i1 - mmt->wr[d]->i0;
+    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n);
+    pi_comm_ptr picol = mmt->pi->wr[d];
     if (v->flags & THREAD_SHARED_VECTOR) {
         if (picol->trank == 0)
             v->abase->vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
@@ -164,25 +171,6 @@ void vec_clear_generic(pi_comm_ptr picol, mmt_vec_ptr v, unsigned int n MAYBE_UN
         v->abase->vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
     }
     shared_free(picol, v->all_v);
-}
-/*}}}*/
-/* {{{ vector init/clear (still generic, but for usual-size vectors) */
-void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int d, int flags)
-{
-    if (v == NULL) v = mmt->wr[d]->v;
-    if (abase == NULL) abase = mmt->abase;
-    if (pitype == NULL) pitype = mmt->pitype;
-    unsigned int n1 = mmt->wr[d]->i1 - mmt->wr[d]->i0;
-    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n1);
-    vec_init_generic(mmt->pi->wr[d], abase, pitype, v, flags, n1);
-}
-
-void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
-{
-    if (v == NULL) v = mmt->wr[d]->v;
-    unsigned int n1 = mmt->wr[d]->i1 - mmt->wr[d]->i0;
-    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n1);
-    vec_clear_generic(mmt->pi->wr[d], v, n1);
 }
 /* }}} */
 

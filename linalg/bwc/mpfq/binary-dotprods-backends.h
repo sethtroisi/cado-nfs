@@ -187,6 +187,7 @@ static inline void dotprod_64K_64L(
  */
 #if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
 #include <emmintrin.h>
+#endif
 static inline void vaddmul_tiny_64K_64L(
             uint64_t * w,
             const uint64_t * u,
@@ -199,10 +200,12 @@ static inline void vaddmul_tiny_64K_64L(
     /* We'll read and write rows two at a time. So we maintain two
      * pointers for each, interlaced. */
     uint64_t * u0 = (uint64_t *) u;
-    uint64_t * u1 = (uint64_t *) (u + K);
     uint64_t * w0 = (uint64_t *) w;
+    unsigned int j = 0;
+#if  defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
+    uint64_t * u1 = (uint64_t *) (u + K);
     uint64_t * w1 = (uint64_t *) (w + L);
-    for (unsigned int j = 0; j < n; j += 2 ) {
+    for ( ; j < n - 1; j += 2 ) {
         const uint64_t * v0 = v;
         for(unsigned int l = 0 ; l < L ; l++) {
             __m128i r = _mm_setzero_si128();
@@ -225,21 +228,8 @@ static inline void vaddmul_tiny_64K_64L(
         u0 += 2 * K; u1 += 2 * K;
         w0 += 2 * L; w1 += 2 * L;
     }
-}
-#else   /* HAVE_SSE2 */
-static inline void vaddmul_tiny_64K_64L(
-            uint64_t * w,
-            const uint64_t * u,
-            const uint64_t * v,
-            unsigned int n,
-            unsigned int K,
-            unsigned int L)
-{
-    /* This is just a direct translation of the sse version. Has been
-     * tested once. */
-    uint64_t * u0 = (uint64_t *) u;
-    uint64_t * w0 = (uint64_t *) w;
-    for (unsigned int j = 0; j < n; j ++ ) {
+#endif
+    for ( ; j < n ; j++) {
         const uint64_t * v0 = v;
         for(unsigned int l = 0 ; l < L ; l++) {
             uint64_t rx = 0;
@@ -260,7 +250,6 @@ static inline void vaddmul_tiny_64K_64L(
         w0 += L;
     }
 }
-#endif
 #endif
 
 #ifdef need_vtranspose_64K_64L

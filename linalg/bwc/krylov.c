@@ -159,7 +159,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     mmt_vec check_vector;
-    mmt_vec ahead;
+    void * ahead;
 
     mpfq_vbase_tmpl AxAc;
     mpfq_vbase_oo_init_templates(AxAc, A, Ac);
@@ -174,19 +174,19 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     if (!bw->skip_online_checks) {
-        vec_init_generic(pi->m, A, A_pi, ahead, 0, nchecks);
+        A->vec_init(A, &ahead, nchecks);
     }
 
     /* We'll store all xy matrices locally before doing reductions. Given
      * the small footprint of these matrices, it's rather innocuous.
      */
-    mmt_vec xymats;
+    void * xymats;
 
     if (tcan_print) {
         printf("Each thread allocates %zd kb for the A matrices\n",
                 A->vec_elt_stride(A, bw->m*bw->interval) >> 10);
     }
-    vec_init_generic(pi->m, A, A_pi, xymats, 0, bw->m*bw->interval);
+    A->vec_init(A, &xymats, bw->m*bw->interval);
     
     if (bw->end == 0) {
         /* Decide on an automatic ending value */
@@ -231,7 +231,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          * memory */
 
         if (!bw->skip_online_checks) {
-            A->vec_set_zero(A, ahead->v, nchecks);
+            A->vec_set_zero(A, ahead, nchecks);
             unsigned int how_many;
             unsigned int offset_c;
             unsigned int offset_v;
@@ -240,7 +240,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     mcol->i0, mcol->i1);
 
             if (how_many) {
-                AxAc->dotprod(A->obj, Ac->obj, ahead->v,
+                AxAc->dotprod(A->obj, Ac->obj, ahead,
                         SUBVEC(check_vector, v, offset_c),
                         SUBVEC(mcol->v, v, offset_v),
                         how_many);
@@ -255,7 +255,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         pi_interleaving_flip(pi);
         matmul_top_twist_vector(mmt, bw->dir);
 
-        A->vec_set_zero(A, xymats->v, bw->m*bw->interval);
+        A->vec_set_zero(A, xymats, bw->m*bw->interval);
         serialize(pi->m);
         for(int i = 0 ; i < bw->interval ; i++) {
             /* The first part of this loop must be guaranteed to be free
@@ -263,7 +263,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             pi_interleaving_flip(pi);
 
             /* Compute the product by x */
-            x_dotprod(mmt, gxvecs, nx, xymats, i * bw->m, bw->m, 1);
+            x_dotprod(mmt, gxvecs, nx, A, xymats, i * bw->m, bw->m, 1);
             matmul_top_mul_cpu(mmt, bw->dir);
 
 #ifdef MEASURE_LINALG_JITTER_TIMINGS
@@ -299,10 +299,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks, -1);
+            x_dotprod(mmt, gxvecs, nx, A, ahead, 0, nchecks, -1);
 
-            pi_allreduce(NULL, ahead->v, nchecks, A_pi, BWC_PI_SUM, pi->m);
-            if (!A->vec_is_zero(A, ahead->v, nchecks)) {
+            pi_allreduce(NULL, ahead, nchecks, A_pi, BWC_PI_SUM, pi->m);
+            if (!A->vec_is_zero(A, ahead, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
             }
@@ -311,7 +311,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         matmul_top_untwist_vector(mmt, bw->dir);
 
         /* Now (and only now) collect the xy matrices */
-        pi_allreduce(NULL, xymats->v,
+        pi_allreduce(NULL, xymats,
                 bw->m * bw->interval,
                 A_pi, BWC_PI_SUM, pi->m);
 
@@ -320,7 +320,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             int rc;
             rc = asprintf(&tmp, A_FILE_PATTERN, ys[0], ys[1], s, s+bw->interval);
             FILE * f = fopen(tmp, "wb");
-            rc = fwrite(xymats->v, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
+            rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
             if (rc != bw->m*bw->interval) {
                 fprintf(stderr, "Ayee -- short write\n");
                 // make sure our input data won't be deleted -- this
@@ -355,11 +355,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
     serialize(pi->m);
 
-    vec_clear_generic(pi->m, xymats, bw->m*bw->interval);
+    A->vec_clear(A, &xymats, bw->m*bw->interval);
 
     if (!bw->skip_online_checks) {
         mmt_vec_clear(mmt, check_vector, !bw->dir);
-        vec_clear_generic(pi->m, ahead, nchecks);
+        A->vec_clear(A, &ahead, nchecks);
     }
 
     free(gxvecs);

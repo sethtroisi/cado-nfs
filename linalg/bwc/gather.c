@@ -203,10 +203,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
         (picol->njobs * picol->ncores);
 
-    mmt_vec svec;
-    mmt_vec tvec;
-    vec_init_generic(pi->m, A, A_pi, svec, 0, ii1-ii0);
-    vec_init_generic(pi->m, A, A_pi, tvec, 0, ii1-ii0);
+    void * svec;
+    void * tvec;
+    A->vec_init(A, &svec, ii1-ii0);
+    A->vec_init(A, &tvec, ii1-ii0);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     if (rhs_name != NULL) {
@@ -282,7 +282,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
             pi_bcast(rhscoeffs, nrhs, A_pi, 0, 0, pi->m);
 
-            A->vec_set_zero(A, tvec->v, ii1 - ii0);
+            A->vec_set_zero(A, tvec, ii1 - ii0);
             for(unsigned int j = 0 ; j < nrhs ; j++) {
                 /* Add c_j times v_j to tvec */
                 ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
@@ -294,13 +294,13 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+                ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
 
-                A->vec_scal_mul(A, svec->v, svec->v, A->vec_coeff_ptr(A, rhscoeffs, j), ii1 - ii0);
-                A->vec_add(A, tvec->v, tvec->v, svec->v, ii1 - ii0);
+                A->vec_scal_mul(A, svec, svec, A->vec_coeff_ptr(A, rhscoeffs, j), ii1 - ii0);
+                A->vec_add(A, tvec, tvec, svec, ii1 - ii0);
             }
 
             /* Now save the sum to a temp file, which we'll read later on
@@ -313,7 +313,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 rc = pi_file_open(f, pi, bw->dir, tmp, "wb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_write(f, tvec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+                ssize_t s = pi_file_write(f, tvec, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
@@ -339,12 +339,12 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
             if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
             ASSERT_ALWAYS(rc);
-            ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+            ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
             ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
             pi_file_close(f);
             free(tmp);
 
-            A->vec_add(A, sv, sv, svec->v, ii1 - ii0);
+            A->vec_add(A, sv, sv, svec, ii1 - ii0);
         }
 
         /* allgather, really */
@@ -487,8 +487,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (rhscoeffs_file) fclose(rhscoeffs_file);
     if (rhscoeffs_name) mmt_vec_clear(mmt, rhscoeffs_vec, bw->dir);
 
-    vec_clear_generic(pi->m, svec, ii1-ii0);
-    vec_clear_generic(pi->m, tvec, ii1-ii0);
+    A->vec_clear(A, &svec, ii1-ii0);
+    A->vec_clear(A, &tvec, ii1-ii0);
 
     matmul_top_clear(mmt);
     pi_free_mpfq_datatype(pi, A_pi);

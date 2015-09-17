@@ -1,6 +1,7 @@
 #ifndef XDOTPROD_H_
 #define XDOTPROD_H_
 
+#include "mpfq/mpfq_vbase.h"
 #include "matmul_top.h"
 
 /* This interface is relevant to both krylov and mksol, since it's used
@@ -11,7 +12,7 @@
 extern "C" {
 #endif
 
-void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int, mmt_vec_ptr v, unsigned int z0, unsigned int m, int sign);
+void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int, mpfq_vbase_ptr A, void * v, unsigned int z0, unsigned int m, int sign);
 
 #ifdef __cplusplus
 }

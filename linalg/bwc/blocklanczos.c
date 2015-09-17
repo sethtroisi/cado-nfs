@@ -28,7 +28,7 @@ struct blstate {
      * allocated everywhere (we set flags to 0, so as to avoid having
      * shared vectors) */
     mmt_vec V[3];
-    mmt_vec L[3];
+    void * L[3];
     bit_vector D[3];
 
     /* Here are the semantics of the data fields above.
@@ -160,7 +160,7 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
     size_t nelts_for_nnmat = bw->n * (bw->n / A->groupsize(A));
 
     for(int i = 0 ; i < 3 ; i++) {
-        vec_init_generic(pi->m, A, bl->A_pi, bl->L[i], 0, nelts_for_nnmat);
+        A->vec_init(A, &(bl->L[i]), nelts_for_nnmat);
         /* We also need D_n, D_{n-1}, D_{n-2}. Those are in fact bitmaps.
          * Not clear that the bitmap type is really the one we want, though. */
         bit_vector_init(bl->D[i], bw->n);
@@ -180,7 +180,7 @@ void blstate_clear(struct blstate * bl)
 
     serialize(mmt->pi->m);
     for(int i = 0 ; i < 3 ; i++) {
-        vec_clear_generic(pi->m, bl->L[i], nelts_for_nnmat);
+        A->vec_clear(A, &(bl->L[i]), nelts_for_nnmat);
         /* We also need D_n, D_{n-1}, D_{n-2}. Those are in fact bitmaps.
          * Not clear that the bitmap type is really the one we want, though. */
         bit_vector_clear(bl->D[i]);
@@ -205,10 +205,10 @@ void blstate_set_start(struct blstate * bl)
     for(int i = 0 ; i < 3 ; i++) {
         bit_vector_set(bl->D[i], 1);
         /* Set L[i] to identity -- it's awkward, yes. */
-        A->vec_set_zero(A, bl->L[i]->v, nelts_for_nnmat);
+        A->vec_set_zero(A, bl->L[i], nelts_for_nnmat);
         for(int j = 0 ; j < bw->n ; j++) {
             int p = j * bw->n + j;
-            A->set_ui_at(A, A->vec_coeff_ptr(A, bl->L[i]->v, p / g), p % g, 1);
+            A->set_ui_at(A, A->vec_coeff_ptr(A, bl->L[i], p / g), p % g, 1);
         }
     }
     /* matmul_top_vec_init has already set V to zero */
@@ -243,9 +243,9 @@ void blstate_load(struct blstate * bl, unsigned int iter)
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         bit_vector_read_from_stream(bl->D[i1], f->f);
         size_t rc;
-        rc = fread(bl->L[i1]->v, A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
+        rc = fread(bl->L[i1], A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
         ASSERT_ALWAYS(rc == (size_t) nelts_for_nnmat);
-        rc = fread(bl->L[i2]->v, A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
+        rc = fread(bl->L[i2], A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
         ASSERT_ALWAYS(rc == (size_t) nelts_for_nnmat);
     }
     ssize_t s;
@@ -293,7 +293,7 @@ void blstate_save(struct blstate * bl, unsigned int iter)
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         bit_vector_write_to_stream(bl->D[i1], f->f);
         size_t rc;
-        rc = fwrite(bl->L[i1]->v, A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
+        rc = fwrite(bl->L[i1], A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
         ASSERT_ALWAYS(rc == (size_t) nelts_for_nnmat);
     }
     ssize_t s;
@@ -519,10 +519,11 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
     timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
-    mmt_vec vav, vaav;
+    void * vav;
+    void * vaav;
 
-    vec_init_generic(pi->m, A, bl->A_pi, vav,  0, nelts_for_nnmat);
-    vec_init_generic(pi->m, A, bl->A_pi, vaav, 0, nelts_for_nnmat);
+    A->vec_init(A, &vav, nelts_for_nnmat);
+    A->vec_init(A, &vaav, nelts_for_nnmat);
 
     /* TODO: Put that in the state file. */
     int sum_Ni = 0;
@@ -610,18 +611,18 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
              *  A * V_n         mcol->v
              */
 
-            AxA->dotprod(A->obj, A->obj, vav->v,
+            AxA->dotprod(A->obj, A->obj, vav,
                     mmt_my_own_subvec(bl->mmt, bl->V[i0], bw->dir), mcol->v->v,
                     mmt_my_own_size_in_items(bl->mmt, bw->dir));
 
-            pi_allreduce(NULL, vav->v,
+            pi_allreduce(NULL, vav,
                     nelts_for_nnmat, bl->A_pi, BWC_PI_BXOR, pi->m);
 
-            AxA->dotprod(A->obj, A->obj, vaav->v,
+            AxA->dotprod(A->obj, A->obj, vaav,
                     mcol->v->v, mcol->v->v,
                     mmt_my_own_size_in_items(bl->mmt, bw->dir));
 
-            pi_allreduce(NULL, vaav->v, nelts_for_nnmat,
+            pi_allreduce(NULL, vaav, nelts_for_nnmat,
                     bl->A_pi, BWC_PI_BXOR, pi->m);
 
 
@@ -653,11 +654,11 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 uint64_t * X   = mmt_my_own_subvec(bl->mmt, NULL, bw->dir);
                 uint64_t D0;
                 uint64_t D1 = bl->D[i1]->p[0];
-                mat64_ptr mvav = (mat64_ptr) vav->v;
-                mat64_ptr mvaav = (mat64_ptr) vaav->v;
-                mat64_ptr mL0 = (mat64_ptr) bl->L[i0]->v;
-                mat64_ptr mL1 = (mat64_ptr) bl->L[i1]->v;
-                mat64_ptr mL2 = (mat64_ptr) bl->L[i2]->v;
+                mat64_ptr mvav = (mat64_ptr) vav;
+                mat64_ptr mvaav = (mat64_ptr) vaav;
+                mat64_ptr mL0 = (mat64_ptr) bl->L[i0];
+                mat64_ptr mL1 = (mat64_ptr) bl->L[i1];
+                mat64_ptr mL2 = (mat64_ptr) bl->L[i2];
                 mat64 m0, m1, m2, t;
 
                 /* We need to save vav for use a wee bit later in this loop. */
@@ -727,8 +728,8 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
     // make sense.
     timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, "blocklanczos");
 
-    vec_clear_generic(pi->m, vav, nelts_for_nnmat);
-    vec_clear_generic(pi->m, vaav, nelts_for_nnmat);
+    A->vec_clear(A, &vav, nelts_for_nnmat);
+    A->vec_clear(A, &vaav, nelts_for_nnmat);
 
 #if 0
     pi_log_clear(pi->m);

@@ -244,10 +244,6 @@ extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_
 extern void mmt_vec_load(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 extern void mmt_vec_save(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 
-/* These two do not really belong here, but come as a useful complement */
-extern void vec_init_generic(pi_comm_ptr, mpfq_vbase_ptr, pi_datatype_ptr, mmt_vec_ptr, int, unsigned int);
-extern void vec_clear_generic(pi_comm_ptr, mmt_vec_ptr, unsigned int);
-
 /* we should refrain from exposing these. At least for mksol,
  * allreduce_across is really useful, though. We use it for the block
  * Lanczos iterations, too.

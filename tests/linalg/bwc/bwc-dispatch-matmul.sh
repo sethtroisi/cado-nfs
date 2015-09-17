@@ -2,12 +2,12 @@
 
 set -e
 
-# only arguments understood are mpi= thr= seed= keep
+if [ "$CADO_DEBUG" ] ; then set -x ; fi
+
+# only arguments understood are mpi= thr= seed=
 
 thr=1x1
 mpi=1x1
-# 400000, 5 fails miserably with mpi=2x2 thr=1x1.
-# 65536, 2 fails miserably with mpi=2x2 thr=1x1.
 nrows=65536
 density=2
 seed=$RANDOM    # can be overridden !
@@ -17,7 +17,7 @@ while [ $# -gt 0 ] ; do
         eval "$1"
         shift
         continue
-    elif [[ "$1" =~ ^(seed|keep|nrows|density)=[0-9]+$ ]] ; then
+    elif [[ "$1" =~ ^(seed|nrows|density)=[0-9]+$ ]] ; then
         eval "$1"
         shift
         continue
@@ -38,7 +38,7 @@ while [ $# -gt 0 ] ; do
         shift
         continue
     else
-        echo "only arguments understood are mpi= thr= seed= keep= nrows= density= bindir= hostfile=" >&2
+        echo "only arguments understood are mpi= thr= seed= nrows= density= bindir= hostfile=" >&2
         exit 1
     fi
 done
@@ -70,8 +70,15 @@ nv=$((thr2 * mpi2))
 M=x$seed
 D=`mktemp -d /tmp/bwc.XXXXXXXXXXX`
 
-# MPI=/localdisk/ethome/Packages/openmpi-1.8.2 DEBUG=1 make -j8
+cleanup() {
+    if ! [ "$CADO_DEBUG" ] ; then
+        rm -rf $D
+    fi
+}
 
+trap cleanup EXIT
+
+# MPI=/localdisk/ethome/Packages/openmpi-1.8.2 DEBUG=1 make -j8
 
 "$bindir/mf_scan" --ascii-in --mfile <("$bindir/random_matrix" $nrows -d $density -s $seed)  --binary-out --freq --ofile $D/$M.bin
 
@@ -101,7 +108,4 @@ $bindir/bwc.pl dispatch "$@"
 rc=$?
 # $bindir/dispatch nullspace=left wdir=/tmp/$M thr=${thr1}x${thr2} interval=20 mn=64 prime=2 verbose_flags=^all-cmdline,^bwc-timing-grids matrix=/tmp/$M.bin balancing=$bfile ys=0..64 sequential_cache_build=1 sanity_check_vector=H1 rebuild_cache=1 matmul_bucket_methods=small1,small2,large
 
-if ! [ "$keep" ] ; then
-rm -rf "$D"
-fi
 exit $rc

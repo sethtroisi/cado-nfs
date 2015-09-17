@@ -141,20 +141,21 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             memcpy(dst, &value, sizeof(uint64_t));
         }
         /* This is L. Now compute the dot product. */
-        mmt_vec dp0, dp1;
-        vec_init_generic(pi->m, A, A_pi, dp0, 0, A->groupsize(A));
-        vec_init_generic(pi->m, A, A_pi, dp1, 0, A->groupsize(A));
+        void * dp0;
+        void * dp1;
+        A->vec_init(A, &dp0, A->groupsize(A));
+        A->vec_init(A, &dp1, A->groupsize(A));
         unsigned int how_many;
         unsigned int offset_c;
         unsigned int offset_v;
         how_many = intersect_two_intervals(&offset_c, &offset_v,
                 mrow->i0, mrow->i1,
                 mcol->i0, mcol->i1);
-        A->dotprod(A, dp0->v,
+        A->dotprod(A, dp0,
                 SUBVEC(mrow->v, v, offset_c),
                 SUBVEC(mcol->v, v, offset_v),
                 how_many);
-        pi_allreduce(NULL, dp0->v, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
+        pi_allreduce(NULL, dp0, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
         /* now we can throw away Hx */
         matmul_top_twist_vector(mmt, 0);
         matmul_top_mul(mmt, 0);
@@ -167,12 +168,12 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             memset(dst, 0, A->vec_elt_stride(A,1));
             memcpy(dst, &value, sizeof(uint64_t));
         }
-        A->dotprod(A, dp1->v,
+        A->dotprod(A, dp1,
                 SUBVEC(mrow->v, v, offset_c),
                 SUBVEC(mcol->v, v, offset_v),
                 how_many);
-        pi_allreduce(NULL, dp1->v, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
-        int diff = memcmp(dp0->v, dp1->v, A->vec_elt_stride(A, A->groupsize(A)));
+        pi_allreduce(NULL, dp1, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
+        int diff = memcmp(dp0, dp1, A->vec_elt_stride(A, A->groupsize(A)));
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             if (diff) {
                 printf("%s : failed\n", checkname);
@@ -181,8 +182,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             }
             printf("%s : ok\n", checkname);
         }
-        vec_clear_generic(pi->m, dp0, A->groupsize(A));
-        vec_clear_generic(pi->m, dp1, A->groupsize(A));
+        A->vec_clear(A, &dp0, A->groupsize(A));
+        A->vec_clear(A, &dp1, A->groupsize(A));
     }
 
     matmul_top_clear(mmt);
