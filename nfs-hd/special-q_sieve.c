@@ -1976,7 +1976,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   ASSERT(t == 3); // TODO: remove as soon as possible.
   sieving_bound_init(H, t);
   for (unsigned int i = 0; i < t; i++) {
-    sieving_bound_set_hi(H, i, (unsigned int) r[i]);
+    sieving_bound_set_hi(H, i, (unsigned int) 1 << r[i]);
   }
   free(r);
 
