@@ -98,7 +98,7 @@ usage_adv (char **argv)
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
-  fprintf (stderr, " -ropteffort M   sieving effort ranging from 1 to 10 (default %d).\n", DEFAULT_ROPTEFFORT);
+  fprintf (stderr, " -ropteffort M   sieving effort ranging from 1 to 10 (default %.0f).\n", DEFAULT_ROPTEFFORT);
 
   fprintf (stderr, "\nExample 1: %s %s -f fname\n", argv[0], argv[1]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
@@ -223,13 +223,9 @@ ropt_parse_param ( int argc,
         }
         else if (argc >= 3 && strcmp (argv[1], "-ropteffort") == 0)
         {
-          param->effort = atoi (argv[2]);
+          param->effort = atof (argv[2]);
           argv += 2;
           argc -= 2;
-          if (param->effort < 1 || param->effort > 10) {
-            fprintf (stderr, "Error: -ropteffort not in range (1-10).\n");
-            exit(1);
-          }       
         }
         else if (argc >= 3 && strcmp (argv[1], "--skip_ropt") == 0)
         {
@@ -326,13 +322,9 @@ ropt_parse_param ( int argc,
         }
         else if (argc >= 3 && strcmp (argv[1], "-ropteffort") == 0)
         {
-          param->effort = atoi (argv[2]);
+          param->effort = atof (argv[2]);
           argv += 2;
           argc -= 2;
-          if (param->effort < 1 || param->effort > 10) {
-            fprintf (stderr, "Error: -ropteffort not in range (1-10).\n");
-            exit(1);
-          }
         }
         else if (argc >= 2 && strcmp (argv[1], "--skip_ropt") == 0)
         {
@@ -551,8 +543,7 @@ declare_usage_basic (param_list pl)
   char str[200];
   param_list_decl_usage(pl, "inputpolys", "root-sieve the size-optimized "
                                           "polynomials given in this file");
-  snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
-            DEFAULT_ROPTEFFORT);
+  snprintf (str, 200, "root-sieve effort (default %.0f)", DEFAULT_ROPTEFFORT);
   param_list_decl_usage(pl, "ropteffort", str);
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   snprintf (str, 200, "sieving area (default %.2e)", AREA);
@@ -603,7 +594,7 @@ main_basic (int argc, char **argv)
   for (unsigned int i = 0; i < size_input_polys; i++)
     cado_poly_init (input_polys[i]);
   ropt_param_init (ropt_param);
-  ropt_param->effort = DEFAULT_ROPTEFFORT; /* ropt effort, among 1-10 */
+  ropt_param->effort = DEFAULT_ROPTEFFORT; /* ropt effort */
 
   /* read params */
   param_list pl;
@@ -629,7 +620,7 @@ main_basic (int argc, char **argv)
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
   /* sieving effort that passed to ropt */
-  param_list_parse_int (pl, "ropteffort", &(ropt_param->effort));
+  param_list_parse_double (pl, "ropteffort", &(ropt_param->effort));
   /* param for ropt */
   param_list_parse_double (pl, "boundmaxlognorm", &(ropt_param->bound_lognorm));
   /* filename of the file with the list of polynomials to root-sieve */
@@ -642,13 +633,6 @@ main_basic (int argc, char **argv)
   verbose_interpret_parameters(pl);
   param_list_print_command_line (stdout, pl);
 
-  /* Check that ropteffort is in [1,10] */
-  if (ropt_param->effort < 1 || ropt_param->effort > 10)
-  {
-    fprintf (stderr, "Error, -ropteffort should be in [1,10]\n");
-    usage_basic (argv0[0], NULL, pl);
-  }
-
   /* Check that nthreads is >= 1 */
   if (nthreads == 0)
   {
@@ -659,7 +643,7 @@ main_basic (int argc, char **argv)
   if (polys_filename == NULL)
     usage_basic (argv0[0], "inputpolys", pl);
 
-  printf ("# Info: Will use %u thread%s\n# Info: ropteffort = %d\n", nthreads,
+  printf ("# Info: Will use %u thread%s\n# Info: ropteffort = %.0f\n", nthreads,
           (nthreads > 1) ? "s": "", ropt_param->effort);
 
   /* detect L1 cache size */
