@@ -1668,7 +1668,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #ifdef ENUM_LATTICE
     enum_lattice(array, file_trace_pos, r, Mqr, H, f, matrix);
 #else // ENUM_LATTICE
-    if (Mqr->coeff[1][1] != 0) {
+    if (Mqr->coeff[1][1] != 1) {
 #ifdef SPACE_SIEVE
       space_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit);
 #else
