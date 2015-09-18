@@ -399,9 +399,9 @@ usage(const char *argv0)
     fprintf (stderr, "    -complete <file> - write rels in file. If possible "
                                              "incorrect rels are corrected\n");
     fprintf (stderr, "    -lpb0 <l>        - chech that ideals on side 0 are "
-                                             "below 2^l\n");
+                                             "below l\n");
     fprintf (stderr, "    -lpb1 <l>        - chech that ideals on side 1 are "
-                                             "below 2^l\n");
+                                             "below l\n");
     fprintf (stderr, "    -v               - more verbose output\n");
     exit (1);
 }

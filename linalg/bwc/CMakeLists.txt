@@ -7,7 +7,7 @@ include_directories(. ..)
 # variable. However this mechanism is somewhat fragile.
 if (${WITH_MPI})
 add_definitions(-DWITH_MPI)
-endif (${WITH_MPI})
+endif()
 
 ### bwc-specific configuration.
 
@@ -73,7 +73,7 @@ set(balancing_sources
 
 if (HAVE_CURL)
 set(balancing_sources ${balancing_sources} balancing_curl_source.c)
-endif (HAVE_CURL)
+endif()
 
 set(bwc_base_sources
     ${balancing_sources}
@@ -102,7 +102,7 @@ target_link_libraries(bwc_base ${gmp_libname})
 
 if (HAVE_CURL)
 target_link_libraries(bwc_base curl)
-endif (HAVE_CURL)
+endif()
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
 target_link_libraries(bwc_base hwloc)
