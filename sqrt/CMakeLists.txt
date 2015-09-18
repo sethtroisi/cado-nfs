@@ -1,7 +1,7 @@
 
 if (${WITH_MPI})
 add_definitions(-DWITH_MPI)
-endif (${WITH_MPI})
+endif()
 
 add_executable(sqrt sqrt.c)
 target_link_libraries(sqrt utils_with_io ${pthread_libs})

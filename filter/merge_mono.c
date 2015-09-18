@@ -164,7 +164,7 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
     // update R[j] by removing i
     remove_i_from_Rj(mat, i, j);
     if (final)
-      MkzUpdateDown (mat, i, j);
+      MkzUpdateDown (mat, j);
 }
 
 //////////////////////////////////////////////////////////////////////

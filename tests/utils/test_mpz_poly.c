@@ -976,6 +976,18 @@ void test_mpz_poly_resultant()
   mpz_set_str(val, "-61519394185549843500", 10);
   ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
 
+  mpz_poly_resultant(res, g, f);
+  mpz_set_str(val, "-61519394185549843500", 10);
+  ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
+
+  /*f=-3-15*x^1-9*x^2+3*x^3-12*x^4-12*x^5-3*x^6-3*x^7-12*x^8-15*x^9*/
+  /*g=-6-13*x^1+9*x^2+7*x^3-5*x^4-5*x^5+11*x^6+2*x^7*/
+  mpz_poly_cleandeg(f, 9);
+  mpz_poly_setcoeffs_si_var(f, 9, -3, -15, -9, 3, -12, -12, -3, -3, -12, -15);
+  mpz_poly_resultant(res, g, f);
+  mpz_set_str(val, "-4936496053264331049", 10);
+  ASSERT_ALWAYS(mpz_cmp(res, val) == 0);
+
   mpz_clear(res);
   mpz_clear(val);
   mpz_poly_clear(f);

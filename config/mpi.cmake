@@ -94,10 +94,10 @@ else()
             if (test_return_code)
                 SET(${VAR} 0 CACHE INTERNAL "Test ${VAR}")
                 MESSAGE(STATUS "Performing Test ${VAR} -- Failed")
-            else (test_return_code)
+            else()
                 SET(${VAR} 1 CACHE INTERNAL "Test ${VAR}")
                 MESSAGE(STATUS "Performing Test ${VAR} -- Success")
-            endif (test_return_code)
+            endif()
         endmacro()
 
         my_try_compile_mpicc("

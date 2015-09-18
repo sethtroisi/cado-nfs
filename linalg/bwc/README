@@ -626,9 +626,7 @@ Using bwc.pl with MPI (updated 20150611)
 
 Note: Some additional scheduler-specific bits and pieces (consider them as
 example documentation status only -- none are part of regular tests):
-    OAR : scripts/cluster/bwc-cluster-oar.sh
     openpbs/torque : linalg/bwc/README.TORQUE
-    Oracle SGE : scripts/cluster/sge-linalg.pl
 
 If you intend to only use one sequence, it's not very difficult. If you
 want to do several sequences, you have to split the :complete meta-step

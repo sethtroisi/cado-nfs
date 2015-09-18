@@ -16,7 +16,7 @@
 #include "relation.h"
 
 static void my_sm(const char *outfile, const char *infile, 
-    sm_side_info *sm_info)
+		  sm_side_info *sm_info, int nb_polys)
 {
   FILE *in;
   in = fopen(infile, "r");
@@ -35,7 +35,9 @@ static void my_sm(const char *outfile, const char *infile,
 
   char buf[1024];
   mpz_poly_t pol, smpol;
-  int maxdeg = MAX(sm_info[0]->f->deg, sm_info[1]->f->deg);
+  int maxdeg = sm_info[0]->f->deg;
+  for(int side = 1; side < nb_polys; side++)
+      maxdeg = MAX(maxdeg, sm_info[side]->f->deg);
   mpz_poly_init(pol, maxdeg);
   mpz_poly_init(smpol, maxdeg);
   while (fgets(buf, 1024, in)) {
@@ -44,7 +46,7 @@ static void my_sm(const char *outfile, const char *infile,
     relation rel;
     rel.parse(buf);
     mpz_poly_init_set_ab(pol, rel.a, rel.b);
-    for (int side = 0; side < 2; ++side) {
+    for (int side = 0; side < nb_polys; ++side) {
       compute_sm_piecewise(smpol, pol, sm_info[side]);
       print_sm(out, smpol, sm_info[side]->nsm, sm_info[side]->f->deg);
       if (side == 0 && sm_info[0]->nsm > 0 && sm_info[1]->nsm > 0)
@@ -91,7 +93,7 @@ int main (int argc, char **argv)
 
   param_list pl;
   cado_poly pol;
-  mpz_poly_ptr F[2];
+  mpz_poly_ptr F[NB_POLYS_MAX];
 
   mpz_t ell, ell2;
   double t0;
@@ -138,8 +140,8 @@ int main (int argc, char **argv)
   /* Init polynomial */
   cado_poly_init (pol);
   cado_poly_read(pol, polyfile);
-  F[0] = pol->pols[0];
-  F[1] = pol->pols[1];
+  for(int side = 0; side < pol->nb_polys; side++)
+      F[side] = pol->pols[side];
 
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
@@ -149,13 +151,13 @@ int main (int argc, char **argv)
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
 
-  sm_side_info sm_info[2];
+  sm_side_info sm_info[NB_POLYS_MAX];
 
-  for(int side = 0 ; side < 2 ; side++) {
+  for(int side = 0 ; side < pol->nb_polys; side++) {
     sm_side_info_init(sm_info[side], F[side], ell);
   }
 
-  for (int side = 0; side < 2; side++) {
+  for (int side = 0; side < pol->nb_polys; side++) {
     fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
     mpz_poly_fprintf(stdout, F[side]);
 
@@ -167,12 +169,12 @@ int main (int argc, char **argv)
 
   t0 = seconds();
 
-  my_sm(outfile, infile, sm_info);
+  my_sm(outfile, infile, sm_info, pol->nb_polys);
 
   fprintf(stdout, "\n# sm completed in %2.2lf seconds\n", seconds() - t0);
   fflush(stdout);
 
-  for(int side = 0 ; side < 2 ; side++) {
+  for(int side = 0 ; side < pol->nb_polys ; side++) {
     sm_side_info_clear(sm_info[side]);
   }
 

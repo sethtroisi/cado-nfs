@@ -145,6 +145,8 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
     if (d == !mm->public_->store_transposed) {
         abelt_ur rowsum;
         abelt_ur_init(x, &rowsum);
+        abelt_ur tmp;
+        abelt_ur_init(x, &tmp);
 
         abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop");
@@ -156,12 +158,21 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 j = *q++;
                 int32_t c = *(int32_t*)q++;
                 ASSERT(j < mm->public_->dim[d]);
-                abaddmul_si_ur(x, rowsum, abvec_coeff_ptr_const(x, src, j), c);
+                if (c == 1) {
+                    abelt_ur_set_elt(x, tmp, abvec_coeff_ptr_const(x, src, j));
+                    abelt_ur_add(x, rowsum, rowsum, tmp);
+                } else if (c == -1) {
+                    abelt_ur_set_elt(x, tmp, abvec_coeff_ptr_const(x, src, j));
+                    abelt_ur_sub(x, rowsum, rowsum, tmp);
+                } else {
+                    abaddmul_si_ur(x, rowsum, abvec_coeff_ptr_const(x, src, j), c);
+                }
             }
             abreduce(x, abvec_coeff_ptr(x, dst, i), rowsum);
         }
         ASM_COMMENT("end of critical loop");
         abelt_ur_clear(x, &rowsum);
+        abelt_ur_clear(x, &tmp);
     } else {
         abvec_ur tdst;
         abvec_ur_init(x, &tdst, mm->public_->dim[!d]);

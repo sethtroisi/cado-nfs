@@ -125,12 +125,8 @@ linalg/bwc/bwc-trace.sh
 linalg/bwc/bwc-trace.m
 linalg/bwc/bwc.pl
 linalg/bwc/bwc_config_h.in
-linalg/bwc/checks.list
-linalg/bwc/checks.list.light
-linalg/bwc/checks.sh
 linalg/bwc/cleanup.c
 linalg/bwc/dispatch.c
-linalg/bwc/do-one-test.sh
 linalg/bwc/filenames.h
 linalg/bwc/gather.c
 linalg/bwc/intersections.c
@@ -208,7 +204,6 @@ linalg/bwc/mpfq/mpfq.h
 linalg/bwc/mpfq/mpfq_gfp_common.h
 linalg/bwc/mpfq/mpfq_name_ab.h
 linalg/bwc/mpfq/asm-constraints.patch
-linalg/bwc/mpich2.spec
 linalg/bwc/pad.h
 linalg/bwc/parallelizing_info.c
 linalg/bwc/parallelizing_info.h
@@ -377,18 +372,6 @@ polyselect/ropt_main.c
 polyselect/size_optimization.c
 polyselect/size_optimization.h
 scripts/call_cmake.sh
-scripts/cluster/README_LAS
-scripts/cluster/check_dup_purge.pl
-scripts/cluster/clean.pl
-scripts/cluster/cpu_time.pl
-scripts/cluster/dispatcher
-scripts/cluster/init_cdir
-scripts/cluster/init_ldir
-scripts/cluster/las_1job
-scripts/cluster/las_loop
-scripts/cluster/merge.pl
-scripts/cluster/run_oarjobs
-scripts/cluster/sge-linalg.pl
 scripts/gdb.py
 scripts/install-cmake.sh
 scripts/version.sh
@@ -530,7 +513,6 @@ utils/cado_popen.c
 utils/cado_popen.h
 utils/crc.c
 utils/crc.h
-utils/cut_n_roots.c
 utils/electric_alloc.h
 utils/fakempi.h
 utils/fakepthread.h
@@ -641,10 +623,7 @@ utils/getprime.c
 utils/getprime.h
 utils/gmp_aux.c
 utils/gmp_aux.h
-utils/gmp_factorization_complete.c
 utils/gmp_gcd.c
-utils/gmp_nextprime.c
-utils/gmp_prob_prime.c
 utils/gzip.c
 utils/gzip.h
 utils/memusage.c
@@ -680,7 +659,6 @@ utils/mpz_poly.c
 utils/mpz_poly.h
 utils/purgedfile.c
 utils/purgedfile.h
-utils/random_integer.c
 utils/ringbuf.c
 utils/ringbuf.h
 utils/relation.cpp
@@ -689,7 +667,6 @@ utils/renumber.c
 utils/renumber.h
 utils/rootfinder.c
 utils/rootfinder.h
-utils/roots.c
 utils/select_mpi.h
 tests/utils/test-rootfinder-script.sh
 tests/utils/test_mod.c
@@ -856,7 +833,6 @@ ffs/version.sh
 ffs/Makefile.local.example
 tests/CMakeLists.txt
 tests/utils/CMakeLists.txt
-scripts/coverage-unit-tests.sh
 tests/utils/OpenPegasusNOTICE.txt
 tests/utils/test_rootfinder.c
 tests/utils/test_strlcat.c

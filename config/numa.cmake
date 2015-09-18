@@ -14,7 +14,7 @@ if (DEFINED ENV{NUMA_INCDIR})
     message(STATUS "Adding $ENV{NUMA_INCDIR} to the search path for numa")
     # prepend !
     set(NUMA_INCDIR_HINTS "$ENV{NUMA_INCDIR}" ${NUMA_INCDIR_HINTS})
-endif (DEFINED ENV{NUMA_INCDIR})
+endif()
 
 if (DEFINED ENV{NUMA_LIBDIR})
     message(STATUS "Adding $ENV{NUMA_LIBDIR} to the search path for numa")
