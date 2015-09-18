@@ -23,8 +23,10 @@ static void printf_relation(factor_t * factor, unsigned int * I,
     unsigned int size, MAYBE_UNUSED unsigned int * assert_facto)
 {
   //Print a.
+#ifdef PRINT_POLY_RELATION
   printf("# ");
   mpz_poly_fprintf(stdout, a);
+#endif // PRINT_POLY_RELATION
 
   unsigned int index = 0;
   //Print if the factorisation is good.
@@ -344,7 +346,7 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r, facul_aux_data * da
  */
 static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
     unsigned int * L, unsigned int size, unsigned int t, unsigned int V,
-    int main, facul_aux_data *data)
+    int main, facul_aux_data *data, unsigned int * nb_rel_found)
 {
   mpz_t res;
   mpz_init(res);
@@ -416,8 +418,9 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
   }
 
   if (find >= 2) {
-
     printf_relation(factor, I, L, a, t, V, size, assert_facto);
+
+    (* nb_rel_found)++;
 
   }
 
@@ -523,7 +526,7 @@ static unsigned int find_indices_main(unsigned int ** L,
 static void find_relation(uint64_array_t * indices, uint64_t * index,
     uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indices,
-    facul_aux_data *data)
+    facul_aux_data *data, unsigned int * nb_rel_found)
 {
   unsigned int * L = (unsigned int *) malloc(V * sizeof(unsigned int));
   unsigned int size = 0;
@@ -560,7 +563,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
       number_survivals_facto++;
 #endif // NUMBER_SURVIVALS
 
-      good_polynomial(a, f, L, size, H->t, V, main, data);
+      good_polynomial(a, f, L, size, H->t, V, main, data, nb_rel_found);
     }
 
     mpz_poly_clear(a);
@@ -614,11 +617,15 @@ void find_relations(uint64_array_t * indices, uint64_t number_element,
     data[i].methods = facul_make_aux_methods(nb_curves95(lpb_bit), 0, 0);
   }
 
+  unsigned int nb_rel_found = 0;
   if (0 != length_tot) {
     while(sum_index(index, V, main) < length_tot) {
       find_relation(indices, index, number_element, matrix, f, H, V, main,
-          max_indices, data);
+          max_indices, data, &nb_rel_found);
     }
+  }
+  if (nb_rel_found != 0) {
+    printf("# Number of found relations: %u\n", nb_rel_found);
   } else {
     printf("# No relations\n");
   }
