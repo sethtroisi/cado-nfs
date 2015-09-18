@@ -45,7 +45,7 @@
 
       prime_info pi;
       prime_info_init (pi);
-      for (p = 2; p <= B1; p = getprime (pi))
+      for (p = 2; p <= B1; p = getprime_mt (pi))
          {
             ...
          }

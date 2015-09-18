@@ -21,6 +21,7 @@ import collections
 import abc
 from datetime import datetime
 import re
+import time
 
 cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@"
 if re.search("/", cado_python_libs_path):
@@ -204,8 +205,12 @@ class MyCursor(sqlite3.Cursor):
                             "or maybe filesystem does not properly support "
                             "file locking.")
                     raise
+                if str(e) != "database is locked":
+                   raise
                 i += 1
-                if i == 10 or str(e) != "database is locked":
+                time.sleep(1) # wait for 1 second if database is locked
+                if i == 10:
+                    logger.critical("You might try 'fuser xxx.db' to see which process is locking the database")
                     raise
         logger.transaction("%s.%s(): connection = %s, command finished",
                            classname, parent, id(self._conn))

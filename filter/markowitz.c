@@ -31,13 +31,13 @@ double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 #define MkzGet(Q, i, r) (Q[((i)<<1)+(r)])
 #define MkzSet(Q, i, r, val) (Q[((i)<<1)+(r)] = (val))
 
-static int
-MkzGetCount(int32_t *Q, int32_t *A, int32_t dj) MAYBE_UNUSED;
+#if 0
 static int
 MkzGetCount(int32_t *Q, int32_t *A, int32_t dj)
 {
     return MkzGet(Q, A[dj], 1);
 }
+#endif
 
 inline int
 MkzIsAlive(index_t *A, int32_t dj)
@@ -56,9 +56,8 @@ MkzAssign(int32_t *Q, index_t *A, int32_t k1, int32_t k2)
     A[dj] = k1;
 }
 
-static void
-MkzPrintQueue(int32_t *Q) MAYBE_UNUSED;
-static void
+#if 0
+static void MAYBE_UNUSED
 MkzPrintQueue(int32_t *Q)
 {
     int level = 0, imax = 1, i;
@@ -73,6 +72,7 @@ MkzPrintQueue(int32_t *Q)
     }
     fprintf(stderr, "\n");
 }
+#endif
 
 static void
 MkzUpQueue(int32_t *Q, index_t *A, int32_t k)
@@ -180,6 +180,7 @@ MkzDelete(int32_t *Q, index_t *A, int32_t k)
     MkzMoveUpOrDown(Q, A, k);
 }
 
+#if 0
 // Remove (Q, A)[k].
 void
 MkzRemove(int32_t *dj, int32_t *mkz, int32_t *Q, index_t *A, int32_t k)
@@ -191,10 +192,10 @@ MkzRemove(int32_t *dj, int32_t *mkz, int32_t *Q, index_t *A, int32_t k)
     Q[0]--;
     MkzMoveUpOrDown(Q, A, k);
 }
+#endif
 
-static int
-MkzIsHeap(int32_t *Q) MAYBE_UNUSED;
-static int
+#if MKZ_DEBUG >= 1
+static int MAYBE_UNUSED
 MkzIsHeap(int32_t *Q)
 {
     int k;
@@ -217,6 +218,7 @@ MkzIsHeap(int32_t *Q)
     }
     return 1;
 }
+#endif
 
 static void
 MkzCheck(filter_matrix_t *mat)
@@ -496,7 +498,7 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 // Row[i] has been removed for column j, so that we need to update
 // the Markowitz count.
 void
-MkzUpdateDown (filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
+MkzUpdateDown (filter_matrix_t *mat, int32_t j)
 {
   int32_t adr = mat->MKZA[j];
   int mkz;
