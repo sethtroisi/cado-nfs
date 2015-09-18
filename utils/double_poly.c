@@ -599,7 +599,7 @@ static double double_poly_content(double_poly_srcptr f)
   for (int i = 1; i <= f->deg; i++) {
     gcd = gcd_int64(gcd, (int64_t)f->coeff[i]);
   }
-  return abs((double) gcd);
+  return fabs((double) gcd);
 }
 
 /*
@@ -920,7 +920,7 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
       double_poly_clear(b);
       double_poly_clear(r);
 
-      return (double)s * t * h;
+      h = (double)s * t * h;
     }
   } else {
     //TODO: use last version of a and b in pseudo_division.
@@ -941,7 +941,7 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
     double_poly_clear(b);
     double_poly_clear(r);
     mpz_clear(res);
-
-    return h;
   }
+
+  return h;
 }
