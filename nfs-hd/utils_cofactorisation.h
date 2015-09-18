@@ -19,7 +19,7 @@
  * H: sieving bounds.
  * V: number of number fields.
  */
-void find_relations(uint64_array_t * indices, uint64_t number_element,
+unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
     unsigned int V, int main);
 

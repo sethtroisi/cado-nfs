@@ -2147,6 +2147,9 @@ int main(int argc, char * argv[])
   gmp_randinit_default(state);
   mpz_init(a);
 
+  uint64_t nb_rel = 0;
+  double total_time = 0.0;
+  uint64_t spq_tot = 0;
 
   prime_info pi;
   prime_info_init (pi);
@@ -2250,7 +2253,8 @@ int main(int argc, char * argv[])
         }
 
         sec = seconds();
-        find_relations(indexes, array->number_element, lpb, matrix, f, H, V,
+        nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
+            matrix, f, H, V,
             main_side);
         sec_cofact = seconds() - sec;
 
@@ -2264,6 +2268,8 @@ int main(int argc, char * argv[])
         }
 
         printf("# Time for this special-q: %fs.\n", seconds() - sec_tot);
+        total_time += (seconds() - sec_tot);
+        spq_tot++;
         for (unsigned int j = 0; j < V; j++) {
           printf("# Time to init norm %d: %fs.\n", j, time[j][0]);
           printf("# Time to sieve %d: %fs.\n", j, time[j][1]);
@@ -2299,6 +2305,12 @@ int main(int argc, char * argv[])
 
     ideal_spq_clear(special_q, H->t);
   }
+
+  printf("# Total number of relations: %" PRIu64 "\n", nb_rel);
+  printf("# Total number of special-q: %" PRIu64 "\n", spq_tot);
+  printf("# Time per special-q: %f\n", total_time / (double)spq_tot);
+  printf("# Time per relation: %f\n", total_time / (double)nb_rel);
+  printf("# Relations per special-q: %f\n", (double)nb_rel / (double)spq_tot);
 
   mpz_poly_factor_list_clear(l);
   gmp_randclear(state);
