@@ -2181,6 +2181,7 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "Special-q: q: %" PRIu64 ", g: ", q);
         mpz_poly_fprintf(file_trace_pos, l->factors[i]->f);
+        fprintf(file_trace_pos, "Side of the special-q: %u\n", q_side);
 #endif // TRACE_POS
 
         sec = seconds();
