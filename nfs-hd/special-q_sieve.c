@@ -1828,7 +1828,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #endif // SIEVE_U
 #endif // Draft for special-q_sieve
 
-/* ----- Collect indices with norm less or equal to lpb ----- */
+/* ----- Collect indices with norm less or equal to threshold ----- */
 
 void find_index(uint64_array_ptr indexes, array_srcptr array,
     unsigned char thresh)
@@ -1855,8 +1855,8 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "fbb1", "factor base bound on the number field 1");
   param_list_decl_usage(pl, "thresh0", "threshold on the number field 0");
   param_list_decl_usage(pl, "thresh1", "threshold on the number field 1");
-  param_list_decl_usage(pl, "lpb0", "threshold on the number field 0");
-  param_list_decl_usage(pl, "lpb1", "threshold on the number field 1");
+  param_list_decl_usage(pl, "lpb0", "large prime bound on the number field 0");
+  param_list_decl_usage(pl, "lpb1", "large prime bound on the number field 1");
   param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
   param_list_decl_usage(pl, "f1", "polynomial that defines the number field 1");
   param_list_decl_usage(pl, "q_min", "minimum of the special-q");
@@ -1885,14 +1885,14 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "thresh7", "threshold on the number field 7");
   param_list_decl_usage(pl, "thresh8", "threshold on the number field 8");
   param_list_decl_usage(pl, "thresh9", "threshold on the number field 9");
-  param_list_decl_usage(pl, "lpb2", "threshold on the number field 2");
-  param_list_decl_usage(pl, "lpb3", "threshold on the number field 3");
-  param_list_decl_usage(pl, "lpb4", "threshold on the number field 4");
-  param_list_decl_usage(pl, "lpb5", "threshold on the number field 5");
-  param_list_decl_usage(pl, "lpb6", "threshold on the number field 6");
-  param_list_decl_usage(pl, "lpb7", "threshold on the number field 7");
-  param_list_decl_usage(pl, "lpb8", "threshold on the number field 8");
-  param_list_decl_usage(pl, "lpb9", "threshold on the number field 9");
+  param_list_decl_usage(pl, "lpb2", "large prime bound on the number field 2");
+  param_list_decl_usage(pl, "lpb3", "large prime bound on the number field 3");
+  param_list_decl_usage(pl, "lpb4", "large prime bound on the number field 4");
+  param_list_decl_usage(pl, "lpb5", "large prime bound on the number field 5");
+  param_list_decl_usage(pl, "lpb6", "large prime bound on the number field 6");
+  param_list_decl_usage(pl, "lpb7", "large prime bound on the number field 7");
+  param_list_decl_usage(pl, "lpb8", "large prime bound on the number field 8");
+  param_list_decl_usage(pl, "lpb9", "large prime bound on the number field 9");
   param_list_decl_usage(pl, "f2", "polynomial that defines the number field 2");
   param_list_decl_usage(pl, "f3", "polynomial that defines the number field 3");
   param_list_decl_usage(pl, "f4", "polynomial that defines the number field 4");
@@ -1939,7 +1939,8 @@ void declare_usage(param_list pl)
  */
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
-    uint64_t * q_min, uint64_t * q_max, unsigned char ** thresh, mpz_t ** lpb,
+    uint64_t * q_min, uint64_t * q_max, unsigned char ** thresh,
+    unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
     int * main_side)
 {
@@ -1985,7 +1986,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   * thresh = malloc(sizeof(unsigned char) * (* V));
   * fb = malloc(sizeof(factor_base_t) * (* V));
   * f = malloc(sizeof(mpz_poly_t) * (* V));
-  * lpb = malloc(sizeof(mpz_t) * (* V));
+  * lpb = malloc(sizeof(unsigned int) * (* V));
 
   for (unsigned int i = 0; i < * V; i++) {
     char str [2];
@@ -2003,9 +2004,9 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   for (unsigned int i = 0; i < * V; i++) {
     char str [4];
     sprintf(str, "lpb%u", i);
-    mpz_init((*lpb)[i]);
-    param_list_parse_mpz(pl, str,(*lpb)[i]);
-    ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);
+    (*lpb)[i] = 0;
+    param_list_parse_uint(pl, str,(*lpb) + i);
+    /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
   }
 
 #ifdef MAKE_FB_DURING_SIEVE
@@ -2073,7 +2074,7 @@ int main(int argc, char * argv[])
   uint64_t q_max;
   unsigned int q_side;
   unsigned char * thresh;
-  mpz_t * lpb;
+  unsigned int * lpb;
   array_t array;
   mat_Z_t matrix;
   factor_base_t * fb;
@@ -2085,7 +2086,7 @@ int main(int argc, char * argv[])
 
 #ifdef PRINT_PARAMETERS
   printf("# H =\n");
-  sieving_bound_fprintf_comment(stdout, H);
+  sieving_bound_fprintf_detailed_comment(stdout, H);
   printf("# V = %u\n", V);
   for (unsigned int i = 0; i < V; i++) {
     printf("# fbb%u = %" PRIu64 "\n", i, fbb[i]);
@@ -2094,7 +2095,7 @@ int main(int argc, char * argv[])
     printf("# thresh%u = %u\n", i, (unsigned int)thresh[i]);
   }
   for (unsigned int i = 0; i < V; i++) {
-    gmp_printf("# lpb%u = %Zd\n", i, lpb[i]);
+    printf("# lpb%u = %u\n", i, lpb[i]);
   }
   for (unsigned int i = 0; i < V; i++) {
     printf("# f%u = ", i);
@@ -2310,7 +2311,6 @@ int main(int argc, char * argv[])
 
   mat_Z_clear(matrix);
   for (unsigned int i = 0; i < V; i++) {
-    mpz_clear(lpb[i]);
     mpz_poly_clear(f[i]);
     factor_base_clear(fb[i], H->t);
 #ifdef OLD_NORM

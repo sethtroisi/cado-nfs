@@ -227,11 +227,18 @@ static void add_ideal_pr_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
   }
 }
 
+//WARNING: untested code.
 void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
-    mpz_t * lpb, unsigned int V)
+    unsigned int * lpb_bit, unsigned int V)
 {
   ASSERT(V >= 2);
   ASSERT(t >= 2);
+
+  mpz_t * lpb = (mpz_t *) malloc(V * sizeof(mpz_t)); 
+  for (unsigned int i = 0; i < V; i++) {
+    mpz_init(lpb[i]);
+    mpz_ui_pow_ui(lpb[i], 2, (unsigned long) lpb_bit[i]);
+  }
 
 #ifndef NDEBUG
   for (unsigned int i = 0; i < V; i++) {
@@ -289,8 +296,11 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
     }
   }
 
+  prime_info pi;
+  prime_info_init(pi);
+
   //Next prime.
-  q = getprime(q);
+  q = getprime_mt(pi);
   //Find the maximum of fbb.
   uint64_t qmax = fbb[0];
   for (unsigned int k = 1; k < V; k++) {
@@ -298,7 +308,7 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   }
 
   //For all the prime q less than the max of fbb.
-  for ( ; q <= qmax; q = getprime(q)) {
+  for ( ; q <= qmax; q = getprime_mt(pi)) {
     mpz_set_ui(a, q);
     for (unsigned int k = 0; k < V; k++) {
       //Projective root?
@@ -335,7 +345,12 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   free(indexpr);
   gmp_randclear(state);
   mpz_clear(a);
-  getprime(0);
+
+  for (unsigned int i = 0; i < V; i++) {
+    mpz_clear(lpb[i]);
+  }
+  free(lpb);
+  prime_info_clear (pi);
 }
 
 /* Parse different types. */
@@ -600,8 +615,12 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
 }
 
 void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
-    mpz_srcptr lpb, MAYBE_UNUSED mpz_poly_srcptr f)
+    unsigned int lpb_bit, MAYBE_UNUSED mpz_poly_srcptr f)
 {
+  mpz_t lpb;
+  mpz_init(lpb);
+  mpz_ui_pow_ui(lpb, 2, (unsigned long) lpb_bit);
+
   int size_line = 1024;
   char line [size_line];
 
@@ -609,11 +628,9 @@ void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
   fscanf(file, "fbb:%" PRIu64 "\n", &fbb_tmp);
   ASSERT(fbb <= fbb_tmp);
 
-  mpz_t lpb_tmp;
-  mpz_init(lpb_tmp);
-  gmp_fscanf(file, "lpb:%Zd\n", lpb_tmp);
-  ASSERT(mpz_cmp(lpb, lpb_tmp) <= 0);
-  mpz_clear(lpb_tmp);
+  unsigned int lpb_bit_tmp;
+  fscanf(file, "lpb:%u\n", &lpb_bit_tmp);
+  ASSERT(lpb_bit <= lpb_bit_tmp);
 
   int n;
   fscanf(file, "deg:%d\n", &n);
@@ -689,6 +706,8 @@ void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
 
   factor_base_realloc(fb, number_element_1, number_element_u,
       number_element_pr);
+
+  mpz_clear(lpb);
 }
 
 #ifdef MAIN
@@ -762,12 +781,11 @@ void write_ideal_pr(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
  * t: dimension of the lattice.
  */
 void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
-    int64_t fbb, mpz_srcptr lpb, unsigned int t)
+    int64_t fbb, unsigned int lpb, unsigned int t)
 {
   fprintf(file, "fbb:");
   fprintf(file, "%" PRIu64 "\n", fbb);
-  fprintf(file, "lpb:");
-  gmp_fprintf(file, "%Zd\n", lpb);
+  fprintf(file, "lpb: %u\n", lpb);
   fprintf(file, "deg:%d\n", f->deg); 
   fprintf(file, "f:");
   for (int i = 0; i < f->deg; i++) {
@@ -845,7 +863,7 @@ void declare_usage(param_list pl)
  * n: extension of the finite field.
  */
 void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
-    uint64_t ** fbb, factor_base_t ** fb, unsigned int * t, mpz_t ** lpb,
+    uint64_t ** fbb, factor_base_t ** fb, unsigned int * t, unsigned int ** lpb,
     unsigned int * V, uint64_t * p, unsigned int * n)
 {
   param_list pl;
@@ -877,7 +895,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   * fbb = malloc(sizeof(uint64_t) * (* V));
   * fb = malloc(sizeof(factor_base_t) * (* V));
   * f = malloc(sizeof(mpz_poly_t) * (* V));
-  * lpb = malloc(sizeof(mpz_t) * (* V));
+  * lpb = malloc(sizeof(unsigned int) * (* V));
 
   for (unsigned int i = 0; i < * V; i++) {
     char str [4];
@@ -896,9 +914,9 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   for (unsigned int i = 0; i < * V; i++) {
     char str [4];
     sprintf(str, "lpb%u", i);
-    mpz_init((**lpb) + i);
-    param_list_parse_mpz(pl, str, (**lpb) + i);
-    ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);
+    (*lpb)[i] = 0;
+    param_list_parse_uint(pl, str, (*lpb) + i);
+    /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
   }
 
   param_list_parse_uint(pl, "t", t);
@@ -917,7 +935,7 @@ int main(int argc, char ** argv)
   mpz_poly_t * f;
   uint64_t * fbb;
   unsigned int t;
-  mpz_t * lpb;
+  unsigned int * lpb;
   factor_base_t * fb;
   uint64_t p;
   unsigned int n;
@@ -945,6 +963,11 @@ int main(int argc, char ** argv)
 #ifdef TIME_MAKEFB
   printf("# Time to build makefb: %fs.\n", seconds() - sec);
 #endif // TIME_MAKEFB
+
+  for (unsigned int i = 0; i < V; i++) {
+    factor_base_clear(fb[i], t);
+    mpz_poly_clear(f[i]);
+  }
 
   free(f);
   free(fbb);

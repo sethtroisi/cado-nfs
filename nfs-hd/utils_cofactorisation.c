@@ -581,8 +581,8 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 }
 
 void find_relations(uint64_array_t * indices, uint64_t number_element,
-    mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
-    unsigned int V, int main)
+    unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
+    sieving_bound_srcptr H, unsigned int V, int main)
 {
   //index[i] is the current index of indices[i].
   uint64_t * index = (uint64_t * ) malloc(sizeof(uint64_t) * V);
@@ -608,13 +608,12 @@ void find_relations(uint64_array_t * indices, uint64_t number_element,
   data = (facul_aux_data *)malloc(V*sizeof(facul_aux_data));
   ASSERT_ALWAYS(data != NULL);
   for (unsigned int i = 0; i < V; ++i) {
-    size_t lpb_bit = mpz_sizeinbase(lpb[i], 2);
     unsigned int B = 1000; // FIXME: should be a parameter.
-    data[i].lpb = lpb_bit;
+    data[i].lpb = (unsigned long) lpb[i];
     data[i].fbb = B;
     data[i].BB = ((double)B) * ((double)B);
     data[i].BBB = ((double)B) * data[i].BB;
-    data[i].methods = facul_make_aux_methods(nb_curves95(lpb_bit), 0, 0);
+    data[i].methods = facul_make_aux_methods(nb_curves95(lpb[i]), 0, 0);
   }
 
   unsigned int nb_rel_found = 0;

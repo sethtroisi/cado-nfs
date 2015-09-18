@@ -20,7 +20,7 @@
  * V: number of number fields.
  */
 void find_relations(uint64_array_t * indices, uint64_t number_element,
-    mpz_t * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
+    unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
     unsigned int V, int main);
 
 #endif /* UTILS_COFACTORISATION_H */

@@ -25,7 +25,7 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f);
  * V: number of number fields.
  */
 void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
-            mpz_t * lpb, unsigned int V);
+            unsigned int * lpb, unsigned int V);
 
 /*
  * Read the factor base from a file.
@@ -37,5 +37,5 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
  * f: polynomial that define the number field.
  */
 void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
-    mpz_srcptr lpb, mpz_poly_srcptr f);
+    unsigned int lpb, mpz_poly_srcptr f);
 #endif /* MAKEFB_H */
