@@ -115,7 +115,7 @@ ropt_common ( ropt_poly_t poly,
 
     if (param->verbose) {
       fprintf(stderr, "# Info: verbose level: %d\n", param->verbose);
-      fprintf(stderr, "# Info: sieving effort: %d\n", param->effort);
+      fprintf(stderr, "# Info: sieving effort: %.0f\n", param->effort);
     }
     
     /* call ropt */

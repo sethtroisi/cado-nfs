@@ -6,4 +6,4 @@ cado_define_test(test_crtalgsqrt
     ${CADO_NFS_SOURCE_DIR}/tests/sqrt/c30.ratdep.000
     ${CADO_NFS_SOURCE_DIR}/tests/sqrt/c30.poly
   TARGET_DEPENDENCIES crtalgsqrt)
-endif (HAVE_CABSL)
+endif()
