@@ -69,15 +69,21 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
 void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
     mpz_t * Tr, unsigned char log, unsigned int t)
 {
-  ideal->ideal->r = r;
   mpz_poly_set(ideal->ideal->h, h);
-  ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+
+  if (ideal->ideal->r == 0) {
+    ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
+    for (unsigned int i = 0; i < t - 1; i++) {
+      mpz_init(ideal->Tr[i]);
+    }
+  }
   for (unsigned int i = 0; i < t - 1; i++) {
-    mpz_init(ideal->Tr[i]);
     mpz_set(ideal->Tr[i], Tr[i]);
   }
 
   ideal->log = log;
+
+  ideal->ideal->r = r;
 }
 
 void ideal_1_set(ideal_1_ptr ideal_new, ideal_1_srcptr ideal_old,

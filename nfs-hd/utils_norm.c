@@ -573,7 +573,7 @@ static void init_cells(array_ptr array, MAYBE_UNUSED FILE * file,
     //maxi.
     if (maxi - mini > 2) {
       unsigned int i = 0;
-      while (new_length[i] == 2) {
+      while (i < H->t && new_length[i] == 2) {
         i++;
       }
       uint64_t stop = 1 << (H->t - all_length_2);
