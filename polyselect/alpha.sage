@@ -344,3 +344,19 @@ def check_alpha_projective(f,B):
         s += a
         s2 += a2
         print p, a, a2, s, s2
+
+# given a rootsieve space of S points, estimate the best alpha value
+# which is the solution of f(x)^S = 1/2 for f(x) = 1/2*(1 - erf(x/sqrt(2)))
+# expected_alpha(1e10) = -6.42
+# expected_alpha(1e15) = -7.99
+# expected_alpha(1e20) = -9.30
+def expected_alpha(S):
+   R = RealField(100)
+   y = R(1/2) # (1/2*(1 - erf(x/sqrt(2))))^S = y
+   y = y^(1/S) # 1/2*(1 - erf(x/sqrt(2))) = y
+   y = 2*y # 1 - erf(x/sqrt(2)) = y
+   # 1-erf(-t) ~ 2 - 1/sqrt(pi)/t/exp(t^2) for t -> +oo
+   y = 2 - y # 1/sqrt(pi)/t/exp(t^2) = y
+   t = x/sqrt(2)
+   eq = 1/sqrt(pi)/t/exp(t^2) == y
+   return -find_root(eq, 0, 20)
