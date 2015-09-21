@@ -1937,7 +1937,7 @@ void declare_usage(param_list pl)
  * q_side: side of the special-q.
  * V: number of number fields.
  */
-void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
+void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
     uint64_t * q_min, uint64_t * q_max, unsigned char ** thresh,
     unsigned int ** lpb,
@@ -1981,19 +1981,18 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
   }
   free(r);
 
+  cado_poly_init(f);
+
   //TODO: something strange here.
   * fbb = malloc(sizeof(uint64_t) * (* V));
   * thresh = malloc(sizeof(unsigned char) * (* V));
   * fb = malloc(sizeof(factor_base_t) * (* V));
-  * f = malloc(sizeof(mpz_poly_t) * (* V));
   * lpb = malloc(sizeof(unsigned int) * (* V));
 
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [2];
-    sprintf(str, "f%u", i);
-    mpz_poly_init((*f)[i], -1);
-    param_list_parse_mpz_poly(pl, str, (**f) + i, ".,");
-  }
+  unsigned int size_path = 1024;
+  char path [size_path];
+  param_list_parse_string(pl, "poly", path, size_path);
+  cado_poly_read(f, path);
 
   for (unsigned int i = 0; i < * V; i++) {
     char str [4];
@@ -2014,20 +2013,18 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     factor_base_init((*fb)[i], (*fbb)[i], (*fbb)[i], (*fbb)[i]);
   }
   double sec = seconds();
-  makefb(*fb, *f, *fbb, H->t, *lpb, * V);
+  makefb(*fb, f->pols, *fbb, H->t, *lpb, * V);
   printf("# Time for makefb: %f.\n", seconds() - sec);
 #else
   double sec = seconds();
+  FILE * file_r;
   for (unsigned int i = 0; i < * V; i++) {
     char str [3];
     sprintf(str, "fb%u", i);
-    unsigned int size_path = 1024;
-    char path [size_path];
     param_list_parse_string(pl, str, path, size_path);
-    FILE * file;
-    file = fopen(path, "r");
-    read_factor_base(file, (*fb)[i], (*fbb)[i], (*lpb)[i], (*f)[i]);
-    fclose(file);
+    file_r = fopen(path, "r");
+    read_factor_base(file_r, (*fb)[i], (*fbb)[i], (*lpb)[i], f->pols[i]);
+    fclose(file_r);
   }
   printf("# Time to read factor bases: %f.\n", seconds() - sec);
 #endif
@@ -2067,7 +2064,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
 int main(int argc, char * argv[])
 {
   unsigned int V;
-  mpz_poly_t * f;
+  cado_poly f;
   uint64_t * fbb;
   sieving_bound_t H;
   uint64_t q_min;
@@ -2081,7 +2078,7 @@ int main(int argc, char * argv[])
   uint64_t q;
   int main_side;
 
-  initialise_parameters(argc, argv, &f, &fbb, &fb, H, &q_min, &q_max,
+  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_min, &q_max,
                         &thresh, &lpb, array, matrix, &q_side, &V, &main_side);
 
 #ifdef PRINT_PARAMETERS
@@ -2114,7 +2111,7 @@ int main(int argc, char * argv[])
   double ** pre_compute = (double ** ) malloc(sizeof(double * ) * V);
   for (unsigned int i = 0; i < V; i++) {
     pre_compute[i] = (double * ) malloc((H->t) * sizeof(double));
-    pre_computation(pre_compute[i], f[i], H->t);
+    pre_computation(pre_compute[i], f->pols[i], H->t);
   }
 #endif // OLD_NORM
 
@@ -2166,7 +2163,7 @@ int main(int argc, char * argv[])
     ideal_spq_t special_q;
     ideal_spq_init(special_q);
     mpz_set_si(a, q);
-    mpz_poly_factor(l, f[q_side], a, state);
+    mpz_poly_factor(l, f->pols[q_side], a, state);
 
     for (int i = 0; i < l->size ; i++) {
 
@@ -2227,21 +2224,22 @@ int main(int argc, char * argv[])
           memset(array->array, 255,
               sizeof(unsigned char) * array->number_element);
 #ifndef OLD_NORM
-          init_norm(array, file_trace_pos, H, matrix, f[j], special_q, !(j ^ q_side));
-#else // OLD_NORM
-          init_norm(array, file_trace_pos, pre_compute[j], H, matrix, f[j], special_q,
+          init_norm(array, file_trace_pos, H, matrix, f->pols[j], special_q,
               !(j ^ q_side));
+#else // OLD_NORM
+          init_norm(array, file_trace_pos, pre_compute[j], H, matrix,
+              f->pols[j], special_q, !(j ^ q_side));
 #endif // OLD_NORM
 
           time[j][0] = seconds() - sec;
 
 #ifdef ASSERT_NORM
-          assert_norm(array, H, f[j], matrix);
+          assert_norm(array, H, f->pols[j], matrix);
           printf("----------------------------------------\n");
 #endif // ASSERT_NORM
 
           sec = seconds();
-          special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f[j]);
+          special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j]);
           time[j][1] = seconds() - sec;
           sec = seconds();
           find_index(indexes[j], array, thresh[j]);
@@ -2254,8 +2252,7 @@ int main(int argc, char * argv[])
 
         sec = seconds();
         nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
-            matrix, f, H, V,
-            main_side);
+            matrix, f->pols, H, V, main_side);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
@@ -2323,7 +2320,6 @@ int main(int argc, char * argv[])
 
   mat_Z_clear(matrix);
   for (unsigned int i = 0; i < V; i++) {
-    mpz_poly_clear(f[i]);
     factor_base_clear(fb[i], H->t);
 #ifdef OLD_NORM
     free(pre_compute[i]);
@@ -2337,11 +2333,11 @@ int main(int argc, char * argv[])
 #endif // OLD_NORM
   array_clear(array);
   free(lpb);
-  free(f);
   free(fb);
   sieving_bound_clear(H);
   free(fbb);
   free(thresh);
+  cado_poly_clear(f);
 
   return 0;
 }
