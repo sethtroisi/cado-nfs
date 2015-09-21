@@ -577,6 +577,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
   } else {
     index[L[0]] = index[L[0]] + 1;
   }
+
   free(L);
 }
 
@@ -632,6 +633,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     facul_clear_aux_methods(data[i].methods);
   free(data);
   free(index);
+  free_saved_chains();
 
   return nb_rel_found;
 }
