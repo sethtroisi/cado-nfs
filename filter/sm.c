@@ -37,8 +37,8 @@ Output
 #include <errno.h>
 
 #include "macros.h"
+#include "utils_with_io.h"
 #include "filter_common.h"
-#include "utils.h"
 
 stats_data_t stats; /* struct for printing progress */
 

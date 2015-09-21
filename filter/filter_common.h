@@ -34,13 +34,7 @@
 #endif
 
 
-#include "utils_with_io.h"
-
-unsigned int insert_rel_in_table_no_e (earlyparsed_relation_ptr, index_t, index_t **, weight_t *);
-unsigned int insert_rel_in_table_with_e (earlyparsed_relation_ptr, index_t,
-                                         ideal_merge_t **, int32_t *);
 int cmp_index (const void *p, const void *q);
-int cmp_int (const void *p, const void *q);
 int cmp_ideal_merge (const void *p, const void *q);
 int cmp_int2 (const void *p, const void *q);
 

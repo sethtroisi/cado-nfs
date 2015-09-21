@@ -3,6 +3,7 @@
 
 #include "portability.h"
 #include "filter_common.h"
+#include "utils.h"
 #include "merge_replay_matrix.h"
 #include "sparse.h"
 #include "mst.h"
