@@ -126,6 +126,14 @@ extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
 extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
 extern int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep);
+int param_list_parse_uint64_and_uint64(param_list pl, const char * key,
+    uint64_t * r, const char * sep);
+extern int param_list_parse_uint_list(param_list pl, const char * key,
+    unsigned int * r, size_t n, const char * sep);
+int param_list_parse_uint64_list(param_list pl, const char * key,
+    uint64_t * r, size_t n, const char * sep);
+extern int param_list_parse_uchar_list(param_list pl, const char * key,
+    unsigned char * r, size_t n, const char * sep);
 
 /*
   Return an array r with its size t. The array is initialised with the string

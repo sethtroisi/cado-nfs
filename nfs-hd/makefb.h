@@ -1,6 +1,8 @@
 #ifndef MAKEFB_H
 #define MAKEFB_H
 
+#include "cado.h"
+#include "utils.h"
 #include <stdint.h>
 #include "factor_base.h"
 
@@ -24,8 +26,8 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f);
  * lpb: the V large prime bound.
  * V: number of number fields.
  */
-void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
-            unsigned int * lpb, unsigned int V);
+void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
+    unsigned int t, unsigned int * lpb, unsigned int V);
 
 /*
  * Read the factor base from a file.

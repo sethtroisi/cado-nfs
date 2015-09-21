@@ -193,7 +193,6 @@ void compute_Mqr_1(mat_int64_ptr Mqr, uint64_t * Tqr, unsigned int t,
     index++;
   }
 
-  mat_int64_init(Mqr, t, t);
   mat_int64_set_zero(Mqr);
   for (unsigned int i = 1; i <= t; i++) {
     Mqr->coeff[i][i] = 1;
@@ -1851,16 +1850,11 @@ void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "H", "the sieving region");
   param_list_decl_usage(pl, "V", "number of number field");
-  param_list_decl_usage(pl, "fbb0", "factor base bound on the number field 0");
-  param_list_decl_usage(pl, "fbb1", "factor base bound on the number field 1");
-  param_list_decl_usage(pl, "thresh0", "threshold on the number field 0");
-  param_list_decl_usage(pl, "thresh1", "threshold on the number field 1");
-  param_list_decl_usage(pl, "lpb0", "large prime bound on the number field 0");
-  param_list_decl_usage(pl, "lpb1", "large prime bound on the number field 1");
-  param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
-  param_list_decl_usage(pl, "f1", "polynomial that defines the number field 1");
-  param_list_decl_usage(pl, "q_min", "minimum of the special-q");
-  param_list_decl_usage(pl, "q_max", "maximum of the special-q");
+  param_list_decl_usage(pl, "fbb", "factor base bounds");
+  param_list_decl_usage(pl, "thresh", "thresholds");
+  param_list_decl_usage(pl, "lpb", "large prime bounds");
+  param_list_decl_usage(pl, "poly", "path to the polynomial file");
+  param_list_decl_usage(pl, "q_range", "range of the special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
   param_list_decl_usage(pl, "fb0",
       "path to the file that describe the factor base 0");
@@ -1869,38 +1863,6 @@ void declare_usage(param_list pl)
 
   /* MNFS */
 
-  param_list_decl_usage(pl, "fbb2", "factor base bound on the number field 2");
-  param_list_decl_usage(pl, "fbb3", "factor base bound on the number field 3");
-  param_list_decl_usage(pl, "fbb4", "factor base bound on the number field 4");
-  param_list_decl_usage(pl, "fbb5", "factor base bound on the number field 5");
-  param_list_decl_usage(pl, "fbb6", "factor base bound on the number field 6");
-  param_list_decl_usage(pl, "fbb7", "factor base bound on the number field 7");
-  param_list_decl_usage(pl, "fbb8", "factor base bound on the number field 8");
-  param_list_decl_usage(pl, "fbb9", "factor base bound on the number field 9");
-  param_list_decl_usage(pl, "thresh2", "threshold on the number field 2");
-  param_list_decl_usage(pl, "thresh3", "threshold on the number field 3");
-  param_list_decl_usage(pl, "thresh4", "threshold on the number field 4");
-  param_list_decl_usage(pl, "thresh5", "threshold on the number field 5");
-  param_list_decl_usage(pl, "thresh6", "threshold on the number field 6");
-  param_list_decl_usage(pl, "thresh7", "threshold on the number field 7");
-  param_list_decl_usage(pl, "thresh8", "threshold on the number field 8");
-  param_list_decl_usage(pl, "thresh9", "threshold on the number field 9");
-  param_list_decl_usage(pl, "lpb2", "large prime bound on the number field 2");
-  param_list_decl_usage(pl, "lpb3", "large prime bound on the number field 3");
-  param_list_decl_usage(pl, "lpb4", "large prime bound on the number field 4");
-  param_list_decl_usage(pl, "lpb5", "large prime bound on the number field 5");
-  param_list_decl_usage(pl, "lpb6", "large prime bound on the number field 6");
-  param_list_decl_usage(pl, "lpb7", "large prime bound on the number field 7");
-  param_list_decl_usage(pl, "lpb8", "large prime bound on the number field 8");
-  param_list_decl_usage(pl, "lpb9", "large prime bound on the number field 9");
-  param_list_decl_usage(pl, "f2", "polynomial that defines the number field 2");
-  param_list_decl_usage(pl, "f3", "polynomial that defines the number field 3");
-  param_list_decl_usage(pl, "f4", "polynomial that defines the number field 4");
-  param_list_decl_usage(pl, "f5", "polynomial that defines the number field 5");
-  param_list_decl_usage(pl, "f6", "polynomial that defines the number field 6");
-  param_list_decl_usage(pl, "f7", "polynomial that defines the number field 7");
-  param_list_decl_usage(pl, "f8", "polynomial that defines the number field 8");
-  param_list_decl_usage(pl, "f9", "polynomial that defines the number field 9");
   param_list_decl_usage(pl, "fb2",
       "path to the file that describe the factor base 2");
   param_list_decl_usage(pl, "fb3",
@@ -1939,7 +1901,7 @@ void declare_usage(param_list pl)
  */
 void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
-    uint64_t * q_min, uint64_t * q_max, unsigned char ** thresh,
+    uint64_t ** q_range, unsigned char ** thresh,
     unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
     int * main_side)
@@ -1967,8 +1929,6 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     exit (EXIT_FAILURE);
   }
 
-  param_list_parse_uint(pl, "V", V);
-  ASSERT(* V >= 2 && * V < 11);
 
   unsigned int t;
   int * r;
@@ -1983,30 +1943,28 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   cado_poly_init(f);
 
+  unsigned int size_path = 1024;
+  char path [size_path];
+  param_list_parse_string(pl, "poly", path, size_path);
+  cado_poly_read(f, path);
+  ASSERT(f->nb_polys >= 2);
+
+  * V = (unsigned int) f->nb_polys;
+
   //TODO: something strange here.
   * fbb = malloc(sizeof(uint64_t) * (* V));
   * thresh = malloc(sizeof(unsigned char) * (* V));
   * fb = malloc(sizeof(factor_base_t) * (* V));
   * lpb = malloc(sizeof(unsigned int) * (* V));
+  * q_range = malloc(sizeof(uint64_t) * 2);
 
-  unsigned int size_path = 1024;
-  char path [size_path];
-  param_list_parse_string(pl, "poly", path, size_path);
-  cado_poly_read(f, path);
+  param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
 
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [4];
-    sprintf(str, "fbb%u", i);
-    param_list_parse_uint64(pl, str, (* fbb) + i);
-  }
+  param_list_parse_uint_list(pl, "lpb", * lpb, (size_t) * V, ",");
 
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [4];
-    sprintf(str, "lpb%u", i);
-    (*lpb)[i] = 0;
-    param_list_parse_uint(pl, str,(*lpb) + i);
+  /*for (unsigned int i = 0; i < * V; i++) {*/
     /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
-  }
+  /*}*/
 
 #ifdef MAKE_FB_DURING_SIEVE
   for (unsigned int i = 0; i < * V; i++) {
@@ -2029,11 +1987,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   printf("# Time to read factor bases: %f.\n", seconds() - sec);
 #endif
 
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [7];
-    sprintf(str, "thresh%u", i);
-    param_list_parse_uchar(pl, str, (* thresh) + i);
-  }
+  param_list_parse_uchar_list(pl, "thresh", * thresh, (size_t) * V, ",");
 
   uint64_t number_element = sieving_bound_number_element(H);
   ASSERT(number_element >= 6);
@@ -2041,10 +1995,11 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   //TODO: q_side is an unsigned int.
   param_list_parse_int(pl, "q_side", (int *)q_side);
   ASSERT(* q_side < * V);
-  param_list_parse_uint64(pl, "q_min", q_min);
-  ASSERT(* q_min > fbb[0][* q_side]);
-  param_list_parse_uint64(pl, "q_max", q_max);
-  ASSERT(* q_min < * q_max);
+  
+  param_list_parse_uint64_and_uint64(pl, "q_range", * q_range, ",");
+
+  ASSERT((* q_range)[0] > fbb[0][* q_side]);
+  ASSERT((* q_range)[0] < (* q_range)[1]);
 
   param_list_clear(pl);
 
@@ -2067,8 +2022,7 @@ int main(int argc, char * argv[])
   cado_poly f;
   uint64_t * fbb;
   sieving_bound_t H;
-  uint64_t q_min;
-  uint64_t q_max;
+  uint64_t * q_range;
   unsigned int q_side;
   unsigned char * thresh;
   unsigned int * lpb;
@@ -2078,7 +2032,7 @@ int main(int argc, char * argv[])
   uint64_t q;
   int main_side;
 
-  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_min, &q_max,
+  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
                         &thresh, &lpb, array, matrix, &q_side, &V, &main_side);
 
 #ifdef PRINT_PARAMETERS
@@ -2135,7 +2089,7 @@ int main(int argc, char * argv[])
   file_trace_pos = NULL;
 #endif // TRACE_POS
 
-  ASSERT(q_min >= fbb[q_side]);
+  ASSERT(q_range[0] >= fbb[q_side]);
   gmp_randstate_t state;
   mpz_t a;
   mpz_poly_factor_list l;
@@ -2150,8 +2104,8 @@ int main(int argc, char * argv[])
 
   prime_info pi;
   prime_info_init (pi);
-  //Pass all the prime less than q_min.
-  for (q = 2; q < q_min; q = getprime_mt(pi)) {}
+  //Pass all the prime less than q_range[0].
+  for (q = 2; q < q_range[0]; q = getprime_mt(pi)) {}
 
 #ifdef SPECIAL_Q_IDEAL_U
     int deg_bound_factorise = (int)H->t;
@@ -2159,7 +2113,7 @@ int main(int argc, char * argv[])
     int deg_bound_factorise = 2;
 #endif // SPECIAL_Q_IDEAL_U
 
-  for ( ; q <= q_max; q = getprime_mt(pi)) {
+  for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
     ideal_spq_t special_q;
     ideal_spq_init(special_q);
     mpz_set_si(a, q);
@@ -2337,6 +2291,7 @@ int main(int argc, char * argv[])
   sieving_bound_clear(H);
   free(fbb);
   free(thresh);
+  free(q_range);
   cado_poly_clear(f);
 
   return 0;

@@ -228,8 +228,8 @@ static void add_ideal_pr_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
 }
 
 //WARNING: untested code.
-void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
-    unsigned int * lpb_bit, unsigned int V)
+void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
+    unsigned int t, unsigned int * lpb_bit, unsigned int V)
 {
   ASSERT(V >= 2);
   ASSERT(t >= 2);
@@ -242,7 +242,7 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
 
 #ifndef NDEBUG
   for (unsigned int i = 0; i < V; i++) {
-    ASSERT(f[i]->deg >= 1);
+    ASSERT(f->pols[i]->deg >= 1);
     ASSERT(fbb[i] > 2);
     ASSERT(mpz_cmp_ui(lpb[i], fbb[i]) >= 0);
   }
@@ -263,7 +263,7 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   mpz_init(zero);
   mpz_set_ui(zero, 0);
 
-  //Contains the leading coefficient of f[k].
+  //Contains the leading coefficient of f->pols[k].
   mpz_t lc;
   mpz_init(lc);
 
@@ -280,13 +280,13 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
   //F2.
   mpz_set_ui(a, 2);
   for (unsigned int k = 0; k < V; k++) {
-    mpz_set(lc, mpz_poly_lc_const(f[k]));
+    mpz_set(lc, mpz_poly_lc_const(f->pols[k]));
     //Verify if there exists a projective root.
     if (mpz_congruent_p(lc, zero, a) != 0) {
       add_ideal_pr_part(fb[k], indexpr + k, q, fbb[k], t);
     }
-    //Find the factorisation of f[k] mod 2.
-    mpz_poly_factor2(l, f[k]);
+    //Find the factorisation of f->pols[k] mod 2.
+    mpz_poly_factor2(l, f->pols[k]);
     for (int i = 0; i < l->size ; i++) {
       if (l->factors[i]->f->deg == 1) {
         add_ideal_1_part(fb[k], index1 + k, q, l->factors[i]->f, fbb[k], t);
@@ -312,13 +312,13 @@ void makefb(factor_base_t * fb, mpz_poly_t * f, uint64_t * fbb, unsigned int t,
     mpz_set_ui(a, q);
     for (unsigned int k = 0; k < V; k++) {
       //Projective root?
-      mpz_set(lc, mpz_poly_lc_const(f[k]));
+      mpz_set(lc, mpz_poly_lc_const(f->pols[k]));
       if (mpz_congruent_p(lc, zero, a) != 0) {
         add_ideal_pr_part(fb[k], indexpr + k, q, fbb[k], t);
       }
       if (q <= fbb[k]) {
-        //Factorization of f[k] mod q.
-        mpz_poly_factor(l, f[k], a, state);
+        //Factorization of f->pols[k] mod q.
+        mpz_poly_factor(l, f->pols[k], a, state);
         for (int i = 0; i < l->size ; i++) {
           if (l->factors[i]->f->deg == 1) {
             add_ideal_1_part(fb[k], index1 + k, q, l->factors[i]->f, fbb[k], t);
@@ -814,40 +814,9 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "p", "prime number");
   param_list_decl_usage(pl, "n", "extension");
   param_list_decl_usage(pl, "t", "dimension of the lattice");
-  param_list_decl_usage(pl, "V", "number of number field");
-  param_list_decl_usage(pl, "fbb0", "factor base bound on the number field 0");
-  param_list_decl_usage(pl, "fbb1", "factor base bound on the number field 1");
-  param_list_decl_usage(pl, "lpb0", "threshold on the number field 0");
-  param_list_decl_usage(pl, "lpb1", "threshold on the number field 1");
-  param_list_decl_usage(pl, "f0", "polynomial that defines the number field 0");
-  param_list_decl_usage(pl, "f1", "polynomial that defines the number field 1");
-
-  /* MNFS */
-
-  param_list_decl_usage(pl, "fbb2", "factor base bound on the number field 2");
-  param_list_decl_usage(pl, "fbb3", "factor base bound on the number field 3");
-  param_list_decl_usage(pl, "fbb4", "factor base bound on the number field 4");
-  param_list_decl_usage(pl, "fbb5", "factor base bound on the number field 5");
-  param_list_decl_usage(pl, "fbb6", "factor base bound on the number field 6");
-  param_list_decl_usage(pl, "fbb7", "factor base bound on the number field 7");
-  param_list_decl_usage(pl, "fbb8", "factor base bound on the number field 8");
-  param_list_decl_usage(pl, "fbb9", "factor base bound on the number field 9");
-  param_list_decl_usage(pl, "lpb2", "threshold on the number field 2");
-  param_list_decl_usage(pl, "lpb3", "threshold on the number field 3");
-  param_list_decl_usage(pl, "lpb4", "threshold on the number field 4");
-  param_list_decl_usage(pl, "lpb5", "threshold on the number field 5");
-  param_list_decl_usage(pl, "lpb6", "threshold on the number field 6");
-  param_list_decl_usage(pl, "lpb7", "threshold on the number field 7");
-  param_list_decl_usage(pl, "lpb8", "threshold on the number field 8");
-  param_list_decl_usage(pl, "lpb9", "threshold on the number field 9");
-  param_list_decl_usage(pl, "f2", "polynomial that defines the number field 2");
-  param_list_decl_usage(pl, "f3", "polynomial that defines the number field 3");
-  param_list_decl_usage(pl, "f4", "polynomial that defines the number field 4");
-  param_list_decl_usage(pl, "f5", "polynomial that defines the number field 5");
-  param_list_decl_usage(pl, "f6", "polynomial that defines the number field 6");
-  param_list_decl_usage(pl, "f7", "polynomial that defines the number field 7");
-  param_list_decl_usage(pl, "f8", "polynomial that defines the number field 8");
-  param_list_decl_usage(pl, "f9", "polynomial that defines the number field 9");
+  param_list_decl_usage(pl, "poly", "path to the polynomial file");
+  param_list_decl_usage(pl, "fbb", "factor base bounds");
+  param_list_decl_usage(pl, "lpb", "large prime bounds");
 }
 
 /*
@@ -862,7 +831,7 @@ void declare_usage(param_list pl)
  * p: characteristic of the finite field.
  * n: extension of the finite field.
  */
-void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
+void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, unsigned int * t, unsigned int ** lpb,
     unsigned int * V, uint64_t * p, unsigned int * n)
 {
@@ -889,35 +858,28 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
     exit (EXIT_FAILURE);
   }
 
-  param_list_parse_uint(pl, "V", V);
-  ASSERT(* V >= 2 && * V < 11);
+  cado_poly_init(f);
+  unsigned int size_path = 1024;
+  char path [size_path];
+  param_list_parse_string(pl, "poly", path, size_path);
+  cado_poly_read(f, path);
+  ASSERT(f->nb_polys >= 2);
+  * V = (unsigned int) f->nb_polys;
 
   * fbb = malloc(sizeof(uint64_t) * (* V));
   * fb = malloc(sizeof(factor_base_t) * (* V));
-  * f = malloc(sizeof(mpz_poly_t) * (* V));
   * lpb = malloc(sizeof(unsigned int) * (* V));
 
+  param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
+  param_list_parse_uint_list(pl, "lpb", * lpb, (size_t) * V, ",");
+
   for (unsigned int i = 0; i < * V; i++) {
-    char str [4];
-    sprintf(str, "fbb%u", i);
-    param_list_parse_uint64(pl, str, (* fbb) + i);
     factor_base_init((*fb)[i], (*fbb)[i], (*fbb)[i], (*fbb)[i]);
   }
 
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [2];
-    sprintf(str, "f%u", i);
-    mpz_poly_init((*f)[i], -1);
-    param_list_parse_mpz_poly(pl, str, (**f) + i, ".,");
-  }
-
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [4];
-    sprintf(str, "lpb%u", i);
-    (*lpb)[i] = 0;
-    param_list_parse_uint(pl, str, (*lpb) + i);
+  /*for (unsigned int i = 0; i < * V; i++) {*/
     /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
-  }
+  /*}*/
 
   param_list_parse_uint(pl, "t", t);
   ASSERT(* t > 2);
@@ -932,7 +894,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_t ** f,
 int main(int argc, char ** argv)
 {
   unsigned int V;
-  mpz_poly_t * f;
+  cado_poly f;
   uint64_t * fbb;
   unsigned int t;
   unsigned int * lpb;
@@ -940,7 +902,7 @@ int main(int argc, char ** argv)
   uint64_t p;
   unsigned int n;
 
-  initialise_parameters(argc, argv, &f, &fbb, &fb, &t, &lpb, &V, &p, &n);
+  initialise_parameters(argc, argv, f, &fbb, &fb, &t, &lpb, &V, &p, &n);
 
 #ifdef TIME_MAKEFB
   double sec = seconds();
@@ -953,10 +915,10 @@ int main(int argc, char ** argv)
     (unsigned int)(log((double) p) + log((double) n)) + 5;
   char str [strlength];
   for (unsigned int i = 0; i < V; i++) {
-    sprintf(str, "%" PRIu64 ",%u,%u", p, n, i);
+    sprintf(str, "%" PRIu64 ".%u.%u", p, n, i);
     FILE * file;
     file = fopen (str, "w+");
-    export_factor_base(file, fb[i], f[i], fbb[i], lpb[i], t);
+    export_factor_base(file, fb[i], f->pols[i], fbb[i], lpb[i], t);
     fclose(file);
   }
 
@@ -966,10 +928,9 @@ int main(int argc, char ** argv)
 
   for (unsigned int i = 0; i < V; i++) {
     factor_base_clear(fb[i], t);
-    mpz_poly_clear(f[i]);
   }
 
-  free(f);
+  cado_poly_clear(f);
   free(fbb);
   free(lpb);
   free(fb);
