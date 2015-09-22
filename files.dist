@@ -203,7 +203,6 @@ linalg/bwc/mpfq/mpfq.h
 linalg/bwc/mpfq/mpfq_gfp_common.h
 linalg/bwc/mpfq/mpfq_name_ab.h
 linalg/bwc/mpfq/asm-constraints.patch
-linalg/bwc/pad.h
 linalg/bwc/parallelizing_info.c
 linalg/bwc/parallelizing_info.h
 linalg/bwc/prep.c
