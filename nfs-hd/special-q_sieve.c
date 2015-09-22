@@ -1856,31 +1856,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "path to the polynomial file");
   param_list_decl_usage(pl, "q_range", "range of the special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
-  param_list_decl_usage(pl, "fb0",
-      "path to the file that describe the factor base 0");
-  param_list_decl_usage(pl, "fb1",
-      "path to the file that describe the factor base 1");
-
-  /* MNFS */
-
-  param_list_decl_usage(pl, "fb2",
-      "path to the file that describe the factor base 2");
-  param_list_decl_usage(pl, "fb3",
-      "path to the file that describe the factor base 3");
-  param_list_decl_usage(pl, "fb4",
-      "path to the file that describe the factor base 4");
-  param_list_decl_usage(pl, "fb5",
-      "path to the file that describe the factor base 5");
-  param_list_decl_usage(pl, "fb6",
-      "path to the file that describe the factor base 6");
-  param_list_decl_usage(pl, "fb7",
-      "path to the file that describe the factor base 7");
-  param_list_decl_usage(pl, "fb8",
-      "path to the file that describe the factor base 8");
-  param_list_decl_usage(pl, "fb8",
-      "path to the file that describe the factor base 9");
-  param_list_decl_usage(pl, "main",
-      "main side to cofactorise");
+  param_list_decl_usage(pl, "fb", "path to factor bases");
 }
 
 /*
@@ -1976,14 +1952,10 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 #else
   double sec = seconds();
   FILE * file_r;
-  for (unsigned int i = 0; i < * V; i++) {
-    char str [3];
-    sprintf(str, "fb%u", i);
-    param_list_parse_string(pl, str, path, size_path);
-    file_r = fopen(path, "r");
-    read_factor_base(file_r, (*fb)[i], (*fbb)[i], (*lpb)[i], f->pols[i]);
-    fclose(file_r);
-  }
+  param_list_parse_string(pl, "fb", path, size_path);
+  file_r = fopen(path, "r");
+  read_factor_base(file_r, (*fb), (*fbb), (*lpb), f);
+  fclose(file_r);
   printf("# Time to read factor bases: %f.\n", seconds() - sec);
 #endif
 

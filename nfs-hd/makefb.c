@@ -229,8 +229,10 @@ static void add_ideal_pr_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
 
 //WARNING: untested code.
 void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
-    unsigned int t, unsigned int * lpb_bit, unsigned int V)
+    unsigned int t, unsigned int * lpb_bit)
 {
+  unsigned int V = f->nb_polys;
+
   ASSERT(V >= 2);
   ASSERT(t >= 2);
 
@@ -614,100 +616,105 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
   return ret;
 }
 
-void read_factor_base(FILE * file, factor_base_ptr fb, uint64_t fbb,
-    unsigned int lpb_bit, MAYBE_UNUSED mpz_poly_srcptr f)
+void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
+    unsigned int * lpb_bit, cado_poly_srcptr f)
 {
-  mpz_t lpb;
-  mpz_init(lpb);
-  mpz_ui_pow_ui(lpb, 2, (unsigned long) lpb_bit);
+  for (unsigned int k = 0; k < (unsigned int) f->nb_polys; k++) {
+    mpz_t lpb;
+    mpz_init(lpb);
+    mpz_ui_pow_ui(lpb, 2, (unsigned long) lpb_bit[k]);
 
-  int size_line = 1024;
-  char line [size_line];
+    int size_line = 1024;
+    char line [size_line];
 
-  uint64_t fbb_tmp;
-  fscanf(file, "fbb:%" PRIu64 "\n", &fbb_tmp);
-  ASSERT(fbb <= fbb_tmp);
+    uint64_t fbb_tmp;
+    fscanf(file, "fbb:%" PRIu64 "\n", &fbb_tmp);
+    ASSERT(fbb[k] <= fbb_tmp);
 
-  unsigned int lpb_bit_tmp;
-  fscanf(file, "lpb:%u\n", &lpb_bit_tmp);
-  ASSERT(lpb_bit <= lpb_bit_tmp);
+    unsigned int lpb_bit_tmp;
+    fscanf(file, "lpb:%u\n", &lpb_bit_tmp);
+    ASSERT(lpb_bit[k] <= lpb_bit_tmp);
 
-  int n;
-  fscanf(file, "deg:%d\n", &n);
-  
-  mpz_poly_t f_tmp;
-  mpz_poly_init(f_tmp, n);
-  if (fgets(line, size_line, file) == NULL) {
-    return;
-  }
-  ASSERT_ALWAYS(parse_line_mpz_poly(f_tmp, line, n) == n + 1);
-  ASSERT(mpz_poly_cmp(f, f_tmp) == 0);
-  mpz_poly_clear(f_tmp);
+    int n;
+    fscanf(file, "deg:%d\n", &n);
 
-  unsigned int t;
-  fscanf(file, "t:%u\n", &t);
-
-  uint64_t max_number_element_1, max_number_element_u, max_number_element_pr;
-  fscanf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", &max_number_element_1,
-      &max_number_element_u, &max_number_element_pr);
- 
-  factor_base_init(fb, max_number_element_1, max_number_element_u,
-      max_number_element_pr);
-
-  uint64_t number_element_1, number_element_u, number_element_pr;
- 
-  number_element_1 = 0; 
-  ideal_1_t ideal_1;
-  ideal_1_init(ideal_1);
-  for (uint64_t i = 0; i < max_number_element_1; i++) {
+    mpz_poly_t f_tmp;
+    mpz_poly_init(f_tmp, n);
     if (fgets(line, size_line, file) == NULL) {
       return;
     }
-    parse_ideal_1(ideal_1, line, t);
-    if (ideal_1->ideal->r <= fbb) {
-      factor_base_set_ideal_1(fb, number_element_1, ideal_1, t);
-      number_element_1++;
-    }
-  }
-  ideal_1_clear(ideal_1, t);
+    ASSERT_ALWAYS(parse_line_mpz_poly(f_tmp, line, n) == n + 1);
+    ASSERT(mpz_poly_cmp(f->pols[k], f_tmp) == 0);
+    mpz_poly_clear(f_tmp);
 
-  number_element_u = 0;
-  ideal_u_t ideal_u;
-  ideal_u_init(ideal_u);
-  for (uint64_t i = 0; i < max_number_element_u; i++) {
-    if (fgets(line, size_line, file) == NULL) {
-      return;
-    }
-    parse_ideal_u(ideal_u, line, t);
-    if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
-            (uint64_t)ideal_u->ideal->h->deg)) >= 0
-            && ideal_u->ideal->r <= fbb) {
-      //TODO: Problem here.
-      factor_base_set_ideal_u(fb, number_element_u, ideal_u, t);
-      number_element_u++;
-    }
-  }
-  ideal_u_clear(ideal_u, t);
- 
-  number_element_pr = 0; 
-  ideal_pr_t ideal_pr;
-  ideal_pr_init(ideal_pr);
-  for (uint64_t i = 0; i < max_number_element_pr; i++) {
-    if (fgets(line, size_line, file) == NULL) {
-      return;
-    }
-    parse_ideal_pr(ideal_pr, line, t);
-    if (ideal_pr->ideal->r <= fbb) {
-      factor_base_set_ideal_pr(fb, number_element_pr, ideal_pr->ideal->r, t);
-      number_element_pr++;
-    }
-  }
-  ideal_pr_clear(ideal_pr, t);
+    unsigned int t;
+    fscanf(file, "t:%u\n", &t);
 
-  factor_base_realloc(fb, number_element_1, number_element_u,
-      number_element_pr);
+    uint64_t max_number_element_1, max_number_element_u, max_number_element_pr;
+    fscanf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", &max_number_element_1,
+        &max_number_element_u, &max_number_element_pr);
 
-  mpz_clear(lpb);
+    factor_base_init(fb[k], max_number_element_1, max_number_element_u,
+        max_number_element_pr);
+
+    uint64_t number_element_1, number_element_u, number_element_pr;
+
+    number_element_1 = 0; 
+    ideal_1_t ideal_1;
+    ideal_1_init(ideal_1);
+    for (uint64_t i = 0; i < max_number_element_1; i++) {
+      if (fgets(line, size_line, file) == NULL) {
+        return;
+      }
+      parse_ideal_1(ideal_1, line, t);
+      if (ideal_1->ideal->r <= fbb[k]) {
+        factor_base_set_ideal_1(fb[k], number_element_1, ideal_1, t);
+        number_element_1++;
+      }
+    }
+    ideal_1_clear(ideal_1, t);
+
+    number_element_u = 0;
+    ideal_u_t ideal_u;
+    ideal_u_init(ideal_u);
+    for (uint64_t i = 0; i < max_number_element_u; i++) {
+      if (fgets(line, size_line, file) == NULL) {
+        return;
+      }
+      parse_ideal_u(ideal_u, line, t);
+      if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
+              (uint64_t)ideal_u->ideal->h->deg)) >= 0
+          && ideal_u->ideal->r <= fbb[k]) {
+        //TODO: Problem here.
+        factor_base_set_ideal_u(fb[k], number_element_u, ideal_u, t);
+        number_element_u++;
+      }
+    }
+    ideal_u_clear(ideal_u, t);
+
+    number_element_pr = 0; 
+    ideal_pr_t ideal_pr;
+    ideal_pr_init(ideal_pr);
+    for (uint64_t i = 0; i < max_number_element_pr; i++) {
+      if (fgets(line, size_line, file) == NULL) {
+        return;
+      }
+      parse_ideal_pr(ideal_pr, line, t);
+      if (ideal_pr->ideal->r <= fbb[k]) {
+        factor_base_set_ideal_pr(fb[k], number_element_pr, ideal_pr->ideal->r
+            , t);
+        number_element_pr++;
+      }
+    }
+    ideal_pr_clear(ideal_pr, t);
+
+    factor_base_realloc(fb[k], number_element_1, number_element_u,
+        number_element_pr);
+
+    mpz_clear(lpb);
+
+    fscanf(file, "----------------------------------------\n");
+  }
 }
 
 #ifdef MAIN
@@ -780,43 +787,46 @@ void write_ideal_pr(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
  * lpb: large prime bound.
  * t: dimension of the lattice.
  */
-void export_factor_base(FILE * file, factor_base_srcptr fb, mpz_poly_srcptr f,
-    int64_t fbb, unsigned int lpb, unsigned int t)
+void export_factor_base(FILE * file, factor_base_t * fb, cado_poly_srcptr f,
+    uint64_t * fbb, unsigned int * lpb, unsigned int t)
 {
-  fprintf(file, "fbb:");
-  fprintf(file, "%" PRIu64 "\n", fbb);
-  fprintf(file, "lpb: %u\n", lpb);
-  fprintf(file, "deg:%d\n", f->deg); 
-  fprintf(file, "f:");
-  for (int i = 0; i < f->deg; i++) {
-    gmp_fprintf(file, "%Zd,", f->coeff[i]);
-  }
-  gmp_fprintf(file, "%Zd\n", f->coeff[f->deg]);
-  fprintf(file, "t:%u\n", t);
-  fprintf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", fb->number_element_1,
-      fb->number_element_u, fb->number_element_pr);
-  
-  for (uint64_t i = 0; i < fb->number_element_1; i++) {
-    write_ideal_1(file, fb->factor_base_1[i], t);
-  }
-  
-  for (uint64_t i = 0; i < fb->number_element_u; i++) {
-    write_ideal_u(file, fb->factor_base_u[i], t);
-  }
-  
-  for (uint64_t i = 0; i < fb->number_element_pr; i++) {
-    write_ideal_pr(file, fb->factor_base_pr[i], t);
+  for (unsigned int k = 0; k < (unsigned int)f->nb_polys; k++) {
+    fprintf(file, "fbb:%" PRIu64 "\n", fbb[k]);
+    fprintf(file, "lpb:%u\n", lpb[k]);
+    fprintf(file, "deg:%d\n", f->pols[k]->deg); 
+    fprintf(file, "f:");
+    for (int i = 0; i < f->pols[k]->deg; i++) {
+      gmp_fprintf(file, "%Zd,", f->pols[k]->coeff[i]);
+    }
+    gmp_fprintf(file, "%Zd\n", f->pols[k]->coeff[f->pols[k]->deg]);
+    fprintf(file, "t:%u\n", t);
+    fprintf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n",
+        fb[k]->number_element_1, fb[k]->number_element_u,
+        fb[k]->number_element_pr);
+
+    for (uint64_t i = 0; i < fb[k]->number_element_1; i++) {
+      write_ideal_1(file, fb[k]->factor_base_1[i], t);
+    }
+
+    for (uint64_t i = 0; i < fb[k]->number_element_u; i++) {
+      write_ideal_u(file, fb[k]->factor_base_u[i], t);
+    }
+
+    for (uint64_t i = 0; i < fb[k]->number_element_pr; i++) {
+      write_ideal_pr(file, fb[k]->factor_base_pr[i], t);
+    }
+    fprintf(file, "----------------------------------------\n");
   }
 }
 
 void declare_usage(param_list pl)
 {
-  param_list_decl_usage(pl, "p", "prime number");
-  param_list_decl_usage(pl, "n", "extension");
   param_list_decl_usage(pl, "t", "dimension of the lattice");
   param_list_decl_usage(pl, "poly", "path to the polynomial file");
   param_list_decl_usage(pl, "fbb", "factor base bounds");
   param_list_decl_usage(pl, "lpb", "large prime bounds");
+  param_list_decl_usage(pl, "out", "path to file where factor bases are \
+      stored");
 }
 
 /*
@@ -833,7 +843,7 @@ void declare_usage(param_list pl)
  */
 void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, unsigned int * t, unsigned int ** lpb,
-    unsigned int * V, uint64_t * p, unsigned int * n)
+    char ** file_r)
 {
   param_list pl;
   param_list_init(pl);
@@ -864,16 +874,16 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   param_list_parse_string(pl, "poly", path, size_path);
   cado_poly_read(f, path);
   ASSERT(f->nb_polys >= 2);
-  * V = (unsigned int) f->nb_polys;
+  unsigned int V = (unsigned int) f->nb_polys;
 
-  * fbb = malloc(sizeof(uint64_t) * (* V));
-  * fb = malloc(sizeof(factor_base_t) * (* V));
-  * lpb = malloc(sizeof(unsigned int) * (* V));
+  * fbb = malloc(sizeof(uint64_t) * (V));
+  * fb = malloc(sizeof(factor_base_t) * (V));
+  * lpb = malloc(sizeof(unsigned int) * (V));
 
-  param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
-  param_list_parse_uint_list(pl, "lpb", * lpb, (size_t) * V, ",");
+  param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) V, ",");
+  param_list_parse_uint_list(pl, "lpb", * lpb, (size_t) V, ",");
 
-  for (unsigned int i = 0; i < * V; i++) {
+  for (unsigned int i = 0; i < V; i++) {
     factor_base_init((*fb)[i], (*fbb)[i], (*fbb)[i], (*fbb)[i]);
   }
 
@@ -884,49 +894,42 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   param_list_parse_uint(pl, "t", t);
   ASSERT(* t > 2);
 
-  param_list_parse_uint64(pl, "p", p);
-
-  param_list_parse_uint(pl, "n", n);
+  size_t size = 1024;
+  * file_r = malloc(sizeof(char) * size);
+  param_list_parse_string(pl, "out", * file_r, size);
 
   param_list_clear(pl);
 }
 
 int main(int argc, char ** argv)
 {
-  unsigned int V;
   cado_poly f;
   uint64_t * fbb;
   unsigned int t;
   unsigned int * lpb;
   factor_base_t * fb;
-  uint64_t p;
-  unsigned int n;
+  char * file_r;
 
-  initialise_parameters(argc, argv, f, &fbb, &fb, &t, &lpb, &V, &p, &n);
+  initialise_parameters(argc, argv, f, &fbb, &fb, &t, &lpb, &file_r);
 
 #ifdef TIME_MAKEFB
   double sec = seconds();
 #endif // TIME_MAKEFB
 
-  makefb(fb, f, fbb, t, lpb, V);
+  makefb(fb, f, fbb, t, lpb);
 
   //5 because name of the file is p,n,V.
-  unsigned int strlength =
-    (unsigned int)(log((double) p) + log((double) n)) + 5;
-  char str [strlength];
-  for (unsigned int i = 0; i < V; i++) {
-    sprintf(str, "%" PRIu64 ".%u.%u", p, n, i);
-    FILE * file;
-    file = fopen (str, "w+");
-    export_factor_base(file, fb[i], f->pols[i], fbb[i], lpb[i], t);
-    fclose(file);
-  }
+  FILE * file;
+  file = fopen (file_r, "w+");
 
+  export_factor_base(file, fb, f, fbb, lpb, t);
+
+  fclose(file);
 #ifdef TIME_MAKEFB
   printf("# Time to build makefb: %fs.\n", seconds() - sec);
 #endif // TIME_MAKEFB
 
-  for (unsigned int i = 0; i < V; i++) {
+  for (unsigned int i = 0; i < (unsigned int)f->nb_polys; i++) {
     factor_base_clear(fb[i], t);
   }
 
@@ -934,6 +937,7 @@ int main(int argc, char ** argv)
   free(fbb);
   free(lpb);
   free(fb);
+  free(file_r);
 
   return 0;
 }
