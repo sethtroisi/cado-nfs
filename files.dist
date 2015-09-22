@@ -61,8 +61,7 @@ factor.sh
 filter/CMakeLists.txt
 filter/Makefile
 filter/filter_badideals.h
-filter/filter_common.c
-filter/filter_common.h
+filter/filter_config.h
 filter/dup1.c
 filter/dup2.c
 filter/explain.c

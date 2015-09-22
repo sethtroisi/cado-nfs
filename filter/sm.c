@@ -38,7 +38,7 @@ Output
 
 #include "macros.h"
 #include "utils_with_io.h"
-#include "filter_common.h"
+#include "filter_config.h"
 
 stats_data_t stats; /* struct for printing progress */
 
