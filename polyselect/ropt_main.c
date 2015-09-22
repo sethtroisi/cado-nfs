@@ -383,7 +383,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
     pthread_mutex_unlock (&lock);
 
   /* If the content of the algebraic polynomial has content <> 1, then print a
-     warning (this should not be frequent) and divides all coefficients of the
+     warning (this should not be frequent) and divide all coefficients of the
      polynomial by the content. */
   mpz_init (t);
   mpz_poly_content (t, input_poly->pols[ALG_SIDE]);
