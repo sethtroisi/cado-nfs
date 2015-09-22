@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h>
 
 #include "portability.h"
+#include "utils_with_io.h"
 
 #include "filter_common.h"
 #include "merge_replay_matrix.h"

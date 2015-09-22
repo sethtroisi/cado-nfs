@@ -6,51 +6,6 @@
 #include "utils.h"
 #include "filter_common.h"
 
-static inline unsigned int earlyparsed_relation_nb_above_min_index(earlyparsed_relation_srcptr rel, index_t min_index)
-{
-    unsigned int nb_above_min_index = 0;
-    for (unsigned int i = 0; i < rel->nb; i++) {
-        nb_above_min_index += rel->primes[i].h >= min_index;
-    }
-    return nb_above_min_index;
-}
-
-inline unsigned int
-insert_rel_in_table_with_e(earlyparsed_relation_ptr my_br, index_t min_index,
-                           ideal_merge_t **row_compact, int32_t *ideals_weight)
-{
-    unsigned int nprimes = 0;
-    unsigned int i, itmp, nb_above_min;
-    ideal_merge_t *my_tmp;
-    index_t h;
-
-    itmp = 0;
-    nb_above_min = earlyparsed_relation_nb_above_min_index(my_br, min_index);
-    my_tmp = idealmerge_my_malloc(1 + nb_above_min);
-
-    for (i = 0; i < my_br->nb; i++) {
-	h = my_br->primes[i].h;
-	if (ideals_weight[h] == 0) {
-	    ideals_weight[h] = 1;
-	    nprimes++;
-	} else if (ideals_weight[h] != SMAX(int32_t))
-	    ideals_weight[h]++;
-
-	if (my_tmp && h >= min_index) {
-	    my_tmp[itmp].id = h;
-	    my_tmp[itmp].e = my_br->primes[i].e;
-	    itmp++;
-	}
-    }
-
-    if (my_tmp) {
-	my_tmp[itmp].id = UMAX(my_tmp[itmp].id);	/* sentinel */
-	row_compact[my_br->num] = my_tmp;
-    }
-
-    return nprimes;
-}
-
 int
 cmp_index (const void *p, const void *q)
 {
@@ -65,14 +20,6 @@ cmp_ideal_merge (const void *p, const void *q)
   ideal_merge_t x = *((ideal_merge_t *)p);
   ideal_merge_t y = *((ideal_merge_t *)q);
   return (x.id <= y.id ? -1 : 1);
-}
-
-int
-cmp_int (const void *p, const void *q)
-{
-  int x = *((int *)p);
-  int y = *((int *)q);
-  return (x <= y ? -1 : 1);
 }
 
 /* We also compare x[1] and y[1] to make the code deterministic

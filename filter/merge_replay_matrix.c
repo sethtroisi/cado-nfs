@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "portability.h"
+#include "utils_with_io.h"
 #include "filter_common.h"
 #include "merge_replay_matrix.h"
 #include "sparse.h"

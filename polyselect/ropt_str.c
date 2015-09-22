@@ -225,6 +225,27 @@ ropt_poly_init ( ropt_poly_t poly )
 
 
 /**
+ * clean coefficients
+ */
+void
+ropt_poly_refresh ( ropt_poly_t poly )
+{
+  unsigned int i;
+  mpz_set_ui (poly->n, 0);
+  mpz_set_ui (poly->m, 0);
+  for (i = 0; i <= MAXDEGREE; i++) {
+    mpz_set_ui (poly->f[i], 0);
+    mpz_set_ui (poly->g[i], 0);
+  }
+  for (i = 0; i <= primes[NP-1]; i++) {
+    mpz_set_ui (poly->fx[i], 0);
+    mpz_set_ui (poly->gx[i], 0);
+    mpz_set_ui (poly->numerator[i], 0);
+  }
+}
+
+
+/**
  * Evaluation polynomials at many points.
  */
 static inline void
@@ -252,18 +273,15 @@ ropt_poly_setup_eval (mpz_t *fr, mpz_t *gr, mpz_t *numerator, mpz_poly_srcptr f,
 
 
 /**
- * Precompute fx, gx and numerator in ropt_poly_t. Note: poly->f,
- * poly->g, poly->d, poly->n must be set in prior.
- * This function can be called to reset poly after rotation.
+ * check if g[0]/g[1] is a root of f (mod n)
  */
-void
-ropt_poly_setup ( ropt_poly_t poly )
+bool
+ropt_poly_setup_check ( ropt_poly_t poly )
 {
   int i;
   mpz_t t;
-  mpz_poly_t F, G;
-
   mpz_init (t);
+
   /* degree */
   for ( (poly->d) = MAXDEGREE;
         (poly->d) > 0 && mpz_cmp_ui ((poly->f[poly->d]), 0) == 0;
@@ -277,7 +295,6 @@ ropt_poly_setup ( ropt_poly_t poly )
 
   /* check if m is a root of f mod n */
   mpz_set (t, poly->f[poly->d]);
-
   for (i = poly->d - 1; i >= 0; i --) {
     mpz_mul (t, t, poly->m);
     mpz_add (t, t, poly->f[i]);
@@ -285,23 +302,40 @@ ropt_poly_setup ( ropt_poly_t poly )
   }
 
   if (mpz_cmp_ui (t, 0) != 0) {
+    mpz_clear (t);
+    return 0;
+  }
+  mpz_clear (t);
+  return 1;
+}
+
+
+/**
+ * Precompute fx, gx and numerator in ropt_poly_t. Note: poly->f,
+ * poly->g, poly->d, poly->n must be set in prior.
+ * This function can be called to reset poly after rotation.
+ */
+void
+ropt_poly_setup ( ropt_poly_t poly )
+{
+  if (!ropt_poly_setup_check (poly)) {
     fprintf (stderr, "ERROR: The following polynomial have no common"
              " root. \n");
     print_cadopoly_fg (stderr, poly->f, poly->d, poly->g, 1, poly->n);
     exit (1);
   }
 
+  mpz_poly_t F, G;
   F->coeff = poly->f;
   F->deg = poly->d;
   G->coeff = poly->g;
   G->deg = 1;
-  /* pre-compute f(r) for all r < B */
-  ropt_poly_setup_eval (poly->fx, poly->gx, poly->numerator, F, G, primes);
 
+  /* pre-compute f(r) for all r < B */
+  ropt_poly_setup_eval (poly->fx, poly->gx, poly->numerator,
+                        F, G, primes);
   /* projective alpha */
   poly->alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
-
-  mpz_clear (t);
 }
 
 

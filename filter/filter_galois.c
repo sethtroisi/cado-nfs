@@ -4,8 +4,8 @@
 #include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
-#include "utils.h"
 #include "filter_common.h"
+#include "utils_with_io.h"
 #include "mod_ul.h"
 
 char *argv0; /* = argv[0] */
