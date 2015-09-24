@@ -180,3 +180,28 @@ void list_int64_vector_delete_last_coordinate(list_int64_vector_ptr list,
   }
   list->length = list->length - (i + 1);
 }
+
+//TODO: too naive.
+void list_int64_vector_remove_duplicate(list_int64_vector_ptr list)
+{
+  if (list->length == 0) {
+    return;
+  }
+
+  for (unsigned int i = 0; i < list->length - 1; i++) {
+    for (unsigned int j = i + 1; j < list->length; j++) {
+      if (int64_vector_equal(list->v[i], list->v[j])) {
+        list_int64_vector_delete_int64_vector(list, j);
+      }
+    }
+  }
+}
+
+void list_int64_vector_delete_int64_vector(list_int64_vector_ptr list,
+    unsigned int pos)
+{
+  for (unsigned int i = pos + 1; i < list->length; i++) {
+    int64_vector_set(list->v[i - 1], list->v[i]);
+  }
+  list->length--;
+}

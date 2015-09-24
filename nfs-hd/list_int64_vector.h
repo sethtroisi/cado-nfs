@@ -81,4 +81,8 @@ void list_int64_vector_sort_last(list_int64_vector_ptr list);
 void list_int64_vector_delete_last_coordinate(list_int64_vector_ptr list,
     int64_t val);
 
+void list_int64_vector_remove_duplicate(list_int64_vector_ptr list);
+
+void list_int64_vector_delete_int64_vector(list_int64_vector_ptr list,
+    unsigned int pos);
 #endif /* LIST_INT64_VECTOR_H */

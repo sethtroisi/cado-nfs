@@ -99,6 +99,7 @@ void list_int64_vector_index_delete_int64_vector_index(
   list->length--;
 }
 
+//TODO: too naive
 void list_int64_vector_index_remove_duplicate(list_int64_vector_index_ptr list)
 {
   for (unsigned int i = 0; i < list->length - 1; i++) {
