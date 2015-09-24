@@ -234,11 +234,12 @@ L2_lognorm (mpz_poly_ptr f, double s)
 {
   double res;
   double_poly_t a;
-  double a_coeffs[MAXDEGREE];
-
-  a->coeff = a_coeffs;
+  double_poly_init(a, f->deg);
   double_poly_set_mpz_poly (a, f);
+
   res = L2_lognorm_d (a, s);
+
+  double_poly_clear(a);
   return res;
 }
 
