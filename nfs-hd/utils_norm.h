@@ -23,7 +23,7 @@ void norm_poly(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a);
  * To print if a norm seems suspicious.
  */
 void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
-    mat_Z_srcptr matrix);
+    mat_Z_srcptr matrix, int special_q, MAYBE_UNUSED unsigned char spq_log);
 #endif // ASSERT_NORM
 
 #ifndef OLD_NORM

@@ -2165,8 +2165,9 @@ int main(int argc, char * argv[])
           time[j][0] = seconds() - sec;
 
 #ifdef ASSERT_NORM
-          assert_norm(array, H, f->pols[j], matrix);
-          printf("----------------------------------------\n");
+          printf("# ASSERT_NORM side %u.\n", j);
+          assert_norm(array, H, f->pols[j], matrix, !(j ^ q_side),
+              ideal_spq_get_log(special_q));
 #endif // ASSERT_NORM
 
           sec = seconds();
@@ -2182,7 +2183,7 @@ int main(int argc, char * argv[])
         }
 
         for (unsigned int j = 0; j < V; j++) {
-          printf("# Log 2 of the maximum of the norms %d: %u.\n", j,
+          printf("# Log 2 of the maximum of the norms %u: %u.\n", j,
               max_norm[j]);
         }
 
@@ -2204,14 +2205,14 @@ int main(int argc, char * argv[])
         total_time += (seconds() - sec_tot);
         spq_tot++;
         for (unsigned int j = 0; j < V; j++) {
-          printf("# Time to init norm %d: %fs.\n", j, time[j][0]);
-          printf("# Log 2 of the maximum of the norms %d: %u.\n", j,
+          printf("# Time to init norm %u: %fs.\n", j, time[j][0]);
+          printf("# Log 2 of the maximum of the norms %u: %u.\n", j,
               max_norm[j]);
-          printf("# Time to sieve %d: %fs.\n", j, time[j][1]);
-          printf("# Time to find indexes %d: %fs.\n", j, time [j][2]);
+          printf("# Time to sieve %u: %fs.\n", j, time[j][1]);
+          printf("# Time to find indexes %u: %fs.\n", j, time [j][2]);
 
 #ifdef NUMBER_SURVIVALS
-          printf("# Number of survivals %d: %" PRIu64 ".\n", j,
+          printf("# Number of survivals %u: %" PRIu64 ".\n", j,
                  numbers_survivals[j]);
 #endif // NUMBER_SURVIVALS
         }

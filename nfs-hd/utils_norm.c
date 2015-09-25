@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include "utils_norm.h"
 #include "mat_int64.h"
+#include <float.h>
 
 void norm_poly(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
 {
@@ -77,7 +78,6 @@ static void mean_norm_mode(mpz_ptr mean_norm, int64_vector_srcptr vector,
     }
   }
   if (!all_zero) {
-    int64_vector_fprintf(stdout, vector);
     mpz_vector_t c;
     mpz_vector_init(c, vector->dim);
     int64_vector_to_mpz_vector(c, vector);
@@ -132,7 +132,7 @@ MAYBE_UNUSED static inline void mode_init_norm(
 
 #ifdef ASSERT_NORM
 void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
-    mat_Z_srcptr matrix)
+    mat_Z_srcptr matrix, int special_q, MAYBE_UNUSED unsigned char spq_log)
 {
   mpz_vector_t c;
   mpz_vector_init(c, H->t);
@@ -141,6 +141,10 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
 
   mpz_t norm;
   mpz_init(norm);
+  double gap = 0.0;
+  double mean_gap = 0.0;
+  double max_gap = DBL_MIN;
+  double min_gap = DBL_MAX;
 
   for (uint64_t i = 0; i < array->number_element; i++) {
     array_index_mpz_vector(c, i, H, array->number_element);
@@ -148,6 +152,12 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
     norm_poly(norm, f, a);
 
     double log_norm = (double)mpz_sizeinbase(norm, 2);
+    if (special_q) {
+      log_norm = log_norm - (double) spq_log;
+      if (log_norm < 0.0) {
+        log_norm = 0.0;
+      }
+    }
 
     if (fabs((double)array->array[i] - log_norm) > 2.0) {
       fprintf(stderr, "# Error in norm at index %" PRIu64 "\n", i);
@@ -158,7 +168,20 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
       fprintf(stderr, "# Value in the array: %u. Log of the norm: %f\n",
           array->array[i], log_norm);
     }
+
+    gap =  (double)array->array[i] - log_norm;
+    mean_gap = mean_gap + gap;
+    if (gap > max_gap) {
+      max_gap = gap;
+    }
+    if (gap < min_gap) {
+      min_gap = gap;
+    }
   }
+  printf("# Mean of the gaps: %f.\n",
+      mean_gap / (double) array->number_element);
+  printf("# Max of the gaps: %f.\n", max_gap);
+  printf("# Min of the gaps: %f.\n", min_gap);
   mpz_vector_clear(c);
   mpz_poly_clear(a);
   mpz_clear(norm);
@@ -279,7 +302,7 @@ unsigned char log_norm_double(const int * current_indexes,
   double_poly_clear(poly);
 
   ASSERT(resultant >= 0.0);
-  resultant = round(log2(resultant));
+  resultant = ceil(log2(resultant));
   ASSERT_ALWAYS(resultant < 256.0);
 
   unsigned char res = (unsigned char) resultant;
