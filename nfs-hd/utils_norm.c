@@ -7,6 +7,8 @@
 #include "mat_int64.h"
 #include <float.h>
 
+#define NORM_TOLERANCE_NFSHD 4
+
 void norm_poly(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
 {
   mpz_poly_resultant(res, f, a);
@@ -159,15 +161,15 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
       }
     }
 
-    if (fabs((double)array->array[i] - log_norm) > 2.0) {
-      fprintf(stderr, "# Error in norm at index %" PRIu64 "\n", i);
-      fprintf(stderr, "# Vector c: ");
-      mpz_vector_fprintf(stderr, c);
-      fprintf(stderr, "# Polynomial a: ");
-      mpz_poly_fprintf(stderr, a);
-      fprintf(stderr, "# Value in the array: %u. Log of the norm: %f\n",
-          array->array[i], log_norm);
-    }
+    /*if (fabs((double)array->array[i] - log_norm) > NORM_TOLERANCE_NFSHD.0) {*/
+      /*fprintf(stderr, "# Error in norm at index %" PRIu64 "\n", i);*/
+      /*fprintf(stderr, "# Vector c: ");*/
+      /*mpz_vector_fprintf(stderr, c);*/
+      /*fprintf(stderr, "# Polynomial a: ");*/
+      /*mpz_poly_fprintf(stderr, a);*/
+      /*fprintf(stderr, "# Value in the array: %u. Log of the norm: %f\n",*/
+          /*array->array[i], log_norm);*/
+    /*}*/
 
     gap =  (double)array->array[i] - log_norm;
     mean_gap = mean_gap + gap;
@@ -190,6 +192,10 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
 
 
 #ifndef OLD_NORM
+static double strategie_norm_tolerance(double norm_tolerance) {
+  return norm_tolerance + 2.0;
+}
+
 static void next_bottom_left_cube_in_hypercube(int * bottom_left_cube,
     const unsigned int * length, const unsigned int * use_length,
     const int * bottom_left_hypercube, const unsigned int * length_hypercube,
@@ -386,7 +392,8 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
     MAYBE_UNUSED FILE * file,
     const int * bottom_left_cube, const unsigned int * length,
     sieving_bound_srcptr H, double_poly_srcptr f, mat_int64_srcptr Mq,
-    ideal_spq_srcptr spq, int special_q, MAYBE_UNUSED mpz_poly_srcptr f_Z,
+    ideal_spq_srcptr spq, int special_q, double norm_tolerance,
+    MAYBE_UNUSED mpz_poly_srcptr f_Z,
     MAYBE_UNUSED mpz_ptr mean_norm)
 {
 #ifndef NDEBUG
@@ -486,9 +493,9 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
     } 
     update_mini_maxi(&mini, &maxi, tmp);
 
-    //TODO: arbitrary value. If maxi - mini <= 2, all the cells are intialzed to
-    //maxi.
-    if (maxi - mini > 2) {
+    //TODO: arbitrary value. If maxi - mini <= NORM_TOLERANCE_NFSHD, all the
+    //cells are intialzed to maxi.
+    if (maxi - mini > (unsigned char) norm_tolerance) {
       unsigned int i = 0;
       while (i < H->t && new_length[i] == 2) {
         i++;
@@ -503,8 +510,10 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
         //TODO: not H but other think (ie length)
         next_bottom_left_cube_in_hypercube(current_indexes, new_length,
             use_new_length, bottom_left_cube, length, H->t);
+        //Modify norm_tolerance if strategie change it.
         init_cells(array, max_norm, file, current_indexes, new_length, H, f, Mq,
-            spq, special_q, f_Z, mean_norm);
+            spq, special_q, strategie_norm_tolerance(norm_tolerance), f_Z,
+            mean_norm);
           }
     } else {
       stop = 1;
@@ -599,12 +608,14 @@ void init_norm(array_ptr array, unsigned char * max_norm,
   mat_int64_init(Mq, matrix->NumRows, matrix->NumCols);
   mat_Z_to_mat_int64(Mq, matrix);  
 
+  //First value for norm_tolerance.
+  double norm_tolerance = 0.0;
   //Iterate on all the hypercube.
   for (unsigned int i = 0; i < stop; i++) {
     next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
         bottom_left_hypercube, length_hypercube, H->t);
     init_cells(array, max_norm, file, bottom_left_cube, length, H, f_d, Mq, spq,
-        special_q, f, mean_norm);
+        special_q, norm_tolerance, f, mean_norm);
   }
 
 #ifdef MEAN_NORM
