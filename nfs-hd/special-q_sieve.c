@@ -2040,6 +2040,10 @@ int main(int argc, char * argv[])
     pre_compute[i] = (double * ) malloc((H->t) * sizeof(double));
     pre_computation(pre_compute[i], f->pols[i], H->t);
   }
+#else // OLD_NORM
+  unsigned char * max_norm = (unsigned char *) malloc(sizeof(unsigned char) *
+      V);
+  memset(max_norm, 0, sizeof(unsigned char) * V);
 #endif // OLD_NORM
 
   double ** time = (double ** ) malloc(sizeof(double * ) * V);
@@ -2151,8 +2155,8 @@ int main(int argc, char * argv[])
           memset(array->array, 255,
               sizeof(unsigned char) * array->number_element);
 #ifndef OLD_NORM
-          init_norm(array, file_trace_pos, H, matrix, f->pols[j], special_q,
-              !(j ^ q_side));
+          init_norm(array, max_norm + j, file_trace_pos, H, matrix, f->pols[j],
+              special_q, !(j ^ q_side));
 #else // OLD_NORM
           init_norm(array, file_trace_pos, pre_compute[j], H, matrix,
               f->pols[j], special_q, !(j ^ q_side));
@@ -2177,6 +2181,11 @@ int main(int argc, char * argv[])
 #endif // TRACE_POS
         }
 
+        for (unsigned int j = 0; j < V; j++) {
+          printf("# Log 2 of the maximum of the norms %d: %u.\n", j,
+              max_norm[j]);
+        }
+
         sec = seconds();
         nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
             matrix, f->pols, H, V, main_side);
@@ -2196,6 +2205,8 @@ int main(int argc, char * argv[])
         spq_tot++;
         for (unsigned int j = 0; j < V; j++) {
           printf("# Time to init norm %d: %fs.\n", j, time[j][0]);
+          printf("# Log 2 of the maximum of the norms %d: %u.\n", j,
+              max_norm[j]);
           printf("# Time to sieve %d: %fs.\n", j, time[j][1]);
           printf("# Time to find indexes %d: %fs.\n", j, time [j][2]);
 
@@ -2230,11 +2241,12 @@ int main(int argc, char * argv[])
     ideal_spq_clear(special_q, H->t);
   }
 
-  printf("# Total number of relations: %" PRIu64 "\n", nb_rel);
-  printf("# Total number of special-q: %" PRIu64 "\n", spq_tot);
-  printf("# Time per special-q: %f\n", total_time / (double)spq_tot);
-  printf("# Time per relation: %f\n", total_time / (double)nb_rel);
-  printf("# Relations per special-q: %f\n", (double)nb_rel / (double)spq_tot);
+  printf("# Total time: %fs.\n", total_time);
+  printf("# Total number of relations: %" PRIu64 ".\n", nb_rel);
+  printf("# Total number of special-q: %" PRIu64 ".\n", spq_tot);
+  printf("# Time per special-q: %fs.\n", total_time / (double)spq_tot);
+  printf("# Time per relation: %fs.\n", total_time / (double)nb_rel);
+  printf("# Relations per special-q: %f.\n", (double)nb_rel / (double)spq_tot);
 
   mpz_poly_factor_list_clear(l);
   gmp_randclear(state);
@@ -2257,6 +2269,8 @@ int main(int argc, char * argv[])
   free(indexes);
 #ifdef OLD_NORM
   free(pre_compute);
+#else
+  free(max_norm);
 #endif // OLD_NORM
   array_clear(array);
   free(lpb);

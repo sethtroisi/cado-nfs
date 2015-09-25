@@ -70,26 +70,35 @@ static void trace_pos_init(FILE * file_trace_pos, int64_vector_srcptr vector,
 static void mean_norm_mode(mpz_ptr mean_norm, int64_vector_srcptr vector,
     mat_int64_srcptr Mq, mpz_poly_srcptr f)
 {
-  mpz_vector_t c;
-  mpz_vector_init(c, vector->dim);
-  int64_vector_to_mpz_vector(c, vector);
+  unsigned int all_zero = 1;
+  for (unsigned int i = 0; i < vector->dim; i++) {
+    if (vector->c[i] != 0) {
+      all_zero = 0;
+    }
+  }
+  if (!all_zero) {
+    int64_vector_fprintf(stdout, vector);
+    mpz_vector_t c;
+    mpz_vector_init(c, vector->dim);
+    int64_vector_to_mpz_vector(c, vector);
 
-  mat_Z_t Mq_Z;
-  mat_Z_init(Mq_Z, Mq->NumRows, Mq->NumCols);
-  mat_int64_to_mat_Z(Mq_Z, Mq);
-  mpz_poly_t a;
-  mpz_poly_init(a, 0);
-  mat_Z_mul_mpz_vector_to_mpz_poly(a, Mq_Z, c);
-  mpz_vector_clear(c);
-  mat_Z_clear(Mq_Z);
+    mat_Z_t Mq_Z;
+    mat_Z_init(Mq_Z, Mq->NumRows, Mq->NumCols);
+    mat_int64_to_mat_Z(Mq_Z, Mq);
+    mpz_poly_t a;
+    mpz_poly_init(a, 0);
+    mat_Z_mul_mpz_vector_to_mpz_poly(a, Mq_Z, c);
+    mpz_vector_clear(c);
+    mat_Z_clear(Mq_Z);
 
-  mpz_t res;
-  mpz_init(res);
-  norm_poly(res, f, a);
-  mpz_add(mean_norm, mean_norm, res);
+    mpz_t res;
+    mpz_init(res);
+    norm_poly(res, f, a);
+    mpz_add(mean_norm, mean_norm, res);
 
-  mpz_clear(res);
-  mpz_poly_clear(a);
+    mpz_clear(res);
+    mpz_poly_clear(a);
+  }
 }
 #endif // MEAN_NORM
 
@@ -122,45 +131,6 @@ MAYBE_UNUSED static inline void mode_init_norm(
 }
 
 #ifdef ASSERT_NORM
-static unsigned char log_norm(const int * current_indexes, mat_int64_srcptr M,
-    double_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
-    MAYBE_UNUSED unsigned int size)
-{
-  ASSERT(size == M->NumRows);
-  ASSERT(size == M->NumCols);
-
-  mpz_poly_t poly;
-  mpz_poly_init(poly, M->NumRows);
-
-  for (unsigned int i = 0; i < M->NumRows; i++) {
-    int64_t tmp = 0;
-    for (unsigned int k = 0; k < M->NumCols; k++) {
-      tmp = tmp + M->coeff[i + 1][k + 1] * (int64_t) current_indexes[k];
-    }
-    mpz_poly_setcoeff_int64(poly, i, tmp);
-  }
-
-  mpz_poly_t f_Z;
-  mpz_poly_init(f_Z, f->deg);
-  mpz_poly_set_double_poly(f_Z, f);
-  mpz_t norm;
-  mpz_init(norm);
-  norm_poly(norm, poly, f_Z);
-  mpz_poly_clear(poly);
-  mpz_poly_clear(f_Z);
-
-  unsigned char res = (unsigned char) round(log2(mpz_get_d(norm)));
-
-  if (special_q) {
-    ASSERT(special_q == 1);
-
-    res = res - ideal_spq_get_log(spq);
-  }
-
-  mpz_clear(norm);
-  return res;
-}
-
 void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
     mat_Z_srcptr matrix)
 {
@@ -195,7 +165,444 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
 }
 #endif // ASSERT_NORM
 
-#ifdef OLD_NORM
+
+#ifndef OLD_NORM
+static void next_bottom_left_cube_in_hypercube(int * bottom_left_cube,
+    const unsigned int * length, const unsigned int * use_length,
+    const int * bottom_left_hypercube, const unsigned int * length_hypercube,
+    unsigned int t)
+{
+#ifndef NDEBUG
+  int tmp = 0;
+  int tmp2 = 0;
+  for (unsigned int j = 0; j < t; j++) {
+    tmp = tmp + bottom_left_cube[j];
+    tmp2 = tmp2 + bottom_left_hypercube[j] - (int)length[j] +
+      (int)length_hypercube[j];
+  }
+  ASSERT(tmp <= tmp2);
+#endif
+
+  unsigned int k = 0;
+  while(k < t) {
+    if (bottom_left_cube[k] + (int)length[k] == bottom_left_hypercube[k] +
+        (int)length_hypercube[k]) {
+      bottom_left_cube[k] = bottom_left_hypercube[k];
+      k++;
+    } else {
+      break;
+    }
+  }
+  if (k < t && use_length[k]) {
+    bottom_left_cube[k] = bottom_left_cube[k] + (int)length[k];
+  }
+
+#ifndef NDEBUG
+  for (unsigned int j = 0; j < t - 1; j++) {
+    tmp = bottom_left_cube[j];
+    ASSERT(tmp >= bottom_left_hypercube[j]);
+    ASSERT(tmp + (int)length[j] - 1 < bottom_left_hypercube[j] +
+        (int)length_hypercube[j]);
+  }
+  tmp = bottom_left_cube[t - 1];
+  ASSERT(tmp >= 0);
+  ASSERT(tmp + (int)length[t - 1] - 1 < bottom_left_hypercube[t - 1] +
+      (int)length_hypercube[t - 1]);
+#endif
+}
+
+void add_boolean(int * tab, unsigned int size)
+{
+#ifndef NDEBUG
+  for (unsigned int j = 0; j < size; j++) {
+    ASSERT(tab[j] < 2);
+    ASSERT(tab[j] > -2);
+  }
+#endif
+
+  unsigned int k = 0;
+  while(k < size) {
+    if (tab[k] == 1) {
+      tab[k] = 0;
+      k++;
+    } else {
+      break;
+    }
+  }
+  if (k < size) {
+    tab[k]++;
+  }
+
+#ifndef NDEBUG
+  for (unsigned int j = 0; j < size; j++) {
+    ASSERT(tab[j] < 2);
+    ASSERT(tab[j] > -1);
+  }
+#endif
+}
+
+void add_arrays(int * current_indexes, const int * current_values,
+    const int * true_false, const unsigned int * increment, unsigned int size)
+{
+  for (unsigned int i = 0; i < size; i++) {
+    current_indexes[i] = current_values[i] + (unsigned int) true_false[i] *
+      (increment[i] - 1);
+  }
+}
+
+unsigned char log_norm_double(const int * current_indexes,
+    unsigned char * max_norm, mat_int64_srcptr M,
+    double_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
+    MAYBE_UNUSED unsigned int size)
+{
+  ASSERT(size == M->NumRows);
+  ASSERT(size == M->NumCols);
+
+  double_poly_t poly;
+  double_poly_init(poly, M->NumRows);
+
+  int deg = -1;
+
+  for (unsigned int i = 0; i < M->NumRows; i++) {
+    int64_t tmp = 0;
+    for (unsigned int k = 0; k < M->NumCols; k++) {
+      tmp = tmp + M->coeff[i + 1][k + 1] * (int64_t) current_indexes[k];
+    }
+    poly->coeff[i] = (double) tmp;
+    if (tmp != 0) {
+      deg = (int) i;
+    }
+  }
+  poly->deg = deg;
+
+  double resultant = fabs(double_poly_resultant(poly, f));
+  double_poly_clear(poly);
+
+  ASSERT(resultant >= 0.0);
+  resultant = round(log2(resultant));
+  ASSERT_ALWAYS(resultant < 256.0);
+
+  unsigned char res = (unsigned char) resultant;
+
+  if (special_q) {
+    ASSERT(special_q == 1);
+
+    if (deg == -1) {
+      res = 0;
+    } else {
+      res = res - ideal_spq_get_log(spq);
+    }
+  }
+  if (res > * max_norm) {
+    * max_norm = res;
+  }
+
+  return res;
+}
+
+void update_mini_maxi(unsigned char * mini, unsigned char * maxi,
+    unsigned char val)
+{
+  if (val < * mini) {
+    * mini = val;
+  }
+  if (val > * maxi) {
+    * maxi = val;
+  }
+}
+
+int generate_random_number(int a, int b)
+{
+  int random = rand() % (b - a) + a;
+
+  ASSERT(random >= a);
+  ASSERT(random < b);
+
+  return random;
+}
+
+void add_one_values(int * current_indexes, const int * bottom_left_cube,
+    const unsigned int * increment, unsigned int size)
+{
+#ifndef NDEBUG
+  int tmp = 0;
+  int tmp2 = 0;
+  for (unsigned int j = 0; j < size; j++) {
+    tmp = tmp + current_indexes[j];
+    tmp2 = tmp2 + bottom_left_cube[j] + (int)increment[j] - 1;
+  }
+  ASSERT(tmp <= tmp2);
+#endif
+
+  unsigned int k = 0;
+  while(k < size) {
+    if (current_indexes[k] == bottom_left_cube[k] + (int)increment[k] - 1) {
+      current_indexes[k] = bottom_left_cube[k];
+      k++;
+    } else {
+      break;
+    }
+  }
+  if (k < size) {
+    current_indexes[k]++;
+  }
+
+#ifndef NDEBUG
+  for (unsigned int j = 0; j < size - 1; j++) {
+    tmp = current_indexes[j];
+    ASSERT(tmp >= bottom_left_cube[j]);
+    ASSERT(tmp < bottom_left_cube[j] + (int) increment[j]);
+  }
+  tmp = current_indexes[size - 1];
+  ASSERT(tmp >= bottom_left_cube[size - 1]);
+  ASSERT(tmp < bottom_left_cube[size - 1] + (int) increment[size - 1]);
+#endif
+}
+
+static void init_cells(array_ptr array, unsigned char * max_norm,
+    MAYBE_UNUSED FILE * file,
+    const int * bottom_left_cube, const unsigned int * length,
+    sieving_bound_srcptr H, double_poly_srcptr f, mat_int64_srcptr Mq,
+    ideal_spq_srcptr spq, int special_q, MAYBE_UNUSED mpz_poly_srcptr f_Z,
+    MAYBE_UNUSED mpz_ptr mean_norm)
+{
+#ifndef NDEBUG
+  for (unsigned int i = 0; i < H->t; i++) {
+    ASSERT(length[i] >= 2);
+  }
+#endif // NDEBUG
+
+
+  int * true_false = (int *) malloc(sizeof(int) * H->t);
+  memset(true_false, 0, sizeof(int) * H->t);
+  true_false[0] = -1;
+
+  int * current_indexes = (int *) malloc(sizeof(int) * H->t);
+  memset(current_indexes, 0, sizeof(int) * H->t);
+
+  //Compute the number of vertices.
+  uint64_t stop = 1 << H->t;
+
+  unsigned char tmp = 0;
+  unsigned char maxi = 0;
+  unsigned char mini = UCHAR_MAX;
+
+  //Compute each norm of the vertices of the cube.
+  for (uint64_t i = 0; i < stop; i++) {
+    add_boolean(true_false, H->t);
+    add_arrays(current_indexes, bottom_left_cube, true_false, length, H->t);
+
+    //Get the possible value of current_indexes.
+    tmp = array_get_at(array, current_indexes, H);
+    if (tmp == 255) {
+      tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq, special_q,
+          H->t);
+
+      array_set_at(array, current_indexes, tmp, H);
+
+#ifdef TRACE_POS
+      int64_vector_t vec;
+      int64_vector_init(vec, H->t);
+      for (unsigned cpt = 0; cpt < H->t; cpt++) {
+        vec->c[cpt] = (int64_t) current_indexes[cpt];
+      }
+      mode_init_norm(file, vec, Mq, f_Z, array, H, mean_norm);
+      int64_vector_clear(vec);
+#endif // TRACE_POS
+
+    } 
+    update_mini_maxi(&mini, &maxi, tmp);
+  }
+  free(true_false);
+
+  unsigned int * new_length = (unsigned int * ) malloc(sizeof(unsigned int) *
+      H->t);
+  memset(new_length, 0, sizeof(unsigned int) * H->t);
+  unsigned int * use_new_length = (unsigned int * ) malloc(
+      sizeof(unsigned int) * H->t);
+  memset(use_new_length, 0, sizeof(unsigned int) * H->t);
+  unsigned int all_length_2 = 0;
+
+  for (unsigned int i = 0; i < H->t; i++) {
+    //Generate a random element inside the cube.
+    current_indexes[i] = generate_random_number(bottom_left_cube[i],
+        bottom_left_cube[i] + length[i]);
+    if (length[i] > 2) {
+      new_length[i] = length[i] / 2;
+      use_new_length[i] = 1;
+    } else {
+      ASSERT(length[i] <= 2);
+
+      new_length[i] = 2;
+      all_length_2++;
+      use_new_length[i] = 0;
+    }
+  }
+
+
+  //If all_length_2 == H->t, all the cells are initialized.
+  if (all_length_2 != H->t) {
+
+    tmp = array_get_at(array, current_indexes, H);
+    if (tmp == 255) {
+      tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq, special_q,
+          H->t);
+
+      array_set_at(array, current_indexes, tmp, H);
+
+#ifdef TRACE_POS
+      int64_vector_t vec;
+      int64_vector_init(vec, H->t);
+      for (unsigned cpt = 0; cpt < H->t; cpt++) {
+        vec->c[cpt] = (int64_t) current_indexes[cpt];
+      }
+      mode_init_norm(file, vec, Mq, f_Z, array, H, mean_norm);
+      int64_vector_clear(vec);
+#endif // TRACE_POS
+
+    } 
+    update_mini_maxi(&mini, &maxi, tmp);
+
+    //TODO: arbitrary value. If maxi - mini <= 2, all the cells are intialzed to
+    //maxi.
+    if (maxi - mini > 2) {
+      unsigned int i = 0;
+      while (i < H->t && new_length[i] == 2) {
+        i++;
+      }
+      uint64_t stop = 1 << (H->t - all_length_2);
+
+      for (i = 0; i < H->t; i++) {
+        current_indexes[i] = bottom_left_cube[i];
+      }
+      current_indexes[0] = current_indexes[0] - new_length[0];
+      for (i = 0; i < stop; i++) {
+        //TODO: not H but other think (ie length)
+        next_bottom_left_cube_in_hypercube(current_indexes, new_length,
+            use_new_length, bottom_left_cube, length, H->t);
+        init_cells(array, max_norm, file, current_indexes, new_length, H, f, Mq,
+            spq, special_q, f_Z, mean_norm);
+          }
+    } else {
+      stop = 1;
+      for (unsigned int i = 0; i < H->t; i++) {
+        current_indexes[i] = bottom_left_cube[i];
+        stop = stop * (uint64_t)length[i];
+      }
+      current_indexes[0]--;
+
+      //TODO: use memset for the first coordinate.
+      for (uint64_t i = 0; i < stop; i++) {
+        add_one_values(current_indexes, bottom_left_cube, length, H->t);
+        tmp = array_get_at(array, current_indexes, H);
+        if (tmp == 255) {
+          array_set_at(array, current_indexes, maxi, H);
+
+#ifdef TRACE_POS
+      int64_vector_t vec;
+      int64_vector_init(vec, H->t);
+      for (unsigned cpt = 0; cpt < H->t; cpt++) {
+        vec->c[cpt] = (int64_t) current_indexes[cpt];
+      }
+      mode_init_norm(file, vec, Mq, f_Z, array, H, mean_norm);
+      int64_vector_clear(vec);
+#endif // TRACE_POS
+        } 
+      }
+    }
+  }
+  free(current_indexes);
+  free(new_length);
+  free(use_new_length);
+}
+
+void init_norm(array_ptr array, unsigned char * max_norm,
+    MAYBE_UNUSED FILE * file, sieving_bound_srcptr H, mat_Z_srcptr matrix,
+    mpz_poly_srcptr f, ideal_spq_srcptr spq, int special_q)
+{
+  ASSERT(special_q == 0 || special_q == 1);
+
+  //TODO: error if H = [1, 1, …]
+  srand(time(NULL));
+
+  MAYBE_UNUSED mpz_t mean_norm;
+#ifdef MEAN_NORM
+  mpz_init(mean_norm);
+#endif // MEAN_NORM
+
+  /*Coordinate of the hypercube*/
+  int * bottom_left_hypercube = (int *) malloc(sizeof(int) * H->t);
+  unsigned int * length_hypercube = (unsigned int *)
+    malloc(sizeof(unsigned int) * H->t);
+
+  /*First division of the hypercube*/
+  //Length of the first division of the sieving region in hypercubes.
+  unsigned int * length = (unsigned int * ) malloc(sizeof(unsigned int)
+      * H->t);
+  //Say if the length must be used, ie if the corresponding value in length is
+  //not equal to 2 for the first time.
+  unsigned int * use_length = (unsigned int * ) malloc(sizeof(unsigned int)
+      * H->t);
+  //Coordinate of the an extremal point. In 2 dimension, this point will be the
+  //point at the bottom left of a square.
+  int * bottom_left_cube = (int * ) malloc(sizeof(int) * H->t);
+
+  //TODO: why uint64_t?
+  uint64_t stop = (uint64_t) 1 << H->t;
+
+  //TODO: eventually, think about H->h[i] == 2.
+  //TODO: arbitrary value. The sieving bound gives 2^H->t smaller hypercubes.
+  for (uint64_t i = 0; i < H->t - 1; i++) {
+    length[i] = H->h[i];
+    use_length[i] = 1;
+    bottom_left_cube[i] = -(int) H->h[i];
+    bottom_left_hypercube[i] = -(int) H->h[i];
+    length_hypercube[i] = 2 * H->h[i];
+  }
+  length[H->t - 1] = H->h[H->t - 1] / 2;
+  use_length[H->t - 1] = 1;
+  bottom_left_cube[H->t - 1] = 0;
+  bottom_left_hypercube[H->t - 1] = 0;
+  length_hypercube[H->t - 1] = H->h[H->t - 1];
+
+  bottom_left_cube[0] = -(int) H->h[0] - (int)length[0];
+  bottom_left_cube[H->t - 1] = 0;
+
+  double_poly_t f_d;
+  double_poly_init(f_d, f->deg);
+  double_poly_set_const_mpz_poly(f_d, f);
+
+  mat_int64_t Mq;
+  mat_int64_init(Mq, matrix->NumRows, matrix->NumCols);
+  mat_Z_to_mat_int64(Mq, matrix);  
+
+  //Iterate on all the hypercube.
+  for (unsigned int i = 0; i < stop; i++) {
+    next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
+        bottom_left_hypercube, length_hypercube, H->t);
+    init_cells(array, max_norm, file, bottom_left_cube, length, H, f_d, Mq, spq,
+        special_q, f, mean_norm);
+  }
+
+#ifdef MEAN_NORM
+  mpz_cdiv_q_ui(mean_norm, mean_norm, array->number_element);
+  gmp_printf("# Mean of norms: %Zd.\n", mean_norm);
+  printf("# Bit length of the mean of norms: %zu.\n",
+      mpz_sizeinbase(mean_norm, 2));
+  mpz_clear(mean_norm);
+#endif // MEAN_NORM
+
+  mat_int64_clear(Mq);
+  double_poly_clear(f_d);
+  free(bottom_left_cube);
+  free(length);
+  free(use_length);
+  free(bottom_left_hypercube);
+  free(length_hypercube);
+}
+
+#else // OLD_NORM
+
 void pre_computation(double * pre_compute, mpz_poly_srcptr f, unsigned int d)
 {
   pre_compute[0] = 0;
@@ -284,459 +691,10 @@ void init_each_cell(array_ptr array, uint64_t i, int64_poly_ptr a,
   }
 }
 
-#else // OLD_NORM
-
-static void next_bottom_left_cube_in_hypercube(int * bottom_left_cube,
-    const unsigned int * length, const unsigned int * use_length,
-    const int * bottom_left_hypercube, const unsigned int * length_hypercube,
-    unsigned int t)
-{
-#ifndef NDEBUG
-  int tmp = 0;
-  int tmp2 = 0;
-  for (unsigned int j = 0; j < t; j++) {
-    tmp = tmp + bottom_left_cube[j];
-    tmp2 = tmp2 + bottom_left_hypercube[j] - (int)length[j] +
-      (int)length_hypercube[j];
-  }
-  ASSERT(tmp <= tmp2);
-#endif
-
-  unsigned int k = 0;
-  while(k < t) {
-    if (bottom_left_cube[k] + (int)length[k] == bottom_left_hypercube[k] +
-        (int)length_hypercube[k]) {
-      bottom_left_cube[k] = bottom_left_hypercube[k];
-      k++;
-    } else {
-      break;
-    }
-  }
-  if (k < t && use_length[k]) {
-    bottom_left_cube[k] = bottom_left_cube[k] + (int)length[k];
-  }
-
-#ifndef NDEBUG
-  for (unsigned int j = 0; j < t - 1; j++) {
-    tmp = bottom_left_cube[j];
-    ASSERT(tmp >= bottom_left_hypercube[j]);
-    ASSERT(tmp + (int)length[j] - 1 < bottom_left_hypercube[j] +
-        (int)length_hypercube[j]);
-  }
-  tmp = bottom_left_cube[t - 1];
-  ASSERT(tmp >= 0);
-  ASSERT(tmp + (int)length[t - 1] - 1 < bottom_left_hypercube[t - 1] +
-      (int)length_hypercube[t - 1]);
-#endif
-}
-
-void add_boolean(int * tab, unsigned int size)
-{
-#ifndef NDEBUG
-  for (unsigned int j = 0; j < size; j++) {
-    ASSERT(tab[j] < 2);
-    ASSERT(tab[j] > -2);
-  }
-#endif
-
-  unsigned int k = 0;
-  while(k < size) {
-    if (tab[k] == 1) {
-      tab[k] = 0;
-      k++;
-    } else {
-      break;
-    }
-  }
-  if (k < size) {
-    tab[k]++;
-  }
-
-#ifndef NDEBUG
-  for (unsigned int j = 0; j < size; j++) {
-    ASSERT(tab[j] < 2);
-    ASSERT(tab[j] > -1);
-  }
-#endif
-}
-
-void add_arrays(int * current_indexes, const int * current_values,
-    const int * true_false, const unsigned int * increment, unsigned int size)
-{
-  for (unsigned int i = 0; i < size; i++) {
-    current_indexes[i] = current_values[i] + (unsigned int) true_false[i] *
-      (increment[i] - 1);
-  }
-}
-
-unsigned char log_norm_double(const int * current_indexes, mat_int64_srcptr M,
-    double_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
-    MAYBE_UNUSED unsigned int size)
-{
-  ASSERT(size == M->NumRows);
-  ASSERT(size == M->NumCols);
-
-  double_poly_t poly;
-  double_poly_init(poly, M->NumRows);
-
-  int deg = -1;
-
-  for (unsigned int i = 0; i < M->NumRows; i++) {
-    int64_t tmp = 0;
-    for (unsigned int k = 0; k < M->NumCols; k++) {
-      tmp = tmp + M->coeff[i + 1][k + 1] * (int64_t) current_indexes[k];
-    }
-    poly->coeff[i] = (double) tmp;
-    if (tmp != 0) {
-      deg = (int) i;
-    }
-  }
-  poly->deg = deg;
-
-  double resultant = fabs(double_poly_resultant(poly, f));
-  double_poly_clear(poly);
-
-  ASSERT(resultant >= 0.0);
-
-  unsigned char res = (unsigned char) round(log2(resultant));
-
-  if (special_q) {
-    ASSERT(special_q == 1);
-
-    res = res - ideal_spq_get_log(spq);
-  }
-
-  return res;
-}
-
-void update_mini_maxi(unsigned char * mini, unsigned char * maxi,
-    unsigned char val)
-{
-  if (val < * mini) {
-    * mini = val;
-  }
-  if (val > * maxi) {
-    * maxi = val;
-  }
-}
-
-int generate_random_number(int a, int b)
-{
-  int random = rand() % (b - a) + a;
-
-  ASSERT(random >= a);
-  ASSERT(random < b);
-
-  return random;
-}
-
-void add_one_values(int * current_indexes, const int * bottom_left_cube,
-    const unsigned int * increment, unsigned int size)
-{
-#ifndef NDEBUG
-  int tmp = 0;
-  int tmp2 = 0;
-  for (unsigned int j = 0; j < size; j++) {
-    tmp = tmp + current_indexes[j];
-    tmp2 = tmp2 + bottom_left_cube[j] + (int)increment[j] - 1;
-  }
-  ASSERT(tmp <= tmp2);
-#endif
-
-  unsigned int k = 0;
-  while(k < size) {
-    if (current_indexes[k] == bottom_left_cube[k] + (int)increment[k] - 1) {
-      current_indexes[k] = bottom_left_cube[k];
-      k++;
-    } else {
-      break;
-    }
-  }
-  if (k < size) {
-    current_indexes[k]++;
-  }
-
-#ifndef NDEBUG
-  for (unsigned int j = 0; j < size - 1; j++) {
-    tmp = current_indexes[j];
-    ASSERT(tmp >= bottom_left_cube[j]);
-    ASSERT(tmp < bottom_left_cube[j] + (int) increment[j]);
-  }
-  tmp = current_indexes[size - 1];
-  ASSERT(tmp >= bottom_left_cube[size - 1]);
-  ASSERT(tmp < bottom_left_cube[size - 1] + (int) increment[size - 1]);
-#endif
-}
-
-static void init_cells(array_ptr array, MAYBE_UNUSED FILE * file,
-    const int * bottom_left_cube, const unsigned int * length,
-    sieving_bound_srcptr H, double_poly_srcptr f, mat_int64_srcptr Mq,
-    ideal_spq_srcptr spq, int special_q, MAYBE_UNUSED mpz_poly_srcptr f_Z,
-    MAYBE_UNUSED mpz_ptr mean_norm)
-{
-#ifndef NDEBUG
-  for (unsigned int i = 0; i < H->t; i++) {
-    ASSERT(length[i] >= 2);
-  }
-#endif // NDEBUG
-
-
-  int * true_false = (int *) malloc(sizeof(int) * H->t);
-  memset(true_false, 0, sizeof(int) * H->t);
-  true_false[0] = -1;
-
-  int * current_indexes = (int *) malloc(sizeof(int) * H->t);
-  memset(current_indexes, 0, sizeof(int) * H->t);
-
-  //Compute the number of vertices.
-  uint64_t stop = 1 << H->t;
-
-  unsigned char tmp = 0;
-  unsigned char maxi = 0;
-  unsigned char mini = UCHAR_MAX;
-
-  //Compute each norm of the vertices of the cube.
-  for (uint64_t i = 0; i < stop; i++) {
-    add_boolean(true_false, H->t);
-    add_arrays(current_indexes, bottom_left_cube, true_false, length, H->t);
-
-    //Get the possible value of current_indexes.
-    tmp = array_get_at(array, current_indexes, H);
-    if (tmp == 255) {
-      tmp = log_norm_double(current_indexes, Mq, f, spq, special_q, H->t);
-
-      array_set_at(array, current_indexes, tmp, H);
-
-#ifdef TRACE_POS
-      int64_vector_t vec;
-      int64_vector_init(vec, H->t);
-      for (unsigned cpt = 0; cpt < H->t; cpt++) {
-        vec->c[cpt] = (int64_t) current_indexes[cpt];
-      }
-      mode_init_norm(file, vec, Mq, f_Z, array, H, mean_norm);
-      int64_vector_clear(vec);
-#endif // TRACE_POS
-
-    } 
-    update_mini_maxi(&mini, &maxi, tmp);
-  }
-  free(true_false);
-
-  unsigned int * new_length = (unsigned int * ) malloc(sizeof(unsigned int) *
-      H->t);
-  memset(new_length, 0, sizeof(unsigned int) * H->t);
-  unsigned int * use_new_length = (unsigned int * ) malloc(
-      sizeof(unsigned int) * H->t);
-  memset(use_new_length, 0, sizeof(unsigned int) * H->t);
-  unsigned int all_length_2 = 0;
-
-  for (unsigned int i = 0; i < H->t; i++) {
-    //Generate a random element inside the cube.
-    current_indexes[i] = generate_random_number(bottom_left_cube[i],
-        bottom_left_cube[i] + length[i]);
-    if (length[i] > 2) {
-      new_length[i] = length[i] / 2;
-      use_new_length[i] = 1;
-    } else {
-      ASSERT(length[i] <= 2);
-
-      new_length[i] = 2;
-      all_length_2++;
-      use_new_length[i] = 0;
-    }
-  }
-
-
-  //If all_length_2 == H->t, all the cells are initialized.
-  if (all_length_2 != H->t) {
-
-    tmp = array_get_at(array, current_indexes, H);
-    if (tmp == 255) {
-      tmp = log_norm_double(current_indexes, Mq, f, spq, special_q, H->t);
-
-      array_set_at(array, current_indexes, tmp, H);
-
-#ifdef TRACE_POS
-      int64_vector_t vec;
-      int64_vector_init(vec, H->t);
-      for (unsigned cpt = 0; cpt < H->t; cpt++) {
-        vec->c[cpt] = (int64_t) current_indexes[cpt];
-      }
-      mode_init_norm(file, vec, Mq, f_Z, array, H, mean_norm);
-      int64_vector_clear(vec);
-#endif // TRACE_POS
-
-    } 
-    update_mini_maxi(&mini, &maxi, tmp);
-
-    //TODO: arbitrary value. If maxi - mini <= 2, all the cells are intialzed to
-    //maxi.
-    if (maxi - mini > 2) {
-      unsigned int i = 0;
-      while (i < H->t && new_length[i] == 2) {
-        i++;
-      }
-      uint64_t stop = 1 << (H->t - all_length_2);
-
-      for (i = 0; i < H->t; i++) {
-        current_indexes[i] = bottom_left_cube[i];
-      }
-      current_indexes[0] = current_indexes[0] - new_length[0];
-      for (i = 0; i < stop; i++) {
-        //TODO: not H but other think (ie length)
-        next_bottom_left_cube_in_hypercube(current_indexes, new_length,
-            use_new_length, bottom_left_cube, length, H->t);
-        init_cells(array, file, current_indexes, new_length, H, f, Mq, spq,
-            special_q, f_Z, mean_norm);
-          }
-    } else {
-      stop = 1;
-      for (unsigned int i = 0; i < H->t; i++) {
-        current_indexes[i] = bottom_left_cube[i];
-        stop = stop * (uint64_t)length[i];
-      }
-      current_indexes[0]--;
-
-      //TODO: use memset for the first coordinate.
-      for (uint64_t i = 0; i < stop; i++) {
-        add_one_values(current_indexes, bottom_left_cube, length, H->t);
-        tmp = array_get_at(array, current_indexes, H);
-        if (tmp == 255) {
-          array_set_at(array, current_indexes, maxi, H);
-
-#ifdef TRACE_POS
-      int64_vector_t vec;
-      int64_vector_init(vec, H->t);
-      for (unsigned cpt = 0; cpt < H->t; cpt++) {
-        vec->c[cpt] = (int64_t) current_indexes[cpt];
-      }
-      mode_init_norm(file, vec, Mq, f_Z, array, H, mean_norm);
-      int64_vector_clear(vec);
-#endif // TRACE_POS
-        } 
-      }
-    }
-  }
-  free(current_indexes);
-  free(new_length);
-  free(use_new_length);
-}
-#endif // OLD_NORM
-
-#ifdef OLD_NORM
 void init_norm(array_ptr array, MAYBE_UNUSED FILE * file, double * pre_compute,
     sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
     ideal_spq_srcptr spq, int special_q)
-#else // OLD_NORM
-void init_norm(array_ptr array, MAYBE_UNUSED FILE * file,
-    sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
-    ideal_spq_srcptr spq, int special_q)
-#endif // OLD_NORM
 {
-  ASSERT(special_q == 0 || special_q == 1);
-
-  //TODO: error if H = [1, 1, …]
-#ifndef OLD_NORM
-  srand(time(NULL));
-
-  MAYBE_UNUSED mpz_t mean_norm;
-#ifdef MEAN_NORM
-  mpz_init(mean_norm);
-#endif // MEAN_NORM
-
-  /*Coordinate of the hypercube*/
-  int * bottom_left_hypercube = (int *) malloc(sizeof(int) * H->t);
-  unsigned int * length_hypercube = (unsigned int *)
-    malloc(sizeof(unsigned int) * H->t);
-
-  /*First division of the hypercube*/
-  //Length of the first division of the sieving region in hypercubes.
-  unsigned int * length = (unsigned int * ) malloc(sizeof(unsigned int)
-      * H->t);
-  //Say if the length must be used, ie if the corresponding value in length is
-  //not equal to 2 for the first time.
-  unsigned int * use_length = (unsigned int * ) malloc(sizeof(unsigned int)
-      * H->t);
-  //Coordinate of the an extremal point. In 2 dimension, this point will be the
-  //point at the bottom left of a square.
-  int * bottom_left_cube = (int * ) malloc(sizeof(int) * H->t);
-
-  //TODO: why uint64_t?
-  uint64_t stop = (uint64_t) 1 << H->t;
-
-  //TODO: eventually, think about H->h[i] == 2.
-  //TODO: arbitrary value. The sieving bound gives 2^H->t smaller hypercubes.
-  for (uint64_t i = 0; i < H->t - 1; i++) {
-    length[i] = H->h[i];
-    use_length[i] = 1;
-    bottom_left_cube[i] = -(int) H->h[i];
-    bottom_left_hypercube[i] = -(int) H->h[i];
-    length_hypercube[i] = 2 * H->h[i];
-  }
-  length[H->t - 1] = H->h[H->t - 1] / 2;
-  use_length[H->t - 1] = 1;
-  bottom_left_cube[H->t - 1] = 0;
-  bottom_left_hypercube[H->t - 1] = 0;
-  length_hypercube[H->t - 1] = H->h[H->t - 1];
-
-  bottom_left_cube[0] = -(int) H->h[0] - (int)length[0];
-  bottom_left_cube[H->t - 1] = 0;
-
-  double_poly_t f_d;
-  double_poly_init(f_d, f->deg);
-  double_poly_set_const_mpz_poly(f_d, f);
-
-  mat_int64_t Mq;
-  mat_int64_init(Mq, matrix->NumRows, matrix->NumCols);
-  mat_Z_to_mat_int64(Mq, matrix);  
-
-  //Iterate on all the hypercube.
-  for (unsigned int i = 0; i < stop; i++) {
-    next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
-        bottom_left_hypercube, length_hypercube, H->t);
-    init_cells(array, file, bottom_left_cube, length, H, f_d, Mq, spq,
-        special_q, f, mean_norm);
-  }
-
-#ifdef MEAN_NORM
-  mpz_cdiv_q_ui(mean_norm, mean_norm, array->number_element);
-  gmp_printf("# Mean of norms: %Zd.\n", mean_norm);
-  printf("# Bit length of the mean of norms: %zu.\n",
-      mpz_sizeinbase(mean_norm, 2));
-  mpz_clear(mean_norm);
-#endif // MEAN_NORM
-
-#ifdef STAT_NORM_ARRAY
-  unsigned char norm_max = 0;
-  mpz_t mean_norm_bound;
-  mpz_t tmp;
-  mpz_init(mean_norm_bound);
-  mpz_init(tmp);
-  for (uint64_t i = 0; i < array->number_element; i++) {
-    mpz_set_d(tmp, pow(2.0, (double) array->array[i]));
-    mpz_add(mean_norm_bound, mean_norm_bound, tmp);
-    if (array->array[i] > norm_max) {
-      norm_max = array->array[i];
-    }
-  }
-  mpz_cdiv_q_ui(mean_norm_bound, mean_norm_bound, array->number_element);
-  printf("# Log of the mean of the initialized norms: %zu.\n",
-      mpz_sizeinbase(mean_norm_bound, 2));
-  printf("# Log of norm max: %u.\n", norm_max);
-  mpz_clear(mean_norm_bound);
-  mpz_clear(tmp);
-#endif // STAT_NORM_ARRAY
-
-  mat_int64_clear(Mq);
-  double_poly_clear(f_d);
-  free(bottom_left_cube);
-  free(length);
-  free(use_length);
-  free(bottom_left_hypercube);
-  free(length_hypercube);
-
-#else // OLD_NORM
-
   int64_vector_t vector;
   int64_vector_init(vector, H->t);
   int64_vector_setcoordinate(vector, 0, -(int64_t)H->h[0] - 1);
@@ -772,5 +730,5 @@ void init_norm(array_ptr array, MAYBE_UNUSED FILE * file,
   int64_poly_clear(a);
   int64_vector_clear(vector);
   mat_int64_clear(matrix_int);
-#endif // OLD_NORM
 }
+#endif // OLD_NORM
