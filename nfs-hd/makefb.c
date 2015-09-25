@@ -657,9 +657,8 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     factor_base_init(fb[k], max_number_element_1, max_number_element_u,
         max_number_element_pr);
 
-    uint64_t number_element_1, number_element_u, number_element_pr;
+    uint64_t number_element_1 = 0, number_element_u = 0, number_element_pr = 0;
 
-    number_element_1 = 0; 
     ideal_1_t ideal_1;
     ideal_1_init(ideal_1);
     for (uint64_t i = 0; i < max_number_element_1; i++) {
@@ -674,7 +673,6 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     }
     ideal_1_clear(ideal_1, t);
 
-    number_element_u = 0;
     ideal_u_t ideal_u;
     ideal_u_init(ideal_u);
     for (uint64_t i = 0; i < max_number_element_u; i++) {
@@ -692,21 +690,22 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     }
     ideal_u_clear(ideal_u, t);
 
-    number_element_pr = 0; 
-    ideal_pr_t ideal_pr;
-    ideal_pr_init(ideal_pr);
-    for (uint64_t i = 0; i < max_number_element_pr; i++) {
-      if (fgets(line, size_line, file) == NULL) {
-        return;
+    if (max_number_element_pr != 0) {
+      ideal_pr_t ideal_pr;
+      ideal_pr_init(ideal_pr);
+      for (uint64_t i = 0; i < max_number_element_pr; i++) {
+        if (fgets(line, size_line, file) == NULL) {
+          return;
+        }
+        parse_ideal_pr(ideal_pr, line, t);
+        if (ideal_pr->ideal->r <= fbb[k]) {
+          factor_base_set_ideal_pr(fb[k], number_element_pr, ideal_pr->ideal->r,
+              t);
+          number_element_pr++;
+        }
       }
-      parse_ideal_pr(ideal_pr, line, t);
-      if (ideal_pr->ideal->r <= fbb[k]) {
-        factor_base_set_ideal_pr(fb[k], number_element_pr, ideal_pr->ideal->r
-            , t);
-        number_element_pr++;
-      }
+      ideal_pr_clear(ideal_pr, t);
     }
-    ideal_pr_clear(ideal_pr, t);
 
     factor_base_realloc(fb[k], number_element_1, number_element_u,
         number_element_pr);
