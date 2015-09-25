@@ -345,12 +345,22 @@ def check_alpha_projective(f,B):
         s2 += a2
         print p, a, a2, s, s2
 
+# for small values of S
+def expected_alpha_small(S):
+   assert S <= 1e5
+   eq = 1/2*(1 - erf(x/sqrt(2)))
+   eq = eq^RR(S) == 0.5
+   return find_root(eq, -5, 0)
+
 # given a rootsieve space of S points, estimate the best alpha value
 # which is the solution of f(x)^S = 1/2 for f(x) = 1/2*(1 - erf(x/sqrt(2)))
 # expected_alpha(1e10) = -6.42
 # expected_alpha(1e15) = -7.99
 # expected_alpha(1e20) = -9.30
 def expected_alpha(S):
+   assert 1.0 <= S
+   if S <= 1e5:
+      return expected_alpha_small(S)
    R = RealField(100)
    y = R(1/2) # (1/2*(1 - erf(x/sqrt(2))))^S = y
    y = y^(1/S) # 1/2*(1 - erf(x/sqrt(2))) = y
