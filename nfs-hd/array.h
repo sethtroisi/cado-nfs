@@ -92,6 +92,9 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
 uint64_t array_mpz_vector_index(mpz_vector_srcptr v, sieving_bound_srcptr H,
     uint64_t number_element);
 
+void array_index_int64_vector(int64_vector_ptr v, uint64_t index,
+    sieving_bound_srcptr H, uint64_t number_element);
+
 /*
  * Return the index associated with a vector (int64_vector).
  *

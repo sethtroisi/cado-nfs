@@ -108,6 +108,40 @@ uint64_t array_mpz_vector_index(mpz_vector_srcptr v,
   return index;
 }
 
+void array_index_int64_vector(int64_vector_ptr v, uint64_t index,
+    sieving_bound_srcptr H, uint64_t number_element)
+{
+  ASSERT(v->dim == H->t);
+
+  unsigned int k = v->dim - 1;
+  uint64_t prod = number_element / ((uint64_t)H->h[k]);
+  uint64_t res = index / prod;
+  v->c[k] = (int64_t)res;
+  index = index - res * prod;
+  k = k - 1;
+  prod = prod / (2 * H->h[k]);
+  for ( ; k > 0; k--) {
+    res = index / prod;
+    v->c[k] = (int64_t)res - (int64_t)H->h[k];
+    index = index - res * prod;
+    prod = prod / (2 * H->h[k - 1]);
+  }
+  res = index / prod;
+  v->c[k] = (int64_t)res - (int64_t)H->h[k];
+
+#ifndef NDEBUG
+  int64_t tmp = 0;
+  for (unsigned int i = 0; i < v->dim - 1; i++) {
+    tmp = v->c[i];
+    ASSERT(tmp >= -(int64_t)H->h[i]);
+    ASSERT(tmp < (int64_t)H->h[i]);
+  }
+  tmp = v->c[v->dim - 1];
+  ASSERT(tmp >= 0);
+  ASSERT(tmp < (int64_t)H->h[H->t - 1]);
+#endif
+}
+
 uint64_t array_int64_vector_index(int64_vector_srcptr v,
     sieving_bound_srcptr H, MAYBE_UNUSED uint64_t number_element)
 {
