@@ -11,11 +11,9 @@
 #include "gmp_aux.h"
 #include "portability.h"
 
-/* Entry point for rootfind routines */
-
-
+/* Entry point for rootfind routines, for prime p */
 int
-mpz_poly_roots (mpz_t * r, mpz_poly_t F, const mpz_t p)
+mpz_poly_roots (mpz_t *r, mpz_poly_t F, const mpz_t p)
 {
     int d = F->deg;
 
@@ -48,8 +46,8 @@ mpz_poly_roots (mpz_t * r, mpz_poly_t F, const mpz_t p)
 }
 
 
-/* put in r[0], ..., r[n-1] the roots of F modulo p,
-   and the return value n is the number of roots (without multiplicities)     */
+/* put in r[0], ..., r[n-1] the roots of F modulo p, where p is prime,
+   and the return value n is the number of roots (without multiplicities) */
 int
 mpz_poly_roots_ulong (unsigned long *r, mpz_poly_t F, unsigned long p)
 {
