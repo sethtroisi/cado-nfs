@@ -2206,8 +2206,6 @@ int main(int argc, char * argv[])
         spq_tot++;
         for (unsigned int j = 0; j < V; j++) {
           printf("# Time to init norm %u: %fs.\n", j, time[j][0]);
-          printf("# Log 2 of the maximum of the norms %u: %u.\n", j,
-              max_norm[j]);
           printf("# Time to sieve %u: %fs.\n", j, time[j][1]);
           printf("# Time to find indexes %u: %fs.\n", j, time [j][2]);
 
