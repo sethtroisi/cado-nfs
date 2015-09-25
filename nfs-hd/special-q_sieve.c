@@ -19,6 +19,7 @@
 #include <limits.h>
 #include "utils_norm.h"
 #include "utils_cofactorisation.h"
+#include "ecm/facul.h"
 
 //TODO: change % in test + add or substract.
 
@@ -2265,6 +2266,7 @@ int main(int argc, char * argv[])
   free(thresh);
   free(q_range);
   cado_poly_clear(f);
+  free_saved_chains();
 
   return 0;
 }
