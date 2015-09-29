@@ -229,10 +229,9 @@ sopt_list_skewness_values (mpz_t *skew, mpz_poly_srcptr f, mpz_poly_srcptr g,
 {
   const int d = f->deg;
   unsigned int i = 0;
-  /* skew0 = (|g0/ad|)^(1/(d+1)): we take the (d+1)-th root instead of the
-     d-th root since with the LLL-multiplier, ad will increase */
+  /* skew0 = (|g0/ad|)^(1/(2d)): seems close to optimal experimentally */
   double skew0 = pow (fabs (mpz_get_d (g->coeff[0]) / mpz_get_d (f->coeff[d])),
-                      1.0 / (double) (d + 1));
+                      1.0 / (double) (2 * d));
   if (verbose)
     fprintf (stderr, "# sopt: skew0 = %f\n", skew0);
   for (int e = SOPT_NSKEW; e <= 3 * SOPT_NSKEW; e++, i++)
@@ -993,23 +992,23 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
 
 #define SOPT_INIT_SIZE_ALLOCATED_TRANSLATIONS 1024
 
-
-
 /* Size optimize the polynomial pair (f_raw, g_raw) with rotations and
    translations.
    Assume that deg(g) = 1.
    Return the size-optimized pair (f_opt, g_opt) and the skew lognorm of f_opt.
    The sopt_effort parameter is used to increase the number of translations that
    are considered. sopt_effort = 0 means that we consider only translations
+   Consider rotation up to x^max_rot*g(x), usually max_rot = d-2 or d-3.
    found by sopt_find_translation_deg* and the translation k = 0.
    TODO: LLL on gram matrix to be faster
    TODO: precompute skew^i for i in [0..d]
    TODO: return the n better poly not only the best one
 */
-double
-size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
-                   mpz_poly_srcptr f_raw, mpz_poly_srcptr g_raw,
-                   const unsigned int sopt_effort, const int verbose)
+static double
+size_optimization_aux (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
+                       mpz_poly_srcptr f_raw, mpz_poly_srcptr g_raw,
+                       const unsigned int sopt_effort, const int verbose,
+                       const int max_rot)
 {
   ASSERT_ALWAYS (f_raw->deg >= 2);
   ASSERT_ALWAYS (g_raw->deg == 1);
@@ -1106,10 +1105,10 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   /* Compute values of skewness that are going to be used in LLL */
   sopt_list_skewness_values (list_skew, f_raw, g_raw, verbose);
 
-  /* Init matrix for LLL. We consider rotation up to x^(d-2)*g(x), so m has d
-     row vectors (d-1 for the rotation + 1 for the polynomial f) of d+1
-     coefficients each. */
-  LLL_init (&m, d, d+1);
+  /* Init matrix for LLL. We consider rotation up to x^max_rot*g(x), so m has
+     max_rot+2 row vectors (max_rot+1 for the rotation + 1 for the polynomial f)
+     of d+1 coefficients each. */
+  LLL_init (&m, max_rot + 2, d+1);
   /* The transformation matrix is a square matrix of size d (because m has d
      row vectors). */
   LLL_init (&U, d, d);
@@ -1226,4 +1225,15 @@ size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   }
 
   return best_lognorm;
+}
+
+double
+size_optimization (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
+                   mpz_poly_srcptr f_raw, mpz_poly_srcptr g_raw,
+                   const unsigned int sopt_effort, const int verbose)
+{
+  int d = f_raw->deg;
+  /* rotation up to degree d-2 */
+  return size_optimization_aux (f_opt, g_opt, f_raw, g_raw,
+                                sopt_effort, verbose, d - 2);
 }
