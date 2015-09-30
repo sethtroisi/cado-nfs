@@ -1,5 +1,4 @@
 #include "cado.h"
-
 #include <stdio.h>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
@@ -110,7 +109,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         indices_apply_P(mmt, gxvecs, nx * bw->m, bw->dir);
 
     // xvec_to_vec(mmt, gxvecs, bw->m, nx, bw->dir);
-    // matmul_top_save_vector(mmt, "Z", bw->dir, 0);
 
     /* let's be generous with interleaving protection. I don't want to be
      * bothered, really */
@@ -125,7 +123,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
         if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-        matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
+        mmt_vec_load(mmt, NULL, v_name, bw->dir, bw->start, unpadded);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
@@ -150,12 +148,12 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             printf("// Random generator seeded with %d\n", bw->seed);
         }
         if (tcan_print) { printf("Creating fake %s...", v_name); fflush(stdout); }
-        matmul_top_set_random_and_save_vector(mmt, v_name, bw->dir, bw->start, unpadded, rstate);
+        mmt_vec_set_random_through_file(mmt, NULL, v_name, bw->dir, bw->start, unpadded, rstate);
         if (tcan_print) { printf("done\n"); }
 #else
         unsigned long g = pi->m->jrank * pi->m->ncores + pi->m->trank;
         gmp_randseed_ui(rstate, bw->seed + g);
-        matmul_top_set_random_inconsistent(mmt, bw->dir, rstate);
+        mmt_vec_set_random_inconsistent(mmt, NULL, bw->dir, rstate);
 #endif
         gmp_randclear(rstate);
     }
@@ -167,10 +165,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     mpfq_vbase_oo_init_templates(AxAc, A, Ac);
 
     if (!bw->skip_online_checks) {
-        matmul_top_vec_init_generic(mmt, Ac, Ac_pi,
+        mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, !bw->dir, THREAD_SHARED_VECTOR);
         if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-        matmul_top_load_vector_generic(mmt,
+        mmt_vec_load(mmt,
                 check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval, unpadded);
         if (tcan_print) { printf("done\n"); }
     }
@@ -333,7 +331,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
-        matmul_top_save_vector(mmt, v_name, bw->dir, s + bw->interval, unpadded);
+        mmt_vec_save(mmt, NULL, v_name, bw->dir, s + bw->interval, unpadded);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0)
             keep_rolling_checkpoints(v_name, s + bw->interval);
@@ -341,10 +339,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         serialize(pi->m);
 
         // reached s + bw->interval. Count our time on cpu, and compute the sum.
-        timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, 0);
+        timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, "krylov");
     }
 
-    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, 0);
+    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, "krylov");
 
 #if 0
     pi_log_clear(pi->m);
@@ -353,14 +351,14 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 #endif
 
     if (tcan_print) {
-        printf("Done.\n");
+        printf("Done krylov.\n");
     }
     serialize(pi->m);
 
     vec_clear_generic(pi->m, xymats, bw->m*bw->interval);
 
     if (!bw->skip_online_checks) {
-        matmul_top_vec_clear_generic(mmt, check_vector, !bw->dir);
+        mmt_vec_clear(mmt, check_vector, !bw->dir);
         vec_clear_generic(pi->m, ahead, nchecks);
     }
 

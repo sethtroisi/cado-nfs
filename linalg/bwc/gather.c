@@ -237,7 +237,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (rhscoeffs_name) {
         if (!pi->m->trank && !pi->m->jrank)
             rhscoeffs_file = fopen(rhscoeffs_name, "rb");
-        matmul_top_vec_init_generic(mmt, A, A_pi, rhscoeffs_vec, bw->dir, 0);
+        mmt_vec_init(mmt, A, A_pi, rhscoeffs_vec, bw->dir, 0);
     }
 
     for(int s = 0 ; s < sl->nsols ; s++) {
@@ -352,7 +352,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         /* This is a noop if bw->dir == 0 */
         matmul_top_unapply_T(mmt, bw->dir);
-        matmul_top_save_vector(mmt, kprefix, bw->dir, 0, unpadded);
+        mmt_vec_save(mmt, NULL, kprefix, bw->dir, 0, unpadded);
         matmul_top_apply_T(mmt, bw->dir);
                 
         int is_zero = 0;
@@ -392,7 +392,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 char * tmp;
                 int rc = asprintf(&tmp, R_FILE_BASE_PATTERN, sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
-                matmul_top_load_vector_generic(mmt, rhscoeffs_vec, tmp, bw->dir, 0, unpadded);
+                mmt_vec_load(mmt, rhscoeffs_vec, tmp, bw->dir, 0, unpadded);
                 free(tmp);
                 if (rhscoeffs_file) {
                     /* Now get rid of the R file, we don't need it */
@@ -424,7 +424,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             if (rhscoeffs_name) break;
 
             matmul_top_unapply_T(mmt, bw->dir);
-            matmul_top_save_vector(mmt, kprefix, bw->dir, i, unpadded);
+            mmt_vec_save(mmt, NULL, kprefix, bw->dir, i, unpadded);
             matmul_top_apply_T(mmt, bw->dir);
             matmul_top_twist_vector(mmt, bw->dir);
         }
@@ -485,7 +485,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     if (rhscoeffs_file) fclose(rhscoeffs_file);
-    if (rhscoeffs_name) matmul_top_vec_clear_generic(mmt, rhscoeffs_vec, bw->dir);
+    if (rhscoeffs_name) mmt_vec_clear(mmt, rhscoeffs_vec, bw->dir);
 
     vec_clear_generic(pi->m, svec, ii1-ii0);
     vec_clear_generic(pi->m, tvec, ii1-ii0);

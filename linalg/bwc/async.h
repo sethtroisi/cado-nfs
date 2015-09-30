@@ -51,8 +51,8 @@ void timing_next_timer(struct timing_data * t);
 
 void timing_check(parallelizing_info pi, struct timing_data * t, int iter, int print);
 void timing_update_ticks(struct timing_data * t, int iter);
-void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage);
-void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print, int stage);
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, const char * stage);
+void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print, const char * stage);
 
 void block_control_signals();
 void catch_control_signals();

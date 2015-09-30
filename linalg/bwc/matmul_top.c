@@ -190,7 +190,7 @@ void vec_clear_generic(pi_comm_ptr picol, mmt_vec_ptr v, unsigned int n MAYBE_UN
 }
 /*}}}*/
 /* {{{ vector init/clear (still generic, but for usual-size vectors) */
-void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int d, int flags)
+void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int d, int flags)
 {
     if (v == NULL) v = mmt->wr[d]->v;
     if (abase == NULL) abase = mmt->abase;
@@ -200,7 +200,7 @@ void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, 
     vec_init_generic(mmt->pi->wr[d], abase, pitype, v, flags, n1);
 }
 
-void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
+void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
 {
     if (v == NULL) v = mmt->wr[d]->v;
     unsigned int n1 = mmt->wr[d]->i1 - mmt->wr[d]->i0;
@@ -208,16 +208,26 @@ void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
     vec_clear_generic(mmt->pi->wr[d], v, n1);
 }
 /* }}} */
-/* {{{ vector init/clear (top level) */
-void matmul_top_vec_init(matmul_top_data_ptr mmt, int d, int flags)
+
+/* This copies **ONLY** our locally owned data from v to w. No provision
+ * is made to handle the case where we would want a broader copy. For
+ * that, a priori we want all threads to contribute.
+ */
+void mmt_vec_set(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v, int d)
 {
-    matmul_top_vec_init_generic(mmt, NULL, NULL, NULL, d, flags);
+    mmt_comm_ptr mcol = mmt->wr[d];
+    if (w == NULL) w = mcol->v;
+    if (v == NULL) v = mcol->v;
+    ASSERT_ALWAYS(v->abase == w->abase);
+    pi_comm_ptr picol = mmt->pi->wr[d];
+    ASSERT_ALWAYS((mcol->i1 - mcol->i0) % picol->totalsize == 0);
+    size_t eblock = (mcol->i1 - mcol->i0) /  picol->totalsize;
+    int pos = picol->jrank * picol->ncores + picol->trank;
+    void * src = SUBVEC(v, v, pos * eblock);
+    void * dst = SUBVEC(w, v, pos * eblock);
+    v->abase->vec_set(v->abase, dst, src, eblock);
 }
-void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d)
-{
-    matmul_top_vec_clear_generic(mmt, NULL, d);
-}
-/* }}} */
+
 
 /* {{{ broadcast_down (generic interface) */
 /* broadcast_down reads data in mmt->wr[d]->v, and broadcasts it across the
@@ -420,7 +430,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
 
 /* {{{ generic interfaces for load/save */
 /* {{{ load (generic) */
-void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk)
+void mmt_vec_load(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk)
 {
     if (v == NULL) v = mmt->wr[d]->v;
 
@@ -461,7 +471,7 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, cons
 }
 /* }}} */
 /* {{{ save (generic) */
-void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk)
+void mmt_vec_save(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk)
 {
     if (v == NULL) v = mmt->wr[d]->v;
 
@@ -1350,6 +1360,7 @@ void apply_balancing_permutation(matmul_top_data_ptr mmt, int d)
 
     matmul_top_zero_vec_area(mmt, !d);
     serialize_threads(mmt->pi->m);
+
     for(uint32_t i = 0 ; i < mmt->mm->ntwists ; i++) {
         uint32_t u = mmt->mm->twist[i][0];
         uint32_t v = mmt->mm->twist[i][1];
@@ -1806,20 +1817,13 @@ void matmul_top_mul_comm(matmul_top_data_ptr mmt, int d)
 // Doing a broadcast_down columns will ensure that each row contains
 // the complete data set for our vector.
 
-/* The first function is the back-end, run only on the top row.
- */
-void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk)
+void mmt_vec_set_random_through_file(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate)
 {
-    matmul_top_save_vector_generic(mmt, NULL, name, d, iter, itemsondisk);
-}
-
-void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk)
-{
-    matmul_top_load_vector_generic(mmt, NULL, name, d, iter, itemsondisk);
-}
-
-void matmul_top_set_random_and_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate)
-{
+    /* FIXME: this generates the complete vector on rank 0, saves it, and
+     * loads it again. But I'm a bit puzzled by the choice of saving a
+     * number of items which is n0[d]. Seems to me that this is in fact
+     * incorrect, we want n0[!d] here.
+     */
     mpfq_vbase_ptr A = mmt->abase;
     pi_datatype_ptr A_pi = mmt->pitype;
     parallelizing_info_ptr pi = mmt->pi;
@@ -1848,13 +1852,14 @@ void matmul_top_set_random_and_save_vector(matmul_top_data_ptr mmt, const char *
         A->vec_clear(A, &y, mmt->n[d]);
         free(filename);
     }
-    matmul_top_load_vector(mmt, name, d, iter, itemsondisk);
+    mmt_vec_load(mmt, v, name, d, iter, itemsondisk);
 }
 
-void matmul_top_set_random_inconsistent(matmul_top_data_ptr mmt, int d, gmp_randstate_t rstate)
+void mmt_vec_set_random_inconsistent(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d, gmp_randstate_t rstate)
 {
+    if (v == NULL) v = mmt->wr[d]->v;
     mmt_comm_ptr wr = mmt->wr[d];
-    mmt->abase->vec_random(mmt->abase, wr->v->v, wr->i1 - wr->i0, rstate);
+    mmt->abase->vec_random(mmt->abase, v->v, wr->i1 - wr->i0, rstate);
 }
 
 
@@ -2049,10 +2054,8 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
     }
 
     /* NOTE: flags default to zero */
-    matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
-    matmul_top_vec_init(mmt, 1, flags ? flags[1] : 0);
-
-
+    mmt_vec_init(mmt, NULL, NULL, NULL, 0, flags ? flags[0] : 0);
+    mmt_vec_init(mmt, NULL, NULL, NULL, 1, flags ? flags[1] : 0);
 }
 
 static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl)
@@ -2239,6 +2242,24 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
                 printf("Begin creation of fake matrix data in parallel\n");
             }
             random_matrix_get_u32(mmt->pi, pl, m);
+            /* Fill in ntwists. It's important for BL, since otherwise
+             * with fake matrices the untwisting will in effect multiply
+             * by zero...
+             */
+            mmt_comm_ptr mrow = mmt->wr[0];
+            mmt_comm_ptr mcol = mmt->wr[1];
+            unsigned int nx;
+            unsigned int row_offset;
+            unsigned int col_offset;
+            nx = intersect_two_intervals(&row_offset, &col_offset, mrow->i0, mrow->i1, mcol->i0, mcol->i1);
+            ASSERT_ALWAYS(m->ntwists == 0);
+            ASSERT_ALWAYS(m->twist == NULL);
+            m->ntwists = nx;
+            m->twist = malloc(nx * sizeof(uint32_t[2]));
+            for(unsigned int i = 0 ; i < nx ; i++) {
+                m->twist[i][0] = mrow->i0 + row_offset + i;
+                m->twist[i][1] = mrow->i0 + row_offset + i;
+            }
         } else {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Matrix dispatching starts\n");
@@ -2307,8 +2328,8 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
     serialize(mmt->pi->m);
     serialize_threads(mmt->pi->m);
 
-    matmul_top_vec_clear(mmt,0);
-    matmul_top_vec_clear(mmt,1);
+    mmt_vec_clear(mmt,NULL,0);
+    mmt_vec_clear(mmt,NULL,1);
 #if RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL
     for(int d = 0 ; d < 2 ; d++)  {
         free(mmt->wr[d]->rsbuf[0]); mmt->wr[d]->rsbuf[0] = NULL;

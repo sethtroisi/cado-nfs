@@ -892,7 +892,7 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
                s->my_row0, s->my_nrows,
                s->my_col0, s->my_ncols);
 
-    s->mat->twist=malloc(s->my_nrows * sizeof(int[2]));
+    s->mat->twist=malloc(s->my_nrows * sizeof(uint32_t[2]));
     s->mat->ntwists=0;
 
     /*
@@ -1169,8 +1169,8 @@ void slave_loop(slave_data s)
     slave_dest_stats((slave_dest_ptr) output);
 
     slave_dest_engage_final_pass((slave_dest_ptr) output);
-    s->mat->twist = realloc(s->mat->twist, s->mat->ntwists * sizeof(int[2]));
-    qsort(s->mat->twist, s->mat->ntwists, sizeof(int[2]), (sortfunc_t) &intpair_cmp);
+    s->mat->twist = realloc(s->mat->twist, s->mat->ntwists * sizeof(uint32_t[2]));
+    qsort(s->mat->twist, s->mat->ntwists, sizeof(uint32_t[2]), (sortfunc_t) &intpair_cmp);
 
     if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
         printf("[J%uT%u] building local matrix\n",

@@ -178,12 +178,10 @@ extern void matmul_top_clear(matmul_top_data_ptr mmt);
 #if 0
 extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
 #endif
-extern void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
-extern void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
-extern void matmul_top_set_random_and_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate);
+extern void mmt_vec_set_random_through_file(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate);
 /* do not use this function if you want consistency when the splitting
  * changes ! */
-extern void matmul_top_set_random_inconsistent(matmul_top_data_ptr mmt, int d, gmp_randstate_t rstate);
+extern void mmt_vec_set_random_inconsistent(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d, gmp_randstate_t rstate);
 
 
 extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d);
@@ -218,9 +216,6 @@ extern void matmul_top_untwist_vector(matmul_top_data_ptr mmt, int d);
 extern void indices_apply_S(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);
 extern void indices_apply_P(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);
 
-extern void matmul_top_vec_init(matmul_top_data_ptr mmt, int d, int flags);
-extern void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d);
-
 /* Now some of the generic interface calls. By design, not everything is
  * possible with these calls. In particular, nothing critical is doable.
  * As a general convention, the only thing these calls need to know about
@@ -230,13 +225,14 @@ extern void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d);
  * vector defined in the mmt data for the given direction flag. */
 
 
-extern void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr, mmt_vec_ptr v, int d, int flags);
-extern void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
+extern void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr, mmt_vec_ptr v, int d, int flags);
+extern void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
+extern void mmt_vec_set(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v, int d);
 #if 0
 extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_vec_ptr v, int d);
 #endif
-extern void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
-extern void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
+extern void mmt_vec_load(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
+extern void mmt_vec_save(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 
 /* These two do not really belong here, but come as a useful complement */
 extern void vec_init_generic(pi_comm_ptr, mpfq_vbase_ptr, pi_datatype_ptr, mmt_vec_ptr, int, unsigned int);
@@ -246,7 +242,8 @@ extern void vec_clear_generic(pi_comm_ptr, mmt_vec_ptr, unsigned int);
  * allreduce_across is really useful, though. We use it for the block
  * Lanczos iterations, too.
  */
-// extern void broadcast_down(matmul_top_data_ptr mmt, int d);
+/* FIXME: well, for BL I fear that I might need broadcast_down */
+extern void broadcast_down(matmul_top_data_ptr mmt, int d);
 // extern void reduce_across(matmul_top_data_ptr mmt, int d);
 extern void allreduce_across(matmul_top_data_ptr mmt, int d);
 // extern void apply_permutation(matmul_top_data_ptr mmt, int d);

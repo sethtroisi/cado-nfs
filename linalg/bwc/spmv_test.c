@@ -67,35 +67,35 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         printf("bw->dir==%d d==%d\n", bw->dir, d);
     // known strategies:
     
-    matmul_top_load_vector(mmt, "Y", d, 0, unpadded);
+    mmt_vec_load(mmt, NULL, "Y", d, 0, unpadded);
     matmul_top_twist_vector(mmt, d);
     matmul_top_mul(mmt, d);
     matmul_top_untwist_vector(mmt, d);
-    matmul_top_save_vector(mmt, "MY", d, 0, unpadded);
+    mmt_vec_save(mmt, NULL, "MY", d, 0, unpadded);
 
 #if 0
     matmul_top_apply_P(mmt, d);
-    matmul_top_save_vector(mmt, "xA", d, 0);
+    mmt_vec_save(mmt, NULL, "xA", d, 0);
 
-    matmul_top_load_vector(mmt, "Y", d, 0);
+    mmt_vec_load(mmt, NULL, "Y", d, 0);
     matmul_top_unapply_P(mmt, d);
-    matmul_top_save_vector(mmt, "xB", d, 0);
+    mmt_vec_save(mmt, NULL, "xB", d, 0);
 
-    matmul_top_load_vector(mmt, "Y", d, 0);
+    mmt_vec_load(mmt, NULL, "Y", d, 0);
     matmul_top_apply_P_apply_S(mmt, d);
-    matmul_top_save_vector(mmt, "xC", d, 0);
+    mmt_vec_save(mmt, NULL, "xC", d, 0);
 
-    matmul_top_load_vector(mmt, "Y", d, 0);
+    mmt_vec_load(mmt, NULL, "Y", d, 0);
     matmul_top_unapply_S_unapply_P(mmt, d);
-    matmul_top_save_vector(mmt, "xD", d, 0);
+    mmt_vec_save(mmt, NULL, "xD", d, 0);
 
-    matmul_top_load_vector(mmt, "Y", d, 0);
+    mmt_vec_load(mmt, NULL, "Y", d, 0);
     matmul_top_apply_S(mmt, d);
-    matmul_top_save_vector(mmt, "xE", d, 0);
+    mmt_vec_save(mmt, NULL, "xE", d, 0);
 
-    matmul_top_load_vector(mmt, "Y", d, 0);
+    mmt_vec_load(mmt, NULL, "Y", d, 0);
     matmul_top_unapply_S(mmt, d);
-    matmul_top_save_vector(mmt, "xF", d, 0);
+    mmt_vec_save(mmt, NULL, "xF", d, 0);
 #endif
 
 #if 0
@@ -108,9 +108,9 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     // twist
     // bw->dir==1 d==1 Pr^-1*Sr^-1*zu
     // bw->dir==1 d==0 Pr*Sr*zu
-    matmul_top_load_vector(mmt, "U", d, 0);
+    mmt_vec_load(mmt, NULL, "U", d, 0);
     matmul_top_twist_vector(mmt, d);
-    matmul_top_save_vector(mmt, "V", d, 0);
+    mmt_vec_save(mmt, NULL, "V", d, 0);
 #endif
 
 #if 0
@@ -119,12 +119,12 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     // other direction: Sr*Pr*zu
     // bw->dir==1 d==0 Sr^-1*Pr^-1*zu;
     // bw->dir==1 d==1 Sr*Pr*zu;
-    matmul_top_load_vector(mmt, "U", d, 0);
+    mmt_vec_load(mmt, NULL, "U", d, 0);
     matmul_top_untwist_vector(mmt, d);
-    matmul_top_save_vector(mmt, "V", d, 0);
+    mmt_vec_save(mmt, NULL, "V", d, 0);
 #endif
     // apply_identity(mmt, d);
-    // matmul_top_save_vector(mmt, "V", !d, 0);
+    // mmt_vec_save(mmt, NULL, "V", !d, 0);
 
     serialize(pi->m);
 
@@ -134,8 +134,8 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     memcpy(oldv[1], mmt->wr[1]->v, sizeof(mmt_vec));
     memset(mmt->wr[0]->v, 0, sizeof(mmt_vec));
     memset(mmt->wr[1]->v, 0, sizeof(mmt_vec));
-    matmul_top_vec_init(mmt, 0, flags[1 ^ 0]);
-    matmul_top_vec_init(mmt, 1, flags[1 ^ 1]);
+    mmt_vec_init(mmt, NULL, NULL, NULL, 0, flags[1 ^ 0]);
+    mmt_vec_init(mmt, NULL, NULL, NULL, 1, flags[1 ^ 1]);
 
     serialize_threads(mmt->pi->m);
 
@@ -147,10 +147,10 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     serialize_threads(mmt->pi->m);
 
     matmul_top_mul_comm(mmt, bw->dir);
-    matmul_top_save_vector(mmt, CHECK_FILE_BASE, bw->dir, bw->interval);
+    mmt_vec_save(mmt, NULL, CHECK_FILE_BASE, bw->dir, bw->interval);
 
-    matmul_top_vec_clear(mmt, 0);
-    matmul_top_vec_clear(mmt, 1);
+    mmt_vec_clear(mmt, NULL, 0);
+    mmt_vec_clear(mmt, NULL, 1);
     memcpy(mmt->wr[0]->v, oldv[0], sizeof(mmt_vec));
     memcpy(mmt->wr[1]->v, oldv[1], sizeof(mmt_vec));
     memset(oldv[0], 0, sizeof(mmt_vec));

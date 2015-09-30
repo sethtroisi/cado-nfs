@@ -282,3 +282,5 @@ if (HAVE_MPI)
     test_hello_mpi(1322 mpi=1x3 thr=2x2)
     test_hello_mpi(3222 mpi=3x2 thr=2x2)
 endif()
+
+cado_define_test(test_bl_extraction.c LIBRARIES bwc_base)

@@ -67,7 +67,7 @@ void save_untwisted_transposed_vector(matmul_top_data_ptr mmt, const char * name
     matmul_top_mul_comm(mmt, !d);
     serialize_threads(mmt->pi->m);
 
-    matmul_top_save_vector(mmt, name, !d, iter);
+    mmt_vec_save(mmt, NULL, name, !d, iter);
     // v --> Pr^-1 * v      [[ Pr^-1*Sr^-1*v ]]
     if (picol->trank == 0 || !(mcol->v->flags & THREAD_SHARED_VECTOR)) {
         if (picol->jrank == 0 && picol->trank == 0) {
@@ -158,9 +158,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     // allreduce_across(mmt, !bw->dir);
 
     // matmul_top_twist_vector(mmt, !bw->dir);
-    // matmul_top_save_vector(mmt, "ux", !bw->dir, 0);
+    // mmt_vec_save(mmt, NULL, "ux", !bw->dir, 0);
     // save_untwisted_transposed_vector(mmt, "tx", !bw->dir, 0);
-    matmul_top_save_vector(mmt, CHECK_FILE_BASE, !bw->dir, 0, unpadded);
+    mmt_vec_save(mmt, NULL, CHECK_FILE_BASE, !bw->dir, 0, unpadded);
 
 
     if (tcan_print) {
@@ -201,7 +201,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         serialize(pi->m);
         serialize_threads(mmt->pi->m);
         matmul_top_untwist_vector(mmt, !bw->dir);
-        matmul_top_save_vector(mmt, CHECK_FILE_BASE, !bw->dir, k, unpadded);
+        mmt_vec_save(mmt, NULL, CHECK_FILE_BASE, !bw->dir, k, unpadded);
         if (tcan_print) {
             printf("saved %s.%d\n", CHECK_FILE_BASE, next);
         }

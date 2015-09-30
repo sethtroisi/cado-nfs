@@ -143,7 +143,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
         if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-        matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
+        mmt_vec_load(mmt, NULL, v_name, bw->dir, bw->start, unpadded);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
@@ -158,7 +158,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             printf("// Random generator seeded with %d\n", bw->seed);
         }
         if (tcan_print) { printf("Creating fake %s...", v_name); fflush(stdout); }
-        matmul_top_set_random_and_save_vector(mmt, v_name, bw->dir, bw->start, unpadded, rstate);
+        mmt_vec_set_random_through_file(mmt, NULL, v_name, bw->dir, bw->start, unpadded, rstate);
         if (tcan_print) { printf("done\n"); }
         gmp_randclear(rstate);
     }
@@ -180,10 +180,10 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     mpfq_vbase_oo_init_templates(AxAr, A, Ar);
 
     if (!bw->skip_online_checks) {
-        matmul_top_vec_init_generic(mmt, Ac, Ac_pi,
+        mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, !bw->dir, THREAD_SHARED_VECTOR);
         if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-        matmul_top_load_vector_generic(mmt,
+        mmt_vec_load(mmt,
                 check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval, unpadded);
         if (tcan_print) { printf("done\n"); }
     }
@@ -443,7 +443,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             }
         }
 
-        matmul_top_save_vector(mmt, v_name, bw->dir, s + bw->interval, unpadded);
+        mmt_vec_save(mmt, NULL, v_name, bw->dir, s + bw->interval, unpadded);
 
         /* We need to write our S files, untwisted. There are several
          * ways to do this untwisting. In order to keep the memory
@@ -508,7 +508,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             }
             // TODO: There is not much preventing us from using simply
             // something like:
-            // matmul_top_save_vector(mmt, s_name, bw->dir, s +
+            // mmt_vec_save(mmt, NULL, s_name, bw->dir, s +
             // bw->interval, unpadded);
             // since after the matmul_top_untwist_vector call, we really
             // have something which is ready to go trhough
@@ -537,7 +537,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         serialize(pi->m);
 
         /* recover the vector */
-        matmul_top_load_vector(mmt, v_name, bw->dir, s + bw->interval, unpadded);
+        mmt_vec_load(mmt, NULL, v_name, bw->dir, s + bw->interval, unpadded);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0)
             keep_rolling_checkpoints(v_name, s + bw->interval);
@@ -545,20 +545,20 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         serialize(pi->m);
 
         // reached s + bw->interval. Count our time on cpu, and compute the sum.
-        timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, 1);
+        timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, "mksol");
     }
-    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, 1);
+    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, "mksol");
 
     if (tcan_print) {
-        printf("Done.\n");
+        printf("Done mksol.\n");
     }
     serialize(pi->m);
 
     for(unsigned int k = 0 ; k < multi ; k++) {
-        matmul_top_vec_clear_generic(mmt, sum[k], bw->dir);
+        mmt_vec_clear(mmt, sum[k], bw->dir);
     }
     if (!bw->skip_online_checks) {
-        matmul_top_vec_clear_generic(mmt, check_vector, !bw->dir);
+        mmt_vec_clear(mmt, check_vector, !bw->dir);
         vec_clear_generic(pi->m, ahead, nchecks);
         free(gxvecs);
     }

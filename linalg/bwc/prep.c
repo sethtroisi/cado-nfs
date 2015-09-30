@@ -112,7 +112,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
          * better.
          */
 
-        matmul_top_set_random_and_save_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded, rstate);
+        mmt_vec_set_random_through_file(mmt, NULL, Y_FILE_BASE, bw->dir, 0, unpadded, rstate);
 
         if (tcan_print) {
             printf("// vector generated and dispatched (trial # %u)\n", ntri);
@@ -124,7 +124,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded);
+        mmt_vec_save(mmt, NULL, Y_FILE_BASE, bw->dir, 0, unpadded);
 #endif
 
         // We must compute x^T M y, x^T M^2 y, and so on.

@@ -228,8 +228,7 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
 
 static const char * timer_names[] = TIMER_NAMES;
 
-/* stage=0 for krylov, 1 for mksol */
-void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage, int done)
+void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, const char * stage, int done)
 {
     if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_ITERATION_TIMINGS))
         return;
@@ -321,7 +320,7 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
             for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
 
             printf("%s: N=%d ; ETA (N=%d): %s [%.3f s/iter]\n",
-                   (stage == 0) ? "krylov" : "mksol",
+                   stage,
                    iter, timing->end_mark, eta_string, avdwct);
         }
     }
@@ -331,12 +330,12 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
     serialize_threads(pi->m);
 }
 
-void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage)
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, const char * stage)
 {
     timing_disp_backend(pi, timing, iter, ncoeffs, print, stage, 0);
 }
 
-void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print, int stage)
+void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print, const char * stage)
 {
     timing_disp_backend(pi, timing, timing->end_mark, ncoeffs, print, stage, 1);
 }

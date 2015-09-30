@@ -110,7 +110,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         matmul_top_twist_vector(mmt, 1);
         matmul_top_mul(mmt, 1);
         matmul_top_untwist_vector(mmt, 1);
-        matmul_top_save_vector(mmt, "Hx", 1, 0, unpadded);
+        mmt_vec_save(mmt, NULL, "Hx", 1, 0, unpadded);
         // compare if files are equal.
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             char cmd[1024];
@@ -159,7 +159,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         matmul_top_twist_vector(mmt, 0);
         matmul_top_mul(mmt, 0);
         matmul_top_untwist_vector(mmt, 0);
-        matmul_top_save_vector(mmt, "Hy", 0, 0, unpadded);
+        mmt_vec_save(mmt, NULL, "Hy", 0, 0, unpadded);
         A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
         for(unsigned int i = mcol->i0 ; i < mcol->i1 && i < unpadded ; i++) {
             void * dst = SUBVEC(mcol->v, v, i - mcol->i0);

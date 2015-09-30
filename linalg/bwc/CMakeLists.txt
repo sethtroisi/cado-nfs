@@ -333,6 +333,8 @@ bwc_program(dispatch dispatch.c xdotprod.c)
 bwc_program(mksol mksol.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
+bwc_program(blocklanczos blocklanczos.c)
+target_link_libraries(blocklanczos bitlinalg)
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION ${BINSUFFIX}/linalg/bwc)
 

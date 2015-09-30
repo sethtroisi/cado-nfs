@@ -74,6 +74,15 @@ next_multiple_of_powerof2(unsigned long n, unsigned long k)
     ASSERT((k & (k-1)) == 0);
     return ((n-1)|(k-1)) + 1;
 }
+static inline unsigned long integer_sqrt(unsigned long a)
+{
+    /* returns 2 for a==3, otherwise returns floor(sqrt(a)) */
+    for(unsigned long x = a, y = 1, z; ; x = y, y = z) {
+        z = (y + a/y) / 2;
+        if (z == x || z == y) return y;
+    }
+}
+
 /* Best X86 medium memcpy with pointers & size length already cache
    lines aligned on modern X86, so dst/src/lg & 0x3F = 0 */
 static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
