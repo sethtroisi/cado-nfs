@@ -28,7 +28,7 @@ struct blstate {
      * allocated everywhere (we set flags to 0, so as to avoid having
      * shared vectors) */
     mmt_vec V[3];
-    void * L[3];
+    mat64 L[3];
     bit_vector D[3];
 
     /* Here are the semantics of the data fields above.
@@ -151,21 +151,16 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
-    mmt_vec_init(mmt,0,0, bl->y,   bw->dir, 0, mmt->n[bw->dir]);
-    mmt_vec_init(mmt,0,0, bl->my, !bw->dir, 0, mmt->n[!bw->dir]);
-
-    /* So far we have constrained A to have width exactly n, but it may
-     * also conceivably be a divisor of n. */
-    size_t nelts_for_nnmat = bw->n * (bw->n / A->groupsize(A));
+    mmt_vec_init(mmt,0,0, bl->y,   bw->dir, 0, mmt->n0[bw->dir]);
+    mmt_vec_init(mmt,0,0, bl->my, !bw->dir, 0, mmt->n0[!bw->dir]);
 
     for(int i = 0 ; i < 3 ; i++) {
-        A->vec_init(A, &(bl->L[i]), nelts_for_nnmat);
         /* We also need D_n, D_{n-1}, D_{n-2}. Those are in fact bitmaps.
          * Not clear that the bitmap type is really the one we want, though. */
         bit_vector_init(bl->D[i], bw->n);
         /* We need as well the two previous vectors. For these, distributed
          * storage will be ok. */
-        mmt_vec_init(mmt,0,0, bl->V[i], bw->dir, 0, mmt->n[bw->dir]);
+        mmt_vec_init(mmt,0,0, bl->V[i], bw->dir, 0, mmt->n0[bw->dir]);
     }
 
 }
@@ -174,11 +169,9 @@ void blstate_clear(struct blstate * bl)
 {
     matmul_top_data_ptr mmt = bl->mmt;
     mpfq_vbase_ptr A = bl->A;
-    size_t nelts_for_nnmat = bw->n * (bw->n / A->groupsize(A));
 
     serialize(mmt->pi->m);
     for(int i = 0 ; i < 3 ; i++) {
-        A->vec_clear(A, &(bl->L[i]), nelts_for_nnmat);
         /* We also need D_n, D_{n-1}, D_{n-2}. Those are in fact bitmaps.
          * Not clear that the bitmap type is really the one we want, though. */
         bit_vector_clear(bl->D[i]);
@@ -196,19 +189,11 @@ void blstate_clear(struct blstate * bl)
 void blstate_set_start(struct blstate * bl)
 {
     matmul_top_data_ptr mmt = bl->mmt;
-    mpfq_vbase_ptr A = bl->A;
-    size_t nelts_for_nnmat = bw->n * (bw->n / A->groupsize(A));
 
-    int g = A->groupsize(A);
     /* D = identity, L too, and V = 0 */
     for(int i = 0 ; i < 3 ; i++) {
         bit_vector_set(bl->D[i], 1);
-        /* Set L[i] to identity -- it's awkward, yes. */
-        A->vec_set_zero(A, bl->L[i], nelts_for_nnmat);
-        for(int j = 0 ; j < bw->n ; j++) {
-            int p = j * bw->n + j;
-            A->set_ui_at(A, A->vec_coeff_ptr(A, bl->L[i], p / g), p % g, 1);
-        }
+        mat64_set_identity(bl->L[i]);
     }
     /* matmul_top_vec_init has already set V to zero */
     /* for bw->dir=0, mmt->n0[0] is the number of rows. */
@@ -222,14 +207,7 @@ void blstate_load(struct blstate * bl, unsigned int iter)
     unsigned int i1 = (iter+3-1) % 3;
     unsigned int i2 = (iter+3-2) % 3;
     matmul_top_data_ptr mmt = bl->mmt;
-    mpfq_vbase_ptr A = bl->A;
     parallelizing_info_ptr pi = mmt->pi;
-
-    size_t nelts_for_nnmat = bw->n * (bw->n / A->groupsize(A));
-    /* bw->dir=0: mmt->n0[bw->dir] = number of rows */
-    /* bw->dir=1: mmt->n0[bw->dir] = number of columns */
-    size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[bw->dir]);
-    size_t mysize = mmt_my_own_size_in_bytes(bl->y);
 
     char * filename;
     int rc = asprintf(&filename, "blstate.%u", iter);
@@ -242,21 +220,14 @@ void blstate_load(struct blstate * bl, unsigned int iter)
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         bit_vector_read_from_stream(bl->D[i1], f->f);
         size_t rc;
-        rc = fread(bl->L[i1], A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
-        ASSERT_ALWAYS(rc == (size_t) nelts_for_nnmat);
-        rc = fread(bl->L[i2], A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
-        ASSERT_ALWAYS(rc == (size_t) nelts_for_nnmat);
+        rc = fread(bl->L[i1], sizeof(mat64), 1, f->f);
+        ASSERT_ALWAYS(rc == (size_t) 1);
+        rc = fread(bl->L[i2], sizeof(mat64), 1, f->f);
+        ASSERT_ALWAYS(rc == (size_t) 1);
     }
-    ssize_t s;
-
-    s = pi_file_read(f, mmt_my_own_subvec(bl->V[i0]), mysize, sizeondisk);
-    ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
-
-    s = pi_file_read(f, mmt_my_own_subvec(bl->V[i1]), mysize, sizeondisk);
-    ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
- 
-    s = pi_file_read(f, mmt_my_own_subvec(bl->V[i2]), mysize, sizeondisk);
-    ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
+    mmt_vec_load_stream(f, bl->V[i0], mmt->n0[bw->dir]);
+    mmt_vec_load_stream(f, bl->V[i1], mmt->n0[bw->dir]);
+    mmt_vec_load_stream(f, bl->V[i2], mmt->n0[bw->dir]);
 
     pi_file_close(f);
     if (tcan_print) { printf("done\n"); fflush(stdout); }
@@ -269,14 +240,7 @@ void blstate_save(struct blstate * bl, unsigned int iter)
     unsigned int i1 = (iter+3-1) % 3;
     unsigned int i2 = (iter+3-2) % 3;
     matmul_top_data_ptr mmt = bl->mmt;
-    mpfq_vbase_ptr A = bl->A;
     parallelizing_info_ptr pi = mmt->pi;
-
-    size_t nelts_for_nnmat = bw->n * (bw->n / A->groupsize(A));
-    /* bw->dir=0: mmt->n0[bw->dir] = number of rows */
-    /* bw->dir=1: mmt->n0[bw->dir] = number of columns */
-    size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[bw->dir]);
-    size_t mysize = mmt_my_own_size_in_bytes(bl->y);
 
     char * filename;
     int rc = asprintf(&filename, "blstate.%u", iter);
@@ -289,18 +253,12 @@ void blstate_save(struct blstate * bl, unsigned int iter)
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         bit_vector_write_to_stream(bl->D[i1], f->f);
         size_t rc;
-        rc = fwrite(bl->L[i1], A->vec_elt_stride(A,1), nelts_for_nnmat, f->f);
-        ASSERT_ALWAYS(rc == (size_t) nelts_for_nnmat);
+        rc = fwrite(bl->L[i1], sizeof(mat64), 1, f->f);
+        ASSERT_ALWAYS(rc == (size_t) 1);
     }
-    ssize_t s;
-    s = pi_file_write(f, mmt_my_own_subvec(bl->V[i0]), mysize, sizeondisk);
-    ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
-
-    s = pi_file_write(f, mmt_my_own_subvec(bl->V[i1]), mysize, sizeondisk);
-    ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
- 
-    s = pi_file_write(f, mmt_my_own_subvec(bl->V[i2]), mysize, sizeondisk);
-    ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
+    mmt_vec_save_stream(f, bl->V[i0], mmt->n0[bw->dir]);
+    mmt_vec_save_stream(f, bl->V[i1], mmt->n0[bw->dir]);
+    mmt_vec_save_stream(f, bl->V[i2], mmt->n0[bw->dir]);
 
     pi_file_close(f);
     if (tcan_print) { printf("done\n"); fflush(stdout); }
@@ -308,19 +266,16 @@ void blstate_save(struct blstate * bl, unsigned int iter)
 }
 
 /* Given a *BINARY* vector block of *EXACTLY* 64 vectors (that is, we
- * force bw->n == 0), compute a 64*64 matrix such that m * v is in row
+ * force bw->n == 64), compute a 64*64 matrix such that m * v is in row
  * reduced echelon form. Also return the rank.
  *
- * The vector block has to be according to direction d. If v is NULL, the
- * built-in vector block of the mmt structure in that direction is taken.
- *
- * Note that this is a collective operation.
- *
  * Vector v is modified by this process (and put in RREF).
+ *
+ * This is a collective operation.
  */
 int mmt_vec_echelon(mat64_ptr m, mmt_vec_ptr v0)
 {
-    memset(m, 0, sizeof(mat64));
+    mat64_set_identity(m);
     uint64_t * v = mmt_my_own_subvec(v0);
     size_t eblock = mmt_my_own_size_in_items(v0);
     /* This is the total number of non-zero coordinates of the vector v */
@@ -331,15 +286,15 @@ int mmt_vec_echelon(mat64_ptr m, mmt_vec_ptr v0)
     int rank = 0;
     for(int i = 0 ; i < 64 ; i++) {
         uint64_t mi = UINT64_C(1) << i;
-        /* Find the earliest column which has non-zero in the first row */
+        /* Find the earliest column which has non-zero in the i-th row */
         unsigned int j;
         for(j = 0 ; j < eblock ; j++) {
             if (v[j] & mi) break;
         }
         if (j == eblock) j = n;
-        else j += mmt_my_own_offset_in_items(v0);
+        else j += v0->i0 + mmt_my_own_offset_in_items(v0);
         unsigned int jmin;
-        pi_allreduce(&jmin, &j, 1, BWC_PI_UNSIGNED, BWC_PI_MIN, v0->pi->m);
+        pi_allreduce(&j, &jmin, 1, BWC_PI_UNSIGNED, BWC_PI_MIN, v0->pi->m);
         if (jmin == n) {
             /* zero row */
             continue;
@@ -351,19 +306,46 @@ int mmt_vec_echelon(mat64_ptr m, mmt_vec_ptr v0)
          * owns this column, and then act accordingly */
         uint64_t control = 0;
         if (jmin == j) {
-            control = v[j - mmt_my_own_offset_in_items(v0)];
+            control = v[j - (v0->i0 + mmt_my_own_offset_in_items(v0))];
             ASSERT_ALWAYS(control & mi);
             control ^= mi;
         }
         /* TODO: once we require mpi-3.0, use MPI_UINT64_T instead */
         ASSERT_ALWAYS(sizeof(unsigned long long) == sizeof(uint64_t));
         pi_allreduce(NULL, &control, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_MAX, v0->pi->m);
+        /* add row i to all rows where we had a coeff in column j */
+        /* we'll do that for all coefficients in the block, but on m this
+         * is just one single operation */
+        /* in this notation (as elsewhere with mat64 data), m[i] is
+         * understood as row i of m (pay attention to the fact that this
+         * differs a bit from what happens with y, where y[0] is in fact
+         * the first coordinate of the row vector block, which can be
+         * understood as the first column.
+         */
+        addmul_To64_o64(m, control, m[i]);
         for(unsigned int k = 0 ; k < eblock ; k++) {
             v[k] ^= control & -!!(v[k] & mi);
         }
     }
-    /* TODO: compute m... */
-    /* TODO: realign, to put in RREF */
+    /* put in RREF -- well, almost, since the only thing we do here is
+     * that non-zero rows are before zero rows. */
+    mat64 Z, N;
+    int nZ = 0, nN = 0;
+    memset(Z, 0, sizeof(mat64));
+    memset(N, 0, sizeof(mat64));
+    for(int i = 0 ; i < 64 ; i++) {
+        uint64_t mi = UINT64_C(1) << i;
+        if (usedrows & mi) {
+            N[nN++] = m[i];
+        } else {
+            Z[nZ++] = m[i];
+        }
+    }
+    ASSERT_ALWAYS(nN == rank);
+    ASSERT_ALWAYS(nZ == 64 - rank);
+    memcpy(m, N, rank * sizeof(uint64_t));
+    memcpy(m + rank, Z, (64 - rank) * sizeof(uint64_t));
+
     return rank;
 }
 
@@ -376,59 +358,103 @@ int mmt_vec_echelon(mat64_ptr m, mmt_vec_ptr v0)
  */
 void blstate_save_result(struct blstate * bl, unsigned int iter)
 {
+    mat64 m0, m1, m2;
+    int r;
     unsigned int i0 = iter % 3;
     matmul_top_data_ptr mmt = bl->mmt;
-    mpfq_vbase_ptr A = bl->A;
     parallelizing_info_ptr pi = mmt->pi;
 
     /* bw->dir=0: mmt->n0[bw->dir] = number of rows */
     /* bw->dir=1: mmt->n0[bw->dir] = number of columns */
 
-    char * filename;
-    int rc = asprintf(&filename, "blsolution.bin"); // %u", iter);
-    ASSERT_ALWAYS(rc >= 0);
     pi_file_handle f;
-    int tcan_print = bw->can_print && pi->m->trank == 0;
-    if (tcan_print) { printf("Saving %s...", filename); fflush(stdout); }
-
+    const char * filename = "bl-auxiliary.bin";
     pi_file_open(f, mmt->pi, bw->dir, filename, "wb");
 
-    {
-        size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[bw->dir]);
-        size_t mysize = mmt_my_own_size_in_bytes(bl->y);
-        void * myvec = mmt_my_own_subvec(bl->V[i0]);
+    int tcan_print = bw->can_print && pi->m->trank == 0;
+    if (tcan_print) { printf("Saving %s...\n", filename); fflush(stdout); }
 
-        ssize_t s = pi_file_write(f, myvec, mysize, sizeondisk);
-        ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
-    }
+    mmt_full_vec_set(bl->y, bl->V[i0]);
 
-    /* Save V*M as well. Note that it's a bit peculiar, because we will
-     * need to save something in the other direction.
+    /* save raw V because it's conceivably useful */
+    ASSERT_ALWAYS(bl->y->n == mmt->n0[bw->dir]);
+    mmt_vec_save_stream(f, bl->y, mmt->n0[bw->dir]);
+
+    mmt_vec_twist(mmt, bl->y);
+    matmul_top_mul_cpu(mmt, bl->my, bl->y);
+    mmt_vec_allreduce(bl->my);
+    mmt_vec_untwist(mmt, bl->my);
+
+    /* save V*M as well because it's conceivably useful
+     * XXX TODO: save in the other direction !
+     *
+     * pi_file_open should not have the "inner" flag. This should be a
+     * property of the _write and _read calls. But before we do that, we
+     * should clean up the mess done in mksol & gather.
      */
-    {
-        mmt_own_vec_set(bl->y, bl->V[i0]);
-        mmt_vec_twist(mmt, bl->y);
-        matmul_top_mul_cpu(mmt, bl->my, bl->y);
-        mmt_vec_allreduce(bl->my);
-        mmt_vec_untwist(mmt, bl->my);
+    ASSERT_ALWAYS(bl->my->n == mmt->n0[!bw->dir]);
+    mmt_vec_save_stream(f, bl->my, mmt->n0[!bw->dir]);
 
-        mat64 m;
-        int r = mmt_vec_echelon(m, bl->y);
-        printf("rank(V) == %d\n", r);
-        r = mmt_vec_echelon(m,bl-> my);
-        printf("rank(V*M) == %d\n", r);
+    /* Do some rank calculations */
+    /* m0 is just temp stuff. */
+    mmt_full_vec_set(bl->y, bl->V[i0]);
+    r = mmt_vec_echelon(m0, bl->y);
+    printf("\trank(V) == %d\n", r);
+    /* m1 will be largest rank matrix such that m1*V*M == 0 */
+    r = mmt_vec_echelon(m1,bl-> my);
+    printf("\trank(V*M) == %d\n", r);
 
-        size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[!bw->dir]);
-        size_t mysize = mmt_my_own_size_in_bytes(bl->my);
-        void * myvec = mmt_my_own_subvec(bl->my);
-
-        ssize_t s = pi_file_write(f, myvec, mysize, sizeondisk);
-        ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
+    /* good, so now let's look for real nullspace elements. Since
+     * we've put V*M in RREF, we know what transformation of V
+     * creates zeros in V*M. First, take out the combinations which
+     * yield independent rows in V*M -- these are uninteresting */
+    for(int i = 0 ; i < r ; i++) {
+        m1[i] = 0;
     }
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        size_t rc = fwrite(m1, sizeof(mat64), 1, f->f);
+        ASSERT_ALWAYS(rc == (size_t) 1);
+    }
+    /* Now set y = m1 * V */
+    mmt_full_vec_set(bl->y, bl->V[i0]);
+    mul_N64_T6464(mmt_my_own_subvec(bl->y),
+            mmt_my_own_subvec(bl->y),
+            m1,
+            mmt_my_own_size_in_items(bl->y));
+    bl->y->consistency = 1;
+    /* Compute m2 such that m2 * m1 * V is in RREF. We discard the
+     * combinations which lead to zero, so that m2*m1 should have rank
+     * precisely the rank of the nullspace */
+    r = mmt_vec_echelon(m2, bl->y);
+    printf("\trank(V cap nullspace(M)) == %d\n", r);
+    /* Now we have the really interesting basis of the nullspace */
+    for(int i = r ; i < 64 ; i++) {
+        m2[i] = 0;
+    }
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        size_t rc = fwrite(m2, sizeof(mat64), 1, f->f);
+        ASSERT_ALWAYS(rc == (size_t) 1);
+    }
+    /* Now apply m2*m1 to v, for real */
+    mmt_full_vec_set(bl->y, bl->V[i0]);
+    mul_N64_T6464(mmt_my_own_subvec(bl->y),
+            mmt_my_own_subvec(bl->y),
+            m1,
+            mmt_my_own_size_in_items(bl->y));
+    mul_N64_T6464(mmt_my_own_subvec(bl->y),
+            mmt_my_own_subvec(bl->y),
+            m2,
+            mmt_my_own_size_in_items(bl->y));
+
+
+    /* Now save the reduced kernel basis */
+    ASSERT_ALWAYS(bl->y->n == mmt->n0[bw->dir]);
+    mmt_vec_save_stream(f, bl->y, mmt->n0[bw->dir]);
 
     pi_file_close(f);
-    if (tcan_print) { printf("done\n"); fflush(stdout); }
-    free(filename);
+    if (tcan_print) { printf("Saving %s...done\n", filename); fflush(stdout); }
+
+    mmt_vec_save(bl->y, "blsolution", 0, mmt->n0[bw->dir]);
 }
 
 
@@ -635,9 +661,9 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 uint64_t D1 = bl->D[i1]->p[0];
                 mat64_ptr mvav = (mat64_ptr) vav;
                 mat64_ptr mvaav = (mat64_ptr) vaav;
-                mat64_ptr mL0 = (mat64_ptr) bl->L[i0];
-                mat64_ptr mL1 = (mat64_ptr) bl->L[i1];
-                mat64_ptr mL2 = (mat64_ptr) bl->L[i2];
+                mat64_ptr mL0 = bl->L[i0];
+                mat64_ptr mL1 = bl->L[i1];
+                mat64_ptr mL2 = bl->L[i2];
                 mat64 m0, m1, m2, t;
 
                 /* We need to save vav for use a wee bit later in this loop. */
@@ -671,6 +697,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
                 /* So. We need to get ready for the next step, don't we ? */
                 mmt_own_vec_set(bl->V[i2], bl->y);
+                mmt_vec_broadcast(bl->V[i2]);
             }
             timing_check(pi, timing, s+i+1, tcan_print);
         }
