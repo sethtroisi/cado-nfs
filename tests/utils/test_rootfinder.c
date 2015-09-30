@@ -17,28 +17,23 @@ int cmp(mpz_t * a, mpz_t * b)
 }
 
 /* Check roots of polynomial ff[d]*x^d + ... + ff[1]*x + ff[0] mod pp.
-   If pp is the empty string, generate a random prime (and then generate
+   If pp is the empty string, generate a random integer (and then generate
    random coefficients for ff[]).
    If nroots <> -1, it is the expected number of roots. */
 void
 test (int d, const char *pp, const char *ff[], int nroots)
 {
   mpz_t p, *f, *r, v;
-  int i, n, n0, n1;
+  int i, n, n1;
   mpz_poly_t F;
 
   mpz_init (p);
   if (strlen (pp) > 0)
     mpz_set_str (p, pp, 0);
   else
-    {
-      mpz_urandomb (p, state, 65);
-      mpz_nextprime (p, p);
-    }
-  ASSERT_ALWAYS(mpz_probab_prime_p (p, 5));
+    mpz_urandomb (p, state, 40);
   mpz_init (v);
   f = (mpz_t *) malloc ((d + 1) * sizeof(mpz_t));
-  r = (mpz_t *) malloc ((d + 1) * sizeof(mpz_t));
   F->coeff = f;
   F->deg = d;
   for (i = 0; i <= d; i++)
@@ -51,16 +46,13 @@ test (int d, const char *pp, const char *ff[], int nroots)
           do mpz_urandomb (f[i], state, 65);
           while (i == d && mpz_cmp_ui (f[i], 0) == 0);
         }
-      mpz_init (r[i]);
     }
-  n0 = mpz_poly_roots (NULL, F, p);
-  if (mpz_sizeinbase (p, 2) <= 64)
+  n = mpz_poly_roots_gen (&r, F, p);
+  if (mpz_probab_prime_p (p, 5) && mpz_sizeinbase (p, 2) <= 64)
     {
       n1 = mpz_poly_roots_uint64 (NULL, F, mpz_get_uint64 (p));
-      ASSERT_ALWAYS(n1 == n0);
+      ASSERT_ALWAYS(n1 == n);
     }
-  n = mpz_poly_roots (r, F, p);
-  ASSERT_ALWAYS(n == n0);
   if (nroots != -1)
     ASSERT_ALWAYS(n == nroots);
   for (i = 0; i < n; i++)
@@ -69,10 +61,9 @@ test (int d, const char *pp, const char *ff[], int nroots)
       ASSERT_ALWAYS(mpz_divisible_p (v, p));
     }
   for (i = 0; i <= d; i++)
-    {
-      mpz_clear (f[i]);
-      mpz_clear (r[i]);
-    }
+    mpz_clear (f[i]);
+  for (i = 0; i < n; i++)
+    mpz_clear (r[i]);
   free (f);
   free (r);
   mpz_clear (p);
@@ -86,6 +77,7 @@ main (int argc, const char *argv[])
     const char* test0[] = {"4294967291", "1", "0", "-3"};
     const char* test1[] = {"18446744073709551557", "1", "2", "3", "5"};
     const char* test2[] = {"18446744073709551629", "1", "-1", "7", "-1"};
+    const char* test3[] = {"12", "1", "2", "3", "-4"};
     unsigned long iter = 300;
 
     tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER);
@@ -94,7 +86,7 @@ main (int argc, const char *argv[])
     d = argc - 3;
 
     if (d < 1 && d != -2) {
-	fprintf(stderr, "Usage: test-rootfinder p a_d [...] a_1 a_0\n");
+	fprintf(stderr, "Usage: test_rootfinder [-seed nnn] [-iter nnn] p a_d [...] a_1 a_0\n");
 	exit(1);
     }
 
@@ -103,6 +95,7 @@ main (int argc, const char *argv[])
     test (2, test0[0], test0 + 1, 2);
     test (3, test1[0], test1 + 1, 1);
     test (3, test2[0], test2 + 1, 0);
+    test (3, test3[0], test3 + 1, 1);
 
     while (iter--)
       {

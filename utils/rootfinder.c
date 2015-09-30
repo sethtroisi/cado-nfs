@@ -9,7 +9,116 @@
 #include "mpz_poly.h"
 #include "modul_poly.h"
 #include "gmp_aux.h"
+#include "getprime.h"
 #include "portability.h"
+
+/* Entry point for rootfind routines, for an integer n0 not necessarily prime.
+   Since we cannot know in advance an easy bound on the number of
+   roots, we allocate them in the function: if r = rp[0] at exit,
+   the roots are r[0], r[1], ..., r[k-1] and the return value is k.
+   Note: the elements r[j] must be mpz_clear'ed by the caller, and the
+   array r also.
+   Assume all prime factors of n fit into an unsigned long.
+*/
+unsigned long
+mpz_poly_roots_gen (mpz_t **rp, mpz_poly_t F, const mpz_t n)
+{
+  prime_info pi;
+  unsigned long p, k, i, j, d = F->deg;
+  mpz_t Q, nn;
+
+  ASSERT_ALWAYS (mpz_sgn (n) > 0);
+
+  if (mpz_probab_prime_p (n, 1))
+    {
+      rp[0] = malloc (d * sizeof (mpz_t));
+      for (i = 0; i < d; i++)
+        mpz_init (rp[0][i]);
+      k = mpz_poly_roots (rp[0], F, n);
+      /* free the unused roots */
+      for (i = k; i < d; i++)
+        mpz_clear (rp[0][i]);
+      if (k < d)
+        rp[0] = realloc (rp[0], k * sizeof (mpz_t));
+      return k;
+    }
+
+  prime_info_init (pi);
+  rp[0] = malloc (sizeof (mpz_t));
+  mpz_init_set_ui (rp[0][0], 0);
+  mpz_init_set_ui (Q, 1);
+  mpz_init_set (nn, n);
+  k = 1;
+
+  /* now n is composite */
+  mpz_t v;
+  mpz_init (v);
+  unsigned long *roots_p = malloc (d * sizeof(mpz_t));
+  for (p = 2; mpz_cmp_ui (nn, 1) > 0; p = getprime_mt (pi))
+    {
+      if (mpz_probab_prime_p (nn, 1))
+        {
+          ASSERT_ALWAYS (mpz_fits_ulong_p (nn));
+          p = mpz_get_ui (nn);
+        }
+      if (mpz_divisible_ui_p (nn, p))
+        {
+          unsigned long kp, q;
+          kp = mpz_poly_roots_ulong (roots_p, F, p);
+          mpz_divexact_ui (nn, nn, p);
+          /* lift roots mod p^j if needed */
+          q = p;
+          while (mpz_divisible_ui_p (nn, p))
+            {
+              int ii;
+              q *= p;
+              mpz_divexact_ui (nn, nn, p);
+              for (i = ii = 0; i < kp; i++)
+                {
+                  for (j = 0; j < p; j++)
+                    {
+                      mpz_poly_eval_ui (v, F, roots_p[i] + p * j);
+                      if (mpz_divisible_ui_p (v, q))
+                        break;
+                    }
+                  /* some roots might disappear, for example x^3+2*x^2+3*x-4
+                     has two roots mod 2 (0 and 1) but only one mod 4 (0) */
+                  if (j < p)
+                    roots_p[ii++] = roots_p[i] + p * j;
+                }
+              kp = ii;
+            }
+          /* do a CRT between r[0][0..k-1] mod Q and roots_p[0..kp-1] */
+          rp[0] = realloc (rp[0], k * kp * sizeof (mpz_t));
+          unsigned long invq;
+          mpz_set_ui (v, q);
+          mpz_invert (v, Q, v); /* 1/Q mod q */
+          invq = mpz_get_ui (v);
+          for (i = 0; i < k; i++)
+            for (j = kp; j-- > 0;)
+              {
+                if (j > 0)
+                  mpz_init (rp[0][j*k + i]);
+                /* x = rp[0][i] mod Q and x = roots_p[j] mod q,
+                   thus x = rp[0][i] + Q * t, where
+                   t = (roots_p[j] - rp[0][i])/Q mod q */
+                mpz_ui_sub (v, roots_p[j], rp[0][i]);
+                mpz_mul_ui (v, v, invq);
+                mpz_fdiv_r_ui (v, v, q);
+                mpz_mul (v, Q, v);
+                mpz_add (rp[0][j*k + i], rp[0][i], v);
+              }
+          k *= kp;
+          mpz_mul_ui (Q, Q, q);
+        }
+    }
+  free (roots_p);
+  mpz_clear (v);
+  mpz_clear (Q);
+  mpz_clear (nn);
+  prime_info_clear (pi);
+  return k;
+}
 
 /* Entry point for rootfind routines, for prime p */
 int
@@ -58,10 +167,10 @@ mpz_poly_roots_ulong (unsigned long *r, mpz_poly_t F, unsigned long p)
     modul_initmod_ul(pp, p);
     int i;
     int d = F->deg;
-        
+
     if (r == NULL)
       return modul_poly_roots(NULL, F, pp);
-    
+
     rr = (residueul_t *) malloc(d * sizeof(residueul_t));
     for(i = 0 ; i < d ; i++) {
       modul_init_noset0(rr[i], pp);
@@ -78,7 +187,7 @@ mpz_poly_roots_ulong (unsigned long *r, mpz_poly_t F, unsigned long p)
     }
     free(rr);
     modul_clearmod(pp);
-    
+
     return n;
 }
 
