@@ -1086,6 +1086,11 @@ static void reducer_int_max(const int * b, int * a, int s) { for( ; s-- ; a++, b
 static void reducer_int_sum(const int * b, int * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
 static void reducer_int_band(const int * b, int * a, int s) { for( ; s-- ; a++, b++) *a &= *b; }
 static void reducer_int_bor(const int * b, int * a, int s) { for( ; s-- ; a++, b++) *a |= *b; }
+static void reducer_uint_min(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
+static void reducer_uint_max(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
+static void reducer_uint_sum(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) *a += *b; }
+static void reducer_uint_band(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) *a &= *b; }
+static void reducer_uint_bor(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) *a |= *b; }
 static void reducer_double_min(const double * b, double * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_double_max(const double * b, double * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_double_sum(const double * b, double * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
@@ -1106,6 +1111,11 @@ struct reduction_function predefined_functions[] = {
     { MPI_INT,           MPI_SUM,  (thread_reducer_t) reducer_int_sum, },
     { MPI_INT,           MPI_BAND, (thread_reducer_t) reducer_int_band, },
     { MPI_INT,           MPI_BOR,  (thread_reducer_t) reducer_int_bor, },
+    { MPI_UNSIGNED,      MPI_MIN,  (thread_reducer_t) reducer_uint_min, },
+    { MPI_UNSIGNED,      MPI_MAX,  (thread_reducer_t) reducer_uint_max, },
+    { MPI_UNSIGNED,      MPI_SUM,  (thread_reducer_t) reducer_uint_sum, },
+    { MPI_UNSIGNED,      MPI_BAND, (thread_reducer_t) reducer_uint_band, },
+    { MPI_UNSIGNED,      MPI_BOR,  (thread_reducer_t) reducer_uint_bor, },
     { MPI_DOUBLE,        MPI_MIN,  (thread_reducer_t) reducer_double_min, },
     { MPI_DOUBLE,        MPI_MAX,  (thread_reducer_t) reducer_double_max, },
     { MPI_DOUBLE,        MPI_SUM,  (thread_reducer_t) reducer_double_sum, },

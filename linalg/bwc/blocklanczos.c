@@ -487,11 +487,6 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
     size_t nelts_for_nnmat = bw->n * (bw->n / bl->A->groupsize(bl->A));
 
-    /* hmm, right. So here we're in effect saying that we do not support
-     * threading yet...
-     */
-    ASSERT_ALWAYS(pi->m->totalsize == 1);
-
     serialize(pi->m);
 
     /* note that we don't know how to do checking for BL. Sure, we can
@@ -624,7 +619,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                     mmt_my_own_size_in_items(bl->y));
 
             pi_allreduce(NULL, vav,
-                    nelts_for_nnmat, bl->mmt->pitype, BWC_PI_BXOR, pi->m);
+                    nelts_for_nnmat, bl->mmt->pitype, BWC_PI_SUM, pi->m);
 
             AxA->dotprod(A->obj, A->obj, vaav,
                     mmt_my_own_subvec(bl->y),
@@ -632,7 +627,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                     mmt_my_own_size_in_items(bl->y));
 
             pi_allreduce(NULL, vaav, nelts_for_nnmat,
-                    bl->mmt->pitype, BWC_PI_BXOR, pi->m);
+                    bl->mmt->pitype, BWC_PI_SUM, pi->m);
 
 
             ASSERT_ALWAYS(bl->D[i0]->n == 64);
