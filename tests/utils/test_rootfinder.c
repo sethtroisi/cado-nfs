@@ -33,25 +33,35 @@ test (int d, const char *pp, const char *ff[], int nroots)
   if (strlen (pp) > 0)
     mpz_set_str (p, pp, 0);
   else
-    mpz_urandomb (p, state, MAX_BITS);
-  gmp_printf ("p = %Zd\n", p);
+    {
+      do mpz_urandomb (p, state, MAX_BITS); while (mpz_sgn (p) == 0);
+    }
   mpz_init (v);
   f = (mpz_t *) malloc ((d + 1) * sizeof(mpz_t));
   F->coeff = f;
   F->deg = d;
+ retry:
+  mpz_set (v, p);
   for (i = 0; i <= d; i++)
     {
       mpz_init (f[i]);
       if (strlen (pp) > 0)
         mpz_set_str (f[i], ff[d - i], 0);
       else
-        {
-          do mpz_urandomb (f[i], state, MAX_BITS);
-          while (i == d && mpz_cmp_ui (f[i], 0) == 0);
-        }
-      gmp_printf ("f[%d] = %Zd\n", i, f[i]);
+        mpz_urandomb (f[i], state, MAX_BITS);
+      mpz_gcd (v, v, f[i]);
     }
-  fflush (stdout);
+  if (mpz_cmp_ui (v, 1) > 0) /* f vanishes modulo some prime factor of p */
+    {
+      if (strlen (pp) > 0)
+        {
+          gmp_fprintf (stderr, "Error, given polynomial vanishes mod %Zd\n",
+                       v);
+          exit (1);
+        }
+      else
+        goto retry;
+    }
   n = mpz_poly_roots_gen (&r, F, p);
   if (mpz_probab_prime_p (p, 5) && mpz_sizeinbase (p, 2) <= 64)
     {
