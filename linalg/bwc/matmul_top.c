@@ -198,6 +198,8 @@ void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr
         v->siblings = shared_malloc(wr, wr->ncores * sizeof(void *));
         v->siblings[wr->trank] = v;
     }
+    /* Vectors begin initialized to zero, so we have full consistency */
+    v->consistency = 2;
     serialize_threads(wr);
 }
 
@@ -283,6 +285,7 @@ void mmt_own_vec_set(mmt_vec_ptr w, mmt_vec_ptr v)
 {
     ASSERT_ALWAYS(v->abase == w->abase);
     mmt_own_vec_set2(v, w, v);
+    w->consistency = 1;
 }
 void mmt_full_vec_set(mmt_vec_ptr w, mmt_vec_ptr v)
 {
@@ -504,58 +507,63 @@ mmt_vec_broadcast(mmt_vec_ptr v)
 /* }}} */
 
 /* {{{ generic interfaces for load/save */
-/* {{{ load (generic) */
-void mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk)
+/* {{{ load */
+int mmt_vec_load_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk)
 {
     ASSERT_ALWAYS(v != NULL);
-
     serialize(v->pi->m);
-
     size_t sizeondisk = v->abase->vec_elt_stride(v->abase, itemsondisk);
     void * mychunk = mmt_my_own_subvec(v);
     size_t mysize = mmt_my_own_size_in_bytes(v);
-
+    ssize_t s = pi_file_read(f, mychunk, mysize, sizeondisk);
+    int ok =  s >= 0 && (size_t) s == sizeondisk;
+    v->consistency = ok;
+    /* not clear it's useful, but well. */
+    if (ok) mmt_vec_broadcast(v);
+    serialize_threads(v->pi->m);
+    return ok;
+}
+int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk)
+{
+    ASSERT_ALWAYS(v != NULL);
+    serialize(v->pi->m);
     char * filename;
     int rc = asprintf(&filename, "%s.%u", name, iter);
     ASSERT_ALWAYS(rc >= 0);
 
     pi_file_handle f;
-    if (!pi_file_open(f, v->pi, v->d, filename, "rb"))
-        goto mmt_vec_load_error;
-
-    ssize_t s = pi_file_read(f, mychunk, mysize, sizeondisk);
-    pi_file_close(f);
-
-    if (s < 0 || (size_t) s < sizeondisk) {
-        goto mmt_vec_load_error;
+    int ok = pi_file_open(f, v->pi, v->d, filename, "rb");
+    if (ok) {
+        ok = mmt_vec_load_stream(f, v, itemsondisk);
+        pi_file_close(f);
     }
-
+    if (!ok) {
+        if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+            fprintf(stderr, "ERROR: failed to load %s\n", filename);
+        }
+        if (v->pi->m->trank == 0)
+            MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
+    }
     free(filename);
-    v->consistency = 1;
-    /* not clear it's useful, but well. */
-    mmt_vec_broadcast(v);
     serialize_threads(v->pi->m);
-    return;
-mmt_vec_load_error:
-    if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
-        fprintf(stderr, "ERROR: failed to load %s\n", filename);
-    }
-    if (v->pi->m->trank == 0)
-        MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
-    serialize_threads(v->pi->m);
+    return ok;
 }
 /* }}} */
-/* {{{ save (generic) */
-void mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk)
+/* {{{ save */
+int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk)
 {
     ASSERT_ALWAYS(v != NULL);
     ASSERT_ALWAYS(v->consistency == 2);
-
     serialize_threads(v->pi->m);
-
     size_t sizeondisk = v->abase->vec_elt_stride(v->abase, itemsondisk);
     void * mychunk = mmt_my_own_subvec(v);
     size_t mysize = mmt_my_own_size_in_bytes(v);
+    ssize_t s = pi_file_write(f, mychunk, mysize, sizeondisk);
+    return s >= 0 && (size_t) s == sizeondisk;
+}
+int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk)
+{
+    serialize_threads(v->pi->m);
 
     char * filename;
     int rc = asprintf(&filename, "%s.%u", name, iter);
@@ -563,19 +571,18 @@ void mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned 
 
     pi_file_handle f;
     int ok = pi_file_open(f, v->pi, v->d, filename, "wb");
-    ssize_t s = 0;
     if (ok) {
-        s = pi_file_write(f, mychunk, mysize, sizeondisk);
+        ok = mmt_vec_save_stream(f, v, itemsondisk);
         pi_file_close(f);
     }
-    if (!ok || s < 0 || (size_t) s < sizeondisk) {
+    if (!ok) {
         if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
             fprintf(stderr, "WARNING: failed to save %s\n", filename);
             unlink(filename);
         }
     }
-
     free(filename);
+    return ok;
 }
 /* }}} */
 /* }}} */
@@ -1211,7 +1218,7 @@ void matmul_top_comm_bench_helper(int * pk, double * pt,
 	t1 = wct_seconds();
 	cont = t1 < t0 + 0.25;
 	cont = cont && (t1 < t0 + 1 || k < 100);
-        pi_allreduce(&cont, &cont, 1, BWC_PI_INT, BWC_PI_MIN, v->pi->m);
+        pi_allreduce(NULL, &cont, 1, BWC_PI_INT, BWC_PI_MIN, v->pi->m);
 	if (!cont)
 	    break;
         /* It's difficult to be faithful to the requirements on
@@ -1561,7 +1568,8 @@ void mmt_vec_apply_or_unapply_S_inner(matmul_top_data_ptr mmt, mmt_vec_ptr y, in
      * with this piece of code. Note though that when we do so, applying
      * the permutation actually goes in the opposite direction. */
     int xd = d;
-    if (!s && mmt->n[0] == mmt->n[1]) {
+    if (!s && (mmt->bal->h->flags & FLAG_REPLICATE)) {
+        ASSERT_ALWAYS(mmt->n[0] == mmt->n[1]);
         s = mmt->perm[!d];
         xd = !d;
     }
@@ -1803,7 +1811,8 @@ void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d
         }
         free(r);
         pi_allreduce(NULL, xs, n * sizeof(uint32_t), BWC_PI_BYTE, BWC_PI_BXOR, mmt->pi->m);
-    } else if (mmt->perm[!d] && mmt->n[0] == mmt->n[1]) {
+    } else if (mmt->perm[!d] && (mmt->bal->h->flags & FLAG_REPLICATE)) {
+        ASSERT_ALWAYS(mmt->n[0] == mmt->n[1]);
         /* implicit S -- first we get the bits about the S in the other
          * direction, because the pieces we have are for the other
          * ranges, which is a bit disturbing...

@@ -158,8 +158,10 @@ extern void mmt_full_vec_set_zero(mmt_vec_ptr v);
 #if 0
 extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_vec_ptr v, int d);
 #endif
-extern void mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
-extern void mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
+extern int mmt_vec_load_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk);
+extern int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk);
+extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
+extern int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
 
 extern void mmt_vec_broadcast(mmt_vec_ptr v);
 extern void mmt_vec_reduce(mmt_vec_ptr w, mmt_vec_ptr v);
