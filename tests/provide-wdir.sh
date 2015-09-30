@@ -15,8 +15,10 @@ t=`mktemp -d $TMPDIR/XXXXXXXXXXXXXX`
 
 cleanup() { rm -rf "$t" ; }
 
-if ! [ "$CADO_DEBUG" ] ; then
+if [ "$CADO_DEBUG" ] ; then
     echo "debug mode, data will be left in $t"
+    set -x
+else
     trap cleanup EXIT
 fi
 

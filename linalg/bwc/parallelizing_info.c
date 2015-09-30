@@ -935,6 +935,8 @@ void pi_log_op(pi_comm_ptr wr, const char * fmt, ...)
     gettimeofday(e->tv, NULL);
 
     vsnprintf(e->what, sizeof(e->what), fmt, ap);
+    if (wr->ncores > 1)
+        fprintf(stderr, "%s:%d:%d %s\n", wr->th->desc, wr->jrank, wr->trank, e->what);
     va_end(ap);
 
     lb->next++;
@@ -1078,6 +1080,7 @@ struct reduction_function {
 static void reducer_byte_min(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_byte_max(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_byte_sum(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
+static void reducer_byte_bxor(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) *a ^= *b; }
 static void reducer_int_min(const int * b, int * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_int_max(const int * b, int * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_int_sum(const int * b, int * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
@@ -1097,6 +1100,7 @@ struct reduction_function predefined_functions[] = {
     { MPI_BYTE,          MPI_MIN,  (thread_reducer_t) reducer_byte_min, },
     { MPI_BYTE,          MPI_MAX,  (thread_reducer_t) reducer_byte_max, },
     { MPI_BYTE,          MPI_SUM,  (thread_reducer_t) reducer_byte_sum, },
+    { MPI_BYTE,          MPI_BXOR, (thread_reducer_t) reducer_byte_bxor, },
     { MPI_INT,           MPI_MIN,  (thread_reducer_t) reducer_int_min, },
     { MPI_INT,           MPI_MAX,  (thread_reducer_t) reducer_int_max, },
     { MPI_INT,           MPI_SUM,  (thread_reducer_t) reducer_int_sum, },

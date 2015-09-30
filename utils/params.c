@@ -38,6 +38,52 @@ void param_list_init(param_list pl)
     ASSERT_ALWAYS(pl->docs != NULL && pl->p != NULL);
 }
 
+static void parameter_set(parameter dst, parameter src)
+{
+    memcpy(dst, src, sizeof(parameter));
+    dst->key = src->key ? strdup(src->key) : NULL;
+    dst->value = strdup(src->value);
+}
+
+static void param_list_doc_set(param_list_doc dst, param_list_doc src)
+{
+    dst->key = strdup(src->key);
+    dst->doc = strdup(src->doc);
+}
+
+static void param_list_alias_set(param_list_alias dst, param_list_alias src)
+{
+    dst->alias = strdup(src->alias);
+    dst->key = strdup(src->key);
+}
+static void param_list_switch_set(param_list_switch dst, param_list_switch src)
+{
+    dst->switchname = strdup(src->switchname);
+    dst->ptr = src->ptr;
+}
+
+#define COPY_LIST(__dst, __src, __data, __size, __alloc, __type) do {	\
+    __dst->__data = NULL;						\
+    __dst->__size = __src->__size;					\
+    __dst->__alloc = __src->__size;					\
+    if (__src->__size) { 						\
+        __dst->__data = malloc(__src->__size * sizeof(__type));		\
+        for(int __i = 0 ; __i < (int) __src->__size ; __i++) {		\
+            __type ## _set(__dst->__data[__i], __src->__data[__i]);	\
+        }								\
+    }									\
+} while (0)
+
+void param_list_set(param_list_ptr pl, param_list pl0)
+{
+    memcpy(pl, pl0, sizeof(param_list));
+    if (pl->usage_hdr) pl->usage_hdr = strdup(pl->usage_hdr);
+    COPY_LIST(pl, pl0, p, size, alloc, parameter);
+    COPY_LIST(pl, pl0, aliases, naliases, naliases_alloc, param_list_alias);
+    COPY_LIST(pl, pl0, docs, ndocs, ndocs_alloc, param_list_doc);
+    COPY_LIST(pl, pl0, switches, nswitches, nswitches_alloc, param_list_switch);
+}
+
 void param_list_clear(param_list pl)
 {
     free(pl->usage_hdr);

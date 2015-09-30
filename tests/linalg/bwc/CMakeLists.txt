@@ -254,6 +254,7 @@ cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
 
 cado_divert_test(test-spmv 11 APPEND_ARGUMENTS thr=1x1)
 cado_divert_test(test-spmv 12 APPEND_ARGUMENTS thr=1x2)
+cado_divert_test(test-spmv 13 APPEND_ARGUMENTS thr=1x3)
 cado_divert_test(test-spmv 32 APPEND_ARGUMENTS thr=3x2)
 cado_divert_test(test-spmv 23 APPEND_ARGUMENTS thr=2x3)
 if(HAVE_MPI)

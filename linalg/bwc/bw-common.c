@@ -201,7 +201,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
             if (nullspace_forced) {
                 fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
             } else {
-                fprintf(stderr, "Aborting. Pass nullspace=LEFT if this is really intended.\n");
+                fprintf(stderr, "Aborting. Pass nullspace=RIGHT if this is really intended.\n");
                 exit(1);
             }
         } else {
@@ -209,7 +209,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
             if (nullspace_forced) {
                 fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
             } else {
-                fprintf(stderr, "Aborting. Pass nullspace=RIGHT if this is really intended.\n");
+                fprintf(stderr, "Aborting. Pass nullspace=LEFT if this is really intended.\n");
                 exit(1);
             }
         }

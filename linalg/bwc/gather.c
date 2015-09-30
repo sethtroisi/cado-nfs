@@ -133,11 +133,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
-
-
-    int flags[2];
-    flags[bw->dir] = THREAD_SHARED_VECTOR;
-    flags[!bw->dir] = 0;
+    mmt_vec y, my;
 
     int nsolvecs = bw->nsolvecs;
     unsigned int multi = 1;
@@ -164,9 +160,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
 
-    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
+    mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+    mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
 
-    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
 
     /* this is really a misnomer, because in the typical case, M is
      * rectangular, and then the square matrix does induce some padding.
@@ -176,9 +173,6 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
      * are arranged to be multiples */
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
     unsigned int nrhs = 0;
-
-    mmt_comm_ptr mcol = mmt->wr[bw->dir];
-    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
 
     struct sols_list sl[1];
     prelude(pi, sl);
@@ -193,20 +187,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         return NULL;
     }
 
-    pi_comm_ptr picol = pi->wr[bw->dir];
-
-    unsigned int ii0, ii1;
-    unsigned int di = mcol->i1 - mcol->i0;
-
-    ii0 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank) /
-        (picol->njobs * picol->ncores);
-    ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
-        (picol->njobs * picol->ncores);
-
+    size_t eblock = mmt_my_own_size_in_items(y);
     void * svec;
     void * tvec;
-    A->vec_init(A, &svec, ii1-ii0);
-    A->vec_init(A, &tvec, ii1-ii0);
+    A->vec_init(A, &svec, eblock);
+    A->vec_init(A, &tvec, eblock);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     if (rhs_name != NULL) {
@@ -237,7 +222,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (rhscoeffs_name) {
         if (!pi->m->trank && !pi->m->jrank)
             rhscoeffs_file = fopen(rhscoeffs_name, "rb");
-        mmt_vec_init(mmt, A, A_pi, rhscoeffs_vec, bw->dir, 0);
+        mmt_vec_init(mmt, A, mmt->pitype, rhscoeffs_vec, bw->dir, 0, mmt->n[bw->dir]);
     }
 
     for(int s = 0 ; s < sl->nsols ; s++) {
@@ -253,7 +238,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             printf("Trying to build solutions %u..%u\n", sf->s0, sf->s1);
         }
 
-        A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
+        mmt_full_vec_set_zero(my);
 
         /* This array receives the nrhs coefficients affecting the
          * rhs * columns in the identities obtained */
@@ -280,9 +265,9 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     ASSERT_ALWAYS(rc == 1);
                 }
             }
-            pi_bcast(rhscoeffs, nrhs, A_pi, 0, 0, pi->m);
+            pi_bcast(rhscoeffs, nrhs, mmt->pitype, 0, 0, pi->m);
 
-            A->vec_set_zero(A, tvec, ii1 - ii0);
+            A->vec_set_zero(A, tvec, eblock);
             for(unsigned int j = 0 ; j < nrhs ; j++) {
                 /* Add c_j times v_j to tvec */
                 ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
@@ -294,13 +279,13 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+                ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, eblock), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
 
-                A->vec_scal_mul(A, svec, svec, A->vec_coeff_ptr(A, rhscoeffs, j), ii1 - ii0);
-                A->vec_add(A, tvec, tvec, svec, ii1 - ii0);
+                A->vec_scal_mul(A, svec, svec, A->vec_coeff_ptr(A, rhscoeffs, j), eblock);
+                A->vec_add(A, tvec, tvec, svec, eblock);
             }
 
             /* Now save the sum to a temp file, which we'll read later on
@@ -313,7 +298,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 rc = pi_file_open(f, pi, bw->dir, tmp, "wb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_write(f, tvec, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+                ssize_t s = pi_file_write(f, tvec, A->vec_elt_stride(A, eblock), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
@@ -321,8 +306,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
 
         /* Collect now the sum of the LHS contributions */
-        matmul_top_zero_vec_area(mmt, bw->dir);
-        void * sv = A->vec_subvec(A, mcol->v->v, ii0-mcol->i0);
+        mmt_full_vec_set_zero(y);
+        void * sv = mmt_my_own_subvec(y);
 
         for(int i = 0 ; i < sf->nsfiles ; i++) {
             char * tmp;
@@ -339,36 +324,26 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
             if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
             ASSERT_ALWAYS(rc);
-            ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
+            ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, eblock), A->vec_elt_stride(A, unpadded));
             ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
             pi_file_close(f);
             free(tmp);
 
-            A->vec_add(A, sv, sv, svec, ii1 - ii0);
+            A->vec_add(A, sv, sv, svec, eblock);
         }
+        y->consistency = 1;
 
-        /* allgather, really */
-        allreduce_across(mmt, NULL, bw->dir);
+        mmt_vec_broadcast(y);
 
-        /* This is a noop if bw->dir == 0 */
-        matmul_top_unapply_T(mmt, bw->dir);
-        mmt_vec_save(mmt, NULL, kprefix, bw->dir, 0, unpadded);
-        matmul_top_apply_T(mmt, bw->dir);
+        mmt_vec_unapply_T(mmt, y);
+        mmt_vec_save(y, kprefix, 0, unpadded);
+        mmt_vec_apply_T(mmt, y);
                 
-        int is_zero = 0;
-
         serialize(pi->m);
-        matmul_top_twist_vector(mmt, bw->dir);
+        mmt_vec_twist(mmt, y);
 
-        unsigned int how_many;
-        unsigned int offset_c;
-        unsigned int offset_v;
-        how_many = intersect_two_intervals(&offset_c, &offset_v,
-                    mrow->i0, mrow->i1,
-                    mcol->i0, mcol->i1);
-
-        void * check_area = SUBVEC(mcol->v, v, offset_v);
-        is_zero = A->vec_is_zero(A, check_area, how_many);
+        int is_zero = A->vec_is_zero(A,
+                mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
         pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
         if (is_zero) {
@@ -384,15 +359,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         for(int i = 1 ; i < 10 ; i++) {
             serialize(pi->m);
 
-            matmul_top_mul(mmt, bw->dir);
+            matmul_top_mul(mmt, my, y);
 
-            matmul_top_untwist_vector(mmt, bw->dir);
+            mmt_vec_untwist(mmt, y);
 
             if (rhscoeffs_name) {
                 char * tmp;
                 int rc = asprintf(&tmp, R_FILE_BASE_PATTERN, sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
-                mmt_vec_load(mmt, rhscoeffs_vec, tmp, bw->dir, 0, unpadded);
+                mmt_vec_load(rhscoeffs_vec, tmp, 0, unpadded);
                 free(tmp);
                 if (rhscoeffs_file) {
                     /* Now get rid of the R file, we don't need it */
@@ -403,11 +378,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     free(tmp);
                 }
 
-                A->vec_add(A, check_area, check_area,
-                        SUBVEC(rhscoeffs_vec, v, offset_v), how_many);
+                A->vec_add(A,
+                        mmt_my_own_subvec(y),
+                        mmt_my_own_subvec(y),
+                        mmt_my_own_subvec(rhscoeffs_vec),
+                        mmt_my_own_size_in_items(y));
             }
 
-            is_zero = A->vec_is_zero(A, check_area, how_many);
+            is_zero = A->vec_is_zero(A,
+                    mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
             pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
             if (is_zero) {
@@ -423,10 +402,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
             if (rhscoeffs_name) break;
 
-            matmul_top_unapply_T(mmt, bw->dir);
-            mmt_vec_save(mmt, NULL, kprefix, bw->dir, i, unpadded);
-            matmul_top_apply_T(mmt, bw->dir);
-            matmul_top_twist_vector(mmt, bw->dir);
+            mmt_vec_unapply_T(mmt, y);
+            mmt_vec_save(y, kprefix, i, unpadded);
+            mmt_vec_apply_T(mmt, y);
+            mmt_vec_twist(mmt, y);
         }
         if (!is_zero) {
             if (tcan_print) {
@@ -485,13 +464,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     if (rhscoeffs_file) fclose(rhscoeffs_file);
-    if (rhscoeffs_name) mmt_vec_clear(mmt, rhscoeffs_vec, bw->dir);
+    if (rhscoeffs_name) mmt_vec_clear(mmt, rhscoeffs_vec);
 
-    A->vec_clear(A, &svec, ii1-ii0);
-    A->vec_clear(A, &tvec, ii1-ii0);
+    A->vec_clear(A, &svec, eblock);
+    A->vec_clear(A, &tvec, eblock);
+
+    mmt_vec_clear(mmt, y);
+    mmt_vec_clear(mmt, my);
 
     matmul_top_clear(mmt);
-    pi_free_mpfq_datatype(pi, A_pi);
 
     A->oo_field_clear(A);
 

@@ -16,7 +16,7 @@ void balancing_set_row_col_count(balancing_ptr bal)
     unsigned int s = bal->h->nh * bal->h->nv;
     bal->trows = s * iceildiv(bal->h->nrows, s);
     bal->tcols = s * iceildiv(bal->h->ncols, s);
-    if (bal->h->flags & FLAG_PADDING) {
+    if (bal->h->flags & FLAG_REPLICATE) {
         bal->tcols = bal->trows = MAX(bal->trows, bal->tcols);
     }
 }

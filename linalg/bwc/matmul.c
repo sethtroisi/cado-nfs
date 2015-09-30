@@ -36,7 +36,8 @@ void matmul_decl_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "l2_cache_size",
             "internal, for mm_impl=bucket");
     param_list_decl_usage(pl, "cache_line_size",
-            "internal, for mm_impl=threaded");
+            "internal");
+#if 0
     param_list_decl_usage(pl, "mm_threaded_nthreads",
             "internal, for mm_impl=threaded");
     param_list_decl_usage(pl, "mm_threaded_sgroup_size",
@@ -49,6 +50,7 @@ void matmul_decl_usage(param_list_ptr pl)
             "internal, for mm_impl=threaded");
     param_list_decl_usage(pl, "mm_threaded_densify_tolerance",
             "internal, for mm_impl=threaded");
+#endif
 
     param_list_decl_usage(pl, "matmul_bucket_methods",
             "internal, for mm_impl=bucket");
@@ -67,12 +69,14 @@ void matmul_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "l1_cache_size");
     param_list_lookup_string(pl, "l2_cache_size");
     param_list_lookup_string(pl, "cache_line_size");
+#if 0
     param_list_lookup_string(pl, "mm_threaded_nthreads");
     param_list_lookup_string(pl, "mm_threaded_sgroup_size");
     param_list_lookup_string(pl, "mm_threaded_offset1");
     param_list_lookup_string(pl, "mm_threaded_offset2");
     param_list_lookup_string(pl, "mm_threaded_offset3");
     param_list_lookup_string(pl, "mm_threaded_densify_tolerance");
+#endif
     param_list_lookup_string(pl, "matmul_bucket_methods");
 
     param_list_lookup_string(pl, "local_cache_copy_dir");
@@ -202,21 +206,6 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
 
 void matmul_build_cache(matmul_ptr mm, matrix_u32_ptr m)
 {
-    /* We always have the right to take over the data which is being sent
-     * to use via the matrix_u32_ptr. For sure, we do so for the twisting
-     * info.
-     *
-     * This code fragment should rather be in matmul-common
-     */
-    if (m) {
-        mm->ntwists = m->ntwists;
-        mm->twist = m->twist;
-        m->ntwists = 0;
-        m->twist = NULL;
-    } else {
-        mm->ntwists = 0;
-        mm->twist = NULL;
-    }
     /*
     if (m == NULL) {
         fprintf(stderr, "Called matmul_build_cache() with NULL as matrix_u32_ptr argument. A guaranteed abort() !\n");

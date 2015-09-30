@@ -16,42 +16,13 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 
-/*
- * Relatively common manipulation in fact. Move to matmul_top ?
-static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsigned int nx, int d)
-{
-    mmt_comm_ptr mcol = mmt->wr[d];
-    pi_comm_ptr picol = mmt->pi->wr[d];
-    int shared = mcol->v->flags & THREAD_SHARED_VECTOR;
-    if (!shared || picol->trank == 0) {
-        abzero(mmt->abase, mcol->v->v, mcol->i1 - mcol->i0);
-        for(int j = 0 ; j < m ; j++) {
-            for(unsigned int k = 0 ; k < nx ; k++) {
-                uint32_t i = gxvecs[j*nx+k];
-                // set bit j of entry i to 1.
-                if (i < mcol->i0 || i >= mcol->i1)
-                    continue;
-                abt * where;
-                where = mcol->v->v + aboffset(mmt->abase, i-mcol->i0);
-                abset_ui(mmt->abase, where, j, 1);
-            }
-        }
-    }
-    if (shared)
-        serialize_threads(picol);
-}
- */
-
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
+    mmt_vec y, my;
     struct timing_data timing[1];
-
-    int flags[2];
-    flags[bw->dir] = THREAD_SHARED_VECTOR;
-    flags[!bw->dir] = 0;
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
     if (pi->interleaved) {
@@ -68,8 +39,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
 
-    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
-
     /* Hmmm. This would deserve better thought. Surely we don't need 64
      * in the prime case. Anything which makes checks relevant will do.
      * For the binary case, we used to work with 64 as a constant, but
@@ -85,16 +54,15 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     block_control_signals();
 
-    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
-    unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
+    mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+    mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
 
-    mmt_comm_ptr mcol = mmt->wr[bw->dir];
-    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
+    unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     serialize(pi->m);
     
-    A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
-
+    mmt_full_vec_set_zero(my);
 
     uint32_t * gxvecs = NULL;
     unsigned int nx = 0;
@@ -104,11 +72,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         set_x_fake(&gxvecs, bw->m, &nx, pi);
     }
 
-    indices_apply_S(mmt, gxvecs, nx * bw->m, bw->dir);
-    if (bw->dir == 0)
-        indices_apply_P(mmt, gxvecs, nx * bw->m, bw->dir);
-
-    // xvec_to_vec(mmt, gxvecs, bw->m, nx, bw->dir);
+    indices_twist(mmt, gxvecs, nx * bw->m, bw->dir);
 
     /* let's be generous with interleaving protection. I don't want to be
      * bothered, really */
@@ -123,7 +87,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
         if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-        mmt_vec_load(mmt, NULL, v_name, bw->dir, bw->start, unpadded);
+        mmt_vec_load(y, v_name, bw->start, unpadded);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
@@ -153,7 +117,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 #else
         unsigned long g = pi->m->jrank * pi->m->ncores + pi->m->trank;
         gmp_randseed_ui(rstate, bw->seed + g);
-        mmt_vec_set_random_inconsistent(mmt, NULL, bw->dir, rstate);
+        mmt_vec_set_random_inconsistent(y, rstate);
+        mmt_vec_allreduce(y);
 #endif
         gmp_randclear(rstate);
     }
@@ -165,11 +130,14 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     mpfq_vbase_oo_init_templates(AxAc, A, Ac);
 
     if (!bw->skip_online_checks) {
+        /* We do the dot product by working on the local vector chunks.
+         * Therefore, we must really understand the check vector as
+         * playing a role in the very same direction of the y vector!
+         */
         mmt_vec_init(mmt, Ac, Ac_pi,
-                check_vector, !bw->dir, THREAD_SHARED_VECTOR);
+                check_vector, bw->dir, THREAD_SHARED_VECTOR, mmt->n[bw->dir]);
         if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-        mmt_vec_load(mmt,
-                check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval, unpadded);
+        mmt_vec_load(check_vector, CHECK_FILE_BASE, bw->interval,  mmt->n0[!bw->dir]);
         if (tcan_print) { printf("done\n"); }
     }
 
@@ -232,19 +200,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             A->vec_set_zero(A, ahead, nchecks);
-            unsigned int how_many;
-            unsigned int offset_c;
-            unsigned int offset_v;
-            how_many = intersect_two_intervals(&offset_c, &offset_v,
-                    mrow->i0, mrow->i1,
-                    mcol->i0, mcol->i1);
-
-            if (how_many) {
-                AxAc->dotprod(A->obj, Ac->obj, ahead,
-                        SUBVEC(check_vector, v, offset_c),
-                        SUBVEC(mcol->v, v, offset_v),
-                        how_many);
-            }
+            AxAc->dotprod(A->obj, Ac->obj, ahead,
+                    mmt_my_own_subvec(check_vector),
+                    mmt_my_own_subvec(y),
+                    mmt_my_own_size_in_items(y));
         }
 
         /* Create an empty slot in program execution, so that we don't
@@ -253,7 +212,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          */
         pi_interleaving_flip(pi);
         pi_interleaving_flip(pi);
-        matmul_top_twist_vector(mmt, bw->dir);
+        mmt_vec_twist(mmt, y);
 
         A->vec_set_zero(A, xymats, bw->m*bw->interval);
         serialize(pi->m);
@@ -263,8 +222,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             pi_interleaving_flip(pi);
 
             /* Compute the product by x */
-            x_dotprod(mmt, gxvecs, nx, A, xymats, i * bw->m, bw->m, 1);
-            matmul_top_mul_cpu(mmt, bw->dir);
+            x_dotprod(A->vec_subvec(A, xymats, i * bw->m),
+                    gxvecs, bw->m, nx, y, 1);
+            matmul_top_mul_cpu(mmt, my, y);
 
 #ifdef MEASURE_LINALG_JITTER_TIMINGS
             timing_next_timer(timing); /* now timer is [1] (cpu-wait) */
@@ -279,7 +239,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
             timing_next_timer(timing); /* now timer is [2] (COMM) */ 
             /* Now we can resume MPI communications. */
-            matmul_top_mul_comm(mmt, bw->dir);
+            matmul_top_mul_comm(y, my);
 
 #ifdef MEASURE_LINALG_JITTER_TIMINGS
             timing_next_timer(timing); /* now timer is [3] (comm-wait) */
@@ -299,21 +259,21 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(mmt, gxvecs, nx, A, ahead, 0, nchecks, -1);
+            x_dotprod(ahead, gxvecs, nchecks, nx, y, -1);
 
-            pi_allreduce(NULL, ahead, nchecks, A_pi, BWC_PI_SUM, pi->m);
+            pi_allreduce(NULL, ahead, nchecks, mmt->pitype, BWC_PI_SUM, pi->m);
             if (!A->vec_is_zero(A, ahead, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
             }
         }
 
-        matmul_top_untwist_vector(mmt, bw->dir);
+        mmt_vec_untwist(mmt, y);
 
         /* Now (and only now) collect the xy matrices */
         pi_allreduce(NULL, xymats,
                 bw->m * bw->interval,
-                A_pi, BWC_PI_SUM, pi->m);
+                mmt->pitype, BWC_PI_SUM, pi->m);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * tmp;
@@ -331,7 +291,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
-        mmt_vec_save(mmt, NULL, v_name, bw->dir, s + bw->interval, unpadded);
+        mmt_vec_save(y, v_name, s + bw->interval, mmt->n0[bw->dir]);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0)
             keep_rolling_checkpoints(v_name, s + bw->interval);
@@ -358,15 +318,17 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     A->vec_clear(A, &xymats, bw->m*bw->interval);
 
     if (!bw->skip_online_checks) {
-        mmt_vec_clear(mmt, check_vector, !bw->dir);
+        mmt_vec_clear(mmt, check_vector);
         A->vec_clear(A, &ahead, nchecks);
     }
 
     free(gxvecs);
     free(v_name);
 
+    mmt_vec_clear(mmt, y);
+    mmt_vec_clear(mmt, my);
+
     matmul_top_clear(mmt);
-    pi_free_mpfq_datatype(pi, A_pi);
     pi_free_mpfq_datatype(pi, Ac_pi);
     A->oo_field_clear(A);
     Ac->oo_field_clear(Ac);

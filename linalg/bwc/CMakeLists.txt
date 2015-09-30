@@ -25,7 +25,7 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
-set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced threaded
+set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
 set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_8 pz

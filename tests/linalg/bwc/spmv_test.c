@@ -12,13 +12,80 @@
 #include "mpfq/mpfq_vbase.h"
 #include "portability.h"
 
-/*
-extern void broadcast_down(matmul_top_data_ptr mmt, int d);
-extern void reduce_across(matmul_top_data_ptr mmt, int d);
-extern void allreduce_across(matmul_top_data_ptr mmt, int d);
-extern void apply_permutation(matmul_top_data_ptr mmt, int d);
-extern void apply_identity(matmul_top_data_ptr mmt, int d);
-*/
+int verbose = 0;
+
+void mmt_vec_set_0n(mmt_vec_ptr v, size_t items)
+{
+    serialize(v->pi->m);
+    /* For debug: set to vector [0, 1, ..., n[
+     *
+     * Here we do something a bit fishy. We don't really have a way
+     * to set to the integer i, when in fact we're talking a simd
+     * thing: IOW, we have set_ui_at, but no set_ui. So let's do a
+     * dirty cast */
+    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    size_t off = mmt_my_own_offset_in_items(v);
+    size_t sz = mmt_my_own_size_in_items(v);
+    void * data = mmt_my_own_subvec(v);
+    for(size_t s = 0 ; s < sz ; s++) {
+        uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
+        *ptr = (v->i0 + off + s < items) ? v->i0 + off + s : 0;
+    }
+    v->consistency = 1;
+    serialize(v->pi->m);
+    mmt_vec_broadcast(v);
+    serialize(v->pi->m);
+}
+
+/* check that v[i] == p[i] */
+void mmt_vec_check_equal_0n(mmt_vec_ptr v, size_t items)
+{
+    serialize(v->pi->m);
+    ASSERT_ALWAYS(v->consistency == 2);
+    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    size_t off = mmt_my_own_offset_in_items(v);
+    size_t sz = mmt_my_own_size_in_items(v);
+    void * data = mmt_my_own_subvec(v);
+    for(size_t s = 0 ; s < sz ; s++) {
+        uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
+        ASSERT_ALWAYS(*ptr == (v->i0 + off + s < items ? v->i0 + off + s : 0));
+    }
+}
+
+/* check that v[i] == p[i] */
+void mmt_vec_check_equal_0n_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
+{
+    serialize(v->pi->m);
+    ASSERT_ALWAYS(v->consistency == 2);
+    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    size_t off = mmt_my_own_offset_in_items(v);
+    size_t sz = mmt_my_own_size_in_items(v);
+    void * data = mmt_my_own_subvec(v);
+    for(size_t s = 0 ; s < sz ; s++) {
+        uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
+        ASSERT_ALWAYS(*ptr == (v->i0 + off + s < items ? p[v->i0 + off + s] : 0));
+    }
+}
+
+/* check that v[i] == p^-1[i] */
+void mmt_vec_check_equal_0n_inv_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
+{
+    serialize(v->pi->m);
+    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    size_t off = mmt_my_own_offset_in_items(v);
+    size_t sz = mmt_my_own_size_in_items(v);
+    void * data = mmt_my_own_subvec(v);
+    for(size_t s = 0 ; s < sz ; s++) {
+        uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
+        if (v->i0 + off + s >= items) {
+            ASSERT_ALWAYS(*ptr == 0);
+        } else {
+            ASSERT_ALWAYS(*ptr < items);
+            ASSERT_ALWAYS(p[*ptr] == v->i0 + off + s);
+        }
+    }
+    serialize_threads(v->pi->wr[v->d]);
+}
 
 /* This only does a multiplication */
 
@@ -29,12 +96,16 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     if (pi->interleaved && pi->interleaved->idx)
         return NULL;
 
-    int tcan_print = bw->can_print && pi->m->trank == 0;
-    matmul_top_data mmt;
+    if (verbose) {
+        pi_log_init(pi->m);
+        pi_log_init(pi->wr[0]);
+        pi_log_init(pi->wr[1]);
+    }
 
-    int flags[2];
-    flags[bw->dir] = THREAD_SHARED_VECTOR;
-    flags[!bw->dir] = 0;
+    gmp_randstate_t rstate;
+
+    // int tcan_print = bw->can_print && pi->m->trank == 0;
+    matmul_top_data mmt;
 
     int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
@@ -44,29 +115,267 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
-    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, bw->seed);
 
-    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
-    unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
+    /* recall that d here is only for one optimized direction. The other
+     * direction should still work. Note that changing the optimized
+     * direction is going to trigger a different choice of cache files. */
+    /* TODO check this with the various combinations of d */
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
 
-    mmt_vec_set_zero(mmt, NULL, 0);
-    mmt_vec_set_zero(mmt, NULL, 1);
+    /* check that mmt_apply_identity does what we expect. This function
+     * goes from a vector in one direction to a vector in another
+     * direction (but leaves to us the task of doing the reduction,
+     * however).
+     */
+    {
+        mmt_vec v, vi, vii;
+        mmt_vec_init(mmt,0,0, v,   0, /* shared ! */ 1, mmt->n[0]);
+        mmt_vec_init(mmt,0,0, vi,  1,                0, mmt->n[1]);
+        mmt_vec_init(mmt,0,0, vii, 0,                0, mmt->n[0]);
+        serialize(pi->m);
+        mmt_vec_set_0n(v, mmt->n0[0]);
+        /* We save the Z files, although it's useless, the checking done
+         * here is allright */
+        mmt_vec_save(v, "Z", 0, mmt->n0[0]);
+        mmt_apply_identity(vi, v);
+        mmt_vec_allreduce(vi);
+        mmt_vec_check_equal_0n(vi, mmt->n0[1]);
+        mmt_vec_save(vi, "ZI", 0, mmt->n0[1]);
+        mmt_apply_identity(vii, vi);
+        mmt_vec_allreduce(vii);
+        mmt_vec_check_equal_0n(vii, mmt->n0[0]);
+        mmt_vec_save(vi, "ZII", 0, mmt->n0[0]);
+        mmt_vec_clear(mmt, v);
+        mmt_vec_clear(mmt, vi);
+        mmt_vec_clear(mmt, vii);
+    }
 
-    serialize(pi->m);
 
-    /* saves data to wr[bw->dir]->v == mcol->v) */
+    /* Now check that mmt_apply_S and mmt_unapply_S do what they are
+     * supposed to.  */
+    {
+        balancing bb;
+        const char * bname = param_list_lookup_string(pl, "balancing");
+        balancing_init(bb);
+        balancing_read(bb, bname);
 
-    int d=bw->dir;
+        for(int test_shared = 0 ; test_shared < 2 ; test_shared++) {
+            serialize(pi->m);
+            uint32_t * xr = bb->rowperm;
+            uint32_t * xc = bb->colperm;
+            uint32_t *freeme[2] = {NULL,NULL};
+            if (mmt->bal->h->flags & FLAG_REPLICATE) {
+                ASSERT_ALWAYS(xc || xr);
+                ASSERT_ALWAYS(mmt->bal->trows == mmt->bal->tcols);
+                /* P is the permutation which sends
+                 * sub-block nv*i+j to sub-block nh*j+i
+                 */
+                unsigned int nh = mmt->bal->h->nh;
+                unsigned int nv = mmt->bal->h->nv;
+                size_t z = mmt->bal->trows / (nh * nv);
+                if (!xr) {
+                    /* implicit Sr is P * Sc */
+                    xr = malloc(mmt->bal->trows * sizeof(uint32_t));
+                    freeme[0] = xr;
+                    /* The image of i is Sc(P(i)) */
+                    for(size_t i = 0 ; i < nh ; i++) {
+                        for(size_t j = 0 ; j < nv ; j++) {
+                            for(size_t k = 0 ; k < z ; k++) {
+                                /* The image of (nv*i+j)*z+k by P is
+                                 * (nh*j+i)*z+k */
+                                /* And its image by P*Sc is therefore
+                                 * xc[(nh*j+i)*z+k];
+                                 */
+                                xr[(nv*i+j)*z+k] = xc[(nh*j+i)*z+k];
+                            }
+                        }
+                    }
+                }
+                if (!xc) {
+                    /* implicit Sc is P^-1 * Sr */
+                    xc = malloc(mmt->bal->tcols * sizeof(uint32_t));
+                    freeme[1] = xc;
+                    /* The image of i is Sr(P^-1(i)) */
+                    for(size_t i = 0 ; i < nh ; i++) {
+                        for(size_t j = 0 ; j < nv ; j++) {
+                            for(size_t k = 0 ; k < z ; k++) {
+                                /* The image of (nh*j+i)*z+k by P^-1 is
+                                 * (nv*i+j)*z+k */
+                                /* And its image by P^-1*Sc is therefore
+                                 * xr[(nv*i+j)*z+k];
+                                 */
+                                xc[(nh*j+i)*z+k] = xr[(nv*i+j)*z+k];
+                            }
+                        }
+                    }
+                }
+            }
+            if (xc) {
+                mmt_vec v;
+                mmt_vec_init(mmt,0,0, v,  1, test_shared, mmt->n[1]);
 
-    if  (tcan_print)
-        printf("bw->dir==%d d==%d\n", bw->dir, d);
-    // known strategies:
-    
-    mmt_vec_load(mmt, NULL, "Y", d, 0, unpadded);
-    matmul_top_twist_vector(mmt, d);
-    matmul_top_mul(mmt, d);
-    matmul_top_untwist_vector(mmt, d);
-    mmt_vec_save(mmt, NULL, "MY", d, 0, unpadded);
+                /* Because we want to test the permutation, we need to
+                 * fill our dummy vector with the full range [0..n[, not
+                 * just [0.n0[ padded with zeroes. Two reasons for this:
+                 *  - the permutation wors on the index set [0..n[ anyway
+                 *    (not just [0..n0[),
+                 *  - in order to tell whether we're doing the right
+                 *    thing, we value uniqueness of data in the vector.
+                 */
+                mmt_vec_set_0n(v, mmt->n[1]);
+                /* trsp(v) <- trsp(v) * S: coefficient i goes to position S(i).
+                 * Hence we must check that in position j, we have what
+                 * was beforehand in position S^{-1}(i), right. Which is
+                 * precisely S^{-1}(j).
+                 */
+                /* apply == 1 d == 1 Sc defined:   v <- v * Sc
+                 * apply == 1 d == 1 Sc implicit:  v <- v * Sr
+                 */
+                mmt_vec_apply_S(mmt, v);
+                mmt_vec_check_equal_0n_inv_permuted(v, mmt->n[1], xc);
+                /* apply == 0 d == 1 Sc defined:   v <- v * Sc^-1
+                 * apply == 0 d == 1 Sc implicit:  v <- v * Sr^-1
+                 */
+                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_check_equal_0n(v, mmt->n[1]);
+
+                /* Do the same check in the other direction as well. Most
+                 * probably redundant, though. */
+                mmt_vec_set_0n(v, mmt->n[1]);
+                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_check_equal_0n_permuted(v, mmt->n[1], xc);
+                mmt_vec_apply_S(mmt, v);
+                mmt_vec_check_equal_0n(v, mmt->n[1]);
+                mmt_vec_clear(mmt, v);
+            }
+            if (xr) {
+                /* same for row vectors */
+                mmt_vec v;
+                mmt_vec_init(mmt,0,0, v,  0, test_shared, mmt->n[0]);
+
+                mmt_vec_set_0n(v, mmt->n[0]);
+                /* v <- v * S:  coefficient i goes to position S(i).  */
+                /* apply == 1 d == 0 Sr defined:   v <- v * Sr
+                 * apply == 1 d == 0 Sr implicit:  v <- v * Sc
+                 */
+                mmt_vec_apply_S(mmt, v);
+                mmt_vec_check_equal_0n_inv_permuted(v, mmt->n[0], xr);
+                /*
+                 * apply == 0 d == 0 Sr defined:   v <- v * Sr^-1
+                 * apply == 0 d == 0 Sr implicit:  v <- v * Sc^-1
+                 */
+                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_check_equal_0n(v, mmt->n[0]);
+
+                mmt_vec_set_0n(v, mmt->n[0]);
+                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_check_equal_0n_permuted(v, mmt->n[0], xr);
+                mmt_vec_apply_S(mmt, v);
+                mmt_vec_check_equal_0n(v, mmt->n[1]);
+                mmt_vec_clear(mmt, v);
+            }
+            if (freeme[0]) free(freeme[0]);
+            if (freeme[1]) free(freeme[1]);
+        }
+        balancing_clear(bb);
+    }
+
+
+    /* matrix times vector product */
+    /* The file pair (Y.0, MY.0) will be checked for correctness against the
+     * result obtained by short_matmul */
+    {
+        mmt_vec y, my;
+        mmt_vec_init(mmt,0,0, y,  1, /* shared ! */ 1, mmt->n[1]);
+        mmt_vec_init(mmt,0,0, my, 0,                0, mmt->n[0]);
+        serialize(pi->m);
+        mmt_vec_set_random_through_file(y, "Y", 0, mmt->n0[1], rstate);
+        /* recall that for all purposes, bwc operates with M*T^-1 and not M
+         */
+        mmt_vec_apply_T(mmt, y);
+        mmt_vec_twist(mmt, y);
+        matmul_top_mul_cpu(mmt, my, y);
+        /* watch out -- at this point we are *NOT* doing
+         * matmul_top_mul_comm, so there's no multiplication by P^-1 !
+         */
+        mmt_vec_allreduce(my);
+        mmt_vec_untwist(mmt, my);
+        mmt_vec_save(my, "MY", 0, mmt->n0[0]);
+        mmt_vec_clear(mmt, y);
+        mmt_vec_clear(mmt, my);
+    }
+
+    /* vector times matrix product */
+    /* The file pair (W, WM) will be checked for correctness against the
+     * result obtained by short_matmul */
+    {
+        mmt_vec w, wm;
+        mmt_vec_init(mmt,0,0, w,  0, /* shared ! */ 1, mmt->n[0]);
+        mmt_vec_init(mmt,0,0, wm, 1,                0, mmt->n[1]);
+        serialize(pi->m);
+        mmt_vec_set_random_through_file(w, "W", 0, mmt->n0[0], rstate);
+        mmt_vec_twist(mmt, w);
+        matmul_top_mul_cpu(mmt, wm, w);
+        /* It's not the same if we do allreduce+untwist, thus stay on the
+         * image side, or reduce (changing side) + untwist, which brings
+         * us back to the original side.
+         *
+         * So this test is probably most relevant for rectangular
+         * matrices, but we may do it as well for square matrices. The
+         * only catch is that in the latter case, we should pay attention
+         * to what it does exactly.
+         */
+        mmt_vec_allreduce(wm);
+        mmt_vec_untwist(mmt, wm);
+        mmt_vec_unapply_T(mmt, wm);
+        mmt_vec_save(wm, "WM", 0, mmt->n0[1]);
+        mmt_vec_clear(mmt, w);
+        mmt_vec_clear(mmt, wm);
+    }
+
+    /* indices_twist */
+    {
+        mmt_vec x;
+        uint32_t * xx;
+        unsigned int m = 2;
+        unsigned int nx = 2;
+        xx = malloc(m * nx * sizeof(uint32_t));
+        for(unsigned int k = 0 ; k < m * nx ; k++) {
+            xx[k] = gmp_urandomm_ui(rstate, mmt->n0[0]);
+        }
+        pi_bcast(xx, m * nx * sizeof(uint32_t), BWC_PI_BYTE, 0, 0, pi->m);
+        for(int d = 0 ; d < 2 ; d++)  {
+            mmt_vec_init(mmt,0,0, x,  d, /* shared ! */ 1, mmt->n[d]);
+
+            /* prepare a first vector */
+            mmt_vec_set_x_indices(x, xx, m, nx);
+            mmt_vec_save(x, "Xa", d, mmt->n[d]);
+
+            /* and then a second vector, which should be equal */
+            indices_twist(mmt, xx, nx * m, d);
+            mmt_vec_set_x_indices(x, xx, m, nx);
+            mmt_vec_untwist(mmt, x);
+            mmt_vec_save(x, "Xb", d, mmt->n[d]);
+
+            /* now for the twisted versions, too */
+            mmt_vec_set_x_indices(x, xx, m, nx);
+            mmt_vec_twist(mmt, x);
+            mmt_vec_save(x, "XTa", d, mmt->n[d]);
+
+            indices_twist(mmt, xx, nx * m, d);
+            mmt_vec_set_x_indices(x, xx, m, nx);
+            mmt_vec_save(x, "XTb", d, mmt->n[d]);
+
+            mmt_vec_clear(mmt, x);
+        }
+        free(xx);
+    }
+
+    /* could also be tested:
+     * - simply the permutation P
+     */
 
 #if 0
     matmul_top_apply_P(mmt, d);
@@ -151,9 +460,18 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     memset(oldv[0], 0, sizeof(mmt_vec));
     memset(oldv[1], 0, sizeof(mmt_vec));
 #endif
+
     matmul_top_clear(mmt);
-    pi_free_mpfq_datatype(pi, A_pi);
     A->oo_field_clear(A);
+    gmp_randclear(rstate);
+
+    if (verbose) {
+        pi_log_print_all(pi);
+
+        pi_log_clear(pi->m);
+        pi_log_clear(pi->wr[0]);
+        pi_log_clear(pi->wr[1]);
+    }
 
     return NULL;
 }
@@ -174,8 +492,11 @@ int main(int argc, char * argv[])
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
+    param_list_decl_usage(pl, "v", "(switch) turn on some demo logging");
     matmul_top_decl_usage(pl);
-    /* declare local parameters and switches: none here (so far). */
+
+    /* declare local parameters and switches. */
+    param_list_configure_switch(pl, "v", &verbose);
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
 

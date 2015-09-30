@@ -17,8 +17,6 @@ struct matrix_u32_s {
     // output arguments.
     uint32_t * p;
     size_t size;
-    uint32_t (*twist)[2];
-    size_t ntwists;
 };
 typedef struct matrix_u32_s matrix_u32[1];
 typedef struct matrix_u32_s * matrix_u32_ptr;

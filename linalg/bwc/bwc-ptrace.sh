@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
 set -e
-# set -x
+
+if [ "$CADO_DEBUG" ] ; then
+    set -x
+fi
 
 # This script is intended *for testing only*. It's used for, e.g.,
 # coverage tests. This even goes with dumping all intermediary data to
@@ -472,6 +475,9 @@ print_all_v() {
     echo "$2:=[VectorSpace(GF(p), nr_orig)|];" 
     for j in `seq 0 $splitwidth $((n-1))` ; do
         let j1=j+splitwidth
+        if ! [ -f $wdir/V${j}-${j1}.$1 ] ; then
+            break;
+        fi
         $cmd spvector64 < $wdir/V${j}-${j1}.$1 > $mdir/V${j}.$1.m
         cat <<-EOF
             load "$mdir/V${j}.${1}.m";
@@ -486,6 +492,9 @@ print_all_v 0 Y > $mdir/Y0.m
 echo "VV:=[];" > $mdir/VV.m
 for i in {0..10} ; do
     print_all_v $i V_$i > $mdir/V.$i.m
+    if ! [ -f $mdir/V0.$i.m ] ; then
+        break;
+    fi
     cat >> $mdir/VV.m <<-EOF
     load "$mdir/V.$i.m";
     Append(~VV, V_$i);
@@ -493,13 +502,24 @@ EOF
 done
 
 echo "Saving check vectors to magma format"
-$cmd spvector64 < $wdir/C.0 > $mdir/C0.m
-$cmd spvector64 < $wdir/C.1 > $mdir/C1.m
-$cmd spvector64 < $wdir/C.$interval > $mdir/C$interval.m
+if [ -f "$wdir/C.0" ] ; then
+    $cmd spvector64 < $wdir/C.0 > $mdir/C0.m
+    $cmd spvector64 < $wdir/C.1 > $mdir/C1.m
+    $cmd spvector64 < $wdir/C.$interval > $mdir/C$interval.m
+else
+    echo "var:=0;" > $mdir/C0.m
+    echo "var:=0;" > $mdir/C1.m
+    echo "var:=0;" > $mdir/C$interval.m
+fi
 
 
 echo "Saving krylov sequence to magma format"
-afile=$(basename `find $wdir -name 'A*[0-9]'`)
+afile="`find $wdir -name 'A*[0-9]'`"
+if ! [ "$afile" ] ; then
+    echo "########## FAILURE ! Krylov sequence not finished #############"
+    exit 1
+fi
+afile=$(basename $afile)
 $cmd spvector64 < $wdir/$afile > $mdir/A.m
 
 

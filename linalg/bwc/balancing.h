@@ -31,9 +31,11 @@
 
 #define FLAG_COLPERM    1
 #define FLAG_ROWPERM    2
-#define FLAG_PADDING    4       /* pad to largest dimension */
-#define FLAG_REPLICATE  8       /* only balancing in one dimension */
-                                /* NOTE: requires PADDING, too */
+#define FLAG_REPLICATE  8       /* work with square matrices (padding in
+                                   need be), and replicate one
+                                   permutation to the other side, so that
+                                   we get conjugated permutations.
+                                   */
 
 struct balancing_header_s {
     // FIXME: add a magic number here ? This header is read directly in
@@ -129,18 +131,6 @@ static inline unsigned long balancing_pre_unshuffle(balancing_ptr bal, unsigned 
 }
 
 
-static inline int balancing_progressive_dispatch_block(int n, int t, int k)
-{
-    int f = n / t;
-    int r = n % t;
-    int c = f + 1;
-    if (k < r * c) {
-        return k / c;
-    } else {
-        k -= r * c;
-        return r + k / f;
-    }
-}
 #ifdef __cplusplus
 }
 #endif

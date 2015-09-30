@@ -24,12 +24,8 @@
 void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     matmul_top_data mmt;
+    mmt_vec y, my;
     struct timing_data timing[1];
-
-    int flags[2];
-    /* for the needs of checking, shared vectors are not used here */
-    flags[bw->dir] = 0;
-    flags[!bw->dir] = 0;
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
     /*
@@ -49,8 +45,6 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
 
-    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
-
     block_control_signals();
 
     /*****************************************
@@ -61,7 +55,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
      * this function are just sanity checks. Matrix dispatch can, in
      * fact, be done from any program which does matmul_top_init. This
      * function calls mmt_finish_init, which calls
-     * matmul_top_read_submatrix, which eventually calls
+     * matmul_top_read_submatrix, which eventuallmy,a!ls
      * balancing_get_matrix_u32, which hooks into the balancing code.
      * This is UNLESS either of the two command-line arguments are set,
      * because these trigger special behaviour:
@@ -70,8 +64,9 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
      * random_matrix_size : for creating test matrices, essentially for
      * krylov/mksol speed testing.
      */
-    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
-
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
+    mmt_vec_init(mmt,0,0, y,  1, 0, mmt->n[1]);
+    mmt_vec_init(mmt,0,0, my, 0, 0, mmt->n[0]);
 
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
@@ -93,24 +88,23 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
          * check 2: for some vector L, compute (L, H=M*K) and (L*M, K).
          * This means matmul_top_mul(mmt, 0).
          */
-        mmt_comm_ptr mcol = mmt->wr[1];
-        mmt_comm_ptr mrow = mmt->wr[0];
-
         const char * checkname;
 
         checkname = "1st check: consistency of M*arbitrary1 (Hx.0 == H1)";
 
-        A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
-        for(unsigned int i = mcol->i0 ; i < mcol->i1 && i < unpadded ; i++) {
-            void * dst = SUBVEC(mcol->v, v, i - mcol->i0);
+        mmt_full_vec_set_zero(y);
+        ASSERT_ALWAYS(y->siblings);     /* shared vector undesired */
+        for(unsigned int i = y->i0 ; i < y->i1 && i < unpadded ; i++) {
+            void * dst = A->vec_subvec(A, y->v, i - y->i0);
             uint64_t value = DUMMY_VECTOR_COORD_VALUE(i);
-            memset(dst, 0, A->vec_elt_stride(A,1));
             memcpy(dst, &value, sizeof(uint64_t));
         }
-        matmul_top_twist_vector(mmt, 1);
-        matmul_top_mul(mmt, 1);
-        matmul_top_untwist_vector(mmt, 1);
-        mmt_vec_save(mmt, NULL, "Hx", 1, 0, unpadded);
+        mmt_vec_twist(mmt, y);
+        matmul_top_mul(mmt, my, y);
+        mmt_vec_untwist(mmt, y);
+
+        mmt_vec_save(y, "Hx", 0, unpadded);
+
         // compare if files are equal.
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             char cmd[1024];
@@ -133,11 +127,11 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 
         checkname = "2nd check: (arbitrary2, M*arbitrary1) == (arbitrary2*M==Hy, arbitrary1)";
 
-        A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
-        for(unsigned int i = mrow->i0 ; i < mrow->i1 && i < unpadded ; i++) {
-            void * dst = SUBVEC(mrow->v, v, i - mrow->i0);
+        mmt_full_vec_set_zero(my);
+        ASSERT_ALWAYS(my->siblings);     /* shared vector undesired */
+        for(unsigned int i = my->i0 ; i < my->i1 && i < unpadded ; i++) {
+            void * dst = A->vec_subvec(A, my->v, i - my->i0);
             uint64_t value = DUMMY_VECTOR_COORD_VALUE2(i);
-            memset(dst, 0, A->vec_elt_stride(A,1));
             memcpy(dst, &value, sizeof(uint64_t));
         }
         /* This is L. Now compute the dot product. */
@@ -149,30 +143,32 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         unsigned int offset_c;
         unsigned int offset_v;
         how_many = intersect_two_intervals(&offset_c, &offset_v,
-                mrow->i0, mrow->i1,
-                mcol->i0, mcol->i1);
+                my->i0, my->i1,
+                y->i0, y->i1);
         A->dotprod(A, dp0,
-                SUBVEC(mrow->v, v, offset_c),
-                SUBVEC(mcol->v, v, offset_v),
+                A->vec_subvec(A, my->v, offset_c),
+                A->vec_subvec(A, y->v, offset_v),
                 how_many);
-        pi_allreduce(NULL, dp0, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
+        pi_allreduce(NULL, dp0, A->groupsize(A), mmt->pitype, BWC_PI_SUM, pi->m);
+
         /* now we can throw away Hx */
-        matmul_top_twist_vector(mmt, 0);
-        matmul_top_mul(mmt, 0);
-        matmul_top_untwist_vector(mmt, 0);
-        mmt_vec_save(mmt, NULL, "Hy", 0, 0, unpadded);
-        A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
-        for(unsigned int i = mcol->i0 ; i < mcol->i1 && i < unpadded ; i++) {
-            void * dst = SUBVEC(mcol->v, v, i - mcol->i0);
+        mmt_vec_twist(mmt, my);
+        matmul_top_mul(mmt, y, my);
+        mmt_vec_untwist(mmt, my);
+        mmt_vec_save(my, "Hy", 0, unpadded);
+
+        mmt_full_vec_set_zero(y);
+        ASSERT_ALWAYS(y->siblings);     /* shared vector undesired */
+        for(unsigned int i = y->i0 ; i < y->i1 && i < unpadded ; i++) {
+            void * dst = A->vec_subvec(A, y->v, i - y->i0);
             uint64_t value = DUMMY_VECTOR_COORD_VALUE(i);
-            memset(dst, 0, A->vec_elt_stride(A,1));
             memcpy(dst, &value, sizeof(uint64_t));
         }
         A->dotprod(A, dp1,
-                SUBVEC(mrow->v, v, offset_c),
-                SUBVEC(mcol->v, v, offset_v),
+                A->vec_subvec(A, my->v, offset_c),
+                A->vec_subvec(A, y->v, offset_v),
                 how_many);
-        pi_allreduce(NULL, dp1, A->groupsize(A), A_pi, BWC_PI_SUM, pi->m);
+        pi_allreduce(NULL, dp1, A->groupsize(A), mmt->pitype, BWC_PI_SUM, pi->m);
         int diff = memcmp(dp0, dp1, A->vec_elt_stride(A, A->groupsize(A)));
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             if (diff) {
@@ -186,8 +182,9 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         A->vec_clear(A, &dp1, A->groupsize(A));
     }
 
+    mmt_vec_clear(mmt, y);
+    mmt_vec_clear(mmt, my);
     matmul_top_clear(mmt);
-    pi_free_mpfq_datatype(pi, A_pi);
 
     A->oo_field_clear(A);
 

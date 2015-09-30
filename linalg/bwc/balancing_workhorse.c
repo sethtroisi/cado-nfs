@@ -307,14 +307,15 @@ thread_dest_ptr thread_dest_alloc(thread_pipe_ptr t)
 size_t thread_source_get(thread_source_ptr s, uint32_t ** p, size_t avail)
 {
     ASSERT_ALWAYS(avail == 0);
+    pthread_mutex_lock(&s->t->mu);
     ASSERT_ALWAYS(s->b->pos <= s->t->avail);
     size_t n = s->t->avail - s->b->pos;
     *p = s->t->buf+s->b->pos;
     if (n) {
         s->b->pos += n;
+        pthread_mutex_unlock(&s->t->mu);
         return n;
     }
-    pthread_mutex_lock(&s->t->mu);
     for( ; (n = s->t->avail - s->b->pos) == 0 && s->t->avail < s->t->total; ) {
         pthread_cond_wait(&s->t->hello, &s->t->mu);
         ASSERT_ALWAYS(s->b->pos <= s->t->avail);
@@ -714,19 +715,8 @@ typedef struct master_data_s *master_data_ptr;/*}}}*/
 
 int who_has_row_bare(master_data m, uint32_t rnum)/*{{{*/
 {
-    /*
-    int b;
-    ASSERT(rnum < m->bal->trows);
-    if (rnum < m->row_block0) {
-	b = rnum / (m->row_cellbase + 1);
-    } else {
-	int q = m->bal->trows % m->bal->h->nh;
-	b = (rnum - q) / m->row_cellbase;
-    }
-    assert(b == balancing_progressive_dispatch_block(m->bal->trows, m->bal->h->nh, rnum));
-    return b;
-    */
-    return balancing_progressive_dispatch_block(m->bal->trows, m->bal->h->nh, rnum);
+    ASSERT(m->bal->trows % m->bal->h->nh == 0);
+    return rnum / (m->bal->trows / m->bal->h->nh);
 }
 
 int who_has_row(master_data m, uint32_t rnum)
@@ -737,19 +727,8 @@ int who_has_row(master_data m, uint32_t rnum)
 /*}}}*/
 int who_has_col_bare(master_data m, uint32_t cnum) /*{{{*/
 {
-    /*
-    int b;
-    ASSERT(cnum < m->bal->tcols);
-    if (cnum < m->col_block0) {
-	b = cnum / (m->col_cellbase + 1);
-    } else {
-	int q = m->bal->tcols % m->bal->h->nv;
-	b = (cnum - q) / m->col_cellbase;
-    }
-    assert(b == balancing_progressive_dispatch_block(m->bal->tcols, m->bal->h->nv, cnum));
-    return b;
-    */
-    return balancing_progressive_dispatch_block(m->bal->tcols, m->bal->h->nv, cnum);
+    ASSERT(m->bal->tcols % m->bal->h->nv == 0);
+    return cnum / (m->bal->tcols / m->bal->h->nv);
 }
 
 int who_has_col(master_data m, uint32_t cnum)
@@ -892,9 +871,6 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
                s->my_row0, s->my_nrows,
                s->my_col0, s->my_ncols);
 
-    s->mat->twist=malloc(s->my_nrows * sizeof(uint32_t[2]));
-    s->mat->ntwists=0;
-
     /*
     char buf[16];
 	   // " Datafile %s."
@@ -923,12 +899,6 @@ struct slave_dest_s {/*{{{*/
     uint32_t *col_weights;
     uint32_t current_row;
 
-    /* I'm not really sure that this field is properly named. It receives
-     * fw_colperm(fw_rowperm(real, true, original row index)). That
-     * pretty much seems to be the permutation caused by the shuffled
-     * product option. And we use it exactly that way.
-     */
-    uint32_t original_row;
     int incoming_rowindex;
     uint64_t tw;
     slave_data_ptr s;
@@ -949,35 +919,17 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
             break;
         }
         uint32_t x = p[i];
-        if (R->incoming_rowindex == 2) {
+        if (R->incoming_rowindex == 1) {
             R->current_row = x;
             R->incoming_rowindex--;
             ASSERT(R->current_row <= R->s->bal->trows);
             ASSERT(R->current_row >= R->s->my_row0);
             ASSERT(R->current_row < R->s->my_row0 + R->s->my_nrows);
-            continue;
-        }
-        if (R->incoming_rowindex) {
-            /* We can obtain the info on the balancing permutation for a
-             * small cost */
-            R->original_row = x;
-            R->incoming_rowindex = 0;
-            // don't increase the row counter upon exit.
             R->b->r++;
-            ASSERT_ALWAYS(R->original_row <= R->s->bal->trows);
-            if (R->s->mat->p == NULL && R->original_row >= R->s->my_col0 && R->original_row < R->s->my_col0 + R->s->my_ncols) {
-                R->s->mat->twist[R->s->mat->ntwists][0] = R->current_row;
-                R->s->mat->twist[R->s->mat->ntwists][1] = R->original_row;
-                R->s->mat->ntwists++;
-                ASSERT_ALWAYS(R->s->mat->ntwists <= R->b->r);
-                ASSERT_ALWAYS(R->s->mat->ntwists <= R->s->my_nrows);
-            }
-            // ASSERT(R->current_row >= R->s->my_row0);
-            // ASSERT(R->current_row < R->s->my_row0 + R->s->my_nrows);
             continue;
         }
         if (x == UINT32_MAX) {
-            R->incoming_rowindex = 2;
+            R->incoming_rowindex = 1;
             continue;
         }
         ASSERT(x <= R->s->bal->tcols);
@@ -1169,8 +1121,6 @@ void slave_loop(slave_data s)
     slave_dest_stats((slave_dest_ptr) output);
 
     slave_dest_engage_final_pass((slave_dest_ptr) output);
-    s->mat->twist = realloc(s->mat->twist, s->mat->ntwists * sizeof(uint32_t[2]));
-    qsort(s->mat->twist, s->mat->ntwists, sizeof(uint32_t[2]), (sortfunc_t) &intpair_cmp);
 
     if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
         printf("[J%uT%u] building local matrix\n",
@@ -1273,10 +1223,13 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
     if (m->bal->h->flags & FLAG_REPLICATE) {
         uint32_t * xc = m->bal->colperm;
         uint32_t * xr = m->bal->rowperm;
-        ASSERT_ALWAYS(m->bal->h->flags & FLAG_PADDING);
         ASSERT_ALWAYS(m->bal->tcols == m->bal->trows);
         /* currently we seem to be supporting this only in case the
          * column permutation is authoritative. */
+        if (!xc) {
+            fprintf(stderr, "The current code expects a column permutation replicated on rows, not the converse. There is little adaptation work, but yet to be done. Maybe you could pass \"--reorder columns\" to mf_bal ?\n");
+            abort();
+        }
         ASSERT_ALWAYS(xc);
         ASSERT_ALWAYS(!xr);
         if (!xc) xc = xr;
@@ -1433,19 +1386,9 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             /* Send a new row info _only_ to the nodes on the
              * corresponding row in the process grid ! */
             for (int i = 0; i < (int) m->bal->h->nv; i++) {
-                /* See comment about the field original_row_index. It's a
-                 * misnomer, really. We do want to put
-                 * fw_colperm(fw_rowperm(r)), here. This is used for
-                 * untwisting the shuffle-product vectors, if we ever
-                 * want to.
-                 *
-                 * To be honest, it's rather likely that this is
-                 * completely bogus if we are doing anything different
-                 * from the shuffled-product tactics.
-                 */
-                uint32_t x[3] = {UINT32_MAX, rr, m->fw_colperm[rr], };
+                uint32_t x[2] = {UINT32_MAX, rr, };
                 data_dest_ptr where = d->x[d->noderow + i];
-                where->put(where, x, 3);
+                where->put(where, x, 2);
                 /* debug only */
                 m->sent_rows[d->noderow + i]++;
                 if(m->sent_rows[d->noderow + i] >
@@ -1752,7 +1695,7 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
                     "%" PRIu64 " coeffs\n",
                     m->bal->h->nrows, m->bal->h->ncols, m->bal->h->ncoeffs);
         }
-	if (m->bal->h->flags & FLAG_PADDING) {
+	if (m->bal->h->flags & FLAG_REPLICATE) {
 	    printf("Padding to a matrix of size %" PRIu32 "x%" PRIu32 "\n",
 		   m->bal->trows, m->bal->tcols);
 	}

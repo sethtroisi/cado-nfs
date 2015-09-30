@@ -614,7 +614,7 @@ int main(int argc, char * argv[])
     }
 
     if (!rectangular) {
-        bal->h->flags |= FLAG_PADDING | FLAG_REPLICATE;
+        bal->h->flags |= FLAG_REPLICATE;
     }
 
     balancing_finalize(bal);

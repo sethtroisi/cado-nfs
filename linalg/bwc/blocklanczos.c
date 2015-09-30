@@ -20,8 +20,8 @@
 
 struct blstate {
     matmul_top_data mmt;
+    mmt_vec y, my;
     mpfq_vbase A;
-    pi_datatype_ptr A_pi;
     gmp_randstate_t rstate;
 
     /* We'll need several intermediary n*n matrices. These will be
@@ -142,7 +142,6 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
      * since otherwise this represents quite a significant memory
      * footprint in the end.
      */
-    int flags[2] = {0,0};
 
     gmp_randinit_default(bl->rstate);
 
@@ -151,9 +150,9 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
             MPFQ_GROUPSIZE, bw->ys[1]-bw->ys[0],
             MPFQ_DONE);
 
-    bl->A_pi = pi_alloc_mpfq_datatype(pi, A);
-
-    matmul_top_init(mmt, A, bl->A_pi, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
+    mmt_vec_init(mmt,0,0, bl->y,   bw->dir, 0, mmt->n[bw->dir]);
+    mmt_vec_init(mmt,0,0, bl->my, !bw->dir, 0, mmt->n[!bw->dir]);
 
     /* So far we have constrained A to have width exactly n, but it may
      * also conceivably be a divisor of n. */
@@ -166,7 +165,7 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
         bit_vector_init(bl->D[i], bw->n);
         /* We need as well the two previous vectors. For these, distributed
          * storage will be ok. */
-        mmt_vec_init(mmt, NULL, NULL, bl->V[i], bw->dir, flags[bw->dir]);
+        mmt_vec_init(mmt,0,0, bl->V[i], bw->dir, 0, mmt->n[bw->dir]);
     }
 
 }
@@ -175,7 +174,6 @@ void blstate_clear(struct blstate * bl)
 {
     matmul_top_data_ptr mmt = bl->mmt;
     mpfq_vbase_ptr A = bl->A;
-    parallelizing_info_ptr pi = mmt->pi;
     size_t nelts_for_nnmat = bw->n * (bw->n / A->groupsize(A));
 
     serialize(mmt->pi->m);
@@ -186,9 +184,10 @@ void blstate_clear(struct blstate * bl)
         bit_vector_clear(bl->D[i]);
         /* We need as well the two previous vectors. For these, distributed
          * storage will be ok. */
-        mmt_vec_clear(mmt, bl->V[i], bw->dir);
+        mmt_vec_clear(mmt, bl->V[i]);
     }
-    pi_free_mpfq_datatype(pi, bl->A_pi);
+    mmt_vec_clear(mmt, bl->y);
+    mmt_vec_clear(mmt, bl->my);
     matmul_top_clear(bl->mmt);
     A->oo_field_clear(bl->A);
     gmp_randclear(bl->rstate);
@@ -213,8 +212,8 @@ void blstate_set_start(struct blstate * bl)
     }
     /* matmul_top_vec_init has already set V to zero */
     /* for bw->dir=0, mmt->n0[0] is the number of rows. */
-    mmt_vec_set_random_through_file(mmt, bl->V[0], "blstart", bw->dir, 0, mmt->n0[bw->dir], bl->rstate);
-    mmt_vec_set(mmt, 0, bl->V[0], bw->dir);
+    mmt_vec_set_random_through_file(bl->V[0], "blstart", 0, mmt->n0[bw->dir], bl->rstate);
+    mmt_own_vec_set(bl->y, bl->V[0]);
 }
 
 void blstate_load(struct blstate * bl, unsigned int iter)
@@ -230,7 +229,7 @@ void blstate_load(struct blstate * bl, unsigned int iter)
     /* bw->dir=0: mmt->n0[bw->dir] = number of rows */
     /* bw->dir=1: mmt->n0[bw->dir] = number of columns */
     size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[bw->dir]);
-    size_t mysize = mmt_my_own_size_in_bytes(bl->mmt, NULL, bw->dir);
+    size_t mysize = mmt_my_own_size_in_bytes(bl->y);
 
     char * filename;
     int rc = asprintf(&filename, "blstate.%u", iter);
@@ -250,16 +249,13 @@ void blstate_load(struct blstate * bl, unsigned int iter)
     }
     ssize_t s;
 
-    void * V0 = mmt_my_own_subvec(bl->mmt, bl->V[i0], bw->dir);
-    s = pi_file_read(f, V0, mysize, sizeondisk);
+    s = pi_file_read(f, mmt_my_own_subvec(bl->V[i0]), mysize, sizeondisk);
     ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
 
-    void * V1 = mmt_my_own_subvec(bl->mmt, bl->V[i1], bw->dir);
-    s = pi_file_read(f, V1, mysize, sizeondisk);
+    s = pi_file_read(f, mmt_my_own_subvec(bl->V[i1]), mysize, sizeondisk);
     ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
  
-    void * V2 = mmt_my_own_subvec(bl->mmt, bl->V[i2], bw->dir);
-    s = pi_file_read(f, V2, mysize, sizeondisk);
+    s = pi_file_read(f, mmt_my_own_subvec(bl->V[i2]), mysize, sizeondisk);
     ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
 
     pi_file_close(f);
@@ -280,7 +276,7 @@ void blstate_save(struct blstate * bl, unsigned int iter)
     /* bw->dir=0: mmt->n0[bw->dir] = number of rows */
     /* bw->dir=1: mmt->n0[bw->dir] = number of columns */
     size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[bw->dir]);
-    size_t mysize = mmt_my_own_size_in_bytes(bl->mmt, NULL, bw->dir);
+    size_t mysize = mmt_my_own_size_in_bytes(bl->y);
 
     char * filename;
     int rc = asprintf(&filename, "blstate.%u", iter);
@@ -297,16 +293,13 @@ void blstate_save(struct blstate * bl, unsigned int iter)
         ASSERT_ALWAYS(rc == (size_t) nelts_for_nnmat);
     }
     ssize_t s;
-    void * V0 = mmt_my_own_subvec(bl->mmt, bl->V[i0], bw->dir);
-    s = pi_file_write(f, V0, mysize, sizeondisk);
+    s = pi_file_write(f, mmt_my_own_subvec(bl->V[i0]), mysize, sizeondisk);
     ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
 
-    void * V1 = mmt_my_own_subvec(bl->mmt, bl->V[i1], bw->dir);
-    s = pi_file_write(f, V1, mysize, sizeondisk);
+    s = pi_file_write(f, mmt_my_own_subvec(bl->V[i1]), mysize, sizeondisk);
     ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
  
-    void * V2 = mmt_my_own_subvec(bl->mmt, bl->V[i2], bw->dir);
-    s = pi_file_write(f, V2, mysize, sizeondisk);
+    s = pi_file_write(f, mmt_my_own_subvec(bl->V[i2]), mysize, sizeondisk);
     ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
 
     pi_file_close(f);
@@ -325,13 +318,13 @@ void blstate_save(struct blstate * bl, unsigned int iter)
  *
  * Vector v is modified by this process (and put in RREF).
  */
-int mmt_vec_echelon(matmul_top_data_ptr mmt, mat64_ptr m, mmt_vec_ptr v0, int d)
+int mmt_vec_echelon(mat64_ptr m, mmt_vec_ptr v0)
 {
     memset(m, 0, sizeof(mat64));
-    uint64_t * v = mmt_my_own_subvec(mmt, v0, d);
-    size_t eblock = mmt_my_own_size_in_items(mmt, d);
+    uint64_t * v = mmt_my_own_subvec(v0);
+    size_t eblock = mmt_my_own_size_in_items(v0);
     /* This is the total number of non-zero coordinates of the vector v */
-    size_t n = mmt->n0[!d];
+    size_t n = v0->n;
     /* In all what follows, we'll talk about v being a 64*n matrix, with
      * [v[i]&1] being "the first row", and so on.  */
     uint64_t usedrows = 0;
@@ -344,9 +337,9 @@ int mmt_vec_echelon(matmul_top_data_ptr mmt, mat64_ptr m, mmt_vec_ptr v0, int d)
             if (v[j] & mi) break;
         }
         if (j == eblock) j = n;
-        else j += mmt_my_own_offset_in_items(mmt, d);
+        else j += mmt_my_own_offset_in_items(v0);
         unsigned int jmin;
-        pi_allreduce(&jmin, &j, 1, BWC_PI_UNSIGNED, BWC_PI_MIN, mmt->pi->m);
+        pi_allreduce(&jmin, &j, 1, BWC_PI_UNSIGNED, BWC_PI_MIN, v0->pi->m);
         if (jmin == n) {
             /* zero row */
             continue;
@@ -358,13 +351,13 @@ int mmt_vec_echelon(matmul_top_data_ptr mmt, mat64_ptr m, mmt_vec_ptr v0, int d)
          * owns this column, and then act accordingly */
         uint64_t control = 0;
         if (jmin == j) {
-            control = v[j - mmt_my_own_offset_in_items(mmt, d)];
+            control = v[j - mmt_my_own_offset_in_items(v0)];
             ASSERT_ALWAYS(control & mi);
             control ^= mi;
         }
         /* TODO: once we require mpi-3.0, use MPI_UINT64_T instead */
         ASSERT_ALWAYS(sizeof(unsigned long long) == sizeof(uint64_t));
-        pi_allreduce(NULL, &control, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_MAX, mmt->pi->m);
+        pi_allreduce(NULL, &control, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_MAX, v0->pi->m);
         for(unsigned int k = 0 ; k < eblock ; k++) {
             v[k] ^= control & -!!(v[k] & mi);
         }
@@ -402,8 +395,8 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
 
     {
         size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[bw->dir]);
-        size_t mysize = mmt_my_own_size_in_bytes(bl->mmt, NULL, bw->dir);
-        void * myvec = mmt_my_own_subvec(bl->mmt, bl->V[i0], bw->dir);
+        size_t mysize = mmt_my_own_size_in_bytes(bl->y);
+        void * myvec = mmt_my_own_subvec(bl->V[i0]);
 
         ssize_t s = pi_file_write(f, myvec, mysize, sizeondisk);
         ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
@@ -413,21 +406,21 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
      * need to save something in the other direction.
      */
     {
-        mmt_vec_set(mmt, 0, bl->V[i0], bw->dir);
-        matmul_top_twist_vector(mmt, bw->dir);
-        matmul_top_mul_cpu(mmt, bw->dir);
-        allreduce_across(mmt, NULL, !bw->dir);
-        matmul_top_untwist_vector(mmt, !bw->dir);
+        mmt_own_vec_set(bl->y, bl->V[i0]);
+        mmt_vec_twist(mmt, bl->y);
+        matmul_top_mul_cpu(mmt, bl->my, bl->y);
+        mmt_vec_allreduce(bl->my);
+        mmt_vec_untwist(mmt, bl->my);
 
         mat64 m;
-        int r = mmt_vec_echelon(mmt, m, NULL, bw->dir);
+        int r = mmt_vec_echelon(m, bl->y);
         printf("rank(V) == %d\n", r);
-        r = mmt_vec_echelon(mmt, m, NULL, !bw->dir);
+        r = mmt_vec_echelon(m,bl-> my);
         printf("rank(V*M) == %d\n", r);
 
         size_t sizeondisk = A->vec_elt_stride(A, mmt->n0[!bw->dir]);
-        size_t mysize = mmt_my_own_size_in_bytes(bl->mmt, NULL, !bw->dir);
-        void * myvec = mmt_my_own_subvec(bl->mmt, NULL, !bw->dir);
+        size_t mysize = mmt_my_own_size_in_bytes(bl->my);
+        void * myvec = mmt_my_own_subvec(bl->my);
 
         ssize_t s = pi_file_write(f, myvec, mysize, sizeondisk);
         ASSERT_ALWAYS(s >= 0 && (size_t) s == sizeondisk);
@@ -468,16 +461,10 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
     size_t nelts_for_nnmat = bw->n * (bw->n / bl->A->groupsize(bl->A));
 
-    mmt_comm_ptr mcol = mmt->wr[bw->dir];
-    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
-
-    ASSERT_ALWAYS(mmt->wr[bw->dir]->i0 == 0);
-    ASSERT_ALWAYS(mmt->wr[!bw->dir]->i0 == 0);
     /* hmm, right. So here we're in effect saying that we do not support
      * threading yet...
      */
-    ASSERT_ALWAYS(mmt->wr[bw->dir]->i1 == mmt->n[bw->dir]);
-    ASSERT_ALWAYS(mmt->wr[!bw->dir]->i1 == mmt->n[!bw->dir]);
+    ASSERT_ALWAYS(pi->m->totalsize == 1);
 
     serialize(pi->m);
 
@@ -498,9 +485,6 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
     if (bw->end == 0) {
         /* Decide on an automatic ending value */
         unsigned int length;
-        /* FIXME: is it really mmt->n[bw->dir] ? Looks like it should be
-         * mmt->n[!bw->dir] instead (number of columns, for bw->dir==1).
-         */
         length = mmt->n[bw->dir] / (bw->n - 0.76) + 10;
         /* allow some deviation */
         length += 2*integer_sqrt(length);
@@ -559,14 +543,12 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
          */
 
         for(int k = 0 ; k < 3 ; k++) {
-            mmt_vec_set(mmt, 0, bl->V[k], bw->dir);
-            matmul_top_twist_vector(mmt, bw->dir);
-            mmt_vec_set(mmt, bl->V[k], 0, bw->dir);
+            mmt_vec_twist(mmt, bl->V[k]);
         }
-        mmt_vec_set(mmt, 0, bl->V[s % 3], bw->dir);
+        mmt_own_vec_set(bl->y, bl->V[s % 3]);
 
         /* I *think* that this is necessary */
-        broadcast_down(mmt, NULL, bw->dir);
+        mmt_vec_broadcast(bl->y);
 
         /* FIXME: for BL, we use 8 timers while only 4 are defined in the
          * structure.
@@ -579,7 +561,9 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
             i1 = (s + i + 3 - 1) % 3;
             i2 = (s + i + 3 - 2) % 3;
 
-            A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
+            mmt_full_vec_set_zero(bl->my);
+
+            mmt_vec_ptr yy[2] = {bl->y, bl->my};
 
             for(int d = 0 ; d < 2 ; d++) {
                 /* The first part of this loop must be guaranteed to be free
@@ -587,16 +571,13 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 /* at this point, timer is [0] (CPU) */
 
                 {
-                    /* for d==0: in:mcol->v, out:mrow->v. */
-                    /* for d==1: in:mrow->v, out:mcol->v. */
-                    matmul_top_mul_cpu(mmt, bw->dir ^ d);
-
+                    matmul_top_mul_cpu(mmt, yy[!d], yy[d]);
                     timing_next_timer(timing);  /* now timer is [1] (cpu-wait) */
                 }
                 serialize(pi->m);           /* for measuring waits only */
 
                 timing_next_timer(timing);  /* now timer is [2] (COMM) */
-                allreduce_across(mmt, NULL, 1 ^ d ^ bw->dir);
+                mmt_vec_allreduce(yy[!d]);
 
                 timing_next_timer(timing);  /* now timer is [3] (comm-wait) */
                 serialize(pi->m);           /* for measuring waits only */
@@ -612,29 +593,27 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
              */
 
             AxA->dotprod(A->obj, A->obj, vav,
-                    mmt_my_own_subvec(bl->mmt, bl->V[i0], bw->dir), mcol->v->v,
-                    mmt_my_own_size_in_items(bl->mmt, bw->dir));
+                    mmt_my_own_subvec(bl->V[i0]),
+                    mmt_my_own_subvec(bl->y),
+                    mmt_my_own_size_in_items(bl->y));
 
             pi_allreduce(NULL, vav,
-                    nelts_for_nnmat, bl->A_pi, BWC_PI_BXOR, pi->m);
+                    nelts_for_nnmat, bl->mmt->pitype, BWC_PI_BXOR, pi->m);
 
             AxA->dotprod(A->obj, A->obj, vaav,
-                    mcol->v->v, mcol->v->v,
-                    mmt_my_own_size_in_items(bl->mmt, bw->dir));
+                    mmt_my_own_subvec(bl->y),
+                    mmt_my_own_subvec(bl->y),
+                    mmt_my_own_size_in_items(bl->y));
 
             pi_allreduce(NULL, vaav, nelts_for_nnmat,
-                    bl->A_pi, BWC_PI_BXOR, pi->m);
+                    bl->mmt->pitype, BWC_PI_BXOR, pi->m);
 
 
             ASSERT_ALWAYS(bl->D[i0]->n == 64);
 
-
-
             {
-                pi_comm_ptr picol = mmt->pi->wr[bw->dir];
-                ASSERT_ALWAYS((mcol->i1 - mcol->i0) % picol->totalsize == 0);
-                size_t eblock = (mcol->i1 - mcol->i0) /  picol->totalsize;
-                ASSERT_ALWAYS(mmt->abase->vec_elt_stride(mmt->abase, 1) == sizeof(uint64_t));
+                size_t eblock = mmt_my_own_size_in_items(bl->y);
+                ASSERT_ALWAYS(bl->y->abase->vec_elt_stride(bl->y->abase, 1) == sizeof(uint64_t));
 
                 // Here are the operations we will now perform
                 //
@@ -647,11 +626,11 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
                 // we set up X in mcol->v
 
-                uint64_t * V0 = mmt_my_own_subvec(bl->mmt, bl->V[i0], bw->dir);
-                uint64_t * V1 = mmt_my_own_subvec(bl->mmt, bl->V[i1], bw->dir);
-                uint64_t * V2 = mmt_my_own_subvec(bl->mmt, bl->V[i2], bw->dir);
-                uint64_t * VA  = mmt_my_own_subvec(bl->mmt, NULL, bw->dir);
-                uint64_t * X   = mmt_my_own_subvec(bl->mmt, NULL, bw->dir);
+                uint64_t * V0 = mmt_my_own_subvec(bl->V[i0]);
+                uint64_t * V1 = mmt_my_own_subvec(bl->V[i1]);
+                uint64_t * V2 = mmt_my_own_subvec(bl->V[i2]);
+                uint64_t * VA  = mmt_my_own_subvec(bl->y);
+                uint64_t * X   = mmt_my_own_subvec(bl->y);
                 uint64_t D0;
                 uint64_t D1 = bl->D[i1]->p[0];
                 mat64_ptr mvav = (mat64_ptr) vav;
@@ -691,17 +670,14 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 addmul_N64_6464(X, V2, m2, eblock);
 
                 /* So. We need to get ready for the next step, don't we ? */
-                mmt_vec_set(mmt, bl->V[i2], 0, bw->dir);
+                mmt_own_vec_set(bl->V[i2], bl->y);
             }
             timing_check(pi, timing, s+i+1, tcan_print);
         }
         serialize(pi->m);
 
-        for(int k = 0 ; k < 3 ; k++) {
-            mmt_vec_set(mmt, 0, bl->V[k], bw->dir);
-            matmul_top_untwist_vector(mmt, bw->dir);
-            mmt_vec_set(mmt, bl->V[k], 0, bw->dir);
-        }
+        for(int k = 0 ; k < 3 ; k++)
+            mmt_vec_untwist(mmt, bl->V[k]);
 
         serialize(pi->m);
         if (i < bw->interval) {

@@ -165,10 +165,6 @@ load "R.m";
 
 load "VV.m";
 
-load "C0.m"; C0:=Vector(GF(p),nr_orig,g(var));
-load "C1.m"; C1:=Vector(GF(p),nr_orig,g(var));
-// load "C50.m"; C50:=Vector(GF(p),nr_orig,g(var));
-
 /* Only pick first X, since we only want to verify the check vector */
 load "x.m";
 Xt:=Matrix(GF(p),nr_orig,1,[]);
@@ -181,14 +177,32 @@ x0:=Rows(Transpose(Xfull));
 print "Dimension of the span of the vectors of is X", Dimension(sub<Universe(x0)|x0>);
 xi:=[v*(Msmall*Qsmall) : v in x0];
 
+// if System("test -f C0.m") eq 0 then
+// magma can't do if (...) then load "..."; (sigh).
+load "C0.m";
+if Category(var) ne RngIntElt then
+    C0:=Vector(GF(p),nr_orig,g(var));
+elif assigned C0 then
+    delete C0;
+end if;
+load "C1.m";
+if Category(var) ne RngIntElt then
+    C1:=Vector(GF(p),nr_orig,g(var));
+elif assigned C1 then
+    delete C1;
+end if;
+// load "C50.m"; C50:=Vector(GF(p),nr_orig,g(var));
 
 // interval:=50;
 interval:=1;
 
-print "Checking consistency of check vector C1";
-assert C1 eq xi[1];
-// C1 eq Vector(Xt)*Transpose(Msmall*Qsmall);
-print "Checking consistency of check vector C1: done";
+if assigned C1 then
+    print "Checking consistency of check vector C1";
+    assert C1 eq xi[1];
+    // C1 eq Vector(Xt)*Transpose(Msmall*Qsmall);
+    print "Checking consistency of check vector C1: done";
+end if;
+// end if;
 
 // foo:=Vector(Xt);
 // for i in [1..interval] do print i; foo *:= Transpose(Transpose(Msmall*Qsmall)); end for;

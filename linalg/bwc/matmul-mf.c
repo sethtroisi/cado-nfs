@@ -49,8 +49,6 @@ void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file, i
     m->bfile = NULL;
     m->transpose = mm->store_transposed;
     m->size = sbuf->st_size / sizeof(uint32_t);
-    m->ntwists = 0;
-    m->twist = NULL;
     m->p = mf->p;
 
     /* Beware. We really have dim[0] = nrows and dim[1] = ncols as far as

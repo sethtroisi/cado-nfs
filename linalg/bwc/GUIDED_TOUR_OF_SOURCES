@@ -107,7 +107,6 @@ The code that will run on a single thread is in matmul.[ch] and the
 different implementations it encapsulates. For the moment:
     matmul-basic.[ch]
     matmul-sliced.{cpp,h}
-    matmul-threaded.[ch]
     matmul-bucket.{cpp,h}       [ default ]
 
 practically all cpu time is spent in these routines. Therefore, optimizing
@@ -148,8 +147,55 @@ generated on first use, and saved on disk
 
 (documentation to be continued).
 
-Matrix - vector product -- high-level (1)
------------------------------------------
+Distributed vectors -- the mmt_vec type
+---------------------------------------
+
+The mmt_vec type holds vector data, which is to be distributed across the
+different threads and jobs. And mmt_vec is split into as many pieces as
+we have threads and jobs: when we work with an N*N matrix split into a
+mesh of nh rows and nv columns, each thread "owns" a fraction N/(nh*nv)
+of a vector. However, the mmt_vec has storage space for slightly more
+than that, because each thread needs at some point to access all the data
+it needs to perform a local matrix times vector, or vector times matrix
+product.
+
+We first focus on the chunks (of size N/(nh*nv)) owned by the various threads. How a vector is
+distributed depends on the ordering in which these parts are spread
+across threads. This is controlled by a "direction" parameter.
+We say that an mmt_vec is distributed "in direction d", where d is the
+field m->d. For d==0, the chunks are distributed row-major with respect
+to the parallelizing_info structure:
+ - chunks 0 to nv-1 go to the first row (threads with pi->wr[1]->trank ==
+   0 and pi->wr[1]->jrank == 0)
+ - chunks nv to 2nv-1 go to the second row, and so on.
+When d==1, the chunks are distributed column-major.
+
+Now as said above, a vector has storage for slightly more than the chunk
+it owns. The storage area for v is v->v.  As a whole, v->v is meant to
+contain coefficients for the index range [v->i0..v->i1[.
+
+The chunk owned by v is a subpart of v->v ; It starts at the pointer
+mmt_my_own_subvec(), namely at offset mmt_my_own_offset_in_items() within
+v->v, and for a length which is mmt_my_own_size(). The index range
+corresponding to this sub-area is
+[v->i0+own_offset..v->i0+own_offset+own_size[.
+
+Several threads and jobs are likely to have data areas (v->v) relative to
+the same index range [v->i0..v->i1[. There appears, then, the problem of
+deciding how consistent these data areas may be.
+
+A vector may be:
+     - fully consistent: this means that all threads and job which
+     have a data area for the range [v->i0..v->i1[ agree on its
+     contents.
+     - partially consistent: each job and thread is correct about its
+     own sub-area, but the other parts may be bogus.
+     - inconsistent: data differs everywhere, and even each thread's
+     own sub-area contains stuff which is meaningless if we forget
+     about what's in the other threads for this index range.
+
+Matrix - vector product (1)
+---------------------------
 
 The matmul_top_data type is responsible of tying together the different
 threads and nodes, so as to work collectively on a matrix times vector
@@ -158,37 +204,10 @@ product.
 The matmul_top_data object (generally abbreviated mmt) contains in
 particular
  - on each thread/job, a pointer to the local share of the matrix.
- - communicator info in all directions
- - Two vector areas, a "left vector" and a "row vector". Those are quite
-   often, and admittedly disconcertingly, named "row vector" and "column
-   vector". In fact:
-    - the left vector has (both collectively and locally) as many entries
-      as the matrix has rows, and ditto for the right vector and columns.
-    - the left vector has the proper size to be used in a vector times
-      matrix product. The output of such a product goes to the right
-      vector.
-    - conversely, the right vector is fine for being the input to a
-      matrix times vector product, whose output would go to the left
-      vector.
-
-The left vector is mmt->wr[0]->v
-The right vector is mmt->wr[1]->v
-
-In matmul_top.[ch], the same code can do right or left multiplications. A
-parameter, usally called "d" means:
-  d=0: vector times matrix, i.e. a vector is a row. Used for left
-       nullspace computations (in factorization, for instance)
-  d=1: matrix times vector, i.e. a vector is a column. Used for right
-       nullspace computations (in discrete log)
-Most of the comments in the source code takes the "d=1" point-of-view,
-even though "d=0" is probably the most extensively tested.
-This convention is visible also in the main bw_param structure. In the
-matmul_top.[ch], it also indicates where the source vector is. Such a
-point of view is also visible in the naming of variables, e.g. when we
-write:
-    mmt_comm_ptr mcol = mmt->wr[d];
-this does actually correspond to a column only when d==1.
-
+ - pointer to a parallelizing_info structure, which brings the different
+   communicators
+ - more bookkeeping info about the matrix (embedded permutations and
+   such, as well as the number of rows and columns of the matrix in total)
 
 The main function is matmul_top_mul(), which decomposes in two steps:
   matmul_top_mul_cpu(), which does no communication
@@ -199,53 +218,44 @@ be the same as the d-parameter passed to matmul_top_mul().
 
 In a Lanczos setting, matmul_top_mul() is called in both directions.
 
-Apart from this d=[0|1] nightmare, the mul_cpu() just calls matmul_mul(),
-and put the result in the destination (partial) vector.  The tricky part
-is (of course) the mul_comm() part. A brief on vector layout first.
+Apart from this d=[0|1] nightmare, matmul_top_mul_cpu() just calls matmul_mul(),
+and put the result in the destination (partial) vector.
 
-Vector layout
--------------
+The input of matmul_top_mul_cpu() must be a distributed vector with full
+consistency.
 
-The matmul_top layer distributes vector data across jobs and threads, in
-such a way that prior to doing the local matrix product, each vector has
-all the required input data.
+The output of matmul_top_mul_cpu() is a vector distributed in the
+opposite direction, but which is inconsistent. We need to do some work in
+order to reconcile the data.
 
-Suppose an N*N matrix is split into a mesh of nh rows and nv columns, and
-suppose we're talking about a vector times matrix product.
+This tricky part is the matmul_top_mul_comm() part.
 
-Each threads wants its share of size N/nh of the left vector. Note though
-that there are, in total, nv threads which want the same data set for
-input. Among these, we define each thread to be the "owner" of a fraction
-of size N/(nh*nv).
-
-
-We define several states of consistency for a vector:
- - minimal: each thread has the data it owns correct.
- - maximal: each thread has all input data it might need correct.
-
-
-Matrix - vector product -- high-level (1)
------------------------------------------
-
-The cpu-intensive step requires maximal consistency on the input side.
-Once the local multiplication is completed, we have no consistency on the
-output side, because the data must be reconciled.
+Matrix - vector product (2)
+---------------------------
 
 Two phases of communication are defined in order to reach maximal
 consistency again.
-  - reduce_across()
-  - broadcast_down()
+  - mmt_vec_reduce()
+  - mmt_vec_broadcast()
 It takes as input the result of the cpu step, which is in the
 "destination" vector, and does all the communications to reconstruct the
 vector for the next iteration (thus, stored again in the "source"
 vector).
+Most of the comments in the source code somehow implicitly assume that
+the vector being passed is distributed in the "d=1" direction,
+even though "d=0" is probably the most extensively tested.
+Such a point of view is also visible in the naming of variables, e.g.
+when we write:
+    pi_comm_ptr picol = mmt->pi->wr[d];
+this does actually correspond to a column communicator only when d==1.
 
-reduce_across is actually a slight misnomer. The real operation is a
+
+mmt_vec_reduce is actually a slight misnomer. The real operation is a
 "reduce-scatter" operation, in MPI parlance. It adds all data, and sends
 each share of the resulting vector to its owner. Of course, it's really
 "across" only in case we're doing matrix times vector.
 
-likewise, broadcast_down is more accurately an MPI "all-gather"
+likewise, mmt_vec_broadcast is more accurately an MPI "all-gather"
 operation. Each thread sends the data it owns to all threads which are
 going to need it.
 
@@ -253,10 +263,10 @@ Note that the vector layout which has been presented has the effect that
 if the matrix is in fact the identity, then matmul_top_mul() will not
 compute exactly the expected w = v * Id, but a shuffle of it, which
 involves some transposition of indices. In other words, what is computed
-correspond to a matrix M' = P*M, where P is a permutation matrix. This
-reduces / simplifies / accelerates the mul_comm() part, and if the goal
-is to find a kernel vector, knowing one for M' is equivalent to knowing
-one for M.
+correspond to a matrix M' = P^-1*M, where P^-1 is a permutation matrix.
+This reduces / simplifies / accelerates the mul_comm() part, and if the
+goal is to find a kernel vector, knowing one for M' is equivalent to
+knowing one for M. There's more about this in matmul_top.c.
 
 
 

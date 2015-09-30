@@ -173,7 +173,7 @@ expected to be present in the same directory as the calling binary.
     stored. If the value here is too small, then there are chances that
     you exhaust your disk space.
 
-* mm_impl=[basic|sliced|threaded|bucket|...]
+* mm_impl=[basic|sliced|bucket|...]
 
     low-level matrix multiplication code to use. See below in this document.
 
