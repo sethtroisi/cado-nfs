@@ -834,8 +834,9 @@ void random_matrix_fill_fake_balancing_header(balancing_ptr bal, parallelizing_i
     bal->h->ncols = r->ncols;
     bal->h->ncoeffs = 0; /* FIXME ; what should I do ? */
     bal->h->checksum = 0;
-    /* FIXME: put FLAG_REPLICATE here or not ? */
-    bal->h->flags = FLAG_COLPERM|FLAG_REPLICATE;
+    bal->h->flags = FLAG_COLPERM;
+    if (bal->h->nrows == bal->h->ncols)
+        bal->h->flags |= FLAG_REPLICATE;
     bal->h->pshuf[0] = 1;
     bal->h->pshuf[1] = 0;
     bal->h->pshuf_inv[0] = 1;
