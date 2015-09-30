@@ -32,6 +32,7 @@ test (int d, const char *pp, const char *ff[], int nroots)
     mpz_set_str (p, pp, 0);
   else
     mpz_urandomb (p, state, 40);
+  gmp_printf ("p = %Zd\n", p);
   mpz_init (v);
   f = (mpz_t *) malloc ((d + 1) * sizeof(mpz_t));
   F->coeff = f;
@@ -46,6 +47,7 @@ test (int d, const char *pp, const char *ff[], int nroots)
           do mpz_urandomb (f[i], state, 65);
           while (i == d && mpz_cmp_ui (f[i], 0) == 0);
         }
+      gmp_printf ("f[%d] = %Zd\n", i, f[i]);
     }
   n = mpz_poly_roots_gen (&r, F, p);
   if (mpz_probab_prime_p (p, 5) && mpz_sizeinbase (p, 2) <= 64)
