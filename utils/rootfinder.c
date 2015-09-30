@@ -18,14 +18,12 @@
    the roots are r[0], r[1], ..., r[k-1] and the return value is k.
    Note: the elements r[j] must be mpz_clear'ed by the caller, and the
    array r also.
-   Assume all prime factors of n fit into an unsigned long.
 */
 unsigned long
 mpz_poly_roots_gen (mpz_t **rp, mpz_poly_t F, const mpz_t n)
 {
-  prime_info pi;
-  unsigned long p, k, i, j, d = F->deg;
-  mpz_t Q, nn;
+  unsigned long k, i, j, d = F->deg;
+  mpz_t Q, nn, p;
 
   ASSERT_ALWAYS (mpz_sgn (n) > 0);
 
@@ -43,7 +41,6 @@ mpz_poly_roots_gen (mpz_t **rp, mpz_poly_t F, const mpz_t n)
       return k;
     }
 
-  prime_info_init (pi);
   rp[0] = malloc (sizeof (mpz_t));
   mpz_init_set_ui (rp[0][0], 0);
   mpz_init_set_ui (Q, 1);
@@ -51,49 +48,50 @@ mpz_poly_roots_gen (mpz_t **rp, mpz_poly_t F, const mpz_t n)
   k = 1;
 
   /* now n is composite */
-  mpz_t v;
+  mpz_t v, q, x;
   mpz_init (v);
-  unsigned long *roots_p = malloc (d * sizeof(mpz_t));
-  for (p = 2; mpz_cmp_ui (nn, 1) > 0; p = getprime_mt (pi))
+  mpz_init (q);
+  mpz_init (x);
+  mpz_t *roots_p = malloc (d * sizeof(mpz_t));
+  for (i = 0; i < d; i++)
+    mpz_init (roots_p[i]);
+  for (mpz_init_set_ui (p, 2); mpz_cmp_ui (nn, 1) > 0; mpz_nextprime (p, p))
     {
       if (mpz_probab_prime_p (nn, 1))
+        mpz_set (p, nn);
+      if (mpz_divisible_p (nn, p))
         {
-          ASSERT_ALWAYS (mpz_fits_ulong_p (nn));
-          p = mpz_get_ui (nn);
-        }
-      if (mpz_divisible_ui_p (nn, p))
-        {
-          unsigned long kp, q;
-          kp = mpz_poly_roots_ulong (roots_p, F, p);
-          mpz_divexact_ui (nn, nn, p);
+          unsigned long kp;
+          kp = mpz_poly_roots (roots_p, F, p);
+          mpz_divexact (nn, nn, p);
           /* lift roots mod p^j if needed */
-          q = p;
-          while (mpz_divisible_ui_p (nn, p))
+          mpz_set (q, p);
+          while (mpz_divisible_p (nn, p))
             {
               int ii;
-              q *= p;
-              mpz_divexact_ui (nn, nn, p);
+              mpz_mul (q, q, p);
+              mpz_divexact (nn, nn, p);
               for (i = ii = 0; i < kp; i++)
                 {
-                  for (j = 0; j < p; j++)
+                  /* FIXME: replace this naive for-loop */
+                  mpz_set (roots_p[ii], roots_p[i]);
+                  for (mpz_set_ui (x, 0); mpz_cmp (x, p) < 0;
+                       mpz_add_ui (x, x, 1))
                     {
-                      mpz_poly_eval_ui (v, F, roots_p[i] + p * j);
-                      if (mpz_divisible_ui_p (v, q))
+                      mpz_poly_eval (v, F, roots_p[ii]);
+                      if (mpz_divisible_p (v, q))
                         break;
+                      mpz_add (roots_p[ii], roots_p[ii], p);
                     }
                   /* some roots might disappear, for example x^3+2*x^2+3*x-4
                      has two roots mod 2 (0 and 1) but only one mod 4 (0) */
-                  if (j < p)
-                    roots_p[ii++] = roots_p[i] + p * j;
+                  ii += (mpz_cmp (x, p) < 0);
                 }
               kp = ii;
             }
           /* do a CRT between r[0][0..k-1] mod Q and roots_p[0..kp-1] */
           rp[0] = realloc (rp[0], k * kp * sizeof (mpz_t));
-          unsigned long invq;
-          mpz_set_ui (v, q);
-          mpz_invert (v, Q, v); /* 1/Q mod q */
-          invq = mpz_get_ui (v);
+          mpz_invert (x, Q, q); /* x = 1/Q mod q */
           for (i = 0; i < k; i++)
             for (j = kp; j-- > 0;)
               {
@@ -102,25 +100,30 @@ mpz_poly_roots_gen (mpz_t **rp, mpz_poly_t F, const mpz_t n)
                 /* x = rp[0][i] mod Q and x = roots_p[j] mod q,
                    thus x = rp[0][i] + Q * t, where
                    t = (roots_p[j] - rp[0][i])/Q mod q */
-                mpz_ui_sub (v, roots_p[j], rp[0][i]);
-                mpz_mul_ui (v, v, invq);
-                mpz_fdiv_r_ui (v, v, q);
+                mpz_sub (v, roots_p[j], rp[0][i]);
+                mpz_mul (v, v, x);
+                mpz_mod (v, v, q);
                 mpz_mul (v, Q, v);
                 mpz_add (rp[0][j*k + i], rp[0][i], v);
               }
           k *= kp;
-          mpz_mul_ui (Q, Q, q);
+          mpz_mul (Q, Q, q);
         }
     }
+  for (i = 0; i < d; i++)
+    mpz_clear (roots_p[i]);
   free (roots_p);
   mpz_clear (v);
+  mpz_clear (p);
+  mpz_clear (q);
+  mpz_clear (x);
   mpz_clear (Q);
   mpz_clear (nn);
-  prime_info_clear (pi);
   return k;
 }
 
-/* Entry point for rootfind routines, for prime p */
+/* Entry point for rootfind routines, for prime p.
+   Assume r is an array of deg(F) entries, which are mpz_init'ed. */
 int
 mpz_poly_roots (mpz_t *r, mpz_poly_t F, const mpz_t p)
 {

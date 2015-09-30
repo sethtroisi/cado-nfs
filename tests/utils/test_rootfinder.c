@@ -78,7 +78,7 @@ main (int argc, const char *argv[])
     const char* test1[] = {"18446744073709551557", "1", "2", "3", "5"};
     const char* test2[] = {"18446744073709551629", "1", "-1", "7", "-1"};
     const char* test3[] = {"12", "1", "2", "3", "-4"};
-    unsigned long iter = 300;
+    unsigned long iter = 100;
 
     tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER);
     tests_common_get_iter (&iter);
