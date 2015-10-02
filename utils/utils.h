@@ -38,7 +38,6 @@
 #include "stats.h"
 #include "lll.h"
 #include "verbose.h"
-#include "lognorm_skewness.h"
 #include "mpz_poly.h"
 #include "version_info.h"
 
