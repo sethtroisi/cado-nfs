@@ -309,3 +309,23 @@ set_target_properties(test_bl_extraction PROPERTIES
                 COMPILE_FLAGS "--mpi"
                 LINK_FLAGS "--mpi")
 
+cado_define_test(TEST_NAME test-blocklanczos
+    PROGRAM ${CMAKE_CURRENT_SOURCE_DIR}/test-blocklanczos.sh
+        --density 10
+        --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    NO_DEFAULT_RUN
+    TARGET_DEPENDENCIES mf_scan mf_bal random_matrix blocklanczos
+    bwc_full short_matmul)
+cado_divert_test(test-blocklanczos right
+    APPEND_ARGUMENTS --matrix-size "1000,2000" --nullspace RIGHT)
+cado_divert_test(test-blocklanczos left
+    APPEND_ARGUMENTS --matrix-size "2000,1000" --nullspace left)
+
+cado_define_test(TEST_NAME test-blocklanczos-staged
+    PROGRAM
+    ${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh --arg wdir --
+    ${CADO_NFS_BINARY_DIR}/linalg/bwc/blocklanczos
+    random_matrix=1200,1000,80,seed=1 m=64 n=64 ys=0..64 matrix=fake
+    no_save_cache=1 interval=10 nullspace=left
+    TARGET_DEPENDENCIES test-blocklanczos_dependencies)
+

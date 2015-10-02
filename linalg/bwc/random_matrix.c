@@ -990,7 +990,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     last_printed->z = 0;
 
     if (!arg->transpose) {
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(ncols * sizeof(uint32_t));
         /* we'd like to avoid constant malloc()'s and free()'s */
         punched_interval_ptr pool = NULL;
         punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
@@ -1026,7 +1026,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         free(ptr);
     } else {
         size_t size0 = 0;
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(nrows * sizeof(uint32_t));
         random_matrix_ddata G;
         random_matrix_ddata_init(G);
         /* use a special ddata, for our specially simple process (which

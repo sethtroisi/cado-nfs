@@ -18,6 +18,8 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 
+int exit_code = 0;
+
 struct blstate {
     matmul_top_data mmt;
     mmt_vec y, my;
@@ -503,6 +505,8 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
         blstate_load(bl, bw->start);
     }
 
+    int auto_end = 0;
+
     if (bw->end == 0) {
         /* Decide on an automatic ending value */
         unsigned int length;
@@ -513,6 +517,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
         if (serialize_threads(pi->m)) {
             bw->end = length;
         }
+        auto_end = length;
         serialize(pi->m);
     }
 
@@ -735,8 +740,15 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
     pi_log_clear(pi->wr[1]);
 #endif
 
-    if (tcan_print) {
-        printf("Done blocklanczos.\n");
+    if (auto_end && bw->end == auto_end) {
+        if (tcan_print) {
+            printf("FAILED blocklanczos (no collapse found for inner product).\n");
+        }
+        exit_code = 1;
+    } else {
+        if (tcan_print) {
+            printf("Done blocklanczos.\n");
+        }
     }
     serialize(pi->m);
 
@@ -783,6 +795,6 @@ int main(int argc, char * argv[])
     param_list_clear(pl);
     bw_common_clear_new(bw);
 
-    return 0;
+    return exit_code;
 }
 #endif
