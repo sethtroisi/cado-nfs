@@ -8,38 +8,7 @@
 #include "parameters.h"
 #include "polyselect/rho.h"
 #include "polynomials.h"
-
-/* ---------- */
-
-/* From sieve/strategies/gen_decomp.c (07/05/2015)*/
-/* number of primes <= 2^n */
-/* All values below fit in 53-bit mantissa, so that makes well-defined
- * floating point literals.
- */
-double A7053[256] = {0,1,2,4,6,11,18,31,54,97,172,309,564,1028,1900,
-  3512,6542,12251,23000,43390,82025,155611,295947,
-  564163,1077871,2063689,3957809,7603553,14630843,
-  28192750,54400028,105097565,203280221,393615806,
-  762939111,1480206279,2874398515,5586502348,
-  10866266172,21151907950,41203088796,80316571436,
-  156661034233,305761713237,597116381732,
-  1166746786182,2280998753949,4461632979717,
-  8731188863470,17094432576778,33483379603407,
-  65612899915304,128625503610475,0,};
-
-/* return prime_pi(2^i) */
-static double prime_pi (unsigned long i)
-{
-  if (A7053[i] != 0)
-    return (double) A7053[i];
-  else
-    {
-      double x = ldexp (1.0, i);
-      return x / log (x);
-    }
-}
-
-/* ---------- */
+#include <stdint.h>
 
 double size_sieving_region(sieving_bound_srcptr H)
 {
@@ -54,65 +23,15 @@ double size_sieving_region(sieving_bound_srcptr H)
   return res;
 }
 
-int sieving_region_special_q(sieving_bound_ptr H, unsigned int number_element)
+void find_sieving_region_square(sieving_bound srcptr H, double number,
+    unsigned int t)
 {
-  double nb_elem = pow(2.0, (double)number_element);
-  double tmp = nb_elem / pow(2, (double)(H->t - 1));
-  unsigned int H0 = (unsigned int) nearbyint(pow(tmp, 1/(double)H->t));
-  for (unsigned int i = 0; i < H->t; i++) {
-    sieving_bound_set_hi(H, i, H0);
+  H->t = t;
+  unsigned int H0 = (unsigned int)
+    fceil(pow((double)number / pow(2.0, (double)(t - 1))), 1.0 / (double) t);
+  for (unsigned int i = 0; i < t; i++) {
+    H->h[i] = H0;
   }
-
-  double size = log2(size_sieving_region(H));
-  return (int)nearbyint(size - (double)number_element);
-}
-
-static void recompute_sieving_region(sieving_bound_ptr H, mpz_srcptr p,
-    unsigned int n, unsigned int number_element)
-{
-  double nb_elem = pow(2.0, (double) number_element);
-  // sum(-k/n, k, 0, t-2)
-  double power = -( 2.0 - 3.0*(double)H->t + (double)(H->t * H->t) ) /
-    (2.0 * (double) n);
-  power = pow(mpz_get_d(p), power);
-  nb_elem = nb_elem / power;
-  nb_elem = nb_elem / pow(2.0, (double) H->t - 1.0);
-  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem,
-        1/((double)H->t - 1.0)));
-  sieving_bound_set_hi(H, 0, H0);
-  for (unsigned int i = 1; i < H->t - 1; i++) {
-    double tmp = (double)H0 * pow(mpz_get_d(p), - (double) i / (double) n);
-    sieving_bound_set_hi(H, i, (unsigned int) nearbyint(tmp));
-  }
-}
-
-int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
-    unsigned int number_element)
-{
-  double nb_elem = pow(2.0, (double) number_element);
-  // sum(-k/n, k, 0, t-1)
-  double power = ( (double)H->t - (double)(H->t * H->t) ) / (2.0 * (double) n);
-  power = pow(mpz_get_d(p), power);
-  nb_elem = nb_elem / power;
-  nb_elem = nb_elem / pow(2.0, (double) H->t - 1.0);
-  unsigned int H0 = (unsigned int) nearbyint(pow(nb_elem, 1/((double)H->t)));
-
-  sieving_bound_set_hi(H, 0, H0);
-  for (unsigned int i = 1; i < H->t - 1; i++) {
-    double tmp = (double)H0 * pow(mpz_get_d(p), - (double) i / (double) n);
-    sieving_bound_set_hi(H, i, (unsigned int) nearbyint(tmp));
-  }
-  double tmp = (double)H0 *
-    pow(mpz_get_d(p), - (double) (H->t - 1) / (double) n);
-  if ((unsigned int) nearbyint(tmp) < 2) {
-    sieving_bound_set_hi(H, H->t - 1, 2);
-    recompute_sieving_region(H, p, n, number_element - 1);
-  } else {
-    sieving_bound_set_hi(H, H->t - 1, (unsigned int) nearbyint(tmp));
-  }
-
-  double size = log2(size_sieving_region(H));
-  return (int)nearbyint(size - (double)number_element);
 }
 
 void rand_mpz_poly(mpz_poly_ptr a, sieving_bound_srcptr H)
@@ -139,11 +58,16 @@ void rand_mpz_poly(mpz_poly_ptr a, sieving_bound_srcptr H)
 #endif
 }
 
-void mean_approx_number(mpz_t * mean, mpz_poly_t * f, unsigned int nb_fields,
-    uint64_t number_a, sieving_bound_srcptr H)
+void stat_approx_number(mpz_t * mean, mpz_t * max, mpz_poly_t * f,
+    unsigned int nb_fields, uint64_t number_a, sieving_bound_srcptr H)
 {
   for (unsigned int i = 0; i < nb_fields; i++) {
-    mpz_set_ui(mean[i], 0);
+    if (mean != NULL) {
+      mpz_set_ui(mean[i], 0);
+    }
+    if (max != NULL) {
+      mpz_set_ui(max[i], 0);
+    }
   }
 
   srand(time(NULL));
@@ -157,135 +81,72 @@ void mean_approx_number(mpz_t * mean, mpz_poly_t * f, unsigned int nb_fields,
     for(unsigned int j = 0; j < nb_fields; j++) {
       mpz_poly_resultant(res, f[j], a);
       mpz_abs(res, res);
-      mpz_add(mean[j], mean[j], res);
+      if (mean != NULL) {
+        mpz_add(mean[j], mean[j], res);
+      }
+      if (max != NULL) {
+        if (mpz_cmp(res, max[j]) > 0) {
+          mpz_set(max[j], res);
+        }
+      }
     }
   }
 
-  for(unsigned int i = 0; i < nb_fields; i++) {
-    mpz_cdiv_q_ui(mean[i], mean[i], number_a);
+  if (mean != NULL) {
+    for(unsigned int i = 0; i < nb_fields; i++) {
+      mpz_cdiv_q_ui(mean[i], mean[i], number_a);
+    }
   }
 
   mpz_clear(res);
   mpz_poly_clear(a);
 }
 
-static unsigned int test(mpz_t * mean, unsigned int i, mpz_poly_t * f,
-    unsigned int nb_fields, uint64_t number_a, sieving_bound_srcptr H,
-    unsigned int lpb)
+double compute_smoothness(mpz_t * max, unsigned int V, double lpb)
 {
-  ASSERT(nb_fields == 2);
-
-  mean_approx_number(mean, f, nb_fields, number_a, H); 
-  double goal = ((double)i); 
-  double val = log2( 2 * prime_pi((unsigned long)i) );
-  double smoothness = dickman_rho(log2(mpz_get_d(mean[0])) / (double)lpb);
-  smoothness = smoothness * dickman_rho((log2(mpz_get_d(mean[1])) -
-        (double) lpb - 1) / (double)lpb);
-  val = val - log2( smoothness );
-  val = ceil(val);
-  if (val <= goal) {
-    return 1;
+  double tmp = (double)mpz_sizeinbase(max[0]) / lpb;
+  double res = 1.0;
+  for (unsigned int i = 0; i < V; i++) {
+    res = res * pow(tmp, -tmp);
   }
-  return 0;
-} 
+  return res;
+}
 
-static void increase_sieving_region_special_q(sieving_bound_ptr H, mpz_t * mean,
-    mpz_poly_t * f, unsigned int size_current, unsigned int lpb,
-    uint64_t number_a)
+void find_lpb(mpz_t * max, unsigned int lpb, unsigned int V, double smoothness, 
+    double error)
 {
-  size_current = size_current + 1;
-  sieving_region_special_q(H, size_current);
-  unsigned int res = test(mean, size_current, f, 2, number_a, H, lpb);
-  while (!res) {
-    ASSERT(res == 0);
+  size_t min = mpz_sizeinbase(max[0], 2);
+  for (unsigned int i = 1; i < V; i++) {
+    min = MIN(min, mpz_sizeinbase(max[i], 2));
+  }
 
-    size_current = size_current + 1;
-    if (log2((double)size_current) > 63.0) {
-      break;
+  double lpb_min = 0;
+  double lpb_max = (double) min;
+
+  while (lpb_max - lpb_min >= error) {
+    double m = (lpb_min + lpb_max) / 2;
+    if (compute_smoothness(max, V, lpb_min) * compute_smoothness(max, V, m)) {
+      lpb_min = m;
+    } else {
+      lpb_max = m;
     }
-    sieving_region_special_q(H, size_current);
-    res = test(mean, size_current, f, 2, number_a, H, lpb);
   }
 }
 
-static void decrease_sieving_region_special_q(sieving_bound_ptr H, mpz_t * mean,
-    mpz_poly_t * f, unsigned int size_current, unsigned int lpb,
-    uint64_t number_a)
-{
-  size_current = size_current - 1;
-  sieving_region_special_q(H, size_current);
-  unsigned int res = test(mean, size_current, f, 2, number_a, H, lpb);
-  while (res) {
-    ASSERT(res == 1);
-
-    size_current = size_current - 1;
-    sieving_region_special_q(H, size_current);
-    res = test(mean, size_current, f, 2, number_a, H, lpb);
-  }
-}
-
-void find_parameters_special_q(mpz_srcptr p, unsigned int n, uint64_t number_a,
-    unsigned int lpb_min, unsigned int lpb_max, unsigned int t_min,
-    unsigned int t_max, uint64_t size_start, mpz_poly_srcptr h, int coeff0,
-    int coeff1, unsigned int nb_times, double weight_0, double weight_1)
+void find_parameters(mpz_poly_t * f, unsigned int V, double size,
+    unsigned int t, double smoothness, unsigned int number_poly,
+    unsigned int found)
 {
   sieving_bound_t H;
-  mpz_t a;
-  mpz_t b;
-  mpz_t c;
-  mpz_init(a);
-  mpz_init(b);
-  mpz_init(c);
-  mpz_poly_t g;
-  mpz_poly_init(g, n);
-  mpz_poly_t f0;
-  mpz_poly_init(f0, n);
-  mpz_poly_t f1;
-  mpz_poly_init(f1, n);
-  mpz_poly_t * f = malloc(2 * sizeof(mpz_poly_t));
-  mpz_t * mean = malloc(2 * sizeof(mpz_t));
-  for (unsigned int k = 0; k < 2; k++) {
-    mpz_poly_init(f[k], n);
-    mpz_init(mean[k]);
+  sieving_bound_init(H, t);
+  unsigned int * max_bit = (unsigned int * ) malloc(sizeof(unsigned int) * V);
+  mpz_t * max = (mpz_t * ) malloc(sizeof(mpz_t) * V);
+  for (unsigned int i = 0; i < V; i++) {
+    mpz_init(max[i]);
   }
+  stat_approx_number(NULL, max, f, V, number_poly, H);
 
-  for (unsigned int lpb = lpb_min; lpb < lpb_max; lpb++) {
-    for (unsigned int t = t_min; t < t_max; t++) {
-      sieving_bound_init(H, t);
-
-      sieving_region_special_q(H, size_start);
-      function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, lpb - 1, t,
-          nb_times, weight_0, weight_1);
-      mpz_poly_set(f[0], f0);
-      mpz_poly_set(f[1], f1);
-      
-      unsigned int res = test(mean, size_start, f, 2, number_a, H, lpb);
-      if (res) {
-        ASSERT(res == 1);
-
-        increase_sieving_region_special_q(H, mean, f, size_start, lpb,
-            number_a);
-      } else {
-        ASSERT(res == 0);
-
-        decrease_sieving_region_special_q(H, mean, f, size_start, lpb,
-            number_a);
-      }
-
-      sieving_bound_clear(H);
-    }
-  }
-  mpz_clear(a);
-  mpz_clear(b);
-  mpz_clear(c);
-  mpz_poly_clear(g);
-  mpz_poly_clear(f0);
-  mpz_poly_clear(f1);
-  for (unsigned int k = 0; k < 2; k++) {
-    mpz_poly_clear(f[k]);
-    mpz_clear(mean[k]);
-  }
-  free(f);
-  free(mean);
+  free(max_bit);
+  free(max);
+  sieving_bound_clear(H);
 }
-
