@@ -15,6 +15,7 @@
 #include "mf.h"
 #include "balancing.h"
 #include "rowset_heap.h"
+#include "cheating_vec_init.h"
 
 /* This program computes how a matrix would have to be balanced for
  * fitting a job grid of given size. This does _not_ read the matrix,
@@ -449,6 +450,15 @@ int main(int argc, char * argv[])
     for(int d = 0 ; d < 2 ; d++) {
         /* d == 0 : padding the rows */
         block[d] = iceildiv(matsize[d], nh * nv);
+        /* We also want to enforce alignment of the block size with
+         * respect to the SIMD things.
+         * Given that mmt_vec_init provides 64-byte alignment of vector
+         * areas, we may enforce the block size to be a multiple of
+         * 8 in order to effectively guarantee 64-byte alignment for all
+         * chunks. (Admittedly, this is a it fragile; if we were to
+         * possibly use smaller items, that would change stuff somewhat).
+         */
+        for ( ; block[d] % (FORCED_ALIGNMENT_ON_MPFQ_VEC_TYPES / MINIMUM_ITEM_SIZE_OF_MPFQ_VEC_TYPES) ; block[d]++);
     }
 
     if (!rectangular) {

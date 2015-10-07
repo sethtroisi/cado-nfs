@@ -10,12 +10,17 @@
 #include "balancing.h"
 #include "portability.h"
 #include "utils.h"
+#include "cheating_vec_init.h"
 
 void balancing_set_row_col_count(balancing_ptr bal)
 {
     unsigned int s = bal->h->nh * bal->h->nv;
-    bal->trows = s * iceildiv(bal->h->nrows, s);
-    bal->tcols = s * iceildiv(bal->h->ncols, s);
+    unsigned int b = iceildiv(bal->h->nrows, s);
+    for( ; b % (FORCED_ALIGNMENT_ON_MPFQ_VEC_TYPES / MINIMUM_ITEM_SIZE_OF_MPFQ_VEC_TYPES) ; b++);
+    bal->trows = s * b;
+    b = iceildiv(bal->h->ncols, s);
+    for( ; b % (FORCED_ALIGNMENT_ON_MPFQ_VEC_TYPES / MINIMUM_ITEM_SIZE_OF_MPFQ_VEC_TYPES) ; b++);
+    bal->tcols = s * b;
     if (bal->h->flags & FLAG_REPLICATE) {
         bal->tcols = bal->trows = MAX(bal->trows, bal->tcols);
     }

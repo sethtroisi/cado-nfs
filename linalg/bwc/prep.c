@@ -14,6 +14,7 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "portability.h"
+#include "cheating_vec_init.h"
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -57,7 +58,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     void * xymats;
 
     /* We're cheating on the generic init routines */
-    A->vec_init(A, &xymats, bw->m * prep_lookahead_iterations);
+    cheating_vec_init(A, &xymats, bw->m * prep_lookahead_iterations);
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -193,7 +194,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     matmul_top_clear(mmt);
 
     /* clean up xy mats stuff */
-    A->vec_clear(A, &xymats, bw->m * prep_lookahead_iterations);
+    cheating_vec_clear(A, &xymats, bw->m * prep_lookahead_iterations);
 
     A->oo_field_clear(A);
 
@@ -271,7 +272,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             printf("// Creating %s (extraction from %s)\n", vec_names[j], rhs_name);
         }
         void * coeff;
-        A->vec_init(A, &coeff, 1);
+        cheating_vec_init(A, &coeff, 1);
         mpz_t c;
         mpz_init(c);
         for(unsigned int i = 0 ; i < mmt->n0[!bw->dir] ; i++) {
@@ -286,7 +287,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             }
         }
         mpz_clear(c);
-        A->vec_clear(A, &coeff, 1);
+        cheating_vec_clear(A, &coeff, 1);
         for(unsigned int j = 0 ; j < nrhs ; j++) {
             fclose(vec_files[j]);
             free(vec_names[j]);
@@ -304,11 +305,11 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         vec_file = fopen(vec_name, "wb");
         ASSERT_ALWAYS(vec_file != NULL);
         printf("// Creating %s\n", vec_name);
-        A->vec_init(A, &vec, mmt->n0[!bw->dir]);
+        cheating_vec_init(A, &vec, mmt->n0[!bw->dir]);
         A->vec_random(A, vec, mmt->n0[!bw->dir], rstate);
         rc = fwrite(vec, A->vec_elt_stride(A,1), mmt->n0[!bw->dir], vec_file);
         ASSERT_ALWAYS(rc >= 0 && ((unsigned int) rc) == mmt->n0[!bw->dir]);
-        A->vec_clear(A, &vec, mmt->n0[!bw->dir]);
+        cheating_vec_clear(A, &vec, mmt->n0[!bw->dir]);
         fclose(vec_file);
         free(vec_name);
     }

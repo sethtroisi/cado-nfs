@@ -1282,3 +1282,4 @@ gf2x/already_tuned/x86_64_nosse/gf2x_mul9.h
 tests/provide-wdir.sh
 linalg/bwc/blocklanczos.c
 tests/linalg/bwc/test-blocklanczos.sh
+linalg/bwc/cheating_vec_init.h

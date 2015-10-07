@@ -128,7 +128,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     unsigned long maxsize = siz;
     pi_allreduce(NULL, &maxsize, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_MAX, wr);
 
-    char * strings = shared_malloc_set_zero(wr, wr->totalsize * siz);
+    char * strings = shared_malloc_set_zero(wr, wr->totalsize * maxsize);
 
     int me = wr->jrank * wr->ncores + wr->trank;
 
@@ -140,6 +140,8 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     free(fmt);
 
     char * ptr = strings;
+
+    serialize(pi->m);
 
     if (print) {
         /* There's also the null byte counted in siz. So that makes one
@@ -1374,6 +1376,17 @@ static void pi_thread_allreduce_out(int s MAYBE_UNUSED, struct pi_collective_arg
 void pi_thread_allreduce(void *ptr, void *dptr, size_t count,
                 pi_datatype_ptr datatype, pi_op_ptr op, pi_comm_ptr wr)
 {
+    /* this code is buggy in the not-in-place case. let's fall back
+     * to the in-place situation unconditionally.
+     *
+     * nature of the bug: if we don't do the fallback below, then clearly
+     * a->ptr is being written to. We should clean this up, and use const
+     * when possible.
+     */
+    if (ptr && ptr != dptr) {
+        memcpy(dptr, ptr, count * datatype->item_size);
+        ptr = NULL;
+    }
     struct pi_collective_arg a[1];
     a->wr = wr;
     a->ptr = ptr ? ptr : dptr;  /* handle in-place */

@@ -17,6 +17,7 @@
 #include "rolling.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "cheating_vec_init.h"
 
 void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -155,7 +156,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     /* Our ``ahead zone'' will also be used for storing the data prior to
      * transposing */
     void * ahead;
-    A->vec_init(A, &ahead, bw->n);
+    cheating_vec_init(A, &ahead, bw->n);
 
     mpfq_vbase_tmpl AxAc;
     mpfq_vbase_oo_init_templates(AxAc, A, Ac);
@@ -217,7 +218,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 (multi * Ar->vec_elt_stride(Ar, A->groupsize(A)*bw->interval)) >> 10);
     }
     for(unsigned int k = 0 ; k < multi ; k++) {
-        Ar->vec_init(Ar, &(fcoeffs[k]), A->groupsize(A)*bw->interval);
+        cheating_vec_init(Ar, &(fcoeffs[k]), A->groupsize(A)*bw->interval);
     }
     
     /* Our sum vector is only part of the story of course. All jobs, all
@@ -236,7 +237,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     void * * sum;
     sum = malloc(multi * sizeof(void *));
     for(unsigned int k = 0 ; k < multi ; k++) {
-        Ar->vec_init(Ar, &(sum[k]), eblock);
+        cheating_vec_init(Ar, &(sum[k]), eblock);
         Ar->vec_set_zero(Ar, sum[k], eblock);
     }
 
@@ -531,15 +532,15 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     serialize(pi->m);
 
     for(unsigned int k = 0 ; k < multi ; k++) {
-        Ar->vec_clear(Ar, &(sum[k]), eblock);
+        cheating_vec_clear(Ar, &(sum[k]), eblock);
     }
     if (!bw->skip_online_checks) {
         mmt_vec_clear(mmt, check_vector);
-        A->vec_clear(A, &ahead, nchecks);
+        cheating_vec_clear(A, &ahead, nchecks);
         free(gxvecs);
     }
     for(unsigned int k = 0 ; k < multi ; k++) {
-        Ar->vec_clear(Ar, &(fcoeffs[k]), A->groupsize(A)*bw->interval);
+        cheating_vec_clear(Ar, &(fcoeffs[k]), A->groupsize(A)*bw->interval);
     }
     free(v_name);
     free(fcoeffs);

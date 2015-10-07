@@ -15,6 +15,7 @@
 #include "rolling.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "cheating_vec_init.h"
 
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -142,7 +143,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     if (!bw->skip_online_checks) {
-        A->vec_init(A, &ahead, nchecks);
+        cheating_vec_init(A, &ahead, nchecks);
     }
 
     /* We'll store all xy matrices locally before doing reductions. Given
@@ -154,7 +155,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         printf("Each thread allocates %zd kb for the A matrices\n",
                 A->vec_elt_stride(A, bw->m*bw->interval) >> 10);
     }
-    A->vec_init(A, &xymats, bw->m*bw->interval);
+    cheating_vec_init(A, &xymats, bw->m*bw->interval);
     
     if (bw->end == 0) {
         /* Decide on an automatic ending value */
@@ -315,11 +316,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
     serialize(pi->m);
 
-    A->vec_clear(A, &xymats, bw->m*bw->interval);
+    cheating_vec_clear(A, &xymats, bw->m*bw->interval);
 
     if (!bw->skip_online_checks) {
         mmt_vec_clear(mmt, check_vector);
-        A->vec_clear(A, &ahead, nchecks);
+        cheating_vec_clear(A, &ahead, nchecks);
     }
 
     free(gxvecs);

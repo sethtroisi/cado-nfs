@@ -16,6 +16,7 @@
 #include "portability.h"
 #include "misc.h"
 #include "random_matrix.h"
+#include "cheating_vec_init.h"
 
 /* Our innermost communication routines are essentially all-gather and
  * reduce-scatter, following the MPI terminology. We provide several
@@ -187,13 +188,13 @@ void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr
 
     if (flags & THREAD_SHARED_VECTOR) {
         if (wr->trank == 0) {
-            abase->vec_init(abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+            cheating_vec_init(abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
             abase->vec_set_zero(abase, v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
         }
         pi_thread_bcast(&v->v, sizeof(void*), BWC_PI_BYTE, 0, wr);
         v->siblings = NULL;
     } else {
-        abase->vec_init(abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+        cheating_vec_init(abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
         abase->vec_set_zero(abase, v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
         v->siblings = shared_malloc(wr, wr->ncores * sizeof(void *));
         v->siblings[wr->trank] = v;
@@ -213,11 +214,11 @@ void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v)
     unsigned int n = v->i1 - v->i0;
     matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n);
     if (v->siblings) {
-        v->abase->vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+        cheating_vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
         shared_free(wr, v->siblings);
     } else {
         if (wr->trank == 0)
-            v->abase->vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+            cheating_vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
     }
     memset(v, 0, sizeof(mmt_vec));
 }
@@ -1970,7 +1971,7 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned 
         ASSERT_ALWAYS(rc >= 0);
 
         void * y;
-        A->vec_init(A, &y, v->n);
+        cheating_vec_init(A, &y, v->n);
         A->vec_set_zero(A, y, v->n);
         /* we generate garbage for the padding coordinates too, but
          * that's not really an issue since that does not get written,
@@ -1985,7 +1986,7 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned 
         rc = fwrite(y, A->vec_elt_stride(A,1), itemsondisk, f);
         ASSERT_ALWAYS(rc == (int) itemsondisk);
         fclose(f);
-        A->vec_clear(A, &y, v->n);
+        cheating_vec_clear(A, &y, v->n);
         free(filename);
     }
     mmt_vec_load(v, name, iter, itemsondisk);
@@ -2003,7 +2004,7 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
     mpfq_vbase_ptr A = y->abase;
     mmt_full_vec_set_zero(y);
     void * dummy;
-    A->vec_init(A, &dummy, 1);
+    cheating_vec_init(A, &dummy, 1);
     if (!shared || y->pi->wr[y->d]->trank == 0) {
         for(int j = 0 ; j < m ; j++) {
             for(unsigned int k = 0 ; k < nx ; k++) {
@@ -2029,7 +2030,7 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
             }
         }
     }
-    A->vec_clear(A, &dummy, 1);
+    cheating_vec_clear(A, &dummy, 1);
     y->consistency=2;
     if (shared)
         serialize_threads(y->pi->wr[y->d]);
@@ -2473,7 +2474,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Begin creation of fake matrix data in parallel\n");
             }
-            random_matrix_get_u32(mmt->pi, pl, m);
+            random_matrix_get_u32(mmt->pi, pl, m, mmt->mm->dim[0], mmt->mm->dim[1]);
         } else {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Matrix dispatching starts\n");

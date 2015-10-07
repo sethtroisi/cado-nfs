@@ -223,7 +223,7 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     if (print)
         printf("iteration %d\n", iter);
 
-    grid_print(pi, buf, sizeof(buf), print);
+    grid_print(pi, buf, strlen(buf) + 1, print);
 }
 
 static const char * timer_names[] = TIMER_NAMES;

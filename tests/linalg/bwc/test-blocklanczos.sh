@@ -75,7 +75,12 @@ wdir=$(mktemp -d  /tmp/cado.XXXXXXXX)
 cleanup() { if ! [ "$CADO_DEBUG" ] ; then rm -rf $wdir ; fi ; }
 trap cleanup EXIT
 
-$bindir/random_matrix $nrows $ncols $density seed=1 kleft=128 > $wdir/mat.txt
+kleft=128
+if [ "$kleft" -ge "$((nrows/4))" ] ; then
+    kleft=$((nrows/4))
+fi
+
+$bindir/random_matrix $nrows $ncols $density seed=1 kleft=$kleft > $wdir/mat.txt
 $bindir/mf_scan mfile=$wdir/mat.txt --freq --binary-out --ofile $wdir/mat.bin
 
 file_is_zero() {
@@ -89,7 +94,7 @@ file_is_zero() {
 
 # We pass --rectangular because that is the way we say that we do not
 # care about replicating permutations.
-$bindir/mf_bal 1 1 $wdir/mat.bin skip_decorrelating_permutation=1 out=$wdir/bal.bin --rectangular
+$bindir/mf_bal $nh $nv $wdir/mat.bin skip_decorrelating_permutation=1 out=$wdir/bal.bin --rectangular
 
 $bindir/blocklanczos m=64 n=64 ys=0..64 matrix=mat.bin wdir=$wdir balancing=bal.bin seed=1 interval=$((nrows/10+1)) no_save_cache=1 "${bwc_extra[@]}"
 

@@ -20,6 +20,7 @@
 #include "balancing.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "cheating_vec_init.h"
 
 struct sfile_info {
     unsigned int n0,n1;
@@ -190,8 +191,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     size_t eblock = mmt_my_own_size_in_items(y);
     void * svec;
     void * tvec;
-    A->vec_init(A, &svec, eblock);
-    A->vec_init(A, &tvec, eblock);
+    cheating_vec_init(A, &svec, eblock);
+    cheating_vec_init(A, &tvec, eblock);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     if (rhs_name != NULL) {
@@ -245,7 +246,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         void * rhscoeffs;
 
         if (rhscoeffs_name) {
-            A->vec_init(A, &rhscoeffs, nrhs);
+            cheating_vec_init(A, &rhscoeffs, nrhs);
 
             if (tcan_print) {
                 printf("Reading rhs coefficients for solution %u\n", sf->s0);
@@ -460,14 +461,14 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         serialize(pi->m);
         free(kprefix);
-        if (rhscoeffs_name) A->vec_clear(A, &rhscoeffs, nrhs);
+        if (rhscoeffs_name) cheating_vec_clear(A, &rhscoeffs, nrhs);
     }
 
     if (rhscoeffs_file) fclose(rhscoeffs_file);
     if (rhscoeffs_name) mmt_vec_clear(mmt, rhscoeffs_vec);
 
-    A->vec_clear(A, &svec, eblock);
-    A->vec_clear(A, &tvec, eblock);
+    cheating_vec_clear(A, &svec, eblock);
+    cheating_vec_clear(A, &tvec, eblock);
 
     mmt_vec_clear(mmt, y);
     mmt_vec_clear(mmt, my);

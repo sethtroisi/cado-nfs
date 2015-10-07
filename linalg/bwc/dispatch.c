@@ -20,6 +20,7 @@
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "cheating_vec_init.h"
 
 void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -137,8 +138,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         /* This is L. Now compute the dot product. */
         void * dp0;
         void * dp1;
-        A->vec_init(A, &dp0, A->groupsize(A));
-        A->vec_init(A, &dp1, A->groupsize(A));
+        cheating_vec_init(A, &dp0, A->groupsize(A));
+        cheating_vec_init(A, &dp1, A->groupsize(A));
         unsigned int how_many;
         unsigned int offset_c;
         unsigned int offset_v;
@@ -178,8 +179,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             }
             printf("%s : ok\n", checkname);
         }
-        A->vec_clear(A, &dp0, A->groupsize(A));
-        A->vec_clear(A, &dp1, A->groupsize(A));
+        cheating_vec_clear(A, &dp0, A->groupsize(A));
+        cheating_vec_clear(A, &dp1, A->groupsize(A));
     }
 
     mmt_vec_clear(mmt, y);

@@ -17,6 +17,7 @@
 #include "matops.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "cheating_vec_init.h"
 
 int exit_code = 0;
 
@@ -153,8 +154,8 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
-    mmt_vec_init(mmt,0,0, bl->y,   bw->dir, 0, mmt->n0[bw->dir]);
-    mmt_vec_init(mmt,0,0, bl->my, !bw->dir, 0, mmt->n0[!bw->dir]);
+    mmt_vec_init(mmt,0,0, bl->y,   bw->dir, 0, mmt->n[bw->dir]);
+    mmt_vec_init(mmt,0,0, bl->my, !bw->dir, 0, mmt->n[!bw->dir]);
 
     for(int i = 0 ; i < 3 ; i++) {
         /* We also need D_n, D_{n-1}, D_{n-2}. Those are in fact bitmaps.
@@ -162,7 +163,7 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
         bit_vector_init(bl->D[i], bw->n);
         /* We need as well the two previous vectors. For these, distributed
          * storage will be ok. */
-        mmt_vec_init(mmt,0,0, bl->V[i], bw->dir, 0, mmt->n0[bw->dir]);
+        mmt_vec_init(mmt,0,0, bl->V[i], bw->dir, 0, mmt->n[bw->dir]);
     }
 
 }
@@ -379,7 +380,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
     mmt_full_vec_set(bl->y, bl->V[i0]);
 
     /* save raw V because it's conceivably useful */
-    ASSERT_ALWAYS(bl->y->n == mmt->n0[bw->dir]);
+    ASSERT_ALWAYS(bl->y->n == mmt->n[bw->dir]);
     mmt_vec_save_stream(f, bl->y, mmt->n0[bw->dir]);
 
     mmt_vec_twist(mmt, bl->y);
@@ -394,17 +395,17 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
      * property of the _write and _read calls. But before we do that, we
      * should clean up the mess done in mksol & gather.
      */
-    ASSERT_ALWAYS(bl->my->n == mmt->n0[!bw->dir]);
+    ASSERT_ALWAYS(bl->my->n == mmt->n[!bw->dir]);
     mmt_vec_save_stream(f, bl->my, mmt->n0[!bw->dir]);
 
     /* Do some rank calculations */
     /* m0 is just temp stuff. */
     mmt_full_vec_set(bl->y, bl->V[i0]);
     r = mmt_vec_echelon(m0, bl->y);
-    printf("\trank(V) == %d\n", r);
+    if (tcan_print) printf("\trank(V) == %d\n", r);
     /* m1 will be largest rank matrix such that m1*V*M == 0 */
     r = mmt_vec_echelon(m1,bl-> my);
-    printf("\trank(V*M) == %d\n", r);
+    if (tcan_print) printf("\trank(V*M) == %d\n", r);
 
     /* good, so now let's look for real nullspace elements. Since
      * we've put V*M in RREF, we know what transformation of V
@@ -428,7 +429,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
      * combinations which lead to zero, so that m2*m1 should have rank
      * precisely the rank of the nullspace */
     r = mmt_vec_echelon(m2, bl->y);
-    printf("\trank(V cap nullspace(M)) == %d\n", r);
+    if (tcan_print) printf("\trank(V cap nullspace(M)) == %d\n", r);
     /* Now we have the really interesting basis of the nullspace */
     for(int i = r ; i < 64 ; i++) {
         m2[i] = 0;
@@ -450,7 +451,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
 
 
     /* Now save the reduced kernel basis */
-    ASSERT_ALWAYS(bl->y->n == mmt->n0[bw->dir]);
+    ASSERT_ALWAYS(bl->y->n == mmt->n[bw->dir]);
     mmt_vec_save_stream(f, bl->y, mmt->n0[bw->dir]);
 
     pi_file_close(f);
@@ -532,8 +533,8 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
     void * vav;
     void * vaav;
 
-    A->vec_init(A, &vav, nelts_for_nnmat);
-    A->vec_init(A, &vaav, nelts_for_nnmat);
+    cheating_vec_init(A, &vav, nelts_for_nnmat);
+    cheating_vec_init(A, &vaav, nelts_for_nnmat);
 
     /* TODO: Put that in the state file. */
     int sum_Ni = 0;
@@ -708,11 +709,14 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
         serialize(pi->m);
         if (i < bw->interval) {
-            if (tcan_print) printf("Finished at iteration %d\n", s+i);
+            if (tcan_print) printf("Finished at iteration %d, sum_dim=%d=N*(%u-%.3f)\n", s+i, sum_Ni, bw->n, bw->n-(double)sum_Ni/(s+i));
 
             blstate_save_result(bl, s+i);
             /* We need to cheat somewhat */
-            bw->end = s + i;
+            if (serialize_threads(pi->m)) {
+                bw->end = s + i;
+            }
+            serialize_threads(pi->m);
             timing->end_mark = s + i;
             break;
         }
@@ -731,8 +735,8 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
     // make sense.
     timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, "blocklanczos");
 
-    A->vec_clear(A, &vav, nelts_for_nnmat);
-    A->vec_clear(A, &vaav, nelts_for_nnmat);
+    cheating_vec_clear(A, &vav, nelts_for_nnmat);
+    cheating_vec_clear(A, &vaav, nelts_for_nnmat);
 
 #if 0
     pi_log_clear(pi->m);

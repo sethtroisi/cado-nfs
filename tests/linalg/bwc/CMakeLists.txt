@@ -320,6 +320,8 @@ cado_divert_test(test-blocklanczos right
     APPEND_ARGUMENTS --matrix-size "1000,2000" --nullspace RIGHT)
 cado_divert_test(test-blocklanczos left
     APPEND_ARGUMENTS --matrix-size "2000,1000" --nullspace left)
+cado_divert_test(test-blocklanczos left-thr21
+    APPEND_ARGUMENTS --matrix-size "2000,1000" --nullspace left thr=2x1)
 
 cado_define_test(TEST_NAME test-blocklanczos-staged
     PROGRAM
