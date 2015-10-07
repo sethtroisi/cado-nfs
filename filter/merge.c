@@ -217,9 +217,10 @@ main (int argc, char *argv[])
     mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax, nbmergemax);
 
     fclose_maybe_compressed (rep->outfile, outname);
-    printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRIu64 ") "
-            "w(M)=%" PRIu64 " N*w(M)=%" PRIu64 "\n ", mat->rem_nrows,
-            mat->rem_ncols, mat->rem_nrows - mat->rem_ncols, mat->weight,
+    printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRId64 ") "
+            "w(M)=%" PRIu64 " N*w(M)=%" PRIu64 "\n ",
+            mat->rem_nrows, mat->rem_ncols,
+            ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols), mat->weight,
 	          mat->rem_nrows * mat->weight);
     fflush (stdout);
     MkzClose (mat);
