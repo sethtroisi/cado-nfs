@@ -183,7 +183,7 @@ print_poly_info ( mpz_t *f,
     rotate_auxg_z (f, g[1], g[0], k0, 0);
     skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     logmu = L2_lognorm (F, skew2);
-    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
+    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew));
     mpz_neg (k2, k2);
     mpz_neg (k1, k1);
     mpz_neg (k0, k0);
@@ -198,7 +198,7 @@ print_poly_info ( mpz_t *f,
     rotate_auxg_z (f, g[1], g[0], k0, 0);
     skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     logmu = L2_lognorm (F, skew2);
-    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
+    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew));
     mpz_neg (k1, k1);
     mpz_neg (k0, k0);
     rotate_auxg_z (f, g[1], g[0], k1, 1);
