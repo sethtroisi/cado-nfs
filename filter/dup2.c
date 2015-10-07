@@ -178,7 +178,10 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
   if (renumber_tab->naddcols)
   {
     if (renumber_tab->nb_polys == 2)
+    {
       p = u64toa16(p, (uint64_t) 0);
+      *p++ = ',';
+    }
     else
     {
       index_t index_add_col = 0;
@@ -188,12 +191,14 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
         if (b & ((uint64_t) 1))
         {
           if (nonvoidside & ((uint64_t) 1))
-            p = u64toa16(p, (uint64_t) side);
+          {
+            p = u64toa16(p, (uint64_t) index_add_col);
+            *p++ = ',';
+          }
           index_add_col++;
         }
       }
     }
-    *p++ = ',';
   }
 
 
