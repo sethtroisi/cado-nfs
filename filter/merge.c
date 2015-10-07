@@ -64,6 +64,8 @@ static void declare_usage(param_list pl)
                             "approximated (default " STR(DEFAULT_MERGE_MKZTYPE) ")");
   param_list_decl_usage(pl, "wmstmax", "controls until when a mst is used with "
                             "-mkztype 2 (default " STR(DEFAULT_MERGE_WMSTMAX) ")");
+  param_list_decl_usage(pl, "forbidden-cols", "list of columns that cannot be "
+                                              "used for merges");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   verbose_decl_usage(pl);
@@ -138,6 +140,7 @@ main (int argc, char *argv[])
     /* to a too small value of -maxlevel                      */
     const char * resumename = param_list_lookup_string (pl, "resume");
     const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+    const char *forbidden_cols = param_list_lookup_string(pl, "forbidden-cols");
 
     param_list_parse_int (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
@@ -207,6 +210,13 @@ main (int argc, char *argv[])
     /* resume from given history file if needed */
     if (resumename != NULL)
       resume (rep, mat, resumename);
+
+    /* Some columns can be disable so merge won't use them as pivot */
+    if (forbidden_cols != NULL)
+    {
+      printf ("Disabling columns from %s\n", forbidden_cols);
+      matR_disable_cols (mat, forbidden_cols);
+    }
 
     mat->wmstmax = wmstmax;
     mat->mkztype = mkztype;
