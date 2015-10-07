@@ -675,7 +675,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 int Ni = bit_vector_popcount(bl->D[i0]);
                 sum_Ni += Ni;
                 // int defect = bw->n - Ni;
-                //if (tcan_print) printf("step %d, dim=%d\n", s+i, Ni);
+                // printf("step %d, dim=%d\n", s+i, Ni);
                 if (Ni == 0) {
                     break;
                 }
@@ -695,17 +695,22 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 addmul_N64_6464(X, V0, m0, eblock);
                 addmul_N64_6464(X, V1, m1, eblock);
                 addmul_N64_6464(X, V2, m2, eblock);
+                bl->y->consistency = 1;
 
                 /* So. We need to get ready for the next step, don't we ? */
+                mmt_vec_broadcast(bl->y);
                 mmt_own_vec_set(bl->V[i2], bl->y);
-                mmt_vec_broadcast(bl->V[i2]);
+                bl->V[i2]->consistency = 1;
             }
             timing_check(pi, timing, s+i+1, tcan_print);
         }
         serialize(pi->m);
 
-        for(int k = 0 ; k < 3 ; k++)
+        for(int k = 0 ; k < 3 ; k++) {
+            if (bl->V[k]->consistency < 2)
+                mmt_vec_broadcast(bl->V[k]);
             mmt_vec_untwist(mmt, bl->V[k]);
+        }
 
         serialize(pi->m);
         if (i < bw->interval) {
@@ -748,7 +753,10 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
         if (tcan_print) {
             printf("FAILED blocklanczos (no collapse found for inner product).\n");
         }
-        exit_code = 1;
+        if (serialize_threads(pi->m)) {
+            exit_code = 1;
+        }
+        serialize_threads(pi->m);
     } else {
         if (tcan_print) {
             printf("Done blocklanczos.\n");
