@@ -322,13 +322,11 @@ pages 208-224, 2012.
 Factorisation of RSA-704 with CADO-NFS, Shi Bai, Emmanuel Thomé and Paul
 Zimmermann, preprint, http://eprint.iacr.org/2012/369, 2012.
 
-Size Optimization of Sextic Polynomials in the Number Field Sieve, Shi Bai
-and Paul Zimmermann, preprint, http://wwwmaths.anu.edu.au/~bai/paper/sopt.pdf,
-2012.
+Better Polynomials for GNFS. Shi Bai, Cyril Bouvier, Alexander Kruppa and
+Paul Zimmermann. Mathematics of Computation, 2015.
 
 Root Optimization of Polynomials in the Number Field Sieve, Shi Bai, Richard
-Brent and Emmanuel Thomé, http://wwwmaths.anu.edu.au/~bai/paper/rs.pdf,
-preprint, 2011.
+Brent and Emmanuel Thomé. Mathematics of Computation, 2015.
 
 Non-Linear Polynomial Selection for the Number Field Sieve, Thomas Prest and
 Paul Zimmermann, Journal of Symbolic Computation, special issue in the honour
