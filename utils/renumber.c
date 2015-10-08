@@ -960,6 +960,10 @@ renumber_get_index_from_p_r (renumber_srcptr renumber_info, p_r_values_t p,
   }
 }
 
+/* This function assume that i does not correspond to a bad ideals or an
+ * additional columns (i.e., tab[i] != RENUMBER_SPECIAL_VALUE). It will fail
+ * if this assumption is not satisfied.
+ */
 void
 renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
                              p_r_values_t * r, int *side, index_t i,
@@ -1001,5 +1005,53 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
       *side = renumber_info->rat;
     }
   }
+}
+
+int
+renumber_get_side_from_index (renumber_srcptr renumber_info, index_t i,
+                              cado_poly pol)
+{
+  p_r_values_t *tab = renumber_info->table;
+  int side;
+
+  if (tab[i] == RENUMBER_SPECIAL_VALUE)
+  {
+    if (i < renumber_info->naddcols) /* i corresponds to an additional columns. */
+    {
+      side = 0;
+      index_t index_add_col = 0;
+      uint64_t b;
+      for (b = renumber_info->nonmonic; b != 0; b>>=1, side++)
+      {
+        if (b & ((uint64_t) 1))
+        {
+          if (index_add_col == i)
+            break;
+          index_add_col++;
+        }
+      }
+      ASSERT_ALWAYS (b != 0);
+    }
+    else /* i corresponds to a bad ideals. */
+    {
+      index_t bad = renumber_info->naddcols;
+      int k;
+      for (k = 0; k < renumber_info->bad_ideals.n; k++)
+      {
+        if (i < bad + renumber_info->bad_ideals.nb[k])
+          break;
+        bad += renumber_info->bad_ideals.nb[k];
+      }
+      ASSERT_ALWAYS (k < renumber_info->bad_ideals.n);
+      side = renumber_info->bad_ideals.side[k];
+    }
+  }
+  else
+  {
+    p_r_values_t p, r;
+    renumber_get_p_r_from_index (renumber_info, &p, &r, &side, i, pol);
+  }
+
+  return side;
 }
 

@@ -88,6 +88,7 @@ int renumber_is_bad(int *, index_t*,renumber_srcptr, p_r_values_t, p_r_values_t,
 index_t renumber_get_index_from_p_r (renumber_srcptr, p_r_values_t, p_r_values_t,int);
 void renumber_get_p_r_from_index (renumber_srcptr, p_r_values_t *, p_r_values_t *,
                                                     int *, index_t, cado_poly);
+int renumber_get_side_from_index (renumber_srcptr, index_t, cado_poly);
 
 #ifdef __cplusplus
 }
