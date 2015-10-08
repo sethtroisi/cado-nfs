@@ -158,12 +158,8 @@ print_poly_info ( mpz_t *f,
                   const char *prefix )
 {
   unsigned int i, nroots;
-  double skew, skew2, logmu, alpha, alpha_proj, exp_E;
-  mpz_t k0, k1, k2;
+  double skew, logmu, alpha, alpha_proj, exp_E;
   mpz_poly_t F;
-  mpz_init (k0);
-  mpz_init (k1);
-  mpz_init (k2);
   F->coeff = f;
   F->deg = d;
 
@@ -171,46 +167,13 @@ print_poly_info ( mpz_t *f,
   gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
     gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
-
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-  if (d == 6) {
-    mpz_set_d (k2, skew);
-    rotate_auxg_z (f, g[1], g[0], k2, 2);
-    mpz_mul_ui (k1, k2, (unsigned long) skew);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    mpz_mul_ui (k0, k1, (unsigned long) skew);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew2);
-    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew));
-    mpz_neg (k2, k2);
-    mpz_neg (k1, k1);
-    mpz_neg (k0, k0);
-    rotate_auxg_z (f, g[1], g[0], k2, 2);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-  }
-  else {
-    mpz_set_d (k1, skew);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    mpz_mul_ui (k0, k1, (unsigned long) skew);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew2);
-    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew));
-    mpz_neg (k1, k1);
-    mpz_neg (k0, k0);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-  }
-  
+  exp_E = ropt_bound_expected_E (f, d, g);
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
   alpha = get_alpha (F, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
-
   if (raw == 1)
     printf ("# raw lognorm ");
   else
@@ -220,9 +183,6 @@ print_poly_info ( mpz_t *f,
           logmu, skew, alpha, alpha_proj, logmu + alpha,
           exp_E, nroots);
 
-  mpz_clear (k0);
-  mpz_clear (k1);
-  mpz_clear (k2);
 }
 
 

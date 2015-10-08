@@ -204,6 +204,10 @@ void ropt_bound_setup ( ropt_poly_t poly,
                         ropt_bound_t bound,
                         ropt_param_t param );
 
+double ropt_bound_expected_E ( mpz_t *f,
+                               unsigned int d,
+                               mpz_t *g );
+
 void ropt_bound_reset ( ropt_poly_t poly,
                         ropt_bound_t bound,
                         ropt_param_t param );

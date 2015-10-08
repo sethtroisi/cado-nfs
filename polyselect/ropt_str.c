@@ -19,19 +19,22 @@
 /**
  * Find bound V for constant rotation.
  */
-static inline void
-rotate_bounds_V_mpz ( ropt_poly_t poly,
-                      ropt_bound_t bound )
+static inline double
+rotate_bounds_V_mpz ( mpz_t *f,
+                      mpz_t *g,
+                      int d,
+                      ropt_bound_t bound,
+                      bool flagE )
 {
   mpz_t V;
   mpz_poly_t F0, G0, F, G;
-
-  mpz_poly_init (F0, poly->d);
-  mpz_poly_init (F, poly->d);
+  double lognorm, exp_E = DBL_MAX;
+  mpz_poly_init (F0, d);
+  mpz_poly_init (F, d);
   mpz_poly_init (G0, 1);
   mpz_poly_init (G, 1);
-  mpz_poly_setcoeffs (F0, poly->f, poly->d);
-  mpz_poly_setcoeffs (G0, poly->g, 1);
+  mpz_poly_setcoeffs (F0, f, d);
+  mpz_poly_setcoeffs (G0, g, 1);
 
   /* look for positive V: 2, 4, 8, ... */
   mpz_init_set_ui (V, 1);
@@ -41,9 +44,15 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     mpz_poly_rotation (F, F0, G0, V, 0);
 
     /* translation-optimize the rotated polynomial */
-    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-
+    if (!flagE) {
+      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    }
+    else {
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+      exp_E = fmin(exp_E, lognorm - 0.824 * sqrt (2.0 * i));
+    }
+    
     if (lognorm > bound->bound_lognorm)
       break;
   }
@@ -57,9 +66,15 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     mpz_poly_rotation (F, F0, G0, V, 0);
 
     /* translation-optimize the rotated polynomial */
-    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-
+    if (!flagE) {
+      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    }
+    else {
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+      exp_E = fmin(exp_E, lognorm - 0.824 * sqrt (2.0 * i));
+    }
+    
     if (lognorm > bound->bound_lognorm)
       break;
   }
@@ -70,24 +85,28 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
   mpz_poly_clear (G0);
   mpz_poly_clear (G);
   mpz_clear (V);
+  return exp_E;
 }
 
 
 /**
  * Find bound U for linear rotation.
  */
-static inline void
-rotate_bounds_U_lu ( ropt_poly_t poly,
-                     ropt_bound_t bound )
+static inline double
+rotate_bounds_U_lu ( mpz_t *f,
+                     mpz_t *g,
+                     int d,
+                     ropt_bound_t bound,
+                     bool flagE )
 {
   mpz_poly_t F0, G0, F, G;
-
-  mpz_poly_init (F0, poly->d);
-  mpz_poly_init (F, poly->d);
+  double lognorm, exp_E = DBL_MAX;
+  mpz_poly_init (F0, d);
+  mpz_poly_init (F, d);
   mpz_poly_init (G0, 1);
   mpz_poly_init (G, 1);
-  mpz_poly_setcoeffs (F0, poly->f, poly->d);
-  mpz_poly_setcoeffs (G0, poly->g, 1);
+  mpz_poly_setcoeffs (F0, f, d);
+  mpz_poly_setcoeffs (G0, g, 1);
 
   /* Look for positive u: 1, 2, 4, 8, ... */
   int64_t u = 1;
@@ -97,8 +116,14 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     mpz_poly_rotation_int64 (F, F0, G0, u, 1);
 
     /* translation-optimize the rotated polynomial */
-    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    if (!flagE) {
+      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    }
+    else {
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+      exp_E = fmin(exp_E, lognorm - 0.824 * sqrt (2.0 * i));
+    }
 
     if (lognorm > bound->bound_lognorm)
       break;
@@ -113,8 +138,14 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     mpz_poly_rotation_int64 (F, F0, G0, u, 1);
 
     /* translation-optimize the rotated polynomial */
-    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-    double lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    if (!flagE) {
+      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    }
+    else {
+      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+      exp_E = fmin(exp_E, lognorm - 0.824 * sqrt (2.0 * i));
+    }
 
     if (lognorm > bound->bound_lognorm)
       break;
@@ -125,6 +156,7 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
   mpz_poly_clear (F);
   mpz_poly_clear (G0);
   mpz_poly_clear (G);
+  return exp_E;
 }
 
 
@@ -397,10 +429,8 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
 {
   mpz_poly_t F;
   double skewness;
-
   F->coeff = poly->f;
   F->deg = poly->d;
-
   skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   bound->init_lognorm = L2_lognorm (F, skewness);
 
@@ -414,6 +444,26 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
        larger individual sublattices. */
     bound->bound_lognorm = bound->init_lognorm + BOUND_LOGNORM_INCR_MAX;
   }
+}
+
+
+double
+ropt_bound_expected_E ( mpz_t *f,
+                        unsigned int d,
+                        mpz_t *g )
+{
+  mpz_poly_t F;
+  ropt_bound_t bound;
+  double exp_E;
+  ropt_bound_init (bound);
+  F->coeff = f;
+  F->deg = d;
+  bound->init_lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+  bound->bound_lognorm = bound->init_lognorm + BOUND_LOGNORM_INCR_MAX;
+  exp_E = rotate_bounds_U_lu (f, g, d, bound, 1);
+  exp_E = fmin(exp_E, rotate_bounds_V_mpz (f, g, d, bound, 1));
+  ropt_bound_free (bound);  
+  return exp_E;
 }
 
 
@@ -442,10 +492,10 @@ ropt_bound_setup_globalbound ( ropt_poly_t poly,
   }
 
   /* u bound */
-  rotate_bounds_U_lu (poly, bound);
+  rotate_bounds_U_lu (poly->f, poly->g, poly->d, bound, 0);
 
   /* v bound */
-  rotate_bounds_V_mpz (poly, bound);
+  rotate_bounds_V_mpz (poly->f, poly->g, poly->d, bound, 0);
 }
 
 
@@ -527,10 +577,10 @@ ropt_bound_reset ( ropt_poly_t poly,
 {
 
   /* u bound */
-  rotate_bounds_U_lu (poly, bound);
+  rotate_bounds_U_lu (poly->f, poly->g, poly->d, bound, 0);
 
   /* v bound */
-  rotate_bounds_V_mpz (poly, bound);
+  rotate_bounds_V_mpz (poly->f, poly->g, poly->d, bound, 0);
 
   /* set exp_min_alpha */
   ropt_bound_setup_others (bound);
