@@ -176,6 +176,7 @@ const unsigned char next_prime_idx[] = {
 /**
  * Asymptotic estimate of minimum order statistics
  * for 2^K many rotations where 0 <= K <= 149.
+ * function expected_alpha_est() in alpha.sage
  */
 const double exp_alpha[] = {
    0.000,   -0.614,   -0.946,   -1.248,   -1.514,
