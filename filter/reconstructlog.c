@@ -743,7 +743,7 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile,
   flog = fopen_maybe_compressed (logfile, "r");
   FATAL_ERROR_CHECK(flog == NULL, "Cannot open file for reading logarithms");
   fid = fopen_maybe_compressed (idealsfile, "r");
-  FATAL_ERROR_CHECK(flog == NULL, "Cannot open ideals file");
+  FATAL_ERROR_CHECK(fid == NULL, "Cannot open ideals file");
 
   if (fscanf (fid, "# %" SCNu64 "\n", &ncols) != 1)
   {
