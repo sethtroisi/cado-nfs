@@ -1996,6 +1996,7 @@ void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate)
 {
     ASSERT_ALWAYS(v != NULL);
     v->abase->vec_random(v->abase, v->v, v->i1 - v->i0, rstate);
+    v->consistency=1;
 }
 
 void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int nx)
