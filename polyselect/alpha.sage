@@ -357,16 +357,22 @@ def expected_alpha_small(S):
 # expected_alpha(1e10) = -6.42
 # expected_alpha(1e15) = -7.99
 # expected_alpha(1e20) = -9.30
+# cf formula (3.6) page 40 of Bai's thesis
 def expected_alpha(S):
    assert 1.0 <= S
    if S <= 1e5:
       return expected_alpha_small(S)
-   R = RealField(100)
+   prec = ceil(log(S)/log(2.0)) + 20
+   assert prec <= 521 # corresponds to about S <= 2^500
+   R = RealField(prec)
    y = R(1/2) # (1/2*(1 - erf(x/sqrt(2))))^S = y
    y = y^(1/S) # 1/2*(1 - erf(x/sqrt(2))) = y
+   # for S large, we have y ~ 1 + log(1/2)/S
    y = 2*y # 1 - erf(x/sqrt(2)) = y
+   # now y ~ 2 + 2*log(1/2)/S
    # 1-erf(-t) ~ 2 - 1/sqrt(pi)/t/exp(t^2) for t -> +oo
    y = 2 - y # 1/sqrt(pi)/t/exp(t^2) = y
+   # now y ~ 2*log(2)/S
    t = x/sqrt(2)
    eq = 1/sqrt(pi)/t/exp(t^2) == y
-   return -find_root(eq, 0, 20)
+   return -find_root(eq, 0, 30)
