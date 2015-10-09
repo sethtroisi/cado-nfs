@@ -522,8 +522,8 @@ ropt_bound_setup_others ( ropt_bound_t bound )
 
   size += (int) log2 ((double) (bound->global_u_boundr -
                                 bound->global_u_boundl));
-  if (size > 150)
-    size = 150;
+
+  ASSERT_ALWAYS(size <= 150);
 
   bound->exp_min_alpha = exp_alpha[size-1];
 }
