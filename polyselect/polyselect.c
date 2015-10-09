@@ -1324,7 +1324,8 @@ collision_on_sq ( header_t header,
     if (prod < nq) {
       if (!check_parameters (header->m0, header->d, lq))
         break;
-      prod *= SQ_R->nr[i];
+      prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
+                            the number of primes and thus the Y1 value. */
       lq ++;
     }
   }
