@@ -611,13 +611,10 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "input polynomial file");
   param_list_decl_usage(pl, "renumber", "output file for renumbering table");
   param_list_decl_usage(pl, "out", "output file for free relations");
-  for (unsigned int i = 0; i < NB_POLYS_MAX; i++)
-  {
-    char desc[64], name[8];
-    snprintf (desc, 64, "large prime bound on side %u", i);
-    snprintf (name, 8, "lpb%u", i);
-    param_list_decl_usage(pl, name, desc);
-  }
+  param_list_decl_usage(pl, "lpb0", "large primes bound on side 0");
+  param_list_decl_usage(pl, "lpb1", "large primes bound on side 1");
+  param_list_decl_usage(pl, "lpbs", "large primes bounds (comma-separated list) "
+                                    "(for MNFS)");
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
@@ -642,6 +639,7 @@ main (int argc, char *argv[])
   uint64_t nfree;
   renumber_t renumber_table;
   int lcideals = 0;
+  int lpb_arg[NB_POLYS_MAX] = { 0 };
   unsigned long lpb[NB_POLYS_MAX] = { 0 };
   unsigned int nthreads = 1;
 
@@ -682,15 +680,16 @@ main (int argc, char *argv[])
   const char * outfilename = param_list_lookup_string(pl, "out");
   const char * badidealsfilename = param_list_lookup_string(pl, "badideals");
   const char * renumberfilename = param_list_lookup_string(pl, "renumber");
-  for (unsigned int i = 0; i < NB_POLYS_MAX; i++)
-  {
-    char name[8];
-    snprintf (name, 8, "lpb%u", i);
-    param_list_parse_ulong (pl, name, &lpb[i]);
-  }
+
+  param_list_parse_ulong (pl, "lpb0", &(lpb[0]));
+  param_list_parse_ulong (pl, "lpb1", &(lpb[1]));
+  int narg = param_list_parse_int_list (pl, "lpbs", lpb_arg, NB_POLYS_MAX, ",");
   param_list_parse_ulong (pl, "pmin", &pmin);
   param_list_parse_ulong (pl, "pmax", &pmax);
   param_list_parse_uint (pl, "t", &nthreads);
+
+  if (param_list_warn_unused(pl))
+    usage (pl, argv0);
 
   if (polyfilename == NULL)
   {
@@ -719,17 +718,46 @@ main (int argc, char *argv[])
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);
   }
-  for (int i = 0; i < cpoly->nb_polys; i++)
+
+  if (narg == 0) /* lpbs were given as -lpb0 and -lpb1 */
   {
-    if (lpb[i] == 0)
+    if (cpoly->nb_polys > 2) /* With more than 2 polys, must use -lpbs. */
     {
-      fprintf (stderr, "Error, missing -lpb%u command line argument\n", i);
+      fprintf (stderr, "Error, missing -lpbs command line argument\n");
+      usage (pl, argv0);
+    }
+    if (lpb[0] == 0 || lpb[1] == 0)
+    {
+      fprintf (stderr, "Error, missing -lpb0 and/or -lpb1 command line "
+                       "argument\n");
       usage (pl, argv0);
     }
   }
-
-  if (param_list_warn_unused(pl))
-    usage (pl, argv0);
+  else /* lpbs were given as -lpbs x,x,x,... */
+  {
+    if (narg != cpoly->nb_polys)
+    {
+      fprintf (stderr, "Error, the number of values given in -lpbs does not "
+                       "correspond to the number of polynomials\n");
+      usage (pl, argv0);
+    }
+    if (lpb[0] != 0)
+      fprintf (stderr, "Warning, the value given by -lpb0 will be ignored, "
+                       "the one given by -lpbs will be used\n");
+    if (lpb[1] != 0)
+      fprintf (stderr, "Warning, the value given by -lpb1 will be ignored, "
+                       "the one given by -lpbs will be used\n");
+    for (int i = 0; i < cpoly->nb_polys; i++)
+    {
+      if (lpb_arg[i] <= 0)
+      {
+        fprintf (stderr, "Error, -lpbs command line argument cannot contain "
+                         "non-positive values\n");
+        usage (pl, argv0);
+      }
+      lpb[i] = lpb_arg[i];
+    }
+  }
 
   int ratside = cado_poly_get_ratside (cpoly);
   uint64_t nonmonic = 0;
