@@ -98,7 +98,12 @@
 
 /* {n, K} means use FFT(|K|) up from n words, */
 /* where |K|<3 stands for Toom-Cook 3, K < 0 means use FFT2 */
-#undef GF2X_MUL_FFT_TABLE
+
+/* these thresholds are just plain crap, but probably better this than
+ * nothing (which would amount to disabling fft altogether) */
+#define GF2X_MUL_FFT_TABLE		{	\
+	{ 1, 1 }, { 1736, -81 }, { 1771, 1 }, { 1919, 243 }, 	\
+	{ 1958, 1 }, { 2307, -81 }, { 2354, 1 }, { 2402, 243 },	}
 
 #endif	/* THRESHOLDS_H_ */
 

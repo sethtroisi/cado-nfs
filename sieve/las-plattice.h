@@ -377,8 +377,7 @@ protected:
     static uint32_t maskI;
     static plattice_x_t even_mask;
 public:
-    static void set_masks(const int _logI, const uint32_t lines) {
-        ASSERT_ALWAYS(lines % 2 == 0);
+    static void set_masks(const int _logI) {
         maskI = (1U << _logI) - 1U;
         even_mask = (plattice_x_t(1) << _logI) | plattice_x_t(1);
     }

@@ -14,7 +14,7 @@ if (DEFINED ENV{HWLOC_INCDIR})
     message(STATUS "Adding $ENV{HWLOC_INCDIR} to the search path for hwloc")
     # prepend !
     set(HWLOC_INCDIR_HINTS "$ENV{HWLOC_INCDIR}" ${HWLOC_INCDIR_HINTS})
-endif (DEFINED ENV{HWLOC_INCDIR})
+endif()
 
 if (DEFINED ENV{HWLOC_LIBDIR})
     message(STATUS "Adding $ENV{HWLOC_LIBDIR} to the search path for hwloc")

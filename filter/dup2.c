@@ -51,7 +51,8 @@
 #include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
-#include "filter_common.h"
+#include "filter_config.h"
+#include "utils_with_io.h"
 
 #ifdef FOR_FFS
 #include "utils-ffs.h"

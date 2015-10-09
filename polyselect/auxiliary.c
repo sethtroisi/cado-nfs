@@ -234,11 +234,12 @@ L2_lognorm (mpz_poly_ptr f, double s)
 {
   double res;
   double_poly_t a;
-  double a_coeffs[MAXDEGREE];
-
-  a->coeff = a_coeffs;
+  double_poly_init(a, f->deg);
   double_poly_set_mpz_poly (a, f);
+
   res = L2_lognorm_d (a, s);
+
+  double_poly_clear(a);
   return res;
 }
 
@@ -1576,7 +1577,7 @@ print_cadopoly (FILE *fp, cado_poly p)
                 "nr: %u\n", logmu, alpha, alpha_proj, logmu + alpha, nroots);
 
    e = MurphyE (p, bound_f, bound_g, area, MURPHY_K);
-   fprintf (fp, "# MurphyE(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e\n",
+   fprintf (fp, "# MurphyE(Bf=%.0f,Bg=%.0f,area=%.3e)=%.2e\n",
         bound_f, bound_g, area, e);
 
    return e;

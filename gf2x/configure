@@ -642,6 +642,8 @@ GF2X_64BIT_SOURCES_FALSE
 GF2X_64BIT_SOURCES_TRUE
 GF2X_32BIT_SOURCES_FALSE
 GF2X_32BIT_SOURCES_TRUE
+WORDSIZE_IS_64_FALSE
+WORDSIZE_IS_64_TRUE
 GF2X_WORDSIZE
 EXEEXT_FOR_BUILD
 CC_FOR_BUILD
@@ -16696,6 +16698,15 @@ gf2x_wordsize=`expr 8 \* $ac_cv_sizeof_unsigned_long`
 GF2X_WORDSIZE=$gf2x_wordsize
 
 
+ if test "x$gf2x_wordsize" = x64; then
+  WORDSIZE_IS_64_TRUE=
+  WORDSIZE_IS_64_FALSE='#'
+else
+  WORDSIZE_IS_64_TRUE='#'
+  WORDSIZE_IS_64_FALSE=
+fi
+
+
 
 if test "x${enable_hardware_specific_code}" = xno ; then
  echo "Not using hardware-specific code due to --disable-hardware-specific-code flag"
@@ -17815,7 +17826,7 @@ if test x$hwdir = x ; then
    # All 32-bit pentium patterns
    i?86|pentium*|athlon|prescott)
     if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
-     hwdir=x86_nosse2
+     hwdir=generic$gf2x_wordsize
     else
      hwdir=x86_sse2
      # Maybe on some funny platform from hell, we could get i386 yet have a
@@ -17833,7 +17844,11 @@ if test x$hwdir = x ; then
       hwdir=x86_64_pclmul
     fi
     if test x$ABI = x32 ; then
-     hwdir=x86_sse2
+     if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
+      hwdir=generic32
+     else
+      hwdir=x86_sse2
+     fi
     elif test x$ABI = xdefault ; then
 
     if test x$gf2x_cv_ulongbits = x ; then
@@ -18266,6 +18281,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${am__fastdepCXX_TRUE}" && test -z "${am__fastdepCXX_FALSE}"; then
   as_fn_error $? "conditional \"am__fastdepCXX\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${WORDSIZE_IS_64_TRUE}" && test -z "${WORDSIZE_IS_64_FALSE}"; then
+  as_fn_error $? "conditional \"WORDSIZE_IS_64\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${GF2X_32BIT_SOURCES_TRUE}" && test -z "${GF2X_32BIT_SOURCES_FALSE}"; then

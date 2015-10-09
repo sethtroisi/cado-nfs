@@ -13,8 +13,9 @@
 #include <unistd.h>
 
 #include "portability.h"
+#include "utils_with_io.h"
 
-#include "filter_common.h"
+#include "filter_config.h"
 #include "merge_replay_matrix.h"
 #include "sparse.h"
 #include "mst.h"
@@ -164,7 +165,7 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
     // update R[j] by removing i
     remove_i_from_Rj(mat, i, j);
     if (final)
-      MkzUpdateDown (mat, i, j);
+      MkzUpdateDown (mat, j);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -439,23 +440,6 @@ checkWeights (filter_matrix_t *mat)
 }
 #endif
 
-#if 0
-static void
-checkWeight(filter_matrix_t *mat, int32_t j)
-{
-    int i, w = 0;
-
-    printf ("Rows containing %ld:", (long int) j);
-    for(i = 0; i < mat->nrows; i++)
-	if(!isRowNull(mat, i))
-	    if(hasCol(mat->rows, i, j)){
-		printf (" %d", i);
-		w++;
-	    }
-    printf ("\n");
-    ASSERT(w == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
-}
-#endif
 
 // j has weight m, which should coherent with mat->wt[j] == m
 static void
@@ -466,12 +450,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
     unsigned int k;
     int ni;
 
-# if 0
-    // let's be cautious...
-    if(mat->wt[j] != m){
-	printf ("GASP: wt[%d]=%d != %d\n", j, mat->wt[j], m);
-    }
-# endif
+    ASSERT_ALWAYS(mat->wt[j] == m);
 
     /* each m-merge leads to m-1 additions of rows */
 #if DEBUG >= 1

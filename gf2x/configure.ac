@@ -102,6 +102,8 @@ AC_CHECK_SIZEOF([unsigned long])
 gf2x_wordsize=`expr 8 \* $ac_cv_sizeof_unsigned_long`
 AC_SUBST([GF2X_WORDSIZE], [$gf2x_wordsize])
 
+AM_CONDITIONAL([WORDSIZE_IS_64],[test "x$gf2x_wordsize" = x64])
+
 
 if test "x${enable_hardware_specific_code}" = xno ; then
  echo "Not using hardware-specific code due to --disable-hardware-specific-code flag"
@@ -137,7 +139,7 @@ if test x$hwdir = x ; then
    # All 32-bit pentium patterns
    i?86|pentium*|athlon|prescott)
     if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
-     hwdir=x86_nosse2
+     hwdir=generic$gf2x_wordsize
     else
      hwdir=x86_sse2
      # Maybe on some funny platform from hell, we could get i386 yet have a
@@ -155,7 +157,11 @@ if test x$hwdir = x ; then
       hwdir=x86_64_pclmul
     fi
     if test x$ABI = x32 ; then
-     hwdir=x86_sse2
+     if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
+      hwdir=generic32
+     else
+      hwdir=x86_sse2
+     fi
     elif test x$ABI = xdefault ; then
      RUNTIME_ULONG_BITS()
      case x$gf2x_cv_ulongbits in

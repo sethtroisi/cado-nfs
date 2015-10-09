@@ -77,7 +77,8 @@
 
 #include "portability.h"
 
-#include "filter_common.h"
+#include "utils_with_io.h"
+#include "filter_config.h"
 #include "purge_matrix.h"
 #include "singleton_removal.h"
 #include "clique_removal.h"

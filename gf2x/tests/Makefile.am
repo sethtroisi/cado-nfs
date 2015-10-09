@@ -60,7 +60,11 @@ SYNTHESIZED_TESTS += \
         check_100_100_1_5094c182.mul            \
         check_1000_20_1_6ce07fed.mul            \
         check_1000_100_1_08825281.mul           \
-        check_1000_1000_1_c28bc2e3.mul          \
+        check_1000_1000_1_c28bc2e3.mul
+
+# Do more tests only on 64-bit machines.
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS += \
         check_5437_20_1_ad84f617.mul            \
         check_5437_100_1_8eb064ef.mul           \
         check_5437_1000_1_c546a34c.mul          \
@@ -72,6 +76,7 @@ SYNTHESIZED_TESTS += \
         check_10000_10000_1_2706ca53.mul        \
         check_832040_1346269_1_8513d1fb.mul     \
         check_785672_1271244_1_842e0d19.mul
+endif
 
 TEST_EXTENSIONS += .mul
 # We'll run the *.mul tests above as:
@@ -104,6 +109,7 @@ TERNARY_NS=-DENGINE_TERNARY -DARTIFICIAL_NON_SPLIT_VERSION
 # The edits are:
 #  - link check_ternaryns with libternary (since this is the same
 #  library, really).
+#  - add bench_ternary (introduced 7b9a9b45)
 # -- begin pattern --
 # check_PROGRAMS+=check_ARG0
 # check_ARG0_SOURCES=$(general_fftcheck_sources)
@@ -112,14 +118,16 @@ TERNARY_NS=-DENGINE_TERNARY -DARTIFICIAL_NON_SPLIT_VERSION
 # SYNTHESIZED_TESTS+=   \
 #     check_ARG0_1000_1_c28bc2e3.fft            \
 #     check_ARG0_1000_2_77db95cc.fft            \
-#     check_ARG0_1000_3_6dc06b2f.fft            \
+#     check_ARG0_1000_3_6dc06b2f.fft
+# if WORDSIZE_IS_64
+# SYNTHESIZED_TESTS+=   \
 #     check_ARG0_10000_1_2706ca53.fft           \
 #     check_ARG0_10000_2_3f32a516.fft           \
 #     check_ARG0_10000_3_fd7bba07.fft           \
 #     check_ARG0_100000_1_fca70ced.fft          \
 #     check_ARG0_100000_2_cd1293a5.fft          \
 #     check_ARG0_100000_3_91e7d307.fft
-#
+# endif
 # -- end pattern --
 # -- begin arguments --
 #  ternary $(TERNARY)
@@ -147,13 +155,16 @@ bench_ternary_LDADD=$(top_builddir)/fft/libternary.la
 SYNTHESIZED_TESTS+=   \
     check_ternary_1000_1_c28bc2e3.fft            \
     check_ternary_1000_2_77db95cc.fft            \
-    check_ternary_1000_3_6dc06b2f.fft            \
+    check_ternary_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_ternary_10000_1_2706ca53.fft           \
     check_ternary_10000_2_3f32a516.fft           \
     check_ternary_10000_3_fd7bba07.fft           \
     check_ternary_100000_1_fca70ced.fft          \
     check_ternary_100000_2_cd1293a5.fft          \
     check_ternary_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_ternaryns
 check_ternaryns_SOURCES=$(general_fftcheck_sources)
 check_ternaryns_CFLAGS=$(AM_CFLAGS) $(TERNARY_NS)
@@ -161,13 +172,16 @@ check_ternaryns_LDADD=$(top_builddir)/fft/libternary.la
 SYNTHESIZED_TESTS+=   \
     check_ternaryns_1000_1_c28bc2e3.fft            \
     check_ternaryns_1000_2_77db95cc.fft            \
-    check_ternaryns_1000_3_6dc06b2f.fft            \
+    check_ternaryns_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_ternaryns_10000_1_2706ca53.fft           \
     check_ternaryns_10000_2_3f32a516.fft           \
     check_ternaryns_10000_3_fd7bba07.fft           \
     check_ternaryns_100000_1_fca70ced.fft          \
     check_ternaryns_100000_2_cd1293a5.fft          \
     check_ternaryns_100000_3_91e7d307.fft
+endif
 if ENABLE_FFT_INTERFACE
 check_PROGRAMS+=check_cantor64
 check_cantor64_SOURCES=$(general_fftcheck_sources)
@@ -176,13 +190,16 @@ check_cantor64_LDADD=$(top_builddir)/fft/libcantor64.la
 SYNTHESIZED_TESTS+=   \
     check_cantor64_1000_1_c28bc2e3.fft            \
     check_cantor64_1000_2_77db95cc.fft            \
-    check_cantor64_1000_3_6dc06b2f.fft            \
+    check_cantor64_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor64_10000_1_2706ca53.fft           \
     check_cantor64_10000_2_3f32a516.fft           \
     check_cantor64_10000_3_fd7bba07.fft           \
     check_cantor64_100000_1_fca70ced.fft          \
     check_cantor64_100000_2_cd1293a5.fft          \
     check_cantor64_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_cantor64nt
 check_cantor64nt_SOURCES=$(general_fftcheck_sources)
 check_cantor64nt_CFLAGS=$(AM_CFLAGS) $(C64nt)
@@ -190,13 +207,16 @@ check_cantor64nt_LDADD=$(top_builddir)/fft/libcantor64nt.la
 SYNTHESIZED_TESTS+=   \
     check_cantor64nt_1000_1_c28bc2e3.fft            \
     check_cantor64nt_1000_2_77db95cc.fft            \
-    check_cantor64nt_1000_3_6dc06b2f.fft            \
+    check_cantor64nt_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor64nt_10000_1_2706ca53.fft           \
     check_cantor64nt_10000_2_3f32a516.fft           \
     check_cantor64nt_10000_3_fd7bba07.fft           \
     check_cantor64nt_100000_1_fca70ced.fft          \
     check_cantor64nt_100000_2_cd1293a5.fft          \
     check_cantor64nt_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_cantor64gm
 check_cantor64gm_SOURCES=$(general_fftcheck_sources)
 check_cantor64gm_CFLAGS=$(AM_CFLAGS) $(C64gm)
@@ -204,13 +224,16 @@ check_cantor64gm_LDADD=$(top_builddir)/fft/libcantor64gm.la
 SYNTHESIZED_TESTS+=   \
     check_cantor64gm_1000_1_c28bc2e3.fft            \
     check_cantor64gm_1000_2_77db95cc.fft            \
-    check_cantor64gm_1000_3_6dc06b2f.fft            \
+    check_cantor64gm_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor64gm_10000_1_2706ca53.fft           \
     check_cantor64gm_10000_2_3f32a516.fft           \
     check_cantor64gm_10000_3_fd7bba07.fft           \
     check_cantor64gm_100000_1_fca70ced.fft          \
     check_cantor64gm_100000_2_cd1293a5.fft          \
     check_cantor64gm_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_cantor64gmt
 check_cantor64gmt_SOURCES=$(general_fftcheck_sources)
 check_cantor64gmt_CFLAGS=$(AM_CFLAGS) $(C64gmt)
@@ -218,13 +241,16 @@ check_cantor64gmt_LDADD=$(top_builddir)/fft/libcantor64gmt.la
 SYNTHESIZED_TESTS+=   \
     check_cantor64gmt_1000_1_c28bc2e3.fft            \
     check_cantor64gmt_1000_2_77db95cc.fft            \
-    check_cantor64gmt_1000_3_6dc06b2f.fft            \
+    check_cantor64gmt_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor64gmt_10000_1_2706ca53.fft           \
     check_cantor64gmt_10000_2_3f32a516.fft           \
     check_cantor64gmt_10000_3_fd7bba07.fft           \
     check_cantor64gmt_100000_1_fca70ced.fft          \
     check_cantor64gmt_100000_2_cd1293a5.fft          \
     check_cantor64gmt_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_cantor128
 check_cantor128_SOURCES=$(general_fftcheck_sources)
 check_cantor128_CFLAGS=$(AM_CFLAGS) $(C128)
@@ -232,13 +258,16 @@ check_cantor128_LDADD=$(top_builddir)/fft/libcantor128.la
 SYNTHESIZED_TESTS+=   \
     check_cantor128_1000_1_c28bc2e3.fft            \
     check_cantor128_1000_2_77db95cc.fft            \
-    check_cantor128_1000_3_6dc06b2f.fft            \
+    check_cantor128_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor128_10000_1_2706ca53.fft           \
     check_cantor128_10000_2_3f32a516.fft           \
     check_cantor128_10000_3_fd7bba07.fft           \
     check_cantor128_100000_1_fca70ced.fft          \
     check_cantor128_100000_2_cd1293a5.fft          \
     check_cantor128_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_cantor128nt
 check_cantor128nt_SOURCES=$(general_fftcheck_sources)
 check_cantor128nt_CFLAGS=$(AM_CFLAGS) $(C128nt)
@@ -246,13 +275,16 @@ check_cantor128nt_LDADD=$(top_builddir)/fft/libcantor128nt.la
 SYNTHESIZED_TESTS+=   \
     check_cantor128nt_1000_1_c28bc2e3.fft            \
     check_cantor128nt_1000_2_77db95cc.fft            \
-    check_cantor128nt_1000_3_6dc06b2f.fft            \
+    check_cantor128nt_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor128nt_10000_1_2706ca53.fft           \
     check_cantor128nt_10000_2_3f32a516.fft           \
     check_cantor128nt_10000_3_fd7bba07.fft           \
     check_cantor128nt_100000_1_fca70ced.fft          \
     check_cantor128nt_100000_2_cd1293a5.fft          \
     check_cantor128nt_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_cantor128gm
 check_cantor128gm_SOURCES=$(general_fftcheck_sources)
 check_cantor128gm_CFLAGS=$(AM_CFLAGS) $(C128gm)
@@ -260,13 +292,16 @@ check_cantor128gm_LDADD=$(top_builddir)/fft/libcantor128gm.la
 SYNTHESIZED_TESTS+=   \
     check_cantor128gm_1000_1_c28bc2e3.fft            \
     check_cantor128gm_1000_2_77db95cc.fft            \
-    check_cantor128gm_1000_3_6dc06b2f.fft            \
+    check_cantor128gm_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor128gm_10000_1_2706ca53.fft           \
     check_cantor128gm_10000_2_3f32a516.fft           \
     check_cantor128gm_10000_3_fd7bba07.fft           \
     check_cantor128gm_100000_1_fca70ced.fft          \
     check_cantor128gm_100000_2_cd1293a5.fft          \
     check_cantor128gm_100000_3_91e7d307.fft
+endif
 check_PROGRAMS+=check_cantor128gmt
 check_cantor128gmt_SOURCES=$(general_fftcheck_sources)
 check_cantor128gmt_CFLAGS=$(AM_CFLAGS) $(C128gmt)
@@ -274,13 +309,16 @@ check_cantor128gmt_LDADD=$(top_builddir)/fft/libcantor128gmt.la
 SYNTHESIZED_TESTS+=   \
     check_cantor128gmt_1000_1_c28bc2e3.fft            \
     check_cantor128gmt_1000_2_77db95cc.fft            \
-    check_cantor128gmt_1000_3_6dc06b2f.fft            \
+    check_cantor128gmt_1000_3_6dc06b2f.fft
+if WORDSIZE_IS_64
+SYNTHESIZED_TESTS+=   \
     check_cantor128gmt_10000_1_2706ca53.fft           \
     check_cantor128gmt_10000_2_3f32a516.fft           \
     check_cantor128gmt_10000_3_fd7bba07.fft           \
     check_cantor128gmt_100000_1_fca70ced.fft          \
     check_cantor128gmt_100000_2_cd1293a5.fft          \
     check_cantor128gmt_100000_3_91e7d307.fft
+endif
 endif
 # -- end generated code --
 

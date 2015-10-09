@@ -10,10 +10,10 @@
 /* values of q greater than 1e10 in absolute value do not help */
 #define SOPT_MAX_VALUE_FOR_Q_ROOTS 1e10
 
-/* Number of best rational approximation to keep for each q-root */
+/* Number of best rational approximations to keep for each q-root */
 #define SOPT_NB_RAT_APPROX_OF_Q_ROOTS 8
 
-/* Maximun value for the denominator of rational approximation of q-roots */
+/* Maximum value for the denominator of rational approximations of q-roots */
 #define SOPT_MAX_DEN_IN_RAT_APPROX_OF_Q_ROOTS 100.0
 
 /* Call LLL for skew in [ skew0^(e/(2*NSKEW)) for e in [NSKEW..3*NSKEW] ]*/

@@ -442,11 +442,6 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   new_alpha_pq (&alpha_pqueue, s1param->nbest_sl);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
 
-
-
-
-
-  
   /* Step 1:, find good sublattices */
   t1 = milliseconds ();
   r = ropt_stage1 (poly, bound, s1param, param, alpha_pqueue, 0);

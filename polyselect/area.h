@@ -6,4 +6,4 @@
 extern double area, bound_f, bound_g;
 
 /* default rootsieve effort */
-#define DEFAULT_ROPTEFFORT 5
+#define DEFAULT_ROPTEFFORT 5.0

@@ -27,6 +27,7 @@ typedef struct {
 } enumeratediv_t;
 
 
+unsigned long mpz_poly_roots_gen(mpz_t **r, mpz_poly_t F, const mpz_t p);
 int mpz_poly_roots(mpz_t * r, mpz_poly_t F, const mpz_t p);
 int mpz_poly_roots_ulong(unsigned long * r, mpz_poly_t F, unsigned long p);
 int mpz_poly_roots_uint64(uint64_t * r, mpz_poly_t F, uint64_t p);

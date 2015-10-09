@@ -115,7 +115,7 @@ ropt_common ( ropt_poly_t poly,
 
     if (param->verbose) {
       fprintf(stderr, "# Info: verbose level: %d\n", param->verbose);
-      fprintf(stderr, "# Info: sieving effort: %d\n", param->effort);
+      fprintf(stderr, "# Info: sieving effort: %.0f\n", param->effort);
     }
     
     /* call ropt */
@@ -342,12 +342,14 @@ ropt_on_cadopoly ( FILE *file,
          flag == 1823 || // deg 4
          flag == 1807 ) // deg 3
     {
-      fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
-      ropt_common (poly, param, 0);
-      count ++;
-      flag = 0U;
+      if (ropt_poly_setup_check (poly)) {
+        fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
+        ropt_common (poly, param, 0);
+        count ++;
+        flag = 0U;
+        ropt_poly_refresh (poly);
+      }
     }
-
   } // next line
 
   ropt_poly_free (poly);

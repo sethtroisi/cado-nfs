@@ -5,7 +5,7 @@
 
 macro(add_bwc_test nm script)
     cado_define_test(test-bwc-${nm} SCRIPT
-        ${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh
+        ${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh --arg mats --arg wdir --
         ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script}
         bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${ARGN} -- verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections
         TARGET_DEPENDENCIES bwc_full)
@@ -61,7 +61,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             find_program(MAGMA magma HINTS ENV MAGMA)
             if (MAGMA)
                 set(mextra magma=${MAGMA})
-            endif (MAGMA)
+            endif()
         endif()
         add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
             random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
@@ -84,7 +84,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
                 mpi=3x2 lingen_mpi=2x2 ${mextra})
             add_dependencies(test-bwc-mpi2-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
                 plingen_pz plingen_${gfp_layer})
-        endif (HAVE_MPI)
+        endif()
 
         if(DEFINED ENV{CHECKS_EXPENSIVE})
             add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
@@ -197,7 +197,7 @@ add_dependencies(test-bwc-mpi1-mod2-m-neq-n_dependencies mf_scan)
 add_bwc_test(mpi2-mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
     seed=1 thr=5 mpi=3x2 lingen_mpi=2x2)
 add_dependencies(test-bwc-mpi2-mod2-m-neq-n_dependencies mf_scan)
-endif (HAVE_MPI)
+endif()
 
 add_subdirectory(mpfq)
 
@@ -225,8 +225,8 @@ if (NOT MINGW)
 test_dispatch_matmul(dispatch-matmul-65536-thr nrows=65536 density=2 thr=2x2)
 if (HAVE_MPI)
 test_dispatch_matmul(dispatch-matmul-65536-mpi nrows=65536 density=2 mpi=2x2)
-endif (HAVE_MPI)
-endif (NOT MINGW)
+endif()
+endif()
 
 
 cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
@@ -240,26 +240,45 @@ cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-matcache.sh
     TARGET_DEPENDENCIES
     random_matrix build_matcache bench_matcache)
 
+cado_define_test(TEST_NAME bwc_staged_krylov PROGRAM
+    ${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh --arg wdir --
+    ${CADO_NFS_BINARY_DIR}/linalg/bwc/krylov thr=2x2 nullspace=left
+    interval=200  mn=64 prime=2  ys=0..64 start=0 end=200
+    skip_online_checks=1 rebuild_cache=1 seed=1 matrix=fake.bin
+    sequential_cache_build=1 random_matrix=10000,density=150,seed=1
+    no_save_cache=1 verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch
+    TARGET_DEPENDENCIES bwc_full)
 
 # Tests which use bwc_base will need nwc_config.h
 include_directories(${PROJECT_BINARY_DIR}/linalg/bwc)
 
 if (WITH_MPI)
 add_definitions(-DWITH_MPI)
-endif (WITH_MPI)
+endif()
 
-cado_define_test(test_hello.c ARGUMENTS -v thr=2x2 LIBRARIES bwc_base)
+cado_define_test(test_hello.c NO_DEFAULT_RUN LIBRARIES bwc_base)
 set_target_properties(test_hello PROPERTIES
     COMPILE_FLAGS "--mpi"
     LINK_FLAGS "--mpi")
+
+cado_divert_test(test_hello 11 ARGUMENTS -v thr=1x1)
+cado_divert_test(test_hello 12 ARGUMENTS -v thr=1x2)
+cado_divert_test(test_hello 23 ARGUMENTS -v thr=2x3)
 
 if (HAVE_MPI)
     # yes, the mpi= and thr= arguments are given twice here. This is
     # intentional, because our only logic for discovering the scheduling
     # environment is within bwc.pl, so we have to use it.
     cado_define_test(TEST_NAME test_hello_mpi PROGRAM
-        ${PROJECT_BINARY_DIR}/linalg/bwc/bwc.pl :mpirun mpi=3x2 thr=2x2
-        -- ${CMAKE_CURRENT_BINARY_DIR}/test_hello -v mpi=3x2 thr=2x2
-        TEST_DEPENDENCIES test_hello)
-endif (HAVE_MPI)
-
+        ${PROJECT_BINARY_DIR}/linalg/bwc/bwc.pl
+        NO_DEFAULT_RUN TEST_DEPENDENCIES test_hello)
+    macro(test_hello_mpi code)
+        cado_divert_test(test_hello_mpi ${code} ARGUMENTS
+            :mpirun ${ARGN}
+            -- ${CMAKE_CURRENT_BINARY_DIR}/test_hello -v ${ARGN}
+            TEST_DEPENDENCIES test_hello)
+    endmacro()
+    test_hello_mpi(2122 mpi=2x1 thr=2x2)
+    test_hello_mpi(1322 mpi=1x3 thr=2x2)
+    test_hello_mpi(3222 mpi=3x2 thr=2x2)
+endif()
