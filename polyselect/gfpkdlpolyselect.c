@@ -18,6 +18,7 @@
 #include "rootfinder.h"
 #include "portability.h"
 #include "murphyE.h"
+#include "ropt_param.h"
 
 #include <stdio.h>
 
