@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "portability.h"
 #include "murphyE.h"
+#include "ropt_param.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <time.h> 
@@ -79,11 +80,11 @@ print_nonlinear_poly_info ( mpz_t *f,
     printf ("# f lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, " \
             "exp_E %1.2f\n",
             logmu[0], skew[0], alpha[0], logmu[0] + alpha[0],
-            logmu[0] - 0.824 * sqrt (2.0 * exp_rot[df] * log (skew[0])));
+            logmu[0] + exp_alpha(exp_rot[df] * log (skew[0])));
     printf ("# g lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, " \
             "exp_E %1.2f\n",
             logmu[1], skew[1], alpha[1], logmu[1] + alpha[1],
-            logmu[1] - 0.824 * sqrt (2.0 * exp_rot[dg] * log (skew[1])));
+            logmu[1] + exp_alpha(exp_rot[df] * log (skew[0])));
     printf ("# f+g score %1.2f\n", logmu[1] + alpha[1] + logmu[0] + alpha[0]);
 
 }
