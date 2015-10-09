@@ -13,10 +13,10 @@ MINP=1000
 STEPP=100
 MAXP=20000
 
-if [ -z "${POLYSELECT2L}" ]
+if [ -z "${POLYSELECT}" ]
 then
-  POLYSELECT2L="$HOME/bin/polyselect2l.33f2069"
-  echo "Using default polyselect2l at ${POLYSELECT2L}"
+  POLYSELECT="$HOME/bin/polyselect.33f2069"
+  echo "Using default polyselect at ${POLYSELECT}"
 fi
 
 # Check if an output file is needed, i.e., does not exist, and print a message
@@ -44,7 +44,7 @@ do
     OUTPUTFILE="c120${IDX}.polyselect1.${P}.0-${ADMAX}"
     if test_if_needed "${OUTPUTFILE}"
     then
-      "${POLYSELECT2L}" -P "${P}" -N "${N}" -degree 5 -r -t 2 -admin 0 -admax "${ADMAX}" -incr 60 -nq 1000 -keep "${KEEP}" > "${OUTPUTFILE}"
+      "${POLYSELECT}" -P "${P}" -N "${N}" -degree 5 -r -t 2 -admin 0 -admax "${ADMAX}" -incr 60 -nq 1000 -keep "${KEEP}" > "${OUTPUTFILE}"
     fi
 
     # Generate file of the best KEEP polynomials, sorted by increasing log norm
@@ -118,7 +118,7 @@ do
   if [ -s "${NEWFILE}" ] # if the NEWFILE is non-empty
   then
     echo "Root-optimizing new polynomials from ${NEWFILE} and appending to ${ROPTFILE}"
-    "${POLYSELECT2L}" -rootsieve "${NEWFILE}" -t 2 -keep 10000 -area 67108864000000.0 -Bf 8000000.0 -Bg 4000000.0 >> "${ROPTFILE}"
+    "${POLYSELECT}" -rootsieve "${NEWFILE}" -t 2 -keep 10000 -area 67108864000000.0 -Bf 8000000.0 -Bg 4000000.0 >> "${ROPTFILE}"
   else
     echo "No new polynomials found, nothing to do for root-sieve"
   fi

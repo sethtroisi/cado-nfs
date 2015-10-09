@@ -174,7 +174,7 @@ class Polynomials(object):
         ))
     
     def __init__(self, lines):
-        """ Parse a polynomial file in the syntax as produced by polyselect2l
+        """ Parse a polynomial file in the syntax as produced by polyselect
             and polyselect_ropt
         """
         self.MurphyE = 0.
@@ -1558,11 +1558,11 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     @property
     def programs(self):
         # admin and admax are special, which is a bit ugly: these parameters
-        # to the Polyselect2l constructor are supplied by the task, but the
+        # to the Polyselect constructor are supplied by the task, but the
         # task has itself admin, admax parameters, which specify the total
         # size of the search range. Thus we don't include admin, admax here,
         # or PolyselTask would incorrectly warn about them not being used.
-        return ((cadoprograms.Polyselect2l, (), {}),)
+        return ((cadoprograms.Polyselect, (), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -2019,14 +2019,14 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
-                                          stdout=str(outputfile),
-                                          **self.progparams[0])
+            p = cadoprograms.Polyselect(admin=adstart, admax=adend,
+                                        stdout=str(outputfile),
+                                        **self.progparams[0])
             self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
         self.state.update({"adnext": adend}, commit=True)
 
     def get_total_cpu_or_real_time(self, is_cpu):
-        """ Return number of seconds of cpu time spent by polyselect2l """
+        """ Return number of seconds of cpu time spent by polyselect """
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
 

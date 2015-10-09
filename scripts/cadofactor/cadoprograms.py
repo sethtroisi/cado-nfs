@@ -630,16 +630,16 @@ class Program(object, metaclass=InspectType):
         return '\n'.join(workunit)
 
 
-class Polyselect2l(Program):
+class Polyselect(Program):
     """
-    >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
+    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'polyselect2l -P 5 -N 42 -degree 4 -v'
-    >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
+    'polyselect -P 5 -N 42 -degree 4 -v'
+    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'polyselect2l -P 5 -N 42 -degree 4 -v'
+    'polyselect -P 5 -N 42 -degree 4 -v'
     """
-    binary = "polyselect2l"
+    binary = "polyselect"
     name = binary
     subdir = "polyselect"
 
