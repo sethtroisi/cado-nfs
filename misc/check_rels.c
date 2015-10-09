@@ -38,7 +38,7 @@ rel_add_prime (earlyparsed_relation_ptr rel, unsigned int side, p_r_values_t p,
 {
   for(weight_t i = 0; i < rel->nb ; i++)
   {
-    if (rel->primes[i].p == p && rel->primes[i].h == side)
+    if (rel->primes[i].p == p && rel->primes[i].side == side)
     {
       rel->primes[i].e += e;
       return;
@@ -47,7 +47,7 @@ rel_add_prime (earlyparsed_relation_ptr rel, unsigned int side, p_r_values_t p,
 
   if (rel->nb == rel->nb_alloc)
     realloc_buffer_primes_c (rel);
-  rel->primes[rel->nb] = (prime_t) {.h = side, .p = p, .e = e};
+  rel->primes[rel->nb] = (prime_t) {.h = 0, .p = p, .e = e, .side = side};
   rel->nb++;
 }
 
@@ -67,7 +67,7 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
 {
   exponent_t e = rel->primes[i].e;
   p_r_values_t p = rel->primes[i].p;
-  unsigned int side = rel->primes[i].h, pr = 2;
+  unsigned int side = rel->primes[i].side, pr = 2;
   modulusul_t m;
   prime_info pi;
   prime_info_init (pi);
@@ -82,7 +82,7 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
 
     if (p == 1)
     {
-      rel->primes[i] = (prime_t) {.h= side, .p= pr, .e= e * e_pr_in_p};
+      rel->primes[i] = (prime_t) {.h= 0, .p= pr, .e= e * e_pr_in_p, .side = side};
       break;
     }
     else if (e_pr_in_p != 0)
@@ -94,7 +94,7 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
   prime_info_clear (pi);
   modul_clearmod (m);
   if (p != 1) //means remaining p is prime
-    rel->primes[i] = (prime_t) {.h = side, .p = p, .e = e};
+    rel->primes[i] = (prime_t) {.h = 0, .p = p, .e = e, .side = side};
 }
 
 static int
@@ -140,7 +140,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
   /* check for correctness of the factorization of the norms */
   for(weight_t i = 0; i < rel->nb ; i++)
   {
-    unsigned int side = rel->primes[i].h;
+    unsigned int side = rel->primes[i].side;
     p_r_values_t p = rel->primes[i].p;
     exponent_t e = rel->primes[i].e;
     ASSERT_ALWAYS(p != 0); // could reveal a problem in parsing
@@ -183,7 +183,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
       {
         if (verbose != 0)
         {
-          unsigned int side = (unsigned int) rel->primes[i].h;
+          unsigned int side = (unsigned int) rel->primes[i].side;
           print_error_line (rel->num, rel->a, rel->b, err, nonprime);
           fprintf (stderr, "    given factor %" PRpr " is not prime on side "
                            "%u\n", rel->primes[i].p, side);
@@ -261,7 +261,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
     for(weight_t i = 0; i < rel->nb ; i++)
     {
       p_r_values_t p = rel->primes[i].p;
-      unsigned int side = rel->primes[i].h;
+      unsigned int side = rel->primes[i].side;
       if(p == 0)
 	  continue;
       if (lpb[side] != 0 && p > lpb[side])
@@ -311,7 +311,7 @@ print_relation (FILE *outfile, earlyparsed_relation_ptr rel)
     p++;
     for (i = 0; i < rel->nb; i++)
     {
-      if (rel->primes[i].h == side && rel->primes[i].e > 0)
+      if (rel->primes[i].side == side && rel->primes[i].e > 0)
       {
         op = p;
         p = u64toa16(p, (uint64_t) rel->primes[i].p);
