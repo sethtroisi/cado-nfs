@@ -296,7 +296,7 @@ slaves.basepath = /tmp/work/$(name).wuclient
 # be distributed by the server, as currently there is no mechanism in
 # cadofactor for distributing different binaries to different slaves.
 # A work-around to this is to copy the correct binary (for las and
-# polyselect2l) manually into the different slaves' download/ directories,
+# polyselect) manually into the different slaves' download/ directories,
 # and disabling the SHA1 check for downloaded files so that the clients
 # use the supplied files without checking their SHA1 against the hash
 # supplied in the workunit. Disabling the SHA1 check can be effected with

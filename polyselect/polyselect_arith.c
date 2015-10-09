@@ -1,6 +1,6 @@
 #include "cado.h"
-#include "polyselect2l_arith.h"
-#include "polyselect2l_str.h"
+#include "polyselect_arith.h"
+#include "polyselect_str.h"
 #include "portability.h"
 
 /* return 1/a mod p, assume 0 <= a < p */
@@ -211,7 +211,7 @@ comp_sq_roots ( header_t header,
     nrq = roots_mod_uint64 (rq, mpz_fdiv_ui (header->Ntilde, q), header->d, q);
     roots_lift (rq, header->Ntilde, header->d, header->m0, q, nrq);
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
     unsigned int j = 0;
     mpz_t r1, r2;
     mpz_init (r1);

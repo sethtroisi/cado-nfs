@@ -1,7 +1,7 @@
-#ifndef POLYSELECT2L_ARITH_H
-#define POLYSELECT2L_ARITH_H
+#ifndef POLYSELECT_ARITH_H
+#define POLYSELECT_ARITH_H
 
-#include "polyselect2l_str.h"
+#include "polyselect_str.h"
 
 /* declarations */
 

@@ -357,7 +357,6 @@ def expected_alpha_small(S):
 # expected_alpha(1e10) = -6.42
 # expected_alpha(1e15) = -7.99
 # expected_alpha(1e20) = -9.30
-# cf formula (3.6) page 40 of Bai's thesis
 def expected_alpha(S):
    assert 1.0 <= S
    if S <= 1e5:
