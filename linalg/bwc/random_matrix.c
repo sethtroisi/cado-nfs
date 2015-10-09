@@ -1062,11 +1062,6 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         punched_interval_free(range, &pool);
         punched_interval_free_pool(&pool);
         free(ptr);
-        {
-            uint64_t w=0;
-            for(uint32_t * p = arg->p, i = nrows ; i-- ; p += 1 + *p) w += *p;
-            fprintf(stderr, "J%uT%u %"PRIu64" coeffs\n", pi->m->jrank, pi->m->trank, w);
-        }
     } else {
         size_t size0 = 0;
         uint32_t * ptr = malloc(nrows * sizeof(uint32_t));
@@ -1168,11 +1163,6 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         punched_interval_free_pool(&pool);
         random_matrix_ddata_clear(G);
         free(ptr);
-        {
-            uint64_t w=0;
-            for(uint32_t * p = arg->p, i = ncols ; i-- ; p += 1 + *p) w += *p;
-            fprintf(stderr, "J%uT%u %"PRIu64" coeffs\n", pi->m->jrank, pi->m->trank, w);
-        }
     }
 #undef PUSH_P
     F->total_coeffs = total_coeffs;
