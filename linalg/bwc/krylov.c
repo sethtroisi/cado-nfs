@@ -125,7 +125,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     mmt_vec check_vector;
-    void * ahead;
+    void * ahead = NULL;
 
     mpfq_vbase_tmpl AxAc;
     mpfq_vbase_oo_init_templates(AxAc, A, Ac);
@@ -138,7 +138,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, bw->dir, THREAD_SHARED_VECTOR, mmt->n[bw->dir]);
         if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-        mmt_vec_load(check_vector, CHECK_FILE_BASE, bw->interval,  mmt->n0[!bw->dir]);
+        mmt_vec_load(check_vector, CHECK_FILE_BASE, bw->interval,  mmt->n0[bw->dir]);
         if (tcan_print) { printf("done\n"); }
     }
 

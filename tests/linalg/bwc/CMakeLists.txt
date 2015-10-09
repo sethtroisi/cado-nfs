@@ -169,6 +169,8 @@ endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
+add_bwc_test(mod2-padded bwc-trace.sh random_matrix_size=700,600 m=64 n=64 seed=1 thr=2x2)
+add_dependencies(test-bwc-mod2-padded_dependencies mf_scan)
 
 # Note: because of stop_at_step here, we're not verifying what we're
 # doing, which is a bit stupid.

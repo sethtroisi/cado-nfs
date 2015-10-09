@@ -243,7 +243,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         /* This array receives the nrhs coefficients affecting the
          * rhs * columns in the identities obtained */
-        void * rhscoeffs;
+        void * rhscoeffs = NULL;
 
         if (rhscoeffs_name) {
             cheating_vec_init(A, &rhscoeffs, nrhs);
