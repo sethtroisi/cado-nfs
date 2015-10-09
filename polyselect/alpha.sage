@@ -376,3 +376,19 @@ def expected_alpha(S):
    t = x/sqrt(2)
    eq = 1/sqrt(pi)/t/exp(t^2) == y
    return -find_root(eq, 0, 30)
+
+# approx of above
+# see http://maths-people.anu.edu.au/~brent/pd/Bai-thesis.pdf 
+# (page 40, formula 3.6);
+def expected_alpha_est(bound=150):
+    mu = 0
+    sigma = 0.82
+    c = 0
+    print('%8.3f,' % 0),
+    for K in range(1,bound):
+        c = c + 1
+        E = mu - sigma * (sqrt(2*log(2**K)) - (log(log(2**K)) + 1.3766)/(2*sqrt(2*log(2**K))))
+        if (c % 5 == 0):
+            print
+        print('%8.3f,' % E),
+
