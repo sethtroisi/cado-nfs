@@ -6,6 +6,7 @@
 #include "uint64_array.h"
 #include "mat_Z.h"
 #include "sieving_bound.h"
+#include "ideal.h"
 
 /*
  * To find the relations.
@@ -20,7 +21,8 @@
  * V: number of number fields.
  */
 unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
-    unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f, sieving_bound_srcptr H,
-    unsigned int V, int main);
+    unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
+    sieving_bound_srcptr H, unsigned int V, ideal_spq_srcptr special_q,
+    unsigned int q_side, int main);
 
 #endif /* UTILS_COFACTORISATION_H */

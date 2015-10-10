@@ -2189,7 +2189,7 @@ int main(int argc, char * argv[])
 
         sec = seconds();
         nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
-            matrix, f->pols, H, V, main_side);
+            matrix, f->pols, H, V, special_q, q_side, main_side);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {

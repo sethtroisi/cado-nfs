@@ -45,10 +45,14 @@ void factor_append(factor_ptr factor, mpz_srcptr z)
 void factor_fprintf(FILE * file, factor_srcptr factor)
 {
   fprintf(file, "[");
-  for (unsigned int i = 0; i < factor->number - 1; i++) {
-    gmp_fprintf(file, "%Zd, ", factor->factorization[i]);
+  if (factor->number != 0) {
+    for (unsigned int i = 0; i < factor->number - 1; i++) {
+      gmp_fprintf(file, "%Zd, ", factor->factorization[i]);
+    }
+    gmp_fprintf(file, "%Zd]\n", factor->factorization[factor->number - 1]);
+  } else {
+    fprintf(file, "]\n");
   }
-  gmp_fprintf(file, "%Zd]\n", factor->factorization[factor->number - 1]);
 }
 
 unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B, unsigned int sort)
@@ -194,7 +198,6 @@ static unsigned int brute_force_factorize(factor_ptr factor, mpz_ptr z,
 int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
     mpz_srcptr z_root, unsigned long bound)
 {
-  factor_init(factor, 10);
   prime_info pi;
   prime_info_init (pi);
 
