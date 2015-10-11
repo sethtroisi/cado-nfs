@@ -1283,3 +1283,4 @@ tests/provide-wdir.sh
 linalg/bwc/blocklanczos.c
 tests/linalg/bwc/test-blocklanczos.sh
 linalg/bwc/cheating_vec_init.h
+tests/linalg/bwc/test_bl_extraction.c
