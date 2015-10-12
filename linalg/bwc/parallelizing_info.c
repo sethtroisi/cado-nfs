@@ -128,7 +128,8 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     unsigned long maxsize = siz;
     pi_allreduce(NULL, &maxsize, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_MAX, wr);
 
-    char * strings = shared_malloc_set_zero(wr, wr->totalsize * maxsize);
+    char * strings = malloc(wr->totalsize * maxsize);
+    memset(strings, 0, wr->totalsize * maxsize);
 
     int me = wr->jrank * wr->ncores + wr->trank;
 
@@ -138,6 +139,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     ASSERT_ALWAYS(rc >= 0);
     snprintf(strings + me * maxsize, maxsize, fmt, buf);
     free(fmt);
+    pi_allreduce(NULL, strings, wr->totalsize * maxsize, BWC_PI_BYTE, BWC_PI_BXOR, wr);
 
     char * ptr = strings;
 
@@ -168,7 +170,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
         }
     }
     serialize(wr);
-    shared_free(wr, strings);
+    free(strings);
 }
 
 static void get_node_number_and_prefix(parallelizing_info_ptr pi)
