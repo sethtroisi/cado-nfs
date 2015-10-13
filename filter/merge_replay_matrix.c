@@ -83,6 +83,44 @@ InitMatR (filter_matrix_t *mat)
   }
 }
 
+void
+matR_disable_cols (filter_matrix_t *mat, const char *infilename)
+{
+  FILE *file = NULL;
+  char buf[256];
+
+  file = fopen_maybe_compressed (infilename, "r");
+  ASSERT_ALWAYS (file != NULL);
+
+  int stop = 0;
+  while (!stop)
+  {
+    if (fgets(buf, 256, file) == NULL)
+      stop = 1;
+    else if (buf[0] != '#')
+    {
+      size_t n = strnlen(buf, 256);
+      ASSERT_ALWAYS(n != 256);
+
+      index_t h;
+      int ret = sscanf (buf, "%" SCNid "\n", &h);
+      ASSERT_ALWAYS (ret == 1);
+      if (h < mat->ncols)
+      {
+        if (mat->R[h] != NULL)
+        {
+          free (mat->R[h]);
+          mat->R[h] = NULL;
+        }
+        if (mat->wt[h] > 0)
+          mat->wt[h] = -mat->wt[h]; // trick!!!
+      }
+    }
+  }
+
+  fclose_maybe_compressed (file, infilename);
+}
+
 /* callback function called by filter_rels */
 void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 {

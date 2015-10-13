@@ -50,7 +50,7 @@ rotate_bounds_V_mpz ( mpz_t *f,
     }
     else {
       lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha[i]);
+      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
     }
     
     if (lognorm > bound->bound_lognorm)
@@ -72,7 +72,7 @@ rotate_bounds_V_mpz ( mpz_t *f,
     }
     else {
       lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha[i]);
+      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
     }
     
     if (lognorm > bound->bound_lognorm)
@@ -122,7 +122,7 @@ rotate_bounds_U_lu ( mpz_t *f,
     }
     else {
       lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha[i]);
+      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
     }
 
     if (lognorm > bound->bound_lognorm)
@@ -144,7 +144,7 @@ rotate_bounds_U_lu ( mpz_t *f,
     }
     else {
       lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha[i]);
+      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
     }
 
     if (lognorm > bound->bound_lognorm)
@@ -525,7 +525,7 @@ ropt_bound_setup_others ( ropt_bound_t bound )
 
   ASSERT_ALWAYS(size <= 150);
 
-  bound->exp_min_alpha = exp_alpha[size-1];
+  bound->exp_min_alpha = exp_alpha((double)(size-1)*M_LN2);
 }
 
 

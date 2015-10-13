@@ -86,10 +86,12 @@ main (int argc, char *argv[])
   {
     if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
     {
-      if (i == 0 && tab->add_full_col)
-        printf ("i=0 tab[i]=#   added column\n");
+      int side = renumber_get_side_from_index (tab, i, cpoly);
+      if (i < tab->naddcols)
+        printf ("i=%" PRid " tab[i]=#   added column for side %d\n", i, side);
       else
-        printf ("i=%" PRid " tab[i]=#   above a bad ideals\n", i);
+        printf ("i=%" PRid " tab[i]=#   above a bad ideals on side %d\n",
+                i, side);
     }
     else
     {

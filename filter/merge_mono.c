@@ -628,8 +628,9 @@ number_of_superfluous_rows(filter_matrix_t *mat)
 static inline void
 print_report (filter_matrix_t *mat)
 {
-  printf ("N=%" PRIu64 " (%" PRIu64 ") W=%" PRIu64 " W*N=%" PRIu64 " "
-          "W/N=%.2f\n", mat->rem_nrows, mat->rem_nrows - mat->rem_ncols,
+  printf ("N=%" PRIu64 " (%" PRId64 ") W=%" PRIu64 " W*N=%" PRIu64 " "
+          "W/N=%.2f\n", mat->rem_nrows,
+          ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols),
           mat->weight, compute_WN(mat), compute_WoverN(mat));
   fflush (stdout);
 }

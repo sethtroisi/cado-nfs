@@ -18,6 +18,7 @@
 #include "rootfinder.h"
 #include "portability.h"
 #include "murphyE.h"
+#include "ropt_param.h"
 
 #include <stdio.h>
 
@@ -835,8 +836,8 @@ fprintf_gfpn_poly_info ( FILE* fp, mpz_poly_t f, const char *label_poly)
     }
     fprintf (fp, " lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, " \
 	     "exp_E %1.2f\n",
-	     logmu, skew, alpha, logmu + alpha,
-	     logmu - 0.824 * sqrt (2.0 * exp_rot[f->deg] * log (skew)));
+             logmu, skew, alpha, logmu + alpha,
+             logmu + exp_alpha(exp_rot[f->deg] * log (skew)));
 }
 
 void gfpk_print_params(unsigned int n, mpz_srcptr p, mpz_srcptr ell){

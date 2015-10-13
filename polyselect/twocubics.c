@@ -24,7 +24,7 @@
 #define NEW_ROOTSIEVE
 #define INIT_FACTOR 8UL
 #define PREFIX_HASH
-//#define DEBUG_POLYSELECT2L
+//#define DEBUG_POLYSELECT
 
 #ifdef NEW_ROOTSIEVE
 #include "ropt.h"
@@ -560,7 +560,7 @@ collision_on_p ( header_t header,
                           header->d, header->N, 1, tmp);
             }
         }
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
       fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
       gmp_fprintf (stderr, "# p hash_size: %u for ad = %Zd\n", H->size, header->ad);
 #endif
@@ -604,7 +604,7 @@ collision_on_each_sq ( header_t header,
   uint32_t *pprimes, i;
   int found;
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   int st = milliseconds();
 #endif
 #if SHASH_NBUCKETS == 256
@@ -781,7 +781,7 @@ collision_on_each_sq ( header_t header,
       hash_clear (H);
     }
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   fprintf (stderr, "# inner collision_on_each_sq took %lums\n", milliseconds () - st);
   fprintf (stderr, "# - q hash_alloc (q=%lu): %u\n", q, H->alloc);
 #endif

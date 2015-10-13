@@ -139,12 +139,19 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
       nsteps = DEFAULT_PURGE_NSTEPS;
   }
 
-  int64_t chunk = excess / nsteps;
-
-  fprintf(stdout, "# INFO: number of clique removal steps: %d\n", nsteps);
-  fprintf(stdout, "# INFO: At each step, excess will be decreased by "
-                  "%" PRId64 "\n", chunk);
-  fflush (stdout);
+  int64_t chunk;
+  if (nsteps > 0)
+  {
+    chunk = excess / nsteps;
+    fprintf(stdout, "# INFO: number of clique removal steps: %d\n", nsteps);
+    fprintf(stdout, "# INFO: At each step, excess will be decreased by "
+                    "%" PRId64 "\n", chunk);
+    fflush (stdout);
+  }
+  else
+  {
+    fprintf(stdout, "# INFO: No step of clique removal will be done\n");
+  }
 
   /* nsteps steps of clique removal + singletons removal */
   for (count = 0; count < nsteps && excess > 0; count++)
