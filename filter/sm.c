@@ -345,12 +345,18 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "(required) poly file");
   param_list_decl_usage(pl, "purged", "(required) purged file");
   param_list_decl_usage(pl, "index", "(required) index file");
-  param_list_decl_usage(pl, "out", "output file");
+  param_list_decl_usage(pl, "out", "output file (stdout if not given)");
   param_list_decl_usage(pl, "gorder", "(required) group order");
-  param_list_decl_usage(pl, "smexp0", "(required) sm-exponent");
-  param_list_decl_usage(pl, "smexp1", "(required) sm-exponent");
-  param_list_decl_usage(pl, "smexp2", "(MNFS) sm-exponent");
-  param_list_decl_usage(pl, "nsm", "number of SM on side 0,1,... default deg(polynomial))");
+  char key[10], desc[100];
+  for (int side = 0; side < NB_POLYS_MAX; side++)
+  {
+    snprintf (key, 10, "smexp%d", side);
+    snprintf (desc, 100, "sm-exponent on side %d (default is computed by the "
+                         "program)", side);
+    param_list_decl_usage(pl, key, desc);
+  }
+  param_list_decl_usage(pl, "nsm", "number of SM on side 0,1,... (default is "
+                                   "computed by the program)");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
   verbose_decl_usage(pl);
 }
@@ -382,9 +388,18 @@ int main (int argc, char **argv)
 
   sm_relset_ptr rels = NULL;
   uint64_t nb_relsets;
-  mpz_t ell, ell2, epsilon[NB_POLYS_MAX];
+  mpz_t ell, ell2, exp_arg[NB_POLYS_MAX];
+  int nsm_arg[NB_POLYS_MAX];
   int mt = 1;
   double t0;
+
+  for (int side = 0; side < NB_POLYS_MAX; side++)
+  {
+    /* negative value means that the value that will be used is the value
+     * computed later by sm_side_info_init */
+    nsm_arg[side] = -1;
+    mpz_init_set_si (exp_arg[side], -1);
+  }
 
   /* read params */
   param_list_init(pl);
@@ -399,6 +414,9 @@ int main (int argc, char **argv)
     fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
     usage (argv0, NULL, pl);
   }
+  /* print command-line arguments */
+  verbose_interpret_parameters(pl);
+  param_list_print_command_line (stdout, pl);
 
   /* Read poly filename from command line */
   if ((polyfile = param_list_lookup_string(pl, "poly")) == NULL) {
@@ -439,58 +457,52 @@ int main (int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+  /* Read number of sm to be printed from command line */
+  int nr = param_list_parse_int_list (pl, "nsm", nsm_arg, NB_POLYS_MAX, ",");
+
+  /* Read sm exponent from command line (assuming radix 10) */
+  for (int side = 0; side < NB_POLYS_MAX; side++)
+  {
+    char str[10];
+    snprintf(str, sizeof(str), "smexp%d", side);
+    param_list_parse_mpz(pl, str, exp_arg[side]);
+  }
+
   /* Init polynomial */
   cado_poly_init (pol);
-  cado_poly_read(pol, polyfile);
+  if (!cado_poly_read (pol, polyfile))
+  {
+    fprintf (stderr, "Error reading polynomial file\n");
+    exit (EXIT_FAILURE);
+  }
 
-  mpz_ptr eps[NB_POLYS_MAX];
-  /* Read sm exponent from command line (assuming radix 10) */
-  for (int side = 0; side < pol->nb_polys; side++) {
-      eps[side] = &epsilon[side][0];
-      mpz_init (eps[side]);
-      char str[10];
-      snprintf(str, sizeof(str), "smexp%d", side);
-      if (!param_list_parse_mpz(pl, str, eps[side])) {
-          fprintf(stderr, "Error: parameter -%s is mandatory\n", str);
-          param_list_print_usage(pl, argv0, stderr);
-          exit(EXIT_FAILURE);
-      }
+  if (nr > pol->nb_polys)
+  {
+    fprintf (stderr, "Error, number of nsm values read (%d) is greater than the"
+                     " number of polynomials (%d)\n", nr, pol->nb_polys);
+    exit (EXIT_FAILURE);
   }
-  int nsm[NB_POLYS_MAX], nsm_tot = 0;
-  for(int side = 0; side < pol->nb_polys; side++){
-      F[side] = pol->pols[side];
-      nsm[side] = F[side]->deg;
-  }
-  /* Read number of sm to be printed from command line */
-  int nsm_read[NB_POLYS_MAX];
-  int nsides = param_list_parse_int_list(pl,"nsm",nsm_read,pol->nb_polys,",");
-  memcpy(nsm, nsm_read, nsides * sizeof(int));
-  // it is possible to have non prescribed nsm's corresponding
-  // to default = deg(F)
 
   for(int side = 0; side < pol->nb_polys; side++)
-      nsm_tot += nsm[side];
-  if (nsm_tot == 0){
-      fprintf(stderr, "Error: no SM to compute!\n");
-      exit(EXIT_FAILURE);
-  }
-  for(int side = 0; side < pol->nb_polys; side++){
-      if (nsm[side] > F[side]->deg){
-	  fprintf(stderr, "Error: nsm%d=%d can not exceed the degree=%d\n",
-		  side, nsm[side], F[side]->deg);
-	  param_list_print_usage(pl, argv0, stderr);
-	  exit(EXIT_FAILURE);
-      }
+  {
+    F[side] = pol->pols[side];
+    if (nsm_arg[side] > F[side]->deg)
+    {
+      fprintf(stderr, "Error: nsm%d=%d can not exceed the degree=%d\n",
+                      side, nsm_arg[side], F[side]->deg);
+      usage (argv0, NULL, pl);
+    }
   }
 
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
-  verbose_interpret_parameters(pl);
-  param_list_print_command_line (stdout, pl);
 
   /* Print F, ell, smexp and ell2 */
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
+
+  gmp_fprintf(stdout, "# Sub-group order:\nell = %Zi\n# Computation is done "
+                      "modulo ell2 = ell^2:\nell2 = %Zi\n", ell, ell2);
 
   sm_side_info sm_info[NB_POLYS_MAX];
 
@@ -499,32 +511,48 @@ int main (int argc, char **argv)
   }
 
   for (int side = 0; side < pol->nb_polys; side++) {
-      fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
+      fprintf(stdout, "\n# Polynomial on side %d:\n# F[%d] = ", side, side);
       mpz_poly_fprintf(stdout, F[side]);
-      gmp_fprintf(stdout,
-              "# Sub-group order:\nell = %Zi\n# Computation is done "
-              "modulo ell2 = ell^2:\nell2 = %Zi\n# Shirokauer maps' "
-              "exponent:\neps[%d] = %Zi\n", ell, ell2, side, eps[side]);
-
       printf("# SM info on side %d:\n", side);
       sm_side_info_print(stdout, sm_info[side]);
 
       /* do some consistency checks */
-      if (nsm[side] != sm_info[side]->nsm) {
-          fprintf(stderr, "On side %d, unit rank is %d, computing %d SMs ; weird.\n", side, sm_info[side]->nsm, nsm[side]);
+      if (nsm_arg[side] >= 0)
+      {
+        if (nsm_arg[side] != sm_info[side]->nsm)
+        {
+          fprintf(stderr, "On side %d, unit rank is %d, computing %d SMs ; "
+                          "weird.\n", side, sm_info[side]->nsm, nsm_arg[side]);
           /* for the 0 case, we haven't computed anything: prevent the
            * user from asking SM data anyway */
           ASSERT_ALWAYS(sm_info[side]->nsm != 0);
+        }
+        /* command line wins */
+        sm_info[side]->nsm = nsm_arg[side];
       }
-      /* command line wins */
-      sm_info[side]->nsm = nsm[side];
+      printf("# Will compute %d SMs on side %d\n", sm_info[side]->nsm, side);
 
-      if (nsm[side] && mpz_cmp(eps[side], sm_info[side]->exponent) != 0) {
-          gmp_fprintf(stderr, "On side %d, command line asks for exponent %Zd, while we computed %Zd\n", side, eps[side], sm_info[side]->exponent);
+      if (mpz_cmp_si (exp_arg[side], 0) >= 0)
+      {
+        if (mpz_cmp(exp_arg[side], sm_info[side]->exponent) != 0)
+        {
+          gmp_fprintf(stderr, "On side %d, command line asks for exponent %Zd, "
+                              "while we computed %Zd\n", side, exp_arg[side],
+                              sm_info[side]->exponent);
           /* really not sure I want to proceed, here */
           ASSERT_ALWAYS(0);
+        }
       }
       fflush(stdout);
+  }
+
+  int nsm_tot = 0;
+  for(int side = 0; side < pol->nb_polys; side++)
+      nsm_tot += sm_info[side]->nsm;
+  if (nsm_tot == 0)
+  {
+    fprintf(stderr, "Error: no SM to compute!\n");
+    exit(EXIT_FAILURE);
   }
 
   t0 = seconds();
@@ -533,7 +561,7 @@ int main (int argc, char **argv)
   // corresponding computations.
   // TODO: this will go.
   for (int side = 0; side < pol->nb_polys; ++side) {
-      if (nsm[side] == 0)
+      if (sm_info[side]->nsm == 0)
           F[side] = NULL;
   }
   rels = build_rel_sets(purgedfile, indexfile, &nb_relsets, F, pol->nb_polys, ell2);
@@ -558,7 +586,7 @@ int main (int argc, char **argv)
   free(rels);
 
   for(int side = 0 ; side < pol->nb_polys ; side++) {
-      mpz_clear(eps[side]);
+      mpz_clear(exp_arg[side]);
       sm_side_info_clear(sm_info[side]);
   }
 
