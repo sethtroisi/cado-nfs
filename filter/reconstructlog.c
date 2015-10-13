@@ -877,12 +877,40 @@ write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
   f = fopen_maybe_compressed (filename, "w");
   FATAL_ERROR_CHECK(f == NULL, "Cannot open file for writing");
 
+  /* Divide all known logs by 'base' so that the first known non-zero logarithm
+   * is equal to 1.
+   * TODO: make a command line argument to choose this 'base'.
+   */
+  int base_already_set = 0;
+  mpz_t base;
+  mpz_init (base);
+  for (i = 0; i < tab->size; i++)
+  {
+    if (mpz_sgn(log->tab[i]) > 0) /* The log is known and non-zero */
+    {
+      if (!base_already_set)
+      {
+        base_already_set = 1;
+        /* base = 1/log->tab[i] mod ell */
+        int ret = mpz_invert (base, log->tab[i], log->q);
+        ASSERT_ALWAYS (ret != 0);
+        mpz_set_ui (log->tab[i], 1);
+      }
+      else
+      {
+        mpz_mul (log->tab[i], log->tab[i], base);
+        mpz_mod (log->tab[i], log->tab[i], log->q);
+      }
+    }
+  }
+  mpz_clear (base);
+
   uint64_t nknown = 0;
   stats_init (stats, stdout, &nknown, nbits(tab->size)-5, "Wrote",
               "known logarithms", "ideals", "logs");
   for (i = 0; i < tab->size; i++)
   {
-	  if (mpz_sgn(log->tab[i]) >= 0) // we know the log if this ideal
+	  if (mpz_sgn(log->tab[i]) >= 0) // we know the log of this ideal
     {
       nknown++;
       if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
