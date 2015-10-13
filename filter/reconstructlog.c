@@ -888,7 +888,7 @@ write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
       if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
       {
         ASSERT_ALWAYS (mpz_cmp (log->tab[i], log->q) < 0);
-        if (i < tab->naddcols)
+        if (renumber_is_additional_column (tab, i))
           gmp_fprintf (f, "%" PRid " added column %Zd\n", i, log->tab[i]);
         else
           gmp_fprintf (f, "%" PRid " bad ideals %Zd\n", i, log->tab[i]);
