@@ -656,7 +656,7 @@ def rotatebound_choices_all(f,g):
 # optimize the norm of a given polynomial-pair (f,g) by applying successively
 # translation, rotation by x*g, and rotation by g, until we find a local
 # minimum
-def optimize(f,g):
+def optimize(f,g,steps=200):
     R = f.parent()
     x = f.parent().gen()
     logmu0 = best_l2norm_tk_circular(f)
@@ -670,7 +670,7 @@ def optimize(f,g):
        kr2 *= 2
     while best_l2norm_tk_circular(R(f(x=x+kt))) <= logmu0 + 0.001:
        kt *= 2
-    while count < 200:
+    while count < steps:
         count += 1
         changedt = changedr2 = changedr1 = changedr0 = False
 
