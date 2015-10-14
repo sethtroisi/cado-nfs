@@ -347,14 +347,6 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "index", "(required) index file");
   param_list_decl_usage(pl, "out", "output file (stdout if not given)");
   param_list_decl_usage(pl, "gorder", "(required) group order");
-  char key[10], desc[100];
-  for (int side = 0; side < NB_POLYS_MAX; side++)
-  {
-    snprintf (key, 10, "smexp%d", side);
-    snprintf (desc, 100, "sm-exponent on side %d (default is computed by the "
-                         "program)", side);
-    param_list_decl_usage(pl, key, desc);
-  }
   param_list_decl_usage(pl, "nsm", "number of SM on side 0,1,... (default is "
                                    "computed by the program)");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
@@ -388,18 +380,15 @@ int main (int argc, char **argv)
 
   sm_relset_ptr rels = NULL;
   uint64_t nb_relsets;
-  mpz_t ell, ell2, exp_arg[NB_POLYS_MAX];
+  mpz_t ell, ell2;
   int nsm_arg[NB_POLYS_MAX];
   int mt = 1;
   double t0;
 
+  /* negative value means that the value that will be used is the value
+   * computed later by sm_side_info_init */
   for (int side = 0; side < NB_POLYS_MAX; side++)
-  {
-    /* negative value means that the value that will be used is the value
-     * computed later by sm_side_info_init */
     nsm_arg[side] = -1;
-    mpz_init_set_si (exp_arg[side], -1);
-  }
 
   /* read params */
   param_list_init(pl);
@@ -457,17 +446,6 @@ int main (int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  /* Read number of sm to be printed from command line */
-  int nr = param_list_parse_int_list (pl, "nsm", nsm_arg, NB_POLYS_MAX, ",");
-
-  /* Read sm exponent from command line (assuming radix 10) */
-  for (int side = 0; side < NB_POLYS_MAX; side++)
-  {
-    char str[10];
-    snprintf(str, sizeof(str), "smexp%d", side);
-    param_list_parse_mpz(pl, str, exp_arg[side]);
-  }
-
   /* Init polynomial */
   cado_poly_init (pol);
   if (!cado_poly_read (pol, polyfile))
@@ -476,12 +454,8 @@ int main (int argc, char **argv)
     exit (EXIT_FAILURE);
   }
 
-  if (nr > pol->nb_polys)
-  {
-    fprintf (stderr, "Error, number of nsm values read (%d) is greater than the"
-                     " number of polynomials (%d)\n", nr, pol->nb_polys);
-    exit (EXIT_FAILURE);
-  }
+  /* Read number of sm to be printed from command line */
+  param_list_parse_int_list (pl, "nsm", nsm_arg, pol->nb_polys, ",");
 
   for(int side = 0; side < pol->nb_polys; side++)
   {
@@ -490,7 +464,7 @@ int main (int argc, char **argv)
     {
       fprintf(stderr, "Error: nsm%d=%d can not exceed the degree=%d\n",
                       side, nsm_arg[side], F[side]->deg);
-      usage (argv0, NULL, pl);
+      exit (EXIT_FAILURE);
     }
   }
 
@@ -531,28 +505,7 @@ int main (int argc, char **argv)
         sm_info[side]->nsm = nsm_arg[side];
       }
       printf("# Will compute %d SMs on side %d\n", sm_info[side]->nsm, side);
-
-      if (mpz_cmp_si (exp_arg[side], 0) >= 0)
-      {
-        if (mpz_cmp(exp_arg[side], sm_info[side]->exponent) != 0)
-        {
-          gmp_fprintf(stderr, "On side %d, command line asks for exponent %Zd, "
-                              "while we computed %Zd\n", side, exp_arg[side],
-                              sm_info[side]->exponent);
-          /* really not sure I want to proceed, here */
-          ASSERT_ALWAYS(0);
-        }
-      }
       fflush(stdout);
-  }
-
-  int nsm_tot = 0;
-  for(int side = 0; side < pol->nb_polys; side++)
-      nsm_tot += sm_info[side]->nsm;
-  if (nsm_tot == 0)
-  {
-    fprintf(stderr, "Error: no SM to compute!\n");
-    exit(EXIT_FAILURE);
   }
 
   t0 = seconds();
@@ -585,10 +538,8 @@ int main (int argc, char **argv)
       sm_relset_clear (&rels[i], pol->nb_polys);
   free(rels);
 
-  for(int side = 0 ; side < pol->nb_polys ; side++) {
-      mpz_clear(exp_arg[side]);
-      sm_side_info_clear(sm_info[side]);
-  }
+  for (int side = 0 ; side < pol->nb_polys ; side++)
+    sm_side_info_clear(sm_info[side]);
 
   mpz_clear(ell);
   mpz_clear(ell2);
