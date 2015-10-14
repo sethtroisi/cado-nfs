@@ -927,7 +927,7 @@ write_log (const char *filename, logtab_ptr log, renumber_t tab, cado_poly poly)
   int base_already_set = 0;
   mpz_t base;
   mpz_init (base);
-  for (i = 0; i < logtab->nprimes + logtab->nbsm; i++)
+  for (i = 0; i < log->nprimes + log->nbsm; i++)
   {
     if (mpz_sgn(log->tab[i]) > 0) /* The log is known and non-zero */
     {
