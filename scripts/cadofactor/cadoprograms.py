@@ -1032,8 +1032,6 @@ class SM(Program):
                  index: Parameter(),
                  out: Parameter(),
                  ell: Parameter("gorder"),
-                 smexp0: Parameter(),
-                 smexp1: Parameter(),
                  explicit_units0: Toggle()=None,
                  explicit_units1: Toggle()=None,
 		 abunits: Parameter(),

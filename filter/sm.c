@@ -471,10 +471,9 @@ int main (int argc, char **argv)
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
 
-  /* Print F, ell, smexp and ell2 */
+  /* Print ell and ell^2 */
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
-
   gmp_fprintf(stdout, "# Sub-group order:\nell = %Zi\n# Computation is done "
                       "modulo ell2 = ell^2:\nell2 = %Zi\n", ell, ell2);
 
