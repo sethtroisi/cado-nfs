@@ -371,7 +371,7 @@ protected:
     // order to have it 32 bits for non-top levels.
     plattice_x_t inc_a, inc_c;
     uint32_t bound0, bound1;
-    const slice_offset_t hint;
+    slice_offset_t hint;
     plattice_x_t x;
 
     static uint32_t maskI;
