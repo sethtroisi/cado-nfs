@@ -1033,8 +1033,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   return logmu_opt;
 }
 
-/* count +3 for sopt_find_translations_extra */
-#define SOPT_INIT_SIZE_ALLOCATED_TRANSLATIONS 1024+3
+#define SOPT_INIT_SIZE_ALLOCATED_TRANSLATIONS 1024
 
 /* Size optimize the polynomial pair (f_raw, g_raw) with rotations and
    translations.
