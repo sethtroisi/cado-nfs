@@ -762,8 +762,6 @@ ffs/fppol_set.h
 ffs/fppol_test.c
 ffs/fppol_test.h
 ffs/fq.h
-ffs/filter/README
-ffs/filter/filter.sh
 ffs/norm.c
 ffs/fppol_conv.c
 ffs/gray.h
