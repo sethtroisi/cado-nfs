@@ -488,24 +488,22 @@ int main (int argc, char **argv)
       mpz_poly_fprintf(stdout, F[side]);
       printf("# SM info on side %d:\n", side);
       sm_side_info_print(stdout, sm_info[side]);
+      if (nsm_arg[side] >= 0)
+        sm_info[side]->nsm = nsm_arg[side]; /* command line wins */
+      printf("# Will compute %d SMs on side %d\n", sm_info[side]->nsm, side);
 
       /* do some consistency checks */
-      if (nsm_arg[side] >= 0)
+      if (sm_info[side]->unit_rank != sm_info[side]->nsm)
       {
-        if (nsm_arg[side] != sm_info[side]->nsm)
-        {
-          fprintf(stderr, "On side %d, unit rank is %d, computing %d SMs ; "
-                          "weird.\n", side, sm_info[side]->nsm, nsm_arg[side]);
-          /* for the 0 case, we haven't computed anything: prevent the
-           * user from asking SM data anyway */
-          ASSERT_ALWAYS(sm_info[side]->nsm != 0);
-        }
-        /* command line wins */
-        sm_info[side]->nsm = nsm_arg[side];
+        fprintf(stderr, "# On side %d, unit rank is %d, computing %d SMs ; "
+                        "weird.\n", side, sm_info[side]->unit_rank,
+                        sm_info[side]->nsm);
+        /* for the 0 case, we haven't computed anything: prevent the
+         * user from asking SM data anyway */
+        ASSERT_ALWAYS(sm_info[side]->unit_rank != 0);
       }
-      printf("# Will compute %d SMs on side %d\n", sm_info[side]->nsm, side);
-      fflush(stdout);
   }
+  fflush(stdout);
 
   t0 = seconds();
 
