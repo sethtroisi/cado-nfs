@@ -156,7 +156,7 @@ struct read_data_s
   log_rel_t *rels;
   uint64_t nrels;
   logtab_ptr log;
-  sm_side_info sm_info[NB_POLYS_MAX];
+  sm_side_info *sm_info;
   cado_poly_ptr poly;
   renumber_ptr renum_tab;
   const char * abunitsdirname[NB_POLYS_MAX];
@@ -170,8 +170,9 @@ typedef struct read_data_s * read_data_ptr;
  * table of log is already allocated, but not the table of log_rel_t     */
 static void
 read_data_init (read_data_ptr data, logtab_ptr log, uint64_t nrels,
-                cado_poly_ptr poly, mpz_ptr ell, renumber_ptr renum_tab,
-                const char *abunits0dirname, const char *abunits1dirname)
+                cado_poly_ptr poly, sm_side_info *sm_info,
+                renumber_ptr renum_tab, const char *abunits0dirname,
+                const char *abunits1dirname)
 {
   data->rels = log_rel_init (nrels);
   data->log = log;
@@ -180,15 +181,9 @@ read_data_init (read_data_ptr data, logtab_ptr log, uint64_t nrels,
   data->poly = poly;
   data->renum_tab = renum_tab;
   data->nrels = nrels;
+  data->sm_info = sm_info;
   for (int side = 0; side < poly->nb_polys; side++)
   {
-    fprintf (stdout, "# Polynomial on side %d:\n# F[%d] = ", side, side);
-    mpz_poly_fprintf (stdout, poly->pols[side]);
-    sm_side_info_init (data->sm_info[side], poly->pols[side], ell);
-    printf ("# SM info on side %d:\n", side);
-    sm_side_info_print (stdout, data->sm_info[side]);
-    printf ("# Will compute %d SMs\n\n", data->sm_info[side]->nsm);
-
     if (side == 0)
       data->smlogs[0] = &(log->tab[log->nprimes]);
     else
@@ -200,8 +195,6 @@ read_data_init (read_data_ptr data, logtab_ptr log, uint64_t nrels,
 static void
 read_data_free (read_data_ptr data)
 {
-  for(int side = 0; side < data->poly->nb_polys; side++)
-    sm_side_info_clear(data->sm_info[side]);
   log_rel_free (data->rels, data->nrels);
 }
 
@@ -773,7 +766,7 @@ dep_do_one_iter_mt (dep_read_data_ptr d, bit_vector bv, int nt, uint64_t nrels)
 /* Read the logarithms computed by the linear algebra */
 static void
 read_log_format_LA (logtab_ptr log, const char *logfile, const char *idealsfile,
-		    int *nbsm, int nb_polys)
+                    sm_side_info *sm_info, int nb_polys)
 {
   uint64_t i, ncols, col;
   index_t h;
@@ -817,22 +810,26 @@ read_log_format_LA (logtab_ptr log, const char *logfile, const char *idealsfile,
   ASSERT_ALWAYS (i == ncols);
 
   unsigned int index = 0;
-  for(int side = 0; side < nb_polys; side++){
-      for (int ism = 0; ism < nbsm[side]; ism++){
-	  int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
-	  FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
-	  logtab_insert (log, log->nprimes+index, tmp_log);
-	  index++;
+  for(int side = 0; side < nb_polys; side++)
+  {
+      for (int ism = 0; ism < sm_info[side]->nsm; ism++)
+      {
+        int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
+        FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
+        logtab_insert (log, log->nprimes+index, tmp_log);
+        index++;
       }
   }
-  while (gmp_fscanf (flog, "%Zd\n", tmp_log) == 1)
-    printf ("Warning, line %" PRIu64 " is ignored\n", i++);
+  /* If we are not at the end of the file, it means that it remains some values
+   * and we do not know to what "ideals" they correspond. Probably an error
+   * somewhere, it is better to abort. */
   ASSERT_ALWAYS (feof(flog));
 
-  for(int side = 0; side < nb_polys; side++){
-      if (nbsm[side])
-	  printf ("# Logarithms for %d SM%d columns were also read\n", 
-		  nbsm[side], side);
+  for(int side = 0; side < nb_polys; side++)
+  {
+    if (sm_info[side]->nsm)
+      printf ("# Logarithms for %d SM columns on side %d were also read\n",
+              sm_info[side]->nsm, side);
   }
   mpz_clear (tmp_log);
   fclose_maybe_compressed (flog, logfile);
@@ -1236,8 +1233,12 @@ main(int argc, char *argv[])
   uint64_t nprimes;
   int mt = 1;
   int partial = 0;
-  int nbsm[NB_POLYS_MAX], nbsmtot = 0;
-  memset(nbsm, 0, NB_POLYS_MAX*sizeof(int));
+  int nsm_arg[NB_POLYS_MAX], nsm_tot;
+
+  /* negative value means that the value that will be used is the value
+   * computed later by sm_side_info_init */
+  for (int side = 0; side < NB_POLYS_MAX; side++)
+    nsm_arg[side] = -1;
 
   mpz_t ell;
   logtab_t log;
@@ -1377,14 +1378,17 @@ main(int argc, char *argv[])
   }
 
 #ifndef FOR_FFS
-  /* eek. */
-  int nsides = param_list_parse_int_list(pl, "nsm", nbsm, poly->nb_polys, ",");
-  if(nsides != poly->nb_polys){
-      fprintf (stderr, "Error not enough nsm's\n");
-      exit (EXIT_FAILURE);
-  }
+  /* Read number of sm to be printed from command line */
+  param_list_parse_int_list (pl, "nsm", nsm_arg, poly->nb_polys, ",");
   for(int side = 0; side < poly->nb_polys; side++)
-      nbsmtot += nbsm[side];
+  {
+    if (nsm_arg[side] > poly->pols[side]->deg)
+    {
+      fprintf(stderr, "Error: nsm%d=%d can not exceed the degree=%d\n",
+                      side, nsm_arg[side], poly->pols[side]->deg);
+      exit (EXIT_FAILURE);
+    }
+  }
 
   const char * abunits0dirname = NULL;
   abunits0dirname = param_list_lookup_string(pl, "abunits0");
@@ -1395,9 +1399,6 @@ main(int argc, char *argv[])
   abunits1dirname = param_list_lookup_string(pl, "abunits1");
   if(units1 == 0)
       abunits1dirname = NULL;
-
-#else
-  FATAL_ERROR_CHECK(nbsmtot != 0, "all sm's should be 0 for FFS");
 #endif
 
   if (param_list_warn_unused(pl))
@@ -1407,6 +1408,38 @@ main(int argc, char *argv[])
   }
 
   set_antebuffer_path (argv0, path_antebuffer);
+
+  /* Init data for computation of the SMs. Need that now for nsm_tot */
+  sm_side_info sm_info[NB_POLYS_MAX];
+  nsm_tot = 0;
+  for (int side = 0; side < poly->nb_polys; side++)
+  {
+#ifndef FOR_FFS
+    sm_side_info_init(sm_info[side], poly->pols[side], ell);
+    fprintf(stdout, "\n# Polynomial on side %d:\n# F[%d] = ", side, side);
+    mpz_poly_fprintf(stdout, poly->pols[side]);
+    printf("# SM info on side %d:\n", side);
+    sm_side_info_print(stdout, sm_info[side]);
+    if (nsm_arg[side] >= 0)
+      sm_info[side]->nsm = nsm_arg[side]; /* command line wins */
+    printf("# Will use %d SMs on side %d\n", sm_info[side]->nsm, side);
+
+    /* do some consistency checks */
+    if (sm_info[side]->unit_rank != sm_info[side]->nsm)
+    {
+      fprintf(stderr, "# On side %d, unit rank is %d, computing %d SMs ; "
+                      "weird.\n", side, sm_info[side]->unit_rank,
+                      sm_info[side]->nsm);
+      /* for the 0 case, we haven't computed anything: prevent the
+       * user from asking SM data anyway */
+      ASSERT_ALWAYS(sm_info[side]->unit_rank != 0);
+    }
+    nsm_tot += sm_info[side]->nsm;
+#else
+    sm_info[side]->nsm = 0;
+#endif
+  }
+  fflush(stdout);
 
 
   /* Reading renumber file */
@@ -1422,9 +1455,10 @@ main(int argc, char *argv[])
   /* Malloc'ing log tab and reading values of log */
   printf ("\n###### Reading known logarithms ######\n");
   fflush(stdout);
-  logtab_init (log, nprimes, nbsmtot, ell);
+  logtab_init (log, nprimes, nsm_tot, ell);
   if (logformat == NULL || strcmp(logformat, "LA") == 0)
-      read_log_format_LA (log, logfilename, idealsfilename, nbsm, poly->nb_polys);
+      read_log_format_LA (log, logfilename, idealsfilename, sm_info,
+                                                            poly->nb_polys);
   else
     read_log_format_reconstruct (log, renumber_table, logfilename);
 
@@ -1458,7 +1492,7 @@ main(int argc, char *argv[])
   if (nrels_needed > 0)
   {
       read_data_t data;
-      read_data_init (data, log, nrels_purged + nrels_del, poly, ell,
+      read_data_init (data, log, nrels_purged + nrels_del, poly, sm_info,
                       renumber_table, abunits0dirname, abunits1dirname);
 
       log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
@@ -1481,6 +1515,11 @@ main(int argc, char *argv[])
   /* freeing and closing */
   logtab_clear (log);
   mpz_clear(ell);
+
+#ifndef FOR_FFS
+  for (int side = 0 ; side < poly->nb_polys ; side++)
+    sm_side_info_clear (sm_info[side]);
+#endif
 
   renumber_clear (renumber_table);
   bit_vector_clear(rels_to_process);
