@@ -49,11 +49,6 @@
 uint64_t index_old = 0;
 #endif // ASSERT_SIEVE
 
-#ifdef NUMBER_SURVIVALS
-uint64_t number_survivals = 0;
-uint64_t number_survivals_facto = 0;
-#endif // NUMBER_SURVIVALS
-
 /* ----- Compute Mq, Mqr, Tqr ----- */
 
 /*
@@ -2054,10 +2049,6 @@ int main(int argc, char * argv[])
   double sec_cofact;
   double sec;
 
-#ifdef NUMBER_SURVIVALS
-  uint64_t * numbers_survivals = (uint64_t * ) malloc(sizeof(uint64_t) * V);
-#endif // NUMBER_SURVIVALS
-
   FILE * file_trace_pos;
 #ifdef TRACE_POS
   file_trace_pos = fopen("TRACE_POS.txt", "w+");
@@ -2194,10 +2185,6 @@ int main(int argc, char * argv[])
 
         for (unsigned j = 0; j < V; j++) {
 
-#ifdef NUMBER_SURVIVALS
-          numbers_survivals[j] = indexes[j]->length;
-#endif // NUMBER_SURVIVALS
-
           uint64_array_clear(indexes[j]);
         }
 
@@ -2208,25 +2195,9 @@ int main(int argc, char * argv[])
           printf("# Time to init norm %u: %fs.\n", j, time[j][0]);
           printf("# Time to sieve %u: %fs.\n", j, time[j][1]);
           printf("# Time to find indexes %u: %fs.\n", j, time [j][2]);
-
-#ifdef NUMBER_SURVIVALS
-          printf("# Number of survivals %u: %" PRIu64 ".\n", j,
-                 numbers_survivals[j]);
-#endif // NUMBER_SURVIVALS
         }
 
-#ifdef NUMBER_SURVIVALS
-        free(numbers_survivals);
-#endif // NUMBER_SURVIVALS
-
         printf("# Time to factorize: %fs.\n", sec_cofact);
-
-#ifdef NUMBER_SURVIVALS
-        printf("# Number total of survivals: %" PRIu64 ".\n",
-               number_survivals);
-        printf("# Number total of polynomial a survivals: %" PRIu64 ".\n",
-               number_survivals_facto);
-#endif // NUMBER_SURVIVALS
 
         printf("# ----------------------------------------\n");
 

@@ -248,11 +248,13 @@ facul_aux (mpz_t *factors, const struct modset_t m,
 
 // Returns 1 if norm is smooth, 0 otherwise.
 // Factorization is given in factors.
-static int call_facul(factor_ptr factors, mpz_ptr norm, mpz_srcptr norm_root,
+static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
     facul_aux_data * data) {
   unsigned long B = data->fbb;
 
-  mpz_set(norm, norm_root);
+  mpz_t norm;
+  mpz_init(norm);
+  mpz_set(norm, norm_r);
 
   // Trial divide all the small factors.
   int success = brute_force_factorize_ul(factors, norm, norm, B);
@@ -327,6 +329,7 @@ static int call_facul(factor_ptr factors, mpz_ptr norm, mpz_srcptr norm_root,
   for (int i = 0; i < 16; ++i)
     mpz_clear(fac[i]);
   free(fac);
+  mpz_clear(norm);
   return found > 0;
 }
 
@@ -345,7 +348,8 @@ static int call_facul(factor_ptr factors, mpz_ptr norm, mpz_srcptr norm_root,
 static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
     unsigned int * L, unsigned int size, unsigned int t, unsigned int V,
     int main, facul_aux_data *data, unsigned int * nb_rel_found,
-    ideal_spq_srcptr special_q, unsigned int q_side)
+    ideal_spq_srcptr special_q, unsigned int q_side,
+    MAYBE_UNUSED unsigned int * number_factorisation)
 {
   mpz_t res;
   mpz_init(res);
@@ -384,14 +388,14 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
         mpz_clear(spq);
       }
 
-      int is_smooth = call_facul(factor[i], res, res, &data[L[i]]);
+      int is_smooth = call_facul(factor[i], res, &data[L[i]]);
 #ifdef ASSERT_FACTO
-      if (!mpz_cmp_ui(res, 0)) {
-        assert_facto[i] = 1;
+      assert_facto[i] = factor_assert(factor[i], res_tmp);
+      if (assert_facto[i] == 0) {
+        number_factorisation[1] = number_factorisation[1] + 1;
       } else {
-        assert_facto[i] = 0;
+        number_factorisation[0] = number_factorisation[0] + 1;
       }
-      ASSERT(assert_facto[i] == factor_assert(factor[i], res_tmp));
 #endif
 
       if (is_smooth) {
@@ -412,7 +416,7 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
 
     norm_poly(res, f[main], a);
 
-    int main_is_smooth = call_facul(factor[Lmain], res, res, &data[main]);
+    int main_is_smooth = call_facul(factor[Lmain], res, &data[main]);
 
     if (main_is_smooth) {
       find = 1;
@@ -424,7 +428,7 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
         if (i != Lmain) {
           norm_poly(res, f[L[i]], a);
 
-          int is_smooth = call_facul(factor[i], res, res, &data[L[i]]);
+          int is_smooth = call_facul(factor[i], res, &data[L[i]]);
 #ifdef ASSERT_FACTO
           assert_facto[i] = factor_assert(factor[i], res);
 #endif
@@ -552,7 +556,8 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
     uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indices,
     facul_aux_data *data, unsigned int * nb_rel_found,
-    ideal_spq_srcptr special_q, unsigned int q_side)
+    ideal_spq_srcptr special_q, unsigned int q_side,
+    MAYBE_UNUSED unsigned int * number_factorisation)
 {
   unsigned int * L = (unsigned int *) malloc(V * sizeof(unsigned int));
   unsigned int size = 0;
@@ -577,20 +582,12 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
     mat_Z_mul_mpz_vector_to_mpz_poly(a, matrix, c);
     mpz_poly_content(gcd, a);
 
-#ifdef NUMBER_SURVIVALS
-      number_survivals++;
-#endif // NUMBER_SURVIVALS
-
     //a must be irreducible.
     if (mpz_cmp_ui(gcd, 1) == 0 && a->deg > 0 &&
         mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
 
-#ifdef NUMBER_SURVIVALS
-      number_survivals_facto++;
-#endif // NUMBER_SURVIVALS
-
       good_polynomial(a, f, L, size, H->t, V, main, data, nb_rel_found,
-          special_q, q_side);
+          special_q, q_side, number_factorisation);
     }
 
     mpz_poly_clear(a);
@@ -645,18 +642,30 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     data[i].methods = facul_make_aux_methods(nb_curves95(lpb[i]), 0, 0);
   }
 
+  MAYBE_UNUSED unsigned int * number_factorisation =
+    (unsigned int *) malloc(sizeof(unsigned int) * 2);
+  number_factorisation[0] = 0;
+  number_factorisation[1] = 0;
   unsigned int nb_rel_found = 0;
   if (0 != length_tot) {
     while(sum_index(index, V, main) < length_tot) {
       find_relation(indices, index, number_element, matrix, f, H, V, main,
-          max_indices, data, &nb_rel_found, special_q, q_side);
+          max_indices, data, &nb_rel_found, special_q, q_side,
+          number_factorisation);
     }
   }
   if (nb_rel_found != 0) {
-    printf("# Number of found relations: %u\n", nb_rel_found);
+    printf("# Number of found relations: %u.\n", nb_rel_found);
   } else {
     printf("# No relations\n");
   }
+
+#ifdef ASSERT_FACTO
+  printf("# Number of good factorisations: %u.\n", number_factorisation[0]);
+  printf("# Number of bad factorisations: %u.\n", number_factorisation[1]);
+#endif // ASSERT_FACTO
+  free(number_factorisation);
+
   for (unsigned int i = 0; i < V; ++i)   
     facul_clear_aux_methods(data[i].methods);
   free(data);
