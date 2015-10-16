@@ -174,7 +174,7 @@ class Polynomials(object):
         ))
     
     def __init__(self, lines):
-        """ Parse a polynomial file in the syntax as produced by polyselect2l
+        """ Parse a polynomial file in the syntax as produced by polyselect
             and polyselect_ropt
         """
         self.MurphyE = 0.
@@ -1558,11 +1558,11 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     @property
     def programs(self):
         # admin and admax are special, which is a bit ugly: these parameters
-        # to the Polyselect2l constructor are supplied by the task, but the
+        # to the Polyselect constructor are supplied by the task, but the
         # task has itself admin, admax parameters, which specify the total
         # size of the search range. Thus we don't include admin, admax here,
         # or PolyselTask would incorrectly warn about them not being used.
-        return ((cadoprograms.Polyselect2l, (), {}),)
+        return ((cadoprograms.Polyselect, (), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -2019,14 +2019,14 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
-                                          stdout=str(outputfile),
-                                          **self.progparams[0])
+            p = cadoprograms.Polyselect(admin=adstart, admax=adend,
+                                        stdout=str(outputfile),
+                                        **self.progparams[0])
             self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
         self.state.update({"adnext": adend}, commit=True)
 
     def get_total_cpu_or_real_time(self, is_cpu):
-        """ Return number of seconds of cpu time spent by polyselect2l """
+        """ Return number of seconds of cpu time spent by polyselect """
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
 
@@ -2511,7 +2511,7 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
-                {"dlp": False, "gzip": True, "addfullcol": None})
+                {"dlp": False, "gzip": True, "lcideals": None})
 
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
@@ -2522,8 +2522,8 @@ class FreeRelTask(Task):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         if self.params["dlp"]:
-            # default for dlp is addfullcol
-            self.progparams[0].setdefault("addfullcol", True)
+            # default for dlp is lcideals
+            self.progparams[0].setdefault("lcideals", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"]) and
         # the lpba/lpbr values used in self.state["lpba"] / ["lpbr"]
@@ -3817,12 +3817,6 @@ class NmbrthryTask(Task):
             match = re.match(r'ell (\d+)', line)
             if match:
                 update["ell"] = int(match.group(1))
-            match = re.match(r'smexp0 (\d+)', line)
-            if match:
-                update["smexp0"] = int(match.group(1))
-            match = re.match(r'smexp1 (\d+)', line)
-            if match:
-                update["smexp1"] = int(match.group(1))
             match = re.match(r'nmaps0 (\d+)', line)
             if match:
                 update["nmaps0"] = int(match.group(1))
@@ -3839,12 +3833,8 @@ class NmbrthryTask(Task):
         
         if not "ell" in update:
             raise Exception("Stdout does not give ell")
-        if not "smexp0" in update:
-            raise Exception("Stdout does not give smexp0")
         if not "nmaps0" in update:
             raise Exception("Stdout does not give nmaps0")
-        if not "smexp1" in update:
-            raise Exception("Stdout does not give smexp1")
         if not "nmaps1" in update:
             raise Exception("Stdout does not give nmaps1")
         if not badfile.isfile():
@@ -3866,9 +3856,6 @@ class NmbrthryTask(Task):
     
     def get_ell(self):
         return self.state["ell"]
-    
-    def get_smexp(self):
-        return (self.state["smexp0"], self.state["smexp1"])
     
     def get_nmaps(self):
         return (self.state["nmaps0"], self.state["nmaps1"])
@@ -4395,7 +4382,7 @@ class SMTask(Task):
         return "Schirokauer Maps"
     @property
     def programs(self):
-        override = ("ell", "smexp0", "smexp1", "nmaps0", "nmaps1", "out")
+        override = ("ell", "nmaps0", "nmaps1", "out")
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
                  "renumber": Request.GET_RENUMBER_FILENAME,
                  "badidealinfo": Request.GET_BADIDEALINFO_FILENAME,
@@ -4422,13 +4409,10 @@ class SMTask(Task):
             abunitsdirname = self.workdir.make_filename("abunits")
 
             gorder = self.send_request(Request.GET_ELL)
-            smexp = self.send_request(Request.GET_SMEXP)
             
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
             p = cadoprograms.SM(ell=gorder,
-                    smexp0=smexp[0],
-                    smexp1=smexp[1],
                     nmaps0=nmaps[0],
                     nmaps1=nmaps[1],
                     out=smfilename,
@@ -5217,7 +5201,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_BADIDEAL_FILENAME] = self.nmbrthry.get_bad_filename
             self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.nmbrthry.get_badinfo_filename
             self.request_map[Request.GET_NMAPS] = self.nmbrthry.get_nmaps
-            self.request_map[Request.GET_SMEXP] = self.nmbrthry.get_smexp
             self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
             self.request_map[Request.GET_UNITS_DIRNAME] = self.sm.get_abunits_dirname

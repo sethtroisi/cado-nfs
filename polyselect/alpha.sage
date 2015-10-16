@@ -344,3 +344,25 @@ def check_alpha_projective(f,B):
         s += a
         s2 += a2
         print p, a, a2, s, s2
+
+# given a rootsieve space of n points, estimate the best alpha value
+# see http://maths-people.anu.edu.au/~brent/pd/Bai-thesis.pdf 
+# (page 40, formula 3.6) and
+# A note on the first moment of extreme order statistics from the normal
+# distribution, Max Petzold, https://gupea.ub.gu.se/handle/2077/3092
+def expected_alpha(n):
+    mu = 0
+    sigma = 0.824
+    return mu - sigma*(sqrt(2*log(n))-(log(log(n))+1.3766)/(2*sqrt(2*log(n))))
+
+# print expected_alpha(2^k) for 0 <= k < bound (in 5 columns)
+def expected_alpha_est(bound=150):
+    c = 0
+    print('%8.3f,' % 0),
+    for k in range(1,bound):
+        c = c + 1
+        E = expected_alpha(2^k)
+        if (c % 5 == 0):
+            print
+        print('%8.3f,' % E),
+

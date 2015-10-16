@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "cado.h"
 #include <stdio.h>
 #include "portability.h"
-#include "filter_common.h"
+#include "filter_config.h"
 #include "merge_replay_matrix.h"
 #include "sparse.h"
 #include "report.h"

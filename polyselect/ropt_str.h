@@ -188,7 +188,11 @@ typedef _ropt_info_t ropt_info_t[1];
 /* ropt_poly_t */
 void ropt_poly_init ( ropt_poly_t );
 
+void ropt_poly_refresh ( ropt_poly_t );
+
 void ropt_poly_setup ( ropt_poly_t );
+
+bool ropt_poly_setup_check ( ropt_poly_t );
 
 void ropt_poly_free ( ropt_poly_t );
 
@@ -199,6 +203,10 @@ void ropt_bound_init ( ropt_bound_t );
 void ropt_bound_setup ( ropt_poly_t poly,
                         ropt_bound_t bound,
                         ropt_param_t param );
+
+double ropt_bound_expected_E ( mpz_t *f,
+                               unsigned int d,
+                               mpz_t *g );
 
 void ropt_bound_reset ( ropt_poly_t poly,
                         ropt_bound_t bound,

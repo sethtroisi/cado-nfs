@@ -159,7 +159,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
-  param_list_decl_usage(pl, "addfullcol", "(switch) add a column of 1 in the matrix (for DL)");
+  param_list_decl_usage(pl, "lcideals", "(switch) Add ideals for the leading "
+                                        "coeffs of the polynomials (for DL)");
 }
 
 static void
@@ -176,13 +177,13 @@ main (int argc, char *argv[])
   cado_poly cpoly;
   unsigned long pmin = 2, pmax = 0, nfree;
   renumber_t renumber_table;
-  int add_full_col = 0;
+  int lcideals = 0;
   unsigned long lpb[NB_POLYS_MAX] = { 0 };
 
   param_list pl;
   param_list_init(pl);
   declare_usage(pl);
-  param_list_configure_switch(pl, "-addfullcol", &add_full_col);
+  param_list_configure_switch(pl, "-lcideals", &lcideals);
 
 #ifdef HAVE_MINGW
   _fmode = _O_BINARY;     /* Binary open for all files */
@@ -261,8 +262,12 @@ main (int argc, char *argv[])
     usage (pl, argv0);
 
   int ratside = cado_poly_get_ratside (cpoly);
-  renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside,
-                                                           add_full_col, lpb);
+  uint64_t nonmonic = 0;
+  for (unsigned int i = cpoly->nb_polys; i > 0 ; i--) 
+    nonmonic = (nonmonic << 1) + mpz_poly_is_nonmonic (cpoly->pols[i-1]);
+
+  renumber_init_for_writing (renumber_table, cpoly->nb_polys, ratside, lcideals,
+                             nonmonic, lpb);
   renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
                        cpoly);
 

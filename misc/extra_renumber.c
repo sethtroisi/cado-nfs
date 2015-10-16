@@ -18,12 +18,9 @@ look_for_very_large_primes (void * context_data, earlyparsed_relation_ptr rel)
 {
 
   uint64_t *lpb = (uint64_t *) context_data;
- /* HACK: a relation is on the form a,b:side0:side1
-  * we put the side in primes[i].h
-  */
   for (weight_t i = 0; i < rel->nb; i++)
   {
-    int side = (int) rel->primes[i].h;
+    int side = (int) rel->primes[i].side;
     p_r_values_t p = rel->primes[i].p;
     if (p > lpb[side])
     {

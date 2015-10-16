@@ -392,7 +392,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             90377629292003121684002147101760858109247336549001090677693
             -t 2 -s auto
         TARGET_DEPENDENCIES
-            polyselect2l polyselect_ropt
+            polyselect polyselect_ropt
             freerel makefb
             las
             dup1 dup2 purge merge replay

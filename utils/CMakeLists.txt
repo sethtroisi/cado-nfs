@@ -9,7 +9,7 @@ set (sources
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
         ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c stats.c lll.c
-        verbose.c lognorm_skewness.c
+        verbose.c 
         version_info.c
 	modified_files.c threadpool.cpp
 )

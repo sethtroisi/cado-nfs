@@ -342,12 +342,14 @@ ropt_on_cadopoly ( FILE *file,
          flag == 1823 || // deg 4
          flag == 1807 ) // deg 3
     {
-      fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
-      ropt_common (poly, param, 0);
-      count ++;
-      flag = 0U;
+      if (ropt_poly_setup_check (poly)) {
+        fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
+        ropt_common (poly, param, 0);
+        count ++;
+        flag = 0U;
+        ropt_poly_refresh (poly);
+      }
     }
-
   } // next line
 
   ropt_poly_free (poly);
@@ -524,7 +526,7 @@ print_poly_info_short ( mpz_t *f,
           alpha_proj,
           logmu + alpha,
           nroots,
-          logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew) ),
+          logmu + exp_alpha(exp_rot[d]*log(skew)),
           e );
 
   fflush( stdout );

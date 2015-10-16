@@ -630,16 +630,16 @@ class Program(object, metaclass=InspectType):
         return '\n'.join(workunit)
 
 
-class Polyselect2l(Program):
+class Polyselect(Program):
     """
-    >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
+    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'polyselect2l -P 5 -N 42 -degree 4 -v'
-    >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
+    'polyselect -P 5 -N 42 -degree 4 -v'
+    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
-    'polyselect2l -P 5 -N 42 -degree 4 -v'
+    'polyselect -P 5 -N 42 -degree 4 -v'
     """
-    binary = "polyselect2l"
+    binary = "polyselect"
     name = binary
     subdir = "polyselect"
 
@@ -742,7 +742,7 @@ class FreeRel(Program):
                  badideals: Parameter(is_output_file=True)=None,
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
-                 addfullcol: Toggle() = None,
+                 lcideals: Toggle() = None,
                  threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
@@ -1032,8 +1032,6 @@ class SM(Program):
                  index: Parameter(),
                  out: Parameter(),
                  ell: Parameter("gorder"),
-                 smexp0: Parameter(),
-                 smexp1: Parameter(),
                  explicit_units0: Toggle()=None,
                  explicit_units1: Toggle()=None,
 		 abunits: Parameter(),

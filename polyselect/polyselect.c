@@ -17,14 +17,14 @@
 #include "cado.h"
 #include <stdio.h>
 #include "portability.h"
-#include "polyselect2l.h"
+#include "polyselect.h"
 #include "mpz_poly.h"
 #include "size_optimization.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define INIT_FACTOR 8UL
 #define PREFIX_HASH
-//#define DEBUG_POLYSELECT2L
+//#define DEBUG_POLYSELECT
 
 #ifdef PREFIX_HASH
 char *phash = "# ";
@@ -125,29 +125,6 @@ crt_sq ( mpz_t qqz,
   mpz_clear (sum);
 }
 
-/* check that l/2 <= d*m0/P^2, where l = p1 * p2 * q with P <= p1, p2 <= 2P
-   q is the product of special-q primes. It suffices to check that
-   q <= d*m0/(2P^4). */
-static int
-check_parameters (mpz_t m0, unsigned long d, unsigned long lq)
-{
-  double maxq = 1.0, maxP;
-  int k = lq;
-
-  while (k > 0)
-    maxq *= (double) SPECIAL_Q[LEN_SPECIAL_Q - 1 - (k--)];
-
-  maxP = (double) Primes[lenPrimes - 1];
-  if (2.0 * pow (maxP, 4.0) * maxq >= (double) d * mpz_get_d (m0))
-    return 0;
-
-  if (maxq > pow (maxP, 2.0))
-    return 0;
-
-  return 1;
-}
-
-
 /* print poly info */
 void
 print_poly_info ( mpz_t *f,
@@ -158,12 +135,8 @@ print_poly_info ( mpz_t *f,
                   const char *prefix )
 {
   unsigned int i, nroots;
-  double skew, skew2, logmu, alpha, alpha_proj, exp_E;
-  mpz_t k0, k1, k2;
+  double skew, logmu, alpha, alpha_proj, exp_E;
   mpz_poly_t F;
-  mpz_init (k0);
-  mpz_init (k1);
-  mpz_init (k2);
   F->coeff = f;
   F->deg = d;
 
@@ -171,46 +144,13 @@ print_poly_info ( mpz_t *f,
   gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
     gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
-
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-
-  if (d == 6) {
-    mpz_set_d (k2, skew);
-    rotate_auxg_z (f, g[1], g[0], k2, 2);
-    mpz_mul_ui (k1, k2, (unsigned long) skew);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    mpz_mul_ui (k0, k1, (unsigned long) skew);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew2);
-    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
-    mpz_neg (k2, k2);
-    mpz_neg (k1, k1);
-    mpz_neg (k0, k0);
-    rotate_auxg_z (f, g[1], g[0], k2, 2);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-  }
-  else {
-    mpz_set_d (k1, skew);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    mpz_mul_ui (k0, k1, (unsigned long) skew);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew2);
-    exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
-    mpz_neg (k1, k1);
-    mpz_neg (k0, k0);
-    rotate_auxg_z (f, g[1], g[0], k1, 1);
-    rotate_auxg_z (f, g[1], g[0], k0, 0);
-  }
-  
+  exp_E = ropt_bound_expected_E (f, d, g);
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
   alpha = get_alpha (F, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
-
   if (raw == 1)
     printf ("# raw lognorm ");
   else
@@ -220,9 +160,6 @@ print_poly_info ( mpz_t *f,
           logmu, skew, alpha, alpha_proj, logmu + alpha,
           exp_E, nroots);
 
-  mpz_clear (k0);
-  mpz_clear (k1);
-  mpz_clear (k2);
 }
 
 
@@ -238,7 +175,7 @@ static void
 check_divexact_ui(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED,
                   const unsigned long q, const char *q_name MAYBE_UNUSED)
 {
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   if (mpz_divisible_ui_p (d, q) == 0)
   {
     gmp_fprintf (stderr, "Error: %s=%Zd not divisible by %s=%lu\n",
@@ -253,7 +190,7 @@ static void
 check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mpz_t q,
                const char *q_name MAYBE_UNUSED)
 {
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   if (mpz_divisible_p (d, q) == 0)
   {
     gmp_fprintf (stderr, "Error: %s=%Zd not divisible by %s=%Zd\n",
@@ -403,7 +340,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mpz_poly_t F;
 
   /* the expected rotation space is S^5 for degree 6 */
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("Found match: (%lu,%lld) (%lu,%lld) for "
 	      "ad=%Zd, q=%llu, rq=%Zd\n",
               p1, (long long) i, p2, (long long) i, ad,
@@ -590,7 +527,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   double skew, logmu;
   mpz_poly_t F;
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("Found match: (%" PRIu32 ",%lld) (%" PRIu32 ",%lld) for "
 	      "ad=%Zd, q=%llu, rq=%Zd\n",
               p1, (long long) i, p2, (long long) i, ad,
@@ -834,7 +771,7 @@ collision_on_p ( header_t header,
                           header->d, header->N, 1, zero);
             }
         }
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
       fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
       gmp_fprintf (stderr, "# p hash_size: %u for ad = %Zd\n",
                    H->size, header->ad);
@@ -876,7 +813,7 @@ collision_on_each_sq ( header_t header,
   uint32_t *pprimes, i;
   int found;
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   int st = milliseconds();
 #endif
 #if SHASH_NBUCKETS == 256
@@ -1049,7 +986,7 @@ collision_on_each_sq ( header_t header,
       hash_clear (H);
     }
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   fprintf (stderr, "# inner collision_on_each_sq took %lums\n", milliseconds () - st);
   fprintf (stderr, "# - q hash_alloc (q=%lu): %u\n", q, H->alloc);
 #endif
@@ -1362,9 +1299,8 @@ collision_on_sq ( header_t header,
   /* find a suitable lq */
   for (i = 0; i < SQ_R->size; i++) {
     if (prod < nq) {
-      if (!check_parameters (header->m0, header->d, lq))
-        break;
-      prod *= SQ_R->nr[i];
+      prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
+                            the number of primes and thus the Y1 value. */
       lq ++;
     }
   }
@@ -1419,7 +1355,7 @@ gmp_collision_on_p ( header_t header, proots_t R )
 
   hash_init (H, INIT_FACTOR * lenPrimes);
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   int st = milliseconds();
 #endif
 
@@ -1450,7 +1386,7 @@ gmp_collision_on_p ( header_t header, proots_t R )
     }
   }
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
   gmp_fprintf (stderr, "# p hash_size: %u for ad = %Zd\n", H->size,
                header->ad);
@@ -1483,7 +1419,7 @@ gmp_collision_on_each_sq ( header_t header,
   int64_t ppl, u, v, umax;
   double pc2;
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   int st = milliseconds();
 #endif
 
@@ -1518,7 +1454,7 @@ gmp_collision_on_each_sq ( header_t header,
     }  // next rp
   } // next p
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   fprintf (stderr, "# inner collision_on_each_sq took %lums\n",
 	   milliseconds () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
@@ -1681,7 +1617,7 @@ gmp_collision_on_sq ( header_t header,
   if (tot < BATCH_SIZE)
     tot = BATCH_SIZE;
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
   fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu"
 	   ", maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tot);
 #endif
@@ -1709,7 +1645,7 @@ gmp_collision_on_sq ( header_t header,
       }
     }
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
     unsigned long j;
     for (j = 0; j < BATCH_SIZE; j++)
       gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n",
@@ -1726,7 +1662,7 @@ gmp_collision_on_sq ( header_t header,
     next_comb (N, K, idx_q);
     q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l], lq);
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT
     gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n",
 		 q[l], qqz[l], rqqz[l]);
 #endif

@@ -33,7 +33,7 @@
 #define SUP_ALPHA 4.843
 
 /* maximum lognorm increment for each rotation */
-#define BOUND_LOGNORM_INCR_MAX 1.2
+#define BOUND_LOGNORM_INCR_MAX 1.5
 
 #define MAX_LINE_LENGTH 4096
 
@@ -59,6 +59,11 @@
 /* Increase num in the tuning */
 #define TUNE_NUM_SUBLATTICE 8
 
+/* mu and sigma in function exp_alpha() */
+#define MU 0.0
+#define SIGMA 0.824
+
+
 /* --- declarations --- */
 
 
@@ -70,8 +75,6 @@ extern const unsigned int primes[];
 
 extern const unsigned char next_prime_idx[];
 
-extern const double exp_alpha[];
-
 extern const unsigned int default_sublattice_pe[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES];
 
 extern const unsigned long default_sublattice_prod[NUM_DEFAULT_SUBLATTICE];
@@ -81,5 +84,7 @@ extern const unsigned int s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUB
 extern const unsigned int s1_size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
 
 extern const unsigned int size_total_sublattices[8][2];
+
+double exp_alpha (double logK);
 
 #endif

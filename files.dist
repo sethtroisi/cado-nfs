@@ -61,8 +61,7 @@ factor.sh
 filter/CMakeLists.txt
 filter/Makefile
 filter/filter_badideals.h
-filter/filter_common.c
-filter/filter_common.h
+filter/filter_config.h
 filter/dup1.c
 filter/dup2.c
 filter/explain.c
@@ -204,7 +203,6 @@ linalg/bwc/mpfq/mpfq.h
 linalg/bwc/mpfq/mpfq_gfp_common.h
 linalg/bwc/mpfq/mpfq_name_ab.h
 linalg/bwc/mpfq/asm-constraints.patch
-linalg/bwc/pad.h
 linalg/bwc/parallelizing_info.c
 linalg/bwc/parallelizing_info.h
 linalg/bwc/prep.c
@@ -340,12 +338,12 @@ polyselect/gfpkdlpolyselect.h
 polyselect/gfpkdlpolyselect.c
 polyselect/table_f_Py_phi__f_deg4_s02_C4V4_h1_Py_s20_f01.c
 polyselect/table_t_Py_f_deg4_type0_h1_t-200--200.c
-polyselect/polyselect2l.c
-polyselect/polyselect2l.h
-polyselect/polyselect2l_arith.c
-polyselect/polyselect2l_arith.h
-polyselect/polyselect2l_str.c
-polyselect/polyselect2l_str.h
+polyselect/polyselect.c
+polyselect/polyselect.h
+polyselect/polyselect_arith.c
+polyselect/polyselect_arith.h
+polyselect/polyselect_str.c
+polyselect/polyselect_str.h
 polyselect/rho.c
 polyselect/rho.h
 polyselect/ropt.c
@@ -529,8 +527,6 @@ utils/stats.h
 utils/stats.c
 utils/lll.c
 utils/lll.h
-utils/lognorm_skewness.h
-utils/lognorm_skewness.c
 tests/README
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
@@ -766,8 +762,6 @@ ffs/fppol_set.h
 ffs/fppol_test.c
 ffs/fppol_test.h
 ffs/fq.h
-ffs/filter/README
-ffs/filter/filter.sh
 ffs/norm.c
 ffs/fppol_conv.c
 ffs/gray.h

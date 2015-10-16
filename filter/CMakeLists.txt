@@ -2,7 +2,7 @@ set (bin_list
         dup1 dup2 purge merge merge-dl replay replay-dl sm reconstructlog-dl
 )
 
-set (purge_sources filter_common.c purge_matrix.c singleton_removal.c
+set (purge_sources purge_matrix.c singleton_removal.c
                    clique_removal.c purge.c)
 
 # the utils library is already linked with -lgmp and -lm
@@ -18,17 +18,17 @@ target_link_libraries(filter_galois utils_with_io)
 add_executable(purge ${purge_sources})
 target_link_libraries(purge utils_with_io)
 
-add_executable(merge merge.c filter_common.c markowitz.c mst.c report.c merge_mono.c merge_replay_matrix.c sparse.c)
+add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c merge_replay_matrix.c sparse.c)
 target_link_libraries(merge utils_with_io)
 
-add_executable(merge-dl merge.c filter_common.c markowitz.c mst.c report.c merge_mono.c merge_replay_matrix.c sparse.c)
+add_executable(merge-dl merge.c markowitz.c mst.c report.c merge_mono.c merge_replay_matrix.c sparse.c)
 target_link_libraries(merge-dl utils_with_io)
 set_target_properties(merge-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 
-add_executable(replay filter_common.c replay.c sparse.c)
+add_executable(replay replay.c sparse.c)
 target_link_libraries(replay utils_with_io)
 
-add_executable(replay-dl filter_common.c replay.c sparse.c)
+add_executable(replay-dl replay.c sparse.c)
 target_link_libraries(replay-dl utils_with_io)
 set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 

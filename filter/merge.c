@@ -34,7 +34,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include "portability.h"
 
-#include "filter_common.h"
+#include "filter_config.h"
+#include "utils_with_io.h"
 #include "merge_replay_matrix.h" /* for filter_matrix_t */
 #include "report.h"     /* for report_t */
 #include "markowitz.h" /* for MkzInit */
@@ -64,6 +65,8 @@ static void declare_usage(param_list pl)
                             "approximated (default " STR(DEFAULT_MERGE_MKZTYPE) ")");
   param_list_decl_usage(pl, "wmstmax", "controls until when a mst is used with "
                             "-mkztype 2 (default " STR(DEFAULT_MERGE_WMSTMAX) ")");
+  param_list_decl_usage(pl, "forbidden-cols", "list of columns that cannot be "
+                                              "used for merges");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   verbose_decl_usage(pl);
@@ -138,6 +141,7 @@ main (int argc, char *argv[])
     /* to a too small value of -maxlevel                      */
     const char * resumename = param_list_lookup_string (pl, "resume");
     const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+    const char *forbidden_cols = param_list_lookup_string(pl, "forbidden-cols");
 
     param_list_parse_int (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
@@ -208,6 +212,13 @@ main (int argc, char *argv[])
     if (resumename != NULL)
       resume (rep, mat, resumename);
 
+    /* Some columns can be disable so merge won't use them as pivot */
+    if (forbidden_cols != NULL)
+    {
+      printf ("Disabling columns from %s\n", forbidden_cols);
+      matR_disable_cols (mat, forbidden_cols);
+    }
+
     mat->wmstmax = wmstmax;
     mat->mkztype = mkztype;
     tt = seconds();
@@ -217,9 +228,10 @@ main (int argc, char *argv[])
     mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax, nbmergemax);
 
     fclose_maybe_compressed (rep->outfile, outname);
-    printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRIu64 ") "
-            "w(M)=%" PRIu64 " N*w(M)=%" PRIu64 "\n ", mat->rem_nrows,
-            mat->rem_ncols, mat->rem_nrows - mat->rem_ncols, mat->weight,
+    printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRId64 ") "
+            "w(M)=%" PRIu64 " N*w(M)=%" PRIu64 "\n ",
+            mat->rem_nrows, mat->rem_ncols,
+            ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols), mat->weight,
 	          mat->rem_nrows * mat->weight);
     fflush (stdout);
     MkzClose (mat);

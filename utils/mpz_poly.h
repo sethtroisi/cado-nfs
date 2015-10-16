@@ -83,6 +83,7 @@ void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f,
 /* Tests and comparison functions */
 int mpz_poly_cmp (mpz_poly_srcptr, mpz_poly_srcptr);
 int mpz_poly_normalized_p (mpz_poly_srcptr f);
+int mpz_poly_is_nonmonic (mpz_poly_srcptr f);
 
 /* Polynomial arithmetic */
 void mpz_poly_neg(mpz_poly_ptr f, mpz_poly_srcptr g);

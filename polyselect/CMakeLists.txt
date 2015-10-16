@@ -9,20 +9,20 @@ set (ropt_sources
   )
 
 add_library(polyselect_common ${CADO_SHARED} auxiliary.c rho.c murphyE.c area.c size_optimization.c)
-add_executable (polyselect2l polyselect2l.c polyselect2l_str.c polyselect2l_arith.c ${ropt_sources})
+add_executable (polyselect polyselect.c polyselect_str.c polyselect_arith.c ${ropt_sources})
 
 add_executable (polyselect_ropt ropt_main.c ${ropt_sources})
-add_executable (polyselect_gfpn EXCLUDE_FROM_ALL polyselect_gfpn.c gfpkdlpolyselect.c)
+add_executable (polyselect_gfpn EXCLUDE_FROM_ALL polyselect_gfpn.c gfpkdlpolyselect.c ${ropt_sources})
 
 # the utils library already includes -lgmp and -lm
 target_link_libraries (polyselect_gfpn  polyselect_common utils)
 target_link_libraries (polyselect_common utils)
-target_link_libraries (polyselect2l polyselect_common utils ${pthread_libs})
+target_link_libraries (polyselect polyselect_common utils ${pthread_libs})
 target_link_libraries (polyselect_ropt polyselect_common utils ${pthread_libs})
 
 if(ENABLE_SHARED)
     install(TARGETS polyselect_common DESTINATION ${LIBSUFFIX})
 endif()
-install(TARGETS polyselect2l RUNTIME DESTINATION ${BINSUFFIX}/polyselect)
+install(TARGETS polyselect RUNTIME DESTINATION ${BINSUFFIX}/polyselect)
 install(TARGETS polyselect_ropt RUNTIME DESTINATION ${BINSUFFIX}/polyselect)
 include(CMakeLists-nodist.txt OPTIONAL)

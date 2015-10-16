@@ -184,7 +184,7 @@ test_size_optimization (void)
   n = L2_skew_lognorm (f_opt, SKEWNESS_DEFAULT_PREC);
   ASSERT_ALWAYS(n <= 87.415);
 
-  size_optimization (f_opt, g_opt, f, g, 1, 0);
+  size_optimization (f_opt, g_opt, f, g, 3, 0);
   n = L2_skew_lognorm (f_opt, SKEWNESS_DEFAULT_PREC);
   ASSERT_ALWAYS(n <= 87.197);
 

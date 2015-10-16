@@ -70,7 +70,13 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
         mpz_poly_init (poly->pols[i], MAXDEGREE);
       for(unsigned int j = 0; ; j++)
       {
-        gmp_sscanf(tmp, "%Zd", poly->pols[i]->coeff[j]);
+        int ret = gmp_sscanf(tmp, "%Zd", poly->pols[i]->coeff[j]);
+        if (ret != 1)
+        {
+          fprintf (stderr, "Error while parsing coefficients of degree %u "
+                           "of polynomial %d in polynomial file\n", j, i);
+          abort();
+        }
         for( ; *tmp != '\0' && *tmp != ','; tmp++);
         if(*tmp == '\0')
           break;
@@ -171,17 +177,19 @@ int cado_poly_read(cado_poly poly, const char *filename)
     return r;
 }
 
-/* TODO: adapt for more than 2 polynomials:
- * compute for each pair (0,i) the corresponding common root m_i
- * check all m_i are equal
- * If NULL is passed for m, then, just check that N divides the resultant.
+
+/* If NULL is passed for m, then, just check that N divides the resultant.
+ * Assume there at least two polynomials.
+ * TODO: adapt for more than 2 polynomials:
+ *    compute for each pair (0,i) the corresponding common root m_i
+ *    check all m_i are equal
  */
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
     // have to work with copies, because pseudo_gcd destroys its input
     mpz_poly_t f[2];
 
-    //    ASSERT_ALWAYS(cpoly->nb_polys == 2); // FIXME!!!
+    ASSERT_ALWAYS(cpoly->nb_polys >= 2);
 
     for (int i = 0; i < 2; ++i) {
         mpz_poly_init(f[i], cpoly->pols[i]->alloc);
@@ -230,26 +238,18 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
     return ret;
 }
 
-/* TODO: adapt for more than 2 polynomials */
-/* Return the rational side or -1 if two algebraic sides */
+/* Return the rational side or -1 if only algebraic sides */
+/* Assume that there is at most 1 rational side (renumber.c does the same
+ * assumption).
+ * XXX: Is there a case where more than 1 rational side is needed ??
+ */
 int
 cado_poly_get_ratside (cado_poly_ptr pol)
 {
-#if 0
-  ASSERT_ALWAYS(pol->nb_polys == 2);
-  if (pol->pols[0]->deg != 1 && pol->pols[1]->deg != 1)
-    return -1; /* two algrebraic sides */
-  else if (pol->pols[0]->deg == 1)
-    return 0;
-  else
-    return 1;
-#else
-  // assuming there is at most *one* rational side (?)
   for(int side = 0; side < pol->nb_polys; side++)
-      if(pol->pols[side]->deg == 1)
-	  return side;
+    if(pol->pols[side]->deg == 1)
+      return side;
   return -1;
-#endif
 }
 
 void

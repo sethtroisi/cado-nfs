@@ -656,7 +656,7 @@ static int coeff_cmp(
 #define ROOTS_MOD_THRESHOLD2 67 /* if the roots are needed too */
 
 /* The following function returns the number of roots of f(x) mod p,
-   where f has degree d.
+   where f has degree d, and p is prime.
    If r is not NULL, put the n roots of f(x) mod p in r[0]...r[n-1].
 
    For p <= ROOTS_MOD_THRESHOLD, determine the number of roots of f mod p

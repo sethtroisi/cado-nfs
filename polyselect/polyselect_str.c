@@ -9,9 +9,9 @@
 #define TOKENPASTE2(x, y) TOKENPASTE(x, y)
 #define LABEL_UNIQUE TOKENPASTE2(Label, __LINE__)
 
-/* Data struct used for polyselect2l */
+/* Data struct used for polyselect */
 #include "cado.h"
-#include "polyselect2l_str.h"
+#include "polyselect_str.h"
 #include "portability.h"
 
 void match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,

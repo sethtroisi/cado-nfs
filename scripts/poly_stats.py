@@ -32,7 +32,7 @@ def grep_files(path, regex=None):
                     yield line
 
 def make_polyselect_filename(directory, adstart, adlen):
-    """ Returns the polyselect2l output file name for a given admin -- admax range """
+    """ Returns the polyselect output file name for a given admin -- admax range """
     return '%s/c200.polyselect1.*.%s-%s' % (directory, adstart, adstart + adlen)
 
 def make_polyselect_filenames(directory, admin, admax, adstep, adlen):

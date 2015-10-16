@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include "utils.h"
 #include "portability.h"
-#include "filter_common.h"
+#include "filter_config.h"
 #include "filter_badideals.h"
 #include "mod_ul.h"
 

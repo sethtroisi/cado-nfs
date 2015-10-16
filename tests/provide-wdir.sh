@@ -10,7 +10,8 @@
 # If CADO_DEBUG is set to something, the temp directory is not cleaned.
 
 
-t=`mktemp -d /tmp/XXXXXXXXXXXXXX`
+: ${TMPDIR:=/tmp}
+t=`mktemp -d $TMPDIR/XXXXXXXXXXXXXX`
 
 cleanup() { rm -rf "$t" ; }
 

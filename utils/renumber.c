@@ -6,7 +6,6 @@
 #include "portability.h"
 #include "utils.h"
 
-//TODO remove lpbr lpba in comment, replace by appropirate lpb[i]
 /********************** internal functions *****************************/
 
 static const int ugly[256] = {
@@ -176,8 +175,18 @@ print_info (FILE * f, renumber_srcptr r, int after_reading)
     fprintf (f, "%sThere is no rational side\n", pre);
   else
     fprintf (f, "%sPolynomial on side %d is rational\n", pre, r->rat);
-  fprintf (f, "%s#badideals = %d\n%sadd_full_col = %d\n", pre, r->bad_ideals.n,
-              pre, r->add_full_col);
+  fprintf (f, "%s#badideals = %d\n%s#additional columns = %u\n", pre,
+              r->bad_ideals.n, pre, r->naddcols);
+  if (r->nonmonic)
+  {
+    fprintf (f, "%sNon monic polynomial on side:", pre);
+    for (uint64_t t = r->nonmonic, s = 0; t != 0; t>>=1, s++)
+      if (t & ((uint64_t) 1))
+        fprintf (f, " %" PRIu64 "", s);
+    fprintf (f, "\n");
+  }
+  else
+    fprintf (f, "%sAll polynomials are monic\n", pre);
   for (unsigned int i = 0; i < r->nb_polys; i++)
     fprintf (f, "%slpb%d = %lu\n", pre, i, r->lpb[i]);
 
@@ -258,8 +267,9 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_poly_srcptr f, p_r_values_t p)
 static void
 renumber_write_first_line (renumber_ptr renum)
 {
-  fprintf (renum->file, "%" PRIu8 " %d %d %d %u", renum->nb_bits, renum->rat,
-                    renum->bad_ideals.n, renum->add_full_col, renum->nb_polys);
+  fprintf (renum->file, "%" PRIu8 " %d %d %d %" PRIx64 " %u", renum->nb_bits,
+           renum->rat, renum->bad_ideals.n, renum->naddcols, renum->nonmonic,
+           renum->nb_polys);
   for (unsigned int i = 0; i < renum->nb_polys; i++)
     fprintf (renum->file, " %lu", renum->lpb[i]);
   fprintf (renum->file, "\n");
@@ -269,13 +279,12 @@ static void
 renumber_read_first_line (renumber_ptr renum)
 {
   int ret;
-  ret = fscanf (renum->file, "%" SCNu8 " %d %d %d %u", &(renum->nb_bits),
-                             &(renum->rat), &(renum->bad_ideals.n),
-                             &(renum->add_full_col), &(renum->nb_polys));
-  ASSERT_ALWAYS (ret == 5);
+  ret = fscanf (renum->file, "%" SCNu8 " %d %d %" SCNu8 " %" SCNx64 " %u",
+                &(renum->nb_bits), &(renum->rat), &(renum->bad_ideals.n),
+                &(renum->naddcols), & (renum->nonmonic), &(renum->nb_polys));
+  ASSERT_ALWAYS (ret == 6);
   ASSERT_ALWAYS (renum->nb_polys >= 1);
   ASSERT_ALWAYS (-1 <= renum->rat && renum->rat < (int) renum->nb_polys);
-  ASSERT_ALWAYS (renum->add_full_col == 0 || renum->add_full_col == 1);
   ASSERT_ALWAYS (renum->nb_bits <= 8 * sizeof(p_r_values_t));
   ASSERT_ALWAYS (renum->nb_bits == 32 || renum->nb_bits == 64);
   renum->lpb = (unsigned long *) malloc (renum->nb_polys*sizeof(unsigned long));
@@ -390,18 +399,17 @@ renumber_init_for_reading (renumber_ptr renumber_info)
  * not monic). */
 void
 renumber_init_for_writing (renumber_ptr renumber_info, unsigned int nb_polys,
-                           int rat, int add_full_col, unsigned long *lpb)
+                           int rat, int lcideals, uint64_t nonmonic,
+                           unsigned long *lpb)
 {
   memset(renumber_info, 0, sizeof(renumber_t));
 
   ASSERT_ALWAYS (nb_polys >= 1);
   ASSERT_ALWAYS (-1 <= rat && rat < (int) nb_polys);
-  ASSERT_ALWAYS (add_full_col == 0 || add_full_col == 1);
   ASSERT_ALWAYS (lpb != NULL);
   renumber_info->nb_polys = nb_polys;
   renumber_info->rat = rat;
-  renumber_info->add_full_col = add_full_col;
-
+  
   /* Set lpb table */
   size_t size_ul = nb_polys * sizeof (unsigned long);
   renumber_info->lpb = (unsigned long *) malloc (size_ul);
@@ -426,6 +434,31 @@ renumber_init_for_writing (renumber_ptr renumber_info, unsigned int nb_polys,
   else
     renumber_info->nb_bits = 64;
   ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+
+  /* Compute the number of additional columns needed in the renumbering table
+   * due to the non monic polynomials.
+   * If lcideals == 0 (as it should be for factorization):
+   *    --> no column is added (not needed).
+   * If lcideals != 0:
+   *    if nb_polys == 2:
+   *        if nonmonic == 0:
+   *          --> no column is added (all polynomials are monic).
+   *        if nonmonic != 0:
+   *          --> 1 column is added.
+   *    if nb_polys != 2:
+   *          --> add as many columns as the number of set bits in nonmonic
+   */
+  renumber_info->nonmonic = nonmonic;
+  if (lcideals == 0)
+    renumber_info->naddcols = 0;
+  else
+  {
+    if (nb_polys == 2)
+      renumber_info->naddcols = (nonmonic != 0);
+    else
+      for (renumber_info->naddcols = 0; nonmonic ; nonmonic>>=1)
+        renumber_info->naddcols += nonmonic & ((uint64_t) 1);
+  }
 }
 
 void
@@ -483,7 +516,8 @@ renumber_write_open (renumber_ptr tab, const char *tablefile,
     ASSERT_ALWAYS (fbad != NULL);
   }
 
-  tab->size = (tab->add_full_col) ? 1 : 0;
+  /* additional columns are always at the beginning of the renumbering table. */
+  tab->size = tab->naddcols;
 
   /* Read bad ideals files */
   if (badfile != NULL)
@@ -577,13 +611,10 @@ renumber_read_table (renumber_ptr tab, const char * filename)
 
   memset (tab->cached, 0, cached_table_size);
 
-  if (tab->add_full_col)
-  {
-    tab->table[0] = RENUMBER_SPECIAL_VALUE;
-    tab->size = 1;
-  }
-  else
-    tab->size = 0;
+  /* additional columns are always at the beginning of the renumbering table. */
+  tab->size = tab->naddcols;
+  for (uint8_t i = 0; i < tab->naddcols; i++)
+    tab->table[i] = RENUMBER_SPECIAL_VALUE;
 
   /* Reading the bad ideals at the top of the renumbering file */
   for (int k = 0; k < tab->bad_ideals.n; k++)
@@ -674,7 +705,9 @@ renumber_read_table (renumber_ptr tab, const char * filename)
 int renumber_is_bad (int *nb, index_t *first, renumber_srcptr rn, p_r_values_t p,
                      p_r_values_t r, int side)
 {
-  if (first) *first = (rn->add_full_col) ? 1 : 0;
+  /* bad ideals start after the 'naddcols' additional columns in the table. */
+  if (first != NULL)
+    *first = rn->naddcols;
   int bad = 0;
   for (int i = 0; i < rn->bad_ideals.n; ++i)
   {
@@ -689,6 +722,12 @@ int renumber_is_bad (int *nb, index_t *first, renumber_srcptr rn, p_r_values_t p
       if (first) *first += rn->bad_ideals.nb[i];
   }
   return bad;
+}
+
+int
+renumber_is_additional_column (renumber_srcptr tab, index_t h)
+{
+  return (h < tab->naddcols);
 }
 
 /* This function writes in a string the part of the renumbering table
@@ -927,6 +966,10 @@ renumber_get_index_from_p_r (renumber_srcptr renumber_info, p_r_values_t p,
   }
 }
 
+/* This function assume that i does not correspond to a bad ideals or an
+ * additional columns (i.e., tab[i] != RENUMBER_SPECIAL_VALUE). It will fail
+ * if this assumption is not satisfied.
+ */
 void
 renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
                              p_r_values_t * r, int *side, index_t i,
@@ -968,5 +1011,53 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
       *side = renumber_info->rat;
     }
   }
+}
+
+int
+renumber_get_side_from_index (renumber_srcptr renumber_info, index_t i,
+                              cado_poly pol)
+{
+  p_r_values_t *tab = renumber_info->table;
+  int side;
+
+  if (tab[i] == RENUMBER_SPECIAL_VALUE)
+  {
+    if (renumber_is_additional_column (renumber_info, i))
+    {
+      side = 0;
+      index_t index_add_col = 0;
+      uint64_t b;
+      for (b = renumber_info->nonmonic; b != 0; b>>=1, side++)
+      {
+        if (b & ((uint64_t) 1))
+        {
+          if (index_add_col == i)
+            break;
+          index_add_col++;
+        }
+      }
+      ASSERT_ALWAYS (b != 0);
+    }
+    else /* i corresponds to a bad ideals. */
+    {
+      index_t bad = renumber_info->naddcols;
+      int k;
+      for (k = 0; k < renumber_info->bad_ideals.n; k++)
+      {
+        if (i < bad + renumber_info->bad_ideals.nb[k])
+          break;
+        bad += renumber_info->bad_ideals.nb[k];
+      }
+      ASSERT_ALWAYS (k < renumber_info->bad_ideals.n);
+      side = renumber_info->bad_ideals.side[k];
+    }
+  }
+  else
+  {
+    p_r_values_t p, r;
+    renumber_get_p_r_from_index (renumber_info, &p, &r, &side, i, pol);
+  }
+
+  return side;
 }
 

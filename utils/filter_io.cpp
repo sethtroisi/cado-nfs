@@ -500,9 +500,7 @@ static int earlyparser_inner_skip_ab(ringbuf_ptr r, const char ** pp)
 
 static int prime_t_cmp(prime_t * a, prime_t * b)
 {
-    /* within _abp which is the context which calls us, .h is the prime
-     * side */
-    int r = (a->h > b->h) - (b->h > a->h);
+    int r = (a->side > b->side) - (b->side > a->side);
     if (r) return r;
     r = (a->p > b->p) - (b->p > a->p);
     return r;
@@ -513,11 +511,10 @@ static int prime_t_cmp(prime_t * a, prime_t * b)
  *  - a,b are in decimal (for factoring -- for FFS it's hex anyway)
  *  - the primes need not be sorted (XXX update: now they are, so we may
  *    save time here).
- *  - we have two input sides, but a flat, unique side on output.
+ *  - we have 'nb_polys' input sides, but a flat, unique side on output.
  *  - at some point in the process we must compute r=a/b mod p, and this
- *    is going to end up in the renumber table. We use the (so far
- *    unused) .h field in the prime_t structure to pass information to
- *    the routine which does this.
+ *    is going to end up in the renumber table. We use the .side field in the
+ *    prime_t structure to pass information to the routine which does this.
  */
 static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf_ptr r, uint64_t base);
 static int earlyparser_abp_decimal(earlyparsed_relation_ptr rel, ringbuf_ptr r)
@@ -560,7 +557,7 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
             // rel->primes[n++] = (prime_t) { .h = (index_t) side,.p = (p_r_values_t) pr,.e = 1};
-            rel->primes[n].h = (index_t) side;
+            rel->primes[n].side = side;
             rel->primes[n].p = (p_r_values_t) pr;
             rel->primes[n].e = 1;
             n++;
@@ -607,22 +604,32 @@ earlyparser_line(earlyparsed_relation_ptr rel, ringbuf_ptr r)
     int n = 0;
     /* the total number of commas an colons in a relation with k textual
      * sides is
-     * 1 comma + k * (1 colon + (nprimes-1) commas)
+     * 1 comma + k * (1 colon + max(nprimes-1,0) commas)
      *
-     * (assuming no side has zero prime, which indeed holds).
-     *
-     * 2 sides: 2 colons + nrat+nalg-1 commas
-     * 1 side: 1 colon + n commas
-     *
-     * invariant: colon+commas = n+1, whence nprimes = ncolons+ncommas-1.
+     * If we assume that no side has zero prime, the following invariant holds:
+     *      ncolon+ncommas = nprimes+1, whence nprimes = ncolons+ncommas-1.
+     * With MNFS, we cannot assume anymore that no side has zero prime. But we
+     * can still have this invariant if we consider any number of ... colons as
+     * only one colon.
      */
-
-    for(int c = 0 ; ; ) {
-        if (c == '\n') break;
-	if (c == ',' || c == ':') n++;
-        RINGBUF_GET_ONE_BYTE(c, r, p);
-        rel->line[i++] = c;
-        ASSERT_ALWAYS(i < RELATION_MAX_BYTES);
+    int prev_is_colon = 0;
+    for(int c = 0 ; ; )
+    {
+      if (c == '\n')
+        break;
+      else if (c == ',')
+        n++;
+      else if (c == ':')
+      {
+        if (prev_is_colon == 0)
+          n++;
+        prev_is_colon = 1;
+      }
+      else
+        prev_is_colon = 0;
+      RINGBUF_GET_ONE_BYTE(c, r, p);
+      rel->line[i++] = c;
+      ASSERT_ALWAYS(i < RELATION_MAX_BYTES);
     }
     rel->line[i++] = '\0';
     ASSERT_ALWAYS(i < RELATION_MAX_BYTES);
