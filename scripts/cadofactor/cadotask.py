@@ -3283,7 +3283,7 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.1,
+            {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.01,
              "required_excess": 0.1})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
