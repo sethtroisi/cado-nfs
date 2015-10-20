@@ -972,7 +972,8 @@ class DescentLowerClass(object):
                     ]
         call_that = [str(x) for x in call_that]
         print("command line:\n" + " ".join(call_that))
-        subprocess.check_call(call_that, stderr=subprocess.DEVNULL)
+        with open(os.devnull, 'w') as devnull:
+            subprocess.check_call(call_that, stderr=devnull)
 
         SM = []
         with open(SMfile, 'r') as file:
