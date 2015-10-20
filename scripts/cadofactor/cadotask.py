@@ -3799,6 +3799,14 @@ class NmbrthryTask(Task):
     def run(self):
         super().run()
 
+        # Check if we already compute the bad ideals (we check only
+        # one of the files, assuming everything was correct during the
+        # first run).
+        if "badfile" in self.state:
+            self.logger.info("Nmbrthry task has already run, reusing the result.");
+            return True
+
+        # Create output files and start the computation
         badfile = self.workdir.make_filename("badideals")
         badinfofile = self.workdir.make_filename("badidealinfo")
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaNmbrthry.name)
@@ -4467,7 +4475,7 @@ class ReconstructLogTask(Task):
     def run(self):
         super().run()
 
-        if not "dlog" in self.state or self.have_new_input_files():
+        if (not "dlog" in self.state) or self.have_new_input_files():
             dlogfilename = self.workdir.make_filename("dlog")
             gorder = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
@@ -4496,6 +4504,7 @@ class ReconstructLogTask(Task):
             if not dlogfilename.isfile():
                 raise Exception("Output file %s does not exist" % dlogfilename)
             self.state["dlog"] = dlogfilename.get_wdir_relative()
+            self.remember_input_versions()
         self.logger.debug("Exit ReconstructLogTask.run(" + self.name + ")")
         return True
     
