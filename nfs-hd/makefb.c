@@ -673,12 +673,12 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     }
     ideal_1_clear(ideal_1, t);
 
-    ideal_u_t ideal_u;
-    ideal_u_init(ideal_u);
     for (uint64_t i = 0; i < max_number_element_u; i++) {
       if (fgets(line, size_line, file) == NULL) {
         return;
       }
+      ideal_u_t ideal_u;
+      ideal_u_init(ideal_u);
       parse_ideal_u(ideal_u, line, t);
       if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
               (uint64_t)ideal_u->ideal->h->deg)) >= 0
@@ -687,8 +687,8 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
         factor_base_set_ideal_u(fb[k], number_element_u, ideal_u, t);
         number_element_u++;
       }
+      ideal_u_clear(ideal_u, t);
     }
-    ideal_u_clear(ideal_u, t);
 
     if (max_number_element_pr != 0) {
       ideal_pr_t ideal_pr;
