@@ -560,6 +560,7 @@ int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondis
     void * mychunk = mmt_my_own_subvec(v);
     size_t mysize = mmt_my_own_size_in_bytes(v);
     ssize_t s = pi_file_write(f, mychunk, mysize, sizeondisk);
+    serialize_threads(v->pi->m);
     return s >= 0 && (size_t) s == sizeondisk;
 }
 int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk)
@@ -583,6 +584,7 @@ int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
         }
     }
     free(filename);
+    serialize_threads(v->pi->m);
     return ok;
 }
 /* }}} */
@@ -1697,7 +1699,7 @@ void mmt_vec_untwist(matmul_top_data_ptr mmt, mmt_vec_ptr y)
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-/* {{{ mmt_vec_{un,}appy_T -- this applies the fixed
+/* {{{ mmt_vec_{un,}appy_T -- this applies the fixed column
  * permutation which we use unconditionally in bwc to avoid correlation
  * of row and column weights.
  */
@@ -1708,6 +1710,7 @@ void mmt_vec_apply_or_unapply_T_inner(matmul_top_data_ptr mmt, mmt_vec_ptr y, in
 {
     if (y->d == 0) return;
     ASSERT_ALWAYS(y->consistency == 2);
+    serialize_threads(y->pi->m);
     mmt_vec yt;
     mmt_vec_init(mmt, y->abase, y->pitype, yt, !y->d, 0, y->n);
     for(unsigned int i = y->i0 ; i < y->i1 ; i++) {
