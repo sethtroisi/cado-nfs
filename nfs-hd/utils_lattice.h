@@ -162,7 +162,8 @@ uint64_t index_vector(int64_vector_srcptr v, sieving_bound_srcptr H,
  * H: the sieving bound.
  */
 void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
-    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H);
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H,
+    int up_down);
 
 /*
  * Compute the Gram-Schmidt orthogonalisation of the vector in list_old to
