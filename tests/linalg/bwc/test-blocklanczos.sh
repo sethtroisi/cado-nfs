@@ -8,6 +8,7 @@ seed=1
 bindir=
 nullspace=left
 bwc_extra=()
+mpithr_args=()
 mf_bal_extra=()
 nh=1
 nv=1
@@ -51,6 +52,7 @@ while [ $# -gt 0 ] ; do
                 nh=$((x*nh))
                 x=`echo $1 | cut -d= -f2 | cut -dx -f2`
                 nv=$((x*nv))
+                mpithr_args=("${mpithr_args[@]}" "$1")
                 bwc_extra=("${bwc_extra[@]}" "$1")
                 shift
                 ;;
@@ -96,7 +98,7 @@ file_is_zero() {
 # care about replicating permutations.
 $bindir/mf_bal $nh $nv $wdir/mat.bin skip_decorrelating_permutation=1 out=$wdir/bal.bin --rectangular
 
-$bindir/blocklanczos m=64 n=64 ys=0..64 matrix=mat.bin wdir=$wdir balancing=bal.bin seed=1 interval=$((nrows/10+1)) no_save_cache=1 "${bwc_extra[@]}"
+$bindir/bwc.pl :mpirun "${mpithr_args[@]}" -- $bindir/blocklanczos m=64 n=64 ys=0..64 matrix=mat.bin wdir=$wdir balancing=bal.bin seed=1 interval=$((nrows/10+1)) no_save_cache=1 "${bwc_extra[@]}"
 
 if [ $nullspace = left ] ; then
     $bindir/../../tests/linalg/bwc/short_matmul -t $wdir/mat.bin $wdir/blsolution.0 $wdir/blsolution.0.image

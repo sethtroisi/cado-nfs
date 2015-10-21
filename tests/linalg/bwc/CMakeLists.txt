@@ -328,6 +328,12 @@ cado_divert_test(test-blocklanczos left-thr12
     APPEND_ARGUMENTS --matrix-size "90,69" --nullspace left thr=1x2)
 cado_divert_test(test-blocklanczos left-thr23
     APPEND_ARGUMENTS --matrix-size "1500,1000" --nullspace left thr=2x3)
+if (HAVE_MPI)
+    cado_divert_test(test-blocklanczos left-mpi1-thr23
+        APPEND_ARGUMENTS --matrix-size "2500,1500" --nullspace left mpi=2x3 thr=2x3)
+    cado_divert_test(test-blocklanczos left-mpi2-thr23
+        APPEND_ARGUMENTS --matrix-size "2500,1500" --nullspace left mpi=3x2 thr=2x3)
+endif()
 
 cado_define_test(TEST_NAME test-blocklanczos-staged
     PROGRAM
