@@ -28,7 +28,7 @@ tasks.galois = 1/y
 
 # If you don't want the "full column of 1", uncomment the following line.
 # In particular when both polynomials are not monic, this could help.
-# tasks.addfullcol = false
+# tasks.lcideals = false
 
 tasks.I = 10
 

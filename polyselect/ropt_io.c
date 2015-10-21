@@ -526,7 +526,7 @@ print_poly_info_short ( mpz_t *f,
           alpha_proj,
           logmu + alpha,
           nroots,
-          logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew) ),
+          logmu + exp_alpha(exp_rot[d]*log(skew)),
           e );
 
   fflush( stdout );

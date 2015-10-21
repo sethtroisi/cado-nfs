@@ -57,6 +57,7 @@ typedef struct {
   index_t h;
   p_r_values_t p;
   exponent_t e;
+  uint8_t side;
 } prime_t;
 
 typedef struct {

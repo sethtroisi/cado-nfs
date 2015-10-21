@@ -619,6 +619,19 @@ int mpz_poly_normalized_p (mpz_poly_srcptr f)
   return (f->deg == -1) || mpz_cmp_ui (f->coeff[f->deg], 0) != 0;
 }
 
+/* return 1 if f is nonmonic, i.e. f[deg] != 1, return 0 otherwise (null
+ * polynomial is considered monic).
+ */
+int mpz_poly_is_nonmonic (mpz_poly_srcptr f)
+{
+  if (f->deg == -1)
+    return 0;
+  else if (mpz_cmp_ui (f->coeff[f->deg], 1) == 0)
+    return 0;
+  else
+    return 1;
+}
+
 /* -------------------------------------------------------------------------- */
 
 /* Set f=-g.
@@ -868,7 +881,9 @@ mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
 {
   int i, j;
   int d = f->deg;
-  mpz_poly_set (ft, f);
+
+  if (ft != f)
+    mpz_poly_set (ft, f);
 
   for (i = d - 1; i >= 0; i--)
     for (j = i; j < d; j++)

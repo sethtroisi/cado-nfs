@@ -142,6 +142,7 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
   char buf[1 << 12], *p, *op;
   size_t t;
   unsigned int i, j;
+  uint64_t nonvoidside = 0; /* bit vector of which sides appear in the rel */
 
   p = d64toa16(buf, rel->a);
   *p++ = ',';
@@ -158,13 +159,47 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
       t = p - op;
       for (j = (unsigned int) ((rel->primes[i].e) - 1); j--; p += t)
         memcpy(p, op, t);
+      nonvoidside |= ((uint64_t) 1) << rel->primes[i].side;
     }
   }
-  // Add a column of 1 (it always has index 0) if asked
-  if (renumber_tab->add_full_col)
+
+  /* If needed, print the additional columns (they are always at the beginning
+   * of the renumbering table).
+   * if naddcols == 0:
+   *    do nothing.
+   * else: 
+   *    if nb_polys == 2:
+   *      we add the columns 0 (in this case there is always 1 additional column
+   *      and it is always necessary)
+   *    if nb_polys != 2:
+   *      we add the columns i if and only if the ith bit of
+   *      renumber_tab->nonmonic is 1 (i.e., the polynomial on side i is non
+   *      monic) and the relation contains at least one prime on side i.
+   */
+  if (renumber_tab->naddcols)
   {
-    p = u64toa16(p, (uint64_t) 0);
-    *p++ = ',';
+    if (renumber_tab->nb_polys == 2)
+    {
+      p = u64toa16(p, (uint64_t) 0);
+      *p++ = ',';
+    }
+    else
+    {
+      index_t index_add_col = 0;
+      for (uint64_t b = renumber_tab->nonmonic, side = 0; b != 0;
+                                                b>>=1, nonvoidside>>=1, side++)
+      {
+        if (b & ((uint64_t) 1))
+        {
+          if (nonvoidside & ((uint64_t) 1))
+          {
+            p = u64toa16(p, (uint64_t) index_add_col);
+            *p++ = ',';
+          }
+          index_add_col++;
+        }
+      }
+    }
   }
 
 
@@ -238,18 +273,13 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
   unsigned int i;
   p_r_values_t r;
   prime_t *pr = rel->primes;
-  int side;
   weight_t len = rel->nb; // rel->nb can be modified by bad ideals
 
- /* HACK: a relation is on the form a,b:side0:side1
-  * we put the side in primes[i].h
-  */
   for (i = 0; i < len; i++)
   {
     if (pr[i].e > 0)
     {
-      side = (int) pr[i].h;
-      if (side != renumber_tab->rat)
+      if (pr[i].side != renumber_tab->rat)
       {
 #ifndef FOR_FFS
 #if DEBUG >= 1
@@ -273,10 +303,12 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
       
       int nb; //number of ideals above the bad ideal
       index_t first_index; // first index of the ideals above a bad ideal
-      if (renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r, side))
+      if (renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r,
+                           pr[i].side))
       {
         int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS] = {0,};
-        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e, side, info);
+        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e,
+                           pr[i].side, info);
         
         /* allocate room for (nb) more valuations */
         if (rel->nb + nb - 1 > rel->nb_alloc)
@@ -299,7 +331,8 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
         }
       }
       else
-        pr[i].h = renumber_get_index_from_p_r(renumber_tab, pr[i].p, r, side);
+        pr[i].h = renumber_get_index_from_p_r(renumber_tab, pr[i].p, r,
+                                              pr[i].side);
     }
   }
 }

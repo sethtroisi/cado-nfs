@@ -1,5 +1,5 @@
-#ifndef POLYSELECT2L_STR_H
-#define POLYSELECT2L_STR_H
+#ifndef POLYSELECT_STR_H
+#define POLYSELECT_STR_H
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -105,7 +105,7 @@ int knapsack_solve(knapsack_object_ptr ks)
     /* elements in u1 are sorted in increasing order, in [-B/2,B/2[ */
     /* elements in u2 are sorted in DEcreasing order, or more
      * accurately, in increasing order of their opposite. It is therefore
-     * best to consider u2 as containing the OPPOSITES off the y values,
+     * best to consider u2 as containing the OPPOSITES of the y values,
      * even though in reality we don't have to take the negation. These
      * OPPOSITES, for comparison purposes, are thus considered in
      * [-B/2,B/2[

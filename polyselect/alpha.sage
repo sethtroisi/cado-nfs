@@ -345,28 +345,24 @@ def check_alpha_projective(f,B):
         s2 += a2
         print p, a, a2, s, s2
 
-# for small values of S
-def expected_alpha_small(S):
-   assert S <= 1e5
-   eq = 1/2*(1 - erf(x/sqrt(2)))
-   eq = eq^RR(S) == 0.5
-   return find_root(eq, -5, 0)
+# given a rootsieve space of n points, estimate the best alpha value
+# see http://maths-people.anu.edu.au/~brent/pd/Bai-thesis.pdf 
+# (page 40, formula 3.6) and
+# A note on the first moment of extreme order statistics from the normal
+# distribution, Max Petzold, https://gupea.ub.gu.se/handle/2077/3092
+def expected_alpha(n):
+    mu = 0
+    sigma = 0.824
+    return mu - sigma*(sqrt(2*log(n))-(log(log(n))+1.3766)/(2*sqrt(2*log(n))))
 
-# given a rootsieve space of S points, estimate the best alpha value
-# which is the solution of f(x)^S = 1/2 for f(x) = 1/2*(1 - erf(x/sqrt(2)))
-# expected_alpha(1e10) = -6.42
-# expected_alpha(1e15) = -7.99
-# expected_alpha(1e20) = -9.30
-def expected_alpha(S):
-   assert 1.0 <= S
-   if S <= 1e5:
-      return expected_alpha_small(S)
-   R = RealField(100)
-   y = R(1/2) # (1/2*(1 - erf(x/sqrt(2))))^S = y
-   y = y^(1/S) # 1/2*(1 - erf(x/sqrt(2))) = y
-   y = 2*y # 1 - erf(x/sqrt(2)) = y
-   # 1-erf(-t) ~ 2 - 1/sqrt(pi)/t/exp(t^2) for t -> +oo
-   y = 2 - y # 1/sqrt(pi)/t/exp(t^2) = y
-   t = x/sqrt(2)
-   eq = 1/sqrt(pi)/t/exp(t^2) == y
-   return -find_root(eq, 0, 20)
+# print expected_alpha(2^k) for 0 <= k < bound (in 5 columns)
+def expected_alpha_est(bound=150):
+    c = 0
+    print('%8.3f,' % 0),
+    for k in range(1,bound):
+        c = c + 1
+        E = expected_alpha(2^k)
+        if (c % 5 == 0):
+            print
+        print('%8.3f,' % E),
+
