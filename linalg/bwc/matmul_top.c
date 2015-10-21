@@ -2211,11 +2211,13 @@ static void mmt_get_local_permutation_data(matmul_top_data_ptr mmt, param_list_p
 
     if (mmt->pi->m->trank == 0) {
         if (rowperm_items) {
+            ASSERT_ALWAYS(rowperm_items == mmt->bal->trows);
             if (mmt->pi->m->jrank != 0)
                 bal_tmp->rowperm = malloc(mmt->bal->trows * sizeof(uint32_t));
             MPI_Bcast(bal_tmp->rowperm, mmt->bal->trows * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
         }
         if (colperm_items) {
+            ASSERT_ALWAYS(colperm_items == mmt->bal->tcols);
             if (mmt->pi->m->jrank != 0)
                 bal_tmp->colperm = malloc(mmt->bal->tcols * sizeof(uint32_t));
             MPI_Bcast(bal_tmp->colperm, mmt->bal->tcols * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
