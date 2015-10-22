@@ -4454,13 +4454,10 @@ class ReconstructLogTask(Task):
         return "Logarithms Reconstruction"
     @property
     def programs(self):
-        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                 "renumber": Request.GET_RENUMBER_FILENAME,
-                 "purged": Request.GET_PURGED_FILENAME,
-                 "ker": Request.GET_KERNEL_FILENAME,
-                 "ideals": Request.GET_IDEAL_FILENAME,
-                 "relsdel": Request.GET_RELSDEL_FILENAME}
-        override = ("dlog",  "ell", "nmaps0", "nmaps1", "nrels", "abunits0", "abunits1")
+        input = {"ker": Request.GET_KERNEL_FILENAME,}
+        override = ("dlog",  "ell", "nmaps0", "nmaps1", "nrels",
+                "abunits0", "abunits1", "poly", "renumber",
+                "purged", "ideals", "relsdel")
         return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):
@@ -4491,6 +4488,11 @@ class ReconstructLogTask(Task):
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
+                    poly=self.send_request(Request.GET_POLYNOMIAL_FILENAME),
+                    renumber=self.send_request(Request.GET_RENUMBER_FILENAME),
+                    purged=self.send_request(Request.GET_PURGED_FILENAME),
+                    ideals=self.send_request(Request.GET_IDEAL_FILENAME),
+                    relsdel=self.send_request(Request.GET_RELSDEL_FILENAME),
                     nsm=str(nmaps[0])+","+str(nmaps[1]),
                     nrels=nrels,
 		    abunits0=str(abunitsdirname) + ".0",
