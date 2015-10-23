@@ -3161,7 +3161,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * this hack).
          */
 
-        report->ttbuckets_fill -= seconds();
+        workspaces->thrs[0].rep->ttbuckets_fill -= seconds();
 
         /* Allocate buckets */
         workspaces->pickup_si(si);
@@ -3194,7 +3194,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         ASSERT_ALWAYS(max_full <= 1.0 ||
                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
         
-        report->ttbuckets_fill += seconds();
+        workspaces->thrs[0].rep->ttbuckets_fill += seconds();
 
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {

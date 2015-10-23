@@ -417,7 +417,7 @@ class LogBase(object):
                 index,p,side,r,*value = line.split()
                 if p == "bad" and side == "ideals":
                     self.badideals.append(int(r))
-                elif p == "SM" and side == "col":
+                elif p == "SM":
                     self.SMs.append(int(value[0]))
                 else:
                     # for rational side, we actually don't have the root.
@@ -972,7 +972,8 @@ class DescentLowerClass(object):
                     ]
         call_that = [str(x) for x in call_that]
         print("command line:\n" + " ".join(call_that))
-        subprocess.check_call(call_that, stderr=subprocess.DEVNULL)
+        with open(os.devnull, 'w') as devnull:
+            subprocess.check_call(call_that, stderr=devnull)
 
         SM = []
         with open(SMfile, 'r') as file:

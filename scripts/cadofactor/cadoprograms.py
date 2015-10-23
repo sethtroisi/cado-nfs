@@ -1048,7 +1048,7 @@ class ReconstructLog(Program):
     def __init__(self, *,
                  ell: Parameter("gorder"),
                  threads: Parameter("mt")=None,
-                 ker: Parameter("log"),
+                 ker: Parameter("log", is_input_file=True),
                  dlog: Parameter("out"),
                  renumber: Parameter(),
                  poly: Parameter(),
@@ -1060,8 +1060,8 @@ class ReconstructLog(Program):
                  nsm: Parameter(),
                  explicit_units0: Toggle()=None,
                  explicit_units1: Toggle()=None,
-    		 abunits0: Parameter(is_input_file=True),
-    		 abunits1: Parameter(is_input_file=True),
+    		 abunits0: Parameter(),
+    		 abunits1: Parameter(),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

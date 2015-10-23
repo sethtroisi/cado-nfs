@@ -3283,7 +3283,7 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.1,
+            {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.01,
              "required_excess": 0.1})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -3799,6 +3799,14 @@ class NmbrthryTask(Task):
     def run(self):
         super().run()
 
+        # Check if we already compute the bad ideals (we check only
+        # one of the files, assuming everything was correct during the
+        # first run).
+        if "badfile" in self.state:
+            self.logger.info("Nmbrthry task has already run, reusing the result.");
+            return True
+
+        # Create output files and start the computation
         badfile = self.workdir.make_filename("badideals")
         badinfofile = self.workdir.make_filename("badidealinfo")
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaNmbrthry.name)
@@ -4446,13 +4454,10 @@ class ReconstructLogTask(Task):
         return "Logarithms Reconstruction"
     @property
     def programs(self):
-        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                 "renumber": Request.GET_RENUMBER_FILENAME,
-                 "purged": Request.GET_PURGED_FILENAME,
-                 "ker": Request.GET_KERNEL_FILENAME,
-                 "ideals": Request.GET_IDEAL_FILENAME,
-                 "relsdel": Request.GET_RELSDEL_FILENAME}
-        override = ("dlog",  "ell", "nmaps0", "nmaps1", "nrels", "abunits0", "abunits1")
+        input = {"ker": Request.GET_KERNEL_FILENAME,}
+        override = ("dlog",  "ell", "nmaps0", "nmaps1", "nrels",
+                "abunits0", "abunits1", "poly", "renumber",
+                "purged", "ideals", "relsdel")
         return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):
@@ -4467,7 +4472,7 @@ class ReconstructLogTask(Task):
     def run(self):
         super().run()
 
-        if not "dlog" in self.state or self.have_new_input_files():
+        if (not "dlog" in self.state) or self.have_new_input_files():
             dlogfilename = self.workdir.make_filename("dlog")
             gorder = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
@@ -4483,6 +4488,11 @@ class ReconstructLogTask(Task):
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
+                    poly=self.send_request(Request.GET_POLYNOMIAL_FILENAME),
+                    renumber=self.send_request(Request.GET_RENUMBER_FILENAME),
+                    purged=self.send_request(Request.GET_PURGED_FILENAME),
+                    ideals=self.send_request(Request.GET_IDEAL_FILENAME),
+                    relsdel=self.send_request(Request.GET_RELSDEL_FILENAME),
                     nsm=str(nmaps[0])+","+str(nmaps[1]),
                     nrels=nrels,
 		    abunits0=str(abunitsdirname) + ".0",
@@ -4496,6 +4506,7 @@ class ReconstructLogTask(Task):
             if not dlogfilename.isfile():
                 raise Exception("Output file %s does not exist" % dlogfilename)
             self.state["dlog"] = dlogfilename.get_wdir_relative()
+            self.remember_input_versions()
         self.logger.debug("Exit ReconstructLogTask.run(" + self.name + ")")
         return True
     
