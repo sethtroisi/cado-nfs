@@ -675,8 +675,7 @@ static unsigned int find_min_y(list_int64_vector_srcptr SV,
 }
 
 void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
-    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H,
-    int up_down)
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
   // Contain all the possible vectors to go from z=d to z=d+1.
   list_int64_vector_t list;
@@ -692,11 +691,7 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
   unsigned char found = 2;
 
   for (unsigned int i = 0; i < SV->length; i++) {
-    if (up_down >= 0) {
-      int64_vector_add(v_tmp, vs, SV->v[i]);
-    } else {
-      int64_vector_sub(v_tmp, vs, SV->v[i]);
-    }
+    int64_vector_add(v_tmp, vs, SV->v[i]);
     list_int64_vector_add_int64_vector(list, v_tmp);
 
     if (-(int64_t) H->h[0] <= v_tmp->c[0] && (int64_t)H->h[0] > v_tmp->c[0]) {
@@ -1097,7 +1092,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 
   int64_vector_set(s_out, s);
 
-  plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H, 1);
+  plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
   //Enumerate the element of the sieving region.
   for (unsigned int d = (unsigned int) s->c[2] + 1; d < H->h[2]; d++) {
     plane_sieve_1_enum_plane_incomplete
@@ -1107,7 +1102,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
     }
 
     //Jump in the next plane.
-    plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H, 1);
+    plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
   }
 }
 

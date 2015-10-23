@@ -746,6 +746,57 @@ void plane_sieve_1_enum_plane(array_ptr array,
   int64_vector_clear(v);
 }
 
+void find_new_vs(int64_vector_ptr vs, list_int64_vector_ptr v_refresh,
+    list_int64_vector_t * SV, int64_vector_srcptr e0, int64_vector_srcptr e1,
+    sieving_bound_srcptr H)
+{
+#ifndef NDEBUG
+  int64_t tmp = 0;
+  int64_t tmp2 = 0;
+  for (unsigned int j = 2; j < vs->dim; j++) {
+    tmp = tmp + vs->c[j];
+    tmp2 = tmp2 + H->h[j];
+  }
+  ASSERT(tmp <= tmp2);
+#endif
+
+  unsigned int k = 2;
+  while(k < vs->dim) {
+    if (vs->c[k] == H->h[k] - 1) {
+      int64_vector_set(vs, v_refresh->v[k - 2]);
+      k++;
+    } else {
+      break;
+    }
+  }
+  if (k < vs->dim) {
+    plane_sieve_next_plane(vs, SV[k - 2], e0, e1, H);
+    if (k > 2) {
+      for (unsigned int i = 0; i < k - 2; i++) {
+        int64_vector_set(v_refresh->v[i], vs);
+      }
+    }
+  }
+
+#ifndef NDEBUG
+  if (vs->c[vs->dim - 1] == H->h[vs->dim - 1]) {
+    for (unsigned int j = 2; j < vs->dim - 1; j++) {
+      tmp = vs->c[j];
+      ASSERT(tmp == 0);
+    }
+  } else {
+    for (unsigned int j = 2; j < vs->dim - 1; j++) {
+      tmp = vs->c[j];
+      ASSERT(tmp >= -(int64_t)H->h[j]);
+      ASSERT(tmp < (int64_t)H->h[j]);
+    }
+    tmp = vs->c[vs->dim - 1];
+    ASSERT(tmp >= 0);
+    ASSERT(tmp < H->h[vs->dim - 1]);
+  }
+#endif
+}
+
 /*
  * Plane sieve.
  *
@@ -814,9 +865,16 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   int64_vector_init(vs, e0->dim);
   int64_vector_set_zero(vs);
 
-  int64_vector_t v_refresh;
-  int64_vector_init(v_refresh, e0->dim);
-  int64_vector_set(v_refresh, vs);
+  if (H->t >= 3) {
+    for (unsigned int i = 2; i < H->t - 1; i++) {
+      int64_vector_addmul(vs, vs, SV[i - 2]->v[0], -(int64_t) H->h[i]);
+    }
+    int64_vector_addmul(vs, vs, SV[0]->v[0], -1);
+    plane_sieve_next_plane(vs, SV[0], e0, e1, H);
+  }
+
+  list_int64_vector_t v_refresh;
+  list_int64_vector_init(v_refresh, e0->dim);
 
   uint64_t coord_e0 = 0, coord_e1 = 0;
   coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H, array->number_element);
@@ -824,31 +882,24 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   //Iterate from H[2] to H[t - 1].
   //Enumerate the element of the sieving region.
   uint64_t size = 1;
+
+  for (unsigned int i = 0; i < H->t - 2; i++) {
+    list_int64_vector_add_int64_vector(v_refresh, vs);
+  }
+
   for (unsigned int i = 2; i < H->t - 1; i++) {
     size = size * (2 * (uint64_t) H->h[i]);
-    plane_sieve_next_plane(vs, SV[i - 2], e0, e1, H, -1);
   }
   size = size * ((uint64_t) H->h[H->t - 1]);
-  int up_down = 1;
 
-  //TODO: Beware, next plane is hardcoded for t = 4.
   for (uint64_t d = 0; d < size; d++) {
     plane_sieve_1_enum_plane(array, file_trace_pos, vs, e0, e1, coord_e0,
         coord_e1, H, r, matrix, f, nb_hit);
 
+    //TODO: it is probably possible to better write find_new_vs.
     //Jump in the next plane.
-    if (vs->c[2] == (int)H->h[2] - 1) {
-      up_down = -1;
-      int64_vector_set(vs, v_refresh);
-      plane_sieve_next_plane(vs, SV[0], e0, e1, H, up_down);
-    } else if (vs->c[2] == -(int)H->h[2]) {
-      up_down = 1;
-      int64_vector_set(vs, v_refresh);
-      plane_sieve_next_plane(vs, SV[1], e0, e1, H, up_down);
-      int64_vector_set(v_refresh, vs);
-    } else {
-      plane_sieve_next_plane(vs, SV[0], e0, e1, H, up_down);
-    }
+    find_new_vs(vs, v_refresh, SV, e0, e1, H);
+
   }
 
   for (unsigned int i = 0; i < Mqr->NumRows - 2; i++) {
@@ -858,7 +909,7 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   int64_vector_clear(vs);
   int64_vector_clear(e0);
   int64_vector_clear(e1);
-  int64_vector_clear(v_refresh);
+  list_int64_vector_clear(v_refresh);
 }
 
 /* ----- Space sieve algorithm ----- */
