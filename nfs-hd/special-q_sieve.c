@@ -2143,8 +2143,7 @@ int main(int argc, char * argv[])
         for (unsigned int j = 0; j < V; j++) {
           sec = seconds();
           uint64_array_init(indexes[j], array->number_element);
-          memset(array->array, 255,
-              sizeof(unsigned char) * array->number_element);
+          array_set_all_elements_max(array);
 #ifndef OLD_NORM
           init_norm(array, max_norm + j, file_trace_pos, H, matrix, f->pols[j],
               special_q, !(j ^ q_side));
