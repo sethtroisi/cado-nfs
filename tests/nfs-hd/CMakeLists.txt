@@ -39,3 +39,12 @@ cado_define_test(test_mat_int64.c
 	${CADO_NFS_SOURCE_DIR}/nfs-hd/mat_Z.c
 	${CADO_NFS_SOURCE_DIR}/nfs-hd/int64_poly.c
 	${CADO_NFS_SOURCE_DIR}/nfs-hd/int64_vector.c LIBRARIES utils)
+
+# -----
+cado_define_test(test_resultant.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/sieving_bound.c
+	${CADO_NFS_SOURCE_DIR}/utils/mpz_poly.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/int64_vector.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/mat_int64.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/int64_poly.c
+	${CADO_NFS_SOURCE_DIR}/nfs-hd/mat_Z.c
+	${CADO_NFS_SOURCE_DIR}/utils/double_poly.c LIBRARIES utils)
