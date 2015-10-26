@@ -182,3 +182,4 @@ nfs-hd/utils_norm.h
 nfs-hd/utils_cofactorisation.c
 nfs-hd/utils_cofactorisation.h
 .mailmap
+nfs-hd/CMakeLists.txt
