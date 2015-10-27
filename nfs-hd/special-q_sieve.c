@@ -1853,6 +1853,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "q_range", "range of the special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
   param_list_decl_usage(pl, "fb", "path to factor bases");
+  param_list_decl_usage(pl, "main", "if MNFS-CM, defines the main side");
 }
 
 /*
@@ -1873,10 +1874,9 @@ void declare_usage(param_list pl)
  */
 void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
-    uint64_t ** q_range, unsigned char ** thresh,
-    unsigned int ** lpb,
+    uint64_t ** q_range, unsigned char ** thresh, unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
-    int * main_side)
+    int * main_side, double ** base)
 {
   param_list pl;
   param_list_init(pl);
@@ -1924,11 +1924,12 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * V = (unsigned int) f->nb_polys;
 
   //TODO: something strange here.
-  * fbb = malloc(sizeof(uint64_t) * (* V));
-  * thresh = malloc(sizeof(unsigned char) * (* V));
-  * fb = malloc(sizeof(factor_base_t) * (* V));
-  * lpb = malloc(sizeof(unsigned int) * (* V));
-  * q_range = malloc(sizeof(uint64_t) * 2);
+  * fbb = (uint64_t *) malloc(sizeof(uint64_t) * (* V));
+  * thresh = (unsigned char *) malloc(sizeof(unsigned char) * (* V));
+  * fb = (factor_base_t *) malloc(sizeof(factor_base_t) * (* V));
+  * lpb = (unsigned int *) malloc(sizeof(unsigned int) * (* V));
+  * q_range = (uint64_t *) malloc(sizeof(uint64_t) * 2);
+  * base = (double *) malloc(sizeof(double) * (* V));
 
   param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
 
@@ -1969,7 +1970,31 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   ASSERT((* q_range)[0] > fbb[0][* q_side]);
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
-  param_list_clear(pl);
+  for (unsigned int j = 0; j < * V; j++) {
+    mpz_t inf_f;
+    mpz_init(inf_f);
+    mpz_poly_infinity_norm(inf_f, f->pols[j]);
+    (*base)[j] = pow(mpz_get_d(inf_f), (double)(H->t - 1));
+    mpz_clear(inf_f);
+    double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
+        1.0 / (double)H->t);
+    double tmp = 0;
+    for (unsigned int i = 0; i < H->t; i++) {
+      tmp = tmp + (double)H->h[i];
+    }
+    max_a = tmp * max_a;
+    /*double max_a = (double)H->t * (double) (*q_range)[1];*/
+
+    (*base)[j] = *(base)[j] * 
+      pow((double)(f->pols[j]->deg + 1), (double)(H->t - 1) /2.0) *
+      pow((double)H->t, (double)f->pols[j]->deg / 2.0) *
+      pow(max_a, (double)f->pols[j]->deg);
+    if (* q_side == j) {
+      (*base)[j] = (*base)[j] / (double)(*q_range)[0];
+    }
+    (*base)[j] = pow((*base)[j], 1 / (double)(UCHAR_MAX - 2));
+    (*base)[j] = log2((*base)[j]);
+  }
 
   array_init(array, number_element);
 
@@ -1999,9 +2024,10 @@ int main(int argc, char * argv[])
   factor_base_t * fb;
   uint64_t q;
   int main_side;
+  double * base;
 
-  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
-                        &thresh, &lpb, array, matrix, &q_side, &V, &main_side);
+  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range, &thresh, &lpb,
+      array, matrix, &q_side, &V, &main_side, &base);
 
 #ifdef PRINT_PARAMETERS
   printf("# H =\n");
@@ -2141,6 +2167,10 @@ int main(int argc, char * argv[])
 #endif // TRACE_POS
 
         for (unsigned int j = 0; j < V; j++) {
+#ifdef TRACE_POS
+          fprintf(file_trace_pos, "Base: %d\n", pow(2.0, base[j]));
+#endif // TRACE_POS
+
           sec = seconds();
           uint64_array_init(indexes[j], array->number_element);
           array_set_all_elements_max(array);
@@ -2178,8 +2208,8 @@ int main(int argc, char * argv[])
         }
 
         sec = seconds();
-        nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
-            matrix, f->pols, H, V, special_q, q_side, main_side);
+        /*nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,*/
+            /*matrix, f->pols, H, V, special_q, q_side, main_side);*/
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
@@ -2248,6 +2278,7 @@ int main(int argc, char * argv[])
   free(fbb);
   free(thresh);
   free(q_range);
+  free(base);
   cado_poly_clear(f);
   free_saved_chains();
 
