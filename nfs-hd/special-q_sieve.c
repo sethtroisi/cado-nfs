@@ -1877,7 +1877,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
     uint64_t ** q_range, unsigned char ** thresh, unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
-    int * main_side, double ** base)
+    int * main_side, double ** log2_base)
 {
   param_list pl;
   param_list_init(pl);
@@ -1930,7 +1930,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * fb = (factor_base_t *) malloc(sizeof(factor_base_t) * (* V));
   * lpb = (unsigned int *) malloc(sizeof(unsigned int) * (* V));
   * q_range = (uint64_t *) malloc(sizeof(uint64_t) * 2);
-  * base = (double *) malloc(sizeof(double) * (* V));
+  * log2_base = (double *) malloc(sizeof(double) * (* V));
 
   param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
 
@@ -1939,23 +1939,6 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   /*for (unsigned int i = 0; i < * V; i++) {*/
     /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
   /*}*/
-
-#ifdef MAKE_FB_DURING_SIEVE
-  for (unsigned int i = 0; i < * V; i++) {
-    factor_base_init((*fb)[i], (*fbb)[i], (*fbb)[i], (*fbb)[i]);
-  }
-  double sec = seconds();
-  makefb(*fb, f->pols, *fbb, H->t, *lpb, * V);
-  printf("# Time for makefb: %f.\n", seconds() - sec);
-#else
-  double sec = seconds();
-  FILE * file_r;
-  param_list_parse_string(pl, "fb", path, size_path);
-  file_r = fopen(path, "r");
-  read_factor_base(file_r, (*fb), (*fbb), (*lpb), f);
-  fclose(file_r);
-  printf("# Time to read factor bases: %f.\n", seconds() - sec);
-#endif
 
   param_list_parse_uchar_list(pl, "thresh", * thresh, (size_t) * V, ",");
 
@@ -1971,31 +1954,45 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   ASSERT((* q_range)[0] > fbb[0][* q_side]);
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
+  //TODO: constant here is hard-coded.
+  double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
+      1.0 / (double)H->t);
+  double tmp = 0;
+  for (unsigned int i = 0; i < H->t; i++) {
+    tmp = tmp + (double)H->h[i];
+  }
+  max_a = tmp * max_a;
+  /*OR double max_a = (double)H->t * (double) (*q_range)[1];*/
+
   for (unsigned int j = 0; j < * V; j++) {
+    double precompute =
+      pow((double)(f->pols[j]->deg + 1), (double)(H->t - 1) / 2.0) *
+      pow((double)H->t, (double)f->pols[j]->deg / 2.0) *
+      pow(max_a, (double)f->pols[j]->deg);
+
     mpz_t inf_f;
     mpz_init(inf_f);
     mpz_poly_infinity_norm(inf_f, f->pols[j]);
-    (*base)[j] = pow(mpz_get_d(inf_f), (double)(H->t - 1));
+    (*log2_base)[j] = pow(mpz_get_d(inf_f), (double)(H->t - 1)) * precompute;
     mpz_clear(inf_f);
-    double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
-        1.0 / (double)H->t);
-    double tmp = 0;
-    for (unsigned int i = 0; i < H->t; i++) {
-      tmp = tmp + (double)H->h[i];
-    }
-    max_a = tmp * max_a;
-    /*double max_a = (double)H->t * (double) (*q_range)[1];*/
 
-    (*base)[j] = *(base)[j] *
-      pow((double)(f->pols[j]->deg + 1), (double)(H->t - 1) /2.0) *
-      pow((double)H->t, (double)f->pols[j]->deg / 2.0) *
-      pow(max_a, (double)f->pols[j]->deg);
+    ASSERT((*log2_base)[j] > 0.0);
+
     if (* q_side == j) {
-      (*base)[j] = (*base)[j] / (double)(*q_range)[0];
+      (*log2_base)[j] = (*log2_base)[j] / (double)(*q_range)[0];
     }
-    (*base)[j] = pow((*base)[j], 1 / (double)(UCHAR_MAX - 2));
-    (*base)[j] = log2((*base)[j]);
+
+    (*log2_base)[j] = pow((*log2_base)[j], 1 / (double)(UCHAR_MAX - 2));
+    (*log2_base)[j] = log2((*log2_base)[j]);
   }
+
+  double sec = seconds();
+  FILE * file_r;
+  param_list_parse_string(pl, "fb", path, size_path);
+  file_r = fopen(path, "r");
+  read_factor_base(file_r, *fb, *fbb, *lpb, f, *log2_base);
+  fclose(file_r);
+  printf("# Time to read factor bases: %f.\n", seconds() - sec);
 
   array_init(array, number_element);
 
@@ -2025,10 +2022,10 @@ int main(int argc, char * argv[])
   factor_base_t * fb;
   uint64_t q;
   int main_side;
-  double * base;
+  double * log2_base;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range, &thresh, &lpb,
-      array, matrix, &q_side, &V, &main_side, &base);
+      array, matrix, &q_side, &V, &main_side, &log2_base);
 
 #ifdef PRINT_PARAMETERS
   printf("# H =\n");
@@ -2169,7 +2166,7 @@ int main(int argc, char * argv[])
 
         for (unsigned int j = 0; j < V; j++) {
 #ifdef TRACE_POS
-          fprintf(file_trace_pos, "Base: %d\n", pow(2.0, base[j]));
+          fprintf(file_trace_pos, "Base: %f\n", pow(2.0, log2_base[j]));
 #endif // TRACE_POS
 
           sec = seconds();
@@ -2177,7 +2174,8 @@ int main(int argc, char * argv[])
           array_set_all_elements_max(array);
 #ifndef OLD_NORM
           init_norm(array, max_norm + j, file_trace_pos, H, matrix, f->pols[j],
-              ideal_spq_get_log(special_q), !(j ^ q_side));
+              ideal_spq_get_log(special_q) / log2_base[j], !(j ^ q_side),
+              log2_base[j]);
 #else // OLD_NORM
           init_norm(array, file_trace_pos, pre_compute[j], H, matrix,
               f->pols[j], special_q, !(j ^ q_side));
@@ -2187,7 +2185,7 @@ int main(int argc, char * argv[])
 
 #ifdef ASSERT_NORM
           printf("# ASSERT_NORM side %u.\n", j);
-          assert_norm(array, H, f->pols[j], matrix, !(j ^ q_side),
+          assert_norm(array, H, f->pols[j], matrix, !(j ^ q_side), log2_base[j],
               ideal_spq_get_log(special_q));
 #endif // ASSERT_NORM
 
@@ -2195,7 +2193,8 @@ int main(int argc, char * argv[])
           special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j]);
           time[j][1] = seconds() - sec;
           sec = seconds();
-          find_index(indexes[j], array, thresh[j]);
+          find_index(indexes[j], array,
+              (unsigned char) ceil(thresh[j] / log2_base[j]));
           time[j][2] = seconds() - sec;
 
 #ifdef TRACE_POS
@@ -2209,8 +2208,8 @@ int main(int argc, char * argv[])
         }
 
         sec = seconds();
-        /*nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,*/
-            /*matrix, f->pols, H, V, special_q, q_side, main_side);*/
+        nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
+            matrix, f->pols, H, V, special_q, q_side, main_side);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
@@ -2279,7 +2278,7 @@ int main(int argc, char * argv[])
   free(fbb);
   free(thresh);
   free(q_range);
-  free(base);
+  free(log2_base);
   cado_poly_clear(f);
   free_saved_chains();
 

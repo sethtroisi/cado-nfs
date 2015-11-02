@@ -6,6 +6,7 @@
 #include "utils_norm.h"
 #include "mat_int64.h"
 #include <float.h>
+#include <limits.h>
 
 #define NORM_TOLERANCE_NFSHD 4
 
@@ -120,8 +121,9 @@ static void mean_norm_mode(mpz_ptr mean_norm, int64_vector_srcptr vector,
 MAYBE_UNUSED static inline void mode_init_norm(
     MAYBE_UNUSED FILE * file_trace_pos,
     MAYBE_UNUSED int64_vector_srcptr vector,
-    MAYBE_UNUSED mat_int64_srcptr Mq, MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED array_srcptr array,
-    MAYBE_UNUSED sieving_bound_srcptr H, MAYBE_UNUSED mpz_ptr mean_norm)
+    MAYBE_UNUSED mat_int64_srcptr Mq, MAYBE_UNUSED mpz_poly_srcptr f,
+    MAYBE_UNUSED array_srcptr array, MAYBE_UNUSED sieving_bound_srcptr H,
+    MAYBE_UNUSED mpz_ptr mean_norm)
 {
 #ifdef MEAN_NORM
   mean_norm_mode(mean_norm, vector, Mq, f);
@@ -134,7 +136,7 @@ MAYBE_UNUSED static inline void mode_init_norm(
 
 #ifdef ASSERT_NORM
 void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
-    mat_Z_srcptr matrix, int special_q, MAYBE_UNUSED double spq_log)
+    mat_Z_srcptr matrix, int special_q, double log2_base, double spq_log)
 {
   mpz_vector_t c;
   mpz_vector_init(c, H->t);
@@ -171,7 +173,7 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
           /*array->array[i], log_norm);*/
     /*}*/
 
-    gap =  (double)array->array[i] - log_norm;
+    gap =  ((double)array->array[i]) * log2_base - log_norm;
     mean_gap = mean_gap + gap;
     if (gap > max_gap) {
       max_gap = gap;
@@ -192,8 +194,9 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
 
 
 #ifndef OLD_NORM
-static double strategie_norm_tolerance(double norm_tolerance) {
-  return norm_tolerance + 2.0;
+static double strategie_norm_tolerance(double norm_tolerance, double log2_base)
+{
+  return norm_tolerance + 2.0 / log2_base;
 }
 
 static void next_bottom_left_cube_in_hypercube(int * bottom_left_cube,
@@ -281,7 +284,7 @@ void add_arrays(int * current_indexes, const int * current_values,
 
 unsigned char log_norm_double(const int * current_indexes,
     unsigned char * max_norm, mat_int64_srcptr M,
-    double_poly_srcptr f, double spq_log, int special_q,
+    double_poly_srcptr f, double spq_log, int special_q, double log2_base,
     MAYBE_UNUSED unsigned int size)
 {
   ASSERT(size == M->NumRows);
@@ -308,8 +311,13 @@ unsigned char log_norm_double(const int * current_indexes,
   double_poly_clear(poly);
 
   ASSERT(norm >= 0.0);
-  norm = ceil(log2(norm));
-  ASSERT_ALWAYS(norm < 256.0);
+  double log2_norm = log2(norm);
+  if (log2_norm < 0.0 || isinf(log2_norm)) {
+    log2_norm = 0.0;
+  }
+  ASSERT(log2_norm >= 0.0);
+  double log_norm = ceil(log2_norm / log2_base);
+  ASSERT(log_norm < (double) UCHAR_MAX);
 
   unsigned char val = 0;
   if (special_q) {
@@ -318,16 +326,22 @@ unsigned char log_norm_double(const int * current_indexes,
     if (deg == -1) {
       val = 0;
     } else {
-      ASSERT(norm - spq_log >= 0.0);
-
-      val = (unsigned char)(norm - spq_log);
+      if (log_norm - spq_log < 0.0) {
+        val = 0;
+        log2_norm = 0.0;
+      } else {
+        val = (unsigned char)ceil(log_norm - spq_log);
+        log2_norm = ceil(log2_norm - spq_log * log2_base);
+      }
     }
   } else {
-    val = (unsigned char) norm;
+    val = (unsigned char) log_norm;
   }
-  if (val > * max_norm) {
-    * max_norm = val;
+  if ((unsigned char) log2_norm > * max_norm) {
+    * max_norm = (unsigned char) log2_norm;
   }
+
+  ASSERT_ALWAYS(val < UCHAR_MAX);
 
   return val;
 }
@@ -392,11 +406,10 @@ void add_one_values(int * current_indexes, const int * bottom_left_cube,
 }
 
 static void init_cells(array_ptr array, unsigned char * max_norm,
-    MAYBE_UNUSED FILE * file,
-    const int * bottom_left_cube, const unsigned int * length,
-    sieving_bound_srcptr H, double_poly_srcptr f, mat_int64_srcptr Mq,
-    double spq_log, int special_q, double norm_tolerance,
-    MAYBE_UNUSED mpz_poly_srcptr f_Z,
+    MAYBE_UNUSED FILE * file, const int * bottom_left_cube,
+    const unsigned int * length, sieving_bound_srcptr H, double_poly_srcptr f,
+    mat_int64_srcptr Mq, double spq_log, int special_q, double norm_tolerance,
+    double log2_base, MAYBE_UNUSED mpz_poly_srcptr f_Z,
     MAYBE_UNUSED mpz_ptr mean_norm)
 {
 #ifndef NDEBUG
@@ -427,9 +440,9 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
 
     //Get the possible value of current_indexes.
     tmp = array_get_at(array, current_indexes, H);
-    if (tmp == 255) {
+    if (tmp == UCHAR_MAX) {
       tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq_log,
-          special_q, H->t);
+          special_q, log2_base, H->t);
 
       array_set_at(array, current_indexes, tmp, H);
 
@@ -443,7 +456,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
       int64_vector_clear(vec);
 #endif // TRACE_POS
 
-    } 
+    }
     update_mini_maxi(&mini, &maxi, tmp);
   }
   free(true_false);
@@ -477,9 +490,9 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
   if (all_length_2 != H->t) {
 
     tmp = array_get_at(array, current_indexes, H);
-    if (tmp == 255) {
+    if (tmp == UCHAR_MAX) {
       tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq_log,
-          special_q, H->t);
+          special_q, log2_base, H->t);
 
       array_set_at(array, current_indexes, tmp, H);
 
@@ -493,7 +506,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
       int64_vector_clear(vec);
 #endif // TRACE_POS
 
-    } 
+    }
     update_mini_maxi(&mini, &maxi, tmp);
 
     //TODO: arbitrary value. If maxi - mini <= NORM_TOLERANCE_NFSHD, all the
@@ -515,7 +528,8 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
             use_new_length, bottom_left_cube, length, H->t);
         //Modify norm_tolerance if strategie change it.
         init_cells(array, max_norm, file, current_indexes, new_length, H, f, Mq,
-            spq_log, special_q, strategie_norm_tolerance(norm_tolerance), f_Z,
+            spq_log, special_q,
+            strategie_norm_tolerance(norm_tolerance, log2_base), log2_base, f_Z,
             mean_norm);
           }
     } else {
@@ -530,7 +544,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
       for (uint64_t i = 0; i < stop; i++) {
         add_one_values(current_indexes, bottom_left_cube, length, H->t);
         tmp = array_get_at(array, current_indexes, H);
-        if (tmp == 255) {
+        if (tmp == UCHAR_MAX) {
           array_set_at(array, current_indexes, maxi, H);
 
 #ifdef TRACE_POS
@@ -542,7 +556,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
       mode_init_norm(file, vec, Mq, f_Z, array, H, mean_norm);
       int64_vector_clear(vec);
 #endif // TRACE_POS
-        } 
+        }
       }
     }
   }
@@ -553,7 +567,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
 
 void init_norm(array_ptr array, unsigned char * max_norm,
     MAYBE_UNUSED FILE * file, sieving_bound_srcptr H, mat_Z_srcptr matrix,
-    mpz_poly_srcptr f, double spq_log, int special_q)
+    mpz_poly_srcptr f, double spq_log, int special_q, double log2_base)
 {
   ASSERT(special_q == 0 || special_q == 1);
 
@@ -609,7 +623,7 @@ void init_norm(array_ptr array, unsigned char * max_norm,
 
   mat_int64_t Mq;
   mat_int64_init(Mq, matrix->NumRows, matrix->NumCols);
-  mat_Z_to_mat_int64(Mq, matrix);  
+  mat_Z_to_mat_int64(Mq, matrix);
 
   //First value for norm_tolerance.
   double norm_tolerance = 0.0;
@@ -618,7 +632,7 @@ void init_norm(array_ptr array, unsigned char * max_norm,
     next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
         bottom_left_hypercube, length_hypercube, H->t);
     init_cells(array, max_norm, file, bottom_left_cube, length, H, f_d, Mq,
-        spq_log, special_q, norm_tolerance, f, mean_norm);
+        spq_log, special_q, norm_tolerance, log2_base, f, mean_norm);
   }
 
 #ifdef MEAN_NORM
@@ -706,7 +720,6 @@ void init_each_cell(array_ptr array, uint64_t i, int64_poly_ptr a,
     uint64_t tmp = int64_poly_infinity_norm(a);
     log_bound_resultant =
       (double)pre_compute[a->deg] + log2((double)tmp) * (double)f->deg;
-    
   } else {
     log_bound_resultant = 0;
   }

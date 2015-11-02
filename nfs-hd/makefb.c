@@ -68,7 +68,7 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
 
   //Purge list.
   mpz_poly_factor_list_flush(list);
- 
+
   //If deg(f) in F2 is less than 1, we have the factor.
   if (fcopy->deg < 1) {
     mpz_clear(coeff);
@@ -236,7 +236,7 @@ void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
   ASSERT(V >= 2);
   ASSERT(t >= 2);
 
-  mpz_t * lpb = (mpz_t *) malloc(V * sizeof(mpz_t)); 
+  mpz_t * lpb = (mpz_t *) malloc(V * sizeof(mpz_t));
   for (unsigned int i = 0; i < V; i++) {
     mpz_init(lpb[i]);
     mpz_ui_pow_ui(lpb[i], 2, (unsigned long) lpb_bit[i]);
@@ -249,8 +249,8 @@ void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
     ASSERT(mpz_cmp_ui(lpb[i], fbb[i]) >= 0);
   }
 #endif // NDEBUG
- 
-  //Factorise in Fq. 
+
+  //Factorise in Fq.
   uint64_t q = 2;
   //Count number of ideal_1, ideal_u and ideal_pr for each sides.
   uint64_t * index1 = (uint64_t * ) malloc(sizeof(uint64_t) * V);
@@ -444,7 +444,7 @@ static int parse_cs_mpzs(mpz_t *z, char ** endptr, char * ptr)
 static int parse_mpz_poly(mpz_poly_ptr f, char ** endptr, char * str, int n)
 {
   int ret;
-  
+
   mpz_t * coeffs = (mpz_t *) malloc(sizeof(mpz_t) * (n + 1));
   for (int i = 0; i <= n; i++) {
     mpz_init(coeffs[i]);
@@ -455,7 +455,7 @@ static int parse_mpz_poly(mpz_poly_ptr f, char ** endptr, char * str, int n)
     mpz_clear(coeffs[i]);
   }
   free(coeffs);
-  
+
   return ret;
 }
 
@@ -465,7 +465,7 @@ static int parse_line_mpz_poly(mpz_poly_ptr f, char * str, int n)
   if (str[0] != 'f' || str[1] != ':')
     return 0;
   str += 2;
-  
+
   return parse_mpz_poly(f, &tmp, str, n);
 }
 
@@ -473,13 +473,13 @@ static int parse_ideal_1(ideal_1_ptr ideal, char *str, unsigned int t)
 {
   char *tmp;
   int ret;
- 
+
   if (str[0] != '1' || str[1] != ':')
     return 0;
   str += 2;
   uint64_t r;
   ret = parse_uint64(&r, &tmp, str);
-  
+
   if (!ret || tmp[0] != ':')
     return 0;
   str = tmp + 1;
@@ -519,7 +519,7 @@ static int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
   char *tmp;
   int ret;
 
-  int deg; 
+  int deg;
   ret = parse_int(&deg, &tmp, str);
 
   if (!ret || tmp[0] != ':')
@@ -528,7 +528,7 @@ static int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
 
   uint64_t r;
   ret = parse_uint64(&r, &tmp, str);
-  
+
   if (!ret || tmp[0] != ':')
     return 0;
   str = tmp + 1;
@@ -568,13 +568,13 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
 {
   char *tmp;
   int ret;
- 
+
   if (str[0] != '1' || str[1] != ':')
     return 0;
   str += 2;
   uint64_t r;
   ret = parse_uint64(&r, &tmp, str);
-  
+
   if (!ret || tmp[0] != ':')
     return 0;
   str = tmp + 1;
@@ -617,7 +617,7 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
 }
 
 void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
-    unsigned int * lpb_bit, cado_poly_srcptr f)
+    unsigned int * lpb_bit, cado_poly_srcptr f, double * log2_base)
 {
   for (unsigned int k = 0; k < (unsigned int) f->nb_polys; k++) {
     mpz_t lpb;
@@ -666,6 +666,7 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
         return;
       }
       parse_ideal_1(ideal_1, line, t);
+      ideal_1->log = ideal_1->log / log2_base[k];
       if (ideal_1->ideal->r <= fbb[k]) {
         factor_base_set_ideal_1(fb[k], number_element_1, ideal_1, t);
         number_element_1++;
@@ -680,6 +681,7 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
         return;
       }
       parse_ideal_u(ideal_u, line, t);
+      ideal_u->log = ideal_u->log / log2_base[k];
       if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
               (uint64_t)ideal_u->ideal->h->deg)) >= 0
           && ideal_u->ideal->r <= fbb[k]) {
@@ -698,6 +700,7 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
           return;
         }
         parse_ideal_pr(ideal_pr, line, t);
+        ideal_pr->log = ideal_pr->log / log2_base[k];
         if (ideal_pr->ideal->r <= fbb[k]) {
           factor_base_set_ideal_pr(fb[k], number_element_pr, ideal_pr->ideal->r,
               t);
@@ -792,7 +795,7 @@ void export_factor_base(FILE * file, factor_base_t * fb, cado_poly_srcptr f,
   for (unsigned int k = 0; k < (unsigned int)f->nb_polys; k++) {
     fprintf(file, "fbb:%" PRIu64 "\n", fbb[k]);
     fprintf(file, "lpb:%u\n", lpb[k]);
-    fprintf(file, "deg:%d\n", f->pols[k]->deg); 
+    fprintf(file, "deg:%d\n", f->pols[k]->deg);
     fprintf(file, "f:");
     for (int i = 0; i < f->pols[k]->deg; i++) {
       gmp_fprintf(file, "%Zd,", f->pols[k]->coeff[i]);
