@@ -20,7 +20,7 @@ typedef const s_ideal_t * ideal_srcptr;
 typedef struct {
   ideal_t ideal;
   mpz_t * Tr; // Keep mpz_t because of the explosion of g0^i.
-  unsigned char log;
+  double log;
 } s_ideal_1_t;
 
 //1 for ideal (r, h) with deg(h) = 1.
@@ -32,7 +32,7 @@ typedef const s_ideal_1_t * ideal_1_srcptr;
 typedef struct {
   ideal_t ideal;
   mpz_t ** Tr; // Keep mpz_t because of big coefficients.
-  unsigned char log;
+  double log;
 } s_ideal_u_t;
 
 typedef s_ideal_u_t ideal_u_t[1];
@@ -43,7 +43,7 @@ typedef const s_ideal_u_t * ideal_u_srcptr;
 typedef struct {
   ideal_t ideal;
   mpz_t * Tr; // Keep mpz_t because of big coefficients.
-  unsigned char log;
+  double log;
 } s_ideal_pr_t;
 
 typedef s_ideal_pr_t ideal_pr_t[1];
@@ -126,7 +126,7 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
  * log: frequently equal to log2(r).
  */
 void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-    mpz_t * Tr, unsigned char log, unsigned int t);
+    mpz_t * Tr, double log, unsigned int t);
 
 /*
  * Copy an ideal_1 in an other.
@@ -183,7 +183,7 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
  * log: frequently equal to log2(r^deg(h)).
  */
 void ideal_u_set_element(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-    mpz_t * Tr, unsigned char log, unsigned int t);
+    mpz_t * Tr, double log, unsigned int t);
 
 /*
  * Copy ideal_old in ideal_new.
@@ -238,7 +238,7 @@ void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t);
  * Tr: Tr matrix.
  * log: frequently equal to log2(r).
  */
-void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, unsigned char log,
+void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, double log,
     unsigned int t);
 /*
  * Delete an ideal_pr.
@@ -300,7 +300,7 @@ void ideal_spq_fprintf(FILE * file, ideal_spq_srcptr ideal, unsigned int t);
  *
  * ideal: the ideal.
  */
-unsigned char ideal_spq_get_log(ideal_spq_srcptr ideal);
+double ideal_spq_get_log(ideal_spq_srcptr ideal);
 
 /*
  * Return q of an ideal_spq.

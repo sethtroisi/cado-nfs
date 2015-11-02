@@ -502,7 +502,7 @@ static int parse_ideal_1(ideal_1_ptr ideal, char *str, unsigned int t)
     return 0;
   str = tmp + 1;
 
-  unsigned char log = (unsigned char)atoi(str);
+  double log = atof(str);
 
   ideal_1_set_element(ideal, r, h, Tr, log, t);
 
@@ -552,7 +552,7 @@ static int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
     return 0;
   str = tmp + 1;
 
-  unsigned char log = (unsigned char)atoi(str);
+  double log = atof(str);
 
   ideal_u_set_element(ideal, r, h, Tr, log, t);
 
@@ -604,7 +604,7 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
     return 0;
   str = tmp + 1;
 
-  unsigned char log = (unsigned char)atoi(str);
+  double log = atof(str);
 
   ideal_pr_set_element(ideal, r, log, t);
 
@@ -740,7 +740,7 @@ void write_ideal_1(FILE * file, ideal_1_srcptr ideal, unsigned int t) {
     gmp_fprintf(file, "%Zd,", ideal->Tr[i]);
   }
   gmp_fprintf(file, "%Zd:", ideal->Tr[t - 2]);
-  fprintf(file, "%u\n", ideal->log);
+  fprintf(file, "%f\n", ideal->log);
 }
 
 /*
@@ -760,7 +760,7 @@ void write_ideal_u(FILE * file, ideal_u_srcptr ideal, unsigned int t) {
   }
   gmp_fprintf(file, "%Zd:", ideal->Tr[ideal->ideal->h->deg - 1]
               [t - (unsigned int)ideal->ideal->h->deg - 1]);
-  fprintf(file, "%u\n", ideal->log);
+  fprintf(file, "%f\n", ideal->log);
 }
 
 /*
@@ -773,7 +773,7 @@ void write_ideal_pr(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
     gmp_fprintf(file, "%Zd,", ideal->Tr[i]);
   }
   gmp_fprintf(file, "%Zd:", ideal->Tr[t - 2]);
-  fprintf(file, "%u\n", ideal->log);
+  fprintf(file, "%f\n", ideal->log);
 }
 
 /*

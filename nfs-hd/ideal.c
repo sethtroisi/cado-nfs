@@ -37,7 +37,7 @@ void ideal_fprintf(FILE * file, ideal_srcptr ideal)
 void ideal_1_init(ideal_1_ptr ideal)
 {
   ideal_init(ideal->ideal);
-  ideal->log = 0;
+  ideal->log = 0.0;
 }
 
 void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
@@ -63,11 +63,11 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   }
 
   ideal->ideal->r = r;
-  ideal->log = (unsigned char)(log2((double) r));
+  ideal->log = log2((double) r);
 }
 
 void ideal_1_set_element(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-    mpz_t * Tr, unsigned char log, unsigned int t)
+    mpz_t * Tr, double log, unsigned int t)
 {
   mpz_poly_set(ideal->ideal->h, h);
 
@@ -113,7 +113,7 @@ void ideal_1_clear(ideal_1_ptr ideal, unsigned int t)
   free(ideal->Tr);
 
   ideal_clear(ideal->ideal);
-  ideal->log = 0;
+  ideal->log = 0.0;
 }
 
 void ideal_1_fprintf(FILE * file, ideal_1_srcptr ideal, unsigned int t)
@@ -121,7 +121,7 @@ void ideal_1_fprintf(FILE * file, ideal_1_srcptr ideal, unsigned int t)
   ASSERT(ideal->ideal->h->deg == 1);
 
   ideal_fprintf(file, ideal->ideal);
-  fprintf(file, "log: %u\n", ideal->log);
+  fprintf(file, "log: %f\n", ideal->log);
   fprintf(file, "Tr: [");
   for (unsigned int i = 0; i < t - 2; i++) {
     gmp_fprintf(file, "%Zd, ", ideal->Tr[i]);
@@ -134,7 +134,7 @@ void ideal_1_fprintf(FILE * file, ideal_1_srcptr ideal, unsigned int t)
 void ideal_u_init(ideal_u_ptr ideal)
 {
   ideal_init(ideal->ideal);
-  ideal->log = 0;
+  ideal->log = 0.0;
 }
 
 /*
@@ -188,11 +188,11 @@ void ideal_u_set_part(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   }
 
   ideal->ideal->r = r;
-  ideal->log = (unsigned char)(log2((double) r) * h->deg);
+  ideal->log = log2((double) r) * (double)h->deg;
 }
 
 void ideal_u_set_element(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
-    mpz_t * Tr, unsigned char log, unsigned int t)
+    mpz_t * Tr, double log, unsigned int t)
 {
   mpz_poly_set(ideal->ideal->h, h);
   if ((ideal->ideal->r) == 0) {
@@ -252,7 +252,7 @@ void ideal_u_clear(ideal_u_ptr ideal, unsigned int t)
   free(ideal->Tr);
 
   ideal_clear(ideal->ideal);
-  ideal->log = 0;
+  ideal->log = 0.0;
 }
 
 void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t)
@@ -260,7 +260,7 @@ void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t)
   ASSERT(ideal->ideal->h->deg > 1);
 
   ideal_fprintf(file, ideal->ideal);
-  fprintf(file, "log: %u\n", ideal->log);
+  fprintf(file, "log: %f\n", ideal->log);
 
   fprintf(file, "Tr: [");
   for (int row = 0; row < ideal->ideal->h->deg - 1; row++) {
@@ -284,7 +284,7 @@ void ideal_u_fprintf(FILE * file, ideal_u_srcptr ideal, unsigned int t)
 void ideal_pr_init(ideal_pr_ptr ideal)
 {
   ideal_init(ideal->ideal);
-  ideal->log = 0;
+  ideal->log = 0.0;
 }
 
 void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t)
@@ -306,10 +306,10 @@ void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t)
 
   }
   ideal->ideal->r = r;
-  ideal->log = (unsigned char)(log2((double) r));
+  ideal->log = log2((double) r);
 }
 
-void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, unsigned char log,
+void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, double log,
     unsigned int t)
 {
   mpz_poly_t h;
@@ -341,14 +341,14 @@ void ideal_pr_clear(ideal_pr_ptr ideal, unsigned int t)
   free(ideal->Tr);
 
   ideal_clear(ideal->ideal);
-  ideal->log = 0;
+  ideal->log = 0.0;
 }
 
 void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
 {
   fprintf(file, "Projective root, ");
   ideal_fprintf(file, ideal->ideal);
-  fprintf(file, "log: %u\n", ideal->log);
+  fprintf(file, "log: %f\n", ideal->log);
   fprintf(file, "Tr: [");
   for (unsigned int i = 0; i < t - 2; i++) {
     gmp_fprintf(file, "%Zd, ", ideal->Tr[i]);
@@ -360,7 +360,7 @@ void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
 
 void ideal_spq_init(ideal_spq_ptr ideal)
 {
-  ideal->type = -1; 
+  ideal->type = -1;
 }
 
 void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t q, mpz_poly_srcptr g,
@@ -431,19 +431,17 @@ void ideal_spq_fprintf(FILE * file, ideal_spq_srcptr ideal, unsigned int t)
   }
 }
 
-unsigned char ideal_spq_get_log(ideal_spq_srcptr ideal)
+double ideal_spq_get_log(ideal_spq_srcptr ideal)
 {
-  unsigned char log = 0;
   if (ideal->type == 0) {
-    log = ideal->ideal_1->log;
+    return ideal->ideal_1->log;
   } else if (ideal->type == 1) {
-    log = ideal->ideal_u->log;
+    return ideal->ideal_u->log;
   } else {
     ASSERT(ideal->type == 2);
 
-    log = ideal->ideal_pr->log;
+    return ideal->ideal_pr->log;
   }
-  return log;
 }
 
 uint64_t ideal_spq_get_q(ideal_spq_srcptr ideal)

@@ -134,7 +134,7 @@ MAYBE_UNUSED static inline void mode_init_norm(
 
 #ifdef ASSERT_NORM
 void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
-    mat_Z_srcptr matrix, int special_q, MAYBE_UNUSED unsigned char spq_log)
+    mat_Z_srcptr matrix, int special_q, MAYBE_UNUSED double spq_log)
 {
   mpz_vector_t c;
   mpz_vector_init(c, H->t);
@@ -155,7 +155,7 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
 
     double log_norm = (double)mpz_sizeinbase(norm, 2);
     if (special_q) {
-      log_norm = log_norm - (double) spq_log;
+      log_norm = log_norm - spq_log;
       if (log_norm < 0.0) {
         log_norm = 0.0;
       }
@@ -281,7 +281,7 @@ void add_arrays(int * current_indexes, const int * current_values,
 
 unsigned char log_norm_double(const int * current_indexes,
     unsigned char * max_norm, mat_int64_srcptr M,
-    double_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
+    double_poly_srcptr f, double spq_log, int special_q,
     MAYBE_UNUSED unsigned int size)
 {
   ASSERT(size == M->NumRows);
@@ -304,29 +304,32 @@ unsigned char log_norm_double(const int * current_indexes,
   }
   poly->deg = deg;
 
-  double resultant = fabs(double_poly_resultant(poly, f));
+  double norm = fabs(double_poly_resultant(poly, f));
   double_poly_clear(poly);
 
-  ASSERT(resultant >= 0.0);
-  resultant = ceil(log2(resultant));
-  ASSERT_ALWAYS(resultant < 256.0);
+  ASSERT(norm >= 0.0);
+  norm = ceil(log2(norm));
+  ASSERT_ALWAYS(norm < 256.0);
 
-  unsigned char res = (unsigned char) resultant;
-
+  unsigned char val = 0;
   if (special_q) {
     ASSERT(special_q == 1);
 
     if (deg == -1) {
-      res = 0;
+      val = 0;
     } else {
-      res = res - ideal_spq_get_log(spq);
+      ASSERT(norm - spq_log >= 0.0);
+
+      val = (unsigned char)(norm - spq_log);
     }
+  } else {
+    val = (unsigned char) norm;
   }
-  if (res > * max_norm) {
-    * max_norm = res;
+  if (val > * max_norm) {
+    * max_norm = val;
   }
 
-  return res;
+  return val;
 }
 
 void update_mini_maxi(unsigned char * mini, unsigned char * maxi,
@@ -392,7 +395,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
     MAYBE_UNUSED FILE * file,
     const int * bottom_left_cube, const unsigned int * length,
     sieving_bound_srcptr H, double_poly_srcptr f, mat_int64_srcptr Mq,
-    ideal_spq_srcptr spq, int special_q, double norm_tolerance,
+    double spq_log, int special_q, double norm_tolerance,
     MAYBE_UNUSED mpz_poly_srcptr f_Z,
     MAYBE_UNUSED mpz_ptr mean_norm)
 {
@@ -425,8 +428,8 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
     //Get the possible value of current_indexes.
     tmp = array_get_at(array, current_indexes, H);
     if (tmp == 255) {
-      tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq, special_q,
-          H->t);
+      tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq_log,
+          special_q, H->t);
 
       array_set_at(array, current_indexes, tmp, H);
 
@@ -475,8 +478,8 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
 
     tmp = array_get_at(array, current_indexes, H);
     if (tmp == 255) {
-      tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq, special_q,
-          H->t);
+      tmp = log_norm_double(current_indexes, max_norm, Mq, f, spq_log,
+          special_q, H->t);
 
       array_set_at(array, current_indexes, tmp, H);
 
@@ -512,7 +515,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
             use_new_length, bottom_left_cube, length, H->t);
         //Modify norm_tolerance if strategie change it.
         init_cells(array, max_norm, file, current_indexes, new_length, H, f, Mq,
-            spq, special_q, strategie_norm_tolerance(norm_tolerance), f_Z,
+            spq_log, special_q, strategie_norm_tolerance(norm_tolerance), f_Z,
             mean_norm);
           }
     } else {
@@ -550,7 +553,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
 
 void init_norm(array_ptr array, unsigned char * max_norm,
     MAYBE_UNUSED FILE * file, sieving_bound_srcptr H, mat_Z_srcptr matrix,
-    mpz_poly_srcptr f, ideal_spq_srcptr spq, int special_q)
+    mpz_poly_srcptr f, double spq_log, int special_q)
 {
   ASSERT(special_q == 0 || special_q == 1);
 
@@ -614,8 +617,8 @@ void init_norm(array_ptr array, unsigned char * max_norm,
   for (unsigned int i = 0; i < stop; i++) {
     next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
         bottom_left_hypercube, length_hypercube, H->t);
-    init_cells(array, max_norm, file, bottom_left_cube, length, H, f_d, Mq, spq,
-        special_q, norm_tolerance, f, mean_norm);
+    init_cells(array, max_norm, file, bottom_left_cube, length, H, f_d, Mq,
+        spq_log, special_q, norm_tolerance, f, mean_norm);
   }
 
 #ifdef MEAN_NORM

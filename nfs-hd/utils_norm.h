@@ -40,7 +40,7 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
 void init_norm(array_ptr array, unsigned char * norm_max,
     MAYBE_UNUSED FILE * file,
     sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
-    ideal_spq_srcptr spq, int special_q);
+    double spq_log, int special_q);
 
 #else // OLD_NORM
 
