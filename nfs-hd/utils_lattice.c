@@ -675,7 +675,8 @@ static unsigned int find_min_y(list_int64_vector_srcptr SV,
 }
 
 void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
-    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H,
+    int boolean)
 {
   // Contain all the possible vectors to go from z=d to z=d+1.
   list_int64_vector_t list;
@@ -716,11 +717,26 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
     int64_vector_set(vs, list->v[pos]);
   } else {
     ASSERT(found == 2);
-    add_FK_vector(vs, list, e0, e1, H);
+    
+    if (boolean) {
+      add_FK_vector(vs, list, e0, e1, H);
+      ASSERT(vs->c[0] < (int64_t)H->h[0]);
+      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+    } else {
+      ASSERT(boolean == 0);
+
+      unsigned pos = find_min_y(list, assert, 2);
+      int64_vector_set(vs, list->v[pos]);
+      //TODO: not the closest point to [-H0, H0[.
+      while (vs->c[0] < -(int64_t)H->h[0]) {
+        int64_vector_add(vs, vs, e0);
+      }
+      while (vs->c[0] > (int64_t)H->h[0] - 1) {
+        int64_vector_sub(vs, vs, e0);
+      }
+    }
   }
   
-  ASSERT(vs->c[0] < (int64_t)H->h[0]);
-  ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   free(assert);
   
   list_int64_vector_clear(list);
@@ -1092,7 +1108,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 
   int64_vector_set(s_out, s);
 
-  plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
+  plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H, 1);
   //Enumerate the element of the sieving region.
   for (unsigned int d = (unsigned int) s->c[2] + 1; d < H->h[2]; d++) {
     plane_sieve_1_enum_plane_incomplete
@@ -1102,7 +1118,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
     }
 
     //Jump in the next plane.
-    plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
+    plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H, 1);
   }
 }
 

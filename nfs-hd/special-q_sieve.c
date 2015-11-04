@@ -746,9 +746,14 @@ void plane_sieve_1_enum_plane(array_ptr array,
   int64_vector_clear(v);
 }
 
+void plane_sieve_1_enum_plane_ortho()
+{
+  
+}
+
 void find_new_vs(int64_vector_ptr vs, list_int64_vector_ptr v_refresh,
     list_int64_vector_t * SV, int64_vector_srcptr e0, int64_vector_srcptr e1,
-    sieving_bound_srcptr H)
+    sieving_bound_srcptr H, int boolean)
 {
 #ifndef NDEBUG
   int64_t tmp = 0;
@@ -770,7 +775,7 @@ void find_new_vs(int64_vector_ptr vs, list_int64_vector_ptr v_refresh,
     }
   }
   if (k < vs->dim) {
-    plane_sieve_next_plane(vs, SV[k - 2], e0, e1, H);
+    plane_sieve_next_plane(vs, SV[k - 2], e0, e1, H, boolean);
     if (k > 2) {
       for (unsigned int i = 0; i < k - 2; i++) {
         int64_vector_set(v_refresh->v[i], vs);
@@ -825,6 +830,13 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   int64_vector_init(e0, vec[0]->dim);
   int64_vector_init(e1, vec[1]->dim);
   int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], (int64_t)(2*H->h[0]));
+
+  if (!boolean) {
+    ASSERT(boolean == 0);
+
+    int64_vector_set(e0, vec[0]);
+    int64_vector_set(e1, vec[1]);
+  }
   
   //Find some short vectors to go from z = d to z = d + 1.
   //TODO: go after boolean, no?
@@ -835,26 +847,6 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     SV4(SV[i - 2], vec[0], vec[1], vec[i]);
   }
 
-  //Reduce q-lattice is not possible.
-  if (boolean == 0) {
-    fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
-    mat_int64_fprintf_comment(stderr, Mqr);
- 
-    //plane_sieve_whithout_FK(SV, vec);
-
-    int64_vector_clear(e0);  
-    int64_vector_clear(e1);
-    for (unsigned int i = 0; i < Mqr->NumCols; i++) {
-      int64_vector_clear(vec[i]);
-    }
-    free(vec);
-    for (unsigned int i = 0; i < Mqr->NumCols - 2; i++) {
-      list_int64_vector_clear(SV[i]);
-    }
-    free(SV);
-
-    return;
-  }
 
   for (unsigned int i = 0; i < Mqr->NumCols; i++) {
     int64_vector_clear(vec[i]);
@@ -869,15 +861,26 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     for (unsigned int i = 2; i < H->t - 1; i++) {
       int64_vector_addmul(vs, vs, SV[i - 2]->v[0], -(int64_t) H->h[i]);
     }
+    //Reduce q-lattice is not possible.
+    if (boolean == 0) {
+      fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
+      mat_int64_fprintf_comment(stderr, Mqr);
+    }
     int64_vector_addmul(vs, vs, SV[0]->v[0], -1);
-    plane_sieve_next_plane(vs, SV[0], e0, e1, H);
+    plane_sieve_next_plane(vs, SV[0], e0, e1, H, boolean);
   }
 
   list_int64_vector_t v_refresh;
   list_int64_vector_init(v_refresh, e0->dim);
 
   uint64_t coord_e0 = 0, coord_e1 = 0;
-  coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H, array->number_element);
+  if (boolean) {
+    coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H,
+        array->number_element);
+  } else {
+    coord_e0 = index_vector(e0, H, array->number_element);
+    coord_e1 = index_vector(e1, H, array->number_element);
+  }
 
   //Iterate from H[2] to H[t - 1].
   //Enumerate the element of the sieving region.
@@ -893,12 +896,17 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   size = size * ((uint64_t) H->h[H->t - 1]);
 
   for (uint64_t d = 0; d < size; d++) {
-    plane_sieve_1_enum_plane(array, file_trace_pos, vs, e0, e1, coord_e0,
-        coord_e1, H, r, matrix, f, nb_hit);
+    if (boolean == 0) {
+      //TODO: continue here.
+      plane_sieve_1_enum_plane_ortho();
+    } else {
+      plane_sieve_1_enum_plane(array, file_trace_pos, vs, e0, e1, coord_e0,
+          coord_e1, H, r, matrix, f, nb_hit);
+    }
 
     //TODO: it is probably possible to better write find_new_vs.
     //Jump in the next plane.
-    find_new_vs(vs, v_refresh, SV, e0, e1, H);
+    find_new_vs(vs, v_refresh, SV, e0, e1, H, boolean);
 
   }
 
