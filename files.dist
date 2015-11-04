@@ -1279,3 +1279,4 @@ gf2x/already_tuned/x86_64_nosse/gf2x_mul8.h
 gf2x/already_tuned/x86_64_nosse/gf2x_mul9.h
 tests/provide-wdir.sh
 tests/utils/test_mpz_vector.c
+scripts/build_environment.sh
