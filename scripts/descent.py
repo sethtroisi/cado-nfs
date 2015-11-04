@@ -1066,8 +1066,6 @@ class drive_me_crazy(object):
 
 if __name__ == '__main__':
 
-    print("THIS IS AN EXPERIMENTAL SCRIPT ONLY ! STILL AT WORK.")
-
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Descent initialization for DLP")
 

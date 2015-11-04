@@ -71,10 +71,6 @@ tasks.filter.maxlevel = 15
 tasks.filter.merge.forbw = 3
 tasks.filter.coverNmax = 100
 
-## uncomment to replace sm by explicit units (experimental)
-# tasks.explicit_units = true
-#
-
 tasks.reconstructlog.partial=false
 
 ###########################################################################
