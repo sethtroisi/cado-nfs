@@ -3895,12 +3895,12 @@ class LinAlgDLPTask_Magma(Task):
 
         if not "kerfile" in self.state or self.have_new_input_files():
             kerfile = self.workdir.make_filename("ker")
-            gorder = self.send_request(Request.GET_ELL)
+            ell = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
             nn = nmaps[0] + nmaps[1];
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
             p = cadoprograms.MagmaLinalg(ker=kerfile,
-                                   ell=gorder,
+                                   ell=ell,
                                    nmaps=nn,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
@@ -4416,11 +4416,11 @@ class SMTask(Task):
             smfilename = self.workdir.make_filename("sm")
             abunitsdirname = self.workdir.make_filename("abunits")
 
-            gorder = self.send_request(Request.GET_ELL)
+            ell = self.send_request(Request.GET_ELL)
             
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.SM(ell=gorder,
+            p = cadoprograms.SM(ell=ell,
                     nmaps0=nmaps[0],
                     nmaps1=nmaps[1],
                     out=smfilename,
@@ -4474,7 +4474,7 @@ class ReconstructLogTask(Task):
 
         if (not "dlog" in self.state) or self.have_new_input_files():
             dlogfilename = self.workdir.make_filename("dlog")
-            gorder = self.send_request(Request.GET_ELL)
+            ell = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
 
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
@@ -4487,7 +4487,7 @@ class ReconstructLogTask(Task):
                     self.make_std_paths(cadoprograms.ReconstructLog.name)
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
-                    ell=gorder,
+                    ell=ell,
                     poly=self.send_request(Request.GET_POLYNOMIAL_FILENAME),
                     renumber=self.send_request(Request.GET_RENUMBER_FILENAME),
                     purged=self.send_request(Request.GET_PURGED_FILENAME),

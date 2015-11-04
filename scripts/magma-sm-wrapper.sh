@@ -53,7 +53,7 @@ do
   then
     OUT="$2"
     shift 2
-  elif [ "$1" = "-gorder" ]
+  elif [ "$1" = "-ell" ]
   then
     ELL="$2"
     shift 2
@@ -141,7 +141,7 @@ if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
     else
 	# out contains SM's for side=0..1 in that order, or 0 or 1 depending
 	# on the unit side if any
-	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts $nsm $mtopts"
+	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -ell $ELL $smopts $nsm $mtopts"
 	if [ $nsm0 -ne 0 -o $nsm1 -ne 0 ]; then
 	    echo $CMD; $CMD
 	else

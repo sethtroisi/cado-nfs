@@ -1195,7 +1195,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "log", "input file containing known logarithms");
   param_list_decl_usage(pl, "logformat", "format of input log file: 'LA' or "
                                          "'reconstruct' (default is 'LA')");
-  param_list_decl_usage(pl, "gorder", "group order (see sm -gorder parameter)");
+  param_list_decl_usage(pl, "ell", "group order (see sm -ell parameter)");
   param_list_decl_usage(pl, "out", "output file for logarithms");
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
   param_list_decl_usage(pl, "poly", "input polynomial file");
@@ -1299,15 +1299,15 @@ main(int argc, char *argv[])
   const char * polyfilename = param_list_lookup_string(pl, "poly");
   const char * wantedfilename = param_list_lookup_string(pl, "wanted");
   param_list_parse_uint64(pl, "nrels", &nrels_tot);
-  param_list_parse_mpz(pl, "gorder", ell);
+  param_list_parse_mpz(pl, "ell", ell);
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
   /* Some checks on command line arguments */
   if (mpz_cmp_ui (ell, 0) <= 0)
   {
-    fprintf(stderr, "Error, missing -gorder command line argument "
-                    "(or gorder <= 0)\n");
+    fprintf(stderr, "Error, missing -ell command line argument "
+                    "(or ell <= 0)\n");
     usage (pl, argv0);
   }
   if (nrels_tot == 0)

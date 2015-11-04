@@ -341,7 +341,7 @@ if [ "$cpubinding_file" ] ; then
 fi
 
 if [ $ell != "1" ]; then
-    args=("${args[@]}" gorder=$ell)
+    args=("${args[@]}" ell=$ell)
 fi
 
 # $PYTHON is there to expand a shell variable having that name, if

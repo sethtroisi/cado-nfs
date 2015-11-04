@@ -1826,8 +1826,8 @@ DumpParamsFile := procedure(~params, ficparams)
 	    s:=Gets(fd); if IsEof(s) then break; end if;
 	    tmp:=Split(s, " ");
 	    if tmp eq [] then continue; end if;
-	    if tmp[1] eq "gorder" then
-	        // s = "gorder = 52879981773903133"
+	    if tmp[1] eq "ell" then
+	        // s = "ell = 52879981773903133"
 		params["ell"]:=StringToInteger(tmp[3]);
 	    elif tmp[1] eq "rlim" then
 	        params["lim0"]:=StringToInteger(tmp[3]);

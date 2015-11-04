@@ -30,7 +30,7 @@ cat > $PARAMFILE <<EOF
 name = p3dd7-f4g3-GJL-1
 dlp = true
 N = 8005493
-gorder = 64087926178543
+ell = 64087926178543
 
 slaves.nrclients = $(((1+NCPUS)/2))
 tasks.threads = 2

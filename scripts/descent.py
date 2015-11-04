@@ -323,7 +323,7 @@ class GeneralClass(object):
     def reconstructlog_final_base_args(self):
         s=[
             self.reconstructlog_bin(),
-            "-gorder", self.ell(),
+            "-ell", self.ell(),
             "-sm0", self.nmaps0(),
             "-sm1", self.nmaps1(),
             "-poly", self.poly(),
@@ -968,7 +968,7 @@ class DescentLowerClass(object):
                         "-poly", general.poly(),
                         "-inp", relsforSM,
                         "-out", SMfile,
-                        "-gorder", general.ell()
+                        "-ell", general.ell()
                     ]
         call_that = [str(x) for x in call_that]
         print("command line:\n" + " ".join(call_that))
