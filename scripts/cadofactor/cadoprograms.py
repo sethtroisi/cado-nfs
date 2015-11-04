@@ -953,7 +953,7 @@ class MagmaNmbrthry(Program):
                  N: Parameter("p"),
                  badidealinfo: Parameter("badinfofile"),
                  badideals: Parameter("badfile"),
-                 ell: Parameter("ell")=None,
+                 ell: Parameter(),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -1031,7 +1031,7 @@ class SM(Program):
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),
-                 ell: Parameter("ell"),
+                 ell: Parameter(),
                  explicit_units0: Toggle()=None,
                  explicit_units1: Toggle()=None,
 		 abunits: Parameter(),
@@ -1046,7 +1046,7 @@ class ReconstructLog(Program):
     name = binary
     subdir = "filter"
     def __init__(self, *,
-                 ell: Parameter("ell"),
+                 ell: Parameter(),
                  threads: Parameter("mt")=None,
                  ker: Parameter("log", is_input_file=True),
                  dlog: Parameter("out"),
@@ -1088,6 +1088,7 @@ class Descent(Program):
                  mfb1: Parameter(prefix="--"),
                  lim0: Parameter(prefix="--"),
                  lim1: Parameter(prefix="--"),
+                 ell: Parameter(prefix="--"),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
