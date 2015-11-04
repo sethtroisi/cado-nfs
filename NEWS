@@ -21,7 +21,7 @@ Main changes between cado-nfs-2.1.1 and cado-nfs-2.2:
     poly0=17,42,34,55
   can be written, to set the polynomial 17+42*x+34*x^2+55*x^3 on side 0.
   The old format with X, c, Y,... is still supported, with c and X for
-  side 0 and Y for side 1.
+  side 1 and Y for side 0.
 * References to rational or algebraic sides have been reduced (at least
   internally). This means that several parameters have now aliases
   corresponding to sizes. For instance, the parameter -lpb1 for las is an
@@ -33,8 +33,9 @@ Main changes between cado-nfs-2.1.1 and cado-nfs-2.2:
   separate parameters for m and n. Also the rhs=... parameter allows
   non-homogeneous system solving (useful for handling SMs with no
   overhead in DLP mode).
-
-* to be completed.
+* An estimated time of arrival (ETA) is now printed during the polynomial
+  selection and sieving steps. It corresponds to the estimate finish time
+  of each of those steps (not the full factorization).
 
 Main changes between cado-nfs-2.1 and cado-nfs-2.1.1:
 
