@@ -1031,7 +1031,7 @@ class SM(Program):
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),
-                 ell: Parameter("ell"),
+                 ell: Parameter(),
                  nmaps0: Parameter("nsm0")=None,
                  nmaps1: Parameter("nsm1")=None,
                  threads: Parameter("t")=None,

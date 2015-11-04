@@ -4435,7 +4435,7 @@ class ReconstructLogTask(Task):
     @property
     def programs(self):
         input = {"ker": Request.GET_KERNEL_FILENAME,}
-        override = ("dlog",  "ell", "nmaps0", "nmaps1", "nrels",
+        override = ("dlog", "nmaps0", "nmaps1", "nrels",
                 "poly", "renumber",
                 "purged", "ideals", "relsdel")
         return ((cadoprograms.ReconstructLog, override, input),)
