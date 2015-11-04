@@ -617,7 +617,7 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
 }
 
 void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
-    unsigned int * lpb_bit, cado_poly_srcptr f)
+    unsigned int * lpb_bit, cado_poly_srcptr f, unsigned int t)
 {
   for (unsigned int k = 0; k < (unsigned int) f->nb_polys; k++) {
     mpz_t lpb;
@@ -647,8 +647,9 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     ASSERT(mpz_poly_cmp(f->pols[k], f_tmp) == 0);
     mpz_poly_clear(f_tmp);
 
-    unsigned int t;
-    fscanf(file, "t:%u\n", &t);
+    unsigned int t_tmp;
+    fscanf(file, "t:%u\n", &t_tmp);
+    ASSERT(t == t_tmp);
 
     uint64_t max_number_element_1, max_number_element_u, max_number_element_pr;
     fscanf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", &max_number_element_1,

@@ -2031,7 +2031,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   FILE * file_r;
   param_list_parse_string(pl, "fb", path, size_path);
   file_r = fopen(path, "r");
-  read_factor_base(file_r, (*fb), (*fbb), (*lpb), f);
+  read_factor_base(file_r, (*fb), (*fbb), (*lpb), f, t);
   fclose(file_r);
   printf("# Time to read factor bases: %f.\n", seconds() - sec);
 #endif
