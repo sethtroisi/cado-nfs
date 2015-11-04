@@ -125,6 +125,17 @@ crt_sq ( mpz_t qqz,
   mpz_clear (sum);
 }
 
+/* check that l <= m0/P^2 where l = p1 * p2 * q with P <= p1, p2 <= 2P
+   and q is the product of special-q primes.
+   This will ensure that we can do rotation by x^(d-3)*g(x), since the
+   expected value of a[d-2] is m0/P^2, and x^(d-3)*g(x) has coefficient
+   l for degree d-2. */
+static int
+check_parameters (mpz_t m0, double q)
+{
+  return pow ((double) Primes[lenPrimes - 1], 4.0) * q < mpz_get_d (m0);
+}
+
 /* print poly info */
 void
 print_poly_info ( mpz_t *f,
@@ -1290,6 +1301,7 @@ collision_on_sq ( header_t header,
   unsigned int i;
   unsigned long j, lq = 0UL;
   qroots_t SQ_R;
+  double sq = 1.0;
 
   /* init special-q roots */
   qroots_init (SQ_R);
@@ -1299,8 +1311,11 @@ collision_on_sq ( header_t header,
   /* find a suitable lq */
   for (i = 0; i < SQ_R->size; i++) {
     if (prod < nq) {
+      if (!check_parameters (header->m0, sq * (double) SQ_R->q[i]))
+        break;
       prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
                             the number of primes and thus the Y1 value. */
+      sq *= (double) SQ_R->q[i];
       lq ++;
     }
   }
