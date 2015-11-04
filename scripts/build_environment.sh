@@ -35,7 +35,7 @@ relative_path_of_cwd="${called_from##$absolute_path_of_source}"
 
 # The default behaviour
 # build_tree="/tmp/cado-build-`id -un`"
-: ${build_tree:="${up_path}build/`hostname`"}
+: ${build_tree:="${up_path}/build/`hostname`"}
 
 # Joe gets confused by " in prev line; this line fixes it
 
@@ -48,8 +48,8 @@ relative_path_of_cwd="${called_from##$absolute_path_of_source}"
 # The source directory may contain a hint script with several useful
 # preferences. Its job is to put environment variables. Quite notably,
 # $build_tree is amongst these.
-if [ -f "${up_path}local.sh" ] ; then
-    . "${up_path}local.sh"
+if [ -f "${up_path}/local.sh" ] ; then
+    . "${up_path}/local.sh"
 fi
 
 # If no CFLAGS have been set yet, set something sensible: get optimization by
