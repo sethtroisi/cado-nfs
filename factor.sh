@@ -228,7 +228,6 @@ size=${#n}
 
 # we round to the nearest multiple of 5
 size=`expr \( \( $size + 2 \) \/ 5 \) \* 5`
-echo $size
 
 if $dlp ; then
     if [ $gfpext = "1" ]; then

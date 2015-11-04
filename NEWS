@@ -1,5 +1,9 @@
 Main changes between cado-nfs-2.1.1 and cado-nfs-2.2:
 
+* in local.sh, the customization of the build_tree using the $up_path
+  variable used to be phrased as: build_tree="${up_path}some/sub/path".
+  Now it should be build_tree="${up_path}/some/sub/path", as $up_path no
+  longer embodies a trailing /
 * to be completed.
 
 Main changes between cado-nfs-2.1 and cado-nfs-2.1.1:

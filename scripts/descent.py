@@ -1,35 +1,6 @@
 #!/usr/bin/env python3
 #
-# Example for the p59 in tests/test_full_p59
-#
-#   ./scripts/descent.py		\
-#   --target 15384226356769205532939362866999574621778419520781718884300  \
-#   --db ~/Local/p59/p59.db	        \
-#   --cadobindir $PWD/build/`hostname`	\
-#   --init-I 9		                \
-#   --init-ncurves 20	                \
-#   --init-lpb 24	                \
-#   --init-lim 1000000	                \
-#   --init-mfb 40	                \
-#   --init-tkewness 8388608		\
-#   --I 11		\
-#   --lpb0 22		\
-#   --lpb1 22		\
-#   --lim0 50000	\
-#   --lim1 100000	\
-#   --mfb0 40		\
-#   --mfb1 40		\
-#   --descent-hint ~/Local/p59/p59.hint
-#
-# where the hintfile must not be empty, it should contain at least one
-# line, as in e.g:
-#
-#          22@0 0.0038 0.9940 I=11 50000,22,24,1.2 100000,22,24,1.2
-#          22@1 0.0038 0.9995 I=11 50000,22,24,1.2 100000,22,24,1.2
-#          23@0 0.0038 0.9945 I=11 50000,22,24,1.2 100000,23,43,1.5
-#          23@1 0.0038 0.9990 I=11 50000,22,24,1.2 100000,22,24,1.2
-#          24@0 0.0038 0.9945 I=11 50000,22,24,1.2 100000,24,45,1.5
-
+# Examples of parameters can be found in the params_dl directory
 
 # Algorithms
 #   UpperClass:
@@ -245,7 +216,7 @@ class GeneralClass(object):
             self.__read_magmadata_file()
         return self.magmadata[key]
     def ell(self):
-        return self.__get_magma_data("ell")
+        return int(args.ell)
     def nmaps0(self):
         return self.__get_magma_data("nmaps0")
     def nmaps1(self):
