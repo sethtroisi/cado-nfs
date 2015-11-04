@@ -1032,9 +1032,6 @@ class SM(Program):
                  index: Parameter(),
                  out: Parameter(),
                  ell: Parameter("ell"),
-                 explicit_units0: Toggle()=None,
-                 explicit_units1: Toggle()=None,
-		 abunits: Parameter(),
                  nmaps0: Parameter("nsm0")=None,
                  nmaps1: Parameter("nsm1")=None,
                  threads: Parameter("t")=None,
@@ -1058,10 +1055,6 @@ class ReconstructLog(Program):
                  nrels: Parameter(),
                  partial: Toggle()=None,
                  nsm: Parameter(),
-                 explicit_units0: Toggle()=None,
-                 explicit_units1: Toggle()=None,
-    		 abunits0: Parameter(),
-    		 abunits1: Parameter(),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

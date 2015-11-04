@@ -4414,7 +4414,6 @@ class SMTask(Task):
                 self.logger.info("Number of SM is 0: skipping this part.")
                 return True
             smfilename = self.workdir.make_filename("sm")
-            abunitsdirname = self.workdir.make_filename("abunits")
 
             ell = self.send_request(Request.GET_ELL)
             
@@ -4424,7 +4423,6 @@ class SMTask(Task):
                     nmaps0=nmaps[0],
                     nmaps1=nmaps[1],
                     out=smfilename,
-		    abunits=abunitsdirname,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.merged_args[0])
@@ -4434,15 +4432,11 @@ class SMTask(Task):
             if not smfilename.isfile():
                 raise Exception("Output file %s does not exist" % smfilename)
             self.state["sm"] = smfilename.get_wdir_relative()
-            self.state["abunits"] = abunitsdirname.get_wdir_relative()
         self.logger.debug("Exit SMTask.run(" + self.name + ")")
         return True
     
     def get_sm_filename(self):
         return self.get_state_filename("sm")
-
-    def get_abunits_dirname(self):
-        return self.get_state_filename("abunits")
 
 class ReconstructLogTask(Task):
     """ Logarithms Reconstruction Task """
@@ -4456,7 +4450,7 @@ class ReconstructLogTask(Task):
     def programs(self):
         input = {"ker": Request.GET_KERNEL_FILENAME,}
         override = ("dlog",  "ell", "nmaps0", "nmaps1", "nrels",
-                "abunits0", "abunits1", "poly", "renumber",
+                "poly", "renumber",
                 "purged", "ideals", "relsdel")
         return ((cadoprograms.ReconstructLog, override, input),)
     @property
@@ -4481,8 +4475,6 @@ class ReconstructLogTask(Task):
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             nrels = nfree+nunique
 
-            abunitsdirname = self.send_request(Request.GET_UNITS_DIRNAME)
-                 
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.ReconstructLog.name)
             p = cadoprograms.ReconstructLog(
@@ -4495,8 +4487,6 @@ class ReconstructLogTask(Task):
                     relsdel=self.send_request(Request.GET_RELSDEL_FILENAME),
                     nsm=str(nmaps[0])+","+str(nmaps[1]),
                     nrels=nrels,
-		    abunits0=str(abunitsdirname) + ".0",
-		    abunits1=str(abunitsdirname) + ".1",
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.merged_args[0])
@@ -5214,7 +5204,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_NMAPS] = self.nmbrthry.get_nmaps
             self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
-            self.request_map[Request.GET_UNITS_DIRNAME] = self.sm.get_abunits_dirname
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
             self.request_map[Request.GET_VIRTUAL_LOGS_FILENAME] = self.linalg.get_virtual_logs_filename
