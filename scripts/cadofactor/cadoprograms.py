@@ -1021,19 +1021,16 @@ class BWC(Program):
         super().__init__(locals(), **kwargs)
 
 class SM(Program):
-    binary = "magma-sm-wrapper.sh"
+    binary = "sm"
     name = binary
-    subdir = "scripts"
+    subdir = "filter"
     def __init__(self, *,
                  poly: Parameter(),
-		 renumber: Parameter(),
-		 badidealinfo: Parameter(),
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),
                  ell: Parameter(),
-                 nmaps0: Parameter("nsm0")=None,
-                 nmaps1: Parameter("nsm1")=None,
+                 nsm: Parameter()=None,
                  threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)

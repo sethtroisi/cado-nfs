@@ -4379,10 +4379,8 @@ class SMTask(Task):
         return "Schirokauer Maps"
     @property
     def programs(self):
-        override = ("nmaps0", "nmaps1", "out")
+        override = ("nsm", "out")
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                 "renumber": Request.GET_RENUMBER_FILENAME,
-                 "badidealinfo": Request.GET_BADIDEALINFO_FILENAME,
                  "purged": Request.GET_PURGED_FILENAME,
                  "index": Request.GET_INDEX_FILENAME}
         return ((cadoprograms.SM, override, input),)
@@ -4406,8 +4404,7 @@ class SMTask(Task):
 
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.SM(nmaps0=nmaps[0],
-                    nmaps1=nmaps[1],
+            p = cadoprograms.SM(nsm=str(nmaps[0])+","+str(nmaps[1]),
                     out=smfilename,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
