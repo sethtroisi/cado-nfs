@@ -98,6 +98,7 @@ params/c115.poly
 params/c120.poly
 params/c125.poly
 params/c130.poly
+params/c135.poly
 scripts/polsel_params.sage
 linalg/bwc/bcast-file.c
 misc/README
