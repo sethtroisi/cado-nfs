@@ -1310,7 +1310,7 @@ collision_on_sq ( header_t header,
 
   /* find a suitable lq */
   for (i = 0; i < SQ_R->size; i++) {
-    if (prod < nq) {
+    if (prod <= nq / header->d) {
       if (!check_parameters (header->m0, sq * (double) SQ_R->q[i]))
         break;
       prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
