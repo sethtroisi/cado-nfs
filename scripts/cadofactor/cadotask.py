@@ -3970,6 +3970,9 @@ class LinAlgDLPTask(Task):
                 self.logger.info("Using 2*n=%d as default value for m" % m)
             else:
                 m = self.params["m"]
+            if n == 0:
+                self.logger.error("Error: homogeneous Linalg is not implemented")
+                raise Exception("Program failed")
 
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir,
