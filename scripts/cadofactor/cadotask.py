@@ -4987,7 +4987,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
     def paramnames(self):
         # This isn't a Task subclass so we don't really need to define
         # paramnames, but we do it out of habit
-        return {"name": str, "workdir": str, "N": int, "dlp": False,
+        return {"name": str, "workdir": str, "N": int, "ell": int, "dlp": False,
                 "gfpext": 1, "trybadwu": False, "target": 0}
     @property
     def title(self):
