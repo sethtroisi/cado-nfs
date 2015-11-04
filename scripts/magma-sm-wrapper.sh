@@ -11,9 +11,6 @@ unset PURGED
 unset INDEX
 unset OUT
 unset ELL
-unset SMEXP0
-unset SMEXP1
-unset SMEXP2
 unset NMAPS0
 unset NMAPS1
 unset NMAPS2
