@@ -1,9 +1,186 @@
 #include "utils_cofactorisation.h"
-#include "utils_mpz.h"
 #include "utils_norm.h"
 
 #include "ecm/facul.h"
 #include "ecm/facul_doit.h"
+
+/*
+ * Initialize an array of factors with number, the maximum number of elements.
+ *
+ * factor: the array of factors.
+ * number: the maximum number of elements.
+ */
+static void factor_init(factor_ptr factor, unsigned int alloc)
+{
+  ASSERT(alloc > 0);
+
+  factor->alloc = alloc;
+  factor->number = 0;
+  factor->factorization = (mpz_t * ) malloc(sizeof(mpz_t) * alloc);
+  for (unsigned int i = 0; i < alloc; i++) {
+    mpz_init(factor->factorization[i]);
+  }
+}
+
+/*
+ * Delete an array of factors.
+ *
+ * factor: the array of factors.
+ */
+static void factor_clear(factor_ptr factor)
+{
+  for (unsigned int i = 0; i < factor->alloc; i++) {
+    mpz_clear(factor->factorization[i]);
+  }
+  free(factor->factorization);
+  factor->alloc = 0;
+  factor->number = 0;
+}
+
+/* obvious! */
+static void factor_append(factor_ptr factor, mpz_srcptr z)
+{
+  if (factor->alloc == factor->number) {
+    unsigned int newalloc = factor->alloc + 10;
+    factor->factorization = (mpz_t * ) realloc(factor->factorization,
+        sizeof(mpz_t) * newalloc);
+    for (unsigned int i = factor->alloc; i < newalloc; ++i)
+      mpz_init(factor->factorization[i]);
+    factor->alloc = newalloc;
+  }
+
+  mpz_set(factor->factorization[factor->number], z);
+  factor->number++;
+}
+
+/*
+ * Print an array of factors.
+ *
+ * factor: an array of factors.
+ */
+MAYBE_UNUSED static void factor_fprintf(FILE * file, factor_srcptr factor)
+{
+  fprintf(file, "[");
+  if (factor->number != 0) {
+    for (unsigned int i = 0; i < factor->number - 1; i++) {
+      gmp_fprintf(file, "%Zd, ", factor->factorization[i]);
+    }
+    gmp_fprintf(file, "%Zd]\n", factor->factorization[factor->number - 1]);
+  } else {
+    fprintf(file, "]\n");
+  }
+}
+
+/*
+ * TODO: useless.
+ * Test if the maximum factor of the array factor is less or equal to B. Return
+ *  1 if true, 0 otherwise. If factor is sorted, set sort to 1, 0 otherwise.
+ *
+ * factor: an array of factors.
+ * B: the smoothness bound.
+ * sort: 1 if factor is sorted, 0 otherwise.
+ */
+MAYBE_UNUSED static unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B,
+    unsigned int sort)
+{
+  if (sort) {
+    ASSERT(sort == 1);
+
+    if (mpz_cmp(factor->factorization[factor->number - 1], B) > 0) {
+      return 0;
+    }
+  } else {
+    ASSERT(sort == 0);
+
+    for (unsigned int i = 0; i < factor->number; i++) {
+      if (mpz_cmp(factor->factorization[i], B) > 0) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+
+/*
+ * Return 1 if the factorisation is good, 0 otherwise.
+ */
+static unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z)
+{
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_set_ui(tmp, 1);
+  for (unsigned int i = 0; i < factor->number; i++) {
+    mpz_mul(tmp, tmp, factor->factorization[i]);
+  }
+  unsigned int assert_facto = 0;
+  if (!mpz_cmp(tmp, z)) {
+    ASSERT(mpz_cmp(tmp, z) == 0);
+
+    assert_facto = 1;
+  }
+  mpz_clear(tmp);
+
+  return assert_facto;
+}
+
+/*
+ * Remove all the small factors under a certain bound, and store z_root /
+ *  (factors) in z. Return 1 if z_root is entirely factorize.
+ */
+static int brute_force_factorize_ul(factor_ptr factor, mpz_ptr z,
+    mpz_srcptr z_root, unsigned long bound)
+{
+  prime_info pi;
+  prime_info_init (pi);
+
+  mpz_set(z, z_root);
+  mpz_t prime_Z;
+  mpz_init(prime_Z);
+  unsigned long prime = 2;
+
+  for (prime = 2; prime <= bound; prime = getprime_mt(pi)) {
+    if (mpz_cmp_ui(z, 1) != 0) {
+      mpz_set_ui(prime_Z, prime);
+      mpz_t q;
+      mpz_init(q);
+      mpz_t r;
+      mpz_init(r);
+      mpz_fdiv_qr(q, r, z, prime_Z);
+      while (mpz_cmp_ui(r, 0) == 0) {
+        mpz_set(z, q);
+        factor_append(factor, prime_Z);
+        mpz_fdiv_qr(q, r, z, prime_Z);
+      }
+      mpz_clear(q);
+      mpz_clear(r);
+    }
+  }
+
+  mpz_clear(prime_Z);
+  prime_info_clear (pi);
+
+  if (mpz_cmp_ui(z, 1) == 0) {
+    return 1;
+  }
+  return 0;
+}
+
+static int compare_factor(const void * p0, const void * p1)
+{
+  return(mpz_cmp((mpz_srcptr) p0, (mpz_srcptr) p1));
+}
+
+/*
+ * To sort by acending value the element of the factor array.
+ *
+ * factor: array of factors.
+ */
+static void sort_factor(factor_ptr factor)
+{
+  qsort(factor->factorization, factor->number,
+      sizeof(factor->factorization[0]), compare_factor);
+}
 
 /*
  * Print a relation.
@@ -166,25 +343,25 @@ facul_aux (mpz_t *factors, const struct modset_t m,
 
     switch (m.arith) {
       case CHOOSE_UL:
-        res_fac = facul_doit_onefm_ul(factors, m.m_ul, 
+        res_fac = facul_doit_onefm_ul(factors, m.m_ul,
             methods[i], &fm, &cfm,
             data->lpb, data->BB, data->BBB);
-        break; 
+        break;
       case CHOOSE_15UL:
         res_fac = facul_doit_onefm_15ul(factors, m.m_15ul,
             methods[i], &fm, &cfm,
             data->lpb, data->BB, data->BBB);
-        break; 
+        break;
       case CHOOSE_2UL2:
         res_fac = facul_doit_onefm_2ul2 (factors, m.m_2ul2,
             methods[i], &fm, &cfm,
             data->lpb, data->BB, data->BBB);
-        break; 
+        break;
       case CHOOSE_MPZ:
         res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
             methods[i], &fm, &cfm,
             data->lpb, data->BB, data->BBB);
-        break; 
+        break;
       default: abort();
     }
     // check our result
@@ -312,8 +489,6 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
     n.arith = CHOOSE_MPZ;
   }
   ASSERT_ALWAYS(n.arith != CHOOSE_NONE);
-
-  
 
   // Call the facul machinery.
   // TODO: think about this hard-coded 16...
@@ -544,13 +719,13 @@ static unsigned int find_indices_main(unsigned int ** L,
       }
     }
   }
-  
+
   * L = realloc(* L, size * sizeof(unsigned int));
   return size;
 }
 
 /*
- * For 
+ * For
  */
 static void find_relation(uint64_array_t * indices, uint64_t * index,
     uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_t * f,
@@ -666,7 +841,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
 #endif // ASSERT_FACTO
   free(number_factorisation);
 
-  for (unsigned int i = 0; i < V; ++i)   
+  for (unsigned int i = 0; i < V; ++i)
     facul_clear_aux_methods(data[i].methods);
   free(data);
   free(index);
