@@ -1854,6 +1854,21 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
   uint64_array_realloc(indexes, ind);
 }
 
+#ifdef PRINT_ARRAY_NORM
+void number_norm(FILE * file_array_norm, array_srcptr array, unsigned char max)
+{
+  uint64_t * tab = (uint64_t *) malloc(sizeof(uint64_t) * max);
+  memset(tab, 0, sizeof(uint64_t) * max);
+  for (uint64_t i = 0; i < array->number_element; i++) {
+    tab[array->array[i]] = tab[array->array[i]] + 1;
+  }
+  for (unsigned int i = 0; i < (unsigned int) max; i++) {
+    fprintf(file_array_norm, "%u: %" PRIu64 "\n", i, tab[i]);
+  }
+  free(tab);
+}
+#endif // PRINT_ARRAY_NORM
+
 /* ----- Usage and main ----- */
 
 void declare_usage(param_list pl)
@@ -2071,6 +2086,13 @@ int main(int argc, char * argv[])
   file_trace_pos = NULL;
 #endif // TRACE_POS
 
+#ifdef PRINT_ARRAY_NORM
+  FILE * file_array_norm;
+  file_array_norm = fopen("ARRAY_NORM.txt", "w+");
+  fprintf(file_array_norm, "H: ");
+  sieving_bound_fprintf(file_array_norm, H);
+#endif // PRINT_ARRAY_NORM
+
   ASSERT(q_range[0] >= fbb[q_side]);
   gmp_randstate_t state;
   mpz_t a;
@@ -2149,6 +2171,11 @@ int main(int argc, char * argv[])
         mat_Z_fprintf(file_trace_pos, matrix);
 #endif // TRACE_POS
 
+#ifdef PRINT_ARRAY_NORM
+          fprintf(file_array_norm, "MqLLL:\n");
+          mat_Z_fprintf(file_array_norm, matrix);
+#endif // PRINT_ARRAY_NORM
+
         for (unsigned int j = 0; j < V; j++) {
           sec = seconds();
           uint64_array_init(indexes[j], array->number_element);
@@ -2160,6 +2187,13 @@ int main(int argc, char * argv[])
           init_norm(array, file_trace_pos, pre_compute[j], H, matrix,
               f->pols[j], special_q, !(j ^ q_side));
 #endif // OLD_NORM
+
+#ifdef PRINT_ARRAY_NORM
+          fprintf(file_array_norm, "f%u: ", j);
+          mpz_poly_fprintf(file_array_norm, f->pols[j]);
+          number_norm(file_array_norm, array, max_norm[j]);
+          fprintf(file_array_norm, "********************\n");
+#endif // PRINT_ARRAY_NORM
 
           time[j][0] = seconds() - sec;
 
@@ -2213,6 +2247,10 @@ int main(int argc, char * argv[])
         fprintf(file_trace_pos, "----------------------------------------\n");
 #endif // TRACE_POS
 
+#ifdef PRINT_ARRAY_NORM
+        fprintf(file_array_norm, "----------------------------------------\n");
+        fflush(file_array_norm);
+#endif // PRINT_ARRAY_NORM
       }
     }
 
@@ -2234,6 +2272,10 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
   fclose(file_trace_pos);
 #endif // TRACE_POS
+
+#ifdef PRINT_ARRAY_NORM
+  fclose(file_array_norm);
+#endif // PRINT_ARRAY_NORM
 
   mat_Z_clear(matrix);
   for (unsigned int i = 0; i < V; i++) {

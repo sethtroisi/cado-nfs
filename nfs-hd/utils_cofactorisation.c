@@ -102,6 +102,7 @@ MAYBE_UNUSED static unsigned int factor_is_smooth(factor_srcptr factor, mpz_t B,
   return 1;
 }
 
+#ifdef ASSERT_FACTO
 /*
  * Return 1 if the factorisation is good, 0 otherwise.
  */
@@ -123,6 +124,7 @@ static unsigned int factor_assert(factor_srcptr factor, mpz_srcptr z)
 
   return assert_facto;
 }
+#endif // ASSERT_FACTO
 
 /*
  * Remove all the small factors under a certain bound, and store z_root /
@@ -564,14 +566,15 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
       }
 
       int is_smooth = call_facul(factor[i], res, &data[L[i]]);
+
 #ifdef ASSERT_FACTO
       assert_facto[i] = factor_assert(factor[i], res_tmp);
       if (assert_facto[i] == 0) {
-        number_factorisation[1] = number_factorisation[1] + 1;
-      } else {
         number_factorisation[0] = number_factorisation[0] + 1;
+      } else {
+        number_factorisation[1] = number_factorisation[1] + 1;
       }
-#endif
+#endif // ASSERT_FACTO
 
       if (is_smooth) {
         find++;
@@ -591,22 +594,42 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
 
     norm_poly(res, f[main], a);
 
-    int main_is_smooth = call_facul(factor[Lmain], res, &data[main]);
+#ifdef ASSERT_FACTO
+      mpz_set(res_tmp, res);
+#endif // ASSERT_FACTO
 
-    if (main_is_smooth) {
-      find = 1;
+    int is_smooth = call_facul(factor[Lmain], res, &data[main]);
+
 #ifdef ASSERT_FACTO
       assert_facto[Lmain] = factor_assert(factor[Lmain], res);
-#endif
+      if (assert_facto[Lmain] == 0) {
+        number_factorisation[0] = number_factorisation[0] + 1;
+      } else {
+        number_factorisation[1] = number_factorisation[1] + 1;
+      }
+#endif // ASSERT_FACTO
+
+    if (is_smooth) {
+      find = 1;
 
       for (unsigned int i = 0; i < size; i++) {
         if (i != Lmain) {
           norm_poly(res, f[L[i]], a);
 
-          int is_smooth = call_facul(factor[i], res, &data[L[i]]);
+#ifdef ASSERT_FACTO
+          mpz_set(res_tmp, res);
+#endif // ASSERT_FACTO
+
+          is_smooth = call_facul(factor[i], res, &data[L[i]]);
+
 #ifdef ASSERT_FACTO
           assert_facto[i] = factor_assert(factor[i], res);
-#endif
+          if (assert_facto[i] == 0) {
+            number_factorisation[0] = number_factorisation[0] + 1;
+          } else {
+            number_factorisation[1] = number_factorisation[1] + 1;
+          }
+#endif // ASSERT_FACTO
 
           if (is_smooth) {
             find++;
@@ -819,7 +842,9 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
 
   MAYBE_UNUSED unsigned int * number_factorisation =
     (unsigned int *) malloc(sizeof(unsigned int) * 2);
+  //Bad factorisation.
   number_factorisation[0] = 0;
+  //Good factorisation.
   number_factorisation[1] = 0;
   unsigned int nb_rel_found = 0;
   if (0 != length_tot) {
@@ -836,8 +861,8 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   }
 
 #ifdef ASSERT_FACTO
-  printf("# Number of good factorisations: %u.\n", number_factorisation[0]);
-  printf("# Number of bad factorisations: %u.\n", number_factorisation[1]);
+  printf("# Number of good factorisations: %u.\n", number_factorisation[1]);
+  printf("# Number of bad factorisations: %u.\n", number_factorisation[0]);
 #endif // ASSERT_FACTO
   free(number_factorisation);
 
