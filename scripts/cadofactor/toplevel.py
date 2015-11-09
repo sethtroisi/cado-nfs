@@ -179,13 +179,13 @@ class Cado_NFS_toplevel(object):
             pipe = subprocess.Popen(cmd.split(" "), stdout=subprocess.PIPE)
             loc = locale.getdefaultlocale()[1]
             return [s.decode(loc) for s in pipe.stdout.readlines()]
-        if os.uname().sysname == "OpenBSD":
+        if os.uname()[0] == "OpenBSD":
             # does this count hyperthreading or not ?
             return int(backquote("sysctl -n hw.ncpu")[0])
-        if os.uname().sysname == "Darwin":
+        if os.uname()[0] == "Darwin":
             # does this count hyperthreading or not ?
             return int(backquote("sysctl -n hw.ncpu")[0])
-        if os.uname().sysname == "MINGW32_NT-6.1":
+        if os.uname()[0] == "MINGW32_NT-6.1":
             # not clear whether it's physical or logical.
             crap=backquote("wmic cpu get Caption")
             return max(len(crap)-1,1)
