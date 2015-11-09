@@ -55,6 +55,12 @@
 name = c90
 # All files created by cadofactor will be prefixed by this name.
 
+
+# The other general parameters (N, sourcedir, builddir, tasks.workdir) in
+# this section are commented out, because they do not make sense on a
+# general basis (recall that this very file is also used as a baseline
+# for factoring any 90-digit number).
+#
 # N: The number to be factored. This c90 here is given only as an
 # example, and hence commented out. You may set a value for it in this
 # file or override it on the command line
@@ -63,11 +69,11 @@ name = c90
 # Adjust sourcedir to point to the root of your CADO source directory.
 # This parameter is not actually used by cadofactor directly, but it is
 # referenced as $(sourcedir) further down in this parameter file.
-sourcedir=${HOME}/cado-nfs
+# sourcedir=${HOME}/cado-nfs
 
 # Adjust builddir to point to the root of your CADO build directory
 # Not used directly, either, but referenced, too.
-builddir=${HOME}/build/cado-nfs/
+# builddir=${HOME}/build/cado-nfs/
 
 # workdir: the path of the working directory; if a relative path is
 # specified, it is relative to the CWD from which cadofactor is run.
@@ -77,7 +83,7 @@ builddir=${HOME}/build/cado-nfs/
 # the CADO source or build directory. In fact, it is advisable to keep it
 # separate to facilitate deleting or backing-up the sources, executables,
 # and factorization data individually.
-tasks.workdir = /tmp/
+# tasks.workdir = /tmp/
 
 
 ###########################################################################
@@ -398,11 +404,15 @@ slaves.nrclients = 2
 # system.
 
 # scriptpath must point to the directory in which the cado-nfs-client.py script
-# can be found on the client machines. I.e., with scriptpath as set in this
-# example and if, for example, "sourcedir = /tmp/cado-nfs", then clients will
+# can be found on the client machines (wuclient.py is also needed,
+# although if it is found in $(sourcedir)/scripts/cadofactor, it is fine,
+# too). I.e., with scriptpath as set in this example and if, for example,
+# "sourcedir = /tmp/cado-nfs", then clients will
 # be started through:
 # "ssh [hostname] /tmp/cado-nfs/cado-nfs-client.py [client parameters]"
-slaves.scriptpath = $(sourcedir)/scripts/cadofactor
+#
+# Adjust only if needed.
+# slaves.scriptpath = $(sourcedir)
 
 # downloadretry: Number of seconds a client should wait between failed
 # download attempts from the server

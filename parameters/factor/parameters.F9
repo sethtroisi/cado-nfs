@@ -1,4 +1,6 @@
 # An example parameter file for an SNFS factorization, in this case, F9 = 2^512+1
+#
+# Adjust paths to suit your needs.
 
 name = F9
 N = 5529373746539492451469451709955220061537996975706118061624681552800446063738635599565773930892108210210778168305399196915314944498011438291393118209
@@ -76,7 +78,9 @@ tasks.characters.threads = 2
 # Parameters for worker slaves. This example uses two slaves on localhost.
 slaves.hostnames = localhost
 slaves.nrclients = 2
-slaves.scriptpath = $(sourcedir)/scripts/cadofactor
+
+# adjust if needed
+# slaves.scriptpath = $(sourcedir)/scripts/cadofactor
 slaves.downloadretry = 10
 slaves.basepath = $(workdir)/$(name).wuclient
 slaves.niceness = 10
