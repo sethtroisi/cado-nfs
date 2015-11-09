@@ -5265,7 +5265,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
 
     def start_elapsed_time(self):
         if "starttime" in self.state:
-            self.logger.warning("The start time of the last cadofactor.py "
+            self.logger.warning("The start time of the last cado-nfs.py "
                                 "run was recorded, but not its end time, "
                                 "maybe because it died unexpectedly.")
             self.logger.warning("Elapsed time of last run is not known and "

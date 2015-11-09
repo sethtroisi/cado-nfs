@@ -76,4 +76,4 @@ cleanup() {
     fi
 }
 
-${CADO_NFS_SOURCE_DIR}/scripts/cadofactor/cadofactor.py $PARAMFILE && cleanup
+${CADO_NFS_SOURCE_DIR}/cado-nfs.py $PARAMFILE && cleanup

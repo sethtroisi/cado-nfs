@@ -118,6 +118,8 @@ class Cado_NFS_toplevel(object):
         size_of_n=len(repr(self.args.N))
         # also attempt nearest multiple of 5.
         attempts=[letter+"%d"%x for x in [size_of_n, ((size_of_n+2)//5)*5]]
+        if self.args.gfpext:
+            attempts=[x+"dd%d"%self.args.gfpext for x in attempts]
         if attempts[1]==attempts[0]:
             attempts=attempts[:1]
         self.logger.debug("Looking for parameter file"
@@ -348,6 +350,8 @@ class Cado_NFS_toplevel(object):
                     " command line and --workdir argument cannot exceed 1")
         elif len(supplied_workdir):
             self.args.workdir=supplied_workdir[0]
+        if self.args.ell:
+            equal_options.append("ell=%s"%self.args.ell)
         self.args.options=equal_options
 
     def set_N_paramfile_workdir(self):
@@ -776,6 +780,12 @@ class Cado_NFS_toplevel(object):
                 " max(task.sieve.threads, tasks.polyselect.threads)")
         parser.add_argument("--slaves", "-s",
                 help="Aliases (and conflicts with) slaves.nrclients")
+        parser.add_argument("-gfpext",
+                type=int,
+                default=0,
+                help="Degree of the finite field extension (DLP only)")
+        parser.add_argument("--ell", "-ell",
+                help="Aliases (and conflicts with) ell in parameter files")
         parser.add_argument("--server",
                 help="Run a bare server, do not start any clients",
                 action='store_true')

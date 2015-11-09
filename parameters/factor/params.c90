@@ -39,8 +39,8 @@
 # also contains a couple of parameters relative to the execution
 # environment (for that step only).
 
-# The cadofactor.py script may be used as:
-# cadofactor.py <parametersfile> [<additional parameters> [...]]
+# The cado-nfs.py script may be used as:
+# cado-nfs.py <parametersfile> [<additional parameters> [...]]
 # Additional parameters on the command line are specified in the same
 # format as in this file, e.g., "foo.bar.baz=42", and override values found
 # in the parameter file.
@@ -49,7 +49,7 @@
 # General parameters
 ###########################################################################
 
-# General parameters are relevant to the behaviour of the cadofactor.py script.
+# General parameters are relevant to the behaviour of the cado-nfs.py script.
 
 # - location and name of files -
 name = c90
@@ -277,8 +277,8 @@ tasks.filter.purge.required_excess=0.1 # Controls extra sieving:
 ###########################################################################
 
 # - runtime environment -
-# cadofactor.py supports only running the linear system solving on the
-## host running cadofactor.py itself, using posix threads. More advanced
+# cado-nfs.py supports only running the linear system solving on the
+## host running cado-nfs.py itself, using posix threads. More advanced
 # usage has to go by hand.
 #tasks.linalg.bwc.threads = 2x2		# Multithreading level of Block-Wiedemann ; Use
 					# <mn> (a single integer) or <m>x<n>; if a single
@@ -357,15 +357,15 @@ server.port = 8001
 # Worker slaves
 ###########################################################################
 
-# The cadofactor.py script has the ability to spawn client scripts on many
+# The cado-nfs.py script has the ability to spawn client scripts on many
 # machines using ssh, in a master/slave manner. The client scripts then
 # request workunits describing a small part of the computation that needs
 # to be done, perform this computation, upload the result to the master
-# running the cadofactor.py script, then request and process the next
+# running the cado-nfs.py script, then request and process the next
 # workunit. Client scripts can be launched manually as well to participate
 # in an ongoing factorization.
 
-# Clients which cadofactor.py should start are specified under "slaves".
+# Clients which cado-nfs.py should start are specified under "slaves".
 # We look for any path under "slaves" with a "hostnames" key, then for each
 # host name specified (comma separated list, with multiplicity), one slave is
 # launched on that host.
@@ -422,7 +422,7 @@ slaves.niceness = 10		# nice level for the sieving jobs
 # working directory includes the clientid which should ensure uniqueness.
 
 # Since this example runs its slaves on localhost, we use a subdirectory
-# of the cadofactor.py working directory, so that all files of both master
+# of the cado-nfs.py working directory, so that all files of both master
 # and clients can be cleaned up easily.
 slaves.basepath = /tmp/c90.wuclients
 

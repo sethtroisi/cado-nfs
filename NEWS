@@ -36,6 +36,10 @@ Main changes between cado-nfs-2.1.1 and cado-nfs-2.2:
 * An estimated time of arrival (ETA) is now printed during the polynomial
   selection and sieving steps. It corresponds to the estimate finish time
   of each of those steps (not the full factorization).
+* factor.sh is dead. cadofactor.py has been renamed into cado-nfs.py. The
+  client script wuclient2.py has been renamed into cado-nfs-client.py
+* By default, factorizations running on the localhost will use all
+  available cores.
 
 Main changes between cado-nfs-2.1 and cado-nfs-2.1.1:
 
