@@ -55,9 +55,10 @@
 name = c90
 # All files created by cadofactor will be prefixed by this name.
 
-# N: The number to be factored. This c90 here is given only as an example,
-# replace it in this file or override it on the command line
-N = 482940676938975075806475467716373950242726509723517010302524110187257004202892794033435637
+# N: The number to be factored. This c90 here is given only as an
+# example, and hence commented out. You may set a value for it in this
+# file or override it on the command line
+# N = 482940676938975075806475467716373950242726509723517010302524110187257004202892794033435637
 
 # Adjust sourcedir to point to the root of your CADO source directory.
 # This parameter is not actually used by cadofactor directly, but it is
