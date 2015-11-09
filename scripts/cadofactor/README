@@ -1,6 +1,6 @@
 The cadofactor Python script is generally run with
 
-./cadofactor.py parameterfile
+./cado-nfs.py parameterfile
 
 All the parameters for the factorization are read from the parameter file,
 but it is possible to specify such parameters on the command line, after
@@ -8,11 +8,11 @@ parameterfile.
 
 For example, running
 
-./cadofactor.py ../../params/params.c59 N=90377629292003121684002147101760858109247336549001090677693 tasks.workdir=/tmp/c59 tasks.execpath=$HOME/build/cado-nfs/normal server.whitelist=0.0.0.0/0
+./cado-nfs.py ../../params/params.c59 N=90377629292003121684002147101760858109247336549001090677693 tasks.workdir=/tmp/c59 tasks.execpath=$HOME/build/cado-nfs/normal server.whitelist=0.0.0.0/0
 
 starts the cadofactor script, which also starts the server. It does not start any clients with this command line, so those would have to be started manually:
 
-./wuclient2.py --server=https://quiche.loria.fr:8001 --certsha1=[Certificate SHA1]
+./cado-nfs-client.py --server=https://quiche.loria.fr:8001 --certsha1=[Certificate SHA1]
 
 where the --server and --certsha1 parameters should be given the URL and certificate SHA1 value of the server,
 respectively, as printed by the cadofactor script. You can start an arbitrary number of client scripts, on any
@@ -22,7 +22,10 @@ If you want to let the server automatically start clients, you need to supply a 
 
 ./cadofactor.py ../../params/params.c59 N=90377629292003121684002147101760858109247336549001090677693 tasks.workdir=/tmp/c59 tasks.execpath=$HOME/build/cado-nfs/normal slaves.hostnames=localhost slaves.nrclients=2 slaves.scriptpath=$HOME/git/cado-nfs/scripts/cadofactor
 
-to let it start two clients on localhost. The scriptpath parameter must be the path to the directory on the client machine which contains wuclient2.py (and workunit.py).
+to let it start two clients on localhost. The scriptpath parameter must
+be the path to the directory on the client machine which contains
+cado-nfs-client.py (and workunit.py. The latter can also be fetched from
+scriptpath+"/scripts/cadofactor").
 
 
 For complex set-ups, it is preferable to write a parameter file. Some examples are in "parameters", "parameters.oar", and "parameters.rsa512.oar".

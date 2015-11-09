@@ -642,7 +642,7 @@ performance of the linear algebra step. When hwloc is used, the keyword
 "cpubinding" should appear in cxxx.bwc.log.
 
 See cpubinding.conf for more information. In short, you just need to add on the
-cadofactor.py command line: cpubinding=$(CADO)/linalg/bwc/cpubinding.conf.
+cadofactor.py command line: cpubinding=$(CADO)/parameters/misc/cpubinding.conf.
 
 Using Cantor's algorithm
 ========================

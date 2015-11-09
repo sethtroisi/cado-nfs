@@ -387,7 +387,7 @@ endmacro()
 cado_define_test(full_c30
     SCRIPT
         ${CADO_NFS_SOURCE_DIR}/factor.sh
-1000000001000040000000037000111
+        999073468111577057576445816581
         -t 2 -s auto
     TARGET_DEPENDENCIES
         polyselect polyselect_ropt

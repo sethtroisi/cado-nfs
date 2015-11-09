@@ -4701,7 +4701,7 @@ class StartClientsTask(Task):
         return "Client Launcher"
     @property
     def programs(self):
-        return ((cadoprograms.WuClient, ("clientid", "certsha1"), {}),)
+        return ((cadoprograms.CadoNFSClient, ("clientid", "certsha1"), {}),)
     @property
     def paramnames(self):
         return {'hostnames': str, 'scriptpath': None, "nrclients": [int], "run": True}
@@ -4837,14 +4837,14 @@ class StartClientsTask(Task):
                 self._del_cid(clientid)
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
-        wuclient = cadoprograms.WuClient(server=server,
+        cado_nfs_client = cadoprograms.CadoNFSClient(server=server,
                                          clientid=clientid, daemon=True,
                                          certsha1=certsha1,
                                          **self.progparams[0])
         if host == "localhost":
-            process = cadocommand.Command(wuclient)
+            process = cadocommand.Command(cado_nfs_client)
         else:
-            process = cadocommand.RemoteCommand(wuclient, host, self.parameters)
+            process = cadocommand.RemoteCommand(cado_nfs_client, host, self.parameters)
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
