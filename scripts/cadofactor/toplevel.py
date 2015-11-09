@@ -302,7 +302,8 @@ class Cado_NFS_toplevel(object):
         for x in self.args.options:
             matches=[]
             def match_and_store(matches, pattern, string):
-                matches.clear()
+                # matches.clear() is not for all python versions.
+                del matches[:]
                 foo=re.match(pattern, string)
                 if foo:
                     matches += foo.groups()
