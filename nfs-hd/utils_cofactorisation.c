@@ -199,13 +199,19 @@ static void sort_factor(factor_ptr factor)
  */
 static void printf_relation(factor_t * factor, unsigned int * I,
     unsigned int * L, mpz_poly_srcptr a, unsigned int t, unsigned int V,
-    unsigned int size, MAYBE_UNUSED unsigned int * assert_facto)
+    unsigned int size, MAYBE_UNUSED unsigned int * assert_facto,
+    MAYBE_UNUSED mpz_vector_srcptr c)
 {
   //Print a.
 #ifdef PRINT_POLY_RELATION
   printf("# ");
   mpz_poly_fprintf(stdout, a);
 #endif // PRINT_POLY_RELATION
+
+#ifdef PRINT_VECTOR_RELATION
+  printf("# ");
+  mpz_vector_fprintf(stdout, c);
+#endif // PRINT_VECTOR_RELATION
 
   unsigned int index = 0;
   //Print if the factorisation is good.
@@ -526,7 +532,8 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
     unsigned int * L, unsigned int size, unsigned int t, unsigned int V,
     int main, facul_aux_data *data, unsigned int * nb_rel_found,
     ideal_spq_srcptr special_q, unsigned int q_side,
-    MAYBE_UNUSED unsigned int * number_factorisation)
+    MAYBE_UNUSED unsigned int * number_factorisation,
+    MAYBE_UNUSED mpz_vector_srcptr c)
 {
   mpz_t res;
   mpz_init(res);
@@ -571,6 +578,9 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
       assert_facto[i] = factor_assert(factor[i], res_tmp);
       if (assert_facto[i] == 0) {
         number_factorisation[0] = number_factorisation[0] + 1;
+#ifdef PRINT_ASSERT_FACTO
+        gmp_printf("# Incomplete: %Zd\n", res_tmp);
+#endif // PRINT_ASSERT_FACTO
       } else {
         number_factorisation[1] = number_factorisation[1] + 1;
       }
@@ -644,7 +654,7 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
   }
 
   if (find >= 2) {
-    printf_relation(factor, I, L, a, t, V, size, assert_facto);
+    printf_relation(factor, I, L, a, t, V, size, assert_facto, c);
 
     (* nb_rel_found)++;
 
@@ -785,7 +795,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
         mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
 
       good_polynomial(a, f, L, size, H->t, V, main, data, nb_rel_found,
-          special_q, q_side, number_factorisation);
+          special_q, q_side, number_factorisation, c);
     }
 
     mpz_poly_clear(a);
@@ -861,8 +871,9 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   }
 
 #ifdef ASSERT_FACTO
-  printf("# Number of good factorisations: %u.\n", number_factorisation[1]);
-  printf("# Number of bad factorisations: %u.\n", number_factorisation[0]);
+  printf("# Number of complete factorisations: %u.\n", number_factorisation[1]);
+  printf("# Number of incomplete factorisations: %u.\n",
+      number_factorisation[0]);
 #endif // ASSERT_FACTO
   free(number_factorisation);
 
