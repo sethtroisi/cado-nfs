@@ -99,7 +99,9 @@ name = c90
 # executable as "execpath/execsubdir/execbin" and "execpath/execbin", in this
 # order. Defaults for these parameters are defined for each program in
 # cadoprograms.py; usually it is sufficient to set "execpath".
-tasks.execpath=$(builddir)
+#
+# adjust if needed.
+# tasks.execpath=$(builddir)
 
 # verbose: Verbosity of program output. Many programs accept a -v (or
 # similar) command line flag; this parameter specifies whether verbose
