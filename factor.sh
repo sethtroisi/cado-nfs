@@ -199,7 +199,7 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
       cadofactor="${scriptpath}/cadofactor.py"
       paramdir="${srcdir}/params"
       # Make the path absolute.
-      bindir=`cd "$build_tree" ; pwd`
+      bindir=$(cd "$build_tree" ; pwd)
       cpubinding_file="$srcdir/linalg/bwc/cpubinding.conf"
     fi
 fi
