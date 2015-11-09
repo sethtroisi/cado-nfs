@@ -206,7 +206,7 @@ class Parameters(object):
             if base in d:
                 if isinstance(d[base], dict):
                     break
-                found=pp.copy()
+                found=list(pp)
         if found is not None:
             x=".".join(found+[base])
             return x
