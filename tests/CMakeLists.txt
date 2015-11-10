@@ -444,7 +444,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl)
         cado_define_test(test_gfp2
-            SCRIPT ${CADO_NFS_SOURCE_DIR}/cado-nfs.py 100000000000000000039 -dlp -gfpext 2 -t 2 -ell 164354743277891 -dlpnokeep
+            SCRIPT ${CADO_NFS_SOURCE_DIR}/cado-nfs.py 100000000000000000039 -dlp -gfpext 2 -t 2 -ell 164354743277891 -dlp-no-keep
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
             filter_galois polyselect_gfpn)
