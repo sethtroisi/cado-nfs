@@ -150,12 +150,12 @@ Run a factorization on current machine:
 ./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 -t 2
 
 where the option '-t 2' tells how many cores (via threads) to use on the
-current machine (for polynomial selection, sieving and linear algebra).
-It is possible to set '-t all' (which, in fact, is the default) to use
-all threads on the current machine/
+current machine (for polynomial selection, sieving, linear algebra, among
+others).  It is possible to set '-t all' (which, in fact, is the default)
+to use all threads on the current machine.
 
 CADO-NFS is optimized only for numbers above 85 digits, and no support will
-be provided for numbers of less than 59 digits. Note that it is a good idea
+be provided for numbers of less than 60 digits. Note that it is a good idea
 to remove small prime factors using special-purpose algorithms such as trial
 division, P-1, P+1, or ECM, and use CADO-NFS only for the remaining composite
 factor.
@@ -239,7 +239,7 @@ If you have started a factorization with the cado-nfs.py script, and it was
 interrupted (for example because of a power failure) you can restart in
 any of these two ways:
  - with the same cado-nfs.py command line if a work directory was
-   explicitly provided
+   explicitly provided with workdir=/path/to/workdir
  - with the single argument
         [[work directory]]/XXX.parameters_snapshot.YYY
    where [[work directory]] is the directory which has been chosen
