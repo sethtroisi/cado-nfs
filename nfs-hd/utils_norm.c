@@ -278,7 +278,7 @@ void add_arrays(int * current_indexes, const int * current_values,
       (increment[i] - 1);
   }
 }
-
+#ifndef MPZ_NORM
 unsigned char log_norm_double(const int * current_indexes,
     unsigned char * max_norm, mat_int64_srcptr M,
     double_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
@@ -328,6 +328,58 @@ unsigned char log_norm_double(const int * current_indexes,
 
   return res;
 }
+#else
+unsigned char log_norm_double(const int * current_indexes,
+    unsigned char * max_norm, mat_int64_srcptr M,
+    mpz_poly_srcptr f, ideal_spq_srcptr spq, int special_q,
+    MAYBE_UNUSED unsigned int size)
+{
+  ASSERT(size == M->NumRows);
+  ASSERT(size == M->NumCols);
+
+  mpz_poly_t poly;
+  mpz_poly_init(poly, M->NumRows);
+
+  for (unsigned int i = 0; i < M->NumRows; i++) {
+    int64_t tmp = 0;
+    for (unsigned int k = 0; k < M->NumCols; k++) {
+      tmp = tmp + M->coeff[i + 1][k + 1] * (int64_t) current_indexes[k];
+    }
+    mpz_poly_setcoeff_int64(poly, i, tmp);
+  }
+
+  int deg = poly->deg;
+
+  mpz_t norm;
+  mpz_init(norm);
+  norm_poly(norm, poly, f);
+  double resultant = mpz_get_d(norm);
+  mpz_poly_clear(poly);
+  mpz_clear(norm);
+
+  ASSERT(resultant >= 0.0);
+  resultant = ceil(log2(resultant));
+  ASSERT_ALWAYS(resultant < 256.0);
+
+  unsigned char res = (unsigned char) resultant;
+
+  if (special_q) {
+    ASSERT(special_q == 1);
+
+    if (deg == -1) {
+      res = 0;
+    } else {
+      res = res - ideal_spq_get_log(spq);
+    }
+  }
+
+  if (res > * max_norm) {
+    * max_norm = res;
+  }
+
+  return res;
+}
+#endif // MPZ_NORM
 
 void update_mini_maxi(unsigned char * mini, unsigned char * maxi,
     unsigned char val)
@@ -388,6 +440,7 @@ void add_one_values(int * current_indexes, const int * bottom_left_cube,
 #endif
 }
 
+#ifndef MPZ_NORM
 static void init_cells(array_ptr array, unsigned char * max_norm,
     MAYBE_UNUSED FILE * file,
     const int * bottom_left_cube, const unsigned int * length,
@@ -395,6 +448,15 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
     ideal_spq_srcptr spq, int special_q, double norm_tolerance,
     MAYBE_UNUSED mpz_poly_srcptr f_Z,
     MAYBE_UNUSED mpz_ptr mean_norm)
+#else
+static void init_cells(array_ptr array, unsigned char * max_norm,
+    MAYBE_UNUSED FILE * file,
+    const int * bottom_left_cube, const unsigned int * length,
+    sieving_bound_srcptr H, mpz_poly_srcptr f, mat_int64_srcptr Mq,
+    ideal_spq_srcptr spq, int special_q, double norm_tolerance,
+    MAYBE_UNUSED mpz_poly_srcptr f_Z,
+    MAYBE_UNUSED mpz_ptr mean_norm)
+#endif // MPZ_NORM
 {
 #ifndef NDEBUG
   for (unsigned int i = 0; i < H->t; i++) {
@@ -511,9 +573,15 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
         next_bottom_left_cube_in_hypercube(current_indexes, new_length,
             use_new_length, bottom_left_cube, length, H->t);
         //Modify norm_tolerance if strategie change it.
+#ifndef MPZ_NORM
         init_cells(array, max_norm, file, current_indexes, new_length, H, f, Mq,
             spq, special_q, strategie_norm_tolerance(norm_tolerance), f_Z,
             mean_norm);
+#else
+        init_cells(array, max_norm, file, current_indexes, new_length, H, f_Z,
+            Mq, spq, special_q, strategie_norm_tolerance(norm_tolerance), f_Z,
+            mean_norm);
+#endif // MPZ_NORM
           }
     } else {
       stop = 1;
@@ -614,8 +682,13 @@ void init_norm(array_ptr array, unsigned char * max_norm,
   for (unsigned int i = 0; i < stop; i++) {
     next_bottom_left_cube_in_hypercube(bottom_left_cube, length, use_length,
         bottom_left_hypercube, length_hypercube, H->t);
+#ifndef MPZ_NORM
     init_cells(array, max_norm, file, bottom_left_cube, length, H, f_d, Mq, spq,
         special_q, norm_tolerance, f, mean_norm);
+#else // MPZ_NORM
+    init_cells(array, max_norm, file, bottom_left_cube, length, H, f, Mq, spq,
+        special_q, norm_tolerance, f, mean_norm);
+#endif // MPZ_NORM
   }
 
 #ifdef MEAN_NORM
