@@ -82,6 +82,24 @@ possible to salvage some of the output files which can then be imported into
 a new factorization run of the same number, but with a new working
 directory.
 
+Running with several groups of machines
+=======================================
+
+You can define several groups of machines slaves.xxx, slaves.yyy, ...
+Here is an example:
+
+slaves.big.hostnames = fondue,berthoud
+slaves.big.nrclients = 4
+slaves.big.scriptpath = /users/caramel/zimmerma/svn/cado-nfs
+slaves.big.basepath = /tmp/nfs
+slaves.small.hostnames = sel,poivre
+slaves.small.nrclients = 2
+slaves.small.scriptpath = /users/caramel/zimmerma/svn/cado-nfs
+slaves.small.basepath = /tmp/nfs
+
+This will run 4 clients (with by default 2 threads each) on the "big" machines
+fondue and berthoud, and 2 clients (with by default 2 threads each) on the
+"small" machines sel and poivre.
 
 Importing a polynomial file
 ===========================
