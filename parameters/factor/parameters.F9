@@ -49,3 +49,4 @@ tasks.sieve.ratq = True
 # linear algebra
 tasks.linalg.bwc.m = 64
 tasks.linalg.bwc.n = 64
+tasks.linalg.characters.nchar = 50
