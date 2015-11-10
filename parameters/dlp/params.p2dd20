@@ -9,6 +9,7 @@
 name = p2dd20
 
 # The followig two parameters tell the main script to do DL in GF(p^2)
+# They can also be given as command-line arguments to the main script
 dlp = true
 gfpext = 2
 
