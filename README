@@ -119,8 +119,9 @@ with the operating system's dynamic linker.
 (i) if "make" is directly called from the source directory $SRCDIR,
     "make install" installs all programs and binaries in $SRCDIR/installed.
 
-(ii) otherwise programs and binaries will be installed in /usr/local/share, 
-     the default installation prefix can be changed by one of the following:
+(ii) otherwise programs and binaries will be installed in
+     /usr/local/share/cado-nfs-x.y.z, and this default installation prefix
+     can be changed by one of the following commands:
 
      cmake .../cado-nfs -DCMAKE_INSTALL_PREFIX=/tmp/install
 
