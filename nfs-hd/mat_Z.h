@@ -86,7 +86,7 @@ void mat_Z_clear(mat_Z_ptr matrix);
 
 /*
  * Write a matrix in a file.
- * 
+ *
  * file: the file.
  * matrix: the matrix.
  */
@@ -167,4 +167,7 @@ void mat_Z_LLL_unimodular_transpose(mat_Z_ptr mat_new, mat_Z_srcptr mat_old);
  * Copy a mat_int64 in a mat_Z.
  */
 void mat_int64_to_mat_Z(mat_Z_ptr mat_Z, mat_int64_srcptr mat_int);
+
+void mat_Z_sort_last(mat_Z_ptr M_out, mat_Z_srcptr M_in);
+
 #endif  /* MAT_Z_H */

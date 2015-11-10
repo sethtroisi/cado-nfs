@@ -5,7 +5,7 @@
 
 void sieving_bound_init(sieving_bound_ptr H, unsigned int t)
 {
-  ASSERT(t > 1);
+  ASSERT(t > 2);
 
   H->t = t;
   H->h = (unsigned int * ) malloc(sizeof(unsigned int) * t);
@@ -46,7 +46,7 @@ void sieving_bound_clear(sieving_bound_ptr H)
 
 void sieving_bound_fprintf(FILE * filew, sieving_bound_srcptr H)
 {
-  ASSERT(H->t >= 2);
+  ASSERT(H->t > 2);
 
   fprintf(filew, "[");
   for (unsigned int i = 0 ; i < H->t - 1; i++) {
@@ -57,7 +57,7 @@ void sieving_bound_fprintf(FILE * filew, sieving_bound_srcptr H)
 
 void sieving_bound_fprintf_detailed(FILE * filew, sieving_bound_srcptr H)
 {
-  ASSERT(H->t >= 2);
+  ASSERT(H->t > 2);
 
   for (unsigned int i = 0 ; i < H->t - 1; i++) {
     fprintf(filew, "-H%u: -%u -- H%u: %u\n", i, H->h[i], i, H->h[i] - 1);
@@ -68,7 +68,7 @@ void sieving_bound_fprintf_detailed(FILE * filew, sieving_bound_srcptr H)
 void sieving_bound_fprintf_detailed_comment(FILE * filew,
     sieving_bound_srcptr H)
 {
-  ASSERT(H->t >= 2);
+  ASSERT(H->t > 2);
 
   fprintf(filew, "# [-H%u: -%u -- H%u: %u\n", 0, H->h[0], 0, H->h[0] - 1);
 

@@ -20,21 +20,23 @@ tasks.polyselect.P = 120000
 tasks.polyselect.admax = 5e6
 tasks.polyselect.adrange = 5e4
 tasks.polyselect.incr = 60
-tasks.polyselect.nq = 1000
+tasks.polyselect.nq = 3125
 tasks.polyselect.nrkeep = 400
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-rlim = 8000000
-alim = 16000000
+rlim = 9188000
+alim = 18400000
 lpbr = 28
-lpba = 28
-tasks.sieve.mfbr = 56
+lpba = 29
+tasks.sieve.mfbr = 87
 tasks.sieve.mfba = 84
 tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.8
+tasks.sieve.alambda = 2.4
+tasks.sieve.ncurves0 = 12
+tasks.sieve.ncurves1 = 13
 
 tasks.I = 13
 tasks.sieve.qrange = 10000

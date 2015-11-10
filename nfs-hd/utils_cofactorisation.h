@@ -1,5 +1,5 @@
 #ifndef UTILS_COFACTORISATION_H
-#define UTILS_COFACTORISATION_H 
+#define UTILS_COFACTORISATION_H
 
 #include "cado.h"
 #include "utils.h"
@@ -7,6 +7,18 @@
 #include "mat_Z.h"
 #include "sieving_bound.h"
 #include "ideal.h"
+
+//Define an array with all the factors.
+typedef struct
+{
+  mpz_t * factorization;
+  unsigned int number;
+  unsigned int alloc;
+} s_factor_t;
+
+typedef s_factor_t factor_t[1];
+typedef s_factor_t * factor_ptr;
+typedef const s_factor_t * factor_srcptr;
 
 /*
  * To find the relations.

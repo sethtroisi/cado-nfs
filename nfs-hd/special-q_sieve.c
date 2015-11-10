@@ -137,6 +137,20 @@ void build_Mq_ideal_spq(mat_Z_ptr matrix, ideal_spq_srcptr ideal)
   }
 }
 
+void reogranize_MqLLL(mat_Z_ptr matrix)
+{
+  for (unsigned int col = 1; col <= matrix->NumRows; col++) {
+    if (mpz_cmp_ui(matrix->coeff[matrix->NumRows][col], 0) < 0) {
+      for (unsigned int row = 1; row <= matrix->NumRows; row++) {
+        mpz_mul_si(matrix->coeff[row][col], matrix->coeff[row][col], -1);
+      }
+    }
+  }
+
+  //TODO: seem to be useless, need do to think about that.
+  /*mat_Z_sort_last(matrix, matrix);*/
+}
+
 /*
  * pseudo_Tqr is the normalised Tqr obtained by compute_Tqr_1. If Tqr[0] != 0,
  *  pseudo_Tqr = [(-Tqr[0])^-1 mod r = a, a * Tqr[1], …].
@@ -501,7 +515,7 @@ void line_sieve_ci(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
     for (uint64_t k = 1; k < number_c_l; k++) {
       array->array[index + k] = array->array[index + k] - ideal->log;
-    
+
       mode_sieve(file_trace_pos, H, index + k, array, matrix, f, ideal, NULL,
           number_c_l, 0, 1, nb_hit);
     }
@@ -514,13 +528,13 @@ void line_sieve_ci(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
       index = index + ideal->ideal->r * number_c_l;
 
       array->array[index] = array->array[index] - ideal->log;
- 
+
       mode_sieve(file_trace_pos, H, index, array, matrix, f, ideal, NULL,
           number_c_l, 1, 1, nb_hit);
 
       for (uint64_t k = 1; k < number_c_l; k++) {
         array->array[index + k] = array->array[index + k] - ideal->log;
- 
+
         mode_sieve(file_trace_pos, H, index + k, array, matrix, f, ideal, NULL,
             number_c_l, 1, 1, nb_hit);
       }
@@ -560,7 +574,7 @@ void compute_ci_1(int64_t * ci, unsigned int i, unsigned int pos,
  *
  *
  * array: the array in which we store the resulting norms.
- * c: the 
+ * c: the
  */
 void line_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     int64_vector_ptr c, uint64_t * pseudo_Tqr,
@@ -775,7 +789,7 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos, ideal_1_
   int64_vector_init(e0, vec[0]->dim);
   int64_vector_init(e1, vec[1]->dim);
   int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], (int64_t)(2*H->h[0]));
-  
+
   //Find some short vectors to go from z = d to z = d + 1.
   //TODO: go after boolean, no?
   list_int64_vector_t SV;
@@ -786,10 +800,10 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos, ideal_1_
   if (boolean == 0) {
     fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
     mat_int64_fprintf_comment(stderr, Mqr);
- 
+
     //plane_sieve_whithout_FK(SV, vec);
 
-    int64_vector_clear(e0);  
+    int64_vector_clear(e0);
     int64_vector_clear(e1);
     for (unsigned int i = 0; i < Mqr->NumCols; i++) {
       int64_vector_clear(vec[i]);
@@ -886,11 +900,11 @@ void space_sieve_1_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
       if (list_vec_zero->v[i]->vec->c[1] < 0) {
         index_tmp = index_tmp + list_vec_zero->v[i]->index;
-        mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp, 1, 
+        mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp, 1,
             1, 1, nb_hit);
       } else {
         index_tmp = index_tmp - list_vec_zero->v[i]->index;
-        mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp, 1, 
+        mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp, 1,
             1, 0, nb_hit);
       }
       array->array[index_tmp] = array->array[index_tmp] - r->log;
@@ -931,14 +945,14 @@ void space_sieve_1_next_plane(array_ptr array, uint64_t * index_s,
     }
     array->array[* index_s] = array->array[* index_s] - r->log;
 
-    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s, 1, 
+    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s, 1,
         1, 1, nb_hit);
   }
 }
 
 void space_sieve_1_plane_sieve(array_ptr array,
     list_int64_vector_ptr list_s,MAYBE_UNUSED uint64_t * nbhit,
-    MAYBE_UNUSED unsigned int * entropy, MAYBE_UNUSED FILE * file_trace_pos, 
+    MAYBE_UNUSED unsigned int * entropy, MAYBE_UNUSED FILE * file_trace_pos,
     int64_vector_ptr s,
     uint64_t * index_s, list_int64_vector_index_ptr list_vec,
     MAYBE_UNUSED list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
@@ -986,7 +1000,7 @@ void space_sieve_1_plane_sieve(array_ptr array,
     * index_s = * index_s + index_new;
     array->array[* index_s] = array->array[* index_s] - r->log;
 
-    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s_out, 1, 
+    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s_out, 1,
         1, 1, nb_hit);
 
   }
@@ -1098,7 +1112,7 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
 #endif // SPACE_SIEVE_CUT_EARLY
       ASSERT(hit == 0);
 
-      //Need to do plane sieve to 
+      //Need to do plane sieve to
       if (!plane_sieve) {
         ASSERT(plane_sieve == 0);
         int boolean = space_sieve_1_plane_sieve_init(list_SV, list_FK,
@@ -1169,7 +1183,7 @@ double sum_mi(int64_vector_srcptr x, mat_double_srcptr m, unsigned int i)
 /*
  * Compute sum(l_j, j >= i.
  *
- * l: 
+ * l:
  * i: index.
  */
 double sum_li(double_vector_srcptr l, unsigned int i)
@@ -1244,7 +1258,7 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   list_double_vector_t list;
   list_double_vector_init(list);
   double_vector_gram_schmidt(list, M, list_e);
-  
+
   /* Compute the square of the L2 norm for all the Gram-Schmidt vectors. */
   double_vector_t b;
   double_vector_init(b, list->length);
@@ -1307,7 +1321,7 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   while (i < list->length) {
     double tmp = (double)x->c[i] - ti->c[i] + sum_mi(x, M, i);
     l->c[i] = (tmp * tmp) * b->c[i];
-    
+
     if (i == 0 && sum_li(l, 0) <= A) {
       int64_vector_t v_h;
       int64_vector_init(v_h, x->dim);
@@ -1840,6 +1854,21 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
   uint64_array_realloc(indexes, ind);
 }
 
+#ifdef PRINT_ARRAY_NORM
+void number_norm(FILE * file_array_norm, array_srcptr array, unsigned char max)
+{
+  uint64_t * tab = (uint64_t *) malloc(sizeof(uint64_t) * max);
+  memset(tab, 0, sizeof(uint64_t) * max);
+  for (uint64_t i = 0; i < array->number_element; i++) {
+    tab[array->array[i]] = tab[array->array[i]] + 1;
+  }
+  for (unsigned int i = 0; i < (unsigned int) max; i++) {
+    fprintf(file_array_norm, "%u: %" PRIu64 "\n", i, tab[i]);
+  }
+  free(tab);
+}
+#endif // PRINT_ARRAY_NORM
+
 /* ----- Usage and main ----- */
 
 void declare_usage(param_list pl)
@@ -1963,7 +1992,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   //TODO: q_side is an unsigned int.
   param_list_parse_int(pl, "q_side", (int *)q_side);
   ASSERT(* q_side < * V);
-  
+
   param_list_parse_uint64_and_uint64(pl, "q_range", * q_range, ",");
 
   ASSERT((* q_range)[0] > fbb[0][* q_side]);
@@ -2057,6 +2086,13 @@ int main(int argc, char * argv[])
   file_trace_pos = NULL;
 #endif // TRACE_POS
 
+#ifdef PRINT_ARRAY_NORM
+  FILE * file_array_norm;
+  file_array_norm = fopen("ARRAY_NORM.txt", "w+");
+  fprintf(file_array_norm, "H: ");
+  sieving_bound_fprintf(file_array_norm, H);
+#endif // PRINT_ARRAY_NORM
+
   ASSERT(q_range[0] >= fbb[q_side]);
   gmp_randstate_t state;
   mpz_t a;
@@ -2096,7 +2132,7 @@ int main(int argc, char * argv[])
           ASSERT(l->factors[i]->f->deg > 1);
 
           ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 1);
-        } 
+        }
 
         printf("# Special-q: q: %" PRIu64 ", g: ", q);
         mpz_poly_fprintf(stdout, l->factors[i]->f);
@@ -2120,25 +2156,25 @@ int main(int argc, char * argv[])
 
         mat_Z_LLL_transpose(matrix, matrix);
 
-        /* /\* */
-        /*   TODO: continue here. */
-        /*   If the last coefficient of the last vector is negative, we do not */
-        /*    sieve in the good direction. We therefore take the opposite vector */
-        /*    because we want that a = MqLLL * c, with c in the sieving region */
-        /*    has the last coordinate positive. */
-        /* *\/ */
-        /* if (mpz_cmp_ui(matrix->coeff[matrix->NumRows] */
-        /*                [matrix->NumCols], 0) < 0) { */
-        /*   for (unsigned int rows = 1; rows <= matrix->NumRows; rows++) { */
-        /*     mpz_mul_si(matrix->coeff[rows][matrix->NumCols], */
-        /*                matrix->coeff[rows][matrix->NumCols], -1); */
-        /*   } */
-        /* } */
+        /*
+         * TODO: continue here.
+         * If the last coefficient of the last vector is negative, we do not
+         * sieve in the good direction. We therefore take the opposite vector
+         * because we want that a = MqLLL * c, with c in the sieving region
+         * has the last coordinate positive.
+         */
+
+        reogranize_MqLLL(matrix);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "MqLLL:\n");
         mat_Z_fprintf(file_trace_pos, matrix);
 #endif // TRACE_POS
+
+#ifdef PRINT_ARRAY_NORM
+          fprintf(file_array_norm, "MqLLL:\n");
+          mat_Z_fprintf(file_array_norm, matrix);
+#endif // PRINT_ARRAY_NORM
 
         for (unsigned int j = 0; j < V; j++) {
           sec = seconds();
@@ -2151,6 +2187,13 @@ int main(int argc, char * argv[])
           init_norm(array, file_trace_pos, pre_compute[j], H, matrix,
               f->pols[j], special_q, !(j ^ q_side));
 #endif // OLD_NORM
+
+#ifdef PRINT_ARRAY_NORM
+          fprintf(file_array_norm, "f%u: ", j);
+          mpz_poly_fprintf(file_array_norm, f->pols[j]);
+          number_norm(file_array_norm, array, max_norm[j]);
+          fprintf(file_array_norm, "********************\n");
+#endif // PRINT_ARRAY_NORM
 
           time[j][0] = seconds() - sec;
 
@@ -2204,6 +2247,10 @@ int main(int argc, char * argv[])
         fprintf(file_trace_pos, "----------------------------------------\n");
 #endif // TRACE_POS
 
+#ifdef PRINT_ARRAY_NORM
+        fprintf(file_array_norm, "----------------------------------------\n");
+        fflush(file_array_norm);
+#endif // PRINT_ARRAY_NORM
       }
     }
 
@@ -2225,6 +2272,10 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
   fclose(file_trace_pos);
 #endif // TRACE_POS
+
+#ifdef PRINT_ARRAY_NORM
+  fclose(file_array_norm);
+#endif // PRINT_ARRAY_NORM
 
   mat_Z_clear(matrix);
   for (unsigned int i = 0; i < V; i++) {
