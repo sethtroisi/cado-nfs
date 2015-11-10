@@ -707,9 +707,6 @@ class Cado_NFS_toplevel(object):
             self.parameters.set_if_unset("slaves.nrclients", 1)
         elif self.using_default_parameter_file:
             self.parameters.set_if_unset("slaves.hostnames", "localhost")
-            self.parameters.set_if_unset("slaves.basepath",
-                    os.path.join(self.parameters.get_simple("tasks.workdir",
-                        "client")))
             # running on localhost, default nrclients to just as many as
             # needed to use the number of threads which have been asked
             # for.
@@ -722,6 +719,9 @@ class Cado_NFS_toplevel(object):
                 self.parameters.set_if_unset("slaves.nrclients", nrclients)
             else:
                 self.parameters.set_if_unset("slaves.nrclients", 1)
+        self.parameters.set_if_unset("slaves.basepath",
+                os.path.join(self.parameters.get_simple("tasks.workdir",
+                    "client")))
 
         # What is a sensible default value for scriptpath?
         if self.parameters.get_simple("slaves.nrclients", 0):
