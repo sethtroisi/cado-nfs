@@ -116,11 +116,21 @@ Cado-nfs binaries link to shared libraries, and some do so dynamically.
 For this to work, we rely on some control logic by cmake and cooperation
 with the operating system's dynamic linker.
 
+(i) if "make" is directly called from the source directory $SRCDIR,
+    "make install" installs all programs and binaries in $SRCDIR/installed.
+
+(ii) otherwise programs and binaries will be installed in /usr/local/share, 
+     the default installation prefix can be changed by one of the following:
+
+     cmake .../cado-nfs -DCMAKE_INSTALL_PREFIX=/tmp/install
+
+     export PREFIX=/tmp/install ; cmake .../cado-nfs
+
 Calling one of cado-nfs scripts (e.g., cado-nfs.py) can be done in
 several ways. Here we assume that $SRCDIR is the source directory, that
 $BUILDDIR is the build tree for the local machine (typically
-$SRCDIR/`hostname`), and that $PREFIX is the installation prefix (by
-default, $SRCDIR/installed). We refer to these different ways, and later
+$SRCDIR/`hostname`), and that $PREFIX is the installation prefix (see above).
+We refer to these different ways, and later
 discuss how they work on different systems (which is mostly impacted by
 the shared library mechanism).
 
@@ -255,9 +265,13 @@ Factoring with SNFS:
 
 It is possible to take advantage of the special form of an integer and
 use the Special Number Field Sieve. See parameters/factor/parameters.F9
-for that. Note in particular that you can force the special-q to be on
+for that:
+
+$ cado-nfs.py parameters/factor/parameters.F9 slaves.hostnames=localhost
+
+Note in particular that you can force the special-q to be on
 the rational side if this is more appropriate for your number, with
-tasks.sieve.ratq=True on the cado-nfs.py command line.
+tasks.sieve.ratq=True on the cado-nfs.py command line or in the parameter file.
 
 The default square root algorithm does not work in some very rare cases
 that could possibly occur with SNFS polynomials (a degree 4 polynomial
@@ -269,11 +283,11 @@ Big factorization (more than 200 digits):
 
 By default, to decrease memory usage, it is assumed than less than 2^32 (~ four
 billion) relations or ideals are needed and that the ideals will be less than
-2^32 (i.e. the lpba/lpbr parameters are less or equal to 32). In the case of
-factorizations of number of more than 200 digits, these assumptions may not
+2^32 (i.e., the lpba/lpbr parameters are less or equal to 32). In the case of
+factorizations of numbers of more than 200 digits, these assumptions may not
 hold. In this case, you have to set some variables in your local.sh script
-(see Configure section above for more information on local.sh and section on big
-factorization in local.sh.example).
+(see Configure section above for more information on local.sh and section on
+big factorizations in local.sh.example).
 
 Factoring with two non-linear polynomials:
 ==========================================
@@ -305,14 +319,14 @@ under Windows:
 * if you want a binary without any dependency, you might try MinGW. The INSTALL
   file from GNU MPFR contains detailed instructions on how to compile MPFR
   under Windows. Those instructions should work for CADO-NFS too.
-  See dev_docs/howto-MinGW.txt. Complilation on MinGW32 is tested regularly
+  See dev_docs/howto-MinGW.txt. Compilation on MinGW32 is tested regularly
   and should work, although performance of the 32-bit executables is poor.
 
 * you might try to use MPIR (mpir.org) instead of GMP. MPIR is a fork of GMP,
   which claims to be more portable under Windows.
 
 * you might succeed in compiling the cado-nfs binaries with a
-  cross-compiler for windows (which does not waive the runtime
+  cross-compiler for Windows (which does not waive the runtime
   requirements for cado-nfs.py, notably on unix-like utilities). See
   dev_docs/README.cross in the source code repository for information on
   how to cross-compile.
@@ -320,15 +334,15 @@ under Windows:
 Known problems:
 ===============
 
-* when running the square root step multithread (tasks.sqrt.threads=2 or
-  larger) with GMP <= 6.0, you might encounter an issue due to a "buglet"
+* when running the square root step in multi-thread mode (tasks.sqrt.threads=2
+  or larger) with GMP <= 6.0, you might encounter an issue due to a "buglet"
   in GMP (https://gmplib.org/list-archives/gmp-bugs/2015-March/003607.html).
   Workaround: use tasks.sqrt.threads=1 or GMP >= 6.1.0.
 * GCC 4.1.2 is known to miscompile CADO-NFS (see
   https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490),
-  GCC 4.2.0, 4.2.1 and 4.2.2 are also affected
+  GCC 4.2.0, 4.2.1 and 4.2.2 are also affected.
 * under NetBSD 5.1 amd64, Pthreads in the linear algebra step seem not to
-  work, please use -t 1 option in cado-nfs.py or tasks.linalg.threads=1x1
+  work, please use -t 1 option in cado-nfs.py or tasks.linalg.threads=1x1.
 * under AIX, if GMP is compiled in 64-bit mode, you should set the
   environment variable OBJECT_MODE, for example:
   export OBJECT_MODE=64
@@ -344,7 +358,7 @@ Factorisation of RSA-704 with CADO-NFS, Shi Bai, Emmanuel Thomé and Paul
 Zimmermann, preprint, http://eprint.iacr.org/2012/369, 2012.
 
 Better Polynomials for GNFS. Shi Bai, Cyril Bouvier, Alexander Kruppa and
-Paul Zimmermann. Mathematics of Computation, 2015.
+Paul Zimmermann. Mathematics of Computation, to appear.
 
 Root Optimization of Polynomials in the Number Field Sieve, Shi Bai, Richard
 Brent and Emmanuel Thomé. Mathematics of Computation, 2015.
