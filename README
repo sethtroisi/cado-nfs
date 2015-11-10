@@ -28,9 +28,8 @@ Anything else than the primary platform perhaps works, perhaps does not work.
 
  - Max OS X Leopard and Snow Leopard have been tested to work at
    least once, provided some additional tools and libraries (see below) have
-   been installed, notably for Leopard. ABI selection is sometimes tricky. (see
+   been installed, notably for Leopard. ABI selection is sometimes tricky (see
    local.sh.macosx.x86_32)
-
 
  - 32-bit linux with gcc-4.4 or later is supposed to work.
 
@@ -48,8 +47,8 @@ Required software tools:
     is required to get thread-safe operations.
 *) The GCC compiler works ; some others might, but it is untested. C and
    C++ are required, with C99 support.
-*) GNU make and CMake for building (CMake is installed on the fly if missing
-   (requires an Internet connection))
+*) GNU make and CMake >= 2.8 for building (CMake is installed on the fly if
+   missing (requires an Internet connection))
 *) Support for posix threads.
 *) The main cado-nfs.py script uses a lot of unix tools: Python3, ssh,
    rsync, gzip, and libsqlite3 to mention but a few. For more information
@@ -82,15 +81,15 @@ As a rule of thumb, whenever you happen to modify the local.sh script, it
 is advised to trigger re-configuration of the build system, by the
 special command ``make cmake''. Another way to achieve the same goal is
 to remove the build tree, which is below build/ (normally named as the
-hostname of the current machine).
+hostname of the current machine): ``make tidy'' should do it.
 
 Optional (alternative): configure using cmake directly
 ======================================================
 
 cado-nfs includes a top-level Makefile which builds the binary objects in
 a special build directory which is below build/ (normally named as the
-hostname of the current machine). This way, parralel builds for different
-machines may coexist on one shared directory. This is sort of a magic
+hostname of the current machine). This way, parallel builds for different
+machines may coexist in one shared directory. This is sort of a magic
 ``out-of-source'' build.
 
 Another way to do ``out-of-source'' build is to create a separate build
@@ -117,7 +116,7 @@ Cado-nfs binaries link to shared libraries, and some do so dynamically.
 For this to work, we rely on some control logic by cmake and cooperation
 with the operating system's dynamic linker.
 
-Calling one of cado-nfs scripts (e.g. cado-nfs.py) can be done in
+Calling one of cado-nfs scripts (e.g., cado-nfs.py) can be done in
 several ways. Here we assume that $SRCDIR is the source directory, that
 $BUILDDIR is the build tree for the local machine (typically
 $SRCDIR/`hostname`), and that $PREFIX is the installation prefix (by
@@ -132,7 +131,7 @@ the shared library mechanism).
 
 (2) $PREFIX/bin/cado-nfs.py
     This calls binaries from $PREFIX/bin, and loads parameter files from
-    $PREFIX/share/cado-nfs-2.1.1/
+    $PREFIX/share/cado-nfs-x.y.z/
 
 (3) $BUILDDIR/cado-nfs.py
     This is not supported. Might work, might not. You've been warned.
@@ -142,7 +141,7 @@ MacOS X:
     For any invocation to work, the LD_LIBRARY_PATH or DYLD_LIBRARY_PATH
     variable must be set up properly. The easiest method is to do make
     install, and include in these environment variables the directory
-    $PREFIX/lib/cado-nfs-2.1.1.
+    $PREFIX/lib/cado-nfs-x.y.z.
 
 Run a factorization on current machine:
 =======================================
@@ -152,10 +151,10 @@ Run a factorization on current machine:
 where the option '-t 2' tells how many cores (via threads) to use on the
 current machine (for polynomial selection, sieving and linear algebra).
 It is possible to set '-t all' (which, in fact, is the default) to use
-all threads on the current machine/
+all threads on the current machine.
 
 CADO-NFS is optimized only for numbers above 85 digits, and no support will
-be provided for numbers of less than 59 digits. Note that it is a good idea
+be provided for numbers of less than 58 digits. Note that it is a good idea
 to remove small prime factors using special-purpose algorithms such as trial
 division, P-1, P+1, or ECM, and use CADO-NFS only for the remaining composite
 factor.
@@ -173,7 +172,7 @@ set so that the number of cores specified by -t are kept busy.
 Run a factorization on several machines:
 =======================================
 
-./cado-nfs.py 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 slaves.hostnames=hostname1,hostname2,hostname3 -slaves 4 --client-threads 2
+./cado-nfs.py 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 slaves.hostnames=hostname1,hostname2,hostname3 --slaves 4 --client-threads 2
 
 This starts 4 clients each on hosts hostname1, hostname2, and hostname3,
 where each client uses two cpus (threads). For hostnames that are not
@@ -208,7 +207,7 @@ to use ssh to run commands on slave machines automatically.
 
 Most of the recent Linux distributions will run an ssh-agent for you. But
 if this is not the case with your distribution, or if you are running
-cado-nfs.py inside a ``screen'' in order to logout of your desktop, you
+cado-nfs.py inside a ``screen'' in order to logout from your desktop, you
 will need to run the ssh-agent by hand. As a short recipe, you can type:
    eval `ssh-agent`
    ssh-add
@@ -239,9 +238,11 @@ If you have started a factorization with the cado-nfs.py script, and it was
 interrupted (for example because of a power failure) you can restart in
 any of these two ways:
  - with the same cado-nfs.py command line if a work directory was
-   explicitly provided
- - with the single argument
-        [[work directory]]/XXX.parameters_snapshot.YYY
+   explicitly provided on the command line
+ - with a single argument as in:
+
+   $ cado-nfs.py [[work directory]]/XXX.parameters_snapshot.YYY
+
    where [[work directory]] is the directory which has been chosen
    automatically, XXX is the "name" of the running factorisation, and YYY
    is the largest possible integer value for which such a file exists.
@@ -250,7 +251,7 @@ Factoring with SNFS:
 ====================
 
 It is possible to take advantage of the special form of an integer and
-use the Special Number Field Sieve. See the doc in params/parameters.F9
+use the Special Number Field Sieve. See parameters/factor/parameters.F9
 for that. Note in particular that you can force the special-q to be on
 the rational side if this is more appropriate for your number, with
 tasks.sieve.ratq=True on the cado-nfs.py command line.
@@ -262,6 +263,7 @@ for degree 8). The CRT approach is a workaround. See crtaglsqrt.c .
 
 Big factorization (more than 200 digits):
 =========================================
+
 By default, to decrease memory usage, it is assumed than less than 2^32 (~ four
 billion) relations or ideals are needed and that the ideals will be less than
 2^32 (i.e. the lpba/lpbr parameters are less or equal to 32). In the case of
@@ -295,7 +297,7 @@ under Windows:
 * CygWin provides a Unix-like environment, where compilation should be easy.
   However the binary requires a cygwin.dll file. We have been told of problems
   with shared libraries, the following solves this problem:
-  PATH="installed/lib/cado-nfs-2.1.1:$PATH" ./cado-nfs.py [...]
+  PATH="installed/lib/cado-nfs-x.y.z:$PATH" ./cado-nfs.py [...]
 
 * if you want a binary without any dependency, you might try MinGW. The INSTALL
   file from GNU MPFR contains detailed instructions on how to compile MPFR
@@ -315,6 +317,10 @@ under Windows:
 Known problems:
 ===============
 
+* when running the square root step multithread (tasks.sqrt.threads=2 or
+  larger) with GMP <= 6.0, you might encounter an issue due to a "buglet"
+  in GMP (https://gmplib.org/list-archives/gmp-bugs/2015-March/003607.html).
+  Workaround: use tasks.sqrt.threads=1 or GMP >= 6.1.0.
 * GCC 4.1.2 is known to miscompile CADO-NFS (see
   https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490),
   GCC 4.2.0, 4.2.1 and 4.2.2 are also affected
