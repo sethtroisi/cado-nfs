@@ -8,8 +8,6 @@
 
 name = p60
 
-## The "dlp" flag tells the main script that we want to do dlog
-dlp = true
 ## N is the prime modulo which we want dlogs and ell is the prime
 ## factor of N-1 modulo which the computations are done.
 #  N = 53236943330228380237618624445646085674945074907141464418703
@@ -92,6 +90,3 @@ tasks.descent.lpb0 = 22
 tasks.descent.lpb1 = 22
 tasks.descent.mfb0 = 44
 tasks.descent.mfb1 = 44
-
-tasks.descent.descent_hint = ${CADO_HINTFILE_DIR}/p60.hint
-

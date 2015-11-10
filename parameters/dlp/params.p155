@@ -6,7 +6,6 @@
 ###########################################################################
 
 name = p155
-dlp = true
 
 ###########################################################################
 # Polynomial selection
@@ -73,6 +72,3 @@ tasks.descent.lpb0 = 27
 tasks.descent.lpb1 = 27
 tasks.descent.mfb0 = 54
 tasks.descent.mfb1 = 54
-
-tasks.descent.descent_hint = ${CADO_HINTFILE_DIR}/p155.hint
-

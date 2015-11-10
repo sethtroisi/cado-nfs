@@ -15,18 +15,17 @@ of Magma, so that it will be easy to convert it to C/C++/Python.  This
 step is very cheap, so it is possible to run it on any computer.
 
 In principle, just typing
-  ./cado-nfs.py <p> -dlp -ell <ell> target=<target>
+  ./cado-nfs.py -dlp -ell <ell> target=<target> <p>
 should compute the discrete logarithm of <target> modulo <ell> in
 GF(<p>). Right now, there are parameters only for primes p of around 30,
 60, or 155 digits (to be checked in params_dl/ subdirectory). If no target is
 given, then the output is a file containing the virtual logarithms of all
 the factor base elements.
 
-More flexibility is possible. An example of
-parameter file is given in parameters/dlp/param.p60. The main difference is
-the presence of the "dlp=true" line, and the lines related to characters
-and sqrt disappear. There is an additional block of parameters related to
-individual logarithms.
+More flexibility is possible. An example of parameter file is given in
+parameters/dlp/param.p60. The main difference is that the lines related
+to characters and sqrt disappear and that there is an additional block of
+parameters related to individual logarithms.
 
 After the computation is finished, it is possible to run again the
 cado-nfs.py script, with a different target: only the last step will be

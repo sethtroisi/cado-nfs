@@ -24,6 +24,29 @@ class Cado_NFS_toplevel(object):
     fiddling.
     '''
 
+    def find_default_hint_file(self):
+        ''' return the full path of the default hint file which
+        is appropriate for the given dlp problem.'''
+        assert self.args.dlp
+        assert self.args.gfpext == 1
+        default_param_dir = self.pathdict["data"]
+        default_param_dir = os.path.join(default_param_dir, "dlp")
+        size_of_n=len(repr(self.args.N))
+        # also attempt nearest multiple of 5.
+        attempts=["p%d"%x for x in [size_of_n, ((size_of_n+2)//5)*5]]
+        if attempts[1]==attempts[0]:
+            attempts=attempts[:1]
+        self.logger.debug("Looking for hint file"
+                " for %s in directory %s" % (attempts[0], default_param_dir))
+        for f in attempts:
+            if os.path.isfile(os.path.join(default_param_dir,f+".hint")):
+                hintfile=os.path.join(default_param_dir,f+".hint")
+                self.logger.info("Using default hint file %s" % hintfile)
+                return hintfile
+        raise RuntimeError("no hint file found"
+                " for %s (tried %s)" % (attempts[0], ", ".join(attempts)))
+
+
     def find_default_parameter_file(self):
         ''' return the full path of the default parameter file which
         is appropriate for the given integer self.args.N. We look for the file
@@ -118,7 +141,7 @@ class Cado_NFS_toplevel(object):
         size_of_n=len(repr(self.args.N))
         # also attempt nearest multiple of 5.
         attempts=[letter+"%d"%x for x in [size_of_n, ((size_of_n+2)//5)*5]]
-        if self.args.gfpext:
+        if self.args.gfpext > 1:
             attempts=[x+"dd%d"%self.args.gfpext for x in attempts]
         if attempts[1]==attempts[0]:
             attempts=attempts[:1]
@@ -546,6 +569,7 @@ class Cado_NFS_toplevel(object):
             self.logger.debug("Created directory %s" % wdir)
             os.makedirs(wdir)
 
+
     def set_threads_and_client_threads(self):
         ''' This function processes the --client-threads and
         --server-threads arguments, and sets the parameters
@@ -783,16 +807,16 @@ class Cado_NFS_toplevel(object):
         parser.add_argument("--slaves", "-s",
                 type=int,
                 help="Aliases (and conflicts with) slaves.nrclients")
-        parser.add_argument("-gfpext",
+        parser.add_argument("--gfpext", "-gfpext", 
                 type=int,
-                default=0,
+                default=1,
                 help="Degree of the finite field extension (DLP only)")
         parser.add_argument("--ell", "-ell",
                 help="Aliases (and conflicts with) ell in parameter files")
         parser.add_argument("--server",
                 help="Run a bare server, do not start any clients",
                 action='store_true')
-        parser.add_argument("-dlp",
+        parser.add_argument("--dlp", "-dlp",
                 help="Run discrete logarithm computation instead",
                 action='store_true')
         parser.add_argument("--verboseparam",
@@ -865,6 +889,18 @@ class Cado_NFS_toplevel(object):
         self.parameters.readparams(self.args.options)
         self.set_threads_and_client_threads()
         self.set_slaves_parameters()
+        # convert some more command-line args to parameters:
+        if self.args.dlp:
+            self.parameters.set_simple("dlp", self.args.dlp)
+            if self.args.gfpext:
+                self.parameters.set_simple("gfpext", self.args.gfpext)
+        # get default hint file if necessary
+        if self.parameters.get_simple("dlp", False) and self.parameters.get_simple("gfpext", 1) == 1:
+            if self.parameters.get_simple("target", 0):
+                hintfile = self.parameters.get_simple("descent_hint", "")
+                if hintfile == "":
+                    hintfile = self.find_default_hint_file()
+                self.parameters.set_simple("descent_hint", hintfile)
         return self.parameters
 
     def setpath(self, key, value):
