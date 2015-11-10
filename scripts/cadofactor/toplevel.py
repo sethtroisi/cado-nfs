@@ -700,7 +700,8 @@ class Cado_NFS_toplevel(object):
                 self.parameters.data.pop("slaves", None)
             return
         if self.args.slaves:
-            self.parameters.set_if_unset("slaves.nrclients", self.args.slaves)
+            # We've been asked to override the value, so let's just do it.
+            self.parameters.set_simple("slaves.nrclients", self.args.slaves)
         if self.parameters.myparams(["hostnames"], "slaves"):
             # default nrclients is 1 if we specify explicit list of slaves.
             self.parameters.set_if_unset("slaves.nrclients", 1)
@@ -780,6 +781,7 @@ class Cado_NFS_toplevel(object):
                 " locally, set slaves.nrclient = tasks.threads /"
                 " max(task.sieve.threads, tasks.polyselect.threads)")
         parser.add_argument("--slaves", "-s",
+                type=int,
                 help="Aliases (and conflicts with) slaves.nrclients")
         parser.add_argument("-gfpext",
                 type=int,

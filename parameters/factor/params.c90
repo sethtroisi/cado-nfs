@@ -64,15 +64,21 @@ name = c90
 # N: The number to be factored. This c90 here is given only as an
 # example, and hence commented out. You may set a value for it in this
 # file or override it on the command line
+#
+# adjust if needed
 # N = 482940676938975075806475467716373950242726509723517010302524110187257004202892794033435637
 
 # Adjust sourcedir to point to the root of your CADO source directory.
 # This parameter is not actually used by cadofactor directly, but it is
 # referenced as $(sourcedir) further down in this parameter file.
+#
+# adjust if needed
 # sourcedir=${HOME}/cado-nfs
 
 # Adjust builddir to point to the root of your CADO build directory
 # Not used directly, either, but referenced, too.
+#
+# adjust if needed
 # builddir=${HOME}/build/cado-nfs/
 
 # workdir: the path of the working directory; if a relative path is
@@ -83,8 +89,25 @@ name = c90
 # the CADO source or build directory. In fact, it is advisable to keep it
 # separate to facilitate deleting or backing-up the sources, executables,
 # and factorization data individually.
+#
+# adjust if needed
 # tasks.workdir = /tmp/
 
+# For reference, here is the list of parameters found in various places
+# within this file, which are to be adjusted in case the default values
+# aren't fine. We consider that it is not meaningful for a parameter file
+# to contain values for these, as the choice is really a matter of taste
+# for the user.
+# sourcedir=${HOME}/cado-nfs
+# builddir=${HOME}/build/cado-nfs/
+# tasks.workdir = /tmp/
+# tasks.execpath=$(builddir)
+# slaves.hostnames = localhost
+# slaves.nrclients = 2
+# slaves.scriptpath = $(sourcedir)
+# slaves.downloadretry = 10
+# slaves.niceness = 10		# nice level for the sieving jobs
+# slaves.basepath = /tmp/c90.wuclients
 
 ###########################################################################
 # Parameters for Tasks
@@ -389,7 +412,8 @@ server.port = 8001
 # is started through SSH, its CWD is the CWD after an SSH login (usually the
 # user's home directory).
 
-slaves.hostnames = localhost
+# adjust if needed
+# slaves.hostnames = localhost
 
 # Example with multiple host names. This launches one client on localhost,
 # two on otherhost1, and one on otherhost2, assuming there is no nrclients
@@ -399,8 +423,9 @@ slaves.hostnames = localhost
 # Modifies the behaviour of the "hostnames" list: if nrclients is specified,
 # then multiplicity in the "hostnames" list is ignored, and "nrclients" client
 # scripts are launched on each unique host name.
-
-slaves.nrclients = 2
+#
+# adjust if needed
+# slaves.nrclients = 2
 
 # scriptpath: The path to the cado-nfs-client.py scripts, on the slave's file
 # system.
@@ -413,18 +438,20 @@ slaves.nrclients = 2
 # be started through:
 # "ssh [hostname] /tmp/cado-nfs/cado-nfs-client.py [client parameters]"
 #
-# Adjust only if needed.
+# adjust if needed
 # slaves.scriptpath = $(sourcedir)
 
 # downloadretry: Number of seconds a client should wait between failed
 # download attempts from the server
 
-slaves.downloadretry = 10
+# adjust if needed
+# slaves.downloadretry = 10
 
 # This sets the posix ``nice level'' for programs launched by a slave.
 # If you don't know what it is, you may leave as is, or set to 0.
 
-slaves.niceness = 10		# nice level for the sieving jobs
+# adjust if needed
+# slaves.niceness = 10		# nice level for the sieving jobs
 
 # basepath: defines the base directory under which cado-nfs-client creates its
 # download and working directories. It is permissible to let all clients of
@@ -437,7 +464,9 @@ slaves.niceness = 10		# nice level for the sieving jobs
 # Since this example runs its slaves on localhost, we use a subdirectory
 # of the cado-nfs.py working directory, so that all files of both master
 # and clients can be cleaned up easily.
-slaves.basepath = /tmp/c90.wuclients
+#
+# adjust if needed
+# slaves.basepath = /tmp/c90.wuclients
 
 # If you want to launch clients on multiple groups of slave machines, with
 # different parameters per group, you can group them by different parameter
