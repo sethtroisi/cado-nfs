@@ -13,6 +13,7 @@ Main changes between cado-nfs-2.1.1 and cado-nfs-2.2:
   - linear algebra speedup taking into account machine topology thanks to
     HWLOC (http://www.open-mpi.org/projects/hwloc/).
   - the square root step is now multithread.
+  - default parameters files were optimized for sieving with OPAL/nomad.
 * DLP support: now fully functional over prime fields, including the
   descent step. Still requires Magma for a small number-theoretic
   computation at the beginning (dependency will be removed sooner or later).
