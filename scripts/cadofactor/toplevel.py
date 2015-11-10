@@ -744,8 +744,8 @@ class Cado_NFS_toplevel(object):
             else:
                 self.parameters.set_if_unset("slaves.nrclients", 1)
         self.parameters.set_if_unset("slaves.basepath",
-                os.path.join(self.parameters.get_simple("tasks.workdir",
-                    "client")))
+                os.path.join(self.parameters.get_simple("tasks.workdir", ""),
+                    "client"))
 
         # What is a sensible default value for scriptpath?
         if self.parameters.get_simple("slaves.nrclients", 0):
