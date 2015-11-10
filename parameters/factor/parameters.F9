@@ -45,3 +45,8 @@ tasks.I = 12
 tasks.sieve.qmin = 2000000
 tasks.sieve.qrange = 5000
 tasks.sieve.ratq = True
+
+# slaves
+# add slaves.hostnames=machine1,machine2,machine3 on the command-line
+# to use three machines
+slaves.hostnames = localhost
