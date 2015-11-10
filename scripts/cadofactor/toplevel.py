@@ -827,6 +827,9 @@ class Cado_NFS_toplevel(object):
         parser.add_argument("--no-colors",
                 help="Turn off colored output",
                 action='store_true')
+        parser.add_argument("--dlp-no-keep", "-dlp-no-keep",
+                help="Disable the feature that CADO_DEBUG is set by default in dlp mode",
+                action='store_true')
         return parser
 
     def __init__(self, args=None):
@@ -894,6 +897,8 @@ class Cado_NFS_toplevel(object):
         self.set_slaves_parameters()
         # convert some more command-line args to parameters:
         if self.args.dlp:
+            if not self.args.dlp_no_keep:
+                os.environ["CADO_DEBUG"]="yes, please"
             self.parameters.set_simple("dlp", self.args.dlp)
             if self.args.gfpext:
                 self.parameters.set_simple("gfpext", self.args.gfpext)
