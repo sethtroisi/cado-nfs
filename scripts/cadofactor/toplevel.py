@@ -869,7 +869,7 @@ class Cado_NFS_toplevel(object):
         >>> p = t.get_cooked_parameters()
         >>> print(p)
         N = 12345
-        slaves.basepath = /tmp/a
+        slaves.basepath = /tmp/a/client
         slaves.hostnames = foo,bar
         slaves.nrclients = 1
         slaves.scriptpath = /tmp
