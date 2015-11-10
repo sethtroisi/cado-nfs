@@ -32,8 +32,8 @@
 # build_tree: where do the object files go.
 #
 # Example values:
-# build_tree="${up_path}build/`hostname`"
-# build_tree="${up_path}build/`uname -m`"
+# build_tree="${up_path}/build/`hostname`"
+# build_tree="${up_path}/build/`uname -m`"
 # build_tree=/tmp/cado-nfs-build
 #
 # up_path, amongst other variables, is defined from the caller script
