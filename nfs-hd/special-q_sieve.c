@@ -1419,7 +1419,7 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
 void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_Z_srcptr matrix,
     factor_base_srcptr fb, sieving_bound_srcptr H,
-    MAYBE_UNUSED mpz_poly_srcptr f)
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * output_relation)
 {
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
@@ -1718,7 +1718,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   free(Tqr);
 
 #ifdef TIME_SIEVES
-  printf("# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(output_relation, "# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_line_sieve, ideal_line_sieve,
       time_line_sieve / (double)ideal_line_sieve);
   double time_per_ideal = 0.0;
@@ -1727,14 +1727,14 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   } else {
     time_per_ideal = 0.0;
   }
-  printf("# Perform plane sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(output_relation, "# Perform plane sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_plane_sieve, ideal_plane_sieve, time_per_ideal);
   if (ideal_space_sieve != 0) {
     time_per_ideal = time_space_sieve / (double)ideal_space_sieve;
   } else {
     time_per_ideal = 0.0;
   }
-  printf("# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(output_relation, "# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_space_sieve, ideal_space_sieve, time_per_ideal);
 #endif // TIME_SIEVES
 }
@@ -1882,6 +1882,8 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "q_range", "range of the special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
   param_list_decl_usage(pl, "fb", "path to factor bases");
+  param_list_decl_usage(pl, "main", "if MNFS-CM, main side");
+  param_list_decl_usage(pl, "out", "path to output file");
 }
 
 /*
@@ -1967,13 +1969,21 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
   /*}*/
 
+  path[0] = '\0';
+  param_list_parse_string(pl, "out", path, size_path);
+  if (path[0] == '\0') {
+    * output_relation = stdout;
+  } else {
+    * output_relation = fopen(path, "w");
+  }
+
 #ifdef MAKE_FB_DURING_SIEVE
   for (unsigned int i = 0; i < * V; i++) {
     factor_base_init((*fb)[i], (*fbb)[i], (*fbb)[i], (*fbb)[i]);
   }
   double sec = seconds();
   makefb(*fb, f->pols, *fbb, H->t, *lpb, * V);
-  printf("# Time for makefb: %f.\n", seconds() - sec);
+  fprintf(output_relation, "# Time for makefb: %f.\n", seconds() - sec);
 #else
   double sec = seconds();
   FILE * file_r;
@@ -1981,7 +1991,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   file_r = fopen(path, "r");
   read_factor_base(file_r, (*fb), (*fbb), (*lpb), f);
   fclose(file_r);
-  printf("# Time to read factor bases: %f.\n", seconds() - sec);
+  fprintf(output_relation,
+      "# Time to read factor bases: %f.\n", seconds() - sec);
 #endif
 
   param_list_parse_uchar_list(pl, "thresh", * thresh, (size_t) * V, ",");
@@ -1998,18 +2009,12 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   ASSERT((* q_range)[0] > fbb[0][* q_side]);
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
-  param_list_clear(pl);
-
   array_init(array, number_element);
 
   mat_Z_init(matrix, t, t);
 
   * main_side = -1;
   param_list_parse_int(pl, "main", main_side);
-
-  * output_relation = stdout;
-  param_list_parse_string(pl, "out", path, size_path);
-  * output_relation = fopen(path, "w");
 
   param_list_clear(pl);
 }
@@ -2187,7 +2192,8 @@ int main(int argc, char * argv[])
 #endif // ASSERT_NORM
 
           sec = seconds();
-          special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j]);
+          special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j],
+              output_relation);
           time[j][1] = seconds() - sec;
           sec = seconds();
           find_index(indexes[j], array, thresh[j]);
