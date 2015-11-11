@@ -2007,6 +2007,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * main_side = -1;
   param_list_parse_int(pl, "main", main_side);
 
+  * output_relation = stdout;
   param_list_parse_string(pl, "out", path, size_path);
   * output_relation = fopen(path, "w");
 
@@ -2035,28 +2036,6 @@ int main(int argc, char * argv[])
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
       &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &output_relation);
-
-#ifdef PRINT_PARAMETERS
-  printf("# H =\n");
-  sieving_bound_fprintf_detailed_comment(stdout, H);
-  printf("# V = %u\n", V);
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# fbb%u = %" PRIu64 "\n", i, fbb[i]);
-  }
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# thresh%u = %u\n", i, (unsigned int)thresh[i]);
-  }
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# lpb%u = %u\n", i, lpb[i]);
-  }
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# f%u = ", i);
-    mpz_poly_fprintf(stdout, f[i]);
-  }
-  printf("# q_min = %" PRIu64 "\n", q_min);
-  printf("# q_max = %" PRIu64 "\n", q_min);
-  printf("# q_side = %u\n", q_side);
-#endif // PRINT_PARAMETERS
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2138,8 +2117,8 @@ int main(int argc, char * argv[])
           ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 1);
         }
 
-        printf("# Special-q: q: %" PRIu64 ", g: ", q);
-        mpz_poly_fprintf(stdout, l->factors[i]->f);
+        fprintf(output_relation, "# Special-q: q: %" PRIu64 ", g: ", q);
+        mpz_poly_fprintf(output_relation, l->factors[i]->f);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "Special-q: q: %" PRIu64 ", g: ", q);
@@ -2220,7 +2199,8 @@ int main(int argc, char * argv[])
         }
 
         for (unsigned int j = 0; j < V; j++) {
-          printf("# Log 2 of the maximum of the norms %u: %u.\n", j,
+          fprintf(output_relation,
+              "# Log 2 of the maximum of the norms %u: %u.\n", j,
               max_norm[j]);
         }
 
@@ -2235,18 +2215,22 @@ int main(int argc, char * argv[])
           uint64_array_clear(indexes[j]);
         }
 
-        printf("# Time for this special-q: %fs.\n", seconds() - sec_tot);
+        fprintf(output_relation,
+            "# Time for this special-q: %fs.\n", seconds() - sec_tot);
         total_time += (seconds() - sec_tot);
         spq_tot++;
         for (unsigned int j = 0; j < V; j++) {
-          printf("# Time to init norm %u: %fs.\n", j, time[j][0]);
-          printf("# Time to sieve %u: %fs.\n", j, time[j][1]);
-          printf("# Time to find indexes %u: %fs.\n", j, time [j][2]);
+          fprintf(output_relation, "# Time to init norm %u: %fs.\n", j,
+              time[j][0]);
+          fprintf(output_relation, "# Time to sieve %u: %fs.\n", j, time[j][1]);
+          fprintf(output_relation, "# Time to find indexes %u: %fs.\n", j,
+              time [j][2]);
         }
 
-        printf("# Time to factorize: %fs.\n", sec_cofact);
+        fprintf(output_relation, "# Time to factorize: %fs.\n", sec_cofact);
 
-        printf("# ----------------------------------------\n");
+        fprintf(output_relation,
+            "# ----------------------------------------\n");
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "----------------------------------------\n");
@@ -2262,12 +2246,17 @@ int main(int argc, char * argv[])
     ideal_spq_clear(special_q, H->t);
   }
 
-  printf("# Total time: %fs.\n", total_time);
-  printf("# Total number of relations: %" PRIu64 ".\n", nb_rel);
-  printf("# Total number of special-q: %" PRIu64 ".\n", spq_tot);
-  printf("# Time per special-q: %fs.\n", total_time / (double)spq_tot);
-  printf("# Time per relation: %fs.\n", total_time / (double)nb_rel);
-  printf("# Relations per special-q: %f.\n", (double)nb_rel / (double)spq_tot);
+  fprintf(output_relation, "# Total time: %fs.\n", total_time);
+  fprintf(output_relation, "# Total number of relations: %" PRIu64 ".\n",
+      nb_rel);
+  fprintf(output_relation, "# Total number of special-q: %" PRIu64 ".\n",
+      spq_tot);
+  fprintf(output_relation, "# Time per special-q: %fs.\n",
+      total_time / (double)spq_tot);
+  fprintf(output_relation, "# Time per relation: %fs.\n",
+      total_time / (double)nb_rel);
+  fprintf(output_relation, "# Relations per special-q: %f.\n",
+      (double)nb_rel / (double)spq_tot);
 
   mpz_poly_factor_list_clear(l);
   gmp_randclear(state);
