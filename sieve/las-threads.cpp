@@ -62,10 +62,9 @@ reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fil
   /* We estimate that the updates will be evenly distrubuted among the n
      different bucket arrays, so each gets fill_ratio / n.
      However, for a large number of threads, we need a bit of margin.
-     TODO: maybe using a priority queue in the threadpool, where tasks are
-     sorted according to their weight (i.e. expected number of hits), could
-     help the "auto-balance".
-     For the moment, we put a margin that depends on the number of threads.
+     In principle, one should check that the number of threads asked by the user
+     is not too large compared to the number of slices (i.e. the size of the
+     factor bases).
      */
   double ratio = fill_ratio;
   if (n > 1) {
