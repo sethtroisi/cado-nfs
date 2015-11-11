@@ -199,65 +199,65 @@ static void sort_factor(factor_ptr factor)
  */
 static void printf_relation(factor_t * factor, unsigned int * I,
     unsigned int * L, mpz_poly_srcptr a, unsigned int t, unsigned int V,
-    unsigned int size, MAYBE_UNUSED unsigned int * assert_facto,
-    MAYBE_UNUSED mpz_vector_srcptr c)
+    unsigned int size, FILE * output_relation,
+    MAYBE_UNUSED unsigned int * assert_facto, MAYBE_UNUSED mpz_vector_srcptr c)
 {
   //Print a.
 #ifdef PRINT_POLY_RELATION
-  printf("# ");
-  mpz_poly_fprintf(stdout, a);
+  fprintf(output_relation, "# ");
+  mpz_poly_fprintf(output_relation, a);
 #endif // PRINT_POLY_RELATION
 
 #ifdef PRINT_VECTOR_RELATION
-  printf("# ");
-  mpz_vector_fprintf(stdout, c);
+  fprintf(output_relation, "# ");
+  mpz_vector_fprintf(output_relation, c);
 #endif // PRINT_VECTOR_RELATION
 
   unsigned int index = 0;
   //Print if the factorisation is good.
 #ifdef ASSERT_FACTO
-  printf("# ");
+  fprintf(output_relation, "# ");
   for (unsigned int i = 0; i < V - 1; i++) {
     if (index < size) {
       if (i == L[index]) {
         if (I[index]) {
-          printf("%u:", assert_facto[index]);
+          fprintf(output_relation, "%u:", assert_facto[index]);
         } else {
-          printf(":");
+          fprintf(output_relation, ":");
         }
         index++;
       } else {
-        printf(":");
+        fprintf(output_relation, ":");
       }
     } else {
-      printf(":");
+      fprintf(output_relation, ":");
     }
   }
 
   if (index < size) {
     if (V - 1 == L[index]) {
       if (I[index]) {
-        printf("%u", assert_facto[index]);
+        fprintf(output_relation, "%u", assert_facto[index]);
       }
       index++;
     }
   }
 
-  printf("\n");
+  fprintf(output_relation, "\n");
 #endif // ASSERT_FACTO
 
   //Print the coefficient of a.
   for (int i = 0; i < a->deg; i++) {
-    gmp_printf("%Zd,", a->coeff[i]);
+    gmp_fprintf(output_relation, "%Zd,", a->coeff[i]);
   }
   if ((int)t - 1 == a->deg) {
-    gmp_printf("%Zd:", a->coeff[a->deg]);
+    gmp_fprintf(output_relation, "%Zd:", a->coeff[a->deg]);
   } else {
-    gmp_printf("%Zd,", a->coeff[a->deg]);
+    gmp_fprintf(output_relation, "%Zd,", a->coeff[a->deg]);
     for (int i = a->deg + 1; i < (int)t - 1; i++) {
-      printf("0,");
+      fprintf(output_relation, "0,");
     }
-    printf("0:");
+    fprintf(output_relation, "0:");
   }
 
   //Print the factorisation in the different number field.
@@ -268,28 +268,28 @@ static void printf_relation(factor_t * factor, unsigned int * I,
         if (I[index]) {
           for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
 #ifdef PRINT_DECIMAL
-            gmp_printf("%Zd,", factor[index]->factorization[j]);
+            gmp_fprintf(output_relation, "%Zd,", factor[index]->factorization[j]);
 #else // PRINT_DECIMAL
-            printf("%s,",
+            fprintf(output_relation, "%s,",
                 mpz_get_str(NULL, 16, factor[index]->factorization[j]));
 #endif // PRINT_DECIMAL
           }
 #ifdef PRINT_DECIMAL
-          gmp_printf("%Zd:", factor[index]->factorization[
+          gmp_fprintf(output_relation, "%Zd:", factor[index]->factorization[
                        factor[index]->number - 1]);
 #else // PRINT_DECIMAL
-          printf("%s:", mpz_get_str(NULL, 16,
+          fprintf(output_relation, "%s:", mpz_get_str(NULL, 16,
                 factor[index]->factorization[factor[index]->number - 1]));
 #endif // PRINT_DECIMAL
         } else {
-          printf(":");
+          fprintf(output_relation, ":");
         }
         index++;
       } else {
-        printf(":");
+        fprintf(output_relation, ":");
       }
     } else {
-      printf(":");
+      fprintf(output_relation, ":");
     }
   }
 
@@ -298,24 +298,24 @@ static void printf_relation(factor_t * factor, unsigned int * I,
       if (I[index]) {
         for (unsigned int j = 0; j < factor[index]->number - 1; j++) {
 #ifdef PRINT_DECIMAL
-          gmp_printf("%Zd,", factor[index]->factorization[j]);
+          gmp_fprintf(output_relation, "%Zd,", factor[index]->factorization[j]);
 #else // PRINT_DECIMAL
-          printf("%s,",
+          fprintf(output_relation, "%s,",
                 mpz_get_str(NULL, 16, factor[index]->factorization[j]));
 #endif // PRINT_DECIMAL
         }
 #ifdef PRINT_DECIMAL
-        gmp_printf("%Zd", factor[index]->factorization[
+        gmp_fprintf(output_relation, "%Zd", factor[index]->factorization[
                      factor[index]->number - 1]);
 #else // PRINT_DECIMAL
-        printf("%s", mpz_get_str(NULL, 16,
+        fprintf(output_relation, "%s", mpz_get_str(NULL, 16,
               factor[index]->factorization[factor[index]->number - 1]));
 #endif // PRINT_DECIMAL
       }
       index++;
     }
   }
-  printf("\n");
+  fprintf(output_relation, "\n");
 }
 
 
@@ -531,7 +531,7 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
 static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
     unsigned int * L, unsigned int size, unsigned int t, unsigned int V,
     int main, facul_aux_data *data, unsigned int * nb_rel_found,
-    ideal_spq_srcptr special_q, unsigned int q_side,
+    ideal_spq_srcptr special_q, unsigned int q_side, FILE * output_relation,
     MAYBE_UNUSED unsigned int * number_factorisation,
     MAYBE_UNUSED mpz_vector_srcptr c)
 {
@@ -579,7 +579,7 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
       if (assert_facto[i] == 0) {
         number_factorisation[0] = number_factorisation[0] + 1;
 #ifdef PRINT_ASSERT_FACTO
-        gmp_printf("# Incomplete: %Zd\n", res_tmp);
+        gmp_fprintf(output_relation, "# Incomplete: %Zd\n", res_tmp);
 #endif // PRINT_ASSERT_FACTO
       } else {
         number_factorisation[1] = number_factorisation[1] + 1;
@@ -654,7 +654,8 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
   }
 
   if (find >= 2) {
-    printf_relation(factor, I, L, a, t, V, size, assert_facto, c);
+    printf_relation(factor, I, L, a, t, V, size, output_relation, assert_facto,
+        c);
 
     (* nb_rel_found)++;
 
@@ -764,7 +765,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
     uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indices,
     facul_aux_data *data, unsigned int * nb_rel_found,
-    ideal_spq_srcptr special_q, unsigned int q_side,
+    ideal_spq_srcptr special_q, unsigned int q_side, FILE * output_relation,
     MAYBE_UNUSED unsigned int * number_factorisation)
 {
   unsigned int * L = (unsigned int *) malloc(V * sizeof(unsigned int));
@@ -795,7 +796,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
         mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
 
       good_polynomial(a, f, L, size, H->t, V, main, data, nb_rel_found,
-          special_q, q_side, number_factorisation, c);
+          special_q, q_side, output_relation, number_factorisation, c);
     }
 
     mpz_poly_clear(a);
@@ -816,7 +817,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, ideal_spq_srcptr special_q,
-    unsigned int q_side, int main)
+    unsigned int q_side, int main, FILE * output_relation)
 {
   //index[i] is the current index of indices[i].
   uint64_t * index = (uint64_t * ) malloc(sizeof(uint64_t) * V);
@@ -860,19 +861,19 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   if (0 != length_tot) {
     while(sum_index(index, V, main) < length_tot) {
       find_relation(indices, index, number_element, matrix, f, H, V, main,
-          max_indices, data, &nb_rel_found, special_q, q_side,
+          max_indices, data, &nb_rel_found, special_q, q_side, output_relation,
           number_factorisation);
     }
   }
   if (nb_rel_found != 0) {
-    printf("# Number of found relations: %u.\n", nb_rel_found);
+    fprintf(output_relation, "# Number of found relations: %u.\n", nb_rel_found);
   } else {
-    printf("# No relations\n");
+    fprintf(output_relation, "# No relations\n");
   }
 
 #ifdef ASSERT_FACTO
-  printf("# Number of complete factorisations: %u.\n", number_factorisation[1]);
-  printf("# Number of incomplete factorisations: %u.\n",
+  fprintf(output_relation, "# Number of complete factorisations: %u.\n", number_factorisation[1]);
+  fprintf(output_relation, "# Number of incomplete factorisations: %u.\n",
       number_factorisation[0]);
 #endif // ASSERT_FACTO
   free(number_factorisation);
@@ -882,5 +883,6 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   free(data);
   free(index);
 
+  fflush(output_relation);
   return nb_rel_found;
 }

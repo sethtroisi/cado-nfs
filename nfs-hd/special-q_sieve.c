@@ -1905,7 +1905,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** q_range, unsigned char ** thresh,
     unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
-    int * main_side)
+    int * main_side, FILE ** output_relation)
 {
   param_list pl;
   param_list_init(pl);
@@ -2005,8 +2005,11 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   mat_Z_init(matrix, t, t);
 
   * main_side = -1;
-  //TODO: error in valgrind, because of no main.
   param_list_parse_int(pl, "main", main_side);
+
+  param_list_parse_string(pl, "out", path, size_path);
+  * output_relation = fopen(path, "w");
+
   param_list_clear(pl);
 }
 
@@ -2028,9 +2031,10 @@ int main(int argc, char * argv[])
   factor_base_t * fb;
   uint64_t q;
   int main_side;
+  FILE * output_relation;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
-                        &thresh, &lpb, array, matrix, &q_side, &V, &main_side);
+      &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &output_relation);
 
 #ifdef PRINT_PARAMETERS
   printf("# H =\n");
@@ -2222,7 +2226,8 @@ int main(int argc, char * argv[])
 
         sec = seconds();
         nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
-            matrix, f->pols, H, V, special_q, q_side, main_side);
+            matrix, f->pols, H, V, special_q, q_side, main_side,
+            output_relation);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
@@ -2301,6 +2306,7 @@ int main(int argc, char * argv[])
   free(q_range);
   cado_poly_clear(f);
   free_saved_chains();
+  fclose(output_relation);
 
   return 0;
 }
