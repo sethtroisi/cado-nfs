@@ -203,6 +203,8 @@ class Cado_NFS_toplevel(object):
         def backquote(cmd):
             pipe = subprocess.Popen(cmd.split(" "), stdout=subprocess.PIPE)
             loc = locale.getdefaultlocale()[1]
+            if not loc:
+                loc="ascii"
             return [s.decode(loc) for s in pipe.stdout.readlines()]
         if os.uname()[0] == "OpenBSD":
             # does this count hyperthreading or not ?

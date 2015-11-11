@@ -19,7 +19,10 @@ if not re.search("^/", "@CMAKE_INSTALL_PREFIX@"):
     # ./scripts/build_environment.sh for that.
     helper = pathdict["source"] + "/scripts/build_environment.sh"
     pipe = subprocess.Popen([helper, "--show"], stdout=subprocess.PIPE)
-    output = pipe.communicate()[0].decode(locale.getdefaultlocale()[1])
+    loc = locale.getdefaultlocale()[1]
+    if not loc:
+        loc="ascii"
+    output = pipe.communicate()[0].decode(loc)
     cado_bin_path = [x.split("=",2)[1] for x in output.split("\n") if re.match("^build_tree",x)][0]
     cado_bin_path = re.sub("^\"(.*)\"$", "\\1", cado_bin_path)
     pathdict["lib"] = cado_bin_path
