@@ -883,7 +883,7 @@ class Cado_NFS_toplevel(object):
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.hostnames=foo,bar', 'tasks.workdir=/tmp/a', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
         >>> p = t.get_cooked_parameters()
-        >>> print(re.sub('\\\\', '/', str(p)))
+        >>> print(re.sub('\\\\\\\\', '/', str(p)))
         N = 12345
         slaves.basepath = /tmp/a/client
         slaves.hostnames = foo,bar
