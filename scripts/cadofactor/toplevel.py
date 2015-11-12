@@ -220,6 +220,9 @@ class Cado_NFS_toplevel(object):
             return int(backquote("sysctl -n hw.ncpu")[0])
         if platform.uname()[0] == "Darwin":
             # does this count hyperthreading or not ?
+            first_attempt=backquote("sysctl -n machdep.cpu.core_count")
+            if first_attempt:
+                return int(first_attempt[0])
             return int(backquote("sysctl -n hw.ncpu")[0])
         if platform.uname()[0] == "Windows":
             # not clear whether it's physical or logical.
