@@ -84,13 +84,13 @@ class Cado_NFS_toplevel(object):
         >>> t.args.N=n10
         >>> t.args.dlp=False
         >>> fn=t.find_default_parameter_file()
-        >>> fn == os.path.join(tempdir, "factor/params.c10")
+        >>> fn == os.path.join(tempdir, "factor", "params.c10")
         True
 
         >>> t.args.N=n13
         >>> t.args.dlp=False
         >>> fn=t.find_default_parameter_file()
-        >>> fn == os.path.join(tempdir, "factor/params.c13")
+        >>> fn == os.path.join(tempdir, "factor", "params.c13")
         True
 
         >>> t.args.N=n14
@@ -104,19 +104,19 @@ class Cado_NFS_toplevel(object):
         >>> t.args.N=n18
         >>> t.args.dlp=False
         >>> fn=t.find_default_parameter_file()
-        >>> fn == os.path.join(tempdir, "factor/params.c20")
+        >>> fn == os.path.join(tempdir, "factor", "params.c20")
         True
 
         >>> t.args.N=n18
         >>> t.args.dlp=True
         >>> fn=t.find_default_parameter_file()
-        >>> fn == os.path.join(tempdir, "dlp/params.p20")
+        >>> fn == os.path.join(tempdir, "dlp", "params.p20")
         True
 
         >>> t.args.N=n13
         >>> t.args.dlp=True
         >>> fn=t.find_default_parameter_file()
-        >>> fn == os.path.join(tempdir, "dlp/params.p13")
+        >>> fn == os.path.join(tempdir, "dlp", "params.p13")
         True
 
         >>> t.args.N=n14

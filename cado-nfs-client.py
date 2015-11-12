@@ -38,7 +38,7 @@ import re
 
 cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@/scripts/cadofactor"
 if not re.search("^/", cado_python_libs_path):
-    cado_python_libs_path=os.path.dirname(sys.argv[0])+"/scripts/cadofactor"
+    cado_python_libs_path=os.path.join(os.path.dirname(sys.argv[0]),"scripts","cadofactor")
 
 # note that even though we do have cado-nfs.py and cado-nfs-client.py in
 # the build tree, we make *NO PROMISE* as to whether calling these
