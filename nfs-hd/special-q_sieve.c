@@ -2123,7 +2123,7 @@ int main(int argc, char * argv[])
     mpz_set_si(a, q);
     mpz_poly_factor(l, f->pols[q_side], a, state);
 
-    for (int i = 0; i < l->size ; i++) {
+    for (int i = 0; i < l->size; i++) {
 
       if (l->factors[i]->f->deg < deg_bound_factorise) {
         if (l->factors[i]->f->deg == 1) {
@@ -2263,8 +2263,8 @@ int main(int argc, char * argv[])
         fflush(file_array_norm);
 #endif // PRINT_ARRAY_NORM
       }
+      ideal_spq_clear(special_q, H->t);
     }
-    ideal_spq_clear(special_q, H->t);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);

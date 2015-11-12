@@ -270,16 +270,21 @@ static void printf_relation(factor_t * factor, unsigned int * I,
 #ifdef PRINT_DECIMAL
             gmp_fprintf(outstd, "%Zd,", factor[index]->factorization[j]);
 #else // PRINT_DECIMAL
-            fprintf(outstd, "%s,",
-                mpz_get_str(NULL, 16, factor[index]->factorization[j]));
+            mpz_out_str(outstd, 16, factor[index]->factorization[j]);
+            fprintf(outstd, ",");
+            /*fprintf(outstd, "%s,",*/
+                /*mpz_get_str(NULL, 16, factor[index]->factorization[j]));*/
 #endif // PRINT_DECIMAL
           }
 #ifdef PRINT_DECIMAL
           gmp_fprintf(outstd, "%Zd:", factor[index]->factorization[
                        factor[index]->number - 1]);
 #else // PRINT_DECIMAL
-          fprintf(outstd, "%s:", mpz_get_str(NULL, 16,
-                factor[index]->factorization[factor[index]->number - 1]));
+          mpz_out_str(outstd, 16,
+              factor[index]->factorization[factor[index]->number - 1]);
+            fprintf(outstd, ";");
+          /*fprintf(outstd, "%s:", mpz_get_str(NULL, 16,*/
+                /*factor[index]->factorization[factor[index]->number - 1]));*/
 #endif // PRINT_DECIMAL
         } else {
           fprintf(outstd, ":");
@@ -300,16 +305,20 @@ static void printf_relation(factor_t * factor, unsigned int * I,
 #ifdef PRINT_DECIMAL
           gmp_fprintf(outstd, "%Zd,", factor[index]->factorization[j]);
 #else // PRINT_DECIMAL
-          fprintf(outstd, "%s,",
-                mpz_get_str(NULL, 16, factor[index]->factorization[j]));
+          mpz_out_str(outstd, 16, factor[index]->factorization[j]);
+          fprintf(outstd, ",");
+          /*fprintf(outstd, "%s,",*/
+                /*mpz_get_str(NULL, 16, factor[index]->factorization[j]));*/
 #endif // PRINT_DECIMAL
         }
 #ifdef PRINT_DECIMAL
         gmp_fprintf(outstd, "%Zd", factor[index]->factorization[
                      factor[index]->number - 1]);
 #else // PRINT_DECIMAL
-        fprintf(outstd, "%s", mpz_get_str(NULL, 16,
-              factor[index]->factorization[factor[index]->number - 1]));
+        mpz_out_str(outstd, 16,
+            factor[index]->factorization[factor[index]->number - 1]);
+        /*fprintf(outstd, "%s", mpz_get_str(NULL, 16,*/
+              /*factor[index]->factorization[factor[index]->number - 1]));*/
 #endif // PRINT_DECIMAL
       }
       index++;
@@ -444,6 +453,7 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
   // Trial divide all the small factors.
   int success = brute_force_factorize_ul(factors, norm, norm, B);
   if (success) {
+    mpz_clear(norm);
     return 1;
   }
 
@@ -452,8 +462,10 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
   if (mpz_probab_prime_p(norm, 1)) {
     if (mpz_sizeinbase(norm, 2) <= data->lpb) {
       factor_append(factors, norm);
+      mpz_clear(norm);
       return 1;
     } else {
+      mpz_clear(norm);
       return 0;
     }
   }
@@ -705,7 +717,6 @@ static unsigned int find_indices(unsigned int ** L,
     uint64_array_t * indices, uint64_t * index, unsigned int V,
     uint64_t max_indices)
 {
-  * L = (unsigned int * ) malloc(sizeof(unsigned int) * (V));
   unsigned int size = 0;
   uint64_t min = max_indices;
   for (unsigned int i = 0; i < V; i++) {
