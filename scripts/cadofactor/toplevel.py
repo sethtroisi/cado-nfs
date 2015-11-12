@@ -58,10 +58,14 @@ class Cado_NFS_toplevel(object):
 
         >>> tempdir=tempfile.mkdtemp()
         >>> names = ["c10", "c13", "c20", "p20", "p13" ]
-        >>> os.symlink(".", os.path.join(tempdir, "factor"))
-        >>> os.symlink(".", os.path.join(tempdir, "dlp"))
+        >>> os.mkdir(os.path.join(tempdir, "factor"))
+        >>> os.mkdir(os.path.join(tempdir, "dlp"))
         >>> for n in names:
-        ...  fn=os.path.join(tempdir, "params." + n)
+        ...  if re.search("^p", n):
+        ...    dn="dlp"
+        ...  else:
+        ...    dn="factor"
+        ...  fn=os.path.join(tempdir, dn, "params." + n)
         ...  f=open(fn, "w")
         ...  f.writelines("# hello, world\\n")
         ...  f.close()
@@ -123,11 +127,15 @@ class Cado_NFS_toplevel(object):
         ...   'NOTFOUND'
         'NOTFOUND'
 
-        >>> os.unlink(os.path.join(tempdir, "factor"))
-        >>> os.unlink(os.path.join(tempdir, "dlp"))
         >>> for n in names:
-        ...  fn=os.path.join(tempdir, "params." + n)
+        ...  if re.search("^p", n):
+        ...    dn="dlp"
+        ...  else:
+        ...    dn="factor"
+        ...  fn=os.path.join(tempdir, dn, "params." + n)
         ...  os.unlink(fn)
+        >>> os.rmdir(os.path.join(tempdir, "factor"))
+        >>> os.rmdir(os.path.join(tempdir, "dlp"))
         >>> os.rmdir(tempdir)
         '''
 
