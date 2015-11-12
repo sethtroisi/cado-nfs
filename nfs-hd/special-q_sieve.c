@@ -770,10 +770,10 @@ void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_po
  * matrix: MqLLL.
  * f: polynomial that defines the number field.
  */
-void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos, ideal_1_srcptr r,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H,
-    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED uint64_t * nb_hit)
+void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
+    ideal_1_srcptr r, mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+    FILE * errstd, MAYBE_UNUSED mat_Z_srcptr matrix,
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED uint64_t * nb_hit)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
   ASSERT(Mqr->NumRows == 3);
@@ -798,8 +798,8 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos, ideal_1_
 
   //Reduce q-lattice is not possible.
   if (boolean == 0) {
-    fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
-    mat_int64_fprintf_comment(stderr, Mqr);
+    fprintf(errstd, "# Plane sieve does not support this type of Mqr.\n");
+    mat_int64_fprintf_comment(errstd, Mqr);
 
     //plane_sieve_whithout_FK(SV, vec);
 
@@ -1011,8 +1011,9 @@ void space_sieve_1_plane_sieve(array_ptr array,
 
 //TODO: in many function, a v_tmp is used, try to have only one.
 void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H, MAYBE_UNUSED mat_Z_srcptr
-    matrix, MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED uint64_t * nb_hit)
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H, FILE * errstd,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
+    MAYBE_UNUSED uint64_t * nb_hit)
 {
   //For SPACE_SIEVE_ENTROPY
   MAYBE_UNUSED unsigned int entropy = 0;
@@ -1122,9 +1123,9 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
         if (!boolean) {
           ASSERT(boolean == 0);
 
-          fprintf(stderr,
+          fprintf(errstd,
               "# Plane sieve (called by space sieve) does not support this type of Mqr.\n");
-          mat_int64_fprintf_comment(stderr, Mqr);
+          mat_int64_fprintf_comment(errstd, Mqr);
 
           int64_vector_clear(s);
           list_int64_vector_clear(list_s);
@@ -1417,9 +1418,8 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
  * f: the polynomial that defines the number field.
  */
 void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
-    mat_Z_srcptr matrix,
-    factor_base_srcptr fb, sieving_bound_srcptr H,
-    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * output_relation)
+    mat_Z_srcptr matrix, factor_base_srcptr fb, sieving_bound_srcptr H,
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * outstd, FILE * errstd)
 {
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
@@ -1605,15 +1605,16 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     compute_Mqr_1(Mqr, Tqr, H->t, r);
 
     if (Mqr->coeff[1][1] != 1) {
-      plane_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit);
+      plane_sieve_1(array, file_trace_pos, r, Mqr, H, errstd, matrix, f,
+          &number_hit);
     } else {
-      fprintf(stderr, "# Tqr = [");
+      fprintf(errstd, "# Tqr = [");
       for (unsigned int i = 0; i < H->t - 1; i++) {
-        fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
+        fprintf(errstd, "%" PRIu64 ", ", Tqr[i]);
       }
-      fprintf(stderr, "%" PRIu64 "]\n", Tqr[H->t - 1]);
-      fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
-      mat_int64_fprintf_comment(stderr, Mqr);
+      fprintf(errstd, "%" PRIu64 "]\n", Tqr[H->t - 1]);
+      fprintf(errstd, "# Plane sieve does not support this type of Mqr.\n");
+      mat_int64_fprintf_comment(errstd, Mqr);
     }
 
 #ifdef NUMBER_HIT
@@ -1679,18 +1680,19 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #else // ENUM_LATTICE
     if (Mqr->coeff[1][1] != 1) {
 #ifdef SPACE_SIEVE
-      space_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit);
+      space_sieve_1(array, file_trace_pos, r, Mqr, H, errstd, matrix, f,
+          &number_hit);
 #else
       plane_sieve_1(array, r, Mqr, H, matrix, f);
 #endif // SPACE_SIEVE
     } else {
-      fprintf(stderr, "# Tqr = [");
+      fprintf(errstd, "# Tqr = [");
       for (unsigned int i = 0; i < H->t - 1; i++) {
-        fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
+        fprintf(errstd, "%" PRIu64 ", ", Tqr[i]);
       }
-      fprintf(stderr, "%" PRIu64 "]\n", Tqr[H->t - 1]);
-      fprintf(stderr, "# Space sieve does not support this type of Mqr.\n");
-      mat_int64_fprintf_comment(stderr, Mqr);
+      fprintf(errstd, "%" PRIu64 "]\n", Tqr[H->t - 1]);
+      fprintf(errstd, "# Space sieve does not support this type of Mqr.\n");
+      mat_int64_fprintf_comment(errstd, Mqr);
     }
 #endif // ENUM_LATTICE
 
@@ -1718,7 +1720,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   free(Tqr);
 
 #ifdef TIME_SIEVES
-  fprintf(output_relation, "# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(outstd, "# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_line_sieve, ideal_line_sieve,
       time_line_sieve / (double)ideal_line_sieve);
   double time_per_ideal = 0.0;
@@ -1727,14 +1729,14 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   } else {
     time_per_ideal = 0.0;
   }
-  fprintf(output_relation, "# Perform plane sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(outstd, "# Perform plane sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_plane_sieve, ideal_plane_sieve, time_per_ideal);
   if (ideal_space_sieve != 0) {
     time_per_ideal = time_space_sieve / (double)ideal_space_sieve;
   } else {
     time_per_ideal = 0.0;
   }
-  fprintf(output_relation, "# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(outstd, "# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_space_sieve, ideal_space_sieve, time_per_ideal);
 #endif // TIME_SIEVES
 }
@@ -1884,6 +1886,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "fb", "path to factor bases");
   param_list_decl_usage(pl, "main", "if MNFS-CM, main side");
   param_list_decl_usage(pl, "out", "path to output file");
+  param_list_decl_usage(pl, "err", "path to error file");
 }
 
 /*
@@ -1907,7 +1910,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** q_range, unsigned char ** thresh,
     unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
-    int * main_side, FILE ** output_relation)
+    int * main_side, FILE ** outstd, FILE ** errstd)
 {
   param_list pl;
   param_list_init(pl);
@@ -1972,9 +1975,17 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   path[0] = '\0';
   param_list_parse_string(pl, "out", path, size_path);
   if (path[0] == '\0') {
-    * output_relation = stdout;
+    * outstd = stdout;
   } else {
-    * output_relation = fopen(path, "w");
+    * outstd = fopen(path, "w");
+  }
+
+  path[0] = '\0';
+  param_list_parse_string(pl, "err", path, size_path);
+  if (path[0] == '\0') {
+    * errstd = stderr;
+  } else {
+    * errstd = fopen(path, "w");
   }
 
 #ifdef MAKE_FB_DURING_SIEVE
@@ -1983,7 +1994,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
   double sec = seconds();
   makefb(*fb, f->pols, *fbb, H->t, *lpb, * V);
-  fprintf(output_relation, "# Time for makefb: %f.\n", seconds() - sec);
+  fprintf(outstd, "# Time for makefb: %f.\n", seconds() - sec);
 #else
   double sec = seconds();
   FILE * file_r;
@@ -1991,7 +2002,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   file_r = fopen(path, "r");
   read_factor_base(file_r, (*fb), (*fbb), (*lpb), f);
   fclose(file_r);
-  fprintf(output_relation,
+  fprintf(* outstd,
       "# Time to read factor bases: %f.\n", seconds() - sec);
 #endif
 
@@ -2037,10 +2048,11 @@ int main(int argc, char * argv[])
   factor_base_t * fb;
   uint64_t q;
   int main_side;
-  FILE * output_relation;
+  FILE * outstd;
+  FILE * errstd;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
-      &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &output_relation);
+      &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &outstd, &errstd);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2122,8 +2134,8 @@ int main(int argc, char * argv[])
           ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 1);
         }
 
-        fprintf(output_relation, "# Special-q: q: %" PRIu64 ", g: ", q);
-        mpz_poly_fprintf(output_relation, l->factors[i]->f);
+        fprintf(outstd, "# Special-q: q: %" PRIu64 ", g: ", q);
+        mpz_poly_fprintf(outstd, l->factors[i]->f);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "Special-q: q: %" PRIu64 ", g: ", q);
@@ -2193,7 +2205,7 @@ int main(int argc, char * argv[])
 
           sec = seconds();
           special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j],
-              output_relation);
+              outstd, errstd);
           time[j][1] = seconds() - sec;
           sec = seconds();
           find_index(indexes[j], array, thresh[j]);
@@ -2205,7 +2217,7 @@ int main(int argc, char * argv[])
         }
 
         for (unsigned int j = 0; j < V; j++) {
-          fprintf(output_relation,
+          fprintf(outstd,
               "# Log 2 of the maximum of the norms %u: %u.\n", j,
               max_norm[j]);
         }
@@ -2213,7 +2225,7 @@ int main(int argc, char * argv[])
         sec = seconds();
         nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
             matrix, f->pols, H, V, special_q, q_side, main_side,
-            output_relation);
+            outstd);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
@@ -2221,22 +2233,26 @@ int main(int argc, char * argv[])
           uint64_array_clear(indexes[j]);
         }
 
-        fprintf(output_relation,
+        fprintf(outstd,
             "# Time for this special-q: %fs.\n", seconds() - sec_tot);
         total_time += (seconds() - sec_tot);
         spq_tot++;
         for (unsigned int j = 0; j < V; j++) {
-          fprintf(output_relation, "# Time to init norm %u: %fs.\n", j,
+          fprintf(outstd, "# Time to init norm %u: %fs.\n", j,
               time[j][0]);
-          fprintf(output_relation, "# Time to sieve %u: %fs.\n", j, time[j][1]);
-          fprintf(output_relation, "# Time to find indexes %u: %fs.\n", j,
+          fprintf(outstd, "# Time to sieve %u: %fs.\n", j, time[j][1]);
+          fprintf(outstd, "# Time to find indexes %u: %fs.\n", j,
               time [j][2]);
         }
 
-        fprintf(output_relation, "# Time to factorize: %fs.\n", sec_cofact);
+        fprintf(outstd, "# Time to factorize: %fs.\n", sec_cofact);
 
-        fprintf(output_relation,
+        fprintf(outstd,
             "# ----------------------------------------\n");
+        fprintf(errstd,
+            "# ----------------------------------------\n");
+        fflush(outstd);
+        fflush(errstd);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "----------------------------------------\n");
@@ -2248,20 +2264,19 @@ int main(int argc, char * argv[])
 #endif // PRINT_ARRAY_NORM
       }
     }
-
     ideal_spq_clear(special_q, H->t);
   }
 
-  fprintf(output_relation, "# Total time: %fs.\n", total_time);
-  fprintf(output_relation, "# Total number of relations: %" PRIu64 ".\n",
+  fprintf(outstd, "# Total time: %fs.\n", total_time);
+  fprintf(outstd, "# Total number of relations: %" PRIu64 ".\n",
       nb_rel);
-  fprintf(output_relation, "# Total number of special-q: %" PRIu64 ".\n",
+  fprintf(outstd, "# Total number of special-q: %" PRIu64 ".\n",
       spq_tot);
-  fprintf(output_relation, "# Time per special-q: %fs.\n",
+  fprintf(outstd, "# Time per special-q: %fs.\n",
       total_time / (double)spq_tot);
-  fprintf(output_relation, "# Time per relation: %fs.\n",
+  fprintf(outstd, "# Time per relation: %fs.\n",
       total_time / (double)nb_rel);
-  fprintf(output_relation, "# Relations per special-q: %f.\n",
+  fprintf(outstd, "# Relations per special-q: %f.\n",
       (double)nb_rel / (double)spq_tot);
 
   mpz_poly_factor_list_clear(l);
@@ -2301,7 +2316,8 @@ int main(int argc, char * argv[])
   free(q_range);
   cado_poly_clear(f);
   free_saved_chains();
-  fclose(output_relation);
+  fclose(outstd);
+  fclose(errstd);
 
   return 0;
 }
