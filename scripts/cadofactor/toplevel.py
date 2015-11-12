@@ -5,6 +5,7 @@
 
 import re
 import os
+import platform
 import sys
 import subprocess
 import locale
@@ -214,13 +215,13 @@ class Cado_NFS_toplevel(object):
             if not loc:
                 loc="ascii"
             return [s.decode(loc) for s in pipe.stdout.readlines()]
-        if os.uname()[0] == "OpenBSD":
+        if platform.uname()[0] == "OpenBSD":
             # does this count hyperthreading or not ?
             return int(backquote("sysctl -n hw.ncpu")[0])
-        if os.uname()[0] == "Darwin":
+        if platform.uname()[0] == "Darwin":
             # does this count hyperthreading or not ?
             return int(backquote("sysctl -n hw.ncpu")[0])
-        if os.uname()[0] == "MINGW32_NT-6.1":
+        if platform.uname()[0] == "Windows":
             # not clear whether it's physical or logical.
             crap=backquote("wmic cpu get Caption")
             return max(len(crap)-1,1)
