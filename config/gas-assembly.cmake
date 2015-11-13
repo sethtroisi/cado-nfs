@@ -1,8 +1,8 @@
 # gas-syntax assembly sources.
 message(STATUS "Trying to compile gas-syntax assembly sources")
-if (CMAKE_COMPILER_IS_GNUCC)
-    # -x assembler below is gcc syntax only. Do not attempt to do the
-    # same with other compilers.
+if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Intel")
+    # -x assembler below is gcc syntax, understood by icc as well. Do not
+    # attempt to do the same with other compilers.
     #
     # Note that renaming asm_sample.c to asm_sample.S does not work,
     # because cmake's try_compile insists on knowing which compiler to
