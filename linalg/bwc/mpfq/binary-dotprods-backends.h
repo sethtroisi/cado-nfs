@@ -14,7 +14,7 @@
 #define  need_dotprod_64K_64
 
 #ifdef  need_dotprod_64K_64
-#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64 && !defined(__ICC)
+#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
 #include <emmintrin.h>
 /* u has n rows of 64K bits
  * v has n rows of 64 bits.
@@ -77,7 +77,7 @@ static inline void dotprod_64K_64(uint64_t * b, const uint64_t * A, const uint64
 #endif
 
 #ifdef  need_dotprod_64K_128
-#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64 && !defined(__ICC)
+#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
 /* u has n rows of 64K bits
  * v has n rows of 128 bits.
  * Compute (u|v) == tr(u)*v into the area pointed to by v: 64K rows of 128 bits.
