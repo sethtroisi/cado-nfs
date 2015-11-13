@@ -134,6 +134,25 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     endif()
 endif()
 
+if(CMAKE_C_COMPILER_ID MATCHES "Intel")
+    message(STATUS "Applying flags for icc")
+    set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+    message(STATUS "Applying flags for icpc")
+    # only icc>=15 is full c++11 compliant, it seems. But 14 will do.
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+        set (CMAKE_CXX_FLAGS   "-std=c++11 -g -W -Wall ${CMAKE_CXX_FLAGS}")
+        set(HAVE_CXX11 1)
+        message(STATUS "Enabling C++11 support")
+    else()
+        set (CMAKE_CXX_FLAGS   "-g -W -Wall ${CMAKE_CXX_FLAGS}")
+        # don't set standard flags explicitly. The default seems fine.
+        # set (CMAKE_CXX_FLAGS   "-std=gnu++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
+    endif()
+endif()
+
 
 #####################################################################
 # Set dependencies for external software.

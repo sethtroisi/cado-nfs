@@ -78,7 +78,7 @@
 # Note that some flags, and some compile-time definitions are added
 # anyway and cannot be overridden. For example, one cannot remove
 # -std=c99 for CFLAGS if GNU C is being used, because its use is
-# mandatory.
+# mandatory. We also do this for the Intel compiler icc.
 
 ############################################################
 # CXXFLAGS: Flags for compiling C++ programs
