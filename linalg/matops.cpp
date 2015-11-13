@@ -163,7 +163,6 @@ static inline uint64_t nibrev(uint64_t a)
 
 
 /* level 1 */
-#if !(defined(__ICC) || defined(__INTEL_COMPILER))
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
 void mul_6464_6464_sse(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
 {
@@ -180,13 +179,13 @@ void mul_6464_6464_sse(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
 	__m128i one = _cado_mm_set1_epi64_c(1);
 	for (i = 0; i < 64; i++) {
 	    __m128i bw = _cado_mm_set1_epi64(B[i]);
-	    c ^= (bw & -(a & one));
+	    // c ^= (bw & -(a & one));
+	    c = _mm_xor_si128(c,_mm_and_si128(bw,_mm_sub_epi64(_mm_setzero_si128(),_mm_and_si128(a, one))));
 	    a = _mm_srli_epi64(a, 1);
 	}
 	*Cw++ = c;
     }
 }
-#endif
 #endif
 
 void mul_6464_6464_v2(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
@@ -242,7 +241,6 @@ void addmul_To64_o64_lsb_packof2(uint64_t * r, uint64_t a, uint64_t w)
     }
 }
 
-#if !(defined(__ICC) || defined(__INTEL_COMPILER))
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
 void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t w)
 {
@@ -255,11 +253,12 @@ void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t w)
     };
     __m128i *sr = (__m128i *) r;
     for (int i = 0; i < 64; i += 2) {
-	*sr++ ^= mb[a & 3];
+        // *sr++ ^= mb[a & 3];
+        *sr = _mm_xor_si128(*sr, mb[a & 3]);
+	sr++;
 	a >>= 2;
     }
 }
-#endif
 #endif
 
 /* implements mul_o64_6464 */
@@ -790,7 +789,6 @@ void mul_N64_T6464_transB(uint64_t *C,
     free(tb);
 }
 
-#if !(defined(__ICC) || defined(__INTEL_COMPILER))
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
 /* implements mul_N64_6464 */
 void addmul_N64_6464_sse(uint64_t *C,
@@ -809,10 +807,13 @@ void addmul_N64_6464_sse(uint64_t *C,
         __m128i one = _cado_mm_set1_epi64_c(1);
 	for (int i = 0; i < 64; i++) {
 	    __m128i bw = _cado_mm_set1_epi64(B[i]);
-	    c ^= (bw & -(a & one));
+	    // c ^= (bw & -(a & one));
+	    c = _mm_xor_si128(c,_mm_and_si128(bw,_mm_sub_epi64(_mm_setzero_si128(),_mm_and_si128(a, one))));
 	    a = _mm_srli_epi64(a, 1);
 	}
-	*Cw++ ^= c;
+	// *Cw++ ^= c;
+	*Cw = _mm_xor_si128(*Cw, c);
+	Cw++;
     }
     C += j;
     A += j;
@@ -833,7 +834,6 @@ void mul_N64_6464_sse(uint64_t *C,
     memset(C, 0, m * sizeof(uint64_t));
     addmul_N64_6464_sse(C,A,B,m);
 }
-#endif
 #endif
 
 void mul_64N_N64_addmul(uint64_t *r, uint64_t *a, uint64_t *w, size_t n)
@@ -887,7 +887,6 @@ void mul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
     addmul_TN64_N64_C(b, A, x, ncol);
 }
 
-#if !(defined(__ICC) || defined(__INTEL_COMPILER))
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
 static inline void mul_TN64K_N64_sse2(uint64_t * w, uint64_t * u, uint64_t * v, unsigned int n, unsigned int K)
 {
@@ -909,14 +908,14 @@ static inline void mul_TN64K_N64_sse2(uint64_t * w, uint64_t * u, uint64_t * v, 
         for(unsigned int k = 0 ; k < K ; k++) {
             uint64_t a = *u++;
             for (unsigned int j = 0; j < 64; j += 2) {
-                *sw ^= mb[a & 3];
+	        // *sw++ ^= mb[a & 3];
+	        *sw = _mm_xor_si128(*sw, mb[a & 3]);
+		sw++;
                 a >>= 2;
-                sw ++;
             }
         }
     }
 }
-#endif
 #endif
 
 static inline void mul_TN64K_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol, unsigned int K)
@@ -1429,7 +1428,7 @@ int LUP64_imm(mat64 l, mat64 u, mat64 p, mat64 a)
         // this keeps only the least significant bit of pr.
         uint64_t v = pr^(pr&(pr-1));
         p[j]=v;
-#if defined(HAVE_SSE41) && !defined(VALGRIND) && !defined(__ICC)
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
         int k = j+1;
         if (k&1) {      // alignment call
             uint64_t w = -((u[k]&v)!=0);
@@ -1445,9 +1444,13 @@ int LUP64_imm(mat64 l, mat64 u, mat64 p, mat64 a)
         __m128i * uu = (__m128i*) (u+k);
         __m128i * ll = (__m128i*) (l+k);
         for( ; k < 64 ; k+=2 ) {
-            __m128i ww = _mm_cmpeq_epi64(*uu&vv,vv);
-            *uu++ ^= pp & ww;
-            *ll++ ^= ee & ww;
+	    __m128i ww = _mm_cmpeq_epi64(_mm_and_si128(*uu,vv),vv);
+	    // *uu++ ^= pp & ww;
+	    *uu = _mm_xor_si128(*uu, _mm_and_si128(pp, ww));
+	    uu++;
+	    // *ll++ ^= ee & ww;
+	    *ll = _mm_xor_si128(*ll, _mm_and_si128(ee, ww));
+	    ll++;
         }
 #else
         uint64_t er = l[j];
@@ -1614,7 +1617,7 @@ void mul_N64_6464(uint64_t *C,
  * 20000. At N=2000000, a twice faster version can be obtained. However,
  * it's not critical for cado, so we stick with the slower version.
  */
-#if defined(HAVE_SSE2) && ULONG_BITS == 64 && !defined(__ICC)
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
     mul_N64_6464_sse(C,A,B,m);
 #else
     mul_N64_6464_lookup4(C,A,B,m);
@@ -1624,7 +1627,7 @@ void addmul_N64_6464(uint64_t *C,
 		 const uint64_t *A,
 		 const uint64_t *B, size_t m)
 {
-#if defined(HAVE_SSE2) && ULONG_BITS == 64 && !defined(__ICC)
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
     addmul_N64_6464_sse(C,A,B,m);
 #else
     addmul_N64_6464_lookup4(C,A,B,m);
@@ -1639,7 +1642,7 @@ void mul_N64_T6464(uint64_t *C,
 }
 void addmul_To64_o64(uint64_t * r, uint64_t a, uint64_t w)
 {
-#if defined(HAVE_SSE2) && ULONG_BITS == 64 && !defined(__ICC)
+#if defined(HAVE_SSE2) && ULONG_BITS == 64
     addmul_To64_o64_lsb_sse_v1(r,a,w);
 #else
     addmul_To64_o64_lsb_packof2(r,a,w);
@@ -1839,7 +1842,7 @@ int PLUQ64_inner(int * phi, mat64 l, mat64 u, mat64 a, int col_offset)
         uint64_t v = r^(r&(r-1));
         uint64_t j = cado_ctz64(r);
         phi[i] = col_offset + j;
-#if defined(HAVE_SSE41) && !defined(VALGRIND) && !defined(__ICC)
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
         int k = i+1;
         if (k&1) {      // alignment call
             uint64_t w = -((u[k]&v)!=0);
@@ -1855,9 +1858,13 @@ int PLUQ64_inner(int * phi, mat64 l, mat64 u, mat64 a, int col_offset)
         __m128i * uu = (__m128i*) (u+k);
         __m128i * ll = (__m128i*) (l+k);
         for( ; k < n ; k+=2 ) {
-            __m128i ww = _mm_cmpeq_epi64(*uu&vv,vv);
-            *uu++ ^= pp & ww;
-            *ll++ ^= ee & ww;
+	    __m128i ww = _mm_cmpeq_epi64(_mm_and_si128(*uu,vv),vv);
+            // *uu++ ^= pp & ww;
+	    *uu = _mm_xor_si128(*uu, _mm_and_si128(pp, ww));
+	    uu++;
+            // *ll++ ^= ee & ww;
+	    *ll = _mm_xor_si128(*ll, _mm_and_si128(ee, ww));
+	    ll++;
         }
 #else
         uint64_t er = l[i];
@@ -1948,18 +1955,20 @@ static inline void bli_64x64N_clobber(mat64 h, mat64 * us, int * phi, int nb)
         /* TODO: use _mm_cmpeq_epi64 for this as well, of course */
         ASSERT(us[d][i]&m);
         int k = 0;
-#if defined(HAVE_SSE41) && !defined(VALGRIND) && !defined(__ICC)
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
         __m128i mm = _cado_mm_set1_epi64(m);
         __m128i * uu = (__m128i*) us[d];
         __m128i * hh = (__m128i*) h;
         __m128i hi = _cado_mm_set1_epi64(h[i]);
         int ii=i/2;
         for( ; k < ii ; k++) {
-            __m128i ww = _mm_cmpeq_epi64(*uu++&mm,mm);
+	    __m128i ww = _mm_cmpeq_epi64(_mm_and_si128(*uu++,mm),mm);
             for(int b = 0 ; b < nb ; b++) {
-                ((__m128i*)us[b])[k] ^= ww & _cado_mm_set1_epi64(us[b][i]);
+	        // ((__m128i*)us[b])[k] ^= ww & _cado_mm_set1_epi64(us[b][i]);
+	        ((__m128i*)us[b])[k] = _mm_xor_si128(((__m128i*)us[b])[k], _mm_and_si128(ww, _cado_mm_set1_epi64(us[b][i])));
             }
-            hh[k] ^= ww & hi;
+            // hh[k] ^= ww & hi;
+	    hh[k] = _mm_xor_si128(hh[k], _mm_and_si128(ww, hi));
         }
         k*=2;
 #endif
@@ -1994,7 +2003,7 @@ void extract_cols_64_from_128(mat64 t, mat64 * m, int * phi)
     memset(t, 0, sizeof(mat64));
     uint64_t mask = 1;
     for(int j = 0 ; j < 64 ; j++, mask<<=1) {
-#if defined(HAVE_SSE41) && !defined(VALGRIND) && !defined(__ICC)
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
         __m128i ss[2] = {
             _cado_mm_set1_epi64(s[0][j]),
             _cado_mm_set1_epi64(s[1][j]) };
@@ -2002,7 +2011,12 @@ void extract_cols_64_from_128(mat64 t, mat64 * m, int * phi)
         __m128i * tt = (__m128i*)t;
         __m128i mmk = _cado_mm_set1_epi64(mask);
         for(int i = 0 ; i < 64 ; i+=2) {
-            *tt ^= mmk & _mm_cmpeq_epi64((*mm[0]&ss[0])^(*mm[1]&ss[1]),ss[0]^ss[1]);
+	    // *tt ^= mmk & _mm_cmpeq_epi64((*mm[0]&ss[0])^(*mm[1]&ss[1]),ss[0]^ss[1]);
+	    __m128i xxx = _mm_and_si128(*mm[0],ss[0]);
+	    __m128i yyy = _mm_and_si128(*mm[1],ss[1]);
+	    __m128i zzz = _mm_xor_si128(xxx,yyy);
+	    __m128i ttt = _mm_xor_si128(ss[0],ss[1]);
+	    *tt = _mm_xor_si128(*tt, _mm_and_si128(mmk, _mm_cmpeq_epi64(zzz,ttt)));
             mm[0]++,mm[1]++;
             tt++;
         }
