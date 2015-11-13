@@ -222,8 +222,8 @@ static inline void vaddmul_tiny_64K_64L(
                 }
             }
             /* Because L > 1, the destination words are not contiguous */
-            w0[l] = _mm_xor_si128(w0[l], _mm_cvtsi128_si64(r));
-            w1[l] = _mm_xor_si128(w1[l], _mm_cvtsi128_si64(_mm_srli_si128(r, 8)));
+            w0[l] ^= _mm_cvtsi128_si64(r);
+            w1[l] ^= _mm_cvtsi128_si64(_mm_srli_si128(r, 8));
             v0++; /* next column in v */
         }
         u0 += 2 * K; u1 += 2 * K;
