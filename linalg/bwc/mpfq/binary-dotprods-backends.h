@@ -185,7 +185,7 @@ static inline void dotprod_64K_64L(
 /* multiply the n times 64K-bit vector u by the 64K by
  * 64L matrix v -- n must be even. Result is put in w.
  */
-#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64 && !defined(__ICC)
+#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
 #include <emmintrin.h>
 static inline void vaddmul_tiny_64K_64L(
             uint64_t * w,
@@ -212,7 +212,8 @@ static inline void vaddmul_tiny_64K_64L(
                 __m128i one = _mpfq_mm_set1_epi64_c(1);
                 for (unsigned int i = 0; i < 64; i++) {
                     __m128i zw = _mpfq_mm_set1_epi64(*vv);
-                    r ^= (zw & -(a & one));
+                    // r ^= (zw & -(a & one));
+		    r = _mm_xor_si128(r,_mm_and_si128(zw,_mm_sub_epi64(_mm_setzero_si128(),_mm_and_si128(a, one))));
                     a = _mm_srli_epi64(a, 1);
                     vv += L;
                 }
