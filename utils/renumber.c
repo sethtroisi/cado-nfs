@@ -433,7 +433,12 @@ renumber_init_for_writing (renumber_ptr renumber_info, unsigned int nb_polys,
     renumber_info->nb_bits = 32;
   else
     renumber_info->nb_bits = 64;
-  ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+  if (renumber_info->nb_bits > 8 * sizeof(p_r_values_t))
+    {
+      fprintf (stderr, "Error, p_r_values_t is too small to store ideals, "
+               "recompile with FLAGS_SIZE=\"-D__SIZEOF_P_R_VALUES__=8\"\n");
+      exit (1);
+    }
 
   /* Compute the number of additional columns needed in the renumbering table
    * due to the non monic polynomials.
