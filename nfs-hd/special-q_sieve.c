@@ -1128,6 +1128,7 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
           mat_int64_fprintf_comment(errstd, Mqr);
 
           int64_vector_clear(s);
+          int64_vector_clear(s_tmp);
           list_int64_vector_clear(list_s);
           list_int64_vector_index_clear(list_vec);
           list_int64_vector_index_clear(list_vec_zero);
