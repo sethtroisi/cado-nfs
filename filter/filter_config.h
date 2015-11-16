@@ -37,7 +37,7 @@
 #define DEFAULT_MERGE_MAXLEVEL 10
 #define DEFAULT_MERGE_FORBW 0
 #define DEFAULT_MERGE_RATIO 1.1
-#define DEFAULT_MERGE_COVERNMAX 100.0
+#define DEFAULT_MERGE_COVERNMAX 150.0
 #define DEFAULT_MERGE_MKZTYPE 1 /* pure Markowitz */
 #define DEFAULT_MERGE_WMSTMAX 7 /* relevant only if mkztype == 2 */
 
