@@ -505,11 +505,10 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
  * V: number of number fields.
  */
 static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
-    unsigned int * L, unsigned int t, unsigned int V,
-    int main, facul_aux_data *data, unsigned int * nb_rel_found,
-    ideal_spq_srcptr special_q, unsigned int q_side,unsigned int size,
-    FILE * outstd,
-    MAYBE_UNUSED unsigned int * number_factorisation,
+    unsigned int * L, unsigned int t, unsigned int V, int main,
+    facul_aux_data *data, unsigned int * nb_rel_found,
+    ideal_spq_srcptr special_q, unsigned int q_side, unsigned int size,
+    FILE * outstd, MAYBE_UNUSED unsigned int * number_factorisation,
     MAYBE_UNUSED mpz_vector_srcptr c)
 {
   mpz_t res;
@@ -604,31 +603,33 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
       find = 1;
 
       for (unsigned int i = 0; i < V; i++) {
-        factor_init(factor[i], 10);
-        if (i != (unsigned int)main && L[i]){
-          norm_poly(res, f[i], a);
+        if (i != (unsigned int) main) {
+          factor_init(factor[i], 10);
+          if (L[i]){
+            norm_poly(res, f[i], a);
 
 #ifdef ASSERT_FACTO
-          mpz_set(res_tmp, res);
+            mpz_set(res_tmp, res);
 #endif // ASSERT_FACTO
 
-          is_smooth = call_facul(factor[i], res, &data[i]);
+            is_smooth = call_facul(factor[i], res, &data[i]);
 
 #ifdef ASSERT_FACTO
-          assert_facto[i] = factor_assert(factor[i], res);
-          if (assert_facto[i] == 0) {
-            number_factorisation[0] = number_factorisation[0] + 1;
+            assert_facto[i] = factor_assert(factor[i], res);
+            if (assert_facto[i] == 0) {
+              number_factorisation[0] = number_factorisation[0] + 1;
 #ifdef PRINT_ASSERT_FACTO
-            gmp_fprintf(outstd, "# Incomplete: %Zd\n", res_tmp);
+              gmp_fprintf(outstd, "# Incomplete: %Zd\n", res_tmp);
 #endif // PRINT_ASSERT_FACTO
-          } else {
-            number_factorisation[1] = number_factorisation[1] + 1;
-          }
+            } else {
+              number_factorisation[1] = number_factorisation[1] + 1;
+            }
 #endif // ASSERT_FACTO
 
-          if (is_smooth) {
-            find++;
-            sort_factor(factor[i]);
+            if (is_smooth) {
+              find++;
+              sort_factor(factor[i]);
+            }
           }
         }
       }
@@ -719,7 +720,8 @@ static unsigned int find_indices_main(unsigned int ** L,
   for (unsigned int i = 0; i < V; i++) {
     if (i != (unsigned int) main && indices[i]->length != 0 && index[i] <
         indices[i]->length) {
-      while (target > indices[i]->array[index[i]]) {
+      while (index[i] < indices[i]->length - 1 &&
+          target > indices[i]->array[index[i]]) {
         index[i] = index[i] + 1;
       }
       if (target == indices[i]->array[index[i]]) {
