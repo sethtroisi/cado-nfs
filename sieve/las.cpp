@@ -825,15 +825,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	exit(EXIT_FAILURE);
     }
 
-#ifdef BATCH
-    if ((tmp = param_list_lookup_string (pl, "batch0")) == NULL)
-      {
-        fprintf (stderr, "Error: -batch0 is missing\n");
-        param_list_print_usage (pl, NULL, stderr);
-        exit (EXIT_FAILURE);
-      }
-#endif
-
     // sc->skewness = las->cpoly->skew;
     /* -skew (or -S) may override (or set) the skewness given in the
      * polynomial file */
