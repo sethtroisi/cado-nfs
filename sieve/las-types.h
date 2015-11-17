@@ -199,6 +199,7 @@ struct las_info_s {
     const char * galois; /* a string to indicate which galois to use in las */
     int verbose;
     int suppress_duplicates;
+    int batch; /* batch mode for cofactorization */
 
     /* It's not ``general operational'', but global enough to be here */
     cado_poly cpoly;

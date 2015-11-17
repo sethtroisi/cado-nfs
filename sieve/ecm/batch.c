@@ -71,7 +71,7 @@ prime_list (mpz_list L, prime_info pi, unsigned long pmin,
 }
 
 /* same as prime_list, but only adds primes p for which f has at least one
-   root modulo p */
+   root modulo p, or the leading coefficient of f vanishes modulo p */
 static unsigned long
 prime_list_poly (mpz_list L, prime_info pi, unsigned long pmin,
                  unsigned long pmax, mpz_poly_t f)
@@ -82,7 +82,8 @@ prime_list_poly (mpz_list L, prime_info pi, unsigned long pmin,
     return prime_list (L, pi, pmin, pmax);
 
   for (p = pmin; p < pmax; p = getprime_mt (pi))
-    if (mpz_poly_roots_ulong (NULL, f, p) > 0)
+    if (mpz_divisible_ui_p (f->coeff[f->deg], p) ||
+        mpz_poly_roots_ulong (NULL, f, p) > 0)
       mpz_list_add (L, p);
   return p;
 }
@@ -185,7 +186,7 @@ prime_product (mpz_t P, prime_info pi, unsigned long p_max,
 
 /* same as prime_product, but keeps only primes for which the given polynomial
    has factors modulo p */
-unsigned long
+static void
 prime_product_poly (mpz_t P, prime_info pi, unsigned long p_max,
                     unsigned long p_last, mpz_poly_t f)
 {
@@ -209,7 +210,6 @@ prime_product_poly (mpz_t P, prime_info pi, unsigned long p_max,
   mpz_set (P, l[0]);
 
   mpz_list_clear (L);
-  return p_last;
 }
 
 static unsigned long
@@ -233,6 +233,8 @@ product_tree (mpz_t *R, uint32_t *perm, unsigned long n, unsigned long *w)
 {
   unsigned long h = tree_height (n), i, j;
   mpz_t **T;
+
+  ASSERT_ALWAYS(n >= 1);
 
   T = (mpz_t**) malloc ((h + 1) * sizeof (mpz_t*));
 
@@ -361,6 +363,9 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P,
   mpz_t **T;
   static double t_rem = 0;
 
+  if (n == 0)
+    return;
+
   T = product_tree (R, perm, n, w);
 
   if (verbose > 1)
@@ -384,8 +389,6 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P,
   clear_product_tree (T, n, w);
 }
 
-#define NB_MILLER_RABIN 1
-
 /* invariant:
    relations 0 to *nb_smooth-1 are smooth
    relations *nb_smooth to *nb_unknown-1 are unknown
@@ -394,29 +397,9 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P,
 static void
 update_status (mpz_t *R, uint32_t *perm,
                unsigned char *b_status_r, unsigned char *b_status_a,
-               unsigned long *nb_smooth, unsigned long *nb_unknown,
-               unsigned long lim0, unsigned long lpb0)
+               unsigned long *nb_smooth, unsigned long *nb_unknown)
 {
-  mpz_t z_B2, z_BL, z_B3, z_L2;
-
   unsigned long i, j;
-  unsigned long B;
-  unsigned long L;
-
-  mpz_init (z_B2);
-  mpz_init (z_BL);
-  mpz_init (z_B3);
-  mpz_init (z_L2); /* set to 0 */
-
-  mpz_set_ui (z_B2, lim0);
-  mpz_mul_ui (z_B2, z_B2, lim0);
-  mpz_mul_ui (z_B3, z_B2, lim0);
-  mpz_setbit (z_L2, 2 * lpb0);
-  B = lim0;
-  L = 1UL << lpb0;
-  mpz_set_ui (z_BL, B);
-  mpz_mul_ui (z_BL, z_BL, L);
-  ASSERT_ALWAYS(mpz_cmp_ui (z_B2, L) >= 0);
 
   for (j = *nb_smooth; j < *nb_unknown; j++)
     {
@@ -424,68 +407,47 @@ update_status (mpz_t *R, uint32_t *perm,
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
         /* if R[i] < L, then R[i] is smooth (we assume L <= B^2) */
-        if (mpz_cmp_ui (R[i], L) <= 0)
-          goto smooth;
-        /* if L^2 < R[i] < B^3 or L < R[i] < B^2, then R[i] cannot be smooth */
-        else if ((0 < mpz_cmp (R[i], z_L2) && mpz_cmp (R[i], z_B3) < 0) ||
-                 (0 < mpz_cmp_ui (R[i], L) && mpz_cmp (R[i], z_B2) < 0) ||
-                 mpz_probab_prime_p (R[i], NB_MILLER_RABIN))
-        {
-          /* relation j is useless, swap it with relation *nb_unknown - 1 */
-          (*nb_unknown)--;
-          perm[j] = perm[*nb_unknown];
-          perm[*nb_unknown] = i;
-          j--;
-        }
-        /* now B^2 <= R[i] <= L^2 or B^3 <= R[i] and R[i] is composite */
-        else if (mpz_cmp (R[i], z_BL) <= 0)
-        {
-        smooth:
-          b_status_r[i] = STATUS_SMOOTH;
-          if (b_status_a[i] == STATUS_SMOOTH)
+        if (mpz_cmp_ui (R[i], 1) == 0)
           {
-            /* relation j is smooth, swap it with relation *nb_smooth */
-            perm[j] = perm[*nb_smooth];
-            perm[*nb_smooth] = i;
-            (*nb_smooth)++;
+            b_status_r[i] = STATUS_SMOOTH;
+            if (b_status_a[i] == STATUS_SMOOTH)
+              {
+                /* relation j is smooth, swap it with relation *nb_smooth */
+                perm[j] = perm[*nb_smooth];
+                perm[*nb_smooth] = i;
+                (*nb_smooth)++;
+              }
           }
-        }
+        else /* not smooth */
+          {
+            /* relation j is useless, swap it with relation *nb_unknown - 1 */
+            (*nb_unknown)--;
+            perm[j] = perm[*nb_unknown];
+            perm[*nb_unknown] = i;
+            j--;
+          }
       }
     }
-
-  mpz_clear (z_B2);
-  mpz_clear (z_BL);
-  mpz_clear (z_B3);
-  mpz_clear (z_L2);
 }
 
 /* return the number n of smooth relations in l,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
 find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
-             FILE *batch[2], int verbose)
+             mpz_t batchP[2], int verbose)
 {
   unsigned long nb_rel_read = l->size;
   unsigned long nb_smooth;
   unsigned long nb_unknown;
-  mpz_t P;
   double s;
   double t_smooth = 0;
   double t_update = 0;
   double t_prime = 0;
   double start;
-  unsigned int n0_pass;
-  unsigned long lim_new[2];
   unsigned char *b_status_r;
   unsigned char *b_status_a;
-  int ret;
-
-  ASSERT_ALWAYS(batch[0] != NULL);
-  ASSERT_ALWAYS(batch[1] != NULL);
 
   start = seconds ();
-
-  mpz_init (P);
 
   b_status_r = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
   b_status_a = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
@@ -499,61 +461,40 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
   ASSERT_ALWAYS(lim[0] <= (1UL << lpb[0]));
   ASSERT_ALWAYS(lim[1] <= (1UL << lpb[1]));
 
-  /* Loop */
-
   /* invariant: the smooth relations are in 0..nb_smooth-1,
      the unknown ones in nb_smooth..nb_unknown-1,
      the remaining ones are not smooth */
 
-  n0_pass = 0;
-  while ( (lim[0] < (1UL << lpb[0])) || (lim[1] < (1UL << lpb[1])) )
-  {
-    n0_pass++;
+  /* it seems faster to start from the algebraic side */
+  for (int z = 1; z >= 0; z--)
+    {
+      s = seconds ();
+      t_smooth -= seconds();
+      if (z == 0)
+        smoothness_test (l->R, l->perm + nb_smooth, nb_unknown - nb_smooth,
+                         batchP[0], verbose);
+      else
+        smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth,
+                         batchP[1], verbose);
+      t_smooth += seconds();
+      if (verbose > 1)
+        printf ("# smoothness_test (%lu cofactors) took %.0f seconds"
+                " (total %.0f so far)\n", nb_unknown - nb_smooth, seconds () - s, t_smooth);
 
-    if (verbose)
-      printf ("# Starting pass %u at %.1fs\n",
-              n0_pass, seconds() - start);
+      t_update -= seconds();
+      /* we only need to update relations in [nb_smooth, nb_unknown-1] */
+      if (z == 0)
+        update_status (l->R, l->perm, b_status_r, b_status_a,
+                       &nb_smooth, &nb_unknown);
+      else
+        update_status (l->A, l->perm, b_status_a, b_status_r,
+                       &nb_smooth, &nb_unknown);
+      t_update += seconds();
+      if (verbose)
+        printf ("# rel_smooth: %lu t_update: %.1f seconds\n",
+                nb_smooth, t_update);
+    }
 
-    /* it seems faster to start from the algebraic side */
-    for (int z = 1; z >= 0; z--)
-      {
-        s = seconds ();
-        ret = gmp_fscanf (batch[z], "%lu %Zx\n", &(lim_new[z]), P);
-        ASSERT_ALWAYS(ret == 2);
-        s = seconds () - s;
-        t_prime += s;
-        if (verbose > 1)
-          printf ("# Reading prime product of %zu bits took %.0fs (total %.0fs so far)\n",
-                  mpz_sizeinbase (P, 2), s, t_prime);
-
-        s = seconds ();
-        t_smooth -= seconds();
-        if (z == 0)
-          smoothness_test (l->R, l->perm + nb_smooth, nb_unknown - nb_smooth, P, verbose);
-        else
-          smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth, P, verbose);
-        t_smooth += seconds();
-        if (verbose > 1)
-          printf ("# smoothness_test (%lu cofactors) took %.0f seconds"
-                  " (total %.0f so far)\n", nb_unknown - nb_smooth, seconds () - s, t_smooth);
-
-        lim[z] = lim_new[z];
-        t_update -= seconds();
-        /* we only need to update relations in [nb_smooth, nb_unknown-1] */
-        if (z == 0)
-          update_status (l->R, l->perm, b_status_r, b_status_a,
-                         &nb_smooth, &nb_unknown, lim[z], lpb[z]);
-        else
-          update_status (l->A, l->perm, b_status_a, b_status_r,
-                         &nb_smooth, &nb_unknown, lim[z], lpb[z]);
-        t_update += seconds();
-        if (verbose)
-          printf ("# rel_smooth: %lu t_update: %.1f seconds\n",
-                  nb_smooth, t_update);
-      }
-  }
-
-  mpz_clear (P);
   free (b_status_r);
   free (b_status_a);
 
@@ -817,40 +758,62 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
             seconds () - start, n);
 }
 
-void
-create_batch_file (const char *f, unsigned long B, unsigned long L,
-                   mpz_poly_t pol, int split)
+static void
+create_batch_product (mpz_t P, unsigned long B, unsigned long L,
+mpz_poly_t pol)
 {
-  FILE *fp;
   prime_info pi;
-  unsigned long p, h;
-  mpz_t P;
-  double s = seconds ();
+  unsigned long p;
 
   ASSERT_ALWAYS (L > B);
 
-  printf ("# creating batch file %s", f);
-  fflush (stdout);
-
   prime_info_init (pi);
-  fp = fopen (f, "w");
-  ASSERT_ALWAYS(fp != NULL);
-  mpz_init (P);
-
-  h = (L - B + split - 1) / split;
 
   for (p = 2; p < B; p = getprime_mt (pi));
 
-  while (B < L)
+  prime_product_poly (P, pi, L, p, pol);
+
+  prime_info_clear (pi);
+}
+
+/* We have 3 cases:
+   1) if f == NULL: P is computed but not stored
+   2) if f != NULL but file is non-existing: P is computed and saved in f
+   3) if f != NULL and file is existing: P is read from file
+*/
+void
+create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
+                   mpz_poly_t pol)
+{
+  FILE *fp;
+  double s = seconds ();
+
+  if (f == NULL) /* case 1 */
     {
-      p = prime_product_poly (P, pi, (B + h < L) ? B + h : L, p, pol);
-      gmp_fprintf (fp, "%lu %Zx\n", B + h, P);
-      B += h;
+      create_batch_product (P, B, L, pol);
+      return;
     }
 
+  fp = fopen (f, "r");
+  if (fp != NULL) /* case 3 */
+    {
+      int ret = gmp_fscanf (fp, "%Zx\n", P);
+      ASSERT_ALWAYS(ret == 1);
+      return;
+    }
+
+  /* case 2 */
+  printf ("# creating batch file %s", f);
+  fflush (stdout);
+
+  create_batch_product (P, B, L, pol);
+
+  fp = fopen (f, "w");
+  ASSERT_ALWAYS(fp != NULL);
+
+  gmp_fprintf (fp, "%Zx\n", P);
+
   fclose (fp);
-  prime_info_clear (pi);
-  mpz_clear (P);
   printf (" took %.0fs\n", seconds () - s);
   fflush (stdout);
 }

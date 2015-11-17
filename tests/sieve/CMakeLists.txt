@@ -43,6 +43,8 @@ cado_define_test(F9_sievetest
 # again.
 cado_divert_test(F9_sievetest unsieve1 APPEND_ARGUMENTS -unsievethresh 1)
 
+# cado_divert_test(F9_sievetest batch APPEND_ARGUMENTS -batch)
+
 cado_define_test(F9_cofactest
     SCRIPT
         ${CMAKE_CURRENT_SOURCE_DIR}/F9.cofactest.sh
