@@ -37,7 +37,11 @@
 #define DEFAULT_MERGE_MAXLEVEL 10
 #define DEFAULT_MERGE_FORBW 0
 #define DEFAULT_MERGE_RATIO 1.1
+#ifndef FOR_DL
 #define DEFAULT_MERGE_COVERNMAX 150.0
+#else /* for discrete log, a smaller density is better */
+#define DEFAULT_MERGE_COVERNMAX 100.0
+#endif
 #define DEFAULT_MERGE_MKZTYPE 1 /* pure Markowitz */
 #define DEFAULT_MERGE_WMSTMAX 7 /* relevant only if mkztype == 2 */
 
