@@ -1781,7 +1781,12 @@ apply_one_bucket (unsigned char *S,
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
       uint16_t x;
 #ifdef HAVE_SSE2
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+      /* https://gcc.gnu.org/bugzilla/show_bug.cgi?id=45414 */
+      _mm_prefetch(((const char *) it)+256, _MM_HINT_NTA);
+#else
       _mm_prefetch(((unsigned char *) it)+256, _MM_HINT_NTA);
+#endif
 #endif
       x0 = ((uint64_t *) it)[0];
       x1 = ((uint64_t *) it)[1];
@@ -2975,11 +2980,7 @@ int main (int argc0, char *argv0[])/*{{{*/
        threads, so that threads have some freedom in avoiding the fullest
        bucket array. With only one thread, no balancing needs to be done,
        so we use only one bucket array. */
-    // FIXME: We can't do this. Some parts of the code rely on the fact
-    // that nr_workspaces == las->nb_threads. For instance,
-    // process_bucket_region uses las->nb_threads while it should
-    // sometimes use nr_workspaces.
-    const size_t nr_workspaces = las->nb_threads;
+    const size_t nr_workspaces = las->nb_threads + ((las->nb_threads > 1)?1:0);
     thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
 
     las_report report;
@@ -3161,7 +3162,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * this hack).
          */
 
-        report->ttbuckets_fill -= seconds();
+        workspaces->thrs[0].rep->ttbuckets_fill -= seconds();
 
         /* Allocate buckets */
         workspaces->pickup_si(si);
@@ -3194,7 +3195,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         ASSERT_ALWAYS(max_full <= 1.0 ||
                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
         
-        report->ttbuckets_fill += seconds();
+        workspaces->thrs[0].rep->ttbuckets_fill += seconds();
 
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {

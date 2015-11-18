@@ -346,7 +346,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "purged", "(required) purged file");
   param_list_decl_usage(pl, "index", "(required) index file");
   param_list_decl_usage(pl, "out", "output file (stdout if not given)");
-  param_list_decl_usage(pl, "gorder", "(required) group order");
+  param_list_decl_usage(pl, "ell", "(required) group order");
   param_list_decl_usage(pl, "nsm", "number of SM on side 0,1,... (default is "
                                    "computed by the program)");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
@@ -433,8 +433,8 @@ int main (int argc, char **argv)
 
   /* Read ell from command line (assuming radix 10) */
   mpz_init (ell);
-  if (!param_list_parse_mpz(pl, "gorder", ell)) {
-      fprintf(stderr, "Error: parameter -gorder is mandatory\n");
+  if (!param_list_parse_mpz(pl, "ell", ell)) {
+      fprintf(stderr, "Error: parameter -ell is mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
@@ -488,24 +488,22 @@ int main (int argc, char **argv)
       mpz_poly_fprintf(stdout, F[side]);
       printf("# SM info on side %d:\n", side);
       sm_side_info_print(stdout, sm_info[side]);
+      if (nsm_arg[side] >= 0)
+        sm_info[side]->nsm = nsm_arg[side]; /* command line wins */
+      printf("# Will compute %d SMs on side %d\n", sm_info[side]->nsm, side);
 
       /* do some consistency checks */
-      if (nsm_arg[side] >= 0)
+      if (sm_info[side]->unit_rank != sm_info[side]->nsm)
       {
-        if (nsm_arg[side] != sm_info[side]->nsm)
-        {
-          fprintf(stderr, "On side %d, unit rank is %d, computing %d SMs ; "
-                          "weird.\n", side, sm_info[side]->nsm, nsm_arg[side]);
-          /* for the 0 case, we haven't computed anything: prevent the
-           * user from asking SM data anyway */
-          ASSERT_ALWAYS(sm_info[side]->nsm != 0);
-        }
-        /* command line wins */
-        sm_info[side]->nsm = nsm_arg[side];
+        fprintf(stderr, "# On side %d, unit rank is %d, computing %d SMs ; "
+                        "weird.\n", side, sm_info[side]->unit_rank,
+                        sm_info[side]->nsm);
+        /* for the 0 case, we haven't computed anything: prevent the
+         * user from asking SM data anyway */
+        ASSERT_ALWAYS(sm_info[side]->unit_rank != 0);
       }
-      printf("# Will compute %d SMs on side %d\n", sm_info[side]->nsm, side);
-      fflush(stdout);
   }
+  fflush(stdout);
 
   t0 = seconds();
 

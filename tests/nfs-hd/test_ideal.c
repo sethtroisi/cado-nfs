@@ -64,6 +64,14 @@ int main()
   ASSERT_ALWAYS(ideal_pr->ideal->h->deg == 1);
   ideal_pr_clear(ideal_pr, t);
 
+  ideal_spq_t ideal_spq;
+  ideal_spq_init(ideal_spq);
+  h->deg = 1;
+  ideal_spq_set_part(ideal_spq, r, h, t, 0);
+  ASSERT_ALWAYS(ideal_spq_get_q(ideal_spq) == r);
+  ASSERT_ALWAYS(ideal_spq_get_deg_g(ideal_spq) == 1);
+  ideal_spq_clear(ideal_spq, t);
+
   mpz_poly_clear(h);
   return 0;
 }

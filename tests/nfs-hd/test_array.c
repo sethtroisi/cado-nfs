@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <limits.h>
 #include "sieving_bound.h"
 #include "array.h"
 #include "cado.h"
@@ -20,6 +21,18 @@ int main()
 
   uint64_t nb = sieving_bound_number_element(H);
 
+  array_t array;
+  array_init(array, nb);
+  array_set_all_elements_min(array);
+  for (uint64_t i = 0; i < nb; i++) {
+    ASSERT_ALWAYS(array_get(array, i) == 0);
+  }
+
+  array_set_all_elements_max(array);
+  for (uint64_t i = 0; i < nb; i++) {
+    ASSERT_ALWAYS(array_get(array, i) == UCHAR_MAX);
+  }
+
   int64_vector_t vector;
   int64_vector_init(vector, t);
 
@@ -29,6 +42,19 @@ int main()
   for (unsigned int i = 0; i < t - 1; i++) {
     int64_vector_setcoordinate(vector, i, -(int64_t)H->h[i]);
   }
+  int64_vector_setcoordinate(vector, t - 1, 0);
+
+  array_set(array, 0, 42);
+  ASSERT_ALWAYS(array_get(array, 0) == 42);
+
+  int * vec = (int *)malloc(sizeof(int) * t);
+  for (unsigned int i = 0; i < t - 1; i++) {
+    vec[i] = -(int)H->h[i];
+  }
+  vec[t - 1] = 0;
+
+  array_set_at(array, vec, 17, H);
+  ASSERT_ALWAYS(array_get_at(array, vec, H) == 17);
 
   uint64_t index;
   uint64_t index1;
@@ -47,9 +73,12 @@ int main()
     ASSERT_ALWAYS(index == index1);
   }
 
+
+
   mpz_vector_clear(v);
   int64_vector_clear(vector);
   sieving_bound_clear(H);
+  array_clear(array);
 
   return 0;
 }

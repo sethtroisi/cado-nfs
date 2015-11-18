@@ -768,6 +768,9 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     /* These ASM & switch are really ugly. But it's the ONLY way to
        be sure all the line of S is set only with registers. */
     switch (d) {
+#if !defined(__ICC) || (__ICC >= 1600)
+      /* the Intel compiler icpc fails with "internal error" with the code
+	 below (version 14.0.3 20140422), version 16.0.0 works */
     case 2:
       __asm__ __volatile__ ( BEGIN
       FU(2) U1 U0 LG2ABS FU(2) U1 U0 LG2ABS
@@ -853,6 +856,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
         [u5]"x"(u[5]), [u6]"x"(u[6]), [u7]"x"(u[7]), [u8]"x"(u[8]), [u9]"x"(u[9]));
       break;
+#endif
     default:
       do {
 	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
@@ -1549,9 +1553,9 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
 
     /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
        thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2.
-       We require that scale is of the form (int) * 0.05, so that only a small
+       We require that scale is of the form (int) * 0.025, so that only a small
        number of different factor base slicings can occur. */
-    sideptr->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 20.)*0.05;
+    sideptr->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 40.)*0.025;
     verbose_output_print (0, 1,
         "# Side %d: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
         side, maxlog2, sideptr->scale, exp2 (1. / sideptr->scale));

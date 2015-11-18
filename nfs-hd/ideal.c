@@ -47,6 +47,7 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   ASSERT(mpz_cmp_ui(mpz_poly_lc_const(h), 1) == 0);
 
   mpz_poly_set(ideal->ideal->h, h);
+
   //if r == 0, Tr is not created.
   if (ideal->ideal->r == 0) {
     ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
@@ -360,7 +361,7 @@ void ideal_pr_fprintf(FILE * file, ideal_pr_srcptr ideal, unsigned int t)
 
 void ideal_spq_init(ideal_spq_ptr ideal)
 {
-  ideal->type = -1; 
+  ideal->type = -1;
 }
 
 void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t q, mpz_poly_srcptr g,

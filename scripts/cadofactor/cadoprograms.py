@@ -402,8 +402,10 @@ class Program(object, metaclass=InspectType):
         binary = str(execbin or self.binary) + execsuffix
         execfile = os.path.normpath(os.sep.join([path, binary]))
         execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
+        self.suggest_subdir=dict()
         if execsubfile != execfile and os.path.isfile(execsubfile):
             self.execfile = execsubfile
+            self.suggest_subdir[self.execfile]=subdir
         elif os.path.isfile(execfile):
             self.execfile = execfile
         else:
@@ -616,6 +618,8 @@ class Program(object, metaclass=InspectType):
             wu.append('%s %s' % (key, os.path.basename(filename)))
             if with_checksum:
                 wu.append('CHECKSUM %s' % sha1cache.get_sha1(filename))
+            if self.suggest_subdir.get(filename, None):
+                wu.append('SUGGEST_%s %s' % (key, self.suggest_subdir[filename]))
         
         workunit = ['WORKUNIT %s' % wuname]
         for filename in self.get_input_files():
@@ -953,7 +957,7 @@ class MagmaNmbrthry(Program):
                  N: Parameter("p"),
                  badidealinfo: Parameter("badinfofile"),
                  badideals: Parameter("badfile"),
-                 gorder: Parameter("ell")=None,
+                 ell: Parameter(),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -1021,22 +1025,16 @@ class BWC(Program):
         super().__init__(locals(), **kwargs)
 
 class SM(Program):
-    binary = "magma-sm-wrapper.sh"
+    binary = "sm"
     name = binary
-    subdir = "scripts"
+    subdir = "filter"
     def __init__(self, *,
                  poly: Parameter(),
-		 renumber: Parameter(),
-		 badidealinfo: Parameter(),
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),
-                 ell: Parameter("gorder"),
-                 explicit_units0: Toggle()=None,
-                 explicit_units1: Toggle()=None,
-		 abunits: Parameter(),
-                 nmaps0: Parameter("nsm0")=None,
-                 nmaps1: Parameter("nsm1")=None,
+                 ell: Parameter(),
+                 nsm: Parameter()=None,
                  threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
@@ -1046,9 +1044,9 @@ class ReconstructLog(Program):
     name = binary
     subdir = "filter"
     def __init__(self, *,
-                 ell: Parameter("gorder"),
+                 ell: Parameter(),
                  threads: Parameter("mt")=None,
-                 ker: Parameter("log"),
+                 ker: Parameter("log", is_input_file=True),
                  dlog: Parameter("out"),
                  renumber: Parameter(),
                  poly: Parameter(),
@@ -1058,10 +1056,6 @@ class ReconstructLog(Program):
                  nrels: Parameter(),
                  partial: Toggle()=None,
                  nsm: Parameter(),
-                 explicit_units0: Toggle()=None,
-                 explicit_units1: Toggle()=None,
-    		 abunits0: Parameter(is_input_file=True),
-    		 abunits1: Parameter(is_input_file=True),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -1088,6 +1082,7 @@ class Descent(Program):
                  mfb1: Parameter(prefix="--"),
                  lim0: Parameter(prefix="--"),
                  lim1: Parameter(prefix="--"),
+                 ell: Parameter(prefix="--"),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -1130,10 +1125,10 @@ class Sqrt(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
-class WuClient(Program):
-    binary = "wuclient2.py"
-    name = "wuclient"
-    subdir = "scripts/cadofactor"
+class CadoNFSClient(Program):
+    binary = "cado-nfs-client.py"
+    name = "cado_nfs_client"
+    subdir = ""
     def __init__(self,
                  server: Parameter(prefix='--'),
                  daemon: Toggle(prefix='--')=None,

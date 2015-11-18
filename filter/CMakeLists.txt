@@ -38,9 +38,9 @@ target_link_libraries(reconstructlog-dl utils_with_io)
 add_executable(sm sm.c)
 target_link_libraries(sm utils_with_io)
 
-add_executable(sm_simple EXCLUDE_FROM_ALL sm_simple.cpp)
+add_executable(sm_simple sm_simple.cpp)
 target_link_libraries(sm_simple utils)
 
-install(TARGETS ${bin_list} RUNTIME DESTINATION ${BINSUFFIX}/filter)
+install(TARGETS ${bin_list} RUNTIME DESTINATION ${LIBSUFFIX}/filter)
 
 include(CMakeLists-nodist.txt OPTIONAL)

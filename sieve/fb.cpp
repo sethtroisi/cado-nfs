@@ -316,6 +316,33 @@ fb_entry_x_roots<Nr_roots>::transform_roots(fb_entry_x_roots<Nr_roots>::transfor
   }
 }
 
+// FIXME: why do I have to make those instances explicit???
+// If someone knows how to avoid that...
+
+template void
+fb_entry_x_roots<0>::transform_roots(fb_transformed_entry_x_roots<0> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<1>::transform_roots(fb_transformed_entry_x_roots<1> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<2>::transform_roots(fb_transformed_entry_x_roots<2> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<3>::transform_roots(fb_transformed_entry_x_roots<3> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<4>::transform_roots(fb_transformed_entry_x_roots<4> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<5>::transform_roots(fb_transformed_entry_x_roots<5> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<6>::transform_roots(fb_transformed_entry_x_roots<6> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<7>::transform_roots(fb_transformed_entry_x_roots<7> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<8>::transform_roots(fb_transformed_entry_x_roots<8> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<9>::transform_roots(fb_transformed_entry_x_roots<9> &, qlattice_basis const&) const; 
+template void 
+fb_entry_x_roots<10>::transform_roots(fb_transformed_entry_x_roots<10> &, qlattice_basis const&) const; 
+
+
 
 template <int Nr_roots>
 void
@@ -628,7 +655,7 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
     /* Maybe the slice's weight is greater than max_weight and we have to make
        the slice smaller */
     double weight;
-    while ((weight = est_weight_sum(cur_slice_start, next_slice_start)) > max_weight) {
+    while ((weight = est_weight(cur_slice_start, next_slice_start)) > max_weight) {
       const size_t old = next_slice_start;
       next_slice_start = cur_slice_start + (next_slice_start - cur_slice_start) / 2;
       verbose_output_print (0, 3, "# Slice %u starting at offset %zu has too "

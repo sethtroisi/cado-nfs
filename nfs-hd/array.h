@@ -28,6 +28,17 @@ typedef const s_array_t * array_srcptr;
  */
 void array_init(array_ptr array, uint64_t number_element);
 
+static inline void array_set_all_elements_min(array_ptr array)
+{
+  memset(array->array, 0, sizeof(unsigned char) * array->number_element);
+}
+
+static inline void array_set_all_elements_max(array_ptr array)
+{
+  memset(array->array, UCHAR_MAX,
+      sizeof(unsigned char) * array->number_element);
+}
+
 /*
  * Delete an array.
  *
