@@ -356,28 +356,18 @@ clear_product_tree (mpz_t **T, unsigned long n, unsigned long *w)
    Each R[j] has been divided by its P-smooth part.
 */
 static void
-smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P,
-                 int verbose)
+smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P)
 {
-  unsigned long h = tree_height (n), j, w[MAX_DEPTH];
+  unsigned long j, w[MAX_DEPTH];
   mpz_t **T;
-  static double t_rem = 0;
 
   if (n == 0)
     return;
 
   T = product_tree (R, perm, n, w);
 
-  if (verbose > 1)
-    printf ("# cofactor product has %zu bits\n",
-            mpz_sizeinbase (T[h][0], 2));
-
   /* compute remainder tree */
-  t_rem -= seconds ();
   remainder_tree (T, n, w, P, R, perm);
-  t_rem += seconds ();
-  if (verbose > 1)
-    printf ("# remainder_tree: %.1fs\n", t_rem);
 
   /* now T[0][j] = P mod R[j] for 0 <= j < n */
   for (j = 0; j < n; j++)
@@ -433,21 +423,15 @@ update_status (mpz_t *R, uint32_t *perm,
 /* return the number n of smooth relations in l,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
-find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
-             mpz_t batchP[2], int verbose)
+find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
+             FILE *out, int verbose)
 {
   unsigned long nb_rel_read = l->size;
   unsigned long nb_smooth;
   unsigned long nb_unknown;
-  double s;
-  double t_smooth = 0;
-  double t_update = 0;
-  double t_prime = 0;
-  double start;
   unsigned char *b_status_r;
   unsigned char *b_status_a;
-
-  start = seconds ();
+  double start = seconds ();
 
   b_status_r = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
   b_status_a = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
@@ -468,20 +452,13 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
   /* it seems faster to start from the algebraic side */
   for (int z = 1; z >= 0; z--)
     {
-      s = seconds ();
-      t_smooth -= seconds();
       if (z == 0)
         smoothness_test (l->R, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[0], verbose);
+                         batchP[0]);
       else
         smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[1], verbose);
-      t_smooth += seconds();
-      if (verbose > 1)
-        printf ("# smoothness_test (%lu cofactors) took %.0f seconds"
-                " (total %.0f so far)\n", nb_unknown - nb_smooth, seconds () - s, t_smooth);
+                         batchP[1]);
 
-      t_update -= seconds();
       /* we only need to update relations in [nb_smooth, nb_unknown-1] */
       if (z == 0)
         update_status (l->R, l->perm, b_status_r, b_status_a,
@@ -489,22 +466,13 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
       else
         update_status (l->A, l->perm, b_status_a, b_status_r,
                        &nb_smooth, &nb_unknown);
-      t_update += seconds();
-      if (verbose)
-        printf ("# rel_smooth: %lu t_update: %.1f seconds\n",
-                nb_smooth, t_update);
     }
 
   free (b_status_r);
   free (b_status_a);
 
   if (verbose)
-    {
-      printf ("# find_smooth %.1fs (t_prime %.1fs, t_smooth %.1fs, t_update %.1fs)\n",
-              seconds () - start, t_prime, t_smooth, t_update);
-      printf ("# out of %lu rels, found %lu smooth\n",
-              nb_rel_read, nb_smooth);
-    }
+    fprintf (out, "# batch: took %.1fs to detect %lu smooth relations out of %lu\n", seconds () - start, nb_smooth, nb_rel_read);
 
   return nb_smooth;
 }
@@ -513,7 +481,7 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2],
 static int
 print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
                   struct modset_t *fm, struct modset_t *cfm,
-                  int lpb, double BB, double BBB, int m)
+                  int lpb, double BB, double BBB, int m, FILE *out)
 {
   unsigned long i;
   int j, res_fac;
@@ -531,8 +499,8 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
       for (j = 0; j < res_fac; j++)
         {
           if (m++ > 0)
-            printf (",");
-          gmp_printf ("%Zx", factors[j]);
+            fprintf (out, ",");
+          gmp_fprintf (out, "%Zx", factors[j]);
           mpz_divexact (n, n, factors[j]);
         }
 
@@ -546,7 +514,7 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
           ASSERT(mpz_cmp_d (t, BB) >= 0);
           mpz_divexact (n, n, t);
           m = print_smooth_aux (factors, t, methods + i + 1, fm, &cfm2,
-                                lpb, BB, BBB, m);
+                                lpb, BB, BBB, m, out);
           modset_clear (fm);
           fm->arith = CHOOSE_NONE;
           mpz_clear (t);
@@ -562,7 +530,7 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
           ASSERT(mpz_cmp_d (t, BB) >= 0);
           mpz_divexact (n, n, t);
           m = print_smooth_aux (factors, t, methods + i + 1, &fm2, cfm,
-                                lpb, BB, BBB, m);
+                                lpb, BB, BBB, m, out);
           modset_clear (cfm);
           cfm->arith = CHOOSE_NONE;
           mpz_clear (t);
@@ -573,15 +541,15 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
     {
       ASSERT_ALWAYS (mpz_cmp_d (n, BB) < 0);
       if (m++ > 0)
-        printf (",");
-      gmp_printf ("%Zx", n);
+        fprintf (out, ",");
+      gmp_fprintf (out, "%Zx", n);
     }
 
   return m;
 }
 
 static int
-trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize)
+trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, FILE *out)
 {
   int m = 0; /* number of already printed factors */
   unsigned long i;
@@ -591,8 +559,8 @@ trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize)
       while (mpz_divisible_ui_p (n, sp[i]))
         {
           if (m++ > 0)
-            printf (",");
-          printf ("%lx", sp[i]);
+            fprintf (out, ",");
+          fprintf (out, "%lx", sp[i]);
           mpz_divexact_ui (n, n, sp[i]);
         }
     }
@@ -610,7 +578,8 @@ static void
 print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
               struct modset_t *fm, struct modset_t *cfm,
               unsigned int lpb, double BB, double BBB, unsigned long *sp,
-              unsigned long spsize, mpz_t hint, mpz_t cofac, mpz_ptr sq)
+              unsigned long spsize, mpz_t hint, mpz_t cofac, mpz_ptr sq,
+              FILE *out)
 {
   int m; /* number of already printed factors */
 
@@ -627,22 +596,22 @@ print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
     }
 
   /* remove small primes */
-  m = trial_divide (n, sp, spsize);
+  m = trial_divide (n, sp, spsize, out);
 
   /* factor hint */
-  m = print_smooth_aux (factors, hint, methods, fm, cfm, lpb, BB, BBB, m);
+  m = print_smooth_aux (factors, hint, methods, fm, cfm, lpb, BB, BBB, m, out);
 
   /* factor rest of cofactor */
-  m = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, BB, BBB, m);
+  m = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, BB, BBB, m, out);
 
   /* factor rest of factor base primes */
-  print_smooth_aux (factors, n, methods, fm, cfm, lpb, BB, BBB, m);
+  print_smooth_aux (factors, n, methods, fm, cfm, lpb, BB, BBB, m, out);
 
   if (sq != NULL)
     {
       if (m)
-        printf (",");
-      gmp_printf ("%lx", sq);
+        fprintf (out, ",");
+      gmp_fprintf (out, "%Zx", sq);
     }
 }
 
@@ -659,12 +628,12 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 }
 
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
-   on stdout.
+   on "out".
    n is the number of bi-smooth cofactors in L.
 */
 void
 factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
-        int lpb1, int verbose)
+        int lpb1, FILE *out, int verbose)
 {
   unsigned long i, pmax, *sp0, *sp1, spsize[2];
   int nb_methods;
@@ -730,16 +699,17 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
 
   for (i = 0; i < n; i++)
     {
-      printf ("%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
+      fprintf (out, "%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
 
       print_smooth (Q, norm0[i], methods, &fm, &cfm, lpb0, BB, BBB, sp0,
-                    spsize[0], L->R[perm[i]], L->R0[perm[i]], NULL);
-      printf (":");
+                    spsize[0], L->R[perm[i]], L->R0[perm[i]], NULL, out);
+      fprintf (out, ":");
 
       print_smooth (Q, norm1[i], methods, &fm, &cfm, lpb1, BB, BBB, sp1,
-                    spsize[1], L->A[perm[i]], L->A0[perm[i]], L->sq[perm[i]]);
-      printf ("\n");
-      fflush (stdout);
+                    spsize[1], L->A[perm[i]], L->A0[perm[i]], L->sq[perm[i]],
+                    out);
+      fprintf (out, "\n");
+      fflush (out);
       mpz_clear (norm0[i]);
       mpz_clear (norm1[i]);
     }
@@ -754,8 +724,8 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
   facul_clear_aux_methods (methods);
 
   if (verbose)
-    printf ("# factor: %.1fs to print %lu rels\n",
-            seconds () - start, n);
+    fprintf (out, "# batch: took %.1fs to factor %lu smooth relations\n",
+             seconds () - start, n);
 }
 
 static void
@@ -783,15 +753,21 @@ mpz_poly_t pol)
 */
 void
 create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly_t pol)
+                   mpz_poly_t pol, int verbose, FILE *out)
 {
   FILE *fp;
   double s = seconds ();
 
+  if (verbose)
+    {
+      fprintf (out, "# batch: creating or reading large prime product");
+      fflush (out);
+    }
+
   if (f == NULL) /* case 1 */
     {
       create_batch_product (P, B, L, pol);
-      return;
+      goto end;
     }
 
   fp = fopen (f, "r");
@@ -799,13 +775,10 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
     {
       int ret = gmp_fscanf (fp, "%Zx\n", P);
       ASSERT_ALWAYS(ret == 1);
-      return;
+      goto end;
     }
 
   /* case 2 */
-  printf ("# creating batch file %s", f);
-  fflush (stdout);
-
   create_batch_product (P, B, L, pol);
 
   fp = fopen (f, "w");
@@ -814,7 +787,12 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   gmp_fprintf (fp, "%Zx\n", P);
 
   fclose (fp);
-  printf (" took %.0fs\n", seconds () - s);
-  fflush (stdout);
+
+ end:
+  if (verbose)
+    {
+      fprintf (out, " took %.0fs\n", seconds () - s);
+      fflush (out);
+    }
 }
 

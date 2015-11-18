@@ -29,9 +29,17 @@ cado_define_test(F9_makefbtest
 cado_define_test(F9_sievetest_cleanup 
         PROGRAM ${CMAKE_COMMAND} -E remove -f ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums)
 
-cado_define_test(F9_sievetest 
+cado_define_test(F9_sievetest
         SCRIPT
         ${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh
+        ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums
+        TARGET_DEPENDENCIES las
+        TEST_DEPENDENCIES F9_sievetest_cleanup F9_makefbtest
+        )
+
+cado_define_test(F9_batchtest
+        SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/F9.batchtest.sh
         ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums
         TARGET_DEPENDENCIES las
         TEST_DEPENDENCIES F9_sievetest_cleanup F9_makefbtest
@@ -42,8 +50,6 @@ cado_define_test(F9_sievetest
 # Since sievetest depends on makefbtest, we don't have to specify it
 # again.
 cado_divert_test(F9_sievetest unsieve1 APPEND_ARGUMENTS -unsievethresh 1)
-
-# cado_divert_test(F9_sievetest batch APPEND_ARGUMENTS -batch)
 
 cado_define_test(F9_cofactest
     SCRIPT
