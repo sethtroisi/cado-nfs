@@ -18,16 +18,28 @@ Supported platforms:
 ====================
 
  - The primary development platform is x86_64 linux with gcc 4.4 or
-   later, the most common processor being Intel core2-like. Other 64-bit
-   microarchitectures and processors are checked regularly.
+   later, the most common processor being Intel core2-like or more recent.
+   
+Other architectures are checked regularly, and should work. Please refer to
+http://ci.inria.fr/cado for the status of the currently tested platform
+for the development branch.
 
-Anything else than the primary platform perhaps works, perhaps does not work.
+Release 2.2 has undergone regular testing for the following
+hardware/software configurations.
 
- - arm64-linux is checked regularly, thus should work.
+    - i386, CentOS 6.3
+    - x86_64, Fedora 17, Ubuntu 12.04, Debian 8, OpenBSD 5.3
+    - x86_64, MacOS X 10.8
+    - arm32, Raspbian 7
+    - arm64, Ubuntu 14.04
 
- - x86_64 with icc 14 and 16 did work once, but is not checked regularly.
+All checks above are done with gcc-4.4 or later.
 
- - Mac OS X Mavericks and Mountain Lion have been successfully tested with both
+Anything else perhaps works, perhaps does not work.
+
+ - x86_64 with icc 14 and 16 did work once, but are not checked regularly.
+
+ - Mac OS X Mavericks have been successfully tested with both
    Apple's gcc and clang. (see local.sh.macosx.x86_64) 
 
  - Max OS X Leopard and Snow Leopard have been tested to work at
@@ -35,9 +47,8 @@ Anything else than the primary platform perhaps works, perhaps does not work.
    been installed, notably for Leopard. ABI selection is sometimes tricky (see
    local.sh.macosx.x86_32)
 
- - 32-bit linux with gcc-4.4 or later is supposed to work.
-
- - Windows is only partly supported (see a longer note at the end of this file).
+ - Windows is only partly supported (see a longer note at the end of this
+   file).
 
 Required software tools:
 ========================
@@ -60,9 +71,10 @@ Required software tools:
    README.Python.
 
 Optionally:
-*) Support for curl library.
 *) Support for MPI (see local.sh.example and linalg/bwc/README)
-*) Support for hwloc (see linalg/bwc/cpubinding.conf)
+*) Support for hwloc (see parameters/misc/cpubinding.conf)
+*) Support for curl library, for a very specific use within an I/O bound
+subprogram in linear algebra.
 
 
 Configure
