@@ -783,6 +783,7 @@ class Las(Program):
                  out: Parameter(is_output_file=True)=None,
                  threads: Parameter("t", checktype=int)=None,
                  ratq: Toggle()=None,
+                 batch: Toggle()=None,
                  sqside: Parameter(checktype=int)=None,
                  dup: Toggle()=None,
                  galois: Parameter() = None,
