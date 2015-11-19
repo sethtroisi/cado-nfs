@@ -23,6 +23,10 @@ Supported platforms:
 
 Anything else than the primary platform perhaps works, perhaps does not work.
 
+ - arm64-linux is checked regularly, thus should work.
+
+ - x86_64 with icc 14 and 16 did work once, but is not checked regularly.
+
  - Mac OS X Mavericks and Mountain Lion have been successfully tested with both
    Apple's gcc and clang. (see local.sh.macosx.x86_64) 
 
