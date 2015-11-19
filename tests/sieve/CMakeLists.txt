@@ -29,9 +29,17 @@ cado_define_test(F9_makefbtest
 cado_define_test(F9_sievetest_cleanup 
         PROGRAM ${CMAKE_COMMAND} -E remove -f ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums)
 
-cado_define_test(F9_sievetest 
+cado_define_test(F9_sievetest
         SCRIPT
         ${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh
+        ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums
+        TARGET_DEPENDENCIES las
+        TEST_DEPENDENCIES F9_sievetest_cleanup F9_makefbtest
+        )
+
+cado_define_test(F9_batchtest
+        SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/F9.batchtest.sh
         ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums
         TARGET_DEPENDENCIES las
         TEST_DEPENDENCIES F9_sievetest_cleanup F9_makefbtest
