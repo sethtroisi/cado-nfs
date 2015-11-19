@@ -714,8 +714,8 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         siever_config_ptr sc = h->conf;
         int d = las->hint_lookups[sc->side][sc->bitsize];
         if (d >= 0) {
-            fprintf(stderr, "Error: two hints found for %d%c\n",
-                    sc->bitsize, sidenames[sc->side][0]);
+            fprintf(stderr, "Error: two hints found for %d@%d\n",
+                    sc->bitsize, sc->side);
             exit(1);
         }
         las->hint_lookups[sc->side][sc->bitsize] = h - las->hint_table[0];
@@ -2102,7 +2102,7 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
                  * not have the info in the descent hint table,
                  * period.
                  */
-                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c (%Zd,%Zd)\n", n, sidenames[side][0], v.p, v.r);
+                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d@%d (%Zd,%Zd)\n", n, side, v.p, v.r);
                 time_left = INFINITY;
             } else {
                 if (std::isfinite(time_left))
@@ -3013,7 +3013,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             for(descent_hint_ptr h = las->hint_table[0] ; h->conf->bitsize ; h++) {
                 siever_config_ptr sc = h->conf;
                 if (!siever_config_match(sc, current_config)) continue;
-                verbose_output_print(0, 1, "# Using existing sieving parameters from hint list for q~2^%d on the %s side [%d%c]\n", sc->bitsize, sidenames[sc->side], sc->bitsize, sidenames[sc->side][0]);
+                verbose_output_print(0, 1, "# Using existing sieving parameters from hint list for q~2^%d on the %s side [%d@%d]\n", sc->bitsize, sidenames[sc->side], sc->bitsize, sc->side);
                 memcpy(current_config, sc, sizeof(siever_config));
             }
         }
@@ -3291,12 +3291,12 @@ int main (int argc0, char *argv0[])/*{{{*/
                 for(int i = 0 ; i < me.depth ; i++) {
                     verbose_output_print (0, 1, " ");
                 }
-                verbose_output_print (0, 1, "%d%c ->", n, sidenames[me.side][0]);
+                verbose_output_print (0, 1, "%d@%d ->", n, me.side);
                 for(unsigned int i = 0 ; i < winner.outstanding.size() ; i++) {
                     int side = winner.outstanding[i].first;
                     relation::pr const& v(winner.outstanding[i].second);
                     unsigned int n = mpz_sizeinbase(v.p, 2);
-                    verbose_output_print (0, 1, " %d%c", n, sidenames[side][0]);
+                    verbose_output_print (0, 1, " %d@%d", n, side);
                 }
                 if (winner.outstanding.empty()) {
                     verbose_output_print (0, 1, " done");
@@ -3311,7 +3311,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                     int side = winner.outstanding[i].first;
                     relation::pr const& v(winner.outstanding[i].second);
                     unsigned int n = mpz_sizeinbase(v.p, 2);
-                    verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d%c]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, sidenames[side][0]);
+                    verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing %s (%Zd,%Zd) [%d@%d]" HILIGHT_END " to todo list\n", sidenames[side], v.p, v.r, n, side);
                     las_todo_push_withdepth(las->todo, v.p, v.r, side, si->doing->depth + 1);
                 }
             }
@@ -3319,9 +3319,9 @@ int main (int argc0, char *argv0[])/*{{{*/
             las_todo_entry const& me(*si->doing);
             las->tree->mark_try_again(me.iteration + 1);
             unsigned int n = mpz_sizeinbase(me.p, 2);
-            verbose_output_print (0, 1, "# taking path: %d%c -> loop (#%d)", n, sidenames[me.side][0], me.iteration + 1);
+            verbose_output_print (0, 1, "# taking path: %d@%d -> loop (#%d)", n, me.side, me.iteration + 1);
             verbose_output_vfprint (0, 1, gmp_vfprintf, " \t%d %Zd %Zd\n", me.side,me.p,me.r);
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "%s (%Zd,%Zd) [%d%c]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", sidenames[me.side], me.p, me.r, n, sidenames[me.side][0], me.iteration);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "%s (%Zd,%Zd) [%d@%d]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", sidenames[me.side], me.p, me.r, n, me.side, me.iteration);
             las_todo_push_withdepth(las->todo, me.p, me.r, me.side, me.depth + 1, me.iteration + 1);
         }
 #endif  /* DLP_DESCENT */
