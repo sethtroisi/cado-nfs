@@ -424,7 +424,7 @@ update_status (mpz_t *R, uint32_t *perm,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
 find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
-             FILE *out, int verbose)
+             FILE *out)
 {
   unsigned long nb_rel_read = l->size;
   unsigned long nb_smooth;
@@ -471,8 +471,7 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
   free (b_status_r);
   free (b_status_a);
 
-  if (verbose)
-    fprintf (out, "# batch: took %.1fs to detect %lu smooth relations out of %lu\n", seconds () - start, nb_smooth, nb_rel_read);
+  fprintf (out, "# batch: took %.1fs to detect %lu smooth relations out of %lu\n", seconds () - start, nb_smooth, nb_rel_read);
 
   return nb_smooth;
 }
@@ -633,7 +632,7 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 */
 void
 factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
-        int lpb1, FILE *out, int verbose)
+        int lpb1, FILE *out)
 {
   unsigned long i, pmax, *sp0, *sp1, spsize[2];
   int nb_methods;
@@ -723,9 +722,8 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
   free (sp1);
   facul_clear_aux_methods (methods);
 
-  if (verbose)
-    fprintf (out, "# batch: took %.1fs to factor %lu smooth relations\n",
-             seconds () - start, n);
+  fprintf (out, "# batch: took %.1fs to factor %lu smooth relations\n",
+           seconds () - start, n);
 }
 
 static void
@@ -753,16 +751,13 @@ mpz_poly_t pol)
 */
 void
 create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly_t pol, int verbose, FILE *out)
+                   mpz_poly_t pol, FILE *out)
 {
   FILE *fp;
   double s = seconds ();
 
-  if (verbose)
-    {
-      fprintf (out, "# batch: creating or reading large prime product");
-      fflush (out);
-    }
+  fprintf (out, "# batch: creating or reading large prime product");
+  fflush (out);
 
   if (f == NULL) /* case 1 */
     {
@@ -789,10 +784,7 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   fclose (fp);
 
  end:
-  if (verbose)
-    {
-      fprintf (out, " took %.0fs\n", seconds () - s);
-      fflush (out);
-    }
+  fprintf (out, " took %.0fs\n", seconds () - s);
+  fflush (out);
 }
 
