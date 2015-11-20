@@ -304,7 +304,7 @@ macro(cado_divert_test TEST_BASE DIVERSION)
     # This macro is appropriate when a test defined by
     # cado_define_test (possibly with NO_DEFAULT_RUN) needs to be
     # called several times with various parameter sets.
-    # binary. The different ways to call this macro are:
+    # The different ways to call this macro are:
     # 
     # optional arguments:
     #           TEST_DEPENDENCIES

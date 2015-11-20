@@ -127,6 +127,8 @@
 ############################################################
 # GMP: prefix to installed GMP, or path to built GMP source tree.
 #
+# (GMP is a requirement)
+#
 # Example values:
 # GMP=
 # GMP=/usr/local/gmp-5.1.0
@@ -143,7 +145,35 @@
 # GMP_INCDIR=/some/directory
 
 ############################################################
+# HWLOC: prefix to installed hwloc
+#
+# (HWLOC is optional)
+#
+# Example values:
+# HWLOC=$HOME/Packages/hwloc-1.11.1
+#
+# To accomodate special configurations, one may also use the two extra
+# variables:
+# HWLOC_LIBDIR=/some/directory
+# HWLOC_INCDIR=/some/directory
+
+############################################################
+# CURL: prefix to installed Curl
+#
+# (Curl is optional)
+#
+# Example values:
+# curl=/usr/local
+#
+# To accomodate special configurations, one may also use the two extra
+# variables:
+# CURL_LIBDIR=/some/directory
+# CURL_INCDIR=/some/directory
+
+############################################################
 # MPI: Whether to use MPI (Message Passing Interface) or not
+#
+# (MPI is optional)
 #
 # Example values:
 # MPI=0
