@@ -3349,6 +3349,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (las->batch)
       {
+	double tcof_batch = seconds ();
 	const char *batch0_file, *batch1_file;
 	batch0_file = param_list_lookup_string (pl, "batch0");
 	batch1_file = param_list_lookup_string (pl, "batch1");
@@ -3363,7 +3364,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 			   las->cpoly->pols[0], las->output);
 	create_batch_file (batch1_file, batchP[1], lim[1], 1UL << lpb[1],
 			   las->cpoly->pols[1], las->output);
-	double tcof_batch = seconds ();
 	cofac_list_realloc (las->L, las->L->size);
 	report->reports = find_smooth (las->L, lpb, lim, batchP, las->output);
 	mpz_clear (batchP[0]);

@@ -432,8 +432,8 @@ int main(int argc, char **argv)
     }
     if (col_max_index_arg == 0)
     {
-      fprintf(stderr, "Error, missing -col-max-index command line argument "
-                      "(or col-max-index = 0)\n");
+      fprintf(stderr, "Error, missing or wrong -col-max-index command line argument "
+                      "(should be > 0)\n");
       usage(pl, argv0);
     }
     if (col_min_index_arg == UMAX(uint64_t))

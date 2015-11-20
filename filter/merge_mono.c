@@ -638,7 +638,7 @@ print_report (filter_matrix_t *mat)
 
 void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
-               double target_density, int64_t nbmergemax)
+               double target_density)
 {
   double totopt = 0.0, totfill = 0.0, totMST = 0.0;
   int njrem = 0;
@@ -670,11 +670,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   while(1)
   {
     /* Do we need to stop */
-    if(nbmergemax >= 0 && nbmerge >= nbmergemax)
-    {
-      printf ("nbmergemax=%" PRId64 " reached, stopping.\n", nbmergemax);
-      break;
-    }
     if (WoverN >= target_density)
     {
       printf ("W/N=%.2f too high, stopping.\n", WoverN);
@@ -727,22 +722,19 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
     if (WoverN >= REPORT)
     {
+      print_report (mat);
       REPORT += FREQ_REPORT;
       njrem = removeSingletons (rep, mat);
       ni2rem = number_of_superfluous_rows (mat);
       deleteSuperfluousRows (rep, mat, ni2rem, m);
-      print_report (mat);
     }
   }
 
-  if (nbmergemax < 0)
-  {
-    uint64_t excess = mat->rem_nrows - mat->rem_ncols;
-    printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
-    deleteSuperfluousRows(rep, mat, excess - mat->keep, INT_MAX);
-    printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
-    removeSingletons (rep, mat);
-  }
+  uint64_t excess = mat->rem_nrows - mat->rem_ncols;
+  printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
+  deleteSuperfluousRows(rep, mat, excess - mat->keep, INT_MAX);
+  printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
+  removeSingletons (rep, mat);
 
 #if DEBUG >= 1
   checkWeights (mat);

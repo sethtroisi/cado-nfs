@@ -54,8 +54,6 @@ static void declare_usage(param_list pl)
                             "(default " STR(DEFAULT_MERGE_MAXLEVEL) ")");
   param_list_decl_usage(pl, "target_density", "stop when the average row density exceeds this value"
                             " (default " STR(DEFAULT_MERGE_TARGET_DENSITY) ")");
-  param_list_decl_usage(pl, "nbmergemax", "Maximum number of merges that can "
-                                          "be done (default is no maximum)");
   param_list_decl_usage(pl, "resume", "resume from history file");
   param_list_decl_usage(pl, "mkztype", "controls how the weight of a merge is "
                             "approximated (default " STR(DEFAULT_MERGE_MKZTYPE) ")");
@@ -91,7 +89,6 @@ main (int argc, char *argv[])
     uint32_t mkztype = DEFAULT_MERGE_MKZTYPE;
     uint32_t wmstmax = DEFAULT_MERGE_WMSTMAX;
                                /* use real MST minimum for wt[j] <= wmstmax*/
-    int64_t nbmergemax = -1; /* Negative value means no maximum */
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -139,8 +136,6 @@ main (int argc, char *argv[])
 
     param_list_parse_uint (pl, "mkztype", &mkztype);
     param_list_parse_uint (pl, "wmstmax", &wmstmax);
-
-    param_list_parse_int64 (pl, "nbmergemax", &nbmergemax);
 
     /* Some checks on command line arguments */
     if (param_list_warn_unused(pl))
@@ -206,7 +201,7 @@ main (int argc, char *argv[])
     MkzInit (mat);
     printf ("Time for MkzInit: %2.2lfs\n", seconds()-tt);
 
-    mergeOneByOne (rep, mat, maxlevel, target_density, nbmergemax);
+    mergeOneByOne (rep, mat, maxlevel, target_density);
 
     fclose_maybe_compressed (rep->outfile, outname);
     printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRId64 ") "
