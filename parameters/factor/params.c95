@@ -47,8 +47,7 @@ tasks.sieve.qrange = 2000
 
 tasks.filter.purge.keep = 160
 tasks.filter.maxlevel = 20
-tasks.filter.coverNmax = 150.0
-tasks.filter.merge.forbw = 3
+tasks.filter.target_density = 170.0
 
 ###########################################################################
 # Linear algebra

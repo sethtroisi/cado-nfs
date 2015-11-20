@@ -68,8 +68,7 @@ tasks.sieve.rels_wanted = 800000
 ###########################################################################
 
 tasks.filter.maxlevel = 15
-tasks.filter.merge.forbw = 3
-tasks.filter.coverNmax = 100
+tasks.filter.target_density = 100
 
 tasks.reconstructlog.partial=false
 

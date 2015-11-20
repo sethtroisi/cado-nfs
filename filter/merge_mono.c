@@ -638,7 +638,7 @@ print_report (filter_matrix_t *mat)
 
 void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
-               int forbw, double ratio, double coverNmax, int64_t nbmergemax)
+               double target_density, int64_t nbmergemax)
 {
   double totopt = 0.0, totfill = 0.0, totMST = 0.0;
   int njrem = 0;
@@ -650,7 +650,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   int64_t nbmerge = 0;
   uint64_t WN_prev, WN_cur, WN_min;
   double WoverN;
-  unsigned int ncost = 0, ncostmax = 20; //TODO ncostmax should be a parameter
+  unsigned int ncost = 0;
   int m;
   uint64_t *nb_merges;
 
@@ -675,19 +675,9 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
       printf ("nbmergemax=%" PRId64 " reached, stopping.\n", nbmergemax);
       break;
     }
-    if (forbw == 0 && ((double) WN_cur > ratio * (double) WN_min))
-    {
-      printf ("WN=%.2f*WN_min, stopping.\n", (double) WN_cur / (double) WN_min);
-      break;
-    }
-    else if (forbw == 3 && WoverN >= coverNmax)
+    if (WoverN >= target_density)
     {
       printf ("W/N=%.2f too high, stopping.\n", WoverN);
-      break;
-    }
-    else if(forbw == 1 && ncost >= ncostmax)
-    {
-      printf ("WN value increased %u times in a row, stopping.\n", ncost);
       break;
     }
 
@@ -753,9 +743,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
     removeSingletons (rep, mat);
   }
-
-  if(forbw == 1)
-    printf ("Minimal WN value: %" PRIu64 "\n", WN_min);
 
 #if DEBUG >= 1
   checkWeights (mat);

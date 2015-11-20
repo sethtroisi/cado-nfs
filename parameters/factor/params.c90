@@ -283,17 +283,8 @@ tasks.filter.purge.add_ratio = 0.1
     # expressed as a ratio of the number of unique relations already collected
     # Default value is 0.1 (i.e. number of additional relation is equal to 10% of number of unique relations)
 tasks.filter.maxlevel = 20		# perform up to <maxlevel>-way merges
-#tasks.filter.ratio = 1.1		# used only when forbw=0 (see below)
-tasks.filter.merge.forbw = 3 # forbw=0: stops the merge when the weight of the
-			     #    matrix multiplied by the number of rows c*N
-			     #    exceeds ratio*min(c*N)
-			     # forbw=1: stops when the product c*N is minimal
-			     #    (more exactly when it increases 20 times in
-                             #     a row)
-			     # forbw=3: stops when the average number of
-                             #    non-zero coefficients c/N exceeds coverNmax
-                             #    (default 150)
-tasks.filter.merge.coverNmax = 150
+tasks.filter.merge.target_density = 170 # stop merging when the average density
+				        # per row attains target_density
 tasks.filter.purge.required_excess=0.1 # Controls extra sieving:
                                        # completes the filtering only when
                                        # the relative excess (excess divided

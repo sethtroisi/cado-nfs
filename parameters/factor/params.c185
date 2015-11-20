@@ -67,8 +67,7 @@ tasks.sieve.qrange = 10000
 
 tasks.filter.purge.keep = 160
 tasks.filter.maxlevel = 25
-tasks.filter.coverNmax = 150.0
-tasks.filter.merge.forbw = 3
+tasks.filter.target_density = 170.0
 
 ###########################################################################
 ###########################################################################
