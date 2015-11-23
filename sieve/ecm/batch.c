@@ -781,7 +781,7 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
 
   /* gmp_fprintf is buggy in GMP <= 6.1.0 for numbers of more than 2^33-8 bits:
      https://gmplib.org/list-archives/gmp-bugs/2015-November/003794.html */
-  ASSERT_ALWAYS(mpz_sizeinbase (P, 2) <= 8589934584UL);
+  ASSERT_ALWAYS((mpz_sizeinbase (P, 2) + 1) / 2 <= 4294967292UL);
   gmp_fprintf (fp, "%Zx\n", P);
 
   fclose (fp);
