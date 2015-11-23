@@ -114,7 +114,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
 
   if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
-    fprintf (stdout, "number of rows <= number of columns\n");
+    fprintf (stdout, "number of rows < number of columns + keep\n");
     print_final_values (mat, 0);
     exit(2);
   }
@@ -471,6 +471,7 @@ int main(int argc, char **argv)
       fprintf(stdout, "will be chosen by the program\n");
     else
       fprintf(stdout, "%d\n", nsteps);
+    ASSERT_ALWAYS(keep >= 0);
     fprintf(stdout, "# INFO: target excess: %" PRId64 "\n", keep);
     fflush (stdout);
     /*}}}*/
