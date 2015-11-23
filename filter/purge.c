@@ -180,10 +180,13 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
     cliques_removal (mat, target_excess, nthreads, verbose);
     excess = singleton_removal (mat, nthreads, verbose);
 
-    fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
-                    "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
-                    (int64_t) (oldnrows-mat->nrows), (oldexcess-excess),
-                    (double) (oldnrows-mat->nrows) / (double) (oldexcess-excess));
+    fprintf (stdout, "This step removed %" PRId64 " rows and decreased excess "
+             "by %" PRId64 "\n", (int64_t) (oldnrows - mat->nrows),
+             oldexcess - excess);
+    if (oldexcess > excess)
+      fprintf (stdout, "Each excess row deleted %2.2lf rows\n",
+               (double) (oldnrows - mat->nrows) /
+               (double) (oldexcess - excess));
   }
 
 
