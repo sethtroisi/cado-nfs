@@ -335,7 +335,7 @@ int main(int argc, char **argv)
     uint64_t col_max_index_arg = 0;
     uint64_t nrows_init_arg = 0;
     purge_matrix_t mat; /* All info regarding the matrix is in this struct */
-    int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
+    int64_t keep = DEFAULT_FILTER_EXCESS; /* minimum final excess */
     int nsteps = -1; /* negative value means chosen by purge */
     double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
     unsigned int nthreads = DEFAULT_PURGE_NTHREADS;
@@ -540,11 +540,9 @@ int main(int argc, char **argv)
       purge_matrix_print_stats_rows_weight (stdout, mat, verbose);
     }
 
-    /* XXX: Are these tests useful ? Already checked after first call to
-     * removal_all_singletons in singletons_and_cliques_removal. */
-    if (mat->nrows < mat->ncols)
+    if (mat->nrows < mat->ncols + keep)
     {
-      fprintf (stdout, "number of rows <= number of columns\n");
+      fprintf (stdout, "number of rows < number of columns + keep\n");
       print_final_values (mat, 0);
       exit(2);
     }
