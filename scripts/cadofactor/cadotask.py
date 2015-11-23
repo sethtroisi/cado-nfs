@@ -3436,7 +3436,7 @@ class PurgeTask(Task):
         # not_enough1 = re.compile(r"excess < (\d+.\d+) \* #primes")
         not_enough1 = re.compile(r"\(excess / ncols\) = \d+.?\d* < \d+.?\d*. "
                                  r"See -required_excess argument.")
-        not_enough2 = re.compile(r"number of rows < number of columns + keep")
+        not_enough2 = re.compile(r"number of rows < number of columns \+ keep")
         nrels_nprimes = re.compile(r"\s*nrows=(\d+), ncols=(\d+); "
                                    r"excess=(-?\d+)")
         for line in stderr.splitlines():
