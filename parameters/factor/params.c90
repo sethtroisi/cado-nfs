@@ -276,8 +276,7 @@ tasks.sieve.qrange = 10000		# The size of an elementary sieving task
 # Filtering task
 ###########################################################################
 
-tasks.filter.purge.keep = 160		# maximal excess wanted after purge
-					# (purge shrinks if needed)
+tasks.filter.purge.keep = 160		# minimal excess wanted after purge
 tasks.filter.purge.add_ratio = 0.1
     # Number of additional required relations before next filtering step
     # expressed as a ratio of the number of unique relations already collected
@@ -289,11 +288,12 @@ tasks.filter.purge.required_excess=0.1 # Controls extra sieving:
                                        # completes the filtering only when
                                        # the relative excess (excess divided
                                        # by number of ideals) is larger than
-                                       # the given value (default 0.1) after
-                                       # all singletons have been removed.
-                                       # Setting required_excess=0.0 will
-                                       # complete the factorization as soon
-                                       # as a positive excess is obtained.
+                                       # the given value after all singletons
+                                       # have been removed.
+                                       # Default is required_excess=0.0 and
+                                       # completes the factorization as soon
+                                       # as a positive excess is obtained
+                                       # (>= tasks.filter.purge.keep).
 
 ###########################################################################
 # Linear algebra and characters tasks

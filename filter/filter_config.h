@@ -22,6 +22,7 @@
 
 // How many more relations than prime ideals do we want?
 // A value of 0.1 means 10% more relations than ideals after singleton removal.
+// (Please update params.c90 if you change this value.)
 #define DEFAULT_PURGE_REQUIRED_EXCESS 0.0
 
 // Keep that many more relations (used by purge and merge).
