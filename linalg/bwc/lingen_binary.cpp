@@ -204,7 +204,7 @@ namespace globals {
     std::vector<unsigned int> delta;
     std::vector<unsigned int> chance_list;
 
-#ifndef NDEBUG
+#ifdef DO_EXPENSIVE_CHECKS
     polmat E_saved;
 #endif
 
@@ -1666,7 +1666,7 @@ int main(int argc, char *argv[])
         E.deg(i) = E.ncoef - 1;
     }
 
-#ifndef NDEBUG
+#ifdef DO_EXPENSIVE_CHECKS
     E_saved.copy(E);
 #endif
 
