@@ -11,7 +11,7 @@
          {2340, 256}, {2341, 256}, {2342, 256}, {2343, 256},    \
         }
 #else   /*  STRASSEN_THRESHOLDS_AS_CPP_CONSTANTS */
-template<> unsigned int foo<c128_fft>::default_selector_data[] = {
+template<> unsigned int foo<gf2x_cantor_fft>::default_selector_data[] = {
         /* D = 3 */
         /* I = 4 */
          [1312] = -1, [1313] = 768, [1314] = 256, [1315] = 256, \
@@ -30,7 +30,7 @@ template<> unsigned int foo<c128_fft>::default_selector_data[] = {
          {2340, 128}, {2341, 128}, {2342, 128}, {2343, 128},    \
         }
 #else   /*  STRASSEN_THRESHOLDS_AS_CPP_CONSTANTS */
-template<> unsigned int foo<fake_fft>::default_selector_data[] = {
+template<> unsigned int foo<gf2x_fake_fft>::default_selector_data[] = {
         /* D = 3 */
         /* I = 4 */
          [1312] = -1, [1313] = 1152, [1314] = 384, [1315] = 128,        \
@@ -49,7 +49,7 @@ template<> unsigned int foo<fake_fft>::default_selector_data[] = {
          {2340, 128}, {2341, 128}, {2342, 128}, {2343, 128},    \
         }
 #else   /*  STRASSEN_THRESHOLDS_AS_CPP_CONSTANTS */
-template<> unsigned int foo<gf2x_tfft>::default_selector_data[] = {
+template<> unsigned int foo<gf2x_ternary_fft>::default_selector_data[] = {
         /* D = 3 */
         /* I = 4 */
          [1312] = -1, [1313] = 20736, [1314] = 10368, [1315] = 128,     \
