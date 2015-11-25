@@ -347,6 +347,9 @@ add_executable(lingen lingen_binary.cpp tree_stats.c logline.c
 # This **MUST** match the #define in gf2x/Makefile.am
 set_source_files_properties(lingen_binary.cpp COMPILE_FLAGS
     "-DCANTOR_BASE_FIELD_SIZE=128")
+# for debug only
+# set_source_files_properties(lingen_binary.cpp COMPILE_FLAGS
+# "-DCANTOR_BASE_FIELD_SIZE=128 -DLINGEN_BINARY_TRACE_MALLOCS=20")
 install(TARGETS lingen RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
 target_link_libraries(lingen bwc_base utils gf2x)
 add_dependencies(lingen gf2x-build)

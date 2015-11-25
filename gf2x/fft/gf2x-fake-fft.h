@@ -73,12 +73,24 @@ typedef const gf2x_fake_fft_t * gf2x_fake_fft_srcptr;
 extern void gf2x_fake_fft_init(gf2x_fake_fft_info_ptr p, size_t nF, size_t nG, ...); 
 static inline void gf2x_fake_fft_clear(gf2x_fake_fft_info_ptr p GF2X_MAYBE_UNUSED) {}
 static inline gf2x_fake_fft_ptr gf2x_fake_fft_alloc(gf2x_fake_fft_info_srcptr p, size_t n) {
+#ifdef  LINGEN_BINARY_TRACE_MALLOCS
+    size_t zz = n*p->size*sizeof(unsigned long);
+    if (zz >> LINGEN_BINARY_TRACE_MALLOCS) {
+        fprintf(stderr, "gf2x_fake_fft_alloc(%zu M)\n", zz >> 20);
+    }
+#endif
     return (gf2x_fake_fft_ptr) malloc(n * p->size * sizeof(unsigned long));
 }
 static inline void gf2x_fake_fft_free(gf2x_fake_fft_info_srcptr p GF2X_MAYBE_UNUSED,
         gf2x_fake_fft_ptr x,
         size_t n GF2X_MAYBE_UNUSED)
 {
+#ifdef  LINGEN_BINARY_TRACE_MALLOCS
+    size_t zz = n*p->size*sizeof(unsigned long);
+    if (zz >> LINGEN_BINARY_TRACE_MALLOCS) {
+        fprintf(stderr, "gf2x_fake_fft_free(%zu M)\n", zz >> 20);
+    }
+#endif
     free(x);
 }
 static inline gf2x_fake_fft_ptr gf2x_fake_fft_get(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr x, size_t k) {
