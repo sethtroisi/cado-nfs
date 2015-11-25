@@ -1540,6 +1540,8 @@ int main(int argc, char *argv[])
 
     param_list pl;
 
+    double wct0 = wct_seconds();
+
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
 
@@ -1760,6 +1762,7 @@ int main(int argc, char *argv[])
     }
     if (nresults == 0) {
         fprintf(stderr, "No solution found\n");
+	print_timing_and_memory (wct0);
         exit(1);
     }
 
@@ -1823,6 +1826,9 @@ int main(int argc, char *argv[])
     }
 #endif/*}}}*/
     // print_chance_list(sequence_length, chance_list);
+
+    /* print usage of time and memory */
+    print_timing_and_memory (wct0);
 
     return 0;
 }
