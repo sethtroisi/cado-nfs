@@ -94,6 +94,15 @@ parameters/polynomials/c95.poly
 parameters/polynomials/c100.poly
 parameters/polynomials/c105.poly
 parameters/polynomials/c110.poly
+parameters/polynomials/c115.poly
+parameters/polynomials/c120.poly
+parameters/polynomials/c125.poly
+parameters/polynomials/c130.poly
+parameters/polynomials/c135.poly
+parameters/polynomials/c140.poly
+parameters/polynomials/c145.poly
+parameters/polynomials/c150.poly
+parameters/polynomials/c155.poly
 scripts/polsel_params.sage
 linalg/bwc/bcast-file.c
 misc/README
