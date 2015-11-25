@@ -269,6 +269,8 @@ parameters/polynomials/c125.poly
 parameters/polynomials/c130.poly
 parameters/polynomials/c135.poly
 parameters/polynomials/c140.poly
+parameters/polynomials/c145.poly
+parameters/polynomials/c155.poly
 tests/sieve/F9.st
 polyselect/CMakeLists.txt
 polyselect/Makefile
