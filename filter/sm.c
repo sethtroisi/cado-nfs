@@ -79,6 +79,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
      (indexname) file  */
   sm_relset_ptr rels;
   FILE * ix = fopen_maybe_compressed(indexname, "r");
+  ASSERT_ALWAYS (ix != NULL);
 
   /* small_ncols isn't used here: we don't care */
   ret = fscanf(ix, "%" SCNu64 " %" SCNu64 "", small_nrows, &small_ncols);
