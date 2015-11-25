@@ -204,10 +204,6 @@ namespace globals {
     std::vector<unsigned int> delta;
     std::vector<unsigned int> chance_list;
 
-    polmat E;
-#ifndef NDEBUG
-    polmat E_saved;
-#endif
     // F0 is exactly the n x n identity matrix, plus the X^(s-exponent)e_{cnum}
     // vectors. Here we store the cnum,exponent pairs.
     std::vector<std::pair<unsigned int, unsigned int> > f0_data;
@@ -233,7 +229,7 @@ namespace globals {
 // result has to be shifted t0 positions to the right.
 // Afterwards, column n+j of the result is column cnum[j] of A, shifted
 // exponent[j] positions to the right.
-void compute_E_from_A(polmat const &a)/*{{{*/
+void compute_E_from_A(polmat& E, polmat const &a)/*{{{*/
 {
     using namespace globals;
     polmat tmp_E(m, m + n, a.ncoef - t0);
@@ -992,7 +988,7 @@ static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
  *
  */
 
-static bool go_quadratic(polmat& pi)/*{{{*/
+static bool go_quadratic(polmat& E, polmat& pi)/*{{{*/
 {
     using namespace globals;
     using namespace std;
@@ -1067,10 +1063,10 @@ template<> struct what_to_print<gf2x_fake_fft> {
 };
 
 
-static bool compute_lingen(polmat& pi);
+static bool compute_lingen(polmat& E, polmat& pi);
 
 template<typename fft_type>/*{{{*/
-static bool go_recursive(polmat& pi)
+static bool go_recursive(polmat& E, polmat& pi)
 {
     using namespace globals;
 #ifdef  __GNUC__
@@ -1133,7 +1129,7 @@ static bool go_recursive(polmat& pi)
     E.resize(llen);
 
     polmat pi_left;
-    finished_early = compute_lingen(pi_left);
+    finished_early = compute_lingen(E, pi_left);
     E.clear();
     long pi_l_deg = pi_left.maxdeg();
     unsigned long pi_left_length = pi_left.maxlength();
@@ -1252,7 +1248,7 @@ static bool go_recursive(polmat& pi)
     E.xdiv_resize(llen - kill, rlen);
 
     polmat pi_right;
-    finished_early = compute_lingen(pi_right);
+    finished_early = compute_lingen(E, pi_right);
     int pi_r_deg = pi_right.maxdeg();
     unsigned long pi_right_length = pi_right.maxlength();
     E.clear();
@@ -1308,7 +1304,7 @@ static bool go_recursive(polmat& pi)
     return finished_early;
 }/*}}}*/
 
-static bool compute_lingen(polmat& pi)
+static bool compute_lingen(polmat& E, polmat& pi)
 {
     /* reads the data in the global thing, E and delta. ;
      * compute the linear generator from this.
@@ -1327,15 +1323,15 @@ static bool compute_lingen(polmat& pi)
     */
 
     if (deg_E <= lingen_threshold) {
-        b = go_quadratic(pi);
+        b = go_quadratic(E, pi);
     } else if (deg_E < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<gf2x_fake_fft>(pi);
+        b = go_recursive<gf2x_fake_fft>(E, pi);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<gf2x_cantor_fft>(pi);
+        b = go_recursive<gf2x_cantor_fft>(E, pi);
     }
 
     /*
@@ -1638,7 +1634,10 @@ int main(int argc, char *argv[])
             sequence_length-1, sequence_length);
     
     // multiply_slow(E, A, F0, t0, sequence_length-1);
-    compute_E_from_A(A);
+    //
+    polmat E;
+
+    compute_E_from_A(E, A);
 
     printf("Throwing out a(X)\n");
     A.clear();
@@ -1671,7 +1670,7 @@ int main(int argc, char *argv[])
 
     // E.resize(deg + 1);
     polmat pi_left;
-    compute_lingen(pi_left);
+    compute_lingen(E, pi_left);
 
     int nresults = 0;
     for (unsigned int j = 0; j < m + n; j++) {
