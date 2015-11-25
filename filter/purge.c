@@ -307,7 +307,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "nsteps", "maximal number of steps of clique "
                                       "removal (default: chosen in [1.."
                                              STR(DEFAULT_PURGE_NSTEPS) "])");
-  param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
+  param_list_decl_usage(pl, "required_excess", "%% of excess required at the "
                             "end of the 1st singleton removal step (default "
                             STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
   param_list_decl_usage(pl, "outdel", "outfile for deleted relations (for DL)");
