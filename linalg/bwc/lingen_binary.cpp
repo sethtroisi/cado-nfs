@@ -1142,6 +1142,22 @@ struct recursive_tree_timer_t {
     }
 };      /* }}} */
 
+template<typename T> struct what_to_print {
+    const char * operator()(const char * f) { return f; }
+};
+
+template<> struct what_to_print<gf2x_cantor_fft> {
+    const char * operator()(const char *) { return "gf2x_cantor_fft"; }
+};
+
+template<> struct what_to_print<gf2x_ternary_fft> {
+    const char * operator()(const char *) { return "gf2x_ternary_fft"; }
+};
+
+template<> struct what_to_print<gf2x_fake_fft> {
+    const char * operator()(const char *) { return "gf2x_fake_fft"; }
+};
+
 
 static bool compute_lingen(polmat& pi, recursive_tree_timer_t&);
 
@@ -1150,9 +1166,9 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 {
     using namespace globals;
 #ifdef  __GNUC__
-    tree_stats_enter(stats, __PRETTY_FUNCTION__, E.ncoef);
+    tree_stats_enter(stats, what_to_print<fft_type>()(__PRETTY_FUNCTION__), E.ncoef);
 #else
-    tree_stats_enter(stats, __func__, E.ncoef);
+    tree_stats_enter(stats, what_to_print<fft_type>()(__func__), E.ncoef);
 #endif
 
     /* E is known up to O(X^E.ncoef), so we'll consider this is a problem
