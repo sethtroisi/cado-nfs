@@ -985,7 +985,14 @@ int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly
   int k, j, df = f->deg, dg = g->deg, dq = df - dg;
   mpz_t tmp, lg, invlg;
 
-  ASSERT_ALWAYS(df >= dg);
+  if (df < dg) /* f is already reduced mod g */
+    {
+      mpz_poly_set_zero (q);
+      mpz_poly_set (r, f);
+      return 1;
+    }
+
+  /* now df >= dg */
   mpz_poly_realloc(q, dq + 1);
 
   mpz_init(lg);
