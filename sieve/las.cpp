@@ -2776,7 +2776,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "fb0",   "factor base file on the rational side");
   param_list_decl_usage(pl, "fb1",   "(alias fb) factor base file on the algebraic side");
-  param_list_decl_usage(pl, "fbc",  "factor base cache file");
+  param_list_decl_usage(pl, "fbc",  "factor base cache file (not yet functional)");
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
