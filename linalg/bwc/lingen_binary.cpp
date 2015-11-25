@@ -25,12 +25,6 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
-#ifdef  HAVE_OPENMP
-#include <omp.h>
-#define OMP_ROUND(k) ((k) % omp_get_num_threads() == omp_get_thread_num())
-#else
-#define OMP_ROUND(k) (1)
-#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
