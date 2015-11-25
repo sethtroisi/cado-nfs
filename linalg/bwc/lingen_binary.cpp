@@ -205,7 +205,7 @@ namespace globals {
     std::vector<unsigned int> chance_list;
 
     polmat E;
-#ifndef NDEBUG
+#ifdef DO_EXPENSIVE_CHECKS
     polmat E_saved;
 #endif
     // F0 is exactly the n x n identity matrix, plus the X^(s-exponent)e_{cnum}
@@ -1744,7 +1744,7 @@ int main(int argc, char *argv[])
         E.deg(i) = E.ncoef - 1;
     }
 
-#ifndef NDEBUG
+#ifdef DO_EXPENSIVE_CHECKS
     E_saved.copy(E);
 #endif
 
