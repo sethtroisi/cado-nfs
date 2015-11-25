@@ -261,10 +261,18 @@ struct polmat { /* {{{ */
     inline unsigned long maxlength() const { return 1 + maxdeg(); }
     void alloc() {
         /* we don't care about exceptions */
+        size_t zz = ncols*colstride() * sizeof(unsigned long);
+        if (zz >> 20) {
+            fprintf(stderr, "polmat-alloc(%zu M)\n", zz >> 20);
+        }
         x = mynew<unsigned long>(ncols*colstride());
         _deg = mynew<long>(ncols);
     }
     void clear() {
+        size_t zz = ncols*colstride() * sizeof(unsigned long);
+        if (zz >> 20) {
+            fprintf(stderr, "polmat-free(%zu M)\n", zz >> 20);
+        }
         mydelete(x, ncols*colstride());
         mydelete(_deg, ncols);
     }
