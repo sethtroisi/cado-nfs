@@ -204,6 +204,10 @@ namespace globals {
     std::vector<unsigned int> delta;
     std::vector<unsigned int> chance_list;
 
+#ifndef NDEBUG
+    polmat E_saved;
+#endif
+
     // F0 is exactly the n x n identity matrix, plus the X^(s-exponent)e_{cnum}
     // vectors. Here we store the cnum,exponent pairs.
     std::vector<std::pair<unsigned int, unsigned int> > f0_data;
