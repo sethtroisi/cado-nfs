@@ -259,23 +259,29 @@ struct polmat { /* {{{ */
         return m;
     }/*}}}*/
     inline unsigned long maxlength() const { return 1 + maxdeg(); }
+    private:
     void alloc() {
         /* we don't care about exceptions */
+#ifdef  LINGEN_BINARY_TRACE_MALLOCS
         size_t zz = ncols*colstride() * sizeof(unsigned long);
-        if (zz >> 20) {
+        if (zz >> LINGEN_BINARY_TRACE_MALLOCS) {
             fprintf(stderr, "polmat-alloc(%zu M)\n", zz >> 20);
         }
+#endif
         x = mynew<unsigned long>(ncols*colstride());
         _deg = mynew<long>(ncols);
     }
     void clear() {
+#ifdef  LINGEN_BINARY_TRACE_MALLOCS
         size_t zz = ncols*colstride() * sizeof(unsigned long);
-        if (zz >> 20) {
+        if (zz >> LINGEN_BINARY_TRACE_MALLOCS) {
             fprintf(stderr, "polmat-free(%zu M)\n", zz >> 20);
         }
+#endif
         mydelete(x, ncols*colstride());
         mydelete(_deg, ncols);
     }
+    public:
     /* ctors dtors etc {{{ */
     polmat(unsigned int nrows, unsigned int ncols, unsigned long ncoef)
         : nrows(nrows), ncols(ncols), ncoef(ncoef)
@@ -343,6 +349,24 @@ struct polmat { /* {{{ */
         }
         swap(n);
     }/*}}}*/
+
+    void set_mod_xi(polmat const& E, unsigned long ncoef2) {/*{{{*/
+        nrows = E.nrows;
+        ncols = E.ncols;
+        polmat n(nrows,ncols,ncoef2);
+        swap(n);
+        const unsigned long * src = E.x;
+        unsigned long * dst = x;
+        size_t minstride = std::min(stride(),E.stride());
+        for(unsigned int j = 0 ; j < ncols ; j++) {
+            for(unsigned int i = 0 ; i < nrows ; i++) {
+                memcpy(dst, src, minstride * sizeof(unsigned long));
+                dst += stride();
+                src += E.stride();
+            }
+        }
+    }/*}}}*/
+
     /* Divide by X^k, keep ncoef2 coefficients *//*{{{*/
     void xdiv_resize(unsigned long k, unsigned long ncoef2) {
         ASSERT(k + ncoef2 <= ncoef);
