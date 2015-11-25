@@ -63,7 +63,6 @@ filter/filter_badideals.h
 filter/filter_config.h
 filter/dup1.c
 filter/dup2.c
-filter/explain.c
 filter/merge_replay_matrix.c
 filter/merge_replay_matrix.h
 filter/purge_matrix.c
