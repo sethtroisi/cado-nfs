@@ -7,6 +7,8 @@ include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
 
 
 add_executable(bench_polmatmul EXCLUDE_FROM_ALL bench_polmatmul.cpp)
+set_source_files_properties(bench_polmatmul.cpp COMPILE_FLAGS
+    "-DCANTOR_BASE_FIELD_SIZE=128")
 set_target_properties(bench_polmatmul PROPERTIES
     COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}")
