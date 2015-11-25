@@ -1050,98 +1050,6 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     return finished;
 }/*}}}*/
 
-/* {{{ a tool for measuring timings and displaying progress of a
- * recursive algorithm
- */
-struct recursive_tree_timer_t {
-    struct spent_time {
-        unsigned int step;
-        double total;
-        double proper;
-        spent_time() : step(0), total(0), proper(0) {}
-    };
-
-    std::vector<spent_time> spent;
-
-    std::vector<std::pair<double, double> > stack;
-
-    void push() {
-        unsigned int level = stack.size();
-
-        if (spent.size() <= level) {
-            assert(spent.size() == level);
-            spent.push_back(spent_time());
-        }
-
-        ASSERT(spent.size() > level);
-
-        double st = seconds();
-        double children = 0;
-        if (spent.size() > level + 1) {
-            children = -spent[level+1].total;
-        }
-
-        stack.push_back(std::make_pair(st, children));
-    }
-
-    void pop(unsigned int t MAYBE_UNUSED) {
-        unsigned int level = stack.size() - 1;
-
-        double st = stack.back().first;
-        double children = stack.back().second;
-        stack.pop_back();
-
-        // unsigned int t1 = t;
-        double dtime = seconds() - st;
-
-        if (spent.size() > level + 1) {
-            children += spent[level+1].total;
-        }
-
-        spent[level].step++;
-        spent[level].total += dtime;
-
-        double ptime = dtime - children;
-
-        spent[level].proper += ptime;
-
-        /* make up some guess about the total time of all levels */
-        unsigned int outermost = level;
-        for(unsigned int back = 0 ; back <= level ; back++) {
-            if (spent[level-back].step == 0)
-                break;
-            outermost = level-back;
-        }
-        unsigned int innermost = spent.size() - 1;
-        double estim_tot = 0;
-        double spent_tot = 0;
-        for(unsigned int i = outermost ; i <= innermost ; i++) {
-            estim_tot += spent[i].proper * (1 << i) / (double) spent[i].step;
-            spent_tot += spent[i].proper;
-        }
-        double estim_above = 0;
-        double spent_above = 0;
-        for(unsigned int i = level ; i <= innermost ; i++) {
-            estim_above += spent[i].proper * (1 << i) / (double) spent[i].step;
-            spent_above += spent[i].proper;
-        }
-
-    }
-    void final_info()
-    {
-        for(unsigned int i = 0 ; i < spent.size() ; i++) {
-            printf("[%d] spent %.2f",
-                    i, spent[i].proper);
-            if (i < spent.size() - 1) {
-                printf(" (%.2f counting children)",
-                        spent[i].total);
-            }
-            printf("\n");
-        }
-        printf("Total computation took %.2f\n", spent[0].total);
-    }
-};      /* }}} */
-
 template<typename T> struct what_to_print {
     const char * operator()(const char * f) { return f; }
 };
@@ -1159,10 +1067,10 @@ template<> struct what_to_print<gf2x_fake_fft> {
 };
 
 
-static bool compute_lingen(polmat& pi, recursive_tree_timer_t&);
+static bool compute_lingen(polmat& pi);
 
 template<typename fft_type>/*{{{*/
-static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
+static bool go_recursive(polmat& pi)
 {
     using namespace globals;
 #ifdef  __GNUC__
@@ -1221,12 +1129,11 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     transform(E_hat, E, o, E_length);
     logline_end(NULL, "");
 
-
     /* ditto for this one */
     E.resize(llen);
 
     polmat pi_left;
-    finished_early = compute_lingen(pi_left, tim);
+    finished_early = compute_lingen(pi_left);
     E.clear();
     long pi_l_deg = pi_left.maxdeg();
     unsigned long pi_left_length = pi_left.maxlength();
@@ -1345,7 +1252,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     E.xdiv_resize(llen - kill, rlen);
 
     polmat pi_right;
-    finished_early = compute_lingen(pi_right, tim);
+    finished_early = compute_lingen(pi_right);
     int pi_r_deg = pi_right.maxdeg();
     unsigned long pi_right_length = pi_right.maxlength();
     E.clear();
@@ -1401,7 +1308,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     return finished_early;
 }/*}}}*/
 
-static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
+static bool compute_lingen(polmat& pi)
 {
     /* reads the data in the global thing, E and delta. ;
      * compute the linear generator from this.
@@ -1413,8 +1320,6 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
 
     // unsigned int t0 = t;
     
-    tim.push();
-
     /*
     logline_begin(stdout, UINT_MAX, "t=%u E_checksum() = (%lu, %" PRIx32 ")",
             t, E.ncoef, E.crc());
@@ -1425,12 +1330,12 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
         b = go_quadratic(pi);
     } else if (deg_E < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<gf2x_fake_fft>(pi, tim);
+        b = go_recursive<gf2x_fake_fft>(pi);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<gf2x_cantor_fft>(pi, tim);
+        b = go_recursive<gf2x_cantor_fft>(pi);
     }
 
     /*
@@ -1438,8 +1343,6 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
             t, t0, t, deg_E+1, pi.maxlength(), pi.crc());
     logline_end(NULL, "");
     */
-
-    tim.pop(t);
 
     return b;
 }
@@ -1768,9 +1671,7 @@ int main(int argc, char *argv[])
 
     // E.resize(deg + 1);
     polmat pi_left;
-    recursive_tree_timer_t tim;
-    compute_lingen(pi_left, tim);
-    tim.final_info();
+    compute_lingen(pi_left);
 
     int nresults = 0;
     for (unsigned int j = 0; j < m + n; j++) {
