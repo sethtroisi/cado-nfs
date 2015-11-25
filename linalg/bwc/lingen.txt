@@ -1,3 +1,5 @@
+[see also Feature request #14992 on the bug tracker]
+
 The current binary lingen program sucks in just about every respect.
 
 Parallelism
@@ -74,6 +76,9 @@ earlier with pclmul, and probably also because at some point I had a bug
 with the c128 interface. Unfortunately I don't recall what it was. But
 despite that, activation of Cantor seems much desirable. The lack of
 activation for the gf2x-tfft layer really looks like a bug also.
+
+Note added 25 Nov 2015: cantor_threshold seems to work, and
+cantor_threshold=1024 be close to optimal.
 
 There is a bench_polmatmul program (here, the arguments needed are:
 bench_polmatmul 132000000 512 256). It examines what it takes to do the
