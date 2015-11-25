@@ -270,6 +270,7 @@ parameters/polynomials/c130.poly
 parameters/polynomials/c135.poly
 parameters/polynomials/c140.poly
 parameters/polynomials/c145.poly
+parameters/polynomials/c150.poly
 parameters/polynomials/c155.poly
 tests/sieve/F9.st
 polyselect/CMakeLists.txt
