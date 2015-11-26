@@ -42,5 +42,3 @@ add_executable(sm_simple sm_simple.cpp)
 target_link_libraries(sm_simple utils)
 
 install(TARGETS ${bin_list} RUNTIME DESTINATION ${LIBSUFFIX}/filter)
-
-include(CMakeLists-nodist.txt OPTIONAL)
