@@ -1199,7 +1199,7 @@ void interpolateK_trunc(Kelt * f, unsigned int k, size_t length)
 
 #if (GF2X_WORDSIZE == 64)
 #if CANTOR_BASE_FIELD_SIZE == 128
-void decomposeK(Kelt * f, unsigned long * F, size_t Fl, int k)
+void decomposeK(Kelt * f, const unsigned long * F, size_t Fl, int k)
 {
     assert(Fl <= (1UL << k));
     for (size_t i = 0; i < Fl; ++i) {
@@ -1218,7 +1218,7 @@ void recomposeK(unsigned long * F, Kelt * f, size_t Fl, int k GF2X_MAYBE_UNUSED)
         F[i] = f[i][0] ^ f[i - 1][1];
 }
 #elif CANTOR_BASE_FIELD_SIZE == 64
-void decomposeK(Kelt * f, unsigned long * F, size_t Fl, int k)
+void decomposeK(Kelt * f, const unsigned long * F, size_t Fl, int k)
 {
     size_t i;
     /* We're computing a DFT of length 2^k, so we can accomodate 2^k*32
@@ -1251,7 +1251,7 @@ void recomposeK(unsigned long * F, Kelt * f, size_t Fl, int k GF2X_MAYBE_UNUSED)
 
 #elif (GF2X_WORDSIZE == 32)
 #if CANTOR_BASE_FIELD_SIZE == 128
-void decomposeK(Kelt * f, unsigned long * F, size_t Fl, int k)
+void decomposeK(Kelt * f, const unsigned long * F, size_t Fl, int k)
 {
     size_t i;
     assert(Fl <= (1UL << (k+1)));
@@ -1289,7 +1289,7 @@ void recomposeK(unsigned long * F, Kelt * f, size_t Fl, unsigned int k GF2X_MAYB
     }
 }
 #elif CANTOR_BASE_FIELD_SIZE == 64
-void decomposeK(Kelt * f, unsigned long * F, size_t Fl, int k)
+void decomposeK(Kelt * f, const unsigned long * F, size_t Fl, int k)
 {
     /* We're computing a DFT of length 2^k, so we can accomodate 2^k*32
      * bits in the coefficients. We need to make Fl*32 bits fit. Hence
@@ -1349,7 +1349,7 @@ void gf2x_cantor_fft_clear(gf2x_cantor_fft_info_t p)
 }
 
 /* nF is a number of coefficients */
-void gf2x_cantor_fft_dft(const gf2x_cantor_fft_info_t p, gf2x_cantor_fft_ptr x, unsigned long * F, size_t nF)
+void gf2x_cantor_fft_dft(const gf2x_cantor_fft_info_t p, gf2x_cantor_fft_ptr x, const unsigned long * F, size_t nF)
 {
     size_t Fl = (nF + GF2X_WORDSIZE - 1) / GF2X_WORDSIZE;
     if (nF % GF2X_WORDSIZE) {
