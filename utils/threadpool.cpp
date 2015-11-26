@@ -47,13 +47,13 @@ class thread_task {
 public:
   const task_function_t func;
   const int id;
-  task_parameters * parameters;
+  const task_parameters * const parameters;
   const bool please_die;
   const size_t queue;
   const double cost; // costly tasks are scheduled first.
   task_result *result;
 
-  thread_task(task_function_t _func, int _id, task_parameters *_parameters, size_t _queue, double _cost) :
+  thread_task(task_function_t _func, int _id, const task_parameters *_parameters, size_t _queue, double _cost) :
     func(_func), id(_id), parameters(_parameters), please_die(false), queue(_queue), cost(_cost), result(NULL) {};
   thread_task(bool _kill)
     : func(NULL), id(0), parameters(NULL), please_die(true), queue(0), cost(0.0), result(NULL) {
@@ -129,7 +129,7 @@ thread_pool::thread_work_on_tasks(void *arg)
       break;
     }
     task_function_t func = task->func;
-    task_parameters *params = task->parameters;
+    const task_parameters *params = task->parameters;
     task_result *result = func(params);
     if (result != NULL)
       I->pool.add_result(task->queue, result);
@@ -149,7 +149,7 @@ thread_pool::all_task_queues_empty() const
 
 
 void
-thread_pool::add_task(task_function_t func, task_parameters * params,
+thread_pool::add_task(task_function_t func, const task_parameters *const params,
                       const int id, const size_t queue, double cost)
 {
     ASSERT_ALWAYS(queue < nr_queues);

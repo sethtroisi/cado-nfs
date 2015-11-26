@@ -29,6 +29,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
 #include "bwc_config.h"
 #include "macros.h"
 #include "utils.h"
@@ -1061,10 +1064,10 @@ template<> struct what_to_print<gf2x_fake_fft> {
 };
 
 
-static bool compute_lingen(thread_pool& pool, polmat& E, polmat& pi);
+static bool compute_lingen(polmat& E, polmat& pi);
 
 template<typename fft_type>/*{{{*/
-static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
+static bool go_recursive(polmat& E, polmat& pi)
 {
     using namespace globals;
 #ifdef  __GNUC__
@@ -1114,7 +1117,7 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
     {
         polmat E_left;
         E_left.set_mod_xi(E, llen);
-        finished_early = compute_lingen(pool, E_left, pi_left);
+        finished_early = compute_lingen(E_left, pi_left);
     }
 
     long pi_l_deg = pi_left.maxdeg();
@@ -1201,14 +1204,14 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
 
         logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
                 t, E_length, fft_type::name());
-        transform(pool, E_hat, E, o, E_length);
+        transform(E_hat, E, o, E_length);
         { polmat X; E.swap(X); }
         logline_end(NULL, "");
 
         logline_begin(stdout, E_length,
                 "t=%u DFT_pi_left(%lu) [%s]",
                 t, pi_left_length, fft_type::name());
-        transform(pool, pi_l_hat, pi_left, o, pi_l_deg + 1);
+        transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
         /* retain pi_left */
         logline_end(&t_dft_pi_left, "");
 
@@ -1219,7 +1222,7 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
                 pi_left_length,
                 E_length - llen,
                 fft_type::name());
-        compose(pool, E_middle_hat, E_hat, pi_l_hat, o);
+        compose(E_middle_hat, E_hat, pi_l_hat, o);
         { tpolmat<fft_type> X; E_hat.swap(X); }
         { tpolmat<fft_type> X; pi_l_hat.swap(X); }
         logline_end(&t_mp, "");
@@ -1229,7 +1232,7 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
                 t, E_length + pi_l_deg - kill + 1, fft_type::name());
         /* The transform() calls expect a number of coefficients, not a
          * degree ! */
-        itransform(pool, E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
+        itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
         { tpolmat<fft_type> X; E_middle_hat.swap(X); }
         logline_end(&t_ift_E_middle, "");
     }
@@ -1245,7 +1248,7 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
     E.xdiv_resize(llen - kill, rlen);
 
     polmat pi_right;
-    finished_early = compute_lingen(pool, E, pi_right);
+    finished_early = compute_lingen(E, pi_right);
     int pi_r_deg = pi_right.maxdeg();
     unsigned long pi_right_length = pi_right.maxlength();
 
@@ -1264,13 +1267,13 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
         logline_begin(stdout, E_length,
                 "t=%u DFT_pi_left(%lu) [%s]",
                 t, pi_left_length, fft_type::name());
-        transform(pool, pi_l_hat, pi_left, o, pi_l_deg + 1);
+        transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
         { polmat X; pi_left.swap(X); }
         logline_end(&t_dft_pi_left, "");
 
         logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
                 t, pi_right_length, fft_type::name());
-        transform(pool, pi_r_hat, pi_right, o, pi_r_deg + 1);
+        transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
         { polmat X; pi_right.swap(X); }
         logline_end(&t_dft_pi_right, "");
 
@@ -1280,14 +1283,14 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
                 pi_right_length,
                 pi_left_length + pi_right_length - 1,
                 fft_type::name());
-        compose(pool, pi_hat, pi_l_hat, pi_r_hat, o);
+        compose(pi_hat, pi_l_hat, pi_r_hat, o);
         { tpolmat<fft_type> X; pi_l_hat.swap(X); }
         { tpolmat<fft_type> X; pi_r_hat.swap(X); }
         logline_end(&t_mul, "");
 
         logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
                 t, pi_left_length + pi_right_length - 1, fft_type::name());
-        itransform(pool, pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
+        itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
         { tpolmat<fft_type> X; pi_hat.swap(X); }
         logline_end(&t_ift_pi, "");
     }
@@ -1315,7 +1318,7 @@ static bool go_recursive(thread_pool& pool, polmat& E, polmat& pi)
     return finished_early;
 }/*}}}*/
 
-static bool compute_lingen(thread_pool& pool, polmat& E, polmat& pi)
+static bool compute_lingen(polmat& E, polmat& pi)
 {
     /* reads the data in the global thing, E and delta. ;
      * compute the linear generator from this.
@@ -1337,12 +1340,12 @@ static bool compute_lingen(thread_pool& pool, polmat& E, polmat& pi)
         b = go_quadratic(E, pi);
     } else if (deg_E < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<gf2x_fake_fft>(pool, E, pi);
+        b = go_recursive<gf2x_fake_fft>(E, pi);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<gf2x_cantor_fft>(pool, E, pi);
+        b = go_recursive<gf2x_cantor_fft>(E, pi);
     }
 
     /*
@@ -1465,6 +1468,14 @@ print_and_exit (double wct0, int ret)
 {
   /* print usage of time and memory */
   print_timing_and_memory (wct0);
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+  {
+    if (omp_get_thread_num () == 0)
+      fprintf (stderr, "Used OpenMP with %d thread(s)\n",
+	       omp_get_num_threads ());
+  }
+#endif
   if (ret != 0)
     fprintf (stderr, "No solution found\n");
   return ret; /* 0 if a solution was found, non-zero otherwise */
@@ -1475,7 +1486,6 @@ int main(int argc, char *argv[])
     using namespace globals;
 
     param_list pl;
-    int nb_threads = 1;
 
     double wct0 = wct_seconds();
 
@@ -1488,7 +1498,6 @@ int main(int argc, char *argv[])
     param_list_decl_usage(pl, "lingen-output-file", "output file for lingen. Defaults to [wdir]/F");
     param_list_decl_usage(pl, "lingen_threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor_threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
-    param_list_decl_usage(pl, "t", "number of threads");
     /* }}} */
     logline_decl_usage(pl);
 
@@ -1513,7 +1522,6 @@ int main(int argc, char *argv[])
                 exit(EXIT_FAILURE);
             }
         }
-        param_list_parse_int(pl, "t", &nb_threads);
     }
     param_list_parse_uint(pl, "lingen_threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor_threshold", &cantor_threshold);
@@ -1694,8 +1702,7 @@ int main(int argc, char *argv[])
 
     // E.resize(deg + 1);
     polmat pi_left;
-    thread_pool pool(nb_threads);
-    compute_lingen(pool, E, pi_left);
+    compute_lingen(E, pi_left);
 
     int nresults = 0;
     for (unsigned int j = 0; j < m + n; j++) {

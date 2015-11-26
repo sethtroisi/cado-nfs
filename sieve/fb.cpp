@@ -1180,18 +1180,18 @@ public:
 class make_linear_thread_result: public task_result {
 public:
   task_info_t *T;
-  make_linear_thread_param *orig_param;
-  make_linear_thread_result(task_info_t *_T, make_linear_thread_param *_p)
+  const make_linear_thread_param *orig_param;
+  make_linear_thread_result(task_info_t *_T, const make_linear_thread_param *_p)
     : T(_T), orig_param(_p) {
       ASSERT_ALWAYS(T == orig_param->T);
     }
 };
 
 static task_result *
-process_one_task(task_parameters *_param)
+process_one_task(const task_parameters *_param)
 {
-  make_linear_thread_param *param =
-    static_cast<make_linear_thread_param *>(_param);
+  const make_linear_thread_param *param =
+    static_cast<const make_linear_thread_param *>(_param);
   task_info_t *T = param->T;
   for (unsigned int i = 0; i < T->n; ++i) {
     T->proj[i] = fb_linear_root (&T->r[i], T->poly, T->q[i]);

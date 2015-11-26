@@ -398,9 +398,9 @@ public:
 // top-level, since the plattices have already been precomputed.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice_internal(task_parameters * _param)
+fill_in_buckets_one_slice_internal(const task_parameters *const _param)
 {
-    fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
+    const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -426,9 +426,9 @@ fill_in_buckets_one_slice_internal(task_parameters * _param)
 // At some point, the code should be re-organized, I'm afraid.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice(task_parameters * _param)
+fill_in_buckets_one_slice(const task_parameters *const _param)
 {
-    fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
+    const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
