@@ -345,6 +345,8 @@ include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft/mpfq)
 add_executable(lingen lingen_binary.cpp tree_stats.c logline.c
     lingen_qcode.c lingen_qcode_do.cpp)
 # This **MUST** match the #define in gf2x/Makefile.am
+set_source_files_properties(lingen_qcode_do.cpp COMPILE_FLAGS
+    "-DCANTOR_BASE_FIELD_SIZE=128")
 set_source_files_properties(lingen_binary.cpp COMPILE_FLAGS
     "-DCANTOR_BASE_FIELD_SIZE=128")
 # for debug only

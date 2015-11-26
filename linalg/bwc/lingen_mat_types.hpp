@@ -24,6 +24,7 @@
 #include "bwc_config.h"
 #include "alloc_proxy.h"
 #include "utils.h"
+#include "gf2x-fft.h"
 
 /* Number of words holding B bits ; better naming sought. */
 #define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
@@ -1077,6 +1078,8 @@ void compose_inner(
     }
     dst.swap(tmp);
 }
+
+
 template<typename fft_type>
 inline void compose(
         tpolmat<fft_type>& dst,
