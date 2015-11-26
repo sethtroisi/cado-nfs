@@ -1112,11 +1112,6 @@ static bool go_recursive(polmat& E, polmat& pi)
 #endif
 
     // std::cout << "Recursive call, degree " << E_length << std::endl;
-    // takes lengths.
-    fft_type o(E_length, expected_pi_deg + 1,
-            /* E_length + expected_pi_deg - kill, */
-            m + n);
-
 
     polmat pi_left;
     {
@@ -1201,6 +1196,11 @@ static bool go_recursive(polmat& E, polmat& pi)
         tpolmat<fft_type> E_hat;
         tpolmat<fft_type> pi_l_hat;
         tpolmat<fft_type> E_middle_hat;
+        // takes lengths.
+        fft_type o(E_length, expected_pi_deg + 1,
+                /* E_length + expected_pi_deg - kill, */
+                m + n);
+
 
         logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
                 t, E_length, fft_type::name());
@@ -1260,6 +1260,9 @@ static bool go_recursive(polmat& E, polmat& pi)
         tpolmat<fft_type> pi_l_hat;
         tpolmat<fft_type> pi_r_hat;
         tpolmat<fft_type> pi_hat;
+
+        // takes lengths.
+        fft_type o(pi_l_deg + 1, pi_r_deg + 1, m + n);
 
         logline_begin(stdout, E_length,
                 "t=%u DFT_pi_left(%lu) [%s]",
