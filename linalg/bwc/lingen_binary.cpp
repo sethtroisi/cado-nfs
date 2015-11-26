@@ -29,6 +29,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
 #include "bwc_config.h"
 #include "macros.h"
 #include "utils.h"
@@ -1457,6 +1460,24 @@ void usage()
     exit(1);
 }
 
+static int
+print_and_exit (double wct0, int ret)
+{
+  /* print usage of time and memory */
+  print_timing_and_memory (wct0);
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+  {
+    if (omp_get_thread_num () == 0)
+      fprintf (stderr, "Used OpenMP with %d thread(s)\n",
+	       omp_get_num_threads ());
+  }
+#endif
+  if (ret != 0)
+    fprintf (stderr, "No solution found\n");
+  return ret; /* 0 if a solution was found, non-zero otherwise */
+}
+
 int main(int argc, char *argv[])
 {
     using namespace globals;
@@ -1684,11 +1705,8 @@ int main(int argc, char *argv[])
     for (unsigned int j = 0; j < m + n; j++) {
         nresults += chance_list[j];
     }
-    if (nresults == 0) {
-        fprintf(stderr, "No solution found\n");
-	print_timing_and_memory (wct0);
-        exit(1);
-    }
+    if (nresults == 0)
+      return print_and_exit (wct0, 1);
 
     polmat F;
     compute_final_F_from_PI(F, pi_left);
@@ -1751,10 +1769,7 @@ int main(int argc, char *argv[])
 #endif/*}}}*/
     // print_chance_list(sequence_length, chance_list);
 
-    /* print usage of time and memory */
-    print_timing_and_memory (wct0);
-
-    return 0;
+    return print_and_exit (wct0, 0);
 }
 
 /* vim: set sw=4 sta et: */
