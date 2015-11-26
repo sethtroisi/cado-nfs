@@ -167,9 +167,16 @@ if test x$hwdir = x ; then
      RUNTIME_ULONG_BITS()
      case x$gf2x_cv_ulongbits in
       x64|xdontknow) true ;;
-      *)
+      x32)
         AC_MSG_WARN([The default ABI for this compiler has $gf2x_cv_ulongbits-bit unsigned longs, not 64-bit as the CPU supports. Using $gf2x_cv_ulongbits-bit])
-        hwdir=x86_sse2;;
+        if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
+         hwdir=generic$gf2x_wordsize
+        else
+         hwdir=x86_sse2;;
+        fi
+      *)
+       AC_MSG_ERROR([The default ABI for this compiler has $gf2x_cv_ulongbits-bit unsigned longs, this is not supported])
+       ;;
      esac
     fi
     ;;
