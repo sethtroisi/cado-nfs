@@ -1,18 +1,5 @@
 #include "utils_int64.h"
 
-uint64_t pow_uint64_t(uint64_t d, uint64_t e)
-{
-  ASSERT_ALWAYS(log2((double)d) * (double)e < 64.0);
-
-  if (e == 1) {
-    return d;
-  } else if ((e & 1) == 1) {
-    return d * pow_uint64_t(d * d, (e - 1) / 2);
-  } else {
-    return pow_uint64_t(d * d, e / 2);
-  }
-}
-
 uint64_t invmod_uint64(uint64_t xx, uint64_t mm)
 {
   uint64_t yy;
@@ -68,7 +55,7 @@ void int64_fdiv_qr(int64_t * q, int64_t * r, int64_t n, int64_t d)
   }
 
   * r = n - d * * q;
-  
+
   ASSERT(ABS(* r) < ABS(d));
 
 #ifndef NDEBUG

@@ -8,14 +8,6 @@
 #include "mod_ul.h"
 
 /*
- * Compute d^e.
- *
- * d: a number.
- * e: a number.
- */
-uint64_t pow_uint64_t(uint64_t d, uint64_t e);
-
-/*
  * Compute the modular inverse of xx mod mm.
  *
  * xx: the number for which we want the inverse.

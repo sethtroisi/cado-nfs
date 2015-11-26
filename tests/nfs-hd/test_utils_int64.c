@@ -2,19 +2,6 @@
 
 int main()
 {
-  ASSERT_ALWAYS(1544804416 == pow_uint64_t(34, 6));
-  ASSERT_ALWAYS(4879681 == pow_uint64_t(47, 4));
-  ASSERT_ALWAYS(10578455953408 == pow_uint64_t(28, 9));
-  ASSERT_ALWAYS(17210368 == pow_uint64_t(28, 5));
-  ASSERT_ALWAYS(27000 == pow_uint64_t(30, 3));
-  ASSERT_ALWAYS(25600000000 == pow_uint64_t(20, 8));
-  ASSERT_ALWAYS(841 == pow_uint64_t(29, 2));
-  ASSERT_ALWAYS(10000 == pow_uint64_t(10, 4));
-  ASSERT_ALWAYS(6321363049 == pow_uint64_t(43, 6));
-  ASSERT_ALWAYS(2401 == pow_uint64_t(49, 2));
-  /*uint64_t a = 12157665459056928801;*/
-  /*ASSERT_ALWAYS(a == pow_uint64_t(3, 40));*/
-
   ASSERT_ALWAYS(554343025 == invmod_uint64(324937894, 650109353));
   ASSERT_ALWAYS(299617373 == invmod_uint64(495120181, 585996241));
   ASSERT_ALWAYS(122651190 == invmod_uint64(504807929, 990446713));

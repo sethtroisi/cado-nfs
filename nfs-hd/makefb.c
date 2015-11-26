@@ -203,10 +203,14 @@ static void add_ideal_u_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
   ASSERT(h->deg > 1);
 
   //Verify if the ideal can be added.
-  if (mpz_cmp_ui(lpb, pow_uint64_t(r, (uint64_t)h->deg)) >= 0 && r <= fbb) {
+  mpz_t limit;
+  mpz_init(limit);
+  mpz_set_d(limit, pow((double)r, (double)h->deg));
+  if (mpz_cmp(lpb, limit) >= 0 && r <= fbb) {
     factor_base_set_ideal_u_part(fb, * index, r, h, t);
     * index = * index + 1;
   }
+  mpz_clear(limit);
 }
 
 /*
@@ -680,13 +684,17 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
         return;
       }
       parse_ideal_u(ideal_u, line, t);
-      if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
-              (uint64_t)ideal_u->ideal->h->deg)) >= 0
+      mpz_t limit;
+      mpz_init(limit);
+      mpz_set_d(limit, pow((double)ideal_u->ideal->r,
+            (double)ideal_u->ideal->h->deg));
+      if (mpz_cmp(lpb, limit) >= 0
           && ideal_u->ideal->r <= fbb[k]) {
         //TODO: Problem here.
         factor_base_set_ideal_u(fb[k], number_element_u, ideal_u, t);
         number_element_u++;
       }
+      mpz_clear(limit);
     }
     ideal_u_clear(ideal_u, t);
 
