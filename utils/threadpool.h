@@ -94,7 +94,7 @@ class task_result {
   virtual ~task_result(){};
 };
 
-typedef task_result *(*task_function_t)(const task_parameters *);
+typedef task_result *(*task_function_t)(task_parameters *);
 
 class thread_task;
 class worker_thread;
@@ -121,7 +121,7 @@ class thread_pool : private monitor, private ThreadNonCopyable {
 public:
   thread_pool(size_t _nr_threads, size_t nr_queues = 1);
   ~thread_pool();
-  void add_task(task_function_t func, const task_parameters *const params, const int id, const size_t queue = 0, double cost = 0.0);
+  void add_task(task_function_t func, task_parameters * params, const int id, const size_t queue = 0, double cost = 0.0);
   task_result *get_result(size_t queue = 0, bool blocking = true);
 };
 

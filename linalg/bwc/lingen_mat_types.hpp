@@ -14,16 +14,11 @@
 #include <gmp.h>
 
 #include <algorithm>
-#ifdef  HAVE_OPENMP
-#include <omp.h>
-#define OMP_ROUND(k) ((k) % omp_get_num_threads() == omp_get_thread_num())
-#else
-#define OMP_ROUND(k) (1)
-#endif
 
 #include "bwc_config.h"
 #include "alloc_proxy.h"
 #include "utils.h"
+#include "threadpool.h"
 
 /* Number of words holding B bits ; better naming sought. */
 #define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
@@ -828,25 +823,53 @@ template<typename fft_type> struct tpolmat /* {{{ */
 };
 /*}}}*/
 
+struct lingen_mat_types_task : public task_parameters {
+    virtual ~lingen_mat_types_task() {}
+    virtual void do_task() = 0;
+};
+
+static inline task_result * lingen_mat_types_do(task_parameters * t) {
+    lingen_mat_types_task * v = static_cast<lingen_mat_types_task *>(t);
+    v->do_task();
+    delete t;
+    return new task_result;
+}
+
 template<typename fft_type>
-void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
+struct transform_row_task : public lingen_mat_types_task {
+    fft_type& o;
+    tpolmat<fft_type>& dst;
+    polmat const& src;
+    int d;
+    unsigned int i;
+    unsigned int n;
+    void do_task() {
+        for(unsigned int j = 0 ; j < n ; j++) {
+            o.dft(dst.poly(i,j), src.poly(i,j), d);
+        }
+    }
+    transform_row_task(fft_type& o,
+            tpolmat<fft_type>& dst,
+            polmat const& src,
+            int d, unsigned int i, unsigned int n)
+        : o(o), dst(dst), src(src), d(d), i(i), n(n) {}
+};
+
+template<typename fft_type>
+void transform(thread_pool& pool, tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
 {
     // clock_t t = clock();
     tpolmat<fft_type> tmp(src.nrows, src.ncols, o);
     tmp.zero();
     src.clear_highbits();
-#ifdef  HAVE_OPENMP
-#pragma omp parallel
-#endif  /* HAVE_OPENMP */
-    {
-        int k MAYBE_UNUSED = 0;
-        for(unsigned int j = 0 ; j < src.ncols ; j++) {
-            for(unsigned int i = 0 ; i < src.nrows ; i++) {
-                if (OMP_ROUND(k++))
-                    o.dft(tmp.poly(i,j), src.poly(i,j), d);
-            }
-        }
+    for(unsigned int i = 0 ; i < src.nrows ; i++) {
+        pool.add_task(lingen_mat_types_do,
+                new transform_row_task<fft_type>(o, tmp, src, d, i, src.ncols),
+                0);
     }
+    /* wait for all of these tasks to finish */
+    for(unsigned int x = src.nrows; x--; pool.get_result());
+
     dst.swap(tmp);
     /*
     if (o.size() > 10) {
@@ -858,7 +881,38 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
 }
 
 template<typename fft_type>
+struct glue4_row_task : public lingen_mat_types_task {
+    fft_type& o;
+    tpolmat<fft_type> & dst;
+    tpolmat<fft_type> const& s00;
+    tpolmat<fft_type> const& s01;
+    tpolmat<fft_type> const& s10;
+    tpolmat<fft_type> const& s11;
+    unsigned int i;
+    unsigned int nr2;
+    unsigned int nc2;
+    void do_task() {
+        for(unsigned int j = 0 ; j < nc2 ; j++) {
+            o.cpy(dst.poly(i,j), s00.poly(i,j));
+            o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
+            o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
+            o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
+        }
+    }
+    glue4_row_task(fft_type& o,
+            tpolmat<fft_type>& dst,
+            tpolmat<fft_type> const & s00,
+            tpolmat<fft_type> const & s01,
+            tpolmat<fft_type> const & s10,
+            tpolmat<fft_type> const & s11,
+            unsigned int i, unsigned int nr2, unsigned int nc2)
+        : o(o), dst(dst), s00(s00), s01(s01), s10(s10), s11(s11),
+        i(i), nr2(nr2), nc2(nc2) {}
+};
+
+template<typename fft_type>
 void glue4(
+        thread_pool& pool,
         tpolmat<fft_type> & dst,
         tpolmat<fft_type> const & s00,
         tpolmat<fft_type> const & s01,
@@ -868,61 +922,95 @@ void glue4(
 {
     unsigned int nr2 = dst.nrows >> 1;
     unsigned int nc2 = dst.ncols >> 1;
-#ifdef  HAVE_OPENMP
-#pragma omp parallel
-#endif  /* HAVE_OPENMP */
-    {
-        int k MAYBE_UNUSED = 0;
-        for(unsigned int i = 0; i < nr2; ++i) {
-            for(unsigned int j = 0; j < nc2; ++j) {
-                if (OMP_ROUND(k++))
-                    o.cpy(dst.poly(i,j), s00.poly(i,j));
-                if (OMP_ROUND(k++))
-                    o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
-                if (OMP_ROUND(k++))
-                    o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
-                if (OMP_ROUND(k++))
-                    o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
-            }
-        }
+    for(unsigned int i = 0; i < nr2; ++i) {
+        pool.add_task(lingen_mat_types_do,
+                new glue4_row_task<fft_type>(o, dst, s00, s01, s10, s11, i, nr2, nc2),
+                0);
     }
+    /* wait for all of these tasks to finish */
+    for(unsigned int x = nr2; x--; pool.get_result());
 }
 
 template<typename fft_type>
-void splitin4(
+struct split4_row_task : public lingen_mat_types_task {
+    fft_type& o;
+    tpolmat<fft_type>& dst00;
+    tpolmat<fft_type>& dst01;
+    tpolmat<fft_type>& dst10;
+    tpolmat<fft_type>& dst11;
+    tpolmat<fft_type> const & src;
+    unsigned int i;
+    unsigned int nr2;
+    unsigned int nc2;
+    void do_task() {
+        for(unsigned int j = 0 ; j < nc2 ; j++) {
+            o.cpy(dst00.poly(i,j), src.poly(i,j));
+            o.cpy(dst01.poly(i,j), src.poly(i,j+nc2));
+            o.cpy(dst10.poly(i,j), src.poly(i+nr2,j));
+            o.cpy(dst11.poly(i,j), src.poly(i+nr2,j+nc2));
+        }
+    }
+    split4_row_task(fft_type& o,
+            tpolmat<fft_type>& dst00,
+            tpolmat<fft_type>& dst01,
+            tpolmat<fft_type>& dst10,
+            tpolmat<fft_type>& dst11,
+            tpolmat<fft_type> const & src,
+            unsigned int i, unsigned int nr2, unsigned int nc2)
+        : o(o), dst00(dst00), dst01(dst01), dst10(dst10), dst11(dst11),
+        src(src), i(i), nr2(nr2), nc2(nc2) {}
+};
+
+
+template<typename fft_type>
+void split4(
+        thread_pool& pool,
         tpolmat<fft_type>& dst00,
         tpolmat<fft_type>& dst01,
         tpolmat<fft_type>& dst10,
         tpolmat<fft_type>& dst11,
-        tpolmat<fft_type> const & s,
+        tpolmat<fft_type> const & src,
         fft_type& o)
 {
-    ASSERT((s.nrows & 1) == 0);
-    ASSERT((s.ncols & 1) == 0);
-    unsigned int nr2 = s.nrows >> 1;
-    unsigned int nc2 = s.ncols >> 1;
-#ifdef  HAVE_OPENMP
-#pragma omp parallel
-#endif  /* HAVE_OPENMP */
-    {
-        int k MAYBE_UNUSED = 0;
-        for(unsigned int i = 0; i < nr2; ++i) {
-            for(unsigned int j = 0; j < nc2; ++j) {
-                if (OMP_ROUND(k++))
-                    o.cpy(dst00.poly(i,j), s.poly(i,j));
-                if (OMP_ROUND(k++))
-                    o.cpy(dst01.poly(i,j), s.poly(i,j+nc2));
-                if (OMP_ROUND(k++))
-                    o.cpy(dst10.poly(i,j), s.poly(i+nr2,j));
-                if (OMP_ROUND(k++))
-                    o.cpy(dst11.poly(i,j), s.poly(i+nr2,j+nc2));
-            }
-        }
+    ASSERT((src.nrows & 1) == 0);
+    ASSERT((src.ncols & 1) == 0);
+    unsigned int nr2 = src.nrows >> 1;
+    unsigned int nc2 = src.ncols >> 1;
+    for(unsigned int i = 0; i < nr2; ++i) {
+        pool.add_task(lingen_mat_types_do,
+                new split4_row_task<fft_type>(o, dst00, dst01, dst10, dst11,
+                    src, i, nr2, nc2),
+                0);
     }
+    /* wait for all of these tasks to finish */
+    for(unsigned int x = nr2; x--; pool.get_result());
 }
 
 template<typename fft_type>
+struct add_row_task : public lingen_mat_types_task {
+    fft_type& o;
+    tpolmat<fft_type>& dst;
+    tpolmat<fft_type> const & s1;
+    tpolmat<fft_type> const & s2;
+    unsigned int i;
+    unsigned int n;
+    void do_task() {
+        for(unsigned int j = 0 ; j < n ; j++) {
+            o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
+        }
+    }
+    add_row_task(fft_type& o,
+            tpolmat<fft_type>& dst,
+            tpolmat<fft_type> const & s1,
+            tpolmat<fft_type> const & s2,
+            unsigned int i, unsigned int n)
+        : o(o), dst(dst), s1(s1), s2(s2), i(i), n(n) {}
+};
+
+
+template<typename fft_type>
 void add(
+        thread_pool & pool,
         tpolmat<fft_type>& dst,
         tpolmat<fft_type> const & s1,
         tpolmat<fft_type> const & s2,
@@ -930,23 +1018,21 @@ void add(
 {
     ASSERT(s1.nrows == s2.nrows);
     ASSERT(s1.ncols == s2.ncols);
-#ifdef  HAVE_OPENMP
-#pragma omp parallel
-#endif  /* HAVE_OPENMP */
-    {
-        int k MAYBE_UNUSED = 0;
-        for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-            for(unsigned int j = 0 ; j < s1.ncols ; j++) {
-                if (OMP_ROUND(k++))
-                    o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
-            }
-        }
+    ASSERT(dst.nrows == s2.nrows);
+    ASSERT(dst.ncols == s2.ncols);
+    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+        pool.add_task(lingen_mat_types_do,
+                new add_row_task<fft_type>(o, dst, s1, s2, i, s1.ncols),
+                0);
     }
+    /* wait for all of these tasks to finish */
+    for(unsigned int x = s1.nrows; x--; pool.get_result());
 }
 
 
 template<typename fft_type, typename strassen_selector>
 void compose_strassen(
+        thread_pool & pool,
         tpolmat<fft_type>& dst,
         tpolmat<fft_type> const & s1,
         tpolmat<fft_type> const & s2,
@@ -964,7 +1050,7 @@ void compose_strassen(
     tpolmat<fft_type> A21(nr2, nc2, o);
     tpolmat<fft_type> A22(nr2, nc2, o);
     tpolmat<fft_type> tmpA(nr2, nc2, o);
-    splitin4(A11, A12, A21, A22, s1, o);
+    split4(pool, A11, A12, A21, A22, s1, o);
 
     ASSERT((s2.nrows & 1) == 0);
     ASSERT((s2.ncols & 1) == 0);
@@ -975,51 +1061,58 @@ void compose_strassen(
     tpolmat<fft_type> B21(nr2, nc2, o);
     tpolmat<fft_type> B22(nr2, nc2, o);
     tpolmat<fft_type> tmpB(nr2, nc2, o);
-    splitin4(B11, B12, B21, B22, s2, o);
+    split4(pool, B11, B12, B21, B22, s2, o);
 
     // Build partial products
     unsigned int nr = s1.nrows >> 1;
     unsigned int nc = s2.ncols >> 1;
     // M1 = (A11 + A22)*(B11 +  B22)
     tpolmat<fft_type> M1(nr, nc, o);
-    add(tmpA, A11, A22, o); add(tmpB, B11, B22, o);
-    compose_inner(M1, tmpA, tmpB, o, s);
+    add(pool, tmpA, A11, A22, o);
+    add(pool, tmpB, B11, B22, o);
+    compose_inner(pool, M1, tmpA, tmpB, o, s);
     // M2 = (A21 + A22)*B11
     tpolmat<fft_type> M2(nr, nc, o);
-    add(tmpA, A21, A22, o); 
-    compose_inner(M2, tmpA, B11, o, s);
+    add(pool, tmpA, A21, A22, o); 
+    compose_inner(pool, M2, tmpA, B11, o, s);
     // M3 = A11*(B12-B22)
     tpolmat<fft_type> M3(nr, nc, o);
-    add(tmpB, B12, B22, o); 
-    compose_inner(M3, A11, tmpB, o, s);
+    add(pool, tmpB, B12, B22, o); 
+    compose_inner(pool, M3, A11, tmpB, o, s);
     // M4 = A22*(B21-B11)
     tpolmat<fft_type> M4(nr, nc, o);
-    add(tmpB, B21, B11, o); 
-    compose_inner(M4, A22, tmpB, o, s);
+    add(pool, tmpB, B21, B11, o); 
+    compose_inner(pool, M4, A22, tmpB, o, s);
     // M5 = (A11+A12)*B22
     tpolmat<fft_type> M5(nr, nc, o);
-    add(tmpA, A11, A12, o);
-    compose_inner(M5, tmpA, B22, o, s);
+    add(pool, tmpA, A11, A12, o);
+    compose_inner(pool, M5, tmpA, B22, o, s);
     // M6 = (A21-A11)*(B11+B12)
     tpolmat<fft_type> M6(nr, nc, o);
-    add(tmpA, A21, A11, o); add(tmpB, B11, B12, o);
-    compose_inner(M6, tmpA, tmpB, o, s);
+    add(pool, tmpA, A21, A11, o);
+    add(pool, tmpB, B11, B12, o);
+    compose_inner(pool, M6, tmpA, tmpB, o, s);
     // M7 = (A12-A22)*(B21+B22)
     tpolmat<fft_type> M7(nr, nc, o);
-    add(tmpA, A12, A22, o); add(tmpB, B21, B22, o);
-    compose_inner(M7, tmpA, tmpB, o, s);
+    add(pool, tmpA, A12, A22, o);
+    add(pool, tmpB, B21, B22, o);
+    compose_inner(pool, M7, tmpA, tmpB, o, s);
 
     // Reconstruct result
     // C11 = M1+M4-M5+M7  Store it in M7
-    add(M7, M7, M1, o); add(M7, M7, M4, o); add(M7, M7, M5, o);
+    add(pool, M7, M7, M1, o); 
+    add(pool, M7, M7, M4, o); 
+    add(pool, M7, M7, M5, o);
     // C12 = M3+ M5    Store it in M5
-    add(M5, M5, M3, o);
+    add(pool, M5, M5, M3, o);
     // C21 = M2+M4     Store it in M4
-    add(M4, M4, M2, o);
+    add(pool, M4, M4, M2, o);
     // C22 = M1 - M2 + M3 + M6  Store it in M6
-    add(M6, M6, M1, o); add(M6, M6, M2, o); add(M6, M6, M3, o);
+    add(pool, M6, M6, M1, o); 
+    add(pool, M6, M6, M2, o); 
+    add(pool, M6, M6, M3, o);
 
-    glue4(dst, M7, M5, M4, M6, o);
+    glue4(pool, dst, M7, M5, M4, M6, o);
 }
 
 struct strassen_default_selector {
@@ -1055,8 +1148,34 @@ int operator()(unsigned int m, unsigned int n, unsigned int p, unsigned int nbit
 template<typename T> struct remove_pointer {};
 template<typename T> struct remove_pointer<T*> {typedef T t;};
 
+template<typename fft_type>
+struct compose_row_task : public lingen_mat_types_task {
+    fft_type& o;
+    tpolmat<fft_type>& dst;
+    tpolmat<fft_type> const & s1;
+    tpolmat<fft_type> const & s2;
+    unsigned int i;
+    unsigned int nterms;
+    unsigned int rowsize;
+    void do_task() {
+        for(unsigned int k = 0 ; k < nterms ; k++) {
+            for(unsigned int j = 0 ; j < rowsize ; j++) {
+                o.addcompose(dst.poly(i,j), s1.poly(i,k), s2.poly(k,j));
+            }
+        }
+    }
+    compose_row_task(fft_type& o,
+            tpolmat<fft_type>& dst,
+            tpolmat<fft_type> const & s1,
+            tpolmat<fft_type> const & s2,
+            unsigned int i, unsigned nterms, unsigned int rowsize)
+        : o(o), dst(dst), s1(s1), s2(s2), i(i),
+        nterms(nterms), rowsize(rowsize) {}
+};
+
 template<typename fft_type, typename selector_type>
 void compose_inner(
+        thread_pool & pool,
         tpolmat<fft_type>& dst,
         tpolmat<fft_type> const & s1,
         tpolmat<fft_type> const & s2,
@@ -1067,45 +1186,30 @@ void compose_inner(
     unsigned int nbits;
     nbits = o.size() * sizeof(typename remove_pointer<typename fft_type::ptr>::t) * CHAR_BIT;
     if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
-        compose_strassen(tmp, s1, s2, o, s);
+        compose_strassen(pool, tmp, s1, s2, o, s);
     } else {
         tmp.zero();
-#ifdef  HAVE_OPENMP
-#pragma omp parallel
-#endif  /* HAVE_OPENMP */
-        {
-            typename fft_type::ptr x = o.alloc(1);
-	    /* This way of doing matrix multiplication is better for locality:
-	       in the inner loop, the first element s1[i,k] is constant,
-	       and in the second one s2[k,j], only the second index changes.
-	       If the inner loop was on k, both s1[i,k] and s2[k,j] would
-	       change, and a change on the first index is worse if matrices
-	       are stored row by row. */
-	    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-	      for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-		for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-		  if (OMP_ROUND((int) (i * s2.ncols + j))) {
-		    o.compose(x, s1.poly(i,k), s2.poly(k,j));
-		    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
-		  }
-		}
-	      }
-            }
-            o.free(x,1);
-            x = NULL;
+        for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+            pool.add_task(lingen_mat_types_do,
+                    new compose_row_task<fft_type>(o, tmp, s1, s2,
+                        i, s1.ncols, s2.ncols),
+                    0);
         }
+        /* wait for all of these tasks to finish */
+        for(unsigned int x = s1.nrows; x--; pool.get_result());
     }
     dst.swap(tmp);
 }
 template<typename fft_type>
 inline void compose(
+        thread_pool & pool,
         tpolmat<fft_type>& dst,
         tpolmat<fft_type> const & s1,
         tpolmat<fft_type> const & s2,
         fft_type& o)
 {
     // clock_t t = clock();
-    compose_inner(dst, s1, s2, o, strassen_default_selector());
+    compose_inner(pool, dst, s1, s2, o, strassen_default_selector());
     /*
     if (o.size() > 10) {
         printf("c(%u,%u,%u,%u): %.2fs [strassen]\n",
@@ -1117,13 +1221,14 @@ inline void compose(
 
 template<typename fft_type, typename selector_type>
 inline void compose2(
+        thread_pool & pool,
         tpolmat<fft_type>& dst,
         tpolmat<fft_type> const & s1,
         tpolmat<fft_type> const & s2,
         fft_type& o, selector_type const& s)
 {
     // clock_t t = clock();
-    compose_inner(dst, s1, s2, o, s);
+    compose_inner(pool, dst, s1, s2, o, s);
     /*
     if (o.size() > 10) {
         printf("c(%u,%u,%u,%u): %.2fs [strassen]\n",
@@ -1133,24 +1238,40 @@ inline void compose2(
     */
 }
 
+template<typename fft_type>
+struct itransform_row_task : public lingen_mat_types_task {
+    fft_type& o;
+    polmat& dst;
+    tpolmat<fft_type> & src;
+    int d;
+    unsigned int i;
+    unsigned int n;
+    void do_task() {
+        for(unsigned int j = 0 ; j < n ; j++) {
+            o.ift(dst.poly(i,j), d, src.poly(i,j));
+        }
+    }
+    itransform_row_task(fft_type& o,
+            polmat& dst,
+            tpolmat<fft_type> & src,
+            int d, unsigned int i, unsigned int n)
+        : o(o), dst(dst), src(src), d(d), i(i), n(n) {}
+};
+
 
 template<typename fft_type>
-void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
+void itransform(thread_pool& pool, polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
 {
     // clock_t t = clock();
     polmat tmp(src.nrows, src.ncols, d + 1);
-#ifdef  HAVE_OPENMP
-#pragma omp parallel
-#endif  /* HAVE_OPENMP */
-    {
-        int k MAYBE_UNUSED = 0;
-        for(unsigned int j = 0 ; j < src.ncols ; j++) {
-            for(unsigned int i = 0 ; i < src.nrows ; i++) {
-                if (OMP_ROUND(k++))
-                    o.ift(tmp.poly(i,j), d, src.poly(i,j));
-            }
-        }
+    for(unsigned int i = 0 ; i < src.nrows ; i++) {
+        pool.add_task(lingen_mat_types_do,
+                new itransform_row_task<fft_type>(o, tmp, src, d, i, src.ncols),
+                0);
     }
+    /* wait for all of these tasks to finish */
+    for(unsigned int x = src.nrows; x--; pool.get_result());
+
     for(unsigned int j = 0 ; j < src.ncols ; j++) {
         tmp.setdeg(j);
     }
