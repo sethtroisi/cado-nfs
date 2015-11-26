@@ -172,8 +172,8 @@ if test x$hwdir = x ; then
         if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
          hwdir=generic$gf2x_wordsize
         else
-         hwdir=x86_sse2;;
-        fi
+         hwdir=x86_sse2
+        fi;;
       *)
        AC_MSG_ERROR([The default ABI for this compiler has $gf2x_cv_ulongbits-bit unsigned longs, this is not supported])
        ;;
