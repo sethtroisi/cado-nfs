@@ -1047,7 +1047,7 @@ int operator()(unsigned int m, unsigned int n, unsigned int p, unsigned int nbit
         return 0;
     }
 #endif
-    return 1;
+    return 0;
 }
 
 };
