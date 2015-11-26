@@ -837,7 +837,7 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
     src.clear_highbits();
     {
 #ifdef  HAVE_OPENMP
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
 #endif  /* HAVE_OPENMP */
         for(unsigned int j = 0 ; j < src.ncols ; j++) {
             for(unsigned int i = 0 ; i < src.nrows ; i++) {
@@ -868,7 +868,7 @@ void glue4(
     unsigned int nc2 = dst.ncols >> 1;
     {
 #ifdef  HAVE_OPENMP
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
 #endif  /* HAVE_OPENMP */
         for(unsigned int i = 0; i < nr2; ++i) {
             for(unsigned int j = 0; j < nc2; ++j) {
@@ -896,7 +896,7 @@ void splitin4(
     unsigned int nc2 = s.ncols >> 1;
     {
 #ifdef  HAVE_OPENMP
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
 #endif  /* HAVE_OPENMP */
         for(unsigned int i = 0; i < nr2; ++i) {
             for(unsigned int j = 0; j < nc2; ++j) {
@@ -920,7 +920,7 @@ void add(
     ASSERT(s1.ncols == s2.ncols);
     {
 #ifdef  HAVE_OPENMP
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
 #endif  /* HAVE_OPENMP */
         for(unsigned int i = 0 ; i < s1.nrows ; i++) {
             for(unsigned int j = 0 ; j < s1.ncols ; j++) {
@@ -1058,7 +1058,7 @@ void compose_inner(
         tmp.zero();
         {
 #ifdef  HAVE_OPENMP
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
 #endif  /* HAVE_OPENMP */
             /* This way of doing matrix multiplication is better for locality:
                in the inner loop, the first element s1[i,k] is constant,
@@ -1121,7 +1121,7 @@ void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
     polmat tmp(src.nrows, src.ncols, d + 1);
     {
 #ifdef  HAVE_OPENMP
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
 #endif  /* HAVE_OPENMP */
         for(unsigned int j = 0 ; j < src.ncols ; j++) {
             for(unsigned int i = 0 ; i < src.nrows ; i++) {
