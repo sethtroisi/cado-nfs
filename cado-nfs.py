@@ -118,6 +118,7 @@ if __name__ == '__main__':
     if not dlp:
         print(" ".join(factors))
     else:
+        logger.info("If you want to compute a new target, run %s %s target=<target>", sys.argv[0], snapshot_filename)
         if checkdlp:
             p = int(factors[0])
             ell = int(factors[1])

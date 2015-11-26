@@ -31,8 +31,8 @@ After the computation is finished, it is possible to run again the
 cado-nfs.py script, with a different target: only the last step will be
 run. For ensuring that the precomputed data is really used, copy-paste
 the command-line indicated in the output of the first computation that
-contains "If this computation gets interrupted...", and add target=xxxx
-at the end.
+contains "If you want to compute a new target…", and set the new target at the
+end.
 
 Note: the logarithms are given in an arbitrary base. If you want to
 define them with respect to a specific generator g, then you'll have to
