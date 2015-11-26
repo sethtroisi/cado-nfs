@@ -1122,17 +1122,6 @@ static bool go_recursive(polmat& E, polmat& pi)
         finished_early = compute_lingen(E_left, pi_left);
     }
 
-    tpolmat<fft_type> E_hat;
-
-    logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
-            t, E_length, fft_type::name());
-    /* The transform() calls expect a number of coefficients, not a
-     * degree. */
-    transform(E_hat, E, o, E_length);
-    { polmat X; E.swap(X); }
-
-    logline_end(NULL, "");
-
     long pi_l_deg = pi_left.maxdeg();
     unsigned long pi_left_length = pi_left.maxlength();
 
@@ -1203,41 +1192,47 @@ static bool go_recursive(polmat& E, polmat& pi)
     }/*}}}*/
 #endif
 
-    logline_begin(stdout, E_length,
-            "t=%u DFT_pi_left(%lu) [%s]",
-            t, pi_left_length, fft_type::name());
-    tpolmat<fft_type> pi_l_hat;
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
-    { polmat X; pi_left.swap(X); }
-    logline_end(&t_dft_pi_left, "");
+    {
+        /* NOTE: The transform() calls expect a number of coefficients,
+         * not a degree. */
+        tpolmat<fft_type> E_hat;
+        tpolmat<fft_type> pi_l_hat;
+        tpolmat<fft_type> E_middle_hat;
 
-    tpolmat<fft_type> E_middle_hat;
+        logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
+                t, E_length, fft_type::name());
+        transform(E_hat, E, o, E_length);
+        { polmat X; E.swap(X); }
+        logline_end(NULL, "");
 
-    /* There's a critical lack here. We're not truncating the output */
-    /* TODO XXX Do special convolutions here */
-    /* minimal degree of coefficients of E which contribute to degree
-     * llen and above when multiplying by pi_left is llen-pi_l_deg. */
-    logline_begin(stdout, E_length, "t=%u MP(%lu, %lu) -> %lu [%s]",
-            t,
-            (unsigned long) (E_length - (llen - pi_l_deg)),
-            pi_left_length,
-            E_length - llen,
-            fft_type::name());
-    compose(E_middle_hat, E_hat, pi_l_hat, o);
-    logline_end(&t_mp, "");
+        logline_begin(stdout, E_length,
+                "t=%u DFT_pi_left(%lu) [%s]",
+                t, pi_left_length, fft_type::name());
+        transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
+        /* retain pi_left */
+        logline_end(&t_dft_pi_left, "");
 
-    { tpolmat<fft_type> X; E_hat.swap(X); }
-    /* pi_l_hat is used later on ! */
+        /* XXX do truncation, and middle product with wraparound */
+        logline_begin(stdout, E_length, "t=%u MP(%lu, %lu) -> %lu [%s]",
+                t,
+                (unsigned long) (E_length - (llen - pi_l_deg)),
+                pi_left_length,
+                E_length - llen,
+                fft_type::name());
+        compose(E_middle_hat, E_hat, pi_l_hat, o);
+        { tpolmat<fft_type> X; E_hat.swap(X); }
+        { tpolmat<fft_type> X; pi_l_hat.swap(X); }
+        logline_end(&t_mp, "");
 
-    logline_begin(stdout, E_length, "t=%u IFT_E_middle(%lu) [%s]",
-            t, E_length + pi_l_deg - kill + 1, fft_type::name());
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
-    { tpolmat<fft_type> X; E_middle_hat.swap(X); }
-    logline_end(&t_ift_E_middle, "");
+
+        logline_begin(stdout, E_length, "t=%u IFT_E_middle(%lu) [%s]",
+                t, E_length + pi_l_deg - kill + 1, fft_type::name());
+        /* The transform() calls expect a number of coefficients, not a
+         * degree ! */
+        itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
+        { tpolmat<fft_type> X; E_middle_hat.swap(X); }
+        logline_end(&t_ift_E_middle, "");
+    }
 
     /* Make sure that the first llen-kill coefficients of all entries of
      * E are zero. It's only a matter of verification, so this does not
@@ -1253,35 +1248,46 @@ static bool go_recursive(polmat& E, polmat& pi)
     finished_early = compute_lingen(E, pi_right);
     int pi_r_deg = pi_right.maxdeg();
     unsigned long pi_right_length = pi_right.maxlength();
+
     { polmat X; E.swap(X); }
 
-    logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
-            t, pi_right_length, fft_type::name());
-    tpolmat<fft_type> pi_r_hat;
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
-    { polmat X; pi_right.swap(X); }
-    logline_end(&t_dft_pi_right, "");
+    {
+        /* NOTE: The transform() calls expect a number of coefficients,
+         * not a degree. */
+        tpolmat<fft_type> pi_l_hat;
+        tpolmat<fft_type> pi_r_hat;
+        tpolmat<fft_type> pi_hat;
 
-    logline_begin(stdout, E_length, "t=%u MUL(%lu, %lu) -> %lu [%s]",
-            t,
-            pi_left_length,
-            pi_right_length,
-            pi_left_length + pi_right_length - 1,
-            fft_type::name());
-    tpolmat<fft_type> pi_hat;
-    compose(pi_hat, pi_l_hat, pi_r_hat, o);
-    { tpolmat<fft_type> X; pi_l_hat.swap(X); }
-    { tpolmat<fft_type> X; pi_r_hat.swap(X); }
-    logline_end(&t_mul, "");
+        logline_begin(stdout, E_length,
+                "t=%u DFT_pi_left(%lu) [%s]",
+                t, pi_left_length, fft_type::name());
+        transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
+        { polmat X; pi_left.swap(X); }
+        logline_end(&t_dft_pi_left, "");
 
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
-            t, pi_left_length + pi_right_length - 1, fft_type::name());
-    itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
-    logline_end(&t_ift_pi, "");
+        logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
+                t, pi_right_length, fft_type::name());
+        transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
+        { polmat X; pi_right.swap(X); }
+        logline_end(&t_dft_pi_right, "");
+
+        logline_begin(stdout, E_length, "t=%u MUL(%lu, %lu) -> %lu [%s]",
+                t,
+                pi_left_length,
+                pi_right_length,
+                pi_left_length + pi_right_length - 1,
+                fft_type::name());
+        compose(pi_hat, pi_l_hat, pi_r_hat, o);
+        { tpolmat<fft_type> X; pi_l_hat.swap(X); }
+        { tpolmat<fft_type> X; pi_r_hat.swap(X); }
+        logline_end(&t_mul, "");
+
+        logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
+                t, pi_left_length + pi_right_length - 1, fft_type::name());
+        itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
+        { tpolmat<fft_type> X; pi_hat.swap(X); }
+        logline_end(&t_ift_pi, "");
+    }
 
 
     /*
