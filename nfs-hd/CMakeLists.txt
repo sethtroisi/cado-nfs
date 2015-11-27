@@ -13,7 +13,6 @@ add_executable(special-q_sieve ${SQ_SRC})
 #	TEST_MQR SPECIAL_Q_IDEAL_U)
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS
 	#ASSERT_FACTO TEST_MQR SKEW_LLL)
-set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS ASSERT_SIEVE)
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS
 	#ASSERT_FACTO TEST_MQR)
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS
