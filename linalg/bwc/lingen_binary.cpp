@@ -96,6 +96,8 @@ unsigned int lingen_threshold = 64;
 /* threshold for cantor fft algorithm */
 unsigned int cantor_threshold = UINT_MAX;
 
+/* number of threads */
+unsigned int nthreads = 1;
 
 tree_stats stats;
 
@@ -1505,14 +1507,6 @@ print_and_exit (double wct0, int ret)
 {
   /* print usage of time and memory */
   print_timing_and_memory (wct0);
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-  {
-    if (omp_get_thread_num () == 0)
-      fprintf (stderr, "Used OpenMP with %d thread(s)\n",
-	       omp_get_num_threads ());
-  }
-#endif
   if (ret != 0)
     fprintf (stderr, "No solution found\n");
   return ret; /* 0 if a solution was found, non-zero otherwise */
@@ -1535,6 +1529,7 @@ int main(int argc, char *argv[])
     param_list_decl_usage(pl, "lingen-output-file", "output file for lingen. Defaults to [wdir]/F");
     param_list_decl_usage(pl, "lingen_threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor_threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
+    param_list_decl_usage(pl, "t", "number of threads used");
     /* }}} */
     logline_decl_usage(pl);
 
@@ -1562,6 +1557,8 @@ int main(int argc, char *argv[])
     }
     param_list_parse_uint(pl, "lingen_threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor_threshold", &cantor_threshold);
+    param_list_parse_uint(pl, "t", &nthreads);
+
     /* }}} */
     logline_interpret_parameters(pl);
 
@@ -1570,6 +1567,14 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     param_list_clear(pl);
+
+#ifdef  HAVE_OPENMP
+    if (nthreads > 1)
+      omp_set_num_threads (nthreads);
+#pragma omp parallel
+#pragma omp master
+    fprintf (stderr, "Using OpenMP with %u threads\n", omp_get_num_threads ());
+#endif
 
     logline_init_timer();
 
