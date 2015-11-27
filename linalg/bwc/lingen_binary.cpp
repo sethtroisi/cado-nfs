@@ -59,7 +59,7 @@ void compose_inner<gf2x_fake_fft, strassen_default_selector>(
     tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
     ASSERT(s1.ncols == s2.nrows);
     unsigned int nbits;
-    nbits = o.size() * sizeof(typename remove_pointer<typename fft_type::ptr>::t) * CHAR_BIT;
+    nbits = o.size() * sizeof(remove_pointer<fft_type::ptr>::t) * CHAR_BIT;
     if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
         compose_strassen(tmp, s1, s2, o, s);
     } else {
@@ -69,7 +69,7 @@ void compose_inner<gf2x_fake_fft, strassen_default_selector>(
 #endif  /* HAVE_OPENMP */
         for(unsigned int i = 0 ; i < s1.nrows ; i++) {
             for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-                typename fft_type::ptr x = o.alloc(1);
+                fft_type::ptr x = o.alloc(1);
                 for(unsigned int k = 0 ; k < s1.ncols ; k++) {
                     o.compose(x, s1.poly(i,k), s2.poly(k,j));
                     o.add(tmp.poly(i,j), tmp.poly(i,j), x);
@@ -1086,34 +1086,13 @@ static bool go_quadratic(polmat& E, polmat& pi)/*{{{*/
     return finished;
 }/*}}}*/
 
-template<typename T> struct what_to_print {
-    const char * operator()(const char * f) { return f; }
-};
-
-template<> struct what_to_print<gf2x_cantor_fft> {
-    const char * operator()(const char *) { return "gf2x_cantor_fft"; }
-};
-
-template<> struct what_to_print<gf2x_ternary_fft> {
-    const char * operator()(const char *) { return "gf2x_ternary_fft"; }
-};
-
-template<> struct what_to_print<gf2x_fake_fft> {
-    const char * operator()(const char *) { return "gf2x_fake_fft"; }
-};
-
-
 static bool compute_lingen(polmat& E, polmat& pi);
 
 template<typename fft_type>/*{{{*/
 static bool go_recursive(polmat& E, polmat& pi)
 {
     using namespace globals;
-#ifdef  __GNUC__
-    tree_stats_enter(stats, what_to_print<fft_type>()(__PRETTY_FUNCTION__), E.ncoef);
-#else
-    tree_stats_enter(stats, what_to_print<fft_type>()(__func__), E.ncoef);
-#endif
+    tree_stats_enter(stats, fft_type::name(), E.ncoef);
 
     /* E is known up to O(X^E.ncoef), so we'll consider this is a problem
      * of degree E.ncoef -- this is exactly the number of increases we
