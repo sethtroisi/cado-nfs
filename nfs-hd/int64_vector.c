@@ -127,7 +127,7 @@ void int64_vector_add_one(int64_vector_ptr v, sieving_bound_srcptr H)
 }
 
 unsigned int int64_vector_add_one_i(int64_vector_ptr v, unsigned int i,
-                                    sieving_bound_srcptr H)
+    sieving_bound_srcptr H)
 {
   ASSERT(v->dim == H->t);
   ASSERT(i < v->dim);

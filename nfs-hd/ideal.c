@@ -207,7 +207,7 @@ void ideal_u_set_element(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   }
   for (int row = 0; row < h->deg; row++) {
     for (int col = 0; col < ((int)t - h->deg); col++) {
-      mpz_set(ideal->Tr[row][col], Tr[((int)t-h->deg) * row + col]);
+      mpz_set(ideal->Tr[row][col], Tr[((int)t - h->deg) * row + col]);
     }
   }
   ideal->log = log;

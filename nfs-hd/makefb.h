@@ -39,6 +39,6 @@ void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
  * f: polynomial that define the number field.
  */
 void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
-    unsigned int * lpb, cado_poly_srcptr f);
+    unsigned int * lpb, cado_poly_srcptr f, unsigned int t);
 
 #endif /* MAKEFB_H */
