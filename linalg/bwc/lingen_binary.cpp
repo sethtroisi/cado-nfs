@@ -45,6 +45,53 @@
 #include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
 
+/* we need a partial specialization because gf2x_fake_fft does its own
+ * allocation within addcompose (for the moment)
+ */
+template<>
+void compose_inner<gf2x_fake_fft, strassen_default_selector>(
+        tpolmat<gf2x_fake_fft>& dst,
+        tpolmat<gf2x_fake_fft> const & s1,
+        tpolmat<gf2x_fake_fft> const & s2,
+        gf2x_fake_fft& o, strassen_default_selector const& s)
+{
+    typedef gf2x_fake_fft fft_type;
+    tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
+    ASSERT(s1.ncols == s2.nrows);
+    unsigned int nbits;
+    nbits = o.size() * sizeof(typename remove_pointer<typename fft_type::ptr>::t) * CHAR_BIT;
+    if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
+        compose_strassen(tmp, s1, s2, o, s);
+    } else {
+        tmp.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+        {
+            typename fft_type::ptr x = o.alloc(1);
+            /* This way of doing matrix multiplication is better for locality:
+               in the inner loop, the first element s1[i,k] is constant,
+               and in the second one s2[k,j], only the second index changes.
+               If the inner loop was on k, both s1[i,k] and s2[k,j] would
+               change, and a change on the first index is worse if matrices
+               are stored row by row. */
+            for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+                for(unsigned int k = 0 ; k < s1.ncols ; k++) {
+                    for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+                        if (OMP_ROUND((int) (i * s2.ncols + j))) {
+                            o.compose(x, s1.poly(i,k), s2.poly(k,j));
+                            o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+                        }
+                    }
+                }
+            }
+            o.free(x, 1);
+        }
+    }
+    dst.swap(tmp);
+}
+
+
 /* Provide workalikes of usual interfaces for some ungifted systems */
 #include "portability.h"
 

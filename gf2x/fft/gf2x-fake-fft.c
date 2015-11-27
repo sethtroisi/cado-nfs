@@ -55,7 +55,7 @@ void gf2x_fake_fft_init(gf2x_fake_fft_info_ptr p, size_t nF, size_t nG, ...)
 }
 
 /* n is a number of coefficients ! */
-void gf2x_fake_fft_dft(gf2x_fake_fft_info_srcptr p GF2X_MAYBE_UNUSED, gf2x_fake_fft_ptr dst, unsigned long * src, size_t n) {
+void gf2x_fake_fft_dft(gf2x_fake_fft_info_srcptr p GF2X_MAYBE_UNUSED, gf2x_fake_fft_ptr dst, const unsigned long * src, size_t n) {
     ASSERT(n <= p->n1 || n <= p->n2);
     size_t s = BITS_TO_WORDS(n, ULONG_BITS);
     memcpy(dst, src, s * sizeof(unsigned long));
