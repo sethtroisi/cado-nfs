@@ -1061,12 +1061,6 @@ void compose_inner(
 #ifdef  HAVE_OPENMP
 #pragma omp parallel for collapse(2) schedule(static)
 #endif  /* HAVE_OPENMP */
-            /* This way of doing matrix multiplication is better for locality:
-               in the inner loop, the first element s1[i,k] is constant,
-               and in the second one s2[k,j], only the second index changes.
-               If the inner loop was on k, both s1[i,k] and s2[k,j] would
-               change, and a change on the first index is worse if matrices
-               are stored row by row. */
             for(unsigned int i = 0 ; i < s1.nrows ; i++) {
                 for(unsigned int j = 0 ; j < s2.ncols ; j++) {
                     for(unsigned int k = 0 ; k < s1.ncols ; k++) {
