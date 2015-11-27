@@ -315,4 +315,5 @@ uint64_t ideal_spq_get_q(ideal_spq_srcptr ideal);
  * ideal: the ideal.
  */
 int ideal_spq_get_deg_g(ideal_spq_srcptr ideal);
+
 #endif /* IDEAL_H */

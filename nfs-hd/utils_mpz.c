@@ -1,6 +1,5 @@
 #include "utils_mpz.h"
 #include <stdint.h>
-#include "gmp-ecm.h"
 #include <stdlib.h>
 #include "macros.h"
 #include "getprime.h"

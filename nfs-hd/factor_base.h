@@ -121,7 +121,7 @@ static inline void factor_base_set_ideal_u_part(factor_base_ptr factor_base,
  * t: dimension of the lattice.
  */
 static inline void factor_base_set_ideal_u(factor_base_ptr factor_base,
-    uint64_t index, ideal_u_srcptr ideal, unsigned int t) 
+    uint64_t index, ideal_u_srcptr ideal, unsigned int t)
 {
   ASSERT(index < factor_base->number_element_u);
 
@@ -144,4 +144,5 @@ static inline void factor_base_set_ideal_pr(factor_base_ptr factor_base,
   ideal_pr_init(factor_base->factor_base_pr[index]);
   ideal_pr_set_part(factor_base->factor_base_pr[index], r, t);
 }
+
 #endif  /* FACTOR_BASE_H */

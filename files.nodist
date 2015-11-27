@@ -138,7 +138,6 @@ nfs-hd/array.c
 nfs-hd/array.h
 nfs-hd/factor_base.c
 nfs-hd/factor_base.h
-nfs-hd/gmp-ecm.h
 nfs-hd/ideal.c
 nfs-hd/ideal.h
 nfs-hd/int64_poly.c
