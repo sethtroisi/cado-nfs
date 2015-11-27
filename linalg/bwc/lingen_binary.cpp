@@ -65,27 +65,17 @@ void compose_inner<gf2x_fake_fft, strassen_default_selector>(
     } else {
         tmp.zero();
 #ifdef  HAVE_OPENMP
-#pragma omp parallel
+#pragma omp parallel for collapse(2) schedule(static)
 #endif  /* HAVE_OPENMP */
-        {
-            typename fft_type::ptr x = o.alloc(1);
-            /* This way of doing matrix multiplication is better for locality:
-               in the inner loop, the first element s1[i,k] is constant,
-               and in the second one s2[k,j], only the second index changes.
-               If the inner loop was on k, both s1[i,k] and s2[k,j] would
-               change, and a change on the first index is worse if matrices
-               are stored row by row. */
-            for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+        for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+            for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+                typename fft_type::ptr x = o.alloc(1);
                 for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-                    for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-                        if (OMP_ROUND((int) (i * s2.ncols + j))) {
-                            o.compose(x, s1.poly(i,k), s2.poly(k,j));
-                            o.add(tmp.poly(i,j), tmp.poly(i,j), x);
-                        }
-                    }
+                    o.compose(x, s1.poly(i,k), s2.poly(k,j));
+                    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
                 }
+                o.free(x, 1);
             }
-            o.free(x, 1);
         }
     }
     dst.swap(tmp);
