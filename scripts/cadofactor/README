@@ -277,3 +277,13 @@ tasks.threads) is used in the square root step. To use say
 
 tasks.sqrt.threads = 16
 
+Re-running the linear algebra step
+==================================
+
+If the linear algebra step was already started, and you want to run it again
+with a different set of relations (for example with more sieving), you need
+to add the following to the cado-nfs.py command line, to allow removing the
+previous linear algebra subdirectory:
+
+tasks.linalg.bwc.allow_wipeout = True
+

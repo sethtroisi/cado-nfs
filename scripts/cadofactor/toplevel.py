@@ -196,19 +196,19 @@ class Cado_NFS_toplevel(object):
             f=open("/proc/cpuinfo")
             lines=f.readlines()
             f.close()
-            nphysical=len([x for x in lines if re.match("physical", x)])
+            nphysical=len({x for x in lines if re.match("physical", x)})
             if nphysical == 0:
                 return len([x for x in lines if re.match("processor", x)])
-            cpu_cores={}
+            cpu_cores=set()
             for x in lines:
-                foo=re.match("cpu cores\s*=\s*(\d+)", x)
+                foo=re.match("cpu cores\s*:\s*(\d+)", x)
                 if foo:
                     cpu_cores.add(foo.group(1))
             if len(cpu_cores) == 0:
                 return len([x for x in lines if re.match("processor", x)])
             if len(cpu_cores) != 1:
                 raise ValueError("inhomogeneous platform ?")
-            return nphysical * len(cpu_cores)
+            return nphysical * int(cpu_cores.pop())
         def backquote(cmd):
             pipe = subprocess.Popen(cmd.split(" "), stdout=subprocess.PIPE)
             loc = locale.getdefaultlocale()[1]

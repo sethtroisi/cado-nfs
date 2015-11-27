@@ -63,7 +63,6 @@ filter/filter_badideals.h
 filter/filter_config.h
 filter/dup1.c
 filter/dup2.c
-filter/explain.c
 filter/merge_replay_matrix.c
 filter/merge_replay_matrix.h
 filter/purge_matrix.c
@@ -263,12 +262,6 @@ parameters/factor/params.c90
 parameters/factor/params.c95
 parameters/factor/parameters.F9
 parameters/polynomials/F9.poly
-parameters/polynomials/c115.poly
-parameters/polynomials/c120.poly
-parameters/polynomials/c125.poly
-parameters/polynomials/c130.poly
-parameters/polynomials/c135.poly
-parameters/polynomials/c140.poly
 tests/sieve/F9.st
 polyselect/CMakeLists.txt
 polyselect/Makefile
@@ -642,8 +635,6 @@ utils/filter_io.tex
 utils/sm_utils.c
 utils/sm_utils.h
 utils/utils_with_io.h
-utils/utils-ffs.c
-utils/utils-ffs.h
 utils/cachebuf.h
 linalg/bwc/mpfq/mpfq_p_3.c
 linalg/bwc/mpfq/mpfq_p_3.h

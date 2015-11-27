@@ -2727,7 +2727,7 @@ void las_report_accumulate_threads_and_display(las_info_ptr las,
     verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
     verbose_output_print(0, 2, "coprime: %lu\n", rep->survivors2);
     verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0].get_checksum(), checksum_post_sieve[1].get_checksum());
-    if (las->batch) /* makes no sense in batch mode */
+    if (!las->batch) /* makes no sense in batch mode */
       verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     if (rep->both_even) {
@@ -2776,7 +2776,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "fb0",   "factor base file on the rational side");
   param_list_decl_usage(pl, "fb1",   "(alias fb) factor base file on the algebraic side");
-  param_list_decl_usage(pl, "fbc",  "factor base cache file");
+  param_list_decl_usage(pl, "fbc",  "factor base cache file (not yet functional)");
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");

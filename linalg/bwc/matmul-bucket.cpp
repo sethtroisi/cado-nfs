@@ -1827,9 +1827,8 @@ static unsigned long compressed_size(unsigned long s, unsigned int defer MAYBE_U
     } else if (defer <= 15) {
         return iceildiv(s, 2);
 #endif
-    } else {
-        return s;
     }
+    return s;
 }
 
 static void append_compressed(vector<uint8_t>& t8, vector<uint8_t> const& S, unsigned int defer MAYBE_UNUSED)

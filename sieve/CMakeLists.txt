@@ -48,4 +48,3 @@ add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
 target_link_libraries(dupsup utils_with_io facul las-norms)
 
 install(TARGETS makefb las freerel RUNTIME DESTINATION ${LIBSUFFIX}/sieve) 
-include(CMakeLists-nodist.txt OPTIONAL)

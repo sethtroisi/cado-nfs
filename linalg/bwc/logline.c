@@ -116,8 +116,8 @@ static void logline_puts_raw(int level, const char * s)
     if (logline_timings && current->eol) {
         char buf1[16];
         char buf2[16];
-        size_disp(1024UL * Memusage2(), buf1);
-        size_disp(1024UL * PeakMemusage(), buf2);
+        size_disp_fine(1024UL * Memusage2(), buf1, 10000.0);
+        size_disp_fine(1024UL * PeakMemusage(), buf2, 10000.0);
         fprintf(current->f, "[%.3f %s %s] ", wct_seconds() - start_time, buf1, buf2);
     }
     fputs(s, current->f);

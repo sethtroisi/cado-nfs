@@ -451,6 +451,9 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
   int int_i;
   unsigned int inc;
   uint8_t oy, y;
+  /* icc-14 gets confused between signbit from math.h and std::signbit ;
+   * probably a bug, but fixing is easy. */
+  using std::signbit;
 
   ASSERT_ALWAYS (u1 != 0.);
 

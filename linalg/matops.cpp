@@ -256,6 +256,7 @@ void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t w)
         sr++;
 	a >>= 2;
     }
+    _mm_empty();
 }
 #endif
 
@@ -1879,6 +1880,9 @@ int PLUQ64_inner(int * phi, mat64 l, mat64 u, mat64 a, int col_offset)
         todo^=v;
         rank++;
     }
+#if defined(HAVE_SSE41) && !defined(VALGRIND) && !defined(__ICC)
+    _mm_empty();
+#endif
     return rank;
 }
 
@@ -1982,6 +1986,9 @@ static inline void bli_64x64N_clobber(mat64 h, mat64 * us, int * phi, int nb)
             h[k] ^= w & h[i];
         }
     }
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
+    _mm_empty();
+#endif
 }
 
 void bli_64x128(mat64 h, mat64 * us, int * phi)
