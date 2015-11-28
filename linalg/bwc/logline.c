@@ -118,7 +118,7 @@ static void logline_puts_raw(int level, const char * s)
         char buf2[16];
         size_disp_fine(1024UL * Memusage2(), buf1, 10000.0);
         size_disp_fine(1024UL * PeakMemusage(), buf2, 10000.0);
-        fprintf(current->f, "[%.3f %s %s] ", wct_seconds() - start_time, buf1, buf2);
+        fprintf(current->f, "[%.3f %.3f %s %s] ", wct_seconds() - start_time, seconds(), buf1, buf2);
     }
     fputs(s, current->f);
     size_t n = strlen(s);
