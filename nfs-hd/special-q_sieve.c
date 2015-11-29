@@ -1536,7 +1536,8 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
  */
 void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_Z_srcptr matrix, factor_base_srcptr fb, sieving_bound_srcptr H,
-    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * outstd, FILE * errstd)
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * outstd, FILE * errstd,
+    uint64_t sieve_start)
 {
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
@@ -1558,9 +1559,14 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   time_line_sieve = seconds();
 #endif // TIME_SIEVES
 
+  uint64_t i = 0;
+  while (fb->factor_base_1[i]->ideal->r < sieve_start) {
+    i++;
+  }
+
   /* --- Line sieve --- */
 
-  uint64_t i = 0;
+
   uint64_t line_sieve_stop = 2 * (uint64_t) H->h[0];
 
   while (i < fb->number_element_1 &&
@@ -1995,6 +2001,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "main", "if MNFS-CM, main side");
   param_list_decl_usage(pl, "out", "path to output file");
   param_list_decl_usage(pl, "err", "path to error file");
+  param_list_decl_usage(pl, "start", "value of first ideal r considered");
 }
 
 /*
@@ -2018,7 +2025,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** q_range, unsigned char ** thresh,
     unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
-    int * main_side, FILE ** outstd, FILE ** errstd)
+    int * main_side, FILE ** outstd, FILE ** errstd, uint64_t ** sieve_start)
 {
   param_list pl;
   param_list_init(pl);
@@ -2066,6 +2073,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   //TODO: something strange here.
   * fbb = malloc(sizeof(uint64_t) * (* V));
+  * sieve_start = malloc(sizeof(uint64_t) * (* V));
   * thresh = malloc(sizeof(unsigned char) * (* V));
   * fb = malloc(sizeof(factor_base_t) * (* V));
   * lpb = malloc(sizeof(unsigned int) * (* V));
@@ -2134,6 +2142,17 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * main_side = -1;
   param_list_parse_int(pl, "main", main_side);
 
+  for (unsigned int i = 0; i < * V; i++) {
+    (* sieve_start)[i] = 2;
+  }
+  param_list_parse_uint64_list(pl, "start", * sieve_start, (size_t) * V, ",");
+
+#ifndef NDEBUG
+  for (unsigned int i = 0; i < * V; i++) {
+    ASSERT((* sieve_start)[i] < (*fbb)[i]);
+  }
+#endif // NDEBUG
+
   param_list_clear(pl);
 }
 
@@ -2157,9 +2176,11 @@ int main(int argc, char * argv[])
   int main_side;
   FILE * outstd;
   FILE * errstd;
+  uint64_t * sieve_start;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
-      &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &outstd, &errstd);
+      &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &outstd, &errstd,
+      &sieve_start);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2312,7 +2333,7 @@ int main(int argc, char * argv[])
 
           sec = seconds();
           special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j],
-              outstd, errstd);
+              outstd, errstd, sieve_start[j]);
           time[j][1] = seconds() - sec;
           sec = seconds();
           find_index(indexes[j], array, thresh[j]);
@@ -2417,6 +2438,7 @@ int main(int argc, char * argv[])
   array_clear(array);
   free(lpb);
   free(fb);
+  free(sieve_start);
   sieving_bound_clear(H);
   free(fbb);
   free(thresh);
