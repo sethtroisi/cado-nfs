@@ -1,4 +1,3 @@
-
 set (SQ_SRC special-q_sieve.c mat_int64.c int64_vector.c uint64_array.c
     mat_Z.c ideal.c makefb.c utils_mpz.c int64_poly.c sieving_bound.c
     array.c utils_int64.c factor_base.c utils_lattice.c double_vector.c
@@ -36,3 +35,21 @@ add_executable(makefb-hd ${MAKEFB_SRC})
 set_property(TARGET makefb-hd PROPERTY COMPILE_DEFINITIONS MAIN)
 
 target_link_libraries(makefb-hd utils)
+
+# Polynomial selection
+
+set (POL_SRC polyselect-hd.c polynomials.c sieving_bound.c utils_mpz.c)
+
+add_executable(polyselect-hd ${POL_SRC})
+
+target_link_libraries(polyselect-hd utils polyselect_common)
+
+#set_property(TARGET polyselect-hd PROPERTY COMPILE_DEFINITIONS EEA_BOUND)
+
+# Parameters selection
+
+set (PAR_SRC paraselect-hd.c parameters.c polynomials.c sieving_bound.c utils_mpz.c)
+
+add_executable(paraselect-hd ${PAR_SRC})
+
+target_link_libraries(paraselect-hd utils polyselect_common)

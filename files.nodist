@@ -180,6 +180,13 @@ nfs-hd/list_double_vector.c
 nfs-hd/list_int64_vector.h
 nfs-hd/list_int64_vector_index.c
 nfs-hd/list_int64_vector_index.h
+nfs-hd/CMakeLists.txt
+nfs-hd/parameters.c
+nfs-hd/parameters.h
+nfs-hd/polynomials.c
+nfs-hd/polynomials.h
+nfs-hd/polyselect-hd.c
+nfs-hd/paraselect-hd.c
 tests/nfs-hd/
 nfs-hd/utils_norm.c
 nfs-hd/utils_norm.h

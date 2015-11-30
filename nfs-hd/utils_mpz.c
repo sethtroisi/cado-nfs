@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "macros.h"
-#include "getprime.h"
 
 int mpz_invert_ui(mpz_ptr rop, mpz_srcptr op1, const uint64_t op2)
 {
