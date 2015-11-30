@@ -746,7 +746,7 @@ class HasState(MakesTablenames, wudb.HasDbConnection):
     """ Declares that the class has a DB-backed dictionary in which the class
     can store state information.
     
-    The dicatonary is available as an instance attribute "state".
+    The dictionary is available as an instance attribute "state".
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
