@@ -156,7 +156,6 @@ sieve/strategies/F9.sh
 sieve/freerel_multipoly.c
 linalg/bwc/lingen.txt
 sieve/CMakeLists-nodist.txt
-sieve/bernstein.c
 nfs-hd/array.c
 nfs-hd/array.h
 nfs-hd/double_vector.c
@@ -191,5 +190,13 @@ nfs-hd/utils_lattice.h
 nfs-hd/utils_mpz.c
 nfs-hd/utils_mpz.h
 nfs-hd/vector.h
+nfs-hd/CMakeLists.txt
+nfs-hd/parameters.c
+nfs-hd/parameters.h
+nfs-hd/polynomials.c
+nfs-hd/polynomials.h
+nfs-hd/polyselect-hd.c
+nfs-hd/paraselect-hd.c
+nfs-hd/libecm.a
 tests/nfs-hd/
 sieve/smooth.c

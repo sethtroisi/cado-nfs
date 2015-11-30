@@ -205,6 +205,18 @@ static void random_mpz_poly(mpz_poly_ptr g, int coeff0, int coeff1, int degree,
   mpz_poly_setcoeff_si(g, degree, lc);
 }
 
+static double double_mpz_poly_infinty_norm(mpz_poly_srcptr a)
+{
+  ASSERT(a->deg >= 1);
+
+  double max = abs(mpz_get_d(a->coeff[0]));
+  for (int i = 1; i <= a->deg; i++) {
+    max = MAX(max, abs(mpz_get_d(a->coeff[i])));
+  }
+
+  return max;
+}
+
 static void gen_poly_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
     mpz_ptr a, mpz_ptr b, mpz_ptr c, mpz_srcptr p, mpz_poly_srcptr h,
     int coeff0, int coeff1, unsigned int q, unsigned int t,
@@ -237,7 +249,7 @@ static void gen_poly_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
     } else if (mpz_cmp(smooth, factor->factorization[factor->number - 1]) > 0) {
       mpz_set(smooth, factor->factorization[factor->number - 1]);
       lc = i;
-    } 
+    }
     factor_clear(factor);
   }
   mpz_clear(smooth);
@@ -250,17 +262,21 @@ static void gen_poly_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
   mpz_poly_init(f0_tmp, -1);
   mpz_poly_t f1_tmp;
   mpz_poly_init(f1_tmp, -1);
-  
+
   unsigned int k = 0;
   while (k < nb_times) {
     random_mpz_poly(g, coeff0, coeff1, h->deg, lc);
     mpz_poly_set(f0_tmp, h);
     mpz_poly_mul_mpz(f0_tmp, f0_tmp, c);
     mpz_poly_add(f0_tmp, f0_tmp, g);
+#ifdef ALPHA
     alpha0 = get_alpha(f0_tmp, ALPHA_BOUND);
+#else // ALPHA
+    alpha0 = log2(double_mpz_poly_infinty_norm(f0_tmp));
+#endif // ALPHA
     if (mpz_poly_is_irreducible(f0_tmp, p)) {
       k++;
-#ifdef EEA_BOUND 
+#ifdef EEA_BOUND
       extended_euclidean_algorithm_bound(a, b, p, c, c);
 #else
       extended_euclidean_algorithm_stop_2(a, b, p, c);
@@ -270,8 +286,12 @@ static void gen_poly_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
       mpz_poly_init(tmp, -1);
       mpz_poly_mul_mpz(tmp, h, a);
       mpz_poly_add(f1_tmp, f1_tmp, tmp);
+#ifdef ALPHA
       alpha1 = get_alpha(f1_tmp, ALPHA_BOUND);
-      if (alpha0 + alpha1 < sum_alpha) {
+#else // ALPHA
+      alpha1 = log2(double_mpz_poly_infinty_norm(f1_tmp));
+#endif // ALPHA
+      if (weight_0 * alpha0 + weight_1 * alpha1 < sum_alpha) {
         mpz_poly_set(f0, f0_tmp);
         mpz_poly_set(f1, f1_tmp);
         sum_alpha = weight_0 * alpha0 + weight_1 * alpha1;
@@ -341,5 +361,4 @@ void function_classical(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_srcptr p,
 
   mpz_poly_clear(f0_tmp);
   mpz_poly_clear(f1_tmp);
- 
 }
