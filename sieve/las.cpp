@@ -3071,7 +3071,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (si->qbasis.a0 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis.a0 ||
             si->qbasis.a1 <= INT64_C(-2147483648) || INT64_C(2147483648) <= si->qbasis.a1)
           {
-            fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q. Skipping this special-q.\n");
+            fprintf (stderr, "Warning, too skew special-q basis, define SUPPORT_LARGE_Q. Skipping this special-q.\n");
             continue;
           }
 #endif
