@@ -48,8 +48,8 @@ target_link_libraries(polyselect-hd utils polyselect_common)
 
 # Parameters selection
 
-set (PAR_SRC paraselect-hd.c parameters.c polynomials.c sieving_bound.c utils_mpz.c)
+#set (PAR_SRC paraselect-hd.c parameters.c polynomials.c sieving_bound.c utils_mpz.c)
 
-add_executable(paraselect-hd ${PAR_SRC})
+#add_executable(paraselect-hd ${PAR_SRC})
 
-target_link_libraries(paraselect-hd utils polyselect_common)
+#target_link_libraries(paraselect-hd utils polyselect_common)

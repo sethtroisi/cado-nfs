@@ -55,7 +55,7 @@ int main()
   mpz_init(p);
   mpz_set_str(p, "10822639589", 10);
   unsigned int n = 6;
-  printf("%d\n", sieving_region_special_q(H, nb_elem));
+  sieving_region_square(H, nb_elem);
   sieving_bound_fprintf(stdout, H);
   printf("Size: %f\n", log2(size_sieving_region(H)));
   printf("%d\n", sieving_region_classical(H, p, n, nb_elem));
