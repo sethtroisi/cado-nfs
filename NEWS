@@ -1,5 +1,16 @@
 Main changes between cado-nfs-2.1.1 and cado-nfs-2.2:
 
+* The toplevel scripts (factor.sh, cadofactor.py, wuclient2.py) have
+  changed. Now there are only two main scripts to be used by most users:
+   - cado-nfs.py
+     This combines the roles of the previous factor.sh and cadofactor.py.
+     The most basic use is ./cado-nfs.py <N>, and it will factor N on the
+     local host. It can also become a server in a multi-host
+     computation. See README for more details.
+   - cado-nfs-client.py
+     This is mostly a renaming of wuclient2.py. This starts a client that
+     can contribute to a running computation, possibly on another
+     machine.
 * Main algorithmic improvements:
   - polynomial selection: algorithm of Bai, Bouvier, Kruppa, Zimmermann
     (Better polynomials for GNFS, 2015) has been implemented.
