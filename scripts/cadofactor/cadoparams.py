@@ -497,8 +497,8 @@ class Parameters(object):
         """
         param = ".".join(path + [key])
         # print ("Trying to convert param=%s, value=%s" % (param, orig_value))
-        if datatype is None:
-            return value
+        if datatype is type(None):
+            return orig_value
 
         if datatype is int:
             castfunction = self._cast_to_int

@@ -707,7 +707,7 @@ class Cado_NFS_toplevel(object):
         >>> t.setpath("lib", "/tmp")
         >>> p = t.get_cooked_parameters()
         >>> p.get_simple("slaves.nrclients", 0)
-        1
+        0
 
         If we are run with a non-default parameter file, then we end up
         running in pure server mode.
@@ -742,10 +742,7 @@ class Cado_NFS_toplevel(object):
         if self.args.slaves:
             # We've been asked to override the value, so let's just do it.
             self.parameters.set_simple("slaves.nrclients", self.args.slaves)
-        if self.parameters.myparams(["hostnames"], "slaves"):
-            # default nrclients is 1 if we specify explicit list of slaves.
-            self.parameters.set_if_unset("slaves.nrclients", 1)
-        elif self.using_default_parameter_file:
+        if self.using_default_parameter_file:
             self.parameters.set_if_unset("slaves.hostnames", "localhost")
             # running on localhost, default nrclients to just as many as
             # needed to use the number of threads which have been asked
@@ -763,8 +760,11 @@ class Cado_NFS_toplevel(object):
                 os.path.join(self.parameters.get_simple("tasks.workdir", ""),
                     "client"))
 
-        # What is a sensible default value for scriptpath?
-        if self.parameters.get_simple("slaves.nrclients", 0):
+        # Deal with scriptpath if hostnames is set and nrclients is either set
+        # to an nonzero value or unset.
+        if self.parameters.get_simple("slaves.hostnames", None) and \
+           self.parameters.get_simple("slaves.nrclients", None) != 0:
+            # What is a sensible default value for scriptpath?
             if not self.parameters.get_simple("slaves.scriptpath", ""):
                 # see whether cado-nfs-client.py exists.
                 # try in the source tree. If we have the source tree defined,
@@ -890,7 +890,6 @@ class Cado_NFS_toplevel(object):
         N = 12345
         slaves.basepath = /tmp/a/client
         slaves.hostnames = foo,bar
-        slaves.nrclients = 1
         slaves.scriptpath = /tmp
         tasks.execpath = /tmp
         tasks.threads = 4
