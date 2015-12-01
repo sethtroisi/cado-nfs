@@ -4,7 +4,6 @@
 # with the list of files known to the SCM.  A further word of caution:
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 README.nonlinear
-TODO_BEFORE_RELEASE_2.2
 Toolchain-MinGW64.cmake
 dev_docs/
 files.dist
