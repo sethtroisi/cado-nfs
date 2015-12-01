@@ -116,6 +116,7 @@ misc/descent-init.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
+filter/replay_dblemat.c
 ffs/archives/checker.mag
 ffs/archives/descent_809.mag
 ffs/archives/modprecomp.mag
