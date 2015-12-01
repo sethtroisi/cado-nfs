@@ -1828,6 +1828,8 @@ sub task_lingen {
     # obvious though.
     if ($prime == 2) {
         my @args = @main_args;
+        my $t = $thr_split[0]*$thr_split[1];
+        push @args, "t=$t";
         task_common_run("lingen", @args);
         task_common_run('split',
             (grep { /^(?:mn|m|n|wdir|prime|splits|verbose_flags)=/ } @main_args),
