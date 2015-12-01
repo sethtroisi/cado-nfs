@@ -131,7 +131,7 @@ typedef uint64_t mat64[64];
 typedef uint64_t * mat64_ptr;
 typedef const uint64_t * mat64_srcptr;
 
-static inline uint64_t bitrev(uint64_t a)/*{{{*/
+static inline uint64_t MAYBE_UNUSED bitrev(uint64_t a)/*{{{*/
 {
     a = (a >> 32) ^ (a << 32);
     uint64_t m;
@@ -148,7 +148,7 @@ static inline uint64_t bitrev(uint64_t a)/*{{{*/
     return a;
 }
 /* like bitrev, but keep nibbles intact */
-static inline uint64_t nibrev(uint64_t a)
+static inline uint64_t MAYBE_UNUSED nibrev(uint64_t a)
 {
     a = (a >> 32) ^ (a << 32);
     uint64_t m;
@@ -361,12 +361,12 @@ void copy_6464(mat64_ptr dst, mat64_srcptr src)
 
 /* level 2 */
 
-static inline void copy_N64(uint64_t * dst, const uint64_t * src, size_t m)
+static inline void MAYBE_UNUSED copy_N64(uint64_t * dst, const uint64_t * src, size_t m)
 {
     memcpy(dst, src, m * sizeof(uint64_t));
 }
 
-static inline int cmp_N64(const uint64_t * dst, const uint64_t * src, size_t m)
+static inline int MAYBE_UNUSED cmp_N64(const uint64_t * dst, const uint64_t * src, size_t m)
 {
     return memcmp(dst, src, m * sizeof(uint64_t));
 }
@@ -420,7 +420,7 @@ void mul_N64_6464_lookup4(uint64_t *C,
     }
 }
 /* This can work in place (C==A, or C==B, or both) */
-static inline void addmul_N64_6464_lookup4(uint64_t *C,
+static inline void MAYBE_UNUSED addmul_N64_6464_lookup4(uint64_t *C,
                    const uint64_t *A,
                    const uint64_t *B, size_t m)
 {
@@ -886,7 +886,7 @@ void mul_TN64_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol)
 }
 
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
-static inline void mul_TN64K_N64_sse2(uint64_t * w, uint64_t * u, uint64_t * v, unsigned int n, unsigned int K)
+static inline void MAYBE_UNUSED mul_TN64K_N64_sse2(uint64_t * w, uint64_t * u, uint64_t * v, unsigned int n, unsigned int K)
 {
     memset(w, 0, 64 * K * sizeof(uint64_t));
     for(unsigned int i = 0 ; i < n ; i++) {
@@ -915,7 +915,7 @@ static inline void mul_TN64K_N64_sse2(uint64_t * w, uint64_t * u, uint64_t * v, 
 }
 #endif
 
-static inline void mul_TN64K_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol, unsigned int K)
+static inline void MAYBE_UNUSED mul_TN64K_N64_C(uint64_t * b, uint64_t * A, uint64_t * x, unsigned int ncol, unsigned int K)
 {
     uint64_t idx, i, rA;
     uint64_t rx;
