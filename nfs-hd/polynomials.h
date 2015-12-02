@@ -19,13 +19,14 @@
   q: a special-q.
   t: dimension of the lattice.
 */
-void function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
-    mpz_ptr a, mpz_ptr b, mpz_ptr c, mpz_srcptr p, mpz_poly_srcptr h,
-    int coeff0, int coeff1, unsigned int q, unsigned int t,
-    unsigned int nb_times, double weight_0, double weight_1);
+double function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
+    mpz_ptr a, mpz_ptr b, mpz_ptr c, mpz_srcptr p, mpz_poly_ptr h,
+    int * coeff, unsigned int q, unsigned int t,
+    unsigned int nb_times, double * weight, int c_tol, gmp_randstate_t state,
+    unsigned int h_set);
 
 void function_classical(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_srcptr p,
-    unsigned int n, int coeff0, int coeff1, unsigned int nb_times,
-    double weight_0, double weight_1);
+    unsigned int n, int * coeff, unsigned int nb_times,
+    double * weight, gmp_randstate_t state);
 
 #endif // FUNCTIONS_H

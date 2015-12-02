@@ -845,6 +845,37 @@ int param_list_parse_double(param_list pl, const char * key, double * r)
     return seen;
 }
 
+int param_list_parse_double_and_double(param_list pl, const char * key,
+    double * r, const char * sep)
+{
+    char *value;
+    int seen;
+    if (!get_assoc(pl, key, &value, &seen))
+        return 0;
+    char *orig_value = value, * end;
+    double res[2];
+    res[0] = strtod(value, &end);
+    if (strncmp(end, sep, strlen(sep)) != 0) {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    value = end + strlen(sep);
+    res[1] = strtod(value, &end);
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    if (r) {
+        r[0] = res[0];
+        r[1] = res[1];
+    }
+    return seen;
+}
+
 int param_list_parse_string(param_list pl, const char * key, char * r, size_t n)
 {
     char *value;

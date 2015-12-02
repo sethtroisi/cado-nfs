@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <time.h>
 #include "cado.h"
 #include "utils.h"
 #include "polynomials.h"
@@ -15,29 +16,27 @@ static void mpz_poly_coeff_fprintf(FILE * file, mpz_poly_srcptr f)
   gmp_fprintf(file, "%Zd\n", f->coeff[f->deg]);
 }
 
-  /*function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, q, t);*/
 void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "p", "prime number");
   param_list_decl_usage(pl, "n", "degree of the extension");
-  param_list_decl_usage(pl, "h", "polynomial to build f0 and f1");
-  param_list_decl_usage(pl, "coeff0", "lowest coefficient of g");
-  param_list_decl_usage(pl, "coeff1", "greatest coefficient of g");
-  param_list_decl_usage(pl, "q", "a typical q of a special-q");
-  param_list_decl_usage(pl, "t", "dimension of the lattice");
+  param_list_decl_usage(pl, "coeff", "range of coefficients of g");
   param_list_decl_usage(pl, "nb_times", "number of tested polynomials");
-  param_list_decl_usage(pl, "weight_0",
-      "weight for alpha of f0 when sum alphas");
-  param_list_decl_usage(pl, "weight_1",
-      "weight for alpha of f1 when sum alphas");
+  param_list_decl_usage(pl, "weight",
+      "weight for alphas of when sum alphas");
   param_list_decl_usage(pl, "type", "0 if classical, 1 if special-q");
+  param_list_decl_usage(pl, "q", "a typical q of a special-q (for type 1)");
+  param_list_decl_usage(pl, "t", "dimension of the lattice (for type 1)");
+  param_list_decl_usage(pl, "h", "polynomial to build f0 and f1 (for type 1)");
   param_list_decl_usage(pl, "out", "path to the output file");
+  param_list_decl_usage(pl, "c_tol", "tolerance around c (for type 1)");
 }
 
 void initialise_parameters(int argc, char * argv[], mpz_ptr p, mpz_poly_ptr h,
-    int * coeff0, int * coeff1, unsigned int * q, unsigned int * t,
-    unsigned int * nb_times, double * weight_0, double * weight_1,
-    unsigned int * n, unsigned int * type, FILE ** outstd)
+    int ** coeff, unsigned int * q, unsigned int * t,
+    unsigned int * nb_times, double ** weight,
+    unsigned int * n, unsigned int * type, FILE ** outstd, int * c_tol,
+    unsigned int * h_set)
 {
   param_list pl;
   param_list_init(pl);
@@ -64,32 +63,49 @@ void initialise_parameters(int argc, char * argv[], mpz_ptr p, mpz_poly_ptr h,
 
   * type = 1;
   param_list_parse_uint(pl, "type", type);
+  ASSERT(* type < 2);
+
   param_list_parse_mpz(pl, "p", p);
   param_list_parse_uint(pl, "n", n);
+
   * nb_times = 100;
   param_list_parse_uint(pl, "nb_times", nb_times);
   ASSERT(* nb_times > 0);
 
-  * weight_0 = 0.5;
-  * weight_1 = 0.5;
-  param_list_parse_double(pl, "weight_0", weight_0);
-  param_list_parse_double(pl, "weight_1", weight_1);
-  ASSERT(* weight_0 >= 0.0);
-  ASSERT(* weight_1 >= 0.0);
-  ASSERT(* weight_0 + * weight_1 == 1.0);
+  * weight = (double *) malloc(2 * sizeof(double));
+  (*weight)[0] = 0.5;
+  (*weight)[1] = 0.5;
+  param_list_parse_double_and_double(pl, "weight", * weight, ",");
+  ASSERT((* weight)[0] >= 0.0);
+  ASSERT((* weight)[1] >= 0.0);
+  ASSERT((* weight)[0] + (* weight)[1] == 1.0);
 
-  param_list_parse_int(pl, "coeff0", coeff0);
-  param_list_parse_int(pl, "coeff1", coeff1);
-  ASSERT(coeff0 < coeff1);
+  * coeff = (int *) malloc(2 * sizeof(int));
+  param_list_parse_int_and_int(pl, "coeff", * coeff, ",");
+  ASSERT((*coeff)[0] < (*coeff)[1]);
+  ASSERT((*coeff)[0] < 0);
+  ASSERT((*coeff)[1] > 0);
 
   if (* type == 1) {
     param_list_parse_mpz_poly(pl, "h", h, ",");
-    ASSERT(* n == (unsigned int )h->deg);
+    if (h->deg < (int) * n) {
+      * h_set = 0;
+      mpz_poly_realloc(h, (int)* n + 1);
+      h->deg = * n;
+      ASSERT(h->alloc == (int)* n + 1);
+    } else {
+      * h_set = 1;
+      ASSERT(* n % ((unsigned int )h->deg) == 0);
+    }
 
     param_list_parse_uint(pl, "q", q);
 
     param_list_parse_uint(pl, "t", t);
     ASSERT(* t > 2);
+
+    * c_tol = 20;
+    param_list_parse_int(pl, "c_tol", c_tol);
+    ASSERT(* c_tol > 0);
   }
 
   unsigned int size_path = 1024;
@@ -113,17 +129,17 @@ int main(int argc, char * argv[])
   mpz_poly_t h;
   mpz_poly_init(h, -1);
   unsigned int q;
-  int coeff0;
-  int coeff1;
+  int * coeff;
   unsigned int t;
   unsigned int nb_times;
-  double weight_0;
-  double weight_1;
+  double * weight;
   unsigned int type;
   FILE * outstd;
+  int c_tol;
+  unsigned int h_set;
 
-  initialise_parameters(argc, argv, p, h, &coeff0, &coeff1, &q, &t, &nb_times,
-      &weight_0, &weight_1, &n, &type, &outstd);
+  initialise_parameters(argc, argv, p, h, &coeff, &q, &t, &nb_times,
+      &weight, &n, &type, &outstd, &c_tol, &h_set);
 
   mpz_poly_t f0;
   mpz_poly_init(f0, h->deg);
@@ -132,6 +148,11 @@ int main(int argc, char * argv[])
   mpz_poly_t g;
   mpz_poly_init(g, h->deg);
 
+  gmp_randstate_t state;
+  gmp_randinit_default(state);
+  gmp_randseed_ui(state, time(NULL));
+  srand(time(NULL));
+
   mpz_t a;
   mpz_init(a);
   mpz_t b;
@@ -139,18 +160,18 @@ int main(int argc, char * argv[])
   mpz_t c;
   mpz_init(c);
 
+  double epsilon = 0.0;
+
   gmp_fprintf(outstd, "# p^n: %Zd^%u\n", p, n);
   gmp_fprintf(outstd, "n: %Zd\n", p);
   //TODO: check if it is needed or not for cado_poly.
   fprintf(outstd, "skew: 1.000\n");
-  fprintf(outstd, "# t = %u\n", t);
 
   if (type == 0) {
-    function_classical(f0, f1, p, n, coeff0, coeff1, nb_times, weight_0,
-        weight_1);
+    function_classical(f0, f1, p, n, coeff, nb_times, weight, state);
   } else if (type == 1) {
-    function_special_q(f0, f1, g, a, b, c, p, h, coeff0, coeff1, q, t, nb_times,
-        weight_0, weight_1);
+    epsilon = function_special_q(f0, f1, g, a, b, c, p, h, coeff, q, t,
+        nb_times, weight, c_tol, state, h_set);
   }
 
 #ifndef NDEBUG
@@ -159,12 +180,13 @@ int main(int argc, char * argv[])
   mpz_t tmp;
   mpz_init(tmp);
   mpz_poly_resultant(res, f0, f1);
-  mpz_mod(tmp, res, p);
-  ASSERT(mpz_cmp_ui(tmp, 0) == 0);
   mpz_pow_ui(tmp, p, n);
   mpz_mod(tmp, res, tmp);
   ASSERT(mpz_cmp_ui(tmp, 0) == 0);
-  gmp_fprintf(outstd, "# Resultant of poly0 and poly1: %Zd\n", res);
+  gmp_fprintf(outstd, "# res(poly0, poly1): %Zd\n", res);
+  mpz_pow_ui(tmp, p, n);
+  mpz_divexact(tmp, res, tmp);
+  gmp_fprintf(outstd, "# Excess: %Zd\n", tmp);
   mpz_clear(res);
   mpz_clear(tmp);
 #endif // NDEBUG
@@ -181,7 +203,9 @@ int main(int argc, char * argv[])
   fprintf(outstd, "# alpha1: %f\n", get_alpha(f1, ALPHA_BOUND));
 
   if (type == 1) {
+    fprintf(outstd, "# t = %u\n", t);
     fprintf(outstd, "# log2(q) = %u\n", q);
+    fprintf(outstd, "# epsilon = %f\n", epsilon);
     gmp_fprintf(outstd, "# a: %Zd, b: %Zd, c: %Zd\n", a, b, c);
     fprintf(outstd, "# g: ");
     mpz_poly_fprintf(outstd, g);
@@ -198,6 +222,8 @@ int main(int argc, char * argv[])
   mpz_clear(b);
   mpz_clear(c);
   mpz_clear(p);
+
+  gmp_randclear(state);
 
   fclose(outstd);
 
