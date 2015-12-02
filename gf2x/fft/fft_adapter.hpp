@@ -67,12 +67,15 @@ public:                                                                 \
 	inline void zero(ptr x, size_t n) const { CAT(visible,zero)(o,x,n); }	\
 	inline ptr get(ptr x, size_t n) const { return CAT(visible,get)(o,x,n); }\
 	inline srcptr get(srcptr x, size_t n) const { return CAT(visible,get_const)(o,x,n); }\
-	inline void dft(ptr x, unsigned long * F, size_t n) const {	\
+	inline void dft(ptr x, const unsigned long * F, size_t n) const {	\
 		return CAT(visible,dft)(o,x,F,n);				\
 	}								\
         /* this destroys the input ! */                                 \
 	inline void ift(unsigned long * F, size_t n, ptr x) const {	\
 		return CAT(visible,ift)(o,F,n,x);				\
+	}								\
+	inline void addcompose(ptr y, srcptr x1, srcptr x2) const {	\
+		return CAT(visible,addcompose)(o,y,x1,x2);		\
 	}								\
 	inline void compose(ptr y, srcptr x1, srcptr x2) const {	\
 		return CAT(visible,compose)(o,y,x1,x2);			\

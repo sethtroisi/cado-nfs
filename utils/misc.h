@@ -202,6 +202,7 @@ static inline int cado_parity64(uint64_t x) { return cado_parityll(x); }
 #error "need proper equivalents for cado_ctz64 & friends"
 #endif
 /*}}}*/
+const char *size_disp_fine(size_t s, char buf[16], double cutoff);
 const char *size_disp(size_t s, char buf[16]);
 
 #ifdef __cplusplus

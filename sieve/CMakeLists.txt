@@ -30,10 +30,7 @@ add_executable (fb_test EXCLUDE_FROM_ALL fb.cpp)
 set_property(TARGET fb_test PROPERTY COMPILE_DEFINITIONS TESTDRIVE=1)
 target_link_libraries (fb_test utils)
 
-add_executable (las_descent EXCLUDE_FROM_ALL
-    ${las_sources}
-    las-dlog-base.cpp
-    )
+add_executable (las_descent ${las_sources} las-dlog-base.cpp)
 set_property(TARGET las_descent PROPERTY COMPILE_DEFINITIONS DLP_DESCENT SUPPORT_LARGE_Q)
 target_link_libraries (las_descent ${las_libraries})
 
@@ -50,6 +47,4 @@ add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
     las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
 target_link_libraries(dupsup utils_with_io facul las-norms)
 
-install(TARGETS makefb las freerel RUNTIME DESTINATION ${BINSUFFIX}/sieve)
-
-include(CMakeLists-nodist.txt OPTIONAL)
+install(TARGETS makefb las freerel RUNTIME DESTINATION ${LIBSUFFIX}/sieve) 

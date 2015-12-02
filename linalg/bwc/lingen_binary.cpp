@@ -25,16 +25,13 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
-#ifdef  HAVE_OPENMP
-#include <omp.h>
-#define OMP_ROUND(k) ((k) % omp_get_num_threads() == omp_get_thread_num())
-#else
-#define OMP_ROUND(k) (1)
-#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
 #include "bwc_config.h"
 #include "macros.h"
 #include "utils.h"
@@ -47,6 +44,43 @@
 
 #include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
+
+/* we need a partial specialization because gf2x_fake_fft does its own
+ * allocation within addcompose (for the moment)
+ */
+template<>
+void compose_inner<gf2x_fake_fft, strassen_default_selector>(
+        tpolmat<gf2x_fake_fft>& dst,
+        tpolmat<gf2x_fake_fft> const & s1,
+        tpolmat<gf2x_fake_fft> const & s2,
+        gf2x_fake_fft& o, strassen_default_selector const& s)
+{
+    typedef gf2x_fake_fft fft_type;
+    tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
+    ASSERT(s1.ncols == s2.nrows);
+    unsigned int nbits;
+    nbits = o.size() * sizeof(remove_pointer<fft_type::ptr>::t) * CHAR_BIT;
+    if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
+        compose_strassen(tmp, s1, s2, o, s);
+    } else {
+        tmp.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for collapse(2) schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+            for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+                fft_type::ptr x = o.alloc(1);
+                for(unsigned int k = 0 ; k < s1.ncols ; k++) {
+                    o.compose(x, s1.poly(i,k), s2.poly(k,j));
+                    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+                }
+                o.free(x, 1);
+            }
+        }
+    }
+    dst.swap(tmp);
+}
+
 
 /* Provide workalikes of usual interfaces for some ungifted systems */
 #include "portability.h"
@@ -62,6 +96,8 @@ unsigned int lingen_threshold = 64;
 /* threshold for cantor fft algorithm */
 unsigned int cantor_threshold = UINT_MAX;
 
+/* number of threads */
+unsigned int nthreads = 1;
 
 tree_stats stats;
 
@@ -204,10 +240,10 @@ namespace globals {
     std::vector<unsigned int> delta;
     std::vector<unsigned int> chance_list;
 
-    polmat E;
-#ifndef NDEBUG
+#ifdef DO_EXPENSIVE_CHECKS
     polmat E_saved;
 #endif
+
     // F0 is exactly the n x n identity matrix, plus the X^(s-exponent)e_{cnum}
     // vectors. Here we store the cnum,exponent pairs.
     std::vector<std::pair<unsigned int, unsigned int> > f0_data;
@@ -233,7 +269,7 @@ namespace globals {
 // result has to be shifted t0 positions to the right.
 // Afterwards, column n+j of the result is column cnum[j] of A, shifted
 // exponent[j] positions to the right.
-void compute_E_from_A(polmat const &a)/*{{{*/
+void compute_E_from_A(polmat& E, polmat const &a)/*{{{*/
 {
     using namespace globals;
     polmat tmp_E(m, m + n, a.ncoef - t0);
@@ -992,7 +1028,7 @@ static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
  *
  */
 
-static bool go_quadratic(polmat& pi)/*{{{*/
+static bool go_quadratic(polmat& E, polmat& pi)/*{{{*/
 {
     using namespace globals;
     using namespace std;
@@ -1050,110 +1086,13 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     return finished;
 }/*}}}*/
 
-/* {{{ a tool for measuring timings and displaying progress of a
- * recursive algorithm
- */
-struct recursive_tree_timer_t {
-    struct spent_time {
-        unsigned int step;
-        double total;
-        double proper;
-        spent_time() : step(0), total(0), proper(0) {}
-    };
-
-    std::vector<spent_time> spent;
-
-    std::vector<std::pair<double, double> > stack;
-
-    void push() {
-        unsigned int level = stack.size();
-
-        if (spent.size() <= level) {
-            assert(spent.size() == level);
-            spent.push_back(spent_time());
-        }
-
-        ASSERT(spent.size() > level);
-
-        double st = seconds();
-        double children = 0;
-        if (spent.size() > level + 1) {
-            children = -spent[level+1].total;
-        }
-
-        stack.push_back(std::make_pair(st, children));
-    }
-
-    void pop(unsigned int t MAYBE_UNUSED) {
-        unsigned int level = stack.size() - 1;
-
-        double st = stack.back().first;
-        double children = stack.back().second;
-        stack.pop_back();
-
-        // unsigned int t1 = t;
-        double dtime = seconds() - st;
-
-        if (spent.size() > level + 1) {
-            children += spent[level+1].total;
-        }
-
-        spent[level].step++;
-        spent[level].total += dtime;
-
-        double ptime = dtime - children;
-
-        spent[level].proper += ptime;
-
-        /* make up some guess about the total time of all levels */
-        unsigned int outermost = level;
-        for(unsigned int back = 0 ; back <= level ; back++) {
-            if (spent[level-back].step == 0)
-                break;
-            outermost = level-back;
-        }
-        unsigned int innermost = spent.size() - 1;
-        double estim_tot = 0;
-        double spent_tot = 0;
-        for(unsigned int i = outermost ; i <= innermost ; i++) {
-            estim_tot += spent[i].proper * (1 << i) / (double) spent[i].step;
-            spent_tot += spent[i].proper;
-        }
-        double estim_above = 0;
-        double spent_above = 0;
-        for(unsigned int i = level ; i <= innermost ; i++) {
-            estim_above += spent[i].proper * (1 << i) / (double) spent[i].step;
-            spent_above += spent[i].proper;
-        }
-
-    }
-    void final_info()
-    {
-        for(unsigned int i = 0 ; i < spent.size() ; i++) {
-            printf("[%d] spent %.2f",
-                    i, spent[i].proper);
-            if (i < spent.size() - 1) {
-                printf(" (%.2f counting children)",
-                        spent[i].total);
-            }
-            printf("\n");
-        }
-        printf("Total computation took %.2f\n", spent[0].total);
-    }
-};      /* }}} */
-
-
-static bool compute_lingen(polmat& pi, recursive_tree_timer_t&);
+static bool compute_lingen(polmat& E, polmat& pi);
 
 template<typename fft_type>/*{{{*/
-static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
+static bool go_recursive(polmat& E, polmat& pi)
 {
     using namespace globals;
-#ifdef  __GNUC__
-    tree_stats_enter(stats, __PRETTY_FUNCTION__, E.ncoef);
-#else
-    tree_stats_enter(stats, __func__, E.ncoef);
-#endif
+    tree_stats_enter(stats, fft_type::name(), E.ncoef);
 
     /* E is known up to O(X^E.ncoef), so we'll consider this is a problem
      * of degree E.ncoef -- this is exactly the number of increases we
@@ -1191,27 +1130,14 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 #endif
 
     // std::cout << "Recursive call, degree " << E_length << std::endl;
-    // takes lengths.
-    fft_type o(E_length, expected_pi_deg + 1,
-            /* E_length + expected_pi_deg - kill, */
-            m + n);
-
-    tpolmat<fft_type> E_hat;
-
-    logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
-            t, E_length, fft_type::name());
-    /* The transform() calls expect a number of coefficients, not a
-     * degree. */
-    transform(E_hat, E, o, E_length);
-    logline_end(NULL, "");
-
-
-    /* ditto for this one */
-    E.resize(llen);
 
     polmat pi_left;
-    finished_early = compute_lingen(pi_left, tim);
-    E.clear();
+    {
+        polmat E_left;
+        E_left.set_mod_xi(E, llen);
+        finished_early = compute_lingen(E_left, pi_left);
+    }
+
     long pi_l_deg = pi_left.maxdeg();
     unsigned long pi_left_length = pi_left.maxlength();
 
@@ -1282,41 +1208,52 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     }/*}}}*/
 #endif
 
-    logline_begin(stdout, E_length,
-            "t=%u DFT_pi_left(%lu) [%s]",
-            t, pi_left_length, fft_type::name());
-    tpolmat<fft_type> pi_l_hat;
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
-    pi_left.clear();
-    logline_end(&t_dft_pi_left, "");
+    {
+        /* NOTE: The transform() calls expect a number of coefficients,
+         * not a degree. */
+        tpolmat<fft_type> E_hat;
+        tpolmat<fft_type> pi_l_hat;
+        tpolmat<fft_type> E_middle_hat;
+        // takes lengths.
+        fft_type o(E_length, expected_pi_deg + 1,
+                /* E_length + expected_pi_deg - kill, */
+                m + n);
 
-    tpolmat<fft_type> E_middle_hat;
 
-    /* There's a critical lack here. We're not truncating the output */
-    /* TODO XXX Do special convolutions here */
-    /* minimal degree of coefficients of E which contribute to degree
-     * llen and above when multiplying by pi_left is llen-pi_l_deg. */
-    logline_begin(stdout, E_length, "t=%u MP(%lu, %lu) -> %lu [%s]",
-            t,
-            (unsigned long) (E_length - (llen - pi_l_deg)),
-            pi_left_length,
-            E_length - llen,
-            fft_type::name());
-    compose(E_middle_hat, E_hat, pi_l_hat, o);
-    logline_end(&t_mp, "");
+        logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
+                t, E_length, fft_type::name());
+        transform(E_hat, E, o, E_length);
+        { polmat X; E.swap(X); }
+        logline_end(NULL, "");
 
-    E_hat.clear();
-    /* pi_l_hat is used later on ! */
+        logline_begin(stdout, E_length,
+                "t=%u DFT_pi_left(%lu) [%s]",
+                t, pi_left_length, fft_type::name());
+        transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
+        /* retain pi_left */
+        logline_end(&t_dft_pi_left, "");
 
-    logline_begin(stdout, E_length, "t=%u IFT_E_middle(%lu) [%s]",
-            t, E_length + pi_l_deg - kill + 1, fft_type::name());
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
-    E_middle_hat.clear();
-    logline_end(&t_ift_E_middle, "");
+        /* XXX do truncation, and middle product with wraparound */
+        logline_begin(stdout, E_length, "t=%u MP(%lu, %lu) -> %lu [%s]",
+                t,
+                (unsigned long) (E_length - (llen - pi_l_deg)),
+                pi_left_length,
+                E_length - llen,
+                fft_type::name());
+        compose(E_middle_hat, E_hat, pi_l_hat, o);
+        { tpolmat<fft_type> X; E_hat.swap(X); }
+        { tpolmat<fft_type> X; pi_l_hat.swap(X); }
+        logline_end(&t_mp, "");
+
+
+        logline_begin(stdout, E_length, "t=%u IFT_E_middle(%lu) [%s]",
+                t, E_length + pi_l_deg - kill + 1, fft_type::name());
+        /* The transform() calls expect a number of coefficients, not a
+         * degree ! */
+        itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
+        { tpolmat<fft_type> X; E_middle_hat.swap(X); }
+        logline_end(&t_ift_E_middle, "");
+    }
 
     /* Make sure that the first llen-kill coefficients of all entries of
      * E are zero. It's only a matter of verification, so this does not
@@ -1329,38 +1266,52 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     E.xdiv_resize(llen - kill, rlen);
 
     polmat pi_right;
-    finished_early = compute_lingen(pi_right, tim);
+    finished_early = compute_lingen(E, pi_right);
     int pi_r_deg = pi_right.maxdeg();
     unsigned long pi_right_length = pi_right.maxlength();
-    E.clear();
 
-    logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
-            t, pi_right_length, fft_type::name());
-    tpolmat<fft_type> pi_r_hat;
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
-    pi_right.clear();
-    logline_end(&t_dft_pi_right, "");
+    { polmat X; E.swap(X); }
 
-    logline_begin(stdout, E_length, "t=%u MUL(%lu, %lu) -> %lu [%s]",
-            t,
-            pi_left_length,
-            pi_right_length,
-            pi_left_length + pi_right_length - 1,
-            fft_type::name());
-    tpolmat<fft_type> pi_hat;
-    compose(pi_hat, pi_l_hat, pi_r_hat, o);
-    pi_l_hat.clear();
-    pi_r_hat.clear();
-    logline_end(&t_mul, "");
+    {
+        /* NOTE: The transform() calls expect a number of coefficients,
+         * not a degree. */
+        tpolmat<fft_type> pi_l_hat;
+        tpolmat<fft_type> pi_r_hat;
+        tpolmat<fft_type> pi_hat;
 
-    /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
-            t, pi_left_length + pi_right_length - 1, fft_type::name());
-    itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
-    logline_end(&t_ift_pi, "");
+        // takes lengths.
+        fft_type o(pi_l_deg + 1, pi_r_deg + 1, m + n);
+
+        logline_begin(stdout, E_length,
+                "t=%u DFT_pi_left(%lu) [%s]",
+                t, pi_left_length, fft_type::name());
+        transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
+        { polmat X; pi_left.swap(X); }
+        logline_end(&t_dft_pi_left, "");
+
+        logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
+                t, pi_right_length, fft_type::name());
+        transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
+        { polmat X; pi_right.swap(X); }
+        logline_end(&t_dft_pi_right, "");
+
+        logline_begin(stdout, E_length, "t=%u MUL(%lu, %lu) -> %lu [%s]",
+                t,
+                pi_left_length,
+                pi_right_length,
+                pi_left_length + pi_right_length - 1,
+                fft_type::name());
+        compose(pi_hat, pi_l_hat, pi_r_hat, o);
+        { tpolmat<fft_type> X; pi_l_hat.swap(X); }
+        { tpolmat<fft_type> X; pi_r_hat.swap(X); }
+        logline_end(&t_mul, "");
+
+        logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
+                t, pi_left_length + pi_right_length - 1, fft_type::name());
+        itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
+        { tpolmat<fft_type> X; pi_hat.swap(X); }
+        logline_end(&t_ift_pi, "");
+    }
 
 
     /*
@@ -1385,7 +1336,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     return finished_early;
 }/*}}}*/
 
-static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
+static bool compute_lingen(polmat& E, polmat& pi)
 {
     /* reads the data in the global thing, E and delta. ;
      * compute the linear generator from this.
@@ -1397,8 +1348,6 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
 
     // unsigned int t0 = t;
     
-    tim.push();
-
     /*
     logline_begin(stdout, UINT_MAX, "t=%u E_checksum() = (%lu, %" PRIx32 ")",
             t, E.ncoef, E.crc());
@@ -1406,15 +1355,15 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
     */
 
     if (deg_E <= lingen_threshold) {
-        b = go_quadratic(pi);
+        b = go_quadratic(E, pi);
     } else if (deg_E < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<gf2x_fake_fft>(pi, tim);
+        b = go_recursive<gf2x_fake_fft>(E, pi);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<gf2x_cantor_fft>(pi, tim);
+        b = go_recursive<gf2x_cantor_fft>(E, pi);
     }
 
     /*
@@ -1422,8 +1371,6 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
             t, t0, t, deg_E+1, pi.maxlength(), pi.crc());
     logline_end(NULL, "");
     */
-
-    tim.pop(t);
 
     return b;
 }
@@ -1534,11 +1481,23 @@ void usage()
     exit(1);
 }
 
+static int
+print_and_exit (double wct0, int ret)
+{
+  /* print usage of time and memory */
+  print_timing_and_memory (wct0);
+  if (ret != 0)
+    fprintf (stderr, "No solution found\n");
+  return ret; /* 0 if a solution was found, non-zero otherwise */
+}
+
 int main(int argc, char *argv[])
 {
     using namespace globals;
 
     param_list pl;
+
+    double wct0 = wct_seconds();
 
     bw_common_init_new(bw, &argc, &argv);
     param_list_init(pl);
@@ -1549,6 +1508,7 @@ int main(int argc, char *argv[])
     param_list_decl_usage(pl, "lingen-output-file", "output file for lingen. Defaults to [wdir]/F");
     param_list_decl_usage(pl, "lingen_threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor_threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
+    param_list_decl_usage(pl, "t", "number of threads used");
     /* }}} */
     logline_decl_usage(pl);
 
@@ -1576,6 +1536,8 @@ int main(int argc, char *argv[])
     }
     param_list_parse_uint(pl, "lingen_threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor_threshold", &cantor_threshold);
+    param_list_parse_uint(pl, "t", &nthreads);
+
     /* }}} */
     logline_interpret_parameters(pl);
 
@@ -1584,6 +1546,14 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     param_list_clear(pl);
+
+#ifdef  HAVE_OPENMP
+    if (nthreads > 1)
+      omp_set_num_threads (nthreads);
+#pragma omp parallel
+#pragma omp master
+    fprintf (stderr, "Using OpenMP with %u threads\n", omp_get_num_threads ());
+#endif
 
     logline_init_timer();
 
@@ -1717,10 +1687,13 @@ int main(int argc, char *argv[])
             sequence_length-1, sequence_length);
     
     // multiply_slow(E, A, F0, t0, sequence_length-1);
-    compute_E_from_A(A);
+    //
+    polmat E;
+
+    compute_E_from_A(E, A);
 
     printf("Throwing out a(X)\n");
-    A.clear();
+    { polmat X; A.swap(X); }
 
 
 #if 0/*{{{*/
@@ -1742,7 +1715,7 @@ int main(int argc, char *argv[])
         E.deg(i) = E.ncoef - 1;
     }
 
-#ifndef NDEBUG
+#ifdef DO_EXPENSIVE_CHECKS
     E_saved.copy(E);
 #endif
 
@@ -1750,18 +1723,14 @@ int main(int argc, char *argv[])
 
     // E.resize(deg + 1);
     polmat pi_left;
-    recursive_tree_timer_t tim;
-    compute_lingen(pi_left, tim);
-    tim.final_info();
+    compute_lingen(E, pi_left);
 
     int nresults = 0;
     for (unsigned int j = 0; j < m + n; j++) {
         nresults += chance_list[j];
     }
-    if (nresults == 0) {
-        fprintf(stderr, "No solution found\n");
-        exit(1);
-    }
+    if (nresults == 0)
+      return print_and_exit (wct0, 1);
 
     polmat F;
     compute_final_F_from_PI(F, pi_left);
@@ -1824,7 +1793,7 @@ int main(int argc, char *argv[])
 #endif/*}}}*/
     // print_chance_list(sequence_length, chance_list);
 
-    return 0;
+    return print_and_exit (wct0, 0);
 }
 
 /* vim: set sw=4 sta et: */

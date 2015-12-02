@@ -35,7 +35,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "sparse.h"
 
 #define DEBUG 0
-#define STAT_FFS
 
 // newrows[i] contains a new row formed of old rows that correspond to
 // true original relations (and not multirelations).

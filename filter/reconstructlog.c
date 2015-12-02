@@ -7,9 +7,6 @@
 #include "filter_config.h"
 
 #include "utils_with_io.h"
-#ifdef FOR_FFS
-#include "utils-ffs.h"
-#endif
 #define DEBUG 0
 
 stats_data_t stats; /* struct for printing progress */
@@ -159,7 +156,6 @@ struct read_data_s
   sm_side_info *sm_info;
   cado_poly_ptr poly;
   renumber_ptr renum_tab;
-  const char * abunitsdirname[NB_POLYS_MAX];
   mpz_t * smlogs[NB_POLYS_MAX];    /* the known logarithms of the SMs */
 };
 
@@ -171,13 +167,10 @@ typedef struct read_data_s * read_data_ptr;
 static void
 read_data_init (read_data_ptr data, logtab_ptr log, uint64_t nrels,
                 cado_poly_ptr poly, sm_side_info *sm_info,
-                renumber_ptr renum_tab, const char *abunits0dirname,
-                const char *abunits1dirname)
+                renumber_ptr renum_tab)
 {
   data->rels = log_rel_init (nrels);
   data->log = log;
-  data->abunitsdirname[0] = abunits0dirname;
-  data->abunitsdirname[1] = abunits1dirname;
   data->poly = poly;
   data->renum_tab = renum_tab;
   data->nrels = nrels;
@@ -199,81 +192,7 @@ read_data_free (read_data_ptr data)
 }
 
 /************************ Handling of the SMs *******************************/
-/* number of SM that must be used for side 1. Must be 0 for FFS */
-
-/* Very naive code for finding the valuations of the units. */
-static int
-get_units_for_ab_from_file(int* u, int64_t a, uint64_t b, const char * abunitsfilename, unsigned int nbsm)
-{
-    FILE *in = fopen(abunitsfilename, "r");
-    int64_t aa;
-    uint64_t bb;
-    int32_t ok = 0;
-    while(fscanf(in, "%" PRId64 " %" PRIu64, &aa, &bb) != EOF){
-	for(int i = 0; i < (int)nbsm; i++) {
-            int ret = fscanf(in, "%d", u+i);
-            ASSERT_ALWAYS(ret == 1);
-        }
-	if(aa == a && bb == b){
-	    //	    printf("# GOTCHA a and b\n");
-	    ok = 1;
-	    break;
-	}
-    }
-    fclose(in);
-    if(ok == 0){
-	fprintf(stderr, "GASP: no valuation(s) found ");
-	fprintf(stderr, "for a=%" PRId64 " b=%" PRIu64 "\n", a, b);
-	exit (EXIT_FAILURE);
-    }
-    return ok;
-}
-
-/* Semi-naive code for finding the valuations of the units. Read an index 
-   first, then use the right file. We assume that directory dirname contains
-   a file index, followed by files like 0, 1, 2, 3, ... so that their union
-   contains the list of (a, b, u) by increasing values of a. We assume that
-   all triples with the same a are in the same subfile.
-*/
-static int
-get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname,
-		 unsigned int nbsm)
-{
-    size_t len = strlen(abunitsdirname);
-    char *index = malloc((len+6+1) * sizeof(char));
-    strncpy(index, abunitsdirname, len);
-    strncpy(index+len, "/index", 6);
-    index[len+6] = '\0';
-    //printf("index=%s\n", index);
-    /* read index file */
-    FILE *in = fopen(index, "r");
-    if(in == NULL){
-	perror(index);
-	return 0;
-    }
-    int n, ok = 0;
-    int64_t aa;
-    while(fscanf(in, "%" PRId64 " %d", &aa, &n) != EOF){
-	if(a <= aa){
-	    ok = 1;
-	    break;
-	}
-    }
-    fclose(in);
-    free(index);
-    if(ok == 0){
-	fprintf(stderr, "Could not find abunit file for a=%" PRId64 "\n", a);
-	exit (EXIT_FAILURE);
-    }
-    // TODO: use size of n
-    char *fic = malloc((len+10) * sizeof(char));
-    strncpy(fic, abunitsdirname, len);
-    sprintf(fic+len, "/%d", n);
-    //    printf("fic(%" PRId64 ")=%d => %s\n", a, n, fic);
-    ok = get_units_for_ab_from_file(u, a, b, fic, nbsm);
-    free(fic);
-    return ok;
-}
+/* number of SM that must be used. */
 
 /* 
  * given S ==  data->sm_info[i], the range data->smlogs[i][0..S->nsm[
@@ -305,29 +224,16 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
       sm_side_info_srcptr S = data->sm_info[side];
       if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side)))
       {
-        /* TODO: allow units for MNFS ??? */
-        if (side < 2 && data->abunitsdirname[side]) {
-            int e[S->nsm];
-            /* This function returns an int, but an error is fatal, and
-             * in fact trapped well before. If it derps, then there's no
-             * point in trying to do anything, since we're dead already
-             */
-            get_units_for_ab(e, a, b, data->abunitsdirname[side], S->nsm);
-            for(int i = 0; i < S->nsm; i++)
-                mpz_addmul_si (l, data->smlogs[side][i], e[i]);
-            mpz_mod(l, l, ell);
-        } else {
-            mpz_poly_t u;
-            mpz_poly_init(u, MAX(1, S->f->deg-1));
-            mpz_poly_setcoeff_int64(u, 0, a);
-            mpz_poly_setcoeff_int64(u, 1, -b);
-            compute_sm_piecewise(u, u, S);
-            ASSERT_ALWAYS(u->deg < S->f->deg);
-            for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
+	  mpz_poly_t u;
+	  mpz_poly_init(u, MAX(1, S->f->deg-1));
+	  mpz_poly_setcoeff_int64(u, 0, a);
+	  mpz_poly_setcoeff_int64(u, 1, -b);
+	  compute_sm_piecewise(u, u, S);
+	  ASSERT_ALWAYS(u->deg < S->f->deg);
+	  for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
               mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
-            mpz_mod(l, l, ell);
-            mpz_poly_clear(u);
-        }
+	  mpz_mod(l, l, ell);
+	  mpz_poly_clear(u);
       }
     }
 
@@ -1024,16 +930,14 @@ compute_log_from_rels (bit_vector needed_rels,
   if (nrels_needed != nrels)
     printf ("# Parsing only %" PRIu64 " needed relations out of %" PRIu64 "\n",
             nrels_needed, nrels);
-#if ! defined (FOR_FFS) && DEBUG >= 1
+#if DEBUG >= 1
   printf ("# DEBUG: Using %d thread(s) for thread_sm\n", nt);
 #endif
   fflush(stdout);
   char *fic[3] = {(char *) relspfilename, (char *) relsdfilename, NULL};
   struct filter_rels_description desc[3] = {
                    { .f = thread_insert, .arg=data, .n=1},
-#ifndef FOR_FFS
                    { .f = thread_sm,     .arg=data, .n=nt},
-#endif
                    { .f = NULL,          .arg=0,     .n=0}
       };
   filter_rels2 (fic, desc, EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_INDEX,
@@ -1195,7 +1099,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "log", "input file containing known logarithms");
   param_list_decl_usage(pl, "logformat", "format of input log file: 'LA' or "
                                          "'reconstruct' (default is 'LA')");
-  param_list_decl_usage(pl, "gorder", "group order (see sm -gorder parameter)");
+  param_list_decl_usage(pl, "ell", "group order (see sm -ell parameter)");
   param_list_decl_usage(pl, "out", "output file for logarithms");
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
   param_list_decl_usage(pl, "poly", "input polynomial file");
@@ -1209,13 +1113,7 @@ static void declare_usage(param_list pl)
                                      "-nrels parameter)");
   param_list_decl_usage(pl, "partial", "(switch) do not reconstruct everything "
                                        "that can be reconstructed");
-#ifndef FOR_FFS
   param_list_decl_usage(pl, "nsm", "number of SM's to add on side 0,1,...");
-  param_list_decl_usage(pl, "abunits0", "units for all (a, b) pairs from purged and relsdels on side 0");
-  param_list_decl_usage(pl, "abunits1", "units for all (a, b) pairs from purged and relsdels on side 1");
-  param_list_decl_usage(pl, "explicit_units0", "use units for all (a, b) pairs from purged and relsdels on side 0");
-  param_list_decl_usage(pl, "explicit_units1", "use units for all (a, b) pairs from purged and relsdels on side 1");
-#endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
@@ -1260,7 +1158,6 @@ main(int argc, char *argv[])
   param_list_configure_switch(pl, "partial", &partial);
   param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
-#ifndef FOR_FFS
   int units0 = 0;
   param_list_configure_switch(pl, "explicit_units0", &units0);
   int units1 = 0;
@@ -1269,7 +1166,6 @@ main(int argc, char *argv[])
       fprintf (stderr, "units0 and units1 cannot be both set\n");
       exit (EXIT_FAILURE);
   }
-#endif
 
 #ifdef HAVE_MINGW
   _fmode = _O_BINARY;     /* Binary open for all files */
@@ -1299,15 +1195,15 @@ main(int argc, char *argv[])
   const char * polyfilename = param_list_lookup_string(pl, "poly");
   const char * wantedfilename = param_list_lookup_string(pl, "wanted");
   param_list_parse_uint64(pl, "nrels", &nrels_tot);
-  param_list_parse_mpz(pl, "gorder", ell);
+  param_list_parse_mpz(pl, "ell", ell);
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
   /* Some checks on command line arguments */
   if (mpz_cmp_ui (ell, 0) <= 0)
   {
-    fprintf(stderr, "Error, missing -gorder command line argument "
-                    "(or gorder <= 0)\n");
+    fprintf(stderr, "Error, missing -ell command line argument "
+                    "(or ell <= 0)\n");
     usage (pl, argv0);
   }
   if (nrels_tot == 0)
@@ -1375,17 +1271,12 @@ main(int argc, char *argv[])
   }
 
   cado_poly_init (poly);
-#ifndef FOR_FFS
   if (!cado_poly_read (poly, polyfilename))
-#else
-  if (!ffs_poly_read (poly, polyfilename))
-#endif
   {
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);
   }
 
-#ifndef FOR_FFS
   /* Read number of sm to be printed from command line */
   param_list_parse_int_list (pl, "nsm", nsm_arg, poly->nb_polys, ",");
   for(int side = 0; side < poly->nb_polys; side++)
@@ -1397,17 +1288,6 @@ main(int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
   }
-
-  const char * abunits0dirname = NULL;
-  abunits0dirname = param_list_lookup_string(pl, "abunits0");
-  if(units0 == 0)
-      abunits0dirname = NULL;
-
-  const char * abunits1dirname = NULL;
-  abunits1dirname = param_list_lookup_string(pl, "abunits1");
-  if(units1 == 0)
-      abunits1dirname = NULL;
-#endif
 
   if (param_list_warn_unused(pl))
   {
@@ -1422,7 +1302,6 @@ main(int argc, char *argv[])
   nsm_tot = 0;
   for (int side = 0; side < poly->nb_polys; side++)
   {
-#ifndef FOR_FFS
     sm_side_info_init(sm_info[side], poly->pols[side], ell);
     fprintf(stdout, "\n# Polynomial on side %d:\n# F[%d] = ", side, side);
     mpz_poly_fprintf(stdout, poly->pols[side]);
@@ -1443,9 +1322,6 @@ main(int argc, char *argv[])
       ASSERT_ALWAYS(sm_info[side]->unit_rank != 0);
     }
     nsm_tot += sm_info[side]->nsm;
-#else
-    sm_info[side]->nsm = 0;
-#endif
   }
   fflush(stdout);
 
@@ -1501,7 +1377,7 @@ main(int argc, char *argv[])
   {
       read_data_t data;
       read_data_init (data, log, nrels_purged + nrels_del, poly, sm_info,
-                      renumber_table, abunits0dirname, abunits1dirname);
+                      renumber_table);
 
       log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
               nrels_purged, relsdfilename,
@@ -1524,10 +1400,8 @@ main(int argc, char *argv[])
   logtab_clear (log);
   mpz_clear(ell);
 
-#ifndef FOR_FFS
   for (int side = 0 ; side < poly->nb_polys ; side++)
     sm_side_info_clear (sm_info[side]);
-#endif
 
   renumber_clear (renumber_table);
   bit_vector_clear(rels_to_process);

@@ -57,7 +57,7 @@ void tree_stats_enter(tree_stats_ptr stats, const char * func, unsigned int inpu
     if (rank) { ++stats->depth; return; }
     tree_running_stats_ptr s = stats->stats_curstack + ++stats->depth;
     memset(s, 0, sizeof(struct tree_running_stats_s));
-    s->time_self -= wct_seconds();
+    s->time_self -= seconds();
     s->func = func;
     s->inputsize = inputsize;
 }
@@ -67,7 +67,7 @@ int tree_stats_leave(tree_stats_ptr stats, int rc)
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) { --stats->depth; return rc; }
-    double now = wct_seconds();
+    double now = seconds();
     tree_running_stats_ptr s = stats->stats_curstack + stats->depth;
     s->time_self += now;
     double tt = s->time_self;
