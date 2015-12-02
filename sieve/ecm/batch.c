@@ -4,7 +4,7 @@
 #include "utils.h"
 
 static void
-mpz_list_init (mpz_list L)
+ulong_list_init (ulong_list L)
 {
   L->l = NULL;
   L->alloc = L->size = 0;
@@ -13,30 +13,96 @@ mpz_list_init (mpz_list L)
 /* at any point, all values up to L->alloc should be mpz_init()'ed,
    even beyond L->size */
 static void
-mpz_list_add (mpz_list L, unsigned long n)
+ulong_list_add (ulong_list L, unsigned long n)
 {
   if (L->size == L->alloc)
     {
-      unsigned long old = L->alloc, i;
       L->alloc = 3 * (L->alloc / 2) + 2;
       L->l = realloc (L->l, L->alloc * sizeof (mpz_t));
-      for (i = old; i < L->alloc; i++)
-        mpz_init (L->l[i]);
     }
   ASSERT(L->size < L->alloc);
-  mpz_set_ui (L->l[L->size], n);
+  L->l[L->size] = n;
   L->size ++;
 }
 
 static void
-mpz_list_clear (mpz_list L)
+ulong_list_clear (ulong_list L)
 {
-  size_t i;
-
-  for (i = 0; i < L->alloc; i++)
-    mpz_clear (L->l[i]);
   free (L->l);
   L->alloc = L->size = 0;
+}
+
+static void
+mpz_product_tree_init (mpz_product_tree t)
+{
+  t->l = NULL;
+  t->n = NULL;
+  t->size = 0;
+}
+
+/* add a new entry z */
+static void
+mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
+{
+  if (t->size == 0) /* tree was empty */
+    {
+      t->l = malloc (sizeof (mpz_t));
+      mpz_init_set_ui (t->l[0], n);
+      t->n = malloc (sizeof (unsigned long));
+      t->n[0] = 1;
+      t->size = 1;
+    }
+  else
+    {
+      /* first accumulate in l[0] */
+      if (t->n[0] == 0)
+        mpz_set_ui (t->l[0], n);
+      else
+        mpz_mul_ui (t->l[0], t->l[0], n);
+      t->n[0] ++;
+      for (unsigned int i = 0; t->n[i] == (2UL<<i); i++)
+        {
+          if (i+1 == t->size) /* realloc */
+            {
+              t->l = realloc (t->l, (t->size + 1) * sizeof (mpz_t));
+              mpz_init_set_ui (t->l[t->size], 1);
+              t->n = realloc (t->n, (t->size + 1) * sizeof (unsigned long));
+              t->n[t->size] = 0;
+              t->size++;
+            }
+          if (t->n[i+1] == 0)
+            {
+              mpz_swap (t->l[i+1], t->l[i]);
+              mpz_set_ui (t->l[i], 1);
+            }
+          else /* accumulate */
+            mpz_mul (t->l[i+1], t->l[i+1], t->l[i]);
+          t->n[i+1] += t->n[i];
+          t->n[i] = 0;
+        }
+    }
+}
+
+/* accumulate all products in t->l[0] */
+static void
+mpz_product_tree_accumulate (mpz_product_tree t)
+{
+  for (unsigned int i = 1; i < t->size; i++)
+    {
+      mpz_mul (t->l[0], t->l[0], t->l[i]);
+      t->n[0] += t->n[i];
+      t->n[i] = 0;
+    }
+}
+
+static void
+mpz_product_tree_clear (mpz_product_tree t)
+{
+  for (unsigned int i = 0; i < t->size; i++)
+    mpz_clear (t->l[i]);
+  free (t->l);
+  free (t->n);
+  t->size = 0;
 }
 
 void
@@ -54,26 +120,19 @@ cofac_list_init (cofac_list l)
   l->size = 0;
 }
 
-/* add in the list L all primes pmin <= p < pmax.
-   Assume pmin is the current prime in 'pi'
-   (pmin=2 when 'pi' was just initialized).
-   Return the current prime in 'pi' at the end, i.e.,
-   the smallest prime >= pmax. */
 static unsigned long
-prime_list (mpz_list L, prime_info pi, unsigned long pmin,
+prime_list (ulong_list L, prime_info pi, unsigned long pmin,
             unsigned long pmax)
 {
   unsigned long p;
 
   for (p = pmin; p < pmax; p = getprime_mt (pi))
-    mpz_list_add (L, p);
+    ulong_list_add (L, p);
   return p;
 }
 
-/* same as prime_list, but only adds primes p for which f has at least one
-   root modulo p, or the leading coefficient of f vanishes modulo p */
 static unsigned long
-prime_list_poly (mpz_list L, prime_info pi, unsigned long pmin,
+prime_list_poly (ulong_list L, prime_info pi, unsigned long pmin,
                  unsigned long pmax, mpz_poly_t f)
 {
   unsigned long p;
@@ -84,7 +143,41 @@ prime_list_poly (mpz_list L, prime_info pi, unsigned long pmin,
   for (p = pmin; p < pmax; p = getprime_mt (pi))
     if (mpz_divisible_ui_p (f->coeff[f->deg], p) ||
         mpz_poly_roots_ulong (NULL, f, p) > 0)
-      mpz_list_add (L, p);
+      ulong_list_add (L, p);
+  return p;
+}
+
+/* add in the product tree L all primes pmin <= p < pmax.
+   Assume pmin is the current prime in 'pi'
+   (pmin=2 when 'pi' was just initialized).
+   Return the current prime in 'pi' at the end, i.e.,
+   the smallest prime >= pmax. */
+static unsigned long
+prime_tree (mpz_product_tree L, prime_info pi, unsigned long pmin,
+            unsigned long pmax)
+{
+  unsigned long p;
+
+  for (p = pmin; p < pmax; p = getprime_mt (pi))
+    mpz_product_tree_add_ui (L, p);
+  return p;
+}
+
+/* same as prime_tree, but only adds primes p for which f has at least one
+   root modulo p, or the leading coefficient of f vanishes modulo p */
+static unsigned long
+prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
+                 unsigned long pmax, mpz_poly_t f)
+{
+  unsigned long p;
+
+  if (f->deg == 1)
+    return prime_tree (L, pi, pmin, pmax);
+
+  for (p = pmin; p < pmax; p = getprime_mt (pi))
+    if (mpz_divisible_ui_p (f->coeff[f->deg], p) ||
+        mpz_poly_roots_ulong (NULL, f, p) > 0)
+      mpz_product_tree_add_ui (L, p);
   return p;
 }
 
@@ -154,62 +247,22 @@ cofac_list_clear (cofac_list l)
   free (l->perm);
 }
 
-/* FIXME: since we don't need to keep the indidivual primes here,
-   instead of allocating spaces for n mpz_t data structures, we need
-   only to allocate O(log n) [see function compute_biproduct below] */
-unsigned long
-prime_product (mpz_t P, prime_info pi, unsigned long p_max,
-               unsigned long p_last)
-{
-  unsigned long i;
-  mpz_list L;
-
-  mpz_list_init (L);
-  p_last = prime_list (L, pi, p_last, p_max);
-
-  /* FIXME: equilibrate the product */
-  mpz_t *l = L->l;
-  unsigned long n = L->size;
-  while (n > 1)
-  {
-    for (i = 0; i+1 < n; i+=2)
-      mpz_mul (l[i/2], l[i], l[i+1]);
-    if (n & 1)
-      mpz_swap (l[n/2], l[n-1]);
-    n = (n + 1) / 2;
-  }
-  mpz_set (P, l[0]);
-
-  mpz_list_clear (L);
-  return p_last;
-}
-
-/* same as prime_product, but keeps only primes for which the given polynomial
-   has factors modulo p */
+/* put in P the product of primes p for which the given polynomial has factors
+   modulo p */
 static void
 prime_product_poly (mpz_t P, prime_info pi, unsigned long p_max,
                     unsigned long p_last, mpz_poly_t f)
 {
-  unsigned long i;
-  mpz_list L;
+  mpz_product_tree L;
 
-  mpz_list_init (L);
-  p_last = prime_list_poly (L, pi, p_last, p_max, f);
+  mpz_product_tree_init (L);
+  p_last = prime_tree_poly (L, pi, p_last, p_max, f);
 
-  /* FIXME: equilibrate the product */
-  mpz_t *l = L->l;
-  unsigned long n = L->size;
-  while (n > 1)
-  {
-    for (i = 0; i+1 < n; i+=2)
-      mpz_mul (l[i/2], l[i], l[i+1]);
-    if (n & 1)
-      mpz_swap (l[n/2], l[n-1]);
-    n = (n + 1) / 2;
-  }
-  mpz_set (P, l[0]);
+  mpz_product_tree_accumulate (L);
 
-  mpz_list_clear (L);
+  mpz_set (P, L->l[0]);
+
+  mpz_product_tree_clear (L);
 }
 
 static unsigned long
@@ -640,7 +693,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
   mpz_t Q[2];
   struct modset_t fm, cfm;
   double BB, BBB;
-  mpz_list SP;
+  ulong_list SP0, SP1;
   prime_info pi;
   double start = seconds ();
   mpz_t *norm0, *norm1;
@@ -655,25 +708,19 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
   mpz_init (Q[0]);
   mpz_init (Q[1]);
 
-  mpz_list_init (SP);
+  ulong_list_init (SP0);
   prime_info_init (pi);
-  prime_list_poly (SP, pi, 2, pmax, pol->pols[0]);
-  spsize[0] = SP->size;
-  sp0 = malloc (spsize[0] * sizeof (unsigned long));
-  for (i = 0; i < spsize[0]; i++)
-    sp0[i] = mpz_get_ui (SP->l[i]);
+  prime_list_poly (SP0, pi, 2, pmax, pol->pols[0]);
+  spsize[0] = SP0->size;
+  sp0 = SP0->l;
   prime_info_clear (pi);
-  mpz_list_clear (SP);
 
-  mpz_list_init (SP);
+  ulong_list_init (SP1);
   prime_info_init (pi);
-  prime_list_poly (SP, pi, 2, pmax + pmax / 2, pol->pols[1]);
-  spsize[1] = SP->size;
-  sp1 = malloc (spsize[1] * sizeof (unsigned long));
-  for (i = 0; i < spsize[1]; i++)
-    sp1[i] = mpz_get_ui (SP->l[i]);
+  prime_list_poly (SP1, pi, 2, pmax + pmax / 2, pol->pols[1]);
+  spsize[1] = SP1->size;
+  sp1 = SP1->l;
   prime_info_clear (pi);
-  mpz_list_clear (SP);
 
   nb_methods = 30;
   if (nb_methods >= NB_MAX_METHODS)
@@ -712,14 +759,14 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
       mpz_clear (norm0[i]);
       mpz_clear (norm1[i]);
     }
+  ulong_list_clear (SP0);
+  ulong_list_clear (SP1);
   free (norm0);
   free (norm1);
 
   mpz_clear (Q[0]);
   mpz_clear (Q[1]);
 
-  free (sp0);
-  free (sp1);
   facul_clear_aux_methods (methods);
 
   fprintf (out, "# batch: took %.1fs to factor %lu smooth relations\n",
