@@ -609,9 +609,6 @@ class Cado_NFS_toplevel(object):
         2
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
-        3
-
-        >>> t.parameters.get_simple("tasks.polyselect.threads",0)
         2
 
         >>> os.environ["NCPUS_FAKE"]="3"
