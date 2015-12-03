@@ -2920,7 +2920,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"End of read: \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
         ),
     )
     @property
@@ -3049,7 +3049,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 self.state.update({"run_counter": run_counter + 1},
                                   commit=False)
                 current_counts = self.parse_slice_counts(stderr)
-                self.parse_stats(stderrpath, commit=False)
+                self.parse_stats(stdoutpath, commit=False)
                 # Add relation count from the newly processed files to the
                 # relations-per-slice dict
                 update1 = {str(idx): self.slice_relcounts[str(idx)] + 
@@ -3136,7 +3136,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"End of read: \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
         ),
     )
     @property
@@ -3203,10 +3203,9 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             for f in files:
                 self.already_done_input[f] = True
             outfilenames = {f:i for f in files}
-            self.add_output_files(outfilenames, commit=True)
-            # Disabled for now, there are multiple lines of the same format
-            # which we can't parse atm.
-            # self.parse_stats(stderrpath)
+            self.add_output_files(outfilenames, commit=False)
+            # XXX How do we add the timings ?
+            # self.parse_stats(stdoutpath, commit=True)
             self.logger.info("%d unique relations remain on slice %d",
                              nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
@@ -4027,47 +4026,108 @@ class LinAlgTask(Task, HasStatistics):
     def stat_conversions(self):
         return (
         (
-            "krylov_time",
+            "krylov_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done, N=\d+ ; CPU:", 1))
+            re.compile(re_cap_n_fp(r"Timings for krylov: .wct.", 1))
+        ),
+        (
+            "krylov_cpu",
+            (int, float),
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU:", 1))
+        ),
+        (
+            "krylov_cpu_wait",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait:", 1))
         ),
         (
             "krylov_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done, N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM:", 1))
         ),
         (
-            "lingen_time",
+            "krylov_comm_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("Total computation took", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait:", 1))
         ),
         (
-            "mksol_time",
+            "lingen_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done, N=\d+ ; CPU:", 1))
+            re.compile(re_cap_n_fp("Timings for lingen: .wct.", 1))
+        ),
+        (
+            "lingen_cpu",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for lingen: .cpu.", 1))
+        ),
+        (
+            "mksol_wct",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"Timings for mksol: .wct.", 1))
+        ),
+        (
+            "mksol_cpu",
+            (int, float),
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU:", 1))
+        ),
+        (
+            "mksol_cpu_wait",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait:", 1))
         ),
         (
             "mksol_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done, N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM:", 1))
+        ),
+        (
+            "mksol_comm_wait",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait:", 1))
         ),
     )
     @property
     def stat_formats(self):
         return (
-            ["Krylov: CPU time {krylov_time[0]}", ", COMM time {krylov_comm[0]}"],
-            ["Lingen CPU time {lingen_time[0]}"],
-            ["Mksol: CPU time {mksol_time[0]}", ", COMM time {mksol_comm[0]}"],
+            ["Krylov: WCT time {krylov_wct[0]}",
+                ", iteration CPU time {krylov_cpu[1]:g}",
+                ", COMM {krylov_comm[0]}",
+                ", cpu-wait {krylov_cpu_wait[0]}",
+                ", comm-wait {krylov_comm_wait[0]}",
+                " ({krylov_cpu[0]:d} iterations)"
+                ],
+            ["Lingen CPU time {lingen_cpu[0]}", ", WCT time {lingen_wct[0]}"],
+            ["Mksol: WCT time {mksol_wct[0]}",
+                ", iteration CPU time {mksol_cpu[1]:g}",
+                ", COMM {mksol_comm[0]}",
+                ", cpu-wait {mksol_cpu_wait[0]}",
+                ", comm-wait {mksol_comm_wait[0]}",
+                " ({mksol_cpu[0]:d} iterations)"
+                ],
         )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -4118,6 +4178,7 @@ class LinAlgTask(Task, HasStatistics):
             dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
+            self.logger.debug("Parsing stats from %s" % stdoutpath)
             self.parse_stats(stdoutpath, commit=False)
             output_version = self.state.get("output_version", 0) + 1
             update = {"dependency": dependencyfilename.get_wdir_relative(),

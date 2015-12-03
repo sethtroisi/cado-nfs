@@ -291,7 +291,7 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
 
 
             printf("%sN=%d ; %s: %.2f s/iter [%.3f..%.3f]%s\n",
-                    done ? "done " : "",
+                    done ? ((stage == 0) ? "krylov done " : "mksol done ") : "",
                     iter,
                     timer_names[timer],
                     avwct,
