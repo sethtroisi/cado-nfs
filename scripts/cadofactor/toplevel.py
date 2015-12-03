@@ -673,6 +673,31 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
         2
 
+        >>> t = Cado_NFS_toplevel(args=['12345', '-p', os.path.os.devnull])
+        >>> t.filter_out_N_paramfile_workdir()
+        >>> t.parameters = cadoparams.Parameters()
+        >>> t.set_N_paramfile_workdir()
+        >>> t.parameters.readparams(t.args.options)
+        >>> t.set_threads_and_client_threads()
+        >>> t.parameters.get_simple("tasks.sqrt.sqrt.threads",0)
+        3
+
+        >>> t.parameters.locate("tasks.sqrt.sqrt.threads")
+        'tasks.threads'
+
+        >>> os.environ["NCPUS_FAKE"]="16"
+        >>> t = Cado_NFS_toplevel(args=['12345', '-p', os.path.os.devnull])
+        >>> t.filter_out_N_paramfile_workdir()
+        >>> t.parameters = cadoparams.Parameters()
+        >>> t.set_N_paramfile_workdir()
+        >>> t.parameters.readparams(t.args.options)
+        >>> t.set_threads_and_client_threads()
+        >>> t.parameters.get_simple("tasks.sqrt.sqrt.threads",0)
+        8
+
+        >>> t.parameters.locate("tasks.sqrt.sqrt.threads")
+        'tasks.sqrt.sqrt.threads'
+
         >>> del os.environ["NCPUS_FAKE"]
 
         '''
@@ -709,6 +734,13 @@ class Cado_NFS_toplevel(object):
         for p in ["tasks.polyselect.threads", "tasks.sieve.sieving.threads"]:
             self.logger.info("%s = %s" % (p, self.parameters.get_simple(p)))
             assert self.parameters.locate(p) == p
+        # last thing. For sqrt, more than 8 threads is slightly overkill.
+        # So unless explicitly stated otherwise, we set it to min(8,
+        # server.threads).
+        p="tasks.sqrt.sqrt.threads"
+        t=self.parameters.get_simple(p, 0)
+        if t > 8 and self.parameters.locate(p) == "tasks.threads":
+            self.parameters.set_simple(p, min(t, 8))
 
     def set_slaves_parameters(self):
         ''' sets slaves.nrclients and slaves.scriptpath to default values
