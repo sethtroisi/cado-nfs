@@ -4045,7 +4045,14 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("Total computation took", 1))
+            re.compile(re_cap_n_fp("Timings for lingen: (cpu)", 1))
+        ),
+        (
+            "lingen_wct",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for lingen: (wct)", 1))
         ),
         (
             "mksol_time",
@@ -4066,7 +4073,7 @@ class LinAlgTask(Task, HasStatistics):
     def stat_formats(self):
         return (
             ["Krylov: CPU time {krylov_time[0]}", ", COMM time {krylov_comm[0]}"],
-            ["Lingen CPU time {lingen_time[0]}"],
+            ["Lingen CPU time {lingen_time[0]}", ", WCT time {lingen_wct[0]}"],
             ["Mksol: CPU time {mksol_time[0]}", ", COMM time {mksol_comm[0]}"],
         )
     

@@ -1591,7 +1591,7 @@ int main(int argc, char *argv[])
       omp_set_num_threads (nthreads);
 #pragma omp parallel
 #pragma omp master
-    fprintf (stderr, "Using OpenMP with %u threads\n", omp_get_num_threads ());
+    printf ("Using OpenMP with %u threads\n", omp_get_num_threads ());
 #endif
 
     logline_init_timer();
