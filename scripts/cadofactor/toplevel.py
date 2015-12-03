@@ -922,6 +922,11 @@ class Cado_NFS_toplevel(object):
                 if hintfile == "":
                     hintfile = self.find_default_hint_file()
                 self.parameters.set_simple("descent_hint", hintfile)
+        # set cpubinding file if necessary
+        self.parameters.set_if_unset("tasks.linalg.bwc.cpubinding",
+                os.path.abspath(
+                    os.path.join(self.pathdict["data"],
+                        "misc", "cpubinding.conf")))
         return self.parameters
 
     def setpath(self, key, value):
