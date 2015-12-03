@@ -338,7 +338,7 @@ class Program(object, metaclass=InspectType):
                  execsubdir=None, execbin=None, execsuffix=defaultsuffix,
                  runprefix=None):
         ''' Takes a dict of of command line options. Defaults are filled in
-        from the cadoaprams.Parameters instance parameters.
+        from the cadoparams.Parameters instance parameters.
 
         The stdin, stdout, and stderr parameters accept strings. If a string is
         given, it is interpreted as the file name to use for redirecting that
@@ -747,7 +747,7 @@ class FreeRel(Program):
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
                  lcideals: Toggle() = None,
-                 threads: Parameter("t")=None,
+                 threads: Parameter("t", checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
