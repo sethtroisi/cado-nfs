@@ -11,13 +11,24 @@
 #define STATUS_SMOOTH  0
 #define STATUS_UNKNOWN 1
 
-/* TODO: should replace by mpz_array_t from utils/mpz_array.h */
 typedef struct {
-  mpz_t *l;
+  unsigned long *l;
   size_t alloc;
   size_t size;
-} mpz_list_t;
-typedef mpz_list_t mpz_list[1];
+} ulong_list_t;
+typedef ulong_list_t ulong_list[1];
+
+/* structure to compute on-line a product tree, avoiding to first compute a
+   list of mpz_t (which might take too much memory) */
+typedef struct {
+  mpz_t *l;     /* the value stored is l[0] * l[1] * ... * l[size-1],
+                   where l[0] is the product of n[0] elements, l[1] is
+                   the product of n[1] elements, ..., with n[0]=0 or 1,
+                   n[1]=0 or 2, ..., n[k]=0 or 2^k */
+  unsigned long *n;
+  size_t size;
+} mpz_product_tree_t;
+typedef mpz_product_tree_t mpz_product_tree[1];
 
 typedef struct {
   int64_t *a;
