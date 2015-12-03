@@ -688,21 +688,27 @@ class Cado_NFS_toplevel(object):
             t=int(self.args.server_threads)
             self.parameters.set_simple("tasks.threads", t)
         # We want to enforce a value for tasks.polyselect.threads and
-        # tasks.sieve.sieving.threads. If there is none safe by the side-effect
-        # of having set tasks.threads, we want to set our default.
+        # tasks.sieve.sieving.threads.
         if self.args.client_threads:
             c=self.args.client_threads
             self.parameters.set_simple("tasks.polyselect.threads", c)
             self.parameters.set_simple("tasks.sieve.sieving.threads", c)
         else:
+            # If there is no value set except by the side-effect
+            # of having set tasks.threads or tasks.sieve.threads,
+            # we want to set our default.
             t=self.parameters.get_simple("tasks.threads", 0)
-            for p in ["tasks.polyselect.threads", "tasks.sieve.sieving.threads"]:
-                if self.parameters.locate(p) == "tasks.threads":
-                    self.parameters.set_simple(p, min(t, 2))
+            p="tasks.polyselect.threads"
+            loc = self.parameters.locate(p)
+            if loc == "tasks.threads":
+                self.parameters.set_simple(p, min(t, 2))
+            p="tasks.sieve.sieving.threads"
+            loc = self.parameters.locate(p)
+            if loc == "tasks.threads" or loc == "tasks.sieve.threads":
+                self.parameters.set_simple(p, min(t, 2))
         for p in ["tasks.polyselect.threads", "tasks.sieve.sieving.threads"]:
             self.logger.info("%s = %s" % (p, self.parameters.get_simple(p)))
             assert self.parameters.locate(p) == p
-
 
     def set_slaves_parameters(self):
         ''' sets slaves.nrclients and slaves.scriptpath to default values
@@ -893,7 +899,7 @@ class Cado_NFS_toplevel(object):
         >>> t.setpath("lib", "/tmp")
         >>> t.setpath("data", "/tmp")
         >>> p = t.get_cooked_parameters()
-        >>> print(re.sub('\\\\\\\\', '/', str(p)))
+        >>> print(re.sub('(C:)?\\\\\\\\', '/', str(p)))
         N = 12345
         slaves.basepath = /tmp/a/client
         slaves.hostnames = foo,bar
