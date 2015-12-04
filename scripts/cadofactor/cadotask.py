@@ -3376,7 +3376,7 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stdout(stdout, input_nrels):
+        if self.parse_output(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
@@ -3426,7 +3426,7 @@ class PurgeTask(Task):
     def get_relsdel_filename(self):
         return self.get_state_filename("relsdelfile")
     
-    def parse_stdout(self, stdout, input_nrels):
+    def parse_output(self, stdout, input_nrels):
         # If stdout ends with
         # (excess / ncols) = ... < .... See -required_excess argument.'
         # then we need more relations from filtering and return False
