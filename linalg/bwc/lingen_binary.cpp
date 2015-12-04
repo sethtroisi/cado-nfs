@@ -81,6 +81,64 @@ void compose_inner<gf2x_fake_fft, strassen_default_selector>(
     dst.swap(tmp);
 }
 
+template<>
+inline void fft_combo_inplace<gf2x_fake_fft>(
+        polmat& dst,
+        tpolmat<gf2x_fake_fft> const & s,
+        gf2x_fake_fft& o,
+        int ncoeffs_in,
+        int ncoeffs_out
+        )
+{
+    typedef gf2x_fake_fft fft_type;
+    /* This is not satisfactory. It would be better to replace the input
+     * in place. The only reason we can't do this is because ncoeffs_in
+     * and ncoeffs_out differ, so that we have a different data striding
+     * in the input and the output.
+     */
+    // XXX The +1 seems to be bogus.
+    polmat new_dst(dst.nrows, dst.ncols, ncoeffs_out + 1);
+    tpolmat<fft_type> tmp1(1, dst.ncols, o);
+    tpolmat<fft_type> tmp2(1, s.ncols, o);
+    ASSERT(dst.ncols == s.nrows);
+    dst.clear_highbits();
+    for(unsigned int i = 0 ; i < dst.nrows ; i++) {
+        tmp1.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int k = 0 ; k < dst.ncols ; k++) {
+            o.dft(tmp1.poly(0,k), dst.poly(i,k), ncoeffs_in);
+        }
+
+        /* now do the multiplication */
+        tmp2.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int j = 0 ; j < s.ncols ; j++) {
+            fft_type::ptr x = o.alloc(1);
+            for(unsigned int k = 0 ; k < dst.ncols ; k++) {
+                o.compose(x, tmp1.poly(0,k), s.poly(k,j));
+                o.add(tmp2.poly(0,j), tmp2.poly(0,j), x);
+            }
+            o.free(x, 1);
+        }
+
+        /* and the inverse transform */
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int j = 0 ; j < dst.ncols ; j++) {
+            o.ift(new_dst.poly(i,j), ncoeffs_out, tmp2.poly(0,j));
+        }
+    }
+    for(unsigned int j = 0 ; j < dst.ncols ; j++) {
+        new_dst.setdeg(j);
+    }
+    dst.swap(new_dst);
+}
+
 
 /* Provide workalikes of usual interfaces for some ungifted systems */
 #include "portability.h"
@@ -1211,20 +1269,11 @@ static bool go_recursive(polmat& E, polmat& pi)
     {
         /* NOTE: The transform() calls expect a number of coefficients,
          * not a degree. */
-        tpolmat<fft_type> E_hat;
         tpolmat<fft_type> pi_l_hat;
-        tpolmat<fft_type> E_middle_hat;
         // takes lengths.
         fft_type o(E_length, expected_pi_deg + 1,
                 /* E_length + expected_pi_deg - kill, */
                 m + n);
-
-
-        logline_begin(stdout, E_length, "t=%u DFT_E(%lu) [%s]",
-                t, E_length, fft_type::name());
-        transform(E_hat, E, o, E_length);
-        { polmat X; E.swap(X); }
-        logline_end(NULL, "");
 
         logline_begin(stdout, E_length,
                 "t=%u DFT_pi_left(%lu) [%s]",
@@ -1240,19 +1289,8 @@ static bool go_recursive(polmat& E, polmat& pi)
                 pi_left_length,
                 E_length - llen,
                 fft_type::name());
-        compose(E_middle_hat, E_hat, pi_l_hat, o);
-        { tpolmat<fft_type> X; E_hat.swap(X); }
-        { tpolmat<fft_type> X; pi_l_hat.swap(X); }
+        fft_combo_inplace(E, pi_l_hat, o, E_length, E_length + pi_l_deg - kill + 1);
         logline_end(&t_mp, "");
-
-
-        logline_begin(stdout, E_length, "t=%u IFT_E_middle(%lu) [%s]",
-                t, E_length + pi_l_deg - kill + 1, fft_type::name());
-        /* The transform() calls expect a number of coefficients, not a
-         * degree ! */
-        itransform(E, E_middle_hat, o, E_length + pi_l_deg - kill + 1);
-        { tpolmat<fft_type> X; E_middle_hat.swap(X); }
-        logline_end(&t_ift_E_middle, "");
     }
 
     /* Make sure that the first llen-kill coefficients of all entries of
@@ -1260,10 +1298,9 @@ static bool go_recursive(polmat& E, polmat& pi)
      * have to be critical. Yet, it's an easy way of spotting bugs as
      * well... */
 
+    /* XXX This should also belong to the middle product thing */
     ASSERT_ALWAYS(E.valuation() >= llen - kill);
-
-    /* This chops off some data */
-    E.xdiv_resize(llen - kill, rlen);
+    E.xdiv_resize(llen - kill, rlen); /* This chops off some data */
 
     polmat pi_right;
     finished_early = compute_lingen(E, pi_right);
@@ -1275,19 +1312,8 @@ static bool go_recursive(polmat& E, polmat& pi)
     {
         /* NOTE: The transform() calls expect a number of coefficients,
          * not a degree. */
-        tpolmat<fft_type> pi_l_hat;
         tpolmat<fft_type> pi_r_hat;
-        tpolmat<fft_type> pi_hat;
-
-        // takes lengths.
         fft_type o(pi_l_deg + 1, pi_r_deg + 1, m + n);
-
-        logline_begin(stdout, E_length,
-                "t=%u DFT_pi_left(%lu) [%s]",
-                t, pi_left_length, fft_type::name());
-        transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
-        { polmat X; pi_left.swap(X); }
-        logline_end(&t_dft_pi_left, "");
 
         logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
                 t, pi_right_length, fft_type::name());
@@ -1301,16 +1327,9 @@ static bool go_recursive(polmat& E, polmat& pi)
                 pi_right_length,
                 pi_left_length + pi_right_length - 1,
                 fft_type::name());
-        compose(pi_hat, pi_l_hat, pi_r_hat, o);
-        { tpolmat<fft_type> X; pi_l_hat.swap(X); }
-        { tpolmat<fft_type> X; pi_r_hat.swap(X); }
+        fft_combo_inplace(pi_left, pi_r_hat, o, pi_l_deg + 1, pi_l_deg + pi_r_deg + 1);
         logline_end(&t_mul, "");
-
-        logline_begin(stdout, E_length, "t=%u IFT_pi(%lu) [%s]",
-                t, pi_left_length + pi_right_length - 1, fft_type::name());
-        itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
-        { tpolmat<fft_type> X; pi_hat.swap(X); }
-        logline_end(&t_ift_pi, "");
+        pi.swap(pi_left);
     }
 
 

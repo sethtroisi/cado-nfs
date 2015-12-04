@@ -1092,6 +1092,68 @@ inline void compose(
     */
 }
 
+/* do dst *= s, using the following procedure:
+ * for each row index:
+ *      transform row i of dst to tmp.
+ *      multiply tmp by s to tmp2
+ *      transform tmp2 back to row i of dst
+ */
+template<typename fft_type>
+inline void fft_combo_inplace(
+        polmat& dst,
+        tpolmat<fft_type> const & s,
+        fft_type& o,
+        int ncoeffs_in,
+        int ncoeffs_out
+        )
+{
+    /* This is not satisfactory. It would be better to replace the input
+     * in place. The only reason we can't do this is because ncoeffs_in
+     * and ncoeffs_out differ, so that we have a different data striding
+     * in the input and the output.
+     */
+    // XXX The +1 seems to be bogus.
+    polmat new_dst(dst.nrows, dst.ncols, ncoeffs_out + 1);
+    tpolmat<fft_type> tmp1(1, dst.ncols, o);
+    tpolmat<fft_type> tmp2(1, s.ncols, o);
+    ASSERT(dst.ncols == s.nrows);
+    dst.clear_highbits();
+    for(unsigned int i = 0 ; i < dst.nrows ; i++) {
+        tmp1.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int k = 0 ; k < dst.ncols ; k++) {
+            o.dft(tmp1.poly(0,k), dst.poly(i,k), ncoeffs_in);
+        }
+
+        /* now do the multiplication */
+        tmp2.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int j = 0 ; j < s.ncols ; j++) {
+            for(unsigned int k = 0 ; k < dst.ncols ; k++) {
+                o.addcompose(tmp2.poly(0,j), tmp1.poly(0,k), s.poly(k,j));
+            }
+        }
+
+        /* and the inverse transform */
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int j = 0 ; j < dst.ncols ; j++) {
+            o.ift(new_dst.poly(i,j), ncoeffs_out, tmp2.poly(0,j));
+        }
+    }
+    for(unsigned int j = 0 ; j < dst.ncols ; j++) {
+        new_dst.setdeg(j);
+    }
+    dst.swap(new_dst);
+}
+
+
+
 template<typename fft_type, typename selector_type>
 inline void compose2(
         tpolmat<fft_type>& dst,
@@ -1115,6 +1177,7 @@ template<typename fft_type>
 void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
 {
     // clock_t t = clock();
+    // XXX The +1 seems to be bogus.
     polmat tmp(src.nrows, src.ncols, d + 1);
     {
 #ifdef  HAVE_OPENMP
