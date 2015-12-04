@@ -1039,7 +1039,7 @@ static bool go_quadratic(polmat& E, polmat& pi)/*{{{*/
         E.deg(j) = deg;
     }
     /* There's a nasty bug. Revealed by 32-bits, but can occur on larger
-     * sizes too. Le W be the word size. When E has length W + epsilon,
+     * sizes too. Let W be the word size. When E has length W + epsilon,
      * pi_deg_bound(W+epsilon) may be < W. So that we may have tmp_pi and
      * E have stride 1 and 2 respectively. However, in
      * lingen_qcode_do_tmpl, we fill the pointers in tmp_pi (optrs[]
@@ -1552,7 +1552,7 @@ int main(int argc, char *argv[])
       omp_set_num_threads (nthreads);
 #pragma omp parallel
 #pragma omp master
-    fprintf (stderr, "Using OpenMP with %u threads\n", omp_get_num_threads ());
+    printf ("Using OpenMP with %u threads\n", omp_get_num_threads ());
 #endif
 
     logline_init_timer();
