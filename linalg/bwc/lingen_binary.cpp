@@ -1161,11 +1161,11 @@ static bool go_recursive(polmat& E, polmat& pi)
     unsigned long llen = E_length - rlen;
 
 #if 1
-    /* Arrange so that we recurse on sizes which are multiples of ULONG_BITS. */
+    /* Arrange so that we recurse on sizes which are multiples of 64. */
     /* (note that for reproducibility across different machines, forcing
-     * 64 is better) */
-    if (E_length > ULONG_BITS && llen % ULONG_BITS != 0) {
-        llen += ULONG_BITS - (llen % ULONG_BITS);
+     * 64 is better than ULONG_BITS) */
+    if (E_length > 64 && llen % 64 != 0) {
+        llen += 64 - (llen % 64);
         rlen = E_length - llen;
     }
 #endif
