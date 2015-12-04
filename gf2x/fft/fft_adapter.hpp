@@ -77,6 +77,9 @@ public:                                                                 \
 	inline void addcompose(ptr y, srcptr x1, srcptr x2) const {	\
 		return CAT(visible,addcompose)(o,y,x1,x2);		\
 	}								\
+	inline void addcompose_n(ptr y, srcptr * x1, srcptr * x2, size_t n) const {	\
+		return CAT(visible,addcompose_n)(o,y,x1,x2,n);		\
+	}								\
 	inline void compose(ptr y, srcptr x1, srcptr x2) const {	\
 		return CAT(visible,compose)(o,y,x1,x2);			\
 	}								\

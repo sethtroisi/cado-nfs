@@ -110,6 +110,8 @@ extern void gf2x_cantor_fft_zero(const gf2x_cantor_fft_info_t p, gf2x_cantor_fft
 extern void gf2x_cantor_fft_dft(const gf2x_cantor_fft_info_t p, gf2x_cantor_fft_ptr x, const unsigned long * F, size_t nF);
 extern void gf2x_cantor_fft_compose(const gf2x_cantor_fft_info_t p,
 		gf2x_cantor_fft_ptr y, gf2x_cantor_fft_srcptr x1, gf2x_cantor_fft_srcptr x2);
+extern void gf2x_cantor_fft_addcompose_n(const gf2x_cantor_fft_info_t p,
+		gf2x_cantor_fft_ptr y, gf2x_cantor_fft_srcptr * x1, gf2x_cantor_fft_srcptr * x2, size_t);
 extern void gf2x_cantor_fft_addcompose(const gf2x_cantor_fft_info_t p,
 		gf2x_cantor_fft_ptr y, gf2x_cantor_fft_srcptr x1, gf2x_cantor_fft_srcptr x2);
 extern void gf2x_cantor_fft_add(const gf2x_cantor_fft_info_t p,
