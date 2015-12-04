@@ -4719,8 +4719,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def stop_serving_wus(self):
         self.server.stop_serving_wus()
 
-    def get_url(self):
-        return self.server.get_url()
+    def get_url(self, **kwargs):
+        return self.server.get_url(**kwargs)
 
     def get_cert_sha1(self):
         return self.server.get_cert_sha1()
@@ -4841,9 +4841,17 @@ class StartClientsTask(Task):
         self.pids.clear([clientid], commit=False)
         self.hosts.clear([clientid], commit=True)
     
-    def launch_clients(self, server, certsha1=None):
+    def launch_clients(self, servertask):
+        """ This now takes server as a servertask object, so that we can
+        get an URL which is special-cased for localhost """
+        url = servertask.get_url()
+        url_loc = servertask.get_url(origin="localhost")
+        certsha1 = servertask.get_cert_sha1()
         for host in self.hosts_to_launch:
-            self.launch_one_client(host.strip(), server, certsha1=certsha1)
+            if host == "localhost":
+                self.launch_one_client(host.strip(), url_loc, certsha1=certsha1)
+            else:
+                self.launch_one_client(host.strip(), url, certsha1=certsha1)
         running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in
             self.pids.items()]
         s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
@@ -5315,10 +5323,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         return self.state["dbfilename"]
 
     def start_all_clients(self):
-        url = self.servertask.get_url()
-        certsha1 = self.servertask.get_cert_sha1()
         for clients in self.clients:
-            clients.launch_clients(url, certsha1)
+            clients.launch_clients(self.servertask)
     
     def stop_all_clients(self):
         for clients in self.clients:
