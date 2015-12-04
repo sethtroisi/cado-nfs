@@ -590,7 +590,9 @@ sub detect_mpi {
     }
 
     my $maybe_mvapich2=1;
-    my $maybe_mpich2=1;
+    # mpich versions implementing the mpi-2 standard were named mpich2.
+    # From standard mpi-3 on, the name has returned to mpich.
+    my $maybe_mpich=1;
     my $maybe_openmpi=1;
 
     if (defined($mpi)) {
@@ -609,10 +611,16 @@ sub detect_mpi {
                 if ($mpiexec =~ /openmpi/) {
                     print STDERR "Auto-detecting openmpi based on alternatives\n";
                     $maybe_mvapich2=0;
-                    $maybe_mpich2=0;
+                    $maybe_mpich=0;
                     last;
                 } elsif ($mpiexec =~ /mpich2/) {
                     print STDERR "Auto-detecting mpich2(old) based on alternatives\n";
+                    $maybe_mpich='mpich2';
+                    $maybe_mvapich2=0;
+                    $maybe_openmpi=0;
+                    last;
+                } elsif ($mpiexec =~ /mpich/) {
+                    print STDERR "Auto-detecting mpich based on alternatives\n";
                     $maybe_mvapich2=0;
                     $maybe_openmpi=0;
                     last;
@@ -620,11 +628,11 @@ sub detect_mpi {
                     # Newer mvapich2 uses hydra as well...
                     print STDERR "Auto-detecting mpich or mvapich2 (hydra) based on alternatives\n";
                     $maybe_mvapich2='hydra';
-                    $maybe_mpich2='hydra';
+                    $maybe_mpich='hydra';
                     $maybe_openmpi=0;
                 } elsif ($mpiexec =~ /mvapich2/) {
                     print STDERR "Auto-detecting mvapich2 based on alternatives\n";
-                    $maybe_mpich2=0;
+                    $maybe_mpich=0;
                     $maybe_openmpi=0;
                     last;
                 }
@@ -647,8 +655,8 @@ sub detect_mpi {
                     }
                 }
             }
-            CHECK_MPICH2_VERSION: {
-                if ($maybe_mpich2 && -x "$mpi/mpich2version") {
+            CHECK_MPICH_VERSION: {
+                if ($maybe_mpich =~ /^(hydra|mpich2)/ && -x "$mpi/mpich2version") {
                     my $v = `$mpi/mpich2version -v`;
                     chomp($v);
                     if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
@@ -665,9 +673,22 @@ sub detect_mpi {
                         $mpi_ver .= "+hydra";
                         $needs_mpd=0;
                     }
-                    if ($maybe_mpich2 eq 'hydra') {
+                    if ($maybe_mpich eq 'hydra') {
                         $mpi_ver .= "+hydra" unless $mpi_ver =~ /hydra/;
                         $needs_mpd=0;
+                    }
+                    last SEVERAL_CHECKS;
+                } elsif ($maybe_mpich && -x "$mpi/mpichversion") {
+                    my $v = `$mpi/mpichversion -v`;
+                    chomp($v);
+                    if ($v =~ /MPICH Version:\s*(\d.*)$/) {
+                        $mpi_ver="mpich-$1";
+                        # Only antique mpich-1.x versions don't use
+                        # hydra.
+                        $needs_mpd=($mpi_ver =~ /^mpich-[01]\./);
+                    } else {
+                        $mpi_ver="mpich-UNKNOWN";
+                        $needs_mpd=1;
                     }
                     last SEVERAL_CHECKS;
                 }
@@ -712,7 +733,7 @@ EOMSG
         exit 1;
     }
 }
-# 
+
 # Starting daemons for mpich2 1.[012].x and mvapich2 ; we're assuming
 # this works the same for older mpich2's, although this has never been
 # checked.
