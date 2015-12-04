@@ -1310,15 +1310,13 @@ collision_on_sq ( header_t header,
   //qroots_print (SQ_R);
 
   /* find a suitable lq */
-  for (i = 0; i < SQ_R->size; i++) {
-    if (prod <= nq / (int) header->d) {
-      if (!check_parameters (header->m0, sq * (double) SQ_R->q[i]))
-        break;
-      prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
-                            the number of primes and thus the Y1 value. */
-      sq *= (double) SQ_R->q[i];
-      lq ++;
-    }
+  for (i = 0; prod < nq && i < SQ_R->size; i++) {
+    if (!check_parameters (header->m0, sq * (double) SQ_R->q[i]))
+      break;
+    prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
+                          the number of primes and thus the Y1 value. */
+    sq *= (double) SQ_R->q[i];
+    lq ++;
   }
 
   /* lq < 8 for the moment */
