@@ -216,7 +216,6 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     if (pi->interleaved && pi->interleaved->idx)
         return NULL;
 
-
     matmul_top_data mmt;
 
     unsigned int nrhs = 0;
@@ -331,8 +330,15 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             fprintf(stderr, "m < nrhs is not supported\n");
             exit(EXIT_FAILURE);
         }
+        /* I am not sure that using balancing_pre_shuffle is right both
+         * for bw->dir == 0 and bw->dir == 1. Let's make sure we're in
+         * the case where this has been tested and seems to work
+         * correctly.
+         */
+        ASSERT_ALWAYS(bw->dir == 1);
+        ASSERT_ALWAYS(mmt->nmatrices == 1);
         for(unsigned int i = 0 ; i < nrhs ; i++) {
-            xvecs[i] = balancing_pre_shuffle(mmt->bal, mmt->n0[!bw->dir]-nrhs+i);
+            xvecs[i] = balancing_pre_shuffle(mmt->matrices[0]->bal, mmt->n0[!bw->dir]-nrhs+i);
             printf("Forced %d-th x vector to be the %" PRIu32"-th canonical basis vector\n", i, xvecs[i]);
             ASSERT_ALWAYS(xvecs[i] >= (uint32_t) (bw->m - nrhs));
         }

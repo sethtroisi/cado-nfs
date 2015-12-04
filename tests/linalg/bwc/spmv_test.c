@@ -159,25 +159,44 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         balancing bb;
         const char * bname = param_list_lookup_string(pl, "balancing");
         balancing_init(bb);
-        balancing_read(bb, bname);
+
+        if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+            balancing_read(bb, bname);
+        }
+        pi_bcast(bb, sizeof(balancing), BWC_PI_BYTE, 0, 0, mmt->pi->m);
+        /* fix the mmt->rowperm and mmt->colperm */
+        if (bb->rowperm) {
+            if (mmt->pi->m->jrank || mmt->pi->m->trank) {
+                bb->rowperm = malloc(bb->trows * sizeof(uint32_t));
+            }
+            pi_bcast(bb->rowperm, bb->trows * sizeof(uint32_t), BWC_PI_BYTE, 0, 0, mmt->pi->m);
+        }
+        if (bb->colperm) {
+            if (mmt->pi->m->jrank || mmt->pi->m->trank) {
+                bb->colperm = malloc(bb->tcols * sizeof(uint32_t));
+            }
+            pi_bcast(bb->colperm, bb->tcols * sizeof(uint32_t), BWC_PI_BYTE, 0, 0, mmt->pi->m);
+        }
+
+
 
         for(int test_shared = 0 ; test_shared < 2 ; test_shared++) {
             serialize(pi->m);
             uint32_t * xr = bb->rowperm;
             uint32_t * xc = bb->colperm;
             uint32_t *freeme[2] = {NULL,NULL};
-            if (mmt->bal->h->flags & FLAG_REPLICATE) {
+            if (mmt->matrices[0]->bal->h->flags & FLAG_REPLICATE) {
                 ASSERT_ALWAYS(xc || xr);
-                ASSERT_ALWAYS(mmt->bal->trows == mmt->bal->tcols);
+                ASSERT_ALWAYS(mmt->matrices[0]->bal->trows == mmt->matrices[0]->bal->tcols);
                 /* P is the permutation which sends
                  * sub-block nv*i+j to sub-block nh*j+i
                  */
-                unsigned int nh = mmt->bal->h->nh;
-                unsigned int nv = mmt->bal->h->nv;
-                size_t z = mmt->bal->trows / (nh * nv);
+                unsigned int nh = mmt->matrices[0]->bal->h->nh;
+                unsigned int nv = mmt->matrices[0]->bal->h->nv;
+                size_t z = mmt->matrices[0]->bal->trows / (nh * nv);
                 if (!xr) {
                     /* implicit Sr is P * Sc */
-                    xr = malloc(mmt->bal->trows * sizeof(uint32_t));
+                    xr = malloc(mmt->matrices[0]->bal->trows * sizeof(uint32_t));
                     freeme[0] = xr;
                     /* The image of i is Sc(P(i)) */
                     for(size_t i = 0 ; i < nh ; i++) {
@@ -195,7 +214,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
                 }
                 if (!xc) {
                     /* implicit Sc is P^-1 * Sr */
-                    xc = malloc(mmt->bal->tcols * sizeof(uint32_t));
+                    xc = malloc(mmt->matrices[0]->bal->tcols * sizeof(uint32_t));
                     freeme[1] = xc;
                     /* The image of i is Sr(P^-1(i)) */
                     for(size_t i = 0 ; i < nh ; i++) {
@@ -233,20 +252,20 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
                 /* apply == 1 d == 1 Sc defined:   v <- v * Sc
                  * apply == 1 d == 1 Sc implicit:  v <- v * Sr
                  */
-                mmt_vec_apply_S(mmt, v);
+                mmt_vec_apply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n_inv_permuted(v, mmt->n[1], xc);
                 /* apply == 0 d == 1 Sc defined:   v <- v * Sc^-1
                  * apply == 0 d == 1 Sc implicit:  v <- v * Sr^-1
                  */
-                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_unapply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n(v, mmt->n[1]);
 
                 /* Do the same check in the other direction as well. Most
                  * probably redundant, though. */
                 mmt_vec_set_0n(v, mmt->n[1]);
-                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_unapply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n_permuted(v, mmt->n[1], xc);
-                mmt_vec_apply_S(mmt, v);
+                mmt_vec_apply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n(v, mmt->n[1]);
                 mmt_vec_clear(mmt, v);
             }
@@ -260,19 +279,19 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
                 /* apply == 1 d == 0 Sr defined:   v <- v * Sr
                  * apply == 1 d == 0 Sr implicit:  v <- v * Sc
                  */
-                mmt_vec_apply_S(mmt, v);
+                mmt_vec_apply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n_inv_permuted(v, mmt->n[0], xr);
                 /*
                  * apply == 0 d == 0 Sr defined:   v <- v * Sr^-1
                  * apply == 0 d == 0 Sr implicit:  v <- v * Sc^-1
                  */
-                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_unapply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n(v, mmt->n[0]);
 
                 mmt_vec_set_0n(v, mmt->n[0]);
-                mmt_vec_unapply_S(mmt, v);
+                mmt_vec_unapply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n_permuted(v, mmt->n[0], xr);
-                mmt_vec_apply_S(mmt, v);
+                mmt_vec_apply_S(mmt, 0, v);
                 mmt_vec_check_equal_0n(v, mmt->n[1]);
                 mmt_vec_clear(mmt, v);
             }
@@ -296,7 +315,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          */
         mmt_vec_apply_T(mmt, y);
         mmt_vec_twist(mmt, y);
-        matmul_top_mul_cpu(mmt, my, y);
+        matmul_top_mul_cpu(mmt, 0, my, y);
         /* watch out -- at this point we are *NOT* doing
          * matmul_top_mul_comm, so there's no multiplication by P^-1 !
          */
@@ -317,7 +336,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         serialize(pi->m);
         mmt_vec_set_random_through_file(w, "W", 0, mmt->n0[0], rstate);
         mmt_vec_twist(mmt, w);
-        matmul_top_mul_cpu(mmt, wm, w);
+        matmul_top_mul_cpu(mmt, 0, wm, w);
         /* It's not the same if we do allreduce+untwist, thus stay on the
          * image side, or reduce (changing side) + untwist, which brings
          * us back to the original side.

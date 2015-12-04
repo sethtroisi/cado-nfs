@@ -53,20 +53,17 @@ typedef struct permutation_data permutation_data[1];
 typedef struct permutation_data * permutation_data_ptr;
 /* all methods are private */
 
-struct matmul_top_data_s {
-    parallelizing_info_ptr pi;
-
-    // w <- M v, or v^T <- w^T M would make sense. Of course v^T and w^T
-    // are represented in exactly the same way.
-
-    // global stuff. n[] is going to be misleading in any situation. It's
-    // the size of the matrix in the given direction. Meaning that n[0]
-    // is the horizontal size -- the size of the rows --. This means the
-    // number of columns.
+struct matmul_top_matrix_s {
+    // global stuff.
     //
-    // The number of items in the vector mmt->wr[0]->v is the number of
-    // rows, so it's mmt->n0[1].
+    // n[0] is the number of rows, includding padding.
+    // n[1] is the number of columns, includding padding.
     //
+    // n0[] is without padding.
+    //
+    // Note that a communicator in direction 0 handles in total a dataset
+    // of size n[1] (the number of items in a matrix row is the number of
+    // columns.
     unsigned int n[2];
     unsigned int n0[2]; // n0: unpadded.
 
@@ -84,18 +81,34 @@ struct matmul_top_data_s {
     permutation_data_ptr perm[2];       /* rowperm, colperm */
 
     matmul_ptr mm;
-
-    mpfq_vbase_ptr abase;
-    pi_datatype_ptr pitype;
 };
 
-/* These are flags for the distributed vectors. For the moment we have
- * only one flag */
-#define THREAD_SHARED_VECTOR    1
+typedef struct matmul_top_matrix_s matmul_top_matrix[1];
+typedef struct matmul_top_matrix_s * matmul_top_matrix_ptr;
+typedef struct matmul_top_matrix_s const * matmul_top_matrix_srcptr;
+
+struct matmul_top_data_s {
+    parallelizing_info_ptr pi;
+    mpfq_vbase_ptr abase;
+    pi_datatype_ptr pitype;
+    /* These n[] and n0[] correspond to the dimensions of the product
+     *
+     * n[0] is matrices[0]->n[0]
+     * n[1] is matrices[nmatrices-1]->n[1]
+     */
+    unsigned int n[2];
+    unsigned int n0[2]; // n0: unpadded.
+    int nmatrices;
+    matmul_top_matrix * matrices;
+};
 
 typedef struct matmul_top_data_s matmul_top_data[1];
 typedef struct matmul_top_data_s * matmul_top_data_ptr;
 typedef struct matmul_top_data_s const * matmul_top_data_srcptr;
+
+/* These are flags for the distributed vectors. For the moment we have
+ * only one flag */
+#define THREAD_SHARED_VECTOR    1
 
 #ifdef __cplusplus
 extern "C" {
@@ -126,28 +139,12 @@ extern void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, un
 extern void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate);
 extern void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int nx);
 
-extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v);
+extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr w, mmt_vec_ptr v);
 extern void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_mul_comm(mmt_vec_ptr w, mmt_vec_ptr v);
 
 /* v is both input and output. w is temporary */
-static inline void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v)
-{
-    ASSERT_ALWAYS(v->consistency == 2);
-    matmul_top_mul_cpu(mmt, w, v);
-    ASSERT_ALWAYS(w->consistency == 0);
-    matmul_top_mul_comm(v, w);
-    ASSERT_ALWAYS(v->consistency == 2);
-}
-
-/* Now some of the generic interface calls. By design, not everything is
- * possible with these calls. In particular, nothing critical is doable.
- * As a general convention, the only thing these calls need to know about
- * the abase is the stride value, which corresponds to sizeof(abelt)
- * Besides that, the generic calls take the vector pointer as argument.
- * Specifying NULL as vector argument is equivalent to taking the default
- * vector defined in the mmt data for the given direction flag. */
-
+extern void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v);
 
 extern void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int d, int flags, unsigned int n);
 extern void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v);
@@ -171,8 +168,8 @@ extern void mmt_vec_twist(matmul_top_data_ptr mmt, mmt_vec_ptr y);
 extern void mmt_vec_untwist(matmul_top_data_ptr mmt, mmt_vec_ptr y);
 extern void mmt_vec_apply_T(matmul_top_data_ptr mmt, mmt_vec_ptr y);
 extern void mmt_vec_unapply_T(matmul_top_data_ptr mmt, mmt_vec_ptr y);
-extern void mmt_vec_apply_S(matmul_top_data_ptr mmt, mmt_vec_ptr y);
-extern void mmt_vec_unapply_S(matmul_top_data_ptr mmt, mmt_vec_ptr y);
+extern void mmt_vec_apply_S(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr y);
+extern void mmt_vec_unapply_S(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr y);
 extern void mmt_vec_apply_P(matmul_top_data_ptr mmt, mmt_vec_ptr y);
 extern void mmt_vec_unapply_P(matmul_top_data_ptr mmt, mmt_vec_ptr y);
 extern void mmt_apply_identity(mmt_vec_ptr w, mmt_vec_ptr v);

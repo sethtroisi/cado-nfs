@@ -98,6 +98,7 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         fprintf(stderr, "T%d Cache save time %ds wct\n",
                 tnum, (int) time(NULL) - t0);
         pthread_mutex_unlock(&tg->mu);
+        if (m->mfile) free(m->mfile);
     }
 
     pthread_mutex_lock(&tg->mu);

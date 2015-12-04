@@ -12,7 +12,4 @@
 
 #cmakedefine    BUILD_DYNAMICALLY_LINKABLE_BWC
 
-/* compile-time default, just for me */
-#define MEASURE_LINALG_JITTER_TIMINGS
-
 #endif	/* BWC_CONFIG_H_ */

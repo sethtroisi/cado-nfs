@@ -185,11 +185,17 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_log_init(pi->wr[1]);
 #endif
 
-    timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
+    timing_init(timing, 4 * mmt->nmatrices, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
+    for(int i = 0 ; i < mmt->nmatrices; i++) {
+        timing_set_timer_name(timing, 4*i, "CPU%d", i);
+        timing_set_timer_items(timing, 4*i, mmt->matrices[i]->mm->ncoeffs);
+        timing_set_timer_name(timing, 4*i+1, "cpu-wait%d", i);
+        timing_set_timer_name(timing, 4*i+2, "COMM%d", i);
+        timing_set_timer_name(timing, 4*i+3, "comm-wait%d", i);
+    }
 
     pi_interleaving_flip(pi);
     pi_interleaving_flip(pi);
-
 
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         // Plan ahead. The check vector is here to predict the final A matrix.
@@ -225,31 +231,65 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             /* Compute the product by x */
             x_dotprod(A->vec_subvec(A, xymats, i * bw->m),
                     gxvecs, bw->m, nx, y, 1);
-            matmul_top_mul_cpu(mmt, my, y);
 
-#ifdef MEASURE_LINALG_JITTER_TIMINGS
-            timing_next_timer(timing); /* now timer is [1] (cpu-wait) */
-#endif
-            pi_interleaving_flip(pi);
-            /* from this point on in the loop, mpi calls are allowed */
-#ifdef MEASURE_LINALG_JITTER_TIMINGS
-            /* This is *only* in order to be able to measure the wait
-             * times */
-            serialize(pi->m);
-#endif
+            /* copy code from matmul_top_mul() ; this should really be
+             * factored out */
 
-            timing_next_timer(timing); /* now timer is [2] (COMM) */ 
-            /* Now we can resume MPI communications. */
-            matmul_top_mul_comm(y, my);
+            /* Timers take, in sequence, the 4n values defined in the
+             * definition of the timing structure. The first is timer 0.
+             */
+            mmt_vec_ptr x[2] = { y, my };
+            if (y->d == 0) {
+                for(int mx = 0, k = 0 ; mx < mmt->nmatrices ; mx++, k^=1) {
+                    mmt_vec_ptr src = x[k];
+                    mmt_vec_ptr dst = x[!k];
 
-#ifdef MEASURE_LINALG_JITTER_TIMINGS
-            timing_next_timer(timing); /* now timer is [3] (comm-wait) */
-            /* This is *only* in order to be able to measure the wait
-             * times */
-            serialize(pi->m);
-#endif
+                    matmul_top_mul_cpu(mmt, mx, dst, src);
 
-            timing_next_timer(timing);
+                    timing_next_timer(timing);
+                    pi_interleaving_flip(pi);
+                    serialize(pi->m);
+                    timing_next_timer(timing);
+
+                    /* Now we can resume MPI communications. */
+                    if (mx == (mmt->nmatrices - 1) && (mmt->nmatrices & 1) == 1) {
+                        ASSERT_ALWAYS(src == y);
+                        matmul_top_mul_comm(src, dst);
+                    } else {
+                        mmt_vec_allreduce(dst);
+                    }
+
+                    timing_next_timer(timing);
+                    serialize(pi->m);
+                    timing_next_timer(timing);
+                }
+            } else {
+                /* same, in reverse order */
+                for(int mx = mmt->nmatrices, k = 0 ; mx-- > 0 ; k^=1) {
+                    mmt_vec_ptr src = x[k];
+                    mmt_vec_ptr dst = x[!k];
+                    ASSERT_ALWAYS(src->consistency == 2);
+
+                    matmul_top_mul_cpu(mmt, mx, dst, src);
+                    ASSERT_ALWAYS(dst->consistency == 0);
+
+                    timing_next_timer(timing);
+                    pi_interleaving_flip(pi);
+                    serialize(pi->m);
+                    timing_next_timer(timing);
+
+                    if (mx == 0 && (mmt->nmatrices & 1) == 1) {
+                        ASSERT_ALWAYS(src == y);
+                        matmul_top_mul_comm(src, dst);
+                    } else {
+                        mmt_vec_allreduce(dst);
+                    }
+                    timing_next_timer(timing);
+                    serialize(pi->m);
+                    timing_next_timer(timing);
+                }
+            }
+
             timing_check(pi, timing, s+i+1, tcan_print);
         }
         serialize(pi->m);
@@ -300,10 +340,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         serialize(pi->m);
 
         // reached s + bw->interval. Count our time on cpu, and compute the sum.
-        timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, "krylov");
+        timing_disp_collective_oneline(pi, timing, s + bw->interval, tcan_print, "krylov");
     }
 
-    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, "krylov");
+    timing_final_tally(pi, timing, tcan_print, "krylov");
 
 #if 0
     pi_log_clear(pi->m);

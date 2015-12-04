@@ -146,7 +146,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 #endif
 
     // kill the warning.
-    mmt->mm->iteration[!bw->dir] = INT_MIN;
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        mmt->matrices[i]->mm->iteration[!bw->dir] = INT_MIN;
+    }
 
     int k = 0;
     for(int s = 0 ; s < bw->number_of_check_stops ; s++) {

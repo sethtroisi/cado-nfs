@@ -133,4 +133,5 @@ int main(int argc, char * argv[])
      */
     param_list_clear(pl);
     free(locfile);
+    if (m->mfile) free(m->mfile);
 }

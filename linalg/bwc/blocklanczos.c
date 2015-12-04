@@ -154,6 +154,10 @@ void blstate_init(struct blstate * bl, parallelizing_info_ptr pi, param_list_ptr
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
+
+    /* it's not really in the plans yet */
+    ASSERT_ALWAYS(mmt->nmatrices == 1);
+
     mmt_vec_init(mmt,0,0, bl->y,   bw->dir, 0, mmt->n[bw->dir]);
     mmt_vec_init(mmt,0,0, bl->my, !bw->dir, 0, mmt->n[!bw->dir]);
 
@@ -384,7 +388,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
     mmt_vec_save_stream(f, bl->y, mmt->n0[bw->dir]);
 
     mmt_vec_twist(mmt, bl->y);
-    matmul_top_mul_cpu(mmt, bl->my, bl->y);
+    matmul_top_mul_cpu(mmt, 0, bl->my, bl->y);
     mmt_vec_allreduce(bl->my);
     mmt_vec_untwist(mmt, bl->my);
 
@@ -528,7 +532,14 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
     }
 
 
-    timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
+    timing_init(timing, 4 * mmt->nmatrices, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        timing_set_timer_name(timing, 4*i, "CPU%d", i);
+        timing_set_timer_items(timing, 4*i, mmt->matrices[i]->mm->ncoeffs);
+        timing_set_timer_name(timing, 4*i+1, "cpu-wait%d", i);
+        timing_set_timer_name(timing, 4*i+2, "COMM%d", i);
+        timing_set_timer_name(timing, 4*i+3, "comm-wait%d", i);
+    }
 
     void * vav;
     void * vaav;
@@ -598,7 +609,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 /* at this point, timer is [0] (CPU) */
 
                 {
-                    matmul_top_mul_cpu(mmt, yy[!d], yy[d]);
+                    matmul_top_mul_cpu(mmt, 0, yy[!d], yy[d]);
                     timing_next_timer(timing);  /* now timer is [1] (cpu-wait) */
                 }
                 serialize(pi->m);           /* for measuring waits only */
@@ -732,13 +743,13 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
         if (tcan_print) printf("N=%d ; sum_dim=%d=N*(%u-%.3f)\n", s+i, sum_Ni, bw->n, bw->n-(double)sum_Ni/(s+i));
         // reached s + bw->interval. Count our time on cpu, and compute the sum.
-        timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, "blocklanczos");
+        timing_disp_collective_oneline(pi, timing, s + bw->interval, tcan_print, "blocklanczos");
     }
 
     // we can't do as we do with BW, since the process really stops in
     // the end, continuing the last block to the checkpoint mark does not
     // make sense.
-    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print, "blocklanczos");
+    timing_final_tally(pi, timing, tcan_print, "blocklanczos");
 
     cheating_vec_clear(A, &vav, nelts_for_nnmat);
     cheating_vec_clear(A, &vaav, nelts_for_nnmat);

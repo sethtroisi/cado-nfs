@@ -184,18 +184,22 @@ void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr
     v->i0 = n * (xwr->jrank * xwr->ncores + xwr->trank);
     v->i1 = v->i0 + n;
 
-    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n);
+    /* Look for readahead settings for all submatrices */
+    n += ABASE_UNIVERSAL_READAHEAD_ITEMS;
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        matmul_aux(mmt->matrices[i]->mm, MATMUL_AUX_GET_READAHEAD, &n);
+    }
 
     if (flags & THREAD_SHARED_VECTOR) {
         if (wr->trank == 0) {
-            cheating_vec_init(abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
-            abase->vec_set_zero(abase, v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+            cheating_vec_init(abase, &v->v, n);
+            abase->vec_set_zero(abase, v->v, n);
         }
         pi_thread_bcast(&v->v, sizeof(void*), BWC_PI_BYTE, 0, wr);
         v->siblings = NULL;
     } else {
-        cheating_vec_init(abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
-        abase->vec_set_zero(abase, v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+        cheating_vec_init(abase, &v->v, n);
+        abase->vec_set_zero(abase, v->v, n);
         v->siblings = shared_malloc(wr, wr->ncores * sizeof(void *));
         v->siblings[wr->trank] = v;
     }
@@ -212,13 +216,17 @@ void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v)
     if (v->rsbuf[0]) free(v->rsbuf[0]);
     if (v->rsbuf[1]) free(v->rsbuf[1]);
     unsigned int n = v->i1 - v->i0;
-    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n);
+    /* see above */
+    n += ABASE_UNIVERSAL_READAHEAD_ITEMS;
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        matmul_aux(mmt->matrices[i]->mm, MATMUL_AUX_GET_READAHEAD, &n);
+    }
     if (v->siblings) {
-        cheating_vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+        cheating_vec_clear(v->abase, &v->v, n);
         shared_free(wr, v->siblings);
     } else {
         if (wr->trank == 0)
-            cheating_vec_clear(v->abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+            cheating_vec_clear(v->abase, &v->v, n);
     }
     memset(v, 0, sizeof(mmt_vec));
 }
@@ -591,6 +599,53 @@ int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
 /* }}} */
 
 //////////////////////////////////////////////////////////////////////////
+
+void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v)/*{{{*/
+{
+    /* Do all matrices in turn. For the moment, we represent M as
+     * M0*M1*..*M_{n-1}, so we apply for indices 0 to n-1 when v->d==0,
+     * and for indices n-1 to 0 for v->d == 1. Note that if we were to
+     * change this, we would have to pass an extra argument indicating
+     * whether we mean the transpose or not.
+     */
+    mmt_vec_ptr x[2] = { v, w };
+
+    if (v->d == 0) {
+        for(int midx = 0, k = 0 ; midx < mmt->nmatrices ; midx++, k^=1) {
+            mmt_vec_ptr src = x[k];
+            mmt_vec_ptr dst = x[!k];
+            ASSERT_ALWAYS(src->consistency == 2);
+            matmul_top_mul_cpu(mmt, midx, dst, src);
+            ASSERT_ALWAYS(dst->consistency == 0);
+            /* In quite a few cases, the terminating matmul_top_mul_comm
+             * can be done with simply allreduce(). In the common case
+             * mmt->nmatrices == 1, however, this is not the case. */
+            if (midx == (mmt->nmatrices - 1) && (mmt->nmatrices & 1) == 1) {
+                ASSERT_ALWAYS(src == v);
+                matmul_top_mul_comm(src, dst);
+            } else {
+                mmt_vec_allreduce(dst);
+            }
+        }
+    } else {
+        /* same, in reverse order */
+        for(int midx = mmt->nmatrices, k = 0 ; midx-- > 0 ; k^=1) {
+            mmt_vec_ptr src = x[k];
+            mmt_vec_ptr dst = x[!k];
+            ASSERT_ALWAYS(src->consistency == 2);
+            matmul_top_mul_cpu(mmt, midx, dst, src);
+            ASSERT_ALWAYS(dst->consistency == 0);
+            if (midx == 0 && (mmt->nmatrices & 1) == 1) {
+                ASSERT_ALWAYS(src == v);
+                matmul_top_mul_comm(src, dst);
+            } else {
+                mmt_vec_allreduce(dst);
+            }
+        }
+    }
+    ASSERT_ALWAYS(v->consistency == 2);
+}
+/*}}}*/
 
 #if 0/*{{{*/
 /* no longer used -- was only used by prep.
@@ -1545,7 +1600,7 @@ void mmt_vec_apply_P(matmul_top_data_ptr mmt, mmt_vec_ptr y)
  * See that when, say, Sr is implicitly defined (to P*Sc), this function
  * only applies Sc, not P !
  */
-void mmt_vec_apply_or_unapply_S_inner(matmul_top_data_ptr mmt, mmt_vec_ptr y, int apply)
+void mmt_vec_apply_or_unapply_S_inner(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr y, int apply)
 {
     ASSERT_ALWAYS(y->consistency == 2);
     /* input: fully consistent */
@@ -1565,15 +1620,16 @@ void mmt_vec_apply_or_unapply_S_inner(matmul_top_data_ptr mmt, mmt_vec_ptr y, in
      *  i in [y->i0..y->i1[
      *  j in [yt->i0..yt->i1[
      */
-    permutation_data_ptr s = mmt->perm[d];
+    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+    permutation_data_ptr s = Mloc->perm[d];
 
     /* For square matrices, we'll use the other permutation transparently
      * with this piece of code. Note though that when we do so, applying
      * the permutation actually goes in the opposite direction. */
     int xd = d;
-    if (!s && (mmt->bal->h->flags & FLAG_REPLICATE)) {
-        ASSERT_ALWAYS(mmt->n[0] == mmt->n[1]);
-        s = mmt->perm[!d];
+    if (!s && (Mloc->bal->h->flags & FLAG_REPLICATE)) {
+        ASSERT_ALWAYS(Mloc->n[0] == Mloc->n[1]);
+        s = Mloc->perm[!d];
         xd = !d;
     }
     if (!s) {
@@ -1639,10 +1695,11 @@ void mmt_vec_apply_or_unapply_S_inner(matmul_top_data_ptr mmt, mmt_vec_ptr y, in
 }
 
 /* multiply v by Sr^-1 if v->d == 0, by Sc^-1 if v->d == 1 */
-void mmt_vec_unapply_S(matmul_top_data_ptr mmt, mmt_vec_ptr y)
+void mmt_vec_unapply_S(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr y)
 {
-    mmt_vec_apply_or_unapply_S_inner(mmt, y, 0);
-    if ((mmt->bal->h->flags & FLAG_REPLICATE) && !mmt->perm[y->d]) {
+    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+    mmt_vec_apply_or_unapply_S_inner(mmt, midx, y, 0);
+    if ((Mloc->bal->h->flags & FLAG_REPLICATE) && !Mloc->perm[y->d]) {
         if (y->d == 0) {
             /* implicit Sr^-1 is Sc^-1*P^-1 */
             mmt_vec_unapply_P(mmt, y);
@@ -1654,9 +1711,10 @@ void mmt_vec_unapply_S(matmul_top_data_ptr mmt, mmt_vec_ptr y)
 }
 
 /* multiply v by Sr if v->d == 0, by Sc if v->d == 1 */
-void mmt_vec_apply_S(matmul_top_data_ptr mmt, mmt_vec_ptr y)
+void mmt_vec_apply_S(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr y)
 {
-    if ((mmt->bal->h->flags & FLAG_REPLICATE) && !mmt->perm[y->d]) {
+    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+    if ((Mloc->bal->h->flags & FLAG_REPLICATE) && !Mloc->perm[y->d]) {
 
         if (y->d == 0) {
             /* implicit Sr is P * Sc */
@@ -1666,7 +1724,7 @@ void mmt_vec_apply_S(matmul_top_data_ptr mmt, mmt_vec_ptr y)
             mmt_vec_unapply_P(mmt, y);
         }
     }
-    mmt_vec_apply_or_unapply_S_inner(mmt, y, 1);
+    mmt_vec_apply_or_unapply_S_inner(mmt, midx, y, 1);
 }
 
 /* for square matrix products, the inner loops do
@@ -1688,16 +1746,13 @@ void mmt_vec_apply_S(matmul_top_data_ptr mmt, mmt_vec_ptr y)
 
 void mmt_vec_twist(matmul_top_data_ptr mmt, mmt_vec_ptr y)
 {
-    mmt_vec_unapply_S(mmt, y);
+    mmt_vec_unapply_S(mmt, y->d == 0 ? 0 : (mmt->nmatrices-1), y);
 }
 
 void mmt_vec_untwist(matmul_top_data_ptr mmt, mmt_vec_ptr y)
 {
-    mmt_vec_apply_S(mmt, y);
+    mmt_vec_apply_S(mmt, y->d == 0 ? 0 : (mmt->nmatrices-1), y);
 }
-
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wunused-function"
 
 /* {{{ mmt_vec_{un,}appy_T -- this applies the fixed column
  * permutation which we use unconditionally in bwc to avoid correlation
@@ -1709,6 +1764,7 @@ void mmt_vec_untwist(matmul_top_data_ptr mmt, mmt_vec_ptr y)
 void mmt_vec_apply_or_unapply_T_inner(matmul_top_data_ptr mmt, mmt_vec_ptr y, int apply)
 {
     if (y->d == 0) return;
+    matmul_top_matrix_ptr Mloc = mmt->matrices[mmt->nmatrices - 1];
     ASSERT_ALWAYS(y->consistency == 2);
     serialize_threads(y->pi->m);
     mmt_vec yt;
@@ -1716,9 +1772,9 @@ void mmt_vec_apply_or_unapply_T_inner(matmul_top_data_ptr mmt, mmt_vec_ptr y, in
     for(unsigned int i = y->i0 ; i < y->i1 ; i++) {
         unsigned int j;
         if (apply) {
-            j = balancing_pre_shuffle(mmt->bal, i);
+            j = balancing_pre_shuffle(Mloc->bal, i);
         } else {
-            j = balancing_pre_unshuffle(mmt->bal, i);
+            j = balancing_pre_unshuffle(Mloc->bal, i);
         }
         if (j >= yt->i0 && j < yt->i1) {
             y->abase->vec_set(y->abase,
@@ -1785,12 +1841,14 @@ static void get_local_permutations_ranges(matmul_top_data_ptr mmt, int d, unsign
 
 void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d)
 {
+    int midx = d == 0 ? 0 : (mmt->nmatrices - 1);
+    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
     /* d == 1: twist(v) = v*Sc^-1
      * d == 0: twist(v) = v*Sr^-1
      */
     unsigned int ii[2], jj[2];
 
-    if (mmt->perm[d]) {
+    if (Mloc->perm[d]) {
         /* explicit S */
         /* coordinate S[i] in the original vector becomes i in the
          * twisted vector.
@@ -1798,13 +1856,13 @@ void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d
         get_local_permutations_ranges(mmt, d, ii, jj);
         unsigned int * r = malloc((jj[1] - jj[0]) * sizeof(unsigned int));
         memset(r, 0, (jj[1] - jj[0]) * sizeof(unsigned int));
-        for(size_t i = 0 ; i < mmt->perm[d]->n ; i++) {
-            ASSERT_ALWAYS(mmt->perm[d]->x[i][0] >= ii[0]);
-            ASSERT_ALWAYS(mmt->perm[d]->x[i][0] <  ii[1]);
-            ASSERT_ALWAYS(mmt->perm[d]->x[i][1] >= jj[0]);
-            ASSERT_ALWAYS(mmt->perm[d]->x[i][1] <  jj[1]);
-            // r[mmt->perm[d]->x[i][0] - ii[0]] = mmt->perm[d]->x[i][1];
-            r[mmt->perm[d]->x[i][1] - jj[0]] = mmt->perm[d]->x[i][0];
+        for(size_t i = 0 ; i < Mloc->perm[d]->n ; i++) {
+            ASSERT_ALWAYS(Mloc->perm[d]->x[i][0] >= ii[0]);
+            ASSERT_ALWAYS(Mloc->perm[d]->x[i][0] <  ii[1]);
+            ASSERT_ALWAYS(Mloc->perm[d]->x[i][1] >= jj[0]);
+            ASSERT_ALWAYS(Mloc->perm[d]->x[i][1] <  jj[1]);
+            // r[Mloc->perm[d]->x[i][0] - ii[0]] = Mloc->perm[d]->x[i][1];
+            r[Mloc->perm[d]->x[i][1] - jj[0]] = Mloc->perm[d]->x[i][0];
         }
         for(unsigned int k = 0 ; k < n ; k++) {
             unsigned int j = xs[k];
@@ -1815,8 +1873,8 @@ void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d
         }
         free(r);
         pi_allreduce(NULL, xs, n * sizeof(uint32_t), BWC_PI_BYTE, BWC_PI_BXOR, mmt->pi->m);
-    } else if (mmt->perm[!d] && (mmt->bal->h->flags & FLAG_REPLICATE)) {
-        ASSERT_ALWAYS(mmt->n[0] == mmt->n[1]);
+    } else if (Mloc->perm[!d] && (Mloc->bal->h->flags & FLAG_REPLICATE)) {
+        ASSERT_ALWAYS(Mloc->n[0] == Mloc->n[1]);
         /* implicit S -- first we get the bits about the S in the other
          * direction, because the pieces we have are for the other
          * ranges, which is a bit disturbing...
@@ -1824,18 +1882,19 @@ void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d
         get_local_permutations_ranges(mmt, !d, ii, jj);
         unsigned int * r = malloc((jj[1] - jj[0]) * sizeof(unsigned int));
         memset(r, 0, (jj[1] - jj[0]) * sizeof(unsigned int));
-        for(size_t i = 0 ; i < mmt->perm[!d]->n ; i++) {
-            ASSERT_ALWAYS(mmt->perm[!d]->x[i][0] >= ii[0]);
-            ASSERT_ALWAYS(mmt->perm[!d]->x[i][0] <  ii[1]);
-            ASSERT_ALWAYS(mmt->perm[!d]->x[i][1] >= jj[0]);
-            ASSERT_ALWAYS(mmt->perm[!d]->x[i][1] <  jj[1]);
-            r[mmt->perm[!d]->x[i][1] - jj[0]] = mmt->perm[!d]->x[i][0];
+        for(size_t i = 0 ; i < Mloc->perm[!d]->n ; i++) {
+            ASSERT_ALWAYS(Mloc->perm[!d]->x[i][0] >= ii[0]);
+            ASSERT_ALWAYS(Mloc->perm[!d]->x[i][0] <  ii[1]);
+            ASSERT_ALWAYS(Mloc->perm[!d]->x[i][1] >= jj[0]);
+            ASSERT_ALWAYS(Mloc->perm[!d]->x[i][1] <  jj[1]);
+            r[Mloc->perm[!d]->x[i][1] - jj[0]] = Mloc->perm[!d]->x[i][0];
         }
-        unsigned int nn[2] = { mmt->bal->h->nh, mmt->bal->h->nv };
+        /* nh and nv are the same for all submatrices, really */
+        unsigned int nn[2] = { Mloc->bal->h->nh, Mloc->bal->h->nv };
         /* for d == 0, we have implicit Sr = P * Sc.
          * for d == 1, we have implicit Sc = P^-1 * Sc
          */
-        size_t z = mmt->bal->trows / (nn[0]*nn[1]);
+        size_t z = Mloc->bal->trows / (nn[0]*nn[1]);
         for(unsigned int k = 0 ; k < n ; k++) {
             unsigned int j = xs[k];
             /* for d == 0, index i goes to P^-1[Sc^-1[i]] */
@@ -1875,14 +1934,15 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 /* Takes data in mmt->wr[d]->v, and compute the corresponding partial result in
  * mmt->wr[!d]->v.
  */
-void matmul_top_mul_cpu(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v)
+void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr w, mmt_vec_ptr v)
 {
+    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
     ASSERT_ALWAYS(v->consistency == 2);
     ASSERT_ALWAYS(w->abase == v->abase);
     unsigned int di_in  = v->i1 - v->i0;
     unsigned int di_out = w->i1 - w->i0;
-    ASSERT_ALWAYS(mmt->mm->dim[1] == (v->d ? di_in : di_out));
-    ASSERT_ALWAYS(mmt->mm->dim[0] == (v->d ? di_out : di_in));
+    ASSERT_ALWAYS(Mloc->mm->dim[1] == (v->d ? di_in : di_out));
+    ASSERT_ALWAYS(Mloc->mm->dim[0] == (v->d ? di_out : di_in));
 
     ASSERT_ALWAYS(w->siblings); /* w must not be shared */
 
@@ -1892,7 +1952,7 @@ void matmul_top_mul_cpu(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v)
      * lower-level mm structure. It can quite probably be qualified as a
      * flaw.
      */
-    matmul_mul(mmt->mm, w->v, v->v, v->d);
+    matmul_mul(Mloc->mm, w->v, v->v, v->d);
     w->consistency = 0;
 }
 
@@ -2044,72 +2104,129 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
 
 /**********************************************************************/
 static void mmt_finish_init(matmul_top_data_ptr mmt, param_list_ptr pl, int optimized_direction);
-static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl, int optimized_direction);
+static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_list_ptr pl, int optimized_direction);
+
+/* returns an allocated string holding the name of the midx-th submatrix */
+static char * matrix_list_get_itemname(param_list_ptr pl, const char * key, int midx)
+{
+    char * res = NULL;
+    char ** mnames;
+    int nmatrices;
+    int rc = param_list_parse_string_list_alloc(pl, key, &mnames, &nmatrices, ",");
+    if (rc == 0)
+        return NULL;
+    ASSERT_ALWAYS(midx < nmatrices);
+    for(int i = 0 ; i < nmatrices ; i++) {
+        if (i == midx) {
+            res = mnames[i];
+        } else {
+            free(mnames[i]);
+        }
+    }
+    free(mnames);
+    return res;
+}
+
+static int matrix_list_get_count(param_list_ptr pl, const char * key)
+{
+    if (!param_list_lookup_string(pl, key))
+        return 0;
+
+    char ** mnames;
+    int nmatrices;
+    int rc = param_list_parse_string_list_alloc(pl, key, &mnames, &nmatrices, ",");
+    if (rc == 0)
+        return 0;
+    for(int midx = 0 ; midx < nmatrices ; midx++) {
+        free(mnames[midx]);
+    }
+    free(mnames);
+    return nmatrices;
+}
 
 static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list_ptr pl)
 {
-    mmt->n[0] = mmt->bal->trows;
-    mmt->n[1] = mmt->bal->tcols;
-    mmt->n0[0] = mmt->bal->h->nrows;
-    mmt->n0[1] = mmt->bal->h->ncols;
-   
-    // nslices[0] is the number of slices in a column -- this is the number of
-    // ``horizontal slices'', in balance.c parlance.
-    //
-    // nslices[0] is also the number of big pieces into which a left
-    // vector is split (eventually, it is split in nh * nv pieces of
-    // course, but the topmost split level is nh).
+    char ** mnames;
+    int nmatrices;
+    // get basename of matrix file. Remove potential suffix, .txt or .bin
+    int rc = param_list_parse_string_list_alloc(pl, "matrix", &mnames, &nmatrices, ",");
+    ASSERT_ALWAYS(rc);
 
-    int ok = 1;
-    ok = ok && mmt->pi->wr[0]->totalsize == mmt->bal->h->nv;
-    ok = ok && mmt->pi->wr[1]->totalsize == mmt->bal->h->nh;
-
-    if (!ok) {
-        fprintf(stderr, "Configured split %ux%ux%ux%u does not match "
-                "split %ux%u found in balancing file.\n",
-                mmt->pi->wr[1]->njobs,
-                mmt->pi->wr[0]->njobs,
-                mmt->pi->wr[1]->ncores,
-                mmt->pi->wr[0]->ncores,
-                mmt->bal->h->nh, mmt->bal->h->nv);
-        serialize(mmt->pi->m);
-        exit(1);
-    }
-
-    char * base;
-    {
-        const char * mname;
-        // get basename of matrix file. Remove potential suffix, .txt or .bin
-        mname = param_list_lookup_string(pl, "matrix");
-        ASSERT_ALWAYS(mname);
-        char * last_slash = strrchr(mname, '/');
-        if (last_slash) {
-            mname = last_slash + 1;
-        }
-        const char * suffixes[] = { ".txt", ".bin" };
-        unsigned int l = strlen(mname);
-        for(unsigned int k = 0 ; k < sizeof(suffixes) / sizeof(suffixes[0]) ; k++) {
-            unsigned int ls = strlen(suffixes[k]);
-            if (ls > l) continue;
-            if (strcmp(mname+l-ls,suffixes[k]) == 0)
-                l -= ls;
-        }
-        base = strndup(mname, l);
-    }
-
-    /* The name choice is only indicative. Depending on the value of
-     * the nullspace argument, the matrices in h?.v? may in fact be
-     * transposed because this is what the cache building code prefers to
-     * receive.
-     */
     int pos[2];
     for(int d = 0 ; d < 2 ; d++)  {
         pi_comm_ptr wr = mmt->pi->wr[d];
         pos[d] = wr->jrank * wr->ncores + wr->trank;
     }
-    int rc = asprintf(&mmt->locfile, "%s.%dx%d.%08" PRIx32 ".h%d.v%d", base, mmt->bal->h->nh, mmt->bal->h->nv, mmt->bal->h->checksum, pos[1], pos[0]);
-    free(base);
-    ASSERT_ALWAYS(rc >= 0);
+
+    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
+        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+        Mloc->n[0] = Mloc->bal->trows;
+        Mloc->n[1] = Mloc->bal->tcols;
+        Mloc->n0[0] = Mloc->bal->h->nrows;
+        Mloc->n0[1] = Mloc->bal->h->ncols;
+
+        // nslices[0] is the number of slices in a column -- this is the number of
+        // ``horizontal slices'', in balance.c parlance.
+        //
+        // nslices[0] is also the number of big pieces into which a left
+        // vector is split (eventually, it is split in nh * nv pieces of
+        // course, but the topmost split level is nh).
+
+        int ok = 1;
+        ok = ok && mmt->pi->wr[0]->totalsize == Mloc->bal->h->nv;
+        ok = ok && mmt->pi->wr[1]->totalsize == Mloc->bal->h->nh;
+
+        if (!ok) {
+            fprintf(stderr, "Balancing file for matrix %d"
+                    " has dimensions %ux%u,"
+                    " this conflicts with the current run,"
+                    " which expects dimensions (%ux%u)x(%ux%u).\n",
+                    midx,
+                    Mloc->bal->h->nh, Mloc->bal->h->nv,
+                    mmt->pi->wr[0]->njobs,
+                    mmt->pi->wr[0]->ncores,
+                    mmt->pi->wr[1]->njobs,
+                    mmt->pi->wr[1]->ncores);
+            serialize(mmt->pi->m);
+            exit(1);
+        }
+
+        /* basename of current matrix. Used to derive cache file. */
+        char * base;
+        {
+            char * mname = mnames[midx];
+            char * last_slash = strrchr(mname, '/');
+            if (last_slash) {
+                mname = last_slash + 1;
+            }
+            const char * suffixes[] = { ".txt", ".bin" };
+            unsigned int l = strlen(mname);
+            for(unsigned int k = 0 ; k < sizeof(suffixes) / sizeof(suffixes[0]) ; k++) {
+                unsigned int ls = strlen(suffixes[k]);
+                if (ls > l) continue;
+                if (strcmp(mname+l-ls,suffixes[k]) == 0)
+                    l -= ls;
+            }
+            base = strndup(mname, l);
+        }
+
+        /* The name choice is only indicative. Depending on the value of
+         * the nullspace argument, the matrices in h?.v? may in fact be
+         * transposed because this is what the cache building code prefers to
+         * receive.
+         */
+        int rc = asprintf(&Mloc->locfile, "%s.%dx%d.%08" PRIx32 ".h%d.v%d", base, Mloc->bal->h->nh, Mloc->bal->h->nv, Mloc->bal->h->checksum, pos[1], pos[0]);
+        ASSERT_ALWAYS(rc >= 0);
+        free(base);
+    }
+    mmt->n[0] = mmt->matrices[0]->n[0];
+    mmt->n0[0] = mmt->matrices[0]->n0[0];
+    mmt->n[1] = mmt->matrices[mmt->nmatrices-1]->n[1];
+    mmt->n0[1] = mmt->matrices[mmt->nmatrices-1]->n0[1];
+    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
+        free(mnames[midx]);
+    }
+    free(mnames);
 }
 
 void matmul_top_init(matmul_top_data_ptr mmt,
@@ -2124,7 +2241,15 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     mmt->abase = abase;
     mmt->pitype = pi_alloc_mpfq_datatype(pi, abase);
     mmt->pi = pi;
-    mmt->mm = NULL;
+    mmt->matrices = NULL;
+    mmt->nmatrices = matrix_list_get_count(pl, "matrix");
+
+    const char * tmp, * rtmp;
+
+    if (mmt->nmatrices) {
+        mmt->matrices = malloc(mmt->nmatrices * sizeof(matmul_top_matrix));
+        memset(mmt->matrices, 0, mmt->nmatrices * sizeof(matmul_top_matrix));
+    }
 
     serialize_threads(mmt->pi->m);
 
@@ -2135,7 +2260,6 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     // are filled in later within read_info_file
     //
 
-    const char * tmp, * rtmp;
     tmp = param_list_lookup_string(pl, "balancing");
     rtmp = param_list_lookup_string(pl, "random_matrix");
     if (tmp && rtmp) {
@@ -2148,13 +2272,31 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     }
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         if (tmp) {
-            balancing_read_header(mmt->bal, tmp);
+            /* we could conceivably use a list of balancing files...  */
+            char ** bnames;
+            int nbals;
+            int rc = param_list_parse_string_list_alloc(pl, "balancing", &bnames, &nbals, ",");
+            ASSERT_ALWAYS(rc);
+            if (nbals != mmt->nmatrices) {
+                fprintf(stderr, "balancing= and matrix= have inconsistent number of items\n");
+                exit(EXIT_FAILURE);
+            }
+            for(int i = 0 ; i < nbals ; i++) {
+                balancing_read_header(mmt->matrices[i]->bal, bnames[i]);
+                free(bnames[i]);
+            }
+            free(bnames);
         } else {
-            random_matrix_fill_fake_balancing_header(mmt->bal, pi, rtmp);
+            mmt->nmatrices = 1;
+            mmt->matrices = malloc(sizeof(matmul_top_matrix));
+            memset(mmt->matrices, 0, mmt->nmatrices * sizeof(matmul_top_matrix));
+            random_matrix_fill_fake_balancing_header(mmt->matrices[0]->bal, pi, rtmp);
         }
     }
 
-    pi_bcast(mmt->bal, sizeof(mmt->bal), BWC_PI_BYTE, 0, 0, mmt->pi->m);
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        pi_bcast(mmt->matrices[i]->bal, sizeof(balancing), BWC_PI_BYTE, 0, 0, mmt->pi->m);
+    }
 
     // after that, we need to check for every node if the cache file can
     // be found. If none is found, rebuild the cache files
@@ -2181,86 +2323,92 @@ static void mmt_get_local_permutation_data(matmul_top_data_ptr mmt, param_list_p
 {
     serialize_threads(mmt->pi->m);
 
-    /* we're going to read the balancing file completely, on the leader
-     * node. Make sure there's nothing there yet.
-     */
-    ASSERT_ALWAYS(mmt->bal->rowperm == NULL);
-    ASSERT_ALWAYS(mmt->bal->colperm == NULL);
-    unsigned int rowperm_items=0;
-    unsigned int colperm_items=0;
+    int nbals = matrix_list_get_count(pl, "balancing");
+    ASSERT_ALWAYS(nbals == 0 || nbals == mmt->nmatrices);
 
-    /* Define a complete structure for the balancing which is shared
-     * among threads, so that we'll be able to access it from all threads
-     * simultaneously. We will put things in bal_tmp->rowperm and
-     * bal_tmp->colperm, but beyond that, the header part will be wrong
-     * at non-root nodes.
-     */
-    balancing_ptr bal_tmp = shared_malloc_set_zero(mmt->pi->m, sizeof(balancing));
+    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
+        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+        /* we're going to read the balancing file completely, on the leader
+         * node. Make sure there's nothing there yet.
+         */
+        ASSERT_ALWAYS(Mloc->bal->rowperm == NULL);
+        ASSERT_ALWAYS(Mloc->bal->colperm == NULL);
+        unsigned int rowperm_items=0;
+        unsigned int colperm_items=0;
 
-    if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
-        const char * tmp = param_list_lookup_string(pl, "balancing");
-        if (tmp)
-            balancing_read(bal_tmp, tmp);
-        /* It's fine if we have nothing. This just means that we'll have
-         * no balancing to deal with. */
-        rowperm_items = bal_tmp->rowperm != NULL ? bal_tmp->trows : 0;
-        colperm_items = bal_tmp->colperm != NULL ? bal_tmp->tcols : 0;
-    }
-    pi_bcast(&rowperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
-    pi_bcast(&colperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
+        /* Define a complete structure for the balancing which is shared
+         * among threads, so that we'll be able to access it from all threads
+         * simultaneously. We will put things in bal_tmp->rowperm and
+         * bal_tmp->colperm, but beyond that, the header part will be wrong
+         * at non-root nodes.
+         */
+        balancing_ptr bal_tmp = shared_malloc_set_zero(mmt->pi->m, sizeof(balancing));
 
-    if (mmt->pi->m->trank == 0) {
-        if (rowperm_items) {
-            ASSERT_ALWAYS(rowperm_items == mmt->bal->trows);
-            if (mmt->pi->m->jrank != 0)
-                bal_tmp->rowperm = malloc(mmt->bal->trows * sizeof(uint32_t));
-            MPI_Bcast(bal_tmp->rowperm, mmt->bal->trows * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
+        if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+            const char * tmp = param_list_lookup_string(pl, "balancing");
+            if (tmp)
+                balancing_read(bal_tmp, tmp);
+            /* It's fine if we have nothing. This just means that we'll have
+             * no balancing to deal with. */
+            rowperm_items = bal_tmp->rowperm != NULL ? bal_tmp->trows : 0;
+            colperm_items = bal_tmp->colperm != NULL ? bal_tmp->tcols : 0;
         }
-        if (colperm_items) {
-            ASSERT_ALWAYS(colperm_items == mmt->bal->tcols);
-            if (mmt->pi->m->jrank != 0)
-                bal_tmp->colperm = malloc(mmt->bal->tcols * sizeof(uint32_t));
-            MPI_Bcast(bal_tmp->colperm, mmt->bal->tcols * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
-        }
-    }
-    serialize_threads(mmt->pi->m);      /* important ! */
+        pi_bcast(&rowperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
+        pi_bcast(&colperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
 
-    uint32_t * balperm[2] = { bal_tmp->rowperm, bal_tmp->colperm };
-    for(int d = 0 ; d < 2 ; d++)  {
-        unsigned int ii[2];
-        unsigned int jj[2];
-        get_local_permutations_ranges(mmt, d, ii, jj);
-
-        if (!balperm[d]) continue;
-
-        mmt->perm[d] = permutation_data_alloc();
-
-        /* now create the really local permutation */
-        for(unsigned int i = ii[0] ; i < ii[1] ; i++) {
-            unsigned int j = balperm[d][i];
-            if (j >= jj[0] && j < jj[1]) {
-                unsigned int ij[2] = { i, j };
-                permutation_data_push(mmt->perm[d], ij);
+        if (mmt->pi->m->trank == 0) {
+            if (rowperm_items) {
+                ASSERT_ALWAYS(rowperm_items == Mloc->bal->trows);
+                if (mmt->pi->m->jrank != 0)
+                    bal_tmp->rowperm = malloc(Mloc->bal->trows * sizeof(uint32_t));
+                MPI_Bcast(bal_tmp->rowperm, Mloc->bal->trows * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
+            }
+            if (colperm_items) {
+                ASSERT_ALWAYS(colperm_items == Mloc->bal->tcols);
+                if (mmt->pi->m->jrank != 0)
+                    bal_tmp->colperm = malloc(Mloc->bal->tcols * sizeof(uint32_t));
+                MPI_Bcast(bal_tmp->colperm, Mloc->bal->tcols * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
             }
         }
+        serialize_threads(mmt->pi->m);      /* important ! */
+
+        uint32_t * balperm[2] = { bal_tmp->rowperm, bal_tmp->colperm };
+        for(int d = 0 ; d < 2 ; d++)  {
+            unsigned int ii[2];
+            unsigned int jj[2];
+            get_local_permutations_ranges(mmt, d, ii, jj);
+
+            if (!balperm[d]) continue;
+
+            Mloc->perm[d] = permutation_data_alloc();
+
+            /* now create the really local permutation */
+            for(unsigned int i = ii[0] ; i < ii[1] ; i++) {
+                unsigned int j = balperm[d][i];
+                if (j >= jj[0] && j < jj[1]) {
+                    unsigned int ij[2] = { i, j };
+                    permutation_data_push(Mloc->perm[d], ij);
+                }
+            }
 #if 0
-    const char * text[2] = { "left", "right", };
-        printf("[%s] J%uT%u does %zu/%u permutation pairs for %s vectors\n",
-                mmt->pi->nodenumber_s,
-                mmt->pi->m->jrank, mmt->pi->m->trank,
-                mmt->perm[d]->n, d ? mmt->bal->tcols : mmt->bal->trows,
-                text[d]);
+        const char * text[2] = { "left", "right", };
+            printf("[%s] J%uT%u does %zu/%u permutation pairs for %s vectors\n",
+                    mmt->pi->nodenumber_s,
+                    mmt->pi->m->jrank, mmt->pi->m->trank,
+                    Mloc->perm[d]->n, d ? Mloc->bal->tcols : Mloc->bal->trows,
+                    text[d]);
 #endif
+        }
+
+        serialize_threads(mmt->pi->m);      /* important ! */
+
+        if (mmt->pi->m->trank == 0) {
+            if (bal_tmp->colperm) free(bal_tmp->colperm);
+            if (bal_tmp->rowperm) free(bal_tmp->rowperm);
+        }
+
+        shared_free(mmt->pi->m, bal_tmp);
     }
-
-    serialize_threads(mmt->pi->m);      /* important ! */
-
-    if (mmt->pi->m->trank == 0) {
-        if (bal_tmp->colperm) free(bal_tmp->colperm);
-        if (bal_tmp->rowperm) free(bal_tmp->rowperm);
-    }
-
-    shared_free(mmt->pi->m, bal_tmp);
 }
 
 
@@ -2278,36 +2426,41 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, param_list_ptr pl, int opti
     // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
     // displaying communication info.
 
-    if (!mmt->pi->interleaved) {
-        matmul_top_read_submatrix(mmt, pl, optimized_direction);
-    } else {
-        /* Interleaved threads will share their matrix data. The first
-         * thread to arrive will do the initialization, and the second
-         * one will just grab the pointer. The trick is to be able to
-         * pick the pointer in the right location ! We add a generic
-         * pointer dictionary feature in the parallelizing_info
-         * interface for this purpose.
-         */
+    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
+        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+        if (!mmt->pi->interleaved) {
+            matmul_top_read_submatrix(mmt, midx, pl, optimized_direction);
+        } else {
+            /* Interleaved threads will share their matrix data. The first
+             * thread to arrive will do the initialization, and the second
+             * one will just grab the pointer. The trick is to be able to
+             * pick the pointer in the right location ! We add a generic
+             * pointer dictionary feature in the parallelizing_info
+             * interface for this purpose.
+             */
 
 #define MMT_MM_MAGIC_KEY        0xaa000000UL
 
-        if (mmt->pi->interleaved->idx == 0) {
-            matmul_top_read_submatrix(mmt, pl, optimized_direction);
-            pi_store_generic(mmt->pi, MMT_MM_MAGIC_KEY, mmt->pi->m->trank, mmt->mm);
-        } else {
-            mmt->mm = pi_load_generic(mmt->pi, MMT_MM_MAGIC_KEY, mmt->pi->m->trank);
+            if (mmt->pi->interleaved->idx == 0) {
+                matmul_top_read_submatrix(mmt, midx, pl, optimized_direction);
+                pi_store_generic(mmt->pi, MMT_MM_MAGIC_KEY + midx, mmt->pi->m->trank, Mloc->mm);
+            } else {
+                Mloc->mm = pi_load_generic(mmt->pi, MMT_MM_MAGIC_KEY + midx, mmt->pi->m->trank);
+            }
         }
     }
 }
 
-static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list_ptr pl)
+static int export_cache_list_if_requested(matmul_top_data_ptr mmt, int midx, param_list_ptr pl)
 {
     const char * cachelist = param_list_lookup_string(pl, "export_cachelist");
     if (!cachelist) return 0;
 
+    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+
     char * myline = NULL;
     int rc;
-    rc = asprintf(&myline, "%s %s", mmt->pi->nodename, mmt->mm->cachefile_name);
+    rc = asprintf(&myline, "%s %s", mmt->pi->nodename, Mloc->mm->cachefile_name);
     ASSERT_ALWAYS(rc >= 0);
     ASSERT_ALWAYS(myline != NULL);
     char ** tlines = NULL;
@@ -2318,7 +2471,7 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list_pt
     /* Also, just out of curiosity, try to see what we have currently */
     struct stat st[1];
     int * has_cache = shared_malloc_set_zero(mmt->pi->m, mmt->pi->m->totalsize * sizeof(int));
-    rc = stat(mmt->mm->cachefile_name, st);
+    rc = stat(Mloc->mm->cachefile_name, st);
     unsigned int mynode = mmt->pi->m->ncores * mmt->pi->m->jrank;
     has_cache[mynode + mmt->pi->m->trank] = rc == 0;
     serialize_threads(mmt->pi->m);
@@ -2394,15 +2547,18 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list_pt
 }
 
 
-static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl, int optimized_direction)
+
+static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_list_ptr pl, int optimized_direction)
 {
     int rebuild = 0;
     param_list_parse_int(pl, "rebuild_cache", &rebuild);
 
-    mmt->mm = matmul_init(mmt->abase,
-            mmt->n[0] / mmt->pi->wr[1]->totalsize,
-            mmt->n[1] / mmt->pi->wr[0]->totalsize,
-            mmt->locfile, NULL  /* means: choose mm_impl from pl */,
+    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+
+    Mloc->mm = matmul_init(mmt->abase,
+            Mloc->n[0] / mmt->pi->wr[1]->totalsize,
+            Mloc->n[1] / mmt->pi->wr[0]->totalsize,
+            Mloc->locfile, NULL  /* means: choose mm_impl from pl */,
             pl, optimized_direction); 
 
     // *IF* we need to do a collective read of the matrix, we need to
@@ -2412,9 +2568,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
 
     int cache_loaded = 0;
 
-    if (export_cache_list_if_requested(mmt, pl)) {
-        /* This has the effect of terminating the program if we are being
-         * called from dispatch */
+    if (export_cache_list_if_requested(mmt, midx, pl)) {
+        /* If we are being called from dispatch, once all submatrices
+         * have had their list of required files printed, the program
+         * will exit. */
         return;
     }
 
@@ -2426,11 +2583,11 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
             for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
                 serialize_threads(mmt->pi->m);
                 if (j == mmt->pi->m->trank) {
-                    cache_loaded = matmul_reload_cache(mmt->mm);
+                    cache_loaded = matmul_reload_cache(Mloc->mm);
                 }
             }
         } else {
-            cache_loaded = matmul_reload_cache(mmt->mm);
+            cache_loaded = matmul_reload_cache(Mloc->mm);
         }
     }
 
@@ -2445,7 +2602,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
                     mmt->pi->nodenumber_s,
                     mmt->pi->m->jrank,
                     mmt->pi->m->trank,
-                    mmt->mm->cachefile_name,
+                    Mloc->mm->cachefile_name,
                     cache_loaded ? "ok" : "not ok");
         }
         SEVERAL_THREADS_PLAY_MPI_END();
@@ -2462,13 +2619,13 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
      * matrix_u32 */
 
     if (!cache_loaded) {
-        m->mfile = param_list_lookup_string(pl, "matrix");
-        m->bfile = param_list_lookup_string(pl, "balancing");
+        m->mfile = matrix_list_get_itemname(pl, "matrix", midx);
+        m->bfile = matrix_list_get_itemname(pl, "balancing", midx);
         // the mm layer is informed of the higher priority computations
         // that will take place. Depending on the implementation, this
         // may cause the direct or transposed ordering to be preferred.
         // Thus we have to read this back from the mm structure.
-        m->transpose = mmt->mm->store_transposed;
+        m->transpose = Mloc->mm->store_transposed;
         {
             mpz_t p;
             mpz_init(p);
@@ -2480,7 +2637,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Begin creation of fake matrix data in parallel\n");
             }
-            random_matrix_get_u32(mmt->pi, pl, m, mmt->mm->dim[0], mmt->mm->dim[1]);
+            random_matrix_get_u32(mmt->pi, pl, m, Mloc->mm->dim[0], Mloc->mm->dim[1]);
         } else {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Matrix dispatching starts\n");
@@ -2491,8 +2648,8 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
         int ssm = 0;
         param_list_parse_int(pl, "save_submatrices", &ssm);
         if (ssm) {
-            fprintf(stderr, "DEBUG: creating %s\n", mmt->locfile);
-            FILE * f = fopen(mmt->locfile, "wb");
+            fprintf(stderr, "DEBUG: creating %s\n", Mloc->locfile);
+            FILE * f = fopen(Mloc->locfile, "wb");
             fwrite(m->p, sizeof(uint32_t), m->size, f);
             fclose(f);
         }
@@ -2507,9 +2664,9 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
                         mmt->pi->nodenumber_s,
                         mmt->pi->m->jrank,
                         mmt->pi->m->trank,
-                        mmt->locfile);
-            matmul_build_cache(mmt->mm, m);
-            matmul_save_cache(mmt->mm);
+                        Mloc->locfile);
+            matmul_build_cache(Mloc->mm, m);
+            matmul_save_cache(Mloc->mm);
         }
     } else {
         for(unsigned int j = 0 ; j < mmt->pi->m->ncores + 1 ; j++) {
@@ -2521,10 +2678,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
                             mmt->pi->nodenumber_s,
                             mmt->pi->m->jrank,
                             mmt->pi->m->trank,
-                            mmt->locfile);
-                matmul_build_cache(mmt->mm, m);
+                            Mloc->locfile);
+                matmul_build_cache(Mloc->mm, m);
             } else if (j == mmt->pi->m->trank + 1) {
-                matmul_save_cache(mmt->mm);
+                matmul_save_cache(Mloc->mm);
             }
         }
     }
@@ -2537,9 +2694,12 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list_ptr pl
                 mmt->pi->nodenumber_s,
                 mmt->pi->m->jrank, mmt->pi->m->trank,
                 /* cache for mmt->locfile, */
-                mmt->mm->cachefile_name);
+                Mloc->mm->cachefile_name);
         my_pthread_mutex_unlock(mmt->pi->m->th->m);
     }
+
+    if (m->mfile) free(m->mfile);
+    if (m->bfile) free(m->bfile);
 }
 
 
@@ -2550,23 +2710,28 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
     serialize(mmt->pi->m);
     serialize_threads(mmt->pi->m);
 
+    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
+        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
 #if RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL
-    for(int d = 0 ; d < 2 ; d++)  {
-        permutation_data_free(mmt->perm[d]);
-        // both are expected to hold storage for:
-        // (mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores))
-        // elements, corresponding to the largest abase encountered.
-    }
+        for(int d = 0 ; d < 2 ; d++)  {
+            permutation_data_free(Mloc->perm[d]);
+            // both are expected to hold storage for:
+            // (mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores))
+            // elements, corresponding to the largest abase encountered.
+        }
 #endif  /* RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL */
-    serialize(mmt->pi->m);
-    if (!mmt->pi->interleaved) {
-        matmul_clear(mmt->mm);
-    } else if (mmt->pi->interleaved->idx == 1) {
-        matmul_clear(mmt->mm);
-        /* group 0 is the first to leave, thus it doesn't to freeing.
-         */
+        serialize(mmt->pi->m);
+        if (!mmt->pi->interleaved) {
+            matmul_clear(Mloc->mm);
+        } else if (mmt->pi->interleaved->idx == 1) {
+            matmul_clear(Mloc->mm);
+            /* group 0 is the first to leave, thus it doesn't to freeing.
+            */
+        }
+        free(Mloc->locfile);
     }
-    free(mmt->locfile);
+    serialize(mmt->pi->m);
+    free(mmt->matrices);
 }
 
 static permutation_data_ptr permutation_data_alloc()

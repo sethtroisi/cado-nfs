@@ -26,7 +26,6 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 {
     matmul_top_data mmt;
     mmt_vec y, my;
-    struct timing_data timing[1];
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
     /*
@@ -188,8 +187,6 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     matmul_top_clear(mmt);
 
     A->oo_field_clear(A);
-
-    timing_clear(timing);
 
     return NULL;
 }

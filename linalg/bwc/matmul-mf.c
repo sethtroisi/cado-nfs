@@ -45,7 +45,7 @@ void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file, i
     matrix_read_pass(mf, NULL, rw, cw, 0, 0, 1, withcoeffs);
 
     memset(m, 0, sizeof(matrix_u32));
-    m->mfile = file;
+    m->mfile = strdup(file);
     m->bfile = NULL;
     m->transpose = mm->store_transposed;
     m->size = sbuf->st_size / sizeof(uint32_t);

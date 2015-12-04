@@ -862,6 +862,32 @@ int param_list_parse_string(param_list pl, const char * key, char * r, size_t n)
     return seen;
 }
 
+int param_list_parse_string_list_alloc(param_list pl, const char * key, char *** r, int * n, const char * sep)
+{
+    char * value;
+    *r = NULL;
+    *n = 0;
+    int parsed = 0;
+    if (!get_assoc(pl, key, &value, NULL))
+        return 0;
+    for( ; ; ) {
+        char * v = strstr(value, sep);
+        int itemsize;
+        if (v == NULL) {
+            itemsize = strlen(value);
+        } else {
+            itemsize = v - value;
+        }
+        *r = realloc(*r, (parsed + 1) * sizeof(char *));
+        (*r)[parsed++] = strndup(value, itemsize);
+        if (!v)
+            break;
+        value = v + strlen(sep);
+    }
+    *n = parsed;
+    return parsed;
+}
+
 int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep)
 {
     char *value;
