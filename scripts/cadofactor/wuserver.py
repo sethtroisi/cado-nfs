@@ -744,6 +744,7 @@ subjectAltName=@altnames
 
         self.port = self.httpd.server_address[1]
         self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
+        self.url_loc = "%s://localhost:%d" % (scheme, self.port)
         self.httpd.server_name = self.name
 
         if self.address == "localhost" or self.httpd.server_address[0].startswith("127."):
@@ -753,7 +754,11 @@ subjectAltName=@altnames
     def get_port(self):
         return self.port
 
-    def get_url(self):
+    def get_url(self, origin=None):
+        if origin is "localhost":
+            return self.url_loc
+        elif origin is not None:
+            self.logger.warn("Server address requested for origin=%s ; this is not understood, returning generic url %s instead" % (origin, self.url))
         return self.url
 
     def get_cert_sha1(self):
