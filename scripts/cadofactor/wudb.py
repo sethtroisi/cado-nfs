@@ -1027,9 +1027,10 @@ class WuAccess(object): # {
                 if not PRINTED_CANCELLED_WARNING:
                     logger.warning("If workunits get cancelled due to timeout "
                             "even though the clients are still processing them, "
-                            "consider increasing the wutimeout parameter or "
+                            "consider increasing the tasks.wutimeout parameter or "
                             "decreasing the range covered in each workunit, "
-                            "i.e., the adrange or qrange parameters.")
+                            "i.e., the tasks.polyselect.adrange or "
+                            "tasks.sieve.qrange parameters.")
                     PRINTED_CANCELLED_WARNING = True
             raise
         if DEBUG > 0:

@@ -271,7 +271,9 @@ if (HAVE_MPI)
     # environment is within bwc.pl, so we have to use it.
     cado_define_test(TEST_NAME test_hello_mpi PROGRAM
         ${PROJECT_BINARY_DIR}/linalg/bwc/bwc.pl
-        NO_DEFAULT_RUN TEST_DEPENDENCIES test_hello)
+        NO_DEFAULT_RUN
+        TARGET_DEPENDENCIES test_hello
+        TEST_DEPENDENCIES test_hello)
     macro(test_hello_mpi code)
         cado_divert_test(test_hello_mpi ${code} ARGUMENTS
             :mpirun ${ARGN}
