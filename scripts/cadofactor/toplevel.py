@@ -739,8 +739,8 @@ class Cado_NFS_toplevel(object):
         # server.threads).
         p="tasks.sqrt.sqrt.threads"
         t=self.parameters.get_simple(p, 0)
-        if self.parameters.locate(p) == "tasks.threads":
-            self.parameters.set_simple(p, min(t, 8))
+        if t > 8 and self.parameters.locate(p) == "tasks.threads":
+            self.parameters.set_simple(p, 8)
 
     def set_slaves_parameters(self):
         ''' sets slaves.nrclients and slaves.scriptpath to default values
