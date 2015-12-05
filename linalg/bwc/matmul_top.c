@@ -85,6 +85,10 @@
 static permutation_data_ptr permutation_data_alloc();
 static void permutation_data_free(permutation_data_ptr a);
 static void permutation_data_push(permutation_data_ptr a, unsigned int u[2]);
+#ifdef  MVAPICH2_NUMVERSION
+static void permutation_data_ensure(permutation_data_ptr a, size_t n);
+#endif
+
 
 void matmul_top_decl_usage(param_list_ptr pl)
 {
@@ -2427,6 +2431,10 @@ static void mmt_get_local_permutation_data(matmul_top_data_ptr mmt, param_list_p
             if (!balperm[d]) continue;
 
             Mloc->perm[d] = permutation_data_alloc();
+#ifdef  MVAPICH2_NUMVERSION
+            /* apparently mvapich2 frowns on realloc() */
+            permutation_data_ensure(Mloc->perm[d],ii[1] - ii[0]);
+#endif
 
             /* now create the really local permutation */
             for(unsigned int i = ii[0] ; i < ii[1] ; i++) {
@@ -2798,13 +2806,31 @@ static void permutation_data_free(permutation_data_ptr a)
     free(a);
 }
 
+static pthread_mutex_t pp = PTHREAD_MUTEX_INITIALIZER;
+
 static void permutation_data_push(permutation_data_ptr a, unsigned int u[2])
 {
     if (a->n >= a->alloc) {
+        pthread_mutex_lock(&pp);
         a->alloc = a->n + 16 + a->alloc / 4;
         a->x = realloc(a->x, a->alloc * sizeof(unsigned int[2]));
+        pthread_mutex_unlock(&pp);
+        ASSERT_ALWAYS(a->x != NULL);
     }
     a->x[a->n][0] = u[0];
     a->x[a->n][1] = u[1];
     a->n++;
 }
+
+#ifdef  MVAPICH2_NUMVERSION
+static void permutation_data_ensure(permutation_data_ptr a, size_t n)
+{
+    if (n >= a->alloc) {
+        pthread_mutex_lock(&pp);
+        a->alloc = n;
+        a->x = realloc(a->x, n * sizeof(unsigned int[2]));
+        pthread_mutex_unlock(&pp);
+        ASSERT_ALWAYS(a->x != NULL);
+    }
+}
+#endif

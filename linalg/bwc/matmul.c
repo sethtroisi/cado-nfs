@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <pthread.h>
 #ifdef HAVE_STATVFS_H
 #include <sys/statvfs.h>
 #endif
@@ -144,6 +145,8 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
             MATMUL_LIBS_PREFIX "matmul_%s_%s" MATMUL_LIBS_SUFFIX,
             x->impl_name(x), impl);
 
+    static pthread_mutex_t pp = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&pp);
     void * handle = dlopen(solib, RTLD_NOW);
     if (handle == NULL) {
         fprintf(stderr, "loading %s: %s\n", solib, dlerror());
@@ -154,6 +157,7 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
         fprintf(stderr, "loading %s: %s\n", solib, dlerror());
         abort();
     }
+    pthread_mutex_unlock(&pp);
 #else   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
     rebinder = get_rebinder(impl, x->impl_name(x));
 #endif   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
