@@ -25,7 +25,6 @@
 void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     matmul_top_data mmt;
-    mmt_vec y, my;
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
     /*
@@ -65,6 +64,10 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
      * krylov/mksol speed testing.
      */
     matmul_top_init(mmt, A, pi, pl, bw->dir);
+
+    mmt_vec ymy[2];
+    mmt_vec_ptr y = ymy[0];
+    mmt_vec_ptr my = ymy[1];
     mmt_vec_init(mmt,0,0, y,  1, 0, mmt->n[1]);
     mmt_vec_init(mmt,0,0, my, 0, 0, mmt->n[0]);
 
@@ -100,7 +103,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             memcpy(dst, &value, sizeof(uint64_t));
         }
         mmt_vec_twist(mmt, y);
-        matmul_top_mul(mmt, my, y);
+        matmul_top_mul(mmt, ymy, NULL);
         mmt_vec_untwist(mmt, y);
 
         mmt_vec_save(y, "Hx", 0, unpadded);
@@ -152,8 +155,15 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         pi_allreduce(NULL, dp0, A->groupsize(A), mmt->pitype, BWC_PI_SUM, pi->m);
 
         /* now we can throw away Hx */
+
+        /* we do a transposed multiplication, here. It's a bit of a
+         * quirk, admittedly. We need to build a reversed vector list.
+         */
+        mmt_vec myy[2];
+        memcpy(myy[0], ymy[1], sizeof(mmt_vec));
+        memcpy(myy[1], ymy[0], sizeof(mmt_vec));
         mmt_vec_twist(mmt, my);
-        matmul_top_mul(mmt, y, my);
+        matmul_top_mul(mmt, myy, NULL);
         mmt_vec_untwist(mmt, my);
         mmt_vec_save(my, "Hy", 0, unpadded);
 

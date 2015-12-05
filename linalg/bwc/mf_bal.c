@@ -412,7 +412,7 @@ int main(int argc, char * argv[])
         bal->h->pshuf_inv[1] = 0;
     } else {
         modulusul_t M;
-        modul_initmod_ul(M, bal->h->ncols);
+        modul_initmod_ul(M, MIN(bal->h->nrows, bal->h->ncols));
         residueul_t a,b;
         residueul_t ai,bi;
         modul_init(a, M);

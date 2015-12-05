@@ -127,14 +127,10 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
 
 void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    /* Interleaving does not make sense for this program. So the second
-     * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
+    ASSERT_ALWAYS(!pi->interleaved);
 
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
-    mmt_vec y, my;
 
     int nsolvecs = bw->nsolvecs;
     unsigned int multi = 1;
@@ -162,6 +158,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
+
+    mmt_vec ymy[2];
+    mmt_vec_ptr y = ymy[0];
+    mmt_vec_ptr my = ymy[1];
+
     mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
     mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
 
@@ -360,7 +361,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         for(int i = 1 ; i < 10 ; i++) {
             serialize(pi->m);
 
-            matmul_top_mul(mmt, my, y);
+            matmul_top_mul(mmt, ymy, NULL);
 
             mmt_vec_untwist(mmt, y);
 
@@ -505,6 +506,8 @@ int main(int argc, char * argv[])
             "for the solution vector(s), this corresponds to the contribution(s) on the columns concerned by the rhs");
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    param_list_remove_key(pl, "interleaving");
 
     bw_common_interpret_parameters(bw, pl);
     parallelizing_info_lookup_parameters(pl);

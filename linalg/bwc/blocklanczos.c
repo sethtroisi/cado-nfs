@@ -388,7 +388,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
     mmt_vec_save_stream(f, bl->y, mmt->n0[bw->dir]);
 
     mmt_vec_twist(mmt, bl->y);
-    matmul_top_mul_cpu(mmt, 0, bl->my, bl->y);
+    matmul_top_mul_cpu(mmt, 0, 0, bl->my, bl->y);
     mmt_vec_allreduce(bl->my);
     mmt_vec_untwist(mmt, bl->my);
 
@@ -609,7 +609,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
                 /* at this point, timer is [0] (CPU) */
 
                 {
-                    matmul_top_mul_cpu(mmt, 0, yy[!d], yy[d]);
+                    matmul_top_mul_cpu(mmt, 0, yy[d]->d, yy[!d], yy[d]);
                     timing_next_timer(timing);  /* now timer is [1] (cpu-wait) */
                 }
                 serialize(pi->m);           /* for measuring waits only */

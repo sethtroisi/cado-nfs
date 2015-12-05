@@ -13,7 +13,7 @@ void x_dotprod(void * dst, uint32_t * xv, unsigned int m, unsigned int nx, mmt_v
         serialize_threads(v->pi->wr[v->d]);
     } else {
         // I'd presume that no locking is needed here. But it's unchecked
-        ASSERT_ALWAYS(0);
+        // ASSERT_ALWAYS(0);
     }
 
     for(unsigned int j = 0 ; j < m ; j++) {

@@ -264,7 +264,9 @@ static void param_list_consolidate(param_list pl)
     }
     pl->size = j;
 
-    pl->consolidated = 1;
+    /* consolidated list have to guarantee ordering. We have broken
+     * ordering, clearly */
+    pl->consolidated = 0;
 }
 
 void param_list_remove_key(param_list pl, const char * key)
@@ -282,8 +284,8 @@ void param_list_remove_key(param_list pl, const char * key)
         }
     }
     pl->size = j;
-
-    pl->consolidated = 1;
+    /* if the list was consolidated (sorted), it still is. If it wasn't,
+     * then, well, clearly it's not better */
 }
 
 /* If step_on_empty_line is non-zero, then this function reads the file until a

@@ -20,8 +20,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 {
     /* Interleaving does not make sense for this program. So the second
      * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
+    ASSERT_ALWAYS(!pi->interleaved);
 
     // Doing the ``hello world'' test is a very good way of testing the
     // global mpi/pthreads setup. So despite its apparent irrelevance, I
@@ -30,7 +29,6 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
-    mmt_vec y, my;
 
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
@@ -39,6 +37,11 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
+
+    mmt_vec ymy[2];
+    mmt_vec_ptr y = ymy[0];
+    mmt_vec_ptr my = ymy[1];
+
     mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
     mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
 
@@ -125,7 +128,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         // XXX Note that x^Ty does not count here, because it does not
         // take part to the sequence computed by lingen !
         mmt_vec_twist(mmt, y);
-        matmul_top_mul(mmt, my, y);
+        matmul_top_mul(mmt, ymy, NULL);
         mmt_vec_untwist(mmt, y);
         
         // we have indices mmt->wr[1]->i0..i1 available.
@@ -148,7 +151,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                 }
             }
             mmt_vec_twist(mmt, y);
-            matmul_top_mul(mmt, my, y);
+            matmul_top_mul(mmt, ymy, NULL);
             mmt_vec_untwist(mmt, y);
         }
 
@@ -211,10 +214,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
  */
 void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    /* Interleaving does not make sense for this program. So the second
-     * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
+    ASSERT_ALWAYS(!pi->interleaved);
 
     matmul_top_data mmt;
 
@@ -374,6 +374,9 @@ int main(int argc, char * argv[])
             "file with the right-hand side vectors for inhomogeneous systems mod p");
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    /* This program does not support interleaving */
+    param_list_remove_key(pl, "interleaving");
 
     bw_common_interpret_parameters(bw, pl);
     parallelizing_info_lookup_parameters(pl);

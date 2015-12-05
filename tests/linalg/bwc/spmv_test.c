@@ -91,10 +91,7 @@ void mmt_vec_check_equal_0n_inv_permuted(mmt_vec_ptr v, size_t items, uint32_t *
 
 void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    /* Interleaving does not make sense for this program. So the second
-     * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
+    ASSERT_ALWAYS(!pi->interleaved);
 
     if (verbose) {
         pi_log_init(pi->m);
@@ -315,7 +312,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          */
         mmt_vec_apply_T(mmt, y);
         mmt_vec_twist(mmt, y);
-        matmul_top_mul_cpu(mmt, 0, my, y);
+        matmul_top_mul_cpu(mmt, 0, y->d, my, y);
         /* watch out -- at this point we are *NOT* doing
          * matmul_top_mul_comm, so there's no multiplication by P^-1 !
          */
@@ -336,7 +333,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         serialize(pi->m);
         mmt_vec_set_random_through_file(w, "W", 0, mmt->n0[0], rstate);
         mmt_vec_twist(mmt, w);
-        matmul_top_mul_cpu(mmt, 0, wm, w);
+        matmul_top_mul_cpu(mmt, 0, w->d, wm, w);
         /* It's not the same if we do allreduce+untwist, thus stay on the
          * image side, or reduce (changing side) + untwist, which brings
          * us back to the original side.
@@ -518,6 +515,8 @@ int main(int argc, char * argv[])
     param_list_configure_switch(pl, "v", &verbose);
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    param_list_remove_key(pl, "interleaving");
 
     bw_common_interpret_parameters(bw, pl);
     parallelizing_info_lookup_parameters(pl);

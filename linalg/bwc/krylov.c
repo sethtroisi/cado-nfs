@@ -22,7 +22,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
-    mmt_vec y, my;
     struct timing_data timing[1];
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
@@ -56,15 +55,41 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     block_control_signals();
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
-    mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
-    mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
+
+    /* we allocate as many vectors as we have matrices, plus one if the
+     * number of matrices is odd (so we always have an even number of
+     * vectors). If the number of matrices is odd, then
+     * the first vector may be shared.  Otherwise, I believe it cannot
+     * (but I'm not really sure)
+     *
+     * Storage for vectors need actually not be present at all times.
+     * This could be improved.
+     *
+     * Interleaving could defined twice as many interleaved levels as we
+     * have matrices. It is probably not relevant.
+     */
+
+    int nmats_odd = mmt->nmatrices & 1;
+
+    mmt_vec * ymy = malloc((mmt->nmatrices + nmats_odd) * sizeof(mmt_vec));
+    matmul_top_matrix_ptr mptr;
+    mptr = (matmul_top_matrix_ptr) mmt->matrices + (bw->dir ? (mmt->nmatrices - 1) : 0);
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        int shared = (i == 0) & nmats_odd;
+        mmt_vec_init(mmt,0,0, ymy[i], bw->dir ^ (i&1), shared, mptr->n[bw->dir]);
+        mmt_full_vec_set_zero(ymy[i]);
+
+        mptr += bw->dir ? -1 : 1;
+    }
+    if (nmats_odd) {
+        mmt_vec_init(mmt,0,0, ymy[mmt->nmatrices], !bw->dir, 0, mmt->matrices[0]->n[bw->dir]);
+        mmt_full_vec_set_zero(ymy[mmt->nmatrices]);
+    }
 
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     serialize(pi->m);
     
-    mmt_full_vec_set_zero(my);
-
     uint32_t * gxvecs = NULL;
     unsigned int nx = 0;
     if (!fake) {
@@ -88,7 +113,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
         if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-        mmt_vec_load(y, v_name, bw->start, unpadded);
+        mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
@@ -118,8 +143,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 #else
         unsigned long g = pi->m->jrank * pi->m->ncores + pi->m->trank;
         gmp_randseed_ui(rstate, bw->seed + g);
-        mmt_vec_set_random_inconsistent(y, rstate);
-        mmt_vec_allreduce(y);
+        mmt_vec_set_random_inconsistent(ymy[0], rstate);
+        mmt_vec_allreduce(ymy[0]);
 #endif
         gmp_randclear(rstate);
     }
@@ -209,86 +234,31 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             A->vec_set_zero(A, ahead, nchecks);
             AxAc->dotprod(A->obj, Ac->obj, ahead,
                     mmt_my_own_subvec(check_vector),
-                    mmt_my_own_subvec(y),
-                    mmt_my_own_size_in_items(y));
+                    mmt_my_own_subvec(ymy[0]),
+                    mmt_my_own_size_in_items(ymy[0]));
         }
 
         /* Create an empty slot in program execution, so that we don't
          * impose strong constraints on twist/untwist_vector being free of
-         * MPI calls.
+         * MPI calls (well, it's *not* free of MPI calls, to start
+         * with...).
          */
         pi_interleaving_flip(pi);
         pi_interleaving_flip(pi);
-        mmt_vec_twist(mmt, y);
+        mmt_vec_twist(mmt, ymy[0]);
 
         A->vec_set_zero(A, xymats, bw->m*bw->interval);
         serialize(pi->m);
+        pi_interleaving_flip(pi);
         for(int i = 0 ; i < bw->interval ; i++) {
             /* The first part of this loop must be guaranteed to be free
              * of any mpi calls */
-            pi_interleaving_flip(pi);
 
             /* Compute the product by x */
             x_dotprod(A->vec_subvec(A, xymats, i * bw->m),
-                    gxvecs, bw->m, nx, y, 1);
+                    gxvecs, bw->m, nx, ymy[0], 1);
 
-            /* copy code from matmul_top_mul() ; this should really be
-             * factored out */
-
-            /* Timers take, in sequence, the 4n values defined in the
-             * definition of the timing structure. The first is timer 0.
-             */
-            mmt_vec_ptr x[2] = { y, my };
-            if (y->d == 0) {
-                for(int mx = 0, k = 0 ; mx < mmt->nmatrices ; mx++, k^=1) {
-                    mmt_vec_ptr src = x[k];
-                    mmt_vec_ptr dst = x[!k];
-
-                    matmul_top_mul_cpu(mmt, mx, dst, src);
-
-                    timing_next_timer(timing);
-                    pi_interleaving_flip(pi);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-
-                    /* Now we can resume MPI communications. */
-                    if (mx == (mmt->nmatrices - 1) && (mmt->nmatrices & 1) == 1) {
-                        ASSERT_ALWAYS(src == y);
-                        matmul_top_mul_comm(src, dst);
-                    } else {
-                        mmt_vec_allreduce(dst);
-                    }
-
-                    timing_next_timer(timing);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-                }
-            } else {
-                /* same, in reverse order */
-                for(int mx = mmt->nmatrices, k = 0 ; mx-- > 0 ; k^=1) {
-                    mmt_vec_ptr src = x[k];
-                    mmt_vec_ptr dst = x[!k];
-                    ASSERT_ALWAYS(src->consistency == 2);
-
-                    matmul_top_mul_cpu(mmt, mx, dst, src);
-                    ASSERT_ALWAYS(dst->consistency == 0);
-
-                    timing_next_timer(timing);
-                    pi_interleaving_flip(pi);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-
-                    if (mx == 0 && (mmt->nmatrices & 1) == 1) {
-                        ASSERT_ALWAYS(src == y);
-                        matmul_top_mul_comm(src, dst);
-                    } else {
-                        mmt_vec_allreduce(dst);
-                    }
-                    timing_next_timer(timing);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-                }
-            }
+            matmul_top_mul(mmt, ymy, timing);
 
             timing_check(pi, timing, s+i+1, tcan_print);
         }
@@ -300,7 +270,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(ahead, gxvecs, nchecks, nx, y, -1);
+            x_dotprod(ahead, gxvecs, nchecks, nx, ymy[0], -1);
 
             pi_allreduce(NULL, ahead, nchecks, mmt->pitype, BWC_PI_SUM, pi->m);
             if (!A->vec_is_zero(A, ahead, nchecks)) {
@@ -309,7 +279,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
         }
 
-        mmt_vec_untwist(mmt, y);
+        mmt_vec_untwist(mmt, ymy[0]);
 
         /* Now (and only now) collect the xy matrices */
         pi_allreduce(NULL, xymats,
@@ -332,7 +302,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
-        mmt_vec_save(y, v_name, s + bw->interval, mmt->n0[bw->dir]);
+        mmt_vec_save(ymy[0], v_name, s + bw->interval, mmt->n0[bw->dir]);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0)
             keep_rolling_checkpoints(v_name, s + bw->interval);
@@ -366,8 +336,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     free(gxvecs);
     free(v_name);
 
-    mmt_vec_clear(mmt, y);
-    mmt_vec_clear(mmt, my);
+    for(int i = 0 ; i < mmt->nmatrices + nmats_odd ; i++) {
+        mmt_vec_clear(mmt, ymy[i]);
+    }
+    free(ymy);
 
     matmul_top_clear(mmt);
     pi_free_mpfq_datatype(pi, Ac_pi);

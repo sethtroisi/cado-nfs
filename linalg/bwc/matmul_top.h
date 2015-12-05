@@ -12,6 +12,7 @@
 #include "balancing.h"
 #include "misc.h"
 #include "mpfq/mpfq_vbase.h"
+#include "async.h"
 
 // the ``all_v'' field collects all the pointers to the per-thread vector
 // values. There are exactly pi->wr[0]->ncores such pointers in
@@ -139,12 +140,12 @@ extern void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, un
 extern void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate);
 extern void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int nx);
 
-extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr w, mmt_vec_ptr v);
+extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, int d, mmt_vec_ptr w, mmt_vec_ptr v);
 extern void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_mul_comm(mmt_vec_ptr w, mmt_vec_ptr v);
 
 /* v is both input and output. w is temporary */
-extern void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v);
+extern void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec *w, struct timing_data * tt);
 
 extern void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int d, int flags, unsigned int n);
 extern void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v);

@@ -44,6 +44,7 @@ static void extract_interval(timing_interval_data * since_last_reset, timing_int
 
 void timing_next_timer(struct timing_data * t)
 {
+    if (!t) return;
     double d[2];
     int next = (t->which + 1) % t->ntimers;
 

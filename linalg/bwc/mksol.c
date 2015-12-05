@@ -24,7 +24,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
-    mmt_vec y, my;
     struct timing_data timing[1];
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
@@ -108,8 +107,24 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     block_control_signals();
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
-    mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
-    mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
+
+    int nmats_odd = mmt->nmatrices & 1;
+
+    mmt_vec * ymy = malloc((mmt->nmatrices + nmats_odd) * sizeof(mmt_vec));
+    matmul_top_matrix_ptr mptr;
+    mptr = (matmul_top_matrix_ptr) mmt->matrices + (bw->dir ? (mmt->nmatrices - 1) : 0);
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        int shared = (i == 0) & nmats_odd;
+        mmt_vec_init(mmt,0,0, ymy[i], bw->dir ^ (i&1), shared, mptr->n[bw->dir]);
+        mmt_full_vec_set_zero(ymy[i]);
+
+        mptr += bw->dir ? -1 : 1;
+    }
+    if (nmats_odd) {
+        mmt_vec_init(mmt,0,0, ymy[mmt->nmatrices], !bw->dir, 0, mmt->matrices[0]->n[bw->dir]);
+        mmt_full_vec_set_zero(ymy[mmt->nmatrices]);
+    }
+
 
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
@@ -131,7 +146,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
         if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-        mmt_vec_load(y, v_name, bw->start, unpadded);
+        mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
@@ -146,7 +161,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             printf("// Random generator seeded with %d\n", bw->seed);
         }
         if (tcan_print) { printf("Creating fake %s...", v_name); fflush(stdout); }
-        mmt_vec_set_random_through_file(y, v_name, bw->start, unpadded, rstate);
+        mmt_vec_set_random_through_file(ymy[0], v_name, bw->start, unpadded, rstate);
         if (tcan_print) { printf("done\n"); }
         gmp_randclear(rstate);
     }
@@ -232,7 +247,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     // unsigned int ii0 = y->i0 + mmt_my_own_offset_in_items(y);
     // unsigned int ii1 = ii0 + mmt_my_own_size_in_items(y);
-    size_t eblock = mmt_my_own_size_in_items(y);
+    size_t eblock = mmt_my_own_size_in_items(ymy[0]);
 
     void * * sum;
     sum = malloc(multi * sizeof(void *));
@@ -347,8 +362,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             A->vec_set_zero(A, ahead, nchecks);
             AxAc->dotprod(A->obj, Ac->obj, ahead,
                     mmt_my_own_subvec(check_vector),
-                    mmt_my_own_subvec(y),
-                    mmt_my_own_size_in_items(y));
+                    mmt_my_own_subvec(ymy[0]),
+                    mmt_my_own_size_in_items(ymy[0]));
         }
 
         serialize(pi->m);
@@ -358,7 +373,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          */
         pi_interleaving_flip(pi);
         pi_interleaving_flip(pi);
-        mmt_vec_twist(mmt, y);
+        mmt_vec_twist(mmt, ymy[0]);
         serialize(pi->m);
 
         /* Despite the fact that the bw->end value might lead us
@@ -367,77 +382,21 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          * computations won't be checked.
          */
 
+        pi_interleaving_flip(pi);
+
         for(int i = 0 ; i < bw->interval ; i++) {
             /* The first part of this loop must be guaranteed to be free
              * of any mpi calls */
 
-            /* first timer is [0] (CPU) */
-            pi_interleaving_flip(pi);
             for(unsigned int k = 0 ; k < multi ; k++) {
                 AxAr->addmul_tiny(A->obj, Ar->obj,
                         sum[k],
-                        mmt_my_own_subvec(y),
+                        mmt_my_own_subvec(ymy[0]),
                         Ar->vec_subvec(Ar, fcoeffs[k], i * A->groupsize(A)),
                         eblock);
             }
 
-            /* copy code from matmul_top_mul() ; this should really be
-             * factored out */
-
-            /* Timers take, in sequence, the 4n values defined in the
-             * definition of the timing structure. The first is timer 0.
-             */
-            mmt_vec_ptr x[2] = { y, my };
-            if (y->d == 0) {
-                for(int mx = 0, k = 0 ; mx < mmt->nmatrices ; mx++, k^=1) {
-                    mmt_vec_ptr src = x[k];
-                    mmt_vec_ptr dst = x[!k];
-
-                    matmul_top_mul_cpu(mmt, mx, dst, src);
-
-                    timing_next_timer(timing);
-                    pi_interleaving_flip(pi);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-
-                    /* Now we can resume MPI communications. */
-                    if (mx == (mmt->nmatrices - 1) && (mmt->nmatrices & 1) == 1) {
-                        ASSERT_ALWAYS(src == y);
-                        matmul_top_mul_comm(src, dst);
-                    } else {
-                        mmt_vec_allreduce(dst);
-                    }
-
-                    timing_next_timer(timing);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-                }
-            } else {
-                /* same, in reverse order */
-                for(int mx = mmt->nmatrices, k = 0 ; mx-- > 0 ; k^=1) {
-                    mmt_vec_ptr src = x[k];
-                    mmt_vec_ptr dst = x[!k];
-                    ASSERT_ALWAYS(src->consistency == 2);
-
-                    matmul_top_mul_cpu(mmt, mx, dst, src);
-                    ASSERT_ALWAYS(dst->consistency == 0);
-
-                    timing_next_timer(timing);
-                    pi_interleaving_flip(pi);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-
-                    if (mx == 0 && (mmt->nmatrices & 1) == 1) {
-                        ASSERT_ALWAYS(src == y);
-                        matmul_top_mul_comm(src, dst);
-                    } else {
-                        mmt_vec_allreduce(dst);
-                    }
-                    timing_next_timer(timing);
-                    serialize(pi->m);
-                    timing_next_timer(timing);
-                }
-            }
+            matmul_top_mul(mmt, ymy, timing);
 
             timing_check(pi, timing, s+i+1, tcan_print);
         }
@@ -446,7 +405,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         pi_interleaving_flip(pi);
         pi_interleaving_flip(pi);
 
-        mmt_vec_untwist(mmt, y);
+        mmt_vec_untwist(mmt, ymy[0]);
 
         // FIXME. serialize here ??
         // serialize(pi->m);
@@ -454,7 +413,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! Recall that x_dotprod
              * adds to the result. */
-            x_dotprod(ahead, gxvecs, nchecks, nx, y, -1);
+            x_dotprod(ahead, gxvecs, nchecks, nx, ymy[0], -1);
 
             pi_allreduce(NULL, ahead, nchecks, mmt->pitype, BWC_PI_SUM, pi->m);
             if (!A->vec_is_zero(A, ahead, nchecks)) {
@@ -469,7 +428,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          */
 
         /* save it beforehand */
-        mmt_vec_save(y, v_name, s + bw->interval, unpadded);
+        mmt_vec_save(ymy[0], v_name, s + bw->interval, unpadded);
 
         /* Since S is possibly wider than one single vector, we need
          * several passes. Each corresponds to one batch of potential
@@ -495,7 +454,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
              * the mmt_vec types becomes more versatile */
             for(int i = 0 ; i < npasses ; i++) {
                 serialize(pi->m);
-                mmt_full_vec_set_zero(y);
+                mmt_full_vec_set_zero(ymy[0]);
                 serialize(pi->m);
                 /* Each job/thread copies its data share to mcol->v */
                 void * dst;
@@ -509,25 +468,25 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                  * this looks good enough.
                  */
                 src = pointer_arith_const(sum[k], i * stride);
-                dst = mmt_my_own_subvec(y);
+                dst = mmt_my_own_subvec(ymy[0]);
                 for(size_t j = 0 ; j < eblock ; j++) {
                     memcpy(dst, src, stride);
                     src = pointer_arith_const(src, rstride);
                     dst = pointer_arith(dst, stride);
                 }
-                y->consistency = 1;
+                ymy[0]->consistency = 1;
                 /* Now we collect the data in mcol->v. Note that each
                  * location is non-zero only at one location, so unreduced
                  * addition is unnecessary.
                  */
-                mmt_vec_allreduce(y);
+                mmt_vec_allreduce(ymy[0]);
                 /* untwist the result */
-                mmt_vec_untwist(mmt, y);
+                mmt_vec_untwist(mmt, ymy[0]);
 
                 serialize_threads(pi->m);
 
                 dst = pointer_arith(sum[k], i * stride);
-                src = mmt_my_own_subvec(y);
+                src = mmt_my_own_subvec(ymy[0]);
                 for(size_t j = 0 ; j < eblock ; j++) {
                     memcpy(dst, src, stride);
                     dst = pointer_arith(dst, rstride);
@@ -554,7 +513,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         serialize(pi->m);
 
         /* recover the vector */
-        mmt_vec_load(y, v_name, s + bw->interval, unpadded);
+        mmt_vec_load(ymy[0], v_name, s + bw->interval, unpadded);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0)
             keep_rolling_checkpoints(v_name, s + bw->interval);
@@ -586,8 +545,10 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     free(fcoeffs);
     free(sum);
 
-    mmt_vec_clear(mmt, y);
-    mmt_vec_clear(mmt, my);
+    for(int i = 0 ; i < mmt->nmatrices + nmats_odd ; i++) {
+        mmt_vec_clear(mmt, ymy[i]);
+    }
+    free(ymy);
 
     matmul_top_clear(mmt);
     pi_free_mpfq_datatype(pi, Ar_pi);

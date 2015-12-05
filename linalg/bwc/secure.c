@@ -62,14 +62,10 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 {
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
 
-    /* Interleaving does not make sense for this program. So the second
-     * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
+    ASSERT_ALWAYS(!pi->interleaved);
 
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
-    mmt_vec y, my;
 
     int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
@@ -80,6 +76,10 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
+
+    mmt_vec myy[2];
+    mmt_vec_ptr my = myy[0];
+    mmt_vec_ptr y = myy[1];
 
     /* we work in the opposite direction compared to other programs */
     mmt_vec_init(mmt,0,0, y,   bw->dir,                0, mmt->n[bw->dir]);
@@ -156,7 +156,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_twist(mmt, my);
         for( ; k < next ; k++) {
             pi_log_op(mmt->pi->m, "iteration %d", k);
-            matmul_top_mul(mmt, y, my);
+            matmul_top_mul(mmt, myy, NULL);
 
             if (tcan_print) {
                 putchar('.');
@@ -204,6 +204,8 @@ int main(int argc, char * argv[])
     /* declare local parameters and switches: none here (so far). */
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    param_list_remove_key(pl, "interleaving");
 
     bw_common_interpret_parameters(bw, pl);
     parallelizing_info_lookup_parameters(pl);

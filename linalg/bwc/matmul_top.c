@@ -600,50 +600,84 @@ int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
 
 //////////////////////////////////////////////////////////////////////////
 
-void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec_ptr w, mmt_vec_ptr v)/*{{{*/
+void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec * v, struct timing_data * tt)/*{{{*/
 {
-    /* Do all matrices in turn. For the moment, we represent M as
-     * M0*M1*..*M_{n-1}, so we apply for indices 0 to n-1 when v->d==0,
-     * and for indices n-1 to 0 for v->d == 1. Note that if we were to
-     * change this, we would have to pass an extra argument indicating
-     * whether we mean the transpose or not.
+    /* Do all matrices in turn.
+     *
+     * We represent M as * M0*M1*..*M_{n-1}.
+     *
+     * The input vector is v[0], and the result is put in v[0] again.
+     *
+     * The direction in which we apply the product is given by v[0]->d.
+     * For v[0]->d == 0, we do v[0]*M. For v[0]->d==1, we do M*v[0]
+     *
+     * We use temporaries as follows.
+     * For v[0]->d == 0:
+     *  v[1] <- v[0] * M0 ; v[1]->d == 1
+     *  v[2] <- v[1] * M1 ; v[2]->d == 0
+     *  if n is odd:
+     *  v[n] <- v[n-1] * M_{n-1} ; v[n]->d == 1
+     *  if n is even:
+     *  v[0] <- v[n-1] * M_{n-1} ; v[0]->d == 0
+     *
+     * For v[0]->d == 1:
+     *  v[1] <- M0 * v[0] ; v[1]->d == 0
+     *  v[2] <- M1 * v[1] ; v[2]->d == 1
+     *  if n is odd:
+     *  v[n] <- M_{n-1} * v[n-1] ; v[n]->d == 0
+     *  if n is even:
+     *  v[0] <- M_{n-1} * v[n-1] ; v[0]->d == 1
+     *
+     * This has the consequence that v must hold exactly n+(n&1) vectors.
+     *
+     * Appropriate communication operations are run after each step.
+     *
+     * If tt is not NULL, it should be a timing_data structure holding
+     * exactly 4*n timers (or only 4, conceivably). Timers are switched
+     * exactly that many times.
+     *
+     * If the mmt->pi->interleaving setting is on, we interleave
+     * computations and communications. We do 2n flips. Communications
+     * are forbidden both before and after calls to this function (in the
+     * directly adjacent code fragments before the closest flip() call,
+     * that is).
      */
-    mmt_vec_ptr x[2] = { v, w };
 
-    if (v->d == 0) {
-        for(int midx = 0, k = 0 ; midx < mmt->nmatrices ; midx++, k^=1) {
-            mmt_vec_ptr src = x[k];
-            mmt_vec_ptr dst = x[!k];
-            ASSERT_ALWAYS(src->consistency == 2);
-            matmul_top_mul_cpu(mmt, midx, dst, src);
-            ASSERT_ALWAYS(dst->consistency == 0);
-            /* In quite a few cases, the terminating matmul_top_mul_comm
-             * can be done with simply allreduce(). In the common case
-             * mmt->nmatrices == 1, however, this is not the case. */
-            if (midx == (mmt->nmatrices - 1) && (mmt->nmatrices & 1) == 1) {
-                ASSERT_ALWAYS(src == v);
-                matmul_top_mul_comm(src, dst);
-            } else {
-                mmt_vec_allreduce(dst);
-            }
+    int d = v[0]->d;
+    int nmats_odd = mmt->nmatrices & 1;
+    int midx = (d ? (mmt->nmatrices - 1) : 0);
+    for(int l = 0 ; l < mmt->nmatrices ; l++) {
+        mmt_vec_ptr src = v[l];
+        int last = l == (mmt->nmatrices - 1);
+        int lnext = last && !nmats_odd ? 0 : (l+1);
+        mmt_vec_ptr dst = v[lnext];
+
+        ASSERT_ALWAYS(src->consistency == 2);
+        matmul_top_mul_cpu(mmt, midx, d, dst, src);
+        ASSERT_ALWAYS(dst->consistency == 0);
+
+        timing_next_timer(tt);
+        /* now measuring jitter */
+        pi_interleaving_flip(mmt->pi);
+        serialize(mmt->pi->m);
+        timing_next_timer(tt);
+
+        /* Now we can resume MPI communications. */
+        if (last && nmats_odd) {
+            ASSERT_ALWAYS(lnext == mmt->nmatrices);
+            matmul_top_mul_comm(v[0], dst);
+        } else {
+            mmt_vec_allreduce(dst);
         }
-    } else {
-        /* same, in reverse order */
-        for(int midx = mmt->nmatrices, k = 0 ; midx-- > 0 ; k^=1) {
-            mmt_vec_ptr src = x[k];
-            mmt_vec_ptr dst = x[!k];
-            ASSERT_ALWAYS(src->consistency == 2);
-            matmul_top_mul_cpu(mmt, midx, dst, src);
-            ASSERT_ALWAYS(dst->consistency == 0);
-            if (midx == 0 && (mmt->nmatrices & 1) == 1) {
-                ASSERT_ALWAYS(src == v);
-                matmul_top_mul_comm(src, dst);
-            } else {
-                mmt_vec_allreduce(dst);
-            }
-        }
+        timing_next_timer(tt);
+        /* now measuring jitter */
+        pi_interleaving_flip(mmt->pi);
+        serialize(mmt->pi->m);
+
+        timing_next_timer(tt);
+        midx += d ? -1 : 1;
     }
-    ASSERT_ALWAYS(v->consistency == 2);
+    ASSERT_ALWAYS(v[0]->consistency == 2);
 }
 /*}}}*/
 
@@ -1931,18 +1965,30 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 }
 #endif
 
-/* Takes data in mmt->wr[d]->v, and compute the corresponding partial result in
- * mmt->wr[!d]->v.
+/* For d == 0: do w = v * M
+ * For d == 1: do w = M * v
+ *
+ * We do not necessarily have v->d == d, although this will admittedly be
+ * the case most often:
+ * - in block Wiedemann, we have a vector split in some direction (say
+ *   d==1 when we wanna solve Mw=0), we compute w=Mv, and then there's
+ *   the matmul_top_mul_comm step which moves stuff to v again.
+ * - in block Lanczos, say we start from v->d == 1 again. We do w=M*v,
+ *   so that w->d==0. But then we want to compute M^T * w, which is w^T *
+ *   M. So again, w->d == 0 is appropriate with the second product being
+ *   in the direction foo*M.
+ * - the only case where this does not necessarily happen so is when we
+ *   have several matrices.
  */
-void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr w, mmt_vec_ptr v)
+void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, int d, mmt_vec_ptr w, mmt_vec_ptr v)
 {
     matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
     ASSERT_ALWAYS(v->consistency == 2);
     ASSERT_ALWAYS(w->abase == v->abase);
     unsigned int di_in  = v->i1 - v->i0;
     unsigned int di_out = w->i1 - w->i0;
-    ASSERT_ALWAYS(Mloc->mm->dim[1] == (v->d ? di_in : di_out));
-    ASSERT_ALWAYS(Mloc->mm->dim[0] == (v->d ? di_out : di_in));
+    ASSERT_ALWAYS(Mloc->mm->dim[!d] == di_out);
+    ASSERT_ALWAYS(Mloc->mm->dim[d] == di_in);
 
     ASSERT_ALWAYS(w->siblings); /* w must not be shared */
 
@@ -1952,7 +1998,7 @@ void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr w, mmt_ve
      * lower-level mm structure. It can quite probably be qualified as a
      * flaw.
      */
-    matmul_mul(Mloc->mm, w->v, v->v, v->d);
+    matmul_mul(Mloc->mm, w->v, v->v, d);
     w->consistency = 0;
 }
 
@@ -2107,7 +2153,7 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, param_list_ptr pl, int opti
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_list_ptr pl, int optimized_direction);
 
 /* returns an allocated string holding the name of the midx-th submatrix */
-static char * matrix_list_get_itemname(param_list_ptr pl, const char * key, int midx)
+static char * matrix_list_get_item(param_list_ptr pl, const char * key, int midx)
 {
     char * res = NULL;
     char ** mnames;
@@ -2345,7 +2391,7 @@ static void mmt_get_local_permutation_data(matmul_top_data_ptr mmt, param_list_p
         balancing_ptr bal_tmp = shared_malloc_set_zero(mmt->pi->m, sizeof(balancing));
 
         if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
-            const char * tmp = param_list_lookup_string(pl, "balancing");
+            const char * tmp = matrix_list_get_item(pl, "balancing", midx);
             if (tmp)
                 balancing_read(bal_tmp, tmp);
             /* It's fine if we have nothing. This just means that we'll have
@@ -2429,7 +2475,7 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, param_list_ptr pl, int opti
     for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
         matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
         if (!mmt->pi->interleaved) {
-            matmul_top_read_submatrix(mmt, midx, pl, optimized_direction);
+            matmul_top_read_submatrix(mmt, midx, pl, optimized_direction );
         } else {
             /* Interleaved threads will share their matrix data. The first
              * thread to arrive will do the initialization, and the second
@@ -2559,7 +2605,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
             Mloc->n[0] / mmt->pi->wr[1]->totalsize,
             Mloc->n[1] / mmt->pi->wr[0]->totalsize,
             Mloc->locfile, NULL  /* means: choose mm_impl from pl */,
-            pl, optimized_direction); 
+            pl, optimized_direction);
 
     // *IF* we need to do a collective read of the matrix, we need to
     // provide the pointer *now*.
@@ -2619,8 +2665,8 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
      * matrix_u32 */
 
     if (!cache_loaded) {
-        m->mfile = matrix_list_get_itemname(pl, "matrix", midx);
-        m->bfile = matrix_list_get_itemname(pl, "balancing", midx);
+        m->mfile = matrix_list_get_item(pl, "matrix", midx);
+        m->bfile = matrix_list_get_item(pl, "balancing", midx);
         // the mm layer is informed of the higher priority computations
         // that will take place. Depending on the implementation, this
         // may cause the direct or transposed ordering to be preferred.
