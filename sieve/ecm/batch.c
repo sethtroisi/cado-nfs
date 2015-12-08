@@ -501,7 +501,7 @@ update_status (mpz_t *R, uint32_t *perm,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
 find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
-             FILE *out, int nthreads)
+             FILE *out, int nthreads MAYBE_UNUSED)
 {
   unsigned long nb_rel_read = l->size;
   unsigned long nb_smooth;
@@ -762,7 +762,7 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
 */
 void
 factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
-        FILE *out, int nthreads)
+        FILE *out, int nthreads MAYBE_UNUSED)
 {
   unsigned long i, *sp[2], spsize[2], B[2];
   int nb_methods;
