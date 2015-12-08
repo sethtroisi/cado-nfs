@@ -678,7 +678,7 @@ print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
     }
 
   /* remove small primes */
-  trial_divide (n, sp, spsize, str);
+  str = trial_divide (n, sp, spsize, str);
 
   /* factor the cofactor */
   str = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, B, str0, str);
