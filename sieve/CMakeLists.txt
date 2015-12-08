@@ -21,6 +21,7 @@ set (las_libraries las-norms trialdiv facul utils ${pthread_libs})
 
 add_executable (las ${las_sources})
 target_link_libraries (las ${las_libraries})
+set_target_properties(las PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 
 add_executable (las_tracek EXCLUDE_FROM_ALL ${las_sources})
 set_property(TARGET las_tracek PROPERTY COMPILE_DEFINITIONS TRACE_K=1)

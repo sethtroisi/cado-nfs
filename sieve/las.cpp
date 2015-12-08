@@ -3365,11 +3365,12 @@ int main (int argc0, char *argv0[])/*{{{*/
 			   las->cpoly->pols[1], las->output);
 	double tcof_batch = seconds ();
 	cofac_list_realloc (las->L, las->L->size);
-	report->reports = find_smooth (las->L, lpb, lim, batchP, las->output);
+	report->reports = find_smooth (las->L, lpb, lim, batchP, las->output,
+				       las->nb_threads);
 	mpz_clear (batchP[0]);
 	mpz_clear (batchP[1]);
-	factor (las->L, report->reports, las->cpoly, lpb[0], lpb[1],
-		las->output);
+	factor (las->L, report->reports, las->cpoly, lpb,
+		las->default_config->side, las->output, las->nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	report->ttcof += tcof_batch;
 	/* add to ttf since the remaining time will be computed as ttf-ttcof */
