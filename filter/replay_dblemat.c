@@ -175,7 +175,7 @@ copy_mat(matrix_t M1, matrix_t M2, uint64_t nr)
 
 static void 
 apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr, 
-    const char *hisname) {
+    const char *hisname, uint64_t stop_point) {
   FILE *hisfile;
   hisfile = fopen_maybe_compressed (hisname, "r");
   ASSERT_ALWAYS(hisfile != NULL);
@@ -183,7 +183,7 @@ apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr,
 #define STRLENMAX 2048
   uint64_t addread = 0;
   char str[STRLENMAX];
-  int started3merge = 0;
+  int startedM1 = 0;
 
   printf("Reading row additions\n");
   stats_data_t stats; /* struct for printing progress */
@@ -198,20 +198,32 @@ apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr,
     /* If incomplete line, there is a bug somewhere. Let's crash. */
     ASSERT_ALWAYS(str[strlen(str)-1] == '\n'); 
 
-    /* The first 3-merge is detected by the fact that we don't erase a
-     * row. FIXME: This is not robust! */
-    if (started3merge == 0 && str[0] == '-') {
-      fprintf(stderr, "Reached the first 3-merge\n");
-      started3merge = 1;
-      // Save the current matrix in M2
-      copy_mat(M2, MM, nr);
+    if (!startedM1) {
+      if (stop_point == 0) {
+        // Try to detect first 3-merge
+        /* The first 3-merge is detected by the fact that we don't erase a
+         * row. FIXME: This is not robust! */
+        if (str[0] == '-') {
+          fprintf(stderr, "Reached the first 3-merge\n");
+          startedM1 = 1;
+          // Save the current matrix in M2
+          copy_mat(M2, MM, nr);
+        }
+      } else {
+        if (addread == stop_point) {
+          fprintf(stderr, "Reached stop point\n");
+          startedM1 = 1;
+          // Save the current matrix in M2
+          copy_mat(M2, MM, nr);
+        }
+      }
     }
 
     /* Do the operation on the main matrix. */
     doAllAdds(MM, str, NULL); //index_data);
 
-    /* If you are after the first 3-merge, record operations in M1 */
-    if (started3merge)
+    /* If we are after the stop point, record operations in M1 */
+    if (startedM1)
       doAllAdds(M1, str, NULL);
   }
   stats_print_progress (stats, addread, 0, 0, 1);
@@ -221,6 +233,22 @@ apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr,
 /***********************************/
 /* Renumbering / counting weights  */
 /***********************************/
+
+static uint64_t
+total_weight(const matrix_t M, const uint64_t nr, const uint32_t skip)
+{
+  uint64_t wt = 0;
+  for (uint64_t i = 0; i < nr; i++) {
+    if (M[i] != NULL) {
+      for (uint32_t k = 1; k <= rowLength(M, i); k++) {
+        if (rowCell(M, i, k) >= skip) {
+          wt++;
+        }
+      }
+    }
+  }
+  return wt;
+}
 
 // Compute the column weights of M, store them in col_weight, which must
 // have been pre-allocated with size nc (the number of columns of M).
@@ -536,6 +564,7 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "purged", "input purged file");
   param_list_decl_usage(pl, "his", "input history file");
+  param_list_decl_usage(pl, "stop_point", "point in history where to split matrix");
   param_list_decl_usage(pl, "out", "basename for output matrices");
   param_list_decl_usage(pl, "skip", "number of heaviest columns that go to the "
       "dense matrix (default " STR(DEFAULT_MERGE_SKIP) ")");
@@ -594,6 +623,8 @@ int main(int argc, char *argv[])
   param_list_parse_int(pl, "skip", &skip);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
   set_antebuffer_path (argv0, path_antebuffer);
+  uint64_t stop_point = 0;
+  param_list_parse_uint64(pl, "stop_point", &stop_point);
 
   /* Some checks on command line arguments */
   if (param_list_warn_unused(pl)) {
@@ -662,7 +693,7 @@ int main(int argc, char *argv[])
   }
 
   /* Apply .his file to MM, and record M1 and M2 on the way. */
-  apply_hisfile(MM, M1, M2, nr, hisname);
+  apply_hisfile(MM, M1, M2, nr, hisname, stop_point);
 
   /* Compute column weights in the resulting MM, to deduce extractor
    * matrices (row weights are already known). */
@@ -812,6 +843,9 @@ int main(int argc, char *argv[])
 
   write_matrix("M1", M1, final_nr, nrp, 0, bin);
   write_matrix("M2", M2, nrp, final_nc, skip, bin);
+
+  printf("Total weight of M1: %lu\n", total_weight(M1, final_nr, 0));
+  printf("Total weight of M2: %lu\n", total_weight(M2, nrp, skip));
 
   for (uint64_t i = 0; i < nr; ++i) {
     free(M1[i]);
