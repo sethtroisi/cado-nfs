@@ -140,10 +140,10 @@ tasks.polyselect.nrkeep = 20
 # batch: how many polynomial to put in each WU in the rootsieve phase
 tasks.polyselect.batch = 10                              
 
-# define tasks.sieve.ratq to True if you want special-q's to be taken on
-# the rational side (by default they are on the algebraic side), this can be
-# better in the case of SNFS polynomials
-tasks.sieve.ratq=False
+# define tasks.sieve.sqside to select the side where to put the special-q's.
+# By default the largest norm is on side 1, so sqside=1 is to be chosen
+# in general.
+tasks.sieve.sqside=1
 
 tasks.sieve.rels_wanted = 122540
 tasks.sieve.qrange = 2000

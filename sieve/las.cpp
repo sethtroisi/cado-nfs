@@ -2783,7 +2783,6 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
   param_list_decl_usage(pl, "t",   "number of threads to use");
-  param_list_decl_usage(pl, "ratq", "[deprecated, alias to --sqside 0] (switch) use rational special-q");
   param_list_decl_usage(pl, "sqside", "put special-q on this side");
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
@@ -2867,7 +2866,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     /* Passing NULL is allowed here. Find value with
      * param_list_parse_switch later on */
     param_list_configure_switch(pl, "-v", NULL);
-    param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-ondemand-siever-config", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
