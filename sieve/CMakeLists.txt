@@ -25,6 +25,7 @@ set_target_properties(las PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 
 add_executable (las_tracek EXCLUDE_FROM_ALL ${las_sources})
 set_property(TARGET las_tracek PROPERTY COMPILE_DEFINITIONS TRACE_K=1)
+set_target_properties(las_tracek PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 target_link_libraries (las_tracek ${las_libraries})
 
 add_executable (fb_test EXCLUDE_FROM_ALL fb.cpp)
