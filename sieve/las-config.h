@@ -156,14 +156,20 @@
 
 /* This is currently used to enable some code paths specific to the
  * descent. The mid-term plan is to remove this compile-time flag.
+ * We protect this by an ifndef, because it can be passed on cmd-line as
+ * well (see CMakeLists.txt). And the same for SUPPORT_LARGE_Q below.
  */
+#ifndef DLP_DESCENT
 #define xxxDLP_DESCENT
+#endif
 
 #define DESCENT_DEFAULT_GRACE_TIME_RATIO 0.2    /* default value */
 
-/* Define this to support larger q. This is almost mandatory for the
+/* (Re-)define this to support larger q. This is almost mandatory for the
  * descent. */
+#ifndef SUPPORT_LARGE_Q
 #define xxxSUPPORT_LARGE_Q
+#endif
 
 /* Define SKIP_GCD3 to skip updates where 3 divides gcd(i,j) in the
    bucket sieving phase. Slightly slower than not skipping them
