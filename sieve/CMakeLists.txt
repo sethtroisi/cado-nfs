@@ -33,6 +33,7 @@ target_link_libraries (fb_test utils)
 
 add_executable (las_descent ${las_sources} las-dlog-base.cpp)
 set_property(TARGET las_descent PROPERTY COMPILE_DEFINITIONS DLP_DESCENT SUPPORT_LARGE_Q)
+set_target_properties(las_descent PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 target_link_libraries (las_descent ${las_libraries})
 
 add_library (trialdiv trialdiv.c)
