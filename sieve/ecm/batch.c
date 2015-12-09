@@ -837,6 +837,7 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
 {
   FILE *fp;
   double s = seconds ();
+  size_t ret;
 
   if (f == NULL) /* case 1 */
     {
@@ -851,8 +852,12 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
     {
       fprintf (out, "# batch: reading large prime product");
       fflush (out);
-      int ret = gmp_fscanf (fp, "%Zx\n", P);
-      ASSERT_ALWAYS(ret == 1);
+      ret = mpz_inp_raw (P, fp);
+      if (ret == 0)
+        {
+          fprintf (stderr, "Error while reading batch product from %s\n", f);
+          exit (1);
+        }
       goto end;
     }
 
@@ -864,9 +869,12 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   fp = fopen (f, "w");
   ASSERT_ALWAYS(fp != NULL);
 
-  /* gmp_fprintf is buggy in GMP <= 6.1.0 for numbers of more than 2^33-8 bits:
-     https://gmplib.org/list-archives/gmp-bugs/2015-November/003794.html */
-  gmp_fprintf (fp, "%Zx\n", P);
+  ret = mpz_out_raw (fp, P);
+  if (ret == 0)
+    {
+      fprintf (stderr, "Error while writing batch product to %s\n", f);
+      exit (1);
+    }
 
   fclose (fp);
 
