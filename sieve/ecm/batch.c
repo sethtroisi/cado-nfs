@@ -859,7 +859,7 @@ create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly_t pol)
 */
 void
 create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly_t pol, FILE *out, int nthreads)
+                   mpz_poly_t pol, FILE *out, int nthreads MAYBE_UNUSED)
 {
   FILE *fp;
   double s = seconds (), wct = wct_seconds ();
