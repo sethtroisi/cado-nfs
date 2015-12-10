@@ -289,7 +289,7 @@ $ cado-nfs.py parameters/factor/parameters.F9 slaves.hostnames=localhost
 Note in particular that you can force the special-q to be on
 the rational side if this is more appropriate for your number, with
 tasks.sieve.sqside=0 on the cado-nfs.py command line or in the parameter
-file (assuming you have put the side 0 is the rational side).
+file (assuming side 0 is the rational side).
 
 The default square root algorithm does not work in some very rare cases
 that could possibly occur with SNFS polynomials (a degree 4 polynomial
