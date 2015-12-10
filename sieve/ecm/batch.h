@@ -57,7 +57,7 @@ unsigned long find_smooth (cofac_list, int[2], unsigned long[2], mpz_t[2],
                            FILE*, int);
 void factor (cofac_list, unsigned long, cado_poly, int[], int, FILE*, int);
 void create_batch_file (const char*, mpz_t, unsigned long, unsigned long,
-                        mpz_poly_t, FILE*);
+                        mpz_poly_t, FILE*, int);
 
 #ifdef __cplusplus
 }

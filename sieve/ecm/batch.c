@@ -173,15 +173,42 @@ static unsigned long
 prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
                  unsigned long pmax, mpz_poly_t f)
 {
-  unsigned long p;
+  unsigned long p, *q;
+  int i, j, nthreads = 1;
 
   if (f->deg == 1)
     return prime_tree (L, pi, pmin, pmax);
 
-  for (p = pmin; p < pmax; p = getprime_mt (pi))
-    if (mpz_divisible_ui_p (f->coeff[f->deg], p) ||
-        mpz_poly_roots_ulong (NULL, f, p) > 0)
-      mpz_product_tree_add_ui (L, p);
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+  nthreads = omp_get_num_threads ();
+#endif
+  nthreads *= 10; /* to amortize the varying cost of mpz_poly_roots_ulong */
+  q = malloc (nthreads * sizeof (unsigned long));
+
+  for (p = pmin; p < pmax;)
+    {
+      /* sequential part: getprime_mt is fast */
+      for (i = 0; i < nthreads && p < pmax; p = getprime_mt (pi), i++)
+        q[i] = p;
+
+      /* parallel part: mpz_poly_roots_ulong is the bottleneck */
+#ifdef HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+      for (j = 0; j < i; j++)
+        if (mpz_divisible_ui_p (f->coeff[f->deg], q[j]) == 0 &&
+            mpz_poly_roots_ulong (NULL, f, q[j]) == 0)
+          q[j] = 0;
+
+      /* sequential part: mpz_product_tree_add_ui is fast */
+      for (j = 0; j < i; j++)
+        if (q[j])
+          mpz_product_tree_add_ui (L, q[j]);
+    }
+
+  free (q);
+
   return p;
 }
 
@@ -809,8 +836,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
 }
 
 static void
-create_batch_product (mpz_t P, unsigned long B, unsigned long L,
-mpz_poly_t pol)
+create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly_t pol)
 {
   prime_info pi;
   unsigned long p;
@@ -833,11 +859,15 @@ mpz_poly_t pol)
 */
 void
 create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly_t pol, FILE *out)
+                   mpz_poly_t pol, FILE *out, int nthreads)
 {
   FILE *fp;
-  double s = seconds ();
+  double s = seconds (), wct = wct_seconds ();
   size_t ret;
+
+#ifdef HAVE_OPENMP
+  omp_set_num_threads (nthreads);
+#endif
 
   if (f == NULL) /* case 1 */
     {
@@ -879,8 +909,8 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   fclose (fp);
 
  end:
-  gmp_fprintf (out, " of %zu bits took %.2fs\n", mpz_sizeinbase (P, 2),
-               seconds () - s);
+  gmp_fprintf (out, " of %zu bits took %.2fs (wct %.2fs)\n",
+               mpz_sizeinbase (P, 2), seconds () - s, wct_seconds () - wct);
   fflush (out);
 }
 

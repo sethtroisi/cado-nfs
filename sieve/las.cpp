@@ -3358,9 +3358,9 @@ int main (int argc0, char *argv0[])/*{{{*/
 	mpz_init (batchP[0]);
 	mpz_init (batchP[1]);
 	create_batch_file (batch0_file, batchP[0], lim[0], 1UL << lpb[0],
-			   las->cpoly->pols[0], las->output);
+			   las->cpoly->pols[0], las->output, las->nb_threads);
 	create_batch_file (batch1_file, batchP[1], lim[1], 1UL << lpb[1],
-			   las->cpoly->pols[1], las->output);
+			   las->cpoly->pols[1], las->output, las->nb_threads);
 	double tcof_batch = seconds ();
 	cofac_list_realloc (las->L, las->L->size);
 	report->reports = find_smooth (las->L, lpb, lim, batchP, las->output,
