@@ -16,7 +16,8 @@ In order to get parallelism during the tests themselves, use:
   make check ARGS="-j"
 The combination
   make -j check ARGS="-j"
-should work and use parallelism at every level.
+should work and use parallelism at every level (except a bug in cmake might
+make some tests fail with ARGS="-j" due to a collision in dependencies).
 
 Of course you are free to cap the number of processes spawned, by
 providing an integer argument to the -j option. Note that running tests
