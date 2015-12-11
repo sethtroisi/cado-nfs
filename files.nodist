@@ -11,7 +11,6 @@ files.nodist
 files.unknown
 linalg/bwc/bind_threads.sh
 linalg/bwc/bwc.sty
-linalg/bwc/convert_magma.pl
 filter/merge_mpi.c
 filter/merge_mpi.h
 scripts/polsel_effort
