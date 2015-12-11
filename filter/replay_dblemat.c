@@ -37,7 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
    of two low-weight matrices:
         M_sp = M1 . M2,
    where
-        - M2 is basically MM to which we have applied the 2-merges,
+        - M2 is basically MM to which we have applied the first merges.
         - M1 is the product of all the elementary matrices corresponding
         to other merges.
 
@@ -64,6 +64,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 /* An alias for the main matrix type */
 typedef typerow_t ** matrix_t;
+
+
 
 /******************************************/
 /* Functions for reading the .purged file */
@@ -124,7 +126,7 @@ read_purgedfile(matrix_t mat, const char* filename, uint64_t nrows,
 // If given, j is the index of the column used for pivoting (used in DL).
 
 static void
-doAllAdds(matrix_t M, char *str, index_data_t index_data)
+doAllAdds(matrix_t M, const char *str, index_data_t index_data)
 {
   int32_t j;
   int32_t ind[MERGE_LEVEL_MAX], i0;
@@ -143,7 +145,7 @@ doAllAdds(matrix_t M, char *str, index_data_t index_data)
   for (int k = 1; k < ni; k++)
     addRowsUpdateIndex(M, index_data, ind[k], i0, j);
 
-  if(destroy) {
+  if (destroy) {
     //destroy initial row
     free(M[i0]);
     M[i0] = NULL;
@@ -159,7 +161,7 @@ doAllAdds(matrix_t M, char *str, index_data_t index_data)
 
 // M1 := M2
 static void
-copy_mat(matrix_t M1, matrix_t M2, uint64_t nr)
+copy_mat(matrix_t M1, const matrix_t M2, uint64_t nr)
 {
   for (uint64_t i = 0; i < nr; ++i) {
     if (M2[i] == NULL) {
@@ -173,9 +175,25 @@ copy_mat(matrix_t M1, matrix_t M2, uint64_t nr)
   }
 }
 
+
+static index_data_t init_index_data(uint64_t nr) {
+  // At the beginning, the index_data consists of relsets that
+  // are just single relations.
+  index_data_t index_data = (relset_t *) malloc (nr*sizeof(relset_t));
+  ASSERT_ALWAYS(index_data);
+  for (uint64_t i = 0; i < nr; ++i) {
+    index_data[i].n = 1;
+    index_data[i].rels = (multirel_t *)malloc(sizeof(multirel_t));
+    index_data[i].rels[0].ind_row = i;
+    index_data[i].rels[0].e = 1;
+  }
+  return index_data;
+}
+
 static void 
 apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr, 
-    const char *hisname, uint64_t stop_point) {
+    const char *hisname, index_data_t index_data, uint64_t split_point)
+{
   FILE *hisfile;
   hisfile = fopen_maybe_compressed (hisname, "r");
   ASSERT_ALWAYS(hisfile != NULL);
@@ -199,10 +217,11 @@ apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr,
     ASSERT_ALWAYS(str[strlen(str)-1] == '\n'); 
 
     if (!startedM1) {
-      if (stop_point == 0) {
+      if (split_point == 0) {
         // Try to detect first 3-merge
         /* The first 3-merge is detected by the fact that we don't erase a
-         * row. FIXME: This is not robust! */
+         * row. TODO: This is not robust! 
+         * Anyway, using this default is really suboptimal...*/
         if (str[0] == '-') {
           fprintf(stderr, "Reached the first 3-merge\n");
           startedM1 = 1;
@@ -210,7 +229,7 @@ apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr,
           copy_mat(M2, MM, nr);
         }
       } else {
-        if (addread == stop_point) {
+        if (addread == split_point) {
           fprintf(stderr, "Reached stop point\n");
           startedM1 = 1;
           // Save the current matrix in M2
@@ -220,12 +239,20 @@ apply_hisfile(matrix_t MM, matrix_t M1, matrix_t M2, uint64_t nr,
     }
 
     /* Do the operation on the main matrix. */
-    doAllAdds(MM, str, NULL); //index_data);
+    doAllAdds(MM, str, index_data);
 
     /* If we are after the stop point, record operations in M1 */
     if (startedM1)
       doAllAdds(M1, str, NULL);
   }
+
+  /* If split_point was beyond the end of history file, the user
+   * does not seem to want dblemat. We still have to copy MM to M2.
+   * In that case, M1 is just the identity matrix. */
+  if (!startedM1) {
+    copy_mat(M2, MM, nr);
+  }
+
   stats_print_progress (stats, addread, 0, 0, 1);
 #undef STRLENMAX
 }
@@ -292,7 +319,8 @@ count_non_empty_cols(MAYBE_UNUSED const matrix_t M,
 }
 
 
-
+// Compare pairs of uint64_t, lexicographical order.
+// This is inverted: return 1 if *p is less than *q.
 static inline int
 cmp_uint64_2 (const void *p, const void *q)
 {
@@ -345,8 +373,8 @@ renumber_decr_weights(const uint32_t *col_weight, const uint64_t nc)
 /*****************************/
 
 static void
-write_matrix(const char *filename, const matrix_t M, int nr, int nc,
-    unsigned int skip, int bin) {
+write_matrix(const char *basename, const matrix_t M, int nr, int nc,
+    unsigned int skip, int bin, int zip) {
 
   const struct {
     const char * ext;
@@ -359,18 +387,18 @@ write_matrix(const char *filename, const matrix_t M, int nr, int nc,
   } suffixes[2] = {
     {
       .ext = ".txt",
-      .smat = "txt",
-      .srw = "rw.txt",
-      .scw = "cw.txt",
+      .smat = "sparse.txt",
+      .srw = "sparse.rw.txt",
+      .scw = "sparse.cw.txt",
       .dmat = "dense.txt",
       .drw = "dense.rw.txt",
       .dcw = "dense.cw.txt",
     },
     {
       .ext = ".bin",
-      .smat = "bin",
-      .srw = "rw.bin",
-      .scw = "cw.bin",
+      .smat = "sparse.bin",
+      .srw = "sparse.rw.bin",
+      .scw = "sparse.cw.bin",
       .dmat = "dense.bin",
       .drw = "dense.rw.bin",
       .dcw = "dense.cw.bin",
@@ -383,11 +411,7 @@ write_matrix(const char *filename, const matrix_t M, int nr, int nc,
     strcpy (wmode, "wb");
 #endif
 
-  char * base = strdup(filename);
-  char * zip = has_suffix(filename, ".gz") ? ".gz" : NULL;
-  if (zip) { base[strlen(base)-3]='\0'; }
-  if (has_suffix(base, suf->ext)) { base[strlen(base)-4]='\0'; }
-
+  const char * gz = (zip) ? ".gz" : NULL;
 
   char * smatname = NULL;
   FILE * smatfile = NULL;
@@ -396,9 +420,9 @@ write_matrix(const char *filename, const matrix_t M, int nr, int nc,
   char * scwname  = NULL;
   FILE * scwfile  = NULL;
 
-  smatname = derived_filename(base, suf->smat, zip);
-  srwname  = derived_filename(base, suf->srw, zip);
-  scwname = derived_filename(base, suf->scw, zip);
+  smatname = derived_filename(basename, suf->smat, gz);
+  srwname  = derived_filename(basename, suf->srw, gz);
+  scwname = derived_filename(basename, suf->scw, gz);
   smatfile = fopen_maybe_compressed(smatname, wmode);
   srwfile  = fopen_maybe_compressed(srwname, wmode);
   if (!bin) fprintf(smatfile, "%d %d\n", nr, nc - skip);
@@ -413,19 +437,12 @@ write_matrix(const char *filename, const matrix_t M, int nr, int nc,
   FILE * dcwfile  = NULL;
 
   if (skip) {
-    /* arrange so that we don't get file names like .sparse.dense */
-    char * dbase = strdup(base);
-    char * tmp = strstr(dbase, ".sparse");
-    if (tmp) {
-      memmove(tmp, tmp + 7, strlen(tmp + 7) + 1);
-    }
-    dmatname = derived_filename(dbase, suf->dmat, zip);
-    drwname  = derived_filename(dbase, suf->drw, zip);
-    dcwname = derived_filename(dbase, suf->dcw, zip);
+    dmatname = derived_filename(basename, suf->dmat, gz);
+    drwname  = derived_filename(basename, suf->drw, gz);
+    dcwname = derived_filename(basename, suf->dcw, gz);
     dmatfile = fopen_maybe_compressed(dmatname, wmode);
     drwfile  = fopen_maybe_compressed(drwname, wmode);
     if (!bin) fprintf(dmatfile, "%d %d\n", nr, skip);
-    free(dbase);
     ASSERT_ALWAYS(dmatfile);
     ASSERT_ALWAYS(drwfile);
   }
@@ -551,10 +568,36 @@ write_matrix(const char *filename, const matrix_t M, int nr, int nc,
     free(drwname);
     free(dcwname);
   }
-  free(base);
   free(weights);
 }
 
+
+static void
+write_index(const char *indexname, index_data_t index_data,
+        uint64_t nr, uint64_t nc)
+{
+  FILE *indexfile;
+  indexfile = fopen_maybe_compressed(indexname, "w");
+  fprintf(indexfile, "%" PRIu64 " %"PRIu64"\n", nr, nc);
+
+  for (uint64_t i = 0; i < nr; ++i) {
+    ASSERT (index_data[i].n > 0);
+    fprintf(indexfile, "%d", index_data[i].n);
+    for (unsigned int j = 0; j < index_data[i].n; ++j) {
+#ifdef FOR_DL
+      fprintf(indexfile, " %" PRIx32 ":%d",
+          index_data[i].rels[j].ind_row,
+          index_data[i].rels[j].e);
+#else
+      ASSERT (index_data[i].rels[j].e == 1);
+      fprintf(indexfile, " %" PRIx32 "",
+          index_data[i].rels[j].ind_row);
+#endif
+    }
+    fprintf(indexfile, "\n");
+  }
+  fclose_maybe_compressed(indexfile, indexname);
+}
 
 /********************/
 /* Main and friends */
@@ -564,7 +607,7 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "purged", "input purged file");
   param_list_decl_usage(pl, "his", "input history file");
-  param_list_decl_usage(pl, "stop_point", "point in history where to split matrix");
+  param_list_decl_usage(pl, "split_point", "point in history where to split matrix.\n        By default this is 0, meaning that it splits when the first 3-merge\n" "        occurs. Passing -1 means no splitting at all.");
   param_list_decl_usage(pl, "out", "basename for output matrices");
   param_list_decl_usage(pl, "skip", "number of heaviest columns that go to the "
       "dense matrix (default " STR(DEFAULT_MERGE_SKIP) ")");
@@ -617,14 +660,13 @@ int main(int argc, char *argv[])
   const char * purgedname = param_list_lookup_string(pl, "purged");
   const char * hisname = param_list_lookup_string(pl, "his");
   const char * sparsename = param_list_lookup_string(pl, "out");
-  // FIXME: take care of index file
-  // const char * indexname = param_list_lookup_string(pl, "index");
+  const char * indexname = param_list_lookup_string(pl, "index");
   int skip = DEFAULT_MERGE_SKIP;
   param_list_parse_int(pl, "skip", &skip);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
   set_antebuffer_path (argv0, path_antebuffer);
-  uint64_t stop_point = 0;
-  param_list_parse_uint64(pl, "stop_point", &stop_point);
+  int64_t split_point = 0;
+  param_list_parse_int64(pl, "split_point", &split_point);
 
   /* Some checks on command line arguments */
   if (param_list_warn_unused(pl)) {
@@ -643,14 +685,26 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Error, missing -his command line argument\n");
     usage(pl, argv0);
   }
-  int bin;
-  if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz")) {
-    bin = 1;
+  int zip = 0;
+  if (has_suffix(sparsename, ".gz"))
+    zip=1;
+  int bin = 1;
+  if (has_suffix(sparsename, ".txt") || has_suffix(sparsename, ".txt.gz")) {
+    bin = 0;
+  }
+  if (bin) {
     printf ("# Output matrices will be written in binary format\n");
   } else {
-    bin = 0;
     printf ("# Output matrices will be written in text format\n");
   }
+  char * basename = strdup(sparsename);
+  ASSERT_ALWAYS(basename != NULL);
+  if (has_suffix(basename, ".gz"))
+    basename[strlen(basename)-3]='\0';
+  if (has_suffix(basename, ".bin") || has_suffix(basename, ".txt"))
+    basename[strlen(basename)-4]='\0';
+  if (has_suffix(basename, ".sparse"))
+    basename[strlen(basename)-7]='\0';
   /* End of handling of parameters */
 
 
@@ -692,8 +746,13 @@ int main(int argc, char *argv[])
     M2[i] = NULL;
   }
 
+  /* If required, pre-allocate index_data */
+  index_data_t index_data = NULL;
+  if (indexname != NULL)
+    index_data = init_index_data(nr);
+
   /* Apply .his file to MM, and record M1 and M2 on the way. */
-  apply_hisfile(MM, M1, M2, nr, hisname, stop_point);
+  apply_hisfile(MM, M1, M2, nr, hisname, index_data, (uint64_t) split_point);
 
   /* Compute column weights in the resulting MM, to deduce extractor
    * matrices (row weights are already known). */
@@ -728,6 +787,24 @@ int main(int argc, char *argv[])
     if (MM[i] == NULL) {
       free(M1[i]);
       M1[i] = NULL;
+    }
+  }
+
+  /* Delete relsets of index_data that are empty in MM. */
+  if (index_data) {
+    uint64_t j = 0;
+    for (uint64_t i = 0; i < nr; ++i) {
+      if (MM[i] != NULL) {
+        ASSERT(index_data[i].n != 0);
+        index_data[j] = index_data[i];
+        if (j < i) {
+          index_data[i].n = 0;
+          index_data[i].rels = NULL;
+        }
+        j++;
+      } else {
+        ASSERT(index_data[i].n == 0);
+      }
     }
   }
 
@@ -775,6 +852,7 @@ int main(int argc, char *argv[])
   /* Move non-empty rows of M2 at the beginning, and change column
      numbering of M1 accodingly, so that we still have
         MM = M1 * M2
+     Also update index_data (that recalls rel_sets) if necessary.
     */
   {
     uint64_t *col_renumber = (uint64_t *)malloc(nr*sizeof(uint64_t));
@@ -782,10 +860,12 @@ int main(int argc, char *argv[])
     for (uint64_t i = 0; i < nr; ++i) {
       col_renumber[i] = UINT64_MAX;
       if (M2[i] != NULL) {
+        // M2
         ASSERT(j <= i);
         M2[j] = M2[i];
         if (j < i)
           M2[i] = NULL;
+        // remember the renumbering
         col_renumber[i] = j;
         j++;
       }
@@ -841,11 +921,31 @@ int main(int argc, char *argv[])
     }
   }
 
-  write_matrix("M1", M1, final_nr, nrp, 0, bin);
-  write_matrix("M2", M2, nrp, final_nc, skip, bin);
+  char * basenameM1 = (char *) malloc(strlen(basename)+4);
+  ASSERT_ALWAYS(basenameM1 != NULL);
+  strcpy(basenameM1, basename);
+  strcat(basenameM1, ".M1");
+
+  char * basenameM2 = (char *) malloc(strlen(basename)+4);
+  ASSERT_ALWAYS(basenameM2 != NULL);
+  strcpy(basenameM2, basename);
+  strcat(basenameM2, ".M2");
+
+  write_matrix(basenameM1, M1, final_nr, nrp, 0, bin, zip);
+  write_matrix(basenameM2, M2, nrp, final_nc, skip, bin, zip);
+  free(basename);
+  free(basenameM1);
+  free(basenameM2);
 
   printf("Total weight of M1: %lu\n", total_weight(M1, final_nr, 0));
   printf("Total weight of M2: %lu\n", total_weight(M2, nrp, skip));
+
+  if (indexname != NULL) {
+    write_index(indexname, index_data, final_nr, final_nc);
+    for (uint64_t i = 0; i < nr; ++i)
+      free(index_data[i].rels);
+    free(index_data);
+  }
 
   for (uint64_t i = 0; i < nr; ++i) {
     free(M1[i]);
