@@ -436,8 +436,8 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             -t 2 -dlp-no-keep
             target=92800609832959449330691138186
             191907783019725260605646959711
-            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber merge-dl
-	    replay-dl)
+            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
+	    sm merge-dl replay-dl)
         cado_define_test(test_gfp3
             SCRIPT
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
