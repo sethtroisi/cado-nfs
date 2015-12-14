@@ -44,7 +44,7 @@ mpz_product_tree_init (mpz_product_tree t)
   t->size = 0;
 }
 
-/* add a new entry z */
+/* add a new entry n to product tree t */
 static void
 mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
 {
