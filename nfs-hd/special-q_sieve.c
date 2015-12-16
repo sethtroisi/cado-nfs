@@ -1537,7 +1537,7 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_Z_srcptr matrix, factor_base_srcptr fb, sieving_bound_srcptr H,
     MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * outstd, FILE * errstd,
-    uint64_t sieve_start)
+    uint64_t sieve_start, MAYBE_UNUSED ideal_spq_srcptr special_q)
 {
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
@@ -1564,13 +1564,29 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     i++;
   }
 
-  /* --- Line sieve --- */
+#ifdef Q_BELOW_FBB
+  uint64_t q = ideal_spq_get_q(special_q);
+  mpz_poly_t g;
+  mpz_poly_init(g, ideal_spq_get_deg_g(special_q));
+  ideal_spq_get_g(g, special_q);
+#endif // Q_BELOW_FBB
 
+  /* --- Line sieve --- */
 
   uint64_t line_sieve_stop = 2 * (uint64_t) H->h[0];
 
   while (i < fb->number_element_1 &&
       fb->factor_base_1[i]->ideal->r < line_sieve_stop) {
+
+#ifdef Q_BELOW_FBB
+    if (fb->factor_base_1[i]->ideal->r == q) {
+      if (!mpz_poly_cmp(g, fb->factor_base_1[i]->ideal->h)) {
+        i++;
+        continue;
+      }
+    }
+#endif // Q_BELOW_FBB
+
     ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef ASSERT_SIEVE
@@ -1694,9 +1710,22 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   mat_int64_t Mqr;
   mat_int64_init(Mqr, H->t, H->t);
 
-  uint64_t plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
+  uint64_t plane_sieve_stop = fb->number_element_1;
+  if (H->t == 3) {
+    plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
+  }
   while (i < fb->number_element_1 &&
       fb->factor_base_1[i]->ideal->r < plane_sieve_stop) {
+
+#ifdef Q_BELOW_FBB
+    if (fb->factor_base_1[i]->ideal->r == q) {
+      if (!mpz_poly_cmp(g, fb->factor_base_1[i]->ideal->h)) {
+        i++;
+        continue;
+      }
+    }
+#endif // Q_BELOW_FBB
+
     ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef ASSERT_SIEVE
@@ -1765,6 +1794,16 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #endif // TIME_SIEVES
 
   while (i < fb->number_element_1) {
+
+#ifdef Q_BELOW_FBB
+    if (fb->factor_base_1[i]->ideal->r == q) {
+      if (!mpz_poly_cmp(g, fb->factor_base_1[i]->ideal->h)) {
+        i++;
+        continue;
+      }
+    }
+#endif // Q_BELOW_FBB
+
     ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef ASSERT_SIEVE
@@ -1853,6 +1892,10 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   fprintf(outstd, "# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_space_sieve, ideal_space_sieve, time_per_ideal);
 #endif // TIME_SIEVES
+
+#ifdef Q_BELOW_FBB
+  mpz_poly_clear(g);
+#endif // Q_BELOW_FBB
 }
 
 #if 0
@@ -2132,7 +2175,9 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   param_list_parse_uint64_and_uint64(pl, "q_range", * q_range, ",");
 
+#ifndef Q_BELOW_FBB
   ASSERT((* q_range)[0] > fbb[0][* q_side]);
+#endif // Q_BELOW_FBB
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
   array_init(array, number_element);
@@ -2221,7 +2266,6 @@ int main(int argc, char * argv[])
   sieving_bound_fprintf(file_array_norm, H);
 #endif // PRINT_ARRAY_NORM
 
-  ASSERT(q_range[0] >= fbb[q_side]);
   gmp_randstate_t state;
   mpz_t a;
   mpz_poly_factor_list l;
@@ -2333,7 +2377,7 @@ int main(int argc, char * argv[])
 
           sec = seconds();
           special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j],
-              outstd, errstd, sieve_start[j]);
+              outstd, errstd, sieve_start[j], special_q);
           time[j][1] = seconds() - sec;
           sec = seconds();
           find_index(indexes[j], array, thresh[j]);
@@ -2390,8 +2434,9 @@ int main(int argc, char * argv[])
         fprintf(file_array_norm, "----------------------------------------\n");
         fflush(file_array_norm);
 #endif // PRINT_ARRAY_NORM
+
+        ideal_spq_clear(special_q, H->t);
       }
-      ideal_spq_clear(special_q, H->t);
     }
   }
 

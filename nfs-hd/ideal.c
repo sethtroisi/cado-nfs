@@ -476,3 +476,16 @@ int ideal_spq_get_deg_g(ideal_spq_srcptr ideal)
   }
   return deg_g;
 }
+
+void ideal_spq_get_g(mpz_poly_ptr g, ideal_spq_srcptr ideal)
+{
+  if (ideal->type == 0) {
+    mpz_poly_set(g, ideal->ideal_1->ideal->h);
+  } else if (ideal->type == 1) {
+    mpz_poly_set(g, ideal->ideal_u->ideal->h);
+  } else {
+    ASSERT(ideal->type == 2);
+
+    mpz_poly_set(g, ideal->ideal_pr->ideal->h);
+  }
+}

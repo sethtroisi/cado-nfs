@@ -316,4 +316,10 @@ uint64_t ideal_spq_get_q(ideal_spq_srcptr ideal);
  */
 int ideal_spq_get_deg_g(ideal_spq_srcptr ideal);
 
+/*
+ * Get g of an ideal_spq.
+ */
+void ideal_spq_get_g(mpz_poly_ptr g, ideal_spq_srcptr ideal);
+
+
 #endif /* IDEAL_H */
