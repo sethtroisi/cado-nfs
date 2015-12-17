@@ -2783,7 +2783,6 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
   param_list_decl_usage(pl, "t",   "number of threads to use");
-  param_list_decl_usage(pl, "ratq", "[deprecated, alias to --sqside 0] (switch) use rational special-q");
   param_list_decl_usage(pl, "sqside", "put special-q on this side");
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
@@ -2867,7 +2866,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     /* Passing NULL is allowed here. Find value with
      * param_list_parse_switch later on */
     param_list_configure_switch(pl, "-v", NULL);
-    param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-ondemand-siever-config", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
@@ -3349,7 +3347,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (las->batch)
       {
-	double tcof_batch = seconds ();
 	const char *batch0_file, *batch1_file;
 	batch0_file = param_list_lookup_string (pl, "batch0");
 	batch1_file = param_list_lookup_string (pl, "batch1");
@@ -3361,15 +3358,17 @@ int main (int argc0, char *argv0[])/*{{{*/
 	mpz_init (batchP[0]);
 	mpz_init (batchP[1]);
 	create_batch_file (batch0_file, batchP[0], lim[0], 1UL << lpb[0],
-			   las->cpoly->pols[0], las->output);
+			   las->cpoly->pols[0], las->output, las->nb_threads);
 	create_batch_file (batch1_file, batchP[1], lim[1], 1UL << lpb[1],
-			   las->cpoly->pols[1], las->output);
+			   las->cpoly->pols[1], las->output, las->nb_threads);
+	double tcof_batch = seconds ();
 	cofac_list_realloc (las->L, las->L->size);
-	report->reports = find_smooth (las->L, lpb, lim, batchP, las->output);
+	report->reports = find_smooth (las->L, lpb, lim, batchP, las->output,
+				       las->nb_threads);
 	mpz_clear (batchP[0]);
 	mpz_clear (batchP[1]);
-	factor (las->L, report->reports, las->cpoly, lpb[0], lpb[1],
-		las->output);
+	factor (las->L, report->reports, las->cpoly, lpb,
+		las->default_config->side, las->output, las->nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	report->ttcof += tcof_batch;
 	/* add to ttf since the remaining time will be computed as ttf-ttcof */

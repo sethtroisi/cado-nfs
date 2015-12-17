@@ -99,6 +99,7 @@ linalg/bwc/Makefile
 linalg/bwc/README
 linalg/bwc/README.TORQUE
 linalg/bwc/TODO
+linalg/bwc/convert_magma.pl
 linalg/bwc/mpfq_layer.h
 linalg/bwc/acollect.c
 linalg/bwc/async.c

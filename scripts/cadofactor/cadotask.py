@@ -3376,7 +3376,7 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stdout(stdout, input_nrels):
+        if self.parse_output(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
@@ -3426,7 +3426,7 @@ class PurgeTask(Task):
     def get_relsdel_filename(self):
         return self.get_state_filename("relsdelfile")
     
-    def parse_stdout(self, stdout, input_nrels):
+    def parse_output(self, stdout, input_nrels):
         # If stdout ends with
         # (excess / ncols) = ... < .... See -required_excess argument.'
         # then we need more relations from filtering and return False
@@ -4719,8 +4719,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def stop_serving_wus(self):
         self.server.stop_serving_wus()
 
-    def get_url(self):
-        return self.server.get_url()
+    def get_url(self, **kwargs):
+        return self.server.get_url(**kwargs)
 
     def get_cert_sha1(self):
         return self.server.get_cert_sha1()
@@ -4841,9 +4841,17 @@ class StartClientsTask(Task):
         self.pids.clear([clientid], commit=False)
         self.hosts.clear([clientid], commit=True)
     
-    def launch_clients(self, server, certsha1=None):
+    def launch_clients(self, servertask):
+        """ This now takes server as a servertask object, so that we can
+        get an URL which is special-cased for localhost """
+        url = servertask.get_url()
+        url_loc = servertask.get_url(origin="localhost")
+        certsha1 = servertask.get_cert_sha1()
         for host in self.hosts_to_launch:
-            self.launch_one_client(host.strip(), server, certsha1=certsha1)
+            if host == "localhost":
+                self.launch_one_client(host.strip(), url_loc, certsha1=certsha1)
+            else:
+                self.launch_one_client(host.strip(), url, certsha1=certsha1)
         running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in
             self.pids.items()]
         s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
@@ -5315,10 +5323,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         return self.state["dbfilename"]
 
     def start_all_clients(self):
-        url = self.servertask.get_url()
-        certsha1 = self.servertask.get_cert_sha1()
         for clients in self.clients:
-            clients.launch_clients(url, certsha1)
+            clients.launch_clients(self.servertask)
     
     def stop_all_clients(self):
         for clients in self.clients:

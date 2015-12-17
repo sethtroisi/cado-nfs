@@ -1,7 +1,11 @@
 #include "cado.h"
 #include <stdio.h>
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
 #include "batch.h"
 #include "utils.h"
+
 
 static void
 ulong_list_init (ulong_list L)
@@ -40,7 +44,7 @@ mpz_product_tree_init (mpz_product_tree t)
   t->size = 0;
 }
 
-/* add a new entry z */
+/* add a new entry n to product tree t */
 static void
 mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
 {
@@ -169,15 +173,42 @@ static unsigned long
 prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
                  unsigned long pmax, mpz_poly_t f)
 {
-  unsigned long p;
+  unsigned long p, *q;
+  int i, j, nthreads = 1;
 
   if (f->deg == 1)
     return prime_tree (L, pi, pmin, pmax);
 
-  for (p = pmin; p < pmax; p = getprime_mt (pi))
-    if (mpz_divisible_ui_p (f->coeff[f->deg], p) ||
-        mpz_poly_roots_ulong (NULL, f, p) > 0)
-      mpz_product_tree_add_ui (L, p);
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+  nthreads = omp_get_num_threads ();
+#endif
+  nthreads *= 10; /* to amortize the varying cost of mpz_poly_roots_ulong */
+  q = malloc (nthreads * sizeof (unsigned long));
+
+  for (p = pmin; p < pmax;)
+    {
+      /* sequential part: getprime_mt is fast */
+      for (i = 0; i < nthreads && p < pmax; p = getprime_mt (pi), i++)
+        q[i] = p;
+
+      /* parallel part: mpz_poly_roots_ulong is the bottleneck */
+#ifdef HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+      for (j = 0; j < i; j++)
+        if (mpz_divisible_ui_p (f->coeff[f->deg], q[j]) == 0 &&
+            mpz_poly_roots_ulong (NULL, f, q[j]) == 0)
+          q[j] = 0;
+
+      /* sequential part: mpz_product_tree_add_ui is fast */
+      for (j = 0; j < i; j++)
+        if (q[j])
+          mpz_product_tree_add_ui (L, q[j]);
+    }
+
+  free (q);
+
   return p;
 }
 
@@ -308,6 +339,9 @@ product_tree (mpz_t *R, uint32_t *perm, unsigned long n, unsigned long *w)
   /* compute product tree */
   for (i = 1; i <= h; i++)
     {
+#ifdef HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif
       for (j = 0; j < w[i-1] / 2; j++)
         mpz_mul (T[i][j], T[i-1][2*j], T[i-1][2*j+1]);
       if (w[i-1] & 1)
@@ -315,6 +349,26 @@ product_tree (mpz_t *R, uint32_t *perm, unsigned long n, unsigned long *w)
     }
 
   return T;
+}
+
+static void
+remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
+                    unsigned long j, unsigned long guard)
+{
+  /* T[i][j]/2^(nbits[i][j] + guard) ~ P/T[i][j] */
+  mpz_mul (T[i-1][2*j], T[i][j], T[i-1][2*j]);
+  /* same for the right part */
+  mpz_mul (T[i-1][2*j+1], T[i][j], T[i-1][2*j+1]);
+  /* swap */
+  mpz_swap (T[i-1][2*j], T[i-1][2*j+1]);
+
+  /* get the fractional part, i.e., the low nbits[i][j] + guard bits */
+  mpz_tdiv_r_2exp (T[i-1][2*j], T[i-1][2*j], nbits[i][j] + guard);
+  /* now keep only nbits[i-1][2*j] + guard significant bits */
+  mpz_div_2exp (T[i-1][2*j], T[i-1][2*j], nbits[i][j] - nbits[i-1][2*j]);
+
+  mpz_tdiv_r_2exp (T[i-1][2*j+1], T[i-1][2*j+1], nbits[i][j] + guard);
+  mpz_div_2exp (T[i-1][2*j+1], T[i-1][2*j+1], nbits[i][j] - nbits[i-1][2*j+1]);
 }
 
 /* Compute the remainder tree using the "scaled" variant
@@ -345,24 +399,11 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P,
   /* P/T[h][0] ~ Q/2^(m+guard) */
   for (i = h; i > 0; i--)
     {
+#ifdef HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif
       for (j = 0; j < w[i-1] / 2; j++)
-        {
-          /* T[i][j]/2^(nbits[i][j] + guard) ~ P/T[i][j] */
-          mpz_mul (T[i-1][2*j], T[i][j], T[i-1][2*j]);
-          /* same for the right part */
-          mpz_mul (T[i-1][2*j+1], T[i][j], T[i-1][2*j+1]);
-          /* swap */
-          mpz_swap (T[i-1][2*j], T[i-1][2*j+1]);
-
-          /* get the fractional part, i.e., the low nbits[i][j] + guard bits */
-          mpz_tdiv_r_2exp (T[i-1][2*j], T[i-1][2*j], nbits[i][j] + guard);
-          /* now keep only nbits[i-1][2*j] + guard significant bits */
-          mpz_div_2exp (T[i-1][2*j], T[i-1][2*j], nbits[i][j] - nbits[i-1][2*j]);
-
-          mpz_tdiv_r_2exp (T[i-1][2*j+1], T[i-1][2*j+1], nbits[i][j] + guard);
-          mpz_div_2exp (T[i-1][2*j+1], T[i-1][2*j+1], nbits[i][j] - nbits[i-1][2*j+1]);
-
-        }
+        remainder_tree_aux (T, nbits, i, j, guard);
       if (w[i-1] & 1)
         mpz_swap (T[i-1][w[i-1]-1], T[i][w[i]-1]);
     }
@@ -409,18 +450,28 @@ clear_product_tree (mpz_t **T, unsigned long n, unsigned long *w)
    Each R[j] has been divided by its P-smooth part.
 */
 static void
-smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P)
+smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
 {
   unsigned long j, w[MAX_DEPTH];
   mpz_t **T;
+  double st, wct;
 
   if (n == 0)
     return;
 
+  st = seconds ();
+  wct = wct_seconds ();
   T = product_tree (R, perm, n, w);
+  unsigned long h = tree_height (n);
+  fprintf (out, "# batch: took %.2fs (wct %.2fs) to compute product tree of %zu bits\n",
+           seconds () - st, wct_seconds () - wct, mpz_sizeinbase (T[h][0], 2));
 
   /* compute remainder tree */
+  st = seconds ();
+  wct = wct_seconds ();
   remainder_tree (T, n, w, P, R, perm);
+  fprintf (out, "# batch: took %.2fs (wct %.2fs) to compute remainder tree\n",
+           seconds () - st, wct_seconds () - wct);
 
   /* now T[0][j] = P mod R[j] for 0 <= j < n */
   for (j = 0; j < n; j++)
@@ -449,7 +500,7 @@ update_status (mpz_t *R, uint32_t *perm,
       i = perm[j];
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
-        /* if R[i] < L, then R[i] is smooth (we assume L <= B^2) */
+        /* relation i is smooth iff R[i]=1 */
         if (mpz_cmp_ui (R[i], 1) == 0)
           {
             b_status_r[i] = STATUS_SMOOTH;
@@ -477,7 +528,7 @@ update_status (mpz_t *R, uint32_t *perm,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
 find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
-             FILE *out)
+             FILE *out, int nthreads MAYBE_UNUSED)
 {
   unsigned long nb_rel_read = l->size;
   unsigned long nb_smooth;
@@ -485,6 +536,10 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
   unsigned char *b_status_r;
   unsigned char *b_status_a;
   double start = seconds ();
+
+#ifdef HAVE_OPENMP
+  omp_set_num_threads (nthreads);
+#endif
 
   b_status_r = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
   b_status_a = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
@@ -507,10 +562,10 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
     {
       if (z == 0)
         smoothness_test (l->R, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[0]);
+                         batchP[0], out);
       else
         smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[1]);
+                         batchP[1], out);
 
       /* we only need to update relations in [nb_smooth, nb_unknown-1] */
       if (z == 0)
@@ -524,19 +579,22 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
   free (b_status_r);
   free (b_status_a);
 
-  fprintf (out, "# batch: took %.1fs to detect %lu smooth relations out of %lu\n", seconds () - start, nb_smooth, nb_rel_read);
+  fprintf (out, "# batch: took %.2fs to detect %lu smooth relations out of %lu\n", seconds () - start, nb_smooth, nb_rel_read);
 
   return nb_smooth;
 }
 
-/* print all factors of n, and return the new value of m */
-static int
+/* print all factors of n into 'str', where 'str0' is the string start.
+   B is the small prime bound: n contain no prime factor <= B
+   lpb is the large prime bound: all prime factor of n are < 2^lpb */
+static char*
 print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
                   struct modset_t *fm, struct modset_t *cfm,
-                  int lpb, double BB, double BBB, int m, FILE *out)
+                  int lpb, double B, char *str0, char *str)
 {
   unsigned long i;
   int j, res_fac;
+  double BB = B * B, BBB = B * B * B;
 
   /* any factor < B^2 is necessarily prime */
   for (i = 0; methods[i].method != 0 && mpz_cmp_d (n, BB) >= 0; i++)
@@ -550,9 +608,9 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
 
       for (j = 0; j < res_fac; j++)
         {
-          if (m++ > 0)
-            fprintf (out, ",");
-          gmp_fprintf (out, "%Zx", factors[j]);
+          if (str > str0)
+            str += sprintf (str, ",");
+          str += gmp_sprintf (str, "%Zx", factors[j]);
           mpz_divexact (n, n, factors[j]);
         }
 
@@ -565,8 +623,8 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
           /* t should be composite, i.e., t >= BB */
           ASSERT(mpz_cmp_d (t, BB) >= 0);
           mpz_divexact (n, n, t);
-          m = print_smooth_aux (factors, t, methods + i + 1, fm, &cfm2,
-                                lpb, BB, BBB, m, out);
+          str = print_smooth_aux (factors, t, methods + i + 1, fm, &cfm2,
+                                  lpb, B, str0, str);
           modset_clear (fm);
           fm->arith = CHOOSE_NONE;
           mpz_clear (t);
@@ -581,8 +639,8 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
           /* t should be composite, i.e., t >= BB */
           ASSERT(mpz_cmp_d (t, BB) >= 0);
           mpz_divexact (n, n, t);
-          m = print_smooth_aux (factors, t, methods + i + 1, &fm2, cfm,
-                                lpb, BB, BBB, m, out);
+          str = print_smooth_aux (factors, t, methods + i + 1, &fm2, cfm,
+                                  lpb, B, str0, str);
           modset_clear (cfm);
           cfm->arith = CHOOSE_NONE;
           mpz_clear (t);
@@ -591,80 +649,78 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
 
   if (mpz_cmp_ui (n, 1) > 0)
     {
-      ASSERT_ALWAYS (mpz_cmp_d (n, BB) < 0);
-      if (m++ > 0)
-        fprintf (out, ",");
-      gmp_fprintf (out, "%Zx", n);
+      ASSERT (mpz_cmp_d (n, BB) < 0);
+      if (str > str0)
+        str += sprintf (str, ",");
+      str += gmp_sprintf (str, "%Zx", n);
     }
 
-  return m;
+  return str;
 }
 
-static int
-trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, FILE *out)
+/* return the end of the written string */
+static char*
+trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, char *str)
 {
-  int m = 0; /* number of already printed factors */
   unsigned long i;
+  char *str0 = str;
 
   for (i = 0; i < spsize; i++)
     {
       while (mpz_divisible_ui_p (n, sp[i]))
         {
-          if (m++ > 0)
-            fprintf (out, ",");
-          fprintf (out, "%lx", sp[i]);
+          if (str > str0)
+            str += sprintf (str, ",");
+          str += sprintf (str, "%lx", sp[i]);
           mpz_divexact_ui (n, n, sp[i]);
         }
     }
 
-  return m;
+  return str;
 }
 
-/* Print the prime factor of the input 'n' separated by spaces.
-   The list SP (small primes) contains all primes < B.
-   BB is the prime bound: any factor < BB is necessarily prime.
-   'hint' is either 1 or a product of large primes.
+/* Print the prime factors of the input 'n' separated by spaces.
+   The list sp[] contains small primes (less than B).
+   B is the small prime bound: any factor < B^2 is necessarily prime.
    'cofac' is the initial cofactor (without special-q).
+   factors[2] is a scratch space to store factors.
+   Return the pointer to the next character to write.
 */
-static void
+static char*
 print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
               struct modset_t *fm, struct modset_t *cfm,
-              unsigned int lpb, double BB, double BBB, unsigned long *sp,
-              unsigned long spsize, mpz_t hint, mpz_t cofac, mpz_ptr sq,
-              FILE *out)
+              unsigned int lpb, double B, unsigned long *sp,
+              unsigned long spsize, mpz_t cofac, mpz_ptr sq,
+              char *str)
 {
-  int m; /* number of already printed factors */
+  char *str0 = str;
 
-  ASSERT_ALWAYS(mpz_divisible_p (n, cofac));
+  ASSERT(mpz_divisible_p (n, cofac));
   mpz_divexact (n, n, cofac);
-
-  ASSERT_ALWAYS(mpz_divisible_p (cofac, hint));
-  mpz_divexact (cofac, cofac, hint);
 
   if (sq != NULL)
     {
-      ASSERT_ALWAYS(mpz_divisible_p (n, sq));
+      ASSERT(mpz_divisible_p (n, sq));
       mpz_divexact (n, n, sq);
     }
 
   /* remove small primes */
-  m = trial_divide (n, sp, spsize, out);
+  str = trial_divide (n, sp, spsize, str);
 
-  /* factor hint */
-  m = print_smooth_aux (factors, hint, methods, fm, cfm, lpb, BB, BBB, m, out);
-
-  /* factor rest of cofactor */
-  m = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, BB, BBB, m, out);
+  /* factor the cofactor */
+  str = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, B, str0, str);
 
   /* factor rest of factor base primes */
-  print_smooth_aux (factors, n, methods, fm, cfm, lpb, BB, BBB, m, out);
+  str = print_smooth_aux (factors, n, methods, fm, cfm, lpb, B, str0, str);
 
   if (sq != NULL)
     {
-      if (m)
-        fprintf (out, ",");
-      gmp_fprintf (out, "%Zx", sq);
+      if (str > str0)
+        str += sprintf (str, ",");
+      str += gmp_sprintf (str, "%Zx", sq);
     }
+
+  return str;
 }
 
 /* strip integers in l[0..n-1] which do not divide P */
@@ -679,47 +735,83 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
   return j;
 }
 
+/* sqside = 1 if the special-q is on side 1 (algebraic) */
+static void
+factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
+            FILE *out, facul_method_t *methods, unsigned long *sp[],
+            unsigned long spsize[], int sqside, unsigned long i)
+{
+  mpz_t norm;
+  mpz_t factors[2];
+  uint32_t *perm = L->perm;
+  struct modset_t fm, cfm;
+  char s0[1024];        /* output relation */
+  char *s = s0;
+
+  mpz_init (norm);
+  mpz_init (factors[0]);
+  mpz_init (factors[1]);
+
+  /* compute norms F(a,b) and G(a,b) */
+  mpz_poly_homogeneous_eval_siui (norm, pol->pols[0],
+                                  L->a[perm[i]], L->b[perm[i]]);
+
+  s += sprintf (s, "%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
+
+  s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[0], (double) lim[0],
+                    sp[0], spsize[0], L->R0[perm[i]],
+                    (sqside == 0) ? L->sq[perm[i]] : NULL, s);
+  s += sprintf (s, ":");
+
+  mpz_poly_homogeneous_eval_siui (norm, pol->pols[1],
+                                  L->a[perm[i]], L->b[perm[i]]);
+  s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[1], (double) lim[1],
+                    sp[1], spsize[1], L->A0[perm[i]],
+                    (sqside == 1) ? L->sq[perm[i]] : NULL, s);
+
+  /* avoid two threads writing a relation simultaneously */
+#ifdef  HAVE_OPENMP
+#pragma omp critical
+#endif
+  {
+    fprintf (out, "%s\n", s0);
+    fflush (out);
+  }
+
+  mpz_clear (norm);
+  mpz_clear (factors[0]);
+  mpz_clear (factors[1]);
+}
+
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
    on "out".
    n is the number of bi-smooth cofactors in L.
 */
 void
-factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
-        int lpb1, FILE *out)
+factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
+        FILE *out, int nthreads MAYBE_UNUSED)
 {
-  unsigned long i, pmax, *sp0, *sp1, spsize[2];
+  unsigned long i, *sp[2], spsize[2], B[2];
   int nb_methods;
   facul_method_t *methods;
-  mpz_t Q[2];
-  struct modset_t fm, cfm;
-  double BB, BBB;
   ulong_list SP0, SP1;
   prime_info pi;
-  double start = seconds ();
-  mpz_t *norm0, *norm1;
-  uint32_t *perm = L->perm;
-
-  /* we trial divide by all primes < L^(1/2), so that any factor < L
-     is necessarily prime */
-  pmax = (lpb1 > lpb0) ? lpb1 : lpb0;
-  pmax = (unsigned long) ceil (pow (2.0, (double) pmax / 2.0));
-  pmax = 16 * pmax;
-
-  mpz_init (Q[0]);
-  mpz_init (Q[1]);
+  double start = seconds (), wct_start = wct_seconds ();
 
   ulong_list_init (SP0);
   prime_info_init (pi);
-  prime_list_poly (SP0, pi, 2, pmax, pol->pols[0]);
+  B[0] = (unsigned long) ceil (pow (2.0, (double) lpb[0] / 2.0));
+  prime_list_poly (SP0, pi, 2, B[0], pol->pols[0]);
   spsize[0] = SP0->size;
-  sp0 = SP0->l;
+  sp[0] = SP0->l;
   prime_info_clear (pi);
 
   ulong_list_init (SP1);
   prime_info_init (pi);
-  prime_list_poly (SP1, pi, 2, pmax + pmax / 2, pol->pols[1]);
+  B[1] = (unsigned long) ceil (pow (2.0, (double) lpb[1] / 2.0));
+  prime_list_poly (SP1, pi, 2, B[1], pol->pols[1]);
   spsize[1] = SP1->size;
-  sp1 = SP1->l;
+  sp[1] = SP1->l;
   prime_info_clear (pi);
 
   nb_methods = 30;
@@ -727,55 +819,24 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb0,
     nb_methods = NB_MAX_METHODS - 1;
   methods = facul_make_default_strategy (nb_methods - 3, 0);
 
-  BB = (double) pmax * (double) pmax;
-  BBB = BB * (double) pmax;
-
-  /* compute all norms F(a,b) and G(a,b) */
-  norm0 = malloc (n * sizeof (mpz_t));
-  norm1 = malloc (n * sizeof (mpz_t));
+#ifdef HAVE_OPENMP
+  omp_set_num_threads (nthreads);
+#pragma omp parallel for schedule(static)
+#endif
   for (i = 0; i < n; i++)
-    {
-      mpz_init (norm0[i]);
-      mpz_init (norm1[i]);
-      mpz_poly_homogeneous_eval_siui (norm0[i], pol->pols[0],
-                                      L->a[perm[i]], L->b[perm[i]]);
-      mpz_poly_homogeneous_eval_siui (norm1[i], pol->pols[1],
-                                      L->a[perm[i]], L->b[perm[i]]);
-    }
+    factor_one (L, pol, B, lpb, out, methods, sp, spsize, sqside, i);
 
-  for (i = 0; i < n; i++)
-    {
-      fprintf (out, "%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
-
-      print_smooth (Q, norm0[i], methods, &fm, &cfm, lpb0, BB, BBB, sp0,
-                    spsize[0], L->R[perm[i]], L->R0[perm[i]], NULL, out);
-      fprintf (out, ":");
-
-      print_smooth (Q, norm1[i], methods, &fm, &cfm, lpb1, BB, BBB, sp1,
-                    spsize[1], L->A[perm[i]], L->A0[perm[i]], L->sq[perm[i]],
-                    out);
-      fprintf (out, "\n");
-      fflush (out);
-      mpz_clear (norm0[i]);
-      mpz_clear (norm1[i]);
-    }
   ulong_list_clear (SP0);
   ulong_list_clear (SP1);
-  free (norm0);
-  free (norm1);
-
-  mpz_clear (Q[0]);
-  mpz_clear (Q[1]);
 
   facul_clear_aux_methods (methods);
 
-  fprintf (out, "# batch: took %.1fs to factor %lu smooth relations\n",
-           seconds () - start, n);
+  fprintf (out, "# batch: took %.2fs (wct %.2fs) to factor %lu smooth relations\n",
+           seconds () - start, wct_seconds () - wct_start, n);
 }
 
 static void
-create_batch_product (mpz_t P, unsigned long B, unsigned long L,
-mpz_poly_t pol)
+create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly_t pol)
 {
   prime_info pi;
   unsigned long p;
@@ -798,16 +859,20 @@ mpz_poly_t pol)
 */
 void
 create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly_t pol, FILE *out)
+                   mpz_poly_t pol, FILE *out, int nthreads MAYBE_UNUSED)
 {
   FILE *fp;
-  double s = seconds ();
+  double s = seconds (), wct = wct_seconds ();
+  size_t ret;
 
-  fprintf (out, "# batch: creating or reading large prime product");
-  fflush (out);
+#ifdef HAVE_OPENMP
+  omp_set_num_threads (nthreads);
+#endif
 
   if (f == NULL) /* case 1 */
     {
+      fprintf (out, "# batch: creating large prime product");
+      fflush (out);
       create_batch_product (P, B, L, pol);
       goto end;
     }
@@ -815,26 +880,37 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   fp = fopen (f, "r");
   if (fp != NULL) /* case 3 */
     {
-      int ret = gmp_fscanf (fp, "%Zx\n", P);
-      ASSERT_ALWAYS(ret == 1);
+      fprintf (out, "# batch: reading large prime product");
+      fflush (out);
+      ret = mpz_inp_raw (P, fp);
+      if (ret == 0)
+        {
+          fprintf (stderr, "Error while reading batch product from %s\n", f);
+          exit (1);
+        }
       goto end;
     }
 
   /* case 2 */
+  fprintf (out, "# batch: creating large prime product");
+  fflush (out);
   create_batch_product (P, B, L, pol);
 
   fp = fopen (f, "w");
   ASSERT_ALWAYS(fp != NULL);
 
-  /* gmp_fprintf is buggy in GMP <= 6.1.0 for numbers of more than 2^33-8 bits:
-     https://gmplib.org/list-archives/gmp-bugs/2015-November/003794.html */
-  ASSERT_ALWAYS((mpz_sizeinbase (P, 2) + 1) / 2 <= 4294967292UL);
-  gmp_fprintf (fp, "%Zx\n", P);
+  ret = mpz_out_raw (fp, P);
+  if (ret == 0)
+    {
+      fprintf (stderr, "Error while writing batch product to %s\n", f);
+      exit (1);
+    }
 
   fclose (fp);
 
  end:
-  fprintf (out, " took %.0fs\n", seconds () - s);
+  gmp_fprintf (out, " of %zu bits took %.2fs (wct %.2fs)\n",
+               mpz_sizeinbase (P, 2), seconds () - s, wct_seconds () - wct);
   fflush (out);
 }
 

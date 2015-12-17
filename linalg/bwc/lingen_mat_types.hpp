@@ -953,6 +953,12 @@ inline void fft_combo_inplace(
     tpolmat<fft_type> tmp2(1, s.ncols, o);
     ASSERT(dst.ncols == s.nrows);
     dst.clear_highbits();
+
+    typename fft_type::srcptr * t1s = new typename fft_type::srcptr[dst.ncols];
+    for(unsigned int k = 0 ; k < dst.ncols ; k++) {
+        t1s[k] = tmp1.poly(0,k);
+    }
+
     for(unsigned int i = 0 ; i < dst.nrows ; i++) {
         tmp1.zero();
 #ifdef  HAVE_OPENMP
@@ -968,9 +974,10 @@ inline void fft_combo_inplace(
 #pragma omp parallel for schedule(static)
 #endif  /* HAVE_OPENMP */
         for(unsigned int j = 0 ; j < s.ncols ; j++) {
-            for(unsigned int k = 0 ; k < dst.ncols ; k++) {
-                o.addcompose(tmp2.poly(0,j), tmp1.poly(0,k), s.poly(k,j));
-            }
+            typename fft_type::srcptr * sjs = new typename fft_type::srcptr[dst.ncols];
+            for(unsigned int k = 0 ; k < dst.ncols ; k++) sjs[k] = s.poly(k,j);
+            o.addcompose_n(tmp2.poly(0,j), t1s, sjs, dst.ncols);
+            delete[] sjs;
         }
 
         /* and the inverse transform */
@@ -984,6 +991,8 @@ inline void fft_combo_inplace(
     for(unsigned int j = 0 ; j < dst.ncols ; j++) {
         new_dst.setdeg(j);
     }
+
+    delete[] t1s;
     dst.swap(new_dst);
 }
 
