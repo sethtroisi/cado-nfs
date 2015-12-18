@@ -374,7 +374,7 @@ void mat_Z_set_diag(mat_Z_ptr M, mpz_vector_srcptr diag)
   mat_Z_set_zero(M);
 
   for (unsigned int i = 1; i <= diag->dim; i++) {
-    mpz_set(M->coeff[i][i], diag->c[i]);
+    mpz_set(M->coeff[i][i], diag->c[i - 1]);
   }
 }
 
