@@ -823,6 +823,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   ASSERT_ALWAYS(data != NULL);
   for (unsigned int i = 0; i < V; ++i) {
     unsigned int B = 1000; // FIXME: should be a parameter.
+    /*unsigned int B = (unsigned int) (1 << (lpb[i] - 1));*/
     data[i].lpb = (unsigned long) lpb[i];
     data[i].fbb = B;
     data[i].BB = ((double)B) * ((double)B);

@@ -2032,7 +2032,7 @@ void number_norm(FILE * file_array_norm, array_srcptr array, unsigned char max)
 
 void declare_usage(param_list pl)
 {
-  param_list_decl_usage(pl, "H", "the sieving region");
+  param_list_decl_usage(pl, "H", "sieving region for c");
   param_list_decl_usage(pl, "V", "number of number field");
   param_list_decl_usage(pl, "fbb", "factor base bounds");
   param_list_decl_usage(pl, "thresh", "thresholds");
@@ -2045,6 +2045,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "path to output file");
   param_list_decl_usage(pl, "err", "path to error file");
   param_list_decl_usage(pl, "start", "value of first ideal r considered");
+  param_list_decl_usage(pl, "Ha", "sieving region for a");
 }
 
 /*
@@ -2068,7 +2069,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** q_range, unsigned char ** thresh,
     unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
-    int * main_side, FILE ** outstd, FILE ** errstd, uint64_t ** sieve_start)
+    int * main_side, FILE ** outstd, FILE ** errstd, uint64_t ** sieve_start,
+    sieving_bound_ptr Ha)
 {
   param_list pl;
   param_list_init(pl);
@@ -2102,6 +2104,20 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   for (unsigned int i = 0; i < t; i++) {
     sieving_bound_set_hi(H, i, (unsigned int) 1 << r[i]);
   }
+
+  sieving_bound_init(Ha, t);
+  t = 0;
+  param_list_parse_int_list_size(pl, "Ha", &r, &t, ".,");
+  if (!t) {
+    for (unsigned int i = 0; i < H->t; i++) {
+      sieving_bound_set_hi(Ha, i, 2);
+    }
+  } else {
+    ASSERT(t == H->t);
+    for (unsigned int i = 0; i < t; i++) {
+      sieving_bound_set_hi(Ha, i, (unsigned int) 1 << r[i]);
+    }
+  }
   free(r);
 
   cado_poly_init(f);
@@ -2127,7 +2143,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   param_list_parse_uint_list(pl, "lpb", * lpb, (size_t) * V, ",");
 
   /*for (unsigned int i = 0; i < * V; i++) {*/
-    /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
+  /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
   /*}*/
 
   path[0] = '\0';
@@ -2158,7 +2174,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   FILE * file_r;
   param_list_parse_string(pl, "fb", path, size_path);
   file_r = fopen(path, "r");
-  read_factor_base(file_r, (*fb), (*fbb), (*lpb), f, t);
+  read_factor_base(file_r, (*fb), (*fbb), (*lpb), f, H->t);
   fclose(file_r);
   fprintf(* outstd,
       "# Time to read factor bases: %f.\n", seconds() - sec);
@@ -2177,12 +2193,15 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
 #ifndef Q_BELOW_FBB
   ASSERT((* q_range)[0] > fbb[0][* q_side]);
+#else // Q_BELOW_FBB
+  fprintf(* outstd,
+      "# Special q may be under fbb.\n");
 #endif // Q_BELOW_FBB
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
   array_init(array, number_element);
 
-  mat_Z_init(matrix, t, t);
+  mat_Z_init(matrix, H->t, H->t);
 
   * main_side = -1;
   param_list_parse_int(pl, "main", main_side);
@@ -2202,8 +2221,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 }
 
 /*
-  The main.
-*/
+   The main.
+   */
 int main(int argc, char * argv[])
 {
   unsigned int V;
@@ -2222,10 +2241,11 @@ int main(int argc, char * argv[])
   FILE * outstd;
   FILE * errstd;
   uint64_t * sieve_start;
+  sieving_bound_t Ha;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
       &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &outstd, &errstd,
-      &sieve_start);
+      &sieve_start, Ha);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2278,6 +2298,14 @@ int main(int argc, char * argv[])
   double total_time = 0.0;
   uint64_t spq_tot = 0;
 
+  mpz_vector_t skewness;
+  mpz_vector_init(skewness, Ha->t);
+  mpz_set_ui(skewness->c[0], 1);
+  for (unsigned int i = 1; i < Ha->t; i++) {
+    mpz_set_si(skewness->c[i], Ha->h[0] / Ha->h[i]);
+  }
+  sieving_bound_clear(Ha);
+
   prime_info pi;
   prime_info_init (pi);
   //Pass all the prime less than q_range[0].
@@ -2326,7 +2354,11 @@ int main(int argc, char * argv[])
         mat_Z_fprintf(file_trace_pos, matrix);
 #endif // TRACE_POS
 
+#ifndef SKEW_LLL_SPQ
         mat_Z_LLL_transpose(matrix, matrix);
+#else // SKEW_LLL_SPQ
+        mat_Z_skew_LLL(matrix, matrix, skewness);
+#endif // SKEW_LLL_SPQ
 
         /*
          * TODO: continue here.
@@ -2492,6 +2524,7 @@ int main(int argc, char * argv[])
   free_saved_chains();
   fclose(outstd);
   fclose(errstd);
+  mpz_vector_clear(skewness);
 
   return 0;
 }

@@ -77,6 +77,8 @@ void mat_Z_set_coeff_int64(mat_Z_ptr matrix, int64_t i, unsigned int row,
 void mat_Z_set_coeff_uint64(mat_Z_ptr matrix, uint64_t i, unsigned int row,
     unsigned int col);
 
+void mat_Z_set_zero(mat_Z_ptr matrix);
+
 /*
  * Delete a matrix.
  *
@@ -170,4 +172,8 @@ void mat_int64_to_mat_Z(mat_Z_ptr mat_Z, mat_int64_srcptr mat_int);
 
 void mat_Z_sort_last(mat_Z_ptr M_out, mat_Z_srcptr M_in);
 
+void mat_Z_set_diag(mat_Z_ptr M, mpz_vector_srcptr diag);
+
+void mat_Z_skew_LLL(mat_Z_ptr MSLLL, mat_Z_srcptr M_root,
+    mpz_vector_srcptr skewness);
 #endif  /* MAT_Z_H */
