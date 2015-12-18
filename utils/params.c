@@ -1067,6 +1067,45 @@ void param_list_parse_int_list_size(param_list pl, const char * key , int ** r ,
   }
 }
 
+int param_list_parse_double_list(param_list pl, const char * key,
+    double * r, size_t n, const char * sep)
+{
+    char *value;
+    if (!get_assoc(pl, key, &value, NULL))
+        return 0;
+    char *orig_value = value, * end;
+    double * res = (double *) malloc(n * sizeof(double));
+    memset(res, 0, n * sizeof(double));
+    size_t parsed = 0;
+    for( ;; ) {
+        double tmp = strtod(value, &end);
+        ASSERT(tmp <= UCHAR_MAX);
+        res[parsed] = tmp;
+        if (parsed++ == n)
+            break;
+        if (parsed && *end == '\0')
+            break;
+        if (strncmp(end, sep, strlen(sep)) != 0) {
+            fprintf(stderr, "Parse error: parameter for key %s"
+                    " must match %%d(%s%%d)*; got %s\n",
+                    key, sep, orig_value);
+            exit(1);
+        }
+        value = end + strlen(sep);
+    }
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d(%s%%d){0,%zu}; got %s\n",
+                key, sep, n-1, orig_value);
+        exit(1);
+    }
+    if (r) {
+        memcpy(r, res, n * sizeof(double));
+    }
+    free(res);
+    return parsed;
+}
+
 void param_list_parse_mpz_poly(param_list pl, const char * key,
     mpz_poly_ptr f, const char *sep)
 {

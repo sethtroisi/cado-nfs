@@ -136,6 +136,8 @@ int param_list_parse_uint64_list(param_list pl, const char * key,
     uint64_t * r, size_t n, const char * sep);
 extern int param_list_parse_uchar_list(param_list pl, const char * key,
     unsigned char * r, size_t n, const char * sep);
+int param_list_parse_double_list(param_list pl, const char * key,
+    double * r, size_t n, const char * sep);
 
 /*
   Return an array r with its size t. The array is initialised with the string

@@ -122,7 +122,7 @@ void build_Mq_ideal_spq(mat_Z_ptr matrix, ideal_spq_srcptr ideal)
   }
 }
 
-void reogranize_MqLLL(mat_Z_ptr matrix)
+void reorganize_MqLLL(mat_Z_ptr matrix)
 {
   for (unsigned int col = 1; col <= matrix->NumRows; col++) {
     if (mpz_cmp_ui(matrix->coeff[matrix->NumRows][col], 0) < 0) {
@@ -2065,6 +2065,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "err", "path to error file");
   param_list_decl_usage(pl, "start", "value of first ideal r considered");
   param_list_decl_usage(pl, "Ha", "sieving region for a");
+  param_list_decl_usage(pl, "base", "specify the bases");
 }
 
 /*
@@ -2200,41 +2201,52 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 #endif // Q_BELOW_FBB
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
-  //TODO: constant here is hard-coded.
-  double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
-      1.0 / (double)H->t);
-#ifdef SKEW_LLL_SPQ
-  if (Ha_defined(Ha)) {
-    max_a = (double) (*q_range)[1];
+  for (unsigned int j = 0; j < * V; j++) {
+    (*log2_base)[j] = 0;
   }
+  param_list_parse_double_list(pl, "base", * log2_base, (size_t) * V, ",");
+  if ((*log2_base)[0] != 0) {
+    for (unsigned int j = 0; j < * V; j++) {
+      (*log2_base)[j] = log2((*log2_base)[j]);
+    }
+  } else {
+
+    //TODO: constant here is hard-coded.
+    double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
+        1.0 / (double)H->t);
+#ifdef SKEW_LLL_SPQ
+    if (Ha_defined(Ha)) {
+      max_a = (double) (*q_range)[1];
+    }
 #endif // SKEW_LLL_SPQ
 
-  double tmp = 0;
-  for (unsigned int i = 0; i < H->t; i++) {
-    tmp = tmp + (double)H->h[i];
-  }
-  max_a = tmp * max_a;
-
-  for (unsigned int j = 0; j < * V; j++) {
-    double precompute =
-      pow((double)(f->pols[j]->deg + 1), (double)(H->t - 1) / 2.0) *
-      pow((double)H->t, (double)f->pols[j]->deg / 2.0) *
-      pow(max_a, (double)f->pols[j]->deg);
-
-    mpz_t inf_f;
-    mpz_init(inf_f);
-    mpz_poly_infinity_norm(inf_f, f->pols[j]);
-    (*log2_base)[j] = pow(mpz_get_d(inf_f), (double)(H->t - 1)) * precompute;
-    mpz_clear(inf_f);
-
-    ASSERT((*log2_base)[j] > 0.0);
-
-    if (* q_side == j) {
-      (*log2_base)[j] = (*log2_base)[j] / (double)(*q_range)[0];
+    double tmp = 0;
+    for (unsigned int j = 0; j < H->t; j++) {
+      tmp = tmp + (double)H->h[j];
     }
+    max_a = tmp * max_a;
 
-    (*log2_base)[j] = pow((*log2_base)[j], 1 / (double)(UCHAR_MAX - 2));
-    (*log2_base)[j] = log2((*log2_base)[j]);
+    for (unsigned int j = 0; j < * V; j++) {
+      double precompute =
+        pow((double)(f->pols[j]->deg + 1), (double)(H->t - 1) / 2.0) *
+        pow((double)H->t, (double)f->pols[j]->deg / 2.0) *
+        pow(max_a, (double)f->pols[j]->deg);
+
+      mpz_t inf_f;
+      mpz_init(inf_f);
+      mpz_poly_infinity_norm(inf_f, f->pols[j]);
+      (*log2_base)[j] = pow(mpz_get_d(inf_f), (double)(H->t - 1)) * precompute;
+      mpz_clear(inf_f);
+
+      ASSERT((*log2_base)[j] > 0.0);
+
+      if (* q_side == j) {
+        (*log2_base)[j] = (*log2_base)[j] / (double)(*q_range)[0];
+      }
+
+      (*log2_base)[j] = pow((*log2_base)[j], 1 / (double)(UCHAR_MAX - 2));
+      (*log2_base)[j] = log2((*log2_base)[j]);
+    }
   }
 
   double sec = seconds();
@@ -2409,7 +2421,6 @@ int main(int argc, char * argv[])
         mat_Z_skew_LLL(matrix, matrix, skewness);
 #endif // SKEW_LLL_SPQ
 
-
         /*
          * TODO: continue here.
          * If the last coefficient of the last vector is negative, we do not
@@ -2418,7 +2429,7 @@ int main(int argc, char * argv[])
          * has the last coordinate positive.
          */
 
-        reogranize_MqLLL(matrix);
+        reorganize_MqLLL(matrix);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "MqLLL:\n");
