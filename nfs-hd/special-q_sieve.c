@@ -2321,7 +2321,6 @@ int main(int argc, char * argv[])
 #else // OLD_NORM
   unsigned char * max_norm = (unsigned char *) malloc(sizeof(unsigned char) *
       V);
-  memset(max_norm, 0, sizeof(unsigned char) * V);
 #endif // OLD_NORM
 
   double ** time = (double ** ) malloc(sizeof(double * ) * V);
@@ -2440,6 +2439,10 @@ int main(int argc, char * argv[])
           fprintf(file_array_norm, "MqLLL:\n");
           mat_Z_fprintf(file_array_norm, matrix);
 #endif // PRINT_ARRAY_NORM
+
+#ifndef OLD_NORM
+          memset(max_norm, 0, sizeof(unsigned char) * V);
+#endif // OLD_NORM
 
         for (unsigned int j = 0; j < V; j++) {
 #ifdef TRACE_POS
