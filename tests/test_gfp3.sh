@@ -30,22 +30,20 @@ cat > $PARAMFILE <<EOF
 name = p3dd7-f4g3-GJL-1
 dlp = true
 N = 8005493
-gorder = 64087926178543
+ell = 64087926178543
 
 slaves.nrclients = $(((1+NCPUS)/2))
 tasks.threads = 2
 tasks.linalg.bwc.threads = $NCPUS
 tasks.execpath = $CADO_NFS_BINARY_DIR
-slaves.scriptpath = $CADO_NFS_SOURCE_DIR/scripts/cadofactor
+slaves.scriptpath = $CADO_NFS_SOURCE_DIR
 tasks.workdir = $WDIR
 slaves.basepath= $WDIR/client
 slaves.hostnames = localhost
 
 tasks.polyselect.import = $POLYFILE
 
-# this should be uncommented for nominal execution, since the computations
-# involve 1 unit on side 1, 1 SM on side 0
-tasks.explicit_units1 = true 
+# for the record, the computations involve 1 unit on side 1, 1 SM on side 0
 tasks.lcideals = true
 
 tasks.I = 11
@@ -78,4 +76,4 @@ cleanup() {
     fi
 }
 
-${CADO_NFS_SOURCE_DIR}/scripts/cadofactor/cadofactor.py $PARAMFILE && cleanup
+${CADO_NFS_SOURCE_DIR}/cado-nfs.py $PARAMFILE && cleanup

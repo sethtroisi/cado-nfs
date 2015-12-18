@@ -35,7 +35,7 @@ using namespace std;
 
 /* Make sure that the assembly function is only called if it matches
  * correctly the abase header !! */
-#if defined(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
+#if defined(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES) && (defined(SELECT_MPFQ_LAYER_u64k1) || defined(SELECT_MPFQ_LAYER_u64))
 // disabling one particular assembly code is done by simply disabling the
 // header file (and optionally removing the assembly file from the link
 // list is the CMakeLists.txt file, but in reality it's not needed. This
@@ -1827,9 +1827,8 @@ static unsigned long compressed_size(unsigned long s, unsigned int defer MAYBE_U
     } else if (defer <= 15) {
         return iceildiv(s, 2);
 #endif
-    } else {
-        return s;
     }
+    return s;
 }
 
 static void append_compressed(vector<uint8_t>& t8, vector<uint8_t> const& S, unsigned int defer MAYBE_UNUSED)

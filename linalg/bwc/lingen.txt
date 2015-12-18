@@ -1,3 +1,5 @@
+[see also Feature request #14992 on the bug tracker]
+
 The current binary lingen program sucks in just about every respect.
 
 Parallelism
@@ -61,19 +63,13 @@ multiplication. Alas, barbecue does not support it.
 For choosing the transforms to be used, three options are theoretically
 supported.
 - Cantor (c128) the base field being GF(2^128). The innermost operation
-  therefore cares a great deal about pclmulqdq.
+  therefore cares a great deal about pclmulqdq. This is used for degrees
+  larger or equal to cantor_threshold.
 - ternary fft (gf2x-tfft).
 - "fake" which defines DFT and IFT as copies, and uses gf2x_mul in the
   middle.
 
-As terribly stupid as it may seem, the default is "fake" (see
-compute_lingen). (seems terribly stupid at least in terms of memory !)
-There is a cantor_threshold argument to lingen, but by default the
-threshold is "never". Reasons for that are that cantor pays off much
-earlier with pclmul, and probably also because at some point I had a bug
-with the c128 interface. Unfortunately I don't recall what it was. But
-despite that, activation of Cantor seems much desirable. The lack of
-activation for the gf2x-tfft layer really looks like a bug also.
+(The lack of activation for the gf2x-tfft layer really looks like a bug also.)
 
 There is a bench_polmatmul program (here, the arguments needed are:
 bench_polmatmul 132000000 512 256). It examines what it takes to do the

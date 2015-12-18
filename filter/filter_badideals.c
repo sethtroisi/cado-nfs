@@ -7,16 +7,8 @@
 #include "filter_badideals.h"
 #include "mod_ul.h"
 
-#ifdef FOR_FFS
-#include "utils-ffs.h"
-#endif
-
 #define MAXLINE 1024
-#ifndef FOR_FFS
 #define INPUT_BASE 10
-#else
-#define INPUT_BASE 16
-#endif
 
 /*
   A line in badidealinfo has the form:
@@ -47,15 +39,13 @@
   that case, we should write (e-2) and 2 in the two corresponding columns on
   the side 1.
 
-  For NFS-DL, p and r are read in basis 10.
-  For FFS, p and r are read in hexadecimal.
+  p and r are read in basis 10.
  */
 
 static inline void
 compute_pk_r_wrapper (p_r_values_t *pk, p_r_values_t *r, p_r_values_t p,
                       p_r_values_t rk, unsigned int k)
 {
-#ifndef FOR_FFS
   *pk = p;
   for (unsigned int i = 1; i < k; ++i)
     *pk *= p;
@@ -65,10 +55,6 @@ compute_pk_r_wrapper (p_r_values_t *pk, p_r_values_t *r, p_r_values_t p,
     p_r_values_t x = rk - (*pk);
     *r = p + (x % p);
   }
-#else
-  /* For FFS we call a function in utils-ffs.c that used fppol arithmetic */
-  ffs_compute_pk_r (pk, r, p, rk, k);
-#endif
 }
 
 
@@ -128,7 +114,6 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
 static inline p_r_values_t
 compute_r_wrapper (int64_t a, uint64_t b, p_r_values_t p, p_r_values_t pk)
 {
-#ifndef FOR_FFS
   if ((b % p) == 0)
   {
     if (a < 0)
@@ -141,10 +126,6 @@ compute_r_wrapper (int64_t a, uint64_t b, p_r_values_t p, p_r_values_t pk)
   }
   else
     return relation_compute_r (a, b, pk);
-#else
-  /* For FFS we call a function in utils-ffs.c that used fppol arithmetic */
-  return ffs_compute_r (a, b, p, pk);
-#endif
 }
 
 void

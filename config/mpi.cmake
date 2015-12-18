@@ -53,9 +53,24 @@ else()
         endif()
     endif()
 
-    find_program(MPI_C_COMPILER ${mpicc_names} ${findprog_flags})
-    find_program(MPI_CXX_COMPILER ${mpicxx_names} ${findprog_flags})
-    find_program(MPIEXEC ${mpiexec_names} ${findprog_flags})
+    if(DEFINED ENV{MPI_C_COMPILER})
+        set(MPI_C_COMPILER "$ENV{MPI_C_COMPILER}")
+    else()
+        find_program(MPI_C_COMPILER ${mpicc_names} ${findprog_flags})
+    endif()
+
+
+    if(DEFINED ENV{MPI_CXX_COMPILER})
+        set(MPI_CXX_COMPILER "$ENV{MPI_CXX_COMPILER}")
+    else()
+        find_program(MPI_CXX_COMPILER ${mpicxx_names} ${findprog_flags})
+    endif()
+
+    if(DEFINED ENV{MPIEXEC})
+        set(MPIEXEC "$ENV{MPIEXEC}")
+    else()
+        find_program(MPIEXEC ${mpiexec_names} ${findprog_flags})
+    endif()
 
     if (MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
         message(STATUS "Using MPI C compiler ${MPI_C_COMPILER}")

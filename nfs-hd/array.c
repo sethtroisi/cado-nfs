@@ -24,7 +24,7 @@ void array_clear(array_ptr array)
 void array_fprintf(FILE * filew, array_srcptr array)
 {
   ASSERT(array->number_element != 0);
-  
+
   fprintf(filew, "[");
   for (uint64_t i = 0; i < array->number_element - 1; i++) {
     fprintf(filew, "%u, ", array->array[i]);

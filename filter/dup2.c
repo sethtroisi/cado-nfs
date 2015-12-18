@@ -54,9 +54,6 @@
 #include "filter_config.h"
 #include "utils_with_io.h"
 
-#ifdef FOR_FFS
-#include "utils-ffs.h"
-#endif
 #include "filter_badideals.h"
 #include "relation-tools.h"
 
@@ -281,7 +278,6 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
     {
       if (pr[i].side != renumber_tab->rat)
       {
-#ifndef FOR_FFS
 #if DEBUG >= 1
   // Check for this bug : [#15897] [las] output "ideals" that are not prime
         if (!modul_isprime(&(pr[i].p)))
@@ -294,9 +290,6 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
         }
 #endif
         r = (p_r_values_t) relation_compute_r (rel->a, rel->b, pr[i].p);
-#else
-        r = (p_r_values_t) ffs_relation_compute_r (rel->a, rel->b, pr[i].p);
-#endif
       }
       else
         r = 0; // on the rational side we need not compute r, which is m mod p.
@@ -523,9 +516,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "outdir", "by default, input files are overwritten");
   param_list_decl_usage(pl, "outfmt",
                                "format of output file (default same as input)");
-#ifndef FOR_FFS
   param_list_decl_usage(pl, "dl", "(switch) do not reduce exponents modulo 2");
-#endif
   param_list_decl_usage(pl, "badidealinfo", "file containing info about bad ideals");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
@@ -551,12 +542,8 @@ main (int argc, char *argv[])
 
     param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
-#ifndef FOR_FFS
     is_for_dl = 0; /* By default we do dup2 for factorization */
     param_list_configure_switch(pl, "dl", &is_for_dl);
-#else
-    is_for_dl = 1; /* With FFS, not for dl is meaningless */
-#endif
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -732,15 +719,9 @@ main (int argc, char *argv[])
 
           nrels = ndup = 0;
 
-#ifdef FOR_FFS
-          uint64_t loc_nrels = filter_rels2(local_filelist, desc,
-                  EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_PRIMES,
-                  NULL, NULL);
-#else
           uint64_t loc_nrels = filter_rels2(local_filelist, desc,
                   EARLYPARSE_NEED_AB_DECIMAL | EARLYPARSE_NEED_PRIMES,
                   NULL, NULL);
-#endif
 
           ASSERT_ALWAYS(loc_nrels == nrels);
 

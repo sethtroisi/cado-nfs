@@ -203,10 +203,14 @@ static void add_ideal_u_part(factor_base_ptr fb, uint64_t * index, uint64_t r,
   ASSERT(h->deg > 1);
 
   //Verify if the ideal can be added.
-  if (mpz_cmp_ui(lpb, pow_uint64_t(r, (uint64_t)h->deg)) >= 0 && r <= fbb) {
+  mpz_t limit;
+  mpz_init(limit);
+  mpz_set_d(limit, pow((double)r, (double)h->deg));
+  if (mpz_cmp(lpb, limit) >= 0 && r <= fbb) {
     factor_base_set_ideal_u_part(fb, * index, r, h, t);
     * index = * index + 1;
   }
+  mpz_clear(limit);
 }
 
 /*
@@ -617,7 +621,8 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
 }
 
 void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
-    unsigned int * lpb_bit, cado_poly_srcptr f, double * log2_base)
+    unsigned int * lpb_bit, cado_poly_srcptr f, double * log2_base,
+    unsigned int t)
 {
   for (unsigned int k = 0; k < (unsigned int) f->nb_polys; k++) {
     mpz_t lpb;
@@ -647,8 +652,9 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     ASSERT(mpz_poly_cmp(f->pols[k], f_tmp) == 0);
     mpz_poly_clear(f_tmp);
 
-    unsigned int t;
-    fscanf(file, "t:%u\n", &t);
+    unsigned int t_tmp;
+    fscanf(file, "t:%u\n", &t_tmp);
+    ASSERT(t == t_tmp);
 
     uint64_t max_number_element_1, max_number_element_u, max_number_element_pr;
     fscanf(file, "%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", &max_number_element_1,
@@ -674,23 +680,26 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     }
     ideal_1_clear(ideal_1, t);
 
-    ideal_u_t ideal_u;
-    ideal_u_init(ideal_u);
     for (uint64_t i = 0; i < max_number_element_u; i++) {
       if (fgets(line, size_line, file) == NULL) {
         return;
       }
+      ideal_u_t ideal_u;
+      ideal_u_init(ideal_u);
       parse_ideal_u(ideal_u, line, t);
+      mpz_t limit;
+      mpz_init(limit);
+      mpz_set_d(limit, pow((double)ideal_u->ideal->r,
+            (double)ideal_u->ideal->h->deg));
       ideal_u->log = ideal_u->log / log2_base[k];
-      if (mpz_cmp_ui(lpb, pow_uint64_t(ideal_u->ideal->r,
-              (uint64_t)ideal_u->ideal->h->deg)) >= 0
-          && ideal_u->ideal->r <= fbb[k]) {
+      if (mpz_cmp(lpb, limit) >= 0 && ideal_u->ideal->r <= fbb[k]) {
         //TODO: Problem here.
         factor_base_set_ideal_u(fb[k], number_element_u, ideal_u, t);
         number_element_u++;
       }
+      mpz_clear(limit);
+      ideal_u_clear(ideal_u, t);
     }
-    ideal_u_clear(ideal_u, t);
 
     if (max_number_element_pr != 0) {
       ideal_pr_t ideal_pr;

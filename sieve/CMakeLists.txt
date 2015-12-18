@@ -21,20 +21,20 @@ set (las_libraries las-norms trialdiv facul utils ${pthread_libs})
 
 add_executable (las ${las_sources})
 target_link_libraries (las ${las_libraries})
+set_target_properties(las PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 
 add_executable (las_tracek EXCLUDE_FROM_ALL ${las_sources})
 set_property(TARGET las_tracek PROPERTY COMPILE_DEFINITIONS TRACE_K=1)
+set_target_properties(las_tracek PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 target_link_libraries (las_tracek ${las_libraries})
 
 add_executable (fb_test EXCLUDE_FROM_ALL fb.cpp)
 set_property(TARGET fb_test PROPERTY COMPILE_DEFINITIONS TESTDRIVE=1)
 target_link_libraries (fb_test utils)
 
-add_executable (las_descent EXCLUDE_FROM_ALL
-    ${las_sources}
-    las-dlog-base.cpp
-    )
+add_executable (las_descent ${las_sources} las-dlog-base.cpp)
 set_property(TARGET las_descent PROPERTY COMPILE_DEFINITIONS DLP_DESCENT SUPPORT_LARGE_Q)
+set_target_properties(las_descent PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
 target_link_libraries (las_descent ${las_libraries})
 
 add_library (trialdiv trialdiv.c)
@@ -50,6 +50,4 @@ add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
     las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
 target_link_libraries(dupsup utils_with_io facul las-norms)
 
-install(TARGETS makefb las freerel RUNTIME DESTINATION ${BINSUFFIX}/sieve)
-
-include(CMakeLists-nodist.txt OPTIONAL)
+install(TARGETS makefb las freerel RUNTIME DESTINATION ${LIBSUFFIX}/sieve) 

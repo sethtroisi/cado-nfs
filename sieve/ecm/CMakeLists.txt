@@ -58,6 +58,8 @@ add_library(facul
         mpqs_doit.c mpqs_ul.c mpqs_15ul.c mpqs_2ul2.c mpqs_mpz.c
 	batch.c)
 
+set_target_properties(facul PROPERTIES COMPILE_FLAGS "${OpenMP_C_FLAGS}")
+
 if(MINGW)
 target_link_libraries(facul gnurx)
 endif()

@@ -23,12 +23,12 @@ int main()
 
   array_t array;
   array_init(array, nb);
-  array_set_all_elements_min(array);
+  array_set_all_elements(array, 0);
   for (uint64_t i = 0; i < nb; i++) {
     ASSERT_ALWAYS(array_get(array, i) == 0);
   }
 
-  array_set_all_elements_max(array);
+  array_set_all_elements(array, UCHAR_MAX);
   for (uint64_t i = 0; i < nb; i++) {
     ASSERT_ALWAYS(array_get(array, i) == UCHAR_MAX);
   }

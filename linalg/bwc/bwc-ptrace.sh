@@ -504,15 +504,15 @@ $cmd spvector64 < $wdir/C.$interval > $mdir/C$interval.m
 
 
 echo "Saving krylov sequence to magma format"
-afile=$(basename `find $wdir -name 'A*[0-9]'`)
-$cmd spvector64 < $wdir/$afile > $mdir/A.m
+afile=$(find $wdir -maxdepth 1 -name 'A*[0-9]')
+$cmd spvector64 < $afile > $mdir/A.m
 
 
 
 echo "Saving linear generator to magma format"
-$cmd spvector64 < $wdir/$afile.gen > $mdir/F.m
-if [ -f $wdir/$afile.gen.rhs ] ; then
-$cmd spvector64 < $wdir/$afile.gen.rhs > $mdir/rhscoeffs.m
+$cmd spvector64 < $afile.gen > $mdir/F.m
+if [ -f $afile.gen.rhs ] ; then
+$cmd spvector64 < $afile.gen.rhs > $mdir/rhscoeffs.m
 else
     # We must create an empty file, because otherwise magma won't accept
     # "load" being conditional...

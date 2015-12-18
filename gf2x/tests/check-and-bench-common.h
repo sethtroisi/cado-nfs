@@ -47,8 +47,10 @@ extern int time_ift;
 #define ENGINE_init gf2x_cantor_fft_init
 #define ENGINE_alloc gf2x_cantor_fft_alloc
 #define ENGINE_dft gf2x_cantor_fft_dft
+#define ENGINE_zero gf2x_cantor_fft_zero
 #define ENGINE_compose gf2x_cantor_fft_compose
 #define ENGINE_addcompose gf2x_cantor_fft_addcompose
+#define ENGINE_addcompose_n gf2x_cantor_fft_addcompose_n
 #define ENGINE_free gf2x_cantor_fft_free
 #define ENGINE_ift gf2x_cantor_fft_ift
 #define ENGINE_get gf2x_cantor_fft_get
@@ -70,8 +72,10 @@ extern int time_ift;
 #define ENGINE_init gf2x_ternary_fft_init
 #define ENGINE_alloc gf2x_ternary_fft_alloc
 #define ENGINE_dft gf2x_ternary_fft_dft
+#define ENGINE_zero gf2x_ternary_fft_zero
 #define ENGINE_compose gf2x_ternary_fft_compose
 #define ENGINE_addcompose gf2x_ternary_fft_addcompose
+#define ENGINE_addcompose_n gf2x_ternary_fft_addcompose_n
 #define ENGINE_free gf2x_ternary_fft_free
 #define ENGINE_ift gf2x_ternary_fft_ift
 #define ENGINE_get gf2x_ternary_fft_get

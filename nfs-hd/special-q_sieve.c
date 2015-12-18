@@ -24,17 +24,6 @@
 //TODO: change % in test + add or substract.
 
 /*
- * p = 10822639589
- * n = 6
- * f0 = 1366+1366*x^1+1368*x^2+1368*x^3+1368*x^4+1366*x^5+1365*x^6
- * f1 = 7917871+7917871*x^1-7916275*x^2-7916275*x^3-7916275*x^4+7917871*x^5
- *  +15834944*x^6
- * t = 3
- * lpb = 26
- * N_a = 2^23
- */
-
-/*
  * Different mode:
    - TRACE_POS: follow all the operation make in a case of the array;
    - NUMBER_HIT: count the number of hit;
@@ -44,10 +33,6 @@
       the true norms;
    - …
  */
-
-#ifdef ASSERT_SIEVE
-uint64_t index_old = 0;
-#endif // ASSERT_SIEVE
 
 /* ----- Compute Mq, Mqr, Tqr ----- */
 
@@ -135,6 +120,20 @@ void build_Mq_ideal_spq(mat_Z_ptr matrix, ideal_spq_srcptr ideal)
   } else if (ideal->type == 1) {
     build_Mq_ideal_u(matrix, ideal->ideal_u);
   }
+}
+
+void reogranize_MqLLL(mat_Z_ptr matrix)
+{
+  for (unsigned int col = 1; col <= matrix->NumRows; col++) {
+    if (mpz_cmp_ui(matrix->coeff[matrix->NumRows][col], 0) < 0) {
+      for (unsigned int row = 1; row <= matrix->NumRows; row++) {
+        mpz_mul_si(matrix->coeff[row][col], matrix->coeff[row][col], -1);
+      }
+    }
+  }
+
+  //TODO: seem to be useless, need do to think about that.
+  /*mat_Z_sort_last(matrix, matrix);*/
 }
 
 /*
@@ -335,22 +334,23 @@ void compute_Tqr_u(mpz_t ** Tqr, mat_Z_srcptr matrix, unsigned int t,
  */
 void assert_sieve(sieving_bound_srcptr H, uint64_t index,
     uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_srcptr f,
-    ideal_1_srcptr ideal, int64_vector_srcptr c, unsigned int pos)
+    ideal_1_srcptr ideal, int64_vector_srcptr c, unsigned int pos,
+    uint64_t * index_old)
 {
   /*
    * Verify if we do not sieve the same index, because we do not sieve the power
    *  of an ideal.
    */
-  if (index_old == 0) {
-    ASSERT(index_old <= index);
+  if (* index_old == 0) {
+    ASSERT(* index_old <= index);
   } else {
     if (pos == 1) {
-      ASSERT(index_old < index);
+      ASSERT(* index_old < index);
     } else {
-      ASSERT(index_old > index);
+      ASSERT(* index_old > index);
     }
   }
-  index_old = index;
+  * index_old = index;
 
   mpz_vector_t v;
   mpz_vector_init(v, H->t);
@@ -433,15 +433,16 @@ void trace_pos_sieve(FILE * file_trace_pos, uint64_t index, ideal_1_srcptr ideal
  */
 
 static inline void mode_sieve(MAYBE_UNUSED FILE * file_trace_pos,
-    MAYBE_UNUSED sieving_bound_srcptr H,
-    MAYBE_UNUSED uint64_t index, MAYBE_UNUSED array_srcptr array,
-    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED ideal_1_srcptr ideal, MAYBE_UNUSED int64_vector_srcptr c,
-    MAYBE_UNUSED uint64_t number_c_l, MAYBE_UNUSED unsigned int nbint,
-    MAYBE_UNUSED unsigned int pos, MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED sieving_bound_srcptr H, MAYBE_UNUSED uint64_t index,
+    MAYBE_UNUSED array_srcptr array, MAYBE_UNUSED mat_Z_srcptr matrix,
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED ideal_1_srcptr ideal,
+    MAYBE_UNUSED int64_vector_srcptr c, MAYBE_UNUSED uint64_t number_c_l,
+    MAYBE_UNUSED unsigned int nbint, MAYBE_UNUSED unsigned int pos,
+    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED uint64_t * index_old)
 {
 #ifdef ASSERT_SIEVE
-  assert_sieve(H, index, array->number_element, matrix, f, ideal, c, pos);
+  assert_sieve(H, index, array->number_element, matrix, f, ideal, c, pos,
+      index_old);
 #endif // ASSERT_SIEVE
 
 #ifdef NUMBER_HIT
@@ -473,7 +474,7 @@ void line_sieve_ci(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     int64_vector_ptr c, ideal_1_srcptr ideal,
     int64_t ci, sieving_bound_srcptr H, unsigned int i, uint64_t number_c_l,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED uint64_t * index_old)
 {
 #ifndef NDEBUG
   if (i == 0) {
@@ -485,10 +486,6 @@ void line_sieve_ci(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
   uint64_t index = 0;
 
-#ifdef ASSERT_SIEVE
-  index_old = 0;
-#endif // ASSERT_SIEVE
-
   if (ci < (int64_t)H->h[i]) {
     //Change the ith coordinate of c.
     int64_vector_setcoordinate(c, i, ci);
@@ -496,15 +493,19 @@ void line_sieve_ci(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     index = array_int64_vector_index(c, H, array->number_element);
     array->array[index] = array->array[index] - (unsigned char)ideal->log;
 
+#ifndef MODE_SIEVE_LINE
     mode_sieve(file_trace_pos, H, index, array, matrix, f, ideal, c, number_c_l,
-        1, 1, nb_hit);
+        1, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_LINE
 
     for (uint64_t k = 1; k < number_c_l; k++) {
       array->array[index + k] = array->array[index + k] -
         (unsigned char)ideal->log;
 
+#ifndef MODE_SIEVE_LINE
       mode_sieve(file_trace_pos, H, index + k, array, matrix, f, ideal, NULL,
-          number_c_l, 0, 1, nb_hit);
+          number_c_l, 0, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_LINE
     }
 
     int64_t tmp = ci;
@@ -516,15 +517,19 @@ void line_sieve_ci(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
       array->array[index] = array->array[index] - (unsigned char)ideal->log;
 
+#ifndef MODE_SIEVE_LINE
       mode_sieve(file_trace_pos, H, index, array, matrix, f, ideal, NULL,
-          number_c_l, 1, 1, nb_hit);
+          number_c_l, 1, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_LINE
 
       for (uint64_t k = 1; k < number_c_l; k++) {
         array->array[index + k] = array->array[index + k] -
           (unsigned char)ideal->log;
 
+#ifndef MODE_SIEVE_LINE
         mode_sieve(file_trace_pos, H, index + k, array, matrix, f, ideal, NULL,
-            number_c_l, 1, 1, nb_hit);
+            number_c_l, 1, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_LINE
       }
 
       tmp = tmp + (int64_t)ideal->ideal->r;
@@ -569,7 +574,7 @@ void line_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     ideal_1_srcptr ideal, sieving_bound_srcptr H, unsigned int i,
     uint64_t number_c_l, int64_t * ci, unsigned int pos,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED uint64_t * index_old)
 {
   ASSERT(pos >= i);
 
@@ -607,8 +612,8 @@ void line_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   ASSERT(tmp == tmp_ci);
 #endif // NDEBUG
 
-  line_sieve_ci(array, file_trace_pos, c, ideal, ci_tmp, H, i, number_c_l, matrix, f,
-      nb_hit);
+  line_sieve_ci(array, file_trace_pos, c, ideal, ci_tmp, H, i, number_c_l,
+      matrix, f, nb_hit, index_old);
 }
 
 /* ----- Plane sieve algorithm ----- */
@@ -630,18 +635,18 @@ void line_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
  * f: the polynomial that defines the number field.
  */
 #ifdef PLANE_SIEVE_STARTING_POINT
-void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
-    int64_vector_ptr vs, int64_vector_srcptr e0, int64_vector_srcptr e1,
-    uint64_t coord_e0, uint64_t coord_e1, sieving_bound_srcptr H,
-    ideal_1_srcptr r, MAYBE_UNUSED
-    mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
+void plane_sieve_1_enum_plane(array_ptr array,
+    MAYBE_UNUSED FILE * file_trace_pos, int64_vector_ptr vs,
+    int64_vector_srcptr e0, int64_vector_srcptr e1, uint64_t coord_e0,
+    uint64_t coord_e1, sieving_bound_srcptr H, ideal_1_srcptr r,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
     MAYBE_UNUSED uint64_t * nb_hit)
 #else
-void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
-    int64_vector_srcptr vs,
+void plane_sieve_1_enum_plane(array_ptr array,
+    MAYBE_UNUSED FILE * file_trace_pos, int64_vector_srcptr vs,
     int64_vector_srcptr e0, int64_vector_srcptr e1, uint64_t coord_e0,
-    uint64_t coord_e1, sieving_bound_srcptr H, ideal_1_srcptr r, MAYBE_UNUSED
-    mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
+    uint64_t coord_e1, sieving_bound_srcptr H, ideal_1_srcptr r,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
     MAYBE_UNUSED uint64_t * nb_hit)
 #endif // PLANE_SIEVE_STARTING_POINT
 {
@@ -663,9 +668,7 @@ void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_po
   //Perform Franke-Kleinjung enumeration.
   //x increases.
 
-#ifdef ASSERT_SIEVE
-  index_old = 0;
-#endif // ASSERT_SIEVE
+  uint64_t index_old = 0;
 
   while (v->c[1] < (int64_t)H->h[1]) {
     if (v->c[1] >= -(int64_t)H->h[1]) {
@@ -686,8 +689,10 @@ void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_po
       }
       array->array[index_v] = array->array[index_v] - (unsigned char)r->log;
 
+#ifndef MODE_SIEVE_PLANE
       mode_sieve(file_trace_pos, H, index_v, array, matrix, f, r, v, 1, 1, 1,
-          nb_hit);
+          nb_hit, &index_old);
+#endif // MODE_SIEVE_PLANE
 
     }
 
@@ -703,9 +708,7 @@ void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_po
 
   //x decreases.
 
-#ifdef ASSERT_SIEVE
   index_old = 0;
-#endif // ASSERT_SIEVE
 
   flag_sr = 0;
   int64_vector_set(v, vs);
@@ -728,8 +731,10 @@ void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_po
       }
       array->array[index_v] = array->array[index_v] - (unsigned char)r->log;
 
+#ifndef MODE_SIEVE_PLANE
       mode_sieve(file_trace_pos, H, index_v, array, matrix, f, r, v, 1, 1, 0,
-          nb_hit);
+          nb_hit, &index_old);
+#endif // PLANE_SIEVE_STARTING_POINT
 
     }
 #ifdef PLANE_SIEVE_STARTING_POINT
@@ -748,6 +753,121 @@ void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_po
   int64_vector_clear(v);
 }
 
+void plane_sieve_1_enum_plane_ortho(array_ptr array,
+    MAYBE_UNUSED FILE * file_trace_pos, int64_vector_ptr vs,
+    uint64_t coord_e1, sieving_bound_srcptr H, ideal_1_srcptr r,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
+    MAYBE_UNUSED uint64_t * nb_hit)
+{
+  ASSERT(vs->c[1] == 0);
+
+  int64_vector_t v;
+  int64_vector_init(v, vs->dim);
+  int64_vector_set(v, vs);
+
+  if (v->c[0] >= (int64_t)H->h[0] || v->c[0] < -(int64_t)H->h[0]) {
+#ifndef NDEBUG
+    if (v->c[0] < -(int64_t)H->h[0]) {
+      int64_t k = (int64_t) ceil((-(double)H->h[0] - (double)v->c[0]) /
+          (double)r->ideal->r);
+      v->c[0] = k * (int64_t)r->ideal->r + v->c[0];
+
+      ASSERT(v->c[0] >= -(int64_t)H->h[0]);
+    } else if (v->c[0] >= (int64_t)H->h[0]) {
+      int64_t k = (int64_t) floor(((double)H->h[0] - (double)v->c[0]) /
+          (double)r->ideal->r);
+      v->c[0] = k * (int64_t)r->ideal->r + v->c[0];
+
+      ASSERT(v->c[0] < (int64_t)H->h[0]);
+    }
+#endif // NDEBUG
+
+    int64_vector_clear(v);
+    return;
+  }
+
+
+#ifdef PLANE_SIEVE_STARTING_POINT
+  int64_vector_t vs_tmp;
+  int64_vector_init(vs_tmp, vs->dim);
+  int64_vector_set(vs_tmp, vs);
+#endif // PLANE_SIEVE_STARTING_POINT
+
+  uint64_t index_old = 0;
+
+  v->c[1] = -(int64_t) H->h[1];
+  uint64_t index_v = array_int64_vector_index(v, H, array->number_element);
+  array->array[index_v] = array->array[index_v] - r->log;
+
+#ifndef MODE_SIEVE_PLANE
+  mode_sieve(file_trace_pos, H, index_v, array, matrix, f, r, v, 1, 1, 0,
+      nb_hit, &index_old);
+#endif // MODE_SIEVE_PLANE
+
+  for (int64_t i = -(int64_t) H->h[1] + 1; i < (int64_t) H->h[1]; i++) {
+    index_v = index_v + coord_e1;
+    v->c[1] = i;
+    array->array[index_v] = array->array[index_v] - r->log;
+#ifndef MODE_SIEVE_PLANE
+    mode_sieve(file_trace_pos, H, index_v, array, matrix, f, r, v, 1, 1, 0,
+        nb_hit, &index_old);
+#endif // MODE_SIEVE_PLANE
+  }
+
+  int64_vector_clear(v);
+}
+
+void find_new_vs(int64_vector_ptr vs, list_int64_vector_ptr v_refresh,
+    list_int64_vector_t * SV, int64_vector_srcptr e0, int64_vector_srcptr e1,
+    sieving_bound_srcptr H, int boolean)
+{
+#ifndef NDEBUG
+  int64_t tmp = 0;
+  int64_t tmp2 = 0;
+  for (unsigned int j = 2; j < vs->dim; j++) {
+    tmp = tmp + vs->c[j];
+    tmp2 = tmp2 + H->h[j];
+  }
+  ASSERT(tmp <= tmp2);
+#endif
+
+  unsigned int k = 2;
+  while(k < vs->dim) {
+    if (vs->c[k] == H->h[k] - 1) {
+      int64_vector_set(vs, v_refresh->v[k - 2]);
+      k++;
+    } else {
+      break;
+    }
+  }
+  if (k < vs->dim) {
+    plane_sieve_next_plane(vs, SV[k - 2], e0, e1, H, boolean);
+    if (k > 2) {
+      for (unsigned int i = 0; i < k - 2; i++) {
+        int64_vector_set(v_refresh->v[i], vs);
+      }
+    }
+  }
+
+#ifndef NDEBUG
+  if (vs->c[vs->dim - 1] == H->h[vs->dim - 1]) {
+    for (unsigned int j = 2; j < vs->dim - 1; j++) {
+      tmp = vs->c[j];
+      ASSERT(tmp == 0);
+    }
+  } else {
+    for (unsigned int j = 2; j < vs->dim - 1; j++) {
+      tmp = vs->c[j];
+      ASSERT(tmp >= -(int64_t)H->h[j]);
+      ASSERT(tmp < (int64_t)H->h[j]);
+    }
+    tmp = vs->c[vs->dim - 1];
+    ASSERT(tmp >= 0);
+    ASSERT(tmp < H->h[vs->dim - 1]);
+  }
+#endif
+}
+
 /*
  * Plane sieve.
  *
@@ -758,13 +878,12 @@ void plane_sieve_1_enum_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_po
  * matrix: MqLLL.
  * f: polynomial that defines the number field.
  */
-void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos, ideal_1_srcptr r,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
+    ideal_1_srcptr r, mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
     MAYBE_UNUSED uint64_t * nb_hit)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
-  ASSERT(Mqr->NumRows == 3);
 
   //Perform the Franke-Kleinjung algorithm.
   int64_vector_t * vec = malloc(sizeof(int64_vector_t) * Mqr->NumRows);
@@ -778,29 +897,34 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos, ideal_1_
   int64_vector_init(e1, vec[1]->dim);
   int boolean = reduce_qlattice(e0, e1, vec[0], vec[1], (int64_t)(2*H->h[0]));
 
-  //Find some short vectors to go from z = d to z = d + 1.
-  //TODO: go after boolean, no?
-  list_int64_vector_t SV;
-  list_int64_vector_init(SV, 3);
-  SV4(SV, vec[0], vec[1], vec[2]);
-
-  //Reduce q-lattice is not possible.
-  if (boolean == 0) {
+  if (!boolean) {
+#ifdef PLANE_SIEVE_ORTHO
     fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
     mat_int64_fprintf_comment(stderr, Mqr);
-
-    //plane_sieve_whithout_FK(SV, vec);
-
-    int64_vector_clear(e0);
-    int64_vector_clear(e1);
     for (unsigned int i = 0; i < Mqr->NumCols; i++) {
       int64_vector_clear(vec[i]);
     }
     free(vec);
-    list_int64_vector_clear(SV);
-
+    int64_vector_clear(e0);
+    int64_vector_clear(e1);
     return;
+#else // PLANE_SIEVE_ORTHO
+    ASSERT(boolean == 0);
+
+    int64_vector_set(e0, vec[0]);
+    int64_vector_set(e1, vec[1]);
+#endif // PLANE_SIEVE_ORTHO
   }
+
+  //Find some short vectors to go from z = d to z = d + 1.
+  //TODO: go after boolean, no?
+  list_int64_vector_t * SV = (list_int64_vector_t *)
+    malloc(sizeof(list_int64_vector_t) * (Mqr->NumCols - 2));
+  for (unsigned int i = 2; i < Mqr->NumCols; i++) {
+    list_int64_vector_init(SV[i - 2], Mqr->NumCols);
+    SV4(SV[i - 2], vec[0], vec[1], vec[i]);
+  }
+
 
   for (unsigned int i = 0; i < Mqr->NumCols; i++) {
     int64_vector_clear(vec[i]);
@@ -811,22 +935,60 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos, ideal_1_
   int64_vector_init(vs, e0->dim);
   int64_vector_set_zero(vs);
 
-  uint64_t coord_e0 = 0, coord_e1 = 0;
-  coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H, array->number_element);
-
-  //Enumerate the element of the sieving region.
-  for (unsigned int d = 0; d < H->h[2]; d++) {
-    plane_sieve_1_enum_plane(array, file_trace_pos, vs, e0, e1, coord_e0, coord_e1, H, r,
-        matrix, f, nb_hit);
-
-    //Jump in the next plane.
-    plane_sieve_next_plane(vs, SV, e0, e1, H);
+  if (H->t >= 3) {
+    for (unsigned int i = 2; i < H->t - 1; i++) {
+      int64_vector_addmul(vs, vs, SV[i - 2]->v[0], -(int64_t) H->h[i]);
+    }
+    int64_vector_addmul(vs, vs, SV[0]->v[0], -1);
+    plane_sieve_next_plane(vs, SV[0], e0, e1, H, boolean);
   }
 
-  list_int64_vector_clear(SV);
+  list_int64_vector_t v_refresh;
+  list_int64_vector_init(v_refresh, e0->dim);
+
+  uint64_t coord_e0 = 0, coord_e1 = 0;
+  if (boolean) {
+    coordinate_FK_vector(&coord_e0, &coord_e1, e0, e1, H,
+        array->number_element);
+  } else {
+    coord_e1 = index_vector(e1, H, array->number_element);
+  }
+
+  //Iterate from H[2] to H[t - 1].
+  //Enumerate the element of the sieving region.
+  uint64_t size = 1;
+
+  for (unsigned int i = 0; i < H->t - 2; i++) {
+    list_int64_vector_add_int64_vector(v_refresh, vs);
+  }
+
+  for (unsigned int i = 2; i < H->t - 1; i++) {
+    size = size * (2 * (uint64_t) H->h[i]);
+  }
+  size = size * ((uint64_t) H->h[H->t - 1]);
+
+  for (uint64_t d = 0; d < size; d++) {
+    if (boolean == 0) {
+      plane_sieve_1_enum_plane_ortho(array, file_trace_pos, vs, coord_e1, H, r,
+          matrix, f, nb_hit);
+    } else {
+      plane_sieve_1_enum_plane(array, file_trace_pos, vs, e0, e1, coord_e0,
+          coord_e1, H, r, matrix, f, nb_hit);
+    }
+
+    //TODO: it is probably possible to better write find_new_vs.
+    //Jump in the next plane.
+    find_new_vs(vs, v_refresh, SV, e0, e1, H, boolean);
+  }
+
+  for (unsigned int i = 0; i < Mqr->NumRows - 2; i++) {
+    list_int64_vector_clear(SV[i]);
+  }
+  free(SV);
   int64_vector_clear(vs);
   int64_vector_clear(e0);
   int64_vector_clear(e1);
+  list_int64_vector_clear(v_refresh);
 }
 
 /* ----- Space sieve algorithm ----- */
@@ -836,7 +998,8 @@ void space_sieve_1_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     list_int64_vector_ptr list_s, int64_vector_srcptr s,
     ideal_1_srcptr r, list_int64_vector_index_srcptr list_vec_zero,
     uint64_t index_s, sieving_bound_srcptr H, MAYBE_UNUSED mat_Z_srcptr matrix,
-    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED uint64_t * nb_hit,
+    MAYBE_UNUSED uint64_t * index_old)
 {
   ASSERT(int64_vector_equal(s, list_s->v[0]));
 
@@ -858,12 +1021,16 @@ void space_sieve_1_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
       if (list_vec_zero->v[i]->vec->c[1] < 0) {
         index_tmp = index_tmp - list_vec_zero->v[i]->index;
+#ifndef MODE_SIEVE_SPACE
         mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp,
-            1, 1, 0, nb_hit);
+            1, 1, 0, nb_hit, index_old);
+#endif // MODE_SIEVE_SPACE
       } else {
         index_tmp = index_tmp + list_vec_zero->v[i]->index;
+#ifndef MODE_SIEVE_SPACE
         mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp,
-            1, 1, 1, nb_hit);
+            1, 1, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_SPACE
       }
       array->array[index_tmp] = array->array[index_tmp] - (unsigned char)r->log;
 
@@ -873,9 +1040,7 @@ void space_sieve_1_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
     index_tmp = index_s;
 
-#ifdef ASSERT_SIEVE
-    index_old = index_s;
-#endif // ASSERT_SIEVE
+    * index_old = index_s;
 
     while (int64_vector_in_sieving_region(v_tmp, H)) {
 
@@ -887,12 +1052,17 @@ void space_sieve_1_plane(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
       if (list_vec_zero->v[i]->vec->c[1] < 0) {
         index_tmp = index_tmp + list_vec_zero->v[i]->index;
+#ifndef MODE_SIEVE_SPACE
         mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp, 1,
-            1, 1, nb_hit);
+            1, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_SPACE
       } else {
         index_tmp = index_tmp - list_vec_zero->v[i]->index;
+
+#ifndef MODE_SIEVE_SPACE
         mode_sieve(file_trace_pos, H, index_tmp, array, matrix, f, r, v_tmp, 1,
-            1, 0, nb_hit);
+            1, 0, nb_hit, index_old);
+#endif // MODE_SIEVE_SPACE
       }
       array->array[index_tmp] = array->array[index_tmp] - (unsigned char)r->log;
 
@@ -908,7 +1078,8 @@ void space_sieve_1_next_plane(array_ptr array, uint64_t * index_s,
     list_int64_vector_ptr list_s, unsigned int s_change, int64_vector_srcptr s,
     list_int64_vector_index_srcptr list_vec, unsigned int index_vec,
     ideal_1_srcptr r, sieving_bound_srcptr H, MAYBE_UNUSED mat_Z_srcptr matrix,
-    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED uint64_t * nb_hit,
+    MAYBE_UNUSED uint64_t * index_old)
 {
   if (s->c[2] < (int64_t)H->h[2]) {
 #ifdef SPACE_SIEVE_CUT_EARLY
@@ -932,8 +1103,10 @@ void space_sieve_1_next_plane(array_ptr array, uint64_t * index_s,
     }
     array->array[* index_s] = array->array[* index_s] - (unsigned char)r->log;
 
-    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s, 1, 1, 1,
-        nb_hit);
+#ifndef MODE_SIEVE_SPACE
+    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s, 1,
+        1, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_SPACE
   }
 }
 
@@ -946,7 +1119,7 @@ void space_sieve_1_plane_sieve(array_ptr array,
     mat_int64_srcptr Mqr, list_int64_vector_srcptr list_SV,
     list_int64_vector_srcptr list_FK, sieving_bound_srcptr H,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED uint64_t * index_old)
 {
   int64_vector_t s_out;
   int64_vector_init(s_out, s->dim);
@@ -987,10 +1160,13 @@ void space_sieve_1_plane_sieve(array_ptr array,
     * index_s = * index_s + index_new;
     array->array[* index_s] = array->array[* index_s] - (unsigned char)r->log;
 
-    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s_out, 1, 1,
-        1, nb_hit);
+#ifndef MODE_SIEVE_SPACE
+    mode_sieve(file_trace_pos, H, * index_s, array, matrix, f, r, s_out, 1,
+        1, 1, nb_hit, index_old);
+#endif // MODE_SIEVE_SPACE
 
   }
+
   int64_vector_set(s, s_out);
   int64_vector_clear(s_out);
   int64_vector_clear(v_new);
@@ -998,17 +1174,16 @@ void space_sieve_1_plane_sieve(array_ptr array,
 
 //TODO: in many function, a v_tmp is used, try to have only one.
 void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H, MAYBE_UNUSED mat_Z_srcptr
-    matrix, MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED uint64_t * nb_hit)
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H, FILE * errstd,
+    MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
+    MAYBE_UNUSED uint64_t * nb_hit)
 {
   //For SPACE_SIEVE_ENTROPY
   MAYBE_UNUSED unsigned int entropy = 0;
   //For SPACE_SIEVE_CUT_EARLY
   MAYBE_UNUSED uint64_t nbhit = 0;
 
-#ifdef ASSERT_SIEVE
-  index_old = 0;
-#endif // ASSERT_SIEVE
+  uint64_t index_old = 0;
 
 #ifdef SPACE_SIEVE_CUT_EARLY
   double expected_hit = (double)(4 * H->h[0] * H->h[1] * H->h[2]) /
@@ -1055,8 +1230,10 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
   //TODO: not necessary to do that.
   array->array[index_s] = array->array[index_s] - (unsigned char)r->log;
 
+#ifndef MODE_SIEVE_SPACE
   mode_sieve(file_trace_pos, H, index_s, array, matrix, f, r, s, 1, 1, 1,
-      nb_hit);
+      nb_hit, &index_old);
+#endif // MODE_SIEVE_SPACE
 
 
   //s is in the list of current point.
@@ -1069,7 +1246,7 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
      * the same z coordinate as s.
      */
     space_sieve_1_plane(array, file_trace_pos, &nbhit, list_s, s, r,
-        list_vec_zero, index_s, H, matrix, f, nb_hit);
+        list_vec_zero, index_s, H, matrix, f, nb_hit, &index_old);
 
     //index_vec: index of the vector we used to go to the other plane in list_s
     unsigned int index_vec = 0;
@@ -1088,7 +1265,8 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
     if (hit) {
       int64_vector_set(s, s_tmp);
       space_sieve_1_next_plane(array, &index_s, file_trace_pos, list_s,
-          s_change, s, list_vec, index_vec, r, H, matrix, f, nb_hit);
+          s_change, s, list_vec, index_vec, r, H, matrix, f, nb_hit,
+          &index_old);
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
     double err_rel = ((double)expected_hit - (double)nbhit) / (double)nbhit;
@@ -1109,11 +1287,12 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
         if (!boolean) {
           ASSERT(boolean == 0);
 
-          fprintf(stderr,
+          fprintf(errstd,
               "# Plane sieve (called by space sieve) does not support this type of Mqr.\n");
-          mat_int64_fprintf_comment(stderr, Mqr);
+          mat_int64_fprintf_comment(errstd, Mqr);
 
           int64_vector_clear(s);
+          int64_vector_clear(s_tmp);
           list_int64_vector_clear(list_s);
           list_int64_vector_index_clear(list_vec);
           list_int64_vector_index_clear(list_vec_zero);
@@ -1127,7 +1306,7 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
 
       space_sieve_1_plane_sieve(array, list_s, &nbhit, &entropy, file_trace_pos,
           s, &index_s, list_vec, list_vec_zero, r, Mqr, list_SV, list_FK, H,
-          matrix, f, nb_hit);
+          matrix, f, nb_hit, &index_old);
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
     else if (!hit) {
@@ -1149,6 +1328,7 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
 }
 
 /* ----- Enumeration algorithm ----- */
+//TODO: this part is porbably broken.
 
 /*
  * Compute sum(m[j][i] * x^j, j > i).
@@ -1320,11 +1500,9 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
           array_int64_vector_index(v_h, H, array->number_element);
         array->array[index] = array->array[index] - (unsigned char)ideal->log;
 
-#ifdef ASSERT_SIEVE
-        index_old = 0;
-#endif // ASSERT_SIEVE
-        mode_sieve(file_trace_pos, H, index, array, matrix, f, ideal, v_h, 1, 1, 1,
-            nb_hit);
+        uint64_t index_old = 0;
+        mode_sieve(file_trace_pos, H, index, array, matrix, f, ideal, v_h, 1, 1,
+            1, nb_hit, &index_old);
       }
       int64_vector_clear(v_h);
       x->c[0] = x->c[0] + 1;
@@ -1351,49 +1529,6 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   list_int64_vector_clear(b_root);
 }
 
-#ifdef SIEVE_U
-void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
-    mpz_vector_srcptr c, sieving_bound_srcptr H)
-{
-  //Not optimal
-  int nul = 1;
-  mpz_t * tmp = (mpz_t * )
-    malloc(sizeof(mpz_t) * ideal->ideal->h->deg);
-  for (int row = 0; row < ideal->ideal->h->deg;
-       row++) {
-    mpz_init(tmp[row]);
-    for (unsigned int col = 0; col < c->dim; col++) {
-      mpz_addmul(tmp[row], Tqr[row][col], c->c[col]);
-    }
-    mpz_mod_ui(tmp[row], tmp[row], ideal->ideal->r);
-    if (mpz_cmp_ui(tmp[row], 0) != 0) {
-      nul = 0;
-    }
-  }
-
-  if (nul == 1) {
-    uint64_t index = 0;
-    index = array_mpz_vector_index(c, H, array->number_element);
-    array->array[index] = array->array[index] -
-      (unsigned char)ideal->log;
-
-#ifdef TRACE_POS
-    if (index == TRACE_POS) {
-      fprintf(file_trace_pos, "The ideal is: ");
-      ideal_u_fprintf(file_trace_pos, ideal, H->t);
-      fprintf(file_trace_pos, "The new value of the norm is %u.\n", array->array[index]);
-    }
-#endif // TRACE_POS
-  }
-
-  for (int row = 0; row < ideal->ideal->h->deg;
-       row++) {
-    mpz_clear(tmp[row]);
-  }
-  free(tmp);
-}
-#endif // SIEVE_U
-
 /*
  *
  *
@@ -1404,9 +1539,9 @@ void sieve_u(array_ptr array, mpz_t ** Tqr, ideal_u_srcptr ideal,
  * f: the polynomial that defines the number field.
  */
 void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
-    mat_Z_srcptr matrix,
-    factor_base_srcptr fb, sieving_bound_srcptr H,
-    MAYBE_UNUSED mpz_poly_srcptr f)
+    mat_Z_srcptr matrix, factor_base_srcptr fb, sieving_bound_srcptr H,
+    MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * outstd, FILE * errstd,
+    uint64_t sieve_start, MAYBE_UNUSED ideal_spq_srcptr special_q)
 {
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
@@ -1428,16 +1563,38 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   time_line_sieve = seconds();
 #endif // TIME_SIEVES
 
+  uint64_t i = 0;
+  while (fb->factor_base_1[i]->ideal->r < sieve_start) {
+    i++;
+  }
+
+#ifdef Q_BELOW_FBB
+  uint64_t q = ideal_spq_get_q(special_q);
+  mpz_poly_t g;
+  mpz_poly_init(g, ideal_spq_get_deg_g(special_q));
+  ideal_spq_get_g(g, special_q);
+#endif // Q_BELOW_FBB
+
   /* --- Line sieve --- */
 
-  uint64_t i = 0;
   uint64_t line_sieve_stop = 2 * (uint64_t) H->h[0];
 
   while (i < fb->number_element_1 &&
       fb->factor_base_1[i]->ideal->r < line_sieve_stop) {
+
+#ifdef Q_BELOW_FBB
+    if (fb->factor_base_1[i]->ideal->r == q) {
+      if (!mpz_poly_cmp(g, fb->factor_base_1[i]->ideal->h)) {
+        i++;
+        continue;
+      }
+    }
+#endif // Q_BELOW_FBB
+
     ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef ASSERT_SIEVE
+    printf("# Line sieve.\n");
     printf("# ");
     ideal_fprintf(stdout, r->ideal);
     /*fprintf(stdout, "# Tqr = [");*/
@@ -1445,7 +1602,6 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     /*fprintf(stdout, "%" PRIu64 ", ", Tqr[i]);*/
     /*}*/
     /*fprintf(stdout, "%" PRIu64 "]\n", Tqr[H->t - 1]);*/
-    printf("# Line sieve.\n");
 #endif // ASSERT_SIEVE
 
     //Compute the true Tqr
@@ -1474,6 +1630,8 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     }
 #endif // NDEBUG
 
+    uint64_t index_old = 0;
+
     if (index + 1 != c->dim) {
 
       int64_vector_setcoordinate(c, index + 1, c->c[index + 1] - 1);
@@ -1481,6 +1639,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
       //Compute ci = (-Tqr[index])^(-1) * (Tqr[index + 1]*c[1] + …) mod r.
       //TODO: modify that.
       int64_t ci = 0;
+
       for (unsigned int j = index + 1; j < H->t; j++) {
         ci = ci + (int64_t)pseudo_Tqr[j] * c->c[j];
         if (ci >= (int64_t) r->ideal->r) {
@@ -1507,7 +1666,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
       for (uint64_t j = 0; j < number_c; j++) {
         unsigned int pos = int64_vector_add_one_i(c, index + 1, H);
         line_sieve_1(array, file_trace_pos, c, pseudo_Tqr, r, H, index,
-            number_c_l, &ci, pos, matrix, f, &number_hit);
+            number_c_l, &ci, pos, matrix, f, &number_hit, &index_old);
       }
     } else {
 #ifndef NDEBUG
@@ -1521,8 +1680,8 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
       for (unsigned int i = 0; i < index; i++) {
         number_c_l = number_c_l * (2 * H->h[i]);
       }
-      line_sieve_ci(array, file_trace_pos, c, r, 0, H, index, number_c_l,  matrix, f,
-          &number_hit);
+      line_sieve_ci(array, file_trace_pos, c, r, 0, H, index, number_c_l,
+          matrix, f, &number_hit, &index_old);
     }
 
 #ifdef NUMBER_HIT
@@ -1555,12 +1714,26 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   mat_int64_t Mqr;
   mat_int64_init(Mqr, H->t, H->t);
 
-  uint64_t plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
+  uint64_t plane_sieve_stop = fb->number_element_1;
+  if (H->t == 3) {
+    plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
+  }
   while (i < fb->number_element_1 &&
       fb->factor_base_1[i]->ideal->r < plane_sieve_stop) {
+
+#ifdef Q_BELOW_FBB
+    if (fb->factor_base_1[i]->ideal->r == q) {
+      if (!mpz_poly_cmp(g, fb->factor_base_1[i]->ideal->h)) {
+        i++;
+        continue;
+      }
+    }
+#endif // Q_BELOW_FBB
+
     ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef ASSERT_SIEVE
+    printf("# Plane sieve.\n");
     printf("# ");
     ideal_fprintf(stdout, r->ideal);
     /*fprintf(stdout, "# Tqr = [");*/
@@ -1568,7 +1741,6 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     /*fprintf(stdout, "%" PRIu64 ", ", Tqr[i]);*/
     /*}*/
     /*fprintf(stdout, "%" PRIu64 "]\n", Tqr[H->t - 1]);*/
-    printf("# Plane sieve.\n");
 #endif // ASSERT_SIEVE
 
     //Compute the true Tqr
@@ -1587,20 +1759,18 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
-    ASSERT(H->t == 3);
-
     compute_Mqr_1(Mqr, Tqr, H->t, r);
 
     if (Mqr->coeff[1][1] != 1) {
       plane_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit);
     } else {
-      fprintf(stderr, "# Tqr = [");
+      fprintf(errstd, "# Tqr = [");
       for (unsigned int i = 0; i < H->t - 1; i++) {
-        fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
+        fprintf(errstd, "%" PRIu64 ", ", Tqr[i]);
       }
-      fprintf(stderr, "%" PRIu64 "]\n", Tqr[H->t - 1]);
-      fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
-      mat_int64_fprintf_comment(stderr, Mqr);
+      fprintf(errstd, "%" PRIu64 "]\n", Tqr[H->t - 1]);
+      fprintf(errstd, "# Plane sieve does not support this type of Mqr.\n");
+      mat_int64_fprintf_comment(errstd, Mqr);
     }
 
 #ifdef NUMBER_HIT
@@ -1628,9 +1798,20 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #endif // TIME_SIEVES
 
   while (i < fb->number_element_1) {
+
+#ifdef Q_BELOW_FBB
+    if (fb->factor_base_1[i]->ideal->r == q) {
+      if (!mpz_poly_cmp(g, fb->factor_base_1[i]->ideal->h)) {
+        i++;
+        continue;
+      }
+    }
+#endif // Q_BELOW_FBB
+
     ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef ASSERT_SIEVE
+    printf("# Space sieve.\n");
     printf("# ");
     ideal_fprintf(stdout, r->ideal);
     /*fprintf(stdout, "# Tqr = [");*/
@@ -1638,7 +1819,6 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     /*fprintf(stdout, "%" PRIu64 ", ", Tqr[i]);*/
     /*}*/
     /*fprintf(stdout, "%" PRIu64 "]\n", Tqr[H->t - 1]);*/
-    printf("# Space sieve.\n");
 #endif // ASSERT_SIEVE
 
     //Compute the true Tqr
@@ -1661,26 +1841,18 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
     compute_Mqr_1(Mqr, Tqr, H->t, r);
 
-#ifdef ENUM_LATTICE
-    enum_lattice(array, file_trace_pos, r, Mqr, H, f, matrix);
-#else // ENUM_LATTICE
     if (Mqr->coeff[1][1] != 1) {
-#ifdef SPACE_SIEVE
-      space_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit);
-#else
-      plane_sieve_1(array, r, Mqr, H, matrix, f);
-#endif // SPACE_SIEVE
+      space_sieve_1(array, file_trace_pos, r, Mqr, H, errstd, matrix, f,
+          &number_hit);
     } else {
-      fprintf(stderr, "# Tqr = [");
+      fprintf(errstd, "# Tqr = [");
       for (unsigned int i = 0; i < H->t - 1; i++) {
-        fprintf(stderr, "%" PRIu64 ", ", Tqr[i]);
+        fprintf(errstd, "%" PRIu64 ", ", Tqr[i]);
       }
-      fprintf(stderr, "%" PRIu64 "]\n", Tqr[H->t - 1]);
-      fprintf(stderr, "# Space sieve does not support this type of Mqr.\n");
-      mat_int64_fprintf_comment(stderr, Mqr);
+      fprintf(errstd, "%" PRIu64 "]\n", Tqr[H->t - 1]);
+      fprintf(errstd, "# Space sieve does not support this type of Mqr.\n");
+      mat_int64_fprintf_comment(errstd, Mqr);
     }
-#endif // ENUM_LATTICE
-
 
 #ifdef NUMBER_HIT
     printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
@@ -1705,7 +1877,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   free(Tqr);
 
 #ifdef TIME_SIEVES
-  printf("# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(outstd, "# Perform line sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_line_sieve, ideal_line_sieve,
       time_line_sieve / (double)ideal_line_sieve);
   double time_per_ideal = 0.0;
@@ -1714,16 +1886,20 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   } else {
     time_per_ideal = 0.0;
   }
-  printf("# Perform plane sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(outstd, "# Perform plane sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_plane_sieve, ideal_plane_sieve, time_per_ideal);
   if (ideal_space_sieve != 0) {
     time_per_ideal = time_space_sieve / (double)ideal_space_sieve;
   } else {
     time_per_ideal = 0.0;
   }
-  printf("# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
+  fprintf(outstd, "# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_space_sieve, ideal_space_sieve, time_per_ideal);
 #endif // TIME_SIEVES
+
+#ifdef Q_BELOW_FBB
+  mpz_poly_clear(g);
+#endif // Q_BELOW_FBB
 }
 
 #if 0
@@ -1841,11 +2017,26 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
   uint64_array_realloc(indexes, ind);
 }
 
+#ifdef PRINT_ARRAY_NORM
+void number_norm(FILE * file_array_norm, array_srcptr array, unsigned char max)
+{
+  uint64_t * tab = (uint64_t *) malloc(sizeof(uint64_t) * max);
+  memset(tab, 0, sizeof(uint64_t) * max);
+  for (uint64_t i = 0; i < array->number_element; i++) {
+    tab[array->array[i]] = tab[array->array[i]] + 1;
+  }
+  for (unsigned int i = 0; i < (unsigned int) max; i++) {
+    fprintf(file_array_norm, "%u: %" PRIu64 "\n", i, tab[i]);
+  }
+  free(tab);
+}
+#endif // PRINT_ARRAY_NORM
+
 /* ----- Usage and main ----- */
 
 void declare_usage(param_list pl)
 {
-  param_list_decl_usage(pl, "H", "the sieving region");
+  param_list_decl_usage(pl, "H", "sieving region for c");
   param_list_decl_usage(pl, "V", "number of number field");
   param_list_decl_usage(pl, "fbb", "factor base bounds");
   param_list_decl_usage(pl, "thresh", "thresholds");
@@ -1854,7 +2045,11 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "q_range", "range of the special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
   param_list_decl_usage(pl, "fb", "path to factor bases");
-  param_list_decl_usage(pl, "main", "if MNFS-CM, defines the main side");
+  param_list_decl_usage(pl, "main", "if MNFS-CM, main side");
+  param_list_decl_usage(pl, "out", "path to output file");
+  param_list_decl_usage(pl, "err", "path to error file");
+  param_list_decl_usage(pl, "start", "value of first ideal r considered");
+  param_list_decl_usage(pl, "Ha", "sieving region for a");
 }
 
 /*
@@ -1877,7 +2072,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
     uint64_t ** q_range, unsigned char ** thresh, unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
-    int * main_side, double ** log2_base)
+    int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
+    uint64_t ** sieve_start, sieving_bound_ptr Ha)
 {
   param_list pl;
   param_list_init(pl);
@@ -1907,10 +2103,23 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   int * r;
   param_list_parse_int_list_size(pl, "H", &r, &t, ".,");
   ASSERT(t > 2);
-  ASSERT(t == 3); // TODO: remove as soon as possible.
   sieving_bound_init(H, t);
   for (unsigned int i = 0; i < t; i++) {
     sieving_bound_set_hi(H, i, (unsigned int) 1 << r[i]);
+  }
+
+  sieving_bound_init(Ha, t);
+  t = 0;
+  param_list_parse_int_list_size(pl, "Ha", &r, &t, ".,");
+  if (!t) {
+    for (unsigned int i = 0; i < H->t; i++) {
+      sieving_bound_set_hi(Ha, i, 2);
+    }
+  } else {
+    ASSERT(t == H->t);
+    for (unsigned int i = 0; i < t; i++) {
+      sieving_bound_set_hi(Ha, i, (unsigned int) 1 << r[i]);
+    }
   }
   free(r);
 
@@ -1930,6 +2139,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * fb = (factor_base_t *) malloc(sizeof(factor_base_t) * (* V));
   * lpb = (unsigned int *) malloc(sizeof(unsigned int) * (* V));
   * q_range = (uint64_t *) malloc(sizeof(uint64_t) * 2);
+  * sieve_start = (uint64_t *) malloc(sizeof(uint64_t) * (* V));
   * log2_base = (double *) malloc(sizeof(double) * (* V));
 
   param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
@@ -1937,8 +2147,24 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   param_list_parse_uint_list(pl, "lpb", * lpb, (size_t) * V, ",");
 
   /*for (unsigned int i = 0; i < * V; i++) {*/
-    /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
+  /*ASSERT(mpz_cmp_ui((*lpb)[i], (*fbb)[i]) >= 0);*/
   /*}*/
+
+  path[0] = '\0';
+  param_list_parse_string(pl, "out", path, size_path);
+  if (path[0] == '\0') {
+    * outstd = stdout;
+  } else {
+    * outstd = fopen(path, "w");
+  }
+
+  path[0] = '\0';
+  param_list_parse_string(pl, "err", path, size_path);
+  if (path[0] == '\0') {
+    * errstd = stderr;
+  } else {
+    * errstd = fopen(path, "w");
+  }
 
   param_list_parse_uchar_list(pl, "thresh", * thresh, (size_t) * V, ",");
 
@@ -1951,7 +2177,12 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   param_list_parse_uint64_and_uint64(pl, "q_range", * q_range, ",");
 
+#ifndef Q_BELOW_FBB
   ASSERT((* q_range)[0] > fbb[0][* q_side]);
+#else // Q_BELOW_FBB
+  fprintf(* outstd,
+      "# Special q may be under fbb.\n");
+#endif // Q_BELOW_FBB
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
   //TODO: constant here is hard-coded.
@@ -1990,23 +2221,35 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   FILE * file_r;
   param_list_parse_string(pl, "fb", path, size_path);
   file_r = fopen(path, "r");
-  read_factor_base(file_r, *fb, *fbb, *lpb, f, *log2_base);
+  read_factor_base(file_r, *fb, *fbb, *lpb, f, *log2_base, H->t);
   fclose(file_r);
-  printf("# Time to read factor bases: %f.\n", seconds() - sec);
+  fprintf(* outstd,
+      "# Time to read factor bases: %f.\n", seconds() - sec);
 
   array_init(array, number_element);
 
-  mat_Z_init(matrix, t, t);
+  mat_Z_init(matrix, H->t, H->t);
 
   * main_side = -1;
-  //TODO: error in valgrind, because of no main.
   param_list_parse_int(pl, "main", main_side);
+
+  for (unsigned int i = 0; i < * V; i++) {
+    (* sieve_start)[i] = 2;
+  }
+  param_list_parse_uint64_list(pl, "start", * sieve_start, (size_t) * V, ",");
+
+#ifndef NDEBUG
+  for (unsigned int i = 0; i < * V; i++) {
+    ASSERT((* sieve_start)[i] < (*fbb)[i]);
+  }
+#endif // NDEBUG
+
   param_list_clear(pl);
 }
 
 /*
-  The main.
-*/
+   The main.
+   */
 int main(int argc, char * argv[])
 {
   unsigned int V;
@@ -2023,31 +2266,15 @@ int main(int argc, char * argv[])
   uint64_t q;
   int main_side;
   double * log2_base;
+  FILE * outstd;
+  FILE * errstd;
+  uint64_t * sieve_start;
+  sieving_bound_t Ha;
 
-  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range, &thresh, &lpb,
-      array, matrix, &q_side, &V, &main_side, &log2_base);
-
-#ifdef PRINT_PARAMETERS
-  printf("# H =\n");
-  sieving_bound_fprintf_detailed_comment(stdout, H);
-  printf("# V = %u\n", V);
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# fbb%u = %" PRIu64 "\n", i, fbb[i]);
-  }
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# thresh%u = %u\n", i, (unsigned int)thresh[i]);
-  }
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# lpb%u = %u\n", i, lpb[i]);
-  }
-  for (unsigned int i = 0; i < V; i++) {
-    printf("# f%u = ", i);
-    mpz_poly_fprintf(stdout, f[i]);
-  }
-  printf("# q_min = %" PRIu64 "\n", q_min);
-  printf("# q_max = %" PRIu64 "\n", q_min);
-  printf("# q_side = %u\n", q_side);
-#endif // PRINT_PARAMETERS
+  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
+      &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &log2_base,
+      &outstd, &errstd,
+      &sieve_start, Ha);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2081,7 +2308,13 @@ int main(int argc, char * argv[])
   file_trace_pos = NULL;
 #endif // TRACE_POS
 
-  ASSERT(q_range[0] >= fbb[q_side]);
+#ifdef PRINT_ARRAY_NORM
+  FILE * file_array_norm;
+  file_array_norm = fopen("ARRAY_NORM.txt", "w+");
+  fprintf(file_array_norm, "H: ");
+  sieving_bound_fprintf(file_array_norm, H);
+#endif // PRINT_ARRAY_NORM
+
   gmp_randstate_t state;
   mpz_t a;
   mpz_poly_factor_list l;
@@ -2093,6 +2326,14 @@ int main(int argc, char * argv[])
   uint64_t nb_rel = 0;
   double total_time = 0.0;
   uint64_t spq_tot = 0;
+
+  mpz_vector_t skewness;
+  mpz_vector_init(skewness, Ha->t);
+  mpz_set_ui(skewness->c[0], 1);
+  for (unsigned int i = 1; i < Ha->t; i++) {
+    mpz_set_si(skewness->c[i], Ha->h[0] / Ha->h[i]);
+  }
+  sieving_bound_clear(Ha);
 
   prime_info pi;
   prime_info_init (pi);
@@ -2111,7 +2352,7 @@ int main(int argc, char * argv[])
     mpz_set_si(a, q);
     mpz_poly_factor(l, f->pols[q_side], a, state);
 
-    for (int i = 0; i < l->size ; i++) {
+    for (int i = 0; i < l->size; i++) {
 
       if (l->factors[i]->f->deg < deg_bound_factorise) {
         if (l->factors[i]->f->deg == 1) {
@@ -2122,8 +2363,8 @@ int main(int argc, char * argv[])
           ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 1);
         }
 
-        printf("# Special-q: q: %" PRIu64 ", g: ", q);
-        mpz_poly_fprintf(stdout, l->factors[i]->f);
+        fprintf(outstd, "# Special-q: q: %" PRIu64 ", g: ", q);
+        mpz_poly_fprintf(outstd, l->factors[i]->f);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "Special-q: q: %" PRIu64 ", g: ", q);
@@ -2142,27 +2383,31 @@ int main(int argc, char * argv[])
         mat_Z_fprintf(file_trace_pos, matrix);
 #endif // TRACE_POS
 
+#ifndef SKEW_LLL_SPQ
         mat_Z_LLL_transpose(matrix, matrix);
+#else // SKEW_LLL_SPQ
+        mat_Z_skew_LLL(matrix, matrix, skewness);
+#endif // SKEW_LLL_SPQ
 
-        /* /\* */
-        /*   TODO: continue here. */
-        /*   If the last coefficient of the last vector is negative, we do not */
-        /*    sieve in the good direction. We therefore take the opposite vector */
-        /*    because we want that a = MqLLL * c, with c in the sieving region */
-        /*    has the last coordinate positive. */
-        /* *\/ */
-        /* if (mpz_cmp_ui(matrix->coeff[matrix->NumRows] */
-        /*                [matrix->NumCols], 0) < 0) { */
-        /*   for (unsigned int rows = 1; rows <= matrix->NumRows; rows++) { */
-        /*     mpz_mul_si(matrix->coeff[rows][matrix->NumCols], */
-        /*                matrix->coeff[rows][matrix->NumCols], -1); */
-        /*   } */
-        /* } */
+        /*
+         * TODO: continue here.
+         * If the last coefficient of the last vector is negative, we do not
+         * sieve in the good direction. We therefore take the opposite vector
+         * because we want that a = MqLLL * c, with c in the sieving region
+         * has the last coordinate positive.
+         */
+
+        reogranize_MqLLL(matrix);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "MqLLL:\n");
         mat_Z_fprintf(file_trace_pos, matrix);
 #endif // TRACE_POS
+
+#ifdef PRINT_ARRAY_NORM
+          fprintf(file_array_norm, "MqLLL:\n");
+          mat_Z_fprintf(file_array_norm, matrix);
+#endif // PRINT_ARRAY_NORM
 
         for (unsigned int j = 0; j < V; j++) {
 #ifdef TRACE_POS
@@ -2171,7 +2416,7 @@ int main(int argc, char * argv[])
 
           sec = seconds();
           uint64_array_init(indexes[j], array->number_element);
-          array_set_all_elements_max(array);
+          array_set_all_elements(array, UCHAR_MAX);
 #ifndef OLD_NORM
           init_norm(array, max_norm + j, file_trace_pos, H, matrix, f->pols[j],
               ideal_spq_get_log(special_q) / log2_base[j], !(j ^ q_side),
@@ -2180,6 +2425,13 @@ int main(int argc, char * argv[])
           init_norm(array, file_trace_pos, pre_compute[j], H, matrix,
               f->pols[j], special_q, !(j ^ q_side));
 #endif // OLD_NORM
+
+#ifdef PRINT_ARRAY_NORM
+          fprintf(file_array_norm, "f%u: ", j);
+          mpz_poly_fprintf(file_array_norm, f->pols[j]);
+          number_norm(file_array_norm, array, max_norm[j]);
+          fprintf(file_array_norm, "********************\n");
+#endif // PRINT_ARRAY_NORM
 
           time[j][0] = seconds() - sec;
 
@@ -2190,7 +2442,8 @@ int main(int argc, char * argv[])
 #endif // ASSERT_NORM
 
           sec = seconds();
-          special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j]);
+          special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j],
+              outstd, errstd, sieve_start[j], special_q);
           time[j][1] = seconds() - sec;
           sec = seconds();
           find_index(indexes[j], array,
@@ -2203,13 +2456,15 @@ int main(int argc, char * argv[])
         }
 
         for (unsigned int j = 0; j < V; j++) {
-          printf("# Log 2 of the maximum of the norms %u: %u.\n", j,
+          fprintf(outstd,
+              "# Log 2 of the maximum of the norms %u: %u.\n", j,
               max_norm[j]);
         }
 
         sec = seconds();
         nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
-            matrix, f->pols, H, V, special_q, q_side, main_side);
+            matrix, f->pols, H, V, special_q, q_side, main_side,
+            outstd);
         sec_cofact = seconds() - sec;
 
         for (unsigned j = 0; j < V; j++) {
@@ -2217,35 +2472,52 @@ int main(int argc, char * argv[])
           uint64_array_clear(indexes[j]);
         }
 
-        printf("# Time for this special-q: %fs.\n", seconds() - sec_tot);
+        fprintf(outstd,
+            "# Time for this special-q: %fs.\n", seconds() - sec_tot);
         total_time += (seconds() - sec_tot);
         spq_tot++;
         for (unsigned int j = 0; j < V; j++) {
-          printf("# Time to init norm %u: %fs.\n", j, time[j][0]);
-          printf("# Time to sieve %u: %fs.\n", j, time[j][1]);
-          printf("# Time to find indexes %u: %fs.\n", j, time [j][2]);
+          fprintf(outstd, "# Time to init norm %u: %fs.\n", j,
+              time[j][0]);
+          fprintf(outstd, "# Time to sieve %u: %fs.\n", j, time[j][1]);
+          fprintf(outstd, "# Time to find indexes %u: %fs.\n", j,
+              time [j][2]);
         }
 
-        printf("# Time to factorize: %fs.\n", sec_cofact);
+        fprintf(outstd, "# Time to factorize: %fs.\n", sec_cofact);
 
-        printf("# ----------------------------------------\n");
+        fprintf(outstd,
+            "# ----------------------------------------\n");
+        fprintf(errstd,
+            "# ----------------------------------------\n");
+        fflush(outstd);
+        fflush(errstd);
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "----------------------------------------\n");
 #endif // TRACE_POS
 
+#ifdef PRINT_ARRAY_NORM
+        fprintf(file_array_norm, "----------------------------------------\n");
+        fflush(file_array_norm);
+#endif // PRINT_ARRAY_NORM
+
+        ideal_spq_clear(special_q, H->t);
       }
     }
-
-    ideal_spq_clear(special_q, H->t);
   }
 
-  printf("# Total time: %fs.\n", total_time);
-  printf("# Total number of relations: %" PRIu64 ".\n", nb_rel);
-  printf("# Total number of special-q: %" PRIu64 ".\n", spq_tot);
-  printf("# Time per special-q: %fs.\n", total_time / (double)spq_tot);
-  printf("# Time per relation: %fs.\n", total_time / (double)nb_rel);
-  printf("# Relations per special-q: %f.\n", (double)nb_rel / (double)spq_tot);
+  fprintf(outstd, "# Total time: %fs.\n", total_time);
+  fprintf(outstd, "# Total number of relations: %" PRIu64 ".\n",
+      nb_rel);
+  fprintf(outstd, "# Total number of special-q: %" PRIu64 ".\n",
+      spq_tot);
+  fprintf(outstd, "# Time per special-q: %fs.\n",
+      total_time / (double)spq_tot);
+  fprintf(outstd, "# Time per relation: %fs.\n",
+      total_time / (double)nb_rel);
+  fprintf(outstd, "# Relations per special-q: %f.\n",
+      (double)nb_rel / (double)spq_tot);
 
   mpz_poly_factor_list_clear(l);
   gmp_randclear(state);
@@ -2255,6 +2527,10 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
   fclose(file_trace_pos);
 #endif // TRACE_POS
+
+#ifdef PRINT_ARRAY_NORM
+  fclose(file_array_norm);
+#endif // PRINT_ARRAY_NORM
 
   mat_Z_clear(matrix);
   for (unsigned int i = 0; i < V; i++) {
@@ -2274,6 +2550,7 @@ int main(int argc, char * argv[])
   array_clear(array);
   free(lpb);
   free(fb);
+  free(sieve_start);
   sieving_bound_clear(H);
   free(fbb);
   free(thresh);
@@ -2281,6 +2558,9 @@ int main(int argc, char * argv[])
   free(log2_base);
   cado_poly_clear(f);
   free_saved_chains();
+  fclose(outstd);
+  fclose(errstd);
+  mpz_vector_clear(skewness);
 
   return 0;
 }

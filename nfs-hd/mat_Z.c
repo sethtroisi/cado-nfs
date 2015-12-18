@@ -3,6 +3,7 @@
 #include "macros.h"
 #include "mat_Z.h"
 #include "lll.h"
+#include "mpz_vector.h"
 
 void mat_Z_init(mat_Z_ptr matrix, unsigned int NumRows, unsigned int NumCols)
 {
@@ -94,6 +95,15 @@ void mat_Z_set_coeff_uint64(mat_Z_ptr matrix, uint64_t i, unsigned int row,
   ASSERT(1 <= col);
 
   mpz_set_ui(matrix->coeff[row][col], i);
+}
+
+void mat_Z_set_zero(mat_Z_ptr matrix)
+{
+  for (unsigned int i = 0; i < matrix->NumRows + 1; i++) {
+    for (unsigned int j = 0; j < matrix->NumCols + 1; j++) {
+      mpz_set_ui(matrix->coeff[i][j], 0);
+    }
+  }
 }
 
 void mat_Z_clear(mat_Z_ptr matrix)
@@ -321,4 +331,76 @@ void mat_int64_to_mat_Z(mat_Z_ptr mat_Z, mat_int64_srcptr mat_int)
       mpz_set_si(mat_Z->coeff[row][col], mat_int->coeff[row][col]);
     }
   }
+}
+
+static int compare_last(const void * p0, const void * p1)
+{
+  const mpz_vector_t * v0 = (const mpz_vector_t * ) p0;
+  const mpz_vector_t * v1 = (const mpz_vector_t * ) p1;
+
+  return mpz_cmp((*v0)->c[(*v0)->dim - 1], (*v1)->c[(*v1)->dim - 1]);
+}
+
+void mat_Z_sort_last(mat_Z_ptr M_out, mat_Z_srcptr M_in)
+{
+  mpz_vector_t * v = (mpz_vector_t *) malloc(sizeof(mpz_vector_t) *
+      M_in->NumCols);
+  for (unsigned int col = 1; col <= M_in->NumCols; col++) {
+    mpz_vector_init(v[col - 1], M_in->NumRows);
+    for (unsigned int row = 1; row <= M_in->NumRows; row++) {
+      mpz_set(v[col - 1]->c[row - 1], M_in->coeff[row][col]);
+    }
+  }
+
+  qsort(v, M_in->NumCols, sizeof(v[0]), compare_last);
+
+  for (unsigned int col = 1; col <= M_in->NumCols; col++) {
+    for (unsigned int row = 1; row <= M_in->NumRows; row++) {
+      mpz_set(M_out->coeff[row][col], v[col - 1]->c[row - 1]);
+    }
+  }
+
+  for (unsigned int col = 0; col < M_in->NumCols; col++) {
+    mpz_vector_clear(v[col]);
+  }
+  free(v);
+}
+
+void mat_Z_set_diag(mat_Z_ptr M, mpz_vector_srcptr diag)
+{
+  ASSERT(diag->dim == M->NumCols);
+  ASSERT(diag->dim == M->NumRows);
+
+  mat_Z_set_zero(M);
+
+  for (unsigned int i = 1; i <= diag->dim; i++) {
+    mpz_set(M->coeff[i][i], diag->c[i]);
+  }
+}
+
+void mat_Z_skew_LLL(mat_Z_ptr MSLLL, mat_Z_srcptr M_root,
+    mpz_vector_srcptr skewness)
+{
+  ASSERT(skewness->dim == M_root->NumCols);
+  ASSERT(M_root->NumRows == M_root->NumCols);
+  ASSERT(MSLLL->NumRows == M_root->NumCols);
+  ASSERT(MSLLL->NumRows == M_root->NumCols);
+
+  mat_Z_t I_s;
+  mat_Z_init(I_s, M_root->NumRows, M_root->NumCols);
+  mat_Z_set_diag(I_s, skewness);
+
+  mat_Z_t M;
+  mat_Z_init(M, M_root->NumRows, M_root->NumCols);
+  mat_Z_mul_mat_Z(M, I_s, M_root);
+
+  mat_Z_t U;
+  mat_Z_init(U, M_root->NumRows, M_root->NumCols);
+  mat_Z_LLL_unimodular_transpose(U, M);
+
+  mat_Z_mul_mat_Z(MSLLL, M_root, U);
+
+  mat_Z_clear(U);
+  mat_Z_clear(I_s);
+  mat_Z_clear(M);
 }

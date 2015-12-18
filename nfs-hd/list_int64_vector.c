@@ -120,7 +120,7 @@ int int64_vector_in_polytop_list_int64_vector(int64_vector_srcptr vec,
       ASSERT(int64_vector_equal(vec, list->v[i]) == 0);
 
       return 1;
-    }  
+    }
   }
 
   int c = 0;
@@ -142,7 +142,7 @@ static int compare_last(const void * p0, const void * p1)
 {
   const int64_vector_t * v0 = (const int64_vector_t * ) p0;
   const int64_vector_t * v1 = (const int64_vector_t * ) p1;
-  
+
   return (int)((*v0)->c[(*v0)->dim - 1] - (*v1)->c[(*v1)->dim - 1]);
 }
 

@@ -47,6 +47,7 @@ void ideal_1_set_part(ideal_1_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   ASSERT(mpz_cmp_ui(mpz_poly_lc_const(h), 1) == 0);
 
   mpz_poly_set(ideal->ideal->h, h);
+
   //if r == 0, Tr is not created.
   if (ideal->ideal->r == 0) {
     ideal->Tr = (mpz_t * ) malloc(sizeof(mpz_t) * (t - 1));
@@ -206,7 +207,7 @@ void ideal_u_set_element(ideal_u_ptr ideal, uint64_t r, mpz_poly_srcptr h,
   }
   for (int row = 0; row < h->deg; row++) {
     for (int col = 0; col < ((int)t - h->deg); col++) {
-      mpz_set(ideal->Tr[row][col], Tr[((int)t-h->deg) * row + col]);
+      mpz_set(ideal->Tr[row][col], Tr[((int)t - h->deg) * row + col]);
     }
   }
   ideal->log = log;
@@ -472,4 +473,17 @@ int ideal_spq_get_deg_g(ideal_spq_srcptr ideal)
     deg_g = ideal->ideal_pr->ideal->h->deg;
   }
   return deg_g;
+}
+
+void ideal_spq_get_g(mpz_poly_ptr g, ideal_spq_srcptr ideal)
+{
+  if (ideal->type == 0) {
+    mpz_poly_set(g, ideal->ideal_1->ideal->h);
+  } else if (ideal->type == 1) {
+    mpz_poly_set(g, ideal->ideal_u->ideal->h);
+  } else {
+    ASSERT(ideal->type == 2);
+
+    mpz_poly_set(g, ideal->ideal_pr->ideal->h);
+  }
 }

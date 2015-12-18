@@ -23,9 +23,8 @@ from datetime import datetime
 import re
 import time
 
-cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@"
-if re.search("/", cado_python_libs_path):
-    sys.path.append(cado_python_libs_path)
+if re.search("^/", "@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@"):
+    sys.path.append("@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@")
 
 from workunit import Workunit
 if sys.version_info.major == 3:
@@ -1028,9 +1027,10 @@ class WuAccess(object): # {
                 if not PRINTED_CANCELLED_WARNING:
                     logger.warning("If workunits get cancelled due to timeout "
                             "even though the clients are still processing them, "
-                            "consider increasing the wutimeout parameter or "
+                            "consider increasing the tasks.wutimeout parameter or "
                             "decreasing the range covered in each workunit, "
-                            "i.e., the adrange or qrange parameters.")
+                            "i.e., the tasks.polyselect.adrange or "
+                            "tasks.sieve.qrange parameters.")
                     PRINTED_CANCELLED_WARNING = True
             raise
         if DEBUG > 0:

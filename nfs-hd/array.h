@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "int64_vector.h"
 
-/* 
+/*
  * Array is used to store the value of norm. An index correnspond to an element
  * (a_0, a_1, …, a_{t-1}) with t the dimension of the lattice we consider.
  */
@@ -28,15 +28,12 @@ typedef const s_array_t * array_srcptr;
  */
 void array_init(array_ptr array, uint64_t number_element);
 
-static inline void array_set_all_elements_min(array_ptr array)
+/*
+ * Set all the alement of array to val.
+ */
+static inline void array_set_all_elements(array_ptr array, unsigned char val)
 {
-  memset(array->array, 0, sizeof(unsigned char) * array->number_element);
-}
-
-static inline void array_set_all_elements_max(array_ptr array)
-{
-  memset(array->array, UCHAR_MAX,
-      sizeof(unsigned char) * array->number_element);
+  memset(array->array, val, sizeof(unsigned char) * array->number_element);
 }
 
 /*
@@ -94,7 +91,7 @@ void array_index_mpz_vector(mpz_vector_ptr v, uint64_t index,
 
 /*
  * Return the index associated with a vector (mpz_vector).
- * 
+ *
  * v: the vector.
  * H: the sieving bound.
  * number_element: number of element in the sieving region, only used in the

@@ -305,7 +305,16 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
   }
 #endif // NDEBUG
   ASSERT(v2->c[1] == 0);
-  ASSERT(v2->c[2] == 1);
+  unsigned int v2_assert = 0;
+  for (unsigned int i = 1; i < v2->dim; i++) {
+    if (v2->c[i] == 1) {
+      v2_assert++;
+    } else {
+      ASSERT(v2_assert < 2);
+      ASSERT(v2->c[i] == 0);
+    }
+  }
+  ASSERT(v2_assert == 1);
 
   int64_vector_t u;
   int64_vector_init(u, v0_root->dim);
@@ -333,7 +342,9 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
   for (unsigned int i = 0; i < 2; i++) {
     u->c[i] = a * v0->c[i] + b * v1->c[i];
   }
-  u->c[2] = 0;
+  for (unsigned int i = 2; i < u->dim; i++) {
+    u->c[i] = 0;
+  }
   list_int64_vector_add_int64_vector(SV, u);
 
   //Build a triangle around the projection of v2 in the plane z = 0.
@@ -341,13 +352,17 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] - v0->c[i];
     }
-    u->c[2] = 0;
+    for (unsigned int i = 2; i < u->dim; i++) {
+      u->c[i] = 0;
+    }
     list_int64_vector_add_int64_vector(SV, u);
   } else {
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] + v0->c[i];
     }
-    u->c[2] = 0;
+    for (unsigned int i = 2; i < u->dim; i++) {
+      u->c[i] = 0;
+    }
     list_int64_vector_add_int64_vector(SV, u);
   }
 
@@ -355,13 +370,17 @@ void SV4(list_int64_vector_ptr SV, int64_vector_srcptr v0_root,
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] - v1->c[i];
     }
-    u->c[2] = 0;
+    for (unsigned int i = 2; i < u->dim; i++) {
+      u->c[i] = 0;
+    }
     list_int64_vector_add_int64_vector(SV, u);
   } else {
     for (unsigned int i = 0; i < 2; i++) {
       u->c[i] = SV->v[0]->c[i] + v1->c[i];
     }
-    u->c[2] = 0;
+    for (unsigned int i = 2; i < u->dim; i++) {
+      u->c[i] = 0;
+    }
     list_int64_vector_add_int64_vector(SV, u);
   }
 
@@ -436,7 +455,7 @@ static int64_t compute_k(int64_t x, int64_t xfk, int64_t H0)
 void add_FK_vector(int64_vector_ptr v, list_int64_vector_srcptr list,
     int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
 {
-  ASSERT(v->dim == 3);
+  ASSERT(v->dim == H->t);
 
   int64_vector_t v_use;
   int64_vector_init(v_use, e0->dim);
@@ -576,35 +595,9 @@ void coordinate_FK_vector(uint64_t * coord_v0, uint64_t * coord_v1,
   }
 #endif // NDEBUG
 
-  int64_vector_t e0;
-  int64_vector_init(e0, v0->dim);
-  int64_vector_set(e0, v0);
-  int64_vector_t e1;
-  int64_vector_init(e1, v1->dim);
-  int64_vector_set(e1, v1);
- 
-  e0->c[0] = e0->c[0] + (int64_t)(H->h[0] - 1);
-  e1->c[0] = e1->c[0] - (int64_t)(H->h[0]);
-  e0->c[1] = e0->c[1] - (int64_t)(H->h[1]);
-  e1->c[1] = e1->c[1] - (int64_t)(H->h[1]);
-
-  if (int64_vector_in_sieving_region(e0, H)) {
-    * coord_v0 = array_int64_vector_index(e0, H, number_element) - (2 *
-        (int64_t) H->h[0] - 1);
-  } else {
-    * coord_v0 = 0; 
-  }
-  if (int64_vector_in_sieving_region(e1, H)) {
-    * coord_v1 = array_int64_vector_index(e1, H, number_element);
-  } else {
-    * coord_v1 = 0;
-  }
-
-  ASSERT(* coord_v0 == index_vector(v0, H, number_element));
-  ASSERT(* coord_v1 == index_vector(v1, H, number_element));
-
-  int64_vector_clear(e0);
-  int64_vector_clear(e1);
+  //TODO: there is maybe a better way to achieve this.
+  * coord_v0 = index_vector(v0, H, number_element);
+  * coord_v1 = index_vector(v1, H, number_element);
 }
 
 //TODO: is it a good idea to retun 0 if fail?
@@ -682,11 +675,12 @@ static unsigned int find_min_y(list_int64_vector_srcptr SV,
 }
 
 void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
-    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H)
+    int64_vector_srcptr e0, int64_vector_srcptr e1, sieving_bound_srcptr H,
+    int boolean)
 {
   // Contain all the possible vectors to go from z=d to z=d+1.
   list_int64_vector_t list;
-  list_int64_vector_init(list, 3);
+  list_int64_vector_init(list, SV->v[0]->dim);
   int64_vector_t v_tmp;
   int64_vector_init(v_tmp, SV->v[0]->dim);
   /*
@@ -723,11 +717,26 @@ void plane_sieve_next_plane(int64_vector_ptr vs, list_int64_vector_srcptr SV,
     int64_vector_set(vs, list->v[pos]);
   } else {
     ASSERT(found == 2);
-    add_FK_vector(vs, list, e0, e1, H);
+    
+    if (boolean) {
+      add_FK_vector(vs, list, e0, e1, H);
+      ASSERT(vs->c[0] < (int64_t)H->h[0]);
+      ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
+    } else {
+      ASSERT(boolean == 0);
+
+      unsigned pos = find_min_y(list, assert, 2);
+      int64_vector_set(vs, list->v[pos]);
+      //TODO: not the closest point to [-H0, H0[.
+      while (vs->c[0] < -(int64_t)H->h[0]) {
+        int64_vector_add(vs, vs, e0);
+      }
+      while (vs->c[0] > (int64_t)H->h[0] - 1) {
+        int64_vector_sub(vs, vs, e0);
+      }
+    }
   }
   
-  ASSERT(vs->c[0] < (int64_t)H->h[0]);
-  ASSERT(vs->c[0] >= -(int64_t)H->h[0]);
   free(assert);
   
   list_int64_vector_clear(list);
@@ -1099,7 +1108,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 
   int64_vector_set(s_out, s);
 
-  plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
+  plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H, 1);
   //Enumerate the element of the sieving region.
   for (unsigned int d = (unsigned int) s->c[2] + 1; d < H->h[2]; d++) {
     plane_sieve_1_enum_plane_incomplete
@@ -1109,7 +1118,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
     }
 
     //Jump in the next plane.
-    plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H);
+    plane_sieve_next_plane(s_out, list_SV, list_FK->v[0], list_FK->v[1], H, 1);
   }
 }
 
