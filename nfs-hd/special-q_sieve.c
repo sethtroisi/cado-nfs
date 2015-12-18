@@ -2034,6 +2034,21 @@ void number_norm(FILE * file_array_norm, array_srcptr array, unsigned char max)
 
 /* ----- Usage and main ----- */
 
+/*
+ * Return 0 if Ha is not defined (ie, Ha[i] = 0 for all i), 1 otherwise.
+ */
+int Ha_defined(sieving_bound_srcptr Ha)
+{
+  uint64_t tmp = 0;
+  for (unsigned int i = 0; i < Ha->t; i++) {
+    tmp += Ha->h[i];
+  }
+  if (tmp == 2 * Ha->t) {
+    return 0;
+  }
+  return 1;
+}
+
 void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "H", "sieving region for c");
@@ -2188,12 +2203,17 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   //TODO: constant here is hard-coded.
   double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
       1.0 / (double)H->t);
+#ifdef SKEW_LLL_SPQ
+  if (Ha_defined(Ha)) {
+    max_a = (double) (*q_range)[1];
+  }
+#endif // SKEW_LLL_SPQ
+
   double tmp = 0;
   for (unsigned int i = 0; i < H->t; i++) {
     tmp = tmp + (double)H->h[i];
   }
   max_a = tmp * max_a;
-  /*OR double max_a = (double)H->t * (double) (*q_range)[1];*/
 
   for (unsigned int j = 0; j < * V; j++) {
     double precompute =
@@ -2388,6 +2408,7 @@ int main(int argc, char * argv[])
 #else // SKEW_LLL_SPQ
         mat_Z_skew_LLL(matrix, matrix, skewness);
 #endif // SKEW_LLL_SPQ
+
 
         /*
          * TODO: continue here.
