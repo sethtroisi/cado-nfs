@@ -3363,7 +3363,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 			   las->cpoly->pols[1], las->output, las->nb_threads);
 	double tcof_batch = seconds ();
 	cofac_list_realloc (las->L, las->L->size);
-	report->reports = find_smooth (las->L, lpb, lim, batchP, las->output,
+	report->reports = find_smooth (las->L, batchP, las->output,
 				       las->nb_threads);
 	mpz_clear (batchP[0]);
 	mpz_clear (batchP[1]);
