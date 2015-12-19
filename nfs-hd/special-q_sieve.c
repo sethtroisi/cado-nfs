@@ -2066,6 +2066,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "start", "value of first ideal r considered");
   param_list_decl_usage(pl, "Ha", "sieving region for a");
   param_list_decl_usage(pl, "base", "specify the bases");
+  param_list_decl_usage(pl, "g", "");
 }
 
 /*
@@ -2089,7 +2090,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** q_range, unsigned char ** thresh, unsigned int ** lpb,
     array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
     int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
-    uint64_t ** sieve_start, sieving_bound_ptr Ha)
+    uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g)
 {
   param_list pl;
   param_list_init(pl);
@@ -2201,6 +2202,16 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 #endif // Q_BELOW_FBB
   ASSERT((* q_range)[0] < (* q_range)[1]);
 
+  mpz_poly_init(g, -1);
+  param_list_parse_mpz_poly(pl, "g", g, ",");
+  ASSERT(g->deg == -1 || g->deg > 0);
+
+#ifndef NDEBUG
+  if (g->deg > 0) {
+    ASSERT((* q_range)[1] - (* q_range)[0] == 1);
+  }
+#endif // NDEBUG
+
   for (unsigned int j = 0; j < * V; j++) {
     (*log2_base)[j] = 0;
   }
@@ -2276,6 +2287,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
 #endif // NDEBUG
 
+
   param_list_clear(pl);
 }
 
@@ -2302,11 +2314,12 @@ int main(int argc, char * argv[])
   FILE * errstd;
   uint64_t * sieve_start;
   sieving_bound_t Ha;
+  mpz_poly_t g;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
       &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &log2_base,
       &outstd, &errstd,
-      &sieve_start, Ha);
+      &sieve_start, Ha, g);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2371,11 +2384,11 @@ int main(int argc, char * argv[])
   //Pass all the prime less than q_range[0].
   for (q = 2; q < q_range[0]; q = getprime_mt(pi)) {}
 
-#ifdef SPECIAL_Q_IDEAL_U
+#ifdef SPQ_IDEAL_U
     int deg_bound_factorise = (int)H->t;
-#else // SPECIAL_Q_IDEAL_U
+#else // SPQ_IDEAL_U
     int deg_bound_factorise = 2;
-#endif // SPECIAL_Q_IDEAL_U
+#endif // SPQ_IDEAL_U
 
   for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
     ideal_spq_t special_q;
@@ -2387,10 +2400,24 @@ int main(int argc, char * argv[])
 
       if (l->factors[i]->f->deg < deg_bound_factorise) {
         if (l->factors[i]->f->deg == 1) {
+#ifdef SPQ_DEFINED
+          if (g->deg != -1) {
+            if (mpz_poly_cmp(g, l->factors[i]->f)) {
+              continue;
+            }
+          }
+#endif // SPQ_DEFINED
           ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 0);
         } else {
           ASSERT(l->factors[i]->f->deg > 1);
 
+#ifdef SPQ_DEFINED
+          if (g->deg != -1) {
+            if (mpz_poly_cmp(g, l->factors[i]->f)) {
+              continue;
+            }
+          }
+#endif // SPQ_DEFINED
           ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 1);
         }
 
@@ -2596,6 +2623,7 @@ int main(int argc, char * argv[])
   fclose(outstd);
   fclose(errstd);
   mpz_vector_clear(skewness);
+  mpz_poly_clear(g);
 
   return 0;
 }

@@ -6,6 +6,8 @@ set (SQ_SRC special-q_sieve.c mat_int64.c int64_vector.c uint64_array.c
 
 add_executable(special-q_sieve ${SQ_SRC})
 
+#set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS SKEW_LLL_SPQ SPQ_DEFINED)
+#set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS Q_BELOW_FBB)
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS ASSERT_FACTO
 #    MEAN_NORM_BOUND MEAN_NORM_BOUND_SIEVE TEST_MQR NUMBER_HIT)
 #set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS COME_BACK_FK
