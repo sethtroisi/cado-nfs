@@ -2221,7 +2221,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
       (*log2_base)[j] = log2((*log2_base)[j]);
     }
   } else {
-
+#ifdef ADAPTED_BASIS
     //TODO: constant here is hard-coded.
     double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
         1.0 / (double)H->t);
@@ -2258,6 +2258,11 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
       (*log2_base)[j] = pow((*log2_base)[j], 1 / (double)(UCHAR_MAX - 2));
       (*log2_base)[j] = log2((*log2_base)[j]);
     }
+#else // ADAPTED_BASIS
+    for (unsigned int j = 0; j < * V; j++) {
+      (*log2_base)[j] = 1.0;
+    }
+#endif // ADAPTED_BASIS
   }
 
   double sec = seconds();
