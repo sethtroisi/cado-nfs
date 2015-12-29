@@ -1171,17 +1171,20 @@ static int
 skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		  const char *galois_autom)
 {
+    int imat[4];
     residueul_t mat[4];
     int nroots = orig_nroots, ord;
 
     if(nroots == 0)
 	return 0;
+    automorphism_init(&ord, imat, galois_autom);
     modulusul_t mm;
     unsigned long qq = mpz_get_ui(q);
     modul_initmod_ul(mm, qq);
-    for(int i = 0; i < 4; i++)
+    for(int i = 0; i < 4; i++){
 	modul_init(mat[i], mm);
-    automorphism_init(&ord, mat, mm, galois_autom);
+	modul_set_int64(mat[i], imat[i], mm);
+    }
     if (nroots % ord) {
         fprintf(stderr, "Number of roots modulo q is not divisible by %d. Don't know how to interpret -galois.\n", ord);
         ASSERT_ALWAYS(0);
