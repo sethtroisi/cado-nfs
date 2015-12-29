@@ -1167,20 +1167,12 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
     mpz_clear(t);
 }
 
-/* Galois automorphisms
-   autom2.1: 1/x
-   autom2.2: -x
-   autom3.1: 1-1/x
-   autom3.2: -1-1/x
-   autom4.1: -(x+1)/(x-1)
-   autom6.1: -(2x+1)/(x-1)
-*/
 static int
 skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		  const char *galois_autom)
 {
     residueul_t mat[4];
-    int nroots = orig_nroots;
+    int nroots = orig_nroots, ord;
 
     if(nroots == 0)
 	return 0;
@@ -1189,14 +1181,13 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     modul_initmod_ul(mm, qq);
     for(int i = 0; i < 4; i++)
 	modul_init(mat[i], mm);
-    automorphism_init(&ord, mat, mm, qq, galois_autom);
+    automorphism_init(&ord, mat, mm, galois_autom);
     if (nroots % ord) {
         fprintf(stderr, "Number of roots modulo q is not divisible by %d. Don't know how to interpret -galois.\n", ord);
         ASSERT_ALWAYS(0);
     }
     // Keep only one root among sigma-orbits.
-    residueul_t r1, r2, r3;
-    modul_init(r1, mm);
+    residueul_t r2, r3;
     modul_init(r2, mm);
     modul_init(r3, mm);
     residueul_t conj[ord]; // where to put conjugates
@@ -1206,12 +1197,12 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     memset(used, 0, nroots);
     for(int k = 0; k < nroots; k++){
 	if(used[k]) continue;
-	unsigned long rr = mpz_get_ui(roots[k]);
-	modul_set_ul(r1, rr, mm);
+	unsigned long rr0 = mpz_get_ui(roots[k]), rr;
+	rr = rr0;
 	// build ord-1 conjugates for roots[k]
 	for(int l = 0; l < ord; l++){
-	    automorphism_apply(r1, r1, mm, qq, galois_autom);
-	    modul_set(conj[l], r1, mm);
+	    rr = automorphism_apply(mat, rr, mm, qq);
+	    modul_set_ul(conj[l], rr, mm);
 	}
 #if 0 // debug. 
 	printf("orbit for %lu: %lu", qq, rr);
@@ -1219,8 +1210,8 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	    printf(" -> %lu", conj[l][0]);
 	printf("\n");
 #endif
-	// check: sigma^ord(r1) should be rr
-	ASSERT_ALWAYS(modul_intequal_ul(r1, rr));
+	// check: sigma^ord(rr0) should be rr0
+	ASSERT_ALWAYS(rr == rr0);
 	// look at roots
 	for(int l = k+1; l < nroots; l++){
 	    unsigned long ss = mpz_get_ui(roots[l]);
@@ -1248,7 +1239,6 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	modul_clear(conj[k], mm);
     for(int i = 0; i < 4; i++)
 	modul_clear(mat[i], mm);
-    modul_clear(r1, mm);
     modul_clear(r2, mm);
     modul_clear(r3, mm);
     modul_clearmod(mm);
