@@ -67,69 +67,6 @@ get_outfilename_from_infilename (char *infilename, const char *outfmt,
 // itself, or another index.
 index_t *Gal;
 
-/* compute sigma(r). */
-// TODO: share some of this with las.cpp
-static p_r_values_t cga(p_r_values_t p, p_r_values_t r, const char *action)
-{
-    p_r_values_t sigma_r;
-    modulusul_t mm;
-    residueul_t xx;
-
-    if(strcmp(action, "1/y") == 0){
-	if (r == 0)
-	    sigma_r = p;
-	else if (r == p)
-	    sigma_r = 0;
-	else {
-	    modul_initmod_ul(mm, p);
-	    modul_init(xx, mm);
-	    modul_set_ul(xx, r, mm);
-	    modul_inv(xx, xx, mm);
-	    sigma_r = modul_get_ul(xx, mm);
-	    modul_clear(xx, mm);
-	    modul_clearmod(mm);
-	    ASSERT_ALWAYS(sigma_r < p);
-	}
-    }
-    else if(strcmp(action, "_y") == 0){
-	if (r == 0){
-	    fprintf(stderr, "WARNING: r=0\n");
-	    sigma_r = 0;
-	}
-	else if (r == p){
-	    fprintf(stderr, "WARNING: r=oo\n");
-	    sigma_r = p;
-	}
-	else {
-	    sigma_r = p - r;
-	    ASSERT_ALWAYS(sigma_r < p);
-	}
-    }
-    else if(strcmp(action, "autom3.2") == 0){
-	// sigma(x) = -1-1/x = (-x-1)/x
-	if(r == 0){
-	    fprintf(stderr, "WARNING: r=0\n");
-            sigma_r = p;
-        }
-	else if(r == p){
-	    fprintf(stderr, "WARNING: r=oo\n");
-	    sigma_r = p-1;
-	}
-	else{
-	    modul_initmod_ul(mm, p);
-	    modul_init(xx, mm);
-	    modul_set_ul(xx, r, mm);
-	    modul_inv(xx, xx, mm);
-	    sigma_r = modul_get_ul(xx, mm);
-	    // HERE
-	    modul_clear(xx, mm);
-	    modul_clearmod(mm);
-	    ASSERT_ALWAYS(sigma_r < p);
-	}
-    }
-    return sigma_r;
-}
-
 static void
 compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
 {
@@ -173,7 +110,7 @@ compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
             int k = 0;
             while (k < nr) {
               // Get sigma(r[k]) mod p
-		p_r_values_t sigma_r = cga(old_p, r[k], action);
+		p_r_values_t sigma_r = apply_auto(old_p, r[k], action);
 
               // Find the index of the conjugate
               int l;

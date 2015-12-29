@@ -1179,55 +1179,21 @@ static int
 skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 		  const char *galois_autom)
 {
+    residueul_t mat[4];
     int nroots = orig_nroots;
+
     if(nroots == 0)
 	return 0;
-    int ord = 0;
-    int A, B, C, D; // x -> (A*x+B)/(C*x+D)
-    if(strcmp(galois_autom, "autom2.1") == 0 
-       || strcmp(galois_autom, "1/y") == 0){
-	ord = 2; A = 0; B = 1; C = 1; D = 0;
-    }
-    else if(strcmp(galois_autom, "autom2.2") == 0
-	    || strcmp(galois_autom, "_y") == 0){
-	ord = 2; A = -1; B = 0; C = 0; D = 1;
-    }
-    else if(strcmp(galois_autom, "autom3.1") == 0){
-	// 1-1/x = (x-1)/x
-	ord = 3; A = 1; B = -1; C = 1; D = 0;
-    }
-    else if(strcmp(galois_autom, "autom3.2") == 0){
-	// -1-1/x = (-x-1)/x
-	ord = 3; A = -1; B = -1; C = 1; D = 0;
-    }
-    else if(strcmp(galois_autom, "autom4.1") == 0){
-	// -(x+1)/(x-1)
-	ord = 4; A = -1; B = -1; C = 1; D = -1;
-    }
-    else if(strcmp(galois_autom, "autom6.1") == 0){
-	// -(2*x+1)/(x-1)
-	ord = 6; A = -2; B = -1; C = 1; D = -1;
-    }
-    else{
-	fprintf(stderr, "Unknown automorphism: %s\n", galois_autom);
-	ASSERT_ALWAYS(0);
-    }
+    modulusul_t mm;
+    unsigned long qq = mpz_get_ui(q);
+    modul_initmod_ul(mm, qq);
+    for(int i = 0; i < 4; i++)
+	modul_init(mat[i], mm);
+    automorphism_init(&ord, mat, mm, qq, galois_autom);
     if (nroots % ord) {
         fprintf(stderr, "Number of roots modulo q is not divisible by %d. Don't know how to interpret -galois.\n", ord);
         ASSERT_ALWAYS(0);
     }
-    modulusul_t mm;
-    unsigned long qq = mpz_get_ui(q);
-    modul_initmod_ul(mm, qq);
-    // transforming as residues
-    residueul_t mat[4];
-    for(int i = 0; i < 4; i++)
-	modul_init(mat[i], mm);
-    // be damned inefficient, but who cares?
-    modul_set_int64(mat[0], A, mm);
-    modul_set_int64(mat[1], B, mm);
-    modul_set_int64(mat[2], C, mm);
-    modul_set_int64(mat[3], D, mm);
     // Keep only one root among sigma-orbits.
     residueul_t r1, r2, r3;
     modul_init(r1, mm);
@@ -1244,22 +1210,7 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
 	modul_set_ul(r1, rr, mm);
 	// build ord-1 conjugates for roots[k]
 	for(int l = 0; l < ord; l++){
-	    if(modul_intequal_ul(r1, qq)){
-		// FIXME: sigma(oo) = A/C
-		ASSERT_ALWAYS(0);
-	    }
-	    // denominator: C*r1+D
-	    modul_mul(r2, mat[2], r1, mm);
-	    modul_add(r2, r2, mat[3], mm);
-	    if(modul_is0(r2, mm)){
-		// FIXME: sigma(r1) = oo
-		ASSERT_ALWAYS(0);
-	    }
-	    modul_inv(r3, r2, mm);
-	    // numerator: A*r1+B
-	    modul_mul(r1, mat[0], r1, mm);
-	    modul_add(r1, r1, mat[1], mm);
-	    modul_mul(r1, r3, r1, mm);
+	    automorphism_apply(r1, r1, mm, qq, galois_autom);
 	    modul_set(conj[l], r1, mm);
 	}
 #if 0 // debug. 
