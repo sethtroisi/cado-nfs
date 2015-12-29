@@ -472,13 +472,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     for(int side = 0 ; side < 2 ; side++) {
 	sieve_info_init_trialdiv(si, side); /* Init refactoring stuff */
-	mpz_init (si->BB[side]);
-	mpz_init (si->BBB[side]);
-	mpz_init (si->BBBB[side]);
-	unsigned long lim = si->conf->sides[side]->lim;
-	mpz_ui_pow_ui (si->BB[side], lim, 2);
-	mpz_mul_ui (si->BBB[side], si->BB[side], lim);
-	mpz_mul_ui (si->BBBB[side], si->BBB[side], lim);
 
         // This variable is obsolete (but las-duplicates.cpp still reads
         // it) FIXME
@@ -568,10 +561,6 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
         if (si == las->sievers) {
             delete si->sides[s]->fb;
         }
-
-        mpz_clear (si->BB[s]);
-        mpz_clear (si->BBB[s]);
-        mpz_clear (si->BBBB[s]);
     }
     delete si->doing;
     facul_clear_strategies (si->strategies);
