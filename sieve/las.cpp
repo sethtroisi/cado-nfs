@@ -1304,19 +1304,26 @@ static void add_relations_with_galois(const char *galois, FILE *output,
     a0 = rel.a; b0 = (int64_t)rel.b;
     if(strcmp(galois, "autom2.1") == 0)
 	// remember, 1/x is for plain autom
-	// 1/y is for special Galois: x^4+1 -> DO NOT DUPLICATE RELATIONS!
+	// 1/y is for Galois filtering: x^4+1 -> DO NOT DUPLICATE RELATIONS!
 	// (a-b/x) = 1/x*(-b+a*x)
 	adwg(output, comment, cpt, rel, -b0, -a0);
+    else if(strcmp(galois, "autom2.2") == 0)
+	// remember, -x is for plain autom
+	// -y is for Galois filtering: x^4+1 -> DO NOT DUPLICATE RELATIONS!
+	// (a-(-b)*x) ~ (-a-b*x)
+	adwg(output, comment, cpt, rel, -a0, b0);
     else if(strcmp(galois, "autom3.1") == 0){
-	// modified, not checked
-	a1 = -b0; b1 = a0-b0;
-	adwg(output, comment, cpt, rel, a1, b1);
-	a2 = -b1; b2 = a1-b1;
+	// x -> 1-1/x; hence 1/x*(b-(b-a)*x)
+	a1 = a; b1 = (int64_t)b;
+	a2 = b1; b2 = b1-a1;
 	adwg(output, comment, cpt, rel, a2, b2);
+	a3 = b2; b3 = b2-a2;
+	adwg(output, comment, cpt, rel, a3, b3);
     }
     else if(strcmp(galois, "autom3.2") == 0){
-	b1 = (int64_t)b;
-	a2 = b1; b2 = -a-b1;
+	// x -> -1-1/x; hence 1/x*(b-(-a-b)*x)
+	a1 = a; b1 = (int64_t)b;
+	a2 = b1; b2 = -a1-b1;
 	adwg(output, comment, cpt, rel, a2, b2);
 	a3 = b2; b3 = -a2-b2;
 	adwg(output, comment, cpt, rel, a3, b3);

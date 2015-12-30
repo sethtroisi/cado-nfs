@@ -1,5 +1,7 @@
 #!/bin/sh
 
+## test for y -> -y using Galois filtering
+
 CADO_NFS_SOURCE_DIR=$1
 CADO_NFS_BINARY_DIR=$2
 
