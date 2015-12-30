@@ -448,6 +448,13 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
             filter_galois polyselect_gfpn)
+        cado_define_test(test_gfp2_2_2
+            SCRIPT
+                ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2_2_2.sh
+                ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
+            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
+            plingen_pz sm reconstructlog-dl merge-dl replay-dl
+	    filter_galois)
     else()
         message(STATUS "magma found: ${MAGMA}")
     endif()

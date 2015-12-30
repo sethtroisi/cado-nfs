@@ -854,6 +854,7 @@ linalg/bwc/cpubinding.h
 tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
 tests/test_gfp3.sh
+tests/test_gfp2_2_2.sh
 utils/verbose.c
 utils/verbose.h
 tests/linalg/bwc/bwc-dispatch-matmul.sh
