@@ -87,7 +87,7 @@ static p_r_values_t my_inv(p_r_values_t r, p_r_values_t p){
 static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *action){
     p_r_values_t sigma_r;
 
-    if(strcmp(action, "1/y") == 0 || strcmp(action, "2.1g") == 0){
+    if(strcmp(action, "1/y") == 0 || strcmp(action, "autom2.1g") == 0){
 	if (r == 0)
 	    sigma_r = p;
 	else if (r == p)
@@ -97,7 +97,7 @@ static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *actio
 	    ASSERT_ALWAYS(sigma_r < p);
 	}
     }
-    else if(strcmp(action, "_y") == 0 || strcmp(action, "2.2g") == 0){
+    else if(strcmp(action, "_y") == 0 || strcmp(action, "autom2.2g") == 0){
 	if (r == 0){
 	    fprintf(stderr, "WARNING: r=0\n");
 	    sigma_r = 0;
@@ -111,7 +111,7 @@ static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *actio
 	    ASSERT_ALWAYS(sigma_r < p);
 	}
     }
-    else if(strcmp(action, "3.1g") == 0){
+    else if(strcmp(action, "autom3.1g") == 0){
 	// x -> 1-1/x
 	if (r == 0){
 	    fprintf(stderr, "WARNING: r=0\n");
@@ -290,11 +290,11 @@ static inline uint64_t myhash_3_1(int64_t a, uint64_t b)
 
 static inline uint64_t myhash(int64_t a, uint64_t b, char *action)
 {
-    if(strcmp(action, "1/y") == 0 || strcmp(action, "2.1g") == 0)
+    if(strcmp(action, "1/y") == 0 || strcmp(action, "autom2.1g") == 0)
 	return myhash_2_1(a, b);
-    else if(strcmp(action, "_y") == 0 || strcmp(action, "2.2g") == 0)
+    else if(strcmp(action, "_y") == 0 || strcmp(action, "autom2.2g") == 0)
 	return myhash_2_2(a, b);
-    else if(strcmp(action, "3.1g") == 0)
+    else if(strcmp(action, "autom3.1g") == 0)
 	return myhash_3_1(a, b);
     else
 	return 0;
@@ -379,16 +379,23 @@ thread_galois (void * context_data, earlyparsed_relation_ptr rel, char *action)
   return NULL;
 }
 
+// TODO: do better than having a function per automorphism.
 static void *
-thread_galois_1 (void * context_data, earlyparsed_relation_ptr rel)
+thread_galois_2_1 (void * context_data, earlyparsed_relation_ptr rel)
 {
     return thread_galois(context_data, rel, "1/y");
 }
 
 static void *
-thread_galois_2 (void * context_data, earlyparsed_relation_ptr rel)
+thread_galois_2_2 (void * context_data, earlyparsed_relation_ptr rel)
 {
     return thread_galois(context_data, rel, "_y");
+}
+
+static void *
+thread_galois_3_1 (void * context_data, earlyparsed_relation_ptr rel)
+{
+    return thread_galois(context_data, rel, "autom3.1g");
 }
 
 static void declare_usage(param_list pl)
@@ -493,7 +500,12 @@ main (int argc, char *argv[])
   }
   K = 100 + 1.2 * nrels_expected;
 
-  if( action == NULL || (strcmp(action, "1/y") && strcmp(action, "_y")) )
+  if( action == NULL 
+      || (strcmp(action, "1/y") 
+	  && strcmp(action, "_y") 
+	  && strcmp(action, "autom3.1g")
+	 )
+    )
   {
     fprintf(stderr, "Error, missing -action command line argument\n");
     usage(pl, argv0);
@@ -525,12 +537,14 @@ main (int argc, char *argv[])
     nb_files++;
 
   struct filter_rels_description desc[2] = {
-    { .f = thread_galois_1, .arg=0, .n=1, },
+    { .f = thread_galois_2_1, .arg=0, .n=1, },
     { .f = NULL, },
   };
 
   if(strcmp(action, "_y") == 0)
-      desc[0].f = thread_galois_2;
+      desc[0].f = thread_galois_2_2;
+  else if(strcmp(action, "autom3.1g") == 0)
+      desc[0].f = thread_galois_3_1;
 
   fprintf (stderr, "Reading files (using %d auxiliary threads):\n", desc[0].n);
   for (char **p = files; *p ; p++) {
