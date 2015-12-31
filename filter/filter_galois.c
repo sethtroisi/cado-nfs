@@ -67,7 +67,7 @@ get_outfilename_from_infilename (char *infilename, const char *outfmt,
 // itself, or another index.
 index_t *Gal;
 
-// returns 1/r mod p.
+// returns 1/r mod p; FIXME: should be replaced some time.
 static p_r_values_t my_inv(p_r_values_t r, p_r_values_t p){
     p_r_values_t sigma_r;
 
@@ -121,9 +121,12 @@ static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *actio
 	    fprintf(stderr, "WARNING: r=oo\n");
 	    sigma_r = 1;
 	}
-	else if (r == 1)
+	else if (r == 1){
+	    fprintf(stderr, "WARNING: r=1\n");
 	    sigma_r = 0;
+	}
 	else {
+	    // 1 < r < p => 1 < 1/r < p
 	    sigma_r = p + 1 - my_inv(r, p);
 	    ASSERT_ALWAYS(sigma_r < p);
 	}
@@ -134,12 +137,12 @@ static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *actio
 static void
 compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
 {
-  index_t i, j;
+  index_t i;
   p_r_values_t old_p, p, r[20], rr;
   index_t ind[20];
   int side, old_side;
   int nr;
-  int ord, imat[4];
+  int j, ord, imat[4];
   old_p = 0;
   old_side = 42; // any value different from the legit ones.
   nr = 0;
@@ -182,7 +185,7 @@ compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
 	      for(j = 1; j < ord; j++){
 		  // r[k], ..., sigma^{j-1}(r[k]) already treated
 		  // eq. r[k], ..., r[k+j-1]
-		  // Find the index of the conjugate
+		  // Find the index of sigma_r
 		  int l;
 		  for (l = k+j; l <= nr; ++l) {
 		      if (r[l] == sigma_r)
@@ -245,6 +248,45 @@ static inline uint64_t myhash_2_2(int64_t a, uint64_t b)
 }
 
 // Case 3.1 (x -> 1-1/x): (a, b), (b, b-a), (b-a, -a)
+// If a < b: (a, b), (b, b-a), (b-a, -a) ~ (a-b, a) if a > 0 else (b-a, -a).
+// If a > b: (a, b), (b, b-a) ~ (-b, a-b); (b-a, -a) ~ (a-b, a).
+static inline uint64_t myhash_3_1(int64_t a, uint64_t b)
+{
+    // make everybody usable
+    int64_t b1 = (int64_t)b, a1 = a, a2, b2, a3, b3, aa, bb;
+    if(a1 < b1){
+	a2 = b1;    b2 = b1-a1;
+	a3 = b1-a1; b3 = -a1;
+	if(b3 < 0){
+	    a3 = -a3; b3 = -b3;
+	}
+    }
+    else{
+	a2 = -b1;   b2 = a1-b1;
+	a3 = a1-b1; b3 = a1;
+    }
+    // take largest pair (a_i, b_i) in lexicographic order
+    if(a1 > a2){
+	if(a1 > a3){ aa = a1; bb = b1; }
+	else if(a1 < a3){ aa = a3; bb = b3; }
+	else{ // a1 == a3
+	    if(b1 >= b3){ aa = a1; bb = b1; }
+	    else{ aa = a3; bb = b3; }
+	}
+    }
+    else{ // a1 <= a2
+	if(a2 < a3){ aa = a3; bb = b3; }
+	else if(a2 > a3){ aa = a2; bb = b2; }
+	else{ // a1 <= a2 == a3: we cannot have a1 = a2 = a3 (?)
+	    if(b2 >= b3){ aa = a2; bb = b2; }
+	    else{ aa = a3; bb = b3; }
+	}
+    }
+    ASSERT_ALWAYS(aa > 0);
+    uint64_t h = (CA_DUP2 * (uint64_t) aa + CB_DUP2 * (uint64_t)bb);
+    fprintf(stderr, "HASH: %ld %lu -> %ld %ld -> h=%lu\n", a, b, aa, bb, h);
+    return h;
+}
 
 static inline uint64_t myhash(int64_t a, uint64_t b, char *action)
 {
@@ -252,6 +294,8 @@ static inline uint64_t myhash(int64_t a, uint64_t b, char *action)
 	return myhash_2_1(a, b);
     else if(strcmp(action, "_y") == 0 || strcmp(action, "2.2g") == 0)
 	return myhash_2_2(a, b);
+    else if(strcmp(action, "3.1g") == 0)
+	return myhash_3_1(a, b);
     else
 	return 0;
 }

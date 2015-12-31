@@ -3295,7 +3295,7 @@ class PurgeTask(Task):
     def run(self):
         super().run()
 
-        if not (self.params["galois"] in ["1/y", "_y"]):
+        if not (self.params["galois"] in ["1/y", "_y", "autom3.1g"]):
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             if not nunique:
@@ -3549,7 +3549,7 @@ class FilterGaloisTask(Task):
 
     def run(self):
         # This task must be run only if galois is recognized by filter_galois
-        if not (self.params["galois"] in ["1/y", "_y"]):
+        if not (self.params["galois"] in ["1/y", "_y", "autom3.1g"]):
             return True
 
         super().run()

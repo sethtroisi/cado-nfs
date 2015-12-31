@@ -7,14 +7,17 @@ void automorphism_init(int *ord, int mat[4], const char *galois_autom){
     int A, B, C, D; // x -> (A*x+B)/(C*x+D)
 
     if(strcmp(galois_autom, "autom2.1") == 0 
+       || strcmp(galois_autom, "autom2.1g") == 0
        || strcmp(galois_autom, "1/y") == 0){
 	*ord = 2; A = 0; B = 1; C = 1; D = 0;
     }
     else if(strcmp(galois_autom, "autom2.2") == 0
+	    || strcmp(galois_autom, "autom2.2g") == 0
 	    || strcmp(galois_autom, "_y") == 0){
 	*ord = 2; A = -1; B = 0; C = 0; D = 1;
     }
-    else if(strcmp(galois_autom, "autom3.1") == 0){
+    else if(strcmp(galois_autom, "autom3.1") == 0
+	    || strcmp(galois_autom, "autom3.1g") == 0){
 	// 1-1/x = (x-1)/x
 	*ord = 3; A = 1; B = -1; C = 1; D = 0;
     }
