@@ -1298,7 +1298,19 @@ facul_both_src (mpz_t **factors, const modset_t* m,
       // }
       int side = methods[i].side;
       if (is_smooth[side] != FACUL_MAYBE)
-	continue;
+	{
+	  /* If both sides are smooth, we can exit the loop,
+	     otherwise we must continue with the next methods,
+	     since methods might be interleaved between side 0 and 1,
+	     thus we don't have an easy way to skip all methods for this side.
+	     We could do this with another representation, say methods[0][i]
+	     for side 0, 0 <= i < m, methods[1][j] for side 1, 0 <= j < n,
+	     and which_method[k] = {0, 1} for 0 <= k < m+n. */
+	  if (is_smooth[side] == FACUL_SMOOTH &&
+              is_smooth[1-side] == FACUL_SMOOTH)
+            break;
+	  continue;
+	}
 
       // {for the stats
       if (stats_current_index < STATS_LEN)
