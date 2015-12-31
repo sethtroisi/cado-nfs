@@ -67,29 +67,37 @@ get_outfilename_from_infilename (char *infilename, const char *outfmt,
 // itself, or another index.
 index_t *Gal;
 
+// returns 1/r mod p.
+static p_r_values_t my_inv(p_r_values_t r, p_r_values_t p){
+    p_r_values_t sigma_r;
+
+    modulusul_t mm;
+    residueul_t xx;
+    modul_initmod_ul(mm, p);
+    modul_init(xx, mm);
+    modul_set_ul(xx, r, mm);
+    modul_inv(xx, xx, mm);
+    sigma_r = modul_get_ul(xx, mm);
+    modul_clear(xx, mm);
+    modul_clearmod(mm);
+    return sigma_r;
+}
+
 // TMP, TMP: should be replaced by stuff in galois_utils.
 static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *action){
     p_r_values_t sigma_r;
 
-    if(strcmp(action, "1/y") == 0){
+    if(strcmp(action, "1/y") == 0 || strcmp(action, "2.1g") == 0){
 	if (r == 0)
 	    sigma_r = p;
 	else if (r == p)
 	    sigma_r = 0;
 	else {
-	    modulusul_t mm;
-	    residueul_t xx;
-	    modul_initmod_ul(mm, p);
-	    modul_init(xx, mm);
-	    modul_set_ul(xx, r, mm);
-	    modul_inv(xx, xx, mm);
-	    sigma_r = modul_get_ul(xx, mm);
-	    modul_clear(xx, mm);
-	    modul_clearmod(mm);
+	    sigma_r = my_inv(r, p);
 	    ASSERT_ALWAYS(sigma_r < p);
 	}
     }
-    else if(strcmp(action, "_y") == 0){
+    else if(strcmp(action, "_y") == 0 || strcmp(action, "2.2g") == 0){
 	if (r == 0){
 	    fprintf(stderr, "WARNING: r=0\n");
 	    sigma_r = 0;
@@ -103,13 +111,30 @@ static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *actio
 	    ASSERT_ALWAYS(sigma_r < p);
 	}
     }
+    else if(strcmp(action, "3.1g") == 0){
+	// x -> 1-1/x
+	if (r == 0){
+	    fprintf(stderr, "WARNING: r=0\n");
+	    sigma_r = p;
+	}
+	else if (r == p){
+	    fprintf(stderr, "WARNING: r=oo\n");
+	    sigma_r = 1;
+	}
+	else if (r == 1)
+	    sigma_r = 0;
+	else {
+	    sigma_r = p + 1 - my_inv(r, p);
+	    ASSERT_ALWAYS(sigma_r < p);
+	}
+    }
     return sigma_r;
 }
 
 static void
 compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
 {
-  index_t i;
+  index_t i, j;
   p_r_values_t old_p, p, r[20], rr;
   index_t ind[20];
   int side, old_side;
@@ -141,10 +166,11 @@ compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
       {
         if (old_p != 0) {
           // Sort the roots, to put sigma(r) near r.
-          if (nr & 1) {
+	  // -> build orbits r, sigma(r), ..., sigma^{ord-1}(r)
+	  if ((nr % ord) != 0){
             fprintf(stderr,
-                "Warning: odd number of roots, skipping p=%" PRpr
-                ", r=%" PRpr "\n", old_p, r[0]);
+		"Warning: number of roots not divisible by %d,"
+		"skipping p=%" PRpr ", r=%" PRpr "\n", ord, old_p, r[0]);
             for (int k = 0; k < nr; ++k)
               Gal[ind[k]] = ind[k];
           } else {
@@ -153,26 +179,32 @@ compute_galois_action (renumber_t tab, cado_poly cpoly, const char *action)
               // Get sigma(r[k]) mod p
 	      p_r_values_t sigma_r = apply_auto(old_p, r[k], action);
 
-              // Find the index of the conjugate
-              int l;
-              for (l = k+1; l <= nr; ++l) {
-                if (r[l] == sigma_r)
-                  break;
-              }
-              ASSERT_ALWAYS(l < nr);
-              // Swap position k+1 and l
-              r[l] = r[k+1];
-              r[k+1] = sigma_r;
-              int tmp = ind[l];
-              ind[l] = ind[k+1];
-              ind[k+1] = tmp;
+	      for(j = 1; j < ord; j++){
+		  // r[k], ..., sigma^{j-1}(r[k]) already treated
+		  // eq. r[k], ..., r[k+j-1]
+		  // Find the index of the conjugate
+		  int l;
+		  for (l = k+j; l <= nr; ++l) {
+		      if (r[l] == sigma_r)
+			  break;
+		  }
+		  ASSERT_ALWAYS(l < nr);
+		  // Swap position k+j and l
+		  r[l] = r[k+j];
+		  r[k+j] = sigma_r;
+		  int tmp = ind[l];
+		  ind[l] = ind[k+j];
+		  ind[k+j] = tmp;
+		  sigma_r = apply_auto(old_p, sigma_r, action);
+	      }
+	      ASSERT_ALWAYS(sigma_r == r[k]);
               // Next
-              k += 2;
+              k += ord;
             }
             // Store the correspondence between conjugate ideals
-            for (k = 0; k < nr; k+=2) {
-              Gal[ind[k]] = ind[k];
-              Gal[ind[k+1]] = ind[k];
+            for (k = 0; k < nr; k += ord) {
+		for(j = 0; j < ord; j++)
+		    Gal[ind[k+j]] = ind[k];
             }
           }
         }
@@ -204,7 +236,7 @@ static inline uint64_t myhash_2_1(int64_t a, uint64_t b)
 }
 
 // Case 2.2 (x -> -x): (a-b*(-x)) = (a-(-b)*x) = (a, -b) ~ (-a, b).
-// Hash value that is the same for (a,b) and (-a,b).
+// Hash value that is the same for (a,b) and (-a,b): H((|a|, b))
 // (with sign normalization).
 static inline uint64_t myhash_2_2(int64_t a, uint64_t b)
 {
@@ -212,11 +244,13 @@ static inline uint64_t myhash_2_2(int64_t a, uint64_t b)
     return (CA_DUP2 * (uint64_t) absa + CB_DUP2 * b);
 }
 
+// Case 3.1 (x -> 1-1/x): (a, b), (b, b-a), (b-a, -a)
+
 static inline uint64_t myhash(int64_t a, uint64_t b, char *action)
 {
-    if(strcmp(action, "1/y") == 0)
+    if(strcmp(action, "1/y") == 0 || strcmp(action, "2.1g") == 0)
 	return myhash_2_1(a, b);
-    else if(strcmp(action, "_y") == 0)
+    else if(strcmp(action, "_y") == 0 || strcmp(action, "2.2g") == 0)
 	return myhash_2_2(a, b);
     else
 	return 0;
