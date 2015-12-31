@@ -317,7 +317,6 @@ unsigned char log_norm_double(const int * current_indexes,
   }
   ASSERT(log2_norm >= 0.0);
   double log_norm = ceil(log2_norm / log2_base);
-  ASSERT(log_norm < (double) UCHAR_MAX);
 
   unsigned char val = 0;
   if (special_q) {

@@ -2221,8 +2221,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
       (*log2_base)[j] = log2((*log2_base)[j]);
     }
   } else {
+    //TODO: ADAPTED_BASIS should not be used.
 #ifdef ADAPTED_BASIS
-    //TODO: constant here is hard-coded.
     double max_a = pow(1.075, (double)(H->t - 1)) * pow((double)*q_range[1],
         1.0 / (double)H->t);
 #ifdef SKEW_LLL_SPQ
