@@ -127,7 +127,28 @@ static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *actio
 	}
 	else {
 	    // 1 < r < p => 1 < 1/r < p
+	    // => 1 < p+1-1/r < p
 	    sigma_r = p + 1 - my_inv(r, p);
+	    ASSERT_ALWAYS(sigma_r < p);
+	}
+    }
+    else if(strcmp(action, "autom3.2g") == 0){
+	// x -> -1-1/x
+	if (r == 0){
+	    fprintf(stderr, "WARNING: r=0\n");
+	    sigma_r = p;
+	}
+	else if (r == p){
+	    fprintf(stderr, "WARNING: r=oo\n");
+	    sigma_r = p-1;
+	}
+	else if (r == p-1){
+	    fprintf(stderr, "WARNING: r=-1\n");
+	    sigma_r = 0;
+	}
+	else {
+	    // 1 <= r < p-1 => 1 <= 1/r < p-1
+	    sigma_r = p - 1 - my_inv(r, p);
 	    ASSERT_ALWAYS(sigma_r < p);
 	}
     }
@@ -247,44 +268,57 @@ static inline uint64_t myhash_2_2(int64_t a, uint64_t b)
     return (CA_DUP2 * (uint64_t) absa + CB_DUP2 * b);
 }
 
+static inline void lexico3(int64_t *aa, int64_t *bb, 
+			   int64_t a1, int64_t b1, 
+			   int64_t a2, int64_t b2, 
+			   int64_t a3, int64_t b3)
+{
+    // make signs ok
+    if(b2 < 0){ a2 = -a2; b2 = -b2; }
+    if(b3 < 0){ a3 = -a3; b3 = -b3; }
+    // take largest pair (a_i, b_i) in lexicographic order
+    if(a1 > a2){
+	if(a1 > a3){ *aa = a1; *bb = b1; }
+	else if(a1 < a3){ *aa = a3; *bb = b3; }
+	else{ // a1 == a3
+	    if(b1 >= b3){ *aa = a1; *bb = b1; }
+	    else{ *aa = a3; *bb = b3; }
+	}
+    }
+    else{ // a1 <= a2
+	if(a2 < a3){ *aa = a3; *bb = b3; }
+	else if(a2 > a3){ *aa = a2; *bb = b2; }
+	else{ // a1 <= a2 == a3: we cannot have a1 = a2 = a3 (?)
+	    if(b2 >= b3){ *aa = a2; *bb = b2; }
+	    else{ *aa = a3; *bb = b3; }
+	}
+    }
+    ASSERT_ALWAYS(*aa > 0);
+}
+
 // Case 3.1 (x -> 1-1/x): (a, b), (b, b-a), (b-a, -a)
 // If a < b: (a, b), (b, b-a), (b-a, -a) ~ (a-b, a) if a > 0 else (b-a, -a).
 // If a > b: (a, b), (b, b-a) ~ (-b, a-b); (b-a, -a) ~ (a-b, a).
 static inline uint64_t myhash_3_1(int64_t a, uint64_t b)
 {
-    // make everybody usable
     int64_t b1 = (int64_t)b, a1 = a, a2, b2, a3, b3, aa, bb;
-    if(a1 < b1){
-	a2 = b1;    b2 = b1-a1;
-	a3 = b1-a1; b3 = -a1;
-	if(b3 < 0){
-	    a3 = -a3; b3 = -b3;
-	}
-    }
-    else{
-	a2 = -b1;   b2 = a1-b1;
-	a3 = a1-b1; b3 = a1;
-    }
-    // take largest pair (a_i, b_i) in lexicographic order
-    if(a1 > a2){
-	if(a1 > a3){ aa = a1; bb = b1; }
-	else if(a1 < a3){ aa = a3; bb = b3; }
-	else{ // a1 == a3
-	    if(b1 >= b3){ aa = a1; bb = b1; }
-	    else{ aa = a3; bb = b3; }
-	}
-    }
-    else{ // a1 <= a2
-	if(a2 < a3){ aa = a3; bb = b3; }
-	else if(a2 > a3){ aa = a2; bb = b2; }
-	else{ // a1 <= a2 == a3: we cannot have a1 = a2 = a3 (?)
-	    if(b2 >= b3){ aa = a2; bb = b2; }
-	    else{ aa = a3; bb = b3; }
-	}
-    }
-    ASSERT_ALWAYS(aa > 0);
+    a2 = b1; b2 = -a1+b1;
+    a3 = b2; b3 = -a2+b2;
+    lexico3(&aa, &bb, a1, b1, a2, b2, a3, b3);
     uint64_t h = (CA_DUP2 * (uint64_t) aa + CB_DUP2 * (uint64_t)bb);
-    fprintf(stderr, "HASH: %ld %lu -> %ld %ld -> h=%lu\n", a, b, aa, bb, h);
+    fprintf(stderr, "HASH3.1: %ld %lu -> %ld %ld -> h=%lu\n", a, b, aa, bb, h);
+    return h;
+}
+
+// Case 3.2 (x -> -1-1/x): (a, b), (b, -a-b), (-a-b, a)
+static inline uint64_t myhash_3_2(int64_t a, uint64_t b)
+{
+    int64_t b1 = (int64_t)b, a1 = a, a2, b2, a3, b3, aa, bb;
+    a2 = b1; b2 = -a1-b1;
+    a3 = b2; b3 = -a2-b2;
+    lexico3(&aa, &bb, a1, b1, a2, b2, a3, b3);
+    uint64_t h = (CA_DUP2 * (uint64_t) aa + CB_DUP2 * (uint64_t)bb);
+    fprintf(stderr, "HASH3.2: %ld %lu -> %ld %ld -> h=%lu\n", a, b, aa, bb, h);
     return h;
 }
 
@@ -296,6 +330,8 @@ static inline uint64_t myhash(int64_t a, uint64_t b, char *action)
 	return myhash_2_2(a, b);
     else if(strcmp(action, "autom3.1g") == 0)
 	return myhash_3_1(a, b);
+    else if(strcmp(action, "autom3.2g") == 0)
+	return myhash_3_2(a, b);
     else
 	return 0;
 }
@@ -396,6 +432,12 @@ static void *
 thread_galois_3_1 (void * context_data, earlyparsed_relation_ptr rel)
 {
     return thread_galois(context_data, rel, "autom3.1g");
+}
+
+static void *
+thread_galois_3_2 (void * context_data, earlyparsed_relation_ptr rel)
+{
+    return thread_galois(context_data, rel, "autom3.2g");
 }
 
 static void declare_usage(param_list pl)
@@ -504,6 +546,7 @@ main (int argc, char *argv[])
       || (strcmp(action, "1/y") 
 	  && strcmp(action, "_y") 
 	  && strcmp(action, "autom3.1g")
+	  && strcmp(action, "autom3.2g")
 	 )
     )
   {
@@ -545,6 +588,8 @@ main (int argc, char *argv[])
       desc[0].f = thread_galois_2_2;
   else if(strcmp(action, "autom3.1g") == 0)
       desc[0].f = thread_galois_3_1;
+  else if(strcmp(action, "autom3.2g") == 0)
+      desc[0].f = thread_galois_3_2;
 
   fprintf (stderr, "Reading files (using %d auxiliary threads):\n", desc[0].n);
   for (char **p = files; *p ; p++) {
