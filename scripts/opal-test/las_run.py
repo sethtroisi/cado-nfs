@@ -62,7 +62,7 @@ def run(param_file, problem):
     makefb_params = {
         "poly" : las_params["poly"],
         "alim": las_params["alim"],
-        "maxbits": las_params["I"] - 1
+        "maxbits": las_params["I"]
     }
 
     params = read_params_from_file(param_file)
@@ -78,7 +78,7 @@ def run(param_file, problem):
     # Update parameters for makefb (which may depend on las parameters)
     update_existing(makefb_params, params)
     # also update "maxbits" which depends on "I"
-    makefb_params["maxbits"] = params["I"] - 1
+    makefb_params["maxbits"] = params["I"]
     makefb_params["out"] = las_params["fb"]
 
     makefb_cmd_line = [makefb]

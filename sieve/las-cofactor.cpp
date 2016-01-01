@@ -22,11 +22,9 @@
 /* {{{ cofactoring area */
 
 /* Return 0 if the leftover norm n cannot yield a relation.
-   FIXME: need to check L^k < n < B^(k+1) too.
-   XXX: In doing this, pay attention to the fact that for the descent,
-   we might have B^2<L.
 
-   Possible cases, where qj represents a prime in [B,L], and rj a prime > L:
+   Possible cases, where qj represents a prime in [B,L], and rj a prime > L
+   (assuming L < B^2, which might be false for the DLP descent):
    (0) n >= 2^mfb
    (a) n < L:           1 or q1
    (b) L < n < B^2:     r1 -> cannot yield a relation
@@ -44,26 +42,27 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
   size_t s = mpz_sizeinbase (n, 2);
   unsigned int lpb = si->conf->sides[side]->lpb;
   unsigned int mfb = si->conf->sides[side]->mfb;
+  unsigned int klpb;
+  double nd, kB, B;
 
   if (s > mfb)
     return 0; /* n has more than mfb bits, which is the given limit */
-  /* now n < 2^mfb */
+
   if (s <= lpb)
     return 1; /* case (a) */
-    /* Note also that in the descent case where L > B^2, if we're below L
-     * it's still fine of course, but we have no guarantee that our
-     * cofactor is prime... */
-  /* now n >= L=2^lpb */
-  if (mpz_cmp (n, si->BB[side]) < 0)
-    return 0; /* case (b) */
-  /* now n >= B^2 */
-  if (2 * lpb < s)
+  /* Note that in the case where L > B^2, if we're below L it's still fine of
+     course, but we have no guarantee that our cofactor is prime... */
+
+  nd = mpz_get_d (n);
+  B = (double) si->conf->sides[side]->lim;
+  kB = B * B;
+  for (klpb = lpb; klpb < s; klpb += lpb, kB *= B)
     {
-      if (mpz_cmp (n, si->BBB[side]) < 0)
-        return 0; /* case (e) */
-      if (3 * lpb < s && mpz_cmp (n, si->BBBB[side]) < 0)
-        return 0; /* case (h) */
+      /* invariant: klpb = k * lpb, kB = B^(k+1) */
+      if (nd < kB) /* L^k < n < B^(k+1) */
+	return 0;
     }
+
   // TODO: maybe we should pass the modulus to the facul machinery
   // instead of reconstructing it.
   int prime=0;
@@ -152,11 +151,12 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
   for (int side = 0; side < 2; side++)
     {
       unsigned int lpb = si->strategies->lpb[side];
+      double B = (double) si->conf->sides[side]->lim;
       factors[side]->length = 0;
       multis[side]->length = 0;
 
       /* If n < B^2, then n is prime, since all primes < B have been removed */
-      if (mpz_cmp (n[side], si->BB[side]) < 0)
+      if (mpz_get_d (n[side]) < B * B)
 	{
 	  /* if n > L, return -1 */
 	  if (mpz_sizeinbase (n[side], 2) > lpb)
@@ -213,7 +213,8 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
 	  if (ret == -1)
 	    break;
 
-	  if (mpz_cmp (n[side], si->BB[side]) < 0)
+	  double B = (double) si->conf->sides[side]->lim;
+	  if (mpz_get_d (n[side]) < B * B)
 	    {
 	      if (mpz_sizeinbase (n[side], 2) > lpb)
 		{

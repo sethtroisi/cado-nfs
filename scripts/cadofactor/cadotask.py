@@ -2392,7 +2392,7 @@ class FactorBaseTask(Task):
             assert "poly" in self.state
             assert "alim" in self.state
             # The target file must correspond to the polynomial "poly"
-        self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
+        self.progparams[0].setdefault("maxbits", self.params["I"])
     
     def run(self):
         super().run()

@@ -44,7 +44,7 @@ mpz_product_tree_init (mpz_product_tree t)
   t->size = 0;
 }
 
-/* add a new entry z */
+/* add a new entry n to product tree t */
 static void
 mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
 {
@@ -527,8 +527,8 @@ update_status (mpz_t *R, uint32_t *perm,
 /* return the number n of smooth relations in l,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
-find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
-             FILE *out, int nthreads MAYBE_UNUSED)
+find_smooth (cofac_list l, mpz_t batchP[2], FILE *out,
+             int nthreads MAYBE_UNUSED)
 {
   unsigned long nb_rel_read = l->size;
   unsigned long nb_smooth;
@@ -548,10 +548,6 @@ find_smooth (cofac_list l, int lpb[2], unsigned long lim[2], mpz_t batchP[2],
 
   nb_smooth = 0;
   nb_unknown = nb_rel_read;
-
-  /* the code below assumes lim0 <= 2^lpb0 and lim1 <= 2^lpb1 */
-  ASSERT_ALWAYS(lim[0] <= (1UL << lpb[0]));
-  ASSERT_ALWAYS(lim[1] <= (1UL << lpb[1]));
 
   /* invariant: the smooth relations are in 0..nb_smooth-1,
      the unknown ones in nb_smooth..nb_unknown-1,
