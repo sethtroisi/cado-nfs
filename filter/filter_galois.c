@@ -306,7 +306,7 @@ static inline uint64_t myhash_3_1(int64_t a, uint64_t b)
     a3 = b2; b3 = -a2+b2;
     lexico3(&aa, &bb, a1, b1, a2, b2, a3, b3);
     uint64_t h = (CA_DUP2 * (uint64_t) aa + CB_DUP2 * (uint64_t)bb);
-    fprintf(stderr, "HASH3.1: %ld %lu -> %ld %ld -> h=%lu\n", a, b, aa, bb, h);
+    fprintf(stderr, "HASH3.1: %" PRId64 " %" PRIu64 " -> %" PRId64 " %" PRId64 " -> h=%" PRIu64 "\n", a, b, aa, bb, h);
     return h;
 }
 
@@ -318,7 +318,7 @@ static inline uint64_t myhash_3_2(int64_t a, uint64_t b)
     a3 = b2; b3 = -a2-b2;
     lexico3(&aa, &bb, a1, b1, a2, b2, a3, b3);
     uint64_t h = (CA_DUP2 * (uint64_t) aa + CB_DUP2 * (uint64_t)bb);
-    fprintf(stderr, "HASH3.2: %ld %lu -> %ld %ld -> h=%lu\n", a, b, aa, bb, h);
+    fprintf(stderr, "HASH3.2: %" PRId64 " %" PRIu64 " -> %" PRId64 " %" PRId64 " -> h=%" PRIu64 "\n", a, b, aa, bb, h);
     return h;
 }
 
