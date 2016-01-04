@@ -5,6 +5,8 @@
 #include "cado.h"
 #include "utils.h"
 
+unsigned int mpz_poly_is_reciproqual(mpz_poly_srcptr f);
+
 /*
   f0: the first polynomial.
   f1: the second polynomial.
@@ -23,7 +25,7 @@ double function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_poly_ptr g,
     mpz_ptr a, mpz_ptr b, mpz_ptr c, mpz_srcptr p, mpz_poly_ptr h,
     int * coeff, unsigned int q, unsigned int t,
     unsigned int nb_times, double * weight, int c_tol, gmp_randstate_t state,
-    unsigned int h_set);
+    unsigned int h_set, unsigned int gal);
 
 void function_classical(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_srcptr p,
     unsigned int n, int * coeff, unsigned int nb_times,
