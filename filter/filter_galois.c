@@ -152,6 +152,8 @@ static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *actio
 	    ASSERT_ALWAYS(sigma_r < p);
 	}
     }
+    else
+      ASSERT_ALWAYS(0); /* should not happen */
     return sigma_r;
 }
 
