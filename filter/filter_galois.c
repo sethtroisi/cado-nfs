@@ -85,7 +85,7 @@ static p_r_values_t my_inv(p_r_values_t r, p_r_values_t p){
 
 // TMP, TMP: should be replaced by stuff in galois_utils.
 static p_r_values_t apply_auto(p_r_values_t p, p_r_values_t r, const char *action){
-    p_r_values_t sigma_r;
+    p_r_values_t sigma_r = 0;
 
     if(strcmp(action, "1/y") == 0 || strcmp(action, "autom2.1g") == 0){
 	if (r == 0)
