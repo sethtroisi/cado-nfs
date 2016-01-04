@@ -540,21 +540,22 @@ double function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1,
   unsigned int k = 0;
   while (k < nb_times) {
     if (h_set) {
-      if (gal == 2) {
-        gen_g_gal(g_tmp, h, coeff_Z[0], coeff_Z[1], state);
-      } else {
+      if (gal == 0) {
         random_mpz_poly_constraint(g_tmp, coeff_Z[0], coeff_Z[1],
             (rand() % h->deg) + 1, state, h);
+
+      } else if (gal == 2) {
+        gen_g_gal(g_tmp, h, coeff_Z[0], coeff_Z[1], state);
       }
     } else {
-      if (gal == 2) {
-        random_mpz_poly_reciproqual(h_tmp, coeff_Z[0], coeff_Z[1], h->deg, 0,
-            state);
-        gen_g_gal(g_tmp, h, coeff_Z[0], coeff_Z[1], state);
-      } else {
+      if (gal == 0) {
         random_mpz_poly(h_tmp, coeff_Z[0], coeff_Z[1], h->deg, 0, state);
         random_mpz_poly_constraint(g_tmp, coeff_Z[0], coeff_Z[1],
             (rand() % h->deg) + 1, state, h);
+      } else if (gal == 2) {
+        random_mpz_poly_reciproqual(h_tmp, coeff_Z[0], coeff_Z[1], h->deg, 0,
+            state);
+        gen_g_gal(g_tmp, h, coeff_Z[0], coeff_Z[1], state);
       }
     }
     mpz_poly_set(f0_tmp, h_tmp);
