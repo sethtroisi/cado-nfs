@@ -1423,7 +1423,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 
 
 /*
-  This function is like facul, but we will work with the both norms
+  This function is like facul, but we will work with both norms
   together.  It returns the number of factors for each side.
 */
 int*
@@ -1442,8 +1442,8 @@ facul_both (mpz_t **factors, mpz_t* N,
   gmp_fprintf (stderr, "(%Zd %Zd)", N[0], N[1]);
 #endif
 
-  if (mpz_sgn (N[0]) <= 0 || mpz_sgn (N[1]) <= 0)
-      return found;
+  /* cofactors should be positive */
+  ASSERT (mpz_sgn (N[0]) > 0 && mpz_sgn (N[1]) > 0);
 
   if (mpz_cmp_ui (N[0], 1UL) == 0)
     is_smooth[0] = FACUL_SMOOTH;
