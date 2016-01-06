@@ -1349,7 +1349,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
       default: abort();
       }
       // check our result
-      // res_fac contains the number of factors found
+      // res_fac contains the number of factors found, or -1 of not smooth
       if (res_fac == -1)
 	{
 	  /*
