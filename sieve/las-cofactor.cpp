@@ -157,8 +157,9 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
       factors[side]->length = 0;
       multis[side]->length = 0;
 
+      double B = (double) si->conf->sides[side]->lim;
       /* If n < B^2, then n is prime, since all primes < B have been removed */
-      if (mpz_sizeinbase (n[side], 2) <= si->strategies->lpb[side])
+      if (mpz_get_d (n[side]) < B * B)
 	is_smooth[side] = FACUL_SMOOTH;
     }
 
