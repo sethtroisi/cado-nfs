@@ -150,7 +150,6 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
 
   for (int side = 0; side < 2; side++)
     {
-      unsigned int lpb = si->strategies->lpb[side];
       double B = (double) si->conf->sides[side]->lim;
       factors[side]->length = 0;
       multis[side]->length = 0;
@@ -158,12 +157,7 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
       /* If n < B^2, then n is prime, since all primes < B have been removed */
       if (mpz_get_d (n[side]) < B * B)
 	{
-	  /* if n > L, return -1 */
-	  if (mpz_sizeinbase (n[side], 2) > lpb)
-	    {
-              FREE_MPZ_FACTOR;
-	      return -1;
-	    }
+	  /* here, n should be <= L if check_leftover_norm() did its job */
 	  if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
 	    {
 	      append_mpz_to_array (factors[side], n[side]);
