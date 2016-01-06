@@ -825,7 +825,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
   ulong_list_clear (SP0);
   ulong_list_clear (SP1);
 
-  facul_clear_aux_methods (methods);
+  facul_clear_methods (methods);
 
   fprintf (out, "# batch: took %.2fs (wct %.2fs) to factor %lu smooth relations\n",
            seconds () - start, wct_seconds () - wct_start, n);
