@@ -1272,7 +1272,7 @@ void recomposeK(unsigned long * F, Kelt * f, size_t Fl, unsigned int k GF2X_MAYB
     assert(Fl <= (1UL << (k+1)));
     F[0] = f[0][0];
     F[1] = f[0][1];
-    for (i = 2; i < Fl; i += 2) {
+    for (i = 2; i + 1 < Fl; i += 2) {
         F[i] = f[i/2][0] ^ f[i/2 - 1][2];
         F[i+1] = f[i/2][1] ^ f[i/2 - 1][3];
     }
