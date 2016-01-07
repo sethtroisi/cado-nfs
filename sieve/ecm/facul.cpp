@@ -1047,7 +1047,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 }
 
 void
-modset_get_z (mpz_t z, struct modset_t *modset)
+modset_get_z (mpz_t z, const struct modset_t *modset)
 {
   ASSERT_ALWAYS(modset->arith != modset_t::CHOOSE_NONE);
   switch (modset->arith)
@@ -1290,7 +1290,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	ASSERT_ALWAYS(0);
       }
       // check our result
-      // res_fac contains the number of factors found, or -1 of not smooth
+      // res_fac contains the number of factors found, or -1 if not smooth
       if (res_fac == -1)
 	{
 	  /*
@@ -1307,7 +1307,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	     tries with an other method.
 	  */
 	  if (methods[i].is_the_last)
-            break;
+	    break;
 	  else
 	    continue;
 	}
