@@ -16,7 +16,9 @@
 #define MM_IMPL_MAGIC_basic     1
 #define MM_IMPL_MAGIC_sliced    2
 #define MM_IMPL_MAGIC_bucket    3
+#if 0
 #define MM_IMPL_MAGIC_threaded  4
+#endif
 #define MM_IMPL_MAGIC_basicp    1025
 
 #define CPP_PAD2(A,B) A ## B

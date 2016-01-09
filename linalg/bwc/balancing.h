@@ -31,16 +31,11 @@
 
 #define FLAG_COLPERM    1
 #define FLAG_ROWPERM    2
-#define FLAG_PADDING    4       /* pad to largest dimension */
-#define FLAG_REPLICATE  8       /* only balancing in one dimension */
-#define FLAG_SHUFFLED_MUL  16   /* corresponds to using shuffled product */
-
-/* Shuffled (a.k.a. reordered) product is when matmul_top code dispatches data
- * with allgather + reduce-scatter instead of bcast + reduce, for a gain in
- * efficiency. This amounts to considering the matrix Sr*M*Sc^-1*P (for left
- * multiplication) instead of Sr*M*Sc^-1. Therefore the same permutation pair
- * cannot be used compatibly in the shuffled and non-shuffled case.
- */
+#define FLAG_REPLICATE  8       /* work with square matrices (padding in
+                                   need be), and replicate one
+                                   permutation to the other side, so that
+                                   we get conjugated permutations.
+                                   */
 
 struct balancing_header_s {
     // FIXME: add a magic number here ? This header is read directly in
@@ -64,6 +59,9 @@ struct balancing_header_s {
     // matrix M*S, for some permutation S. As long as we are concerned
     // with left nullspace, this does not make any difference, but it
     // does for right nullspace !
+    /* Note: pshuf and pshuf_inv have to do with what is called
+     * "shuffled-product" elsewhere (and has actually become the default)
+     */
     uint32_t pshuf[2];
     uint32_t pshuf_inv[2];
 };
@@ -123,28 +121,18 @@ static inline unsigned long balancing_row_shuffle_common_(unsigned long r, unsig
  * rshuf_inv arrays */
 static inline unsigned long balancing_pre_shuffle(balancing_ptr bal, unsigned long r)
 {
-    if (r >= bal->h->ncols) return r;
-    return balancing_row_shuffle_common_(r, bal->h->ncols, bal->h->pshuf);
+    unsigned int K = MIN(bal->h->ncols, bal->h->nrows);
+    if (r >= K) return r;
+    return balancing_row_shuffle_common_(r, K, bal->h->pshuf);
 }
 static inline unsigned long balancing_pre_unshuffle(balancing_ptr bal, unsigned long r)
 {
-    if (r >= bal->h->ncols) return r;
-    return balancing_row_shuffle_common_(r, bal->h->ncols, bal->h->pshuf_inv);
+    unsigned int K = MIN(bal->h->ncols, bal->h->nrows);
+    if (r >= K) return r;
+    return balancing_row_shuffle_common_(r, K, bal->h->pshuf_inv);
 }
 
 
-static inline int balancing_progressive_dispatch_block(int n, int t, int k)
-{
-    int f = n / t;
-    int r = n % t;
-    int c = f + 1;
-    if (k < r * c) {
-        return k / c;
-    } else {
-        k -= r * c;
-        return r + k / f;
-    }
-}
 #ifdef __cplusplus
 }
 #endif

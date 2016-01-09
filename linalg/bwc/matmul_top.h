@@ -12,152 +12,104 @@
 #include "balancing.h"
 #include "misc.h"
 #include "mpfq/mpfq_vbase.h"
-
-/* Don't touch this. */
-#define CONJUGATED_PERMUTATIONS
-
-/* A communicator is the information concerning our matrix in one of its
- * two dimensions. Everything is made so that inverting the direction
- * flag should make it possible to compute with the transposed matrix
- * easily.
- * 
- * [note: communicators, both for this layer and the parallelizing_info
- * layer, used to be called "wirings", hence the variable name "wr"]
- *
- * Communicator number 0 is ``horizontal''. In detail, what this means
- * is:
- *
- * n is the total number of rows ; the total number of instances of this
- * communicator, so to say.
- * v is the LEFT vector (result of matrix-times-vector, or input of
- *   vector-times-matrix).
- * fences denote the row indices within the matrix where the different
- *   jobs are split.
- * x denotes the intersection data for communication across rows.
- * i0 denotes the row indices of our local matrix chunk.
- *
- * Horizontal indices i0 to i1 of the LEFT column vector are stored locally.
- * --> v is a chunk of i1-i0 data elements.
- *
- * Communication with the left vector. The intent is to obtain a right
- * vector.
- * --> reduce is done across rows. The destination for row index i is
- *   column index i on conjugation mode(*)
- * XXX TBC.
- *
- * (*) it's somewhat different in non-conjugation mode, since a
- * permutation has to be taken (in which case allreduce is probably
- * preferrable).
- *
- *
- *
- * Note also that we have the pi_comm to consider as well. Those
- * have nothing to do with the matrix, and are relevant with regard to
- * the parallelization of the work.
- */
+#include "async.h"
 
 // the ``all_v'' field collects all the pointers to the per-thread vector
 // values. There are exactly pi->wr[0]->ncores such pointers in
 // mmt->wr[0]. In some cases, these pointers may be equal (for source
 // vectors, never used as destination), and in some cases not.
 
+struct mmt_vec_s;
+typedef struct mmt_vec_s * mmt_vec_ptr;
+
 struct mmt_vec_s {
     mpfq_vbase_ptr abase;
+    parallelizing_info_ptr pi;
+    int d;
     pi_datatype_ptr pitype;
-    size_t stride;      // shorcut to this->abase->vec_elt_stride(this->abase,1)
     void * v;
-    void * * all_v;
-    // internal use
-    int flags;
+    mmt_vec_ptr * siblings;     /* pi->wr[d]->ncores siblings ;
+                                   only in case all cores in the communicator
+                                   have their own data area v */
+    unsigned int n;             // total size in items
+    unsigned int i0;
+    unsigned int i1;
+    size_t rsbuf_size;          // auto-expanded on demand.
+    void * rsbuf[2];            // only for RS_CHOICE == RS_CHOICE_MINE
+    int consistency;    /* 0 == inconsistent ; 1 == partial ; 2 == full */
 };
 typedef struct mmt_vec_s mmt_vec[1];
-typedef struct mmt_vec_s * mmt_vec_ptr;
 
 /* some handy macros to access portions of mmt_vec's */
 #define SUBVEC(v,w,offset) (v)->abase->vec_subvec(v->abase, (v)->w, offset)
 #define SUBVEC_const(v,w,offset) (v)->abase->vec_subvec_const(v->abase, (v)->w, offset)
 
-/*
-struct mmt_generic_vec_s {
-    void * v;
-    void ** all_v;
-    // internal use
-    int flags;
+/* yikes. yet another list structure. Wish we had the STL. */
+struct permutation_data {
+    size_t n;
+    size_t alloc;
+    unsigned int (*x)[2];
 };
-typedef struct mmt_generic_vec_s mmt_generic_vec[1];
-typedef struct mmt_generic_vec_s * mmt_generic_vec_ptr;
-*/
+typedef struct permutation_data permutation_data[1];
+typedef struct permutation_data * permutation_data_ptr;
+/* all methods are private */
 
-struct mmt_comm_s {
-    unsigned int i0;
-    unsigned int i1;
-    /* Note that while i0 and i1 are obviously abase-dependent, clearly
-     * the two following fields are not ! */
-    mmt_vec v;
-    size_t rsbuf_size;          // auto-expanded on demand.
-    void * rsbuf[2];            // only for USE_ALTERNATIVE_REDUCE_SCATTER
-};
-typedef struct mmt_comm_s mmt_comm[1];
-typedef struct mmt_comm_s * mmt_comm_ptr;
-typedef struct mmt_comm_s const * mmt_comm_srcptr;
-
-/* TODO: It's unhandy to have abase here, since it forces some files to
- * be abase-dependent, without any real reason.
- */
-struct matmul_top_data_s {
-    parallelizing_info_ptr pi;
-
-    // w <- M v, or v^T <- w^T M would make sense. Of course v^T and w^T
-    // are represented in exactly the same way.
-
-    // global stuff. n[] is going to be misleading in any situation. It's
-    // the size of the matrix in the given direction. Meaning that n[0]
-    // is the horizontal size -- the size of the rows --. This means the
-    // number of columns.
+struct matmul_top_matrix_s {
+    // global stuff.
+    //
+    // n[0] is the number of rows, includding padding.
+    // n[1] is the number of columns, includding padding.
+    //
+    // n0[] is without padding.
+    //
+    // Note that a communicator in direction 0 handles in total a dataset
+    // of size n[1] (the number of items in a matrix row is the number of
+    // columns.
     unsigned int n[2];
     unsigned int n0[2]; // n0: unpadded.
-    // unsigned int ncoeffs_total;
 
-    // local stuff
-    // // unsigned int ncoeffs;
-    
     // this really ends up within the mm field.
     char * locfile;
 
-    mmt_comm wr[2];
-
-#ifdef  CONJUGATED_PERMUTATIONS
-    // fences[0]: horizontal fences == row indices (horizontal separating line)
-    // fences[1]: vertical fences == col indices (vertical separating line)
-    // fences[0] contains 1 + pi->wr[1]->totalsize values
-    // fences[1] contains 1 + pi->wr[0]->totalsize values
-    //
-    // it turns out later on that this numbering is slightly orthogonal
-    // to the one used in most of the rest of the code, so maybe it's a
-    // bad decision. Fortunately, fences[] is rarely used.
-    unsigned int * fences[2];
-#endif
     balancing bal;
 
+    /* These are local excerpts of the balancing permutation: arrays of
+     * pairs (row index in the (sub)-matrix) ==> (row index in the
+     * original matrix), but only when both coordinates of this pair are
+     * in the current row and column range. This can be viewed as the set
+     * of non-zero positions in the permutation matrix if it were split
+     * just like the current matrix is. */
+    permutation_data_ptr perm[2];       /* rowperm, colperm */
+
     matmul_ptr mm;
-
-    mpfq_vbase_ptr abase;
-    pi_datatype_ptr pitype;
-
-    int io_truncate;
 };
 
-/* THREAD_MULTIPLE_VECTOR is when several threads will be writing to the
- * vector simultaneously. This implies having separate areas.
- *
- * TODO: Think about waiving this restriction in the spirit of bucket
- * sieving, maybe */
-#define THREAD_MULTIPLE_VECTOR    0
-#define THREAD_SHARED_VECTOR    1
+typedef struct matmul_top_matrix_s matmul_top_matrix[1];
+typedef struct matmul_top_matrix_s * matmul_top_matrix_ptr;
+typedef struct matmul_top_matrix_s const * matmul_top_matrix_srcptr;
+
+struct matmul_top_data_s {
+    parallelizing_info_ptr pi;
+    mpfq_vbase_ptr abase;
+    pi_datatype_ptr pitype;
+    /* These n[] and n0[] correspond to the dimensions of the product
+     *
+     * n[0] is matrices[0]->n[0]
+     * n[1] is matrices[nmatrices-1]->n[1]
+     */
+    unsigned int n[2];
+    unsigned int n0[2]; // n0: unpadded.
+    int nmatrices;
+    matmul_top_matrix * matrices;
+};
 
 typedef struct matmul_top_data_s matmul_top_data[1];
 typedef struct matmul_top_data_s * matmul_top_data_ptr;
 typedef struct matmul_top_data_s const * matmul_top_data_srcptr;
+
+/* These are flags for the distributed vectors. For the moment we have
+ * only one flag */
+#define THREAD_SHARED_VECTOR    1
 
 #ifdef __cplusplus
 extern "C" {
@@ -165,9 +117,7 @@ extern "C" {
 
 extern void matmul_top_init(matmul_top_data_ptr mmt,
         mpfq_vbase_ptr abase,
-        pi_datatype_ptr pitype,
         parallelizing_info_ptr pi,
-        int const * flags,
         param_list pl,
         int optimized_direction);
 
@@ -178,80 +128,53 @@ extern void matmul_top_clear(matmul_top_data_ptr mmt);
 #if 0
 extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
 #endif
-extern void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
-extern void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
-extern void matmul_top_set_random_and_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate);
+extern size_t mmt_my_own_size_in_items(mmt_vec_ptr v);
+extern size_t mmt_my_own_size_in_bytes(mmt_vec_ptr v);
+extern size_t mmt_my_own_offset_in_items(mmt_vec_ptr v);
+extern size_t mmt_my_own_offset_in_bytes(mmt_vec_ptr v);
+extern void * mmt_my_own_subvec(mmt_vec_ptr v);
+
+extern void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate);
 /* do not use this function if you want consistency when the splitting
  * changes ! */
-extern void matmul_top_set_random_inconsistent(matmul_top_data_ptr mmt, int d, gmp_randstate_t rstate);
+extern void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate);
+extern void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int nx);
 
-
-extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, int d, mmt_vec_ptr w, mmt_vec_ptr v);
 extern void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_mul_comm(matmul_top_data_ptr mmt, int d);
-static inline void matmul_top_mul(matmul_top_data_ptr mmt, int d)
-{
-    matmul_top_mul_cpu(mmt, d);
-    matmul_top_mul_comm(mmt, d);
-}
+extern void matmul_top_mul_comm(mmt_vec_ptr w, mmt_vec_ptr v);
 
-/* decoding ``apply_P_apply_S''. If bw->dir==0, vectors are row vectors.
- * Multiplication is on the right. For d==0, the result is then v*P*S (we
- * multiply by P, then by S). For d==1, the applications are transposed,
- * so the transpose of the result is S*P*trsp(v). In all cases,
- * ``applying'' means multiplying by the named matrix(ces), in order, in
- * the case d==bw->dir, and to the left or to the right depending which
- * is appropriate. The multiplications are transposed in the case of
- * d==!bw->dir
- */
-extern void matmul_top_zero_vec_area(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_apply_P_apply_S(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_unapply_S_unapply_P(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_apply_P(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_unapply_P(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_apply_S(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_unapply_S(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_apply_T(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_unapply_T(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_twist_vector(matmul_top_data_ptr mmt, int d);
-extern void matmul_top_untwist_vector(matmul_top_data_ptr mmt, int d);
-extern void indices_apply_S(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);
-extern void indices_apply_P(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);
+/* v is both input and output. w is temporary */
+extern void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec *w, struct timing_data * tt);
 
-extern void matmul_top_vec_init(matmul_top_data_ptr mmt, int d, int flags);
-extern void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d);
-
-/* Now some of the generic interface calls. By design, not everything is
- * possible with these calls. In particular, nothing critical is doable.
- * As a general convention, the only thing these calls need to know about
- * the abase is the stride value, which corresponds to sizeof(abelt)
- * Besides that, the generic calls take the vector pointer as argument.
- * Specifying NULL as vector argument is equivalent to taking the default
- * vector defined in the mmt data for the given direction flag. */
-
-
-extern void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr, mmt_vec_ptr v, int d, int flags);
-extern void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
+extern void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr pitype, mmt_vec_ptr v, int d, int flags, unsigned int n);
+extern void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v);
+extern void mmt_own_vec_set(mmt_vec_ptr w, mmt_vec_ptr v);
+extern void mmt_own_vec_set2(mmt_vec_ptr z, mmt_vec_ptr w, mmt_vec_ptr v);
+extern void mmt_full_vec_set(mmt_vec_ptr w, mmt_vec_ptr v);
+extern void mmt_full_vec_set_zero(mmt_vec_ptr v);
 #if 0
 extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_vec_ptr v, int d);
 #endif
-extern void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
-extern void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
+extern int mmt_vec_load_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk);
+extern int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk);
+extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
+extern int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
 
-/* These two do not really belong here, but come as a useful complement */
-extern void vec_init_generic(pi_comm_ptr, mpfq_vbase_ptr, pi_datatype_ptr, mmt_vec_ptr, int, unsigned int);
-extern void vec_clear_generic(pi_comm_ptr, mmt_vec_ptr, unsigned int);
-
-/* we should refrain from exposing these. At least for mksol,
- * allreduce_across is really useful, though. We use it for the block
- * Lanczos iterations, too.
- */
-// extern void broadcast_down(matmul_top_data_ptr mmt, int d);
-// extern void reduce_across(matmul_top_data_ptr mmt, int d);
-extern void allreduce_across(matmul_top_data_ptr mmt, int d);
-// extern void apply_permutation(matmul_top_data_ptr mmt, int d);
-// extern void apply_identity(matmul_top_data_ptr mmt, int d);
-
+extern void mmt_vec_broadcast(mmt_vec_ptr v);
+extern void mmt_vec_reduce(mmt_vec_ptr w, mmt_vec_ptr v);
+extern void mmt_vec_reduce_sameside(mmt_vec_ptr v);
+extern void mmt_vec_allreduce(mmt_vec_ptr v);
+extern void mmt_vec_twist(matmul_top_data_ptr mmt, mmt_vec_ptr y);
+extern void mmt_vec_untwist(matmul_top_data_ptr mmt, mmt_vec_ptr y);
+extern void mmt_vec_apply_T(matmul_top_data_ptr mmt, mmt_vec_ptr y);
+extern void mmt_vec_unapply_T(matmul_top_data_ptr mmt, mmt_vec_ptr y);
+extern void mmt_vec_apply_S(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr y);
+extern void mmt_vec_unapply_S(matmul_top_data_ptr mmt, int midx, mmt_vec_ptr y);
+extern void mmt_vec_apply_P(matmul_top_data_ptr mmt, mmt_vec_ptr y);
+extern void mmt_vec_unapply_P(matmul_top_data_ptr mmt, mmt_vec_ptr y);
+extern void mmt_apply_identity(mmt_vec_ptr w, mmt_vec_ptr v);
+extern void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);
 
 #ifdef __cplusplus
 }

@@ -111,12 +111,18 @@ if ($mode eq 'balancing') {
     my $rowperm = $flags & 2;
     $txflags .= ", colperm" if $colperm;
     $txflags .= ", rowperm" if $rowperm;
-    $txflags .= ", padding" if $flags & 4;
     $txflags .= ", replicate" if $flags & 8;
-    my $tr = $nr;
-    my $tc = $nc;
-    if ($flags & 4) {
-        $tr = $tc = $nr > $nc ? $nr : $nc;
+    # pad.
+    my $pad = sub {
+        my ($n,$K,$b)=@_;
+        my $x = int(($n + $K-1)/$K);
+        while ($x % $b) { $x++; }
+        return $x*$K;
+    };
+    my $tr = &$pad($nr,$nh*$nv,8);
+    my $tc = &$pad($nc,$nh*$nv,8);
+    if ($flags & 8) {
+        $tr = $tc = $tr > $tc ? $tr : $tc;
     }
     print "nr:=$tr; // originally $nr\n";
     print "nc:=$tc; // originally $nc\n";

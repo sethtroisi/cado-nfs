@@ -128,7 +128,8 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     unsigned long maxsize = siz;
     pi_allreduce(NULL, &maxsize, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_MAX, wr);
 
-    char * strings = shared_malloc_set_zero(wr, wr->totalsize * siz);
+    char * strings = malloc(wr->totalsize * maxsize);
+    memset(strings, 0, wr->totalsize * maxsize);
 
     int me = wr->jrank * wr->ncores + wr->trank;
 
@@ -138,8 +139,11 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     ASSERT_ALWAYS(rc >= 0);
     snprintf(strings + me * maxsize, maxsize, fmt, buf);
     free(fmt);
+    pi_allreduce(NULL, strings, wr->totalsize * maxsize, BWC_PI_BYTE, BWC_PI_BXOR, wr);
 
     char * ptr = strings;
+
+    serialize(pi->m);
 
     if (print) {
         /* There's also the null byte counted in siz. So that makes one
@@ -166,7 +170,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
         }
     }
     serialize(wr);
-    shared_free(wr, strings);
+    free(strings);
 }
 
 static void get_node_number_and_prefix(parallelizing_info_ptr pi)
@@ -935,6 +939,8 @@ void pi_log_op(pi_comm_ptr wr, const char * fmt, ...)
     gettimeofday(e->tv, NULL);
 
     vsnprintf(e->what, sizeof(e->what), fmt, ap);
+    if (wr->ncores > 1)
+        fprintf(stderr, "%s:%d:%d %s\n", wr->th->desc, wr->jrank, wr->trank, e->what);
     va_end(ap);
 
     lb->next++;
@@ -1034,15 +1040,21 @@ static struct pi_datatype_s pi_predefined_types[] = {
     { MPI_BYTE,	                NULL, 1 },
     { MPI_UNSIGNED,	        NULL, sizeof(unsigned) },
     { MPI_UNSIGNED_LONG,	NULL, sizeof(unsigned long) },
+    { MPI_UNSIGNED_LONG_LONG,	NULL, sizeof(unsigned long long) },
     { MPI_LONG,	                NULL, sizeof(long) },
 };
 
+/* TODO: mpi-3.0 introduced (at last) MPI_UINT64_T and friends. There are
+ * several places where this can come in handy. So once we set our mind
+ * on requiring mpi-3.0, we can do some simplifications here and there.
+ */
 pi_datatype_ptr BWC_PI_INT              = pi_predefined_types + 0;
 pi_datatype_ptr BWC_PI_DOUBLE           = pi_predefined_types + 1;
 pi_datatype_ptr BWC_PI_BYTE             = pi_predefined_types + 2;
 pi_datatype_ptr BWC_PI_UNSIGNED         = pi_predefined_types + 3;
 pi_datatype_ptr BWC_PI_UNSIGNED_LONG    = pi_predefined_types + 4;
-pi_datatype_ptr BWC_PI_LONG             = pi_predefined_types + 5;
+pi_datatype_ptr BWC_PI_UNSIGNED_LONG_LONG    = pi_predefined_types + 5;
+pi_datatype_ptr BWC_PI_LONG             = pi_predefined_types + 6;
 
 
 struct pi_op_s BWC_PI_MIN[1]	= { { .stock = MPI_MIN, } };
@@ -1072,11 +1084,17 @@ struct reduction_function {
 static void reducer_byte_min(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_byte_max(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_byte_sum(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
+static void reducer_byte_bxor(const unsigned char * b, unsigned char * a, int s) { for( ; s-- ; a++, b++) *a ^= *b; }
 static void reducer_int_min(const int * b, int * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_int_max(const int * b, int * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_int_sum(const int * b, int * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
 static void reducer_int_band(const int * b, int * a, int s) { for( ; s-- ; a++, b++) *a &= *b; }
 static void reducer_int_bor(const int * b, int * a, int s) { for( ; s-- ; a++, b++) *a |= *b; }
+static void reducer_uint_min(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
+static void reducer_uint_max(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
+static void reducer_uint_sum(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) *a += *b; }
+static void reducer_uint_band(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) *a &= *b; }
+static void reducer_uint_bor(const unsigned int * b, unsigned int * a, unsigned int s) { for( ; s-- ; a++, b++) *a |= *b; }
 static void reducer_double_min(const double * b, double * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_double_max(const double * b, double * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_double_sum(const double * b, double * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
@@ -1091,11 +1109,17 @@ struct reduction_function predefined_functions[] = {
     { MPI_BYTE,          MPI_MIN,  (thread_reducer_t) reducer_byte_min, },
     { MPI_BYTE,          MPI_MAX,  (thread_reducer_t) reducer_byte_max, },
     { MPI_BYTE,          MPI_SUM,  (thread_reducer_t) reducer_byte_sum, },
+    { MPI_BYTE,          MPI_BXOR, (thread_reducer_t) reducer_byte_bxor, },
     { MPI_INT,           MPI_MIN,  (thread_reducer_t) reducer_int_min, },
     { MPI_INT,           MPI_MAX,  (thread_reducer_t) reducer_int_max, },
     { MPI_INT,           MPI_SUM,  (thread_reducer_t) reducer_int_sum, },
     { MPI_INT,           MPI_BAND, (thread_reducer_t) reducer_int_band, },
     { MPI_INT,           MPI_BOR,  (thread_reducer_t) reducer_int_bor, },
+    { MPI_UNSIGNED,      MPI_MIN,  (thread_reducer_t) reducer_uint_min, },
+    { MPI_UNSIGNED,      MPI_MAX,  (thread_reducer_t) reducer_uint_max, },
+    { MPI_UNSIGNED,      MPI_SUM,  (thread_reducer_t) reducer_uint_sum, },
+    { MPI_UNSIGNED,      MPI_BAND, (thread_reducer_t) reducer_uint_band, },
+    { MPI_UNSIGNED,      MPI_BOR,  (thread_reducer_t) reducer_uint_bor, },
     { MPI_DOUBLE,        MPI_MIN,  (thread_reducer_t) reducer_double_min, },
     { MPI_DOUBLE,        MPI_MAX,  (thread_reducer_t) reducer_double_max, },
     { MPI_DOUBLE,        MPI_SUM,  (thread_reducer_t) reducer_double_sum, },
@@ -1354,6 +1378,17 @@ static void pi_thread_allreduce_out(int s MAYBE_UNUSED, struct pi_collective_arg
 void pi_thread_allreduce(void *ptr, void *dptr, size_t count,
                 pi_datatype_ptr datatype, pi_op_ptr op, pi_comm_ptr wr)
 {
+    /* this code is buggy in the not-in-place case. let's fall back
+     * to the in-place situation unconditionally.
+     *
+     * nature of the bug: if we don't do the fallback below, then clearly
+     * a->ptr is being written to. We should clean this up, and use const
+     * when possible.
+     */
+    if (ptr && ptr != dptr) {
+        memcpy(dptr, ptr, count * datatype->item_size);
+        ptr = NULL;
+    }
     struct pi_collective_arg a[1];
     a->wr = wr;
     a->ptr = ptr ? ptr : dptr;  /* handle in-place */
@@ -1593,13 +1628,12 @@ void pi_hello(parallelizing_info_ptr pi)
  * In multithreaded context, f must represent a different data area on
  * all threads.
  */
-int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode, size_t totalsize)
+int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode)
 {
     memset(f, 0, sizeof(pi_file_handle));
     f->pi = pi;
     f->inner = inner;
     f->outer = !inner;
-    f->totalsize = totalsize;
     f->f = NULL;
     f->name = strdup(name);
     f->mode = strdup(mode);
@@ -1633,7 +1667,7 @@ int area_is_zero(const void * src, ptrdiff_t offset0, ptrdiff_t offset1)
     return 1;
 }
 
-ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size)
+ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize)
 {
     ASSERT_ALWAYS(size <= ULONG_MAX);
 
@@ -1685,7 +1719,7 @@ ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size)
                                     MPI_STATUS_IGNORE);
                         }
                         if (!failed) {
-                            size_t wanna_write = MIN(size * nci, f->totalsize - res);
+                            size_t wanna_write = MIN(size * nci, totalsize - res);
                             if (wanna_write < size * nci) {
                                 ASSERT_ALWAYS(area_is_zero(sbuf, wanna_write, size * nci));
                             }
@@ -1709,7 +1743,7 @@ ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size)
     return res;
 }
 
-ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size)
+ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize)
 {
     ASSERT_ALWAYS(size <= ULONG_MAX);
 
@@ -1748,7 +1782,7 @@ ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size)
                         /* leader node to read then send data */
                         memset(sbuf, 0, nci * size);
                         if (!failed) {
-                            size_t wanna_read = MIN(size * nci, f->totalsize - res);
+                            size_t wanna_read = MIN(size * nci, totalsize - res);
                             ssize_t x = fread(sbuf, 1, wanna_read, f->f);
                             res += x;
                             if (x < (ssize_t) wanna_read) {

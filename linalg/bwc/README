@@ -173,7 +173,7 @@ expected to be present in the same directory as the calling binary.
     stored. If the value here is too small, then there are chances that
     you exhaust your disk space.
 
-* mm_impl=[basic|sliced|threaded|bucket|...]
+* mm_impl=[basic|sliced|bucket|...]
 
     low-level matrix multiplication code to use. See below in this document.
 
@@ -296,10 +296,9 @@ wdir/W.<bchecksum>                  kernel vectors
 The permutation P
 =================
 
-bwc now uses (optionally) a shuffled matrix times vector product, which
-as a side effect of the matrix times vector product also multiplies by a
-certain permutation matrix. This is done for best efficiency. For the
-case of the un-shuffled product, P is the identity.
+bwc uses a shuffled matrix times vector product, which as a side
+effect of the matrix times vector product also multiplies by a certain
+permutation matrix. This is done for best efficiency.
 
 This permutation matrix is as follows. We assume that the matrix m is
 split in nh horizontal and nv vertical strips. M is first and foremost
@@ -622,7 +621,7 @@ Using bwc.pl with MPI (updated 20150611)
        bwc_bindir= where the binaries are (accessible by all machines)
        mpi_extra_args= this is needed for openmpi
 
-    $ bwc.pl :complete seed=1 thr=2x2 mpi=2x2 hosts=andouille,chipolata,chorizo,merguez matrix=/localdisk/tmp/nfs/c156.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+    $ bwc.pl :complete seed=1 thr=2x2 mpi=2x2 hosts=andouille,chipolata,chorizo,merguez matrix=/localdisk/tmp/nfs/c156.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
 
 Note: Some additional scheduler-specific bits and pieces (consider them as
 example documentation status only -- none are part of regular tests):

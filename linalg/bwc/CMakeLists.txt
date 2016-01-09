@@ -25,7 +25,7 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
-set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced threaded
+set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
 set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 pz
@@ -332,6 +332,8 @@ bwc_program(dispatch dispatch.c xdotprod.c)
 bwc_program(mksol mksol.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
+bwc_program(blocklanczos blocklanczos.c)
+target_link_libraries(blocklanczos bitlinalg)
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION
     ${LIBSUFFIX}/linalg/bwc)
@@ -424,9 +426,6 @@ add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     bwc_matmul)
 
 # Those are used only for tests.
-add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
-target_link_libraries(short_matmul bwc_base)
-bwc_program_extra(spmv_test spmv_test.c)
 bwc_program_extra(build_matcache build_matcache.c)
 target_link_libraries(build_matcache matmul_mf)
 bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)

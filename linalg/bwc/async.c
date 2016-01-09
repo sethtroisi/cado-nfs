@@ -15,21 +15,28 @@
 // int int_caught = 0;
 int hup_caught = 0;
 
+/* With respect to the currently running timer, extract a set of timing
+ * values which is complete. That means a copy, except that for the
+ * current timer, we do value + clock().
+ */
 static void extract_interval(timing_interval_data * since_last_reset, timing_interval_data * since_beginning, struct timing_data * t)
 {
-    memcpy(since_last_reset, t->since_last_reset, NTIMERS_EACH_ITERATION * sizeof(struct timing_interval_data_s));
-    memcpy(since_beginning, t->since_beginning, NTIMERS_EACH_ITERATION * sizeof(struct timing_interval_data_s));
+    memcpy(since_last_reset, t->since_last_reset, t->ntimers * sizeof(struct timing_interval_data_s));
+    memcpy(since_beginning, t->since_beginning, t->ntimers * sizeof(struct timing_interval_data_s));
     double d[2];
+
     seconds_user_sys(d);
     since_last_reset[t->which]->job[0] += d[0];
     since_last_reset[t->which]->job[1] += d[1];
     since_beginning[t->which]->job[0] += d[0];
     since_beginning[t->which]->job[1] += d[1];
+
     thread_seconds_user_sys(d);
     since_last_reset[t->which]->thread[0] += d[0];
     since_last_reset[t->which]->thread[1] += d[1];
     since_beginning[t->which]->thread[0] += d[0];
     since_beginning[t->which]->thread[1] += d[1];
+
     double w = wct_seconds();
     since_last_reset[t->which]->wct += w;
     since_beginning[t->which]->wct += w;
@@ -37,9 +44,11 @@ static void extract_interval(timing_interval_data * since_last_reset, timing_int
 
 void timing_next_timer(struct timing_data * t)
 {
+    if (!t) return;
     double d[2];
+    int next = (t->which + 1) % t->ntimers;
+
     seconds_user_sys(d);
-    int next = (t->which + 1) % NTIMERS_EACH_ITERATION;
     t->since_last_reset[t->which]->job[0] += d[0];
     t->since_last_reset[t->which]->job[1] += d[1];
     t->since_beginning[t->which]->job[0] += d[0];
@@ -48,6 +57,7 @@ void timing_next_timer(struct timing_data * t)
     t->since_last_reset[next]->job[1] -= d[1];
     t->since_beginning[next]->job[0] -= d[0];
     t->since_beginning[next]->job[1] -= d[1];
+
     thread_seconds_user_sys(d);
     t->since_last_reset[t->which]->thread[0] += d[0];
     t->since_last_reset[t->which]->thread[1] += d[1];
@@ -57,17 +67,18 @@ void timing_next_timer(struct timing_data * t)
     t->since_last_reset[next]->thread[1] -= d[1];
     t->since_beginning[next]->thread[0] -= d[0];
     t->since_beginning[next]->thread[1] -= d[1];
+
     double w = wct_seconds();
     t->since_last_reset[t->which]->wct += w;
     t->since_last_reset[next]->wct -= w;
     t->since_beginning[t->which]->wct += w;
     t->since_beginning[next]->wct -= w;
+
     t->which = next;
 }
 
 static void timing_partial_init(struct timing_data * t, int iter)
 {
-    memset(t, 0, sizeof(struct timing_data));
     t->go_mark = iter;
     t->last_print = iter;
     t->next_print = iter + 1;
@@ -87,27 +98,66 @@ static void timing_partial_init(struct timing_data * t, int iter)
     t->since_last_reset[t->which]->wct = -w;
 }
 
-void timing_init(struct timing_data * t, int start, int end)
+void timing_init(struct timing_data * t, int n, int start, int end)
 {
+    memset(t, 0, sizeof(struct timing_data));
+    t->ntimers = n;
+    t->names = malloc(n * sizeof(char *));
+    t->items = malloc(n * sizeof(size_t));
+    for(int i = 0 ; i < n ; i++) {
+        t->items[i] = 0;
+        int rc = asprintf(&(t->names[i]), "timer%d", i);
+        ASSERT_ALWAYS(rc >= 0);
+    }
+    t->since_last_reset = malloc(n * sizeof(timing_interval_data));
+    t->since_beginning = malloc(n * sizeof(timing_interval_data));
+    memset(t->since_last_reset, 0, n * sizeof(timing_interval_data));
+    memset(t->since_beginning, 0, n * sizeof(timing_interval_data));
+
     timing_partial_init(t, start);
-    memcpy(t->since_beginning, t->since_last_reset, sizeof(t->since_last_reset));
+    memcpy(t->since_beginning, t->since_last_reset, n * sizeof(timing_interval_data));
     t->begin_mark = start;
     t->end_mark = end;
 }
 
-void timing_clear(struct timing_data * t MAYBE_UNUSED)
+void timing_set_timer_name(struct timing_data * t, int i, const char * fmt, ...)
 {
+    va_list ap;
+    va_start(ap, fmt);
+    ASSERT_ALWAYS(i >= 0 && i < t->ntimers);
+    free(t->names[i]);
+    int rc = vasprintf(&(t->names[i]), fmt, ap);
+    ASSERT_ALWAYS(rc >= 0);
+    va_end(ap);
 }
 
-static void timing_rare_checks(pi_comm_ptr wr, struct timing_data * t, int iter, int print)
+void timing_set_timer_items(struct timing_data * t, int i, size_t v)
 {
+    t->items[i] = v;
+}
+
+void timing_clear(struct timing_data * t)
+{
+    for(int i = 0 ; i < t->ntimers ; i++) {
+        free(t->names[i]);
+    }
+    free(t->names);
+    free(t->items);
+    free(t->since_last_reset);
+    free(t->since_beginning);
+}
+
+static void timing_rare_checks(pi_comm_ptr wr MAYBE_UNUSED, struct timing_data * t MAYBE_UNUSED, int iter MAYBE_UNUSED, int print MAYBE_UNUSED)
+{
+#if 0
+/* This is very probably buggy */
     /* We've decided that it was time to check for asynchronous data.
      * Since it's an expensive operation, the whole point is to avoid
      * doing this check too often. */
     // timing_update_ticks(t, iter);
 
-    timing_interval_data since_last_reset[NTIMERS_EACH_ITERATION];
-    timing_interval_data since_beginning[NTIMERS_EACH_ITERATION];
+    timing_interval_data since_last_reset[ntimers];
+    timing_interval_data since_beginning[ntimers];
     extract_interval(since_last_reset, since_beginning, t);
 
     /* First, re-evaluate the async checking period */
@@ -157,6 +207,7 @@ static void timing_rare_checks(pi_comm_ptr wr, struct timing_data * t, int iter,
     hup_caught = 0;
     // int_caught = 0;
     timing_partial_init(t, iter);
+#endif
 }
 
 
@@ -195,26 +246,31 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
 
     char buf[20];
 
-    timing_interval_data since_last_reset[NTIMERS_EACH_ITERATION];
-    timing_interval_data since_beginning[NTIMERS_EACH_ITERATION];
+    timing_interval_data since_last_reset[timing->ntimers];
+    timing_interval_data since_beginning[timing->ntimers];
     extract_interval(since_last_reset, since_beginning, timing);
     double di = iter - timing->go_mark;
 
-#ifdef MEASURE_LINALG_JITTER_TIMINGS
-    double cpu = since_last_reset[0]->wct;
-    double cpuw = since_last_reset[1]->wct;
-    double comm = since_last_reset[2]->wct;
-    double commw = since_last_reset[3]->wct;
+    ASSERT_ALWAYS(timing->ntimers % 4 == 0);
+
+    double cpu = 0;
+    double cpuw = 0;
+    double comm = 0;
+    double commw = 0;
+    double thrcpu = 0;
+    double thrcomm = 0;
+
+    for(int k = 0 ; 4 * k < timing->ntimers ; k++) {
+        cpu += since_last_reset[4*k+0]->wct;
+        cpuw += since_last_reset[4*k+1]->wct;
+        comm += since_last_reset[4*k+2]->wct;
+        commw += since_last_reset[4*k+3]->wct;
+        thrcpu += since_last_reset[4*k+0]->thread[0];
+        thrcomm += since_last_reset[4*k+2]->thread[0];
+    }
+
     double cput = cpu + cpuw;
     double commt = comm + commw;
-    double thrcpu = since_last_reset[0]->thread[0];
-    double thrcomm = since_last_reset[2]->thread[0];
-#else
-    double cput = since_last_reset[0]->wct;
-    double commt = since_last_reset[1]->wct;
-    double thrcpu = since_last_reset[0]->thread[0];
-    double thrcomm = since_last_reset[1]->thread[0];
-#endif
     // (avg wct cpu)(cpu % cpu) + (avg comm)(cpu % comm)
     snprintf(buf, sizeof(buf), "%.2f@%.0f%%+%.2f@%.0f%%",
             cput/di, 100.0 * thrcpu / cput,
@@ -223,25 +279,21 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     if (print)
         printf("iteration %d\n", iter);
 
-    grid_print(pi, buf, sizeof(buf), print);
+    grid_print(pi, buf, strlen(buf) + 1, print);
 }
 
-static const char * timer_names[] = TIMER_NAMES;
-
-/* stage=0 for krylov, 1 for mksol */
-void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage, int done)
+void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int iter, int print, const char * stage, int done)
 {
     if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_ITERATION_TIMINGS))
         return;
 
-    timing_interval_data since_last_reset[NTIMERS_EACH_ITERATION];
-    timing_interval_data since_beginning[NTIMERS_EACH_ITERATION];
+    timing_interval_data since_last_reset[timing->ntimers];
+    timing_interval_data since_beginning[timing->ntimers];
     extract_interval(since_last_reset, since_beginning, timing);
 
     timing_interval_data * T = done ? since_beginning : since_last_reset;
 
     double di = iter - timing->go_mark;
-    double ncoeffs_d = ncoeffs;
 
     /* for each timer, we want to print:
      *
@@ -251,11 +303,16 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
      *  - the CPU % for each. This is \sum job[0] / total wct.
      */
 
-    timing_interval_data Tmin[NTIMERS_EACH_ITERATION];
-    timing_interval_data Tmax[NTIMERS_EACH_ITERATION];
-    timing_interval_data Tsum[NTIMERS_EACH_ITERATION];
+    timing_interval_data Tmin[timing->ntimers];
+    timing_interval_data Tmax[timing->ntimers];
+    timing_interval_data Tsum[timing->ntimers];
+    double ncoeffs_d[timing->ntimers];
 
-    int ndoubles = NTIMERS_EACH_ITERATION * sizeof(timing_interval_data) / sizeof(double);
+    for(int i = 0 ; i < timing->ntimers ; i++) {
+        ncoeffs_d[i] = timing->items[i];
+    }
+
+    int ndoubles = timing->ntimers * sizeof(timing_interval_data) / sizeof(double);
 
     pi_allreduce((double*) T, (double*) Tsum,
             ndoubles, BWC_PI_DOUBLE, BWC_PI_SUM,
@@ -267,34 +324,35 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
             ndoubles, BWC_PI_DOUBLE, BWC_PI_MAX,
             pi->m);
     pi_allreduce(NULL, &ncoeffs_d,
-            1, BWC_PI_DOUBLE, BWC_PI_SUM,
+            timing->ntimers, BWC_PI_DOUBLE, BWC_PI_SUM,
             pi->m);
 
     double sum_dwct = 0;
-    for(int i = 0 ; i < NTIMERS_EACH_ITERATION ; i++) {
+    for(int i = 0 ; i < timing->ntimers ; i++) {
         sum_dwct += Tsum[i]->wct;
     }
     double avdwct = sum_dwct / pi->m->totalsize / di;
 
     if (print) {
-        for(int timer = 0 ; timer < NTIMERS_EACH_ITERATION ; timer++) {
+        for(int timer = 0 ; timer < timing->ntimers ; timer++) {
             double avwct = Tsum[timer]->wct / pi->m->totalsize / di;
 
             char extra[32]={'\0'};
-            if (timer == 0) {
+            if (ncoeffs_d[timer] != 0) {
                 // nanoseconds per coefficient are computed based on the
                 // total (aggregated) wall-clock time per iteration within
                 // the cpu-bound part, and divided by the total number of
                 // coefficients.
-                double nsc = Tsum[timer]->wct / di / ncoeffs_d * 1.0e9;
-                snprintf(extra, sizeof(extra), ", %.2f ns/%.1fGcoeff", nsc, ncoeffs_d*1.0e-9);
+                double nsc = Tsum[timer]->wct / di / ncoeffs_d[timer] * 1.0e9;
+                snprintf(extra, sizeof(extra), ", %.2f ns/%.1fGitems", nsc, ncoeffs_d[timer]*1.0e-9);
             }
 
-
-            printf("%sN=%d ; %s: %.2f s/iter [%.3f..%.3f]%s\n",
-                    done ? ((stage == 0) ? "krylov done " : "mksol done ") : "",
+            /* This is parsed by the python stats */
+            printf("%s%sN=%d ; %s: %.2f s/iter [%.3f..%.3f]%s\n",
+                    done ? stage : "",
+                    done ? " done " : "",
                     iter,
-                    timer_names[timer],
+                    timing->names[timer],
                     avwct,
                     Tmin[timer]->wct/di,
                     Tmax[timer]->wct/di,
@@ -321,7 +379,7 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
             for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
 
             printf("%s: N=%d ; ETA (N=%d): %s [%.3f s/iter]\n",
-                   (stage == 0) ? "krylov" : "mksol",
+                   stage,
                    iter, timing->end_mark, eta_string, avdwct);
         }
     }
@@ -331,14 +389,14 @@ void timing_disp_backend(parallelizing_info pi, struct timing_data * timing, int
     serialize_threads(pi->m);
 }
 
-void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage)
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, int print, const char * stage)
 {
-    timing_disp_backend(pi, timing, iter, ncoeffs, print, stage, 0);
+    timing_disp_backend(pi, timing, iter, print, stage, 0);
 }
 
-void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print, int stage)
+void timing_final_tally(parallelizing_info pi, struct timing_data * timing, int print, const char * stage)
 {
-    timing_disp_backend(pi, timing, timing->end_mark, ncoeffs, print, stage, 1);
+    timing_disp_backend(pi, timing, timing->end_mark, print, stage, 1);
 }
 void block_control_signals()
 {

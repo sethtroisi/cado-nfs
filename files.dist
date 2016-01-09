@@ -1195,8 +1195,8 @@ linalg/bwc/mpfq/mpfq_u64k3_t.c
 linalg/bwc/mpfq/mpfq_u64k3_t.h
 tests/linalg/bwc/test-spmv.sh
 tests/linalg/bwc/test-matcache.sh
-linalg/bwc/short_matmul.c
-linalg/bwc/spmv_test.c
+tests/linalg/bwc/short_matmul.c
+tests/linalg/bwc/spmv_test.c
 linalg/bwc/bench_matcache.c
 linalg/bwc/build_matcache.c
 tests/linalg/bwc/test_hello.c
@@ -1218,6 +1218,10 @@ gf2x/already_tuned/x86_64_nosse/gf2x_mul8.h
 gf2x/already_tuned/x86_64_nosse/gf2x_mul9.h
 tests/provide-wdir.sh
 tests/utils/test_mpz_vector.c
+linalg/bwc/blocklanczos.c
+tests/linalg/bwc/test-blocklanczos.sh
+linalg/bwc/cheating_vec_init.h
+tests/linalg/bwc/test_bl_extraction.c
 scripts/build_environment.sh
 scripts/cadofactor/toplevel.py
 scripts/realpath.sh

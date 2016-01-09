@@ -202,10 +202,10 @@ static inline void vaddmul_tiny_64K_64L(
     uint64_t * u0 = (uint64_t *) u;
     uint64_t * w0 = (uint64_t *) w;
     unsigned int j = 0;
-#if     defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
+#if  defined(HAVE_SSE2) && GMP_LIMB_BITS == 64
     uint64_t * u1 = (uint64_t *) (u + K);
     uint64_t * w1 = (uint64_t *) (w + L);
-    for (; j < n - 1; j += 2 ) {
+    for ( ; j < n - 1; j += 2 ) {
         const uint64_t * v0 = v;
         for(unsigned int l = 0 ; l < L ; l++) {
             __m128i r = _mm_setzero_si128();
@@ -230,9 +230,9 @@ static inline void vaddmul_tiny_64K_64L(
         w0 += 2 * L; w1 += 2 * L;
     }
 #endif
-    /* This is just a direct translation of the sse version. Has been
-     * tested once. */
-    for (; j < n; j ++ ) {
+    for ( ; j < n ; j++) {
+        /* This is just a direct translation of the sse version. Has been
+         * tested once. */
         const uint64_t * v0 = v;
         for(unsigned int l = 0 ; l < L ; l++) {
             uint64_t rx = 0;
