@@ -202,12 +202,12 @@ create_test_matrix_if_needed() {
     outer_ncols=`echo $random_matrix_size | cut -d, -f2`   # = nrows if no comma
     escaped_size=$(echo $random_matrix_size | tr , _)
     if [ "$prime" = 2 ] ; then
-        basename=$mats/t${escaped}
+        basename=$mats/t${escaped_size}
         matrix="$basename.matrix.bin"
         rmargs=("${rmargs[@]}"  --k$nullspace ${random_matrix_minkernel})
         # ncols=
     elif ! [ "$nrhs" ] ; then
-        basename=$mats/t${escaped}p
+        basename=$mats/t${escaped_size}p
         matrix="$basename.matrix.bin"
         rmargs=("${rmargs[@]}" --k$nullspace ${random_matrix_minkernel})
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
@@ -218,7 +218,7 @@ create_test_matrix_if_needed() {
         # a matrix with N rows and N-r columns, and later pad the column
         # width data with r zeroes.
         ncols=$((nrows-nrhs))
-        basename=$mats/t${escaped}p+${nrhs}
+        basename=$mats/t${escaped_size}p+${nrhs}
         density=`echo "l($random_matrix_size)^2/2" | bc -l | cut -d. -f1`
         if [ "$density" -lt 12 ] ; then density=12; fi
         rmargs=("${rmargs[@]}" -d $density)
