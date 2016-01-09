@@ -5,7 +5,7 @@ in most cases the following should work to factor the number 903...693
 using all cores on the local machine
 
 1) make
-2) ./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 
+2) ./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693
 
 More details follow.
 
