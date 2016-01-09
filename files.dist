@@ -847,7 +847,6 @@ tests/linalg/bwc/test-plingen.sh
 tests/gf2x/CMakeLists.txt
 tests/gf2x/test_cantor.c
 config/hwloc.cmake
-config/numa.cmake
 parameters/misc/cpubinding.conf
 linalg/bwc/cpubinding.cpp
 linalg/bwc/cpubinding.h
