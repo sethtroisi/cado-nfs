@@ -1109,6 +1109,9 @@ sub rename_file_on_leader {
 # {{{ get_cached_bfile -> check for balancing file.
 sub get_cached_bfile {
     my $key = 'balancing';
+    if ($param->{$key}) {
+        $cache->{$key}=[$param->{$key}];
+    }
     if (defined(my $z = $cache->{$key})) {
         my @x = @$z;
         return wantarray ? @x : $x[0];
