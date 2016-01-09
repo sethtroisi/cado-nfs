@@ -2392,7 +2392,7 @@ class FactorBaseTask(Task):
             assert "poly" in self.state
             assert "alim" in self.state
             # The target file must correspond to the polynomial "poly"
-        self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
+        self.progparams[0].setdefault("maxbits", self.params["I"])
     
     def run(self):
         super().run()
@@ -3283,7 +3283,7 @@ class PurgeTask(Task):
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.01,
-             "required_excess": 0.1})
+             "required_excess": 0.0})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3295,7 +3295,7 @@ class PurgeTask(Task):
     def run(self):
         super().run()
 
-        if not (self.params["galois"] in ["1/y", "_y"]):
+        if not (self.params["galois"] in ["1/y", "_y", "autom3.1g", "autom3.2g"]):
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             if not nunique:
@@ -3376,7 +3376,7 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stderr(stdout, input_nrels):
+        if self.parse_output(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
@@ -3426,9 +3426,9 @@ class PurgeTask(Task):
     def get_relsdel_filename(self):
         return self.get_state_filename("relsdelfile")
     
-    def parse_stderr(self, stderr, input_nrels):
-        # If stderr ends with
-        # b'excess < 0.10 * #primes. See -required_excess argument.'
+    def parse_output(self, stdout, input_nrels):
+        # If stdout ends with
+        # (excess / ncols) = ... < .... See -required_excess argument.'
         # then we need more relations from filtering and return False
         input_nprimes = None
         have_enough = True
@@ -3438,7 +3438,7 @@ class PurgeTask(Task):
         not_enough2 = re.compile(r"number of rows < number of columns \+ keep")
         nrels_nprimes = re.compile(r"\s*nrows=(\d+), ncols=(\d+); "
                                    r"excess=(-?\d+)")
-        for line in stderr.splitlines():
+        for line in stdout.splitlines():
             match = not_enough1.match(line)
             if match:
                 have_enough = False
@@ -3549,7 +3549,7 @@ class FilterGaloisTask(Task):
 
     def run(self):
         # This task must be run only if galois is recognized by filter_galois
-        if not (self.params["galois"] in ["1/y", "_y"]):
+        if not (self.params["galois"] in ["1/y", "_y", "autom3.1g", "autom3.2g"]):
             return True
 
         super().run()
@@ -4719,8 +4719,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def stop_serving_wus(self):
         self.server.stop_serving_wus()
 
-    def get_url(self):
-        return self.server.get_url()
+    def get_url(self, **kwargs):
+        return self.server.get_url(**kwargs)
 
     def get_cert_sha1(self):
         return self.server.get_cert_sha1()
@@ -4841,9 +4841,17 @@ class StartClientsTask(Task):
         self.pids.clear([clientid], commit=False)
         self.hosts.clear([clientid], commit=True)
     
-    def launch_clients(self, server, certsha1=None):
+    def launch_clients(self, servertask):
+        """ This now takes server as a servertask object, so that we can
+        get an URL which is special-cased for localhost """
+        url = servertask.get_url()
+        url_loc = servertask.get_url(origin="localhost")
+        certsha1 = servertask.get_cert_sha1()
         for host in self.hosts_to_launch:
-            self.launch_one_client(host.strip(), server, certsha1=certsha1)
+            if host == "localhost":
+                self.launch_one_client(host.strip(), url_loc, certsha1=certsha1)
+            else:
+                self.launch_one_client(host.strip(), url, certsha1=certsha1)
         running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in
             self.pids.items()]
         s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
@@ -5315,10 +5323,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         return self.state["dbfilename"]
 
     def start_all_clients(self):
-        url = self.servertask.get_url()
-        certsha1 = self.servertask.get_cert_sha1()
         for clients in self.clients:
-            clients.launch_clients(url, certsha1)
+            clients.launch_clients(self.servertask)
     
     def stop_all_clients(self):
         for clients in self.clients:

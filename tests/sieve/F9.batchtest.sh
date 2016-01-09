@@ -10,8 +10,8 @@ SOURCE_TEST_DIR="`dirname "$0"`"
 shift 4
 
 # the checksum should not change in batch mode, which should find the maximum
-# number of relations
-REFERENCE_SHA1="ada1f8268b249109dd3e4d3bab5abf0513e817ac" # 272 relations
+# number of relations (except if the order of primes changes)
+REFERENCE_SHA1="6acf11b0b7927bbc8cd350c7441f8ad028ef9adc" # 272 relations
 
 rlim=2300000
 alim=1200000

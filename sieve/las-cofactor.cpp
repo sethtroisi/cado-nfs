@@ -22,11 +22,9 @@
 /* {{{ cofactoring area */
 
 /* Return 0 if the leftover norm n cannot yield a relation.
-   FIXME: need to check L^k < n < B^(k+1) too.
-   XXX: In doing this, pay attention to the fact that for the descent,
-   we might have B^2<L.
 
-   Possible cases, where qj represents a prime in [B,L], and rj a prime > L:
+   Possible cases, where qj represents a prime in [B,L], and rj a prime > L
+   (assuming L < B^2, which might be false for the DLP descent):
    (0) n >= 2^mfb
    (a) n < L:           1 or q1
    (b) L < n < B^2:     r1 -> cannot yield a relation
@@ -44,26 +42,27 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
   size_t s = mpz_sizeinbase (n, 2);
   unsigned int lpb = si->conf->sides[side]->lpb;
   unsigned int mfb = si->conf->sides[side]->mfb;
+  unsigned int klpb;
+  double nd, kB, B;
 
   if (s > mfb)
     return 0; /* n has more than mfb bits, which is the given limit */
-  /* now n < 2^mfb */
+
   if (s <= lpb)
     return 1; /* case (a) */
-    /* Note also that in the descent case where L > B^2, if we're below L
-     * it's still fine of course, but we have no guarantee that our
-     * cofactor is prime... */
-  /* now n >= L=2^lpb */
-  if (mpz_cmp (n, si->BB[side]) < 0)
-    return 0; /* case (b) */
-  /* now n >= B^2 */
-  if (2 * lpb < s)
+  /* Note that in the case where L > B^2, if we're below L it's still fine of
+     course, but we have no guarantee that our cofactor is prime... */
+
+  nd = mpz_get_d (n);
+  B = (double) si->conf->sides[side]->lim;
+  kB = B * B;
+  for (klpb = lpb; klpb < s; klpb += lpb, kB *= B)
     {
-      if (mpz_cmp (n, si->BBB[side]) < 0)
-        return 0; /* case (e) */
-      if (3 * lpb < s && mpz_cmp (n, si->BBBB[side]) < 0)
-        return 0; /* case (h) */
+      /* invariant: klpb = k * lpb, kB = B^(k+1) */
+      if (nd < kB) /* L^k < n < B^(k+1) */
+	return 0;
     }
+
   // TODO: maybe we should pass the modulus to the facul machinery
   // instead of reconstructing it.
   int prime=0;
@@ -123,6 +122,10 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 /* This is the same function as factor_leftover_norm() but it works
    with both norms! It is used when we want to factor these norms
    simultaneously and not one after the other.
+   Return values:
+   -1  one of the cofactors is not smooth
+   0   unable to fully factor one of the cofactors
+   1   both cofactors are smooth
 */
 
 int
@@ -151,96 +154,54 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
 
   for (int side = 0; side < 2; side++)
     {
-      unsigned int lpb = si->strategies->lpb[side];
       factors[side]->length = 0;
       multis[side]->length = 0;
 
+      double B = (double) si->conf->sides[side]->lim;
       /* If n < B^2, then n is prime, since all primes < B have been removed */
-      if (mpz_cmp (n[side], si->BB[side]) < 0)
-	{
-	  /* if n > L, return -1 */
-	  if (mpz_sizeinbase (n[side], 2) > lpb)
-	    {
-              FREE_MPZ_FACTOR;
-	      return -1;
-	    }
-	  if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
-	    {
-	      append_mpz_to_array (factors[side], n[side]);
-	      append_uint32_to_array (multis[side], 1);
-	    }
-	  is_smooth[side] = FACUL_SMOOTH;
-	}
+      if (mpz_get_d (n[side]) < B * B)
+	is_smooth[side] = FACUL_SMOOTH;
     }
 
-  /* use the facul library */
-  //gmp_printf ("facul: %Zd, %Zd\n", n[0], n[1]);
+  /* call the facul library */
   int* facul_code = facul_both (mpz_factors, n, si->strategies, is_smooth);
 
-  if (facul_code[0] == FACUL_NOT_SMOOTH ||
-      facul_code[1] == FACUL_NOT_SMOOTH)
+  if (is_smooth[0] != FACUL_SMOOTH || is_smooth[1] != FACUL_SMOOTH)
     {
       //free ul
       FREE_MPZ_FACTOR;
       free (facul_code);
-      return -1;
+      if (is_smooth[0] == FACUL_NOT_SMOOTH || is_smooth[1] == FACUL_NOT_SMOOTH)
+	return -1;
+      else
+	return 0;
     }
 
-  ASSERT (facul_code[0] == 0 || mpz_cmp (n[0], mpz_factors[0][0]) != 0);
-  ASSERT (facul_code[1] == 0 || mpz_cmp (n[1], mpz_factors[1][0]) != 0);
-  int ret = is_smooth[0] == 1 && is_smooth[1] == 1;
-  for (int side = 0; ret == 1 && side < 2; side++)
+  /* now we know both cofactors are smooth */
+  for (int side = 0; side < 2; side++)
     {
-      unsigned int lpb = si->strategies->lpb[side];
-      uint32_t i, nr_factors;
-      if (facul_code[side] > 0)
+      /* facul_code[side] is the number of found (smooth) factors */
+      for (int i = 0; i < facul_code[side]; i++)
 	{
-	  nr_factors = facul_code[side];
-	  for (i = 0; i < nr_factors; i++)
-	    {
-              if (mpz_sizeinbase(mpz_factors[side][i], 2) > lpb)
-		/* Larger than large prime bound? */
-		{
-		  ret = -1;
-		  break;
-		}
-	      mpz_divexact (n[side], n[side], mpz_factors[side][i]);
-	      append_mpz_to_array (factors[side], mpz_factors[side][i]);
-	      append_uint32_to_array (multis[side], 1);
-	      /* FIXME, deal with repeated
-		 factors correctly */
-	    }
-	  if (ret == -1)
-	    break;
+	  /* we know that factors found by facul_both() are primes < L */
+	  mpz_divexact (n[side], n[side], mpz_factors[side][i]);
+	  append_mpz_to_array (factors[side], mpz_factors[side][i]);
+	  append_uint32_to_array (multis[side], 1);
+	  /* repeated factors should not be a problem, since they will
+	     be dealt correctly in the filtering */
+	}
 
-	  if (mpz_cmp (n[side], si->BB[side]) < 0)
-	    {
-	      if (mpz_sizeinbase (n[side], 2) > lpb)
-		{
-		  ret = -1;
-		  break;
-		}
-
-	      else if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
-		{
-		  append_mpz_to_array (factors[side], n[side]);
-		  append_uint32_to_array (multis[side], 1);
-		  ret = 1;
-		}
-	    }
-
-	  if (check_leftover_norm (n[side], si, side) == 0)
-	    {
-	      ret = -1;
-	      break;
-	    }
+      /* since the cofactor is smooth, n[side] is a prime < L here */
+      if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
+	{
+	  append_mpz_to_array (factors[side], n[side]);
+	  append_uint32_to_array (multis[side], 1);
 	}
     }
   //free
   FREE_MPZ_FACTOR;
   free (facul_code);
-  /* ret = 0  => unable to completely factor n */
-  return ret; 
+  return 1; /* both cofactors are smooth */
 }
 
 

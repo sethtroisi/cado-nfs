@@ -250,13 +250,13 @@ tasks.I = 11
     # "tasks.sieve" level.
 
 
-tasks.sieve.ratq = 0
-    # The ratq parameter specifies whether or not the special-q is to be
-    # taken on the rational side (ratq=1) or on the algebraic side
-    # (ratq=0). ratq should be set on the side where the largest norms are
-    # expected. As a very rough rule of thumb, this means ratq=0 for gnfs
-    # runs and usually for snfs runs, but ratq=1 for snfs runs where the
-    # degree of the polynomial is forced to be small by algebraic factors.
+tasks.sieve.sqside = 1
+    # The sqside parameter specifies the side number where the special-q
+    # is to be taken. sqside should be set on the side where the largest
+    # norms are expected. By default, the polynomial selection puts the
+    # algebraic polynomial on side 1, and that's where to put the
+    # special-q.  For snfs numbers, sometimes it is better to put is on
+    # the rational side.
 
 tasks.sieve.qmin = 400000		# Start of the special-q range
     # qmin is usually equal to the corresponding factor base bound, but this
@@ -284,7 +284,7 @@ tasks.filter.purge.add_ratio = 0.1
 tasks.filter.maxlevel = 20		# perform up to <maxlevel>-way merges
 tasks.filter.merge.target_density = 170 # stop merging when the average density
 				        # per row attains target_density
-tasks.filter.purge.required_excess=0.1 # Controls extra sieving:
+tasks.filter.purge.required_excess=0.0 # Controls extra sieving:
                                        # completes the filtering only when
                                        # the relative excess (excess divided
                                        # by number of ideals) is larger than

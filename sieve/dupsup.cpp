@@ -188,11 +188,10 @@ main (int argc, char * argv[])
         if (fgets(line, sizeof(line), f) == NULL)
           break;
         if (read_sq_comment(sq, rho, &side, line)) {
-          unsigned long limits[2] = {conf->sides[0]->lim, conf->sides[1]->lim};
           if (si != NULL)
             clear_sieve_info(si);
           si = fill_in_sieve_info(sq, rho, side, 1U << conf->logI, 1U << (conf->logI - 1),
-                                  limits, strategy, cpoly, conf);
+                                  strategy, cpoly, conf);
         } else {
             relation rel;
             if (rel.parse(line)) {

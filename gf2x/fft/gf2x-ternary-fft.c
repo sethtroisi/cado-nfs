@@ -935,12 +935,19 @@ void gf2x_ternary_fft_add(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr t
     }
 }
 
-void gf2x_ternary_fft_addcompose(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr tc, gf2x_ternary_fft_srcptr ta, gf2x_ternary_fft_srcptr tb)
+void gf2x_ternary_fft_addcompose_n(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr tc, gf2x_ternary_fft_srcptr * ta, gf2x_ternary_fft_srcptr * tb, size_t n)
 {
     gf2x_ternary_fft_t * t = gf2x_ternary_fft_alloc(o, 1);
-    gf2x_ternary_fft_compose(o, t, ta, tb);
-    gf2x_ternary_fft_add(o, tc, tc, t);
+    for(size_t k = 0 ; k < n ; k++) {
+        gf2x_ternary_fft_compose(o, t, ta[k], tb[k]);
+        gf2x_ternary_fft_add(o, tc, tc, t);
+    }
     gf2x_ternary_fft_free(o, t, 1);
+}
+
+void gf2x_ternary_fft_addcompose(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr tc, gf2x_ternary_fft_srcptr ta, gf2x_ternary_fft_srcptr tb)
+{
+    gf2x_ternary_fft_addcompose_n(o, tc, &ta, &tb, 1);
 }
 
 void gf2x_ternary_fft_ift_inner(gf2x_ternary_fft_info_srcptr o, unsigned long * a, size_t bits_a, gf2x_ternary_fft_ptr tr, size_t M)

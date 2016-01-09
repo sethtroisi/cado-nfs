@@ -80,12 +80,6 @@ struct bcol {/*{{{*/
     void zero() {
         memset(x, 0, stride() * sizeof(unsigned long));
     }
-    bool is_zero_likely() const {
-        for(unsigned int i = 0 ; i < stride() ; i++) {
-            if (x[i] != 0) return false;
-        }
-        return true;
-    }
     inline unsigned long coeff(unsigned int i) const
     {
         ASSERT(i < nrows);
@@ -154,25 +148,6 @@ public:
         return dst;
     }
 #endif
-    /* zero column j */
-    void zcol(unsigned int j) {
-        ASSERT(j < ncols);
-        memset(x + j * stride(), 0, stride() * sizeof(unsigned long));
-    }
-    bool col_is_zero(unsigned int j) const {
-        ASSERT(j < ncols);
-        const unsigned long * src = x + j * stride();
-        for(unsigned int i = 0 ; i < stride() ; i++) {
-            if (src[i] != 0) return false;
-        }
-        return true;
-    }
-    bool is_zero() const {
-        for(unsigned int i = 0 ; i < ncols * stride() ; i++) {
-            if (x[i] != 0) return false;
-        }
-        return true;
-    }
     inline unsigned long coeff(unsigned int i, unsigned int j) const
     {
         ASSERT(i < nrows);
@@ -180,27 +155,6 @@ public:
         unsigned int offset = i / ULONG_BITS;
         unsigned long shift = i % ULONG_BITS;
         return (x[j * stride() + offset] >> shift) & 1UL;
-    }
-    /* add column j0 to column j. Optionally, b indicates a number of rows
-     * which are known to be zero in both columns.
-     * The mask corresponds to a multiplicating coefficient.
-     */
-    void acol(unsigned int j, unsigned int j0, unsigned int b = 0, unsigned long mask = 1UL) {
-        ASSERT(j < ncols);
-        ASSERT(j0 < ncols);
-        unsigned long * dst = x + j * stride();
-        const unsigned long * src = x + j0 * stride();
-        for(unsigned int l = b / ULONG_BITS ; l < stride() ; l++) {
-            dst[l] ^= src[l] & -mask;
-        }
-    }
-    void acol(unsigned int j, bcol& a, unsigned int b = 0, unsigned long mask = 1UL) {
-        ASSERT(j < ncols);
-        unsigned long * dst = x + j * stride();
-        const unsigned long * src = a.x;
-        for(unsigned int l = b / ULONG_BITS ; l < stride() ; l++) {
-            dst[l] ^= src[l] & -mask;
-        }
     }
     unsigned int ffs(unsigned int j) const {
         ASSERT(j < ncols);
@@ -218,13 +172,6 @@ public:
         bcol tmp_a(nrows);
         memcpy(tmp_a.x, x + j * stride(), stride() * sizeof(unsigned long));
         a.swap(tmp_a);
-    }
-    void addcoeff(unsigned int i, unsigned int j, unsigned long z)
-    {
-        ASSERT(i < nrows);
-        ASSERT(j < ncols);
-        unsigned int offset = i / ULONG_BITS;
-        x[j * stride() + offset] ^= z << (i % ULONG_BITS);
     }
 };/*}}}*/
 struct polmat { /* {{{ */
@@ -321,36 +268,6 @@ struct polmat { /* {{{ */
     }
     /* }}} */
     public:
-#if 0
-    polmat clone() {
-        polmat dst(nrows, ncols, ncoef);
-        memcpy(dst.x, x, ncols*colstride()*sizeof(unsigned long));
-        memcpy(dst._deg, _deg, ncols*sizeof(long));
-        return dst;
-    }
-#endif
-    /* this handles expansion and shrinking */
-    void resize(unsigned long ncoef2) {/*{{{*/
-        size_t newstride = BITS_TO_WORDS(ncoef2, ULONG_BITS);
-        if (newstride == stride()) {
-            ncoef = ncoef2;
-            return;
-        }
-        size_t minstride = std::min(stride(),newstride);
-        /* take the opportunity of reallocation for reordering columns. */
-        polmat n(nrows,ncols,ncoef2);
-        unsigned long * dst = n.x;
-        for(unsigned int j = 0 ; j < ncols ; j++) {
-            const unsigned long * src = x + j * colstride();
-            for(unsigned int i = 0 ; i < nrows ; i++) {
-                memcpy(dst, src, minstride * sizeof(unsigned long));
-                dst += newstride;
-                src += stride();
-            }
-        }
-        swap(n);
-    }/*}}}*/
-
     void set_mod_xi(polmat const& E, unsigned long ncoef2) {/*{{{*/
         nrows = E.nrows;
         ncols = E.ncols;
@@ -460,20 +377,6 @@ struct polmat { /* {{{ */
         }
     }
     /*}}}*/
-    void xmul_col(unsigned int j, unsigned long s=1) {/*{{{*/
-        ASSERT(j < ncols);
-        mp_limb_t * dst = x + j * colstride();
-        ASSERT(1ul <= s && s <= GMP_LIMB_BITS-1);
-        mpn_lshift(dst, dst, colstride(), s);
-        /* We may have garbage for the low bits. It may matter, or maybe
-         * not. If it does, call xclean0_col */
-        deg(j) += deg(j) >= 0;
-        // BUG_ON(deg(j) >= (int) ncoef);
-        // we do NOT consider this a bug. Instead, this means that te
-        // corresponding column has gone live. 
-        // Normally not a problem since it is supposed to occur only
-        // when sufficiently many generators are known.
-    }/*}}}*/
     void xmul_poly(unsigned int i, unsigned int j, unsigned long s=1) {/*{{{*/
         ASSERT(i < nrows);
         ASSERT(j < ncols);
@@ -490,38 +393,6 @@ struct polmat { /* {{{ */
         unsigned long * dst = x + (j * nrows + i) * stride();
         for(unsigned int k = 0 ; k < stride() ; k++)
             dst[k] ^= src[k];
-    }/*}}}*/
-    void xclean0_col(unsigned int j) {/*{{{*/
-        ASSERT(j < ncols);
-        unsigned long * dst = x + j * colstride();
-        for(unsigned int i = 0 ; i < nrows ; i++, dst += stride())
-            dst[0] &= ~1UL;
-        deg(j) -= deg(j) == 0;
-    }/*}}}*/
-    /* {{{ add column j times mask to column i. */
-    void acol(unsigned int i, unsigned int j, unsigned long mask = 1UL) {
-        ASSERT(i < nrows);
-        ASSERT(j < ncols);
-        unsigned long * dst = x + i * colstride();
-        const unsigned long * src = x + j * colstride();
-        for(unsigned int l = 0 ; l < colstride() ; l++) {
-            dst[l] ^= src[l] & -mask;
-        }
-        // ASSERT(_deg[i] >= _deg[j]);
-        deg(i) = std::max(deg(j), deg(i));
-    }
-    /* }}} */
-    unsigned int ffs(unsigned int j, unsigned int k) const {/*{{{*/
-        ASSERT(k < nrows);
-        ASSERT(j < ncols);
-        unsigned int offset = k / ULONG_BITS;
-        unsigned long mask = 1UL << (k % ULONG_BITS);
-        const unsigned long * src = x + j * colstride() + offset;
-        for(unsigned int z = 0 ; z < nrows ; z++) {
-            if (*src & mask) return z;
-            src += stride();
-        }
-        return UINT_MAX;
     }/*}}}*/
 
     unsigned long valuation() const {/*{{{*/
@@ -579,21 +450,11 @@ struct polmat { /* {{{ */
         ASSERT(j < ncols);
         return x + (j * nrows + i) * stride();
     }/*}}}*/
-    unsigned long * col(unsigned int j) { return poly(0, j); }/*{{{*/
-    unsigned long const * col(unsigned int j) const { return poly(0, j); }/*}}}*/
     /* zero column j *//*{{{*/
     void zcol(unsigned int j) {
         ASSERT(j < ncols);
-        memset(col(j), 0, colstride() * sizeof(unsigned long));
+        memset(poly(0, j), 0, colstride() * sizeof(unsigned long));
         deg(j) = -1;
-    }/*}}}*/
-    /* is zero column j *//*{{{*/
-    bool is_zcol(unsigned int j) const {
-        ASSERT(j < ncols);
-        unsigned long const * y = col(j);
-        for(unsigned int x = colstride(); x--;y++)
-            if (*y) return false;
-        return true;
     }/*}}}*/
     /* shift is understood ``shift left'' (multiply by X) */
     void import_col_shift(unsigned int k, polmat const& a, unsigned int j, long s)/*{{{*/
@@ -601,8 +462,8 @@ struct polmat { /* {{{ */
         ASSERT(k < ncols);
         ASSERT(j < a.ncols);
         ASSERT_ALWAYS(a.nrows == nrows);
-        unsigned long const * src = a.col(j);
-        unsigned long * dst = col(k);
+        unsigned long const * src = a.poly(0, j);
+        unsigned long * dst = poly(0, k);
         unsigned long as = s > 0 ? s : -s;
         mp_size_t sw = as / GMP_LIMB_BITS;
         mp_size_t sb = as & (GMP_LIMB_BITS - 1);
@@ -670,17 +531,7 @@ struct polmat { /* {{{ */
             }/*}}}*/
         }
     }/*}}}*/
-    /* these accessors are not the preferred ones for performance */
-    inline unsigned long coeff(unsigned int i, unsigned int j, unsigned long k) const/*{{{*/
-    {
-        ASSERT(i < nrows);
-        ASSERT(j < ncols);
-        ASSERT(k < ncoef);
-        ASSERT_ALWAYS(!critical);
-        unsigned long offset = k / ULONG_BITS;
-        unsigned long shift = k % ULONG_BITS;
-        return (poly(i,j)[offset] >> shift) & 1UL;
-    }/*}}}*/
+    /* this accessors is bad performance-wise */
     void extract_coeff(bmat& a, unsigned long k) const/*{{{*/
     {
         ASSERT(k < ncoef);
@@ -690,21 +541,13 @@ struct polmat { /* {{{ */
             for(unsigned int i = 0 ; i < nrows ; i++) {
                 unsigned int boffset = i / ULONG_BITS;
                 unsigned long bmask = 1UL << (i % ULONG_BITS);
-                unsigned long coeff = this->coeff(i,j,k);
+                unsigned long offset = k / ULONG_BITS;
+                unsigned long shift = k % ULONG_BITS;
+                unsigned long coeff = (poly(i,j)[offset] >> shift) & 1UL;
                 tmp_a.x[j*tmp_a.stride() + boffset] ^= bmask & -coeff;
             }
         }
         a.swap(tmp_a);
-    }/*}}}*/
-    void addcoeff(unsigned int i, unsigned int j, unsigned long k, unsigned long z)/*{{{*/
-    {
-        ASSERT(i < nrows);
-        ASSERT(j < ncols);
-        ASSERT(k < ncoef);
-        ASSERT_ALWAYS(!critical);
-        // brev_warning();
-        size_t offset = k / ULONG_BITS;
-        poly(i,j)[offset] ^= z << (k % ULONG_BITS);
     }/*}}}*/
     void clear_highbits() {/*{{{*/
         size_t offset = ncoef / ULONG_BITS;
@@ -816,14 +659,6 @@ template<typename fft_type> struct tpolmat /* {{{ */
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         return po->get(x, j * nrows + i);
-    }
-    typename fft_type::ptr col(unsigned int j) { return poly(0, j); }
-    typename fft_type::srcptr col(unsigned int j) const { return poly(0, j); }
-    /* zero column j */
-    void zcol(unsigned int j) {
-        ASSERT(j < ncols);
-        po->zero(col(j), 1);
-        deg(j) = -1;
     }
     uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * po->size() * sizeof(*x)); }
 };
@@ -1092,29 +927,79 @@ inline void compose(
     */
 }
 
-template<typename fft_type, typename selector_type>
-inline void compose2(
-        tpolmat<fft_type>& dst,
-        tpolmat<fft_type> const & s1,
-        tpolmat<fft_type> const & s2,
-        fft_type& o, selector_type const& s)
+/* do dst *= s, using the following procedure:
+ * for each row index:
+ *      transform row i of dst to tmp.
+ *      multiply tmp by s to tmp2
+ *      transform tmp2 back to row i of dst
+ */
+template<typename fft_type>
+inline void fft_combo_inplace(
+        polmat& dst,
+        tpolmat<fft_type> const & s,
+        fft_type& o,
+        int ncoeffs_in,
+        int ncoeffs_out
+        )
 {
-    // clock_t t = clock();
-    compose_inner(dst, s1, s2, o, s);
-    /*
-    if (o.size() > 10) {
-        printf("c(%u,%u,%u,%u): %.2fs [strassen]\n",
-                s1.nrows,s1.ncols,s2.ncols,o.size(),
-                (double)(clock()-t)/CLOCKS_PER_SEC);
-    }
-    */
-}
+    /* This is not satisfactory. It would be better to replace the input
+     * in place. The only reason we can't do this is because ncoeffs_in
+     * and ncoeffs_out differ, so that we have a different data striding
+     * in the input and the output.
+     */
+    // XXX The +1 seems to be bogus.
+    polmat new_dst(dst.nrows, dst.ncols, ncoeffs_out + 1);
+    tpolmat<fft_type> tmp1(1, dst.ncols, o);
+    tpolmat<fft_type> tmp2(1, s.ncols, o);
+    ASSERT(dst.ncols == s.nrows);
+    dst.clear_highbits();
 
+    typename fft_type::srcptr * t1s = new typename fft_type::srcptr[dst.ncols];
+    for(unsigned int k = 0 ; k < dst.ncols ; k++) {
+        t1s[k] = tmp1.poly(0,k);
+    }
+
+    for(unsigned int i = 0 ; i < dst.nrows ; i++) {
+        tmp1.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int k = 0 ; k < dst.ncols ; k++) {
+            o.dft(tmp1.poly(0,k), dst.poly(i,k), ncoeffs_in);
+        }
+
+        /* now do the multiplication */
+        tmp2.zero();
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int j = 0 ; j < s.ncols ; j++) {
+            typename fft_type::srcptr * sjs = new typename fft_type::srcptr[dst.ncols];
+            for(unsigned int k = 0 ; k < dst.ncols ; k++) sjs[k] = s.poly(k,j);
+            o.addcompose_n(tmp2.poly(0,j), t1s, sjs, dst.ncols);
+            delete[] sjs;
+        }
+
+        /* and the inverse transform */
+#ifdef  HAVE_OPENMP
+#pragma omp parallel for schedule(static)
+#endif  /* HAVE_OPENMP */
+        for(unsigned int j = 0 ; j < dst.ncols ; j++) {
+            o.ift(new_dst.poly(i,j), ncoeffs_out, tmp2.poly(0,j));
+        }
+    }
+    for(unsigned int j = 0 ; j < dst.ncols ; j++) {
+        new_dst.setdeg(j);
+    }
+
+    delete[] t1s;
+    dst.swap(new_dst);
+}
 
 template<typename fft_type>
 void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
 {
-    // clock_t t = clock();
+    // XXX The +1 seems to be bogus.
     polmat tmp(src.nrows, src.ncols, d + 1);
     {
 #ifdef  HAVE_OPENMP
@@ -1130,14 +1015,6 @@ void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
         tmp.setdeg(j);
     }
     dst.swap(tmp);
-    /*
-       if (o.size() > 10) {
-       printf("i(%u,%u,%u,%u): %.2fs\n",
-       src.nrows,src.ncols,d,o.size(),
-       (double)(clock()-t)/CLOCKS_PER_SEC);
-       }
-       */
 }
-
 
 #endif	/* LINGEN_MAT_TYPES_HPP_ */

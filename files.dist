@@ -99,6 +99,7 @@ linalg/bwc/Makefile
 linalg/bwc/README
 linalg/bwc/README.TORQUE
 linalg/bwc/TODO
+linalg/bwc/convert_magma.pl
 linalg/bwc/mpfq_layer.h
 linalg/bwc/acollect.c
 linalg/bwc/async.c
@@ -634,6 +635,8 @@ utils/filter_io.h
 utils/filter_io.tex
 utils/sm_utils.c
 utils/sm_utils.h
+utils/galois_utils.c
+utils/galois_utils.h
 utils/utils_with_io.h
 utils/cachebuf.h
 linalg/bwc/mpfq/mpfq_p_3.c
@@ -844,13 +847,13 @@ tests/linalg/bwc/test-plingen.sh
 tests/gf2x/CMakeLists.txt
 tests/gf2x/test_cantor.c
 config/hwloc.cmake
-config/numa.cmake
 parameters/misc/cpubinding.conf
 linalg/bwc/cpubinding.cpp
 linalg/bwc/cpubinding.h
 tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
 tests/test_gfp3.sh
+tests/test_gfp2_2_2g.sh
 utils/verbose.c
 utils/verbose.h
 tests/linalg/bwc/bwc-dispatch-matmul.sh

@@ -10,17 +10,20 @@ set(CADO_VERSION_STRING  "${CADO_VERSION_MAJOR}.${CADO_VERSION_MINOR}.${CADO_VER
 set(CADO_DIST_ARCHIVE_NAME "cado-nfs-${CADO_VERSION_STRING}")
 
 #####################################################################
-# cmake version -- set_property requires 2.6. Note that haters of progress
-# report things (this include me, casually) have to wait for cmake 2.7, since
-# it has only recently become possible to (only partially) disable them:
-# http://public.kitware.com/Bug/view.php?id=8726
-# set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
-# set(CMAKE_COLOR_MAKEFILE OFF)
 
 # If you change the min version, also change scripts/call_cmake.sh
 cmake_minimum_required(VERSION 2.8.0)
 if(COMMAND cmake_policy)
         cmake_policy(SET CMP0003 NEW)
+endif()
+
+set(CMAKE_LEGACY_CYGWIN_WIN32 0) # Remove when CMake >= 2.8.4 is required
+
+if (MINGW)
+    # we could do this as well in other cases.
+    # http://public.kitware.com/Bug/view.php?id=8726
+    set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
+    set(CMAKE_COLOR_MAKEFILE OFF)
 endif()
 
 #####################################################################
@@ -223,7 +226,6 @@ include("${CADO_NFS_SOURCE_DIR}/config/odd_address_io_int.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/strlcpy.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/linux.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/hwloc.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/numa.cmake")
 IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
