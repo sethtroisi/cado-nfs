@@ -399,6 +399,8 @@ void mul_N64_6464_lookup4(uint64_t *C,
         Bx[j][9]  = w; w ^= bb[0];
         Bx[j][8]  = w;
     }
+    /* We don't zero out C before the computation, but rather at the
+     * moment we read A[i], so that A==C is supported */
     for (size_t i = 0; i < m; i++) {
         uint64_t aa = A[i];
         C[i] = Bx[0][aa & 15]; aa>>=4;
@@ -445,7 +447,6 @@ static inline void MAYBE_UNUSED addmul_N64_6464_lookup4(uint64_t *C,
         Bx[j][9]  = w; w ^= bb[0];
         Bx[j][8]  = w;
     }
-    memset(C, 0, m * sizeof(uint64_t));
     for (size_t i = 0; i < m; i++) {
         uint64_t aa = A[i];
         C[i]^= Bx[0][aa & 15]; aa>>=4;
