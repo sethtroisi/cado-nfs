@@ -388,7 +388,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
     mmt_vec_save_stream(f, bl->y, mmt->n0[bw->dir]);
 
     mmt_vec_twist(mmt, bl->y);
-    matmul_top_mul_cpu(mmt, 0, 0, bl->my, bl->y);
+    matmul_top_mul_cpu(mmt, 0, bl->y->d, bl->my, bl->y);
     mmt_vec_allreduce(bl->my);
     mmt_vec_untwist(mmt, bl->my);
 
