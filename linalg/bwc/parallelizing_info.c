@@ -1101,9 +1101,15 @@ static void reducer_double_sum(const double * b, double * a, int s) { for( ; s--
 static void reducer_long_min(const long * b, long * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_long_max(const long * b, long * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_long_sum(const long * b, long * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
+static void reducer_longlong_min(const long long * b, long long * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
+static void reducer_longlong_max(const long long * b, long long * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
+static void reducer_longlong_sum(const long long * b, long long * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
 static void reducer_ulong_min(const unsigned long * b, unsigned long * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
 static void reducer_ulong_max(const unsigned long * b, unsigned long * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
 static void reducer_ulong_sum(const unsigned long * b, unsigned long * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
+static void reducer_ulonglong_min(const unsigned long long * b, unsigned long long * a, int s) { for( ; s-- ; a++, b++) if (*b < *a) *a = *b; }
+static void reducer_ulonglong_max(const unsigned long long * b, unsigned long long * a, int s) { for( ; s-- ; a++, b++) if (*b > *a) *a = *b; }
+static void reducer_ulonglong_sum(const unsigned long long * b, unsigned long long * a, int s) { for( ; s-- ; a++, b++) *a += *b; }
 
 struct reduction_function predefined_functions[] = {
     { MPI_BYTE,          MPI_MIN,  (thread_reducer_t) reducer_byte_min, },
@@ -1129,6 +1135,12 @@ struct reduction_function predefined_functions[] = {
     { MPI_UNSIGNED_LONG, MPI_MIN,  (thread_reducer_t) reducer_ulong_min, },
     { MPI_UNSIGNED_LONG, MPI_MAX,  (thread_reducer_t) reducer_ulong_max, },
     { MPI_UNSIGNED_LONG, MPI_SUM,  (thread_reducer_t) reducer_ulong_sum, },
+    { MPI_LONG_LONG,          MPI_MIN,  (thread_reducer_t) reducer_longlong_min, },
+    { MPI_LONG_LONG,          MPI_MAX,  (thread_reducer_t) reducer_longlong_max, },
+    { MPI_LONG_LONG,          MPI_SUM,  (thread_reducer_t) reducer_longlong_sum, },
+    { MPI_UNSIGNED_LONG_LONG, MPI_MIN,  (thread_reducer_t) reducer_ulonglong_min, },
+    { MPI_UNSIGNED_LONG_LONG, MPI_MAX,  (thread_reducer_t) reducer_ulonglong_max, },
+    { MPI_UNSIGNED_LONG_LONG, MPI_SUM,  (thread_reducer_t) reducer_ulonglong_sum, },
     { 0, 0, NULL, },
 };
 

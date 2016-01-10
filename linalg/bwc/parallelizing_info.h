@@ -204,6 +204,7 @@ extern pi_datatype_ptr BWC_PI_DOUBLE;
 extern pi_datatype_ptr BWC_PI_BYTE;
 extern pi_datatype_ptr BWC_PI_UNSIGNED;
 extern pi_datatype_ptr BWC_PI_UNSIGNED_LONG;
+extern pi_datatype_ptr BWC_PI_UNSIGNED_LONG_LONG;
 extern pi_datatype_ptr BWC_PI_LONG;
 
 

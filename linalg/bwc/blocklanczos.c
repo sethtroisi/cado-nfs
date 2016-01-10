@@ -319,7 +319,7 @@ int mmt_vec_echelon(mat64_ptr m, mmt_vec_ptr v0)
         }
         /* TODO: once we require mpi-3.0, use MPI_UINT64_T instead */
         ASSERT_ALWAYS(sizeof(unsigned long long) == sizeof(uint64_t));
-        pi_allreduce(NULL, &control, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_MAX, v0->pi->m);
+        pi_allreduce(NULL, &control, 1, BWC_PI_UNSIGNED_LONG_LONG, BWC_PI_MAX, v0->pi->m);
         /* add row i to all rows where we had a coeff in column j */
         /* we'll do that for all coefficients in the block, but on m this
          * is just one single operation */
@@ -442,6 +442,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
         size_t rc = fwrite(m2, sizeof(mat64), 1, f->f);
         ASSERT_ALWAYS(rc == (size_t) 1);
     }
+    serialize(mmt->pi->m);
     /* Now apply m2*m1 to v, for real */
     mmt_full_vec_set(bl->y, bl->V[i0]);
     mul_N64_T6464(mmt_my_own_subvec(bl->y),
