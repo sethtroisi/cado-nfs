@@ -37,6 +37,8 @@ typedef int MPI_Request;
 #define MPI_COMM_WORLD	0
 
 #define MPI_THREAD_SINGLE       0
+#define MPI_THREAD_FUNNELED     1
+#define MPI_THREAD_SERIALIZED   2
 #define MPI_THREAD_MULTIPLE     3
 
 /* We define different ops, but since they're collected amongst
