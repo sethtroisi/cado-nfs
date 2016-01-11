@@ -2395,9 +2395,11 @@ static void mmt_get_local_permutation_data(matmul_top_data_ptr mmt, param_list_p
         balancing_ptr bal_tmp = shared_malloc_set_zero(mmt->pi->m, sizeof(balancing));
 
         if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
-            const char * tmp = matrix_list_get_item(pl, "balancing", midx);
-            if (tmp)
+            char * tmp = matrix_list_get_item(pl, "balancing", midx);
+            if (tmp) {
                 balancing_read(bal_tmp, tmp);
+                free(tmp);
+            }
             /* It's fine if we have nothing. This just means that we'll have
              * no balancing to deal with. */
             rowperm_items = bal_tmp->rowperm != NULL ? bal_tmp->trows : 0;
