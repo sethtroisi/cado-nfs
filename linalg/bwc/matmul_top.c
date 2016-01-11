@@ -823,8 +823,8 @@ void alternative_reduce_scatter_parallel(pi_comm_ptr xr, mmt_vec_ptr * vs)
      * Of course, since this is a multithreaded routine, each thread in
      * xr is doing so at the same time */
     if (v->rsbuf_size < needed) {
-        v->rsbuf[0] = malloc(needed);
-        v->rsbuf[1] = malloc(needed);
+        v->rsbuf[0] = realloc(v->rsbuf[0], needed);
+        v->rsbuf[1] = realloc(v->rsbuf[1], needed);
         v->rsbuf_size = needed;
     }
 
