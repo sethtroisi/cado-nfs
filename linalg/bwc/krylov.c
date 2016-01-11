@@ -299,7 +299,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
-        mmt_vec_save(ymy[0], v_name, s + bw->interval, mmt->n0[bw->dir]);
+        mmt_vec_save(ymy[0], v_name, s + bw->interval, unpadded);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0)
             keep_rolling_checkpoints(v_name, s + bw->interval);
