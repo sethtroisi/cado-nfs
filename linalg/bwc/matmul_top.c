@@ -722,8 +722,8 @@ void alternative_reduce_scatter(mmt_vec_ptr v)
 
     if (v->rsbuf_size < needed) {
         ASSERT_ALWAYS(v->rsbuf_size == 0);
-        v->rsbuf[0] = malloc(needed);
-        v->rsbuf[1] = malloc(needed);
+        v->rsbuf[0] = realloc(v->rsbuf[0], needed);
+        v->rsbuf[1] = realloc(v->rsbuf[1], needed);
         v->rsbuf_size = needed;
     }
 
@@ -922,8 +922,8 @@ int my_MPI_Reduce_scatter_block(void *sendbuf, void *recvbuf, int recvcount,
     size_t needed = recvcount * tsize;
 
     if (rsbuf_size < needed) {
-        rsbuf[0] = malloc(needed);
-        rsbuf[1] = malloc(needed);
+        rsbuf[0] = realloc(rsbuf[0], needed);
+        rsbuf[1] = realloc(rsbuf[1], needed);
         rsbuf_size = needed;
     }
 

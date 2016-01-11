@@ -159,11 +159,17 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         /* we do a transposed multiplication, here. It's a bit of a
          * quirk, admittedly. We need to build a reversed vector list.
          */
-        mmt_vec myy[2];
-        memcpy(myy[0], ymy[1], sizeof(mmt_vec));
-        memcpy(myy[1], ymy[0], sizeof(mmt_vec));
         mmt_vec_twist(mmt, my);
-        matmul_top_mul(mmt, myy, NULL);
+        {
+            mmt_vec myy[2];
+            mmt_vec_init(mmt,0,0, myy[0],  0, 0, mmt->n[0]);
+            mmt_vec_init(mmt,0,0, myy[1],  1, 0, mmt->n[1]);
+            mmt_full_vec_set(myy[0], my);
+            matmul_top_mul(mmt, myy, NULL);
+            mmt_full_vec_set(my, myy[0]);
+            mmt_vec_clear(mmt, myy[0]);
+            mmt_vec_clear(mmt, myy[1]);
+        }
         mmt_vec_untwist(mmt, my);
         mmt_vec_save(my, "Hy", 0, unpadded);
 
