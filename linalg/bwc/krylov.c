@@ -251,9 +251,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         serialize(pi->m);
         pi_interleaving_flip(pi);
         for(int i = 0 ; i < bw->interval ; i++) {
-            /* The first part of this loop must be guaranteed to be free
-             * of any mpi calls */
-
             /* Compute the product by x */
             x_dotprod(A->vec_subvec(A, xymats, i * bw->m),
                     gxvecs, bw->m, nx, ymy[0], 1);

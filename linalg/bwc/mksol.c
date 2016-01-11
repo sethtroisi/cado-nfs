@@ -385,9 +385,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         pi_interleaving_flip(pi);
 
         for(int i = 0 ; i < bw->interval ; i++) {
-            /* The first part of this loop must be guaranteed to be free
-             * of any mpi calls */
-
             for(unsigned int k = 0 ; k < multi ; k++) {
                 AxAr->addmul_tiny(A->obj, Ar->obj,
                         sum[k],
