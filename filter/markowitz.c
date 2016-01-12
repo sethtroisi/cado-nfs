@@ -57,7 +57,7 @@ MkzAssign(int32_t *Q, index_t *A, int32_t k1, int32_t k2)
     A[dj] = k1;
 }
 
-#if 0
+#if MKZ_DEBUG
 static void MAYBE_UNUSED
 MkzPrintQueue(int32_t *Q)
 {
@@ -153,7 +153,7 @@ MkzMoveUpOrDown(int32_t *Q, index_t *A, int32_t k)
     // move new node up or down
     if(k == 1)
 	// rare event!
-	MkzDownQueue(Q, A, 1);
+	MkzDownQueue(Q, A, k);
     else{
 	// k has a father
 	if(MkzGet(Q, k/2, 1) > MkzGet(Q, k, 1))
@@ -348,6 +348,9 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
   int32_t *Q = mat->MKZQ;
   index_t *A = mat->MKZA;
 
+  if (Q[0] == 0)
+    return 0;
+
   /* Q[0] contains the number of items in Q[], thus the first element is
      stored in Q[2..3] */
   *dj = MkzGet(Q, 1, 0);
@@ -358,7 +361,7 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
       MkzDelete (Q, A, 1);
       A[*dj] = MKZ_INF;
 
-      if (MkzQueueCardinality(mat->MKZQ) <= 0)
+      if (MkzQueueCardinality(mat->MKZQ) == 0)
         return 0;
 
       *dj = MkzGet(Q, 1, 0);
@@ -366,11 +369,12 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
     }
   A[*dj] = MKZ_INF; /* already done in MkzRemoveJ, but if we don't do it,
                        we get A[j1]=A[j2] for some j1 <> j2 */
-  if (MkzQueueCardinality(mat->MKZQ) <= 0)
-    return 0;
-  MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
+  if (Q[0] > 1)
+    {
+      MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] to index 1 */
+      MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+    }
   Q[0]--;                   /* decrease number of entries in Q,A */
-  MkzDownQueue(Q, A, 1);    /* reorder heap structure */
   return 1;
 }
 
@@ -539,22 +543,20 @@ MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
 void
 MkzRemoveJ(filter_matrix_t *mat, int32_t j)
 {
-    int32_t dj = j;
+    mat->wt[j] = 0;
 
-    mat->wt[dj] = 0;
-
-    /* This can happen when maxlevel < weight[dj] <= cwmax initially, thus
-       A[dj] was initialized to MKZ_INF, but because of a merge it becomes
+    /* This can happen when maxlevel < weight[j] <= cwmax initially, thus
+       A[j] was initialized to MKZ_INF, but because of a merge it becomes
        larger than cwmax. FIXME: should we have maxlevel = cwmax? */
-    if (mat->MKZA[dj] == MKZ_INF)
-	return;
+    if (mat->MKZA[j] == MKZ_INF)
+      return;
 
 #if MKZ_DEBUG >= 1
-    fprintf(stderr, "Removing col %d of weight %d\n", j, mat->wt[dj]);
+    fprintf(stderr, "Removing col %d of weight %d\n", j, mat->wt[j]);
 #endif
     // remove j from the QA structure
-    MkzDelete (mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
-    mat->MKZA[dj] = MKZ_INF;
+    MkzDelete (mat->MKZQ, mat->MKZA, mat->MKZA[j]);
+    mat->MKZA[j] = MKZ_INF;
 #if MKZ_DEBUG >= 1
     MkzIsHeap(mat->MKZQ);
 #endif
