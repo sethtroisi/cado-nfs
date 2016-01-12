@@ -672,7 +672,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     /* Do we need to stop */
     if (WoverN >= target_density)
     {
-      printf ("W/N=%.2f too high, stopping.\n", WoverN);
+      printf ("Reached target density W/N=%.2f.\n", WoverN);
       break;
     }
 
