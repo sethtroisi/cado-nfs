@@ -9,6 +9,33 @@
 #include "merge_replay_matrix.h"
 #include "sparse.h"
 
+/***************** memory allocation on R[j] *********************************/
+
+static void
+mallocRj (filter_matrix_t *mat, int j, int32_t w)
+{
+  mat->R[j] = (index_t *) malloc((w + 1) * sizeof(index_t));
+  FATAL_ERROR_CHECK(mat->R[j] == NULL, "Cannot allocate memory");
+  mat->R[j][0] = 0; /* last index used */
+}
+
+static void
+reallocRj (filter_matrix_t *mat, int j, int32_t w)
+{
+  mat->R[j] = (index_t *) realloc (mat->R[j], (w + 1) * sizeof(index_t));
+  FATAL_ERROR_CHECK(mat->R[j] == NULL, "Cannot reallocate memory");
+  mat->R[j][0] = w;
+}
+
+void
+freeRj (filter_matrix_t *mat, int j)
+{
+    free (mat->R[j]);
+    mat->R[j] = NULL;
+}
+
+/*****************************************************************************/
+
 int
 decrS (int w)
 {
@@ -55,7 +82,7 @@ clearMat (filter_matrix_t *mat)
   free (mat->rows);
   free (mat->wt);
   for (j = 0; j < mat->ncols; j++)
-    free (mat->R[j]);
+    freeRj (mat, j);
   free (mat->R);
 }
 
@@ -70,11 +97,7 @@ InitMatR (filter_matrix_t *mat)
   {
     w = mat->wt[h];
     if (w <= mat->cwmax)
-    {
-      mat->R[h] = (index_t *) malloc((w + 1) * sizeof(index_t));
-      FATAL_ERROR_CHECK(mat->R[h] == NULL, "Cannot allocate memory");
-      mat->R[h][0] = 0; /* last index used */
-    }
+      mallocRj (mat, h, w);
     else /* weight is larger than cwmax */
     {
       mat->wt[h] = -mat->wt[h]; // trick!!!
@@ -108,10 +131,7 @@ matR_disable_cols (filter_matrix_t *mat, const char *infilename)
       if (h < mat->ncols)
       {
         if (mat->R[h] != NULL)
-        {
-          free (mat->R[h]);
-          mat->R[h] = NULL;
-        }
+          freeRj (mat, h);
         if (mat->wt[h] > 0)
           mat->wt[h] = -mat->wt[h]; // trick!!!
       }
@@ -284,18 +304,18 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   printf("# Start to fill-in columns of the matrix...\n");
   fflush (stdout);
   for (i = 0; i < mat->nrows; i++)
-  {
-    for(unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
     {
-      h = matCell(mat, i, k);
-      if(mat->wt[h] > 0)
-      {
-        mat->R[h][0]++;
-        mat->R[h][mat->R[h][0]] = i;
-      }
+      for (unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
+        {
+          h = matCell(mat, i, k);
+          if (mat->wt[h] > 0)
+            {
+              mat->R[h][0]++;
+              mat->R[h][mat->R[h][0]] = i;
+            }
+        }
     }
-  }
-    printf ("# Done\n");
+  printf ("# Done\n");
 }
 
 void
@@ -309,13 +329,6 @@ destroyRow(filter_matrix_t *mat, int i)
 {
     free(mat->rows[i]);
     mat->rows[i] = NULL;
-}
-
-void
-freeRj(filter_matrix_t *mat, int j)
-{
-    free(mat->R[j]);
-    mat->R[j] = NULL;
 }
 
 // Don't touch to R[j][0]!!!!
@@ -365,10 +378,9 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 #if DEBUG >= 2
     fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
 #endif
-    int l = mat->R[j][0]+2;
-    mat->R[j] = (index_t *)realloc(mat->R[j], l * sizeof(index_t));
-    mat->R[j][l-1] = i;
-    mat->R[j][0] = l-1;
+    int l = mat->R[j][0] + 1;
+    reallocRj (mat, j, l);
+    mat->R[j][l] = i;
   }
 }
 

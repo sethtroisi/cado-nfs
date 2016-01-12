@@ -118,6 +118,7 @@ main (int argc, char *argv[])
       usage (pl, argv0);
     }
     /* print command-line arguments */
+    verbose_interpret_parameters (pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 

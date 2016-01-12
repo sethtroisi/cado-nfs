@@ -119,7 +119,7 @@ static void
 removeColumnAndUpdate(filter_matrix_t *mat, int j)
 {
     MkzRemoveJ (mat, j);
-    freeRj(mat, j);
+    freeRj (mat, j);
 }
 
 // The cell [i, j] may be incorporated to the data structure, at least
