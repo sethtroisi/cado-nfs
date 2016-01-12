@@ -56,7 +56,7 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
 {
   mat->keep  = keep;
   mat->mergelevelmax = maxlevel;
-  mat->cwmax = 2 * maxlevel;
+  mat->cwmax = maxlevel;
   ASSERT_ALWAYS (mat->cwmax < 255);
   mat->nburied = nburied;
 
