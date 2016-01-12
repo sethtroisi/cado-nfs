@@ -625,6 +625,29 @@ number_of_superfluous_rows(filter_matrix_t *mat)
     return ni2rem;
 }
 
+static void
+print_memory_usage (filter_matrix_t *mat)
+{
+  unsigned long mem_rows, mem_wt, mem_cols, mem_MQZ;
+
+  mem_rows = mat->nrows * sizeof (typerow_t*);
+  for (unsigned long i = 0; i < mat->nrows; i++)
+    if (mat->rows[i] != NULL)
+      mem_rows += (rowLength(mat->rows, i) + 1) * sizeof (typerow_t);
+  mem_wt = mat->ncols * sizeof (int32_t);
+  mem_cols = mat->ncols * sizeof (index_t*);
+  for (unsigned long j = 0; j < mat->ncols; j++)
+    if (mat->R[j] != NULL)
+      mem_cols += (mat->R[j][0] + 1) * sizeof (index_t);
+  mem_MQZ = (mat->MKZQ[1] + 1) * 2 * sizeof(int32_t); /* memory for MQZQ */
+  mem_MQZ += (mat->ncols + 1) * sizeof(index_t); /* memory for MQZA */
+  printf ("# memory usage: rows %luMB, cols %luMB, wt %luMB, MQZ %luMB, "
+          "tot %lu MB (VmPeak %ld)\n",
+          mem_rows >> 20, mem_cols >> 20, mem_wt >> 20, mem_MQZ >> 20,
+          (mem_rows + mem_cols + mem_wt + mem_MQZ) >> 20,
+          PeakMemusage () >> 10);
+}
+
 static inline void
 print_report (filter_matrix_t *mat)
 {
@@ -632,9 +655,10 @@ print_report (filter_matrix_t *mat)
           "W/N=%.2f\n", mat->rem_nrows,
           ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols),
           mat->weight, compute_WN(mat), compute_WoverN(mat));
+  if (mat->verbose)
+    print_memory_usage (mat);
   fflush (stdout);
 }
-
 
 void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,

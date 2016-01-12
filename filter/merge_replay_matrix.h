@@ -18,6 +18,7 @@
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
+  int verbose;         /* verbose level */
   uint64_t nrows;
   uint64_t ncols;
   uint64_t rem_nrows;  /* number of remaining rows */

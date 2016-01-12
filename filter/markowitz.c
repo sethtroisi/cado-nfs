@@ -387,7 +387,7 @@ MkzInit(filter_matrix_t *mat)
 #endif
     fprintf(stderr, "Entering initMarkowitz");
     fprintf(stderr, " (wmstmax=%d, type=%d)\n", mat->wmstmax, mat->mkztype);
-    // compute number of elligible columns in the heap
+    // compute number of eligible columns in the heap
     for(j = 0; j < mat->ncols; j++)
       if(0 < mat->wt[j] && mat->wt[j] <= maxlevel)
         sz++;
