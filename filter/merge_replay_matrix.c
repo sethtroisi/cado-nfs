@@ -14,6 +14,14 @@
 static void
 mallocRj (filter_matrix_t *mat, int j, int32_t w)
 {
+  if (w == 0)
+    {
+      /* This can happen because we do not renumber columns in purge,
+	 thus the range of the j-values is larger than the number of
+	 columns. We simply ignore those columns. */
+      mat->R[j] = NULL;
+      return;
+    }
   mat->R[j] = (index_t *) malloc((w + 1) * sizeof(index_t));
   FATAL_ERROR_CHECK(mat->R[j] == NULL, "Cannot allocate memory");
   mat->R[j][0] = 0; /* last index used */
@@ -92,11 +100,12 @@ InitMatR (filter_matrix_t *mat)
 {
   index_t h;
   int32_t w;
+  int32_t wmax = mat->cwmax;
 
-  for(h = 0; h < mat->ncols; h++)
+  for (h = 0; h < mat->ncols; h++)
   {
     w = mat->wt[h];
-    if (w <= mat->cwmax)
+    if (w <= wmax)
       mallocRj (mat, h, w);
     else /* weight is larger than cwmax */
     {
