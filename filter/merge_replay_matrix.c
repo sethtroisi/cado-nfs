@@ -333,25 +333,21 @@ destroyRow(filter_matrix_t *mat, int i)
 
 // Don't touch to R[j][0]!!!!
 void
-remove_i_from_Rj(filter_matrix_t *mat, int i, int j)
+remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
 {
   // be dumb for a while
-  unsigned int k;
+  unsigned int k, n = mat->R[j][0];
 
-  if(mat->R[j] == NULL)
-  {
-	  fprintf(stderr, "Row %d already empty\n", j);
-	  return;
-  }
-  for(k = 1; k <= mat->R[j][0]; k++)
-	  if((int) mat->R[j][k] == i)
-    {
-#if DEBUG >= 2
-      fprintf(stderr, "Removing row %d from R[%d]\n", i, j);
-#endif
-      mat->R[j][k] = UMAX(index_t);
-      break;
-	  }
+  /* R[j] should not be empty */
+  ASSERT(mat->R[j] != NULL);
+
+  for (k = 1; k <= n; k++)
+    if (mat->R[j][k] == i)
+      {
+        mat->R[j][k] = UMAX(index_t);
+        return;
+      }
+  ASSERT_ALWAYS(0);
 }
 
 // cell M[i, j] is incorporated in the data structure. It is used
