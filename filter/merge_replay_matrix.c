@@ -159,12 +159,12 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
   FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
   matLengthRow(mat, rel->num) = rel->nb;
+  mat->tot_weight += rel->nb;
 
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
     exponent_t e = rel->primes[i].e;
-    mat->tot_weight++;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
 #ifndef FOR_DL
