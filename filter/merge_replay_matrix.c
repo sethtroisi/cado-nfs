@@ -95,36 +95,45 @@ clearMat (filter_matrix_t *mat)
 }
 
 #ifndef FOR_DL
-/* Renumber the non-zero columns to contiguous values [0, 1, 2, ...] */
+/* Renumber the non-zero columns to contiguous values [0, 1, 2, ...]
+ * We can use this function only for factorization because in this case we do
+ * not need the indexes of the columns (contrary to DL where the indexes of the
+ * column are printed in the history file). */
 static void
 renumber_columns (filter_matrix_t *mat)
 {
-  index_t *p;
-  uint32_t i, j, h;
+  index_t *p = NULL;
 
-  p = malloc (mat->ncols * sizeof (index_t));
+  p = (index_t *) malloc (mat->ncols * sizeof (index_t));
+  ASSERT_ALWAYS (p != NULL);
 
   /* first compute the mapping of column indices */
-  for (j = h = 0; j < mat->ncols; j++)
+  index_t h = 0;
+  for (uint64_t j = 0; j < mat->ncols; j++)
+  {
+    /* at this point wt[j] = 0 if ideal j never appears in relations,
+     * or wt[j] > 0 if ideal j appears in relations */
+    if (mat->wt[j] != 0)
     {
-      /* at this point wt[j] = 0 if ideal j never appears in relations,
-	 or wt[j] > 0 if ideal j appears in relations */
-      if (mat->wt[j] != 0)
-	{
-	  /* index j is mapped to h, with h <= j */
-	  p[j] = h;
-	  mat->wt[h] = mat->wt[j];
-	  h++;
-	}
+      /* index j is mapped to h, with h <= j */
+      p[j] = h;
+      mat->wt[h] = mat->wt[j];
+      h++;
     }
-  ASSERT_ALWAYS(h <= mat->rem_ncols);
+  }
+  /* h should be equal to rem_ncols, which is the number of columns with
+   * non-zero weight */
+  ASSERT_ALWAYS(h == mat->rem_ncols);
 
+  /* Realloc mat->wt */
   mat->wt = realloc (mat->wt, h * sizeof (int32_t));
+  /* Reset mat->ncols to behave as if they were no non-zero columns. */
   mat->ncols = h;
 
-  /* apply mapping to the rows */
-  for (i = 0; i < mat->nrows; i++)
-    for (j = 1; j <= mat->rows[i][0]; j++)
+  /* apply mapping to the rows. As p is a non decreasing function, the rows are
+   * still sorted after this operation. */
+  for (uint64_t i = 0; i < mat->nrows; i++)
+    for (index_t j = 1; j <= mat->rows[i][0]; j++)
       mat->rows[i][j] = p[mat->rows[i][j]];
 
   free (p);
