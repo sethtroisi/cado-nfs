@@ -20,7 +20,9 @@
 
 typedef struct {
     uint32_t ind_row;
+#ifdef FOR_DL
     int32_t e;
+#endif
 } multirel_t;
 
 typedef struct {
