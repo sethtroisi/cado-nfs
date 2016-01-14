@@ -94,6 +94,43 @@ clearMat (filter_matrix_t *mat)
   free (mat->R);
 }
 
+#ifndef FOR_DL
+/* Renumber the non-zero columns to contiguous values [0, 1, 2, ...] */
+static void
+renumber_columns (filter_matrix_t *mat)
+{
+  index_t *p;
+  uint32_t i, j, h;
+
+  p = malloc (mat->ncols * sizeof (index_t));
+
+  /* first compute the mapping of column indices */
+  for (j = h = 0; j < mat->ncols; j++)
+    {
+      /* at this point wt[j] = 0 if ideal j never appears in relations,
+	 or wt[j] > 0 if ideal j appears in relations */
+      if (mat->wt[j] != 0)
+	{
+	  /* index j is mapped to h, with h <= j */
+	  p[j] = h;
+	  mat->wt[h] = mat->wt[j];
+	  h++;
+	}
+    }
+  ASSERT_ALWAYS(h <= mat->rem_ncols);
+
+  mat->wt = realloc (mat->wt, h * sizeof (int32_t));
+  mat->ncols = h;
+
+  /* apply mapping to the rows */
+  for (i = 0; i < mat->nrows; i++)
+    for (j = 1; j <= mat->rows[i][0]; j++)
+      mat->rows[i][j] = p[mat->rows[i][j]];
+
+  free (p);
+}
+#endif
+
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
 void
 InitMatR (filter_matrix_t *mat)
@@ -101,6 +138,10 @@ InitMatR (filter_matrix_t *mat)
   index_t h;
   int32_t w;
   int32_t wmax = mat->cwmax;
+
+#ifndef FOR_DL
+  renumber_columns (mat);
+#endif
 
   for (h = 0; h < mat->ncols; h++)
   {

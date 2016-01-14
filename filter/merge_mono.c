@@ -628,7 +628,7 @@ number_of_superfluous_rows(filter_matrix_t *mat)
 static void
 print_memory_usage (filter_matrix_t *mat)
 {
-  unsigned long mem_rows, mem_wt, mem_cols, mem_MQZ;
+  unsigned long mem_rows, mem_wt, mem_cols, mem_MKZ;
 
   mem_rows = mat->nrows * sizeof (typerow_t*);
   for (unsigned long i = 0; i < mat->nrows; i++)
@@ -639,12 +639,12 @@ print_memory_usage (filter_matrix_t *mat)
   for (unsigned long j = 0; j < mat->ncols; j++)
     if (mat->R[j] != NULL)
       mem_cols += (mat->R[j][0] + 1) * sizeof (index_t);
-  mem_MQZ = (mat->MKZQ[1] + 1) * 2 * sizeof(int32_t); /* memory for MQZQ */
-  mem_MQZ += (mat->ncols + 1) * sizeof(index_t); /* memory for MQZA */
-  printf ("# memory usage: rows %luMB, cols %luMB, wt %luMB, MQZ %luMB, "
+  mem_MKZ = (mat->MKZQ[1] + 1) * 2 * sizeof(int32_t); /* memory for MKZQ */
+  mem_MKZ += (mat->ncols + 1) * sizeof(index_t); /* memory for MKZA */
+  printf ("# memory usage: rows %luMB, cols %luMB, wt %luMB, MKZ %luMB, "
           "tot %lu MB (VmPeak %ld)\n",
-          mem_rows >> 20, mem_cols >> 20, mem_wt >> 20, mem_MQZ >> 20,
-          (mem_rows + mem_cols + mem_wt + mem_MQZ) >> 20,
+          mem_rows >> 20, mem_cols >> 20, mem_wt >> 20, mem_MKZ >> 20,
+          (mem_rows + mem_cols + mem_wt + mem_MKZ) >> 20,
           PeakMemusage () >> 10);
 }
 
