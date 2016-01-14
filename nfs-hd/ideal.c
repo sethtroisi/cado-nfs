@@ -410,7 +410,7 @@ void ideal_spq_clear(ideal_spq_ptr ideal, unsigned int t)
   } else if (ideal->type == 2) {
     ideal_pr_clear(ideal->ideal_pr, t);
   } else {
-    ASSERT(ideal->type = -1);
+    ASSERT(ideal->type == -1);
   }
 
   ideal->type = -1;
@@ -429,6 +429,22 @@ void ideal_spq_fprintf(FILE * file, ideal_spq_srcptr ideal, unsigned int t)
     ASSERT(ideal->type == 2);
 
     ideal_pr_fprintf(file, ideal->ideal_pr, t);
+  }
+}
+
+void ideal_spq_fprintf_q_g(FILE * file, ideal_spq_srcptr ideal)
+{
+  if (ideal->type == -1) {
+    fprintf(file, "No special-q ideal.\n");
+  }
+  if (ideal->type == 0) {
+    ideal_fprintf(file, ideal->ideal_1->ideal);
+  } else if (ideal->type == 1) {
+    ideal_fprintf(file, ideal->ideal_u->ideal);
+  } else {
+    ASSERT(ideal->type == 2);
+
+    ideal_fprintf(file, ideal->ideal_pr->ideal);
   }
 }
 

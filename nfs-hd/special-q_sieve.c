@@ -36,6 +36,49 @@
 
 /* ----- Compute Mq, Mqr, Tqr ----- */
 
+typedef struct {
+  //Array of spq with MqLLL.
+  ideal_spq_t * spq;
+  mat_Z_t * MqLLL;
+  unsigned int number;
+} s_array_spq_t;
+
+typedef s_array_spq_t array_spq_t[1];
+typedef s_array_spq_t * array_spq_ptr;
+typedef const s_array_spq_t * array_spq_srcptr;
+
+void array_spq_init(array_spq_ptr array_spq, unsigned int number_alloc,
+    unsigned int t)
+{
+  array_spq->number = 0;
+  array_spq->spq = (ideal_spq_t *) malloc(sizeof(ideal_spq_t) * number_alloc);
+  array_spq->MqLLL = (mat_Z_t *) malloc(sizeof(mat_Z_t) * number_alloc);
+
+  for (unsigned int i = 0; i < number_alloc; i++) {
+    ideal_spq_init(array_spq->spq[i]);
+    mat_Z_init(array_spq->MqLLL[i], t, t);
+  }
+}
+
+void array_spq_clear(array_spq_ptr array_spq, unsigned int number_alloc,
+    unsigned int t)
+{
+  array_spq->number = 0;
+  for (unsigned int i = 0; i < number_alloc; i++) {
+    ideal_spq_clear(array_spq->spq[i], t);
+    mat_Z_clear(array_spq->MqLLL[i]);
+  }
+  free(array_spq->spq);
+  free(array_spq->MqLLL);
+}
+
+void array_spq_refresh(array_spq_ptr array_spq, unsigned int t)
+{
+  for (unsigned int i = 0; i < array_spq->number; i++) {
+    ideal_spq_clear(array_spq->spq[i], t);
+  }
+}
+
 /*
  * Build the matrix Mq for an ideal (q, g) with deg(g) = 1. The matrix need Tq
  *  with the good coefficients, i.e. t the coeffecients not reduced modulo q.
@@ -133,7 +176,75 @@ void reorganize_MqLLL(mat_Z_ptr matrix)
   }
 
   //TODO: seem to be useless, need do to think about that.
-  /*mat_Z_sort_last(matrix, matrix);*/
+  mat_Z_sort_last(matrix, matrix);
+}
+
+void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
+    unsigned int t, gmp_randstate_t state, int deg_bound_factorise)
+{
+  mpz_poly_factor_list l;
+  mpz_t q_Z;
+
+  mpz_init(q_Z);
+  mpz_set_ui(q_Z, q);
+  mpz_poly_factor_list_init(l);
+
+  mpz_poly_factor(l, f, q_Z, state);
+  mpz_clear(q_Z);
+
+  ASSERT(array_spq->number == 0);
+
+  for (int i = 0; i < l->size; i++) {
+
+    if (l->factors[i]->f->deg < deg_bound_factorise) {
+      if (l->factors[i]->f->deg == 1) {
+#ifdef SPQ_DEFINED
+        if (g->deg != -1) {
+          if (mpz_poly_cmp(g, l->factors[i]->f)) {
+            continue;
+          }
+        }
+#endif // SPQ_DEFINED
+        ideal_spq_set_part(array_spq->spq[array_spq->number], q,
+            l->factors[i]->f, t, 0);
+      } else {
+        ASSERT(l->factors[i]->f->deg > 1);
+
+#ifdef SPQ_DEFINED
+        if (g->deg != -1) {
+          if (mpz_poly_cmp(g, l->factors[i]->f)) {
+            continue;
+          }
+        }
+#endif // SPQ_DEFINED
+        ideal_spq_set_part(array_spq->spq[array_spq->number], q,
+            l->factors[i]->f, t, 1);
+      }
+
+      /* LLL part */
+      build_Mq_ideal_spq(array_spq->MqLLL[array_spq->number],
+          array_spq->spq[array_spq->number]);
+
+#ifndef SKEW_LLL_SPQ
+      mat_Z_LLL_transpose(array_spq->MqLLL[array_spq->number],
+          array_spq->MqLLL[array_spq->number]);
+#else // SKEW_LLL_SPQ
+      mat_Z_skew_LLL(array_spq->MqLLL[array_spq->number],
+          array_spq->MqLLL[array_spq->number, skewness]);
+#endif // SKEW_LLL_SPQ
+
+      /*
+       * If the last coefficient of the last vector is negative, we do not
+       * sieve in the good direction. We therefore take the opposite vector
+       * because we want that a = MqLLL * c, with c in the sieving region
+       * has the last coordinate positive.
+       */
+      reorganize_MqLLL(array_spq->MqLLL[array_spq->number]);
+
+      array_spq->number++;
+    }
+  }
+  mpz_poly_factor_list_clear(l);
 }
 
 /*
@@ -2081,14 +2192,13 @@ void declare_usage(param_list pl)
  * thresh: the V threshold.
  * lpb: the V large prime bounds.
  * array: array in which the norms are stored.
- * matrix: the Mq matrix (set with zero coefficients).
  * q_side: side of the special-q.
  * V: number of number fields.
  */
 void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** fbb, factor_base_t ** fb, sieving_bound_ptr H,
     uint64_t ** q_range, unsigned char ** thresh, unsigned int ** lpb,
-    array_ptr array, mat_Z_ptr matrix, unsigned int * q_side, unsigned int * V,
+    array_ptr array, unsigned int * q_side, unsigned int * V,
     int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
     uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g)
 {
@@ -2276,8 +2386,6 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   array_init(array, number_element);
 
-  mat_Z_init(matrix, H->t, H->t);
-
   * main_side = -1;
   param_list_parse_int(pl, "main", main_side);
 
@@ -2297,8 +2405,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 }
 
 /*
-   The main.
-   */
+ * The main.
+ */
 int main(int argc, char * argv[])
 {
   unsigned int V;
@@ -2310,7 +2418,6 @@ int main(int argc, char * argv[])
   unsigned char * thresh;
   unsigned int * lpb;
   array_t array;
-  mat_Z_t matrix;
   factor_base_t * fb;
   uint64_t q;
   int main_side;
@@ -2322,7 +2429,7 @@ int main(int argc, char * argv[])
   mpz_poly_t g;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
-      &thresh, &lpb, array, matrix, &q_side, &V, &main_side, &log2_base,
+      &thresh, &lpb, array, &q_side, &V, &main_side, &log2_base,
       &outstd, &errstd,
       &sieve_start, Ha, g);
 
@@ -2365,12 +2472,9 @@ int main(int argc, char * argv[])
 #endif // PRINT_ARRAY_NORM
 
   gmp_randstate_t state;
-  mpz_t a;
-  mpz_poly_factor_list l;
-
-  mpz_poly_factor_list_init(l);
   gmp_randinit_default(state);
-  mpz_init(a);
+  array_spq_t spq;
+  array_spq_init(spq, f->pols[q_side]->deg, H->t);
 
   uint64_t nb_rel = 0;
   double total_time = 0.0;
@@ -2385,193 +2489,141 @@ int main(int argc, char * argv[])
   sieving_bound_clear(Ha);
 
   prime_info pi;
-  prime_info_init (pi);
+  prime_info_init(pi);
   //Pass all the prime less than q_range[0].
   for (q = 2; q < q_range[0]; q = getprime_mt(pi)) {}
 
 #ifdef SPQ_IDEAL_U
-    int deg_bound_factorise = (int)H->t;
+  int deg_bound_factorise = (int)H->t;
 #else // SPQ_IDEAL_U
-    int deg_bound_factorise = 2;
+  int deg_bound_factorise = 2;
 #endif // SPQ_IDEAL_U
 
   for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
-    ideal_spq_t special_q;
-    ideal_spq_init(special_q);
-    mpz_set_si(a, q);
-    mpz_poly_factor(l, f->pols[q_side], a, state);
+    //TODO: print time to build MqLLL.
+    compute_all_spq(spq, q, f->pols[q_side], H->t, state, deg_bound_factorise);
 
-    for (int i = 0; i < l->size; i++) {
+    for (unsigned int i = 0; i < spq->number; i++) {
+      sec = seconds();
+      sec_tot = sec;
 
-      if (l->factors[i]->f->deg < deg_bound_factorise) {
-        if (l->factors[i]->f->deg == 1) {
-#ifdef SPQ_DEFINED
-          if (g->deg != -1) {
-            if (mpz_poly_cmp(g, l->factors[i]->f)) {
-              continue;
-            }
-          }
-#endif // SPQ_DEFINED
-          ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 0);
-        } else {
-          ASSERT(l->factors[i]->f->deg > 1);
-
-#ifdef SPQ_DEFINED
-          if (g->deg != -1) {
-            if (mpz_poly_cmp(g, l->factors[i]->f)) {
-              continue;
-            }
-          }
-#endif // SPQ_DEFINED
-          ideal_spq_set_part(special_q, q, l->factors[i]->f, H->t, 1);
-        }
-
-        fprintf(outstd, "# Special-q: q: %" PRIu64 ", g: ", q);
-        mpz_poly_fprintf(outstd, l->factors[i]->f);
+      fprintf(outstd, "# Special-q: ");
+      ideal_spq_fprintf_q_g(outstd, spq->spq[i]);
 
 #ifdef TRACE_POS
-        fprintf(file_trace_pos, "Special-q: q: %" PRIu64 ", g: ", q);
-        mpz_poly_fprintf(file_trace_pos, l->factors[i]->f);
-        fprintf(file_trace_pos, "Side of the special-q: %u\n", q_side);
+      fprintf(file_trace_pos, "# Special-q: ");
+      ideal_spq_fprintf_q_g(file_trace_pos, spq->spq[i]);
+#endif // TRACE_POS
+
+#ifdef TRACE_POS
+      fprintf(file_trace_pos, "MqLLL:\n");
+      mat_Z_fprintf(file_trace_pos, spq->MqLLL[i]);
+#endif // TRACE_POS
+
+#ifdef PRINT_ARRAY_NORM
+      fprintf(file_array_norm, "MqLLL:\n");
+      mat_Z_fprintf(file_array_norm, spq->MqLLL[i]);
+#endif // PRINT_ARRAY_NORM
+
+#ifndef OLD_NORM
+      memset(max_norm, 0, sizeof(unsigned char) * V);
+#endif // OLD_NORM
+
+      for (unsigned int j = 0; j < V; j++) {
+#ifdef TRACE_POS
+        fprintf(file_trace_pos, "Base: %f\n", pow(2.0, log2_base[j]));
 #endif // TRACE_POS
 
         sec = seconds();
-        sec_tot = sec;
-
-        /* LLL part */
-        build_Mq_ideal_spq(matrix, special_q);
-
-#ifdef TRACE_POS
-        fprintf(file_trace_pos, "Mq:\n");
-        mat_Z_fprintf(file_trace_pos, matrix);
-#endif // TRACE_POS
-
-#ifndef SKEW_LLL_SPQ
-        mat_Z_LLL_transpose(matrix, matrix);
-#else // SKEW_LLL_SPQ
-        mat_Z_skew_LLL(matrix, matrix, skewness);
-#endif // SKEW_LLL_SPQ
-
-        /*
-         * TODO: continue here.
-         * If the last coefficient of the last vector is negative, we do not
-         * sieve in the good direction. We therefore take the opposite vector
-         * because we want that a = MqLLL * c, with c in the sieving region
-         * has the last coordinate positive.
-         */
-
-        reorganize_MqLLL(matrix);
-
-#ifdef TRACE_POS
-        fprintf(file_trace_pos, "MqLLL:\n");
-        mat_Z_fprintf(file_trace_pos, matrix);
-#endif // TRACE_POS
-
-#ifdef PRINT_ARRAY_NORM
-          fprintf(file_array_norm, "MqLLL:\n");
-          mat_Z_fprintf(file_array_norm, matrix);
-#endif // PRINT_ARRAY_NORM
-
+        uint64_array_init(indexes[j], array->number_element);
+        array_set_all_elements(array, UCHAR_MAX);
 #ifndef OLD_NORM
-          memset(max_norm, 0, sizeof(unsigned char) * V);
-#endif // OLD_NORM
-
-        for (unsigned int j = 0; j < V; j++) {
-#ifdef TRACE_POS
-          fprintf(file_trace_pos, "Base: %f\n", pow(2.0, log2_base[j]));
-#endif // TRACE_POS
-
-          sec = seconds();
-          uint64_array_init(indexes[j], array->number_element);
-          array_set_all_elements(array, UCHAR_MAX);
-#ifndef OLD_NORM
-          init_norm(array, max_norm + j, file_trace_pos, H, matrix, f->pols[j],
-              ideal_spq_get_log(special_q) / log2_base[j], !(j ^ q_side),
-              log2_base[j]);
+        init_norm(array, max_norm + j, file_trace_pos, H, spq->MqLLL[i], f->pols[j],
+            ideal_spq_get_log(spq->spq[i]) / log2_base[j], !(j ^ q_side),
+            log2_base[j]);
 #else // OLD_NORM
-          init_norm(array, file_trace_pos, pre_compute[j], H, matrix,
-              f->pols[j], special_q, !(j ^ q_side));
+        init_norm(array, file_trace_pos, pre_compute[j], H, spq->MqLLL[i],
+            f->pols[j], spq->spq[i], !(j ^ q_side));
 #endif // OLD_NORM
 
 #ifdef PRINT_ARRAY_NORM
-          fprintf(file_array_norm, "f%u: ", j);
-          mpz_poly_fprintf(file_array_norm, f->pols[j]);
-          number_norm(file_array_norm, array, max_norm[j]);
-          fprintf(file_array_norm, "********************\n");
+        fprintf(file_array_norm, "f%u: ", j);
+        mpz_poly_fprintf(file_array_norm, f->pols[j]);
+        number_norm(file_array_norm, array, max_norm[j]);
+        fprintf(file_array_norm, "********************\n");
 #endif // PRINT_ARRAY_NORM
 
-          time[j][0] = seconds() - sec;
+        time[j][0] = seconds() - sec;
 
 #ifdef ASSERT_NORM
-          printf("# ASSERT_NORM side %u.\n", j);
-          assert_norm(array, H, f->pols[j], matrix, !(j ^ q_side), log2_base[j],
-              ideal_spq_get_log(special_q));
+        printf("# ASSERT_NORM side %u.\n", j);
+        assert_norm(array, H, f->pols[j], spq->MqLLL[i], !(j ^ q_side), log2_base[j],
+            ideal_spq_get_log(spq->spq[i]));
 #endif // ASSERT_NORM
 
-          sec = seconds();
-          special_q_sieve(array, file_trace_pos, matrix, fb[j], H, f->pols[j],
-              outstd, errstd, sieve_start[j], special_q);
-          time[j][1] = seconds() - sec;
-          sec = seconds();
-          find_index(indexes[j], array,
-              (unsigned char) ceil(thresh[j] / log2_base[j]));
-          time[j][2] = seconds() - sec;
+        sec = seconds();
+        special_q_sieve(array, file_trace_pos, spq->MqLLL[i], fb[j], H, f->pols[j],
+            outstd, errstd, sieve_start[j], spq->spq[i]);
+        time[j][1] = seconds() - sec;
+        sec = seconds();
+        find_index(indexes[j], array,
+            (unsigned char) ceil(thresh[j] / log2_base[j]));
+        time[j][2] = seconds() - sec;
 
 #ifdef TRACE_POS
         fprintf(file_trace_pos, "********************\n");
 #endif // TRACE_POS
-        }
+      }
 
-        for (unsigned int j = 0; j < V; j++) {
-          fprintf(outstd,
-              "# Log 2 of the maximum of the norms %u: %u.\n", j,
-              max_norm[j]);
-        }
-
-        sec = seconds();
-        nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
-            matrix, f->pols, H, V, special_q, q_side, main_side,
-            outstd);
-        sec_cofact = seconds() - sec;
-
-        for (unsigned j = 0; j < V; j++) {
-
-          uint64_array_clear(indexes[j]);
-        }
-
+      for (unsigned int j = 0; j < V; j++) {
         fprintf(outstd,
-            "# Time for this special-q: %fs.\n", seconds() - sec_tot);
-        total_time += (seconds() - sec_tot);
-        spq_tot++;
-        for (unsigned int j = 0; j < V; j++) {
-          fprintf(outstd, "# Time to init norm %u: %fs.\n", j,
-              time[j][0]);
-          fprintf(outstd, "# Time to sieve %u: %fs.\n", j, time[j][1]);
-          fprintf(outstd, "# Time to find indexes %u: %fs.\n", j,
-              time [j][2]);
-        }
+            "# Log 2 of the maximum of the norms %u: %u.\n", j,
+            max_norm[j]);
+      }
 
-        fprintf(outstd, "# Time to factorize: %fs.\n", sec_cofact);
+      sec = seconds();
+      nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
+          spq->MqLLL[i], f->pols, H, V, spq->spq[i], q_side, main_side,
+          outstd);
+      sec_cofact = seconds() - sec;
 
-        fprintf(outstd,
-            "# ----------------------------------------\n");
-        fprintf(errstd,
-            "# ----------------------------------------\n");
-        fflush(outstd);
-        fflush(errstd);
+      for (unsigned j = 0; j < V; j++) {
+
+        uint64_array_clear(indexes[j]);
+      }
+
+      fprintf(outstd,
+          "# Time for this special-q: %fs.\n", seconds() - sec_tot);
+      total_time += (seconds() - sec_tot);
+      spq_tot++;
+      for (unsigned int j = 0; j < V; j++) {
+        fprintf(outstd, "# Time to init norm %u: %fs.\n", j,
+            time[j][0]);
+        fprintf(outstd, "# Time to sieve %u: %fs.\n", j, time[j][1]);
+        fprintf(outstd, "# Time to find indexes %u: %fs.\n", j,
+            time [j][2]);
+      }
+
+      fprintf(outstd, "# Time to factorize: %fs.\n", sec_cofact);
+
+      fprintf(outstd,
+          "# ----------------------------------------\n");
+      fprintf(errstd,
+          "# ----------------------------------------\n");
+      fflush(outstd);
+      fflush(errstd);
 
 #ifdef TRACE_POS
-        fprintf(file_trace_pos, "----------------------------------------\n");
+      fprintf(file_trace_pos, "----------------------------------------\n");
 #endif // TRACE_POS
 
 #ifdef PRINT_ARRAY_NORM
-        fprintf(file_array_norm, "----------------------------------------\n");
-        fflush(file_array_norm);
+      fprintf(file_array_norm, "----------------------------------------\n");
+      fflush(file_array_norm);
 #endif // PRINT_ARRAY_NORM
 
-        ideal_spq_clear(special_q, H->t);
-      }
     }
+    array_spq_refresh(spq, H->t);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);
@@ -2586,10 +2638,9 @@ int main(int argc, char * argv[])
   fprintf(outstd, "# Relations per special-q: %f.\n",
       (double)nb_rel / (double)spq_tot);
 
-  mpz_poly_factor_list_clear(l);
+  array_spq_clear(spq, f->pols[q_side]->deg, H->t);
   gmp_randclear(state);
-  mpz_clear(a);
-  prime_info_clear (pi);
+  prime_info_clear(pi);
 
 #ifdef TRACE_POS
   fclose(file_trace_pos);
@@ -2599,7 +2650,6 @@ int main(int argc, char * argv[])
   fclose(file_array_norm);
 #endif // PRINT_ARRAY_NORM
 
-  mat_Z_clear(matrix);
   for (unsigned int i = 0; i < V; i++) {
     factor_base_clear(fb[i], H->t);
 #ifdef OLD_NORM

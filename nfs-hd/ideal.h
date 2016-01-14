@@ -295,6 +295,8 @@ void ideal_spq_clear(ideal_spq_ptr ideal, unsigned int t);
  */
 void ideal_spq_fprintf(FILE * file, ideal_spq_srcptr ideal, unsigned int t);
 
+void ideal_spq_fprintf_q_g(FILE * file, ideal_spq_srcptr ideal);
+
 /*
  * Return the log of the ideal_spq.
  *
