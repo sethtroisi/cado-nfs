@@ -41,6 +41,7 @@ typedef struct {
   ideal_spq_t * spq;
   mat_Z_t * MqLLL;
   unsigned int number;
+  unsigned int number_alloc;
 } s_array_spq_t;
 
 typedef s_array_spq_t array_spq_t[1];
@@ -53,6 +54,7 @@ void array_spq_init(array_spq_ptr array_spq, unsigned int number_alloc,
   array_spq->number = 0;
   array_spq->spq = (ideal_spq_t *) malloc(sizeof(ideal_spq_t) * number_alloc);
   array_spq->MqLLL = (mat_Z_t *) malloc(sizeof(mat_Z_t) * number_alloc);
+  array_spq->number_alloc = number_alloc;
 
   for (unsigned int i = 0; i < number_alloc; i++) {
     ideal_spq_init(array_spq->spq[i]);
@@ -60,12 +62,16 @@ void array_spq_init(array_spq_ptr array_spq, unsigned int number_alloc,
   }
 }
 
-void array_spq_clear(array_spq_ptr array_spq, unsigned int number_alloc,
-    unsigned int t)
+void array_spq_clear(array_spq_ptr array_spq, unsigned int t)
 {
-  array_spq->number = 0;
-  for (unsigned int i = 0; i < number_alloc; i++) {
+  ASSERT(array_spq->number <= array_spq->number_alloc);
+
+  for (unsigned int i = 0; i < array_spq->number; i++) {
     ideal_spq_clear(array_spq->spq[i], t);
+  }
+  array_spq->number = 0;
+  for (unsigned int i = 0; i < array_spq->number_alloc; i++) {
+    ASSERT(array_spq->spq[i]->type == -1);
     mat_Z_clear(array_spq->MqLLL[i]);
   }
   free(array_spq->spq);
@@ -74,9 +80,38 @@ void array_spq_clear(array_spq_ptr array_spq, unsigned int number_alloc,
 
 void array_spq_refresh(array_spq_ptr array_spq, unsigned int t)
 {
+  ASSERT(array_spq->number <= array_spq->number_alloc);
+
   for (unsigned int i = 0; i < array_spq->number; i++) {
     ideal_spq_clear(array_spq->spq[i], t);
   }
+  array_spq->number = 0;
+}
+
+void array_spq_fprintf(FILE * file, array_spq_srcptr array_spq)
+{
+  for (unsigned int i = 0; i < array_spq->number; i++) {
+    ideal_spq_fprintf_q_g(file, array_spq->spq[i]);
+    mat_Z_fprintf(file, array_spq->MqLLL[i]);
+  }
+}
+
+void array_spq_swap(array_spq_ptr array_spq_0, array_spq_ptr array_spq_1)
+{
+  unsigned int number_tmp = array_spq_0->number;
+  unsigned int number_alloc_tmp = array_spq_0->number_alloc;
+  ideal_spq_t * ideal_tmp = array_spq_0->spq;
+  mat_Z_t * MqLLL_tmp = array_spq_0->MqLLL;
+
+  array_spq_0->number = array_spq_1->number;
+  array_spq_0->number_alloc = array_spq_1->number_alloc;
+  array_spq_0->spq = array_spq_1->spq;
+  array_spq_0->MqLLL = array_spq_1->MqLLL;
+
+  array_spq_1->number = number_tmp;
+  array_spq_1->number_alloc = number_alloc_tmp;
+  array_spq_1->spq = ideal_tmp;
+  array_spq_1->MqLLL = MqLLL_tmp;
 }
 
 /*
@@ -180,8 +215,12 @@ void reorganize_MqLLL(mat_Z_ptr matrix)
 }
 
 void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
-    unsigned int t, gmp_randstate_t state, int deg_bound_factorise)
+    sieving_bound_srcptr H, gmp_randstate_t state, int deg_bound_factorise,
+    MAYBE_UNUSED mpz_vector_srcptr skewness)
 {
+  array_spq_t array_spq_tmp;
+  array_spq_init(array_spq_tmp, f->deg, H->t);
+
   mpz_poly_factor_list l;
   mpz_t q_Z;
 
@@ -191,8 +230,6 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
 
   mpz_poly_factor(l, f, q_Z, state);
   mpz_clear(q_Z);
-
-  ASSERT(array_spq->number == 0);
 
   for (int i = 0; i < l->size; i++) {
 
@@ -205,8 +242,8 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
           }
         }
 #endif // SPQ_DEFINED
-        ideal_spq_set_part(array_spq->spq[array_spq->number], q,
-            l->factors[i]->f, t, 0);
+        ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
+            l->factors[i]->f, H->t, 0);
       } else {
         ASSERT(l->factors[i]->f->deg > 1);
 
@@ -217,20 +254,20 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
           }
         }
 #endif // SPQ_DEFINED
-        ideal_spq_set_part(array_spq->spq[array_spq->number], q,
-            l->factors[i]->f, t, 1);
+        ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
+            l->factors[i]->f, H->t, 1);
       }
 
       /* LLL part */
-      build_Mq_ideal_spq(array_spq->MqLLL[array_spq->number],
-          array_spq->spq[array_spq->number]);
+      build_Mq_ideal_spq(array_spq_tmp->MqLLL[array_spq_tmp->number],
+          array_spq_tmp->spq[array_spq_tmp->number]);
 
 #ifndef SKEW_LLL_SPQ
-      mat_Z_LLL_transpose(array_spq->MqLLL[array_spq->number],
-          array_spq->MqLLL[array_spq->number]);
+      mat_Z_LLL_transpose(array_spq_tmp->MqLLL[array_spq_tmp->number],
+          array_spq_tmp->MqLLL[array_spq_tmp->number]);
 #else // SKEW_LLL_SPQ
-      mat_Z_skew_LLL(array_spq->MqLLL[array_spq->number],
-          array_spq->MqLLL[array_spq->number, skewness]);
+      mat_Z_skew_LLL(array_spq_tmp->MqLLL[array_spq_tmp->number],
+          array_spq_tmp->MqLLL[array_spq_tmp->number, skewness]);
 #endif // SKEW_LLL_SPQ
 
       /*
@@ -239,12 +276,58 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
        * because we want that a = MqLLL * c, with c in the sieving region
        * has the last coordinate positive.
        */
-      reorganize_MqLLL(array_spq->MqLLL[array_spq->number]);
+      reorganize_MqLLL(array_spq_tmp->MqLLL[array_spq_tmp->number]);
 
-      array_spq->number++;
+      array_spq_tmp->number++;
     }
   }
   mpz_poly_factor_list_clear(l);
+
+  array_spq_swap(array_spq_tmp, array_spq);
+  array_spq_clear(array_spq_tmp, H->t);
+
+#ifdef GALOIS_6
+  if (array_spq->number > 0) {
+    mpz_vector_t c;
+    mpz_vector_init(c, H->t);
+    for (unsigned int i = 0; i < H->t; i++) {
+      mpz_set_ui(c->c[i], H->h[i]);
+    }
+    mpz_poly_t a;
+    mpz_poly_init(a, H->t);
+    mpz_t norm_inf;
+    mpz_init(norm_inf);
+    mpz_t tmp;
+    mpz_init(tmp);
+    mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[0], c);
+    mpz_poly_infinity_norm(norm_inf, a);
+    unsigned int index = 0;
+
+    for (unsigned int i = 1; i < array_spq->number; i++) {
+      mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[i], c);
+      mpz_poly_infinity_norm(tmp, a);
+      if (mpz_cmp(tmp, norm_inf) < 0) {
+        index = i;
+        mpz_set(norm_inf, tmp);
+      }
+    }
+
+    mpz_poly_clear(a);
+    mpz_vector_clear(c);
+    mpz_clear(norm_inf);
+    mpz_clear(tmp);
+
+    array_spq_t array_spq_gal;
+    array_spq_init(array_spq_gal, 1, H->t);
+    ideal_spq_set(array_spq_gal->spq[0], array_spq->spq[index], H->t);
+    mat_Z_copy(array_spq_gal->MqLLL[0], array_spq->MqLLL[index]);
+    array_spq_gal->number = 1;
+
+    array_spq_swap(array_spq_gal, array_spq);
+
+    array_spq_clear(array_spq_gal, H->t);
+  }
+#endif // GALOIS_6
 }
 
 /*
@@ -2501,7 +2584,8 @@ int main(int argc, char * argv[])
 
   for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
     //TODO: print time to build MqLLL.
-    compute_all_spq(spq, q, f->pols[q_side], H->t, state, deg_bound_factorise);
+    compute_all_spq(spq, q, f->pols[q_side], H, state, deg_bound_factorise,
+        skewness);
 
     for (unsigned int i = 0; i < spq->number; i++) {
       sec = seconds();
@@ -2623,7 +2707,6 @@ int main(int argc, char * argv[])
 #endif // PRINT_ARRAY_NORM
 
     }
-    array_spq_refresh(spq, H->t);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);
@@ -2638,7 +2721,7 @@ int main(int argc, char * argv[])
   fprintf(outstd, "# Relations per special-q: %f.\n",
       (double)nb_rel / (double)spq_tot);
 
-  array_spq_clear(spq, f->pols[q_side]->deg, H->t);
+  array_spq_clear(spq, H->t);
   gmp_randclear(state);
   prime_info_clear(pi);
 

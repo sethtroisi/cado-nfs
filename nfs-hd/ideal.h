@@ -240,6 +240,9 @@ void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t);
  */
 void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, double log,
     unsigned int t);
+
+void ideal_pr_set(ideal_pr_ptr ideal_new, ideal_pr_srcptr ideal_old,
+    unsigned int t);
 /*
  * Delete an ideal_pr.
  *
@@ -277,6 +280,8 @@ void ideal_spq_init(ideal_spq_ptr ideal);
  */
 void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t q, mpz_poly_srcptr g,
     unsigned int t, char type);
+
+void ideal_spq_set(ideal_spq_ptr ideal, ideal_spq_srcptr ideal_old, unsigned int t);
 
 /*
  * Clear an ideal_spq.
