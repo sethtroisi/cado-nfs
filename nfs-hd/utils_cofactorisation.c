@@ -492,6 +492,93 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
   return found > 0;
 }
 
+static void automorphism_6_2(mpz_poly_ptr b, mpz_poly_srcptr a)
+{
+  mpz_t * c = (mpz_t *) malloc(sizeof(mpz_t) * 2);
+  for (int i = 0; i < 2; i++) {
+    mpz_init(c[i]);
+  }
+
+  mpz_sub(c[0], c[0], a->coeff[1]);
+  mpz_submul_ui(c[0], a->coeff[0], 2);
+
+  mpz_add(c[1], c[1], a->coeff[1]);
+  mpz_add(c[1], c[1], a->coeff[0]);
+
+  mpz_poly_setcoeffs(b, c, 1);
+  for (int i = 0; i < 2; i++) {
+    mpz_clear(c[i]);
+  }
+  free(c);
+}
+
+static void automorphism_6_3(mpz_poly_ptr b, mpz_poly_srcptr a)
+{
+  mpz_t * c = (mpz_t *) malloc(sizeof(mpz_t) * 3);
+  for (int i = 0; i < 3; i++) {
+    mpz_init(c[i]);
+  }
+
+  mpz_add(c[0], c[0], a->coeff[2]);
+  mpz_submul_ui(c[0], a->coeff[1], 2);
+  mpz_addmul_ui(c[0], a->coeff[0], 4);
+
+  mpz_submul_ui(c[1], a->coeff[2], 2);
+  mpz_add(c[1], c[1], a->coeff[1]);
+  mpz_addmul_ui(c[1], a->coeff[0], 4);
+
+  mpz_add(c[2], c[2], a->coeff[2]);
+  mpz_add(c[2], c[2], a->coeff[1]);
+  mpz_add(c[2], c[2], a->coeff[0]);
+
+  mpz_poly_setcoeffs(b, c, 2);
+  for (int i = 0; i < 3; i++) {
+    mpz_clear(c[i]);
+  }
+  free(c);
+}
+
+static void rewrite_poly(mpz_poly_ptr b)
+{
+  mpz_t c;
+  mpz_init(c);
+  mpz_poly_content(c, b);
+
+  mpz_poly_divexact_mpz(b, b, c);
+  if (mpz_cmp_ui(b->coeff[b->deg], 0) < 0) {
+    mpz_poly_neg(b, b);
+  }
+  mpz_clear(c);
+}
+
+static void printf_relation_galois(factor_t * factor,
+    mpz_poly_srcptr a, unsigned int t, unsigned int V,
+    FILE * outstd, MAYBE_UNUSED unsigned int * assert_facto,
+    MAYBE_UNUSED mpz_vector_srcptr c)
+{
+  if (a->deg == 1 || a->deg > 2) {
+    fprintf(outstd, "# Can not use Galois 6\n");
+  } else {
+    fprintf(outstd, "# Use Galois 6\n");
+    mpz_poly_t b;
+    mpz_poly_init(b, a->deg);
+    mpz_poly_set(b, a);
+
+    for (unsigned int i = 0; i < 5; i++) {
+      if (a->deg == 2) {
+        automorphism_6_3(b, b);
+      } else if (a->deg == 1) {
+        automorphism_6_2(b, b);
+        printf("# BEWARE: factorization is probably wrong.\n");
+      }
+      rewrite_poly(b);
+      printf_relation(factor, b, t, V, outstd, assert_facto, c);
+    }
+    mpz_poly_clear(b);
+    fprintf(outstd, "# ----------\n");
+  }
+}
+
 /*
  * A potential polynomial is found. Factorise it to verify if it gives a
  *  relation.
@@ -509,7 +596,7 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
     facul_aux_data *data, unsigned int * nb_rel_found,
     ideal_spq_srcptr special_q, unsigned int q_side, unsigned int size,
     FILE * outstd, MAYBE_UNUSED unsigned int * number_factorisation,
-    MAYBE_UNUSED mpz_vector_srcptr c)
+    MAYBE_UNUSED mpz_vector_srcptr c, unsigned int gal, MAYBE_UNUSED unsigned int * nb_rel_gal)
 {
   mpz_t res;
   mpz_init(res);
@@ -639,6 +726,11 @@ static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
   if (find >= 2) {
     printf_relation(factor, a, t, V, outstd, assert_facto, c);
     (* nb_rel_found)++;
+
+    if (gal == 6) {
+      printf_relation_galois(factor, a, t, V, outstd, assert_facto, c);
+      (* nb_rel_gal) += 5;
+    }
   }
 
   mpz_clear(res);
@@ -741,7 +833,8 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
     sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indices,
     facul_aux_data *data, unsigned int * nb_rel_found,
     ideal_spq_srcptr special_q, unsigned int q_side, FILE * outstd,
-    MAYBE_UNUSED unsigned int * number_factorisation)
+    MAYBE_UNUSED unsigned int * number_factorisation, unsigned int gal,
+    MAYBE_UNUSED unsigned int * nb_rel_gal)
 {
   unsigned int * L = (unsigned int *) malloc(V * sizeof(unsigned int));
   unsigned int size = 0;
@@ -773,7 +866,8 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
         mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
 
       good_polynomial(a, f, L, H->t, V, main, data, nb_rel_found,
-          special_q, q_side, size, outstd, number_factorisation, c);
+          special_q, q_side, size, outstd, number_factorisation, c, gal,
+          nb_rel_gal);
     }
 
     mpz_poly_clear(a);
@@ -796,7 +890,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, ideal_spq_srcptr special_q,
-    unsigned int q_side, int main, FILE * outstd)
+    unsigned int q_side, int main, FILE * outstd, unsigned int gal)
 {
   //index[i] is the current index of indices[i].
   uint64_t * index = (uint64_t * ) malloc(sizeof(uint64_t) * V);
@@ -838,15 +932,21 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   //Good factorisation.
   number_factorisation[1] = 0;
   unsigned int nb_rel_found = 0;
+  unsigned int nb_rel_gal = 0;
   if (0 != length_tot) {
     while(sum_index(index, V, main) < length_tot) {
       find_relation(indices, index, number_element, matrix, f, H, V, main,
           max_indices, data, &nb_rel_found, special_q, q_side, outstd,
-          number_factorisation);
+          number_factorisation, gal, &nb_rel_gal);
     }
   }
   if (nb_rel_found != 0) {
-    fprintf(outstd, "# Number of found relations: %u.\n", nb_rel_found);
+    if (gal == 6) {
+      fprintf(outstd, "# Number of found relations: %u (with %u by Galois 6).\n", nb_rel_found +
+          nb_rel_gal, nb_rel_gal);
+    } else {
+      fprintf(outstd, "# Number of found relations: %u.\n", nb_rel_found);
+    }
   } else {
     fprintf(outstd, "# No relations\n");
   }
@@ -863,5 +963,5 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   free(data);
   free(index);
 
-  return nb_rel_found;
+  return nb_rel_found + nb_rel_gal;
 }

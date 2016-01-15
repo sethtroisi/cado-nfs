@@ -216,7 +216,7 @@ void reorganize_MqLLL(mat_Z_ptr matrix)
 
 void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state, int deg_bound_factorise,
-    MAYBE_UNUSED mpz_vector_srcptr skewness)
+    MAYBE_UNUSED mpz_vector_srcptr skewness, unsigned int gal)
 {
   array_spq_t array_spq_tmp;
   array_spq_init(array_spq_tmp, f->deg, H->t);
@@ -286,48 +286,48 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
   array_spq_swap(array_spq_tmp, array_spq);
   array_spq_clear(array_spq_tmp, H->t);
 
-#ifdef GALOIS_6
-  if (array_spq->number > 0) {
-    mpz_vector_t c;
-    mpz_vector_init(c, H->t);
-    for (unsigned int i = 0; i < H->t; i++) {
-      mpz_set_ui(c->c[i], H->h[i]);
-    }
-    mpz_poly_t a;
-    mpz_poly_init(a, H->t);
-    mpz_t norm_inf;
-    mpz_init(norm_inf);
-    mpz_t tmp;
-    mpz_init(tmp);
-    mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[0], c);
-    mpz_poly_infinity_norm(norm_inf, a);
-    unsigned int index = 0;
-
-    for (unsigned int i = 1; i < array_spq->number; i++) {
-      mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[i], c);
-      mpz_poly_infinity_norm(tmp, a);
-      if (mpz_cmp(tmp, norm_inf) < 0) {
-        index = i;
-        mpz_set(norm_inf, tmp);
+  if (gal == 6) {
+    if (array_spq->number > 0) {
+      mpz_vector_t c;
+      mpz_vector_init(c, H->t);
+      for (unsigned int i = 0; i < H->t; i++) {
+        mpz_set_ui(c->c[i], H->h[i]);
       }
+      mpz_poly_t a;
+      mpz_poly_init(a, H->t);
+      mpz_t norm_inf;
+      mpz_init(norm_inf);
+      mpz_t tmp;
+      mpz_init(tmp);
+      mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[0], c);
+      mpz_poly_infinity_norm(norm_inf, a);
+      unsigned int index = 0;
+
+      for (unsigned int i = 1; i < array_spq->number; i++) {
+        mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[i], c);
+        mpz_poly_infinity_norm(tmp, a);
+        if (mpz_cmp(tmp, norm_inf) < 0) {
+          index = i;
+          mpz_set(norm_inf, tmp);
+        }
+      }
+
+      mpz_poly_clear(a);
+      mpz_vector_clear(c);
+      mpz_clear(norm_inf);
+      mpz_clear(tmp);
+
+      array_spq_t array_spq_gal;
+      array_spq_init(array_spq_gal, 1, H->t);
+      ideal_spq_set(array_spq_gal->spq[0], array_spq->spq[index], H->t);
+      mat_Z_copy(array_spq_gal->MqLLL[0], array_spq->MqLLL[index]);
+      array_spq_gal->number = 1;
+
+      array_spq_swap(array_spq_gal, array_spq);
+
+      array_spq_clear(array_spq_gal, H->t);
     }
-
-    mpz_poly_clear(a);
-    mpz_vector_clear(c);
-    mpz_clear(norm_inf);
-    mpz_clear(tmp);
-
-    array_spq_t array_spq_gal;
-    array_spq_init(array_spq_gal, 1, H->t);
-    ideal_spq_set(array_spq_gal->spq[0], array_spq->spq[index], H->t);
-    mat_Z_copy(array_spq_gal->MqLLL[0], array_spq->MqLLL[index]);
-    array_spq_gal->number = 1;
-
-    array_spq_swap(array_spq_gal, array_spq);
-
-    array_spq_clear(array_spq_gal, H->t);
   }
-#endif // GALOIS_6
 }
 
 /*
@@ -2260,7 +2260,8 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "start", "value of first ideal r considered");
   param_list_decl_usage(pl, "Ha", "sieving region for a");
   param_list_decl_usage(pl, "base", "specify the bases");
-  param_list_decl_usage(pl, "g", "");
+  param_list_decl_usage(pl, "g", "polynomial associated with q");
+  param_list_decl_usage(pl, "gal", "type of Galois action (6)");
 }
 
 /*
@@ -2283,7 +2284,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     uint64_t ** q_range, unsigned char ** thresh, unsigned int ** lpb,
     array_ptr array, unsigned int * q_side, unsigned int * V,
     int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
-    uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g)
+    uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g,
+    unsigned int * gal)
 {
   param_list pl;
   param_list_init(pl);
@@ -2483,6 +2485,9 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
 #endif // NDEBUG
 
+  * gal = 0;
+  param_list_parse_uint(pl, "gal", gal);
+  ASSERT(* gal == 0 || * gal == 6);
 
   param_list_clear(pl);
 }
@@ -2510,11 +2515,11 @@ int main(int argc, char * argv[])
   uint64_t * sieve_start;
   sieving_bound_t Ha;
   mpz_poly_t g;
+  unsigned int gal;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
       &thresh, &lpb, array, &q_side, &V, &main_side, &log2_base,
-      &outstd, &errstd,
-      &sieve_start, Ha, g);
+      &outstd, &errstd, &sieve_start, Ha, g, &gal);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2585,7 +2590,7 @@ int main(int argc, char * argv[])
   for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
     //TODO: print time to build MqLLL.
     compute_all_spq(spq, q, f->pols[q_side], H, state, deg_bound_factorise,
-        skewness);
+        skewness, gal);
 
     for (unsigned int i = 0; i < spq->number; i++) {
       sec = seconds();
@@ -2668,7 +2673,7 @@ int main(int argc, char * argv[])
       sec = seconds();
       nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
           spq->MqLLL[i], f->pols, H, V, spq->spq[i], q_side, main_side,
-          outstd);
+          outstd, gal);
       sec_cofact = seconds() - sec;
 
       for (unsigned j = 0; j < V; j++) {
