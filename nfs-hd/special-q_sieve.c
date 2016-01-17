@@ -1770,7 +1770,6 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #endif // Q_BELOW_FBB
 
   /* --- Line sieve --- */
-
   uint64_t line_sieve_stop = 2 * (uint64_t) H->h[0];
 
   while (i < fb->number_element_1 &&
@@ -1912,6 +1911,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   if (H->t == 3) {
     plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
   }
+
   while (i < fb->number_element_1 &&
       fb->factor_base_1[i]->ideal->r < plane_sieve_stop) {
 
@@ -2485,9 +2485,9 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
 #endif // NDEBUG
 
-  * gal = 0;
+  * gal = 1;
   param_list_parse_uint(pl, "gal", gal);
-  ASSERT(* gal == 0 || * gal == 6);
+  ASSERT(* gal == 1 || * gal == 6);
 
   param_list_clear(pl);
 }
@@ -2651,8 +2651,8 @@ int main(int argc, char * argv[])
 #endif // ASSERT_NORM
 
         sec = seconds();
-        special_q_sieve(array, file_trace_pos, spq->MqLLL[i], fb[j], H, f->pols[j],
-            outstd, errstd, sieve_start[j], spq->spq[i]);
+        special_q_sieve(array, file_trace_pos, spq->MqLLL[i], fb[j], H,
+            f->pols[j], outstd, errstd, sieve_start[j], spq->spq[i]);
         time[j][1] = seconds() - sec;
         sec = seconds();
         find_index(indexes[j], array,

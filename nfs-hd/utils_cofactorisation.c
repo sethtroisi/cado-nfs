@@ -492,7 +492,48 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
   return found > 0;
 }
 
-static void automorphism_6_2(mpz_poly_ptr b, mpz_poly_srcptr a)
+static unsigned int is_irreducible(mpz_poly_srcptr a)
+{
+  if (a->deg == 1) {
+    return 1;
+  }
+  else if (a->deg == 2) {
+    mpz_t delta;
+    mpz_init(delta);
+    mpz_submul_ui(delta, a->coeff[0], 4);
+    mpz_mul(delta, delta, a->coeff[2]);
+    mpz_addmul(delta, a->coeff[1], a->coeff[1]);
+
+    if (mpz_perfect_square_p(delta) == 0) {
+      mpz_clear(delta);
+      return 1;
+    }
+    mpz_sqrt(delta, delta);
+    mpz_sub(delta, delta, a->coeff[1]);
+
+    mpz_t Z_zero;
+    mpz_init(Z_zero);
+    mpz_t Z_2a;
+    mpz_init(Z_2a);
+    mpz_mul_ui(Z_2a, a->coeff[2], 2);
+    if (mpz_congruent_p(delta, Z_zero, Z_2a) == 0) {
+      mpz_clear(Z_2a);
+      mpz_clear(Z_zero);
+      mpz_clear(delta);
+      return 1;
+    };
+
+    mpz_clear(Z_2a);
+    mpz_clear(Z_zero);
+    mpz_clear(delta);
+    return 0;
+  } else {
+    //TODO: wrong.
+    return 1;
+  }
+}
+
+static void automorphism_6_1(mpz_poly_ptr b, mpz_poly_srcptr a)
 {
   mpz_t * c = (mpz_t *) malloc(sizeof(mpz_t) * 2);
   for (int i = 0; i < 2; i++) {
@@ -512,7 +553,7 @@ static void automorphism_6_2(mpz_poly_ptr b, mpz_poly_srcptr a)
   free(c);
 }
 
-static void automorphism_6_3(mpz_poly_ptr b, mpz_poly_srcptr a)
+static void automorphism_6_2(mpz_poly_ptr b, mpz_poly_srcptr a)
 {
   mpz_t * c = (mpz_t *) malloc(sizeof(mpz_t) * 3);
   for (int i = 0; i < 3; i++) {
@@ -566,9 +607,9 @@ static void printf_relation_galois(factor_t * factor,
 
     for (unsigned int i = 0; i < 5; i++) {
       if (a->deg == 2) {
-        automorphism_6_3(b, b);
-      } else if (a->deg == 1) {
         automorphism_6_2(b, b);
+      } else if (a->deg == 1) {
+        automorphism_6_1(b, b);
         printf("# BEWARE: factorization is probably wrong.\n");
       }
       rewrite_poly(b);
@@ -863,7 +904,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 
     //a must be irreducible.
     if (mpz_cmp_ui(gcd, 1) == 0 && a->deg > 0 &&
-        mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0) {
+        mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0 && is_irreducible(a)) {
 
       good_polynomial(a, f, L, H->t, V, main, data, nb_rel_found,
           special_q, q_side, size, outstd, number_factorisation, c, gal,
