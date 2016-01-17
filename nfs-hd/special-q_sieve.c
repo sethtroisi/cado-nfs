@@ -214,9 +214,53 @@ void reorganize_MqLLL(mat_Z_ptr matrix)
   mat_Z_sort_last(matrix, matrix);
 }
 
+void init_corner(mpz_vector_t * c, unsigned int nb_vec, sieving_bound_srcptr H)
+{
+  for (unsigned int i = 0; i < H->t - 1; i++) {
+    mpz_set_si(c[0]->c[i], -(int)H->h[i]);
+  }
+  mpz_set_ui(c[0]->c[H->t - 1], H->h[H->t - 1]);
+
+  for (unsigned int i = 1; i < nb_vec; i++) {
+    mpz_vector_set(c[i], c[i - 1]);
+    for (unsigned int j = 0; j < H->t - 1; j++) {
+      if (mpz_sgn(c[i - 1]->c[j]) < 0) {
+        mpz_neg(c[i]->c[j], c[i - 1]->c[j]);
+        break;
+      } else {
+        mpz_neg(c[i]->c[j], c[i - 1]->c[j]);
+      }
+    }
+  }
+}
+
+void max_infinity_norm(mpz_ptr max, mat_Z_srcptr MqLLL, mpz_vector_t * c,
+    unsigned int nb_vec)
+{
+  mpz_poly_t a;
+  mpz_poly_init(a, c[0]->dim);
+  mpz_t tmp;
+  mpz_init(tmp);
+
+  mat_Z_mul_mpz_vector_to_mpz_poly(a, MqLLL, c[0]);
+  mpz_poly_infinity_norm(max, a);
+
+  for (unsigned int i = 1; i < nb_vec; i++) {
+    mat_Z_mul_mpz_vector_to_mpz_poly(a, MqLLL, c[i]);
+    mpz_poly_infinity_norm(tmp, a);
+    if (mpz_cmp(max, tmp) < 0) {
+      mpz_set(max, tmp);
+    }
+  }
+
+  mpz_clear(tmp);
+  mpz_poly_clear(a);
+}
+
 void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state, int deg_bound_factorise,
-    MAYBE_UNUSED mpz_vector_srcptr skewness, unsigned int gal)
+    MAYBE_UNUSED mpz_vector_srcptr skewness, unsigned int gal,
+    mpz_vector_t * c, unsigned int nb_vec)
 {
   array_spq_t array_spq_tmp;
   array_spq_init(array_spq_tmp, f->deg, H->t);
@@ -288,32 +332,21 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
 
   if (gal == 6) {
     if (array_spq->number > 0) {
-      mpz_vector_t c;
-      mpz_vector_init(c, H->t);
-      for (unsigned int i = 0; i < H->t; i++) {
-        mpz_set_ui(c->c[i], H->h[i]);
-      }
-      mpz_poly_t a;
-      mpz_poly_init(a, H->t);
       mpz_t norm_inf;
       mpz_init(norm_inf);
       mpz_t tmp;
       mpz_init(tmp);
-      mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[0], c);
-      mpz_poly_infinity_norm(norm_inf, a);
+      max_infinity_norm(norm_inf, array_spq->MqLLL[0], c, nb_vec);
       unsigned int index = 0;
 
       for (unsigned int i = 1; i < array_spq->number; i++) {
-        mat_Z_mul_mpz_vector_to_mpz_poly(a, array_spq->MqLLL[i], c);
-        mpz_poly_infinity_norm(tmp, a);
+        max_infinity_norm(tmp, array_spq->MqLLL[i], c, nb_vec);
         if (mpz_cmp(tmp, norm_inf) < 0) {
           index = i;
           mpz_set(norm_inf, tmp);
         }
       }
 
-      mpz_poly_clear(a);
-      mpz_vector_clear(c);
       mpz_clear(norm_inf);
       mpz_clear(tmp);
 
@@ -2261,7 +2294,8 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "Ha", "sieving region for a");
   param_list_decl_usage(pl, "base", "specify the bases");
   param_list_decl_usage(pl, "g", "polynomial associated with q");
-  param_list_decl_usage(pl, "gal", "type of Galois action (6)");
+  param_list_decl_usage(pl, "gal", "type of Galois action (6 with action "
+    "x->-(2 * x + 1) / (x - 1))");
 }
 
 /*
@@ -2587,10 +2621,21 @@ int main(int argc, char * argv[])
   int deg_bound_factorise = 2;
 #endif // SPQ_IDEAL_U
 
+  unsigned int nb_vec = 0;
+  mpz_vector_t * c = NULL;
+  if (gal == 6) {
+    nb_vec = 1 << (H->t - 1);
+    c = (mpz_vector_t *) malloc(sizeof(mpz_vector_t) * nb_vec);
+    for (unsigned int i = 0; i < nb_vec; i++) {
+      mpz_vector_init(c[i], H->t);
+    }
+    init_corner(c, nb_vec, H);
+  }
+
   for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
     //TODO: print time to build MqLLL.
     compute_all_spq(spq, q, f->pols[q_side], H, state, deg_bound_factorise,
-        skewness, gal);
+        skewness, gal, c, nb_vec);
 
     for (unsigned int i = 0; i < spq->number; i++) {
       sec = seconds();
@@ -2726,6 +2771,12 @@ int main(int argc, char * argv[])
   fprintf(outstd, "# Relations per special-q: %f.\n",
       (double)nb_rel / (double)spq_tot);
 
+  if (gal == 6) {
+    for (unsigned int i = 0; i < nb_vec; i++) {
+      mpz_vector_clear(c[i]);
+    }
+    free(c);
+  }
   array_spq_clear(spq, H->t);
   gmp_randclear(state);
   prime_info_clear(pi);
