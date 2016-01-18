@@ -53,6 +53,26 @@ static void factor_append(factor_ptr factor, mpz_srcptr z)
   factor->number++;
 }
 
+static unsigned int factor_remove(factor_ptr factor, mpz_srcptr z) {
+  unsigned int found = 0;
+  unsigned int i = 0;
+  for ( ; i < factor->number; i++) {
+    if (mpz_cmp(z, factor->factorization[i]) == 0) {
+      found = 1;
+      break;
+    }
+  }
+  if (found == 0) {
+    return 0;
+  }
+
+  for ( ; i < factor->number - 1; i++) {
+    mpz_set(factor->factorization[i], factor->factorization[i + 1]);
+  }
+  factor->number--;
+  return 1;
+}
+
 /*
  * Print an array of factors.
  *
@@ -508,23 +528,7 @@ static unsigned int is_irreducible(mpz_poly_srcptr a)
       mpz_clear(delta);
       return 1;
     }
-    mpz_sqrt(delta, delta);
-    mpz_sub(delta, delta, a->coeff[1]);
 
-    mpz_t Z_zero;
-    mpz_init(Z_zero);
-    mpz_t Z_2a;
-    mpz_init(Z_2a);
-    mpz_mul_ui(Z_2a, a->coeff[2], 2);
-    if (mpz_congruent_p(delta, Z_zero, Z_2a) == 0) {
-      mpz_clear(Z_2a);
-      mpz_clear(Z_zero);
-      mpz_clear(delta);
-      return 1;
-    };
-
-    mpz_clear(Z_2a);
-    mpz_clear(Z_zero);
     mpz_clear(delta);
     return 0;
   } else {
@@ -540,11 +544,12 @@ static void automorphism_6_1(mpz_poly_ptr b, mpz_poly_srcptr a)
     mpz_init(c[i]);
   }
 
+  mpz_sub(c[0], c[0], a->coeff[0]);
   mpz_sub(c[0], c[0], a->coeff[1]);
-  mpz_submul_ui(c[0], a->coeff[0], 2);
 
-  mpz_add(c[1], c[1], a->coeff[1]);
-  mpz_add(c[1], c[1], a->coeff[0]);
+  mpz_set(c[1], a->coeff[0]);
+  mpz_submul_ui(c[1], a->coeff[1], 2);
+
 
   mpz_poly_setcoeffs(b, c, 1);
   for (int i = 0; i < 2; i++) {
@@ -560,17 +565,17 @@ static void automorphism_6_2(mpz_poly_ptr b, mpz_poly_srcptr a)
     mpz_init(c[i]);
   }
 
+  mpz_add(c[0], a->coeff[0], a->coeff[1]);
   mpz_add(c[0], c[0], a->coeff[2]);
-  mpz_submul_ui(c[0], a->coeff[1], 2);
-  mpz_addmul_ui(c[0], a->coeff[0], 4);
 
-  mpz_submul_ui(c[1], a->coeff[2], 2);
+  mpz_submul_ui(c[1], a->coeff[0], 2);
   mpz_add(c[1], c[1], a->coeff[1]);
-  mpz_addmul_ui(c[1], a->coeff[0], 4);
+  mpz_addmul_ui(c[1], a->coeff[2], 4);
 
-  mpz_add(c[2], c[2], a->coeff[2]);
-  mpz_add(c[2], c[2], a->coeff[1]);
-  mpz_add(c[2], c[2], a->coeff[0]);
+  mpz_set(c[2], a->coeff[0]);
+  mpz_submul_ui(c[2], a->coeff[1], 2);
+  mpz_addmul_ui(c[2], a->coeff[2], 4);
+
 
   mpz_poly_setcoeffs(b, c, 2);
   for (int i = 0; i < 3; i++) {
@@ -579,28 +584,62 @@ static void automorphism_6_2(mpz_poly_ptr b, mpz_poly_srcptr a)
   free(c);
 }
 
-static void rewrite_poly(mpz_poly_ptr b)
+static void rewrite_poly_6(mpz_poly_ptr b, factor_t * fac, unsigned int V)
 {
+  mpz_t append;
+  mpz_init(append);
+  mpz_set_ui(append, 3);
+  for (unsigned int i = 0; i < V; i++) {
+    for (unsigned int j = 0; j < 3 * (unsigned int)b->deg; j++) {
+      factor_append(fac[i], append);
+    }
+    sort_factor(fac[i]);
+  }
+  mpz_clear(append);
+
   mpz_t c;
   mpz_init(c);
   mpz_poly_content(c, b);
 
   mpz_poly_divexact_mpz(b, b, c);
+
+  if (mpz_cmp_ui(c, 1) > 0) {
+    factor_t fac_tmp;
+    factor_init(fac_tmp, 10);
+    brute_force_factorize_ul(fac_tmp, c, c, 1000);
+
+    ASSERT(mpz_cmp_ui(c, 1) == 0);
+
+    for (unsigned int j = 0; j < fac_tmp->number; j++) {
+      for (unsigned int i = 0; i < V; i++) {
+        for (unsigned int k = 0; k < 6; k++) {
+          MAYBE_UNUSED unsigned int bo = factor_remove(fac[i],
+              fac_tmp->factorization[j]);
+          ASSERT(bo == 1);
+        }
+      }
+    }
+
+    factor_clear(fac_tmp);
+  }
+
   if (mpz_cmp_ui(b->coeff[b->deg], 0) < 0) {
     mpz_poly_neg(b, b);
   }
+
   mpz_clear(c);
 }
 
+//TODO. assert facto is false: need to recompute.
 static void printf_relation_galois(factor_t * factor,
     mpz_poly_srcptr a, unsigned int t, unsigned int V,
     FILE * outstd, MAYBE_UNUSED unsigned int * assert_facto,
     MAYBE_UNUSED mpz_vector_srcptr c)
 {
-  if (a->deg == 1 || a->deg > 2) {
+  if (a->deg > 2) {
     fprintf(outstd, "# Can not use Galois 6\n");
   } else {
-    fprintf(outstd, "# Use Galois 6\n");
+    fprintf(outstd, "# Use Galois 6 (the given factorization may be wrong)\n");
     mpz_poly_t b;
     mpz_poly_init(b, a->deg);
     mpz_poly_set(b, a);
@@ -610,9 +649,8 @@ static void printf_relation_galois(factor_t * factor,
         automorphism_6_2(b, b);
       } else if (a->deg == 1) {
         automorphism_6_1(b, b);
-        printf("# BEWARE: factorization is probably wrong.\n");
       }
-      rewrite_poly(b);
+      rewrite_poly_6(b, factor, V);
       printf_relation(factor, b, t, V, outstd, assert_facto, c);
     }
     mpz_poly_clear(b);
