@@ -1940,7 +1940,8 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   mat_int64_t Mqr;
   mat_int64_init(Mqr, H->t, H->t);
 
-  uint64_t plane_sieve_stop = fb->number_element_1;
+  uint64_t plane_sieve_stop =
+    fb->factor_base_1[fb->number_element_1 - 1]->ideal->r + 1;
   if (H->t == 3) {
     plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
   }
