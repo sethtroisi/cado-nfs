@@ -17,11 +17,12 @@ name = c100
 tasks.polyselect.degree = 4
 
 tasks.polyselect.P = 10000
-tasks.polyselect.admax = 250e3
+tasks.polyselect.admax = 5e5
 tasks.polyselect.adrange = 1e4
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 64
-tasks.polyselect.nrkeep = 50
+tasks.polyselect.nrkeep = 40
+tasks.polyselect.ropteffort = 4
 
 ###########################################################################
 # Sieve

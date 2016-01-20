@@ -17,7 +17,7 @@ name = c105
 tasks.polyselect.degree = 4
 
 tasks.polyselect.P = 10000
-tasks.polyselect.admax = 250e3
+tasks.polyselect.admax = 5e5
 tasks.polyselect.adrange = 1e4
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 256

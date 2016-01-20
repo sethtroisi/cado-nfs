@@ -21,7 +21,8 @@ tasks.polyselect.adrange = 5000
 tasks.polyselect.incr = 60
 tasks.polyselect.P = 420
 tasks.polyselect.nq = 64
-tasks.polyselect.nrkeep = 20
+tasks.polyselect.nrkeep = 10
+tasks.polyselect.ropteffort = 1
 
 ###########################################################################
 # Sieve
