@@ -67,7 +67,9 @@ void mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b);
 
 void mpz_poly_setcoeff(mpz_poly_ptr f, int i, mpz_srcptr z);
 void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, long z);
+void mpz_poly_setcoeff_ui(mpz_poly_ptr f, int i, unsigned long z);
 void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z);
+void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f) {
     ASSERT(f->deg >= 0);
