@@ -276,6 +276,9 @@ foreach(vw ${BWC_EXTRA_BACKENDS})
     CONFIGURE_MATMUL_LIB(${v} ${w})
 endforeach(vw ${BWC_EXTRA_BACKENDS})
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bwc_config.h)
+    message(FATAL_ERROR "Please remove the file ${CMAKE_CURRENT_SOURCE_DIR}/bwc_config.h before proceeding")
+endif()
 configure_file(bwc_config_h.in bwc_config.h ESCAPE_QUOTES @ONLY)
 
 
@@ -415,7 +418,6 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         LINK_FLAGS "--mpi"
         )
 endforeach(v)
-
 
 add_custom_target(bwc_matmul)
 add_dependencies(bwc_matmul ${all_matmul_libs})
