@@ -1092,12 +1092,11 @@ thread_sqrt (void * context_data, earlyparsed_relation_ptr rel)
 void create_dependencies(const char * prefix, const char * indexname, const char * purgedname, const char * kername)
 {
     FILE * ix = fopen_maybe_compressed(indexname, "r");
-    int small_nrows, small_ncols;
+    uint64_t small_nrows;
     int ret;
 
-    /* small_ncols isn't used here: we don't care. */
-    ret = fscanf(ix, "%d %d", &small_nrows, &small_ncols);
-    ASSERT(ret == 2);
+    ret = fscanf(ix, "%" SCNu64 "\n", &small_nrows);
+    ASSERT(ret == 1);
 
     FILE * ker;
     size_t ker_stride;
@@ -1124,7 +1123,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     uint64_t * abs = malloc(nrows * sizeof(uint64_t));
     memset(abs, 0, nrows * sizeof(uint64_t));
 
-    for(int i = 0 ; i < small_nrows ; i++) {
+    for(uint64_t i = 0 ; i < small_nrows ; i++) {
         uint64_t v;
         ret = fread(&v, sizeof(uint64_t), 1, ker);
         if (ker_stride) fseek(ker, ker_stride, SEEK_CUR);
