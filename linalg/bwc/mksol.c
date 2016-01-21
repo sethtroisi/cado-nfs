@@ -234,6 +234,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     for(unsigned int k = 0 ; k < multi ; k++) {
         cheating_vec_init(Ar, &(fcoeffs[k]), A->groupsize(A)*bw->interval);
+        /* When we reach EOF while reading F, it is crucially important
+         * that we have a zero area past the end of the file ! */
+        Ar->vec_set_zero(Ar, fcoeffs[k], A->groupsize(A)*bw->interval);
     }
     
     /* Our sum vector is only part of the story of course. All jobs, all
