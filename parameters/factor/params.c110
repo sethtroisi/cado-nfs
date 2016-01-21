@@ -14,32 +14,32 @@ name = c110
 # Polynomial selection
 ###########################################################################
 
-tasks.polyselect.degree = 4
+tasks.polyselect.degree = 5
 
 tasks.polyselect.P = 10000
-tasks.polyselect.admax = 4e5
-tasks.polyselect.adrange = 4e3
+tasks.polyselect.admax = 1e6
+tasks.polyselect.adrange = 1e4
 tasks.polyselect.incr = 60
-tasks.polyselect.nq = 1000
+tasks.polyselect.nq = 3125
 tasks.polyselect.nrkeep = 100
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-rlim = 2907107
-alim = 2719850
-lpbr = 26
-lpba = 26
-tasks.sieve.mfbr = 70
-tasks.sieve.mfba = 63
-tasks.sieve.rlambda = 2.250743152463077
-tasks.sieve.alambda = 2.149912281077057
-tasks.sieve.ncurves0 = 13
-tasks.sieve.ncurves1 = 12
+rlim = 1512052
+alim = 1702886
+lpbr = 25
+lpba = 25
+tasks.sieve.mfbr = 72
+tasks.sieve.mfba = 61
+tasks.sieve.rlambda = 1.97999724528
+tasks.sieve.alambda = 2.44001470779
+tasks.sieve.ncurves0 = 4
+tasks.sieve.ncurves1 = 16
 tasks.I = 12
 
-tasks.sieve.qrange = 2000
+tasks.sieve.qrange = 10000
 
 ###########################################################################
 # Filtering
