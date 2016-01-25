@@ -639,7 +639,7 @@ static void printf_relation_galois(factor_t * factor,
   if (a->deg > 2) {
     fprintf(outstd, "# Can not use Galois 6\n");
   } else {
-    fprintf(outstd, "# Use Galois 6 (the given factorization may be wrong)\n");
+    fprintf(outstd, "# Use Galois 6\n");
     mpz_poly_t b;
     mpz_poly_init(b, a->deg);
     mpz_poly_set(b, a);

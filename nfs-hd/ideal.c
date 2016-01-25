@@ -382,7 +382,7 @@ void ideal_spq_init(ideal_spq_ptr ideal)
 }
 
 void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t q, mpz_poly_srcptr g,
-    unsigned int t, char type)
+    unsigned int t, int type)
 {
   ASSERT(type >= 0 && type < 3);
 #ifndef NDEBUG

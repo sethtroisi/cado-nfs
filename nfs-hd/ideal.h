@@ -56,7 +56,7 @@ typedef struct {
   ideal_u_t ideal_u;
   ideal_pr_t ideal_pr;
   // 0 if ideal_1, 1 if ideal_u, 2 if ideal_pr.
-  char type;
+  int type;
 } s_ideal_spq_t;
 
 typedef s_ideal_spq_t ideal_spq_t[1];
@@ -279,7 +279,7 @@ void ideal_spq_init(ideal_spq_ptr ideal);
  * type: type of the ideal_spq.
  */
 void ideal_spq_set_part(ideal_spq_ptr ideal, uint64_t q, mpz_poly_srcptr g,
-    unsigned int t, char type);
+    unsigned int t, int type);
 
 void ideal_spq_set(ideal_spq_ptr ideal, ideal_spq_srcptr ideal_old, unsigned int t);
 

@@ -940,7 +940,7 @@ int param_list_parse_uint_list(param_list pl, const char * key,
     memset(res, 0, n * sizeof(unsigned int));
     size_t parsed = 0;
     for( ;; ) {
-        long int tmp = strtoul(value, &end, 0);
+        unsigned long int tmp = strtoul(value, &end, 0);
         ASSERT(tmp <= UINT_MAX);
         res[parsed] = tmp;
         if (parsed++ == n)
