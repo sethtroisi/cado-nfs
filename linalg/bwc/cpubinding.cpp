@@ -720,14 +720,14 @@ void cpubinder::read_param_list(param_list_ptr pl, int want_conf_file)
             istringstream is(topology_string);
             synthetic_topology stopo;
             if (is >> stopo) {
+#if HWLOC_API_VERSION < 0x010b00
                 for(auto& x: stopo) {
 #if HWLOC_API_VERSION < 0x010900
                     if (x.object == "NUMANode") { x.object="node"; }
 #endif
-#if HWLOC_API_VERSION < 0x010b00
                     if (x.object == "Package") { x.object="Socket"; }
-#endif
                 }
+#endif
                 ostringstream os;
                 os << stopo;
                 string ss(os.str());
