@@ -40,11 +40,11 @@ target_link_libraries(makefb-hd utils)
 
 # Polynomial selection
 
-set (POL_SRC polyselect-hd.c polynomials.c sieving_bound.c utils_mpz.c)
+#set (POL_SRC polyselect-hd.c polynomials.c sieving_bound.c utils_mpz.c)
 
-add_executable(polyselect-hd ${POL_SRC})
+#add_executable(polyselect-hd ${POL_SRC})
 
-target_link_libraries(polyselect-hd utils polyselect_common)
+#target_link_libraries(polyselect-hd utils polyselect_common)
 
 #set_property(TARGET polyselect-hd PROPERTY COMPILE_DEFINITIONS EEA_BOUND)
 

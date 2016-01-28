@@ -9,7 +9,7 @@
 
 /* The maximum degree of polynomials supported. Used for statically 
    allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
-#define MAXDEGREE 10
+#define MAXDEGREE 12
 
 #define NB_POLYS_MAX 8 /* maximal number of polynomials in multiple fields */
 
