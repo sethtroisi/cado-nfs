@@ -553,24 +553,37 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
 
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         /* XXX For BL, how much do we care about twisting ? */
-        /* The BW iteration, combined with shuffled_product option, is
-         * such that for a stored matrix M', we do the iteration with
-         * P*M'. So in order to have an equivalent of multiplying by M,
-         * we want P*M' = S^-1 * M * S, i.e. M' = (SP)^-1 M S.
+        /* The BW iteration is such that for a stored matrix M', we do
+         * the iteration with P*M', for some matrix P. More precisely, we
+         * do the following, where w is a row vector.
+         *      Transpose(w) <- M' * v
+         *      v <- P * Transpose(w) = P * M' * v
+         *
+         * (in a nutshell, P transforms row index N*x+y to N*y+x -- but
+         * it's slightly more complicated than this. This is because we
+         * do communications with all-gather and reduce-scatter).
+         *
+         * So in order to have an equivalent of multiplying by M, we want
+         * P*M' = S^-1 * M * S, i.e. M' = (SP)^-1 M S.
          *
          * Now if in fact, we are doing the iteration followed by its
          * transpose, this may end up somewhat different.
          *
-         * But it's incorrect to think like this. In the BL iteration,
-         * shuffled_product makes no sense at all. All communications are
-         * done with allreduce, so there is no inherent shuffling in the
-         * parallelized matrix multiplication. So when we have a stored
-         * matrix M', we do multiply by M'. Now let us say that we have
-         * run the balancing process just like it would have been for BW.
-         * So we have M' = (SP)^-1 M S. If we multiply by M'^T
-         * afterwards, we end up multiplying by S^-1 * M^T * M * S. So
-         * twisting a vector means computing S^-1*V -- that should be
-         * essentially the same as for bwc.
+         * Note though that it's a bit incorrect to think like this. In
+         * the BL iteration, this matrix P has little bearing anyway.
+         * What we really do is
+         *      Transpose(w) <- M' * v, followed by
+         *      Transpose(v) <- w * M',
+         * so that v <- Transpose(M')*M' * v, no matter what P is:
+         * All communications are done with allreduce, so there is no
+         * inherent shuffling in the parallelized matrix multiplication.
+         *
+         * When we have a stored matrix M', we do multiply by M'. Now let
+         * us say that we have run the balancing process just like it
+         * would have been for BW.  So we have M' = (SP)^-1 M S. If we
+         * multiply by M'^T afterwards, we end up multiplying by S^-1 *
+         * M^T * M * S. So twisting a vector means computing S^-1*V --
+         * that should be essentially the same as for bwc.
          *
          * [description above is for solving M*w=0, while for BL we are
          * really in the factoring case where we care about w*M=0. So
