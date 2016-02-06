@@ -55,3 +55,10 @@ target_link_libraries(makefb-hd utils)
 #add_executable(paraselect-hd ${PAR_SRC})
 
 #target_link_libraries(paraselect-hd utils polyselect_common)
+
+# Alpha 3d
+
+set (ALP_SRC alpha3d.c)
+add_executable(alpha3d ${ALP_SRC})
+set_property(TARGET alpha3d PROPERTY COMPILE_DEFINITIONS MAIN)
+target_link_libraries(alpha3d utils)
