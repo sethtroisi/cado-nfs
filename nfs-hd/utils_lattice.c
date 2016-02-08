@@ -1128,10 +1128,10 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
-  skewness->c[0] = 1;
-  skewness->c[1] = 1;
+  skewness->c[0] = 2 * H->h[1];
+  skewness->c[1] = 2 * H->h[0];
   //TODO: bound?
-  skewness->c[2] = (int64_t)(4 * H->h[0] * H->h[0] * H->h[0]) / (int64_t)r->ideal->r;
+  skewness->c[2] = (int64_t)(4 * H->h[0] * H->h[0] * H->h[1] * H->h[1]) / (int64_t)r->ideal->r;
 
   mat_int64_t MSLLL;
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);

@@ -2605,9 +2605,12 @@ int main(int argc, char * argv[])
 
   mpz_vector_t skewness;
   mpz_vector_init(skewness, Ha->t);
-  mpz_set_ui(skewness->c[0], 1);
-  for (unsigned int i = 1; i < Ha->t; i++) {
-    mpz_set_si(skewness->c[i], Ha->h[0] / Ha->h[i]);
+  uint64_t prod = 1;
+  for (unsigned int i = 0; i < Ha->t; i++) {
+    prod = Ha->h[i];
+  }
+  for (unsigned int i = 0; i < Ha->t; i++) {
+    mpz_set_si(skewness->c[i], prod / Ha->h[i]);
   }
   sieving_bound_clear(Ha);
 
