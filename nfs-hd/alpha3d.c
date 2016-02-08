@@ -104,21 +104,24 @@ static void random_mpz_poly(mpz_poly_ptr g, int degree, mpz_srcptr min,
 }
 
 
-static void mpz_poly_irred(mpz_poly_ptr a, mpz_srcptr B, gmp_randstate_t state)
+static void mpz_poly_irred(mpz_poly_ptr a, mpz_srcptr one, mpz_srcptr B,
+    gmp_randstate_t state)
 {
-  mpz_t one;
-  mpz_init(one);
-  mpz_set_ui(one, 1);
   mpz_t content;
   mpz_init(content);
 
   do {
-  random_mpz_poly(a, 2, one, B, state);
-  mpz_poly_content(content, a);
+    random_mpz_poly(a, 2, one, B, state);
+    mpz_poly_content(content, a);
   } while (!is_irreducible(a) || mpz_cmp_ui(content, 1) != 0);
 
+#ifndef NDEBUG
+  mpz_poly_content(content, a);
+  ASSERT(mpz_cmp_ui(content, 1) == 0);
+  ASSERT(is_irreducible(a));
+#endif // NDEBUG
+
   mpz_clear(content);
-  mpz_clear(one);
 }
 
 static void monte_carlo_average_value(double * V, mpz_poly_srcptr f, unsigned long * bad_p,
@@ -132,6 +135,10 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f, unsigned lo
   mpz_set_ui(B, N);
   mpz_mul(B, B, B);
 
+  mpz_t one;
+  mpz_init(one);
+  mpz_set_ui(one, 1);
+
   mpz_poly_t a;
   mpz_poly_init(a, 2);
 
@@ -139,7 +146,7 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f, unsigned lo
   mpz_init(resultant);
 
   for (unsigned int i = 0; i < N; i++) {
-    mpz_poly_irred(a, B, state);
+    mpz_poly_irred(a, one, B, state);
     mpz_poly_resultant(resultant, f, a);
     for (unsigned int j = 0; j < length; j++) {
       unsigned int v = mpz_valuation(resultant, bad_p[j]);
@@ -149,6 +156,7 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f, unsigned lo
 
   mpz_clear(resultant);
   mpz_poly_clear(a);
+  mpz_clear(one);
   mpz_clear(B);
 
   for (unsigned int i = 0; i < length; i++) {
@@ -192,11 +200,13 @@ double alpha3d(mpz_poly_srcptr f, unsigned long p_end, unsigned int N)
             state));
     }
   }
+  printf("Alpha before Monte Carlo: %f\n", alpha);
 
   double * V = (double *) malloc(sizeof(double) * index);
   monte_carlo_average_value(V, f, bad_p, index, N, state);
 
   for (unsigned int i = 0; i < index; i++) {
+    printf("%f\n", V[i]);
     alpha += log((double)bad_p[i]) * (1 / (double)(bad_p[i] - 1) - V[i]);
   }
 
@@ -210,7 +220,7 @@ double alpha3d(mpz_poly_srcptr f, unsigned long p_end, unsigned int N)
   return alpha;
 }
 
-#ifdef MAIN
+#ifdef MAIN_ALPHA3D
 void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "f", "a polynomial");
@@ -270,4 +280,4 @@ int main(int argc, char ** argv)
 
   return 0;
 }
-#endif // MAIN
+#endif // MAIN_ALPHA3D

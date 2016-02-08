@@ -193,3 +193,7 @@ nfs-hd/utils_cofactorisation.c
 nfs-hd/utils_cofactorisation.h
 .mailmap
 nfs-hd/CMakeLists.txt
+nfs-hd/alpha3d.c
+nfs-hd/murphyE3d.h
+nfs-hd/murphyE3d.c
+nfs-hd/alpha3d.h
