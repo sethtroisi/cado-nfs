@@ -95,6 +95,7 @@ static void random_mpz_poly(mpz_poly_ptr g, int degree, mpz_srcptr min,
     rand_mpz(rand_Z, min, max, state);
     mpz_poly_setcoeff(g, i, rand_Z);
   }
+  rand_mpz(rand_Z, min, max, state);
   while(mpz_cmp_ui(rand_Z, 0) == 0) {
     rand_mpz(rand_Z, min, max, state);
   }
@@ -124,8 +125,9 @@ static void mpz_poly_irred(mpz_poly_ptr a, mpz_srcptr one, mpz_srcptr B,
   mpz_clear(content);
 }
 
-static void monte_carlo_average_value(double * V, mpz_poly_srcptr f, unsigned long * bad_p,
-    unsigned int length, unsigned int N, gmp_randstate_t state)
+static void monte_carlo_average_value(double * V, mpz_poly_srcptr f,
+    unsigned long * bad_p, unsigned int length, unsigned int N,
+    gmp_randstate_t state)
 {
   for (unsigned int i = 0; i < length; i++) {
     V[i] = 0.0;
@@ -134,6 +136,7 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f, unsigned lo
   mpz_init(B);
   mpz_set_ui(B, N);
   mpz_mul(B, B, B);
+  mpz_add_ui(B, B, 1);
 
   mpz_t one;
   mpz_init(one);
@@ -200,13 +203,11 @@ double alpha3d(mpz_poly_srcptr f, unsigned long p_end, unsigned int N)
             state));
     }
   }
-  printf("Alpha before Monte Carlo: %f\n", alpha);
 
   double * V = (double *) malloc(sizeof(double) * index);
   monte_carlo_average_value(V, f, bad_p, index, N, state);
 
   for (unsigned int i = 0; i < index; i++) {
-    printf("%f\n", V[i]);
     alpha += log((double)bad_p[i]) * (1 / (double)(bad_p[i] - 1) - V[i]);
   }
 
