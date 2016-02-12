@@ -1,0 +1,38 @@
+Compile:
+  * (optionaly) copy "local.sh.example" in "local.sh" in the same directory;
+  * (optionaly) edit "local.sh" if you want that binaries are stored in a
+     specific directory (see line "build_tree=…");
+  * (optionaly) edit "local.sh" if you want specific compiling options (see line
+    "CFLAGS=…" and "CXXFLAGS=…", current state of the code support at least
+    combination of "-g", "-O[0-3]", "-DNDEBUG");
+  * execute: "make makefb-hd special-q_sieve";
+  * if you have not edit "local.sh", the binaries needed to launch our examples
+    can be found in "build/<hostname>/nfs-hd", otherwise they can be found in
+    the directory "nfs-hd" in the path we edit in "build_tree".
+
+Source code:
+  * the great majority of the implementation of the sieve in higher dimensions
+    can be found in the directory "nfs-hd".
+
+Reproduce the computations of http://hal.inria.fr/hal-01273045 :
+  * the polynomials files are stored in the directory "parameters/nfs-hd",
+    one for the p6bd40 (240 bits), an other of the p6bd50 (300 bits) and a last
+    for p6bd65 (389 bits);
+  * the file "parameters/nfs-hd/command_p6bd(40|50|65).txt" contains the two    needed commands, the first one to build the sieve base, i.e. all the
+    elements we will sieve, and the second to perform the sieve itself;
+  * check the relations:
+  ** after the special-q_sieve, the output is stored in the file you give in
+    argument to -out;
+  ** use "grep -v "#" [path/to/out]> relations.raw" to extract the relations;
+  ** use "sort relations.raw | uniq > relations.uniq" to remove duplicate;
+  ** in the directory "nfs-hd/check_relations", compile "check_relation" with
+     "make" (it requires NTL, maybe modify some variables such as build_tree);
+  ** put "p6bd(40|50|65).poly", "check_relations" and "relations.uniq" in the
+    same directory;
+  ** in the file "parameters/nfs-hd/command_p6bd(40|50|65).txt", the last
+    line gives the command you need to launch this check.
+
+----------
+
+All these steps, including compilation, are summarized in
+"nfs-hd/automatic_p6bd40.sh".

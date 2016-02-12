@@ -1,0 +1,8 @@
+# Build the ideals we sieve.
+./makefb-hd -t 3 -fbb 1482911,1482911 -poly [path/to/p6bd40.poly] -lpb 25,25 -out [path/to/sieve_base_p6bd40]
+
+# Perform special-q sieve.
+./special-q_sieve -H 7,7,7 -fbb 1482911,1482911 -thresh 55,55 -poly [path/to/p6bd40.poly] -lpb 25,25 -q_side 1 -fb [path/to/sieve_base_p6bd40] -q_range 1482937,2900828 -out [path/to/out] -err [path/to/err] -gal 6
+
+# Check the relations
+./check_relations relations.uniq relations.true p6bd40.poly 25,25 relations.err
