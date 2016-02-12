@@ -16,6 +16,7 @@ typedef s_point3d_t point3d_t[1];
 typedef s_point3d_t * point3d_ptr;
 typedef const s_point3d_t * point3d_srcptr;
 
+//Based on https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
 void fibonacci_sphere(point3d_t * point, unsigned int N)
 {
   double offset = 2.0 / (double) N;
@@ -38,7 +39,6 @@ double murphyE3d(cado_poly_srcptr f, double * lpb, double area,
   double * alpha = (double *) malloc(sizeof(double) * f->nb_polys);
   for (int i = 0; i < f->nb_polys; i++) {
     alpha[i] = alpha3d(f->pols[i], p, N_alpha);
-    printf("%f\n", alpha[i]);
   }
 
   double E = 0.0;
