@@ -442,6 +442,14 @@ void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z)
     mpz_poly_cleandeg (f, i);
 }
 
+void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set_d (f->coeff[i], z);
+  if (i >= f->deg)
+    mpz_poly_cleandeg (f, i);
+}
+
 /* Get coefficient for the i-th term. */
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f)
 {
