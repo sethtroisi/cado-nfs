@@ -8,7 +8,6 @@
 ###########################################################################
 
 name = c180
-#tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection
@@ -18,7 +17,7 @@ tasks.polyselect.degree = 5
 
 tasks.polyselect.P = 5000000
 tasks.polyselect.admax = 2e7
-tasks.polyselect.adrange = 2e5
+tasks.polyselect.adrange = 1e5
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1000
 tasks.polyselect.nrkeep = 1000
