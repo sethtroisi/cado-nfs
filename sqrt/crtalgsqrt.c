@@ -3888,7 +3888,7 @@ fprintf(stderr, "Finished accumulating the product at %2.2lf\n",
         WCT);
 fprintf(stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
 fprintf(stderr, "maximal polynomial bit-size = %lu\n",
-        (unsigned long) mpz_poly_sizeinbase(prd->p, pol->alg->deg - 1, 2));
+        (unsigned long) mpz_poly_sizeinbase(prd->p, 2));
 
 p = FindSuitableModP(F);
 fprintf(stderr, "Using p=%lu for lifting\n", p);
