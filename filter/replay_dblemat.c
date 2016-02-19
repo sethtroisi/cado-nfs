@@ -958,6 +958,6 @@ int main(int argc, char *argv[])
   free(MM_col_wt);
 
   param_list_clear(pl);
-  print_timing_and_memory(wct0);
+  print_timing_and_memory (stdout, wct0);
   return 0;
 }

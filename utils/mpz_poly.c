@@ -809,8 +809,8 @@ mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
     size_t sg, sh, s;
     mpz_init (G);
     mpz_init (H);
-    sg = mpz_poly_sizeinbase (g, g->deg, 2);
-    sh = mpz_poly_sizeinbase (h, h->deg, 2);
+    sg = mpz_poly_sizeinbase (g, 2);
+    sh = mpz_poly_sizeinbase (h, 2);
     /* the +1 accounts for a possible sign */
     for (s = sg + sh + 1, i = h->deg; i > 1; i = (i + 1) / 2, s++);
     mpz_set (G, g->coeff[g->deg]);
@@ -1755,12 +1755,12 @@ mpz_poly_base_modp_clear (mpz_poly_t *P, int l)
 
 /* return the maximal size of the coefficients of f in base b */
 size_t
-mpz_poly_sizeinbase (mpz_poly_ptr f, int d, int b)
+mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
 {
   size_t S = 0, s;
   int i;
+  int d = f->deg;
 
-  ASSERT_ALWAYS(d < f->alloc);
   for (i = 0; i <= d; i++)
   {
     s = mpz_sizeinbase (f->coeff[i], b);

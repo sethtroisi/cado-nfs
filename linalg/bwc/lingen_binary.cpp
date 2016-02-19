@@ -1445,7 +1445,7 @@ static int
 print_and_exit (double wct0, int ret)
 {
   /* print usage of time and memory */
-  print_timing_and_memory (wct0);
+  print_timing_and_memory (stdout, wct0);
   if (ret != 0)
     fprintf (stderr, "No solution found\n");
   return ret; /* 0 if a solution was found, non-zero otherwise */

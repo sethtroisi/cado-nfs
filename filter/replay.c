@@ -894,6 +894,6 @@ main(int argc, char *argv[])
                  bin, idealsfilename, for_msieve, Nmax);
 
   param_list_clear(pl);
-  print_timing_and_memory (wct0);
+  print_timing_and_memory (stdout, wct0);
   return 0;
 }

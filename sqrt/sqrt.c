@@ -67,6 +67,7 @@ accumulate_fast_end (mpz_t *prd, unsigned long lprd)
     mpz_mul (prd[0], prd[0], prd[i]);
 }
 
+/* return the total size of prd[0], ..., prd[lprd-1] in bytes */
 static size_t
 stats (mpz_t *prd, unsigned long lprd)
 {
@@ -75,7 +76,7 @@ stats (mpz_t *prd, unsigned long lprd)
 
   for (i = 0; i < lprd; i++)
     s += mpz_size (prd[i]);
-  return s;
+  return s * sizeof (mp_limb_t);
 }
 
 static char*
@@ -162,7 +163,6 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   unsigned long lprd; /* number of elements in prd[] */
   unsigned long nprd; /* number of accumulated products in prd[] */
   unsigned long i;
-  unsigned long res, peakres = 0;
 
   ASSERT_ALWAYS (pol->pols[side]->deg == 1);
 
@@ -202,14 +202,11 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
 
       if (ab_pairs % 1000000 == 0)
         {
-          res = Memusage2 ();
-          if (res > peakres)
-            peakres = res;
           pthread_mutex_lock (&lock);
-          fprintf (stderr, "SqrtRat(%d): %lu pairs: size %zuMb, %lums, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
-                   numdep, ab_pairs, stats (prd, lprd) >> 17, milliseconds (),
-                   Memusage () >> 10, PeakMemusage () >> 10,
-                   res >> 10, peakres >> 10);
+          fprintf (stderr, "Rat(%d): read %lu pairs in %1.2fs, size %zuM (peak %luM)\n",
+                   numdep, ab_pairs, seconds (), stats (prd, lprd) >> 20,
+                   PeakMemusage () >> 10);
+	  fflush (stderr);
           pthread_mutex_unlock (&lock);
         }
 
@@ -229,8 +226,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   free (depname);
 
   pthread_mutex_lock (&lock);
-  fprintf (stderr, "SqrtRat(%d): read %lu (a,b) pairs, including %lu free\n",
+  fprintf (stderr, "Rat(%d): read %lu (a,b) pairs, including %lu free\n",
            numdep, ab_pairs, freerels);
+  fflush (stderr);
   pthread_mutex_unlock (&lock);
 
   pthread_mutex_lock (&lock);
@@ -243,8 +241,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
     mpz_mul (prd[0], prd[0], pol->pols[side]->coeff[1]);
 
   pthread_mutex_lock (&lock);
-  fprintf (stderr, "SqrtRat(%d): size of product = %zu bits\n",
+  fprintf (stderr, "Rat(%d): size of product = %zu bits\n",
            numdep, mpz_sizeinbase (prd[0], 2));
+  fflush (stderr);
   pthread_mutex_unlock (&lock);
 
   if (mpz_sgn (prd[0]) < 0)
@@ -254,16 +253,18 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
     }
 
   pthread_mutex_lock (&lock);
-  fprintf (stderr, "Starting rational square root for dep %d at %lums\n",
-           numdep, milliseconds ());
+  fprintf (stderr, "Rat(%d): starting rational square root at %.2lfs\n",
+           numdep, seconds ());
+  fflush (stderr);
   pthread_mutex_unlock (&lock);
 
   /* since we know we have a square, take the square root */
   mpz_sqrtrem (prd[0], v, prd[0]);
 
   pthread_mutex_lock (&lock);
-  fprintf (stderr, "Computed rational square root for dep %d at %lums\n",
-           numdep, milliseconds ());
+  fprintf (stderr, "Rat(%d): computed square root at %.2lfs\n",
+           numdep, seconds ());
+  fflush (stderr);
   pthread_mutex_unlock (&lock);
 
   if (mpz_cmp_ui (v, 0) != 0)
@@ -304,8 +305,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   mpz_mod (prd[0], prd[0], Np);
 
   pthread_mutex_lock (&lock);
-  fprintf (stderr, "SqrtRat(%d): reduced mod n at %lums\n",
-           numdep, milliseconds ());
+  fprintf (stderr, "Rat(%d): reduced mod n at %.2lfs\n",
+           numdep, seconds ());
+  fflush (stderr);
   pthread_mutex_unlock (&lock);
 
   /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
@@ -313,8 +315,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
 
   mpz_powm_ui (v, pol->pols[side]->coeff[1], (ab_pairs + 1) / 2, Np);
   pthread_mutex_lock (&lock);
-  fprintf (stderr, "SqrtRat(%d): computed g1^(nab/2) mod n at %lums\n",
-           numdep, milliseconds ());
+  fprintf (stderr, "Rat(%d): computed g1^(nab/2) mod n at %.2lfs\n",
+           numdep, seconds ());
+  fflush (stderr);
   pthread_mutex_unlock (&lock);
   resfile = fopen_maybe_compressed_lock (sidename, "wb");
 
@@ -327,9 +330,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   free (sidename);
 
   pthread_mutex_lock (&lock);
-  gmp_fprintf (stderr, "SqrtRat(%d): square root is %Zd\n", numdep, prd[0]);
-  fprintf (stderr, "SqrtRat(%d): square root time: %lums\n", numdep,
-           milliseconds ());
+  gmp_fprintf (stderr, "Rat(%d): square root is %Zd\n", numdep, prd[0]);
+  fprintf (stderr, "Rat(%d): square root time: %.2lfs\n", numdep, seconds ());
+  fflush (stderr);
   pthread_mutex_unlock (&lock);
 
   for (i = 0; i < lprd; i++)
@@ -494,7 +497,8 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
 
 // res <- Sqrt(AA) mod F, using p-adic lifting, at prime p.
 void
-polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
+polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
+	       int numdep)
 {
   mpz_poly_t A, *P;
   int v;
@@ -511,10 +515,14 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
      twice as large, before reduction by f(x). The reduction modulo f(x)
      produces A(x), however that reduction should not decrease the size of
      the coefficients. */
-  target_size = mpz_poly_sizeinbase (AA->p, AA->p->deg, 2);
+  target_size = mpz_poly_sizeinbase (AA->p, 2);
   target_size = target_size / 2;
   target_size += target_size / 10;
-  fprintf (stderr, "target_size=%lu\n", (unsigned long int) target_size);
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "Alg(%d): target_size=%lu\n", numdep,
+	   (unsigned long int) target_size);
+  fflush (stderr);
+  pthread_mutex_unlock (&lock);
 
   mpz_poly_init(A, d-1);
   // Clean up the mess with denominator: if it is an odd power of fd,
@@ -555,8 +563,11 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   for (k = target_k, logk = 0; k > 1; k = (k + 1) / 2, logk ++)
     K[logk] = k;
   K[logk] = 1;
-  fprintf (stderr, "Reducing A mod p^%d took %2.2lf\n", target_k,
-           seconds () - st);
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "Alg(%d): reducing A mod p^%d took %.2lfs\n", numdep,
+	   target_k, seconds () - st);
+  fflush (stderr);
+  pthread_mutex_unlock (&lock);
 
   // Initialize things modulo p:
   mpz_set_ui (pk, p);
@@ -564,7 +575,11 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   lk = 0; /* k = 2^lk */
   st = seconds ();
   P = mpz_poly_base_modp_init (A, p, K, logk0 = logk);
-  fprintf (stderr, "mpz_poly_base_modp_init took %2.2lf\n", seconds () - st);
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "Alg(%d): mpz_poly_base_modp_init took %.2lfs\n",
+	   numdep, seconds () - st);
+  fflush (stderr);
+  pthread_mutex_unlock (&lock);
 
   mpz_poly_set (a, P[0]);
 
@@ -615,6 +630,13 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
     st = seconds ();
     mpz_poly_base_modp_lift (a, P, ++lk, pk);
     st = seconds () - st;
+    if (verbose)
+      {
+	pthread_mutex_lock (&lock);
+        fprintf (stderr, "Alg(%d):    mpz_poly_base_modp_lift took %.2lfs (peak %luM)\n", numdep, st, PeakMemusage () >> 10);
+        fflush (stderr);
+	pthread_mutex_unlock (&lock);
+      }
 
     /* invariant: k = K[logk] */
     ASSERT_ALWAYS(k == K[logk]);
@@ -629,21 +651,22 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
       }
     k = K[logk];
     barrett_init (invpk, pk); /* FIXME: we could lift 1/p^k also */
-    fprintf (stderr, "start lifting mod p^%d (%lu bits) at %2.2lf\n",
-             k, (unsigned long int) mpz_sizeinbase (pk, 2), seconds ());
-    if (verbose)
-      {
-        fprintf (stderr, "   mpz_poly_base_modp_lift took %2.2lf\n", st);
-        fflush (stderr);
-      }
+    pthread_mutex_lock (&lock);
+    fprintf (stderr, "Alg(%d): start lifting mod p^%d (%lu bits) at %.2lfs\n",
+             numdep, k, (unsigned long int) mpz_sizeinbase (pk, 2),
+	     seconds ());
+    fflush (stderr);
+    pthread_mutex_unlock (&lock);
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
     st = seconds ();
     mpz_poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, F, pk, invpk); /* tmp = invsqrtA^2 */
     if (verbose)
       {
-        fprintf (stderr, "   mpz_poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+	pthread_mutex_lock (&lock);
+        fprintf (stderr, "Alg(%d):    mpz_poly_sqr_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
         fflush (stderr);
+	pthread_mutex_unlock (&lock);
       }
 
     /* Faster version which computes x <- x + x/2*(1-a*x^2).
@@ -653,8 +676,10 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
     mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, a, F, pk, invpk); /* tmp=a*invsqrtA^2 */
     if (verbose)
       {
-        fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+	pthread_mutex_lock (&lock);
+        fprintf (stderr, "Alg(%d):    mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
         fflush (stderr);
+	pthread_mutex_unlock (&lock);
       }
     mpz_poly_sub_ui (tmp, tmp, 1); /* a*invsqrtA^2-1 */
     mpz_poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
@@ -662,8 +687,10 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
     mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
     if (verbose)
       {
-        fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+	pthread_mutex_lock (&lock);
+        fprintf (stderr, "Alg(%d):    mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
         fflush (stderr);
+	pthread_mutex_unlock (&lock);
       }
     /* tmp = invsqrtA/2 * (a*invsqrtA^2-1) */
     mpz_poly_sub_mod_mpz (invsqrtA, invsqrtA, tmp, pk);
@@ -687,9 +714,12 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_clear (invsqrtA);
   mpz_poly_clear (a);
 
-  size_t sqrt_size = mpz_poly_sizeinbase (res->p, F->deg - 1, 2);
-  fprintf (stderr, "maximal sqrt bit-size = %zu (%.0f%% of target size)\n",
-          sqrt_size, 100.0 * (double) sqrt_size / target_size);
+  size_t sqrt_size = mpz_poly_sizeinbase (res->p, 2);
+  pthread_mutex_lock (&lock);
+  fprintf (stderr, "Alg(%d): maximal sqrt bit-size = %zu (%.0f%% of target size)\n",
+	   numdep, sqrt_size, 100.0 * (double) sqrt_size / target_size);
+  fflush (stderr);
+  pthread_mutex_unlock (&lock);
 }
 
 static unsigned long
@@ -829,8 +859,8 @@ calculateSqrtAlg (const char *prefix, int numdep,
         if(!(nab % 100000))
           {
             pthread_mutex_lock (&lock);
-            fprintf(stderr, "# AlgSqrt(%d): reading ab pair #%d at %2.2lf\n",
-                    numdep, nab, seconds ());
+            fprintf(stderr, "Alg(%d): reading ab pair #%d at %.2lfs (peak %luM)\n",
+                    numdep, nab, seconds (), PeakMemusage () >> 10);
             pthread_mutex_unlock (&lock);
           }
         if((a == 0) && (b == 0))
@@ -842,8 +872,9 @@ calculateSqrtAlg (const char *prefix, int numdep,
       nfree++;
       }
       pthread_mutex_lock (&lock);
-      fprintf (stderr, "# AlgSqrt(%d): read %d including %d free relations\n",
+      fprintf (stderr, "Alg(%d): read %d including %d free relations\n",
                numdep, nab, nfree);
+      fflush (stderr);
       pthread_mutex_unlock (&lock);
       ASSERT_ALWAYS ((nab & 1) == 0);
       ASSERT_ALWAYS ((nfree & 1) == 0);
@@ -879,20 +910,23 @@ calculateSqrtAlg (const char *prefix, int numdep,
     }
 
     pthread_mutex_lock (&lock);
-    fprintf (stderr, "AlgSqrt(%d): finished accumulating product at %2.2lf\n",
+    fprintf (stderr, "Alg(%d): finished accumulating product at %.2lfs\n",
              numdep, seconds());
-    fprintf (stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
-    fprintf (stderr, "maximal polynomial bit-size = %lu\n",
-             (unsigned long) mpz_poly_sizeinbase (prd->p, deg - 1, 2));
+    fprintf (stderr, "Alg(%d): nab = %d, nfree = %d, v = %d\n", numdep,
+	     nab, nfree, prd->v);
+    fprintf (stderr, "Alg(%d): maximal polynomial bit-size = %lu\n", numdep,
+             (unsigned long) mpz_poly_sizeinbase (prd->p, 2));
     p = FindSuitableModP(F, Np);
-    fprintf (stderr, "Using p=%lu for lifting\n", p);
+    fprintf (stderr, "Alg(%d): using p=%lu for lifting\n", numdep, p);
+    fflush (stderr);
     pthread_mutex_unlock (&lock);
 
     double tm = seconds();
-    polymodF_sqrt (prd, prd, F, p);
+    polymodF_sqrt (prd, prd, F, p, numdep);
     pthread_mutex_lock (&lock);
-    fprintf (stderr, "AlgSqrt(%d): square root lifted in %2.2lf\n",
+    fprintf (stderr, "Alg(%d): square root lifted in %.2lfs\n",
              numdep, seconds() - tm);
+    fflush (stderr);
     pthread_mutex_unlock (&lock);
 
     mpz_init(algsqrt);
@@ -919,10 +953,11 @@ calculateSqrtAlg (const char *prefix, int numdep,
     fclose_maybe_compressed_lock (resfile, sidename);
 
     pthread_mutex_lock (&lock);
-    gmp_fprintf (stderr, "AlgSqrt(%d): square root is: %Zd\n",
+    gmp_fprintf (stderr, "Alg(%d): square root is: %Zd\n",
                  numdep, algsqrt);
-    fprintf (stderr, "AlgSqrt(%d): square root time is %2.2lf\n",
+    fprintf (stderr, "Alg(%d): square root time is %.2lfs\n",
              numdep, seconds() - t0);
+    fflush (stderr);
     pthread_mutex_unlock (&lock);
     free (sidename);
     mpz_clear(aux);
@@ -1342,6 +1377,8 @@ int main(int argc, char *argv[])
     if (!(opt_ab || opt_side0 || opt_side1 || opt_gcd))
         opt_ab = opt_side0 = opt_side1 = opt_gcd = 1;
 
+    double wct0 = wct_seconds();
+
     /*
      * In the case where the number N to factor has a prime factor that
      * divides the leading coefficient of f or g, the reduction modulo N
@@ -1458,5 +1495,6 @@ int main(int argc, char *argv[])
     cado_poly_clear (pol);
     param_list_clear (pl);
     mpz_clear (Np);
+    print_timing_and_memory (stderr, wct0);
     return 0;
 }
