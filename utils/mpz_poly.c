@@ -361,9 +361,12 @@ void mpz_poly_clear(mpz_poly_ptr f)
   int i;
   for (i = 0; i < f->alloc; ++i)
     mpz_clear(f->coeff[i]);
-  free(f->coeff);
+  if (f->coeff != NULL)
+    free(f->coeff);
+  f->coeff = NULL; /* to avoid a double-free */
   memset(f, 0, sizeof(mpz_poly_t));
   f->deg = -1;
+  f->alloc = 0; /* to avoid a double-free */
 }
 
 /* Return 0 if f[i] is zero, -1 is f[i] is negative and +1 if f[i] is positive,
@@ -1768,6 +1771,18 @@ mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
       S = s;
   }
   return S;
+}
+
+/* return the total size (in bytes) to store the polynomial f */
+size_t
+mpz_poly_totalsize (mpz_poly_srcptr f)
+{
+  int i;
+  size_t s = 0;
+
+  for (i = 0; i <= f->deg; i++)
+    s += mpz_size (f->coeff[i]);
+  return s * sizeof (mp_limb_t);
 }
 
 /* f=gcd(f, g) mod p, with p in mpz_t */
