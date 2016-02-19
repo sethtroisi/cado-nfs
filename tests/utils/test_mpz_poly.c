@@ -600,6 +600,7 @@ test_mpz_poly_base_modp_init (unsigned long iter)
           m = 833;
         }
       mpz_poly_random (f, d, m);
+      f->deg = d;
       s = mpz_poly_sizeinbase (f, 2);
       for (i = 0; i <= d; i++)
         ASSERT_ALWAYS(mpz_sizeinbase (f->coeff[i], 2) <= s);
