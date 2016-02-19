@@ -47,6 +47,7 @@ accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
         {
           lprd[0] ++;
           prd = (mpz_t*) realloc (prd, lprd[0] * sizeof (mpz_t));
+          ASSERT_ALWAYS(prd != NULL);
           mpz_init_set_ui (prd[i + 1], 1);
         }
       mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
@@ -90,6 +91,7 @@ get_depname (const char *prefix, const char *algrat, int numdep)
     if (strcmp (prefix + strlen (prefix) - strlen (suffix), suffix) == 0)
       break;
   prefix_base = malloc (strlen (prefix) - strlen (suffix) + 1);
+  ASSERT_ALWAYS(prefix_base != NULL);
   strncpy (prefix_base, prefix, strlen (prefix) - strlen (suffix));
   prefix_base[strlen (prefix) - strlen (suffix)] = '\0';
   ret = asprintf (&depname, "%s.%s%03d%s", prefix_base, algrat, numdep, suffix);
@@ -179,6 +181,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
   lprd = 1;
   nprd = 0;
   prd = (mpz_t*) malloc (lprd * sizeof (mpz_t));
+  ASSERT_ALWAYS(prd != NULL);
   mpz_init_set_ui (prd[0], 1);
 
   line_number = 2;
@@ -628,32 +631,40 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
     barrett_init (invpk, pk); /* FIXME: we could lift 1/p^k also */
     fprintf (stderr, "start lifting mod p^%d (%lu bits) at %2.2lf\n",
              k, (unsigned long int) mpz_sizeinbase (pk, 2), seconds ());
-#ifdef VERBOSE
-    fprintf (stderr, "   mpz_poly_base_modp_lift took %2.2lf\n", st);
-#endif
+    if (verbose)
+      {
+        fprintf (stderr, "   mpz_poly_base_modp_lift took %2.2lf\n", st);
+        fflush (stderr);
+      }
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
     st = seconds ();
     mpz_poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, F, pk, invpk); /* tmp = invsqrtA^2 */
-#ifdef VERBOSE
-    fprintf (stderr, "   mpz_poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
-#endif
+    if (verbose)
+      {
+        fprintf (stderr, "   mpz_poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+        fflush (stderr);
+      }
 
     /* Faster version which computes x <- x + x/2*(1-a*x^2).
        However I don't see how to use the fact that the coefficients
        if 1-a*x^2 are divisible by p^(k/2). */
     st = seconds ();
     mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, a, F, pk, invpk); /* tmp=a*invsqrtA^2 */
-#ifdef VERBOSE
-    fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
-#endif
+    if (verbose)
+      {
+        fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+        fflush (stderr);
+      }
     mpz_poly_sub_ui (tmp, tmp, 1); /* a*invsqrtA^2-1 */
     mpz_poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
     st = seconds ();
     mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
-#ifdef VERBOSE
-    fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
-#endif
+    if (verbose)
+      {
+        fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+        fflush (stderr);
+      }
     /* tmp = invsqrtA/2 * (a*invsqrtA^2-1) */
     mpz_poly_sub_mod_mpz (invsqrtA, invsqrtA, tmp, pk);
 
@@ -731,10 +742,11 @@ accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const mpz_poly_t F,
         {
           lprd[0] ++;
           prd = (polymodF_t*) realloc (prd, *lprd * sizeof (polymodF_t));
-      mpz_poly_init(prd[i+1]->p, F->deg);
+          ASSERT_ALWAYS(prd != NULL);
+          mpz_poly_init(prd[i+1]->p, F->deg);
           mpz_set_ui(prd[i + 1]->p->coeff[0], 1);
-      prd[i+1]->p->deg = 0;
-      prd[i+1]->v = 0;
+          prd[i+1]->p->deg = 0;
+          prd[i+1]->v = 0;
         }
       polymodF_mul (prd[i+1], prd[i+1], prd[i], F);
       mpz_set_ui(prd[i]->p->coeff[0], 1);
@@ -808,6 +820,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
       unsigned long lprd = 1; /* number of elements in prd_tab[] */
       unsigned long nprd = 0; /* number of accumulated products in prd_tab[] */
       prd_tab = (polymodF_t*) malloc (lprd * sizeof (polymodF_t));
+      ASSERT_ALWAYS(prd_tab != NULL);
       mpz_poly_init (prd_tab[0]->p, F->deg);
       mpz_set_ui (prd_tab[0]->p->coeff[0], 1);
       prd_tab[0]->p->deg = 0;
@@ -1121,6 +1134,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     purgedfile_read_firstline (purgedname, &nrows, &ncols);
 
     uint64_t * abs = malloc(nrows * sizeof(uint64_t));
+    ASSERT_ALWAYS(abs != NULL);
     memset(abs, 0, nrows * sizeof(uint64_t));
 
     for(uint64_t i = 0 ; i < small_nrows ; i++) {
@@ -1211,7 +1225,9 @@ calculateTaskN (int task, const char *prefix, int numdep, int nthreads,
   int j;
 
   tid = (pthread_t*) malloc (nthreads * sizeof (pthread_t));
+  ASSERT_ALWAYS(tid != NULL);
   T = (tab_t*) malloc (nthreads * sizeof (tab_t));
+  ASSERT_ALWAYS(T != NULL);
   for (j = 0; j < nthreads; j++)
     {
       T[j]->prefix = prefix;
