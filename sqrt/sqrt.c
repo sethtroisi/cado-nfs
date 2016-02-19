@@ -585,7 +585,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       size_t s = 0;
       for (i = 0; i <= logk; i++)
 	s += mpz_poly_totalsize (P[i]);
-      fprintf (stderr, "Alg(%d): P takes %luMb\n", numdep, s >> 20);
+      fprintf (stderr, "Alg(%d): P takes %zuMb\n", numdep, s >> 20);
     }
   fflush (stderr);
   pthread_mutex_unlock (&lock);
@@ -649,7 +649,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       {
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_base_modp_lift took %.2lfs (peak %luM)\n", numdep, st, PeakMemusage () >> 10);
-	fprintf (stderr, "Alg(%d):    a takes %luMb\n", numdep,
+	fprintf (stderr, "Alg(%d):    a takes %zuMb\n", numdep,
 		 mpz_poly_totalsize (a) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
@@ -682,7 +682,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       {
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_sqr_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
-	fprintf (stderr, "Alg(%d):    tmp takes %luMb\n", numdep,
+	fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
 		 mpz_poly_totalsize (tmp) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
@@ -697,7 +697,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       {
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
-	fprintf (stderr, "Alg(%d):    tmp takes %luMb\n", numdep,
+	fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
 		 mpz_poly_totalsize (tmp) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
@@ -710,7 +710,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       {
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
-	fprintf (stderr, "Alg(%d):    tmp takes %luMb\n", numdep,
+	fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
 		 mpz_poly_totalsize (tmp) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
@@ -720,7 +720,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
     if (verbose)
       {
 	pthread_mutex_lock (&lock);
-	fprintf (stderr, "Alg(%d):    invsqrtA takes %luMb\n", numdep,
+	fprintf (stderr, "Alg(%d):    invsqrtA takes %zuMb\n", numdep,
 		 mpz_poly_totalsize (invsqrtA) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
@@ -735,7 +735,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
     {
       pthread_mutex_lock (&lock);
       fprintf (stderr, "Alg(%d):    final mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
-      fprintf (stderr, "Alg(%d):    tmp takes %luMb\n", numdep,
+      fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
 	       mpz_poly_totalsize (tmp) >> 20);
       fflush (stderr);
       pthread_mutex_unlock (&lock);
@@ -954,7 +954,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
 	  s += mpz_poly_totalsize (prd_tab[i]->p);
 	  mpz_poly_clear(prd_tab[i]->p);
 	}
-      fprintf (stderr, "Alg(%d): product tree took %luMb (peak %luM)\n",
+      fprintf (stderr, "Alg(%d): product tree took %zuMb (peak %luM)\n",
 	       numdep, s >> 20, PeakMemusage () >> 10);
       free(prd_tab);
     }
