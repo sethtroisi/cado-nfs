@@ -260,7 +260,7 @@ void max_infinity_norm(mpz_ptr max, mat_Z_srcptr MqLLL, mpz_vector_t * c,
 void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state, int deg_bound_factorise,
     MAYBE_UNUSED mpz_vector_srcptr skewness, unsigned int gal,
-    mpz_vector_t * c, unsigned int nb_vec)
+    mpz_vector_t * c, unsigned int nb_vec, MAYBE_UNUSED mpz_poly_srcptr g)
 {
   array_spq_t array_spq_tmp;
   array_spq_init(array_spq_tmp, f->deg, H->t);
@@ -280,10 +280,8 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
     if (l->factors[i]->f->deg < deg_bound_factorise) {
       if (l->factors[i]->f->deg == 1) {
 #ifdef SPQ_DEFINED
-        if (g->deg != -1) {
-          if (mpz_poly_cmp(g, l->factors[i]->f)) {
-            continue;
-          }
+        if (mpz_poly_cmp(g, l->factors[i]->f)) {
+          continue;
         }
 #endif // SPQ_DEFINED
         ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
@@ -292,10 +290,8 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
         ASSERT(l->factors[i]->f->deg > 1);
 
 #ifdef SPQ_DEFINED
-        if (g->deg != -1) {
-          if (mpz_poly_cmp(g, l->factors[i]->f)) {
-            continue;
-          }
+        if (mpz_poly_cmp(g, l->factors[i]->f)) {
+          continue;
         }
 #endif // SPQ_DEFINED
         ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
@@ -2639,7 +2635,7 @@ int main(int argc, char * argv[])
   for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
     //TODO: print time to build MqLLL.
     compute_all_spq(spq, q, f->pols[q_side], H, state, deg_bound_factorise,
-        skewness, gal, c, nb_vec);
+        skewness, gal, c, nb_vec, g);
 
     for (unsigned int i = 0; i < spq->number; i++) {
       sec = seconds();
