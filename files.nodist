@@ -114,6 +114,7 @@ misc/descent-init.c
 misc/descent_init_Fp.c
 misc/smooth_detect.c
 misc/smooth_detect.h
+misc/filter_sieved_pairs.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
