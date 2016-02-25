@@ -38,18 +38,24 @@ void cand_clear(cand_t c);
 void cand_set(cand_t c, const cand_t d);
 void cand_set_original_values(cand_t c, const mpz_t u0, const mpz_t v0,
         unsigned long id);
+void cand_set_presieved_values(cand_t c, const mpz_t u0, const mpz_t v0,
+        const mpz_t u, const mpz_t v,
+        unsigned int lpu, unsigned int lpv,
+        unsigned long id);
 
 // Type for tuning parameters for smooth_detect. 
 //   min_effort: the effort at the start (effort = sum of the B1 already tried)
 //   max_effort: when this value is reached, don't increase effort anymore
 //   max_pool_size: number of candidates to keep in mind at the same time
 //   verbose: 0 = no verbose, 1 verbose
-// Default values: {2000, +inf, 10, 1}.
+//   minB1: first B1 to try, in the ECM chain.
+// Default values: {2000, +inf, 10, 1, 100.0}.
 typedef struct {
   double min_effort;
   double max_effort;
   unsigned int max_pool_size;
   int verbose;
+  double minB1;
 } smooth_detect_param_s;
 
 // The main exported function. Smooth candidate is put in C.

@@ -24,12 +24,11 @@
 // For a bug in ecm ?
 double default_B1done;
 
-#define B1MIN 100            // Value of B1 to start each new candidate
-                             // If you change it, you must update the
-                             // table expected_effort[] below.
 #define EA_THRESHOLD 0.8     // Heuristic for early-abort: low = keep many
 
 // Expected effort to extract of prime of p bits.
+// This has been computed for B1min = 200.0, but this is rather stable
+// for interesting values of p.
 #define MAX_PBIT 100
 static const double expected_effort[MAX_PBIT] = {
   200, 200, 200, 200, 200, 200, 200, 200, 200, 200, // 0 - 9
@@ -174,6 +173,21 @@ void cand_set_original_values(cand_t c, const mpz_t u0, const mpz_t v0,
   cand_update_check_prime(c);
 }
 
+void cand_set_presieved_values(cand_t c, const mpz_t u0, const mpz_t v0,
+        const mpz_t u, const mpz_t v,
+        unsigned int lpu, unsigned int lpv,
+        unsigned long id) {
+  mpz_set(c->u0, u0);
+  mpz_set(c->v0, v0);
+  mpz_set(c->u, u);
+  mpz_set(c->v, v);
+  c->lpu = lpu;
+  c->lpv = lpv;
+  c->effort = 0.0;
+  c->id = id;
+  cand_update_check_prime(c);
+}
+
 // Cost is the bitsize of the largest unfactored part
 // For factored numbers, this is INT_MAX
 int cost(const cand_t c) {
@@ -306,6 +320,7 @@ typedef struct {
   double current_effort;             // current effort per candidate.
   double max_effort;
   unsigned long max_pool_size;
+  double minB1;
 } context_s;
 typedef context_s context_t[1];
 
@@ -323,8 +338,8 @@ double remove_small_factors(mpz_t z) {
 }
 
 // get a B1, so that we can quickly cover the target effort
-double get_B1_from_effort(double effort) {
-  double B1 = B1MIN;
+double get_B1_from_effort(double effort, double minB1) {
+  double B1 = minB1;
   double S = B1;
   while (S < effort) {
     B1 += sqrt(B1);
@@ -353,9 +368,9 @@ void my_ecm_factor(mpz_t f, mpz_t z, double B1) {
 bool smooth_detect_one_step(cand_t winner, context_t ctx) {
   cand_t C;
   cand_init(C);
-  // Get a new candidate, not obviously worse than current best.
-  double gain_u = 0.0;
-  double gain_v = 0.0;
+  // Get a new candidate, not obviously non-smooth
+  double gain_u = mpz_sizeinbase(C->u0, 2) - mpz_sizeinbase(C->u, 2);
+  double gain_v = mpz_sizeinbase(C->v0, 2) - mpz_sizeinbase(C->v, 2);
   do {
     ctx->next_cand(C, ctx->param_next_cand);
     gain_u += remove_small_factors(C->u);
@@ -364,7 +379,7 @@ bool smooth_detect_one_step(cand_t winner, context_t ctx) {
   } while (C->lpu >= ctx->target || C->lpv >= ctx->target);
 
   // Start a loop of ECM
-  double B1 = B1MIN;   // initial B1
+  double B1 = ctx->minB1;   // initial B1
   int cpt = 0;         // number of curves tried on this number
   mpz_t f;             // output of ecm
   mpz_init(f);
@@ -427,7 +442,7 @@ bool smooth_detect_one_step(cand_t winner, context_t ctx) {
     pool_insert(ctx->pool, C);
   }
 
-  B1 = get_B1_from_effort(ctx->current_effort);
+  B1 = get_B1_from_effort(ctx->current_effort, ctx->minB1);
 
   // Run ECM on the numbers in pool, so that they all have received more
   // or less the same effort.
@@ -499,7 +514,7 @@ void smooth_detect(cand_t C, void (*next_cand)(cand_t, void *),
     ecm_clear(params);
   }
 
-  const smooth_detect_param_s default_param = {2000.0, 1e20, 10, 1};
+  const smooth_detect_param_s default_param = {2000.0, 1e20, 10, 1, 100.0};
   if (param == NULL) {
     param = &default_param;
   }
@@ -514,6 +529,7 @@ void smooth_detect(cand_t C, void (*next_cand)(cand_t, void *),
   ctx->current_effort = param->min_effort;
   ctx->max_effort = param->max_effort;
   ctx->max_pool_size = param->max_pool_size;
+  ctx->minB1 = param->minB1;
 
   double tm = get_time();
   int cpt = 0;
@@ -525,7 +541,8 @@ void smooth_detect(cand_t C, void (*next_cand)(cand_t, void *),
       printf("***** Pool status after %d candidates in %.1fs\n", cpt,
           get_time()-tm);
       printf("current_effort = %.0f\n", ctx->current_effort);
-      printf("current max B1 = %.0f\n",get_B1_from_effort(ctx->current_effort));
+      printf("current max B1 = %.0f\n",
+          get_B1_from_effort(ctx->current_effort, ctx->minB1));
       pool_print(ctx->pool);
     }
   }
