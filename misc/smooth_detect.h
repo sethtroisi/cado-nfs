@@ -43,11 +43,13 @@ void cand_set_original_values(cand_t c, const mpz_t u0, const mpz_t v0,
 //   min_effort: the effort at the start (effort = sum of the B1 already tried)
 //   max_effort: when this value is reached, don't increase effort anymore
 //   max_pool_size: number of candidates to keep in mind at the same time
-// Default values: {2000, +inf, 10}.
+//   verbose: 0 = no verbose, 1 verbose
+// Default values: {2000, +inf, 10, 1}.
 typedef struct {
   double min_effort;
   double max_effort;
   unsigned int max_pool_size;
+  int verbose;
 } smooth_detect_param_s;
 
 // The main exported function. Smooth candidate is put in C.

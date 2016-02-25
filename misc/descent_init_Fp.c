@@ -102,6 +102,8 @@ int main(int argc, char **argv) {
   unsigned long nthread = 1;
   double mineff = 2000.0;
   double maxeff = 1e20;
+  int verbose = 0;
+  clock_t tm = clock();
   
   while (argc > 2 && argv[1][0] == '-') {
     if (strcmp(argv[1], "-seed") == 0) {
@@ -120,6 +122,10 @@ int main(int argc, char **argv) {
       maxeff = strtof(argv[2], NULL);
       argc -= 2;
       argv += 2;
+    } else if (strcmp(argv[1], "-v") == 0) {
+      verbose = 1;
+      argc -= 1;
+      argv += 1;
     } else if (strcmp(argv[1], "-target") == 0) {
       target = strtoul(argv[2], NULL, 10);
       argc -= 2;
@@ -140,7 +146,7 @@ int main(int argc, char **argv) {
   mpz_init_set_str(params.p, argv[1], 10);
   mpz_init_set_str(params.z, argv[2], 10);
   
-  const smooth_detect_param_s smooth_param = {mineff, maxeff, 10};
+  const smooth_detect_param_s smooth_param = {mineff, maxeff, 10, verbose};
 
   thparam_s thparam[1];
   thparam->params = &params;
@@ -167,6 +173,7 @@ int main(int argc, char **argv) {
   }
 
 end:
+  printf("Total CPU time: %.0f s\n", ((double)(clock() - tm)) / CLOCKS_PER_SEC);
   free(thid);
   mpz_clear(params.p);
   mpz_clear(params.z);

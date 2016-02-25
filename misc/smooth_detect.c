@@ -24,13 +24,13 @@
 // For a bug in ecm ?
 double default_B1done;
 
-#define B1MIN 200            // Value of B1 to start each new candidate
+#define B1MIN 100            // Value of B1 to start each new candidate
                              // If you change it, you must update the
                              // table expected_effort[] below.
 #define EA_THRESHOLD 0.8     // Heuristic for early-abort: low = keep many
 
 // Expected effort to extract of prime of p bits.
-#define MAX_PBIT 90
+#define MAX_PBIT 100
 static const double expected_effort[MAX_PBIT] = {
   200, 200, 200, 200, 200, 200, 200, 200, 200, 200, // 0 - 9
   200, 200, 200, 200, 200, 200, 200, 211, 219, 243, // 10 - 19
@@ -45,6 +45,8 @@ static const double expected_effort[MAX_PBIT] = {
   4373729, 4899345, 5218152, 6269843, 7063446, // 75 - 79
   9553542, 9891138, 10623352, 13795248, 17574109, // 80 - 84
   18790448, 23529670, 24757303, 30897420, 31188626, // 85 - 89
+  36647830, 41007546, 45692079, 53881307, 69709984, // 90 - 94
+  81857570, 84194044, 107900749, 94609433, 136660173 // 95 - 99
 };
 
 
@@ -136,12 +138,12 @@ bool cand_is_probably_not_smooth(const cand_t c, unsigned int bound) {
   for (unsigned int k = 2; k < 4; ++k) {
     unsigned long bu = mpz_sizeinbase(c->u, 2);
     if ((bu < (k+1)*bits) && (bu > k*bound)) {
-      printf("Probably not smooth, level %d: %lu bits!\n", k, bu);
+//      printf("Probably not smooth, level %d: %lu bits!\n", k, bu);
       return true;
     }
     unsigned long bv = mpz_sizeinbase(c->v, 2);
     if ((bv < (k+1)*bits) && (bv > k*bound)) {
-      printf("Probably not smooth, level %d: %lu bits!\n", k, bv);
+//      printf("Probably not smooth, level %d: %lu bits!\n", k, bv);
       return true;
     }
   }
@@ -434,10 +436,17 @@ bool smooth_detect_one_step(cand_t winner, context_t ctx) {
     cand_s * c = &ctx->pool->list[i][0];
     double effort = ctx->current_effort;
     // more effort for the most promising candidates!
+    // the correcting factors below are completely heuristic...
     if (ctx->pool->n > 5) {
         if (i == 0) { effort *= 2; }
         if (i == 1) { effort *= 1.6; }
         if (i == 2) { effort *= 1.3; }
+        if (i == 3) { effort *= 1.1; }
+        if (i == 4) { effort *= 1.0; }
+        if (i >= 5) { effort *= 0.7; }
+        if (i >= 8) { effort *= 0.5; }
+        if (i >= 10) { effort *= 0.2; }
+        if (i >= 15) { effort *= 0.1; }
     }
     while (!cand_is_factored(c) && c->effort < effort) {
       if (mpz_cmp_ui(c->u, 1) != 0) {
@@ -469,6 +478,7 @@ bool smooth_detect_one_step(cand_t winner, context_t ctx) {
     if (cand_is_factored(c) && l <= ctx->target) {
       cand_print(c);
       cand_set(winner, c);
+      return true;
     }
   }
   pool_sort(ctx->pool);
@@ -489,7 +499,7 @@ void smooth_detect(cand_t C, void (*next_cand)(cand_t, void *),
     ecm_clear(params);
   }
 
-  const smooth_detect_param_s default_param = {2000.0, 1e20, 10};
+  const smooth_detect_param_s default_param = {2000.0, 1e20, 10, 1};
   if (param == NULL) {
     param = &default_param;
   }
@@ -511,7 +521,7 @@ void smooth_detect(cand_t C, void (*next_cand)(cand_t, void *),
   while (!found) {
     found = smooth_detect_one_step(C, ctx);
     cpt++;
-    if (cpt % 20 == 0) {
+    if (param->verbose && (cpt % 20 == 0)) {
       printf("***** Pool status after %d candidates in %.1fs\n", cpt,
           get_time()-tm);
       printf("current_effort = %.0f\n", ctx->current_effort);
