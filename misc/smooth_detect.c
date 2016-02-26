@@ -453,15 +453,10 @@ bool smooth_detect_one_step(cand_t winner, context_t ctx) {
     // more effort for the most promising candidates!
     // the correcting factors below are completely heuristic...
     if (ctx->pool->n > 5) {
-        if (i == 0) { effort *= 2; }
-        if (i == 1) { effort *= 1.6; }
-        if (i == 2) { effort *= 1.3; }
-        if (i == 3) { effort *= 1.1; }
-        if (i == 4) { effort *= 1.0; }
-        if (i >= 5) { effort *= 0.7; }
-        if (i >= 8) { effort *= 0.5; }
-        if (i >= 10) { effort *= 0.2; }
-        if (i >= 15) { effort *= 0.1; }
+      if (i == 0) { effort *= 2; }
+      if (i == 1) { effort *= 1.6; }
+      if (i == 2) { effort *= 1.3; }
+      if (i == 3) { effort *= 1.1; }
     }
     while (!cand_is_factored(c) && c->effort < effort) {
       if (mpz_cmp_ui(c->u, 1) != 0) {
