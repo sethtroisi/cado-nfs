@@ -45,7 +45,19 @@ void next_cand_sieved_pair(cand_t cand, void *params) {
   mpz_t u, v, u0;
   mpz_init(u);
   mpz_init(v);
-  gmp_fscanf(param->file, "%*Zd %lu %Zd %Zd %*Zd\n", &id, u, v);
+  // skip commented lines
+  int c = fgetc(param->file);
+  assert (c != EOF);
+  while (c == '#') {
+    char str[2048];
+    fgets(str, 2048, param->file);
+    c = fgetc(param->file);
+    assert (c != EOF);
+  }
+  ungetc(c, param->file);
+  // read the line
+  ret = gmp_fscanf(param->file, "%*Zd %lu %Zd %Zd %*Zd\n", &id, u, v);
+  assert (ret == 3);
   mpz_init_set_ui(u0, 1);
   mpz_mul_2exp(u0, u0, 256);
   cand_set_presieved_values(cand, u0, u0, u, v, 0, 0, id);
