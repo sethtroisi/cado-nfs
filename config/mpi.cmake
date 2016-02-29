@@ -143,3 +143,13 @@ else()
         message(FATAL_ERROR "Cannot find all of mpicc/mpic++/mpiexec with MPI=$ENV{MPI}")
     endif()
 endif()
+
+if(HAVE_MPI)
+    if(EXISTS ${HAVE_MPI}/ompi_info)
+        execute_process(COMMAND ${HAVE_MPI}/ompi_info -V OUTPUT_VARIABLE t)
+        string(REGEX MATCH "Open MPI v([0-9\\.]+(rc[0-9]*)?)" t ${t})
+        string(REGEX REPLACE "Open MPI v" "" MPI_OPENMPI_VERSION ${t})
+        message(STATUS "Open MPI version ${MPI_OPENMPI_VERSION}")
+    endif()
+endif()
+

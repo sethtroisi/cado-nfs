@@ -134,6 +134,7 @@ linalg/bwc/lingen_binary.cpp
 linalg/bwc/lingen_mat_types.hpp
 linalg/bwc/matmul-basic.c
 linalg/bwc/matmul-basicp.cpp
+linalg/bwc/matmul-zone.cpp
 linalg/bwc/matmul-bucket.cpp
 linalg/bwc/matmul-common.c
 linalg/bwc/matmul-common.h

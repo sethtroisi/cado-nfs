@@ -31,7 +31,7 @@ set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
 set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 pz
     CACHE STRING
     "which GF(p) backends to compile for DLOG mode")
-set(BWC_GFP_MATMUL_BACKENDS basicp
+set(BWC_GFP_MATMUL_BACKENDS basicp zone
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
 
@@ -98,6 +98,13 @@ endif()
 add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
 target_link_libraries(bwc_base ${gmp_libname})
+
+if (MPI_OPENMPI_VERSION VERSION_GREATER 1.4)
+    # https://www.open-mpi.org/community/lists/users/2014/11/25891.php
+    message(STATUS "Enabling workaround for https://github.com/open-mpi/ompi/issues/299")
+    link_directories(${HAVE_MPI}/../lib)
+    target_link_libraries(bwc_base open-pal open-rte)
+endif()
 
 if (HAVE_CURL)
 target_link_libraries(bwc_base curl)
@@ -210,6 +217,7 @@ endif()
 
 set(matmul_basic_sources    matmul-basic.c)
 set(matmul_basicp_sources   matmul-basicp.cpp)
+set(matmul_zone_sources   matmul-zone.cpp)
 set(matmul_sliced_sources   matmul-sliced.cpp)
 set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
