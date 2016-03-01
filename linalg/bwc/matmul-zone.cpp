@@ -4,10 +4,12 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <vector>
 #include <utility>
 #include <sstream>
+#include <algorithm>
 
 #include "bwc_config.h"
 #include "matmul.h"
@@ -38,12 +40,55 @@
 
 using namespace std;
 
+struct zone {
+    typedef vector<pair<int, uint32_t>> qpm_t;
+    typedef vector<pair<int, pair<uint32_t, int32_t>>> qg_t;
+    unsigned int i0, j0;
+    qpm_t qp, qm;
+    qg_t qg;
+    zone(unsigned int i0, unsigned int j0) : i0(i0), j0(j0) {}
+    inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
+    void operator()(abdst_field x, abdst_vec_ur tdst, absrc_vec tsrc) const;
+
+    struct sort_qpm {
+        inline bool operator()(qpm_t::value_type const& a, qpm_t::value_type const& b) const {
+            return a.second < b.second;
+        }
+    };
+
+    struct sort_qg {
+        inline bool operator()(qg_t::value_type const& a, qg_t::value_type const& b) const {
+            return a.second.first < b.second.first;
+        }
+    };
+
+    void sort() {
+        std::sort(qp.begin(), qp.end(), sort_qpm());
+        std::sort(qm.begin(), qm.end(), sort_qpm());
+        std::sort(qg.begin(), qg.end(), sort_qg());
+    }
+#if 1
+    struct sorter {
+        inline bool operator()(zone const& a, zone const& b) {
+            return a.i0 < b.i0 || (a.i0 == b.i0 && a.j0 < b.j0);
+        }
+    };
+#else
+    struct sorter {
+        inline bool operator()(zone const& a, zone const& b) {
+            return a.j0 < b.j0 || (a.j0 == b.j0 && a.i0 < b.i0);
+        }
+    }
+#endif
+};
+
 struct matmul_zone_data {
     /* repeat the fields from the public interface */
     struct matmul_public_s public_[1];
     /* now our private fields */
     abdst_field xab;
-    vector<uint32_t> qp, qm, qq;
+
+    vector<zone> q;
 
     ~matmul_zone_data();
     matmul_zone_data(void* xx, param_list pl, int optimized_direction);
@@ -127,6 +172,16 @@ matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direc
     }
 }
 
+#define CMAX 4
+#define ROWBATCH        128
+#define COLBATCH        0
+
+struct sort_jc {
+    inline bool operator()(pair<uint32_t, int32_t> const& a, pair<uint32_t,int32_t> const& b) const {
+        return a.first < b.first;
+    }
+};
+
 void matmul_zone_data::build_cache(uint32_t * data)
 {
     matmul_zone_data * mm = this;
@@ -134,48 +189,79 @@ void matmul_zone_data::build_cache(uint32_t * data)
     ASSERT_ALWAYS(data);
 
     unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
+
+#if COLBATCH
+    unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
+#endif
     
     uint32_t * ptr = data;
-    unsigned int i = 0;
 
     /* count coefficients */
     mm->public_->ncoeffs = 0;
 
-#define CMAX 4
-
     uint64_t ccount[2*CMAX + 1] = {0,};
 
-    for( ; i < nrows_t ; i++) {
-        unsigned int weight = *ptr++;
-        vector<uint32_t> lqp, lqm, lqq;
-        for(unsigned int i = 0 ; i < weight ; i++, ptr += 2) {
-            uint32_t j = ptr[0];
-            int32_t c = ptr[1];
-            if (c < 0 && c >= -CMAX) {
-                ccount[CMAX + c]++;
-                for( ; c++ ; ) lqm.push_back(j);
-            } else if (c > 0 && c <= CMAX) {
-                ccount[CMAX + c]++;
-                for( ; c-- ; ) lqp.push_back(j);
+    for(unsigned int i0 = 0 ; i0 < nrows_t ; i0 += ROWBATCH) {
+        uint32_t * pp[ROWBATCH + 1];
+        uint32_t * cc[ROWBATCH + 1];
+        pp[0] = ptr;
+        for(unsigned int k = 0 ; k < ROWBATCH ; k++) {
+            cc[k] = pp[k] + 1;
+            if (i0 + k < nrows_t) {
+                pp[k+1] = pp[k] + 1 + 2*(*pp[k]);
+                mm->public_->ncoeffs += *pp[k];
+                /* This is very important. We must sort rows before
+                 * processing. */
+                pair<uint32_t, int32_t> * cb = (pair<uint32_t, int32_t> *) cc[k];
+                pair<uint32_t, int32_t> * ce = cb + *pp[k];
+                sort(cb, ce, sort_jc());
             } else {
-                ccount[CMAX]++;
-                lqq.push_back(j);
-                lqq.push_back((uint32_t) c);
+                pp[k+1] = pp[k];
             }
-        } 
-        qp.push_back(lqp.size()); qp.insert(qp.end(), lqp.begin(), lqp.end());
-        qm.push_back(lqm.size()); qm.insert(qm.end(), lqm.begin(), lqm.end());
-        qq.push_back(lqq.size()); qq.insert(qq.end(), lqq.begin(), lqq.end());
-
-        mm->public_->ncoeffs += weight;
+        }
+        ptr = pp[ROWBATCH];
+#if COLBATCH
+        for(unsigned int j0 = 0 ; j0 < ncols_t ; j0 += COLBATCH) {
+#else
+        {
+            unsigned int j0 = 0;
+#endif
+            zone z(i0, j0);
+            for(unsigned int k = 0 ; k < ROWBATCH ; k++) {
+                for( ; cc[k] < pp[k+1] ; cc[k] += 2) {
+                    uint32_t j = cc[k][0] - j0;
+                    int32_t c = cc[k][1];
+#if COLBATCH
+                    if (j >= COLBATCH) break;
+#endif
+                    if (c < 0 && c >= -CMAX) {
+                        ccount[CMAX + c]++;
+                        for( ; c++ ; ) {
+                            z.qm.push_back(make_pair(k, j));
+                        }
+                    } else if (c > 0 && c <= CMAX) {
+                        ccount[CMAX + c]++;
+                        for( ; c-- ; ) {
+                            z.qp.push_back(make_pair(k, j));
+                        }
+                    } else {
+                        ccount[CMAX]++;
+                        z.qg.push_back(make_pair(k, make_pair(j, c)));
+                    }
+                }
+            }
+            z.sort();
+            if (!z.empty()) q.push_back(z);
+        }
     }
+    sort(q.begin(), q.end(), zone::sorter());
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (nrows_t + 2 * mm->public_->ncoeffs));
     free(data);
     ostringstream os;
     for(int i = -CMAX ; i <= CMAX ; i++) {
         os << " " << i << ":" << (double) ccount[CMAX + i] / nrows_t;
     }
-    printf("Stats: %s\n", os.str().c_str());
+    printf("Stats: [%" PRIu64 "] %s\n", mm->public_->ncoeffs, os.str().c_str());
 }
 
 int matmul_zone_data::reload_cache()
@@ -183,20 +269,24 @@ int matmul_zone_data::reload_cache()
     FILE * f = matmul_common_reload_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
     if (f == NULL) { return 0; }
 
-    uint32_t nqp;
-    uint32_t nqm;
-    uint32_t nqq;
-    MATMUL_COMMON_READ_ONE32(nqp, f);
-    MATMUL_COMMON_READ_ONE32(nqm, f);
-    MATMUL_COMMON_READ_ONE32(nqq, f);
+    size_t qsize;
 
-    qp.insert(qp.end(), nqp, 0);
-    MATMUL_COMMON_READ_MANY32(&(qp[0]), nqp, f);
-    qm.insert(qm.end(), nqm, 0);
-    MATMUL_COMMON_READ_MANY32(&(qm[0]), nqm, f);
-    qq.insert(qq.end(), nqq, 0);
-    MATMUL_COMMON_READ_MANY32(&(qq[0]), nqq, f);
-
+    MATMUL_COMMON_READ_ONE32(qsize, f);
+    q.insert(q.end(), qsize, zone(0,0));
+    for(size_t i = 0 ; i < qsize ; i++) {
+        size_t qpsize, qmsize, qgsize;
+        MATMUL_COMMON_READ_ONE32(q[i].i0, f);
+        MATMUL_COMMON_READ_ONE32(q[i].j0, f);
+        MATMUL_COMMON_READ_ONE32(qpsize, f);
+        MATMUL_COMMON_READ_ONE32(qmsize, f);
+        MATMUL_COMMON_READ_ONE32(qgsize, f);
+        q[i].qp.insert(q[i].qp.end(), qpsize, zone::qpm_t::value_type());
+        q[i].qm.insert(q[i].qm.end(), qmsize, zone::qpm_t::value_type());
+        q[i].qg.insert(q[i].qg.end(), qgsize, zone::qg_t::value_type());
+        MATMUL_COMMON_READ_MANY32(&(q[i].qp[0]), 2 * q[i].qp.size(), f);
+        MATMUL_COMMON_READ_MANY32(&(q[i].qm[0]), 2 * q[i].qm.size(), f);
+        MATMUL_COMMON_READ_MANY32(&(q[i].qg[0]), 3 * q[i].qg.size(), f);
+    }
     fclose(f);
 
     return 1;
@@ -206,15 +296,56 @@ void matmul_zone_data::save_cache()
 {
     FILE * f = matmul_common_save_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
 
-    MATMUL_COMMON_WRITE_ONE32(qp.size(), f);
-    MATMUL_COMMON_WRITE_ONE32(qm.size(), f);
-    MATMUL_COMMON_WRITE_ONE32(qq.size(), f);
-
-    MATMUL_COMMON_WRITE_MANY32(&(qp[0]), qp.size(), f);
-    MATMUL_COMMON_WRITE_MANY32(&(qm[0]), qm.size(), f);
-    MATMUL_COMMON_WRITE_MANY32(&(qq[0]), qq.size(), f);
-
+    MATMUL_COMMON_WRITE_ONE32(q.size(), f);
+    for(size_t i = 0 ; i < q.size() ; i++) {
+        MATMUL_COMMON_WRITE_ONE32(q[i].i0, f);
+        MATMUL_COMMON_WRITE_ONE32(q[i].j0, f);
+        MATMUL_COMMON_WRITE_ONE32(q[i].qp.size(), f);
+        MATMUL_COMMON_WRITE_ONE32(q[i].qm.size(), f);
+        MATMUL_COMMON_WRITE_ONE32(q[i].qg.size(), f);
+        MATMUL_COMMON_WRITE_MANY32(&(q[i].qp[0]), 2 * q[i].qp.size(), f);
+        MATMUL_COMMON_WRITE_MANY32(&(q[i].qm[0]), 2 * q[i].qm.size(), f);
+        MATMUL_COMMON_WRITE_MANY32(&(q[i].qg[0]), 3 * q[i].qg.size(), f);
+    }
     fclose(f);
+}
+
+void zone::operator()(abdst_field x, abdst_vec_ur tdst, absrc_vec tsrc) const
+{
+    abelt_ur tmp;
+    abelt_ur_init(x, &tmp);
+    for(qpm_t::const_iterator u = qp.begin() ; u != qp.end() ; u++) {
+        unsigned int i = u->first;
+        unsigned int j = u->second;
+        abelt_ur_set_elt(x,
+                tmp,
+                abvec_coeff_ptr_const(x, tsrc, j));
+        abelt_ur_add(x,
+                abvec_ur_coeff_ptr(x, tdst, i),
+                abvec_ur_coeff_ptr(x, tdst, i),
+                tmp);
+    }
+    for(qpm_t::const_iterator u = qm.begin() ; u != qm.end() ; u++) {
+        unsigned int i = u->first;
+        unsigned int j = u->second;
+        abelt_ur_set_elt(x,
+                tmp,
+                abvec_coeff_ptr_const(x, tsrc, j));
+        abelt_ur_sub(x,
+                abvec_ur_coeff_ptr(x, tdst, i),
+                abvec_ur_coeff_ptr(x, tdst, i),
+                tmp);
+    }
+    for(qg_t::const_iterator u = qg.begin() ; u != qg.end() ; u++) {
+        unsigned int i = u->first;
+        unsigned int j = u->second.first;
+        int32_t c = u->second.second;
+        abaddmul_si_ur(x,
+                abvec_ur_coeff_ptr(x, tdst, i),
+                abvec_coeff_ptr_const(x, tsrc, j),
+                c);
+    }
+    abelt_ur_clear(x, &tmp);
 }
 
 void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
@@ -235,46 +366,45 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
     /* TODO: missing in mpfq   elt_ur_{add,sub}_elt
      */
     if (d == !mm->public_->store_transposed) {
-        abelt_ur rowsum;
-        abelt_ur_init(x, &rowsum);
-        abelt_ur tmp;
-        abelt_ur_init(x, &tmp);
+        abvec_ur tdst ;
+        abvec_ur_init(x, &tdst, ROWBATCH);
 
         abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop");
-        uint32_t * zp, * zm;
-        zp = &(qp[0]);
-        zm = &(qm[0]);
-        uint32_t * q = &(qq[0]);					\
-        for(unsigned int i = 0 ; i < mm->public_->dim[!d] ; i++) {
-            uint32_t plen = *zp++;
-            uint32_t mlen = *zm++;
-            uint32_t glen = *q++ / 2;
-            abelt_ur_set_elt(x, rowsum, abvec_coeff_ptr(x, dst, i));
-            for(unsigned int j = 0 ; plen-- ; ) {
-                j = *zp++;
-                ASSERT(j < mm->public_->dim[d]);
-                abelt_ur_set_elt(x, tmp, abvec_coeff_ptr_const(x, src, j));
-                abelt_ur_add(x, rowsum, rowsum, tmp);
+        unsigned int last_i0 = UINT_MAX;
+        unsigned int active = 0;
+        for(size_t k = 0 ; k < q.size() ; k++) {
+            zone const& z = q[k];
+            if (z.i0 != last_i0) {
+                if (last_i0 != UINT_MAX) {
+                    for(unsigned int i = 0 ; i < active ; i++) {
+                        abreduce(x, 
+                                abvec_coeff_ptr(x, dst, last_i0 + i),
+                                abvec_ur_coeff_ptr(x, tdst, i));
+                    }
+                }
+                last_i0 = z.i0;
+                active = MIN(ROWBATCH, mm->public_->dim[!d] - z.i0);
+                for(unsigned int i = 0 ; i < active ; i++) {
+                    abelt_ur_set_elt(x,
+                            abvec_ur_coeff_ptr(x, tdst, i),
+                            abvec_coeff_ptr_const(x, dst, z.i0 + i));
+                }
             }
-            for(unsigned int j = 0 ; mlen-- ; ) {
-                j = *zm++;
-                ASSERT(j < mm->public_->dim[d]);
-                abelt_ur_set_elt(x, tmp, abvec_coeff_ptr_const(x, src, j));
-                abelt_ur_sub(x, rowsum, rowsum, tmp);
+            absrc_vec tsrc = abvec_subvec_const(x, src, z.j0);
+            z(x, tdst, tsrc);
+        }
+        if (last_i0 != UINT_MAX) {
+            for(unsigned int i = 0 ; i < active ; i++) {
+                abreduce(x, 
+                        abvec_coeff_ptr(x, dst, last_i0 + i),
+                        abvec_ur_coeff_ptr(x, tdst, i));
             }
-            for(unsigned int j = 0 ; glen-- ; ) {
-                j = *q++;
-                int32_t c = *(int32_t*)q++;
-                ASSERT(j < mm->public_->dim[d]);
-                abaddmul_si_ur(x, rowsum, abvec_coeff_ptr_const(x, src, j), c);
-            }
-            abreduce(x, abvec_coeff_ptr(x, dst, i), rowsum);
         }
         ASM_COMMENT("end of critical loop");
-        abelt_ur_clear(x, &rowsum);
-        abelt_ur_clear(x, &tmp);
+        abvec_ur_clear(x, &tdst, ROWBATCH);
     } else {
+#if 0
         abvec_ur tdst;
         abvec_ur_init(x, &tdst, mm->public_->dim[!d]);
         abelt_ur tmp;
@@ -327,6 +457,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         ASM_COMMENT("end of critical loop (transposed mult)");
         abelt_ur_clear(x, &tmp);
         abvec_ur_clear(x, &tdst, mm->public_->dim[!d]);
+#endif
     }
     ASM_COMMENT("end of multiplication code");
 

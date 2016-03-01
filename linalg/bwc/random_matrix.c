@@ -1036,7 +1036,9 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
             for(unsigned long j = 0 ; j < c ; j++) {
                 PUSH_P(ptr[j]);
                 if (maxcoeff) {
-                    int co = gmp_urandomm_ui(rstate, 2 * maxcoeff + 1) - maxcoeff;
+                    int co = gmp_urandomm_ui(rstate, 2 * maxcoeff) - (maxcoeff-1);
+                    /* do this so that we avoid 0 ! */
+                    co -= (co <= 0);
                     PUSH_P(co);
                     // if (r->rhs->n) v += co * (1+ptr[j]);
                 }
@@ -1239,7 +1241,9 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
             WU32(out, " ", ptr[j], "");
             if (colweights) colweights[ptr[j]]++;
             if (r->maxcoeff) {
-                int32_t co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff + 1) - r->maxcoeff;
+                int32_t co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff) - (r->maxcoeff - 1);
+                /* do this so that we avoid 0 ! */
+                co -= (co <= 0);
                 WS32(out, ":", co, "");
                 if (r->rhs->n) v += (long) co * (long) (1+ptr[j]);
             }
