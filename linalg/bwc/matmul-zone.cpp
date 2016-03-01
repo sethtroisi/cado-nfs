@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <string.h>
+#include <pthread.h>
 #include <vector>
 #include <utility>
 #include <sstream>
@@ -197,8 +198,8 @@ matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direc
 }
 
 #define CMAX 4
-#define ROWBATCH        128
-#define COLBATCH        16384
+#define ROWBATCH        8192
+#define COLBATCH        16200
 
 struct sort_jc {
     inline bool operator()(pair<uint32_t, int32_t> const& a, pair<uint32_t,int32_t> const& b) const {
@@ -280,8 +281,10 @@ void matmul_zone_data::build_cache(uint32_t * data)
             zavg += z.size();
         }
     }
-    sort(q.begin(), q.end(), zone::sorter());
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (nrows_t + 2 * mm->public_->ncoeffs));
+    sort(q.begin(), q.end(), zone::sorter());
+
+
     free(data);
     ostringstream os;
     for(int i = -CMAX ; i <= CMAX ; i++) {
@@ -523,10 +526,14 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
 void matmul_zone_data::report(double scale MAYBE_UNUSED)
 {
+    static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&lk);
+    unsigned int niter = public_->iteration[0] + public_->iteration[1];
     for(tmap_t::const_iterator it = tmap.begin() ; it != tmap.end() ; it++) {
-        printf("j0=%u [%u zones]: avg %.1f cycles/c [%" PRIu64 " coeffs]\n",
-                it->first, it->second.n, it->second.tt / scale / it->second.w, it->second.w);
+        printf("j0=%u [%u zones]: avg %.1f cycles/c [%.1f coeffs avg] - %.1f Mcycles/iter\n",
+                it->first, it->second.n / niter, it->second.tt / scale / it->second.w, (double) it->second.w / it->second.n, (double) it->second.tt / niter * 1.0e-6);
     }
+    pthread_mutex_unlock(&lk);
 }
 
 void matmul_zone_data::auxv(int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
