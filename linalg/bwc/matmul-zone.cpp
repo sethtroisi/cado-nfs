@@ -54,12 +54,151 @@ static inline uint64_t cputicks()
                 : "rdx");
         return r;
 }
-struct zone {
+
+/* {{{ some boilerplate related to saving cache files */
+
+struct cachefile {
+    FILE * f;
+    cachefile(FILE * f) : f(f) {}
+    template<typename T> struct basic_seq {
+        cachefile& out(cachefile& c, T const * t, size_t n) const {
+            for(size_t i = 0 ; i < n ; i++) c << t[i];
+            return c;
+        }
+        cachefile& in(cachefile& c, T * t, size_t n) {
+            for(size_t i = 0 ; i < n ; i++) c >> t[i];
+            return c;
+        }
+    };
+    template<typename T> struct seq : public basic_seq<T> {
+    };
+};
+
+template<> struct cachefile::seq<uint16_t> : public cachefile::basic_seq<uint16_t> {
+    typedef uint16_t T;
+    cachefile& in(cachefile& c, T * t, size_t n) {
+        MATMUL_COMMON_READ_MANY16(t, n, c.f);
+        return c;
+    }
+    cachefile& out(cachefile& c, T const * t, size_t n) const {
+        MATMUL_COMMON_WRITE_MANY16(t, n, c.f);
+        return c;
+    }
+};
+
+template<> struct cachefile::seq<uint32_t> : public cachefile::basic_seq<uint32_t> {
+    typedef uint32_t T;
+    cachefile& in(cachefile& c, T * t, size_t n) {
+        MATMUL_COMMON_READ_MANY32(t, n, c.f);
+        return c;
+    }
+    cachefile& out(cachefile& c, T const * t, size_t n) const {
+        MATMUL_COMMON_WRITE_MANY32(t, n, c.f);
+        return c;
+    }
+};
+
+template<> struct cachefile::seq<pair<int, uint32_t>> : public cachefile::basic_seq<pair<int, uint32_t>> {
+    typedef pair<int, uint32_t> T;
+    cachefile& in(cachefile& c, T * t, size_t n) {
+        MATMUL_COMMON_READ_MANY32(t, 2*n, c.f);
+        return c;
+    }
+    cachefile& out(cachefile& c, T const * t, size_t n) const {
+        MATMUL_COMMON_WRITE_MANY32(t, 2*n, c.f);
+        return c;
+    }
+};
+
+template<> struct cachefile::seq<pair<uint16_t, int32_t>> : public cachefile::basic_seq<pair<uint16_t, int32_t>> {
+    typedef pair<uint16_t, int32_t> T;
+    cachefile& in(cachefile& c, T * t, size_t n) {
+        MATMUL_COMMON_READ_MANY16(t, 3*n, c.f);
+        return c;
+    }
+    cachefile& out(cachefile& c, T const * t, size_t n) const {
+        MATMUL_COMMON_WRITE_MANY16(t, 3*n, c.f);
+        return c;
+    }
+};
+
+template<> struct cachefile::seq<pair<int, pair<uint32_t, int32_t>>> : public cachefile::basic_seq<pair<int, pair<uint32_t, int32_t>>> {
+    typedef pair<int, pair<uint32_t, int32_t>> T;
+    cachefile& in(cachefile& c, T * t, size_t n) {
+        MATMUL_COMMON_READ_MANY32(t, 3*n, c.f);
+        return c;
+    }
+    cachefile& out(cachefile& c, T const * t, size_t n) const {
+        MATMUL_COMMON_WRITE_MANY32(t, 3*n, c.f);
+        return c;
+    }
+};
+
+
+cachefile& operator>>(cachefile & c, uint32_t & x) {
+    MATMUL_COMMON_READ_ONE32(x, c.f);
+    return c;
+}
+
+cachefile& operator<<(cachefile & c, uint32_t const & x) {
+    MATMUL_COMMON_WRITE_ONE32(x, c.f);
+    return c;
+}
+
+cachefile& operator>>(cachefile & c, int32_t & x) {
+    MATMUL_COMMON_READ_ONE32(x, c.f);
+    return c;
+}
+
+cachefile& operator<<(cachefile & c, int32_t const & x) {
+    MATMUL_COMMON_WRITE_ONE32(x, c.f);
+    return c;
+}
+
+cachefile& operator>>(cachefile & c, uint64_t & x) {
+    MATMUL_COMMON_READ_ONE64(x, c.f);
+    return c;
+}
+
+cachefile& operator<<(cachefile & c, uint64_t const & x) {
+    MATMUL_COMMON_WRITE_ONE64(x, c.f);
+    return c;
+}
+
+cachefile& operator>>(cachefile & c, int64_t & x) {
+    MATMUL_COMMON_READ_ONE64(x, c.f);
+    return c;
+}
+
+cachefile& operator<<(cachefile & c, int64_t const & x) {
+    MATMUL_COMMON_WRITE_ONE64(x, c.f);
+    return c;
+}
+
+template<typename T> cachefile& operator>>(cachefile & c, cachefile::seq<T> & s);
+template<typename T> cachefile& operator<<(cachefile & c, cachefile::seq<T> const & s);
+
+template<typename T> cachefile& operator>>(cachefile & c, vector<T>&v)
+{
+    size_t size;
+    c >> size;
+    v.insert(v.end(), size, T());
+    return cachefile::seq<T>().in(c, &(v[0]), v.size());
+}
+template<typename T> cachefile& operator<<(cachefile & c, vector<T> const &v)
+{
+    c << v.size();
+    return cachefile::seq<T>().out(c, &(v[0]), v.size());
+}
+/* }}} */
+
+struct zone {/*{{{*/
     typedef vector<pair<int, uint32_t>> qpm_t;
     typedef vector<pair<int, pair<uint32_t, int32_t>>> qg_t;
     unsigned int i0, j0;
     qpm_t qp, qm;
     qg_t qg;
+    zone() { i0 = j0 = 0; }
     zone(unsigned int i0, unsigned int j0) : i0(i0), j0(j0) {}
     inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
     inline size_t size() const { return qp.size() + qm.size() + qg.size(); }
@@ -82,22 +221,30 @@ struct zone {
         std::sort(qm.begin(), qm.end(), sort_qpm());
         std::sort(qg.begin(), qg.end(), sort_qg());
     }
-#if 1
-    struct sorter {
+    struct rowmajor_sorter {/*{{{*/
         inline bool operator()(zone const& a, zone const& b) const {
             return a.i0 < b.i0 || (a.i0 == b.i0 && a.j0 < b.j0);
         }
-    };
-#else
-    struct sorter {
+    };/*}}}*/
+    struct colmajor_sorter {/*{{{*/
         inline bool operator()(zone const& a, zone const& b) const {
             return a.j0 < b.j0 || (a.j0 == b.j0 && a.i0 < b.i0);
         }
-    };
-#endif
+    };/*}}}*/
+
+    cachefile& cachefile_load(cachefile& c) {/*{{{*/
+        return c >> i0 >> j0 >> qp >> qm >> qg;
+    }/*}}}*/
+    cachefile& cachefile_save(cachefile& c) const {/*{{{*/
+        return c << i0 << j0 << qp << qm << qg;
+    }/*}}}*/
 };
 
-struct matmul_zone_data {
+inline cachefile& operator>>(cachefile& c, zone& z) { return z.cachefile_load(c); }
+inline cachefile& operator<<(cachefile& c, zone const & z) { return z.cachefile_save(c); }
+/*}}}*/
+
+struct matmul_zone_data {/*{{{*/
     /* repeat the fields from the public interface */
     struct matmul_public_s public_[1];
     /* now our private fields */
@@ -105,6 +252,7 @@ struct matmul_zone_data {
 
     vector<zone> q;
 
+    /* {{{ timing data */
     struct twn {
         uint64_t tt;
         size_t w;
@@ -114,7 +262,56 @@ struct matmul_zone_data {
 
     typedef map<unsigned int, twn> tmap_t;
     tmap_t tmap;
+    /* }}} */
 
+    /* {{{ dispatchers and combiners */
+
+    struct dispatcher_t : public vector<uint16_t> {
+        typedef vector<uint16_t> super;
+        unsigned int i0;
+        unsigned int j0;
+        /* a dispatcher contains: (col id)* */
+        cachefile& cachefile_load(cachefile& c) {/*{{{*/
+            return c >> i0 >> j0 >> (super&)*this;
+        }/*}}}*/
+        cachefile& cachefile_save(cachefile& c) const {/*{{{*/
+            return c << i0 << j0 << (super&)*this;
+        }/*}}}*/
+    };
+    struct combiner_t {
+        unsigned int i0;
+        unsigned int j0;
+        /* which buffer will we read from, and how many values, from
+         * where ?  */
+        size_t index, offset, count;
+        /* a combiner contains: (dest row id)* (duplicated indices for negative) */
+        typedef uint16_t main_value_type;
+        vector<main_value_type> main;
+        vector<pair<uint16_t, int32_t>> aux;
+        struct rowmajor_sorter {
+            inline bool operator()(combiner_t const& a, combiner_t const& b) const {
+                return a.i0 < b.i0 || (a.i0 == b.i0 && a.j0 < b.j0);
+            }
+        };
+        cachefile& cachefile_load(cachefile& c) {/*{{{*/
+            return c >> i0 >> j0
+                >> index >> offset >> count
+                >> main >> aux;
+        }/*}}}*/
+        cachefile& cachefile_save(cachefile& c) const {/*{{{*/
+            return c << i0 << j0
+                << index << offset << count
+                << main << aux;
+        }/*}}}*/
+    };
+
+    size_t maxmaxw;
+    size_t dispatch_strips;
+    vector<dispatcher_t> dispatchers;
+    vector<combiner_t> combiners;
+    /* }}} */
+
+    /* {{{ front-end */
     ~matmul_zone_data();
     matmul_zone_data(void* xx, param_list pl, int optimized_direction);
     void build_cache(uint32_t * data);
@@ -124,8 +321,17 @@ struct matmul_zone_data {
     void report(double scale MAYBE_UNUSED);
     void auxv(int op, va_list ap);
     void aux(int op, ...);
-};
+    /* }}} */
 
+    private:/*{{{*/
+    void create_dispatchers_and_combiners(vector<zone> & q1);
+    /*}}}*/
+};
+inline cachefile& operator>>(cachefile& c, matmul_zone_data::dispatcher_t& z) { return z.cachefile_load(c); }
+inline cachefile& operator<<(cachefile& c, matmul_zone_data::dispatcher_t const & z) { return z.cachefile_save(c); }
+inline cachefile& operator>>(cachefile& c, matmul_zone_data::combiner_t& z) { return z.cachefile_load(c); }
+inline cachefile& operator<<(cachefile& c, matmul_zone_data::combiner_t const & z) { return z.cachefile_save(c); }
+/*}}}*/
 /**************************************************************************/
 /*{{{ trampolines for C bindings */
 void MATMUL_NAME(clear)(matmul_ptr mm0)
@@ -178,36 +384,141 @@ void MATMUL_NAME(aux)(matmul_ptr mm0, int op, ...)
 
 /**************************************************************************/
 
-matmul_zone_data::~matmul_zone_data() {
+matmul_zone_data::~matmul_zone_data() {/*{{{*/
     matmul_common_clear(public_);
 }
-
-matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direction) : xab((abdst_field) xab)
+/*}}}*/
+matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direction) : xab((abdst_field) xab)/*{{{*/
 {
     memset(&public_, 0, sizeof(public_));
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
     public_->store_transposed = suggest;
     if (pl) {
-        param_list_parse_int(pl, "mm_store_transposed", 
+        param_list_parse_int(pl, "mm_store_transposed",
                 &public_->store_transposed);
         if (public_->store_transposed != suggest) {
             fprintf(stderr, "Warning, mm_store_transposed"
                     " overrides suggested matrix storage ordering\n");
-        }           
+        }
     }
 }
+/*}}}*/
 
 #define CMAX 4
 #define ROWBATCH        8192
 #define COLBATCH        16200
 
-struct sort_jc {
+struct sort_jc {/*{{{*/
     inline bool operator()(pair<uint32_t, int32_t> const& a, pair<uint32_t,int32_t> const& b) const {
         return a.first < b.first;
     }
 };
+/*}}}*/
+void merge_dispatchers(vector<matmul_zone_data::dispatcher_t>& all, size_t maxmaxw)/*{{{*/
+{
+    typedef matmul_zone_data::dispatcher_t dispatcher_t;
+    vector<dispatcher_t> merged;
+    for(size_t k0 = 0, k1; k0 < all.size() ; ) {
+        /* recompute maxw, since we haven't kept track */
+        size_t maxw = 0;
+        unsigned int j0 = all[k0].j0;
+        for(k1 = k0 ; k1 < all.size() && all[k1].j0 == all[k0].j0 ; k1++) {
+            maxw = max(maxw, all[k1].size());
+        }
+        /* the range [k0..k1[ has dispatchers for the same set of
+         * columns. */
+        unsigned int group = maxmaxw / maxw;
+        unsigned int nm = 0;
+        size_t old_k0 = k0;
+        for( ; k0 < k1 ; ) {
+            dispatcher_t D;
+            D.i0 = all[k0].i0;
+            D.j0 = all[k0].j0;
+            /* concatenate. */
+            for(unsigned int k2 = 0 ; k2 < group && k0 < k1 ; k2++, k0++) {
+                D.insert(D.end(), all[k0].begin(), all[k0].end());
+                /* free this memory as early as we can */
+                all[k0].clear();
+                /* XXX at this point, combiner must get the info that it
+                 * should read in the buffer from index D.size()
+                 */
+            }
+            merged.push_back(D);
+            nm++;
+        }
+        printf("j0=%u: maxw = %zu ; group %u together. Split %zd dispatchers [%zu..%zu[ into %u dispatchers\n", j0, maxw, group, k1 - old_k0, old_k0, k1, nm);
+    }
+    printf("We now have %zu dispatchers, combined from %zu original\n",
+            merged.size(), all.size());
+    all.swap(merged);
+}
+/*}}}*/
+void matmul_zone_data::create_dispatchers_and_combiners(vector<zone> & q1)/*{{{*/
+{
+    /* q1 has vertical strips which are *not* the first strip */
+    sort(q1.begin(), q1.end(), zone::colmajor_sorter());
 
-void matmul_zone_data::build_cache(uint32_t * data)
+    maxmaxw = 0;
+    for(size_t k0 = 0, k1; k0 < q1.size() ; k0 = k1) {
+        /* find the max weight of cells for this j0 */
+        /* here, weight is the sum of absolute values. Oh, and we merge
+         * qp and qm, too. */
+        size_t maxw = 0;
+        for(k1 = k0 ; k1 < q1.size() && q1[k1].j0 == q1[k0].j0 ; k1++) {
+            /* qp and qm already have repeated coeffs. For qg, we'll
+             * store coeffs just at the end of the array */
+            maxw = max(maxw, q1[k1].size());
+        }
+        maxmaxw = max(maxmaxw, maxw);
+    }
+
+    /* now prepare the pre-reading of source coeffs into the buffers. We
+     * need one array which directs data in the first pass, and another
+     * one for the second pass.
+     */
+
+    for(size_t k = 0 ; k < q1.size() ; k++) {
+        dispatcher_t D;
+        combiner_t C;
+        D.i0 = C.i0 = q1[k].i0;
+        D.j0 = C.j0 = q1[k].j0;
+        for(size_t i = 0 ; i < q1[k].qp.size() ; i++) {
+            uint16_t col_id = q1[k].qp[i].second;
+            uint16_t destrow_id = q1[k].qp[i].first;
+            D.push_back(col_id);
+            C.main.push_back(destrow_id);
+        }
+        for(size_t i = 0 ; i < q1[k].qm.size() ; i++) {
+            uint16_t col_id = q1[k].qm[i].second;
+            uint16_t destrow_id = q1[k].qm[i].first;
+            D.push_back(col_id);
+            /* specific offset for negative coefficients */
+            C.main.push_back(destrow_id + ROWBATCH);
+        }
+        for(size_t i = 0 ; i < q1[k].qg.size() ; i++) {
+            uint16_t col_id = q1[k].qg[i].second.first;
+            uint16_t destrow_id = q1[k].qg[i].first;
+            int32_t coeff = q1[k].qg[i].second.second;
+            D.push_back(col_id);
+            C.aux.push_back(make_pair(destrow_id, coeff));
+        }
+        /* XXX I think that D is sorted column-major, right ? */
+        dispatchers.push_back(D);
+        combiners.push_back(C);
+    }
+    q1.clear();
+
+    /* We now merge dispatchers */
+    merge_dispatchers(dispatchers, maxmaxw);
+
+    /* and sort combiners so that they are organized row-major */
+    /* notice that the overall weight of combiners may be a concern in
+     * the end.
+     */
+    sort(combiners.begin(), combiners.end(), combiner_t::rowmajor_sorter());
+}
+/*}}}*/
+void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
 {
     matmul_zone_data * mm = this;
 
@@ -218,7 +529,7 @@ void matmul_zone_data::build_cache(uint32_t * data)
 #if COLBATCH
     unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
 #endif
-    
+
     uint32_t * ptr = data;
 
     /* count coefficients */
@@ -226,6 +537,8 @@ void matmul_zone_data::build_cache(uint32_t * data)
 
     uint64_t ccount[2*CMAX + 1] = {0,};
     double zavg = 0;
+
+    vector<zone> q1;
 
     for(unsigned int i0 = 0 ; i0 < nrows_t ; i0 += ROWBATCH) {
         uint32_t * pp[ROWBATCH + 1];
@@ -246,20 +559,13 @@ void matmul_zone_data::build_cache(uint32_t * data)
             }
         }
         ptr = pp[ROWBATCH];
-#if COLBATCH
         for(unsigned int j0 = 0 ; j0 < ncols_t ; j0 += COLBATCH) {
-#else
-        {
-            unsigned int j0 = 0;
-#endif
             zone z(i0, j0);
             for(unsigned int k = 0 ; k < ROWBATCH ; k++) {
                 for( ; cc[k] < pp[k+1] ; cc[k] += 2) {
                     uint32_t j = cc[k][0] - j0;
                     int32_t c = cc[k][1];
-#if COLBATCH
                     if (j >= COLBATCH) break;
-#endif
                     if (c < 0 && c >= -CMAX) {
                         ccount[CMAX + c]++;
                         for( ; c++ ; ) {
@@ -277,13 +583,23 @@ void matmul_zone_data::build_cache(uint32_t * data)
                 }
             }
             z.sort();
-            if (!z.empty()) q.push_back(z);
+            if (!z.empty()) {
+                if (j0) {
+                    q1.push_back(z);
+                    q.push_back(z);
+                } else {
+                    q.push_back(z);
+                }
+            }
             zavg += z.size();
         }
     }
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (nrows_t + 2 * mm->public_->ncoeffs));
-    sort(q.begin(), q.end(), zone::sorter());
+    sort(q.begin(), q.end(), zone::rowmajor_sorter());
 
+    /* each zone in q1 becomes a dispatcher and a combiner */
+    /* The first pass sets bucket_id to zero */
+    create_dispatchers_and_combiners(q1);
 
     free(data);
     ostringstream os;
@@ -292,30 +608,14 @@ void matmul_zone_data::build_cache(uint32_t * data)
     }
     printf("Stats: [%" PRIu64 "] %s, %zu zones of average weight %.1f\n", mm->public_->ncoeffs, os.str().c_str(), q.size(), zavg / q.size());
 }
-
+/*}}}*/
+/* cache load and save {{{ */
 int matmul_zone_data::reload_cache()
 {
     FILE * f = matmul_common_reload_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
     if (f == NULL) { return 0; }
-
-    size_t qsize;
-
-    MATMUL_COMMON_READ_ONE32(qsize, f);
-    q.insert(q.end(), qsize, zone(0,0));
-    for(size_t i = 0 ; i < qsize ; i++) {
-        size_t qpsize, qmsize, qgsize;
-        MATMUL_COMMON_READ_ONE32(q[i].i0, f);
-        MATMUL_COMMON_READ_ONE32(q[i].j0, f);
-        MATMUL_COMMON_READ_ONE32(qpsize, f);
-        MATMUL_COMMON_READ_ONE32(qmsize, f);
-        MATMUL_COMMON_READ_ONE32(qgsize, f);
-        q[i].qp.insert(q[i].qp.end(), qpsize, zone::qpm_t::value_type());
-        q[i].qm.insert(q[i].qm.end(), qmsize, zone::qpm_t::value_type());
-        q[i].qg.insert(q[i].qg.end(), qgsize, zone::qg_t::value_type());
-        MATMUL_COMMON_READ_MANY32(&(q[i].qp[0]), 2 * q[i].qp.size(), f);
-        MATMUL_COMMON_READ_MANY32(&(q[i].qm[0]), 2 * q[i].qm.size(), f);
-        MATMUL_COMMON_READ_MANY32(&(q[i].qg[0]), 3 * q[i].qg.size(), f);
-    }
+    cachefile c(f);
+    c >> q;
     fclose(f);
 
     return 1;
@@ -324,20 +624,11 @@ int matmul_zone_data::reload_cache()
 void matmul_zone_data::save_cache()
 {
     FILE * f = matmul_common_save_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
-
-    MATMUL_COMMON_WRITE_ONE32(q.size(), f);
-    for(size_t i = 0 ; i < q.size() ; i++) {
-        MATMUL_COMMON_WRITE_ONE32(q[i].i0, f);
-        MATMUL_COMMON_WRITE_ONE32(q[i].j0, f);
-        MATMUL_COMMON_WRITE_ONE32(q[i].qp.size(), f);
-        MATMUL_COMMON_WRITE_ONE32(q[i].qm.size(), f);
-        MATMUL_COMMON_WRITE_ONE32(q[i].qg.size(), f);
-        MATMUL_COMMON_WRITE_MANY32(&(q[i].qp[0]), 2 * q[i].qp.size(), f);
-        MATMUL_COMMON_WRITE_MANY32(&(q[i].qm[0]), 2 * q[i].qm.size(), f);
-        MATMUL_COMMON_WRITE_MANY32(&(q[i].qg[0]), 3 * q[i].qg.size(), f);
-    }
+    cachefile c(f);
+    c << q;
     fclose(f);
 }
+/* }}} */
 
 void zone::operator()(abdst_field x, abdst_vec_ur tdst, absrc_vec tsrc) const
 {
@@ -392,37 +683,75 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
      * (store_transposed == 0) or column-major (store_transposed == 1)
      */
 
-    /* TODO: missing in mpfq   elt_ur_{add,sub}_elt
+    /* TODO: missing in mpfq elt_ur_{add,sub}_elt
      */
     if (d == !mm->public_->store_transposed) {
+        /* We need to find the position of all dispatchers */
+        vector<vector<dispatcher_t>::const_iterator> start_points;
+        vector<vector<dispatcher_t>::const_iterator> current_points;
+        vector<abvec_ur> current_buffers;
+        vector<abvec_ur> current_buffer_pointers;
+
+        {       /* prepare dispatcher heads and buffers {{{ */
+            unsigned int last_j0 = UINT_MAX;
+            for(vector<dispatcher_t>::const_iterator v = dispatchers.begin() ; v != dispatchers.end() ; v++) {
+                if (v->j0 != last_j0) {
+                    start_points.push_back(v);
+                    current_points.push_back(v);
+                    abvec_ur buf;
+                    abvec_ur_init(x, &buf, maxmaxw);
+                    current_buffers.push_back(buf);
+                    current_buffer_pointers.push_back(buf);
+                    last_j0 = v->j0;
+                }
+            }
+            start_points.push_back(dispatchers.end());
+            printf("Found %zu different dispatcher strips\n", current_points.size());
+        } /* }}} */
+
         abvec_ur tdst ;
         abvec_ur_init(x, &tdst, ROWBATCH);
 
         abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop");
-        unsigned int last_i0 = UINT_MAX;
-        unsigned int active = 0;
 
+        /*
         unsigned int last_j0 = UINT_MAX;
         twn current;
+        */
         for(size_t k = 0 ; k < q.size() ; k++) {
             zone const& z = q[k];
-            if (z.i0 != last_i0) {
-                if (last_i0 != UINT_MAX) {
-                    for(unsigned int i = 0 ; i < active ; i++) {
-                        abreduce(x, 
-                                abvec_coeff_ptr(x, dst, last_i0 + i),
-                                abvec_ur_coeff_ptr(x, tdst, i));
-                    }
-                }
-                last_i0 = z.i0;
-                active = MIN(ROWBATCH, mm->public_->dim[!d] - z.i0);
-                for(unsigned int i = 0 ; i < active ; i++) {
-                    abelt_ur_set_elt(x,
-                            abvec_ur_coeff_ptr(x, tdst, i),
-                            abvec_coeff_ptr_const(x, dst, z.i0 + i));
-                }
+
+            /* loop through all dispatcher strips, and pre-fill buffers if
+             * we happen to need it. */
+
+#if 0
+            for(size_t i = 0 ; i < current_points.size() ; i++) {
+                /* If this dispatcher strip is done, surely we don't want
+                 * to check. Otherwise, the check is whether the ``to be
+                 * done'' value i0 is ours */
+                if (current_points[i] == start_points[i + 1]) continue;
+                if (current_points[i]->i0 > z.i0) continue;
+                /* right, so we can fill the buffer. Let's go. */
+                absrc_vec tsrc = abvec_subvec_const(x, src, current_points[i]->j0);
+                /* oh, but we need to find the offsets of each bucket... */
+
+
+
             }
+#endif
+
+
+
+
+
+            unsigned int active = MIN(ROWBATCH, mm->public_->dim[!d] - z.i0);
+            for(unsigned int i = 0 ; i < active ; i++) {
+                abelt_ur_set_elt(x,
+                        abvec_ur_coeff_ptr(x, tdst, i),
+                        abvec_coeff_ptr_const(x, dst, z.i0 + i));
+            }
+            /*
             if (z.j0 != last_j0) {
                 if (last_j0 != UINT_MAX) {
                     current.tt += cputicks();
@@ -440,16 +769,17 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 current.w = z.size();
                 current.n = 1;
             }
+            */
             absrc_vec tsrc = abvec_subvec_const(x, src, z.j0);
             z(x, tdst, tsrc);
-        }
-        if (last_i0 != UINT_MAX) {
+
             for(unsigned int i = 0 ; i < active ; i++) {
-                abreduce(x, 
-                        abvec_coeff_ptr(x, dst, last_i0 + i),
+                abreduce(x,
+                        abvec_coeff_ptr(x, dst, z.i0 + i),
                         abvec_ur_coeff_ptr(x, tdst, i));
             }
         }
+        /*
         if (last_j0 != UINT_MAX) {
             current.tt += cputicks();
             tmap_t::iterator it = tmap.find(last_j0);
@@ -461,6 +791,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 it->second.n++;
             }
         }
+        */
         ASM_COMMENT("end of critical loop");
         abvec_ur_clear(x, &tdst, ROWBATCH);
     } else {
