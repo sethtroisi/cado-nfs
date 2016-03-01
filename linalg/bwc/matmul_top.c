@@ -2758,6 +2758,13 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
     if (m->bfile) free(m->bfile);
 }
 
+void matmul_top_report(matmul_top_data_ptr mmt, double scale)
+{
+    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
+        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
+        matmul_report(Mloc->mm, scale);
+    }
+}
 
 void matmul_top_clear(matmul_top_data_ptr mmt)
 {

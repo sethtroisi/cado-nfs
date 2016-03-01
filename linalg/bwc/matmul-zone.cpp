@@ -10,6 +10,7 @@
 #include <utility>
 #include <sstream>
 #include <algorithm>
+#include <map>
 
 #include "bwc_config.h"
 #include "matmul.h"
@@ -40,6 +41,18 @@
 
 using namespace std;
 
+static inline uint64_t cputicks()
+{
+        uint64_t r;
+        __asm__ __volatile__(
+                "rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rdx, %%rax\n\t"
+                : "=a"(r)
+                :
+                : "rdx");
+        return r;
+}
 struct zone {
     typedef vector<pair<int, uint32_t>> qpm_t;
     typedef vector<pair<int, pair<uint32_t, int32_t>>> qg_t;
@@ -48,6 +61,7 @@ struct zone {
     qg_t qg;
     zone(unsigned int i0, unsigned int j0) : i0(i0), j0(j0) {}
     inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
+    inline size_t size() const { return qp.size() + qm.size() + qg.size(); }
     void operator()(abdst_field x, abdst_vec_ur tdst, absrc_vec tsrc) const;
 
     struct sort_qpm {
@@ -69,16 +83,16 @@ struct zone {
     }
 #if 1
     struct sorter {
-        inline bool operator()(zone const& a, zone const& b) {
+        inline bool operator()(zone const& a, zone const& b) const {
             return a.i0 < b.i0 || (a.i0 == b.i0 && a.j0 < b.j0);
         }
     };
 #else
     struct sorter {
-        inline bool operator()(zone const& a, zone const& b) {
+        inline bool operator()(zone const& a, zone const& b) const {
             return a.j0 < b.j0 || (a.j0 == b.j0 && a.i0 < b.i0);
         }
-    }
+    };
 #endif
 };
 
@@ -89,6 +103,16 @@ struct matmul_zone_data {
     abdst_field xab;
 
     vector<zone> q;
+
+    struct twn {
+        uint64_t tt;
+        size_t w;
+        unsigned int n;
+        // twn() : tt(0), w(0), n(0) {}
+    };
+
+    typedef map<unsigned int, twn> tmap_t;
+    tmap_t tmap;
 
     ~matmul_zone_data();
     matmul_zone_data(void* xx, param_list pl, int optimized_direction);
@@ -174,7 +198,7 @@ matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direc
 
 #define CMAX 4
 #define ROWBATCH        128
-#define COLBATCH        0
+#define COLBATCH        16384
 
 struct sort_jc {
     inline bool operator()(pair<uint32_t, int32_t> const& a, pair<uint32_t,int32_t> const& b) const {
@@ -200,6 +224,7 @@ void matmul_zone_data::build_cache(uint32_t * data)
     mm->public_->ncoeffs = 0;
 
     uint64_t ccount[2*CMAX + 1] = {0,};
+    double zavg = 0;
 
     for(unsigned int i0 = 0 ; i0 < nrows_t ; i0 += ROWBATCH) {
         uint32_t * pp[ROWBATCH + 1];
@@ -252,6 +277,7 @@ void matmul_zone_data::build_cache(uint32_t * data)
             }
             z.sort();
             if (!z.empty()) q.push_back(z);
+            zavg += z.size();
         }
     }
     sort(q.begin(), q.end(), zone::sorter());
@@ -261,7 +287,7 @@ void matmul_zone_data::build_cache(uint32_t * data)
     for(int i = -CMAX ; i <= CMAX ; i++) {
         os << " " << i << ":" << (double) ccount[CMAX + i] / nrows_t;
     }
-    printf("Stats: [%" PRIu64 "] %s\n", mm->public_->ncoeffs, os.str().c_str());
+    printf("Stats: [%" PRIu64 "] %s, %zu zones of average weight %.1f\n", mm->public_->ncoeffs, os.str().c_str(), q.size(), zavg / q.size());
 }
 
 int matmul_zone_data::reload_cache()
@@ -373,6 +399,9 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         ASM_COMMENT("critical loop");
         unsigned int last_i0 = UINT_MAX;
         unsigned int active = 0;
+
+        unsigned int last_j0 = UINT_MAX;
+        twn current;
         for(size_t k = 0 ; k < q.size() ; k++) {
             zone const& z = q[k];
             if (z.i0 != last_i0) {
@@ -391,6 +420,23 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                             abvec_coeff_ptr_const(x, dst, z.i0 + i));
                 }
             }
+            if (z.j0 != last_j0) {
+                if (last_j0 != UINT_MAX) {
+                    current.tt += cputicks();
+                    tmap_t::iterator it = tmap.find(last_j0);
+                    if (it == tmap.end()) {
+                        tmap.insert(make_pair(last_j0, current));
+                    } else {
+                        it->second.tt += current.tt;
+                        it->second.w += current.w;
+                        it->second.n++;
+                    }
+                }
+                last_j0 = z.j0;
+                current.tt = -cputicks();
+                current.w = z.size();
+                current.n = 1;
+            }
             absrc_vec tsrc = abvec_subvec_const(x, src, z.j0);
             z(x, tdst, tsrc);
         }
@@ -399,6 +445,17 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 abreduce(x, 
                         abvec_coeff_ptr(x, dst, last_i0 + i),
                         abvec_ur_coeff_ptr(x, tdst, i));
+            }
+        }
+        if (last_j0 != UINT_MAX) {
+            current.tt += cputicks();
+            tmap_t::iterator it = tmap.find(last_j0);
+            if (it == tmap.end()) {
+                tmap.insert(make_pair(last_j0, current));
+            } else {
+                it->second.tt += current.tt;
+                it->second.w += current.w;
+                it->second.n++;
             }
         }
         ASM_COMMENT("end of critical loop");
@@ -466,6 +523,10 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
 void matmul_zone_data::report(double scale MAYBE_UNUSED)
 {
+    for(tmap_t::const_iterator it = tmap.begin() ; it != tmap.end() ; it++) {
+        printf("j0=%u [%u zones]: avg %.1f cycles/c [%" PRIu64 " coeffs]\n",
+                it->first, it->second.n, it->second.tt / scale / it->second.w, it->second.w);
+    }
 }
 
 void matmul_zone_data::auxv(int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
