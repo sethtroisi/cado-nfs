@@ -424,7 +424,7 @@ sqrt/CMakeLists.txt
 sqrt/Makefile
 sqrt/checkdep.c
 sqrt/crtalgsqrt.c
-sqrt/gmp-hacks.h
+utils/gmp-hacks.h
 sqrt/knapsack.c
 sqrt/knapsack.h
 sqrt/polyroots.c
@@ -1225,3 +1225,5 @@ tests/linalg/bwc/test_bl_extraction.c
 scripts/build_environment.sh
 scripts/cadofactor/toplevel.py
 scripts/realpath.sh
+linalg/bwc/arith-modp.hpp
+tests/linalg/bwc/test-arith-modp.cpp

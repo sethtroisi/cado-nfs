@@ -345,3 +345,4 @@ cado_define_test(TEST_NAME test-blocklanczos-staged
     no_save_cache=1 interval=10 nullspace=left
     TARGET_DEPENDENCIES test-blocklanczos_dependencies)
 
+cado_define_test(test-arith-modp.cpp LIBRARIES tests)

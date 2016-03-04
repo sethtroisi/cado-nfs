@@ -1,6 +1,8 @@
 #ifndef GMP_HACKS_H_
 #define GMP_HACKS_H_
 
+#include <string.h>
+
 /* TODO: remove this. It's only here by lack of something better for the
  * needs of crtalgsqrt. */
 
