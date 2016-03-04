@@ -118,7 +118,6 @@ int main(int argc, const char * argv[])
     do_tests< gfp<7, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<8, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<9, 2>, SUMMANDS, CBOUND>(iter);
-
     tests_common_clear();
 }
 
