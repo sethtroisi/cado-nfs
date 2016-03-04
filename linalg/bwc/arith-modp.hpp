@@ -6,7 +6,7 @@
 #include "gmp-hacks.h"
 #include "macros.h"
 
-#define  DEBUG_INFINITE_LOOPS
+#define  xxxDEBUG_INFINITE_LOOPS
 
 namespace arith_modp_details {
     template<bool x> struct is_true {};
@@ -274,53 +274,411 @@ namespace arith_modp_details {
 
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
     /* Now some specializations */
-    template<>
-        struct gfp<1, 1> : public gfp_middle<1,1,gfp<1,1> > {
-            static inline void add(elt_ur & dst, elt const & src)
-            {
-                asm("# gfp<1, 1>::add\n"
-                    "addq %q2, %q0\n"
-                    "adcq $0x0, %q1\n"
-                    : "+r"(dst.x[0]), "+r"(dst.x[1])
-                    : "rm"(src.x[0])
-                   );
-            }
 
-            static inline void sub(elt_ur & dst, elt const & src)
-            {
-                asm("# gfp<1, 1>::sub\n"
-                    "subq %q2, %q0\n"
-                    "sbbq $0x0, %q1\n"
-                    : "+r"(dst.x[0]), "+r"(dst.x[1])
-                    : "rm"(src.x[0])
-                   );
-            }
+    /* {{{ gfp<1,1> */
+    template<> struct gfp<1, 1> : public gfp_middle<1,1,gfp<1,1> > {
+        static inline void add(elt_ur & dst, elt const & src)
+        {
+            asm("# gfp<1, 1>::add\n"
+                "addq %q2, %q0\n"
+                "adcq $0x0, %q1\n"
+                : "+r"(dst.x[0]), "+r"(dst.x[1])
+                : "rm"(src.x[0])
+               );
+        }
 
-            static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x)
-            {
-                mp_limb_t foo, bar;
-                asm("# gfp<1, 1>::addmul\n"
-                    "mulq    %[mult]\n"
-                    "addq    %%rax, %[z0]\n"
-                    "adcq    $0, %%rdx\n"
-                    "addq    %%rdx, %[z1]\n"
-                : "=a"(foo), "=d"(bar), [z0]"+rm"(dst.x[0]), [z1]"+rm"(dst.x[1])
-                : "0"(src.x[0]), [mult]"r1m"(x)
-                );
-            }
-            static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x)
-            {
-                mp_limb_t foo, bar;
-                asm("# gfp<1, 1>::submul\n"
-                    "mulq    %[mult]\n"
-                    "subq    %%rax, %[z0]\n"
-                    "adcq    $0, %%rdx\n"
-                    "subq    %%rdx, %[z1]\n"
-                : "=a"(foo), "=d"(bar), [z0]"+rm"(dst.x[0]), [z1]"+rm"(dst.x[1])
-                : "0"(src.x[0]), [mult]"r1m"(x)
-                );
-            }
-        };
+        static inline void sub(elt_ur & dst, elt const & src)
+        {
+            asm("# gfp<1, 1>::sub\n"
+                "subq %q2, %q0\n"
+                "sbbq $0x0, %q1\n"
+                : "+r"(dst.x[0]), "+r"(dst.x[1])
+                : "rm"(src.x[0])
+               );
+        }
+
+        static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x)
+        {
+            mp_limb_t foo, bar;
+            asm("# gfp<1, 1>::addmul\n"
+                "mulq   %[mult]\n"
+                "addq   %%rax, %[z0]\n"
+                "adcq   $0, %%rdx\n"
+                "addq   %%rdx, %[z1]\n"
+            : "=a"(foo), "=d"(bar), [z0]"+rm"(dst.x[0]), [z1]"+rm"(dst.x[1])
+            : "0"(src.x[0]), [mult]"r1m"(x)
+            );
+        }
+        static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x)
+        {
+            mp_limb_t foo, bar;
+            asm("# gfp<1, 1>::submul\n"
+                "mulq   %[mult]\n"
+                "subq   %%rax, %[z0]\n"
+                "adcq   $0, %%rdx\n"
+                "subq   %%rdx, %[z1]\n"
+            : "=a"(foo), "=d"(bar), [z0]"+rm"(dst.x[0]), [z1]"+rm"(dst.x[1])
+            : "0"(src.x[0]), [mult]"r1m"(x)
+            );
+        }
+    };
+    /* }}} */
+
+    /* {{{ gfp<2,1> */
+    template<> struct gfp<2, 1> : public gfp_middle<2,1,gfp<2,1> > {
+        static inline void add(elt_ur & dst, elt const & src) {
+            asm("# gfp<2, 1>::add\n"
+                "addq %q[s0], %q[d0]\n"
+                "adcq %q[s1], %q[d1]\n"
+                "adcq $0x0, %q[d2]\n"
+                : [d0]"+rm"(dst.x[0]), [d1]"+rm"(dst.x[1]), [d2]"+rm"(dst.x[2])
+                : [s0]"r"(src.x[0]), [s1]"r"(src.x[1])
+               );
+        }
+
+        static inline void sub(elt_ur & dst, elt const & src) {
+            asm("# gfp<2, 1>::sub\n"
+                "subq %q[s0], %q[d0]\n"
+                "sbbq %q[s1], %q[d1]\n"
+                "sbbq $0x0, %q[d2]\n"
+                : [d0]"+rm"(dst.x[0]), [d1]"+rm"(dst.x[1]), [d2]"+rm"(dst.x[2])
+                : [s0]"r"(src.x[0]), [s1]"r"(src.x[1])
+               );
+        }
+
+        static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x) {
+            mp_limb_t foo, bar;
+            asm("# gfp<2, 1>::addmul\n"
+                "mulq   %[mult]\n"
+                "addq   %%rax, %[z0]\n"
+                "adcq   $0, %%rdx\n"
+                "movq   %%rdx, %%rcx\n"
+                "movq   %[s1], %%rax\n"
+                "mulq   %[mult]\n"
+                "addq   %%rcx, %%rax\n"
+                "adcq   $0, %%rdx\n"
+                "addq   %%rax, %[z1]\n"
+                "adcq   $0, %%rdx\n"
+                "addq   %%rdx, %[z2]\n"
+            : "=&a"(foo), "=&d"(bar),
+            [z0]"+rm"(dst.x[0]),
+            [z1]"+rm"(dst.x[1]),
+            [z2]"+rm"(dst.x[2])
+            : [s0]"0"(src.x[0]), [s1]"rm"(src.x[1]), [mult]"rm"(x)
+            : "rcx"
+            );
+        }
+
+        static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x) {
+            mp_limb_t foo, bar;
+            asm("# gfp<2, 1>::submul\n"
+                "mulq   %[mult]\n"
+                "subq   %%rax, %[z0]\n"
+                "adcq   $0, %%rdx\n"
+                "movq   %%rdx, %%rcx\n"
+                "movq   %[s1], %%rax\n"
+                "mulq   %[mult]\n"
+                "addq   %%rcx, %%rax\n"
+                "adcq   $0, %%rdx\n"
+                "subq   %%rax, %[z1]\n"
+                "adcq   $0, %%rdx\n"
+                "subq   %%rdx, %[z2]\n"
+            : "=&a"(foo), "=&d"(bar),
+            [z0]"+rm"(dst.x[0]),
+            [z1]"+rm"(dst.x[1]),
+            [z2]"+rm"(dst.x[2])
+            : [s0]"0"(src.x[0]), [s1]"rm"(src.x[1]), [mult]"rm"(x)
+            : "rcx"
+            );
+        }
+    };
+    /* }}} */
+
+    /* {{{ macros for assembly for further specializations */
+#define FEED_IN_WITH_S0_IN_RAX(in1, r0, r1) \
+        /* status: s0 in rax */                                \
+        "mulq   %[mult]\n"             /* rdx:rax = s0 * v */  \
+        "movq   %%rax, %%" #r0 "\n"    /* lo contrib to d1 */  \
+        "movq   " in1 ", %%rax\n"        /* load s1          */  \
+        "movq   %%rdx, %%" #r1 "\n"    /* hi contrib to d1 */
+#define FEED_IN(in0, in1, r0, r1) \
+        "movq   " in0 ", %%rax\n"       \
+        FEED_IN_WITH_S0_IN_RAX(in1, r0, r1)
+#define INNER_MUL(op, out, in, r0, r1, r2)   \
+        /* status: r1:r0 to be added to d_{i+1}:d_i, rax = s_{i+1} */     \
+        "xorq   %%" #r2 ", %%" #r2 "\n"                                   \
+        "mulq   %[mult]\n"                   /* rdx:rax = s_{i+1} * v */  \
+        "" #op "q %%" #r0 ", " out "\n" /* store d_i             */   \
+        "adcq   %%rax, %%" #r1 "\n"         /* lo contrib to d_{i+1} */   \
+        "adcq   %%rdx, %%" #r2 "\n"         /* hi contrib to d_{i+2} */   \
+        "movq   " in ", %%rax\n"       /* load s_{i+2}          */
+#define FINISH(op, opc, out0, out1, out2, r0, r1) \
+        /* r1:r0 to be added to d_{i+1}:d_i ; rax = s_{i+2} */	\
+        "mulq   %[mult]\n"                   			\
+        "" #op "q   %%" #r0 ", " out0 "\n"  			\
+        "adcq   %%rax, %%" #r1 "\n"				\
+        "adcq   $0x0, %%rdx\n"					\
+        "" #op "q   %%" #r1 ", " out1 "\n" 			\
+        "" #opc "q   %%rdx, " out2 "\n" 
+    /* }}} */
+    /* {{{ this macro actually exposes the specialization in itself */
+#define EXPOSE_SPECIALIZATION(n)					\
+    template<> struct gfp<n, 1> : public gfp_middle<n,1,gfp<n,1> > {	\
+        static inline void add(elt_ur & dst, elt const & src) {		\
+            asm("# gfp<" #n ", 1>::add\n"				\
+                    ADDSUB_CODE ## n(add, adc)				\
+               );							\
+        }								\
+        static inline void sub(elt_ur & dst, elt const & src) {		\
+            asm("# gfp<4, 1>::sub\n"					\
+                    ADDSUB_CODE ## n(sub, sbb)				\
+               );							\
+        }								\
+        static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x) {\
+            mp_limb_t foo MAYBE_UNUSED;					\
+            asm ("# gfp<" #n ", 1>::addmul\n"				\
+                    ADDSUBMUL_CODE ## n(add, adc)			\
+            );								\
+        }								\
+        static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x) {\
+            mp_limb_t foo MAYBE_UNUSED;					\
+            asm("# gfp<" #n ", 1>::submul\n"				\
+                    ADDSUBMUL_CODE ## n(sub, sbb)			\
+            );								\
+        }								\
+    }
+    /* }}} */
+
+    /* {{{ code for gfp<3, 1> */
+#define ADDSUBMUL_CODE3(op, opc)					\
+                FEED_IN_WITH_S0_IN_RAX("%[s1]", r8, r9)			\
+                INNER_MUL(op, "%[z0]", "%[s2]", r8, r9, r10)		\
+                FINISH(op, opc, "%[z1]", "%[z2]", "%[z3]", r9, r10)	\
+                : "=&a"(foo),                                           \
+                    [z0]"+rm"(dst.x[0]),				\
+                    [z1]"+rm"(dst.x[1]),				\
+                    [z2]"+rm"(dst.x[2]),				\
+                    [z3]"+rm"(dst.x[3])					\
+                :							\
+                    [s0]"0"(src.x[0]),					\
+                    [s1]"rm"(src.x[1]),					\
+                    [s2]"rm"(src.x[2]),					\
+                    [mult]"rm"(x)					\
+                : "r8", "r9", "r10", "rdx"
+
+#define ADDSUB_CODE3(op, opc)   \
+        "" #op  "q %q[s0], %q[d0]\n"					\
+        "" #opc "q %q[s1], %q[d1]\n"					\
+        "" #opc "q %q[s2], %q[d2]\n"					\
+        "" #opc "q $0x0, %q[d3]\n"					\
+                :							\
+                [d0]"+rm"(dst.x[0]),					\
+                [d1]"+rm"(dst.x[1]),					\
+                [d2]"+rm"(dst.x[2]),					\
+                [d3]"+rm"(dst.x[3])					\
+                :							\
+                [s0]"r"(src.x[0]),					\
+                [s1]"r"(src.x[1]),					\
+                [s2]"r"(src.x[2])
+
+    EXPOSE_SPECIALIZATION(3);
+    /* }}} */
+
+    /* {{{ code for gfp<4, 1> */
+    /*
+#define ADDSUBMUL_CODE4(op, opc)					\
+                FEED_IN_WITH_S0_IN_RAX("%[s1]", r8, r9)			\
+                INNER_MUL(op, "%[z0]", "%[s2]", r8, r9, r10)		\
+                INNER_MUL(op, "%[z1]", "%[s3]", r9, r10, r11)		\
+                FINISH(op, opc, "%[z2]", "%[z3]", "%[z4]", r10, r11)	\
+                : "=&a"(foo),                                           \
+                    [z0]"+rm"(dst.x[0]),				\
+                    [z1]"+rm"(dst.x[1]),				\
+                    [z2]"+rm"(dst.x[2]),				\
+                    [z3]"+rm"(dst.x[3]),				\
+                    [z4]"+rm"(dst.x[4])					\
+                :							\
+                    [s0]"0"(src.x[0]),					\
+                    [s1]"rm"(src.x[1]),					\
+                    [s2]"rm"(src.x[2]),					\
+                    [s3]"rm"(src.x[3]),					\
+                    [mult]"rm"(x)					\
+                : "r8", "r9", "r10", "r11", "rdx"
+
+#define xADDSUB_CODE4(op, opc)   \
+"" #op  "q %q[s0], (%[z])\n"					\
+"" #opc "q %q[s1], 0x8(%[z])\n"					\
+"" #opc "q %q[s2], 0x10(%[z])\n"				\
+"" #opc "q %q[s3], 0x18(%[z])\n"				\
+"" #opc "q $0x0, 0x20(%[z])\n"					\
+        :							\
+        :							\
+            [z]"r"(&dst.x[0]),				        \
+            [s0]"r"(src.x[0]),					\
+            [s1]"r"(src.x[1]),					\
+            [s2]"r"(src.x[2]),					\
+            [s3]"r"(src.x[3])                                   \
+        : "memory"
+
+
+                */
+#define ADDSUB_CODE4(op, opc)   \
+        "" #op  "q %q[s0], %q[d0]\n"					\
+        "" #opc "q %q[s1], %q[d1]\n"					\
+        "" #opc "q %q[s2], %q[d2]\n"					\
+        "" #opc "q %q[s3], %q[d3]\n"					\
+        "" #opc "q $0x0, %q[d4]\n"					\
+                :							\
+                [d0]"+rm"(dst.x[0]),					\
+                [d1]"+rm"(dst.x[1]),					\
+                [d2]"+rm"(dst.x[2]),					\
+                [d3]"+rm"(dst.x[3]),					\
+                [d4]"+rm"(dst.x[4])					\
+                :							\
+                [s0]"r"(src.x[0]),					\
+                [s1]"r"(src.x[1]),					\
+                [s2]"r"(src.x[2]),					\
+                [s3]"r"(src.x[3])
+
+
+#define ADDSUBMUL_CODE4(op, opc)					\
+                FEED_IN("0x0(%[s])", "0x8(%[s])", r8, r9)		\
+                INNER_MUL(op, "0x0(%[z])", "0x10(%[s])", r8, r9, r10)	\
+                INNER_MUL(op, "0x8(%[z])", "0x18(%[s])", r9, r10, r11)	\
+                FINISH(op, opc,                                         \
+                        "0x10(%[z])", "0x18(%[z])", "0x20(%[z])",       \
+                        r10, r11)                               	\
+                :							\
+                :							\
+                    [z]"D"(&dst.x[0]),				        \
+                    [s]"S"(&src.x[0]),					\
+                    [mult]"rm"(x)					\
+                : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
+
+    EXPOSE_SPECIALIZATION(4);
+    /* }}} */
+
+    /* {{{ code for gfp<5, 1> */
+
+#define ADDSUBMUL_CODE5(op, opc)					\
+                FEED_IN("0x0(%[s])", "0x8(%[s])", r8, r9)		\
+                INNER_MUL(op, "0x0(%[z])", "0x10(%[s])", r8, r9, r10)	\
+                INNER_MUL(op, "0x8(%[z])", "0x18(%[s])", r9, r10, r11)	\
+                INNER_MUL(op, "0x10(%[z])", "0x20(%[s])", r10, r11, r8)	\
+                FINISH(op, opc,                                         \
+                        "0x18(%[z])", "0x20(%[z])", "0x28(%[z])",       \
+                        r11, r8)                               	\
+                :							\
+                :							\
+                    [z]"D"(&dst.x[0]),				        \
+                    [s]"S"(&src.x[0]),					\
+                    [mult]"rm"(x)					\
+                : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
+
+#define ADDSUB_CODE5(op, opc)   \
+        "" #op  "q %q[s0], (%[z])\n"					\
+        "" #opc "q %q[s1], 0x8(%[z])\n"					\
+        "" #opc "q %q[s2], 0x10(%[z])\n"				\
+        "" #opc "q %q[s3], 0x18(%[z])\n"				\
+        "" #opc "q %q[s4], 0x20(%[z])\n"				\
+        "" #opc "q $0x0, 0x28(%[z])\n"					\
+                :							\
+                :							\
+                    [z]"r"(&dst.x[0]),				        \
+                    [s0]"r"(src.x[0]),					\
+                    [s1]"r"(src.x[1]),					\
+                    [s2]"r"(src.x[2]),					\
+                    [s3]"r"(src.x[3]),					\
+                    [s4]"r"(src.x[4])                                   \
+                : "memory"
+
+    EXPOSE_SPECIALIZATION(5);
+    /* }}} */
+
+    /* {{{ code for gfp<6, 1> */
+
+#define ADDSUBMUL_CODE6(op, opc)					\
+                FEED_IN("0x0(%[s])", "0x8(%[s])", r8, r9)		\
+                INNER_MUL(op, "0x0(%[z])", "0x10(%[s])", r8, r9, r10)	\
+                INNER_MUL(op, "0x8(%[z])", "0x18(%[s])", r9, r10, r11)	\
+                INNER_MUL(op, "0x10(%[z])", "0x20(%[s])", r10, r11, r8)	\
+                INNER_MUL(op, "0x18(%[z])", "0x28(%[s])", r11, r8, r9)	\
+                FINISH(op, opc,                                         \
+                        "0x20(%[z])", "0x28(%[z])", "0x30(%[z])",       \
+                        r8, r9)                               	\
+                :							\
+                :							\
+                    [z]"D"(&dst.x[0]),				        \
+                    [s]"S"(&src.x[0]),					\
+                    [mult]"rm"(x)					\
+                : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
+
+#define ADDSUB_CODE6(op, opc)   \
+        "" #op  "q %q[s0], (%[z])\n"					\
+        "" #opc "q %q[s1], 0x8(%[z])\n"					\
+        "" #opc "q %q[s2], 0x10(%[z])\n"				\
+        "" #opc "q %q[s3], 0x18(%[z])\n"				\
+        "" #opc "q %q[s4], 0x20(%[z])\n"				\
+        "" #opc "q %q[s5], 0x28(%[z])\n"				\
+        "" #opc "q $0x0, 0x30(%[z])\n"					\
+                :							\
+                :							\
+                    [z]"r"(&dst.x[0]),				        \
+                    [s0]"r"(src.x[0]),					\
+                    [s1]"r"(src.x[1]),					\
+                    [s2]"r"(src.x[2]),					\
+                    [s3]"r"(src.x[3]),					\
+                    [s4]"r"(src.x[4]),                                  \
+                    [s5]"r"(src.x[5])                                   \
+                : "memory"
+
+    EXPOSE_SPECIALIZATION(6);
+    /* }}} */
+
+    /* {{{ code for gfp<7, 1> */
+#define ADDSUBMUL_CODE7(op, opc)					\
+                FEED_IN("0x0(%[s])", "0x8(%[s])", r8, r9)		\
+                INNER_MUL(op, "0x0(%[z])", "0x10(%[s])", r8, r9, r10)	\
+                INNER_MUL(op, "0x8(%[z])", "0x18(%[s])", r9, r10, r11)	\
+                INNER_MUL(op, "0x10(%[z])", "0x20(%[s])", r10, r11, r8)	\
+                INNER_MUL(op, "0x18(%[z])", "0x28(%[s])", r11, r8, r9)	\
+                INNER_MUL(op, "0x20(%[z])", "0x30(%[s])", r8, r9, r10)	\
+                FINISH(op, opc,                                         \
+                        "0x28(%[z])", "0x30(%[z])", "0x38(%[z])",       \
+                        r9, r10)                               	\
+                :							\
+                :							\
+                    [z]"D"(&dst.x[0]),				        \
+                    [s]"S"(&src.x[0]),					\
+                    [mult]"rm"(x)					\
+                : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
+
+#define ADDSUB_CODE7(op, opc)   \
+        "" #op  "q %q[s0], (%[z])\n"					\
+        "" #opc "q %q[s1], 0x8(%[z])\n"					\
+        "" #opc "q %q[s2], 0x10(%[z])\n"				\
+        "" #opc "q %q[s3], 0x18(%[z])\n"				\
+        "" #opc "q %q[s4], 0x20(%[z])\n"				\
+        "" #opc "q %q[s5], 0x28(%[z])\n"				\
+        "" #opc "q %q[s6], 0x30(%[z])\n"				\
+        "" #opc "q $0x0, 0x38(%[z])\n"					\
+                :							\
+                :							\
+                    [z]"r"(&dst.x[0]),				        \
+                    [s0]"r"(src.x[0]),					\
+                    [s1]"r"(src.x[1]),					\
+                    [s2]"r"(src.x[2]),					\
+                    [s3]"r"(src.x[3]),					\
+                    [s4]"r"(src.x[4]),                                  \
+                    [s5]"r"(src.x[5]),                                  \
+                    [s6]"r"(src.x[6])                                   \
+                : "memory"
+
+    EXPOSE_SPECIALIZATION(7);
+    /* }}} */
+    
+    /* further specialization only seem to bring very marginal
+     * improvements. */
 #endif
 }
 

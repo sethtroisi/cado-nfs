@@ -202,6 +202,7 @@ add_subdirectory(mpfq)
 
 # some tests below use the bwc include files.
 include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
+include_directories(${PROJECT_SOURCE_DIR}/utils)
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
     cado_define_test(test_cpubinding.c
@@ -345,4 +346,4 @@ cado_define_test(TEST_NAME test-blocklanczos-staged
     no_save_cache=1 interval=10 nullspace=left
     TARGET_DEPENDENCIES test-blocklanczos_dependencies)
 
-cado_define_test(test-arith-modp.cpp LIBRARIES tests)
+cado_define_test(test-arith-modp.cpp LIBRARIES tests utils)

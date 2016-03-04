@@ -3,6 +3,8 @@
 #include <gmp.h>
 #include "tests_common.h"
 #include "arith-modp.hpp"
+#include "timing.h"
+
 
 
 template<typename F, int summands, int cbound>
@@ -30,10 +32,17 @@ void do_tests(unsigned long iter)
         mpz_init(xz[i]);
     }
 
+    uint64_t tt = 0;
+
     for(unsigned long test = 0 ; test < iter ; test++) {
         for(int i = 0 ; i < summands ; i++) {
-            coeffs[i] = gmp_urandomm_ui(state, 2 * cbound);
-            coeffs[i] -= cbound - (coeffs[i] >= cbound);
+            /* cheat a little bit so that we effectively have 90% of
+             * +1/-1
+             */
+            coeffs[i] = gmp_urandomm_ui(state, 2 * 10*cbound);
+            coeffs[i] -= 10*cbound - (coeffs[i] >= 10*cbound);
+            if (coeffs[i] > cbound) coeffs[i]=1;
+            if (coeffs[i] < -cbound) coeffs[i]=-1;
         }
         /* Take a random modulus which is not a power of 2, and fits
          * within m bits */
@@ -64,15 +73,22 @@ void do_tests(unsigned long iter)
         }
         mpz_mod(yz, yz, pz);
 
+        tt -= microseconds();
 
         for(int i = 0 ; i < summands ; i++) {
-            if (coeffs[i] > 0) {
+            if (coeffs[i] == 1) {
+                F::add(y, x[i]);
+            } else if (coeffs[i] == -1) {
+                F::sub(y, x[i]);
+            } else if (coeffs[i] > 0) {
                 F::addmul(y, x[i], coeffs[i]);
             } else {
                 F::submul(y, x[i], -coeffs[i]);
             }
         }
         F::reduce(r, y, p, j);
+
+        tt += microseconds();
 
         MPZ_SET_MPN(rz, r.x, F::n);
 
@@ -82,7 +98,7 @@ void do_tests(unsigned long iter)
             gmp_printf("ok [%d+%d] %Zd\n", F::n, F::extra, pz);
         }
     }
-    printf("%lu tests ok [%d+%d]\n", iter, F::n, F::extra);
+    printf("%lu tests ok [%d+%d] in %.4f s\n", iter, F::n, F::extra, 1.0e-6 * tt);
 
     mpz_clear(pz);
     mpz_clear(rz);
@@ -110,6 +126,7 @@ int main(int argc, const char * argv[])
     do_tests< gfp<7>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<8>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<9>, SUMMANDS, CBOUND>(iter);
+    /*
     do_tests< gfp<2, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<3, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<4, 2>, SUMMANDS, CBOUND>(iter);
@@ -118,6 +135,7 @@ int main(int argc, const char * argv[])
     do_tests< gfp<7, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<8, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<9, 2>, SUMMANDS, CBOUND>(iter);
+    */
     tests_common_clear();
 }
 
