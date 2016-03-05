@@ -5,7 +5,7 @@
 #include "arith-modp.hpp"
 #include "timing.h"
 
-
+using namespace arith_modp;
 
 template<typename F, int summands, int cbound>
 void do_tests(unsigned long iter)
@@ -48,7 +48,11 @@ void do_tests(unsigned long iter)
          * within m bits */
         do {
             mpz_rrandomb(pz, state, m);
-        } while (mpz_scan1(pz, 0) == mpz_sizeinbase(pz, 2) - 1);
+            mp_limb_t u = pz->_mp_d[F::n-1];
+            mp_limb_t v = pz->_mp_d[0];
+            pz->_mp_d[F::n-1] = v;
+            pz->_mp_d[0] = u;
+        } while (pz->_mp_d[F::n-1] == 0 || mpz_scan1(pz, 0) == mpz_sizeinbase(pz, 2) - 1);
         for(int i = 0 ; i < summands ; i++) {
             mpz_urandomm(xz[i], state, pz);
         }
@@ -126,7 +130,6 @@ int main(int argc, const char * argv[])
     do_tests< gfp<7>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<8>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<9>, SUMMANDS, CBOUND>(iter);
-    /*
     do_tests< gfp<2, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<3, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<4, 2>, SUMMANDS, CBOUND>(iter);
@@ -135,7 +138,6 @@ int main(int argc, const char * argv[])
     do_tests< gfp<7, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<8, 2>, SUMMANDS, CBOUND>(iter);
     do_tests< gfp<9, 2>, SUMMANDS, CBOUND>(iter);
-    */
     tests_common_clear();
 }
 

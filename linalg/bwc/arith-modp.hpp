@@ -1,6 +1,7 @@
 #ifndef ARITH_MODP_HPP_
 #define ARITH_MODP_HPP_
 
+#include <type_traits>
 #include <gmp.h>
 
 #include "gmp-hacks.h"
@@ -8,10 +9,32 @@
 
 #define  xxxDEBUG_INFINITE_LOOPS
 
-namespace arith_modp_details {
+namespace arith_modp {
+namespace details {
     template<bool x> struct is_true {};
     template<> struct is_true<true> { typedef int type; };
     typedef typename std::make_signed<mp_limb_t>::type signed_mp_limb_t;
+
+    template<int n> struct mpn {
+        typedef mpn<n> self;
+        mp_limb_t x[n];
+        mpn() { memset(x, 0, n * sizeof(mp_limb_t)); }
+        mpn(mpn const& a) { memset(x, a.x, n * sizeof(mp_limb_t)); }
+        mpn(mpz_srcptr a) { MPN_SET_MPZ(x, n, a); }
+        self& operator=(mpz_srcptr a) { MPN_SET_MPZ(x, n, a); return *this; }
+        void zero() { memset(x, 0, n * sizeof(mp_limb_t)); }
+        operator mp_limb_t * () { return x; }
+        operator const mp_limb_t * () const { return x; }
+        static void zero(self * x, int N) {
+            memset(x, 0, n * N * sizeof(mp_limb_t));
+        }
+        static void copy(self * y, const self * x, int N) {
+            memcpy(y, x, n * N * sizeof(mp_limb_t));
+        }
+        bool operator==(self const& a) {
+            return memcmp(x, a.x, n * sizeof(mp_limb_t)) == 0;
+        }
+    };
 
     template<int n_, int extra_, typename T>
         struct gfp_base {
@@ -21,9 +44,9 @@ namespace arith_modp_details {
             static const int n = n_;
             static const typename is_true<n_>= extra_>::type extra = extra_;
 
-            struct elt { mp_limb_t x[n]; };
-            struct elt_ur { mp_limb_t x[n + extra]; };
-            struct preinv { mp_limb_t x[extra]; int shift; };
+            typedef mpn<n> elt;
+            typedef mpn<n + extra> elt_ur;
+            struct preinv : public mpn<extra> { int shift; };
 
             static void propagate_carry(mp_limb_t * dst, mp_limb_t cy) {
                 mpn_add_1(dst, dst, extra, cy);
@@ -39,25 +62,25 @@ namespace arith_modp_details {
 
             static inline void add(elt_ur & dst, elt const & src)
             {
-                mp_limb_t cy = mpn_add_n(dst.x, dst.x, src.x, n);
-                T::propagate_carry(dst.x + n, cy);
+                mp_limb_t cy = mpn_add_n(dst, dst, src, n);
+                T::propagate_carry(dst + n, cy);
             }
 
             static inline void sub(elt_ur & dst, elt const & src)
             {
-                mp_limb_t cy = mpn_sub_n(dst.x, dst.x, src.x, n);
-                T::propagate_borrow(dst.x + n, cy);
+                mp_limb_t cy = mpn_sub_n(dst, dst, src, n);
+                T::propagate_borrow(dst + n, cy);
             }
 
             static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x)
             {
-                mp_limb_t cy = mpn_addmul_1(dst.x, src.x, n, x);
-                T::propagate_carry(dst.x + n, cy);
+                mp_limb_t cy = mpn_addmul_1(dst, src, n, x);
+                T::propagate_carry(dst + n, cy);
             }
             static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x)
             {
-                mp_limb_t cy = mpn_submul_1(dst.x, src.x, n, x);
-                T::propagate_borrow(dst.x + n, cy);
+                mp_limb_t cy = mpn_submul_1(dst, src, n, x);
+                T::propagate_borrow(dst + n, cy);
             }
 
             /* Preinverse for Barrett reduction. See also the code for reduction,
@@ -80,7 +103,7 @@ namespace arith_modp_details {
                 mpz_t pz;
                 mpz_init_set_ui(big,1);
                 mpz_init(pz);
-                MPZ_SET_MPN(pz, p.x, n);
+                MPZ_SET_MPN(pz, p, n);
                 size_t m = mpz_sizeinbase(pz, 2);
                 ASSERT_ALWAYS(m <= (size_t) n * mp_bits_per_limb);
                 size_t ell = extra * mp_bits_per_limb;
@@ -88,7 +111,7 @@ namespace arith_modp_details {
                 mpz_fdiv_q(big, big, pz);
                 ASSERT_ALWAYS(mpz_sizeinbase(big, 2) == (ell + 1));
                 mpz_fdiv_r_2exp(big, big, ell);
-                MPN_SET_MPZ(j.x, extra, big);
+                MPN_SET_MPZ(j, extra, big);
                 j.shift = (mp_bits_per_limb - m) % mp_bits_per_limb;
                 mpz_clear(big);
                 mpz_clear(pz);
@@ -157,33 +180,33 @@ namespace arith_modp_details {
             {
                 mp_limb_t tmp[extra + 1];
                 if (j.shift) {
-                    mpn_lshift(tmp, a.x + n - 1, extra + 1, j.shift);
+                    mpn_lshift(tmp, a + n - 1, extra + 1, j.shift);
                 } else {
-                    mpn_copyi(tmp + 1, a.x + n, extra);
+                    mpn_copyi(tmp + 1, a + n, extra);
                 }
                 mp_limb_t a1I[2*extra];
-                mpn_mul_n(a1I, tmp + 1, j.x, extra);
+                mpn_mul_n(a1I, tmp + 1, j, extra);
                 mpn_add_n(a1I + extra, a1I + extra, tmp + 1, extra);
                 mp_limb_t * q0 = a1I + extra;
                 typename std::make_signed<mp_limb_t>::type sa1 = (tmp+1)[extra-1];
                 if (sa1 < 0) {
-                    mpn_sub_n(q0, q0, j.x, extra);
+                    mpn_sub_n(q0, q0, j, extra);
                     mpn_sub_1(q0, q0, extra, 1);
-                    mpn_add_n(a.x + extra, a.x + extra, p.x, n);
+                    mpn_add_n(a + extra, a + extra, p, n);
                 }
                 /* emulate a submul_n ; need to do mul first, then sub... */
                 mp_limb_t scratch[n + extra];
-                mpn_mul(scratch, p.x, n, q0, extra);
-                mpn_sub_n(a.x, a.x, scratch, n + extra);
+                mpn_mul(scratch, p, n, q0, extra);
+                mpn_sub_n(a, a, scratch, n + extra);
 #if !defined(NDEBUG) && !defined(DEBUG_INFINITE_LOOPS)
                 int spin=0;
 #endif
-                while (!upperlimbs_are_zero(a.x + n) || mpn_cmp(a.x, p.x, n) >= 0) {
+                while (!upperlimbs_are_zero(a + n) || mpn_cmp(a, p, n) >= 0) {
                     T::sub(a, p);
                     /*
                        {
-                       mp_limb_t cy = mpn_sub_n(a.x, a.x, p.x, n);
-                       propagate_borrow(a.x + n, cy);
+                       mp_limb_t cy = mpn_sub_n(a, a, p, n);
+                       propagate_borrow(a + n, cy);
                        }
                        */
 #if !defined(NDEBUG) && !defined(DEBUG_INFINITE_LOOPS)
@@ -191,7 +214,7 @@ namespace arith_modp_details {
                     ASSERT_ALWAYS(spin < 4);
 #endif
                 }
-                mpn_copyi(r.x, a.x, n);
+                mpn_copyi(r, a, n);
             }
         };
 
@@ -220,41 +243,41 @@ namespace arith_modp_details {
 
             /* this reduces a in place, and copies the result to r */
             static void reduce(elt & r, elt_ur & a, elt const & p, preinv const & j) {
-                mp_limb_t a1 = a.x[n] << j.shift;
+                mp_limb_t a1 = a[n] << j.shift;
                 if (j.shift) {
-                    a1 |= a.x[n-1] >> (mp_bits_per_limb - j.shift);
+                    a1 |= a[n-1] >> (mp_bits_per_limb - j.shift);
                 }
                 signed_mp_limb_t sa1 = a1;
                 mp_limb_t tmp[2];
 #ifdef  umul_ppmm
-                umul_ppmm(tmp[1], tmp[0], a1, j.x[0]);
+                umul_ppmm(tmp[1], tmp[0], a1, j[0]);
 #elif defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-                __asm__ ("mulq %3" : "=a"(tmp[0]), "=d" (tmp[1]) : "0" (a1), "rm" (j.x[0]));
+                __asm__ ("mulq %3" : "=a"(tmp[0]), "=d" (tmp[1]) : "0" (a1), "rm" (j[0]));
 #else
-                mpn_mul_n(tmp, &a1, j.x, 1);
+                mpn_mul_n(tmp, &a1, j, 1);
 #endif
                 mp_limb_t q0 = tmp[1] + a1;
                 if (sa1 < 0) {
                     /* see above for the specificities of the negative case */
-                    q0 -= j.x[0] + 1;
-                    mpn_add_n(a.x + 1, a.x + 1, p.x, n);
+                    q0 -= j[0] + 1;
+                    mpn_add_n(a + 1, a + 1, p, n);
                 }
                 T::submul(a, p, q0);
                 /*
                    {
-                   mp_limb_t cy = mpn_submul_1(a.x, p.x, n, q0);
-                   super::propagate_borrow(a.x + n, cy);
+                   mp_limb_t cy = mpn_submul_1(a, p, n, q0);
+                   super::propagate_borrow(a + n, cy);
                    }
                    */
 #if !defined(NDEBUG) && !defined(DEBUG_INFINITE_LOOPS)
                 int spin=0;
 #endif
-                while (a.x[n] || mpn_cmp(a.x, p.x, n) >= 0) {
+                while (a[n] || mpn_cmp(a, p, n) >= 0) {
                     T::sub(a, p);
                     /*
                        {
-                       mp_limb_t cy = mpn_sub_n(a.x, a.x, p.x, n);
-                       super::propagate_borrow(a.x + n, cy);
+                       mp_limb_t cy = mpn_sub_n(a, a, p, n);
+                       super::propagate_borrow(a + n, cy);
                        }
                        */
 #if !defined(NDEBUG) && !defined(DEBUG_INFINITE_LOOPS)
@@ -262,7 +285,7 @@ namespace arith_modp_details {
                     ASSERT_ALWAYS(spin < 4);
 #endif
                 }
-                mpn_copyi(r.x, a.x, n);
+                mpn_copyi(r, a, n);
             }
         };
 
@@ -282,8 +305,8 @@ namespace arith_modp_details {
             asm("# gfp<1, 1>::add\n"
                 "addq %q2, %q0\n"
                 "adcq $0x0, %q1\n"
-                : "+r"(dst.x[0]), "+r"(dst.x[1])
-                : "rm"(src.x[0])
+                : "+r"(dst[0]), "+r"(dst[1])
+                : "rm"(src[0])
                );
         }
 
@@ -292,8 +315,8 @@ namespace arith_modp_details {
             asm("# gfp<1, 1>::sub\n"
                 "subq %q2, %q0\n"
                 "sbbq $0x0, %q1\n"
-                : "+r"(dst.x[0]), "+r"(dst.x[1])
-                : "rm"(src.x[0])
+                : "+r"(dst[0]), "+r"(dst[1])
+                : "rm"(src[0])
                );
         }
 
@@ -305,8 +328,8 @@ namespace arith_modp_details {
                 "addq   %%rax, %[z0]\n"
                 "adcq   $0, %%rdx\n"
                 "addq   %%rdx, %[z1]\n"
-            : "=a"(foo), "=d"(bar), [z0]"+rm"(dst.x[0]), [z1]"+rm"(dst.x[1])
-            : "0"(src.x[0]), [mult]"r1m"(x)
+            : "=a"(foo), "=d"(bar), [z0]"+rm"(dst[0]), [z1]"+rm"(dst[1])
+            : "0"(src[0]), [mult]"r1m"(x)
             );
         }
         static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x)
@@ -317,8 +340,8 @@ namespace arith_modp_details {
                 "subq   %%rax, %[z0]\n"
                 "adcq   $0, %%rdx\n"
                 "subq   %%rdx, %[z1]\n"
-            : "=a"(foo), "=d"(bar), [z0]"+rm"(dst.x[0]), [z1]"+rm"(dst.x[1])
-            : "0"(src.x[0]), [mult]"r1m"(x)
+            : "=a"(foo), "=d"(bar), [z0]"+rm"(dst[0]), [z1]"+rm"(dst[1])
+            : "0"(src[0]), [mult]"r1m"(x)
             );
         }
     };
@@ -331,8 +354,8 @@ namespace arith_modp_details {
                 "addq %q[s0], %q[d0]\n"
                 "adcq %q[s1], %q[d1]\n"
                 "adcq $0x0, %q[d2]\n"
-                : [d0]"+rm"(dst.x[0]), [d1]"+rm"(dst.x[1]), [d2]"+rm"(dst.x[2])
-                : [s0]"r"(src.x[0]), [s1]"r"(src.x[1])
+                : [d0]"+rm"(dst[0]), [d1]"+rm"(dst[1]), [d2]"+rm"(dst[2])
+                : [s0]"r"(src[0]), [s1]"r"(src[1])
                );
         }
 
@@ -341,8 +364,8 @@ namespace arith_modp_details {
                 "subq %q[s0], %q[d0]\n"
                 "sbbq %q[s1], %q[d1]\n"
                 "sbbq $0x0, %q[d2]\n"
-                : [d0]"+rm"(dst.x[0]), [d1]"+rm"(dst.x[1]), [d2]"+rm"(dst.x[2])
-                : [s0]"r"(src.x[0]), [s1]"r"(src.x[1])
+                : [d0]"+rm"(dst[0]), [d1]"+rm"(dst[1]), [d2]"+rm"(dst[2])
+                : [s0]"r"(src[0]), [s1]"r"(src[1])
                );
         }
 
@@ -361,10 +384,10 @@ namespace arith_modp_details {
                 "adcq   $0, %%rdx\n"
                 "addq   %%rdx, %[z2]\n"
             : "=&a"(foo), "=&d"(bar),
-            [z0]"+rm"(dst.x[0]),
-            [z1]"+rm"(dst.x[1]),
-            [z2]"+rm"(dst.x[2])
-            : [s0]"0"(src.x[0]), [s1]"rm"(src.x[1]), [mult]"rm"(x)
+            [z0]"+rm"(dst[0]),
+            [z1]"+rm"(dst[1]),
+            [z2]"+rm"(dst[2])
+            : [s0]"0"(src[0]), [s1]"rm"(src[1]), [mult]"rm"(x)
             : "rcx"
             );
         }
@@ -384,10 +407,10 @@ namespace arith_modp_details {
                 "adcq   $0, %%rdx\n"
                 "subq   %%rdx, %[z2]\n"
             : "=&a"(foo), "=&d"(bar),
-            [z0]"+rm"(dst.x[0]),
-            [z1]"+rm"(dst.x[1]),
-            [z2]"+rm"(dst.x[2])
-            : [s0]"0"(src.x[0]), [s1]"rm"(src.x[1]), [mult]"rm"(x)
+            [z0]"+rm"(dst[0]),
+            [z1]"+rm"(dst[1]),
+            [z2]"+rm"(dst[2])
+            : [s0]"0"(src[0]), [s1]"rm"(src[1]), [mult]"rm"(x)
             : "rcx"
             );
         }
@@ -455,14 +478,14 @@ namespace arith_modp_details {
                 INNER_MUL(op, "%[z0]", "%[s2]", r8, r9, r10)		\
                 FINISH(op, opc, "%[z1]", "%[z2]", "%[z3]", r9, r10)	\
                 : "=&a"(foo),                                           \
-                    [z0]"+rm"(dst.x[0]),				\
-                    [z1]"+rm"(dst.x[1]),				\
-                    [z2]"+rm"(dst.x[2]),				\
-                    [z3]"+rm"(dst.x[3])					\
+                    [z0]"+rm"(dst[0]),				\
+                    [z1]"+rm"(dst[1]),				\
+                    [z2]"+rm"(dst[2]),				\
+                    [z3]"+rm"(dst[3])					\
                 :							\
-                    [s0]"0"(src.x[0]),					\
-                    [s1]"rm"(src.x[1]),					\
-                    [s2]"rm"(src.x[2]),					\
+                    [s0]"0"(src[0]),					\
+                    [s1]"rm"(src[1]),					\
+                    [s2]"rm"(src[2]),					\
                     [mult]"rm"(x)					\
                 : "r8", "r9", "r10", "rdx"
 
@@ -472,14 +495,14 @@ namespace arith_modp_details {
         "" #opc "q %q[s2], %q[d2]\n"					\
         "" #opc "q $0x0, %q[d3]\n"					\
                 :							\
-                [d0]"+rm"(dst.x[0]),					\
-                [d1]"+rm"(dst.x[1]),					\
-                [d2]"+rm"(dst.x[2]),					\
-                [d3]"+rm"(dst.x[3])					\
+                [d0]"+rm"(dst[0]),					\
+                [d1]"+rm"(dst[1]),					\
+                [d2]"+rm"(dst[2]),					\
+                [d3]"+rm"(dst[3])					\
                 :							\
-                [s0]"r"(src.x[0]),					\
-                [s1]"r"(src.x[1]),					\
-                [s2]"r"(src.x[2])
+                [s0]"r"(src[0]),					\
+                [s1]"r"(src[1]),					\
+                [s2]"r"(src[2])
 
     EXPOSE_SPECIALIZATION(3);
     /* }}} */
@@ -492,16 +515,16 @@ namespace arith_modp_details {
                 INNER_MUL(op, "%[z1]", "%[s3]", r9, r10, r11)		\
                 FINISH(op, opc, "%[z2]", "%[z3]", "%[z4]", r10, r11)	\
                 : "=&a"(foo),                                           \
-                    [z0]"+rm"(dst.x[0]),				\
-                    [z1]"+rm"(dst.x[1]),				\
-                    [z2]"+rm"(dst.x[2]),				\
-                    [z3]"+rm"(dst.x[3]),				\
-                    [z4]"+rm"(dst.x[4])					\
+                    [z0]"+rm"(dst[0]),				\
+                    [z1]"+rm"(dst[1]),				\
+                    [z2]"+rm"(dst[2]),				\
+                    [z3]"+rm"(dst[3]),				\
+                    [z4]"+rm"(dst[4])					\
                 :							\
-                    [s0]"0"(src.x[0]),					\
-                    [s1]"rm"(src.x[1]),					\
-                    [s2]"rm"(src.x[2]),					\
-                    [s3]"rm"(src.x[3]),					\
+                    [s0]"0"(src[0]),					\
+                    [s1]"rm"(src[1]),					\
+                    [s2]"rm"(src[2]),					\
+                    [s3]"rm"(src[3]),					\
                     [mult]"rm"(x)					\
                 : "r8", "r9", "r10", "r11", "rdx"
 
@@ -513,11 +536,11 @@ namespace arith_modp_details {
 "" #opc "q $0x0, 0x20(%[z])\n"					\
         :							\
         :							\
-            [z]"r"(&dst.x[0]),				        \
-            [s0]"r"(src.x[0]),					\
-            [s1]"r"(src.x[1]),					\
-            [s2]"r"(src.x[2]),					\
-            [s3]"r"(src.x[3])                                   \
+            [z]"r"(&dst[0]),				        \
+            [s0]"r"(src[0]),					\
+            [s1]"r"(src[1]),					\
+            [s2]"r"(src[2]),					\
+            [s3]"r"(src[3])                                   \
         : "memory"
 
 
@@ -529,16 +552,16 @@ namespace arith_modp_details {
         "" #opc "q %q[s3], %q[d3]\n"					\
         "" #opc "q $0x0, %q[d4]\n"					\
                 :							\
-                [d0]"+rm"(dst.x[0]),					\
-                [d1]"+rm"(dst.x[1]),					\
-                [d2]"+rm"(dst.x[2]),					\
-                [d3]"+rm"(dst.x[3]),					\
-                [d4]"+rm"(dst.x[4])					\
+                [d0]"+rm"(dst[0]),					\
+                [d1]"+rm"(dst[1]),					\
+                [d2]"+rm"(dst[2]),					\
+                [d3]"+rm"(dst[3]),					\
+                [d4]"+rm"(dst[4])					\
                 :							\
-                [s0]"r"(src.x[0]),					\
-                [s1]"r"(src.x[1]),					\
-                [s2]"r"(src.x[2]),					\
-                [s3]"r"(src.x[3])
+                [s0]"r"(src[0]),					\
+                [s1]"r"(src[1]),					\
+                [s2]"r"(src[2]),					\
+                [s3]"r"(src[3])
 
 
 #define ADDSUBMUL_CODE4(op, opc)					\
@@ -550,8 +573,8 @@ namespace arith_modp_details {
                         r10, r11)                               	\
                 :							\
                 :							\
-                    [z]"D"(&dst.x[0]),				        \
-                    [s]"S"(&src.x[0]),					\
+                    [z]"D"(&dst[0]),				        \
+                    [s]"S"(&src[0]),					\
                     [mult]"rm"(x)					\
                 : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
 
@@ -570,8 +593,8 @@ namespace arith_modp_details {
                         r11, r8)                               	\
                 :							\
                 :							\
-                    [z]"D"(&dst.x[0]),				        \
-                    [s]"S"(&src.x[0]),					\
+                    [z]"D"(&dst[0]),				        \
+                    [s]"S"(&src[0]),					\
                     [mult]"rm"(x)					\
                 : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
 
@@ -584,12 +607,12 @@ namespace arith_modp_details {
         "" #opc "q $0x0, 0x28(%[z])\n"					\
                 :							\
                 :							\
-                    [z]"r"(&dst.x[0]),				        \
-                    [s0]"r"(src.x[0]),					\
-                    [s1]"r"(src.x[1]),					\
-                    [s2]"r"(src.x[2]),					\
-                    [s3]"r"(src.x[3]),					\
-                    [s4]"r"(src.x[4])                                   \
+                    [z]"r"(&dst[0]),				        \
+                    [s0]"r"(src[0]),					\
+                    [s1]"r"(src[1]),					\
+                    [s2]"r"(src[2]),					\
+                    [s3]"r"(src[3]),					\
+                    [s4]"r"(src[4])                                   \
                 : "memory"
 
     EXPOSE_SPECIALIZATION(5);
@@ -608,8 +631,8 @@ namespace arith_modp_details {
                         r8, r9)                               	\
                 :							\
                 :							\
-                    [z]"D"(&dst.x[0]),				        \
-                    [s]"S"(&src.x[0]),					\
+                    [z]"D"(&dst[0]),				        \
+                    [s]"S"(&src[0]),					\
                     [mult]"rm"(x)					\
                 : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
 
@@ -623,13 +646,13 @@ namespace arith_modp_details {
         "" #opc "q $0x0, 0x30(%[z])\n"					\
                 :							\
                 :							\
-                    [z]"r"(&dst.x[0]),				        \
-                    [s0]"r"(src.x[0]),					\
-                    [s1]"r"(src.x[1]),					\
-                    [s2]"r"(src.x[2]),					\
-                    [s3]"r"(src.x[3]),					\
-                    [s4]"r"(src.x[4]),                                  \
-                    [s5]"r"(src.x[5])                                   \
+                    [z]"r"(&dst[0]),				        \
+                    [s0]"r"(src[0]),					\
+                    [s1]"r"(src[1]),					\
+                    [s2]"r"(src[2]),					\
+                    [s3]"r"(src[3]),					\
+                    [s4]"r"(src[4]),                                  \
+                    [s5]"r"(src[5])                                   \
                 : "memory"
 
     EXPOSE_SPECIALIZATION(6);
@@ -648,8 +671,8 @@ namespace arith_modp_details {
                         r9, r10)                               	\
                 :							\
                 :							\
-                    [z]"D"(&dst.x[0]),				        \
-                    [s]"S"(&src.x[0]),					\
+                    [z]"D"(&dst[0]),				        \
+                    [s]"S"(&src[0]),					\
                     [mult]"rm"(x)					\
                 : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
 
@@ -664,17 +687,62 @@ namespace arith_modp_details {
         "" #opc "q $0x0, 0x38(%[z])\n"					\
                 :							\
                 :							\
-                    [z]"r"(&dst.x[0]),				        \
-                    [s0]"r"(src.x[0]),					\
-                    [s1]"r"(src.x[1]),					\
-                    [s2]"r"(src.x[2]),					\
-                    [s3]"r"(src.x[3]),					\
-                    [s4]"r"(src.x[4]),                                  \
-                    [s5]"r"(src.x[5]),                                  \
-                    [s6]"r"(src.x[6])                                   \
+                    [z]"r"(&dst[0]),				        \
+                    [s0]"r"(src[0]),					\
+                    [s1]"r"(src[1]),					\
+                    [s2]"r"(src[2]),					\
+                    [s3]"r"(src[3]),					\
+                    [s4]"r"(src[4]),                                  \
+                    [s5]"r"(src[5]),                                  \
+                    [s6]"r"(src[6])                                   \
                 : "memory"
 
     EXPOSE_SPECIALIZATION(7);
+    /* }}} */
+
+    /* {{{ code for gfp<8, 1> */
+#define ADDSUBMUL_CODE8(op, opc)					\
+                FEED_IN("0x0(%[s])", "0x8(%[s])", r8, r9)		\
+                INNER_MUL(op, "0x0(%[z])", "0x10(%[s])", r8, r9, r10)	\
+                INNER_MUL(op, "0x8(%[z])", "0x18(%[s])", r9, r10, r11)	\
+                INNER_MUL(op, "0x10(%[z])", "0x20(%[s])", r10, r11, r8)	\
+                INNER_MUL(op, "0x18(%[z])", "0x28(%[s])", r11, r8, r9)	\
+                INNER_MUL(op, "0x20(%[z])", "0x30(%[s])", r8, r9, r10)	\
+                INNER_MUL(op, "0x28(%[z])", "0x38(%[s])", r9, r10, r11)	\
+                FINISH(op, opc,                                         \
+                        "0x30(%[z])", "0x38(%[z])", "0x40(%[z])",       \
+                        r10, r11)                               	\
+                :							\
+                :							\
+                    [z]"D"(&dst[0]),				        \
+                    [s]"S"(&src[0]),					\
+                    [mult]"rm"(x)					\
+                : "r8", "r9", "r10", "r11", "rax", "rdx", "memory"
+
+#define ADDSUB_CODE8(op, opc)   \
+        "" #op  "q %q[s0], (%[z])\n"					\
+        "" #opc "q %q[s1], 0x8(%[z])\n"					\
+        "" #opc "q %q[s2], 0x10(%[z])\n"				\
+        "" #opc "q %q[s3], 0x18(%[z])\n"				\
+        "" #opc "q %q[s4], 0x20(%[z])\n"				\
+        "" #opc "q %q[s5], 0x28(%[z])\n"				\
+        "" #opc "q %q[s6], 0x30(%[z])\n"				\
+        "" #opc "q %q[s7], 0x38(%[z])\n"				\
+        "" #opc "q $0x0, 0x40(%[z])\n"					\
+                :							\
+                :							\
+                    [z]"r"(&dst[0]),				        \
+                    [s0]"r"(src[0]),					\
+                    [s1]"r"(src[1]),					\
+                    [s2]"r"(src[2]),					\
+                    [s3]"r"(src[3]),					\
+                    [s4]"r"(src[4]),                                  \
+                    [s5]"r"(src[5]),                                  \
+                    [s6]"r"(src[6]),                                   \
+                    [s7]"r"(src[7])                                   \
+                : "memory"
+
+    EXPOSE_SPECIALIZATION(8);
     /* }}} */
     
     /* further specialization only seem to bring very marginal
@@ -683,7 +751,8 @@ namespace arith_modp_details {
 }
 
 /* expose only what we have in our public interface */
-using arith_modp_details::gfp;
+using details::gfp;
+}
 
 
 

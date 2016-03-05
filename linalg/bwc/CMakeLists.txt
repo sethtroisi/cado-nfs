@@ -209,7 +209,7 @@ endif()
 
 
 set(matmul_basic_sources    matmul-basic.c)
-set(matmul_basicp_sources   matmul-basicp.c)
+set(matmul_basicp_sources   matmul-basicp.cpp)
 set(matmul_sliced_sources   matmul-sliced.cpp)
 set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
