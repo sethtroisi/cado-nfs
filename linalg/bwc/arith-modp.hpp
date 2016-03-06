@@ -1,7 +1,6 @@
 #ifndef ARITH_MODP_HPP_
 #define ARITH_MODP_HPP_
 
-#include <type_traits>
 #include <gmp.h>
 
 #include "gmp-hacks.h"
@@ -11,9 +10,14 @@
 
 namespace arith_modp {
 namespace details {
+    /* some of this is provided by <type_traits>, but that is post C++98
+     */
     template<bool x> struct is_true {};
     template<> struct is_true<true> { typedef int type; };
-    typedef typename std::make_signed<mp_limb_t>::type signed_mp_limb_t;
+    template<typename T> struct make_signed {};
+    template<> struct make_signed<unsigned long> { typedef long type; };
+    template<> struct make_signed<unsigned long long> { typedef long long type; };
+    typedef typename make_signed<mp_limb_t>::type signed_mp_limb_t;
 
     template<int n> struct mpn {
         typedef mpn<n> self;
@@ -45,7 +49,13 @@ namespace details {
             static const typename is_true<n_>= extra_>::type extra = extra_;
 
             typedef mpn<n> elt;
-            typedef mpn<n + extra> elt_ur;
+            struct elt_ur: public mpn<n + extra> {
+                elt_ur& operator=(elt const& a) {
+                    mpn_copyi(mpn<n + extra>::x, a.x, n);
+                    memset(mpn<n + extra>::x + n, 0, extra * sizeof(mp_limb_t));
+                    return *this;
+                }
+            };
             struct preinv : public mpn<extra> { int shift; };
 
             static void propagate_carry(mp_limb_t * dst, mp_limb_t cy) {
@@ -188,7 +198,7 @@ namespace details {
                 mpn_mul_n(a1I, tmp + 1, j, extra);
                 mpn_add_n(a1I + extra, a1I + extra, tmp + 1, extra);
                 mp_limb_t * q0 = a1I + extra;
-                typename std::make_signed<mp_limb_t>::type sa1 = (tmp+1)[extra-1];
+                typename make_signed<mp_limb_t>::type sa1 = (tmp+1)[extra-1];
                 if (sa1 < 0) {
                     mpn_sub_n(q0, q0, j, extra);
                     mpn_sub_1(q0, q0, extra, 1);
