@@ -206,7 +206,7 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 } else if (c > 0) {
                     gfp::addmul(tdst[j], src[i], c);
                 } else {
-                    gfp::submul(tdst[j], src[i], c);
+                    gfp::submul(tdst[j], src[i], -c);
                 }
             }
         }
