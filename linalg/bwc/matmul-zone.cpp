@@ -21,6 +21,10 @@
 
 #include "matmul_facade.h"
 
+#include "arith-modp.hpp"
+
+typedef arith_modp::gfp<sizeof(abelt)/sizeof(unsigned long)> gfp;
+
 /* This extension is used to distinguish between several possible
  * implementations of the product */
 #define MM_EXTENSION   "-zone"
@@ -202,7 +206,7 @@ struct zone {/*{{{*/
     zone(unsigned int i0, unsigned int j0) : i0(i0), j0(j0) {}
     inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
     inline size_t size() const { return qp.size() + qm.size() + qg.size(); }
-    void operator()(abdst_field x, abdst_vec_ur tdst, absrc_vec tsrc) const;
+    void operator()(gfp::elt_ur *, const gfp::elt *) const;
 
     struct sort_qpm {
         inline bool operator()(qpm_t::value_type const& a, qpm_t::value_type const& b) const {
@@ -630,42 +634,28 @@ void matmul_zone_data::save_cache()
 }
 /* }}} */
 
-void zone::operator()(abdst_field x, abdst_vec_ur tdst, absrc_vec tsrc) const
+void zone::operator()(gfp::elt_ur * tdst, const gfp::elt * tsrc) const
 {
-    abelt_ur tmp;
-    abelt_ur_init(x, &tmp);
     for(qpm_t::const_iterator u = qp.begin() ; u != qp.end() ; u++) {
         unsigned int i = u->first;
         unsigned int j = u->second;
-        abelt_ur_set_elt(x,
-                tmp,
-                abvec_coeff_ptr_const(x, tsrc, j));
-        abelt_ur_add(x,
-                abvec_ur_coeff_ptr(x, tdst, i),
-                abvec_ur_coeff_ptr(x, tdst, i),
-                tmp);
+        gfp::add(tdst[i], tsrc[j]);
     }
     for(qpm_t::const_iterator u = qm.begin() ; u != qm.end() ; u++) {
         unsigned int i = u->first;
         unsigned int j = u->second;
-        abelt_ur_set_elt(x,
-                tmp,
-                abvec_coeff_ptr_const(x, tsrc, j));
-        abelt_ur_sub(x,
-                abvec_ur_coeff_ptr(x, tdst, i),
-                abvec_ur_coeff_ptr(x, tdst, i),
-                tmp);
+        gfp::sub(tdst[i], tsrc[j]);
     }
     for(qg_t::const_iterator u = qg.begin() ; u != qg.end() ; u++) {
         unsigned int i = u->first;
         unsigned int j = u->second.first;
         int32_t c = u->second.second;
-        abaddmul_si_ur(x,
-                abvec_ur_coeff_ptr(x, tdst, i),
-                abvec_coeff_ptr_const(x, tsrc, j),
-                c);
+        if (c>0) {
+            gfp::addmul(tdst[i], tsrc[j], c);
+        } else {
+            gfp::submul(tdst[i], tsrc[j], -c);
+        }
     }
-    abelt_ur_clear(x, &tmp);
 }
 
 void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
@@ -673,8 +663,21 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
     matmul_zone_data * mm = this;
     ASM_COMMENT("multiplication code");
     abdst_field x = mm->xab;
-    absrc_vec src = (absrc_vec) xsrc; // typical C const problem.
-    abdst_vec dst = (abdst_vec) xdst;
+    const gfp::elt * src = (const gfp::elt *) xsrc;
+    gfp::elt * dst = (gfp::elt *) xdst;
+
+    gfp::preinv preinverse;
+    gfp::elt prime;
+
+    {
+        mpz_t p;
+        mpz_init(p);
+        abfield_characteristic(x, p);
+        prime = p;
+        mpz_clear(p);
+    }
+
+    gfp::compute_preinv(preinverse, prime);
 
     /* d == 1: matrix times vector product */
     /* d == 0: vector times matrix product */
@@ -682,6 +685,8 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
     /* However the matrix may be stored either row-major
      * (store_transposed == 0) or column-major (store_transposed == 1)
      */
+
+    gfp::elt::zero(dst, mm->public_->dim[!d]);
 
     /* TODO: missing in mpfq elt_ur_{add,sub}_elt
      */
@@ -709,10 +714,8 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
             printf("Found %zu different dispatcher strips\n", current_points.size());
         } /* }}} */
 
-        abvec_ur tdst ;
-        abvec_ur_init(x, &tdst, ROWBATCH);
+        gfp::elt_ur * tdst = new gfp::elt_ur[ROWBATCH];
 
-        abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop");
 
         /*
@@ -741,15 +744,9 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
             }
 #endif
 
-
-
-
-
             unsigned int active = MIN(ROWBATCH, mm->public_->dim[!d] - z.i0);
             for(unsigned int i = 0 ; i < active ; i++) {
-                abelt_ur_set_elt(x,
-                        abvec_ur_coeff_ptr(x, tdst, i),
-                        abvec_coeff_ptr_const(x, dst, z.i0 + i));
+                tdst[i] = dst[z.i0 + i];
             }
             /*
             if (z.j0 != last_j0) {
@@ -770,13 +767,12 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 current.n = 1;
             }
             */
-            absrc_vec tsrc = abvec_subvec_const(x, src, z.j0);
-            z(x, tdst, tsrc);
+            const gfp::elt * tsrc = src + z.j0;
+
+            z(tdst, tsrc);
 
             for(unsigned int i = 0 ; i < active ; i++) {
-                abreduce(x,
-                        abvec_coeff_ptr(x, dst, z.i0 + i),
-                        abvec_ur_coeff_ptr(x, tdst, i));
+                gfp::reduce(dst[z.i0 + i], tdst[i], prime, preinverse);
             }
         }
         /*
@@ -793,7 +789,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         }
         */
         ASM_COMMENT("end of critical loop");
-        abvec_ur_clear(x, &tdst, ROWBATCH);
+        delete[] tdst;
     } else {
 #if 0
         abvec_ur tdst;
