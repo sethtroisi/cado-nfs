@@ -300,7 +300,7 @@ namespace details {
         };
 
     template<int n, int extra=1>
-        struct gfp : public gfp_middle<n, extra, gfp<n, extra>>
+        struct gfp : public gfp_middle<n, extra, gfp<n, extra> >
     {
     };
 
