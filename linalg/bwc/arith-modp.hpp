@@ -17,7 +17,7 @@ namespace details {
     template<typename T> struct make_signed {};
     template<> struct make_signed<unsigned long> { typedef long type; };
     template<> struct make_signed<unsigned long long> { typedef long long type; };
-    typedef typename make_signed<mp_limb_t>::type signed_mp_limb_t;
+    typedef make_signed<mp_limb_t>::type signed_mp_limb_t;
 
     template<int n> struct mpn {
         typedef mpn<n> self;
@@ -247,9 +247,11 @@ namespace details {
             }
 
             using super::n;
-            using typename super::elt;
-            using typename super::elt_ur;
-            using typename super::preinv;
+            /* We would prefer write "using typename super::elt" below,
+             * however this is only ok with recent c++ */
+            typedef typename super::elt elt;
+            typedef typename super::elt_ur elt_ur;
+            typedef typename super::preinv preinv;
 
             /* this reduces a in place, and copies the result to r */
             static void reduce(elt & r, elt_ur & a, elt const & p, preinv const & j) {
