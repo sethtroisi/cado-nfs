@@ -32,6 +32,16 @@ mpn_zero(mp_limb_t *rp, mp_size_t n)
 {
     memset(rp, 0, n * sizeof(mp_limb_t));
 }
+void
+mpn_copyi(mp_limb_t *rp, const mp_limb_t *up, mp_size_t n)
+{
+    memmove(rp, up, n * sizeof(mp_limb_t));
+}
+void
+mpn_copyd(mp_limb_t *rp, const mp_limb_t *up, mp_size_t n)
+{
+    memmove(rp, up, n * sizeof(mp_limb_t));
+}
 #endif
 
 /* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */
