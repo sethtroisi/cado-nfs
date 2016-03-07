@@ -51,60 +51,63 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         endif()
     endif()
     set(p "${prime_${width}}")
-    add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
-    add_dependencies(test-bwc-modp-inhomogeneous-${gfp_layer}_dependencies
-        plingen_pz plingen_${gfp_layer})
-    if(gfp_layer STREQUAL "p_1")
-        set(mextra)
-        # Only try to enable magma if CHECKS_EXPENSIVE is set.
-        if(DEFINED ENV{CHECKS_EXPENSIVE})
-            find_program(MAGMA magma HINTS ENV MAGMA)
-            if (MAGMA)
-                set(mextra magma=${MAGMA})
+    if(gfp_layer STREQUAL "pz")
+    else()
+        add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
+        add_dependencies(test-bwc-modp-inhomogeneous-${gfp_layer}_dependencies
+            plingen_pz plingen_${gfp_layer})
+        if(gfp_layer STREQUAL "p_1")
+            set(mextra)
+            # Only try to enable magma if CHECKS_EXPENSIVE is set.
+            if(DEFINED ENV{CHECKS_EXPENSIVE})
+                find_program(MAGMA magma HINTS ENV MAGMA)
+                if (MAGMA)
+                    set(mextra magma=${MAGMA})
+                endif()
             endif()
+            add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
+                random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
+            add_dependencies(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6_dependencies
+                plingen_pz plingen_${gfp_layer})
+
+            add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
+            add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                plingen_pz plingen_${gfp_layer})
+
+            if (HAVE_MPI)
+                add_bwc_test(mpi1-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                    prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
+                    mpi=2x3 lingen_mpi=2x2 ${mextra})
+                add_dependencies(test-bwc-mpi1-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                    plingen_pz plingen_${gfp_layer})
+                add_bwc_test(mpi2-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                    prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
+                    mpi=3x2 lingen_mpi=2x2 ${mextra})
+                add_dependencies(test-bwc-mpi2-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                    plingen_pz plingen_${gfp_layer})
+            endif()
+
+            if(DEFINED ENV{CHECKS_EXPENSIVE})
+                add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
+                    prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
+                add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive_dependencies
+                    plingen_pz plingen_${gfp_layer})
+            endif()
+
+            add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
+                prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
+            add_dependencies(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1_dependencies
+                plingen_pz plingen_${gfp_layer})
+            #        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
+            #            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
+            #        add_dependencies(modp-homogeneous-minimal-mn4_dependencies
+            #        plingen_pz plingen_${gfp_layer})
+            #        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
+            #            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
+            #        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies
+            #        plingen_pz plingen_${gfp_layer})
         endif()
-        add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
-            random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
-        add_dependencies(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6_dependencies
-            plingen_pz plingen_${gfp_layer})
-
-        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
-        add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
-                plingen_pz plingen_${gfp_layer})
-
-        if (HAVE_MPI)
-            add_bwc_test(mpi1-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
-                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
-                mpi=2x3 lingen_mpi=2x2 ${mextra})
-            add_dependencies(test-bwc-mpi1-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
-                plingen_pz plingen_${gfp_layer})
-            add_bwc_test(mpi2-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
-                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
-                mpi=3x2 lingen_mpi=2x2 ${mextra})
-            add_dependencies(test-bwc-mpi2-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
-                plingen_pz plingen_${gfp_layer})
-        endif()
-
-        if(DEFINED ENV{CHECKS_EXPENSIVE})
-            add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
-                prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
-            add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive_dependencies
-                plingen_pz plingen_${gfp_layer})
-        endif()
-
-        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
-        add_dependencies(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1_dependencies
-            plingen_pz plingen_${gfp_layer})
-#        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
-#            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
-#        add_dependencies(modp-homogeneous-minimal-mn4_dependencies
-#        plingen_pz plingen_${gfp_layer})
-#        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
-#            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
-#        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies
-#        plingen_pz plingen_${gfp_layer})
     endif()
 
     # Also add some plingen tests if it so occurs that the current
@@ -118,7 +121,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     # p
     # seed for random generation (entries are (2^k*(seed/1000) mod q) + (3^k*(seed%1000) mod q) mod p, with q=2^20-3).
     # arguments to be passed to plingen (including mpi arguments)
-    
+
     # we create a phony first test, so as to limit the risk of having
     # several tests trigger the same build dependency on
     # plingen_${gfp_layer} at the same time. Of course, the bare test
