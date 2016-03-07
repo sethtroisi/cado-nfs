@@ -463,7 +463,7 @@ namespace details {
                );							\
         }								\
         static inline void sub(elt_ur & dst, elt const & src) {		\
-            asm("# gfp<4, 1>::sub\n"					\
+            asm("# gfp<" #n ", 1>::sub\n"					\
                     ADDSUB_CODE ## n(sub, sbb)				\
                );							\
         }								\
