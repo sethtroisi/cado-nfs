@@ -30,7 +30,7 @@ set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
 set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 pz
     CACHE STRING
-    "which GF(p) backends to compile for DLOG mode")
+    "which GF(p) backends to compile for DLOG mode (pz excluded)")
 set(BWC_GFP_MATMUL_BACKENDS basicp
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
@@ -215,6 +215,9 @@ set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
 
 macro(CONFIGURE_MATMUL_LIB v i)
+    if(v STREQUAL "pz")
+        # message(STATUS "Information: pz matmul backends are now disabled")
+    else()
     set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${i})")
     string(COMPARE EQUAL "${v}" "u64k1" doing_u64)
     string(COMPARE EQUAL "${i}" "bucket" doing_bucket)
@@ -238,14 +241,15 @@ macro(CONFIGURE_MATMUL_LIB v i)
         endif()
     endif()
 
-    add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
-    target_link_libraries(matmul_${v}_${i} matmul_common bwc_mpfq)
-    set_target_properties(matmul_${v}_${i} PROPERTIES
-        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v} -DMM_IMPL=${i} -DMM_MPFQ_LAYER=${v}"
-            LINK_FLAGS "--mpi")
-    set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
-    if(ENABLE_SHARED)
-        install(TARGETS matmul_${v}_${i} DESTINATION ${LIBSUFFIX}/linalg/bwc)
+        add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
+        target_link_libraries(matmul_${v}_${i} matmul_common bwc_mpfq)
+        set_target_properties(matmul_${v}_${i} PROPERTIES
+            COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v} -DMM_IMPL=${i} -DMM_MPFQ_LAYER=${v}"
+                LINK_FLAGS "--mpi")
+        set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
+        if(ENABLE_SHARED)
+            install(TARGETS matmul_${v}_${i} DESTINATION ${LIBSUFFIX}/linalg/bwc)
+        endif()
     endif()
 endmacro()
 
