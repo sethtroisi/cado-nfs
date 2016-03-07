@@ -26,6 +26,12 @@ mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
   for (i = 0; i < n; i++)
     rp[i] = s1p[i] ^ s2p[i];
 }
+
+void
+mpn_zero(mp_limb_t *rp, mp_size_t n)
+{
+    memset(rp, 0, n * sizeof(mp_limb_t));
+}
 #endif
 
 /* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */

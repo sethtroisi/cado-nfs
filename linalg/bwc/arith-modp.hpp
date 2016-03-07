@@ -4,6 +4,7 @@
 #include <gmp.h>
 
 #include "gmp-hacks.h"
+#include "gmp_aux.h"
 #include "macros.h"
 
 #define  xxxDEBUG_INFINITE_LOOPS
