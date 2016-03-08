@@ -1,0 +1,31 @@
+# GF(2^1003)
+#
+# F = x^6 + (t + 1)*x^2 + (t^5 + t^2 + t)*x + t^6 + t^3 (alpha = -4.2099821480)
+# G = x + t^168 + t^32 + t^12
+
+gf=2
+
+pol0=48,26,3,0,0,0,1
+pol1=1000000000000000000000000000000000100001000,1
+I=14
+J=14
+
+fbb0=25
+fbb1=25
+lpb0=33
+lpb1=33
+thresh0=99
+thresh1=99
+sqside=1
+S=2
+
+fb0=Aroots.2.1003
+fb1=Rroots.2.1003
+
+q0=4000000
+q1=4000100
+
+# Timings on one core of i5-2500 at 3.3 GHz
+#       For q = 2^26,  24 rel/sq at 0.69 s/rel.
+#       For q = 2^30,  10 rel/sq at 1.51 s/rel.
+

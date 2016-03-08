@@ -1,0 +1,44 @@
+
+// Compute a more-or-less skew-reduced basis of the lattice
+//   [ q, 0 ; rho, 1 ]
+// The skewness S is a degree.
+
+function skewgauss(q, rho, S)
+    t := Parent(q).1;
+    a0 := q;
+    b0 := Parent(q)!0;
+    a1 := rho;
+    b1 := t^S;
+//    printf "%o, %o, %o, %o\n", Degree(a0), Degree(b0), Degree(a1), Degree(b1);
+
+    repeat
+        qq := a0 div a1;
+        if Degree(qq)+Degree(b1) gt Degree(a0) then break; end if;
+        a0 -:= qq*a1;
+        b0 -:= qq*b1;
+
+//        printf "%o, %o, %o, %o\n", Degree(a0), Degree(b0), Degree(a1), Degree(b1);
+
+        qq := a1 div a0;
+        if Degree(qq)+Degree(b0) gt Degree(a1) then break; end if;
+        a1 -:= qq*a0;
+        b1 -:= qq*b0;
+
+//        printf "%o, %o, %o, %o\n", Degree(a0), Degree(b0), Degree(a1), Degree(b1);
+    until Degree(a0) le Degree(b0);
+    return a0, b0 div t^S, a1, b1 div t^S;
+end function;
+
+/*
+PP<t> := PolynomialRing(GF(2));
+
+repeat
+    q := Random(PP, 31);
+until IsIrreducible(q);
+
+r := Random(PP, 31); r := r mod q;
+skewgauss(q, r, 1);
+skewgauss(q, r, 2);
+skewgauss(q, r, 3);
+
+*/

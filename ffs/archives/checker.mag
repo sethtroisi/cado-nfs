@@ -1,0 +1,152 @@
+/*  Use this checker like this:
+ 
+p := 2;
+load "checker.mag";
+I := 9; J := 9;
+lpb := [25, 25];
+threshold := [50, 50];
+fbb := [12, 12];
+
+q := hex2pol("3F29C8D");
+rho := hex2pol("1E3DC3");
+
+PrintAllRelations(q, rho, I, J, fbb, threshold, lpb);
+
+
+////////////////////////////////////////////////////////////
+
+
+p := 3;
+load "checker.mag";
+I := 6; J := 6;
+lpb := [15, 15];
+threshold := [30, 30];
+fbb := [9, 9];
+
+q := hex2pol("41409965");
+rho := hex2pol("2AAA4696");
+
+PrintAllRelations(q, rho, I, J, fbb, threshold, lpb);
+
+*/
+
+load "skewgauss.mag";
+
+
+
+if p eq 2 then 
+
+PP<t> := PolynomialRing(GF(p));
+MP<x> := PolynomialRing(PP);
+F := x^5 + x^4 + x^3 + x^2 + x + t^2;
+G := x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15 + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 + t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9 + t^6 + t^4 + t^3 + t^2;
+
+function hex2pol(x)
+    return PP!Intseq(StringToInteger(x, 16), 2);
+end function;
+
+function pol2hex(x)
+    return IntegerToString(Seqint([Integers()!xx : xx in Eltseq(x)], 2), 16);
+end function;
+
+
+else  // p := 3
+
+PP<t> := PolynomialRing(GF(3));
+MP<x> := PolynomialRing(PP);
+F := x^5 + x*t + x + t^2;
+G := x*t^25 + x*t^23 + 2*x*t^22 + 2*x*t^21 + 2*x*t^20 + x*t^18 + 2*x*t^17 + x*t^16 + 2*x*t^14 + 2*x*t^13 + 2*x*t^11 + x*t^10 + 2*x*t^9 + 2*x*t^8 + x*t^7 + 2*x*t^6 + x*t^5 + x*t^4 + 2*x*t^2 + x*t + 2*x + t^26 + 2*t^25 + t^23 + t^22 + 2*t^20 + t^19 + t^18 + 2*t^17 + t^16 + t^12 + t^11 + 2*t^10 + t^8 + t^7 + 2*t^6 + t^4 + 2*t^3 + t + 2;
+
+function pol2hex(p)
+    xx := Seqint([ Integers()!x : x in Eltseq(p) ], 4);
+    return IntegerToString(xx, 16);
+end function;
+
+function hex2pol(x)
+    return PP!Intseq(StringToInteger(x, 16), 4);
+end function;
+
+end if;
+
+
+function AllRelations(q, rho, I, J, fbb, threshold, lpb)
+    Rels := [];
+    a0, b0, a1, b1 := skewgauss(q, rho, 0);
+
+    ij2ab := function(i,j)
+        return i*a0+j*a1, i*b0+j*b1;
+    end function;
+    Normf := function(i,j)
+        a,b := ij2ab(i,j);
+        return Numerator(Evaluate(F, a/b)*b^Degree(F));
+    end function;
+    Normg := function(i,j)
+        a,b := ij2ab(i,j);
+        return Numerator(Evaluate(G, a/b)*b^Degree(G));
+    end function;
+
+    IsSmooth := function(f, a, b, B, th, L)
+        ff := Factorization(f);
+        // no prime larger than the large prime bound?
+        if Degree(ff[#ff][1]) gt L then return false; end if;
+
+        // count the degree acculumated by the sieve part
+        // and check the threshold:
+        deg := 0;
+        for i in [1..#ff] do
+            pp := ff[i][1];
+            if Degree(pp) le B then
+                nocontrib := false;
+                // check that it is not a projective root in the qlattice.
+                // compute (a0 - rr*b0) mod pp
+                if b mod pp eq 0 then
+                    nocontrib := true;
+                end if;
+                if not nocontrib then 
+                    rr := (Modinv(b, pp)*a) mod pp;
+                    if (a0 - rr*b0) mod pp eq 0 then
+                        nocontrib := true;
+                    end if;
+                end if;
+                if not nocontrib then 
+                    deg +:= Degree(pp);
+                end if;
+            end if;
+        end for;
+        if Degree(f)-deg gt th then return false; end if;
+
+        return true;
+    end function;
+
+    Nrels := 0;
+    for jj in [1..p^I-1] do
+        j := PP ! Intseq(jj, p);
+        if not IsMonic(j) then continue; end if;
+        for ii in [1..p^I-1] do
+            i := PP ! Intseq(ii, p);
+            if Degree(GCD(i,j)) ne 0 then continue; end if;
+
+            Nf := Normf(i,j);
+            Nf div:= q;
+            a,b := ij2ab(i,j);
+            if not IsSmooth(Nf, a, b, fbb[1], threshold[1], lpb[1]) then continue; end if;
+            if not IsSmooth(Normg(i,j), a, b, fbb[1], threshold[2], lpb[2]) then continue; end if;
+
+            Append(~Rels, [a,b]);
+            Nrels +:= 1;
+        end for;
+    end for;
+    return Rels;
+end function;
+
+procedure PrintAllRelations(q, rho, I, J, fbb, threshold, lpb)
+    Rels := AllRelations(q, rho, I, J, fbb, threshold, lpb);
+    for r in Rels do
+        printf "%o,%o\n", pol2hex(r[1]), pol2hex(r[2]);
+    end for;
+    printf "Total: %o relations found\n", #Rels;
+end procedure;
+
+
+
+

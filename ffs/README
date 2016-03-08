@@ -1,0 +1,7 @@
+This subdirectory is an implementation of the steps of the Function Field
+Sieve that are specific to this algorithm.
+
+It supports only the characteristic 2 and 3 for the moment.
+
+As a part of CADO_NFS this code is also distributed under the GNU LESSER
+GENERAL PUBLIC LICENSE Version 2.1 or later.

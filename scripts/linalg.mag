@@ -1,0 +1,93 @@
+
+/*
+
+Run with
+  magma ell:=$ELL nmaps:=$SMAPS sparsefile:=$SPARSE smfile:=$SM kerfile:=$KER linalg.mag
+
+*/
+
+ell := StringToInteger(ell);
+nmaps := StringToInteger(nmaps);
+
+SetNthreads(4);
+SetVerbose("SparseMatrix", 1);
+
+function ReadLineIndex(str)
+    S := Split(str, " ");
+    n := StringToInteger(S[1]);
+    assert #S eq n+1;
+    C := [];
+    for i := 1 to n do
+        A := Split(S[i+1], ":");
+        Append(~C, [ StringToInteger(A[1], 16), StringToInteger(A[2]) ]);
+    end for;
+    return C;
+end function;
+
+
+function ReadLineSmall(str)
+    S := Split(str, " ");
+    n := StringToInteger(S[1]);
+    assert #S eq n+1;
+    C := [];
+    for i := 1 to n do
+        A := Split(S[i+1], ":");
+        Append(~C, [ StringToInteger(A[1]), StringToInteger(A[2]) ]);
+    end for;
+    return C;
+end function;
+
+M := SparseMatrix();
+
+// Main part
+printf "Reading the sparse matrix %o...\n", sparsefile;
+SmallFile := Read(sparsefile);
+Lines := Split(SmallFile);
+m, n := Explode(StringToIntegerSequence(Lines[1]));
+
+for i := 1 to m do
+    C := ReadLineSmall(Lines[i+1]);
+    for j := 1 to #C do
+        SetEntry(~M, i, 1+C[j][1], C[j][2]);
+    end for;
+end for;
+
+// SM part
+if nmaps gt 0 then
+    printf "Reading the SM part %o...\n", smfile;
+    SMFile := Read(smfile);
+    Lines := Split(SMFile);
+    mm := StringToIntegerSequence(Lines[1])[1];
+    assert mm eq m;
+
+    for i := 1 to m do
+        C := StringToIntegerSequence(Lines[i+1]);
+        assert #C ge nmaps;
+        for j := 1 to nmaps do
+            SetEntry(~M, i, n+j, C[j]);
+        end for;
+    end for;
+end if;
+
+// If the system is overdetermined, let's erase the last rows because
+// Magma 2.20 (upto at least patch-level 4) has a bug.
+if NumberOfRows(M) gt NumberOfColumns(M) then
+    for i := NumberOfColumns(M)+1 to NumberOfRows(M) do
+        S := Support(M, i);
+        for j in S do
+            SetEntry(~M, i, j, 0);
+        end for;
+    end for;
+end if;
+
+// Computing...
+printf "Computing kernel...\n";
+time v := ModularSolution(M, ell : Lanczos := false);
+
+printf "Write result to %o...\n", kerfile;
+SetOutputFile(kerfile: Overwrite:=true);
+for i := 1 to Dimension(Parent(v)) do
+    print v[i];
+end for;
+UnsetOutputFile();
+exit;

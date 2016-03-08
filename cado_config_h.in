@@ -1,0 +1,82 @@
+#ifndef CADO_CONFIG_H_
+#define CADO_CONFIG_H_
+
+#define CFLAGS      "@CMAKE_C_FLAGS@"
+#define CXXFLAGS    "@CMAKE_CXX_FLAGS@"
+
+#define GMP_INCDIR    "@GMP_INCDIR@"
+#define GMP_LIBDIR    "@GMP_LIBDIR@"
+#define MPIR_INCDIR    "@MPIR_INCDIR@"
+#define MPIR_LIBDIR    "@MPIR_LIBDIR@"
+
+#cmakedefine    HAVE_MPIR
+
+#cmakedefine    HAVE_POSIX_MEMALIGN
+#cmakedefine    HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#cmakedefine    HAVE_PTHREAD_BARRIER_WAIT
+#cmakedefine    HAVE_CURL
+#cmakedefine    HAVE_SSE2
+#cmakedefine    HAVE_SSE3
+#cmakedefine    HAVE_SSSE3
+#cmakedefine    HAVE_SSE41
+#cmakedefine    HAVE_PCLMUL
+#cmakedefine    HAVE_OPENMP
+#cmakedefine    HAVE_ALLOCA_H
+#cmakedefine    HAVE_CABSL
+#cmakedefine    HAVE_LOG2
+#cmakedefine    HAVE_EXP2
+#cmakedefine    HAVE_RESOURCE_H
+#cmakedefine    HAVE_UTSNAME_H
+#cmakedefine    HAVE_MMAN_H
+#cmakedefine    HAVE_STATVFS_H
+#cmakedefine    HAVE_WAIT_H
+#cmakedefine    HAVE_LIBGEN_H
+#cmakedefine    HAVE_SIGHUP
+#cmakedefine    HAVE_GETRUSAGE
+#cmakedefine    HAVE_RUSAGE_THREAD
+#cmakedefine    HAVE_GETC_UNLOCKED
+#cmakedefine    HAVE_NANOSLEEP
+#cmakedefine    HAVE_USLEEP
+#cmakedefine    HAVE_POPEN
+#cmakedefine    HAVE_PCLOSE
+#cmakedefine    HAVE_LRAND48
+#cmakedefine    HAVE_STRDUP
+#cmakedefine    HAVE_STRNDUP
+#cmakedefine    HAVE_WAITPID
+#cmakedefine    HAVE_CTIME_R
+#cmakedefine    HAVE_REALPATH
+#cmakedefine    HAVE_SYS_MMAN_H
+#cmakedefine    HAVE_MMAP
+#cmakedefine    HAVE_SYSCONF
+#cmakedefine    HAVE_STRLCPY
+#cmakedefine    HAVE_STRLCAT
+#cmakedefine    HAVE_LINUX_BINFMTS_H
+#cmakedefine    HAVE_HWLOC
+#cmakedefine    HAVE_CXX11
+#define    ULONG_BITS   @ULONG_BITS@
+#define    ULONGLONG_BITS   @ULONGLONG_BITS@
+/* In the C source files, we may of course check MPI_VERSION and
+ * MPI_SUBVERSION by ourselves. However we would like to possibly
+ * dismiss, on the per-implementation basis, the claim of MPI-3 support.
+ */
+#cmakedefine    HAVE_MPI2_API
+#cmakedefine    HAVE_MPI3_API
+
+#cmakedefine    HAVE_SYNC_FETCH
+#cmakedefine    HAVE_ASPRINTF
+#cmakedefine    HAVE_MINGW
+/* We define __USE_MINGW_ANSI_STDIO under MinGW to make MinGW provide */
+/* C99-compliant printf() functions */
+#cmakedefine01    __USE_MINGW_ANSI_STDIO
+
+#cmakedefine    VOLATILE_IF_GCC_UBUNTU_BUG
+#cmakedefine    VOLATILE_IF_GCC_58805_BUG
+
+#cmakedefine    HAVE_EXECUTABLE_SUFFIX
+#ifdef HAVE_EXECUTABLE_SUFFIX
+#define EXECUTABLE_SUFFIX "@CMAKE_EXECUTABLE_SUFFIX@"
+#endif
+
+#cmakedefine HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES
+
+#endif  /* CADO_CONFIG_H_ */

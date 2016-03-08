@@ -1,0 +1,56 @@
+This file explains how to use the FFS possibilities of CADO-NFS. It is
+possible to deal with finite fields of one of the two following forms:
+  - finite fields of characteristic 2   
+  - finite fields of characteristic 3
+
+There is no general script for FFS.  We describe here the sequence of
+steps to be performed.  It is assumed that the user has some background
+knowledge on the algorithm.
+
+
+Notation:
+  p, n:   we want to compute dlog in GF(p^n), with p=2 or p=3.
+
+You should first compile the FFS-related binaries. Visit the ffs/
+subdirectory, copy Makefile.local.example to Makefile.local and edit it
+to configure according to what you want; then type 'make'.
+
+- polynomial selection:
+  Nothing automatic. There are some tools in the polyselect subdirectory.
+  The code presently assumes that curves with only one place at infinity
+  are chosen.
+
+- relation collection:
+  Create a parameter file, imitating the ones in the ffs/params/
+  directory.
+  Then run
+    ffs/f2/makefb <paramfile>
+  or 
+    ffs/f3/makefb <paramfile>
+  depending whether you are in characteristic 2 or 3. From now on, we assume
+  characteristic 2.
+
+  Computing relations is done with
+    ffs/f2/sieve <paramfile>
+  You'll have to deal by yourself with the special-q ranges, and so on.
+
+- freerels/filtering
+  To generate the freerels and the renumbering table, you can use the freerels
+  binary from the ffs directory (MAY BE OUTDATED)
+  You'll have to remove manually the duplicates and convert the relations to the
+  renumber format. Then purge, merge-dl, replay-dl can be used to perform the
+  filtering step.
+  No Schirokauer maps are needed here.
+
+- Linear algebra:
+  Exactly the same as for NFS-DL.
+  Have a look at the ouput and log files of "./cado-nfs.py p -dlp" and try
+  to imitate.
+
+- Reconstruct dlogs of fb elements
+  You can use reconstructlog-dl without Schirokauer maps (-nsm 0,0). It may
+  required to use a phony polynomial file for the -poly command line argument.
+
+- Individual logarithms
+  Nothing automatic. Use ffs/descent_init and ffs/sieve to do the
+  descent.
