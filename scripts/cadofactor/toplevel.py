@@ -28,11 +28,12 @@ class Cado_NFS_toplevel(object):
     def find_default_hint_file(self):
         ''' return the full path of the default hint file which
         is appropriate for the given dlp problem.'''
-        assert self.args.dlp
-        assert self.args.gfpext == 1
+        assert self.parameters.get_simple("dlp", False)
+        assert self.parameters.get_simple("gfpext", 1) == 1
+        assert self.parameters.get_simple("N", 0) != 0
         default_param_dir = self.pathdict["data"]
         default_param_dir = os.path.join(default_param_dir, "dlp")
-        size_of_n=len(repr(self.args.N))
+        size_of_n=len(repr(self.parameters.get_simple("N", 0)))
         # also attempt nearest multiple of 5.
         attempts=["p%d"%x for x in [size_of_n, ((size_of_n+2)//5)*5]]
         if attempts[1]==attempts[0]:
