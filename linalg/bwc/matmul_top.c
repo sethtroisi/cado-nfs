@@ -2177,30 +2177,20 @@ static char * matrix_list_get_item(param_list_ptr pl, const char * key, int midx
     return res;
 }
 
-static int matrix_list_get_count(param_list_ptr pl, const char * key)
-{
-    if (!param_list_lookup_string(pl, key))
-        return 0;
-
-    char ** mnames;
-    int nmatrices;
-    int rc = param_list_parse_string_list_alloc(pl, key, &mnames, &nmatrices, ",");
-    if (rc == 0)
-        return 0;
-    for(int midx = 0 ; midx < nmatrices ; midx++) {
-        free(mnames[midx]);
-    }
-    free(mnames);
-    return nmatrices;
-}
-
 static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list_ptr pl)
 {
     char ** mnames;
     int nmatrices;
     // get basename of matrix file. Remove potential suffix, .txt or .bin
-    int rc = param_list_parse_string_list_alloc(pl, "matrix", &mnames, &nmatrices, ",");
-    ASSERT_ALWAYS(rc);
+    if (param_list_lookup_string(pl, "random_matrix")) {
+        mnames = malloc(sizeof(char *));
+        mnames[0] = malloc(16);
+        int rc = strlcpy(mnames[0], "fake", 16);
+        ASSERT_ALWAYS(rc < 16);
+    } else {
+        int rc = param_list_parse_string_list_alloc(pl, "matrix", &mnames, &nmatrices, ",");
+        ASSERT_ALWAYS(rc);
+    }
 
     int pos[2];
     for(int d = 0 ; d < 2 ; d++)  {
@@ -2292,9 +2282,28 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     mmt->pitype = pi_alloc_mpfq_datatype(pi, abase);
     mmt->pi = pi;
     mmt->matrices = NULL;
-    mmt->nmatrices = matrix_list_get_count(pl, "matrix");
 
-    const char * tmp, * rtmp;
+    int nbals = param_list_get_list_count(pl, "balancing");
+    mmt->nmatrices = param_list_get_list_count(pl, "matrix");
+    const char * random_description = param_list_lookup_string(pl, "random_matrix");
+
+
+    if (random_description) {
+        if (nbals || mmt->nmatrices) {
+            fprintf(stderr, "random_matrix is incompatible with balancing= and matrix=\n");
+            exit(EXIT_FAILURE);
+        }
+    } else if (nbals && !mmt->nmatrices) {
+        fprintf(stderr, "missing parameter matrix=\n");
+        exit(EXIT_FAILURE);
+    } else if (!nbals && mmt->nmatrices) {
+        fprintf(stderr, "missing parameter balancing=\n");
+        exit(EXIT_FAILURE);
+    } else if (nbals != mmt->nmatrices) {
+        fprintf(stderr, "balancing= and matrix= have inconsistent number of items\n");
+        exit(EXIT_FAILURE);
+    }
+
 
     if (mmt->nmatrices) {
         mmt->matrices = malloc(mmt->nmatrices * sizeof(matmul_top_matrix));
@@ -2308,39 +2317,23 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     // locfile,
     // wr[]->*
     // are filled in later within read_info_file
-    //
 
-    tmp = param_list_lookup_string(pl, "balancing");
-    rtmp = param_list_lookup_string(pl, "random_matrix");
-    if (tmp && rtmp) {
-        fprintf(stderr, "balancing= and random_matrix= are incompatible\n");
-        exit(1);
-    }
-    if (!tmp && !rtmp) {
-        fprintf(stderr, "Missing parameter balancing=\n");
-        exit(1);
-    }
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        if (tmp) {
+        if (nbals) {
             /* we could conceivably use a list of balancing files...  */
             char ** bnames;
-            int nbals;
-            int rc = param_list_parse_string_list_alloc(pl, "balancing", &bnames, &nbals, ",");
-            ASSERT_ALWAYS(rc);
-            if (nbals != mmt->nmatrices) {
-                fprintf(stderr, "balancing= and matrix= have inconsistent number of items\n");
-                exit(EXIT_FAILURE);
-            }
+            param_list_parse_string_list_alloc(pl, "balancing", &bnames, &nbals, ",");
             for(int i = 0 ; i < nbals ; i++) {
                 balancing_read_header(mmt->matrices[i]->bal, bnames[i]);
                 free(bnames[i]);
             }
             free(bnames);
-        } else {
+        }
+        if (random_description) {
             mmt->nmatrices = 1;
             mmt->matrices = malloc(sizeof(matmul_top_matrix));
             memset(mmt->matrices, 0, mmt->nmatrices * sizeof(matmul_top_matrix));
-            random_matrix_fill_fake_balancing_header(mmt->matrices[0]->bal, pi, rtmp);
+            random_matrix_fill_fake_balancing_header(mmt->matrices[0]->bal, pi, random_description);
         }
     }
 
@@ -2373,7 +2366,7 @@ static void mmt_get_local_permutation_data(matmul_top_data_ptr mmt, param_list_p
 {
     serialize_threads(mmt->pi->m);
 
-    int nbals = matrix_list_get_count(pl, "balancing");
+    int nbals = param_list_get_list_count(pl, "balancing");
     ASSERT_ALWAYS(nbals == 0 || nbals == mmt->nmatrices);
 
     for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
