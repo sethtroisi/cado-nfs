@@ -2304,6 +2304,8 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         exit(EXIT_FAILURE);
     }
 
+    if (random_description)
+        mmt->nmatrices = 1;
 
     if (mmt->nmatrices) {
         mmt->matrices = malloc(mmt->nmatrices * sizeof(matmul_top_matrix));
@@ -2330,9 +2332,6 @@ void matmul_top_init(matmul_top_data_ptr mmt,
             free(bnames);
         }
         if (random_description) {
-            mmt->nmatrices = 1;
-            mmt->matrices = malloc(sizeof(matmul_top_matrix));
-            memset(mmt->matrices, 0, mmt->nmatrices * sizeof(matmul_top_matrix));
             random_matrix_fill_fake_balancing_header(mmt->matrices[0]->bal, pi, random_description);
         }
     }
