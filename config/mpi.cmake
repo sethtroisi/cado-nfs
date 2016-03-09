@@ -106,6 +106,10 @@ else()
                 message(STATUS "MPI C Compiler is Intel MPI, version ${CMAKE_MATCH_1}")
                 set(MPI_COMPILER_IS_INTEL_MPI 1)
                 set(MPI_INTEL_COMPILER_VERSION ${CMAKE_MATCH_1})
+		set(MPI_C_COMPILER_CMDLINE_INSERTIONS "-cc=${CMAKE_C_COMPILER}")
+		set(MPI_CXX_COMPILER_CMDLINE_INSERTIONS "-cxx=${CMAKE_CXX_COMPILER}")
+		message(STATUS "Adding -cc=${CMAKE_C_COMPILER} to mpicc command line")
+		message(STATUS "Adding -cxx=${CMAKE_CXX_COMPILER} to mpicxx command line")
             else()
                 # perhaps it's openmpi, but openmpi won't tell on mere
                 # mpicc -v...

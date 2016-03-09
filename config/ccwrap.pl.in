@@ -3,50 +3,68 @@
 use warnings;
 use strict;
 
+my $want_cxx = ($0 =~ 'cxxwrap');
+
 my $default_cc = '@CMAKE_C_COMPILER@';
 my $mpi_cc = '@MPI_C_COMPILER@';
 my $default_cxx = '@CMAKE_CXX_COMPILER@';
 my $mpi_cxx = '@MPI_CXX_COMPILER@';
 
+my $compiler_name = $want_cxx ? 'c++' : 'cc';
+my $default_compiler = $want_cxx ? $default_cxx : $default_cc;
+my $mpi_compiler = $want_cxx ? $mpi_cxx : $mpi_cc;
+
 sub usage {
     print STDERR <<EOF;
 Usage: $0 [command line arguments...]
 
-This really wraps around the original cc, as the expansion is:
+This really wraps around the original $compiler_name, as the expansion is:
 
-$default_cc [command line arguments...]
+$default_compiler [command line arguments...]
 
 However, if an argument --mpi is found, then the command line becomes
 
-$mpi_cc [command line arguments...] (with the --mpi removed)
+$mpi_compiler [command line arguments...] (with the --mpi removed)
 EOF
     exit 1;
 }
 
-my $cc = $default_cc;
-my $cxx = $default_cxx;
+# scan to see if we have -c or -S somewhere
 
-my @a = ();
+# if we have no -c, then we're linking, in which case we _want_ a c++ linker
+# because there might be c++ object files in some of the linked libs.
+
+my $compiling = scalar grep(/^-[cS]$/, @ARGV);
+
+if (!$compiling) {
+	$want_cxx = 1;
+	$default_compiler = $want_cxx ? $default_cxx : $default_cc;
+	$mpi_compiler = $want_cxx ? $mpi_cxx : $mpi_cc;
+}
+
+my $compiler = $default_compiler;
+
+my @args = ();
+my @prepend;
 
 my $compile = 0;
 while (defined($_=shift @ARGV)) {
     /^--mpi$/ && do {
-        $cc = $mpi_cc;
-        $cxx = $mpi_cxx;
-        # print STDERR "Using $cc instead of $default_cc\n";
+        $compiler = $mpi_compiler;
+	@prepend = ($want_cxx ?
+			 split(';', '@MPI_CXX_COMPILER_CMDLINE_INSERTIONS@')
+			:
+			 split(';', '@MPI_C_COMPILER_CMDLINE_INSERTIONS@'));
+        # print STDERR "Using $compiler instead of $default_compiler\n";
         next;
     };
-    $compile=1 if /^-c$/;
-    $compile=1 if /^-S$/; # Also set if we compile to assembly output
-    push @a, $_;
+    push @args, $_;
 }
 
-usage unless scalar @a;
+usage unless scalar @args;
 
-# if we have no -c, then we're linking, in which case we _want_ a c++ linker
-# because there might be c++ object files in some of the linked libs.
-$cc = $cxx unless $compile;
+unshift @args, @prepend;
 
-# print "$cc ", join(" ", @a), "\n";
+# print "$compiler ", join(" ", @args), "\n";
 
-exec $cc, @a;
+exec $compiler, @args;
