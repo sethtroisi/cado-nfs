@@ -2244,14 +2244,23 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
 #ifdef PRINT_ARRAY_NORM
 void number_norm(FILE * file_array_norm, array_srcptr array, unsigned char max)
 {
-  uint64_t * tab = (uint64_t *) malloc(sizeof(uint64_t) * max);
-  memset(tab, 0, sizeof(uint64_t) * max);
+  unsigned char max_cur = max;
+  //TODO: use UCHAR_MAX is a little bit too much.
+  uint64_t * tab = (uint64_t *) malloc(sizeof(uint64_t) * UCHAR_MAX);
+  memset(tab, 0, sizeof(uint64_t) * UCHAR_MAX);
   for (uint64_t i = 0; i < array->number_element; i++) {
+    if (array->array[i] > max_cur) {
+      max_cur = array->array[i];
+    } 
     tab[array->array[i]] = tab[array->array[i]] + 1;
   }
-  for (unsigned int i = 0; i < (unsigned int) max; i++) {
+  uint64_t sum = 0;
+  for (unsigned int i = 0; i <= (unsigned int) max_cur; i++) {
+    sum += tab[i];
     fprintf(file_array_norm, "%u: %" PRIu64 "\n", i, tab[i]);
   }
+  fprintf(file_array_norm, "Max: %u\n", max);
+  ASSERT(sum == array->number_element);
   free(tab);
 }
 #endif // PRINT_ARRAY_NORM
