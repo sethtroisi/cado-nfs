@@ -60,6 +60,27 @@ endif()
 ### end bwc-specific configuration.
 
 
+# These are just shorthands. Some targets also like to define compile and
+# link flags for their own, so it's really messy, because I don't know
+# how to have cmake *append* to the target's link flags.
+
+# Note that whenever a target (at least very certainly an executable)
+# links an mpi compiled library, it must be marked as mpi as well.
+
+macro(mark_mpi_target target)
+    set_target_properties(${target} PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+endmacro()
+macro(mpi_add_library target)
+    add_library(${target} ${ARGN})
+    mark_mpi_target(${target})
+endmacro()
+macro(mpi_add_executable target)
+    add_executable(${target} ${ARGN})
+    mark_mpi_target(${target})
+endmacro()
+
 ### bwc_base
 
 # Note that because the balancing code contains balancing_get_matrix_u32,
@@ -95,7 +116,7 @@ set(bwc_base_sources
     )
 endif()
 
-add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
+mpi_add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
 target_link_libraries(bwc_base ${gmp_libname})
 
@@ -108,28 +129,23 @@ target_link_libraries(bwc_base hwloc)
 endif()
 
 
-set_target_properties(bwc_base PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
-
 if(ENABLE_SHARED)
     install(TARGETS bwc_base DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()
 
 ### end bwc_base
 
-
-add_library(mf ${CADO_SHARED} mf.c)
+mpi_add_library(mf ${CADO_SHARED} mf.c)
 target_link_libraries(mf bwc_base utils)
 if(ENABLE_SHARED)
     install(TARGETS mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()
-add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
+mpi_add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
 target_link_libraries(mf_scan mf)
 
 
 include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
-add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
+mpi_add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
 target_link_libraries(mf_bal mf m)
 install(TARGETS mf_bal RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
 
@@ -138,8 +154,6 @@ configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
 add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
 set_property(TARGET random_matrix PROPERTY COMPILE_DEFINITIONS WANT_MAIN)
-
-
 target_link_libraries(random_matrix utils m)
 
 ### bwc_mpfq
@@ -199,10 +213,7 @@ ENDIF()
 # shared, as embarking the code within the impl-specific .so is fine.
 # Unfortunately, we do want matmul_common to be compiled with -fPIC,
 # then. Which is easiest to trigger by making it a shared object.
-add_library(matmul_common ${CADO_SHARED} matmul-common.c)
-set_target_properties(matmul_common PROPERTIES
-    COMPILE_FLAGS "--mpi"
-    LINK_FLAGS "--mpi")
+mpi_add_library(matmul_common ${CADO_SHARED} matmul-common.c)
 if(ENABLE_SHARED)
     install(TARGETS matmul_common DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()
@@ -299,10 +310,7 @@ target_link_libraries(bwc_base ${all_matmul_libs})
 endif()
 
 ### matmul_mf
-add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
-    set_target_properties(matmul_mf PROPERTIES
-            COMPILE_FLAGS "--mpi"
-            LINK_FLAGS "--mpi")
+mpi_add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
 target_link_libraries(matmul_mf mf)
 if(ENABLE_SHARED)
     install(TARGETS matmul_mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
@@ -310,11 +318,9 @@ endif()
 ### end matmul_mf
 
 macro(bwc_program_base v)
-    add_executable(${v} ${ARGN})
+    mpi_add_executable(${v} ${ARGN})
     set_target_properties(${v} PROPERTIES
-            LINKER_LANGUAGE CXX
-            COMPILE_FLAGS "--mpi"
-            LINK_FLAGS "--mpi")
+            LINKER_LANGUAGE CXX)
         # -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${v} bwc_base)
 endmacro()
