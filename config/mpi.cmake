@@ -81,6 +81,49 @@ else()
         # to escape its scope and go into the cache right now.
         set(WITH_MPI 1 CACHE INTERNAL "MPI is being used (for relevant code parts)")
 
+
+        # Run mpicc -v to detect the MPI implementation. We need this at least
+        # to add some command-line arguments to MPI builds for the Intel MPI
+        # implementation.
+
+        execute_process(COMMAND ${MPI_C_COMPILER} -v
+                RESULT_VARIABLE test_return_code
+                OUTPUT_VARIABLE test_stdout
+                ERROR_VARIABLE test_stderr
+                )
+        string(STRIP "${test_stdout}" test_stdout)
+        if (test_return_code)
+        else()
+            if(test_stdout MATCHES "mpi.*for MVAPICH2 version (.*)")
+                message(STATUS "MPI C Compiler is mvapich2, version ${CMAKE_MATCH_1}")
+                set(MPI_COMPILER_IS_MVAPICH2 1)
+                set(MPI_MVAPICH2_COMPILER_VERSION ${CMAKE_MATCH_1})
+            elseif(test_stdout MATCHES "mpi.*for MPICH.*version (.*)")
+                message(STATUS "MPI C Compiler is mpich, version ${CMAKE_MATCH_1}")
+                set(MPI_COMPILER_IS_MPICH 1)
+                set(MPI_MPICH_COMPILER_VERSION ${CMAKE_MATCH_1})
+            elseif(test_stdout MATCHES "^mpi.*for.*Intel.*MPI.*Library ([0-9].*) for")
+                message(STATUS "MPI C Compiler is Intel MPI, version ${CMAKE_MATCH_1}")
+                set(MPI_COMPILER_IS_INTEL_MPI 1)
+                set(MPI_INTEL_COMPILER_VERSION ${CMAKE_MATCH_1})
+            else()
+                # perhaps it's openmpi, but openmpi won't tell on mere
+                # mpicc -v...
+                execute_process(COMMAND ${MPI_C_COMPILER} -showme:version
+                        RESULT_VARIABLE test_return_code
+                        OUTPUT_VARIABLE test_stdout
+                        ERROR_VARIABLE test_stderr
+                        )
+                string(STRIP "${test_stdout}" test_stdout)
+                if(test_stdout MATCHES "Open MPI ([^ ]*)")
+                    message(STATUS "MPI C Compiler is Open MPI, version ${CMAKE_MATCH_1}")
+                    set(MPI_COMPILER_IS_OPEN_MPI 1)
+                    set(MPI_OPEN_MPI_COMPILER_VERSION ${CMAKE_MATCH_1})
+                else()
+                    message(STATUS "MPI C Compiler front-end not recognized, proceeding anyway")
+                endif()
+            endif()
+        endif()
         # Now check for the MPI API version.
         macro(my_try_compile_mpicc SOURCE VAR)
             string(RANDOM LENGTH 8 ALPHABET "0123456789abcdef" uuid)
