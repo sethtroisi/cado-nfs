@@ -890,6 +890,24 @@ int param_list_parse_string_list_alloc(param_list pl, const char * key, char ***
     return parsed;
 }
 
+int param_list_get_list_count(param_list_ptr pl, const char * key)
+{
+    if (!param_list_lookup_string(pl, key))
+        return 0;
+
+    char ** names;
+    int nitems;
+    int rc = param_list_parse_string_list_alloc(pl, key, &names, &nitems, ",");
+    if (rc == 0)
+        return 0;
+    for(int midx = 0 ; midx < nitems ; midx++) {
+        free(names[midx]);
+    }
+    free(names);
+    return nitems;
+}
+
+
 int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep)
 {
     char *value;
