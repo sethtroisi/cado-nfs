@@ -292,7 +292,7 @@ void add_arrays(int * current_indexes, const int * current_values,
   }
 }
 
-unsigned char norm_spq(double norm, unsigned char * max_norm, double spq_log,
+unsigned char norm_spq(double norm, unsigned int * max_norm, double spq_log,
     double log2_base, int special_q, int deg)
 {
   ASSERT(norm >= 0.0);
@@ -321,8 +321,8 @@ unsigned char norm_spq(double norm, unsigned char * max_norm, double spq_log,
   } else {
     val = (unsigned char) log_norm;
   }
-  if ((unsigned char) log2_norm > * max_norm) {
-    * max_norm = (unsigned char) log2_norm;
+  if ((unsigned int) log2_norm > * max_norm) {
+    * max_norm = (unsigned int) log2_norm;
   }
 
   ASSERT_ALWAYS(val < UCHAR_MAX);
@@ -332,7 +332,7 @@ unsigned char norm_spq(double norm, unsigned char * max_norm, double spq_log,
 
 #ifndef MPZ_NORM
 unsigned char log_norm_double(const int * current_indexes,
-    unsigned char * max_norm, mat_int64_srcptr M,
+    unsigned int * max_norm, mat_int64_srcptr M,
     double_poly_srcptr f, double spq_log, int special_q, double log2_base,
     MAYBE_UNUSED unsigned int size)
 {
@@ -363,7 +363,7 @@ unsigned char log_norm_double(const int * current_indexes,
 }
 #else
 unsigned char log_norm_double(const int * current_indexes,
-    unsigned char * max_norm, mat_int64_srcptr M,
+    unsigned int * max_norm, mat_int64_srcptr M,
     mpz_poly_srcptr f, double spq_log, int special_q, double log2_base,
     MAYBE_UNUSED unsigned int size)
 {
@@ -454,14 +454,14 @@ void add_one_values(int * current_indexes, const int * bottom_left_cube,
 }
 
 #ifndef MPZ_NORM
-static void init_cells(array_ptr array, unsigned char * max_norm,
+static void init_cells(array_ptr array, unsigned int * max_norm,
     MAYBE_UNUSED FILE * file, const int * bottom_left_cube,
     const unsigned int * length, sieving_bound_srcptr H, double_poly_srcptr f,
     mat_int64_srcptr Mq, double spq_log, int special_q, double norm_tolerance,
     double log2_base, MAYBE_UNUSED mpz_poly_srcptr f_Z,
     MAYBE_UNUSED mpz_ptr mean_norm)
 #else // MPZ_NORM
-static void init_cells(array_ptr array, unsigned char * max_norm,
+static void init_cells(array_ptr array, unsigned int * max_norm,
     MAYBE_UNUSED FILE * file, const int * bottom_left_cube,
     const unsigned int * length, sieving_bound_srcptr H, mpz_poly_srcptr f,
     mat_int64_srcptr Mq, double spq_log, int special_q,
@@ -614,7 +614,7 @@ static void init_cells(array_ptr array, unsigned char * max_norm,
   free(use_new_length);
 }
 
-void init_norm(array_ptr array, unsigned char * max_norm,
+void init_norm(array_ptr array, unsigned int * max_norm,
     MAYBE_UNUSED FILE * file, sieving_bound_srcptr H, mat_Z_srcptr matrix,
     mpz_poly_srcptr f, double spq_log, int special_q, double log2_base)
 {

@@ -37,7 +37,7 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
  * spq: the special-q.
  * special_q: 0 if there is no special-q in this side, else 1.
  */
-void init_norm(array_ptr array, unsigned char * norm_max,
+void init_norm(array_ptr array, unsigned int * norm_max,
     FILE * file, sieving_bound_srcptr H, mat_Z_srcptr matrix, mpz_poly_srcptr f,
     double spq_log, int special_q, double log2_base);
 

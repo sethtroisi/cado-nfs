@@ -2242,24 +2242,35 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
 }
 
 #ifdef PRINT_ARRAY_NORM
-void number_norm(FILE * file_array_norm, array_srcptr array, unsigned char max)
+/*
+ * Print the number of element with the same log2 of norm with the format
+ *  "log2 number". To draw histogram with R,
+ *   d <- read.csv(file, head=TRUE, sep=" ", comment.char = "#")
+ *   barplot(d$NUMBER, names.arg=d$LOG2NORM, ylab="number", xlab="log(norm, 2)")
+ */
+void number_norm(FILE * file_array_norm, array_srcptr array, unsigned int max,
+    double log2_base)
 {
-  unsigned char max_cur = max;
+  unsigned int max_cur = max;
   //TODO: use UCHAR_MAX is a little bit too much.
-  uint64_t * tab = (uint64_t *) malloc(sizeof(uint64_t) * UCHAR_MAX);
-  memset(tab, 0, sizeof(uint64_t) * UCHAR_MAX);
+  unsigned int nb_elem = (unsigned int) ceil(UCHAR_MAX * log2_base);
+  uint64_t * tab = (uint64_t *) malloc(sizeof(uint64_t) * nb_elem);
+  memset(tab, 0, sizeof(uint64_t) * nb_elem);
+  unsigned int norm_cur = 0;
   for (uint64_t i = 0; i < array->number_element; i++) {
-    if (array->array[i] > max_cur) {
-      max_cur = array->array[i];
+    norm_cur = (unsigned int) ceil((double)array->array[i] * log2_base);
+    if (norm_cur > max_cur) {
+      max_cur = norm_cur;
     } 
-    tab[array->array[i]] = tab[array->array[i]] + 1;
+    tab[norm_cur] = tab[norm_cur] + 1;
   }
   uint64_t sum = 0;
-  for (unsigned int i = 0; i <= (unsigned int) max_cur; i++) {
+  fprintf(file_array_norm, "LOG2NORM NUMBER\n");
+  for (unsigned int i = 0; i <= max_cur; i++) {
     sum += tab[i];
-    fprintf(file_array_norm, "%u: %" PRIu64 "\n", i, tab[i]);
+    fprintf(file_array_norm, "%u %" PRIu64 "\n", i, tab[i]);
   }
-  fprintf(file_array_norm, "Max: %u\n", max);
+  fprintf(file_array_norm, "# Max: %u\n", max);
   ASSERT(sum == array->number_element);
   free(tab);
 }
@@ -2572,7 +2583,7 @@ int main(int argc, char * argv[])
     pre_computation(pre_compute[i], f->pols[i], H->t);
   }
 #else // OLD_NORM
-  unsigned char * max_norm = (unsigned char *) malloc(sizeof(unsigned char) *
+  unsigned int * max_norm = (unsigned int *) malloc(sizeof(unsigned int) *
       V);
 #endif // OLD_NORM
 
@@ -2594,11 +2605,8 @@ int main(int argc, char * argv[])
 
 #ifdef PRINT_ARRAY_NORM
   FILE * file_array_norm;
-  file_array_norm = fopen("ARRAY_NORM.txt", "w+");
-  fprintf(file_array_norm, "H: ");
-  sieving_bound_fprintf(file_array_norm, H);
+  char * name_array_norm = (char *) malloc(sizeof(char) * 1024);
 #endif // PRINT_ARRAY_NORM
-
   gmp_randstate_t state;
   gmp_randinit_default(state);
   array_spq_t spq;
@@ -2663,13 +2671,8 @@ int main(int argc, char * argv[])
       mat_Z_fprintf(file_trace_pos, spq->MqLLL[i]);
 #endif // TRACE_POS
 
-#ifdef PRINT_ARRAY_NORM
-      fprintf(file_array_norm, "MqLLL:\n");
-      mat_Z_fprintf(file_array_norm, spq->MqLLL[i]);
-#endif // PRINT_ARRAY_NORM
-
 #ifndef OLD_NORM
-      memset(max_norm, 0, sizeof(unsigned char) * V);
+      memset(max_norm, 0, sizeof(unsigned int) * V);
 #endif // OLD_NORM
 
       for (unsigned int j = 0; j < V; j++) {
@@ -2690,10 +2693,20 @@ int main(int argc, char * argv[])
 #endif // OLD_NORM
 
 #ifdef PRINT_ARRAY_NORM
-        fprintf(file_array_norm, "f%u: ", j);
+#ifndef MPZ_NORM
+        sprintf(name_array_norm, "ARRAY_NORM_%" PRIu64 "_%u.csv", q, j);
+#else // MPZ_NORM
+        sprintf(name_array_norm, "ARRAY_MPZ_NORM_%" PRIu64 "_%u.csv", q, j);
+#endif // MPZ_NORM
+        file_array_norm = fopen(name_array_norm, "w+");
+        fprintf(file_array_norm, "# H: ");
+        sieving_bound_fprintf(file_array_norm, H);
+        fprintf(file_array_norm, "# MqLLL:\n");
+        mat_Z_fprintf_comment(file_array_norm, spq->MqLLL[i]);
+        fprintf(file_array_norm, "# f%u: ", j);
         mpz_poly_fprintf(file_array_norm, f->pols[j]);
-        number_norm(file_array_norm, array, max_norm[j]);
-        fprintf(file_array_norm, "********************\n");
+        number_norm(file_array_norm, array, max_norm[j], log2_base[j]);
+        fclose(file_array_norm);
 #endif // PRINT_ARRAY_NORM
 
         time[j][0] = seconds() - sec;
@@ -2759,12 +2772,6 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
       fprintf(file_trace_pos, "----------------------------------------\n");
 #endif // TRACE_POS
-
-#ifdef PRINT_ARRAY_NORM
-      fprintf(file_array_norm, "----------------------------------------\n");
-      fflush(file_array_norm);
-#endif // PRINT_ARRAY_NORM
-
     }
   }
 
@@ -2795,7 +2802,7 @@ int main(int argc, char * argv[])
 #endif // TRACE_POS
 
 #ifdef PRINT_ARRAY_NORM
-  fclose(file_array_norm);
+  free(name_array_norm);
 #endif // PRINT_ARRAY_NORM
 
   for (unsigned int i = 0; i < V; i++) {
