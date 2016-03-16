@@ -201,7 +201,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
             if (nullspace_forced) {
                 fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
             } else {
-                fprintf(stderr, "Aborting. Pass nullspace=LEFT if this is really intended.\n");
+                fprintf(stderr, "Aborting. Pass nullspace=RIGHT if this is really intended.\n");
                 exit(1);
             }
         } else {
@@ -209,7 +209,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
             if (nullspace_forced) {
                 fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
             } else {
-                fprintf(stderr, "Aborting. Pass nullspace=RIGHT if this is really intended.\n");
+                fprintf(stderr, "Aborting. Pass nullspace=LEFT if this is really intended.\n");
                 exit(1);
             }
         }
@@ -295,7 +295,16 @@ int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{
     }
 #endif  /* #if 0 */
 #else
-    MPI_Init(p_argc, p_argv);
+    int req = MPI_THREAD_SERIALIZED;
+    int prov;
+    MPI_Init_thread(p_argc, p_argv, req, &prov);
+    if (req != prov) {
+        fprintf(stderr, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
+                " got %d != req %d\n",
+                prov, req);
+        fprintf(stderr, "Proceeding anyway\n");
+    }
+    // MPI_Init(p_argc, p_argv);
 #endif
     int rank;
     int size;

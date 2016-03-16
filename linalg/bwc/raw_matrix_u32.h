@@ -10,15 +10,13 @@ extern "C" {
 
 struct matrix_u32_s {
     // input arguments.
-    const char * mfile;    // matrix file name
-    const char * bfile;    // balancing file name ; NULL will mean auto-detect
+    char * mfile;    // matrix file name
+    char * bfile;    // balancing file name ; NULL will mean auto-detect
     int transpose;
     int withcoeffs;
     // output arguments.
     uint32_t * p;
     size_t size;
-    uint32_t (*twist)[2];
-    size_t ntwists;
 };
 typedef struct matrix_u32_s matrix_u32[1];
 typedef struct matrix_u32_s * matrix_u32_ptr;

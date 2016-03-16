@@ -1,4 +1,4 @@
-Main changes between cado-nfs-2.1.1 and cado-nfs-2.2:
+Main changes between cado-nfs-2.1.1 and cado-nfs-2.2.0:
 
 * The toplevel scripts (factor.sh, cadofactor.py, wuclient2.py) have
   changed. Now there are only two main scripts to be used by most users:

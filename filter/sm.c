@@ -56,7 +56,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 			     int nb_polys,
                              const mpz_t ell2)
 {
-  uint64_t nrows, ncols, small_ncols, len_relset;
+  uint64_t nrows, ncols, len_relset;
   uint64_t r[MAX_LEN_RELSET];
   int64_t e[MAX_LEN_RELSET];
   int ret;
@@ -81,9 +81,8 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   FILE * ix = fopen_maybe_compressed(indexname, "r");
   ASSERT_ALWAYS (ix != NULL);
 
-  /* small_ncols isn't used here: we don't care */
-  ret = fscanf(ix, "%" SCNu64 " %" SCNu64 "", small_nrows, &small_ncols);
-  ASSERT(ret == 2);
+  ret = fscanf(ix, "%" SCNu64 "\n", small_nrows);
+  ASSERT(ret == 1);
 
   rels = (sm_relset_ptr) malloc (*small_nrows * sizeof(sm_relset_t));
   ASSERT_ALWAYS (rels != NULL);

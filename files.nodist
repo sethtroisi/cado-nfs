@@ -61,7 +61,6 @@ sieve/ecm/CMakeLists-nodist.txt
 sieve/ecm/ecm_avg_exp.gp
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
-sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
 utils/README_POLYNOMIALS
@@ -112,6 +111,10 @@ misc/psi.c
 misc/cacheline.c
 misc/CMakeLists-nodist.txt
 misc/descent-init.c
+misc/descent_init_Fp.c
+misc/smooth_detect.c
+misc/smooth_detect.h
+misc/filter_sieved_pairs.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c

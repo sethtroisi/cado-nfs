@@ -8,7 +8,8 @@ set (sources
         mpz_poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
-        ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c stats.c lll.c
+        ringbuf.c sm_utils.c galois_utils.c memalloc.c 
+	mpz_vector.c memory.c stats.c lll.c
         verbose.c 
         version_info.c
 	modified_files.c threadpool.cpp

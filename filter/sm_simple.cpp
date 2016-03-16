@@ -43,9 +43,30 @@ static void my_sm(const char *outfile, const char *infile,
   while (fgets(buf, 1024, in)) {
     if (buf[0] == '#')
       continue;
-    relation rel;
-    rel.parse(buf);
-    mpz_poly_init_set_ab(pol, rel.a, rel.b);
+    if (buf[0] == 'p'){
+	// we read a polynomial
+	// buf = "p deg c0 c1 ... c_deg"
+	int deg;
+	char *tmp = buf+2;
+	sscanf(tmp, "%d", &deg);
+	mpz_t zbuf;
+	mpz_init(zbuf);
+	for(int i = 0; i <= deg; i++){
+	    for(++tmp ; *tmp != ' '; tmp++);
+	    gmp_sscanf(tmp, "%Zd", zbuf);
+	    mpz_poly_setcoeff(pol, i, zbuf);
+	}
+	mpz_clear(zbuf);
+	fprintf(stderr, "Poly read: ");
+	mpz_poly_fprintf(stderr, pol);
+	fprintf(stderr, "\n");
+    }
+    else{
+	// we read a relation
+	relation rel;
+	rel.parse(buf);
+	mpz_poly_init_set_ab(pol, rel.a, rel.b);
+    }
     for (int side = 0; side < nb_polys; ++side) {
       compute_sm_piecewise(smpol, pol, sm_info[side]);
       print_sm(out, smpol, sm_info[side]->nsm, sm_info[side]->f->deg);

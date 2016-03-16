@@ -122,6 +122,10 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 /* This is the same function as factor_leftover_norm() but it works
    with both norms! It is used when we want to factor these norms
    simultaneously and not one after the other.
+   Return values:
+   -1  one of the cofactors is not smooth
+   0   unable to fully factor one of the cofactors
+   1   both cofactors are smooth
 */
 
 int
@@ -150,98 +154,54 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
 
   for (int side = 0; side < 2; side++)
     {
-      unsigned int lpb = si->strategies->lpb[side];
-      double B = (double) si->conf->sides[side]->lim;
       factors[side]->length = 0;
       multis[side]->length = 0;
 
+      double B = (double) si->conf->sides[side]->lim;
       /* If n < B^2, then n is prime, since all primes < B have been removed */
       if (mpz_get_d (n[side]) < B * B)
-	{
-	  /* if n > L, return -1 */
-	  if (mpz_sizeinbase (n[side], 2) > lpb)
-	    {
-              FREE_MPZ_FACTOR;
-	      return -1;
-	    }
-	  if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
-	    {
-	      append_mpz_to_array (factors[side], n[side]);
-	      append_uint32_to_array (multis[side], 1);
-	    }
-	  is_smooth[side] = FACUL_SMOOTH;
-	}
+	is_smooth[side] = FACUL_SMOOTH;
     }
 
-  /* use the facul library */
-  //gmp_printf ("facul: %Zd, %Zd\n", n[0], n[1]);
+  /* call the facul library */
   int* facul_code = facul_both (mpz_factors, n, si->strategies, is_smooth);
 
-  if (facul_code[0] == FACUL_NOT_SMOOTH ||
-      facul_code[1] == FACUL_NOT_SMOOTH)
+  if (is_smooth[0] != FACUL_SMOOTH || is_smooth[1] != FACUL_SMOOTH)
     {
       //free ul
       FREE_MPZ_FACTOR;
       free (facul_code);
-      return -1;
+      if (is_smooth[0] == FACUL_NOT_SMOOTH || is_smooth[1] == FACUL_NOT_SMOOTH)
+	return -1;
+      else
+	return 0;
     }
 
-  ASSERT (facul_code[0] == 0 || mpz_cmp (n[0], mpz_factors[0][0]) != 0);
-  ASSERT (facul_code[1] == 0 || mpz_cmp (n[1], mpz_factors[1][0]) != 0);
-  int ret = is_smooth[0] == 1 && is_smooth[1] == 1;
-  for (int side = 0; ret == 1 && side < 2; side++)
+  /* now we know both cofactors are smooth */
+  for (int side = 0; side < 2; side++)
     {
-      unsigned int lpb = si->strategies->lpb[side];
-      uint32_t i, nr_factors;
-      if (facul_code[side] > 0)
+      /* facul_code[side] is the number of found (smooth) factors */
+      for (int i = 0; i < facul_code[side]; i++)
 	{
-	  nr_factors = facul_code[side];
-	  for (i = 0; i < nr_factors; i++)
-	    {
-              if (mpz_sizeinbase(mpz_factors[side][i], 2) > lpb)
-		/* Larger than large prime bound? */
-		{
-		  ret = -1;
-		  break;
-		}
-	      mpz_divexact (n[side], n[side], mpz_factors[side][i]);
-	      append_mpz_to_array (factors[side], mpz_factors[side][i]);
-	      append_uint32_to_array (multis[side], 1);
-	      /* FIXME, deal with repeated
-		 factors correctly */
-	    }
-	  if (ret == -1)
-	    break;
+	  /* we know that factors found by facul_both() are primes < L */
+	  mpz_divexact (n[side], n[side], mpz_factors[side][i]);
+	  append_mpz_to_array (factors[side], mpz_factors[side][i]);
+	  append_uint32_to_array (multis[side], 1);
+	  /* repeated factors should not be a problem, since they will
+	     be dealt correctly in the filtering */
+	}
 
-	  double B = (double) si->conf->sides[side]->lim;
-	  if (mpz_get_d (n[side]) < B * B)
-	    {
-	      if (mpz_sizeinbase (n[side], 2) > lpb)
-		{
-		  ret = -1;
-		  break;
-		}
-
-	      else if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
-		{
-		  append_mpz_to_array (factors[side], n[side]);
-		  append_uint32_to_array (multis[side], 1);
-		  ret = 1;
-		}
-	    }
-
-	  if (check_leftover_norm (n[side], si, side) == 0)
-	    {
-	      ret = -1;
-	      break;
-	    }
+      /* since the cofactor is smooth, n[side] is a prime < L here */
+      if (mpz_cmp_ui (n[side], 1) > 0) /* 1 is special */
+	{
+	  append_mpz_to_array (factors[side], n[side]);
+	  append_uint32_to_array (multis[side], 1);
 	}
     }
   //free
   FREE_MPZ_FACTOR;
   free (facul_code);
-  /* ret = 0  => unable to completely factor n */
-  return ret; 
+  return 1; /* both cofactors are smooth */
 }
 
 

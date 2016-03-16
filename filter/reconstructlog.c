@@ -1158,15 +1158,6 @@ main(int argc, char *argv[])
   param_list_configure_switch(pl, "partial", &partial);
   param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
-  int units0 = 0;
-  param_list_configure_switch(pl, "explicit_units0", &units0);
-  int units1 = 0;
-  param_list_configure_switch(pl, "explicit_units1", &units1);
-  if(units0 != 0 && units1 != 0){
-      fprintf (stderr, "units0 and units1 cannot be both set\n");
-      exit (EXIT_FAILURE);
-  }
-
 #ifdef HAVE_MINGW
   _fmode = _O_BINARY;     /* Binary open for all files */
 #endif

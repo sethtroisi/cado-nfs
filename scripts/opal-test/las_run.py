@@ -57,12 +57,13 @@ def run(param_file, problem):
         "alambda": 1.2,
         "ncurves0": 6,
         "ncurves1": 6,
-        "t": 1 # number of threads for las
+        "t": 2 # number of threads for las
     }
     makefb_params = {
         "poly" : las_params["poly"],
         "alim": las_params["alim"],
-        "maxbits": las_params["I"]
+        "maxbits": las_params["I"],
+        "t": 1
     }
 
     params = read_params_from_file(param_file)
@@ -80,6 +81,7 @@ def run(param_file, problem):
     # also update "maxbits" which depends on "I"
     makefb_params["maxbits"] = params["I"]
     makefb_params["out"] = las_params["fb"]
+    makefb_params["t"] = las_params["t"]
 
     makefb_cmd_line = [makefb]
     for (key, value) in makefb_params.items():

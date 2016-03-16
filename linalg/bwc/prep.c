@@ -14,13 +14,13 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "portability.h"
+#include "cheating_vec_init.h"
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     /* Interleaving does not make sense for this program. So the second
      * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
+    ASSERT_ALWAYS(!pi->interleaved);
 
     // Doing the ``hello world'' test is a very good way of testing the
     // global mpi/pthreads setup. So despite its apparent irrelevance, I
@@ -30,19 +30,22 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
 
-    int flags[2];
-    flags[bw->dir] = THREAD_SHARED_VECTOR;
-    flags[!bw->dir] = 0;
-
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, bw->n,
             MPFQ_DONE);
 
-    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
 
-    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
+    mmt_vec ymy[2];
+    mmt_vec_ptr y = ymy[0];
+    mmt_vec_ptr my = ymy[1];
+
+    mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+    mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
+
+
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     /* Number of copies of m by n matrices to use for trying to obtain a
@@ -54,17 +57,11 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     prep_lookahead_iterations = iceildiv(bw->m, bw->m) + 1;
 
     unsigned int my_nx = 1;
-
-    mmt_comm_ptr mcol = mmt->wr[bw->dir];
-    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
-
     uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
-
-    mmt_vec xymats;
+    void * xymats;
 
     /* We're cheating on the generic init routines */
-    vec_init_generic(pi->m, A, A_pi, xymats, 0,
-            bw->m * prep_lookahead_iterations);
+    cheating_vec_init(A, &xymats, bw->m * prep_lookahead_iterations);
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -112,7 +109,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
          * better.
          */
 
-        matmul_top_set_random_and_save_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded, rstate);
+        mmt_vec_set_random_through_file(y, Y_FILE_BASE, 0, unpadded, rstate);
 
         if (tcan_print) {
             printf("// vector generated and dispatched (trial # %u)\n", ntri);
@@ -124,39 +121,38 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded);
+        mmt_vec_save(mmt, NULL, Y_FILE_BASE, bw->dir, 0, unpadded);
 #endif
 
         // We must compute x^T M y, x^T M^2 y, and so on.
         // XXX Note that x^Ty does not count here, because it does not
         // take part to the sequence computed by lingen !
-        matmul_top_twist_vector(mmt, bw->dir);
-        matmul_top_mul(mmt, bw->dir);
-        matmul_top_untwist_vector(mmt, bw->dir);
+        mmt_vec_twist(mmt, y);
+        matmul_top_mul(mmt, ymy, NULL);
+        mmt_vec_untwist(mmt, y);
         
         // we have indices mmt->wr[1]->i0..i1 available.
-        A->vec_set_zero(A, xymats->v, bw->m * prep_lookahead_iterations);
+        A->vec_set_zero(A, xymats, bw->m * prep_lookahead_iterations);
 
+        /* XXX it's really like x_dotprod, except that we're filling
+         * the coefficients in another order (but why ?) */
         for(unsigned int k = 0 ; k < prep_lookahead_iterations ; k++) {
             for(int j = 0 ; j < bw->m ; j++) {
-                void * where = SUBVEC(xymats, v, j * prep_lookahead_iterations + k);
+                void * where = A->vec_subvec(A, xymats, j * prep_lookahead_iterations + k);
                 for(unsigned int t = 0 ; t < my_nx ; t++) {
                     uint32_t i = xvecs[j*my_nx+t];
-                    if (i < mcol->i0 || i >= mcol->i1)
+                    unsigned int vi0 = y->i0 + mmt_my_own_offset_in_items(y);
+                    unsigned int vi1 = vi0 + mmt_my_own_size_in_items(y);
+                    if (i < vi0 || i >= vi1)
                         continue;
-                    /* We want the data to match our bw->interval on both
-                     * directions, because otherwise we'll end up
-                     * computing rubbish -- recall that no broadcast_down
-                     * has occurred yet.
-                     */
-                    if (i < mrow->i0 || i >= mrow->i1)
-                        continue;
-                    A->add(A, where, where, SUBVEC(mcol->v, v, i - mcol->i0));
+
+                    void * coeff = y->abase->vec_subvec(y->abase, y->v, i - y->i0);
+                    A->add(A, where, where, coeff);
                 }
             }
-            matmul_top_twist_vector(mmt, bw->dir);
-            matmul_top_mul(mmt, bw->dir);
-            matmul_top_untwist_vector(mmt, bw->dir);
+            mmt_vec_twist(mmt, y);
+            matmul_top_mul(mmt, ymy, NULL);
+            mmt_vec_untwist(mmt, y);
         }
 
         /* Make sure computation is over for everyone ! */
@@ -164,9 +160,9 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         /* Now all threads and jobs must collectively reduce the zone
          * pointed to by xymats */
-        pi_allreduce(NULL, xymats->v,
+        pi_allreduce(NULL, xymats,
                 bw->m * prep_lookahead_iterations,
-                A_pi, BWC_PI_SUM, pi->m);
+                mmt->pitype, BWC_PI_SUM, pi->m);
 
         /* OK -- now everybody has the same data */
 
@@ -174,7 +170,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
-            dimk = kernel((mp_limb_t *) xymats->v, NULL,
+            dimk = kernel((mp_limb_t *) xymats, NULL,
                     bw->m, prep_lookahead_iterations * A->groupsize(A),
                     A->vec_elt_stride(A, prep_lookahead_iterations)/sizeof(mp_limb_t),
                     0);
@@ -196,11 +192,12 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     save_x(xvecs, bw->m, my_nx, pi);
 
+    mmt_vec_clear(mmt, y);
+    mmt_vec_clear(mmt, my);
     matmul_top_clear(mmt);
-    pi_free_mpfq_datatype(pi, A_pi);
 
     /* clean up xy mats stuff */
-    vec_clear_generic(pi->m, xymats, bw->m * prep_lookahead_iterations);
+    cheating_vec_clear(A, &xymats, bw->m * prep_lookahead_iterations);
 
     A->oo_field_clear(A);
 
@@ -217,17 +214,9 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
  */
 void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    /* Interleaving does not make sense for this program. So the second
-     * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
-
+    ASSERT_ALWAYS(!pi->interleaved);
 
     matmul_top_data mmt;
-
-    int flags[2];
-    flags[bw->dir] = THREAD_SHARED_VECTOR;
-    flags[!bw->dir] = 0;
 
     unsigned int nrhs = 0;
 
@@ -239,7 +228,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 
     pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
 
-    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
 
     if (pi->m->trank || pi->m->jrank) {
         /* as said above, this is *NOT* a parallel program.  */
@@ -282,7 +271,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             printf("// Creating %s (extraction from %s)\n", vec_names[j], rhs_name);
         }
         void * coeff;
-        A->vec_init(A, &coeff, 1);
+        cheating_vec_init(A, &coeff, 1);
         mpz_t c;
         mpz_init(c);
         for(unsigned int i = 0 ; i < mmt->n0[!bw->dir] ; i++) {
@@ -297,7 +286,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             }
         }
         mpz_clear(c);
-        A->vec_clear(A, &coeff, 1);
+        cheating_vec_clear(A, &coeff, 1);
         for(unsigned int j = 0 ; j < nrhs ; j++) {
             fclose(vec_files[j]);
             free(vec_names[j]);
@@ -315,11 +304,11 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         vec_file = fopen(vec_name, "wb");
         ASSERT_ALWAYS(vec_file != NULL);
         printf("// Creating %s\n", vec_name);
-        A->vec_init(A, &vec, mmt->n0[!bw->dir]);
+        cheating_vec_init(A, &vec, mmt->n0[!bw->dir]);
         A->vec_random(A, vec, mmt->n0[!bw->dir], rstate);
         rc = fwrite(vec, A->vec_elt_stride(A,1), mmt->n0[!bw->dir], vec_file);
         ASSERT_ALWAYS(rc >= 0 && ((unsigned int) rc) == mmt->n0[!bw->dir]);
-        A->vec_clear(A, &vec, mmt->n0[!bw->dir]);
+        cheating_vec_clear(A, &vec, mmt->n0[!bw->dir]);
         fclose(vec_file);
         free(vec_name);
     }
@@ -341,8 +330,15 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             fprintf(stderr, "m < nrhs is not supported\n");
             exit(EXIT_FAILURE);
         }
+        /* I am not sure that using balancing_pre_shuffle is right both
+         * for bw->dir == 0 and bw->dir == 1. Let's make sure we're in
+         * the case where this has been tested and seems to work
+         * correctly.
+         */
+        ASSERT_ALWAYS(bw->dir == 1);
+        ASSERT_ALWAYS(mmt->nmatrices == 1);
         for(unsigned int i = 0 ; i < nrhs ; i++) {
-            xvecs[i] = balancing_pre_shuffle(mmt->bal, mmt->n0[!bw->dir]-nrhs+i);
+            xvecs[i] = balancing_pre_shuffle(mmt->matrices[0]->bal, mmt->n0[!bw->dir]-nrhs+i);
             printf("Forced %d-th x vector to be the %" PRIu32"-th canonical basis vector\n", i, xvecs[i]);
             ASSERT_ALWAYS(xvecs[i] >= (uint32_t) (bw->m - nrhs));
         }
@@ -378,6 +374,9 @@ int main(int argc, char * argv[])
             "file with the right-hand side vectors for inhomogeneous systems mod p");
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    /* This program does not support interleaving */
+    param_list_remove_key(pl, "interleaving");
 
     bw_common_interpret_parameters(bw, pl);
     parallelizing_info_lookup_parameters(pl);

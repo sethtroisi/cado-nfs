@@ -141,8 +141,8 @@ Is is created by replay, and contains the link between the rows of the
 small matrix (coming out from merge/replay) and the relation sets to
 which they correspond.
 
-The first line gives number of rows (relation-sets) and columns (ideals)
-after the merge/replay.
+The first line gives the number of rows (relation-sets) after the merge/replay
+(in decimal).
 
 Then, each line of the file corresponds to a line of the sparse matrix:
 the first entry is an integer giving the number of relations in the

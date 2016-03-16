@@ -127,6 +127,8 @@ extern int param_list_parse_string(param_list, const char *, char *, size_t);
 extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
 extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
+extern int param_list_parse_string_list_alloc(param_list pl, const char * key, char *** r, int * n, const char * sep);
+extern int param_list_get_list_count(param_list_ptr pl, const char * key);
 extern int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep);
 int param_list_parse_uint64_and_uint64(param_list pl, const char * key,
     uint64_t * r, const char * sep);

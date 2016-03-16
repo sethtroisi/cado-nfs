@@ -365,18 +365,17 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
 static blockmatrix small_character_matrix(blockmatrix bcmat, const char * indexname)
 {
     FILE * ix = fopen_maybe_compressed(indexname, "r");
-    int small_nrows, small_ncols;
+    uint64_t small_nrows;
     int ret;
 
-    /* small_ncols isn't used here: we don't care. */
-    ret = fscanf(ix, "%d %d", &small_nrows, &small_ncols);
-    ASSERT(ret == 2);
+    ret = fscanf(ix, "%" SCNu64 "\n", &small_nrows);
+    ASSERT(ret == 1);
 
     unsigned int nchars2 = bcmat->ncols;
 
     blockmatrix res = blockmatrix_alloc(small_nrows, nchars2);
 
-    for(int i = 0 ; i < small_nrows ; i++) {
+    for(uint64_t i = 0 ; i < small_nrows ; i++) {
         int nc;
         ret = fscanf(ix, "%d", &nc); ASSERT_ALWAYS(ret == 1);
         for(unsigned int cg = 0 ; cg < nchars2 ; cg+=64) {

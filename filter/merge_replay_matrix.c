@@ -9,6 +9,41 @@
 #include "merge_replay_matrix.h"
 #include "sparse.h"
 
+/***************** memory allocation on R[j] *********************************/
+
+static void
+mallocRj (filter_matrix_t *mat, int j, int32_t w)
+{
+  if (w == 0)
+    {
+      /* This can happen because we do not renumber columns in purge,
+	 thus the range of the j-values is larger than the number of
+	 columns. We simply ignore those columns. */
+      mat->R[j] = NULL;
+      return;
+    }
+  mat->R[j] = (index_t *) malloc((w + 1) * sizeof(index_t));
+  FATAL_ERROR_CHECK(mat->R[j] == NULL, "Cannot allocate memory");
+  mat->R[j][0] = 0; /* last index used */
+}
+
+static void
+reallocRj (filter_matrix_t *mat, int j, int32_t w)
+{
+  mat->R[j] = (index_t *) realloc (mat->R[j], (w + 1) * sizeof(index_t));
+  FATAL_ERROR_CHECK(mat->R[j] == NULL, "Cannot reallocate memory");
+  mat->R[j][0] = w;
+}
+
+void
+freeRj (filter_matrix_t *mat, int j)
+{
+    free (mat->R[j]);
+    mat->R[j] = NULL;
+}
+
+/*****************************************************************************/
+
 int
 decrS (int w)
 {
@@ -29,7 +64,7 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
 {
   mat->keep  = keep;
   mat->mergelevelmax = maxlevel;
-  mat->cwmax = 2 * maxlevel;
+  mat->cwmax = maxlevel;
   ASSERT_ALWAYS (mat->cwmax < 255);
   mat->nburied = nburied;
 
@@ -55,9 +90,55 @@ clearMat (filter_matrix_t *mat)
   free (mat->rows);
   free (mat->wt);
   for (j = 0; j < mat->ncols; j++)
-    free (mat->R[j]);
+    freeRj (mat, j);
   free (mat->R);
 }
+
+#ifndef FOR_DL
+/* Renumber the non-zero columns to contiguous values [0, 1, 2, ...]
+ * We can use this function only for factorization because in this case we do
+ * not need the indexes of the columns (contrary to DL where the indexes of the
+ * column are printed in the history file). */
+static void
+renumber_columns (filter_matrix_t *mat)
+{
+  index_t *p = NULL;
+
+  p = (index_t *) malloc (mat->ncols * sizeof (index_t));
+  ASSERT_ALWAYS (p != NULL);
+
+  /* first compute the mapping of column indices */
+  index_t h = 0;
+  for (uint64_t j = 0; j < mat->ncols; j++)
+  {
+    /* at this point wt[j] = 0 if ideal j never appears in relations,
+     * or wt[j] > 0 if ideal j appears in relations */
+    if (mat->wt[j] != 0)
+    {
+      /* index j is mapped to h, with h <= j */
+      p[j] = h;
+      mat->wt[h] = mat->wt[j];
+      h++;
+    }
+  }
+  /* h should be equal to rem_ncols, which is the number of columns with
+   * non-zero weight */
+  ASSERT_ALWAYS(h == mat->rem_ncols);
+
+  /* Realloc mat->wt */
+  mat->wt = realloc (mat->wt, h * sizeof (int32_t));
+  /* Reset mat->ncols to behave as if they were no non-zero columns. */
+  mat->ncols = h;
+
+  /* apply mapping to the rows. As p is a non decreasing function, the rows are
+   * still sorted after this operation. */
+  for (uint64_t i = 0; i < mat->nrows; i++)
+    for (index_t j = 1; j <= mat->rows[i][0]; j++)
+      mat->rows[i][j] = p[mat->rows[i][j]];
+
+  free (p);
+}
+#endif
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
 void
@@ -65,16 +146,17 @@ InitMatR (filter_matrix_t *mat)
 {
   index_t h;
   int32_t w;
+  int32_t wmax = mat->cwmax;
 
-  for(h = 0; h < mat->ncols; h++)
+#ifndef FOR_DL
+  renumber_columns (mat);
+#endif
+
+  for (h = 0; h < mat->ncols; h++)
   {
     w = mat->wt[h];
-    if (w <= mat->cwmax)
-    {
-      mat->R[h] = (index_t *) malloc((w + 1) * sizeof(index_t));
-      FATAL_ERROR_CHECK(mat->R[h] == NULL, "Cannot allocate memory");
-      mat->R[h][0] = 0; /* last index used */
-    }
+    if (w <= wmax)
+      mallocRj (mat, h, w);
     else /* weight is larger than cwmax */
     {
       mat->wt[h] = -mat->wt[h]; // trick!!!
@@ -108,10 +190,7 @@ matR_disable_cols (filter_matrix_t *mat, const char *infilename)
       if (h < mat->ncols)
       {
         if (mat->R[h] != NULL)
-        {
-          free (mat->R[h]);
-          mat->R[h] = NULL;
-        }
+          freeRj (mat, h);
         if (mat->wt[h] > 0)
           mat->wt[h] = -mat->wt[h]; // trick!!!
       }
@@ -130,12 +209,12 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
   FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
   matLengthRow(mat, rel->num) = rel->nb;
+  mat->tot_weight += rel->nb;
 
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
     exponent_t e = rel->primes[i].e;
-    mat->tot_weight++;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
 #ifndef FOR_DL
@@ -284,18 +363,18 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   printf("# Start to fill-in columns of the matrix...\n");
   fflush (stdout);
   for (i = 0; i < mat->nrows; i++)
-  {
-    for(unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
     {
-      h = matCell(mat, i, k);
-      if(mat->wt[h] > 0)
-      {
-        mat->R[h][0]++;
-        mat->R[h][mat->R[h][0]] = i;
-      }
+      for (unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
+        {
+          h = matCell(mat, i, k);
+          if (mat->wt[h] > 0)
+            {
+              mat->R[h][0]++;
+              mat->R[h][mat->R[h][0]] = i;
+            }
+        }
     }
-  }
-    printf ("# Done\n");
+  printf ("# Done\n");
 }
 
 void
@@ -311,34 +390,23 @@ destroyRow(filter_matrix_t *mat, int i)
     mat->rows[i] = NULL;
 }
 
-void
-freeRj(filter_matrix_t *mat, int j)
-{
-    free(mat->R[j]);
-    mat->R[j] = NULL;
-}
-
 // Don't touch to R[j][0]!!!!
 void
-remove_i_from_Rj(filter_matrix_t *mat, int i, int j)
+remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
 {
   // be dumb for a while
-  unsigned int k;
+  unsigned int k, n = mat->R[j][0];
 
-  if(mat->R[j] == NULL)
-  {
-	  fprintf(stderr, "Row %d already empty\n", j);
-	  return;
-  }
-  for(k = 1; k <= mat->R[j][0]; k++)
-	  if((int) mat->R[j][k] == i)
-    {
-#if DEBUG >= 2
-      fprintf(stderr, "Removing row %d from R[%d]\n", i, j);
-#endif
-      mat->R[j][k] = UMAX(index_t);
-      break;
-	  }
+  /* R[j] should not be empty */
+  ASSERT(mat->R[j] != NULL);
+
+  for (k = 1; k <= n; k++)
+    if (mat->R[j][k] == i)
+      {
+        mat->R[j][k] = UMAX(index_t);
+        return;
+      }
+  ASSERT_ALWAYS(0);
 }
 
 // cell M[i, j] is incorporated in the data structure. It is used
@@ -365,10 +433,9 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 #if DEBUG >= 2
     fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
 #endif
-    int l = mat->R[j][0]+2;
-    mat->R[j] = (index_t *)realloc(mat->R[j], l * sizeof(index_t));
-    mat->R[j][l-1] = i;
-    mat->R[j][0] = l-1;
+    int l = mat->R[j][0] + 1;
+    reallocRj (mat, j, l);
+    mat->R[j][l] = i;
   }
 }
 

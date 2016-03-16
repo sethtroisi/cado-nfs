@@ -43,15 +43,15 @@ unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 
-int nb_curves90 (const unsigned int lpb);
-int nb_curves95 (const unsigned int lpb);
+static int nb_curves90 (const unsigned int lpb);
 #if 0
+static int nb_curves95 (const unsigned int lpb);
 static int nb_curves99 (const unsigned int lpb);
 #endif
 
 int nb_curves (const unsigned int lpb) { return nb_curves90(lpb); }
 
-int
+static int
 nb_curves90 (const unsigned int lpb)
 {
   /* the following table, computed with the proba_cofactor() function in the
@@ -106,7 +106,8 @@ nb_curves90 (const unsigned int lpb)
 // ncurves = 100 corresponds to looking for 50-bit factors.
 // ncurves = 200 corresponds to looking for 64-bit factors.
 
-int
+#if 0
+static int
 nb_curves95 (const unsigned int lpb)
 {
     /* same, but with target probability 95% */
@@ -143,8 +144,6 @@ nb_curves95 (const unsigned int lpb)
   return (lpb <= nT) ? T[lpb] : T[nT];
 }
 
-
-#if 0
 static int
 nb_curves99 (const unsigned int lpb)
 {
@@ -688,49 +687,6 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 }
 
 /*
- * This function generates a chain of 'n' ecm used to the auxiliary
- * cofactorization.
- */
-facul_method_t*
-facul_make_aux_methods (int n, unsigned int already_used, const int verbose)
-{
-    n = MAX(2,n);
-  facul_method_t *methods = (facul_method_t*) malloc ((n+1) * sizeof (facul_method_t));
-
-  /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
-  methods[0].method = EC_METHOD;
-  methods[0].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-  ecm_make_plan ((ecm_plan_t*) methods[0].plan, 105, 3255, MONTY12, 2, 1, verbose);
-
-  methods[1].method = EC_METHOD;
-  methods[1].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-  ecm_make_plan ((ecm_plan_t*) methods[1].plan, 315, 5355, BRENT12, 11, 1, verbose);
-
-  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
-  double B1 = 105.0;
-  for (int i = 2; i < n ; i++)
-    {
-      double B2;
-      unsigned int k;
-
-      B1 += sqrt (B1);
-      B2 = 17.0 * B1;
-      /* we round B2 to (2k+1)*105, thus k is the integer nearest to
-	 B2/210-0.5 */
-      k = B2 / 210.0;
-      methods[i].method = EC_METHOD;
-      methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-      ecm_make_plan ((ecm_plan_t*) methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
-		     MONTY12, i + 1 + already_used, 1, 0);
-    }
-
-  methods[n].method = 0;
-  methods[n].plan = NULL;
-
-  return methods;
-}
-
-/*
   Make a simple strategy for factoring. We start with
   P-1 and P+1 (with x0=2/7), then an ECM curve with low bounds, then
   a bunch of ECM curves with larger bounds. How many methods to do in
@@ -791,7 +747,7 @@ facul_make_default_strategy (int n, const int verbose)
   if (n > 1)
     {
       ecm_clear_plan (methods[n+2].plan);
-      /* the plan pointer will be freed in facul_clear_aux_methods() */
+      /* the plan pointer will be freed in facul_clear_strategy() */
       methods[n+2].method = MPQS_METHOD;
     }
 #endif
@@ -803,7 +759,7 @@ facul_make_default_strategy (int n, const int verbose)
 
 
 void 
-facul_clear_aux_methods (facul_method_t *methods)
+facul_clear_methods (facul_method_t *methods)
 {
   if (methods == NULL)
     return;
@@ -971,24 +927,6 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 	  methods[index_last_method[1]].is_the_last = 1;
     }
   
-  // Create the auxiliary methods
-  // add test to check if it's necessary to create our aux methods
-
-  // rationale: we have selected some number of curves to catch our LPs
-  // of some desired size with probability 90%.  We found one, so we'll
-  // strive hard to not miss the others.  Therefore, the goal is rather
-  // 99% here -- we go for 95.
-  //
-  // We have a secondary table which tells how many curves this means.
-  //
-  // Note that strategies->methods_aux is common to both sides.
-  int ncurves_aux[2];
-  ncurves_aux[0] = (n0 > -1) ? n0 : nb_curves95 (rlpb);
-  ncurves_aux[1] = (n1 > -1) ? n1 : nb_curves95 (alpb);
-  strategies->methods_aux = facul_make_aux_methods (MAX(ncurves_aux[0], ncurves_aux[1]), max_curves_used_before_aux, verbose);
-  // old way was:
-  // strategies->methods_aux = facul_make_aux_methods (30, verbose);
-
   return strategies;
 }
 
@@ -1036,9 +974,6 @@ facul_clear_strategies (facul_strategies_t *strategies)
       free(strategies->uniform_strategy[0]);
       free(strategies->uniform_strategy[1]);
   }
-
-  // free methods_aux
-  facul_clear_aux_methods (strategies->methods_aux);
 
   // free strategies
   free (strategies);
@@ -1112,7 +1047,7 @@ facul_fprint_strategies (FILE* file, facul_strategies_t* strategies)
 }
 
 void
-modset_get_z (mpz_t z, struct modset_t *modset)
+modset_get_z (mpz_t z, const struct modset_t *modset)
 {
   ASSERT_ALWAYS(modset->arith != modset_t::CHOOSE_NONE);
   switch (modset->arith)
@@ -1134,7 +1069,7 @@ modset_get_z (mpz_t z, struct modset_t *modset)
       mpz_set (z, modset->m_mpz);
       break;
     default:
-      abort ();
+      ASSERT_ALWAYS(0);
     }
 }
 
@@ -1147,16 +1082,18 @@ modset_get_z (mpz_t z, struct modset_t *modset)
  */
 static int
 facul_aux (mpz_t *factors, const modset_t m,
-	   const facul_strategies_t *strategies, int method_start, int side)
+	   const facul_strategies_t *strategies,
+	   facul_method_side_t *methods, int method_start, int side)
 {
   int found = 0;
-  facul_method_t* methods = strategies->methods_aux;
   if (methods == NULL)
     return found;
 
-  int i = 0;
-  for (i = method_start ;methods[i].method != 0; i++)
+  for (int i = method_start; methods[i].method != NULL; i++)
     {
+      if (methods[i].side != side)
+	continue; /* this method is not for this side */
+
       if (i < STATS_LEN)
 	stats_called_aux[i]++;
       modset_t fm, cfm;
@@ -1166,33 +1103,34 @@ facul_aux (mpz_t *factors, const modset_t m,
       switch (m.arith) {
           case modset_t::CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors, m.m_ul,
-				      methods[i], &fm, &cfm,
+				      *methods[i].method, &fm, &cfm,
 				      strategies->lpb[side],
 				      strategies->assume_prime_thresh[side],
 				      strategies->BBB[side]);
 	break;
           case modset_t::CHOOSE_15UL:
 	res_fac = facul_doit_onefm_15ul(factors, m.m_15ul,
-					methods[i], &fm, &cfm,
+					*methods[i].method, &fm, &cfm,
 					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
           case modset_t::CHOOSE_2UL2:
 	res_fac = facul_doit_onefm_2ul2 (factors, m.m_2ul2,
-					 methods[i], &fm, &cfm,
+					 *methods[i].method, &fm, &cfm,
 					 strategies->lpb[side],
 					 strategies->assume_prime_thresh[side],
 					 strategies->BBB[side]);
 	break;
           case modset_t::CHOOSE_MPZ:
 	res_fac = facul_doit_onefm_mpz (factors, m.m_mpz,
-					methods[i], &fm, &cfm,
+					*methods[i].method, &fm, &cfm,
 					strategies->lpb[side],
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
-      default: abort();
+      default:
+	ASSERT_ALWAYS(0);
       }
       // check our result
       // res_fac contains the number of factors found
@@ -1224,7 +1162,7 @@ facul_aux (mpz_t *factors, const modset_t m,
       if (fm.arith != modset_t::CHOOSE_NONE)
 	{
 	  int found2 = facul_aux (factors+res_fac, fm, strategies,
-				  i+1, side);
+				  methods, i+1, side);
           if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
 	    {
 	      found = FACUL_NOT_SMOOTH;
@@ -1239,7 +1177,7 @@ facul_aux (mpz_t *factors, const modset_t m,
       if (cfm.arith != modset_t::CHOOSE_NONE)
 	{
 	  int found2 = facul_aux (factors+res_fac, cfm, strategies,
-				  i+1, side);
+				  methods, i+1, side);
           if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
           {
               found = FACUL_NOT_SMOOTH;
@@ -1286,6 +1224,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
   f[1][0].arith = modset_t::CHOOSE_NONE;
   f[1][1].arith = modset_t::CHOOSE_NONE;
   int stats_nb_side = 0, stats_index_transition = 0;
+  int last_i[2]; /* last_i[s] is the index of last method tried on side s */
   for (int i = 0; methods[i].method != NULL; i++)
     {
       // {for the stats
@@ -1317,6 +1256,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	stats_called[stats_current_index]++;
       // }
       int res_fac = 0;
+      last_i[side] = i;
       switch (m[side].arith) {
           case modset_t::CHOOSE_UL:
 	res_fac = facul_doit_onefm_ul(factors[side], m[side].m_ul,
@@ -1346,10 +1286,11 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 					strategies->assume_prime_thresh[side],
 					strategies->BBB[side]);
 	break;
-      default: abort();
+      default:
+	ASSERT_ALWAYS(0);
       }
       // check our result
-      // res_fac contains the number of factors found
+      // res_fac contains the number of factors found, or -1 if not smooth
       if (res_fac == -1)
 	{
 	  /*
@@ -1366,7 +1307,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	     tries with an other method.
 	  */
 	  if (methods[i].is_the_last)
-            break;
+	    break;
 	  else
 	    continue;
 	}
@@ -1398,7 +1339,8 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	    if (f[side][ind_cof].arith != modset_t::CHOOSE_NONE)
 	      {
 		int found2 = facul_aux (factors[side]+found[side],
-					f[side][ind_cof], strategies, 0, side);
+					f[side][ind_cof], strategies,
+					methods, last_i[side] + 1, side);
 		if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
 		  {
 		    is_smooth[side] = FACUL_NOT_SMOOTH;
@@ -1423,7 +1365,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 
 
 /*
-  This function is like facul, but we will work with the both norms
+  This function is like facul, but we will work with both norms
   together.  It returns the number of factors for each side.
 */
 int*
@@ -1442,8 +1384,8 @@ facul_both (mpz_t **factors, mpz_t* N,
   gmp_fprintf (stderr, "(%Zd %Zd)", N[0], N[1]);
 #endif
 
-  if (mpz_sgn (N[0]) <= 0 || mpz_sgn (N[1]) <= 0)
-      return found;
+  /* cofactors should be positive */
+  ASSERT (mpz_sgn (N[0]) > 0 && mpz_sgn (N[1]) > 0);
 
   if (mpz_cmp_ui (N[0], 1UL) == 0)
     is_smooth[0] = FACUL_SMOOTH;
@@ -1540,7 +1482,7 @@ modset_clear (modset_t *modset)
     modmpz_clearmod (modset->m_mpz);
     break;
   default:
-    abort();
+    ASSERT_ALWAYS(0);
   }
   modset->arith = modset_t::CHOOSE_NONE;
 }

@@ -737,6 +737,8 @@ class Cado_NFS_toplevel(object):
         # last thing. For sqrt, more than 8 threads is slightly overkill.
         # So unless explicitly stated otherwise, we set it to min(8,
         # server.threads).
+        # Note: for a c180, 8 threads is still too large for 64Gb (we need
+        # about 16Gb per thread).
         p="tasks.sqrt.sqrt.threads"
         t=self.parameters.get_simple(p, 0)
         if t > 8 and self.parameters.locate(p) == "tasks.threads":

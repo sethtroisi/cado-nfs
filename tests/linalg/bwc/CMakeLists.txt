@@ -51,60 +51,63 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         endif()
     endif()
     set(p "${prime_${width}}")
-    add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
-    add_dependencies(test-bwc-modp-inhomogeneous-${gfp_layer}_dependencies
-        plingen_pz plingen_${gfp_layer})
-    if(gfp_layer STREQUAL "p_1")
-        set(mextra)
-        # Only try to enable magma if CHECKS_EXPENSIVE is set.
-        if(DEFINED ENV{CHECKS_EXPENSIVE})
-            find_program(MAGMA magma HINTS ENV MAGMA)
-            if (MAGMA)
-                set(mextra magma=${MAGMA})
+    if(gfp_layer STREQUAL "pz")
+    else()
+        add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
+        add_dependencies(test-bwc-modp-inhomogeneous-${gfp_layer}_dependencies
+            plingen_pz plingen_${gfp_layer})
+        if(gfp_layer STREQUAL "p_1")
+            set(mextra)
+            # Only try to enable magma if CHECKS_EXPENSIVE is set.
+            if(DEFINED ENV{CHECKS_EXPENSIVE})
+                find_program(MAGMA magma HINTS ENV MAGMA)
+                if (MAGMA)
+                    set(mextra magma=${MAGMA})
+                endif()
             endif()
+            add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
+                random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
+            add_dependencies(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6_dependencies
+                plingen_pz plingen_${gfp_layer})
+
+            add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
+            add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                plingen_pz plingen_${gfp_layer})
+
+            if (HAVE_MPI)
+                add_bwc_test(mpi1-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                    prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
+                    mpi=2x3 lingen_mpi=2x2 ${mextra})
+                add_dependencies(test-bwc-mpi1-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                    plingen_pz plingen_${gfp_layer})
+                add_bwc_test(mpi2-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+                    prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
+                    mpi=3x2 lingen_mpi=2x2 ${mextra})
+                add_dependencies(test-bwc-mpi2-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
+                    plingen_pz plingen_${gfp_layer})
+            endif()
+
+            if(DEFINED ENV{CHECKS_EXPENSIVE})
+                add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
+                    prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
+                add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive_dependencies
+                    plingen_pz plingen_${gfp_layer})
+            endif()
+
+            add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
+                prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
+            add_dependencies(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1_dependencies
+                plingen_pz plingen_${gfp_layer})
+            #        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
+            #            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
+            #        add_dependencies(modp-homogeneous-minimal-mn4_dependencies
+            #        plingen_pz plingen_${gfp_layer})
+            #        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
+            #            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
+            #        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies
+            #        plingen_pz plingen_${gfp_layer})
         endif()
-        add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
-            random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
-        add_dependencies(test-bwc-modp-inhomogeneous-minimal-3rhs-mn6_dependencies
-            plingen_pz plingen_${gfp_layer})
-
-        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
-        add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
-                plingen_pz plingen_${gfp_layer})
-
-        if (HAVE_MPI)
-            add_bwc_test(mpi1-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
-                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
-                mpi=2x3 lingen_mpi=2x2 ${mextra})
-            add_dependencies(test-bwc-mpi1-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
-                plingen_pz plingen_${gfp_layer})
-            add_bwc_test(mpi2-modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
-                prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
-                mpi=3x2 lingen_mpi=2x2 ${mextra})
-            add_dependencies(test-bwc-mpi2-modp-inhomogeneous-minimal-2rhs-mn4_dependencies
-                plingen_pz plingen_${gfp_layer})
-        endif()
-
-        if(DEFINED ENV{CHECKS_EXPENSIVE})
-            add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
-                prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
-            add_dependencies(test-bwc-modp-inhomogeneous-minimal-2rhs-mn4-expensive_dependencies
-                plingen_pz plingen_${gfp_layer})
-        endif()
-
-        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
-        add_dependencies(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1_dependencies
-            plingen_pz plingen_${gfp_layer})
-#        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
-#            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
-#        add_dependencies(modp-homogeneous-minimal-mn4_dependencies
-#        plingen_pz plingen_${gfp_layer})
-#        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
-#            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
-#        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies
-#        plingen_pz plingen_${gfp_layer})
     endif()
 
     # Also add some plingen tests if it so occurs that the current
@@ -118,7 +121,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     # p
     # seed for random generation (entries are (2^k*(seed/1000) mod q) + (3^k*(seed%1000) mod q) mod p, with q=2^20-3).
     # arguments to be passed to plingen (including mpi arguments)
-    
+
     # we create a phony first test, so as to limit the risk of having
     # several tests trigger the same build dependency on
     # plingen_${gfp_layer} at the same time. Of course, the bare test
@@ -169,6 +172,8 @@ endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
+add_bwc_test(mod2-padded bwc-trace.sh random_matrix_size=700,600 m=64 n=64 seed=1 thr=2x2)
+add_dependencies(test-bwc-mod2-padded_dependencies mf_scan)
 
 # Note: because of stop_at_step here, we're not verifying what we're
 # doing, which is a bit stupid.
@@ -176,9 +181,6 @@ add_bwc_test(mod2-rolling bwc-trace.sh random_matrix_size=2000
     interval=10 keep_rolling_checkpoints=2 checkpoint_precious=40 m=64 n=64
     seed=1 thr=2x2 stop_at_step=lingen)
 add_dependencies(test-bwc-mod2-rolling_dependencies mf_scan)
-
-add_bwc_test(mod2-noshuffle bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 shuffle=0)
-add_dependencies(test-bwc-mod2-noshuffle_dependencies mf_scan)
 
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 m=128 n=128 seed=1 thr=3)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
@@ -203,6 +205,7 @@ add_subdirectory(mpfq)
 
 # some tests below use the bwc include files.
 include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
+include_directories(${PROJECT_SOURCE_DIR}/utils)
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
     cado_define_test(test_cpubinding.c
@@ -228,15 +231,47 @@ test_dispatch_matmul(dispatch-matmul-65536-mpi nrows=65536 density=2 mpi=2x2)
 endif()
 endif()
 
+if (WITH_MPI)
+add_definitions(-DWITH_MPI)
+endif()
+
+cado_define_test(test_hello.c NO_DEFAULT_RUN LIBRARIES bwc_base)
+set_target_properties(test_hello PROPERTIES
+            LINKER_LANGUAGE CXX
+            COMPILE_FLAGS "--mpi"
+            LINK_FLAGS "--mpi")
+
+add_executable(spmv_test spmv_test.c)
+set_target_properties(spmv_test PROPERTIES
+            LINKER_LANGUAGE CXX
+            COMPILE_FLAGS "--mpi"
+            LINK_FLAGS "--mpi")
+target_link_libraries(spmv_test bwc_base)
+
+add_executable(short_matmul short_matmul.c)
+target_link_libraries(short_matmul bwc_base)
 
 cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
-    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    ARGUMENTS
+    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}
+    NO_DEFAULT_RUN
     TARGET_DEPENDENCIES
-    random_matrix spmv_test short_matmul mf_scan)
+    random_matrix spmv_test short_matmul mf_scan mf_bal bwc_matmul)
 
+cado_divert_test(test-spmv 11 APPEND_ARGUMENTS thr=1x1)
+cado_divert_test(test-spmv 12 APPEND_ARGUMENTS thr=1x2)
+cado_divert_test(test-spmv 13 APPEND_ARGUMENTS thr=1x3)
+cado_divert_test(test-spmv 32 APPEND_ARGUMENTS thr=3x2)
+cado_divert_test(test-spmv 23 APPEND_ARGUMENTS thr=2x3)
+if(HAVE_MPI)
+cado_divert_test(test-spmv 2122 APPEND_ARGUMENTS mpi=2x1 thr=2x2)
+cado_divert_test(test-spmv 1322 APPEND_ARGUMENTS mpi=1x3 thr=2x2)
+cado_divert_test(test-spmv 3222 APPEND_ARGUMENTS mpi=3x2 thr=2x2)
+endif()
 
 cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-matcache.sh
-    --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    --matrix-size 1000 --density 10 --bindir
+    ${CADO_NFS_BINARY_DIR}/linalg/bwc
     TARGET_DEPENDENCIES
     random_matrix build_matcache bench_matcache)
 
@@ -244,22 +279,13 @@ cado_define_test(TEST_NAME bwc_staged_krylov PROGRAM
     ${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh --arg wdir --
     ${CADO_NFS_BINARY_DIR}/linalg/bwc/krylov thr=2x2 nullspace=left
     interval=200  mn=64 prime=2  ys=0..64 start=0 end=200
-    skip_online_checks=1 rebuild_cache=1 seed=1 matrix=fake.bin
+    skip_online_checks=1 rebuild_cache=1 seed=1
     sequential_cache_build=1 random_matrix=10000,density=150,seed=1
     no_save_cache=1 verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch
     TARGET_DEPENDENCIES bwc_full)
 
 # Tests which use bwc_base will need nwc_config.h
 include_directories(${PROJECT_BINARY_DIR}/linalg/bwc)
-
-if (WITH_MPI)
-add_definitions(-DWITH_MPI)
-endif()
-
-cado_define_test(test_hello.c NO_DEFAULT_RUN LIBRARIES bwc_base)
-set_target_properties(test_hello PROPERTIES
-    COMPILE_FLAGS "--mpi"
-    LINK_FLAGS "--mpi")
 
 cado_divert_test(test_hello 11 ARGUMENTS -v thr=1x1)
 cado_divert_test(test_hello 12 ARGUMENTS -v thr=1x2)
@@ -284,3 +310,43 @@ if (HAVE_MPI)
     test_hello_mpi(1322 mpi=1x3 thr=2x2)
     test_hello_mpi(3222 mpi=3x2 thr=2x2)
 endif()
+
+cado_define_test(test_bl_extraction.c LIBRARIES bwc_base bitlinalg)
+set_target_properties(test_bl_extraction PROPERTIES
+                LINKER_LANGUAGE CXX
+                COMPILE_FLAGS "--mpi"
+                LINK_FLAGS "--mpi")
+
+cado_define_test(TEST_NAME test-blocklanczos
+    PROGRAM ${CMAKE_CURRENT_SOURCE_DIR}/test-blocklanczos.sh
+        --density 10
+        --bindir ${CADO_NFS_BINARY_DIR}/linalg/bwc
+    NO_DEFAULT_RUN
+    TARGET_DEPENDENCIES mf_scan mf_bal random_matrix blocklanczos
+    bwc_full short_matmul)
+cado_divert_test(test-blocklanczos right
+    APPEND_ARGUMENTS --matrix-size "1000,2000" --nullspace RIGHT)
+cado_divert_test(test-blocklanczos left
+    APPEND_ARGUMENTS --matrix-size "2000,1000" --nullspace left)
+cado_divert_test(test-blocklanczos left-thr21
+    APPEND_ARGUMENTS --matrix-size "2000,1000" --nullspace left thr=2x1)
+cado_divert_test(test-blocklanczos left-thr12
+    APPEND_ARGUMENTS --matrix-size "90,69" --nullspace left thr=1x2)
+cado_divert_test(test-blocklanczos left-thr23
+    APPEND_ARGUMENTS --matrix-size "1500,1000" --nullspace left thr=2x3)
+if (HAVE_MPI)
+    cado_divert_test(test-blocklanczos left-mpi1-thr23
+        APPEND_ARGUMENTS --matrix-size "2500,1500" --nullspace left mpi=2x3 thr=2x3)
+    cado_divert_test(test-blocklanczos left-mpi2-thr23
+        APPEND_ARGUMENTS --matrix-size "2500,1500" --nullspace left mpi=3x2 thr=2x3)
+endif()
+
+cado_define_test(TEST_NAME test-blocklanczos-staged
+    PROGRAM
+    ${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh --arg wdir --
+    ${CADO_NFS_BINARY_DIR}/linalg/bwc/blocklanczos
+    random_matrix=1200,1000,80,seed=1 m=64 n=64 ys=0..64
+    no_save_cache=1 interval=10 nullspace=left
+    TARGET_DEPENDENCIES test-blocklanczos_dependencies)
+
+cado_define_test(test-arith-modp.cpp LIBRARIES tests utils)

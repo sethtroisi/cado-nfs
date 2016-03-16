@@ -119,7 +119,7 @@ static void
 removeColumnAndUpdate(filter_matrix_t *mat, int j)
 {
     MkzRemoveJ (mat, j);
-    freeRj(mat, j);
+    freeRj (mat, j);
 }
 
 // The cell [i, j] may be incorporated to the data structure, at least
@@ -625,6 +625,29 @@ number_of_superfluous_rows(filter_matrix_t *mat)
     return ni2rem;
 }
 
+static void
+print_memory_usage (filter_matrix_t *mat)
+{
+  unsigned long mem_rows, mem_wt, mem_cols, mem_MKZ;
+
+  mem_rows = mat->nrows * sizeof (typerow_t*);
+  for (unsigned long i = 0; i < mat->nrows; i++)
+    if (mat->rows[i] != NULL)
+      mem_rows += (rowLength(mat->rows, i) + 1) * sizeof (typerow_t);
+  mem_wt = mat->ncols * sizeof (int32_t);
+  mem_cols = mat->ncols * sizeof (index_t*);
+  for (unsigned long j = 0; j < mat->ncols; j++)
+    if (mat->R[j] != NULL)
+      mem_cols += (mat->R[j][0] + 1) * sizeof (index_t);
+  mem_MKZ = (mat->MKZQ[1] + 1) * 2 * sizeof(int32_t); /* memory for MKZQ */
+  mem_MKZ += (mat->ncols + 1) * sizeof(index_t); /* memory for MKZA */
+  printf ("# memory usage: rows %luMB, cols %luMB, wt %luMB, MKZ %luMB, "
+          "tot %lu MB (VmPeak %ld)\n",
+          mem_rows >> 20, mem_cols >> 20, mem_wt >> 20, mem_MKZ >> 20,
+          (mem_rows + mem_cols + mem_wt + mem_MKZ) >> 20,
+          PeakMemusage () >> 10);
+}
+
 static inline void
 print_report (filter_matrix_t *mat)
 {
@@ -632,9 +655,10 @@ print_report (filter_matrix_t *mat)
           "W/N=%.2f\n", mat->rem_nrows,
           ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols),
           mat->weight, compute_WN(mat), compute_WoverN(mat));
+  if (mat->verbose)
+    print_memory_usage (mat);
   fflush (stdout);
 }
-
 
 void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
@@ -672,7 +696,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     /* Do we need to stop */
     if (WoverN >= target_density)
     {
-      printf ("W/N=%.2f too high, stopping.\n", WoverN);
+      printf ("Reached target density W/N=%.2f.\n", WoverN);
       break;
     }
 

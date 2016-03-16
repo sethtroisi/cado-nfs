@@ -228,7 +228,7 @@ static int compute_unit_rank(mpz_poly_srcptr f)
 
 void compute_change_of_basis_matrix(mpz_t * matrix, mpz_poly_srcptr f, mpz_poly_factor_list_srcptr fac, mpz_srcptr ell)
 {
-    /* now compute the change of basis matrix. This is given simpy
+    /* now compute the change of basis matrix. This is given simply
      * as the CRT matrix from the piecewise representation modulo
      * the factors of f to the full representation.
      *

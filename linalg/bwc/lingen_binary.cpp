@@ -1445,7 +1445,7 @@ static int
 print_and_exit (double wct0, int ret)
 {
   /* print usage of time and memory */
-  print_timing_and_memory (wct0);
+  print_timing_and_memory (stdout, wct0);
   if (ret != 0)
     fprintf (stderr, "No solution found\n");
   return ret; /* 0 if a solution was found, non-zero otherwise */
@@ -1508,11 +1508,10 @@ int main(int argc, char *argv[])
     param_list_clear(pl);
 
 #ifdef  HAVE_OPENMP
-    if (nthreads > 1)
-      omp_set_num_threads (nthreads);
+    omp_set_num_threads (nthreads);
 #pragma omp parallel
 #pragma omp master
-    printf ("Using OpenMP with %u threads\n", omp_get_num_threads ());
+    printf ("Using OpenMP with %u thread(s)\n", omp_get_num_threads ());
 #endif
 
     logline_init_timer();

@@ -320,6 +320,43 @@ typedef struct {
   facul_method_t * methods;     // list of ECMs (null-terminated)
 } facul_aux_data;
 
+// FIXME: this does not belong to here!
+static int
+nb_curves95 (const unsigned int lpb)
+{
+    /* same, but with target probability 95% */
+    /* do_table(10,64,ntries=500,target_prob=0.95)
+     */
+  int T[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0-9 */
+/* lpb=10 */ 0, /* 0:1.000000 */
+/* lpb=11 */ 0, /* 0:1.000000 */
+/* lpb=12 */ 0, /* 0:1.000000 */
+/* lpb=13 */ 0, /* 0:1.000000 */
+/* lpb=14 */ 0, /* 0:1.000000 */
+/* lpb=15 */ 0, /* 0:0.998000 */
+/* lpb=16 */ 0, /* 0:0.986000 */
+/* lpb=17 */ 0, /* 0:0.972000 */
+/* lpb=18 */ 0, /* 0:0.964000 */
+/* lpb=19 */ 1, /* 0:0.926000, 1:0.986000 */
+/* lpb=20 */ 1, /* 1:0.986000 */
+/* lpb=21 */ 2, /* 1:0.946000, 2:0.976000 */
+/* lpb=22 */ 3, /* 2:0.940000, 3:0.966000 */
+/* lpb=23 */ 3, /* 3:0.952000 */
+/* lpb=24 */ 5, /* 4:0.926000, 5:0.962000 */
+/* lpb=25 */ 7, /* 6:0.934000, 7:0.956000 */
+/* lpb=26 */ 8, /* 7:0.934000, 8:0.956000 */
+/* lpb=27 */ 10, /* 9:0.936000, 10:0.956000 */
+/* lpb=28 */ 13, /* 12:0.938000, 13:0.954000 */
+/* lpb=29 */ 16, /* 15:0.946000, 16:0.956000 */
+/* lpb=30 */ 18, /* 17:0.936000, 18:0.950000 */
+/* lpb=31 */ 22, /* 21:0.934000, 22:0.958000 */
+/* lpb=32 */ 26, /* 25:0.940000, 26:0.950000 */
+/* lpb=33 */ 29, /* 28:0.942000, 29:0.952000 */
+/* lpb=34 */ 33, /* 32:0.948000, 33:0.956000 */
+  };
+  const unsigned int nT = sizeof(T)/sizeof(int) - 1;
+  return (lpb <= nT) ? T[lpb] : T[nT];
+}
 
 // FIXME: This has been duplicated from facul.cpp
 // (September 2015).
@@ -1001,7 +1038,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     data[i].fbb = B;
     data[i].BB = ((double)B) * ((double)B);
     data[i].BBB = ((double)B) * data[i].BB;
-    data[i].methods = facul_make_aux_methods(nb_curves95(lpb[i]), 0, 0);
+    data[i].methods = facul_make_default_strategy(nb_curves95(lpb[i]), 0);
   }
 
   MAYBE_UNUSED unsigned int * number_factorisation =
@@ -1038,7 +1075,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   free(number_factorisation);
 
   for (unsigned int i = 0; i < V; ++i)
-    facul_clear_aux_methods(data[i].methods);
+    facul_clear_methods(data[i].methods);
   free(data);
   free(index);
 

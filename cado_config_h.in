@@ -19,6 +19,7 @@
 #cmakedefine    HAVE_SSE3
 #cmakedefine    HAVE_SSSE3
 #cmakedefine    HAVE_SSE41
+#cmakedefine    HAVE_PCLMUL
 #cmakedefine    HAVE_OPENMP
 #cmakedefine    HAVE_ALLOCA_H
 #cmakedefine    HAVE_CABSL
@@ -50,7 +51,6 @@
 #cmakedefine    HAVE_STRLCPY
 #cmakedefine    HAVE_STRLCAT
 #cmakedefine    HAVE_LINUX_BINFMTS_H
-#cmakedefine    HAVE_NUMA
 #cmakedefine    HAVE_HWLOC
 #cmakedefine    HAVE_CXX11
 #define    ULONG_BITS   @ULONG_BITS@

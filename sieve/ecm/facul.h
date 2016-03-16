@@ -21,6 +21,8 @@
 /* #define ECM_MONT_METHOD xxx */
 /* #define ECM_TWED_METHOD xxx */
 
+/* we should have FACUL_NOT_SMOOTH < 0, FACUL_MAYBE = 0,
+   and FACUL_SMOOTH, FACUL_AUX >= 1 */
 #define FACUL_NOT_SMOOTH (-1)
 #define FACUL_MAYBE (0)
 #define FACUL_SMOOTH (1)
@@ -83,8 +85,6 @@ typedef struct {
   facul_method_t* precomputed_methods;  /* Optimization for
 					   facul_make_strategies ().*/
 
-  facul_method_t* methods_aux;
-
   facul_method_side_t * uniform_strategy[2]; /* this is 0 if we have a
                                                 strategy file, and 1 if we
                                                 just have a uniform
@@ -118,13 +118,9 @@ modset_clear (struct modset_t *);
 
 
 facul_method_t* facul_make_default_strategy (int, const int);
-facul_method_t*
-facul_make_aux_methods (int n, unsigned int already_used, const int verbose);
-void facul_clear_aux_methods (facul_method_t*);
+void facul_clear_methods (facul_method_t*);
 
 int nb_curves (unsigned int);
-int nb_curves90 (const unsigned int lpb);
-int nb_curves95 (const unsigned int lpb);
 facul_strategy_t * facul_make_strategy (unsigned long, unsigned int, int, int);
 void facul_clear_strategy (facul_strategy_t *);
 void facul_print_stats (FILE *);
@@ -144,7 +140,7 @@ facul_fprint_strategies (FILE*, facul_strategies_t* );
 void
 modset_clear (struct modset_t *modset);
 
-void modset_get_z (mpz_t, struct modset_t*);
+void modset_get_z (mpz_t, const struct modset_t*);
 
 int*
 facul_both (mpz_t**, mpz_t* ,

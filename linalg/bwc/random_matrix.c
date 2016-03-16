@@ -834,7 +834,9 @@ void random_matrix_fill_fake_balancing_header(balancing_ptr bal, parallelizing_i
     bal->h->ncols = r->ncols;
     bal->h->ncoeffs = 0; /* FIXME ; what should I do ? */
     bal->h->checksum = 0;
-    bal->h->flags = FLAG_PADDING|FLAG_COLPERM|FLAG_SHUFFLED_MUL|FLAG_REPLICATE;
+    bal->h->flags = FLAG_COLPERM;
+    if (bal->h->nrows == bal->h->ncols)
+        bal->h->flags |= FLAG_REPLICATE;
     bal->h->pshuf[0] = 1;
     bal->h->pshuf[1] = 0;
     bal->h->pshuf_inv[0] = 1;
@@ -913,8 +915,16 @@ uint32_t * matrix_transpose(uint32_t * p, size_t size, unsigned long nrows, unsi
 }
 #endif
 
-
-void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
+/* in the mmt structures, because of the balancing work, we promised that
+ * matrices of size padded_nrows*padded_ncols would be generated on each
+ * node. However, we know that the real matrix has to have one particular
+ * shape, which means that on the current node, it might be that we'll
+ * have some padding rows and columns to generate.
+ *
+ * Note that the on-the-fly random_matrix setup omits the balancing
+ * permutations, so that all padding rows are on the last blocks.
+ */
+void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg, unsigned long padded_nrows, unsigned long padded_ncols)
 {
     const char * rtmp = param_list_lookup_string(pl, "random_matrix");
     ASSERT_ALWAYS(rtmp);
@@ -943,8 +953,35 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
 
-    nrows /= pi->wr[1]->totalsize;
-    ncols /= pi->wr[0]->totalsize;
+    unsigned long padrows, padcols;
+
+    /* This adjustment has padding evenly spread. It's not correct, since
+     * we don't do any reordering of the indices whatsoever.
+     */
+#define OLD_ADJUST(items, comm) do {					\
+    unsigned int rk = comm->jrank * comm->ncores + comm->trank;		\
+    n ## items = n ## items / comm->totalsize +                         \
+                (rk < (n ## items % comm->totalsize));                  \
+    ASSERT_ALWAYS(n ## items <= padded_n ## items);			\
+    pad ## items = padded_n ## items - n ## items;			\
+} while (0)
+
+    /* This one with not evenly spread */
+#define ADJUST(items, comm) do {					\
+    unsigned int rk = comm->jrank * comm->ncores + comm->trank;		\
+    if (rk * padded_n ## items >= n ## items) {				\
+        n ## items = 0;							\
+    } else if ((rk+1) * padded_n ## items >= n ## items) {		\
+        n ## items = n ## items - rk * padded_n ## items;		\
+    } else {								\
+        n ## items = padded_n ## items;		                        \
+    }                                                                   \
+    pad ## items = padded_n ## items - n ## items;			\
+} while (0)
+
+    ADJUST(rows, pi->wr[1]);
+    ADJUST(cols, pi->wr[0]);
+
     density /= pi->wr[0]->totalsize;
     // F->offset /= pi->wr[0]->totalsize;
     gmp_randseed_ui(rstate, seed);
@@ -988,7 +1025,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     last_printed->z = 0;
 
     if (!arg->transpose) {
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(ncols * sizeof(uint32_t));
         /* we'd like to avoid constant malloc()'s and free()'s */
         punched_interval_ptr pool = NULL;
         punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
@@ -1016,6 +1053,9 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 fflush(stdout);
             }
         }
+        for(unsigned long i = 0 ; i < padrows ; i++) {
+            PUSH_P(0);
+        }
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             printf("\n");
         }
@@ -1024,7 +1064,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         free(ptr);
     } else {
         size_t size0 = 0;
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(nrows * sizeof(uint32_t));
         random_matrix_ddata G;
         random_matrix_ddata_init(G);
         /* use a special ddata, for our specially simple process (which
@@ -1116,6 +1156,9 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                         size_disp(dt > 0 ? (size_t) ((arg->size-size0) * sizeof(uint32_t) / dt) : 0, buf2), weight);
                 fflush(stdout);
             }
+        }
+        for(unsigned long j = 0 ; j < padcols ; j++) {
+            PUSH_P(0);
         }
         punched_interval_free_pool(&pool);
         random_matrix_ddata_clear(G);
@@ -1260,7 +1303,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 void usage()
 {
-    fprintf(stderr, "Usage: ./random <nrows> [<ncols>] [<density>] [options]\n"
+    fprintf(stderr, "Usage: ./random_matrix <nrows> [<ncols>] [<density>] [options]\n"
             "Options:\n"
             "\t-d <density> : desired density per row\n"
             "\t-s <seed> : seed\n"
@@ -1326,6 +1369,12 @@ int main(int argc, char * argv[])
     if (kernel_left > r->ncols / 4) {
         fprintf(stderr, "Warning, left kernel is large."
                 " Could trigger misbehaviours\n");
+    }
+    if (kernel_left >= r->ncols) {
+        kernel_left = r->ncols - 1;
+    }
+    if (kernel_right >= r->nrows) {
+        kernel_right = r->nrows - 1;
     }
 
     if (r->rhs->n) {

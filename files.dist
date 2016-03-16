@@ -133,7 +133,7 @@ linalg/bwc/krylov.c
 linalg/bwc/lingen_binary.cpp
 linalg/bwc/lingen_mat_types.hpp
 linalg/bwc/matmul-basic.c
-linalg/bwc/matmul-basicp.c
+linalg/bwc/matmul-basicp.cpp
 linalg/bwc/matmul-bucket.cpp
 linalg/bwc/matmul-common.c
 linalg/bwc/matmul-common.h
@@ -424,7 +424,7 @@ sqrt/CMakeLists.txt
 sqrt/Makefile
 sqrt/checkdep.c
 sqrt/crtalgsqrt.c
-sqrt/gmp-hacks.h
+utils/gmp-hacks.h
 sqrt/knapsack.c
 sqrt/knapsack.h
 sqrt/polyroots.c
@@ -635,6 +635,8 @@ utils/filter_io.h
 utils/filter_io.tex
 utils/sm_utils.c
 utils/sm_utils.h
+utils/galois_utils.c
+utils/galois_utils.h
 utils/utils_with_io.h
 utils/cachebuf.h
 linalg/bwc/mpfq/mpfq_p_3.c
@@ -845,13 +847,13 @@ tests/linalg/bwc/test-plingen.sh
 tests/gf2x/CMakeLists.txt
 tests/gf2x/test_cantor.c
 config/hwloc.cmake
-config/numa.cmake
 parameters/misc/cpubinding.conf
 linalg/bwc/cpubinding.cpp
 linalg/bwc/cpubinding.h
 tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
 tests/test_gfp3.sh
+tests/test_gfp2_2_2g.sh
 utils/verbose.c
 utils/verbose.h
 tests/linalg/bwc/bwc-dispatch-matmul.sh
@@ -1193,8 +1195,8 @@ linalg/bwc/mpfq/mpfq_u64k3_t.c
 linalg/bwc/mpfq/mpfq_u64k3_t.h
 tests/linalg/bwc/test-spmv.sh
 tests/linalg/bwc/test-matcache.sh
-linalg/bwc/short_matmul.c
-linalg/bwc/spmv_test.c
+tests/linalg/bwc/short_matmul.c
+tests/linalg/bwc/spmv_test.c
 linalg/bwc/bench_matcache.c
 linalg/bwc/build_matcache.c
 tests/linalg/bwc/test_hello.c
@@ -1216,6 +1218,12 @@ gf2x/already_tuned/x86_64_nosse/gf2x_mul8.h
 gf2x/already_tuned/x86_64_nosse/gf2x_mul9.h
 tests/provide-wdir.sh
 tests/utils/test_mpz_vector.c
+linalg/bwc/blocklanczos.c
+tests/linalg/bwc/test-blocklanczos.sh
+linalg/bwc/cheating_vec_init.h
+tests/linalg/bwc/test_bl_extraction.c
 scripts/build_environment.sh
 scripts/cadofactor/toplevel.py
 scripts/realpath.sh
+linalg/bwc/arith-modp.hpp
+tests/linalg/bwc/test-arith-modp.cpp

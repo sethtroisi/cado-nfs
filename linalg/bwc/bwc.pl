@@ -122,7 +122,6 @@ my $param_defaults={
     thr => '1x1',
     mpi => '1x1',
     lingen_mpi => '1x1',
-    shuffled_product => 1,
     interval => 200,
 };
 # {{{
@@ -1110,6 +1109,9 @@ sub rename_file_on_leader {
 # {{{ get_cached_bfile -> check for balancing file.
 sub get_cached_bfile {
     my $key = 'balancing';
+    if ($param->{$key}) {
+        $cache->{$key}=[$param->{$key}];
+    }
     if (defined(my $z = $cache->{$key})) {
         my @x = @$z;
         return wantarray ? @x : $x[0];
@@ -1122,11 +1124,7 @@ sub get_cached_bfile {
     $x =~ s{^(?:.*/)?([^/]+)$}{$1};
     $x =~ s/\.(?:bin|txt)$//;
     my $pre_pat = "$x\.${nh}x${nv}";
-    if ($param->{'shuffled_product'}) {
-        $pat = qr/([0-9a-f]{7}[13579bdf])\.bin\s*$/;
-    } else {
-        $pat = qr/([0-9a-f]{7}[02468ace])\.bin\s*$/;
-    }
+    $pat = qr/([0-9a-f]{8})\.bin\s*$/;
     my @bfiles;
     my $hash;
     for my $fileinfo (get_cached_leadernode_filelist) {
@@ -1303,7 +1301,6 @@ sub task_common_run {
     # are we absolutely sure that lingen needs no matrix ?
     @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|mksol|dispatch)$/;
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
-    @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
     @_ = grep !/skip_decorrelating_permutation/, @_ unless $program =~ /mf_bal/;
     @_ = grep !/(?:precmd|tolerate_failure)/, @_;
 
@@ -1364,7 +1361,6 @@ sub subtask_find_or_create_balancing {
 
     print STDERR "No bfile found, we need a new one\n";
     my @mfbal=("mfile=$matrix", "out=$wdir/", $nh, $nv);
-    unshift @mfbal, "--shuffled-product" if $param->{'shuffled_product'};
     unshift @mfbal, "--withcoeffs" if $prime ne '2';
     task_common_run "mf_bal", @mfbal;
     expire_cache_entry "balancing";

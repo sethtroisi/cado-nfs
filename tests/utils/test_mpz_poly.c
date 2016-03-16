@@ -600,8 +600,8 @@ test_mpz_poly_base_modp_init (unsigned long iter)
           m = 833;
         }
       mpz_poly_random (f, d, m);
-      s = mpz_poly_sizeinbase (f, d, 2);
-      for (i = 0; i <= d; i++)
+      s = mpz_poly_sizeinbase (f, 2);
+      for (i = 0; i <= f->deg; i++)
         ASSERT_ALWAYS(mpz_sizeinbase (f->coeff[i], 2) <= s);
       P = mpz_poly_base_modp_init (f, p, K, l);
       /* check f = P[0] + p^K[l]*P[1] + p^K[l-1]*P[2] + ... + p^K[1]*P[l] */

@@ -110,11 +110,14 @@ macro(cado_define_test)
     # ARGUMENTS defines which arguments are to be passed to the binary.
     # Optional.
     #
-    # NO_DEFAULT_RUN (incompatible with ARGUMENTS) indicates that no test
-    # is really defined, only a baseline for further calls to
-    # cado_divert_test. (note that despite the fact that no test is
-    # created in cmake's mind, we do need a test name for further
-    # reference in cado_divert_test).
+    # NO_DEFAULT_RUN indicates that no test is really defined, only a
+    # baseline for further calls to cado_divert_test. (note that despite
+    # the fact that no test is created in cmake's mind, we do need a test
+    # name for further reference in cado_divert_test).
+    #
+    # Giving ARGUMENTS together with NO_DEFAULT_RUN just specifies a
+    # common set of arguments to be passed to all diversions, provided
+    # these are defined with APPEND_ARGUMENTS
     set(IMPLICIT)
     set(TEST_DEPENDENCIES)
     set(TARGET_DEPENDENCIES)
@@ -237,11 +240,6 @@ macro(cado_define_test)
     if(nNO_DEFAULT_RUN GREATER 1)
         message(FATAL_ERROR "discarded arguments after NO_DEFAULT_RUN for test ${TEST_NAME}")
         set(NO_DEFAULT_RUN 1)
-    elseif(nNO_DEFAULT_RUN GREATER 0)
-        list(LENGTH ARGUMENTS nARGUMENTS)
-        if (nARGUMENTS GREATER 0)
-            message(FATAL_ERROR "NO_DEFAULT_RUN and ARGUMENTS are incomaptible for test ${TEST_NAME}")
-        endif()
     endif()
 
     # If we have a binary to build, then the meaning of
@@ -297,6 +295,10 @@ macro(cado_define_test)
             string_join(all_deps ";" ${deps})
             set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
         endif()
+    else()
+        # just in case we defined default arguments.
+        list(LENGTH ARGUMENTS nARGUMENTS)
+        set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
     endif()
 endmacro()
 
@@ -436,7 +438,8 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             -t 2 -dlp-no-keep
             target=92800609832959449330691138186
             191907783019725260605646959711
-            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber)
+            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
+	    plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
         cado_define_test(test_gfp3
             SCRIPT
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
@@ -448,6 +451,13 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
             filter_galois polyselect_gfpn)
+        cado_define_test(test_gfp2_2_2g
+            SCRIPT
+                ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp2_2_2g.sh
+                ${CADO_NFS_SOURCE_DIR} ${CADO_NFS_BINARY_DIR}
+            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
+            plingen_pz sm reconstructlog-dl merge-dl replay-dl
+	    filter_galois)
     else()
         message(STATUS "magma found: ${MAGMA}")
     endif()

@@ -399,6 +399,8 @@ void mul_N64_6464_lookup4(uint64_t *C,
         Bx[j][9]  = w; w ^= bb[0];
         Bx[j][8]  = w;
     }
+    /* We don't zero out C before the computation, but rather at the
+     * moment we read A[i], so that A==C is supported */
     for (size_t i = 0; i < m; i++) {
         uint64_t aa = A[i];
         C[i] = Bx[0][aa & 15]; aa>>=4;
@@ -445,7 +447,6 @@ static inline void MAYBE_UNUSED addmul_N64_6464_lookup4(uint64_t *C,
         Bx[j][9]  = w; w ^= bb[0];
         Bx[j][8]  = w;
     }
-    memset(C, 0, m * sizeof(uint64_t));
     for (size_t i = 0; i < m; i++) {
         uint64_t aa = A[i];
         C[i]^= Bx[0][aa & 15]; aa>>=4;
@@ -789,7 +790,7 @@ void mul_N64_T6464_transB(uint64_t *C,
 }
 
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
-/* implements mul_N64_6464 */
+/* implements addmul_N64_6464 */
 void addmul_N64_6464_sse(uint64_t *C,
 		 const uint64_t *A,
 		 const uint64_t *B, size_t m)
@@ -798,7 +799,8 @@ void addmul_N64_6464_sse(uint64_t *C,
     __m128i *Cw = (__m128i *) C;
     __m128i *Aw = (__m128i *) A;
 
-    /* If m is odd, then we can't do sse because of data width */
+    /* If m is odd, then we can't do sse all the way through because of
+     * data width */
     for (j = 0; j < m - 1; j += 2) {
         __m128i c = _mm_setzero_si128();
 	__m128i a = *Aw++;
@@ -825,12 +827,42 @@ void addmul_N64_6464_sse(uint64_t *C,
 	*C++ ^= c;
     }
 }
+/* can work in place, so not simply memset0 + addmul (the ^= have been
+ * changed to =)
+ */
 void mul_N64_6464_sse(uint64_t *C,
 		 const uint64_t *A,
 		 const uint64_t *B, size_t m)
 {
-    memset(C, 0, m * sizeof(uint64_t));
-    addmul_N64_6464_sse(C,A,B,m);
+    size_t j;
+    __m128i *Cw = (__m128i *) C;
+    __m128i *Aw = (__m128i *) A;
+
+    /* If m is odd, then we can't do sse all the way through because of
+     * data width */
+    for (j = 0; j < m - 1; j += 2) {
+        __m128i c = _mm_setzero_si128();
+	__m128i a = *Aw++;
+
+        __m128i one = _cado_mm_set1_epi64_c(1);
+	for (int i = 0; i < 64; i++) {
+	    __m128i bw = _cado_mm_set1_epi64(B[i]);
+	    c ^= (bw & -(a & one));
+	    a = _mm_srli_epi64(a, 1);
+	}
+	*Cw++ = c;
+    }
+    C += j;
+    A += j;
+    for (; j < m; j++) {
+	uint64_t c = UINT64_C(0);
+	uint64_t a = *A++;
+	for (int i = 0; i < 64; i++) {
+	    c ^= (B[i] & -(a & UINT64_C(1)));
+	    a >>= UINT64_C(1);
+	}
+	*C++ = c;
+    }
 }
 #endif
 
