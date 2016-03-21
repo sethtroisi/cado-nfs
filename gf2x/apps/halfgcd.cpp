@@ -200,6 +200,10 @@ IterHalfGCD (GF2XMatrix& M_out, GF2X& U, GF2X& V, long d_red)
    GF2X Q, t(INIT_SIZE, d_red);
 
    while (deg(V) > goal) {
+     /* For the gcd of two polynomials of degree < 74207281,
+	this PlainDivRem() call takes about 20% of the total gcd time.
+	Here U and V have degree less than about 2*NTL_GF2X_HalfGCD_CROSSOVER,
+	and usually deg(V) = deg(U) - <small value>. */
       PlainDivRem(Q, U, U, V);
       swap(U, V);
 
@@ -330,7 +334,8 @@ HalfGCD2 (GF2XMatrix& M_out, GF2X& U, GF2X& V, long d_red, int extended)
    GF2X Q;
    GF2XMatrix M2;
 
-   DivRem (Q, U, U, V);
+   /* this PlainDivRem() call takes negligible time */
+   PlainDivRem (Q, U, U, V);
    swap (U, V);
 
    if (extended)

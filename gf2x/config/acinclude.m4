@@ -145,16 +145,30 @@ int main()
 
 AC_DEFUN([SSE41_EXAMPLE],[AC_LANG_SOURCE([
 #include <stdint.h>
+#include <stdlib.h>
 #include <smmintrin.h>
 
 int main() {
     __m128i x = _mm_setr_epi32(42, 0, 17, 0);
     __m128i y = _mm_setr_epi32(41, 0, 17, 0);
     x = _mm_cmpeq_epi64(x, y);
+    // x = 0....0 1....1
+    y =  _mm_insert_epi64(y, _mm_extract_epi64(x, 1), 0); 
+    // y = 1....1 0x11
+    y = _mm_andnot_si128(y, y);
+    // y = 0....0 0x11
+    x = _mm_cmpeq_epi64(x, y);
+    // x = 1....1 1....1
     /* the following test is for emulated 32-bit on physical 64-bit */
     if (sizeof(unsigned long) != 8)
       abort ();
-    return 0;
+    unsigned int z = _mm_extract_epi32(x, 2);
+    return
+        (
+       (_mm_extract_epi32(x, 0) != 0)
+    && (_mm_extract_epi32(x, 1) != 0)
+    && (_mm_extract_epi32(x, 2) == 0)
+    && (_mm_extract_epi32(x, 3) == 0)) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 ])])
 AC_DEFUN([PCLMUL_EXAMPLE],[AC_LANG_SOURCE([
@@ -491,6 +505,63 @@ AC_DEFUN([CHECK_PCLMUL_SUPPORT],[
   AC_DEFINE([GF2X_HAVE_PCLMUL_SUPPORT],[1],[Define if pclmul code as present in the source tree is supported by the compiler])
  fi
 ])# CHECK_PCLMUL_SUPPORT
+
+AC_DEFUN([HELLO_WORLD_EXAMPLE],[AC_LANG_SOURCE([
+#include <stdio.h>
+
+int main() {
+    printf("hello\n");
+    return 0;
+}
+])])
+
+
+AC_DEFUN([CHECK_MARCH_NATIVE_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ special_double_setting="yes, via -march=x86-64 -march=native"
+ AC_CACHE_CHECK([whether $CC understands -march=native], [gf2x_cv_cc_supports_march_native],[
+  gf2x_cv_cc_supports_march_native=no
+  CFLAGS="$ac_save_CFLAGS -march=native"
+  AC_COMPILE_IFELSE(
+      [HELLO_WORLD_EXAMPLE()],
+      [
+      gf2x_cv_cc_supports_march_native=yes
+      ],
+      [
+      CFLAGS="$ac_save_CFLAGS -march=x86-64 -march=native"
+      AC_COMPILE_IFELSE(
+          [HELLO_WORLD_EXAMPLE()],
+          [
+          gf2x_cv_cc_supports_march_native="$special_double_setting"
+          ],
+          [AC_MSG_RESULT(no)])
+      ]
+  )
+  CFLAGS=$ac_save_CFLAGS
+  ])
+  if test "$gf2x_cv_cc_supports_march_native" = "$special_double_setting" ;then
+    CFLAGS="$CFLAGS -march=x86-64 -march=native"
+  elif test "$gf2x_cv_cc_supports_march_native" = "yes" ;then
+    CFLAGS="$CFLAGS -march=native"
+  fi
+])# CHECK_MARCH_NATIVE_SUPPORT
+
+AC_DEFUN([CHECK_MTUNE_NATIVE_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ AC_CACHE_CHECK([whether $CC understands -mtune=native], [gf2x_cv_cc_supports_mtune_native],[
+  gf2x_cv_cc_supports_mtune_native=no
+  CFLAGS="$ac_save_CFLAGS -mtune=native"
+  AC_COMPILE_IFELSE(
+      [HELLO_WORLD_EXAMPLE()],
+      [
+      gf2x_cv_cc_supports_mtune_native=yes
+      ])
+  CFLAGS=$ac_save_CFLAGS
+  ])
+  if test "$gf2x_cv_cc_supports_mtune_native" = "yes" ;then
+    CFLAGS="$CFLAGS -mtune=native"
+  fi
+])# CHECK_MTUNE_NATIVE_SUPPORT
 
 
 # It is necessary to make all tests. We do encounter in the wild binutils

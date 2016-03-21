@@ -1229,3 +1229,5 @@ scripts/cadofactor/toplevel.py
 scripts/realpath.sh
 linalg/bwc/arith-modp.hpp
 tests/linalg/bwc/test-arith-modp.cpp
+gf2x/lowlevel/mul5clk2.c
+gf2x/src/check_small_size.c
