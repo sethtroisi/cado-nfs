@@ -1357,6 +1357,8 @@ if __name__ == '__main__':
                           help="Keep and upload old results when client starts")
         parser.add_option("--nosha1check", default=False, action="store_true", 
                           help="Skip checking the SHA1 for input files")
+        parser.add_option("--single", default=False, action="store_true", 
+                          help="process only a single WU, then exit")
         parser.add_option("--nocncheck", default=False, action="store_true", 
                           help="Don't check common name/SAN of certificate. "
                           "Currently works only under Python 2.")
@@ -1502,6 +1504,9 @@ if __name__ == '__main__':
                 logging.info("Client finishing: %s. Bye." % e)
                 break
             client_ok = client.process()
+            if options.single:
+                logging.info("Client processed its WU. Finishing now as implied by --single")
+                sys.exit(0)
 #        except Exception:
 #            logging.exception("Exception occurred")
 #            break
