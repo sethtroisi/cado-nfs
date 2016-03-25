@@ -766,36 +766,50 @@ class WorkunitClient(object):
         
         self.wu_filename = os.path.join(self.settings["DLDIR"], 
                                         self.settings["WU_FILENAME"])
-        self.download_wu()
 
-        # Get an exclusive lock to avoid two clients working on the same 
-        # workunit
-        try:
-            self.wu_file = open_exclusive(self.wu_filename)
-        except FileLockedException:
-            logging.error("File '%s' is already locked. This may "
-                          "indicate that two clients with clientid '%s' are "
-                          "running. Terminating.", 
-                          self.wu_filename, self.settings["CLIENTID"])
-            raise
+        force_reload=False
 
-        logging.debug ("Parsing workunit from file %s", self.wu_filename)
-        wu_text = self.wu_file.read()
-        # WU file stays open so we keep the lock
+        while True:
+            self.download_wu(force_reload=force_reload)
 
-        try:
-            self.workunit = Workunit(wu_text)
-        except Exception as err:
-            logging.error("Invalid workunit file: %s", err)
-            self.cleanup()
-            raise WorkunitParseError()
+            # Get an exclusive lock to avoid two clients working on the same 
+            # workunit
+            try:
+                self.wu_file = open_exclusive(self.wu_filename)
+            except FileLockedException:
+                logging.error("File '%s' is already locked. This may "
+                              "indicate that two clients with clientid '%s' are "
+                              "running. Terminating.", 
+                              self.wu_filename, self.settings["CLIENTID"])
+                raise
+
+            logging.debug ("Parsing workunit from file %s", self.wu_filename)
+            wu_text = self.wu_file.read()
+            # WU file stays open so we keep the lock
+
+            try:
+                self.workunit = Workunit(wu_text)
+            except Exception as err:
+                logging.error("Invalid workunit file: %s", err)
+                self.cleanup()
+                raise WorkunitParseError()
+            if not force_reload and self.workunit.get("DEADLINE") and time.time() > float(self.workunit.get("DEADLINE")):
+                logging.warn("Old workunit file %s has passed deadline (%s), ignoring",
+                        self.wu_filename, 
+                        time.asctime(time.localtime(float(self.workunit.get("DEADLINE")))))
+                os.remove(self.wu_filename)
+                close_exclusive(self.wu_file)
+                force_reload=True
+            else:
+                break
+
         logging.debug ("Workunit ID is %s", self.workunit.get_id())
     
-    def download_wu(self):
+    def download_wu(self, *args, **kwargs):
         # Download the WU file if none exists
         url = self.settings["GETWUPATH"]
         options = "clientid=" + self.settings["CLIENTID"]
-        self.get_missing_file(url, self.wu_filename, options=options)
+        self.get_missing_file(url, self.wu_filename, options=options, *args, **kwargs)
 
     def cleanup(self):
         logging.info ("Removing workunit file %s", self.wu_filename)
@@ -1026,7 +1040,7 @@ class WorkunitClient(object):
         request.close()
     
     def get_missing_file(self, urlpath, filename, checksum=None,
-                         options=None):
+                         options=None, force_reload=False):
         """ Downloads a file if it does not exit already.
 
         Also checks the checksum, if specified; if the file already exists and
@@ -1038,16 +1052,20 @@ class WorkunitClient(object):
         """
         # print('get_missing_file(%s, %s, %s)' % (urlpath, filename, checksum))
         if os.path.isfile(filename):
-            logging.info ("%s already exists, not downloading", filename)
-            if checksum is None:
-                return True
-            filesum = self.do_checksum(filename)
-            if filesum.lower() == checksum.lower():
-                return True
-            logging.error ("Existing file %s has wrong checksum %s, "
-                           "workunit specified %s. Deleting file.", 
-                           filename, filesum, checksum)
-            os.remove(filename)
+            if force_reload:
+                logging.info ("%s already exists, removing because of force_reload", filename)
+                os.remove(filename)
+            else:
+                logging.info ("%s already exists, not downloading", filename)
+                if checksum is None:
+                    return True
+                filesum = self.do_checksum(filename)
+                if filesum.lower() == checksum.lower():
+                    return True
+                logging.error ("Existing file %s has wrong checksum %s, "
+                               "workunit specified %s. Deleting file.", 
+                               filename, filesum, checksum)
+                os.remove(filename)
 
         # If checksum is wrong and does not change during two downloads, exit 
         # with failue, as apparently the file on the server and checksum in 
