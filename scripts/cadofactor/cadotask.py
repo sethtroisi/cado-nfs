@@ -2013,6 +2013,8 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def submit_one_wu(self):
         adstart = self.state["adnext"]
         adend = adstart + self.params["adrange"]
+        adend -= adend - (adend % self.params["adrange"])
+        assert adend > adstart
         adend = min(adend, self.params["admax"])
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
@@ -2721,6 +2723,8 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
+            q1 = q1 - (q1 % self.params["qrange"])
+            assert q1 > q0
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = \
