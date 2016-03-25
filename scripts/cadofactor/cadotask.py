@@ -2013,7 +2013,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def submit_one_wu(self):
         adstart = self.state["adnext"]
         adend = adstart + self.params["adrange"]
-        adend -= adend - (adend % self.params["adrange"])
+        adend = adend - (adend % self.params["adrange"])
         assert adend > adstart
         adend = min(adend, self.params["admax"])
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
