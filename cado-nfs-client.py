@@ -689,7 +689,7 @@ class WorkunitProcessor(object):
             else:
                 renice_func = None
 
-            if len(self.settings["override"]):
+            if self.settings["override"]:
                 mangled=[]
                 orig=re.split(' *', command)
                 while orig:
