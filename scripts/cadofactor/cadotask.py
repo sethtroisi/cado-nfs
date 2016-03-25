@@ -2760,7 +2760,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         if self.handle_error_result(message):
             return True
         output_files = message.get_output_files()
-        assert len(output_files) == 1
+        if len(output_files) != 1:
+            self.logger.warn("Received output with %d files: %s" % (len(output_files), ", ".join(output_files)))
+            return False
         stderrfilename = message.get_stderrfile(0)
         ok = self.add_file(output_files[0], stderrfilename, commit=False)
         self.verification(message.get_wu_id(), ok, commit=True)
