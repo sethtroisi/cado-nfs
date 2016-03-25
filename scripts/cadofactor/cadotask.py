@@ -4642,7 +4642,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def paramnames(self):
         return {"name": str, "workdir": None, "address": None, "port": 0,
                 "threaded": False, "ssl": True, "whitelist": None,
-                "only_registered": True, "forgetport": False}
+                "only_registered": True, "forgetport": False,
+                "timeout_hint": None}
     @property
     def param_nodename(self):
         return self.name
@@ -4669,6 +4670,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
             cafilename = basedir + self.params["name"] + ".server.cert"
         else:
             cafilename = None
+
+        servertimeout_hint = self.params.get("timeout_hint")
 
         server_whitelist = []
         if not whitelist is None:
@@ -4713,7 +4716,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         self.server = wuserver.ServerLauncher(serveraddress, serverport,
             threaded, self.get_db_filename(), self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
-            whitelist=server_whitelist)
+            whitelist=server_whitelist,
+            timeout_hint=servertimeout_hint)
         self.state["port"] = self.server.get_port()
 
     def run(self):

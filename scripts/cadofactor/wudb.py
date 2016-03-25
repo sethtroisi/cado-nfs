@@ -966,7 +966,7 @@ class WuAccess(object): # {
         self.commit(commit)
         cursor.close()
 
-    def assign(self, clientid, commit=True):
+    def assign(self, clientid, commit=True, timeout_hint=None):
         """ Finds an available workunit and assigns it to clientid.
             Returns the text of the workunit, or None if no available 
             workunit exists """
@@ -988,10 +988,14 @@ class WuAccess(object): # {
                 self.check(r[0])
             d = {"status": WuStatus.ASSIGNED, 
                  "assignedclient": clientid,
-                 "timeassigned": str(datetime.utcnow())}
+                 "timeassigned": str(datetime.utcnow())
+                 }
             pk = self.mapper.getpk()
             self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
             result = r[0]["wu"]
+            if timeout_hint:
+                dltext = "%d\n" % int(time.time() + int(timeout_hint))
+                result = result + "DEADLINE " + dltext 
         else:
             result = None
         
