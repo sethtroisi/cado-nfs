@@ -689,6 +689,22 @@ class WorkunitProcessor(object):
             else:
                 renice_func = None
 
+            if len(self.settings["override"]):
+                mangled=[]
+                orig=re.split(' *', command)
+                while orig:
+                    a=orig.pop(0)
+                    repl=None
+                    for sub in self.settings["override"]:
+                        if re.match('^-{1,2}' + sub[0] + '$', a):
+                            repl=sub[1]
+                    mangled.append(a)
+                    if repl is not None:
+                        oldvalue=orig.pop(0)
+                        logging.info("Overriding argument %s %s by %s %s in command line (substitution %s %s)" % (a, oldvalue, a, sub[1], sub[0], sub[1]))
+                        mangled.append(sub[1])
+                command=' '.join(mangled)
+
             (returncode, stdout, stderr) = run_command(command, shell=True,
                     preexec_fn=renice_func)
 
@@ -1364,8 +1380,12 @@ if __name__ == '__main__':
                           "Currently works only under Python 2.")
         parser.add_option("--externdl", default=False, action="store_true", 
                           help="Use wget or curl for HTTPS downloads")
+        parser.add_option("--override", nargs=2, action='append',
+                          metavar=('REGEXP', 'VALUE'),
+                          help="Modify command-line arguments which match ^-{1,2}REGEXP$ to take the given VALUE. Note that REGEXP cannot start with a dash")
         # Parse command line
         (options, args) = parser.parse_args()
+
         if args:
             sys.stderr.write("Did not understand command line arguments %s\n" %
                              " ".join(args))
@@ -1480,6 +1500,8 @@ if __name__ == '__main__':
                         "Python 2 and can't find working wget or curl as "
                         "fall-back. Aborting.")
                 sys.exit(1)
+
+    SETTINGS["override"] = options.override
 
     if options.daemon:
         create_daemon(keepfd=None if logfile is None else [logfile.fileno()])
