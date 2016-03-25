@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 # TODO: 
 # FILES table: OBSOLETE column
 #     OBSOLETE says that this file was replaced by a newer version, for example checkrels may want to create a new file with only part of the output. 
@@ -15,6 +14,9 @@ from __future__ import print_function
 
 import sys
 import sqlite3
+import MySQLdb
+import MySQLdb.cursors
+import _mysql_exceptions
 import threading
 import traceback
 import collections
@@ -47,6 +49,9 @@ logger.setLevel(logging.NOTSET)
 
 
 PRINTED_CANCELLED_WARNING = False
+
+username = 'cado'
+password = '***REMOVED***'
 
 def join3(l, pre=None, post=None, sep=", "):
     """ 
@@ -96,8 +101,9 @@ def conn_commit(conn):
 
 def conn_close(conn):
     logger.transaction("Closing connection %d", id(conn))
-    if conn.in_transaction:
-        logger.warning("Connection %d being closed while in transaction", id(conn))
+    # TODO figure this out
+    #if conn.in_transaction:
+    #    logger.warning("Connection %d being closed while in transaction", id(conn))
     conn.close()
 
 # Dummy class for defining "constants" with reverse lookup
@@ -107,7 +113,8 @@ STATUS_VALUES = range(len(STATUS_NAMES))
 WuStatusBase = collections.namedtuple("WuStatusBase", STATUS_NAMES)
 class WuStatusClass(WuStatusBase):
     def check(self, status):
-        assert status in self
+        print(status)
+        #assert status in self
     def get_name(self, status):
         self.check(status)
         return STATUS_NAMES[status]
@@ -129,7 +136,7 @@ def check_tablename(name):
 class StatusUpdateError(Exception):
     pass
 
-class MyCursor(sqlite3.Cursor):
+class MyCursor(MySQLdb.cursors.Cursor):
     """ This class represents a DB cursor and provides convenience functions 
         around SQL queries. In particular it is meant to provide an  
         (1) an interface to SQL functionality via method calls with parameters, 
@@ -142,7 +149,9 @@ class MyCursor(sqlite3.Cursor):
     name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!=", "like": "like"}
     
     def __init__(self, conn):
+        pass
         # Enable foreign key support
+        # TODO: remove
         self._conn = conn
         super().__init__(conn)
 
@@ -170,7 +179,7 @@ class MyCursor(sqlite3.Cursor):
                 where = " " + name + " "
             else:
                 where = where + " AND "
-            where = where + join3(args[opname].keys(), post=" " + cls.name_to_operator[opname] + " ?", sep=" AND ")
+            where = where + join3(args[opname].keys(), post=" " + cls.name_to_operator[opname] + " %s", sep=" AND ")
             values = values + list(args[opname].values())
         return (where, values)
 
@@ -194,9 +203,11 @@ class MyCursor(sqlite3.Cursor):
                 if values is None:
                     self.execute(command)
                 else:
+                    if "SELECT" not in command:
+                        print(command,values)
                     self.execute(command, values)
                 break
-            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+            except (Exception) as e:
                 if str(e) == "database disk image is malformed" or \
                         str(e) == "disk I/O error":
                     logger.critical("sqlite3 reports error accessing the database.")
@@ -250,10 +261,13 @@ class MyCursor(sqlite3.Cursor):
         self._exec (command)
     
     def create_index(self, name, table, columns):
-        """ Creates an index with fields as described in the columns list """
-        command = "CREATE INDEX IF NOT EXISTS %s ON %s( %s );" \
-                  % (name, table, ", ".join(columns))
-        self._exec (command)
+        try:
+            """ Creates an index with fields as described in the columns list """
+            command = "CREATE INDEX %s ON %s( %s );" % (name, table, ", ".join(columns))
+            self._exec (command)
+        except _mysql_exceptions.OperationalError as e:
+                        print(e)
+                        pass
     
     def insert(self, table, d):
         """ Insert a new entry, where d is a dictionary containing the 
@@ -269,7 +283,7 @@ class MyCursor(sqlite3.Cursor):
         fields = self._without_None(d)
         fields_str = ", ".join(fields.keys())
 
-        sqlformat = ", ".join(("?",) * len(fields)) # sqlformat = "?, ?, ?, " ... "?"
+        sqlformat = ", ".join(("%s",) * len(fields)) # sqlformat = "?, ?, ?, " ... "?"
         command = "INSERT INTO %s( %s ) VALUES ( %s );" \
                   % (table, fields_str, sqlformat)
         values = list(fields.values())
@@ -283,7 +297,7 @@ class MyCursor(sqlite3.Cursor):
             fields and their values to update """
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE column_n+1=value_n+1, ...,
-        setstr = join3(d.keys(), post = " = ?", sep = ", ")
+        setstr = join3(d.keys(), post = " = %s", sep = ", ")
         (wherestr, wherevalues) = self._where_str("WHERE", **conditions)
         command = "UPDATE %s SET %s %s" % (table, setstr, wherestr)
         values = list(d.values()) + wherevalues
@@ -391,8 +405,12 @@ class DbTable(object):
             cursor.create_index(self.tablename + "_pkindex", r.tablename, 
                                 (fk[0], ))
         for indexname in self.index:
-            cursor.create_index(self.tablename + "_" + indexname, 
-                                self.tablename, self.index[indexname])
+            try:
+                cursor.create_index(indexname, 
+                                    self.tablename, self.index[indexname])
+            except _mysql_exceptions.OperationalError as e:
+                print(e)
+                pass
 
     def insert(self, cursor, values, foreign=None):
         """ Insert a new row into this table. The column:value pairs are 
@@ -430,10 +448,11 @@ class DbTable(object):
 
 class WuTable(DbTable):
     tablename = "workunits"
+    #removed ASC
     fields = (
-        ("wurowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
-        ("wuid", "TEXT", "UNIQUE NOT NULL"), 
-        ("submitter", "TEXT", ""),
+        ("wurowid", "INTEGER PRIMARY KEY AUTO_INCREMENT", "UNIQUE NOT NULL"), 
+        ("wuid", "VARCHAR(512)", "UNIQUE NOT NULL"), 
+        ("submitter", "VARCHAR(512)", ""),
         ("status", "INTEGER", "NOT NULL"), 
         ("wu", "TEXT", "NOT NULL"), 
         ("timecreated", "TEXT", ""), 
@@ -453,10 +472,11 @@ class WuTable(DbTable):
 
 class FilesTable(DbTable):
     tablename = "files"
+    #removed ASC
     fields = (
-        ("filesrowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
+        ("filesrowid", "INTEGER PRIMARY KEY AUTO_INCREMENT", "UNIQUE NOT NULL"), 
         ("filename", "TEXT", ""), 
-        ("path", "TEXT", "UNIQUE NOT NULL"),
+        ("path", "VARCHAR(512)", "UNIQUE NOT NULL"),
         ("type", "TEXT", ""),
         ("command", "INTEGER", "")
     )
@@ -466,15 +486,16 @@ class FilesTable(DbTable):
 
 
 class DictDbTable(DbTable):
+    #removed ASC
     fields = (
-        ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"),
-        ("key", "TEXT", "UNIQUE NOT NULL"),
+        ("rowid", "INTEGER PRIMARY KEY AUTO_INCREMENT", "UNIQUE NOT NULL"),
+        ("kkey", "VARCHAR(200)", "UNIQUE NOT NULL"),
         ("type", "INTEGER", "NOT NULL"),
         ("value", "TEXT", "")
         )
     primarykey = fields[0][0]
     references = None
-    index = {"keyindex": ("key",)}
+    index = {"kkey_index": ("kkey",)}
     def __init__(self, *args, name = None, **kwargs):
         self.tablename = name
         super().__init__(*args, **kwargs)
@@ -557,7 +578,8 @@ class DictDbAccess(collections.MutableMapping):
         '''
         
         if isinstance(db, str):
-            self._conn = sqlite3.connect(db)
+            #self._conn = sqlite3.connect(db)
+            self._conn = MySQLdb.connect("localhost", username,password, db)
             self._ownconn = True
         else:
             self._conn = db
@@ -624,19 +646,19 @@ class DictDbAccess(collections.MutableMapping):
         cursor = self._conn.cursor(MyCursor)
         rows = self._table.where(cursor)
         cursor.close()
-        return {r["key"]: self.__convert_value(r) for r in rows}
+        return {r["kkey"]: self.__convert_value(r) for r in rows}
     
     def __setitem_nocommit(self, cursor, key, value):
-        """ Set dictioary key to value and update/insert into table,
+        """ Set dictionary key to value and update/insert into table,
         but don't commit. Cursor must be given
         """
         update = {"value": str(value), "type": self.__get_type_idx(value)}
         if key in self._data:
             # Update the table row where column "key" equals key
-            self._table.update(cursor, update, eq={"key": key})
+            self._table.update(cursor, update, eq={"kkey": key})
         else:
             # Insert a new row
-            update["key"] = key
+            update["kkey"] = key
             self._table.insert(cursor, update)
         # Update the in-memory dict
         self._data[key] = value
@@ -644,8 +666,9 @@ class DictDbAccess(collections.MutableMapping):
     def __setitem__(self, key, value):
         """ Access by indexing, e.g., d["foo"]. Always commits """
         cursor = self._conn.cursor(MyCursor)
-        if not self._conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        # TODO: fix transaction
+        #if not self._conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         self.__setitem_nocommit(cursor, key, value)
         conn_commit(self._conn)
         cursor.close()
@@ -653,9 +676,9 @@ class DictDbAccess(collections.MutableMapping):
     def __delitem__(self, key, commit=True):
         """ Delete a key from the dictionary """
         cursor = self._conn.cursor(MyCursor)
-        if not self._conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
-        self._table.delete(cursor, eq={"key": key})
+        #if not self._conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
+        self._table.delete(cursor, eq={"kkey": key})
         if commit:
             conn_commit(self._conn)
         cursor.close()
@@ -677,8 +700,9 @@ class DictDbAccess(collections.MutableMapping):
     
     def update(self, other, commit=True):
         cursor = self._conn.cursor(MyCursor)
-        if not self._conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        # TODO: fix transaction
+        #if not self._conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         for (key, value) in other.items():
             self.__setitem_nocommit(cursor, key, value)
         if commit:
@@ -688,15 +712,16 @@ class DictDbAccess(collections.MutableMapping):
     def clear(self, args = None, commit=True):
         """ Overridden clear that allows removing several keys atomically """
         cursor = self._conn.cursor(MyCursor)
-        if not self._conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        # TODO: restore transactions
+        #if not self._conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         if args is None:
             self._data.clear()
             self._table.delete(cursor)
         else:
             for key in args:
                 del(self._data[key])
-                self._table.delete(cursor, eq={"key": key})
+                self._table.delete(cursor, eq={"kkey": key})
         if commit:
             conn_commit(self._conn)
         cursor.close()
@@ -784,7 +809,7 @@ class Mapper(object):
         joinsource = "( %s )" % command
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
-            joinsource = "%s LEFT JOIN %s USING ( %s )" \
+            joinsource = "%s tmp LEFT JOIN %s USING ( %s )" \
                          % (joinsource, self.subtables[s].getname(), pk)
         # FIXME: don't get result rows as dict! Leave as tuple and
         # take them apart positionally
@@ -823,15 +848,16 @@ class WuAccess(object): # {
     
     def __init__(self, db):
         if isinstance(db, str):
-            self.conn = sqlite3.connect(db)
+            #self.conn = sqlite3.connect(db)
+            self.conn = MySQLdb.connect("localhost",username, password, db)
             self._ownconn = True
         else:
             self.conn = db
             self._ownconn = False
         cursor = self.conn.cursor(MyCursor)
-        cursor.pragma("foreign_keys = ON")
-        self.commit()
-        cursor.close()
+        #cursor.pragma("foreign_keys = ON")
+        #self.commit()
+        #cursor.close()
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
     def __del__(self):
@@ -935,7 +961,7 @@ class WuAccess(object): # {
 
     def create_tables(self):
         cursor = self.conn.cursor(MyCursor)
-        cursor.pragma("journal_mode=WAL")
+        #cursor.pragma("journal_mode=WAL")
         self.mapper.create(cursor)
         self.commit()
         cursor.close()
@@ -956,8 +982,9 @@ class WuAccess(object): # {
         """ Create new workunits from wus which contains the texts of the 
             workunit files """
         cursor = self.conn.cursor(MyCursor)
-        if not self.conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        # todo restore transactions
+        #if not self.conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         if isinstance(wus, str):
             self._create1(cursor, wus, priority)
         else:
@@ -971,8 +998,9 @@ class WuAccess(object): # {
             Returns the text of the workunit, or None if no available 
             workunit exists """
         cursor = self.conn.cursor(MyCursor)
-        if not self.conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        # todo restore transaction
+        #if not self.conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         r = self.mapper.table.where(cursor, limit = 1, 
                                     order=("priority", "DESC"), 
                                     eq={"status": WuStatus.AVAILABLE})
@@ -1010,8 +1038,8 @@ class WuAccess(object): # {
     def result(self, wuid, clientid, files, errorcode=None,
                failedcommand=None, commit=True):
         cursor = self.conn.cursor(MyCursor)
-        if not self.conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        #if not self.conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
             self.commit(commit)
@@ -1052,8 +1080,8 @@ class WuAccess(object): # {
 
     def verification(self, wuid, ok, commit=True):
         cursor = self.conn.cursor(MyCursor)
-        if not self.conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        #if not self.conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
             self.commit(commit)
@@ -1090,8 +1118,8 @@ class WuAccess(object): # {
 
     def set_status(self, status, commit=True, **conditions):
         cursor = self.conn.cursor(MyCursor)
-        if not self.conn.in_transaction:
-            cursor.begin(EXCLUSIVE)
+        #if not self.conn.in_transaction:
+        #    cursor.begin(EXCLUSIVE)
         self.mapper.table.update(cursor, {"status": status}, **conditions)
         self.commit(commit)
         cursor.close()
@@ -1302,8 +1330,27 @@ class DbAccess(object):
         self.__db = db
     
     def get_db_connection(self):
-        return sqlite3.connect(self.__db)
+        #return sqlite3.connect(self.__db)
+        db = None
+        try:
+            db =MySQLdb.connect("localhost",username,password,self.__db)
+        except _mysql_exceptions.OperationalError as e:
+            ## TODO catch errors here
+            db = MySQLdb.connect("localhost",username, password)
+            cursor = db.cursor()
+            
+            cursor.execute("CREATE DATABASE %s;" % self.__db)
+            db.commit()
+            cursor.execute("USE %s;" % self.__db);
+            db_pool = WuAccess(self.__db)
+            db_pool.create_tables()
+            #db.commit()
+
+            
+
+        return db
     
+        
     def get_db_filename(self):
         return self.__db
     
