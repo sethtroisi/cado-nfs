@@ -189,7 +189,6 @@ class MyCursor(MySQLdb.cursors.Cursor):
         
         # FIXME: should be the caller's class name, as _exec could be 
         # called from outside this class
-        #print(command, values)
         classname = self.__class__.__name__
         parent = sys._getframe(1).f_code.co_name
         command_str = command.replace("?", "%r")
@@ -204,8 +203,8 @@ class MyCursor(MySQLdb.cursors.Cursor):
                 if values is None:
                     self.execute(command)
                 else:
-                    #if "SELECT" not in command:
-                    #    print(command,values)
+                    if "SELECT" not in command:
+                        print(command,values)
                     self.execute(command, values)
                 break
             except (Exception) as e:
@@ -804,36 +803,24 @@ class Mapper(object):
     def where(self, cursor, limit = None, order = None, **cond):
         # We want:
         # SELECT * FROM (SELECT * from workunits WHERE status = 2 LIMIT 1) LEFT JOIN files USING ( wurowid );
-
         pk = self.getpk()
         (command, values) = cursor.where_query(self.table.tablename,
                                                limit=limit, **cond)
         joinsource = "( %s )" % command
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
-            joinsource = "%s tmp LEFT JOIN %s ON tmp.%s=%s.%s" \
-                         % (joinsource,self.subtables[s].getname(), pk, self.subtables[s].getname(),  pk)
+            joinsource = "%s tmp LEFT JOIN %s USING ( %s )" \
+                         % (joinsource, self.subtables[s].getname(), pk)
         # FIXME: don't get result rows as dict! Leave as tuple and
         # take them apart positionally
-        
         rows = cursor.where_as_dict(joinsource, order=order, values=values)
         wus = []
         for r in rows:
-            #import pdb; pdb.set_trace()
             # Collapse rows with identical primary key
             if len(wus) == 0 or r[pk] != wus[-1][pk]:
-                #wus.append(r)
-                d = self.table.dictextract(r)
-                if 'files' in r:
-                    d['files'] = r[files]
-                else:
-                    d['files'] = None
-                wus.append(d)
-                #print(wus)
-                #for s in self.subtables.keys():
-                    #print(wus)
-                    #wus[-1][s] = None
-                    #print(wus[-1][s])
+                wus.append(self.table.dictextract(r))
+                for s in self.subtables.keys():
+                    wus[-1][s] = None
 
             for (sn, sm) in self.subtables.items():
                 spk = sm.getpk()
@@ -1085,7 +1072,6 @@ class WuAccess(object): # {
         else:
             d["status"] = WuStatus.RECEIVED_ERROR
         pk = self.mapper.getpk()
-        logger.warning(pk + " was primary key")
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
         self._add_files(cursor, files, rowid = data[pk])
         self.commit(commit)
