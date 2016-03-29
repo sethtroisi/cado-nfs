@@ -1176,7 +1176,6 @@ class WuAccess(object): # {
             return False
         # FIXME: should we do the update by wuid and skip these checks?
         try:
-            print(data)
             self._checkstatus(data, [WuStatus.RECEIVED_OK, WuStatus.RECEIVED_ERROR])
         except StatusUpdateError:
             self.commit(commit)
@@ -1230,10 +1229,6 @@ class WuAccess(object): # {
         return self.count(eq={"status": WuStatus.AVAILABLE})
     
     def get_one_result(self):
-        #print("GETTING ONE RESULT")
-        if BREAK:
-            pass
-            #import pdb; pdb.set_trace()
         r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_OK})
         if not r:
             r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_ERROR})
