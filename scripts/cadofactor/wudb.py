@@ -14,9 +14,8 @@ from __future__ import print_function
 
 import sys
 import sqlite3
-import MySQLdb
-import MySQLdb.cursors
-import _mysql_exceptions
+import mysql
+import mysql.connector
 import threading
 import traceback
 import collections
@@ -113,8 +112,7 @@ STATUS_VALUES = range(len(STATUS_NAMES))
 WuStatusBase = collections.namedtuple("WuStatusBase", STATUS_NAMES)
 class WuStatusClass(WuStatusBase):
     def check(self, status):
-        print(status)
-        #assert status in self
+        assert status in self
     def get_name(self, status):
         self.check(status)
         return STATUS_NAMES[status]
@@ -136,7 +134,7 @@ def check_tablename(name):
 class StatusUpdateError(Exception):
     pass
 
-class MyCursor(MySQLdb.cursors.Cursor):
+class MyCursor(mysql.connector.cursor.MySQLCursor):
     """ This class represents a DB cursor and provides convenience functions 
         around SQL queries. In particular it is meant to provide an  
         (1) an interface to SQL functionality via method calls with parameters, 
@@ -149,11 +147,13 @@ class MyCursor(MySQLdb.cursors.Cursor):
     name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!=", "like": "like"}
     
     def __init__(self, conn):
-        pass
         # Enable foreign key support
         # TODO: remove
         self._conn = conn
         super().__init__(conn)
+
+    def in_transaction(self):
+        return self._conn.in_transaction
 
     @staticmethod
     def _without_None(d):
@@ -194,8 +194,8 @@ class MyCursor(MySQLdb.cursors.Cursor):
         command_str = command.replace("?", "%r")
         if not values is None:
             command_str = command_str % tuple(values)
-        logger.transaction("%s.%s(): connection = %s, command = %s",
-                           classname, parent, id(self._conn), command_str)
+        #logger.transaction("%s.%s(): connection = %s, command = %s",
+        #                   classname, parent, id(self._conn), command_str)
         
         i = 0
         while True:
@@ -203,8 +203,6 @@ class MyCursor(MySQLdb.cursors.Cursor):
                 if values is None:
                     self.execute(command)
                 else:
-                    if "SELECT" not in command:
-                        print(command,values)
                     self.execute(command, values)
                 break
             except (Exception) as e:
@@ -222,9 +220,17 @@ class MyCursor(MySQLdb.cursors.Cursor):
                 if i == 10:
                     logger.critical("You might try 'fuser xxx.db' to see which process is locking the database")
                     raise
-        logger.transaction("%s.%s(): connection = %s, command finished",
-                           classname, parent, id(self._conn))
+        #logger.transaction("%s.%s(): connection = %s, command finished",
+        #                   classname, parent, id(self._conn))
 
+
+    def unlock(self):
+        self._exec("UNLOCK TABLES")
+
+    def close(self):
+        self.unlock()
+        super()
+        
     def begin(self, mode=None):
         if mode is None:
             self._exec("BEGIN")
@@ -233,21 +239,62 @@ class MyCursor(MySQLdb.cursors.Cursor):
         elif mode is IMMEDIATE:
             self._exec("BEGIN IMMEDIATE")
         elif mode is EXCLUSIVE:
-            if DEBUG > 1:
-                tb = traceback.extract_stack()
-                if not exclusive_transaction == [None, None]:
-                    old_tb_str = "".join(traceback.format_list(exclusive_transaction[1]))
-                    new_tb_str = "".join(traceback.format_list(tb))
-                    logger.warning("Called MyCursor.begin(EXCLUSIVE) when there was aleady an exclusive transaction %d\n%s",
-                                        id(exclusive_transaction[0]), old_tb_str)
-                    logger.warning("New transaction: %d\n%s", id(self.connection), new_tb_str)
+            # if DEBUG > 1:
+            #     tb = traceback.extract_stack()
+            #     if not exclusive_transaction == [None, None]:
+            #         old_tb_str = "".join(traceback.format_list(exclusive_transaction[1]))
+            #         new_tb_str = "".join(traceback.format_list(tb))
+            #         logger.warning("Called MyCursor.begin(EXCLUSIVE) when there was aleady an exclusive transaction %d\n%s",
+            #                             id(exclusive_transaction[0]), old_tb_str)
+            #         logger.warning("New transaction: %d\n%s", id(self._conn), new_tb_str)
+
+            # workaround to update cursor
+            self._exec("START TRANSACTION")
+            #self._exec("BEGIN EXCLUSIVE")
+            try:
+
+                tables = ["bwc",
+                          "characters",
+                          "duplicates1",
+                          "duplicates1_counts",
+                          "duplicates1_infiles",
+                          "duplicates1_outputfiles",
+                          "duplicates2",
+                          "duplicates2_counts",
+                          "duplicates2_infiles",
+                          "duplicates2_outputfiles",
+                          "factorbase",
+                          "files",
+                          "freerel",
+                          "merge",
+                          "polyselect1",
+                          "polyselect1_bestpolynomials",
+                          "polyselect2",
+                          "purgetask",
+                          "server",
+                          "server_registered_filenames",
+                          "sieving",
+                          "sieving_outputfiles",
+                          "slaves",
+                          "slaves_client_hosts",
+                          "slaves_client_pids",
+                          "sqrt",
+                          "sqrt_factors",
+                          "tasks"
+                          "workunits"]
+                s = ''
+                for table in tables:
+                    s += table + ' WRITE, '
+                self._exec("LOCK TABLES " + s)
+                    #self._exec("LOCK TABLES files WRITE, sieving WRITE, polyselect1, server WRITE, server_registered_filenames WRITE, slaves WRITE, slaves_client_pids WRITE, tasks WRITE, workunits WRITE")
+            except:
+                pass
+
             
-            self._exec("BEGIN EXCLUSIVE")
-            
-            if DEBUG > 1:
-                assert exclusive_transaction == [None, None]
-                exclusive_transaction[0] = self.connection
-                exclusive_transaction[1] = tb
+            # if DEBUG > 1:
+            #     assert exclusive_transaction == [None, None]
+            #     exclusive_transaction[0] = self._conn
+            #     exclusive_transaction[1] = tb
         else:
             raise TypeError("Invalid mode parameter: %r" % mode)
     
@@ -265,7 +312,7 @@ class MyCursor(MySQLdb.cursors.Cursor):
             """ Creates an index with fields as described in the columns list """
             command = "CREATE INDEX %s ON %s( %s );" % (name, table, ", ".join(columns))
             self._exec (command)
-        except _mysql_exceptions.OperationalError as e:
+        except Exception as e:
                         print(e)
                         pass
     
@@ -408,7 +455,7 @@ class DbTable(object):
             try:
                 cursor.create_index(indexname, 
                                     self.tablename, self.index[indexname])
-            except _mysql_exceptions.OperationalError as e:
+            except Exception as e:
                 print(e)
                 pass
 
@@ -579,19 +626,27 @@ class DictDbAccess(collections.MutableMapping):
         
         if isinstance(db, str):
             #self._conn = sqlite3.connect(db)
-            self._conn = MySQLdb.connect("localhost", username,password, db)
+            self._conn = mysql.connector.connect(user=username, password=password, host="localhost", database=db)
             self._ownconn = True
         else:
             self._conn = db
             self._ownconn = False
         self._table = DictDbTable(name = name)
         # Create an empty table if none exists
-        cursor = self._conn.cursor(MyCursor)
+        cursor = self.get_cursor()
         self._table.create(cursor);
         # Get the entries currently stored in the DB
         self._data = self._getall()
         cursor.close()
-    
+
+    def get_cursor(self):
+        c = self._conn.cursor(MyCursor)
+        c.__class__ = MyCursor
+        c._conn = self._conn
+        c._conn.commit()
+        return c
+
+        
     # Implement the abstract methods defined by collections.MutableMapping
     # All but __del__ and __setitem__ are simply passed through to the self._data
     # dictionary
@@ -640,10 +695,18 @@ class DictDbAccess(collections.MutableMapping):
             if valuetype == t:
                 return idx
         raise TypeError("Type %s not supported" % str(valuetype))
+
+
+    def get_cursor(self):
+        c = self._conn.cursor(MyCursor)
+        c.__class__ = MyCursor
+        c._conn = self._conn
+        c._conn.commit()
+        return c
     
     def _getall(self):
         """ Reads the whole table and returns it as a dict """
-        cursor = self._conn.cursor(MyCursor)
+        cursor = self.get_cursor()
         rows = self._table.where(cursor)
         cursor.close()
         return {r["kkey"]: self.__convert_value(r) for r in rows}
@@ -665,22 +728,26 @@ class DictDbAccess(collections.MutableMapping):
     
     def __setitem__(self, key, value):
         """ Access by indexing, e.g., d["foo"]. Always commits """
-        cursor = self._conn.cursor(MyCursor)
-        # TODO: fix transaction
-        #if not self._conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        cursor = self.get_cursor()
+
+        if not cursor.in_transaction:
+            cursor.begin(EXCLUSIVE)
         self.__setitem_nocommit(cursor, key, value)
         conn_commit(self._conn)
+        
         cursor.close()
-    
+
+
     def __delitem__(self, key, commit=True):
         """ Delete a key from the dictionary """
-        cursor = self._conn.cursor(MyCursor)
-        #if not self._conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        cursor = self.get_cursor()
+
+        if not cursor.in_transaction:
+            cursor.begin(EXCLUSIVE)
         self._table.delete(cursor, eq={"kkey": key})
         if commit:
             conn_commit(self._conn)
+        
         cursor.close()
         del(self._data[key])
     
@@ -699,22 +766,21 @@ class DictDbAccess(collections.MutableMapping):
         return self._data[key]
     
     def update(self, other, commit=True):
-        cursor = self._conn.cursor(MyCursor)
-        # TODO: fix transaction
-        #if not self._conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        cursor = self.get_cursor()
+        if not self._conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         for (key, value) in other.items():
             self.__setitem_nocommit(cursor, key, value)
         if commit:
             conn_commit(self._conn)
+        
         cursor.close()
     
     def clear(self, args = None, commit=True):
         """ Overridden clear that allows removing several keys atomically """
-        cursor = self._conn.cursor(MyCursor)
-        # TODO: restore transactions
-        #if not self._conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        cursor = self.get_cursor()
+        if not self._conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         if args is None:
             self._data.clear()
             self._table.delete(cursor)
@@ -824,6 +890,7 @@ class Mapper(object):
 
             for (sn, sm) in self.subtables.items():
                 spk = sm.getpk()
+                # if there was a match on the subtable
                 if spk in r and not r[spk] is None:
                     if wus[-1][sn] == None:
                         # If this sub-array is empty, init it
@@ -849,17 +916,25 @@ class WuAccess(object): # {
     def __init__(self, db):
         if isinstance(db, str):
             #self.conn = sqlite3.connect(db)
-            self.conn = MySQLdb.connect("localhost",username, password, db)
+            self.conn = mysql.connector.connect(user=username, password=password, host="localhost", database=db)
             self._ownconn = True
         else:
             self.conn = db
             self._ownconn = False
-        cursor = self.conn.cursor(MyCursor)
+        cursor = self.get_cursor()
         #cursor.pragma("foreign_keys = ON")
         #self.commit()
-        #cursor.close()
+        cursor.close()
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
-    
+
+    def get_cursor(self):
+        c = self.conn.cursor(MyCursor)
+        c.__class__ = MyCursor
+        c._conn = self.conn
+        c._conn.commit()
+        return c
+
+        
     def __del__(self):
         if self._ownconn:
             if callable(conn_close):
@@ -960,7 +1035,7 @@ class WuAccess(object): # {
             conn_commit(self.conn)
 
     def create_tables(self):
-        cursor = self.conn.cursor(MyCursor)
+        cursor = self.get_cursor()
         #cursor.pragma("journal_mode=WAL")
         self.mapper.create(cursor)
         self.commit()
@@ -981,26 +1056,26 @@ class WuAccess(object): # {
     def create(self, wus, priority=None, commit=True):
         """ Create new workunits from wus which contains the texts of the 
             workunit files """
-        cursor = self.conn.cursor(MyCursor)
+        cursor = self.get_cursor()
         # todo restore transactions
-        #if not self.conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         if isinstance(wus, str):
             self._create1(cursor, wus, priority)
         else:
             for wu in wus:
                 self._create1(cursor, wu, priority)
         self.commit(commit)
+        
         cursor.close()
 
     def assign(self, clientid, commit=True):
         """ Finds an available workunit and assigns it to clientid.
             Returns the text of the workunit, or None if no available 
             workunit exists """
-        cursor = self.conn.cursor(MyCursor)
-        # todo restore transaction
-        #if not self.conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        cursor = self.get_cursor()
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         r = self.mapper.table.where(cursor, limit = 1, 
                                     order=("priority", "DESC"), 
                                     eq={"status": WuStatus.AVAILABLE})
@@ -1037,9 +1112,11 @@ class WuAccess(object): # {
 
     def result(self, wuid, clientid, files, errorcode=None,
                failedcommand=None, commit=True):
-        cursor = self.conn.cursor(MyCursor)
+        cursor = self.get_cursor()
+
         #if not self.conn.in_transaction:
         #    cursor.begin(EXCLUSIVE)
+        cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
             self.commit(commit)
@@ -1072,16 +1149,20 @@ class WuAccess(object): # {
         else:
             d["status"] = WuStatus.RECEIVED_ERROR
         pk = self.mapper.getpk()
-        self.mapper.table.update(cursor, d, eq={pk:data[pk]})
         self._add_files(cursor, files, rowid = data[pk])
+        self.mapper.table.update(cursor, d, eq={pk:data[pk]})
         self.commit(commit)
+        
         cursor.close()
+        global BREAK
+        BREAK = True
+    
         return True
 
     def verification(self, wuid, ok, commit=True):
-        cursor = self.conn.cursor(MyCursor)
-        #if not self.conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        cursor = self.get_cursor()
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
             self.commit(commit)
@@ -1117,21 +1198,22 @@ class WuAccess(object): # {
         self.set_status(WuStatus.CANCELLED, commit=commit, **conditions)
 
     def set_status(self, status, commit=True, **conditions):
-        cursor = self.conn.cursor(MyCursor)
-        #if not self.conn.in_transaction:
-        #    cursor.begin(EXCLUSIVE)
+        cursor = self.get_cursor()
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         self.mapper.table.update(cursor, {"status": status}, **conditions)
         self.commit(commit)
+        
         cursor.close()
 
     def query(self, limit=None, **conditions):
-        cursor = self.conn.cursor(MyCursor)
+        cursor = self.get_cursor()
         r = self.mapper.where(cursor, limit=limit, **conditions)
         cursor.close()
         return r
 
     def count(self, **cond):
-        cursor = self.conn.cursor(MyCursor)
+        cursor = self.get_cursor()
         count = self.mapper.count(cursor, **cond)
         cursor.close()
         return count
@@ -1333,17 +1415,19 @@ class DbAccess(object):
         #return sqlite3.connect(self.__db)
         db = None
         try:
-            db =MySQLdb.connect("localhost",username,password,self.__db)
-        except _mysql_exceptions.OperationalError as e:
+            db = mysql.connector.connect(user=username, password=password, host="localhost",database=self.__db)
+        except Exception  as e:
             ## TODO catch errors here
-            db = MySQLdb.connect("localhost",username, password)
+            db = mysql.connector.connect(user=username, password=password, host="localhost")
             cursor = db.cursor()
             
             cursor.execute("CREATE DATABASE %s;" % self.__db)
-            db.commit()
+            #db.commit()
             cursor.execute("USE %s;" % self.__db);
+            cursor.execute("SET autocommit = 1")
             db_pool = WuAccess(self.__db)
             db_pool.create_tables()
+            del db_pool
             #db.commit()
 
             

@@ -3271,7 +3271,7 @@ class PurgeTask(Task):
     """ Removes singletons and computes excess """
     @property
     def name(self):
-        return "purge"
+        return "purgetask"
     @property
     def title(self):
         return "Filtering - Singleton removal"

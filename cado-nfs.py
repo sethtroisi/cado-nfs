@@ -96,7 +96,7 @@ if __name__ == '__main__':
     
     logger.info("If this computation gets interrupted, it can be resumed with %s %s", sys.argv[0], snapshot_filename)
 
-    wudb_file = os.path.join(wdir, name + ".db")
+    wudb_file = name
     factorjob = cadotask.CompleteFactorization(db=wudb_file,
                                                parameters = parameters,
                                                path_prefix = [])
