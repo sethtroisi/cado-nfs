@@ -882,6 +882,9 @@ class Cado_NFS_toplevel(object):
         parser.add_argument("--dlp", "-dlp",
                 help="Run discrete logarithm computation instead",
                 action='store_true')
+        parser.add_argument("--mysql", "-mysql",
+                help="Use a mysql db for tracking workunits etc",
+                action='store_true')
         parser.add_argument("--verboseparam",
                 help="Enable very verbose parameter parsing",
                 action='store_true')
@@ -964,6 +967,8 @@ class Cado_NFS_toplevel(object):
             self.parameters.set_simple("dlp", self.args.dlp)
             if self.args.gfpext:
                 self.parameters.set_simple("gfpext", self.args.gfpext)
+        if self.args.mysql:
+            self.parameters.set_simple("mysql", self.args.dlp)
         # get default hint file if necessary
         if self.parameters.get_simple("dlp", False) and self.parameters.get_simple("gfpext", 1) == 1:
             if self.parameters.get_simple("target", 0):

@@ -96,7 +96,11 @@ if __name__ == '__main__':
     
     logger.info("If this computation gets interrupted, it can be resumed with %s %s", sys.argv[0], snapshot_filename)
 
-    wudb_file = name
+
+    use_mysql = parameters.get_simple("mysql",False)
+    
+    wudb_file = name if use_mysql else os.path.join(wdir, name + ".db")
+    
     factorjob = cadotask.CompleteFactorization(db=wudb_file,
                                                parameters = parameters,
                                                path_prefix = [])
