@@ -144,7 +144,7 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
                 " - Implement fixed-width mpfq code beyond what is already implemented, at at least up to the current size (%lu words)\n"
                 " - Implement variable-width c++ code in arith-modp.hpp\n"
                 "Currently, everything up to 9 machine words is supported\n",
-                x->field_characteristic_bits(x) / mp_bits_per_limb);
+                iceildiv(x->field_characteristic_bits(x), mp_bits_per_limb));
         abort();
     }
 
