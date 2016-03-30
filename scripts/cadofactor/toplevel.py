@@ -968,7 +968,7 @@ class Cado_NFS_toplevel(object):
             if self.args.gfpext:
                 self.parameters.set_simple("gfpext", self.args.gfpext)
         if self.args.mysql:
-            self.parameters.set_simple("mysql", self.args.dlp)
+            self.parameters.set_simple("mysql", self.args.mysql)
         # get default hint file if necessary
         if self.parameters.get_simple("dlp", False) and self.parameters.get_simple("gfpext", 1) == 1:
             if self.parameters.get_simple("target", 0):
