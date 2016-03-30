@@ -59,7 +59,7 @@ void next_cand_sieved_pair(cand_t cand, void *params) {
   ret = gmp_fscanf(param->file, "%*Zd %lu %Zd %Zd %*Zd\n", &id, u, v);
   assert (ret == 3);
   mpz_init_set_ui(u0, 1);
-  mpz_mul_2exp(u0, u0, 256);
+  mpz_mul_2exp(u0, u0, 512);
   cand_set_presieved_values(cand, u0, u0, u, v, 0, 0, id);
   mpz_clear(u);
   mpz_clear(v);

@@ -85,9 +85,9 @@ void do_tests(unsigned long iter)
             } else if (coeffs[i] == -1) {
                 F::sub(y, x[i]);
             } else if (coeffs[i] > 0) {
-                F::addmul(y, x[i], coeffs[i]);
+                F::addmul_ui(y, x[i], coeffs[i]);
             } else {
-                F::submul(y, x[i], -coeffs[i]);
+                F::submul_ui(y, x[i], -coeffs[i]);
             }
         }
         F::reduce(r, y, p, j);
