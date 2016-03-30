@@ -229,7 +229,7 @@ class MyCursor(mysql.connector.cursor.MySQLCursor):
         self._exec("UNLOCK TABLES")
 
     def close(self):
-        self.unlock()
+        #self.unlock()
         super()
         
     def begin(self, mode=None):
@@ -286,7 +286,7 @@ class MyCursor(mysql.connector.cursor.MySQLCursor):
                 s = ''
                 for table in tables:
                     s += table + ' WRITE, '
-                self._exec("LOCK TABLES " + s)
+                #self._exec("LOCK TABLES " + s)
                     #self._exec("LOCK TABLES files WRITE, sieving WRITE, polyselect1, server WRITE, server_registered_filenames WRITE, slaves WRITE, slaves_client_pids WRITE, tasks WRITE, workunits WRITE")
             except:
                 pass
@@ -1176,7 +1176,6 @@ class WuAccess(object): # {
             return False
         # FIXME: should we do the update by wuid and skip these checks?
         try:
-            print(data)
             self._checkstatus(data, [WuStatus.RECEIVED_OK, WuStatus.RECEIVED_ERROR])
         except StatusUpdateError:
             self.commit(commit)
