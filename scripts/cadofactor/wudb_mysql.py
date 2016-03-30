@@ -225,13 +225,6 @@ class MyCursor(mysql.connector.cursor.MySQLCursor):
         #                   classname, parent, id(self._conn))
 
 
-    def unlock(self):
-        self._exec("UNLOCK TABLES")
-
-    def close(self):
-        #self.unlock()
-        super()
-        
     def begin(self, mode=None):
         if mode is None:
             self._exec("BEGIN")
@@ -251,46 +244,6 @@ class MyCursor(mysql.connector.cursor.MySQLCursor):
 
             # workaround to update cursor
             self._exec("START TRANSACTION")
-            #self._exec("BEGIN EXCLUSIVE")
-            try:
-
-                tables = ["bwc",
-                          "characters",
-                          "duplicates1",
-                          "duplicates1_counts",
-                          "duplicates1_infiles",
-                          "duplicates1_outputfiles",
-                          "duplicates2",
-                          "duplicates2_counts",
-                          "duplicates2_infiles",
-                          "duplicates2_outputfiles",
-                          "factorbase",
-                          "files",
-                          "freerel",
-                          "merge",
-                          "polyselect1",
-                          "polyselect1_bestpolynomials",
-                          "polyselect2",
-                          "purgetask",
-                          "server",
-                          "server_registered_filenames",
-                          "sieving",
-                          "sieving_outputfiles",
-                          "slaves",
-                          "slaves_client_hosts",
-                          "slaves_client_pids",
-                          "sqrt",
-                          "sqrt_factors",
-                          "tasks"
-                          "workunits"]
-                s = ''
-                for table in tables:
-                    s += table + ' WRITE, '
-                #self._exec("LOCK TABLES " + s)
-                    #self._exec("LOCK TABLES files WRITE, sieving WRITE, polyselect1, server WRITE, server_registered_filenames WRITE, slaves WRITE, slaves_client_pids WRITE, tasks WRITE, workunits WRITE")
-            except:
-                pass
-
             
             # if DEBUG > 1:
             #     assert exclusive_transaction == [None, None]
