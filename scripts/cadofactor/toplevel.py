@@ -885,6 +885,12 @@ class Cado_NFS_toplevel(object):
         parser.add_argument("--mysql", "-mysql",
                 help="Use a mysql db for tracking workunits etc",
                 action='store_true')
+        parser.add_argument("--mysql-user", "-mysql-user",
+                help="Use a mysql db for tracking workunits etc",
+                action='store')
+        parser.add_argument("--mysql-password", "-mysql-password",
+                help="Use a mysql db for tracking workunits etc",
+                action='store')
         parser.add_argument("--verboseparam",
                 help="Enable very verbose parameter parsing",
                 action='store_true')
@@ -968,7 +974,11 @@ class Cado_NFS_toplevel(object):
             if self.args.gfpext:
                 self.parameters.set_simple("gfpext", self.args.gfpext)
         if self.args.mysql:
-            self.parameters.set_simple("mysql", self.args.dlp)
+            self.parameters.set_simple("mysql.use", self.args.mysql)
+        if self.args.mysql_user:
+            self.parameters.set_if_unset("mysql.username", self.args.mysql_user)
+        if self.args.mysql_password:
+            self.parameters.set_if_unset("mysql.password", self.args.mysql_password)
         # get default hint file if necessary
         if self.parameters.get_simple("dlp", False) and self.parameters.get_simple("gfpext", 1) == 1:
             if self.parameters.get_simple("target", 0):

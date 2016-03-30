@@ -51,8 +51,8 @@ logger.setLevel(logging.NOTSET)
 
 PRINTED_CANCELLED_WARNING = False
 
-username = 'cado'
-password = '***REMOVED***'
+username = None
+password = None
 
 def join3(l, pre=None, post=None, sep=", "):
     """ 
@@ -1428,7 +1428,7 @@ class DbAccess(object):
         db = None
         try:
             db = mysql.connector.connect(user=username, password=password, host="localhost",database=self.__db)
-        except Exception  as e:
+        except mysql.connector.errors.ProgrammingError  as e:
             ## TODO catch errors here
             db = mysql.connector.connect(user=username, password=password, host="localhost")
             cursor = db.cursor()
