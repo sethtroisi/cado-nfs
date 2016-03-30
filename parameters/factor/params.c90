@@ -205,6 +205,9 @@ tasks.polyselect.nq = 256
     # the linear polynomial will be q1*q2*q3*q4*p1*p2 where q1,q2,q3,q4 are
     # small primes, and P <= p1, p2 < 2*P.
 
+tasks.polyselect.ropteffort = 5
+    # Indicates how much effort is spent in stage 2 (rootsieve) of the
+    # polynomial selection.
 
 ###########################################################################
 # Sieve task

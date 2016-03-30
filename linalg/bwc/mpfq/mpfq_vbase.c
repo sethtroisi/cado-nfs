@@ -15,6 +15,30 @@
 #include "mpfq_p_1.h"
 #include "mpfq_p_1_t.h"
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_1 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_10
+#include "mpfq_p_10.h"
+#include "mpfq_p_10_t.h"
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_10 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_11
+#include "mpfq_p_11.h"
+#include "mpfq_p_11_t.h"
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_11 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_12
+#include "mpfq_p_12.h"
+#include "mpfq_p_12_t.h"
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_12 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_13
+#include "mpfq_p_13.h"
+#include "mpfq_p_13_t.h"
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_13 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_14
+#include "mpfq_p_14.h"
+#include "mpfq_p_14_t.h"
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_14 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_15
+#include "mpfq_p_15.h"
+#include "mpfq_p_15_t.h"
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_15 */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_2
 #include "mpfq_p_2.h"
 #include "mpfq_p_2_t.h"
@@ -90,6 +114,30 @@ void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr v, ...)
             } else if (strcmp(mandatory_tag, "p_1") == 0 && groupsize == 1 && mpz_size(p) == 1) {
                 mpfq_p_1_oo_field_init(v);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_1 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_10
+            } else if (strcmp(mandatory_tag, "p_10") == 0 && groupsize == 1 && mpz_size(p) == 10) {
+                mpfq_p_10_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_10 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_11
+            } else if (strcmp(mandatory_tag, "p_11") == 0 && groupsize == 1 && mpz_size(p) == 11) {
+                mpfq_p_11_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_11 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_12
+            } else if (strcmp(mandatory_tag, "p_12") == 0 && groupsize == 1 && mpz_size(p) == 12) {
+                mpfq_p_12_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_12 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_13
+            } else if (strcmp(mandatory_tag, "p_13") == 0 && groupsize == 1 && mpz_size(p) == 13) {
+                mpfq_p_13_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_13 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_14
+            } else if (strcmp(mandatory_tag, "p_14") == 0 && groupsize == 1 && mpz_size(p) == 14) {
+                mpfq_p_14_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_14 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_15
+            } else if (strcmp(mandatory_tag, "p_15") == 0 && groupsize == 1 && mpz_size(p) == 15) {
+                mpfq_p_15_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_15 */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_2
             } else if (strcmp(mandatory_tag, "p_2") == 0 && groupsize == 1 && mpz_size(p) == 2) {
                 mpfq_p_2_oo_field_init(v);
@@ -143,6 +191,30 @@ void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr v, ...)
         } else if (groupsize == 1 && mpz_size(p) == 1) {
             mpfq_p_1_oo_field_init(v);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_1 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_10
+        } else if (groupsize == 1 && mpz_size(p) == 10) {
+            mpfq_p_10_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_10 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_11
+        } else if (groupsize == 1 && mpz_size(p) == 11) {
+            mpfq_p_11_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_11 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_12
+        } else if (groupsize == 1 && mpz_size(p) == 12) {
+            mpfq_p_12_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_12 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_13
+        } else if (groupsize == 1 && mpz_size(p) == 13) {
+            mpfq_p_13_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_13 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_14
+        } else if (groupsize == 1 && mpz_size(p) == 14) {
+            mpfq_p_14_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_14 */
+#ifdef COMPILE_MPFQ_PRIME_FIELD_p_15
+        } else if (groupsize == 1 && mpz_size(p) == 15) {
+            mpfq_p_15_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELD_p_15 */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_2
         } else if (groupsize == 1 && mpz_size(p) == 2) {
             mpfq_p_2_oo_field_init(v);
@@ -263,6 +335,42 @@ void mpfq_vbase_oo_init_templates(mpfq_vbase_tmpl_ptr w, mpfq_vbase_ptr v0, mpfq
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_1_p_1_addmul_tiny;
         w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_1_p_1_transpose;
 #endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_1) */
+#if defined(COMPILE_MPFQ_PRIME_FIELD_p_10)
+    } else if (strcmp(s0, "p_10") == 0 && strcmp(s1, "p_10") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_10_p_10_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_10_p_10_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_10_p_10_transpose;
+#endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_10) */
+#if defined(COMPILE_MPFQ_PRIME_FIELD_p_11)
+    } else if (strcmp(s0, "p_11") == 0 && strcmp(s1, "p_11") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_11_p_11_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_11_p_11_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_11_p_11_transpose;
+#endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_11) */
+#if defined(COMPILE_MPFQ_PRIME_FIELD_p_12)
+    } else if (strcmp(s0, "p_12") == 0 && strcmp(s1, "p_12") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_12_p_12_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_12_p_12_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_12_p_12_transpose;
+#endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_12) */
+#if defined(COMPILE_MPFQ_PRIME_FIELD_p_13)
+    } else if (strcmp(s0, "p_13") == 0 && strcmp(s1, "p_13") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_13_p_13_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_13_p_13_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_13_p_13_transpose;
+#endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_13) */
+#if defined(COMPILE_MPFQ_PRIME_FIELD_p_14)
+    } else if (strcmp(s0, "p_14") == 0 && strcmp(s1, "p_14") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_14_p_14_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_14_p_14_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_14_p_14_transpose;
+#endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_14) */
+#if defined(COMPILE_MPFQ_PRIME_FIELD_p_15)
+    } else if (strcmp(s0, "p_15") == 0 && strcmp(s1, "p_15") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_15_p_15_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_p_15_p_15_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_p_15_p_15_transpose;
+#endif /* defined(COMPILE_MPFQ_PRIME_FIELD_p_15) */
 #if defined(COMPILE_MPFQ_PRIME_FIELD_p_2)
     } else if (strcmp(s0, "p_2") == 0 && strcmp(s1, "p_2") == 0) {
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_p_2_p_2_dotprod;

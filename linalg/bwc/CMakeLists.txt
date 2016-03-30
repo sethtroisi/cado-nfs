@@ -28,7 +28,7 @@ set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
-set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 pz
+set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 p_10 p_11 p_12 p_13 p_14 p_15 pz
     CACHE STRING
     "which GF(p) backends to compile for DLOG mode (pz excluded)")
 set(BWC_GFP_MATMUL_BACKENDS basicp

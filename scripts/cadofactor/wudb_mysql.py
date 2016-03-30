@@ -225,13 +225,6 @@ class MyCursor(mysql.connector.cursor.MySQLCursor):
         #                   classname, parent, id(self._conn))
 
 
-    def unlock(self):
-        self._exec("UNLOCK TABLES")
-
-    def close(self):
-        self.unlock()
-        super()
-        
     def begin(self, mode=None):
         if mode is None:
             self._exec("BEGIN")
@@ -251,46 +244,6 @@ class MyCursor(mysql.connector.cursor.MySQLCursor):
 
             # workaround to update cursor
             self._exec("START TRANSACTION")
-            #self._exec("BEGIN EXCLUSIVE")
-            try:
-
-                tables = ["bwc",
-                          "characters",
-                          "duplicates1",
-                          "duplicates1_counts",
-                          "duplicates1_infiles",
-                          "duplicates1_outputfiles",
-                          "duplicates2",
-                          "duplicates2_counts",
-                          "duplicates2_infiles",
-                          "duplicates2_outputfiles",
-                          "factorbase",
-                          "files",
-                          "freerel",
-                          "merge",
-                          "polyselect1",
-                          "polyselect1_bestpolynomials",
-                          "polyselect2",
-                          "purgetask",
-                          "server",
-                          "server_registered_filenames",
-                          "sieving",
-                          "sieving_outputfiles",
-                          "slaves",
-                          "slaves_client_hosts",
-                          "slaves_client_pids",
-                          "sqrt",
-                          "sqrt_factors",
-                          "tasks"
-                          "workunits"]
-                s = ''
-                for table in tables:
-                    s += table + ' WRITE, '
-                self._exec("LOCK TABLES " + s)
-                    #self._exec("LOCK TABLES files WRITE, sieving WRITE, polyselect1, server WRITE, server_registered_filenames WRITE, slaves WRITE, slaves_client_pids WRITE, tasks WRITE, workunits WRITE")
-            except:
-                pass
-
             
             # if DEBUG > 1:
             #     assert exclusive_transaction == [None, None]
@@ -1074,7 +1027,7 @@ class WuAccess(object): # {
         
         cursor.close()
 
-    def assign(self, clientid, commit=True):
+    def assign(self, clientid, commit=True, timeout_hint=None):
         """ Finds an available workunit and assigns it to clientid.
             Returns the text of the workunit, or None if no available 
             workunit exists """
@@ -1100,6 +1053,10 @@ class WuAccess(object): # {
             pk = self.mapper.getpk()
             self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
             result = r[0]["wu"]
+            if timeout_hint:
+                dltext = "%d\n" % int(time.time() + int(timeout_hint))
+                result = result + "DEADLINE " + dltext
+            
         else:
             result = None
         
@@ -1176,7 +1133,6 @@ class WuAccess(object): # {
             return False
         # FIXME: should we do the update by wuid and skip these checks?
         try:
-            print(data)
             self._checkstatus(data, [WuStatus.RECEIVED_OK, WuStatus.RECEIVED_ERROR])
         except StatusUpdateError:
             self.commit(commit)
@@ -1230,10 +1186,6 @@ class WuAccess(object): # {
         return self.count(eq={"status": WuStatus.AVAILABLE})
     
     def get_one_result(self):
-        #print("GETTING ONE RESULT")
-        if BREAK:
-            pass
-            #import pdb; pdb.set_trace()
         r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_OK})
         if not r:
             r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_ERROR})

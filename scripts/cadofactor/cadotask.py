@@ -2013,6 +2013,8 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def submit_one_wu(self):
         adstart = self.state["adnext"]
         adend = adstart + self.params["adrange"]
+        adend = adend - (adend % self.params["adrange"])
+        assert adend > adstart
         adend = min(adend, self.params["admax"])
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
@@ -2721,6 +2723,8 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
+            q1 = q1 - (q1 % self.params["qrange"])
+            assert q1 > q0
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = \
@@ -2756,7 +2760,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         if self.handle_error_result(message):
             return True
         output_files = message.get_output_files()
-        assert len(output_files) == 1
+        if len(output_files) != 1:
+            self.logger.warn("Received output with %d files: %s" % (len(output_files), ", ".join(output_files)))
+            return False
         stderrfilename = message.get_stderrfile(0)
         ok = self.add_file(output_files[0], stderrfilename, commit=False)
         self.verification(message.get_wu_id(), ok, commit=True)
@@ -4636,7 +4642,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def paramnames(self):
         return {"name": str, "workdir": None, "address": None, "port": 0,
                 "threaded": False, "ssl": True, "whitelist": None,
-                "only_registered": True, "forgetport": False}
+                "only_registered": True, "forgetport": False,
+                "timeout_hint": None}
     @property
     def param_nodename(self):
         return self.name
@@ -4663,6 +4670,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
             cafilename = basedir + self.params["name"] + ".server.cert"
         else:
             cafilename = None
+
+        servertimeout_hint = self.params.get("timeout_hint")
 
         server_whitelist = []
         if not whitelist is None:
@@ -4707,7 +4716,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         self.server = wuserver.ServerLauncher(serveraddress, serverport,
             threaded, self.get_db_filename(), self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
-            whitelist=server_whitelist)
+            whitelist=server_whitelist,
+            timeout_hint=servertimeout_hint)
         self.state["port"] = self.server.get_port()
 
     def run(self):

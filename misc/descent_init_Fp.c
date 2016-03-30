@@ -102,6 +102,7 @@ int main(int argc, char **argv) {
   unsigned long nthread = 1;
   double mineff = 2000.0;
   double maxeff = 1e20;
+  double minB1 = 100.0;
   int verbose = 0;
   clock_t tm = clock();
   
@@ -112,6 +113,10 @@ int main(int argc, char **argv) {
       argv += 2;
     } else if (strcmp(argv[1], "-mt") == 0) {
       nthread = strtoul(argv[2], NULL, 10);
+      argc -= 2;
+      argv += 2;
+    } else if (strcmp(argv[1], "-minB1") == 0) {
+      minB1 = strtof(argv[2], NULL);
       argc -= 2;
       argv += 2;
     } else if (strcmp(argv[1], "-mineff") == 0) {
@@ -146,8 +151,7 @@ int main(int argc, char **argv) {
   mpz_init_set_str(params.p, argv[1], 10);
   mpz_init_set_str(params.z, argv[2], 10);
   
-  const smooth_detect_param_s smooth_param = {mineff, maxeff, 10, verbose};
-
+  const smooth_detect_param_s smooth_param = {mineff, maxeff, 10, verbose, minB1};
   thparam_s thparam[1];
   thparam->params = &params;
   thparam->smooth_param = &smooth_param;
