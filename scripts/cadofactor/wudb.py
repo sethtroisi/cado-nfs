@@ -39,11 +39,14 @@ toplevel_params = toplevel.Cado_NFS_toplevel()
 for key, value in pathdict.items():
     toplevel_params.setpath(key, value)
 parameters = toplevel_params.get_cooked_parameters()
-use_mysql = parameters.get_simple("mysql",False)
+use_mysql = parameters.get_simple("mysql.use",False)
 if use_mysql:
     import wudb_mysql
     wudb_mysql.dbname = parameters.get_simple("name")
     print("Loading Mysql")
+    import wudb_mysql
+    wudb_mysql.username = parameters.get_simple("mysql.username",'cado')
+    wudb_mysql.password = parameters.get_simple("mysql.password",'***REMOVED***')
     from wudb_mysql import *
 else:
     print("Loading Sqlite")

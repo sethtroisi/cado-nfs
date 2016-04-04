@@ -97,7 +97,7 @@ if __name__ == '__main__':
     logger.info("If this computation gets interrupted, it can be resumed with %s %s", sys.argv[0], snapshot_filename)
 
 
-    use_mysql = parameters.get_simple("mysql",False)
+    use_mysql = parameters.get_simple("mysql.use",False)
     
     wudb_file = name if use_mysql else os.path.join(wdir, name + ".db")
     
