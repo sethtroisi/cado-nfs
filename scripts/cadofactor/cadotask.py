@@ -768,10 +768,14 @@ class FilesCreator(MakesTablenames, wudb.HasDbConnection, metaclass=abc.ABCMeta)
     
     def add_output_files(self, filenames, *, commit):
         """ Adds a dict of files to the list of existing output files """
+        final_files = {}
         for filename in filenames:
             if filename in self.output_files:
-                raise KeyError("%s already in output files table" % filename)
-        self.output_files.update(filenames, commit=commit)
+                self.logger.warning("%s already in output files table" % filename)
+                #raise KeyError("%s already in output files table" % filename)
+            else:
+                final_files[filename] = filenames[filename]
+        self.output_files.update(final_files, commit=commit)
     
     def get_output_filenames(self, condition=None):
         """ Return output file names, optionally those that match a condition
