@@ -136,6 +136,7 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
 void
 sm_relset_init (sm_relset_t r, int *d, int nb_polys)
 {
+  r->nb_polys = nb_polys;
   for (int side = 0; side < nb_polys; side++) {
     mpz_poly_init (r->num[side], d[side]);
     mpz_poly_init (r->denom[side], d[side]);
@@ -150,6 +151,17 @@ sm_relset_clear (sm_relset_t r, int nb_polys)
     mpz_poly_clear (r->denom[side]);
   }
 }
+
+void
+sm_relset_copy (sm_relset_t r, sm_relset_srcptr s)
+{
+  r->nb_polys = s->nb_polys;
+  for (int side = 0; side < r->nb_polys; side++) {
+    mpz_poly_set (r->num[side], s->num[side]);
+    mpz_poly_set (r->denom[side], s->denom[side]);
+  }
+}
+
 
 /* Given an array of index of rows and an array of abpolys,
  * construct the polynomial that corresponds to the relation-set, i.e. 

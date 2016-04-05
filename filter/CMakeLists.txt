@@ -44,4 +44,13 @@ target_link_libraries(sm utils_with_io)
 add_executable(sm_simple sm_simple.cpp)
 target_link_libraries(sm_simple utils)
 
+if (${WITH_MPI})
+add_definitions(-DWITH_MPI)
+add_executable(sm_mpi EXCLUDE_FROM_ALL sm_mpi.c)
+target_link_libraries(sm_mpi utils_with_io)
+set_target_properties(sm_mpi PROPERTIES
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
+endif()
+
 install(TARGETS ${bin_list} RUNTIME DESTINATION ${LIBSUFFIX}/filter)
