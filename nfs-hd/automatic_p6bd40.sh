@@ -24,7 +24,7 @@ sleep 0.5
 echo
 echo "Check the relations"
 sleep 0.5
-cd ../../../../cado-nfs/nfs-hd/check_relations/
+cd ../../../nfs-hd/check_relations/
 make build_tree=../../build/`hostname`/nfs-hd
 cd ../../build/`hostname`/nfs-hd/
 grep -v "#" sieve_1482937_2900828 > relations.raw
