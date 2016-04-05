@@ -9,6 +9,7 @@
 #include <limits.h>
 
 #define NORM_TOLERANCE_NFSHD 4
+#define RAND_SEED 42
 
 void norm_poly(mpz_ptr res, mpz_poly_srcptr f, mpz_poly_srcptr a)
 {
@@ -621,7 +622,7 @@ void init_norm(array_ptr array, unsigned int * max_norm,
   ASSERT(special_q == 0 || special_q == 1);
 
   //TODO: error if H = [1, 1, …]
-  srand(time(NULL));
+  srand(RAND_SEED);
 
   MAYBE_UNUSED mpz_t mean_norm;
 #ifdef MEAN_NORM
