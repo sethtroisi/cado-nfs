@@ -38,19 +38,16 @@ set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 add_executable(reconstructlog-dl reconstructlog.c)
 target_link_libraries(reconstructlog-dl utils_with_io)
 
-add_executable(sm sm.c)
-target_link_libraries(sm utils_with_io)
-
 add_executable(sm_simple sm_simple.cpp)
 target_link_libraries(sm_simple utils)
 
 if (${WITH_MPI})
     add_definitions(-DWITH_MPI)
 endif()
-add_executable(sm_mpi EXCLUDE_FROM_ALL sm_mpi.c)
-target_link_libraries(sm_mpi utils_with_io)
+add_executable(sm sm.c)
+target_link_libraries(sm utils_with_io)
 if (${WITH_MPI})
-set_target_properties(sm_mpi PROPERTIES
+set_target_properties(sm PROPERTIES
     COMPILE_FLAGS "--mpi"
     LINK_FLAGS "--mpi")
 endif()
