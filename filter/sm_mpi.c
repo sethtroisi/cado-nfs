@@ -231,20 +231,27 @@ struct th_info_s {
 typedef struct th_info_s th_info_t;
 
 uint64_t next_relset = 0; // All relsets below this are done, or being processed
+uint64_t count_processed_sm = 0; // Number of already computed relsets.
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; 
 
 void * thread_process(void *th_arg) {
   th_info_t * args = (th_info_t *)th_arg;
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  fprintf(stderr, "Starting thread on mpi job %d\n", rank);
+
+  const uint64_t BLOCK = 10;
 
   while(1) {
     // get a new block of relsets to compute
     pthread_mutex_lock(&mutex);
     if (next_relset >= args->tot_relset) {
       pthread_mutex_unlock(&mutex);
+      fprintf(stderr, "Finishing thread on mpi job %d\n", rank);
       return NULL;
     }
     uint64_t first = next_relset;
-    uint64_t last = MIN(first + 10, args->tot_relset);
+    uint64_t last = MIN(first + BLOCK, args->tot_relset);
     next_relset = last;
     pthread_mutex_unlock(&mutex);
 
@@ -265,6 +272,9 @@ void * thread_process(void *th_arg) {
             args->sm_info[side]);
       }
     }
+    pthread_mutex_lock(&mutex);
+    count_processed_sm += BLOCK;
+    pthread_mutex_unlock(&mutex);
   }
 }
 
@@ -278,7 +288,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "ell", "(required) group order");
   param_list_decl_usage(pl, "nsm", "number of SM on side 0,1,... (default is "
                                    "computed by the program)");
-  param_list_decl_usage(pl, "t", "number of threads (default 1)");
+  param_list_decl_usage(pl, "t", "number of threads on each mpi job (default 1)");
   verbose_decl_usage(pl);
 }
 
@@ -301,7 +311,7 @@ int main (int argc, char **argv)
   int size;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
-  int idoio = (rank == 0);
+  int idoio = (rank == 0); // Am I the job allowed to do I/O ?
   int mt = 1;
   double t0 = seconds();
 
@@ -480,6 +490,7 @@ int main (int argc, char **argv)
     }
   }
 
+  ///////////////////////
   // Only process 0 constructs the relation sets.
   if (rank == 0) {
     rels = build_rel_sets(purgedfile, indexfile, &nb_relsets, F, pol->nb_polys, ell2);
@@ -489,6 +500,7 @@ int main (int argc, char **argv)
   }
   MPI_Bcast(&nb_relsets, 1, MPI_MY_UINT64_T, 0, MPI_COMM_WORLD);
 
+  ///////////////////////
   // Send a share of the rel sets to each process (round Robin)
   uint64_t nb_parts = (nb_relsets - 1) / size + 1; // ceiling
   sm_relset_ptr part_rels = (sm_relset_ptr)malloc(nb_parts*sizeof(sm_relset_t));
@@ -547,11 +559,21 @@ int main (int argc, char **argv)
   th_id = (pthread_t *) malloc(mt*sizeof(pthread_t));
   ASSERT_ALWAYS(th_id != NULL);
   for (int i = 0; i < mt; ++i) {
-    pthread_create(&th_id[i], NULL, &thread_process, (void *)&th_args);
+    int ret;
+    ret = pthread_create(&th_id[i], NULL, &thread_process, (void *)&th_args);
+    ASSERT_ALWAYS(ret == 0);
   }
 
-  // Here, could do some stats.
+  stats_init(stats, stdout, &count_processed_sm, nbits(nb_relsets)-5,
+      "Computed", "SMs", "", "SMs");
+  while (count_processed_sm < nb_parts) {
+    if (stats_test_progress(stats))
+      stats_print_progress (stats, count_processed_sm, 0, 0, 0);
+    usleep(1);
+  }
+  stats_print_progress (stats, nb_parts, 0, 0, 1);
 
+  // join the threads.
   for (int i = 0; i < mt; ++i)
     pthread_join(th_id[i], NULL);
   free(th_id);
