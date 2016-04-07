@@ -35,11 +35,11 @@ Output
 #include <sys/stat.h>
 #include <pthread.h>
 #include <errno.h>
-#include <mpi.h>
 
 #include "macros.h"
 #include "utils_with_io.h"
 #include "filter_config.h"
+#include "select_mpi.h"
 
 stats_data_t stats; /* struct for printing progress */
 
@@ -218,6 +218,57 @@ void MPI_Recv_res(mpz_poly_t * res, int src, sm_side_info * sm_info,
   }
 }
 
+
+// Pthread part: on each node, we use shared memory instead of mpi
+
+struct th_info_s {
+  sm_side_info * sm_info;
+  sm_relset_ptr rels;
+  mpz_poly_t ** dst;
+  uint64_t tot_relset;
+  int nb_polys;
+};
+typedef struct th_info_s th_info_t;
+
+uint64_t next_relset = 0; // All relsets below this are done, or being processed
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; 
+
+void * thread_process(void *th_arg) {
+  th_info_t * args = (th_info_t *)th_arg;
+
+  while(1) {
+    // get a new block of relsets to compute
+    pthread_mutex_lock(&mutex);
+    if (next_relset >= args->tot_relset) {
+      pthread_mutex_unlock(&mutex);
+      return NULL;
+    }
+    uint64_t first = next_relset;
+    uint64_t last = MIN(first + 10, args->tot_relset);
+    next_relset = last;
+    pthread_mutex_unlock(&mutex);
+
+    // Process the relsets
+    for (uint64_t i = first; i < last; ++i) {
+      for(int side = 0 ; side < args->nb_polys ; side++) {
+        if (args->sm_info[side]->nsm == 0)
+          continue;
+        mpz_poly_reduce_frac_mod_f_mod_mpz(
+            args->rels[i].num[side],
+            args->rels[i].denom[side],
+            args->sm_info[side]->f0,
+            args->sm_info[side]->ell2,
+            args->sm_info[side]->invl2
+            );
+        compute_sm_piecewise(args->dst[i][side],
+            args->rels[i].num[side],
+            args->sm_info[side]);
+      }
+    }
+  }
+}
+
+
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "(required) poly file");
@@ -227,6 +278,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "ell", "(required) group order");
   param_list_decl_usage(pl, "nsm", "number of SM on side 0,1,... (default is "
                                    "computed by the program)");
+  param_list_decl_usage(pl, "t", "number of threads (default 1)");
   verbose_decl_usage(pl);
 }
 
@@ -250,6 +302,7 @@ int main (int argc, char **argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   int idoio = (rank == 0);
+  int mt = 1;
   double t0 = seconds();
 
   char *argv0 = argv[0];
@@ -327,6 +380,15 @@ int main (int argc, char **argv)
   if (!param_list_parse_mpz(pl, "ell", ell)) {
     if (idoio) {
       fprintf(stderr, "Error: parameter -ell is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+    }
+    exit(EXIT_FAILURE);
+  }
+
+  param_list_parse_int(pl, "t", &mt);
+  if (mt < 1) {
+    if (idoio) {
+      fprintf(stderr, "Error: parameter -mt must be at least 1\n");
       param_list_print_usage(pl, argv0, stderr);
     }
     exit(EXIT_FAILURE);
@@ -456,7 +518,10 @@ int main (int argc, char **argv)
     free(rels);
   }
 
+  ///////////////////////
   // Process the relsets.
+  t0 = seconds();
+
   mpz_poly_t **dst = (mpz_poly_t **) malloc(nb_parts*sizeof(mpz_poly_t*));
   for (uint64_t j = 0; j < nb_parts; ++j) {
     dst[j] = (mpz_poly_t *) malloc(pol->nb_polys*sizeof(mpz_poly_t));
@@ -466,28 +531,32 @@ int main (int argc, char **argv)
         mpz_poly_init(dst[j][side], sm_info[side]->f->deg);
     }
   }
-  for (uint64_t i = 0; i < nb_parts; ++i) {
-    if (i*size+rank >= nb_relsets)
-      continue;
-    for(int side = 0 ; side < pol->nb_polys ; side++) {
-      if (sm_info[side]->nsm == 0)
-        continue;
-      mpz_poly_reduce_frac_mod_f_mod_mpz(
-          part_rels[i].num[side],
-          part_rels[i].denom[side],
-          sm_info[side]->f0,
-          sm_info[side]->ell2,
-          sm_info[side]->invl2
-          );
-      compute_sm_piecewise(dst[i][side],
-          part_rels[i].num[side],
-          sm_info[side]);
-    }
-    if (i % 100 == 0) {
-      fprintf(stderr, "Process %d: done %" PRIu64 " SMs in %f sec\n",
-          rank, i, seconds()-t0);
-    }
+
+  // parameters for the threads (same for all).
+  th_info_t th_args;
+  th_args.sm_info = sm_info;
+  th_args.rels = part_rels;
+  th_args.dst = dst;
+  th_args.nb_polys = pol->nb_polys;
+  th_args.tot_relset = nb_parts;
+  if ((nb_parts-1)*size + rank > nb_relsets)
+    th_args.tot_relset = nb_parts - 1;
+  // start the threads
+  next_relset = 0;
+  pthread_t *th_id;
+  th_id = (pthread_t *) malloc(mt*sizeof(pthread_t));
+  ASSERT_ALWAYS(th_id != NULL);
+  for (int i = 0; i < mt; ++i) {
+    pthread_create(&th_id[i], NULL, &thread_process, (void *)&th_args);
   }
+
+  // Here, could do some stats.
+
+  for (int i = 0; i < mt; ++i)
+    pthread_join(th_id[i], NULL);
+  free(th_id);
+  fprintf(stderr, "Job %d: processed all relsets in %f s\n",
+      rank, seconds()-t0);
 
   // Send back results and print
   if (rank != 0) { // sender
