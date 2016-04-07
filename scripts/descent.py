@@ -594,7 +594,7 @@ class DescentUpperClass(object):
         self.I        = int(args.init_I)
         self.slaves   = int(args.slaves)
 
-    def __isqrt(n):
+    def __isqrt(self, n):
         x = n
         y = (x + 1) // 2
         while y < x:
