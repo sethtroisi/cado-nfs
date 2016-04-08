@@ -775,7 +775,7 @@ improve_list_k (list_mpz_ptr list_k, const unsigned int sopt_effort,
   /* Sort list_k by increasing order and remove duplicates */
   list_mpz_sort_and_remove_dup (list_k, verbose);
   if (verbose)
-    fprintf (stderr, "# sopt: It remains %" PRIu64 " values after sorting "
+    fprintf (stderr, "# sopt: It remains %" PRIu64 " values after sorting"
                      " and removing duplicates\n", list_k->len);
 
   mpz_clear (k);
@@ -1142,8 +1142,8 @@ size_optimization_aux (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     /* Sort list_k by increasing order and remove duplicates */
     list_mpz_sort_and_remove_dup (list_k, verbose);
     if (verbose)
-      fprintf (stderr, "# sopt: It remains %" PRIu64 " values after sorting and"
-                       " removing duplicates\n", list_k->len);
+      fprintf (stderr, "# sopt: It remains %" PRIu64 " values after sorting"
+                       " and removing duplicates\n", list_k->len);
   }
   else
   {
@@ -1237,8 +1237,9 @@ size_optimization_aux (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
               if (verbose)
               {
                 gmp_fprintf (stderr, "# sopt:       better lognorm %.2f (previ"
-                                 "ous was %.2f) for skew[%u] = %Zd\n",
-                             lognorm, best_lognorm, j, list_skew[j]);
+                             "ous was %.2f) for skew[%u] = %Zd and k = %Zd\n",
+                             lognorm, best_lognorm, j, list_skew[j],
+                             list_k->tab[i]);
               }
               best_lognorm = lognorm;
               mpz_poly_swap (fbest, fld);
