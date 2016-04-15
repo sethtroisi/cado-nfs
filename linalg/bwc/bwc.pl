@@ -8,6 +8,7 @@ use File::Temp qw/tempdir tempfile mktemp/;
 use List::Util qw[max];
 use Data::Dumper;
 use Fcntl;
+use Carp;
 
 # This companion program serves as a helper for running bwc programs.
 #
@@ -1148,13 +1149,48 @@ sub get_cached_bfile {
 sub get_cached_balancing_header {
     my $key = 'balancing_header';
     if (defined(my $z = $cache->{$key})) { return @$z; }
-    my $balancing = get_cached_bfile;
+    my $balancing = get_cached_bfile or confess "\$balancing undefined";
     sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
     sysread($fh, my $bhdr, 16);
     my @x = unpack("LLLL", $bhdr);
     $cache->{$key} = \@x;
     close($fh);
     return @x;
+}
+sub get_nrows_ncols {
+    my $key = 'nrows_ncols';
+    if (defined(my $z = $cache->{$key})) {
+        return @$z;
+    }
+    if (defined(my $z = $cache->{'balancing_header'})) {
+        my @x = @$z;
+        shift @x;
+        shift @x;
+        $cache->{$key} = \@x;
+        return @x;
+    }
+    if (defined(my $balancing = get_cached_bfile)) {
+        sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
+        sysread($fh, my $bhdr, 16);
+        my @xx = unpack("LLLL", $bhdr);
+        $cache->{'balancing_header'} = \@xx;
+        my @x = @xx;
+        close($fh);
+        shift @x;
+        shift @x;
+        $cache->{$key} = \@x;
+        return @x;
+    }
+    (my $mrw = $matrix) =~ s/(\.(?:bin|txt))$/.rw$1/;
+    (my $mrw = $matrix) =~ s/(\.(?:bin|txt))$/.cw$1/;
+    if ($mrw ne $matrix && $mcw ne $matrix && -f $mrw && -f $mcw) {
+        my $nrows = ((stat $mrw)[7] / 4);
+        my $ncols = ((stat $mcw)[7] / 4);
+        my @x = ($nrows, $ncols);
+        $cache->{$key} = \@x;
+        return @x;
+    }
+    confess "Cannot find nrows and ncols ???";
 }
 # }}}
 
@@ -1256,7 +1292,7 @@ sub get_cached_nbytes_per_splitwidth {
 # {{{ inferring max iteration indices.
 sub max_krylov_iteration {
     # read matrix dimension from the balancing header.
-    my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
+    my ($bnrows, $bncols) = get_nrows_ncols;
     my $length = $bncols > $bnrows ? $bncols : $bnrows;
     $length = int(($length+$m-1)/$m) + int(($length+$n-1)/$n);
     $length += 2 * int(($m+$n-1)/$m);
@@ -1750,7 +1786,7 @@ sub task_krylov {
 
 sub task_lingen_input_errors {
     my $h = shift;
-    my $length = max_krylov_iteration;
+    my $length = $param->{'krylov_length'} || max_krylov_iteration;
     my $afiles = list_afiles;
     my $astrings = {};
     my $ok = 1;
