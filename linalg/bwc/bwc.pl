@@ -1975,54 +1975,63 @@ sub task_mksol {
     }
     
     my @todo;
-    eval {
-        @todo = subtask_krylov_mksol_todo $length, sub {
-            my ($range, $cp) = @_;
-            ## return if $cp > $length;
-            my @musthave_found;
-            my @musthave_notfound;
-            for my $s (@sols) {
-                $s =~ /^(\d+)\.\.(\d+)$/ or die;
-                my $optional = $1 >= $nsolvecs;
-                last if $optional;
-                if ($sfiles->{$s . ".." . $range}->{$cp}) {
-                    push @musthave_found, $s;
-                } else {
-                    push @musthave_notfound, $s;
+
+    my @only_seq = grep(/^ys=\d+\.\.\d+$/, @main_args);
+    my @only_start = grep(/^start=\d+$/, @main_args);
+
+    if (@only_start && @only_seq) {
+        @todo = (join(" ", (@only_seq, @only_start)));
+        task_check_message 'ok', "Command line imposes one specific subtask @todo";
+    } else {
+        eval {
+            @todo = subtask_krylov_mksol_todo $length, sub {
+                my ($range, $cp) = @_;
+                ## return if $cp > $length;
+                my @musthave_found;
+                my @musthave_notfound;
+                for my $s (@sols) {
+                    $s =~ /^(\d+)\.\.(\d+)$/ or die;
+                    my $optional = $1 >= $nsolvecs;
+                    last if $optional;
+                    if ($sfiles->{$s . ".." . $range}->{$cp}) {
+                        push @musthave_found, $s;
+                    } else {
+                        push @musthave_notfound, $s;
+                    }
                 }
-            }
-            return 1 unless @musthave_notfound;
-            return 0 unless @musthave_found;
-            print "\n";
-            print STDERR "\n";
-            my $msg = <<EOF;
+                return 1 unless @musthave_notfound;
+                return 0 unless @musthave_found;
+                print "\n";
+                print STDERR "\n";
+                my $msg = <<EOF;
 ## A previous run of mksol has been done with a different value of nsolvecs.
 ## The code presently wants to compute all solutions together, so we cannot
 ## work around this easily
 ##   found: @musthave_found
 ##   notfound: @musthave_notfound
 EOF
-            die $msg;
+                die $msg;
+            };
         };
-    };
-    if ($@) {
-        task_check_message 'error', "Failure message while checking $current_task files";
-        die;
+        if ($@) {
+            task_check_message 'error', "Failure message while checking $current_task files";
+            die;
+        }
+        if (!@todo) {
+            # Note that we haven't checked for the A files yet !
+            task_check_message 'ok', "All $current_task tasks are done, good.\n";
+            return;
+        }
+
+        task_check_message 'missing',
+                    "Pending tasks for $current_task:\n" . join("\n", @todo);
     }
 
-    if (!@todo) {
-        # Note that we haven't checked for the A files yet !
-        task_check_message 'ok', "All $current_task tasks are done, good.\n";
-        return;
-    }
-
-    task_check_message 'missing',
-                "Pending tasks for $current_task:\n" . join("\n", @todo);
     for my $t (@todo) {
         # take out ys from main_args, put the right one in place if
         # needed.
         # print "main_args: @main_args\n";
-        my @args = grep { !/^(ys|n?rhs)/ } @main_args;
+        my @args = grep { !/^(ys|n?rhs|start)/ } @main_args;
         push @args, split(' ', $t);
         if (!grep { /^nsolvecs=(\d+)/} @args) {
             push @args, "nsolvecs=$nsolvecs";
