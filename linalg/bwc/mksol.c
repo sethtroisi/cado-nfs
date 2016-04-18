@@ -145,7 +145,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
-        if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
+        if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
         mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
         if (tcan_print) { printf("done\n"); }
     } else {
