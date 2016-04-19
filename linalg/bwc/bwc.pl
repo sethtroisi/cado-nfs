@@ -9,6 +9,7 @@ use List::Util qw[max];
 use Data::Dumper;
 use Fcntl;
 use Carp;
+use POSIX ":sys_wait_h";
 
 # This companion program serves as a helper for running bwc programs.
 #
@@ -503,19 +504,55 @@ sub dosystem
     }
 
     print STDERR $msg if $my_verbose_flags->{'cmdline'};
-    my $rc = system $prg, @args;
-    return if $rc == 0;
-    if ($rc == -1) {
-        print STDERR "Cannot execute $prg\n";
-    } elsif ($rc & 127) {
-        my $sig = $rc & 127;
-        my $coreinfo = ($rc & 128) ? 'with' : 'without';
-        print STDERR "$prg: died with signal $sig, $coreinfo coredump\n";
+    # Need to make sure that if we get SIGTERM, then we kill our child
+    # as well.
+    defined(my $pid = fork) or die "Cannot fork\n";
+    if ($pid == 0) {
+        exec $prg, @args or die "Cannot execute $prg\n";
     } else {
-        my $ret = $rc >> 8;
-        print STDERR "$prg: exited with status $ret\n";
+        my $die_now;
+        my $handler = sub {
+            my ($sig) = @_;
+            print STDERR "Caught a SIG$sig--shutting down\n";
+            $die_now=1;
+        };
+        # catch signals we often receive.
+        local $SIG{'INT'} = $handler;
+        local $SIG{'QUIT'} = $handler;
+        local $SIG{'TERM'} = $handler;
+        local $SIG{'HUP'} = $handler;
+        local $SIG{'USR1'} = $handler;
+        local $SIG{'USR2'} = $handler;
+        print STDERR "Waiting for pid $pid\n";
+        while (1) {
+            my $rc = waitpid($pid,WNOHANG);
+            if ($rc == 0) {
+                next unless $die_now;
+                print STDERR "killing pid $pid\n";
+                kill 'TERM', $pid or print STDERR "kill -TERM $pid: $!\n";
+                sleep(1);
+                kill 'KILL', $pid or print STDERR "kill -9 $pid: $!\n";
+                exit(1);
+            }
+            my $status = $?;
+            if ($rc < 0) {
+                print STDERR "$prg: process $pid vanished\n";
+            } else {
+                print STDERR "$prg: waitpid($pid) returns $rc\n" unless $pid == $rc;
+                if (WIFEXITED($status)) {
+                    my $ret = WEXITSTATUS($status);
+                    print STDERR "$prg: exited with status $ret\n";
+                    return if $ret == 0;
+                } elsif (WIFSIGNALED($status)) {
+                    my $sig = WTERMSIG($status);
+                    # WCOREDUMP does not seem to be defined.
+                    my $core = ($status & 128) ? 'with' : 'without';
+                    print STDERR "$prg: died with signal $sig, $core coredump\n";
+                }
+            }
+            die "aborted on subprogram error";
+        }
     }
-    die "aborted on subprogram error";
 }
 
 sub ssh_program
