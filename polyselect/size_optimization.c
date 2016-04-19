@@ -182,8 +182,9 @@ hash_uint64_insert (hash_table_uint64_ptr H, uint64_t h)
 
 /******************************************************************************/
 
-/* store in Q[0..nb_approx-1] the nb_approx best rational approximations of q
-   with denominator <= bound. nb_approx should be greater than 0
+/* store in Q[0..nb_approx-1] the (at most) nb_approx first best rational
+   approximations of q with denominator <= bound.
+   nb_approx should be greater than 0
    Return the number of found approximations. */
 static inline unsigned int
 compute_rational_approximation (double *Q, double q, unsigned int nb_approx,
@@ -193,28 +194,17 @@ compute_rational_approximation (double *Q, double q, unsigned int nb_approx,
   double *E = (double *) malloc (nb_approx * sizeof(double));
   ASSERT_ALWAYS (E != NULL);
 
-  for (double den = 2.0; den <= bound; den += 1.0)
+  for (double den = 2.0; n < nb_approx - 1 && den <= bound; den += 1.0)
   {
     double num = floor (den * q + 0.5);
     double e = fabs (q - num / den);
-    unsigned int j;
-    /* search for duplicate before inserting */
-    for (j = 0; j < n && e > E[j]; j++);
-    if (j < n && e == E[j])
-      continue;
-    /* If we arrive here, it means that num/den and e should be inserted in
-       position j in Q and E respectively */
-    if (n < nb_approx - 1) /* We are not at maximum size (we need one space left
-    for approximation with denominator 1) */
-      n++;
 
-    for (unsigned int l = n; l > j; l--)
-    {
-      Q[l] = Q[l-1];
-      E[l] = E[l-1];
-    }
-    Q[j] = num / den;
-    E[j] = e;
+    /* if the previous approximation was better, skip the current one */
+    if (n > 0 && e >= E[n-1])
+      continue;
+    Q[n] = num / den;
+    E[n] = e;
+    n++;
   }
   /* force approximation with denominator 1 at the end */
   Q[n++] = floor (q + 0.5);
