@@ -1182,7 +1182,7 @@ sub get_nrows_ncols {
         return @x;
     }
     (my $mrw = $matrix) =~ s/(\.(?:bin|txt))$/.rw$1/;
-    (my $mrw = $matrix) =~ s/(\.(?:bin|txt))$/.cw$1/;
+    (my $mcw = $matrix) =~ s/(\.(?:bin|txt))$/.cw$1/;
     if ($mrw ne $matrix && $mcw ne $matrix && -f $mrw && -f $mcw) {
         my $nrows = ((stat $mrw)[7] / 4);
         my $ncols = ((stat $mcw)[7] / 4);
@@ -1785,6 +1785,8 @@ sub task_krylov {
 # {{{ lingen
 
 sub task_lingen_input_errors {
+    # krylov_length is not documented. It's just here to fool lingen and
+    # let it believe that it does have the full data set.
     my $h = shift;
     my $length = $param->{'krylov_length'} || max_krylov_iteration;
     my $afiles = list_afiles;
@@ -1792,6 +1794,9 @@ sub task_lingen_input_errors {
     my $ok = 1;
     my $nb_afiles = 0;
     my $rlength = int(($length + $param->{'interval'} - 1) / $param->{'interval'}) * $param->{'interval'};
+    if (defined($param->{'krylov_length'})) {
+        $rlength = $param->{'krylov_length'};
+    }
     for my $k (keys %$afiles) {
         my @strings;
         my ($z0, $z1);
