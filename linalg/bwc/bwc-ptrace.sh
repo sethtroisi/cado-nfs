@@ -347,6 +347,7 @@ fi
 
 if ! [ "$magma" ] ; then
     $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
+    $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]*
     exit 0
 else
     if $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}" ; then
@@ -358,6 +359,7 @@ else
         echo " ########## FAILURE ! bwc.pl returned false ########## "
         echo " ########## FAILURE ! bwc.pl returned false ########## "
     fi
+    $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]*
 fi
 
 set +x
