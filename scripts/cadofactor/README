@@ -198,6 +198,19 @@ the script will assume various things, like the presence of certain
 commented lines. The list of these particularities may vary over time,
 so we don't even try to list them here.
 
+When importing relations, some statistics are gathered by parsing the
+relation files. This is a costly operation, especially when relations
+from a large number of files are gathered. An expedient for this problem
+is to create, for each file cxx.sieving.xxx-yyy.zzzzzzz.gz, a file
+cxx.sieving.xxx-yyy.zzzzzzz.gz.stats.txt, which contain the relevant
+statistics. The format of this file should match the format of the
+statistics files produced by the cado-nfs siever with the -stats-stderr
+option. Examples of such statistics files are found as the files
+*.stderr0 in the $name.upload/ directory for a cado-nfs factorization.
+The only crucial bit information is the line which gives the number of
+relations in the file, which has to match the following format:
+# Total $nrels reports [%.2fs/r, %.2fr/sq]
+
 File locking
 ============
 
