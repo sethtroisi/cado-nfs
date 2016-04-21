@@ -45,13 +45,13 @@ typedef struct mmt_vec_s mmt_vec[1];
 #define SUBVEC_const(v,w,offset) (v)->abase->vec_subvec_const(v->abase, (v)->w, offset)
 
 /* yikes. yet another list structure. Wish we had the STL. */
-struct permutation_data {
+struct permutation_data_s {
     size_t n;
     size_t alloc;
     unsigned int (*x)[2];
 };
-typedef struct permutation_data permutation_data[1];
-typedef struct permutation_data * permutation_data_ptr;
+typedef struct permutation_data_s permutation_data[1];
+typedef struct permutation_data_s * permutation_data_ptr;
 /* all methods are private */
 
 struct matmul_top_matrix_s {
