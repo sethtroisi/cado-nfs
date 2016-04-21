@@ -216,18 +216,14 @@ Controlling the filtering stage
 ===============================
 
 By default CADO-NFS requires an excess (after the first singleton removal)
-of 10% more relations than ideals. This is controlled by:
+of 0% more relations than ideals. This is controlled by:
 
-tasks.filter.purge.required_excess=0.1
+tasks.filter.purge.required_excess=0.0
 
 If you want a larger excess, say 20%, just add on the cado-nfs.py command
 line (or in the parameter file):
 
 tasks.filter.purge.required_excess=0.2
-
-If any positive excess is enough:
-
-tasks.filter.purge.required_excess=0.0
 
 Note: if your factorization already started the linear algebra step, and you
 want to do more sieving, you can restart it with a larger "rels_wanted" than
@@ -245,7 +241,7 @@ collected:
 tasks.filter.purge.add_ratio=0.05
 
 specifies that you want 5% more relations before next filtering step.
-The default value is 0.1 (i.e. 10%).
+The default value is 0.01 (i.e. 1% more relations).
 
 Printing and manipulating the database
 ======================================
@@ -276,4 +272,14 @@ tasks.threads) is used in the square root step. To use say
 16 threads in parallel, add the following to the cado-nfs.py command line:
 
 tasks.sqrt.threads = 16
+
+Re-running the linear algebra step
+==================================
+
+If the linear algebra step was already started, and you want to run it again
+with a different set of relations (for example with more sieving), you need
+to add the following to the cado-nfs.py command line, to allow removing the
+previous linear algebra subdirectory:
+
+tasks.linalg.bwc.allow_wipeout = True
 

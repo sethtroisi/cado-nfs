@@ -28,6 +28,9 @@ set_target_properties(merge-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 add_executable(replay replay.c sparse.c)
 target_link_libraries(replay utils_with_io)
 
+add_executable(replay_dblemat EXCLUDE_FROM_ALL replay_dblemat.c sparse.c)
+target_link_libraries(replay_dblemat utils_with_io)
+
 add_executable(replay-dl replay.c sparse.c)
 target_link_libraries(replay-dl utils_with_io)
 set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
@@ -35,12 +38,18 @@ set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 add_executable(reconstructlog-dl reconstructlog.c)
 target_link_libraries(reconstructlog-dl utils_with_io)
 
-add_executable(sm sm.c)
-target_link_libraries(sm utils_with_io)
-
 add_executable(sm_simple sm_simple.cpp)
 target_link_libraries(sm_simple utils)
 
-install(TARGETS ${bin_list} RUNTIME DESTINATION ${LIBSUFFIX}/filter)
+if (${WITH_MPI})
+    add_definitions(-DWITH_MPI)
+endif()
+add_executable(sm sm.c)
+target_link_libraries(sm utils_with_io)
+if (${WITH_MPI})
+set_target_properties(sm PROPERTIES
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
+endif()
 
-include(CMakeLists-nodist.txt OPTIONAL)
+install(TARGETS ${bin_list} RUNTIME DESTINATION ${LIBSUFFIX}/filter)

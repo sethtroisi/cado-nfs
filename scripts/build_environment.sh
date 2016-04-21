@@ -36,7 +36,14 @@ pwdP="pwd -P"
 if ! $pwdP >/dev/null 2>&1 ; then
     pwdP=pwd
 fi
-called_from="`pwd`"
+#
+# When "make" is run from the subdirectory $CADO/linalg/bwc, we set:
+#
+# called_from to be the absolute path of $CADO/linalg/bwc
+# absolute_path_of_source to be the absolute path of $CADO
+# relative_path_of_cwd to be linalg/bwc
+#
+called_from="$(readlink_f `pwd`)"
 absolute_path_of_source="$(readlink_f $up_path)"
 relative_path_of_cwd="${called_from##$absolute_path_of_source}"
 

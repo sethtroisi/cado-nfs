@@ -32,9 +32,6 @@ while [ $# -gt 0 ] ; do
         shift
         bindir=$1
         shift
-    elif [ "$1" = "--no-cleanup" ] ; then
-        no_cleanup=1
-        shift
     else
         usage
     fi
@@ -53,7 +50,7 @@ fi
 
 wdir=$(mktemp -d  /tmp/cado.XXXXXXXX)
 
-cleanup() { if ! [ "$no_cleanup" ] ; then rm -rf $wdir ; fi ; }
+cleanup() { if ! [ "$CADO_DEBUG" ] ; then rm -rf $wdir ; fi ; }
 trap cleanup EXIT
 
 $bindir/random_matrix $N -d $dens  --binary -o $wdir/mat.bin -s $seed

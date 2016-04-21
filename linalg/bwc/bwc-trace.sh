@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# NOTE: magma debug was in bf225ce125bc21c5ae5f4c3b2f8acc652e248f46, and
+# it seems it has not been ported completely.
+
 set -e
 # set -x
 

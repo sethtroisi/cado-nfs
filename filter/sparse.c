@@ -1,8 +1,8 @@
-/* 
+/*
  * Program: history
  * Author : F. Morain
  * Purpose: managing history of merges
- * 
+ *
  * Algorithm:
  *
  */
@@ -58,7 +58,7 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
     ASSERT(rows[i1] != NULL);
     ASSERT(rows[i2] != NULL);
 #if DEBUG >= 1
-    fprintf(stderr, "R[%d] =", i1); fprintRow(stderr, rows[i1]); 
+    fprintf(stderr, "R[%d] =", i1); fprintRow(stderr, rows[i1]);
     fprintf(stderr, "\n");
     fprintf(stderr, "R[%d] =", i2); fprintRow(stderr, rows[i2]);
     fprintf(stderr, "\n");
@@ -67,10 +67,8 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
     tmp = (typerow_t *)malloc(len * sizeof(typerow_t));
     k = k1 = k2 = 1;
 
-    int e1 = 1, e2 = 1;  // default value for non-DL
-
 #ifdef FOR_DL /* look for the exponents of j in i1 i2*/
-    e1 = 0, e2 = 0;
+    int e1 = 0, e2 = 0;
     int d;
     unsigned int l;
     for (l = 1 ; l <= rowLength(rows, i1) ; l++)
@@ -92,7 +90,7 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
         rows[i1][l].e *= e2;
 
 #if DEBUG >= 1
-    fprintf (stdout, "Computing %d*rows[%d] + %d*rows[%d] for j=%d\n", 
+    fprintf (stdout, "Computing %d*rows[%d] + %d*rows[%d] for j=%d\n",
                       e2, i1, e1, i2, j);
 #endif
 
@@ -158,11 +156,15 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
         tmp.rels = (multirel_t *) malloc((r1.n+r2.n)*sizeof(multirel_t));
         while ((k1 < r1.n) && (k2 < r2.n)) {
             if (r1.rels[k1].ind_row < r2.rels[k2].ind_row) {
-                tmp.rels[k].ind_row = r1.rels[k1].ind_row;
-                tmp.rels[k++].e = e2*r1.rels[k1++].e;
-            } else if (r1.rels[k1].ind_row > r2.rels[k2].ind_row) { 
-                tmp.rels[k].ind_row = r2.rels[k2].ind_row;
-                tmp.rels[k++].e = e1*r2.rels[k2++].e;
+#ifdef FOR_DL
+                tmp.rels[k].e = e2*r1.rels[k1].e;
+#endif
+                tmp.rels[k++].ind_row = r1.rels[k1++].ind_row;
+            } else if (r1.rels[k1].ind_row > r2.rels[k2].ind_row) {
+#ifdef FOR_DL
+                tmp.rels[k].e = e1*r2.rels[k2].e;
+#endif
+                tmp.rels[k++].ind_row = r2.rels[k2++].ind_row;
             } else {
 #ifdef FOR_DL
                 int32_t e = e2*r1.rels[k1].e + e1*r2.rels[k2].e;
@@ -176,16 +178,22 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
             }
         }
         // finish with k1 and k2
-        for( ; k1 < r1.n; k1++) {
-            tmp.rels[k].ind_row = r1.rels[k1].ind_row;
-            tmp.rels[k++].e = e2*r1.rels[k1].e;
+        for( ; k1 < r1.n; ) {
+#ifdef FOR_DL
+            tmp.rels[k].e = e2*r1.rels[k1].e;
+#endif
+            tmp.rels[k++].ind_row = r1.rels[k1++].ind_row;
         }
-        for( ; k2 < r2.n; k2++) {
-            tmp.rels[k].ind_row = r2.rels[k2].ind_row;
-            tmp.rels[k++].e = e1*r2.rels[k2].e;
+        for( ; k2 < r2.n; ) {
+#ifdef FOR_DL
+            tmp.rels[k].e = e1*r2.rels[k2].e;
+#endif
+            tmp.rels[k++].ind_row = r2.rels[k2++].ind_row;
         }
         ASSERT (k <= r1.n + r2.n);
         tmp.n = k;
+	if (k < r1.n + r2.n) /* reallocate to save memory */
+	  tmp.rels = realloc (tmp.rels, k * sizeof(multirel_t));
 
         // copy back to i1
         free (index_data[i1].rels);
@@ -210,7 +218,7 @@ hasCol(int32_t **rows, int i, int32_t j)
 }
 
 // A line is "[-]i i1 ... ik [#j]"
-int parse_hisfile_line (int32_t *ind, char *t, int32_t *j)
+int parse_hisfile_line (int32_t *ind, const char *t, int32_t *j)
 {
   int ni = 0, sg = 1;
 

@@ -87,7 +87,7 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
 sieve_info_ptr
 fill_in_sieve_info(const mpz_t q, const mpz_t rho,
                    const int sq_side, const uint32_t I, const uint32_t J,
-                   const unsigned long limits[2], facul_strategy_t *strategy[2],
+                   facul_strategy_t *strategy[2],
                    cado_poly_ptr cpoly, siever_config_srcptr conf)
 {
   sieve_info_ptr new_si;
@@ -109,17 +109,8 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
   mpz_init_set(new_si->doing->r, rho);
   new_si->doing->side = sq_side;
 
-  for (int side = 0; side < 2; side++) {
-    const unsigned long lim = limits[side];
-    mpz_init (new_si->BB[side]);
-    mpz_init (new_si->BBB[side]);
-    mpz_init (new_si->BBBB[side]);
-    mpz_ui_pow_ui (new_si->BB[side], lim, 2);
-    mpz_mul_ui (new_si->BBB[side], new_si->BB[side], lim);
-    mpz_mul_ui (new_si->BBBB[side], new_si->BBB[side], lim);
-
+  for (int side = 0; side < 2; side++)
     new_si->sides[side]->strategy = strategy[side];
-  }
   SkewGauss(new_si->qbasis, new_si->doing->p, new_si->doing->r, new_si->cpoly->skew);
   return new_si;
 }
@@ -129,14 +120,13 @@ static sieve_info_ptr
 fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_t b,
                            sieve_info_srcptr old_si)
 {
-  const unsigned long lim[2] = {old_si->conf->sides[0]->lim, old_si->conf->sides[1]->lim};
   facul_strategy_t *strategies[2] = {old_si->sides[0]->strategy, old_si->sides[1]->strategy};
   mpz_t sq, rho;
   mpz_init_set_ui(sq, p);
   mpz_init(rho);
   compute_a_over_b_mod_p(rho, a, b, sq);
   return fill_in_sieve_info(sq, rho, old_si->doing->side, old_si->I, old_si->J,
-                            lim, strategies, old_si->cpoly, old_si->conf);
+                            strategies, old_si->cpoly, old_si->conf);
   mpz_clear(sq);
   mpz_clear(rho);
 }
@@ -144,11 +134,6 @@ fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_
 void
 clear_sieve_info(sieve_info_ptr new_si)
 {
-  for (int side = 0; side < 2; side++) {
-    mpz_clear(new_si->BB[side]);
-    mpz_clear(new_si->BBB[side]);
-    mpz_clear(new_si->BBBB[side]);
-  }
   sieve_info_clear_norm_data(new_si);
   mpz_clear(new_si->doing->r);
   mpz_clear(new_si->doing->p);

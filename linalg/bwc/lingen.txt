@@ -1,3 +1,5 @@
+[see also Feature request #14992 on the bug tracker]
+
 The current binary lingen program sucks in just about every respect.
 
 Parallelism
@@ -10,41 +12,27 @@ Linear system solving
 ************************************************************************
 * Fact 1.
 
-The binary lingen program is not parallel. I have tried to add openmp
-parallelism at the most obvious places (like computation of Fourier
-transforms for all entries in a matrix), but unfortunately, for reasons I
-do not understand, this crashes. See /ceph/thome/lingen.log . I suspect
-that there would be a benefit in making sure that openmp limits the
-number of threads, but my attempts so far with the environment variables
-OMP_THREAD_LIMIT and OMP_NUM_THREADS (I don't know which does what) have
-also failed. The real thing to do anyway would be to provide multi node
-parallelism, as is done with plingen.
+The binary lingen program is not as parallel as plingen. In 2015, work
+was done towards making the binary lingen openmp-capable. 
 
-Action 1 (done in commit 0586c99)
-========
-
-Making the OMP patch work should be doable within a reasonable amount of
-time, I expect.
-
-Action 2
-========
 
 The best option as far as parallelism is concerned is to use the plingen
 code structure. This cannot be done before the inner arithmetic gets a
 review.
 
+Note that plingen, too, could benefit from some more parallelism (at the
+node level).
+
 
 ************************************************************************
 * Fact 2.
 
-Memory consumption of the program is totally insane. For a 12g input,
-very soon more than 150gb are needed, and I truly fear that at the end of
-the day, the memory needed could be much much worse, notably because of
-Fourier transforms at the top level. As it is now, we are forced to run
-the program on barbecue, which is the only machine we have with a really
-large amount of memory.
+Memory consumption of the program is significant. For a 12g input, it's
+about 400g total. Analysis seems to show that in fact, it's quite
+reasonable. (work done in december 2015 to trim this down).
 
-No action currently, since bitrot is the main problem at this point.
+The main outstanding thing to trim down memory usage is to introduce a
+middle product.
 
 ************************************************************************
 * Fact 3: inner arithmetic sucks.
@@ -61,19 +49,13 @@ multiplication. Alas, barbecue does not support it.
 For choosing the transforms to be used, three options are theoretically
 supported.
 - Cantor (c128) the base field being GF(2^128). The innermost operation
-  therefore cares a great deal about pclmulqdq.
+  therefore cares a great deal about pclmulqdq. This is used for degrees
+  larger or equal to cantor_threshold.
 - ternary fft (gf2x-tfft).
 - "fake" which defines DFT and IFT as copies, and uses gf2x_mul in the
   middle.
 
-As terribly stupid as it may seem, the default is "fake" (see
-compute_lingen). (seems terribly stupid at least in terms of memory !)
-There is a cantor_threshold argument to lingen, but by default the
-threshold is "never". Reasons for that are that cantor pays off much
-earlier with pclmul, and probably also because at some point I had a bug
-with the c128 interface. Unfortunately I don't recall what it was. But
-despite that, activation of Cantor seems much desirable. The lack of
-activation for the gf2x-tfft layer really looks like a bug also.
+(The lack of activation for the gf2x-tfft layer really looks like a bug also.)
 
 There is a bench_polmatmul program (here, the arguments needed are:
 bench_polmatmul 132000000 512 256). It examines what it takes to do the
@@ -89,10 +71,8 @@ time. I am confident that improvement is possible here as well.
 Update: on a c125, 94% of the total time spent in the leaves (go_quadratic)
 is spent in extract_coeff_degree_t(), and only 6% in gauss().
 
-Action 3
-========
 
-much to do here.
+There's much to do here.
 
 We identify two operations we have to perform.
 

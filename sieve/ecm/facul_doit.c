@@ -440,7 +440,7 @@ facul_doit_onefm (mpz_t *factors, const modulus_t m,
   else 
     {
       /* A method value we don't know about. Something's wrong, bail out */
-      abort();
+      ASSERT_ALWAYS(0);
     }
   /* The following possibilities exist:
      bt:   Factor:    Cofactor:   Action:

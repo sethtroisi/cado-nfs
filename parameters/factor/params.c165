@@ -27,18 +27,18 @@ tasks.polyselect.nrkeep = 900
 # Sieve
 ###########################################################################
 
-rlim = 25000000
-alim = 49765624
-lpbr = 30
-lpba = 31
-tasks.sieve.mfbr = 70
-tasks.sieve.mfba = 96
-tasks.sieve.rlambda = 2.0875
-tasks.sieve.alambda = 3.2125
-tasks.sieve.ncurves0 = 13
-tasks.sieve.ncurves1 = 7
-
+rlim = 32597942
+alim = 26165833
+lpbr = 29
+lpba = 30
+tasks.sieve.mfbr = 92
+tasks.sieve.mfba = 91
+tasks.sieve.rlambda = 2.119140659504046
+tasks.sieve.alambda = 2.884388719543129
+tasks.sieve.ncurves0 = 16
+tasks.sieve.ncurves1 = 10
 tasks.I = 14
+
 tasks.sieve.qrange = 10000
 
 ###########################################################################
@@ -57,7 +57,6 @@ tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.m = 64
 tasks.linalg.bwc.n = 64
-tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
 # Characters

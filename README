@@ -5,7 +5,7 @@ in most cases the following should work to factor the number 903...693
 using all cores on the local machine
 
 1) make
-2) ./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 
+2) ./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693
 
 More details follow.
 
@@ -181,10 +181,10 @@ others).  It is possible to set '-t all' (which, in fact, is the default)
 to use all threads on the current machine.
 
 CADO-NFS is optimized only for numbers above 85 digits, and no support will
-be provided for numbers of less than 60 digits. Note that it is a good idea
-to remove small prime factors using special-purpose algorithms such as trial
-division, P-1, P+1, or ECM, and use CADO-NFS only for the remaining composite
-factor.
+be provided for numbers of less than 60 digits (for very large numbers,
+no support is promised). Note that it is a good idea to remove small prime
+factors using special-purpose algorithms such as trial division, P-1, P+1,
+or ECM, and use CADO-NFS only for the remaining composite factor.
 
 Parts of the Number Field Sieve computation are massively distributed. In
 this mode, client scripts (namely, cado-nfs-client.py) are run on many
@@ -288,7 +288,8 @@ $ cado-nfs.py parameters/factor/parameters.F9 slaves.hostnames=localhost
 
 Note in particular that you can force the special-q to be on
 the rational side if this is more appropriate for your number, with
-tasks.sieve.ratq=True on the cado-nfs.py command line or in the parameter file.
+tasks.sieve.sqside=0 on the cado-nfs.py command line or in the parameter
+file (assuming side 0 is the rational side).
 
 The default square root algorithm does not work in some very rare cases
 that could possibly occur with SNFS polynomials (a degree 4 polynomial
@@ -347,6 +348,47 @@ under Windows:
   requirements for cado-nfs.py, notably on unix-like utilities). See
   dev_docs/README.cross in the source code repository for information on
   how to cross-compile.
+
+Examples of basic usage:
+========================
+
+* Run a full factorization on the local machine, using all available
+  cores:
+
+./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 
+
+* Run a full factorization on the local machine, using 8 threads for the
+  server (this includes the linear algebra), and 4 jobs of 2 threads
+  each for the polynomial selection and the sieving:
+
+./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 --slaves 4 --client-threads 2 --server-threads 8
+
+* Run a factorization in the given directory, interrupt it (with Ctrl-C,
+  or whatever unexpected event), and resume the computation:
+
+./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 workdir=/tmp/myfacto
+[Ctrl-C]
+./cado-nfs.py /tmp/myfacto/c60.parameters_snapshot.0 
+
+* Run a server on machine1, and a slave on machine2, disabling ssl:
+
+machine1$ ./cado-nfs.py --server 90377629292003121684002147101760858109247336549001090677693 server.port=4242 server.ssl=no server.whitelist=machine2
+machine2$ ./cado-nfs-client.py --server=http://machine1:4242
+
+Note: if you are on an insecure network, you'll have to activate ssl, and
+then pass the appropriate sha1 certificate to the client (the server
+prints the appropriate command-line to be copy-pasted on machine2).
+
+* Run a factorization on machine1, and have it start automatically a
+  slave on machine2 via SSH:
+
+./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 
+slaves.hostnames=machine1,machine2
+
+Note that, in that case, you have to specify machine1 as well in the list
+of hostnames if you want it to contribute to the polynomial selection and
+the sieving.
+
 
 Known problems:
 ===============

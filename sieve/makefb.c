@@ -7,8 +7,6 @@
 #include "portability.h"
 #include "utils.h"
 
-#define MAX_THREADS 16
-
 /*
  * Compute g(x) = f(a*x+b), with deg f = d, and a and b are longs.
  * Must have a != 0 and d >= 1
@@ -385,9 +383,11 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
     fprintf(outfile, "# alim = %lu\n", alim);
     fprintf(outfile, "# maxbits = %d\n", maxbits);
 
-    pthread_t tid[MAX_THREADS];
+    pthread_t *tid;
     unsigned long p;
-    tab_t T[MAX_THREADS];
+    tab_t *T;
+    tid = (pthread_t*) malloc (nb_threads * sizeof (pthread_t));
+    T = (tab_t*) malloc (nb_threads * sizeof (tab_t));
     for (j = 0; j < nb_threads; j++)
       {
         T[j]->f = f;
@@ -436,6 +436,8 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
         }
       }
     }
+    free (tid);
+    free (T);
     prime_info_clear (pi);
 }
 
@@ -499,7 +501,7 @@ main (int argc, char *argv[])
   }
 
   param_list_parse_ulong(pl, "t"   , &nb_threads);
-  ASSERT_ALWAYS(1 <= nb_threads && nb_threads <= MAX_THREADS);
+  ASSERT_ALWAYS(1 <= nb_threads);
 
   param_list_parse_ulong(pl, "lim", &lim);
   if (lim == 0) {

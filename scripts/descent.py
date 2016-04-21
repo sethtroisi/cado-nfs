@@ -594,13 +594,21 @@ class DescentUpperClass(object):
         self.I        = int(args.init_I)
         self.slaves   = int(args.slaves)
 
+    def __isqrt(self, n):
+        x = n
+        y = (x + 1) // 2
+        while y < x:
+            x = y
+            y = (x + n // x) // 2
+        return x
+
     def __myxgcd(self, a, b, T):
         assert type(a) == int
         assert type(b) == int
         assert type(T) == int
         ainit = a
         binit = b
-        bound = math.floor(math.sqrt(b*T))
+        bound = self.__isqrt(b*T)
         x = 0
         lastx = 1
         y = 1

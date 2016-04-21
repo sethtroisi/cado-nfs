@@ -7,10 +7,6 @@
 #include "portability.h"
 #include "utils.h"
 
-#ifdef FOR_FFS
-#include "utils-ffs.h"
-#endif
-
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "input polynomial file");
@@ -69,11 +65,7 @@ main (int argc, char *argv[])
     }
 
     cado_poly_init(cpoly);
-#ifndef FOR_FFS
     if (!cado_poly_read (cpoly, polyfilename))
-#else
-    if (!ffs_poly_read (cpoly, polyfilename))
-#endif
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);

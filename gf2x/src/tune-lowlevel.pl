@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #  This file is part of the gf2x library.
 #
-#  Copyright 2007, 2008, 2009, 2010, 2012, 2013
+#  Copyright 2007, 2008, 2009, 2010, 2012, 2013, 2015, 2016
 #  Richard Brent, Pierrick Gaudry, Emmanuel Thome', Paul Zimmermann
 #
 #  This program is free software; you can redistribute it and/or modify it
@@ -109,13 +109,14 @@ for my $s (sort { $a <=> $b } keys %sizes) {
                 # We are building out of source, so we resort to putting an
                 # absolute path in the link target.
                 $xxlink_target_in_already_tuned_subdir="$e/../lowlevel/$cfile";
-                $cfile="$e/$cfile";
+                $cfile = "$e/../lowlevel/$cfile";
             } else {
                 die "Cannot find $cfile anywhere !"
             }
         }
         # my $prepared="ready_gf2x_mul$s.c";
         # mysys "sed -e s///g $selected > $prepared";
+        # print "diff ../$slot $cfile\n";
         my $rc=system "diff ../$slot $cfile > /dev/null";
         if ($rc == 0) {
             $msg .= " (previous)";

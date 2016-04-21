@@ -4,7 +4,6 @@
 # with the list of files known to the SCM.  A further word of caution:
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 README.nonlinear
-TODO_BEFORE_RELEASE_2.2
 Toolchain-MinGW64.cmake
 dev_docs/
 files.dist
@@ -12,7 +11,6 @@ files.nodist
 files.unknown
 linalg/bwc/bind_threads.sh
 linalg/bwc/bwc.sty
-linalg/bwc/convert_magma.pl
 filter/merge_mpi.c
 filter/merge_mpi.h
 scripts/polsel_effort
@@ -63,7 +61,6 @@ sieve/ecm/CMakeLists-nodist.txt
 sieve/ecm/ecm_avg_exp.gp
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
-sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
 utils/README_POLYNOMIALS
@@ -73,7 +70,6 @@ tests/utils/build-testcases-rootfinder.m
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
-filter/CMakeLists-nodist.txt
 filter/debug-tools.sh
 parameters/polynomials/rsa155.poly
 parameters/polynomials/rsa155.poly2
@@ -94,6 +90,15 @@ parameters/polynomials/c95.poly
 parameters/polynomials/c100.poly
 parameters/polynomials/c105.poly
 parameters/polynomials/c110.poly
+parameters/polynomials/c115.poly
+parameters/polynomials/c120.poly
+parameters/polynomials/c125.poly
+parameters/polynomials/c130.poly
+parameters/polynomials/c135.poly
+parameters/polynomials/c140.poly
+parameters/polynomials/c145.poly
+parameters/polynomials/c150.poly
+parameters/polynomials/c155.poly
 scripts/polsel_params.sage
 linalg/bwc/bcast-file.c
 misc/README
@@ -106,9 +111,14 @@ misc/psi.c
 misc/cacheline.c
 misc/CMakeLists-nodist.txt
 misc/descent-init.c
+misc/descent_init_Fp.c
+misc/smooth_detect.c
+misc/smooth_detect.h
+misc/filter_sieved_pairs.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
+filter/replay_dblemat.c
 ffs/archives/checker.mag
 ffs/archives/descent_809.mag
 ffs/archives/modprecomp.mag
@@ -131,7 +141,5 @@ sieve/strategies/script_str_r.sh
 sieve/strategies/CMakeLists-nodist.txt
 sieve/strategies/test_strategy_cado.c
 sieve/strategies/F9.sh
-sieve/freerel_multipoly.c
 linalg/bwc/lingen.txt
-sieve/CMakeLists-nodist.txt
 .mailmap

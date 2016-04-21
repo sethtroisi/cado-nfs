@@ -7,9 +7,6 @@
 #include "filter_config.h"
 
 #include "utils_with_io.h"
-#ifdef FOR_FFS
-#include "utils-ffs.h"
-#endif
 #define DEBUG 0
 
 stats_data_t stats; /* struct for printing progress */
@@ -195,7 +192,7 @@ read_data_free (read_data_ptr data)
 }
 
 /************************ Handling of the SMs *******************************/
-/* number of SM that must be used for side 1. Must be 0 for FFS */
+/* number of SM that must be used. */
 
 /* 
  * given S ==  data->sm_info[i], the range data->smlogs[i][0..S->nsm[
@@ -933,16 +930,14 @@ compute_log_from_rels (bit_vector needed_rels,
   if (nrels_needed != nrels)
     printf ("# Parsing only %" PRIu64 " needed relations out of %" PRIu64 "\n",
             nrels_needed, nrels);
-#if ! defined (FOR_FFS) && DEBUG >= 1
+#if DEBUG >= 1
   printf ("# DEBUG: Using %d thread(s) for thread_sm\n", nt);
 #endif
   fflush(stdout);
   char *fic[3] = {(char *) relspfilename, (char *) relsdfilename, NULL};
   struct filter_rels_description desc[3] = {
                    { .f = thread_insert, .arg=data, .n=1},
-#ifndef FOR_FFS
                    { .f = thread_sm,     .arg=data, .n=nt},
-#endif
                    { .f = NULL,          .arg=0,     .n=0}
       };
   filter_rels2 (fic, desc, EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_INDEX,
@@ -1118,9 +1113,7 @@ static void declare_usage(param_list pl)
                                      "-nrels parameter)");
   param_list_decl_usage(pl, "partial", "(switch) do not reconstruct everything "
                                        "that can be reconstructed");
-#ifndef FOR_FFS
   param_list_decl_usage(pl, "nsm", "number of SM's to add on side 0,1,...");
-#endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
@@ -1164,17 +1157,6 @@ main(int argc, char *argv[])
 
   param_list_configure_switch(pl, "partial", &partial);
   param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
-
-#ifndef FOR_FFS
-  int units0 = 0;
-  param_list_configure_switch(pl, "explicit_units0", &units0);
-  int units1 = 0;
-  param_list_configure_switch(pl, "explicit_units1", &units1);
-  if(units0 != 0 && units1 != 0){
-      fprintf (stderr, "units0 and units1 cannot be both set\n");
-      exit (EXIT_FAILURE);
-  }
-#endif
 
 #ifdef HAVE_MINGW
   _fmode = _O_BINARY;     /* Binary open for all files */
@@ -1280,17 +1262,12 @@ main(int argc, char *argv[])
   }
 
   cado_poly_init (poly);
-#ifndef FOR_FFS
   if (!cado_poly_read (poly, polyfilename))
-#else
-  if (!ffs_poly_read (poly, polyfilename))
-#endif
   {
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);
   }
 
-#ifndef FOR_FFS
   /* Read number of sm to be printed from command line */
   param_list_parse_int_list (pl, "nsm", nsm_arg, poly->nb_polys, ",");
   for(int side = 0; side < poly->nb_polys; side++)
@@ -1302,8 +1279,6 @@ main(int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
   }
-
-#endif
 
   if (param_list_warn_unused(pl))
   {
@@ -1318,7 +1293,6 @@ main(int argc, char *argv[])
   nsm_tot = 0;
   for (int side = 0; side < poly->nb_polys; side++)
   {
-#ifndef FOR_FFS
     sm_side_info_init(sm_info[side], poly->pols[side], ell);
     fprintf(stdout, "\n# Polynomial on side %d:\n# F[%d] = ", side, side);
     mpz_poly_fprintf(stdout, poly->pols[side]);
@@ -1339,9 +1313,6 @@ main(int argc, char *argv[])
       ASSERT_ALWAYS(sm_info[side]->unit_rank != 0);
     }
     nsm_tot += sm_info[side]->nsm;
-#else
-    sm_info[side]->nsm = 0;
-#endif
   }
   fflush(stdout);
 
@@ -1420,10 +1391,8 @@ main(int argc, char *argv[])
   logtab_clear (log);
   mpz_clear(ell);
 
-#ifndef FOR_FFS
   for (int side = 0 ; side < poly->nb_polys ; side++)
     sm_side_info_clear (sm_info[side]);
-#endif
 
   renumber_clear (renumber_table);
   bit_vector_clear(rels_to_process);

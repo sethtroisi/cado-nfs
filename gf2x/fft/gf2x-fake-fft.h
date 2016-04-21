@@ -91,8 +91,9 @@ static inline void gf2x_fake_fft_zero(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft
 {
     memset(x, 0, n * p->size * sizeof(unsigned long));
 }
-extern void gf2x_fake_fft_dft(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr x, unsigned long * F, size_t nF);
+extern void gf2x_fake_fft_dft(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr x, const unsigned long * F, size_t nF);
 extern void gf2x_fake_fft_compose(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr y, gf2x_fake_fft_srcptr x1, gf2x_fake_fft_srcptr x2);
+extern void gf2x_fake_fft_addcompose_n(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr y, gf2x_fake_fft_srcptr *x1, gf2x_fake_fft_srcptr *x2, size_t n);
 extern void gf2x_fake_fft_addcompose(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr y, gf2x_fake_fft_srcptr x1, gf2x_fake_fft_srcptr x2);
 extern void gf2x_fake_fft_add(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr y, gf2x_fake_fft_srcptr x1, gf2x_fake_fft_srcptr x2);
 extern void gf2x_fake_fft_cpy(gf2x_fake_fft_info_srcptr p, gf2x_fake_fft_ptr y, gf2x_fake_fft_srcptr x);

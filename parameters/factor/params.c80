@@ -21,7 +21,7 @@ tasks.polyselect.adrange = 5000
 tasks.polyselect.incr = 60
 tasks.polyselect.P = 10000
 tasks.polyselect.nq = 64
-tasks.polyselect.nrkeep = 30
+tasks.polyselect.nrkeep = 20
 tasks.polyselect.ropteffort = 2
 
 ###########################################################################
@@ -58,7 +58,6 @@ tasks.linalg.bwc.interval = 100
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.m = 64
 tasks.linalg.bwc.n = 64
-tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
 # Characters

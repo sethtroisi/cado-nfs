@@ -20,7 +20,9 @@
 
 typedef struct {
     uint32_t ind_row;
+#ifdef FOR_DL
     int32_t e;
+#endif
 } multirel_t;
 
 typedef struct {
@@ -36,7 +38,7 @@ typedef relset_t * index_data_t;
 extern void fprintRow(FILE *file, typerow_t *row);
 extern int hasCol(int32_t **rows, int i, int32_t j);
 
-extern int parse_hisfile_line (int32_t *ind, char *t, int32_t *j);
+extern int parse_hisfile_line (int32_t *ind, const char *t, int32_t *j);
 
 extern void addRowsUpdateIndex(typerow_t **rows, index_data_t index_data_t,
         int i1, int i2, int32_t j);

@@ -109,11 +109,14 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am_factor_OBJECTS = factor.$(OBJEXT) halfgcd.$(OBJEXT)
 factor_OBJECTS = $(am_factor_OBJECTS)
-factor_DEPENDENCIES = ../libgf2x.la
+factor_DEPENDENCIES = ../libgf2x.la $(NTL)/lib/libntl.a
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+factor_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(factor_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -428,6 +431,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
@@ -512,10 +516,14 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir) -T$(top_builddir)
+
+# put here the location of the NTL installation (for example /usr/local)
+NTL = 
+AM_CPPFLAGS = -I$(top_srcdir) -T$(top_builddir) -fopenmp -std=c++11 -I$(NTL)/include
 factor_SOURCES = factor.cpp halfgcd.cpp
 noinst_HEADERS = halfgcd.hpp
-factor_LDADD = ../libgf2x.la -lntl -lgmp
+factor_LDFLAGS = -fopenmp
+factor_LDADD = ../libgf2x.la $(NTL)/lib/libntl.a -lgmp
 LOG_COMPILER = $(SHELL) 2>/dev/null
 TESTS = check-factor-000.sh check-factor-001.sh	\
       check-factor-002.sh check-factor-003.sh
@@ -566,7 +574,7 @@ clean-checkPROGRAMS:
 
 factor$(EXEEXT): $(factor_OBJECTS) $(factor_DEPENDENCIES) $(EXTRA_factor_DEPENDENCIES) 
 	@rm -f factor$(EXEEXT)
-	$(AM_V_CXXLD)$(CXXLINK) $(factor_OBJECTS) $(factor_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(factor_LINK) $(factor_OBJECTS) $(factor_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)

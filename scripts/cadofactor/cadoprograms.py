@@ -338,7 +338,7 @@ class Program(object, metaclass=InspectType):
                  execsubdir=None, execbin=None, execsuffix=defaultsuffix,
                  runprefix=None):
         ''' Takes a dict of of command line options. Defaults are filled in
-        from the cadoaprams.Parameters instance parameters.
+        from the cadoparams.Parameters instance parameters.
 
         The stdin, stdout, and stderr parameters accept strings. If a string is
         given, it is interpreted as the file name to use for redirecting that
@@ -747,7 +747,7 @@ class FreeRel(Program):
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
                  lcideals: Toggle() = None,
-                 threads: Parameter("t")=None,
+                 threads: Parameter("t", checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -782,7 +782,6 @@ class Las(Program):
                  factorbase1: Parameter("fb1", is_input_file=True)=None,
                  out: Parameter(is_output_file=True)=None,
                  threads: Parameter("t", checktype=int)=None,
-                 ratq: Toggle()=None,
                  batch: Toggle()=None,
                  sqside: Parameter(checktype=int)=None,
                  dup: Toggle()=None,
@@ -995,11 +994,10 @@ class BWC(Program):
                  hosts: ParameterEq()=None,
                  hostfile: ParameterEq()=None,
                  interleaving: ParameterEq()=None,
-                 shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
                  mm_impl: ParameterEq()=None,
                  cpubinding: ParameterEq()=None,
-                 cantor_threshold: ParameterEq()=None,
+                 cantor_threshold: ParameterEq()=2048,
                  lingen_threshold: ParameterEq()=None,
                  precmd: ParameterEq()=None,
                  # put None below for a random seed,

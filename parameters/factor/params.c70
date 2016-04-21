@@ -21,7 +21,8 @@ tasks.polyselect.adrange = 22000
 tasks.polyselect.incr = 60
 tasks.polyselect.P = 1800
 tasks.polyselect.nq = 64
-tasks.polyselect.nrkeep = 40
+tasks.polyselect.nrkeep = 20
+tasks.polyselect.ropteffort = 2
 
 ###########################################################################
 # Sieve
@@ -57,7 +58,6 @@ tasks.linalg.bwc.interval = 100
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.m = 64
 tasks.linalg.bwc.n = 64
-tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
 # Characters

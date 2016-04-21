@@ -196,19 +196,19 @@ class Cado_NFS_toplevel(object):
             f=open("/proc/cpuinfo")
             lines=f.readlines()
             f.close()
-            nphysical=len([x for x in lines if re.match("physical", x)])
+            nphysical=len({x for x in lines if re.match("physical", x)})
             if nphysical == 0:
                 return len([x for x in lines if re.match("processor", x)])
-            cpu_cores={}
+            cpu_cores=set()
             for x in lines:
-                foo=re.match("cpu cores\s*=\s*(\d+)", x)
+                foo=re.match("cpu cores\s*:\s*(\d+)", x)
                 if foo:
                     cpu_cores.add(foo.group(1))
             if len(cpu_cores) == 0:
                 return len([x for x in lines if re.match("processor", x)])
             if len(cpu_cores) != 1:
                 raise ValueError("inhomogeneous platform ?")
-            return nphysical * len(cpu_cores)
+            return nphysical * int(cpu_cores.pop())
         def backquote(cmd):
             pipe = subprocess.Popen(cmd.split(" "), stdout=subprocess.PIPE)
             loc = locale.getdefaultlocale()[1]
@@ -361,7 +361,7 @@ class Cado_NFS_toplevel(object):
                 if re.match("tasks.threads=(.*)", x):
                     if self.args.server_threads:
                         raise ValueError("--server-threads conflicts with " +x)
-                elif re.match("tasks\.(sieve|polyselect)(\.\w+)*\.threads=(\.*)", x):
+                elif re.match("tasks\\.(sieve\\.sieving|polyselect)\\.threads=(.*)", x):
                     if self.args.client_threads:
                         raise ValueError("--client-threads conflicts with " + x)
                 equal_options.append(x)
@@ -590,7 +590,7 @@ class Cado_NFS_toplevel(object):
         ''' This function processes the --client-threads and
         --server-threads arguments, and sets the parameters
         tasks.threads, tasks.polyselect.threads, and
-        tasks.sieve.threads
+        tasks.sieve.sieving.threads
 
         >>> os.environ["NCPUS_FAKE"]="3"
         >>> t = Cado_NFS_toplevel(args=['12345', '-p', os.path.os.devnull, '--server-threads', 'all'])
@@ -603,6 +603,9 @@ class Cado_NFS_toplevel(object):
         3
 
         >>> t.parameters.get_simple("tasks.sieve.threads",0)
+        3
+
+        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
         2
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -618,7 +621,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         3
 
-        >>> t.parameters.get_simple("tasks.sieve.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
         1
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -633,7 +636,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         4
 
-        >>> t.parameters.get_simple("tasks.sieve.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
         2
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -648,7 +651,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         1
 
-        >>> t.parameters.get_simple("tasks.sieve.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
         1
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -664,11 +667,36 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         3
 
-        >>> t.parameters.get_simple("tasks.sieve.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
         2
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
         2
+
+        >>> t = Cado_NFS_toplevel(args=['12345', '-p', os.path.os.devnull])
+        >>> t.filter_out_N_paramfile_workdir()
+        >>> t.parameters = cadoparams.Parameters()
+        >>> t.set_N_paramfile_workdir()
+        >>> t.parameters.readparams(t.args.options)
+        >>> t.set_threads_and_client_threads()
+        >>> t.parameters.get_simple("tasks.sqrt.sqrt.threads",0)
+        3
+
+        >>> t.parameters.locate("tasks.sqrt.sqrt.threads")
+        'tasks.threads'
+
+        >>> os.environ["NCPUS_FAKE"]="16"
+        >>> t = Cado_NFS_toplevel(args=['12345', '-p', os.path.os.devnull])
+        >>> t.filter_out_N_paramfile_workdir()
+        >>> t.parameters = cadoparams.Parameters()
+        >>> t.set_N_paramfile_workdir()
+        >>> t.parameters.readparams(t.args.options)
+        >>> t.set_threads_and_client_threads()
+        >>> t.parameters.get_simple("tasks.sqrt.sqrt.threads",0)
+        8
+
+        >>> t.parameters.locate("tasks.sqrt.sqrt.threads")
+        'tasks.sqrt.sqrt.threads'
 
         >>> del os.environ["NCPUS_FAKE"]
 
@@ -685,35 +713,52 @@ class Cado_NFS_toplevel(object):
             t=int(self.args.server_threads)
             self.parameters.set_simple("tasks.threads", t)
         # We want to enforce a value for tasks.polyselect.threads and
-        # tasks.sieve.threads. If there is none safe by the side-effect
-        # of having set tasks.threads, we want to set our default.
+        # tasks.sieve.sieving.threads.
         if self.args.client_threads:
             c=self.args.client_threads
             self.parameters.set_simple("tasks.polyselect.threads", c)
-            self.parameters.set_simple("tasks.sieve.threads", c)
+            self.parameters.set_simple("tasks.sieve.sieving.threads", c)
         else:
+            # If there is no value set except by the side-effect
+            # of having set tasks.threads or tasks.sieve.threads,
+            # we want to set our default.
             t=self.parameters.get_simple("tasks.threads", 0)
-            for p in ["tasks.polyselect.threads", "tasks.sieve.threads"]:
-                if self.parameters.locate(p) == "tasks.threads":
-                    self.parameters.set_simple(p, min(t, 2))
-        for p in ["tasks.polyselect.threads", "tasks.sieve.threads"]:
+            p="tasks.polyselect.threads"
+            loc = self.parameters.locate(p)
+            if loc == "tasks.threads":
+                self.parameters.set_simple(p, min(t, 2))
+            p="tasks.sieve.sieving.threads"
+            loc = self.parameters.locate(p)
+            if loc == "tasks.threads" or loc == "tasks.sieve.threads":
+                self.parameters.set_simple(p, min(t, 2))
+        for p in ["tasks.polyselect.threads", "tasks.sieve.sieving.threads"]:
             self.logger.info("%s = %s" % (p, self.parameters.get_simple(p)))
             assert self.parameters.locate(p) == p
-
+        # last thing. For sqrt, more than 8 threads is slightly overkill.
+        # So unless explicitly stated otherwise, we set it to min(8,
+        # server.threads).
+        # Note: for a c180, 8 threads is still too large for 64Gb (we need
+        # about 16Gb per thread).
+        p="tasks.sqrt.sqrt.threads"
+        t=self.parameters.get_simple(p, 0)
+        if t > 8 and self.parameters.locate(p) == "tasks.threads":
+            self.parameters.set_simple(p, 8)
 
     def set_slaves_parameters(self):
         ''' sets slaves.nrclients and slaves.scriptpath to default values
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.hostnames=foo,bar', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
+        >>> t.setpath("data", "/tmp")
         >>> p = t.get_cooked_parameters()
         >>> p.get_simple("slaves.nrclients", 0)
-        1
+        0
 
         If we are run with a non-default parameter file, then we end up
         running in pure server mode.
         >>> os.environ["NCPUS_FAKE"]="4"
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
+        >>> t.setpath("data", "/tmp")
         >>> p = t.get_cooked_parameters()
         >>> p.get_simple("slaves.nrclients", 0)
         0
@@ -721,6 +766,7 @@ class Cado_NFS_toplevel(object):
         >>> os.environ["NCPUS_FAKE"]="4"
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
+        >>> t.setpath("data", "/tmp")
 
         We are cheating. In order to see what happens in the old
         "factor.sh"-like way, see what happens if we read the old
@@ -742,17 +788,14 @@ class Cado_NFS_toplevel(object):
         if self.args.slaves:
             # We've been asked to override the value, so let's just do it.
             self.parameters.set_simple("slaves.nrclients", self.args.slaves)
-        if self.parameters.myparams(["hostnames"], "slaves"):
-            # default nrclients is 1 if we specify explicit list of slaves.
-            self.parameters.set_if_unset("slaves.nrclients", 1)
-        elif self.using_default_parameter_file:
+        if self.using_default_parameter_file:
             self.parameters.set_if_unset("slaves.hostnames", "localhost")
             # running on localhost, default nrclients to just as many as
             # needed to use the number of threads which have been asked
             # for.
             t = self.parameters.get_simple("tasks.threads", 0)
             tp = self.parameters.get_simple("tasks.polyselect.threads", 0)
-            ts = self.parameters.get_simple("tasks.sieve.threads", 0)
+            ts = self.parameters.get_simple("tasks.sieve.sieving.threads", 0)
             if t:
                 ct = max(tp,ts)
                 nrclients=int((t+ct-1)//ct)
@@ -763,8 +806,11 @@ class Cado_NFS_toplevel(object):
                 os.path.join(self.parameters.get_simple("tasks.workdir", ""),
                     "client"))
 
-        # What is a sensible default value for scriptpath?
-        if self.parameters.get_simple("slaves.nrclients", 0):
+        # Deal with scriptpath if hostnames is set and nrclients is either set
+        # to an nonzero value or unset.
+        if self.parameters.get_simple("slaves.hostnames", None) and \
+           self.parameters.get_simple("slaves.nrclients", None) != 0:
+            # What is a sensible default value for scriptpath?
             if not self.parameters.get_simple("slaves.scriptpath", ""):
                 # see whether cado-nfs-client.py exists.
                 # try in the source tree. If we have the source tree defined,
@@ -819,7 +865,7 @@ class Cado_NFS_toplevel(object):
                 " --client-threads may also be passed, leading to"
                 " finer grain setting. When used to run the factorization"
                 " locally, set slaves.nrclient = tasks.threads /"
-                " max(task.sieve.threads, tasks.polyselect.threads)")
+                " max(task.sieve.sieving.threads, tasks.polyselect.threads)")
         parser.add_argument("--slaves", "-s",
                 type=int,
                 help="Aliases (and conflicts with) slaves.nrclients")
@@ -885,18 +931,19 @@ class Cado_NFS_toplevel(object):
         >>> os.environ["NCPUS_FAKE"]="4"
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.hostnames=foo,bar', 'tasks.workdir=/tmp/a', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
+        >>> t.setpath("data", "/tmp")
         >>> p = t.get_cooked_parameters()
-        >>> print(re.sub('\\\\\\\\', '/', str(p)))
+        >>> print(re.sub('(C:)?\\\\\\\\', '/', str(p)))
         N = 12345
         slaves.basepath = /tmp/a/client
         slaves.hostnames = foo,bar
-        slaves.nrclients = 1
         slaves.scriptpath = /tmp
         tasks.execpath = /tmp
         tasks.threads = 4
         tasks.workdir = /tmp/a
+        tasks.linalg.bwc.cpubinding = /tmp/misc/cpubinding.conf
         tasks.polyselect.threads = 2
-        tasks.sieve.threads = 2
+        tasks.sieve.sieving.threads = 2
 
         >>> del os.environ["NCPUS_FAKE"]
         '''
@@ -923,6 +970,11 @@ class Cado_NFS_toplevel(object):
                 if hintfile == "":
                     hintfile = self.find_default_hint_file()
                 self.parameters.set_simple("descent_hint", hintfile)
+        # set cpubinding file if necessary
+        self.parameters.set_if_unset("tasks.linalg.bwc.cpubinding",
+                os.path.abspath(
+                    os.path.join(self.pathdict["data"],
+                        "misc", "cpubinding.conf")))
         return self.parameters
 
     def setpath(self, key, value):

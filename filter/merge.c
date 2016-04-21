@@ -63,7 +63,7 @@ static void declare_usage(param_list pl)
                                               "used for merges");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
-  verbose_decl_usage(pl);
+  param_list_decl_usage(pl, "v", "verbose level");
 }
 
 static void
@@ -97,11 +97,13 @@ main (int argc, char *argv[])
     double tt;
     double wct0 = wct_seconds ();
     param_list pl;
+    int verbose = 0;
     param_list_init (pl);
     declare_usage(pl);
     argv++,argc--;
 
     param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
+    param_list_configure_switch(pl, "v", &verbose);
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -116,7 +118,7 @@ main (int argc, char *argv[])
       usage (pl, argv0);
     }
     /* print command-line arguments */
-    verbose_interpret_parameters(pl);
+    verbose_interpret_parameters (pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 
@@ -195,6 +197,7 @@ main (int argc, char *argv[])
       matR_disable_cols (mat, forbidden_cols);
     }
 
+    mat->verbose = verbose;
     mat->wmstmax = wmstmax;
     mat->mkztype = mkztype;
     tt = seconds();
@@ -217,7 +220,7 @@ main (int argc, char *argv[])
 
     printf ("Total merge time: %.2f seconds\n", seconds ());
 
-    print_timing_and_memory (wct0);
+    print_timing_and_memory (stdout, wct0);
 
     return 0;
 }

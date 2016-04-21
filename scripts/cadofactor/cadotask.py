@@ -746,7 +746,7 @@ class HasState(MakesTablenames, wudb.HasDbConnection):
     """ Declares that the class has a DB-backed dictionary in which the class
     can store state information.
     
-    The dicatonary is available as an instance attribute "state".
+    The dictionary is available as an instance attribute "state".
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -2013,6 +2013,8 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def submit_one_wu(self):
         adstart = self.state["adnext"]
         adend = adstart + self.params["adrange"]
+        adend = adend - (adend % self.params["adrange"])
+        assert adend > adstart
         adend = min(adend, self.params["admax"])
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
@@ -2392,7 +2394,7 @@ class FactorBaseTask(Task):
             assert "poly" in self.state
             assert "alim" in self.state
             # The target file must correspond to the polynomial "poly"
-        self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
+        self.progparams[0].setdefault("maxbits", self.params["I"])
     
     def run(self):
         super().run()
@@ -2721,6 +2723,8 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
+            q1 = q1 - (q1 % self.params["qrange"])
+            assert q1 > q0
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = \
@@ -2756,7 +2760,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         if self.handle_error_result(message):
             return True
         output_files = message.get_output_files()
-        assert len(output_files) == 1
+        if len(output_files) != 1:
+            self.logger.warn("Received output with %d files: %s" % (len(output_files), ", ".join(output_files)))
+            return False
         stderrfilename = message.get_stderrfile(0)
         ok = self.add_file(output_files[0], stderrfilename, commit=False)
         self.verification(message.get_wu_id(), ok, commit=True)
@@ -2920,7 +2926,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"End of read: \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
         ),
     )
     @property
@@ -3049,7 +3055,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 self.state.update({"run_counter": run_counter + 1},
                                   commit=False)
                 current_counts = self.parse_slice_counts(stderr)
-                self.parse_stats(stderrpath, commit=False)
+                self.parse_stats(stdoutpath, commit=False)
                 # Add relation count from the newly processed files to the
                 # relations-per-slice dict
                 update1 = {str(idx): self.slice_relcounts[str(idx)] + 
@@ -3136,7 +3142,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"End of read: \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
         ),
     )
     @property
@@ -3203,10 +3209,9 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             for f in files:
                 self.already_done_input[f] = True
             outfilenames = {f:i for f in files}
-            self.add_output_files(outfilenames, commit=True)
-            # Disabled for now, there are multiple lines of the same format
-            # which we can't parse atm.
-            # self.parse_stats(stderrpath)
+            self.add_output_files(outfilenames, commit=False)
+            # XXX How do we add the timings ?
+            # self.parse_stats(stdoutpath, commit=True)
             self.logger.info("%d unique relations remain on slice %d",
                              nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
@@ -3284,7 +3289,7 @@ class PurgeTask(Task):
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.01,
-             "required_excess": 0.1})
+             "required_excess": 0.0})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3296,7 +3301,7 @@ class PurgeTask(Task):
     def run(self):
         super().run()
 
-        if not (self.params["galois"] in ["1/y", "_y"]):
+        if not (self.params["galois"] in ["1/y", "_y", "autom3.1g", "autom3.2g"]):
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             if not nunique:
@@ -3377,7 +3382,7 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stderr(stdout, input_nrels):
+        if self.parse_output(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
@@ -3427,19 +3432,19 @@ class PurgeTask(Task):
     def get_relsdel_filename(self):
         return self.get_state_filename("relsdelfile")
     
-    def parse_stderr(self, stderr, input_nrels):
-        # If stderr ends with
-        # b'excess < 0.10 * #primes. See -required_excess argument.'
+    def parse_output(self, stdout, input_nrels):
+        # If stdout ends with
+        # (excess / ncols) = ... < .... See -required_excess argument.'
         # then we need more relations from filtering and return False
         input_nprimes = None
         have_enough = True
         # not_enough1 = re.compile(r"excess < (\d+.\d+) \* #primes")
         not_enough1 = re.compile(r"\(excess / ncols\) = \d+.?\d* < \d+.?\d*. "
                                  r"See -required_excess argument.")
-        not_enough2 = re.compile(r"number of rows <= number of columns")
+        not_enough2 = re.compile(r"number of rows < number of columns \+ keep")
         nrels_nprimes = re.compile(r"\s*nrows=(\d+), ncols=(\d+); "
                                    r"excess=(-?\d+)")
-        for line in stderr.splitlines():
+        for line in stdout.splitlines():
             match = not_enough1.match(line)
             if match:
                 have_enough = False
@@ -3550,7 +3555,7 @@ class FilterGaloisTask(Task):
 
     def run(self):
         # This task must be run only if galois is recognized by filter_galois
-        if not (self.params["galois"] in ["1/y", "_y"]):
+        if not (self.params["galois"] in ["1/y", "_y", "autom3.1g", "autom3.2g"]):
             return True
 
         super().run()
@@ -4027,47 +4032,108 @@ class LinAlgTask(Task, HasStatistics):
     def stat_conversions(self):
         return (
         (
-            "krylov_time",
+            "krylov_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done, N=\d+ ; CPU:", 1))
+            re.compile(re_cap_n_fp(r"Timings for krylov: .wct.", 1))
+        ),
+        (
+            "krylov_cpu",
+            (int, float),
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU:", 1))
+        ),
+        (
+            "krylov_cpu_wait",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait:", 1))
         ),
         (
             "krylov_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done, N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM:", 1))
         ),
         (
-            "lingen_time",
+            "krylov_comm_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("Total computation took", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait:", 1))
         ),
         (
-            "mksol_time",
+            "lingen_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done, N=\d+ ; CPU:", 1))
+            re.compile(re_cap_n_fp("Timings for lingen: .wct.", 1))
+        ),
+        (
+            "lingen_cpu",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for lingen: .cpu.", 1))
+        ),
+        (
+            "mksol_wct",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"Timings for mksol: .wct.", 1))
+        ),
+        (
+            "mksol_cpu",
+            (int, float),
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU:", 1))
+        ),
+        (
+            "mksol_cpu_wait",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait:", 1))
         ),
         (
             "mksol_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done, N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM:", 1))
+        ),
+        (
+            "mksol_comm_wait",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait:", 1))
         ),
     )
     @property
     def stat_formats(self):
         return (
-            ["Krylov: CPU time {krylov_time[0]}", ", COMM time {krylov_comm[0]}"],
-            ["Lingen CPU time {lingen_time[0]}"],
-            ["Mksol: CPU time {mksol_time[0]}", ", COMM time {mksol_comm[0]}"],
+            ["Krylov: WCT time {krylov_wct[0]}",
+                ", iteration CPU time {krylov_cpu[1]:g}",
+                ", COMM {krylov_comm[0]}",
+                ", cpu-wait {krylov_cpu_wait[0]}",
+                ", comm-wait {krylov_comm_wait[0]}",
+                " ({krylov_cpu[0]:d} iterations)"
+                ],
+            ["Lingen CPU time {lingen_cpu[0]}", ", WCT time {lingen_wct[0]}"],
+            ["Mksol: WCT time {mksol_wct[0]}",
+                ", iteration CPU time {mksol_cpu[1]:g}",
+                ", COMM {mksol_comm[0]}",
+                ", cpu-wait {mksol_cpu_wait[0]}",
+                ", comm-wait {mksol_comm_wait[0]}",
+                " ({mksol_cpu[0]:d} iterations)"
+                ],
         )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -4118,6 +4184,7 @@ class LinAlgTask(Task, HasStatistics):
             dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
+            self.logger.debug("Parsing stats from %s" % stdoutpath)
             self.parse_stats(stdoutpath, commit=False)
             output_version = self.state.get("output_version", 0) + 1
             update = {"dependency": dependencyfilename.get_wdir_relative(),
@@ -4575,7 +4642,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def paramnames(self):
         return {"name": str, "workdir": None, "address": None, "port": 0,
                 "threaded": False, "ssl": True, "whitelist": None,
-                "only_registered": True, "forgetport": False}
+                "only_registered": True, "forgetport": False,
+                "timeout_hint": None}
     @property
     def param_nodename(self):
         return self.name
@@ -4602,6 +4670,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
             cafilename = basedir + self.params["name"] + ".server.cert"
         else:
             cafilename = None
+
+        servertimeout_hint = self.params.get("timeout_hint")
 
         server_whitelist = []
         if not whitelist is None:
@@ -4646,7 +4716,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         self.server = wuserver.ServerLauncher(serveraddress, serverport,
             threaded, self.get_db_filename(), self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
-            whitelist=server_whitelist)
+            whitelist=server_whitelist,
+            timeout_hint=servertimeout_hint)
         self.state["port"] = self.server.get_port()
 
     def run(self):
@@ -4658,8 +4729,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def stop_serving_wus(self):
         self.server.stop_serving_wus()
 
-    def get_url(self):
-        return self.server.get_url()
+    def get_url(self, **kwargs):
+        return self.server.get_url(**kwargs)
 
     def get_cert_sha1(self):
         return self.server.get_cert_sha1()
@@ -4780,9 +4851,17 @@ class StartClientsTask(Task):
         self.pids.clear([clientid], commit=False)
         self.hosts.clear([clientid], commit=True)
     
-    def launch_clients(self, server, certsha1=None):
+    def launch_clients(self, servertask):
+        """ This now takes server as a servertask object, so that we can
+        get an URL which is special-cased for localhost """
+        url = servertask.get_url()
+        url_loc = servertask.get_url(origin="localhost")
+        certsha1 = servertask.get_cert_sha1()
         for host in self.hosts_to_launch:
-            self.launch_one_client(host.strip(), server, certsha1=certsha1)
+            if host == "localhost":
+                self.launch_one_client(host.strip(), url_loc, certsha1=certsha1)
+            else:
+                self.launch_one_client(host.strip(), url, certsha1=certsha1)
         running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in
             self.pids.items()]
         s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
@@ -5254,10 +5333,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         return self.state["dbfilename"]
 
     def start_all_clients(self):
-        url = self.servertask.get_url()
-        certsha1 = self.servertask.get_cert_sha1()
         for clients in self.clients:
-            clients.launch_clients(url, certsha1)
+            clients.launch_clients(self.servertask)
     
     def stop_all_clients(self):
         for clients in self.clients:

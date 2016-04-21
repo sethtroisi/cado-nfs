@@ -204,6 +204,7 @@ extern pi_datatype_ptr BWC_PI_DOUBLE;
 extern pi_datatype_ptr BWC_PI_BYTE;
 extern pi_datatype_ptr BWC_PI_UNSIGNED;
 extern pi_datatype_ptr BWC_PI_UNSIGNED_LONG;
+extern pi_datatype_ptr BWC_PI_UNSIGNED_LONG_LONG;
 extern pi_datatype_ptr BWC_PI_LONG;
 
 
@@ -240,7 +241,6 @@ struct pi_file_handle_s {
     parallelizing_info_ptr pi;
     int inner;
     int outer;
-    size_t totalsize;
 };
 typedef struct pi_file_handle_s pi_file_handle[1];
 typedef struct pi_file_handle_s * pi_file_handle_ptr;
@@ -273,10 +273,12 @@ extern void pi_go(
 extern void pi_hello(parallelizing_info_ptr pi);
 
 /* I/O functions */
-extern int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode, size_t totalsize);
+extern int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode);
 extern void pi_file_close(pi_file_handle_ptr f);
-extern ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size);
-extern ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size);
+/* totalsize is the size which should be on disk. It may be shorter than
+ * the sum of the individual sizes, in case of padding */
+extern ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize);
+extern ssize_t pi_file_read(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize);
 
 /* the parallelizing_info layer has some collective operations which
  * deliberately have prototypes simlar or identical to their mpi

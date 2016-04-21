@@ -88,11 +88,7 @@ main (int argc, char *argv[])
   if (inverse)
   {
     cado_poly_init(poly);
-#ifndef FOR_FFS
     if (!cado_poly_read (poly, polyfilename))
-#else
-    if (!ffs_poly_read (poly, polyfilename))
-#endif
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);

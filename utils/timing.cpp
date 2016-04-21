@@ -103,9 +103,9 @@ wct_seconds (void)
 }
 
 void
-print_timing_and_memory (double wct0)
+print_timing_and_memory (FILE*fp, double wct0)
 {
-  fprintf (stderr, "Total usage: time %1.0fs (cpu), %1.0fs (wct) ; "
+  fprintf (fp, "Total usage: time %1.0fs (cpu), %1.0fs (wct) ; "
            "memory %luM, peak %luM\n",
            seconds (), wct_seconds () - wct0,
            Memusage () >> 10, PeakMemusage () >> 10);

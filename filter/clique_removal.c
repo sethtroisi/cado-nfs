@@ -322,7 +322,7 @@ compute_one_connected_component (comp_t *clique, purge_matrix_srcptr mat,
 }
 
 
-/* Delete the connected component containing the of row "current_row"
+/* Delete the connected component containing the row "current_row"
  *
  * WARNING: this code itself is multithread compatible (if each thread has its
  * own row_buffer), but it calls purge_matrix_delete_row, which is NOT
@@ -419,7 +419,7 @@ typedef struct comp_mt_thread_data_s {
  * connected component (has to be of the form: BV_BITS << x)*/
 #define COMP_MT_ROWS_BLOCK (BV_BITS<<4)
 
-/* This multithread function fill the tree data->comp_tree with the
+/* This multithread function fills the tree data->comp_tree with the
  * data->comp_tree->alloc heaviest connected components whose smallest row
  * belongs in
  *   [ data->begin_first_block + j * jump_to_next_block,
@@ -516,7 +516,7 @@ clique_removal_core_mt (purge_matrix_ptr mat, int64_t target_excess,
     purge_matrix_print_stats_on_cliques (stdout, mat, verbose);
 
   /* At this point, in each pth[i].comp_tree we have pth[i].comp_tree->size
-     connected components order by decreasing weight. */
+     connected components ordered by decreasing weight. */
   size_t *next_clique = NULL;
   uint64_buffer_t buf;
   next_clique = (size_t *) malloc (nthreads * sizeof (next_clique));

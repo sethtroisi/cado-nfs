@@ -25,12 +25,12 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
-set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced threaded
+set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
-set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 pz
+set(BWC_GFP_ARITHMETIC_BACKENDS p_1 p_2 p_3 p_4 p_5 p_6 p_7 p_8 p_9 p_10 p_11 p_12 p_13 p_14 p_15 pz
     CACHE STRING
-    "which GF(p) backends to compile for DLOG mode")
+    "which GF(p) backends to compile for DLOG mode (pz excluded)")
 set(BWC_GFP_MATMUL_BACKENDS basicp
     CACHE STRING
     "which low-level matrix multiplication backends to use for GF(2) linear algebra")
@@ -59,6 +59,27 @@ endif()
 
 ### end bwc-specific configuration.
 
+
+# These are just shorthands. Some targets also like to define compile and
+# link flags for their own, so it's really messy, because I don't know
+# how to have cmake *append* to the target's link flags.
+
+# Note that whenever a target (at least very certainly an executable)
+# links an mpi compiled library, it must be marked as mpi as well.
+
+macro(mark_mpi_target target)
+    set_target_properties(${target} PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+endmacro()
+macro(mpi_add_library target)
+    add_library(${target} ${ARGN})
+    mark_mpi_target(${target})
+endmacro()
+macro(mpi_add_executable target)
+    add_executable(${target} ${ARGN})
+    mark_mpi_target(${target})
+endmacro()
 
 ### bwc_base
 
@@ -95,7 +116,7 @@ set(bwc_base_sources
     )
 endif()
 
-add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
+mpi_add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
 target_link_libraries(bwc_base ${gmp_libname})
 
@@ -108,28 +129,23 @@ target_link_libraries(bwc_base hwloc)
 endif()
 
 
-set_target_properties(bwc_base PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
-
 if(ENABLE_SHARED)
     install(TARGETS bwc_base DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()
 
 ### end bwc_base
 
-
-add_library(mf ${CADO_SHARED} mf.c)
+mpi_add_library(mf ${CADO_SHARED} mf.c)
 target_link_libraries(mf bwc_base utils)
 if(ENABLE_SHARED)
     install(TARGETS mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()
-add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
+mpi_add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
 target_link_libraries(mf_scan mf)
 
 
 include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
-add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
+mpi_add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
 target_link_libraries(mf_bal mf m)
 install(TARGETS mf_bal RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
 
@@ -138,8 +154,6 @@ configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
 add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
 set_property(TARGET random_matrix PROPERTY COMPILE_DEFINITIONS WANT_MAIN)
-
-
 target_link_libraries(random_matrix utils m)
 
 ### bwc_mpfq
@@ -199,22 +213,22 @@ ENDIF()
 # shared, as embarking the code within the impl-specific .so is fine.
 # Unfortunately, we do want matmul_common to be compiled with -fPIC,
 # then. Which is easiest to trigger by making it a shared object.
-add_library(matmul_common ${CADO_SHARED} matmul-common.c)
-set_target_properties(matmul_common PROPERTIES
-    COMPILE_FLAGS "--mpi"
-    LINK_FLAGS "--mpi")
+mpi_add_library(matmul_common ${CADO_SHARED} matmul-common.c)
 if(ENABLE_SHARED)
     install(TARGETS matmul_common DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()
 
 
 set(matmul_basic_sources    matmul-basic.c)
-set(matmul_basicp_sources   matmul-basicp.c)
+set(matmul_basicp_sources   matmul-basicp.cpp)
 set(matmul_sliced_sources   matmul-sliced.cpp)
 set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
 
 macro(CONFIGURE_MATMUL_LIB v i)
+    if(v STREQUAL "pz")
+        # message(STATUS "Information: pz matmul backends are now disabled")
+    else()
     set(COOKED_BWC_BACKENDS ${COOKED_BWC_BACKENDS} "DO(${v}, ${i})")
     string(COMPARE EQUAL "${v}" "u64k1" doing_u64)
     string(COMPARE EQUAL "${i}" "bucket" doing_bucket)
@@ -238,14 +252,15 @@ macro(CONFIGURE_MATMUL_LIB v i)
         endif()
     endif()
 
-    add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
-    target_link_libraries(matmul_${v}_${i} matmul_common bwc_mpfq)
-    set_target_properties(matmul_${v}_${i} PROPERTIES
-        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v} -DMM_IMPL=${i} -DMM_MPFQ_LAYER=${v}"
-            LINK_FLAGS "--mpi")
-    set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
-    if(ENABLE_SHARED)
-        install(TARGETS matmul_${v}_${i} DESTINATION ${LIBSUFFIX}/linalg/bwc)
+        add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
+        target_link_libraries(matmul_${v}_${i} matmul_common bwc_mpfq)
+        set_target_properties(matmul_${v}_${i} PROPERTIES
+            COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v} -DMM_IMPL=${i} -DMM_MPFQ_LAYER=${v}"
+                LINK_FLAGS "--mpi")
+        set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
+        if(ENABLE_SHARED)
+            install(TARGETS matmul_${v}_${i} DESTINATION ${LIBSUFFIX}/linalg/bwc)
+        endif()
     endif()
 endmacro()
 
@@ -276,6 +291,9 @@ foreach(vw ${BWC_EXTRA_BACKENDS})
     CONFIGURE_MATMUL_LIB(${v} ${w})
 endforeach(vw ${BWC_EXTRA_BACKENDS})
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bwc_config.h)
+    message(FATAL_ERROR "Please remove the file ${CMAKE_CURRENT_SOURCE_DIR}/bwc_config.h before proceeding")
+endif()
 configure_file(bwc_config_h.in bwc_config.h ESCAPE_QUOTES @ONLY)
 
 
@@ -292,10 +310,7 @@ target_link_libraries(bwc_base ${all_matmul_libs})
 endif()
 
 ### matmul_mf
-add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
-    set_target_properties(matmul_mf PROPERTIES
-            COMPILE_FLAGS "--mpi"
-            LINK_FLAGS "--mpi")
+mpi_add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
 target_link_libraries(matmul_mf mf)
 if(ENABLE_SHARED)
     install(TARGETS matmul_mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
@@ -303,11 +318,9 @@ endif()
 ### end matmul_mf
 
 macro(bwc_program_base v)
-    add_executable(${v} ${ARGN})
+    mpi_add_executable(${v} ${ARGN})
     set_target_properties(${v} PROPERTIES
-            LINKER_LANGUAGE CXX
-            COMPILE_FLAGS "--mpi"
-            LINK_FLAGS "--mpi")
+            LINKER_LANGUAGE CXX)
         # -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${v} bwc_base)
 endmacro()
@@ -332,6 +345,8 @@ bwc_program(dispatch dispatch.c xdotprod.c)
 bwc_program(mksol mksol.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
+bwc_program(blocklanczos blocklanczos.c)
+target_link_libraries(blocklanczos bitlinalg)
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION
     ${LIBSUFFIX}/linalg/bwc)
@@ -345,8 +360,13 @@ include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft/mpfq)
 add_executable(lingen lingen_binary.cpp tree_stats.c logline.c
     lingen_qcode.c lingen_qcode_do.cpp)
 # This **MUST** match the #define in gf2x/Makefile.am
+set_source_files_properties(lingen_qcode_do.cpp COMPILE_FLAGS
+    "-DCANTOR_BASE_FIELD_SIZE=128")
 set_source_files_properties(lingen_binary.cpp COMPILE_FLAGS
     "-DCANTOR_BASE_FIELD_SIZE=128")
+# for debug only
+# set_source_files_properties(lingen_binary.cpp COMPILE_FLAGS
+# "-DCANTOR_BASE_FIELD_SIZE=128 -DLINGEN_BINARY_TRACE_MALLOCS=20")
 install(TARGETS lingen RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
 target_link_libraries(lingen bwc_base utils gf2x)
 add_dependencies(lingen gf2x-build)
@@ -409,7 +429,6 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         )
 endforeach(v)
 
-
 add_custom_target(bwc_matmul)
 add_dependencies(bwc_matmul ${all_matmul_libs})
 
@@ -419,9 +438,6 @@ add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     bwc_matmul)
 
 # Those are used only for tests.
-add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
-target_link_libraries(short_matmul bwc_base)
-bwc_program_extra(spmv_test spmv_test.c)
 bwc_program_extra(build_matcache build_matcache.c)
 target_link_libraries(build_matcache matmul_mf)
 bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)

@@ -67,7 +67,9 @@ void mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b);
 
 void mpz_poly_setcoeff(mpz_poly_ptr f, int i, mpz_srcptr z);
 void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, long z);
+void mpz_poly_setcoeff_ui(mpz_poly_ptr f, int i, unsigned long z);
 void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z);
+void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 
 /* Print functions */
@@ -144,7 +146,8 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m,
 mpz_poly_t* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
 void mpz_poly_base_modp_clear (mpz_poly_t *P, int l);
 void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_srcptr pk);
-size_t mpz_poly_sizeinbase (mpz_poly_ptr f, int d, int base);
+size_t mpz_poly_sizeinbase (mpz_poly_srcptr f, int base);
+size_t mpz_poly_totalsize (mpz_poly_srcptr f);
 void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
 // compute f = GCD(f,g) mod N. If this fails, put the factor in the last
 // given argument.

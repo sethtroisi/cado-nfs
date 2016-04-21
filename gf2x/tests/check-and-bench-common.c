@@ -92,15 +92,16 @@ long ENGINE_mul(unsigned long ** H, unsigned long ** F, size_t Fl, unsigned long
     t=cputime(); time_conv -= t;
     for(int i = 0 ; i < n ; i++)
         for(int j = 0 ; j < n ; j++) {
-            ENGINE_compose(order,
-                    ENGINE_get(order, h, i*n+j),
-                    ENGINE_get_const(order, (ENGINE_srcptr) f, i*n/*+k*/),
-                    ENGINE_get_const(order, (ENGINE_srcptr) g, /*k*n+*/j));
-            for(int k = 1 ; k < n ; k++)
-                ENGINE_addcompose(order,
-                        ENGINE_get(order, h, i*n+j),
-                        ENGINE_get_const(order, (ENGINE_srcptr) f, i*n+k),
-                        ENGINE_get_const(order, (ENGINE_srcptr) g, k*n+j));
+            ENGINE_srcptr * ff = malloc(n * sizeof(ENGINE_srcptr));
+            ENGINE_srcptr * gg = malloc(n * sizeof(ENGINE_srcptr));
+            for(int k = 0 ; k < n ; k++) {
+                ff[k] = ENGINE_get_const(order, (ENGINE_srcptr) f, i*n+k);
+                gg[k] = ENGINE_get_const(order, (ENGINE_srcptr) g, k*n+j);
+            }
+            ENGINE_zero(order, ENGINE_get(order, h, i*n+j), 1);
+            ENGINE_addcompose_n(order, ENGINE_get(order, h, i*n+j), ff, gg, n);
+            free(ff);
+            free(gg);
         }
     t=cputime(); time_conv += t;
 

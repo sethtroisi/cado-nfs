@@ -311,54 +311,16 @@ if sys.version_info[0] == 2:
 
 
 def create_daemon(workdir=None, umask=None, keepfd=None):
-    """Disk And Execution MONitor (Daemon)
+    """Run a sub-process, detach it from the control tty.
 
-    Configurable daemon behaviors:
+    This is a simplified version of the code found there.
 
-       1.) The current working directory set to the "/" directory.
-       2.) The current file creation mode mask set to 0.
-       3.) Close all open files (1024). 
-       4.) Redirect standard I/O streams to "/dev/null".
-
-    A failed call to fork() now raises an exception.
-
-    References:
-       1) Advanced Programming in the Unix Environment: W. Richard Stevens
-       2) Unix Programming Frequently Asked Questions:
-             http://www.erlenstar.demon.co.uk/unix/faq_toc.html
-    Detach a process from the controlling terminal and run it in the
-    background as a daemon.
-
-    Published at
     http://code.activestate.com/recipes/278731-creating-a-daemon-the-python-way/
 
     Changes: workdir is now a parameter, daemon changes CWD only if workdir 
     parameter is specified. umask is also a parameter, and the process' umask
     is set only if a value is specified.
     """
-
-    __author__ = "Chad J. Schroeder"
-    __copyright__ = "Copyright (C) 2005 Chad J. Schroeder"
-
-    __revision__ = "$Id$"
-    __version__ = "0.2"
-    
-    # Use a one-element array to fool Python 2 into not binding a local
-    # name in handler(). Python3 has 'nonlocal' for that
-    sigusr1_received = [False]
-    def handler(signum, frame):
-        if signum == signal.SIGUSR2:
-            sigusr1_received[0] = True
-
-    # The pid of the original process, used for sending a SIGUSR2 later
-    original_pid = os.getpid()
-
-    # We need to install the signal handler before forking, to guarantee that
-    # the original process has the signal handler installed at the time its
-    # grand-child sends the signal
-    old_handler = signal.signal(signal.SIGUSR2, handler)
-
-    # Default daemon parameters.
 
     # Default maximum for the number of available file descriptors.
     maxfd_default = 1024
@@ -379,125 +341,28 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
     except OSError as e:
         raise Exception("%s [%d]" % (e.strerror, e.errno))
 
-    if (pid == 0):	# The first child.
-        # Un-install the signal handler in the child process
-        signal.signal(signal.SIGUSR2, signal.SIG_DFL)
+    if pid > 0:	# master
+        sys.stdout.write("PID: %d\n" % pid)
+        sys.stdout.flush()
+        sys.exit()
 
-        # To become the session leader of this new session and the process group
-        # leader of the new process group, we call os.setsid().  The process is
-        # also guaranteed not to have a controlling terminal.
-        os.setsid()
+    # To become the session leader of this new session and the process group
+    # leader of the new process group, we call os.setsid().  The process is
+    # also guaranteed not to have a controlling terminal.
+    os.setsid()
 
-        # Is ignoring SIGHUP necessary?
-        #
-        # It's often suggested that the SIGHUP signal should be ignored before
-        # the second fork to avoid premature termination of the process.  The
-        # reason is that when the first child terminates, all processes, e.g.
-        # the second child, in the orphaned group will be sent a SIGHUP.
-        #
-        # "However, as part of the session management system, there are exactly
-        # two cases where SIGHUP is sent on the death of a process:
-        #
-        #   1) When the process that dies is the session leader of a session
-        #      that is attached to a terminal device, SIGHUP is sent to all
-        #      processes in the foreground process group of that terminal
-        #      device.
-        #   2) When the death of a process causes a process group to become
-        #      orphaned, and one or more processes in the orphaned group are
-        #      stopped, then SIGHUP and SIGCONT are sent to all members of the
-        #      orphaned group." [2]
-        #
-        # The first case can be ignored since the child is guaranteed not to
-        # have a controlling terminal.  The second case isn't so easy to
-        # dismiss.
-        # The process group is orphaned when the first child terminates and
-        # POSIX.1 requires that every STOPPED process in an orphaned process
-        # group be sent a SIGHUP signal followed by a SIGCONT signal.  Since the
-        # second child is not STOPPED though, we can safely forego ignoring the
-        # SIGHUP signal.  In any case, there are no ill-effects if it is
-        # ignored.
-        #
-        # signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    # Since the current working directory may be a mounted filesystem,
+    # we avoid the issue of not being able to unmount the filesystem at
+    # shutdown time by changing it to the root directory.
+    if not workdir is None:
+        os.chdir(workdir)
 
-        try:
-            # Fork a second child and exit immediately to prevent zombies.  This
-            # causes the second child process to be orphaned, making the init
-            # process responsible for its cleanup.  And, since the first child
-            # is a session leader without a controlling terminal, it's possible
-            # for it to acquire one by opening a terminal in the future (System
-            #  V-based systems).  This second fork guarantees that the child is
-            # no longer a session leader, preventing the daemon from ever
-            # acquiring a controlling terminal.
-            pid = os.fork()	# Fork a second child.
-        except OSError as e:
-            raise Exception("%s [%d]" % (e.strerror, e.errno))
+    # We probably don't want the file mode creation mask inherited from
+    # the parent, so we give the child complete control over
+    # permissions.
+    if not umask is None:
+        os.umask(umask)
 
-        if (pid == 0):	# The second child.
-            # Since the current working directory may be a mounted filesystem,
-            # we avoid the issue of not being able to unmount the filesystem at
-            # shutdown time by changing it to the root directory.
-            if not workdir is None:
-                os.chdir(workdir)
-            # We probably don't want the file mode creation mask inherited from
-            # the parent, so we give the child complete control over
-            # permissions.
-            if not umask is None:
-                os.umask(umask)
-        else:
-            # exit() or _exit()?  See below.
-            os._exit(0)	# Exit parent (the first child) of the second child.
-    else:
-        # Wait for the child to send a SIGUSR2 signal. This gives the grand-
-        # child time to print its PID to stdout, before the original process
-        # exits and possibly closes the SSH connection which started the
-        # client - we want to read the PID over the SSH connection, after all.
-        while not sigusr1_received[0]:
-            signal.pause()
-
-        # exit() or _exit()?
-        # _exit is like exit(), but it doesn't call any functions registered
-        # with atexit (and on_exit) or any registered signal handlers.  It also
-        # closes any open file descriptors.  Using exit() may cause all stdio
-        # streams to be flushed twice and any temporary files may be 
-        # unexpectedly removed.  It's therefore recommended that child branches
-        # of a fork() and the parent branch(es) of a daemon use _exit().
-        os._exit(0)	# Exit parent of the first child.
-
-    # Print the daemon's PID. We inherited the file descriptors from the
-    # original process so this should go over the SSH connection, if we
-    # were started via SSH.
-    sys.stdout.write("PID: %d\n" % os.getpid())
-    sys.stdout.flush()
-    
-    # Tell the original process that it's ok to terminate now
-    os.kill(original_pid, signal.SIGUSR2)
-
-    # Close all open file descriptors.  This prevents the child from keeping
-    # open any file descriptors inherited from the parent.  There is a variety
-    # of methods to accomplish this task.  Three are listed below.
-    #
-    # Try the system configuration variable, SC_OPEN_MAX, to obtain the maximum
-    # number of open file descriptors to close.  If it doesn't exists, use
-    # the default value (configurable).
-    #
-    # try:
-    #    maxfd = os.sysconf("SC_OPEN_MAX")
-    # except (AttributeError, ValueError):
-    #    maxfd = maxfd_default
-    #
-    # OR
-    #
-    # if (os.sysconf_names.has_key("SC_OPEN_MAX")):
-    #    maxfd = os.sysconf("SC_OPEN_MAX")
-    # else:
-    #    maxfd = maxfd_default
-    #
-    # OR
-    #
-    # Use the getrlimit method to retrieve the maximum file descriptor number
-    # that can be opened by this process.  If there is not limit on the
-    # resource, use the default value.
-    #
     import resource		# Resource usage information.
     maxfd = resource.getrlimit(resource.RLIMIT_NOFILE)[1]
     if (maxfd == resource.RLIM_INFINITY):
@@ -824,6 +689,22 @@ class WorkunitProcessor(object):
             else:
                 renice_func = None
 
+            if self.settings["override"]:
+                mangled=[]
+                orig=re.split(' *', command)
+                while orig:
+                    a=orig.pop(0)
+                    repl=None
+                    for sub in self.settings["override"]:
+                        if re.match('^-{1,2}' + sub[0] + '$', a):
+                            repl=sub[1]
+                    mangled.append(a)
+                    if repl is not None:
+                        oldvalue=orig.pop(0)
+                        logging.info("Overriding argument %s %s by %s %s in command line (substitution %s %s)" % (a, oldvalue, a, sub[1], sub[0], sub[1]))
+                        mangled.append(sub[1])
+                command=' '.join(mangled)
+
             (returncode, stdout, stderr) = run_command(command, shell=True,
                     preexec_fn=renice_func)
 
@@ -885,36 +766,50 @@ class WorkunitClient(object):
         
         self.wu_filename = os.path.join(self.settings["DLDIR"], 
                                         self.settings["WU_FILENAME"])
-        self.download_wu()
 
-        # Get an exclusive lock to avoid two clients working on the same 
-        # workunit
-        try:
-            self.wu_file = open_exclusive(self.wu_filename)
-        except FileLockedException:
-            logging.error("File '%s' is already locked. This may "
-                          "indicate that two clients with clientid '%s' are "
-                          "running. Terminating.", 
-                          self.wu_filename, self.settings["CLIENTID"])
-            raise
+        force_reload=False
 
-        logging.debug ("Parsing workunit from file %s", self.wu_filename)
-        wu_text = self.wu_file.read()
-        # WU file stays open so we keep the lock
+        while True:
+            self.download_wu(force_reload=force_reload)
 
-        try:
-            self.workunit = Workunit(wu_text)
-        except Exception as err:
-            logging.error("Invalid workunit file: %s", err)
-            self.cleanup()
-            raise WorkunitParseError()
+            # Get an exclusive lock to avoid two clients working on the same 
+            # workunit
+            try:
+                self.wu_file = open_exclusive(self.wu_filename)
+            except FileLockedException:
+                logging.error("File '%s' is already locked. This may "
+                              "indicate that two clients with clientid '%s' are "
+                              "running. Terminating.", 
+                              self.wu_filename, self.settings["CLIENTID"])
+                raise
+
+            logging.debug ("Parsing workunit from file %s", self.wu_filename)
+            wu_text = self.wu_file.read()
+            # WU file stays open so we keep the lock
+
+            try:
+                self.workunit = Workunit(wu_text)
+            except Exception as err:
+                logging.error("Invalid workunit file: %s", err)
+                self.cleanup()
+                raise WorkunitParseError()
+            if not force_reload and self.workunit.get("DEADLINE") and time.time() > float(self.workunit.get("DEADLINE")):
+                logging.warn("Old workunit file %s has passed deadline (%s), ignoring",
+                        self.wu_filename, 
+                        time.asctime(time.localtime(float(self.workunit.get("DEADLINE")))))
+                os.remove(self.wu_filename)
+                close_exclusive(self.wu_file)
+                force_reload=True
+            else:
+                break
+
         logging.debug ("Workunit ID is %s", self.workunit.get_id())
     
-    def download_wu(self):
+    def download_wu(self, *args, **kwargs):
         # Download the WU file if none exists
         url = self.settings["GETWUPATH"]
         options = "clientid=" + self.settings["CLIENTID"]
-        self.get_missing_file(url, self.wu_filename, options=options)
+        self.get_missing_file(url, self.wu_filename, options=options, *args, **kwargs)
 
     def cleanup(self):
         logging.info ("Removing workunit file %s", self.wu_filename)
@@ -1145,7 +1040,7 @@ class WorkunitClient(object):
         request.close()
     
     def get_missing_file(self, urlpath, filename, checksum=None,
-                         options=None):
+                         options=None, force_reload=False):
         """ Downloads a file if it does not exit already.
 
         Also checks the checksum, if specified; if the file already exists and
@@ -1157,16 +1052,20 @@ class WorkunitClient(object):
         """
         # print('get_missing_file(%s, %s, %s)' % (urlpath, filename, checksum))
         if os.path.isfile(filename):
-            logging.info ("%s already exists, not downloading", filename)
-            if checksum is None:
-                return True
-            filesum = self.do_checksum(filename)
-            if filesum.lower() == checksum.lower():
-                return True
-            logging.error ("Existing file %s has wrong checksum %s, "
-                           "workunit specified %s. Deleting file.", 
-                           filename, filesum, checksum)
-            os.remove(filename)
+            if force_reload:
+                logging.info ("%s already exists, removing because of force_reload", filename)
+                os.remove(filename)
+            else:
+                logging.info ("%s already exists, not downloading", filename)
+                if checksum is None:
+                    return True
+                filesum = self.do_checksum(filename)
+                if filesum.lower() == checksum.lower():
+                    return True
+                logging.error ("Existing file %s has wrong checksum %s, "
+                               "workunit specified %s. Deleting file.", 
+                               filename, filesum, checksum)
+                os.remove(filename)
 
         # If checksum is wrong and does not change during two downloads, exit 
         # with failue, as apparently the file on the server and checksum in 
@@ -1492,13 +1391,19 @@ if __name__ == '__main__':
                           help="Keep and upload old results when client starts")
         parser.add_option("--nosha1check", default=False, action="store_true", 
                           help="Skip checking the SHA1 for input files")
+        parser.add_option("--single", default=False, action="store_true", 
+                          help="process only a single WU, then exit")
         parser.add_option("--nocncheck", default=False, action="store_true", 
                           help="Don't check common name/SAN of certificate. "
                           "Currently works only under Python 2.")
         parser.add_option("--externdl", default=False, action="store_true", 
                           help="Use wget or curl for HTTPS downloads")
+        parser.add_option("--override", nargs=2, action='append',
+                          metavar=('REGEXP', 'VALUE'),
+                          help="Modify command-line arguments which match ^-{1,2}REGEXP$ to take the given VALUE. Note that REGEXP cannot start with a dash")
         # Parse command line
         (options, args) = parser.parse_args()
+
         if args:
             sys.stderr.write("Did not understand command line arguments %s\n" %
                              " ".join(args))
@@ -1614,6 +1519,8 @@ if __name__ == '__main__':
                         "fall-back. Aborting.")
                 sys.exit(1)
 
+    SETTINGS["override"] = options.override
+
     if options.daemon:
         create_daemon(keepfd=None if logfile is None else [logfile.fileno()])
 
@@ -1637,6 +1544,9 @@ if __name__ == '__main__':
                 logging.info("Client finishing: %s. Bye." % e)
                 break
             client_ok = client.process()
+            if options.single:
+                logging.info("Client processed its WU. Finishing now as implied by --single")
+                sys.exit(0)
 #        except Exception:
 #            logging.exception("Exception occurred")
 #            break
