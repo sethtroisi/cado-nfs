@@ -523,6 +523,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         // reached s + bw->interval. Count our time on cpu, and compute the sum.
         timing_disp_collective_oneline(pi, timing, s + bw->interval, tcan_print, "mksol");
     }
+
+    timing->end_mark = bw->start + bw->interval * iceildiv(bw->end - bw->start, bw->interval);
+
     timing_final_tally(pi, timing, tcan_print, "mksol");
 
     if (tcan_print) {
