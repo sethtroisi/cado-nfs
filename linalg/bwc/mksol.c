@@ -496,7 +496,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
             /* TODO: this can now be done with mmt_vec_save ! */
             char * s_name;
-            rc = asprintf(&s_name, S_FILE_BASE_PATTERN ".%u", k, k + nsolvecs_pervec, ys[0], ys[1], s+bw->interval);
+            rc = asprintf(&s_name, S_FILE_BASE_PATTERN ".%u-%u", k, k + nsolvecs_pervec, ys[0], ys[1], s, s+bw->interval);
             pi_file_handle f;
             pi_file_open(f, pi, bw->dir, s_name, "wb");
             ssize_t s = pi_file_write(f, sum[k], Ar->vec_elt_stride(Ar, eblock), Ar->vec_elt_stride(Ar, unpadded));

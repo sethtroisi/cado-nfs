@@ -1254,7 +1254,7 @@ sub list_afiles {
 }
 
 sub list_sfiles {
-    my ($f, $filesize) = list_files_generic(4, qr/S\.sols(\d+)-(\d+).(\d+)-(\d+)\.(\d+)/);
+    my ($f, $filesize) = list_files_generic(4, qr/S\.sols(\d+)-(\d+).(\d+)-(\d+)\.(\d+)-(\d+)/);
     if ($filesize) {    # take the occasion to store it.
         my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
         my $N = $bncols > $bnrows ? $bncols : $bnrows;
@@ -1266,7 +1266,9 @@ sub list_sfiles {
         eval { store_cached_entry('nbytes_per_splitwidth', $filesize / ($length/$splitwidth)); };
         die "Problem with the size of S files:\n$@" if $@;
     }
-    my $flatten = sub { local $_; map { shift @$_ } @_; };
+    # Because our S pattern now includes the iteration range, we pick
+    # $_->[1] for the identifier.
+    my $flatten = sub { local $_; map { $_->[1] } @_; };
     $f->{$_} = [&$flatten(@{$f->{$_}})] for keys %$f;
     @{$f->{$_}} = sort { $a <=> $b } @{$f->{$_}} for keys %$f;
     return $f;
