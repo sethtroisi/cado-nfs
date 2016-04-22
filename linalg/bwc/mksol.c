@@ -349,7 +349,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
         /* broadcast f */
         for(unsigned int k = 0 ; k < multi ; k++) {
-            pi_bcast(fcoeffs[k], A->groupsize(A) * bw->interval, mmt->pitype, 0, 0, pi->m);
+            pi_bcast(fcoeffs[k], A->groupsize(A) * bw->interval, Ar_pi, 0, 0, pi->m);
         }
 
         for(unsigned int k = 0 ; k < multi ; k++) {
