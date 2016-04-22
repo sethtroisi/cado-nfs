@@ -303,23 +303,6 @@ sopt_find_translations_extra (list_mpz_t list_k, mpz_poly_srcptr f0,
   mpz_poly_init (f, d);
   mpz_poly_set (f, f0);
 
-  /* Since g[1] and g[0] are of opposite signs, we want f[d-2] and f[d-3] to
-     be of opposite signs too. */
-
-  int count = 0;
-  while (mpz_sgn (f->coeff[d-2]) == mpz_sgn (f->coeff[d-3]) && count < 100)
-    {
-      mpz_t k;
-      count ++;
-      mpz_init (k);
-      if (mpz_sgn (f->coeff[d-3]) == mpz_sgn (g->coeff[0]))
-        mpz_set_si (k, -1);
-      else
-        mpz_set_si (k, 1);
-      mpz_poly_rotation (f, f, g, k, d-3);
-      mpz_clear (k);
-    }
-
   cd = mpz_get_d (f->coeff[d]);
   cdm1 = mpz_get_d (f->coeff[d-1]);
   cdm2 = mpz_get_d (f->coeff[d-2]);
