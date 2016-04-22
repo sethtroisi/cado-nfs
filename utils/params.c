@@ -108,9 +108,12 @@ void param_list_clear(param_list pl)
     memset(pl, 0, sizeof(pl[0]));
 }
 
-void param_list_usage_header(param_list pl, const char * hdr)
+void param_list_usage_header(param_list pl, const char * hdr, ...)
 {
-    pl->usage_hdr = strdup(hdr);
+    va_list ap;
+    va_start(ap, hdr);
+    vasprintf(&(pl->usage_hdr), hdr, ap);
+    va_end(ap);
 }
 
 

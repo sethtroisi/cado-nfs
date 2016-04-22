@@ -2861,7 +2861,11 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             nrels = self.get_nrels() - self.get_nrels(filename)
             self.state.update({"rels_found": nrels}, commit=False)
             self.forget_output_filenames([filename], commit=True)
-        self.add_file(filename)
+        filename_with_stats_extension = filename + ".stats.txt"
+        if os.path.isfile(filename_with_stats_extension):
+            self.add_file(filename, filename_with_stats_extension)
+        else:
+            self.add_file(filename)
 
     def get_statistics_as_strings(self):
         strings = ["Total number of relations: %d" % self.get_nrels()]

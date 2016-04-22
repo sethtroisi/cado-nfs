@@ -39,12 +39,14 @@ namespace details {
         bool operator==(self const& a) {
             return memcmp(x, a.x, n * sizeof(mp_limb_t)) == 0;
         }
+        /*
         bool operator<(self const& a) {
             return memcmp(x, a.x, n * sizeof(mp_limb_t)) < 0;
         }
         bool operator>(self const& a) {
             return memcmp(x, a.x, n * sizeof(mp_limb_t)) > 0;
         }
+        */
     };
 
     template<int n_, int extra_, typename T>
