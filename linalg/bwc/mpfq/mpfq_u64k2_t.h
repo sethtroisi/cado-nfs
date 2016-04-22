@@ -120,17 +120,29 @@
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_u64k2_u64k1_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k2_src_vec, unsigned int);
 void mpfq_u64k2_u64k1_dotprod(mpfq_u64k2_dst_field, mpfq_u64k1_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k2_src_vec, unsigned int);
+void mpfq_u64k2_u64k2_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
 void mpfq_u64k2_u64k2_dotprod(mpfq_u64k2_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
+void mpfq_u64k2_u64k3_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k2_src_vec, unsigned int);
 void mpfq_u64k2_u64k3_dotprod(mpfq_u64k2_dst_field, mpfq_u64k3_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k3_src_vec, mpfq_u64k2_src_vec, unsigned int);
+void mpfq_u64k2_u64k4_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k2_src_vec, unsigned int);
 void mpfq_u64k2_u64k4_dotprod(mpfq_u64k2_dst_field, mpfq_u64k4_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k2_src_vec, unsigned int);
+void mpfq_u64k2_u64k1_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k1_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k1_dst_vec, unsigned int);
 void mpfq_u64k2_u64k1_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k1_dst_vec, unsigned int);
+void mpfq_u64k2_u64k2_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_dst_vec, unsigned int);
 void mpfq_u64k2_u64k2_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_dst_vec, unsigned int);
+void mpfq_u64k2_u64k3_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k3_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k3_dst_vec, unsigned int);
 void mpfq_u64k2_u64k3_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k3_dst_vec, unsigned int);
+void mpfq_u64k2_u64k4_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k4_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k4_dst_vec, unsigned int);
 void mpfq_u64k2_u64k4_addmul_tiny(mpfq_u64k2_dst_field, mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k4_dst_vec, unsigned int);
+void mpfq_u64k2_u64k1_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k1_src_vec);
 void mpfq_u64k2_u64k1_transpose(mpfq_u64k2_dst_field, mpfq_u64k1_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k1_src_vec);
+void mpfq_u64k2_u64k2_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec);
 void mpfq_u64k2_u64k2_transpose(mpfq_u64k2_dst_field, mpfq_u64k2_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec);
+void mpfq_u64k2_u64k3_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k3_src_vec);
 void mpfq_u64k2_u64k3_transpose(mpfq_u64k2_dst_field, mpfq_u64k3_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k3_src_vec);
+void mpfq_u64k2_u64k4_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k4_src_vec);
 void mpfq_u64k2_u64k4_transpose(mpfq_u64k2_dst_field, mpfq_u64k4_dst_field, mpfq_u64k2_dst_vec, mpfq_u64k4_src_vec);
 
 #endif  /* MPFQ_U64K2_T_H_ */
