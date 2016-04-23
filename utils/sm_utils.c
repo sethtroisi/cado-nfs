@@ -35,7 +35,7 @@ double m_seconds = 0;
 /* u and dst may be equal */
 void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
 {
-    /* now for a split-chunk compute_sm_straightforward */
+    /* now for a split-chunk compute_sm */
 
     if (sm->nsm == 0)
         return;
