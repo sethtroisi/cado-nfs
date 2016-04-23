@@ -113,7 +113,7 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 
 /* Assume nSM > 0 */
 void
-print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
+print_sm2 (FILE *f, mpz_poly_t SM, int nSM, int d, const char * delim)
 {
   if (nSM == 0)
     return;
@@ -128,10 +128,16 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
     if (d > SM->deg)
       fprintf(f, " 0");
     else
-      gmp_fprintf(f, " %Zu", SM->coeff[d]);
+      gmp_fprintf(f, "%s%Zu", delim, SM->coeff[d]);
   }
   //fprintf(f, "\n");
 }
+void
+print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
+{
+    print_sm2(f, SM, nSM, d, " ");
+}
+
 
 void
 sm_relset_init (sm_relset_t r, int *d, int nb_polys)

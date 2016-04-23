@@ -1255,3 +1255,4 @@ linalg/bwc/mpfq/mpfq_p_15.c
 linalg/bwc/mpfq/mpfq_p_15.h
 linalg/bwc/mpfq/mpfq_p_15_t.c
 linalg/bwc/mpfq/mpfq_p_15_t.h
+filter/sm_append.cpp

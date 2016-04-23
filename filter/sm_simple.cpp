@@ -82,7 +82,6 @@ static void my_sm(const char *outfile, const char *infile,
 }
 
 
-
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "(required) poly file");

@@ -63,6 +63,8 @@ void compute_sm_straightforward(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_inf
 
 // Print coeffs of the SM polynomial
 void print_sm (FILE *, mpz_poly_t, int, int);
+// same, with a delimiter
+void print_sm2 (FILE *f, mpz_poly_t SM, int nSM, int d, const char * delim);
 
 /* This does the same as compute_sm_straightforward, except that it works piecewise on
  * the different components. It is thus noticeably faster. Results are
