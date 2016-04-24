@@ -348,18 +348,16 @@ int main (int argc, char **argv)
 
     FILE * in = rank ? NULL : stdin;
     FILE * out = rank ? NULL: stdout;
-    const char * tmp;
-    if ((tmp = param_list_lookup_string(pl, "in")) != NULL) {
-        if (!rank) {
-            in = fopen(tmp, "r");
-            ASSERT_ALWAYS(in != NULL);
-        }
+    const char * infilename = param_list_lookup_string(pl, "in");
+    const char * outfilename = param_list_lookup_string(pl, "out");
+
+    if (!rank && infilename) {
+        in = fopen_maybe_compressed(infilename, "r");
+        ASSERT_ALWAYS(in != NULL);
     }
-    if ((tmp = param_list_lookup_string(pl, "out")) != NULL) {
-        if (!rank) {
-            out = fopen(tmp, "w");
-            ASSERT_ALWAYS(out != NULL);
-        }
+    if (!rank && outfilename) {
+        out = fopen_maybe_compressed(outfilename, "w");
+        ASSERT_ALWAYS(out != NULL);
     }
 
     if (param_list_warn_unused(pl))
@@ -403,8 +401,8 @@ int main (int argc, char **argv)
         fflush(stdout);
     }
 
-    if (!rank && in != stdin) fclose(in);
-    if (!rank && out != stdout) fclose(out);
+    if (!rank && infilename) fclose_maybe_compressed(in, infilename);
+    if (!rank && out != stdout) fclose_maybe_compressed(out, outfilename);
 
     for(int side = 0 ; side < pol->nb_polys ; side++) {
         sm_side_info_clear(sm_info[side]);
