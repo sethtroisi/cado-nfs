@@ -29,8 +29,6 @@
 #include "select_mpi.h"
 #include "relation.h"
 
-#define BATCH_SIZE 128
-
 using namespace std;
 
 struct ab_pair {
@@ -40,110 +38,183 @@ struct ab_pair {
 
 typedef vector<ab_pair> ab_pair_batch;
 
-static void sm_append_master(FILE * in, FILE * out, sm_side_info *sm_info, int nb_polys, int size)
+unsigned int batch_size = 128;
+
+struct task_globals {
+    int nsm_total;
+    size_t limbs_per_ell;
+    FILE * in;
+    FILE * out;
+    size_t nrels_in;
+    size_t nrels_out;
+};
+
+struct peer_status {
+    MPI_Request req;
+    ab_pair_batch batch;
+    vector<string> rels;
+    void receive(task_globals & tg, int peer, int turn);
+    void send_finish(task_globals & tg, int peer, int turn);
+    /* returns 1 on eof, 0 normally */
+    int create_and_send_batch(task_globals& tg, int peer, int turn);
+};
+
+void peer_status::receive(task_globals & tg, int peer, int turn)
 {
+    unsigned long bsize = batch.size();
+
+    if (!bsize) return;
+
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
+    batch.clear();
+
+    mp_limb_t returns[bsize][tg.nsm_total][tg.limbs_per_ell];
+
+    MPI_Recv(returns, bsize * tg.nsm_total * tg.limbs_per_ell * sizeof(mp_limb_t), MPI_BYTE, peer, turn, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    ASSERT_ALWAYS(rels.size() == bsize);
+
+    for(unsigned long i = 0 ; i < bsize ; i++) {
+        fputs(rels[i].c_str(), tg.out);
+        bool comma = false;
+        for (int j = 0 ; j < tg.nsm_total ; j++) {
+            gmp_fprintf(tg.out, "%c%Nd", comma ? ',' : ':', returns[i][j], tg.limbs_per_ell);
+            comma=true;
+        }
+        fputc('\n', tg.out);
+        tg.nrels_out++;
+    }
+    rels.clear();
+}
+
+void peer_status::send_finish(task_globals &, int peer, int turn)
+{
+    /* tell this slave to finish */
+    unsigned long bsize = 0;
+    MPI_Send(&bsize, 1, MPI_UNSIGNED_LONG, peer, turn, MPI_COMM_WORLD);
+}
+
+int peer_status::create_and_send_batch(task_globals& tg, int peer, int turn)
+{
+    int eof = 0;
     char buf[1024];
 
+    ASSERT_ALWAYS(batch.empty());
+    while (!eof && batch.size() < batch_size && fgets(buf, 1024, tg.in)) {
+        int n = strlen(buf);
+        if (!n) {
+            fprintf(stderr, "Got 0-sized buffer in fgets, shouldn't happen. Assuming EOF.\n");
+            eof=true;
+            break;
+        }
+        buf[n-1]='\0';
+
+        if (buf[0] == '#') {
+            fputs(buf, tg.out);
+            fputc('\n', tg.out);
+            continue;
+        }
+
+        tg.nrels_in++;
+        rels.push_back(string(buf));
+
+        char * p = buf;
+        ab_pair ab;
+        int64_t sign = 1;
+        if (*p=='-') {
+            sign=-1;
+            p++;
+        }
+        if (sscanf(p, "%" SCNx64 ",%" SCNx64 ":", &ab.a, &ab.b) < 2) {
+            fprintf(stderr, "Parse error at line: %s\n", buf);
+            exit(EXIT_FAILURE);
+        }
+        ab.a *= sign;
+
+        batch.push_back(ab);
+    }
+    if (!eof && batch.size() < batch_size) {
+        eof=true;
+        if (ferror(stdin)) {
+            fprintf(stderr, "Error on stdin\n");
+        }
+    }
+    /* 0 bsize will be recognized by slaves as a 
+     * reason to stop processing */
+    unsigned long bsize = batch.size();
+    MPI_Send(&bsize, 1, MPI_UNSIGNED_LONG, peer, turn, MPI_COMM_WORLD);
+    if (bsize)
+        MPI_Isend((char*) &(batch[0]), bsize * sizeof(ab_pair), MPI_BYTE, peer, turn, MPI_COMM_WORLD, &req);
+    return eof;
+}
+
+#define CSI_RED "\033[00;31m"
+#define CSI_GREEN "\033[00;32m"
+#define CSI_YELLOW "\033[00;33m"
+#define CSI_BLUE "\033[00;34m"
+#define CSI_PINK "\033[00;35m"
+#define CSI_BOLDRED "\033[01;31m"
+#define CSI_BOLDGREEN "\033[01;32m"
+#define CSI_BOLDYELLOW "\033[01;33m"
+#define CSI_BOLDBLUE "\033[01;34m"
+#define CSI_BOLDPINK "\033[01;35m"
+#define CSI_RESET "\033[m"
+
+static void sm_append_master(FILE * in, FILE * out, sm_side_info *sm_info, int nb_polys, int size)
+{
     /* need to know how many mp_limb_t's we'll get back from each batch */
-    size_t limbs_per_ell = 0;
-    int nsm_total=0;
+    task_globals tg;
+    tg.limbs_per_ell = 0;
+    tg.nsm_total=0;
+    tg.in = in;
+    tg.out = out;
+    tg.nrels_in = 0;
+    tg.nrels_out = 0;
     for(int side = 0; side < nb_polys; side++) {
-        nsm_total += sm_info[side]->nsm;
-        if (sm_info[side]->nsm) limbs_per_ell = mpz_size(sm_info[side]->ell);
+        tg.nsm_total += sm_info[side]->nsm;
+        if (sm_info[side]->nsm) 
+            tg.limbs_per_ell = mpz_size(sm_info[side]->ell);
     }
 
-    std::vector<MPI_Request> active(size);
-    std::vector<ab_pair_batch> ab_pair_batches(size);
-    std::vector<string> history;
+    std::vector<peer_status> peers(size);
 
-    bool eof = false;
+    int eof = 0;
+    /* eof = 1 on first time. eof = 2 when all receives are done */
 
-    for(int turn = 0 ; !eof ; turn++) {
-        history.clear();
-        /* {{{ Collect batches, and send them */
+    fprintf(stderr, "# running master with %d slaves, batch size %u\n",
+            size-1, batch_size);
+    fprintf(stderr, "# make sure you use \"--bind-to core\" or equivalent\n");
+
+    double t0 = wct_seconds();
+    for(int turn = 0 ; eof < 2 ; turn++, eof += !!eof) {
+        // double t = wct_seconds();
+        // fprintf(stderr, "%.3f " CSI_BOLDRED "start turn %d" CSI_RESET "\n", t0, turn);
         for(int peer = 1; peer < size; peer++) {
-            ASSERT_ALWAYS(ab_pair_batches[peer].empty());
-            while (!eof &&
-                    ab_pair_batches[peer].size() < BATCH_SIZE &&
-                    fgets(buf, 1024, in))
-            {
-                int n = strlen(buf);
-                if (!n) {
-                    fprintf(stderr, "Got 0-sized buffer in fgets, shouldn't happen. Assuming EOF.\n");
-                    eof=true;
-                    break;
-                }
-                buf[n-1]='\0';
+            double dt = wct_seconds();
+            // fprintf(stderr, "%.3f start turn %d receive from peer %d\n", wct_seconds(), turn, peer);
+            peers[peer].receive(tg, peer, turn - 1);
+            dt = wct_seconds() - dt;
+            // fprintf(stderr, "%.3f done turn %d receive from peer %d [taken %.1f]\n", wct_seconds(), turn, peer, dt);
 
-                if (buf[0] == '#') {
-                    fputs(buf, out);
-                    fputc('\n', out);
-                    continue;
-                }
-
-                history.push_back(string(buf));
-
-                char * p = buf;
-                ab_pair ab;
-                int64_t sign = 1;
-                if (*p=='-') {
-                    sign=-1;
-                    p++;
-                }
-                if (sscanf(p, "%" SCNx64 ",%" SCNx64 ":", &ab.a, &ab.b) < 2) {
-                    fprintf(stderr, "Parse error at line: %s\n", buf);
-                    exit(EXIT_FAILURE);
-                }
-                ab.a *= sign;
-
-                ab_pair_batches[peer].push_back(ab);
-            }
-            if (!eof && ab_pair_batches[peer].size() < BATCH_SIZE) {
-                eof=true;
-                if (ferror(stdin)) {
-                    fprintf(stderr, "Error on stdin\n");
-                }
-            }
-            /* 0 bsize will be recognized by slaves as a 
-             * reason to stop processing */
-            unsigned long bsize = ab_pair_batches[peer].size();
-            MPI_Send(&bsize, 1, MPI_UNSIGNED_LONG, peer, turn, MPI_COMM_WORLD);
-            if (bsize)
-                MPI_Isend((char*) &(ab_pair_batches[peer][0]), bsize * sizeof(ab_pair), MPI_BYTE, peer, turn, MPI_COMM_WORLD, &active[peer]);
-
-        }
-        /* }}} */
-
-        /* Now receive the batches from the clients and print the results */
-        size_t histidx = 0;
-        for(int peer = 1; peer < size; peer++) {
-            unsigned long bsize = ab_pair_batches[peer].size();
-
-            if (bsize == 0)
-                continue;
-
-            MPI_Wait(&active[peer], MPI_STATUS_IGNORE);
-            ab_pair_batches[peer].clear();
-
-            mp_limb_t returns[bsize][nsm_total][limbs_per_ell];
-
-            MPI_Recv(returns, bsize * nsm_total * limbs_per_ell * sizeof(mp_limb_t), MPI_BYTE, peer, turn, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            for(unsigned long i = 0 ; i < bsize ; i++) {
-                fputs(history[histidx++].c_str(), out);
-                bool comma = false;
-                for (int j = 0 ; j < nsm_total ; j++) {
-                    gmp_fprintf(out, "%c%Nd", comma ? ',' : ':', returns[i][j], limbs_per_ell);
-                    comma=true;
-                }
-                fputc('\n', out);
-            }
-            if (eof) {
-                /* also tell this one to finish */
-                bsize = 0;
-                MPI_Send(&bsize, 1, MPI_UNSIGNED_LONG, peer, turn+1, MPI_COMM_WORLD);
+            if (eof == 1) {
+                peers[peer].send_finish(tg, peer, turn);
+            } else if (!eof) {
+                // dt = wct_seconds();
+                // fprintf(stderr, "%.3f start turn %d send to peer %d\n", wct_seconds(), turn, peer);
+                eof = peers[peer].create_and_send_batch(tg, peer, turn);
+                // dt = wct_seconds() - dt;
+                // fprintf(stderr, "%.3f done turn %d send to peer %d [taken %.1f]\n", wct_seconds(), turn, peer, dt);
             }
         }
-        history.clear();
+        // fprintf(stderr, "%.3f " CSI_BOLDRED "done turn %d " CSI_RESET "[taken %.1f] s\n", wct_seconds(), turn, wct_seconds()-t);
+        if (turn && !(turn & (turn+1))) {
+            /* print only when turn is a power of two */
+            fprintf(stderr, "# printed %lu rels in %.1f s"
+                    " (%.1f / batch, %.1f rels/s)\n",
+                    tg.nrels_out, wct_seconds()-t0,
+                    (wct_seconds()-t0) / turn,
+                    tg.nrels_out / (wct_seconds()-t0));
+        }
     }
 }
 
@@ -153,6 +224,8 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
     size_t limbs_per_ell = 0;
     int nsm_total=0;
     int maxdeg = 0;
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     for(int side = 0; side < nb_polys; side++) {
         nsm_total += sm_info[side]->nsm;
@@ -172,6 +245,8 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
         ab_pair_batch batch(bsize);
         MPI_Recv((char*) &(batch[0]), bsize * sizeof(ab_pair), MPI_BYTE, 0, turn, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
+        double t0 = wct_seconds();
+        // fprintf(stderr, "%.3f turn %d peer %d start on batch of size %lu\n", wct_seconds(), turn, rank, bsize);
         mp_limb_t returns[bsize][nsm_total][limbs_per_ell];
         memset(returns, 0, bsize*nsm_total*limbs_per_ell*sizeof(mp_limb_t));
 
@@ -191,8 +266,16 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
             }
             mpz_poly_clear(pol);
         }
+        // fprintf(stderr, "%.3f " CSI_BLUE "turn %d peer %d done batch of size %lu" CSI_RESET " [taken %.1f]\n", wct_seconds(), turn, rank, bsize, wct_seconds() - t0);
+        if (rank == 1 && turn == 2)
+        fprintf(stderr, "# peer processes batch of %lu in %.1f [%.1f SMs/s]\n",
+                bsize,
+                wct_seconds() - t0,
+                bsize / (wct_seconds() - t0));
 
+        t0 = wct_seconds();
         MPI_Send(returns, bsize * nsm_total * limbs_per_ell * sizeof(mp_limb_t), MPI_BYTE, 0, turn, MPI_COMM_WORLD);
+        // fprintf(stderr, "%.3f turn %d peer %d send return took %.1f\n", wct_seconds(), turn, rank, wct_seconds() - t0);
     }
     mpz_poly_clear(smpol);
 }
@@ -273,6 +356,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "nsm", "number of SMs to use per side");
     param_list_decl_usage(pl, "in", "data input (defaults to stdin)");
     param_list_decl_usage(pl, "out", "data output (defaults to stdout)");
+    param_list_decl_usage(pl, "b", "batch size for MPI loop");
     verbose_decl_usage(pl);
 }
 
@@ -359,13 +443,15 @@ int main (int argc, char **argv)
         ASSERT_ALWAYS(out != NULL);
     }
 
-    if (param_list_warn_unused(pl))
-        usage (argv0, NULL, pl);
+    param_list_parse_uint(pl, "b", &batch_size);
 
     verbose_interpret_parameters(pl);
 
+    if (param_list_warn_unused(pl))
+        usage (argv0, NULL, pl);
+
     if (!rank)
-    param_list_print_command_line (stdout, pl);
+        param_list_print_command_line (stdout, pl);
 
     sm_side_info sm_info[NB_POLYS_MAX];
 
@@ -379,15 +465,15 @@ int main (int argc, char **argv)
 
     /*
        if (!rank) {
-           for (int side = 0; side < pol->nb_polys; side++) {
-               printf("\n# Polynomial on side %d:\nF[%d] = ", side, side);
-               mpz_poly_fprintf(stdout, F[side]);
+       for (int side = 0; side < pol->nb_polys; side++) {
+       printf("\n# Polynomial on side %d:\nF[%d] = ", side, side);
+       mpz_poly_fprintf(stdout, F[side]);
 
-               printf("# SM info on side %d:\n", side);
-               sm_side_info_print(stdout, sm_info[side]);
+       printf("# SM info on side %d:\n", side);
+       sm_side_info_print(stdout, sm_info[side]);
 
-               fflush(stdout);
-           }
+       fflush(stdout);
+       }
        }
        */
 
