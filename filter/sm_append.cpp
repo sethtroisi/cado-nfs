@@ -209,7 +209,7 @@ static void sm_append_master(FILE * in, FILE * out, sm_side_info *sm_info, int n
         // fprintf(stderr, "%.3f " CSI_BOLDRED "done turn %d " CSI_RESET "[taken %.1f] s\n", wct_seconds(), turn, wct_seconds()-t);
         if (turn && !(turn & (turn+1))) {
             /* print only when turn is a power of two */
-            fprintf(stderr, "# printed %lu rels in %.1f s"
+            fprintf(stderr, "# printed %zu rels in %.1f s"
                     " (%.1f / batch, %.1f rels/s)\n",
                     tg.nrels_out, wct_seconds()-t0,
                     (wct_seconds()-t0) / turn,
