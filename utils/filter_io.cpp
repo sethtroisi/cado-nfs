@@ -274,6 +274,12 @@ inflight_rels_buffer<locking, n>::~inflight_rels_buffer()
             free(rels[i]->primes);
         }
         if (rels[i]->line) free(rels[i]->line);
+        if (rels[i]->sm_alloc) {
+            for(int j = 0 ; j < rels[i]->sm_alloc ; j++) {
+                mpz_clear(rels[i]->sm[j]);
+            }
+            free(rels[i]->sm);
+        }
         memset(rels[i], 0, sizeof(rels[i]));
     }
     delete[] rels;
@@ -663,7 +669,7 @@ earlyparser_abline_decimal(earlyparsed_relation_ptr rel, ringbuf_ptr r)
  */
 static int
 earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
-        int parseab)
+        int parseab, int parsesm)
 {
     const char *p = r->rhead;
 
@@ -677,9 +683,14 @@ earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
     
     unsigned int n = 0;
 
+    char next_delim = parsesm ? ':' : '\n';
+    c='\0';
     for( ; ; ) {
         uint64_t pr;
         int sgn = 1;
+        if (c == next_delim) break;
+        /* In all cases, we want to stop processing at newlines, in case
+         * we expect to find SM info but in fact it's missing */
         if (c == '\n') break;
         if (p[0] == '-') {
         //if (c == '-') {
@@ -698,6 +709,20 @@ earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
         }
     }
     rel->nb = n;
+    if (parsesm) {
+        /* We need some more stuff. */
+        for(rel->sm_size = 0 ; c != '\n' ; rel->sm_size++) {
+            if (rel->sm_size >= rel->sm_alloc) {
+                rel->sm = (mpz_t*) realloc((void*) rel->sm, (rel->sm_alloc + 1) * sizeof(mpz_t));
+                mpz_init(rel->sm[rel->sm_size]);
+                rel->sm_alloc++;
+            }
+            int consumed;
+            gmp_sscanf(p, "%Zd%n", rel->sm[rel->sm_size], &consumed);
+            p += consumed;
+            c = *p++;
+        }
+    }
 
     return 1;
 }
@@ -705,13 +730,19 @@ earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
 static int
 earlyparser_index(earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
-    return earlyparser_index_maybeabhexa(rel, r, 0);
+    return earlyparser_index_maybeabhexa(rel, r, 0, 0);
 }
 
 static int
 earlyparser_abindex_hexa (earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
-    return earlyparser_index_maybeabhexa(rel, r, 1);
+    return earlyparser_index_maybeabhexa(rel, r, 1, 0);
+}
+
+static int
+earlyparser_abindex_hexa_sm (earlyparsed_relation_ptr rel, ringbuf_ptr r)
+{
+    return earlyparser_index_maybeabhexa(rel, r, 1, 1);
 }
 
 
@@ -885,6 +916,10 @@ uint64_t filter_rels2_inner(char ** input_files,
         case _(INDEX) | _(AB_HEXA):
             /* e.g. reconstructlog */
             earlyparser = earlyparser_abindex_hexa;
+            break;
+        case _(INDEX) | _(AB_HEXA) | _(SM):
+            /* e.g. reconstructlog */
+            earlyparser = earlyparser_abindex_hexa_sm;
             break;
         case _(LINE):
             /* e.g. for purge/2 */

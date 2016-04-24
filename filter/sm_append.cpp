@@ -303,7 +303,6 @@ int main (int argc, char **argv)
     mpz_poly_ptr F[NB_POLYS_MAX];
 
     mpz_t ell;
-    double t0;
 
     /* read params */
     param_list_init(pl);
@@ -392,12 +391,11 @@ int main (int argc, char **argv)
        }
        */
 
-    t0 = wct_seconds();
-
     sm_append(in, out, sm_info, pol->nb_polys);
 
+    /* Make sure we print no footer line, because reconstructlog-dl won't
+     * grok it */
     if (!rank) {
-        printf("\n# sm completed in %2.2lf seconds (WCT)\n", wct_seconds() - t0);
         fflush(stdout);
     }
 

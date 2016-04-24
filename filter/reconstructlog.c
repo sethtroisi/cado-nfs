@@ -211,30 +211,61 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
     uint64_t b = rel->b;
 
     uint64_t nonvoidside = 0; /* bit vector of which sides appear in the rel */
-    for (weight_t i = 0; i < rel->nb; i++)
-    {
+    for (weight_t i = 0; i < rel->nb; i++) {
       index_t h = rel->primes[i].h;
       int side = renumber_get_side_from_index (data->renum_tab, h, data->poly);
       nonvoidside |= ((uint64_t) 1) << side;
     }
 
-    mpz_srcptr ell = data->log->ell;
-    for(int side = 0 ; side < data->poly->nb_polys ; side++)
-    {
-      sm_side_info_srcptr S = data->sm_info[side];
-      if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side)))
-      {
-	  mpz_poly_t u;
-	  mpz_poly_init(u, MAX(1, S->f->deg-1));
-	  mpz_poly_setcoeff_int64(u, 0, a);
-	  mpz_poly_setcoeff_int64(u, 1, -b);
-	  compute_sm_piecewise(u, u, S);
-	  ASSERT_ALWAYS(u->deg < S->f->deg);
-	  for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
-              mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
-	  mpz_mod(l, l, ell);
-	  mpz_poly_clear(u);
-      }
+    if (rel->sm_size) {
+        /* use the SM values which are already present in the input file,
+         * because some goodwill computed them for us.
+         */
+        int c = 0;
+        for(int side = 0 ; side < data->poly->nb_polys ; side++) {
+            sm_side_info_srcptr S = data->sm_info[side];
+            if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side))) {
+#define xxxDOUBLECHECK_SM
+#ifdef DOUBLECHECK_SM
+                mpz_poly_t u;
+                mpz_poly_init(u, MAX(1, S->f->deg-1));
+                mpz_poly_setcoeff_int64(u, 0, a);
+                mpz_poly_setcoeff_int64(u, 1, -b);
+                compute_sm_piecewise(u, u, S);
+                ASSERT_ALWAYS(u->deg < S->f->deg);
+                ASSERT_ALWAYS(u->deg == S->f->deg - 1);
+                for(int i = 0 ; i < S->nsm; i++) {
+                    ASSERT_ALWAYS(mpz_cmp(u->coeff[S->f->deg-1-i],rel->sm[c + i]) == 0);
+                }
+
+#endif
+                ASSERT_ALWAYS(c + S->nsm <= rel->sm_size);
+                for(int i = 0 ; i < S->nsm ; i++, c++) {
+                    mpz_addmul(l, data->smlogs[side][i], rel->sm[c]);
+                }
+                mpz_mod(l, l, data->log->ell);
+#ifdef DOUBLECHECK_SM
+                mpz_poly_clear(u);
+#endif
+            }
+        }
+    } else {
+        mpz_srcptr ell = data->log->ell;
+        for(int side = 0 ; side < data->poly->nb_polys ; side++) {
+            sm_side_info_srcptr S = data->sm_info[side];
+            if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side))) {
+                mpz_poly_t u;
+                mpz_poly_init(u, MAX(1, S->f->deg-1));
+                mpz_poly_setcoeff_int64(u, 0, a);
+                mpz_poly_setcoeff_int64(u, 1, -b);
+                compute_sm_piecewise(u, u, S);
+                ASSERT_ALWAYS(u->deg < S->f->deg);
+                for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
+                    mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
+                mpz_mod(l, l, ell);
+                mpz_poly_clear(u);
+            }
+        }
     }
 
     return NULL;
@@ -938,10 +969,13 @@ compute_log_from_rels (bit_vector needed_rels,
   struct filter_rels_description desc[3] = {
                    { .f = thread_insert, .arg=data, .n=1},
                    { .f = thread_sm,     .arg=data, .n=nt},
-                   { .f = NULL,          .arg=0,     .n=0}
+                   { .f = NULL,          .arg=0,    .n=0}
       };
-  filter_rels2 (fic, desc, EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_INDEX,
-                needed_rels, NULL);
+  filter_rels2 (fic, desc,
+          EARLYPARSE_NEED_AB_HEXA |
+          EARLYPARSE_NEED_INDEX |
+          EARLYPARSE_NEED_SM, /* It's fine (albeit slow) if we recompute them */
+          needed_rels, NULL);
 
   /* computing missing log */
   printf ("# Starting to compute missing logarithms from rels\n");
