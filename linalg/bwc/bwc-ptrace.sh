@@ -588,11 +588,12 @@ EOF
     save_s() {
         i="$1"
         j="$2"
-        k="$3"
+        k0="$3"
+        k1="$4"
         let i1=i+1
         let j1=j+1
-        binfile="S.sols${i}-${i1}.${j}-${j1}.$k"
-        magmafile="S${i},${j}.${k}.m"
+        binfile="S.sols${i}-${i1}.${j}-${j1}.${k0}-${k1}"
+        magmafile="S${i},${j}.${k0}-${k1}.m"
         if ! [ -f "$wdir/$binfile" ] ; then return 1 ; fi
         $cmd spvector64 < "$wdir/$binfile" > "$mdir/$magmafile"
         echo "load \"$mdir/$magmafile\"; Append(~vars, var);" >> "$mdir/S.m"
@@ -601,14 +602,15 @@ EOF
 
     save_s_j() {
         i="$1"
-        k="$2"
+        k0="$2"
+        k1="$3"
         for j in `seq 0 $((n-1))` ; do
-            if ! save_s $i $j $k ; then
+            if ! save_s $i $j $k0 $k1 ; then
                 if [ $i != 0 ] || [ $j != 0 ] ; then
                     echo "Weird. Short of S files not at i,j=($i,$j)!=(0,0) ?" >&2
                     exit 1
                 fi
-                echo "nblocks:=$((k/interval-1));" >> $mdir/S.m
+                echo "nblocks:=$((k1/interval-1));" >> $mdir/S.m
                 return 1
             fi
         done
@@ -616,9 +618,10 @@ EOF
     }
 
     save_s_ij() {
-        k="$1"
+        k0="$1"
+        k1="$2"
         for i in `seq 0 $((nsolvecs-1))` ; do
-            if ! save_s_j $i $k ; then
+            if ! save_s_j $i $k0 $k1 ; then
                 return 1
             fi
         done
@@ -626,11 +629,11 @@ EOF
     }
 
     echo "vars:=[];" > $mdir/S.m
-    k=$interval;
-    while save_s_ij $k ; do
+    k=0;
+    while save_s_ij $k $((k+interval)) ; do
         k=$((k+interval))
     done
-    echo "nblocks:=$((k/interval-1));" >> $mdir/S.m
+    echo "nblocks:=$((k/interval));" >> $mdir/S.m
 
     echo "Saving gather data to magma format"
     echo "vars:=[];" > $mdir/K.m
