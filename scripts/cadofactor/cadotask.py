@@ -518,6 +518,7 @@ class Statistics(object):
         
         If they are found, they are added to self.stats.
         """
+        # print ("Parsing line: >%s<" % line.strip())
         for (key, types, defaults, combine, regex) in self.conversions:
             match = regex.match(line)
             if match:
@@ -830,6 +831,7 @@ class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta
         super().print_stats()
     
     def parse_stats(self, filename, *, commit):
+        # self.logger.info("Parsing filename %s\n", filename)
         new_stats = self.statistics.parse_stats(filename)
         self.logger.debug("Newly arrived stats: %s", new_stats)
         update = self.statistics.as_dict()
