@@ -493,6 +493,24 @@ static int earlyparser_inner_read_prime(ringbuf_ptr r, const char ** pp, uint64_
     return c;
 }
 
+static int earlyparser_inner_read_mpz(ringbuf_ptr r, const char ** pp, mpz_t z)
+{
+    uint64_t v;
+    int c;
+    const char * p = *pp;
+#define BASE 10
+    /* copy-paste code blob above */
+    RINGBUF_GET_ONE_BYTE(c, r, p);
+    for (mpz_set_ui(z, 0); (v = ugly[c]) < BASE;) {
+        mpz_mul_ui(z, z, 10);
+        mpz_add_ui(z, z, v);
+        RINGBUF_GET_ONE_BYTE(c, r, p);
+    }
+#undef BASE
+    *pp = p;
+    return c;
+}
+
 static int earlyparser_inner_skip_ab(ringbuf_ptr r, const char ** pp)
 {
     const char * p = *pp;
@@ -717,10 +735,7 @@ earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
                 mpz_init(rel->sm[rel->sm_size]);
                 rel->sm_alloc++;
             }
-            int consumed;
-            gmp_sscanf(p, "%Zd%n", rel->sm[rel->sm_size], &consumed);
-            p += consumed;
-            c = *p++;
+            c = earlyparser_inner_read_mpz(r, &p, rel->sm[rel->sm_size]);
         }
     }
 
