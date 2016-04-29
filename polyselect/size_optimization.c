@@ -1165,8 +1165,8 @@ best_norm2 (mpz_poly_ptr fopt, mpz_poly_ptr gopt,
 #endif
 
   mpz_set (k, best_k);
-  mpz_clear (best_k);
  clear_ft_gt:
+  mpz_clear (best_k);
   mpz_poly_clear (ft);
   mpz_poly_clear (gt);
 
