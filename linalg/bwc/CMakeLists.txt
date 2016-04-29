@@ -341,6 +341,7 @@ bwc_program(split split.c)
 bwc_program(prep prep.c)
 target_link_libraries(prep bitlinalg)
 bwc_program(krylov krylov.c xdotprod.c)
+bwc_program(bwccheck bwccheck.cpp xdotprod.c)
 bwc_program(dispatch dispatch.c xdotprod.c)
 bwc_program(mksol mksol.c xdotprod.c)
 bwc_program(gather gather.c)
@@ -435,7 +436,7 @@ add_dependencies(bwc_matmul ${all_matmul_libs})
 add_custom_target(bwc_full)
 add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
-    bwc_matmul)
+    bwc_matmul bwccheck)
 
 # Those are used only for tests.
 bwc_program_extra(build_matcache build_matcache.c)

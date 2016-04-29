@@ -504,7 +504,7 @@ class Statistics(object):
         """ Initialise values in self from the strings in the "stats"
         dictionary
         """
-        for (key, types, defaults, combine, regex) in self.conversions:
+        for (key, types, defaults, combine, regex, allow_several) in self.conversions:
             if key in stats:
                 if key in self.stats:
                     print("duplicate %s\n" % key)
@@ -518,15 +518,25 @@ class Statistics(object):
         
         If they are found, they are added to self.stats.
         """
-        for (key, types, defaults, combine, regex) in self.conversions:
+        for (key, types, defaults, combine, regex, allow_several) in self.conversions:
             match = regex.match(line)
             if match:
-                assert not key in self.stats
                 # print (pattern.pattern, match.groups())
                 # Optional groups that did not match are returned as None.
                 # Skip over those so typecast doesn't raise TypeError
                 groups = [group for group in match.groups() if not group is None]
-                self.stats[key] = self.typecast(groups, types)
+                new_val = self.typecast(groups, types)
+                if not allow_several:
+                    assert not key in self.stats
+                    self.stats[key] = new_val
+                else:
+                    # Some output files inherently have several values.
+                    # This is the case of bwc output files if we use
+                    # multiple sequences.
+                    if key in self.stats:
+                        self.stats[key] = combine(self.stats[key], new_val)
+                    else:
+                        self.stats[key] = new_val
                 assert not self.stats[key] is None
     
     def merge_one_stat(self, key, new_val, combine):
@@ -543,7 +553,7 @@ class Statistics(object):
         """
         
         assert self.conversions == new_stats.conversions
-        for (key, types, defaults, combine, regex) in self.conversions:
+        for (key, types, defaults, combine, regex, allow_several) in self.conversions:
             if key in new_stats.stats:
                 self.merge_one_stat(key, new_stats.stats[key], combine)
     
@@ -830,6 +840,7 @@ class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta
         super().print_stats()
     
     def parse_stats(self, filename, *, commit):
+        # self.logger.info("Parsing filename %s\n", filename)
         new_stats = self.statistics.parse_stats(filename)
         self.logger.debug("Newly arrived stats: %s", new_stats)
         update = self.statistics.as_dict()
@@ -1600,28 +1611,32 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: potential collisions=", 1))
+            re.compile(re_cap_n_fp("# Stat: potential collisions=", 1)),
+            False
         ),
         (
             "stats_rawlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             self.update_lognorms,
-            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES)),
+            False
         ),
         (
             "stats_optlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             self.update_lognorms,
-            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES)),
+            False
         ),
         (
             "stats_tries",
             int,
             "0 0 0",
             Statistics.add_list,
-            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
+            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm"),
+            False
         ),
         # Note for "best raw logmu" pattern: a regex like (%s )* does not work;
         # the number of the capture group is determined by the parentheses
@@ -1633,21 +1648,24 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             float,
             "",
             Statistics.smallest_n,
-            re.compile(re_cap_n_fp("# Stat: best raw logmu:", 10))
+            re.compile(re_cap_n_fp("# Stat: best raw logmu:", 10)),
+            False
         ),
         (
             "stats_opt_logmu",
             float,
             "",
             Statistics.smallest_n,
-            re.compile(re_cap_n_fp("# Stat: best opt logmu:", 10))
+            re.compile(re_cap_n_fp("# Stat: best opt logmu:", 10)),
+            False
         ),
         (
             "stats_total_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s"))
+            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s")),
+            False
         ),
     )
     @property
@@ -2056,14 +2074,16 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s"))
+            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s")),
+            False
         ),
         (
             "stats_rootsieve_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: rootsieve took", 1, "s"))
+            re.compile(re_cap_n_fp("# Stat: rootsieve took", 1, "s")),
+            False
         )
     )
     @property
@@ -2657,28 +2677,32 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             (float, int),
             "0 0",
             Statistics.zip_combine_mean,
-            re.compile(re_cap_n_fp("# Average J=", 1, r"\s*for (\d+) special-q's"))
+            re.compile(re_cap_n_fp("# Average J=", 1, r"\s*for (\d+) special-q's")),
+            False
         ),
         (
             "stats_max_bucket_fill",
             float,
             "0",
             max,
-            re.compile(re_cap_n_fp("#.*max bucket fill", 1))
+            re.compile(re_cap_n_fp("#.*max bucket fill", 1)),
+            False
         ),
         (
             "stats_total_cpu_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Total cpu time", 1, "s"))
+            re.compile(re_cap_n_fp("# Total cpu time", 1, "s")),
+            False
         ),
         (
             "stats_total_time",
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Total time", 1, "s"))
+            re.compile(re_cap_n_fp("# Total time", 1, "s")),
+            False
         )
     )
     @property
@@ -2930,7 +2954,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s")),
+            False
         ),
     )
     @property
@@ -3146,7 +3171,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s")),
+            False
         ),
     )
     @property
@@ -4040,84 +4066,96 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"Timings for krylov: .wct.", 1))
+            re.compile(re_cap_n_fp(r"Timings for krylov: .wct.", 1)),
+            True
         ),
         (
             "krylov_cpu",
             (int, float),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU:", 1)),
+            True
         ),
         (
             "krylov_cpu_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait:", 1)),
+            True
         ),
         (
             "krylov_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM:", 1)),
+            True
         ),
         (
             "krylov_comm_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait:", 1)),
+            True
         ),
         (
             "lingen_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("Timings for lingen: .wct.", 1))
+            re.compile(re_cap_n_fp("Timings for lingen: .wct.", 1)),
+            False
         ),
         (
             "lingen_cpu",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("Timings for lingen: .cpu.", 1))
+            re.compile(re_cap_n_fp("Timings for lingen: .cpu.", 1)),
+            False
         ),
         (
             "mksol_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"Timings for mksol: .wct.", 1))
+            re.compile(re_cap_n_fp(r"Timings for mksol: .wct.", 1)),
+            True
         ),
         (
             "mksol_cpu",
             (int, float),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU:", 1)),
+            True
         ),
         (
             "mksol_cpu_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait:", 1)),
+            True
         ),
         (
             "mksol_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM:", 1)),
+            True
         ),
         (
             "mksol_comm_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait:", 1)),
+            True
         ),
     )
     @property

@@ -39,6 +39,7 @@ struct ab_pair {
 typedef vector<ab_pair> ab_pair_batch;
 
 unsigned int batch_size = 128;
+unsigned int debug = 0;
 
 struct task_globals {
     int nsm_total;
@@ -58,6 +59,17 @@ struct peer_status {
     /* returns 1 on eof, 0 normally */
     int create_and_send_batch(task_globals& tg, int peer, int turn);
 };
+
+static int debug_fprintf(FILE * out, const char * fmt, ...)
+    ATTR_PRINTF(2, 3);
+static int debug_fprintf(FILE * out, const char * fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    int rc = debug ? vfprintf(out, fmt, ap) : 1;
+    va_end(ap);
+    return rc;
+}
 
 void peer_status::receive(task_globals & tg, int peer, int turn)
 {
@@ -186,27 +198,33 @@ static void sm_append_master(FILE * in, FILE * out, sm_side_info *sm_info, int n
     fprintf(stderr, "# make sure you use \"--bind-to core\" or equivalent\n");
 
     double t0 = wct_seconds();
-    for(int turn = 0 ; eof < 2 ; turn++, eof += !!eof) {
-        // double t = wct_seconds();
-        // fprintf(stderr, "%.3f " CSI_BOLDRED "start turn %d" CSI_RESET "\n", t0, turn);
+    for(int turn = 0 ; eof <= 2 ; turn++, eof += !!eof) {
+        double t = wct_seconds();
+        debug_fprintf(stderr, "%.3f " CSI_BOLDRED "start turn %d" CSI_RESET "\n", t0, turn);
         for(int peer = 1; peer < size; peer++) {
+            if (eof && peers[peer].batch.empty()) {
+                /* Our last send was a 0-send, so we have nothing to do */
+                continue;
+            }
+
             double dt = wct_seconds();
-            // fprintf(stderr, "%.3f start turn %d receive from peer %d\n", wct_seconds(), turn, peer);
+            debug_fprintf(stderr, "%.3f start turn %d receive from peer %d\n", wct_seconds(), turn - 1, peer);
             peers[peer].receive(tg, peer, turn - 1);
             dt = wct_seconds() - dt;
-            // fprintf(stderr, "%.3f done turn %d receive from peer %d [taken %.1f]\n", wct_seconds(), turn, peer, dt);
+            debug_fprintf(stderr, "%.3f done turn %d receive from peer %d [taken %.1f]\n", wct_seconds(), turn - 1, peer, dt);
 
-            if (eof == 1) {
+            if (eof) {
+                debug_fprintf(stderr, "%.3f start turn %d send finish to peer %d\n", wct_seconds(), turn, peer);
                 peers[peer].send_finish(tg, peer, turn);
             } else if (!eof) {
-                // dt = wct_seconds();
-                // fprintf(stderr, "%.3f start turn %d send to peer %d\n", wct_seconds(), turn, peer);
+                dt = wct_seconds();
+                debug_fprintf(stderr, "%.3f start turn %d send to peer %d\n", wct_seconds(), turn, peer);
                 eof = peers[peer].create_and_send_batch(tg, peer, turn);
-                // dt = wct_seconds() - dt;
-                // fprintf(stderr, "%.3f done turn %d send to peer %d [taken %.1f]\n", wct_seconds(), turn, peer, dt);
+                dt = wct_seconds() - dt;
+                debug_fprintf(stderr, "%.3f done turn %d send to peer %d [taken %.1f]\n", wct_seconds(), turn, peer, dt);
             }
         }
-        // fprintf(stderr, "%.3f " CSI_BOLDRED "done turn %d " CSI_RESET "[taken %.1f] s\n", wct_seconds(), turn, wct_seconds()-t);
+        debug_fprintf(stderr, "%.3f " CSI_BOLDRED "done turn %d " CSI_RESET "[taken %.1f] s\n", wct_seconds(), turn, wct_seconds()-t);
         if (turn && !(turn & (turn+1))) {
             /* print only when turn is a power of two */
             fprintf(stderr, "# printed %zu rels in %.1f s"
@@ -240,13 +258,15 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
     for(int turn = 0 ; ; turn++) {
         unsigned long bsize;
         MPI_Recv(&bsize, 1, MPI_UNSIGNED_LONG, 0, turn, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        if (bsize == 0)
+        if (bsize == 0) {
+            debug_fprintf(stderr, "%.3f turn %d peer %d receive finish\n", wct_seconds(), turn, rank);
             break;
+        }
         ab_pair_batch batch(bsize);
         MPI_Recv((char*) &(batch[0]), bsize * sizeof(ab_pair), MPI_BYTE, 0, turn, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         double t0 = wct_seconds();
-        // fprintf(stderr, "%.3f turn %d peer %d start on batch of size %lu\n", wct_seconds(), turn, rank, bsize);
+        debug_fprintf(stderr, "%.3f turn %d peer %d start on batch of size %lu\n", wct_seconds(), turn, rank, bsize);
         mp_limb_t returns[bsize][nsm_total][limbs_per_ell];
         memset(returns, 0, bsize*nsm_total*limbs_per_ell*sizeof(mp_limb_t));
 
@@ -266,7 +286,7 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
             }
             mpz_poly_clear(pol);
         }
-        // fprintf(stderr, "%.3f " CSI_BLUE "turn %d peer %d done batch of size %lu" CSI_RESET " [taken %.1f]\n", wct_seconds(), turn, rank, bsize, wct_seconds() - t0);
+        debug_fprintf(stderr, "%.3f " CSI_BLUE "turn %d peer %d done batch of size %lu" CSI_RESET " [taken %.1f]\n", wct_seconds(), turn, rank, bsize, wct_seconds() - t0);
         if (rank == 1 && turn == 2)
         fprintf(stderr, "# peer processes batch of %lu in %.1f [%.1f SMs/s]\n",
                 bsize,
@@ -275,7 +295,7 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
 
         t0 = wct_seconds();
         MPI_Send(returns, bsize * nsm_total * limbs_per_ell * sizeof(mp_limb_t), MPI_BYTE, 0, turn, MPI_COMM_WORLD);
-        // fprintf(stderr, "%.3f turn %d peer %d send return took %.1f\n", wct_seconds(), turn, rank, wct_seconds() - t0);
+        debug_fprintf(stderr, "%.3f turn %d peer %d send return took %.1f\n", wct_seconds(), turn, rank, wct_seconds() - t0);
     }
     mpz_poly_clear(smpol);
 }
