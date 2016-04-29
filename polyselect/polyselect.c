@@ -148,9 +148,11 @@ print_poly_info ( mpz_t *f,
 {
   unsigned int i, nroots;
   double skew, logmu, alpha, alpha_proj, exp_E;
-  mpz_poly_t F;
+  mpz_poly_t F, G;
   F->coeff = f;
   F->deg = d;
+  G->coeff = g;
+  G->deg = 1;
 
   gmp_printf ("%sn: %Zd\n", prefix, n);
   gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
@@ -161,6 +163,7 @@ print_poly_info ( mpz_t *f,
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
+  logmu += expected_rotation_gain (F, G);
   alpha = get_alpha (F, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
   if (raw == 1)
