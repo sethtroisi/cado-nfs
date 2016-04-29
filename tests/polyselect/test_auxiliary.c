@@ -186,7 +186,10 @@ test_size_optimization (void)
 
   size_optimization (f_opt, g_opt, f, g, 3, 0);
   n = L2_skew_lognorm (f_opt, SKEWNESS_DEFAULT_PREC);
-  ASSERT_ALWAYS(n <= 87.197);
+  /* note: now size_optimization optimizes the sum of the lognorm and of the
+     expected alpha value, thus on this particular example we do no longer get
+     a better lognorm with sopt_effort=3 */
+  ASSERT_ALWAYS(n <= 87.415);
 
   mpz_poly_clear (f);
   mpz_poly_clear (g);
