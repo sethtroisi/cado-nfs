@@ -408,14 +408,14 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
             // tmpmat is a single column.
             tmpmat.zcol(0);
             for(unsigned int k = 0 ; k < l.size() ; k++) {
-                tmpmat.addpoly(l[k].second, 0, pi.poly(l[k].first, j));
+                tmpmat.addpoly(l[k].second, 0, pi, l[k].first, j);
             }
-            tmp_F.addpoly(i,j,pi.poly(i,j));
-            for(unsigned int k = 0 ; k < exps.size() ; k++) {
-                tmpmat.xmul_poly(exps[k],0,t0-exps[k]);
-                tmp_F.addpoly(i,j,tmpmat.poly(exps[k],0));
-            }
-        }
+	    tmp_F.addpoly(i,j,pi,i,j);
+	    for(unsigned int k = 0 ; k < exps.size() ; k++) {
+		    tmpmat.xmul_poly(exps[k],0,t0-exps[k]);
+		    tmp_F.addpoly(i,j,tmpmat, exps[k],0);
+	    }
+	}
     }
     for(unsigned int j = 0 ; j < m + n ; j++) {
         int pideg = pi.deg(j);
