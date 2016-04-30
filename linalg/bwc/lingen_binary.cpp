@@ -381,7 +381,7 @@ std::string intlist_to_string(iterator t0, iterator t1)
 // polynomials.
 void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
 {
-    printf("Computing final F from PI (crc(pi)=%" PRIx32 ")\n", pi.crc());
+    printf("Computing final F from PI (crc(pi)=%" PRIx32 ", ncoef=%lu)\n", pi.crc(), pi.ncoef);
     using namespace globals;
     // We take t0 rows, so that we can do as few shifts as possible
     // tmpmat is used only within the inner loop.
@@ -514,7 +514,7 @@ void bw_commit_f(polmat& F)
     using namespace std;
 
     /* Say n' columns are said interesting. We'll pad these to n */
-    printf("Writing F files (crc: %" PRIx32 ")\n", F.crc());
+    printf("Writing F files (crc(F)=%" PRIx32 ")\n", F.crc());
 
     unsigned int * pick = (unsigned int *) malloc(n * sizeof(unsigned int));
     memset(pick, 0, n * sizeof(unsigned int));
