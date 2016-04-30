@@ -55,7 +55,7 @@ nn=0
 while [ $nn -lt $A_length ] ; do
     cat $wdir/X
     let nn+=$random_stem
-done | head -c $A_length > $wdir/seq
+done | dd ibs=1 count=$A_length > $wdir/seq
 
 if ! "$bindir/lingen" m=$m n=$n lingen-input-file=$wdir/seq lingen-output-file=$wdir/seq.gen > >(tee $wdir/output > /dev/stderr) ; then
     echo "Error running lingen >&2"
