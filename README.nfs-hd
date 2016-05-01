@@ -18,7 +18,8 @@ Reproduce the computations of http://hal.inria.fr/hal-01273045 :
   * the polynomials files are stored in the directory "parameters/nfs-hd",
     one for the p6bd40 (240 bits), an other of the p6bd50 (300 bits) and a last
     for p6bd65 (389 bits);
-  * the file "parameters/nfs-hd/command_p6bd(40|50|65).txt" contains the two    needed commands, the first one to build the sieve base, i.e. all the
+  * the file "parameters/nfs-hd/command_p6bd(40|50|65).txt" contains the two
+    needed commands, the first one to build the sieve base, i.e. all the
     elements we will sieve, and the second to perform the sieve itself;
   * check the relations:
   ** after the special-q_sieve, the output is stored in the file you give in
@@ -36,3 +37,5 @@ Reproduce the computations of http://hal.inria.fr/hal-01273045 :
 
 All these steps, including compilation, are summarized in
 "nfs-hd/automatic_p6bd40.sh".
+
+---------

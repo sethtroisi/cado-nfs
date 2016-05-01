@@ -707,7 +707,7 @@ static void printf_relation_galois(factor_t * factor,
  * t: dimension of the lattice.
  * V: number of number fields.
  */
-static void good_polynomial(mpz_poly_srcptr a, mpz_poly_t * f,
+static void good_polynomial(mpz_poly_srcptr a, const mpz_poly_t * f,
     unsigned int * L, unsigned int t, unsigned int V, int main,
     facul_aux_data *data, unsigned int * nb_rel_found,
     ideal_spq_srcptr special_q, unsigned int q_side, unsigned int size,
@@ -945,7 +945,7 @@ static unsigned int find_indices_main(unsigned int ** L,
  * For
  */
 static void find_relation(uint64_array_t * indices, uint64_t * index,
-    uint64_t number_element, mat_Z_srcptr matrix, mpz_poly_t * f,
+    uint64_t number_element, mat_Z_srcptr matrix, const mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, int main, uint64_t max_indices,
     facul_aux_data *data, unsigned int * nb_rel_found,
     ideal_spq_srcptr special_q, unsigned int q_side, FILE * outstd,
@@ -1004,7 +1004,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 }
 
 unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
-    unsigned int * lpb, mat_Z_srcptr matrix, mpz_poly_t * f,
+    unsigned int * lpb, mat_Z_srcptr matrix, const mpz_poly_t * f,
     sieving_bound_srcptr H, unsigned int V, ideal_spq_srcptr special_q,
     unsigned int q_side, int main, FILE * outstd, unsigned int gal)
 {

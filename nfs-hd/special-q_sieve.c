@@ -17,6 +17,7 @@
 #include "double_poly.h"
 #include <time.h>
 #include <limits.h>
+#include <ctype.h>
 #include "utils_norm.h"
 #include "utils_cofactorisation.h"
 #include "ecm/facul.h"
@@ -1620,8 +1621,7 @@ void construct_v(int64_vector_ptr v, int64_vector_srcptr x,
  * matrix: MqLLL.
  */
 void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
-    ideal_1_srcptr ideal,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H,
+    ideal_1_srcptr ideal, mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED mat_Z_srcptr matrix,
     MAYBE_UNUSED uint64_t * nb_hit)
 {
@@ -2035,7 +2035,13 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     ideal_1_set(r, fb->factor_base_1[i], H->t);
 
 #ifdef ASSERT_SIEVE
+#ifdef PLANE_SIEVE_INSTEAD_OF_SPACE_SIEVE
+    printf("# Plane sieve.\n");
+#elif ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
+    printf("# Enumeration.\n");
+#else
     printf("# Space sieve.\n");
+#endif
     printf("# ");
     ideal_fprintf(stdout, r->ideal);
     /*fprintf(stdout, "# Tqr = [");*/
@@ -2061,13 +2067,21 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
-    ASSERT(H->t == 3);
-
     compute_Mqr_1(Mqr, Tqr, H->t, r);
 
+#if ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
+    enum_lattice(array, file_trace_pos, r, Mqr, H, f, matrix, &number_hit);
+#else // ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
+
     if (Mqr->coeff[1][1] != 1) {
+#ifdef PLANE_SIEVE_INSTEAD_OF_SPACE_SIEVE
+      plane_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit);
+#else // PLANE_SIEVE_INSTEAD_OF_SPACE_SIEVE
+      ASSERT(H->t == 3);
+
       space_sieve_1(array, file_trace_pos, r, Mqr, H, errstd, matrix, f,
           &number_hit);
+#endif // PLANE_SIEVE_INSTEAD_OF_SPACE_SIEVE
     } else {
       fprintf(errstd, "# Tqr = [");
       for (unsigned int i = 0; i < H->t - 1; i++) {
@@ -2077,6 +2091,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
       fprintf(errstd, "# Space sieve does not support this type of Mqr.\n");
       mat_int64_fprintf_comment(errstd, Mqr);
     }
+#endif // ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
 
 #ifdef NUMBER_HIT
     printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
@@ -2293,6 +2308,322 @@ int Ha_defined(sieving_bound_srcptr Ha)
   return 1;
 }
 
+//Do not deal with OLD_NORM.
+//TODO: one day, delete V and use f->nb_pols.
+void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
+    unsigned int q_side, sieving_bound_srcptr H, gmp_randstate_t state,
+    int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
+    mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
+    FILE * outstd, FILE * file_trace_pos, unsigned int * max_norm,
+    unsigned int V, double * log2_base, uint64_array_t * indexes,
+    array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
+    factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
+    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time)
+{
+  double sec_tot;
+  double sec_cofact;
+  double sec;
+
+  //TODO: print time to build MqLLL.
+  compute_all_spq(spq, q, f->pols[q_side], H, state, deg_bound_factorise,
+      skewness, gal, c, nb_vec, g);
+
+  for (unsigned int i = 0; i < spq->number; i++) {
+    sec = seconds();
+    sec_tot = sec;
+
+    fprintf(outstd, "# Special-q: ");
+    ideal_spq_fprintf_q_g(outstd, spq->spq[i]);
+
+#ifdef TRACE_POS
+    fprintf(file_trace_pos, "# Special-q: ");
+    ideal_spq_fprintf_q_g(file_trace_pos, spq->spq[i]);
+#endif // TRACE_POS
+
+#ifdef TRACE_POS
+    fprintf(file_trace_pos, "MqLLL:\n");
+    mat_Z_fprintf(file_trace_pos, spq->MqLLL[i]);
+#endif // TRACE_POS
+
+#ifndef OLD_NORM
+    memset(max_norm, 0, sizeof(unsigned int) * V);
+#endif // OLD_NORM
+
+    for (unsigned int j = 0; j < V; j++) {
+#ifdef TRACE_POS
+      fprintf(file_trace_pos, "Base: %f\n", pow(2.0, log2_base[j]));
+#endif // TRACE_POS
+
+      sec = seconds();
+      uint64_array_init(indexes[j], array->number_element);
+      array_set_all_elements(array, UCHAR_MAX);
+#ifndef OLD_NORM
+      init_norm(array, max_norm + j, file_trace_pos, H, spq->MqLLL[i],
+          f->pols[j], ideal_spq_get_log(spq->spq[i]) / log2_base[j],
+          !(j ^ q_side), log2_base[j]);
+#else // OLD_NORM
+      init_norm(array, file_trace_pos, pre_compute[j], H, spq->MqLLL[i],
+          f->pols[j], spq->spq[i], !(j ^ q_side));
+#endif // OLD_NORM
+
+#ifdef PRINT_ARRAY_NORM
+      FILE * file_array_norm;
+      char * name_array_norm = (char *) malloc(sizeof(char) * 1024);
+#ifndef MPZ_NORM
+      sprintf(name_array_norm, "ARRAY_NORM_%" PRIu64 "_%u.csv", q, j);
+#else // MPZ_NORM
+      sprintf(name_array_norm, "ARRAY_MPZ_NORM_%" PRIu64 "_%u.csv", q, j);
+#endif // MPZ_NORM
+      file_array_norm = fopen(name_array_norm, "w+");
+      fprintf(file_array_norm, "# H: ");
+      sieving_bound_fprintf(file_array_norm, H);
+      fprintf(file_array_norm, "# MqLLL:\n");
+      mat_Z_fprintf_comment(file_array_norm, spq->MqLLL[i]);
+      fprintf(file_array_norm, "# f%u: ", j);
+      mpz_poly_fprintf(file_array_norm, f->pols[j]);
+      number_norm(file_array_norm, array, max_norm[j], log2_base[j]);
+      fclose(file_array_norm);
+      free(name_array_norm);
+#endif // PRINT_ARRAY_NORM
+
+      time[j][0] = seconds() - sec;
+
+#ifdef ASSERT_NORM
+      printf("# ASSERT_NORM side %u.\n", j);
+      assert_norm(array, H, f->pols[j], spq->MqLLL[i], !(j ^ q_side),
+          log2_base[j], ideal_spq_get_log(spq->spq[i]));
+#endif // ASSERT_NORM
+
+      sec = seconds();
+      special_q_sieve(array, file_trace_pos, spq->MqLLL[i], fb[j], H,
+          f->pols[j], outstd, errstd, sieve_start[j], spq->spq[i]);
+      time[j][1] = seconds() - sec;
+      sec = seconds();
+      find_index(indexes[j], array,
+          (unsigned char) ceil(thresh[j] / log2_base[j]));
+      time[j][2] = seconds() - sec;
+
+#ifdef TRACE_POS
+      fprintf(file_trace_pos, "********************\n");
+#endif // TRACE_POS
+    }
+
+    for (unsigned int j = 0; j < V; j++) {
+      fprintf(outstd,
+          "# Log 2 of the maximum of the norms %u: %u.\n", j,
+          max_norm[j]);
+    }
+
+    sec = seconds();
+    * nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
+        spq->MqLLL[i], f->pols, H, V, spq->spq[i], q_side, main_side,
+        outstd, gal);
+    sec_cofact = seconds() - sec;
+
+    for (unsigned j = 0; j < V; j++) {
+
+      uint64_array_clear(indexes[j]);
+    }
+
+    fprintf(outstd,
+        "# Time for this special-q: %fs.\n", seconds() - sec_tot);
+    * total_time += (seconds() - sec_tot);
+    * spq_tot = * spq_tot + 1;
+    for (unsigned int j = 0; j < V; j++) {
+      fprintf(outstd, "# Time to init norm %u: %fs.\n", j,
+          time[j][0]);
+      fprintf(outstd, "# Time to sieve %u: %fs.\n", j, time[j][1]);
+      fprintf(outstd, "# Time to find indexes %u: %fs.\n", j,
+          time [j][2]);
+    }
+
+    fprintf(outstd, "# Time to factorize: %fs.\n", sec_cofact);
+
+    fprintf(outstd,
+        "# ----------------------------------------\n");
+    fprintf(errstd,
+        "# ----------------------------------------\n");
+    fflush(outstd);
+    fflush(errstd);
+
+#ifdef TRACE_POS
+    fprintf(file_trace_pos, "----------------------------------------\n");
+#endif // TRACE_POS
+  }
+}
+
+void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
+    sieving_bound_srcptr H, gmp_randstate_t state,
+    int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
+    mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
+    FILE * outstd, FILE * file_trace_pos, unsigned int * max_norm,
+    unsigned int V, double * log2_base, uint64_array_t * indexes,
+    array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
+    factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
+    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time)
+{
+  ASSERT(g->deg == -1);
+
+  size_t len = 1024;
+  char * line = (char * ) malloc(sizeof(char) * len);
+  ssize_t read;
+  unsigned int q_side = 0;
+  uint64_t q = 0;
+
+  while ((read = getline(&line, &len, qfile) != -1)) {
+    sscanf(line, "%u:%" PRIu64 "\n", &q_side, &q);
+
+#ifndef Q_BELOW_FBB
+    ASSERT(q > fb[q_side]->factor_base_1
+        [fb[q_side]->number_element_1 - 1]->ideal->r);
+    ASSERT(q > fb[q_side]->factor_base_u
+        [fb[q_side]->number_element_u - 1]->ideal->r);
+#endif // Q_BELOW_FBB
+
+    do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
+        gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
+        indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
+        nb_rel, spq_tot, total_time);
+  }
+  free(line);
+}
+
+//TODO: begining of duplicate code.
+int parse_ulong(unsigned long * x, char ** endptr, char * ptr)
+{
+  unsigned long xx;
+  errno = 0;
+  xx = strtoul(ptr, endptr, 10);
+  if (errno) {
+    // failure
+    return 0;
+  }
+  *x = xx;
+  return 1;
+}
+
+int parse_mpz(mpz_t z, char ** endptr, char * ptr)
+{
+  int r = gmp_sscanf(ptr, "%Zd", z);
+  if (r != 1) {
+    *endptr = ptr;
+    return 0; // failure
+  }
+  *endptr = ptr;
+  while (isdigit(*endptr[0]) || *endptr[0] == '-') {
+    (*endptr)++;
+  }
+  return 1;
+}
+
+int parse_cs_mpzs(mpz_t *z, char ** endptr, char * ptr)
+{
+  char *myptr = ptr;
+  int cpt = 0;
+  for(;;) {
+    int ret = parse_mpz(z[cpt], endptr, myptr);
+    if (!ret) {
+      return 0; // failure or empty list
+    }
+    // got an mpz
+    cpt++;
+    myptr = *endptr;
+    if (myptr[0] != ',') {
+      // finished!
+      *endptr = myptr;
+      return cpt;
+    }
+    // prepare for next mpz
+    myptr++;
+  }
+}
+
+int parse_mpz_poly(mpz_poly_ptr f, char ** endptr, char * str, int n)
+{
+  int ret;
+
+  mpz_t * coeffs = (mpz_t *) malloc(sizeof(mpz_t) * (n + 1));
+  for (int i = 0; i <= n; i++) {
+    mpz_init(coeffs[i]);
+  }
+  ret = parse_cs_mpzs(coeffs, endptr, str);
+  mpz_poly_setcoeffs(f, coeffs, n);
+  for (int i = 0; i <= n; i++) {
+    mpz_clear(coeffs[i]);
+  }
+  free(coeffs);
+
+  return ret;
+}
+//TODO: end of duplicate code.
+
+int parse_spq(char * str, unsigned int * q_side, uint64_t * q, mpz_poly_ptr g)
+{
+  char *tmp;
+  int ret;
+  unsigned long r = 0;
+
+  ret = parse_ulong(&r, &tmp, str);
+  * q_side = (unsigned int) r;
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+
+  ret = parse_ulong(&r, &tmp, str);
+  * q = (uint64_t) r;
+
+  if (!ret || tmp[0] != ':')
+    return 0;
+  str = tmp + 1;
+
+  ret = parse_mpz_poly(g, &tmp, str, 1);
+  ASSERT(ret == 1 || ret == 2);
+
+  return ret;
+}
+
+void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
+    sieving_bound_srcptr H, gmp_randstate_t state,
+    int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
+    mpz_vector_t * c, unsigned int nb_vec,
+    FILE * outstd, MAYBE_UNUSED FILE * file_trace_pos, unsigned int * max_norm,
+    unsigned int V, double * log2_base, uint64_array_t * indexes,
+    array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
+    factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
+    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time)
+{
+  size_t len = 1024;
+  char * line = (char * ) malloc(sizeof(char) * len);
+  ssize_t read;
+  unsigned int q_side = 0;
+  uint64_t q = 0;
+  mpz_poly_t g;
+  mpz_poly_init(g, 1);
+
+  while ((read = getline(&line, &len, qfile) != -1)) {
+    parse_spq(line, &q_side, &q, g);
+#ifndef Q_BELOW_FBB
+#ifndef NDEBUG
+    if (g->deg == 1) {
+      ASSERT(q > fb[q_side]->factor_base_1
+          [fb[q_side]->number_element_1 - 1]->ideal->r);
+    } else {
+      ASSERT(g->deg > 1);
+      ASSERT(q > fb[q_side]->factor_base_u
+          [fb[q_side]->number_element_u - 1]->ideal->r);
+    }
+#endif // NDEBUG
+#endif // Q_BELOW_FBB
+    do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
+        gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
+        indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
+        nb_rel, spq_tot, total_time);
+  }
+  mpz_poly_clear(g);
+  free(line);
+}
+
 void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "H", "sieving region for c");
@@ -2313,6 +2644,8 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "g", "polynomial associated with q");
   param_list_decl_usage(pl, "gal", "type of Galois action (6 with action "
     "x->-(2 * x + 1) / (x - 1))");
+  param_list_decl_usage(pl, "qfile", "path to a qfile");
+  param_list_decl_usage(pl, "qfilespq", "path to a qfile");
 }
 
 /*
@@ -2336,7 +2669,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     array_ptr array, unsigned int * q_side, unsigned int * V,
     int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
     uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g,
-    unsigned int * gal)
+    unsigned int * gal, FILE ** qfile, unsigned int * qfilespq)
 {
   param_list pl;
   param_list_init(pl);
@@ -2360,7 +2693,6 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     param_list_print_usage(pl, argv0, stderr);
     exit (EXIT_FAILURE);
   }
-
 
   unsigned int t;
   int * r;
@@ -2429,28 +2761,61 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     * errstd = fopen(path, "w");
   }
 
+  * qfilespq = 0;
+  path[0] = '\0';
+  param_list_parse_string(pl, "qfile", path, size_path);
+  * qfile = NULL;
+  if (path[0] != '\0') {
+    * qfile = fopen(path, "r");
+    * qfilespq = 1;
+  }
+  path[0] = '\0';
+  param_list_parse_string(pl, "qfilespq", path, size_path);
+  if (path[0] != '\0') {
+    ASSERT(* qfile == NULL);
+    * qfile = fopen(path, "r");
+    * qfilespq = 2;
+  }
+
   param_list_parse_uchar_list(pl, "thresh", * thresh, (size_t) * V, ",");
 
   uint64_t number_element = sieving_bound_number_element(H);
   ASSERT(number_element >= 6);
 
   //TODO: q_side is an unsigned int.
+  * q_side = UINT_MAX;
   param_list_parse_int(pl, "q_side", (int *)q_side);
-  ASSERT(* q_side < * V);
+  if (* qfile == NULL) {
+    ASSERT(* q_side < * V);
+  } else {
+    ASSERT(*q_side == UINT_MAX);
+  }
 
+  (* q_range)[0] = 0;
+  (* q_range)[1] = 0;
   param_list_parse_uint64_and_uint64(pl, "q_range", * q_range, ",");
 
+  if (* qfile == NULL) {
 #ifndef Q_BELOW_FBB
-  ASSERT((* q_range)[0] > fbb[0][* q_side]);
+    ASSERT((* q_range)[0] > fbb[0][* q_side]);
 #else // Q_BELOW_FBB
-  fprintf(* outstd,
-      "# Special q may be under fbb.\n");
+    fprintf(* outstd,
+        "# Special q may be under fbb.\n");
 #endif // Q_BELOW_FBB
-  ASSERT((* q_range)[0] < (* q_range)[1]);
+    ASSERT((* q_range)[0] < (* q_range)[1]);
+  } else {
+    ASSERT((* q_range)[0] == (* q_range)[1]);
+    ASSERT((* q_range)[0] == 0);
+  }
 
   mpz_poly_init(g, -1);
   param_list_parse_mpz_poly(pl, "g", g, ",");
   ASSERT(g->deg == -1 || g->deg > 0);
+#ifndef NDEBUG
+  if (* qfile == NULL) {
+    ASSERT(g->deg == -1);
+  }
+#endif // NDEBUG
 
 #ifndef NDEBUG
   if (g->deg > 0) {
@@ -2567,10 +2932,12 @@ int main(int argc, char * argv[])
   sieving_bound_t Ha;
   mpz_poly_t g;
   unsigned int gal;
+  FILE * qfile;
+  unsigned int qfilespq;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
       &thresh, &lpb, array, &q_side, &V, &main_side, &log2_base,
-      &outstd, &errstd, &sieve_start, Ha, g, &gal);
+      &outstd, &errstd, &sieve_start, Ha, g, &gal, &qfile, &qfilespq);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -2591,10 +2958,6 @@ int main(int argc, char * argv[])
   for (unsigned int i = 0; i < V; i++) {
     time[i] = (double * ) malloc(sizeof(double) * 3);
   }
-  double sec_tot;
-  double sec_cofact;
-  double sec;
-
   FILE * file_trace_pos;
 #ifdef TRACE_POS
   file_trace_pos = fopen("TRACE_POS.txt", "w+");
@@ -2603,14 +2966,10 @@ int main(int argc, char * argv[])
   file_trace_pos = NULL;
 #endif // TRACE_POS
 
-#ifdef PRINT_ARRAY_NORM
-  FILE * file_array_norm;
-  char * name_array_norm = (char *) malloc(sizeof(char) * 1024);
-#endif // PRINT_ARRAY_NORM
   gmp_randstate_t state;
   gmp_randinit_default(state);
   array_spq_t spq;
-  array_spq_init(spq, f->pols[q_side]->deg, H->t);
+  array_spq_init(spq, f->pols[0]->deg, H->t);
 
   uint64_t nb_rel = 0;
   double total_time = 0.0;
@@ -2649,130 +3008,27 @@ int main(int argc, char * argv[])
     init_corner(c, nb_vec, H);
   }
 
-  for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
-    //TODO: print time to build MqLLL.
-    compute_all_spq(spq, q, f->pols[q_side], H, state, deg_bound_factorise,
-        skewness, gal, c, nb_vec, g);
-
-    for (unsigned int i = 0; i < spq->number; i++) {
-      sec = seconds();
-      sec_tot = sec;
-
-      fprintf(outstd, "# Special-q: ");
-      ideal_spq_fprintf_q_g(outstd, spq->spq[i]);
-
-#ifdef TRACE_POS
-      fprintf(file_trace_pos, "# Special-q: ");
-      ideal_spq_fprintf_q_g(file_trace_pos, spq->spq[i]);
-#endif // TRACE_POS
-
-#ifdef TRACE_POS
-      fprintf(file_trace_pos, "MqLLL:\n");
-      mat_Z_fprintf(file_trace_pos, spq->MqLLL[i]);
-#endif // TRACE_POS
-
-#ifndef OLD_NORM
-      memset(max_norm, 0, sizeof(unsigned int) * V);
-#endif // OLD_NORM
-
-      for (unsigned int j = 0; j < V; j++) {
-#ifdef TRACE_POS
-        fprintf(file_trace_pos, "Base: %f\n", pow(2.0, log2_base[j]));
-#endif // TRACE_POS
-
-        sec = seconds();
-        uint64_array_init(indexes[j], array->number_element);
-        array_set_all_elements(array, UCHAR_MAX);
-#ifndef OLD_NORM
-        init_norm(array, max_norm + j, file_trace_pos, H, spq->MqLLL[i], f->pols[j],
-            ideal_spq_get_log(spq->spq[i]) / log2_base[j], !(j ^ q_side),
-            log2_base[j]);
-#else // OLD_NORM
-        init_norm(array, file_trace_pos, pre_compute[j], H, spq->MqLLL[i],
-            f->pols[j], spq->spq[i], !(j ^ q_side));
-#endif // OLD_NORM
-
-#ifdef PRINT_ARRAY_NORM
-#ifndef MPZ_NORM
-        sprintf(name_array_norm, "ARRAY_NORM_%" PRIu64 "_%u.csv", q, j);
-#else // MPZ_NORM
-        sprintf(name_array_norm, "ARRAY_MPZ_NORM_%" PRIu64 "_%u.csv", q, j);
-#endif // MPZ_NORM
-        file_array_norm = fopen(name_array_norm, "w+");
-        fprintf(file_array_norm, "# H: ");
-        sieving_bound_fprintf(file_array_norm, H);
-        fprintf(file_array_norm, "# MqLLL:\n");
-        mat_Z_fprintf_comment(file_array_norm, spq->MqLLL[i]);
-        fprintf(file_array_norm, "# f%u: ", j);
-        mpz_poly_fprintf(file_array_norm, f->pols[j]);
-        number_norm(file_array_norm, array, max_norm[j], log2_base[j]);
-        fclose(file_array_norm);
-#endif // PRINT_ARRAY_NORM
-
-        time[j][0] = seconds() - sec;
-
-#ifdef ASSERT_NORM
-        printf("# ASSERT_NORM side %u.\n", j);
-        assert_norm(array, H, f->pols[j], spq->MqLLL[i], !(j ^ q_side), log2_base[j],
-            ideal_spq_get_log(spq->spq[i]));
-#endif // ASSERT_NORM
-
-        sec = seconds();
-        special_q_sieve(array, file_trace_pos, spq->MqLLL[i], fb[j], H,
-            f->pols[j], outstd, errstd, sieve_start[j], spq->spq[i]);
-        time[j][1] = seconds() - sec;
-        sec = seconds();
-        find_index(indexes[j], array,
-            (unsigned char) ceil(thresh[j] / log2_base[j]));
-        time[j][2] = seconds() - sec;
-
-#ifdef TRACE_POS
-        fprintf(file_trace_pos, "********************\n");
-#endif // TRACE_POS
-      }
-
-      for (unsigned int j = 0; j < V; j++) {
-        fprintf(outstd,
-            "# Log 2 of the maximum of the norms %u: %u.\n", j,
-            max_norm[j]);
-      }
-
-      sec = seconds();
-      nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
-          spq->MqLLL[i], f->pols, H, V, spq->spq[i], q_side, main_side,
-          outstd, gal);
-      sec_cofact = seconds() - sec;
-
-      for (unsigned j = 0; j < V; j++) {
-
-        uint64_array_clear(indexes[j]);
-      }
-
-      fprintf(outstd,
-          "# Time for this special-q: %fs.\n", seconds() - sec_tot);
-      total_time += (seconds() - sec_tot);
-      spq_tot++;
-      for (unsigned int j = 0; j < V; j++) {
-        fprintf(outstd, "# Time to init norm %u: %fs.\n", j,
-            time[j][0]);
-        fprintf(outstd, "# Time to sieve %u: %fs.\n", j, time[j][1]);
-        fprintf(outstd, "# Time to find indexes %u: %fs.\n", j,
-            time [j][2]);
-      }
-
-      fprintf(outstd, "# Time to factorize: %fs.\n", sec_cofact);
-
-      fprintf(outstd,
-          "# ----------------------------------------\n");
-      fprintf(errstd,
-          "# ----------------------------------------\n");
-      fflush(outstd);
-      fflush(errstd);
-
-#ifdef TRACE_POS
-      fprintf(file_trace_pos, "----------------------------------------\n");
-#endif // TRACE_POS
+  if (qfilespq == 0) {
+    for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
+      ASSERT(qfile == NULL);
+      //Use fonction here.
+      do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
+          gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
+          indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
+          &nb_rel, &spq_tot, &total_time);
     }
+  } else if (qfilespq == 1){
+    read_q_file(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
+        c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base, indexes,
+        array, time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
+        &spq_tot, &total_time);
+  } else {
+    ASSERT(qfilespq == 2);
+
+    read_q_file_spq(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
+        c, nb_vec, outstd, file_trace_pos, max_norm, V, log2_base, indexes,
+        array, time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
+        &spq_tot, &total_time);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);
@@ -2801,10 +3057,6 @@ int main(int argc, char * argv[])
   fclose(file_trace_pos);
 #endif // TRACE_POS
 
-#ifdef PRINT_ARRAY_NORM
-  free(name_array_norm);
-#endif // PRINT_ARRAY_NORM
-
   for (unsigned int i = 0; i < V; i++) {
     factor_base_clear(fb[i], H->t);
 #ifdef OLD_NORM
@@ -2832,6 +3084,9 @@ int main(int argc, char * argv[])
   free_saved_chains();
   fclose(outstd);
   fclose(errstd);
+  if (qfile != NULL) {
+    fclose(qfile);
+  }
   mpz_vector_clear(skewness);
   mpz_poly_clear(g);
 
