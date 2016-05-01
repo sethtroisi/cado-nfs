@@ -8,7 +8,6 @@
 ###########################################################################
 
 name = c165
-#tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection
@@ -27,18 +26,18 @@ tasks.polyselect.nrkeep = 900
 # Sieve
 ###########################################################################
 
-rlim = 25000000
-alim = 49765624
-lpbr = 30
-lpba = 31
-tasks.sieve.mfbr = 70
-tasks.sieve.mfba = 96
-tasks.sieve.rlambda = 2.0875
-tasks.sieve.alambda = 3.2125
-tasks.sieve.ncurves0 = 13
-tasks.sieve.ncurves1 = 7
-
+rlim = 32597942
+alim = 26165833
+lpbr = 29
+lpba = 30
+tasks.sieve.mfbr = 92
+tasks.sieve.mfba = 91
+tasks.sieve.rlambda = 2.119140659504046
+tasks.sieve.alambda = 2.884388719543129
+tasks.sieve.ncurves0 = 16
+tasks.sieve.ncurves1 = 10
 tasks.I = 14
+
 tasks.sieve.qrange = 10000
 
 ###########################################################################

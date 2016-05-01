@@ -8,6 +8,10 @@
 #include "gzip.h"
 #include "portability.h"
 
+/* Read all lines which begin with # in the input file, until we find one
+ * which matches the desided format.
+ */
+
 void
 purgedfile_read_firstline (const char *fname, uint64_t *nrows, uint64_t *ncols)
 {
@@ -17,7 +21,19 @@ purgedfile_read_firstline (const char *fname, uint64_t *nrows, uint64_t *ncols)
     fprintf(stderr, "%s: %s\n", fname, strerror(errno));
     abort();
   }
-  int ret = fscanf(f_tmp, "# %" SCNu64 " %" SCNu64 "", nrows, ncols);
-  ASSERT_ALWAYS (ret == 2);
+  char buf[1024];
+  while (fgets(buf, sizeof(buf), f_tmp)) {
+      if (*buf != '#') {
+          break;
+      }
+      int ret = sscanf(buf, "# %" SCNu64 " %" SCNu64 "", nrows, ncols);
+      if (ret == 2) {
+          fclose_maybe_compressed(f_tmp, fname);
+          return;
+      }
+  }
+  fprintf(stderr,
+          "Parse error while reading %s: no header line with desired format\n", fname);
   fclose_maybe_compressed(f_tmp, fname);
+  exit(EXIT_FAILURE);
 }

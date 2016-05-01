@@ -89,7 +89,8 @@ extern void param_list_clear(param_list pl);
 extern void param_list_decl_usage(param_list pl, const char * key,
         const char * doc);
 extern void param_list_print_usage(param_list pl, const char * argv0, FILE *f);
-extern void param_list_usage_header(param_list pl, const char * hdr);
+extern void param_list_usage_header(param_list pl, const char * hdr, ...)
+    ATTR_PRINTF(2, 3);
 
 // takes a file, in the Cado-NFS params format, and stores the dictionary
 // of parameters to pl.

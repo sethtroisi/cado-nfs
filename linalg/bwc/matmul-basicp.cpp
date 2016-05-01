@@ -201,9 +201,9 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 } else if (c == -1) {
                     gfp::sub(rowsum, src[j]);
                 } else if (c > 0) {
-                    gfp::addmul(rowsum, src[j], c);
+                    gfp::addmul_ui(rowsum, src[j], c);
                 } else {
-                    gfp::submul(rowsum, src[j], -c);
+                    gfp::submul_ui(rowsum, src[j], -c);
                 }
             }
             gfp::reduce(dst[i], rowsum, prime, preinverse);
@@ -228,9 +228,9 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 } else if (c == -1) {
                     gfp::sub(tdst[j], src[i]);
                 } else if (c > 0) {
-                    gfp::addmul(tdst[j], src[i], c);
+                    gfp::addmul_ui(tdst[j], src[i], c);
                 } else {
-                    gfp::submul(tdst[j], src[i], -c);
+                    gfp::submul_ui(tdst[j], src[i], -c);
                 }
             }
         }

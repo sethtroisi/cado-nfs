@@ -35,7 +35,7 @@ double m_seconds = 0;
 /* u and dst may be equal */
 void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
 {
-    /* now for a split-chunk compute_sm_straightforward */
+    /* now for a split-chunk compute_sm */
 
     if (sm->nsm == 0)
         return;
@@ -113,7 +113,7 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 
 /* Assume nSM > 0 */
 void
-print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
+print_sm2 (FILE *f, mpz_poly_t SM, int nSM, int d, const char * delim)
 {
   if (nSM == 0)
     return;
@@ -128,14 +128,21 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
     if (d > SM->deg)
       fprintf(f, " 0");
     else
-      gmp_fprintf(f, " %Zu", SM->coeff[d]);
+      gmp_fprintf(f, "%s%Zu", delim, SM->coeff[d]);
   }
   //fprintf(f, "\n");
 }
+void
+print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
+{
+    print_sm2(f, SM, nSM, d, " ");
+}
+
 
 void
 sm_relset_init (sm_relset_t r, int *d, int nb_polys)
 {
+  r->nb_polys = nb_polys;
   for (int side = 0; side < nb_polys; side++) {
     mpz_poly_init (r->num[side], d[side]);
     mpz_poly_init (r->denom[side], d[side]);
@@ -150,6 +157,17 @@ sm_relset_clear (sm_relset_t r, int nb_polys)
     mpz_poly_clear (r->denom[side]);
   }
 }
+
+void
+sm_relset_copy (sm_relset_t r, sm_relset_srcptr s)
+{
+  r->nb_polys = s->nb_polys;
+  for (int side = 0; side < r->nb_polys; side++) {
+    mpz_poly_set (r->num[side], s->num[side]);
+    mpz_poly_set (r->denom[side], s->denom[side]);
+  }
+}
+
 
 /* Given an array of index of rows and an array of abpolys,
  * construct the polynomial that corresponds to the relation-set, i.e. 

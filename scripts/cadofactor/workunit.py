@@ -19,6 +19,7 @@ class Workunit(object):
         ("FILE", _ChecksummedKey),
         ("EXECFILE", _ChecksummedKey),
         ("SUGGEST_EXECFILE", _ScalarKey),
+        ("DEADLINE", _ScalarKey),
         ("COMMAND", _ListKey), ("RESULT", _ListKey), ("DELETE", _ListKey), 
         ("CHECKSUM", _ListKey))
     # The type for CHECKSUM does not really matter so long as it's not 
