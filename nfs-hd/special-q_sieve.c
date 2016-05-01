@@ -2480,6 +2480,14 @@ void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
         [fb[q_side]->number_element_u - 1]->ideal->r);
 #endif // Q_BELOW_FBB
 
+#ifndef NDEBUG
+    mpz_t z;
+    mpz_init(z);
+    mpz_set_uint64(z, q);
+    ASSERT(mpz_probab_prime_p(z, 20) != 0);
+    mpz_clear(z);
+#endif // NDEBUG
+
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
         gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
         indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
@@ -2615,6 +2623,15 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     }
 #endif // NDEBUG
 #endif // Q_BELOW_FBB
+
+#ifndef NDEBUG
+    mpz_t z;
+    mpz_init(z);
+    mpz_set_uint64(z, q);
+    ASSERT(mpz_probab_prime_p(z, 20) != 0);
+    mpz_clear(z);
+#endif // NDEBUG
+
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
         gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
         indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
