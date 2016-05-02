@@ -155,8 +155,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
   free(lpb_size);
 
-  unsigned int area_size = 40;
-  param_list_parse_uint(pl, "area", &area_size);
+  double area_size = 40.0;
+  param_list_parse_double(pl, "area", &area_size);
   * area = pow(2.0, (double) area_size);
 
   param_list_parse_uint(pl, "N", N);

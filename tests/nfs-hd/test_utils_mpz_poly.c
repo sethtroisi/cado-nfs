@@ -1,7 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "makefb.h"
+#include "utils_mpz_poly.h"
 
 /* Come from test/utils/test_mpz_poly.c */
 static void mpz_poly_setcoeffs_si_var(mpz_poly_t f, int d, ...)

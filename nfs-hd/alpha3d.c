@@ -3,6 +3,7 @@
 #include <math.h>
 #include <time.h>
 #include "alpha3d.h"
+#include "utils_mpz_poly.h"
 
 static double expect_val_p(mpz_poly_srcptr f, unsigned long p, gmp_randstate_t state)
 {
@@ -12,7 +13,11 @@ static double expect_val_p(mpz_poly_srcptr f, unsigned long p, gmp_randstate_t s
   mpz_poly_factor_list lf;
   mpz_poly_factor_list_init(lf);
 
-  mpz_poly_factor(lf, f, p_Z, state);
+  if (p == 2) {
+    mpz_poly_factor2(lf, f);
+  } else {
+    mpz_poly_factor(lf, f, p_Z, state);
+  }
   unsigned int nr1 = 0;
   unsigned int nr2 = 0;
 

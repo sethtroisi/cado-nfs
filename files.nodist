@@ -205,3 +205,5 @@ README.nfs-hd
 nfs-hd/automatic_p6bd40.sh
 nfs-hd/check_relations/
 parameters/nfs-hd/
+nfs-hd/utils_mpz_poly.h
+nfs-hd/utils_mpz_poly.c
