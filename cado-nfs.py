@@ -77,11 +77,14 @@ if __name__ == '__main__':
     logfilename = os.path.join(wdir, name + ".log")
     filehandler = cadologger.FileHandler(filename = logfilename, lvl = filelvl)
     logger.addHandler(filehandler)
+
     
     logger.info("Command line parameters: %s", 
                 " ".join([shellquote(arg, idx == 0) for idx, arg in enumerate(sys.argv)]))
 
+
     logger.debug("Root parameter dictionary:\n%s", parameters)
+
 
     # Write a snapshot of the parameters to a file
     for counter in itertools.count():
@@ -93,13 +96,14 @@ if __name__ == '__main__':
         logger.debug("Writing parameter snapshot to %s", snapshot_filename)
         snapshot_file.write(str(parameters))
         snapshot_file.write("\n")
-    
+
     logger.info("If this computation gets interrupted, it can be resumed with %s %s", sys.argv[0], snapshot_filename)
 
     wudb_file = os.path.join(wdir, name + ".db")
     factorjob = cadotask.CompleteFactorization(db=wudb_file,
                                                parameters = parameters,
                                                path_prefix = [])
+
     factors = factorjob.run()
     
     dlp_param = parameters.myparams({"dlp": False,}, "")
@@ -108,7 +112,6 @@ if __name__ == '__main__':
     checkdlp = checkdlp_param["checkdlp"]
     target_param = parameters.myparams({"target": 0,}, "")
     target = int(target_param["target"])
-
     if factors is None:
         toplevel_params.purge_temp_files(nopurge=True)
         sys.exit("Error occurred, terminating")
