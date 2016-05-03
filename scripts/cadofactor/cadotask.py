@@ -4358,9 +4358,7 @@ class SqrtTask(Task):
                 with stdoutpath.open("r") as stdoutfile:
                     stdout = stdoutfile.read()
                 lines = stdout.splitlines()
-                # Skip last factor which cannot produce a new split on top
-                # of what the smaller factors did
-                for line in lines[:-1]:
+                for line in lines:
                     if line == "Failed":
                         continue # try next lines (if any) in multi-thread mode
                     self.add_factor(int(line))
