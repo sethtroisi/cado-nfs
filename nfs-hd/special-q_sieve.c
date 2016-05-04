@@ -2108,7 +2108,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
 #ifdef TIME_SIEVES
   time_space_sieve = seconds() - time_space_sieve;
-  ideal_space_sieve = i - ideal_line_sieve - ideal_space_sieve;
+  ideal_space_sieve = i - ideal_line_sieve - ideal_plane_sieve;
 #endif // TIME_SIEVES
 
   mat_int64_clear(Mqr);
