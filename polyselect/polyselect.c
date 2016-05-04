@@ -59,9 +59,11 @@ double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
 double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
+double min_exp_E = LOGNORM_MAX, max_exp_E = 0.0,
+  aver_exp_E = 0.0, var_exp_E = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
-double *best_opt_logmu, *best_logmu;
+double *best_opt_logmu, *best_exp_E;
 double optimize_time = 0.0;
 mpz_t admin, admax;
 int tries = 0;
@@ -147,7 +149,7 @@ print_poly_info ( mpz_t *f,
                   const char *prefix )
 {
   unsigned int i, nroots;
-  double skew, logmu, alpha, alpha_proj, exp_E;
+  double skew, logmu, exp_E;
   mpz_poly_t F, G;
   F->coeff = f;
   F->deg = d;
@@ -163,18 +165,13 @@ print_poly_info ( mpz_t *f,
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
-  logmu += expected_rotation_gain (F, G);
-  alpha = get_alpha (F, ALPHA_BOUND);
-  alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
+  exp_E = logmu + expected_rotation_gain (F, G);
   if (raw == 1)
-    printf ("# raw lognorm ");
+    printf ("# raw exp_E");
   else
-    printf ("# lognorm ");
-  printf ("%1.2f, skew %1.2f, alpha %1.2f (proj: %1.2f), E %1.2f"
-          ", exp_E %1.2f, %u rroots\n",
-          logmu, skew, alpha, alpha_proj, logmu + alpha,
-          exp_E, nroots);
-
+    printf ("# exp_E");
+  printf (" %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
+          exp_E, logmu, skew, nroots);
 }
 
 
@@ -232,16 +229,14 @@ output_polynomials (mpz_t *fold, const unsigned long d, mpz_t *gold,
   mutex_unlock (&lock);
 }
 
-void
-output_skipped_poly (const double logmu, const mpz_t ad,
-                     const mpz_t l, const mpz_t g0)
+static void
+output_skipped_poly (const mpz_t ad, const mpz_t l, const mpz_t g0)
 {
   mpz_t m;
   mpz_init(m);
   mpz_neg(m, g0); 
   mutex_lock (&lock);
-  gmp_printf ("# Skip polynomial: %.2f, ad: %Zd, l: %Zd, m: %Zd\n",
-              logmu, ad, l, m);
+  gmp_printf ("# Skip polynomial: %.2f, ad: %Zd, l: %Zd, m: %Zd\n", ad, l, m);
   mutex_unlock (&lock);
   mpz_clear(m);
 }
@@ -294,11 +289,11 @@ sorted_insert_double(double *array, const size_t len, const double value)
 /* return 1 if the polynomial is ok and among the best ones,
    otherwise return 0 */
 static int
-optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g)
+optimize_raw_poly (mpz_poly_t F, mpz_t *g)
 {
   double skew;
   mpz_t t;
-  double st;
+  double st, logmu, exp_E;
 
   /* check that the algebraic polynomial has content 1, otherwise skip it */
   mpz_init (t);
@@ -325,19 +320,28 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g)
   mutex_unlock (&lock);
 
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-  *logmu = L2_lognorm (F, skew);
+  logmu = L2_lognorm (F, skew);
+  exp_E = logmu + expected_rotation_gain ((mpz_poly_ptr) F, (mpz_poly_ptr) G);
 
-  sorted_insert_double (best_opt_logmu, keep, *logmu);
-  sorted_insert_double (best_logmu, keep, *logmu);
+  sorted_insert_double (best_opt_logmu, keep, logmu);
+  sorted_insert_double (best_exp_E, keep, exp_E);
 
   mutex_lock (&lock);
   collisions_good ++;
-  aver_opt_lognorm += *logmu;
-  var_opt_lognorm += *logmu * *logmu;
-  if (*logmu < min_opt_lognorm)
-    min_opt_lognorm = *logmu;
-  if (*logmu > max_opt_lognorm)
-    max_opt_lognorm = *logmu;
+
+  aver_opt_lognorm += logmu;
+  var_opt_lognorm += logmu * logmu;
+  if (logmu < min_opt_lognorm)
+    min_opt_lognorm = logmu;
+  if (logmu > max_opt_lognorm)
+    max_opt_lognorm = logmu;
+
+  aver_exp_E += exp_E;
+  var_exp_E += exp_E * exp_E;
+  if (exp_E < min_exp_E)
+    min_exp_E = exp_E;
+  if (exp_E > max_exp_E)
+    max_exp_E = exp_E;
 
   mutex_unlock (&lock);
 
@@ -503,7 +507,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  did_optimize = optimize_raw_poly (&logmu, F, g);
+  did_optimize = optimize_raw_poly (F, g);
 
   if (did_optimize && out != NULL)
     output_msieve (out, d, F->coeff, g);
@@ -513,7 +517,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
     output_polynomials (fold, d, gold, N, F->coeff, g);
   
   if (!did_optimize && verbose >= 1)
-    output_skipped_poly (logmu, ad, l, g[0]);
+    output_skipped_poly (ad, l, g[0]);
 
   mpz_clear (l);
   mpz_clear (m);
@@ -671,7 +675,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  did_optimize = optimize_raw_poly (&logmu, F, g);
+  did_optimize = optimize_raw_poly (F, g);
 
   if (did_optimize && out != NULL)
     output_msieve(out, d, F->coeff, g);
@@ -681,7 +685,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     output_polynomials (fold, d, gold, N, F->coeff, g);
   
   if (!did_optimize && verbose >= 1)
-    output_skipped_poly (logmu, ad, l, g[0]);
+    output_skipped_poly (ad, l, g[0]);
 
   mpz_clear (tmp);
   mpz_clear (l);
@@ -1843,19 +1847,19 @@ main (int argc, char *argv[])
   if (keep > 0) {
     best_opt_logmu = (double *) malloc(keep * sizeof(double));
     ASSERT_ALWAYS(best_opt_logmu != NULL);
-    best_logmu = (double *) malloc(keep * sizeof(double));
-    ASSERT_ALWAYS(best_logmu != NULL);
+    best_exp_E = (double *) malloc(keep * sizeof(double));
+    ASSERT_ALWAYS(best_exp_E != NULL);
   } else {
     /* Allow keep == 0, say, if we want only timings. malloc() may or may not
        return a NULL pointer for a size argument of zero, so we do it
        ourselves. */
     best_opt_logmu = NULL;
-    best_logmu = NULL;
+    best_exp_E = NULL;
   }
   for (size_t i = 0; i < keep; i++)
     {
       best_opt_logmu[i] = LOGNORM_MAX; /* best logmu after size optimization */
-      best_logmu[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
+      best_exp_E[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
     }
 
   /* parse and check N in the first place */
@@ -2003,16 +2007,22 @@ main (int argc, char *argv[])
               / (double) milliseconds ());
       if (collisions > 0)
         {
-          double mean = aver_opt_lognorm / collisions_good;
           double rawmean = aver_raw_lognorm / collisions;
 
           printf ("# Stat: raw lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                   collisions, min_raw_lognorm, rawmean, max_raw_lognorm,
                   sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
           if (collisions_good > 0)
-            printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
-                    collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
-                    sqrt (var_opt_lognorm / collisions_good - mean * mean));
+            {
+              double mean = aver_opt_lognorm / collisions_good;
+              double Emean = aver_exp_E / collisions_good;
+              printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
+                      collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
+                      sqrt (var_opt_lognorm / collisions_good - mean * mean));
+              printf ("# Stat: exp_E (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
+                      collisions_good, min_exp_E, Emean, max_exp_E,
+                      sqrt (var_exp_E / collisions_good - Emean * Emean));
+            }
         }
     }
 
@@ -2030,10 +2040,10 @@ main (int argc, char *argv[])
   /* print best keep values of logmu */
   if (collisions_good > 0)
     {
-      printf ("# Stat: best logmu after size optimization:");
+      printf ("# Stat: best exp_E after size optimization:");
       for (size_t i = 0; i < keep; i++)
-        if (best_opt_logmu[i] < LOGNORM_MAX)
-          printf (" %1.2f", best_opt_logmu[i]);
+        if (best_exp_E[i] < LOGNORM_MAX)
+          printf (" %1.2f", best_exp_E[i]);
       printf ("\n");
     }
 
@@ -2051,7 +2061,7 @@ main (int argc, char *argv[])
   cado_poly_clear (best_poly);
   cado_poly_clear (curr_poly);
   free(best_opt_logmu);
-  free(best_logmu);
+  free(best_exp_E);
   param_list_clear (pl);
 
   return 0;
