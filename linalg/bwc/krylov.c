@@ -108,6 +108,12 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_interleaving_flip(pi);
     pi_interleaving_flip(pi);
 
+    /* I have absolutely no idea why, but the two --apparently useless--
+     * serializing calls around the next block seem to have a beneficial
+     * impact on the SEGv's we see every now and then with --mca
+     * mpi_leave_pinned 1
+     */
+    serialize(pi->m);
     char * v_name = NULL;
     int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
     ASSERT_ALWAYS(rc >= 0);
@@ -148,6 +154,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 #endif
         gmp_randclear(rstate);
     }
+    serialize(pi->m);
 
     mmt_vec check_vector;
     void * ahead = NULL;
