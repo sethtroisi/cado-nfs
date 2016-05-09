@@ -141,6 +141,14 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         }
     }
 
+    /* let's be generous with interleaving protection. I don't want to be
+     * bothered, really */
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+    matmul_top_comm_bench(mmt, bw->dir);
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+
     char * v_name = NULL;
     int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
     ASSERT_ALWAYS(rc >= 0);

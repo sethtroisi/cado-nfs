@@ -161,7 +161,8 @@ class Polynomials(object):
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
-    re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
+    # the 'lognorm' variable now represents the expected E-value
+    re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -225,13 +226,13 @@ class Polynomials(object):
                 self.MurphyParams = match.group(1)
                 self.MurphyE = float(match.group(2))
                 continue
-            # If this is a comment line telling the lognorm,
+            # If this is a comment line telling the expected E-value,
             # extract the value and store it
             match = self.re_lognorm.match(line)
             if match:
                 if self.lognorm != 0:
                     raise PolynomialParseException(
-                        "Line '%s' redefines lognorm value" % line)
+                        "Line '%s' redefines exp_E value" % line)
                 self.lognorm = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
@@ -302,7 +303,7 @@ class Polynomials(object):
             else:
                 arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
-            arr.append("# lognorm %g\n" % self.lognorm)
+            arr.append("# exp_E %g\n" % self.lognorm)
         if len(self.tabpoly) > 0:
             for i in range(len(self.tabpoly)):
                 arr.append("# poly%d = %s\n" % (i, str(self.tabpoly[i])))
@@ -4358,9 +4359,7 @@ class SqrtTask(Task):
                 with stdoutpath.open("r") as stdoutfile:
                     stdout = stdoutfile.read()
                 lines = stdout.splitlines()
-                # Skip last factor which cannot produce a new split on top
-                # of what the smaller factors did
-                for line in lines[:-1]:
+                for line in lines:
                     if line == "Failed":
                         continue # try next lines (if any) in multi-thread mode
                     self.add_factor(int(line))

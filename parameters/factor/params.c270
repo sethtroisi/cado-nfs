@@ -1,3 +1,5 @@
+# those parameters are experimental
+
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
@@ -7,35 +9,38 @@
 # General parameters
 ###########################################################################
 
-name = c145
+name = c270
 
 ###########################################################################
 # Polynomial selection
 ###########################################################################
 
-tasks.polyselect.degree = 5
+tasks.polyselect.degree = 6
 
-tasks.polyselect.P = 400000
-tasks.polyselect.admax = 1e7
-tasks.polyselect.adrange = 1e5
+tasks.polyselect.P = 10000000
+tasks.polyselect.admax = 1e8
+tasks.polyselect.adrange = 1e6
 tasks.polyselect.incr = 60
-tasks.polyselect.nq = 1000
+tasks.polyselect.nq = 1296 # this is 6^4
 tasks.polyselect.nrkeep = 100
+tasks.wutimeout = 18000 # required for rootsieve in degree 6
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-rlim = 10000000
-alim = 20000000
-lpbr = 29
-lpba = 29
-tasks.sieve.mfbr = 58
-tasks.sieve.mfba = 87
-tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.8
+rlim = 100000000000
+alim = 100000000000
+lpbr = 34
+lpba = 35
+tasks.sieve.mfbr = 77
+tasks.sieve.mfba = 102
+tasks.sieve.rlambda = 2.4
+tasks.sieve.alambda = 3.4
+tasks.sieve.ncurves0 = 26
+tasks.sieve.ncurves1 = 21
+tasks.I = 16
 
-tasks.I = 13
 tasks.sieve.qrange = 10000
 
 ###########################################################################
@@ -43,7 +48,7 @@ tasks.sieve.qrange = 10000
 ###########################################################################
 
 tasks.filter.purge.keep = 160
-tasks.filter.maxlevel = 20
+tasks.filter.maxlevel = 25
 tasks.filter.target_density = 170.0
 
 ###########################################################################

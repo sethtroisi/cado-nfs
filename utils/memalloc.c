@@ -1,5 +1,7 @@
 #include "cado.h"
 #include <stdio.h>
+#include <pthread.h>
+
 #include "portability.h"
 #include "utils.h"
 
@@ -9,6 +11,8 @@ static index_t *index_p;
 static unsigned int index_used = BLOCK_SIZE; /* usage of current block */
 static unsigned int index_psize = 0;  /* minimal size of relcompact_list */
 static int index_pcurrent = -1; /* index of current block */
+
+static pthread_mutex_t index_t_malloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* same thing but for ideal_merge_t */
 static ideal_merge_t **idealmerge_plist = NULL;
@@ -25,6 +29,7 @@ index_my_malloc (unsigned int n)
 {
   index_t *ptr;
 
+  pthread_mutex_lock(&index_t_malloc_lock);
   if (index_used + n > BLOCK_SIZE)
   {
     index_used = 0;
@@ -44,6 +49,7 @@ index_my_malloc (unsigned int n)
   }
   ptr = &(index_p[index_used]);
   index_used += n;
+  pthread_mutex_unlock(&index_t_malloc_lock);
   return ptr;
 }
 
@@ -53,6 +59,7 @@ idealmerge_my_malloc (unsigned int n)
 {
   ideal_merge_t *ptr;
 
+  pthread_mutex_lock(&index_t_malloc_lock);
   if (idealmerge_used + n > BLOCK_SIZE)
   {
     idealmerge_used = 0;
@@ -75,12 +82,14 @@ idealmerge_my_malloc (unsigned int n)
   }
   ptr = &(idealmerge_p[idealmerge_used]);
   idealmerge_used += n;
+  pthread_mutex_unlock(&index_t_malloc_lock);
   return ptr;
 }
 
 void
 my_malloc_free_all (void)
 {
+    pthread_mutex_lock(&index_t_malloc_lock);
   for ( ; index_pcurrent >= 0; index_pcurrent--)
   {
     free(index_plist[index_pcurrent]);
@@ -98,6 +107,8 @@ my_malloc_free_all (void)
   index_used = idealmerge_used = BLOCK_SIZE;
   index_psize = idealmerge_psize = 0;
   my_malloc_bytes = 0;
+  pthread_mutex_unlock(&index_t_malloc_lock);
+
 }
 
 inline size_t
