@@ -404,9 +404,9 @@ Stopping the factorization during a specific step:
 ==================================================
 It is possible to stop the factorization:
 
-./cado-nfs.py 9037762929200312168400214710176085810924733654900109 tasks.xxxxx.run=false
+./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 tasks.xxxx.run=false
 
-This command works with: polysect, sieve, filter, linalg
+This command works with: xxxx = polyselect, sieve, filter, linalg
 
 
 Known problems:
