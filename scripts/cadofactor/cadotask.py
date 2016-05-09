@@ -5325,16 +5325,18 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         self.start_elapsed_time()
 
         self.servertask.run()
-        
+        tasks=[]
+        for task in self.tasks:
+            tasks.append(task)
         last_task = None
         last_status = True
         try:
             self.start_all_clients()
-            
-            while last_status:
+            i=0
+            while last_status and i<len(tasks):
                 last_status, last_task = self.run_next_task()
-
-            
+                tasks[i].print_stats()
+                i+=1
             for task in self.tasks:
                 task.print_stats()
         
@@ -5410,12 +5412,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                 #self.logger.info("Next task that wants to run: %s", task.title)
                 self.tasks_that_want_to_run.remove(task)
                 return [task.run(), task.title]
-
-            task.print_stats()
-
-
         return [False, None]
-    
+
     def get_sum_of_cpu_or_real_time(self, is_cpu):
         total = 0
         for task in self.tasks:
