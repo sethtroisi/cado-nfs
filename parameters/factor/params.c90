@@ -214,7 +214,9 @@ tasks.polyselect.sopteffort = 0
 
 tasks.polyselect.ropteffort = 5
     # Indicates how much effort is spent in stage 2 (rootsieve) of the
-    # polynomial selection.
+    # polynomial selection. The number of sublattices considered is
+    # proportional to ropteffort, and the rootsieve time is roughly
+    # proportional to ropteffort.
 
 
 ###########################################################################
