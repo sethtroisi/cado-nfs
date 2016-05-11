@@ -5324,18 +5324,19 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         self.start_elapsed_time()
 
         self.servertask.run()
-        tasks=[]
-        for task in self.tasks:
-            tasks.append(task)
         last_task = None
         last_status = True
         try:
+            tasks=[]
+            for i in range(len(self.tasks)):
+                tasks.append(self.tasks[i])
             self.start_all_clients()
             i=0
-            while last_status and i<len(tasks):
+            while last_status:
                 last_status, last_task = self.run_next_task()
-                tasks[i].print_stats()
-                i+=1
+                if i<len(self.tasks):
+                    self.tasks[i].print_stats()
+                    i+=1
             for task in self.tasks:
                 task.print_stats()
         
