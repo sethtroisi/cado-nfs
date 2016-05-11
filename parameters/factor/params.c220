@@ -21,7 +21,7 @@ tasks.polyselect.adrange = 1e6
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1296 # this is 6^4
 tasks.polyselect.nrkeep = 100
-tasks.wutimeout = 18000 # required for rootsieve in degree 6
+tasks.wutimeout = 24000 # required for rootsieve in degree 6
 
 ###########################################################################
 # Sieve
