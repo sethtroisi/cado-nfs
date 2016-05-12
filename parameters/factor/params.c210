@@ -1,3 +1,5 @@
+# experimental parameters
+
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
@@ -7,7 +9,7 @@
 # General parameters
 ###########################################################################
 
-name = c220
+name = c210
 
 ###########################################################################
 # Polynomial selection
@@ -21,14 +23,14 @@ tasks.polyselect.adrange = 1e6
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1296 # this is 6^4
 tasks.polyselect.nrkeep = 100
-tasks.wutimeout = 24000 # required for rootsieve in degree 6
+tasks.wutimeout = 18000 # required for rootsieve in degree 6
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-rlim = 500000000
-alim = 800000000
+rlim = 250000000
+alim = 500000000
 lpbr = 34
 lpba = 35
 tasks.sieve.mfbr = 77
@@ -37,7 +39,7 @@ tasks.sieve.rlambda = 2.4
 tasks.sieve.alambda = 3.4
 tasks.sieve.ncurves0 = 26
 tasks.sieve.ncurves1 = 21
-tasks.I = 16
+tasks.I = 15
 
 tasks.sieve.qrange = 10000
 
@@ -47,7 +49,7 @@ tasks.sieve.qrange = 10000
 
 tasks.filter.purge.keep = 160
 tasks.filter.maxlevel = 25
-tasks.filter.target_density = 175.0
+tasks.filter.target_density = 170.0
 
 ###########################################################################
 # Linear algebra
