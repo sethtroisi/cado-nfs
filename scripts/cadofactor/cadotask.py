@@ -23,7 +23,7 @@ import workunit
 from struct import error as structerror
 from shutil import rmtree
 from workunit import Workunit
-
+import sys
 # Patterns for floating-point numbers
 # They can be used with the string.format() function, e.g.,
 # re.compile("value = {cap_fp}".format(**REGEXES))
@@ -2893,6 +2893,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             self.add_file(filename)
 
     def get_statistics_as_strings(self):
+        if len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false":
+            self.logger.info("not run (tasks.sieve.run=false)")
+            sys.exit("Factorization stopped")
         strings = ["Total number of relations: %d" % self.get_nrels()]
         strings += super().get_statistics_as_strings()
         return strings
@@ -2933,6 +2936,8 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
 
 class Duplicates1Task(Task, FilesCreator, HasStatistics):
     """ Removes duplicate relations """
+    global m
+    m = 0
     @property
     def name(self):
         return "duplicates1"
@@ -2941,6 +2946,12 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
+        global m
+        m+=1
+        #print("m = ", m)
+        if m ==2 and len(sys.argv)>2 and sys.argv[2]=="tasks.filter.run=false":
+            self.logger.info("not run (tasks.filter.run=false)")
+            sys.exit("Factorization stopped")
         return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
     @property
     def paramnames(self):
@@ -2979,7 +2990,6 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     
     def run(self):
         super().run()
-
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
@@ -3194,7 +3204,6 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     
     def run(self):
         super().run()
-
         input_nrel = 0
         for i in range(0, self.nr_slices):
             files = self.send_request(Request.GET_DUP1_FILENAMES, i.__eq__)
@@ -3331,7 +3340,6 @@ class PurgeTask(Task):
     
     def run(self):
         super().run()
-
         if not (self.params["galois"] in ["1/y", "_y", "autom3.1g", "autom3.2g"]):
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
@@ -3444,7 +3452,6 @@ class PurgeTask(Task):
         Given 'nunique' relations and an excess of 'excess',
         estimate how many new (unique) relations we need.
         """
-        
         additional = nunique * self.params["add_ratio"]
         # if the excess is negative, we need at least -excess new relations
         if excess < 0:
@@ -3588,7 +3595,6 @@ class FilterGaloisTask(Task):
         # This task must be run only if galois is recognized by filter_galois
         if not (self.params["galois"] in ["1/y", "_y", "autom3.1g", "autom3.2g"]):
             return True
-
         super().run()
 
         files = self.send_request(Request.GET_UNIQUE_FILENAMES)
@@ -4045,6 +4051,8 @@ class LinAlgDLPTask(Task):
 
 class LinAlgTask(Task, HasStatistics):
     """ Runs the linear algebra step """
+    global n
+    n = 0
     @property
     def name(self):
         return "bwc"
@@ -4053,12 +4061,16 @@ class LinAlgTask(Task, HasStatistics):
         return "Linear Algebra"
     @property
     def programs(self):
+        global n
+        n= n+1
+        if n ==2 and len(sys.argv)>2 and sys.argv[2]=="tasks.linalg.run=false":
+            self.logger.info("not run (tasks.linalg.run=false)")
+            sys.exit("Factorization stopped")
         return ((cadoprograms.BWC, ("complete", "matrix",  "wdir", "nullspace"),
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"allow_wipeout": False})
-
     @property
     def stat_conversions(self):
         return (
@@ -4186,7 +4198,6 @@ class LinAlgTask(Task, HasStatistics):
     
     def run(self):
         super().run()
-
         if self.state["ran_already"] and self.have_new_input_files():
             if self.params["allow_wipeout"]:
                 self.logger.warn("Ran before, but input files have changed. "
@@ -4270,7 +4281,6 @@ class CharactersTask(Task):
     
     def run(self):
         super().run()
-
         if not "kernel" in self.state or self.have_new_input_files():
             kernelfilename = self.workdir.make_filename("kernel")
             (stdoutpath, stderrpath) = \
@@ -5256,9 +5266,19 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             if self.params["target"]:
                 self.tasks = self.tasks + (self.descent,)
         else:
-            self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving, self.dup1, self.dup2, self.purge,
-                          self.merge, self.linalg, self.characters, self.sqrt)
+            if len(sys.argv)>2:
+                if sys.argv[2] == "tasks.sieve.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving)
+                if sys.argv[2] == "tasks.filter.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
+				 self.dup1)
+                if sys.argv[2] == "tasks.linalg.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
+				 self.dup1, self.purge, self.merge, self.linalg)
+            else:
+                self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                              self.sieving, self.dup1, self.dup2, self.purge,
+                      self.merge, self.linalg, self.characters, self.sqrt)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
@@ -5326,10 +5346,10 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         self.servertask.run()
         last_task = None
         last_status = True
+        tasks=[]
+        for i in range(len(self.tasks)):
+            tasks.append(self.tasks[i])
         try:
-            tasks=[]
-            for i in range(len(self.tasks)):
-                tasks.append(self.tasks[i])
             self.start_all_clients()
             i=0
             while last_status:
@@ -5339,7 +5359,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                     i+=1
             for task in self.tasks:
                 task.print_stats()
-        
         except KeyboardInterrupt:
             self.logger.fatal("Received KeyboardInterrupt. Terminating")
             had_interrupt = True
