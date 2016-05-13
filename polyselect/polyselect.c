@@ -1809,7 +1809,7 @@ main (int argc, char *argv[])
   unsigned long P = 0;
   int quiet = 0, nthreads = 1, st;
   tab_t *T;
-  pthread_t tid[MAX_THREADS];
+  pthread_t *tid;
 
   mpz_init (N);
   mpz_init (admin);
@@ -1912,11 +1912,9 @@ main (int argc, char *argv[])
     exit (1);
   }
 
-  /* check nthreads */
-  if (nthreads > MAX_THREADS) {
-    fprintf (stderr, "Error, nthreads should be <= %d\n", MAX_THREADS);
-    exit (1);
-  }
+  /* allocate threads */
+  tid = malloc (nthreads * sizeof (pthread_t));
+  ASSERT_ALWAYS(tid != NULL);
 
   /* quiet mode */
   if (quiet == 1)
@@ -2063,6 +2061,7 @@ main (int argc, char *argv[])
   free(best_opt_logmu);
   free(best_exp_E);
   param_list_clear (pl);
+  free (tid);
 
   return 0;
 }
