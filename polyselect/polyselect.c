@@ -1270,8 +1270,9 @@ collision_on_batch_sq ( header_t header,
     modredcul_init (qq, modpp);
     modredcul_init (tmp, modpp);
 
-    /* q^2/B (mod pp) */
-    modredcul_intset_ul (tmp, q);
+    /* q^2/B (mod pp). Warning: for large nq, we might have q > p^2, therefore
+       we must first reduce q mod p^2 before calling modredcul_intset_ul. */
+    modredcul_intset_ul (tmp, q % pp);
     modredcul_sqr (qq, tmp, modpp);
     /* B/q^2 (mod pp) */
     modredcul_intinv (tmp, qq, modpp);
