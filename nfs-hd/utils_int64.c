@@ -115,7 +115,11 @@ void int64_gcdext(int64_t * e, int64_t * s, int64_t * t, int64_t a, int64_t b)
   mpz_gcdext(e_Z, s_Z, t_Z, a_Z, b_Z);
 
   ASSERT(mpz_cmp_ui(e_Z, 0) > 0);
-  * e = mpz_get_ui(e_Z);
+  ASSERT(mpz_sizeinbase(e_Z, 2) < 63);
+  ASSERT(mpz_sizeinbase(s_Z, 2) < 63);
+  ASSERT(mpz_sizeinbase(t_Z, 2) < 63);
+
+  * e = mpz_get_si(e_Z);
   * s = mpz_get_si(s_Z);
   * t = mpz_get_si(t_Z);
 
