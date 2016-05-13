@@ -5287,7 +5287,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
          #   if len(sys.argv)>2 and sys.argv[2] == "tasks.linalg.run=false":
          #       self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving, self.dup1, self.purge, self.merge, self.linalg)
             else:
-                print(sys.argv[2], len(sys.argv))
                 self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving, self.dup1, self.dup2, self.purge, self.merge, self.linalg, self.characters, self.sqrt)
 
         for (path, key, value) in parameters.get_unused_parameters():
