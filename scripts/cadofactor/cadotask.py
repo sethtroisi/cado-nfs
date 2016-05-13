@@ -2650,6 +2650,8 @@ class FreeRelTask(Task):
 class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                   patterns.Observer):
     """ Does the sieving, uses client/server """
+    global k
+    k=0
     @property
     def name(self):
         return "sieving"
@@ -2658,6 +2660,11 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return "Lattice Sieving"
     @property
     def programs(self):
+        global k
+        k=k+1
+        if k==2 and len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false":
+            self.logger.info("not run (tasks.sieve.run=false)")
+            sys.exit("Factorization stopped")
         override = ("q0", "q1", "factorbase", "out", "stats_stderr")
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
         return ((cadoprograms.Las, override, input),)
@@ -2893,9 +2900,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             self.add_file(filename)
 
     def get_statistics_as_strings(self):
-        if len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false":
-            self.logger.info("not run (tasks.sieve.run=false)")
-            sys.exit("Factorization stopped")
+        #if len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false":
+            #self.logger.info("not run (tasks.sieve.run=false)")
+            #sys.exit("Factorization stopped")
         strings = ["Total number of relations: %d" % self.get_nrels()]
         strings += super().get_statistics_as_strings()
         return strings
@@ -5257,8 +5264,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             if self.params["gfpext"] == 1:
                 self.tasks = (self.polysel1, self.polysel2)
             else:
-                self.tasks = (self.polyselgfpn,)
-            self.tasks = self.tasks + (self.nmbrthry, self.fb,
+                self.tasks = (self.polyselgfpn)
+                self.tasks = self.tasks + (self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2,
                           self.filtergalois, self.purge, self.merge,
@@ -5266,19 +5273,22 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             if self.params["target"]:
                 self.tasks = self.tasks + (self.descent,)
         else:
-            if len(sys.argv)>2:
-                if sys.argv[2] == "tasks.sieve.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving)
-                if sys.argv[2] == "tasks.filter.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
-				 self.dup1)
-                if sys.argv[2] == "tasks.linalg.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
-				 self.dup1, self.purge, self.merge, self.linalg)
+            if len(sys.argv)==3:
+                if sys.argv[2]=='tasks.sieve.run=false':
+                    self.tasks=(self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving)
+                if sys.argv[2]=="tasks.filter.run=false":
+                    self.tasks=(self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving, self.dup1)
+                if sys.argv[2]=="tasks.linalg.run=false":
+                    self.tasks=(self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving, self.dup1, self.dup2, self.purge, self.merge, self.linalg)
+        	#if len(sys.argv)>2 and sys.argv[2] == "tasks.sieve.run=false":
+        #        self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving)
+         #   if len(sys.argv)>2 and sys.argv[2] == "tasks.filter.run=false":
+         #       self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving, self.dup1)
+         #   if len(sys.argv)>2 and sys.argv[2] == "tasks.linalg.run=false":
+         #       self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving, self.dup1, self.purge, self.merge, self.linalg)
             else:
-                self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                              self.sieving, self.dup1, self.dup2, self.purge,
-                      self.merge, self.linalg, self.characters, self.sqrt)
+                print(sys.argv[2], len(sys.argv))
+                self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving, self.dup1, self.dup2, self.purge, self.merge, self.linalg, self.characters, self.sqrt)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
