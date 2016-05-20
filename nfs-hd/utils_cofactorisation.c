@@ -53,7 +53,7 @@ static void factor_append(factor_ptr factor, mpz_srcptr z)
   factor->number++;
 }
 
-static unsigned int factor_remove(factor_ptr factor, mpz_srcptr z) {
+MAYBE_UNUSED static unsigned int factor_remove(factor_ptr factor, mpz_srcptr z) {
   unsigned int found = 0;
   unsigned int i = 0;
   for ( ; i < factor->number; i++) {
@@ -207,6 +207,7 @@ static void sort_factor(factor_ptr factor)
       sizeof(factor->factorization[0]), compare_factor);
 }
 
+#ifndef NOT_PRINT_RELATION
 /*
  * Print a relation.
  *
@@ -310,6 +311,7 @@ static void printf_relation(factor_t * factor,
   }
   fprintf(outstd, "\n");
 }
+#endif // NOT_PRINT_RELATION
 
 
 typedef struct {
@@ -574,6 +576,7 @@ static unsigned int is_irreducible(mpz_poly_srcptr a)
   }
 }
 
+#ifndef NOT_PRINT_RELATION
 static void automorphism_6_1(mpz_poly_ptr b, mpz_poly_srcptr a)
 {
   mpz_t * c = (mpz_t *) malloc(sizeof(mpz_t) * 2);
@@ -694,6 +697,7 @@ static void printf_relation_galois(factor_t * factor,
     fprintf(outstd, "# ----------\n");
   }
 }
+#endif // NOT_PRINT_RELATION
 
 /*
  * A potential polynomial is found. Factorise it to verify if it gives a
@@ -708,10 +712,10 @@ static void printf_relation_galois(factor_t * factor,
  * V: number of number fields.
  */
 static void good_polynomial(mpz_poly_srcptr a, const mpz_poly_t * f,
-    unsigned int * L, unsigned int t, unsigned int V, int main,
+    unsigned int * L, MAYBE_UNUSED unsigned int t, unsigned int V, int main,
     facul_aux_data *data, unsigned int * nb_rel_found,
     ideal_spq_srcptr special_q, unsigned int q_side, unsigned int size,
-    FILE * outstd, MAYBE_UNUSED unsigned int * number_factorisation,
+    MAYBE_UNUSED FILE * outstd, MAYBE_UNUSED unsigned int * number_factorisation,
     MAYBE_UNUSED mpz_vector_srcptr c, unsigned int gal, MAYBE_UNUSED unsigned int * nb_rel_gal)
 {
   mpz_t res;
@@ -719,7 +723,7 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly_t * f,
 
   factor_t * factor = (factor_t * ) malloc(sizeof(factor_t) * V);
 
-  unsigned int * assert_facto;
+  MAYBE_UNUSED unsigned int * assert_facto;
 #ifdef ASSERT_FACTO
   assert_facto = (unsigned int * ) malloc(sizeof(unsigned int) * V);
   mpz_t res_tmp;
@@ -840,11 +844,15 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly_t * f,
   }
 
   if (find >= 2) {
+#ifndef NOT_PRINT_RELATION
     printf_relation(factor, a, t, V, outstd, assert_facto, c);
+#endif // NOT_PRINT_RELATION
     (* nb_rel_found)++;
 
     if (gal == 6) {
+#ifndef NOT_PRINT_RELATION
       printf_relation_galois(factor, a, t, V, outstd, assert_facto, c);
+#endif // NOT_PRINT_RELATION
       (* nb_rel_gal) += 5;
     }
   }
