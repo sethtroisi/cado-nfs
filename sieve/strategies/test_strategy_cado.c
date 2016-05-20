@@ -122,23 +122,23 @@ tabular_strategy_t *generate_strategy_cado(tabular_fm_t * methods,
 	    strategy_set_proba(strat, 1.0);
 	fm_free(zero);
     } else {
-      int len = 3 + nb_curves(lpb);
-      //printf ("len  = %d\n", len);
-      ASSERT(len <= methods->index);
-      for (int i = 0; i < len; i++)
-	strategy_add_fm(strat, methods->tab[i]);
+        int len = 3 + nb_curves(lpb);
+        //printf ("len  = %d\n", len);
+        ASSERT(len <= methods->index);
+        for (int i = 0; i < len; i++)
+            strategy_add_fm(strat, methods->tab[i]);
 
-	//eval
-	double p = compute_proba_strategy(tab_dec, strat, fbb, lpb);
+        //eval
+        double p = compute_proba_strategy(tab_dec, strat, fbb, lpb);
 
-	double t = compute_time_strategy(tab_dec, strat, r);
-	/* if (r == CONST_TEST_R) */
-	/*   { */
-	/*     printf ("p =  %lf, t = %lf\n", p, t); */
-	/*     getchar(); */
-	/*   } */
-	strategy_set_proba(strat, p);
-	strategy_set_time(strat, t);
+        double t = compute_time_strategy(tab_dec, strat, r);
+        /* if (r == CONST_TEST_R) */
+        /*   { */
+        /*     printf ("p =  %lf, t = %lf\n", p, t); */
+        /*     getchar(); */
+        /*   } */
+        strategy_set_proba(strat, p);
+        strategy_set_time(strat, t);
     }
 
     tabular_strategy_add_strategy(tab_strat, strat);
