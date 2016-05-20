@@ -448,6 +448,9 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             191907783019725260605646959711
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
 	    plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
+	cado_define_test(full_p31
+            SCRIPT ${CADO_NFS_SOURCE_DIR}./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 workdir=/tmp/cado
+...)
         cado_define_test(test_gfp3
             SCRIPT
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
