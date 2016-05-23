@@ -28,6 +28,9 @@ If we sieve both sides, a relation is earlier if
 - we sieve q on the rational side and it contains a prime q' on the algebraic 
   side in Q_0 less than or equal to q
 
+NOTE: this strategy for the case where we sieve two sides is not implemented.
+Currently, las has no way to know about it.
+
 Then we must go through the various steps the siever does to identify 
 relations and check the conditions that cause the relation to be found or 
 missed.
@@ -87,7 +90,7 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
 sieve_info_ptr
 fill_in_sieve_info(const mpz_t q, const mpz_t rho,
                    const int sq_side, const uint32_t I, const uint32_t J,
-                   facul_strategy_t *strategy[2],
+                   facul_strategies_t *strategies,
                    cado_poly_ptr cpoly, siever_config_srcptr conf)
 {
   sieve_info_ptr new_si;
@@ -105,12 +108,12 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
   /* Allocate memory */
   sieve_info_init_norm_data(new_si);
 
+  new_si->doing = new las_todo_entry();
   mpz_init_set(new_si->doing->p, q);
   mpz_init_set(new_si->doing->r, rho);
   new_si->doing->side = sq_side;
 
-  for (int side = 0; side < 2; side++)
-    new_si->sides[side]->strategy = strategy[side];
+  new_si->strategies = strategies;
   SkewGauss(new_si->qbasis, new_si->doing->p, new_si->doing->r, new_si->cpoly->skew);
   return new_si;
 }
@@ -120,13 +123,12 @@ static sieve_info_ptr
 fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_t b,
                            sieve_info_srcptr old_si)
 {
-  facul_strategy_t *strategies[2] = {old_si->sides[0]->strategy, old_si->sides[1]->strategy};
   mpz_t sq, rho;
   mpz_init_set_ui(sq, p);
   mpz_init(rho);
   compute_a_over_b_mod_p(rho, a, b, sq);
   return fill_in_sieve_info(sq, rho, old_si->doing->side, old_si->I, old_si->J,
-                            strategies, old_si->cpoly, old_si->conf);
+                            old_si->strategies, old_si->cpoly, old_si->conf);
   mpz_clear(sq);
   mpz_clear(rho);
 }
@@ -135,8 +137,7 @@ void
 clear_sieve_info(sieve_info_ptr new_si)
 {
   sieve_info_clear_norm_data(new_si);
-  mpz_clear(new_si->doing->r);
-  mpz_clear(new_si->doing->p);
+  delete new_si->doing; // this clears doing->p and doing->r as well
   free (new_si);
 }
 

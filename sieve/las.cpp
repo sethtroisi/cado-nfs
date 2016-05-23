@@ -472,11 +472,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     for(int side = 0 ; side < 2 ; side++) {
 	sieve_info_init_trialdiv(si, side); /* Init refactoring stuff */
-
-        // This variable is obsolete (but las-duplicates.cpp still reads
-        // it) FIXME
-        si->sides[side]->strategy = NULL;
-
         reorder_fb(si, side);
         verbose_output_print(0, 2, "# small %s factor base", sidenames[side]);
         size_t nr_roots;
@@ -552,9 +547,6 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
     si->j_div = NULL;
 
     for(int s = 0 ; s < 2 ; s++) {
-        if (si->sides[s]->strategy != NULL)
-	    facul_clear_strategy (si->sides[s]->strategy);
-	si->sides[s]->strategy = NULL;
 	sieve_info_clear_trialdiv(si, s);
         delete si->sides[s]->fb_smallsieved;
         si->sides[s]->fb_smallsieved = NULL;
