@@ -727,7 +727,7 @@ fb_vector<FB_ENTRY_TYPE>::mmap_fbc(void *p, void * const end)
 {
   struct vec_t {
     size_t        size;
-    FB_ENTRY_TYPE data[];
+    FB_ENTRY_TYPE data[0];
   };
   vec_t *v = static_cast<vec_t *>(p);
 
