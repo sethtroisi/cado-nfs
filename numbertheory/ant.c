@@ -951,6 +951,18 @@ void print_polynom(mpz_t* f, int degree){
 	printf("\n");
 }
 
+// We assume that M is a square Matrix and that its size is not 0
+mpz_ptr mpz_mat_trace(mpz_mat_ptr M){
+	mpz_t* p = malloc(sizeof(mpz_t));
+	mpz_init(*p);
+	unsigned int i;
+
+	for(i = 0 ; i < (M->n) ; i++){
+		mpz_add(*p,*p,mpz_mat_entry(M,i,i));
+	}
+	return *p;
+}
+
 int main(int argc, char * argv[])/*{{{*/
 {
 	/*
@@ -1076,7 +1088,7 @@ int main(int argc, char * argv[])/*{{{*/
 			mpz_set(mpz_mat_entry(mul_alpha,i,j),p);
 		}
 
-		mpz_mat_fprint(stdout,mul_alpha);
+
 		
 	}
 }
