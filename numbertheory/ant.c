@@ -1031,16 +1031,53 @@ int main(int argc, char * argv[])/*{{{*/
 
 	if(argc > 1){
 
-		int degree = argc-2;
+		// Initialisation
+		unsigned int degree = argc-2;
 		mpz_t f[degree+1];
+		mpz_mat mul_alpha, id;
+		mpz_mat M, N;
+		mpz_t p;
+		mpz_t minus;
 
-		int i;
+		// Storing the coefficients obtained in the command line in the polynom
+		unsigned int i,j, k;
 		for(i = 0 ; i <= degree ; i++){
 			mpz_init(f[i]);
 			mpz_set_str(f[i],argv[i+1],10);
 		}
 		printf("\n\n");
 		print_polynom(f,degree);
+
+		//Initialising each matrix
+		mpz_mat_init(mul_alpha,degree,degree);
+		mpz_mat_init(id,degree,degree);
+		mpz_mat_init(M,degree,degree);
+		mpz_mat_init(N,degree,degree);
+		mpz_init(p);
+		mpz_init(minus);
+		mpz_mat_set_ui(id,1);
+		mpz_set_si(minus,-1);
+		
+
+		// Filling the coefficients in mul_alpha, the companion matrix of f
+		for(i = 0 ; i < degree ; i++){
+			// Setting the left part of the companion matrix
+			for(j = 0 ; j < degree-1 ; j++){
+				if(i == j+1){ mpz_set_ui(mpz_mat_entry(mul_alpha,i,j),1); }
+				else{ mpz_set_ui(mpz_mat_entry(mul_alpha,i,j),0); }
+			}
+
+			// Computing the coefficients for the column on the right
+			mpz_set(p,f[i]);
+			mpz_mul(p,p,minus);
+			for(k = 1 ; k < degree-1-j ; k++){
+				mpz_mul(p,p,f[degree]);
+			}
+			mpz_set(mpz_mat_entry(mul_alpha,i,j),p);
+		}
+
+		mpz_mat_fprint(stdout,mul_alpha);
+		
 	}
 }
 /*}}}*/
