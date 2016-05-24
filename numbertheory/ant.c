@@ -937,8 +937,8 @@ seconds (void)
 /*}}}*/
 
 
-// Prints the polynom
-void print_polynom(mpz_t* f, int degree){
+// Prints the polynomial
+void print_polynomial(mpz_t* f, int degree){
 	int i;
 	for(i = degree ; i >= 0 ; i--){
 		if(mpz_get_ui(f[i]) != 0){
@@ -1039,7 +1039,7 @@ int main(int argc, char * argv[])/*{{{*/
 
 
 	// Here starts my personal work
-	// We assume that the polynom was given in a command line, by giving its coefficient, in reversed order (first the constant coefficient, etc. And the head coefficient in the end);
+	// We assume that the polynomial was given in a command line, by giving its coefficient, in reversed order (first the constant coefficient, etc. And the head coefficient in the end);
 
 	if(argc > 1){
 
@@ -1051,14 +1051,14 @@ int main(int argc, char * argv[])/*{{{*/
 		mpz_t p;
 		mpz_t minus;
 
-		// Storing the coefficients obtained in the command line in the polynom
+		// Storing the coefficients obtained in the command line in the polynomial
 		unsigned int i,j, k;
 		for(i = 0 ; i <= degree ; i++){
 			mpz_init(f[i]);
 			mpz_set_str(f[i],argv[i+1],10);
 		}
 		printf("\n\n");
-		print_polynom(f,degree);
+		print_polynomial(f,degree);
 
 		//Initialising each matrix
 		mpz_mat_init(mul_alpha,degree,degree);
