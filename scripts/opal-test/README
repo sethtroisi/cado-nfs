@@ -14,6 +14,23 @@ Download OPAL from <https://github.com/dpo/opal>, or clone with
 Install OPAL into your user site directory:
   cd opal && python setup.py install --user
 
+[the following documentation is out-of-date: start of new documentation]
+
+- copy a polynomial file to the current directory, say c60.poly
+- copy a parameter file to the current directory, say params.c60
+- run ./optimize.sh params.c60 c60.poly
+- at the end of the optimization, the optimized parameter file will be
+  params.c60.opt in the current directory. If some optimized variables
+  are at the border of an initial interval (for example if optimize.sh
+  tried 10 <= I <= 12, and the optimized file uses I=10), you might want
+  to rerun the optimization with the new optimized file:
+  $ mv params.c60.opt params.c60
+  $ ./optimize.sh params.c60 c60.poly
+
+(more details at the beginning of the file optimize.sh)
+
+[end of new documentation]
+
 Copy the polynomial file from a c59 factorization to
   scripts/opal-test/c59.polyselect2.poly
 Edit las_run.py so that build_dir variable points to your CADO build
