@@ -5,7 +5,6 @@
 #include <sys/resource.h>	/* for getrusage */
 #include "macros.h"
 
-
 /*{{{ typedefs */
 
 // mpz_t : multiple precision Z-elements ; same for mpq_t
