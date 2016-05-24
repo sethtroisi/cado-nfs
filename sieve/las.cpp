@@ -142,13 +142,9 @@ static void sieve_info_clear_trialdiv(sieve_info_ptr si, int side)/*{{{*/
 /* {{{ Initialize the factor bases */
 void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_list pl)
 {
-    double tfb;
-    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
+    fb_factorbase *fb[2];
 
     for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr pol = las->cpoly->pols[side];
-        sieve_side_info_ptr sis = si->sides[side];
-
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
         fbprime_t bk_thresh1 = si->conf->bucket_thresh1;
         const fbprime_t fbb = si->conf->sides[side]->lim;
@@ -162,24 +158,30 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         }
         const fbprime_t thresholds[4] = {bk_thresh, bk_thresh1, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
-        sis->fb = new fb_factorbase(thresholds, powlim, only_general);
+        fb[side] = si->sides[side]->fb = new fb_factorbase(thresholds, powlim, only_general);
+    }
 
-        if (fbcfilename != NULL) {
-            /* Try to read the factor base cache file. If that fails, because
-               the file does not exist or is not compatible with our parameters,
-               it will be written after we generate the factor bases. */
-            verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
-                   fbcfilename);
-            if (sis->fb->mmap_fbc(fbcfilename)) {
-                verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
-                continue;
-            } else {
-                verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
-            }
-        }
+    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
+
+    if (fbcfilename != NULL) {
+      /* Try to read the factor base cache file. If that fails, because
+         the file does not exist or is not compatible with our parameters,
+         it will be written after we generate the factor bases. */
+      verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
+                           fbcfilename);
+      if (fb_mmap_fbc(fb, fbcfilename)) {
+        verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
+        return;
+      } else {
+        verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
+      }
+    }
+
+    for(int side = 0 ; side < 2 ; side++) {
+        mpz_poly_ptr pol = las->cpoly->pols[side];
 
         if (pol->deg > 1) {
-            tfb = seconds ();
+            double tfb = seconds ();
             char fbparamname[4];
             snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
@@ -189,29 +191,29 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             }
             verbose_output_print(0, 1, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             tfb = seconds () - tfb;
-            if (!sis->fb->read(fbfilename))
+            if (!fb[side]->read(fbfilename))
                 exit(EXIT_FAILURE);
             verbose_output_print(0, 1,
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
                     sidenames[side],
-                    sis->fb->size() >> 20, tfb);
+                    fb[side]->size() >> 20, tfb);
         } else {
-            tfb = seconds ();
+            double tfb = seconds ();
             double tfb_wct = wct_seconds ();
-            sis->fb->make_linear_threadpool ((const mpz_t *) pol->coeff,
+            fb[side]->make_linear_threadpool ((const mpz_t *) pol->coeff,
                     las->nb_threads);
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;
             verbose_output_print(0, 1,
                     "# Creating rational factor base of %zuMb took %1.1fs (%1.1fs real)\n",
-                    sis->fb->size() >> 20, tfb, tfb_wct);
+                    fb[side]->size() >> 20, tfb, tfb_wct);
         }
+    }
 
-        if (fbcfilename != NULL) {
-            verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
-            sis->fb->dump_fbc(fbcfilename);
-            verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
-        }
+    if (fbcfilename != NULL) {
+        verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
+        fb_dump_fbc(fb, fbcfilename);
+        verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
     }
 }
 /*}}}*/
@@ -263,15 +265,15 @@ void reorder_fb(sieve_info_ptr si, int side)
 
     fb_part *small_part = si->sides[side]->fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
-    const std::vector<fb_general_entry> *small_entries = small_part->get_general_vector();
+    const fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si->conf->bucket_thresh;
     fbprime_t costlim = si->conf->td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
-    for(std::vector<fb_general_entry>::const_iterator it = small_entries->begin();
-        it != small_entries->end();
-        it++)
+    for (fb_vector<fb_general_entry>::const_iterator it = small_entries->begin();
+         it != small_entries->end();
+         it++)
     {
         /* The extra conditions on powers of 2 and 3 are related to how
          * pattern-sieving is done.
