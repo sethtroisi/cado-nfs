@@ -7,6 +7,9 @@
 
 
 /*{{{ typedefs */
+
+// mpz_t : multiple precision Z-elements ; same for mpq_t
+// a matric on mpz_t type
 struct mpz_mat_s {
     mpz_t *x;
     unsigned int m,n;
@@ -15,6 +18,7 @@ typedef struct mpz_mat_s mpz_mat[1];
 typedef struct mpz_mat_s * mpz_mat_ptr;
 typedef const struct mpz_mat_s * mpz_mat_srcptr;
 
+// same on mpq_t type
 struct mpq_mat_s {
     mpq_t *x;
     unsigned int m,n;
@@ -933,8 +937,24 @@ seconds (void)
 }
 /*}}}*/
 
+
+// Prints the polynom
+void print_polynom(mpz_t* f, int degree){
+	int i;
+	for(i = degree ; i >= 0 ; i--){
+		if(mpz_get_ui(f[i]) != 0){
+			gmp_printf("%Zd",f[i]);
+			if(i > 0){
+				printf("*x^%d + ",i);
+			}
+		}
+	}
+	printf("\n");
+}
+
 int main(int argc, char * argv[])/*{{{*/
 {
+	/*
     unsigned int m = 8;
     unsigned int n = 5;
     if (argc == 3) {
@@ -961,6 +981,7 @@ int main(int argc, char * argv[])/*{{{*/
     mpz_set_ui(p, 19);
 
     if (0) {
+	printf("\n\nCas 0.1\n\n");
         mpq_mat_urandomm(M, state, p);
         mpq_mat_fprint(stdout, M);
         printf("\n");
@@ -972,6 +993,7 @@ int main(int argc, char * argv[])/*{{{*/
     }
 
     if (0) {
+	printf("\n\nCas 0.2\n\n");
         mpz_mat_urandomm(Mz, state, p);
         mpz_mat_fprint(stdout, Mz);
         printf("\n");
@@ -983,6 +1005,7 @@ int main(int argc, char * argv[])/*{{{*/
     }
 
     if (1) {
+	printf("\n\nCas 1\n\n");
         mpz_mat_realloc(Mz, m, n);
         mpz_mat_urandomm(Mz, state, p);
         mpz_mat_fprint(stdout, Mz); printf("\n");
@@ -1001,5 +1024,24 @@ int main(int argc, char * argv[])/*{{{*/
     mpz_mat_clear(Mz);
     mpz_mat_clear(Tz);
     gmp_randclear(state);
+	*/
+
+
+	// Here starts my personal work
+	// We assume that the polynom was given in a command line, by giving its coefficient, in reversed order (first the constant coefficient, etc. And the head coefficient in the end);
+
+	if(argc > 1){
+
+		int degree = argc-2;
+		mpz_t f[degree+1];
+
+		int i;
+		for(i = 0 ; i <= degree ; i++){
+			mpz_init(f[i]);
+			mpz_set_str(f[i],argv[i+1],10);
+		}
+		printf("\n\n");
+		print_polynom(f,degree);
+	}
 }
 /*}}}*/
