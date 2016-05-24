@@ -5,6 +5,7 @@
 #include <sys/resource.h>	/* for getrusage */
 #include "macros.h"
 
+
 /*{{{ typedefs */
 struct mpz_mat_s {
     mpz_t *x;
