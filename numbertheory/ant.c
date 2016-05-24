@@ -963,6 +963,19 @@ mpz_ptr mpz_mat_trace(mpz_mat_ptr M){
 	return *p;
 }
 
+// We assume that M is a triangular Matrix and that its size is not 0
+mpz_ptr mpz_mat_tr_determinant(mpz_mat_ptr M){
+	mpz_t* p = malloc(sizeof(mpz_t));
+	mpz_init(*p);
+	mpz_set_ui(*p,1);
+	unsigned int i;
+
+	for(i = 0 ; i < (M->n) ; i++){
+		mpz_mul(*p,*p,mpz_mat_entry(M,i,i));
+	}
+	return *p;
+}
+
 int main(int argc, char * argv[])/*{{{*/
 {
 	/*
@@ -1041,13 +1054,13 @@ int main(int argc, char * argv[])/*{{{*/
 	// Here starts my personal work
 	// We assume that the polynom was given in a command line, by giving its coefficient, in reversed order (first the constant coefficient, etc. And the head coefficient in the end);
 
+	
 	if(argc > 1){
 
 		// Initialisation
 		unsigned int degree = argc-2;
 		mpz_t f[degree+1];
-		mpz_mat mul_alpha, id;
-		mpz_mat M, N;
+		mpz_mat mul_alpha, M, D, D2;
 		mpz_t p;
 		mpz_t minus;
 
@@ -1062,12 +1075,12 @@ int main(int argc, char * argv[])/*{{{*/
 
 		//Initialising each matrix
 		mpz_mat_init(mul_alpha,degree,degree);
-		mpz_mat_init(id,degree,degree);
 		mpz_mat_init(M,degree,degree);
-		mpz_mat_init(N,degree,degree);
+		mpz_mat_init(D,degree,degree);
+		mpz_mat_init(D2,2*degree,degree);
 		mpz_init(p);
 		mpz_init(minus);
-		mpz_mat_set_ui(id,1);
+		mpz_mat_set_ui(M,1); // M starts as the identity Matrix
 		mpz_set_si(minus,-1);
 		
 
@@ -1088,8 +1101,38 @@ int main(int argc, char * argv[])/*{{{*/
 			mpz_set(mpz_mat_entry(mul_alpha,i,j),p);
 		}
 
+		// Filling the coefficients in D, whose determinant must be computed to get the discriminant.
+		for(i = 0 ; i < degree ; i++){
+			for(j = 0 ; j <= i ; j++){
+				mpz_set(mpz_mat_entry(D,i-j,j),mpz_mat_trace(M));
+			}
+			mpz_mat_multiply(M,M,mul_alpha);
+		}
+		for(j = 1 ; j < degree ; j++){
+			for(i = degree-1 ; j <= i ; i--){
+				mpz_set(mpz_mat_entry(D,i,j+(degree-1)-i),mpz_mat_trace(M));
+			}
+			mpz_mat_multiply(M,M,mul_alpha);
+		}
 
-		
+
+		// Preparing the HNF
+		mpz_mat_fprint(stdout, mul_alpha); printf("\n");
+		mpz_mat_fprint(stdout, D); printf("\n");
+		mpz_mat_realloc(M,degree,degree);
+        mpz_hnf_backend(D, M);
+        mpz_mat_fprint(stdout, D); printf("\n");
+
+/*
+		mpz_mat_submat_swap(D,0,0,D2,0,0,degree,degree);
+		mpz_hnf_backend(D2,D);
+		mpz_mat_submat_swap(D,0,0,D2,0,0,degree,degree);
+*/
+
+		mpz_set(p,mpz_mat_tr_determinant(D));
+		gmp_printf("The discriminant of Z[f_d * alpha] is %Zd\n\n",p);
+
+	
 	}
 }
 /*}}}*/
