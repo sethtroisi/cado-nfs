@@ -96,8 +96,10 @@ if os.name == "nt":
             f.seek(0)
             msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
             f.seek(pos)
-# could replace "posix" by "posix_disabled" here, cf:
+# could replace "posix" by "xxx" here if os.name is "posix" but you still get
+# the error message "IOError: [Errno 37] No locks available"
 # https://lists.gforge.inria.fr/pipermail/cado-nfs-discuss/2016-May/000634.html
+# https://lists.gforge.inria.fr/pipermail/cado-nfs-discuss/2016-May/000636.html
 elif os.name == "posix":
     import fcntl
     class FileLock(object):
