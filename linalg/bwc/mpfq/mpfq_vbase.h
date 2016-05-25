@@ -6,6 +6,11 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <gmp.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct mpfq_vbase_s;
 typedef struct mpfq_vbase_s * mpfq_vbase_ptr;
 typedef struct mpfq_vbase_s const * mpfq_vbase_srcptr;
@@ -24,7 +29,7 @@ struct mpfq_vbase_s {
     int (*field_degree)(mpfq_vbase_ptr);
     void (*field_init)(mpfq_vbase_ptr);
     void (*field_clear)(mpfq_vbase_ptr);
-    void (*field_specify)(mpfq_vbase_ptr, unsigned long, void *);
+    void (*field_specify)(mpfq_vbase_ptr, unsigned long, const void *);
     void (*field_setopt)(mpfq_vbase_ptr, unsigned long, void *);
     void (*init)(mpfq_vbase_ptr, void *);
     void (*clear)(mpfq_vbase_ptr, void *);
@@ -186,6 +191,10 @@ typedef struct mpfq_vbase_tmpl_s mpfq_vbase_tmpl[1];
 
 void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr, ...);
 void mpfq_vbase_oo_init_templates(mpfq_vbase_tmpl_ptr, mpfq_vbase_ptr, mpfq_vbase_ptr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* MPFQ_VBASE_H_ */
 

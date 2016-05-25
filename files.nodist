@@ -55,6 +55,7 @@ polyselect/rotation_bound.sage
 polyselect/E.sage
 polyselect/MurphyE.sage
 polyselect/twoquadratics.sage
+polyselect/size_optimization.sage
 scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/ecm/CMakeLists-nodist.txt

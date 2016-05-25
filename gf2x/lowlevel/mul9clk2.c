@@ -93,19 +93,39 @@ GF2X_STORAGE_CLASS_mul9
 void gf2x_mul9 (unsigned long *c, const unsigned long *a, const unsigned long *b)
 {
   unsigned long aa[9], bb[9];
+
+  /*
+   * a = al(t) + t^3 * am(t) + t^6 * ah(t)
+   * b = bl(t) + t^3 * bm(t) + t^6 * bh(t)
+   *
+   * aa0 = am + ah
+   * aa1 = al + ah
+   * aa2 = al + am
+   * 
+   * p0e + z^64 * p0o = al * bl
+   * p1e + z^64 * p1o = am * bm
+   * p2e + z^64 * p2o = ah * bh
+   *
+   * aa0 * bb0   = (am*bm + ah*bh + am*bh + ah*bm)
+   * aa1 * bb1   = (al*bl + ah*bh + al*bh + ah*bl)
+   * aa2 * bb2   = (al*bl + am*bm + al*bm + am*bl)
+   *
+   * a*b =  al*bl * t^0
+   *      + (aa2*bb2 + al*bl + am*bm) * t^3
+   *      + (am*bm + al*bl + ah*bh + aa1 * bb1) * t^6
+   *      + (aa0*bb0 + ah*bh + am*bm) * t^9
+   *      + ah*bh * t^12
+   */
   aa[0] = a[3]^a[6];
   aa[1] = a[4]^a[7];
-
   aa[2] = a[5]^a[8];
 
   aa[3] = a[0]^a[6];
   aa[4] = a[1]^a[7];
-
   aa[5] = a[2]^a[8];
 
   aa[6] = a[0]^a[3];
   aa[7] = a[1]^a[4];
-
   aa[8] = a[2]^a[5];
 
   bb[0] = b[3]^b[6];
@@ -114,11 +134,12 @@ void gf2x_mul9 (unsigned long *c, const unsigned long *a, const unsigned long *b
 
   bb[3] = b[0]^b[6];
   bb[4] = b[1]^b[7];
-
   bb[5] = b[2]^b[8];
+
   bb[6] = b[0]^b[3];
   bb[7] = b[1]^b[4];
   bb[8] = b[2]^b[5];
+
 
   __m128i p0e[3], p0o[2];
   __m128i p1e[3], p1o[2];
@@ -159,10 +180,17 @@ void gf2x_mul9 (unsigned long *c, const unsigned long *a, const unsigned long *b
   e = p2e[1]; h=l; l=p2o[1];
   _mm_storeu_si128((__m128i*)(c+14), PXOR3(e, _mm_slli_si128(l, 8), _mm_srli_si128(h, 8)));
 
-  e = p2e[2];
+  e = p2e[2]; h=l;
   _mm_storeu_si128((__m128i*)(c+16), PXOR(e, _mm_srli_si128(h, 8)));
 
   /*
+   * a*b =  al*bl * t^0
+   *      + (aa2*bb2 + al*bl + am*bm) * t^3
+   *      + (am*bm + al*bl + ah*bh + aa1 * bb1) * t^6
+   *      + (aa0*bb0 + ah*bh + am*bm) * t^9
+   *      + ah*bh * t^12
+   *
+   * this is the 64-bit breakdown
   c[0]  =                   p0e[0]                   ^                                           ;
   c[1]  =                   p0e[1]                   ^                   p0o[0]                  ;
   c[2]  =                   p0e[2]                   ^                   p0o[1]                  ;

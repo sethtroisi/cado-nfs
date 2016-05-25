@@ -2,6 +2,7 @@
 
 #include "cado.h"
 #include <stdint.h>
+#include <string.h>
 #include "gmp_aux.h"
 #include "macros.h"
 
@@ -25,6 +26,22 @@ mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
 
   for (i = 0; i < n; i++)
     rp[i] = s1p[i] ^ s2p[i];
+}
+
+void
+mpn_zero(mp_limb_t *rp, mp_size_t n)
+{
+    memset(rp, 0, n * sizeof(mp_limb_t));
+}
+void
+mpn_copyi(mp_limb_t *rp, const mp_limb_t *up, mp_size_t n)
+{
+    memmove(rp, up, n * sizeof(mp_limb_t));
+}
+void
+mpn_copyd(mp_limb_t *rp, const mp_limb_t *up, mp_size_t n)
+{
+    memmove(rp, up, n * sizeof(mp_limb_t));
 }
 #endif
 

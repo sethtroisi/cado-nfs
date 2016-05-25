@@ -4,6 +4,7 @@
 #include <gmp.h>
 
 #include "gmp-hacks.h"
+#include "gmp_aux.h"
 #include "macros.h"
 
 #define  xxxDEBUG_INFINITE_LOOPS
@@ -17,7 +18,7 @@ namespace details {
     template<typename T> struct make_signed {};
     template<> struct make_signed<unsigned long> { typedef long type; };
     template<> struct make_signed<unsigned long long> { typedef long long type; };
-    typedef typename make_signed<mp_limb_t>::type signed_mp_limb_t;
+    typedef make_signed<mp_limb_t>::type signed_mp_limb_t;
 
     template<int n> struct mpn {
         typedef mpn<n> self;
@@ -38,6 +39,14 @@ namespace details {
         bool operator==(self const& a) {
             return memcmp(x, a.x, n * sizeof(mp_limb_t)) == 0;
         }
+        /*
+        bool operator<(self const& a) {
+            return memcmp(x, a.x, n * sizeof(mp_limb_t)) < 0;
+        }
+        bool operator>(self const& a) {
+            return memcmp(x, a.x, n * sizeof(mp_limb_t)) > 0;
+        }
+        */
     };
 
     template<int n_, int extra_, typename T>
@@ -82,12 +91,12 @@ namespace details {
                 T::propagate_borrow(dst + n, cy);
             }
 
-            static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x)
+            static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
             {
                 mp_limb_t cy = mpn_addmul_1(dst, src, n, x);
                 T::propagate_carry(dst + n, cy);
             }
-            static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x)
+            static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
             {
                 mp_limb_t cy = mpn_submul_1(dst, src, n, x);
                 T::propagate_borrow(dst + n, cy);
@@ -180,10 +189,9 @@ namespace details {
              *         a-p*(q0-1) <= a0 + 2p < 4p
              *
              * To compute a-p*(q0-1), we actually compute
-             * a-p*(q0+2^ell-1)+2^ell*p, which is a submul followed by one
+             * a-p*(q0+2^ell-1)+2^ell*p, which is a submul_ui followed by one
              * addition.
              */
-
 
             /* this reduces a in place, and copies the result to r */
             static void reduce(elt & r, elt_ur & a, elt const & p, preinv const & j)
@@ -247,9 +255,11 @@ namespace details {
             }
 
             using super::n;
-            using typename super::elt;
-            using typename super::elt_ur;
-            using typename super::preinv;
+            /* We would prefer write "using typename super::elt" below,
+             * however this is only ok with recent c++ */
+            typedef typename super::elt elt;
+            typedef typename super::elt_ur elt_ur;
+            typedef typename super::preinv preinv;
 
             /* this reduces a in place, and copies the result to r */
             static void reduce(elt & r, elt_ur & a, elt const & p, preinv const & j) {
@@ -272,7 +282,7 @@ namespace details {
                     q0 -= j[0] + 1;
                     mpn_add_n(a + 1, a + 1, p, n);
                 }
-                T::submul(a, p, q0);
+                T::submul_ui(a, p, q0);
                 /*
                    {
                    mp_limb_t cy = mpn_submul_1(a, p, n, q0);
@@ -300,7 +310,7 @@ namespace details {
         };
 
     template<int n, int extra=1>
-        struct gfp : public gfp_middle<n, extra, gfp<n, extra>>
+        struct gfp : public gfp_middle<n, extra, gfp<n, extra> >
     {
     };
 
@@ -330,10 +340,10 @@ namespace details {
                );
         }
 
-        static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x)
+        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
         {
             mp_limb_t foo, bar;
-            asm("# gfp<1, 1>::addmul\n"
+            asm("# gfp<1, 1>::addmul_ui\n"
                 "mulq   %[mult]\n"
                 "addq   %%rax, %[z0]\n"
                 "adcq   $0, %%rdx\n"
@@ -342,10 +352,10 @@ namespace details {
             : "0"(src[0]), [mult]"r1m"(x)
             );
         }
-        static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x)
+        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
         {
             mp_limb_t foo, bar;
-            asm("# gfp<1, 1>::submul\n"
+            asm("# gfp<1, 1>::submul_ui\n"
                 "mulq   %[mult]\n"
                 "subq   %%rax, %[z0]\n"
                 "adcq   $0, %%rdx\n"
@@ -379,9 +389,9 @@ namespace details {
                );
         }
 
-        static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x) {
+        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {
             mp_limb_t foo, bar;
-            asm("# gfp<2, 1>::addmul\n"
+            asm("# gfp<2, 1>::addmul_ui\n"
                 "mulq   %[mult]\n"
                 "addq   %%rax, %[z0]\n"
                 "adcq   $0, %%rdx\n"
@@ -402,9 +412,9 @@ namespace details {
             );
         }
 
-        static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x) {
+        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {
             mp_limb_t foo, bar;
-            asm("# gfp<2, 1>::submul\n"
+            asm("# gfp<2, 1>::submul_ui\n"
                 "mulq   %[mult]\n"
                 "subq   %%rax, %[z0]\n"
                 "adcq   $0, %%rdx\n"
@@ -463,19 +473,19 @@ namespace details {
                );							\
         }								\
         static inline void sub(elt_ur & dst, elt const & src) {		\
-            asm("# gfp<4, 1>::sub\n"					\
+            asm("# gfp<" #n ", 1>::sub\n"					\
                     ADDSUB_CODE ## n(sub, sbb)				\
                );							\
         }								\
-        static inline void addmul(elt_ur & dst, elt const & src, mp_limb_t x) {\
+        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {\
             mp_limb_t foo MAYBE_UNUSED;					\
-            asm ("# gfp<" #n ", 1>::addmul\n"				\
+            asm ("# gfp<" #n ", 1>::addmul_ui\n"				\
                     ADDSUBMUL_CODE ## n(add, adc)			\
             );								\
         }								\
-        static inline void submul(elt_ur & dst, elt const & src, mp_limb_t x) {\
+        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {\
             mp_limb_t foo MAYBE_UNUSED;					\
-            asm("# gfp<" #n ", 1>::submul\n"				\
+            asm("# gfp<" #n ", 1>::submul_ui\n"				\
                     ADDSUBMUL_CODE ## n(sub, sbb)			\
             );								\
         }								\

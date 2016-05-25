@@ -8,7 +8,7 @@
 struct sm_side_info_s {
     int unit_rank;
     int nsm; /* number of SMs that are going to be computed. By default, is
-                equal to unitrank but can be modify by the user. */
+                equal to unitrank but can be modified by the user. */
     mpz_t ell;
     mpz_t ell2;
     mpz_t invl2;        /* barrett precomputed inverse.
@@ -44,6 +44,7 @@ void sm_side_info_print(FILE * out, sm_side_info_srcptr sm);
 
 void sm_relset_init (sm_relset_t r, int *d, int nb_polys);
 void sm_relset_clear (sm_relset_t r, int nb_polys);
+void sm_relset_copy (sm_relset_t r, sm_relset_srcptr s);
 
 // (a,b) -> a - b*x
 void mpz_poly_init_set_ab (mpz_poly_ptr, int64_t, uint64_t);
@@ -62,6 +63,8 @@ void compute_sm_straightforward(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_inf
 
 // Print coeffs of the SM polynomial
 void print_sm (FILE *, mpz_poly_t, int, int);
+// same, with a delimiter
+void print_sm2 (FILE *f, mpz_poly_t SM, int nSM, int d, const char * delim);
 
 /* This does the same as compute_sm_straightforward, except that it works piecewise on
  * the different components. It is thus noticeably faster. Results are

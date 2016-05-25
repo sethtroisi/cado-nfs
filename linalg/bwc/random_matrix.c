@@ -699,6 +699,7 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         return 0;
     }
+
     /* {{{ parse r->nrows, r->ncols, density */
     if ((r->nrows = wild_args[0]) == 0) {
         fprintf(stderr, "Please specify r->nrows\n");
@@ -795,6 +796,7 @@ int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r,
 
     n_argv0 = n_argv = malloc(strlen(rmstring) * sizeof(char*));
     n_argc = 0;
+    n_argv[n_argc++]="random_matrix";
     for(char * q = rmstring, * qq; q != NULL; q = qq) {
         qq = strchr(q, ',');
         if (qq) { *qq++='\0'; }
@@ -802,7 +804,7 @@ int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r,
     }
     /* }}} */
     param_list_init(pl2);
-    int ok = random_matrix_process_data_set_from_args(r, pl2, n_argc, n_argv);
+    int ok = random_matrix_process_data_set_from_args(r, pl2, n_argc-1, n_argv+1);
     if (!ok || param_list_warn_unused(pl2)) {
         fprintf(stderr, "Bad argument list for parameter random_matrix: %s\n", rmstring);
         exit(1);

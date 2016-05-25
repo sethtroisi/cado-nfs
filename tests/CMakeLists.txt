@@ -409,6 +409,14 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         TARGET_DEPENDENCIES
             full_c30_dependencies
             )
+    cado_define_test(full_c65_128
+        SCRIPT
+            ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
+            22381151342911794563007770625342242843893411711318155026160427871
+            tasks.linalg.bwc.m=128 tasks.linalg.bwc.n=128 --server-threads 2
+        TARGET_DEPENDENCIES
+            full_c30_dependencies
+            )
     cado_define_test(nonlinear_c59
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
@@ -440,6 +448,9 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             191907783019725260605646959711
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
 	    plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
+	cado_define_test(full_p31
+            SCRIPT ${CADO_NFS_SOURCE_DIR}./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 workdir=/tmp/cado
+...)
         cado_define_test(test_gfp3
             SCRIPT
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh

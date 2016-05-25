@@ -15,7 +15,31 @@
 
 #include "arith-modp.hpp"
 
-typedef arith_modp::gfp<sizeof(abelt)/sizeof(unsigned long)> gfp;
+/* define "gfp" as being our c++ type built from the number of words in
+ * the underlying mpfq data type.
+ *
+ * It's a bit hacky, but mpfq should provide a ``number of words''
+ * implementation info.
+ */
+template<typename F, unsigned int m> struct our_gfp_type {
+    static const int mpfq_base_field_width = sizeof(F)/sizeof(unsigned long);
+    typedef arith_modp::gfp<mpfq_base_field_width> type;
+};
+
+template<typename F> struct our_gfp_type<F, UINT_MAX> {
+    static const int mpfq_base_field_width = 0;
+    /* We *intentionally* do not provide a variable-width GF(p) type with
+     * the C++ code. That wouldn't be totally impossible, but I can assure
+     * that it would be a royal pain (something like a 200+-line patch of
+     * barely parseable c++ hacks to arith-modp.hpp -- tried it out and
+     * gave up...).
+     */
+};
+
+/* If this line complains that ::type is not a type, then see above */
+typedef typename our_gfp_type<abelt,abimpl_max_characteristic_bits()>::type gfp;
+
+
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
@@ -177,9 +201,9 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 } else if (c == -1) {
                     gfp::sub(rowsum, src[j]);
                 } else if (c > 0) {
-                    gfp::addmul(rowsum, src[j], c);
+                    gfp::addmul_ui(rowsum, src[j], c);
                 } else {
-                    gfp::submul(rowsum, src[j], -c);
+                    gfp::submul_ui(rowsum, src[j], -c);
                 }
             }
             gfp::reduce(dst[i], rowsum, prime, preinverse);
@@ -204,9 +228,9 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 } else if (c == -1) {
                     gfp::sub(tdst[j], src[i]);
                 } else if (c > 0) {
-                    gfp::addmul(tdst[j], src[i], c);
+                    gfp::addmul_ui(tdst[j], src[i], c);
                 } else {
-                    gfp::submul(tdst[j], src[i], c);
+                    gfp::submul_ui(tdst[j], src[i], -c);
                 }
             }
         }

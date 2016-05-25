@@ -24,8 +24,14 @@
 #  Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
 #  02110-1301, USA.
 
-
 AC_INIT([gf2x], [1.2])
+
+if test "x$CFLAGS" != x ; then
+ has_CFLAGS_from_env=yes
+else
+ has_CFLAGS_from_env=no
+fi
+
 : ${CFLAGS=-g -O4}
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
@@ -117,6 +123,19 @@ else
  CHECK_SSSE3_SUPPORT()
  CHECK_SSE41_SUPPORT()
  CHECK_PCLMUL_SUPPORT()
+ # The undocumented environment variable DISABLE_MARCH_NATIVE_TEST can be
+ # used to avoid any attempt to add -march=native flag to gcc. This is
+ # unfortunately mandatory on some virtual machines for which the cpuid
+ # capabilities are incorrectly reported (leading to i386 guests with
+ # BMI2, or other similar absurdities).
+ if test "x$DISABLE_MARCH_NATIVE_TEST" = x ; then
+  if test "x$has_CFLAGS_from_env" = xno ; then
+   CHECK_MARCH_NATIVE_SUPPORT()
+   CHECK_MTUNE_NATIVE_SUPPORT()
+  fi
+ else
+   echo "Not doing test for -march=native as per environment variable $DISABLE_MARCH_NATIVE_TEST"
+  fi
 fi
 
 : ${ABI='default'}

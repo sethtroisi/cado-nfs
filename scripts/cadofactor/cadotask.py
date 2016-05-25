@@ -20,9 +20,12 @@ import cadoparams
 import cadocommand
 import wuserver
 import workunit
+import sys
 from struct import error as structerror
 from shutil import rmtree
 from workunit import Workunit
+
+
 
 # Patterns for floating-point numbers
 # They can be used with the string.format() function, e.g.,
@@ -31,6 +34,11 @@ from workunit import Workunit
 RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 CAP_FP = "(%s)" % RE_FP
 REGEXES = {"fp": RE_FP, "cap_fp": CAP_FP}
+
+class nb:
+    nb_sieving=0
+    nb_filter=0
+    nb_linalg=0
 
 def re_cap_n_fp(prefix, n, suffix=""):
     """ Generate a regular expression that starts with prefix, then captures
@@ -161,7 +169,8 @@ class Polynomials(object):
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
-    re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
+    # the 'lognorm' variable now represents the expected E-value
+    re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -225,13 +234,13 @@ class Polynomials(object):
                 self.MurphyParams = match.group(1)
                 self.MurphyE = float(match.group(2))
                 continue
-            # If this is a comment line telling the lognorm,
+            # If this is a comment line telling the expected E-value,
             # extract the value and store it
             match = self.re_lognorm.match(line)
             if match:
                 if self.lognorm != 0:
                     raise PolynomialParseException(
-                        "Line '%s' redefines lognorm value" % line)
+                        "Line '%s' redefines exp_E value" % line)
                 self.lognorm = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
@@ -302,7 +311,7 @@ class Polynomials(object):
             else:
                 arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
-            arr.append("# lognorm %g\n" % self.lognorm)
+            arr.append("# exp_E %g\n" % self.lognorm)
         if len(self.tabpoly) > 0:
             for i in range(len(self.tabpoly)):
                 arr.append("# poly%d = %s\n" % (i, str(self.tabpoly[i])))
@@ -504,7 +513,7 @@ class Statistics(object):
         """ Initialise values in self from the strings in the "stats"
         dictionary
         """
-        for (key, types, defaults, combine, regex) in self.conversions:
+        for (key, types, defaults, combine, regex, allow_several) in self.conversions:
             if key in stats:
                 if key in self.stats:
                     print("duplicate %s\n" % key)
@@ -518,15 +527,25 @@ class Statistics(object):
         
         If they are found, they are added to self.stats.
         """
-        for (key, types, defaults, combine, regex) in self.conversions:
+        for (key, types, defaults, combine, regex, allow_several) in self.conversions:
             match = regex.match(line)
             if match:
-                assert not key in self.stats
                 # print (pattern.pattern, match.groups())
                 # Optional groups that did not match are returned as None.
                 # Skip over those so typecast doesn't raise TypeError
                 groups = [group for group in match.groups() if not group is None]
-                self.stats[key] = self.typecast(groups, types)
+                new_val = self.typecast(groups, types)
+                if not allow_several:
+                    assert not key in self.stats
+                    self.stats[key] = new_val
+                else:
+                    # Some output files inherently have several values.
+                    # This is the case of bwc output files if we use
+                    # multiple sequences.
+                    if key in self.stats:
+                        self.stats[key] = combine(self.stats[key], new_val)
+                    else:
+                        self.stats[key] = new_val
                 assert not self.stats[key] is None
     
     def merge_one_stat(self, key, new_val, combine):
@@ -543,7 +562,7 @@ class Statistics(object):
         """
         
         assert self.conversions == new_stats.conversions
-        for (key, types, defaults, combine, regex) in self.conversions:
+        for (key, types, defaults, combine, regex, allow_several) in self.conversions:
             if key in new_stats.stats:
                 self.merge_one_stat(key, new_stats.stats[key], combine)
     
@@ -830,6 +849,7 @@ class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta
         super().print_stats()
     
     def parse_stats(self, filename, *, commit):
+        # self.logger.info("Parsing filename %s\n", filename)
         new_stats = self.statistics.parse_stats(filename)
         self.logger.debug("Newly arrived stats: %s", new_stats)
         update = self.statistics.as_dict()
@@ -1600,28 +1620,32 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: potential collisions=", 1))
+            re.compile(re_cap_n_fp("# Stat: potential collisions=", 1)),
+            False
         ),
         (
             "stats_rawlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             self.update_lognorms,
-            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES)),
+            False
         ),
         (
             "stats_optlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             self.update_lognorms,
-            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES)),
+            False
         ),
         (
             "stats_tries",
             int,
             "0 0 0",
             Statistics.add_list,
-            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
+            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm"),
+            False
         ),
         # Note for "best raw logmu" pattern: a regex like (%s )* does not work;
         # the number of the capture group is determined by the parentheses
@@ -1633,21 +1657,24 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             float,
             "",
             Statistics.smallest_n,
-            re.compile(re_cap_n_fp("# Stat: best raw logmu:", 10))
+            re.compile(re_cap_n_fp("# Stat: best raw logmu:", 10)),
+            False
         ),
         (
             "stats_opt_logmu",
             float,
             "",
             Statistics.smallest_n,
-            re.compile(re_cap_n_fp("# Stat: best opt logmu:", 10))
+            re.compile(re_cap_n_fp("# Stat: best opt logmu:", 10)),
+            False
         ),
         (
             "stats_total_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s"))
+            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s")),
+            False
         ),
     )
     @property
@@ -2013,6 +2040,8 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def submit_one_wu(self):
         adstart = self.state["adnext"]
         adend = adstart + self.params["adrange"]
+        adend = adend - (adend % self.params["adrange"])
+        assert adend > adstart
         adend = min(adend, self.params["admax"])
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
@@ -2054,14 +2083,16 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s"))
+            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s")),
+            False
         ),
         (
             "stats_rootsieve_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Stat: rootsieve took", 1, "s"))
+            re.compile(re_cap_n_fp("# Stat: rootsieve took", 1, "s")),
+            False
         )
     )
     @property
@@ -2635,6 +2666,10 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return "Lattice Sieving"
     @property
     def programs(self):
+        nb.nb_sieving+=1
+        if len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false" and nb.nb_sieving>=2:
+            self.logger.info("Not run (%s)", sys.argv[2])
+            sys.exit("Factorization stopped")
         override = ("q0", "q1", "factorbase", "out", "stats_stderr")
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
         return ((cadoprograms.Las, override, input),)
@@ -2655,28 +2690,32 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             (float, int),
             "0 0",
             Statistics.zip_combine_mean,
-            re.compile(re_cap_n_fp("# Average J=", 1, r"\s*for (\d+) special-q's"))
+            re.compile(re_cap_n_fp("# Average J=", 1, r"\s*for (\d+) special-q's")),
+            False
         ),
         (
             "stats_max_bucket_fill",
             float,
             "0",
             max,
-            re.compile(re_cap_n_fp("#.*max bucket fill", 1))
+            re.compile(re_cap_n_fp("#.*max bucket fill", 1)),
+            False
         ),
         (
             "stats_total_cpu_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Total cpu time", 1, "s"))
+            re.compile(re_cap_n_fp("# Total cpu time", 1, "s")),
+            False
         ),
         (
             "stats_total_time",
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("# Total time", 1, "s"))
+            re.compile(re_cap_n_fp("# Total time", 1, "s")),
+            False
         )
     )
     @property
@@ -2721,6 +2760,8 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
+            q1 = q1 - (q1 % self.params["qrange"])
+            assert q1 > q0
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = \
@@ -2756,7 +2797,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         if self.handle_error_result(message):
             return True
         output_files = message.get_output_files()
-        assert len(output_files) == 1
+        if len(output_files) != 1:
+            self.logger.warn("Received output with %d files: %s" % (len(output_files), ", ".join(output_files)))
+            return False
         stderrfilename = message.get_stderrfile(0)
         ok = self.add_file(output_files[0], stderrfilename, commit=False)
         self.verification(message.get_wu_id(), ok, commit=True)
@@ -2855,7 +2898,11 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             nrels = self.get_nrels() - self.get_nrels(filename)
             self.state.update({"rels_found": nrels}, commit=False)
             self.forget_output_filenames([filename], commit=True)
-        self.add_file(filename)
+        filename_with_stats_extension = filename + ".stats.txt"
+        if os.path.isfile(filename_with_stats_extension):
+            self.add_file(filename, filename_with_stats_extension)
+        else:
+            self.add_file(filename)
 
     def get_statistics_as_strings(self):
         strings = ["Total number of relations: %d" % self.get_nrels()]
@@ -2906,6 +2953,10 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
+        nb.nb_filter+=1
+        if len(sys.argv)>2 and sys.argv[2]=="tasks.filter.run=false" and nb.nb_filter>=2:
+            self.logger.info("Not run (%s)", sys.argv[2])
+            sys.exit("Factorization stopped")
         return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
     @property
     def paramnames(self):
@@ -2920,7 +2971,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s")),
+            False
         ),
     )
     @property
@@ -3136,7 +3188,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s"))
+            re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s")),
+            False
         ),
     )
     @property
@@ -3407,7 +3460,7 @@ class PurgeTask(Task):
         Given 'nunique' relations and an excess of 'excess',
         estimate how many new (unique) relations we need.
         """
-        
+
         additional = nunique * self.params["add_ratio"]
         # if the excess is negative, we need at least -excess new relations
         if excess < 0:
@@ -4016,6 +4069,10 @@ class LinAlgTask(Task, HasStatistics):
         return "Linear Algebra"
     @property
     def programs(self):
+        nb.nb_linalg+=1
+        if len(sys.argv)>2 and sys.argv[2]=="tasks.linalg.run=false" and nb.nb_linalg>=2:
+            self.logger.info("Not run (%s)", sys.argv[2])
+            sys.exit("Factorization stopped")
         return ((cadoprograms.BWC, ("complete", "matrix",  "wdir", "nullspace"),
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
@@ -4030,84 +4087,96 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"Timings for krylov: .wct.", 1))
+            re.compile(re_cap_n_fp(r"Timings for krylov: .wct.", 1)),
+            True
         ),
         (
             "krylov_cpu",
             (int, float),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU:", 1)),
+            True
         ),
         (
             "krylov_cpu_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait:", 1)),
+            True
         ),
         (
             "krylov_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM:", 1)),
+            True
         ),
         (
             "krylov_comm_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait:", 1))
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait:", 1)),
+            True
         ),
         (
             "lingen_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("Timings for lingen: .wct.", 1))
+            re.compile(re_cap_n_fp("Timings for lingen: .wct.", 1)),
+            False
         ),
         (
             "lingen_cpu",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp("Timings for lingen: .cpu.", 1))
+            re.compile(re_cap_n_fp("Timings for lingen: .cpu.", 1)),
+            False
         ),
         (
             "mksol_wct",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"Timings for mksol: .wct.", 1))
+            re.compile(re_cap_n_fp(r"Timings for mksol: .wct.", 1)),
+            True
         ),
         (
             "mksol_cpu",
             (int, float),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU:", 1)),
+            True
         ),
         (
             "mksol_cpu_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait:", 1)),
+            True
         ),
         (
             "mksol_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM:", 1)),
+            True
         ),
         (
             "mksol_comm_wait",
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait:", 1))
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait:", 1)),
+            True
         ),
     )
     @property
@@ -4310,9 +4379,7 @@ class SqrtTask(Task):
                 with stdoutpath.open("r") as stdoutfile:
                     stdout = stdoutfile.read()
                 lines = stdout.splitlines()
-                # Skip last factor which cannot produce a new split on top
-                # of what the smaller factors did
-                for line in lines[:-1]:
+                for line in lines:
                     if line == "Failed":
                         continue # try next lines (if any) in multi-thread mode
                     self.add_factor(int(line))
@@ -4636,7 +4703,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
     def paramnames(self):
         return {"name": str, "workdir": None, "address": None, "port": 0,
                 "threaded": False, "ssl": True, "whitelist": None,
-                "only_registered": True, "forgetport": False}
+                "only_registered": True, "forgetport": False,
+                "timeout_hint": None}
     @property
     def param_nodename(self):
         return self.name
@@ -4663,6 +4731,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
             cafilename = basedir + self.params["name"] + ".server.cert"
         else:
             cafilename = None
+
+        servertimeout_hint = self.params.get("timeout_hint")
 
         server_whitelist = []
         if not whitelist is None:
@@ -4707,7 +4777,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         self.server = wuserver.ServerLauncher(serveraddress, serverport,
             threaded, self.get_db_filename(), self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
-            whitelist=server_whitelist)
+            whitelist=server_whitelist,
+            timeout_hint=servertimeout_hint)
         self.state["port"] = self.server.get_port()
 
     def run(self):
@@ -5208,6 +5279,17 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
                           self.sieving, self.dup1, self.dup2, self.purge,
                           self.merge, self.linalg, self.characters, self.sqrt)
+            if len(sys.argv)>2:
+                if sys.argv[2]=="tasks.sieve.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving)
+                if sys.argv[2]=="tasks.filter.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving, self.dup1)
+                if sys.argv[2]=="tasks.linalg.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving, self.dup1, self.dup2, self.purge,
+                          self.merge, self.linalg)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
@@ -5273,18 +5355,22 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         self.start_elapsed_time()
 
         self.servertask.run()
-        
         last_task = None
         last_status = True
         try:
+            tasks=[]
+            for i in range(len(self.tasks)):
+                tasks.append(self.tasks[i])
             self.start_all_clients()
-            
+            i=0
             while last_status:
                 last_status, last_task = self.run_next_task()
-            
+                if i<len(self.tasks):
+                    self.tasks[i].print_stats()
+                    i+=1
             for task in self.tasks:
                 task.print_stats()
-        
+
         except KeyboardInterrupt:
             self.logger.fatal("Received KeyboardInterrupt. Terminating")
             had_interrupt = True
@@ -5349,16 +5435,16 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         self.state.__delitem__("starttime", commit=False)
         self.state.update({"elapsed": elapsed}, commit=True)
         return elapsed
+
     
     def run_next_task(self):
         for task in self.tasks:
             if task in self.tasks_that_want_to_run:
-                # self.logger.info("Next task that wants to run: %s",
-                #                  task.title)
+                #self.logger.info("Next task that wants to run: %s", task.title)
                 self.tasks_that_want_to_run.remove(task)
                 return [task.run(), task.title]
         return [False, None]
-    
+
     def get_sum_of_cpu_or_real_time(self, is_cpu):
         total = 0
         for task in self.tasks:

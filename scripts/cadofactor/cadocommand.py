@@ -75,7 +75,7 @@ class Command(object):
         logger.cmd(cmdline, self.child.pid)
     
     def wait(self):
-        ''' Wait for command to finish executing, capturing stdout and stderr 
+        ''' Wait for command to finish executing, capturing stdout and stderr
         in output tuple
         '''
         (stdout, stderr) = self.child.communicate()

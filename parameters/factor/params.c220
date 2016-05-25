@@ -8,7 +8,6 @@
 ###########################################################################
 
 name = c220
-#tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection
@@ -21,14 +20,15 @@ tasks.polyselect.admax = 1e8
 tasks.polyselect.adrange = 1e6
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1296 # this is 6^4
-tasks.polyselect.nrkeep = 2000
+tasks.polyselect.nrkeep = 100
+tasks.wutimeout = 24000 # required for rootsieve in degree 6
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
 rlim = 500000000
-alim = 680000000
+alim = 800000000
 lpbr = 34
 lpba = 35
 tasks.sieve.mfbr = 77
@@ -37,7 +37,7 @@ tasks.sieve.rlambda = 2.4
 tasks.sieve.alambda = 3.4
 tasks.sieve.ncurves0 = 26
 tasks.sieve.ncurves1 = 21
-tasks.I = 15
+tasks.I = 16
 
 tasks.sieve.qrange = 10000
 
@@ -47,7 +47,7 @@ tasks.sieve.qrange = 10000
 
 tasks.filter.purge.keep = 160
 tasks.filter.maxlevel = 25
-tasks.filter.target_density = 170.0
+tasks.filter.target_density = 175.0
 
 ###########################################################################
 # Linear algebra

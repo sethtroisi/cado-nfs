@@ -13,8 +13,6 @@
 #include "auxiliary.h"
 #include "murphyE.h"
 
-#define MAX_THREADS 16
-
 #define LEN_SPECIAL_Q 55
 //#define DEBUG_HASH_TABLE
 

@@ -14,9 +14,7 @@
 ###########################################################################
 ###########################################################################
 
-#tasks.threads = 2
 name = c185
-#tasks.threads = 2
 
 ###########################################################################
 ###########################################################################
@@ -31,10 +29,10 @@ tasks.polyselect.degree = 5
 # note: those parameters are just a guess, they might be far from optimal
 tasks.polyselect.P = 5000000
 tasks.polyselect.admax = 2e7
-tasks.polyselect.adrange = 2e5
+tasks.polyselect.adrange = 2e4
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1000
-tasks.polyselect.nrkeep = 1000
+tasks.polyselect.nrkeep = 100
 
 ###########################################################################
 ###########################################################################

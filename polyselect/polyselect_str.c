@@ -954,9 +954,7 @@ shash_find_collision (shash_t H)
     __builtin_prefetch(TH, 1, 3);		\
   } while (0)					\
 
-#ifdef MAX_THREADS
   pthread_mutex_lock (&lock);
-#endif
   if (!size) {
     size = H->balloc << 1;
     /* round up to power of 2 */
@@ -968,9 +966,7 @@ shash_find_collision (shash_t H)
     mask = size - 1;
     size += 16; /* Guard to avoid to test the end of hash_table when ++TH */
   }
-#ifdef MAX_THREADS
   pthread_mutex_unlock (&lock);
-#endif
   T = (uint32_t*) malloc (size * sizeof(*T));
   for (k = 0; k < SHASH_NBUCKETS; k++) {
     Hj = H->base[k];

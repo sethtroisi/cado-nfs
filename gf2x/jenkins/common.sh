@@ -34,6 +34,13 @@ else
     exit 1
 fi
 
+# The undocumented environment variable DISABLE_MARCH_NATIVE_TEST can be
+# used to avoid any attempt to add -march=native flag to gcc. This is
+# unfortunately mandatory on some virtual machines for which the cpuid
+# capabilities are incorrectly reported (leading to i386 guests with
+# BMI2, or other similar absurdities).
+export DISABLE_MARCH_NATIVE_TEST=yes
+
 # By default, we do check the FFT interface, but as an option, we also
 # allow not checking it.
 if ! [ "$DISABLE_FFT" ] ; then

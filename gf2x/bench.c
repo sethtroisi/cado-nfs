@@ -25,6 +25,7 @@
    02110-1301, USA.
 */
 
+#include <stdio.h>
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -69,7 +70,7 @@ int main(int argc, char * argv[])
 
     unsigned long jmax = 100000;
 
-    for(i = n0 ; i < n ; i++) {
+    for(i = n0 ; i < n ; i<<=1) {
         /* warm up */
         gf2x_mul(c,a,i,b,i);
         gf2x_mul(c,a,i,b,i);
