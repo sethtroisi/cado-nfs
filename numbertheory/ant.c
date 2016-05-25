@@ -1100,10 +1100,14 @@ int main(int argc, char * argv[])/*{{{*/
 			}
 
 			// Computing the coefficients for the column on the right
+			gmp_printf("i = %d ; p is initially %Zd",i,p); printf("\n");
 			mpz_set(p,f[i]);
+			gmp_printf("i = %d ; p is %Zd after multiplication with f[%d]",i,p,i); printf("\n");
 			mpz_mul(p,p,minus);
-			for(k = 1 ; k < degree-1-j ; k++){
+			gmp_printf("i = %d ; p is %Zd after multiplication with -1",i,p); printf("\n");
+			for(k = 1 ; k <= degree-1-i ; k++){
 				mpz_mul(p,p,f[degree]);
+				gmp_printf("i = %d ; k = %d ; p is %Zd after being multiplied by leading coefficient %d times",i,k,p,k); printf("\n");
 			}
 			mpz_set(mpz_mat_entry(mul_alpha,i,j),p);
 		}
@@ -1114,8 +1118,9 @@ int main(int argc, char * argv[])/*{{{*/
 
 		// Filling the coefficients in D, whose determinant must be computed to get the discriminant.
 		for(i = 0 ; i < degree ; i++){
-			printf("Computing trace of mul_alpha^%d\n",i);
-			mpz_mat_fprint(stdout, M); printf("\n");	
+			//printf("Computing trace of mul_alpha^%d\n",i);
+			//mpz_mat_fprint(stdout, M); printf("\n");	
+			//gmp_printf("Trace of mul_alpha^%d is %Zd",i,mpz_mat_trace(M)); printf("\n");
 			for(j = 0 ; j <= i ; j++){
 				mpz_set(mpz_mat_entry(D,i-j,j),mpz_mat_trace(M));
 			}
@@ -1123,8 +1128,9 @@ int main(int argc, char * argv[])/*{{{*/
 			mpz_mat_swap(M,N);
 		}
 		for(j = 1 ; j < degree ; j++){
-			printf("Computing trace of mul_alpha^%d\n",degree-1+j);
-			mpz_mat_fprint(stdout, M); printf("\n");
+			//printf("Computing trace of mul_alpha^%d\n",degree-1+j);
+			//mpz_mat_fprint(stdout, M); printf("\n");
+			//gmp_printf("Trace of mul_alpha^%d is %Zd",degree-1+j,mpz_mat_trace(M)); printf("\n");
 			for(i = degree-1 ; j <= i ; i--){
 				mpz_set(mpz_mat_entry(D,i,j+(degree-1)-i),mpz_mat_trace(M));
 			}
