@@ -70,7 +70,9 @@ class Command(object):
             self.stderr = self._open(stderr, True, append_err)
         
         self.child = subprocess.Popen(progargs, *args, stdin=self.stdin,
-            stdout=self.stdout, stderr=self.stderr, **kwargs)
+            stdout=subprocess.PIPE, stderr=self.stderr, **kwargs)
+        for x in self.child.stdout:
+            print(x)
         cmdline = self.program.make_command_line()
         logger.cmd(cmdline, self.child.pid)
     
