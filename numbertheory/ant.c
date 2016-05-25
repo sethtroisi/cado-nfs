@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <sys/resource.h>	/* for getrusage */
 #include "macros.h"
+#include "mpz_poly.h"
 
 /*{{{ typedefs */
 
@@ -991,6 +992,58 @@ void print_polynomial(mpz_t* f, int degree){
 	printf("\n");
 }
 
+// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an order, and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p).
+void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, unsigned int p)
+{
+    if(B->m != B->n) 
+        return;
+
+    else {
+        unsigned int i, j;
+        mpq_mat_realloc(U,B->m,B->n);
+
+        mpz_t K; // common denominator
+        mpz_init(K);
+        mpz_set_si(K,1);
+        mpz_poly_t f;
+        mpz_poly_t f2;
+        mpz_poly_init(f,B->n-1);
+        mpz_poly_init(f2,B->n-1);
+
+        mpz_t N[B->n]; // will be used to store numerators of w[j] times K 
+        for (i = 0 ; i < B->m ; i++){
+            mpz_init(N[i]);
+        }
+
+
+        for (j = 0 ; j < U->m ; j++) {
+
+            // Putting the LCM of all denominators of coefficients of w[j] in K
+            mpz_set_si(K,1);
+            for (i = 0 ; i < U-> n ; i++) {
+                mpz_lcm(K,K,mpq_denref(mpq_mat_entry_const(B,i,j)));
+            }
+               
+            // Generating the polynom
+            for (i = 0 ; i < B->m ; i++) {
+                mpz_set_si(N[i],1);
+                mpz_mul(N[i],K,mpq_numref(mpq_mat_entry_const(B,i,j)));
+            }
+            mpz_poly_setcoeffs(f,N,B->n-1);
+            mpz_poly_set(f2,f);
+
+            // Setting it to the power of p
+            for (i = 0 ; i < p-1 ; i++) {
+                mpz_poly_mul(f,f,f2);
+            }
+            
+        }
+        mpz_poly_clear(f2);
+        mpz_poly_clear(f);
+        mpz_clear(K);
+    }
+}
+
 int main(int argc, char * argv[])/*{{{*/
 {
 	/*
@@ -1069,7 +1122,7 @@ int main(int argc, char * argv[])/*{{{*/
 	// Here starts my personal work
 	// We assume that the polynomial was given in a command line, by giving its coefficient, in reversed order (first the constant coefficient, etc. And the head coefficient in the end);
 
-	
+	/*
 	if(argc > 1){
 
 		// Initialisation
@@ -1153,8 +1206,59 @@ int main(int argc, char * argv[])/*{{{*/
 		mpz_mat_clear(D2);
 		for(i = 0 ; i <= degree ; i++){
 			mpz_clear(f[i]);
-        }
+                }
 	
-	}
+	}*/
+
+    // These are only examples to be sure that gaussian reduction is working.
+    unsigned int n = 3;
+    unsigned int p = 3;
+    mpq_mat B, B_inv, B2, T, U;
+    mpq_mat_init(B, n, n); // The matrix of generators
+    mpq_mat_init(B_inv, n, n); // Its inverse
+    mpq_mat_init(B2, n, 2*n); // An auxiliary matrix on which gaussian reduction will be applied
+    mpq_mat_init(T, n, n); // An auxiliary matrix
+    mpq_mat_init(U, n, n);
+    mpq_mat_set_ui(T, 1);
+
+    // Filling in B here as an example, not supposed to represent the generators of any order
+    mpq_set_si(mpq_mat_entry(B,0,0),1,1);
+    mpq_set_si(mpq_mat_entry(B,0,1),0,1);
+    mpq_set_si(mpq_mat_entry(B,0,2),0,1);
+    mpq_set_si(mpq_mat_entry(B,1,0),0,1);
+    mpq_set_si(mpq_mat_entry(B,1,1),185,1);
+    mpq_set_si(mpq_mat_entry(B,1,2),0,1);
+    mpq_set_si(mpq_mat_entry(B,2,0),0,1);
+    mpq_set_si(mpq_mat_entry(B,2,1),95,1);
+    mpq_set_si(mpq_mat_entry(B,2,2),185,1);
+
+    mpq_mat_fprint(stdout,B); printf("\n");
+
+
+    // Inverting B
+    mpq_mat_set(B_inv,B);
+    mpq_mat_submat_swap(B,0,0,B2,0,0,3,3);
+    mpq_mat_swap(B,B_inv);
+    mpq_mat_submat_swap(T,0,0,B2,0,3,3,3);
+        // B2 now contains B and identity
+    mpq_gauss_backend(B2,T);
+        // B2 now contains identity and B^-1
+    mpq_mat_submat_swap(B_inv,0,0,B2,0,3,3,3);
+
+    mpq_mat_fprint(stdout,B_inv); printf("\n");
+    mpq_mat_fprint(stdout,B); printf("\n");
+
+
+
+    // Now building the matrix U, containing all generators to the power of p
+    // Generators are polynomials, stored in the matrix B
+    generators_to_power_p(U,B,p);
+
+
+    mpq_mat_clear(B);
+    mpq_mat_clear(B_inv);
+    mpq_mat_clear(B2);
+    mpq_mat_clear(T);
+    mpq_mat_clear(U);
 }
 /*}}}*/
