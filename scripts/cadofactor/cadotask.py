@@ -963,6 +963,14 @@ def chain_dict(d1, d2):
     """
     return {key: d2[value] for key, value in d1.items()}
 
+class RealTimeOutputFilter:
+    def __init__(self, logger, filename):
+        self.stdout = open(filename, "w")
+        self.logger = logger
+    def filter(self, data):
+        self.stdout.write(data)
+        
+
 class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
            cadoparams.UseParameters, Runnable, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed.
@@ -989,10 +997,10 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     @property
     def param_nodename(self):
         return self.name
-    
     def __init__(self, *, mediator, db, parameters, path_prefix):
         ''' Sets up a database connection and a DB-backed dictionary for
         parameters. Reads parameters from DB, and merges with hierarchical
+    
         parameters in the parameters argument. Parameters passed in by
         parameters argument do not override values in the DB-backed
         parameter dictionary.
@@ -1255,6 +1263,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         result to updateObserver().
         '''
         wuname = self.make_wuname(identifier)
+        self.logger.info(" created WUname %s" % wuname)
         process = cadocommand.Command(command)
         cputime_used = os.times()[2] # CPU time of child processes
         realtime_used = time.time()
@@ -3964,6 +3973,10 @@ class LinAlgDLPTask_Magma(Task):
     def get_virtual_logs_filename(self):
         return self.get_state_filename("kerfile")
 
+class bwc_output_filter(RealTimeOutputFilter):
+    def filter(self, data):
+        super().filter(data)
+        self.logger.info(data)
 
 # I've just ditched the statistics bit, cause I don't know to make its
 # despair cry a little bit more useful.
@@ -4238,7 +4251,7 @@ class LinAlgTask(Task, HasStatistics):
             self.remember_input_versions(commit=True)
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left",
-                                 stdout=str(stdoutpath),
+                                 stdout=bwc_output_filter(self.logger, str(stdoutpath)),
                                  stderr=str(stderrpath),
                                  **self.progparams[0])
             message = self.submit_command(p, "", log_errors=True)

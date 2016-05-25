@@ -7,7 +7,7 @@ import logging
 import cadocommand
 import cadologger
 import cadoparams
-
+import sys
 
 class InspectType(type):
     """ Meta-class that adds a class attribute "init_signature" with the
@@ -1017,6 +1017,10 @@ class BWC(Program):
                 bwc_bindir = os.path.normpath(os.sep.join([kwargs["execpath"], self.subdir]))
             bwc_bindir = translate_mingw_path(bwc_bindir)
         super().__init__(locals(), **kwargs)
+    def make_command_line(self, *args, **kwargs):
+	    c = super().make_command_line(*args, **kwargs)
+	    sys.stderr.write("Just created command line for BWC: %s" % c)
+	    return c
 
 class SM(Program):
     binary = "sm"
