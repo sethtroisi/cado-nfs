@@ -1263,3 +1263,4 @@ filter/sm_append.cpp
 linalg/bwc/bwccheck.cpp
 tests/linalg/bwc/test-lingen-crc.sh
 numbertheory/ant.c
+numbertheory/CMakeLists.txt
