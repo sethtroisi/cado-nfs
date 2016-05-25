@@ -1153,7 +1153,7 @@ int main(int argc, char * argv[])/*{{{*/
 		mpz_mat_clear(D2);
 		for(i = 0 ; i <= degree ; i++){
 			mpz_clear(f[i]);
-                }
+        }
 	
 	}
 }
