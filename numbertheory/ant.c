@@ -210,6 +210,23 @@ void mpq_mat_urandomm(mpq_mat_ptr M, gmp_randstate_t state, mpz_srcptr p)
 
 
 /*}}}*/
+/*{{{ determinant and trace */
+// We assume that M is a square Matrix and that its size is not 0
+void mpz_mat_trace(mpz_ptr t, mpz_mat_srcptr M)
+{
+    mpz_set_ui(t, 0);
+    for(unsigned int i = 0 ; i < M->n ; i++)
+        mpz_add(t, t, mpz_mat_entry_const(M,i,i));
+}
+
+// We assume that M is a triangular Matrix and that its size is not 0
+void mpz_mat_determinant_triangular(mpz_ptr d, mpz_mat_srcptr M)
+{
+    mpz_set_ui(d, 1);
+    for(unsigned int i = 0 ; i < M->n ; i++)
+        mpz_mul(d, d, mpz_mat_entry_const(M,i,i));
+}
+/*}}}*/
 /*{{{ miscellaneous */
 void mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
 {
@@ -770,13 +787,16 @@ int mpz_hnf_helper_heap_aux_cmp(struct mpz_hnf_helper_heap_aux * data, unsigned 
  * T ==  0    S
  * where S is unimodular. The resulting vector T*A has entries [n0..n[
  * equal to (g,0,...,0), while entries [0..n0[ are reduced modulo g.
+ *
+ * return +1 or -1 which is the determinant of T.
  */
-void mpz_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned int n0, unsigned int n)
+int mpz_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned int n0, unsigned int n)
 {
+    int signdet=1;
     mpz_mat_realloc(dT, n, n);
     mpz_mat_set_ui(dT, 1);
 
-    if (n == n0) return;
+    if (n == n0) return signdet;
 
     mpz_t q, r2;
     mpz_mat A;
@@ -801,6 +821,7 @@ void mpz_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned int n0,
             continue;
         if (mpz_sgn(Ai) == -1) {
             mpz_neg(Ai, Ai);
+            signdet = -signdet;
             mpz_set_si(mpz_mat_entry(dT, i, i), -1);
             for(unsigned int j = 0 ; j < n ; j++) {
                 mpz_neg(mpz_mat_entry(T, i, j), mpz_mat_entry(T, i, j));
@@ -863,6 +884,8 @@ void mpz_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned int n0,
     mpz_clear(q);
     mpz_clear(r2);
     free(heap);
+
+    return signdet;
 }
 /* {{{ this computes the row hnf on a column C.
  * The result is always of the form C'=(gcd(C),0,0,...,0). The transform
@@ -879,12 +902,16 @@ void mpz_gcd_many(mpz_mat_ptr dT, mpz_ptr * a, unsigned int n)
 }
 /*}}}*/
 /*}}}*/
-void mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
+
+/* return +1 or -1, which is the determinant of the transformation matrix
+ * T */
+int mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
 {
     /* Warning ; for this to work, we need to have extra blank rows in M
      * and T, so we require on input M and T to be overallocated (twice
      * as many rows).
      */
+    int signdet = 1;
     unsigned int m = M->m;
     unsigned int n = M->n;
     mpz_mat_realloc(T, m, m);
@@ -901,7 +928,7 @@ void mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
         for(unsigned int i = 0 ; i < m ; i++) {
             colm[i] = mpz_mat_entry(M, i, j);
         }
-        mpz_hnf_helper(T, dT, colm, rank, m);
+        signdet *= mpz_hnf_helper(T, dT, colm, rank, m);
 
         /* apply dT to the submatrix of size m * (n - 1 - j) of M */
         mpz_mat_realloc(Mx, m, n - 1 - j);
@@ -919,6 +946,8 @@ void mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
     mpz_mat_clear(dT);
     mpz_mat_clear(Mx);
     mpz_mat_clear(My);
+
+    return signdet;
 }
 /* }}} */
 
@@ -949,37 +978,6 @@ void print_polynomial(mpz_t* f, int degree){
 		}
 	}
 	printf("\n");
-}
-
-// We assume that M is a square Matrix and that its size is not 0
-mpz_ptr mpz_mat_trace(mpz_mat_ptr M){
-	mpz_t* p = malloc(sizeof(mpz_t));
-	mpz_t q;
-	mpz_init(*p);
-	mpz_init(q);
-	unsigned int i;
-
-	for(i = 0 ; i < (M->n) ; i++){
-		mpz_add(q,*p,mpz_mat_entry(M,i,i));
-		mpz_swap(*p,q);
-	}
-	return *p;
-}
-
-// We assume that M is a triangular Matrix and that its size is not 0
-mpz_ptr mpz_mat_tr_determinant(mpz_mat_ptr M){
-	mpz_t* p = malloc(sizeof(mpz_t));
-	mpz_t q;
-	mpz_init(*p);
-	mpz_init(q);
-	mpz_set_ui(*p,1);
-	unsigned int i;
-
-	for(i = 0 ; i < (M->n) ; i++){
-		mpz_mul(q,*p,mpz_mat_entry(M,i,i));
-		mpz_swap(*p,q);
-	}
-	return *p;
 }
 
 int main(int argc, char * argv[])/*{{{*/
@@ -1113,14 +1111,14 @@ int main(int argc, char * argv[])/*{{{*/
 		// Filling the coefficients in D, whose determinant must be computed to get the discriminant.
 		for(i = 0 ; i < degree ; i++){
 			for(j = 0 ; j <= i ; j++){
-				mpz_set(mpz_mat_entry(D,i-j,j),mpz_mat_trace(M));
+                            mpz_mat_trace(mpz_mat_entry(D, i-j, j), M);
 			}
 			mpz_mat_multiply(N,M,mul_alpha);
 			mpz_mat_swap(M,N);
 		}
 		for(j = 1 ; j < degree ; j++){
 			for(i = degree-1 ; j <= i ; i--){
-				mpz_set(mpz_mat_entry(D,i,j+(degree-1)-i),mpz_mat_trace(M));
+				mpz_mat_trace(mpz_mat_entry(D,i,j+(degree-1)-i),M);
 			}
 			mpz_mat_multiply(N,M,mul_alpha);
 			mpz_mat_swap(M,N);
@@ -1129,11 +1127,22 @@ int main(int argc, char * argv[])/*{{{*/
 
 		// Preparing the HNF
 		mpz_mat_realloc(M,degree,degree);
-        mpz_hnf_backend(D, M);
+                int sign = mpz_hnf_backend(D, M);
 
-		mpz_set(p,mpz_mat_tr_determinant(D));
+                mpz_mat_determinant_triangular(p, D);
+                mpz_mul_si(p,p,sign);
 		gmp_printf("\nThe discriminant of Z[f_d * alpha] is %Zd\n\n",p);
 
+		mpz_clear(p);
+		mpz_clear(minus);
+		mpz_mat_clear(mul_alpha);
+		mpz_mat_clear(M);
+		mpz_mat_clear(N);
+		mpz_mat_clear(D);
+		mpz_mat_clear(D2);
+		for(i = 0 ; i <= degree ; i++){
+			mpz_clear(f[i]);
+                }
 	
 	}
 }
