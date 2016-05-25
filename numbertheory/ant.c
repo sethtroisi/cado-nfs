@@ -319,6 +319,16 @@ void mpq_mat_permuterows(mpq_mat_ptr M, unsigned int * perm)
     mpq_mat_clear(Mx);
 }
 
+int permutation_signature(const unsigned int * perm, unsigned int n)
+{
+    /* can this be done in O(n) only ?? */
+    int sign = 1;
+    for(unsigned int i = 0 ; i < n ; i++)
+        for(unsigned int j = i ; j < n ; j++)
+            if (perm[j] < perm[i]) sign*=-1;
+    return sign;
+}
+
 
 /* add lambda times row i1 to row i0 */
 void mpz_mat_addmulrow(mpz_mat_ptr M, unsigned int i0, unsigned int i1, mpz_srcptr lambda)
@@ -875,6 +885,7 @@ int mpz_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned int n0, 
     mpz_mat_permuterows(T, heap);
     mpz_mat_permuterows(dT, heap);
     mpz_mat_permuterows(A, heap);
+    signdet*= permutation_signature(heap, n);
     for(unsigned int i = 0 ; i < n ; i++) {
         mpz_ptr Ai = mpz_mat_entry(A, i, 0);
         mpz_swap(a[i], Ai);
