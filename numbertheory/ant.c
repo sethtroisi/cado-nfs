@@ -954,11 +954,14 @@ void print_polynomial(mpz_t* f, int degree){
 // We assume that M is a square Matrix and that its size is not 0
 mpz_ptr mpz_mat_trace(mpz_mat_ptr M){
 	mpz_t* p = malloc(sizeof(mpz_t));
+	mpz_t q;
 	mpz_init(*p);
+	mpz_init(q);
 	unsigned int i;
 
 	for(i = 0 ; i < (M->n) ; i++){
-		mpz_add(*p,*p,mpz_mat_entry(M,i,i));
+		mpz_add(q,*p,mpz_mat_entry(M,i,i));
+		mpz_swap(*p,q);
 	}
 	return *p;
 }
@@ -966,12 +969,15 @@ mpz_ptr mpz_mat_trace(mpz_mat_ptr M){
 // We assume that M is a triangular Matrix and that its size is not 0
 mpz_ptr mpz_mat_tr_determinant(mpz_mat_ptr M){
 	mpz_t* p = malloc(sizeof(mpz_t));
+	mpz_t q;
 	mpz_init(*p);
+	mpz_init(q);
 	mpz_set_ui(*p,1);
 	unsigned int i;
 
 	for(i = 0 ; i < (M->n) ; i++){
-		mpz_mul(*p,*p,mpz_mat_entry(M,i,i));
+		mpz_mul(q,*p,mpz_mat_entry(M,i,i));
+		mpz_swap(*p,q);
 	}
 	return *p;
 }
@@ -1060,7 +1066,7 @@ int main(int argc, char * argv[])/*{{{*/
 		// Initialisation
 		unsigned int degree = argc-2;
 		mpz_t f[degree+1];
-		mpz_mat mul_alpha, M, D, D2;
+		mpz_mat mul_alpha, M, N, D, D2;
 		mpz_t p;
 		mpz_t minus;
 
@@ -1076,6 +1082,7 @@ int main(int argc, char * argv[])/*{{{*/
 		//Initialising each matrix
 		mpz_mat_init(mul_alpha,degree,degree);
 		mpz_mat_init(M,degree,degree);
+		mpz_mat_init(N,degree,degree);
 		mpz_mat_init(D,degree,degree);
 		mpz_mat_init(D2,2*degree,degree);
 		mpz_init(p);
@@ -1101,23 +1108,32 @@ int main(int argc, char * argv[])/*{{{*/
 			mpz_set(mpz_mat_entry(mul_alpha,i,j),p);
 		}
 
+
+		mpz_mat_fprint(stdout, mul_alpha); printf("\n");
+
+
 		// Filling the coefficients in D, whose determinant must be computed to get the discriminant.
 		for(i = 0 ; i < degree ; i++){
+			printf("Computing trace of mul_alpha^%d\n",i);
+			mpz_mat_fprint(stdout, M); printf("\n");	
 			for(j = 0 ; j <= i ; j++){
 				mpz_set(mpz_mat_entry(D,i-j,j),mpz_mat_trace(M));
 			}
-			mpz_mat_multiply(M,M,mul_alpha);
+			mpz_mat_multiply(N,M,mul_alpha);
+			mpz_mat_swap(M,N);
 		}
 		for(j = 1 ; j < degree ; j++){
+			printf("Computing trace of mul_alpha^%d\n",degree-1+j);
+			mpz_mat_fprint(stdout, M); printf("\n");
 			for(i = degree-1 ; j <= i ; i--){
 				mpz_set(mpz_mat_entry(D,i,j+(degree-1)-i),mpz_mat_trace(M));
 			}
-			mpz_mat_multiply(M,M,mul_alpha);
+			mpz_mat_multiply(N,M,mul_alpha);
+			mpz_mat_swap(M,N);
 		}
 
 
 		// Preparing the HNF
-		mpz_mat_fprint(stdout, mul_alpha); printf("\n");
 		mpz_mat_fprint(stdout, D); printf("\n");
 		mpz_mat_realloc(M,degree,degree);
         mpz_hnf_backend(D, M);
