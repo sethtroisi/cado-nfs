@@ -3976,7 +3976,9 @@ class LinAlgDLPTask_Magma(Task):
 class bwc_output_filter(RealTimeOutputFilter):
     def filter(self, data):
         super().filter(data)
-        self.logger.info(data)
+        if "ETA" in data:
+            self.logger.info(data.rstrip())
+            
 
 # I've just ditched the statistics bit, cause I don't know to make its
 # despair cry a little bit more useful.
