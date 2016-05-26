@@ -558,7 +558,7 @@ void mpq_mat_multiply(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_mat_srcptr B)
         for(unsigned int j = 0 ; j < B->n ; j++) {
             mpq_set_ui(mpq_mat_entry(C, i, j), 0, 1);
             for(unsigned int k = 0 ; k < B->m ; k++) {
-                mpq_add(z,
+                mpq_mul(z,
                         mpq_mat_entry_const(A, i, k),
                         mpq_mat_entry_const(B, k, j));
                 mpq_add(mpq_mat_entry(C, i, j),
@@ -1290,20 +1290,20 @@ int main(int argc, char * argv[])/*{{{*/
     mpz_poly_setcoeff_si(f,2,817);
     mpz_poly_setcoeff_si(f,3,57);
     mpz_poly_to_monic(g,f);
-    mpz_poly_fprintf(stdout,f); printf("\n");
-    mpz_poly_fprintf(stdout,g); printf("\n");
+    printf("f is : "); mpz_poly_fprintf(stdout,f); printf("\n");
+    printf("f^ is : "); mpz_poly_fprintf(stdout,g); printf("\n");
 
-    // Filling in B here as an example ; genereators of the maximal order of the number field of 57*x^3 + 817*x^2 + 577*x + 781 (tested with magma);
+    // Filling in B here as an example ; genereators of the maximal order of the number field of g (tested with magma);
     mpq_set_si(mpq_mat_entry(B,0,0),1,1);
     mpq_set_si(mpq_mat_entry(B,0,1),0,1);
     mpq_set_si(mpq_mat_entry(B,0,2),5,6);
     mpq_set_si(mpq_mat_entry(B,1,0),0,1);
-    mpq_set_si(mpq_mat_entry(B,1,1),57,1);
-    mpq_set_si(mpq_mat_entry(B,1,2),95,3);
+    mpq_set_si(mpq_mat_entry(B,1,1),1,1);
+    mpq_set_si(mpq_mat_entry(B,1,2),5,9);
     mpq_set_si(mpq_mat_entry(B,2,0),0,1);
-    mpq_set_si(mpq_mat_entry(B,2,1),0,0);
-    mpq_set_si(mpq_mat_entry(B,2,2),19,2);
-    mpq_mat_fprint(stdout,B); printf("\n");
+    mpq_set_si(mpq_mat_entry(B,2,1),0,1);
+    mpq_set_si(mpq_mat_entry(B,2,2),1,342);
+    printf("generators are :\n"); mpq_mat_fprint(stdout,B); printf("\n");
 
 
     // Inverting B
@@ -1316,18 +1316,17 @@ int main(int argc, char * argv[])/*{{{*/
         // B2 now contains identity and B^-1
     mpq_mat_submat_swap(B_inv,0,0,B2,0,3,3,3);
 
-    mpq_mat_fprint(stdout,B_inv); printf("\n");
 
 
     // Now building the matrix U, containing all generators to the power of p
     // Generators are polynomials, stored in the matrix B
     generators_to_power_p(U,B,g,p);
-    mpq_mat_fprint(stdout,U); printf("\n");
+    printf("generators to the power %d are :\n",p); mpq_mat_fprint(stdout,U); printf("\n");
     
 
     // Now multiplying B^-1 and U;
     mpq_mat_multiply(T,B_inv,U);
-    mpq_mat_fprint(stdout,T); printf("\n");
+    printf("The result is :\n"); mpq_mat_fprint(stdout,T); printf("\n");
 
     mpq_mat_clear(B);
     mpq_mat_clear(B_inv);
