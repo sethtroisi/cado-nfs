@@ -1263,7 +1263,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         result to updateObserver().
         '''
         wuname = self.make_wuname(identifier)
-        self.logger.info(" created WUname %s" % wuname)
+        #self.logger.info(" created WUname %s" % wuname)
         process = cadocommand.Command(command)
         cputime_used = os.times()[2] # CPU time of child processes
         realtime_used = time.time()
@@ -4377,11 +4377,11 @@ class SqrtTask(Task):
             t = self.progparams[0].get("threads", 1)
             while not self.is_done():
                 dep = self.state.get("next_dep", 0)
-                if t == 1:
-                   self.logger.info("Trying dependency %d", dep)
-                else:
-                   self.logger.info("Trying dependencies %d to %d",
-                                    dep, dep+t-1)
+                #if t == 1:
+                   #self.logger.info("Trying dependency %d", dep)
+                #else:
+                   #self.logger.info("Trying dependencies %d to %d",
+                                    #dep, dep+t-1)
                 (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Sqrt.name)
                 p = cadoprograms.Sqrt(ab=False, side1=True,
