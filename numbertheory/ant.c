@@ -1007,9 +1007,8 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsi
         mpz_init(K);
         mpz_init(K2);
         mpz_set_si(K,1);
-        mpz_poly_t f, f2;
+        mpz_poly_t f2;
         mpz_poly_t g2;
-        mpz_poly_init(f,B->n-1);
         mpz_poly_init(f2,B->n-1);
         mpz_poly_init(g2,B->n-1);
         mpz_init(p2);
@@ -1020,11 +1019,12 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsi
             mpz_init(N[i]);
         }
 
-
-        mpz_poly_fprintf(stdout,g);
         mpz_poly_mod_mpz(g2,g,p2,NULL);
 
         for (j = 0 ; j < U->m ; j++) {
+            mpz_poly_t f;
+            mpz_poly_init(f,B->n-1);
+
             // Putting the LCM of all denominators of coefficients of w[j] in K
             mpz_set_si(K,1);
             for (i = 0 ; i < U-> n ; i++) {
@@ -1032,29 +1032,33 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsi
             }
             mpz_set(K2,K);
                
+
             // Generating the polynom
             for (i = 0 ; i < B->n ; i++) {
-                mpz_set_si(N[i],1);
-                mpz_mul(N[i],K,mpq_numref(mpq_mat_entry_const(B,i,j)));
+                mpq_t aux1;
+                mpq_t K_rat;
+                mpq_init(aux1);
+                mpq_init(K_rat);
+
+                mpq_set(aux1,mpq_mat_entry_const(B,i,j));
+                mpq_set_z(K_rat,K);
+                mpq_mul(aux1,aux1,K_rat);
+                mpq_get_num(N[i],aux1);
+            
+                mpq_clear(K_rat);
+                mpq_clear(aux1);
             }
             mpz_poly_setcoeffs(f,N,B->n-1);
             mpz_poly_set(f2,f);
 
-            printf("polynomial f is :"); mpz_poly_fprintf(stdout,f);
-            // Setting it to the power of p
-            printf("polynomial g is :"); mpz_poly_fprintf(stdout,g);
-            printf("polynomial g2 is :"); mpz_poly_fprintf(stdout,g2);
-
-            // ********* HERE I have to find a way to compute f^p mod g without having to compute them mod p. I'm currently writing something in mpz_poly.c in order to do this.
-
-
-            mpz_poly_power_mod_f_mod_ui(f,f,g2,p2,p);
-            printf("polynomial f^p is :"); mpz_poly_fprintf(stdout,f);
+            // Computing f^p mod g (it returns (K * the corresponding generator)^p
+            mpz_poly_power_mod_f(f,f,g,p);
 
             // Storing K^p in K
-            for (i = 0 ; i < p ; i ++) {
+            for (i = 2 ; i <= p ; i ++) {
                 mpz_mul(K,K,K2);
             }
+
             // Storing w[j] in j-th column of U
             for (k = 0 ; k <= f->deg ; k++) {
                 mpz_poly_getcoeff(K2,k,f);
@@ -1062,7 +1066,8 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsi
                 mpq_set_den(mpq_mat_entry(U,k,j),K);
                 mpq_canonicalize(mpq_mat_entry(U,k,j));
             } 
-            printf("HELP !!\n");
+            
+            mpz_poly_clear(f);
         }
 
         for (i = 0 ; i < B->m ; i++){
@@ -1072,7 +1077,6 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsi
         mpz_clear(K2);
         mpz_clear(p2);
         mpz_poly_clear(g2);
-        mpz_poly_clear(f);
         mpz_clear(K);
     }
 }
@@ -1298,7 +1302,7 @@ int main(int argc, char * argv[])/*{{{*/
     mpq_set_si(mpq_mat_entry(B,1,2),95,3);
     mpq_set_si(mpq_mat_entry(B,2,0),0,1);
     mpq_set_si(mpq_mat_entry(B,2,1),0,0);
-    mpq_set_si(mpq_mat_entry(B,2,2),57,6);
+    mpq_set_si(mpq_mat_entry(B,2,2),19,2);
     mpq_mat_fprint(stdout,B); printf("\n");
 
 
@@ -1313,10 +1317,6 @@ int main(int argc, char * argv[])/*{{{*/
     mpq_mat_submat_swap(B_inv,0,0,B2,0,3,3,3);
 
     mpq_mat_fprint(stdout,B_inv); printf("\n");
-
-
-
-
 
 
     // Now building the matrix U, containing all generators to the power of p

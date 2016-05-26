@@ -105,6 +105,8 @@ int mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcpt
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
                             mpz_poly_srcptr f, mpz_srcptr m,
                             mpz_srcptr invm);
+void mpz_poly_mul_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
+                        mpz_poly_srcptr f);
 void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
                                          mpz_poly_srcptr F, mpz_srcptr m, mpz_srcptr invm);
 int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
@@ -131,6 +133,8 @@ void polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
                   mpz_poly_srcptr F);
 void mpz_poly_sqr_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                             mpz_srcptr m, mpz_srcptr invm);
+void mpz_poly_power_mod_f(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+                         unsigned int a);
 void mpz_poly_power_mod_f_mod_ui(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                              mpz_srcptr a, unsigned long p);
 void mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,

@@ -1503,6 +1503,15 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr 
   mpz_poly_clear(R);
 }
 
+/* Q = P1*P2 mod f, assuming f is monic */
+void
+mpz_poly_mul_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
+                        mpz_poly_srcptr f)
+{
+    mpz_poly_mul(Q,P1,P2);
+    mpz_poly_mod_f(Q,f);
+}
+
 /* Q = P^2 mod f, mod m
    f is the original algebraic polynomial (non monic but small coefficients)
    Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
@@ -1539,6 +1548,23 @@ void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f) {
   df->deg = (f->deg <= 0) ? -1 : f->deg - 1;
   for (n = 0; n <= f->deg - 1; n++)
     mpz_mul_si (df->coeff[n], f->coeff[n + 1], n + 1);
+}
+
+/* Q = P^a mod f, assuming f is monic */
+void mpz_poly_power_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+                         unsigned int a)
+{
+    mpz_poly_t P2;
+    mpz_poly_init(P2,P->deg+1);
+    mpz_poly_set(P2,P);
+    mpz_poly_set(Q,P);
+
+    mpz_poly_mod_f(Q,f);
+    for (unsigned int i = 2 ; i <= a ; i++){
+        mpz_poly_mul_mod_f(Q,Q,P2,f);
+    }
+
+    mpz_poly_clear(P2);
 }
 
 /* Q = P^a mod f, mod p (f is the algebraic polynomial, non monic) */
