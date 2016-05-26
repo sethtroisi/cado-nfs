@@ -1271,7 +1271,7 @@ int main(int argc, char * argv[])/*{{{*/
     // The inputs to this problem are f, one polynomial of degree n, and B, the matrix containing the genereators of one order of the number field obtained with f, as well as p, a prime number
     // These are only examples to be sure that gaussian reduction is working.
     unsigned int n = 3;
-    unsigned int p = 7;
+    unsigned int p = 3;
     mpq_mat B, B_inv, B2, T, U;
     mpz_poly_t f, g;
 
@@ -1296,7 +1296,7 @@ int main(int argc, char * argv[])/*{{{*/
     // Filling in B here as an example ; genereators of the maximal order of the number field of 57*x^3 + 817*x^2 + 577*x + 781 (tested with magma);
     mpq_set_si(mpq_mat_entry(B,0,0),1,1);
     mpq_set_si(mpq_mat_entry(B,0,1),0,1);
-    mpq_set_si(mpq_mat_entry(B,0,2),5,1);
+    mpq_set_si(mpq_mat_entry(B,0,2),5,6);
     mpq_set_si(mpq_mat_entry(B,1,0),0,1);
     mpq_set_si(mpq_mat_entry(B,1,1),57,1);
     mpq_set_si(mpq_mat_entry(B,1,2),95,3);
@@ -1323,7 +1323,11 @@ int main(int argc, char * argv[])/*{{{*/
     // Generators are polynomials, stored in the matrix B
     generators_to_power_p(U,B,g,p);
     mpq_mat_fprint(stdout,U); printf("\n");
+    
 
+    // Now multiplying B^-1 and U;
+    mpq_mat_multiply(T,B_inv,U);
+    mpq_mat_fprint(stdout,T); printf("\n");
 
     mpq_mat_clear(B);
     mpq_mat_clear(B_inv);
