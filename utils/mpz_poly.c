@@ -1418,6 +1418,8 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
     return R->deg;
 }
 
+
+
 /*  Reduce frac (= num / denom) mod F mod m ,
     i.e. compute num * denom^-1 mod F mod m .
     The return value is in num, denom is set to constant polynomial 1

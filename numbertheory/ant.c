@@ -992,23 +992,28 @@ void print_polynomial(mpz_t* f, int degree){
 	printf("\n");
 }
 
-// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an order, and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p).
-void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr f, unsigned int p)
+// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an order, and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p), reduced mod g and mod p.
+void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsigned int p)
 {
     if(B->m != B->n) 
         return;
 
     else {
         unsigned int i, j;
+        int k;
         mpq_mat_realloc(U,B->m,B->n);
 
-        mpz_t K; // common denominator
+        mpz_t K, K2, p2; // common denominator
         mpz_init(K);
+        mpz_init(K2);
         mpz_set_si(K,1);
-        mpz_poly_t f;
-        mpz_poly_t f2;
+        mpz_poly_t f, f2;
+        mpz_poly_t g2;
         mpz_poly_init(f,B->n-1);
         mpz_poly_init(f2,B->n-1);
+        mpz_poly_init(g2,B->n-1);
+        mpz_init(p2);
+        mpz_set_ui(p2,p);
 
         mpz_t N[B->n]; // will be used to store numerators of w[j] times K 
         for (i = 0 ; i < B->m ; i++){
@@ -1016,29 +1021,57 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr f, unsi
         }
 
 
-        for (j = 0 ; j < U->m ; j++) {
+        mpz_poly_fprintf(stdout,g);
+        mpz_poly_mod_mpz(g2,g,p2,NULL);
 
+        for (j = 0 ; j < U->m ; j++) {
             // Putting the LCM of all denominators of coefficients of w[j] in K
             mpz_set_si(K,1);
             for (i = 0 ; i < U-> n ; i++) {
                 mpz_lcm(K,K,mpq_denref(mpq_mat_entry_const(B,i,j)));
             }
+            mpz_set(K2,K);
                
             // Generating the polynom
-            for (i = 0 ; i < B->m ; i++) {
+            for (i = 0 ; i < B->n ; i++) {
                 mpz_set_si(N[i],1);
                 mpz_mul(N[i],K,mpq_numref(mpq_mat_entry_const(B,i,j)));
             }
             mpz_poly_setcoeffs(f,N,B->n-1);
             mpz_poly_set(f2,f);
 
+            printf("polynomial f is :"); mpz_poly_fprintf(stdout,f);
             // Setting it to the power of p
-            for (i = 0 ; i < p-1 ; i++) {
-                mpz_poly_mul(f,f,f2);
+            printf("polynomial g is :"); mpz_poly_fprintf(stdout,g);
+            printf("polynomial g2 is :"); mpz_poly_fprintf(stdout,g2);
+
+            // ********* HERE I have to find a way to compute f^p mod g without having to compute them mod p. I'm currently writing something in mpz_poly.c in order to do this.
+
+
+            mpz_poly_power_mod_f_mod_ui(f,f,g2,p2,p);
+            printf("polynomial f^p is :"); mpz_poly_fprintf(stdout,f);
+
+            // Storing K^p in K
+            for (i = 0 ; i < p ; i ++) {
+                mpz_mul(K,K,K2);
             }
-            
+            // Storing w[j] in j-th column of U
+            for (k = 0 ; k <= f->deg ; k++) {
+                mpz_poly_getcoeff(K2,k,f);
+                mpq_set_num(mpq_mat_entry(U,k,j),K2);
+                mpq_set_den(mpq_mat_entry(U,k,j),K);
+                mpq_canonicalize(mpq_mat_entry(U,k,j));
+            } 
+            printf("HELP !!\n");
+        }
+
+        for (i = 0 ; i < B->m ; i++){
+            mpz_clear(N[i]);
         }
         mpz_poly_clear(f2);
+        mpz_clear(K2);
+        mpz_clear(p2);
+        mpz_poly_clear(g2);
         mpz_poly_clear(f);
         mpz_clear(K);
     }
@@ -1234,7 +1267,7 @@ int main(int argc, char * argv[])/*{{{*/
     // The inputs to this problem are f, one polynomial of degree n, and B, the matrix containing the genereators of one order of the number field obtained with f, as well as p, a prime number
     // These are only examples to be sure that gaussian reduction is working.
     unsigned int n = 3;
-    unsigned int p = 3;
+    unsigned int p = 7;
     mpq_mat B, B_inv, B2, T, U;
     mpz_poly_t f, g;
 
@@ -1259,12 +1292,12 @@ int main(int argc, char * argv[])/*{{{*/
     // Filling in B here as an example ; genereators of the maximal order of the number field of 57*x^3 + 817*x^2 + 577*x + 781 (tested with magma);
     mpq_set_si(mpq_mat_entry(B,0,0),1,1);
     mpq_set_si(mpq_mat_entry(B,0,1),0,1);
-    mpq_set_si(mpq_mat_entry(B,0,2),0,1);
+    mpq_set_si(mpq_mat_entry(B,0,2),5,1);
     mpq_set_si(mpq_mat_entry(B,1,0),0,1);
     mpq_set_si(mpq_mat_entry(B,1,1),57,1);
-    mpq_set_si(mpq_mat_entry(B,1,2),0,1);
-    mpq_set_si(mpq_mat_entry(B,2,0),5,1);
-    mpq_set_si(mpq_mat_entry(B,2,1),95,3);
+    mpq_set_si(mpq_mat_entry(B,1,2),95,3);
+    mpq_set_si(mpq_mat_entry(B,2,0),0,1);
+    mpq_set_si(mpq_mat_entry(B,2,1),0,0);
     mpq_set_si(mpq_mat_entry(B,2,2),57,6);
     mpq_mat_fprint(stdout,B); printf("\n");
 
@@ -1289,6 +1322,7 @@ int main(int argc, char * argv[])/*{{{*/
     // Now building the matrix U, containing all generators to the power of p
     // Generators are polynomials, stored in the matrix B
     generators_to_power_p(U,B,g,p);
+    mpq_mat_fprint(stdout,U); printf("\n");
 
 
     mpq_mat_clear(B);
