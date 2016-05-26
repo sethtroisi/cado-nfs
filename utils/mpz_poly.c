@@ -1418,7 +1418,27 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
     return R->deg;
 }
 
+/* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0]
+   Return the degree of the remainder. Stores the resut of the reduction in R */
+/* Assume that f is a monic polynomial */
+int mpz_poly_mod_f(mpz_poly_ptr R, mpz_poly_srcptr f){
+    if(R->deg >= f->deg) {
+        mpz_poly_t aux;
+        mpz_t Rd;
+        mpz_poly_init(aux,R->deg-f->deg);
+        mpz_init(Rd);
 
+        mpz_poly_getcoeff(Rd,R->deg,R);
+        mpz_poly_setcoeff(aux,R->deg-f->deg,Rd);
+        mpz_poly_mul(aux,aux,f);
+        mpz_poly_sub(R,R,aux);
+
+        mpz_clear(Rd);
+        mpz_poly_clear(aux);
+        mpz_poly_mod_f(R,f);
+    }
+    return R->deg;
+}
 
 /*  Reduce frac (= num / denom) mod F mod m ,
     i.e. compute num * denom^-1 mod F mod m .
