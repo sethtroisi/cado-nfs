@@ -993,7 +993,7 @@ void print_polynomial(mpz_t* f, int degree){
 }
 
 // Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an order, and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p).
-void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, unsigned int p)
+void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr f, unsigned int p)
 {
     if(B->m != B->n) 
         return;
@@ -1042,6 +1042,27 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, unsigned int p)
         mpz_poly_clear(f);
         mpz_clear(K);
     }
+}
+
+void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_ptr f)
+{
+    mpz_t fd,temp;
+    mpz_init(fd);
+    mpz_init(temp);
+    mpz_poly_getcoeff(fd,f->deg,f);
+
+    mpz_poly_set(g,f);
+    for (int k = 0 ; k < g->deg ; k++) {
+        mpz_poly_getcoeff(temp,k,g);
+        for(int j = 1 ; j <= g->deg-1-k ; j++){
+            mpz_mul(temp,temp,fd);
+        }
+        mpz_poly_setcoeff(g,k,temp);
+    }
+    mpz_poly_setcoeff_ui(g,g->deg,1);
+
+    mpz_clear(temp);
+    mpz_clear(fd);
 }
 
 int main(int argc, char * argv[])/*{{{*/
@@ -1210,10 +1231,15 @@ int main(int argc, char * argv[])/*{{{*/
 	
 	}*/
 
+    // The inputs to this problem are f, one polynomial of degree n, and B, the matrix containing the genereators of one order of the number field obtained with f, as well as p, a prime number
     // These are only examples to be sure that gaussian reduction is working.
     unsigned int n = 3;
     unsigned int p = 3;
     mpq_mat B, B_inv, B2, T, U;
+    mpz_poly_t f, g;
+
+    mpz_poly_init(f,n);
+    mpz_poly_init(g,n);
     mpq_mat_init(B, n, n); // The matrix of generators
     mpq_mat_init(B_inv, n, n); // Its inverse
     mpq_mat_init(B2, n, 2*n); // An auxiliary matrix on which gaussian reduction will be applied
@@ -1221,17 +1247,25 @@ int main(int argc, char * argv[])/*{{{*/
     mpq_mat_init(U, n, n);
     mpq_mat_set_ui(T, 1);
 
-    // Filling in B here as an example, not supposed to represent the generators of any order
+    // Filling in f as an example, and storing in g the monic polynom such as (fd*alpha) is a root of if and only if alpha is a root of f
+    mpz_poly_setcoeff_si(f,0,781);
+    mpz_poly_setcoeff_si(f,1,577);
+    mpz_poly_setcoeff_si(f,2,817);
+    mpz_poly_setcoeff_si(f,3,57);
+    mpz_poly_to_monic(g,f);
+    mpz_poly_fprintf(stdout,f); printf("\n");
+    mpz_poly_fprintf(stdout,g); printf("\n");
+
+    // Filling in B here as an example ; genereators of the maximal order of the number field of 57*x^3 + 817*x^2 + 577*x + 781 (tested with magma);
     mpq_set_si(mpq_mat_entry(B,0,0),1,1);
     mpq_set_si(mpq_mat_entry(B,0,1),0,1);
     mpq_set_si(mpq_mat_entry(B,0,2),0,1);
     mpq_set_si(mpq_mat_entry(B,1,0),0,1);
-    mpq_set_si(mpq_mat_entry(B,1,1),185,1);
+    mpq_set_si(mpq_mat_entry(B,1,1),57,1);
     mpq_set_si(mpq_mat_entry(B,1,2),0,1);
-    mpq_set_si(mpq_mat_entry(B,2,0),0,1);
-    mpq_set_si(mpq_mat_entry(B,2,1),95,1);
-    mpq_set_si(mpq_mat_entry(B,2,2),185,1);
-
+    mpq_set_si(mpq_mat_entry(B,2,0),5,1);
+    mpq_set_si(mpq_mat_entry(B,2,1),95,3);
+    mpq_set_si(mpq_mat_entry(B,2,2),57,6);
     mpq_mat_fprint(stdout,B); printf("\n");
 
 
@@ -1246,13 +1280,15 @@ int main(int argc, char * argv[])/*{{{*/
     mpq_mat_submat_swap(B_inv,0,0,B2,0,3,3,3);
 
     mpq_mat_fprint(stdout,B_inv); printf("\n");
-    mpq_mat_fprint(stdout,B); printf("\n");
+
+
+
 
 
 
     // Now building the matrix U, containing all generators to the power of p
     // Generators are polynomials, stored in the matrix B
-    generators_to_power_p(U,B,p);
+    generators_to_power_p(U,B,g,p);
 
 
     mpq_mat_clear(B);
