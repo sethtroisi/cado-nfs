@@ -257,6 +257,19 @@ void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned int p)
 }
 /*}}}*/
 /* {{{ row-level operations */
+// Return 1 if the k-th line of M is null, 0 else
+int mpz_mat_isnull_row(mpz_mat_srcptr M, unsigned int k){
+    unsigned int j = 0;
+    ASSERT_ALWAYS(k < M->m);
+    while((j < M->n) && !mpz_cmp_si(mpz_mat_entry_const(M,k,j),0)){
+        j++;
+    }
+    if(j == M->n){
+        return 1;
+    }
+    return 0;
+}
+
 void mpz_mat_swaprows(mpz_mat_ptr M, unsigned int i0, unsigned int i1)
 {
     ASSERT_ALWAYS(i0 < M->m);
@@ -603,7 +616,7 @@ void mpz_mat_power_ui_mod_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n, un
     mpz_mat_init(C,A->m,A->n);
     mpz_mat_init(D,A->m,A->n);
     mpz_mat_set_ui(C,1);
-    for (k = 2 ; k <= n ; k++){
+    for (k = 1 ; k <= n ; k++){
         mpz_mat_multiply_mod_ui(D,C,A,p);
         mpz_mat_swap(C,D);
     }
@@ -1028,7 +1041,49 @@ int mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
     return signdet;
 }
 /* }}} */
+/*{{{ kernel*/
+// This is supposed to compute the Kernel of M mod p and to store it in the matrix K. If r is the rank of M, and M is a square matrix n*n, K is a n*(n-r) matrix
+void mpz_mat_kernel(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned int p){
+    mpz_mat T, H;
+    mpz_t p2;
+    unsigned int r;
+    unsigned int i,j;
 
+    mpz_mat_init(T,M->m,M->n);
+    mpz_mat_init(H,M->m,M->n);
+    mpz_init(p2);
+    mpz_set_ui(p2,p);
+    mpz_mat_set(H,M);
+
+    // Storing a reduced matrix of M in H with gauss
+    mpz_gauss_backend_mod(H,T,p2);
+    // Finding the rank of M and H
+    r = H->m;
+    while((r>0) && mpz_mat_isnull_row(H,r-1)){
+        r--;
+    }
+    // Kernel is of dimension n-r, and a basis of the kernel is given in the n-r last lines of T
+    // We shall keep the convention of magma
+    if(r == H->m){
+        mpz_mat_realloc(K,H->m,1);
+        // K is the null vector
+        return;
+    }
+
+    // Reallocating K with n-r columns
+    mpz_mat_realloc(K,H->m,H->n-r);
+    for(i = 0 ; i<H->m ; i++){
+        for(j = 0 ; j < H->n-r ; j++){
+            mpz_set(mpz_mat_entry(K,i,j),mpz_mat_entry(T,r+j,i));
+        }
+    }
+
+    mpz_clear(p2);
+    mpz_mat_clear(T);
+    mpz_mat_clear(H);
+    
+}
+/* }}} */
 /*{{{ timer*/
 double
 seconds (void)
@@ -1315,25 +1370,25 @@ int main(int argc, char * argv[])/*{{{*/
 
     // The inputs to this problem are f, one polynomial of degree n, and B, the matrix containing the genereators of one order of the number field obtained with f, as well as p, a prime number
     unsigned int n = 3;
-    unsigned int p = 3;
-    unsigned int k = 5;
+    unsigned int p = strtoul(argv[1],NULL,0); //19; //atoi(argv[1]);
+    unsigned int k = strtoul(argv[2],NULL,0); //1; //atoi(argv[2]);
     mpq_mat B, B_inv, B2, T, U;
     mpz_poly_t f, g;
-    mpz_mat X, Fk, H;
+    mpz_mat X, K;
     mpz_t den;
+
+    printf("HELP !!!");
 
     mpz_poly_init(f,n);
     mpz_poly_init(g,n);
     mpz_mat_init(X,n,n);
-    mpz_mat_init(Fk,n,n);
-    mpz_mat_init(H,n,n);
+    mpz_mat_init(K,n,n);
     mpq_mat_init(B, n, n); // The matrix of generators
     mpq_mat_init(B_inv, n, n); // Its inverse
     mpq_mat_init(B2, n, 2*n); // An auxiliary matrix on which gaussian reduction will be applied
     mpq_mat_init(T, n, n); // An auxiliary matrix
     mpq_mat_init(U, n, n);
     mpq_mat_set_ui(T, 1);
-    mpz_mat_set_ui(Fk,1);
     mpz_init(den);
 
     // Filling in f as an example, and storing in g the monic polynom such as (fd*alpha) is a root of if and only if alpha is a root of f
@@ -1379,15 +1434,18 @@ int main(int argc, char * argv[])/*{{{*/
     mpq_mat_multiply(T,B_inv,U);
     mpq_mat_numden(X,den,T);
     mpz_mat_mod_ui(X,X,p);
+
+    printf("Matrix of the application z -> (z^%d mod f mod %d) :\n",p,p); mpz_mat_fprint(stdout,X); printf("\n");
     mpz_mat_power_ui_mod_ui(X,X,k,p);
     printf("Matrix to the power of %d of the application z -> (z^%d mod f mod %d) :\n",k,p,p); mpz_mat_fprint(stdout,X); printf("\n");
 
-    mpz_hnf_backend(X,H);
-    printf("HNF of the matrix of the application z -> (z^%d mod f mod %d) :\n",p,p); mpz_mat_fprint(stdout,X); printf("\n");
-    printf("Transformation matrix :\n"); mpz_mat_fprint(stdout,H); printf("\n");
 
-    mpz_mat_clear(Fk);
-    mpz_mat_clear(H);
+    mpz_mat_kernel(K,X,p);
+    printf("F is the application z -> (z^%d mod f mod %d) :\n", p, p);
+    printf("A basis of F^%d is :\n",k);
+    mpz_mat_fprint(stdout,K); 
+
+    mpz_mat_clear(K);
     mpz_mat_clear(X);
     mpq_mat_clear(B);
     mpq_mat_clear(B_inv);
