@@ -244,6 +244,17 @@ void mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
             mpz_mul(dst, dst, mpq_numref(src));
         }
 }
+
+void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned int p)
+{
+    unsigned int i,j;
+    mpz_mat_realloc(dst,src->m,src->n);
+    for (i = 0 ; i < dst->m ; i++){
+        for (j = 0 ; j < dst->n ; j++){
+            mpz_fdiv_r_ui(mpz_mat_entry(dst,i,j),mpz_mat_entry_const(src,i,j),p);
+        }
+    }
+}
 /*}}}*/
 /* {{{ row-level operations */
 void mpz_mat_swaprows(mpz_mat_ptr M, unsigned int i0, unsigned int i1)
@@ -547,6 +558,61 @@ void mpz_mat_multiply(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_mat_srcptr B)
         }
     }
 }
+
+void mpz_mat_multiply_mod_ui(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_mat_srcptr B, unsigned int p)
+{
+    ASSERT_ALWAYS(A->n == B->m);
+    mpz_mat_realloc(C, A->m, B->n);
+    for(unsigned int i = 0 ; i < A->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+            mpz_set_ui(mpz_mat_entry(C, i, j), 0);
+            for(unsigned int k = 0 ; k < B->m ; k++) {
+                mpz_addmul(mpz_mat_entry(C, i, j),
+                        mpz_mat_entry_const(A, i, k),
+                        mpz_mat_entry_const(B, k, j));
+            }
+        }
+    }
+    mpz_mat_mod_ui(C,C,p);
+}
+
+// Returns A^n for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
+void mpz_mat_power_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n){
+    unsigned int k;
+    mpz_mat C,D;
+    ASSERT_ALWAYS(A->n == A->m);
+    mpz_mat_init(C,A->m,A->n);
+    mpz_mat_init(D,A->m,A->n);
+    mpz_mat_set_ui(C,1);
+    mpz_mat_fprint(stdout,A);
+    for (k = 2 ; k <= n ; k++){
+        mpz_mat_multiply(D,C,A);
+        mpz_mat_swap(C,D);
+    }
+    mpz_mat_realloc(B,A->m,A->n);
+    mpz_mat_swap(C,B);
+    mpz_mat_clear(C);
+    mpz_mat_clear(D);
+}
+
+// Returns A^n mod pfor n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
+void mpz_mat_power_ui_mod_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n, unsigned int p){
+    unsigned int k;
+    mpz_mat C,D;
+    ASSERT_ALWAYS(A->n == A->m);
+    mpz_mat_init(C,A->m,A->n);
+    mpz_mat_init(D,A->m,A->n);
+    mpz_mat_set_ui(C,1);
+    for (k = 2 ; k <= n ; k++){
+        mpz_mat_multiply_mod_ui(D,C,A,p);
+        mpz_mat_swap(C,D);
+    }
+    mpz_mat_realloc(B,A->m,A->n);
+    mpz_mat_swap(C,B);
+    mpz_mat_clear(C);
+    mpz_mat_clear(D);
+}
+
 
 void mpq_mat_multiply(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_mat_srcptr B)
 {
@@ -1081,27 +1147,6 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsi
     }
 }
 
-void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_ptr f)
-{
-    mpz_t fd,temp;
-    mpz_init(fd);
-    mpz_init(temp);
-    mpz_poly_getcoeff(fd,f->deg,f);
-
-    mpz_poly_set(g,f);
-    for (int k = 0 ; k < g->deg ; k++) {
-        mpz_poly_getcoeff(temp,k,g);
-        for(int j = 1 ; j <= g->deg-1-k ; j++){
-            mpz_mul(temp,temp,fd);
-        }
-        mpz_poly_setcoeff(g,k,temp);
-    }
-    mpz_poly_setcoeff_ui(g,g->deg,1);
-
-    mpz_clear(temp);
-    mpz_clear(fd);
-}
-
 int main(int argc, char * argv[])/*{{{*/
 {
 	/*
@@ -1269,20 +1314,27 @@ int main(int argc, char * argv[])/*{{{*/
 	}*/
 
     // The inputs to this problem are f, one polynomial of degree n, and B, the matrix containing the genereators of one order of the number field obtained with f, as well as p, a prime number
-    // These are only examples to be sure that gaussian reduction is working.
     unsigned int n = 3;
     unsigned int p = 3;
+    unsigned int k = 5;
     mpq_mat B, B_inv, B2, T, U;
     mpz_poly_t f, g;
+    mpz_mat X, Fk, H;
+    mpz_t den;
 
     mpz_poly_init(f,n);
     mpz_poly_init(g,n);
+    mpz_mat_init(X,n,n);
+    mpz_mat_init(Fk,n,n);
+    mpz_mat_init(H,n,n);
     mpq_mat_init(B, n, n); // The matrix of generators
     mpq_mat_init(B_inv, n, n); // Its inverse
     mpq_mat_init(B2, n, 2*n); // An auxiliary matrix on which gaussian reduction will be applied
     mpq_mat_init(T, n, n); // An auxiliary matrix
     mpq_mat_init(U, n, n);
     mpq_mat_set_ui(T, 1);
+    mpz_mat_set_ui(Fk,1);
+    mpz_init(den);
 
     // Filling in f as an example, and storing in g the monic polynom such as (fd*alpha) is a root of if and only if alpha is a root of f
     mpz_poly_setcoeff_si(f,0,781);
@@ -1296,13 +1348,13 @@ int main(int argc, char * argv[])/*{{{*/
     // Filling in B here as an example ; genereators of the maximal order of the number field of g (tested with magma);
     mpq_set_si(mpq_mat_entry(B,0,0),1,1);
     mpq_set_si(mpq_mat_entry(B,0,1),0,1);
-    mpq_set_si(mpq_mat_entry(B,0,2),5,6);
+    mpq_set_si(mpq_mat_entry(B,0,2),0,1);
     mpq_set_si(mpq_mat_entry(B,1,0),0,1);
     mpq_set_si(mpq_mat_entry(B,1,1),1,1);
-    mpq_set_si(mpq_mat_entry(B,1,2),5,9);
+    mpq_set_si(mpq_mat_entry(B,1,2),0,1);
     mpq_set_si(mpq_mat_entry(B,2,0),0,1);
     mpq_set_si(mpq_mat_entry(B,2,1),0,1);
-    mpq_set_si(mpq_mat_entry(B,2,2),1,342);
+    mpq_set_si(mpq_mat_entry(B,2,2),1,1);
     printf("generators are :\n"); mpq_mat_fprint(stdout,B); printf("\n");
 
 
@@ -1321,17 +1373,27 @@ int main(int argc, char * argv[])/*{{{*/
     // Now building the matrix U, containing all generators to the power of p
     // Generators are polynomials, stored in the matrix B
     generators_to_power_p(U,B,g,p);
-    printf("generators to the power %d are :\n",p); mpq_mat_fprint(stdout,U); printf("\n");
     
 
     // Now multiplying B^-1 and U;
     mpq_mat_multiply(T,B_inv,U);
-    printf("The result is :\n"); mpq_mat_fprint(stdout,T); printf("\n");
+    mpq_mat_numden(X,den,T);
+    mpz_mat_mod_ui(X,X,p);
+    mpz_mat_power_ui_mod_ui(X,X,k,p);
+    printf("Matrix to the power of %d of the application z -> (z^%d mod f mod %d) :\n",k,p,p); mpz_mat_fprint(stdout,X); printf("\n");
 
+    mpz_hnf_backend(X,H);
+    printf("HNF of the matrix of the application z -> (z^%d mod f mod %d) :\n",p,p); mpz_mat_fprint(stdout,X); printf("\n");
+    printf("Transformation matrix :\n"); mpz_mat_fprint(stdout,H); printf("\n");
+
+    mpz_mat_clear(Fk);
+    mpz_mat_clear(H);
+    mpz_mat_clear(X);
     mpq_mat_clear(B);
     mpq_mat_clear(B_inv);
     mpq_mat_clear(B2);
     mpq_mat_clear(T);
     mpq_mat_clear(U);
+    mpz_clear(den);
 }
 /*}}}*/

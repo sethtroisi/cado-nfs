@@ -1418,6 +1418,28 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
     return R->deg;
 }
 
+/* Stores in g the polynomial linked to f by : alpha is a root of f if and only if lc(f)*alpha is a root of g ; g is a monic */
+void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_ptr f)
+{
+    mpz_t fd,temp;
+    mpz_init(fd);
+    mpz_init(temp);
+    mpz_poly_getcoeff(fd,f->deg,f);
+
+    mpz_poly_set(g,f);
+    for (int k = 0 ; k < g->deg ; k++) {
+        mpz_poly_getcoeff(temp,k,g);
+        for(int j = 1 ; j <= g->deg-1-k ; j++){
+            mpz_mul(temp,temp,fd);
+        }
+        mpz_poly_setcoeff(g,k,temp);
+    }
+    mpz_poly_setcoeff_ui(g,g->deg,1);
+
+    mpz_clear(temp);
+    mpz_clear(fd);
+}
+
 /* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0]
    Return the degree of the remainder. Stores the resut of the reduction in R */
 /* Assume that f is a monic polynomial */
