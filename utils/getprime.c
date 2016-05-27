@@ -218,6 +218,7 @@ main (int argc, char *argv[])
 {
   unsigned long p, B;
   unsigned long pi = 0;
+  int diff = 0;
   prime_info i;
 
   if (argc != 2)
@@ -230,8 +231,16 @@ main (int argc, char *argv[])
   
   prime_info_init (i);
 
-  for (pi = 0, p = 2; p <= B; p = getprime_mt (i), pi++);
-  printf ("pi(%lu)=%lu\n", B, pi);
+  for (pi = 0, p = 2; p <= B; pi++) {
+      unsigned long newp = getprime_mt (i);
+      if (newp-p > diff) {
+          for( ; diff < newp - p ; diff++) {
+              printf ("firstdiff(%d)=%lu\n", diff, p);
+          }
+      }
+      p = newp;
+  }
+  printf ("pi(%lu)=%lu, maxdiff=%d\n", B, pi, diff);
 
   prime_info_clear (i); /* free the tables */
 

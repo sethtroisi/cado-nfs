@@ -144,3 +144,4 @@ sieve/strategies/test_strategy_cado.c
 sieve/strategies/F9.sh
 linalg/bwc/lingen.txt
 .mailmap
+utils/randomprime.cpp
