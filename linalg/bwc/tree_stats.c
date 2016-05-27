@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
+#include <ctype.h>
+
 #include "portability.h"
 #include "select_mpi.h"
 #include "utils.h"
@@ -48,6 +51,23 @@ void tree_stats_print(tree_stats_ptr stats, unsigned int level)
         printf("expected time for levels 0-%u: %.1f (total: %.1f)\n",
                 nstars-1, complement, sum + complement);
     }
+    {
+        /* print ETA */
+        time_t now[1];
+        time_t eta[1];
+        char eta_string[32] = "not available yet\n";
+        time(now);
+        *eta = *now + sum + complement - (wct_seconds() - stats->begin);
+#ifdef HAVE_CTIME_R
+        ctime_r(eta, eta_string);
+#else
+        strncpy(eta_string, ctime(eta), sizeof(eta_string));
+#endif
+        unsigned int s = strlen(eta_string);
+        for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
+
+        printf("lingen ETA: %s\n", eta_string);
+    }
 }
 
 void tree_stats_enter(tree_stats_ptr stats, const char * func, unsigned int inputsize)
@@ -55,6 +75,9 @@ void tree_stats_enter(tree_stats_ptr stats, const char * func, unsigned int inpu
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) { ++stats->depth; return; }
+    if (stats->depth == 0) {
+        stats->begin = wct_seconds();
+    }
     tree_running_stats_ptr s = stats->stats_curstack + ++stats->depth;
     memset(s, 0, sizeof(struct tree_running_stats_s));
     s->time_self -= wct_seconds();
