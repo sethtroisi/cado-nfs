@@ -139,6 +139,10 @@ configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
 add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
 set_property(TARGET random_matrix PROPERTY COMPILE_DEFINITIONS WANT_MAIN)
+set_target_properties(random_matrix PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+
 
 
 target_link_libraries(random_matrix utils m)
