@@ -290,6 +290,7 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         return 0;
     }
+
     /* {{{ parse r->nrows, r->ncols, density */
     if ((r->nrows = wild_args[0]) == 0) {
         fprintf(stderr, "Please specify r->nrows\n");
@@ -386,6 +387,7 @@ int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r,
 
     n_argv0 = n_argv = malloc(strlen(rmstring) * sizeof(char*));
     n_argc = 0;
+    n_argv[n_argc++]="random_matrix";
     for(char * q = rmstring, * qq; q != NULL; q = qq) {
         qq = strchr(q, ',');
         if (qq) { *qq++='\0'; }
@@ -393,7 +395,7 @@ int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r,
     }
     /* }}} */
     param_list_init(pl2);
-    int ok = random_matrix_process_data_set_from_args(r, pl2, n_argc, n_argv);
+    int ok = random_matrix_process_data_set_from_args(r, pl2, n_argc-1, n_argv+1);
     if (!ok || param_list_warn_unused(pl2)) {
         fprintf(stderr, "Bad argument list for parameter random_matrix: %s\n", rmstring);
         exit(1);
@@ -428,6 +430,9 @@ struct random_matrix_ddata_s {
     double spread;
     unsigned long ncols;        /* only for constraint correction */
     unsigned long nrows;        /* informational */
+    unsigned long padcols;        /* only for constraint correction */
+    unsigned long padrows;        /* informational */
+    int print;  /* 1 if we should print */
 
     uint64_t total_coeffs;   /* informational, after generation */
     double row_avg;     /* informational, after generation */
@@ -439,8 +444,8 @@ typedef struct random_matrix_ddata_s * random_matrix_ddata_ptr;
 void random_matrix_ddata_init(random_matrix_ddata_ptr d);
 void random_matrix_ddata_set_default(random_matrix_ddata_ptr d);
 void random_matrix_ddata_clear(random_matrix_ddata_ptr d);
-void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi);
-void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi, int kernel_left, int kernel_right);
+void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols);
+void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols, int kernel_left, int kernel_right);
 void random_matrix_ddata_info(FILE * out, random_matrix_ddata_ptr f);
 void random_matrix_ddata_init(random_matrix_ddata_ptr F);
 void random_matrix_ddata_clear(random_matrix_ddata_ptr F);
@@ -551,12 +556,38 @@ void random_matrix_ddata_info(FILE * out, random_matrix_ddata_ptr f)
             extreme_normal(nrows, mean_n, -sdev_n));
 }
 
-void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr R, parallelizing_info_srcptr pi, int kernel_left, int kernel_right)
+/* in the mmt structures, because of the balancing work, we promised that
+ * matrices of size padded_nrows*padded_ncols would be generated on each
+ * node. However, we know that the real matrix has to have one particular
+ * shape, which means that on the current node, it might be that we'll
+ * have some padding rows and columns to generate.
+ *
+ * Note that the on-the-fly random_matrix setup omits the balancing
+ * permutations, so that all padding rows are on the last blocks.
+ */
+void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr R, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols, int kernel_left, int kernel_right)
 {
+    f->print = pi ? pi->m->jrank == 0 && pi->m->trank == 0 : 1;
     /* Adapt to the parallelizing_info structure : divide */
     /* note that padding has to still be padding. */
     f->nrows = (R->nrows - kernel_right) / (pi ? pi->wr[1]->totalsize : 1);
     f->ncols = (R->ncols - kernel_left) / (pi ? pi->wr[0]->totalsize : 1);
+
+#define ADJUST(items, comm) do {					\
+    unsigned int rk = comm->jrank * comm->ncores + comm->trank;		\
+    if (rk * padded_n ## items >= R->n ## items) {			\
+        f->n ## items = 0;						\
+    } else if ((rk+1) * padded_n ## items >= R->n ## items) {		\
+        f->n ## items = R->n ## items - rk * padded_n ## items;		\
+    } else {								\
+        f->n ## items = padded_n ## items;	                        \
+    }                                                                   \
+    f->pad ## items = padded_n ## items - f->n ## items;		\
+} while (0)
+
+    if (pi) ADJUST(rows, pi->wr[1]); else f->nrows = R->nrows;
+    if (pi) ADJUST(cols, pi->wr[1]); else f->ncols = R->ncols;
+
     double density = R->density / (pi ? pi->wr[0]->totalsize : 1);
     /* sets the scale parameter so that the expected row weight matches
      * our desired density target */
@@ -587,9 +618,9 @@ void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_m
     }
 }
 
-void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi)
+void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols)
 {
-    random_matrix_ddata_adjust_force_kernel(f, r, pi, 0, 0);
+    random_matrix_ddata_adjust_force_kernel(f, r, pi, padded_nrows, padded_ncols, 0, 0);
 }
 
 /* }}} */
@@ -881,7 +912,9 @@ void random_matrix_fill_fake_balancing_header(balancing_ptr bal, parallelizing_i
     bal->h->ncols = r->ncols;
     bal->h->ncoeffs = 0; /* FIXME ; what should I do ? */
     bal->h->checksum = 0;
-    bal->h->flags = FLAG_PADDING|FLAG_COLPERM|FLAG_SHUFFLED_MUL|FLAG_REPLICATE;
+    bal->h->flags = FLAG_COLPERM;
+    if (bal->h->nrows == bal->h->ncols)
+        bal->h->flags |= FLAG_REPLICATE;
     bal->h->pshuf[0] = 1;
     bal->h->pshuf[1] = 0;
     bal->h->pshuf_inv[0] = 1;
@@ -986,11 +1019,11 @@ void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_
     last_printed->t = t0;
     last_printed->z = 0;
 
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(F->ncols * sizeof(uint32_t));
         /* we'd like to avoid constant malloc()'s and free()'s */
         punched_interval_ptr pool = NULL;
         punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
-        for(unsigned long i = 0 ; i < nrows ; i++) {
+        for(unsigned long i = 0 ; i < F->nrows ; i++) {
             // long v = 0;
             uint32_t c = generate_row(rstate, F, ptr, range, & pool);
             PUSH_P(c);
@@ -1004,7 +1037,7 @@ void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_
             }
             total_coeffs += c;
             tot_sq += (double) c * (double) c;
-            if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
+            if (F->print && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
                 double dt = last_printed->t - t0;
                 char buf[16];
                 char buf2[16];
@@ -1014,21 +1047,22 @@ void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_
                 fflush(stdout);
             }
         }
-        if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            printf("\n");
+        for(unsigned long j = 0 ; j < F->padrows ; j++) {
+            PUSH_P(0);
         }
+        if (F->print) printf("\n");
         punched_interval_free(range, &pool);
         punched_interval_free_pool(&pool);
         free(ptr);
 #undef PUSH_P
 
     F->total_coeffs = total_coeffs;
-    double e = (double) total_coeffs / nrows;
-    double s = (double) tot_sq / nrows;
+    double e = (double) total_coeffs / F->nrows;
+    double s = (double) tot_sq / F->nrows;
     double sdev = sqrt(s - e*e);
     F->row_avg = e;
     F->row_sdev = sdev;
-    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && pi->m->jrank == 0 && pi->m->trank == 0) {
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && F->print) {
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
@@ -1039,6 +1073,8 @@ void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_dda
 {
     uint64_t total_coeffs = 0;
     double tot_sq = 0;
+
+    int has_coeffs = F->maxcoeff > 0;
 
     size_t alloc = 0;
     ASSERT_ALWAYS(arg->p == NULL);
@@ -1058,31 +1094,31 @@ void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_dda
     last_printed->z = 0;
 
         size_t size0 = 0;
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(F->ncols * sizeof(uint32_t));
         random_matrix_ddata G;
         random_matrix_ddata_init(G);
         /* use a special ddata, for our specially simple process (which
          * still needs the pick-and-punch thing */
         G->alpha=0;
-        G->ncols = nrows; /* yes */
+        G->ncols = F->nrows; /* yes */
         /* Then in fact it's easier, as we can avoid inverse transform
          * sampling for the computation of the coefficients */
         // int heavy = 1;
         punched_interval_ptr pool = NULL;
-        for(unsigned long j = 0 ; j < ncols ; j++) {
+        for(unsigned long j = 0 ; j < F->ncols ; j++) {
             double p = dist_p(F, j);
             G->scale = p;
             unsigned long weight;
             if (p > 0.1) {
                 weight = 0;
-                for(unsigned long i = 0 ; i < nrows ; i++) {
+                for(unsigned long i = 0 ; i < F->nrows ; i++) {
                     if (random_uniform(rstate) < p)
                         ptr[weight++]=i;
                 }
             } else {
-                weight = random_binomial(rstate, nrows, p);
+                weight = random_binomial(rstate, F->nrows, p);
                 for(unsigned long i = 0 ; i < weight ; i++) {
-                    ptr[i] = gmp_urandomm_ui(rstate, nrows);
+                    ptr[i] = gmp_urandomm_ui(rstate, F->nrows);
                 }
                 qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                 unsigned long nw = 0;
@@ -1146,7 +1182,7 @@ void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_dda
             }
             total_coeffs += weight;
             tot_sq += (double) weight * (double) weight;
-            if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
+            if (F->print && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
                 double dt = last_printed->t - t0;
                 char buf[16];
                 char buf2[16];
@@ -1156,17 +1192,20 @@ void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_dda
                 fflush(stdout);
             }
         }
+        for(unsigned long j = 0 ; j < F->padcols ; j++) {
+            PUSH_P(0);
+        }
         punched_interval_free_pool(&pool);
         random_matrix_ddata_clear(G);
         free(ptr);
 #undef PUSH_P
     F->total_coeffs = total_coeffs;
-    double e = (double) total_coeffs / nrows;
-    double s = (double) tot_sq / nrows;
+    double e = (double) total_coeffs / F->nrows;
+    double s = (double) tot_sq / F->nrows;
     double sdev = sqrt(s - e*e);
     F->row_avg = e;
     F->row_sdev = sdev;
-    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && pi->m->jrank == 0 && pi->m->trank == 0) {
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && F->print) {
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
@@ -1175,7 +1214,7 @@ void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_dda
 }
 
 
-void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
+void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg, unsigned long padded_nrows, unsigned long padded_ncols)
 {
     random_matrix_process_data r;
     random_matrix_process_data_init(r);
@@ -1192,11 +1231,12 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     random_matrix_ddata F;
     random_matrix_ddata_init(F);
     random_matrix_ddata_set_default(F);
-    random_matrix_ddata_adjust(F, R, pi);
+    random_matrix_ddata_adjust(F, r, pi, padded_nrows, padded_ncols);
 
-    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+    if (F->print) {
         printf("Each of the %u jobs on %u nodes creates a matrix with %lu rows %lu cols, and %d coefficients per row on average. Seed for rank 0 is %lu.\n",
-                pi->m->totalsize, pi->m->njobs, nrows, ncols, density, seed);
+                pi->m->totalsize, pi->m->njobs,
+                r->nrows, r->ncols, r->density, r->seed);
     }
 
     gmp_randstate_t rstate;
@@ -1336,7 +1376,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 void usage()
 {
-    fprintf(stderr, "Usage: ./random <nrows> [<ncols>] [<density>] [options]\n"
+    fprintf(stderr, "Usage: ./random_matrix <nrows> [<ncols>] [<density>] [options]\n"
             "Options:\n"
             "\t-d <density> : desired density per row\n"
             "\t-s <seed> : seed\n"
@@ -1403,6 +1443,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Warning, left kernel is large."
                 " Could trigger misbehaviours\n");
     }
+    if (kernel_left >= r->ncols) {
+        kernel_left = r->ncols - 1;
+    }
+    if (kernel_right >= r->nrows) {
+        kernel_right = r->nrows - 1;
+    }
 
     if (r->rhs->n) {
         ASSERT_ALWAYS(kernel_left == 0);
@@ -1419,7 +1465,7 @@ int main(int argc, char * argv[])
     random_matrix_ddata F;
     random_matrix_ddata_init(F);
     random_matrix_ddata_set_default(F);
-    random_matrix_ddata_adjust_force_kernel(F, r, NULL, kernel_left, kernel_right);
+    random_matrix_ddata_adjust_force_kernel(F, r, NULL, r->nrows, r->ncols, kernel_left, kernel_right);
     if (verbose) random_matrix_ddata_info(stderr, F);
 
     random_matrix_process_print(r, F);

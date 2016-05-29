@@ -2238,7 +2238,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Begin creation of fake matrix data in parallel\n");
             }
-            random_matrix_get_u32(mmt->pi, pl, m);
+            random_matrix_get_u32(mmt->pi, pl, m, mmt->mm->dim[0], mmt->mm->dim[1]);
         } else {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Matrix dispatching starts\n");
