@@ -1786,25 +1786,23 @@ int main(int argc, char * argv[])/*{{{*/
 			}
 			
 			
-			//printf("gamma*c in the basis of Ip :\n");
-			//mpq_mat_fprint(stdout,row_q);
+
 			
 			// Converting row_q (gamma*c mod g) in the basis of I_p (it is supposed to contain only integers)
 			mpq_mat_multiply(res,row_q,B_inv);
 			mpq_mat_multiply(res,res,I_inv);
 			
-			mpq_mat_fprint(stdout,res);
-			/*
+			//mpq_mat_fprint(stdout,res);
+			
 			// Extracting the numerators (remember, integers only) into a mpz_mat
 			mpq_mat_numden(row,coeff,res);
 			// Computing the same matrix, modulo p (it is supposed to be a vector of n integers, associated to gamma)
 			mpz_mat_mod_ui(row,row,p);
-			printf("The same, mod %d :\n",p);
 			mpz_mat_fprint(stdout,row);
 			//mpq_mat_fprint(stdout,res);
 			printf("\n\n");
 			
-			*/
+			
 			
 			mpq_mat_clear(res);
 			mpq_mat_clear(c_mat);
