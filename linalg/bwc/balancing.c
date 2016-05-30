@@ -12,7 +12,7 @@ void balancing_set_row_col_count(balancing_ptr bal)
 {
     bal->trows = bal->h->nrows;
     bal->tcols = bal->h->ncols;
-    if (bal->h->flags & FLAG_PADDING) {
+    if (bal->h->flags & FLAG_REPLICATE) {
         bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
     } else {
         ASSERT_ALWAYS(0);       // read me:
