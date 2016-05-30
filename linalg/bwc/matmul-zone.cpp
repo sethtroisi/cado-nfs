@@ -620,12 +620,14 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
             z.sort();
             // printf("Zone %zu: %zu+%zu+%zu\n", q.size(), z.qp.size(), z.qm.size(), z.qg.size());
             if (!z.empty()) {
-                if (j0) {
-                    q1.push_back(z);
-                    q.push_back(z);
-                } else {
-                    q.push_back(z);
-                }
+                /* blocks which are not in the first strip qualify for
+                 * the dispatcher/combiner split. */
+                if (j0) q1.push_back(z);
+                /* Currently, the dispatcher/combiner split is not
+                 * operational, so we put the block to the main list
+                 * anyway.
+                 */
+                q.push_back(z);
             }
             zavg += z.size();
         }
@@ -729,7 +731,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         vector<abvec_ur> current_buffers;
         vector<abvec_ur> current_buffer_pointers;
 
-        {       /* prepare dispatcher heads and buffers {{{ */
+        if (0) {       /* prepare dispatcher heads and buffers {{{ */
             unsigned int last_j0 = UINT_MAX;
             for(vector<dispatcher_t>::const_iterator v = dispatchers.begin() ; v != dispatchers.end() ; v++) {
                 if (v->j0 != last_j0) {
@@ -740,6 +742,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                     current_buffers.push_back(buf);
                     current_buffer_pointers.push_back(buf);
                     last_j0 = v->j0;
+                    abvec_ur_clear(x, &buf, maxmaxw);
                 }
             }
             start_points.push_back(dispatchers.end());
@@ -775,9 +778,6 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 /* right, so we can fill the buffer. Let's go. */
                 absrc_vec tsrc = abvec_subvec_const(x, src, current_points[i]->j0);
                 /* oh, but we need to find the offsets of each bucket... */
-
-
-
             }
 #endif
             if (z.i0 != last_i0) {
