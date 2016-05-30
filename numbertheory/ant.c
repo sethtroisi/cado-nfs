@@ -211,6 +211,42 @@ void mpq_mat_urandomm(mpq_mat_ptr M, gmp_randstate_t state, mpz_srcptr p)
 
 
 /*}}}*/
+/*{{{ Joining matrices */
+// I didn't write all possible functions there, only those I needed, but it could be completed
+void mpz_mat_vertical_join(mpz_mat_ptr N, mpz_mat_srcptr M1, mpz_mat_srcptr M2)
+{
+	ASSERT_ALWAYS(M1->n == M2->n);
+	mpz_mat_realloc(N,M1->m+M2->m,M1->n);
+	
+	mpz_mat top,bottom;
+	mpz_mat_init(top,M1->m,M1->n);
+	mpz_mat_init(bottom,M2->m,M2->n);
+	mpz_mat_set(top,M1);
+	mpz_mat_set(bottom,M2);
+	mpz_mat_submat_swap(top,0,0,N,0,0,top->m,top->n);
+	mpz_mat_submat_swap(bottom,0,0,N,top->m,0,bottom->m,bottom->n);
+	mpz_mat_clear(top);
+	mpz_mat_clear(bottom);
+	
+}
+
+void mpq_mat_vertical_join(mpq_mat_ptr N, mpq_mat_srcptr M1, mpq_mat_srcptr M2)
+{
+	ASSERT_ALWAYS(M1->n == M2->n);
+	mpq_mat_realloc(N,M1->m+M2->m,M1->n);
+	
+	mpq_mat top,bottom;
+	mpq_mat_init(top,M1->m,M1->n);
+	mpq_mat_init(bottom,M2->m,M2->n);
+	mpq_mat_set(top,M1);
+	mpq_mat_set(bottom,M2);
+	mpq_mat_submat_swap(top,0,0,N,0,0,top->m,top->n);
+	mpq_mat_submat_swap(bottom,0,0,N,top->m,0,bottom->m,bottom->n);
+	mpq_mat_clear(top);
+	mpq_mat_clear(bottom);
+	
+}
+/*}}}*/
 /*{{{ determinant and trace */
 // We assume that M is a square Matrix and that its size is not 0
 void mpz_mat_trace(mpz_ptr t, mpz_mat_srcptr M)
@@ -243,6 +279,17 @@ void mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
             mpz_divexact(dst, den, mpq_denref(src));
             mpz_mul(dst, dst, mpq_numref(src));
         }
+}
+
+void mpz_mat_to_mpq_mat(mpq_mat_ptr N, mpz_mat_srcptr M)
+{
+	mpq_mat_realloc(N,M->m,M->n);
+	unsigned int i,j;
+	for(i = 0 ; i < M->m ; i++) {
+		for(j = 0 ; j < M->n ; j++) {
+			mpq_set_z(mpq_mat_entry(N,i,j),mpz_mat_entry_const(M,i,j));
+		}
+	}
 }
 
 void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned int p)
@@ -1365,8 +1412,9 @@ int main(int argc, char * argv[])/*{{{*/
 
     unsigned int p = strtoul(argv[2],NULL,0); //19; //atoi(argv[1]);
     FILE * problemfile = fopen(argv[1], "r");
+    printf("HELP !");
 
-    mpq_mat B, B_inv, B2, T, U;
+    mpq_mat B, B_inv, B2, T, U, K_rat, I;
     mpz_poly_t f, g;
     mpz_mat X, K;
     mpz_t den;
@@ -1381,6 +1429,8 @@ int main(int argc, char * argv[])/*{{{*/
     mpz_poly_init(g,n);
     mpz_mat_init(X,n,n);
     mpz_mat_init(K,n,n);
+	mpq_mat_init(K_rat,n,n);
+    mpq_mat_init(I,n,n);
     mpq_mat_init(B, n, n); // The matrix of generators
     mpq_mat_init(B_inv, n, n); // Its inverse
     mpq_mat_init(B2, n, 2*n); // An auxiliary matrix on which gaussian reduction will be applied
@@ -1452,14 +1502,24 @@ int main(int argc, char * argv[])/*{{{*/
     printf("F is the application z -> (z^%d mod f mod %d) :\n", p, p);
     printf("A basis of F^%d is :\n",k);
     mpz_mat_fprint(stdout,K); 
+	mpz_mat_to_mpq_mat(K_rat,K);
 
+	// Just a little test to be sure that the joining function is working
+	mpq_mat_vertical_join(I, B, K_rat);
+	mpq_mat_fprint(stdout,I);
+	
+	
+	mpq_mat_clear(K_rat);
     mpz_mat_clear(K);
     mpz_mat_clear(X);
+    mpq_mat_clear(I);
     mpq_mat_clear(B);
     mpq_mat_clear(B_inv);
     mpq_mat_clear(B2);
     mpq_mat_clear(T);
     mpq_mat_clear(U);
     mpz_clear(den);
+    
+
 }
 /*}}}*/
