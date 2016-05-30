@@ -651,9 +651,9 @@ void zone::operator()(gfp::elt_ur * tdst, const gfp::elt * tsrc) const
         unsigned int j = u->second.first;
         int32_t c = u->second.second;
         if (c>0) {
-            gfp::addmul(tdst[i], tsrc[j], c);
+            gfp::addmul_ui(tdst[i], tsrc[j], c);
         } else {
-            gfp::submul(tdst[i], tsrc[j], -c);
+            gfp::submul_ui(tdst[i], tsrc[j], -c);
         }
     }
 }
