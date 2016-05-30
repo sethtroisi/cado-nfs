@@ -1745,18 +1745,24 @@ int main(int argc, char * argv[])/*{{{*/
 				mpq_canonicalize(mpq_mat_entry(row_q,0,k));
 			}
 			mpq_mat_numden(row,coeff,row_q);
+			
+			printf("gamma*c in the basis of Ip :\n");
 			mpq_mat_fprint(stdout,row_q);
 			
-			// Converting row_q (gamma*c mod g) in the basis of I_p
+			// Converting row_q (gamma*c mod g) in the basis of I_p (it is supposed to contain only integers)
 			mpz_mat_to_mpq_mat(I_rat,I);
 			mpq_mat_invert(I_inv,I_rat);
 			mpq_mat_multiply(res,row_q,B_inv);
 			mpq_mat_multiply(res,res,I_inv);
 			
+			// Extracting the numerators (remember, integers only) into a mpz_mat
 			mpq_mat_numden(row,coeff,res);
+			// Computing the same matrix, modulo p (it is supposed to be a vector of n integers, associated to gamma)
 			mpz_mat_mod_ui(row,row,p);
+			printf("The same, mod %d :\n",p);
 			mpz_mat_fprint(stdout,row);
 			//mpq_mat_fprint(stdout,res);
+			printf("\n\n");
 			
 			mpq_mat_clear(res);
 			mpq_mat_clear(I_rat);
