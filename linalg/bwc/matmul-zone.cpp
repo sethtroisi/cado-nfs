@@ -433,7 +433,7 @@ matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direc
 /*}}}*/
 
 #define CMAX 4
-#define ROWBATCH        65536
+#define ROWBATCH        4096
 #define COLBATCH        65536
 
 struct sort_jc {/*{{{*/
@@ -618,8 +618,7 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
                 }
             }
             z.sort();
-            printf("Zone %zu: %zu+%zu+%zu\n",
-                    q.size(), z.qp.size(), z.qm.size(), z.qg.size());
+            // printf("Zone %zu: %zu+%zu+%zu\n", q.size(), z.qp.size(), z.qm.size(), z.qg.size());
             if (!z.empty()) {
                 if (j0) {
                     q1.push_back(z);
