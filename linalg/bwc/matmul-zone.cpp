@@ -126,6 +126,18 @@ template<> struct cachefile::seq<pair<uint16_t, int32_t>> : public cachefile::ba
     }
 };
 
+template<> struct cachefile::seq<pair<uint16_t, uint16_t>> : public cachefile::basic_seq<pair<uint16_t, uint16_t>> {
+    typedef pair<uint16_t, uint16_t> T;
+    cachefile& in(cachefile& c, T * t, size_t n) {
+        MATMUL_COMMON_READ_MANY16(t, 2*n, c.f);
+        return c;
+    }
+    cachefile& out(cachefile& c, T const * t, size_t n) const {
+        MATMUL_COMMON_WRITE_MANY16(t, 2*n, c.f);
+        return c;
+    }
+};
+
 template<> struct cachefile::seq<pair<int, pair<uint32_t, int32_t>>> : public cachefile::basic_seq<pair<int, pair<uint32_t, int32_t>>> {
     typedef pair<int, pair<uint32_t, int32_t>> T;
     cachefile& in(cachefile& c, T * t, size_t n) {
@@ -134,6 +146,18 @@ template<> struct cachefile::seq<pair<int, pair<uint32_t, int32_t>>> : public ca
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
         MATMUL_COMMON_WRITE_MANY32(t, 3*n, c.f);
+        return c;
+    }
+};
+
+template<> struct cachefile::seq<pair<uint16_t, pair<uint16_t, int32_t>>> : public cachefile::basic_seq<pair<uint16_t, pair<uint16_t, int32_t>>> {
+    typedef pair<uint16_t, pair<uint16_t, int32_t>> T;
+    cachefile& in(cachefile& c, T * t, size_t n) {
+        MATMUL_COMMON_READ_MANY16(t, 4*n, c.f);
+        return c;
+    }
+    cachefile& out(cachefile& c, T const * t, size_t n) const {
+        MATMUL_COMMON_WRITE_MANY16(t, 4*n, c.f);
         return c;
     }
 };
@@ -197,8 +221,8 @@ template<typename T> cachefile& operator<<(cachefile & c, vector<T> const &v)
 /* }}} */
 
 struct zone {/*{{{*/
-    typedef vector<pair<int, uint32_t>> qpm_t;
-    typedef vector<pair<int, pair<uint32_t, int32_t>>> qg_t;
+    typedef vector<pair<uint16_t, uint16_t>> qpm_t;
+    typedef vector<pair<uint16_t, pair<uint16_t, int32_t>>> qg_t;
     unsigned int i0, j0;
     qpm_t qp, qm;
     qg_t qg;
@@ -409,8 +433,8 @@ matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direc
 /*}}}*/
 
 #define CMAX 4
-#define ROWBATCH        8192
-#define COLBATCH        16200
+#define ROWBATCH        65536
+#define COLBATCH        65536
 
 struct sort_jc {/*{{{*/
     inline bool operator()(pair<uint32_t, int32_t> const& a, pair<uint32_t,int32_t> const& b) const {
@@ -545,18 +569,25 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
     vector<zone> q1;
 
     for(unsigned int i0 = 0 ; i0 < nrows_t ; i0 += ROWBATCH) {
+        /* Create the data structures for the horizontal strip starting
+         * at row i0, column 0.
+         */
+
+        /* Because this horizontal strip will be split in many blocks, we
+         * need to have a batch of pointers for reading each row. */
         uint32_t * pp[ROWBATCH + 1];
         uint32_t * cc[ROWBATCH + 1];
         pp[0] = ptr;
         for(unsigned int k = 0 ; k < ROWBATCH ; k++) {
             cc[k] = pp[k] + 1;
             if (i0 + k < nrows_t) {
-                pp[k+1] = pp[k] + 1 + 2*(*pp[k]);
-                mm->public_->ncoeffs += *pp[k];
+                uint32_t weight = *pp[k];
+                pp[k+1] = pp[k] + 1 + 2*weight;
+                mm->public_->ncoeffs += weight;
                 /* This is very important. We must sort rows before
                  * processing. */
                 pair<uint32_t, int32_t> * cb = (pair<uint32_t, int32_t> *) cc[k];
-                pair<uint32_t, int32_t> * ce = cb + *pp[k];
+                pair<uint32_t, int32_t> * ce = cb + weight;
                 sort(cb, ce, sort_jc());
             } else {
                 pp[k+1] = pp[k];
@@ -587,6 +618,8 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
                 }
             }
             z.sort();
+            printf("Zone %zu: %zu+%zu+%zu\n",
+                    q.size(), z.qp.size(), z.qm.size(), z.qg.size());
             if (!z.empty()) {
                 if (j0) {
                     q1.push_back(z);
@@ -637,18 +670,18 @@ void matmul_zone_data::save_cache()
 void zone::operator()(gfp::elt_ur * tdst, const gfp::elt * tsrc) const
 {
     for(qpm_t::const_iterator u = qp.begin() ; u != qp.end() ; u++) {
-        unsigned int i = u->first;
-        unsigned int j = u->second;
+        uint16_t i = u->first;
+        uint16_t j = u->second;
         gfp::add(tdst[i], tsrc[j]);
     }
     for(qpm_t::const_iterator u = qm.begin() ; u != qm.end() ; u++) {
-        unsigned int i = u->first;
-        unsigned int j = u->second;
+        uint16_t i = u->first;
+        uint16_t j = u->second;
         gfp::sub(tdst[i], tsrc[j]);
     }
     for(qg_t::const_iterator u = qg.begin() ; u != qg.end() ; u++) {
-        unsigned int i = u->first;
-        unsigned int j = u->second.first;
+        uint16_t i = u->first;
+        uint16_t j = u->second.first;
         int32_t c = u->second.second;
         if (c>0) {
             gfp::addmul_ui(tdst[i], tsrc[j], c);
@@ -711,17 +744,22 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 }
             }
             start_points.push_back(dispatchers.end());
-            printf("Found %zu different dispatcher strips\n", current_points.size());
+            // printf("Found %zu different dispatcher strips\n", current_points.size());
         } /* }}} */
 
         gfp::elt_ur * tdst = new gfp::elt_ur[ROWBATCH];
 
         ASM_COMMENT("critical loop");
 
+        unsigned int last_i0 = UINT_MAX;
         /*
         unsigned int last_j0 = UINT_MAX;
         twn current;
         */
+
+        /* This loops processes the blocks in their sorting order. Here
+         * we assume it's row-wise.
+         */
         for(size_t k = 0 ; k < q.size() ; k++) {
             zone const& z = q[k];
 
@@ -743,11 +781,19 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
             }
 #endif
-
-            unsigned int active = MIN(ROWBATCH, mm->public_->dim[!d] - z.i0);
-            for(unsigned int i = 0 ; i < active ; i++) {
-                tdst[i] = dst[z.i0 + i];
+            if (z.i0 != last_i0) {
+                if (last_i0 != UINT_MAX) {
+                    for(unsigned int i = 0 ; i < ROWBATCH ; i++) {
+                        gfp::reduce(dst[last_i0 + i], tdst[i], prime, preinverse);
+                    }
+                }
+                /* This operation below sets stuff to zero, so it's here
+                 * that we assume blocks are sorted row-wise.
+                 */
+                gfp::elt_ur::zero(tdst, ROWBATCH);
+                last_i0 = z.i0;
             }
+
             /*
             if (z.j0 != last_j0) {
                 if (last_j0 != UINT_MAX) {
@@ -771,10 +817,15 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
             z(tdst, tsrc);
 
+        }
+        {
+            /* reduce last batch. It could possibly be incomplete */
+            unsigned int active = MIN(ROWBATCH, mm->public_->dim[!d] - last_i0);
             for(unsigned int i = 0 ; i < active ; i++) {
-                gfp::reduce(dst[z.i0 + i], tdst[i], prime, preinverse);
+                gfp::reduce(dst[last_i0 + i], tdst[i], prime, preinverse);
             }
         }
+
         /*
         if (last_j0 != UINT_MAX) {
             current.tt += cputicks();
