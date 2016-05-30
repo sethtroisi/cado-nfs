@@ -1733,6 +1733,7 @@ int main(int argc, char * argv[])/*{{{*/
 			mpq_mat_multiply(c_mat,row_q,B);
 			mpq_mat_row_to_poly(c,denom_c,c_mat,0);
 			
+			
 			// Computing gamma*c mod g
 			mpz_poly_mul_mod_f(aux,gamma,c,g);
 			
