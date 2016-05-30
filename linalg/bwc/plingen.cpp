@@ -2167,8 +2167,11 @@ void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
 
     matpoly_init(ab, aa->A, m, n, 1);
 
-    if (random_input_length)
+    if (random_input_length) {
+        /* see below. I think it would be a bug to not do that */
+        bm_io_read1(aa, 0);
         return;
+    }
 
     aa->f = fopen(aa->input_file, aa->ascii ? "r" : "rb");
 

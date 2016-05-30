@@ -10,11 +10,6 @@
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
-#ifdef HAVE_SYS_MMAN_H
-#include <sys/mman.h>
-#else
-#define MAP_FAILED ((void *) -1)
-#endif
 #include <gmp.h>
 #include <vector>
 #include <map>
@@ -24,6 +19,28 @@
 #include "las-qlattice.h"
 #include "las-plattice.h"
 #include "las-base.hpp"
+
+// If a plain-old data type T inherits from _padded_pod<T>, it ensures that all
+// the sizeof(T) bytes of any instance of T will be initialized, even if its
+// data members do not occupy the whole memory region.
+// For instance, this allows one to write `fwrite(&x, sizeof(T), 1, f)' without
+// Valgrind complaining because of uninitialized memory reads.
+template <typename T>
+class _padded_pod {
+  public:
+    _padded_pod() {
+      memset(this,  0, sizeof(T));
+    }
+
+    _padded_pod(const _padded_pod &x) {
+      memcpy(this, &x, sizeof(T));
+    }
+
+    const _padded_pod &operator=(const _padded_pod &x) {
+      memcpy(this, &x, sizeof(T));
+      return *this;
+    }
+};
 
 /* Forward declaration so fb_general_entry can use it in constructors */
 template <int Nr_roots>
@@ -83,7 +100,7 @@ struct fb_general_root {
    etc. They could, of course, also store the simple cases, but for those we
    use the simple struct to conserve memory and to decide algorithms (batch
    inversion, etc.) statically. */
-class fb_general_entry {
+class fb_general_entry : public _padded_pod<fb_general_entry> {
   void read_roots (const char *, unsigned char, unsigned char, unsigned long);
 public:
   typedef fb_general_entry transformed_entry_t;
@@ -139,7 +156,7 @@ public:
 /* "Simple" factor base entries. We imply q=p, k=1, oldexp=0, exp=1,
    and projective=false for all roots. */
 template <int Nr_roots>
-class fb_entry_x_roots {
+class fb_entry_x_roots : public _padded_pod<fb_entry_x_roots<Nr_roots> > {
 public:
   typedef fb_transformed_entry_x_roots<Nr_roots> transformed_entry_t;
   fbprime_t p;
@@ -226,6 +243,9 @@ class fb_slice_interface {
 };
 
 class fb_vector_interface: public fb_interface {
+  virtual void *mmap_fbc(void *p, void * const end) = 0;
+  virtual bool  dump_fbc(FILE *f) const = 0;
+  virtual void  clear() = 0;
   public:
   virtual ~fb_vector_interface(){}
   virtual const fb_slice_interface *get_slice(size_t) const = 0;
@@ -238,6 +258,7 @@ class fb_vector_interface: public fb_interface {
   virtual void make_slices(double scale, double max_weight,
                            slice_index_t &next_index) = 0;
   virtual const fb_slice_interface *get_first_slice() const = 0;
+  friend class fb_part;
 };
 
 
@@ -301,7 +322,10 @@ public:
 
 template <class FB_ENTRY_TYPE>
 class fb_vector : public fb_vector_interface, private NonCopyable {
-  std::vector<FB_ENTRY_TYPE> vec;
+  FB_ENTRY_TYPE *data;
+  size_t         size, alloc;
+  bool           read_only, mmapped;
+
   typedef std::vector<fb_slice<FB_ENTRY_TYPE> > slices_t;
   const slices_t *slices; /* If no slicing exists, e.g., because the fb_part
                              is only_general (and thus meant for line-sieving)
@@ -316,20 +340,38 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
   double est_weight_sum(size_t, size_t) const;
   double est_weight_compare(size_t, size_t) const;
   double est_weight(size_t, size_t) const;
+  void *mmap_fbc(void *p, void * const end);
+  bool  dump_fbc(FILE *f) const;
+  void  clear();
+  void  init();
  public:
   static const size_t max_slice_len = 65536;
 
-  fb_vector() : slices(NULL){};
+  fb_vector() : slices(NULL) { init(); }
   ~fb_vector();
 
   void make_slices(double scale, double max_weight, slice_index_t &next_index);
-  std::vector<FB_ENTRY_TYPE> *get_vector() {return &vec;}
+
+  typedef const FB_ENTRY_TYPE *const_iterator;
+
+  const_iterator begin() const { return data;      }
+  const_iterator end()   const { return data+size; }
 
   /* Implement fb_vector interface */
   int get_nr_roots() const {return FB_ENTRY_TYPE::fixed_nr_roots;}
   bool is_general() const {return FB_ENTRY_TYPE::is_general_type;}
-  void append(const fb_general_entry &new_entry) {vec.push_back(new_entry);}
-  
+
+  void append(const fb_general_entry &new_entry) {
+    ASSERT_ALWAYS(!read_only);
+    if (size >= alloc) {
+      alloc += std::max(alloc, static_cast<size_t>(16));
+      data   = static_cast<FB_ENTRY_TYPE *>(realloc(data, alloc * sizeof(FB_ENTRY_TYPE)));
+      if (data == NULL)
+        throw std::bad_alloc();
+    }
+    memset(data+size, 0, sizeof(FB_ENTRY_TYPE));
+    data[size++] = new_entry;
+  }
   
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   void fprint(FILE *out) const;
@@ -337,7 +379,13 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
                       fbprime_t td_thresh) const;
 
   /* Finalizing requires only sorting the vector */
-  void finalize() {sort();}
+  void finalize() {
+    ASSERT_ALWAYS(!read_only);
+    alloc = size;
+    data  = static_cast<FB_ENTRY_TYPE *>(realloc(data, alloc * sizeof(FB_ENTRY_TYPE)));
+    sort();
+    read_only = true;
+  }
 
   const fb_slice<FB_ENTRY_TYPE> *get_first_slice() const {
     if (slices == NULL || slices->empty()) {
@@ -357,8 +405,8 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
     }
     return slice;
   }
+  friend class fb_part;
 };
-
 
 /* A "part" is the set of all factor base primes that get sieved over a given
    bucket region size.
@@ -435,6 +483,9 @@ class fb_part: public fb_interface, private NonCopyable {
     }
   }
   void make_slices(double scale, double max_weight, slice_index_t &next_index);
+  void *mmap_fbc(void *p, void * const end);
+  bool  dump_fbc(FILE *f) const;
+  void  clear();
 public:
   fb_part(const fbprime_t _powlim, const bool only_general=false)
     : powlim(_powlim), only_general(only_general){}
@@ -444,7 +495,7 @@ public:
   void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
   void finalize();
   bool is_only_general() const {return only_general;}
-  std::vector<fb_general_entry> *get_general_vector(){return general_vector.get_vector();}
+  const fb_vector<fb_general_entry> *get_general_vector(){ return &general_vector; }
   const fb_slice_interface *get_first_slice() const {
     /* Find the first non-empty slices entry and return a pointer to it,
        or return NULL if all are empty */
@@ -493,6 +544,9 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   fbprime_t thresholds[FB_MAX_PARTS];
   void finalize();
   int toplevel;
+  void *mmap_fbc(void *p, void * const end);
+  bool  dump_fbc(FILE *f) const;
+  void  clear();
  public:
   fb_factorbase(const fbprime_t *thresholds,
                 fbprime_t powlim,
@@ -502,8 +556,6 @@ class fb_factorbase: public fb_interface, private NonCopyable {
   void make_linear (const mpz_t *poly);
   void make_linear_parallel (const mpz_t *poly, const unsigned int nb_threads);
   void make_linear_threadpool(const mpz_t *poly, const unsigned int nb_threads);
-  bool mmap_fbc(const char *) {return false;};
-  void dump_fbc(const char *) {return;};
   size_t size() const {return 0;}
   void fprint(FILE *) const;
   void append(const fb_general_entry &);
@@ -520,6 +572,9 @@ class fb_factorbase: public fb_interface, private NonCopyable {
     return NULL;
   }
   int get_toplevel() const { return toplevel; }
+
+  friend bool fb_mmap_fbc(fb_factorbase *[2], const char *);
+  friend void fb_dump_fbc(fb_factorbase *[2], const char *);
 };
 
 
@@ -527,5 +582,8 @@ unsigned char	fb_log (double, double, double);
 fbprime_t       fb_pow (fbprime_t, unsigned long);
 fbprime_t       fb_is_power (fbprime_t, unsigned long *);
 void print_worst_weight_errors();
+
+bool fb_mmap_fbc(fb_factorbase *fb[2], const char *filename);
+void fb_dump_fbc(fb_factorbase *fb[2], const char *filename);
 
 #endif

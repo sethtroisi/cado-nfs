@@ -1909,7 +1909,11 @@ sub task_lingen {
             @args = grep { !/^(mpi|thr)=/ } @args;
         }
         push @args, grep { /^verbose_flags=/ } @main_args;
-        task_common_run("plingen_pz", @args);
+        if (! -f "$wdir/$concatenated_A.gen") {
+            task_common_run("plingen_pz", @args);
+        } else {
+            task_check_message 'ok', "lingen already has .gen file, good.";
+        }
         # Some splitting work needed...
         @args=();
         push @args, "splits=" . join(",",@splits);
