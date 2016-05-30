@@ -295,12 +295,16 @@ void mpz_mat_to_mpq_mat(mpq_mat_ptr N, mpz_mat_srcptr M)
 void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned int p)
 {
     unsigned int i,j;
-    mpz_mat_realloc(dst,src->m,src->n);
-    for (i = 0 ; i < dst->m ; i++){
-        for (j = 0 ; j < dst->n ; j++){
-            mpz_fdiv_r_ui(mpz_mat_entry(dst,i,j),mpz_mat_entry_const(src,i,j),p);
+    mpz_mat C;
+    mpz_mat_init(C,src->m,src->n);
+    for (i = 0 ; i < C->m ; i++){
+        for (j = 0 ; j < C->n ; j++){
+            mpz_fdiv_r_ui(mpz_mat_entry(C,i,j),mpz_mat_entry_const(src,i,j),p);
         }
     }
+    mpz_mat_realloc(dst,src->m,src->n);
+    mpz_mat_set(dst,C);
+    mpz_mat_clear(C);
 }
 /*}}}*/
 /* {{{ row-level operations */
@@ -1214,6 +1218,32 @@ void mpz_mat_kernel(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned int p)
     
 }
 /* }}} */
+/*{{{ inversion*/
+void mpq_mat_invert(mpq_mat_ptr dst, mpq_mat_ptr src)
+{
+	// Inverting B
+	mpq_mat inv, id, aux;
+	ASSERT_ALWAYS(src->m == src->m);
+	mpq_mat_init(inv,src->m,2*src->m);
+	mpq_mat_init(id,src->m,src->n);
+	mpq_mat_init(aux,src->m,src->n);
+	
+	mpq_mat_set_ui(id,1);
+    mpq_mat_set(aux,src);
+    
+    mpq_mat_submat_swap(aux,0,0,inv,0,0,src->m,src->n);
+    mpq_mat_submat_swap(id,0,0,inv,0,src->n,src->m,src->n);
+    
+        // B2 now contains B and identity
+    mpq_gauss_backend(inv,aux);
+        // B2 now contains identity and B^-1
+    mpq_mat_submat_swap(dst,0,0,inv,0,src->m,src->m,src->m);
+    
+    mpq_mat_clear(inv);
+    mpq_mat_clear(id);
+    mpq_mat_clear(aux);
+}
+/* }}} */
 /*{{{ timer*/
 double
 seconds (void)
@@ -1225,6 +1255,73 @@ seconds (void)
     r *= (uint64_t) 1000000UL;
     r += (uint64_t) res->ru_utime.tv_usec;
     return r * 1.0e-6;
+}
+/*}}}*/
+/*{{{ conversion of rows and columns to polynomials*/
+void mpz_mat_row_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int i)
+{
+	mpz_poly_clear(f);
+	mpz_poly_init(f,M->n);
+	unsigned int j;
+	for (j = 0 ; j < M->n; j++){
+		mpz_poly_setcoeff(f,j,mpz_mat_entry_const(M,i,j));
+	}
+}
+
+void mpz_mat_column_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int j)
+{
+	mpz_poly_clear(f);
+	mpz_poly_init(f,M->m);
+	unsigned int i;
+	for (i = 0 ; i < M->m; i++){
+		mpz_poly_setcoeff(f,i,mpz_mat_entry_const(M,i,j));
+	}
+}
+
+void mpq_mat_row_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, unsigned int i)
+{
+	mpz_poly_clear(f);
+	mpz_poly_init(f,M->n);
+	mpz_set_si(denom,1);
+	unsigned int j;
+    for (j = 0 ; j < M->n ; j++) {
+        mpz_lcm(denom,denom,mpq_denref(mpq_mat_entry_const(M,i,j)));
+    }
+	for (j = 0 ; j < M->n; j++){
+		mpq_t aux;
+		mpz_t num;
+		mpq_init(aux);
+		mpz_init(num);
+		mpq_set_z(aux,denom);
+		mpq_mul(aux,aux,mpq_mat_entry_const(M,i,j));
+		mpz_set(num,mpq_numref(aux));
+		mpz_poly_setcoeff(f,j,num);
+		mpq_clear(aux);
+		mpz_init(num);
+	}
+}
+
+void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, unsigned int j)
+{
+	mpz_poly_clear(f);
+	mpz_poly_init(f,M->m);
+	mpz_set_si(denom,1);
+	unsigned int i;
+    for (i = 0 ; i < M->m ; i++) {
+        mpz_lcm(denom,denom,mpq_denref(mpq_mat_entry_const(M,i,j)));
+    }
+	for (i = 0 ; i < M->m; i++){
+		mpq_t aux;
+		mpz_t num;
+		mpq_init(aux);
+		mpz_init(num);
+		mpq_set_z(aux,denom);
+		mpq_mul(aux,aux,mpq_mat_entry_const(M,i,j));
+		mpz_set(num,mpq_numref(aux));
+		mpz_poly_setcoeff(f,i,num);
+		mpq_clear(aux);
+		mpz_init(num);
+	}
 }
 /*}}}*/
 
@@ -1501,11 +1598,10 @@ int main(int argc, char * argv[])/*{{{*/
 
     unsigned int p = strtoul(argv[2],NULL,0); //19; //atoi(argv[1]);
     FILE * problemfile = fopen(argv[1], "r");
-    printf("HELP !");
 
-    mpq_mat B, B_inv, B2, T, U;
+    mpq_mat B, B_inv, T, U;
     mpz_poly_t f, g;
-    mpz_mat X, K, I, J, T0;
+    mpz_mat X, K, I, J, T0, M;
     mpz_t den;
 
     printf("Format: [degree] [coeffs] [coeffs of order basis]\n");
@@ -1519,11 +1615,11 @@ int main(int argc, char * argv[])/*{{{*/
     mpz_mat_init(X,n,n);
     mpz_mat_init(T0,n,n);
     mpz_mat_init(K,n,n);
+    mpz_mat_init(M,n,n*n);
     mpz_mat_init(I,n,n);
     mpz_mat_init(J,n,n);
     mpq_mat_init(B, n, n); // The matrix of generators
     mpq_mat_init(B_inv, n, n); // Its inverse
-    mpq_mat_init(B2, n, 2*n); // An auxiliary matrix on which gaussian reduction will be applied
     mpq_mat_init(T, n, n); // An auxiliary matrix
     mpq_mat_init(U, n, n);
     mpq_mat_set_ui(T, 1);
@@ -1557,14 +1653,8 @@ int main(int argc, char * argv[])/*{{{*/
 
 
     // Inverting B
-    mpq_mat_set(B_inv,B);
-    mpq_mat_submat_swap(B,0,0,B2,0,0,3,3);
-    mpq_mat_swap(B,B_inv);
-    mpq_mat_submat_swap(T,0,0,B2,0,3,3,3);
-        // B2 now contains B and identity
-    mpq_gauss_backend(B2,T);
-        // B2 now contains identity and B^-1
-    mpq_mat_submat_swap(B_inv,0,0,B2,0,3,3,3);
+    mpq_mat_invert(B_inv,B);
+
 
 
 
@@ -1610,6 +1700,83 @@ int main(int argc, char * argv[])/*{{{*/
 	printf("Generators of I_p in the basis of the given order O :\n");
 	mpz_mat_fprint(stdout,I); printf("\n");
 	
+
+	unsigned int i,j;
+	for (i = 0 ; i < n ; i++){
+		for (j = 0 ; j < n ; j++){
+			mpz_poly_t gamma, c, aux;
+			mpz_t denom_g, denom_c, coeff;
+			mpz_mat row, aux_row;
+			mpq_mat row_q, c_mat, I_rat, I_inv, res;
+			mpz_mat_init(row,1,n);
+			mpz_mat_init(aux_row,1,n);
+			mpq_mat_init(row_q,1,n);
+			mpq_mat_init(c_mat,1,n);
+			mpq_mat_init(I_rat,n,n);
+			mpq_mat_init(I_inv,n,n);
+			mpq_mat_init(res,n,n);
+			mpz_poly_init(gamma,n);
+			mpz_poly_init(c,n);
+			mpz_poly_init(aux,n);
+			mpz_init(denom_g);
+			mpz_init(denom_c);
+			mpz_init(coeff);
+			
+			printf("i = %d ; j = %d\n",i,j);
+			// Storing one generator of B in the polynomial gamma and in denom_g
+			mpq_mat_row_to_poly(gamma,denom_g,B,i);
+			//Storing one generator of I_p in the polyomial c and in denom_c
+			mpz_mat_submat_swap(aux_row,0,0,I,j,0,1,n);
+			mpz_mat_set(row,aux_row);
+			mpz_mat_submat_swap(aux_row,0,0,I,j,0,1,n);
+			mpz_mat_to_mpq_mat(row_q,row);
+			mpq_mat_multiply(c_mat,row_q,B);
+			mpq_mat_row_to_poly(c,denom_c,c_mat,0);
+			
+			// Computing gamma*c mod g
+			mpz_poly_mul_mod_f(aux,gamma,c,g);
+			
+			// Storing the result in row_q
+			for(int k = 0 ; k <= aux->deg ; k++){
+				mpz_poly_getcoeff(coeff,k,aux);
+				mpq_set_num(mpq_mat_entry(row_q,0,k),coeff);
+				mpz_mul(coeff,denom_c,denom_g);
+				mpq_set_den(mpq_mat_entry(row_q,0,k),coeff);
+				mpq_canonicalize(mpq_mat_entry(row_q,0,k));
+			}
+			mpq_mat_numden(row,coeff,row_q);
+			mpq_mat_fprint(stdout,row_q);
+			
+			// Converting row_q (gamma*c mod g) in the basis of I_p
+			mpz_mat_to_mpq_mat(I_rat,I);
+			mpq_mat_invert(I_inv,I_rat);
+			mpq_mat_multiply(res,row_q,B_inv);
+			mpq_mat_multiply(res,res,I_inv);
+			
+			mpq_mat_numden(row,coeff,res);
+			mpz_mat_mod_ui(row,row,p);
+			mpz_mat_fprint(stdout,row);
+			//mpq_mat_fprint(stdout,res);
+			
+			mpq_mat_clear(res);
+			mpq_mat_clear(I_rat);
+			mpq_mat_clear(I_inv);
+			mpq_mat_clear(c_mat);
+			mpq_mat_clear(row_q);
+			mpz_mat_clear(row);
+			mpz_mat_clear(aux_row);
+			mpz_clear(coeff);
+			mpz_clear(denom_g);
+			mpz_clear(denom_c);
+			mpz_poly_clear(gamma);
+			mpz_poly_clear(c);
+			mpz_poly_clear(aux);
+		}
+	}
+
+
+
+	mpz_mat_clear(M);
 	mpz_mat_clear(T0);
     mpz_mat_clear(K);
     mpz_mat_clear(X);
@@ -1617,7 +1784,6 @@ int main(int argc, char * argv[])/*{{{*/
     mpz_mat_clear(I);
     mpq_mat_clear(B);
     mpq_mat_clear(B_inv);
-    mpq_mat_clear(B2);
     mpq_mat_clear(T);
     mpq_mat_clear(U);
     mpz_clear(den);
