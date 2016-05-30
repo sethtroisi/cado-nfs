@@ -636,6 +636,48 @@ void mpz_mat_multiply_mod_ui(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_mat_srcptr B, 
     mpz_mat_mod_ui(C,C,p);
 }
 
+void mpz_mat_multiply_by_mpz(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_ptr k)
+{
+    mpz_mat B;
+	mpz_mat_init(B,A->m,A->n);
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+			mpz_mul(mpz_mat_entry(B, i, j),mpz_mat_entry_const(A,i,j),k);
+        }
+    }
+    mpz_mat_realloc(C, A->m, A->n);
+    mpz_mat_set(C,B);
+    mpz_mat_clear(B);
+}
+
+void mpz_mat_multiply_by_si(mpz_mat_ptr C, mpz_mat_srcptr A, int k)
+{
+    mpz_mat B;
+	mpz_mat_init(B,A->m,A->n);
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+			mpz_mul_si(mpz_mat_entry(B, i, j),mpz_mat_entry_const(A,i,j),k);
+        }
+    }
+    mpz_mat_realloc(C, A->m, A->n);
+    mpz_mat_set(C,B);
+    mpz_mat_clear(B);
+}
+
+void mpz_mat_multiply_by_ui(mpz_mat_ptr C, mpz_mat_srcptr A, unsigned int k)
+{
+    mpz_mat B;
+	mpz_mat_init(B,A->m,A->n);
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+			mpz_mul_ui(mpz_mat_entry(B, i, j),mpz_mat_entry_const(A,i,j),k);
+        }
+    }
+    mpz_mat_realloc(C, A->m, A->n);
+    mpz_mat_set(C,B);
+    mpz_mat_clear(B);
+}
+
 // Returns A^n for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
 void mpz_mat_power_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n){
     unsigned int k;
@@ -695,6 +737,53 @@ void mpq_mat_multiply(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_mat_srcptr B)
     }
     mpq_clear(z);
 }
+
+void mpq_mat_multiply_by_mpq(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_ptr k)
+{
+    mpq_mat B;
+	mpq_mat_init(B,A->m,A->n);
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+			mpq_mul(mpq_mat_entry(B, i, j),mpq_mat_entry_const(A,i,j),k);
+        }
+    }
+    mpq_mat_realloc(C, A->m, A->n);
+    mpq_mat_set(C,B);
+    mpq_mat_clear(B);
+}
+
+void mpq_mat_multiply_by_si(mpq_mat_ptr C, mpq_mat_srcptr A, int k)
+{
+    mpq_mat B;
+	mpq_mat_init(B,A->m,A->n);
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+			mpz_mul_si(mpq_numref(mpq_mat_entry(B,i,j)),mpq_numref(mpq_mat_entry_const(A,i,j)),k);
+			mpz_set(mpq_denref(mpq_mat_entry(B,i,j)),mpq_denref(mpq_mat_entry_const(A,i,j)));
+			mpq_canonicalize(mpq_mat_entry(B,i,j));
+        }
+    }
+    mpq_mat_realloc(C, A->m, A->n);
+    mpq_mat_set(C,B);
+    mpq_mat_clear(B);
+}
+
+void mpq_mat_multiply_by_ui(mpq_mat_ptr C, mpq_mat_srcptr A, unsigned int k)
+{
+	mpq_mat B;
+	mpq_mat_init(B,A->m,A->n);
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+			mpz_mul_ui(mpq_numref(mpq_mat_entry(B,i,j)),mpq_numref(mpq_mat_entry_const(A,i,j)),k);
+			mpz_set(mpq_denref(mpq_mat_entry(B,i,j)),mpq_denref(mpq_mat_entry_const(A,i,j)));
+			mpq_canonicalize(mpq_mat_entry(B,i,j));
+        }
+    }
+    mpq_mat_realloc(C, A->m, A->n);
+    mpq_mat_set(C,B);
+    mpq_mat_clear(B);
+}
+
 /*}}}*/
 /* {{{ gaussian reduction over the rationals
  * this is a backend for row gaussian reduction. T receives the
@@ -1414,9 +1503,9 @@ int main(int argc, char * argv[])/*{{{*/
     FILE * problemfile = fopen(argv[1], "r");
     printf("HELP !");
 
-    mpq_mat B, B_inv, B2, T, U, K_rat, I;
+    mpq_mat B, B_inv, B2, T, U;
     mpz_poly_t f, g;
-    mpz_mat X, K;
+    mpz_mat X, K, I, J, T0;
     mpz_t den;
 
     printf("Format: [degree] [coeffs] [coeffs of order basis]\n");
@@ -1428,9 +1517,10 @@ int main(int argc, char * argv[])/*{{{*/
     mpz_poly_init(f,n);
     mpz_poly_init(g,n);
     mpz_mat_init(X,n,n);
+    mpz_mat_init(T0,n,n);
     mpz_mat_init(K,n,n);
-	mpq_mat_init(K_rat,n,n);
-    mpq_mat_init(I,n,n);
+    mpz_mat_init(I,n,n);
+    mpz_mat_init(J,n,n);
     mpq_mat_init(B, n, n); // The matrix of generators
     mpq_mat_init(B_inv, n, n); // Its inverse
     mpq_mat_init(B2, n, 2*n); // An auxiliary matrix on which gaussian reduction will be applied
@@ -1502,17 +1592,29 @@ int main(int argc, char * argv[])/*{{{*/
     printf("F is the application z -> (z^%d mod f mod %d) :\n", p, p);
     printf("A basis of F^%d is :\n",k);
     mpz_mat_fprint(stdout,K); 
-	mpz_mat_to_mpq_mat(K_rat,K);
-
-	// Just a little test to be sure that the joining function is working
-	mpq_mat_vertical_join(I, B, K_rat);
-	mpq_mat_fprint(stdout,I);
+    
+    
+    
+    
+    
+    
+    printf("\n\n****** Generating a new order ******\n");
 	
+	// Getting generators of I_p
+	mpz_mat_set_ui(J,1);
+	mpz_mat_multiply_by_ui(J,J,p);
+	mpz_mat_vertical_join(I,J,K);
+	mpz_hnf_backend(I,T0);
+	mpz_mat_submat_swap(I,0,0,J,0,0,n,n);
+	mpz_mat_set(I,J);
+	printf("Generators of I_p in the basis of the given order O :\n");
+	mpz_mat_fprint(stdout,I); printf("\n");
 	
-	mpq_mat_clear(K_rat);
+	mpz_mat_clear(T0);
     mpz_mat_clear(K);
     mpz_mat_clear(X);
-    mpq_mat_clear(I);
+    mpz_mat_clear(J);
+    mpz_mat_clear(I);
     mpq_mat_clear(B);
     mpq_mat_clear(B_inv);
     mpq_mat_clear(B2);
