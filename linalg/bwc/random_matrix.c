@@ -588,7 +588,13 @@ void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_m
     if (pi) ADJUST(rows, pi->wr[1]); else f->nrows = R->nrows;
     if (pi) ADJUST(cols, pi->wr[1]); else f->ncols = R->ncols;
 
-    double density = R->density / (pi ? pi->wr[0]->totalsize : 1);
+    // experimental: don't scale. Somehow it seems that I'm doing this scaling
+    // twice. I shouldn't. Alas, I see no obvious place where this seems to
+    // happen.
+    //
+    // double density = R->density / (pi ? pi->wr[0]->totalsize : 1);
+    double density = R->density;
+
     /* sets the scale parameter so that the expected row weight matches
      * our desired density target */
     f->scale = density / dist_q(f, f->ncols);
@@ -1236,7 +1242,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     if (F->print) {
         printf("Each of the %u jobs on %u nodes creates a matrix with %lu rows %lu cols, and %d coefficients per row on average. Seed for rank 0 is %lu.\n",
                 pi->m->totalsize, pi->m->njobs,
-                r->nrows, r->ncols, r->density, r->seed);
+                F->nrows, F->ncols, r->density / pi->wr[0]->totalsize, r->seed);
     }
 
     gmp_randstate_t rstate;
