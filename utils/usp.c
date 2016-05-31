@@ -526,6 +526,12 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   double_poly_set_mpz_poly (q, P);
   sa = double_poly_eval (q, a);
   sb = double_poly_eval (q, b);
+  {
+      for(int ii = 0; ii <= n; ii++)
+	  gmp_printf("+x^%d*(%Zd)\n", ii, P->coeff[ii]);
+      printf("a=%lf\nb=%lf\n", a, b);
+      printf("sa=%lf\nsb=%lf\n", sa, sb);
+  }
   /* due to truncation of the initial coefficients, and rounding error in
      evaluation of q, it might be that sa and sb do not have opposite signs */
   if (sa * sb >= 0)
@@ -622,9 +628,14 @@ main (int argc, char *argv[])
 #endif
   if (argc >= 2)
     T = atof (argv[1]);
-  nroots = numberOfRealRoots (p, n, T, verbose);
+  root_struct *Roots = (root_struct *)malloc(n * sizeof(root_struct));
+  for(i = 0; i < n; i++)
+      root_struct_init (Roots+i);
+  nroots = numberOfRealRoots (p, n, T, verbose, Roots);
   printf ("%d real root(s)\n", nroots);
 
+  for(i = 0; i < n; i++)
+      root_struct_clear (Roots+i);
   for (i = 0; i <= n; i++)
     mpz_clear (p[i]);
   free (p);
