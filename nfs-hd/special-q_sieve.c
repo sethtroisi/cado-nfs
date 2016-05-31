@@ -1799,7 +1799,12 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #endif // Q_BELOW_FBB
 
   /* --- Line sieve --- */
+#ifndef LINE_SIEVE_BOUND
   uint64_t line_sieve_stop = 2 * (uint64_t) H->h[0];
+#else // LINE_SIEVE_BOUND
+  ASSERT(LINE_SIEVE_BOUND >= 1);
+  uint64_t line_sieve_stop = (uint64_t) (LINE_SIEVE_BOUND * 2 * (double) H->h[0]);
+#endif // LINE_SIEVE_BOUND
 
   while (i < fb->number_element_1 &&
       fb->factor_base_1[i]->ideal->r < line_sieve_stop) {
@@ -1936,10 +1941,16 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   mat_int64_t Mqr;
   mat_int64_init(Mqr, H->t, H->t);
 
-  uint64_t plane_sieve_stop =
-    fb->factor_base_1[fb->number_element_1 - 1]->ideal->r + 1;
-  if (H->t == 3) {
-    plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
+#ifndef PLANE_SIEVE_BOUND
+  uint64_t plane_sieve_stop = 4 * (int64_t)(H->h[0] * H->h[1]);
+#else // PLANE_SIEVE_BOUND
+  ASSERT(PLANE_SIEVE_BOUND >= 1);
+  uint64_t plane_sieve_stop = (uint64_t) (PLANE_SIEVE_BOUND * 4 * (double)(H->h[0] * H->h[1]));
+#endif // PLANE_SIEVE_BOUND
+
+  if (H->t > 3) {
+    plane_sieve_stop =
+      fb->factor_base_1[fb->number_element_1 - 1]->ideal->r + 1;
   }
 
   while (i < fb->number_element_1 &&
@@ -3059,6 +3070,61 @@ int main(int argc, char * argv[])
       total_time / (double)nb_rel);
   fprintf(outstd, "# Relations per special-q: %f.\n",
       (double)nb_rel / (double)spq_tot);
+
+#ifdef LINE_SIEVE_BOUND
+  uint64_t line_sieve_stop_theoretical = 2 * (uint64_t) H->h[0];
+  uint64_t line_sieve_stop = (uint64_t)
+    (LINE_SIEVE_BOUND * 2 * (double) H->h[0]);
+  ASSERT(line_sieve_stop >= line_sieve_stop_theoretical);
+  for (unsigned int i = 0; i < V; i++) {
+    uint64_t nb = 0;
+    uint64_t nb_more = 0;
+    uint64_t k = 0;
+    while (k < fb[i]->number_element_1 &&
+        fb[i]->factor_base_1[k]->ideal->r < line_sieve_stop) {
+      if (fb[i]->factor_base_1[k]->ideal->r > line_sieve_stop_theoretical) {
+        nb_more++;
+      } else {
+        nb++;
+      }
+      k++;
+    }
+    fprintf(outstd, "# Line sieve on side %u sieves %" PRIu64 " + %" PRIu64 " \
+ideals.\n", i, nb, nb_more);
+  }
+#endif // LINE_SIEVE_BOUND
+
+#ifdef PLANE_SIEVE_BOUND
+
+#ifndef LINE_SIEVE_BOUND
+  uint64_t line_sieve_stop = 2 * (uint64_t) H->h[0];
+#endif // LINE_SIEVE_BOUND
+
+  uint64_t plane_sieve_stop_theoretical = 4 * (int64_t)(H->h[0] * H->h[1]);
+  uint64_t plane_sieve_stop = (uint64_t)
+    (PLANE_SIEVE_BOUND * 4 * (double)(H->h[0] * H->h[1]));
+  ASSERT(plane_sieve_stop >= plane_sieve_stop_theoretical);
+  for (unsigned int i = 0; i < V; i++) {
+    uint64_t nb = 0;
+    uint64_t nb_more = 0;
+    uint64_t k = 0;
+    while (k < fb[i]->number_element_1 &&
+        fb[i]->factor_base_1[k]->ideal->r < line_sieve_stop) {
+      k++;
+    }
+    while (k < fb[i]->number_element_1 &&
+        fb[i]->factor_base_1[k]->ideal->r < plane_sieve_stop) {
+      if (fb[i]->factor_base_1[k]->ideal->r > plane_sieve_stop_theoretical) {
+        nb_more++;
+      } else {
+        nb++;
+      }
+      k++;
+    }
+    fprintf(outstd, "# Plane sieve on side %u sieves %" PRIu64 " + %" PRIu64 " \
+ideals.\n", i, nb, nb_more);
+  }
+#endif // PLANE_SIEVE_BOUND
 
   if (gal == 6) {
     for (unsigned int i = 0; i < nb_vec; i++) {
