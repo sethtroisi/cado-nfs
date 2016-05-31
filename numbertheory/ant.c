@@ -1852,32 +1852,34 @@ int main(int argc, char * argv[])/*{{{*/
 	printf("The (n,n^2) matrix containing the integers mod p :\n");
 	mpz_mat_fprint(stdout,M); printf("\n");
 	mpz_mat_kernel(K_M,M,p);
-	printf("Its kernel in the basis of Ip :\n");
-	mpz_mat_fprint(stdout,K_M); printf("\n");
 	
-	// The kernel is converted from the basis of I_p to the basis of O
-	mpz_mat_multiply(K_M,K_M,I);
+
 	printf("Its kernel in the basis of O :\n");
 	mpz_mat_fprint(stdout,K_M); printf("\n");
 	
 	mpz_mat J;
 	mpq_mat new_B, J2;
+	mpq_t p_inv;
 	mpq_mat_init(new_B,n,n);
 	mpz_mat_init(J,n,n);
 	mpq_mat_init(J2,n,n);
+	mpq_init(p_inv);
+	
+	mpq_set_ui(p_inv,1,p);
 	join_HNF(J,K_M,p);
-	printf("Generators of the new order in the basis of O :\n");
+	printf("Generators of %d*O' in the basis of O :\n",p);
 	mpz_mat_fprint(stdout,J); printf("\n");
 	mpz_mat_to_mpq_mat(J2,J);
 	mpq_mat_multiply(new_B, J2, B);
-	printf("Generators of the new order in the basis of alpha^ :\n");
+	mpq_mat_multiply_by_mpq(new_B,new_B,p_inv);
+	printf("Generators of O' in the basis of alpha^ :\n");
 	mpq_mat_fprint(stdout,new_B); printf("\n");
 	
 	mpq_mat_clear(new_B);
 	mpq_mat_clear(J2);
 	mpz_mat_clear(J);
 	
-	
+	mpq_clear(p_inv);
 	mpz_poly_clear(f);
 	mpz_poly_clear(g);
 	mpz_mat_clear(K_M);
