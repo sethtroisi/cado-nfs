@@ -9,7 +9,7 @@
 sieve_info_ptr
 fill_in_sieve_info(const mpz_t q, const mpz_t rho,
                    const int sq_side, const uint32_t I, const uint32_t J,
-                   facul_strategy_t *strategy[2],
+                   facul_strategies_t *strategy,
                    cado_poly_ptr cpoly, siever_config_srcptr conf);
 
 void clear_sieve_info(sieve_info_ptr);

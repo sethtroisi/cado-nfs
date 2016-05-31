@@ -763,6 +763,7 @@ class Las(Program):
                  rho: Parameter(checktype=int)=None,
                  tdthresh: Parameter(checktype=int)=None,
                  bkthresh: Parameter(checktype=int)=None,
+                 bkthresh1: Parameter(checktype=int)=None,
                  rlim: Parameter(checktype=int)=None,
                  alim: Parameter(checktype=int)=None,
                  lpbr: Parameter(checktype=int)=None,

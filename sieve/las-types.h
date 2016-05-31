@@ -125,8 +125,6 @@ struct sieve_side_info_s {
     small_sieve_data_t ssd[1];
     /* And this is just created as an extraction of the above */
     small_sieve_data_t rsd[1];
-
-    facul_strategy_t *strategy;
 };
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
 typedef const struct sieve_side_info_s * sieve_side_info_srcptr;
