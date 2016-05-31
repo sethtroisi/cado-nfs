@@ -263,6 +263,22 @@ void mpz_mat_determinant_triangular(mpz_ptr d, mpz_mat_srcptr M)
     for(unsigned int i = 0 ; i < M->n ; i++)
         mpz_mul(d, d, mpz_mat_entry_const(M,i,i));
 }
+
+// We assume that M is a square Matrix and that its size is not 0
+void mpq_mat_trace(mpq_ptr t, mpq_mat_srcptr M)
+{
+    mpq_set_ui(t, 0, 1);
+    for(unsigned int i = 0 ; i < M->n ; i++)
+        mpq_add(t, t, mpq_mat_entry_const(M,i,i));
+}
+
+// We assume that M is a triangular Matrix and that its size is not 0
+void mpq_mat_determinant_triangular(mpq_ptr d, mpq_mat_srcptr M)
+{
+    mpq_set_ui(d, 1, 1);
+    for(unsigned int i = 0 ; i < M->n ; i++)
+        mpq_mul(d, d, mpq_mat_entry_const(M,i,i));
+}
 /*}}}*/
 /*{{{ miscellaneous */
 void mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
@@ -1435,8 +1451,9 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsi
     mpz_clear(K);
 }
 
-// Builds the HNF of the matrix containing the vectors of the kernel of the application z -> z^p, and the identity*p
-void generators_of_Ip(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p){
+// Builds the block matrix containing p*identity in the top, and K in the bottom
+// Then computes its HNF and stores it in I
+void join_HNF(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p){
 	mpz_mat J, T0;
 	mpz_mat_init(J,K->n,K->n);
 	mpz_mat_init(T0,K->n,K->n);
@@ -1559,6 +1576,28 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_ptr B, mpz_mat_ptr I, m
 	mpq_mat_clear(B_inv);
 }
 
+void read_data(unsigned int* deg, mpz_poly_ptr f, mpq_mat_ptr B, FILE* problemfile)
+{
+	fscanf(problemfile, "%u", deg);
+	
+	mpz_poly_realloc(f,*deg+1);
+	for(unsigned int i = 0 ; i <= *deg ; i++) {
+        int c;
+        fscanf(problemfile, "%d", &c);
+        mpz_poly_setcoeff_si(f,i,c);
+    }
+    
+    mpq_mat_realloc(B,*deg, *deg);
+    for(unsigned int i = 0 ; i < *deg ; i++) {
+        int denom;
+        fscanf(problemfile, "%d", &denom);
+        for(unsigned int j = 0 ; j < *deg ; j++) {
+            int c;
+            fscanf(problemfile, "%d", &c);
+            mpq_set_si(mpq_mat_entry(B,i,j),c,denom);
+        }
+    }
+}
 
 int main(int argc, char * argv[])/*{{{*/
 {
@@ -1744,62 +1783,33 @@ int main(int argc, char * argv[])/*{{{*/
     printf("Format: [degree] [coeffs] [coeffs of order basis]\n");
 
     unsigned int n;
-
-    fscanf(problemfile, "%u", &n);
-
-	mpz_mat_init(K_M,n,n);
     mpz_poly_init(f,n);
+    mpq_mat_init(B, 0, 0); // The matrix of generators
+	read_data(&n, f, B, problemfile); /* Read the data in the file, and reallocate enough space for f and B
+	And sets the value of n, and fills in f and B */
+	fclose(problemfile);
+	
+	
+	mpz_mat_init(K_M,n,n);
     mpz_poly_init(g,n);
     mpz_mat_init(X,n,n);
     mpz_mat_init(T0,n,n);
     mpz_mat_init(K,n,n);
     mpz_mat_init(M,n,n*n);
     mpz_mat_init(I,n,n);
-    mpq_mat_init(B, n, n); // The matrix of generators
     mpq_mat_init(B_inv, n, n); // Its inverse
     mpq_mat_init(T, n, n); // An auxiliary matrix
     mpq_mat_init(U, n, n);
     mpq_mat_set_ui(T, 1);
     mpz_init(den);
 
-
-
-
-
-
-
-
-    // Filling in f as an example, and storing in g the monic polynomial such as (fd*alpha) is a root of if and only if alpha is a root of f
-
-    for(unsigned int i = 0 ; i <= n ; i++) {
-        int c;
-        fscanf(problemfile, "%d", &c);
-        mpz_poly_setcoeff_si(f,i,c);
-    }
+	// Storing in g the monic polynomial such as (fd*alpha) is a root of if and only if alpha is a root of f
     mpz_poly_to_monic(g,f);
     printf("f is : "); mpz_poly_fprintf(stdout,f); printf("\n");
     printf("f^ is : "); mpz_poly_fprintf(stdout,g); printf("\n");
 
-    // Filling in B here as an example ; genereators of the maximal order of the number field of g (tested with magma);
-    for(unsigned int i = 0 ; i < n ; i++) {
-        int denom;
-        fscanf(problemfile, "%d", &denom);
-        for(unsigned int j = 0 ; j < n ; j++) {
-            int c;
-            fscanf(problemfile, "%d", &c);
-            mpq_set_si(mpq_mat_entry(B,i,j),c,denom);
-        }
-    }
-
-    fclose(problemfile);
-
-
-
-
-
 	
-    printf("generators are :\n"); mpq_mat_fprint(stdout,B); printf("\n");
-    // Inverting B
+    printf("Generators of O (in the basis of alpha^) are :\n"); mpq_mat_fprint(stdout,B); printf("\n");
     mpq_mat_invert(B_inv,B);
 
     // Now building the matrix U, containing all generators to the power of p
@@ -1807,61 +1817,69 @@ int main(int argc, char * argv[])/*{{{*/
     generators_to_power_p(U,B,g,p);
     
 
-    // Now multiplying B^-1 and U;
+    // Now multiplying B^-1 and U, and storing in X the application  F : z -> (z^p mod f mod p)
     mpq_mat_multiply(T,B_inv,U);
     mpq_mat_numden(X,den,T);
     mpz_mat_mod_ui(X,X,p);
-
-    //printf("Matrix of the application z -> (z^%d mod f mod %d) :\n",p,p); mpz_mat_fprint(stdout,X); printf("\n");
 
     /* Which power of p ? */
     int k = 1;
     for(unsigned int pk = p ; pk < n ; k++, pk *= p) ;
     mpz_mat_power_ui_mod_ui(X,X,k,p);
 
-    //printf("Matrix to the power of %d of the application z -> (z^%d mod f mod %d) :\n",k,p,p); mpz_mat_fprint(stdout,X); printf("\n");
-
-
+	// Storing in K a basis of Ker((z -> (z^%p mod f mod p))^k)
     mpz_mat_kernel(K,X,p);
-    //printf("F is the application z -> (z^%d mod f mod %d) :\n", p, p);
-    //printf("A basis of Ker(F^%d) is :\n",k);
-    //mpz_mat_fprint(stdout,K); 
-    
-    
-    
-    
-    
 
-	
+    
+    
+    	
 	// Getting generators of I_p
-	generators_of_Ip(I,K,p);
-	printf("Generators of I_p in the basis of the given order O :\n");
+	join_HNF(I,K,p);
+	printf("Generators of I_p in the basis of the generators of O :\n");
 	mpz_mat_fprint(stdout,I); printf("\n");
 	
+	
+	
+	
+	
+	
+
 	
 	// Building the (n,n^2) matrix containing the integers mod p associated to all genereators of O
 	generators_to_integers_mod_p(M,B,I,g,p);
 	
 	
 	printf("The (n,n^2) matrix containing the integers mod p :\n");
-	mpz_mat_fprint(stdout,M);
+	mpz_mat_fprint(stdout,M); printf("\n");
 	mpz_mat_kernel(K_M,M,p);
-	printf("Its kernel :\n");
-	mpz_mat_fprint(stdout,K_M);
+	printf("Its kernel in the basis of Ip :\n");
+	mpz_mat_fprint(stdout,K_M); printf("\n");
 	
 	// The kernel is converted from the basis of I_p to the basis of O
 	mpz_mat_multiply(K_M,K_M,I);
+	printf("Its kernel in the basis of O :\n");
+	mpz_mat_fprint(stdout,K_M); printf("\n");
 	
 	mpz_mat J;
+	mpq_mat new_B, J2;
+	mpq_mat_init(new_B,n,n);
 	mpz_mat_init(J,n,n);
-	generators_of_Ip(J,K_M,p);
+	mpq_mat_init(J2,n,n);
+	join_HNF(J,K_M,p);
 	printf("Generators of the new order in the basis of O :\n");
-	mpz_mat_fprint(stdout,J);
+	mpz_mat_fprint(stdout,J); printf("\n");
+	mpz_mat_to_mpq_mat(J2,J);
+	mpq_mat_multiply(new_B, J2, B);
+	printf("Generators of the new order in the basis of alpha^ :\n");
+	mpq_mat_fprint(stdout,new_B); printf("\n");
+	
+	mpq_mat_clear(new_B);
+	mpq_mat_clear(J2);
+	mpz_mat_clear(J);
 	
 	
 	mpz_poly_clear(f);
 	mpz_poly_clear(g);
-	mpz_mat_clear(J);
 	mpz_mat_clear(K_M);
 	mpz_mat_clear(M);
 	mpz_mat_clear(T0);
