@@ -545,6 +545,16 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
       sa = double_poly_eval_safe (q, a);
       sb = double_poly_eval_safe (q, b);
     }
+  if (sa == 0.0)
+    {
+      c = a;
+      goto end_refine;
+    }
+  if (sb == 0.0)
+    {
+      c = b;
+      goto end_refine;
+    }
   ASSERT_ALWAYS(sa * sb < 0);
   sc = 0.;
   if (precision > 0.)
@@ -593,6 +603,7 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
     printf ("sa=%.16e sb=%.16e\n", sa, sb);
     exit (EXIT_FAILURE);
   }
+ end_refine:
   double_poly_clear (q);
   return c;
 }
