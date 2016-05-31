@@ -1309,7 +1309,7 @@ void mpq_mat_row_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, unsign
 		mpz_set(num,mpq_numref(aux));
 		mpz_poly_setcoeff(f,j,num);
 		mpq_clear(aux);
-		mpz_init(num);
+		mpz_clear(num);
 	}
 }
 
@@ -1452,6 +1452,113 @@ void generators_of_Ip(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p){
 	mpz_mat_clear(T0);
 	mpz_mat_clear(J);
 }
+
+// Builds the (n,n^2) matrix containing the integers mod p
+// They're obtained with the generators of O and the generators of I_p
+// Generators of O are in B (they're given in the basis of alpha^)
+// Generators of I_p are in I (in the basis of O)
+// The products are computed mod g
+void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_ptr B, mpz_mat_ptr I, mpz_poly_ptr g, unsigned int p)
+{
+	ASSERT_ALWAYS((B->m == B->n) && (I->m == I->n) && (B->m == I->m));
+	unsigned int n = B->m;
+	mpq_mat I_rat, I_inv, B_inv;
+	mpz_mat_realloc(M, n, n*n);
+	
+	mpq_mat_init(I_rat,n,n);
+	mpq_mat_init(I_inv,n,n);
+	mpq_mat_init(B_inv,n,n);
+	
+	mpz_mat_to_mpq_mat(I_rat,I);
+	mpq_mat_invert(I_inv,I_rat);
+	mpq_mat_invert(B_inv,B);
+	
+	unsigned int i,j;
+	
+	for (i = 0 ; i < n ; i++){
+		for (j = 0 ; j < n ; j++){
+			
+			// Gammma : polynomial of generator of Ip (only the numerators, multiplied by LCM of denominators)
+			// c : same for generators of O
+			mpz_poly_t gamma, c, aux;
+			// LCM of denominators of generators of Ip, of O, and one auxiliary coefficient
+			mpz_t denom_g, denom_c, coeff;
+			// Line matrices containing the product gamma*c mod g
+			mpz_mat row, aux_row;
+			// Auxiliary row matrices, necessary because generators of Ip need to be converted in the basis of alpha^
+			mpq_mat row_q, c_mat, res;
+			
+			// Initialisation
+			mpz_mat_init(row,1,n);
+			mpz_mat_init(aux_row,1,n);
+			mpq_mat_init(row_q,1,n);
+			mpq_mat_init(c_mat,1,n);
+			mpq_mat_init(res,n,n);
+			mpz_poly_init(gamma,n);
+			mpz_poly_init(c,n);
+			mpz_poly_init(aux,n);
+			mpz_init(denom_g);
+			mpz_init(denom_c);
+			mpz_init(coeff);
+			
+
+			
+			 
+			// Storing one generator of B in the polynomial gamma and in denom_g
+			mpq_mat_row_to_poly(gamma,denom_g,B,i);
+			//Storing one generator of I_p in the polyomial c and in denom_c
+			mpz_mat_submat_swap(aux_row,0,0,I,j,0,1,n);
+			mpz_mat_set(row,aux_row);
+			mpz_mat_submat_swap(aux_row,0,0,I,j,0,1,n);
+			mpz_mat_to_mpq_mat(row_q,row);
+			mpq_mat_multiply(c_mat,row_q,B);
+			mpq_mat_row_to_poly(c,denom_c,c_mat,0);
+			
+			
+			// Computing gamma*c mod g
+			mpz_poly_mul_mod_f(aux,gamma,c,g);
+			// Storing the result in row_q
+			for(int k = 0 ; k <= aux->deg ; k++){
+				mpz_poly_getcoeff(coeff,k,aux);
+				mpq_set_num(mpq_mat_entry(row_q,0,k),coeff);
+				mpz_mul(coeff,denom_c,denom_g);
+				mpq_set_den(mpq_mat_entry(row_q,0,k),coeff);
+				mpq_canonicalize(mpq_mat_entry(row_q,0,k));
+			}
+			
+			
+
+			
+			// Converting row_q (gamma*c mod g) in the basis of I_p (it is supposed to contain only integers)
+			mpq_mat_multiply(res,row_q,B_inv);
+			mpq_mat_multiply(res,res,I_inv);
+			
+			
+			// Extracting the numerators (remember, integers only) into a mpz_mat
+			mpq_mat_numden(row,coeff,res);
+			// Computing the same matrix, modulo p (it is supposed to be a vector of n integers, associated to gamma)
+			mpz_mat_mod_ui(row,row,p);
+			mpz_mat_submat_swap(row,0,0,M,i,n*j,1,n);
+			
+
+			mpq_mat_clear(res);
+			mpq_mat_clear(c_mat);
+			mpq_mat_clear(row_q);
+			mpz_mat_clear(row);
+			mpz_mat_clear(aux_row);
+			mpz_clear(coeff);
+			mpz_clear(denom_g);
+			mpz_clear(denom_c);
+			mpz_poly_clear(gamma);
+			mpz_poly_clear(c);
+			mpz_poly_clear(aux);
+		}
+	}
+	mpq_mat_clear(I_rat);
+	mpq_mat_clear(I_inv);
+	mpq_mat_clear(B_inv);
+}
+
 
 int main(int argc, char * argv[])/*{{{*/
 {
@@ -1631,7 +1738,7 @@ int main(int argc, char * argv[])/*{{{*/
 
     mpq_mat B, B_inv, T, U;
     mpz_poly_t f, g;
-    mpz_mat X, K, I, T0, M;
+    mpz_mat X, K, I, T0, M, K_M;
     mpz_t den;
 
     printf("Format: [degree] [coeffs] [coeffs of order basis]\n");
@@ -1640,6 +1747,7 @@ int main(int argc, char * argv[])/*{{{*/
 
     fscanf(problemfile, "%u", &n);
 
+	mpz_mat_init(K_M,n,n);
     mpz_poly_init(f,n);
     mpz_poly_init(g,n);
     mpz_mat_init(X,n,n);
@@ -1685,14 +1793,14 @@ int main(int argc, char * argv[])/*{{{*/
 
     fclose(problemfile);
 
+
+
+
+
+	
     printf("generators are :\n"); mpq_mat_fprint(stdout,B); printf("\n");
-
-
     // Inverting B
     mpq_mat_invert(B_inv,B);
-
-
-
 
     // Now building the matrix U, containing all generators to the power of p
     // Generators are polynomials, stored in the matrix B
@@ -1730,96 +1838,31 @@ int main(int argc, char * argv[])/*{{{*/
 	printf("Generators of I_p in the basis of the given order O :\n");
 	mpz_mat_fprint(stdout,I); printf("\n");
 	
-	mpq_mat I_rat, I_inv;
-	mpz_mat K_M;
-	mpq_mat_init(I_rat,n,n);
-	mpq_mat_init(I_inv,n,n);
-	mpz_mat_init(K_M,n,n);
-	mpz_mat_to_mpq_mat(I_rat,I);
-	mpq_mat_invert(I_inv,I_rat);
-	unsigned int i,j;
 	
-	for (i = 0 ; i < n ; i++){
-		for (j = 0 ; j < n ; j++){
-			mpz_poly_t gamma, c, aux;
-			mpz_t denom_g, denom_c, coeff;
-			mpz_mat row, aux_row;
-			mpq_mat row_q, c_mat, res;
-			mpz_mat_init(row,1,n);
-			mpz_mat_init(aux_row,1,n);
-			mpq_mat_init(row_q,1,n);
-			mpq_mat_init(c_mat,1,n);
-			mpq_mat_init(res,n,n);
-			mpz_poly_init(gamma,n);
-			mpz_poly_init(c,n);
-			mpz_poly_init(aux,n);
-			mpz_init(denom_g);
-			mpz_init(denom_c);
-			mpz_init(coeff);
-			
-
-			
-			 
-			// Storing one generator of B in the polynomial gamma and in denom_g
-			mpq_mat_row_to_poly(gamma,denom_g,B,i);
-			//Storing one generator of I_p in the polyomial c and in denom_c
-			mpz_mat_submat_swap(aux_row,0,0,I,j,0,1,n);
-			mpz_mat_set(row,aux_row);
-			mpz_mat_submat_swap(aux_row,0,0,I,j,0,1,n);
-			mpz_mat_to_mpq_mat(row_q,row);
-			mpq_mat_multiply(c_mat,row_q,B);
-			mpq_mat_row_to_poly(c,denom_c,c_mat,0);
-			
-			
-			// Computing gamma*c mod g
-			mpz_poly_mul_mod_f(aux,gamma,c,g);
-			// Storing the result in row_q
-			for(int k = 0 ; k <= aux->deg ; k++){
-				mpz_poly_getcoeff(coeff,k,aux);
-				mpq_set_num(mpq_mat_entry(row_q,0,k),coeff);
-				mpz_mul(coeff,denom_c,denom_g);
-				mpq_set_den(mpq_mat_entry(row_q,0,k),coeff);
-				mpq_canonicalize(mpq_mat_entry(row_q,0,k));
-			}
-			
-			
-
-			
-			// Converting row_q (gamma*c mod g) in the basis of I_p (it is supposed to contain only integers)
-			mpq_mat_multiply(res,row_q,B_inv);
-			mpq_mat_multiply(res,res,I_inv);
-			
-			
-			// Extracting the numerators (remember, integers only) into a mpz_mat
-			mpq_mat_numden(row,coeff,res);
-			// Computing the same matrix, modulo p (it is supposed to be a vector of n integers, associated to gamma)
-			mpz_mat_mod_ui(row,row,p);
-			mpz_mat_submat_swap(row,0,0,M,i,n*j,1,n);
-			
-			
-			
-			mpq_mat_clear(res);
-			mpq_mat_clear(c_mat);
-			mpq_mat_clear(row_q);
-			mpz_mat_clear(row);
-			mpz_mat_clear(aux_row);
-			mpz_clear(coeff);
-			mpz_clear(denom_g);
-			mpz_clear(denom_c);
-			mpz_poly_clear(gamma);
-			mpz_poly_clear(c);
-			mpz_poly_clear(aux);
-		}
-	}
+	// Building the (n,n^2) matrix containing the integers mod p associated to all genereators of O
+	generators_to_integers_mod_p(M,B,I,g,p);
+	
+	
 	printf("The (n,n^2) matrix containing the integers mod p :\n");
 	mpz_mat_fprint(stdout,M);
 	mpz_mat_kernel(K_M,M,p);
 	printf("Its kernel :\n");
 	mpz_mat_fprint(stdout,K_M);
-
+	
+	// The kernel is converted from the basis of I_p to the basis of O
+	mpz_mat_multiply(K_M,K_M,I);
+	
+	mpz_mat J;
+	mpz_mat_init(J,n,n);
+	generators_of_Ip(J,K_M,p);
+	printf("Generators of the new order in the basis of O :\n");
+	mpz_mat_fprint(stdout,J);
+	
+	
+	mpz_poly_clear(f);
+	mpz_poly_clear(g);
+	mpz_mat_clear(J);
 	mpz_mat_clear(K_M);
-	mpq_mat_clear(I_rat);
-	mpq_mat_clear(I_inv);
 	mpz_mat_clear(M);
 	mpz_mat_clear(T0);
     mpz_mat_clear(K);
