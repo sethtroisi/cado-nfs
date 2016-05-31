@@ -1219,7 +1219,7 @@ void mpz_mat_kernel(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned int p)
     // We shall keep the convention of magma
     
     // Reallocating K with n-r columns
-    mpz_mat_realloc(K, H->m-r, H->n);
+    mpz_mat_realloc(K, H->m-r, H->m);
     mpz_mat_submat_swap(    K, 0, 0,
                             T, r, 0, 
                             M->m - r, M->m);
@@ -1704,30 +1704,26 @@ int main(int argc, char * argv[])/*{{{*/
     mpq_mat_numden(X,den,T);
     mpz_mat_mod_ui(X,X,p);
 
-    printf("Matrix of the application z -> (z^%d mod f mod %d) :\n",p,p); mpz_mat_fprint(stdout,X); printf("\n");
+    //printf("Matrix of the application z -> (z^%d mod f mod %d) :\n",p,p); mpz_mat_fprint(stdout,X); printf("\n");
 
     /* Which power of p ? */
     int k = 1;
     for(unsigned int pk = p ; pk < n ; k++, pk *= p) ;
     mpz_mat_power_ui_mod_ui(X,X,k,p);
 
-    printf("Matrix to the power of %d of the application z -> (z^%d mod f mod %d) :\n",k,p,p); mpz_mat_fprint(stdout,X); printf("\n");
+    //printf("Matrix to the power of %d of the application z -> (z^%d mod f mod %d) :\n",k,p,p); mpz_mat_fprint(stdout,X); printf("\n");
 
 
     mpz_mat_kernel(K,X,p);
-    printf("F is the application z -> (z^%d mod f mod %d) :\n", p, p);
-    printf("A basis of F^%d is :\n",k);
-    mpz_mat_fprint(stdout,K); 
+    //printf("F is the application z -> (z^%d mod f mod %d) :\n", p, p);
+    //printf("A basis of Ker(F^%d) is :\n",k);
+    //mpz_mat_fprint(stdout,K); 
     
     
     
     
     
-    
-    
-    
-    
-    printf("\n\n****** Generating a new order ******\n");
+
 	
 	// Getting generators of I_p
 	generators_of_Ip(I,K,p);
@@ -1735,8 +1731,10 @@ int main(int argc, char * argv[])/*{{{*/
 	mpz_mat_fprint(stdout,I); printf("\n");
 	
 	mpq_mat I_rat, I_inv;
+	mpz_mat K_M;
 	mpq_mat_init(I_rat,n,n);
 	mpq_mat_init(I_inv,n,n);
+	mpz_mat_init(K_M,n,n);
 	mpz_mat_to_mpq_mat(I_rat,I);
 	mpq_mat_invert(I_inv,I_rat);
 	unsigned int i,j;
@@ -1762,7 +1760,6 @@ int main(int argc, char * argv[])/*{{{*/
 
 			
 			 
-			printf("i = %d ; j = %d\n",i,j);
 			// Storing one generator of B in the polynomial gamma and in denom_g
 			mpq_mat_row_to_poly(gamma,denom_g,B,i);
 			//Storing one generator of I_p in the polyomial c and in denom_c
@@ -1792,15 +1789,12 @@ int main(int argc, char * argv[])/*{{{*/
 			mpq_mat_multiply(res,row_q,B_inv);
 			mpq_mat_multiply(res,res,I_inv);
 			
-			//mpq_mat_fprint(stdout,res);
 			
 			// Extracting the numerators (remember, integers only) into a mpz_mat
 			mpq_mat_numden(row,coeff,res);
 			// Computing the same matrix, modulo p (it is supposed to be a vector of n integers, associated to gamma)
 			mpz_mat_mod_ui(row,row,p);
-			mpz_mat_fprint(stdout,row);
-			//mpq_mat_fprint(stdout,res);
-			printf("\n\n");
+			mpz_mat_submat_swap(row,0,0,M,i,n*j,1,n);
 			
 			
 			
@@ -1817,8 +1811,13 @@ int main(int argc, char * argv[])/*{{{*/
 			mpz_poly_clear(aux);
 		}
 	}
+	printf("The (n,n^2) matrix containing the integers mod p :\n");
+	mpz_mat_fprint(stdout,M);
+	mpz_mat_kernel(K_M,M,p);
+	printf("Its kernel :\n");
+	mpz_mat_fprint(stdout,K_M);
 
-
+	mpz_mat_clear(K_M);
 	mpq_mat_clear(I_rat);
 	mpq_mat_clear(I_inv);
 	mpz_mat_clear(M);
