@@ -643,7 +643,7 @@ main (int argc, char *argv[])
       r.ka = ka;
       mpz_init_set_ui(r.b, b);
       r.kb = kb;
-      double rf = rootRefine(&r, p, n, precision);
+      printf("rf=%lf\n", rootRefine(&r, p, n, precision));
       root_struct_clear(&r);
   }
   else{
