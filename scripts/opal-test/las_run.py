@@ -106,7 +106,7 @@ def run(param_file, problem):
         outputfile = "las.%d.out" % q0
         las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
 
-        las_cmd_line = [las, "-allow-largesq"]
+        las_cmd_line = [las, "-allow-largesq", "-dup"]
         for (key, value) in las_params.items():
             las_cmd_line += ["-%s" % key, str(value)]
         # sys.stderr.write("Running: %s\n" % " ".join(las_cmd_line))

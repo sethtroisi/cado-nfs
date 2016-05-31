@@ -78,9 +78,11 @@ parse_config(siever_config_ptr sc, param_list pl)
     seen &= param_list_parse_ulong (pl, "lim0",  &(sc->sides[0]->lim));
     seen &= param_list_parse_int   (pl, "lpb0",  &(sc->sides[0]->lpb));
     seen &= param_list_parse_int   (pl, "mfb0",  &(sc->sides[0]->mfb));
+    seen &= param_list_parse_int   (pl, "ncurves0",  &(sc->sides[0]->ncurves));
     seen &= param_list_parse_ulong (pl, "lim1",  &(sc->sides[1]->lim));
     seen &= param_list_parse_int   (pl, "lpb1",  &(sc->sides[1]->lpb));
     seen &= param_list_parse_int   (pl, "mfb1",  &(sc->sides[1]->mfb));
+    seen &= param_list_parse_int   (pl, "ncurves1",  &(sc->sides[1]->ncurves));
     return seen;
 }
 
@@ -97,6 +99,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lpb1", "(alias lpba) set algebraic large prime bound to 2^lpb1");
   param_list_decl_usage(pl, "mfb0", "(alias mfbr) set rational cofactor bound 2^mfb0");
   param_list_decl_usage(pl, "mfb1", "(alias mfba) set algebraic cofactor bound 2^mfb1");
+  param_list_decl_usage(pl, "ncurves0", "set rational number of curves");
+  param_list_decl_usage(pl, "ncurves1", "set algebraic number of curves"); 
   param_list_decl_usage(pl, "lambda0", "(alias rlambda) rational lambda value");
   param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
   param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
@@ -118,7 +122,6 @@ int
 main (int argc, char * argv[])
 {
     char * argv0 = argv[0];
-    facul_strategy_t *strategy[NB_POLYS_MAX];
     siever_config conf;
     int nb_threads = 1;
 
@@ -171,9 +174,16 @@ main (int argc, char * argv[])
 
     tune_las_memset();
 
-    for (int side = 0; side < cpoly->nb_polys; side++)
-      strategy[side] = facul_make_strategy(conf->sides[side]->lim,
-                                           conf->sides[side]->lpb, 0, 0);
+    facul_strategies_t* strategies = facul_make_strategies (
+            conf->sides[0]->lim,
+            conf->sides[0]->lpb,
+            conf->sides[0]->mfb,
+            conf->sides[1]->lim,
+            conf->sides[1]->lpb,
+            conf->sides[1]->mfb,
+            conf->sides[0]->ncurves,
+            conf->sides[1]->ncurves,
+            NULL, 0);
 
     mpz_t sq, rho;
     mpz_init(sq);
@@ -191,7 +201,7 @@ main (int argc, char * argv[])
           if (si != NULL)
             clear_sieve_info(si);
           si = fill_in_sieve_info(sq, rho, side, 1U << conf->logI, 1U << (conf->logI - 1),
-                                  strategy, cpoly, conf);
+                                  strategies, cpoly, conf);
         } else {
             relation rel;
             if (rel.parse(line)) {
@@ -205,8 +215,7 @@ main (int argc, char * argv[])
       clear_sieve_info(si);
     }
     
-    for (int side = 0; side < cpoly->nb_polys; side++)
-      facul_clear_strategy(strategy[side]);
+    facul_clear_strategies(strategies);
     cado_poly_clear(cpoly);
     mpz_clear(sq);
     mpz_clear(rho);

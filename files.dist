@@ -253,7 +253,11 @@ parameters/factor/params.c190
 parameters/factor/params.c195
 parameters/factor/params.c200
 parameters/factor/params.c205
+parameters/factor/params.c210
 parameters/factor/params.c220
+parameters/factor/params.c230
+parameters/factor/params.c270
+parameters/factor/params.c310
 parameters/factor/params.c30
 parameters/factor/params.c60
 parameters/factor/params.c65
@@ -1257,3 +1261,4 @@ linalg/bwc/mpfq/mpfq_p_15_t.c
 linalg/bwc/mpfq/mpfq_p_15_t.h
 filter/sm_append.cpp
 linalg/bwc/bwccheck.cpp
+tests/linalg/bwc/test-lingen-crc.sh

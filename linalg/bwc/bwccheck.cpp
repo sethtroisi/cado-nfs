@@ -325,7 +325,7 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                     if (Vs[j].n == Vs[i].n + C.stretch)
                         break;
                 }
-                if (Vs[j].n == Vs[i].n + C.stretch) {
+                if (j < Vs.size()) {
                     Vs[j].checks++;
                     const char * vi = Vs[i].c_str();
                     const char * vj = Vs[j].c_str();

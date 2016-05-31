@@ -20,9 +20,12 @@ import cadoparams
 import cadocommand
 import wuserver
 import workunit
+import sys
 from struct import error as structerror
 from shutil import rmtree
 from workunit import Workunit
+
+
 
 # Patterns for floating-point numbers
 # They can be used with the string.format() function, e.g.,
@@ -31,6 +34,11 @@ from workunit import Workunit
 RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 CAP_FP = "(%s)" % RE_FP
 REGEXES = {"fp": RE_FP, "cap_fp": CAP_FP}
+
+class nb:
+    nb_sieving=0
+    nb_filter=0
+    nb_linalg=0
 
 def re_cap_n_fp(prefix, n, suffix=""):
     """ Generate a regular expression that starts with prefix, then captures
@@ -161,7 +169,8 @@ class Polynomials(object):
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
-    re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
+    # the 'lognorm' variable now represents the expected E-value
+    re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -225,13 +234,13 @@ class Polynomials(object):
                 self.MurphyParams = match.group(1)
                 self.MurphyE = float(match.group(2))
                 continue
-            # If this is a comment line telling the lognorm,
+            # If this is a comment line telling the expected E-value,
             # extract the value and store it
             match = self.re_lognorm.match(line)
             if match:
                 if self.lognorm != 0:
                     raise PolynomialParseException(
-                        "Line '%s' redefines lognorm value" % line)
+                        "Line '%s' redefines exp_E value" % line)
                 self.lognorm = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
@@ -302,7 +311,7 @@ class Polynomials(object):
             else:
                 arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
-            arr.append("# lognorm %g\n" % self.lognorm)
+            arr.append("# exp_E %g\n" % self.lognorm)
         if len(self.tabpoly) > 0:
             for i in range(len(self.tabpoly)):
                 arr.append("# poly%d = %s\n" % (i, str(self.tabpoly[i])))
@@ -2657,6 +2666,10 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return "Lattice Sieving"
     @property
     def programs(self):
+        nb.nb_sieving+=1
+        if len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false" and nb.nb_sieving>=2:
+            self.logger.info("Not run (%s)", sys.argv[2])
+            sys.exit("Factorization stopped")
         override = ("q0", "q1", "factorbase", "out", "stats_stderr")
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
         return ((cadoprograms.Las, override, input),)
@@ -2940,6 +2953,10 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
+        nb.nb_filter+=1
+        if len(sys.argv)>2 and sys.argv[2]=="tasks.filter.run=false" and nb.nb_filter>=2:
+            self.logger.info("Not run (%s)", sys.argv[2])
+            sys.exit("Factorization stopped")
         return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
     @property
     def paramnames(self):
@@ -3443,7 +3460,7 @@ class PurgeTask(Task):
         Given 'nunique' relations and an excess of 'excess',
         estimate how many new (unique) relations we need.
         """
-        
+
         additional = nunique * self.params["add_ratio"]
         # if the excess is negative, we need at least -excess new relations
         if excess < 0:
@@ -4052,6 +4069,10 @@ class LinAlgTask(Task, HasStatistics):
         return "Linear Algebra"
     @property
     def programs(self):
+        nb.nb_linalg+=1
+        if len(sys.argv)>2 and sys.argv[2]=="tasks.linalg.run=false" and nb.nb_linalg>=2:
+            self.logger.info("Not run (%s)", sys.argv[2])
+            sys.exit("Factorization stopped")
         return ((cadoprograms.BWC, ("complete", "matrix",  "wdir", "nullspace"),
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
@@ -4358,9 +4379,7 @@ class SqrtTask(Task):
                 with stdoutpath.open("r") as stdoutfile:
                     stdout = stdoutfile.read()
                 lines = stdout.splitlines()
-                # Skip last factor which cannot produce a new split on top
-                # of what the smaller factors did
-                for line in lines[:-1]:
+                for line in lines:
                     if line == "Failed":
                         continue # try next lines (if any) in multi-thread mode
                     self.add_factor(int(line))
@@ -5260,6 +5279,17 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
                           self.sieving, self.dup1, self.dup2, self.purge,
                           self.merge, self.linalg, self.characters, self.sqrt)
+            if len(sys.argv)>2:
+                if sys.argv[2]=="tasks.sieve.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving)
+                if sys.argv[2]=="tasks.filter.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving, self.dup1)
+                if sys.argv[2]=="tasks.linalg.run=false":
+                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
+                          self.sieving, self.dup1, self.dup2, self.purge,
+                          self.merge, self.linalg)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
@@ -5325,18 +5355,22 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         self.start_elapsed_time()
 
         self.servertask.run()
-        
         last_task = None
         last_status = True
         try:
+            tasks=[]
+            for i in range(len(self.tasks)):
+                tasks.append(self.tasks[i])
             self.start_all_clients()
-            
+            i=0
             while last_status:
                 last_status, last_task = self.run_next_task()
-            
+                if i<len(self.tasks):
+                    self.tasks[i].print_stats()
+                    i+=1
             for task in self.tasks:
                 task.print_stats()
-        
+
         except KeyboardInterrupt:
             self.logger.fatal("Received KeyboardInterrupt. Terminating")
             had_interrupt = True
@@ -5401,16 +5435,16 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         self.state.__delitem__("starttime", commit=False)
         self.state.update({"elapsed": elapsed}, commit=True)
         return elapsed
+
     
     def run_next_task(self):
         for task in self.tasks:
             if task in self.tasks_that_want_to_run:
-                # self.logger.info("Next task that wants to run: %s",
-                #                  task.title)
+                #self.logger.info("Next task that wants to run: %s", task.title)
                 self.tasks_that_want_to_run.remove(task)
                 return [task.run(), task.title]
         return [False, None]
-    
+
     def get_sum_of_cpu_or_real_time(self, is_cpu):
         total = 0
         for task in self.tasks:

@@ -48,7 +48,7 @@ log_rel_free (log_rel_t *rels, uint64_t nrels)
   free(rels);
 }
 
-/***** Light relations structure (for constructing the dependancy graph) *****/
+/***** Light relations structure (for constructing the dependency graph) *****/
 typedef struct
 {
   weight_t len;
@@ -407,7 +407,7 @@ log_do_one_part_of_iter (read_data_ptr data, bit_vector not_used, uint64_t start
 
 #define log_do_one_iter_mono(d, bv, n) log_do_one_part_of_iter (d, bv, 0, n)
 
-/************************** Dependancy graph *********************************/
+/************************** Dependency graph *********************************/
 typedef struct
 {
   uint8_t state;
@@ -555,8 +555,8 @@ dep_nb_unknown_log (dep_read_data_ptr data, uint64_t i, index_t *h)
   return nb;
 }
 
-/* Compute all dependancies for relations in [start,end[.
- * Return the number of dependancies found */
+/* Compute all dependencies for relations in [start,end[.
+ * Return the number of dependencies found */
 static uint64_t
 dep_do_one_part_of_iter (dep_read_data_ptr data, bit_vector not_used,
                          uint64_t start, uint64_t end)
@@ -966,6 +966,10 @@ compute_log_from_rels (bit_vector needed_rels,
 #endif
   fflush(stdout);
   char *fic[3] = {(char *) relspfilename, (char *) relsdfilename, NULL};
+
+  /* When purged.gz and relsdel.gz both have SM info included, we may
+   * have an advantage in having more threads for thread_insert. Note
+   * though that we'll most probably be limited by gzip throughput */
   struct filter_rels_description desc[3] = {
                    { .f = thread_insert, .arg=data, .n=1},
                    { .f = thread_sm,     .arg=data, .n=nt},
@@ -1057,7 +1061,7 @@ compute_needed_rels (bit_vector needed_rels,
                EARLYPARSE_NEED_INDEX, NULL, NULL);
 
   /* computing dependencies */
-  printf ("# Starting to compute dependancies from rels\n");
+  printf ("# Starting to compute dependencies from rels\n");
 
   /* adjust the number of threads based on the number of relations */
   double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
@@ -1082,7 +1086,7 @@ compute_needed_rels (bit_vector needed_rels,
       computed = dep_do_one_iter_mono (data, needed_rels, nrels);
     total_computed += computed;
 
-    printf ("# Iteration %" PRIu64 ": %" PRIu64 " new dependancies computed\n",
+    printf ("# Iteration %" PRIu64 ": %" PRIu64 " new dependencies computed\n",
             iter, computed);
     printf ("# Iteration %" PRIu64 " took %.1fs (wall-clock time).\n",
             iter, wct_seconds() - wct_tt);
@@ -1090,7 +1094,7 @@ compute_needed_rels (bit_vector needed_rels,
     iter++;
   } while (computed);
 
-  printf ("# Computing dependancies took %.1fs (wall-clock time)\n",
+  printf ("# Computing dependencies took %.1fs (wall-clock time)\n",
           wct_seconds() - wct_tt0);
 
   FILE *f = NULL;
@@ -1169,7 +1173,7 @@ main(int argc, char *argv[])
   char *argv0 = argv[0];
 
   renumber_t renumber_table;
-  uint64_t nrels_tot = 0, nrels_purged, nideals_purged, nrels_del, nrels_needed;
+  uint64_t nrels_tot = 0, nrels_purged, nrels_del, nrels_needed;
   uint64_t nprimes;
   int mt = 1;
   int partial = 0;
@@ -1219,19 +1223,17 @@ main(int argc, char *argv[])
   const char * renumberfilename = param_list_lookup_string(pl, "renumber");
   const char * polyfilename = param_list_lookup_string(pl, "poly");
   const char * wantedfilename = param_list_lookup_string(pl, "wanted");
-  param_list_parse_uint64(pl, "nrels", &nrels_tot);
-  param_list_parse_mpz(pl, "ell", ell);
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
   /* Some checks on command line arguments */
-  if (mpz_cmp_ui (ell, 0) <= 0)
+  if (!param_list_parse_mpz(pl, "ell", ell) || mpz_cmp_ui (ell, 0) <= 0)
   {
     fprintf(stderr, "Error, missing -ell command line argument "
                     "(or ell <= 0)\n");
     usage (pl, argv0);
   }
-  if (nrels_tot == 0)
+  if (!param_list_parse_uint64(pl, "nrels", &nrels_tot) || nrels_tot == 0)
   {
     fprintf(stderr, "Error, missing -nrels command line argument "
                     "(or nrels = 0)\n");
@@ -1358,8 +1360,11 @@ main(int argc, char *argv[])
   nprimes = renumber_table->size;
 
   /* Read number of rows and cols on first line of purged file */
-  purgedfile_read_firstline (relspfilename, &nrels_purged, &nideals_purged);
-  nrels_del = nrels_tot - nrels_purged;
+  {
+      uint64_t nideals_purged;
+      purgedfile_read_firstline (relspfilename, &nrels_purged, &nideals_purged);
+      nrels_del = nrels_tot - nrels_purged;
+  }
 
   /* Malloc'ing log tab and reading values of log */
   printf ("\n###### Reading known logarithms ######\n");

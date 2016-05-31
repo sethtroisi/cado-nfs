@@ -208,3 +208,4 @@ nfs-hd/check_relations/
 parameters/nfs-hd/
 nfs-hd/utils_mpz_poly.h
 nfs-hd/utils_mpz_poly.c
+utils/randomprime.cpp

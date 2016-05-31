@@ -409,6 +409,14 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         TARGET_DEPENDENCIES
             full_c30_dependencies
             )
+    cado_define_test(full_c59workdir
+        SCRIPT
+            ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
+	    90377629292003121684002147101760858109247336549001090677693
+	    workdir=/tmp/cado
+        TARGET_DEPENDENCIES
+	    full_c30_dependencies
+            )
     cado_define_test(full_c65_128
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
