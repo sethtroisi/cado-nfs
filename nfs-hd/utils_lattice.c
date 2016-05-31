@@ -1127,16 +1127,15 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
-#if 1
   skewness->c[0] = 1;
   skewness->c[1] = H->h[0] / H->h[1];
-  //TODO: bound?
+#ifdef SKEWNESS
+  skewness->c[2] = (int64_t)(SKEWNESS * H->h[0] * H->h[0] * H->h[1]) / (int64_t)r->ideal->r;
+  //Theoretical bound.
+  /*skewness->c[2] = (int64_t)(8 * H->h[0] * H->h[0] * H->h[1]) / (int64_t)r->ideal->r;*/
+#else //SKEWNESS
   skewness->c[2] = (int64_t)(2 * H->h[0] * H->h[0] * H->h[1]) / (int64_t)r->ideal->r;
-#else // 0
-  skewness->c[0] = 1;
-  skewness->c[1] = H->h[0] / H->h[1];
-  skewness->c[2] = (int64_t)(H->h[0] * H->h[0] * H->h[1]) / (int64_t)r->ideal->r;
-#endif // 0
+#endif // SKEWNESS
 
   mat_int64_t MSLLL;
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
@@ -1317,6 +1316,20 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
    This follows the implementation in utils/lll.c, but for mat_int64_t.
  */
 
+// Return 0 if not overflow, 1 if overflow.
+static int int128_overflow_64(int64_t * x_64, __int128_t x)
+{
+  __int128_t min = INT64_MIN;
+  __int128_t max = INT64_MAX;
+
+  * x_64 = (int64_t) x;
+
+  int ret = !(min <= x && x <= max);
+  ASSERT(ret == 0 || ret == 1);
+
+  return ret;
+}
+
 static void innerproduct(int64_t * x, int64_t * a, int64_t * b,
     unsigned int n)
 {
@@ -1414,35 +1427,16 @@ static void muladddiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
   if (__builtin_smull_overflow(c1, x, tmp) ||
       __builtin_smull_overflow(c2, y, &tmpb) ||
       __builtin_saddl_overflow(* tmp, tmpb, tmp)) {
-    mpz_t c1_Z, c2_Z, x_Z, y_Z, z_Z, c, t1;
-    mpz_init(c1_Z);
-    mpz_init(c2_Z);
-    mpz_init(x_Z);
-    mpz_init(y_Z);
-    mpz_init(z_Z);
-    mpz_init(c);
-    mpz_init(t1);
+    __int128_t c1_128, c2_128, x_128, y_128, z_128;
+    c1_128 = (__int128_t) c1;
+    c2_128 = (__int128_t) c2;
+    x_128 = (__int128_t) x;
+    y_128 = (__int128_t) y;
+    z_128 = (__int128_t) z;
 
-    mpz_set_int64(c1_Z, c1);
-    mpz_set_int64(c2_Z, c2);
-    mpz_set_int64(x_Z, x);
-    mpz_set_int64(y_Z, y);
-    mpz_set_int64(z_Z, z);
-
-    mpz_mul(t1, x_Z, c1_Z);
-    mpz_addmul(t1, y_Z, c2_Z);
-    mpz_divexact(c, t1, z_Z);
-
-    mpz_clear(c1_Z);
-    mpz_clear(c2_Z);
-    mpz_clear(x_Z);
-    mpz_clear(y_Z);
-    mpz_clear(z_Z);
-    mpz_clear(t1);
-
-    ASSERT(mpz_sizeinbase(c, 2) < 63);
-    * tmp = mpz_get_int64(c);
-    mpz_clear(c);
+    int ret = int128_overflow_64(tmp, (x_128 * c1_128 + y_128 * c2_128) /
+        z_128);
+    ASSERT_ALWAYS(ret == 0);
   } else {
     * tmp = * tmp / z;
   }
@@ -1533,35 +1527,16 @@ static void mulsubdiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
   if (__builtin_smull_overflow(c1, x, tmp) ||
       __builtin_smull_overflow(c2, y, &tmpb) ||
       __builtin_ssubl_overflow(* tmp, tmpb, tmp)) {
-    mpz_t c1_Z, c2_Z, x_Z, y_Z, z_Z, c, t1;
-    mpz_init(c1_Z);
-    mpz_init(c2_Z);
-    mpz_init(x_Z);
-    mpz_init(y_Z);
-    mpz_init(z_Z);
-    mpz_init(c);
-    mpz_init(t1);
+    __int128_t c1_128, c2_128, x_128, y_128, z_128;
+    c1_128 = (__int128_t) c1;
+    c2_128 = (__int128_t) c2;
+    x_128 = (__int128_t) x;
+    y_128 = (__int128_t) y;
+    z_128 = (__int128_t) z;
 
-    mpz_set_int64(c1_Z, c1);
-    mpz_set_int64(c2_Z, c2);
-    mpz_set_int64(x_Z, x);
-    mpz_set_int64(y_Z, y);
-    mpz_set_int64(z_Z, z);
-
-    mpz_mul(t1, x_Z, c1_Z);
-    mpz_submul(t1, y_Z, c2_Z);
-    mpz_divexact(c, t1, z_Z);
-
-    mpz_clear(c1_Z);
-    mpz_clear(c2_Z);
-    mpz_clear(x_Z);
-    mpz_clear(y_Z);
-    mpz_clear(z_Z);
-    mpz_clear(t1);
-
-    ASSERT(mpz_sizeinbase(c, 2) < 63);
-    * tmp = mpz_get_int64(c);
-    mpz_clear(c);
+    int ret = int128_overflow_64(tmp, (x_128 * c1_128 - y_128 * c2_128) /
+        z_128);
+    ASSERT_ALWAYS(ret == 0);
   } else {
     * tmp = * tmp / z;
   }
