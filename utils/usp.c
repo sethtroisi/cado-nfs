@@ -519,6 +519,10 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
   if (a == b) /* might be the case for an exact root a/2^k */
     return a;
+#if 0 /* FM */
+  gmp_printf("r.a: %Zd\nr.b: %Zd\nprec=%lf\n", r[0].a, r[0].b, precision);
+  printf("ka=%d, kb=%d\n", r[0].ka, r[0].kb);
+#endif
 
   P->coeff = p;
   P->deg = n;
@@ -526,12 +530,14 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   double_poly_set_mpz_poly (q, P);
   sa = double_poly_eval (q, a);
   sb = double_poly_eval (q, b);
+#if 0 /* FM */
   {
       for(int ii = 0; ii <= n; ii++)
 	  gmp_printf("+x^%d*(%Zd)\n", ii, P->coeff[ii]);
       printf("a=%lf\nb=%lf\n", a, b);
       printf("sa=%lf\nsb=%lf\n", sa, sb);
   }
+#endif
   /* due to truncation of the initial coefficients, and rounding error in
      evaluation of q, it might be that sa and sb do not have opposite signs */
   if (sa * sb >= 0)
@@ -626,16 +632,28 @@ main (int argc, char *argv[])
   printf ("input polynomial is ");
   printPol (p, n);
 #endif
-  if (argc >= 2)
-    T = atof (argv[1]);
-  root_struct *Roots = (root_struct *)malloc(n * sizeof(root_struct));
-  for(i = 0; i < n; i++)
-      root_struct_init (Roots+i);
-  nroots = numberOfRealRoots (p, n, T, verbose, Roots);
-  printf ("%d real root(s)\n", nroots);
+  if (argc >= 4){
+      /* ./a.out a ka b kb precision to test rootRefine */
+      int a = atoi(argv[1]), ka = atoi(argv[2]);
+      int b = atoi(argv[3]), kb = atoi(argv[4]);
+      double precision = atof(argv[5]);
+      root_struct r;
+      root_struct_init(&r);
+      mpz_init_set_ui(r.a, a);
+      r.ka = ka;
+      mpz_init_set_ui(r.b, b);
+      r.kb = kb;
+      double rf = rootRefine(&r, p, n, precision);
+      root_struct_clear(&r);
+  }
+  else{
+      if (argc >= 2){
+	  T = atof (argv[1]);
+	  nroots = numberOfRealRoots (p, n, T, verbose, NULL);
+	  printf ("%d real root(s)\n", nroots);
+      }
+  }
 
-  for(i = 0; i < n; i++)
-      root_struct_clear (Roots+i);
   for (i = 0; i <= n; i++)
     mpz_clear (p[i]);
   free (p);
