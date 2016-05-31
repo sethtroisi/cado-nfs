@@ -1369,86 +1369,59 @@ void print_polynomial(mpz_t* f, int degree)
 	printf("\n");
 }
 
-// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an order, and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p), reduced mod g and mod p.
-void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B, mpz_poly_ptr g, unsigned int p)
+// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an order,
+// and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p),
+// reduced mod g and mod p.
+void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B,
+        mpz_poly_ptr g, unsigned int p)
 {
     ASSERT_ALWAYS (B->m == B->n) ;
 
-    unsigned int i, j;
-    int k;
-    mpq_mat_realloc(U,B->m,B->n);
+    mpq_mat_realloc(U, B->m, B->n);
 
-    mpz_t K, tmp, p2; // common denominator
-    mpz_init(K);
+    mpz_t lcm, tmp;
+    mpq_t aux1, K_rat;
+    mpz_init(lcm);
     mpz_init(tmp);
-    mpz_set_si(K,1);
-    mpz_poly_t f2;
-    mpz_poly_t g2;
-    mpz_poly_init(f2,B->n-1);
-    mpz_poly_init(g2,B->n-1);
-    mpz_init(p2);
-    mpz_set_ui(p2,p);
+    mpq_init(aux1);
+    mpq_init(K_rat);
 
-    mpz_t N[B->n]; // will be used to store numerators of w[j] times K 
-    for (i = 0 ; i < B->m ; i++){
-        mpz_init(N[i]);
-    }
-
-    mpz_poly_mod_mpz(g2,g,p2,NULL);
-
-    for (j = 0 ; j < U->m ; j++) {
+    for (unsigned int i = 0 ; i < U->m ; i++) {
         mpz_poly_t f;
-        mpz_poly_init(f,B->n-1);
+        mpz_poly_init(f, B->n-1);
 
-        // Putting the LCM of all denominators of coefficients of w[j] in K
-        mpz_set_si(K,1);
-        for (i = 0 ; i < U-> n ; i++) {
-            mpz_lcm(K,K,mpq_denref(mpq_mat_entry_const(B,i,j)));
+        // Putting the LCM of all denominators of coefficients of w[i] in lcm
+        mpz_set_si(lcm,1);
+        for (unsigned int j = 0 ; j < B->n ; j++) {
+            mpz_lcm(lcm,lcm,mpq_denref(mpq_mat_entry_const(B,j,i)));
         }
-
 
         // Generating the polynomial
-        for (i = 0 ; i < B->n ; i++) {
-            mpq_t aux1;
-            mpq_t K_rat;
-            mpq_init(aux1);
-            mpq_init(K_rat);
-
-            mpq_set(aux1,mpq_mat_entry_const(B,i,j));
-            mpq_set_z(K_rat,K);
-            mpq_mul(aux1,aux1,K_rat);
-            mpq_get_num(N[i],aux1);
-
-            mpq_clear(K_rat);
-            mpq_clear(aux1);
+        for (unsigned int j = 0 ; j < B->n ; j++) {
+            mpq_set_z(K_rat,lcm);
+            mpq_mul(aux1,mpq_mat_entry_const(B,i,j),K_rat);
+            ASSERT_ALWAYS(mpz_cmp_ui(mpq_denref(aux1), 1) == 0);
+            mpz_poly_setcoeff(f, j, mpq_numref(aux1));
         }
-        mpz_poly_setcoeffs(f,N,B->n-1);
-        mpz_poly_set(f2,f);
 
-        // Computing f^p mod g (it returns (K * the corresponding generator)^p
+        // Computing f^p mod g (it returns (lcm * the corresponding generator)^p
         mpz_poly_power_mod_f(f,f,g,p);
 
-        mpz_pow_ui(K, K, p);
+        mpz_pow_ui(lcm, lcm, p);
 
-        // Storing w[j] in j-th row of U
-        for (k = 0 ; k <= f->deg ; k++) {
-            mpz_poly_getcoeff(tmp,k,f);
-            mpq_set_num(mpq_mat_entry(U,j,k),tmp);
-            mpq_set_den(mpq_mat_entry(U,j,k),K);
-            mpq_canonicalize(mpq_mat_entry(U,j,k));
+        // Storing w[i] in i-th row of U
+        for (int j = 0 ; j <= f->deg ; j++) {
+            mpz_poly_getcoeff(tmp,j,f);
+            mpq_set_num(mpq_mat_entry(U,i,j),tmp);
+            mpq_set_den(mpq_mat_entry(U,i,j),lcm);
+            mpq_canonicalize(mpq_mat_entry(U,i,j));
         } 
-
         mpz_poly_clear(f);
     }
-
-    for (i = 0 ; i < B->m ; i++){
-        mpz_clear(N[i]);
-    }
-    mpz_poly_clear(f2);
+    mpq_clear(K_rat);
+    mpq_clear(aux1);
     mpz_clear(tmp);
-    mpz_clear(p2);
-    mpz_poly_clear(g2);
-    mpz_clear(K);
+    mpz_clear(lcm);
 }
 
 // Builds the block matrix containing p*identity in the top, and K in the bottom
@@ -1817,8 +1790,8 @@ int main(int argc, char * argv[])/*{{{*/
     generators_to_power_p(U,B,g,p);
     
 
-    // Now multiplying B^-1 and U, and storing in X the application  F : z -> (z^p mod f mod p)
-    mpq_mat_multiply(T,B_inv,U);
+    // Now do U * B^-1, storing in X the application  F : z -> (z^p mod f mod p)
+    mpq_mat_multiply(T,U, B_inv);
     mpq_mat_numden(X,den,T);
     mpz_mat_mod_ui(X,X,p);
 
