@@ -970,6 +970,7 @@ class RealTimeOutputFilter:
     def filter(self, data):
         self.stdout.write(data)
         
+        
 
 class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
            cadoparams.UseParameters, Runnable, metaclass=abc.ABCMeta):
@@ -3976,7 +3977,7 @@ class LinAlgDLPTask_Magma(Task):
 class bwc_output_filter(RealTimeOutputFilter):
     def filter(self, data):
         super().filter(data)
-        if "ETA" in data:
+        if ("ETA" or "Timings") in data:
             self.logger.info(data.rstrip())
             
 
@@ -4251,6 +4252,11 @@ class LinAlgTask(Task, HasStatistics):
             wdir = workdir.realpath()
             self.state["ran_already"] = True
             self.remember_input_versions(commit=True)
+            p = cadoprograms.BWC(complete=True,
+                                 matrix=matrix,  wdir=wdir, nullspace="left",
+                                 stdout=str(stdoutpath),
+                                 stderr=str(stderrpath),
+                                 **self.progparams[0])
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left",
                                  stdout=bwc_output_filter(self.logger, str(stdoutpath)),
