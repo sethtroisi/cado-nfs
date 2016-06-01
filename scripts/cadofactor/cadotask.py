@@ -4254,11 +4254,6 @@ class LinAlgTask(Task, HasStatistics):
             self.remember_input_versions(commit=True)
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left",
-                                 stdout=str(stdoutpath),
-                                 stderr=str(stderrpath),
-                                 **self.progparams[0])
-            p = cadoprograms.BWC(complete=True,
-                                 matrix=matrix,  wdir=wdir, nullspace="left",
                                  stdout=bwc_output_filter(self.logger, str(stdoutpath)),
                                  stderr=str(stderrpath),
                                  **self.progparams[0])
