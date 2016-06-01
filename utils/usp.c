@@ -519,10 +519,6 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
   if (a == b) /* might be the case for an exact root a/2^k */
     return a;
-#if 0 /* FM */
-  gmp_printf("r.a: %Zd\nr.b: %Zd\nprec=%lf\n", r[0].a, r[0].b, precision);
-  printf("ka=%d, kb=%d\n", r[0].ka, r[0].kb);
-#endif
 
   P->coeff = p;
   P->deg = n;
@@ -530,14 +526,6 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   double_poly_set_mpz_poly (q, P);
   sa = double_poly_eval (q, a);
   sb = double_poly_eval (q, b);
-#if 0 /* FM */
-  {
-      for(int ii = 0; ii <= n; ii++)
-	  gmp_printf("+x^%d*(%Zd)\n", ii, P->coeff[ii]);
-      printf("a=%lf\nb=%lf\n", a, b);
-      printf("sa=%lf\nsb=%lf\n", sa, sb);
-  }
-#endif
   /* due to truncation of the initial coefficients, and rounding error in
      evaluation of q, it might be that sa and sb do not have opposite signs */
   if (sa * sb >= 0)
