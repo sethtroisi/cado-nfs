@@ -1265,3 +1265,5 @@ tests/linalg/bwc/test-lingen-crc.sh
 numbertheory/ant.c
 numbertheory/CMakeLists.txt
 numbertheory/Makefile
+tests/numbertheory/CMakeLists.txt
+tests/numbertheory/test-numbertheory.sh
