@@ -210,6 +210,7 @@ else()
     include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/avx.cmake")
+    include("${CADO_NFS_SOURCE_DIR}/config/avx2.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/pclmul.cmake")
 endif()
 
