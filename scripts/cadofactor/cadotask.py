@@ -4270,11 +4270,11 @@ class LinAlgTask(Task, HasStatistics):
                                  stdout=outfilter,
                                  stderr=str(stderrpath),
                                  **self.progparams[0])
-            outfilter.flush()
-            outfilter.close()
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
+            outfilter.flush()
+            outfilter.close()
             dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
