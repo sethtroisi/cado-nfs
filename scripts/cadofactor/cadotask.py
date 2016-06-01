@@ -715,6 +715,8 @@ class Statistics(object):
         """
         new_stats = Statistics(self.conversions, self.stat_formats)
         with open(str(filename), "r") as inputfile:
+            sys.stderr.write("File size for stats file %s: %d\n" %
+                    (str(filename), os.fstat(inputfile.fileno()).st_size))
             for line in inputfile:
                 new_stats.parse_line(line)
         self.merge_stats(new_stats)
