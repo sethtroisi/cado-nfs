@@ -1395,7 +1395,7 @@ void print_polynomial(mpz_t* f, int degree)
 // and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p),
 // reduced mod g and mod p.
 void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B,
-        mpz_poly_ptr g, unsigned int p)
+        mpz_poly_srcptr g, unsigned int p)
 {
     ASSERT_ALWAYS (B->m == B->n) ;
 
@@ -1415,7 +1415,7 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B,
         // Putting the LCM of all denominators of coefficients of w[i] in lcm
         mpz_set_si(lcm,1);
         for (unsigned int j = 0 ; j < B->n ; j++) {
-            mpz_lcm(lcm,lcm,mpq_denref(mpq_mat_entry_const(B,j,i)));
+            mpz_lcm(lcm,lcm,mpq_denref(mpq_mat_entry_const(B,i,j)));
         }
 
         // Generating the polynomial
