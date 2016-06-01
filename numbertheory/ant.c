@@ -1421,8 +1421,9 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B,
         // Generating the polynomial
         for (unsigned int j = 0 ; j < B->n ; j++) {
             mpq_set_z(K_rat,lcm);
+            //gmp_printf("%Zd/%Zd * %Zd/%Zd\n", mpq_numref(mpq_mat_entry_const(B,i,j)), mpq_denref(mpq_mat_entry_const(B,i,j)), mpq_numref(K_rat), mpq_denref(K_rat));
             mpq_mul(aux1,mpq_mat_entry_const(B,i,j),K_rat);
-            ASSERT_ALWAYS(mpz_cmp_ui(mpq_denref(aux1), 1) == 0);
+            ASSERT_ALWAYS(!mpz_cmp_ui(mpq_denref(aux1), 0) == 0);
             mpz_poly_setcoeff(f, j, mpq_numref(aux1));
         }
 
