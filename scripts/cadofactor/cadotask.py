@@ -969,6 +969,10 @@ class RealTimeOutputFilter:
         self.logger = logger
     def filter(self, data):
         self.stdout.write(data)
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+         self.stdout.close()
         
         
 
@@ -4252,17 +4256,13 @@ class LinAlgTask(Task, HasStatistics):
             wdir = workdir.realpath()
             self.state["ran_already"] = True
             self.remember_input_versions(commit=True)
-            p = cadoprograms.BWC(complete=True,
-                                 matrix=matrix,  wdir=wdir, nullspace="left",
-                                 stdout=str(stdoutpath),
-                                 stderr=str(stderrpath),
-                                 **self.progparams[0])
-            p = cadoprograms.BWC(complete=True,
-                                 matrix=matrix,  wdir=wdir, nullspace="left",
-                                 stdout=bwc_output_filter(self.logger, str(stdoutpath)),
-                                 stderr=str(stderrpath),
-                                 **self.progparams[0])
-            message = self.submit_command(p, "", log_errors=True)
+            with bwc_output_filter(self.logger, str(stdoutpath)) as outfilter:
+                p = cadoprograms.BWC(complete=True,
+                                     matrix=matrix,  wdir=wdir, nullspace="left",
+                                     stdout=outfilter,
+                                     stderr=str(stderrpath),
+                                     **self.progparams[0])
+                message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
