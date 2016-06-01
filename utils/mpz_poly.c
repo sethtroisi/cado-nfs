@@ -1419,7 +1419,7 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
 }
 
 /* Stores in g the polynomial linked to f by : alpha is a root of f if and only if lc(f)*alpha is a root of g ; g is a monic */
-void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_ptr f)
+void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_srcptr f)
 {
     mpz_t fd,temp;
     mpz_init(fd);

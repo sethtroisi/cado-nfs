@@ -84,7 +84,7 @@ int mpz_poly_normalized_p (mpz_poly_srcptr f);
 int mpz_poly_is_nonmonic (mpz_poly_srcptr f);
 
 /* Polynomial arithmetic */
-void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_ptr f);
+void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_srcptr f);
 void mpz_poly_neg(mpz_poly_ptr f, mpz_poly_srcptr g);
 void mpz_poly_add(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h);
 void mpz_poly_sub(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h);

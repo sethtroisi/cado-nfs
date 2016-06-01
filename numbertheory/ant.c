@@ -1247,11 +1247,12 @@ void mpz_mat_kernel(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned int p)
 }
 /* }}} */
 /*{{{ inversion*/
-void mpq_mat_invert(mpq_mat_ptr dst, mpq_mat_ptr src)
+void mpq_mat_invert(mpq_mat_ptr dst, mpq_mat_srcptr src)
 {
 	// Inverting B
 	mpq_mat inv, id, aux;
 	ASSERT_ALWAYS(src->m == src->m);
+	
 	mpq_mat_init(inv,src->m,2*src->m);
 	mpq_mat_init(id,src->m,src->n);
 	mpq_mat_init(aux,src->m,src->n);
@@ -1270,6 +1271,27 @@ void mpq_mat_invert(mpq_mat_ptr dst, mpq_mat_ptr src)
     mpq_mat_clear(inv);
     mpq_mat_clear(id);
     mpq_mat_clear(aux);
+}
+/* }}} */
+/*{{{ equality */
+int mpq_mat_eq(mpq_mat_srcptr A, mpq_mat_srcptr B)
+{
+	if((A->m != B->m) || (A->n != B->n)){
+			return 0;
+	}
+	int test = 1;
+	unsigned int i = 0;
+	while(test && (i < A->m)){
+		unsigned int j = 0;
+		while(test && (j < A->n)){
+			if(!mpq_equal(mpq_mat_entry_const(A,i,j),mpq_mat_entry_const(B,i,j))){
+				test = 0;
+			}
+			j++;
+		}
+		i++;
+	}
+	return test;
 }
 /* }}} */
 /*{{{ timer*/
@@ -1448,17 +1470,20 @@ void join_HNF(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p){
 // Generators of O are in B (they're given in the basis of alpha^)
 // Generators of I_p are in I (in the basis of O)
 // The products are computed mod g
-void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_ptr B, mpz_mat_ptr I, mpz_poly_ptr g, unsigned int p)
+void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B, mpz_mat_srcptr I_p, mpz_poly_srcptr g, unsigned int p)
 {
-    ASSERT_ALWAYS((B->m == B->n) && (I->m == I->n) && (B->m == I->m));
+    ASSERT_ALWAYS((B->m == B->n) && (I_p->m == I_p->n) && (B->m == I_p->m));
     unsigned int n = B->m;
+    mpz_mat I;
     mpq_mat I_rat, I_inv, B_inv;
     mpz_mat_realloc(M, n, n * n);
 
+	mpz_mat_init(I, n, n);
     mpq_mat_init(I_rat, n, n);
     mpq_mat_init(I_inv, n, n);
     mpq_mat_init(B_inv, n, n);
 
+	mpz_mat_set(I,I_p);
     mpz_mat_to_mpq_mat(I_rat, I);
     mpq_mat_invert(I_inv, I_rat);
     mpq_mat_invert(B_inv, B);
@@ -1534,6 +1559,7 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_ptr B, mpz_mat_ptr I, m
 	    mpz_poly_clear(aux);
 	}
     }
+    mpz_mat_clear(I);
     mpq_mat_clear(I_rat);
     mpq_mat_clear(I_inv);
     mpq_mat_clear(B_inv);
@@ -1560,6 +1586,110 @@ void read_data(unsigned int* deg, mpz_poly_ptr f, mpq_mat_ptr B, FILE* problemfi
             mpq_set_si(mpq_mat_entry(B,i,j),c,denom);
         }
     }
+}
+
+// Builds one p-maximal-order starting from the matrix B, containing the generators of one order (in the basis of alpha^)
+// In the number field of the polynomial f, of degree n
+// Stores the generators of this p-maximal-order (in the basis of alpha^) in D
+void p_maximal_order(mpq_mat_ptr D, mpq_mat_srcptr B, mpz_poly_srcptr f, unsigned int p)
+{
+	ASSERT_ALWAYS(B->m == B->n);
+	
+	mpq_mat new_D;
+    mpz_poly_t g;
+	mpq_t p_inv;
+	unsigned int n = B->n;
+    
+
+	mpq_mat_init(new_D, n, n);
+    mpz_poly_init(g,n); // Monic polynomial corresponding to g
+	mpq_init(p_inv); // 1/p
+    
+    // Storing in g the monic polynomial such as (fd*alpha) is a root of if and only if alpha is a root of f
+    mpz_poly_to_monic(g,f);
+    // Initializing D to B
+    mpq_mat_set(D,B);
+    mpq_mat_set(new_D,B);
+    mpq_set_ui(p_inv,1,p);
+    
+    do{
+		mpq_mat_set(D,new_D);
+		
+		mpq_mat D_inv, T, U, J2;
+		mpz_mat X, K, I, T0, M, K_M, J;
+		mpz_t den;
+	
+		mpz_mat_init(K_M,n,n); // Ker(M)
+		mpz_mat_init(X,n,n); // Matrix of the Froebenius morphism
+		mpz_mat_init(T0,n,n);
+		mpz_mat_init(K,n,n); // Ker(X)
+		mpz_mat_init(M,n,n*n); // The (n,n^2) Matrix containing all products of generators of O and of its p-radical
+		mpz_mat_init(I,n,n); // Matrix of the p-radical
+		mpq_mat_init(D_inv, n, n); // inverse of D
+		mpq_mat_init(T, n, n);
+		mpq_mat_init(U, n, n); // Contains all the generators of D, to the power of p
+		mpq_mat_set_ui(T, 1);
+		mpz_mat_init(J,n,n); // Generators of p * new order in the basis of the previous order (mpz_mat version)
+		mpq_mat_init(J2,n,n); // Generators of p * new order in the basis of the previous order (mpq_mat version)
+		mpz_init(den);
+    
+		// Inverting D
+		mpq_mat_invert(D_inv,D);
+
+		// Now building the matrix U, containing all generators to the power of p
+		// Generators are polynomials, stored in the matrix D
+		generators_to_power_p(U,D,g,p);
+		
+		// Now do U * D^-1, storing in X the application  F : z -> (z^p mod g mod p)
+		mpq_mat_multiply(T,U, D_inv);
+		mpq_mat_numden(X,den,T);
+		mpz_mat_mod_ui(X,X,p);
+
+		/* Which power of p ? */
+		int k = 1;
+		for(unsigned int pk = p ; pk < n ; k++, pk *= p) ;
+		mpz_mat_power_ui_mod_ui(X,X,k,p);
+
+		// Storing in K a basis of Ker((z -> (z^%p mod g mod p))^k)
+		mpz_mat_kernel(K,X,p);
+		
+		// Getting generators of the p radical from Ker(X) by computing HNF of the vertical block matrix (p*Id, K);
+		join_HNF(I,K,p);
+	
+		// Building the (n,n^2) matrix containing the integers mod p associated to all genereators of O
+		generators_to_integers_mod_p(M,D,I,g,p);
+		
+		// Computing Ker(M)
+		mpz_mat_kernel(K_M,M,p);
+		
+		// Getting generators of p*O' by computing HNF of the vertical block matrix (p*Id, K_M);
+		join_HNF(J,K_M,p);
+		// Converting into a mpq_mat
+		mpz_mat_to_mpq_mat(J2,J);
+		// Converting in the basis of alpha^
+		mpq_mat_multiply(new_D, J2, D);
+		// Dividing by p
+		mpq_mat_multiply_by_mpq(new_D,new_D,p_inv);
+		
+
+		mpq_mat_clear(J2);
+		mpz_mat_clear(J);
+		mpz_mat_clear(K_M);
+		mpz_mat_clear(M);
+		mpz_mat_clear(T0);
+		mpz_mat_clear(K);
+		mpz_mat_clear(X);
+		mpz_mat_clear(I);
+		mpq_mat_clear(D_inv);
+		mpq_mat_clear(T);
+		mpq_mat_clear(U);
+		mpz_clear(den);
+    
+	}while(!mpq_mat_eq(new_D,D));
+	
+	mpq_mat_clear(new_D);
+	mpz_poly_clear(g);
+	mpq_clear(p_inv);
 }
 
 int main(int argc, char * argv[])/*{{{*/
@@ -1738,124 +1868,36 @@ int main(int argc, char * argv[])/*{{{*/
     unsigned int p = strtoul(argv[2],NULL,0); //19; //atoi(argv[1]);
     FILE * problemfile = fopen(argv[1], "r");
 
-    mpq_mat B, B_inv, T, U;
-    mpz_poly_t f, g;
-    mpz_mat X, K, I, T0, M, K_M;
-    mpz_t den;
+    mpq_mat B, D;
+    mpz_poly_t f;
 
     printf("Format: [degree] [coeffs] [coeffs of order basis]\n");
 
-    unsigned int n;
+    unsigned int n = 0;
     mpz_poly_init(f,n);
     mpq_mat_init(B, 0, 0); // The matrix of generators
 	read_data(&n, f, B, problemfile); /* Read the data in the file, and reallocate enough space for f and B
 	And sets the value of n, and fills in f and B */
 	fclose(problemfile);
+	mpq_mat_init(D, n, n);
 	
-	
-	mpz_mat_init(K_M,n,n);
-    mpz_poly_init(g,n);
-    mpz_mat_init(X,n,n);
-    mpz_mat_init(T0,n,n);
-    mpz_mat_init(K,n,n);
-    mpz_mat_init(M,n,n*n);
-    mpz_mat_init(I,n,n);
-    mpq_mat_init(B_inv, n, n); // Its inverse
-    mpq_mat_init(T, n, n); // An auxiliary matrix
-    mpq_mat_init(U, n, n);
-    mpq_mat_set_ui(T, 1);
-    mpz_init(den);
-
-	// Storing in g the monic polynomial such as (fd*alpha) is a root of if and only if alpha is a root of f
-    mpz_poly_to_monic(g,f);
-    printf("f is : "); mpz_poly_fprintf(stdout,f); printf("\n");
-    printf("f^ is : "); mpz_poly_fprintf(stdout,g); printf("\n");
-
-	
-    printf("Generators of O (in the basis of alpha^) are :\n"); mpq_mat_fprint(stdout,B); printf("\n");
-    mpq_mat_invert(B_inv,B);
-
-    // Now building the matrix U, containing all generators to the power of p
-    // Generators are polynomials, stored in the matrix B
-    generators_to_power_p(U,B,g,p);
-    
-
-    // Now do U * B^-1, storing in X the application  F : z -> (z^p mod f mod p)
-    mpq_mat_multiply(T,U, B_inv);
-    mpq_mat_numden(X,den,T);
-    mpz_mat_mod_ui(X,X,p);
-
-    /* Which power of p ? */
-    int k = 1;
-    for(unsigned int pk = p ; pk < n ; k++, pk *= p) ;
-    mpz_mat_power_ui_mod_ui(X,X,k,p);
-
-	// Storing in K a basis of Ker((z -> (z^%p mod f mod p))^k)
-    mpz_mat_kernel(K,X,p);
-
-    
-    
-    	
-	// Getting generators of I_p
-	join_HNF(I,K,p);
-	printf("Generators of I_p in the basis of the generators of O :\n");
-	mpz_mat_fprint(stdout,I); printf("\n");
-	
-	
-	
-	
-	
-	
-
-	
-	// Building the (n,n^2) matrix containing the integers mod p associated to all genereators of O
-	generators_to_integers_mod_p(M,B,I,g,p);
-	
-	
-	printf("The (n,n^2) matrix containing the integers mod p :\n");
-	mpz_mat_fprint(stdout,M); printf("\n");
-	mpz_mat_kernel(K_M,M,p);
-	
-
-	printf("Its kernel in the basis of O :\n");
-	mpz_mat_fprint(stdout,K_M); printf("\n");
-	
-	mpz_mat J;
-	mpq_mat new_B, J2;
-	mpq_t p_inv;
-	mpq_mat_init(new_B,n,n);
-	mpz_mat_init(J,n,n);
-	mpq_mat_init(J2,n,n);
-	mpq_init(p_inv);
-	
-	mpq_set_ui(p_inv,1,p);
-	join_HNF(J,K_M,p);
-	printf("Generators of %d*O' in the basis of O :\n",p);
-	mpz_mat_fprint(stdout,J); printf("\n");
-	mpz_mat_to_mpq_mat(J2,J);
-	mpq_mat_multiply(new_B, J2, B);
-	mpq_mat_multiply_by_mpq(new_B,new_B,p_inv);
-	printf("Generators of O' in the basis of alpha^ :\n");
-	mpq_mat_fprint(stdout,new_B); printf("\n");
-	
-	mpq_mat_clear(new_B);
-	mpq_mat_clear(J2);
-	mpz_mat_clear(J);
-	
-	mpq_clear(p_inv);
-	mpz_poly_clear(f);
+	mpz_poly_t g;
+	mpz_poly_init(g,n);
+	mpz_poly_to_monic(g,f);
+	printf("f  is : "); mpz_poly_fprintf(stdout,f);printf("\n");
+	printf("f^ is : "); mpz_poly_fprintf(stdout,g);printf("\n");
 	mpz_poly_clear(g);
-	mpz_mat_clear(K_M);
-	mpz_mat_clear(M);
-	mpz_mat_clear(T0);
-    mpz_mat_clear(K);
-    mpz_mat_clear(X);
-    mpz_mat_clear(I);
+	
+	p_maximal_order(D,B,f,p);
+	printf("Starting from\n");
+	mpq_mat_fprint(stdout,B); printf("\n");
+	printf("the maximal order is \n");
+	mpq_mat_fprint(stdout,D); printf("\n");
+	
+    mpz_poly_clear(f);
     mpq_mat_clear(B);
-    mpq_mat_clear(B_inv);
-    mpq_mat_clear(T);
-    mpq_mat_clear(U);
-    mpz_clear(den);
+    mpq_mat_clear(D);
+
     
 
 }
