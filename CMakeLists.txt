@@ -108,11 +108,12 @@ if(CMAKE_COMPILER_IS_GNUCC)
     # prevents the definition of __STRICT_ANSI__
     #
     # Ditto for C++, with the c++98/gnu++98 subtlety.
-    if (MINGW)
-        set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
-    else()
-        set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
-    endif()
+        if (MINGW)
+            set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
+        else()
+            set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+        endif()
+    # Someday we'll enable c11. This will provide us aligned_alloc.
 endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
@@ -208,6 +209,7 @@ else()
     include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
+    include("${CADO_NFS_SOURCE_DIR}/config/avx.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/pclmul.cmake")
 endif()
 

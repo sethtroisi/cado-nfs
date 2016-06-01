@@ -24,7 +24,7 @@ namespace details {
         typedef mpn<n> self;
         mp_limb_t x[n];
         mpn() { memset(x, 0, n * sizeof(mp_limb_t)); }
-        mpn(mpn const& a) { memset(x, a.x, n * sizeof(mp_limb_t)); }
+        mpn(mpn const& a) { memcpy(x, a.x, n * sizeof(mp_limb_t)); }
         mpn(mpz_srcptr a) { MPN_SET_MPZ(x, n, a); }
         self& operator=(mpz_srcptr a) { MPN_SET_MPZ(x, n, a); return *this; }
         void zero() { memset(x, 0, n * sizeof(mp_limb_t)); }
@@ -89,6 +89,16 @@ namespace details {
             {
                 mp_limb_t cy = mpn_sub_n(dst, dst, src, n);
                 T::propagate_borrow(dst + n, cy);
+            }
+
+            static inline void add_ur(elt_ur & dst, elt_ur const & src)
+            {
+                mpn_add_n(dst, dst, src, n + extra);
+            }
+
+            static inline void sub_ur(elt_ur & dst, elt_ur const & src)
+            {
+                mpn_sub_n(dst, dst, src, n + extra);
             }
 
             static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
@@ -467,6 +477,8 @@ namespace details {
     /* {{{ this macro actually exposes the specialization in itself */
 #define EXPOSE_SPECIALIZATION(n)					\
     template<> struct gfp<n, 1> : public gfp_middle<n,1,gfp<n,1> > {	\
+        using gfp_middle<n,1,gfp<n,1> >::add_ur;   \
+        using gfp_middle<n,1,gfp<n,1> >::sub_ur;   \
         static inline void add(elt_ur & dst, elt const & src) {		\
             asm("# gfp<" #n ", 1>::add\n"				\
                     ADDSUB_CODE ## n(add, adc)				\

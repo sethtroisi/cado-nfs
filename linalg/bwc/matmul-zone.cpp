@@ -46,6 +46,37 @@ typedef arith_modp::gfp<sizeof(abelt)/sizeof(unsigned long)> gfp;
 
 using namespace std;
 
+
+/* Config block */
+#define DISPATCHERS_AND_COMBINERS
+
+/* Size of the row blocks. This impacts both the immediate blocks, and
+ * the dispatch/combine blocks */
+size_t rowbatch = 2048;
+
+/* Immediate blocks have this many columns. */
+size_t colbatch0 = 65536;
+
+/* Coefficients whose absolute value is below this bound are stored as
+ * repetition of the column index several times.
+ */
+int coeff_repeat_bound = 4;
+
+int debug_print = 0;
+
+#ifdef DISPATCHERS_AND_COMBINERS
+/* column indices below col_col_dispatcher_cutoff are treated as immediate
+ * blocks.  Setting this cutoff to 1 is
+ * sufficient to force the first vertical strip to be processed as
+ * immediate blocks only, which is generally something we want
+ * because there are so many coefficients there. */
+size_t col_dispatcher_cutoff = 1048576;
+
+/* For the dispatcher/combiner split, we treat this number of columns at
+ * a time.  */
+size_t colbatch1 = 8192;
+#endif
+
 static inline uint64_t cputicks()
 {
         uint64_t r;
@@ -218,16 +249,42 @@ template<typename T> cachefile& operator<<(cachefile & c, vector<T> const &v)
     c << v.size();
     return cachefile::seq<T>().out(c, &(v[0]), v.size());
 }
+// template<typename T> inline cachefile& operator>>(cachefile& c, T& z) { return z.cachefile_load(c); }
+// template<typename T> inline cachefile& operator<<(cachefile& c, T const & z) { return z.cachefile_save(c); }
 /* }}} */
 
-struct zone {/*{{{*/
+struct placed_block {/*{{{*/
+    unsigned int i0, j0;
+    placed_block() { i0 = j0 = 0; }
+    placed_block(unsigned int i0, unsigned int j0) : i0(i0), j0(j0) {}
+    struct rowmajor_sorter {/*{{{*/
+        inline bool operator()(placed_block const& a, placed_block const& b) const {
+            return a.i0 < b.i0 || (a.i0 == b.i0 && a.j0 < b.j0);
+        }
+    };/*}}}*/
+    struct colmajor_sorter {/*{{{*/
+        inline bool operator()(placed_block const& a, placed_block const& b) const {
+            return a.j0 < b.j0 || (a.j0 == b.j0 && a.i0 < b.i0);
+        }
+    };/*}}}*/
+    cachefile& cachefile_load(cachefile& c) {/*{{{*/
+        return c >> i0 >> j0;
+    }/*}}}*/
+    cachefile& cachefile_save(cachefile& c) const {/*{{{*/
+        return c << i0 << j0;
+    }/*}}}*/
+};
+inline cachefile& operator>>(cachefile& c, placed_block& z) { return z.cachefile_load(c); }
+inline cachefile& operator<<(cachefile& c, placed_block const & z) { return z.cachefile_save(c); }
+/*}}}*/
+
+struct zone : public placed_block { /* {{{ (immediate zones) */
     typedef vector<pair<uint16_t, uint16_t>> qpm_t;
     typedef vector<pair<uint16_t, pair<uint16_t, int32_t>>> qg_t;
-    unsigned int i0, j0;
     qpm_t qp, qm;
     qg_t qg;
-    zone() { i0 = j0 = 0; }
-    zone(unsigned int i0, unsigned int j0) : i0(i0), j0(j0) {}
+    zone() {}
+    zone(unsigned int i0, unsigned int j0) : placed_block(i0, j0) {}
     inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
     inline size_t size() const { return qp.size() + qm.size() + qg.size(); }
     void operator()(gfp::elt_ur *, const gfp::elt *) const;
@@ -249,28 +306,97 @@ struct zone {/*{{{*/
         std::sort(qm.begin(), qm.end(), sort_qpm());
         std::sort(qg.begin(), qg.end(), sort_qg());
     }
-    struct rowmajor_sorter {/*{{{*/
-        inline bool operator()(zone const& a, zone const& b) const {
-            return a.i0 < b.i0 || (a.i0 == b.i0 && a.j0 < b.j0);
-        }
-    };/*}}}*/
-    struct colmajor_sorter {/*{{{*/
-        inline bool operator()(zone const& a, zone const& b) const {
-            return a.j0 < b.j0 || (a.j0 == b.j0 && a.i0 < b.i0);
-        }
-    };/*}}}*/
-
     cachefile& cachefile_load(cachefile& c) {/*{{{*/
-        return c >> i0 >> j0 >> qp >> qm >> qg;
+        return c >> (placed_block&) *this >> qp >> qm >> qg;
     }/*}}}*/
     cachefile& cachefile_save(cachefile& c) const {/*{{{*/
-        return c << i0 << j0 << qp << qm << qg;
+        return c << (placed_block const&) *this << qp << qm << qg;
     }/*}}}*/
 };
-
 inline cachefile& operator>>(cachefile& c, zone& z) { return z.cachefile_load(c); }
 inline cachefile& operator<<(cachefile& c, zone const & z) { return z.cachefile_save(c); }
 /*}}}*/
+#ifdef DISPATCHERS_AND_COMBINERS
+struct dispatcher : public vector<uint16_t>, public placed_block {/*{{{*/
+    typedef vector<uint16_t> super;
+    /* a dispatcher contains: (col id)* */
+    cachefile& cachefile_load(cachefile& c) {/*{{{*/
+        return c >> (placed_block&)*this >> (super&)*this;
+    }/*}}}*/
+    cachefile& cachefile_save(cachefile& c) const {/*{{{*/
+        return c << (placed_block const&)*this << (super const&)*this;
+    }/*}}}*/
+};
+inline cachefile& operator>>(cachefile& c, dispatcher& z) { return z.cachefile_load(c); }
+inline cachefile& operator<<(cachefile& c, dispatcher const & z) { return z.cachefile_save(c); }
+/*}}}*/
+struct combiner : public placed_block {/*{{{*/
+    /* which buffer will we read from, and how many values, from
+     * where ?  */
+    size_t index, offset, count;
+    /* a combiner contains: (dest row id)* (index range is duplicated, in
+     * order to account for the fact that we offset the index by a full
+     * row batch to account for negative coefficients) */
+    typedef uint16_t main_value_type;
+    vector<main_value_type> main;
+    vector<pair<uint16_t, int32_t>> aux;
+    cachefile& cachefile_load(cachefile& c) {/*{{{*/
+        return c >> (placed_block&)*this
+            >> index >> offset >> count
+            >> main >> aux;
+    }/*}}}*/
+    cachefile& cachefile_save(cachefile& c) const {/*{{{*/
+        return c << (placed_block const&)*this
+            << index << offset << count
+            << main << aux;
+    }/*}}}*/
+};
+inline cachefile& operator>>(cachefile& c, combiner& z) { return z.cachefile_load(c); }
+inline cachefile& operator<<(cachefile& c, combiner const & z) { return z.cachefile_save(c); }
+/*}}}*/
+/* {{{ Temporary buffers which are used when reading the dispatchers.  */
+struct temp_buffer {
+    unsigned int j0;
+    typedef vector<gfp::elt> vec_type;  
+    vec_type v;
+    vec_type::iterator ptr;
+    temp_buffer(unsigned int j0, size_t n) : j0(j0), v(n), ptr(v.begin()) {}
+    void rewind() { ptr = v.begin(); }
+};
+/* }}} */
+#endif
+
+struct block_of_rows : public placed_block {/*{{{*/
+    /* A block of rows contains:
+     *
+     *  - immediate zones, presumably for leftmost blocks.
+     *  - dispatcher blocks
+     *  - combiner blocks
+     *
+     * It is processed in the order found in matmul_zone_data::mul
+     */
+    vector<zone> Z;
+#ifdef DISPATCHERS_AND_COMBINERS
+    vector<dispatcher> D;       /* can be empty */
+    vector<combiner> C;
+#endif
+    block_of_rows() {}
+    block_of_rows(unsigned int i0) : placed_block(i0, 0) {}
+    cachefile& cachefile_load(cachefile& c) {/*{{{*/
+        c >> (placed_block&)*this >> Z;
+#ifdef DISPATCHERS_AND_COMBINERS
+        c >> D >> C;
+#endif
+        return c;
+    }/*}}}*/
+    cachefile& cachefile_save(cachefile& c) const {/*{{{*/
+        c << (placed_block const&)*this << Z;
+#ifdef DISPATCHERS_AND_COMBINERS
+        c << D << C;
+#endif
+        return c;
+    }/*}}}*/
+};/*}}}*/
 
 struct matmul_zone_data {/*{{{*/
     /* repeat the fields from the public interface */
@@ -278,7 +404,10 @@ struct matmul_zone_data {/*{{{*/
     /* now our private fields */
     abdst_field xab;
 
-    vector<zone> q;
+    vector<block_of_rows> blocks;
+#ifdef DISPATCHERS_AND_COMBINERS
+    size_t maxmaxw = 0;
+#endif
 
     /* {{{ timing data */
     struct twn {
@@ -292,53 +421,6 @@ struct matmul_zone_data {/*{{{*/
     tmap_t tmap;
     /* }}} */
 
-    /* {{{ dispatchers and combiners */
-
-    struct dispatcher_t : public vector<uint16_t> {
-        typedef vector<uint16_t> super;
-        unsigned int i0;
-        unsigned int j0;
-        /* a dispatcher contains: (col id)* */
-        cachefile& cachefile_load(cachefile& c) {/*{{{*/
-            return c >> i0 >> j0 >> (super&)*this;
-        }/*}}}*/
-        cachefile& cachefile_save(cachefile& c) const {/*{{{*/
-            return c << i0 << j0 << (super&)*this;
-        }/*}}}*/
-    };
-    struct combiner_t {
-        unsigned int i0;
-        unsigned int j0;
-        /* which buffer will we read from, and how many values, from
-         * where ?  */
-        size_t index, offset, count;
-        /* a combiner contains: (dest row id)* (duplicated indices for negative) */
-        typedef uint16_t main_value_type;
-        vector<main_value_type> main;
-        vector<pair<uint16_t, int32_t>> aux;
-        struct rowmajor_sorter {
-            inline bool operator()(combiner_t const& a, combiner_t const& b) const {
-                return a.i0 < b.i0 || (a.i0 == b.i0 && a.j0 < b.j0);
-            }
-        };
-        cachefile& cachefile_load(cachefile& c) {/*{{{*/
-            return c >> i0 >> j0
-                >> index >> offset >> count
-                >> main >> aux;
-        }/*}}}*/
-        cachefile& cachefile_save(cachefile& c) const {/*{{{*/
-            return c << i0 << j0
-                << index << offset << count
-                << main << aux;
-        }/*}}}*/
-    };
-
-    size_t maxmaxw;
-    size_t dispatch_strips;
-    vector<dispatcher_t> dispatchers;
-    vector<combiner_t> combiners;
-    /* }}} */
-
     /* {{{ front-end */
     ~matmul_zone_data();
     matmul_zone_data(void* xx, param_list pl, int optimized_direction);
@@ -350,15 +432,7 @@ struct matmul_zone_data {/*{{{*/
     void auxv(int op, va_list ap);
     void aux(int op, ...);
     /* }}} */
-
-    private:/*{{{*/
-    void create_dispatchers_and_combiners(vector<zone> & q1);
-    /*}}}*/
 };
-inline cachefile& operator>>(cachefile& c, matmul_zone_data::dispatcher_t& z) { return z.cachefile_load(c); }
-inline cachefile& operator<<(cachefile& c, matmul_zone_data::dispatcher_t const & z) { return z.cachefile_save(c); }
-inline cachefile& operator>>(cachefile& c, matmul_zone_data::combiner_t& z) { return z.cachefile_load(c); }
-inline cachefile& operator<<(cachefile& c, matmul_zone_data::combiner_t const & z) { return z.cachefile_save(c); }
 /*}}}*/
 /**************************************************************************/
 /*{{{ trampolines for C bindings */
@@ -432,20 +506,44 @@ matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direc
 }
 /*}}}*/
 
-#define CMAX 4
-#define ROWBATCH        4096
-#define COLBATCH        65536
-
+struct coeff_stats {/*{{{*/
+    int bound;
+    vector<uint64_t> ccount;
+    coeff_stats(int c) : bound(c), ccount(2*c+1, 0) {}
+    void operator()(int c) {
+        if (c < 0 && c >= -bound) {
+            ccount[bound + c]++;
+        } else if (c > 0 && c <= bound) {
+            ccount[bound + c]++;
+        } else {
+            ccount[0]++;
+        }
+    }
+    void report(std::ostream& o, size_t nrows) {
+        o << "coeff stats per row";
+        int maxnz = bound;
+        for( ; maxnz > 1 ; maxnz--)
+            if (ccount[bound + maxnz] + ccount[bound - maxnz]) break;
+        for(int i = 1 ; i <= maxnz ; i++) {
+            o << " ±" << i << ":" << (double) (ccount[bound + i] + ccount[bound - i]) / nrows;
+        }
+        if (ccount[bound]) o << " other:" << (double) ccount[bound] / nrows;   
+        o << "\n";
+    }
+};
+/*}}}*/
 struct sort_jc {/*{{{*/
     inline bool operator()(pair<uint32_t, int32_t> const& a, pair<uint32_t,int32_t> const& b) const {
         return a.first < b.first;
     }
 };
 /*}}}*/
-void merge_dispatchers(vector<matmul_zone_data::dispatcher_t>& all, size_t maxmaxw)/*{{{*/
+
+#ifdef DISPATCHERS_AND_COMBINERS
+void merge_dispatchers(vector<dispatcher>& all, size_t maxmaxw)/*{{{*/
 {
-    typedef matmul_zone_data::dispatcher_t dispatcher_t;
-    vector<dispatcher_t> merged;
+    typedef dispatcher dispatcher;
+    vector<dispatcher> merged;
     for(size_t k0 = 0, k1; k0 < all.size() ; ) {
         /* recompute maxw, since we haven't kept track */
         size_t maxw = 0;
@@ -459,7 +557,7 @@ void merge_dispatchers(vector<matmul_zone_data::dispatcher_t>& all, size_t maxma
         unsigned int nm = 0;
         size_t old_k0 = k0;
         for( ; k0 < k1 ; ) {
-            dispatcher_t D;
+            dispatcher D;
             D.i0 = all[k0].i0;
             D.j0 = all[k0].j0;
             /* concatenate. */
@@ -471,81 +569,49 @@ void merge_dispatchers(vector<matmul_zone_data::dispatcher_t>& all, size_t maxma
                  * should read in the buffer from index D.size()
                  */
             }
-            merged.push_back(D);
+            merged.push_back(std::move(D));
             nm++;
         }
-        printf("j0=%u: maxw = %zu ; group %u together. Split %zd dispatchers [%zu..%zu[ into %u dispatchers\n", j0, maxw, group, k1 - old_k0, old_k0, k1, nm);
+        if (debug_print)
+            printf("j0=%u: maxw = %zu ; group %u together. Split %zd dispatchers [%zu..%zu[ into %u dispatchers\n", j0, maxw, group, k1 - old_k0, old_k0, k1, nm);
     }
-    printf("We now have %zu dispatchers, combined from %zu original\n",
-            merged.size(), all.size());
+    if (debug_print)
+        printf("We now have %zu dispatchers, combined from %zu original\n",
+                merged.size(), all.size());
     all.swap(merged);
 }
 /*}}}*/
-void matmul_zone_data::create_dispatchers_and_combiners(vector<zone> & q1)/*{{{*/
+
+pair<dispatcher, combiner> create_dispatcher_and_combiner(zone const& q)/*{{{*/
 {
-    /* q1 has vertical strips which are *not* the first strip */
-    sort(q1.begin(), q1.end(), zone::colmajor_sorter());
-
-    maxmaxw = 0;
-    for(size_t k0 = 0, k1; k0 < q1.size() ; k0 = k1) {
-        /* find the max weight of cells for this j0 */
-        /* here, weight is the sum of absolute values. Oh, and we merge
-         * qp and qm, too. */
-        size_t maxw = 0;
-        for(k1 = k0 ; k1 < q1.size() && q1[k1].j0 == q1[k0].j0 ; k1++) {
-            /* qp and qm already have repeated coeffs. For qg, we'll
-             * store coeffs just at the end of the array */
-            maxw = max(maxw, q1[k1].size());
-        }
-        maxmaxw = max(maxmaxw, maxw);
+    dispatcher D;
+    combiner C;
+    D.i0 = C.i0 = q.i0;
+    D.j0 = C.j0 = q.j0;
+    for(auto const& ij : q.qp) {
+        uint16_t destrow_id = ij.first;
+        uint16_t col_id = ij.second;
+        D.push_back(col_id);
+        C.main.push_back(destrow_id);
     }
-
-    /* now prepare the pre-reading of source coeffs into the buffers. We
-     * need one array which directs data in the first pass, and another
-     * one for the second pass.
-     */
-
-    for(size_t k = 0 ; k < q1.size() ; k++) {
-        dispatcher_t D;
-        combiner_t C;
-        D.i0 = C.i0 = q1[k].i0;
-        D.j0 = C.j0 = q1[k].j0;
-        for(size_t i = 0 ; i < q1[k].qp.size() ; i++) {
-            uint16_t col_id = q1[k].qp[i].second;
-            uint16_t destrow_id = q1[k].qp[i].first;
-            D.push_back(col_id);
-            C.main.push_back(destrow_id);
-        }
-        for(size_t i = 0 ; i < q1[k].qm.size() ; i++) {
-            uint16_t col_id = q1[k].qm[i].second;
-            uint16_t destrow_id = q1[k].qm[i].first;
-            D.push_back(col_id);
-            /* specific offset for negative coefficients */
-            C.main.push_back(destrow_id + ROWBATCH);
-        }
-        for(size_t i = 0 ; i < q1[k].qg.size() ; i++) {
-            uint16_t col_id = q1[k].qg[i].second.first;
-            uint16_t destrow_id = q1[k].qg[i].first;
-            int32_t coeff = q1[k].qg[i].second.second;
-            D.push_back(col_id);
-            C.aux.push_back(make_pair(destrow_id, coeff));
-        }
-        /* XXX I think that D is sorted column-major, right ? */
-        dispatchers.push_back(D);
-        combiners.push_back(C);
+    for(auto const& ij : q.qm) {
+        uint16_t destrow_id = ij.first;
+        uint16_t col_id = ij.second;
+        D.push_back(col_id);
+        /* specific offset for negative coefficients */
+        C.main.push_back(destrow_id + rowbatch);
     }
-    q1.clear();
+    for(auto const& ijc : q.qg) {
+        uint16_t col_id = ijc.second.first;
+        uint16_t destrow_id = ijc.first;
+        int32_t coeff = ijc.second.second;
+        D.push_back(col_id);
+        C.aux.push_back(make_pair(destrow_id, coeff));
+    }
+    return make_pair(D, C);
+}/*}}}*/
+#endif
 
-    /* We now merge dispatchers */
-    merge_dispatchers(dispatchers, maxmaxw);
-
-    /* and sort combiners so that they are organized row-major */
-    /* notice that the overall weight of combiners may be a concern in
-     * the end.
-     */
-    sort(combiners.begin(), combiners.end(), combiner_t::rowmajor_sorter());
-}
-/*}}}*/
 void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
 {
     matmul_zone_data * mm = this;
@@ -553,32 +619,39 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
     ASSERT_ALWAYS(data);
 
     unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
-
-#if COLBATCH
     unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
-#endif
 
     uint32_t * ptr = data;
 
     /* count coefficients */
     mm->public_->ncoeffs = 0;
 
-    uint64_t ccount[2*CMAX + 1] = {0,};
     double zavg = 0;
 
-    vector<zone> q1;
+#ifdef DISPATCHERS_AND_COMBINERS
+    /* immediate zones as well as combiners are stored right inside the
+     * block_of_rows structures. As for dispatchers, we'll put them there
+     * in a second pass.
+     */
+    vector<dispatcher> D;
+#endif
 
-    for(unsigned int i0 = 0 ; i0 < nrows_t ; i0 += ROWBATCH) {
+    size_t n_immediate = 0;
+
+    coeff_stats cstats(coeff_repeat_bound);
+
+    for(unsigned int i0 = 0 ; i0 < nrows_t ; i0 += rowbatch) {
         /* Create the data structures for the horizontal strip starting
          * at row i0, column 0.
          */
+        block_of_rows B(i0);
 
         /* Because this horizontal strip will be split in many blocks, we
          * need to have a batch of pointers for reading each row. */
-        uint32_t * pp[ROWBATCH + 1];
-        uint32_t * cc[ROWBATCH + 1];
+        uint32_t * pp[rowbatch + 1];
+        uint32_t * cc[rowbatch + 1];
         pp[0] = ptr;
-        for(unsigned int k = 0 ; k < ROWBATCH ; k++) {
+        for(unsigned int k = 0 ; k < rowbatch ; k++) {
             cc[k] = pp[k] + 1;
             if (i0 + k < nrows_t) {
                 uint32_t weight = *pp[k];
@@ -593,58 +666,79 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
                 pp[k+1] = pp[k];
             }
         }
-        ptr = pp[ROWBATCH];
-        for(unsigned int j0 = 0 ; j0 < ncols_t ; j0 += COLBATCH) {
+        ptr = pp[rowbatch];
+        for(unsigned int j0 = 0, colbatch ; j0 < ncols_t ; j0 += colbatch) {
+#ifdef DISPATCHERS_AND_COMBINERS
+            colbatch = (j0 < col_dispatcher_cutoff) ? colbatch0 : colbatch1;
+#else
+            colbatch = colbatch0;
+#endif
             zone z(i0, j0);
-            for(unsigned int k = 0 ; k < ROWBATCH ; k++) {
+            for(unsigned int k = 0 ; k < rowbatch ; k++) {
                 for( ; cc[k] < pp[k+1] ; cc[k] += 2) {
                     uint32_t j = cc[k][0] - j0;
                     int32_t c = cc[k][1];
-                    if (j >= COLBATCH) break;
-                    if (c < 0 && c >= -CMAX) {
-                        ccount[CMAX + c]++;
+                    if (j >= colbatch) break;
+                    cstats(c);
+                    if (c < 0 && c >= -coeff_repeat_bound) {
                         for( ; c++ ; ) {
                             z.qm.push_back(make_pair(k, j));
                         }
-                    } else if (c > 0 && c <= CMAX) {
-                        ccount[CMAX + c]++;
+                    } else if (c > 0 && c <= coeff_repeat_bound) {
                         for( ; c-- ; ) {
                             z.qp.push_back(make_pair(k, j));
                         }
                     } else {
-                        ccount[CMAX]++;
                         z.qg.push_back(make_pair(k, make_pair(j, c)));
                     }
                 }
             }
             z.sort();
-            // printf("Zone %zu: %zu+%zu+%zu\n", q.size(), z.qp.size(), z.qm.size(), z.qg.size());
-            if (!z.empty()) {
-                /* blocks which are not in the first strip qualify for
+            // printf("Zone %zu @[%u,%u]: %zu+%zu+%zu\n", B.Z.size(), z.i0, z.j0, z.qp.size(), z.qm.size(), z.qg.size());
+            if (z.empty()) continue;
+
+#ifdef DISPATCHERS_AND_COMBINERS
+            if (j0 >= col_dispatcher_cutoff) {
+                /* blocks which are not in the first strip go for
                  * the dispatcher/combiner split. */
-                if (j0) q1.push_back(z);
-                /* Currently, the dispatcher/combiner split is not
-                 * operational, so we put the block to the main list
-                 * anyway.
-                 */
-                q.push_back(z);
+                if (z.size() > maxmaxw)
+                    maxmaxw = z.size();
+                auto DC = create_dispatcher_and_combiner(z);
+                D.push_back(std::move(DC.first));
+                B.C.push_back(std::move(DC.second));
+            } else
+#endif
+            {
+                zavg += z.size();
+                B.Z.push_back(std::move(z));
+                n_immediate++;
             }
-            zavg += z.size();
         }
+        blocks.push_back(std::move(B));
     }
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (nrows_t + 2 * mm->public_->ncoeffs));
-    sort(q.begin(), q.end(), zone::rowmajor_sorter());
-
-    /* each zone in q1 becomes a dispatcher and a combiner */
-    /* The first pass sets bucket_id to zero */
-    create_dispatchers_and_combiners(q1);
+#ifdef DISPATCHERS_AND_COMBINERS
+    /* We now merge dispatchers */
+    sort(D.begin(), D.end(), dispatcher::colmajor_sorter());
+    merge_dispatchers(D, maxmaxw);
+    sort(D.begin(), D.end(), dispatcher::rowmajor_sorter());
+    /* And put the dispatchers to the proper place */
+    for(size_t i = 0, j = 0; i < D.size() ; i++) {
+        for ( ; D[i].i0 > blocks[j].i0 ; j++) ;
+        blocks[j].D.push_back(std::move(D[i]));
+    }
+#endif
 
     free(data);
     ostringstream os;
-    for(int i = -CMAX ; i <= CMAX ; i++) {
-        os << " " << i << ":" << (double) ccount[CMAX + i] / nrows_t;
+    if (debug_print) {
+        cstats.report(os, nrows_t);
+        printf("Stats: [%" PRIu64 " coeffs]:"
+                " %zu immediate zones of average weight %.1f\n%s",
+                mm->public_->ncoeffs,
+                n_immediate, zavg / n_immediate,
+                os.str().c_str());
     }
-    printf("Stats: [%" PRIu64 "] %s, %zu zones of average weight %.1f\n", mm->public_->ncoeffs, os.str().c_str(), q.size(), zavg / q.size());
 }
 /*}}}*/
 /* cache load and save {{{ */
@@ -653,7 +747,15 @@ int matmul_zone_data::reload_cache()
     FILE * f = matmul_common_reload_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
     if (f == NULL) { return 0; }
     cachefile c(f);
-    c >> q;
+    c >> blocks;
+#ifdef DISPATCHERS_AND_COMBINERS
+    maxmaxw = 0;
+    for(auto const& B : blocks) {
+        for(auto const& D : B.D) {
+            maxmaxw = std::max(D.size(), maxmaxw);
+        }
+    }
+#endif
     fclose(f);
 
     return 1;
@@ -663,27 +765,53 @@ void matmul_zone_data::save_cache()
 {
     FILE * f = matmul_common_save_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
     cachefile c(f);
-    c << q;
+    c << blocks;
     fclose(f);
 }
 /* }}} */
 
+#if 0
+extern "C" {
+extern void gfp3_dispatch_add(void * tdst, const void * tsrc, const void * p, size_t size);
+extern void gfp3_dispatch_sub(void * tdst, const void * tsrc, const void * p, size_t size);
+}
+
+void __attribute__((noinline)) gfp3_dispatch_add (void * tdst, const void * tsrc, const void * p, size_t size)
+{
+    gfp::elt_ur * tdst0 = (gfp::elt_ur *) tdst; 
+    const gfp::elt * tsrc0 = (const gfp::elt *) tsrc; 
+    const zone::qpm_t::value_type * q = (const zone::qpm_t::value_type *) p;
+    for( ; size-- ; q++) {
+        gfp::add(tdst0[q->first], tsrc0[q->second]);
+    }
+}
+
+void __attribute__((noinline)) gfp3_dispatch_sub (void * tdst, const void * tsrc, const void * p, size_t size)
+{
+    gfp::elt_ur * tdst0 = (gfp::elt_ur *) tdst; 
+    const gfp::elt * tsrc0 = (const gfp::elt *) tsrc; 
+    const zone::qpm_t::value_type * q = (const zone::qpm_t::value_type *) p;
+    for( ; size-- ; q++) {
+        gfp::sub(tdst0[q->first], tsrc0[q->second]);
+    }
+}
+#endif
+
 void zone::operator()(gfp::elt_ur * tdst, const gfp::elt * tsrc) const
 {
-    for(qpm_t::const_iterator u = qp.begin() ; u != qp.end() ; u++) {
-        uint16_t i = u->first;
-        uint16_t j = u->second;
-        gfp::add(tdst[i], tsrc[j]);
-    }
-    for(qpm_t::const_iterator u = qm.begin() ; u != qm.end() ; u++) {
-        uint16_t i = u->first;
-        uint16_t j = u->second;
-        gfp::sub(tdst[i], tsrc[j]);
-    }
-    for(qg_t::const_iterator u = qg.begin() ; u != qg.end() ; u++) {
-        uint16_t i = u->first;
-        uint16_t j = u->second.first;
-        int32_t c = u->second.second;
+#if 1
+    for(auto const& ij : qp) 
+        gfp::add(tdst[ij.first], tsrc[ij.second]);
+    for(auto const& ij : qm) 
+        gfp::sub(tdst[ij.first], tsrc[ij.second]);
+#else
+    gfp3_dispatch_add((void*)tdst, (const void*)tsrc, (const void*)(&*qp.begin()), qp.size());
+    gfp3_dispatch_sub((void*)tdst, (const void*)tsrc, (const void*)(&*qm.begin()), qm.size());
+#endif
+    for(auto const& ijc : qg) {
+        uint16_t i = ijc.first;
+        uint16_t j = ijc.second.first;
+        int32_t c = ijc.second.second;
         if (c>0) {
             gfp::addmul_ui(tdst[i], tsrc[j], c);
         } else {
@@ -722,122 +850,109 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
     gfp::elt::zero(dst, mm->public_->dim[!d]);
 
-    /* TODO: missing in mpfq elt_ur_{add,sub}_elt
+    /* Processing order:
+     *
+     *  - vector data corresponding to the combiner blocks is
+     *  read from the buffers, and stored to a buffer which stores a
+     *  write window to the destination
+     *  - immediate blocks are read an applied
+     *  - the write window to the destination undergoes reduction, and
+     *  final store.
+     *  - dispatcher blocks (if any) are processed, thereby refilling
+     *  buffers which were emptied when processing their last combiner.
      */
+
+#ifdef DISPATCHERS_AND_COMBINERS
+    vector<temp_buffer> buffers;
+    unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
+
+    /* replay the sequence of starting column indices */
+    for(unsigned int j0 = 0, colbatch ; j0 < ncols_t ; j0 += colbatch) {
+        if (j0 < col_dispatcher_cutoff) {
+            colbatch = colbatch0;
+        } else {
+            colbatch = colbatch1;
+            buffers.push_back(std::move(temp_buffer(j0, maxmaxw)));
+        }
+    }
+#endif
+
+    /* TODO: missing in mpfq elt_ur_{add,sub}_elt */
     if (d == !mm->public_->store_transposed) {
-        /* We need to find the position of all dispatchers */
-        vector<vector<dispatcher_t>::const_iterator> start_points;
-        vector<vector<dispatcher_t>::const_iterator> current_points;
-        vector<abvec_ur> current_buffers;
-        vector<abvec_ur> current_buffer_pointers;
 
-        if (0) {       /* prepare dispatcher heads and buffers {{{ */
-            unsigned int last_j0 = UINT_MAX;
-            for(vector<dispatcher_t>::const_iterator v = dispatchers.begin() ; v != dispatchers.end() ; v++) {
-                if (v->j0 != last_j0) {
-                    start_points.push_back(v);
-                    current_points.push_back(v);
-                    abvec_ur buf;
-                    abvec_ur_init(x, &buf, maxmaxw);
-                    current_buffers.push_back(buf);
-                    current_buffer_pointers.push_back(buf);
-                    last_j0 = v->j0;
-                    abvec_ur_clear(x, &buf, maxmaxw);
-                }
-            }
-            start_points.push_back(dispatchers.end());
-            // printf("Found %zu different dispatcher strips\n", current_points.size());
-        } /* }}} */
-
-        gfp::elt_ur * tdst = new gfp::elt_ur[ROWBATCH];
+#ifdef DISPATCHERS_AND_COMBINERS
+        /* Doubling rowbatch is because we do a nasty trick with the
+         * indices for the negative coefficients. Oddly enough, we don't
+         * seem to do so currently for the immediate zones...
+         */
+        gfp::elt_ur * tdst = new gfp::elt_ur[2*rowbatch];
+#else
+        gfp::elt_ur * tdst = new gfp::elt_ur[rowbatch];
+#endif
 
         ASM_COMMENT("critical loop");
 
-        unsigned int last_i0 = UINT_MAX;
-        /*
-        unsigned int last_j0 = UINT_MAX;
-        twn current;
-        */
+        for(auto const& B : blocks) {
+#ifdef DISPATCHERS_AND_COMBINERS
+            gfp::elt_ur::zero(tdst, 2 * rowbatch);
+#else
+            gfp::elt_ur::zero(tdst, rowbatch);
+#endif
 
-        /* This loops processes the blocks in their sorting order. Here
-         * we assume it's row-wise.
-         */
-        for(size_t k = 0 ; k < q.size() ; k++) {
-            zone const& z = q[k];
-
+#ifdef DISPATCHERS_AND_COMBINERS
             /* loop through all dispatcher strips, and pre-fill buffers if
              * we happen to need it. */
+            for(size_t j = 0, k = 0; j < B.D.size() ; j++) {
+                auto const& d(B.D[j]);
+                ASSERT_ALWAYS(d.i0 == B.i0);
+                for( ; buffers[k].j0 < d.j0 ; k++) ;
 
-#if 0
-            for(size_t i = 0 ; i < current_points.size() ; i++) {
-                /* If this dispatcher strip is done, surely we don't want
-                 * to check. Otherwise, the check is whether the ``to be
-                 * done'' value i0 is ours */
-                if (current_points[i] == start_points[i + 1]) continue;
-                if (current_points[i]->i0 > z.i0) continue;
-                /* right, so we can fill the buffer. Let's go. */
-                absrc_vec tsrc = abvec_subvec_const(x, src, current_points[i]->j0);
-                /* oh, but we need to find the offsets of each bucket... */
+                /* Fill that buffer now ! */
+                auto ptr = buffers[k].v.begin();
+                for(auto const& x : d) {
+                    *ptr++ = src[d.j0 + x];
+                }
+                buffers[k].rewind();
             }
 #endif
-            if (z.i0 != last_i0) {
-                if (last_i0 != UINT_MAX) {
-                    for(unsigned int i = 0 ; i < ROWBATCH ; i++) {
-                        gfp::reduce(dst[last_i0 + i], tdst[i], prime, preinverse);
-                    }
-                }
-                /* This operation below sets stuff to zero, so it's here
-                 * that we assume blocks are sorted row-wise.
-                 */
-                gfp::elt_ur::zero(tdst, ROWBATCH);
-                last_i0 = z.i0;
+
+            /* process immediate zones */
+            for(auto const & z : B.Z) {
+                z(tdst, src + z.j0);
             }
 
-            /*
-            if (z.j0 != last_j0) {
-                if (last_j0 != UINT_MAX) {
-                    current.tt += cputicks();
-                    tmap_t::iterator it = tmap.find(last_j0);
-                    if (it == tmap.end()) {
-                        tmap.insert(make_pair(last_j0, current));
+#ifdef DISPATCHERS_AND_COMBINERS
+            /* Read all combiner data, and apply it */
+            for(size_t j = 0, k = 0 ; j < B.C.size() ; j++, k++) {
+                for( ; buffers[k].j0 < B.C[j].j0 ; k++) ;
+                for(auto const& x : B.C[j].main) {
+                    ASSERT(buffers[k].ptr < buffers[k].v.end());
+                    gfp::add(tdst[x], *(gfp::elt *)&*buffers[k].ptr++);
+                }
+                /* Almost surely this loop will never run */
+                for(auto const& xc : B.C[j].aux) {
+                    auto x = xc.first;
+                    auto c = xc.second;
+                    if (c > 0) {
+                        gfp::addmul_ui(tdst[x], *(gfp::elt *)&*buffers[k].ptr++, c);
                     } else {
-                        it->second.tt += current.tt;
-                        it->second.w += current.w;
-                        it->second.n++;
+                        gfp::submul_ui(tdst[x], *(gfp::elt *)&*buffers[k].ptr++, -c);
                     }
                 }
-                last_j0 = z.j0;
-                current.tt = -cputicks();
-                current.w = z.size();
-                current.n = 1;
             }
-            */
-            const gfp::elt * tsrc = src + z.j0;
+#endif
 
-            z(tdst, tsrc);
-
-        }
-        {
             /* reduce last batch. It could possibly be incomplete */
-            unsigned int active = MIN(ROWBATCH, mm->public_->dim[!d] - last_i0);
-            for(unsigned int i = 0 ; i < active ; i++) {
-                gfp::reduce(dst[last_i0 + i], tdst[i], prime, preinverse);
+            size_t active = std::min(rowbatch,
+                    (size_t) (mm->public_->dim[!d] - B.i0));
+            for(size_t i = 0 ; i < active ; i++) {
+#ifdef DISPATCHERS_AND_COMBINERS
+                gfp::sub_ur(tdst[i], tdst[i + rowbatch]);
+#endif
+                gfp::reduce(dst[B.i0 + i], tdst[i], prime, preinverse);
             }
         }
 
-        /*
-        if (last_j0 != UINT_MAX) {
-            current.tt += cputicks();
-            tmap_t::iterator it = tmap.find(last_j0);
-            if (it == tmap.end()) {
-                tmap.insert(make_pair(last_j0, current));
-            } else {
-                it->second.tt += current.tt;
-                it->second.w += current.w;
-                it->second.n++;
-            }
-        }
-        */
         ASM_COMMENT("end of critical loop");
         delete[] tdst;
     } else {
