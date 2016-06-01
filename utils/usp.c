@@ -515,6 +515,9 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   mpz_poly_t P;
   unsigned int count = MAX_LOOPS + 1;
 
+  /* Note: if precision = 0.0, rootRefine will stop when the bound a and b
+     are two adjacent floating-point numbers. */
+
   a = ldexp (mpz_get_d (r[0].a), -r[0].ka); /* a/2^ka */
   b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
   if (a == b) /* might be the case for an exact root a/2^k */
@@ -544,45 +547,16 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
       goto end_refine;
     }
   ASSERT_ALWAYS(sa * sb < 0);
-  sc = 0.;
-  if (precision > 0.)
-    if (sa >= 0.)
-      while (--count) {
-	c = (a + b) * .5;
-	if (fabs(a - b) <= precision || c == a || c == b) break;
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) b = c; else a = c;
-      }
-    else
-      while (--count) {
-	c = (a + b) * .5;
-	if (fabs(a - b) <= precision || c == a || c == b) break;
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) a = c; else b = c;
-      }
-  else
-    if (sa >= 0.)
-      while (--count) {
-#if defined(__i386)
-        { volatile double ms = (a + b) * 0.5; c = ms; }
-#else
-	c = (a + b) * .5;
-#endif
-	if (c == a || c == b) break;             
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) b = c; else a = c;
-      }
-    else
-      while (--count) {
-#if defined(__i386)
-        { volatile double ms = (a + b) * 0.5; c = ms; }
-#else
-	c = (a + b) * .5;
-#endif
-	if (c == a || c == b) break;
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) a = c; else b = c;
-      }
+  /* Note: in principle we should also use double_poly_eval_safe in the
+     loop below, because due to rounding errors double_poly_eval() might
+     return a value with the wrong sign, and thus we might search for a
+     root in the wrong half-interval. */
+  while (--count) {
+    c = (a + b) * .5;
+    if (fabs(a - b) <= precision || c == a || c == b) break;
+    sc = double_poly_eval (q, c);
+    if (sa * sc < 0.) b = c; else a = c;
+  }
   if (UNLIKELY(!count)) {
     printf ("Unable to refine root:\n");
     mpz_poly_fprintf (stdout, P);
