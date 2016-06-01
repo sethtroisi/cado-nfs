@@ -1698,6 +1698,126 @@ void p_maximal_order(mpq_mat_ptr D, mpq_mat_srcptr B, mpz_poly_srcptr f,
     mpq_clear(p_inv);
 }
 
+// W is the matrix containing the generators of one p-maximal order Ok, in the basis of alpha^ (root of g)
+// theta is a row matrix representing an element of Ok/pOk, thus a vector on the basis (W[0], ... W[n-1]) (with coeffs mod p)
+// g is the monic polynom defining the number field in which we are
+void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcptr theta, mpz_poly_srcptr g, unsigned int p)
+{
+    ASSERT_ALWAYS(W->m == W->n);
+    unsigned int n = W->m;
+    ASSERT_ALWAYS((theta->m == 1) && (theta->n == n));
+    
+    // First let's build the matrix of multiplication by theta, in the basis of (W[0], ... W[n-1])
+    mpz_mat times_theta;
+    mpq_mat times_theta_rat;
+    mpz_mat_init(times_theta,n,n);
+    mpq_mat_init(times_theta_rat,n,n);
+    
+    mpq_mat theta_rat; // Will contain theta in the basis of alpha^
+    mpq_mat_init(theta_rat,1,n);
+    mpz_mat_to_mpq_mat(theta_rat,theta);
+    mpq_mat_multiply(theta_rat,theta_rat,W); // Now contains theta in the basis of alpha^
+
+    // Converting theta into one polynom and one common denominator
+    mpz_poly_t theta_poly;
+    mpz_t theta_denom;
+    mpz_poly_init(theta_poly,n-1);
+    mpz_init(theta_denom);
+    mpq_mat_row_to_poly(theta_poly,theta_denom,theta_rat,0);
+    
+    for (unsigned i = 0 ; i < n ; i++) {
+        // Converting w[i] into one polynom and one common denominator
+        mpz_poly_t w_poly;
+        mpz_t w_denom;
+        mpz_poly_init(w_poly,n-1);
+        mpz_init(w_denom);
+        mpq_mat_row_to_poly(w_poly,w_denom,W,i);
+        
+        // Computing theta (in the basis of alpha)^ * w[i] mod g, without the common denominators.
+        // We divide at the end
+        mpz_poly_t res;
+        mpz_poly_init(res,n-1);
+        mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
+    
+        
+        for (unsigned j = 0 ; j < n ; j++) {
+            mpz_t coeff, denom;
+            mpz_init(coeff);
+            mpz_init(denom);
+            
+            // Storing the product into one row of times_theta_rat, then dividing by the common denominators
+            mpz_poly_getcoeff(coeff,j,res);
+            mpq_set_num(mpq_mat_entry(times_theta_rat,i,j),coeff);
+            mpz_mul(denom,theta_denom,w_denom);
+            mpq_set_den(mpq_mat_entry(times_theta_rat,i,j),denom);
+            mpq_canonicalize(mpq_mat_entry(times_theta_rat,i,j));
+            
+            
+            mpz_clear(denom);
+            mpz_clear(coeff);
+        }
+        
+        mpz_poly_clear(res);
+        mpz_clear(w_denom);
+        mpz_poly_clear(w_poly);
+    }
+    
+    // Now we have to multiply by W^-1, in order to get into the basis of (w[0], ... w[n-1]) again
+    mpq_mat W_inv;
+    mpq_mat_init(W_inv,n,n);
+    mpq_mat_invert(W_inv,W);
+    mpq_mat_multiply(times_theta_rat,times_theta_rat,W_inv);
+        
+    // Now we have to convert it into a matrix of integers
+    mpz_t denom;
+    mpz_init(denom);
+    mpq_mat_numden(times_theta,denom,times_theta_rat);
+        
+    mpz_clear(denom);
+    mpq_mat_clear(W_inv);
+    mpz_clear(theta_denom);
+    mpz_poly_clear(theta_poly);
+    mpq_mat_clear(theta_rat);
+    mpq_mat_clear(times_theta_rat);
+    mpz_mat_clear(times_theta);
+/*
+    // Putting the LCM of all denominators of coefficients of w[i] in lcm
+    mpz_t lcm;
+    mpz_init(lcm);
+	mpz_set_si(lcm, 1);
+	for (unsigned int j = 0; j < B->n; j++) {
+	    mpz_lcm(lcm, lcm, mpq_denref(mpq_mat_entry_const(B, i, j)));
+	}
+
+	// Generating the polynomial
+	for (unsigned int j = 0; j < B->n; j++) {
+	    mpq_set_z(K_rat, lcm);
+	    //gmp_printf("%Zd/%Zd * %Zd/%Zd\n", mpq_numref(mpq_mat_entry_const(B,i,j)), mpq_denref(mpq_mat_entry_const(B,i,j)), mpq_numref(K_rat), mpq_denref(K_rat));
+	    mpq_mul(aux1, mpq_mat_entry_const(B, i, j), K_rat);
+	    ASSERT_ALWAYS(!mpz_cmp_ui(mpq_denref(aux1), 0) == 0);
+	    mpz_poly_setcoeff(f, j, mpq_numref(aux1));
+	}
+
+	// Computing f^p mod g (it returns (lcm * the corresponding generator)^p
+	mpz_poly_power_mod_f(f, f, g, p);
+
+	mpz_pow_ui(lcm, lcm, p);
+
+	// Storing w[i] in i-th row of U
+	for (int j = 0; j <= f->deg; j++) {
+	    mpz_poly_getcoeff(tmp, j, f);
+	    mpq_set_num(mpq_mat_entry(U, i, j), tmp);
+	    mpq_set_den(mpq_mat_entry(U, i, j), lcm);
+	    mpq_canonicalize(mpq_mat_entry(U, i, j));
+	}
+    
+    mpz_clear(lcm);
+    */
+
+    mpq_mat_clear(theta_rat);
+    
+}
+
 int main(int argc, char *argv[])
 {				/*{{{ */
     /*
