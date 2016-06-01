@@ -715,8 +715,6 @@ class Statistics(object):
         """
         new_stats = Statistics(self.conversions, self.stat_formats)
         with open(str(filename), "r") as inputfile:
-            sys.stderr.write("File size for stats file %s: %d\n" %
-                    (str(filename), os.fstat(inputfile.fileno()).st_size))
             for line in inputfile:
                 new_stats.parse_line(line)
         self.merge_stats(new_stats)
@@ -971,16 +969,10 @@ class RealTimeOutputFilter:
         self.logger = logger
     def filter(self, data):
         self.stdout.write(data)
-    def flush(self):
-        self.stdout.flush()
-    def close(self):
-        self.stdout.flush()
-    #    def __enter__(self):
-    #        pass
-    #    def __exit__(self, *args):
-    #        self.stdout.close()
-    # def __del__(self):
-    #     self.stdout.close()
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+         self.stdout.close()
         
         
 
@@ -4264,15 +4256,13 @@ class LinAlgTask(Task, HasStatistics):
             wdir = workdir.realpath()
             self.state["ran_already"] = True
             self.remember_input_versions(commit=True)
-            outfilter = bwc_output_filter(self.logger, str(stdoutpath))
-            p = cadoprograms.BWC(complete=True,
-                                 matrix=matrix,  wdir=wdir, nullspace="left",
-                                 stdout=outfilter,
-                                 stderr=str(stderrpath),
-                                 **self.progparams[0])
-            outfilter.flush()
-            outfilter.close()
-            message = self.submit_command(p, "", log_errors=True)
+            with bwc_output_filter(self.logger, str(stdoutpath)) as outfilter:
+                p = cadoprograms.BWC(complete=True,
+                                     matrix=matrix,  wdir=wdir, nullspace="left",
+                                     stdout=outfilter,
+                                     stderr=str(stderrpath),
+                                     **self.progparams[0])
+                message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
