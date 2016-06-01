@@ -87,7 +87,7 @@ for n in `seq 1 $nfields` ; do
     coeffs=()
     x=()
     for i in `seq 0 $d` ; do
-        if [ $i -lt $((d+1)) ] ; then
+        if [ $i -lt $d ] ; then
             x=("${x[@]}" $((RANDOM-10000)))
         else
             while true ; do
