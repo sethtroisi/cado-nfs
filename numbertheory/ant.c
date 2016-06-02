@@ -1740,9 +1740,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
         mpz_poly_cleandeg(res,n-1);
         
-        printf("res = "); mpz_poly_fprintf(stdout,res);
         for (int j = 0 ; j <= res->deg ; j++) {
-            printf("i = %d ; j = %d\n",i,j);
             mpz_t coeff, denom;
             mpz_init(coeff);
             mpz_init(denom);
@@ -1781,7 +1779,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     // And mod p
     mpz_mat_mod_ui(times_theta,times_theta,p);
     
-    printf("multiplication by theta is :\n");
+    printf("multiplication by theta is with coefficients mod p is :\n");
     mpz_mat_fprint(stdout,times_theta);
     
     mpz_clear(denom_eq_1);
