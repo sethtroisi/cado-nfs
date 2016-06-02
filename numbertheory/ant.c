@@ -725,7 +725,7 @@ void mpz_mat_power_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n){
     mpz_mat_clear(D);
 }
 
-// Returns A^n mod pfor n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
+// Returns A^n mod p for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
 void mpz_mat_power_ui_mod_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n, unsigned int p){
     unsigned int k;
     mpz_mat C,D;
@@ -814,6 +814,89 @@ void mpq_mat_multiply_by_ui(mpq_mat_ptr C, mpq_mat_srcptr A, unsigned int k)
     mpq_mat_realloc(C, A->m, A->n);
     mpq_mat_set(C,B);
     mpq_mat_clear(B);
+}
+
+void mpz_mat_add(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B)
+{
+    ASSERT_ALWAYS(A->m == B->m);
+    ASSERT_ALWAYS(A->n == B->n);
+    mpz_mat C;
+    mpz_mat_init(C,A->m,A->n);
+    
+    for(unsigned int i = 0 ; i < A->m ; i++){
+        for(unsigned int j = 0 ; j < A->n ; j++){
+            mpz_add(mpz_mat_entry(C,i,j),mpz_mat_entry_const(A,i,j),mpz_mat_entry_const(B,i,j));
+        }
+    }
+    
+    mpz_mat_realloc(D,A->m,A->n);
+    mpz_mat_set(D,C);
+    mpz_mat_clear(C);
+}
+
+void mpz_mat_in_poly(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)
+{
+    ASSERT_ALWAYS(M->m == M->n);
+    unsigned int n = M->n;
+    int d = f->deg;
+    mpz_mat total, current_power;
+    mpz_mat_init(total,n,n);
+    mpz_mat_init(current_power,n,n);
+    mpz_mat_set_ui(current_power,1);
+    
+    for (int i = 0 ; i <= d ; i++) {
+        mpz_mat current_term;
+        mpz_mat_init(current_term,n,n);
+        mpz_t aux;
+        mpz_init(aux);
+        
+        mpz_poly_getcoeff(aux,i,f);
+        mpz_mat_multiply_by_mpz(current_term,current_power,aux);
+        mpz_mat_add(total,total,current_term);
+        mpz_mat_multiply(current_power,current_power,M);
+        
+        mpz_clear(aux);
+        mpz_mat_clear(current_term);
+        
+    }
+    
+    mpz_mat_set(D,total);
+    mpz_mat_clear(current_power);
+    mpz_mat_clear(total);
+}
+
+void mpz_mat_in_poly_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned int p)
+{
+    ASSERT_ALWAYS(M->m == M->n);
+    unsigned int n = M->n;
+    int d = f->deg;
+    mpz_mat total, current_power;
+    mpz_mat_init(total,n,n);
+    mpz_mat_init(current_power,n,n);
+    mpz_mat_set_ui(current_power,1);
+    
+    for (int i = 0 ; i <= d ; i++) {
+        mpz_mat current_term;
+        mpz_mat_init(current_term,n,n);
+        mpz_t aux;
+        mpz_init(aux);
+        
+        mpz_poly_getcoeff(aux,i,f);
+        mpz_mat_multiply_by_mpz(current_term,current_power,aux);
+        mpz_mat_add(total,total,current_term);
+        mpz_mat_multiply(current_power,current_power,M);
+        
+        mpz_clear(aux);
+        mpz_mat_clear(current_term);
+        
+        mpz_mat_mod_ui(total,total,p);
+        mpz_mat_mod_ui(current_power,current_power,p);
+        
+    }
+    
+    mpz_mat_set(D,total);
+    mpz_mat_clear(current_power);
+    mpz_mat_clear(total);
 }
 
 /*}}}*/
@@ -1573,23 +1656,26 @@ void read_data(unsigned int *deg, mpz_poly_ptr f, mpq_mat_ptr B,
 	       FILE * problemfile)
 {
     fscanf(problemfile, "%u", deg);
-
+    
     mpz_poly_realloc(f, *deg + 1);
     for (unsigned int i = 0; i <= *deg; i++) {
-	int c;
-	fscanf(problemfile, "%d", &c);
-	mpz_poly_setcoeff_si(f, i, c);
+        int c;
+        fscanf(problemfile, "%d", &c);
+        mpz_poly_setcoeff_si(f, i, c);
     }
 
     mpq_mat_realloc(B, *deg, *deg);
     for (unsigned int i = 0; i < *deg; i++) {
-	int denom;
-	fscanf(problemfile, "%d", &denom);
-	for (unsigned int j = 0; j < *deg; j++) {
-	    int c;
-	    fscanf(problemfile, "%d", &c);
-	    mpq_set_si(mpq_mat_entry(B, i, j), c, denom);
-	}
+        int denom;
+        denom = 1;
+        //fscanf(problemfile, "%d", &denom);
+        for (unsigned int j = 0; j < *deg; j++) {
+            int c;
+            if(i == j){c = 1;}
+            else{c = 0;}
+            //fscanf(problemfile, "%d", &c);
+            mpq_set_si(mpq_mat_entry(B, i, j), c, denom);
+        }
     }
 }
 
@@ -1773,15 +1859,62 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_init(denom_eq_1);
     mpq_mat_numden(times_theta,denom_eq_1,times_theta_rat);
     
-    printf("multiplication by theta is :\n");
-    mpz_mat_fprint(stdout,times_theta);
-    
     // And mod p
     mpz_mat_mod_ui(times_theta,times_theta,p);
+
+    printf("matrix of multiplication by theta, mod %d:\n", p);
+    mpz_mat_fprint(stdout,times_theta); printf("\n");
     
-    printf("multiplication by theta is with coefficients mod p is :\n");
-    mpz_mat_fprint(stdout,times_theta);
+    // Now starting to compute the (n,n^2) matrix whose kernel will be computed
+    mpz_mat M,current;
+    mpz_mat_init(M,n,n*n);
+    mpz_mat_init(current,n,n);
+    mpz_mat_set_ui(current,1);
+    for (unsigned int k = 0 ; k < n ; k++){
+        for (unsigned int i = 0 ; i < n ; i++){
+            for (unsigned int j = 0 ; j < n ; j++){
+                mpz_set(mpz_mat_entry(M,k,j+n*i),mpz_mat_entry(current,i,j));
+            }
+        }
+        mpz_mat_mod_ui(M,M,p);
+        mpz_mat_multiply(current,current,times_theta);
+        mpz_mat_mod_ui(current,current,p);
+    }
     
+    //printf("big matrix, mod %d:\n", p);
+    //mpz_mat_fprint(stdout,M); printf("\n");
+    
+    // Now computing its kernel
+    mpz_mat K;
+    mpz_mat_init(K,0,0);
+    mpz_mat_kernel(K,M,p);
+
+    printf("kernel of (n,n^2) matrix, mod %d:\n", p);
+    mpz_mat_fprint(stdout,K); printf("\n");
+
+    // Getting the minimal polynomial and verifying that f(M) = 0
+    if(K->m == 0){
+        mpz_poly_realloc(f,0);
+    }
+    else{
+        mpz_mat_row_to_poly(f,K,0);
+    }
+    
+    // Testing
+    mpz_mat test_mat;
+    mpz_mat_init(test_mat,n,n);
+    mpz_mat_in_poly_mod_ui(test_mat,times_theta,f,p);
+    printf("f(times_theta) :\n");
+    mpz_mat_fprint(stdout,test_mat); printf("\n");
+    mpz_mat_clear(test_mat);
+    
+    
+    printf("minimal polynomial of times_theta mod %d:\n", p);
+    mpz_poly_fprintf(stdout,f); printf("\n");
+    
+    mpz_mat_clear(K);
+    mpz_mat_clear(current);
+    mpz_mat_clear(M);
     mpz_clear(denom_eq_1);
     mpq_mat_clear(W_inv);
     mpz_clear(theta_denom);
@@ -2039,7 +2172,14 @@ int main(int argc, char *argv[])
     mpz_poly_init(test,n);
     mpz_mat theta;
     mpz_mat_init(theta,1,n);
+    mpz_set_si(mpz_mat_entry(theta,0,0),1);
     mpz_set_si(mpz_mat_entry(theta,0,1),1);
+    mpz_set_si(mpz_mat_entry(theta,0,2),2);
+    mpz_set_si(mpz_mat_entry(theta,0,3),1);
+    mpz_set_si(mpz_mat_entry(theta,0,4),2);
+    mpz_set_si(mpz_mat_entry(theta,0,5),0);
+    mpz_set_si(mpz_mat_entry(theta,0,6),0);
+    mpz_set_si(mpz_mat_entry(theta,0,7),2);
     minimal_poly_of_mul_by_theta(test,D,theta,g,p);
     mpz_mat_clear(theta);
     mpz_poly_clear(test);
