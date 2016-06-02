@@ -24,6 +24,9 @@
 #include "arith-modp.hpp"
 
 typedef arith_modp::gfp<sizeof(abelt)/sizeof(unsigned long)> gfp;
+typedef arith_modp::fast_type<gfp> fast_gfp;
+typedef fast_gfp::elt fast_elt;
+typedef fast_gfp::elt_ur fast_elt_ur;
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
@@ -48,7 +51,7 @@ using namespace std;
 
 
 /* Config block */
-#define DISPATCHERS_AND_COMBINERS
+#define xxxDISPATCHERS_AND_COMBINERS
 
 /* Size of the row blocks. This impacts both the immediate blocks, and
  * the dispatch/combine blocks */
@@ -287,7 +290,7 @@ struct zone : public placed_block { /* {{{ (immediate zones) */
     zone(unsigned int i0, unsigned int j0) : placed_block(i0, j0) {}
     inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
     inline size_t size() const { return qp.size() + qm.size() + qg.size(); }
-    void operator()(gfp::elt_ur *, const gfp::elt *) const;
+    void operator()(fast_elt_ur *, const fast_elt *, gfp::elt const&, gfp::preinv const&) const;
 
     struct sort_qpm {
         inline bool operator()(qpm_t::value_type const& a, qpm_t::value_type const& b) const {
@@ -357,7 +360,7 @@ inline cachefile& operator<<(cachefile& c, combiner const & z) { return z.cachef
 /* {{{ Temporary buffers which are used when reading the dispatchers.  */
 struct temp_buffer {
     unsigned int j0;
-    typedef vector<gfp::elt> vec_type;  
+    typedef vector<fast_elt, aligned_allocator<fast_elt> > vec_type;  
     vec_type v;
     vec_type::iterator ptr;
     temp_buffer(unsigned int j0, size_t n) : j0(j0), v(n), ptr(v.begin()) {}
@@ -405,6 +408,10 @@ struct matmul_zone_data {/*{{{*/
     abdst_field xab;
 
     vector<block_of_rows> blocks;
+
+    vector<fast_elt, aligned_allocator<fast_elt> > alternate_src;
+    vector<fast_elt, aligned_allocator<fast_elt> > alternate_dst;
+
 #ifdef DISPATCHERS_AND_COMBINERS
     size_t maxmaxw = 0;
 #endif
@@ -796,14 +803,41 @@ void __attribute__((noinline)) gfp3_dispatch_sub (void * tdst, const void * tsrc
     }
 }
 #endif
+#if 0
+extern "C" {
+extern void gfp3_dispatch_add(void * tdst, const void * tsrc, const void * p, size_t size);
+extern void gfp3_dispatch_sub(void * tdst, const void * tsrc, const void * p, size_t size);
+}
 
-void zone::operator()(gfp::elt_ur * tdst, const gfp::elt * tsrc) const
+void __attribute__((noinline)) gfp3_dispatch_add (void * tdst, const void * tsrc, const void * p, size_t size)
+{
+    fast_elt_ur * tdst0 = (fast_elt_ur *) tdst; 
+    const fast_elt * tsrc0 = (const fast_elt *) tsrc; 
+    const zone::qpm_t::value_type * q = (const zone::qpm_t::value_type *) p;
+    for( ; size-- ; q++) {
+        fast_gfp::add(tdst0[q->first], tsrc0[q->second]);
+    }
+}
+
+void __attribute__((noinline)) gfp3_dispatch_sub (void * tdst, const void * tsrc, const void * p, size_t size)
+{
+    fast_elt_ur * tdst0 = (fast_elt_ur *) tdst; 
+    const fast_elt * tsrc0 = (const fast_elt *) tsrc; 
+    const zone::qpm_t::value_type * q = (const zone::qpm_t::value_type *) p;
+    for( ; size-- ; q++) {
+        fast_gfp::sub(tdst0[q->first], tsrc0[q->second]);
+    }
+}
+#endif
+
+void zone::operator()(fast_elt_ur * tdst, const fast_elt * tsrc,
+        gfp::elt const& prime, gfp::preinv const& preinverse) const
 {
 #if 1
     for(auto const& ij : qp) 
-        gfp::add(tdst[ij.first], tsrc[ij.second]);
+        fast_gfp::add(tdst[ij.first], tsrc[ij.second]);
     for(auto const& ij : qm) 
-        gfp::sub(tdst[ij.first], tsrc[ij.second]);
+        fast_gfp::sub(tdst[ij.first], tsrc[ij.second]);
 #else
     gfp3_dispatch_add((void*)tdst, (const void*)tsrc, (const void*)(&*qp.begin()), qp.size());
     gfp3_dispatch_sub((void*)tdst, (const void*)tsrc, (const void*)(&*qm.begin()), qm.size());
@@ -813,9 +847,9 @@ void zone::operator()(gfp::elt_ur * tdst, const gfp::elt * tsrc) const
         uint16_t j = ijc.second.first;
         int32_t c = ijc.second.second;
         if (c>0) {
-            gfp::addmul_ui(tdst[i], tsrc[j], c);
+            fast_gfp::addmul_ui(tdst[i], tsrc[j], c, prime, preinverse);
         } else {
-            gfp::submul_ui(tdst[i], tsrc[j], -c);
+            fast_gfp::submul_ui(tdst[i], tsrc[j], -c, prime, preinverse);
         }
     }
 }
@@ -825,8 +859,6 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
     matmul_zone_data * mm = this;
     ASM_COMMENT("multiplication code");
     abdst_field x = mm->xab;
-    const gfp::elt * src = (const gfp::elt *) xsrc;
-    gfp::elt * dst = (gfp::elt *) xdst;
 
     gfp::preinv preinverse;
     gfp::elt prime;
@@ -841,6 +873,32 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
     gfp::compute_preinv(preinverse, prime);
 
+    const fast_elt * src;
+    fast_elt * dst;
+
+    size_t nsrc = mm->public_->dim[d];
+    size_t ndst = mm->public_->dim[!d];
+    
+    if (arith_modp::details::is_same<gfp::elt, fast_elt>::value) {
+        src = (const fast_elt *) xsrc;
+        dst = (fast_elt *) xdst;
+    } else {
+        if (alternate_src.empty()) alternate_src.assign(nsrc, fast_elt());
+        if (alternate_dst.empty()) alternate_dst.assign(ndst, fast_elt());
+        ASSERT_ALWAYS(alternate_src.size() == nsrc);
+        ASSERT_ALWAYS(alternate_dst.size() == ndst);
+        /* we read items in xsrc exactly as they are, which is gfp::elt's.
+         * And because those are convertible to fast_gfp::elt's, we'll
+         * get our vector.
+         */
+        const gfp::elt * begin = (const gfp::elt *) xsrc;
+        const gfp::elt * end = begin + nsrc;
+        alternate_src.assign(begin, end);
+        src = &alternate_src.front();
+        dst = &alternate_dst.front();
+    }
+
+
     /* d == 1: matrix times vector product */
     /* d == 0: vector times matrix product */
 
@@ -848,7 +906,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
      * (store_transposed == 0) or column-major (store_transposed == 1)
      */
 
-    gfp::elt::zero(dst, mm->public_->dim[!d]);
+    fast_elt::zero(dst, ndst);
 
     /* Processing order:
      *
@@ -885,18 +943,18 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
          * indices for the negative coefficients. Oddly enough, we don't
          * seem to do so currently for the immediate zones...
          */
-        gfp::elt_ur * tdst = new gfp::elt_ur[2*rowbatch];
+        fast_elt_ur * tdst = new fast_elt_ur[2*rowbatch];
 #else
-        gfp::elt_ur * tdst = new gfp::elt_ur[rowbatch];
+        fast_elt_ur * tdst = new fast_elt_ur[rowbatch];
 #endif
 
         ASM_COMMENT("critical loop");
 
         for(auto const& B : blocks) {
 #ifdef DISPATCHERS_AND_COMBINERS
-            gfp::elt_ur::zero(tdst, 2 * rowbatch);
+            fast_elt_ur::zero(tdst, 2 * rowbatch);
 #else
-            gfp::elt_ur::zero(tdst, rowbatch);
+            fast_elt_ur::zero(tdst, rowbatch);
 #endif
 
 #ifdef DISPATCHERS_AND_COMBINERS
@@ -910,7 +968,8 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 /* Fill that buffer now ! */
                 auto ptr = buffers[k].v.begin();
                 for(auto const& x : d) {
-                    *ptr++ = src[d.j0 + x];
+                    fast_gfp::stream_store(ptr++, src[d.j0 + x]);
+                    // *ptr++ = src[d.j0 + x];
                 }
                 buffers[k].rewind();
             }
@@ -918,7 +977,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
             /* process immediate zones */
             for(auto const & z : B.Z) {
-                z(tdst, src + z.j0);
+                z(tdst, src + z.j0, prime, preinverse);
             }
 
 #ifdef DISPATCHERS_AND_COMBINERS
@@ -927,16 +986,16 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 for( ; buffers[k].j0 < B.C[j].j0 ; k++) ;
                 for(auto const& x : B.C[j].main) {
                     ASSERT(buffers[k].ptr < buffers[k].v.end());
-                    gfp::add(tdst[x], *(gfp::elt *)&*buffers[k].ptr++);
+                    fast_gfp::add(tdst[x], *(gfp::elt *)&*buffers[k].ptr++);
                 }
                 /* Almost surely this loop will never run */
                 for(auto const& xc : B.C[j].aux) {
                     auto x = xc.first;
                     auto c = xc.second;
                     if (c > 0) {
-                        gfp::addmul_ui(tdst[x], *(gfp::elt *)&*buffers[k].ptr++, c);
+                        fast_gfp::addmul_ui(tdst[x], *buffers[k].ptr++, c, prime, preinverse);
                     } else {
-                        gfp::submul_ui(tdst[x], *(gfp::elt *)&*buffers[k].ptr++, -c);
+                        fast_gfp::submul_ui(tdst[x], *buffers[k].ptr++, -c, prime, preinverse);
                     }
                 }
             }
@@ -947,9 +1006,9 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                     (size_t) (mm->public_->dim[!d] - B.i0));
             for(size_t i = 0 ; i < active ; i++) {
 #ifdef DISPATCHERS_AND_COMBINERS
-                gfp::sub_ur(tdst[i], tdst[i + rowbatch]);
+                fast_gfp::sub_ur(tdst[i], tdst[i + rowbatch]);
 #endif
-                gfp::reduce(dst[B.i0 + i], tdst[i], prime, preinverse);
+                fast_gfp::reduce(dst[B.i0 + i], tdst[i], prime, preinverse);
             }
         }
 
@@ -1011,6 +1070,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         abvec_ur_clear(x, &tdst, mm->public_->dim[!d]);
 #endif
     }
+
     ASM_COMMENT("end of multiplication code");
 
     mm->public_->iteration[d]++;

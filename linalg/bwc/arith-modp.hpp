@@ -6,6 +6,12 @@
 #include "gmp-hacks.h"
 #include "gmp_aux.h"
 #include "macros.h"
+#include "memory.h"
+
+#if defined(HAVE_AVX2) || defined(HAVE_SSSE3)
+#include <x86intrin.h>
+#endif
+
 
 #define  xxxDEBUG_INFINITE_LOOPS
 
@@ -15,6 +21,8 @@ namespace details {
      */
     template<bool x> struct is_true {};
     template<> struct is_true<true> { typedef int type; };
+    template<typename T, typename U> struct is_same { static const bool value = false; };
+    template<typename T> struct is_same<T, T> { static const bool value = true; };
     template<typename T> struct make_signed {};
     template<> struct make_signed<unsigned long> { typedef long type; };
     template<> struct make_signed<unsigned long long> { typedef long long type; };
@@ -79,6 +87,7 @@ namespace details {
                 return true;
             }
 
+            static inline void stream_store(elt * dst, elt const& src) { *dst = src; }
             static inline void add(elt_ur & dst, elt const & src)
             {
                 mp_limb_t cy = mpn_add_n(dst, dst, src, n);
@@ -101,12 +110,12 @@ namespace details {
                 mpn_sub_n(dst, dst, src, n + extra);
             }
 
-            static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
+            static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&)
             {
                 mp_limb_t cy = mpn_addmul_1(dst, src, n, x);
                 T::propagate_carry(dst + n, cy);
             }
-            static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
+            static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&)
             {
                 mp_limb_t cy = mpn_submul_1(dst, src, n, x);
                 T::propagate_borrow(dst + n, cy);
@@ -292,7 +301,7 @@ namespace details {
                     q0 -= j[0] + 1;
                     mpn_add_n(a + 1, a + 1, p, n);
                 }
-                T::submul_ui(a, p, q0);
+                T::submul_ui(a, p, q0, p, j);
                 /*
                    {
                    mp_limb_t cy = mpn_submul_1(a, p, n, q0);
@@ -325,6 +334,40 @@ namespace details {
     };
 
 
+    /* Now for some sizes, we see a clear interest in using auxiliary
+     * vector types. We call these "fast" types. The general compromise
+     * is that we accept types which may be a little wider, but generally
+     * allow for better performance. The specs go typically as follows.
+     *
+     * - conversion to the "fast" types must be done for both operands
+     *   (say, source vector as well as destination vector). We don't
+     *   intend to go with the same kind of arithmetic that what we do
+     *   with elt and elt_ur above, where a "mixed" add/sub function
+     *   exists.
+     *
+     * - "fast" types are amenable to vector instructions
+     *
+     * - up to some number of additions or subtractions may be performed
+     *   on the fast type before reduction.
+     *
+     * - type may be ambiguous (so comparison entails conversion).
+     *
+     * We have two natural choices:
+     *
+     *  - RNS representation
+     *  - carry-save (aka nails).
+     *
+     * The specializations below work with nails. The idea is as follows.
+     * For a p spanning three 64-bit words, we spread data into four
+     * 48-bit words in an avx register. Then we can accumulate up to 2^16
+     * of these at little cost.
+     */
+
+    /* the default version is just making no difference, so that we'll
+     * use the simple elt / elt_ur mechanism */
+    template<typename T> struct fast_type : public T { };
+
+
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
     /* Now some specializations */
 
@@ -350,7 +393,7 @@ namespace details {
                );
         }
 
-        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
+        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&)
         {
             mp_limb_t foo, bar;
             asm("# gfp<1, 1>::addmul_ui\n"
@@ -362,7 +405,7 @@ namespace details {
             : "0"(src[0]), [mult]"r1m"(x)
             );
         }
-        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x)
+        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&)
         {
             mp_limb_t foo, bar;
             asm("# gfp<1, 1>::submul_ui\n"
@@ -399,7 +442,8 @@ namespace details {
                );
         }
 
-        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {
+        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&)
+        {
             mp_limb_t foo, bar;
             asm("# gfp<2, 1>::addmul_ui\n"
                 "mulq   %[mult]\n"
@@ -422,7 +466,7 @@ namespace details {
             );
         }
 
-        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {
+        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&) {
             mp_limb_t foo, bar;
             asm("# gfp<2, 1>::submul_ui\n"
                 "mulq   %[mult]\n"
@@ -489,13 +533,13 @@ namespace details {
                     ADDSUB_CODE ## n(sub, sbb)				\
                );							\
         }								\
-        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {\
+        static inline void addmul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&) {\
             mp_limb_t foo MAYBE_UNUSED;					\
             asm ("# gfp<" #n ", 1>::addmul_ui\n"				\
                     ADDSUBMUL_CODE ## n(add, adc)			\
             );								\
         }								\
-        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x) {\
+        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x, elt const&, preinv const&) {\
             mp_limb_t foo MAYBE_UNUSED;					\
             asm("# gfp<" #n ", 1>::submul_ui\n"				\
                     ADDSUBMUL_CODE ## n(sub, sbb)			\
@@ -779,11 +823,273 @@ namespace details {
     
     /* further specialization only seem to bring very marginal
      * improvements. */
+
+
+#if 0 && (defined(HAVE_AVX2) || defined(HAVE_SSSE3))
+    template<> struct fast_type<gfp<3, 1> > {
+        typedef gfp<3, 1> super;
+        struct elt;
+        typedef elt elt_ur;
+        struct elt {
+            typedef elt self;
+#ifdef  HAVE_AVX2
+            __m256i data[1];
+#else
+            __m128i data[2];
 #endif
-}
+            elt() { zero(); }
+            elt(elt const& a) {
+                data[0] = a.data[0];
+#ifndef HAVE_AVX2
+                data[1] = a.data[1];
+#endif
+            }
+            /* we do not construct (nor affect) from mpz, because we're not
+             * positional */
+            void zero() {
+#ifdef  HAVE_AVX2
+                data[0] = _mm256_setzero_si256();
+#else
+                data[0] = _mm_setzero_si128();
+                data[1] = _mm_setzero_si128();
+#endif
+            }
+            static void zero(elt * x, int N) {
+                memset(x, 0, N * sizeof(data));
+            }
+            static void copy(elt * y, const elt * x, int N) {
+                memcpy(y, x, N * sizeof(data));
+            }
+            bool operator==(elt const& a) {
+                return memcmp(data, a.data, sizeof(data)) == 0;
+            }
+            elt(super::elt const& a) {
+                convert(*this, a);
+            }
+
+            operator super::elt_ur() const {
+                super::elt_ur carries(conv_backend_get_carries(*this));
+                super::add(carries, conv_backend_get_main(*this));
+                return carries;
+            }
+
+            /* same, but we assume carry is zero */
+            operator super::elt() const {
+                return conv_backend_get_main(*this);
+            }
+        };
+
+        static inline void stream_store(elt * dst, elt const& src) {
+            /* Do we want to stream that or not ? */
+#ifdef  HAVE_AVX2
+            _mm256_storeu_si256(dst->data+0, src.data[0]);
+#else
+            _mm_storeu_si128(dst->data+0, src.data[0]);
+            _mm_storeu_si128(dst->data+1, src.data[1]);
+#endif
+        }
+        static inline void add(elt & dst, elt const & src)
+        {
+#ifdef  HAVE_AVX2
+            dst.data[0] = _mm256_add_epi64 (dst.data[0], src.data[0]);
+#else
+            dst.data[0] = _mm_add_epi64 (dst.data[0], src.data[0]);
+            dst.data[1] = _mm_add_epi64 (dst.data[1], src.data[1]);
+#endif
+        }
+
+        static inline void sub(elt & dst, elt const & src)
+        {
+#ifdef  HAVE_AVX2
+            dst.data[0] = _mm256_sub_epi64 (dst.data[0], src.data[0]);
+#else
+            dst.data[0] = _mm_sub_epi64 (dst.data[0], src.data[0]);
+            dst.data[1] = _mm_sub_epi64 (dst.data[1], src.data[1]);
+#endif
+        }
+
+        static inline void sub_ur(elt_ur & dst, elt_ur const & src)
+        {
+#ifdef  HAVE_AVX2
+            dst.data[0] = _mm256_sub_epi64 (dst.data[0], src.data[0]);
+#else
+            dst.data[0] = _mm_sub_epi64 (dst.data[0], src.data[0]);
+            dst.data[1] = _mm_sub_epi64 (dst.data[1], src.data[1]);
+#endif
+        }
+
+        /* conversions are done as a combination of blend & shuffle */
+
+        /* case of 192 bits within 256 bits. Three 64-bit words
+         * split into four 48-bit words.
+         */
+        static void convert(elt& dst, const super::elt& a) {
+            /* index of 16-bit word in destination, fetched from
+             * which index of 16-bit word in the gfp::elt. This is
+             * given for the 256-bit registers
+             *
+             * 0    0
+             * 1    1
+             * 2    2
+             * 3    <empty>
+             * 4    3
+             * 5    4
+             * 6    5
+             * 7    <empty>
+             * 8    6
+             * 9    7
+             * 10   8
+             * 11   <empty>
+             * 12   9
+             * 13   10
+             * 14   11
+             * 15   <empty>
+             */
+#ifdef  HAVE_AVX2
+            dst.data[0] = _mm256_shuffle_epi8(
+                    _mm256_loadu_si256((__m128i*) a.x),
+                    _mm256_setr_epi8( 
+                        0,1,2,3,4,5,-1,-1,
+                        6,7,8,9,10,11,-1,-1,
+                        12,13,14,15,16,17,-1,-1,
+                        18,19,20,21,22,23,-1,-1));
+
+#else   /* SSSE3 !! */
+            __m128i lo = _mm_loadu_si128((__m128i*) a.x);
+            __m128i hi = _mm_loadu_si128((__m128i*) (a.x + 2));
+            /* note that 16bit-wide shuffles use an 8-bit immediate,
+             * but do not offer the option to selectively insert
+             * zeroes. So we're probably better off shuffling bytes.
+             */
+            dst.data[0] = _mm_shuffle_epi8(lo, _mm_setr_epi8( 
+                        0,1,2,3,4,5,-1,-1,
+                        6,7,8,9,10,11,-1,-1));
+            dst.data[1] = _mm_xor_si128(
+                    _mm_shuffle_epi8(lo, _mm_setr_epi8( 
+                            12,13,14,15,-1,-1,-1,-1,
+                            -1,-1,-1,-1, -1,-1,-1,-1)),
+                    _mm_shuffle_epi8(hi, _mm_setr_epi8( 
+                            -1,-1,-1,-1, 0, 1,-1,-1,
+                            2, 3, 4, 5, 6, 7, -1, -1)));
+#endif
+        }
+
+        static super::elt conv_backend_get_main(elt const& src) {
+            super::elt main;
+#ifdef  HAVE_AVX2
+            _mm256_storeu_si256((__m256i*) main.x,
+                    _mm256_shuffle_epi8(src.data[0],
+                        _mm256_setr_epi8(
+                            0,1,2,3,4,5,
+                            8,9,10,11,12,13,
+                            16,17,18,19,20,21,
+                            24,25,26,27,28,29,
+                            -1,-1,-1,-1,-1,-1,-1,-1)));
+#else
+            _mm_storeu_si128((__m128i*) main.x,
+                    _mm_xor_si128(
+                        _mm_shuffle_epi8(src.data[0],
+                            _mm_setr_epi8(
+                                0,1,2,3,4,5,
+                                8,9,10,11,12,13,
+                                -1,-1,-1,-1)),
+                        _mm_shuffle_epi8(src.data[1],
+                            _mm_setr_epi8(
+                                -1,-1,-1,-1,-1,-1,
+                                -1,-1,-1,-1,-1,-1,
+                                0,1,2,3))));
+            _mm_storeu_si128((__m128i*) (main.x + 2),
+                    _mm_shuffle_epi8(src.data[1],
+                        _mm_setr_epi8(
+                            4,5,
+                            8,9,10,11,12,13,
+                            -1,-1,-1,-1,-1,-1,-1,-1)));
+#endif
+            return main;
+        }
+        static super::elt_ur conv_backend_get_carries(elt const& src) {
+            super::elt_ur carries;
+#ifdef  HAVE_AVX2
+            _mm256_storeu_si256((__m256i*) carries.x,
+                    _mm256_shuffle_epi8(src.data[0],
+                        _mm256_setr_epi8(
+                            -1,-1,-1,-1,-1,-1,
+                            6,7,
+                            -1,-1,-1,-1,
+                            14,15,
+                            -1,-1,-1,-1,
+                            22,23,
+                            -1,-1,-1,-1,
+                            30,31,
+                            -1,-1,-1,-1,-1,-1
+                            )));
+#else
+            _mm_storeu_si128((__m128i*) carries.x,
+                    _mm_shuffle_epi8(src.data[0],
+                        _mm_setr_epi8(
+                            -1,-1,-1,-1,-1,-1,
+                            6,7,
+                            -1,-1,-1,-1,
+                            14,15,
+                            -1,-1)));
+            _mm_storeu_si128((__m128i*) carries.x,
+                    _mm_shuffle_epi8(src.data[1],
+                        _mm_setr_epi8(
+                            -1,-1,
+                            6,7,
+                            -1,-1,-1,-1,
+                            14,15,
+                            -1,-1,-1,-1,-1,-1
+                            )));
+#endif
+            return carries;
+        }
+
+
+
+        /* (add|sub)mul_ui go through convert, do naively and convert
+         * back. Yes, it's slightly painful. Here we assume that src
+         * has undergone little to no accumulated additions, so that
+         * it can basically be converted lossless to a gfp::elt
+         */
+        static inline void addmul_ui(elt & dst, elt const & src, mp_limb_t x, super::elt const & p, super::preinv const & j)
+        {
+            super::elt zr;
+            super::elt_ur z(dst);
+            super::addmul_ui(z, (super::elt) src, x, p, j);
+            super::reduce(zr, z, p, j);
+            dst = zr;
+        }
+        static inline void submul_ui(elt_ur & dst, elt const & src, mp_limb_t x, super::elt const & p, super::preinv const & j)
+        {
+            super::elt zr;
+            super::elt_ur z(dst);
+            super::submul_ui(z, (super::elt) src, x, p, j);
+            super::reduce(zr, z, p, j);
+            dst = zr;
+        }
+
+        /* we have *TWO* reduction functions here. One which assigns to a
+         * standard gfp::elt, and one which assigns to fast_type::elt */
+        static void reduce(super::elt & r, elt const & a, super::elt const & p, super::preinv const & j)
+        {
+            super::elt_ur z(a);
+            super::reduce(r, z, p, j);
+        }
+        static void reduce(elt & r, elt const & a, super::elt const & p, super::preinv const & j)
+        {
+            super::elt zr;
+            reduce(zr, a, p, j);
+            r = zr;
+        }
+    };
+#endif  /* defined(HAVE_AVX2) || defined(HAVE_SSSE3) */
+#endif
+    }
 
 /* expose only what we have in our public interface */
 using details::gfp;
+using details::fast_type;
 }
 
 
