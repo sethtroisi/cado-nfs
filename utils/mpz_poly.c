@@ -561,10 +561,12 @@ int mpz_poly_valuation(mpz_poly_srcptr f)
 
 
 /* Print coefficients of f. */
-void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
+void mpz_poly_fprintf_var (FILE *fp, mpz_poly_srcptr f, char var, int end)
 {
   if (f->deg == -1) {
-      fprintf (fp, "0\n");
+      fprintf (fp, "0");
+      if (end)
+        fprintf (fp, "\n");
       return;
   }
   for (int i = 0, printed = 0; i <= f->deg; ++i) {
@@ -574,13 +576,13 @@ void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
           gmp_fprintf (fp, "+");
 
       if (i && mpz_cmp_ui(f->coeff[i], 1) == 0) {
-          gmp_fprintf (fp, "x");
+          gmp_fprintf (fp, "%c", var);
       } else if (i && mpz_cmp_ui(f->coeff[i], -1) == 0) {
-          gmp_fprintf (fp, "-x");
+          gmp_fprintf (fp, "-%c", var);
       } else {
           gmp_fprintf (fp, "%Zd", f->coeff[i]);
           if (i) {
-              gmp_fprintf (fp, "*x");
+              gmp_fprintf (fp, "*%c", var);
           }
       }
 
@@ -588,7 +590,13 @@ void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
           gmp_fprintf (fp, "^%d", i);
       }
   }
-  fprintf (fp, "\n");
+  if (end)
+    gmp_fprintf (fp, "\n");
+}
+
+void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
+{
+  mpz_poly_fprintf_var(fp, f, 'x', 1);
 }
 
 /* Print f of degree d with the following format

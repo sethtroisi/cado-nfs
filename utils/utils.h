@@ -41,5 +41,6 @@
 #include "verbose.h"
 #include "mpz_poly.h"
 #include "version_info.h"
+#include "mpz_poly_bivariate.h"
 
 #endif	/* CADO_UTILS_H_ */

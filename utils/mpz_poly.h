@@ -78,6 +78,7 @@ static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f) {
 }
 
 /* Print functions */
+void mpz_poly_fprintf_var (FILE *fp, mpz_poly_srcptr f, char var, int end);
 void mpz_poly_fprintf(FILE *fp, mpz_poly_srcptr f);
 void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep);
 void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f,

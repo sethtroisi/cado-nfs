@@ -12,7 +12,7 @@ set (sources
 	mpz_vector.c memory.c stats.c lll.c
         verbose.c 
         version_info.c
-	modified_files.c threadpool.cpp
+	modified_files.c threadpool.cpp mpz_poly_bivariate.c
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
