@@ -3645,9 +3645,9 @@ class FilterGaloisTask(Task):
         return self.state["noutrels"]
 
     def parse_remaining(self, text):
-        # "Number of ouput relations: 303571"
+        # "Number of output relations: 303571"
         for line in text:
-            match = re.match(r'Number of ouput relations:\s*(\d+)', line)
+            match = re.match(r'Number of output relations:\s*(\d+)', line)
             if match:
                 remaining = int(match.group(1))
                 return remaining
