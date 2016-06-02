@@ -1311,7 +1311,7 @@ seconds (void)
 void mpz_mat_row_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int i)
 {
 	mpz_poly_clear(f);
-	mpz_poly_init(f,M->n);
+	mpz_poly_init(f,M->n-1);
 	unsigned int j;
 	for (j = 0 ; j < M->n; j++){
 		mpz_poly_setcoeff(f,j,mpz_mat_entry_const(M,i,j));
@@ -1321,7 +1321,7 @@ void mpz_mat_row_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int i)
 void mpz_mat_column_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int j)
 {
 	mpz_poly_clear(f);
-	mpz_poly_init(f,M->m);
+	mpz_poly_init(f,M->m-1);
 	unsigned int i;
 	for (i = 0 ; i < M->m; i++){
 		mpz_poly_setcoeff(f,i,mpz_mat_entry_const(M,i,j));
@@ -1331,7 +1331,7 @@ void mpz_mat_column_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int j)
 void mpq_mat_row_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, unsigned int i)
 {
 	mpz_poly_clear(f);
-	mpz_poly_init(f,M->n);
+	mpz_poly_init(f,M->n-1);
 	mpz_set_si(denom,1);
 	unsigned int j;
     for (j = 0 ; j < M->n ; j++) {
@@ -1354,7 +1354,7 @@ void mpq_mat_row_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, unsign
 void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, unsigned int j)
 {
 	mpz_poly_clear(f);
-	mpz_poly_init(f,M->m);
+	mpz_poly_init(f,M->m-1);
 	mpz_set_si(denom,1);
 	unsigned int i;
     for (i = 0 ; i < M->m ; i++) {
@@ -1724,7 +1724,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_poly_init(theta_poly,n-1);
     mpz_init(theta_denom);
     mpq_mat_row_to_poly(theta_poly,theta_denom,theta_rat,0);
-    
+
     for (unsigned i = 0 ; i < n ; i++) {
         // Converting w[i] into one polynom and one common denominator
         mpz_poly_t w_poly;
@@ -1736,11 +1736,13 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         // Computing theta (in the basis of alpha)^ * w[i] mod g, without the common denominators.
         // We divide at the end
         mpz_poly_t res;
-        mpz_poly_init(res,n-1);
+        mpz_poly_init(res,n-1);        
         mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
-    
+        mpz_poly_cleandeg(res,n-1);
         
-        for (unsigned j = 0 ; j < n ; j++) {
+        printf("res = "); mpz_poly_fprintf(stdout,res);
+        for (int j = 0 ; j <= res->deg ; j++) {
+            printf("i = %d ; j = %d\n",i,j);
             mpz_t coeff, denom;
             mpz_init(coeff);
             mpz_init(denom);
@@ -1769,11 +1771,20 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpq_mat_multiply(times_theta_rat,times_theta_rat,W_inv);
         
     // Now we have to convert it into a matrix of integers
-    mpz_t denom;
-    mpz_init(denom);
-    mpq_mat_numden(times_theta,denom,times_theta_rat);
-        
-    mpz_clear(denom);
+    mpz_t denom_eq_1;
+    mpz_init(denom_eq_1);
+    mpq_mat_numden(times_theta,denom_eq_1,times_theta_rat);
+    
+    printf("multiplication by theta is :\n");
+    mpz_mat_fprint(stdout,times_theta);
+    
+    // And mod p
+    mpz_mat_mod_ui(times_theta,times_theta,p);
+    
+    printf("multiplication by theta is :\n");
+    mpz_mat_fprint(stdout,times_theta);
+    
+    mpz_clear(denom_eq_1);
     mpq_mat_clear(W_inv);
     mpz_clear(theta_denom);
     mpz_poly_clear(theta_poly);
@@ -1813,8 +1824,6 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     
     mpz_clear(lcm);
     */
-
-    mpq_mat_clear(theta_rat);
     
 }
 
@@ -2016,8 +2025,8 @@ int main(int argc, char *argv[])
     printf("f^ is : ");
     mpz_poly_fprintf(stdout, g);
     printf("\n");
-    mpz_poly_clear(g);
 
+    
     p_maximal_order(D, B, f, p);
     printf("Starting from\n");
     mpq_mat_fprint(stdout, B);
@@ -2026,6 +2035,20 @@ int main(int argc, char *argv[])
     mpq_mat_fprint(stdout, D);
     printf("\n");
 
+    
+    
+    mpz_poly_t test;
+    mpz_poly_init(test,n);
+    mpz_mat theta;
+    mpz_mat_init(theta,1,n);
+    mpz_set_si(mpz_mat_entry(theta,0,1),1);
+    minimal_poly_of_mul_by_theta(test,D,theta,g,p);
+    mpz_mat_clear(theta);
+    mpz_poly_clear(test);
+    
+    
+    
+    mpz_poly_clear(g);
     mpz_poly_clear(f);
     mpq_mat_clear(B);
     mpq_mat_clear(D);
