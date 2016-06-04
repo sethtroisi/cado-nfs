@@ -73,11 +73,17 @@ int debug_print = 0;
  * sufficient to force the first vertical strip to be processed as
  * immediate blocks only, which is generally something we want
  * because there are so many coefficients there. */
-size_t col_dispatcher_cutoff = 1048576;
+size_t col_dispatcher_cutoff = 262144;
 
 /* For the dispatcher/combiner split, we treat this number of columns at
  * a time.  */
-size_t colbatch1 = 8192;
+
+/* 8k 0.82 cpu @100
+ * 16k 0.74 cpu @100
+ * 32k 0.71 cpu @100
+ * 64k 0.70 cpu @100
+ */
+size_t colbatch1 = 65536;
 #endif
 
 static inline uint64_t cputicks()
@@ -803,7 +809,7 @@ void __attribute__((noinline)) gfp3_dispatch_sub (void * tdst, const void * tsrc
     }
 }
 #endif
-#if 0
+#if 1
 extern "C" {
 extern void gfp3_dispatch_add(void * tdst, const void * tsrc, const void * p, size_t size);
 extern void gfp3_dispatch_sub(void * tdst, const void * tsrc, const void * p, size_t size);
@@ -968,7 +974,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 /* Fill that buffer now ! */
                 auto ptr = buffers[k].v.begin();
                 for(auto const& x : d) {
-                    fast_gfp::stream_store(ptr++, src[d.j0 + x]);
+                    fast_gfp::stream_store(&*ptr++, src[d.j0 + x]);
                     // *ptr++ = src[d.j0 + x];
                 }
                 buffers[k].rewind();

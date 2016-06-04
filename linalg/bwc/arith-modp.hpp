@@ -880,12 +880,22 @@ namespace details {
         };
 
         static inline void stream_store(elt * dst, elt const& src) {
-            /* Do we want to stream that or not ? */
+            /* Do we want to stream that or not ? In fact it's slower
+             * when streaming... */
+#if 0
+#ifdef  HAVE_AVX2
+            _mm256_stream_si256(dst->data+0, src.data[0]);
+#else
+            _mm_stream_si128(dst->data+0, src.data[0]);
+            _mm_stream_si128(dst->data+1, src.data[1]);
+#endif
+#else
 #ifdef  HAVE_AVX2
             _mm256_storeu_si256(dst->data+0, src.data[0]);
 #else
             _mm_storeu_si128(dst->data+0, src.data[0]);
             _mm_storeu_si128(dst->data+1, src.data[1]);
+#endif
 #endif
         }
         static inline void add(elt & dst, elt const & src)
