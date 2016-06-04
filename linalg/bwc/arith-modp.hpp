@@ -825,7 +825,7 @@ namespace details {
      * improvements. */
 
 
-#if 0 && (defined(HAVE_AVX2) || defined(HAVE_SSSE3))
+#if defined(HAVE_AVX2) || defined(HAVE_SSSE3)
     template<> struct fast_type<gfp<3, 1> > {
         typedef gfp<3, 1> super;
         struct elt;
