@@ -143,7 +143,7 @@ void test_mpz_poly_bivariate_resultant()
   mpz_poly_bivariate_setcoeff(g, 2, tmp);
 
   mpz_poly_bivariate_resultant_y(tmp, f, g);
-  ASSERT(tpm->deg == 8);
+  ASSERT_ALWAYS(tmp->deg == 8);
   ASSERT_ALWAYS(mpz_cmp_ui(tmp->coeff[0], 10000) == 0);
   ASSERT_ALWAYS(mpz_cmp_ui(tmp->coeff[1], 86200) == 0);
   ASSERT_ALWAYS(mpz_cmp_ui(tmp->coeff[2], 150561) == 0);
@@ -155,7 +155,7 @@ void test_mpz_poly_bivariate_resultant()
   ASSERT_ALWAYS(mpz_cmp_ui(tmp->coeff[8], 12859396) == 0);
 
   mpz_poly_bivariate_resultant_x(tmp, f, g);
-  ASSERT(tpm->deg == 8);
+  ASSERT_ALWAYS(tmp->deg == 8);
   ASSERT_ALWAYS(mpz_cmp_ui(tmp->coeff[0], 467750) == 0);
   ASSERT_ALWAYS(mpz_cmp_ui(tmp->coeff[2], 38960) == 0);
   ASSERT_ALWAYS(mpz_cmp_si(tmp->coeff[4], -996138) == 0);

@@ -202,8 +202,6 @@ void mpz_poly_bivariate_cleandeg(mpz_poly_bivariate_ptr f, int deg_y)
 void mpz_poly_bivariate_setcoeff(mpz_poly_bivariate_ptr f, int i,
     mpz_poly_srcptr z)
 {
-  ASSERT(mpz_cmp_ui(z->coeff[z->deg], 0) != 0);
-
   mpz_poly_bivariate_realloc(f, i + 1);
   mpz_poly_set(f->coeff[i], z);
   if (i >= f->deg_y) {
