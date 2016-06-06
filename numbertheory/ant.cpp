@@ -3,9 +3,12 @@
 #include <gmp.h>
 #include <stdint.h>
 #include <sys/resource.h>	/* for getrusage */
+#include <vector>
 #include "macros.h"
 #include "mpz_poly.h"
 #include "mpz_mat.h"
+
+using namespace std;
 
 /*{{{ timer*/
 double
@@ -560,8 +563,8 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_mat test_mat;
     mpz_mat_init(test_mat,n,n);
     mpz_mat_in_poly_mod_ui(test_mat,times_theta,f,p);
-    printf("f(times_theta) :\n");
-    mpz_mat_fprint(stdout,test_mat); printf("\n");
+    //printf("f(times_theta) :\n");
+    //mpz_mat_fprint(stdout,test_mat); printf("\n");
     mpz_mat_clear(test_mat);
     
     
@@ -582,93 +585,48 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
 }
 
 // Represents the type of elements found in pick_from, in badideals.mag
-typedef struct
-{
-    mpz_mat E; // the basis of the subspace E
-    mpz_mat I; // the basis of one ideal
-    unsigned int dim; // The dimension of E, instead of having the full space like in magma
-} subspace_ideal;
-
-// A list of subspace_ideal, e.g. the type of pick_from
-struct node_subspace_ideal
-{
-    subspace_ideal data;
-    struct node_subspace_ideal *next;
+struct subspace_ideal {
+    cxx_mpz_mat E; // the basis of the subspace E
+    cxx_mpz_mat I; // the basis of one ideal
+    cxx_mpz_mat V;
+//    unsigned int dim; // The dimension of E, instead of having the full space like in magma
 };
-typedef struct node_subspace_ideal node_subspace_ideal;
 
-void subspace_ideal_init(subspace_ideal G, unsigned int n)
-{
-    mpz_mat_init(G.E,n,n);
-    mpz_mat_init(G.I,n,n);
-}
-
-void subspace_ideal_clear(subspace_ideal G)
-{
-    mpz_mat_clear(G.E);
-    mpz_mat_clear(G.I);
-}
-
-// Adds G at the end of the List
-void node_subspace_ideal_add(node_subspace_ideal* L, subspace_ideal G)
-{
-    if(L == NULL){
-        L = (node_subspace_ideal*) malloc(sizeof(node_subspace_ideal));
-        L->data = G;
-        L->next = NULL;
-    }
-    else{
-        node_subspace_ideal_add(L->next,G);
-    }
-}
-
-// Pops the beginning of the list and returns a pointer on it
-// Warning : you have to free all the pointers returned by this function by yoursef
-subspace_ideal* node_subspace_ideal_pop(node_subspace_ideal* L)
-{
-    if(L == NULL){
-        return NULL;
-    }
-    else{
-        subspace_ideal* res = NULL;
-        res = (subspace_ideal*) malloc(sizeof(subspace_ideal));
-        *res = L->data;
-        
-        node_subspace_ideal* M = NULL;
-        M = L->next;
-        free(L);
-        L = M;
-        
-        
-        
-        return res;
-    }
-}
-
-void factorization_of_prime(mpz_poly_srcptr g, unsigned int p)
+void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_srcptr g, unsigned int p)
 {
     int n = g->deg;
     
-    mpq_mat G, G_inv, Id;
+    mpq_mat G, G_inv, Id_q;
     mpz_mat Ip;
+    cxx_mpz_mat Id_z; // This line makes valgrind say that there are ~70000 bytes in one block that are still reachable. Don't know if it's a problem.
     mpq_mat_init(G,n,n);
     mpq_mat_init(G_inv,n,n);
-    mpq_mat_init(Id,n,n);
+    mpq_mat_init(Id_q,n,n);
     mpz_mat_init(Ip,n,n);
-    mpq_mat_set_ui(Id,1);
+    mpq_mat_set_ui(Id_q,1);
+    mpz_mat_set_ui(Id_z,1);
     
     // Computing the generators of p-maximal order, storing them in G
-    p_maximal_order(G,Id,g,p);
-    
+    p_maximal_order(G,Id_q,g,p);
     // Computing the p-radical of the order of G, storing it in Ip
     p_radical_of_order(Ip,G,g,p);
-    
     mpq_mat_invert(G_inv,G);
+    
+    
+    // The initial value in pick_from
+    subspace_ideal initial;
+    mpz_mat_set(initial.E,Id_z); // It is the basis of Ok/p*Ok, but written on the basis of Ok/p*Ok ; thus, it's the identity
+    mpz_mat_set(initial.I,Id_z); //p*identity
+    mpz_mat_set(initial.V,Id_z); // identity
+    mpz_mat_multiply_by_ui(initial.I,initial.I,p);
+    
+    vector<subspace_ideal> pick_from;
+    pick_from.push_back(initial);
     
     mpz_mat_clear(Ip);
     mpq_mat_clear(G_inv);
     mpq_mat_clear(G);
-    mpq_mat_clear(Id);
+    mpq_mat_clear(Id_q);
 }
 
 int main(int argc, char *argv[])
@@ -880,7 +838,7 @@ int main(int argc, char *argv[])
     printf("\n");
 
     
-    
+    /*
     mpz_poly test;
     mpz_poly_init(test,n);
     mpz_mat theta;
@@ -896,7 +854,8 @@ int main(int argc, char *argv[])
     minimal_poly_of_mul_by_theta(test,D,theta,g,p);
     mpz_mat_clear(theta);
     mpz_poly_clear(test);
-    
+    */
+    factorization_of_prime(g,p);
     
     
     mpz_poly_clear(g);
