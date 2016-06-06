@@ -1893,10 +1893,10 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     
     // Now starting to compute the (n,n^2) matrix whose kernel will be computed
     mpz_mat M,current;
-    mpz_mat_init(M,n,n*n);
+    mpz_mat_init(M,n+1,n*n);
     mpz_mat_init(current,n,n);
     mpz_mat_set_ui(current,1);
-    for (unsigned int k = 0 ; k < n ; k++){
+    for (unsigned int k = 0 ; k < n+1 ; k++){
         for (unsigned int i = 0 ; i < n ; i++){
             for (unsigned int j = 0 ; j < n ; j++){
                 mpz_set(mpz_mat_entry(M,k,j+n*i),mpz_mat_entry(current,i,j));
@@ -1915,7 +1915,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_mat_init(K,0,0);
     mpz_mat_kernel(K,M,p);
 
-    printf("kernel of (n,n^2) matrix, mod %d:\n", p);
+    printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
     mpz_mat_fprint(stdout,K); printf("\n");
 
     // Getting the minimal polynomial and verifying that f(M) = 0
@@ -1948,39 +1948,6 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpq_mat_clear(theta_rat);
     mpq_mat_clear(times_theta_rat);
     mpz_mat_clear(times_theta);
-/*
-    // Putting the LCM of all denominators of coefficients of w[i] in lcm
-    mpz_t lcm;
-    mpz_init(lcm);
-	mpz_set_si(lcm, 1);
-	for (unsigned int j = 0; j < B->n; j++) {
-	    mpz_lcm(lcm, lcm, mpq_denref(mpq_mat_entry_const(B, i, j)));
-	}
-
-	// Generating the polynomial
-	for (unsigned int j = 0; j < B->n; j++) {
-	    mpq_set_z(K_rat, lcm);
-	    //gmp_printf("%Zd/%Zd * %Zd/%Zd\n", mpq_numref(mpq_mat_entry_const(B,i,j)), mpq_denref(mpq_mat_entry_const(B,i,j)), mpq_numref(K_rat), mpq_denref(K_rat));
-	    mpq_mul(aux1, mpq_mat_entry_const(B, i, j), K_rat);
-	    ASSERT_ALWAYS(!mpz_cmp_ui(mpq_denref(aux1), 0) == 0);
-	    mpz_poly_setcoeff(f, j, mpq_numref(aux1));
-	}
-
-	// Computing f^p mod g (it returns (lcm * the corresponding generator)^p
-	mpz_poly_power_mod_f(f, f, g, p);
-
-	mpz_pow_ui(lcm, lcm, p);
-
-	// Storing w[i] in i-th row of U
-	for (int j = 0; j <= f->deg; j++) {
-	    mpz_poly_getcoeff(tmp, j, f);
-	    mpq_set_num(mpq_mat_entry(U, i, j), tmp);
-	    mpq_set_den(mpq_mat_entry(U, i, j), lcm);
-	    mpq_canonicalize(mpq_mat_entry(U, i, j));
-	}
-    
-    mpz_clear(lcm);
-    */
     
 }
 
