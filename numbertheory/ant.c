@@ -1888,8 +1888,8 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     // And mod p
     mpz_mat_mod_ui(times_theta,times_theta,p);
 
-    printf("matrix of multiplication by theta, mod %d:\n", p);
-    mpz_mat_fprint(stdout,times_theta); printf("\n");
+    //printf("matrix of multiplication by theta, mod %d:\n", p);
+    //mpz_mat_fprint(stdout,times_theta); printf("\n");
     
     // Now starting to compute the (n,n^2) matrix whose kernel will be computed
     mpz_mat M,current;
@@ -1907,16 +1907,13 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_mat_mod_ui(current,current,p);
     }
     
-    //printf("big matrix, mod %d:\n", p);
-    //mpz_mat_fprint(stdout,M); printf("\n");
-    
     // Now computing its kernel
     mpz_mat K;
     mpz_mat_init(K,0,0);
     mpz_mat_kernel(K,M,p);
 
-    printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
-    mpz_mat_fprint(stdout,K); printf("\n");
+    //printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
+    //mpz_mat_fprint(stdout,K); printf("\n");
 
     // Getting the minimal polynomial and verifying that f(M) = 0
     if(K->m == 0){
@@ -1926,17 +1923,8 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_mat_row_to_poly(f,K,0);
     }
     
-    // Testing
-    mpz_mat test_mat;
-    mpz_mat_init(test_mat,n,n);
-    mpz_mat_in_poly_mod_ui(test_mat,times_theta,f,p);
-    printf("f(times_theta) :\n");
-    mpz_mat_fprint(stdout,test_mat); printf("\n");
-    mpz_mat_clear(test_mat);
-    
-    
-    printf("minimal polynomial of times_theta mod %d:\n", p);
-    mpz_poly_fprintf(stdout,f); printf("\n");
+    //printf("minimal polynomial of times_theta mod %d:\n", p);
+    //mpz_poly_fprintf(stdout,f); printf("\n");
     
     mpz_mat_clear(K);
     mpz_mat_clear(current);
@@ -2242,15 +2230,16 @@ int main(int argc, char *argv[])
 
     
     p_maximal_order(D, B, f, p);
-    printf("Starting from\n");
-    mpq_mat_fprint(stdout, B);
-    printf("\n");
-    printf("the maximal order is \n");
+    //printf("Starting from\n");
+    //mpq_mat_fprint(stdout, B);
+    //printf("\n");
+    printf("the %d-maximal order is \n",p);
     mpq_mat_fprint(stdout, D);
     printf("\n");
 
     
-    
+    factorization_of_prime(g,p);
+    /*
     mpz_poly_t test;
     mpz_poly_init(test,n);
     mpz_mat theta;
@@ -2266,7 +2255,7 @@ int main(int argc, char *argv[])
     minimal_poly_of_mul_by_theta(test,D,theta,g,p);
     mpz_mat_clear(theta);
     mpz_poly_clear(test);
-    
+    */
     
     
     mpz_poly_clear(g);
