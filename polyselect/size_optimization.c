@@ -778,12 +778,12 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   mpz_init_set_ui (kt, 1);
   while (1)
   {
-    mpz_polyranslation (ftmp, f_raw, kt);
+    mpz_poly_translation (ftmp, f_raw, kt);
     logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
     if (logmu > logmu_opt + SOPT_LOCAL_DESCENT_GUARD)
     {
       mpz_neg (tmp, kt);
-      mpz_polyranslation (ftmp, f_raw, tmp);
+      mpz_poly_translation (ftmp, f_raw, tmp);
       logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
       if (logmu > logmu_opt + SOPT_LOCAL_DESCENT_GUARD)
         break;
@@ -806,26 +806,26 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     if (use_translation != 0)
     {
       /* first try translation by kt */
-      mpz_polyranslation (ftmp, f_opt, kt); /* f(x+kt) */
+      mpz_poly_translation (ftmp, f_opt, kt); /* f(x+kt) */
       logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
       if (logmu < logmu_opt)
       {
         changedt = 1;
         logmu_opt = logmu;
         mpz_poly_swap (f_opt, ftmp);
-        mpz_polyranslation (g_opt, g_opt, kt);
+        mpz_poly_translation (g_opt, g_opt, kt);
       }
       else
       {
         mpz_neg (tmp, kt);
-        mpz_polyranslation (ftmp, f_opt, tmp); /* f(x-kt) */
+        mpz_poly_translation (ftmp, f_opt, tmp); /* f(x-kt) */
         logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
         if (logmu < logmu_opt)
         {
           changedt = 1;
           logmu_opt = logmu;
           mpz_poly_swap (f_opt, ftmp);
-          mpz_polyranslation (g_opt, g_opt, tmp);
+          mpz_poly_translation (g_opt, g_opt, tmp);
         }
       }
     }
@@ -1050,8 +1050,8 @@ best_norm (mpz_poly_ptr fopt, mpz_poly_ptr gopt,
 
   ASSERT_ALWAYS(m.NumCols == d+1);
 
-  mpz_polyranslation (ft, f_raw, k);
-  mpz_polyranslation (gt, g_raw, k);
+  mpz_poly_translation (ft, f_raw, k);
+  mpz_poly_translation (gt, g_raw, k);
   LLL_set_matrix_from_polys (&m, ft, gt, skew, tmp);
   LLL (tmp, m, NULL, a, b);
   for (int l = 1; l <= m.NumRows; l++)
