@@ -20,10 +20,14 @@ int main(int argc, char * argv[])
 
     map<unsigned long, cxx_mpz_mat> v;
 
-    mpz_t det, p;
+    mpz_t det;
     mpz_init(det);
-    mpz_init_set_ui(p, 1009);
+    unsigned long p = 1009;
 
+    /* This generates many matrices at random, and puts in the std::map
+     * above the relationship with the determinant of the reduction mod
+     * 1009 of the leading submatrix of their HNF
+     */
     for(int i = 0 ; i < 10 ; i++) {
         cxx_mpz_mat M;
 
@@ -33,14 +37,16 @@ int main(int argc, char * argv[])
                 mpz_set_si(mpz_mat_entry(M, i, j), (rand() - (RAND_MAX / 2)));
             }
         }
+        mpz_mat_mod_ui(M, M, p);
         cxx_mpz_mat M1 = M, T, M2;
-        mpz_gauss_backend_mod(M1, T, p);
-        mpz_mat_fprint(stdout, M1);
+        mpz_hnf_backend(M1, T);
+        // mpz_mat_fprint(stdout, M1);
         unsigned int d = std::min(M1->m, M1->n);
         mpz_mat_realloc(M2, d, d);
         mpz_mat_submat_swap(M2, 0, 0, M1, 0, 0, d, d);
         mpz_mat_determinant_triangular(det, M2);
-        v.insert(make_pair(mpz_get_ui(det) % mpz_get_ui(p), M));
+        mpz_mod_ui(det, det, p);
+        v.insert(make_pair(mpz_get_ui(det), M));
     }
 
     for(decltype(v)::const_iterator it = v.begin() ; it != v.end() ; it++) {
@@ -49,5 +55,4 @@ int main(int argc, char * argv[])
     }
 
     mpz_clear(det);
-    mpz_clear(p);
 }

@@ -909,7 +909,7 @@ mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
 
 /* Set ft(x) = f(x+k) where k is an mpz_t, ft and f can be the same poly. */
 void
-mpz_polyranslation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
+mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
 {
   int i, j;
   int d = f->deg;
@@ -1845,7 +1845,7 @@ mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
 
 /* return the total size (in bytes) to store the polynomial f */
 size_t
-mpz_polyotalsize (mpz_poly_srcptr f)
+mpz_poly_totalsize (mpz_poly_srcptr f)
 {
   int i;
   size_t s = 0;
