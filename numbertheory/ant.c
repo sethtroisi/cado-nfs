@@ -1939,6 +1939,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     
 }
 
+
 // Represents the type of elements found in pick_from, in badideals.mag
 typedef struct
 {
@@ -1947,62 +1948,9 @@ typedef struct
     unsigned int dim; // The dimension of E, instead of having the full space like in magma
 } subspace_ideal;
 
-// A list of subspace_ideal, e.g. the type of pick_from
-struct node_subspace_ideal
-{
-    subspace_ideal data;
-    struct node_subspace_ideal *next;
-};
-typedef struct node_subspace_ideal node_subspace_ideal;
 
-void subspace_ideal_init(subspace_ideal G, unsigned int n)
-{
-    mpz_mat_init(G.E,n,n);
-    mpz_mat_init(G.I,n,n);
-}
-
-void subspace_ideal_clear(subspace_ideal G)
-{
-    mpz_mat_clear(G.E);
-    mpz_mat_clear(G.I);
-}
-
-// Adds G at the end of the List
-void node_subspace_ideal_add(node_subspace_ideal* L, subspace_ideal G)
-{
-    if(L == NULL){
-        L = malloc(sizeof(node_subspace_ideal));
-        L->data = G;
-        L->next = NULL;
-    }
-    else{
-        node_subspace_ideal_add(L->next,G);
-    }
-}
-
-// Pops the beginning of the list and returns a pointer on it
-// Warning : you have to free all the pointers returned by this function by yoursef
-subspace_ideal* node_subspace_ideal_pop(node_subspace_ideal* L)
-{
-    if(L == NULL){
-        return NULL;
-    }
-    else{
-        subspace_ideal* res = NULL;
-        res = malloc(sizeof(subspace_ideal));
-        *res = L->data;
-        
-        node_subspace_ideal* M = NULL;
-        M = L->next;
-        free(L);
-        L = M;
-        
-        
-        
-        return res;
-    }
-}
-
+// Don't know how to return what I'm supposed to return for now ; I'll see that later
+// It's basically the same function you can see in badideals.mag
 void factorization_of_prime(mpz_poly_srcptr g, unsigned int p)
 {
     int n = g->deg;
@@ -2020,14 +1968,16 @@ void factorization_of_prime(mpz_poly_srcptr g, unsigned int p)
     
     // Computing the p-radical of the order of G, storing it in Ip
     p_radical_of_order(Ip,G,g,p);
-    
     mpq_mat_invert(G_inv,G);
+    
+
     
     mpz_mat_clear(Ip);
     mpq_mat_clear(G_inv);
     mpq_mat_clear(G);
     mpq_mat_clear(Id);
 }
+
 
 int main(int argc, char *argv[])
 {				/*{{{ */
