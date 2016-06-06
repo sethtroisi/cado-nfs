@@ -1262,6 +1262,7 @@ linalg/bwc/mpfq/mpfq_p_15_t.h
 filter/sm_append.cpp
 linalg/bwc/bwccheck.cpp
 tests/linalg/bwc/test-lingen-crc.sh
+tests/utils/test_cxx_mpz_poly.cpp
 numbertheory/ant.c
 numbertheory/CMakeLists.txt
 numbertheory/Makefile

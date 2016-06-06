@@ -70,14 +70,15 @@ L2_lognorm_d (double_poly_srcptr p, double s)
     */
     n = a0 * a0 + a1 * a1;
     n = n * 0.785398163397448310; /* Pi/4 */
+    ASSERT_ALWAYS(n < DBL_MAX);
     return 0.5 * log (n / s);
   }
   else if (d == 2)
   {
     double a2, a1, a0;
-    a2 = a[2] * s * s;
-    a1 = a[1] * s;
-    a0 = a[0];
+    a2 = a[2] * s;
+    a1 = a[1];
+    a0 = a[0] / s;
     /* use circular integral (Sage code):
        var('a2,a1,a0,x,y,r,s,t')
        f = a2*x^2+a1*x+a0
@@ -88,15 +89,16 @@ L2_lognorm_d (double_poly_srcptr p, double s)
     */
     n = 3.0 * (a2 * a2 + a0 * a0) + 2.0 * a0 * a2 + a1 * a1;
     n = n * 0.130899693899574704; /* Pi/24 */
-    return 0.5 * log(n / (s * s));
+    ASSERT_ALWAYS(n < DBL_MAX);
+    return 0.5 * log(n);
   }
   else if (d == 3)
     {
-      double a3, a2, a1, a0;
-      a3 = a[3] * s * s * s;
-      a2 = a[2] * s * s;
-      a1 = a[1] * s;
-      a0 = a[0];
+      double a3, a2, a1, a0, invs = 1.0 / s;
+      a3 = a[3] * s * s;
+      a2 = a[2] * s;
+      a1 = a[1];
+      a0 = a[0] * invs;
       /* use circular integral (Sage code):
          var('a3,a2,a1,a0,x,y,r,s,t')
          f = a3*x^3+a2*x^2+a1*x+a0
@@ -108,17 +110,18 @@ L2_lognorm_d (double_poly_srcptr p, double s)
       n = 5.0 * (a3 * a3 + a0 * a0) + 2.0 * (a3 * a1 + a0 * a2)
         + a1 * a1 + a2 * a2;
       n = n * 0.049087385212340519352; /* Pi/64 */
-      return 0.5 * log(n / (s * s * s));
+      ASSERT_ALWAYS(n < DBL_MAX);
+      return 0.5 * log(n * invs);
     }
   else if (d == 4)
     {
-      double a4, a3, a2, a1, a0;
+      double a4, a3, a2, a1, a0, invs = 1.0 / s;
 
-      a4 = a[4] * s * s * s * s;
-      a3 = a[3] * s * s * s;
-      a2 = a[2] * s * s;
-      a1 = a[1] * s;
-      a0 = a[0];
+      a4 = a[4] * s * s;
+      a3 = a[3] * s;
+      a2 = a[2];
+      a1 = a[1] * invs;
+      a0 = a[0] * invs * invs;
       /* use circular integral (Sage code):
          var('a4,a3,a2,a1,a0,x,r,s,t')
          f = a4*x^4+a3*x^3+a2*x^2+a1*x+a0
@@ -131,24 +134,24 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 5.0 * (a3 * a3 + a1 * a1) + 6.0 * (a4 * a0 + a3 * a1)
         + 3.0 * a2 * a2;
       n = n * 0.0049087385212340519352; /* Pi/640 */
-      return 0.5 * log(n / (s * s * s * s));
+      ASSERT_ALWAYS(n < DBL_MAX);
+      return 0.5 * log(n);
     }
   else if (d == 5)
     {
-      double a5, a4, a3, a2, a1, a0, s2 = s * s, s3 = s2 * s, s4 = s3 * s,
-        s5 = s4 * s;
+      double a5, a4, a3, a2, a1, a0, invs = 1.0 / s;
 
       /*
         f := a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
         F := expand(y^5*subs(x=x/y,f));
         int(int(subs(x=x*s,F)^2/s^5, x=-1..1), y=-1..1);
        */
-      a0 = a[0];
-      a1 = a[1] * s;
-      a2 = a[2] * s2;
-      a3 = a[3] * s3;
-      a4 = a[4] * s4;
-      a5 = a[5] * s5;
+      a0 = a[0] * invs * invs;
+      a1 = a[1] * invs;;
+      a2 = a[2];
+      a3 = a[3] * s;
+      a4 = a[4] * s * s;
+      a5 = a[5] * s * s * s;
       /* use circular integral (Sage code):
          var('a5,a4,a3,a2,a1,a0,x,r,s,t')
          f = a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0
@@ -161,19 +164,13 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 14.0 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5)
         + 7.0 * (a4 * a4 + a1 * a1) + 3.0 * (a3 * a3 + a2 * a2);
       n = n * 0.0020453077171808549730; /* Pi/1536 */
-      return 0.5 * log(n / s5);
+      ASSERT_ALWAYS(n < DBL_MAX);
+      return 0.5 * log(n * invs);
     }
   else if (d == 6)
     {
-      double a6, a5, a4, a3, a2, a1, a0;
+      double a6, a5, a4, a3, a2, a1, a0, invs;
 
-      a6 = a[6] * s * s * s * s * s * s;
-      a5 = a[5] * s * s * s * s * s;
-      a4 = a[4] * s * s * s * s;
-      a3 = a[3] * s * s * s;
-      a2 = a[2] * s * s;
-      a1 = a[1] * s;
-      a0 = a[0];
       /* use circular integral (Sage code):
          R.<x> = PolynomialRing(ZZ)
          S.<a> = InfinitePolynomialRing(R)
@@ -184,25 +181,35 @@ L2_lognorm_d (double_poly_srcptr p, double s)
          v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
          (s^d*v).expand().collect(pi)
       */
+      invs = 1.0 / s;
+      a6 = a[6] * s * s * s;
+      a5 = a[5] * s * s;
+      a4 = a[4] * s;
+      a3 = a[3];
+      a2 = a[2] * invs;
+      a1 = a[1] * invs * invs;
+      a0 = a[0] * invs * invs * invs;
       n = 231.0 * (a6 * a6 + a0 * a0) + 42.0 * (a6 * a4 + a2 * a0)
         + 21.0 * (a5 * a5 + a1 * a1) + 7.0 * (a4 * a4 + a2 * a2)
         + 14.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
         + 10.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 5.0 * a3 * a3;
       n = n * 0.00043828022511018320850; /* Pi/7168 */
-      return 0.5 * log(n / (s * s * s * s * s * s));
+      ASSERT_ALWAYS(n < DBL_MAX);
+      return 0.5 * log(n);
     }
   else /* d == 7 */
     {
       double a7, a6, a5, a4, a3, a2, a1, a0;
+      double invs = 1.0 / s;
 
-      a7 = a[7] * s * s * s * s * s * s * s;
-      a6 = a[6] * s * s * s * s * s * s;
-      a5 = a[5] * s * s * s * s * s;
-      a4 = a[4] * s * s * s * s;
-      a3 = a[3] * s * s * s;
-      a2 = a[2] * s * s;
-      a1 = a[1] * s;
-      a0 = a[0];
+      a7 = a[7] * s * s * s * s;
+      a6 = a[6] * s * s * s;
+      a5 = a[5] * s * s;
+      a4 = a[4] * s;
+      a3 = a[3];
+      a2 = a[2] * invs;
+      a1 = a[1] * invs * invs;
+      a0 = a[0] * invs * invs * invs;
       /* use circular integral (Sage code):
          var('r,s,t,y')
          R.<x> = PolynomialRing(ZZ)
@@ -217,7 +224,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 9*(a2*a2+a5*a5) + 18*(a1*a3+a0*a4+a4*a6+a3*a7) + 5*(a3*a3+a4*a4)
         + 10*(a2*a4+a1*a5+a3*a5+a0*a6+a2*a6+a1*a7);
       n = n * 0.000191747598485705154; /* Pi/16384 */
-      return 0.5 * log(n / (s * s * s * s * s * s * s));
+      ASSERT_ALWAYS(n < DBL_MAX);
+      return 0.5 * log(n * invs);
     }
 }
 
@@ -332,7 +340,7 @@ L2_skewness_deg6_approx (mpz_poly_ptr f MAYBE_UNUSED, double_poly_ptr ff,
 {
   double *dfd = dff->coeff;
   double *fd = ff->coeff;
-  double s, nc, s2, s4, s5, s6, a, b, c, smin, smax;
+  double s, nc, a, b, c, smin, smax;
   int sign_changes = 0;
   double q[7], logmu, best_logmu = DBL_MAX, best_s = DBL_MAX;
 
@@ -386,15 +394,13 @@ L2_skewness_deg6_approx (mpz_poly_ptr f MAYBE_UNUSED, double_poly_ptr ff,
 
   /* positive roots are in [smin, smax] */
 
-#define MULTS 2.0
-  double v = -1.0;
-  for (double t = MULTS * smin; t <= smax; t = MULTS * t)
+  double v = -1.0, oldv;
+  for (double t = 2.0 * smin; t <= smax; t = 2.0 * t)
     {
       /* invariant: q(smin) < 0 */
+      oldv = v;
       v = (((((dfd[6]*t)+dfd[5])*t+dfd[4])*t*t+dfd[2])*t+dfd[1])*t+dfd[0];
-      if (v <= 0)
-        smin = t;
-      else
+      if (oldv < 0 && v > 0)
         {
           /* the derivative has a root in [smin,b] and is increasing, thus
              the norm has a minimum in [smin,b], we refine it by dichotomy */
@@ -403,13 +409,9 @@ L2_skewness_deg6_approx (mpz_poly_ptr f MAYBE_UNUSED, double_poly_ptr ff,
           for (int i = 0; i < prec; i++)
             {
               c = (a + b) * 0.5;
-              s2 = c * c;
-              s4 = s2 * s2;
-              s5 = s4 * c;
-              s6 = s5 * c;
 
-              nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
-                + dfd[2] * s2 + dfd[1] * c + dfd[0];
+              nc = ((((dfd[6] * c + dfd[5]) * c + dfd[4]) * c * c + dfd[2]) * c
+                    + dfd[1]) * c + dfd[0];
               if (nc > 0)
                 b = c;
               else
@@ -428,9 +430,8 @@ L2_skewness_deg6_approx (mpz_poly_ptr f MAYBE_UNUSED, double_poly_ptr ff,
               best_s = s;
             }
         }
+      smin = t; /* to avoid hitting twice the same root of the derivative */
     }
-
-  ASSERT_ALWAYS (best_s < DBL_MAX);
 
   return best_s;
 }
@@ -440,7 +441,7 @@ L2_skewness_deg6 (mpz_poly_ptr f MAYBE_UNUSED, double_poly_srcptr ff,
                   double_poly_srcptr dff MAYBE_UNUSED, int prec MAYBE_UNUSED)
 {
   double s, logmu, logmu_min = DBL_MAX, s_min = 1.0;
-  mpz_poly_t df;
+  mpz_poly df;
   root_struct Roots[6];
   int i, k;
 
@@ -1088,7 +1089,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   int v0;
   unsigned long *roots, r, r0;
   int i, d = f->deg, nroots;
-  mpz_poly_t g, H;
+  mpz_poly g, H;
 
   mpz_init (c);
   mpz_poly_content (c, f);
@@ -1240,7 +1241,7 @@ special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc)
   if (p_divides_lc) {
       /* compute g(x) = f(1/(px))*(px)^d, i.e., g[i] = f[d-i]*p^i */
       /* IOW, the reciprocal polynomial evaluated at px */
-      mpz_poly_t G;
+      mpz_poly G;
       mpz_t *g;
       mpz_t t;
       int i;
@@ -1540,7 +1541,7 @@ print_cadopoly (FILE *fp, cado_poly p)
 {
    unsigned int nroots = 0;
    double alpha, alpha_proj, logmu, e;
-   mpz_poly_t F, G;
+   mpz_poly F, G;
 
    F->coeff = p->pols[ALG_SIDE]->coeff;
    F->deg = p->pols[ALG_SIDE]->deg;

@@ -20,7 +20,7 @@ check_num (double x, double y, double emax)
 static void
 test_L2_lognorm (void)
 {
-  mpz_poly_t p;
+  mpz_poly p;
   double n;
 
   mpz_poly_init (p, MAXDEGREE);
@@ -91,7 +91,7 @@ test_L2_lognorm (void)
 static void
 test_L2_skewness (int t)
 {
-  mpz_poly_t p;
+  mpz_poly p;
   int d, i;
   double s, n, sl, nl, sh, nh, eps;
   int prec = 10;
@@ -153,7 +153,7 @@ test_L2_skewness (int t)
 static void
 test_size_optimization (void)
 {
-  mpz_poly_t f, g, f_opt, g_opt;
+  mpz_poly f, g, f_opt, g_opt;
   double n;
 
   /* check size-optimization of some RSA-1024 polynomial */

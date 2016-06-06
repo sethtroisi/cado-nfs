@@ -1409,7 +1409,7 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B,
     mpq_init(K_rat);
 
     for (unsigned int i = 0; i < U->m; i++) {
-	mpz_poly_t f;
+	mpz_poly f;
 	mpz_poly_init(f, B->n - 1);
 
 	// Putting the LCM of all denominators of coefficients of w[i] in lcm
@@ -1497,7 +1497,7 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B,
 
 	    // Gammma : polynomial of generator of Ip (only the numerators, multiplied by LCM of denominators)
 	    // c : same for generators of O
-	    mpz_poly_t gamma, c, aux;
+	    mpz_poly gamma, c, aux;
 	    // LCM of denominators of generators of Ip, of O, and one auxiliary coefficient
 	    mpz_t denom_g, denom_c, coeff;
 	    // Line matrices containing the product gamma*c mod g
@@ -1602,7 +1602,7 @@ void p_maximal_order(mpq_mat_ptr D, mpq_mat_srcptr B, mpz_poly_srcptr f,
     ASSERT_ALWAYS(B->m == B->n);
 
     mpq_mat new_D;
-    mpz_poly_t g;
+    mpz_poly g;
     mpq_t p_inv;
     unsigned int n = B->n;
 
@@ -1719,7 +1719,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpq_mat_multiply(theta_rat,theta_rat,W); // Now contains theta in the basis of alpha^
 
     // Converting theta into one polynom and one common denominator
-    mpz_poly_t theta_poly;
+    mpz_poly theta_poly;
     mpz_t theta_denom;
     mpz_poly_init(theta_poly,n-1);
     mpz_init(theta_denom);
@@ -1727,7 +1727,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     
     for (unsigned i = 0 ; i < n ; i++) {
         // Converting w[i] into one polynom and one common denominator
-        mpz_poly_t w_poly;
+        mpz_poly w_poly;
         mpz_t w_denom;
         mpz_poly_init(w_poly,n-1);
         mpz_init(w_denom);
@@ -1735,7 +1735,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         
         // Computing theta (in the basis of alpha)^ * w[i] mod g, without the common denominators.
         // We divide at the end
-        mpz_poly_t res;
+        mpz_poly res;
         mpz_poly_init(res,n-1);
         mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
     
@@ -1995,7 +1995,7 @@ int main(int argc, char *argv[])
     FILE *problemfile = fopen(argv[1], "r");
 
     mpq_mat B, D;
-    mpz_poly_t f;
+    mpz_poly f;
 
     printf("Format: [degree] [coeffs] [coeffs of order basis]\n");
 
@@ -2007,7 +2007,7 @@ int main(int argc, char *argv[])
     fclose(problemfile);
     mpq_mat_init(D, n, n);
 
-    mpz_poly_t g;
+    mpz_poly g;
     mpz_poly_init(g, n);
     mpz_poly_to_monic(g, f);
     printf("f  is : ");

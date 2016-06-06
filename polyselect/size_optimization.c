@@ -734,7 +734,7 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   int changedt, changed[SOPT_MAX_DEGREE_ROTATION+1];
   double logmu_opt, logmu;
   unsigned int iter = 0;
-  mpz_poly_t ftmp;
+  mpz_poly ftmp;
 
   ASSERT_ALWAYS(deg_rotation <= SOPT_MAX_DEGREE_ROTATION);
 
@@ -778,12 +778,12 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   mpz_init_set_ui (kt, 1);
   while (1)
   {
-    mpz_poly_translation (ftmp, f_raw, kt);
+    mpz_polyranslation (ftmp, f_raw, kt);
     logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
     if (logmu > logmu_opt + SOPT_LOCAL_DESCENT_GUARD)
     {
       mpz_neg (tmp, kt);
-      mpz_poly_translation (ftmp, f_raw, tmp);
+      mpz_polyranslation (ftmp, f_raw, tmp);
       logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
       if (logmu > logmu_opt + SOPT_LOCAL_DESCENT_GUARD)
         break;
@@ -806,26 +806,26 @@ sopt_local_descent (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     if (use_translation != 0)
     {
       /* first try translation by kt */
-      mpz_poly_translation (ftmp, f_opt, kt); /* f(x+kt) */
+      mpz_polyranslation (ftmp, f_opt, kt); /* f(x+kt) */
       logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
       if (logmu < logmu_opt)
       {
         changedt = 1;
         logmu_opt = logmu;
         mpz_poly_swap (f_opt, ftmp);
-        mpz_poly_translation (g_opt, g_opt, kt);
+        mpz_polyranslation (g_opt, g_opt, kt);
       }
       else
       {
         mpz_neg (tmp, kt);
-        mpz_poly_translation (ftmp, f_opt, tmp); /* f(x-kt) */
+        mpz_polyranslation (ftmp, f_opt, tmp); /* f(x-kt) */
         logmu = L2_skew_lognorm (ftmp, SKEWNESS_DEFAULT_PREC);
         if (logmu < logmu_opt)
         {
           changedt = 1;
           logmu_opt = logmu;
           mpz_poly_swap (f_opt, ftmp);
-          mpz_poly_translation (g_opt, g_opt, tmp);
+          mpz_polyranslation (g_opt, g_opt, tmp);
         }
       }
     }
@@ -1038,7 +1038,7 @@ best_norm (mpz_poly_ptr fopt, mpz_poly_ptr gopt,
   mat_Z m;
   mpz_t tmp, a, b;
   double min_norm = DBL_MAX, norm;
-  mpz_poly_t ft, gt;
+  mpz_poly ft, gt;
 
   mpz_poly_init (ft, d);
   mpz_poly_init (gt, 1);
@@ -1050,8 +1050,8 @@ best_norm (mpz_poly_ptr fopt, mpz_poly_ptr gopt,
 
   ASSERT_ALWAYS(m.NumCols == d+1);
 
-  mpz_poly_translation (ft, f_raw, k);
-  mpz_poly_translation (gt, g_raw, k);
+  mpz_polyranslation (ft, f_raw, k);
+  mpz_polyranslation (gt, g_raw, k);
   LLL_set_matrix_from_polys (&m, ft, gt, skew, tmp);
   LLL (tmp, m, NULL, a, b);
   for (int l = 1; l <= m.NumRows; l++)
@@ -1102,7 +1102,7 @@ best_norm2 (mpz_poly_ptr fopt, mpz_poly_ptr gopt,
   double_poly_t eq;
   int d = f_raw->deg, nroots;
   mpz_t best_k;
-  mpz_poly_t ft, gt;
+  mpz_poly ft, gt;
 
   mpz_poly_init (ft, d);
   mpz_poly_init (gt, 1);
@@ -1214,7 +1214,7 @@ size_optimization_aux (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
 
   /****************************** init *******************************/
   mpz_t tmp, tmp2, skew, a, b;
-  mpz_poly_t ft, gt, flll, fld, gld, fbest, gbest;
+  mpz_poly ft, gt, flll, fld, gld, fbest, gbest;
   list_mpz_t list_k;
   mat_Z m, U;
 

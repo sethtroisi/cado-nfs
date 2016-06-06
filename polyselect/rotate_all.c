@@ -96,7 +96,7 @@ update_table (mpz_t *f, int d, mpz_t m, mpz_t b, double *A, long K0, long K1,
   modul_poly_init (fpn, d);
 
   /* first reduce f(x) and g(x) mod p^n */
-  mpz_poly_t F;
+  mpz_poly F;
   F->coeff = f;
   F->deg = d;
   modul_poly_set_mod_raw (fpn, F, Pn);

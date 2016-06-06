@@ -5,8 +5,10 @@ import logging
 import re
 import cadoprograms
 import cadologger
+import cadotask
 from os import environ as os_environ
-
+#t=nb()
+#print(t.taskn)
 logger = logging.getLogger("Command")
 
 def shellquote(s, first=True):
@@ -63,14 +65,22 @@ class Command(object):
             self.program.get_stdio()
         
         self.stdin = self._open(stdin, False)
-        self.stdout = self._open(stdout, True, append_out)
-        if self.is_same(stdout, stderr):
-            self.stderr = subprocess.STDOUT
+        if type(stdout) == str or stdout is None:
+            self.stdout = self._open(stdout, True, append_out)
+            if self.is_same(stdout, stderr):
+                self.stderr = subprocess.STDOUT
+            else:
+                self.stderr = self._open(stderr, True, append_err)
+            self.child = subprocess.Popen(progargs, *args, stdin=self.stdin, stdout=self.stdout, stderr=self.stderr, **kwargs)
         else:
+            self.stdout = None
             self.stderr = self._open(stderr, True, append_err)
-        
-        self.child = subprocess.Popen(progargs, *args, stdin=self.stdin,
-            stdout=self.stdout, stderr=self.stderr, **kwargs)
+            self.child = subprocess.Popen(progargs, *args, stdin=self.stdin,
+                stdout=subprocess.PIPE, stderr=self.stderr, **kwargs)
+            for x in self.child.stdout:
+                stdout.filter(x.decode("utf-8"))
+
+
         cmdline = self.program.make_command_line()
         logger.cmd(cmdline, self.child.pid)
     

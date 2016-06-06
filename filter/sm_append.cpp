@@ -251,7 +251,7 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
         if (sm_info[side]->nsm) limbs_per_ell = mpz_size(sm_info[side]->ell);
     }
 
-    mpz_poly_t smpol;
+    mpz_poly smpol;
 
     mpz_poly_init(smpol, maxdeg);
 
@@ -271,7 +271,7 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
         memset(returns, 0, bsize*nsm_total*limbs_per_ell*sizeof(mp_limb_t));
 
         for(unsigned long i = 0 ; i < bsize ; i++) {
-            mpz_poly_t pol;
+            mpz_poly pol;
             mpz_poly_init_set_ab(pol, batch[i].a, batch[i].b);
             int smidx = 0;
             for (int side = 0; side < nb_polys; ++side) {
@@ -303,7 +303,7 @@ static void sm_append_slave(sm_side_info *sm_info, int nb_polys)
 static void sm_append_sync(FILE * in, FILE * out, sm_side_info *sm_info, int nb_polys)
 {
     char buf[1024];
-    mpz_poly_t pol, smpol;
+    mpz_poly pol, smpol;
     int maxdeg = sm_info[0]->f->deg;
     for(int side = 1; side < nb_polys; side++)
         maxdeg = MAX(maxdeg, sm_info[side]->f->deg);

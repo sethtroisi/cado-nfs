@@ -107,7 +107,7 @@ void test_mpz_poly()
 {
   mpz_vector_t c;
   mpz_vector_init(c, 3);
-  mpz_poly_t p;
+  mpz_poly p;
   mpz_poly_init(p, -1);
 
   mpz_vector_setcoordinate_ui(c, 1, 2);

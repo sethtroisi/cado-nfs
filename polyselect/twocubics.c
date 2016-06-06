@@ -156,12 +156,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   unsigned long j;
   int cmp;
   double skew, logmu, E;
-  mpz_poly_t F;
+  mpz_poly F;
 #endif
 
   mpz_t l, r, k, mprime, Nprime, C, l2, tmp, r1, r0, t, adm1, m, skew, root;
   mpz_vector_t a, b, reduced_a, reduced_b;
-  mpz_poly_t f, g;
+  mpz_poly f, g;
 
   mpz_init (root);
   mpz_init (m);

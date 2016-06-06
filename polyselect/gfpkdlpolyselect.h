@@ -98,20 +98,20 @@ typedef struct {
 
 typedef polyselect_parameters_t pp_t[1];
 
-// to convert a poly from int poly[] to mpz_poly_t format
-void mpz_poly_set_si(mpz_poly_t f, const int * h, int deg_h);
+// to convert a poly from int poly[] to mpz_poly format
+void mpz_poly_set_si(mpz_poly f, const int * h, int deg_h);
 void mpz_poly_setcoeff_sli(mpz_poly_ptr f, int i, long int z);
-void mpz_poly_set_sli(mpz_poly_t f, const long int * h, int deg_h);
+void mpz_poly_set_sli(mpz_poly f, const long int * h, int deg_h);
 
 // works only if PY is of degree 2
-void eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
-void eval_si_phi_mpz_y(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
-void eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
+void eval_mpz_phi_mpz_uv(mpz_poly g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
+void eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
+void eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
 // works only if PY is of degree 2
 
-void init_eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
-void init_eval_si_phi_mpz_y(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
-void init_eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
+void init_eval_mpz_phi_mpz_uv(mpz_poly g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
+void init_eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
+void init_eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
 
 
 bool is_irreducible_ZZ(mpz_poly_srcptr phi);
@@ -121,26 +121,26 @@ bool is_irreducible_mod_p_si(const long int* Py, int deg_Py, mpz_srcptr p);
 
 // same as is_good_poly_check_all in gfpk/magma/polyselect_utils.mag
 // return: error_code, see above
-int is_good_poly(pp_t pp, ppf_t ppf, mpz_poly_t f);
+int is_good_poly(pp_t pp, ppf_t ppf, mpz_poly f);
 // I need a function that works also for polynomials of small coefficients (signed long int)
-bool is_good_phi(mpz_poly_t phi, unsigned int n, mpz_t p);
-bool is_good_f_PY(fPyphi_t* fPyphi, mpz_poly_t** phi);
+bool is_good_phi(mpz_poly phi, unsigned int n, mpz_t p);
+bool is_good_f_PY(fPyphi_t* fPyphi, mpz_poly** phi);
 
 // set f_id l'indice de la bonne ligne du tableau de {f, Py, phi}
 bool get_f_CONJ(int* f_id, mpz_t * tab_roots_Py, int* nb_roots_Py, const fPyphi_poly_t * ff, mpz_srcptr p);
 // ff->tab_f[i] is the line with a right f.
 
 // case MNFS: tab of g_i, 1 <= i <= mnfs.
-bool get_g_CONJ(mpz_poly_t g[], mpz_poly_t phi, ppf_t params_g, int f_id, mpz_t * tab_roots_Py, int nb_roots_Py, const fPyphi_poly_t * ff, pp_t params);
+bool get_g_CONJ(mpz_poly g[], mpz_poly phi, ppf_t params_g, int f_id, mpz_t * tab_roots_Py, int nb_roots_Py, const fPyphi_poly_t * ff, pp_t params);
 // ff->tab[i] is the line with a right f.
 // ff->tab[i].f
 
 /* print functions */
 
-void mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly_t f, 
+void mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly f, 
 					const int j, const char* label_poly);
 void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, unsigned int deg_Py, int j, const char *label_poly);
-void fprintf_gfpn_poly_info (FILE* fp, mpz_poly_t f, const char *label_poly);
+void fprintf_gfpn_poly_info (FILE* fp, mpz_poly f, const char *label_poly);
 void gfpk_print_params(unsigned int n, mpz_srcptr p, mpz_srcptr ell);
 
 // the function to call for generating a .poly file.
