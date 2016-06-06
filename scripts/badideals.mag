@@ -579,7 +579,8 @@ function factorization_of_prime(K, p)
      */
 
     pick_from:=[<G, [p*x:x in G], VectorSpace(GF(p),n)>];
-
+    // It is a set containg <subspace of Ok/pOk (or a basis of that subspace), p*basis, vectorspace of dim n on GF(p)>
+    // G is in fact a p maximal order
     /* How do write an element of <G>, given as a vector over a basis of K,
      * directly as a combination of the elements of G ?
      *
