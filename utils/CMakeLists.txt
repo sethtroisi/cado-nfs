@@ -5,7 +5,7 @@ set (sources
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
         double_poly.c rootfinder.c params.c gcd.c
         mpz_array.c gzip.c misc.c
-        mpz_poly.c crc.c purgedfile.c bit_vector.c
+        mpz_mat.c mpz_poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
         ringbuf.c sm_utils.c galois_utils.c memalloc.c 

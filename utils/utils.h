@@ -40,6 +40,7 @@
 #include "lll.h"
 #include "verbose.h"
 #include "mpz_poly.h"
+#include "mpz_mat.h"
 #include "version_info.h"
 
 #endif	/* CADO_UTILS_H_ */

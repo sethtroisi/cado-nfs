@@ -1,4 +1,3 @@
-
 #ifndef MPZ_POLY_H_
 #define MPZ_POLY_H_
 
@@ -257,6 +256,8 @@ struct cxx_mpz_poly {
 #endif
     operator mpz_poly_ptr() { return x; }
     operator mpz_poly_srcptr() const { return x; }
+    mpz_poly_ptr operator->() { return x; }
+    mpz_poly_srcptr operator->() const { return x; }
 };
 #endif
 
