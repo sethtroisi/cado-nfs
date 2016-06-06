@@ -21,7 +21,7 @@ typedef struct {
   mpz_t *coeff;
 } mpz_poly_struct_t;
 
-typedef mpz_poly_struct_t mpz_poly_t[1];
+typedef mpz_poly_struct_t mpz_poly[1];
 typedef mpz_poly_struct_t * mpz_poly_ptr;
 typedef const mpz_poly_struct_t * mpz_poly_srcptr;
 
@@ -35,7 +35,7 @@ typedef const mpz_poly_struct_t * mpz_poly_srcptr;
    The following type represents a polynomial modulo F(x):
    If P is such an element, it means: P = P.p / f_d^P.v */
 typedef struct {
-  mpz_poly_t p;
+  mpz_poly p;
   int v;
 } polymodF_struct_t;
 
@@ -94,7 +94,7 @@ void mpz_poly_sub_mod_mpz(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h,
 void mpz_poly_mul(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h);
 void mpz_poly_mul_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
 void mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
-void mpz_poly_translation (mpz_poly_ptr, mpz_poly_srcptr, const mpz_t);
+void mpz_polyranslation (mpz_poly_ptr, mpz_poly_srcptr, const mpz_t);
 void mpz_poly_rotation (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const mpz_t, int);
 void mpz_poly_rotation_int64 (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const int64_t, int);
 void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
@@ -143,11 +143,11 @@ void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f);
 void barrett_init (mpz_ptr invm, mpz_srcptr m);
 void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m,
                   mpz_srcptr invm);
-mpz_poly_t* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
-void mpz_poly_base_modp_clear (mpz_poly_t *P, int l);
-void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_srcptr pk);
+mpz_poly* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
+void mpz_poly_base_modp_clear (mpz_poly *P, int l);
+void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly *P, int k, mpz_srcptr pk);
 size_t mpz_poly_sizeinbase (mpz_poly_srcptr f, int base);
-size_t mpz_poly_totalsize (mpz_poly_srcptr f);
+size_t mpz_polyotalsize (mpz_poly_srcptr f);
 void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
 // compute f = GCD(f,g) mod N. If this fails, put the factor in the last
 // given argument.
@@ -162,7 +162,7 @@ void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f);
 int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
 
 struct mpz_poly_with_m_s {
-    mpz_poly_t f;
+    mpz_poly f;
     int m;
 };
 typedef struct mpz_poly_with_m_s mpz_poly_with_m[1];
@@ -214,6 +214,44 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* This is sort of a generic way to write a c++ equivalent to the C type.
+ * The first-class citizen in the cado-nfs code is (still) the C type, so
+ * we're definitely bound to have a few infelicities here:
+ *  - the type name can't be the same because of the size-1 array trick
+ *    in C.
+ *  - the C type is embedded as a member x for the same reason.
+ *  - most operations on the C type should go through the member x
+ *    (however, the conversions we have to _ptr and _srcptr can ease
+ *    things a bit).
+ */
+struct cxx_mpz_poly {
+    mpz_poly x;
+    cxx_mpz_poly() { mpz_poly_init(x, -1); }
+    ~cxx_mpz_poly() { mpz_poly_clear(x); }
+    cxx_mpz_poly(cxx_mpz_poly const & o) {
+        mpz_poly_init(x, -1);
+        mpz_poly_set(x, o.x);
+    }
+    cxx_mpz_poly & operator=(cxx_mpz_poly const & o) {
+        mpz_poly_set(x, o.x);
+        return *this;
+    }
+#if __cplusplus >= 201103L
+    cxx_mpz_poly(cxx_mpz_poly && o) {
+        mpz_poly_init(x, -1);
+        mpz_poly_swap(x, o.x);
+    }
+    cxx_mpz_poly& operator=(cxx_mpz_poly && o) {
+        mpz_poly_swap(x, o.x);
+        return *this;
+    }
+#endif
+    operator mpz_poly_ptr() { return x; }
+    operator mpz_poly_srcptr() const { return x; }
+};
 #endif
 
 #endif	/* MPZ_POLY_H_ */

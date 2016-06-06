@@ -187,7 +187,7 @@ int cado_poly_read(cado_poly poly, const char *filename)
 int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
     // have to work with copies, because pseudo_gcd destroys its input
-    mpz_poly_t f[2];
+    mpz_poly f[2];
 
     ASSERT_ALWAYS(cpoly->nb_polys >= 2);
 

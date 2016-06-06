@@ -366,7 +366,7 @@ polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
 
 /* Reduce the coefficients of R in [-m/2, m/2], which are assumed in [0, m[ */
 static void
-mpz_poly_mod_center (mpz_poly_t R, const mpz_t m)
+mpz_poly_mod_center (mpz_poly R, const mpz_t m)
 {
   int i;
   mpz_t m_over_2;
@@ -391,7 +391,7 @@ mpz_poly_mod_center (mpz_poly_t R, const mpz_t m)
    Assumes the coefficients x satisfy 0 <= x < m.
 */
 static int
-mpz_poly_integer_reconstruction (mpz_poly_t R, const mpz_t m)
+mpz_poly_integer_reconstruction (mpz_poly R, const mpz_t m)
 {
   int i;
   size_t sizem = mpz_sizeinbase (m, 2), sizer;
@@ -413,12 +413,12 @@ mpz_poly_integer_reconstruction (mpz_poly_t R, const mpz_t m)
 
 // compute res := sqrt(a) in Fp[x]/f(x)
 static void
-TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned long p)
+TonelliShanks (mpz_poly res, const mpz_poly a, const mpz_poly F, unsigned long p)
 {
   int d = F->deg;
   mpz_t q;
-  mpz_poly_t delta;  // a non quadratic residue
-  mpz_poly_t auxpol;
+  mpz_poly delta;  // a non quadratic residue
+  mpz_poly auxpol;
   mpz_t aux;
   mpz_t t;
   int s;
@@ -460,7 +460,7 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
 
   // follow the description of Crandall-Pomerance, page 94
   {
-    mpz_poly_t A, D;
+    mpz_poly A, D;
     mpz_t m;
     int i;
     mpz_poly_init(A, d);
@@ -498,10 +498,10 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
 
 // res <- Sqrt(AA) mod F, using p-adic lifting, at prime p.
 void
-polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
+polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly F, unsigned long p,
 	       int numdep)
 {
-  mpz_poly_t A, *P;
+  mpz_poly A, *P;
   int v;
   int d = F->deg;
   int k, lk, target_k, logk, logk0, K[32];
@@ -540,9 +540,9 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
   // divide by fd^v.
 
   // Variables for the lifted values
-  mpz_poly_t invsqrtA;
+  mpz_poly invsqrtA;
   // variables for A and F modulo pk
-  mpz_poly_t a;
+  mpz_poly a;
   mpz_poly_init(invsqrtA, d-1);
   mpz_poly_init(a, d-1);
   // variable for the current pk
@@ -584,7 +584,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       int i;
       size_t s = 0;
       for (i = 0; i <= logk; i++)
-	s += mpz_poly_totalsize (P[i]);
+	s += mpz_polyotalsize (P[i]);
       fprintf (stderr, "Alg(%d): P takes %zuMb\n", numdep, s >> 20);
     }
   fflush (stderr);
@@ -624,7 +624,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
   // When entering the loop, invsqrtA contains the inverse square root
   // of A computed modulo p.
 
-  mpz_poly_t tmp;
+  mpz_poly tmp;
   mpz_poly_init (tmp, 2*d-1);
   do {
     double st;
@@ -650,7 +650,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_base_modp_lift took %.2lfs (peak %luM)\n", numdep, st, PeakMemusage () >> 10);
 	fprintf (stderr, "Alg(%d):    a takes %zuMb\n", numdep,
-		 mpz_poly_totalsize (a) >> 20);
+		 mpz_polyotalsize (a) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
       }
@@ -683,7 +683,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_sqr_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
 	fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
-		 mpz_poly_totalsize (tmp) >> 20);
+		 mpz_polyotalsize (tmp) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
       }
@@ -698,7 +698,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
 	fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
-		 mpz_poly_totalsize (tmp) >> 20);
+		 mpz_polyotalsize (tmp) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
       }
@@ -711,7 +711,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
 	pthread_mutex_lock (&lock);
         fprintf (stderr, "Alg(%d):    mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
 	fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
-		 mpz_poly_totalsize (tmp) >> 20);
+		 mpz_polyotalsize (tmp) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
       }
@@ -721,7 +721,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       {
 	pthread_mutex_lock (&lock);
 	fprintf (stderr, "Alg(%d):    invsqrtA takes %zuMb\n", numdep,
-		 mpz_poly_totalsize (invsqrtA) >> 20);
+		 mpz_polyotalsize (invsqrtA) >> 20);
         fflush (stderr);
 	pthread_mutex_unlock (&lock);
       }
@@ -736,7 +736,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
       pthread_mutex_lock (&lock);
       fprintf (stderr, "Alg(%d):    final mpz_poly_mul_mod_f_mod_mpz took %.2lfs (peak %luM)\n", numdep, seconds () - st, PeakMemusage () >> 10);
       fprintf (stderr, "Alg(%d):    tmp takes %zuMb\n", numdep,
-	       mpz_poly_totalsize (tmp) >> 20);
+	       mpz_polyotalsize (tmp) >> 20);
       fflush (stderr);
       pthread_mutex_unlock (&lock);
     }
@@ -762,7 +762,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p,
 }
 
 static unsigned long
-FindSuitableModP (mpz_poly_t F, mpz_t N)
+FindSuitableModP (mpz_poly F, mpz_t N)
 {
   unsigned long p = 2;
   int dF = F->deg;
@@ -796,7 +796,7 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
 
 // Products are computed modulo the polynomial F.
 polymodF_t*
-accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const mpz_poly_t F,
+accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const mpz_poly F,
                  unsigned long *lprd, unsigned long nprd)
 {
   unsigned long i;
@@ -833,7 +833,7 @@ accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const mpz_poly_t F,
 
 /* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
 void
-accumulate_fast_F_end (polymodF_t *prd, const mpz_poly_t F, unsigned long lprd)
+accumulate_fast_F_end (polymodF_t *prd, const mpz_poly F, unsigned long lprd)
 {
   unsigned long i;
 
@@ -851,7 +851,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
   char *depname, *sidename;
   FILE *depfile = NULL;
   FILE *resfile;
-  mpz_poly_t F;
+  mpz_poly F;
   polymodF_t prd, tmp;
   long a;
   unsigned long b;
@@ -951,7 +951,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
       size_t s = 0;
       for (i = 0; i < (long)lprd; ++i)
 	{
-	  s += mpz_poly_totalsize (prd_tab[i]->p);
+	  s += mpz_polyotalsize (prd_tab[i]->p);
 	  mpz_poly_clear(prd_tab[i]->p);
 	}
       fprintf (stderr, "Alg(%d): product tree took %zuMb (peak %luM)\n",

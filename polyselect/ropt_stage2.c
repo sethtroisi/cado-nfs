@@ -870,7 +870,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   sievescore_pq *sievescore;
   sievearray_t sa;
 
-  mpz_poly_t F, G;
+  mpz_poly F, G;
   F->coeff = s2param->f;
   G->coeff = s2param->g;
   F->deg = poly->d;

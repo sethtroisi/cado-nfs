@@ -46,7 +46,7 @@ stats_data_t stats; /* struct for printing progress */
 void *
 thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 {
-  mpz_poly_t * abpolys = (mpz_poly_t *) context_data;
+  mpz_poly * abpolys = (mpz_poly *) context_data;
   mpz_poly_init_set_ab(abpolys[rel->num], rel->a, rel->b);
 
   return NULL;
@@ -63,10 +63,10 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   int ret;
 
   /* array of (a,b) pairs from (purgedname) file */
-  mpz_poly_t *pairs;
+  mpz_poly *pairs;
 
   purgedfile_read_firstline (purgedname, &nrows, &ncols);
-  pairs = (mpz_poly_t *) malloc (nrows * sizeof(mpz_poly_t));
+  pairs = (mpz_poly *) malloc (nrows * sizeof(mpz_poly));
   ASSERT_ALWAYS (pairs != NULL);
   /* For each rel, read the a,b-pair and init the corresponding poly pairs[] */
   fprintf(stdout, "\n# Reading %" PRIu64 " (a,b) pairs\n", nrows);
@@ -129,7 +129,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
 
 void print_all_sm(FILE *out, sm_side_info *sm_info, int nb_polys,
-    mpz_poly_t *sm) {
+    mpz_poly *sm) {
   for(int side = 0, c = 0 ; side < nb_polys ; side++) {
     if (sm_info[side]->nsm == 0)
       continue;
@@ -200,7 +200,7 @@ void MPI_Recv_relset(sm_relset_ptr relset, int src, int nb_polys) {
   }
 }
 
-void MPI_Send_res(mpz_poly_t * res, int dst, sm_side_info *sm_info,
+void MPI_Send_res(mpz_poly * res, int dst, sm_side_info *sm_info,
     int nb_polys) {
   for(int side = 0 ; side < nb_polys ; side++) {
     if (sm_info[side]->nsm == 0)
@@ -209,7 +209,7 @@ void MPI_Send_res(mpz_poly_t * res, int dst, sm_side_info *sm_info,
   }
 }
 
-void MPI_Recv_res(mpz_poly_t * res, int src, sm_side_info * sm_info,
+void MPI_Recv_res(mpz_poly * res, int src, sm_side_info * sm_info,
     int nb_polys) {
   for(int side = 0 ; side < nb_polys ; side++) {
     if (sm_info[side]->nsm == 0)
@@ -224,7 +224,7 @@ void MPI_Recv_res(mpz_poly_t * res, int src, sm_side_info * sm_info,
 struct th_info_s {
   sm_side_info * sm_info;
   sm_relset_ptr rels;
-  mpz_poly_t ** dst;
+  mpz_poly ** dst;
   uint64_t tot_relset;
   int nb_polys;
 };
@@ -534,10 +534,10 @@ int main (int argc, char **argv)
   // Process the relsets.
   t0 = seconds();
 
-  mpz_poly_t **dst = (mpz_poly_t **) malloc(nb_parts*sizeof(mpz_poly_t*));
+  mpz_poly **dst = (mpz_poly **) malloc(nb_parts*sizeof(mpz_poly*));
   for (uint64_t j = 0; j < nb_parts; ++j) {
-    dst[j] = (mpz_poly_t *) malloc(pol->nb_polys*sizeof(mpz_poly_t));
-    memset(dst[j], 0, pol->nb_polys*sizeof(mpz_poly_t));
+    dst[j] = (mpz_poly *) malloc(pol->nb_polys*sizeof(mpz_poly));
+    memset(dst[j], 0, pol->nb_polys*sizeof(mpz_poly));
     for(int side = 0 ; side < pol->nb_polys ; side++) {
       if (sm_info[side]->nsm != 0)
         mpz_poly_init(dst[j][side], sm_info[side]->f->deg);
@@ -595,8 +595,8 @@ int main (int argc, char **argv)
     }
     fprintf(out, "%" PRIu64 " %d", nb_relsets, nsm_total);
     gmp_fprintf(out, " %Zd\n", ell);
-    mpz_poly_t *res;
-    res = (mpz_poly_t *) malloc(pol->nb_polys*sizeof(mpz_poly_t));
+    mpz_poly *res;
+    res = (mpz_poly *) malloc(pol->nb_polys*sizeof(mpz_poly));
     for(int side = 0 ; side < pol->nb_polys ; side++) {
       mpz_poly_init(res[side], sm_info[side]->f->deg);
     }

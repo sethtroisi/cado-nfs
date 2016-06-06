@@ -137,7 +137,7 @@ prime_list (ulong_list L, prime_info pi, unsigned long pmin,
 
 static unsigned long
 prime_list_poly (ulong_list L, prime_info pi, unsigned long pmin,
-                 unsigned long pmax, mpz_poly_t f)
+                 unsigned long pmax, mpz_poly f)
 {
   unsigned long p;
 
@@ -171,7 +171,7 @@ prime_tree (mpz_product_tree L, prime_info pi, unsigned long pmin,
    root modulo p, or the leading coefficient of f vanishes modulo p */
 static unsigned long
 prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
-                 unsigned long pmax, mpz_poly_t f)
+                 unsigned long pmax, mpz_poly f)
 {
   unsigned long p, *q;
   int i, j, nthreads = 1;
@@ -282,7 +282,7 @@ cofac_list_clear (cofac_list l)
    modulo p */
 static void
 prime_product_poly (mpz_t P, prime_info pi, unsigned long p_max,
-                    unsigned long p_last, mpz_poly_t f)
+                    unsigned long p_last, mpz_poly f)
 {
   mpz_product_tree L;
 
@@ -832,7 +832,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
 }
 
 static void
-create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly_t pol)
+create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly pol)
 {
   prime_info pi;
   unsigned long p;
@@ -855,7 +855,7 @@ create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly_t pol)
 */
 void
 create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly_t pol, FILE *out, int nthreads MAYBE_UNUSED)
+                   mpz_poly pol, FILE *out, int nthreads MAYBE_UNUSED)
 {
   FILE *fp;
   double s = seconds (), wct = wct_seconds ();

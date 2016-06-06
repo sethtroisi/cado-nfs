@@ -441,7 +441,7 @@ L2_skewness_deg6 (mpz_poly_ptr f MAYBE_UNUSED, double_poly_srcptr ff,
                   double_poly_srcptr dff MAYBE_UNUSED, int prec MAYBE_UNUSED)
 {
   double s, logmu, logmu_min = DBL_MAX, s_min = 1.0;
-  mpz_poly_t df;
+  mpz_poly df;
   root_struct Roots[6];
   int i, k;
 
@@ -1089,7 +1089,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   int v0;
   unsigned long *roots, r, r0;
   int i, d = f->deg, nroots;
-  mpz_poly_t g, H;
+  mpz_poly g, H;
 
   mpz_init (c);
   mpz_poly_content (c, f);
@@ -1241,7 +1241,7 @@ special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc)
   if (p_divides_lc) {
       /* compute g(x) = f(1/(px))*(px)^d, i.e., g[i] = f[d-i]*p^i */
       /* IOW, the reciprocal polynomial evaluated at px */
-      mpz_poly_t G;
+      mpz_poly G;
       mpz_t *g;
       mpz_t t;
       int i;
@@ -1541,7 +1541,7 @@ print_cadopoly (FILE *fp, cado_poly p)
 {
    unsigned int nroots = 0;
    double alpha, alpha_proj, logmu, e;
-   mpz_poly_t F, G;
+   mpz_poly F, G;
 
    F->coeff = p->pols[ALG_SIDE]->coeff;
    F->deg = p->pols[ALG_SIDE]->deg;

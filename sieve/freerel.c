@@ -249,7 +249,7 @@ typedef struct freerel_th_data_s {
   unsigned long *lpb;
   unsigned long pmin, pmax, lpbmax;
   renumber_ptr tab;
-  mpz_poly_t *pols;
+  mpz_poly *pols;
   /* Read-write part */
   th_buf_t bufs[NB_BUFFERS_PER_THREAD];
 } freerel_th_data_t;

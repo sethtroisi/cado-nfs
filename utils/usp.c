@@ -503,7 +503,7 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   double a, b, c;
   double sa, sb, sc;
   double_poly_t q;
-  mpz_poly_t P;
+  mpz_poly P;
 
   /* Note: if precision = 0.0, rootRefine will stop when the bound a and b
      are two adjacent floating-point numbers. */

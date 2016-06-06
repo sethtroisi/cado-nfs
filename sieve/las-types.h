@@ -114,7 +114,7 @@ struct sieve_side_info_s {
     double cexp2[257]; /* for 2^X * scale + GUARD */
     double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
 
-    mpz_poly_t fij;   /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
+    mpz_poly fij;   /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
                          q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
     unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
