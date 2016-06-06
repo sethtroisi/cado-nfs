@@ -3,7 +3,8 @@
 #include <gmp.h>
 #include <stdint.h>
 #include <sys/resource.h>	/* for getrusage */
-#include <vector>
+#include <queue>
+#include <time.h>
 #include "macros.h"
 #include "mpz_poly.h"
 #include "mpz_mat.h"
@@ -603,9 +604,14 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     mpq_mat_init(G_inv,n,n);
     mpq_mat_init(Id_q,n,n);
     mpz_mat_init(Ip,n,n);
+    mpz_mat_realloc(Id_z,n,n);
     mpq_mat_set_ui(Id_q,1);
     mpz_mat_set_ui(Id_z,1);
     
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    gmp_randseed_ui(state,clock());
+        
     // Computing the generators of p-maximal order, storing them in G
     p_maximal_order(G,Id_q,g,p);
     // Computing the p-radical of the order of G, storing it in Ip
@@ -620,9 +626,33 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     mpz_mat_set(initial.V,Id_z); // identity
     mpz_mat_multiply_by_ui(initial.I,initial.I,p);
     
-    vector<subspace_ideal> pick_from;
-    pick_from.push_back(initial);
+    // The vector on which the recursion will happen.
+    queue<subspace_ideal> pick_from;
+    pick_from.push(initial);
     
+    while (pick_from.size() > 0)  {
+        mpz_poly f;
+        mpz_poly_init(f,n);
+        
+        // Getting the head element
+        subspace_ideal current = pick_from.front();
+        pick_from.pop();
+        
+        // Picking one random element of subspace E
+        cxx_mpz_mat c;
+        mpz_mat_init(c,1,n);
+        for (int i = 0 ; i < n ; i++) {
+            mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
+        }
+        minimal_poly_of_mul_by_theta(f,G,c,g,p);
+        mpz_poly_cleandeg(f,n);
+        
+        printf("Element c is : "); mpz_mat_fprint(stdout,c); printf("\n");
+        printf("Minimal polynomial is : "); mpz_poly_fprintf(stdout,f); printf("\n");
+        mpz_poly_clear(f);
+    }
+    
+    gmp_randclear(state);
     mpz_mat_clear(Ip);
     mpq_mat_clear(G_inv);
     mpq_mat_clear(G);
@@ -833,7 +863,7 @@ int main(int argc, char *argv[])
     printf("Starting from\n");
     mpq_mat_fprint(stdout, B);
     printf("\n");
-    printf("the maximal order is \n");
+    printf("the %d-maximal order is \n", p);
     mpq_mat_fprint(stdout, D);
     printf("\n");
 
