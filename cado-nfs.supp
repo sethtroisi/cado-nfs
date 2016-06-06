@@ -42,4 +42,26 @@
    ...
    fun:main
 }
+{
+   ok_there_is_an_annoying_error_with_glibc_2_22_which_seems_hard_to_reproduce_but_let_us_write_a_suppression_for_it
+   Memcheck:Cond
+   fun:index
+   fun:expand_dynamic_string_token
+   fun:fillin_rpath
+   ...
+   obj:/lib/x86_64-linux-gnu/ld-2.22.so
+   ...
+}
+{
+   another_one_of_the_stop_bothering_me_kind
+   Memcheck:Cond
+   fun:index
+   fun:expand_dynamic_string_token
+   ...
+   fun:do_preload
+   fun:dl_main
+   ...
+   obj:/lib/x86_64-linux-gnu/ld-2.22.so
+   ...
+}
 

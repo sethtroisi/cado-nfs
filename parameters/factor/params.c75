@@ -8,7 +8,6 @@
 ###########################################################################
 
 name = c75
-#tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
@@ -28,16 +27,16 @@ tasks.polyselect.ropteffort = 3
 # Sieve
 ###########################################################################
 
-rlim = 281342
-alim = 231602
+rlim = 140678
+alim = 155158
 lpbr = 21
 lpba = 21
-tasks.sieve.mfbr = 44
-tasks.sieve.mfba = 43
-tasks.sieve.rlambda = 2.150000000002561
-tasks.sieve.alambda = 2.100000000004224
+tasks.sieve.mfbr = 66
+tasks.sieve.mfba = 66
+tasks.sieve.rlambda = 2.073162839302450
+tasks.sieve.alambda = 1.951884664583816
 tasks.sieve.ncurves0 = 16
-tasks.sieve.ncurves1 = 13
+tasks.sieve.ncurves1 = 15
 tasks.I = 10
 tasks.sieve.qrange = 1000
 

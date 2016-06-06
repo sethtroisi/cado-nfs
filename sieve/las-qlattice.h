@@ -33,7 +33,7 @@ fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
         const uint32_t invp, const qlattice_basis &basis);
 #ifdef  HAVE_redc_64
 static inline fbprime_t
-fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
+fb_root_in_qlattice_127bits (const fbprime_t p, const fbprime_t R,
         const uint64_t invp, const qlattice_basis &basis);
 #endif
 
@@ -45,9 +45,9 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
 #else
 /* The reason why the special-q is constrained to some limit is quite
  * clearly linked to the fb_root_in_qlattice variant being used. However,
- * it does not seem to be exactly 31 or 63 bits. This should be
+ * it does not seem to be exactly 31 or 127 bits. This should be
  * investigated */
-#define MAX_SPECIALQ_BITSIZE    60
+#define MAX_SPECIALQ_BITSIZE    126
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const redc_invp_t invp, const qlattice_basis &basis);
@@ -55,7 +55,7 @@ static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const redc_invp_t invp, const qlattice_basis &basis)
 {
-    return fb_root_in_qlattice_63bits(p, R, invp, basis);
+    return fb_root_in_qlattice_127bits(p, R, invp, basis);
 }
 #endif
 
@@ -133,9 +133,9 @@ fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
 
 #ifdef  HAVE_redc_64
 /* This one is dog slow, but should be correct under the relaxed
- * condition that p be at most 63 bits or so */
+ * condition that q be at most 127 bits or so */
 static inline fbprime_t
-fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
+fb_root_in_qlattice_127bits (const fbprime_t p, const fbprime_t R,
         const uint64_t invp, const qlattice_basis &basis)
 {
   int64_t aux1, aux2;
@@ -147,13 +147,13 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
   
   if (LIKELY(R < p)) /* Root in a,b-plane is affine */
     {
-      aux1 = ((int64_t)R)*basis.b1 - basis.a1;
-      aux2 = basis.a0 - ((int64_t)R)*basis.b0;
+      aux1 = ((int64_t)R)*redc_64(basis.b1, p, invp) - redc_64(basis.a1, p, invp);
+      aux2 = redc_64(basis.a0, p, invp) - ((int64_t)R)*redc_64(basis.b0, p, invp);
     }
   else /* Root in a,b-plane is projective */
     {
-      aux1 = basis.b1 - ((int64_t)(R - p))*basis.a1;
-      aux2 = ((int64_t)(R - p))*basis.a0 - basis.b0;
+      aux1 = redc_64(basis.b1, p, invp) - ((int64_t)(R - p))*redc_64(basis.a1, p, invp);
+      aux2 = ((int64_t)(R - p))*redc_64(basis.a0, p, invp) - redc_64(basis.b0, p, invp);
     }
   
   /* The root in the (i,j) plane is (aux1:aux2). Now let's put it
@@ -187,6 +187,7 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
   return (fbprime_t) (redc_64 (aux2, p, invp) + aux1);
 }
 
+
 #endif
 
 /* This is just for powers of 2, and is used by both versions above */
@@ -197,13 +198,13 @@ static inline fbprime_t fb_root_in_qlattice_po2 (const fbprime_t p, const fbprim
     ASSERT(p == (p & -p)); /* Test that p is power of 2 */
     if (R < p) /* Root in a,b-plane is non-projective */
       {
-	u = (int64_t)R * basis.b1 - basis.a1;
-	v = basis.a0 - (int64_t)R * basis.b0;
+	u = (int64_t)R * (basis.b1 % p) - basis.a1;
+	v = basis.a0 - (int64_t)R * (basis.b0 % p);
       }
     else /* Root in a,b-plane is projective */
       {
-        u = basis.b1 - (int64_t)(R - p) * basis.a1;
-        v = (int64_t)(R - p) * basis.a0 - basis.b0;
+        u = basis.b1 - (int64_t)(R - p) * (basis.a1 % p);
+        v = (int64_t)(R - p) * (basis.a0 % p) - basis.b0;
       }
     
     if (v & 1)

@@ -220,7 +220,7 @@ main (int argc, char *argv[])
 
     printf ("Total merge time: %.2f seconds\n", seconds ());
 
-    print_timing_and_memory (wct0);
+    print_timing_and_memory (stdout, wct0);
 
     return 0;
 }

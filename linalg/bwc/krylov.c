@@ -108,11 +108,17 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_interleaving_flip(pi);
     pi_interleaving_flip(pi);
 
+    /* I have absolutely no idea why, but the two --apparently useless--
+     * serializing calls around the next block seem to have a beneficial
+     * impact on the SEGv's we see every now and then with --mca
+     * mpi_leave_pinned 1
+     */
+    serialize(pi->m);
     char * v_name = NULL;
     int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
-        if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
+        if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
         mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
         if (tcan_print) { printf("done\n"); }
     } else {
@@ -148,6 +154,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 #endif
         gmp_randclear(rstate);
     }
+    serialize(pi->m);
 
     mmt_vec check_vector;
     void * ahead = NULL;
@@ -232,7 +239,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             A->vec_set_zero(A, ahead, nchecks);
-            AxAc->dotprod(A->obj, Ac->obj, ahead,
+            AxAc->dotprod(A, Ac, ahead,
                     mmt_my_own_subvec(check_vector),
                     mmt_my_own_subvec(ymy[0]),
                     mmt_my_own_size_in_items(ymy[0]));

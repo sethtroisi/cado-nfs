@@ -11,6 +11,7 @@
 #include <cctype>
 #include <algorithm>
 #include <iterator>
+#include <vector>
 
 #include <hwloc.h>
 #include <stdio.h>

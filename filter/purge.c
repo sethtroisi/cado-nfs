@@ -612,7 +612,7 @@ int main(int argc, char **argv)
 
     purge_matrix_clear (mat);
     /* print usage of time and memory */
-    print_timing_and_memory(wct0);
+    print_timing_and_memory (stdout, wct0);
 
     param_list_clear(pl);
 

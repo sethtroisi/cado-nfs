@@ -96,6 +96,10 @@ if os.name == "nt":
             f.seek(0)
             msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
             f.seek(pos)
+# could replace "posix" by "xxx" here if os.name is "posix" but you still get
+# the error message "IOError: [Errno 37] No locks available"
+# https://lists.gforge.inria.fr/pipermail/cado-nfs-discuss/2016-May/000634.html
+# https://lists.gforge.inria.fr/pipermail/cado-nfs-discuss/2016-May/000636.html
 elif os.name == "posix":
     import fcntl
     class FileLock(object):
@@ -689,6 +693,22 @@ class WorkunitProcessor(object):
             else:
                 renice_func = None
 
+            if self.settings["override"]:
+                mangled=[]
+                orig=re.split(' *', command)
+                while orig:
+                    a=orig.pop(0)
+                    repl=None
+                    for sub in self.settings["override"]:
+                        if re.match('^-{1,2}' + sub[0] + '$', a):
+                            repl=sub[1]
+                    mangled.append(a)
+                    if repl is not None:
+                        oldvalue=orig.pop(0)
+                        logging.info("Overriding argument %s %s by %s %s in command line (substitution %s %s)" % (a, oldvalue, a, sub[1], sub[0], sub[1]))
+                        mangled.append(sub[1])
+                command=' '.join(mangled)
+
             (returncode, stdout, stderr) = run_command(command, shell=True,
                     preexec_fn=renice_func)
 
@@ -750,36 +770,50 @@ class WorkunitClient(object):
         
         self.wu_filename = os.path.join(self.settings["DLDIR"], 
                                         self.settings["WU_FILENAME"])
-        self.download_wu()
 
-        # Get an exclusive lock to avoid two clients working on the same 
-        # workunit
-        try:
-            self.wu_file = open_exclusive(self.wu_filename)
-        except FileLockedException:
-            logging.error("File '%s' is already locked. This may "
-                          "indicate that two clients with clientid '%s' are "
-                          "running. Terminating.", 
-                          self.wu_filename, self.settings["CLIENTID"])
-            raise
+        force_reload=False
 
-        logging.debug ("Parsing workunit from file %s", self.wu_filename)
-        wu_text = self.wu_file.read()
-        # WU file stays open so we keep the lock
+        while True:
+            self.download_wu(force_reload=force_reload)
 
-        try:
-            self.workunit = Workunit(wu_text)
-        except Exception as err:
-            logging.error("Invalid workunit file: %s", err)
-            self.cleanup()
-            raise WorkunitParseError()
+            # Get an exclusive lock to avoid two clients working on the same 
+            # workunit
+            try:
+                self.wu_file = open_exclusive(self.wu_filename)
+            except FileLockedException:
+                logging.error("File '%s' is already locked. This may "
+                              "indicate that two clients with clientid '%s' are "
+                              "running. Terminating.", 
+                              self.wu_filename, self.settings["CLIENTID"])
+                raise
+
+            logging.debug ("Parsing workunit from file %s", self.wu_filename)
+            wu_text = self.wu_file.read()
+            # WU file stays open so we keep the lock
+
+            try:
+                self.workunit = Workunit(wu_text)
+            except Exception as err:
+                logging.error("Invalid workunit file: %s", err)
+                self.cleanup()
+                raise WorkunitParseError()
+            if not force_reload and self.workunit.get("DEADLINE") and time.time() > float(self.workunit.get("DEADLINE")):
+                logging.warn("Old workunit file %s has passed deadline (%s), ignoring",
+                        self.wu_filename, 
+                        time.asctime(time.localtime(float(self.workunit.get("DEADLINE")))))
+                os.remove(self.wu_filename)
+                close_exclusive(self.wu_file)
+                force_reload=True
+            else:
+                break
+
         logging.debug ("Workunit ID is %s", self.workunit.get_id())
     
-    def download_wu(self):
+    def download_wu(self, *args, **kwargs):
         # Download the WU file if none exists
         url = self.settings["GETWUPATH"]
         options = "clientid=" + self.settings["CLIENTID"]
-        self.get_missing_file(url, self.wu_filename, options=options)
+        self.get_missing_file(url, self.wu_filename, options=options, *args, **kwargs)
 
     def cleanup(self):
         logging.info ("Removing workunit file %s", self.wu_filename)
@@ -1010,7 +1044,7 @@ class WorkunitClient(object):
         request.close()
     
     def get_missing_file(self, urlpath, filename, checksum=None,
-                         options=None):
+                         options=None, force_reload=False):
         """ Downloads a file if it does not exit already.
 
         Also checks the checksum, if specified; if the file already exists and
@@ -1022,16 +1056,20 @@ class WorkunitClient(object):
         """
         # print('get_missing_file(%s, %s, %s)' % (urlpath, filename, checksum))
         if os.path.isfile(filename):
-            logging.info ("%s already exists, not downloading", filename)
-            if checksum is None:
-                return True
-            filesum = self.do_checksum(filename)
-            if filesum.lower() == checksum.lower():
-                return True
-            logging.error ("Existing file %s has wrong checksum %s, "
-                           "workunit specified %s. Deleting file.", 
-                           filename, filesum, checksum)
-            os.remove(filename)
+            if force_reload:
+                logging.info ("%s already exists, removing because of force_reload", filename)
+                os.remove(filename)
+            else:
+                logging.info ("%s already exists, not downloading", filename)
+                if checksum is None:
+                    return True
+                filesum = self.do_checksum(filename)
+                if filesum.lower() == checksum.lower():
+                    return True
+                logging.error ("Existing file %s has wrong checksum %s, "
+                               "workunit specified %s. Deleting file.", 
+                               filename, filesum, checksum)
+                os.remove(filename)
 
         # If checksum is wrong and does not change during two downloads, exit 
         # with failue, as apparently the file on the server and checksum in 
@@ -1357,13 +1395,19 @@ if __name__ == '__main__':
                           help="Keep and upload old results when client starts")
         parser.add_option("--nosha1check", default=False, action="store_true", 
                           help="Skip checking the SHA1 for input files")
+        parser.add_option("--single", default=False, action="store_true", 
+                          help="process only a single WU, then exit")
         parser.add_option("--nocncheck", default=False, action="store_true", 
                           help="Don't check common name/SAN of certificate. "
                           "Currently works only under Python 2.")
         parser.add_option("--externdl", default=False, action="store_true", 
                           help="Use wget or curl for HTTPS downloads")
+        parser.add_option("--override", nargs=2, action='append',
+                          metavar=('REGEXP', 'VALUE'),
+                          help="Modify command-line arguments which match ^-{1,2}REGEXP$ to take the given VALUE. Note that REGEXP cannot start with a dash")
         # Parse command line
         (options, args) = parser.parse_args()
+
         if args:
             sys.stderr.write("Did not understand command line arguments %s\n" %
                              " ".join(args))
@@ -1479,6 +1523,8 @@ if __name__ == '__main__':
                         "fall-back. Aborting.")
                 sys.exit(1)
 
+    SETTINGS["override"] = options.override
+
     if options.daemon:
         create_daemon(keepfd=None if logfile is None else [logfile.fileno()])
 
@@ -1502,6 +1548,9 @@ if __name__ == '__main__':
                 logging.info("Client finishing: %s. Bye." % e)
                 break
             client_ok = client.process()
+            if options.single:
+                logging.info("Client processed its WU. Finishing now as implied by --single")
+                sys.exit(0)
 #        except Exception:
 #            logging.exception("Exception occurred")
 #            break

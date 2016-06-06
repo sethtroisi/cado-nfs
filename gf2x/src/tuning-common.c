@@ -41,7 +41,12 @@ void random_wordstring(unsigned long *a, long n)
 {
     long i;
     for (i = 0; i < n; i++)
-	a[i] = random();
+      {
+        /* random () returns a value between 0 and RAND_MAX = 2^31-1 */
+	a[i] = random () + (random () << 31);
+        if (sizeof (long) > sizeof (int))
+          a[i] |= random () << 62;
+      }
 }
 
 void dump(const unsigned long *a, long m, const unsigned long *b, long n,

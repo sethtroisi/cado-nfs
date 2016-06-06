@@ -55,6 +55,7 @@ polyselect/rotation_bound.sage
 polyselect/E.sage
 polyselect/MurphyE.sage
 polyselect/twoquadratics.sage
+polyselect/size_optimization.sage
 scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/ecm/CMakeLists-nodist.txt
@@ -111,6 +112,10 @@ misc/psi.c
 misc/cacheline.c
 misc/CMakeLists-nodist.txt
 misc/descent-init.c
+misc/descent_init_Fp.c
+misc/smooth_detect.c
+misc/smooth_detect.h
+misc/filter_sieved_pairs.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
@@ -139,3 +144,4 @@ sieve/strategies/test_strategy_cado.c
 sieve/strategies/F9.sh
 linalg/bwc/lingen.txt
 .mailmap
+utils/randomprime.cpp

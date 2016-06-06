@@ -205,6 +205,19 @@ tasks.polyselect.nq = 256
     # the linear polynomial will be q1*q2*q3*q4*p1*p2 where q1,q2,q3,q4 are
     # small primes, and P <= p1, p2 < 2*P.
 
+tasks.polyselect.sopteffort = 0
+    # Indicates how much effort is spent in stage 1 (size optimization) of the
+    # polynomial selection. The default value is 0. For each i in the range
+    # [1..sopteffort], and for each translation k in the initial list, we also
+    # try k +/- k/10^i and k +/- k/(2*10^i). Thus the size optimization time
+    # grows roughly by a factor 1+4*sopteffort with respect to sopteffort=0.
+
+tasks.polyselect.ropteffort = 5
+    # Indicates how much effort is spent in stage 2 (rootsieve) of the
+    # polynomial selection. The number of sublattices considered is
+    # proportional to ropteffort, and the rootsieve time is roughly
+    # proportional to ropteffort.
+
 
 ###########################################################################
 # Sieve task

@@ -42,7 +42,7 @@ cado_poly_extended_clear (cado_poly_extended poly)
 }
 
 void
-cado_poly_set2 (cado_poly poly, mpz_poly_t f, mpz_poly_t g, mpz_t N, 
+cado_poly_set2 (cado_poly poly, mpz_poly f, mpz_poly g, mpz_t N, 
                 mpz_t skew)
 {
   mpz_poly_set (poly->pols[0], f);
@@ -52,7 +52,7 @@ cado_poly_set2 (cado_poly poly, mpz_poly_t f, mpz_poly_t g, mpz_t N,
 }
 
 void
-cado_poly_extended_set (cado_poly_extended poly, mpz_poly_t f, mpz_poly_t g,
+cado_poly_extended_set (cado_poly_extended poly, mpz_poly f, mpz_poly g,
                         mpz_t N, mpz_t p, mpz_t skew, double E)
 {
   mpz_poly_set (poly->poly->pols[0], f);
@@ -230,7 +230,7 @@ mpz_msqrt (mpz_t r, mpz_t N, mpz_t P)
    We then compute a reduced basis of the lattice spanned by a and b with the
    Lagrange algorithm using the maximun possible skewness (bound by maxS)
  */
-void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
+void MontgomeryTwoQuadratics (mpz_poly f, mpz_poly g, mpz_t skew, mpz_t N,
                               mpz_t P, mpz_t m, mpz_t maxS)
 {
   ASSERT_ALWAYS (mpz_coprime_p(P, N));
@@ -422,7 +422,7 @@ main (int argc, char *argv[])
   cado_poly_extended best_poly, poly;
   cado_poly cur_poly;
   mpz_t P, sqrtN, r, m, skew_used;
-  mpz_poly_t f, g;
+  mpz_poly f, g;
 
   cado_poly_extended_init (best_poly);
   cado_poly_extended_init (poly);

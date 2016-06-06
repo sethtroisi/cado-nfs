@@ -24,7 +24,8 @@
 
 struct sfile_info {
     unsigned int n0,n1;
-    unsigned int iter;
+    unsigned int iter0;
+    unsigned int iter1;
 };
 
 struct sfiles_list {
@@ -40,6 +41,18 @@ struct sols_list {
     struct sfiles_list (*sols)[1];
 };
 
+static int sort_sfile_info(const struct sfile_info * a, const struct sfile_info * b)
+{
+    int r = (a->n0 > b->n0) - (b->n0 > a->n0);
+    if (r) return r;
+    r = (a->n1 > b->n1) - (b->n1 > a->n1);
+    if (r) return r;
+    r = (a->iter1 > b->iter1) - (b->iter1 > a->iter1);
+    if (r) return r;
+    r = (a->iter1 > b->iter1) - (b->iter1 > a->iter1);
+    return r;
+}
+
 int exitcode = 0;
 
 static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
@@ -48,7 +61,7 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
     sl->sols = NULL;
     sl->nsols=0;
     serialize_threads(pi->m);
-    const char * spat = S_FILE_BASE_PATTERN ".%u" "%n";
+    const char * spat = S_FILE_BASE_PATTERN ".%u-%u" "%n";
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         /* It's our job to collect the directory data.
          */
@@ -60,8 +73,8 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
             int rc;
             unsigned int n0,n1;
             unsigned int s0,s1;
-            unsigned int iter;
-            rc = sscanf(de->d_name, spat, &s0, &s1, &n0, &n1, &iter, &k);
+            unsigned int iter0, iter1;
+            rc = sscanf(de->d_name, spat, &s0, &s1, &n0, &n1, &iter0, &iter1, &k);
             if (rc < 5 || k != (int) strlen(de->d_name)) {
                 continue;
             }
@@ -90,8 +103,9 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
             }
             s->sfiles[s->nsfiles]->n0 = n0;
             s->sfiles[s->nsfiles]->n1 = n1;
-            s->sfiles[s->nsfiles]->iter = iter;
-            if (bw->interval && iter % bw->interval != 0) {
+            s->sfiles[s->nsfiles]->iter0 = iter0;
+            s->sfiles[s->nsfiles]->iter1 = iter1;
+            if (bw->interval && iter1 % bw->interval != 0) {
                 fprintf(stderr,
                         "Warning: %s is not a checkpoint at a multiple of "
                         "the interval value %d -- this might indicate a "
@@ -102,6 +116,28 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
         }
         closedir(dir);
     }
+    for(int i = 0 ; i < sl->nsols ; i++) {
+        struct sfiles_list * s = sl->sols[i];
+        qsort(s->sfiles, s->nsfiles, sizeof(struct sfile_info),
+             (int(*)(const void*,const void*)) &sort_sfile_info);
+        for(int i = 1 ; i < s->nsfiles ; i++) {
+            struct sfile_info * prev = s->sfiles[i-1];
+            struct sfile_info * cur = s->sfiles[i];
+            if (cur->iter0 == 0)
+                continue;
+            if (cur->n0 != prev->n0 || cur->n1 != prev->n1 || cur->iter0 != prev->iter1) {
+                fprintf(stderr, "Within the set of S files, there seems to be a gap between "
+                        S_FILE_BASE_PATTERN ".%u-%u"
+                        " and "
+                        S_FILE_BASE_PATTERN ".%u-%u"
+                        "\n",
+                        s->s0, s->s1, prev->n0, prev->n1, prev->iter0, prev->iter1,
+                        s->s0, s->s1, cur->n0, cur->n1, cur->iter0, cur->iter1);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
     /* Note that it's not necessary to care about the file names -- in
      * practice, the file name is only relevant to the job/thread doing
      * actual I/O.
@@ -313,10 +349,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         for(int i = 0 ; i < sf->nsfiles ; i++) {
             char * tmp;
-            int rc = asprintf(&tmp, S_FILE_BASE_PATTERN ".%u",
+            int rc = asprintf(&tmp, S_FILE_BASE_PATTERN ".%u-%u",
                     sf->s0, sf->s1,
                     sf->sfiles[i]->n0, sf->sfiles[i]->n1,
-                    sf->sfiles[i]->iter);
+                    sf->sfiles[i]->iter0,
+                    sf->sfiles[i]->iter1);
             ASSERT_ALWAYS(rc >= 0);
 
             if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {

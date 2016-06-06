@@ -138,6 +138,15 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
     typedef void (*rebinder_t)(matmul_ptr mm);
     rebinder_t rebinder;
 
+    if (strcmp(x->impl_name(x), "pz") == 0) {
+        fprintf(stderr, "Note: the pz backends for linear algebra have been intentionally disabled, in favour of fixed-width types, fixed at compile time. Therefore, in order to do linear algebra mod this p, you must either:\n"
+                " - Use a version before 48202e0\n"
+                " - Implement fixed-width mpfq code beyond what is already implemented, at at least up to the current size (%lu words)\n"
+                " - Implement variable-width c++ code in arith-modp.hpp\n"
+                "Currently, everything up to 9 machine words is supported\n",
+                iceildiv(x->field_characteristic_bits(x), mp_bits_per_limb));
+        abort();
+    }
 
 #ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
     char solib[256];

@@ -20,7 +20,7 @@ check_num (double x, double y, double emax)
 static void
 test_L2_lognorm (void)
 {
-  mpz_poly_t p;
+  mpz_poly p;
   double n;
 
   mpz_poly_init (p, MAXDEGREE);
@@ -91,7 +91,7 @@ test_L2_lognorm (void)
 static void
 test_L2_skewness (int t)
 {
-  mpz_poly_t p;
+  mpz_poly p;
   int d, i;
   double s, n, sl, nl, sh, nh, eps;
   int prec = 10;
@@ -153,7 +153,7 @@ test_L2_skewness (int t)
 static void
 test_size_optimization (void)
 {
-  mpz_poly_t f, g, f_opt, g_opt;
+  mpz_poly f, g, f_opt, g_opt;
   double n;
 
   /* check size-optimization of some RSA-1024 polynomial */
@@ -186,7 +186,10 @@ test_size_optimization (void)
 
   size_optimization (f_opt, g_opt, f, g, 3, 0);
   n = L2_skew_lognorm (f_opt, SKEWNESS_DEFAULT_PREC);
-  ASSERT_ALWAYS(n <= 87.197);
+  /* note: now size_optimization optimizes the sum of the lognorm and of the
+     expected alpha value, thus on this particular example we do no longer get
+     a better lognorm with sopt_effort=3 */
+  ASSERT_ALWAYS(n <= 87.415);
 
   mpz_poly_clear (f);
   mpz_poly_clear (g);

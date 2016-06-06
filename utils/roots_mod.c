@@ -917,7 +917,7 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
     }
   else
     {
-      mpz_poly_t f;
+      mpz_poly f;
       mpz_poly_init(f, d);
       mpz_poly_setcoeff_int64 (f, d, 1);
       mpz_poly_setcoeff_int64 (f, 0, p-a);

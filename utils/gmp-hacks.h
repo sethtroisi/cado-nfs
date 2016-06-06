@@ -1,6 +1,8 @@
 #ifndef GMP_HACKS_H_
 #define GMP_HACKS_H_
 
+#include <string.h>
+
 /* TODO: remove this. It's only here by lack of something better for the
  * needs of crtalgsqrt. */
 
@@ -71,8 +73,9 @@
 	   
 #define MPN_SET_MPZ(DST,NLIMBS,SRC)					\
 	BEGIN_BLOCK							\
-	memcpy((DST),PTR(SRC),SIZ(SRC) * sizeof(mp_limb_t));		\
-	memset((DST)+SIZ(SRC),0,((NLIMBS)-SIZ(SRC)) * sizeof(mp_limb_t));\
+        mp_size_t r = MIN(ABS(SIZ(SRC)),NLIMBS);                        \
+	memcpy((DST),PTR(SRC),r * sizeof(mp_limb_t));   		\
+	memset((DST)+SIZ(SRC),0,((NLIMBS)-r) * sizeof(mp_limb_t));      \
 	END_BLOCK
 
 /* This one is rather ill-designed, hence the ASSERTS as a caution */

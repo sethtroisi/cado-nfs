@@ -34,7 +34,7 @@ static void my_sm(const char *outfile, const char *infile,
   }
 
   char buf[1024];
-  mpz_poly_t pol, smpol;
+  mpz_poly pol, smpol;
   int maxdeg = sm_info[0]->f->deg;
   for(int side = 1; side < nb_polys; side++)
       maxdeg = MAX(maxdeg, sm_info[side]->f->deg);
@@ -80,7 +80,6 @@ static void my_sm(const char *outfile, const char *infile,
     fclose(out);
   fclose(in);
 }
-
 
 
 static void declare_usage(param_list pl)

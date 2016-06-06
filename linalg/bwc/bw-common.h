@@ -81,7 +81,7 @@ struct bw_params {
      */
     int dir;
 
-    /* Only prep and lingen are not deterministic. */
+    /* secure, prep, and lingen are not deterministic. */
     int seed;
 
     /* If enabled, do not check the intermediate results while running

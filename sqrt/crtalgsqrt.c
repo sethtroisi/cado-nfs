@@ -355,8 +355,8 @@ void cachefile_close(cachefile_ptr c)
 /* }}} */
 
 void
-polymodF_mul_monic (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t P2,
-        const mpz_poly_t F);
+polymodF_mul_monic (mpz_poly Q, const mpz_poly P1, const mpz_poly P2,
+        const mpz_poly F);
 
 /* {{{ mpi-gmp helpers */
 static int mpi_data_agrees(void *buffer, int count, MPI_Datatype datatype,/*{{{*/
@@ -520,14 +520,14 @@ void allreduce_mulmod_mpz(mpz_ptr z, MPI_Comm comm, mpz_srcptr px)/*{{{*/
 #endif
 }/*}}}*/
 
-void reduce_polymodF_mul_monic(mpz_poly_t P, int recv, MPI_Comm comm, mpz_poly_t F)/*{{{*/
+void reduce_polymodF_mul_monic(mpz_poly P, int recv, MPI_Comm comm, mpz_poly F)/*{{{*/
 {
     int me;
     int s;
     MPI_Comm_rank(comm, &me);
     MPI_Comm_size(comm, &s);
     ASSERT_ALWAYS(recv == 0);
-    mpz_poly_t Q;
+    mpz_poly Q;
     mpz_poly_init(Q, F->deg-1);
     ASSERT_ALWAYS(P->deg < F->deg);
     for(int done_size = 1 ; done_size < s ; done_size <<= 1) {
@@ -553,7 +553,7 @@ void reduce_polymodF_mul_monic(mpz_poly_t P, int recv, MPI_Comm comm, mpz_poly_t
     }
     mpz_poly_clear(Q);
 }/*}}}*/
-static void broadcast_poly(mpz_poly_t P, int maxdeg, int root, MPI_Comm comm) /*{{{*/
+static void broadcast_poly(mpz_poly P, int maxdeg, int root, MPI_Comm comm) /*{{{*/
 {
     /* maxdeg must be <= all allocation degrees. */
     ASSERT_ALWAYS(maxdeg + 1 <= P->alloc);
@@ -565,7 +565,7 @@ static void broadcast_poly(mpz_poly_t P, int maxdeg, int root, MPI_Comm comm) /*
     }
     mpz_poly_cleandeg(P, maxdeg);
 }/*}}}*/
-void allreduce_polymodF_mul_monic(mpz_poly_t P, MPI_Comm comm, mpz_poly_t F)/*{{{*/
+void allreduce_polymodF_mul_monic(mpz_poly P, MPI_Comm comm, mpz_poly F)/*{{{*/
 {
     reduce_polymodF_mul_monic(P, 0, comm, F);
     broadcast_poly(P, F->deg - 1, 0, comm);
@@ -1025,8 +1025,8 @@ struct sqrt_globals {
     mpz_t P;    // prime product (not to the power prec)
     size_t nbits_sqrt;
     // size_t nbits_a;
-    mpz_poly_t f_hat;
-    mpz_poly_t f_hat_diff;
+    mpz_poly f_hat;
+    mpz_poly f_hat_diff;
     double f_hat_coeffs;
     cado_poly pol;
     mpz_t root_m;
@@ -1050,7 +1050,7 @@ struct sqrt_globals glob = { .lll_maxdim=50, .ncores = 2 };
 // {{{ TODO: Now that the v field is gone, replace the polymodF layer.
 // Here's the only fragments which need to remain.
 static void
-mpz_poly_from_ab_monic(mpz_poly_t tmp, long a, unsigned long b) {
+mpz_poly_from_ab_monic(mpz_poly tmp, long a, unsigned long b) {
     tmp->deg = b != 0;
     mpz_set_ui (tmp->coeff[1], b);
     mpz_neg (tmp->coeff[1], tmp->coeff[1]);
@@ -1059,7 +1059,7 @@ mpz_poly_from_ab_monic(mpz_poly_t tmp, long a, unsigned long b) {
 }
 
     static void
-mpz_poly_reducemodF_monic(mpz_poly_t P, mpz_poly_t p, const mpz_poly_t F)
+mpz_poly_reducemodF_monic(mpz_poly P, mpz_poly p, const mpz_poly F)
 {
     if (p->deg < F->deg) {
         mpz_poly_set(P, p);
@@ -1081,7 +1081,7 @@ mpz_poly_reducemodF_monic(mpz_poly_t P, mpz_poly_t p, const mpz_poly_t F)
 polymodF_mul_monic (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
         mpz_poly_srcptr F)
 {
-    mpz_poly_t prd;
+    mpz_poly prd;
     mpz_poly_init(prd, P1->deg+P2->deg);
     ASSERT_ALWAYS(mpz_poly_normalized_p (P1));
     ASSERT_ALWAYS(mpz_poly_normalized_p (P2));
@@ -1394,11 +1394,11 @@ struct prime_data {
 
     // after the rational ptree reduction, this contains the share of A
     // with coefficients reduced. Short-lived.
-    mpz_poly_t A;
+    mpz_poly A;
 
-    mpz_poly_t evals;       // set of evaluations.
-    mpz_poly_t lroots;      // (lifted) roots.
-    mpz_poly_t sqrts;       // square roots of A(x)     (only in the end !)
+    mpz_poly evals;       // set of evaluations.
+    mpz_poly lroots;      // (lifted) roots.
+    mpz_poly sqrts;       // square roots of A(x)     (only in the end !)
 
 };/* }}} */
 
@@ -1406,7 +1406,7 @@ struct prime_data {
 struct alg_ptree_s {
     struct alg_ptree_s * t0;
     struct alg_ptree_s * t1;
-    mpz_poly_t s;
+    mpz_poly s;
 };
 typedef struct alg_ptree_s alg_ptree_t;
 
@@ -2185,7 +2185,7 @@ struct subtask_info_t {
 // the accumulation is done for all data between:
 // the first data line starting at offset >= off0 (inclusive)
 // the first data line starting at offset >= off1 (exclusive)
-size_t accumulate_ab_poly(mpz_poly_ptr P, ab_source_ptr ab, size_t off0, size_t off1, mpz_poly_t tmp)
+size_t accumulate_ab_poly(mpz_poly_ptr P, ab_source_ptr ab, size_t off0, size_t off1, mpz_poly tmp)
 {
     size_t res = 0;
     mpz_set_ui(P->coeff[0], 1);
@@ -2203,7 +2203,7 @@ size_t accumulate_ab_poly(mpz_poly_ptr P, ab_source_ptr ab, size_t off0, size_t 
         return res;
     }
     size_t d = (off1 - off0) / 2;
-    mpz_poly_t Pl, Pr;
+    mpz_poly Pl, Pr;
     mpz_poly_init(Pl, glob.n);
     mpz_poly_init(Pr, glob.n);
     res += accumulate_ab_poly(Pl, ab, off0, off0 + d, tmp);
@@ -2240,7 +2240,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
 
     ab_source ab;
     ab_source_init_set(ab, glob.ab);
-    mpz_poly_t tmp;
+    mpz_poly tmp;
     mpz_poly_init(tmp, 1);
     info->nab_loc = accumulate_ab_poly(P, ab, off0, off1, tmp);
     mpz_poly_clear(tmp);
@@ -2264,7 +2264,7 @@ void * a_poly_read_share_child2(struct subtask_info_t * info)
     return NULL;
 }
 
-size_t a_poly_read_share(mpz_poly_t P, size_t off0, size_t off1)
+size_t a_poly_read_share(mpz_poly P, size_t off0, size_t off1)
 {
     STOPWATCH_DECL;
     STOPWATCH_GO();
@@ -2298,7 +2298,7 @@ size_t a_poly_read_share(mpz_poly_t P, size_t off0, size_t off1)
     int j0 = glob.ncores * glob.arank;
     int j1 = j0 + glob.ncores;
 
-    mpz_poly_t * pols = malloc((j1-j0) * sizeof(mpz_poly_t));
+    mpz_poly * pols = malloc((j1-j0) * sizeof(mpz_poly));
     for(int j = j0 ; j < j1 ; j++) mpz_poly_init(pols[j-j0], glob.n);
 
     for(int j = j0 ; j < j1 ; j++) {
@@ -2634,7 +2634,7 @@ void reduce_poly_mod_rat_ptree(mpz_poly_ptr P, rat_ptree_t * T)/*{{{*/
         mpz_poly_swap(T->p->A, P);
         return;
     }
-    mpz_poly_t temp;
+    mpz_poly temp;
     mpz_poly_init(temp, glob.n);
     temp->deg = glob.n - 1;
     for(int i = 0 ; i < glob.n ; i++) {
@@ -2672,7 +2672,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
             mpz_poly_cleandeg(ptree->p->A, glob.n-1);
         }
         if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
-            mpz_poly_t foo;
+            mpz_poly foo;
             mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
             mpz_poly_clear(foo);
@@ -2680,14 +2680,14 @@ void * rational_reduction_child(struct subtask_info_t * info)
     } else {
         ASSERT_ALWAYS(ptree != NULL);
 
-        mpz_poly_t temp;
+        mpz_poly temp;
         mpz_poly_init(temp, glob.n);
         for(int i = 0 ; i < glob.n ; i++) {
             WRAP_mpz_mod(temp->coeff[i], info->P->coeff[i], ptree->zx);
         }
         mpz_poly_cleandeg(temp, glob.n-1);
         if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
-            mpz_poly_t foo;
+            mpz_poly foo;
             mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
             mpz_poly_clear(foo);
@@ -3670,7 +3670,7 @@ int main(int argc, char **argv)
 
     size_t nab = 0;
 
-    mpz_poly_t P;
+    mpz_poly P;
     mpz_poly_init(P, glob.n);
 
     int next = 0;
@@ -3888,7 +3888,7 @@ fprintf(stderr, "Finished accumulating the product at %2.2lf\n",
         WCT);
 fprintf(stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
 fprintf(stderr, "maximal polynomial bit-size = %lu\n",
-        (unsigned long) mpz_poly_sizeinbase(prd->p, pol->alg->deg - 1, 2));
+        (unsigned long) mpz_poly_sizeinbase(prd->p, 2));
 
 p = FindSuitableModP(F);
 fprintf(stderr, "Using p=%lu for lifting\n", p);
