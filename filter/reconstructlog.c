@@ -227,7 +227,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
             if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side))) {
 #define xxxDOUBLECHECK_SM
 #ifdef DOUBLECHECK_SM
-                mpz_poly_t u;
+                mpz_poly u;
                 mpz_poly_init(u, MAX(1, S->f->deg-1));
                 mpz_poly_setcoeff_int64(u, 0, a);
                 mpz_poly_setcoeff_int64(u, 1, -b);
@@ -254,7 +254,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
         for(int side = 0 ; side < data->poly->nb_polys ; side++) {
             sm_side_info_srcptr S = data->sm_info[side];
             if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side))) {
-                mpz_poly_t u;
+                mpz_poly u;
                 mpz_poly_init(u, MAX(1, S->f->deg-1));
                 mpz_poly_setcoeff_int64(u, 0, a);
                 mpz_poly_setcoeff_int64(u, 1, -b);

@@ -150,7 +150,7 @@ print_poly_info ( mpz_t *f,
 {
   unsigned int i, nroots;
   double skew, logmu, exp_E;
-  mpz_poly_t F, G;
+  mpz_poly F, G;
   F->coeff = f;
   F->deg = d;
   G->coeff = g;
@@ -289,7 +289,7 @@ sorted_insert_double(double *array, const size_t len, const double value)
 /* return 1 if the polynomial is ok and among the best ones,
    otherwise return 0 */
 static int
-optimize_raw_poly (mpz_poly_t F, mpz_t *g)
+optimize_raw_poly (mpz_poly F, mpz_t *g)
 {
   double skew;
   mpz_t t;
@@ -306,7 +306,7 @@ optimize_raw_poly (mpz_poly_t F, mpz_t *g)
   mpz_clear (t);
 
   /* optimize size */
-  mpz_poly_t G;
+  mpz_poly G;
   G->deg = 1;
   G->alloc = 2;
   G->coeff = g;
@@ -356,7 +356,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2];
   int cmp, did_optimize;
   double skew, logmu;
-  mpz_poly_t F;
+  mpz_poly F;
 
   /* the expected rotation space is S^5 for degree 6 */
 #ifdef DEBUG_POLYSELECT
@@ -544,7 +544,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, tmp;
   int cmp, did_optimize;
   double skew, logmu;
-  mpz_poly_t F;
+  mpz_poly F;
 
 #ifdef DEBUG_POLYSELECT
   gmp_printf ("Found match: (%" PRIu32 ",%lld) (%" PRIu32 ",%lld) for "

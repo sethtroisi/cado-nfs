@@ -138,7 +138,7 @@ int main(int argc, char * argv[])
   mpz_t p;
   mpz_init(p);
   unsigned int n;
-  mpz_poly_t h;
+  mpz_poly h;
   mpz_poly_init(h, -1);
   unsigned int q;
   int * coeff;
@@ -154,11 +154,11 @@ int main(int argc, char * argv[])
   initialise_parameters(argc, argv, p, h, &coeff, &q, &t, &nb_times,
       &weight, &n, &type, &outstd, &c_tol, &h_set, &gal);
 
-  mpz_poly_t f0;
+  mpz_poly f0;
   mpz_poly_init(f0, h->deg);
-  mpz_poly_t f1;
+  mpz_poly f1;
   mpz_poly_init(f1, h->deg);
-  mpz_poly_t g;
+  mpz_poly g;
   mpz_poly_init(g, h->deg);
 
   gmp_randstate_t state;

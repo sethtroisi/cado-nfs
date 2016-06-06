@@ -53,8 +53,6 @@ def run(param_file, problem):
         "lpba": 22,
         "mfbr": 22,
         "mfba": 22,
-        "rlambda": 1.2,
-        "alambda": 1.2,
         "ncurves0": 6,
         "ncurves1": 6,
         "t": 2 # number of threads for las
@@ -73,7 +71,7 @@ def run(param_file, problem):
     las_params["mfbr"] = max(las_params["mfbr"], las_params["lpbr"])
     las_params["mfba"] = max(las_params["mfba"], las_params["lpba"])
     
-    to_print = ["I", "alim", "lpba", "mfba", "alambda", "rlim", "lpbr", "mfbr", "rlambda", "ncurves0", "ncurves1"]
+    to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     # Update parameters for makefb (which may depend on las parameters)

@@ -16,7 +16,7 @@ typedef struct {
   int alloc;
   int deg_y;
   int deg_x;
-  mpz_poly_t * coeff;
+  mpz_poly * coeff;
 } mpz_poly_bivariate_struct_t;
 
 typedef mpz_poly_bivariate_struct_t mpz_poly_bivariate_t[1];

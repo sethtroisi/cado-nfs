@@ -52,7 +52,7 @@ double murphyE3d(cado_poly_srcptr f, double * lpb, double area,
   double x = 0.0;
   double y = 0.0;
   double z = 0.0;
-  mpz_poly_t a;
+  mpz_poly a;
   mpz_poly_init(a, 2);
   mpz_t resultant;
   mpz_init(resultant);

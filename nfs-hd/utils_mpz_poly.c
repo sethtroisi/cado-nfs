@@ -33,7 +33,7 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
   mpz_set_ui(p, 2);
 
   //make a copy of f.
-  mpz_poly_t fcopy;
+  mpz_poly fcopy;
   mpz_poly_init(fcopy, f->deg);
   mpz_poly_set(fcopy, f);
 
@@ -70,7 +70,7 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
     mpz_poly_factor_list_push(list, fcopy, 1);
   } else {
     //Create the first possible factor.
-    mpz_poly_t tmp;
+    mpz_poly tmp;
     mpz_poly_init(tmp, 1);
     mpz_poly_setcoeff_int64(tmp, 1, 1);
 
@@ -78,9 +78,9 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
     while (tmp->deg <= fcopy->deg) {
       //tmp is a possible factor.
       if (mpz_poly_is_irreducible(tmp, p)) {
-        mpz_poly_t q;
+        mpz_poly q;
         mpz_poly_init(q, 0);
-        mpz_poly_t r;
+        mpz_poly r;
         mpz_poly_init(r, 0);
         //Euclidean division of fcopy
         mpz_poly_div_qr(q, r, fcopy, tmp, p);
@@ -119,7 +119,7 @@ void mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
     mpz_poly_setcoeff(fcopy, i, coeff);
   }
 
-  mpz_poly_t fmul;
+  mpz_poly fmul;
   mpz_poly_init(fmul, -1);
   mpz_poly_set(fmul, list->factors[0]->f);
   for (int j = 1; j < list->factors[0]->m; j++) {

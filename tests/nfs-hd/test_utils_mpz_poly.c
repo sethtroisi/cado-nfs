@@ -4,7 +4,7 @@
 #include "utils_mpz_poly.h"
 
 /* Come from test/utils/test_mpz_poly.c */
-static void mpz_poly_setcoeffs_si_var(mpz_poly_t f, int d, ...)
+static void mpz_poly_setcoeffs_si_var(mpz_poly f, int d, ...)
 {
     va_list ap;
     va_start(ap, d);
@@ -20,7 +20,7 @@ int main()
 {
   mpz_poly_factor_list l;
   mpz_poly_factor_list_init(l);
-  mpz_poly_t f;
+  mpz_poly f;
   mpz_poly_init(f, 0);
   
   // 0+1*x^1+2*x^2+2*x^3+2*x^4  

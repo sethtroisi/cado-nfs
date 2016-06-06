@@ -147,7 +147,7 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f,
   mpz_init(one);
   mpz_set_ui(one, 1);
 
-  mpz_poly_t a;
+  mpz_poly a;
   mpz_poly_init(a, 2);
 
   mpz_t resultant;
@@ -274,7 +274,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_ptr f,
 }
 int main(int argc, char ** argv)
 {
-  mpz_poly_t f;
+  mpz_poly f;
   unsigned long p;
   unsigned int N;
 

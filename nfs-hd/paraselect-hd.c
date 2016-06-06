@@ -22,7 +22,7 @@ int main()
 
   /*uint64_t size_start = 34359738368;*/
 
-  /*mpz_poly_t h;*/
+  /*mpz_poly h;*/
   /*mpz_poly_init(h, n);*/
   /*for (int k = 0; k <= (int)n; k++) {*/
     /*mpz_poly_setcoeff_si(h, k, 1);*/
@@ -36,9 +36,9 @@ int main()
   /*double weight_0 = 0.5;*/
   /*double weight_1 = 0.5;*/
 
-  /*mpz_poly_t f0;*/
+  /*mpz_poly f0;*/
   /*mpz_poly_init(f0, n);*/
-  /*mpz_poly_t f1;*/
+  /*mpz_poly f1;*/
   /*mpz_poly_init(f1, n);*/
 
   /*find_parameters_adapted(p, n, number_a, lpb_min, lpb_max, t_min, t_max,*/

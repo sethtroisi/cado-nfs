@@ -44,7 +44,7 @@ int main()
   ASSERT_ALWAYS((uint64_t) int64_poly_max(pol1) ==
       int64_poly_infinity_norm(pol1));
 
-  mpz_poly_t pol2;
+  mpz_poly pol2;
   mpz_poly_init(pol2, 0);
   int64_poly_to_mpz_poly(pol2, pol1);
 

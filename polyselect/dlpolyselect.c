@@ -47,10 +47,10 @@ print_nonlinear_poly_info ( mpz_t *f,
 {
     unsigned int i;
     double skew[2], logmu[2], alpha[2];
-    mpz_poly_t ff;
+    mpz_poly ff;
     ff->deg = df;
     ff->coeff = f;
-    mpz_poly_t gg;
+    mpz_poly gg;
     gg->deg = dg;
     gg->coeff = g;
 
@@ -120,7 +120,7 @@ polygen_JL_f ( mpz_t n,
         }
 
         /* content test (not necessary for now) */
-        mpz_poly_t ff;
+        mpz_poly ff;
         ff->deg = d;
         ff->coeff = f;
         mpz_poly_content (t, ff);

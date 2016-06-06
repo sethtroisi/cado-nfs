@@ -27,10 +27,10 @@ void resultant()
 {
   unsigned int dim = 3;
 
-  mpz_poly_t a_Z;
+  mpz_poly a_Z;
   mpz_poly_init(a_Z, dim);
 
-  mpz_poly_t f_Z;
+  mpz_poly f_Z;
   mpz_poly_init(f_Z, 6);
 
   mat_int64_t M;

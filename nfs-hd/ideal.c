@@ -290,7 +290,7 @@ void ideal_pr_init(ideal_pr_ptr ideal)
 
 void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t)
 {
-  mpz_poly_t h;
+  mpz_poly h;
   mpz_poly_init(h, -1);
   mpz_poly_setcoeff_si(h, 1, 1);
   mpz_poly_set(ideal->ideal->h, h);
@@ -313,7 +313,7 @@ void ideal_pr_set_part(ideal_pr_ptr ideal, uint64_t r, unsigned int t)
 void ideal_pr_set_element(ideal_pr_ptr ideal, uint64_t r, double log,
     unsigned int t)
 {
-  mpz_poly_t h;
+  mpz_poly h;
   mpz_poly_init(h, -1);
   mpz_poly_setcoeff_si(h, 1, 1);
   mpz_poly_set(ideal->ideal->h, h);

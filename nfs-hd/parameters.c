@@ -60,7 +60,7 @@ void rand_mpz_poly(mpz_poly_ptr a, sieving_bound_srcptr H)
 #endif
 }
 
-void stat_approx_number(mpz_t * mean, mpz_t * max, mpz_poly_t * f,
+void stat_approx_number(mpz_t * mean, mpz_t * max, mpz_poly * f,
     unsigned int nb_fields, uint64_t number_a, sieving_bound_srcptr H)
 {
   for (unsigned int i = 0; i < nb_fields; i++) {
@@ -73,7 +73,7 @@ void stat_approx_number(mpz_t * mean, mpz_t * max, mpz_poly_t * f,
   }
 
   srand(time(NULL));
-  mpz_poly_t a;
+  mpz_poly a;
   mpz_poly_init(a, (int)H->t);
 
   mpz_t res;
@@ -135,7 +135,7 @@ void find_lpb(mpz_t * max, MAYBE_UNUSED unsigned int lpb, unsigned int V,
   }
 }
 
-void find_parameters(mpz_poly_t * f, unsigned int V, MAYBE_UNUSED double size,
+void find_parameters(mpz_poly * f, unsigned int V, MAYBE_UNUSED double size,
     unsigned int t, MAYBE_UNUSED double smoothness, unsigned int number_poly,
     MAYBE_UNUSED unsigned int found)
 {

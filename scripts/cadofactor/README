@@ -296,3 +296,12 @@ previous linear algebra subdirectory:
 
 tasks.linalg.bwc.allow_wipeout = True
 
+Debugging
+=========
+
+For debugging the cado-nfs.py script, you might use:
+
+$ ./cado-nfs.py ... --filelog DEBUG
+
+and this will print more information in the cxxx.log file.
+

@@ -5,7 +5,7 @@
 #include "mpz_poly.h"
 
 //From test_mpz_poly
-static void mpz_poly_setcoeffs_si_var(mpz_poly_t f, int d, ...)
+static void mpz_poly_setcoeffs_si_var(mpz_poly f, int d, ...)
 {
     va_list ap;
     va_start(ap, d);
@@ -19,7 +19,7 @@ static void mpz_poly_setcoeffs_si_var(mpz_poly_t f, int d, ...)
 
 int main()
 {
-  mpz_poly_t f;
+  mpz_poly f;
   mpz_poly_init(f, 6);
 
   mpz_poly_setcoeffs_si_var(f, 6, 1, -91348, -228385, -20, 228370, 91354, 1);

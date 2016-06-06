@@ -64,13 +64,16 @@ double_poly_eval (double_poly_srcptr p, const double x)
 static long
 mpz_set_d_exp (mpz_t r, double x)
 {
-  long e = 0;
+  long e;
 
-  if (x != 0.0)
+  if (x == 0.0)
     {
-      e = ilogb (x) - 52;
-      mpz_set_d (r, ldexp (x, -e));
+      mpz_set_ui (r, 0);
+      return 0;
     }
+
+  e = ilogb (x) - 52;
+  mpz_set_d (r, ldexp (x, -e));
   return e;
 }
 
@@ -926,7 +929,7 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
     //TODO: use last version of a and b in pseudo_division.
     mpz_t res;
     mpz_init(res);
-    mpz_poly_t f, g;
+    mpz_poly f, g;
     mpz_poly_init(f, p->deg);
     mpz_poly_init(g, q->deg);
     mpz_poly_set_double_poly(f, p);

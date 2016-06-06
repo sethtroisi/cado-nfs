@@ -26,10 +26,6 @@ cado_define_test(test_utils_int64.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/utils_int64.c
 	LIBRARIES utils)
 
 # -----
-cado_define_test(test_utils_mpz.c ${CADO_NFS_SOURCE_DIR}/nfs-hd/utils_mpz.c
-	LIBRARIES utils)
-
-# -----
 cado_define_test(test_mat_int64.c
 	${CADO_NFS_SOURCE_DIR}/nfs-hd/mat_int64.c
 	${CADO_NFS_SOURCE_DIR}/nfs-hd/utils_int64.c

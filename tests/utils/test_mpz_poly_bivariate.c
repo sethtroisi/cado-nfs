@@ -4,7 +4,7 @@
 
 void test_mpz_poly_bivariate_trivialities()
 {
-  mpz_poly_t tmp;
+  mpz_poly tmp;
   mpz_poly_init(tmp, 2);
 
   mpz_poly_bivariate_t f;
@@ -113,7 +113,7 @@ void test_mpz_poly_bivariate_trivialities()
 
 void test_mpz_poly_bivariate_resultant()
 {
-  mpz_poly_t tmp;
+  mpz_poly tmp;
   mpz_poly_init(tmp, 2);
 
   mpz_poly_bivariate_t f;

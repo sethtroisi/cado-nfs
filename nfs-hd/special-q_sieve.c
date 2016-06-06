@@ -238,7 +238,7 @@ void init_corner(mpz_vector_t * c, unsigned int nb_vec, sieving_bound_srcptr H)
 void max_infinity_norm(mpz_ptr max, mat_Z_srcptr MqLLL, mpz_vector_t * c,
     unsigned int nb_vec)
 {
-  mpz_poly_t a;
+  mpz_poly a;
   mpz_poly_init(a, c[0]->dim);
   mpz_t tmp;
   mpz_init(tmp);
@@ -578,7 +578,7 @@ void assert_sieve(sieving_bound_srcptr H, uint64_t index,
 
   mpz_vector_t v;
   mpz_vector_init(v, H->t);
-  mpz_poly_t a;
+  mpz_poly a;
   mpz_poly_init(a, -1);
   mpz_t res;
   mpz_init(res);
@@ -600,9 +600,9 @@ void assert_sieve(sieving_bound_srcptr H, uint64_t index,
 
   //Verify if h divides a mod r.
   if (a->deg != -1) {
-    mpz_poly_t r;
+    mpz_poly r;
     mpz_poly_init(r, -1);
-    mpz_poly_t q;
+    mpz_poly q;
     mpz_poly_init(q, -1);
     mpz_t p;
     mpz_init(p);
@@ -1793,7 +1793,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
 #ifdef Q_BELOW_FBB
   uint64_t q = ideal_spq_get_q(special_q);
-  mpz_poly_t g;
+  mpz_poly g;
   mpz_poly_init(g, ideal_spq_get_deg_g(special_q));
   ideal_spq_get_g(g, special_q);
 #endif // Q_BELOW_FBB
@@ -2617,7 +2617,7 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
   ssize_t read;
   unsigned int q_side = 0;
   uint64_t q = 0;
-  mpz_poly_t g;
+  mpz_poly g;
   mpz_poly_init(g, 1);
 
   while ((read = getline(&line, &len, qfile) != -1)) {
@@ -2958,7 +2958,7 @@ int main(int argc, char * argv[])
   FILE * errstd;
   uint64_t * sieve_start;
   sieving_bound_t Ha;
-  mpz_poly_t g;
+  mpz_poly g;
   unsigned int gal;
   FILE * qfile;
   unsigned int qfilespq;

@@ -46,7 +46,7 @@ static void trace_pos_init(FILE * file_trace_pos, int64_vector_srcptr vector,
     mat_Z_t Mq_Z;
     mat_Z_init(Mq_Z, Mq->NumRows, Mq->NumCols);
     mat_int64_to_mat_Z(Mq_Z, Mq);
-    mpz_poly_t a;
+    mpz_poly a;
     mpz_poly_init(a, 0);
     mat_Z_mul_mpz_vector_to_mpz_poly(a, Mq_Z, c);
     mpz_vector_clear(c);
@@ -89,7 +89,7 @@ static void mean_norm_mode(mpz_ptr mean_norm, int64_vector_srcptr vector,
     mat_Z_t Mq_Z;
     mat_Z_init(Mq_Z, Mq->NumRows, Mq->NumCols);
     mat_int64_to_mat_Z(Mq_Z, Mq);
-    mpz_poly_t a;
+    mpz_poly a;
     mpz_poly_init(a, 0);
     mat_Z_mul_mpz_vector_to_mpz_poly(a, Mq_Z, c);
     mpz_vector_clear(c);
@@ -151,7 +151,7 @@ void assert_norm(array_srcptr array, sieving_bound_srcptr H, mpz_poly_srcptr f,
 {
   mpz_vector_t c;
   mpz_vector_init(c, H->t);
-  mpz_poly_t a;
+  mpz_poly a;
   mpz_poly_init(a, 0);
 
   mpz_t norm;
@@ -371,7 +371,7 @@ unsigned char log_norm_double(const int * current_indexes,
   ASSERT(size == M->NumRows);
   ASSERT(size == M->NumCols);
 
-  mpz_poly_t poly;
+  mpz_poly poly;
   mpz_poly_init(poly, M->NumRows);
 
   for (unsigned int i = 0; i < M->NumRows; i++) {

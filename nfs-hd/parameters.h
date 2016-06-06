@@ -13,7 +13,7 @@ int sieving_region_classical(sieving_bound_ptr H, mpz_srcptr p, unsigned int n,
 
 void rand_mpz_poly(mpz_poly_ptr a, sieving_bound_srcptr H);
 
-void mean_approx_number(mpz_t * mean, mpz_poly_t * f, unsigned int nb_fields,
+void mean_approx_number(mpz_t * mean, mpz_poly * f, unsigned int nb_fields,
                         uint64_t number_a, sieving_bound_srcptr H);
 
 void find_parameters_special_q(mpz_srcptr p, unsigned int n, uint64_t number_a,

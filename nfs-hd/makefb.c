@@ -342,7 +342,7 @@ static int parse_ideal_1(ideal_1_ptr ideal, char *str, unsigned int t)
   if (!ret || tmp[0] != ':')
     return 0;
   str = tmp + 1;
-  mpz_poly_t h;
+  mpz_poly h;
   mpz_poly_init(h, 1);
   ret = parse_mpz_poly(h, &tmp, str, 1);
   ASSERT(ret == 2);
@@ -391,7 +391,7 @@ static int parse_ideal_u(ideal_u_ptr ideal, char * str, unsigned int t)
   if (!ret || tmp[0] != ':')
     return 0;
   str = tmp + 1;
-  mpz_poly_t h;
+  mpz_poly h;
   mpz_poly_init(h, deg);
   ret = parse_mpz_poly(h, &tmp, str, deg);
   ASSERT(ret == deg + 1);
@@ -437,7 +437,7 @@ static int parse_ideal_pr(ideal_pr_ptr ideal, char *str, unsigned int t)
   if (!ret || tmp[0] != ':')
     return 0;
   str = tmp + 1;
-  mpz_poly_t h;
+  mpz_poly h;
   mpz_poly_init(h, 1);
   ret = parse_mpz_poly(h, &tmp, str, 1);
   ASSERT(ret == 2);
@@ -498,7 +498,7 @@ void read_factor_base(FILE * file, factor_base_t * fb, uint64_t * fbb,
     int n;
     fscanf(file, "deg:%d\n", &n);
 
-    mpz_poly_t f_tmp;
+    mpz_poly f_tmp;
     mpz_poly_init(f_tmp, n);
     if (fgets(line, size_line, file) == NULL) {
       return;

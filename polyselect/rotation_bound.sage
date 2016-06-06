@@ -227,7 +227,7 @@ def best_l2norm_tk(f):
 def best_l2norm_tk_circular(f):
     return l2norm_tk_circular(f, skew_l2norm_tk_circular(f))
 
-def skew_l2norm_tk_circular(f):
+def skew_l2norm_tk_circular(f, verbose=false):
    if f.degree()==6:
       R.<s> = RealField(PRECISION)[]
       a0 = f[0]
@@ -238,13 +238,21 @@ def skew_l2norm_tk_circular(f):
       a5 = f[5] * s^5
       a6 = f[6] * s^6
       d = (231*a0^2+42*a0*a2+14*a0*a4+10*a0*a6+21*a1^2+14*a1*a3+10*a1*a5+7*a2^2+10*a2*a4+14*a2*a6+5*a3^2+14*a3*a5+7*a4^2+42*a4*a6+21*a5^2+231*a6^2)/s^6
+      if verbose:
+         print "trying to minimize", d
       # derivative of d wrt s
-      e = -1386*a0^2+168*a6*a4+28*a6*a2-28*a4*a0-168*a2*a0+84*a5^2-84*a1^2+1386*a6^2+14*a4^2-14*a2^2+28*a5*a3-28*a3*a1
+      e = -99*a0^2+12*a6*a4+2*a6*a2-2*a4*a0-12*a2*a0+6*a5^2-6*a1^2+99*a6^2+a4^2-a2^2+2*a5*a3-2*a3*a1
+      if verbose:
+         print "derivative is", e
       r = e.real_roots()
       root_pos=[s for s in r if s > 0]
+      if verbose:
+         print "positive real roots of derivative:", r
       best_norm = infinity
       for r in root_pos:
          no = d(r)
+         if verbose:
+            print "value at r=", r, "is", no
          if no < best_norm:
             best_norm = no
             best_root = r

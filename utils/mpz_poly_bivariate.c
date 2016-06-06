@@ -12,7 +12,7 @@
  * lagrange_poly = p / denom;
  */
 typedef struct {
-  mpz_poly_t p;
+  mpz_poly p;
   mpz_t denom;
 } lagrange_poly_struct_t;
 
@@ -54,7 +54,7 @@ static void lagrange_poly_add(lagrange_poly_ptr r, lagrange_poly_srcptr p,
   mpz_poly_mul_mpz(r->p, p->p, lcm_red);
   // r = r + q * lcm_red
   mpz_divexact(lcm_red, lcm, q->denom);
-  mpz_poly_t tmp;
+  mpz_poly tmp;
   mpz_poly_init(tmp, q->p->deg);
   mpz_poly_mul_mpz(tmp, q->p, lcm_red);
   mpz_poly_add(r->p, r->p, tmp);
@@ -74,7 +74,7 @@ static void interpolate(mpz_poly_ptr p, mpz_t * x, mpz_t * y, unsigned int nb)
 {
   lagrange_poly_t * l = (lagrange_poly_t * )
     malloc(sizeof(lagrange_poly_t) * nb);
-  mpz_poly_t poly_tmp;
+  mpz_poly poly_tmp;
   mpz_poly_init(poly_tmp, 1);
   mpz_poly_setcoeff_int64(poly_tmp, 1, 1);
   mpz_t Z_tmp;
@@ -125,12 +125,12 @@ void mpz_poly_bivariate_init_y_x(mpz_poly_bivariate_ptr f, int dy, int dx)
   f->deg_x = -1;
   if (dy < 0) {
     f->alloc = 0;
-    f->coeff = (mpz_poly_t *) NULL;
+    f->coeff = (mpz_poly *) NULL;
   }
   else {
     int i;
     f->alloc = dy + 1;
-    f->coeff = (mpz_poly_t *) malloc ((dy + 1)*sizeof(mpz_poly_t));
+    f->coeff = (mpz_poly *) malloc ((dy + 1)*sizeof(mpz_poly));
     FATAL_ERROR_CHECK(f->coeff == NULL, "not enough memory");
     for (i = 0; i <= dy; ++i) {
       mpz_poly_init(f->coeff[i], dx);
@@ -147,7 +147,7 @@ void mpz_poly_bivariate_realloc_x(mpz_poly_bivariate_ptr f, int nc, int dx)
 {
   int i;
   if (f->alloc < nc) {
-    f->coeff = (mpz_poly_t*) realloc(f->coeff, nc * sizeof(mpz_poly_t));
+    f->coeff = (mpz_poly*) realloc(f->coeff, nc * sizeof(mpz_poly));
     FATAL_ERROR_CHECK(f->coeff == NULL, "not enough memory");
     for (i = f->alloc; i < nc; i++) {
       mpz_poly_init(f->coeff[i], dx);
@@ -297,8 +297,8 @@ void mpz_poly_bivariate_resultant_y(mpz_poly_ptr resultant,
   int nb_eval = MAX(f->deg_x, g->deg_x) * (f->deg_y + g->deg_y) + 1;
   mpz_t * resultants = (mpz_t * ) malloc(sizeof(mpz_t) * nb_eval);
   mpz_t * x = (mpz_t * ) malloc(sizeof(mpz_t) * nb_eval);
-  mpz_poly_t f_eval;
-  mpz_poly_t g_eval;
+  mpz_poly f_eval;
+  mpz_poly g_eval;
   mpz_poly_init(f_eval, -1);
   mpz_poly_init(g_eval, -1);
   int point = -nb_eval / 2;
@@ -336,8 +336,8 @@ void mpz_poly_bivariate_resultant_x(mpz_poly_ptr resultant,
   int nb_eval = MAX(f->deg_y, g->deg_y) * (f->deg_x + g->deg_x) + 1;
   mpz_t * resultants = (mpz_t * ) malloc(sizeof(mpz_t) * nb_eval);
   mpz_t * y = (mpz_t * ) malloc(sizeof(mpz_t) * nb_eval);
-  mpz_poly_t f_eval;
-  mpz_poly_t g_eval;
+  mpz_poly f_eval;
+  mpz_poly g_eval;
   mpz_poly_init(f_eval, -1);
   mpz_poly_init(g_eval, -1);
   int point = -nb_eval / 2;

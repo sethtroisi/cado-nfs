@@ -525,13 +525,13 @@ double function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1,
   double alpha0 = 0.0;
   double alpha1 = 0.0;
   double sum_alpha = DBL_MAX;
-  mpz_poly_t f0_tmp;
+  mpz_poly f0_tmp;
   mpz_poly_init(f0_tmp, -1);
-  mpz_poly_t f1_tmp;
+  mpz_poly f1_tmp;
   mpz_poly_init(f1_tmp, -1);
-  mpz_poly_t g_tmp;
+  mpz_poly g_tmp;
   mpz_poly_init(g_tmp, -1);
-  mpz_poly_t h_tmp;
+  mpz_poly h_tmp;
   mpz_poly_init(h_tmp, -1);
   if (h_set) {
     mpz_poly_set(h_tmp, h);
@@ -569,7 +569,7 @@ double function_special_q(mpz_poly_ptr f0, mpz_poly_ptr f1,
     if (mpz_poly_is_irreducible(f0_tmp, p)) {
       k++;
       mpz_poly_mul_mpz(f1_tmp, g_tmp, b);
-      mpz_poly_t f_tmp;
+      mpz_poly f_tmp;
       mpz_poly_init(f_tmp, -1);
       mpz_poly_mul_mpz(f_tmp, h_tmp, a);
       mpz_poly_add(f1_tmp, f1_tmp, f_tmp);
@@ -624,9 +624,9 @@ void function_classical(mpz_poly_ptr f0, mpz_poly_ptr f1, mpz_srcptr p,
     mpz_set_si(coeff_Z[i], coeff[i]);
   }
 
-  mpz_poly_t f0_tmp;
+  mpz_poly f0_tmp;
   mpz_poly_init(f0_tmp, -1);
-  mpz_poly_t f1_tmp;
+  mpz_poly f1_tmp;
   mpz_poly_init(f1_tmp, -1);
 
   double sum_alpha = DBL_MAX;

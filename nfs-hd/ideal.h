@@ -10,7 +10,7 @@
  */
 typedef struct {
   uint64_t r;
-  mpz_poly_t h;
+  mpz_poly h;
 } s_ideal_t;
 
 typedef s_ideal_t ideal_t[1];

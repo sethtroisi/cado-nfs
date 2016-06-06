@@ -8,7 +8,7 @@
 
 int main()
 {
-  mpz_poly_t h;
+  mpz_poly h;
   mpz_poly_init(h, 0);
   mpz_poly_setcoeff_si(h, 1, 1);
   mpz_poly_setcoeff_si(h, 0, 3);
@@ -27,7 +27,7 @@ int main()
   ideal_1_set_part(ideal_1, r, h, t);
   ASSERT_ALWAYS(ideal_1->ideal->r == r);
   ASSERT_ALWAYS(mpz_poly_cmp(ideal_1->ideal->h, h) == 0);
-  ASSERT_ALWAYS(ideal_1->log == (unsigned char)log2((double)r));
+  ASSERT_ALWAYS(ideal_1->log == log2((double)r));
   //Test Tr.
   mpz_t Tr;
   mpz_init(Tr);
@@ -51,8 +51,7 @@ int main()
   ideal_u_set_part(ideal_u, r, h, t);
   ASSERT_ALWAYS(ideal_u->ideal->r == r);
   ASSERT_ALWAYS(mpz_poly_cmp(ideal_u->ideal->h, h) == 0);
-  ASSERT_ALWAYS(ideal_u->log == (unsigned char)log2(pow((double)r,(double)h->deg
-          )));
+  ASSERT_ALWAYS(ideal_u->log == log2(pow((double)r,(double)h->deg)));
   //TODO: Test Tr.
 
   ideal_u_clear(ideal_u, t);
