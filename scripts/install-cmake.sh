@@ -21,7 +21,7 @@ if [ "$?" = "0" ] ; then
 else
     curl="`which curl 2>/dev/null`"
     if [ "$?" = "0" ] ; then
-        curl $url > $package
+        curl -L $url > $package
     else
         echo "Need either wget or curl to get $url" >&2
         exit 1

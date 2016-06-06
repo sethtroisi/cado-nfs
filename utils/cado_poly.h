@@ -18,7 +18,7 @@ struct cado_poly_s {
   double skew;    /* skewness from poly file, if given, otherwise 0. */
 
   int nb_polys;   /* number of polynomials used, 2 in most cases */
-  mpz_poly_t pols[NB_POLYS_MAX];
+  mpz_poly pols[NB_POLYS_MAX];
 };
 typedef struct cado_poly_s cado_poly[1];
 typedef struct cado_poly_s * cado_poly_ptr;

@@ -963,6 +963,19 @@ def chain_dict(d1, d2):
     """
     return {key: d2[value] for key, value in d1.items()}
 
+class RealTimeOutputFilter:
+    def __init__(self, logger, filename):
+        self.stdout = open(filename, "w")
+        self.logger = logger
+    def filter(self, data):
+        self.stdout.write(data)
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+         self.stdout.close()
+        
+        
+
 class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
            cadoparams.UseParameters, Runnable, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed.
@@ -989,10 +1002,10 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     @property
     def param_nodename(self):
         return self.name
-    
     def __init__(self, *, mediator, db, parameters, path_prefix):
         ''' Sets up a database connection and a DB-backed dictionary for
         parameters. Reads parameters from DB, and merges with hierarchical
+    
         parameters in the parameters argument. Parameters passed in by
         parameters argument do not override values in the DB-backed
         parameter dictionary.
@@ -1255,6 +1268,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         result to updateObserver().
         '''
         wuname = self.make_wuname(identifier)
+        #self.logger.info(" created WUname %s" % wuname)
         process = cadocommand.Command(command)
         cputime_used = os.times()[2] # CPU time of child processes
         realtime_used = time.time()
@@ -3631,9 +3645,9 @@ class FilterGaloisTask(Task):
         return self.state["noutrels"]
 
     def parse_remaining(self, text):
-        # "Number of ouput relations: 303571"
+        # "Number of output relations: 303571"
         for line in text:
-            match = re.match(r'Number of ouput relations:\s*(\d+)', line)
+            match = re.match(r'Number of output relations:\s*(\d+)', line)
             if match:
                 remaining = int(match.group(1))
                 return remaining
@@ -3964,6 +3978,12 @@ class LinAlgDLPTask_Magma(Task):
     def get_virtual_logs_filename(self):
         return self.get_state_filename("kerfile")
 
+class bwc_output_filter(RealTimeOutputFilter):
+    def filter(self, data):
+        super().filter(data)
+        if ("ETA" or "Timings") in data:
+            self.logger.info(data.rstrip())
+            
 
 # I've just ditched the statistics bit, cause I don't know to make its
 # despair cry a little bit more useful.
@@ -4236,12 +4256,13 @@ class LinAlgTask(Task, HasStatistics):
             wdir = workdir.realpath()
             self.state["ran_already"] = True
             self.remember_input_versions(commit=True)
-            p = cadoprograms.BWC(complete=True,
-                                 matrix=matrix,  wdir=wdir, nullspace="left",
-                                 stdout=str(stdoutpath),
-                                 stderr=str(stderrpath),
-                                 **self.progparams[0])
-            message = self.submit_command(p, "", log_errors=True)
+            with bwc_output_filter(self.logger, str(stdoutpath)) as outfilter:
+                p = cadoprograms.BWC(complete=True,
+                                     matrix=matrix,  wdir=wdir, nullspace="left",
+                                     stdout=outfilter,
+                                     stderr=str(stderrpath),
+                                     **self.progparams[0])
+                message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
@@ -4362,11 +4383,11 @@ class SqrtTask(Task):
             t = self.progparams[0].get("threads", 1)
             while not self.is_done():
                 dep = self.state.get("next_dep", 0)
-                if t == 1:
-                   self.logger.info("Trying dependency %d", dep)
-                else:
-                   self.logger.info("Trying dependencies %d to %d",
-                                    dep, dep+t-1)
+                #if t == 1:
+                   #self.logger.info("Trying dependency %d", dep)
+                #else:
+                   #self.logger.info("Trying dependencies %d to %d",
+                                    #dep, dep+t-1)
                 (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Sqrt.name)
                 p = cadoprograms.Sqrt(ab=False, side1=True,

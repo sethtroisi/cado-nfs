@@ -56,7 +56,7 @@ ropt_common ( ropt_poly_t poly,
   /* reducing c5 to raw and skip ropt */
   if (param->gen_raw) {
     mpz_t l, m, res;
-    mpz_poly_t F;
+    mpz_poly F;
     mpz_init (l);
     mpz_init (m);
     mpz_init (res);
@@ -82,7 +82,7 @@ ropt_common ( ropt_poly_t poly,
     mpz_clear (res);
   }
 
-  mpz_poly_t F;
+  mpz_poly F;
   F->coeff = poly->f;
   F->deg = poly->d;
   /* print original or reduced polynomial */
@@ -94,7 +94,7 @@ ropt_common ( ropt_poly_t poly,
   /* if sopt and not from -fm */
   if (fm==0) {
     if (param->sopt) {
-      mpz_poly_t F2, G2;
+      mpz_poly F2, G2;
       mpz_poly_init (F2, poly->d);
       mpz_poly_init (G2, 1);
       mpz_poly_setcoeffs (F2, poly->f, poly->d);
@@ -426,7 +426,7 @@ ropt_on_msievepoly ( FILE *file,
       Lemma21 (poly->f, poly->n, poly->d, l, m, res);
     }
 
-    mpz_poly_t F, G;
+    mpz_poly F, G;
     mpz_poly_init (F, poly->d);
     mpz_poly_init (G, 1);
     mpz_poly_setcoeffs (F, poly->f, poly->d);
@@ -486,7 +486,7 @@ print_poly_info_short ( mpz_t *f,
   double skew, logmu, alpha, e, alpha_proj;
   int i;
   double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
-  mpz_poly_t F;
+  mpz_poly F;
   F->coeff = f;
   F->deg = d;
 
