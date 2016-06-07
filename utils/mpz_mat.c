@@ -264,20 +264,41 @@ void mpq_mat_determinant_triangular(mpq_ptr d, mpq_mat_srcptr M)
 }
 /*}}}*/
 /*{{{ miscellaneous */
-void mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
+
+/* convert to integer matrix divided by lcm of denominator.
+ * return 1
+ * if den==NULL, return 0 if denominator happens to not be 1 (in which
+ * case the matrix return is undefined).
+ */
+
+int mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
 {
-    mpz_set_ui(den, 1);
-    for(unsigned int i = 0 ; i < M->m ; i++)
-        for(unsigned int j = 0 ; j < M->n ; j++)
-            mpz_lcm(den, den, mpq_denref(mpq_mat_entry_const(M, i, j)));
+    int ret = 1;
+    if (den) mpz_set_ui(den, 1);
+    for(unsigned int i = 0 ; i < M->m ; i++) {
+        for(unsigned int j = 0 ; j < M->n ; j++) {
+            mpz_srcptr Mij =  mpq_denref(mpq_mat_entry_const(M, i, j));
+            if (den) {
+                mpz_lcm(den, den, Mij);
+            } else {
+                ret = 0;
+            }
+        }
+    }
     mpz_mat_realloc(num, M->m, M->n);
-    for(unsigned int i = 0 ; i < M->m ; i++)
+    for(unsigned int i = 0 ; i < M->m ; i++) {
         for(unsigned int j = 0 ; j < M->n ; j++) {
             mpz_ptr dst = mpz_mat_entry(num, i, j);
             mpq_srcptr src = mpq_mat_entry_const(M, i, j);
-            mpz_divexact(dst, den, mpq_denref(src));
-            mpz_mul(dst, dst, mpq_numref(src));
+            if (den) {
+                mpz_divexact(dst, den, mpq_denref(src));
+                mpz_mul(dst, dst, mpq_numref(src));
+            } else {
+                mpz_set(dst, mpq_numref(src));
+            }
         }
+    }
+    return ret;
 }
 
 void mpz_mat_to_mpq_mat(mpq_mat_ptr N, mpz_mat_srcptr M)

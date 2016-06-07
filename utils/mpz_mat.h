@@ -82,7 +82,7 @@ void mpq_mat_trace(mpq_ptr t, mpq_mat_srcptr M);
 void mpq_mat_determinant_triangular(mpq_ptr d, mpq_mat_srcptr M);
 
 /* miscellaneous */
-void mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M);
+int mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M);
 void mpz_mat_to_mpq_mat(mpq_mat_ptr N, mpz_mat_srcptr M);
 void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned int p);
 
