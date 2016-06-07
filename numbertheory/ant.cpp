@@ -541,8 +541,8 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_mat_mod_ui(current,current,p);
     }
     
-    //printf("big matrix, mod %d:\n", p);
-    //mpz_mat_fprint(stdout,M); printf("\n");
+    printf("big matrix, mod %d:\n", p);
+    mpz_mat_fprint(stdout,M); printf("\n");
     
     // Now computing its kernel
     mpz_mat K;
@@ -867,24 +867,6 @@ int main(int argc, char *argv[])
     mpq_mat_fprint(stdout, D);
     printf("\n");
 
-    
-    /*
-    mpz_poly test;
-    mpz_poly_init(test,n);
-    mpz_mat theta;
-    mpz_mat_init(theta,1,n);
-    mpz_set_si(mpz_mat_entry(theta,0,0),1);
-    mpz_set_si(mpz_mat_entry(theta,0,1),1);
-    mpz_set_si(mpz_mat_entry(theta,0,2),1);
-    mpz_set_si(mpz_mat_entry(theta,0,3),1);
-    mpz_set_si(mpz_mat_entry(theta,0,4),1);
-    mpz_set_si(mpz_mat_entry(theta,0,5),1);
-    mpz_set_si(mpz_mat_entry(theta,0,6),1);
-    mpz_set_si(mpz_mat_entry(theta,0,7),1);
-    minimal_poly_of_mul_by_theta(test,D,theta,g,p);
-    mpz_mat_clear(theta);
-    mpz_poly_clear(test);
-    */
     factorization_of_prime(g,p);
     
     
