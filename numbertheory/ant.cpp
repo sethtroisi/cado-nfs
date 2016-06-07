@@ -292,11 +292,13 @@ void read_data(unsigned int *deg, mpz_poly_ptr f, mpq_mat_ptr B,
     fscanf(problemfile, "%u", deg);
     
     mpz_poly_realloc(f, *deg + 1);
+    mpz_t c;
+    mpz_init(c);
     for (unsigned int i = 0; i <= *deg; i++) {
-        int c;
-        fscanf(problemfile, "%d", &c);
-        mpz_poly_setcoeff_si(f, i, c);
+        gmp_fscanf(problemfile, "%Zd", &c);
+        mpz_poly_setcoeff (f, i, c);
     }
+    mpz_clear(c);
 
     mpq_mat_realloc(B, *deg, *deg);
     for (unsigned int i = 0; i < *deg; i++) {
