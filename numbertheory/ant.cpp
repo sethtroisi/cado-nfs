@@ -503,7 +503,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpq_mat theta_rat; // Will contain theta in the basis of alpha^
     mpq_mat_init(theta_rat,1,n);
     mpz_mat_to_mpq_mat(theta_rat,theta);
-    mpq_mat_multiply(theta_rat,theta_rat,W); // Now contains theta in the basis of alpha^
+    mpq_mat_multiply(theta_rat,theta_rat,W); // Now contains theta in the basis of alpha^ (rationnal coefficients)
 
     // Converting theta into one polynom and one common denominator
     mpz_poly theta_poly;
@@ -517,8 +517,9 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     printf("theta poly : "); mpz_poly_fprintf(stdout,theta_poly);
     gmp_printf("theta denom = %Zd\n",theta_denom);
     
+    // Computing theta*w[i] (in the basis of alpha^ ) for each i
     for (unsigned i = 0 ; i < n ; i++) {
-        // Converting w[i] into one polynom and one common denominator
+        // Converting w[i] (already in the basis of alpha^) into one polynom and one common denominator
         mpz_poly w_poly;
         mpz_t w_denom;
         mpz_poly_init(w_poly,n-1);
@@ -532,7 +533,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_poly res;
         mpz_poly_init(res,n-1);        
         mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
-        mpz_poly_cleandeg(res,n-1);
+        mpz_poly_cleandeg(res,n-1); // In case the degree of the product isn't n-1
         
         //printf("res : "); mpz_poly_fprintf(stdout,res);
         
@@ -563,9 +564,6 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpq_mat_init(W_inv,n,n);
     mpq_mat_invert(W_inv,W);
     mpq_mat_multiply(times_theta_rat,times_theta_rat,W_inv);
-    
-    
-    printf("W_inv = \n"); mpq_mat_fprint(stdout,W_inv);
     
     // Now we have to convert it into a matrix of integers
     mpz_t denom_eq_1;
@@ -650,9 +648,9 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
 {
     int n = g->deg;
     
-    mpq_mat G, G_inv, Id_q;
-    mpz_mat Ip;
-    cxx_mpz_mat Id_z; // This line makes valgrind say that there are ~70000 bytes in one block that are still reachable. Don't know if it's a problem.
+    mpq_mat G, G_inv, Id_q; // G = Basis of p-maximal-order Ok ; Id_q = identity (in rational domain)
+    mpz_mat Ip; // p radical of Ok
+    cxx_mpz_mat Id_z; // Identity (in integers domain)
     mpq_mat_init(G,n,n);
     mpq_mat_init(G_inv,n,n);
     mpq_mat_init(Id_q,n,n);
@@ -683,6 +681,10 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     queue<subspace_ideal> pick_from;
     pick_from.push(initial);
     
+    
+    printf("W = \n"); mpq_mat_fprint(stdout,G); printf("\n");
+    printf("W_inv = \n"); mpq_mat_fprint(stdout,G_inv); printf("\n");
+    
     while (pick_from.size() > 0)  {
         mpz_poly f;
         mpz_poly_init(f,n);
@@ -694,14 +696,14 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         // Picking one random element of subspace E
         cxx_mpz_mat c;
         mpz_mat_realloc(c,1,n);
-        mpz_set_ui(mpz_mat_entry(c,0,0),0);
-        mpz_set_ui(mpz_mat_entry(c,0,1),0);
-        mpz_set_ui(mpz_mat_entry(c,0,2),0);
-        mpz_set_ui(mpz_mat_entry(c,0,3),1);
-        mpz_set_ui(mpz_mat_entry(c,0,4),2);
-        mpz_set_ui(mpz_mat_entry(c,0,5),2);
-        mpz_set_ui(mpz_mat_entry(c,0,6),0);
-        mpz_set_ui(mpz_mat_entry(c,0,7),1);
+        mpz_set_ui(mpz_mat_entry(c,0,0),0);//0);
+        mpz_set_ui(mpz_mat_entry(c,0,1),1);//0);
+        mpz_set_ui(mpz_mat_entry(c,0,2),0);//0);
+        mpz_set_ui(mpz_mat_entry(c,0,3),2);//1);
+        mpz_set_ui(mpz_mat_entry(c,0,4),1);//2);
+        mpz_set_ui(mpz_mat_entry(c,0,5),0);//2);
+        mpz_set_ui(mpz_mat_entry(c,0,6),0);//0);
+        mpz_set_ui(mpz_mat_entry(c,0,7),0);//1);
         /*
         for (int i = 0 ; i < n ; i++) {
             mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
@@ -923,13 +925,15 @@ int main(int argc, char *argv[])
 
     
     p_maximal_order(D, B, f, p);
+    /*
     printf("Starting from\n");
     mpq_mat_fprint(stdout, B);
     printf("\n");
     printf("the %d-maximal order is \n", p);
     mpq_mat_fprint(stdout, D);
     printf("\n");
-
+    */
+    
     factorization_of_prime(g,p);
     
     
