@@ -441,6 +441,45 @@ void p_maximal_order(mpq_mat_ptr D, mpq_mat_srcptr B, mpz_poly_srcptr f,
 
     } while (!mpq_mat_eq(new_D, D));
 
+
+    // Now we have to make the HNF of D
+    // First take the lcm of all denominators in D
+    mpz_t denom; // lcm of denominator
+    mpq_t denom_q, denom_inv; // denom_q = denom ; denom_inv = 1/denom
+    mpz_init(denom);
+    mpq_init(denom_q);
+    mpq_init(denom_inv);
+    mpz_set_ui(denom,1);
+    mpq_set_ui(denom_inv,1,1);
+    for(unsigned int i = 0 ; i < n ; i++){
+        for(unsigned int j = 0 ; j < n ; j++){
+            mpz_lcm(denom,denom,mpq_denref(mpq_mat_entry(D,i,j)));
+        }
+    }
+    mpq_set_z(denom_q,denom);
+    mpq_div(denom_inv,denom_inv,denom_q);
+    
+    // Multiplying D by the denom
+    mpq_mat_multiply_by_mpq(D,D,denom_q);
+    
+    // Preparing the HNF in D_z
+    mpz_t denom_eq_1;
+    mpz_mat D_z,T;
+    mpz_mat_init(D_z,n,n);
+    mpz_mat_init(T,n,n);
+    mpz_init(denom_eq_1);
+    
+    mpq_mat_numden(D_z,denom_eq_1,D);
+    mpz_hnf_backend(D_z,T);
+    mpz_mat_to_mpq_mat(D,D_z);
+    mpq_mat_multiply_by_mpq(D,D,denom_inv);
+    
+    mpq_clear(denom_inv);
+    mpz_clear(denom_eq_1);
+    mpz_mat_clear(D_z);
+    mpz_mat_clear(T);
+    mpq_clear(denom_q);
+    mpz_clear(denom);
     mpq_mat_clear(new_D);
     mpz_poly_clear(g);
     mpq_clear(p_inv);
@@ -654,7 +693,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         
         // Picking one random element of subspace E
         cxx_mpz_mat c;
-        mpz_mat_init(c,1,n);
+        mpz_mat_realloc(c,1,n);
         mpz_set_ui(mpz_mat_entry(c,0,0),0);
         mpz_set_ui(mpz_mat_entry(c,0,1),0);
         mpz_set_ui(mpz_mat_entry(c,0,2),0);
