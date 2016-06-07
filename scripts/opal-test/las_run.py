@@ -70,6 +70,9 @@ def run(param_file, problem):
     update_existing(las_params, params)
     las_params["mfbr"] = max(las_params["mfbr"], las_params["lpbr"])
     las_params["mfba"] = max(las_params["mfba"], las_params["lpba"])
+
+    las_params["rlim"] = min(las_params["rlim"], 2 ** las_params["lpbr"])
+    las_params["alim"] = min(las_params["alim"], 2 ** las_params["lpba"])
     
     to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))

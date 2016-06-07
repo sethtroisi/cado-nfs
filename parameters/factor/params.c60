@@ -27,8 +27,8 @@ tasks.polyselect.ropteffort = 1
 # Sieve
 ###########################################################################
 
-rlim = 161214
-alim = 96228
+rlim = 161143
+alim = 96426
 lpbr = 18
 lpba = 19
 tasks.sieve.mfbr = 18
