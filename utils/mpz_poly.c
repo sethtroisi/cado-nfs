@@ -502,6 +502,7 @@ void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
     g->deg = f->deg - i;
 }
 
+/* g <- f * x^i */
 void
 mpz_poly_mul_xi (mpz_poly_ptr g, mpz_poly_srcptr f, int i)
 {
