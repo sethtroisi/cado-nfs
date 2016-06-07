@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <gmp.h>
 #include <stdint.h>
 #include <sys/resource.h>	/* for getrusage */
@@ -900,6 +901,11 @@ int main(int argc, char *argv[])
 
     unsigned int p = strtoul(argv[2], NULL, 0);	//19; //atoi(argv[1]);
     FILE *problemfile = fopen(argv[1], "r");
+
+    if (!problemfile) {
+        fprintf(stderr, "%s: %s\n", argv[1], strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 
     mpq_mat B, D;
     mpz_poly f;
