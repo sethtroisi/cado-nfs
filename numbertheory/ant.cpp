@@ -471,6 +471,11 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_init(theta_denom);
     mpq_mat_row_to_poly(theta_poly,theta_denom,theta_rat,0);
 
+    //printf("theta : "); mpz_mat_fprint(stdout,theta);
+    //printf("theta rat : "); mpq_mat_fprint(stdout,theta_rat);
+    printf("theta poly : "); mpz_poly_fprintf(stdout,theta_poly);
+    gmp_printf("theta denom = %Zd\n",theta_denom);
+    
     for (unsigned i = 0 ; i < n ; i++) {
         // Converting w[i] into one polynom and one common denominator
         mpz_poly w_poly;
@@ -479,12 +484,16 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_init(w_denom);
         mpq_mat_row_to_poly(w_poly,w_denom,W,i);
         
+        //printf("w[%d] poly : ",i); mpz_poly_fprintf(stdout,w_poly);
+    
         // Computing theta (in the basis of alpha)^ * w[i] mod g, without the common denominators.
         // We divide at the end
         mpz_poly res;
         mpz_poly_init(res,n-1);        
         mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
         mpz_poly_cleandeg(res,n-1);
+        
+        //printf("res : "); mpz_poly_fprintf(stdout,res);
         
         for (int j = 0 ; j <= res->deg ; j++) {
             mpz_t coeff, denom;
@@ -513,7 +522,10 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpq_mat_init(W_inv,n,n);
     mpq_mat_invert(W_inv,W);
     mpq_mat_multiply(times_theta_rat,times_theta_rat,W_inv);
-        
+    
+    
+    printf("W_inv = \n"); mpq_mat_fprint(stdout,W_inv);
+    
     // Now we have to convert it into a matrix of integers
     mpz_t denom_eq_1;
     mpz_init(denom_eq_1);
@@ -542,7 +554,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     }
     
     printf("big matrix, mod %d:\n", p);
-    mpz_mat_fprint(stdout,M); printf("\n");
+    //mpz_mat_fprint(stdout,M); printf("\n");
     
     // Now computing its kernel
     mpz_mat K;
@@ -641,9 +653,19 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         // Picking one random element of subspace E
         cxx_mpz_mat c;
         mpz_mat_init(c,1,n);
+        mpz_set_ui(mpz_mat_entry(c,0,0),0);
+        mpz_set_ui(mpz_mat_entry(c,0,1),0);
+        mpz_set_ui(mpz_mat_entry(c,0,2),0);
+        mpz_set_ui(mpz_mat_entry(c,0,3),1);
+        mpz_set_ui(mpz_mat_entry(c,0,4),2);
+        mpz_set_ui(mpz_mat_entry(c,0,5),2);
+        mpz_set_ui(mpz_mat_entry(c,0,6),0);
+        mpz_set_ui(mpz_mat_entry(c,0,7),1);
+        /*
         for (int i = 0 ; i < n ; i++) {
             mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
         }
+        * */
         minimal_poly_of_mul_by_theta(f,G,c,g,p);
         mpz_poly_cleandeg(f,n);
         
