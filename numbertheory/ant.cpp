@@ -36,6 +36,16 @@ void mpz_mat_row_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int i)
 	}
 }
 
+void mpz_mat_row_to_poly_rev(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int i)
+{
+	mpz_poly_clear(f);
+	mpz_poly_init(f,M->n-1);
+	unsigned int j;
+	for (j = 0 ; j < M->n; j++){
+		mpz_poly_setcoeff(f,j,mpz_mat_entry_const(M,i,M->n-1-j));
+	}
+}
+
 void mpz_mat_column_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, unsigned int j)
 {
 	mpz_poly_clear(f);
@@ -608,7 +618,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     printf("matrix of multiplication by theta, mod %d:\n", p);
     mpz_mat_fprint(stdout,times_theta); printf("\n");
 
-    // Now starting to compute the (n,n^2) matrix whose kernel will be computed
+    // Now starting to compute the (n+1,n^2) matrix whose kernel will be computed
     mpz_mat M,current;
     mpz_mat_init(M,n+1,n*n);
     mpz_mat_init(current,n,n);
@@ -616,21 +626,30 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     for (unsigned int k = 0 ; k < n+1 ; k++){
         for (unsigned int i = 0 ; i < n ; i++){
             for (unsigned int j = 0 ; j < n ; j++){
-                mpz_set(mpz_mat_entry(M,k,j+n*i),mpz_mat_entry(current,i,j));
+                mpz_set(mpz_mat_entry(M,n-k,j+n*i),mpz_mat_entry(current,i,j));
             }
         }
         mpz_mat_mod_ui(M,M,p);
         mpz_mat_multiply(current,current,times_theta);
         mpz_mat_mod_ui(current,current,p);
     }
-    
+
     printf("big matrix, mod %d:\n", p);
     //mpz_mat_fprint(stdout,M); printf("\n");
-    
+
     // Now computing its kernel
     mpz_mat K;
     mpz_mat_init(K,0,0);
     mpz_mat_kernel(K,M,p);
+
+    {
+        mpz_t pz;
+        mpz_init_set_ui(pz, p);
+        /* This thrashes M, which we no longer use. The only thing we
+         * care about is getting K in row-reduced echelon form */
+        mpz_gauss_backend_mod(K,M,pz);
+        mpz_clear(pz);
+    }
 
     printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
     mpz_mat_fprint(stdout,K); printf("\n");
@@ -638,19 +657,20 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     // Getting the minimal polynomial and verifying that f(M) = 0
     if(K->m == 0){
         mpz_poly_realloc(f,0);
-    }
-    else{
-        mpz_mat_row_to_poly(f,K,0);
+    } else {
+        mpz_poly_set_zero(f);
+        mpz_mat_row_to_poly_rev(f,K,K->m-1);
     }
     
-    // Testing
-    mpz_mat test_mat;
-    mpz_mat_init(test_mat,n,n);
-    mpz_mat_in_poly_mod_ui(test_mat,times_theta,f,p);
-    //printf("f(times_theta) :\n");
-    //mpz_mat_fprint(stdout,test_mat); printf("\n");
-    mpz_mat_clear(test_mat);
-    
+    {
+        // Testing
+        mpz_mat test_mat;
+        mpz_mat_init(test_mat,n,n);
+        mpz_mat_in_poly_mod_ui(test_mat,times_theta,f,p);
+        //printf("f(times_theta) :\n");
+        //mpz_mat_fprint(stdout,test_mat); printf("\n");
+        mpz_mat_clear(test_mat);
+    }
     
     printf("minimal polynomial of times_theta mod %d:\n", p);
     mpz_poly_fprintf(stdout,f); printf("\n");

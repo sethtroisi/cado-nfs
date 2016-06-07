@@ -838,6 +838,8 @@ void mpz_mat_add(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B)
     mpz_mat_clear(C);
 }
 
+/* mpz_poly_eval_mpz_mat_mod ? */
+/* TODO: Horner ! */
 void mpz_mat_in_poly(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)
 {
     ASSERT_ALWAYS(M->m == M->n);
@@ -869,6 +871,8 @@ void mpz_mat_in_poly(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)
     mpz_mat_clear(total);
 }
 
+/* mpz_poly_eval_mpz_mat_mod_ui ? */
+/* TODO: Horner ! */
 void mpz_mat_in_poly_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned int p)
 {
     ASSERT_ALWAYS(M->m == M->n);
@@ -957,6 +961,9 @@ void mpq_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T)
  *
  * M is the reduced matrix (modification in place of the input), T the
  * transformation matrix (so that T * input-M = output-M)
+ *
+ * Note that if M is rectangular, this the function we want to call in
+ * order to get a row-reduced echelon form of M.
  */
 void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
 {
