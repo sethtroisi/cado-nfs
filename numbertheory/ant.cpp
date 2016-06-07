@@ -672,9 +672,9 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     
     // The initial value in pick_from
     subspace_ideal initial;
-    mpz_mat_set(initial.E,Id_z); // It is the basis of Ok/p*Ok, but written on the basis of Ok/p*Ok ; thus, it's the identity
-    mpz_mat_set(initial.I,Id_z); //p*identity
-    mpz_mat_set(initial.V,Id_z); // identity
+    initial.E = Id_z; // It is the basis of Ok/p*Ok, but written on the basis of Ok/p*Ok ; thus, it's the identity
+    initial.V = Id_z; // identity
+    initial.I = Id_z; //p*identity
     mpz_mat_multiply_by_ui(initial.I,initial.I,p);
     
     // The vector on which the recursion will happen.
@@ -696,19 +696,20 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         // Picking one random element of subspace E
         cxx_mpz_mat c;
         mpz_mat_realloc(c,1,n);
-        mpz_set_ui(mpz_mat_entry(c,0,0),0);//0);
-        mpz_set_ui(mpz_mat_entry(c,0,1),1);//0);
-        mpz_set_ui(mpz_mat_entry(c,0,2),0);//0);
-        mpz_set_ui(mpz_mat_entry(c,0,3),2);//1);
-        mpz_set_ui(mpz_mat_entry(c,0,4),1);//2);
-        mpz_set_ui(mpz_mat_entry(c,0,5),0);//2);
-        mpz_set_ui(mpz_mat_entry(c,0,6),0);//0);
-        mpz_set_ui(mpz_mat_entry(c,0,7),0);//1);
-        /*
-        for (int i = 0 ; i < n ; i++) {
-            mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
+        if (n == 8) {
+            mpz_set_ui(mpz_mat_entry(c,0,0),0);//0);
+            mpz_set_ui(mpz_mat_entry(c,0,1),1);//0);
+            mpz_set_ui(mpz_mat_entry(c,0,2),0);//0);
+            mpz_set_ui(mpz_mat_entry(c,0,3),2);//1);
+            mpz_set_ui(mpz_mat_entry(c,0,4),1);//2);
+            mpz_set_ui(mpz_mat_entry(c,0,5),0);//2);
+            mpz_set_ui(mpz_mat_entry(c,0,6),0);//0);
+            mpz_set_ui(mpz_mat_entry(c,0,7),0);//1);
+        } else {
+            for (int i = 0 ; i < n ; i++) {
+                mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
+            }
         }
-        * */
         minimal_poly_of_mul_by_theta(f,G,c,g,p);
         mpz_poly_cleandeg(f,n);
         
