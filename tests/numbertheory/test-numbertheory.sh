@@ -49,9 +49,10 @@ input_file_for_binary() {
 
 read -s -r -d '' perl_code <<-'EOF'
     while (<>) {
-        /the maximal order/ && do { $x=1; next; };
+        /maximal order is/ && do { $x=1; next; };
         s/^\s*//;
         print if $x;
+        last if $x && /^$/;
     }
 
 EOF
@@ -65,7 +66,7 @@ cat <<-'EOF'
     O:=Order([LeadingCoefficient(f)*alpha]);
     try
         myO:=Order([FieldOfFractions(O)!Eltseq(r):r in Rows(basis)]);
-        test := Gcd(Index(pMaximalOrder(myO,p),myO), p) eq 1;
+        assert Gcd(Index(pMaximalOrder(myO,p),myO), p) eq 1;
         printf "ok p:=%o; d:=%o; COEFFS:=\"%o\";\n", p, n, COEFFS;
     catch e
         printf "FAILED p:=%o; d:=%o; COEFFS:=\"%o\"; RESULT:=\"%o\";\n", p, n, COEFFS, RESULT;
