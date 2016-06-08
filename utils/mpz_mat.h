@@ -148,8 +148,8 @@ void mpq_mat_multiply_by_si(mpq_mat_ptr C, mpq_mat_srcptr A, int k);
 void mpq_mat_multiply_by_ui(mpq_mat_ptr C, mpq_mat_srcptr A, unsigned int k);
 void mpz_mat_add(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
 /* XXX what does that do ??? */
-void mpz_mat_in_poly(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f);
-void mpz_mat_in_poly_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned int p);
+void mpz_poly_eval_mpz_mat(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f);
+void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned int p);
 
 /*  gaussian reduction over the rationals
  * this is a backend for row gaussian reduction. T receives the

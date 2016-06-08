@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <sys/resource.h>	/* for getrusage */
 #include <queue>
+#include <vector>
 #include <time.h>
 #include "macros.h"
 #include "mpz_poly.h"
@@ -662,6 +663,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_mat_row_to_poly_rev(f,K,K->m-1);
     }
     
+    /*
     {
         // Testing
         mpz_mat test_mat;
@@ -670,7 +672,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         //printf("f(times_theta) :\n");
         //mpz_mat_fprint(stdout,test_mat); printf("\n");
         mpz_mat_clear(test_mat);
-    }
+    }*/
     
     //printf("minimal polynomial of times_theta mod %d:\n", p);
     //mpz_poly_fprintf(stdout,f); printf("\n");
@@ -746,6 +748,9 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         }
         
         // Finding its minimal polynomial
+        cxx_mpz_mat Mc;
+        mpz_mat_realloc(Mc,n,n);
+        matrix_of_multiplication_by_theta_local(Mc,G,c,g,p);
         minimal_poly_of_mul_by_theta(f,G,c,g,p);
         mpz_poly_cleandeg(f,n);
         
@@ -761,6 +766,25 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         mpz_poly_factor(lf,f,p_0,state);
         
         mpz_poly_factor_list_fprintf(stdout,lf);
+        
+        
+        //mpz_mat_fprint(stdout, Mc); printf("\n");
+        
+        // Building the list of characteristic subspaces
+        vector<cxx_mpz_mat> char_subspaces;
+        for (int i = 0 ; i < lf->size ; i++){
+            // For each factor f (with multiplicity m), we compute (f(Mc))^m mod p
+            cxx_mpz_mat res, ker;
+            mpz_mat_realloc(res,n,n);
+            mpz_poly_eval_mpz_mat_mod_ui(res,Mc,lf->factors[i]->f,p);
+            mpz_mat_power_ui_mod_ui(res,res,lf->factors[i]->m,p);
+            
+            // Computing the kernel
+            mpz_mat_kernel(ker,res,p);
+            
+            //printf("(f[%d](Mc))^%d :\n",i,lf->factors[i]->m); mpz_mat_fprint(stdout,res); printf("\n");
+            //printf("Ker ((f[%d](Mc))^%d) :\n",i,lf->factors[i]->m); mpz_mat_fprint(stdout,ker); printf("\n");
+        }
         
         mpz_clear(p_0);
         mpz_poly_factor_list_clear(lf);

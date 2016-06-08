@@ -2463,7 +2463,6 @@ void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l)
 {
     for (int i = 0 ; i < l->size ; i++){
         mpz_poly_fprintf_m(fp,l->factors[i]->f,l->factors[i]->m);
-        //printf("with multiplicity %d\n\n", l->factors[i]->m);
     }
 }
 /* Squarefree factorization */

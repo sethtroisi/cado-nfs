@@ -838,9 +838,8 @@ void mpz_mat_add(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B)
     mpz_mat_clear(C);
 }
 
-/* mpz_poly_eval_mpz_mat_mod ? */
 /* TODO: Horner ! */
-void mpz_mat_in_poly(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)
+void mpz_poly_eval_mpz_mat(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)
 {
     ASSERT_ALWAYS(M->m == M->n);
     unsigned int n = M->n;
@@ -871,9 +870,8 @@ void mpz_mat_in_poly(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)
     mpz_mat_clear(total);
 }
 
-/* mpz_poly_eval_mpz_mat_mod_ui ? */
 /* TODO: Horner ! */
-void mpz_mat_in_poly_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned int p)
+void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned int p)
 {
     ASSERT_ALWAYS(M->m == M->n);
     unsigned int n = M->n;
