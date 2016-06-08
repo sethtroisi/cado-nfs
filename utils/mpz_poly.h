@@ -269,7 +269,7 @@ struct cxx_mpz_poly {
 struct cxx_mpq_poly
 {
     cxx_mpz_poly num;
-    mpz_t den;
+    mpz_ptr den;
     cxx_mpq_poly() { /*mpz_init(den);*/ }
     ~cxx_mpq_poly() { /*mpz_clear(den);*/ }
 };

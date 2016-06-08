@@ -890,6 +890,8 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     mpz_poly_fprintf(stdout,v_poly.num);
                     
                     gens.push_back(v_poly);
+                    printf("%d and %d\n", gens.back().den, v_poly.den);
+                    mpz_set(gens.back().den, v_poly.den);
                     mpz_clear(v_poly.den);
                 }
             }
