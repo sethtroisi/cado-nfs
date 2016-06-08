@@ -888,13 +888,24 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     
                     gens.push_back(v_poly);
                 }
+
+                /* build: 3n * n matrix with:
+                 *  - gens as computed above (in a matrix)
+                 *  - Ip
+                 *  - current.I
+                 *
+                 * hnf of that
+                 *
+                 * leading n*n submatrix
+                 *
+                 */
             }
             printf("\n");
             for(unsigned int j = 0 ; j < gens.size() ; j++){
                 char * tmp;
                 int rc = mpz_poly_asprintf(&tmp,gens[j].num);
                 ASSERT_ALWAYS(rc >= 0);
-                gmp_printf("(1/%Zd)*(%s)\n",gens[j].den, tmp);
+                gmp_printf("(1/%Zd)*(%s),\n",gens[j].den, tmp);
                 free(tmp);
             }
         }
