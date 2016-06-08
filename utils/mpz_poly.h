@@ -224,6 +224,8 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
 #endif
 
 #ifdef __cplusplus
+#include "utils/cxx_mpz.hpp"
+
 /* This is sort of a generic way to write a c++ equivalent to the C type.
  * The first-class citizen in the cado-nfs code is (still) the C type, so
  * we're definitely bound to have a few infelicities here:
@@ -262,17 +264,6 @@ struct cxx_mpz_poly {
     mpz_poly_srcptr operator->() const { return x; }
 };
 
-
-/* Structure defining a rational polynomial
- * For now it's just here to make it easier to store rational polynomials in a vector
- * Some parts of ant.cpp could be changed with this, but that's no priority for now */
-struct cxx_mpq_poly
-{
-    cxx_mpz_poly num;
-    mpz_t den;
-    cxx_mpq_poly() { /*mpz_init(den);*/ }
-    ~cxx_mpq_poly() { /*mpz_clear(den);*/ }
-};
 #endif
 
 #endif	/* MPZ_POLY_H_ */
