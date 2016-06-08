@@ -1271,3 +1271,4 @@ tests/numbertheory/test-numbertheory.sh
 tests/utils/test_cxx_mpz_mat.cpp
 utils/mpz_mat.c
 utils/mpz_mat.h
+utils/cxx_mpz.hpp

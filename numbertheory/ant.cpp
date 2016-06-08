@@ -10,6 +10,7 @@
 #include "macros.h"
 #include "mpz_poly.h"
 #include "mpz_mat.h"
+#include "utils/cxx_mpz.hpp"
 
 using namespace std;
 
@@ -117,6 +118,15 @@ void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, uns
 }
 /*}}}*/
 
+
+/* Structure defining a rational polynomial
+ * For now it's just here to make it easier to store rational polynomials in a vector
+ * Some parts of ant.cpp could be changed with this, but that's no priority for now */
+struct cxx_mpq_poly
+{
+    cxx_mpz_poly num;
+    cxx_mpz den;
+};
 
 // Prints the polynomial
 void print_polynomial(mpz_t * f, int degree)
@@ -722,6 +732,7 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
     mpz_mat_clear(W_t);
 }
 
+
 void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_srcptr g, unsigned int p)
 {
     int n = g->deg;
@@ -880,7 +891,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
 
                     // Converting v_rat into one polynomial with rational coeff
                     cxx_mpq_poly v_poly;
-                    mpz_init(v_poly.den);
                     mpz_poly_realloc(v_poly.num,n);
                     mpq_mat_row_to_poly(v_poly.num,v_poly.den,v_rat,0);
                     mpz_poly_cleandeg(v_poly.num,n);
@@ -890,9 +900,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     mpz_poly_fprintf(stdout,v_poly.num);
                     
                     gens.push_back(v_poly);
-                    printf("%d and %d\n", gens.back().den, v_poly.den);
-                    mpz_set(gens.back().den, v_poly.den);
-                    mpz_clear(v_poly.den);
                 }
             }
             printf("\n");
