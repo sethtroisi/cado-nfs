@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <sys/resource.h>	/* for getrusage */
 #include <queue>
-#include <vector>
+#include <list>
 #include <time.h>
 #include "macros.h"
 #include "mpz_poly.h"
@@ -787,6 +787,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         for (int i = 0 ; i < n ; i++) {
             mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
         }
+        mpz_mat_multiply_mod_ui(c,c,current.E,p);
         
         // Finding its minimal polynomial
         cxx_mpz_mat Mc;
@@ -805,8 +806,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         mpz_init(p_0);
         mpz_set_ui(p_0,p);
         mpz_poly_factor(lf,f,p_0,state);
-        
-        mpz_poly_factor_list_fprintf(stdout,lf);
         
         
         //mpz_mat_fprint(stdout, Mc); printf("\n");
@@ -831,10 +830,32 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
             //Now we have to compute the intersection of Vect(ker) and V
             intersection_of_subspaces_mod_ui(char_sub, current.V, ker, p);
             //printf("Basis of intersection of V and Ker :\n"); mpz_mat_fprint(stdout,char_sub); printf("\n");
+            //printf("Characteristic subspace #%d :\n",i); mpz_mat_fprint(stdout,char_sub); printf("\n");
             char_subspaces.push_back(char_sub);
         }
         
+        // Purging it from null characteristic subspaces
+        mpz_poly_factor_list rlf; // reduced list of factors
+        mpz_poly_factor_list_init(rlf);
+        vector<cxx_mpz_mat> r_char_subspaces;
+        for (int i = 0 ; i < lf->size ; i++){
+            if(char_subspaces.at(i)->m > 0){
+                mpz_poly_factor_list_push(rlf, lf->factors[i]->f, lf->factors[i]->m);
+                cxx_mpz_mat aux;
+                aux = char_subspaces.at(i);
+                r_char_subspaces.push_back(aux);
+            }
+        }
+        
+        
+        mpz_poly_factor_list_fprintf(stdout,lf);
+        for(unsigned int i = 0 ; i < r_char_subspaces.size() ; i++){
+            printf("Characteristic subspace #%d :\n",i); mpz_mat_fprint(stdout,r_char_subspaces.at(i)); printf("\n");
+        }
+        
+        
         mpz_clear(p_0);
+        mpz_poly_factor_list_clear(rlf);
         mpz_poly_factor_list_clear(lf);
         mpz_poly_clear(f);
     }
