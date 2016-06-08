@@ -199,6 +199,60 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B,
     mpz_clear(lcm);
 }
 
+/* This is almost like hnf_backend, except that we do it in a different
+ * order. We consider columns in reverse order. And we also reverse the
+ * order of the first non-zero rows we obtain.
+ */
+int mpz_hnf_backend_rev(mpz_mat_ptr M0, mpz_mat_ptr T0)
+{
+    mpz_mat M, T;
+    mpz_mat_init(M, M0->m, M0->n);
+    mpz_mat_realloc(T0, M0->m, M0->m);
+    mpz_mat_init(T, T0->m, T0->n);
+    for(unsigned int i = 0; i < M0->m; i++) {
+        for(unsigned int j = 0; j < M0->n; j++) {
+            mpz_swap(mpz_mat_entry(M,i,j),mpz_mat_entry(M0,i,M0->n-1-j));
+        }
+    }
+    int s = mpz_hnf_backend(M, T);
+    unsigned int rank = 0;
+    for(unsigned int i = 0; i < M->m; i++) {
+        for(unsigned int j = 0; j < M->n; j++) {
+            if (mpz_cmp_ui(mpz_mat_entry_const(M,i,j),0) != 0) {
+                rank=i+1;
+                break;
+            }
+        }
+    }
+    ASSERT_ALWAYS(M->m == T->m);
+    ASSERT_ALWAYS(M->m == T->n);
+    ASSERT_ALWAYS(M->m == T0->m);
+    ASSERT_ALWAYS(M->m == T0->n);
+    for(unsigned int i = 0; i < rank; i++) {
+        for(unsigned int j = 0; j < M->n; j++) {
+            mpz_swap(mpz_mat_entry(M0,i,j),mpz_mat_entry(M,rank-1-i,M0->n-1-j));
+        }
+        for(unsigned int j = 0; j < T->n; j++) {
+            mpz_swap(mpz_mat_entry(T0,i,j),mpz_mat_entry(T,rank-1-i,j));
+        }
+    }
+
+    for(unsigned int i = rank; i < M->m; i++) {
+        for(unsigned int j = 0; j < M->n; j++) {
+            mpz_swap(mpz_mat_entry(M0,i,j),mpz_mat_entry(M,i,M0->n-1-j));
+        }
+        for(unsigned int j = 0; j < T->n; j++) {
+            mpz_swap(mpz_mat_entry(T0,i,j),mpz_mat_entry(T,i,j));
+        }
+    }
+    if ((rank/2)&1) s = -s;
+    mpz_mat_clear(M);
+    mpz_mat_clear(T);
+    return s;
+}
+
+
+
 // Builds the block matrix containing p*identity in the top, and K in the bottom
 // Then computes its HNF and stores it in I
 void join_HNF(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p)
@@ -211,7 +265,7 @@ void join_HNF(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p)
     mpz_mat_set_ui(J, 1);
     mpz_mat_multiply_by_ui(J, J, p);
     mpz_mat_vertical_join(I, J, K);
-    mpz_hnf_backend(I, T0);
+    mpz_hnf_backend_rev(I, T0);
     mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
     mpz_mat_set(I, J);
 
@@ -505,7 +559,7 @@ void p_maximal_order(mpq_mat_ptr D, mpq_mat_srcptr B, mpz_poly_srcptr f,
     mpz_init(denom_eq_1);
     
     mpq_mat_numden(D_z,denom_eq_1,D);
-    mpz_hnf_backend(D_z,T);
+    mpz_hnf_backend_rev(D_z,T);
     mpz_mat_to_mpq_mat(D,D_z);
     mpq_mat_multiply_by_mpq(D,D,denom_inv);
     
