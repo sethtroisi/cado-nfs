@@ -76,6 +76,7 @@ void mpz_poly_fprintf(FILE *fp, mpz_poly_srcptr f);
 void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep);
 void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f,
                                    const char letter, const char *pre);
+void mpz_poly_fprintf_m (FILE *fp, mpz_poly_srcptr f, int m);
 
 /* Tests and comparison functions */
 int mpz_poly_cmp (mpz_poly_srcptr, mpz_poly_srcptr);
@@ -187,6 +188,7 @@ void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_clear(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_flush(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, int m);
+void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l);
 int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, mpz_srcptr p);
 int mpz_poly_factor_ddf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p);
 int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate);

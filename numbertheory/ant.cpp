@@ -615,8 +615,8 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
 
     matrix_of_multiplication_by_theta_local(times_theta, W, theta, g, p);
 
-    printf("matrix of multiplication by theta, mod %d:\n", p);
-    mpz_mat_fprint(stdout,times_theta); printf("\n");
+    //printf("matrix of multiplication by theta, mod %d:\n", p);
+    //mpz_mat_fprint(stdout,times_theta); printf("\n");
 
     // Now starting to compute the (n+1,n^2) matrix whose kernel will be computed
     mpz_mat M,current;
@@ -634,7 +634,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_mat_mod_ui(current,current,p);
     }
 
-    printf("big matrix, mod %d:\n", p);
+    //printf("big matrix, mod %d:\n", p);
     //mpz_mat_fprint(stdout,M); printf("\n");
 
     // Now computing its kernel
@@ -651,8 +651,8 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_clear(pz);
     }
 
-    printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
-    mpz_mat_fprint(stdout,K); printf("\n");
+    //printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
+    //mpz_mat_fprint(stdout,K); printf("\n");
 
     // Getting the minimal polynomial and verifying that f(M) = 0
     if(K->m == 0){
@@ -672,8 +672,8 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_mat_clear(test_mat);
     }
     
-    printf("minimal polynomial of times_theta mod %d:\n", p);
-    mpz_poly_fprintf(stdout,f); printf("\n");
+    //printf("minimal polynomial of times_theta mod %d:\n", p);
+    //mpz_poly_fprintf(stdout,f); printf("\n");
     
     mpz_mat_clear(K);
     mpz_mat_clear(current);
@@ -727,8 +727,8 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     pick_from.push(initial);
     
     
-    printf("W = \n"); mpq_mat_fprint(stdout,G); printf("\n");
-    printf("W_inv = \n"); mpq_mat_fprint(stdout,G_inv); printf("\n");
+    //printf("W = \n"); mpq_mat_fprint(stdout,G); printf("\n");
+    //printf("W_inv = \n"); mpq_mat_fprint(stdout,G_inv); printf("\n");
     
     while (pick_from.size() > 0)  {
         mpz_poly f;
@@ -741,25 +741,29 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         // Picking one random element of subspace E
         cxx_mpz_mat c;
         mpz_mat_realloc(c,1,n);
-        if (n == 8) {
-            mpz_set_ui(mpz_mat_entry(c,0,0),0);//0);
-            mpz_set_ui(mpz_mat_entry(c,0,1),1);//0);
-            mpz_set_ui(mpz_mat_entry(c,0,2),0);//0);
-            mpz_set_ui(mpz_mat_entry(c,0,3),2);//1);
-            mpz_set_ui(mpz_mat_entry(c,0,4),1);//2);
-            mpz_set_ui(mpz_mat_entry(c,0,5),0);//2);
-            mpz_set_ui(mpz_mat_entry(c,0,6),0);//0);
-            mpz_set_ui(mpz_mat_entry(c,0,7),0);//1);
-        } else {
-            for (int i = 0 ; i < n ; i++) {
-                mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
-            }
+        for (int i = 0 ; i < n ; i++) {
+            mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
         }
+        
+        // Finding its minimal polynomial
         minimal_poly_of_mul_by_theta(f,G,c,g,p);
         mpz_poly_cleandeg(f,n);
         
         printf("Element c is : "); mpz_mat_fprint(stdout,c); printf("\n");
         printf("Minimal polynomial is : "); mpz_poly_fprintf(stdout,f); printf("\n");
+        
+        // Factorization of the minimal polynomial
+        mpz_poly_factor_list lf;
+        mpz_poly_factor_list_init(lf);
+        mpz_t p_0;
+        mpz_init(p_0);
+        mpz_set_ui(p_0,p);
+        mpz_poly_factor(lf,f,p_0,state);
+        
+        mpz_poly_factor_list_fprintf(stdout,lf);
+        
+        mpz_clear(p_0);
+        mpz_poly_factor_list_clear(lf);
         mpz_poly_clear(f);
     }
     
@@ -976,14 +980,14 @@ int main(int argc, char *argv[])
 
     
     p_maximal_order(D, B, f, p);
-    /*
-    printf("Starting from\n");
-    mpq_mat_fprint(stdout, B);
+    
+    //printf("Starting from\n");
+    //mpq_mat_fprint(stdout, B);
     printf("\n");
     printf("the %d-maximal order is \n", p);
     mpq_mat_fprint(stdout, D);
     printf("\n");
-    */
+    
     
     factorization_of_prime(g,p);
     

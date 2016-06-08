@@ -590,6 +590,38 @@ void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
   fprintf (fp, "\n");
 }
 
+/* Print coefficients of f and the multiplicity m of f (f is an irreductible factor of one bigger polyonom). */
+void mpz_poly_fprintf_m (FILE *fp, mpz_poly_srcptr f, int m)
+{
+  fprintf (fp, "( ");
+  if (f->deg == -1) {
+      fprintf (fp, "0\n");
+      return;
+  }
+  for (int i = 0, printed = 0; i <= f->deg; ++i) {
+      if (mpz_cmp_ui(f->coeff[i], 0) == 0) continue;
+
+      if (printed++ && mpz_cmp_ui(f->coeff[i], 0) > 0)
+          gmp_fprintf (fp, "+");
+
+      if (i && mpz_cmp_ui(f->coeff[i], 1) == 0) {
+          gmp_fprintf (fp, "x");
+      } else if (i && mpz_cmp_ui(f->coeff[i], -1) == 0) {
+          gmp_fprintf (fp, "-x");
+      } else {
+          gmp_fprintf (fp, "%Zd", f->coeff[i]);
+          if (i) {
+              gmp_fprintf (fp, "*x");
+          }
+      }
+
+      if (i > 1) {
+          gmp_fprintf (fp, "^%d", i);
+      }
+  }
+  fprintf (fp, " )^%d\n",m);
+}
+
 /* Print f of degree d with the following format
     f0<sep>f1<sep>...<sep>fd\n
    Print only '\n' if f = 0 (ie deg(f) = -1)
@@ -2427,9 +2459,16 @@ void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, in
     l->factors[l->size - 1]->m = m;
 }
 
+void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l)
+{
+    for (int i = 0 ; i < l->size ; i++){
+        mpz_poly_fprintf_m(fp,l->factors[i]->f,l->factors[i]->m);
+        //printf("with multiplicity %d\n\n", l->factors[i]->m);
+    }
+}
 /* Squarefree factorization */
 
-/* This auxiliary function almost does the sqf. It fills
+/* This auxiliary functionp almost does the sqf. It fills
  * lf->factors[stride*i] (i from 1 to deg(f)) with the factors with
  * multiplicity i in f.  lf->factors[0] is filled with the product whose
  * multiplicity is a multiple of the field characteristic.  returns max
