@@ -577,19 +577,8 @@ void matrix_of_multiplication_by_theta_local(mpz_mat_ptr M, mpq_mat_srcptr W, mp
     mpq_mat_multiply(times_theta_rat,times_theta_rat,W_inv);
     
     // Now we have to convert it into a matrix of integers
-    {
-#if 0
-        int rc = mpq_mat_numden(times_theta, NULL, times_theta_rat);
-        ASSERT_ALWAYS(rc == 1);
-#else
-        mpz_t foo;
-        mpz_init(foo);
-        mpq_mat_numden(times_theta, foo, times_theta_rat);
-        int rc = mpz_cmp_ui(foo, 1) == 0;
-        mpz_clear(foo);
-        ASSERT_ALWAYS(rc == 1);
-#endif
-    }
+    int rc = mpq_mat_numden(times_theta, NULL, times_theta_rat);
+    ASSERT_ALWAYS(rc == 1);
     
     // And mod p
     mpz_mat_mod_ui(times_theta,times_theta,p);
