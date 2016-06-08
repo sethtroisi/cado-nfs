@@ -278,7 +278,7 @@ void mpz_mat_transpose(mpz_mat_ptr D, mpz_mat_srcptr M)
 /* convert to integer matrix divided by lcm of denominator.
  * return 1
  * if den==NULL, return 0 if denominator happens to not be 1 (in which
- * case the matrix return is undefined).
+ * case the matrix returned is undefined).
  */
 
 int mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
@@ -290,7 +290,7 @@ int mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M)
             mpz_srcptr Mij =  mpq_denref(mpq_mat_entry_const(M, i, j));
             if (den) {
                 mpz_lcm(den, den, Mij);
-            } else {
+            } else if (mpz_cmp_ui(Mij, 1) != 0) {
                 ret = 0;
             }
         }
