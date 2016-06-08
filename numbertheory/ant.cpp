@@ -567,6 +567,7 @@ void matrix_of_multiplication_by_theta_local(mpz_mat_ptr M, mpq_mat_srcptr W, mp
         mpz_poly_clear(res);
         mpz_clear(w_denom);
         mpz_poly_clear(w_poly);
+        mpz_clear(denom);
     }
     
     // Now we have to multiply by W^-1, in order to get into the basis of (w[0], ... w[n-1]) again
@@ -691,6 +692,46 @@ struct subspace_ideal {
 //    unsigned int dim; // The dimension of E, instead of having the full space like in magma
 };
 
+// U and W are matrices containing generators (in rows) of vector subspaces of one big vector space
+// This computes the basis of the intersection of those subspaces
+void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_srcptr W, unsigned int p)
+{
+    ASSERT_ALWAYS(U->n == W->n);
+    mpz_mat U_t, W_t; // U and W, transposed
+    mpz_mat_init(U_t, U->n, U->m);
+    mpz_mat_init(W_t, W->n, W->m);
+    
+    mpz_mat_transpose(U_t,U);
+    mpz_mat_transpose(W_t,W);
+    
+    mpz_mat X, Y; // Left kernel of U_t and W_t
+    mpz_mat_init(X, 0, U->n);
+    mpz_mat_init(Y, 0, W->n);
+    
+    mpz_mat_kernel(X,U_t,p);
+    mpz_mat_kernel(Y,W_t,p);
+    
+    //printf("X is :\n"); mpz_mat_fprint(stdout, X); printf("\n");
+    //printf("Y is :\n"); mpz_mat_fprint(stdout, Y); printf("\n");
+    
+    mpz_mat Z, Z_t; // Block matrix, X on the top, Y in the bottom ; and its transposed
+    mpz_mat_init(Z,X->m + Y->m, U->n);
+    mpz_mat_init(Z_t, U->n, X->m + Y->m);
+    mpz_mat_vertical_join(Z,X,Y);
+    //printf("Z is :\n"); mpz_mat_fprint(stdout, Z); printf("\n");
+    
+    mpz_mat_transpose(Z_t, Z);
+    mpz_mat_kernel(M, Z_t, p);
+    
+    //printf("M is :\n"); mpz_mat_fprint(stdout, M); printf("\n");
+    
+    mpz_mat_clear(Z);
+    mpz_mat_clear(X);
+    mpz_mat_clear(Y);
+    mpz_mat_clear(U_t);
+    mpz_mat_clear(W_t);
+}
+
 void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_srcptr g, unsigned int p)
 {
     int n = g->deg;
@@ -720,8 +761,8 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     // The initial value in pick_from
     subspace_ideal initial;
     initial.E = Id_z; // It is the basis of Ok/p*Ok, but written on the basis of Ok/p*Ok ; thus, it's the identity
-    initial.V = Id_z; // identity
     initial.I = Id_z; //p*identity
+    initial.V = Id_z; // identity
     mpz_mat_multiply_by_ui(initial.I,initial.I,p);
     
     // The vector on which the recursion will happen.
@@ -774,7 +815,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         vector<cxx_mpz_mat> char_subspaces;
         for (int i = 0 ; i < lf->size ; i++){
             // For each factor f (with multiplicity m), we compute (f(Mc))^m mod p
-            cxx_mpz_mat res, ker;
+            cxx_mpz_mat res, ker, char_sub;
             mpz_mat_realloc(res,n,n);
             mpz_poly_eval_mpz_mat_mod_ui(res,Mc,lf->factors[i]->f,p);
             mpz_mat_power_ui_mod_ui(res,res,lf->factors[i]->m,p);
@@ -782,8 +823,15 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
             // Computing the kernel
             mpz_mat_kernel(ker,res,p);
             
+            
             //printf("(f[%d](Mc))^%d :\n",i,lf->factors[i]->m); mpz_mat_fprint(stdout,res); printf("\n");
             //printf("Ker ((f[%d](Mc))^%d) :\n",i,lf->factors[i]->m); mpz_mat_fprint(stdout,ker); printf("\n");
+            //printf("current V :\n"); mpz_mat_fprint(stdout,current.V); printf("\n");
+            
+            //Now we have to compute the intersection of Vect(ker) and V
+            intersection_of_subspaces_mod_ui(char_sub, current.V, ker, p);
+            //printf("Basis of intersection of V and Ker :\n"); mpz_mat_fprint(stdout,char_sub); printf("\n");
+            char_subspaces.push_back(char_sub);
         }
         
         mpz_clear(p_0);

@@ -80,6 +80,7 @@ void mpz_mat_determinant_triangular(mpz_ptr d, mpz_mat_srcptr M);
 void mpq_mat_trace(mpq_ptr t, mpq_mat_srcptr M);
 // We assume that M is triangular (and square)
 void mpq_mat_determinant_triangular(mpq_ptr d, mpq_mat_srcptr M);
+void mpz_mat_transpose(mpz_mat_ptr D, mpz_mat_srcptr M);
 
 /* miscellaneous */
 int mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M);

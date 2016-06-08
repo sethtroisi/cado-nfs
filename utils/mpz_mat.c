@@ -226,7 +226,7 @@ void mpq_mat_vertical_join(mpq_mat_ptr N, mpq_mat_srcptr M1, mpq_mat_srcptr M2)
 
 }
 /*}}}*/
-/*{{{ determinant and trace */
+/*{{{ determinant, trace and transposition */
 // We assume that M is square
 void mpz_mat_trace(mpz_ptr t, mpz_mat_srcptr M)
 {
@@ -261,6 +261,16 @@ void mpq_mat_determinant_triangular(mpq_ptr d, mpq_mat_srcptr M)
     mpq_set_ui(d, 1, 1);
     for(unsigned int i = 0 ; i < M->n ; i++)
         mpq_mul(d, d, mpq_mat_entry_const(M,i,i));
+}
+
+void mpz_mat_transpose(mpz_mat_ptr D, mpz_mat_srcptr M)
+{
+    mpz_mat_realloc(D,M->n,M->m);
+    for(unsigned int i = 0 ; i < M->m ; i++){
+        for(unsigned int j = 0 ; j < M->n ; j++){
+            mpz_set(mpz_mat_entry(D,j,i),mpz_mat_entry_const(M,i,j));
+        }
+    }
 }
 /*}}}*/
 /*{{{ miscellaneous */
