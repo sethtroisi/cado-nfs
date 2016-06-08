@@ -1265,15 +1265,17 @@ int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
 unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
     unsigned int * index_vec, unsigned int * s_change,
     list_int64_vector_srcptr list_s, list_int64_vector_index_srcptr list_vec,
-    sieving_bound_srcptr H, int64_vector_srcptr s)
+    sieving_bound_srcptr H, MAYBE_UNUSED int64_vector_srcptr s)
 {
   ASSERT(* s_change == 0);
+  ASSERT(int64_vector_equal(list_s->v[0], s));
+  ASSERT(s->dim == s_tmp->dim);
 
   unsigned int hit = 0;
   int64_vector_t v_tmp;
-  int64_vector_init(v_tmp, s->dim);
+  int64_vector_init(v_tmp, s_tmp->dim);
 
-  for (unsigned int i = 0; i < s->dim; i++) {
+  for (unsigned int i = 0; i < s_tmp->dim; i++) {
     s_tmp->c[i] = (int64_t)H->h[i];
   }
   for (unsigned int i = 0; i < list_s->length; i++) {
@@ -1285,13 +1287,15 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
         if (v_tmp->c[2] < s_tmp->c[2]) {
           int64_vector_set(s_tmp, v_tmp);
           * index_vec = j;
-          if (!int64_vector_equal(s, list_s->v[i])) {
+          if (i != 0) {
             * s_change = 1;
           }
         }
-        int64_vector_clear(v_tmp);
         hit = 1;
+#ifndef SPACE_SIEVE_SEEK_ENUM_ALL
+        int64_vector_clear(v_tmp);
         return hit;
+#endif // SPACE_SIEVE_SEEK_ENUM_ALL
       }
     }
   }
