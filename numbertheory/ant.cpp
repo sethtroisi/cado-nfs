@@ -199,6 +199,60 @@ void generators_to_power_p(mpq_mat_ptr U, mpq_mat_srcptr B,
     mpz_clear(lcm);
 }
 
+/* This is almost like hnf_backend, except that we do it in a different
+ * order. We consider columns in reverse order. And we also reverse the
+ * order of the first non-zero rows we obtain.
+ */
+int mpz_hnf_backend_rev(mpz_mat_ptr M0, mpz_mat_ptr T0)
+{
+    mpz_mat M, T;
+    mpz_mat_init(M, M0->m, M0->n);
+    mpz_mat_realloc(T0, M0->m, M0->m);
+    mpz_mat_init(T, T0->m, T0->n);
+    for(unsigned int i = 0; i < M0->m; i++) {
+        for(unsigned int j = 0; j < M0->n; j++) {
+            mpz_swap(mpz_mat_entry(M,i,j),mpz_mat_entry(M0,i,M0->n-1-j));
+        }
+    }
+    int s = mpz_hnf_backend(M, T);
+    unsigned int rank = 0;
+    for(unsigned int i = 0; i < M->m; i++) {
+        for(unsigned int j = 0; j < M->n; j++) {
+            if (mpz_cmp_ui(mpz_mat_entry_const(M,i,j),0) != 0) {
+                rank=i+1;
+                break;
+            }
+        }
+    }
+    ASSERT_ALWAYS(M->m == T->m);
+    ASSERT_ALWAYS(M->m == T->n);
+    ASSERT_ALWAYS(M->m == T0->m);
+    ASSERT_ALWAYS(M->m == T0->n);
+    for(unsigned int i = 0; i < rank; i++) {
+        for(unsigned int j = 0; j < M->n; j++) {
+            mpz_swap(mpz_mat_entry(M0,i,j),mpz_mat_entry(M,rank-1-i,M0->n-1-j));
+        }
+        for(unsigned int j = 0; j < T->n; j++) {
+            mpz_swap(mpz_mat_entry(T0,i,j),mpz_mat_entry(T,rank-1-i,j));
+        }
+    }
+
+    for(unsigned int i = rank; i < M->m; i++) {
+        for(unsigned int j = 0; j < M->n; j++) {
+            mpz_swap(mpz_mat_entry(M0,i,j),mpz_mat_entry(M,i,M0->n-1-j));
+        }
+        for(unsigned int j = 0; j < T->n; j++) {
+            mpz_swap(mpz_mat_entry(T0,i,j),mpz_mat_entry(T,i,j));
+        }
+    }
+    if ((rank/2)&1) s = -s;
+    mpz_mat_clear(M);
+    mpz_mat_clear(T);
+    return s;
+}
+
+
+
 // Builds the block matrix containing p*identity in the top, and K in the bottom
 // Then computes its HNF and stores it in I
 void join_HNF(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p)
@@ -211,7 +265,7 @@ void join_HNF(mpz_mat_ptr I, mpz_mat_srcptr K, unsigned int p)
     mpz_mat_set_ui(J, 1);
     mpz_mat_multiply_by_ui(J, J, p);
     mpz_mat_vertical_join(I, J, K);
-    mpz_hnf_backend(I, T0);
+    mpz_hnf_backend_rev(I, T0);
     mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
     mpz_mat_set(I, J);
 
@@ -505,7 +559,7 @@ void p_maximal_order(mpq_mat_ptr D, mpq_mat_srcptr B, mpz_poly_srcptr f,
     mpz_init(denom_eq_1);
     
     mpq_mat_numden(D_z,denom_eq_1,D);
-    mpz_hnf_backend(D_z,T);
+    mpz_hnf_backend_rev(D_z,T);
     mpz_mat_to_mpq_mat(D,D_z);
     mpq_mat_multiply_by_mpq(D,D,denom_inv);
     
@@ -643,14 +697,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_mat_init(K,0,0);
     mpz_mat_kernel(K,M,p);
 
-    {
-        mpz_t pz;
-        mpz_init_set_ui(pz, p);
-        /* This thrashes M, which we no longer use. The only thing we
-         * care about is getting K in row-reduced echelon form */
-        mpz_gauss_backend_mod(K,M,pz);
-        mpz_clear(pz);
-    }
+    mpz_gauss_backend_mod_ui(K,NULL,p);
 
     //printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
     //mpz_mat_fprint(stdout,K); printf("\n");
@@ -733,7 +780,7 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
 }
 
 
-void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_srcptr g, unsigned int p)
+void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_srcptr g, unsigned int p, gmp_randstate_t state)
 {
     int n = g->deg;
     
@@ -748,10 +795,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     mpq_mat_set_ui(Id_q,1);
     mpz_mat_set_ui(Id_z,1);
     
-    gmp_randstate_t state;
-    gmp_randinit_default(state);
-    gmp_randseed_ui(state,clock());
-        
     // Computing the generators of p-maximal order, storing them in G
     p_maximal_order(G,Id_q,g,p);
     // Computing the p-radical of the order of G, storing it in Ip
@@ -774,7 +817,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     //printf("W = \n"); mpq_mat_fprint(stdout,G); printf("\n");
     //printf("W_inv = \n"); mpq_mat_fprint(stdout,G_inv); printf("\n");
     
-    while (pick_from.size() > 0)  {
+    while (!pick_from.empty()) {
         mpz_poly f;
         mpz_poly_init(f,n);
         
@@ -832,6 +875,8 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
             intersection_of_subspaces_mod_ui(char_sub, current.V, ker, p);
             //printf("Basis of intersection of V and Ker :\n"); mpz_mat_fprint(stdout,char_sub); printf("\n");
             //printf("Characteristic subspace #%d :\n",i); mpz_mat_fprint(stdout,char_sub); printf("\n");
+            //
+            mpz_gauss_backend_mod_ui(char_sub,NULL,p);
             char_subspaces.push_back(char_sub);
         }
         
@@ -840,10 +885,10 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         mpz_poly_factor_list_init(fac_Pc);
         vector<cxx_mpz_mat> r_char_subspaces;
         for (int i = 0 ; i < lf->size ; i++){
-            if(char_subspaces.at(i)->m > 0){
+            if(char_subspaces[i]->m > 0){
                 mpz_poly_factor_list_push(fac_Pc, lf->factors[i]->f, lf->factors[i]->m);
                 cxx_mpz_mat aux;
-                aux = char_subspaces.at(i);
+                aux = char_subspaces[i];
                 r_char_subspaces.push_back(aux);
             }
         }
@@ -851,7 +896,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         
         mpz_poly_factor_list_fprintf(stdout,lf);
         for(unsigned int i = 0 ; i < r_char_subspaces.size() ; i++){
-            printf("Characteristic subspace #%d :\n",i); mpz_mat_fprint(stdout,r_char_subspaces.at(i)); printf("\n");
+            printf("Characteristic subspace #%d :\n",i); mpz_mat_fprint(stdout,r_char_subspaces[i]); printf("\n");
         }
         
         
@@ -870,7 +915,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     p1 = p;
                 else
                     p1 = 1;
-                for (unsigned int k = 0 ; k < r_char_subspaces.at(j)->m ; k++){
+                for (unsigned int k = 0 ; k < r_char_subspaces[j]->m ; k++){
                     // Extracting the k-th vector of the basis of j-th characteristic subspace
                     cxx_mpz_mat aux;
                     cxx_mpz_mat v;
@@ -878,13 +923,13 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     mpz_mat_realloc(aux,1,n);
                     mpz_mat_realloc(v,1,n);
                     
-                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces.at(j),k,0,1,n);
+                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces[j],k,0,1,n);
                     mpz_mat_set(v,aux);
-                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces.at(j),k,0,1,n);
+                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces[j],k,0,1,n);
                     // v now contains this vector, on the basis of O
                     
                     
-                    // Multiplying v by G transfers v in the number field K (rationnal coefficients, thus v goes into v_rat)
+                    // Multiplying v by G transfers v in the number field K (rational coefficients, thus v goes into v_rat)
                     mpz_mat_to_mpq_mat(v_rat,v);
                     mpq_mat_multiply(v_rat,v_rat,G);
                     mpq_mat_multiply_by_ui(v_rat,v_rat,p1);
@@ -895,17 +940,27 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     mpq_mat_row_to_poly(v_poly.num,v_poly.den,v_rat,0);
                     mpz_poly_cleandeg(v_poly.num,n);
                     
-                    printf("i = %d ; j = %d ; k = %d\n",i,j,k);
-                    gmp_printf("(1/%Zd) * ",v_poly.den);
-                    mpz_poly_fprintf(stdout,v_poly.num);
-                    
                     gens.push_back(v_poly);
                 }
+
+                /* build: 3n * n matrix with:
+                 *  - gens as computed above (in a matrix)
+                 *  - Ip
+                 *  - current.I
+                 *
+                 * hnf of that
+                 *
+                 * leading n*n submatrix
+                 *
+                 */
             }
             printf("\n");
             for(unsigned int j = 0 ; j < gens.size() ; j++){
-                gmp_printf("(1/%Zd) * ",gens.at(j).den);
-                mpz_poly_fprintf(stdout,gens.at(j).num);
+                char * tmp;
+                int rc = mpz_poly_asprintf(&tmp,gens[j].num);
+                ASSERT_ALWAYS(rc >= 0);
+                gmp_printf("(1/%Zd)*(%s),\n",gens[j].den, tmp);
+                free(tmp);
             }
         }
         
@@ -915,7 +970,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         mpz_poly_clear(f);
     }
     
-    gmp_randclear(state);
     mpz_mat_clear(Ip);
     mpq_mat_clear(G_inv);
     mpq_mat_clear(G);
@@ -1090,8 +1144,23 @@ int main(int argc, char *argv[])
 
     // The inputs to this problem are f, one polynomial of degree n, and B, the matrix containing the genereators of one order of the number field obtained with f, as well as p, a prime number
 
+    unsigned long seed = clock();
+
+    for( ; argc > 3 ; ) {
+        if (strcmp(argv[1], "-s") == 0 || strcmp(argv[1], "--seed") == 0) {
+            seed = atoi(argv[2]);
+            argc--,argv++;
+            argc--,argv++;
+            continue;
+        }
+        fprintf(stderr, "Usage: ./a.out [options] [filename] [p]\n");
+        fprintf(stderr, "Unexpected arg: %s\n", argv[1]);
+	exit(EXIT_FAILURE);
+    }
+
+
     if (argc != 3) {
-	fprintf(stderr, "Usage: ./a.out [filename] [p]\n");
+	fprintf(stderr, "Usage: ./a.out [options] [filename] [p]\n");
 	exit(EXIT_FAILURE);
     }
 
@@ -1136,9 +1205,14 @@ int main(int argc, char *argv[])
     mpq_mat_fprint(stdout, D);
     printf("\n");
     
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    gmp_randseed_ui(state, seed);
+        
     
-    factorization_of_prime(g,p);
+    factorization_of_prime(g,p, state);
     
+    gmp_randclear(state);
     
     mpz_poly_clear(g);
     mpz_poly_clear(f);

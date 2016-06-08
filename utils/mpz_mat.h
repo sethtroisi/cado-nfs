@@ -159,8 +159,11 @@ void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcp
  *
  * this works reasonably well over Fp, but for rationals we suffer from
  * coefficient blowup.
+ *
+ * T may be NULL in case we don't care.
  */
 void mpq_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T);
+void mpz_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p);
 
 
 /* Gaussian reduction over Z/pZ

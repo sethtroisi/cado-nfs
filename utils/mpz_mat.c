@@ -972,13 +972,16 @@ void mpq_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T)
  *
  * Note that if M is rectangular, this the function we want to call in
  * order to get a row-reduced echelon form of M.
+ *
+ * T may be NULL in case we don't give a penny about the transformation
+ * matrix.
  */
 void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
 {
     unsigned int m = M->m;
     unsigned int n = M->n;
-    mpz_mat_realloc(T, m, m);
-    mpz_mat_set_ui(T, 1);
+    if (T) mpz_mat_realloc(T, m, m);
+    if (T) mpz_mat_set_ui(T, 1);
     unsigned int rank = 0;
     mpz_t gcd, tmp2, tmp3;
     mpz_init(gcd);
@@ -998,7 +1001,7 @@ void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
         if (i1 == M->m) /* this column is zero */
             continue;
         mpz_mat_swaprows(M, rank, i1);
-        mpz_mat_swaprows(T, rank, i1);
+        if (T) mpz_mat_swaprows(T, rank, i1);
         i1 = rank;
         /* canonicalize this row */
         /* gcd is gcd(M[rank, j], p) */
@@ -1006,7 +1009,7 @@ void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
         mpz_divexact(tmp3, p, gcd);
         mpz_invert(tmp2, tmp2, tmp3);
         mpz_mat_mulrow_mod(M, rank, tmp2, p);
-        mpz_mat_mulrow_mod(T, rank, tmp2, p);
+        if (T) mpz_mat_mulrow_mod(T, rank, tmp2, p);
         ASSERT_ALWAYS(mpz_cmp(mpz_mat_entry(M, rank, j), gcd) == 0);
         for(unsigned int i0 = 0 ; i0 < m ; i0++) {
             if (i0 == rank) continue;
@@ -1016,7 +1019,7 @@ void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
             mpz_fdiv_q(tmp2, mpz_mat_entry(M, i0, j), gcd);
             /* for i0 > rank, we should have exact quotient */
             mpz_mat_submulrow_mod(M, i0, rank, tmp2, p);
-            mpz_mat_submulrow_mod(T, i0, rank, tmp2, p);
+            if (T) mpz_mat_submulrow_mod(T, i0, rank, tmp2, p);
             ASSERT_ALWAYS(mpz_cmp_ui(mpz_mat_entry(M, i0, j), 0) == 0);
         }
         rank++;
@@ -1026,6 +1029,16 @@ void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
     mpz_clear(tmp3);
 }
 /* }}} */
+
+void mpz_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p)
+{
+    mpz_t pz;
+    mpz_init_set_ui(pz, p);
+    mpz_gauss_backend_mod(M, T, pz);
+    mpz_clear(pz);
+}
+
+
 /* {{{ integer heap routines */
 /* input: heap[0..n-1[ a heap, and heap[n-1] unused.
  * output: heap[0..n[ a heap, includes x

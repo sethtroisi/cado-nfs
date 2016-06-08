@@ -72,11 +72,11 @@ void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 
 /* Print functions */
+int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f);
 void mpz_poly_fprintf(FILE *fp, mpz_poly_srcptr f);
 void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep);
 void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f,
                                    const char letter, const char *pre);
-void mpz_poly_fprintf_m (FILE *fp, mpz_poly_srcptr f, int m);
 
 /* Tests and comparison functions */
 int mpz_poly_cmp (mpz_poly_srcptr, mpz_poly_srcptr);
