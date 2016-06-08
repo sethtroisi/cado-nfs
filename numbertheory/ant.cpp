@@ -891,8 +891,11 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
             }
             printf("\n");
             for(unsigned int j = 0 ; j < gens.size() ; j++){
-                gmp_printf("(1/%Zd) * ",gens[j].den);
-                mpz_poly_fprintf(stdout,gens[j].num);
+                char * tmp;
+                int rc = mpz_poly_asprintf(&tmp,gens[j].num);
+                ASSERT_ALWAYS(rc >= 0);
+                gmp_printf("(1/%Zd)*(%s)\n",gens[j].den, tmp);
+                free(tmp);
             }
         }
         

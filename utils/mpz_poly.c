@@ -559,67 +559,70 @@ int mpz_poly_valuation(mpz_poly_srcptr f)
 }
 
 
+int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
+{
+    size_t alloc = 0;
+    size_t size = 0;
+    int rc;
+    static const size_t batch = 4;
+    *res = NULL;
+
+    alloc += batch;
+    *res = realloc(*res, alloc);
+    if (*res == NULL) goto oom;
+
+#define SNPRINTF_FRAGMENT(fmt, arg) do {				\
+    rc = gmp_snprintf(*res + size, alloc - size, fmt, arg);	\
+    if (size + (size_t) rc >= alloc) {				\
+        alloc = MAX(alloc + batch, size + (size_t) rc);		\
+        *res = realloc(*res, alloc);					\
+        if (*res == NULL) goto oom;					\
+        rc = gmp_snprintf(*res + size, alloc - size, fmt, arg);	\
+    }									\
+    size += rc;							\
+    ASSERT_ALWAYS(size <= alloc);				\
+} while (0)
+
+    if (f->deg == -1) {
+        SNPRINTF_FRAGMENT("%d", 0);
+        return size;
+    }
+    for (int i = 0, printed = 0; i <= f->deg; ++i) {
+        if (mpz_cmp_ui(f->coeff[i], 0) == 0) continue;
+        if (printed++ && mpz_cmp_ui(f->coeff[i], 0) > 0)
+            SNPRINTF_FRAGMENT ("%s", "+");
+        if (i && mpz_cmp_ui(f->coeff[i], 1) == 0) {
+            SNPRINTF_FRAGMENT ("%s", "x");
+        } else if (i && mpz_cmp_ui(f->coeff[i], -1) == 0) {
+            SNPRINTF_FRAGMENT ("%s", "-x");
+        } else {
+            SNPRINTF_FRAGMENT ("%Zd", f->coeff[i]);
+            if (i) {
+                SNPRINTF_FRAGMENT ("%s", "*x");
+            }
+        }
+
+        if (i > 1) {
+            SNPRINTF_FRAGMENT ("^%d", i);
+        }
+    }
+
+    return size;
+#undef SNPRINTF_FRAGMENT
+oom:
+    free(res);
+    return -1;
+}
+
+
 /* Print coefficients of f. */
 void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
 {
-  if (f->deg == -1) {
-      fprintf (fp, "0\n");
-      return;
-  }
-  for (int i = 0, printed = 0; i <= f->deg; ++i) {
-      if (mpz_cmp_ui(f->coeff[i], 0) == 0) continue;
-
-      if (printed++ && mpz_cmp_ui(f->coeff[i], 0) > 0)
-          gmp_fprintf (fp, "+");
-
-      if (i && mpz_cmp_ui(f->coeff[i], 1) == 0) {
-          gmp_fprintf (fp, "x");
-      } else if (i && mpz_cmp_ui(f->coeff[i], -1) == 0) {
-          gmp_fprintf (fp, "-x");
-      } else {
-          gmp_fprintf (fp, "%Zd", f->coeff[i]);
-          if (i) {
-              gmp_fprintf (fp, "*x");
-          }
-      }
-
-      if (i > 1) {
-          gmp_fprintf (fp, "^%d", i);
-      }
-  }
-  fprintf (fp, "\n");
-}
-
-/* Print coefficients of f and the multiplicity m of f (f is an irreductible factor of one bigger polyonom). */
-void mpz_poly_fprintf_m (FILE *fp, mpz_poly_srcptr f, int m)
-{
-  fprintf (fp, "( ");
-  if (f->deg == -1) {
-      fprintf (fp, "0\n");
-      return;
-  }
-  for (int i = 0, printed = 0; i <= f->deg; ++i) {
-      if (mpz_cmp_ui(f->coeff[i], 0) == 0) continue;
-
-      if (printed++ && mpz_cmp_ui(f->coeff[i], 0) > 0)
-          gmp_fprintf (fp, "+");
-
-      if (i && mpz_cmp_ui(f->coeff[i], 1) == 0) {
-          gmp_fprintf (fp, "x");
-      } else if (i && mpz_cmp_ui(f->coeff[i], -1) == 0) {
-          gmp_fprintf (fp, "-x");
-      } else {
-          gmp_fprintf (fp, "%Zd", f->coeff[i]);
-          if (i) {
-              gmp_fprintf (fp, "*x");
-          }
-      }
-
-      if (i > 1) {
-          gmp_fprintf (fp, "^%d", i);
-      }
-  }
-  fprintf (fp, " )^%d\n",m);
+    char * res;
+    int rc = mpz_poly_asprintf(&res, f);
+    ASSERT_ALWAYS(rc >= 0);
+    fprintf(fp, "%s\n", res);
+    free(res);
 }
 
 /* Print f of degree d with the following format
@@ -2462,7 +2465,11 @@ void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, in
 void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l)
 {
     for (int i = 0 ; i < l->size ; i++){
-        mpz_poly_fprintf_m(fp,l->factors[i]->f,l->factors[i]->m);
+        char * res;
+        int rc = mpz_poly_asprintf(&res,l->factors[i]->f);
+        ASSERT(rc >= 0);
+        fprintf(fp, "(%s)^%d", res, l->factors[i]->m);
+        free(res);
     }
 }
 /* Squarefree factorization */
