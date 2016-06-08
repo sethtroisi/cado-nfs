@@ -261,6 +261,18 @@ struct cxx_mpz_poly {
     mpz_poly_ptr operator->() { return x; }
     mpz_poly_srcptr operator->() const { return x; }
 };
+
+
+/* Structure defining a rational polynomial
+ * For now it's just here to make it easier to store rational polynomials in a vector
+ * Some parts of ant.cpp could be changed with this, but that's no priority for now */
+struct cxx_mpq_poly
+{
+    cxx_mpz_poly num;
+    mpz_t den;
+    cxx_mpq_poly() { /*mpz_init(den);*/ }
+    ~cxx_mpq_poly() { /*mpz_clear(den);*/ }
+};
 #endif
 
 #endif	/* MPZ_POLY_H_ */

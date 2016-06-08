@@ -725,6 +725,7 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
     
     //printf("M is :\n"); mpz_mat_fprint(stdout, M); printf("\n");
     
+    mpz_mat_clear(Z_t);
     mpz_mat_clear(Z);
     mpz_mat_clear(X);
     mpz_mat_clear(Y);
@@ -835,12 +836,12 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         }
         
         // Purging it from null characteristic subspaces
-        mpz_poly_factor_list rlf; // reduced list of factors
-        mpz_poly_factor_list_init(rlf);
+        mpz_poly_factor_list fac_Pc; // reduced list of factors
+        mpz_poly_factor_list_init(fac_Pc);
         vector<cxx_mpz_mat> r_char_subspaces;
         for (int i = 0 ; i < lf->size ; i++){
             if(char_subspaces.at(i)->m > 0){
-                mpz_poly_factor_list_push(rlf, lf->factors[i]->f, lf->factors[i]->m);
+                mpz_poly_factor_list_push(fac_Pc, lf->factors[i]->f, lf->factors[i]->m);
                 cxx_mpz_mat aux;
                 aux = char_subspaces.at(i);
                 r_char_subspaces.push_back(aux);
@@ -854,8 +855,64 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         }
         
         
+        // Now finishing the run on the tree
+        for (int i = 0 ; i < fac_Pc->size ; i++){
+            
+            int e = fac_Pc->factors[i]->m;
+                
+            /* Consider the elements of O which map to zero in O/I^e, and
+             * non-zero elsewhere. These generate I !
+             * Those are going in gens*/
+            vector<cxx_mpq_poly> gens;
+            for (int j = 0 ; j < fac_Pc->size ; j++){
+                unsigned int p1;
+                if(i == j)
+                    p1 = p;
+                else
+                    p1 = 1;
+                for (unsigned int k = 0 ; k < r_char_subspaces.at(j)->m ; k++){
+                    // Extracting the k-th vector of the basis of j-th characteristic subspace
+                    cxx_mpz_mat aux;
+                    cxx_mpz_mat v;
+                    cxx_mpq_mat v_rat;
+                    mpz_mat_realloc(aux,1,n);
+                    mpz_mat_realloc(v,1,n);
+                    
+                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces.at(j),k,0,1,n);
+                    mpz_mat_set(v,aux);
+                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces.at(j),k,0,1,n);
+                    // v now contains this vector, on the basis of O
+                    
+                    
+                    // Multiplying v by G transfers v in the number field K (rationnal coefficients, thus v goes into v_rat)
+                    mpz_mat_to_mpq_mat(v_rat,v);
+                    mpq_mat_multiply(v_rat,v_rat,G);
+                    mpq_mat_multiply_by_ui(v_rat,v_rat,p1);
+
+                    // Converting v_rat into one polynomial with rational coeff
+                    cxx_mpq_poly v_poly;
+                    mpz_init(v_poly.den);
+                    mpz_poly_realloc(v_poly.num,n);
+                    mpq_mat_row_to_poly(v_poly.num,v_poly.den,v_rat,0);
+                    mpz_poly_cleandeg(v_poly.num,n);
+                    
+                    printf("i = %d ; j = %d ; k = %d\n",i,j,k);
+                    gmp_printf("(1/%Zd) * ",v_poly.den);
+                    mpz_poly_fprintf(stdout,v_poly.num);
+                    
+                    gens.push_back(v_poly);
+                    mpz_clear(v_poly.den);
+                }
+            }
+            printf("\n");
+            for(unsigned int j = 0 ; j < gens.size() ; j++){
+                gmp_printf("(1/%Zd) * ",gens.at(j).den);
+                mpz_poly_fprintf(stdout,gens.at(j).num);
+            }
+        }
+        
         mpz_clear(p_0);
-        mpz_poly_factor_list_clear(rlf);
+        mpz_poly_factor_list_clear(fac_Pc);
         mpz_poly_factor_list_clear(lf);
         mpz_poly_clear(f);
     }
