@@ -1912,10 +1912,10 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     }
 
 #ifdef NUMBER_HIT
-    printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
+    fprintf(outstd, "# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
         number_hit, r->ideal->r);
-    mpz_poly_fprintf(stdout, r->ideal->h);
-    printf("# Estimated number of hits: %u.\n",
+    mpz_poly_fprintf(outstd, r->ideal->h);
+    fprintf(outstd, "# Estimated number of hits: %u.\n",
         (unsigned int) nearbyint((double) array->number_element /
           (double) r->ideal->r));
     number_hit = 0;
@@ -2009,10 +2009,10 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     }
 
 #ifdef NUMBER_HIT
-    printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
+    fprintf(outstd, "# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
         number_hit, r->ideal->r);
-    mpz_poly_fprintf(stdout, r->ideal->h);
-    printf("# Estimated number of hits: %u.\n",
+    mpz_poly_fprintf(outstd, r->ideal->h);
+    fprintf(outstd, "# Estimated number of hits: %u.\n",
         (unsigned int) nearbyint((double) array->number_element /
           (double) r->ideal->r));
     number_hit = 0;
@@ -2105,10 +2105,10 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #endif // ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
 
 #ifdef NUMBER_HIT
-    printf("# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
+    fprintf(outstd, "# Number of hits: %" PRIu64 " for r: %" PRIu64 ", h: ",
         number_hit, r->ideal->r);
-    mpz_poly_fprintf(stdout, r->ideal->h);
-    printf("# Estimated number of hits: %u.\n",
+    mpz_poly_fprintf(outstd, r->ideal->h);
+    fprintf(outstd, "# Estimated number of hits: %u.\n",
         (unsigned int) nearbyint((double) array->number_element /
           (double) r->ideal->r));
     number_hit = 0;
