@@ -875,7 +875,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     // v now contains this vector, on the basis of O
                     
                     
-                    // Multiplying v by G transfers v in the number field K (rationnal coefficients, thus v goes into v_rat)
+                    // Multiplying v by G transfers v in the number field K (rational coefficients, thus v goes into v_rat)
                     mpz_mat_to_mpq_mat(v_rat,v);
                     mpq_mat_multiply(v_rat,v_rat,G);
                     mpq_mat_multiply_by_ui(v_rat,v_rat,p1);

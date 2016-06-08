@@ -572,15 +572,25 @@ int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
     if (*res == NULL) goto oom;
 
 #define SNPRINTF_FRAGMENT(fmt, arg) do {				\
-    rc = gmp_snprintf(*res + size, alloc - size, fmt, arg);	\
-    if (size + (size_t) rc >= alloc) {				\
-        alloc = MAX(alloc + batch, size + (size_t) rc);		\
+    rc = gmp_snprintf(*res + size, alloc - size, fmt, arg);     	\
+    if (size + (size_t) rc + 1 >= alloc) {				\
+        alloc = MAX(alloc + batch, size + (size_t) rc + 1);             \
         *res = realloc(*res, alloc);					\
         if (*res == NULL) goto oom;					\
-        rc = gmp_snprintf(*res + size, alloc - size, fmt, arg);	\
+        rc = gmp_snprintf(*res + size, alloc - size, fmt, arg); 	\
     }									\
-    size += rc;							\
-    ASSERT_ALWAYS(size <= alloc);				\
+    size += rc;								\
+    ASSERT_ALWAYS(size < alloc);					\
+} while (0)
+
+#define PUTS_FRAGMENT(arg) do {						\
+    if (size + (size_t) strlen(arg) + 1 >= alloc) {			\
+        alloc = MAX(alloc + batch, size + (size_t) rc + 1);		\
+        *res = realloc(*res, alloc);					\
+        if (*res == NULL) goto oom;					\
+    }									\
+    size += strlcpy(*res + size, arg, alloc-size);			\
+    ASSERT_ALWAYS(size < alloc);					\
 } while (0)
 
     if (f->deg == -1) {
@@ -590,15 +600,15 @@ int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
     for (int i = 0, printed = 0; i <= f->deg; ++i) {
         if (mpz_cmp_ui(f->coeff[i], 0) == 0) continue;
         if (printed++ && mpz_cmp_ui(f->coeff[i], 0) > 0)
-            SNPRINTF_FRAGMENT ("%s", "+");
+            PUTS_FRAGMENT ("+");
         if (i && mpz_cmp_ui(f->coeff[i], 1) == 0) {
-            SNPRINTF_FRAGMENT ("%s", "x");
+            PUTS_FRAGMENT ("x");
         } else if (i && mpz_cmp_ui(f->coeff[i], -1) == 0) {
-            SNPRINTF_FRAGMENT ("%s", "-x");
+            PUTS_FRAGMENT ("-x");
         } else {
             SNPRINTF_FRAGMENT ("%Zd", f->coeff[i]);
             if (i) {
-                SNPRINTF_FRAGMENT ("%s", "*x");
+                PUTS_FRAGMENT ("*x");
             }
         }
 
@@ -609,6 +619,7 @@ int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
 
     return size;
 #undef SNPRINTF_FRAGMENT
+#undef PUTS_FRAGMENT
 oom:
     free(res);
     return -1;
@@ -2468,9 +2479,11 @@ void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l)
         char * res;
         int rc = mpz_poly_asprintf(&res,l->factors[i]->f);
         ASSERT(rc >= 0);
+        if (i) fprintf(fp, "*");
         fprintf(fp, "(%s)^%d", res, l->factors[i]->m);
         free(res);
     }
+    fprintf(fp, "\n");
 }
 /* Squarefree factorization */
 
