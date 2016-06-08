@@ -46,7 +46,7 @@ const unsigned int size_total_sublattices[8][2] = {
   {180, 64}, /* up to 179 digits */
   {220, 128}, /* up to 219 digits */
   {260, 256}, /* up to 259 digits */
-  {300, 16} /* up to 299 digits */
+  {300, 512} /* up to 299 digits */
 };
 
 
