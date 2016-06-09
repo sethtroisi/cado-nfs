@@ -851,18 +851,13 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     p_radical_of_order(Ip,G,g,p);
     mpq_mat_invert(G_inv,G);
     
-    printf("%d-radical :\n", p); mpz_mat_fprint(stdout, Ip); printf("\n");
-    
     cxx_mpq_mat test;
     mpq_mat_realloc(test,n,n);
     cxx_mpq_mat Ip_rat;
     mpq_mat_realloc(Ip_rat,n,n);
-    printf("HELP !\n");
     mpz_mat_to_mpq_mat(Ip_rat,Ip);
-    mpq_mat_multiply(test,Ip_rat,G);
-    printf("%d-radical :\n", p); mpq_mat_fprint(stdout, test); printf("\n");
-    hnf_magma_style(test,test);
-    printf("%d-radical magma-style :\n", p); mpq_mat_fprint(stdout, test); printf("\n");
+    mpq_mat_multiply(Ip_rat,Ip_rat,G);
+    hnf_magma_style(Ip_rat,Ip_rat);
     
     
     
@@ -897,6 +892,8 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         }
         mpz_mat_multiply_mod_ui(c,c,current.E,p);
         
+        printf("HELP !\n");
+        
         // Finding its minimal polynomial
         cxx_mpz_mat Mc;
         mpz_mat_realloc(Mc,n,n);
@@ -915,7 +912,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         mpz_set_ui(p_0,p);
         mpz_poly_factor(lf,f,p_0,state);
         
-        printf("HELP 2!\n");
+        printf("HELP !\n");
         //mpz_mat_fprint(stdout, Mc); printf("\n");
         
         // Building the list of characteristic subspaces
