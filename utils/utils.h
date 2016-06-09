@@ -42,5 +42,9 @@
 #include "mpz_poly.h"
 #include "mpz_mat.h"
 #include "version_info.h"
+#ifdef __cplusplus
+#include "utils/cxx_mpz.hpp"
+#endif
+
 
 #endif	/* CADO_UTILS_H_ */

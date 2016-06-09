@@ -224,8 +224,6 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
 #endif
 
 #ifdef __cplusplus
-#include "utils/cxx_mpz.hpp"
-
 /* This is sort of a generic way to write a c++ equivalent to the C type.
  * The first-class citizen in the cado-nfs code is (still) the C type, so
  * we're definitely bound to have a few infelicities here:
