@@ -37,14 +37,6 @@ input_file_for_binary() {
     shift
     echo $d
     echo "$@"
-    for i in `seq 1 $d` ; do
-        echo -n 1
-        for j in `seq 1 $d` ; do
-            [ $i != $j ]
-            echo -n " $?"
-        done
-        echo
-    done
 }
 
 read -s -r -d '' perl_code <<-'EOF'
@@ -67,7 +59,7 @@ cat <<-'EOF'
     try
         myO:=Order([FieldOfFractions(O)!Eltseq(r):r in Rows(basis)]);
         assert Gcd(Index(pMaximalOrder(myO,p),myO), p) eq 1;
-        printf "ok p:=%o; d:=%o; COEFFS:=\"%o\";\n", p, n, COEFFS;
+        printf "ok p:=%o; d:=%o; COEFFS:=\"%o\"; RESULT:=\"%o\";\n", p, n, COEFFS, RESULT;
     catch e
         printf "FAILED p:=%o; d:=%o; COEFFS:=\"%o\"; RESULT:=\"%o\";\n", p, n, COEFFS, RESULT;
     end try;
@@ -81,6 +73,8 @@ computed_basis() {
 }
 
 primes=($(echo $primelist))
+
+set -e
 
 for n in `seq 1 $nfields` ; do
     d=$((RANDOM % 10))
@@ -102,6 +96,7 @@ for n in `seq 1 $nfields` ; do
 
     for p in "${primes[@]}" ; do
         res=$(computed_basis <(input_file_for_binary $d "${x[@]}") $p)
+        echo "--- $res"
         set -- "${x[@]}"
         displayed=$($magma -b <(echo "COEFFS:=\"$*\"; RESULT:=\"$res\"; p:=$p;") <(magma_code))
         echo $displayed
