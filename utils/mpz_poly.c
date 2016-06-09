@@ -584,7 +584,8 @@ int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
 } while (0)
 
 #define PUTS_FRAGMENT(arg) do {						\
-    if (size + (size_t) strlen(arg) + 1 >= alloc) {			\
+    rc = strlen(arg);                                                   \
+    if (size + (size_t) rc + 1 >= alloc) {      			\
         alloc = MAX(alloc + batch, size + (size_t) rc + 1);		\
         *res = realloc(*res, alloc);					\
         if (*res == NULL) goto oom;					\
@@ -2478,7 +2479,7 @@ void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l)
     for (int i = 0 ; i < l->size ; i++){
         char * res;
         int rc = mpz_poly_asprintf(&res,l->factors[i]->f);
-        ASSERT(rc >= 0);
+        ASSERT_ALWAYS(rc >= 0);
         if (i) fprintf(fp, "*");
         fprintf(fp, "(%s)^%d", res, l->factors[i]->m);
         free(res);
