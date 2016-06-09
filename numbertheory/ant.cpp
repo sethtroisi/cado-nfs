@@ -997,6 +997,163 @@ void factorization_of_prime(vector<pair<cxx_mpq_mat, int>>& ideals, mpz_poly_src
     mpq_mat_clear(Id_q);
 }
 
+// G is one p-maximal order (on the basis of alpha^) on the number field of g, I one ideal (on alpha^)
+// Finds a such that (a/p)*I is in the order of G (a is one element of the order) ; stores a/p in h
+void valuation_helper_for_ideal(mpq_mat_ptr h, mpq_mat_srcptr G, mpz_poly_ptr g, mpq_mat_srcptr I, unsigned int p)
+{
+    ASSERT_ALWAYS((G->m == G->n) && (I->m == I->n) && (G->m == I->m));
+    unsigned int n = G->m;
+    
+    cxx_mpz_mat C, ker;
+    mpz_mat_realloc(C,n,n*n);
+    
+    // Filling C with the products G[i]*I[j] (being polynomials on alpha^)
+    for(unsigned int i = 0 ; i < n ; i++){
+        for(unsigned int j = 0 ; j < n ; j++){
+            cxx_mpz_poly aux1, aux2, aux3;
+            mpz_t denom1, denom2, denom3;
+            mpz_init(denom1);
+            mpz_init(denom2);
+            mpz_init(denom3);
+            mpz_poly_realloc(aux1,n);
+            mpz_poly_realloc(aux2,n);
+            mpz_poly_realloc(aux3,n);
+            
+            mpq_mat_row_to_poly(aux1, denom1, G, i);
+            mpq_mat_row_to_poly(aux2, denom2, I, j);
+            mpz_poly_cleandeg(aux1, n-1);
+            mpz_poly_cleandeg(aux2, n-1);
+            
+            mpz_poly_mul_mod_f(aux3, aux1, aux2, g);
+            mpz_mul(denom3,denom1,denom1);
+            mpz_poly_cleandeg(aux3, n-1);
+            
+            cxx_mpq_mat aux_mat;
+            mpq_mat_realloc(aux_mat, 1, n);
+            mpq_poly_to_mat_row(aux_mat, 0, aux3, denom3);
+            
+            cxx_mpq_mat G_inv;
+            mpq_mat_realloc(G_inv,n,n);
+            mpq_mat_invert(G_inv,G);
+            mpq_mat_multiply(aux_mat, aux_mat, G_inv);
+            
+            cxx_mpz_mat aux_mat_int;
+            mpz_mat_realloc(aux_mat_int,1,n);
+            mpq_mat_numden(aux_mat_int,NULL,aux_mat);
+            
+            mpz_mat_submat_swap(aux_mat_int, 0, 0, C, i, n*(j-1), 1, n);
+            
+            mpz_clear(denom1);
+            mpz_clear(denom2);
+            mpz_clear(denom3);
+        }
+    }
+    
+    // Reducing mod p and computing the kernel
+    mpz_mat_mod_ui(C, C, p);
+    mpz_mat_kernel(ker, C, p);
+    
+    
+    cxx_mpq_mat ker_rat, a_over_ps;
+    mpq_t p_inv;
+    mpq_set_ui(p_inv,1,p);
+    
+    // Turning the vectors of the kernel in the basis of alpha^, and dividing by p
+    mpz_mat_to_mpq_mat(ker_rat, ker);
+    mpq_mat_multiply(ker_rat, ker_rat, G);
+    mpq_mat_multiply_by_mpq(ker_rat, ker_rat, p_inv);
+    
+    mpq_mat_realloc(h, 1, n);
+    mpq_mat_submat_swap(h, 0, 0, ker_rat, 0, 0, 1, n);
+    
+    mpq_clear(p_inv);
+}
+
+// g is the polynomial generating the number field
+// G contains generators of order O in basis of alpha^
+// I is a prime ideal of O above p, on the basis of alpha^
+// e is its ramification index
+// J is an ideal on the basis of alpha^
+int valuation_of_ideal_at_prime_ideal(mpq_mat_ptr G, mpz_poly_ptr g, mpq_mat_ptr J, mpq_mat_ptr I, int e, unsigned int p)
+{
+    ASSERT_ALWAYS((G->m == G->n) && (G->n == J->m) && (J->m == J->n) && (J->n == I->m) && (I->m == I->n));
+    unsigned int n = G->m;
+    
+    cxx_mpq_mat G_inv, MJ, h;
+    cxx_mpz_mat MJ_int;
+    mpz_t dJ, denom;
+    mpz_init(dJ); // Initial denominator of MJ
+    mpz_init(denom); // Denominator of MJ for the loop
+    mpq_mat_realloc(G_inv,n,n);
+    mpq_mat_realloc(MJ,n,n); // MJ is the MJ existing in magma
+    mpz_mat_realloc(MJ_int,n,n); // The MJ_int here is only MJ*dJ
+    
+    mpq_mat_multiply(MJ, J, G_inv);
+    mpq_mat_numden(MJ_int, dJ, MJ); // Now MJ_int = dJ*MJ, like in magma
+    mpz_mat_to_mpq_mat(MJ, MJ_int); // We need a rational matrix because we have to compute its denominator
+    
+    // Now dJ contains the denominator MJ_rat had at the beginning (most of the time, 1)
+    // And MJ contains integers, (former values of MJ * dJ)
+    
+    valuation_helper_for_ideal(h, G, g, I, p);
+    
+    int v = -1;
+    mpz_set(denom, dJ);
+    while(!mpz_cmp_ui(denom,1)){ // while denom == 1
+        cxx_mpq_mat aux, h_times_MJ_G;
+        mpq_mat_realloc(h_times_MJ_G, n, n);
+        mpq_mat_realloc(aux,n,n);
+        mpq_mat_multiply(aux, MJ, G); // This way, you obtain all rows of the form (Vector(K,j),Vector(G))
+        // Now, these rows (in aux) are polynomials, and have to be multiplied with h ; then, again in a matrix, and times G^-1
+        
+        for(unsigned int j = 0 ; j < n ; j++){
+            cxx_mpz_poly aux1, aux2, aux3;
+            mpz_t denom1, denom2, denom3;
+            mpz_init(denom1);
+            mpz_init(denom2);
+            mpz_init(denom3);
+            mpz_poly_realloc(aux1, n);
+            mpz_poly_realloc(aux2, n);
+            
+            mpq_mat_row_to_poly(aux1, denom1, aux, j);
+            mpq_mat_row_to_poly(aux2, denom2, h, 0);
+            
+            mpz_poly_mul_mod_f(aux3, aux1, aux2, g);
+            mpz_mul(denom3, denom1, denom2);
+            
+            cxx_mpq_mat aux_mat;
+            mpq_mat_realloc(aux_mat,1,n);
+            mpq_poly_to_mat_row(aux_mat, 0, aux3, denom3);
+            
+            mpz_clear(denom1);
+            mpz_clear(denom2);
+            mpz_clear(denom3);
+        }
+        // h_times_MJ_G contains the polynomials multiplied by h ; now, MJ must be h_times_MJ_G * G^-1
+        // Thus MJ contains only h * MJ
+        
+        mpq_mat_multiply(MJ, h_times_MJ_G, G_inv);
+        
+        cxx_mpz_mat trash;
+        mpz_mat_realloc(trash,n,n);
+        mpq_mat_numden(trash, denom, MJ);
+        
+        v++;
+    }
+    
+    int dJ_int = mpz_get_si(dJ);
+    int val_dJ_on_p = 0;
+    while(dJ_int%p == 0){
+        dJ_int = dJ_int/p;
+        val_dJ_on_p += 1;
+    }
+    
+    mpz_clear(dJ);
+    mpz_clear(denom);
+    
+    return v-val_dJ_on_p*e;
+}
+
 int main(int argc, char *argv[])
 {				/*{{{ */
     /*
