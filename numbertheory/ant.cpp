@@ -1198,8 +1198,6 @@ int main(int argc, char *argv[])
     
     p_maximal_order(D, B, f, p);
     
-    //printf("Starting from\n");
-    //mpq_mat_fprint(stdout, B);
     printf("\n");
     printf("the %d-maximal order is \n", p);
     mpq_mat_fprint(stdout, D);
