@@ -85,7 +85,7 @@ void mpq_poly_to_mat_row(mpq_mat_ptr M, unsigned int i, mpz_poly_srcptr f, mpz_s
     ASSERT_ALWAYS(f->deg < (int) M->n);
     mpz_t coeff;
     mpz_init(coeff);
-    for (unsigned int j = 0 ; j < M->n; j++){
+    for (int j = 0 ; j <= f->deg; j++){
         mpz_poly_getcoeff(coeff,j,f);
         mpq_set_num(mpq_mat_entry(M,i,j),coeff);
         mpq_set_den(mpq_mat_entry(M,i,j),denom);
@@ -625,6 +625,7 @@ void matrix_of_multiplication_by_theta_local(mpz_mat_ptr M, mpq_mat_srcptr W, mp
         mpz_poly res;
         mpz_poly_init(res,n-1);        
         mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
+        mpz_poly_cleandeg(res,n-1);
         
         mpq_poly_to_mat_row(times_theta_rat, i, res, denom);
 
@@ -633,6 +634,7 @@ void matrix_of_multiplication_by_theta_local(mpz_mat_ptr M, mpq_mat_srcptr W, mp
         mpz_poly_clear(w_poly);
         mpz_clear(denom);
     }
+    
     
     // Now we have to multiply by W^-1, in order to get into the basis of (w[0], ... w[n-1]) again
     mpq_mat W_inv;
@@ -892,8 +894,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         }
         mpz_mat_multiply_mod_ui(c,c,current.E,p);
         
-        printf("HELP !\n");
-        
         // Finding its minimal polynomial
         cxx_mpz_mat Mc;
         mpz_mat_realloc(Mc,n,n);
@@ -911,9 +911,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         mpz_init(p_0);
         mpz_set_ui(p_0,p);
         mpz_poly_factor(lf,f,p_0,state);
-        
-        printf("HELP !\n");
-        //mpz_mat_fprint(stdout, Mc); printf("\n");
         
         // Building the list of characteristic subspaces
         vector<cxx_mpz_mat> char_subspaces;
