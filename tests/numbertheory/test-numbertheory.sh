@@ -44,7 +44,12 @@ read -s -r -d '' perl_code <<-'EOF'
         /maximal order is/ && do { $x=1; next; };
         s/^\s*//;
         print if $x;
-        last if $x && /^$/;
+        do { print "\n"; last; } if $x && /^$/;
+    }
+    while (<>) {
+        s/^\s*//;
+        print if /^[\d\s\/]*$/;
+        /multiplicity of (\d+)/ && do { print "$1\n"; };
     }
 
 EOF
@@ -54,14 +59,29 @@ cat <<-'EOF'
     f:=Polynomial(StringToIntegerSequence(COEFFS));
     n:=Degree(f);
     K<alpha>:=NumberField(f);
-    basis:=Matrix(Rationals(),n,n,[StringToRational(x):x in Split(RESULT," ")]);
+    rr:=Split(RESULT," ");
+    r_order:=rr[1..n^2];
+    rr:=rr[n^2+1..#rr];
+    assert #rr mod (n^2+1) eq 0;
+    nideals:=#rr div (n^2+1);
+    basis:=Matrix(Rationals(),n,n,[StringToRational(x):x in r_order]);
+    ideal_bases:=[<Matrix(Rationals(),n,n,[StringToRational(x):x in
+    rr[(k-1)*(n^2+1)+1..k*(n^2+1)-1]]),StringToInteger(rr[k*(n^2+1)])> : k in [1..nideals]];
     O:=Order([LeadingCoefficient(f)*alpha]);
+    OK:=MaximalOrder(K);
     try
+        testing:="p-maximal order";
         myO:=Order([FieldOfFractions(O)!Eltseq(r):r in Rows(basis)]);
         assert Gcd(Index(pMaximalOrder(myO,p),myO), p) eq 1;
-        printf "ok p:=%o; d:=%o; COEFFS:=\"%o\"; RESULT:=\"%o\";\n", p, n, COEFFS, RESULT;
+        testing:="factorization of p";
+        myO:=Order([FieldOfFractions(O)!Eltseq(r):r in Rows(basis)]);
+        myIs:=[<ideal<myO|[FieldOfFractions(O)!Eltseq(r):r in
+        Rows(x[1])]>, x[2]>:x in ideal_bases];
+        myI_OKs:=[<ideal<OK|I[1]>,I[2]>:I in myIs];
+        assert Seqset(Decomposition(OK,p)) eq Seqset(myI_OKs);
+        printf "ok p:=%o; d:=%o; COEFFS:=\"%o\";\n", p, n, COEFFS, RESULT;
     catch e
-        printf "FAILED p:=%o; d:=%o; COEFFS:=\"%o\"; RESULT:=\"%o\";\n", p, n, COEFFS, RESULT;
+        printf "FAILED[%o] p:=%o; d:=%o; COEFFS:=\"%o\"; RESULT:=\"%o\";\n", testing, p, n, COEFFS, RESULT;
     end try;
     quit;
 EOF
@@ -96,9 +116,8 @@ for n in `seq 1 $nfields` ; do
 
     for p in "${primes[@]}" ; do
         res=$(computed_basis <(input_file_for_binary $d "${x[@]}") $p)
-        echo "--- $res"
         set -- "${x[@]}"
-        displayed=$($magma -b <(echo "COEFFS:=\"$*\"; RESULT:=\"$res\"; p:=$p;") <(magma_code))
+        displayed=$($magma -b <(echo "COEFFS:=\"$*\"; RESULT:=\"$res\"; p:=$p;") <(magma_code)  < /dev/null)
         echo $displayed
         if echo $displayed | grep -q FAILED ; then
             exit 1
