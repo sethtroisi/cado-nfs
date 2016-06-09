@@ -783,18 +783,18 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
 
 void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
 {
-    ASSERT_ALWAYS(M->m == M->n);
-    int n = M->m;
+    //ASSERT_ALWAYS(M->m == M->n);
+    //int n = M->m;
     
     mpq_mat tmp;
-    mpq_mat_init(tmp,n,n);
+    mpq_mat_init(tmp,M->m,M->n);
     mpq_mat_set(tmp,M);
     
-    for (int i = 0 ;  i < n/2 ; i++){
-        mpq_mat_submat_swap(tmp,i,0,tmp,n-1-i,0,1,n);
+    for (unsigned int i = 0 ;  i < M->m/2 ; i++){
+        mpq_mat_submat_swap(tmp,i,0,tmp,M->m-1-i,0,1,M->n);
     }
-    for (int j = 0 ;  j < n/2 ; j++){
-        mpq_mat_submat_swap(tmp,0,j,tmp,0,n-1-j,n,1);
+    for (unsigned int j = 0 ;  j < M->n/2 ; j++){
+        mpq_mat_submat_swap(tmp,0,j,tmp,0,M->n-1-j,M->m,1);
     }
     
     mpz_t denom;
@@ -803,8 +803,8 @@ void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
     mpz_init(denom);
     mpq_init(denom_inv);
     mpq_init(denom_rat);
-    mpz_mat_init(tmp_int,n,n);
-    mpz_mat_init(T,n,n);
+    mpz_mat_init(tmp_int,M->m,M->n);
+    mpz_mat_init(T,0,0);
     
     mpq_mat_numden(tmp_int,denom,tmp);
     mpq_set_ui(denom_inv,1,1);
@@ -816,11 +816,11 @@ void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
 
 
 
-    for (int j = 0 ;  j < n/2 ; j++){
-        mpq_mat_submat_swap(tmp,0,j,tmp,0,n-1-j,n,1);
+    for (unsigned int j = 0 ;  j < M->n/2 ; j++){
+        mpq_mat_submat_swap(tmp,0,j,tmp,0,M->n-1-j,M->m,1);
     }
-    for (int i = 0 ;  i < n/2 ; i++){
-        mpq_mat_submat_swap(tmp,i,0,tmp,n-1-i,0,1,n);
+    for (unsigned int i = 0 ;  i < M->m/2 ; i++){
+        mpq_mat_submat_swap(tmp,i,0,tmp,M->m-1-i,0,1,M->n);
     }
     
     mpz_mat_clear(T);
@@ -837,13 +837,15 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     int n = g->deg;
     
     mpq_mat G, G_inv, Id_q; // G = Basis of p-maximal-order Ok ; Id_q = identity (in rational domain)
-    mpz_mat Ip; // p radical of Ok
+    mpz_mat Ip; // p radical of Ok, in its basis
     cxx_mpz_mat Id_z; // Identity (in integers domain)
+    cxx_mpq_mat Ip_rat; // p radical, in the basis of alpha^
     mpq_mat_init(G,n,n);
     mpq_mat_init(G_inv,n,n);
     mpq_mat_init(Id_q,n,n);
     mpz_mat_init(Ip,n,n);
     mpz_mat_realloc(Id_z,n,n);
+    mpq_mat_realloc(Ip_rat,n,n);
     mpq_mat_set_ui(Id_q,1);
     mpz_mat_set_ui(Id_z,1);
     
@@ -853,10 +855,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     p_radical_of_order(Ip,G,g,p);
     mpq_mat_invert(G_inv,G);
     
-    cxx_mpq_mat test;
-    mpq_mat_realloc(test,n,n);
-    cxx_mpq_mat Ip_rat;
-    mpq_mat_realloc(Ip_rat,n,n);
+    // Computing the p-radical in the basis of alpha^
     mpz_mat_to_mpq_mat(Ip_rat,Ip);
     mpq_mat_multiply(Ip_rat,Ip_rat,G);
     hnf_magma_style(Ip_rat,Ip_rat);
@@ -873,10 +872,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     // The vector on which the recursion will happen.
     queue<subspace_ideal> pick_from;
     pick_from.push(initial);
-    
-    
-    //printf("W = \n"); mpq_mat_fprint(stdout,G); printf("\n");
-    //printf("W_inv = \n"); mpq_mat_fprint(stdout,G_inv); printf("\n");
     
     while (!pick_from.empty()) {
         mpz_poly f;
@@ -966,7 +961,11 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
             /* Consider the elements of O which map to zero in O/I^e, and
              * non-zero elsewhere. These generate I !
              * Those are going in gens*/
-            vector<cxx_mpq_poly> gens;
+            cxx_mpq_mat gens;
+            mpq_mat_realloc(gens,n,n);
+            //vector<cxx_mpq_poly> gens_vect;
+            
+            int current_line = 0;
             for (int j = 0 ; j < fac_Pc->size ; j++){
                 unsigned int p1;
                 if(i == j)
@@ -992,36 +991,55 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     mpq_mat_multiply(v_rat,v_rat,G);
                     mpq_mat_multiply_by_ui(v_rat,v_rat,p1);
 
-                    // Converting v_rat into one polynomial with rational coeff
+                    /* Converting v_rat into one polynomial with rational coeff
                     cxx_mpq_poly v_poly;
                     mpz_poly_realloc(v_poly.num,n);
                     mpq_mat_row_to_poly(v_poly.num,v_poly.den,v_rat,0);
                     mpz_poly_cleandeg(v_poly.num,n);
                     
-                    gens.push_back(v_poly);
+                    gens_vect.push_back(v_poly);*/
+                    
+                    mpq_mat_submat_swap(gens,current_line,0,v_rat,0,0,1,n);
+                    current_line++;
                 }
-
-                /* build: 3n * n matrix with:
-                 *  - gens as computed above (in a matrix)
-                 *  - Ip
-                 *  - current.I
-                 *
-                 * hnf of that
-                 *
-                 * leading n*n submatrix
-                 *
-                 */
             }
+            /*
             printf("\n");
-            for(unsigned int j = 0 ; j < gens.size() ; j++){
+            for(unsigned int j = 0 ; j < gens_vect.size() ; j++){
                 char * tmp;
-                int rc = mpz_poly_asprintf(&tmp,gens[j].num);
+                int rc = mpz_poly_asprintf(&tmp,gens_vect[j].num);
                 ASSERT_ALWAYS(rc >= 0);
-                gmp_printf("(1/%Zd)*(%s),\n",gens[j].den, tmp);
+                gmp_printf("(1/%Zd)*(%s),\n",gens_vect[j].den, tmp);
                 free(tmp);
             }
+            */
             
-            
+            /* build: 3n * n matrix with:
+             *  - gens as computed above (in a matrix)
+             *  - Ip
+             *  - current.I
+             *
+             * hnf of that
+             *
+             * leading n*n submatrix
+             *
+             */
+             
+             // Transfering current ideal (the one we try to separate) subspace basis of alpha^
+             cxx_mpq_mat gcd_with;
+             mpz_mat_to_mpq_mat(gcd_with,current.I);
+             mpq_mat_multiply(gcd_with,gcd_with,G);
+             
+             //Now computing 3n*n matrix with gens, Ip_rat and gcd_with
+             
+             cxx_mpq_mat big_matrix, bigger_matrix;
+             mpq_mat_vertical_join(big_matrix,gens,Ip_rat);
+             mpq_mat_vertical_join(bigger_matrix,big_matrix,gcd_with);
+             
+             printf("bigger matrix :\n"); mpq_mat_fprint(stdout,bigger_matrix); printf("\n");
+             hnf_magma_style(bigger_matrix, bigger_matrix);
+             printf("bigger matrix :\n"); mpq_mat_fprint(stdout,bigger_matrix); printf("\n");
+             
         }
         
         mpz_clear(p_0);
