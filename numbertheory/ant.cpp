@@ -779,6 +779,56 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
     mpz_mat_clear(W_t);
 }
 
+void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
+{
+    ASSERT_ALWAYS(M->m == M->n);
+    int n = M->m;
+    
+    mpq_mat tmp;
+    mpq_mat_init(tmp,n,n);
+    mpq_mat_set(tmp,M);
+    
+    for (int i = 0 ;  i < n/2 ; i++){
+        mpq_mat_submat_swap(tmp,i,0,tmp,n-1-i,0,1,n);
+    }
+    for (int j = 0 ;  j < n/2 ; j++){
+        mpq_mat_submat_swap(tmp,0,j,tmp,0,n-1-j,n,1);
+    }
+    
+    mpz_t denom;
+    mpq_t denom_inv, denom_rat;
+    mpz_mat tmp_int, T;
+    mpz_init(denom);
+    mpq_init(denom_inv);
+    mpq_init(denom_rat);
+    mpz_mat_init(tmp_int,n,n);
+    mpz_mat_init(T,n,n);
+    
+    mpq_mat_numden(tmp_int,denom,tmp);
+    mpq_set_ui(denom_inv,1,1);
+    mpq_set_z(denom_rat,denom);
+    mpq_div(denom_inv,denom_inv,denom_rat);
+    mpz_hnf_backend(tmp_int,T);
+    mpz_mat_to_mpq_mat(tmp,tmp_int);
+    mpq_mat_multiply_by_mpq(tmp,tmp,denom_inv);
+
+
+
+    for (int j = 0 ;  j < n/2 ; j++){
+        mpq_mat_submat_swap(tmp,0,j,tmp,0,n-1-j,n,1);
+    }
+    for (int i = 0 ;  i < n/2 ; i++){
+        mpq_mat_submat_swap(tmp,i,0,tmp,n-1-i,0,1,n);
+    }
+    
+    mpz_mat_clear(T);
+    mpz_mat_clear(tmp_int);
+    mpq_clear(denom_rat);
+    mpq_clear(denom_inv);
+    mpz_clear(denom);
+    mpq_mat_set(D,tmp);
+    mpq_mat_clear(tmp);
+}
 
 void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_srcptr g, unsigned int p, gmp_randstate_t state)
 {
@@ -801,12 +851,26 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
     p_radical_of_order(Ip,G,g,p);
     mpq_mat_invert(G_inv,G);
     
+    printf("%d-radical :\n", p); mpz_mat_fprint(stdout, Ip); printf("\n");
+    
+    cxx_mpq_mat test;
+    mpq_mat_realloc(test,n,n);
+    cxx_mpq_mat Ip_rat;
+    mpq_mat_realloc(Ip_rat,n,n);
+    printf("HELP !\n");
+    mpz_mat_to_mpq_mat(Ip_rat,Ip);
+    mpq_mat_multiply(test,Ip_rat,G);
+    printf("%d-radical :\n", p); mpq_mat_fprint(stdout, test); printf("\n");
+    hnf_magma_style(test,test);
+    printf("%d-radical magma-style :\n", p); mpq_mat_fprint(stdout, test); printf("\n");
+    
+    
     
     // The initial value in pick_from
     subspace_ideal initial;
     initial.E = Id_z; // It is the basis of Ok/p*Ok, but written on the basis of Ok/p*Ok ; thus, it's the identity
-    initial.I = Id_z; //p*identity
-    initial.V = Id_z; // identity
+    initial.I = Id_z; //p*identity ; the ideal we're trying to separate, in the basis of Ok/p*Ok
+    initial.V = Id_z; // identity ; current characteristic subspace, in the basis of Ok/p*Ok
     mpz_mat_multiply_by_ui(initial.I,initial.I,p);
     
     // The vector on which the recursion will happen.
@@ -851,7 +915,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         mpz_set_ui(p_0,p);
         mpz_poly_factor(lf,f,p_0,state);
         
-        
+        printf("HELP 2!\n");
         //mpz_mat_fprint(stdout, Mc); printf("\n");
         
         // Building the list of characteristic subspaces
@@ -962,6 +1026,8 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                 gmp_printf("(1/%Zd)*(%s),\n",gens[j].den, tmp);
                 free(tmp);
             }
+            
+            
         }
         
         mpz_clear(p_0);
