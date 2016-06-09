@@ -601,11 +601,6 @@ void matrix_of_multiplication_by_theta_local(mpz_mat_ptr M, mpq_mat_srcptr W, mp
     mpz_poly_init(theta_poly,n-1);
     mpz_init(theta_denom);
     mpq_mat_row_to_poly(theta_poly,theta_denom,theta_rat,0);
-
-    //printf("theta : "); mpz_mat_fprint(stdout,theta);
-    //printf("theta rat : "); mpq_mat_fprint(stdout,theta_rat);
-    // printf("theta poly : "); mpz_poly_fprintf(stdout,theta_poly);
-    // gmp_printf("theta denom = %Zd\n",theta_denom);
     
     // Computing theta*w[i] (in the basis of alpha^ ) for each i
     for (unsigned i = 0 ; i < n ; i++) {
@@ -671,10 +666,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_mat_init(times_theta,n,n);
 
     matrix_of_multiplication_by_theta_local(times_theta, W, theta, g, p);
-
-    //printf("matrix of multiplication by theta, mod %d:\n", p);
-    //mpz_mat_fprint(stdout,times_theta); printf("\n");
-
+    
     // Now starting to compute the (n+1,n^2) matrix whose kernel will be computed
     mpz_mat M,current;
     mpz_mat_init(M,n+1,n*n);
@@ -691,8 +683,6 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_mat_mod_ui(current,current,p);
     }
 
-    //printf("big matrix, mod %d:\n", p);
-    //mpz_mat_fprint(stdout,M); printf("\n");
 
     // Now computing its kernel
     mpz_mat K;
@@ -700,10 +690,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
     mpz_mat_kernel(K,M,p);
 
     mpz_gauss_backend_mod_ui(K,NULL,p);
-
-    //printf("kernel of (n+1,n^2) matrix, mod %d:\n", p);
-    //mpz_mat_fprint(stdout,K); printf("\n");
-
+    
     // Getting the minimal polynomial and verifying that f(M) = 0
     if(K->m == 0){
         mpz_poly_realloc(f,0);
@@ -711,20 +698,6 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
         mpz_poly_set_zero(f);
         mpz_mat_row_to_poly_rev(f,K,K->m-1);
     }
-    
-    /*
-    {
-        // Testing
-        mpz_mat test_mat;
-        mpz_mat_init(test_mat,n,n);
-        mpz_mat_in_poly_mod_ui(test_mat,times_theta,f,p);
-        //printf("f(times_theta) :\n");
-        //mpz_mat_fprint(stdout,test_mat); printf("\n");
-        mpz_mat_clear(test_mat);
-    }*/
-    
-    //printf("minimal polynomial of times_theta mod %d:\n", p);
-    //mpz_poly_fprintf(stdout,f); printf("\n");
     
     mpz_mat_clear(K);
     mpz_mat_clear(current);
@@ -736,8 +709,7 @@ void minimal_poly_of_mul_by_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcp
 struct subspace_ideal {
     cxx_mpz_mat E; // the basis of the subspace E
     cxx_mpz_mat I; // the basis of one ideal
-    cxx_mpz_mat V;
-//    unsigned int dim; // The dimension of E, instead of having the full space like in magma
+    cxx_mpz_mat V; // same as E, in fact
 };
 
 // U and W are matrices containing generators (in rows) of vector subspaces of one big vector space
@@ -756,8 +728,8 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
     mpz_mat_init(X, 0, U->n);
     mpz_mat_init(Y, 0, W->n);
     
-    mpz_mat_kernel(X,U_t,p);
-    mpz_mat_kernel(Y,W_t,p);
+    mpz_mat_kernel(X,U_t,p); // X = ker(x -> x*(transpose of U)
+    mpz_mat_kernel(Y,W_t,p); // Y = ker(y -> y*(transpose of W)
     
     mpz_mat Z, Z_t; // Block matrix, X on the top, Y in the bottom ; and its transposed
     mpz_mat_init(Z,X->m + Y->m, U->n);
@@ -765,7 +737,7 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
     mpz_mat_vertical_join(Z,X,Y);
     
     mpz_mat_transpose(Z_t, Z);
-    mpz_mat_kernel(M, Z_t, p);
+    mpz_mat_kernel(M, Z_t, p); // M = ker(z -> z*(transpose of Z);
     
     mpz_mat_clear(Z_t);
     mpz_mat_clear(Z);
@@ -775,15 +747,17 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
     mpz_mat_clear(W_t);
 }
 
+
+// I wasn't sure if hnf_backend now follows the convention of magma
+// This takes M on (under magma conventions) and returns its hnf under magma conventions
 void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
 {
-    //ASSERT_ALWAYS(M->m == M->n);
-    //int n = M->m;
-    
+    // Will contain the result before going in D
     mpq_mat tmp;
     mpq_mat_init(tmp,M->m,M->n);
     mpq_mat_set(tmp,M);
     
+    // Thats not really a transposition. In fact, coeff (i,j) goes to (n-1-i,n-1-j);
     for (unsigned int i = 0 ;  i < M->m/2 ; i++){
         mpq_mat_submat_swap(tmp,i,0,tmp,M->m-1-i,0,1,M->n);
     }
@@ -800,6 +774,7 @@ void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
     mpz_mat_init(tmp_int,M->m,M->n);
     mpz_mat_init(T,0,0);
     
+    // Doing HNF on integer-matrix
     mpq_mat_numden(tmp_int,denom,tmp);
     mpq_set_ui(denom_inv,1,1);
     mpq_set_z(denom_rat,denom);
@@ -809,7 +784,7 @@ void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
     mpq_mat_multiply_by_mpq(tmp,tmp,denom_inv);
 
 
-
+    // Inverting the transformation made before
     for (unsigned int j = 0 ;  j < M->n/2 ; j++){
         mpq_mat_submat_swap(tmp,0,j,tmp,0,M->n-1-j,M->m,1);
     }
