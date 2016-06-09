@@ -759,19 +759,13 @@ void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_s
     mpz_mat_kernel(X,U_t,p);
     mpz_mat_kernel(Y,W_t,p);
     
-    //printf("X is :\n"); mpz_mat_fprint(stdout, X); printf("\n");
-    //printf("Y is :\n"); mpz_mat_fprint(stdout, Y); printf("\n");
-    
     mpz_mat Z, Z_t; // Block matrix, X on the top, Y in the bottom ; and its transposed
     mpz_mat_init(Z,X->m + Y->m, U->n);
     mpz_mat_init(Z_t, U->n, X->m + Y->m);
     mpz_mat_vertical_join(Z,X,Y);
-    //printf("Z is :\n"); mpz_mat_fprint(stdout, Z); printf("\n");
     
     mpz_mat_transpose(Z_t, Z);
     mpz_mat_kernel(M, Z_t, p);
-    
-    //printf("M is :\n"); mpz_mat_fprint(stdout, M); printf("\n");
     
     mpz_mat_clear(Z_t);
     mpz_mat_clear(Z);
@@ -832,7 +826,7 @@ void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
     mpq_mat_clear(tmp);
 }
 
-void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_srcptr g, unsigned int p, gmp_randstate_t state)
+void factorization_of_prime(vector<pair<cxx_mpq_mat, int>>& ideals, mpz_poly_srcptr g, unsigned int p, gmp_randstate_t state)
 {
     int n = g->deg;
     
@@ -882,22 +876,21 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
         pick_from.pop();
         
         // Picking one random element of subspace E
-        cxx_mpz_mat c;
-        mpz_mat_realloc(c,1,n);
-        for (int i = 0 ; i < n ; i++) {
-            mpz_set_ui(mpz_mat_entry(c,0,i),gmp_urandomm_ui(state,p));
+        cxx_mpz_mat c_E, c_O; // c_E : coeffs of linear combination of dim(E) elements (which are given on the basis of O)
+                              // c_O : same element, given directly on the basis of O
+        mpz_mat_realloc(c_E,1,current.E->m);
+        mpz_mat_realloc(c_O,1,n);
+        for (unsigned int i = 0 ; i < current.E->m ; i++) {
+            mpz_set_ui(mpz_mat_entry(c_E,0,i),gmp_urandomm_ui(state,p));
         }
-        mpz_mat_multiply_mod_ui(c,c,current.E,p);
+        mpz_mat_multiply_mod_ui(c_O,c_E,current.E,p);
         
         // Finding its minimal polynomial
         cxx_mpz_mat Mc;
         mpz_mat_realloc(Mc,n,n);
-        matrix_of_multiplication_by_theta_local(Mc,G,c,g,p);
-        minimal_poly_of_mul_by_theta(f,G,c,g,p);
+        matrix_of_multiplication_by_theta_local(Mc,G,c_O,g,p);
+        minimal_poly_of_mul_by_theta(f,G,c_O,g,p);
         mpz_poly_cleandeg(f,n);
-        
-        printf("Element c is : "); mpz_mat_fprint(stdout,c); printf("\n");
-        printf("Minimal polynomial is : "); mpz_poly_fprintf(stdout,f); printf("\n");
         
         // Factorization of the minimal polynomial
         mpz_poly_factor_list lf;
@@ -920,15 +913,8 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
             mpz_mat_kernel(ker,res,p);
             
             
-            //printf("(f[%d](Mc))^%d :\n",i,lf->factors[i]->m); mpz_mat_fprint(stdout,res); printf("\n");
-            //printf("Ker ((f[%d](Mc))^%d) :\n",i,lf->factors[i]->m); mpz_mat_fprint(stdout,ker); printf("\n");
-            //printf("current V :\n"); mpz_mat_fprint(stdout,current.V); printf("\n");
-            
             //Now we have to compute the intersection of Vect(ker) and V
             intersection_of_subspaces_mod_ui(char_sub, current.V, ker, p);
-            //printf("Basis of intersection of V and Ker :\n"); mpz_mat_fprint(stdout,char_sub); printf("\n");
-            //printf("Characteristic subspace #%d :\n",i); mpz_mat_fprint(stdout,char_sub); printf("\n");
-            //
             mpz_gauss_backend_mod_ui(char_sub,NULL,p);
             char_subspaces.push_back(char_sub);
         }
@@ -944,14 +930,7 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                 aux = char_subspaces[i];
                 r_char_subspaces.push_back(aux);
             }
-        }
-        
-        
-        mpz_poly_factor_list_fprintf(stdout,lf);
-        for(unsigned int i = 0 ; i < r_char_subspaces.size() ; i++){
-            printf("Characteristic subspace #%d :\n",i); mpz_mat_fprint(stdout,r_char_subspaces[i]); printf("\n");
-        }
-        
+        }        
         
         // Now finishing the run on the tree
         for (int i = 0 ; i < fac_Pc->size ; i++){
@@ -963,7 +942,6 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
              * Those are going in gens*/
             cxx_mpq_mat gens;
             mpq_mat_realloc(gens,n,n);
-            //vector<cxx_mpq_poly> gens_vect;
             
             int current_line = 0;
             for (int j = 0 ; j < fac_Pc->size ; j++){
@@ -991,39 +969,10 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
                     mpq_mat_multiply(v_rat,v_rat,G);
                     mpq_mat_multiply_by_ui(v_rat,v_rat,p1);
 
-                    /* Converting v_rat into one polynomial with rational coeff
-                    cxx_mpq_poly v_poly;
-                    mpz_poly_realloc(v_poly.num,n);
-                    mpq_mat_row_to_poly(v_poly.num,v_poly.den,v_rat,0);
-                    mpz_poly_cleandeg(v_poly.num,n);
-                    
-                    gens_vect.push_back(v_poly);*/
-                    
                     mpq_mat_submat_swap(gens,current_line,0,v_rat,0,0,1,n);
                     current_line++;
                 }
             }
-            /*
-            printf("\n");
-            for(unsigned int j = 0 ; j < gens_vect.size() ; j++){
-                char * tmp;
-                int rc = mpz_poly_asprintf(&tmp,gens_vect[j].num);
-                ASSERT_ALWAYS(rc >= 0);
-                gmp_printf("(1/%Zd)*(%s),\n",gens_vect[j].den, tmp);
-                free(tmp);
-            }
-            */
-            
-            /* build: 3n * n matrix with:
-             *  - gens as computed above (in a matrix)
-             *  - Ip
-             *  - current.I
-             *
-             * hnf of that
-             *
-             * leading n*n submatrix
-             *
-             */
              
              // Transfering current ideal (the one we try to separate) subspace basis of alpha^
              cxx_mpq_mat gcd_with;
@@ -1032,14 +981,33 @@ void factorization_of_prime(/*vector<pair<cxx_mpz_mat, int>>& res,*/ mpz_poly_sr
              
              //Now computing 3n*n matrix with gens, Ip_rat and gcd_with
              
-             cxx_mpq_mat big_matrix, bigger_matrix;
+             cxx_mpq_mat big_matrix, bigger_matrix, Ix, new_ideal_rat;
+             cxx_mpz_mat new_ideal;
+             mpq_mat_realloc(Ix,n,n);
+             mpq_mat_realloc(new_ideal_rat,n,n);
+             mpz_mat_realloc(new_ideal,n,n);
+             
              mpq_mat_vertical_join(big_matrix,gens,Ip_rat);
              mpq_mat_vertical_join(bigger_matrix,big_matrix,gcd_with);
-             
-             printf("bigger matrix :\n"); mpq_mat_fprint(stdout,bigger_matrix); printf("\n");
              hnf_magma_style(bigger_matrix, bigger_matrix);
-             printf("bigger matrix :\n"); mpq_mat_fprint(stdout,bigger_matrix); printf("\n");
+             mpq_mat_submat_swap(Ix,0,0,bigger_matrix,2*n,0,n,n);
              
+             mpq_mat_multiply(new_ideal_rat,Ix,G_inv);
+             mpq_mat_numden(new_ideal,NULL,new_ideal_rat);
+             
+             if( (int) r_char_subspaces[i]->m == e*(fac_Pc->factors[i]->f->deg)){
+                 pair<cxx_mpq_mat, int> new_pair = make_pair(Ix,e);
+                 ideals.push_back(new_pair);
+             }
+             else{
+                 subspace_ideal new_subspace_ideal;
+                 new_subspace_ideal.E = r_char_subspaces[i];
+                 new_subspace_ideal.I = new_ideal;
+                 new_subspace_ideal.V = r_char_subspaces[i];
+                 pick_from.push(new_subspace_ideal);
+             }
+             
+            
         }
         
         mpz_clear(p_0);
@@ -1285,8 +1253,13 @@ int main(int argc, char *argv[])
     gmp_randinit_default(state);
     gmp_randseed_ui(state, seed);
         
-    
-    factorization_of_prime(g,p, state);
+    vector<pair<cxx_mpq_mat, int>> ideals;
+    factorization_of_prime(ideals, g, p, state);
+    for(unsigned int i = 0 ; i < ideals.size() ; i++){
+        printf("Ideal :\n");
+        mpq_mat_fprint(stdout, ideals[i].first);
+        printf("with a multiplicity of %d\n\n",ideals[i].second);
+    }
     
     gmp_randclear(state);
     
