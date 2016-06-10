@@ -511,6 +511,11 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
+  /* if the coefficient of degree d-2 is negative, the size optimization
+     will not work well, thus we simply discard those polynomials */
+  if (mpz_sgn (f[d]) * mpz_sgn (f[d-2]) > 0)
+    goto end;
+
   /* save unoptimized polynomial to fold */
   for (unsigned long j = d + 1; j -- != 0; )
     mpz_set (fold[j], f[j]);
@@ -550,6 +555,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (ad, l, g[0]);
 
+ end:
   mpz_clear (l);
   mpz_clear (m);
   mpz_clear (t);
