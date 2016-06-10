@@ -776,6 +776,7 @@ void mpq_mat_multiply(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B)
                         mpq_mat_entry(C, i, j),
                         z);
             }
+            mpq_canonicalize(mpq_mat_entry(C,i,j));
         }
     }
     mpq_mat_realloc(D,A->m,B->n);
