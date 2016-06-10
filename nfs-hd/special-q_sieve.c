@@ -2655,7 +2655,6 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
 void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "H", "sieving region for c");
-  param_list_decl_usage(pl, "V", "number of number field");
   param_list_decl_usage(pl, "fbb", "factor base bounds");
   param_list_decl_usage(pl, "thresh", "thresholds");
   param_list_decl_usage(pl, "lpb", "large prime bounds");
@@ -2671,7 +2670,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "base", "specify the bases");
   param_list_decl_usage(pl, "g", "polynomial associated with q");
   param_list_decl_usage(pl, "gal", "type of Galois action (6 with action "
-    "x->-(2 * x + 1) / (x - 1))");
+    "x-> -(2 * x + 1) / (x - 1))");
   param_list_decl_usage(pl, "qfile", "path to a qfile");
   param_list_decl_usage(pl, "qfilespq", "path to a qfile");
 }
