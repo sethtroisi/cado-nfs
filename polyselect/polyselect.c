@@ -251,6 +251,7 @@ output_polynomials (mpz_t *fold, const unsigned long d, mpz_t *gold,
       printf("%s",str_old);
   if (str != NULL)
     printf("%s",str);
+  fflush (stdout);
   mutex_unlock (&lock);
 
   if (str_old != NULL)
@@ -748,7 +749,7 @@ collision_on_p ( header_t header,
   mpz_t zero;
   int found = 0;
   shash_t H;
-  int st = 0;
+  int st = milliseconds ();
 
   /* init zero */
   mpz_init_set_ui (zero, 0);
@@ -774,10 +775,8 @@ collision_on_p ( header_t header,
           continue;
         }
 
-      st -= milliseconds ();
       nrp = roots_mod_uint64 (rp, mpz_fdiv_ui (header->Ntilde, p), header->d,
                               p);
-      st += milliseconds ();
       tot_roots += nrp;
       roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
       proots_add (R, nrp, rp, nprimes);
@@ -792,6 +791,7 @@ collision_on_p ( header_t header,
   found = shash_find_collision (H);
   shash_clear (H);
   free (rp);
+  st = milliseconds () - st;
 
   if (verbose > 2)
     fprintf (stderr, "# computing %lu p-roots took %dms\n", tot_roots, st);
