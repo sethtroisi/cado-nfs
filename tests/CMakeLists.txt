@@ -411,9 +411,9 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             )
     cado_define_test(full_c59workdir
         SCRIPT
+            ${CMAKE_CURRENT_SOURCE_DIR}/provide-wdir.sh  --arg workdir
             ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
 	    90377629292003121684002147101760858109247336549001090677693
-	    workdir=/tmp/cado
         TARGET_DEPENDENCIES
 	    full_c30_dependencies
             )

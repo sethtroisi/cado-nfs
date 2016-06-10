@@ -191,24 +191,17 @@ compute_rational_approximation (double *Q, double q, unsigned int nb_approx,
                                 double bound)
 {
   unsigned int n = 0;
-  double *E = (double *) malloc (nb_approx * sizeof(double));
-  ASSERT_ALWAYS (E != NULL);
+  double best_e = 2.0;
 
-  for (double den = 2.0; n < nb_approx - 1 && den <= bound; den += 1.0)
+  for (double den = 1.0; n < nb_approx && den <= bound; den += 1.0)
   {
     double num = floor (den * q + 0.5);
     double e = fabs (q - num / den);
-
-    /* if the previous approximation was better, skip the current one */
-    if (n > 0 && e >= E[n-1])
+    if (e >= best_e)
       continue;
-    Q[n] = num / den;
-    E[n] = e;
-    n++;
+    best_e = e;
+    Q[n++] = num / den;
   }
-  /* force approximation with denominator 1 at the end */
-  Q[n++] = floor (q + 0.5);
-  free (E);
   return n;
 }
 
@@ -228,7 +221,8 @@ sopt_get_skewness (mpz_t skew, mpz_poly_srcptr f, mpz_poly_srcptr g)
    degree 4 and 3. */
 static void
 sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
-                             mpz_poly_srcptr g, const int verbose)
+                             mpz_poly_srcptr g, const int verbose,
+                             int sopt_effort)
 {
   ASSERT_ALWAYS (f->deg == 6);
   ASSERT_ALWAYS (g->deg == 1);
@@ -244,6 +238,12 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
   a2 = mpz_get_d (f->coeff[2]);
   g1 = mpz_get_d (g->coeff[1]);
   g0 = mpz_get_d (g->coeff[0]);
+
+  double kmax;
+  /* after translation by k, we have a2 = Theta(binomial(6,2)*a6*k^4)
+     = Theta(15*a6*k^4), thus after reduction by x^2*g, a3 = Theta(15*a6*k^4*g1/g0).
+     Since we want a3 << g0, a lower bound for k is |g0^2/(15*a6*g1)|^(1/4). */
+  kmax = pow (fabs (g0 * g0 / (15.0 * a6 * g1)), 0.25);
 
   /* Let f~(x,k,q3) = f(x+k)+q3*x^3*g(x+k).
      Let c_i(k,q3) be the coefficient of x^i in f~. Then
@@ -269,7 +269,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
   */
 
   double_poly_t res;
-  double roots_q3[5]; /* 5 = 3 roots for res + 2 roots for the derivative */
+  double roots_q3[3]; /* roots for res */
   double_poly_init (res, 3);
 
   /* degree 3: a6*g1^3 */
@@ -291,9 +291,13 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
                   + 64.0 * a4 * a4 * a4 * a6 - 180.0 * a3 * a4 * a5 * a6
                   + 135.0 * a3 * a3 * a6 * a6;
 
-  /* compute roots of res */
+  /* compute real roots of res:
+     (1) if a6*a4 < 0, usually we have 2 "small" real roots (almost opposite)
+         and one huge real root
+     (2) if a6*a4 > 0, usually we only have one huge real root */
   nb_q3roots = double_poly_compute_all_roots_with_bound (roots_q3, res,
 						 SOPT_MAX_VALUE_FOR_Q_ROOTS);
+
   if (verbose)
   {
     fprintf (stderr, "# sopt: q-roots of Res(c3,c4) or Res(c3,c4)' = {");
@@ -304,22 +308,59 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
 
   double_poly_t C;
   double_poly_init (C, 4);
-  for (i = 0; i < nb_q3roots; i++)
+  int a = 1, b = 1;
+  /* for an average of 2 roots per polynomial, using sopt_effort > 0 will increase
+     the size optimization time by a ratio (sopt_effort + 1) on average */
+  for (i = 0; i < nb_q3roots + 2 * sopt_effort; i++)
   {
+    /* (1) for i < nb_q3roots, we deal with the i-th root nb_q3roots[i], and generate
+           up to SOPT_NB_RAT_APPROX_OF_Q_ROOTS rational approximations of it;
+       (2) for i >= nb_q3roots, we consider fractions a/b, gcd(a,b) = 1, |a/b| <= 1 */
+
     unsigned int t;
     double q3_rat_approx[SOPT_NB_RAT_APPROX_OF_Q_ROOTS];
-    t = compute_rational_approximation (q3_rat_approx, roots_q3[i],
-                                        SOPT_NB_RAT_APPROX_OF_Q_ROOTS,
-                                        SOPT_MAX_DEN_IN_RAT_APPROX_OF_Q_ROOTS);
+
+    if (i < nb_q3roots)
+      t = compute_rational_approximation (q3_rat_approx, roots_q3[i],
+                                          SOPT_NB_RAT_APPROX_OF_Q_ROOTS,
+                                          SOPT_MAX_DEN_IN_RAT_APPROX_OF_Q_ROOTS);
+    else
+      t = SOPT_NB_RAT_APPROX_OF_Q_ROOTS;
+
     for (unsigned int j = 0; j < t; j++)
     {
       double q3_rat = q3_rat_approx[j];
       double double_roots_k[5];
       unsigned int nb_k_roots;
 
+      if (i >= nb_q3roots)
+        {
+          q3_rat = (double) a / (double) b;
+          if (a > 0)
+            a = -a;
+          else /* generate next Farey fraction:
+                  1/1 -> -1/1 -> 1/2 -> -1/2 -> 1/3 -> -1/3 -> 2/3 ->
+                  -2/3 -> 1/4 -> ... */
+            {
+              a = (-a) + 1; /* now a > 0 */
+              while (gcd_uint64 (a, b) != 1)
+                a ++;
+              if (a > b)
+                {
+                  a = 1;
+                  b = b + 1;
+                }
+            }
+        }
+
       if (verbose > 1)
-        fprintf (stderr, "# sopt: process rational approximation %f of %f\n",
-                         q3_rat, roots_q3[i]);
+        {
+          if (i < nb_q3roots)
+            fprintf (stderr, "# sopt: process rational approximation %f of %f\n",
+                     q3_rat, roots_q3[i]);
+          else
+            fprintf (stderr, "# sopt: process rational approximation %f\n", q3_rat);
+        }
 
       /* find roots k of c4(k, q3=q3_rat) */
       C->deg = 2;
@@ -327,7 +368,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       C->coeff[1] = 5.0 * a5;
       C->coeff[0] = g1 * q3_rat + a4;
 
-      nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
+      nb_k_roots = double_poly_compute_all_roots_with_bound (double_roots_k, C, kmax);
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
@@ -343,7 +384,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       C->coeff[1] = g1 * q3_rat + 4.0 * a4;
       C->coeff[0] = q3_rat * g0 + a3;
 
-      nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
+      nb_k_roots = double_poly_compute_all_roots_with_bound (double_roots_k, C, kmax);
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
@@ -372,7 +413,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       C->coeff[1] = 2.0 * g1 * a3 - 2.0 * g1 * q3_rat * g0 - 4.0 * g0 * a4;
       C->coeff[0] = -q3_rat * g0 * g0 - g0 * a3 + g1 * a2;
 
-      nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
+      nb_k_roots = double_poly_compute_all_roots_with_bound (double_roots_k, C, kmax);
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
@@ -382,7 +423,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
       }
 
       double_poly_derivative (C, C);
-      nb_k_roots = double_poly_compute_all_roots (double_roots_k, C);
+      nb_k_roots = double_poly_compute_all_roots_with_bound (double_roots_k, C, kmax);
       for (unsigned int l = 0; l < nb_k_roots; l++)
       {
         list_mpz_append_from_rounded_double (list_k, double_roots_k[l]);
@@ -447,7 +488,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
         ASSERT_ALWAYS(nb_roots_q2 <= 12+4*(ii+1));
       }
 #endif
-  }
+      }
   double_poly_clear (C);
   double_poly_clear (res);
 }
@@ -457,7 +498,8 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
    degree 3 and 2. */
 static void
 sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
-                             mpz_poly_srcptr g, const int verbose)
+                             mpz_poly_srcptr g, const int verbose,
+                             int sopt_effort)
 {
   ASSERT_ALWAYS (f->deg == 5);
   ASSERT_ALWAYS (g->deg == 1);
@@ -526,18 +568,44 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
 
   double_poly_t C;
   double_poly_init (C, 2);
-  for (i = 0; i < nb_q2roots; i++)
+  int a = 1, b = 1;
+  /* for an average of 1 root per polynomial, using sopt_effort > 0 will increase
+     the size optimization time by a ratio (sopt_effort + 1) on average */
+  for (i = 0; i < nb_q2roots + sopt_effort; i++)
   {
     unsigned int t;
     double q2_rat_approx[SOPT_NB_RAT_APPROX_OF_Q_ROOTS];
+
+    if (i < nb_q2roots)
     t = compute_rational_approximation (q2_rat_approx, roots_q2[i],
                                         SOPT_NB_RAT_APPROX_OF_Q_ROOTS,
                                         SOPT_MAX_DEN_IN_RAT_APPROX_OF_Q_ROOTS);
+    else
+      t = SOPT_NB_RAT_APPROX_OF_Q_ROOTS;
+
     for (unsigned int j = 0; j < t; j++)
     {
       double q2_rat = q2_rat_approx[j];
       double double_roots_k[5];
       unsigned int nb_k_roots;
+
+      if (i >= nb_q2roots)
+        {
+          q2_rat = (double) a / (double) b;
+          if (a > 0)
+            a = -a;
+          else
+            {
+              a = (-a) + 1; /* now a > 0 */
+              while (gcd_uint64 (a, b) != 1)
+                a ++;
+              if (a > b)
+                {
+                  a = 1;
+                  b = b + 1;
+                }
+            }
+        }
 
       if (verbose > 1)
         fprintf (stderr, "# sopt: process rational approximation %f of %f\n",
@@ -560,68 +628,6 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
   }
   double_poly_clear (C);
   double_poly_clear (res);
-}
-
-/* If sopt_effort is not 0, add translations to the list of translations that
-   are going to be tried in LLL */
-static inline void
-improve_list_k (list_mpz_ptr list_k, const unsigned int sopt_effort,
-                const int verbose)
-{
-  if (sopt_effort == 0) /* do nothing if sopt_effort == 0 */
-    return ;
-  mpz_t k, new_k, delta_k;
-  mpz_init (k);
-  mpz_init (new_k);
-  mpz_init (delta_k);
-
-  if (verbose)
-    fprintf (stderr, "# sopt: improve_list_k: for each k in list_k, add "
-                     " k +/- k/10^i and k +/- k/(2*10^i) for i in [1..%u]\n",
-                      sopt_effort);
-
-  uint64_t len = list_k->len;
-  for (unsigned int i = 0; i < len; i++)
-  {
-    mpz_set (k, list_k->tab[i]);
-    unsigned long int d = 10;
-    for (unsigned int i = 0; i < sopt_effort; i++)
-    {
-      mpz_ndiv_q_ui (delta_k, k, d);
-      mpz_add (new_k, k, delta_k);
-      list_mpz_append (list_k, new_k);
-      mpz_sub (new_k, k, delta_k);
-      list_mpz_append (list_k, new_k);
-
-      mpz_ndiv_q_ui (delta_k, k, 2*d);
-      mpz_add (new_k, k, delta_k);
-      list_mpz_append (list_k, new_k);
-      mpz_sub (new_k, k, delta_k);
-      list_mpz_append (list_k, new_k);
-
-      d *= 10;
-    }
-  }
-
-  if (verbose)
-  {
-    fprintf (stderr, "# sopt: %" PRIu64 " values for the translations were "
-                     "added\n", list_k->len-len);
-    len = list_k->len;
-  }
-
-// TODO add k of the form j*10^i for some value of i and j (depending of
-// sopt_effort).
-
-  /* Sort list_k by increasing order and remove duplicates */
-  list_mpz_sort_and_remove_dup (list_k, verbose);
-  if (verbose)
-    fprintf (stderr, "# sopt: It remains %" PRIu64 " values after sorting"
-                     " and removing duplicates\n", list_k->len);
-
-  mpz_clear (k);
-  mpz_clear (new_k);
-  mpz_clear (delta_k);
 }
 
 /* Construct the LLL matrix from the polynomial pair. */
@@ -1243,9 +1249,9 @@ size_optimization_aux (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
   if (d == 6 || d == 5)
   {
     if (d == 6)
-      sopt_find_translations_deg6 (list_k, f_raw, g_raw, verbose);
+      sopt_find_translations_deg6 (list_k, f_raw, g_raw, verbose, sopt_effort);
     else if (d == 5)
-      sopt_find_translations_deg5 (list_k, f_raw, g_raw, verbose);
+      sopt_find_translations_deg5 (list_k, f_raw, g_raw, verbose, sopt_effort);
     if (verbose)
       fprintf (stderr, "# sopt: %" PRIu64 " values for the translations were "
                        "computed and added in list_k\n", list_k->len);
@@ -1270,13 +1276,6 @@ size_optimization_aux (mpz_poly_ptr f_opt, mpz_poly_ptr g_opt,
     if (verbose)
       fprintf (stderr, "# sopt: Start with list_k = { 0 }\n");
   }
-
-  /******* Improve list of translation (depending on sopt_effort) *******/
-  if (verbose)
-    fprintf (stderr, "# sopt: Calling improve_list_k with sopt_effort = %u\n",
-                      sopt_effort);
-  improve_list_k (list_k, sopt_effort, verbose);
-
 
   /****************************** Main loop *******************************/
   /* For each value of k, call LLL on translated polynomial, and for each
