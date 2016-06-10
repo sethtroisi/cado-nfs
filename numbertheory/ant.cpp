@@ -375,7 +375,7 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B,
     mpq_mat_clear(B_inv);
 }
 
-void read_data(unsigned int *deg, mpz_poly_ptr f, mpq_mat_ptr J,
+void read_data(unsigned int *deg, mpz_poly_ptr f, mpq_mat_ptr J, /*mpz_mat_ptr gen,*/
 	       FILE * problemfile)
 {
     fscanf(problemfile, "%u", deg);
@@ -397,8 +397,8 @@ void read_data(unsigned int *deg, mpz_poly_ptr f, mpq_mat_ptr J,
     fscanf(problemfile, "%d", &b);
     mpz_set_si(mpz_mat_entry(gen,0,0),a);
     mpz_set_si(mpz_mat_entry(gen,0,1),b);
-*/
-  
+    */
+    
     mpq_mat_realloc(J,*deg,*deg);
     for (unsigned int i = 0; i < *deg; i++) {
         long int denom;
@@ -1492,6 +1492,7 @@ int main(int argc, char *argv[])
     mpz_poly_clear(g);
     mpz_poly_clear(f);
     mpq_mat_clear(D);
+    mpz_mat_clear(gen);
 
 
 
