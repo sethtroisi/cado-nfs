@@ -22,8 +22,6 @@ void test_mpz_poly_bivariate_trivialities()
 
   //(11+17*x+42*x^2)+(12+18*x+43*x^2)*y^2
   mpz_poly_bivariate_fprintf(stdout, f);
-  //(11+17*t+42*t^2)+(12+18*t+43*t^2)*x^2
-  mpz_poly_bivariate_fprintf_var(stdout, f, 'x', 't');
 
   mpz_poly_bivariate_clear(f);
 

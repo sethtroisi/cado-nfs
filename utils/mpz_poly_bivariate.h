@@ -54,11 +54,6 @@ void mpz_poly_bivariate_cleandeg(mpz_poly_bivariate_ptr f, int deg_y);
 void mpz_poly_bivariate_setcoeff(mpz_poly_bivariate_ptr f, int i,
     mpz_poly_srcptr z);
 /*
- * Print f in a file. Choose the name of the variables.
- */
-void mpz_poly_bivariate_fprintf_var(FILE * fp, mpz_poly_bivariate_srcptr f,
-    char var_y, char var_x);
-/*
  * Print f in a file.
  */
 void mpz_poly_bivariate_fprintf(FILE * fp, mpz_poly_bivariate_srcptr f);

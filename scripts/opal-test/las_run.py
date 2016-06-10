@@ -94,7 +94,8 @@ def run(param_file, problem):
     q0 = las_params["alim"]
     q_range = 1000
     q_inc = 0
-    rels_wanted = int(primepi(las_params["lpba"]) + primepi(las_params["lpbr"]))
+    # since we remove duplicates, 80% of the total ideals should be enough
+    rels_wanted = int(0.8 * primepi(las_params["lpba"]) + 0.8 * primepi(las_params["lpbr"]))
     # read the best time so far (if any)
     best_time = get_best_time ("las.best")
     if best_time >= 1e308:

@@ -36,7 +36,7 @@ static void lagrange_poly_clear(lagrange_poly_ptr p)
 MAYBE_UNUSED static void lagrange_poly_fprintf(FILE * f, lagrange_poly_srcptr p)
 {
   fprintf(f, "(");
-  mpz_poly_fprintf_var(f, p->p, 'x', 0);
+  mpz_poly_fprintf(f, p->p);
   gmp_fprintf(f, ") / %Zd\n", p->denom);
 }
 
@@ -221,8 +221,7 @@ void mpz_poly_bivariate_setcoeff(mpz_poly_bivariate_ptr f, int i,
   }
 }
 
-void mpz_poly_bivariate_fprintf_var(FILE * fp, mpz_poly_bivariate_srcptr f,
-    char var_y, char var_x)
+void mpz_poly_bivariate_fprintf(FILE * fp, mpz_poly_bivariate_srcptr f)
 {
   if (f->deg_y == -1) {
     fprintf(fp, "0\n");
@@ -238,10 +237,10 @@ void mpz_poly_bivariate_fprintf_var(FILE * fp, mpz_poly_bivariate_srcptr f,
     }
 
     fprintf(fp, "(");
-    mpz_poly_fprintf_var(fp, f->coeff[i], var_x, 0);
+    mpz_poly_fprintf_endl(fp, f->coeff[i], 0);
     fprintf(fp, ")");
     if (i) {
-      fprintf(fp, "*%c", var_y);
+      fprintf(fp, "*y");
     }
 
     if (i > 1) {
@@ -249,11 +248,6 @@ void mpz_poly_bivariate_fprintf_var(FILE * fp, mpz_poly_bivariate_srcptr f,
     }
   }
   fprintf(fp, "\n");
-}
-
-void mpz_poly_bivariate_fprintf(FILE * fp, mpz_poly_bivariate_srcptr f)
-{
-  mpz_poly_bivariate_fprintf_var(fp, f, 'y', 'x');
 }
 
 void mpz_poly_bivariate_eval_y(mpz_poly_ptr res,

@@ -655,6 +655,45 @@ void test_mpz_poly_factor(unsigned long iter)
     mpz_poly_init(f, -1);
     mpz_poly_factor_list_init(lf);
 
+    
+    mpz_set_ui(p, 2);
+    // 0+1*x^1+2*x^2+2*x^3+2*x^4  
+    mpz_poly_setcoeffs_si_var(f, 4, 0, 1, 2, 2, 2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 1);
+    mpz_t coeff;
+    mpz_init(coeff);
+    mpz_poly_getcoeff(coeff, 0, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 0) == 0);
+    mpz_poly_getcoeff(coeff, 1, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 1) == 0);
+
+    // 1+0*x^1+2*x^2+2*x^3+2*x^4  
+    mpz_poly_setcoeffs_si_var(f, 4, 1, 0, 2, 2, 2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 0);
+
+    //0+1*x^1-2*x^2-2*x^3-2*x^4
+    mpz_poly_setcoeffs_si_var(f, 4, 0, 1, -2, -2, -2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 1);
+    mpz_poly_getcoeff(coeff, 0, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 0) == 0);
+    mpz_poly_getcoeff(coeff, 1, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 1) == 0);
+
+    mpz_clear(coeff);
+
+    //x^10 + x^9 + x^8 + 1
+    mpz_poly_setcoeffs_si_var(f, 10, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 3);
+
+    //x^10 + x^8 + x^7 + x^6 + x^2 + x + 1
+    mpz_poly_setcoeffs_si_var(f, 10, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 1);
+
     mpz_set_ui(p, 13);
     mpz_poly_setcoeffs_ui_var(f, 21, 3, 8, 5, 5, 6, 1, 9, 4, 3, 3, 8, 7, 7, 7, 0, 12, 5, 11, 11, 1, 7, 10);
     mpz_poly_factor(lf, f, p, state);

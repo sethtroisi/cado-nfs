@@ -141,12 +141,14 @@ check_parameters (mpz_t m0, double q)
 
 /* print poly info */
 void
-print_poly_info ( mpz_t *f,
+print_poly_info ( char *buf,
+                  mpz_t *f,
                   const unsigned int d,
                   mpz_t g[2],
                   const mpz_t n,
                   const int raw,
-                  const char *prefix )
+                  const char *prefix,
+                  bool raw_option )
 {
   unsigned int i, nroots;
   double skew, logmu, exp_E;
@@ -156,10 +158,18 @@ print_poly_info ( mpz_t *f,
   G->coeff = g;
   G->deg = 1;
 
-  gmp_printf ("%sn: %Zd\n", prefix, n);
-  gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
+  if (raw_option)
+    sprintf (buf, "# Raw polynomial:\n");
+  else
+    sprintf (buf, "# Size-optimized polynomial:\n");
+
+  //gmp_printf ("%sn: %Zd\n", prefix, n);
+  gmp_sprintf (buf+strlen(buf), "%sn: %Zd\n", prefix, n);
+  //gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
+  gmp_sprintf (buf+strlen(buf), "%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
-    gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
+    //gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
+    gmp_sprintf (buf+strlen(buf), "%sc%u: %Zd\n", prefix, i, f[i]);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   exp_E = ropt_bound_expected_E (f, d, g);
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
@@ -167,11 +177,18 @@ print_poly_info ( mpz_t *f,
   logmu = L2_lognorm (F, skew);
   exp_E = logmu + expected_rotation_gain (F, G);
   if (raw == 1)
-    printf ("# raw exp_E");
+    //printf ("# raw exp_E");
+    sprintf (buf+strlen(buf), "# raw exp_E");
   else
-    printf ("# exp_E");
-  printf (" %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
-          exp_E, logmu, skew, nroots);
+    //printf ("# exp_E");
+    sprintf (buf+strlen(buf), "# exp_E");
+
+  //printf (" %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
+  // exp_E, logmu, skew, nroots);
+  sprintf (buf+strlen(buf), " %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
+           exp_E, logmu, skew, nroots);
+  if (!raw_option)
+    sprintf (buf+strlen(buf), "\n");
 }
 
 
@@ -217,16 +234,29 @@ static void
 output_polynomials (mpz_t *fold, const unsigned long d, mpz_t *gold,
                     const mpz_t N, mpz_t *f, mpz_t *g)
 {
-  mutex_lock (&lock);
+  size_t sz = mpz_sizeinbase (N, 10);
+  int length = sz*12;
+  char *str_old = malloc(sizeof(char) * length);
+  char *str = malloc(sizeof(char) * length);
   if (fold != NULL && gold != NULL) {
-    printf ("# Raw polynomial:\n");
-    print_poly_info (fold, d, gold, N, 1, phash);
+    if (str_old != NULL)
+      print_poly_info (str_old, fold, d, gold, N, 1, phash, 1);
   }
-    gmp_printf ("# Size-optimized polynomial:\n");
-  print_poly_info (f, d, g, N, 0, "");
-  printf ("\n");
-  fflush (stdout);
+  if (str != NULL)
+    print_poly_info (str, f, d, g, N, 0, "", 0);
+
+  mutex_lock (&lock);
+  if (fold != NULL && gold != NULL)
+    if (str_old != NULL)
+      printf("%s",str_old);
+  if (str != NULL)
+    printf("%s",str);
   mutex_unlock (&lock);
+
+  if (str_old != NULL)
+    free (str_old);
+  if (str != NULL)
+    free (str);
 }
 
 static void

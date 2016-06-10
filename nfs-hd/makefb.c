@@ -11,7 +11,6 @@
 #include "getprime.h"
 #include "makefb.h"
 #include "utils_int64.h"
-#include "utils_mpz_poly.h"
 
 /*
  * Mode:
@@ -138,30 +137,9 @@ void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
   mpz_init(a);
   mpz_poly_factor_list_init(l);
 
-  //F2.
-  mpz_set_ui(a, 2);
-  for (unsigned int k = 0; k < V; k++) {
-    mpz_set(lc, mpz_poly_lc_const(f->pols[k]));
-    //Verify if there exists a projective root.
-    if (mpz_congruent_p(lc, zero, a) != 0) {
-      add_ideal_pr_part(fb[k], indexpr + k, q, fbb[k], t);
-    }
-    //Find the factorisation of f->pols[k] mod 2.
-    mpz_poly_factor2(l, f->pols[k]);
-    for (int i = 0; i < l->size ; i++) {
-      if (l->factors[i]->f->deg == 1) {
-        add_ideal_1_part(fb[k], index1 + k, q, l->factors[i]->f, fbb[k], t);
-      } else if (l->factors[i]->f->deg < (int)t) {
-        add_ideal_u_part(fb[k], indexu + k, q, l->factors[i]->f, fbb[k], lpb[k], t);
-      }
-    }
-  }
-
   prime_info pi;
   prime_info_init(pi);
 
-  //Next prime.
-  q = getprime_mt(pi);
   //Find the maximum of fbb.
   uint64_t qmax = fbb[0];
   for (unsigned int k = 1; k < V; k++) {

@@ -2,8 +2,7 @@ set (SQ_SRC special-q_sieve.c mat_int64.c int64_vector.c uint64_array.c
     mat_Z.c ideal.c makefb.c utils_mpz.c int64_poly.c sieving_bound.c
     array.c utils_int64.c factor_base.c utils_lattice.c double_vector.c
     mat_double.c list_int64_vector.c list_double_vector.c
-    list_int64_vector_index.c utils_norm.c utils_cofactorisation.c
-    utils_mpz_poly.c)
+    list_int64_vector_index.c utils_norm.c utils_cofactorisation.c)
 
 add_executable(special-q_sieve ${SQ_SRC})
 
@@ -32,7 +31,7 @@ target_link_libraries(special-q_sieve facul utils)
 
 # Makefb
 
-set(MAKEFB_SRC makefb.c factor_base.c ideal.c utils_int64.c utils_mpz_poly.c)
+set(MAKEFB_SRC makefb.c factor_base.c ideal.c utils_int64.c)
 
 add_executable(makefb-hd ${MAKEFB_SRC})
 
@@ -59,13 +58,13 @@ target_link_libraries(makefb-hd utils)
 #target_link_libraries(paraselect-hd utils polyselect_common)
 
 # Alpha 3d
-set (ALP_SRC alpha3d.c utils_mpz_poly.c)
+set (ALP_SRC alpha3d.c)
 add_executable(alpha3d ${ALP_SRC})
 set_property(TARGET alpha3d PROPERTY COMPILE_DEFINITIONS MAIN_ALPHA3D)
 target_link_libraries(alpha3d utils)
 
 # Murphy-E
-set (MUR_SRC murphyE3d.c alpha3d.c utils_mpz_poly.c)
+set (MUR_SRC murphyE3d.c alpha3d.c)
 add_executable(murphyE3d ${MUR_SRC})
 set_property(TARGET murphyE3d PROPERTY COMPILE_DEFINITIONS MAIN_MURPHYE3D)
 target_link_libraries(murphyE3d utils polyselect_common)
