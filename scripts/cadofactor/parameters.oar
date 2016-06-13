@@ -40,7 +40,8 @@ slaves.catrel.hostnames = @${OAR_NODE_FILE}
 # nrclients defines how many clients to start on each unique hostname
 # Note that the total number of threads in use will be nrclient * nrthreads
 slaves.catrel.nrclients = 8
-slaves.catrel.scriptpath = ${HOME}/git/cado-nfs/scripts/cadofactor
+# scriptpath is where the cado-nfs-client.py script can be found
+slaves.catrel.scriptpath = ${HOME}/git/cado-nfs
 slaves.catrel.downloadretry = 10
 # This causes cadofactor to startclient by using "oarsh" for remote login
 # instead of the default "ssh"
