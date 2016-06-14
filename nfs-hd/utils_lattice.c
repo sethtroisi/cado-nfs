@@ -192,11 +192,35 @@ void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
 
   mat_int64_t U;
   mat_int64_init(U, M_root->NumRows, M_root->NumCols);
-#ifdef SLLL_INT64
   lll_Mqr_unimodular(U, M);
-#else // SLLL_INT64
+
+  mat_int64_mul_mat_int64(MSLLL, M_root, U);
+
+  mat_int64_clear(U);
+  mat_int64_clear(I_s);
+  mat_int64_clear(M);
+}
+
+void skew_LLL_safe(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
+    int64_vector_srcptr skewness)
+{
+  ASSERT(skewness->dim == M_root->NumCols);
+  ASSERT(M_root->NumRows == M_root->NumCols);
+  ASSERT(MSLLL->NumRows == M_root->NumCols);
+  ASSERT(MSLLL->NumRows == M_root->NumCols);
+
+  mat_int64_t I_s;
+  mat_int64_init(I_s, M_root->NumRows, M_root->NumCols);
+  mat_int64_set_diag(I_s, skewness);
+
+  mat_int64_t M;
+  mat_int64_init(M, M_root->NumRows, M_root->NumCols);
+  mat_int64_mul_mat_int64(M, I_s, M_root);
+
+
+  mat_int64_t U;
+  mat_int64_init(U, M_root->NumRows, M_root->NumCols);
   mat_int64_LLL_unimodular_transpose(U, M);
-#endif // SLLL_INT64
 
   mat_int64_mul_mat_int64(MSLLL, M_root, U);
 
@@ -1153,7 +1177,11 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
 
   mat_int64_t MSLLL;
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
+#ifdef SLLL_SAFE
+  skew_LLL_safe(MSLLL, Mqr, skewness);
+#else // SLLL_SAFE
   skew_LLL(MSLLL, Mqr, skewness);
+#endif // SLLL_SAFE
   int64_vector_clear(skewness);
 
   for (unsigned int col = 1; col <= MSLLL->NumCols; col++) {
