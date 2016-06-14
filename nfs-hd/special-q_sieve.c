@@ -1343,7 +1343,8 @@ void space_sieve_1_plane_sieve(array_ptr array,
     mat_int64_srcptr Mqr, list_int64_vector_srcptr list_SV,
     list_int64_vector_srcptr list_FK, sieving_bound_srcptr H,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED uint64_t * index_old)
+    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED uint64_t * index_old,
+    unsigned int * new_vec)
 {
   int64_vector_t s_out;
   int64_vector_init(s_out, s->dim);
@@ -1362,13 +1363,22 @@ void space_sieve_1_plane_sieve(array_ptr array,
     uint64_t index_new = index_vector(v_new, H, array->number_element);
     list_int64_vector_index_add_int64_vector_index(list_vec, v_new,
         index_new);
+    * new_vec = * new_vec + 1;
 
 #ifdef SPACE_SIEVE_ENTROPY
     //TODO: avoid duplicate.
     if (* entropy < SPACE_SIEVE_ENTROPY) {
+#ifdef SPACE_SIEVE_STAT
+      unsigned int nb_vec = list_vec->length;
+      unsigned int nb_vec_zero = list_vec_zero->length;
+#endif // SPACE_SIEVE_STAT
       space_sieve_generate_new_vectors(list_vec, list_vec_zero, H,
-          array->number_element);
+          array->number_element, new_vec);
       * entropy = * entropy + 1;
+#ifdef SPACE_SIEVE_STAT
+     * new_vec = list_vec->length - nb_vec + list_vec_zero->length -
+          nb_vec_zero;
+#endif // SPACE_SIEVE_STAT
 
 #ifdef SPACE_SIEVE_REMOVE_DUPLICATE
       list_int64_vector_index_remove_duplicate_sort(list_vec);
@@ -1400,7 +1410,8 @@ void space_sieve_1_plane_sieve(array_ptr array,
 void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
     mat_int64_srcptr Mqr, sieving_bound_srcptr H, FILE * errstd,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED uint64_t * call_plane_sieve,
+    MAYBE_UNUSED uint64_t * skew_lll_fail, FILE * file_space_sieve_stat)
 {
   //For SPACE_SIEVE_ENTROPY
   MAYBE_UNUSED unsigned int entropy = 0;
@@ -1434,8 +1445,15 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
   list_int64_vector_t list_s;
   list_int64_vector_init(list_s, 3);
 
+  unsigned int fail = 0;
   unsigned int vector_1 = space_sieve_1_init(list_vec, list_vec_zero, r, Mqr,
-      H, array->number_element);
+      H, array->number_element, &fail, file_space_sieve_stat);
+
+#ifdef SPACE_SIEVE_STAT
+  unsigned int nb_vec_0 = list_vec_zero->length;
+  unsigned int nb_vec = list_vec->length;
+#endif // SPACE_SIEVE_STAT
+  unsigned int new_vec = 0;
 
   //0 if plane sieve is already done, 1 otherwise.
   int plane_sieve = 0;
@@ -1504,9 +1522,9 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
       //Need to do plane sieve to
       if (!plane_sieve) {
         ASSERT(plane_sieve == 0);
-        int boolean = space_sieve_1_plane_sieve_init(list_SV, list_FK,
-            list_vec, list_vec_zero, r, H, Mqr, vector_1,
-            array->number_element);
+        int boolean = space_sieve_1_plane_sieve_init(list_SV, list_FK, list_vec,
+            list_vec_zero, r, H, Mqr, vector_1, array->number_element,
+            &new_vec);
 
         if (!boolean) {
           ASSERT(boolean == 0);
@@ -1526,11 +1544,19 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
           return;
         }
         plane_sieve = 1;
+
+#ifdef SPACE_SIEVE_STAT
+        call_plane_sieve[0] = call_plane_sieve[0] + 1;
+#endif // SPACE_SIEVE_STAT
       }
+
+#ifdef SPACE_SIEVE_STAT
+      call_plane_sieve[1] = call_plane_sieve[1] + 1;
+#endif // SPACE_SIEVE_STAT
 
       space_sieve_1_plane_sieve(array, list_s, &nbhit, &entropy, file_trace_pos,
           s, &index_s, list_vec, list_vec_zero, r, Mqr, list_SV, list_FK, H,
-          matrix, f, nb_hit, &index_old);
+          matrix, f, nb_hit, &index_old, &new_vec);
     }
 #ifdef SPACE_SIEVE_CUT_EARLY
     else if (!hit) {
@@ -1545,6 +1571,53 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
 
   int64_vector_clear(s);
   list_int64_vector_clear(list_s);
+
+#ifdef SPACE_SIEVE_STAT
+  if (plane_sieve == 1 && list_vec_zero->length == nb_vec_0 && list_vec->length
+      == nb_vec) {
+    call_plane_sieve[2] = call_plane_sieve[2] + 1;
+  }
+#endif // SPACE_SIEVE_STAT
+
+#ifdef SPACE_SIEVE_STAT
+  unsigned int used_zero = 0;
+  for (unsigned int i = 0; i < list_vec_zero->length; i++) {
+    if (list_vec_zero->v[i]->index != 0) {
+      used_zero++;
+    }
+  }
+  unsigned int used = 0;
+  for (unsigned int i = 0; i < list_vec->length; i++) {
+    if (list_vec->v[i]->index != 0) {
+      used++;
+    }
+  }
+  fprintf(file_space_sieve_stat, "Space sieve uses %u vectors (%u vectors_zero \
++ %u vectors).\n", used + used_zero, used_zero, used);
+
+  if (fail) {
+    fprintf(file_space_sieve_stat, "Skew LLL seems wrong ");
+    if (!plane_sieve) {
+      fprintf(file_space_sieve_stat, "but needs no new vector.\n");
+      skew_lll_fail[2] = skew_lll_fail[2] + 1;
+    } else {
+      fprintf(file_space_sieve_stat, "and needs %u new vectors.\n", new_vec);
+      skew_lll_fail[3] = skew_lll_fail[3] + 1;
+    }
+  } else {
+    fprintf(file_space_sieve_stat, "Skew LLL seems good ");
+    if (!plane_sieve) {
+      fprintf(file_space_sieve_stat, "and needs no new vector.\n");
+      skew_lll_fail[0] = skew_lll_fail[0] + 1;
+    } else {
+      fprintf(file_space_sieve_stat, "but needs %u new vectors.\n", new_vec);
+      skew_lll_fail[1] = skew_lll_fail[1] + 1;
+    }
+  }
+  
+  fprintf(file_space_sieve_stat, "********************\n");
+#endif // SPACE_SIEVE_STAT
+
   list_int64_vector_index_clear(list_vec);
   list_int64_vector_index_clear(list_vec_zero);
   list_int64_vector_clear(list_FK);
@@ -1764,7 +1837,8 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_Z_srcptr matrix, factor_base_srcptr fb, sieving_bound_srcptr H,
     MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * outstd, FILE * errstd,
-    uint64_t sieve_start, MAYBE_UNUSED ideal_spq_srcptr special_q)
+    uint64_t sieve_start, MAYBE_UNUSED ideal_spq_srcptr special_q, FILE *
+    file_space_sieve_stat)
 {
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
@@ -2032,6 +2106,29 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   time_space_sieve = seconds();
 #endif // TIME_SIEVES
 
+#ifdef SPACE_SIEVE_STAT
+  uint64_t * call_plane_sieve = (uint64_t * )
+    malloc(sizeof(uint64_t) * 3);
+  //Init plane sieve
+  call_plane_sieve[0] = 0;
+  //Call plane sieve
+  call_plane_sieve[1] = 0;
+  //Call plane sieve not needed
+  call_plane_sieve[2] = 0;
+  uint64_t * skew_lll_fail = (uint64_t * ) malloc(sizeof(uint64_t) * 4);
+  // not fail and no need of new vector
+  skew_lll_fail[0] = 0;
+  // not fail and need of new vector
+  skew_lll_fail[1] = 0;
+  // fail and no need of new vector
+  skew_lll_fail[2] = 0;
+  // fail and need of new vector
+  skew_lll_fail[3] = 0;
+#else // SPACE_SIEVE_STAT
+  uint64_t * call_plane_sieve = NULL;
+  uint64_t * skew_lll_fail = NULL;
+#endif // SPACE_SIEVE_STAT
+
   while (i < fb->number_element_1) {
 
 #ifdef Q_BELOW_FBB
@@ -2091,7 +2188,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
       ASSERT(H->t == 3);
 
       space_sieve_1(array, file_trace_pos, r, Mqr, H, errstd, matrix, f,
-          &number_hit);
+          &number_hit, call_plane_sieve, skew_lll_fail, file_space_sieve_stat);
 #endif // PLANE_SIEVE_INSTEAD_OF_SPACE_SIEVE
     } else {
       fprintf(errstd, "# Tqr = [");
@@ -2146,6 +2243,39 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   fprintf(outstd, "# Perform space sieve: %fs for %" PRIu64 " ideals, %fs per ideal.\n",
       time_space_sieve, ideal_space_sieve, time_per_ideal);
 #endif // TIME_SIEVES
+
+#ifdef SPACE_SIEVE_STAT
+  fprintf(file_space_sieve_stat, "Skew LLL gives vectors in bounds for \
+%" PRIu64 " ideals (%.2f %%).\n", skew_lll_fail[0] + skew_lll_fail[1],
+      (double)(skew_lll_fail[0] + skew_lll_fail[1]) * 100/
+      (double)(skew_lll_fail[0] + skew_lll_fail[1] + skew_lll_fail[2] +
+        skew_lll_fail[3]));
+  fprintf(file_space_sieve_stat, "Skew LLL gives vectors in bounds for \
+%" PRIu64 " ideals (%.2f %%).\n", skew_lll_fail[2] + skew_lll_fail[3],
+      (double)(skew_lll_fail[2] + skew_lll_fail[3]) * 100 /
+      (double)(skew_lll_fail[0] + skew_lll_fail[1] + skew_lll_fail[2] +
+        skew_lll_fail[3]));
+  fprintf(file_space_sieve_stat, "In bounds without need of new vectors: \
+%" PRIu64 ".\n", skew_lll_fail[0]);
+  fprintf(file_space_sieve_stat, "In bounds with need of new vectors: \
+%" PRIu64 ".\n", skew_lll_fail[1]);
+  fprintf(file_space_sieve_stat, "Out of bounds without need of new vectors: \
+%" PRIu64 ".\n", skew_lll_fail[2]);
+  fprintf(file_space_sieve_stat, "Out of bounds with need of new vectors: \
+%" PRIu64 ".\n", skew_lll_fail[3]);
+  free(skew_lll_fail);
+
+  ASSERT(call_plane_sieve[0] <= call_plane_sieve[1]);
+
+  fprintf(file_space_sieve_stat, "Space sieve call %" PRIu64 " times the \
+plane sieve (%" PRIu64 " initialisations) but %" PRIu64 " ( %.2f %%) just to \
+exit space sieve.\n", call_plane_sieve[1], call_plane_sieve[0],
+call_plane_sieve[2], (double)call_plane_sieve[2] * 100 /
+(double)call_plane_sieve[0]);
+
+  fprintf(file_space_sieve_stat, "----------------------------------------\n");
+  free(call_plane_sieve);
+#endif // SPACE_SIEVE_STAT
 
 #ifdef Q_BELOW_FBB
   mpz_poly_clear(g);
@@ -2329,7 +2459,8 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
     unsigned int V, double * log2_base, uint64_array_t * indexes,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
     factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
-    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time)
+    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time,
+    FILE * file_space_sieve_stat)
 {
   double sec_tot;
   double sec_cofact;
@@ -2407,7 +2538,8 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
 
       sec = seconds();
       special_q_sieve(array, file_trace_pos, spq->MqLLL[i], fb[j], H,
-          f->pols[j], outstd, errstd, sieve_start[j], spq->spq[i]);
+          f->pols[j], outstd, errstd, sieve_start[j], spq->spq[i],
+          file_space_sieve_stat);
       time[j][1] = seconds() - sec;
       sec = seconds();
       find_index(indexes[j], array,
@@ -2471,7 +2603,8 @@ void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     unsigned int V, double * log2_base, uint64_array_t * indexes,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
     factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
-    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time)
+    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time,
+    FILE * file_space_sieve_stat)
 {
   ASSERT(g->deg == -1);
 
@@ -2502,7 +2635,7 @@ void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
         gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
         indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-        nb_rel, spq_tot, total_time);
+        nb_rel, spq_tot, total_time, file_space_sieve_stat);
   }
   free(line);
 }
@@ -2610,7 +2743,8 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     unsigned int V, double * log2_base, uint64_array_t * indexes,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
     factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
-    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time)
+    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time,
+    FILE * file_space_sieve_stat)
 {
   size_t len = 1024;
   char * line = (char * ) malloc(sizeof(char) * len);
@@ -2646,7 +2780,7 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
         gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
         indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-        nb_rel, spq_tot, total_time);
+        nb_rel, spq_tot, total_time, file_space_sieve_stat);
   }
   mpz_poly_clear(g);
   free(line);
@@ -2989,9 +3123,34 @@ int main(int argc, char * argv[])
 #ifdef TRACE_POS
   file_trace_pos = fopen("TRACE_POS.txt", "w+");
   fprintf(file_trace_pos, "TRACE_POS: %d\n", TRACE_POS);
-#else
+#else // TRACE_POS
   file_trace_pos = NULL;
 #endif // TRACE_POS
+
+  FILE * file_space_sieve_stat;
+#ifdef SPACE_SIEVE_STAT
+#ifdef SKEWNESS_TRUE
+#ifdef SKEWNESS
+  char * path = (char * ) malloc(sizeof(char) * 1024);
+  sprintf(path, "SPACE_SIEVE_STAT_%d_TRUE.txt", SKEWNESS);
+  file_space_sieve_stat = fopen(path, "w+");
+  free(path);
+#else // SKEWNESS
+  file_space_sieve_stat = fopen("SPACE_SIEVE_STAT_2_TRUE.txt", "w+");
+#endif // SKEWNESS
+#else // SKEWNESS_TRUE
+#ifdef SKEWNESS
+  char * path = (char * ) malloc(sizeof(char) * 1024);
+  sprintf(path, "SPACE_SIEVE_STAT_%d.txt", SKEWNESS);
+  file_space_sieve_stat = fopen(path, "w+");
+  free(path);
+#else // SKEWNESS
+  file_space_sieve_stat = fopen("SPACE_SIEVE_STAT_2.txt", "w+");
+#endif // SKEWNESS
+#endif // SKEWNESS_TRUE
+#else // SPACE_SIEVE_STAT
+  file_space_sieve_stat = NULL;
+#endif // SPACE_SIEVE_STAT
 
   gmp_randstate_t state;
   gmp_randinit_default(state);
@@ -3042,20 +3201,20 @@ int main(int argc, char * argv[])
       do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
           gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
           indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-          &nb_rel, &spq_tot, &total_time);
+          &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
     }
   } else if (qfilespq == 1){
     read_q_file(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
         c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base, indexes,
         array, time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
-        &spq_tot, &total_time);
+        &spq_tot, &total_time, file_space_sieve_stat);
   } else {
     ASSERT(qfilespq == 2);
 
     read_q_file_spq(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
         c, nb_vec, outstd, file_trace_pos, max_norm, V, log2_base, indexes,
         array, time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
-        &spq_tot, &total_time);
+        &spq_tot, &total_time, file_space_sieve_stat);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);
@@ -3138,6 +3297,10 @@ ideals.\n", i, nb, nb_more);
 #ifdef TRACE_POS
   fclose(file_trace_pos);
 #endif // TRACE_POS
+
+#ifdef SPACE_SIEVE_STAT
+  fclose(file_space_sieve_stat);
+#endif // SPACE_SIEVE_STAT
 
   for (unsigned int i = 0; i < V; i++) {
     factor_base_clear(fb[i], H->t);

@@ -202,7 +202,8 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
  */
 unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element);
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element,
+    unsigned int * skew_lll_fail, FILE * file_skew_lll_stat);
 /*
  * During the plane sieve, compute reduce q lattice and SV4 and store vectors in
  *  the appropriate lists.
@@ -211,7 +212,7 @@ int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
     list_int64_vector_ptr list_FK, list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, MAYBE_UNUSED ideal_1_srcptr r,
     sieving_bound_srcptr H, mat_int64_srcptr Mqr,
-    unsigned int vector_1, uint64_t number_element);
+    unsigned int vector_1, uint64_t number_element, unsigned int * new_vec);
 
 /*
  * Store in s_tmp the starting point with the smallest z coordinate that are in

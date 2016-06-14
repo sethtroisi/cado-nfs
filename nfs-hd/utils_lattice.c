@@ -1123,12 +1123,25 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 
 unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
-    mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element)
+    mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element,
+    MAYBE_UNUSED unsigned int * skew_lll_fail,
+    MAYBE_UNUSED FILE * file_space_sieve_stat)
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
+#ifdef SKEWNESS_TRUE
+  skewness->c[0] = (int64_t)r->ideal->r;
+  skewness->c[1] = (int64_t) (H->h[0] / H->h[1]) * (int64_t)r->ideal->r;
+#ifdef SKEWNESS
+  skewness->c[2] = (int64_t)(SKEWNESS * H->h[0] * H->h[0] * H->h[1]);
+  //Theoretical bound.
+  /*skewness->c[2] = (int64_t)(8 * H->h[0] * H->h[0] * H->h[1]);*/
+#else //SKEWNESS
+  skewness->c[2] = (int64_t)(2 * H->h[0] * H->h[0] * H->h[1]);
+#endif //SKEWNESS
+#else // SKEWNESS_TRUE
   skewness->c[0] = 1;
-  skewness->c[1] = H->h[0] / H->h[1];
+  skewness->c[1] = (int64_t) (H->h[0] / H->h[1]);
 #ifdef SKEWNESS
   skewness->c[2] = (int64_t)(SKEWNESS * H->h[0] * H->h[0] * H->h[1]) / (int64_t)r->ideal->r;
   //Theoretical bound.
@@ -1136,6 +1149,7 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
 #else //SKEWNESS
   skewness->c[2] = (int64_t)(2 * H->h[0] * H->h[0] * H->h[1]) / (int64_t)r->ideal->r;
 #endif // SKEWNESS
+#endif // SKEWNESS_TRUE
 
   mat_int64_t MSLLL;
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
@@ -1149,6 +1163,38 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
       }
     }
   }
+
+#ifdef SPACE_SIEVE_STAT
+  int64_t * target = (int64_t *) malloc(sizeof(int64_t) * 2);
+  target[0] = (int64_t) (2 * H->h[0]);
+  target[1] = (int64_t) (2 * H->h[1]);
+  * skew_lll_fail = 0;
+  unsigned int out = 0;
+  unsigned int col = 1;
+  while (col <= MSLLL->NumCols) {
+    //Just verify the 2 first coefficients of a vector.
+    for (unsigned int row = 1; row < MSLLL->NumRows; row++) {
+      if (ABS(MSLLL->coeff[row][col]) > target[row - 1]) {
+        * skew_lll_fail =  1;
+        out++;
+        break;
+      }
+    }
+    col++;
+  }
+
+  fprintf(file_space_sieve_stat, "Mqr =\n");
+  mat_int64_fprintf(file_space_sieve_stat, Mqr);
+  fprintf(file_space_sieve_stat, "target = [%" PRId64 ", %" PRId64 ", ?]\n",
+      target[0], target[1]);
+  fprintf(file_space_sieve_stat, "MSLLL =\n");
+  mat_int64_fprintf(file_space_sieve_stat, MSLLL);
+  if (out > 1) {
+    fprintf(file_space_sieve_stat, "%u vectors out\n", out);
+  }
+
+  free(target);
+#endif // SPACE_SIEVE_STAT
   
   //TODO: we must generate all the zero vectors!
   unsigned int vector_1 = space_sieve_linear_combination(
@@ -1157,6 +1203,11 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
 
   list_int64_vector_index_sort_last(list_vec);
 
+#ifdef SPACE_SIEVE_STAT
+  fprintf(file_space_sieve_stat, "Generate %u vectors with z == 0 and %u \
+vectors with z != 0.\n", list_vec_zero->length, list_vec->length);
+#endif // SPACE_SIEVE_STAT
+
   return vector_1;
 }
 
@@ -1164,9 +1215,8 @@ int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
     list_int64_vector_ptr list_FK, list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, MAYBE_UNUSED ideal_1_srcptr r,
     sieving_bound_srcptr H, mat_int64_srcptr Mqr,
-    unsigned int vector_1, uint64_t number_element)
+    unsigned int vector_1, uint64_t number_element, unsigned int * new_vec)
 {
-
   int64_vector_t * vec = malloc(sizeof(int64_vector_t) * Mqr->NumRows);
   for (unsigned int i = 0; i < Mqr->NumCols; i++) {
     int64_vector_init(vec[i], Mqr->NumRows);
@@ -1249,6 +1299,7 @@ int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
       list_int64_vector_index_add_int64_vector_index(list_vec_zero,
           list_FK->v[0],
           index_vector(list_FK->v[0], H, number_element));
+      * new_vec = 0;
     }
   }
   if (space_sieve_good_vector(list_FK->v[1], H)) {
@@ -1256,6 +1307,7 @@ int space_sieve_1_plane_sieve_init(list_int64_vector_ptr list_SV,
       list_int64_vector_index_add_int64_vector_index(list_vec_zero,
           list_FK->v[1],
           index_vector(list_FK->v[1], H, number_element));
+      * new_vec = 0;
     }
   }
 
