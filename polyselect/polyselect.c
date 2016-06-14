@@ -251,6 +251,7 @@ output_polynomials (mpz_t *fold, const unsigned long d, mpz_t *gold,
       printf("%s",str_old);
   if (str != NULL)
     printf("%s",str);
+  fflush (stdout);
   mutex_unlock (&lock);
 
   if (str_old != NULL)
@@ -510,6 +511,11 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
+  /* if the coefficient of degree d-2 is negative, the size optimization
+     will not work well, thus we simply discard those polynomials */
+  if (mpz_sgn (f[d]) * mpz_sgn (f[d-2]) > 0)
+    goto end;
+
   /* save unoptimized polynomial to fold */
   for (unsigned long j = d + 1; j -- != 0; )
     mpz_set (fold[j], f[j]);
@@ -549,6 +555,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (ad, l, g[0]);
 
+ end:
   mpz_clear (l);
   mpz_clear (m);
   mpz_clear (t);
@@ -748,7 +755,7 @@ collision_on_p ( header_t header,
   mpz_t zero;
   int found = 0;
   shash_t H;
-  int st = 0;
+  int st = milliseconds ();
 
   /* init zero */
   mpz_init_set_ui (zero, 0);
@@ -774,10 +781,8 @@ collision_on_p ( header_t header,
           continue;
         }
 
-      st -= milliseconds ();
       nrp = roots_mod_uint64 (rp, mpz_fdiv_ui (header->Ntilde, p), header->d,
                               p);
-      st += milliseconds ();
       tot_roots += nrp;
       roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
       proots_add (R, nrp, rp, nprimes);
@@ -792,6 +797,7 @@ collision_on_p ( header_t header,
   found = shash_find_collision (H);
   shash_clear (H);
   free (rp);
+  st = milliseconds () - st;
 
   if (verbose > 2)
     fprintf (stderr, "# computing %lu p-roots took %dms\n", tot_roots, st);

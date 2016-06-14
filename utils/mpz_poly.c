@@ -2751,12 +2751,10 @@ static void mpz_poly_add_one_in_F2(mpz_poly_ptr f)
  *
  * Return the number of factors found.
  */
-static int mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
+static int mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f,
+    mpz_srcptr p)
 {
-  //set p to 2, because we work in F2.
-  mpz_t p;
-  mpz_init(p);
-  mpz_set_ui(p, 2);
+  ASSERT(mpz_cmp_ui(p, 2) == 0);
 
   //make a copy of f.
   mpz_poly fcopy;
@@ -2779,14 +2777,12 @@ static int mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
   if (fcopy->deg < 1) {
     mpz_clear(coeff);
     mpz_poly_clear(fcopy);
-    mpz_clear(p);
     ASSERT(list->size == 0);
     return list->size;
   } else if (fcopy->deg == 1) {
     mpz_clear(coeff);
     mpz_poly_factor_list_push(list, fcopy, 1);
     mpz_poly_clear(fcopy);
-    mpz_clear(p);
     ASSERT(list->size == 1);
     return list->size;
   }
@@ -2869,7 +2865,6 @@ static int mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f)
 
   mpz_clear(coeff);
   mpz_poly_clear(fcopy);
-  mpz_clear(p);
 
   return list->size;
 }
@@ -3014,7 +3009,7 @@ int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, m
     if (mpz_cmp_ui(p, 2) == 0) {
         /* we need some other code for edf. Currently we have very naive
          * code, but that's good enough for small degree. */
-        return mpz_poly_factor2(lf, f);
+        return mpz_poly_factor2(lf, f, p);
     }
 
     int v = mpz_poly_valuation(f);
