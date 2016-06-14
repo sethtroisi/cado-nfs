@@ -2177,7 +2177,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
     compute_Mqr_1(Mqr, Tqr, H->t, r);
 
-#if ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
+#ifdef ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
     enum_lattice(array, file_trace_pos, r, Mqr, H, f, matrix, &number_hit);
 #else // ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE
 
@@ -3121,8 +3121,11 @@ int main(int argc, char * argv[])
   }
   FILE * file_trace_pos;
 #ifdef TRACE_POS
-  file_trace_pos = fopen("TRACE_POS.txt", "w+");
+  char * path_tp = (char * ) malloc(sizeof(char) * 1024);
+  sprintf(path_tp, "TRACE_POS_%d.txt", TRACE_POS);
+  file_trace_pos = fopen(path_tp, "w+");
   fprintf(file_trace_pos, "TRACE_POS: %d\n", TRACE_POS);
+  free(path_tp);
 #else // TRACE_POS
   file_trace_pos = NULL;
 #endif // TRACE_POS
@@ -3131,19 +3134,19 @@ int main(int argc, char * argv[])
 #ifdef SPACE_SIEVE_STAT
 #ifdef SKEWNESS_TRUE
 #ifdef SKEWNESS
-  char * path = (char * ) malloc(sizeof(char) * 1024);
-  sprintf(path, "SPACE_SIEVE_STAT_%d_TRUE.txt", SKEWNESS);
-  file_space_sieve_stat = fopen(path, "w+");
-  free(path);
+  char * path_stat = (char * ) malloc(sizeof(char) * 1024);
+  sprintf(path_stat, "SPACE_SIEVE_STAT_%d_TRUE.txt", SKEWNESS);
+  file_space_sieve_stat = fopen(path_stat, "w+");
+  free(path_stat);
 #else // SKEWNESS
   file_space_sieve_stat = fopen("SPACE_SIEVE_STAT_2_TRUE.txt", "w+");
 #endif // SKEWNESS
 #else // SKEWNESS_TRUE
 #ifdef SKEWNESS
-  char * path = (char * ) malloc(sizeof(char) * 1024);
-  sprintf(path, "SPACE_SIEVE_STAT_%d.txt", SKEWNESS);
-  file_space_sieve_stat = fopen(path, "w+");
-  free(path);
+  char * path_stat = (char * ) malloc(sizeof(char) * 1024);
+  sprintf(path_stat, "SPACE_SIEVE_STAT_%d.txt", SKEWNESS);
+  file_space_sieve_stat = fopen(path_stat, "w+");
+  free(path_stat);
 #else // SKEWNESS
   file_space_sieve_stat = fopen("SPACE_SIEVE_STAT_2.txt", "w+");
 #endif // SKEWNESS

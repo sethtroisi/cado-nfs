@@ -59,3 +59,29 @@ qfilespq must be compose by "qside:q:h". For the p6bd50, qfilespq can be like
 "
 ./special-q_sieve -H 7,7,7 -fbb 1482911,1482911 -thresh 80,80 -poly p6bd50.poly
 -lpb 25,25 -fb factor_base -base 2,2 -gal 6 -qfilespq qfilespq
+
+---------
+nfs-hd/CMakeLists.txt
+Some features can be enabled by setting some things in the
+nfs-hd/CMakeLists.txt. In order to have these features enabled, you need to
+have lines as 
+  set_property(TARGET special-q_sieve PROPERTY COMPILE_DEFINITIONS
+  TIMES_SIEVES NOT_PRINT_RELATION SIEVE SKEWNESS=2 SPACE_SIEVE_STAT)
+
+An incomplete list is given below:
+  * TIME_SIEVES: print the spending time by sieves for a special-q.
+  * NUMBER_HIT: give the real and expected number of hit per ideal r.
+  * LINE_SIEVE_BOUND=[x]: do line sieve even if r >= [x] * 2 * H[0], [x] must
+    be >= 1.0 and is a double.
+  * PLANE_SIEVE_BOUND=[x]: do line sieve even if r >= [x] * 4 * H[0] * H[1],
+    [x] must be >= 1.0 and is a double.
+  * TRACE_POS=[x]: follow what happens in a specific cell of the array in which
+    we store the norm.
+  * PLANE_SIEVE_INSTEAD_OF_SPACE_SIEVE: do plane sieve instead of space sieve
+    when r >= 4 * H[0] * H[1].
+  * ENUM_LATTICE_INSTEAD_OF_SPACE_SIEVE: perform enumeration algorithm (like
+    KFP) instead of space sieve wher r >= 4 * H[0] * H[1].
+  * ASSERT_SIEVE: verify what happens when a hit is done. If MODE_SIEVE_LINE is
+    activated, disable ASSERT_SIEVE during line sieve (same for
+    MODE_SIEVE_PLANE and MODE_SIEVE_SPACE).
+  * SPACE_SIEVE_STAT: do some stat during space sieve.

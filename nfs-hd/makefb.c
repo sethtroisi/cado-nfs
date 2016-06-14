@@ -756,7 +756,7 @@ int main(int argc, char ** argv)
 
   initialise_parameters(argc, argv, f, &fbb, &fb, &t, &lpb, &file_r);
 
-#ifdef TIME_MAKEFB
+#ifndef TIME_MAKEFB
   double sec = seconds();
 #endif // TIME_MAKEFB
 
@@ -769,7 +769,7 @@ int main(int argc, char ** argv)
   export_factor_base(file, fb, f, fbb, lpb, t);
 
   fclose(file);
-#ifdef TIME_MAKEFB
+#ifndef TIME_MAKEFB
   printf("# Time to build makefb: %fs.\n", seconds() - sec);
 #endif // TIME_MAKEFB
 
