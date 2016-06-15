@@ -1,7 +1,5 @@
 
 add_executable(cachesize EXCLUDE_FROM_ALL cachesize.c cachesize_cpuid.c
     cachesize_guess.c timing.cpp memusage.c version_info.c)
-add_executable(randomprime EXCLUDE_FROM_ALL randomprime.cpp)
-target_link_libraries(randomprime utils)
 
 # vim: set ft=cmake:
