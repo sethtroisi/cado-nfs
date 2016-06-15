@@ -362,12 +362,20 @@ ropt_parse_param ( int argc,
 
 
 static void
-ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
+ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id,
+              ropt_time_t tott)
 {
-  double curr_MurphyE, st;
+  double curr_MurphyE, st, st1;
   mpz_t t;
   cado_poly ropt_poly;
+  ropt_time_t eacht;
+  omp_lock_t lockt;
+  omp_init_lock(&lockt);
   cado_poly_init (ropt_poly);
+  eacht->ropt_time = 0.0;
+  eacht->ropt_time_stage1 = 0.0;
+  eacht->ropt_time_tunning = 0.0;
+  eacht->ropt_time_stage2 = 0.0;
 
   if (nthreads > 1)
     pthread_mutex_lock (&lock);
@@ -393,9 +401,17 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   mpz_clear (t);
 
   st = seconds_thread ();
-  ropt_polyselect (ropt_poly, input_poly, ropt_param);
-  *ropt_time += seconds_thread () - st;
+  ropt_polyselect (ropt_poly, input_poly, ropt_param, eacht);
+  st1 = seconds_thread ();
 
+  /* update time */
+  omp_set_lock(&lockt);
+  tott->ropt_time += st1 - st;
+  tott->ropt_time_stage1 += eacht->ropt_time_stage1;
+  tott->ropt_time_tunning += eacht->ropt_time_tunning;
+  tott->ropt_time_stage2 += eacht->ropt_time_stage2;
+  omp_unset_lock(&lockt);
+  
   /* MurphyE */
   ropt_poly->skew = L2_skewness (ropt_poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
   curr_MurphyE = MurphyE (ropt_poly, bound_f, bound_g, area, MURPHY_K);
@@ -576,7 +592,11 @@ main_basic (int argc, char **argv)
   cado_poly *input_polys = NULL;
   unsigned int nb_input_polys = 0; /* number of input polynomials */
   unsigned int size_input_polys = 16; /* Size of input_polys tab. */
-  double rootsieve_time = 0.0;
+  ropt_time_t tott;
+  tott->ropt_time = 0.0;
+  tott->ropt_time_stage1 = 0.0;
+  tott->ropt_time_tunning = 0.0;
+  tott->ropt_time_stage2 = 0.0;
 
   cado_poly_init (best_poly);
   input_polys = (cado_poly *) malloc (size_input_polys * sizeof (cado_poly));
@@ -686,7 +706,7 @@ main_basic (int argc, char **argv)
 #pragma omp parallel for schedule(dynamic)
 #endif
   for (unsigned int i = 0; i < nb_input_polys; i++)
-    ropt_wrapper (input_polys[i], i, &rootsieve_time);
+    ropt_wrapper (input_polys[i], i, tott);
 
   /* print total time and rootsieve time.
      These two lines gets parsed by the script. */
@@ -696,8 +716,13 @@ main_basic (int argc, char **argv)
                               works or in mono-thread mode */
   if (nthreads == 1)
 #endif
-    printf ("# Stat: rootsieve took %.2fs\n", rootsieve_time);
-
+  {
+    printf ("# Stat: rootsieve took %.2fs\n", tott->ropt_time);
+    printf ("# Stat:  (stage 1 took %.2fs)\n", tott->ropt_time_stage1);
+    printf ("# Stat:  (tunning took %.2fs)\n", tott->ropt_time_tunning);
+    printf ("# Stat:  (stage 2 took %.2fs)\n", tott->ropt_time_stage2);
+  }
+  
   if (best_MurphyE == 0.0)
   {
     if (nb_input_polys > 0)

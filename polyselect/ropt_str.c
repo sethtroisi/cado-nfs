@@ -767,7 +767,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
   if (s1param->nbest_sl < 4)
     s1param->nbest_sl = 4;
   if (param->verbose >= 1)
-    printf ("# [Info] s1param->nbest_sl: %u\n", s1param->nbest_sl);
+    printf ("# Info: s1param->nbest_sl: %u\n", s1param->nbest_sl);
 
   /* Set 3: set "e_sl[]" */
   ropt_s1param_setup_e_sl (poly, s1param, bound, param);
@@ -1152,6 +1152,9 @@ ropt_info_init ( ropt_info_t info )
   info->best_MurphyE = 0.0;
   info->mode = 0;
   info->w = 0;
+  info->ropt_time_stage1 = 0.0;
+  info->ropt_time_tunning = 0.0;
+  info->ropt_time_stage2 = 0.0;
 }
 
 
