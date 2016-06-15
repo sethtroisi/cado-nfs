@@ -1662,9 +1662,12 @@ do_detranslate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k)
 }
 
 
-/* TODO: adapt for more than 2 polynomials and two algebraic polynomials */
-void
-cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix)
+/* If final <> 0, print the real value of E (root-optimized polynomial),
+   otherwise print the expected value of E. Return E or exp_E accordingly.
+   TODO: adapt for more than 2 polynomials and two algebraic polynomials */
+double
+cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix,
+                             int final)
 {
   unsigned int nrroots;
   double lognorm, alpha, alpha_proj, exp_E;
@@ -1675,23 +1678,26 @@ cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix)
   lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
   alpha = get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (poly->pols[ALG_SIDE], ALPHA_BOUND);
-  exp_E = lognorm
+  exp_E = (final) ? 0.0 : lognorm
     + expected_rotation_gain (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE]);
 
   cado_poly_fprintf (stdout, poly, prefix);
   cado_poly_fprintf_info (fp, lognorm, exp_E, alpha, alpha_proj, nrroots,
                           prefix);
+  return (final) ? lognorm + alpha : exp_E;
 }
 
 /* TODO: adapt for more than 2 polynomials and two algebraic polynomials */
-void
+double
 cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr poly,
                                          double MurphyE, double bound_f,
                                          double bound_g, double area,
                                          const char *prefix)
 {
-  cado_poly_fprintf_with_info (fp, poly, prefix);
+  double exp_E;
+  exp_E = cado_poly_fprintf_with_info (fp, poly, prefix, 1);
   cado_poly_fprintf_MurphyE (fp, MurphyE, bound_f, bound_g, area, prefix);
+  return exp_E;
 }
 
 static double

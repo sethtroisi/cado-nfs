@@ -280,6 +280,8 @@ cado_poly_fprintf (FILE *fp, cado_poly_srcptr poly, const char *prefix)
   fprintf (fp, "skew: %1.3f\n", poly->skew);
 }
 
+/* if exp_E = 0, print E = lognorm + alpha (root-optimized polynomial),
+   otherwise print exp_E */
 void
 cado_poly_fprintf_info (FILE *fp, double lognorm, double exp_E, double alpha,
                         double alpha_proj, unsigned int nrroots,
@@ -288,10 +290,11 @@ cado_poly_fprintf_info (FILE *fp, double lognorm, double exp_E, double alpha,
   if (prefix)
     fputs (prefix, fp);
   /* Always print "# " after the prefix and before the info line. */
-  fprintf (fp, "# lognorm %1.2f, exp_E %1.2f, alpha %1.2f (proj %1.2f),"
-           " %u real root%s\n",
-           lognorm, exp_E, alpha, alpha_proj, nrroots,
-           (nrroots <= 1) ? "" : "s");
+  fprintf (fp, "# lognorm %1.2f, %s %1.2f, alpha %1.2f (proj %1.2f),"
+             " %u real root%s\n",
+             lognorm, (exp_E == 0) ? "E" : "exp_E",
+             (exp_E == 0) ? lognorm + alpha : exp_E, alpha, alpha_proj,
+             nrroots, (nrroots <= 1) ? "" : "s");
 }
 
 void

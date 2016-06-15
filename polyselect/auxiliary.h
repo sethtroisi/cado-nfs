@@ -91,10 +91,10 @@ void rotate_auxg_z (mpz_t*, const mpz_t, const mpz_t, const mpz_t, unsigned int)
 void do_translate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k);
 
 
-void cado_poly_fprintf_with_info (FILE *, cado_poly_ptr, const char *);
-void cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr, double,
-                                              double, double, double,
-                                              const char *);
+double cado_poly_fprintf_with_info (FILE *, cado_poly_ptr, const char *, int);
+double cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr,
+                                                double, double, double, double,
+                                                const char *);
 double expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g);
 
 #ifdef __cplusplus
