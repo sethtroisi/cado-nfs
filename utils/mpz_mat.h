@@ -252,6 +252,33 @@ struct cxx_mpz_t{
     mpz_ptr operator->() { return x; }
     mpz_srcptr operator->() const { return x; }
 };
+struct cxx_mpq_t{
+    mpq_t x;
+    cxx_mpq_t() {mpq_init(x);}
+    ~cxx_mpq_t() {mpq_clear(x);}
+    cxx_mpq_t(cxx_mpq_t const & o) {
+        mpq_init(x);
+        mpq_set(x, o.x);
+    }
+    cxx_mpq_t & operator=(cxx_mpq_t const & o) {
+        mpq_set(x, o.x);
+        return *this;
+    }
+#if __cplusplus >= 201103L
+    cxx_mpq_t(cxx_mpq_t && o) {
+        mpq_init(x);
+        mpq_swap(x, o.x);
+    }
+    cxx_mpq_t& operator=(cxx_mpq_t && o) {
+        mpq_swap(x, o.x);
+        return *this;
+    }
+#endif
+    operator mpq_ptr() { return x; }
+    operator mpq_srcptr() const { return x; }
+    mpq_ptr operator->() { return x; }
+    mpq_srcptr operator->() const { return x; }
+};
 struct cxx_mpq_mat {
     mpq_mat x;
     cxx_mpq_mat() { mpq_mat_init(x, 0, 0); }

@@ -378,7 +378,9 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B,
 void read_data(unsigned int *deg, mpz_poly_ptr f, /*mpz_mat_ptr gen,*/
 	       FILE * problemfile)
 {
-    fscanf(problemfile, "%u", deg);
+    // This variable k is here just because I'm sick of seeing the warning "unused result"
+    int k = fscanf(problemfile, "%u", deg);
+    k++;
     
     mpz_poly_realloc(f, *deg + 1);
     mpz_t c;
@@ -1120,7 +1122,6 @@ void make_ideal(mpq_mat_ptr I, mpq_mat_srcptr G, mpz_poly_srcptr g, mpz_mat_srcp
         }
     }
     
-    
     hnf_magma_style(I,I);
     
     cxx_mpq_mat J;
@@ -1412,6 +1413,33 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
     printf("\n\n Filtering roots\n\n");
     for(unsigned int i = 0 ; i < rootsp.size() ; i++){
         gmp_printf("(%Zd : %Zd)\n", rootsp[i].first, rootsp[i].second);
+    }
+    
+    // Now going to compute the valuation of each ideal <p, a-b*alpha> on each ideals above p, where a/b belong to the set of roots
+    for(unsigned int i = 0 ; i < rootsp.size() ; i++){
+        cxx_mpz_t u = rootsp[i].first;
+        cxx_mpz_t v = rootsp[i].second;
+        
+        
+        // Computing the ideal ii, e.g. <p,(v*alpha-u)>*J
+        cxx_mpz_mat gens_ii;
+        cxx_mpq_mat ii;
+        mpz_mat_realloc(gens_ii,3,n);
+        mpz_set_ui(mpz_mat_entry(gens_ii,0,0),p);
+        mpz_set_ui(mpz_mat_entry(gens_ii,1,1),p);
+        mpz_set(mpz_mat_entry(gens_ii,2,0),u); mpz_mul_si(mpz_mat_entry(gens_ii,2,0),mpz_mat_entry(gens_ii,2,0),-1);
+        mpz_set(mpz_mat_entry(gens_ii,2,1),v);
+        make_ideal(ii, order, f, gens_ii);
+        
+        /*
+        cxx_mpz_mat ii_in, T;
+        cxx_mpz_t den;
+        cxx_mpq_t den_rat, den_inv;
+        mpq_mat_numden(ii_int, den, ii);
+        mpz_hnf_backend
+        */
+        //hnf_magma_style(ii, ii);
+        printf("ii is\n"); mpq_mat_fprint(stdout, ii); printf("\n");
     }
 
 }
