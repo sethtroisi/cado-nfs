@@ -12,6 +12,8 @@ add_library(polyselect_common ${CADO_SHARED} auxiliary.c rho.c murphyE.c area.c 
 add_executable (polyselect polyselect.c polyselect_str.c polyselect_arith.c ${ropt_sources})
 
 add_executable (polyselect_ropt ropt_main.c ${ropt_sources})
+set_target_properties(polyselect_ropt PROPERTIES
+  COMPILE_FLAGS ${OpenMP_C_FLAGS} LINK_FLAGS ${OpenMP_C_FLAGS})
 add_executable (polyselect_gfpn EXCLUDE_FROM_ALL polyselect_gfpn.c gfpkdlpolyselect.c ${ropt_sources})
 
 # the utils library already includes -lgmp and -lm
