@@ -47,7 +47,8 @@ double best_MurphyE = 0.0; /* Murphy's E (the larger the better) */
 ropt_param_t ropt_param; /* params for ropt algorithms */
 double total_exp_E = 0.0; /* cumulated expected E for input polynomials */
 double total_E = 0.0; /* cumulated E-value for input polynomials */
-
+double nb_read = 0.0; /* number of read polynomials so far */
+double nb_optimized = 0.0; /* number of optimized polynomials so far */
 
 /**
  * Usage
@@ -372,6 +373,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
     pthread_mutex_lock (&lock);
   printf ("\n### input polynomial %u ###\n", poly_id);
   total_exp_E += cado_poly_fprintf_with_info (stdout, input_poly, "# ", 0);
+  nb_read += 1.0;
   fflush (stdout);
   if (nthreads > 1)
     pthread_mutex_unlock (&lock);
@@ -400,16 +402,18 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   if (nthreads > 1)
     pthread_mutex_lock (&lock);
   if (curr_MurphyE > best_MurphyE)
-  {
-    best_MurphyE = curr_MurphyE;
-    cado_poly_set (best_poly, ropt_poly);
-  }
+    {
+      best_MurphyE = curr_MurphyE;
+      cado_poly_set (best_poly, ropt_poly);
+    }
   printf ("\n### root-optimized polynomial %u ###\n", poly_id);
   total_E += cado_poly_fprintf_with_info_and_MurphyE (stdout, ropt_poly,
                                                       curr_MurphyE,
                                                       bound_f, bound_g, area,
                                                       "# ");
-  printf ("### Best MurphyE so far is %.2e\n", best_MurphyE);
+  nb_optimized += 1.0;
+  printf ("### Best MurphyE so far is %.2e, av. exp_E %.2f, av. E %.2f\n",
+          best_MurphyE, total_exp_E / nb_read, total_E / nb_optimized);
   fflush (stdout);
   if (nthreads > 1)
     pthread_mutex_unlock (&lock);
