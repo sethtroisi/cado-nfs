@@ -134,7 +134,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         mkdir_with_parents(tmp, 1);
         if (chdir(tmp) < 0) {
             fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -162,7 +162,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         fprintf(stderr, "The combination of skip_online_checks and keep_rolling_checkpointsis a dangerous match.");
         if (!yes_i_insist) {
             printf("\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         fprintf(stderr, " Proceeding anyway\n");
     }
@@ -186,7 +186,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         } else {
             fprintf(stderr, "Parameter nullspace may only be %s|%s\n",
                     dirtext[0], dirtext[1]);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         free(tmp_l);
     } else {
@@ -202,7 +202,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
                 fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
             } else {
                 fprintf(stderr, "Aborting. Pass nullspace=RIGHT if this is really intended.\n");
-                exit(1);
+                exit(EXIT_FAILURE);
             }
         } else {
             fprintf(stderr, "p>2 seems appropriate for discrete logarithm. Yet, the nullspace parameter has been passed as nullspace=left. This looks odd.\n");
@@ -210,7 +210,7 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
                 fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
             } else {
                 fprintf(stderr, "Aborting. Pass nullspace=LEFT if this is really intended.\n");
-                exit(1);
+                exit(EXIT_FAILURE);
             }
         }
     }
@@ -268,6 +268,7 @@ static int bw_common_init_defaults(struct bw_params * bw)/*{{{*/
 
 int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
 {
+    char * mpiinit_diag = NULL;
     /* First do MPI_Init */
 #if defined(MPI_LIBRARY_MT_CAPABLE)
     int req = MPI_THREAD_MULTIPLE;
@@ -277,7 +278,7 @@ int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{
         fprintf(stderr, "Cannot init mpi with MPI_THREAD_MULTIPLE ;"
                 " got %d != req %d\n",
                 prov, req);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 #if 0   /* was: elif OMPI_VERSION_ATLEAST(1,8,2) */
     /* This is just a try, right. In practice, we do rely on the
@@ -291,7 +292,7 @@ int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{
         fprintf(stderr, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
                 " got %d != req %d\n",
                 prov, req);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 #endif  /* #if 0 */
 #else
@@ -299,10 +300,12 @@ int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{
     int prov;
     MPI_Init_thread(p_argc, p_argv, req, &prov);
     if (req != prov) {
-        fprintf(stderr, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
-                " got %d != req %d\n",
+        asprintf(&mpiinit_diag, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
+                " got %d != req %d\n"
+                "Proceeding anyway\n",
                 prov, req);
-        fprintf(stderr, "Proceeding anyway\n");
+    } else {
+        asprintf(&mpiinit_diag, "Successfully initialized MPI with MPI_THREAD_SERIALIZED\n");
     }
     // MPI_Init(p_argc, p_argv);
 #endif
@@ -318,6 +321,29 @@ int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{
 
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
+
+    if (bw->can_print) {
+        fputs(mpiinit_diag, stdout);
+        if (req != prov) {
+            fputs(mpiinit_diag, stderr);
+        }
+        int ver, subver;
+        char libname[MPI_MAX_LIBRARY_VERSION_STRING];
+        int len;
+        MPI_Get_version(&ver, &subver);
+        MPI_Get_library_version(libname, &len);
+        printf("MPI library is %s [MPI %d.%d]\n", libname, ver, subver);
+        if (ver != MPI_VERSION || subver != MPI_SUBVERSION) {
+            if (LEXGE2(ver,subver,MPI_VERSION,MPI_SUBVERSION)) {
+                fprintf(stderr, "****** Warning: this program was compiled with headers for an MPI implementation honouring version %d.%d, while the library implements version %d.%d. This is not a problem per se, but it very likely hints at the fact that the MPI implementation you're using to run the program differs from the one you used to compile it. It does cause problems fairly often. Be warned.\n", MPI_VERSION,MPI_SUBVERSION, ver,subver);
+            } else {
+                fprintf(stderr, "****** Warning: this program was compiled with headers for an MPI implementation honouring version %d.%d, while the library implements version %d.%d. This is a fatal error (and presumably you're actually not seeing this message because your code failed to link).\n", MPI_VERSION,MPI_SUBVERSION, ver,subver);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+    free(mpiinit_diag);
+
 
     return 0;
 }
