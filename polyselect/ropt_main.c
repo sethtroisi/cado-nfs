@@ -369,8 +369,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id,
   mpz_t t;
   cado_poly ropt_poly;
   ropt_time_t eacht;
-  omp_lock_t lockt;
-  omp_init_lock(&lockt);
+
   cado_poly_init (ropt_poly);
   eacht->ropt_time = 0.0;
   eacht->ropt_time_stage1 = 0.0;
@@ -404,19 +403,19 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id,
   ropt_polyselect (ropt_poly, input_poly, ropt_param, eacht);
   st1 = seconds_thread ();
 
+  /* MurphyE */
+  ropt_poly->skew = L2_skewness (ropt_poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+  curr_MurphyE = MurphyE (ropt_poly, bound_f, bound_g, area, MURPHY_K);
+
+  if (nthreads > 1)
+    pthread_mutex_lock (&lock);
+
   /* update time */
-  omp_set_lock(&lockt);
   tott->ropt_time += st1 - st;
   tott->ropt_time_stage1 += eacht->ropt_time_stage1;
   tott->ropt_time_tunning += eacht->ropt_time_tunning;
   tott->ropt_time_stage2 += eacht->ropt_time_stage2;
-  omp_unset_lock(&lockt);
   
-  /* MurphyE */
-  ropt_poly->skew = L2_skewness (ropt_poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
-  curr_MurphyE = MurphyE (ropt_poly, bound_f, bound_g, area, MURPHY_K);
-  if (nthreads > 1)
-    pthread_mutex_lock (&lock);
   if (curr_MurphyE > best_MurphyE)
     {
       best_MurphyE = curr_MurphyE;
@@ -431,6 +430,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id,
   printf ("### Best MurphyE so far is %.2e, av. exp_E %.2f, av. E %.2f\n",
           best_MurphyE, total_exp_E / nb_read, total_E / nb_optimized);
   fflush (stdout);
+
   if (nthreads > 1)
     pthread_mutex_unlock (&lock);
 
