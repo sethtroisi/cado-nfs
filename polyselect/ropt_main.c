@@ -675,7 +675,7 @@ main_basic (int argc, char **argv)
   omp_set_num_threads (nthreads);
 #pragma omp parallel
 #pragma omp master
-  printf ("Using OpenMP with %u thread(s)\n", omp_get_num_threads ());
+  printf ("# Info: Using OpenMP with %u thread(s)\n", omp_get_num_threads ());
 #pragma omp parallel for schedule(dynamic)
   for (unsigned int i = 0; i < nb_input_polys; i++)
     ropt_wrapper (input_polys[i], i, &rootsieve_time);
