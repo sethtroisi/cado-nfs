@@ -58,6 +58,8 @@
  */
 
 /* _this_ part can be configured */
+// #define RS_CHOICE RS_CHOICE_STOCK_RS
+// #define AG_CHOICE AG_CHOICE_STOCK_AG
 #define RS_CHOICE RS_CHOICE_MINE_PARALLEL
 #define AG_CHOICE (MPI_VERSION_ATLEAST(3,0) ? AG_CHOICE_STOCK_IAG : AG_CHOICE_STOCK_AG)
 
@@ -1094,7 +1096,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
             int * rc = malloc(wr->njobs * sizeof(int));
             for(unsigned int k = 0 ; k < wr->njobs ; k++)
                 rc[k] = (v->i1 - v->i0) / wr->njobs;
-            err = MPI_Reduce_scatter(dptr, dptr, rc,
+            int err = MPI_Reduce_scatter(dptr, dptr, rc,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
                     wr->pals);
@@ -1105,7 +1107,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
 #elif RS_CHOICE == RS_CHOICE_STOCK_RSBLOCK
         void * dptr = mmt_vec_sibling(v, 0)->v;
         SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
-            err = MPI_Reduce_scatter_block(dptr, dptr,
+            int err = MPI_Reduce_scatter_block(dptr, dptr,
                     (v->i1 - v->i0) / wr->njobs,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
@@ -1116,7 +1118,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
 #elif RS_CHOICE == RS_CHOICE_MINE_DROP_IN
         void * dptr = mmt_vec_sibling(v, 0)->v;
         SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
-            err = my_MPI_Reduce_scatter_block(MPI_IN_PLACE, dptr,
+            int err = my_MPI_Reduce_scatter_block(MPI_IN_PLACE, dptr,
                     (v->i1 - v->i0) / wr->njobs,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
@@ -1128,7 +1130,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
         void * dptr = mmt_vec_sibling(v, 0)->v;
         MPI_Request * req = shared_malloc(xr, xr->ncores * sizeof(MPI_Request));
         SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
-            err = MPI_Ireduce_scatter(dptr, dptr,
+            int err = MPI_Ireduce_scatter(dptr, dptr,
                     (v->i1 - v->i0) / wr->njobs,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
@@ -2778,14 +2780,12 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
 
     for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
         matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
-#if RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL
         for(int d = 0 ; d < 2 ; d++)  {
             permutation_data_free(Mloc->perm[d]);
             // both are expected to hold storage for:
             // (mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores))
             // elements, corresponding to the largest abase encountered.
         }
-#endif  /* RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL */
         serialize(mmt->pi->m);
         if (!mmt->pi->interleaved) {
             matmul_clear(Mloc->mm);
