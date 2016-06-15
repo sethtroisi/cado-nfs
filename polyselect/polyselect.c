@@ -171,10 +171,10 @@ print_poly_info ( char *buf,
     //gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
     gmp_sprintf (buf+strlen(buf), "%sc%u: %Zd\n", prefix, i, f[i]);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-  exp_E = ropt_bound_expected_E (f, d, g);
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
+  // exp_E = ropt_bound_expected_E (F, G);
   exp_E = logmu + expected_rotation_gain (F, G);
   if (raw == 1)
     //printf ("# raw exp_E");

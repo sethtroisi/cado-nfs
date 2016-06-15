@@ -448,13 +448,15 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
 
 
 double
-ropt_bound_expected_E ( mpz_t *f,
-                        unsigned int d,
-                        mpz_t *g )
+ropt_bound_expected_E (mpz_poly F, mpz_poly G)
 {
-  mpz_poly F;
+  mpz_t *f = F->coeff;
+  mpz_t *g = G->coeff;
+  unsigned int d = F->deg;
   ropt_bound_t bound;
   double exp_E;
+
+  ASSERT_ALWAYS(G->deg == 1);
   ropt_bound_init (bound);
   F->coeff = f;
   F->deg = d;
