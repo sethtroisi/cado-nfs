@@ -138,6 +138,7 @@ extern void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, un
 /* do not use this function if you want consistency when the splitting
  * changes ! */
 extern void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate);
+extern void mmt_vec_truncate(matmul_top_data_ptr mmt, mmt_vec_ptr v);
 extern void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int nx);
 
 extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int midx, int d, mmt_vec_ptr w, mmt_vec_ptr v);

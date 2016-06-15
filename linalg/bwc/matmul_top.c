@@ -2137,6 +2137,17 @@ void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate)
     v->consistency=1;
 }
 
+void mmt_vec_truncate(matmul_top_data_ptr mmt, mmt_vec_ptr v)
+{
+    ASSERT_ALWAYS(v != NULL);
+    if (mmt->n0[v->d] >= v->i0 && mmt->n0[v->d] < v->i1) {
+        v->abase->vec_set_zero(v->abase, 
+                v->abase->vec_subvec(v->abase, 
+                    v->v, mmt->n0[v->d] - v->i0),
+                v->i1 - mmt->n0[v->d]);
+    }
+}
+
 void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int nx)
 {
     int shared = !y->siblings;
@@ -2619,6 +2630,14 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, int midx, par
     return 1;
 }
 
+static unsigned int local_fraction(unsigned int padded, unsigned int normal, pi_comm_ptr wr)
+{
+    ASSERT_ALWAYS(padded % wr->totalsize == 0);
+    unsigned int i = wr->jrank * wr->ncores + wr->trank;
+    unsigned int quo = padded / wr->totalsize;
+    return MIN(normal - i * quo, quo);
+}
+
 
 
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_list_ptr pl, int optimized_direction)
@@ -2710,7 +2729,15 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Begin creation of fake matrix data in parallel\n");
             }
-            random_matrix_get_u32(mmt->pi, pl, m, Mloc->mm->dim[0], Mloc->mm->dim[1]);
+            /* Mloc->mm->dim[0,1] contains the dimensions of the padded
+             * matrix. This is absolutely fine in the normal case. But in
+             * the case of staged matrices, it's a bit different. We must
+             * make sure that we generate matrices which have zeroes in
+             * the padding area.
+             */
+            random_matrix_get_u32(mmt->pi, pl, m,
+                    local_fraction(Mloc->n[0], Mloc->n0[0], mmt->pi->wr[1]),
+                    local_fraction(Mloc->n[1], Mloc->n0[1], mmt->pi->wr[0]));
         } else {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Matrix dispatching starts\n");
