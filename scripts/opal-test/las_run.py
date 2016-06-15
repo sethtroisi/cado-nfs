@@ -53,8 +53,6 @@ def run(param_file, problem):
         "lpba": 22,
         "mfbr": 22,
         "mfba": 22,
-        "rlambda": 1.2,
-        "alambda": 1.2,
         "ncurves0": 6,
         "ncurves1": 6,
         "t": 2 # number of threads for las
@@ -72,8 +70,11 @@ def run(param_file, problem):
     update_existing(las_params, params)
     las_params["mfbr"] = max(las_params["mfbr"], las_params["lpbr"])
     las_params["mfba"] = max(las_params["mfba"], las_params["lpba"])
+
+    las_params["rlim"] = min(las_params["rlim"], 2 ** las_params["lpbr"])
+    las_params["alim"] = min(las_params["alim"], 2 ** las_params["lpba"])
     
-    to_print = ["I", "alim", "lpba", "mfba", "alambda", "rlim", "lpbr", "mfbr", "rlambda", "ncurves0", "ncurves1"]
+    to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     # Update parameters for makefb (which may depend on las parameters)
@@ -93,7 +94,8 @@ def run(param_file, problem):
     q0 = las_params["alim"]
     q_range = 1000
     q_inc = 0
-    rels_wanted = int(primepi(las_params["lpba"]) + primepi(las_params["lpbr"]))
+    # since we remove duplicates, 80% of the total ideals should be enough
+    rels_wanted = int(0.8 * primepi(las_params["lpba"]) + 0.8 * primepi(las_params["lpbr"]))
     # read the best time so far (if any)
     best_time = get_best_time ("las.best")
     if best_time >= 1e308:

@@ -1,5 +1,3 @@
-# experimental parameters
-
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
@@ -17,13 +15,14 @@ name = c210
 
 tasks.polyselect.degree = 6
 
-tasks.polyselect.P = 10000000
-tasks.polyselect.admax = 1e8
-tasks.polyselect.adrange = 1e6
+tasks.polyselect.P = 50000000
+tasks.polyselect.admax = 2e8
+tasks.polyselect.adrange = 1e4
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1296 # this is 6^4
 tasks.polyselect.nrkeep = 100
-tasks.wutimeout = 18000 # required for rootsieve in degree 6
+tasks.polyselect.ropteffort = 10
+tasks.wutimeout = 36000 # required for rootsieve in degree 6
 
 ###########################################################################
 # Sieve

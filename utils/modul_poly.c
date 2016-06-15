@@ -124,7 +124,7 @@ modul_poly_derivative(modul_poly_t f, const modul_poly_t g, modulusul_t p)
 
 /* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
 int
-modul_poly_set_mod (modul_poly_t fp, mpz_poly_t F, modulusul_t p)
+modul_poly_set_mod (modul_poly_t fp, mpz_poly F, modulusul_t p)
 {
   int d;
 
@@ -136,7 +136,7 @@ modul_poly_set_mod (modul_poly_t fp, mpz_poly_t F, modulusul_t p)
 
 /* fp <- f mod p. Return degree of fp (-1 if fp=0). */
 int
-modul_poly_set_mod_raw (modul_poly_t fp, mpz_poly_t F, modulusul_t p)
+modul_poly_set_mod_raw (modul_poly_t fp, mpz_poly F, modulusul_t p)
 {
   int i;
   mpz_t *f = F->coeff;
@@ -676,7 +676,7 @@ static int coeff_cmp(
    which has lower degree? Warning: if f has root -a, we might miss it.]
 */
 int
-modul_poly_roots(residueul_t *r, mpz_poly_t F, modulusul_t p)
+modul_poly_roots(residueul_t *r, mpz_poly F, modulusul_t p)
 {
   modul_poly_t fp, g, h;
   int df;
@@ -753,7 +753,7 @@ modul_poly_roots(residueul_t *r, mpz_poly_t F, modulusul_t p)
 }
 
 int
-modul_poly_roots_ulong (unsigned long *r, mpz_poly_t F, modulusul_t p)
+modul_poly_roots_ulong (unsigned long *r, mpz_poly F, modulusul_t p)
 {
     residueul_t * pr;
     int i, n;

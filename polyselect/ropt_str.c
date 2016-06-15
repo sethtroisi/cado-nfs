@@ -27,7 +27,7 @@ rotate_bounds_V_mpz ( mpz_t *f,
                       bool flagE )
 {
   mpz_t V;
-  mpz_poly_t F0, G0, F, G;
+  mpz_poly F0, G0, F, G;
   double lognorm, exp_E = DBL_MAX;
   mpz_poly_init (F0, d);
   mpz_poly_init (F, d);
@@ -99,7 +99,7 @@ rotate_bounds_U_lu ( mpz_t *f,
                      ropt_bound_t bound,
                      bool flagE )
 {
-  mpz_poly_t F0, G0, F, G;
+  mpz_poly F0, G0, F, G;
   double lognorm, exp_E = DBL_MAX;
   mpz_poly_init (F0, d);
   mpz_poly_init (F, d);
@@ -167,7 +167,7 @@ static inline void
 rotate_bounds_W_lu ( ropt_poly_t poly,
                      ropt_bound_t bound )
 {
-  mpz_poly_t F0, G0, F, G;
+  mpz_poly F0, G0, F, G;
 
   mpz_poly_init (F0, poly->d);
   mpz_poly_init (F, poly->d);
@@ -357,7 +357,7 @@ ropt_poly_setup ( ropt_poly_t poly )
     exit (1);
   }
 
-  mpz_poly_t F, G;
+  mpz_poly F, G;
   F->coeff = poly->f;
   F->deg = poly->d;
   G->coeff = poly->g;
@@ -427,7 +427,7 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
                              ropt_bound_t bound,
                              ropt_param_t param )
 {
-  mpz_poly_t F;
+  mpz_poly F;
   double skewness;
   F->coeff = poly->f;
   F->deg = poly->d;
@@ -448,13 +448,15 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
 
 
 double
-ropt_bound_expected_E ( mpz_t *f,
-                        unsigned int d,
-                        mpz_t *g )
+ropt_bound_expected_E (mpz_poly F, mpz_poly G)
 {
-  mpz_poly_t F;
+  mpz_t *f = F->coeff;
+  mpz_t *g = G->coeff;
+  unsigned int d = F->deg;
   ropt_bound_t bound;
   double exp_E;
+
+  ASSERT_ALWAYS(G->deg == 1);
   ropt_bound_init (bound);
   F->coeff = f;
   F->deg = d;
@@ -684,7 +686,7 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
   else
     sublattice = bound_by_u / 16;
 
-  mpz_poly_t F;
+  mpz_poly F;
   F->coeff = poly->f;
   F->deg = poly->d;
   double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);

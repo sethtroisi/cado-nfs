@@ -26,6 +26,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 #include "utils.h"
 #include "rho.h"
 #include "auxiliary.h"
@@ -35,25 +38,17 @@
 #include "area.h"
 #include "ropt.h"
 
-/* thread structure for ropt */
-typedef struct
-{
-  cado_poly_ptr poly;
-  unsigned int id;
-  unsigned int poly_id;
-  double ropt_time;
-} __ropt_thread_struct;
-typedef __ropt_thread_struct ropt_thread_t[1];
-typedef __ropt_thread_struct * ropt_thread_ptr;
-typedef const __ropt_thread_struct * ropt_thread_srcptr;
-pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
-                                                   lock for those variables */
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
+                                                     lock for output */
 unsigned int nthreads = 1;
 int tot_found = 0; /* total number of polynomials */
 cado_poly best_poly;
 double best_MurphyE = 0.0; /* Murphy's E (the larger the better) */
 ropt_param_t ropt_param; /* params for ropt algorithms */
-
+double total_exp_E = 0.0; /* cumulated expected E for input polynomials */
+double total_E = 0.0; /* cumulated E-value for input polynomials */
+double nb_read = 0.0; /* number of read polynomials so far */
+double nb_optimized = 0.0; /* number of optimized polynomials so far */
 
 /**
  * Usage
@@ -377,7 +372,8 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   if (nthreads > 1)
     pthread_mutex_lock (&lock);
   printf ("\n### input polynomial %u ###\n", poly_id);
-  cado_poly_fprintf_with_info (stdout, input_poly, "# ");
+  total_exp_E += cado_poly_fprintf_with_info (stdout, input_poly, "# ", 0);
+  nb_read += 1.0;
   fflush (stdout);
   if (nthreads > 1)
     pthread_mutex_unlock (&lock);
@@ -406,30 +402,24 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id, double *ropt_time)
   if (nthreads > 1)
     pthread_mutex_lock (&lock);
   if (curr_MurphyE > best_MurphyE)
-  {
-    best_MurphyE = curr_MurphyE;
-    cado_poly_set (best_poly, ropt_poly);
-  }
+    {
+      best_MurphyE = curr_MurphyE;
+      cado_poly_set (best_poly, ropt_poly);
+    }
   printf ("\n### root-optimized polynomial %u ###\n", poly_id);
-    cado_poly_fprintf_with_info_and_MurphyE (stdout, ropt_poly, curr_MurphyE,
-                                             bound_f, bound_g, area, "# ");
-  printf ("### Best MurphyE so far is %.2e\n", best_MurphyE);
+  total_E += cado_poly_fprintf_with_info_and_MurphyE (stdout, ropt_poly,
+                                                      curr_MurphyE,
+                                                      bound_f, bound_g, area,
+                                                      "# ");
+  nb_optimized += 1.0;
+  printf ("### Best MurphyE so far is %.2e, av. exp_E %.2f, av. E %.2f\n",
+          best_MurphyE, total_exp_E / nb_read, total_E / nb_optimized);
   fflush (stdout);
   if (nthreads > 1)
     pthread_mutex_unlock (&lock);
 
   cado_poly_clear (ropt_poly);
 }
-
-
-static void *
-thread_ropt (void *args)
-{
-  ropt_thread_ptr data = (ropt_thread_ptr) args;
-  ropt_wrapper (data->poly, data->poly_id, &(data->ropt_time));
-  return NULL;
-}
-
 
 /**
  * Interface main_adv(). This will call ropt_on_cadopoly().
@@ -688,54 +678,15 @@ main_basic (int argc, char **argv)
   printf ("# %u polynomials read.\n", nb_input_polys);
 
   /* Main loop: do root-optimization on input_polys. */
-  if (nthreads > 1) /* multi thread version */
-  {
-    /* Allocated memory for threads and threads_data */
-    pthread_t *threads = NULL;
-    ropt_thread_t *threads_data = NULL;
-    threads = (pthread_t *) malloc (nthreads * sizeof (pthread_t));
-    ASSERT_ALWAYS (threads != NULL);
-    threads_data = (ropt_thread_t *) malloc (nthreads * sizeof (ropt_thread_t));
-    ASSERT_ALWAYS (threads_data != NULL);
-    for (unsigned int i = 0; i < nthreads; i++)
-    {
-      threads_data[i]->ropt_time = 0.0;
-      threads_data[i]->id = i;
-    }
-
-    for (unsigned int i = 0; i < nb_input_polys; )
-    {
-      unsigned int j;
-      for (j = 0; j < nthreads && i < nb_input_polys; j++, i++)
-      {
-        threads_data[j]->poly = input_polys[i];
-        threads_data[j]->poly_id = i;
-        pthread_create (&threads[j], NULL, thread_ropt,
-                        (void *) (threads_data[j]));
-      }
-
-      /* we have created j threads, with j = nthreads usually, except at the
-         end of we might have j < nthreads */
-      while (j > 0)
-        pthread_join (threads[--j], NULL);
-    }
-
-    for (unsigned int i = 0; i < nthreads; i++)
-    {
-      rootsieve_time += threads_data[i]->ropt_time;
-      if (ropt_param->verbose > 0)
-        printf ("# Stat: rootsieve on thread %u took %.2fs\n", i,
-                threads_data[i]->ropt_time);
-    }
-
-    free (threads);
-    free (threads_data);
-  }
-  else /* mono thread version */
-  {
-    for (unsigned int i = 0; i < nb_input_polys; i++)
-      ropt_wrapper (input_polys[i], i, &rootsieve_time);
-  }
+#ifdef HAVE_OPENMP
+  omp_set_num_threads (nthreads);
+#pragma omp parallel
+#pragma omp master
+  printf ("# Info: Using OpenMP with %u thread(s)\n", omp_get_num_threads ());
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for (unsigned int i = 0; i < nb_input_polys; i++)
+    ropt_wrapper (input_polys[i], i, &rootsieve_time);
 
   /* print total time and rootsieve time.
      These two lines gets parsed by the script. */
@@ -768,6 +719,9 @@ main_basic (int argc, char **argv)
     printf ("# Best polynomial found:\n");
     cado_poly_fprintf_with_info_and_MurphyE (stdout, best_poly, best_MurphyE,
                                              bound_f, bound_g, area, NULL);
+    printf ("# Average exp_E: %.2f, average E: %.2f\n",
+            total_exp_E / (double) nb_input_polys,
+            total_E / (double) nb_input_polys);
   }
 
   ropt_param_free (ropt_param);

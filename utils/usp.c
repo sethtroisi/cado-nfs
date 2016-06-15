@@ -494,31 +494,28 @@ numberOfRealRoots (mpz_t *p, const int orig_n, double T, int verbose, root_struc
 /* refine the root interval r[0] for the polynomial p of degree n,
    and return a double-precision approximation of the corresponding root,
    with a maximal error <= precision.
-   CAREFUL1: precision is an absolute value, not a relative.
+   Warning: precision is an absolute value, not a relative.
    Use it only if you know what you do!
-   CAREFUL2: with precision == 0. + x86 32 bits + gcc mathematical default
-   -mfpmath=387, the computation of c = (a + b) * .5 is done on the
-   top of the i387 stack in 80 bits precision (extended precision).
-   The next comparison c == a is done in this case between a memory
-   double (64 bits) and this 80 bits value.
-   Solution: in x86 and not in x86-64, (a + b) * .5 is written in memory
-   and loads in c.
 */
-#define MAX_LOOPS (1024 + 1074) /* difference between the maximal and minimal
-                                   exponents of the double format */
 double
 rootRefine (root_struct *r, mpz_t *p, int n, double precision)
 {
   double a, b, c;
   double sa, sb, sc;
   double_poly_t q;
-  mpz_poly_t P;
-  unsigned int count = MAX_LOOPS + 1;
+  mpz_poly P;
+
+  /* Note: if precision = 0.0, rootRefine will stop when the bound a and b
+     are two adjacent floating-point numbers. */
 
   a = ldexp (mpz_get_d (r[0].a), -r[0].ka); /* a/2^ka */
   b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
-  if (a == b) /* might be the case for an exact root a/2^k */
-    return a;
+  c = (a + b) * .5;
+
+  ASSERT_ALWAYS (a <= b);
+
+  if (b - a <= precision) /* includes the case a = b */
+    return c;
 
   P->coeff = p;
   P->deg = n;
@@ -533,54 +530,44 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
       sa = double_poly_eval_safe (q, a);
       sb = double_poly_eval_safe (q, b);
     }
+  if (sa == 0.0)
+    {
+      c = a;
+      goto end_refine;
+    }
+  if (sb == 0.0)
+    {
+      c = b;
+      goto end_refine;
+    }
   ASSERT_ALWAYS(sa * sb < 0);
-  sc = 0.;
-  if (precision > 0.)
-    if (sa >= 0.)
-      while (--count) {
-	c = (a + b) * .5;
-	if (fabs(a - b) <= precision || c == a || c == b) break;
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) b = c; else a = c;
-      }
-    else
-      while (--count) {
-	c = (a + b) * .5;
-	if (fabs(a - b) <= precision || c == a || c == b) break;
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) a = c; else b = c;
-      }
-  else
-    if (sa >= 0.)
-      while (--count) {
+  while (b - a > precision) {
+    /* Warning: with precision == 0. + x86 32 bits + gcc mathematical default
+       -mfpmath=387, the computation of c = (a + b) * .5 is done on the
+       top of the i387 stack in 80 bits precision (extended precision).
+       The next comparison c == a is done in this case between a memory
+       double (64 bits) and this 80 bits value, and might fail forever,
+       unless we convert c to binary64. */
 #if defined(__i386)
-        { volatile double ms = (a + b) * 0.5; c = ms; }
+    { volatile double ms = (a + b) * 0.5; c = ms; }
 #else
-	c = (a + b) * .5;
+    c = (a + b) * .5;
 #endif
-	if (c == a || c == b) break;             
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) b = c; else a = c;
-      }
-    else
-      while (--count) {
-#if defined(__i386)
-        { volatile double ms = (a + b) * 0.5; c = ms; }
-#else
-	c = (a + b) * .5;
-#endif
-	if (c == a || c == b) break;
-	sc = double_poly_eval (q, c);
-	if (sc < 0.) a = c; else b = c;
-      }
-  if (UNLIKELY(!count)) {
-    printf ("Unable to refine root:\n");
-    mpz_poly_fprintf (stdout, P);
-    printf ("a=%.16e\n", ldexp (mpz_get_d (r[0].a), -r[0].ka));
-    printf ("b=%.16e\n", ldexp (mpz_get_d (r[0].b), -r[0].kb));
-    printf ("sa=%.16e sb=%.16e\n", sa, sb);
-    exit (EXIT_FAILURE);
+    if (c == a || c == b) break; /* avoids infinite loops if precision = 0
+                                    or precision < ulp(a) */
+
+    /* Note: in principle we should also use double_poly_eval_safe here,
+     because due to rounding errors double_poly_eval() might return a value
+     with the wrong sign, and thus we might search for a root in the wrong
+     half-interval. However this should happen rarely, thus for efficiency
+     reasons we keep double_poly_eval() here (rootRefine is critical in the
+     norm initialization in las and in the skewness computation for degree 6).
+     Another solution would be to translate the input polynomial at x=a before
+     the loop, which should reduce the cancellations when evaluating p(c). */
+    sc = double_poly_eval (q, c);
+    if (sa * sc < 0.) b = c; else a = c;
   }
+ end_refine:
   double_poly_clear (q);
   return c;
 }
@@ -620,10 +607,27 @@ main (int argc, char *argv[])
   printf ("input polynomial is ");
   printPol (p, n);
 #endif
-  if (argc >= 2)
-    T = atof (argv[1]);
-  nroots = numberOfRealRoots (p, n, T, verbose);
-  printf ("%d real root(s)\n", nroots);
+  if (argc >= 4){
+      /* ./a.out a ka b kb precision to test rootRefine */
+      int a = atoi(argv[1]), ka = atoi(argv[2]);
+      int b = atoi(argv[3]), kb = atoi(argv[4]);
+      double precision = atof(argv[5]);
+      root_struct r;
+      root_struct_init(&r);
+      mpz_init_set_ui(r.a, a);
+      r.ka = ka;
+      mpz_init_set_ui(r.b, b);
+      r.kb = kb;
+      printf("rf=%lf\n", rootRefine(&r, p, n, precision));
+      root_struct_clear(&r);
+  }
+  else{
+      if (argc >= 2){
+	  T = atof (argv[1]);
+	  nroots = numberOfRealRoots (p, n, T, verbose, NULL);
+	  printf ("%d real root(s)\n", nroots);
+      }
+  }
 
   for (i = 0; i <= n; i++)
     mpz_clear (p[i]);

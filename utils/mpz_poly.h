@@ -1,4 +1,3 @@
-
 #ifndef MPZ_POLY_H_
 #define MPZ_POLY_H_
 
@@ -21,7 +20,7 @@ typedef struct {
   mpz_t *coeff;
 } mpz_poly_struct_t;
 
-typedef mpz_poly_struct_t mpz_poly_t[1];
+typedef mpz_poly_struct_t mpz_poly[1];
 typedef mpz_poly_struct_t * mpz_poly_ptr;
 typedef const mpz_poly_struct_t * mpz_poly_srcptr;
 
@@ -35,7 +34,7 @@ typedef const mpz_poly_struct_t * mpz_poly_srcptr;
    The following type represents a polynomial modulo F(x):
    If P is such an element, it means: P = P.p / f_d^P.v */
 typedef struct {
-  mpz_poly_t p;
+  mpz_poly p;
   int v;
 } polymodF_struct_t;
 
@@ -73,6 +72,7 @@ void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 
 /* Print functions */
+int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f);
 void mpz_poly_fprintf(FILE *fp, mpz_poly_srcptr f);
 void mpz_poly_fprintf_coeffs (FILE *fp, mpz_poly_srcptr f, const char sep);
 void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f,
@@ -84,6 +84,7 @@ int mpz_poly_normalized_p (mpz_poly_srcptr f);
 int mpz_poly_is_nonmonic (mpz_poly_srcptr f);
 
 /* Polynomial arithmetic */
+void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_srcptr f);
 void mpz_poly_neg(mpz_poly_ptr f, mpz_poly_srcptr g);
 void mpz_poly_add(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h);
 void mpz_poly_sub(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h);
@@ -100,10 +101,13 @@ void mpz_poly_rotation_int64 (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, co
 void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
 int mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
                         mpz_srcptr invm);
+int mpz_poly_mod_f(mpz_poly_ptr R, mpz_poly_srcptr f);
 int mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
                             mpz_poly_srcptr f, mpz_srcptr m,
                             mpz_srcptr invm);
+void mpz_poly_mul_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
+                        mpz_poly_srcptr f);
 void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
                                          mpz_poly_srcptr F, mpz_srcptr m, mpz_srcptr invm);
 int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
@@ -130,6 +134,8 @@ void polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
                   mpz_poly_srcptr F);
 void mpz_poly_sqr_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                             mpz_srcptr m, mpz_srcptr invm);
+void mpz_poly_power_mod_f(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+                         unsigned int a);
 void mpz_poly_power_mod_f_mod_ui(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                              mpz_srcptr a, unsigned long p);
 void mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
@@ -143,9 +149,9 @@ void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f);
 void barrett_init (mpz_ptr invm, mpz_srcptr m);
 void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m,
                   mpz_srcptr invm);
-mpz_poly_t* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
-void mpz_poly_base_modp_clear (mpz_poly_t *P, int l);
-void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_srcptr pk);
+mpz_poly* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
+void mpz_poly_base_modp_clear (mpz_poly *P, int l);
+void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly *P, int k, mpz_srcptr pk);
 size_t mpz_poly_sizeinbase (mpz_poly_srcptr f, int base);
 size_t mpz_poly_totalsize (mpz_poly_srcptr f);
 void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
@@ -162,7 +168,7 @@ void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f);
 int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
 
 struct mpz_poly_with_m_s {
-    mpz_poly_t f;
+    mpz_poly f;
     int m;
 };
 typedef struct mpz_poly_with_m_s mpz_poly_with_m[1];
@@ -182,6 +188,7 @@ void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_clear(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_flush(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, int m);
+void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l);
 int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, mpz_srcptr p);
 int mpz_poly_factor_ddf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p);
 int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate);
@@ -214,6 +221,47 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* This is sort of a generic way to write a c++ equivalent to the C type.
+ * The first-class citizen in the cado-nfs code is (still) the C type, so
+ * we're definitely bound to have a few infelicities here:
+ *  - the type name can't be the same because of the size-1 array trick
+ *    in C.
+ *  - the C type is embedded as a member x for the same reason.
+ *  - most operations on the C type should go through the member x
+ *    (however, the conversions we have to _ptr and _srcptr can ease
+ *    things a bit).
+ */
+struct cxx_mpz_poly {
+    mpz_poly x;
+    cxx_mpz_poly() { mpz_poly_init(x, -1); }
+    ~cxx_mpz_poly() { mpz_poly_clear(x); }
+    cxx_mpz_poly(cxx_mpz_poly const & o) {
+        mpz_poly_init(x, -1);
+        mpz_poly_set(x, o.x);
+    }
+    cxx_mpz_poly & operator=(cxx_mpz_poly const & o) {
+        mpz_poly_set(x, o.x);
+        return *this;
+    }
+#if __cplusplus >= 201103L
+    cxx_mpz_poly(cxx_mpz_poly && o) {
+        mpz_poly_init(x, -1);
+        mpz_poly_swap(x, o.x);
+    }
+    cxx_mpz_poly& operator=(cxx_mpz_poly && o) {
+        mpz_poly_swap(x, o.x);
+        return *this;
+    }
+#endif
+    operator mpz_poly_ptr() { return x; }
+    operator mpz_poly_srcptr() const { return x; }
+    mpz_poly_ptr operator->() { return x; }
+    mpz_poly_srcptr operator->() const { return x; }
+};
+
 #endif
 
 #endif	/* MPZ_POLY_H_ */

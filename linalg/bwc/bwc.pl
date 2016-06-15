@@ -1639,7 +1639,7 @@ sub task_dispatch {
     }
 
     if ($status eq 'some') {
-        task_check_message 'error', "Missing ouput files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
+        task_check_message 'error', "Missing output files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
         die;
     }
 
@@ -1704,7 +1704,7 @@ sub task_prep {
     }
 
     if ($status eq 'some') {
-        task_check_message 'error', "Missing ouput files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
+        task_check_message 'error', "Missing output files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
         die;
     }
 

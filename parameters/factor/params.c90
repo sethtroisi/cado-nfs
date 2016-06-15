@@ -151,8 +151,8 @@ tasks.maxtimedout = 100
 # the parameter tree, all tasks can find them.
 
 # (r,a) means rational or algebraic side
-rlim = 270782
-alim = 320938
+rlim = 386090
+alim = 417250
 # The number of rational (resp. # algebraic) primes is roughly rlim/log(rlim)
 # (resp. alim/log(rlim))
 lpbr = 23
@@ -207,10 +207,8 @@ tasks.polyselect.nq = 256
 
 tasks.polyselect.sopteffort = 0
     # Indicates how much effort is spent in stage 1 (size optimization) of the
-    # polynomial selection. The default value is 0. For each i in the range
-    # [1..sopteffort], and for each translation k in the initial list, we also
-    # try k +/- k/10^i and k +/- k/(2*10^i). Thus the size optimization time
-    # grows roughly by a factor 1+4*sopteffort with respect to sopteffort=0.
+    # polynomial selection. The default value is 0. The size optimization time
+    # is roughly proportional to 1+sopteffort.
 
 tasks.polyselect.ropteffort = 5
     # Indicates how much effort is spent in stage 2 (rootsieve) of the
@@ -223,13 +221,13 @@ tasks.polyselect.ropteffort = 5
 # Sieve task
 ###########################################################################
 
-tasks.sieve.mfbr = 75
-tasks.sieve.mfba = 70
+tasks.sieve.mfbr = 46
+tasks.sieve.mfba = 46
     # mfbr/mfba is the (base 2 log of the) limit for the cofactor we try
     # to split into large primes.
 
-tasks.sieve.rlambda = 2.131250000000000
-tasks.sieve.alambda = 2.103125000000000
+# tasks.sieve.rlambda = 2.131250000000000
+# tasks.sieve.alambda = 2.103125000000000
     # rlambda/alambda is the early-abort ratio: if after sieving, and
     # subtracting from the log of the norm the contribution of the
     # sieved primes, the approximation of the log of the remaining
@@ -239,9 +237,13 @@ tasks.sieve.alambda = 2.103125000000000
     # rational side. It is customary, when at most k large primes are
     # allowed, to set rlambda to e.g. k + 0.1, in order to compensate for
     # inaccuracies due to sieving.
+    # In case rlambda or alambda are not given (or have value 0),
+    # a default value is computed from mfbr or mfba. Since the sieving
+    # parameters are optimized without rlambda/alambda, it is better to
+    # leave them unspecified.
 
-tasks.sieve.ncurves0 = 4
-tasks.sieve.ncurves1 = 2
+tasks.sieve.ncurves0 = 8
+tasks.sieve.ncurves1 = 8
     # ncurves0 controls the number of P-1/P+1/ECM curves used in the
     # cofactorization on side 0 (i.e., rational side), more precisely we
     # use 3+ncurves0 curves. If one increases ncurves0, one will find more

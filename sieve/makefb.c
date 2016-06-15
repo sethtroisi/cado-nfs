@@ -13,8 +13,8 @@
  */
 void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
     ASSERT (a != 0  &&  d >= 1);
-    // lazy: use the mpz_poly_t interface of utils/mpz_poly.h
-    mpz_poly_t aXpb, aXpbi, G, Aux;
+    // lazy: use the mpz_poly interface of utils/mpz_poly.h
+    mpz_poly aXpb, aXpbi, G, Aux;
     mpz_poly_init(aXpb, 1);  // alloc sets to zero
     mpz_poly_init(aXpbi, d);
     mpz_poly_init(G, d);
@@ -197,7 +197,7 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
     unsigned long *roots;
     mpz_t aux;
 
-    mpz_poly_t F;
+    mpz_poly F;
     F->coeff = f;
     F->deg = d;
 
@@ -371,7 +371,7 @@ one_thread (void* args)
   return NULL;
 }
 
-void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
+void makefb_with_powers(FILE* outfile, mpz_poly F, unsigned long alim,
                         int maxbits, int nb_threads)
 {
     mpz_t *f = F->coeff;

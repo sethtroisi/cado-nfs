@@ -11,7 +11,7 @@
 #define SOPT_MAX_VALUE_FOR_Q_ROOTS 1e10
 
 /* Number of best rational approximations to keep for each q-root */
-#define SOPT_NB_RAT_APPROX_OF_Q_ROOTS 8
+#define SOPT_NB_RAT_APPROX_OF_Q_ROOTS 16
 
 /* Maximum value for the denominator of rational approximations of q-roots */
 #define SOPT_MAX_DEN_IN_RAT_APPROX_OF_Q_ROOTS 100.0
@@ -34,7 +34,6 @@ double sopt_local_descent (mpz_poly_ptr, mpz_poly_ptr, mpz_poly_srcptr,
                            mpz_poly_srcptr, int, int, unsigned int, int);
 double size_optimization (mpz_poly_ptr, mpz_poly_ptr, mpz_poly_srcptr,
                           mpz_poly_srcptr, const unsigned int, const int);
-double expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g);
 
 #endif	/* POLYSELECT_SIZE_OPTIMIZATION_H_ */
 
