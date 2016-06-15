@@ -7,6 +7,7 @@
 #include "cado_mpi_config.h"
 #include "macros.h"
 #include "portability.h"
+#include "misc.h"
 
 typedef int MPI_Status;
 typedef int MPI_Datatype;
@@ -98,6 +99,7 @@ static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datat
     if (sendbuf) memcpy(recvbuf, sendbuf, count * fakempi_sizeof_type(datatype));
     return 0;
 }
+
 static inline int MPI_Reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                     MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)
 {
@@ -223,6 +225,33 @@ static inline int MPI_Error_string(int err, char * msg, int * len)
 {
     *len = snprintf(msg, MPI_MAX_ERROR_STRING, "%s", strerror(err));
     return *len >= 0 ? 0 : ENOMEM;
+}
+
+/* We advertise version 2.1, because there's an impossible
+ * chicken-and-egg problem with MPI_Reduce_local. We can't implement it
+ * without having access to the function doing the reduction. And the
+ * latter can be a custom one, accessed with... MPI_Reduce_local.
+ */
+#define MPI_VERSION 2
+#define MPI_SUBVERSION 1
+
+#if 0
+/* This function is 3.0 only. For the above reason, we don't expose it */
+#define MPI_MAX_LIBRARY_VERSION_STRING  32
+static inline int MPI_Get_library_version(char * ptr, int * len)
+{
+    size_t res = strlcpy(ptr, "fake mpi 0.0", MPI_MAX_LIBRARY_VERSION_STRING);
+    ASSERT_ALWAYS(res < MPI_MAX_LIBRARY_VERSION_STRING);
+    *len = strlen(ptr);
+    return 0;
+}
+#endif
+
+static inline int MPI_Get_version(int * ver, int * subver)
+{
+    *ver = MPI_VERSION;
+    *subver = MPI_SUBVERSION;
+    return 0;
 }
 
 /* See at the beginning of this file.

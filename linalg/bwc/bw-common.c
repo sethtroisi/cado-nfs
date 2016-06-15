@@ -328,11 +328,15 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
             fputs(mpiinit_diag, stderr);
         }
         int ver, subver;
-        char libname[MPI_MAX_LIBRARY_VERSION_STRING];
-        int len;
         MPI_Get_version(&ver, &subver);
+#if MPI_VERSION_ATLEAST(3,0)
+        int len;
+        char libname[MPI_MAX_LIBRARY_VERSION_STRING];
         MPI_Get_library_version(libname, &len);
-        printf("MPI library is %s [MPI %d.%d]\n", libname, ver, subver);
+        printf("MPI library is %s [MPI-%d.%d]\n", libname, ver, subver);
+#else
+        printf("MPI library follows [MPI-%d.%d]\n", ver, subver);
+#endif
         if (ver != MPI_VERSION || subver != MPI_SUBVERSION) {
             if (LEXGE2(ver,subver,MPI_VERSION,MPI_SUBVERSION)) {
                 fprintf(stderr, "****** Warning: this program was compiled with headers for an MPI implementation honouring version %d.%d, while the library implements version %d.%d. This is not a problem per se, but it very likely hints at the fact that the MPI implementation you're using to run the program differs from the one you used to compile it. It does cause problems fairly often. Be warned.\n", MPI_VERSION,MPI_SUBVERSION, ver,subver);
