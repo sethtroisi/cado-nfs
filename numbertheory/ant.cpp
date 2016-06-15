@@ -1240,6 +1240,7 @@ int valuation_of_ideal_at_prime_ideal(mpq_mat_srcptr G, mpz_poly_srcptr g, mpq_m
     
     mpz_set(denom, dJ);
     do{
+        //mpq_mat_fprint(stdout, MJ); printf("\n");
         //printf("v = %d\n", v);
         //gmp_printf("denom is %Zd\n", denom);
         cxx_mpq_mat aux, h_times_MJ_G;
@@ -1420,7 +1421,6 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
         cxx_mpz_t u = rootsp[i].first;
         cxx_mpz_t v = rootsp[i].second;
         
-        
         // Computing the ideal ii, e.g. <p,(v*alpha-u)>*J
         cxx_mpz_mat gens_ii;
         cxx_mpq_mat ii;
@@ -1430,16 +1430,32 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
         mpz_set(mpz_mat_entry(gens_ii,2,0),u); mpz_mul_si(mpz_mat_entry(gens_ii,2,0),mpz_mat_entry(gens_ii,2,0),-1);
         mpz_set(mpz_mat_entry(gens_ii,2,1),v);
         make_ideal(ii, order, f, gens_ii);
+
+        //printf("ii is\n"); mpq_mat_fprint(stdout, ii); printf("\n");
+        
+        
         
         /*
-        cxx_mpz_mat ii_in, T;
-        cxx_mpz_t den;
-        cxx_mpq_t den_rat, den_inv;
-        mpq_mat_numden(ii_int, den, ii);
-        mpz_hnf_backend
-        */
-        //hnf_magma_style(ii, ii);
-        printf("ii is\n"); mpq_mat_fprint(stdout, ii); printf("\n");
+         * 
+        // Computing the valuation of ii on each prime ideal above p
+        vector<int> vals;
+        for(unsigned int j = 0 ; j < ideals.size(); j++){
+            vals.push_back(valuation_of_ideal_at_prime_ideal(order, f, ii, ideals[j].first, ideals[j].second, p));
+            gmp_printf("valuation of (%Zd : %Zd) on ideal %d is : %d\n", u, v, j, vals.back());
+        }
+        printf("\n");
+        
+        // Detecting all indices for which vals[i] != 0
+        vector<int> indices;
+        for(unsigned int j = 0 ; j < vals.size(); j++){
+            if(vals[j] != 0){indices.push_back(j);}
+        }
+        
+        
+        if(indices.size() == 1){
+            continue;
+        }
+        * /
     }
 
 }
