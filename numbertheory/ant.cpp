@@ -1301,44 +1301,74 @@ int valuation_of_ideal_at_prime_ideal(mpq_mat_srcptr G, mpz_poly_srcptr g, mpq_m
     
 }
 
-// Computes Norm(a - b*alpha), where alpha is the root of f which define your number field
-void norm(mpz_ptr res, mpz_poly_ptr f, mpz_ptr a, mpz_ptr b)
+// Roots contains elements of P^1 (Z/pZ)
+// This function leaves each element only once (e.g. if roots contains 1/1 and 4/4, then 4/4 will be deleted from the vector)
+void filter_roots(vector<pair<cxx_mpz_t, cxx_mpz_t>>& roots, unsigned int p)
 {
-    mpz_t pow_a, pow_b, sum, current_term;
-    mpz_init(sum);
-    mpz_init(current_term);
-    mpz_init(pow_a);
-    mpz_init(pow_b);
-    mpz_set_ui(sum,0);
+    unsigned int i = 0;
+
+    // Filtering the root
+    while(i < roots.size()-1){
+        // We look for roots[j] equal to roots[i], for j > i
+        unsigned int j = i+1;
+        while (j < roots.size()){
+            cxx_mpz_t a = roots[j].first;
+            cxx_mpz_t b = roots[j].second;
             
-    for(int k = 0 ; k <= f->deg ; k++){
-        mpz_set_ui(pow_a,1);
-        mpz_set_ui(pow_b,1);
-        for(int l = 1 ; l <= k ; l++){
-            mpz_mul(pow_a,pow_a,a);
-            //gmp_printf("a ; %Zd^%d = %Zd\n", a, l, pow_a);
+            // At this point, we will multiply a and b with 2, then a and b with 3, etc...
+            // if we find one k such that a*k = roots[i].first and b*k = roots[i].second, then it's the same quotient
+            // Thus we can erase a/b
+            cxx_mpz_t a1, b1;
+            unsigned int k = 2;
+            bool eq = false;
+            while( (k < p) && (!eq) ){
+                a1 = a;
+                b1 = b;
+                
+                mpz_mul_ui(a1, a1, k);
+                mpz_mul_ui(b1, b1, k);
+                mpz_mod_ui(a1, a1, p);
+                mpz_mod_ui(b1, b1, p);
+                if( (mpz_cmp(a1,roots[i].first) == 0) && (mpz_cmp(b1,roots[i].second) == 0) ){
+                    eq = true;
+                }
+                k++;
+            }
+            
+            if(eq){
+                roots.erase(roots.begin()+j);
+            }
+            else{
+                j++;
+            }
         }
-        for(int l = 1 ; l <= f->deg-k ; l++){
-            mpz_mul(pow_b,pow_b,b);
-            //gmp_printf("b ; %Zd^%d = %Zd\n", b, l, pow_b);
-        }
-        mpz_poly_getcoeff(current_term,k,f);
-        mpz_mul(current_term,current_term,pow_a);
-        mpz_mul(current_term,current_term,pow_b);
-        mpz_add(sum,sum,current_term);
+        
+        i++;
     }
     
-    mpz_set(res,sum);
-            
-            
-    mpz_clear(current_term);
-    mpz_clear(sum);
-    mpz_clear(pow_a);
-    mpz_clear(pow_b);
-}
+    // Putting each root on the form (_/1)
+    for (i = 0 ; i < roots.size() ; i++){
+        if(mpz_cmp_ui(roots[i].second,1) != 0){
+            cxx_mpz_t a1, b1;
+            unsigned int k = 2;
+            bool eq = false;
+            while( (k < p) && (!eq) ){
+                a1 = roots[i].first;
+                b1 = roots[i].second;
 
-void filter_roots()
-{
+                mpz_mul_ui(a1, a1, k);
+                mpz_mul_ui(b1, b1, k);
+                mpz_mod_ui(a1, a1, p);
+                mpz_mod_ui(b1, b1, p);
+                if(mpz_cmp_ui(b1,1) == 0 ){
+                    eq = true;
+                }
+                k++;
+            }
+            mpz_set(roots[i].first,a1);
+            mpz_set(roots[i].second,b1);
+        }
+    }
 }
 
 void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vector<pair<cxx_mpq_mat, int>> ideals, unsigned int p)
@@ -1360,28 +1390,30 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
     vector<pair<cxx_mpz_t, cxx_mpz_t>> rootsp;
     for (unsigned int i = 0 ; i < p ; i++){
         for (unsigned int j = 1 ; j < p ; j++){
-            mpz_t res, a, b;
-            mpz_init(a);
-            mpz_init(b);
-            mpz_init(res);
+            cxx_mpz_t res, a, b;
             mpz_set_ui(a,i);
             mpz_set_ui(b,j);
             
-            norm(res,f,a,b);
-            //gmp_printf("Norm(%Zd - %Zd*alpha) = %Zd\n",a,b,res);
-            mpz_mod_ui(res,res,p);/*
+            mpz_poly_homogeneous_eval_siui(res,f,i,j);
+            mpz_mod_ui(res,res,p);
             if(mpz_congruent_ui_p(res,0,p)){
                 pair<cxx_mpz_t,cxx_mpz_t> new_elem;
                 new_elem = make_pair(a,b);
                 rootsp.push_back(new_elem);
-            }*/
-            //gmp_printf("Norm(%Zd - %Zd*alpha) mod %d = %Zd\n",a,b,p,res);
-            mpz_clear(a);
-            mpz_clear(b);
-            mpz_clear(res);
+            }
+
             
         }
     }
+    
+    // Since each roots is listed several times under different forms (ex : if 1/1 is root, 2/2 is too, etc...)
+    // we filter roots here to keep each root only once
+    filter_roots(rootsp, p); 
+    printf("\n\n Filtering roots\n\n");
+    for(unsigned int i = 0 ; i < rootsp.size() ; i++){
+        gmp_printf("(%Zd : %Zd)\n", rootsp[i].first, rootsp[i].second);
+    }
+
 }
 
 int main(int argc, char *argv[])
