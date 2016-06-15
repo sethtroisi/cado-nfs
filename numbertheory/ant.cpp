@@ -1337,6 +1337,10 @@ void norm(mpz_ptr res, mpz_poly_ptr f, mpz_ptr a, mpz_ptr b)
     mpz_clear(pow_b);
 }
 
+void filter_roots()
+{
+}
+
 void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vector<pair<cxx_mpq_mat, int>> ideals, unsigned int p)
 {
     ASSERT_ALWAYS(order->m == order->n);
@@ -1353,7 +1357,7 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
        
     
     // Now listing all roots of the homogenous polynomial build from f
-    //vector<pair<mpz_t, mpz_t>> rootsp;
+    vector<pair<cxx_mpz_t, cxx_mpz_t>> rootsp;
     for (unsigned int i = 0 ; i < p ; i++){
         for (unsigned int j = 1 ; j < p ; j++){
             mpz_t res, a, b;
@@ -1364,14 +1368,14 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
             mpz_set_ui(b,j);
             
             norm(res,f,a,b);
-            gmp_printf("Norm(%Zd - %Zd*alpha) = %Zd\n",a,b,res);
+            //gmp_printf("Norm(%Zd - %Zd*alpha) = %Zd\n",a,b,res);
             mpz_mod_ui(res,res,p);/*
             if(mpz_congruent_ui_p(res,0,p)){
-                pair<mpz_t,mpz_t> new_elem;
+                pair<cxx_mpz_t,cxx_mpz_t> new_elem;
                 new_elem = make_pair(a,b);
                 rootsp.push_back(new_elem);
             }*/
-            gmp_printf("Norm(%Zd - %Zd*alpha) mod %d = %Zd\n",a,b,p,res);
+            //gmp_printf("Norm(%Zd - %Zd*alpha) mod %d = %Zd\n",a,b,p,res);
             mpz_clear(a);
             mpz_clear(b);
             mpz_clear(res);

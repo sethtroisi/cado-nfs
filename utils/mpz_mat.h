@@ -229,6 +229,28 @@ struct cxx_mpz_t{
     mpz_t x;
     cxx_mpz_t() {mpz_init(x);}
     ~cxx_mpz_t() {mpz_clear(x);}
+    cxx_mpz_t(cxx_mpz_t const & o) {
+        mpz_init(x);
+        mpz_set(x, o.x);
+    }
+    cxx_mpz_t & operator=(cxx_mpz_t const & o) {
+        mpz_set(x, o.x);
+        return *this;
+    }
+#if __cplusplus >= 201103L
+    cxx_mpz_t(cxx_mpz_t && o) {
+        mpz_init(x);
+        mpz_swap(x, o.x);
+    }
+    cxx_mpz_t& operator=(cxx_mpz_t && o) {
+        mpz_swap(x, o.x);
+        return *this;
+    }
+#endif
+    operator mpz_ptr() { return x; }
+    operator mpz_srcptr() const { return x; }
+    mpz_ptr operator->() { return x; }
+    mpz_srcptr operator->() const { return x; }
 };
 struct cxx_mpq_mat {
     mpq_mat x;
