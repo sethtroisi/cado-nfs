@@ -266,7 +266,7 @@ static int bw_common_init_defaults(struct bw_params * bw)/*{{{*/
 }
 /*}}}*/
 
-int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
+int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
 {
     char * mpiinit_diag = NULL;
     /* First do MPI_Init */
@@ -348,7 +348,7 @@ int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{
     return 0;
 }
 /*}}}*/
-int bw_common_clear_new(struct bw_params * bw)/*{{{*/
+int bw_common_clear(struct bw_params * bw)/*{{{*/
 {
     int size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);

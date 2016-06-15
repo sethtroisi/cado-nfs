@@ -578,7 +578,7 @@ int main(int argc, char * argv[])
 {
     param_list pl;
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
     parallelizing_info_init();
 
@@ -605,7 +605,7 @@ int main(int argc, char * argv[])
 
     parallelizing_info_finish();
     param_list_clear(pl);
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
     return 0;
 }

@@ -2693,7 +2693,7 @@ int main(int argc, char *argv[])
 
     param_list pl;
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
 
     bw_common_decl_usage(pl);
@@ -3031,7 +3031,7 @@ int main(int argc, char *argv[])
     gmp_randclear(rstate);
 
     param_list_clear(pl);
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
     return rank0_exit_code;
 }

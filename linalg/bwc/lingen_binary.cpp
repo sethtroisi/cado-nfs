@@ -1459,7 +1459,7 @@ int main(int argc, char *argv[])
 
     double wct0 = wct_seconds();
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
 
     bw_common_decl_usage(pl);
@@ -1695,7 +1695,7 @@ int main(int argc, char *argv[])
     compute_final_F_from_PI(F, pi_left);
     bw_commit_f(F);
 
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
 #if 0/*{{{*/
     if (ec->degree>=0) {

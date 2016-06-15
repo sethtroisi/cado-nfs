@@ -505,7 +505,7 @@ int main(int argc, char * argv[])
 {
     param_list pl;
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
 
     param_list_usage_header(pl,
@@ -530,7 +530,7 @@ int main(int argc, char * argv[])
     check_prog(pl, argc, argv);
 
     param_list_clear(pl);
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
     return 0;
 }
