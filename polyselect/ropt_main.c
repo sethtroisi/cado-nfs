@@ -26,7 +26,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#ifdef HAVE_OPENMP
 #include <omp.h>
+#endif
 #include "utils.h"
 #include "rho.h"
 #include "auxiliary.h"
@@ -672,11 +674,13 @@ main_basic (int argc, char **argv)
   printf ("# %u polynomials read.\n", nb_input_polys);
 
   /* Main loop: do root-optimization on input_polys. */
+#ifdef HAVE_OPENMP
   omp_set_num_threads (nthreads);
 #pragma omp parallel
 #pragma omp master
   printf ("# Info: Using OpenMP with %u thread(s)\n", omp_get_num_threads ());
 #pragma omp parallel for schedule(dynamic)
+#endif
   for (unsigned int i = 0; i < nb_input_polys; i++)
     ropt_wrapper (input_polys[i], i, &rootsieve_time);
 
