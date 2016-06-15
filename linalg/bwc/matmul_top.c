@@ -602,6 +602,24 @@ int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
 /* }}} */
 /* }}} */
 
+void mmt_vec_reduce_mod_p(mmt_vec_ptr v)
+{
+    void * ptr = mmt_my_own_subvec(v);
+    void * tmp;
+    v->abase->vec_ur_init(v->abase, &tmp, 1);
+    for(size_t i = 0 ; i < mmt_my_own_size_in_items(v) ; i++) {
+        v->abase->elt_ur_set_elt(v->abase,
+                tmp,
+                v->abase->vec_coeff_ptr_const(v->abase, ptr, i));
+        v->abase->reduce(v->abase,
+                v->abase->vec_coeff_ptr(v->abase, ptr, i),
+                tmp);
+    }
+    v->abase->vec_ur_clear(v->abase, &tmp, 1);
+}
+
+
+
 //////////////////////////////////////////////////////////////////////////
 
 void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec * v, struct timing_data * tt)/*{{{*/

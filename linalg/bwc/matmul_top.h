@@ -160,6 +160,7 @@ extern int mmt_vec_load_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int ite
 extern int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk);
 extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
 extern int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
+extern void mmt_vec_reduce_mod_p(mmt_vec_ptr v);
 
 extern void mmt_vec_broadcast(mmt_vec_ptr v);
 extern void mmt_vec_reduce(mmt_vec_ptr w, mmt_vec_ptr v);

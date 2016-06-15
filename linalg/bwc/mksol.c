@@ -155,6 +155,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     if (!fake) {
         if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
         mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
+        mmt_vec_reduce_mod_p(ymy[0]);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
