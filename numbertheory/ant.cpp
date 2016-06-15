@@ -1455,7 +1455,7 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
         if(indices.size() == 1){
             continue;
         }
-        * /
+        */
     }
 
 }
