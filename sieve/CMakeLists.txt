@@ -50,4 +50,8 @@ add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
     las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
 target_link_libraries(dupsup utils_with_io facul las-norms)
 
+add_executable(fake_rels EXCLUDE_FROM_ALL fake_rels.cpp)
+target_link_libraries(fake_rels utils_with_io)
+
+
 install(TARGETS makefb las freerel RUNTIME DESTINATION ${LIBSUFFIX}/sieve) 
