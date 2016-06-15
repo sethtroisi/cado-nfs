@@ -45,6 +45,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 extern double bound_f, bound_g, area;
 
+#define MAX_DEGREE 10
+
+#define NORM_MARGIN 0.2
+
+typedef struct
+{
+  double kmin, kmax;
+  double jmin[MAX_DEGREE], jmax[MAX_DEGREE];
+} rotation_space;
+
 #define mpz_add_si(a,b,c)                       \
   if (c >= 0) mpz_add_ui (a, b, c);             \
   else mpz_sub_ui (a, b, -(c))
@@ -85,6 +95,7 @@ void cado_poly_fprintf_with_info (FILE *, cado_poly_ptr, const char *);
 void cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr, double,
                                               double, double, double,
                                               const char *);
+double expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g);
 
 #ifdef __cplusplus
 }

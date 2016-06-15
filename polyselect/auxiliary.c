@@ -1689,3 +1689,125 @@ cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr poly,
   cado_poly_fprintf_with_info (fp, poly, prefix);
   cado_poly_fprintf_MurphyE (fp, MurphyE, bound_f, bound_g, area, prefix);
 }
+
+static double
+expected_alpha (double S)
+{
+  double logS, t;
+
+  if (S <= 1.0)
+    return 0.0;
+
+  logS = log (S);
+  t = sqrt (2 * logS);
+  return -0.824 * (t - (log (logS) + 1.3766) / (2 * t));
+}
+
+/* compute largest interval kmin <= k <= kmax such that when we add k*x^i*g(x)
+   to f(x), the lognorm does not increase more than NORM_MARGIN */
+static void
+expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
+{
+  double s = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
+  double n = L2_lognorm (f, s), n2;
+  mpz_t fi, fip1, kmin, kmax, k;
+
+  mpz_init_set (fi, f->coeff[i]);
+  mpz_init_set (fip1, f->coeff[i+1]);
+  mpz_init (kmin);
+  mpz_init (kmax);
+  mpz_init (k);
+
+  /* negative side */
+  mpz_set_si (kmin, -1);
+  for (;;)
+    {
+      mpz_set (f->coeff[i], fi);
+      mpz_set (f->coeff[i+1], fip1);
+      rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], kmin, i);
+      n2 = L2_lognorm (f, s);
+      if (n2 > n + NORM_MARGIN)
+        break;
+      mpz_mul_2exp (kmin, kmin, 1);
+    }
+  /* now kmin < k < kmin/2 */
+  mpz_tdiv_q_2exp (kmax, kmin, 1);
+  while (1)
+    {
+      mpz_add (k, kmin, kmax);
+      mpz_div_2exp (k, k, 1);
+      if (mpz_cmp (k, kmin) == 0 || mpz_cmp (k, kmax) == 0)
+        break;
+      mpz_set (f->coeff[i], fi);
+      mpz_set (f->coeff[i+1], fip1);
+      rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], k, i);
+      n2 = L2_lognorm (f, s);
+      if (n2 > n + NORM_MARGIN)
+        mpz_set (kmin, k);
+      else
+        mpz_set (kmax, k);
+    }
+  r->jmin[i] = mpz_get_d (kmax);
+
+  /* positive side */
+  mpz_set_ui (kmax, 1);
+  for (;;)
+    {
+      mpz_set (f->coeff[i], fi);
+      mpz_set (f->coeff[i+1], fip1);
+      rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], kmax, i);
+      n2 = L2_lognorm (f, s);
+      if (n2 > n + NORM_MARGIN)
+        break;
+      mpz_mul_2exp (kmax, kmax, 1);
+    }
+  /* now kmax < k < kmax/2 */
+  mpz_tdiv_q_2exp (kmin, kmax, 1);
+  while (1)
+    {
+      mpz_add (k, kmin, kmax);
+      mpz_div_2exp (k, k, 1);
+      if (mpz_cmp (k, kmin) == 0 || mpz_cmp (k, kmax) == 0)
+        break;
+      mpz_set (f->coeff[i], fi);
+      mpz_set (f->coeff[i+1], fip1);
+      rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], k, i);
+      n2 = L2_lognorm (f, s);
+      if (n2 > n + NORM_MARGIN)
+        mpz_set (kmin, k);
+      else
+        mpz_set (kmax, k);
+    }
+  r->jmax[i] = mpz_get_d (kmin);
+
+  /* reset f[i] and f[i+1] */
+  mpz_set (f->coeff[i], fi);
+  mpz_set (f->coeff[i+1], fip1);
+
+  mpz_clear (fi);
+  mpz_clear (fip1);
+  mpz_clear (kmin);
+  mpz_clear (kmax);
+  mpz_clear (k);
+}
+
+/* for a given pair (f,g), tries to estimate the value of alpha one might
+   expect from rotation (including the projective alpha) */
+double
+expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g)
+{
+  double S = 1.0, s, incr = 0.0;
+  rotation_space r;
+  double proj_alpha = get_biased_alpha_projective (f, ALPHA_BOUND_SMALL);
+
+  for (int i = 0; 2 * i < f->deg; i++)
+    {
+      expected_growth (&r, f, g, i);
+      s = r.jmax[i] - r.jmin[i] + 1.0;
+      S *= s;
+      /* assume each non-zero rotation increases on average by NORM_MARGIN/2 */
+      if (s >= 2.0)
+        incr += NORM_MARGIN / 2.0;
+    }
+  return proj_alpha + expected_alpha (S) + incr;
+}
