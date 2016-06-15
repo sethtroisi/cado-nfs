@@ -606,6 +606,11 @@ int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
 
 void mmt_vec_reduce_mod_p(mmt_vec_ptr v)
 {
+    /* if it so happens that there's no reduce function defined, it may
+     * correspond to a case where we have nothing to do, like over GF(2)
+     * -- where unreduced elements are just the same, period */
+    if (!v->abase->reduce)
+        return;
     void * ptr = mmt_my_own_subvec(v);
     void * tmp;
     v->abase->vec_ur_init(v->abase, &tmp, 1);
