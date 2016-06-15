@@ -1667,16 +1667,20 @@ void
 cado_poly_fprintf_with_info (FILE *fp, cado_poly_ptr poly, const char *prefix)
 {
   unsigned int nrroots;
-  double lognorm, alpha, alpha_proj;
+  double lognorm, alpha, alpha_proj, exp_E;
+
   nrroots = numberOfRealRoots (poly->pols[ALG_SIDE]->coeff, poly->pols[ALG_SIDE]->deg, 0, 0, NULL);
   if (poly->skew <= 0.0) /* If skew is undefined, compute it. */
     poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
   lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
   alpha = get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (poly->pols[ALG_SIDE], ALPHA_BOUND);
+  exp_E = lognorm
+    + expected_rotation_gain (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE]);
 
   cado_poly_fprintf (stdout, poly, prefix);
-  cado_poly_fprintf_info (fp, lognorm, alpha, alpha_proj, nrroots, prefix);
+  cado_poly_fprintf_info (fp, lognorm, exp_E, alpha, alpha_proj, nrroots,
+                          prefix);
 }
 
 /* TODO: adapt for more than 2 polynomials and two algebraic polynomials */

@@ -281,16 +281,17 @@ cado_poly_fprintf (FILE *fp, cado_poly_srcptr poly, const char *prefix)
 }
 
 void
-cado_poly_fprintf_info (FILE *fp, double lognorm, double alpha,
+cado_poly_fprintf_info (FILE *fp, double lognorm, double exp_E, double alpha,
                         double alpha_proj, unsigned int nrroots,
                         const char *prefix)
 {
   if (prefix)
     fputs (prefix, fp);
   /* Always print "# " after the prefix and before the info line. */
-  fprintf (fp, "# lognorm %1.2f, alpha %1.2f (proj %1.2f), E %1.2f, "
-               "%u real root%s\n", lognorm, alpha, alpha_proj, lognorm + alpha,
-               nrroots, (nrroots <= 1) ? "" : "s");
+  fprintf (fp, "# lognorm %1.2f, exp_E %1.2f, alpha %1.2f (proj %1.2f),"
+           " %u real root%s\n",
+           lognorm, exp_E, alpha, alpha_proj, nrroots,
+           (nrroots <= 1) ? "" : "s");
 }
 
 void
