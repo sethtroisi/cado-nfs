@@ -225,6 +225,11 @@ struct cxx_mpz_mat {
     mpz_mat_ptr operator->() { return x; }
     mpz_mat_srcptr operator->() const { return x; }
 };
+struct cxx_mpz_t{
+    mpz_t x;
+    cxx_mpz_t() {mpz_init(x);}
+    ~cxx_mpz_t() {mpz_clear(x);}
+};
 struct cxx_mpq_mat {
     mpq_mat x;
     cxx_mpq_mat() { mpq_mat_init(x, 0, 0); }

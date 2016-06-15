@@ -375,7 +375,7 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B,
     mpq_mat_clear(B_inv);
 }
 
-void read_data(unsigned int *deg, mpz_poly_ptr f, /*mpq_mat_ptr J,*/ mpz_mat_ptr gen,
+void read_data(unsigned int *deg, mpz_poly_ptr f, /*mpz_mat_ptr gen,*/
 	       FILE * problemfile)
 {
     fscanf(problemfile, "%u", deg);
@@ -390,17 +390,8 @@ void read_data(unsigned int *deg, mpz_poly_ptr f, /*mpq_mat_ptr J,*/ mpz_mat_ptr
     mpz_clear(c);
 
     // Creating one ideal from two coefficients a and b, representing the generator a-b*alpha
-    mpz_mat_realloc(gen, 2, *deg);
+    //mpz_mat_realloc(gen, 2, *deg);
     /*
-    int a,b;
-    fscanf(problemfile, "%d", &a);
-    fscanf(problemfile, "%d", &b);
-    mpz_set_si(mpz_mat_entry(gen,0,0),a);
-    mpz_set_si(mpz_mat_entry(gen,0,1),b);
-    fscanf(problemfile, "%d", &a);
-    fscanf(problemfile, "%d", &b);
-    mpz_set_si(mpz_mat_entry(gen,1,0),a);
-    mpz_set_si(mpz_mat_entry(gen,1,1),b);*/
     for(unsigned int i = 0 ; i < gen->m ; i++){
         for(unsigned int j = 0 ; j < gen->n ; j++){
             int a;
@@ -408,7 +399,7 @@ void read_data(unsigned int *deg, mpz_poly_ptr f, /*mpq_mat_ptr J,*/ mpz_mat_ptr
             mpz_set_si(mpz_mat_entry(gen,i,j),a);
         }
     }
-    
+    */
     /*
     mpq_mat_realloc(J,*deg,*deg);
     for (unsigned int i = 0; i < *deg; i++) {
@@ -1110,14 +1101,13 @@ void make_ideal(mpq_mat_ptr I, mpq_mat_srcptr G, mpz_poly_srcptr g, mpz_mat_srcp
         mpz_poly_realloc(aux1,n);
         mpz_mat_row_to_poly(aux1,gen,i);
         for(unsigned int j = 0 ; j < n ; j++){
-                cxx_mpz_poly aux2, aux3;
+            cxx_mpz_poly aux2, aux3;
             mpz_t denom;
             mpz_init(denom);
             mpz_poly_realloc(aux3, n);
             mpz_poly_realloc(aux2, n);
             
             mpq_mat_row_to_poly(aux2, denom, G, j);
-            
             mpz_poly_mul_mod_f(aux3, aux1, aux2, g);
             
             cxx_mpq_mat aux_mat;
@@ -1130,9 +1120,8 @@ void make_ideal(mpq_mat_ptr I, mpq_mat_srcptr G, mpz_poly_srcptr g, mpz_mat_srcp
         }
     }
     
-    printf("I is :\n"); mpq_mat_fprint(stdout, I); printf("\n");
+    
     hnf_magma_style(I,I);
-    printf("I is :\n"); mpq_mat_fprint(stdout, I); printf("\n");
     
     cxx_mpq_mat J;
     mpq_mat_realloc(J,n,n);
@@ -1312,41 +1301,83 @@ int valuation_of_ideal_at_prime_ideal(mpq_mat_srcptr G, mpz_poly_srcptr g, mpq_m
     
 }
 
-// g is the polynomial generating the number field
-// G contains generators of order O in basis of alpha^
-// I is a prime ideal of O above p, on the basis of alpha^
-// e is its ramification index
-// gens is the matrix of generators of an ideal on the basis of alpha^
-// It works like this : gens is the set of generators (b_1,...b_k). Thus, it is the gcd of all principal ideal (b_1), ... (b_k)
-// Thus, we compute the valuation of each principal ideal with the previous function, and we keep the minimum
-int valuation_of_ideal_by_gens_at_prime_ideal(mpq_mat_srcptr G, mpz_poly_srcptr g, mpz_mat_srcptr gens, mpq_mat_srcptr I, const int e, const unsigned int p)
+// Computes Norm(a - b*alpha), where alpha is the root of f which define your number field
+void norm(mpz_ptr res, mpz_poly_ptr f, mpz_ptr a, mpz_ptr b)
 {
-    int res = 0;
-    ASSERT_ALWAYS(G->n == G->m);
-    int n = G->n;
+    mpz_t pow_a, pow_b, sum, current_term;
+    mpz_init(sum);
+    mpz_init(current_term);
+    mpz_init(pow_a);
+    mpz_init(pow_b);
+    mpz_set_ui(sum,0);
+            
+    for(int k = 0 ; k <= f->deg ; k++){
+        mpz_set_ui(pow_a,1);
+        mpz_set_ui(pow_b,1);
+        for(int l = 1 ; l <= k ; l++){
+            mpz_mul(pow_a,pow_a,a);
+            //gmp_printf("a ; %Zd^%d = %Zd\n", a, l, pow_a);
+        }
+        for(int l = 1 ; l <= f->deg-k ; l++){
+            mpz_mul(pow_b,pow_b,b);
+            //gmp_printf("b ; %Zd^%d = %Zd\n", b, l, pow_b);
+        }
+        mpz_poly_getcoeff(current_term,k,f);
+        mpz_mul(current_term,current_term,pow_a);
+        mpz_mul(current_term,current_term,pow_b);
+        mpz_add(sum,sum,current_term);
+    }
     
-    for (unsigned int i = 0 ; i < gens->m ; i++){
-        if(!mpz_mat_isnull_row(gens,i)){
-            cxx_mpz_mat gens_i;
-            mpz_mat_realloc(gens_i,1,gens->n);
-            for(unsigned int k = 0 ; k < gens->n ; k++){
-                mpz_set(mpz_mat_entry(gens_i,0,k),mpz_mat_entry_const(gens,i,k));
-            }
-        
-            cxx_mpq_mat J;
-            mpq_mat_realloc(J,n,n);
-            make_principal_ideal(J,G,g,gens_i);
+    mpz_set(res,sum);
+            
+            
+    mpz_clear(current_term);
+    mpz_clear(sum);
+    mpz_clear(pow_a);
+    mpz_clear(pow_b);
+}
 
-            if(i == 0){
-                res = valuation_of_ideal_at_prime_ideal(G,g,J,I,e,p);
-            }
-            else{
-                int new_res = valuation_of_ideal_at_prime_ideal(G,g,J,I,e,p);
-                if(new_res < res){ res = new_res; }
-            }
+void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vector<pair<cxx_mpq_mat, int>> ideals, unsigned int p)
+{
+    ASSERT_ALWAYS(order->m == order->n);
+    int n = order->m;
+    
+    // First building the ideal jj (J^-1 where J is <1, alpha>^-1)
+    cxx_mpz_mat jj_gen;
+    cxx_mpq_mat jj;
+    
+    mpz_mat_realloc(jj_gen,1,n);
+    mpz_set_ui(mpz_mat_entry(jj_gen,0,0),1);
+    mpz_set_ui(mpz_mat_entry(jj_gen,0,1),1);
+    make_ideal(jj,order,f,jj_gen);
+       
+    
+    // Now listing all roots of the homogenous polynomial build from f
+    //vector<pair<mpz_t, mpz_t>> rootsp;
+    for (unsigned int i = 0 ; i < p ; i++){
+        for (unsigned int j = 1 ; j < p ; j++){
+            mpz_t res, a, b;
+            mpz_init(a);
+            mpz_init(b);
+            mpz_init(res);
+            mpz_set_ui(a,i);
+            mpz_set_ui(b,j);
+            
+            norm(res,f,a,b);
+            gmp_printf("Norm(%Zd - %Zd*alpha) = %Zd\n",a,b,res);
+            mpz_mod_ui(res,res,p);/*
+            if(mpz_congruent_ui_p(res,0,p)){
+                pair<mpz_t,mpz_t> new_elem;
+                new_elem = make_pair(a,b);
+                rootsp.push_back(new_elem);
+            }*/
+            gmp_printf("Norm(%Zd - %Zd*alpha) mod %d = %Zd\n",a,b,p,res);
+            mpz_clear(a);
+            mpz_clear(b);
+            mpz_clear(res);
+            
         }
     }
-    return res;
 }
 
 int main(int argc, char *argv[])
@@ -1545,17 +1576,14 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    mpz_mat gen; // generator which will generate the ideal J
-    mpq_mat D, J;
+    mpq_mat D;
     mpz_poly f;
 
     printf("Format: [degree] [coeffs] [coeffs of order basis]\n");
 
     unsigned int n = 0;
     mpz_poly_init(f, n);
-    mpz_mat_init(gen,n,n);
-    mpq_mat_init(J,n,n);
-    read_data(&n, f, gen, problemfile);	
+    read_data(&n, f, /*gen,*/ problemfile);	
     fclose(problemfile);
     mpq_mat_init(D, n, n);
 
@@ -1588,33 +1616,14 @@ int main(int argc, char *argv[])
         mpq_mat_fprint(stdout, ideals[i].first);
         printf("with a multiplicity of %d\n\n",ideals[i].second);
     }
-    
-    
-    // Tests on the valuation of one ideal on another
-    
-    cxx_mpq_mat I;
-    mpq_mat_realloc(I,n,n);
-    I = ideals.back().first;
-    int mul_I = ideals.back().second;
-    
 
-    make_ideal(J,D,g,gen);
-    // Testing the valuation function
-    printf("valuation of ideal generated by :\n");
-    mpz_mat_fprint(stdout, gen); printf("\n");
-    printf("on ideal \n");
-    mpq_mat_fprint(stdout, I); printf("\n");
-    int val = valuation_of_ideal_at_prime_ideal(D,g,J,I,mul_I,p);
-    printf("is %d\n", val);
-    mpq_mat_clear(J);
-
+    print_comments_for_badideals_above_p(D,g,ideals,p);
     
     gmp_randclear(state);
     
     mpz_poly_clear(g);
     mpz_poly_clear(f);
     mpq_mat_clear(D);
-    mpz_mat_clear(gen);
 
 
 
