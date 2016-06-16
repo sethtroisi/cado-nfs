@@ -671,6 +671,12 @@ main_basic (int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+  /* Remove initial empty lines */
+  int c;
+  while ((c = fgetc (polys_file)) == '\n');
+  if (c != EOF)
+    ungetc (c, polys_file);
+
   /* Read all polynomials from file. Store then in input_polys. */
   while (cado_poly_read_next_poly_from_stream (input_polys[nb_input_polys],
                                                polys_file))
