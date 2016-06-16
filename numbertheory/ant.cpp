@@ -1,5 +1,10 @@
+#include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <stdio.h>
+#include <cstdlib>
 #include <string.h>
+#include <string>
 #include <errno.h>
 #include <gmp.h>
 #include <stdint.h>
@@ -1401,7 +1406,7 @@ void filter_roots(vector<pair<cxx_mpz_t, cxx_mpz_t>>& roots, unsigned int p)
     }
 }
 
-void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vector<pair<cxx_mpq_mat, int>> ideals, unsigned int p)
+void print_comments_for_badideals_above_p(string& SBAD, string& SBADINFO, unsigned int side, mpq_mat_ptr order, mpz_poly_ptr f, vector<pair<cxx_mpq_mat, int>> ideals, unsigned int p)
 {
     ASSERT_ALWAYS(order->m == order->n);
     int n = order->m;
@@ -1491,10 +1496,28 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
             if(vals[j] != 0){indices.push_back(j);}
         }
         
-        
+        // If only one ideal holds the valuation, there's nothing to do
         if(indices.size() == 1){
             continue;
         }
+        
+        // Normalisation of the root
+        int a;
+        pair<cxx_mpz_t, cxx_mpz_t> Q;
+        Q = rootsp[i];
+        if(mpz_cmp_ui(Q.second, 0) != 0){
+            a = mpz_get_ui(Q.first);
+        }
+        else{
+            a = p;
+        }
+        
+        std::stringstream stream;
+        stream << std::hex << p << "," << a;
+        std::string result( stream.str() );
+
+        SBAD += (result+":"+to_string(side)+", "+to_string(indices.size()));
+        cout << SBAD << endl;
         
     }
 
@@ -1737,7 +1760,9 @@ int main(int argc, char *argv[])
         printf("with a multiplicity of %d\n\n",ideals[i].second);
     }
 
-    print_comments_for_badideals_above_p(D,g,ideals,p);
+    string SBAD = "";
+    string SBADINFO = "";
+    print_comments_for_badideals_above_p(SBAD, SBADINFO, 0, D,g,ideals,p);
     
     gmp_randclear(state);
     
