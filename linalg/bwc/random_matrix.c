@@ -573,20 +573,24 @@ void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_m
     f->nrows = (R->nrows - kernel_right) / (pi ? pi->wr[1]->totalsize : 1);
     f->ncols = (R->ncols - kernel_left) / (pi ? pi->wr[0]->totalsize : 1);
 
-#define ADJUST(items, comm) do {					\
-    unsigned int rk = comm->jrank * comm->ncores + comm->trank;		\
-    if (rk * padded_n ## items >= R->n ## items) {			\
-        f->n ## items = 0;						\
-    } else if ((rk+1) * padded_n ## items >= R->n ## items) {		\
-        f->n ## items = R->n ## items - rk * padded_n ## items;		\
+#define ADJUST(pi, items, comm, ker) do {				\
+    if (pi) {								\
+        unsigned int rk = comm->jrank * comm->ncores + comm->trank;	\
+        if (rk * padded_n ## items >= R->n ## items - ker) {		\
+            f->n ## items = 0;						\
+        } else if ((rk+1) * padded_n ## items >= R->n ## items - ker) {	\
+            f->n ## items = R->n ## items - ker - rk * padded_n ## items; \
+        } else {							\
+            f->n ## items = padded_n ## items;				\
+        }								\
+        f->pad ## items = padded_n ## items - f->n ## items;		\
     } else {								\
-        f->n ## items = padded_n ## items;	                        \
-    }                                                                   \
-    f->pad ## items = padded_n ## items - f->n ## items;		\
+        f->n ## items =  R->n ## items - ker;				\
+    }									\
 } while (0)
 
-    if (pi) ADJUST(rows, pi->wr[1]); else f->nrows = R->nrows;
-    if (pi) ADJUST(cols, pi->wr[1]); else f->ncols = R->ncols;
+    ADJUST(pi, rows, pi->wr[1], kernel_right);
+    ADJUST(pi, cols, pi->wr[0], kernel_left);
 
     // experimental: don't scale. Somehow it seems that I'm doing this scaling
     // twice. I shouldn't. Alas, I see no obvious place where this seems to
