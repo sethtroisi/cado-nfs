@@ -3,11 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// we're doing open close mmap truncate...
-#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
-/* See https://github.com/open-mpi/ompi/issues/299 */
-#include <sys/mman.h>
-#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

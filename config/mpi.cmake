@@ -121,8 +121,25 @@ else()
                     message(STATUS "MPI C Compiler is Open MPI, version ${CMAKE_MATCH_1}")
                     set(MPI_COMPILER_IS_OPEN_MPI 1)
                     set(MPI_OPEN_MPI_COMPILER_VERSION ${CMAKE_MATCH_1})
-                    set(MPI_C_COMPILER_CMDLINE_INSERTIONS "--openmpi:linkall")
-                    set(MPI_CXX_COMPILER_CMDLINE_INSERTIONS "--openmpi:linkall")
+                    if(MPI_OPEN_MPI_COMPILER_VERSION VERSION_GREATER 1.6.5
+                            AND
+                            MPI_OPEN_MPI_COMPILER_VERSION VERSION_LESS 2.0.0)
+                        message(STATUS "Enabling workaround for long-standing OpenMPI breakage (ompi/pull/1495)")
+                        # tl;dr leave_pinned is just plain broken
+                        # throughout most of the 1.7, 1.8. 1.9, and 1.10
+                        # series of OpenMPI. The work to fix this is at
+                        # https://github.com/open-mpi/ompi/pull/1495 ;
+                        # see the attached commit logs (namely, commits
+                        # 57035744 and 4b7cd1c0 in ompi-release carry the
+                        # fix. Those are open-mpi/ompi@7aa03d66 and
+                        # open-mpi/ompi@11e2d788 in the ompi repository).
+                        set(MPIEXEC_EXTRA_STANZAS "--mca mpi_leave_pinned 0")
+                        # This is solely to fix
+                        # https://github.com/open-mpi/ompi/issues/299 but
+                        # the problem is broader than that.
+                        # set(MPI_C_COMPILER_CMDLINE_INSERTIONS "--openmpi:linkall")
+                        # set(MPI_CXX_COMPILER_CMDLINE_INSERTIONS "--openmpi:linkall")
+                    endif()
                 else()
                     message(STATUS "MPI C Compiler front-end not recognized, proceeding anyway")
                 endif()
