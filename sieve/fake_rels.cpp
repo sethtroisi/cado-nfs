@@ -58,7 +58,7 @@ void prepare_indexrange(indexrange *Ind, renumber_t ren_tab,
     Ind[1].finalize();
 }
 
-#define MAXFACTORS 30  // on each side. Should be enough?
+#define MAXFACTORS 50  // on each side. Should be enough?
 
 struct fake_rel {
     index_t ind[2][MAXFACTORS];
@@ -77,15 +77,15 @@ void read_rel(fake_rel& rel, uint64_t q, int sqside, const char *str,
     {
         char *endpstr = NULL;
         a = strtoll(pstr, &endpstr, 10);
-        assert (endpstr != pstr);
+        ASSERT_ALWAYS (endpstr != pstr);
         pstr = endpstr;
-        assert (pstr[0]==',');
+        ASSERT_ALWAYS (pstr[0]==',');
         pstr++;
         b = strtoull(pstr, &endpstr, 10);
-        assert (endpstr != pstr);
+        ASSERT_ALWAYS (endpstr != pstr);
         pstr = endpstr;
         // skip ':'
-        assert (pstr[0]==':');
+        ASSERT_ALWAYS (pstr[0]==':');
         pstr++;
     }
     while (pstr[0] != '\0' && pstr[0] != '\n') {
@@ -101,7 +101,7 @@ void read_rel(fake_rel& rel, uint64_t q, int sqside, const char *str,
         }
         char *endpstr = NULL;
         uint64_t p = strtoull(pstr, &endpstr, 16);
-        assert (endpstr != pstr);
+        ASSERT_ALWAYS (endpstr != pstr);
         if (side != sqside || q != p) {
             p_r_values_t r = relation_compute_r(a, b, p);
             index_t index;
@@ -114,7 +114,7 @@ void read_rel(fake_rel& rel, uint64_t q, int sqside, const char *str,
             }
             rel.ind[side][rel.nb_ind[side]] = index;
             rel.nb_ind[side]++;
-            assert (rel.nb_ind[side] <= MAXFACTORS);
+            ASSERT_ALWAYS (rel.nb_ind[side] <= MAXFACTORS);
         }
         pstr = endpstr;
     }
@@ -125,7 +125,7 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
 {
     FILE * file;
     file = fopen(filename, "r");
-    assert (file != NULL);
+    ASSERT_ALWAYS (file != NULL);
     uint64_t q = 0;
     unsigned int nr = 0;
 
@@ -142,7 +142,7 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
             ptr = strstr(line, "# Sieving side-");
             if (ptr != NULL) {
                 // starting a new special-q
-                assert (sqside == (ptr[15] - '0'));
+                ASSERT_ALWAYS (sqside == (ptr[15] - '0'));
                 ptr += 19; // skip "# Sieving side-0 q="
                 q = strtoull(ptr, NULL, 10);
                 nrels.push_back(nr);
@@ -192,7 +192,7 @@ void advance_prime_in_fb(int *mult, uint64_t *q, uint64_t *roots,
     unsigned long newp;
     do {
         newp = getprime_mt (pdata);
-        assert (newp > *q);
+        ASSERT_ALWAYS (newp > *q);
         nr = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], newp);
     } while (nr == 0);
 
