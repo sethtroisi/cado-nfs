@@ -339,6 +339,13 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B,
 
             // Computing gamma*c mod g
             mpz_poly_mul_mod_f(aux, gamma, c, g);
+            
+            /*
+            if((i == 1) && (j == n-1)){
+                printf("row_q is : "); mpq_mat_fprint(stdout,row_q); printf("\n");
+            }
+            */
+            
             // Storing the result in row_q
             for (int k = 0; k <= aux->deg; k++) {
                 mpz_poly_getcoeff(coeff, k, aux);
@@ -347,6 +354,12 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B,
                 mpq_set_den(mpq_mat_entry(row_q, 0, k), coeff);
                 mpq_canonicalize(mpq_mat_entry(row_q, 0, k));
             }
+            // Since we re-use row_q from before, we have to delete all previous coefficients
+            for (int k = aux->deg+1 ; k < (int) n ; k++){
+                mpz_set_ui(mpq_numref(mpq_mat_entry(row_q, 0, k)), 0);
+                mpz_set_ui(mpq_denref(mpq_mat_entry(row_q, 0, k)), 1);
+            }
+            
 
             // Converting row_q (gamma*c mod g) in the basis of I_p (it is supposed to contain only integers)
             mpq_mat_multiply(res, row_q, B_inv);
@@ -354,6 +367,17 @@ void generators_to_integers_mod_p(mpz_mat_ptr M, mpq_mat_srcptr B,
 
             // Extracting the numerators (remember, integers only) into a mpz_mat
             mpq_mat_numden(row, coeff, res);
+            
+            /*
+            if((i == 1) && (j == n-1)){
+                printf("gamma is : "); mpz_poly_fprintf(stdout,gamma);
+                printf("c is : "); mpz_poly_fprintf(stdout,c);
+                printf("aux is : "); mpz_poly_fprintf(stdout,aux);
+                printf("row_q is : "); mpq_mat_fprint(stdout,row_q); printf("\n");
+                printf("row is : "); mpz_mat_fprint(stdout,row); printf("\n");
+            }
+            */
+            
             // Computing the same matrix, modulo p (it is supposed to be a vector of n integers, associated to gamma)
             mpz_mat_mod_ui(row, row, p);
             mpz_mat_submat_swap(row, 0, 0, M, i, n * j, 1, n);
@@ -531,11 +555,11 @@ void p_maximal_order(mpq_mat_ptr D, mpz_poly_srcptr f,
 
         // Building the (n,n^2) matrix containing the integers mod p associated to all genereators of O
         generators_to_integers_mod_p(M, D, I, g, p);
-        printf("M is :\n"); mpz_mat_fprint(stdout, M); printf("\n");
+        //printf("M is :\n"); mpz_mat_fprint(stdout, M); printf("\n");
         
         // Computing Ker(M)
         mpz_mat_kernel(K_M, M, p);
-        printf("Ker(M) is :\n"); mpz_mat_fprint(stdout, K_M); printf("\n");
+        //printf("Ker(M) is :\n"); mpz_mat_fprint(stdout, K_M); printf("\n");
 
         // Getting generators of p*O' by computing HNF of the vertical block matrix (p*Id, K_M);
         join_HNF(J, K_M, p);
