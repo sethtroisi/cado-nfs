@@ -1439,7 +1439,20 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
     // Since each roots is listed several times under different forms (ex : if 1/1 is root, 2/2 is too, etc...)
     // we filter roots here to keep each root only once
     filter_roots(rootsp, p); 
-    printf("\n\n Filtering roots\n\n");
+    
+    // Testing if (1 : 0) is a root
+    cxx_mpz_t fd;
+    mpz_poly_getcoeff(fd,f->deg,f);
+    if(mpz_congruent_ui_p(fd,0,p)){
+        cxx_mpz_t a,b;
+        mpz_set_ui(a,1);
+        mpz_set_ui(b,0);
+        pair<cxx_mpz_t,cxx_mpz_t> new_elem;
+        new_elem = make_pair(a,b);
+        rootsp.push_back(new_elem);
+    }
+    
+    printf("Roots :\n");
     for(unsigned int i = 0 ; i < rootsp.size() ; i++){
         gmp_printf("(%Zd : %Zd)\n", rootsp[i].first, rootsp[i].second);
     }
@@ -1463,8 +1476,7 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
         
         
         
-        /*
-         * 
+        
         // Computing the valuation of ii on each prime ideal above p
         vector<int> vals;
         for(unsigned int j = 0 ; j < ideals.size(); j++){
@@ -1483,7 +1495,7 @@ void print_comments_for_badideals_above_p(mpq_mat_ptr order, mpz_poly_ptr f, vec
         if(indices.size() == 1){
             continue;
         }
-        */
+        
     }
 
 }
