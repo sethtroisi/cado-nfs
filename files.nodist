@@ -81,6 +81,7 @@ parameters/polynomials/rsa155.poly5
 parameters/polynomials/rsa180.poly
 parameters/polynomials/rsa190.poly
 parameters/polynomials/rsa704.poly
+parameters/polynomials/rsa768.poly
 parameters/polynomials/c60.poly
 parameters/polynomials/c65.poly
 parameters/polynomials/c70.poly
