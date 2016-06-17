@@ -59,6 +59,16 @@
 /* Increase num in the tuning */
 #define TUNE_NUM_SUBLATTICE 8
 
+/* Tuning parameter */
+#define TUNE_EARLY_ABORT 0
+
+#define TUNE_EARLY_ABORT_THR 2
+
+#define TUNE_BOUND_ON_UV_TRIALS 64
+
+#define TUNE_BOUND_ON_MOD_TRIALS 64
+
+
 /* mu and sigma in function exp_alpha() */
 #define MU 0.0
 #define SIGMA 0.824
