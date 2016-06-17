@@ -1153,7 +1153,7 @@ ropt_info_init ( ropt_info_t info )
   info->mode = 0;
   info->w = 0;
   info->ropt_time_stage1 = 0.0;
-  info->ropt_time_tunning = 0.0;
+  info->ropt_time_tuning = 0.0;
   info->ropt_time_stage2 = 0.0;
 }
 

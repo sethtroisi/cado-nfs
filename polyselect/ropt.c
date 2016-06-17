@@ -267,7 +267,7 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
 
   /* get time passed from info, use info to keep interface unchanged */
   eacht->ropt_time_stage1 = info->ropt_time_stage1;
-  eacht->ropt_time_tunning = info->ropt_time_tunning;
+  eacht->ropt_time_tuning = info->ropt_time_tuning;
   eacht->ropt_time_stage2 = info->ropt_time_stage2;
   
   /* free */

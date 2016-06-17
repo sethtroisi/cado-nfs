@@ -179,7 +179,7 @@ typedef struct {
   /* record quadratic rotation information */
   int w; 
   double ropt_time_stage1;
-  double ropt_time_tunning;
+  double ropt_time_tuning;
   double ropt_time_stage2;
 } _ropt_info_t;
 typedef _ropt_info_t ropt_info_t[1];

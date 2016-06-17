@@ -461,7 +461,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   t3 = seconds_thread () - t3;
 
   info->ropt_time_stage1 = t1;
-  info->ropt_time_tunning = t2;
+  info->ropt_time_tuning = t2;
   info->ropt_time_stage2 = t3;
 
   if (param->verbose >= 1) {

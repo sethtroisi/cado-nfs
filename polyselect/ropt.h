@@ -14,7 +14,7 @@ typedef struct
 {
   double ropt_time;
   double ropt_time_stage1;
-  double ropt_time_tunning;
+  double ropt_time_tuning;
   double ropt_time_stage2;
 } __ropt_time_struct;
 typedef __ropt_time_struct ropt_time_t[1];

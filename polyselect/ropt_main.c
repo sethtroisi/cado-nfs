@@ -373,7 +373,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id,
   cado_poly_init (ropt_poly);
   eacht->ropt_time = 0.0;
   eacht->ropt_time_stage1 = 0.0;
-  eacht->ropt_time_tunning = 0.0;
+  eacht->ropt_time_tuning = 0.0;
   eacht->ropt_time_stage2 = 0.0;
 
   if (nthreads > 1)
@@ -413,7 +413,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id,
   /* update time */
   tott->ropt_time += st1 - st;
   tott->ropt_time_stage1 += eacht->ropt_time_stage1;
-  tott->ropt_time_tunning += eacht->ropt_time_tunning;
+  tott->ropt_time_tuning += eacht->ropt_time_tuning;
   tott->ropt_time_stage2 += eacht->ropt_time_stage2;
   
   if (curr_MurphyE > best_MurphyE)
@@ -595,7 +595,7 @@ main_basic (int argc, char **argv)
   ropt_time_t tott;
   tott->ropt_time = 0.0;
   tott->ropt_time_stage1 = 0.0;
-  tott->ropt_time_tunning = 0.0;
+  tott->ropt_time_tuning = 0.0;
   tott->ropt_time_stage2 = 0.0;
 
   cado_poly_init (best_poly);
@@ -725,7 +725,7 @@ main_basic (int argc, char **argv)
   {
     printf ("# Stat: rootsieve took %.2fs\n", tott->ropt_time);
     printf ("# Stat:  (stage 1 took %.2fs)\n", tott->ropt_time_stage1);
-    printf ("# Stat:  (tunning took %.2fs)\n", tott->ropt_time_tunning);
+    printf ("# Stat:  (tuning took %.2fs)\n", tott->ropt_time_tuning);
     printf ("# Stat:  (stage 2 took %.2fs)\n", tott->ropt_time_stage2);
   }
   

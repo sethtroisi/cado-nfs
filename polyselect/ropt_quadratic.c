@@ -589,7 +589,7 @@ ropt_quadratic ( ropt_poly_t poly,
 
   /* nbest_sl is the number of sublattice to be finally root-sieved.
      Here we use some larger value since alpha_pqueue records more 
-     sublattices to be tunned */
+     sublattices to be tuned */
   new_alpha_pq (&alpha_pqueue, s1param->nbest_sl * TUNE_NUM_SUBLATTICE);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
 
@@ -611,7 +611,7 @@ ropt_quadratic ( ropt_poly_t poly,
   t3 = seconds_thread () - t3;
   
   info->ropt_time_stage1 = t1;
-  info->ropt_time_tunning = t2;
+  info->ropt_time_tuning = t2;
   info->ropt_time_stage2 = t3;
   
   if (param->verbose >= 2) {
