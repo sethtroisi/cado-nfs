@@ -120,6 +120,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (!fake) {
         if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
         mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
+        mmt_vec_reduce_mod_p(ymy[0]);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
@@ -150,6 +151,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         unsigned long g = pi->m->jrank * pi->m->ncores + pi->m->trank;
         gmp_randseed_ui(rstate, bw->seed + g);
         mmt_vec_set_random_inconsistent(ymy[0], rstate);
+        mmt_vec_truncate(mmt, ymy[0]);
         mmt_vec_allreduce(ymy[0]);
 #endif
         gmp_randclear(rstate);
@@ -360,7 +362,7 @@ int main(int argc, char * argv[])
 {
     param_list pl;
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
     parallelizing_info_init();
 
@@ -387,7 +389,7 @@ int main(int argc, char * argv[])
 
     parallelizing_info_finish();
     param_list_clear(pl);
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
     return 0;
 }

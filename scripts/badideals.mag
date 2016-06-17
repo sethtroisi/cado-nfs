@@ -767,10 +767,16 @@ function lift_root(lifting_info, k0, Q, vals)
              * some, it's going to lift higher. Find which ones.  */
          alive:=[i:i in [1..#vals] | newvals[i] ne vals[i]];
          if #alive eq 0 then
+         /* most often we have the following situation, but not always.
+          * See e.g. x^9 + 85*x^8 + 89770*x^7 + 593728275*x^6 +
+          * 283940743250*x^5 + 472456493155000*x^4 + 432131333316700000*x^3 +
+          * 430133520259178859375*x^2 + 187639110350099814765625*x +
+          * 163282249771063692092187500
          if not &and [lifting_info`inertia[i] eq 1: i in [1..#vals]|vals[i] ne 0] then
              worried:=true;
          end if;
-             Append(~dead_branches_reports, <p, k, NormalizeProjectiveElement([u,v], p^k), vals>);
+          */
+             Append(~dead_branches_reports, <p, k, NormalizeProjectiveElement([u,v], p^k), [Integers()| vals[j]*lifting_info`inertia[j]:j in [1..#vals]]>);
          else
              Append(~live_branches, <nQ, newvals>);
          end if;
@@ -783,12 +789,13 @@ function lift_root(lifting_info, k0, Q, vals)
          end for;
          return [<p, k0, NormalizeProjectiveElement(Q, p^k0), vv>];
      else
-         /* I think that we may *really* have a problem here, maybe from
-          * degree 8 on. */
+         /* This is the case which makes important the multiplication by the
+          * inertia degree in dead_branches_reports above !
          if worried then
              print "XXX", vals, lifting_info`inertia;
          end if;
-         assert not worried;
+         // assert not worried;
+          */
          return dead_branches_reports cat &cat [
              lift_root(lifting_info, k, Q, v)
              where Q,v is Explode(Qv)

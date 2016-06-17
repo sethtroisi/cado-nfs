@@ -231,7 +231,7 @@ ropt ( ropt_poly_t poly,
  */
 void
 ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
-                 ropt_param_t param)
+                 ropt_param_t param, ropt_time_t eacht)
 {
   int i;
   ropt_poly_t poly;
@@ -265,6 +265,11 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
   mpz_poly_cleandeg (output_poly->pols[ALG_SIDE], input_poly->pols[ALG_SIDE]->deg);
   mpz_set (output_poly->n, input_poly->n);
 
+  /* get time passed from info, use info to keep interface unchanged */
+  eacht->ropt_time_stage1 = info->ropt_time_stage1;
+  eacht->ropt_time_tuning = info->ropt_time_tuning;
+  eacht->ropt_time_stage2 = info->ropt_time_stage2;
+  
   /* free */
   ropt_bestpoly_free (bestpoly, poly->d);
   ropt_info_free (info);

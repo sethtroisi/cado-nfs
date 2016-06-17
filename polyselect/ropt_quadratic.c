@@ -575,7 +575,7 @@ ropt_quadratic ( ropt_poly_t poly,
                  ropt_param_t param,
                  ropt_info_t info )
 {
-  unsigned long t1, t2, t3;
+  double t1, t2, t3;
   ropt_bound_t bound;
   ropt_s1param_t s1param;
   alpha_pq *alpha_pqueue;
@@ -589,31 +589,35 @@ ropt_quadratic ( ropt_poly_t poly,
 
   /* nbest_sl is the number of sublattice to be finally root-sieved.
      Here we use some larger value since alpha_pqueue records more 
-     sublattices to be tunned */
+     sublattices to be tuned */
   new_alpha_pq (&alpha_pqueue, s1param->nbest_sl * TUNE_NUM_SUBLATTICE);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
 
   /* Step 1: find good sublattice */
-  t1 = milliseconds ();
+  t1 = seconds_thread ();
   ropt_quadratic_stage1 (poly, bound, s1param, param, alpha_pqueue);
-  t1 = milliseconds () - t1;
+  t1 = seconds_thread () - t1;
   
   /* Step 2: rank/tune above found sublattices by short sieving */
-  t2 = milliseconds ();
+  t2 = seconds_thread ();
   ropt_quadratic_tune (poly, bound, s1param, param, info, alpha_pqueue,
                        global_E_pqueue);
-  t2 = milliseconds () - t2;
+  t2 = seconds_thread () - t2;
   
   /* Step 3, root sieve */
-  t3 = milliseconds ();
+  t3 = seconds_thread ();
   ropt_quadratic_sieve (poly, bound, s1param, param, info, alpha_pqueue,
                         global_E_pqueue);
-  t3 = milliseconds () - t3;
+  t3 = seconds_thread () - t3;
+  
+  info->ropt_time_stage1 = t1;
+  info->ropt_time_tuning = t2;
+  info->ropt_time_stage2 = t3;
   
   if (param->verbose >= 2) {
-    fprintf ( stderr, "# Stat: tot (stage 1) took %lums\n", t1 );
-    fprintf ( stderr, "# Stat: tot (tuning ) took %lums\n", t2 );
-    fprintf ( stderr, "# Stat: tot (stage 2) took %lums\n", t3 );
+    fprintf ( stderr, "# Stat: this polynomial (stage 1) took %.2fs\n", t1 );
+    fprintf ( stderr, "# Stat: this polynomial (tuning ) took %.2fs\n", t2 );
+    fprintf ( stderr, "# Stat: this polynomial (stage 2) took %.2fs\n", t3 );
   }
 
   /* Step 4, return best poly */
