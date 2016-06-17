@@ -726,7 +726,7 @@ main_basic (int argc, char **argv)
     printf ("# Stat: rootsieve took %.2fs\n", tott->ropt_time);
     printf ("# Stat:  (stage 1 took %.2fs)\n", tott->ropt_time_stage1);
     printf ("# Stat:  (tuning took %.2fs)\n", tott->ropt_time_tuning);
-    printf ("# Stat:  (stage 2 took %.2fs)\n", tott->ropt_time_stage2);
+    printf ("# Stat:  (stage 2 (sieving) took %.2fs)\n", tott->ropt_time_stage2);
   }
   
   if (best_MurphyE == 0.0)
