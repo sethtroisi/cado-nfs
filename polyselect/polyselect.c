@@ -67,6 +67,7 @@ double *best_opt_logmu, *best_exp_E;
 double optimize_time = 0.0;
 mpz_t admin, admax;
 int tries = 0;
+double target_E = 0.0; /* target E-value, 0.0 if not given */
 
 static void
 mutex_lock(pthread_mutex_t *lock)
@@ -139,6 +140,20 @@ check_parameters (mpz_t m0, double q)
   return pow ((double) Primes[lenPrimes - 1], 4.0) * q < mpz_get_d (m0);
 }
 
+/* given a distribution with mean m and variance v, estimate the parameters
+   beta and eta from a matching Weibull distribution:
+   m = eta * gamma (1 + 1/beta)
+   v = eta^2 * [gamma (1 + 2/beta) - gamma (1 + 1/beta)^2] */
+static void
+estimate_weibull (double *beta, double *eta, double m, double v)
+{
+  double y = sqrt (v) / m;
+
+  y = y * (0.7796968012336761 + y * (0.61970313728462 + 0.0562963108244 * y));
+  *beta = 1.0 / y;
+  *eta = m * (1.0 + y * (0.57721566490153 - 0.655878071520 * y));
+}
+
 /* print poly info */
 void
 print_poly_info ( char *buf,
@@ -163,30 +178,36 @@ print_poly_info ( char *buf,
   else
     sprintf (buf, "# Size-optimized polynomial:\n");
 
-  //gmp_printf ("%sn: %Zd\n", prefix, n);
   gmp_sprintf (buf+strlen(buf), "%sn: %Zd\n", prefix, n);
-  //gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   gmp_sprintf (buf+strlen(buf), "%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
-    //gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
     gmp_sprintf (buf+strlen(buf), "%sc%u: %Zd\n", prefix, i, f[i]);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
-  // exp_E = ropt_bound_expected_E (F, G);
   exp_E = logmu + expected_rotation_gain (F, G);
   if (raw == 1)
-    //printf ("# raw exp_E");
     sprintf (buf+strlen(buf), "# raw exp_E");
   else
-    //printf ("# exp_E");
     sprintf (buf+strlen(buf), "# exp_E");
 
-  //printf (" %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
-  // exp_E, logmu, skew, nroots);
   sprintf (buf+strlen(buf), " %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
            exp_E, logmu, skew, nroots);
+
+  if (!raw_option && target_E != 0.0)
+    {
+      double beta, eta, m, prob;
+
+      m = aver_exp_E / collisions_good;
+      estimate_weibull (&beta, &eta, m, var_exp_E / collisions_good - m * m);
+      prob = 1.0 - exp (- pow (target_E / eta, beta));
+      sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
+               " (beta=%.2f,eta=%.2f)\n",
+               target_E, 1.0 / prob, seconds () / (prob * collisions_good),
+               beta, eta);
+    }
+
   if (!raw_option)
     sprintf (buf+strlen(buf), "\n");
 }
@@ -1821,6 +1842,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   param_list_decl_usage(pl, "v", "(switch) verbose mode");
   param_list_decl_usage(pl, "q", "(switch) quiet mode");
+  param_list_decl_usage(pl, "target_E", "target E-value\n");
   verbose_decl_usage(pl);
 }
 
@@ -1931,6 +1953,7 @@ main (int argc, char *argv[])
 
   param_list_parse_ulong (pl, "incr", &incr);
   param_list_parse_double (pl, "maxtime", &maxtime);
+  param_list_parse_double (pl, "target_E", &target_E);
   out = param_list_lookup_string (pl, "out");
 
   if (param_list_warn_unused(pl))
