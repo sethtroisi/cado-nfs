@@ -47,7 +47,7 @@ ropt_linear_tune ( ropt_poly_t poly,
   mpz_init (old_mod);
 
   ropt_s2param_init (poly, s2param);
-  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE/2);
+  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE/4);
 
   /* Step 1: test sieve on alpha_pqueue */
   used = alpha_pqueue->used - 1;
