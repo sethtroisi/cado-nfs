@@ -13,7 +13,10 @@
 # lpb without changing wdir, you'll have to remove those cache-files
 # first in wdir.
 #
-# WARNING: this works only if we sieve only on one side.
+# If two-sided sieving is wanted, put comma-separated sides and qmax in
+# the corresponding variables, for instance:
+#   sqside=0,1
+#   qmax=500000000,600000000
 
 if [ $# != 1 ]; then
     echo "Usage: $0 <polyfile>"
@@ -44,7 +47,7 @@ fi
 if [ -z ${wdir+x} ]; then
     wdir=`mktemp -d /tmp/est_mat.XXXXXXX`;
 else
-    mkdir -p $wdir || (echo "mkdir -p $wdir failed" && exit 1)
+    mkdir -p $wdir || (echo "mkdir -p $wdir failed"; false) || exit 1
 fi
 echo "Working directory is $wdir"
 
@@ -68,39 +71,72 @@ if [ ! -e $renumberfile ]; then
       -out /dev/null -pmax 1 -lpb0 $lpb0 -lpb1 $lpb1 -t 2
 fi
 
-## split the qrange into 5 chunks
-NCHUNKS=5
-if [ $sqside == "0" ]; then
-    qmin=$lim0
-    qqmax=`echo "2 ^ $lpb0" | bc`
-else
-    qmin=$lim1
-    qqmax=`echo "2 ^ $lpb1" | bc`
+## How many sides to sieve?
+# convert sqside and qmax to arrays
+IFS=',' read -ra array <<< "$sqside"
+sqside=(${array[@]})
+IFS=',' read -ra array <<< "$qmax"
+qmax=(${array[@]})
+
+nsides=${#sqside[@]}
+qmin=()
+echo "We sieve on $nsides sides."
+if [ ${#sqside[@]} != ${#qmax[@]} ]; then
+    echo "For multi-side sieving, length of sqside and qmax arrays must agree"
+    exit 1;
 fi
-if [ $qqmax -le $qmax ]; then
-    echo "qmax should be less then lpb"
+for i in `seq 0 $((nsides-1))`; do
+    side=${sqside[$i]}
+    qm=${qmax[$i]}
+    lpb=lpb$side
+    qqmax=`echo "2 ^ ${!lpb}" | bc`
+    if [ $qqmax -le $qm ]; then
+        echo "Error on side $side: qmax should be less then lpb"
+        exit 1
+    fi
+    lim=lim$side
+    qmin+=(${!lim})
+    echo "  Side $side: qmin=${!lim} qmax=$qm"
+done
+
+## Sampling / faking on each side
+NCHUNKS=5
+NBSAMPLE=20
+fakefiles=()
+if [ $nsides == 1 ]; then
+    dupqmax="0,0"
+elif [ $nsides == 2 ]; then
+    dupqmax="${qmax[0]},${qmax[1]}"
+else
+    echo "Can't deal with more than 2 sides yet."
     exit 1
 fi
-qrange=$(((qmax-qmin)/NCHUNKS))
+for i in `seq 0 $((nsides-1))`; do
+    side=${sqside[$i]}
+    echo "******************************"
+    echo "Dealing with side $side..."
+    qmax=${qmax[$i]}
+    qmin=${qmin[$i]}
+    qrange=$(((qmax-qmin)/NCHUNKS))
 
-## sample with real sieving and build fake rels
-NBSAMPLE=50
-fakefiles=()
-for i in `seq 1 $NCHUNKS`; do
-    q0=$((qmin + (i-1)*qrange))
-    q1=$((qmin + i*qrange))
-    echo "Dealing with qrange=[$q0,$q1]"
-    echo "  Sampling..."
-    $CADO_BUILD/sieve/las -I $I -poly $polyfile -q0 $q0 -q1 $q1 \
-      -lim0 $lim0 -lim1 $lim1 -lpb0 $lpb0 -lpb1 $lpb1 -sqside $sqside \
-      -mfb0 $mfb0 -mfb1 $mfb1 \
-      -fb0 $rootfile0 -fb1 $rootfile1 -random-sample $NBSAMPLE \
-      -t 1 -dup > $wdir/sample.${q0}-${q1}
-    echo "  Building fake relations..."
-    $CADO_BUILD/sieve/fake_rels -poly $polyfile -lpb0 $lpb0 -lpb1 $lpb1 \
-      -q0 $q0 -q1 $q1 -sqside $sqside -sample $wdir/sample.${q0}-${q1} \
-      -renumber $renumberfile > $wdir/fakerels.${q0}-${q1}
-    fakefiles+=("$wdir/fakerels.${q0}-${q1}")
+    ## sample with real sieving and build fake rels
+    for i in `seq 1 $NCHUNKS`; do
+        q0=$((qmin + (i-1)*qrange))
+        q1=$((qmin + i*qrange))
+        echo "Dealing with qrange=[$q0,$q1]"
+        echo "  Sampling..."
+        $CADO_BUILD/sieve/las -I $I -poly $polyfile -q0 $q0 -q1 $q1 \
+          -lim0 $lim0 -lim1 $lim1 -lpb0 $lpb0 -lpb1 $lpb1 -sqside $side \
+          -mfb0 $mfb0 -mfb1 $mfb1 \
+          -fb0 $rootfile0 -fb1 $rootfile1 -random-sample $NBSAMPLE \
+          -t 1 -dup -dup-qmax $dupqmax > $wdir/sample.side${side}.${q0}-${q1}
+        echo "  Building fake relations..."
+        $CADO_BUILD/sieve/fake_rels -poly $polyfile -lpb0 $lpb0 -lpb1 $lpb1 \
+          -q0 $q0 -q1 $q1 -sqside $side \
+          -sample $wdir/sample.side${side}.${q0}-${q1} \
+          -renumber $renumberfile > $wdir/fakerels.side${side}.${q0}-${q1}
+        fakefiles+=("$wdir/fakerels.side${side}.${q0}-${q1}")
+    done
 done
 nrels=`cat ${fakefiles[@]} | grep -v "^#" | wc -l`
 echo "We have $nrels fake relations"

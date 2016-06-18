@@ -104,6 +104,7 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
   new_si->cpoly = cpoly; /* A pointer, and polynomial not get modified */
 
   memmove(new_si->conf, conf, sizeof(new_si->conf));
+  new_si->conf->side = sq_side;
 
   /* Allocate memory */
   sieve_info_init_norm_data(new_si);
@@ -120,14 +121,14 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
 
 
 static sieve_info_ptr
-fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_t b,
-                           sieve_info_srcptr old_si)
+fill_in_sieve_info_from_si(const unsigned long p, int side,
+        const int64_t a, const uint64_t b, sieve_info_srcptr old_si)
 {
   mpz_t sq, rho;
   mpz_init_set_ui(sq, p);
   mpz_init(rho);
   compute_a_over_b_mod_p(rho, a, b, sq);
-  return fill_in_sieve_info(sq, rho, old_si->doing->side, old_si->I, old_si->J,
+  return fill_in_sieve_info(sq, rho, side, old_si->I, old_si->J,
                             old_si->strategies, old_si->cpoly, old_si->conf);
   mpz_clear(sq);
   mpz_clear(rho);
@@ -279,7 +280,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   // si = get_sieve_info_from_config(las, sc, pl);
   /* Create a dummy sieve_info struct with just enough info to let us use
      the lattice-reduction and coordinate-conversion functions */
-  si = fill_in_sieve_info_from_si (sq, rel.a, rel.b, old_si);
+  si = fill_in_sieve_info_from_si (sq, sq_side, rel.a, rel.b, old_si);
   const unsigned long r = mpz_get_ui(si->doing->r);
 
   const uint32_t oldI = si->I, oldJ = si->J;
@@ -381,28 +382,28 @@ clear_and_exit:
 }
 
 
-/* Return whether a given prime that divides the relation on a given side is
-   a special-q-sieved prime. This currently tests simply that the side is the
-   same as the "doing" side in the sieve_info (FIXME for sieving both sides),
-   and that the prime is greater than the factor base bound. */
+/* This function decides whether the given (sq,side) was previously
+ * sieved (compared to the current sq stored in si->doing).
+ * This takes qmax into account.
+ */
 static int
-sq_is_sieved(const unsigned long sq, int side, sieve_info_srcptr si)
-{
-  return side == si->doing->side && sq > si->conf->sides[side]->lim;
-}
-
-/* Return ordering between the special-q "sq" on side "side" and the special-q
-   specified in si->doing: -1 if (sq,side) is earlier, 0 if they are identical,
-   and 1 if (sq, side) is later */
-static int
-sq_cmp(const unsigned long sq, const int side, sieve_info_srcptr si)
-{
-  /* We assume sq are sieved in lexicographical ordering of (sq, side) */
-  int cmp = -mpz_cmp_ui(si->doing->p, sq); /* negate because of swapped
-                                              operands */
-  if (cmp == 0)
-    cmp = (side < si->doing->side) ? -1 : (side == si->doing->side) ? 0 : 1;
-  return cmp;
+sq_was_previously_sieved(const unsigned long sq, int side, sieve_info_srcptr si){
+  if (side == si->doing->side) {
+    int cmp = mpz_cmp_ui(si->doing->p, sq);
+    if (cmp <= 0)
+      return 0;
+    return (sq > si->conf->sides[side]->lim);
+  } else {
+    // Did we sieve other sides?
+    ASSERT_ALWAYS(si->conf->sides[side]->qmax != 0);
+    if (si->conf->sides[side]->qmax == 0)
+      return 0;
+    // Is q smaller than current, and within the bounds for this side?
+    int cmp = mpz_cmp_ui(si->doing->p, sq);
+    if (cmp <= 0)
+      return 0;
+    return (sq > si->conf->sides[side]->lim && sq < si->conf->sides[side]->qmax);
+  }
 }
 
 /* For one special-q identified by (sq, side) (the root r is given
@@ -423,7 +424,7 @@ check_one_prime(mpz_srcptr zsq, const int side,
   }
   unsigned long sq = mpz_get_ui(zsq);
   int is_dupe = 0;
-  if (sq_is_sieved(sq, side, si) && sq_cmp(sq, side, si) < 0) {
+  if (sq_was_previously_sieved(sq, side, si)) {
     is_dupe = sq_finds_relation(sq, side, rel, nb_threads, si);
     if (verbose) {
       verbose_output_print(0, 1, "# DUPECHECK relation is probably%s a dupe\n",

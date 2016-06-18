@@ -914,6 +914,11 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
                         &sc->sides[side]->ncurves))
                 sc->sides[side]->ncurves = -1;
 
+        long dupqmax[2] = {0, 0};
+        param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
+        sc->sides[0]->qmax = dupqmax[0];
+        sc->sides[1]->qmax = dupqmax[1];
+
         if (complete)
             las->default_config = sc;
     }
@@ -2747,6 +2752,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
   param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+  param_list_decl_usage(pl, "dup-qmax", "limits of q-sieving for 2-sided duplicate removal");
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");
