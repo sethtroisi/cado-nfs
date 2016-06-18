@@ -40,6 +40,7 @@ struct siever_config_s {
         int mfb;           /* bound for residuals is 2^mfbr */
         int ncurves;       /* number of cofactorization curves */
         double lambda;     /* lambda sieve parameter */
+        unsigned long qmax; /* largest q sieved on this side, for dup sup */
     } sides[2][1];
 };
 typedef struct siever_config_s siever_config[1];
