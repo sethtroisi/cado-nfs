@@ -31,7 +31,11 @@ ropt_linear_tune ( ropt_poly_t poly,
   mpz_t u, tmpu, v, mod, old_mod;
   ropt_s2param_t s2param;
   alpha_pq *tmp_alpha_pqueue;
-
+#if TUNE_EARLY_ABORT
+  double ave_E, ave_bestE, new_ave_E, new_ave_bestE;
+  int acc;
+#endif  
+  
 #ifdef ROPT_LINEAR_TUNE_HARDER
   int k;
 #endif
@@ -43,7 +47,7 @@ ropt_linear_tune ( ropt_poly_t poly,
   mpz_init (old_mod);
 
   ropt_s2param_init (poly, s2param);
-  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl);
+  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE/2);
 
   /* Step 1: test sieve on alpha_pqueue */
   used = alpha_pqueue->used - 1;
@@ -68,9 +72,18 @@ ropt_linear_tune ( ropt_poly_t poly,
     /* detect positive good u (may also detect good mod with more time) */
     mpz_set (tmpu, u);
     j = 0;
+#if TUNE_EARLY_ABORT
+    ave_E = 0.0;
+    ave_bestE = 0.0;
+    new_ave_E = 0.0;
+    new_ave_bestE = 0.0;
+    acc = 0;
+#endif
+    
     while (mpz_cmp_si(tmpu, bound->global_u_boundr) <= 0) {
-
-      if (j > 32) break;
+      
+      if (j > TUNE_BOUND_ON_UV_TRIALS)
+        break;
 
 #ifdef ROPT_LINEAR_TUNE_HARDER /* slow tuning process */
       k = 0;
@@ -125,15 +138,36 @@ ropt_linear_tune ( ropt_poly_t poly,
 #endif
 
       mpz_add (tmpu, tmpu, mod); // consider original u itself.
+#if TUNE_EARLY_ABORT
+      new_ave_E = ave_E + info->ave_MurphyE;
+      new_ave_bestE = ave_bestE + info->best_MurphyE;
+      if (j>0) {
+        if ((ave_E/j>new_ave_E/(j+1)) && (ave_bestE/j > new_ave_bestE/(j+1))) {
+          acc ++;
+          if (acc >= TUNE_EARLY_ABORT_THR)
+            break;
+        }
+      }
+      ave_E = new_ave_E;
+      ave_bestE = new_ave_bestE;
+#endif      
       j ++;
     }
 
     /* detect negative good u */
     mpz_set (tmpu, u);
     j = 0;
+#if TUNE_EARLY_ABORT
+    ave_E = 0.0;
+    ave_bestE = 0.0;
+    new_ave_E = 0.0;
+    new_ave_bestE = 0.0;
+    acc = 0;
+#endif
+
     while (mpz_cmp_si (tmpu, bound->global_u_boundl) > 0) {
 
-      if (j >= 32)
+      if (j > TUNE_BOUND_ON_UV_TRIALS)
         break;
       mpz_sub (tmpu, tmpu, mod);
 
@@ -188,6 +222,20 @@ ropt_linear_tune ( ropt_poly_t poly,
       }
 
 #endif
+
+#if TUNE_EARLY_ABORT
+      new_ave_E = ave_E + info->ave_MurphyE;
+      new_ave_bestE = ave_bestE + info->best_MurphyE;
+      if (j>0) {
+        if ((ave_E/j>new_ave_E/(j+1)) && (ave_bestE/j > new_ave_bestE/(j+1))) {
+          acc ++;
+          if (acc >= TUNE_EARLY_ABORT_THR)
+            break;
+        }
+      }
+      ave_E = new_ave_E;
+      ave_bestE = new_ave_bestE;
+#endif      
 
       j ++;
 
@@ -439,7 +487,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   ropt_bound_setup (poly, bound, param);
   ropt_s1param_init (s1param);
   ropt_s1param_setup (poly, s1param, bound, param);
-  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl);
+  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
 
   /* Step 1:, find good sublattices */
@@ -483,6 +531,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
 
 /**
  * Linear rotation: deg 4.
+ * No tuning at all.
  */
 void
 ropt_linear_deg34 ( ropt_poly_t poly,

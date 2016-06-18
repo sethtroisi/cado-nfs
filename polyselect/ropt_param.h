@@ -63,7 +63,7 @@
    ------------------------- */
 
 /* Increase num in the tuning */
-#define TUNE_NUM_SUBLATTICE 8
+#define TUNE_NUM_SUBLATTICE 32
 
 /* Similar to above, but in tune mode */
 #define TUNE_NUM_TOPALPHA_SIEVEARRAY 4
