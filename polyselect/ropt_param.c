@@ -77,7 +77,7 @@ s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
  */
 const unsigned int
 s1_size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES] = {
-  8,  8,  4,  4,  4,  2,  2,  2,  2
+  16,  8,  8,  4,  4,  2,  2,  2,  2
 };
 
 
