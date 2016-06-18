@@ -492,8 +492,11 @@ ropt_linear_deg5 ( ropt_poly_t poly,
 
   /* Step 1:, find good sublattices */
   t1 = seconds_thread ();
+  int old_nbest_sl = s1param->nbest_sl;
+  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE;
   r = ropt_stage1 (poly, bound, s1param, param, alpha_pqueue, 0);
   t1 = seconds_thread () - t1;
+  s1param->nbest_sl = old_nbest_sl;
   if (r == -1) return;
   
   /* Step 2: rank/tune above found sublattices by short sieving */
