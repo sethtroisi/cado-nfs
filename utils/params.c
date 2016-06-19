@@ -112,7 +112,8 @@ void param_list_usage_header(param_list pl, const char * hdr, ...)
 {
     va_list ap;
     va_start(ap, hdr);
-    vasprintf(&(pl->usage_hdr), hdr, ap);
+    int rc = vasprintf(&(pl->usage_hdr), hdr, ap);
+    ASSERT_ALWAYS(rc >= 0);
     va_end(ap);
 }
 

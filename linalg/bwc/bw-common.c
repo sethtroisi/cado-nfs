@@ -300,12 +300,14 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
     int prov;
     MPI_Init_thread(p_argc, p_argv, req, &prov);
     if (req != prov) {
-        asprintf(&mpiinit_diag, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
+        int rc = asprintf(&mpiinit_diag, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
                 " got %d != req %d\n"
                 "Proceeding anyway\n",
                 prov, req);
+        ASSERT_ALWAYS(rc >= 0);
     } else {
-        asprintf(&mpiinit_diag, "Successfully initialized MPI with MPI_THREAD_SERIALIZED\n");
+        int rc = asprintf(&mpiinit_diag, "Successfully initialized MPI with MPI_THREAD_SERIALIZED\n");
+        ASSERT_ALWAYS(rc >= 0);
     }
     // MPI_Init(p_argc, p_argv);
 #endif
